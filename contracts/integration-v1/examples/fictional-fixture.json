@@ -1,0 +1,69 @@
+{
+  "kind": "fictional-fixture",
+  "description": "Invented identifiers, board, channels, bytecode and evidence. This example is not a deployable program, real pinout, test result or physical proof.",
+  "boardProfile": {
+    "schema": "GhostFlow/board-profile-v1",
+    "id": "fixture-board-profile",
+    "revision": "fixture-r1",
+    "boardModel": "FICTIONAL-RELAY-BOARD",
+    "endpoints": {
+      "relay.1": { "direction": "output", "type": "Bool", "driver": "fixture-relay-expander", "address": "fixture-bus/fixture-address/channel-0", "activeLevel": "high", "safeLevel": 0 },
+      "relay.2": { "direction": "output", "type": "Bool", "driver": "fixture-relay-expander", "address": "fixture-bus/fixture-address/channel-1", "activeLevel": "low", "safeLevel": 1 },
+      "input.1": { "direction": "input", "type": "Bool", "driver": "fixture-input-driver", "address": "fixture-input/channel-0", "activeLevel": "high", "safeLevel": 0 }
+    }
+  },
+  "installation": {
+    "schema": "GhostFlow/installation-mapping-v1",
+    "id": "fixture-site",
+    "revision": "fixture-r1",
+    "boardProfile": { "id": "fixture-board-profile", "revision": "fixture-r1", "sha256": "b39377481e7f0727940caca573f143de28e503e172b4bb9ec3256794d26d89fe" },
+    "bindings": { "pump": "relay.1", "valveA": "relay.2", "start": "input.1" }
+  },
+  "release": {
+    "schema": "GhostFlow/integration-release-v1",
+    "toolchain": { "version": "fixture-toolchain-v1", "sha256": "1111111111111111111111111111111111111111111111111111111111111111" },
+    "runtimeSemanticsVersion": "fixture-semantics-v1",
+    "bytecodeFormat": "fixture-bytecode-v1",
+    "protocolVersion": "fixture-protocol-v1",
+    "device": {
+      "firmwareSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "boardProfile": { "id": "fixture-board-profile", "revision": "fixture-r1", "sha256": "b39377481e7f0727940caca573f143de28e503e172b4bb9ec3256794d26d89fe" }
+    },
+    "installation": { "id": "fixture-site", "revision": "fixture-r1", "sha256": "90ec13633fbf4a03d0f9c5a828c34a8f1a7ba2e059d0e85b68dc9b9c999df948" }
+  },
+  "artifacts": {
+    "source": "FICTIONAL SOURCE — not compilable.\n",
+    "moduleHex": "4649585455524500",
+    "manifest": {
+      "format": "fictional-manifest-v1",
+      "bytecodeSha256": "3329012b7ed5a700a7b2eef5a3fd924471f3248e235d8d0843da68691c2c56c9",
+      "inputs": [{ "name": "start", "type": "Bool" }],
+      "outputs": [{ "name": "pump", "type": "Bool" }, { "name": "valveA", "type": "Bool" }]
+    }
+  },
+  "runEvidence": {
+    "schema": "GhostFlow/integration-run-v1",
+    "kind": "fictional-fixture",
+    "releaseSha256": "b91c6c569fd1eab4786fc408df7a417dfe10b411a8e10776235d941055847437",
+    "startedAt": "2000-01-01T00:00:00.000Z",
+    "finishedAt": "2000-01-01T00:00:02.000Z",
+    "artifacts": { "sourceSha256": "b88a5fff00391fd05ccd4a191e0b47f8fdc0070f660ede1fec79f5e9095491b8", "moduleSha256": "3329012b7ed5a700a7b2eef5a3fd924471f3248e235d8d0843da68691c2c56c9", "manifestSha256": "80ba38614fe616fc09b9054fcb66aab2f4335a374a2bb59ccc235bc2a87834e8" },
+    "device": {
+      "bootId": "fixture-boot-not-a-device",
+      "observedAt": "2000-01-01T00:00:01.000Z",
+      "firmwareSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "boardProfile": { "id": "fixture-board-profile", "revision": "fixture-r1", "sha256": "b39377481e7f0727940caca573f143de28e503e172b4bb9ec3256794d26d89fe" },
+      "installation": { "id": "fixture-site", "revision": "fixture-r1", "sha256": "90ec13633fbf4a03d0f9c5a828c34a8f1a7ba2e059d0e85b68dc9b9c999df948" },
+      "runtimeSemanticsVersion": "fixture-semantics-v1",
+      "bytecodeFormat": "fixture-bytecode-v1",
+      "protocolVersion": "fixture-protocol-v1",
+      "sourceSha256": "b88a5fff00391fd05ccd4a191e0b47f8fdc0070f660ede1fec79f5e9095491b8",
+      "moduleSha256": "3329012b7ed5a700a7b2eef5a3fd924471f3248e235d8d0843da68691c2c56c9"
+    },
+    "gates": {
+      "host": { "status": "pass", "source": { "type": "injected-fixture", "reference": "fixture://host-record" }, "scope": "Invented host test result for schema demonstration." },
+      "hardware": { "status": "pass", "source": { "type": "register-readback", "reference": "fixture://register-record" }, "scope": "Invented register observation; demonstrates identity association only." },
+      "physical": { "status": "unknown", "source": { "type": "none", "reference": null }, "scope": "No electrical or installed-load result exists in this fictional example." }
+    }
+  }
+}

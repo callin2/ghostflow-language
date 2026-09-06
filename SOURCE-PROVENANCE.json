@@ -1,0 +1,536 @@
+{
+  "schema": "GhostFlow/source-extraction-v1",
+  "project": "ghostflow-language",
+  "extractedAt": "2026-09-06T08:49:45.652Z",
+  "sourceRootAlias": "current",
+  "referenceRevision": null,
+  "snapshotPolicy": "selected-working-tree-by-file-hash-not-clean-commit",
+  "snapshotSha256": "b0d6a4c7b7e16e800ae759b7938bbd82a01f5c5df274091430e8c59a5ec82720",
+  "files": [
+    {
+      "path": ".gitignore",
+      "executable": false,
+      "origin": "migration-overlay",
+      "sourcePath": "project-layout/ghostflow-language/.gitignore",
+      "sha256": "eaa1a4377122c71ef0feb3a83c297273686450d977de1a6ab55419ef65737d7b"
+    },
+    {
+      "path": "AGENTS.md",
+      "executable": false,
+      "origin": "migration-overlay",
+      "sourcePath": "project-layout/ghostflow-language/AGENTS.md",
+      "sha256": "4e573943137c7a44514f12816bb1131d629332c10f119882d69c8921fb1f8750"
+    },
+    {
+      "path": "Cargo.lock",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "Cargo.lock",
+      "sha256": "c8797fd72d027be74f9ded85531f57326068cea000895c1d0509cc4fbe41de70"
+    },
+    {
+      "path": "Cargo.toml",
+      "executable": false,
+      "origin": "migration-overlay",
+      "sourcePath": "project-layout/ghostflow-language/Cargo.toml",
+      "sha256": "9a1e536a347de0e2f9d3206ef532243e5a4d02c50555d7580857c6c4615f6234"
+    },
+    {
+      "path": "contracts/integration-v1/examples/fictional-fixture.json",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "contracts/integration-v1/examples/fictional-fixture.json",
+      "sha256": "d41c6ee597767393ed470466a6f614855639c6c67216081257c7e142d515356b"
+    },
+    {
+      "path": "contracts/integration-v1/README.md",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "contracts/integration-v1/README.md",
+      "sha256": "2b6915116de0e5058fbec4d2937c49aadd6daa30b4b44228325cf3aaac69d594"
+    },
+    {
+      "path": "crates/ghostflow-core/Cargo.toml",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "crates/ghostflow-core/Cargo.toml",
+      "sha256": "8769fbc9be84f878a9aff5c9665319d015b4713395bc9b351c4088add409c648"
+    },
+    {
+      "path": "crates/ghostflow-core/examples/resource_report.rs",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "crates/ghostflow-core/examples/resource_report.rs",
+      "sha256": "ca908e8e0eecd5761e1e53a978b8925196fa6c9451ab92440affafa2aa812d9e"
+    },
+    {
+      "path": "crates/ghostflow-core/examples/run.rs",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "crates/ghostflow-core/examples/run.rs",
+      "sha256": "9dbaab5ceb2f3e3827b36e42260c94757d8a967c6a7a135084e45c8a9e65082d"
+    },
+    {
+      "path": "crates/ghostflow-core/src/lib.rs",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "crates/ghostflow-core/src/lib.rs",
+      "sha256": "d571390edb547833d2893d947242c46fabe630443dab1ad22e009b7dd952a906"
+    },
+    {
+      "path": "crates/ghostflow-core/src/signals.rs",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "crates/ghostflow-core/src/signals.rs",
+      "sha256": "b8702c292638469222ce16c581da988cc6541dc69fa37e54737e9ce7a15b370b"
+    },
+    {
+      "path": "crates/ghostflow-core/src/station.rs",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "crates/ghostflow-core/src/station.rs",
+      "sha256": "55818dc7e34b787b563729394494f6b93588c240f2b6be2593333c4f2886696d"
+    },
+    {
+      "path": "docs/BYTECODE.md",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "docs/BYTECODE.md",
+      "sha256": "de24067eef38a5ea763cbdf2be8606bdd9b76111e1e9f9a69278df753dc39fdb"
+    },
+    {
+      "path": "docs/CONSTRAINTS.md",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "docs/CONSTRAINTS.md",
+      "sha256": "a0295934823be563a8e7387da8ebaa0a8637c2c13be82e49a66eb9af8840b40b"
+    },
+    {
+      "path": "docs/DESIGN-NOTES.md",
+      "executable": false,
+      "origin": "migration-overlay",
+      "sourcePath": "project-layout/ghostflow-language/docs/DESIGN-NOTES.md",
+      "sha256": "1576c22db22edbdfd7824edaab350479bb75db3ae517cbbc8220aecfad57d6cf"
+    },
+    {
+      "path": "docs/IMPLEMENTATION.md",
+      "executable": false,
+      "origin": "migration-overlay",
+      "sourcePath": "project-layout/ghostflow-language/docs/IMPLEMENTATION.md",
+      "sha256": "e5c74796fd24b02be233943808d3926cc828b6e9ae8add473c6a570576319235"
+    },
+    {
+      "path": "docs/LANGUAGE-EXAMPLES.md",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "docs/LANGUAGE-EXAMPLES.md",
+      "sha256": "bf265ed72fd529e0bf9a5e2905ee11c9629fb3931d82973d9b1907481d9d9b45"
+    },
+    {
+      "path": "docs/LANGUAGE-MVP-0.1.md",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "docs/LANGUAGE-MVP-0.1.md",
+      "sha256": "90f016d98bf0dd97eb20adfa9b40900c571798bf5fe56c01372f1762a57ec4f6"
+    },
+    {
+      "path": "docs/LANGUAGE-SURFACE.md",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "docs/LANGUAGE-SURFACE.md",
+      "sha256": "0450f720b21c86fe0205a1614ba1f44823e8b1919e98c6df5e2336bcdc014e96"
+    },
+    {
+      "path": "docs/LANGUAGE.md",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "docs/LANGUAGE.md",
+      "sha256": "8cc7d5f7d22564261c1bbac96b2876aaf39dcbc7f9e0a1b80d69ff96cfacecb8"
+    },
+    {
+      "path": "docs/LITERATE.md",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "docs/LITERATE.md",
+      "sha256": "b9225727f97d4051f62980ad04a2911cea8d239b4b7d75e5f9bab0654bfe4dd1"
+    },
+    {
+      "path": "docs/TRACEABILITY.md",
+      "executable": false,
+      "origin": "migration-overlay",
+      "sourcePath": "project-layout/ghostflow-language/docs/TRACEABILITY.md",
+      "sha256": "14f57f5ca4946fd82bfc582188b98b5170614e1e8bfab38ae4be6ec0c70be6e3"
+    },
+    {
+      "path": "docs/TUTORIAL.md",
+      "executable": false,
+      "origin": "migration-overlay",
+      "sourcePath": "project-layout/ghostflow-language/docs/TUTORIAL.md",
+      "sha256": "808f3dad10ef7ff0b3994a79eec6dd9836dcc20ec981551b09cc6480a15d04a4"
+    },
+    {
+      "path": "docs/VERIFICATION.md",
+      "executable": false,
+      "origin": "migration-overlay",
+      "sourcePath": "project-layout/ghostflow-language/docs/VERIFICATION.md",
+      "sha256": "95323191457e3f0bcea7e6fcfb737273711379239cec5befb52c7a1702037063"
+    },
+    {
+      "path": "examples/irrigation.ghost",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "examples/irrigation.ghost",
+      "sha256": "7324edc937175804e02ca2c1465d60241ec19078df77f2283d70db8a412ce69a"
+    },
+    {
+      "path": "examples/scheduled-watering.ghost",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "examples/scheduled-watering.ghost",
+      "sha256": "dbdf279b9a5e6b04b3f5ad537bc260f48b0da30a46bff3cb595aee337e312e9c"
+    },
+    {
+      "path": "examples/scheduled-watering.ghost.md",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "examples/scheduled-watering.ghost.md",
+      "sha256": "f0ce124c74c375b121e2f3cdeeba3b38cf8a6dc7ead90db60aa05bcfddcd7c61"
+    },
+    {
+      "path": "examples/station-rules.ghost",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "examples/station-rules.ghost",
+      "sha256": "f87ff6a8a2e054185fb4cdf196a7678cd32488b2abef6d6b56b8dd421d7ef9d2"
+    },
+    {
+      "path": "examples/tutorial/01-latch.csv",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "examples/tutorial/01-latch.csv",
+      "sha256": "173cedb775a8a9dd29b92f07e70306cd8cd8325647e9609102712d44a39bb956"
+    },
+    {
+      "path": "examples/tutorial/01-latch.ghost",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "examples/tutorial/01-latch.ghost",
+      "sha256": "fb36db4bd17f7098aaa1238312b802ee9eb0949b90c909a007c5a92779c76a33"
+    },
+    {
+      "path": "examples/tutorial/01-latch.ghost.md",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "examples/tutorial/01-latch.ghost.md",
+      "sha256": "3abfe25023621938a7cbd9b15f4d0097cf34cedda1a496bc76dd15f952189642"
+    },
+    {
+      "path": "examples/tutorial/02-watering.ghost",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "examples/tutorial/02-watering.ghost",
+      "sha256": "8a2602348014e278f23e523446850ea41fa6669441c04460a8defd854c44b4bc"
+    },
+    {
+      "path": "examples/tutorial/03-moisture.ghost",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "examples/tutorial/03-moisture.ghost",
+      "sha256": "82d89c9d53d36f1711c752e0dbdec94c67df97b365c67c17558bcee2351b589b"
+    },
+    {
+      "path": "examples/tutorial/04-extra-valves.ghost",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "examples/tutorial/04-extra-valves.ghost",
+      "sha256": "c8cdd8d1ef7e8c25b1e8cd6ba9e8ceeeb2727189f29a716b959588ed571f845e"
+    },
+    {
+      "path": "Makefile",
+      "executable": false,
+      "origin": "migration-overlay",
+      "sourcePath": "project-layout/ghostflow-language/Makefile",
+      "sha256": "25d9041ff0b283bd4a0ddd203c8b9956b5c1d6c8752ecee4443208e470a9c0b9"
+    },
+    {
+      "path": "package-lock.json",
+      "executable": false,
+      "origin": "migration-overlay",
+      "sourcePath": "project-layout/ghostflow-language/package-lock.json",
+      "sha256": "d36c3419275007592465c7901b96e06223b1293859cbc9f01e6984bec4e30e80"
+    },
+    {
+      "path": "package.json",
+      "executable": false,
+      "origin": "migration-overlay",
+      "sourcePath": "project-layout/ghostflow-language/package.json",
+      "sha256": "711f0d401403573ef52ed2ded8a29ec371fc9a213a7ce63e95dd711758580a2f"
+    },
+    {
+      "path": "README.md",
+      "executable": false,
+      "origin": "migration-overlay",
+      "sourcePath": "project-layout/ghostflow-language/README.md",
+      "sha256": "79aaa22287ad861de2ba010974086160a11f12e6ede0985f841b95958c14ad30"
+    },
+    {
+      "path": "runtimes/node/ledger.mjs",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "runtimes/node/ledger.mjs",
+      "sha256": "ce1bbfd2e745ea46d5ac8ff6bb4cd3d978ae932843462fec9e4d99f25f260baa"
+    },
+    {
+      "path": "runtimes/wasm/Cargo.toml",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "runtimes/wasm/Cargo.toml",
+      "sha256": "0e405be0345eb74ccaf001e66e8d5e45655cad63ed28d94f89ebda54bb1a7a9b"
+    },
+    {
+      "path": "runtimes/wasm/control-runtime.mjs",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "runtimes/wasm/control-runtime.mjs",
+      "sha256": "0a4516d2c9034dc65cf9eba729ee3504036850d266e366b2ca40aecb5967964f"
+    },
+    {
+      "path": "runtimes/wasm/ghostflow-runtime.mjs",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "runtimes/wasm/ghostflow-runtime.mjs",
+      "sha256": "dc1c820e7e99a729f2390e9f77eb0b17f2c1b986265abc78d76fd99bcb33fc5c"
+    },
+    {
+      "path": "runtimes/wasm/policy.mjs",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "runtimes/wasm/policy.mjs",
+      "sha256": "f4c6a99fcb6b4281caef58e6a9de45b2f21ccd878b90dde93066307e43d0b279"
+    },
+    {
+      "path": "runtimes/wasm/README.md",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "runtimes/wasm/README.md",
+      "sha256": "f87ceeaa3b41a003808ae48b207849571adfb9ff5bbf2f2a1511ed876fb7bd57"
+    },
+    {
+      "path": "runtimes/wasm/schedule.mjs",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "runtimes/wasm/schedule.mjs",
+      "sha256": "5ed01d78acd3da7b8681eb0c0c0a9fb064baf5aa49c24f2fd20031c6e41c76ae"
+    },
+    {
+      "path": "runtimes/wasm/scheduled-admission.mjs",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "runtimes/wasm/scheduled-admission.mjs",
+      "sha256": "a5efaf62e3e2a94ed4b3b90564a044c4e1fa89917d6ffe9dcd66a02a8d0b168d"
+    },
+    {
+      "path": "runtimes/wasm/signals_abi.rs",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "runtimes/wasm/signals_abi.rs",
+      "sha256": "3ba3d11b8516d414a700c65ebe0c998d2cb3a21685ef81f43062799c930148e5"
+    },
+    {
+      "path": "runtimes/wasm/signals.mjs",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "runtimes/wasm/signals.mjs",
+      "sha256": "3be57cb076a6fd92c4cb6c61db57fa0870faa61081e120e271f71d8f0b58c10e"
+    },
+    {
+      "path": "runtimes/wasm/src/lib.rs",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "runtimes/wasm/src/lib.rs",
+      "sha256": "8f5bb0e58cbbe467fa6497cd7b85d18c0b7fb027e2ab5a4bd96771cde4c68311"
+    },
+    {
+      "path": "runtimes/wasm/station_abi.rs",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "runtimes/wasm/station_abi.rs",
+      "sha256": "98b9cb73c04af12cc8b34b7580822e479e1a7ebd2e7206039c0064584613f9f4"
+    },
+    {
+      "path": "runtimes/wasm/station.mjs",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "runtimes/wasm/station.mjs",
+      "sha256": "86377cfcd380e65d893b4ec51745d393108b6df251d5104845dfb01b99a19b8e"
+    },
+    {
+      "path": "tests/compiler.test.mjs",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "tests/compiler.test.mjs",
+      "sha256": "826ce633e257c0741b9c488aa70fe5c627c514a3855711d6a5def9d76e6a07a8"
+    },
+    {
+      "path": "tests/constraints.test.mjs",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "tests/constraints.test.mjs",
+      "sha256": "72474e3e417552048589b5e1fbf23beadf5fef11ab74c98d6a4611fd1e60769b"
+    },
+    {
+      "path": "tests/control-host.test.mjs",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "tests/control-host.test.mjs",
+      "sha256": "acb9e2904c43998ef46afb0de397f18f6c3601ca5c9b842c90121555e0d1708a"
+    },
+    {
+      "path": "tests/control.test.mjs",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "tests/control.test.mjs",
+      "sha256": "d0a74e5ff1805ca13959699681609af526383361ddedc9d5dd437977e8a52cb4"
+    },
+    {
+      "path": "tests/integration-contract.test.mjs",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "tests/integration-contract.test.mjs",
+      "sha256": "5f04ff27e883bd3f5490db451836ffe98905d381ab6a71ecc8bf968c9250d77a"
+    },
+    {
+      "path": "tests/ledger.test.mjs",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "tests/ledger.test.mjs",
+      "sha256": "075813cb5c2b50531873ce409ee34bf2d60245389e220a106283b28c8fdb36cc"
+    },
+    {
+      "path": "tests/literate.test.mjs",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "tests/literate.test.mjs",
+      "sha256": "c1c665ff61241ff5aa375fdfffaa7ec870a6a09b4026a4239d1bdd0afc222296"
+    },
+    {
+      "path": "tests/policy.test.mjs",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "tests/policy.test.mjs",
+      "sha256": "fb862d5c84246038a9faada82462a979f84da7e3e5e33660a68984bca78dbbc1"
+    },
+    {
+      "path": "tests/schedule.test.mjs",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "tests/schedule.test.mjs",
+      "sha256": "062a4e782f0780ebed17a194e13a5bad8e17bc62db3ef28e534418629b7fb95c"
+    },
+    {
+      "path": "tests/scheduled-admission.test.mjs",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "tests/scheduled-admission.test.mjs",
+      "sha256": "b954536f12f219aa3b4d2b1c2f7d78d1f5f7ca6ad555595c7c6b80082c5ee742"
+    },
+    {
+      "path": "tests/signals-wasm.test.mjs",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "tests/signals-wasm.test.mjs",
+      "sha256": "d2749b9a7d8fa5797245597f4e2b052d3139c80125544a19c9e9380f95a16f6f"
+    },
+    {
+      "path": "tests/station-wasm.test.mjs",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "tests/station-wasm.test.mjs",
+      "sha256": "250449fc901e444a830b710c3152b1634818a7cf9bfab0f839572e38830e1ac1"
+    },
+    {
+      "path": "tests/toolchain.test.mjs",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "tests/toolchain.test.mjs",
+      "sha256": "3fb1e518ea769e935b3893fe997c8a42f88e2eeb033004334b93ec1826f0d0db"
+    },
+    {
+      "path": "tools/constraints.mjs",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "tools/constraints.mjs",
+      "sha256": "40c21b6934992647449e9546a0fb85678b6674f18a33830579a638a40efcc29b"
+    },
+    {
+      "path": "tools/control.mjs",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "tools/control.mjs",
+      "sha256": "49f56877a1e6c24a866d1b0ec12e32b745e33c75cf22f2c005446f730bfb8b74"
+    },
+    {
+      "path": "tools/gfb1.mjs",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "tools/gfb1.mjs",
+      "sha256": "bb2e28e53d5f3489d79ea5215d98726c9929654893765253b4e087b4be3bd173"
+    },
+    {
+      "path": "tools/ghostc.mjs",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "tools/ghostc.mjs",
+      "sha256": "73e7ca83af9cd9a87bee30c925db74325259041d41d739b2b23e42ab7b1b3409"
+    },
+    {
+      "path": "tools/ghostrules.mjs",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "tools/ghostrules.mjs",
+      "sha256": "3c5d31fd87d0c456085f3f47cbf621ed735bb3f3c0b201dc5aa21ae61872dc2b"
+    },
+    {
+      "path": "tools/integration-contract.mjs",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "tools/integration-contract.mjs",
+      "sha256": "feadc781783d8b178d729ad8129e233d9f86e0143f4a2b808676d6e5a2bc5c15"
+    },
+    {
+      "path": "tools/literate.mjs",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "tools/literate.mjs",
+      "sha256": "48825cb63d572b9fabccb3be0d0a28b9028ebd655ffd02df796e44833ef9d7e7"
+    },
+    {
+      "path": "tools/station-demo.mjs",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "tools/station-demo.mjs",
+      "sha256": "e0fd8c28da9a921bb20d5e6e68b30acb5c011ea03df046a2d2143b577a25ba34"
+    },
+    {
+      "path": "tools/toolchain.mjs",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "tools/toolchain.mjs",
+      "sha256": "dc2030680884070fff72cc0b173dc4a018db0bda802847c6ed062bb62eb25306"
+    },
+    {
+      "path": "tools/tutorial.mjs",
+      "executable": false,
+      "origin": "current",
+      "sourcePath": "tools/tutorial.mjs",
+      "sha256": "c45744f0c3333cb647c192045f8c7d5b0371f4798c98e1ee714dec6017e572b2"
+    },
+    {
+      "path": "tools/verify-language.mjs",
+      "executable": false,
+      "origin": "migration-overlay",
+      "sourcePath": "project-layout/ghostflow-language/tools/verify-language.mjs",
+      "sha256": "348f2b00a9eb4fbb18a2e5f9cf990b7dfa83e4a4224112959615d0fbc1ec357d"
+    }
+  ]
+}

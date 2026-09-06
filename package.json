@@ -1,0 +1,23 @@
+{
+  "name": "ghostflow-language",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node tools/verify-language.mjs",
+    "test:node": "node tools/verify-language.mjs --node-only",
+    "test:compiler": "node --test tests/compiler.test.mjs tests/constraints.test.mjs tests/literate.test.mjs tests/toolchain.test.mjs",
+    "test:contract": "node --test tests/integration-contract.test.mjs",
+    "tutorial": "node tools/tutorial.mjs",
+    "compile": "node tools/ghostc.mjs",
+    "compile:example": "node tools/ghostc.mjs examples/scheduled-watering.ghost build/scheduled-watering.gfb",
+    "constraints": "node tools/ghostrules.mjs",
+    "build:wasm": "cargo build --locked --offline -p ghostflow-wasm --target wasm32-unknown-unknown --release"
+  },
+  "dependencies": {
+    "commonmark": "0.31.2"
+  }
+}

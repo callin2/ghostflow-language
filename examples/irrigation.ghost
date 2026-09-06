@@ -1,0 +1,47 @@
+; One farming intent, progressively enhanced by available capabilities.
+(module irrigation
+  (version 1)
+
+  (input start bool)
+  (input stop bool)
+  (input low-water bool)
+  (input moisture number)
+
+  (state watering bool false)
+  (state fault bool false)
+
+  (strategy basic 0
+    (device
+      (all
+        (has actuator pump bool)
+        (has actuator valve bool)))
+
+    (next fault input.low-water)
+    (next watering
+      (if (or input.stop input.low-water)
+          false
+          (or input.start state.watering)))
+
+    (intent valve next.watering)
+    (intent pump next.watering))
+
+  (strategy moisture-aware 10
+    (device
+      (all
+        (has actuator pump bool)
+        (has actuator valve bool)
+        (has sensor moisture number)))
+
+    (next fault input.low-water)
+    (next watering
+      (if (or input.stop input.low-water)
+          false
+          (or input.start
+              (and state.watering (lt input.moisture 35)))))
+
+    (intent valve next.watering)
+    (intent pump next.watering))
+
+  ; Native safety kernel applies these after user logic.
+  (requires pump valve))
+

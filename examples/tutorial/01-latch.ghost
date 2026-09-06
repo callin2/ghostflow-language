@@ -1,0 +1,14 @@
+control LatchingPump {
+  input start: Bool;
+  input stop: Bool;
+
+  output pump, valve: Bool = false;
+  state watering: Bool = false;
+
+  // stop wins when start and stop arrive in the same tick.
+  watering' = !stop && (start || watering);
+
+  valve <- watering';
+  pump  <- watering';
+  require pump => valve;
+}
