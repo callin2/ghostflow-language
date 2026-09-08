@@ -2,6 +2,7 @@ import { GhostFlowRuntime } from './ghostflow-runtime.mjs';
 import { SignalConditioner } from './signals.mjs';
 
 const FORMAT = 'GhostFlow/control-v1';
+const SETTINGS_FORMAT = 'GhostFlow/control-v2';
 const RESERVED = '__gf_';
 const TYPES = new Set(['Bool', 'Number', 'Percent', 'Duration']);
 const SENSOR_TYPES = new Set(['Bool', 'Number', 'Percent']);
@@ -103,10 +104,51 @@ function generated(value, expected, label) {
   if (value !== expected) throw new Error(`${label} must be ${expected}`);
 }
 
-function validateManifest(input) {
+function validateSettings(config, label) {
+  const settings = record(config.settings, `${label}.settings`);
+  keys(settings, ['access'], ['min', 'max', 'step', 'apply', 'label'], `${label}.settings`);
+  if (settings.access !== 'operator' && settings.access !== 'designer') throw new Error(`${label}.settings.access must be operator or designer`);
+  if (settings.apply !== undefined && settings.apply !== 'stopped') throw new Error(`${label}.settings.apply must be stopped`);
+  if (settings.label !== undefined && (typeof settings.label !== 'string' || settings.label.length === 0 || settings.label.length > 128)) {
+    throw new Error(`${label}.settings.label must be a string of 1 to 128 characters`);
+  }
+
+  const numericKeys = ['min', 'max', 'step'];
+  const presentNumeric = numericKeys.filter(key => Object.prototype.hasOwnProperty.call(settings, key));
+  if (config.type === 'Bool') {
+    if (presentNumeric.length > 0) throw new Error(`${label}.settings cannot define numeric bounds for Bool`);
+  } else {
+    for (const key of numericKeys) if (!Object.prototype.hasOwnProperty.call(settings, key)) throw new Error(`${label}.settings.${key} is required for numeric config`);
+    for (const key of numericKeys) typedValue(settings[key], config.type, `${label}.settings.${key}`);
+    if (settings.min > settings.max) throw new Error(`${label}.settings range is inverted`);
+    if (settings.step <= 0) throw new Error(`${label}.settings.step must be positive`);
+    if (Math.abs((config.value - settings.min) / settings.step - Math.round((config.value - settings.min) / settings.step)) > 1e-9) {
+      throw new Error(`${label}.value is not aligned to settings.step from settings.min`);
+    }
+    if (config.value < settings.min || config.value > settings.max) throw new Error(`${label}.value is outside settings range`);
+  }
+
+  // Compiler-emitted source-literal spans are metadata for candidate generation.
+  // Validate them strictly instead of accepting or silently dropping them.
+  const hasStart = Object.prototype.hasOwnProperty.call(config, 'initialOffset');
+  const hasEnd = Object.prototype.hasOwnProperty.call(config, 'initialEndOffset');
+  if (hasStart !== hasEnd) throw new Error(`${label} literal offsets must be provided together`);
+  if (hasStart) {
+    safeInteger(config.initialOffset, `${label}.initialOffset`);
+    safeInteger(config.initialEndOffset, `${label}.initialEndOffset`);
+    if (config.initialEndOffset <= config.initialOffset) throw new Error(`${label} literal offsets must be increasing`);
+  }
+
+  const normalized = copy(settings);
+  if (normalized.apply === undefined) normalized.apply = 'stopped';
+  return normalized;
+}
+
+function validateManifest(input, { acceptSettings = false } = {}) {
   const manifest = record(input, 'manifest');
   keys(manifest, ['format', 'name', 'inputs', 'outputs', 'sensors', 'schedules', 'timers', 'signals', 'configs', 'bytecodeSha256'], [], 'manifest');
-  if (manifest.format !== FORMAT) throw new Error(`unsupported manifest format ${String(manifest.format)}`);
+  if (manifest.format !== FORMAT && (manifest.format !== SETTINGS_FORMAT || !acceptSettings)) throw new Error(`unsupported manifest format ${String(manifest.format)}`);
+  const settingsManifest = manifest.format === SETTINGS_FORMAT;
   name(manifest.name, 'manifest.name');
   if (typeof manifest.bytecodeSha256 !== 'string' || !/^[0-9a-f]{64}$/.test(manifest.bytecodeSha256)) throw new Error('manifest.bytecodeSha256 must be a lowercase SHA-256 hex digest');
 
@@ -116,7 +158,7 @@ function validateManifest(input) {
   const schedules = validateList(manifest.schedules, 'manifest.schedules', ['name', 'timezone', 'slots', 'dueInput']);
   const timers = validateList(manifest.timers, 'manifest.timers', ['name', 'state', 'clockInput']);
   const signals = validateList(manifest.signals, 'manifest.signals', ['name', 'sensor', 'onBelow', 'offAbove', 'initial', 'valueInput', 'okInput']);
-  const configs = validateList(manifest.configs, 'manifest.configs', ['name', 'type', 'value']);
+  const configs = validateList(manifest.configs, 'manifest.configs', ['name', 'type', 'value'], settingsManifest ? ['settings', 'initialOffset', 'initialEndOffset'] : []);
 
   for (const item of inputs) { name(item.name, 'input.name'); type(item.type, `input ${item.name}.type`); }
   for (const item of outputs) { name(item.name, 'output.name'); type(item.type, `output ${item.name}.type`); }
@@ -134,6 +176,11 @@ function validateManifest(input) {
     name(item.name, 'config.name');
     type(item.type, `config ${item.name}.type`);
     typedValue(item.value, item.type, `config ${item.name}.value`);
+    const hasSettings = Object.prototype.hasOwnProperty.call(item, 'settings');
+    const hasOffsets = Object.prototype.hasOwnProperty.call(item, 'initialOffset') || Object.prototype.hasOwnProperty.call(item, 'initialEndOffset');
+    if (!settingsManifest && (hasSettings || hasOffsets)) throw new Error(`v1 config ${item.name} cannot contain operating settings metadata`);
+    if (settingsManifest && hasOffsets && !hasSettings) throw new Error(`v2 config ${item.name} literal offsets require settings`);
+    if (settingsManifest && hasSettings) item.settings = validateSettings(item, `config ${item.name}`);
   }
   unique(configs.map(item => item.name), 'config');
 
@@ -242,11 +289,11 @@ function hostReading(raw, sensorType) {
 function inputValue(value, inputType, label) { return typedValue(value, inputType, label); }
 
 export class ControlRuntime {
-  static async instantiate(wasmBytes, { bytes: bytecode, manifest } = {}) {
+  static async instantiate(wasmBytes, { bytes: bytecode, manifest } = {}, options = {}) {
     const wasm = new Uint8Array(bytes(wasmBytes, 'wasmBytes'));
     // Copy caller-owned bytecode before awaiting digest verification (TOCTOU-safe).
     const compiledBytes = new Uint8Array(bytes(bytecode, 'bytes'));
-    const checkedManifest = validateManifest(manifest);
+    const checkedManifest = validateManifest(manifest, options);
     const digest = await sha256(compiledBytes);
     if (digest !== checkedManifest.manifest.bytecodeSha256) throw new Error('bytecode SHA-256 does not match manifest');
 
@@ -271,6 +318,12 @@ export class ControlRuntime {
       throw error;
     }
     return new ControlRuntime(runtime, checkedManifest, sensors, signals);
+  }
+
+  // New simulation consumers opt into the v2 operating-settings contract.
+  // The original instantiate entry point remains a strict v1 consumer.
+  static async instantiateSimulation(wasmBytes, artifact = {}) {
+    return ControlRuntime.instantiate(wasmBytes, artifact, { acceptSettings: true });
   }
 
   constructor(runtime, manifest, sensors, signals) {
