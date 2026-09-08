@@ -59,7 +59,7 @@ function tokeniseControl(source, filename) {
   };
   const add = (kind, value, start) => {
     if (tokens.length >= 8192) error(start, 'token limit exceeded (8192)');
-    tokens.push({ kind, value, ...start, endLine: line, endColumn: column });
+    tokens.push({ kind, value, ...start, endLine: line, endColumn: column, endOffset: at });
   };
   while (at < source.length) {
     const c = source[at];
@@ -213,8 +213,31 @@ class ControlParser {
   config() {
     const start = this.take(), name = this.identifier('expected config name');
     this.expect(':'); const type = this.typeName(); this.expect('=', 'config requires a value');
-    const value = this.expression(); this.expect(';', 'expected ; after config declaration');
-    return this.node('config', start, { name: name.value, type, value });
+    const value = this.expression();
+    const settings = {};
+    if (this.maybe('{')) {
+      while (!this.matches('}')) {
+        const key = this.identifier('expected config option');
+        if (settings[key.value] !== undefined) error(key, `duplicate config option ${key.value}`);
+        this.expect('=', `expected = after config option ${key.value}`);
+        const minus = this.maybe('-');
+        const option = this.current();
+        if (key.value === 'label') {
+          if (minus) error(minus, 'config label must be a string');
+          if (option.kind !== 'string') error(option, 'config label must be a string');
+          settings[key.value] = this.take().value;
+        } else {
+          if (minus && option.kind !== 'number') error(option, 'config option negative value must be a number literal');
+          if (option.kind !== 'identifier' && option.kind !== 'number') error(option, `config option ${key.value} must be a literal`);
+          settings[key.value] = `${minus ? '-' : ''}${this.take().value}`;
+        }
+        this.expect(';', 'expected ; after config option');
+      }
+      this.take();
+    }
+    if (!settings || Object.keys(settings).length === 0) this.expect(';', 'expected ; after config declaration');
+    else this.maybe(';');
+    return this.node('config', start, { name: name.value, type, value, settings });
   }
   letDecl() {
     const start = this.take(), name = this.identifier('expected let name');
@@ -370,9 +393,20 @@ class ControlParser {
       if (this.maybe("'")) return this.node('nextReference', token, { name: token.value });
       return this.node('reference', token, { name: token.value });
     }
-    if (token.value === '!') return this.node('unary', token, { op: '!', value: this.expression(7) });
-    if (token.value === '-') return this.node('unary', token, { op: '-', value: this.expression(7) });
-    if (token.value === '(') { const value = this.expression(); this.expect(')', 'expected )'); return value; }
+    if (token.value === '!' || token.value === '-') {
+      const value = this.expression(7);
+      return this.node('unary', token, {
+        op: token.value,
+        value,
+        loc: { ...copyLoc(token), endOffset: value.loc.endOffset, endLine: value.loc.endLine, endColumn: value.loc.endColumn },
+      });
+    }
+    if (token.value === '(') {
+      const value = this.expression(); this.expect(')', 'expected )');
+      // Keep grouping provenance for source-span consumers. Lowering otherwise
+      // intentionally treats parentheses as transparent.
+      return { ...value, parenthesized: true };
+    }
     error(token, `expected expression, found ${token.value || 'end of file'}`);
   }
   call(name) {
@@ -408,7 +442,7 @@ class ControlParser {
 }
 
 const BIN_PREC = { '||': 1, '&&': 2, '==': 3, '!=': 3, '<': 3, '<=': 3, '>': 3, '>=': 3, '+': 5, '-': 5, '*': 6, '/': 6 };
-function copyLoc(token) { return { filename: token.filename, line: token.line, column: token.column, endLine: token.endLine ?? token.line, endColumn: token.endColumn ?? token.column }; }
+function copyLoc(token) { return { filename: token.filename, line: token.line, column: token.column, offset: token.offset, endOffset: token.endOffset, endLine: token.endLine ?? token.line, endColumn: token.endColumn ?? token.column }; }
 
 function rejectName(name, loc, label) {
   if (!isName(name)) error(loc, `invalid ${label} name ${name}`);
@@ -423,6 +457,39 @@ function duration(raw, loc) {
   const value = Number(match[1]) * units[match[2]];
   if (!Number.isInteger(value) || !Number.isFinite(value) || value < 0) error(loc, 'Duration must be a non-negative integer number of milliseconds');
   return value;
+}
+function operatingValue(value, type, loc, label) {
+  if (type.kind === 'Bool') {
+    if (typeof value !== 'boolean') error(loc, `${label} must be Bool`);
+  } else if (type.kind === 'Duration') {
+    if (!Number.isSafeInteger(value) || value < 0) error(loc, `${label} must be a non-negative safe integer Duration`);
+  } else {
+    if (!Number.isFinite(value)) error(loc, `${label} must be finite`);
+    if (type.kind === 'Percent' && (value < 0 || value > 100)) error(loc, `${label} must be between 0% and 100%`);
+  }
+  return value;
+}
+function settingValue(raw, type, loc) {
+  let value;
+  if (type.kind === 'Duration') { value = duration(raw, loc); if (value === null) error(loc, 'Duration setting must use a duration literal'); }
+  else if (type.kind === 'Percent') { if (!String(raw).endsWith('%')) error(loc, 'Percent setting must use %'); value = Number(String(raw).slice(0, -1)); }
+  else if (type.kind === 'Number') value = Number(raw);
+  else return raw;
+  return operatingValue(value, type, loc, 'config setting');
+}
+function isOperatingConfigLiteral(node, type) {
+  if (node.kind === 'literal') {
+    if (type.kind === 'Bool') return node.raw === 'true' || node.raw === 'false';
+    if (type.kind === 'Duration') return duration(node.raw, node.loc) !== null;
+    if (type.kind === 'Percent') return node.raw.endsWith('%');
+    return type.kind === 'Number' && /^(?:\d+(?:\.\d+)?|\.\d+)$/.test(node.raw);
+  }
+  return type.kind === 'Number'
+    && node.kind === 'unary'
+    && node.op === '-'
+    && node.value.kind === 'literal'
+    && !node.value.parenthesized
+    && /^(?:\d+(?:\.\d+)?|\.\d+)$/.test(node.value.raw);
 }
 function validateNominalConstant(type, value, loc) {
   if (value === undefined) return;
@@ -540,7 +607,26 @@ class Lowerer {
       if (item.kind === 'config') {
         const type = this.resolveType(item.type); const value = this.expression(item.value, new Map(), { allowNext: false });
         if (!sameType(value.type, type) || value.constant === undefined) error(item.loc, 'config value must be a constant of the declared type');
-        this.symbols.get(item.name).type = type; this.symbols.get(item.name).value = value; this.manifest.configs.push({ name: item.name, type: type.kind, value: value.constant });
+        this.symbols.get(item.name).type = type; this.symbols.get(item.name).value = value;
+        const settings = item.settings ?? {};
+        if (Object.keys(settings).length) {
+          if (!isOperatingConfigLiteral(item.value, type)) error(item.value.loc, 'operating config initial value must be a supported literal');
+          operatingValue(value.constant, type, item.value.loc, 'operating config initial value');
+          const allowed = new Set(['min', 'max', 'step', 'access', 'apply', 'label']);
+          for (const key of Object.keys(settings)) if (!allowed.has(key)) error(item.loc, `unknown config option ${key}`);
+          if (!['operator', 'designer'].includes(settings.access ?? '')) error(item.loc, 'config access must be operator or designer');
+          if ((settings.apply ?? 'stopped') !== 'stopped') error(item.loc, 'config apply must be stopped');
+          if (settings.label !== undefined && (settings.label.length === 0 || settings.label.length > 128)) error(item.loc, 'config label must be 1 to 128 characters');
+          if (type.kind === 'Bool' && ['min', 'max', 'step'].some(key => settings[key] !== undefined)) error(item.loc, 'Bool config cannot have numeric bounds');
+          for (const key of ['min', 'max', 'step']) if (settings[key] !== undefined) settings[key] = settingValue(settings[key], type, item.loc);
+          if (type.kind !== 'Bool') {
+            if (!['Number', 'Duration', 'Percent'].includes(type.kind) || settings.min === undefined || settings.max === undefined || settings.step === undefined || settings.step <= 0 || settings.min > settings.max) error(item.loc, 'numeric config requires valid min, max and positive step');
+            if (value.constant < settings.min || value.constant > settings.max) error(item.value.loc, 'config initial value is outside settings range');
+            if (Math.abs((value.constant - settings.min) / settings.step - Math.round((value.constant - settings.min) / settings.step)) > 1e-9) error(item.value.loc, 'config initial value is not aligned to settings.step from settings.min');
+          }
+          this.manifest.format = 'GhostFlow/control-v2';
+          this.manifest.configs.push({ name: item.name, type: type.kind, value: value.constant, settings, initialOffset: item.value.loc.offset, initialEndOffset: item.value.loc.endOffset ?? item.value.loc.offset });
+        } else this.manifest.configs.push({ name: item.name, type: type.kind, value: value.constant });
       }
       if (item.kind === 'sensor') this.addSensor(item);
       if (item.kind === 'schedule') this.addSchedule(item);

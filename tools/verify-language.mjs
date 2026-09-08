@@ -20,6 +20,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/signals-wasm.test.mjs',
   'tests/station-wasm.test.mjs',
   'tests/toolchain.test.mjs',
+  'tests/operating-settings.test.mjs',
 ]);
 
 const root = fileURLToPath(new URL('../', import.meta.url));
