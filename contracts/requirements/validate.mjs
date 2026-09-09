@@ -7,6 +7,10 @@ const ID_HEX_LENGTH = 16;
 
 function fail(message) { throw new Error(`requirement catalog: ${message}`); }
 
+export function normalizeExcerpt(lines) {
+  return lines.map(line => line.replace(/\s+/g, ' ').trim()).join('\n').trim();
+}
+
 function relativePath(value, label) {
   if (typeof value !== 'string' || !value || path.isAbsolute(value) || value.split('/').includes('..')) {
     fail(`${label} must be a repository-relative path`);
@@ -21,10 +25,28 @@ function checkLocator(locator, label, root) {
   if (!Array.isArray(locator.lines) || locator.lines.length !== 2
     || !locator.lines.every(line => Number.isInteger(line) && line > 0)
     || locator.lines[0] > locator.lines[1]) fail(`${label}.lines must be an increasing positive range`);
+  if (typeof locator.sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(locator.sha256)) {
+    fail(`${label}.sha256 must be a 64-character lowercase SHA-256 digest`);
+  }
   const absolute = path.join(root, file);
   if (!fs.existsSync(absolute) || !fs.statSync(absolute).isFile()) fail(`${label} points to missing file ${file}`);
-  const lineCount = fs.readFileSync(absolute, 'utf8').split('\n').length;
+  const lines = fs.readFileSync(absolute, 'utf8').replace(/\r\n?/g, '\n').split('\n');
+  const lineCount = lines.length;
   if (locator.lines[1] > lineCount) fail(`${label} points beyond ${file}`);
+  const excerpt = normalizeExcerpt(lines.slice(locator.lines[0] - 1, locator.lines[1]));
+  const digest = createHash('sha256').update(excerpt).digest('hex');
+  if (digest !== locator.sha256) fail(`${label}.sha256 mismatch`);
+
+  const heading = locator.heading.trim();
+  const isMarkdown = file.endsWith('.md');
+  const headingLine = lines.findIndex(line => {
+    const normalized = line.replace(/\s+/g, ' ').trim();
+    if (isMarkdown) return /^#{1,6}\s+/.test(normalized)
+      && normalized.replace(/^#{1,6}\s+/, '').replace(/\s+#+$/, '').trim() === heading;
+    return normalized.includes(heading);
+  });
+  if (headingLine < 0) fail(`${label}.heading not found in ${file}`);
+  if (headingLine + 1 > locator.lines[0]) fail(`${label}.heading must precede its line range`);
   return file;
 }
 
