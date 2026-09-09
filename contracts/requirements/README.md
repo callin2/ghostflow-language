@@ -17,3 +17,20 @@ validator checks IDs, duplicate rows, locators, excerpt digests, and both sides
 of the requirement/test relation. It does not claim that a referenced test
 proves more than its selector describes, and pending host/Driver or physical
 behavior stays outside this language export.
+
+## Current inventory
+
+The catalog currently contains 41 atomic rows across the requested execution
+specification slice: 8 seed output/tick rows, 12 MVP rows, 9 implemented-
+surface rows, 8 GFB1 bytecode rows, and 5 implementation-boundary rows. These
+rows deliberately keep direct evidence links small and leave uncovered
+behavior as `pending` rather than upgrading documentation to an acceptance
+claim. The seed rows overlap the named documents; the category counts are
+inventory slices, not a claim that every prose sentence is independently
+rowed.
+
+The catalog does not row explanatory prose, historical alternatives, repeated
+examples, or consumer-owned physical/API behavior. Remaining language details
+outside these finite slices are intentionally excluded with no coverage claim;
+when cataloged, design-only sketches and unavailable evidence must remain
+explicitly marked `pending` or `design-only` with a reason.

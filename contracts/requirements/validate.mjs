@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 
 const ID_PREFIX = 'GF-REQ-';
 const ID_HEX_LENGTH = 16;
+const REQUIREMENT_STATUSES = new Set(['implemented', 'partial', 'pending', 'design-only']);
 
 function fail(message) { throw new Error(`requirement catalog: ${message}`); }
 
@@ -90,7 +91,12 @@ export function validateCatalog(catalog, { root = path.resolve(new URL('../..', 
     checkSet(row.targets, `requirements[${index}].targets`);
     const hasTests = Array.isArray(row.testIds) && row.testIds.length > 0;
     const hasPending = typeof row.pendingReason === 'string' && row.pendingReason.trim().length > 0;
+    const status = row.status ?? (hasPending ? 'partial' : 'implemented');
+    if (!REQUIREMENT_STATUSES.has(status)) fail(`${row.id} has an unsupported status`);
     if (!hasTests && !hasPending) fail(`${row.id} has neither testIds nor pendingReason`);
+    if ((status === 'pending' || status === 'design-only' || status === 'partial') && !hasPending) {
+      fail(`${row.id} status ${status} requires pendingReason`);
+    }
     if (hasTests) {
       if (row.testIds.some(testId => typeof testId !== 'string' || !tests.has(testId))) {
         fail(`${row.id} references an unknown test ID`);
