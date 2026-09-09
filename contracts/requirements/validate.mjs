@@ -75,6 +75,7 @@ export function validateCatalog(catalog, { root = path.resolve(new URL('../..', 
     tests.set(row.id, row);
     relativePath(row.file, `tests[${index}].file`);
     checkLocator(row.locator, `tests[${index}].locator`, root);
+    if (row.file !== row.locator.path) fail(`tests[${index}].file and locator.path disagree`);
     if (typeof row.selector !== 'string' || !row.selector.trim()) fail(`tests[${index}].selector is missing`);
     const absolute = path.join(root, row.file);
     if (!fs.existsSync(absolute) || !fs.statSync(absolute).isFile()) fail(`tests[${index}] points to missing file ${row.file}`);
@@ -94,6 +95,9 @@ export function validateCatalog(catalog, { root = path.resolve(new URL('../..', 
     const status = row.status ?? (hasPending ? 'partial' : 'implemented');
     if (!REQUIREMENT_STATUSES.has(status)) fail(`${row.id} has an unsupported status`);
     if (!hasTests && !hasPending) fail(`${row.id} has neither testIds nor pendingReason`);
+    if (status === 'implemented' && (!hasTests || hasPending)) {
+      fail(`${row.id} implemented status requires tests and no pendingReason`);
+    }
     if ((status === 'pending' || status === 'design-only' || status === 'partial') && !hasPending) {
       fail(`${row.id} status ${status} requires pendingReason`);
     }

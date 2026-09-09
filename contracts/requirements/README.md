@@ -29,6 +29,14 @@ claim. The seed rows overlap the named documents; the category counts are
 inventory slices, not a claim that every prose sentence is independently
 rowed.
 
+After the TASK-61 conformance expansion, these 41 rows have 15 `implemented`,
+4 `partial`, 21 `pending`, and 1 `design-only` statuses, linked to 17 source-backed
+test records. Here `implemented` means the exact statement has focused automated
+evidence in this catalog; it is not exhaustive language, platform, or physical
+assurance. The validator rejects `implemented` rows with unresolved pending
+reasons or without tests. See `docs/TASK-61-CONFORMANCE.md` for the bounded
+evidence and remaining conflicts.
+
 The catalog does not row explanatory prose, historical alternatives, repeated
 examples, or consumer-owned physical/API behavior. Remaining language details
 outside these finite slices are intentionally excluded with no coverage claim;

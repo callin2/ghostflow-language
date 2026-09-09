@@ -9,7 +9,7 @@ import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 
 const root = path.resolve(new URL('..', import.meta.url).pathname);
 const wasmPath = path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm');
-const nativePath = path.join(root, 'target/debug/examples/run');
+const nativePath = path.join(root, 'target/release/examples/run');
 const channels = Array.from({ length: 8 }, (_, index) => index + 1);
 const names = prefix => channels.map(channel => `${prefix}${channel}`);
 
@@ -20,10 +20,9 @@ const source = `control EightChannelBench {
 }`;
 
 const vectors = [
-  Array(8).fill(false),
-  Array(8).fill(true),
-  [true, false, true, false, true, false, true, false],
-  [false, true, false, true, false, true, false, true],
+  // Exhaust the full 2^8 input space, including all-off/on and alternating bits.
+  ...Array.from({ length: 256 }, (_, mask) =>
+    channels.map((_, index) => Boolean(mask & (1 << index)))),
 ];
 
 function observable(trace) {
@@ -41,7 +40,7 @@ function observable(trace) {
 
 test('GF-TEST-output-native-wasm-differential: all 8DI vectors produce identical 8RO traces', async t => {
   assert.ok(fs.existsSync(wasmPath), 'release WASM artifact is required; run the full language verifier');
-  assert.ok(fs.existsSync(nativePath), 'debug native runner is required; run the full language verifier');
+  assert.ok(fs.existsSync(nativePath), 'release native runner is required; run the full language verifier');
   const compiled = await compileSource(source, { filename: 'eight-channel-conformance.ghost' });
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-output-conformance-'));
   t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
@@ -69,4 +68,3 @@ test('GF-TEST-output-native-wasm-differential: all 8DI vectors produce identical
     wasm.dispose();
   }
 });
-

@@ -22,18 +22,28 @@ const cases = [
 
 function replaceOnce(source, needle, replacement) { const first = source.indexOf(needle); if (first < 0 || source.indexOf(needle, first + needle.length) >= 0) throw new Error(`mutation needle is not unique: ${needle}`); return source.slice(0, first) + replacement + source.slice(first + needle.length); }
 function run(file) { return new Promise(resolve => { const child = spawn(process.execPath, [file], { cwd: root, stdio: 'ignore', timeout: 5_000 }); child.on('error', error => resolve({ status: null, signal: null, error: error.message })); child.on('close', (status, signal) => resolve({ status, signal, error: null })); }); }
-function probeSource(source, diagnostic) { return `import assert from 'node:assert/strict';\nimport { compileControl, ControlCompileError } from './${moduleName}';\nassert.throws(() => compileControl(${JSON.stringify(source)}), error => error instanceof ControlCompileError && error.message.includes(${JSON.stringify(diagnostic)}));\n`; }
+function probeSource(source, diagnostic) { return `import assert from 'node:assert/strict';\nimport { compileControl, ControlCompileError } from './${moduleName}';\ntry {\n  assert.throws(() => compileControl(${JSON.stringify(source)}), error => error instanceof ControlCompileError && error.message.includes(${JSON.stringify(diagnostic)}));\n} catch (error) {\n  if (error instanceof assert.AssertionError) process.exitCode = 42;\n  else throw error;\n}\n`; }
 
-const report = { format: 'GhostFlow/output-contract-mutation-v1', timeoutMs: 5_000, mutants: [], survivors: 0 };
+const report = { format: 'GhostFlow/output-contract-mutation-v1', timeoutMs: 5_000, scope: 'four compiler output-declaration guards only', baselines: [], mutants: [], survivors: 0, infrastructureFailures: 0 };
 try {
-  const baseline = cases[0]; await fs.writeFile(modulePath, original); await fs.writeFile(probePath, probeSource(baseline.source, baseline.diagnostic));
-  const baselineResult = await run(probePath); if (baselineResult.status !== 0 || baselineResult.signal || baselineResult.error) throw new Error('original output-contract probe did not pass');
+  await fs.writeFile(modulePath, original);
+  for (const baseline of cases) {
+    await fs.writeFile(probePath, probeSource(baseline.source, baseline.diagnostic));
+    const baselineResult = await run(probePath);
+    report.baselines.push({ name: baseline.name, result: baselineResult });
+    if (baselineResult.status !== 0 || baselineResult.signal || baselineResult.error) throw new Error(`original output-contract probe did not pass: ${baseline.name}`);
+  }
   for (const mutant of cases) {
     await fs.writeFile(modulePath, replaceOnce(original, mutant.needle, mutant.replacement));
     await fs.writeFile(probePath, probeSource(mutant.source, mutant.diagnostic));
-    const result = await run(probePath); const killed = result.status !== 0 || Boolean(result.signal) || Boolean(result.error);
-    report.mutants.push({ name: mutant.name, killed, timedOut: Boolean(result.signal), result }); if (!killed) report.survivors++;
+    const result = await run(probePath);
+    const infrastructureFailure = Boolean(result.signal || result.error) || ![0, 42].includes(result.status);
+    const killed = !infrastructureFailure && result.status === 42;
+    report.mutants.push({ name: mutant.name, killed, interrupted: Boolean(result.signal), infrastructureFailure, result });
+    if (infrastructureFailure) report.infrastructureFailures++;
+    else if (!killed) report.survivors++;
   }
+  if (report.infrastructureFailures !== 0) throw new Error(`output-contract mutation infrastructure failures: ${report.infrastructureFailures}`);
   if (report.survivors !== 0) throw new Error(`output-contract mutation survivors: ${report.survivors}`);
   await fs.mkdir(path.join(root, 'build'), { recursive: true }); await fs.writeFile(path.join(root, 'build', 'mutation-output-contract.json'), JSON.stringify(report, null, 2) + '\n');
   console.log(JSON.stringify(report, null, 2));

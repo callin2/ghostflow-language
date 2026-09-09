@@ -8,7 +8,7 @@ const root = path.resolve(new URL('..', import.meta.url).pathname);
 const catalog = readCatalog({ root });
 
 test('requirement catalog has content-derived IDs and complete relation', () => {
-  assert.deepEqual(validateCatalog(catalog, { root }), { requirements: 41, tests: 7, linkedTests: 7 });
+  assert.deepEqual(validateCatalog(catalog, { root }), { requirements: 41, tests: 17, linkedTests: 17 });
   for (const requirement of catalog.requirements) assert.equal(requirement.id, requirementId(requirement.statement));
 });
 
@@ -40,4 +40,17 @@ test('catalog source and test locators resolve to checked-in files', () => {
   for (const row of [...catalog.requirements.map(item => item.source), ...catalog.tests.map(item => item.locator)]) {
     assert.equal(fs.existsSync(path.join(root, row.path)), true, row.path);
   }
+});
+
+test('catalog cannot mark incomplete evidence implemented or point a test at another file', () => {
+  const candidate = structuredClone(catalog);
+  const pending = candidate.requirements.find(row => row.status === 'pending');
+  pending.status = 'implemented';
+  assert.throws(() => validateCatalog(candidate, { root }), /implemented status requires tests and no pendingReason/);
+  pending.testIds = [candidate.tests[0].id];
+  assert.throws(() => validateCatalog(candidate, { root }), /implemented status requires tests and no pendingReason/);
+  const mismatched = structuredClone(catalog);
+  mismatched.tests[0].file = mismatched.tests[1].file === mismatched.tests[0].file
+    ? 'tests/runtime-conformance.test.mjs' : mismatched.tests[1].file;
+  assert.throws(() => validateCatalog(mismatched, { root }), /file and locator.path disagree/);
 });

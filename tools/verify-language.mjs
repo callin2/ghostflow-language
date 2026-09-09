@@ -18,6 +18,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/policy.test.mjs',
   'tests/requirement-catalog.test.mjs',
   'tests/output-conformance.test.mjs',
+  'tests/runtime-conformance.test.mjs',
   'tests/schedule.test.mjs',
   'tests/scheduled-admission.test.mjs',
   'tests/signals-wasm.test.mjs',
@@ -53,6 +54,7 @@ async function verify(nodeOnly) {
   // Retained tests/tutorial use host target/debug and the explicit WASM target.
   delete env.CARGO_BUILD_TARGET;
   const wasmPath = path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm');
+  const nativePath = path.join(root, 'target/release/examples/run');
   let wasmVerified = false;
 
   async function gate(command, arguments_) {
@@ -100,6 +102,7 @@ async function verify(nodeOnly) {
     }
     if (nodeOnly) {
       if (!fs.existsSync(wasmPath)) throw new Error('WASM artifact missing; run npm test first');
+      if (!fs.existsSync(nativePath)) throw new Error('release native artifact missing; run npm test first');
     } else {
       report.rustc = (await gate('rustc', ['--version'])).trim();
       report.cargo = (await gate('cargo', ['--version'])).trim();
@@ -108,6 +111,7 @@ async function verify(nodeOnly) {
       await gate(process.execPath, ['tools/ghostc.mjs', 'examples/irrigation.ghost', 'build/irrigation.gfb']);
       await gate('cargo', ['test', '--locked', '--offline', '--workspace']);
       await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-core', '--example', 'run']);
+      await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-core', '--example', 'run', '--release']);
       await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-wasm', '--target', 'wasm32-unknown-unknown', '--release']);
       wasmVerified = true;
     }
@@ -118,6 +122,8 @@ async function verify(nodeOnly) {
     }
     const bytes = fs.readFileSync(wasmPath);
     report.wasm = { bytes: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex'), builtByThisRun: wasmVerified };
+    const nativeBytes = fs.readFileSync(nativePath);
+    report.native = { bytes: nativeBytes.length, sha256: createHash('sha256').update(nativeBytes).digest('hex'), buildProfile: 'release', builtByThisRun: !nodeOnly };
     report.passed = true;
   } catch (error) {
     report.failure = error.message;
