@@ -12,7 +12,7 @@ const markdown = `# A literate control
 
 \`\`\`ghost
 control Mapped {
-  output pump: Bool = false;
+  output pump: Bool;
   pump <- false;
 }
 \`\`\`
@@ -54,7 +54,7 @@ const invalid = `# Invalid literate control
 
 \`\`\`ghost
 control Invalid {
-  output pump: Bool = false;
+  output pump: Bool;
   pump <- missing;
 }
 \`\`\`

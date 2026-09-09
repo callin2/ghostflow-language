@@ -475,6 +475,6 @@ control FractionalDuration {
 `, 'Duration literal must use a whole-number unit quantity');
 
 const manyInputs = Array.from({ length: 129 }, (_, index) => `input input${index}: Bool;`).join('\n');
-expectError(`control Budget { ${manyInputs} output pump: Bool; }`, 'input budget exceeded');
+expectError(`control Budget { ${manyInputs} output pump: Bool; pump <- false; }`, 'input budget exceeded');
 
 console.log(`control tests passed (${scheduledResult.bytes.length} byte scheduled control, ${sensorResult.bytes.length} byte sensor control)`);

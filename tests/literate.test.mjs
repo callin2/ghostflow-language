@@ -11,7 +11,7 @@ assert.equal(extracted.warnings.length, 0);
 const mapped = extractLiterate([
   '```ghost',
   'control Demo {',
-  '  output pump: Bool = false;',
+  '  output pump: Bool;',
   '  require pump => ;',
   '}',
   '```',
@@ -25,7 +25,7 @@ assert.deepEqual(mapSourcePosition(mapped.sourceMap, 3, 19), {
 const document = [
   '```ghost',
   'control Demo {',
-  '  output pump: Bool = false;',
+  '  output pump: Bool;',
   '  require pump => ;',
   '}',
   '```',
