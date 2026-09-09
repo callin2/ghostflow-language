@@ -199,6 +199,9 @@ class ControlParser {
     const names = this.names(`expected ${kind} name`);
     this.expect(':', `expected : after ${kind} name`);
     const type = this.typeName();
+    if (kind === 'output' && this.matches('=')) {
+      error(this.current(), 'output declarations are type-only; connect each output with `name <- expression;`');
+    }
     let initial = null;
     if (this.maybe('=')) initial = this.expression();
     this.expect(';', `expected ; after ${kind} declaration`);
@@ -528,9 +531,7 @@ class Lowerer {
       }
       if (item.kind === 'output') {
         const type = this.resolveType(item.type); if (!SCALAR_TYPES.has(type.kind)) error(item.type.loc, 'output must use a scalar type');
-        const initial = item.initial ? this.expression(item.initial, new Map(), { allowNext: false }) : { type, constant: type.kind === 'Bool' ? false : 0 };
-        if (!sameType(initial.type, type) || initial.constant === undefined) error(item.loc, 'output default must be a constant of the output type');
-        for (const name of item.names) { this.outputs.set(name, { name, type, initial: initial.constant, loc: item.loc, expression: null }); this.symbols.get(name).type = type; this.manifest.outputs.push({ name, type: type.kind }); }
+        for (const name of item.names) { this.outputs.set(name, { name, type, loc: item.loc, expression: null }); this.symbols.get(name).type = type; this.manifest.outputs.push({ name, type: type.kind }); }
       }
       if (item.kind === 'state') {
         const type = this.resolveType(item.type); const initial = this.expression(item.initial, new Map(), { allowNext: false });
@@ -552,6 +553,9 @@ class Lowerer {
     for (const item of this.ast.body) if (item.kind === 'let') this.addLet(item);
     for (const item of this.ast.body) if (item.kind === 'next') this.addNext(item);
     for (const item of this.ast.body) if (item.kind === 'connection') this.addConnection(item);
+    for (const output of this.outputs.values()) {
+      if (!output.expression) error(output.loc, `output ${output.name} requires exactly one connection (${output.name} <- expression;)`);
+    }
     for (const item of this.ast.body) if (item.kind === 'require' || item.kind === 'mutex') this.addConstraint(item);
   }
   addSensor(item) {
@@ -824,8 +828,7 @@ class Lowerer {
   intentForms() {
     const forms = [];
     for (const output of this.outputs.values()) {
-      const expression = output.expression ?? { type: output.type, sexpr: gfbDefault(output.type, output.initial) };
-      forms.push(['intent', output.name, expression.sexpr]);
+      forms.push(['intent', output.name, output.expression.sexpr]);
     }
     return forms;
   }

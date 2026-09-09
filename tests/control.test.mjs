@@ -158,8 +158,8 @@ control MoistureDemand {
   state amount: Number = 0;
   running' = latch(start, stop, running) && dry_ok;
   amount' = ifthenelse(running, amount + scale, amount);
-  output pump, valve: Bool = false;
-  output requested: Number = 0;
+  output pump, valve: Bool;
+  output requested: Number;
   pump <- running';
   valve <- next.running;
   requested <- amount';
@@ -203,7 +203,7 @@ fn hold(start: Bool, blocked: Bool, previous: Bool) -> Bool {
 control WateringDemand {
   input start, stop: Bool;
   sensor low_water: Bool;
-  output pump, valve: Bool = false;
+  output pump, valve: Bool;
   state watering: Bool = false;
   let water_ok = case low_water { ok(low) => !low; fault(_) => false; };
   let blocked = stop || !water_ok;
@@ -217,7 +217,7 @@ assert.equal(inspectModule(topLevelFunction.bytes).name, 'WateringDemand');
 
 const forwardDefinitions = compileControl(`
 control ForwardDefinitions {
-  output pump: Bool = false;
+  output pump: Bool;
   pump <- hold(enabled, delayed);
   let delayed = permit;
   fn hold(value: Bool, gate: Bool) -> Bool { value && gate }
@@ -230,7 +230,7 @@ assert.deepEqual(inspectModule(forwardDefinitions.bytes).inputs, [{ name: 'enabl
 const noSensor = compileControl(`
 control Basic {
   input enable: Bool;
-  output pump: Bool = false;
+  output pump: Bool;
   pump <- enable;
 }
 `, { filename: 'basic.ghost' });
@@ -253,7 +253,7 @@ try {
 const virtualRuntime = await ControlRuntime.instantiate(wasm, await compileSource(`
 control Basic {
   input enable: Bool;
-  output pump: Bool = false;
+  output pump: Bool;
   pump <- enable;
 }
 `, { filename: 'basic-host.ghost' }));
@@ -269,7 +269,43 @@ control StateOnly {
 `, { filename: 'state-only.ghost' });
 assert.deepEqual(inspectModule(outputless.bytes).strategyQueries, [{ kind: 'const', value: true }]);
 
-const parsed = parseControl('control Parsed { output pump: Bool = false; pump <- false; }', { filename: 'parsed.ghost' });
+expectError(`
+control OutputInitializer {
+  output pump: Bool = false;
+  pump <- false;
+}
+`, 'output declarations are type-only');
+
+expectError(`
+control MissingOutputConnection {
+  output pump: Bool;
+}
+`, 'output pump requires exactly one connection');
+
+expectError(`
+control DuplicateOutputConnection {
+  output pump: Bool;
+  pump <- false;
+  pump <- true;
+}
+`, 'duplicate output connection pump');
+
+expectError(`
+control OutputConnectionTypeMismatch {
+  output requested: Number;
+  requested <- true;
+}
+`, 'output requested must be Number');
+
+const constantOutput = compileControl(`
+control ConstantOutput {
+  output pump: Bool;
+  pump <- false;
+}
+`, { filename: 'constant-output.ghost' });
+assert.deepEqual(constantOutput.manifest.outputs, [{ name: 'pump', type: 'Bool' }]);
+
+const parsed = parseControl('control Parsed { output pump: Bool; pump <- false; }', { filename: 'parsed.ghost' });
 assert.equal(parsed.name, 'Parsed');
 assert.ok(parsed.sourceNodes.some(node => node.kind === 'connection'));
 
@@ -278,7 +314,7 @@ control MissingCase {
   type Phase = Idle | Open;
   state phase: Phase = Idle;
   phase' = case phase { Idle => Idle; };
-  output pump: Bool = false;
+  output pump: Bool;
 }
 `, 'must be exhaustive');
 
@@ -286,7 +322,7 @@ expectError(`
 control UnitMix {
   state duration: Duration = 1s;
   duration' = duration + 20%;
-  output pump: Bool = false;
+  output pump: Bool;
 }
 `, 'does not implicitly mix Duration and Percent');
 
@@ -295,13 +331,13 @@ control NextOutsideOutput {
   state first: Bool = false;
   state second: Bool = false;
   second' = first';
-  output pump: Bool = false;
+  output pump: Bool;
 }
 `, 'allowed only in output expressions');
 
 expectError(`
 control Unknown {
-  output pump: Bool = false;
+  output pump: Bool;
   pump <- missing;
 }
 `, 'bad.ghost:4:11: unknown identifier missing');
@@ -309,7 +345,7 @@ control Unknown {
 expectError(`
 control Recursive {
   fn loop(value: Bool) -> Bool { loop(value) }
-  output pump: Bool = false;
+  output pump: Bool;
   pump <- loop(true);
 }
 `, 'recursive purefn loop is not supported');
@@ -318,7 +354,7 @@ expectError(`
 control MutualRecursive {
   fn first(value: Bool) -> Bool { second(value) }
   fn second(value: Bool) -> Bool { first(value) }
-  output pump: Bool = false;
+  output pump: Bool;
   pump <- first(true);
 }
 `, 'recursive purefn first is not supported');
@@ -327,7 +363,7 @@ expectError(`
 control CapturedInput {
   input enabled: Bool;
   fn hidden() -> Bool { enabled }
-  output pump: Bool = false;
+  output pump: Bool;
 }
 `, 'purefn hidden cannot capture global enabled');
 
@@ -335,7 +371,7 @@ expectError(`
 control CapturedState {
   state held: Bool = false;
   fn hidden() -> Bool { held }
-  output pump: Bool = false;
+  output pump: Bool;
 }
 `, 'purefn hidden cannot capture global held');
 
@@ -343,7 +379,7 @@ expectError(`
 control LetCycle {
   let first = second;
   let second = first;
-  output pump: Bool = false;
+  output pump: Bool;
   pump <- first;
 }
 `, 'cyclic let definition involving first');
@@ -352,7 +388,7 @@ const repeatedDup = `${'dup('.repeat(13)}true${')'.repeat(13)}`;
 expectError(`
 control Expansion {
   fn dup(value: Bool) -> Bool { value && value }
-  output pump: Bool = false;
+  output pump: Bool;
   pump <- ${repeatedDup};
 }
 `, 'function expansion exceeds 4096 node budget');
@@ -361,28 +397,28 @@ expectError(`
 control Duplicate {
   input start: Bool;
   state start: Bool = false;
-  output pump: Bool = false;
+  output pump: Bool;
 }
 `, 'duplicate name start');
 
 expectError(`
 control Reserved {
   input __gf_now_ms: Number;
-  output pump: Bool = false;
+  output pump: Bool;
 }
 `, 'uses reserved __gf_ prefix');
 
 expectError(`
 control Unsupported {
   adapt { }
-  output pump: Bool = false;
+  output pump: Bool;
 }
 `, 'unsupported construct adapt');
 
 expectError(`
 control Constraints {
   constraints Shared { }
-  output pump: Bool = false;
+  output pump: Bool;
 }
 `, 'named-constraints parser');
 
@@ -392,53 +428,53 @@ control BadSlots {
     timezone = "Asia/Seoul";
     selected = [06:07, 06:00];
   }
-  output pump: Bool = false;
+  output pump: Bool;
 }
 `, 'requires a unique 15-minute HH:MM slot');
 
 expectError(`
 control BadSensor {
   sensor moisture: Percent { filter = median(4); }
-  output pump: Bool = false;
+  output pump: Bool;
 }
 `, 'median window must be an odd integer');
 
 expectError(`
 control RecoverBudget {
   sensor moisture: Percent { recover_after = 32 samples; }
-  output pump: Bool = false;
+  output pump: Bool;
 }
 `, 'recover_after must be an integer from 1 to 31 samples');
 
 expectError(`
 control PercentRange {
   config target: Percent = 101%;
-  output pump: Bool = false;
+  output pump: Bool;
 }
 `, 'Percent literal must be between 0% and 100%');
 
 expectError(`
 control NegativePercent {
   config target: Percent = -1%;
-  output pump: Bool = false;
+  output pump: Bool;
 }
 `, 'Percent constant must be between 0% and 100%');
 
 expectError(`
 control NegativeDuration {
   config wait: Duration = -1s;
-  output pump: Bool = false;
+  output pump: Bool;
 }
 `, 'Duration constant must be a non-negative integer number of milliseconds');
 
 expectError(`
 control FractionalDuration {
   config wait: Duration = 1.5s;
-  output pump: Bool = false;
+  output pump: Bool;
 }
 `, 'Duration literal must use a whole-number unit quantity');
 
 const manyInputs = Array.from({ length: 129 }, (_, index) => `input input${index}: Bool;`).join('\n');
-expectError(`control Budget { ${manyInputs} output pump: Bool = false; }`, 'input budget exceeded');
+expectError(`control Budget { ${manyInputs} output pump: Bool; }`, 'input budget exceeded');
 
 console.log(`control tests passed (${scheduledResult.bytes.length} byte scheduled control, ${sensorResult.bytes.length} byte sensor control)`);
