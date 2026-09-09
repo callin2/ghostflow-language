@@ -8,6 +8,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const TESTS = Object.freeze([
+  'tests/boundary-conformance.test.mjs',
   'tests/compiler.test.mjs', 'tests/constraints.test.mjs', 'tests/control-host.test.mjs',
   'tests/control.test.mjs', 'tests/integration-contract.test.mjs', 'tests/ledger.test.mjs',
   'tests/literate.test.mjs', 'tests/policy.test.mjs',
