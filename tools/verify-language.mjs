@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 // Deliberately explicit. Product/LLM/device tests belong to other repositories.
 export const LANGUAGE_TESTS = Object.freeze([
+  'tests/boundary-conformance.test.mjs',
   'tests/compiler.test.mjs',
   'tests/constraints.test.mjs',
   'tests/control-host.test.mjs',
