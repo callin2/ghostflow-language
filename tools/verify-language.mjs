@@ -15,6 +15,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/ledger.test.mjs',
   'tests/literate.test.mjs',
   'tests/policy.test.mjs',
+  'tests/requirement-catalog.test.mjs',
   'tests/schedule.test.mjs',
   'tests/scheduled-admission.test.mjs',
   'tests/signals-wasm.test.mjs',
@@ -89,7 +90,7 @@ async function verify(nodeOnly) {
     if (process.platform === 'win32') throw new Error('retained native tutorial paths require a POSIX host (macOS/Linux)');
     for (const relative of [
       'tools', 'crates/ghostflow-core', 'runtimes/wasm', 'runtimes/node/ledger.mjs',
-      'tests', 'examples', 'docs', 'contracts/integration-v1', 'README.md', 'AGENTS.md', '.gitignore',
+      'tests', 'examples', 'docs', 'contracts/integration-v1', 'contracts/requirements', 'README.md', 'AGENTS.md', '.gitignore',
       'Cargo.toml', 'Cargo.lock', 'package.json', 'package-lock.json', 'Makefile',
     ]) hashSource(relative);
     for (const test of LANGUAGE_TESTS) {

@@ -41,7 +41,7 @@ fence 안의 원래 코드 들여쓰기는 유지한다. 각 본문의 마지막
 ```ghost
 control Irrigation {
   input start, stop: Bool;
-  output pump, valve: Bool = false;
+  output pump, valve: Bool;
   state watering: Bool = false;
 ```
 
@@ -74,7 +74,7 @@ control Irrigation {
 ```text
 control Irrigation {
   input start, stop: Bool;
-  output pump, valve: Bool = false;
+  output pump, valve: Bool;
   state watering: Bool = false;
 
   watering' = !stop && (start || watering);
@@ -94,7 +94,7 @@ control Irrigation {
 ````markdown
 ```ghost
 control Demo {
-  output pump: Bool = false;
+  output pump: Bool;
   pump <- false;
 }
 ```
@@ -153,7 +153,7 @@ control의 닫는 중괄호가 누락되면 시작 위치와 문서 끝을 함�
 ````markdown
 ```ghost
 control Demo {
-  output pump: Bool = false;
+  output pump: Bool;
   require pump => ;
 }
 ```
@@ -169,7 +169,7 @@ control Demo {
 ````markdown
 ```ghost
 control Demo {
-  output pump: Bool = false;
+  output pump: Bool;
 ```
 
 설명을 이어 쓴다.
