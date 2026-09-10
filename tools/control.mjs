@@ -119,7 +119,6 @@ class ControlParser {
     this.nextNodeId = 1;
   }
   current() { return this.tokens[this.at]; }
-  previous() { return this.tokens[this.at - 1]; }
   matches(value) { return this.current().value === value; }
   take() { return this.tokens[this.at++]; }
   maybe(value) { if (this.matches(value)) return this.take(); return null; }
