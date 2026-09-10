@@ -1,5 +1,6 @@
 import { compileControl } from './control.mjs';
 import { extractLiterate, mapSourcePosition } from './literate.mjs';
+import { remapSourceTrace } from './source-trace.mjs';
 
 const UTF8 = new TextEncoder();
 const RAW_JSON_LIMIT = 1024 * 1024;
@@ -236,5 +237,6 @@ export async function compileLessonBundle(jsonText) {
   } catch (error) {
     remapCompileError(error, extraction, filename);
   }
+  compilation = { ...compilation, traceMetadata: remapSourceTrace(compilation.traceMetadata, extraction.sourceMap) };
   return { bundle, extraction, compilation };
 }

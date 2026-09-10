@@ -334,6 +334,38 @@ impl Module {
 
 pub type NamedValues = BTreeMap<String, Value>;
 
+const SAFETY_TRACE_MAX_CONSTRAINTS: usize = 128;
+const SAFETY_TRACE_MAX_NAMES: usize = 32;
+
+#[derive(Clone, Debug)]
+pub struct SafetyTrace {
+    pub constraints: Vec<SafetyTraceConstraint>,
+}
+
+#[derive(Clone, Debug)]
+pub struct SafetyTraceConstraint {
+    pub index: usize,
+    pub kind: &'static str,
+    pub names: Vec<String>,
+    /// The first observed rule violation only; this is not a complete causality graph.
+    pub first_violation: Option<SafetyTraceViolation>,
+    pub final_evaluation: SafetyTraceFinal,
+}
+
+#[derive(Clone, Debug)]
+pub struct SafetyTraceViolation {
+    pub round: usize,
+    pub values: NamedValues,
+    pub blocked: Vec<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct SafetyTraceFinal {
+    pub round: usize,
+    pub values: NamedValues,
+    pub satisfied: bool,
+}
+
 #[derive(Clone, Debug)]
 pub struct TickRecord {
     pub module_fingerprint: u64,
@@ -345,6 +377,7 @@ pub struct TickRecord {
     pub requested_intents: NamedValues,
     pub safe_intents: NamedValues,
     pub faults: Vec<String>,
+    pub safety_trace: SafetyTrace,
 }
 
 impl TickRecord {
@@ -382,10 +415,34 @@ impl TickRecord {
                     .join(",")
             )
         }
-        format!("{{\"tick\":{},\"module\":\"{:016x}\",\"strategy\":{},\"inputs\":{},\"stateBefore\":{},\"stateAfter\":{},\"requested\":{},\"safe\":{},\"faults\":[{}]}}",
+        fn strings(items: &[String]) -> String {
+            format!(
+                "[{}]",
+                items
+                    .iter()
+                    .map(|item| text(item))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            )
+        }
+        fn safety_trace(trace: &SafetyTrace) -> String {
+            let constraints = trace.constraints.iter().map(|constraint| {
+                let first = constraint.first_violation.as_ref().map_or_else(|| "null".to_string(), |violation| {
+                    format!("{{\"round\":{},\"values\":{},\"blocked\":{}}}", violation.round, values(&violation.values), strings(&violation.blocked))
+                });
+                format!("{{\"index\":{},\"kind\":{},\"names\":{},\"firstViolation\":{},\"final\":{{\"round\":{},\"values\":{},\"satisfied\":{}}}}}",
+                    constraint.index, text(constraint.kind), strings(&constraint.names), first,
+                    constraint.final_evaluation.round, values(&constraint.final_evaluation.values), constraint.final_evaluation.satisfied)
+            }).collect::<Vec<_>>().join(",");
+            format!(
+                "{{\"format\":\"GhostFlow/safety-trace-v1\",\"constraints\":[{}]}}",
+                constraints
+            )
+        }
+        format!("{{\"tick\":{},\"module\":\"{:016x}\",\"strategy\":{},\"inputs\":{},\"stateBefore\":{},\"stateAfter\":{},\"requested\":{},\"safe\":{},\"faults\":[{}],\"safetyTrace\":{}}}",
             self.tick, self.module_fingerprint, text(&self.strategy), values(&self.inputs),
             values(&self.state_before), values(&self.state_after), values(&self.requested_intents),
-            values(&self.safe_intents), self.faults.iter().map(|fault| text(fault)).collect::<Vec<_>>().join(","))
+            values(&self.safe_intents), self.faults.iter().map(|fault| text(fault)).collect::<Vec<_>>().join(","), safety_trace(&self.safety_trace))
     }
 }
 
@@ -579,7 +636,7 @@ impl Runtime {
             debug_assert_eq!(value.value_type(), intent.value_type);
             requested.insert(intent.name.clone(), value);
         }
-        let (safe, faults) = apply_safety(requested.clone(), &m.constraints);
+        let (safe, faults, safety_trace) = apply_safety(requested.clone(), &m.constraints);
         let rec = TickRecord {
             module_fingerprint: m.fingerprint,
             tick: self.next_tick,
@@ -590,6 +647,7 @@ impl Runtime {
             requested_intents: requested,
             safe_intents: safe.clone(),
             faults,
+            safety_trace,
         };
         self.next_tick = next_tick;
         self.last_time_ms = clock.or(self.last_time_ms);
@@ -744,15 +802,93 @@ fn select_strategy(m: &Module, caps: &[Capability]) -> Result<usize> {
         .map(|x| x.0)
         .ok_or_else(|| Error::new("no device strategy matches capabilities"))
 }
-fn apply_safety(mut values: NamedValues, constraints: &[Constraint]) -> (NamedValues, Vec<String>) {
+fn trace_names(constraint: &Constraint) -> Vec<String> {
+    constraint
+        .names
+        .iter()
+        .take(SAFETY_TRACE_MAX_NAMES)
+        .cloned()
+        .collect()
+}
+
+fn trace_values(values: &NamedValues, names: &[String]) -> NamedValues {
+    names
+        .iter()
+        .filter_map(|name| values.get(name).map(|value| (name.clone(), *value)))
+        .collect()
+}
+
+fn constraint_kind(constraint: &Constraint) -> &'static str {
+    match constraint.kind {
+        1 => "requires",
+        3 => "requires-any",
+        _ => "mutex",
+    }
+}
+
+fn constraint_blocked(values: &NamedValues, constraint: &Constraint) -> Vec<String> {
+    let on = |name: &String| matches!(values.get(name), Some(Value::Bool(true)));
+    if constraint.kind == 1 || constraint.kind == 3 {
+        if on(&constraint.names[0]) && !constraint.names[1..].iter().any(on) {
+            return vec![constraint.names[0].clone()];
+        }
+    } else if constraint.names.iter().filter(|name| on(name)).count() > 1 {
+        return constraint
+            .names
+            .iter()
+            .filter(|name| on(name))
+            .cloned()
+            .collect();
+    }
+    vec![]
+}
+
+fn apply_safety(
+    mut values: NamedValues,
+    constraints: &[Constraint],
+) -> (NamedValues, Vec<String>, SafetyTrace) {
     let mut faults = BTreeSet::new();
+    let mut trace = SafetyTrace {
+        constraints: constraints
+            .iter()
+            .take(SAFETY_TRACE_MAX_CONSTRAINTS)
+            .enumerate()
+            .map(|(index, constraint)| {
+                let names = trace_names(constraint);
+                SafetyTraceConstraint {
+                    index,
+                    kind: constraint_kind(constraint),
+                    names: names.clone(),
+                    first_violation: None,
+                    final_evaluation: SafetyTraceFinal {
+                        round: 0,
+                        values: trace_values(&values, &names),
+                        satisfied: false,
+                    },
+                }
+            })
+            .collect(),
+    };
     // Every round reads one candidate snapshot. Only true -> false is possible.
-    for _ in 0..=values.len() {
+    for round in 0..=values.len() {
         let mut blocked = BTreeSet::new();
-        let on = |name: &String| matches!(values.get(name), Some(Value::Bool(true)));
-        for c in constraints {
+        for (index, c) in constraints.iter().enumerate() {
+            let rule_blocked = constraint_blocked(&values, c);
+            if let Some(record) = trace.constraints.get_mut(index) {
+                if !rule_blocked.is_empty() && record.first_violation.is_none() {
+                    record.first_violation = Some(SafetyTraceViolation {
+                        round,
+                        values: trace_values(&values, &record.names),
+                        blocked: rule_blocked
+                            .iter()
+                            .filter(|name| record.names.contains(name))
+                            .cloned()
+                            .collect(),
+                    });
+                }
+            }
             if c.kind == 1 || c.kind == 3 {
-                if on(&c.names[0]) && !c.names[1..].iter().any(on) {
+                if !rule_blocked.is_empty() {
                     blocked.insert(c.names[0].clone());
                     faults.insert(format!(
                         "requires:{}:{}",
@@ -760,19 +896,31 @@ fn apply_safety(mut values: NamedValues, constraints: &[Constraint]) -> (NamedVa
                         c.names[1..].join("|")
                     ));
                 }
-            } else if c.names.iter().filter(|name| on(name)).count() > 1 {
-                blocked.extend(c.names.iter().filter(|name| on(name)).cloned());
+            } else if !rule_blocked.is_empty() {
+                blocked.extend(rule_blocked);
                 faults.insert(format!("mutex:{}", c.names.join(",")));
             }
         }
         if blocked.is_empty() {
+            for (index, c) in constraints
+                .iter()
+                .enumerate()
+                .take(SAFETY_TRACE_MAX_CONSTRAINTS)
+            {
+                let record = &mut trace.constraints[index];
+                record.final_evaluation = SafetyTraceFinal {
+                    round,
+                    values: trace_values(&values, &record.names),
+                    satisfied: constraint_blocked(&values, c).is_empty(),
+                };
+            }
             break;
         }
         for name in blocked {
             values.insert(name, Value::Bool(false));
         }
     }
-    (values, faults.into_iter().collect())
+    (values, faults.into_iter().collect(), trace)
 }
 
 fn verify_expression(
@@ -1160,9 +1308,9 @@ mod tests {
                 names: vec!["a".into(), "b".into()],
             },
         ];
-        let (forward, faults) = apply_safety(initial.clone(), &rules);
+        let (forward, faults, _) = apply_safety(initial.clone(), &rules);
         rules.reverse();
-        let (reverse, _) = apply_safety(initial, &rules);
+        let (reverse, _, _) = apply_safety(initial, &rules);
         assert_eq!(forward, reverse);
         assert!(forward.values().all(|value| *value == Value::Bool(false)));
         assert_eq!(faults.len(), 2);
@@ -1184,6 +1332,133 @@ mod tests {
             },
         ];
         assert_eq!(apply_safety(initial, &rules).0["pump"], Value::Bool(false));
+    }
+    #[test]
+    fn safety_trace_records_first_pass_block_and_final_no_block_round() {
+        let initial = [("pump", true), ("permit", false)]
+            .into_iter()
+            .map(|(name, value)| (name.into(), Value::Bool(value)))
+            .collect();
+        let rules = vec![Constraint {
+            kind: 1,
+            names: vec!["pump".into(), "permit".into()],
+        }];
+        let (safe, _, trace) = apply_safety(initial, &rules);
+        let rule = &trace.constraints[0];
+        let first = rule.first_violation.as_ref().unwrap();
+        assert_eq!(safe["pump"], Value::Bool(false));
+        assert_eq!(first.round, 0);
+        assert_eq!(first.values["pump"], Value::Bool(true));
+        assert_eq!(first.blocked, vec!["pump"]);
+        assert_eq!(rule.final_evaluation.round, 1);
+        assert_eq!(rule.final_evaluation.values["pump"], Value::Bool(false));
+        assert!(rule.final_evaluation.satisfied);
+        let encoded = TickRecord {
+            module_fingerprint: 0,
+            tick: 1,
+            strategy: "test".into(),
+            inputs: BTreeMap::new(),
+            state_before: BTreeMap::new(),
+            state_after: BTreeMap::new(),
+            requested_intents: BTreeMap::new(),
+            safe_intents: safe,
+            faults: vec![],
+            safety_trace: trace,
+        }
+        .to_json();
+        assert!(encoded.contains("\"format\":\"GhostFlow/safety-trace-v1\""));
+        assert!(encoded.contains("\"firstViolation\":{\"round\":0"));
+    }
+    #[test]
+    fn safety_trace_records_cascaded_requires_in_later_round() {
+        let initial = [("pump", true), ("valve", true), ("permit", false)]
+            .into_iter()
+            .map(|(name, value)| (name.into(), Value::Bool(value)))
+            .collect();
+        let rules = vec![
+            Constraint {
+                kind: 1,
+                names: vec!["pump".into(), "valve".into()],
+            },
+            Constraint {
+                kind: 1,
+                names: vec!["valve".into(), "permit".into()],
+            },
+        ];
+        let (_, _, trace) = apply_safety(initial, &rules);
+        assert_eq!(
+            trace.constraints[0].first_violation.as_ref().unwrap().round,
+            1
+        );
+        assert_eq!(
+            trace.constraints[1].first_violation.as_ref().unwrap().round,
+            0
+        );
+        assert_eq!(trace.constraints[0].final_evaluation.round, 2);
+        assert!(trace
+            .constraints
+            .iter()
+            .all(|rule| rule.final_evaluation.satisfied));
+    }
+    #[test]
+    fn safety_trace_records_mutex_and_satisfied_false_target() {
+        let mutex_initial = [("a", true), ("b", true)]
+            .into_iter()
+            .map(|(name, value)| (name.into(), Value::Bool(value)))
+            .collect();
+        let mutex = vec![Constraint {
+            kind: 2,
+            names: vec!["a".into(), "b".into()],
+        }];
+        let (_, _, mutex_trace) = apply_safety(mutex_initial, &mutex);
+        let mutex_rule = &mutex_trace.constraints[0];
+        assert_eq!(mutex_rule.kind, "mutex");
+        assert_eq!(
+            mutex_rule.first_violation.as_ref().unwrap().blocked,
+            vec!["a", "b"]
+        );
+        assert_eq!(mutex_rule.final_evaluation.round, 1);
+
+        let false_target = [("pump", false), ("permit", false)]
+            .into_iter()
+            .map(|(name, value)| (name.into(), Value::Bool(value)))
+            .collect();
+        let requires = vec![Constraint {
+            kind: 1,
+            names: vec!["pump".into(), "permit".into()],
+        }];
+        let (_, _, trace) = apply_safety(false_target, &requires);
+        assert!(trace.constraints[0].first_violation.is_none());
+        assert_eq!(trace.constraints[0].final_evaluation.round, 0);
+        assert_eq!(
+            trace.constraints[0].final_evaluation.values["pump"],
+            Value::Bool(false)
+        );
+        assert!(trace.constraints[0].final_evaluation.satisfied);
+    }
+    #[test]
+    fn safety_trace_bounds_one_snapshot_pair_per_rule() {
+        let initial = (0..33)
+            .map(|index| (format!("v{index}"), Value::Bool(false)))
+            .collect();
+        let names = (0..33).map(|index| format!("v{index}")).collect::<Vec<_>>();
+        let rules = (0..129)
+            .map(|_| Constraint {
+                kind: 2,
+                names: names.clone(),
+            })
+            .collect::<Vec<_>>();
+        let (_, _, trace) = apply_safety(initial, &rules);
+        assert_eq!(trace.constraints.len(), 128);
+        assert!(trace.constraints.iter().all(|rule| rule.names.len() == 32));
+        assert!(trace
+            .constraints
+            .iter()
+            .all(|rule| rule.first_violation.is_none()));
+        assert!(trace
+            .constraints
+            .iter()
+            .all(|rule| rule.final_evaluation.values.len() == 32));
     }
     #[test]
     fn constant_query_and_bounds_are_verified() {
