@@ -548,7 +548,12 @@ class Lowerer {
     }
     // Every node carries the original filename/line/column, including when a
     // future literate extractor maps this array back to Markdown locations.
-    return { bytes, manifest: this.manifest, sourceMap: this.ast.sourceNodes, traceMetadata: buildSourceTrace(this.ast, this.constraints, bytes) };
+    return {
+      bytes,
+      manifest: this.manifest,
+      sourceMap: this.ast.sourceNodes,
+      traceMetadata: buildSourceTrace(this.ast, this.constraints, bytes, transitions, intents),
+    };
   }
   unique(name, loc, category) {
     rejectName(name, loc, category);
