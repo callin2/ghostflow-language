@@ -17,6 +17,23 @@ cryptographic integrity proof. Consumers must keep source/compiler/runtime and
 SHA-256 identities from the same compilation/run. Two different commented sources
 can generate identical bytecode; matching fingerprints alone do not select source.
 
+## Static dependency companion
+
+Language issue #11 / TASK-58.12.1 adds `dependencies` to the compiler companion.
+Each entry has `target: {field, name}` and deduplicated `reads: [{field, name}]`.
+Transition targets use `stateAfter`, intent targets use `requested`; reads retain
+`inputs`, `stateBefore` and `stateAfter` phases. These come from the compiler's
+already-lowered expressions, including expanded functions and implicit holds.
+They are possible static reads, including both conditional branches, **not** an
+executed-branch trace or a claim that every read caused the selected output.
+
+Consumers resolve source locations through existing bindings. Generated fields
+without bindings are explicitly unmapped, never assigned an invented source
+location. Previous-state edges end at the previous scan boundary; following them
+as same-scan transitions would falsely create feedback causality. Global safety
+constraints remain a separate relation with their actual round observations.
+This companion does not change GFB bytes or runtime output semantics.
+
 ## Runtime observations
 
 `TickRecord.to_json()` adds `safetyTrace` with format `GhostFlow/safety-trace-v1`.
