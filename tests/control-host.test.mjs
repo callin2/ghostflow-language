@@ -77,7 +77,7 @@ test('accepts compiler-emitted v2 settings and executes the compiled config valu
   const compiled = await compileSource(`
 control SettingsHost {
   config duration: Duration = 5min { min = 1min; max = 20min; step = 1min; access = operator; label = "관수 시간"; }
-  output enabled: Bool = false;
+  output enabled: Bool;
   enabled <- duration > 0min;
 }
 `, { filename: 'settings-host.ghost' });
@@ -94,7 +94,7 @@ control SettingsHost {
 });
 
 test('strictly validates v2 settings metadata and keeps v1 metadata-free', async () => {
-  const v2 = await compileSource('control V2 { config level: Percent = 50% { min = 0%; max = 100%; step = 10%; access = designer; apply = stopped; label = "Level"; } output ready: Bool = false; ready <- level >= 0%; }', { filename: 'v2-settings.ghost' });
+  const v2 = await compileSource('control V2 { config level: Percent = 50% { min = 0%; max = 100%; step = 10%; access = designer; apply = stopped; label = "Level"; } output ready: Bool; ready <- level >= 0%; }', { filename: 'v2-settings.ghost' });
   const invalid = change => ({ ...v2, manifest: { ...v2.manifest, configs: [{ ...v2.manifest.configs[0], settings: { ...v2.manifest.configs[0].settings, ...change } }] } });
   await assert.rejects(() => ControlRuntime.instantiateSimulation(wasmBytes, invalid({ access: 'viewer' })), /access/);
   await assert.rejects(() => ControlRuntime.instantiateSimulation(wasmBytes, invalid({ apply: 'running' })), /apply/);
@@ -103,7 +103,7 @@ test('strictly validates v2 settings metadata and keeps v1 metadata-free', async
   await assert.rejects(() => ControlRuntime.instantiateSimulation(wasmBytes, invalid({ min: '0' })), /must be/);
   await assert.rejects(() => ControlRuntime.instantiateSimulation(wasmBytes, { ...v2, manifest: { ...v2.manifest, configs: [{ ...v2.manifest.configs[0], initialOffset: '0' }] } }), /Offset|offset/);
 
-  const v1 = await compileSource('control V1 { config duration: Duration = 5min; output ready: Bool = false; ready <- duration > 0min; }', { filename: 'v1-settings.ghost' });
+  const v1 = await compileSource('control V1 { config duration: Duration = 5min; output ready: Bool; ready <- duration > 0min; }', { filename: 'v1-settings.ghost' });
   assert.equal(v1.manifest.format, 'GhostFlow/control-v1');
   await assert.rejects(() => ControlRuntime.instantiate(wasmBytes, { ...v1, manifest: { ...v1.manifest, configs: [{ ...v1.manifest.configs[0], settings: { access: 'operator' } }] } }), /unknown key|v1 config/);
 });
@@ -125,7 +125,7 @@ test('deep-copies and freezes the validated manifest', async () => {
 });
 
 test('freezes nested v2 settings and preserves the bytecode hash boundary', async () => {
-  const compiled = await compileSource('control FrozenSettings { config level: Percent = 50% { min = 0%; max = 100%; step = 10%; access = operator; } output ready: Bool = false; ready <- level > 0%; }', { filename: 'frozen-settings.ghost' });
+  const compiled = await compileSource('control FrozenSettings { config level: Percent = 50% { min = 0%; max = 100%; step = 10%; access = operator; } output ready: Bool; ready <- level > 0%; }', { filename: 'frozen-settings.ghost' });
   const runtime = await ControlRuntime.instantiateSimulation(wasmBytes, compiled);
   try {
     assert.equal(Object.isFrozen(runtime.manifest.configs[0]), true);
