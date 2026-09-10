@@ -26,6 +26,13 @@ callbacks. `runtimes/node/ledger.mjs` provides the file persistence used by host
 station tests. API and firmware consumers must consume these implementations
 through their contracts instead of reimplementing VM transitions.
 
+An `output name: Type;` declaration is type-only and must have exactly one
+`name <- expression;` connection. The connection produces a logical requested
+intent for the tick; safety resolution may produce a distinct safe intent. The VM
+does not assign startup defaults and does not promise that an intent reached
+hardware. Startup and failure-safe OFF behavior, output application timing, and
+driver disconnect handling are host/Driver policy and require separate evidence.
+
 ## Artifacts and versions
 
 | Item | Current representation | Role |

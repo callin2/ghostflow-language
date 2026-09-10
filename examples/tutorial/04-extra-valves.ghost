@@ -12,7 +12,7 @@ control ExtraValves {
   type Phase = Idle | Open3 | Water3 | Stop3 | Switch | Open4 | Water4 | Stop4;
   state phase: Phase = Idle;
   timer age = elapsed(phase);
-  output pump, valve3, valve4: Bool = false;
+  output pump, valve3, valve4: Bool;
 
   phase' = case phase {
     Idle => if extra_starts.due then Open3 else Idle;

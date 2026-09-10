@@ -1224,14 +1224,58 @@ mod tests {
         runtime.activate().unwrap();
         submit(&mut runtime, true, false, false, 90.0);
         runtime.tick().unwrap();
+        assert_eq!(runtime.intent("pump"), Some(Value::Bool(true)));
         let mut bad = module.clone();
         bad.states[0].value_type = Type::Number;
         bad.states[0].default = Value::Number(0.0);
         assert!(runtime.hot_swap(bad).is_err());
         assert_eq!(runtime.state("watering"), Some(Value::Bool(true)));
+        assert_eq!(runtime.intent("pump"), Some(Value::Bool(true)));
         let mut renamed = module;
         renamed.name = "another".into();
         assert!(runtime.hot_swap(renamed).is_err());
+        assert_eq!(runtime.intent("pump"), Some(Value::Bool(true)));
+    }
+    #[test]
+    fn output_intents_exist_only_after_a_successful_tick_and_reset_at_hot_swap() {
+        let module = Module::load(MODULE).unwrap();
+        let mut runtime = Runtime::new(16);
+        runtime.install(module.clone(), false);
+        for name in ["pump", "valve"] {
+            runtime
+                .add_capability(Capability::new("actuator", name, Type::Bool))
+                .unwrap();
+        }
+
+        // Installation and activation select code but do not invent an output
+        // intent. The host/driver owns its physical safe state until a complete
+        // input snapshot commits the first tick.
+        assert_eq!(runtime.intent("pump"), None);
+        runtime.activate().unwrap();
+        assert_eq!(runtime.intent("pump"), None);
+        assert!(runtime.tick().is_err());
+        assert_eq!(runtime.intent("pump"), None);
+        assert!(runtime.journal().is_empty());
+
+        submit(&mut runtime, true, false, false, 90.0);
+        runtime.tick().unwrap();
+        assert_eq!(runtime.intent("pump"), Some(Value::Bool(true)));
+        assert_eq!(runtime.journal().len(), 1);
+
+        // A missing next snapshot is atomic and retains the last committed VM
+        // intent. A successful module replacement instead clears it, requiring
+        // the host to hold safe output until the replacement's first tick.
+        assert!(runtime.tick().is_err());
+        assert_eq!(runtime.intent("pump"), Some(Value::Bool(true)));
+        assert_eq!(runtime.journal().len(), 1);
+        runtime.hot_swap(module).unwrap();
+        assert_eq!(runtime.intent("pump"), None);
+        assert!(runtime.tick().is_err());
+        assert_eq!(runtime.intent("pump"), None);
+
+        submit(&mut runtime, true, false, false, 90.0);
+        runtime.tick().unwrap();
+        assert_eq!(runtime.intent("pump"), Some(Value::Bool(true)));
     }
     #[test]
     fn monotonic_input_failure_is_atomic() {

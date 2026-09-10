@@ -11,7 +11,7 @@ control LatchingPump {
   input start: Bool;
   input stop: Bool;
 
-  output pump, valve: Bool = false;
+  output pump, valve: Bool;
   state watering: Bool = false;
 
   // stop wins when start and stop arrive in the same tick.

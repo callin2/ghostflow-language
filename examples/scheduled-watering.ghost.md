@@ -37,7 +37,7 @@ control ScheduledWatering {
   config pump_stop_delay: Duration = 2s;
   config switch_delay: Duration = 2s;
 
-  output pump, valve1, valve2: Bool = false;
+  output pump, valve1, valve2: Bool;
 ```
 
 ## 어디까지 진행했는가

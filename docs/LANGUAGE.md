@@ -64,7 +64,7 @@ safe            = safety(requested, constraints)
 | strategy | 장치 질의, 전략별 입력, 계산, 전이, 의도 |
 | let / with | 상태를 갖지 않는 이름 있는 중간 계산 |
 | next | 다음 상태의 정의 |
-| intent / emit | 현재 tick에 요청하는 capability 출력 |
+| output / intent / emit | 타입을 선언하고 정확히 하나의 연결식으로 현재 tick의 capability 출력 intent를 요청 |
 | safety | 최종 출력에 적용할 requires / mutex 제약 |
 
 표현식 그래프의 조합 논리 순환은 컴파일 오류다. 피드백은 state처럼 이전 tick
@@ -86,7 +86,7 @@ control WateringDemand {
   input start, stop: Bool;
   sensor low_water: Bool;
 
-  output pump, valve: Bool = false;
+  output pump, valve: Bool;
   state watering: Bool = false;
 
   let water_ok = case low_water {
@@ -105,6 +105,12 @@ control WateringDemand {
 
 `watering`은 기억, `watering'`은 이번 tick에 확정할 후보, `<-`는 출력 의도다.
 함수 `hold` 자체에는 숨은 기억이 없다. 시작·정지는 bool 샘플이며 에지 이벤트가 아니다.
+
+`output name: Type;`은 intent 포트의 타입만 선언한다. 각 출력 이름에는 정확히 하나의
+`name <- expression;` 연결이 있어야 하며 선언의 초기값은 허용하지 않는다. 이 연결식은
+VM이 이번 tick에 요청하는 논리 intent다. 부팅·계산 실패·호스트 연결 해제 때 출력을 OFF로
+유지하거나 적용을 중단하는 startup/fail-safe 정책은 VM intent와 별개로 호스트/Driver가
+소유한다. 출력 선언의 기본값으로 안전 정책을 암묵적으로 정하지 않는다.
 다음은 초기 watering=false에서 순서대로 입력한 기대 결과다.
 
 | tick | start | stop | low_water | watering' | valve / pump 의도 |
@@ -358,7 +364,7 @@ fault에는 위반한 제약과 차단한 출력 ID를 남긴다.
 ```ghost
 control OutputGuard {
   input pump_request, valve_request: Bool;
-  output pump, valve: Bool = false;
+  output pump, valve: Bool;
 
   valve <- valve_request;
   pump  <- pump_request;

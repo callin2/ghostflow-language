@@ -20,7 +20,7 @@ control MoistureDemand {
   };
 
   state watering: Bool = false;
-  output pump, valve: Bool = false;
+  output pump, valve: Bool;
 
   watering' = !stop && dry_ok && (start || watering);
   valve <- watering';

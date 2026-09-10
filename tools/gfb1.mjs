@@ -1,7 +1,9 @@
 class CompileError extends Error {}
 
+const UTF8 = new TextEncoder();
+
 function tokenize(source) {
-  if (Buffer.byteLength(source) > 1024 * 1024) throw new CompileError('source byte limit exceeded');
+  if (UTF8.encode(source).byteLength > 1024 * 1024) throw new CompileError('source byte limit exceeded');
   const tokens = [];
   let i = 0;
   while (i < source.length) {
@@ -45,14 +47,14 @@ const OP = { bool:1, number:2, input:3, state:4, next:5, not:10, and:11, or:12,
 
 class Writer {
   constructor() { this.parts = []; }
-  bytes(v) { this.parts.push(Buffer.from(v)); }
-  u8(v) { const b=Buffer.alloc(1); b.writeUInt8(v); this.parts.push(b); }
-  u16(v) { const b=Buffer.alloc(2); b.writeUInt16LE(v); this.parts.push(b); }
-  u32(v) { const b=Buffer.alloc(4); b.writeUInt32LE(v); this.parts.push(b); }
-  i32(v) { const b=Buffer.alloc(4); b.writeInt32LE(v); this.parts.push(b); }
-  f64(v) { const b=Buffer.alloc(8); b.writeDoubleLE(v); this.parts.push(b); }
-  str(s) { const b=Buffer.from(s, 'utf8'); if (b.length>65535) throw new CompileError('string too long'); this.u16(b.length); this.bytes(b); }
-  finish() { return Buffer.concat(this.parts); }
+  bytes(v) { this.parts.push(v instanceof Uint8Array ? v : new Uint8Array(v)); }
+  u8(v) { const b=new Uint8Array(1); new DataView(b.buffer).setUint8(0,v); this.parts.push(b); }
+  u16(v) { const b=new Uint8Array(2); new DataView(b.buffer).setUint16(0,v,true); this.parts.push(b); }
+  u32(v) { const b=new Uint8Array(4); new DataView(b.buffer).setUint32(0,v,true); this.parts.push(b); }
+  i32(v) { const b=new Uint8Array(4); new DataView(b.buffer).setInt32(0,v,true); this.parts.push(b); }
+  f64(v) { const b=new Uint8Array(8); new DataView(b.buffer).setFloat64(0,v,true); this.parts.push(b); }
+  str(s) { const b=UTF8.encode(s); if (b.length>65535) throw new CompileError('string too long'); this.u16(b.length); this.bytes(b); }
+  finish() { const size=this.parts.reduce((total,part)=>total+part.byteLength,0); const out=new Uint8Array(size); let at=0; for(const part of this.parts){out.set(part,at);at+=part.byteLength;} return globalThis.Buffer?.from ? globalThis.Buffer.from(out) : out; }
 }
 
 function assertName(name, label) {
@@ -145,7 +147,7 @@ function compile(ast) {
   });
   unique(compiledStrategies,'strategy'); if(!compiledStrategies.length)throw new CompileError('module needs a strategy');
   for(const c of constraints)for(const s of compiledStrategies){const available=new Map(s.intents.map(i=>[i.name,i.type]));for(const n of c.names){if(!available.has(n))throw new CompileError(`constraint intent ${n} is missing from strategy ${s.name}`);if(available.get(n)!==TYPE.bool)throw new CompileError(`constraint intent ${n} must be bool`);}}
-  const w=new Writer();w.bytes(Buffer.from('GFB1'));w.u16(1);w.str(name);w.u32(version);
+  const w=new Writer();w.bytes(UTF8.encode('GFB1'));w.u16(1);w.str(name);w.u32(version);
   w.u16(inputs.length);for(const x of inputs){w.str(x.name);w.u8(x.type);}
   w.u16(states.length);for(const x of states){w.str(x.name);w.u8(x.type);if(x.type===TYPE.bool)w.u8(x.value?1:0);else w.f64(x.value);}
   w.u16(compiledStrategies.length);for(const s of compiledStrategies){w.str(s.name);w.i32(s.priority);w.u32(s.query.length);w.bytes(s.query);w.u16(s.transitions.length);for(const t of s.transitions){w.u16(t.index);w.u32(t.expr.length);w.bytes(t.expr);}w.u16(s.intents.length);for(const i of s.intents){w.str(i.name);w.u8(i.type);w.u32(i.expr.length);w.bytes(i.expr);}}

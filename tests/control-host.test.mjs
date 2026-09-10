@@ -18,7 +18,7 @@ control MoistureHost {
   }
   signal dry = hysteresis(moisture, on_below: 30%, off_above: 35%, initial: false);
   let dry_ok = case dry { ok(value) => value; fault(_) => false; };
-  output pump: Bool = false;
+  output pump: Bool;
   pump <- start && dry_ok;
 }
 `;
@@ -162,7 +162,7 @@ test('keeps typed Percent inputs strict while sensor Percent payloads remain fal
   const compiled = await compileSource(`
 control PercentInputHost {
   input level: Percent;
-  output pump: Bool = false;
+  output pump: Bool;
   pump <- level > 50%;
 }
 `, { filename: 'percent-input-host.ghost' });

@@ -13,7 +13,7 @@
 | `input start: Bool;` | 호스트가 공급하는 매 tick 입력 |
 | `sensor moisture: Percent;` | 측정 payload 타입; 읽기는 정상/오류를 구분 |
 | `sensor moisture?: Percent;` | 설치가 선택적인 sensor capability |
-| `output pump: Bool = false;` | 출력 포트와 초기/안전 기본값 |
+| `output pump: Bool;` | 출력 intent 포트의 타입 선언 |
 | `state watering: Bool = false;` | tick 사이에 남는 상태와 초기값 |
 | `let name = expression;` | 상태를 갖지 않는 계산 |
 | `watering' = expression;` | 다음 상태의 정의 |
@@ -53,7 +53,9 @@ let water_ok = case low_water {
 
 sensor의 선언 타입은 정상 payload이며 실제 읽기는 해당 값 또는 fault다.
 fault를 처리해 대체값을 사용해도 원래 입력 오류는 기록한다. input/output 이름은
-control 안에서 유일하며, 같은 출력에 두 정의를 쓰지 않는다.
+control 안에서 유일하다. 출력은 타입만 선언하고 같은 이름의 `name <- expression;`
+연결을 정확히 하나 둬야 한다. 출력 연결은 이번 tick에 계산할 intent를 정의하며,
+선언에 초기값을 쓰거나 연결을 생략할 수 없다.
 
 `require`는 순수 출력 제약이다. 초기 지원 형태는 bool 출력의 requires와 mutex로
 제한한다. 예를 들어 `pump => (valve1 || valve2)`는 열린 밸브 의도가 하나도 없으면
@@ -114,7 +116,7 @@ control LatchingPump {
   input stop: Bool;
   input enabled: Bool;
 
-  output pump, valve: Bool = false;
+  output pump, valve: Bool;
   state running: Bool = false;
 
   // stop과 start가 같은 tick에 오면 stop이 이긴다.
@@ -137,6 +139,12 @@ false` 또는 둘 다인 tick에서는 `running'`과 두 출력이 모두 false�
 중재는 [공통 제약 계약](CONSTRAINTS.md)의 모드 관리자·공유 설비 제약이 담당한다.
 피드백 센서, 압력, 유량은 이 기본 예제의 필수 입력이 아니다.
 
+출력 intent의 계산과 실제 출력의 시작·정지·장애 시 안전 상태는 서로 다른 경계다.
+GhostFlow VM은 연결식과 safety 제약을 계산해 requested/safe intent를 반환할 뿐이며,
+부팅·실패·연결 해제 시 모든 출력을 OFF로 만드는 fail-safe 정책과 적용 시점은
+호스트/Driver가 소유한다. `output` 선언의 생략된 초기값을 그런 정책의 표현으로
+해석하지 않는다.
+
 ### 시간표와 타이머를 읽는 단일 밸브 관수 예제
 
 아래는 [일반 관수 예제](../examples/scheduled-watering.ghost)의 시간표/단계 전이에서
@@ -150,7 +158,7 @@ control TimedWatering {
     selected = [06:00, 18:45];
   }
 
-  output pump, valve: Bool = false;
+  output pump, valve: Bool;
   type Phase = Idle | Open1 | Water1 | Stop1;
 
   state phase: Phase = Idle;
