@@ -14,7 +14,7 @@ export class LiterateError extends Error {
 /** CommonMark determines containers; raw source supplies unmodified code and locations. */
 export function extractLiterate(markdown, { filename = '<literate>' } = {}) {
   if (typeof markdown !== 'string') throw new TypeError('markdown must be a string');
-  if (Buffer.byteLength(markdown) > MAX_INPUT_BYTES) throw new RangeError('literate byte limit exceeded');
+  if (new TextEncoder().encode(markdown).byteLength > MAX_INPUT_BYTES) throw new RangeError('literate byte limit exceeded');
   const lines = markdown.replace(/\r\n/g, '\n').split('\n');
   if (lines.length > MAX_INPUT_LINES) throw new RangeError('literate line limit exceeded');
   let frontMatterEnd = -1;
