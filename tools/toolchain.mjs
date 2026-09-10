@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { compile, parse, tokenize } from './gfb1.mjs';
+import { remapSourceTrace } from './source-trace.mjs';
 
 function remapSourceNodes(nodes, lines, mapPosition) {
   if (!Array.isArray(nodes)) return nodes;
@@ -54,7 +55,7 @@ export async function compileSource(source, { filename = 'program.ghost' } = {})
   }
   if (extraction) {
     const { mapSourcePosition } = await import('./literate.mjs');
-    result = { ...result, sourceMap: remapSourceNodes(result.sourceMap, extraction.sourceMap, mapSourcePosition) };
+    result = { ...result, sourceMap: remapSourceNodes(result.sourceMap, extraction.sourceMap, mapSourcePosition), traceMetadata: remapSourceTrace(result.traceMetadata, extraction.sourceMap) };
   }
   const bytes = Buffer.from(result.bytes);
   if (bytes.length > 1024 * 1024) throw new Error('compiled module byte limit exceeded');

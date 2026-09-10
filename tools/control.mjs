@@ -6,6 +6,7 @@
  * load modules, or execute user supplied code.
  */
 import { tokenize as sexprTokenize, parse as sexprParse, compile as compileGfb, CompileError } from './gfb1.mjs';
+import { buildSourceTrace } from './source-trace.mjs';
 
 const INPUT_LIMIT = 128;
 const STATE_LIMIT = 128;
@@ -547,7 +548,7 @@ class Lowerer {
     }
     // Every node carries the original filename/line/column, including when a
     // future literate extractor maps this array back to Markdown locations.
-    return { bytes, manifest: this.manifest, sourceMap: this.ast.sourceNodes };
+    return { bytes, manifest: this.manifest, sourceMap: this.ast.sourceNodes, traceMetadata: buildSourceTrace(this.ast, this.constraints, bytes) };
   }
   unique(name, loc, category) {
     rejectName(name, loc, category);
