@@ -137,8 +137,8 @@
         "path": "crates/ghostflow-core/src/lib.rs",
         "heading": "fn output_intents_exist_only_after_a_successful_tick_and_reset_at_hot_swap()",
         "lines": [
-          1515,
-          1553
+          1516,
+          1554
         ],
         "sha256": "fad904bbab62b4ed435e7fcfda4abd5daec22b69c457aefe4b036415f1430731"
       },
