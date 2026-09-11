@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fmt;
 
+pub mod scan;
 pub mod signals;
 pub mod station;
 
