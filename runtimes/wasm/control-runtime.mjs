@@ -1,4 +1,5 @@
 import { GhostFlowRuntime } from './ghostflow-runtime.mjs';
+import { FramedGhostFlowRuntime } from './framed-runtime.mjs';
 import { SignalConditioner } from './signals.mjs';
 
 const FORMAT = 'GhostFlow/control-v1';
@@ -288,36 +289,46 @@ function hostReading(raw, sensorType) {
 
 function inputValue(value, inputType, label) { return typedValue(value, inputType, label); }
 
+async function instantiateControlRuntime(wasmBytes, { bytes: bytecode, manifest } = {}, options, instantiateRuntime) {
+  const wasm = new Uint8Array(bytes(wasmBytes, 'wasmBytes'));
+  // Copy caller-owned bytecode before awaiting digest verification (TOCTOU-safe).
+  const compiledBytes = new Uint8Array(bytes(bytecode, 'bytes'));
+  const checkedManifest = validateManifest(manifest, options);
+  const digest = await sha256(compiledBytes);
+  if (digest !== checkedManifest.manifest.bytecodeSha256) throw new Error('bytecode SHA-256 does not match manifest');
+
+  const runtime = await instantiateRuntime(wasm);
+  const sensors = new Map();
+  const signals = new Map();
+  try {
+    runtime.load(compiledBytes);
+    for (const item of checkedManifest.manifest.sensors) sensors.set(item.name, { item, conditioner: new SignalConditioner(runtime.wasm, sensorConfig(item)) });
+    for (const item of checkedManifest.manifest.signals) {
+      const sensor = checkedManifest.sensorByName.get(item.sensor);
+      // Signals intentionally duplicate the sensor conditioner: each node owns
+      // its own bounded 31-slot state and can be checkpointed independently.
+      signals.set(item.name, { item, conditioner: new SignalConditioner(runtime.wasm, { ...sensorConfig(sensor), hysteresis: { onBelow: item.onBelow, offAbove: item.offAbove, initial: item.initial } }) });
+    }
+    for (const output of checkedManifest.manifest.outputs) runtime.addCapability('actuator', output.name, output.type === 'Bool' ? 'bool' : 'number');
+    runtime.activate();
+  } catch (error) {
+    for (const { conditioner } of signals.values()) conditioner.dispose();
+    for (const { conditioner } of sensors.values()) conditioner.dispose();
+    runtime.dispose();
+    throw error;
+  }
+  return { runtime, checkedManifest, sensors, signals };
+}
+
 export class ControlRuntime {
   static async instantiate(wasmBytes, { bytes: bytecode, manifest } = {}, options = {}) {
-    const wasm = new Uint8Array(bytes(wasmBytes, 'wasmBytes'));
-    // Copy caller-owned bytecode before awaiting digest verification (TOCTOU-safe).
-    const compiledBytes = new Uint8Array(bytes(bytecode, 'bytes'));
-    const checkedManifest = validateManifest(manifest, options);
-    const digest = await sha256(compiledBytes);
-    if (digest !== checkedManifest.manifest.bytecodeSha256) throw new Error('bytecode SHA-256 does not match manifest');
+    const initialized = await instantiateControlRuntime(wasmBytes, { bytes: bytecode, manifest }, options, GhostFlowRuntime.instantiate);
+    return new ControlRuntime(initialized.runtime, initialized.checkedManifest, initialized.sensors, initialized.signals);
+  }
 
-    const runtime = await GhostFlowRuntime.instantiate(wasm);
-    const sensors = new Map();
-    const signals = new Map();
-    try {
-      runtime.load(compiledBytes);
-      for (const item of checkedManifest.manifest.sensors) sensors.set(item.name, { item, conditioner: new SignalConditioner(runtime.wasm, sensorConfig(item)) });
-      for (const item of checkedManifest.manifest.signals) {
-        const sensor = checkedManifest.sensorByName.get(item.sensor);
-        // Signals intentionally duplicate the sensor conditioner: each node owns
-        // its own bounded 31-slot state and can be checkpointed independently.
-        signals.set(item.name, { item, conditioner: new SignalConditioner(runtime.wasm, { ...sensorConfig(sensor), hysteresis: { onBelow: item.onBelow, offAbove: item.offAbove, initial: item.initial } }) });
-      }
-      for (const output of checkedManifest.manifest.outputs) runtime.addCapability('actuator', output.name, output.type === 'Bool' ? 'bool' : 'number');
-      runtime.activate();
-    } catch (error) {
-      for (const { conditioner } of signals.values()) conditioner.dispose();
-      for (const { conditioner } of sensors.values()) conditioner.dispose();
-      runtime.dispose();
-      throw error;
-    }
-    return new ControlRuntime(runtime, checkedManifest, sensors, signals);
+  static async instantiateFramed(wasmBytes, artifact = {}, options = {}) {
+    const initialized = await instantiateControlRuntime(wasmBytes, artifact, options, FramedGhostFlowRuntime.instantiate);
+    return new ControlRuntime(initialized.runtime, initialized.checkedManifest, initialized.sensors, initialized.signals, true);
   }
 
   // New simulation consumers opt into the v2 operating-settings contract.
@@ -326,7 +337,11 @@ export class ControlRuntime {
     return ControlRuntime.instantiate(wasmBytes, artifact, { acceptSettings: true });
   }
 
-  constructor(runtime, manifest, sensors, signals) {
+  #frameScanId;
+  #framed;
+  #faulted;
+
+  constructor(runtime, manifest, sensors, signals, framed = false) {
     this.runtime = runtime;
     this.exports = runtime.wasm;
     this.manifest = manifest.manifest;
@@ -336,6 +351,16 @@ export class ControlRuntime {
     this.sensors = sensors;
     this.signals = signals;
     this.lastNowMs = null;
+    this.#framed = framed;
+    this.#frameScanId = 0;
+    this.#faulted = false;
+  }
+
+  /** Latest committed framed outcome; legacy entries deliberately expose none. */
+  get lastFrameOutcome() {
+    this.#live();
+    if (!this.#framed) return null;
+    return this.runtime.outcome;
   }
 
   /**
@@ -343,56 +368,19 @@ export class ControlRuntime {
    * acquisition owner; this host never polls hardware or performs I/O.
    */
   step({ nowMs, inputs = {}, samples = {}, due = {} } = {}) {
+    if (this.#framed) return this.#stepFramed({ nowMs, inputs, samples, due });
+    return this.#stepLegacy({ nowMs, inputs, samples, due });
+  }
+
+  #stepLegacy({ nowMs, inputs = {}, samples = {}, due = {} } = {}) {
     this.#live();
-    safeInteger(nowMs, 'nowMs');
-    if (this.lastNowMs !== null && nowMs < this.lastNowMs) throw new Error('nowMs must be monotonic');
-    record(inputs, 'inputs'); record(samples, 'samples'); record(due, 'due');
-    const inputKeys = Object.keys(inputs);
-    for (const key of inputKeys) if (!this.inputNames.has(key)) throw new Error(`unknown input ${key}`);
-    for (const item of this.manifest.inputs) if (!Object.prototype.hasOwnProperty.call(inputs, item.name)) throw new Error(`missing input ${item.name}`);
-    for (const key of Object.keys(samples)) if (!this.sensorByName.has(key)) throw new Error(`unknown sensor ${key}`);
-    for (const key of Object.keys(due)) if (!this.scheduleNames.has(key)) throw new Error(`unknown schedule ${key}`);
-
-    const normalizedSamples = new Map();
-    for (const [sensorName, raw] of Object.entries(samples)) {
-      const item = this.sensorByName.get(sensorName);
-      const sample = record(raw, `samples.${sensorName}`);
-      keys(sample, ['epoch', 'id', 'timestampMs', 'quality', 'value'], [], `samples.${sensorName}`);
-      const epoch = safeInteger(sample.epoch, `samples.${sensorName}.epoch`);
-      const id = safeInteger(sample.id, `samples.${sensorName}.id`);
-      const timestampMs = safeInteger(sample.timestampMs, `samples.${sensorName}.timestampMs`);
-      if (timestampMs > nowMs) throw new RangeError(`samples.${sensorName}.timestampMs cannot be in the future`);
-      const quality = sample.quality;
-      if (!(typeof quality === 'number' ? Number.isInteger(quality) && quality >= 0 && quality <= 4 : ['NotReady', 'Good', 'Disconnected', 'Stale', 'Invalid'].includes(quality))) throw new TypeError(`samples.${sensorName}.quality is unsupported`);
-      let value;
-      if (item.type === 'Bool') {
-        if (typeof sample.value !== 'boolean') throw new TypeError(`samples.${sensorName}.value must be boolean`);
-        value = sample.value ? 1 : 0;
-      } else {
-        if (typeof sample.value !== 'number') throw new TypeError(`samples.${sensorName}.value must be numeric`);
-        // Hardware payloads are fallible data. Normalize non-finite values to a
-        // core Invalid sample so the VM receives a safe value and provenance.
-        value = Number.isFinite(sample.value) ? sample.value : 0;
-      }
-      normalizedSamples.set(sensorName, { epoch, id, timestampMs, value, quality: Number.isFinite(sample.value) || item.type === 'Bool' ? quality : 'Invalid' });
-    }
-    for (const item of this.manifest.inputs) inputValue(inputs[item.name], item.type, `inputs.${item.name}`);
-    for (const [scheduleName, value] of Object.entries(due)) if (typeof value !== 'boolean') throw new TypeError(`due.${scheduleName} must be boolean`);
-
-    const sensorReadings = new Map();
-    for (const [sensorName, entry] of this.sensors) {
-      const raw = normalizedSamples.has(sensorName) ? entry.conditioner.update(normalizedSamples.get(sensorName), nowMs) : entry.conditioner.read(nowMs);
-      sensorReadings.set(sensorName, hostReading(raw, entry.item.type));
-    }
-    const signalReadings = new Map();
-    for (const [signalName, entry] of this.signals) {
-      const raw = normalizedSamples.has(entry.item.sensor) ? entry.conditioner.update(normalizedSamples.get(entry.item.sensor), nowMs) : entry.conditioner.read(nowMs);
-      signalReadings.set(signalName, { ok: raw.ok, value: raw.ok ? Boolean(raw.dry) : false, quality: raw.quality, dry: raw.ok ? Boolean(raw.dry) : false });
-    }
+    const captured = this.#captureSnapshot({ nowMs, inputs, samples, due });
+    const { sensorReadings, signalReadings } = this.#condition(captured.normalizedSamples, captured.nowMs);
 
     for (const item of this.manifest.inputs) {
-      if (item.type === 'Bool') this.runtime.setBool(item.name, inputs[item.name]);
-      else this.runtime.setNumber(item.name, inputs[item.name]);
+      const value = captured.inputValues.get(item.name);
+      if (item.type === 'Bool') this.runtime.setBool(item.name, value);
+      else this.runtime.setNumber(item.name, value);
     }
     for (const [sensorName, entry] of this.sensors) {
       const reading = sensorReadings.get(sensorName);
@@ -405,9 +393,9 @@ export class ControlRuntime {
       this.runtime.setBool(entry.item.valueInput, reading.value);
       this.runtime.setBool(entry.item.okInput, reading.ok);
     }
-    for (const item of this.manifest.schedules) this.runtime.setBool(item.dueInput, due[item.name] ?? false);
-    if (this.manifest.timers.length > 0) this.runtime.tickAt(nowMs); else this.runtime.tick();
-    this.lastNowMs = nowMs;
+    for (const item of this.manifest.schedules) this.runtime.setBool(item.dueInput, captured.dueValues.get(item.name) ?? false);
+    if (this.manifest.timers.length > 0) this.runtime.tickAt(captured.nowMs); else this.runtime.tick();
+    this.lastNowMs = captured.nowMs;
     return {
       vm: this.runtime.trace,
       sensors: Object.fromEntries(sensorReadings),
@@ -415,11 +403,116 @@ export class ControlRuntime {
     };
   }
 
+  #captureSnapshot({ nowMs, inputs = {}, samples = {}, due = {} } = {}) {
+    safeInteger(nowMs, 'nowMs');
+    if (this.lastNowMs !== null && nowMs < this.lastNowMs) throw new Error('nowMs must be monotonic');
+    record(inputs, 'inputs'); record(samples, 'samples'); record(due, 'due');
+    for (const key of Object.keys(inputs)) if (!this.inputNames.has(key)) throw new Error(`unknown input ${key}`);
+    for (const item of this.manifest.inputs) if (!Object.prototype.hasOwnProperty.call(inputs, item.name)) throw new Error(`missing input ${item.name}`);
+    for (const key of Object.keys(samples)) if (!this.sensorByName.has(key)) throw new Error(`unknown sensor ${key}`);
+    for (const key of Object.keys(due)) if (!this.scheduleNames.has(key)) throw new Error(`unknown schedule ${key}`);
+
+    const inputValues = new Map();
+    for (const item of this.manifest.inputs) {
+      const value = inputs[item.name];
+      inputValue(value, item.type, `inputs.${item.name}`);
+      inputValues.set(item.name, value);
+    }
+
+    const normalizedSamples = new Map();
+    for (const sensorName of Object.keys(samples)) {
+      const item = this.sensorByName.get(sensorName);
+      const sample = record(samples[sensorName], `samples.${sensorName}`);
+      keys(sample, ['epoch', 'id', 'timestampMs', 'quality', 'value'], [], `samples.${sensorName}`);
+      const epoch = safeInteger(sample.epoch, `samples.${sensorName}.epoch`);
+      const id = safeInteger(sample.id, `samples.${sensorName}.id`);
+      const timestampMs = safeInteger(sample.timestampMs, `samples.${sensorName}.timestampMs`);
+      if (timestampMs > nowMs) throw new RangeError(`samples.${sensorName}.timestampMs cannot be in the future`);
+      const quality = sample.quality;
+      if (!(typeof quality === 'number' ? Number.isInteger(quality) && quality >= 0 && quality <= 4 : ['NotReady', 'Good', 'Disconnected', 'Stale', 'Invalid'].includes(quality))) throw new TypeError(`samples.${sensorName}.quality is unsupported`);
+      const rawValue = sample.value;
+      let value;
+      if (item.type === 'Bool') {
+        if (typeof rawValue !== 'boolean') throw new TypeError(`samples.${sensorName}.value must be boolean`);
+        value = rawValue ? 1 : 0;
+      } else {
+        if (typeof rawValue !== 'number') throw new TypeError(`samples.${sensorName}.value must be numeric`);
+        value = Number.isFinite(rawValue) ? rawValue : 0;
+      }
+      normalizedSamples.set(sensorName, { epoch, id, timestampMs, value, quality: Number.isFinite(rawValue) || item.type === 'Bool' ? quality : 'Invalid' });
+    }
+
+    const dueValues = new Map();
+    for (const item of this.manifest.schedules) {
+      if (!Object.prototype.hasOwnProperty.call(due, item.name)) continue;
+      const value = due[item.name];
+      if (typeof value !== 'boolean') throw new TypeError(`due.${item.name} must be boolean`);
+      dueValues.set(item.name, value);
+    }
+    return { nowMs, inputValues, normalizedSamples, dueValues };
+  }
+
+  #condition(normalizedSamples, nowMs) {
+    const sensorReadings = new Map();
+    for (const [sensorName, entry] of this.sensors) {
+      const raw = normalizedSamples.has(sensorName) ? entry.conditioner.update(normalizedSamples.get(sensorName), nowMs) : entry.conditioner.read(nowMs);
+      sensorReadings.set(sensorName, hostReading(raw, entry.item.type));
+    }
+    const signalReadings = new Map();
+    for (const [signalName, entry] of this.signals) {
+      const raw = normalizedSamples.has(entry.item.sensor) ? entry.conditioner.update(normalizedSamples.get(entry.item.sensor), nowMs) : entry.conditioner.read(nowMs);
+      signalReadings.set(signalName, { ok: raw.ok, value: raw.ok ? Boolean(raw.dry) : false, quality: raw.quality, dry: raw.ok ? Boolean(raw.dry) : false });
+    }
+    return { sensorReadings, signalReadings };
+  }
+
+  #stepFramed(snapshot) {
+    this.#live();
+    if (this.#faulted) throw new Error('framed ControlRuntime is faulted; create a new instance');
+    const captured = this.#captureSnapshot(snapshot);
+    if (this.#frameScanId === null || !Number.isSafeInteger(this.#frameScanId) || this.#frameScanId < 0 || this.#frameScanId > MAX_SAFE) {
+      throw new RangeError('framed scan ID is exhausted');
+    }
+
+    try {
+      const { sensorReadings, signalReadings } = this.#condition(captured.normalizedSamples, captured.nowMs);
+      const frameInputs = [];
+      for (const item of this.manifest.inputs) frameInputs.push({ name: item.name, value: captured.inputValues.get(item.name) });
+      for (const [, entry] of this.sensors) {
+        const reading = sensorReadings.get(entry.item.name);
+        frameInputs.push({ name: entry.item.valueInput, value: reading.value });
+        frameInputs.push({ name: entry.item.okInput, value: reading.ok });
+      }
+      for (const [, entry] of this.signals) {
+        const reading = signalReadings.get(entry.item.name);
+        frameInputs.push({ name: entry.item.valueInput, value: reading.value });
+        frameInputs.push({ name: entry.item.okInput, value: reading.ok });
+      }
+      for (const item of this.manifest.schedules) frameInputs.push({ name: item.dueInput, value: captured.dueValues.get(item.name) ?? false });
+
+      const scanId = this.#frameScanId;
+      const outcome = this.runtime.scan({ scanId, logicalTimeMs: captured.nowMs, inputs: frameInputs });
+      this.lastNowMs = captured.nowMs;
+      this.#frameScanId = scanId === MAX_SAFE ? null : scanId + 1;
+      return {
+        vm: outcome.trace,
+        sensors: Object.fromEntries(sensorReadings),
+        signals: Object.fromEntries(signalReadings),
+        frame: { scanId, logicalTimeMs: captured.nowMs },
+      };
+    } catch (error) {
+      this.#faulted = true;
+      throw error;
+    }
+  }
+
   dispose() {
     for (const { conditioner } of this.signals.values()) conditioner.dispose();
     for (const { conditioner } of this.sensors.values()) conditioner.dispose();
     this.runtime.dispose();
     this.lastNowMs = null;
+    this.#frameScanId = null;
+    this.#faulted = false;
   }
 
   #live() { if (!this.runtime.handle) throw new Error('ControlRuntime is disposed'); }
