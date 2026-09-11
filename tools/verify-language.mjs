@@ -13,6 +13,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/coverage-edges.test.mjs',
   'tests/gfb1-browser.test.mjs',
   'tests/control-host.test.mjs',
+  'tests/framed-control-host.test.mjs',
   'tests/control.test.mjs',
   'tests/integration-contract.test.mjs',
   'tests/ledger.test.mjs',
