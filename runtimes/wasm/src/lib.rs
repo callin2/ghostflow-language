@@ -1,6 +1,9 @@
 use ghostflow_core::{Capability, Module, Runtime, Type, Value};
 use std::{slice, str};
 
+#[path = "../framed_abi.rs"]
+mod framed_abi;
+
 #[path = "../signals_abi.rs"]
 mod signals_abi;
 
