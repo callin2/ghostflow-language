@@ -37,18 +37,20 @@ driver disconnect handling are host/Driver policy and require separate evidence.
 
 | Item | Current representation | Role |
 |---|---|---|
-| Authoritative program | `.ghost` or `.ghost.md` | User/LLM-authored control source |
+| Authoritative program | `.ghost.md` | Literate source with intent, code, comments and explanation; plain `.ghost` remains a low-level test/import input |
 | Generated executable | `.gfb`, GFB1 envelope version 1 | Binary IR consumed by the VM |
 | Generated control manifest | `GhostFlow/control-v1` | Typed host ports, timer/sensor/schedule requirements and bytecode hash |
 | Generated constraint policy | `GhostFlow/constraints-v1` | Lowered standalone constraint source, bound by the host |
-| Generated source map | `.gfb.map.json` | Diagnostic nodes and literate line mapping |
+| Generated source map | `.gfb.map.json` | Diagnostic nodes/line mapping; source-preserving envelope from compileSource as specified in SOURCE-MAP.md |
 | Integration identity/evidence | `contracts/integration-v1`, pure checker | Cross-project release, profile, mapping and run identities |
 | Host verification | `GhostFlow/language-verification-v1` | This checkout's commands, results and source/artifact hashes |
 
 The npm/core version `0.1.0`, source-language profile, bytecode version, manifest
-format and firmware version are independent. The source map currently has no
-separate version tag. This migration does not alter compiler artifact schemas;
-the integration team's v1 contract checker is included unchanged.
+format and firmware version are independent. The original migration map was an
+unversioned nodes/lines object. The additive [source-map contract](SOURCE-MAP.md)
+preserves those fields and adds a versioned original-source envelope and paired
+hashes. GFB and the strict control manifest remain unchanged. The integration
+team's v1 contract checker is included unchanged.
 
 A release owner must preserve source, bytecode, manifest and map together with
 their hashes, compiler/core revision, dependency locks, runtime ABI/profile and
