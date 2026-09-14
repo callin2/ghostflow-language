@@ -13,6 +13,7 @@
     "test:contract": "node --test tests/integration-contract.test.mjs",
     "test:coverage": "node tools/coverage-language.mjs",
     "test:mutation:output": "node tools/mutation-output-contract.mjs",
+    "generate:pc01": "node tools/generate-pc-01-projection.mjs --write",
     "tutorial": "node tools/tutorial.mjs",
     "compile": "node tools/ghostc.mjs",
     "compile:example": "node tools/ghostc.mjs examples/scheduled-watering.ghost build/scheduled-watering.gfb",

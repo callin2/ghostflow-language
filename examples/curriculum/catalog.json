@@ -10,6 +10,7 @@
     "repository": "callin2/farm_studio_system",
     "revision": "056a1c88cdfe3276700f6b6a819b715370af20eb"
   },
+  "replayScenarios": "examples/curriculum/replay-scenarios.json",
   "lessons": [
     {
       "id": "PC-01",
@@ -19,8 +20,9 @@
         "path": "docs/ProgrammingInGhostflow.md",
         "anchor": "ch01",
         "example": "E01",
+        "generatedPath": "examples/curriculum/generated/pc-01-e01.generated.ghost.md",
         "documentSha256": "f9af11d95f3430a0cbf6c32d56745a77f172a73f1d537e0b894f0c0a4478e450",
-        "projectionSha256": "19439a1f0f7772c8ee4278c6acb170a680e1226f4f72972daa2c8fe1c326af5e"
+        "projectionSha256": "64c95bef71b46035c98921837cb359cb0b20ae7e60f2976f38c13b23a21099f8"
       }
     },
     {

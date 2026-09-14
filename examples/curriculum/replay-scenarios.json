@@ -1,0 +1,166 @@
+{
+  "format": "GhostFlow/plc-curriculum-replay-v1",
+  "scenarios": [
+    {
+      "id": "PC-01",
+      "source": {
+        "canonicalPath": "docs/ProgrammingInGhostflow.md",
+        "canonicalSha256": "f9af11d95f3430a0cbf6c32d56745a77f172a73f1d537e0b894f0c0a4478e450",
+        "executablePath": "examples/curriculum/generated/pc-01-e01.generated.ghost.md",
+        "executableSha256": "64c95bef71b46035c98921837cb359cb0b20ae7e60f2976f38c13b23a21099f8"
+      },
+      "inputs": ["switch_on"],
+      "outputs": ["lamp"],
+      "frames": [
+        { "atMs": 0, "inputs": { "switch_on": false } },
+        { "atMs": 1000, "inputs": { "switch_on": true } },
+        { "atMs": 2000, "inputs": { "switch_on": false } }
+      ],
+      "checkpoints": [
+        { "frame": 0, "requested": { "lamp": false }, "safe": { "lamp": false } },
+        { "frame": 1, "requested": { "lamp": true }, "safe": { "lamp": true } },
+        { "frame": 2, "requested": { "lamp": false }, "safe": { "lamp": false } }
+      ]
+    },
+    {
+      "id": "PC-02",
+      "source": {
+        "canonicalPath": "examples/curriculum/pc-02-start-stop.ghost.md",
+        "canonicalSha256": "e92cc7ff393cd6c7a8fc9ff7d5a9285e928c1953eac3b85e11d525a969b08fc1",
+        "executablePath": "examples/curriculum/pc-02-start-stop.ghost.md",
+        "executableSha256": "e92cc7ff393cd6c7a8fc9ff7d5a9285e928c1953eac3b85e11d525a969b08fc1"
+      },
+      "inputs": ["start", "stop_ok"],
+      "outputs": ["valve", "pump"],
+      "frames": [
+        { "atMs": 0, "inputs": { "start": false, "stop_ok": true } },
+        { "atMs": 100, "inputs": { "start": true, "stop_ok": true } },
+        { "atMs": 200, "inputs": { "start": false, "stop_ok": true } },
+        { "atMs": 300, "inputs": { "start": false, "stop_ok": false } },
+        { "atMs": 400, "inputs": { "start": true, "stop_ok": true } },
+        { "atMs": 500, "inputs": { "start": false, "stop_ok": true } },
+        { "atMs": 600, "inputs": { "start": true, "stop_ok": true } }
+      ],
+      "checkpoints": [
+        { "frame": 0, "requested": { "valve": false, "pump": false }, "safe": { "valve": false, "pump": false } },
+        { "frame": 1, "requested": { "valve": true, "pump": true }, "safe": { "valve": true, "pump": true } },
+        { "frame": 3, "requested": { "valve": false, "pump": false }, "safe": { "valve": false, "pump": false } },
+        { "frame": 4, "requested": { "valve": false, "pump": false }, "safe": { "valve": false, "pump": false } },
+        { "frame": 6, "requested": { "valve": true, "pump": true }, "safe": { "valve": true, "pump": true } }
+      ]
+    },
+    {
+      "id": "PC-03",
+      "source": {
+        "canonicalPath": "examples/curriculum/pc-03-motor-contactor.ghost.md",
+        "canonicalSha256": "e02704e9cba1293d289041763046dfeb85f461ab77710addacf19758e38dec94",
+        "executablePath": "examples/curriculum/pc-03-motor-contactor.ghost.md",
+        "executableSha256": "e02704e9cba1293d289041763046dfeb85f461ab77710addacf19758e38dec94"
+      },
+      "inputs": ["start", "stop_ok", "overload_ok"],
+      "outputs": ["motor_contactor"],
+      "frames": [
+        { "atMs": 0, "inputs": { "start": false, "stop_ok": true, "overload_ok": true } },
+        { "atMs": 100, "inputs": { "start": true, "stop_ok": true, "overload_ok": true } },
+        { "atMs": 200, "inputs": { "start": false, "stop_ok": true, "overload_ok": true } },
+        { "atMs": 300, "inputs": { "start": false, "stop_ok": true, "overload_ok": false } },
+        { "atMs": 400, "inputs": { "start": true, "stop_ok": true, "overload_ok": true } },
+        { "atMs": 500, "inputs": { "start": false, "stop_ok": true, "overload_ok": true } },
+        { "atMs": 600, "inputs": { "start": true, "stop_ok": true, "overload_ok": true } }
+      ],
+      "checkpoints": [
+        { "frame": 0, "requested": { "motor_contactor": false }, "safe": { "motor_contactor": false } },
+        { "frame": 1, "requested": { "motor_contactor": true }, "safe": { "motor_contactor": true } },
+        { "frame": 3, "requested": { "motor_contactor": false }, "safe": { "motor_contactor": false } },
+        { "frame": 4, "requested": { "motor_contactor": false }, "safe": { "motor_contactor": false } },
+        { "frame": 6, "requested": { "motor_contactor": true }, "safe": { "motor_contactor": true } }
+      ]
+    },
+    {
+      "id": "PC-05",
+      "source": {
+        "canonicalPath": "examples/curriculum/pc-05-limit-feedback.ghost.md",
+        "canonicalSha256": "8ba701567bfa67257031917dd52d579d784db1c298860e866fde3782307e64f0",
+        "executablePath": "examples/curriculum/pc-05-limit-feedback.ghost.md",
+        "executableSha256": "8ba701567bfa67257031917dd52d579d784db1c298860e866fde3782307e64f0"
+      },
+      "inputs": ["open_request", "close_request", "open_limit", "close_limit", "stop_ok", "overload_ok"],
+      "outputs": ["valve_open_contactor", "valve_close_contactor"],
+      "frames": [
+        { "atMs": 0, "inputs": { "open_request": false, "close_request": false, "open_limit": false, "close_limit": true, "stop_ok": true, "overload_ok": true } },
+        { "atMs": 100, "inputs": { "open_request": true, "close_request": false, "open_limit": false, "close_limit": true, "stop_ok": true, "overload_ok": true } },
+        { "atMs": 200, "inputs": { "open_request": false, "close_request": false, "open_limit": false, "close_limit": false, "stop_ok": true, "overload_ok": true } },
+        { "atMs": 300, "inputs": { "open_request": false, "close_request": false, "open_limit": true, "close_limit": false, "stop_ok": true, "overload_ok": true } },
+        { "atMs": 400, "inputs": { "open_request": false, "close_request": true, "open_limit": true, "close_limit": false, "stop_ok": true, "overload_ok": true } },
+        { "atMs": 500, "inputs": { "open_request": false, "close_request": false, "open_limit": false, "close_limit": false, "stop_ok": true, "overload_ok": true } },
+        { "atMs": 600, "inputs": { "open_request": false, "close_request": false, "open_limit": false, "close_limit": true, "stop_ok": true, "overload_ok": true } }
+      ],
+      "checkpoints": [
+        { "frame": 0, "requested": { "valve_open_contactor": false, "valve_close_contactor": false }, "safe": { "valve_open_contactor": false, "valve_close_contactor": false } },
+        { "frame": 1, "requested": { "valve_open_contactor": true, "valve_close_contactor": false }, "safe": { "valve_open_contactor": true, "valve_close_contactor": false } },
+        { "frame": 3, "requested": { "valve_open_contactor": false, "valve_close_contactor": false }, "safe": { "valve_open_contactor": false, "valve_close_contactor": false } },
+        { "frame": 4, "requested": { "valve_open_contactor": false, "valve_close_contactor": true }, "safe": { "valve_open_contactor": false, "valve_close_contactor": true } },
+        { "frame": 6, "requested": { "valve_open_contactor": false, "valve_close_contactor": false }, "safe": { "valve_open_contactor": false, "valve_close_contactor": false } }
+      ]
+    },
+    {
+      "id": "PC-08",
+      "source": {
+        "canonicalPath": "examples/curriculum/pc-08-manual-auto.ghost.md",
+        "canonicalSha256": "d08217d485548f1b1feae947939491aa444438c46a13ca3a9aa0425d33c5a06b",
+        "executablePath": "examples/curriculum/pc-08-manual-auto.ghost.md",
+        "executableSha256": "d08217d485548f1b1feae947939491aa444438c46a13ca3a9aa0425d33c5a06b"
+      },
+      "inputs": ["manual_mode_request", "auto_mode_request", "manual_start", "auto_demand", "stop_ok", "overload_ok"],
+      "outputs": ["pump_contactor"],
+      "frames": [
+        { "atMs": 0, "inputs": { "manual_mode_request": false, "auto_mode_request": false, "manual_start": false, "auto_demand": false, "stop_ok": true, "overload_ok": true } },
+        { "atMs": 100, "inputs": { "manual_mode_request": true, "auto_mode_request": false, "manual_start": false, "auto_demand": false, "stop_ok": true, "overload_ok": true } },
+        { "atMs": 200, "inputs": { "manual_mode_request": true, "auto_mode_request": false, "manual_start": false, "auto_demand": false, "stop_ok": true, "overload_ok": true } },
+        { "atMs": 300, "inputs": { "manual_mode_request": true, "auto_mode_request": false, "manual_start": true, "auto_demand": false, "stop_ok": true, "overload_ok": true } },
+        { "atMs": 400, "inputs": { "manual_mode_request": true, "auto_mode_request": false, "manual_start": false, "auto_demand": false, "stop_ok": true, "overload_ok": true } },
+        { "atMs": 500, "inputs": { "manual_mode_request": true, "auto_mode_request": false, "manual_start": false, "auto_demand": false, "stop_ok": false, "overload_ok": true } },
+        { "atMs": 600, "inputs": { "manual_mode_request": true, "auto_mode_request": false, "manual_start": true, "auto_demand": false, "stop_ok": true, "overload_ok": true } },
+        { "atMs": 700, "inputs": { "manual_mode_request": true, "auto_mode_request": false, "manual_start": false, "auto_demand": false, "stop_ok": true, "overload_ok": true } },
+        { "atMs": 800, "inputs": { "manual_mode_request": true, "auto_mode_request": false, "manual_start": true, "auto_demand": false, "stop_ok": true, "overload_ok": true } }
+      ],
+      "checkpoints": [
+        { "frame": 0, "requested": { "pump_contactor": false }, "safe": { "pump_contactor": false } },
+        { "frame": 1, "requested": { "pump_contactor": false }, "safe": { "pump_contactor": false } },
+        { "frame": 3, "requested": { "pump_contactor": true }, "safe": { "pump_contactor": true } },
+        { "frame": 5, "requested": { "pump_contactor": false }, "safe": { "pump_contactor": false } },
+        { "frame": 6, "requested": { "pump_contactor": false }, "safe": { "pump_contactor": false } },
+        { "frame": 8, "requested": { "pump_contactor": true }, "safe": { "pump_contactor": true } }
+      ]
+    },
+    {
+      "id": "PC-09",
+      "source": {
+        "canonicalPath": "examples/curriculum/pc-09-sequential-water-supply.ghost.md",
+        "canonicalSha256": "322433eda0f7c5e0503f5830a39011d67d9eaf8c70416e8ea68f389e19821947",
+        "executablePath": "examples/curriculum/pc-09-sequential-water-supply.ghost.md",
+        "executableSha256": "322433eda0f7c5e0503f5830a39011d67d9eaf8c70416e8ea68f389e19821947"
+      },
+      "inputs": ["start_request", "open_limit", "close_limit", "stop_ok", "overload_ok"],
+      "outputs": ["valve_open_contactor", "valve_close_contactor", "pump_contactor"],
+      "frames": [
+        { "atMs": 0, "inputs": { "start_request": false, "open_limit": false, "close_limit": true, "stop_ok": true, "overload_ok": true } },
+        { "atMs": 100, "inputs": { "start_request": true, "open_limit": false, "close_limit": true, "stop_ok": true, "overload_ok": true } },
+        { "atMs": 200, "inputs": { "start_request": false, "open_limit": true, "close_limit": false, "stop_ok": true, "overload_ok": true } },
+        { "atMs": 2200, "inputs": { "start_request": false, "open_limit": true, "close_limit": false, "stop_ok": true, "overload_ok": true } },
+        { "atMs": 302200, "inputs": { "start_request": false, "open_limit": true, "close_limit": false, "stop_ok": true, "overload_ok": true } },
+        { "atMs": 302201, "inputs": { "start_request": false, "open_limit": true, "close_limit": false, "stop_ok": true, "overload_ok": true } },
+        { "atMs": 302300, "inputs": { "start_request": false, "open_limit": false, "close_limit": true, "stop_ok": true, "overload_ok": true } }
+      ],
+      "checkpoints": [
+        { "frame": 0, "requested": { "valve_open_contactor": false, "valve_close_contactor": false, "pump_contactor": false }, "safe": { "valve_open_contactor": false, "valve_close_contactor": false, "pump_contactor": false } },
+        { "frame": 1, "requested": { "valve_open_contactor": true, "valve_close_contactor": false, "pump_contactor": false }, "safe": { "valve_open_contactor": true, "valve_close_contactor": false, "pump_contactor": false } },
+        { "frame": 2, "requested": { "valve_open_contactor": false, "valve_close_contactor": false, "pump_contactor": false }, "safe": { "valve_open_contactor": false, "valve_close_contactor": false, "pump_contactor": false } },
+        { "frame": 3, "requested": { "valve_open_contactor": false, "valve_close_contactor": false, "pump_contactor": true }, "safe": { "valve_open_contactor": false, "valve_close_contactor": false, "pump_contactor": true } },
+        { "frame": 4, "requested": { "valve_open_contactor": false, "valve_close_contactor": false, "pump_contactor": false }, "safe": { "valve_open_contactor": false, "valve_close_contactor": false, "pump_contactor": false } },
+        { "frame": 5, "requested": { "valve_open_contactor": false, "valve_close_contactor": true, "pump_contactor": false }, "safe": { "valve_open_contactor": false, "valve_close_contactor": true, "pump_contactor": false } },
+        { "frame": 6, "requested": { "valve_open_contactor": false, "valve_close_contactor": false, "pump_contactor": false }, "safe": { "valve_open_contactor": false, "valve_close_contactor": false, "pump_contactor": false } }
+      ]
+    }
+  ]
+}
