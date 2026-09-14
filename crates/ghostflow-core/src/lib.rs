@@ -3,6 +3,7 @@ use std::fmt;
 
 pub mod scan;
 pub mod signals;
+pub mod solar;
 pub mod station;
 
 const MAX_INPUTS: usize = 128;

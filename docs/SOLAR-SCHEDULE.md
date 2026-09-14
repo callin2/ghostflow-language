@@ -42,6 +42,16 @@ without Solar retain their v1/v2 manifest behavior.
 DailySlots. `preview(wallMs)` reports the event's local date, `eventWallMs`,
 `scheduledWallMs`, and calculation identity. Preview never consumes an event.
 
+`ghostflow_core::solar` provides the matching bounded portable native provider
+for a device worker: `ClockSnapshot`, `SolarDescriptor`, and `SolarSchedule`.
+It accepts only `Asia/Seoul`, `UTC`, and `Etc/UTC` today; other IANA zones are
+explicitly rejected rather than given an invented DST rule. A missing `wall_ms`
+is always untrusted and cannot create a synthetic current-time sample. Its
+polling reasons retain the baseline, recovery, rollback, and gap behavior
+described below; an admitted occurrence is returned in `SolarPoll.occurrence`.
+The calculation port and its retained upstream license are documented in
+[SUNCALC-ATTRIBUTION.md](SUNCALC-ATTRIBUTION.md).
+
 The pinned [SunCalc 2.0.2](https://github.com/mourner/suncalc/tree/v2.0.2)
 provider calculates sea-level sunrise/sunset (upper limb, standard refraction).
 Supported event dates are 2000–2100. Adjacent UTC solar days are resolved to the
