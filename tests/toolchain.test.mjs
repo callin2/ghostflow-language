@@ -6,7 +6,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { compileControl } from '../tools/control.mjs';
 import { extractLiterate } from '../tools/literate.mjs';
-import { compileSource, verifyArtifactSourceMap, writeArtifact } from '../tools/toolchain.mjs';
+import { compileSource, restoreArtifactSourceMap, verifyArtifactSourceMap, writeArtifact } from '../tools/toolchain.mjs';
 
 const filename = 'mapped.ghost.md';
 const markdown = [
@@ -30,6 +30,28 @@ const markdown = [
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
+}
+
+const traceableTimerControl = `control TraceableTimer {
+  input running: Bool;
+  state enabled: Bool = false;
+  enabled' = running;
+  timer age = elapsed(enabled);
+  output pump, permit: Bool;
+  pump <- enabled';
+  permit <- running;
+  require pump => permit;
+}`;
+
+function artifactMap(result) {
+  return {
+    format: 'GhostFlow/source-map-v1',
+    bytecodeSha256: result.manifest.bytecodeSha256,
+    sourceDocument: result.sourceDocument,
+    nodes: result.sourceMap,
+    lines: result.extractionMap,
+    traceMetadata: result.traceMetadata,
+  };
 }
 
 test('source-preserving map recovers the exact CRLF literate document', async () => {
@@ -140,6 +162,93 @@ test('source-map verification rejects tampering, malformed source fields, and wr
   assert.throws(() => verifyArtifactSourceMap({ ...map, lines: {} }, result.bytes), /lines/);
   assert.throws(() => verifyArtifactSourceMap(map, result.bytes, { expectedSourceSha256: 'z'.repeat(64) }), /lowercase/);
   assert.throws(() => verifyArtifactSourceMap(map, result.bytes, { expectedSourceSha256: '0'.repeat(64) }), /expected revision/);
+});
+
+test('traceable artifact maps persist and restore source, map, extraction, and verified trace metadata', async () => {
+  const result = await compileSource(traceableTimerControl, { filename: 'traceable-timer.ghost' });
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-toolchain-'));
+  try {
+    const artifact = path.join(temporary, 'traceable-timer.gfb');
+    writeArtifact(result, artifact);
+    const map = JSON.parse(fs.readFileSync(`${artifact}.map.json`, 'utf8'));
+    assert.deepEqual(map.traceMetadata, result.traceMetadata);
+    assert.deepEqual(
+      verifyArtifactSourceMap(map, result.bytes, { expectedSourceSha256: result.sourceDocument.sha256 }),
+      result.sourceDocument,
+      'the legacy verifier preserves its source-document return value',
+    );
+    assert.deepEqual(
+      restoreArtifactSourceMap(map, result.bytes, { expectedSourceSha256: result.sourceDocument.sha256 }),
+      {
+        sourceDocument: result.sourceDocument,
+        sourceMap: result.sourceMap,
+        extractionMap: result.extractionMap,
+        traceMetadata: result.traceMetadata,
+      },
+    );
+  } finally {
+    fs.rmSync(temporary, { recursive: true, force: true });
+  }
+});
+
+test('traceable artifact-map restoration fails closed when trace provenance is absent or malformed', async () => {
+  const result = await compileSource(traceableTimerControl, { filename: 'traceable-timer.ghost' });
+  const map = artifactMap(result);
+  const timerBindings = map.traceMetadata.bindings.filter(entry => entry.kind === 'timer');
+  assert.equal(timerBindings.length, 2, 'fixture has both required generated timer-state bindings');
+  const [since, initialized] = timerBindings;
+  const malformed = [
+    ['missing trace metadata', value => { delete value.traceMetadata; }],
+    ['wrong module fingerprint', value => { value.traceMetadata.moduleFingerprint = '0000000000000000'; }],
+    ['duplicate timer binding', value => { value.traceMetadata.bindings.push(structuredClone(since)); }],
+    ['missing timer binding', value => {
+      value.traceMetadata.bindings = value.traceMetadata.bindings.filter(entry => !(entry.kind === 'timer' && entry.generated.role === initialized.generated.role));
+    }],
+    ['wrong timer role', value => { value.traceMetadata.bindings.find(entry => entry.kind === 'timer').generated.role = 'forged'; }],
+    ['wrong generated timer name', value => { value.traceMetadata.bindings.find(entry => entry.kind === 'timer').name = '__gf_timer_since_forged'; }],
+    ['wrong timer AST node', value => { value.traceMetadata.bindings.find(entry => entry.kind === 'timer').nodeId = 'forged-node'; }],
+    ['wrong timer source', value => { value.traceMetadata.bindings.find(entry => entry.kind === 'timer').source.line += 1; }],
+    ['unknown dependency target', value => { value.traceMetadata.dependencies[0].target.name = 'forged_target'; }],
+    ['broken constraint coverage', value => { value.traceMetadata.constraints.pop(); }],
+  ];
+  for (const [label, mutate] of malformed) {
+    const candidate = clone(map);
+    mutate(candidate);
+    assert.throws(
+      () => restoreArtifactSourceMap(candidate, result.bytes),
+      /traceMetadata|trace metadata|trace provenance|source trace|binding|timer|dependency|constraint|module/i,
+      label,
+    );
+    if (label === 'missing trace metadata') {
+      assert.deepEqual(
+        verifyArtifactSourceMap(candidate, result.bytes), result.sourceDocument,
+        'the compatibility verifier remains source-only compatible when metadata is absent',
+      );
+    } else {
+      assert.throws(
+        () => verifyArtifactSourceMap(candidate, result.bytes),
+        /traceMetadata|trace metadata|trace provenance|source trace|binding|timer|dependency|constraint|module/i,
+        `${label} is also rejected by the legacy verifier when metadata is present`,
+      );
+    }
+  }
+});
+
+test('legacy maps without traceable control nodes restore with a null trace metadata projection', async () => {
+  const legacy = await compileSource('(module LegacyRestore (strategy run 0 (device true)))', { filename: 'legacy-restore.ghost' });
+  const map = {
+    format: 'GhostFlow/source-map-v1',
+    bytecodeSha256: createHash('sha256').update(legacy.bytes).digest('hex'),
+    sourceDocument: legacy.sourceDocument,
+    nodes: legacy.sourceMap,
+    lines: legacy.extractionMap,
+  };
+  assert.deepEqual(restoreArtifactSourceMap(map, legacy.bytes), {
+    sourceDocument: legacy.sourceDocument,
+    sourceMap: legacy.sourceMap,
+    extractionMap: legacy.extractionMap,
+    traceMetadata: null,
+  });
 });
 
 test('writeArtifact rejects an invalid envelope before replacing existing files', async () => {
