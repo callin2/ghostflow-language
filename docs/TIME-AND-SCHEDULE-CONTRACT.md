@@ -9,6 +9,10 @@ surface form below is implemented. `Duration`, elapsed timers, `DailySlots` and
 the bounded Solar host already exist; the remaining types and policies are
 proposals for T2–T4 and joint review.
 
+The additive continuous-true Bool timer metadata and compatibility contract is
+specified separately in `CONTINUOUS-BOOL-TIMER-CONTRACT.md` (NT-T1-A/#46). It
+does not change the existing `elapsed(state)` timer described here.
+
 ## Confirmed product meaning
 
 - Control values and outputs form time-varying signals, but source stays readable
