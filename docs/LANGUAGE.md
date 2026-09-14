@@ -142,11 +142,13 @@ A안은 제한된 YAML을 파싱한다. C안은 절과 end로 블록을 구분�
 주석은 세 안 모두 `#`다. 호출 괄호는 유지한다. 줄 연속은 열린 괄호 안 또는
 쉼표 뒤에서 허용한다.
 
-기본 값 타입은 bool과 유한한 IEEE 754 binary64 number다.
+현재 구현된 기본 값 타입은 bool과 유한한 IEEE 754 binary64 number다.
 true/false만 bool 리터럴이며 문자열·숫자의 truthiness나 암묵적 변환은 없다.
 숫자는 십진수 정수 또는 소수 표기로 시작하며 NaN/Infinity는 거부한다.
 module version은 u32, strategy priority는 i32 범위의 정수 리터럴이다.
 문서의 0.2, module version, 바이트코드 포맷 버전은 서로 별개다.
+R14 검토용 [정확한 정수 계약](EXACT-INTEGER-CONTRACT.md)은 세 번째 스칼라
+`Int/i32`를 제안한다. N2~N4가 끝나기 전에는 구현된 타입으로 표시하지 않는다.
 
 센서 샘플은 `Result<T, SensorFault>`로 표현한다. 생성자는 `Ok(value)`,
 `Err(fault)`이며 초기 SensorFault 집합은 `Disconnected | Stale | Invalid`다.
@@ -180,13 +182,17 @@ Result를 bool/number처럼 직접 사용하는 것은 타입 오류다. state�
 
 `(args) -> expr`의 본문은 그 뒤의 전체 식이다. 함수식의 경계가 모호하면
 괄호로 감싼다. 비교와 파이프를 섞는 식에는 괄호를 사용한다.
-is/isnt는 같은 타입 값의 동등성/비동등성이다. 순서 비교는 number에만 허용한다.
+is/isnt는 같은 타입 값의 동등성/비동등성이다. 현재 순서 비교는 number에만 허용한다.
+정수 계약이 채택되면 같은 `Int` 두 값의 순서 비교도 허용하고 혼합 비교는 거부한다.
 장치 질의의 `type is number`는 별도의 타입 태그 비교다.
 
 이 단계의 함수와 연산은 순수하고 종료가 보장되어야 한다. 단축 평가에 의존하는
 부작용이나 오류 회피 패턴은 허용하지 않는다. 모든 분기를 타입 검사하고,
 안전한 식은 미리 계산할 수 있다. 산술·나눗셈 오류 규칙은 후속 수치 프로파일에서
-정의한다. 현재 GFB1에도 산술 opcode는 없다.
+정의한다. 정확한 정수의 최소 범위·연산·변환 제안과 구현 수용 벡터는
+[EXACT-INTEGER-CONTRACT.md](EXACT-INTEGER-CONTRACT.md)에 분리한다. 이 링크는
+설계 제안이며 현재 parser/GFB/VM이 `Int`를 지원한다는 뜻이 아니다. 현재 GFB1은
+`Number/f64` 산술 opcode만 가지며 정수 opcode와 나머지 연산은 없다.
 
 ```ghost
 latch = (start, stop, held) -> not stop and (start or held)
