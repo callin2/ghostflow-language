@@ -41,6 +41,7 @@ const traceableTimerControl = `control TraceableTimer {
   pump <- enabled';
   permit <- running;
   require pump => permit;
+  require !(pump && permit);
 }`;
 
 function artifactMap(result) {

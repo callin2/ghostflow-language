@@ -256,7 +256,7 @@ export function verifySourceTraceMetadata(metadata, bytes, nodes, {
     for (const name of entry.names) requireName(name, 'source trace constraint name');
     const node = nodeById.get(entry.nodeId);
     const kindMatches = node?.kind === 'mutex' ? entry.kind === 'mutex'
-      : node?.kind === 'require' && ['requires', 'requires-any'].includes(entry.kind);
+      : node?.kind === 'require' && ['requires', 'requires-any', 'mutex'].includes(entry.kind);
     if (!kindMatches || usedConstraintNodes.has(entry.nodeId)) throw new Error('source trace constraint node mismatch');
     usedConstraintNodes.add(entry.nodeId);
     requireNodePosition(entry, node, `source trace constraint ${entry.index}`);
