@@ -46,6 +46,17 @@ const rows = [
 ];
 const outputs = ['a', 'b', 'c', 'permit', 'anyTarget', 'anyA', 'anyB', 'mutexA', 'mutexB'];
 
+const timerSource = [
+  'control TimerTraceFixture {',
+  '  input command: Bool;',
+  '  state running: Bool = false;',
+  "  running' = command;",
+  '  timer age = elapsed(running);',
+  '  output pump: Bool;',
+  '  pump <- running;',
+  '}',
+].join('\n');
+
 function sha256(value) {
   return crypto.createHash('sha256').update(value).digest('hex');
 }
@@ -99,7 +110,10 @@ function lessonBundle(markdown) {
 test('source trace records actual compiler nodes, bindings, ordered constraint kinds, and byte fingerprint', async t => {
   const compiled = await compileSource(source, { filename: 'trace.ghost' });
   const direct = compileControl(source, { filename: 'trace.ghost' });
-  assert.deepEqual(compiled.traceMetadata, direct.traceMetadata);
+  const { sourceDocumentSha256, bytecodeSha256, ...compilerTrace } = compiled.traceMetadata;
+  assert.deepEqual(compilerTrace, direct.traceMetadata);
+  assert.equal(sourceDocumentSha256, compiled.sourceDocument.sha256);
+  assert.equal(bytecodeSha256, compiled.manifest.bytecodeSha256);
   assert.equal(compiled.traceMetadata.format, 'GhostFlow/source-trace-v1');
 
   assert.deepEqual(compiled.traceMetadata.bindings.map(({ kind, name, fields }) => ({ kind, name, fields })), [
@@ -153,10 +167,67 @@ test('source trace remaps extracted and lesson literate locations while retainin
   assert.equal(compiledLesson.compilation.traceMetadata.moduleFingerprint, direct.traceMetadata.moduleFingerprint);
 });
 
+test('each authored timer binds its two generated runtime states to the timer declaration', async () => {
+  const direct = await compileSource(timerSource, { filename: 'timer-trace.ghost' });
+  const timerNode = direct.sourceMap.find(node => node.kind === 'timer');
+  assert.ok(timerNode, 'the authored timer AST node exists in the compiler source map');
+  const timerBindings = direct.traceMetadata.bindings.filter(entry => entry.kind === 'timer');
+  assert.deepEqual(timerBindings.map(({ kind, name, fields, generated }) => ({ kind, name, fields, generated })), [
+    {
+      kind: 'timer', name: '__gf_timer_since_age', fields: ['stateBefore', 'stateAfter'],
+      generated: { declaration: 'age', role: 'since' },
+    },
+    {
+      kind: 'timer', name: '__gf_timer_initialized_age', fields: ['stateBefore', 'stateAfter'],
+      generated: { declaration: 'age', role: 'initialized' },
+    },
+  ]);
+  for (const binding of timerBindings) {
+    assert.equal(binding.nodeId, timerNode.id);
+    assert.deepEqual(
+      { filename: binding.source.filename, line: binding.source.line, column: binding.source.column },
+      { filename: timerNode.filename, line: timerNode.line, column: timerNode.column },
+    );
+  }
+
+  const markdown = ['# Timer trace', '', '```ghost', timerSource, '```', ''].join('\n');
+  const literate = await compileSource(markdown, { filename: 'timer-trace.ghost.md' });
+  const literateTimer = literate.sourceMap.find(node => node.kind === 'timer');
+  for (const binding of literate.traceMetadata.bindings.filter(entry => entry.kind === 'timer')) {
+    assert.equal(binding.nodeId, literateTimer.id);
+    assert.deepEqual(binding.source, { filename: 'timer-trace.ghost.md', line: literateTimer.line, column: literateTimer.column });
+    assert.deepEqual(
+      { filename: binding.extractedSource.filename, line: binding.extractedSource.line, column: binding.extractedSource.column },
+      { filename: 'timer-trace.ghost.md', line: timerNode.line, column: timerNode.column },
+    );
+  }
+
+  const observed = observeSourceTrace(direct.traceMetadata, {
+    module: direct.traceMetadata.moduleFingerprint,
+    inputs: {},
+    stateBefore: { __gf_timer_since_age: 1000, __gf_timer_initialized_age: true },
+    stateAfter: { __gf_timer_since_age: 2000, __gf_timer_initialized_age: true },
+    requested: {}, safe: {},
+    safetyTrace: { format: 'GhostFlow/safety-trace-v1', constraints: [] },
+  });
+  assert.deepEqual(observed.bindings.filter(entry => entry.kind === 'timer').map(entry => entry.observations), [
+    [
+      { field: 'stateBefore', observed: true, value: 1000 },
+      { field: 'stateAfter', observed: true, value: 2000 },
+    ],
+    [
+      { field: 'stateBefore', observed: true, value: true },
+      { field: 'stateAfter', observed: true, value: true },
+    ],
+  ]);
+});
+
 test('source observations bind state, next, requested, safe, and exact safety outcomes', async t => {
   const compiled = await compileSource(source, { filename: 'trace.ghost' });
   const [trace] = await runNativeAndWasm(t, compiled.bytes);
   const observed = observeSourceTrace(compiled.traceMetadata, trace);
+  assert.equal(observed.sourceDocumentSha256, compiled.sourceDocument.sha256);
+  assert.equal(observed.bytecodeSha256, compiled.manifest.bytecodeSha256);
   const binding = name => observed.bindings.find(entry => entry.name === name);
   assert.deepEqual(binding('cascade').observations, [{ field: 'inputs', observed: true, value: true }]);
   assert.deepEqual(binding('latched').observations, [

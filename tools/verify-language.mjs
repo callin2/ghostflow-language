@@ -33,6 +33,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/scheduled-admission.test.mjs',
   'tests/signals-wasm.test.mjs',
   'tests/scan-frame-wasm.test.mjs',
+  'tests/scan-tape-parity.test.mjs',
   'tests/station-wasm.test.mjs',
   'tests/toolchain.test.mjs',
   'tests/operating-settings.test.mjs',
@@ -67,6 +68,7 @@ async function verify(nodeOnly) {
   delete env.CARGO_BUILD_TARGET;
   const wasmPath = path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm');
   const nativePath = path.join(root, 'target/release/examples/run');
+  const framedNativePath = path.join(root, 'target/release/examples/scan_tape');
   let wasmVerified = false;
 
   async function gate(command, arguments_) {
@@ -115,6 +117,7 @@ async function verify(nodeOnly) {
     if (nodeOnly) {
       if (!fs.existsSync(wasmPath)) throw new Error('WASM artifact missing; run npm test first');
       if (!fs.existsSync(nativePath)) throw new Error('release native artifact missing; run npm test first');
+      if (!fs.existsSync(framedNativePath)) throw new Error('release framed native artifact missing; run npm test first');
     } else {
       report.rustc = (await gate('rustc', ['--version'])).trim();
       report.cargo = (await gate('cargo', ['--version'])).trim();
@@ -125,6 +128,7 @@ async function verify(nodeOnly) {
       await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-core', '--example', 'run']);
       await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-core', '--example', 'run', '--release']);
       await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-core', '--example', 'scan_adapter', '--release']);
+      await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-core', '--example', 'scan_tape', '--release']);
       await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-wasm', '--target', 'wasm32-unknown-unknown', '--release']);
       wasmVerified = true;
     }
@@ -137,6 +141,8 @@ async function verify(nodeOnly) {
     report.wasm = { bytes: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex'), builtByThisRun: wasmVerified };
     const nativeBytes = fs.readFileSync(nativePath);
     report.native = { bytes: nativeBytes.length, sha256: createHash('sha256').update(nativeBytes).digest('hex'), buildProfile: 'release', builtByThisRun: !nodeOnly };
+    const framedNativeBytes = fs.readFileSync(framedNativePath);
+    report.framedNative = { bytes: framedNativeBytes.length, sha256: createHash('sha256').update(framedNativeBytes).digest('hex'), buildProfile: 'release', builtByThisRun: !nodeOnly };
     report.passed = true;
   } catch (error) {
     report.failure = error.message;
