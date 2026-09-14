@@ -6,6 +6,8 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { extractLiterate } from './literate.mjs';
 import { compileSource } from './toolchain.mjs';
+import { CURRICULUM_REPLAY_MANIFEST, prepareCurriculumReplays, verifyCurriculumReplayWasm } from './curriculum-replay.mjs';
+import { PC01_PROJECTION, verifyPc01Projection } from './generate-pc-01-projection.mjs';
 
 // Deliberately explicit. Product/LLM/device tests belong to other repositories.
 export const LANGUAGE_TESTS = Object.freeze([
@@ -19,6 +21,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/control-host.test.mjs',
   'tests/framed-control-host.test.mjs',
   'tests/control.test.mjs',
+  'tests/curriculum-replay.test.mjs',
   'tests/integration-contract.test.mjs',
   'tests/intent-anchor-map.test.mjs',
   'tests/ledger.test.mjs',
@@ -127,17 +130,6 @@ async function verify(nodeOnly, curriculumOnly) {
     return { absolute, text: fs.readFileSync(absolute, 'utf8') };
   }
 
-  function e01Projection(document, filename) {
-    const anchor = '<a id="ch01"></a>';
-    const start = document.indexOf(anchor);
-    if (start < 0 || document.indexOf(anchor, start + anchor.length) >= 0) throw new Error('PC-01 source anchor ch01 must occur exactly once');
-    const nextAnchor = document.indexOf('\n<a id=', start + anchor.length);
-    const section = document.slice(start, nextAnchor < 0 ? document.length : nextAnchor);
-    const matches = [...section.matchAll(/```ghost\r?\n(\/\/ E01\r?\n[\s\S]*?)\r?\n```/g)];
-    if (matches.length !== 1) throw new Error('PC-01 E01 executable source must occur exactly once within ch01');
-    return `# PC-01 derived projection of ${filename}#ch01 (E01)\n\n` + '```ghost\n' + matches[0][1] + '\n```\n';
-  }
-
   async function verifyPlcCurriculum() {
     const { text: catalogText } = sourceFile(PLC_CURRICULUM_CATALOG, 'PLC curriculum catalog');
     const catalog = JSON.parse(catalogText);
@@ -157,6 +149,9 @@ async function verify(nodeOnly, curriculumOnly) {
     }
     if (importedSourceProvenance.revision !== PLC_CURRICULUM_IMPORTED_REVISION) {
       throw new Error(`PLC curriculum imported source provenance revision must be ${PLC_CURRICULUM_IMPORTED_REVISION}`);
+    }
+    if (catalog.replayScenarios !== CURRICULUM_REPLAY_MANIFEST) {
+      throw new Error(`PLC curriculum replayScenarios must be ${CURRICULUM_REPLAY_MANIFEST}`);
     }
     if (!Array.isArray(catalog.lessons) || catalog.lessons.length !== PLC_CURRICULUM_IDS.length) {
       throw new Error('PLC curriculum catalog must declare PC-01 through PC-10 exactly once');
@@ -178,15 +173,17 @@ async function verify(nodeOnly, curriculumOnly) {
         if (digest !== requireString(source.documentSha256, 'PC-01 document SHA-256')) {
           throw new Error(`PC-01 document SHA-256 does not match ${relative}`);
         }
-        const projection = e01Projection(text, relative);
-        const projectionSha256 = sourceSha256(projection);
+        if (source.generatedPath !== PC01_PROJECTION) throw new Error(`PC-01 generatedPath must be ${PC01_PROJECTION}`);
+        const generated = verifyPc01Projection({ repositoryRoot: root });
+        if (generated.documentSha256 !== digest) throw new Error('PC-01 generated projection source digest is stale');
+        const projectionSha256 = generated.projectionSha256;
         if (projectionSha256 !== requireString(source.projectionSha256, 'PC-01 projection SHA-256')) {
           throw new Error('PC-01 projection SHA-256 does not match the derived E01 source');
         }
-        const extraction = extractLiterate(projection, { filename: `${relative}#ch01:E01.ghost.md` });
+        const extraction = extractLiterate(generated.projection, { filename: source.generatedPath });
         if (extraction.warnings.length) throw new Error(`PC-01 E01 projection has literate warnings: ${extraction.warnings.join('; ')}`);
-        await compileSource(projection, { filename: `${relative}#ch01:E01.ghost.md` });
-        lessons.push({ id: lesson.id, source: relative, documentSha256: digest, projectionSha256, projection: 'E01@ch01' });
+        await compileSource(generated.projection, { filename: source.generatedPath });
+        lessons.push({ id: lesson.id, source: relative, generatedSource: source.generatedPath, documentSha256: digest, projectionSha256, projection: 'E01@ch01' });
         continue;
       }
       if (source.kind !== 'canonical-literate' || !relative.endsWith('.ghost.md')) {
@@ -200,6 +197,8 @@ async function verify(nodeOnly, curriculumOnly) {
       await compileSource(text, { filename: relative });
       lessons.push({ id: lesson.id, source: relative, sha256: digest });
     }
+    const replayText = sourceFile(CURRICULUM_REPLAY_MANIFEST, 'PLC curriculum replay manifest').text;
+    const replay = await prepareCurriculumReplays({ repositoryRoot: root, catalog });
     report.plcCurriculum = {
       catalog: PLC_CURRICULUM_CATALOG,
       catalogSha256: sourceSha256(catalogText),
@@ -211,8 +210,15 @@ async function verify(nodeOnly, curriculumOnly) {
       },
       importedSourceProvenance: { ...importedSourceProvenance },
       lessons,
+      replay: {
+        manifest: CURRICULUM_REPLAY_MANIFEST,
+        manifestSha256: sourceSha256(replayText),
+        scenarios: replay.scenarios.length,
+        frames: replay.scenarios.reduce((count, entry) => count + entry.scenario.frames.length, 0),
+        checkpoints: replay.scenarios.reduce((count, entry) => count + entry.scenario.checkpoints.length, 0),
+      },
     };
-    console.log(`PLC curriculum catalog: PASS ${lessons.length} lessons (${report.plcCurriculum.catalogSha256})`);
+    console.log(`PLC curriculum catalog: PASS ${lessons.length} lessons, ${replay.scenarios.length} replay scenarios (${report.plcCurriculum.catalogSha256})`);
   }
 
   function hashSource(relative) {
@@ -243,6 +249,11 @@ async function verify(nodeOnly, curriculumOnly) {
     }
     await verifyPlcCurriculum();
     if (curriculumOnly) {
+      if (!fs.existsSync(wasmPath)) {
+        await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-wasm', '--target', 'wasm32-unknown-unknown', '--release']);
+        wasmVerified = true;
+      }
+      report.plcCurriculum.replay.runtime = await verifyCurriculumReplayWasm(fs.readFileSync(wasmPath), { repositoryRoot: root });
       report.passed = true;
       return;
     }
@@ -264,6 +275,7 @@ async function verify(nodeOnly, curriculumOnly) {
       await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-wasm', '--target', 'wasm32-unknown-unknown', '--release']);
       wasmVerified = true;
     }
+    report.plcCurriculum.replay.runtime = await verifyCurriculumReplayWasm(fs.readFileSync(wasmPath), { repositoryRoot: root });
     await gate(process.execPath, ['--test', ...LANGUAGE_TESTS]);
     if (!nodeOnly) {
       await gate(process.execPath, ['tools/tutorial.mjs', '--no-build']);
