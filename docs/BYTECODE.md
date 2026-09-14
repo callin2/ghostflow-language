@@ -177,3 +177,28 @@ and bounded in-memory execution. Pressure, flow, pump
 curves, other device metadata, and feedback sensors are optional: no mandatory
 GFB1 field or basic-safety requirement forces them. Capacity analysis or
 verified feedback must be an explicit future opt-in, not MVP bytecode behavior.
+
+## Tracked GFB1 golden vector
+
+`tests/fixtures/gfb1-golden-v1.ghost.md` is the authoritative literate source
+for the tracked `tests/fixtures/gfb1-golden-v1.gfb` artifact. The accompanying
+`gfb1-golden-v1.json` fixes these regression digests:
+
+- source SHA-256: `af7e2a824c337ace94e38ff82ef5a1344d75f2374e2581ef390f76f8ce8d92a0`
+- GFB SHA-256: `2a8ff8e4e26ce6ed7bd92404f0c94ca4d469dbcb672e5ea6e1243c06805a079b`
+
+`tests/gfb1-golden.test.mjs` recompiles the literate source with Node and with
+the existing GFB1 compiler in a Buffer-less browser-like VM. Both results must
+match the tracked artifact byte for byte and reproduce the fixed GFB digest.
+The same test sends those exact valid bytes, plus deterministic corruptions, to
+the release native and WASM loaders. Magic, format version, truncation, trailing
+bytes, query structure, and expression structure are independent fail-closed
+checks. These hashes are regression identities, not signatures or trust claims.
+
+The format version is the `u16` immediately after the `GFB1` magic; it is not the
+module's own version field. Current loaders accept format version `1` only. An
+unsupported format version must fail during load, before activation, without
+guessing, down-conversion, or fallback acceptance. Migration to a later bytecode
+format requires an explicit compiler/runtime compatibility decision and its own
+golden/conformance evidence; a later format is not accepted as GFB1 merely
+because part of its envelope resembles version 1.
