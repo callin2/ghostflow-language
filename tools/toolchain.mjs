@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { compile, parse, tokenize } from './gfb1.mjs';
-import { remapSourceTrace, sourceMapRequiresTraceMetadata, verifySourceTraceMetadata } from './source-trace.mjs';
+import { attachIntentMetadata, remapSourceTrace, sourceMapRequiresTraceMetadata, verifySourceTraceMetadata } from './source-trace.mjs';
 
 const SOURCE_LIMIT = 1024 * 1024;
 const SOURCE_DOCUMENT_FORMAT = 'GhostFlow/source-document-v1';
@@ -82,6 +82,8 @@ function validateArtifactSourceMap(map, bytes, { expectedSourceSha256, requireTr
       sourceDocumentSha256: document.sha256,
       bytecodeSha256: map.bytecodeSha256,
       requireRevisionIdentity: true,
+      sourceDocument: document,
+      extractionMap: map.lines,
     });
   } else if (sourceMapRequiresTraceMetadata(map.nodes) && (hasTraceMetadata || requireTraceMetadata)) {
     throw new Error('source map trace metadata is missing for a traceable control');
@@ -137,6 +139,14 @@ export async function compileSource(source, { filename = 'program.ghost' } = {})
   } else if (filename.endsWith('.md')) {
     throw new Error(`${filename}: literate sources must use .ghost.md`);
   }
+  if (!extraction) {
+    const lines = source.replace(/\r\n/g, '\n').split('\n');
+    const line = lines.findIndex(value => /^\s*\/\/.*ghostflow:link/.test(value));
+    if (line >= 0) {
+      const column = lines[line].indexOf('ghostflow:link') + 1;
+      throw new Error(`${filename}:${line + 1}:${column}: ghostflow link directives require a literate .ghost.md source`);
+    }
+  }
   const legacy = code.trimStart().startsWith('(') || code.trimStart().startsWith(';');
   let result;
   try {
@@ -153,6 +163,21 @@ export async function compileSource(source, { filename = 'program.ghost' } = {})
       }
     }
     throw error;
+  }
+  if (extraction && (extraction.anchors.length || extraction.linkDirectives.length)) {
+    if (legacy) throw new Error(`${filename}: ghostflow intent links require a control source`);
+    const { parseControl } = await import('./control.mjs');
+    const ast = parseControl(code, { filename });
+    result = {
+      ...result,
+      traceMetadata: attachIntentMetadata(result.traceMetadata, {
+        anchors: extraction.anchors,
+        linkDirectives: extraction.linkDirectives,
+        ast,
+        sourceMap: result.sourceMap,
+        extractionMap: extraction.sourceMap,
+      }),
+    };
   }
   if (extraction) {
     const { mapSourcePosition } = await import('./literate.mjs');

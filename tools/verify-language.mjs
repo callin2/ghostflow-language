@@ -18,6 +18,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/framed-control-host.test.mjs',
   'tests/control.test.mjs',
   'tests/integration-contract.test.mjs',
+  'tests/intent-anchor-map.test.mjs',
   'tests/ledger.test.mjs',
   'tests/literate.test.mjs',
   'tests/lesson.test.mjs',
