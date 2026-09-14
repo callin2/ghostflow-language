@@ -567,6 +567,8 @@ export async function verifyPortablePackage(packageValue, options = {}) {
         sourceDocumentSha256: sourceSha256,
         bytecodeSha256,
         requireRevisionIdentity: true,
+        sourceDocument: mappedDocument,
+        extractionMap: sourceMap.lines,
       });
     }
   } catch (error) {

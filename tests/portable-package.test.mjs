@@ -150,6 +150,34 @@ test('GF-TEST-portable-package: deterministic package preserves exact literate, 
   assert.equal(verified.bytecode.copy()[0], 0x47, 'each bytecode copy is detached from verified state');
 });
 
+test('GF-TEST-portable-package-intent-map: a re-signed replacement source map still fails strict intent provenance recovery', async () => {
+  const source = `<!-- ghostflow:anchor id=GF-INT-PUMP-001 kind=intent status=confirmed origin=user -->
+펌프를 켜 주세요.
+
+\`\`\`ghost
+control IntentPackage {
+  input request: Bool;
+  // ghostflow:link id=GF-INT-PUMP-001 relation=implements
+  output pump: Bool;
+  pump <- request;
+}
+\`\`\`
+`;
+  const compilation = await compileSource(source, { filename: 'intent-package.ghost.md' });
+  const current = await currentKeyPromise;
+  const packageValue = await buildPortablePackage(compilation, identity, buildOptions([
+    { keyId: current.keyId, privateKey: current.privateKey },
+  ]));
+  const candidate = clone(packageValue);
+  const map = JSON.parse(Buffer.from(candidate.payload.sourceMap.contentBase64, 'base64').toString('utf8'));
+  map.traceMetadata.intentLinks[0].source.line = 999999;
+  const mapBytes = encoder.encode(canonicalJson(map));
+  candidate.payload.sourceMap.contentBase64 = base64(mapBytes);
+  candidate.payload.sourceMap.sha256 = await digestHex(mapBytes);
+  await resign(candidate, current);
+  await expectsCode(() => verifyPortablePackage(candidate, verifierOptions(current)), 'source-map-mismatch');
+});
+
 test('GF-TEST-portable-package-trust: key rotation accepts a new active signer and rejects a solely revoked signer', async () => {
   const { compilation, current } = await fixture();
   const next = await nextKeyPromise;

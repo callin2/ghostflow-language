@@ -11,6 +11,19 @@ export class LiterateError extends Error {
   }
 }
 
+const ANCHOR_ID = '[A-Za-z][A-Za-z0-9._:-]{0,127}';
+const ANCHOR = new RegExp(`^<!-- ghostflow:anchor id=(${ANCHOR_ID}) kind=(intent|premise|assumption) status=(confirmed|unconfirmed|superseded) origin=(user|operator|engineer|ai|imported) -->$`);
+const LINK = new RegExp(`^(\\s*)// ghostflow:link id=(${ANCHOR_ID}) relation=(implements|constrains|fallback|assumes)$`);
+
+function range(filename, firstLine, firstColumn, lastLine, lastColumn) {
+  return { filename, line: firstLine, column: firstColumn, endLine: lastLine, endColumn: lastColumn + 1 };
+}
+
+function directiveColumn(line, marker) {
+  const offset = line.indexOf(marker);
+  return offset < 0 ? 1 : offset + 1;
+}
+
 /** CommonMark determines containers; raw source supplies unmodified code and locations. */
 export function extractLiterate(markdown, { filename = '<literate>' } = {}) {
   if (typeof markdown !== 'string') throw new TypeError('markdown must be a string');
@@ -24,12 +37,15 @@ export function extractLiterate(markdown, { filename = '<literate>' } = {}) {
   }
   // Preserve every line number while preventing front matter from becoming Markdown code.
   const parsedSource = lines.map((line, index) => index <= frontMatterEnd ? '' : line).join('\n');
-  const walker = new Parser().parse(parsedSource).walker();
-  const chunks = [], sourceMap = [], warnings = [];
+  const root = new Parser().parse(parsedSource);
+  const walker = root.walker();
+  const chunks = [], sourceMap = [], warnings = [], topLevel = [], anchors = [], linkDirectives = [];
   let event;
   while ((event = walker.next())) {
     const node = event.node;
-    if (!event.entering || node.type !== 'code_block') continue;
+    if (!event.entering) continue;
+    if (node.parent?.type === 'document') topLevel.push(node);
+    if (node.type !== 'code_block') continue;
     const info = node.info ?? '';
     if (!/^ghost(?:$|[-\s])/.test(info)) continue;
     const [[first, column], [last]] = node.sourcepos;
@@ -50,10 +66,46 @@ export function extractLiterate(markdown, { filename = '<literate>' } = {}) {
     if (!body.some(line => line.trim())) continue;
     if (chunks.length) sourceMap.push(null);
     chunks.push(body.join('\n') + '\n');
-    body.forEach((line, index) => sourceMap.push({ file: filename, line: first + index + 1, column: 1, length: line.length }));
+    body.forEach((line, index) => {
+      const originalLine = first + index + 1;
+      const extractedLine = sourceMap.length + 1;
+      const match = LINK.exec(line);
+      if (match) {
+        const column = match[1].length + 1;
+        linkDirectives.push({
+          anchorId: match[2], relation: match[3],
+          directiveSource: range(filename, originalLine, column, originalLine, line.length),
+          extractedDirectiveSource: range(filename, extractedLine, column, extractedLine, line.length),
+        });
+      } else if (/^\s*\/\/.*ghostflow:link/.test(line)) {
+        throw new LiterateError(filename, originalLine, directiveColumn(line, 'ghostflow:link'), 'malformed ghostflow link directive');
+      }
+      sourceMap.push({ file: filename, line: originalLine, column: 1, length: line.length });
+    });
   }
   if (!chunks.length) throw new LiterateError(filename, 1, 1, 'no executable ghost code');
-  return { code: chunks.join('\n'), sourceMap, warnings };
+  for (const [index, node] of topLevel.entries()) {
+    if (node.type !== 'html_block' || typeof node.literal !== 'string') continue;
+    const [[firstLine, firstColumn], [lastLine, lastColumn]] = node.sourcepos;
+    const match = ANCHOR.exec(node.literal);
+    if (!match) {
+      if (node.literal.startsWith('<!-- ghostflow:anchor') && !node.literal.includes('\n')) {
+        throw new LiterateError(filename, firstLine, directiveColumn(lines[firstLine - 1], 'ghostflow:anchor'), 'malformed ghostflow anchor directive');
+      }
+      continue;
+    }
+    const body = topLevel[index + 1];
+    if (!body || !['paragraph', 'block_quote'].includes(body.type)) {
+      throw new LiterateError(filename, firstLine, firstColumn, 'ghostflow anchor requires one following top-level paragraph or block quote');
+    }
+    const [[bodyFirstLine, bodyFirstColumn], [bodyLastLine, bodyLastColumn]] = body.sourcepos;
+    anchors.push({
+      id: match[1], kind: match[2], status: match[3], origin: match[4],
+      directiveSource: range(filename, firstLine, firstColumn, lastLine, lastColumn),
+      source: range(filename, bodyFirstLine, bodyFirstColumn, bodyLastLine, bodyLastColumn),
+    });
+  }
+  return { code: chunks.join('\n'), sourceMap, warnings, anchors, linkDirectives };
 }
 
 /** Maps copied characters (and the end-of-line insertion point), never generated separators. */

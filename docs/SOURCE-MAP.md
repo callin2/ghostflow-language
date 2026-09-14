@@ -1,7 +1,8 @@
 # Source-preserving artifact map — first slice
 
 Status: Main implementation contract, 2026-09-13. Implements part of LS-1;
-intent-anchor syntax, per-expression traces and optimizer provenance are later slices.
+explicit intent anchors are specified by `INTENT-ANCHOR-MAP.md`; per-expression
+traces and optimizer provenance remain later slices.
 GFB1 bytes, execution semantics and the existing sourceMap node array stay unchanged.
 
 ## Why
