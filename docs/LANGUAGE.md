@@ -165,6 +165,10 @@ Result를 bool/number처럼 직접 사용하는 것은 타입 오류다. state�
 보장하지 않으며, 타입·참조·자원 오류와 처리되지 않은 언어 예외를 차단하는 것이
 언어의 목표다.
 
+DateTime·단조 경과·반복 일정·자연 사건·근무 달력과 필수 fallback의 최소 설계는
+[TIME-AND-SCHEDULE-CONTRACT.md](TIME-AND-SCHEDULE-CONTRACT.md)에 둔다. 현재
+`Duration`/DailySlots/Solar 구현 경계와 T2~T4 제안을 명시적으로 구분한다.
+
 ## 4. 표현식과 함수 조합
 
 공통 식은 리터럴, 참조, 호출, 함수 정의, 괄호, 다음 연산자다.
