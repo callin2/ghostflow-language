@@ -1,4 +1,5 @@
 import { compileControl } from './control.mjs';
+import { canonicalJson } from './canonical-json.mjs';
 import { extractLiterate, mapSourcePosition } from './literate.mjs';
 import { remapSourceTrace } from './source-trace.mjs';
 
@@ -15,7 +16,6 @@ const NARRATION_LIMIT = 4096;
 const ID_LIMIT = 128;
 const TITLE_LIMIT = 256;
 const LOCALE_LIMIT = 64;
-const CANONICAL_DEPTH_LIMIT = 64;
 
 export class LessonBundleError extends Error {
   constructor(code, message) {
@@ -65,24 +65,10 @@ function detached(value) {
   return value;
 }
 
-function canonicalValue(value, depth = 0) {
-  if (depth > CANONICAL_DEPTH_LIMIT) throw new RangeError('canonical JSON nesting exceeds 64');
-  if (value === null || typeof value === 'string' || typeof value === 'boolean') return JSON.stringify(value);
-  if (typeof value === 'number') {
-    if (!Number.isFinite(value)) throw new TypeError('canonical JSON does not support non-finite numbers');
-    return JSON.stringify(value);
-  }
-  if (Array.isArray(value)) return `[${value.map(item => canonicalValue(item, depth + 1)).join(',')}]`;
-  if (isPlainObject(value)) {
-    return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${canonicalValue(value[key], depth + 1)}`).join(',')}}`;
-  }
-  throw new TypeError('canonical JSON only supports plain JSON values');
-}
-
 /** Canonical JSON sorts object keys recursively while preserving array and UTF-8 string content.
  * It includes bundleSha256 when present; callers omit that own field to calculate a bundle digest. */
 export function canonicalLessonJson(value) {
-  return canonicalValue(value);
+  return canonicalJson(value);
 }
 
 async function sha256(text) {

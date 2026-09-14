@@ -10,6 +10,12 @@ signals and station arbitration. Native and WASM tests share that Rust core.
                          native / WASM portable Rust core
 ```
 
+Product deployment wraps the `.ghost.md` result with
+`tools/portable-package.mjs`: one signed package preserves the exact source, GFB,
+manifest, source map and host-compatibility identity. Browser and Device
+consumers use the same verifier contract before passing recovered GFB bytes to
+their WASM or native loader. See [Portable GFB package v1](docs/PORTABLE-PACKAGE.md).
+
 This repository contains `tools/` compiler/CLI/tutorial code,
 `crates/ghostflow-core`, `runtimes/wasm`, the reference Node ledger adapter,
 selected `tests/`, language `docs/`, and virtual `examples/`. Existing relative

@@ -202,3 +202,8 @@ guessing, down-conversion, or fallback acceptance. Migration to a later bytecode
 format requires an explicit compiler/runtime compatibility decision and its own
 golden/conformance evidence; a later format is not accepted as GFB1 merely
 because part of its envelope resembles version 1.
+
+For distribution, [Portable GFB package v1](PORTABLE-PACKAGE.md) preserves these
+exact bytes and binds them to the authoritative literate source, manifest,
+source map, compiler/runtime identity, capabilities and installation binding.
+Packaging does not add, remove or rewrite a GFB1 byte.
