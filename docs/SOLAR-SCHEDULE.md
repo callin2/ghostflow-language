@@ -90,3 +90,9 @@ for Seoul test coordinates on 2026-09-14 reports rise 06:13, set 18:42 (UTC+9,
 minute resolution). Tests allow 90 seconds for provider/rounding differences.
 This implements the browser/host driver. The ESP32 solar-time driver remains
 separate work; no device operations are performed by these tests.
+
+The broader [time and Schedule contract proposal](TIME-AND-SCHEDULE-CONTRACT.md)
+records the next-version DateTime, work-calendar, tidal and fallback boundaries.
+Its proposed general timezone/DST profile is not implemented by this bounded
+native provider. The 60-second gap above is missed-occurrence suppression, not
+permission to operate from stale civil time after synchronization is lost.
