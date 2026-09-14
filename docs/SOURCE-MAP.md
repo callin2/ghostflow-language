@@ -29,7 +29,9 @@ product source format. No new source grammar is introduced.
 
 The existing `.gfb.map.json` gains `format: GhostFlow/source-map-v1`,
 `bytecodeSha256` and `sourceDocument`. Its `nodes` and `lines` fields remain as
-before. Keep the control manifest unchanged: the current WASM host rejects
+before. Current control artifacts also persist the compiler-owned
+`traceMetadata`; low-level legacy artifacts record it as null. Keep the control
+manifest unchanged: the current WASM host rejects
 unknown manifest fields. The source digest lives in sourceDocument; product
 release records can carry it using their existing source-identity contract.
 Old readers may use their existing nodes/lines; readers promising source recovery
@@ -65,6 +67,17 @@ when these checks or serialization fail.
 This slice does not make the existing multi-file writer an atomic transaction;
 consumers must reject mixed revisions. Package-level transactional publication
 remains a host responsibility. Never write to sourceDocument.filename.
+
+`restoreArtifactSourceMap(map, bytes, {expectedSourceSha256})` is the strict
+source-plus-trace recovery boundary. It returns `sourceDocument`, `sourceMap`,
+`extractionMap` and `traceMetadata` only after source SHA-256, bytecode SHA-256,
+the same two revision identities recorded in `traceMetadata`, module fingerprint
+and compiler-owned source bindings agree. A traceable control
+with absent trace metadata, or a missing/duplicate/mismatched generated timer
+binding, is rejected. `verifyArtifactSourceMap` keeps its existing source-document
+return value and accepts older source-only v1 maps, but verifies trace metadata
+whenever present. Therefore source-only compatibility is not evidence that an old
+map supports output-to-source navigation.
 
 ## Acceptance examples
 

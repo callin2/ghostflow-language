@@ -110,7 +110,10 @@ function lessonBundle(markdown) {
 test('source trace records actual compiler nodes, bindings, ordered constraint kinds, and byte fingerprint', async t => {
   const compiled = await compileSource(source, { filename: 'trace.ghost' });
   const direct = compileControl(source, { filename: 'trace.ghost' });
-  assert.deepEqual(compiled.traceMetadata, direct.traceMetadata);
+  const { sourceDocumentSha256, bytecodeSha256, ...compilerTrace } = compiled.traceMetadata;
+  assert.deepEqual(compilerTrace, direct.traceMetadata);
+  assert.equal(sourceDocumentSha256, compiled.sourceDocument.sha256);
+  assert.equal(bytecodeSha256, compiled.manifest.bytecodeSha256);
   assert.equal(compiled.traceMetadata.format, 'GhostFlow/source-trace-v1');
 
   assert.deepEqual(compiled.traceMetadata.bindings.map(({ kind, name, fields }) => ({ kind, name, fields })), [
@@ -223,6 +226,8 @@ test('source observations bind state, next, requested, safe, and exact safety ou
   const compiled = await compileSource(source, { filename: 'trace.ghost' });
   const [trace] = await runNativeAndWasm(t, compiled.bytes);
   const observed = observeSourceTrace(compiled.traceMetadata, trace);
+  assert.equal(observed.sourceDocumentSha256, compiled.sourceDocument.sha256);
+  assert.equal(observed.bytecodeSha256, compiled.manifest.bytecodeSha256);
   const binding = name => observed.bindings.find(entry => entry.name === name);
   assert.deepEqual(binding('cascade').observations, [{ field: 'inputs', observed: true, value: true }]);
   assert.deepEqual(binding('latched').observations, [

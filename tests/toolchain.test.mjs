@@ -172,6 +172,8 @@ test('traceable artifact maps persist and restore source, map, extraction, and v
     writeArtifact(result, artifact);
     const map = JSON.parse(fs.readFileSync(`${artifact}.map.json`, 'utf8'));
     assert.deepEqual(map.traceMetadata, result.traceMetadata);
+    assert.equal(map.traceMetadata.sourceDocumentSha256, result.sourceDocument.sha256);
+    assert.equal(map.traceMetadata.bytecodeSha256, result.manifest.bytecodeSha256);
     assert.deepEqual(
       verifyArtifactSourceMap(map, result.bytes, { expectedSourceSha256: result.sourceDocument.sha256 }),
       result.sourceDocument,
@@ -200,6 +202,8 @@ test('traceable artifact-map restoration fails closed when trace provenance is a
   const malformed = [
     ['missing trace metadata', value => { delete value.traceMetadata; }],
     ['wrong module fingerprint', value => { value.traceMetadata.moduleFingerprint = '0000000000000000'; }],
+    ['wrong trace source revision', value => { value.traceMetadata.sourceDocumentSha256 = '0'.repeat(64); }],
+    ['wrong trace bytecode revision', value => { value.traceMetadata.bytecodeSha256 = '0'.repeat(64); }],
     ['duplicate timer binding', value => { value.traceMetadata.bindings.push(structuredClone(since)); }],
     ['missing timer binding', value => {
       value.traceMetadata.bindings = value.traceMetadata.bindings.filter(entry => !(entry.kind === 'timer' && entry.generated.role === initialized.generated.role));
