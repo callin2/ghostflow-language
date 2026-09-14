@@ -50,6 +50,8 @@ const PLC_CURRICULUM_IDS = Object.freeze([
   'PC-01', 'PC-02', 'PC-03', 'PC-04', 'PC-05',
   'PC-06', 'PC-07', 'PC-08', 'PC-09', 'PC-10',
 ]);
+const PLC_CURRICULUM_IMPORTED_REPOSITORY = 'callin2/farm_studio_system';
+const PLC_CURRICULUM_IMPORTED_REVISION = '056a1c88cdfe3276700f6b6a819b715370af20eb';
 const args = process.argv.slice(2);
 if (args.length > 1 || (args.length === 1 && !['--node-only', '--curriculum-only'].includes(args[0]))) {
   console.error('usage: node tools/verify-language.mjs [--node-only|--curriculum-only]');
@@ -126,10 +128,14 @@ async function verify(nodeOnly, curriculumOnly) {
   }
 
   function e01Projection(document, filename) {
-    if (!document.includes('<a id="ch01"></a>')) throw new Error('PC-01 source anchor ch01 is missing');
-    const match = /```ghost\r?\n(\/\/ E01\r?\n[\s\S]*?)\r?\n```/.exec(document);
-    if (!match) throw new Error('PC-01 E01 executable source is missing at ch01');
-    return `# PC-01 derived projection of ${filename}#ch01 (E01)\n\n` + '```ghost\n' + match[1] + '\n```\n';
+    const anchor = '<a id="ch01"></a>';
+    const start = document.indexOf(anchor);
+    if (start < 0 || document.indexOf(anchor, start + anchor.length) >= 0) throw new Error('PC-01 source anchor ch01 must occur exactly once');
+    const nextAnchor = document.indexOf('\n<a id=', start + anchor.length);
+    const section = document.slice(start, nextAnchor < 0 ? document.length : nextAnchor);
+    const matches = [...section.matchAll(/```ghost\r?\n(\/\/ E01\r?\n[\s\S]*?)\r?\n```/g)];
+    if (matches.length !== 1) throw new Error('PC-01 E01 executable source must occur exactly once within ch01');
+    return `# PC-01 derived projection of ${filename}#ch01 (E01)\n\n` + '```ghost\n' + matches[0][1] + '\n```\n';
   }
 
   async function verifyPlcCurriculum() {
@@ -140,8 +146,17 @@ async function verify(nodeOnly, curriculumOnly) {
     const toolchain = requireObject(catalog.toolchain, 'PLC curriculum toolchain');
     if (toolchain.package !== 'ghostflow-language') throw new Error('PLC curriculum catalog must identify ghostflow-language');
     requireString(toolchain.packageVersion, 'PLC curriculum toolchain packageVersion');
-    if (!/^[0-9a-f]{40}$/.test(requireString(toolchain.revision, 'PLC curriculum toolchain revision'))) {
-      throw new Error('PLC curriculum toolchain revision must be a full git SHA-1');
+    for (const key of ['compilerRevision', 'runtimeRevision']) {
+      if (!/^[0-9a-f]{40}$/.test(requireString(toolchain[key], `PLC curriculum toolchain ${key}`))) {
+        throw new Error(`PLC curriculum toolchain ${key} must be a full git SHA-1`);
+      }
+    }
+    const importedSourceProvenance = requireObject(catalog.importedSourceProvenance, 'PLC curriculum imported source provenance');
+    if (importedSourceProvenance.repository !== PLC_CURRICULUM_IMPORTED_REPOSITORY) {
+      throw new Error(`PLC curriculum imported source provenance must identify ${PLC_CURRICULUM_IMPORTED_REPOSITORY}`);
+    }
+    if (importedSourceProvenance.revision !== PLC_CURRICULUM_IMPORTED_REVISION) {
+      throw new Error(`PLC curriculum imported source provenance revision must be ${PLC_CURRICULUM_IMPORTED_REVISION}`);
     }
     if (!Array.isArray(catalog.lessons) || catalog.lessons.length !== PLC_CURRICULUM_IDS.length) {
       throw new Error('PLC curriculum catalog must declare PC-01 through PC-10 exactly once');
@@ -155,22 +170,30 @@ async function verify(nodeOnly, curriculumOnly) {
       const relative = requireString(source.path, `${lesson.id} source path`);
       const { text } = sourceFile(relative, `${lesson.id} source`);
       const digest = sourceSha256(text);
-      if (digest !== requireString(source.sha256, `${lesson.id} source SHA-256`)) {
-        throw new Error(`${lesson.id} source SHA-256 does not match ${relative}`);
-      }
       if (lesson.id === 'PC-01') {
         if (source.kind !== 'book-example-projection' || source.anchor !== 'ch01' || source.example !== 'E01') {
           throw new Error('PC-01 must remain the E01 projection at docs/ProgrammingInGhostflow.md#ch01');
         }
+        if (Object.hasOwn(source, 'sha256')) throw new Error('PC-01 must distinguish documentSha256 from projectionSha256');
+        if (digest !== requireString(source.documentSha256, 'PC-01 document SHA-256')) {
+          throw new Error(`PC-01 document SHA-256 does not match ${relative}`);
+        }
         const projection = e01Projection(text, relative);
+        const projectionSha256 = sourceSha256(projection);
+        if (projectionSha256 !== requireString(source.projectionSha256, 'PC-01 projection SHA-256')) {
+          throw new Error('PC-01 projection SHA-256 does not match the derived E01 source');
+        }
         const extraction = extractLiterate(projection, { filename: `${relative}#ch01:E01.ghost.md` });
         if (extraction.warnings.length) throw new Error(`PC-01 E01 projection has literate warnings: ${extraction.warnings.join('; ')}`);
         await compileSource(projection, { filename: `${relative}#ch01:E01.ghost.md` });
-        lessons.push({ id: lesson.id, source: relative, sha256: digest, projection: 'E01@ch01' });
+        lessons.push({ id: lesson.id, source: relative, documentSha256: digest, projectionSha256, projection: 'E01@ch01' });
         continue;
       }
       if (source.kind !== 'canonical-literate' || !relative.endsWith('.ghost.md')) {
         throw new Error(`${lesson.id} must reference one canonical literate .ghost.md source`);
+      }
+      if (digest !== requireString(source.sha256, `${lesson.id} source SHA-256`)) {
+        throw new Error(`${lesson.id} source SHA-256 does not match ${relative}`);
       }
       const extraction = extractLiterate(text, { filename: relative });
       if (extraction.warnings.length) throw new Error(`${lesson.id} has literate warnings: ${extraction.warnings.join('; ')}`);
@@ -180,7 +203,13 @@ async function verify(nodeOnly, curriculumOnly) {
     report.plcCurriculum = {
       catalog: PLC_CURRICULUM_CATALOG,
       catalogSha256: sourceSha256(catalogText),
-      toolchain: { package: toolchain.package, packageVersion: toolchain.packageVersion, revision: toolchain.revision },
+      toolchain: {
+        package: toolchain.package,
+        packageVersion: toolchain.packageVersion,
+        compilerRevision: toolchain.compilerRevision,
+        runtimeRevision: toolchain.runtimeRevision,
+      },
+      importedSourceProvenance: { ...importedSourceProvenance },
       lessons,
     };
     console.log(`PLC curriculum catalog: PASS ${lessons.length} lessons (${report.plcCurriculum.catalogSha256})`);
@@ -259,8 +288,8 @@ async function verify(nodeOnly, curriculumOnly) {
     const encoded = JSON.stringify(report, null, 2) + '\n';
     const runName = `${report.startedAt.replaceAll(':', '-')}-${report.id}.json`;
     fs.writeFileSync(path.join(history, runName), encoded, { flag: 'wx' });
-    // Partial Node runs must not replace the full host suite's latest result.
-    const latest = nodeOnly ? 'verification-node.json' : 'verification.json';
+    // Partial verification runs must not replace the full host suite's latest result.
+    const latest = curriculumOnly ? 'verification-curriculum.json' : (nodeOnly ? 'verification-node.json' : 'verification.json');
     fs.writeFileSync(path.join(build, latest), encoded);
     console.log(`${report.passed ? 'PASS' : 'FAIL'} — build/${latest} (${report.scope}; host evidence only)`);
   }
