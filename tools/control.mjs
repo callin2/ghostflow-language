@@ -74,7 +74,7 @@ function tokeniseControl(source, filename) {
     if (['<-', '=>', '->', '&&', '||', '<=', '>=', '==', '!=', '..'].includes(pair)) {
       take(); take(); add('symbol', pair, start); continue;
     }
-    if ('{}()[],:;=<>!+-*/|\'?.'.includes(c)) { take(); add('symbol', c, start); continue; }
+    if ('{}()[],:;=<>!+-*/|\'?.`'.includes(c)) { take(); add('symbol', c, start); continue; }
     if (c === '"') {
       let raw = take(), closed = false;
       while (at < source.length) {
@@ -315,7 +315,8 @@ class ControlParser {
   schedule() {
     const start = this.take(), name = this.identifier('expected schedule name'); this.expect(':');
     const kind = this.identifier('expected schedule type');
-    if (kind.value !== 'DailySlots') error(kind, 'only DailySlots<15min> schedules are supported');
+    if (kind.value === 'Solar') return this.solarSchedule(start, name);
+    if (kind.value !== 'DailySlots') error(kind, 'only DailySlots<15min> schedules are supported (or Solar)');
     this.expect('<'); const interval = this.expression(4); this.expect('>', 'expected > after DailySlots interval');
     this.expect('{', 'expected { after schedule type'); let timezone = null, selected = null;
     while (!this.matches('}')) {
@@ -329,7 +330,65 @@ class ControlParser {
       this.expect(';', 'expected ; after schedule option');
     }
     this.take(); this.maybe(';');
-    return this.node('schedule', start, { name: name.value, interval, timezone, selected });
+    return this.node('schedule', start, { name: name.value, scheduleType: 'DailySlots', interval, timezone, selected });
+  }
+  solarSchedule(start, name) {
+    this.expect('{', 'expected { after Solar');
+    const options = { timezone: null, latitude: null, longitude: null, at: null, fallback: null };
+    const seen = new Set();
+    while (!this.matches('}')) {
+      const key = this.identifier('expected Solar schedule option');
+      if (seen.has(key.value)) error(key, `duplicate Solar schedule option ${key.value}`);
+      seen.add(key.value);
+      this.expect('=', `expected = after Solar schedule option ${key.value}`);
+      if (key.value === 'timezone') {
+        const value = this.current();
+        if (value.kind !== 'string') error(value, 'Solar timezone must be a string');
+        options.timezone = this.take().value;
+      } else if (key.value === 'latitude' || key.value === 'longitude') {
+        options[key.value] = this.solarCoordinate(key, key.value);
+      } else if (key.value === 'at') {
+        options.at = this.solarAt();
+      } else if (key.value === 'fallback') {
+        const value = this.identifier('Solar fallback must be skip');
+        if (value.value !== 'skip') error(value, 'Solar fallback must be skip');
+        options.fallback = value.value;
+      } else error(key, `unsupported Solar schedule option ${key.value}`);
+      this.expect(';', 'expected ; after Solar schedule option');
+    }
+    this.take(); this.maybe(';');
+    return this.node('schedule', start, { name: name.value, scheduleType: 'Solar', ...options });
+  }
+  solarCoordinate(key, label) {
+    const minus = this.maybe('-');
+    const value = this.current();
+    if (value.kind !== 'number' || !/^(?:\d+(?:\.\d+)?|\.\d+)$/.test(value.value)) {
+      error(value, `Solar ${label} must be a signed finite numeric literal`);
+    }
+    this.take();
+    const coordinate = Number(`${minus ? '-' : ''}${value.value}`);
+    const limit = label === 'latitude' ? 90 : 180;
+    if (!Number.isFinite(coordinate) || coordinate < -limit || coordinate > limit) {
+      error(value, `Solar ${label} must be between ${-limit} and ${limit}`);
+    }
+    return coordinate;
+  }
+  solarAt() {
+    const tag = this.identifier('Solar at must use sun`rise` or sun`set`');
+    if (tag.value !== 'sun') error(tag, 'Solar at must use sun`rise` or sun`set`');
+    this.expect('`', 'Solar at must use a sun tagged literal');
+    const event = this.identifier('Solar event must be rise or set');
+    if (event.value !== 'rise' && event.value !== 'set') error(event, 'Solar event must be rise or set');
+    let offsetMs = 0;
+    if (this.matches('+') || this.matches('-')) {
+      const sign = this.take().value;
+      const duration = this.current();
+      if (duration.kind !== 'number') error(duration, 'Solar offset must be an integer duration literal');
+      this.take();
+      offsetMs = solarOffsetMilliseconds(duration.value, sign, duration);
+    }
+    this.expect('`', 'Solar at tagged literal must end with `');
+    return { event: event.value, offsetMs };
   }
   timer() {
     const start = this.take(), name = this.identifier('expected timer name'); this.expect('=');
@@ -461,6 +520,18 @@ function duration(raw, loc) {
   if (!Number.isInteger(value) || !Number.isFinite(value) || value < 0) error(loc, 'Duration must be a non-negative integer number of milliseconds');
   return value;
 }
+function solarOffsetMilliseconds(raw, sign, loc) {
+  const match = /^(\d+)(ms|min|s|h)$/.exec(raw);
+  if (!match) error(loc, 'Solar offset must be an integer duration literal using ms, s, min, or h');
+  const units = { ms: 1n, s: 1000n, min: 60_000n, h: 3_600_000n };
+  const magnitude = BigInt(match[1]) * units[match[2]];
+  const day = 86_400_000n;
+  if (magnitude > day) error(loc, 'Solar offset magnitude must not exceed 24h');
+  // The bound above makes this conversion exact.  Duration text itself is
+  // parsed as BigInt so fractional values cannot be rounded into a schedule.
+  const milliseconds = Number(magnitude);
+  return sign === '-' ? -milliseconds : milliseconds;
+}
 function operatingValue(value, type, loc, label) {
   if (type.kind === 'Bool') {
     if (typeof value !== 'boolean') error(loc, `${label} must be Bool`);
@@ -524,6 +595,7 @@ class Lowerer {
       format: 'GhostFlow/control-v1', name: ast.name, inputs: [], outputs: [], sensors: [], schedules: [], timers: [], signals: [], configs: [],
     };
     this.gfbInputs = []; this.gfbStates = []; this.constraints = []; this.hasClock = false;
+    this.hasSolarSchedule = ast.body.some(item => item.kind === 'schedule' && item.scheduleType === 'Solar');
   }
   lower() {
     rejectName(this.ast.name, this.ast.loc, 'control');
@@ -625,6 +697,7 @@ class Lowerer {
         this.symbols.get(item.name).type = type; this.symbols.get(item.name).value = value;
         const settings = item.settings ?? {};
         if (Object.keys(settings).length) {
+          if (this.hasSolarSchedule) error(item.loc, 'Solar schedules cannot be combined with operating settings metadata yet');
           if (!isOperatingConfigLiteral(item.value, type)) error(item.value.loc, 'operating config initial value must be a supported literal');
           operatingValue(value.constant, type, item.value.loc, 'operating config initial value');
           const allowed = new Set(['min', 'max', 'step', 'access', 'apply', 'label']);
@@ -690,6 +763,7 @@ class Lowerer {
     this.manifest.sensors.push(record); this.sensors.set(item.name, { type, valueInput, okInput, loc: item.loc }); this.symbols.get(item.name).type = { kind: 'Result', value: type };
   }
   addSchedule(item) {
+    if (item.scheduleType === 'Solar') return this.addSolarSchedule(item);
     const interval = this.expression(item.interval, new Map(), { allowNext: false });
     if (!sameType(interval.type, DURATION) || interval.constant !== 900_000) error(item.interval.loc, 'only DailySlots<15min> is supported');
     if (!item.timezone || !item.timezone.trim()) error(item.loc, 'schedule requires timezone');
@@ -702,6 +776,25 @@ class Lowerer {
     }
     const dueInput = this.generatedName('schedule_due', item.name); this.addInput(dueInput, BOOL, item.loc);
     this.manifest.schedules.push({ name: item.name, timezone: item.timezone, slots, dueInput }); this.schedules.set(item.name, { dueInput, loc: item.loc }); this.symbols.get(item.name).type = { kind: 'Schedule' };
+  }
+  addSolarSchedule(item) {
+    for (const field of ['timezone', 'latitude', 'longitude', 'at', 'fallback']) {
+      if (item[field] === null) error(item.loc, `Solar schedule requires ${field}`);
+    }
+    if (!item.timezone.trim()) error(item.loc, 'Solar schedule requires a non-empty timezone');
+    try { new Intl.DateTimeFormat('en-US', { timeZone: item.timezone }); }
+    catch { error(item.loc, 'Solar timezone must be a supported IANA timezone'); }
+    const dueInput = this.generatedName('schedule_due', item.name);
+    this.addInput(dueInput, BOOL, item.loc);
+    this.manifest.format = 'GhostFlow/control-v3';
+    this.manifest.schedules.push({
+      kind: 'solar', name: item.name, timezone: item.timezone,
+      latitude: item.latitude, longitude: item.longitude,
+      event: item.at.event, offsetMs: item.at.offsetMs,
+      fallback: item.fallback, dueInput,
+    });
+    this.schedules.set(item.name, { dueInput, loc: item.loc });
+    this.symbols.get(item.name).type = { kind: 'Schedule' };
   }
   addSignal(item) {
     const call = item.call;

@@ -1,9 +1,11 @@
 import { GhostFlowRuntime } from './ghostflow-runtime.mjs';
 import { FramedGhostFlowRuntime } from './framed-runtime.mjs';
 import { SignalConditioner } from './signals.mjs';
+import { validateSolarDescriptor } from './solar-schedule.mjs';
 
 const FORMAT = 'GhostFlow/control-v1';
 const SETTINGS_FORMAT = 'GhostFlow/control-v2';
+const SOLAR_FORMAT = 'GhostFlow/control-v3';
 const RESERVED = '__gf_';
 const TYPES = new Set(['Bool', 'Number', 'Percent', 'Duration']);
 const SENSOR_TYPES = new Set(['Bool', 'Number', 'Percent']);
@@ -145,18 +147,28 @@ function validateSettings(config, label) {
   return normalized;
 }
 
-function validateManifest(input, { acceptSettings = false } = {}) {
+function validateManifest(input, { acceptSettings = false, acceptSolar = false } = {}) {
   const manifest = record(input, 'manifest');
   keys(manifest, ['format', 'name', 'inputs', 'outputs', 'sensors', 'schedules', 'timers', 'signals', 'configs', 'bytecodeSha256'], [], 'manifest');
-  if (manifest.format !== FORMAT && (manifest.format !== SETTINGS_FORMAT || !acceptSettings)) throw new Error(`unsupported manifest format ${String(manifest.format)}`);
+  if (manifest.format !== FORMAT && !(manifest.format === SETTINGS_FORMAT && acceptSettings) && !(manifest.format === SOLAR_FORMAT && acceptSolar)) throw new Error(`unsupported manifest format ${String(manifest.format)}`);
   const settingsManifest = manifest.format === SETTINGS_FORMAT;
+  const solarManifest = manifest.format === SOLAR_FORMAT;
   name(manifest.name, 'manifest.name');
   if (typeof manifest.bytecodeSha256 !== 'string' || !/^[0-9a-f]{64}$/.test(manifest.bytecodeSha256)) throw new Error('manifest.bytecodeSha256 must be a lowercase SHA-256 hex digest');
 
   const inputs = validateList(manifest.inputs, 'manifest.inputs', ['name', 'type']);
   const outputs = validateList(manifest.outputs, 'manifest.outputs', ['name', 'type']);
   const sensors = validateList(manifest.sensors, 'manifest.sensors', ['name', 'type', 'sampleMs', 'validMin', 'validMax', 'filter', 'window', 'staleMs', 'recoverSamples', 'valueInput', 'okInput'], ['optional']);
-  const schedules = validateList(manifest.schedules, 'manifest.schedules', ['name', 'timezone', 'slots', 'dueInput']);
+  if (!Array.isArray(manifest.schedules) || manifest.schedules.length > MAX_LIST) throw new TypeError('manifest.schedules must be a bounded array');
+  const schedules = manifest.schedules.map((schedule, index) => {
+    const solar = solarManifest && schedule?.kind === 'solar';
+    const fields = solar ? ['kind', 'name', 'timezone', 'latitude', 'longitude', 'event', 'offsetMs', 'fallback', 'dueInput'] : ['name', 'timezone', 'slots', 'dueInput'];
+    const item = record(schedule, `manifest.schedules[${index}]`);
+    keys(item, fields, [], `manifest.schedules[${index}]`);
+    if (solar) validateSolarDescriptor(item);
+    return copy(item);
+  });
+  if (solarManifest && !schedules.some(item => item.kind === 'solar')) throw new Error('v3 manifest requires a Solar schedule');
   const timers = validateList(manifest.timers, 'manifest.timers', ['name', 'state', 'clockInput']);
   const signals = validateList(manifest.signals, 'manifest.signals', ['name', 'sensor', 'onBelow', 'offAbove', 'initial', 'valueInput', 'okInput']);
   const configs = validateList(manifest.configs, 'manifest.configs', ['name', 'type', 'value'], settingsManifest ? ['settings', 'initialOffset', 'initialEndOffset'] : []);
@@ -222,9 +234,11 @@ function validateManifest(input, { acceptSettings = false } = {}) {
     string(item.timezone, `schedule ${item.name}.timezone`);
     try { new Intl.DateTimeFormat('en-US', { timeZone: item.timezone }).format(0); }
     catch { throw new Error(`schedule ${item.name}.timezone is not an Intl timezone`); }
-    if (!Array.isArray(item.slots) || item.slots.length > MAX_SCHEDULE_SLOTS) throw new RangeError(`schedule ${item.name}.slots must contain at most ${MAX_SCHEDULE_SLOTS} slots`);
-    for (const slot of item.slots) { safeInteger(slot, `schedule ${item.name}.slot`, 0, 1439); if (slot % 15 !== 0) throw new Error(`schedule ${item.name}.slot must be a 15-minute boundary`); }
-    unique(item.slots, `schedule ${item.name}.slot`);
+    if (item.kind !== 'solar') {
+      if (!Array.isArray(item.slots) || item.slots.length > MAX_SCHEDULE_SLOTS) throw new RangeError(`schedule ${item.name}.slots must contain at most ${MAX_SCHEDULE_SLOTS} slots`);
+      for (const slot of item.slots) { safeInteger(slot, `schedule ${item.name}.slot`, 0, 1439); if (slot % 15 !== 0) throw new Error(`schedule ${item.name}.slot must be a 15-minute boundary`); }
+      unique(item.slots, `schedule ${item.name}.slot`);
+    }
     name(item.dueInput, `schedule ${item.name}.dueInput`, true);
     generated(item.dueInput, `${RESERVED}schedule_due_${item.name}`, `schedule ${item.name}.dueInput`);
     scheduleNames.add(item.name);

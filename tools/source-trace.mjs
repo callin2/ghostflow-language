@@ -109,6 +109,7 @@ export function buildSourceTrace(ast, constraints, bytes, transitions = [], inte
   }
   for (const node of ast.body) {
     if (node.kind === 'input') for (const name of node.names) add(node, name, ['inputs']);
+    if (node.kind === 'schedule' && node.scheduleType === 'Solar') add(node, `__gf_schedule_due_${node.name}`, ['inputs']);
     if (node.kind === 'state') add(node, node.name, ['stateBefore', 'stateAfter']);
     if (node.kind === 'next') add(node, node.name, ['stateAfter']);
     if (node.kind === 'connection') add(node, node.name, ['requested', 'safe']);

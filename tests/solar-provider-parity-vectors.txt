@@ -1,0 +1,7 @@
+# name|timezone|latitude|longitude|event|offsetMs|previewWallMs|date|eventWallMs|scheduledWallMs
+# Generated from runtimes/wasm/solar-schedule.mjs SolarSchedule with SunCalc 2.0.2.
+utc-seoul-rise|UTC|37.5665|126.978|rise|0|1789387200000|2026-09-14|1789420417345|1789420417345
+utc-seoul-set|UTC|37.5665|126.978|set|0|1789387200000|2026-09-14|1789378930479|1789378930479
+seoul-extreme-west-rise|Asia/Seoul|37.5665|-179.9|rise|0|1789354800000|2026-09-14|1789321210705|1789321210705
+seoul-extreme-west-set-minus12h|Asia/Seoul|37.5665|-179.9|set|-43200000|1789354800000|2026-09-14|1789366194865|1789322994865
+seoul-east-rise-plus12h|Asia/Seoul|37.5665|179.9|rise|43200000|1789354800000|2026-09-14|1789321258733|1789364458733
