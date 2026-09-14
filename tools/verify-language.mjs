@@ -27,6 +27,8 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/output-conformance.test.mjs',
   'tests/runtime-conformance.test.mjs',
   'tests/schedule.test.mjs',
+  'tests/solar-control.test.mjs',
+  'tests/solar-schedule.test.mjs',
   'tests/scheduled-admission.test.mjs',
   'tests/signals-wasm.test.mjs',
   'tests/scan-frame-wasm.test.mjs',

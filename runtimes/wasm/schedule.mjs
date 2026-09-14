@@ -1,5 +1,6 @@
 // Wall-clock eligibility only. A station's durable admission ledger, not this
 // helper, owns once-per-occurrence execution and pump-time accounting.
+export { SolarSchedule } from './solar-schedule.mjs';
 const integer = (value, name) => {
   if (!Number.isSafeInteger(value) || value < 0) throw new TypeError(`${name} must be a nonnegative safe integer`);
   return value;
