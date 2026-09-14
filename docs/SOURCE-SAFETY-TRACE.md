@@ -12,6 +12,13 @@ requested/safe. Constraint indexes follow the actual lowered GFB constraint orde
 not a UI's inferred order. Literate adapters retain extracted coordinates and map
 original locations only when a real mapping exists.
 
+Elapsed timers have two compiler-generated runtime states. Each is an ordinary
+binding to `stateBefore` and `stateAfter`, but remains visibly generated:
+`generated: {declaration, role}` uses the authored timer name and one of the exact
+roles `since` or `initialized`. Both entries point to the authoritative `timer`
+declaration node. They are not synthetic authored assignments and do not claim
+that the declaration alone dynamically caused a later output.
+
 The FNV module fingerprint is the existing core diagnostic identifier, not a
 cryptographic integrity proof. Consumers must keep source/compiler/runtime and
 SHA-256 identities from the same compilation/run. Two different commented sources
@@ -27,12 +34,34 @@ already-lowered expressions, including expanded functions and implicit holds.
 They are possible static reads, including both conditional branches, **not** an
 executed-branch trace or a claim that every read caused the selected output.
 
-Consumers resolve source locations through existing bindings. Generated fields
-without bindings are explicitly unmapped, never assigned an invented source
-location. Previous-state edges end at the previous scan boundary; following them
-as same-scan transitions would falsely create feedback causality. Global safety
-constraints remain a separate relation with their actual round observations.
-This companion does not change GFB bytes or runtime output semantics.
+Consumers resolve source locations through existing bindings. The two generated
+timer states resolve to their timer declaration; other generated fields without
+bindings, such as the injected monotonic clock input, remain explicitly unmapped
+and never receive an invented source location. Previous-state edges end at the
+previous scan boundary; following them as same-scan transitions would falsely
+create feedback causality. Global safety constraints remain a separate relation
+with their actual round observations. This companion does not change GFB bytes or
+runtime output semantics.
+
+## Artifact persistence and strict recovery
+
+`compileSource` results persist the existing trace companion as
+`traceMetadata` in the `GhostFlow/source-map-v1` envelope. The GFB and strict
+control manifest do not change. The persisted companion carries
+`sourceDocumentSha256` and `bytecodeSha256`, while the direct low-level
+`compileControl` companion remains source-container independent.
+`restoreArtifactSourceMap` first validates the exact source-document SHA-256 and
+GFB SHA-256 against those companion identities, then the runtime module
+fingerprint, binding/node positions, generated timer pair, dependency targets and
+complete constraint-node coverage. Only then does it return the source, maps and
+trace metadata as one revision-bound result.
+
+Strict recovery rejects a traceable control map with missing trace metadata and
+rejects duplicate, missing or mismatched generated timer bindings. The older
+`verifyArtifactSourceMap` source-only API remains compatible with v1 maps that
+predate trace persistence, but validates trace metadata whenever the field is
+present. A consumer that promises output-to-source navigation must use strict
+recovery rather than treating source-only verification as trace acceptance.
 
 ## Runtime observations
 
@@ -58,7 +87,10 @@ The official `observeSourceTrace` helper requires matching module and safety
 formats plus ordered constraint index/kind/names. Missing fields are unobserved,
 never fabricated zero/false values. It joins actual fields; it does not interpret
 expressions again or infer electrical/mechanical operation. Frontend binding and
-physical feedback remain distinct later gates.
+physical feedback remain distinct later gates. When the companion came from
+`compileSource`, the source observation retains its `sourceDocumentSha256` and
+`bytecodeSha256` so downstream navigation cannot silently drop the selected
+revision identity.
 
 Acceptance requires explicit first-pass and cascading violations, mutex and
 satisfied cases, source locations and exact native/WASM equality. A passing source

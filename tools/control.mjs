@@ -546,13 +546,22 @@ class Lowerer {
       const message = cause instanceof Error ? cause.message : String(cause);
       error(this.ast.loc, `GFB1 lowering rejected control: ${message}`);
     }
+    const generatedTimers = [];
+    for (const node of this.ast.body) if (node.kind === 'timer') {
+      const timer = this.timers.get(node.name);
+      if (!timer) internal(`timer ${node.name} has no lowered state binding`);
+      generatedTimers.push(
+        { node, name: timer.sinceState, role: 'since' },
+        { node, name: timer.initState, role: 'initialized' },
+      );
+    }
     // Every node carries the original filename/line/column, including when a
     // future literate extractor maps this array back to Markdown locations.
     return {
       bytes,
       manifest: this.manifest,
       sourceMap: this.ast.sourceNodes,
-      traceMetadata: buildSourceTrace(this.ast, this.constraints, bytes, transitions, intents),
+      traceMetadata: buildSourceTrace(this.ast, this.constraints, bytes, transitions, intents, generatedTimers),
     };
   }
   unique(name, loc, category) {
