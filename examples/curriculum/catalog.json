@@ -1,0 +1,102 @@
+{
+  "format": "GhostFlow/plc-curriculum-catalog-v1",
+  "toolchain": {
+    "package": "ghostflow-language",
+    "packageVersion": "0.1.0",
+    "revision": "0e1cf721fcbfd87363977f9b15b629f1fec3459d"
+  },
+  "lessons": [
+    {
+      "id": "PC-01",
+      "title": "버튼으로 램프 켜기",
+      "source": {
+        "kind": "book-example-projection",
+        "path": "docs/ProgrammingInGhostflow.md",
+        "anchor": "ch01",
+        "example": "E01",
+        "sha256": "f9af11d95f3430a0cbf6c32d56745a77f172a73f1d537e0b894f0c0a4478e450"
+      }
+    },
+    {
+      "id": "PC-02",
+      "title": "START / STOP 제어",
+      "source": {
+        "kind": "canonical-literate",
+        "path": "examples/curriculum/pc-02-start-stop.ghost.md",
+        "sha256": "e92cc7ff393cd6c7a8fc9ff7d5a9285e928c1953eac3b85e11d525a969b08fc1"
+      }
+    },
+    {
+      "id": "PC-03",
+      "title": "모터 제어",
+      "source": {
+        "kind": "canonical-literate",
+        "path": "examples/curriculum/pc-03-motor-contactor.ghost.md",
+        "sha256": "e02704e9cba1293d289041763046dfeb85f461ab77710addacf19758e38dec94"
+      }
+    },
+    {
+      "id": "PC-04",
+      "title": "정회전 / 역회전",
+      "source": {
+        "kind": "canonical-literate",
+        "path": "examples/curriculum/pc-04-direction-interlock.ghost.md",
+        "sha256": "0af195d9b76de1c056553d46debc9dd76fc6923d15fe5953ab070dddaeb2a1c0"
+      }
+    },
+    {
+      "id": "PC-05",
+      "title": "리미트 스위치 추가",
+      "source": {
+        "kind": "canonical-literate",
+        "path": "examples/curriculum/pc-05-limit-feedback.ghost.md",
+        "sha256": "8ba701567bfa67257031917dd52d579d784db1c298860e866fde3782307e64f0"
+      }
+    },
+    {
+      "id": "PC-06",
+      "title": "Timer 사용",
+      "source": {
+        "kind": "canonical-literate",
+        "path": "examples/curriculum/pc-06-timer-patterns.ghost.md",
+        "sha256": "5a23760a949379849e5f4948148090bf7b86e75e5cf4a9cd5086e481aa69c1d0"
+      }
+    },
+    {
+      "id": "PC-07",
+      "title": "자동 물탱크 제어",
+      "source": {
+        "kind": "canonical-literate",
+        "path": "examples/curriculum/pc-07-tank-hysteresis.ghost.md",
+        "sha256": "6b060154f7a2d18e65f60ea09b47616b1c991db7e9d48847e74f7343f14e29f6"
+      }
+    },
+    {
+      "id": "PC-08",
+      "title": "Manual / Auto",
+      "source": {
+        "kind": "canonical-literate",
+        "path": "examples/curriculum/pc-08-manual-auto.ghost.md",
+        "sha256": "d08217d485548f1b1feae947939491aa444438c46a13ca3a9aa0425d33c5a06b"
+      }
+    },
+    {
+      "id": "PC-09",
+      "title": "밸브 + 펌프 순차제어",
+      "source": {
+        "kind": "canonical-literate",
+        "path": "examples/curriculum/pc-09-sequential-water-supply.ghost.md",
+        "sha256": "322433eda0f7c5e0503f5830a39011d67d9eaf8c70416e8ea68f389e19821947"
+      }
+    },
+    {
+      "id": "PC-10",
+      "title": "Fault / Alarm / Reset",
+      "source": {
+        "kind": "canonical-literate",
+        "path": "examples/curriculum/pc-10-fault-alarm-reset.ghost.md",
+        "sha256": "3de1cb4fab6125e27776b15e3bbdf48b5f7fd252b8b3a052f8222745330424d4"
+      }
+    }
+  ]
+}
