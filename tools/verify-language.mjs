@@ -29,6 +29,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/schedule.test.mjs',
   'tests/solar-control.test.mjs',
   'tests/solar-schedule.test.mjs',
+  'tests/solar-scanframe-native-wasm.test.mjs',
   'tests/scheduled-admission.test.mjs',
   'tests/signals-wasm.test.mjs',
   'tests/scan-frame-wasm.test.mjs',
@@ -123,6 +124,7 @@ async function verify(nodeOnly) {
       await gate('cargo', ['test', '--locked', '--offline', '--workspace']);
       await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-core', '--example', 'run']);
       await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-core', '--example', 'run', '--release']);
+      await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-core', '--example', 'scan_adapter', '--release']);
       await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-wasm', '--target', 'wasm32-unknown-unknown', '--release']);
       wasmVerified = true;
     }
