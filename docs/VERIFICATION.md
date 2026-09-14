@@ -23,10 +23,13 @@ command and preserving the failure report:
 1. Read toolchain versions and check Rust formatting.
 2. Compile the legacy fixture required by `include_bytes!` in Rust unit tests.
 3. Run workspace Rust tests with the existing lockfile.
-4. Build the native example runner and the release WASM from the same core.
-5. Run the explicit 13-file language/integration-contract Node suite.
+4. Build the legacy native runner, release framed `scan_tape` runner and release
+   WASM from the same core.
+5. Run the explicit language/integration-contract Node suite, including framed
+   native/WASM tape parity (see [SCAN-TAPE-PARITY.md](SCAN-TAPE-PARITY.md)).
 6. Execute the tutorial with freshly built runners and compare native/WASM traces.
-7. Record the native resource report, WASM digest and source hashes.
+7. Record the native resource report, both native runner digests, WASM digest
+   and source hashes.
 
 The Node suite covers compiler errors, literate extraction, artifact maps,
 manifest-aware control execution, constraints/policy, schedules and occurrence
@@ -39,7 +42,7 @@ conformance coverage, not a proof of all runtime or device behavior.
 `build/verification.json` is the latest full host result. Unique files in
 `build/verification-runs/` retain previous results; `build/tutorial/` contains
 the regenerated programs and traces. All are ignored execution evidence. The
-partial `npm run test:node` requires an existing WASM build and writes
+partial `npm run test:node` requires existing WASM and both release native builds and writes
 `build/verification-node.json`, leaving the latest full result intact.
 
 API acceptance, genuine farmer-language evaluation, firmware compatibility,
