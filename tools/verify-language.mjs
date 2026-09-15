@@ -48,6 +48,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/scan-tape-parity.test.mjs',
   'tests/station-wasm.test.mjs',
   'tests/toolchain.test.mjs',
+  'tests/browser-toolchain.test.mjs',
   'tests/operating-settings.test.mjs',
 ]);
 

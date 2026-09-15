@@ -58,7 +58,7 @@ function inspectQuery(bytes) {
 
 // A deliberately small reader: it verifies only the GFB1 envelope fields the
 // front-end owns, without duplicating the compiler or runtime verifier.
-function inspectModule(bytes) {
+function inspectModule(bytes) { bytes = Buffer.from(bytes);
   assert.equal(bytes.subarray(0, 4).toString(), 'GFB1');
   const state = { at: 4 };
   assert.equal(bytes.readUInt16LE(state.at), 1); state.at += 2;

@@ -1,5 +1,5 @@
-import { createHash } from 'node:crypto';
 import { canonicalJson } from '../../tools/canonical-json.mjs';
+import { sha256Hex } from '../../tools/sha256.mjs';
 
 export const INTERACTION_SCHEMA_FORMAT = 'GhostFlow/interaction-schema-v0';
 export const RUNTIME_SNAPSHOT_FORMAT = 'GhostFlow/runtime-snapshot-v0';
@@ -247,10 +247,10 @@ function expectedJoin(schema, snapshot, expected) {
 
 /** SHA-256 of strict canonical JSON bytes for the static schema, distinct from its format version. */
 export function interactionSchemaSha256(schema) {
-  return createHash('sha256').update(canonicalJson(schema, {
+  return sha256Hex(canonicalJson(schema, {
     rejectSparseArrays: true,
     rejectUnsafeIntegers: true,
-  }), 'utf8').digest('hex');
+  }));
 }
 
 /**
