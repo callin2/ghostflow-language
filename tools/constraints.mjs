@@ -311,8 +311,8 @@ class Parser {
   }
 }
 
-/** Compile a standalone .ghost rules source to a host-policy artifact. */
-export function compileConstraints(source, { filename = 'constraints.ghost' } = {}) {
+/** @internal Lower extracted canonical-literate constraint code to a host-policy artifact. */
+export function compileConstraints(source, { filename = '<extracted-constraints>' } = {}) {
   return new Parser(source, String(filename)).parse();
 }
 

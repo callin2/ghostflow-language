@@ -15,9 +15,10 @@ compiler input.
 
 Modern control supports inputs, configs, outputs, state, finite enums, pure
 functions, expression/next-state checks, elapsed timers, DailySlots, sensors and
-signals within the existing bounded profile. Standalone constraint source uses
-`tools/constraints.mjs`/`tools/ghostrules.mjs` and its separate generated policy
-format. Unsupported syntax is rejected; this export adds no language features.
+signals within the existing bounded profile. Standalone constraints use canonical
+`.ghost.md` input through `tools/ghostrules.mjs`; its internal
+`tools/constraints.mjs` lowerer produces the separate generated policy format.
+Unsupported syntax is rejected; this export adds no language features.
 
 `crates/ghostflow-core` owns module loading, expression execution, simultaneous
 state transitions, intent/safety resolution, signal conditioning and station
