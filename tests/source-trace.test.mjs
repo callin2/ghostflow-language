@@ -7,7 +7,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { compileControl } from '../tools/control.mjs';
 import { compileLessonBundle, canonicalLessonJson } from '../tools/lesson.mjs';
-import { compileSource } from '../tools/toolchain.mjs';
+import { compileSource } from './helpers/literate-compile.mjs';
 import { observeRuntimeValues, observeSourceTrace } from '../tools/source-trace.mjs';
 import { GhostFlowRuntime } from '../runtimes/wasm/ghostflow-runtime.mjs';
 
@@ -110,8 +110,14 @@ function lessonBundle(markdown) {
 test('source trace records actual compiler nodes, bindings, ordered constraint kinds, and byte fingerprint', async t => {
   const compiled = await compileSource(source, { filename: 'trace.ghost' });
   const direct = compileControl(source, { filename: 'trace.ghost' });
-  const { sourceDocumentSha256, bytecodeSha256, ...compilerTrace } = compiled.traceMetadata;
-  assert.deepEqual(compilerTrace, direct.traceMetadata);
+  const signature = trace => ({
+    moduleFingerprint: trace.moduleFingerprint,
+    bindings: trace.bindings.map(({ nodeId, kind, name, fields }) => ({ nodeId, kind, name, fields })),
+    dependencies: trace.dependencies,
+    constraints: trace.constraints.map(({ index, kind, names, nodeId }) => ({ index, kind, names, nodeId })),
+  });
+  const { sourceDocumentSha256, bytecodeSha256 } = compiled.traceMetadata;
+  assert.deepEqual(signature(compiled.traceMetadata), signature(direct.traceMetadata));
   assert.equal(sourceDocumentSha256, compiled.sourceDocument.sha256);
   assert.equal(bytecodeSha256, compiled.manifest.bytecodeSha256);
   assert.equal(compiled.traceMetadata.format, 'GhostFlow/source-trace-v1');
@@ -198,7 +204,7 @@ test('each authored timer binds its two generated runtime states to the timer de
     assert.deepEqual(binding.source, { filename: 'timer-trace.ghost.md', line: literateTimer.line, column: literateTimer.column });
     assert.deepEqual(
       { filename: binding.extractedSource.filename, line: binding.extractedSource.line, column: binding.extractedSource.column },
-      { filename: 'timer-trace.ghost.md', line: timerNode.line, column: timerNode.column },
+      { filename: 'timer-trace.ghost.md', line: literateTimer.extracted.line, column: literateTimer.extracted.column },
     );
   }
 

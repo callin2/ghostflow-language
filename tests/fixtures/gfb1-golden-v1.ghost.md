@@ -5,12 +5,11 @@ artifact. The program is intentionally small and runs only in virtual host
 conformance tests.
 
 ```ghost
-(module gfb1_golden
-  (version 1)
-  (input enabled bool)
-  (state running bool false)
-  (strategy basic 0
-    (device (has actuator pump bool))
-    (next running input.enabled)
-    (intent pump (not input.enabled))))
+control gfb1_golden {
+  input enabled: Bool;
+  state running: Bool = false;
+  running' = enabled;
+  output pump: Bool;
+  pump <- !enabled;
+}
 ```

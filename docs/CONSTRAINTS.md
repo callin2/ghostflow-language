@@ -5,7 +5,10 @@
 [선택한 control 문법](LANGUAGE-SURFACE.md)에 대한 후속 계약이다.
 
 아래에는 실행 가능한 부분과 미래 **설계 예제**가 함께 있다. control은 `ghostc`,
-유한한 named constraints는 `ghostrules`로 따로 컴파일한다. 전체 DSL을 지원하는
+유한한 named constraints는 canonical `.ghost.md` 문서를 `ghostrules`로 따로
+컴파일한다. CLI는 최상위 `ghost` fenced code만 정확히 추출하며 plain `.ghost` 입력을
+거절한다. `tools/constraints.mjs`의 `compileConstraints`는 이 추출 코드만 받는 내부
+lowerer다. 전체 DSL을 지원하는
 범용 solver는 아니다. `constraints` 예제의 설비·포트 이름은 설치 구성에 바인딩해야 한다.
 완결된 control과 control 내부에 넣는 단편을 각 예제에서 구분한다.
 

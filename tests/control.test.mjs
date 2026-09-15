@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { compileControl, ControlCompileError, parseControl } from '../tools/control.mjs';
-import { compileSource } from '../tools/toolchain.mjs';
+import { extractLiterate } from '../tools/literate.mjs';
+import { compileSource } from './helpers/literate-compile.mjs';
 import { GhostFlowRuntime } from '../runtimes/wasm/ghostflow-runtime.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 
@@ -88,8 +89,9 @@ function inspectModule(bytes) {
   return { name, inputs, states, strategies, strategyQueries, constraints };
 }
 
-const scheduled = fs.readFileSync(new URL('../examples/scheduled-watering.ghost', import.meta.url), 'utf8');
-const scheduledResult = compileControl(scheduled, { filename: 'examples/scheduled-watering.ghost' });
+const scheduledFilename = 'examples/scheduled-watering.ghost.md';
+const scheduled = extractLiterate(fs.readFileSync(new URL('../examples/scheduled-watering.ghost.md', import.meta.url), 'utf8'), { filename: scheduledFilename }).code;
+const scheduledResult = compileControl(scheduled, { filename: scheduledFilename });
 const scheduledModule = inspectModule(scheduledResult.bytes);
 
 assert.equal(scheduledModule.name, 'ScheduledWatering');
@@ -134,7 +136,7 @@ assert.deepEqual(scheduledModule.constraints, [
   { kind: 2, names: ['valve1', 'valve2'] },
 ]);
 assert.ok(scheduledResult.sourceMap.length > 40);
-assert.ok(scheduledResult.sourceMap.every(node => node.filename === 'examples/scheduled-watering.ghost' && node.line >= 1 && node.column >= 1));
+assert.ok(scheduledResult.sourceMap.every(node => node.filename === scheduledFilename && node.line >= 1 && node.column >= 1));
 
 const sensorProgram = `
 control MoistureDemand {
@@ -188,8 +190,8 @@ assert.equal(sensorModule.inputs.find(field => field.name === '__gf_signal_value
 assert.deepEqual(sensorModule.constraints, [{ kind: 1, names: ['pump', 'valve'] }]);
 
 const tutorialMoisture = compileControl(
-  fs.readFileSync(new URL('../examples/tutorial/03-moisture.ghost', import.meta.url), 'utf8'),
-  { filename: 'examples/tutorial/03-moisture.ghost' },
+  extractLiterate(fs.readFileSync(new URL('../examples/tutorial/03-moisture.ghost.md', import.meta.url), 'utf8'), { filename: 'examples/tutorial/03-moisture.ghost.md' }).code,
+  { filename: 'examples/tutorial/03-moisture.ghost.md' },
 );
 const tutorialMoistureModule = inspectModule(tutorialMoisture.bytes);
 assert.equal(tutorialMoisture.manifest.signals[0].name, 'dry');

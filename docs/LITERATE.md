@@ -7,8 +7,8 @@ Literate는 소스 포장 형식이며 제어 언어의 실행 모델을 바꾸�
 
 ## 파일과 추출 규칙
 
-- `.ghost`: 일반 GhostFlow 소스.
-- `.ghost.md`: Markdown 안의 실행 코드 블록을 추출하는 literate 소스.
+- `.ghost.md`: Markdown 안의 실행 코드 블록을 추출하는 유일한 GhostFlow 제품 소스.
+- `.ghost`: 보존할 경우 비실행 역사 증거일 뿐이며 컴파일러 입력이나 fallback이 아니다.
 - 일반 `.md`는 확장자만으로 GhostFlow 실행 대상으로 취급하지 않는다.
 
 문서의 최상위 fenced code block 중 정보 문자열이 정확히 `ghost`인 블록만
@@ -65,11 +65,12 @@ control Irrigation {
 상태를 따로 확정하지 않는다. 모든 상태의 다음 값과 출력은 원래 tick 계약을 따른다.
 문서에 붙인 관찰 결과는 프로그램 입력으로 자동 되먹임되지 않는다.
 
-### 기존 문서형 예제의 추출 결과
+### 문서형 예제의 추출 결과
 
-위 규칙을 적용한 일반 `.ghost` 소스의 예는 다음과 같다. 이는
-앞의 `Irrigation` 문서형 예제의 `ghost` 블록들을 문서 순서대로 이어 붙인 결과다.
-파일의 설명·표·링크는 포함하지 않으며, 아래 `text` fence는 표시용이다.
+앞의 `Irrigation` 문서형 예제에서 컴파일러가 추출하는 코드의 예는 다음과 같다.
+이는 `ghost` 블록들을 문서 순서대로 이은 내부 추출 결과이며 독립 파일이나 별도
+입력 형식이 아니다. 파일의 설명·표·링크는 포함하지 않으며, 아래 `text` fence는
+표시용이다.
 
 ```text
 control Irrigation {
@@ -124,9 +125,7 @@ control 내부의 설명을 자연스럽게 배치하면서 일반 언어의 구
 ## 컴파일과 런타임의 관계
 
 ```text
-일반 .ghost ─────────────────┐
-                             ├─ 같은 파서 → 같은 타입·시간·자원 검사 → .gfb
-literate .ghost.md → 코드 추출 ┘
+.ghost.md → 코드 추출 → 같은 파서 → 같은 타입·시간·자원 검사 → .gfb
 ```
 
 추출된 코드가 같으면 타입 그래프와 실행 의미가 같아야 한다. 디버그 정보를 제외한
@@ -192,17 +191,16 @@ tick 모델이 정한다.
 
 ## 예제와 검증 기준
 
-[일반 시간표 관수 코드](../examples/scheduled-watering.ghost)와
-[설명이 있는 동일 프로그램](../examples/scheduled-watering.ghost.md)을 제공한다.
-둘 다 `ghostc` 입력으로 사용할 수 있다. Markdown은 호스트에서만 해석하며 MCU에 넣지 않는다.
+[설명이 있는 시간표 관수 문서](../examples/scheduled-watering.ghost.md)를 제공한다.
+이 문서만 `ghostc` 입력으로 사용할 수 있다. Markdown은 호스트에서만 해석하며 MCU에 넣지 않는다.
 
 문법과 추출기를 구현할 때 확인할 기준은 다음과 같다.
 
-1. 두 예제의 추출 소스가 같고 같은 입력에서 같은 상태·출력 trace를 만든다.
+1. 설명만 다른 두 canonical 문서가 같은 추출 소스와 같은 상태·출력 trace를 만든다.
 2. 설명만 바꿔도 실행 그래프와 실행 바이트코드는 유지된다.
-3. 일반 코드, 중첩 fence, 목록·인용 속 예시는 실행되지 않는다.
+3. plain `.ghost` 입력, 중첩 fence, 목록·인용 속 예시는 실행되지 않는다.
 4. 잘못된 fence와 분리된 토큰/표현식은 원래 문서 위치로 진단한다.
 5. 여러 블록에 걸친 control도 한 tick 모델과 같은 상태 범위를 사용한다.
 
 추출·위치 진단 테스트는 `tests/literate.test.mjs`, `tests/toolchain.test.mjs`에,
-일반/literate 컴파일 및 실제 VM trace 동등성은 `tools/tutorial.mjs`에 있다.
+canonical literate 컴파일 및 실제 VM trace 동등성은 `tools/tutorial.mjs`에 있다.

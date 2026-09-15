@@ -2,7 +2,7 @@
 
 이 문서는 설명과 GhostFlow 코드를 함께 담는다. control/literate 컴파일러와
 manifest 호스트로 실행한다. 물리 출력이 아닌 가상 튜토리얼이다.
-[일반 코드](scheduled-watering.ghost)와 같은 프로그램이다.
+이 문서가 정식 실행 프로그램이며, `scheduled-watering.ghost`는 비실행 역사 증거다.
 
 선택한 시각마다 1번 구역을 급수하고 이어서 2번 구역을 급수한다.
 두 구역은 펌프 하나를 공유한다.

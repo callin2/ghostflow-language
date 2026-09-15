@@ -6,7 +6,7 @@
 
 이 문서는 PC-06의 유일한 canonical literate 실행 원본이다. 기존 교재의
 [E08 DelayedStart](../../docs/ProgrammingInGhostflow.md#e08--입력이-2초-유지되면-켜기)와
-[tutorial/02-watering](../tutorial/02-watering.ghost)를 보존하고 참조한다.
+[tutorial/02-watering](../tutorial/02-watering.ghost.md)를 보존하고 참조한다.
 E08은 하나의 상태와 `elapsed(phase)`를 소개하고, tutorial 예제는 실제 급수
 순서를 보여 준다. 이 과는 그 지식을 세 개의 독립적인 요구 채널로 확장한다.
 

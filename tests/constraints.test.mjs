@@ -6,7 +6,7 @@ import path from 'node:path';
 import { compileConstraints, ConstraintCompileError } from '../tools/constraints.mjs';
 
 const source = `
-// Separate .ghost rules file: bindings are resolved by the parent host runtime.
+// Extracted canonical-literate rules: bindings are resolved by the parent host runtime.
 constraints StationRules {
   exclusive(automatic, manual, configuring);
   allow enter(Auto, Manual, Configure)
@@ -79,11 +79,17 @@ assert.doesNotThrow(() => compileConstraints('constraints Safe { once starts per
 expectError('constraints Safe { globalThis.pwned(); }', 'unsupported constraint expression globalThis');
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostrules-test-'));
-const input = path.join(dir, 'rules.ghost');
+const input = path.join(dir, 'rules.ghost.md');
+const plainInput = path.join(dir, 'rules.ghost');
 const output = path.join(dir, 'rules.json');
-fs.writeFileSync(input, source);
+fs.writeFileSync(input, `# Station rules\n\n\`\`\`ghost\n${source}\`\`\`\n`);
+fs.writeFileSync(plainInput, source);
 execFileSync(process.execPath, ['tools/ghostrules.mjs', input, output], { cwd: process.cwd(), stdio: 'pipe' });
 assert.deepEqual(JSON.parse(fs.readFileSync(output, 'utf8')), artifact);
 execFileSync(process.execPath, ['tools/ghostrules.mjs', '--check', input], { cwd: process.cwd(), stdio: 'pipe' });
+assert.throws(
+  () => execFileSync(process.execPath, ['tools/ghostrules.mjs', '--check', plainInput], { cwd: process.cwd(), stdio: 'pipe' }),
+  error => String(error.stderr).includes('requires a canonical .ghost.md literate source'),
+);
 
 console.log(`constraints tests passed (${artifact.groups.length} groups, ${artifact.groups[0].rules.length} StationRules rules)`);

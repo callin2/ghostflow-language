@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
-import { compileSource } from '../tools/toolchain.mjs';
+import { compileSource } from './helpers/literate-compile.mjs';
+import { extractLiterate } from '../tools/literate.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 
 const wasmPath = new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url);
@@ -27,7 +28,10 @@ async function artifact() { return compileSource(source, { filename: 'control-ho
 async function host() { return ControlRuntime.instantiate(wasmBytes, await artifact()); }
 function sample(id, value, quality = 'Good') { return { epoch: 1, id, timestampMs: id * 1000, value, quality }; }
 
-const scheduledSource = fs.readFileSync(new URL('../examples/scheduled-watering.ghost', import.meta.url), 'utf8');
+const scheduledSource = extractLiterate(
+  fs.readFileSync(new URL('../examples/scheduled-watering.ghost.md', import.meta.url), 'utf8'),
+  { filename: 'examples/scheduled-watering.ghost.md' },
+).code;
 
 test('runs compiled control through real WASM with sensor fault/recovery and virtual output capability', async () => {
   const runtime = await host();

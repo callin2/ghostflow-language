@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { compileSource } from '../tools/toolchain.mjs';
+import { compileSource } from './helpers/literate-compile.mjs';
 import { compile, parse, tokenize } from '../tools/gfb1.mjs';
 import { GhostFlowRuntime } from '../runtimes/wasm/ghostflow-runtime.mjs';
 
@@ -172,15 +172,15 @@ test('GF-TEST-load-error: every truncation and invalid format agree across targe
   }
 });
 
-test('GF-TEST-literate-runtime-equivalence: plain and CommonMark inputs deploy identical GFB and traces', async t => {
+test('GF-TEST-literate-runtime-equivalence: equivalent canonical literate documents deploy identical GFB and traces', async t => {
   const source = 'control Literate { input enabled: Bool; output result: Bool; result <- enabled; }';
-  const plain = await compileSource(source, { filename: 'same.ghost' });
-  const literate = await compileSource(`# Controller\n\n\`\`\`ghost\n${source}\n\`\`\`\n`, { filename: 'same.ghost.md' });
-  assert.deepEqual(literate.bytes, plain.bytes);
-  const direct = await differential(t, plain.bytes, ['enabled'], [{ enabled: false }, { enabled: true }], [['result', 'bool']]);
-  const markdown = await differential(t, literate.bytes, ['enabled'], [{ enabled: false }, { enabled: true }], [['result', 'bool']]);
-  assert.deepEqual(markdown.outcomes, direct.outcomes);
-  assert.deepEqual(direct.outcomes.map(row => row.trace.safe.result), [false, true]);
+  const first = await compileSource(`# Controller\n\n\`\`\`ghost\n${source}\n\`\`\`\n`, { filename: 'first.ghost.md' });
+  const second = await compileSource(`# Same executable control, with independent intent prose.\n\n\`\`\`ghost\n${source}\n\`\`\`\n`, { filename: 'second.ghost.md' });
+  assert.deepEqual(first.bytes, second.bytes);
+  const firstRun = await differential(t, first.bytes, ['enabled'], [{ enabled: false }, { enabled: true }], [['result', 'bool']]);
+  const secondRun = await differential(t, second.bytes, ['enabled'], [{ enabled: false }, { enabled: true }], [['result', 'bool']]);
+  assert.deepEqual(secondRun.outcomes, firstRun.outcomes);
+  assert.deepEqual(firstRun.outcomes.map(row => row.trace.safe.result), [false, true]);
 });
 
 // Independent minimal GFB envelope: no compiler-generated query can contain

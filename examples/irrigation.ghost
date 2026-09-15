@@ -1,4 +1,5 @@
-; One farming intent, progressively enhanced by available capabilities.
+; Historical pre-literate source evidence only. Product compilation rejects it;
+; use irrigation.ghost.md as the canonical executable source.
 (module irrigation
   (version 1)
 
@@ -44,4 +45,3 @@
 
   ; Native safety kernel applies these after user logic.
   (requires pump valve))
-

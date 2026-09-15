@@ -43,6 +43,13 @@ const traceableTimerControl = `control TraceableTimer {
   require pump => permit;
   require !(pump && permit);
 }`;
+const traceableTimerDocument = `# Traceable timer
+
+\`\`\`ghost
+${traceableTimerControl}
+\`\`\`
+`;
+const traceableTimerFilename = 'traceable-timer.ghost.md';
 
 function artifactMap(result) {
   return {
@@ -166,7 +173,7 @@ test('source-map verification rejects tampering, malformed source fields, and wr
 });
 
 test('traceable artifact maps persist and restore source, map, extraction, and verified trace metadata', async () => {
-  const result = await compileSource(traceableTimerControl, { filename: 'traceable-timer.ghost' });
+  const result = await compileSource(traceableTimerDocument, { filename: traceableTimerFilename });
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-toolchain-'));
   try {
     const artifact = path.join(temporary, 'traceable-timer.gfb');
@@ -187,6 +194,8 @@ test('traceable artifact maps persist and restore source, map, extraction, and v
         sourceMap: result.sourceMap,
         extractionMap: result.extractionMap,
         traceMetadata: result.traceMetadata,
+        interactionSchema: null,
+        interactionSourceIdentity: null,
       },
     );
   } finally {
@@ -195,7 +204,7 @@ test('traceable artifact maps persist and restore source, map, extraction, and v
 });
 
 test('traceable artifact-map restoration fails closed when trace provenance is absent or malformed', async () => {
-  const result = await compileSource(traceableTimerControl, { filename: 'traceable-timer.ghost' });
+  const result = await compileSource(traceableTimerDocument, { filename: traceableTimerFilename });
   const map = artifactMap(result);
   const timerBindings = map.traceMetadata.bindings.filter(entry => entry.kind === 'timer');
   assert.equal(timerBindings.length, 2, 'fixture has both required generated timer-state bindings');
@@ -239,23 +248,6 @@ test('traceable artifact-map restoration fails closed when trace provenance is a
   }
 });
 
-test('legacy maps without traceable control nodes restore with a null trace metadata projection', async () => {
-  const legacy = await compileSource('(module LegacyRestore (strategy run 0 (device true)))', { filename: 'legacy-restore.ghost' });
-  const map = {
-    format: 'GhostFlow/source-map-v1',
-    bytecodeSha256: createHash('sha256').update(legacy.bytes).digest('hex'),
-    sourceDocument: legacy.sourceDocument,
-    nodes: legacy.sourceMap,
-    lines: legacy.extractionMap,
-  };
-  assert.deepEqual(restoreArtifactSourceMap(map, legacy.bytes), {
-    sourceDocument: legacy.sourceDocument,
-    sourceMap: legacy.sourceMap,
-    extractionMap: legacy.extractionMap,
-    traceMetadata: null,
-  });
-});
-
 test('writeArtifact rejects an invalid envelope before replacing existing files', async () => {
   const result = await compileSource(markdown, { filename });
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-toolchain-'));
@@ -279,30 +271,6 @@ test('writeArtifact rejects an invalid envelope before replacing existing files'
       assert.throws(() => writeArtifact(invalid, artifact), message);
       for (const [name, contents] of before) assert.deepEqual(fs.readFileSync(name), contents, `${name} was not replaced`);
     }
-  } finally {
-    fs.rmSync(temporary, { recursive: true, force: true });
-  }
-});
-
-test('low-level legacy compilation gains a plain source envelope while direct compileControl stays legacy-compatible', async () => {
-  const legacy = await compileSource('(module Legacy (strategy run 0 (device true)))', { filename: 'legacy.ghost' });
-  assert.equal(legacy.manifest, null);
-  assert.equal(legacy.sourceDocument.kind, 'plain');
-  assert.equal(legacy.bytes.subarray(0, 4).toString(), 'GFB1');
-
-  const direct = compileControl(extractLiterate(markdown, { filename }).code, { filename });
-  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-toolchain-'));
-  try {
-    const legacyArtifact = path.join(temporary, 'legacy.gfb');
-    writeArtifact(legacy, legacyArtifact);
-    const legacyMap = JSON.parse(fs.readFileSync(`${legacyArtifact}.map.json`, 'utf8'));
-    assert.deepEqual(verifyArtifactSourceMap(legacyMap, legacy.bytes), legacy.sourceDocument);
-    assert.equal(fs.existsSync(`${legacyArtifact}.manifest.json`), false);
-
-    const directArtifact = path.join(temporary, 'direct.gfb');
-    writeArtifact(direct, directArtifact);
-    assert.deepEqual(JSON.parse(fs.readFileSync(`${directArtifact}.map.json`, 'utf8')), { nodes: direct.sourceMap });
-    assert.equal('sourceDocument' in JSON.parse(fs.readFileSync(`${directArtifact}.map.json`, 'utf8')), false);
   } finally {
     fs.rmSync(temporary, { recursive: true, force: true });
   }

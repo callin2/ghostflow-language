@@ -35,6 +35,15 @@ tutorial traces are execution evidence under ignored `build/`, separate from
 source releases. Report host validation separately from Device, API and farmer-UX
 validation.
 
+## v1 clean break: canonical literate source only
+
+- This pre-1.0 toolchain accepts canonical `.ghost.md` literate documents for
+  product compilation. Once a replacement is accepted and verified, remove its
+  superseded active source/API/fallback paths and their compatibility tests.
+- Add compatibility only for an explicitly approved, concrete current user,
+  data, or deployment need. Historical raw material may remain as clearly
+  isolated evidence, never as an executable fallback.
+
 The migration export preserves compiler/runtime semantics. Format or ABI changes
 need an explicit compatibility decision and conformance tests; package version,
 source-language profile, GFB1 format, manifest format and Device firmware version

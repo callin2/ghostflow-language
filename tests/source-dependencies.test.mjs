@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import test from 'node:test';
 import { observeSourceTrace } from '../tools/source-trace.mjs';
-import { compileSource } from '../tools/toolchain.mjs';
+import { compileSource } from './helpers/literate-compile.mjs';
 
 function dependencyEntries(compilation) {
   return compilation.traceMetadata.dependencies.map(({ target, reads }) => ({ target, reads }));

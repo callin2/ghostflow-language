@@ -102,19 +102,15 @@ test('GF-TEST-intent-anchor-diagnostics: author errors identify the literate sou
   }
   await assert.rejects(
     () => compileSource('// ghostflow:link id=GF-INT-PUMP-001 relation=implements\ncontrol Plain {}', { filename: 'plain.ghost' }),
-    /plain\.ghost:1:4: ghostflow link directives require a literate/,
+    /requires a canonical .ghost.md literate source/,
   );
-  const stringValue = await compileSource(`control PlainString {
-  config enabled: Bool = false { access = operator; label = "contains ghostflow:link safely"; }
-}`, { filename: 'plain-string.ghost' });
-  assert.equal(stringValue.manifest.name, 'PlainString', 'a string containing the marker is not a directive');
-  const literateString = await compileSource(`\`\`\`ghost
+  const stringValue = await compileSource(`\`\`\`ghost
 control LiterateString {
   config enabled: Bool = false { access = operator; label = "contains ghostflow:link safely"; }
 }
 \`\`\`
 `, { filename: 'literate-string.ghost.md' });
-  assert.equal(literateString.manifest.name, 'LiterateString');
+  assert.equal(stringValue.manifest.name, 'LiterateString', 'a string containing the marker is not a directive');
   const ignoredHtml = await compileSource(`<div><!-- ghostflow:anchor id=GF-IGNORED kind=intent status=confirmed origin=user --></div>
 
 \`\`\`ghost
@@ -179,7 +175,7 @@ test('GF-TEST-intent-anchor-recovery: revision, range, metadata, and node tamper
       delete value.traceMetadata.intentAnchors;
       delete value.traceMetadata.intentLinks;
     }, /metadata presence mismatch/],
-    ['plain source kind', value => { value.sourceDocument.kind = 'plain'; }, /requires literate source kind/],
+    ['plain source kind', value => { value.sourceDocument.kind = 'plain'; }, /canonical literate/],
     ['extraction map', value => { value.lines[0].length += 1; }, /extraction map mismatch/],
     ['unknown field', value => { value.traceMetadata.intentLinks[0].forged = true; }, /intent link fields mismatch/],
     ['unknown metadata field', value => { value.traceMetadata.forged = true; }, /metadata fields mismatch/],

@@ -5,7 +5,7 @@
 > 사용자 발화를 그대로 인용한 문서가 아니다.
 
 이 문서가 PC-07의 유일한 canonical literate 실행 원본이다. 기존
-[tutorial/03-moisture](../tutorial/03-moisture.ghost)는 연속 수분 센서의
+[tutorial/03-moisture](../tutorial/03-moisture.ghost.md)는 연속 수분 센서의
 median 필터·품질 상태·hysteresis를 함께 다루는 별개의 예제이므로 보존하고
 참조한다. 이 과는 아날로그 값이나 연속 센서 처리가 아니라, 물리적인 상·하한
 스위치를 이용한 탱크 충전 제어를 다룬다.

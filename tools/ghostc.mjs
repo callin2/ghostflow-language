@@ -4,8 +4,6 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { compileSource, writeArtifact } from './toolchain.mjs';
 
-// Preserve the original library API for existing callers and MVP tests.
-export { tokenize, parse, compile, CompileError } from './gfb1.mjs';
 export { compileSource } from './toolchain.mjs';
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
@@ -13,7 +11,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.ar
   const check = args.includes('--check');
   const names = args.filter(arg => arg !== '--check');
   if (!names[0] || (!check && !names[1]) || names.length > 2 || names.some(arg => arg.startsWith('--'))) {
-    console.error('usage: ghostc <input.ghost|input.ghost.md> <output.gfb>\n       ghostc --check <input.ghost|input.ghost.md>');
+    console.error('usage: ghostc <input.ghost.md> <output.gfb>\n       ghostc --check <input.ghost.md>');
     process.exitCode = 2;
   } else {
     try {

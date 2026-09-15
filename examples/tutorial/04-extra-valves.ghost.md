@@ -1,13 +1,14 @@
-// HISTORICAL NON-EXECUTABLE EVIDENCE. Canonical source: 04-extra-valves.ghost.md.
-// This raw pre-literate source is not a product compiler input or fallback.
-// Add this control; the existing ScheduledWatering source is unchanged.
-// The host binds pump to the same station and valves 3/4 to new physical ports.
+# Extra station valves
+
+This independent canonical control shares the host-owned station pump while
+sequencing valves three and four at its own selected time.
+
+```ghost
 control ExtraValves {
   schedule extra_starts: DailySlots<15min> {
     timezone = "Asia/Seoul";
     selected = [19:15];
   }
-
   config water_time: Duration = 5min;
   config valve_delay: Duration = 2s;
   config stop_delay: Duration = 2s;
@@ -15,7 +16,6 @@ control ExtraValves {
   state phase: Phase = Idle;
   timer age = elapsed(phase);
   output pump, valve3, valve4: Bool;
-
   phase' = case phase {
     Idle => if extra_starts.due then Open3 else Idle;
     Open3 => if age >= valve_delay then Water3 else Open3;
@@ -26,10 +26,10 @@ control ExtraValves {
     Water4 => if age >= water_time then Stop4 else Water4;
     Stop4 => if age >= stop_delay then Idle else Stop4;
   };
-
   valve3 <- phase' in {Open3, Water3, Stop3};
   valve4 <- phase' in {Open4, Water4, Stop4};
   pump <- phase' in {Water3, Water4};
   require pump => (valve3 || valve4);
   require !(valve3 && valve4);
 }
+```

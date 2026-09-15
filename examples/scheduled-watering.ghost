@@ -1,4 +1,6 @@
 // Executable with ghostc and the manifest-aware virtual host; no GPIO driver.
+// HISTORICAL NON-EXECUTABLE EVIDENCE. Canonical source: scheduled-watering.ghost.md.
+// This raw pre-literate source is not a product compiler input or fallback.
 control ScheduledWatering {
 
   schedule starts: DailySlots<15min> {

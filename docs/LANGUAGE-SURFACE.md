@@ -147,7 +147,7 @@ GhostFlow VM은 연결식과 safety 제약을 계산해 requested/safe intent를
 
 ### 시간표와 타이머를 읽는 단일 밸브 관수 예제
 
-아래는 [일반 관수 예제](../examples/scheduled-watering.ghost)의 시간표/단계 전이에서
+아래는 [literate 관수 예제](../examples/scheduled-watering.ghost.md)의 시간표/단계 전이에서
 읽어야 할 부분을 단일 밸브 control로 줄인 **설계 예제**다. 두 밸브 전체 예제는 링크한
 파일에 있으며, 아래에서는 입력 선언·상태 전이·출력 연결을 한곳에서 읽을 수 있다.
 
@@ -198,7 +198,7 @@ control TimedWatering {
 
 ### 선택적 moisture 적응: 문법 미확정 스케치
 
-`examples/scheduled-watering.ghost`에는 `adapt` 표기가 없다. 따라서 아래는 완전한
+`examples/scheduled-watering.ghost.md`에는 `adapt` 표기가 없다. 따라서 아래는 완전한
 문법이나 실행 계약을 정하는 코드가 아니라, 앞에서 설명한 `has moisture` 보호 범위의
 의도만 보이는 **확장 스케치**다.
 
@@ -221,12 +221,12 @@ has moisture {
 
 ## Literate는 같은 언어의 문서형 입력
 
-일반 `.ghost` 코드와 `.ghost.md` 문서에서 추출한 코드는 같은 파서와 실행 모델을
-사용한다. 하나의 control을 설명 문단 사이의 여러 ghost 블록으로 나눌 수 있다.
-자세한 추출·소스맵 계약은 [LITERATE.md](LITERATE.md)에 있다.
+정식 GhostFlow 입력은 `.ghost.md` literate 문서뿐이다. 하나의 control을 설명 문단
+사이의 여러 ghost 블록으로 나눌 수 있으며, 추출된 코드는 같은 타입·실행 모델로
+내려간다. 일반 `.ghost` 원자료는 역사적 증거일 뿐 컴파일러 입력이나 fallback이
+아니다. 자세한 추출·소스맵 계약은 [LITERATE.md](LITERATE.md)에 있다.
 
-[일반 관수 예제](../examples/scheduled-watering.ghost)와
-[literate 관수 예제](../examples/scheduled-watering.ghost.md)는 같은 코드다.
+[literate 관수 예제](../examples/scheduled-watering.ghost.md)가 정식 실행 예제다.
 현재 control 문법·시간 기능·literate의 참조 구현은 GFB1과 manifest로 실행한다.
 미구현 확장은 [구현 경계](IMPLEMENTATION.md)에 구분했다. [0.2 공통 계약](LANGUAGE.md)의 결정론,
 오류 기록, 고스트 실행, 모듈 교체 원칙은 이어받는다.

@@ -5,8 +5,8 @@
 > 물리적 위치를 분리해 표현한다.
 
 이 문서는 PC-09의 유일한 canonical literate 실행 원본이다. 기존
-[tutorial/02 시간 순차제어](../tutorial/02-watering.ghost)와
-[tutorial/04 공유 펌프 예제](../tutorial/04-extra-valves.ghost)를 보존하고
+[tutorial/02 시간 순차제어](../tutorial/02-watering.ghost.md)와
+[tutorial/04 공유 펌프 예제](../tutorial/04-extra-valves.ghost.md)를 보존하고
 대조한다. tutorial/02는 시간만으로 단계를 이어 가는 기본 예제이고, tutorial/04는 여러
 control이 공유 펌프를 사용할 때의 별도 중재 문제를 보여 준다. 이 과는 그
 둘을 대체하지 않고, 하나의 급수 순서 안에서 밸브 피드백과 펌프 선행 정지를

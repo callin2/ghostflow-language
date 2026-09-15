@@ -7,8 +7,8 @@
 이 문서는 PC-08의 유일한 canonical literate 실행 원본이다. 기존
 [PC-03 수동 시작·자기유지](./pc-03-motor-contactor.ghost.md)와
 [PC-07 자동 수요](./pc-07-tank-hysteresis.ghost.md)를 결합하되 두 원본을
-대체하지 않는다. 기존 [station mode 규칙](../station-rules.ghost)과
-[공유 펌프 예제](../tutorial/04-extra-valves.ghost)는 복수 control 중재라는
+대체하지 않는다. 기존 [station mode 규칙](../station-rules.ghost.md)과
+[공유 펌프 예제](../tutorial/04-extra-valves.ghost.md)는 복수 control 중재라는
 고유한 심화 범위로 보존한다.
 
 ## 의도와 정규화

@@ -1,6 +1,9 @@
-// HISTORICAL NON-EXECUTABLE EVIDENCE. Canonical source: station-rules.ghost.md.
-// This raw pre-literate source is not a product compiler input or fallback.
-// Standalone host rules for one station and its one physical pump.
+# Shared station policy
+
+This canonical constraint document declares host-owned station limits and mode
+interlocks for one shared pump.
+
+```ghost
 constraints StationRules {
   exclusive(automatic, manual, configuring);
 
@@ -15,3 +18,4 @@ constraints StationRules {
   once starts per occurrence;
   check pump_capacity(pump1);
 }
+```
