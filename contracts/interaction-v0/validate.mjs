@@ -63,8 +63,9 @@ function moduleIdentity(value, path, errors) {
 }
 
 function sourceIdentity(value, path, errors) {
-  if (!exactObject(value, ['id', 'format', 'kind', 'sha256'], path, errors)) return;
-  publicId(value.id, `${path}.id`, errors);
+  if (!exactObject(value, ['documentId', 'revisionId', 'format', 'kind', 'sha256'], path, errors)) return;
+  publicId(value.documentId, `${path}.documentId`, errors);
+  publicId(value.revisionId, `${path}.revisionId`, errors);
   if (value.format !== 'GhostFlow/source-document-v1') issue(errors, `${path}.format`, 'format', 'must be GhostFlow/source-document-v1');
   if (value.kind !== 'literate' && value.kind !== 'plain') issue(errors, `${path}.kind`, 'source_kind', 'must be literate or plain');
   sha256(value.sha256, `${path}.sha256`, errors);
@@ -238,11 +239,14 @@ function expectedJoin(schema, snapshot, expected) {
   const compare = (actual, expectedValue, label) => {
     if (expectedValue !== undefined && actual !== expectedValue) staleReasons.push(label);
   };
+  compare(snapshot.schema.format, expected.schemaFormat, 'schema.format');
+  compare(snapshot.schema.version, expected.schemaVersion, 'schema.version');
   compare(interactionSchemaSha256(schema), expected.schemaSha256, 'schema.sha256');
   compare(snapshot.module.id, expected.moduleId, 'module.id');
   compare(snapshot.module.moduleFingerprint, expected.moduleFingerprint, 'module.moduleFingerprint');
   compare(snapshot.module.bytecodeSha256, expected.moduleBytecodeSha256, 'module.bytecodeSha256');
-  compare(snapshot.source.id, expected.sourceId, 'source.id');
+  compare(snapshot.source.documentId, expected.sourceDocumentId, 'source.documentId');
+  compare(snapshot.source.revisionId, expected.sourceRevisionId, 'source.revisionId');
   compare(snapshot.source.sha256, expected.sourceSha256, 'source.sha256');
   compare(snapshot.runId, expected.runId, 'runId');
   return { status: staleReasons.length ? 'stale' : 'ready', staleReasons };

@@ -7,7 +7,8 @@
     "bytecodeSha256": "1731ed04a86f63f840a78cab0a0f17eb02ea76ee724c038ce1e35b97b0ec1416"
   },
   "source": {
-    "id": "source.fixture-five-minute-watering-v0",
+    "documentId": "source.fixture-five-minute-watering",
+    "revisionId": "revision.fixture-five-minute-watering-v0",
     "format": "GhostFlow/source-document-v1",
     "kind": "literate",
     "sha256": "7eb5baa44b13ec059b1f50d63b589ab08674715ab3eb243d307aebadeda68fd9"

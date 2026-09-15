@@ -12,20 +12,31 @@ canonical static schema JSON in `snapshot.schema.sha256`; consumers must join
 that digest, format, and version with the supplied static document.
 
 The schema digest is SHA-256 of UTF-8 bytes produced by this repository's
-`canonicalJson(schema, {rejectSparseArrays: true, rejectUnsafeIntegers: true})`:
-recursive object-key sorting, preserved array order, well-formed Unicode
-strings, and finite/safe numeric values only. Consumers compare the supplied
-digest. A cross-language producer must reproduce those exact bytes before it
-can issue a matching snapshot; a format-version match alone is insufficient.
+`canonicalJson(schema, {rejectSparseArrays: true, rejectUnsafeIntegers: true})`.
+It is precisely: recursively sort each plain-object's keys by ECMAScript UTF-16
+code-unit ordering; keep array element order; encode strings with ECMAScript
+`JSON.stringify` after rejecting malformed Unicode; encode booleans and null as
+their JSON literals; encode finite IEEE-754 numbers with ECMAScript
+`JSON.stringify` spelling (including `-0` as `0`), rejecting unsafe integers;
+emit no whitespace; reject sparse arrays, non-plain objects, non-finite numbers,
+and nesting deeper than 64. Consumers compare the supplied digest. A
+cross-language producer must reproduce those exact bytes before it can issue a
+matching snapshot; a format-version match alone is insufficient.
 
 ## Static schema
 
 The schema has pinned `module` (`id`, compiler trace `moduleFingerprint`, and
-manifest `bytecodeSha256`) and source-document (`id`, `format`, `kind`, source
-`sha256`) identities. `source.id` is an opaque public source-document identity;
-it is not a path, so it supports production documents held in conversation or
-revision storage. The fixture's repository path belongs only to its test
-harness.
+manifest `bytecodeSha256`) and source-document (`documentId`, `revisionId`,
+`format`, `kind`, source `sha256`) identities. `module.id` is the public control
+module identity; `moduleFingerprint` is the compiler's stable 16-hex trace
+fingerprint of the compiled module; `bytecodeSha256` is the lowercase SHA-256 of
+the emitted manifest bytecode. The fingerprint and artifact digest are distinct
+and both are required. `source.documentId` is an opaque public identity stable
+across revisions of one authored document; `source.revisionId` is an opaque,
+immutable identity for one stored canonical revision; `source.sha256` is the
+lowercase SHA-256 of that revision's UTF-8 source bytes. Neither source identity
+is a path, so they support documents held in conversation or revision storage.
+The fixture's repository path belongs only to its test harness.
 
 Every descriptor has a public stable authored `id` and `name`, a semantic
 `kind`, compiler/source semantic `sourceType`, explicit `access`, and
@@ -78,7 +89,9 @@ Per-observation payload statuses are intentionally minimal:
 
 The validator reports `join.status: "stale"` with exact stale reasons only when
 an optional expected identity is supplied. The expected join can compare schema
-digest; module ID, fingerprint, and bytecode SHA; source ID and SHA; and run ID.
+format, version, and digest; module ID, fingerprint, and bytecode SHA; source
+document ID, revision ID, and SHA; and run ID. `scanId` is deliberately absent:
+it is only an ordering coordinate within one run.
 A schema/snapshot mismatch inside the documents themselves is a validation
 `error`, not stale data. This distinction prevents an untrusted payload from
 labeling itself stale to conceal an identity failure.
