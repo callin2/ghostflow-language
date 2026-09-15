@@ -18,6 +18,19 @@ const wateringIdentity = {
   revisionId: 'revision.fixture-five-minute-watering-v1',
 };
 
+const directSource = `# Direct input to output
+
+The pump follows the enable input without authored state or a timer.
+
+\`\`\`ghost
+control DirectOutput {
+  input enabled: Bool;
+  output pump: Bool;
+  pump <- enabled;
+}
+\`\`\`
+`;
+
 test('GF-TEST-interaction-emission: canonical literate compilation produces the exact checked-in v0 schema', async () => {
   const expected = readJson('contracts/interaction-v0/examples/five-minute-watering.schema.json');
   const compilation = await compileSource(read(wateringPath), {
@@ -69,6 +82,26 @@ test('GF-TEST-interaction-emission-policy: product compilation is literate-only 
     }),
     /requires a canonical \.ghost\.md literate source/,
   );
+});
+
+test('GF-TEST-interaction-emission-empty: stateless literate control emits an identified empty schema', async () => {
+  const identity = {
+    documentId: 'source.direct-output',
+    revisionId: 'revision.direct-output.1',
+  };
+  const compilation = await compileSource(directSource, {
+    filename: 'direct-output.ghost.md',
+    interactionSourceIdentity: identity,
+  });
+
+  assert.deepEqual(compilation.interactionSchema.descriptors, []);
+  assert.equal(compilation.interactionSchema.module.id, 'DirectOutput');
+  assert.deepEqual(compilation.interactionSchema.source, {
+    ...identity,
+    format: 'GhostFlow/source-document-v1',
+    kind: 'literate',
+    sha256: compilation.sourceDocument.sha256,
+  });
 });
 
 test('GF-TEST-interaction-emission-descriptors: all authored states and timers retain parsed semantic types and anchors', async () => {

@@ -62,6 +62,32 @@ test('GF-TEST-interaction-v0: fixture binds exact static semantics to one comple
   assert.deepEqual(snapshot.completion, { kind: 'completed-scan', scanId: 0, logicalTimeMs: 0 });
 });
 
+test('GF-TEST-interaction-v0-empty: an identified stateless module has an exact empty snapshot', () => {
+  const emptySchema = clone(schema);
+  emptySchema.module.id = 'DirectOutput';
+  emptySchema.source.documentId = 'source.direct-output';
+  emptySchema.source.revisionId = 'revision.direct-output.1';
+  emptySchema.descriptors = [];
+  const emptySnapshot = clone(snapshot);
+  emptySnapshot.schema.sha256 = interactionSchemaSha256(emptySchema);
+  emptySnapshot.module = clone(emptySchema.module);
+  emptySnapshot.source = clone(emptySchema.source);
+  emptySnapshot.runId = 'run.direct-output.1';
+  emptySnapshot.observations = [];
+
+  assert.deepEqual(validate(emptySchema, emptySnapshot), {
+    valid: true,
+    errors: [],
+    join: { status: 'ready', staleReasons: [] },
+  });
+
+  const unexpected = clone(emptySnapshot);
+  unexpected.observations.push({ descriptorId: 'state.invented', status: 'ready', value: false });
+  const result = validate(emptySchema, unexpected);
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.some(entry => entry.code === 'unknown_descriptor'));
+});
+
 test('GF-TEST-interaction-v0-fixture: static source and module identities match the checked-in literate fixture', async () => {
   const source = fs.readFileSync(path.join(root, fixtureSourcePath), 'utf8');
   assert.equal(createHash('sha256').update(source).digest('hex'), schema.source.sha256);

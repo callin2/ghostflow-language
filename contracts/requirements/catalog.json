@@ -263,8 +263,8 @@
         "path": "tests/interaction-emission.test.mjs",
         "heading": "test('GF-TEST-interaction-emission-policy: product compilation is literate-only and identity is caller-supplied', async () => {",
         "lines": [
-          50,
-          72
+          63,
+          85
         ],
         "sha256": "6f35522285ec4d6114ee75c603e7626ce38bfc18cb8c8e18fa7cc413d72fc845"
       },

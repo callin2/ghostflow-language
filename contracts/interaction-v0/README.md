@@ -56,6 +56,14 @@ carries `builtin` `Bool`, `Number`, or `Duration`, or a named `nominal` type and
 semantic unit. Runtime JSON spelling never selects the type: `0` remains a
 `Number` or a `Duration` only because the static descriptor says which it is.
 
+A valid stateless control has an identified schema with `descriptors: []`.
+This means the exact literate revision and compiled module have no public
+state or timer to observe; it does not mean that the schema, source identity,
+or module identity is absent. The corresponding completed snapshot has
+`observations: []` while retaining the exact schema digest, module, source,
+run, and completed-scan identities. Producers must not invent a Boolean state
+or timer merely to make a direct input-to-output control observable.
+
 Every descriptor also names its positive compiler source-map node ID and at
 least one literate intent anchor. The descriptor ID/name and anchor IDs are
 public and reject the reserved `__gf_` prefix; source-map node IDs are numeric
@@ -88,7 +96,8 @@ the host/runtime instance; it must change on reset or a new run because the same
 source can restart at `scanId: 0`. `completion` provides a non-negative
 `scanId` and logical milliseconds. A snapshot must have exactly one observation
 for every descriptor, including an explicit `unavailable` observation when no
-value exists; omission is invalid. v0 does not define a distinct tick identity.
+value exists; omission is invalid. Consequently, a schema with no descriptors
+has exactly zero observations. v0 does not define a distinct tick identity.
 The framed host owns that completion identity. A control with a timer also has
 the compiler-generated private clock in its completed trace, and the producer
 requires that clock to equal `completion.logicalTimeMs`. A state-only control
