@@ -153,8 +153,8 @@ function validateSchema(schema, errors) {
   for (const entry of schema.descriptors) {
     if (entry?.kind !== 'timer') continue;
     const subject = descriptorsById.get(entry.operation?.subjectId);
-    if (!subject || subject.kind !== 'state' || subject.sourceType?.kind !== 'builtin' || subject.sourceType?.name !== 'Bool') {
-      issue(errors, `schema.descriptors.${entry.id}.operation.subjectId`, 'timer_subject', 'must resolve to an authored Bool state descriptor');
+    if (!subject || subject.kind !== 'state') {
+      issue(errors, `schema.descriptors.${entry.id}.operation.subjectId`, 'timer_subject', 'must resolve to an authored state descriptor');
     }
   }
 }
