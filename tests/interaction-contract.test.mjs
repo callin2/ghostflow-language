@@ -51,9 +51,12 @@ test('GF-TEST-interaction-v0: fixture binds exact static semantics to one comple
     rejectSparseArrays: true,
     rejectUnsafeIntegers: true,
   }), '{"a":["한글",true],"z":0}');
-  assert.deepEqual(snapshot.observations.map(entry => entry.value), [0, 0, false, 0]);
-  assert.deepEqual(schema.descriptors.map(entry => entry.sourceType.name), ['Number', 'Percent', 'Bool', 'Duration']);
-  assert.deepEqual(schema.descriptors.map(entry => entry.kind), ['state', 'state', 'state', 'timer']);
+  assert.deepEqual(snapshot.observations.map(entry => entry.value), [false, false, 0]);
+  assert.deepEqual(schema.descriptors.map(entry => entry.id), [
+    'state.request_was_high', 'state.watering', 'timer.age',
+  ]);
+  assert.deepEqual(schema.descriptors.map(entry => entry.sourceType.name), ['Bool', 'Bool', 'Duration']);
+  assert.deepEqual(schema.descriptors.map(entry => entry.kind), ['state', 'state', 'timer']);
   const timer = schema.descriptors.find(entry => entry.id === 'timer.age');
   assert.deepEqual(timer.operation, { kind: 'elapsed_since_change', subjectId: 'state.watering' });
   assert.deepEqual(snapshot.completion, { kind: 'completed-scan', scanId: 0, logicalTimeMs: 0 });
@@ -86,7 +89,7 @@ test('GF-TEST-interaction-v0-status: unavailable and error are explicit, while s
   validatorInput.observations = validatorInput.observations.map(entry => entry.descriptorId === unavailableExpectation.descriptorId
     ? { descriptorId: entry.descriptorId, status: unavailableExpectation.status, reason: unavailableExpectation.reason }
     : entry);
-  validatorInput.observations[1] = { descriptorId: 'state.moisture', status: 'error', error: 'sample-decode-failed' };
+  validatorInput.observations[1] = { descriptorId: 'state.watering', status: 'error', error: 'runtime-value-invalid' };
   assert.equal(validate(schema, validatorInput).valid, true);
 
   const stale = validate(schema, snapshot, { expected: { sourceSha256: '0'.repeat(64), runId: 'earlier-run' } });
@@ -161,7 +164,7 @@ test('GF-TEST-interaction-v0-rejection: rejects unknown fields, mismatched ident
   for (const access of [['write'], ['execute'], ['read', 'write'], ['read', 'read']]) {
     expectInvalid((candidate) => { candidate.descriptors[0].access = access; }, 'access');
   }
-  expectInvalid((candidate) => { candidate.descriptors[3].operation.subjectId = 'state.pressure'; }, 'timer_subject');
-  expectInvalid((candidate) => { candidate.descriptors[3].operation.subjectId = 'timer.age'; }, 'timer_subject');
+  expectInvalid((candidate) => { candidate.descriptors[2].operation.subjectId = 'state.unknown'; }, 'timer_subject');
+  expectInvalid((candidate) => { candidate.descriptors[2].operation.subjectId = 'timer.age'; }, 'timer_subject');
   expectInvalid((_schema, candidate) => { candidate.completion.kind = 'completed-tick'; }, 'completion');
 });

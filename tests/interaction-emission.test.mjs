@@ -15,7 +15,7 @@ const readJson = relative => JSON.parse(read(relative));
 
 const wateringIdentity = {
   documentId: 'source.fixture-five-minute-watering',
-  revisionId: 'revision.fixture-five-minute-watering-v0',
+  revisionId: 'revision.fixture-five-minute-watering-v1',
 };
 
 test('GF-TEST-interaction-emission: canonical literate compilation produces the exact checked-in v0 schema', async () => {

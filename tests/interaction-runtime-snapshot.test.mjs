@@ -174,6 +174,51 @@ test('GF-TEST-interaction-runtime-snapshot: exact corpus source/tape produces id
   }
 });
 
+test('GF-TEST-interaction-runtime-snapshot-watering: eight outputs follow edge latch, priority stops, and exact five-minute cutoff', async () => {
+  const fixture = corpus.cases[0];
+  const artifact = await compileFixture(fixture);
+  const tape = JSON.parse(read(fixture.tapePath));
+  const run = tape.runs[0];
+  const execution = await executeWasm(artifact, run, 'every-scan');
+  const wateringByScan = [false, true, true, false, false, false, true, false, false, false, true, false, false];
+  const timerAgeByScan = [0, 0, 1000, 0, 1000, 2000, 0, 0, 1000, 2000, 0, 0, 1000];
+
+  assert.deepEqual(execution.outcomes.map(outcome => outcome.trace.stateAfter.watering), wateringByScan);
+  assert.deepEqual(execution.snapshots.map(snapshot => snapshot.observations.find(entry => entry.descriptorId === 'timer.age').value), timerAgeByScan);
+  for (const [index, outcome] of execution.outcomes.entries()) {
+    const expectedOutputs = Object.fromEntries(Array.from({ length: 8 }, (_, channel) => {
+      const name = `RO${channel + 1}`;
+      return [name, name === 'RO1' || name === 'RO2' ? wateringByScan[index] : false];
+    }));
+    assert.deepEqual(outcome.trace.requested, expectedOutputs, `scan ${index}: exact requested output set`);
+    assert.deepEqual(outcome.trace.safe, expectedOutputs, `scan ${index}: exact safe output set`);
+  }
+
+  const scans = run.scans;
+  assert.equal(scans[2].inputs[0].value, false, 'release after the start edge');
+  assert.deepEqual(scans[2].inputs.slice(3).map(input => input.value), [true, true, true, true, true], 'spare DI4-DI8 inputs may be asserted without affecting control');
+  assert.equal(execution.outcomes[2].trace.stateAfter.watering, true, 'released request maintains watering');
+  assert.equal(scans[3].inputs[1].value, true, 'stop is asserted while a new request edge is present');
+  assert.equal(execution.outcomes[3].trace.stateBefore.watering, true);
+  assert.equal(execution.outcomes[3].trace.stateAfter.watering, false, 'stop has priority in the same scan');
+  assert.equal(scans[4].inputs[0].value, true);
+  assert.equal(scans[4].inputs[1].value, false);
+  assert.equal(execution.outcomes[4].trace.stateAfter.watering, false, 'clearing stop while DI1 stays held does not restart');
+  assert.equal(execution.outcomes[6].trace.stateAfter.watering, true, 'release then a new request edge restarts');
+  assert.equal(scans[7].inputs[2].value, true);
+  assert.equal(execution.outcomes[7].trace.stateBefore.watering, true);
+  assert.equal(execution.outcomes[7].trace.stateAfter.watering, false, 'low-water has priority in the same scan');
+  assert.equal(scans[8].inputs[0].value, true);
+  assert.equal(scans[8].inputs[2].value, false);
+  assert.equal(execution.outcomes[8].trace.stateAfter.watering, false, 'clearing low-water while DI1 stays held does not restart');
+  assert.equal(execution.outcomes[10].trace.stateAfter.watering, true, 'a second release and new edge starts a fresh timed run');
+  assert.equal(scans[11].completion.logicalTimeMs - scans[10].completion.logicalTimeMs, 300000);
+  assert.equal(execution.outcomes[11].trace.stateBefore.watering, true);
+  assert.equal(execution.outcomes[11].trace.stateAfter.watering, false, 'the exact five-minute boundary turns watering off');
+  assert.equal(scans[12].inputs[0].value, true);
+  assert.equal(execution.outcomes[12].trace.stateAfter.watering, false, 'holding DI1 beyond cutoff does not restart');
+});
+
 test('GF-TEST-interaction-runtime-snapshot-observation: disabled, immediate, and delayed observation never change control outcomes', async () => {
   for (const fixture of corpus.cases) {
     const artifact = await compileFixture(fixture);
@@ -208,6 +253,8 @@ test('GF-TEST-interaction-runtime-snapshot-identity: run epoch prevents a reused
   const tape = JSON.parse(read(fixture.tapePath));
   const before = await executeWasm(artifact, tape.runs[0], 'every-scan');
   const after = await executeWasm(artifact, tape.runs[1], 'every-scan');
+  assert.notEqual(tape.runs[0].runId, tape.runs[1].runId);
+  assert.equal(tape.runs[1].scans.length, 1, 'the reset run is the minimum fresh scan-zero proof');
   assert.equal(before.snapshots[0].completion.scanId, 0);
   assert.equal(after.snapshots[0].completion.scanId, 0);
   assert.deepEqual(joinRuntimeSnapshot(artifact.interactionSchema, after.snapshots[0],
@@ -215,7 +262,7 @@ test('GF-TEST-interaction-runtime-snapshot-identity: run epoch prevents a reused
     status: 'stale', staleReasons: ['runId'],
   });
   assert.throws(() => joinRuntimeSnapshot(artifact.interactionSchema, {
-    ...after.snapshots[0], observations: [{ descriptorId: 'state.pressure', status: 'stale' }],
+    ...after.snapshots[0], observations: [{ descriptorId: 'state.watering', status: 'stale' }],
   }, expectedRuntimeIdentity(artifact.interactionSchema, tape.runs[1].runId)), /failed contract validation/);
 });
 
@@ -228,26 +275,25 @@ test('GF-TEST-interaction-runtime-snapshot-statuses: false and zero are ready wh
     compilation: artifact, runId: tape.runs[0].runId, completion: tape.runs[0].scans[0].completion, trace: outcome.trace,
   });
   assert.deepEqual(ready.observations, [
-    { descriptorId: 'state.pressure', status: 'ready', value: 0 },
-    { descriptorId: 'state.moisture', status: 'ready', value: 0 },
+    { descriptorId: 'state.request_was_high', status: 'ready', value: false },
     { descriptorId: 'state.watering', status: 'ready', value: false },
     { descriptorId: 'timer.age', status: 'ready', value: 0 },
   ]);
   const unavailableTrace = structuredClone(outcome.trace);
-  delete unavailableTrace.stateAfter.pressure;
+  delete unavailableTrace.stateAfter.request_was_high;
   const unavailable = emitCompletedScanSnapshot({
     compilation: artifact, runId: tape.runs[0].runId, completion: tape.runs[0].scans[0].completion, trace: unavailableTrace,
   });
   assert.deepEqual(unavailable.observations[0], {
-    descriptorId: 'state.pressure', status: 'unavailable', reason: 'runtime-value-unavailable',
+    descriptorId: 'state.request_was_high', status: 'unavailable', reason: 'runtime-value-unavailable',
   });
   const malformedTrace = structuredClone(outcome.trace);
-  malformedTrace.stateAfter.pressure = null;
+  malformedTrace.stateAfter.request_was_high = null;
   const malformed = emitCompletedScanSnapshot({
     compilation: artifact, runId: tape.runs[0].runId, completion: tape.runs[0].scans[0].completion, trace: malformedTrace,
   });
   assert.deepEqual(malformed.observations[0], {
-    descriptorId: 'state.pressure', status: 'error', error: 'runtime-value-invalid',
+    descriptorId: 'state.request_was_high', status: 'error', error: 'runtime-value-invalid',
   });
   assert.equal(JSON.stringify(malformed).includes('__gf_'), false);
 });
