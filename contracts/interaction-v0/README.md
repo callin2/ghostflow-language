@@ -115,6 +115,40 @@ digest, static identity, completion, and descriptor-coverage checks. It
 validates records only; it makes no device, physical, frontend,
 compiler-emission, or runtime-collection claim.
 
+## Shared conformance corpus
+
+`examples/corpus.json` pins the canonical source revision and compiled module
+identity for each test case. The unchanged five-minute literate source is the
+first case. `examples/multiple-values.ghost.md` is the second canonical
+program: it has two authored Bool states and elapsed timers, one Number state,
+and one nominal `Percent` state. Both use syntax accepted by the current
+compiler; no new descriptor kind is implied.
+
+Each `.scan-tape.json` beside the corpus is versioned, renderer-neutral test
+stimulus. Every frame records a completed scan, logical time, and every named
+declared input in compiled manifest order. Runs have distinct `runId` values
+and restart `scanId` at zero. The tape digest is SHA-256 over strict canonical
+JSON for the complete tape object with the `digest` member omitted, using this
+repository's `canonicalJson` with sparse arrays and unsafe integers rejected.
+This input tape is maintained test data, not another GhostFlow control source.
+
+`observationExpectations` may describe a validator-only `unavailable` case. It
+does not claim a runtime observation and is not copied into the checked-in
+snapshot. The corpus verifier compiles the exact `.ghost.md` bytes, checks
+source/module/artifact identities, validates complete inputs and run-local
+ordering, and checks any existing schema/snapshot projections. Run it with
+`node contracts/interaction-v0/verify-corpus.mjs` or
+`node --test tests/interaction-corpus.test.mjs`. The
+checked-in schema and snapshot for five-minute watering, and any later schema,
+snapshot, or GFB files, are derived projections; the literate document remains
+the only canonical control source. The second program intentionally has no
+hand-maintained plain `.ghost` counterpart or fabricated runtime snapshot.
+
+These are host-side compile and corpus-integrity checks. They do not claim
+native/WASM replay, browser acceptance, firmware execution, or physical-device
+behavior; runtime and cross-product consumption are verified by their assigned
+downstream tasks.
+
 The v0 alternative rejected here is putting `stale` beside `ready` in an
 untrusted observation. That would make a producer's assertion substitute for a
 consumer's identity join. Deriving it in validation keeps the document small

@@ -1,0 +1,71 @@
+{
+  "format": "GhostFlow/interaction-scan-tape-v1",
+  "version": "1.0",
+  "caseId": "multiple-values",
+  "source": {
+    "documentId": "source.fixture-multiple-values",
+    "revisionId": "revision.fixture-multiple-values-v0",
+    "format": "GhostFlow/source-document-v1",
+    "kind": "literate",
+    "sha256": "7741d81f6a222ad108ca4026676ce8a1efb1c2e5431d58f9bf8dc49fa49ff645"
+  },
+  "tapeId": "tape.multiple-values.v1",
+  "digest": {
+    "algorithm": "SHA-256",
+    "strategy": "canonical-json-excluding-digest-v1",
+    "sha256": "16e8e6eac3f28e94b85c115004fdc2a9ae2cb09c054ab79cf784059df4af1913"
+  },
+  "runs": [
+    {
+      "runId": "multiple-values-run-before-reset",
+      "scans": [
+        {
+          "completion": { "kind": "completed-scan", "scanId": 0, "logicalTimeMs": 0 },
+          "inputs": [
+            { "name": "first_enable", "value": false },
+            { "name": "second_enable", "value": false },
+            { "name": "sample", "value": 0 }
+          ]
+        },
+        {
+          "completion": { "kind": "completed-scan", "scanId": 1, "logicalTimeMs": 10 },
+          "inputs": [
+            { "name": "first_enable", "value": true },
+            { "name": "second_enable", "value": false },
+            { "name": "sample", "value": 12.5 }
+          ]
+        },
+        {
+          "completion": { "kind": "completed-scan", "scanId": 2, "logicalTimeMs": 250 },
+          "inputs": [
+            { "name": "first_enable", "value": true },
+            { "name": "second_enable", "value": true },
+            { "name": "sample", "value": 0 }
+          ]
+        }
+      ]
+    },
+    {
+      "runId": "multiple-values-run-after-reset",
+      "scans": [
+        {
+          "completion": { "kind": "completed-scan", "scanId": 0, "logicalTimeMs": 0 },
+          "inputs": [
+            { "name": "first_enable", "value": false },
+            { "name": "second_enable", "value": false },
+            { "name": "sample", "value": 0 }
+          ]
+        },
+        {
+          "completion": { "kind": "completed-scan", "scanId": 1, "logicalTimeMs": 1 },
+          "inputs": [
+            { "name": "first_enable", "value": false },
+            { "name": "second_enable", "value": true },
+            { "name": "sample", "value": 1 }
+          ]
+        }
+      ]
+    }
+  ],
+  "observationExpectations": []
+}
