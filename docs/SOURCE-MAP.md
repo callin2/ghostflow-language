@@ -18,33 +18,35 @@ and transpilation. A coordinate map without the original text cannot do this.
 | Field | Meaning |
 |---|---|
 | format | `GhostFlow/source-document-v1` |
-| kind | `literate` for `.ghost.md`, otherwise `plain` for existing low-level inputs |
+| kind | always `literate` for the canonical `.ghost.md` product input |
 | filename | original input name, used only as metadata, never as an output destination |
 | text | exact accepted input string; preserve comments, prose, CRLF, Unicode and trailing newline |
 | sha256 | lowercase SHA-256 of the UTF-8 input text before extraction or normalization |
 
 Input must be a well-formed Unicode string, representable in UTF-8 without loss,
 within the existing 1 MiB source limit. The existing parser/extractor limits still
-apply. Recording a plain test/import input does not make it a second canonical
-product source format. No new source grammar is introduced.
+apply. Plain `.ghost` source is not a public compile/import format. No new source
+grammar is introduced.
 
 The existing `.gfb.map.json` gains `format: GhostFlow/source-map-v1`,
 `bytecodeSha256` and `sourceDocument`. Its `nodes` and `lines` fields remain as
 before. Current control artifacts also persist the compiler-owned
-`traceMetadata`; low-level legacy artifacts record it as null. Keep the control
-manifest unchanged: the current WASM host rejects
+`traceMetadata`; lowerer-only test artifacts may record it as null. Keep the
+control manifest unchanged: the current WASM host rejects
 unknown manifest fields. The source digest lives in sourceDocument; product
 release records can carry it using their existing source-identity contract.
-Old readers may use their existing nodes/lines; readers promising source recovery
-must require the new envelope and validate it, rather than reconstructing prose.
+Readers promising source recovery must require this envelope and validate it,
+rather than reconstructing prose.
 
 `compileSource.sourceMap` remains an array. Internal low-level `compileControl`
-callers and legacy `writeArtifact` results without sourceDocument retain their
-previous behavior; they do not claim source-preserving output. New compileSource
-results, including low-level legacy inputs, carry the original text and write a
-source-preserving map even when there is no control manifest.
+fixtures may produce a lowerer-only result, but are not product compiler inputs
+and do not claim source-preserving output. Every public `compileSource` result
+carries the complete original literate document and writes a source-preserving
+map. Node artifact restoration validates only envelopes that carry this same
+canonical literate source document; new product compilation never creates a
+plain-source envelope.
 An explicitly present but invalid sourceDocument (including null or undefined)
-is an error, not a request to silently fall back to the legacy map.
+is an error, not a request to silently fall back to an unverified map.
 
 ## Verification boundary
 
@@ -90,8 +92,8 @@ map supports output-to-source navigation.
   preserves GFB bytes and source node IDs. Locations may move with the document.
 - Modified text, mismatched bytes, missing source, invalid digest/kind and an
   incorrect expected document revision fail verification before recovery.
-- Low-level plain and legacy fixtures keep their executable behavior. Existing
-  nodes/lines consumers continue to read the map.
+- Lowerer-only fixtures remain isolated compiler-component tests; product callers
+  always compile and persist the complete literate document.
 
 The portable runtime and physical output path are unchanged. Application code
 must render source text as text, never execute embedded HTML or paths. The map

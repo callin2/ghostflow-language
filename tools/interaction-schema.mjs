@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { equalBytes, sha256Hex } from './sha256.mjs';
 import {
   INTERACTION_SCHEMA_FORMAT,
   INTERACTION_SCHEMA_VERSION,
@@ -16,10 +16,6 @@ const SOURCE_FORMAT = 'GhostFlow/source-document-v1';
 
 function fail(message) {
   throw new Error(`interaction schema: ${message}`);
-}
-
-function sha256(value) {
-  return createHash('sha256').update(value).digest('hex');
 }
 
 function publicId(value, label) {
@@ -45,7 +41,7 @@ function canonicalDocument(document) {
   if (!document || typeof document !== 'object' || document.format !== SOURCE_FORMAT
       || document.kind !== 'literate' || typeof document.text !== 'string'
       || typeof document.filename !== 'string' || !SHA256.test(document.sha256)
-      || sha256(document.text) !== document.sha256) {
+      || sha256Hex(document.text) !== document.sha256) {
     fail('a product Interaction Schema requires an intact canonical literate source document');
   }
   return document;
@@ -93,7 +89,7 @@ function expectedSchema(compilation, identityValue) {
   if (!manifest || typeof manifest.name !== 'string' || !trace || typeof trace.moduleFingerprint !== 'string') {
     fail('compiler result lacks product control manifest or source trace metadata');
   }
-  if (!SHA256.test(manifest.bytecodeSha256) || manifest.bytecodeSha256 !== sha256(compilation.bytes)) {
+  if (!SHA256.test(manifest.bytecodeSha256) || manifest.bytecodeSha256 !== sha256Hex(compilation.bytes)) {
     fail('compiler result bytecode identity is invalid');
   }
   const extraction = extractLiterate(source.text, { filename: source.filename });
@@ -164,9 +160,9 @@ export function restoreInteractionSchema({ sourceDocument, sourceMap, traceMetad
   const source = canonicalDocument(sourceDocument);
   const extraction = extractLiterate(source.text, { filename: source.filename });
   const replay = compileControl(extraction.code, { filename: source.filename });
-  const replayBytes = Buffer.from(replay.bytes);
-  if (!Buffer.from(bytes).equals(replayBytes)) fail('bytecode does not match canonical literate source replay');
-  const manifest = { ...replay.manifest, bytecodeSha256: sha256(replayBytes) };
+  const replayBytes = Uint8Array.from(replay.bytes);
+  if (!equalBytes(bytes, replayBytes)) fail('bytecode does not match canonical literate source replay');
+  const manifest = { ...replay.manifest, bytecodeSha256: sha256Hex(replayBytes) };
   return verifyInteractionSchema({
     bytes: replayBytes,
     manifest,

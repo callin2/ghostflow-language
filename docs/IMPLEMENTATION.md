@@ -7,11 +7,18 @@ is determined by the compiler and the host tests described in
 
 ## Executable path
 
-`tools/toolchain.mjs` exposes `compileSource(source, {filename})` for canonical
-`.ghost.md` documents only. CommonMark extraction preserves original-position
-mapping through `tools/literate.mjs`; the extracted control lowers through
-`tools/gfb1.mjs` to GFB1. Superseded raw source is historical evidence, not a
-compiler input.
+`tools/browser-toolchain.mjs` exposes `compileSource(source, {filename,
+interactionSourceIdentity})` for canonical `.ghost.md` documents only and is
+safe to import from a browser Worker. `tools/toolchain.mjs` wraps that same
+environment-neutral compiler for Node and owns artifact filesystem I/O.
+CommonMark extraction preserves original-position mapping through
+`tools/literate.mjs`; the extracted control lowers through `tools/gfb1.mjs` to
+GFB1. Plain source is rejected at both public compiler boundaries.
+
+The language suite verifies that this browser entry's local import graph has no
+Node builtin or `Buffer` dependency and executes it with `Buffer` unavailable.
+It does not add a browser runner or claim Vite/Chromium Worker evidence; that
+consumer integration belongs to the Farm Studio Web boundary.
 
 Modern control supports inputs, configs, outputs, state, finite enums, pure
 functions, expression/next-state checks, elapsed timers, DailySlots, sensors and

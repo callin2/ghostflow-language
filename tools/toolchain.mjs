@@ -1,33 +1,30 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { createHash } from 'node:crypto';
-import { attachIntentMetadata, remapSourceTrace, sourceMapRequiresTraceMetadata, verifySourceTraceMetadata } from './source-trace.mjs';
-import { emitInteractionSchema, restoreInteractionSchema } from './interaction-schema.mjs';
+import { restoreInteractionSchema } from './interaction-schema.mjs';
+import { sourceMapRequiresTraceMetadata, verifySourceTraceMetadata } from './source-trace.mjs';
+import { compileSource as compileCanonicalSource, emitInteractionSchema } from './compile-source.mjs';
+import { isWellFormedUnicode, sha256Hex, utf8ByteLength } from './sha256.mjs';
 
-export { emitInteractionSchema } from './interaction-schema.mjs';
+export { emitInteractionSchema };
 
 const SOURCE_LIMIT = 1024 * 1024;
 const SOURCE_DOCUMENT_FORMAT = 'GhostFlow/source-document-v1';
 const SOURCE_MAP_FORMAT = 'GhostFlow/source-map-v1';
 const SHA256 = /^[0-9a-f]{64}$/;
 
-function sha256(value) {
-  return createHash('sha256').update(value).digest('hex');
-}
-
-function isLosslessUtf8(value) {
-  if (typeof value !== 'string') return false;
-  if (typeof value.isWellFormed === 'function') return value.isWellFormed();
-  return Buffer.from(value, 'utf8').toString('utf8') === value;
+/** Node artifact wrapper; browser callers import browser-toolchain.mjs. */
+export async function compileSource(source, options = {}) {
+  const result = await compileCanonicalSource(source, options);
+  return { ...result, bytes: Buffer.from(result.bytes) };
 }
 
 function requireSourceText(text, label = 'source text') {
-  if (!isLosslessUtf8(text)) throw new Error(`${label} must be a well-formed UTF-8 string`);
-  if (Buffer.byteLength(text) > SOURCE_LIMIT) throw new Error(`${label} byte limit exceeded`);
+  if (!isWellFormedUnicode(text)) throw new Error(`${label} must be a well-formed UTF-8 string`);
+  if (utf8ByteLength(text) > SOURCE_LIMIT) throw new Error(`${label} byte limit exceeded`);
 }
 
 function requireFilename(filename, label = 'source filename') {
-  if (!isLosslessUtf8(filename) || filename.length === 0 || filename.includes('\0')) {
+  if (!isWellFormedUnicode(filename) || filename.length === 0 || filename.includes('\0')) {
     throw new Error(`${label} must be a non-empty well-formed UTF-8 string`);
   }
 }
@@ -47,7 +44,7 @@ function requireBytes(bytes) {
 function sourceMapEnvelope(result, bytes) {
   return {
     format: SOURCE_MAP_FORMAT,
-    bytecodeSha256: sha256(bytes),
+    bytecodeSha256: sha256Hex(bytes),
     sourceDocument: result.sourceDocument,
     nodes: result.sourceMap,
     lines: result.extractionMap ?? null,
@@ -71,10 +68,10 @@ function validateArtifactSourceMap(map, bytes, { expectedSourceSha256, requireTr
   requireFilename(document.filename);
   requireSourceText(document.text);
   requireDigest(document.sha256, 'source document sha256');
-  if (sha256(document.text) !== document.sha256) throw new Error('source document SHA-256 does not match text');
+  if (sha256Hex(document.text) !== document.sha256) throw new Error('source document SHA-256 does not match text');
 
   const artifactBytes = requireBytes(bytes);
-  if (sha256(artifactBytes) !== map.bytecodeSha256) throw new Error('source map bytecode SHA-256 does not match artifact');
+  if (sha256Hex(artifactBytes) !== map.bytecodeSha256) throw new Error('source map bytecode SHA-256 does not match artifact');
   if (expectedSourceSha256 !== undefined) {
     requireDigest(expectedSourceSha256, 'expected source SHA-256');
     if (document.sha256 !== expectedSourceSha256) throw new Error('source document SHA-256 does not match expected revision');
@@ -133,102 +130,6 @@ export function restoreArtifactSourceMap(map, bytes, options = {}) {
     traceMetadata: restored.traceMetadata,
     interactionSchema: restored.interactionSchema,
     interactionSourceIdentity: restored.interactionSourceIdentity,
-  };
-}
-
-function remapSourceNodes(nodes, lines, mapPosition) {
-  if (!Array.isArray(nodes)) return nodes;
-  return nodes.map(node => {
-    if (!node || typeof node !== 'object') return node;
-    const original = mapPosition(lines, node.line, node.column);
-    if (!original) return node;
-    const extracted = {
-      filename: node.filename, line: node.line, column: node.column,
-      endLine: node.endLine, endColumn: node.endColumn,
-    };
-    const end = mapPosition(lines, node.endLine ?? node.line, node.endColumn ?? node.column);
-    // Preserve the compiler-assigned ID exactly: host trace IDs are stable
-    // across Markdown-only edits, while this records both coordinate systems.
-    return {
-      ...node,
-      filename: original.file, line: original.line, column: original.column,
-      ...(end ? { endLine: end.line, endColumn: end.column } : {}),
-      extracted,
-    };
-  });
-}
-
-export async function compileSource(source, options = {}) {
-  if (!options || typeof options !== 'object' || Array.isArray(options)) throw new TypeError('compile options must be an object');
-  if (Object.hasOwn(options, 'interactionSchema')) {
-    throw new Error('interactionSchema is not a compile option; supply interactionSourceIdentity explicitly');
-  }
-  const { filename = 'program.ghost.md', interactionSourceIdentity } = options;
-  requireFilename(filename, 'source filename');
-  requireSourceText(source, `${filename}: source`);
-  if (!filename.endsWith('.ghost.md')) throw new Error(`${filename}: GhostFlow product compilation requires a canonical .ghost.md literate source`);
-  const { extractLiterate } = await import('./literate.mjs');
-  const extraction = extractLiterate(source, { filename });
-  const code = extraction.code;
-  let result;
-  try {
-    result = (await import('./control.mjs')).compileControl(code, { filename });
-  } catch (error) {
-    if (extraction && Number.isInteger(error.line)) {
-      const { mapSourcePosition } = await import('./literate.mjs');
-      const original = mapSourcePosition(extraction.sourceMap, error.line, error.column ?? 1);
-      if (original) {
-        const detail = error.message.replace(/^.*?:\d+:\d+:\s*/, '');
-        error.message = `${filename}:${original.line}:${original.column}: ${detail}`;
-        error.filename = original.file; error.line = original.line; error.column = original.column;
-      }
-    }
-    throw error;
-  }
-  if (extraction && (extraction.anchors.length || extraction.linkDirectives.length)) {
-    const { parseControl } = await import('./control.mjs');
-    const ast = parseControl(code, { filename });
-    result = {
-      ...result,
-      traceMetadata: attachIntentMetadata(result.traceMetadata, {
-        anchors: extraction.anchors,
-        linkDirectives: extraction.linkDirectives,
-        ast,
-        sourceMap: result.sourceMap,
-        extractionMap: extraction.sourceMap,
-      }),
-    };
-  }
-  if (extraction) {
-    const { mapSourcePosition } = await import('./literate.mjs');
-    result = { ...result, sourceMap: remapSourceNodes(result.sourceMap, extraction.sourceMap, mapSourcePosition), traceMetadata: remapSourceTrace(result.traceMetadata, extraction.sourceMap) };
-  }
-  const bytes = Buffer.from(result.bytes);
-  if (bytes.length > SOURCE_LIMIT) throw new Error('compiled module byte limit exceeded');
-  const digest = sha256(bytes);
-  const sourceDocument = {
-    format: SOURCE_DOCUMENT_FORMAT,
-    kind: 'literate',
-    filename,
-    text: source,
-    sha256: sha256(source),
-  };
-  const traceMetadata = result.traceMetadata ? {
-    ...result.traceMetadata,
-    sourceDocumentSha256: sourceDocument.sha256,
-    bytecodeSha256: digest,
-  } : result.traceMetadata;
-  const compilation = { ...result, bytes, sourceDocument, traceMetadata,
-    manifest: result.manifest ? { ...result.manifest, bytecodeSha256: digest } : null,
-    extractionMap: extraction.sourceMap, warnings: extraction.warnings };
-  const schema = interactionSourceIdentity === undefined ? null : emitInteractionSchema(compilation, interactionSourceIdentity);
-  return {
-    ...compilation,
-    interactionSchema: schema,
-    interactionSourceIdentity: schema ? {
-      documentId: schema.source.documentId,
-      revisionId: schema.source.revisionId,
-    } : null,
   };
 }
 

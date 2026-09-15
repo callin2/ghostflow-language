@@ -10,6 +10,11 @@ signals and station arbitration. Native and WASM tests share that Rust core.
                          native / WASM portable Rust core
 ```
 
+`tools/browser-toolchain.mjs` is the public browser/Worker compiler entry. It
+accepts the same complete canonical `.ghost.md` document and immutable source
+identity as the Node entry, but has no Node I/O dependency. `tools/toolchain.mjs`
+is the Node wrapper and artifact read/write boundary.
+
 Product deployment wraps the `.ghost.md` result with
 `tools/portable-package.mjs`: one signed package preserves the exact source, GFB,
 manifest, source map and host-compatibility identity. Browser and Device

@@ -26,7 +26,7 @@ test('GFB1 compiles in a browser-like VM realm without Buffer', () => {
   const nodeBytes = compile(parse(tokenize(source)));
   assert.equal(browserBytes.constructor.name, 'Uint8Array');
   assert.equal(Buffer.isBuffer(browserBytes), false);
-  assert.equal(Buffer.isBuffer(nodeBytes), true);
-  assert.deepEqual(Buffer.from(browserBytes), nodeBytes);
+  assert.equal(Buffer.isBuffer(nodeBytes), false);
+  assert.deepEqual(browserBytes, nodeBytes);
   assert.deepEqual(Buffer.from(browserBytes.subarray(0, 4)), Buffer.from('GFB1'));
 });
