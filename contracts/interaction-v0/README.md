@@ -79,11 +79,15 @@ canonical literate artifact before it emits a public snapshot.
 {"kind":"elapsed_since_change","subjectId":"state.watering"}
 ```
 
-It reports elapsed milliseconds since the authored `watering` state last
-changed. It is not accumulated ON time. The validator requires its subject to
-resolve to an authored `state` descriptor with builtin `Bool`. The schema
-deliberately retains Boolean `state.watering`, including `false`, for execution
-and explanation.
+For a Bool subject such as `watering`, this is elapsed time since the Bool last
+changed—not accumulated active/ON duration. In controls that use the timer only
+while the Bool is true, the control logic may interpret that age as an active
+duration, but the timer itself continues to measure age since either transition.
+For a nominal enum subject such as `Phase`, `elapsed(phase)` is phase age: it
+resets whenever the enum value changes and continues regardless of which phase
+is current. `examples/enum-phase-age.ghost.md` and its focused compiler/WASM
+tests demonstrate that the state remains nominal `Phase`, while the timer is a
+`Duration` whose subject is `state.phase`.
 
 There are no widget, layout, visibility, color, coordinate, or renderer-policy
 fields. A renderer may show timers and hide Boolean states by default, but that

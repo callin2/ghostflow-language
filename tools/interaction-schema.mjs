@@ -120,7 +120,7 @@ function expectedSchema(compilation, identityValue) {
       continue;
     }
     const subject = item.call?.args?.[0]?.name;
-    if (declaredStates.get(subject) !== 'Bool') fail(`timer.${item.name} must target an authored Bool state`);
+    if (!declaredStates.has(subject)) fail(`timer.${item.name} must target an authored state`);
     descriptors.push({
       id: `timer.${item.name}`, name: item.name, kind: 'timer', sourceType: sourceType('Duration'), access: ['read'],
       operation: { kind: 'elapsed_since_change', subjectId: `state.${subject}` },

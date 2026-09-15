@@ -187,6 +187,31 @@ test('GF-TEST-interaction-runtime-snapshot: exact corpus source/tape produces id
   }
 });
 
+test('GF-TEST-interaction-runtime-snapshot-enum-phase-age: completed WASM scan observes nominal phase and elapsed phase age', async () => {
+  const sourcePath = 'contracts/interaction-v0/examples/enum-phase-age.ghost.md';
+  const artifact = await compileSource(read(sourcePath), {
+    filename: sourcePath,
+    interactionSourceIdentity: {
+      documentId: 'source.fixture-enum-phase-age',
+      revisionId: 'revision.fixture-enum-phase-age-v0',
+    },
+  });
+  const run = {
+    runId: 'enum-phase-age-run',
+    scans: [
+      { completion: { kind: 'completed-scan', scanId: 0, logicalTimeMs: 100 }, inputs: [{ name: 'advance', value: false }] },
+      { completion: { kind: 'completed-scan', scanId: 1, logicalTimeMs: 175 }, inputs: [{ name: 'advance', value: true }] },
+      { completion: { kind: 'completed-scan', scanId: 2, logicalTimeMs: 230 }, inputs: [{ name: 'advance', value: true }] },
+    ],
+  };
+  const execution = await executeWasm(artifact, run, 'every-scan');
+  assert.equal(execution.outcomes[1].trace.stateAfter.phase, 1, 'enum runtime state is exposed as its scalar ordinal');
+  assert.deepEqual(execution.snapshots[2].observations, [
+    { descriptorId: 'state.phase', status: 'ready', value: 1 },
+    { descriptorId: 'timer.age', status: 'ready', value: 55 },
+  ]);
+});
+
 test('GF-TEST-interaction-runtime-snapshot-watering: eight outputs follow edge latch, priority stops, and exact five-minute cutoff', async () => {
   const fixture = corpus.cases[0];
   const artifact = await compileFixture(fixture);

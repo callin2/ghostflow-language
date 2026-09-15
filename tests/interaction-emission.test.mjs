@@ -10,6 +10,7 @@ import { compileSource, restoreArtifactSourceMap, writeArtifact } from '../tools
 const root = path.resolve(new URL('..', import.meta.url).pathname);
 const wateringPath = 'contracts/interaction-v0/examples/five-minute-watering.ghost.md';
 const multiplePath = 'contracts/interaction-v0/examples/multiple-values.ghost.md';
+const enumPhaseAgePath = 'contracts/interaction-v0/examples/enum-phase-age.ghost.md';
 const read = relative => fs.readFileSync(path.join(root, relative), 'utf8');
 const readJson = relative => JSON.parse(read(relative));
 
@@ -124,4 +125,25 @@ test('GF-TEST-interaction-emission-descriptors: all authored states and timers r
   ]);
   assert.ok(compilation.interactionSchema.descriptors.every(entry => entry.provenance.intentAnchorIds.length === 1));
   await verifyInteractionCorpus();
+});
+
+test('GF-TEST-interaction-emission-enum-phase-age: enum state remains nominal and elapsed timer targets it', async () => {
+  const identity = {
+    documentId: 'source.fixture-enum-phase-age',
+    revisionId: 'revision.fixture-enum-phase-age-v0',
+  };
+  const compilation = await compileSource(read(enumPhaseAgePath), {
+    filename: enumPhaseAgePath,
+    interactionSourceIdentity: identity,
+  });
+  const [phase, age] = compilation.interactionSchema.descriptors;
+  assert.deepEqual([phase.id, phase.kind, phase.sourceType], [
+    'state.phase', 'state', { kind: 'nominal', name: 'Phase', unit: null },
+  ]);
+  assert.deepEqual([age.id, age.kind, age.sourceType, age.operation], [
+    'timer.age', 'timer', { kind: 'builtin', name: 'Duration', unit: 'ms' },
+    { kind: 'elapsed_since_change', subjectId: 'state.phase' },
+  ]);
+  assert.deepEqual(phase.provenance.intentAnchorIds, ['GF-INT-FIXTURE-ENUM-PHASE-AGE-V0']);
+  assert.deepEqual(age.provenance.intentAnchorIds, ['GF-INT-FIXTURE-ENUM-PHASE-AGE-V0']);
 });
