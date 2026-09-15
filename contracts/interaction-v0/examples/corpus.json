@@ -7,15 +7,15 @@
       "sourcePath": "contracts/interaction-v0/examples/five-minute-watering.ghost.md",
       "source": {
         "documentId": "source.fixture-five-minute-watering",
-        "revisionId": "revision.fixture-five-minute-watering-v0",
+        "revisionId": "revision.fixture-five-minute-watering-v1",
         "format": "GhostFlow/source-document-v1",
         "kind": "literate",
-        "sha256": "7eb5baa44b13ec059b1f50d63b589ab08674715ab3eb243d307aebadeda68fd9"
+        "sha256": "46bdeaf16279db1b4148efce305f34eafabe9051c83ead94a331a402ef1cc5ba"
       },
       "module": {
         "id": "FiveMinuteWatering",
-        "moduleFingerprint": "b97f6afadf52d4ba",
-        "bytecodeSha256": "1731ed04a86f63f840a78cab0a0f17eb02ea76ee724c038ce1e35b97b0ec1416"
+        "moduleFingerprint": "3eec53d45f3e2715",
+        "bytecodeSha256": "51332126c9877f46bc074ebe4c0c1a05ed6796752c9f4ddd6d3d0d2f5e3b1229"
       },
       "tapePath": "contracts/interaction-v0/examples/five-minute-watering.scan-tape.json",
       "projections": {

@@ -4,26 +4,41 @@
   "schema": {
     "format": "GhostFlow/interaction-schema-v0",
     "version": "0.1",
-    "sha256": "2aae7953431635551e068d1c2a76e62676440abf098a3a92a93d8eb086e7f8e3"
+    "sha256": "dac491c84a24cb0dbf04fd2d3b7a4d0f0a01c61b540c0ec666ebc1cd1150abc4"
   },
   "module": {
     "id": "FiveMinuteWatering",
-    "moduleFingerprint": "b97f6afadf52d4ba",
-    "bytecodeSha256": "1731ed04a86f63f840a78cab0a0f17eb02ea76ee724c038ce1e35b97b0ec1416"
+    "moduleFingerprint": "3eec53d45f3e2715",
+    "bytecodeSha256": "51332126c9877f46bc074ebe4c0c1a05ed6796752c9f4ddd6d3d0d2f5e3b1229"
   },
   "source": {
     "documentId": "source.fixture-five-minute-watering",
-    "revisionId": "revision.fixture-five-minute-watering-v0",
+    "revisionId": "revision.fixture-five-minute-watering-v1",
     "format": "GhostFlow/source-document-v1",
     "kind": "literate",
-    "sha256": "7eb5baa44b13ec059b1f50d63b589ab08674715ab3eb243d307aebadeda68fd9"
+    "sha256": "46bdeaf16279db1b4148efce305f34eafabe9051c83ead94a331a402ef1cc5ba"
   },
-  "runId": "fixture-run-2026-09-15-a",
-  "completion": { "kind": "completed-scan", "scanId": 0, "logicalTimeMs": 0 },
+  "runId": "watering-run-before-reset-v1",
+  "completion": {
+    "kind": "completed-scan",
+    "scanId": 0,
+    "logicalTimeMs": 0
+  },
   "observations": [
-    { "descriptorId": "state.pressure", "status": "ready", "value": 0 },
-    { "descriptorId": "state.moisture", "status": "ready", "value": 0 },
-    { "descriptorId": "state.watering", "status": "ready", "value": false },
-    { "descriptorId": "timer.age", "status": "ready", "value": 0 }
+    {
+      "descriptorId": "state.request_was_high",
+      "status": "ready",
+      "value": false
+    },
+    {
+      "descriptorId": "state.watering",
+      "status": "ready",
+      "value": false
+    },
+    {
+      "descriptorId": "timer.age",
+      "status": "ready",
+      "value": 0
+    }
   ]
 }

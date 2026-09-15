@@ -122,8 +122,10 @@ compiler-emission, or runtime-collection claim.
 ## Shared conformance corpus
 
 `examples/corpus.json` pins the canonical source revision and compiled module
-identity for each test case. The unchanged five-minute literate source is the
-first case. `examples/multiple-values.ghost.md` is the second canonical
+identity for each test case. The first case is the canonical five-minute
+watering control; its original intent, logical equipment mapping and
+software-only evidence boundary are recorded in that `.ghost.md`.
+`examples/multiple-values.ghost.md` is the second canonical
 program: it has two authored Bool states and elapsed timers, one Number state,
 and one nominal `Percent` state. Both use syntax accepted by the current
 compiler; no new descriptor kind is implied.

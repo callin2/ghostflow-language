@@ -4,59 +4,150 @@
   "caseId": "five-minute-watering",
   "source": {
     "documentId": "source.fixture-five-minute-watering",
-    "revisionId": "revision.fixture-five-minute-watering-v0",
+    "revisionId": "revision.fixture-five-minute-watering-v1",
     "format": "GhostFlow/source-document-v1",
     "kind": "literate",
-    "sha256": "7eb5baa44b13ec059b1f50d63b589ab08674715ab3eb243d307aebadeda68fd9"
+    "sha256": "46bdeaf16279db1b4148efce305f34eafabe9051c83ead94a331a402ef1cc5ba"
   },
-  "tapeId": "tape.five-minute-watering.v1",
+  "tapeId": "tape.five-minute-watering.v2",
   "digest": {
     "algorithm": "SHA-256",
     "strategy": "canonical-json-excluding-digest-v1",
-    "sha256": "abfcafc37e307a3c563d89f6a18e5b9ea7c9405838f1ff87fe83a156da996be2"
+    "sha256": "db7ce4778b04044ab0ed7d289b7b4ed172ec21e4d45c74dcdc9b93fa13d2391d"
   },
   "runs": [
     {
-      "runId": "watering-run-before-reset",
+      "runId": "watering-run-before-reset-v1",
       "scans": [
         {
           "completion": { "kind": "completed-scan", "scanId": 0, "logicalTimeMs": 0 },
           "inputs": [
-            { "name": "start", "value": false },
-            { "name": "stop", "value": false }
+            { "name": "DI1", "value": false }, { "name": "DI2", "value": false },
+            { "name": "DI3", "value": false }, { "name": "DI4", "value": false },
+            { "name": "DI5", "value": false }, { "name": "DI6", "value": false },
+            { "name": "DI7", "value": false }, { "name": "DI8", "value": false }
           ]
         },
         {
           "completion": { "kind": "completed-scan", "scanId": 1, "logicalTimeMs": 1000 },
           "inputs": [
-            { "name": "start", "value": true },
-            { "name": "stop", "value": false }
+            { "name": "DI1", "value": true }, { "name": "DI2", "value": false },
+            { "name": "DI3", "value": false }, { "name": "DI4", "value": false },
+            { "name": "DI5", "value": false }, { "name": "DI6", "value": false },
+            { "name": "DI7", "value": false }, { "name": "DI8", "value": false }
           ]
         },
         {
-          "completion": { "kind": "completed-scan", "scanId": 2, "logicalTimeMs": 301000 },
+          "completion": { "kind": "completed-scan", "scanId": 2, "logicalTimeMs": 2000 },
           "inputs": [
-            { "name": "start", "value": false },
-            { "name": "stop", "value": false }
+            { "name": "DI1", "value": false }, { "name": "DI2", "value": false },
+            { "name": "DI3", "value": false }, { "name": "DI4", "value": true },
+            { "name": "DI5", "value": true }, { "name": "DI6", "value": true },
+            { "name": "DI7", "value": true }, { "name": "DI8", "value": true }
+          ]
+        },
+        {
+          "completion": { "kind": "completed-scan", "scanId": 3, "logicalTimeMs": 3000 },
+          "inputs": [
+            { "name": "DI1", "value": true }, { "name": "DI2", "value": true },
+            { "name": "DI3", "value": false }, { "name": "DI4", "value": false },
+            { "name": "DI5", "value": false }, { "name": "DI6", "value": false },
+            { "name": "DI7", "value": false }, { "name": "DI8", "value": false }
+          ]
+        },
+        {
+          "completion": { "kind": "completed-scan", "scanId": 4, "logicalTimeMs": 4000 },
+          "inputs": [
+            { "name": "DI1", "value": true }, { "name": "DI2", "value": false },
+            { "name": "DI3", "value": false }, { "name": "DI4", "value": false },
+            { "name": "DI5", "value": false }, { "name": "DI6", "value": false },
+            { "name": "DI7", "value": false }, { "name": "DI8", "value": false }
+          ]
+        },
+        {
+          "completion": { "kind": "completed-scan", "scanId": 5, "logicalTimeMs": 5000 },
+          "inputs": [
+            { "name": "DI1", "value": false }, { "name": "DI2", "value": false },
+            { "name": "DI3", "value": false }, { "name": "DI4", "value": false },
+            { "name": "DI5", "value": false }, { "name": "DI6", "value": false },
+            { "name": "DI7", "value": false }, { "name": "DI8", "value": false }
+          ]
+        },
+        {
+          "completion": { "kind": "completed-scan", "scanId": 6, "logicalTimeMs": 6000 },
+          "inputs": [
+            { "name": "DI1", "value": true }, { "name": "DI2", "value": false },
+            { "name": "DI3", "value": false }, { "name": "DI4", "value": false },
+            { "name": "DI5", "value": false }, { "name": "DI6", "value": false },
+            { "name": "DI7", "value": false }, { "name": "DI8", "value": false }
+          ]
+        },
+        {
+          "completion": { "kind": "completed-scan", "scanId": 7, "logicalTimeMs": 7000 },
+          "inputs": [
+            { "name": "DI1", "value": true }, { "name": "DI2", "value": false },
+            { "name": "DI3", "value": true }, { "name": "DI4", "value": false },
+            { "name": "DI5", "value": false }, { "name": "DI6", "value": false },
+            { "name": "DI7", "value": false }, { "name": "DI8", "value": false }
+          ]
+        },
+        {
+          "completion": { "kind": "completed-scan", "scanId": 8, "logicalTimeMs": 8000 },
+          "inputs": [
+            { "name": "DI1", "value": true }, { "name": "DI2", "value": false },
+            { "name": "DI3", "value": false }, { "name": "DI4", "value": false },
+            { "name": "DI5", "value": false }, { "name": "DI6", "value": false },
+            { "name": "DI7", "value": false }, { "name": "DI8", "value": false }
+          ]
+        },
+        {
+          "completion": { "kind": "completed-scan", "scanId": 9, "logicalTimeMs": 9000 },
+          "inputs": [
+            { "name": "DI1", "value": false }, { "name": "DI2", "value": false },
+            { "name": "DI3", "value": false }, { "name": "DI4", "value": false },
+            { "name": "DI5", "value": false }, { "name": "DI6", "value": false },
+            { "name": "DI7", "value": false }, { "name": "DI8", "value": false }
+          ]
+        },
+        {
+          "completion": { "kind": "completed-scan", "scanId": 10, "logicalTimeMs": 10000 },
+          "inputs": [
+            { "name": "DI1", "value": true }, { "name": "DI2", "value": false },
+            { "name": "DI3", "value": false }, { "name": "DI4", "value": false },
+            { "name": "DI5", "value": false }, { "name": "DI6", "value": false },
+            { "name": "DI7", "value": false }, { "name": "DI8", "value": false }
+          ]
+        },
+        {
+          "completion": { "kind": "completed-scan", "scanId": 11, "logicalTimeMs": 310000 },
+          "inputs": [
+            { "name": "DI1", "value": true }, { "name": "DI2", "value": false },
+            { "name": "DI3", "value": false }, { "name": "DI4", "value": false },
+            { "name": "DI5", "value": false }, { "name": "DI6", "value": false },
+            { "name": "DI7", "value": false }, { "name": "DI8", "value": false }
+          ]
+        },
+        {
+          "completion": { "kind": "completed-scan", "scanId": 12, "logicalTimeMs": 311000 },
+          "inputs": [
+            { "name": "DI1", "value": true }, { "name": "DI2", "value": false },
+            { "name": "DI3", "value": false }, { "name": "DI4", "value": false },
+            { "name": "DI5", "value": false }, { "name": "DI6", "value": false },
+            { "name": "DI7", "value": false }, { "name": "DI8", "value": false }
           ]
         }
       ]
     },
     {
-      "runId": "watering-run-after-reset",
+      "runId": "watering-run-after-reset-v1",
       "scans": [
         {
           "completion": { "kind": "completed-scan", "scanId": 0, "logicalTimeMs": 0 },
           "inputs": [
-            { "name": "start", "value": false },
-            { "name": "stop", "value": false }
-          ]
-        },
-        {
-          "completion": { "kind": "completed-scan", "scanId": 1, "logicalTimeMs": 25 },
-          "inputs": [
-            { "name": "start", "value": false },
-            { "name": "stop", "value": true }
+            { "name": "DI1", "value": false }, { "name": "DI2", "value": false },
+            { "name": "DI3", "value": false }, { "name": "DI4", "value": false },
+            { "name": "DI5", "value": false }, { "name": "DI6", "value": false },
+            { "name": "DI7", "value": false }, { "name": "DI8", "value": false }
           ]
         }
       ]
@@ -64,7 +155,7 @@
   ],
   "observationExpectations": [
     {
-      "expectationId": "unavailable-observation-validation-case",
+      "expectationId": "unavailable-timer-validation-case",
       "descriptorId": "timer.age",
       "status": "unavailable",
       "reason": "no-value-provided-by-test-observer"
