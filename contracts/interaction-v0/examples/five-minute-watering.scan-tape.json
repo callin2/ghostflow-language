@@ -1,0 +1,73 @@
+{
+  "format": "GhostFlow/interaction-scan-tape-v1",
+  "version": "1.0",
+  "caseId": "five-minute-watering",
+  "source": {
+    "documentId": "source.fixture-five-minute-watering",
+    "revisionId": "revision.fixture-five-minute-watering-v0",
+    "format": "GhostFlow/source-document-v1",
+    "kind": "literate",
+    "sha256": "7eb5baa44b13ec059b1f50d63b589ab08674715ab3eb243d307aebadeda68fd9"
+  },
+  "tapeId": "tape.five-minute-watering.v1",
+  "digest": {
+    "algorithm": "SHA-256",
+    "strategy": "canonical-json-excluding-digest-v1",
+    "sha256": "abfcafc37e307a3c563d89f6a18e5b9ea7c9405838f1ff87fe83a156da996be2"
+  },
+  "runs": [
+    {
+      "runId": "watering-run-before-reset",
+      "scans": [
+        {
+          "completion": { "kind": "completed-scan", "scanId": 0, "logicalTimeMs": 0 },
+          "inputs": [
+            { "name": "start", "value": false },
+            { "name": "stop", "value": false }
+          ]
+        },
+        {
+          "completion": { "kind": "completed-scan", "scanId": 1, "logicalTimeMs": 1000 },
+          "inputs": [
+            { "name": "start", "value": true },
+            { "name": "stop", "value": false }
+          ]
+        },
+        {
+          "completion": { "kind": "completed-scan", "scanId": 2, "logicalTimeMs": 301000 },
+          "inputs": [
+            { "name": "start", "value": false },
+            { "name": "stop", "value": false }
+          ]
+        }
+      ]
+    },
+    {
+      "runId": "watering-run-after-reset",
+      "scans": [
+        {
+          "completion": { "kind": "completed-scan", "scanId": 0, "logicalTimeMs": 0 },
+          "inputs": [
+            { "name": "start", "value": false },
+            { "name": "stop", "value": false }
+          ]
+        },
+        {
+          "completion": { "kind": "completed-scan", "scanId": 1, "logicalTimeMs": 25 },
+          "inputs": [
+            { "name": "start", "value": false },
+            { "name": "stop", "value": true }
+          ]
+        }
+      ]
+    }
+  ],
+  "observationExpectations": [
+    {
+      "expectationId": "unavailable-observation-validation-case",
+      "descriptorId": "timer.age",
+      "status": "unavailable",
+      "reason": "no-value-provided-by-test-observer"
+    }
+  ]
+}

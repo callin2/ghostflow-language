@@ -12,6 +12,7 @@ const fixtureSourcePath = 'contracts/interaction-v0/examples/five-minute-waterin
 const read = relative => JSON.parse(fs.readFileSync(path.join(root, relative), 'utf8'));
 const schema = read('contracts/interaction-v0/examples/five-minute-watering.schema.json');
 const snapshot = read('contracts/interaction-v0/examples/five-minute-watering.snapshot.json');
+const scanTape = read('contracts/interaction-v0/examples/five-minute-watering.scan-tape.json');
 const clone = value => structuredClone(value);
 
 function validate(candidateSchema = schema, candidateSnapshot = snapshot, options) {
@@ -78,10 +79,15 @@ test('GF-TEST-interaction-v0-fixture: static source and module identities match 
 });
 
 test('GF-TEST-interaction-v0-status: unavailable and error are explicit, while stale is an expected-identity join result', () => {
-  const unavailable = clone(snapshot);
-  unavailable.observations[0] = { descriptorId: 'state.pressure', status: 'unavailable', reason: 'adapter-not-configured' };
-  unavailable.observations[1] = { descriptorId: 'state.moisture', status: 'error', error: 'sample-decode-failed' };
-  assert.equal(validate(schema, unavailable).valid, true);
+  const unavailableExpectation = scanTape.observationExpectations.find(entry => entry.status === 'unavailable');
+  assert.ok(unavailableExpectation, 'the test-only absence case is explicit corpus metadata');
+  // This is an in-memory validator input only; it is never persisted as runtime evidence.
+  const validatorInput = clone(snapshot);
+  validatorInput.observations = validatorInput.observations.map(entry => entry.descriptorId === unavailableExpectation.descriptorId
+    ? { descriptorId: entry.descriptorId, status: unavailableExpectation.status, reason: unavailableExpectation.reason }
+    : entry);
+  validatorInput.observations[1] = { descriptorId: 'state.moisture', status: 'error', error: 'sample-decode-failed' };
+  assert.equal(validate(schema, validatorInput).valid, true);
 
   const stale = validate(schema, snapshot, { expected: { sourceSha256: '0'.repeat(64), runId: 'earlier-run' } });
   assert.deepEqual(stale, {

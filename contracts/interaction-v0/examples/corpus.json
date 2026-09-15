@@ -1,0 +1,48 @@
+{
+  "format": "GhostFlow/interaction-test-corpus-v1",
+  "version": "1.0",
+  "cases": [
+    {
+      "caseId": "five-minute-watering",
+      "sourcePath": "contracts/interaction-v0/examples/five-minute-watering.ghost.md",
+      "source": {
+        "documentId": "source.fixture-five-minute-watering",
+        "revisionId": "revision.fixture-five-minute-watering-v0",
+        "format": "GhostFlow/source-document-v1",
+        "kind": "literate",
+        "sha256": "7eb5baa44b13ec059b1f50d63b589ab08674715ab3eb243d307aebadeda68fd9"
+      },
+      "module": {
+        "id": "FiveMinuteWatering",
+        "moduleFingerprint": "b97f6afadf52d4ba",
+        "bytecodeSha256": "1731ed04a86f63f840a78cab0a0f17eb02ea76ee724c038ce1e35b97b0ec1416"
+      },
+      "tapePath": "contracts/interaction-v0/examples/five-minute-watering.scan-tape.json",
+      "projections": {
+        "schemaPath": "contracts/interaction-v0/examples/five-minute-watering.schema.json",
+        "snapshotPath": "contracts/interaction-v0/examples/five-minute-watering.snapshot.json"
+      }
+    },
+    {
+      "caseId": "multiple-values",
+      "sourcePath": "contracts/interaction-v0/examples/multiple-values.ghost.md",
+      "source": {
+        "documentId": "source.fixture-multiple-values",
+        "revisionId": "revision.fixture-multiple-values-v0",
+        "format": "GhostFlow/source-document-v1",
+        "kind": "literate",
+        "sha256": "7741d81f6a222ad108ca4026676ce8a1efb1c2e5431d58f9bf8dc49fa49ff645"
+      },
+      "module": {
+        "id": "MultipleValues",
+        "moduleFingerprint": "10d9ff03a035b5db",
+        "bytecodeSha256": "482f342455ec754cc81eee6c07e134847721ff44e906cb52ad4b1eee93004e81"
+      },
+      "tapePath": "contracts/interaction-v0/examples/multiple-values.scan-tape.json",
+      "projections": {
+        "schemaPath": null,
+        "snapshotPath": null
+      }
+    }
+  ]
+}

@@ -24,6 +24,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/curriculum-replay.test.mjs',
   'tests/integration-contract.test.mjs',
   'tests/interaction-contract.test.mjs',
+  'tests/interaction-corpus.test.mjs',
   'tests/intent-anchor-map.test.mjs',
   'tests/ledger.test.mjs',
   'tests/literate.test.mjs',
