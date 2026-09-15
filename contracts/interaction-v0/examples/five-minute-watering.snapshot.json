@@ -4,23 +4,24 @@
   "schema": {
     "format": "GhostFlow/interaction-schema-v0",
     "version": "0.1",
-    "sha256": "67dd056a030e46622caeaf629072d009888a17f730cab1ef8d1c4bb3a6fe7855"
+    "sha256": "cf52bcec45f36a1ade9367bb4c2e97b9181337a93a87d9b50bd73a101ea885e1"
   },
   "module": {
     "id": "FiveMinuteWatering",
-    "sha256": "debc311746754c859df1bfcf252f5080c174c425202362e7f6bf6719709460df"
+    "moduleFingerprint": "b97f6afadf52d4ba",
+    "bytecodeSha256": "1731ed04a86f63f840a78cab0a0f17eb02ea76ee724c038ce1e35b97b0ec1416"
   },
   "source": {
+    "id": "source.fixture-five-minute-watering-v0",
     "format": "GhostFlow/source-document-v1",
     "kind": "literate",
-    "path": "contracts/interaction-v0/examples/five-minute-watering.ghost.md",
-    "sha256": "4abdd35d79a05d70749e1d8a5b2cf5fd49f88cc2283eabea851e1b3dcadce3ad"
+    "sha256": "7eb5baa44b13ec059b1f50d63b589ab08674715ab3eb243d307aebadeda68fd9"
   },
   "runId": "fixture-run-2026-09-15-a",
   "completion": { "kind": "completed-scan", "scanId": 0, "logicalTimeMs": 0 },
   "observations": [
-    { "descriptorId": "input.pressure", "status": "ready", "value": 0 },
-    { "descriptorId": "input.moisture", "status": "ready", "value": 0 },
+    { "descriptorId": "state.pressure", "status": "ready", "value": 0 },
+    { "descriptorId": "state.moisture", "status": "ready", "value": 0 },
     { "descriptorId": "state.watering", "status": "ready", "value": false },
     { "descriptorId": "timer.age", "status": "ready", "value": 0 }
   ]

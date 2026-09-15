@@ -7,13 +7,13 @@ time since that state changed; it is not accumulated pump-on time.
 ```ghost
 control FiveMinuteWatering {
   input start, stop: Bool;
-  // ghostflow:link id=GF-INT-FIXTURE-WATERING-V0 relation=implements
-  input pressure: Number;
-  // ghostflow:link id=GF-INT-FIXTURE-WATERING-V0 relation=implements
-  input moisture: Percent;
   config watering_limit: Duration = 5min;
   output pump: Bool;
 
+  // ghostflow:link id=GF-INT-FIXTURE-WATERING-V0 relation=implements
+  state pressure: Number = 0;
+  // ghostflow:link id=GF-INT-FIXTURE-WATERING-V0 relation=implements
+  state moisture: Percent = 0%;
   // ghostflow:link id=GF-INT-FIXTURE-WATERING-V0 relation=implements
   state watering: Bool = false;
   // ghostflow:link id=GF-INT-FIXTURE-WATERING-V0 relation=implements

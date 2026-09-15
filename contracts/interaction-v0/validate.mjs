@@ -8,6 +8,7 @@ export const RUNTIME_SNAPSHOT_VERSION = '0.1';
 
 const PUBLIC_ID = /^[A-Za-z][A-Za-z0-9._:-]{0,127}$/;
 const SHA256 = /^[a-f0-9]{64}$/;
+const MODULE_FINGERPRINT = /^[a-f0-9]{16}$/;
 const BUILTIN_TYPES = new Map([
   ['Bool', null],
   ['Number', null],
@@ -52,18 +53,20 @@ function sha256(value, path, errors) {
   return true;
 }
 
-function identity(value, path, errors, { source = false } = {}) {
-  const fields = source ? ['format', 'kind', 'path', 'sha256'] : ['id', 'sha256'];
-  if (!exactObject(value, fields, path, errors)) return;
-  if (source) {
-    if (value.format !== 'GhostFlow/source-document-v1') issue(errors, `${path}.format`, 'format', 'must be GhostFlow/source-document-v1');
-    if (value.kind !== 'literate' && value.kind !== 'plain') issue(errors, `${path}.kind`, 'source_kind', 'must be literate or plain');
-    if (typeof value.path !== 'string' || !value.path || value.path.startsWith('/') || value.path.split('/').includes('..')) {
-      issue(errors, `${path}.path`, 'source_path', 'must be a repository-relative path');
-    }
-  } else {
-    publicId(value.id, `${path}.id`, errors);
+function moduleIdentity(value, path, errors) {
+  if (!exactObject(value, ['id', 'moduleFingerprint', 'bytecodeSha256'], path, errors)) return;
+  publicId(value.id, `${path}.id`, errors);
+  if (typeof value.moduleFingerprint !== 'string' || !MODULE_FINGERPRINT.test(value.moduleFingerprint)) {
+    issue(errors, `${path}.moduleFingerprint`, 'module_fingerprint', 'must be the lowercase 16-hex compiler moduleFingerprint');
   }
+  sha256(value.bytecodeSha256, `${path}.bytecodeSha256`, errors);
+}
+
+function sourceIdentity(value, path, errors) {
+  if (!exactObject(value, ['id', 'format', 'kind', 'sha256'], path, errors)) return;
+  publicId(value.id, `${path}.id`, errors);
+  if (value.format !== 'GhostFlow/source-document-v1') issue(errors, `${path}.format`, 'format', 'must be GhostFlow/source-document-v1');
+  if (value.kind !== 'literate' && value.kind !== 'plain') issue(errors, `${path}.kind`, 'source_kind', 'must be literate or plain');
   sha256(value.sha256, `${path}.sha256`, errors);
 }
 
@@ -111,7 +114,7 @@ function descriptor(value, index, errors) {
   if (!exactObject(value, fields, path, errors)) return;
   publicId(value.id, `${path}.id`, errors);
   publicId(value.name, `${path}.name`, errors);
-  if (!['state', 'input', 'setting', 'command', 'timer'].includes(value.kind)) issue(errors, `${path}.kind`, 'descriptor_kind', 'is unsupported in v0');
+  if (!['state', 'timer'].includes(value.kind)) issue(errors, `${path}.kind`, 'descriptor_kind', 'v0 supports state and timer only');
   sourceType(value.sourceType, `${path}.sourceType`, errors);
   if (!Array.isArray(value.access) || value.access.length === 0) issue(errors, `${path}.access`, 'access', 'must be a non-empty array');
   else {
@@ -138,8 +141,8 @@ function validateSchema(schema, errors) {
   if (!exactObject(schema, ['format', 'version', 'module', 'source', 'descriptors'], 'schema', errors)) return;
   if (schema.format !== INTERACTION_SCHEMA_FORMAT) issue(errors, 'schema.format', 'format', `must be ${INTERACTION_SCHEMA_FORMAT}`);
   if (schema.version !== INTERACTION_SCHEMA_VERSION) issue(errors, 'schema.version', 'version', `must be ${INTERACTION_SCHEMA_VERSION}`);
-  identity(schema.module, 'schema.module', errors);
-  identity(schema.source, 'schema.source', errors, { source: true });
+  moduleIdentity(schema.module, 'schema.module', errors);
+  sourceIdentity(schema.source, 'schema.source', errors);
   if (!Array.isArray(schema.descriptors) || schema.descriptors.length === 0) {
     issue(errors, 'schema.descriptors', 'descriptors', 'must be a non-empty array');
     return;
@@ -152,9 +155,12 @@ function validateSchema(schema, errors) {
     if (names.has(entry?.name)) issue(errors, `schema.descriptors[${index}].name`, 'duplicate_identity', 'must be unique');
     ids.add(entry?.id); names.add(entry?.name);
   });
+  const descriptorsById = new Map(schema.descriptors.map(entry => [entry?.id, entry]));
   for (const entry of schema.descriptors) {
-    if (entry?.kind === 'timer' && !ids.has(entry.operation?.subjectId)) {
-      issue(errors, `schema.descriptors.${entry.id}.operation.subjectId`, 'timer_subject', 'must name an authored descriptor');
+    if (entry?.kind !== 'timer') continue;
+    const subject = descriptorsById.get(entry.operation?.subjectId);
+    if (!subject || subject.kind !== 'state' || subject.sourceType?.kind !== 'builtin' || subject.sourceType?.name !== 'Bool') {
+      issue(errors, `schema.descriptors.${entry.id}.operation.subjectId`, 'timer_subject', 'must resolve to an authored Bool state descriptor');
     }
   }
 }
@@ -202,13 +208,13 @@ function validateSnapshot(schema, snapshot, errors) {
     sha256(snapshot.schema.sha256, 'snapshot.schema.sha256', errors);
     if (snapshot.schema.sha256 !== interactionSchemaSha256(schema)) issue(errors, 'snapshot.schema.sha256', 'identity_mismatch', 'does not match the exact static schema digest');
   }
-  identity(snapshot.module, 'snapshot.module', errors);
-  identity(snapshot.source, 'snapshot.source', errors, { source: true });
+  moduleIdentity(snapshot.module, 'snapshot.module', errors);
+  sourceIdentity(snapshot.source, 'snapshot.source', errors);
   sameIdentity(snapshot.module, schema.module, 'snapshot.module', errors);
   sameIdentity(snapshot.source, schema.source, 'snapshot.source', errors);
   publicId(snapshot.runId, 'snapshot.runId', errors);
   if (exactObject(snapshot.completion, ['kind', 'scanId', 'logicalTimeMs'], 'snapshot.completion', errors)) {
-    if (!['completed-scan', 'completed-tick'].includes(snapshot.completion.kind)) issue(errors, 'snapshot.completion.kind', 'completion', 'must be completed-scan or completed-tick');
+    if (snapshot.completion.kind !== 'completed-scan') issue(errors, 'snapshot.completion.kind', 'completion', 'must be completed-scan in v0');
     for (const key of ['scanId', 'logicalTimeMs']) if (!Number.isSafeInteger(snapshot.completion[key]) || snapshot.completion[key] < 0) issue(errors, `snapshot.completion.${key}`, 'completion', 'must be a non-negative safe integer');
   }
   if (!Array.isArray(snapshot.observations)) {
@@ -234,15 +240,20 @@ function expectedJoin(schema, snapshot, expected) {
   };
   compare(interactionSchemaSha256(schema), expected.schemaSha256, 'schema.sha256');
   compare(snapshot.module.id, expected.moduleId, 'module.id');
-  compare(snapshot.module.sha256, expected.moduleSha256, 'module.sha256');
+  compare(snapshot.module.moduleFingerprint, expected.moduleFingerprint, 'module.moduleFingerprint');
+  compare(snapshot.module.bytecodeSha256, expected.moduleBytecodeSha256, 'module.bytecodeSha256');
+  compare(snapshot.source.id, expected.sourceId, 'source.id');
   compare(snapshot.source.sha256, expected.sourceSha256, 'source.sha256');
   compare(snapshot.runId, expected.runId, 'runId');
   return { status: staleReasons.length ? 'stale' : 'ready', staleReasons };
 }
 
-/** SHA-256 of the canonical static schema document; this is distinct from its format version. */
+/** SHA-256 of strict canonical JSON bytes for the static schema, distinct from its format version. */
 export function interactionSchemaSha256(schema) {
-  return createHash('sha256').update(canonicalJson(schema)).digest('hex');
+  return createHash('sha256').update(canonicalJson(schema, {
+    rejectSparseArrays: true,
+    rejectUnsafeIntegers: true,
+  }), 'utf8').digest('hex');
 }
 
 /**
