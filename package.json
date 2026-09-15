@@ -9,14 +9,14 @@
   "scripts": {
     "test": "node tools/verify-language.mjs",
     "test:node": "node tools/verify-language.mjs --node-only",
-    "test:compiler": "node --test tests/compiler.test.mjs tests/constraints.test.mjs tests/literate.test.mjs tests/toolchain.test.mjs",
+    "test:compiler": "node --test tests/compiler.test.mjs tests/constraints.test.mjs tests/literate.test.mjs tests/toolchain.test.mjs tests/interaction-emission.test.mjs",
     "test:contract": "node --test tests/integration-contract.test.mjs",
     "test:coverage": "node tools/coverage-language.mjs",
     "test:mutation:output": "node tools/mutation-output-contract.mjs",
     "generate:pc01": "node tools/generate-pc-01-projection.mjs --write",
     "tutorial": "node tools/tutorial.mjs",
     "compile": "node tools/ghostc.mjs",
-    "compile:example": "node tools/ghostc.mjs examples/scheduled-watering.ghost build/scheduled-watering.gfb",
+    "compile:example": "node tools/ghostc.mjs examples/scheduled-watering.ghost.md build/scheduled-watering.gfb",
     "constraints": "node tools/ghostrules.mjs",
     "build:wasm": "cargo build --locked --offline -p ghostflow-wasm --target wasm32-unknown-unknown --release"
   },

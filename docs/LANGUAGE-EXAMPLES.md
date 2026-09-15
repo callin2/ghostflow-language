@@ -3,7 +3,7 @@
 2026-09-05 · 설계 비교용. 아래 코드는 새 문법 제안이며 현재 `ghostc`로 실행할 수 없다.
 이 문서는 초기 A/B/C 비교 기록이다. 후속 대화에서 선택한 문법과 literate 형식은
 [control 문법](LANGUAGE-SURFACE.md), [LITERATE.md](LITERATE.md)에 있다.
-실행 중인 MVP 예제는 [irrigation.ghost](../examples/irrigation.ghost)다.
+실행 중인 MVP 예제는 [irrigation.ghost.md](../examples/irrigation.ghost.md)다.
 공통 의미는 [언어 사양](LANGUAGE.md), 취향의 근거는 [설계 노트](DESIGN-NOTES.md)를 따른다.
 
 ## 비교할 동작

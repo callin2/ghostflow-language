@@ -2,19 +2,19 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createHash } from 'node:crypto';
-import { compileSource } from '../tools/toolchain.mjs';
+import { compileSource, literateDocument } from './helpers/literate-compile.mjs';
 import { createOperatingSettingsCandidate } from '../tools/operating-settings.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 
-const source = `// preserve this\ncontrol irrigation {\n  config duration: Duration = 5min { min = 1min; max = 20min; step = 1min; access = operator; apply = stopped; label = "관수"; }\n  state running: Bool = false;\n}`;
+const source = literateDocument(`// preserve this\ncontrol irrigation {\n  config duration: Duration = 5min { min = 1min; max = 20min; step = 1min; access = operator; apply = stopped; label = "관수"; }\n  state running: Bool = false;\n}`);
 const hash = value => createHash('sha256').update(value).digest('hex');
 
 test('참조하지 않는 운영 설정은 GFB를 유지한다', async () => {
-  const before = await compileSource(source, { filename: 'irrigation.ghost' });
+  const before = await compileSource(source, { filename: 'irrigation.ghost.md' });
   const result = await createOperatingSettingsCandidate({ source, expectedSourceSha256: hash(source), changes: { duration: 600000 } });
   assert.equal(before.manifest.format, 'GhostFlow/control-v2');
   assert.equal(result.manifest.format, 'GhostFlow/control-v2');
-  assert.deepEqual([...before.bytes], [...(await compileSource(result.source, { filename: 'irrigation.ghost' })).bytes]);
+  assert.deepEqual([...before.bytes], [...(await compileSource(result.source, { filename: 'irrigation.ghost.md' })).bytes]);
   assert.match(result.source, /duration: Duration = 600000ms/);
   assert.match(result.source, /preserve this/);
 });
@@ -23,15 +23,15 @@ test('참조하는 duration 설정은 GFB 상수와 실제 WASM 출력만 바꾼
   // Concrete TASK43.2 reproduction: the config is part of an output expression,
   // so its literal must change the compiled constant. Exercise the explicit
   // v2 simulation consumer without stripping metadata or weakening v1.
-  const effectSource = `// source outside the literal stays byte-for-byte\ncontrol SettingsEffect {\n  config duration: Duration = 5min { min = 1min; max = 20min; step = 1min; access = operator; apply = stopped; }\n  output duration_ms: Duration;\n  duration_ms <- duration;\n}`;
-  const before = await compileSource(effectSource, { filename: 'settings-effect.ghost' });
+  const effectSource = literateDocument(`// source outside the literal stays byte-for-byte\ncontrol SettingsEffect {\n  config duration: Duration = 5min { min = 1min; max = 20min; step = 1min; access = operator; apply = stopped; }\n  output duration_ms: Duration;\n  duration_ms <- duration;\n}`);
+  const before = await compileSource(effectSource, { filename: 'settings-effect.ghost.md' });
   const result = await createOperatingSettingsCandidate({
     source: effectSource,
-    filename: 'settings-effect.ghost',
+    filename: 'settings-effect.ghost.md',
     expectedSourceSha256: hash(effectSource),
     changes: { duration: 600000 },
   });
-  const after = await compileSource(result.source, { filename: 'settings-effect.ghost' });
+  const after = await compileSource(result.source, { filename: 'settings-effect.ghost.md' });
   assert.equal(result.source, effectSource.replace('Duration = 5min {', 'Duration = 600000ms {'));
   assert.notDeepEqual([...after.bytes], [...before.bytes]);
   assert.notEqual(after.manifest.bytecodeSha256, before.manifest.bytecodeSha256);
@@ -70,10 +70,10 @@ test('운영 후보는 첫 await 전 요청 값을 snapshot해 TOCTOU 변경을 
 });
 
 test('Bool 운영 설정 후보는 숫자 경계 없이 실제 리터럴만 바꾼다', async () => {
-  const boolSource = `control BoolSettings {\n  config enabled: Bool = false { access = operator; label = "사용"; }\n  output value: Bool;\n  value <- enabled;\n}`;
+  const boolSource = literateDocument(`control BoolSettings {\n  config enabled: Bool = false { access = operator; label = "사용"; }\n  output value: Bool;\n  value <- enabled;\n}`);
   const result = await createOperatingSettingsCandidate({
     source: boolSource,
-    filename: 'bool-settings.ghost',
+    filename: 'bool-settings.ghost.md',
     expectedSourceSha256: hash(boolSource),
     changes: { enabled: true },
   });
@@ -95,17 +95,17 @@ test('컴파일러는 호스트가 거절할 v2 운영 설정 선언을 fail-clo
 });
 
 test('컴파일러는 단순 음수 Number 리터럴의 전체 span만 편집 가능하게 만든다', async () => {
-  const negativeSource = `control NegativeSettings {\n  config offset: Number = -5 { min = -10; max = 10; step = 1; access = operator; }\n  output value: Number;\n  value <- offset;\n}`;
+  const negativeSource = literateDocument(`control NegativeSettings {\n  config offset: Number = -5 { min = -10; max = 10; step = 1; access = operator; }\n  output value: Number;\n  value <- offset;\n}`);
   const negative = await createOperatingSettingsCandidate({
     source: negativeSource,
-    filename: 'negative-settings.ghost',
+    filename: 'negative-settings.ghost.md',
     expectedSourceSha256: hash(negativeSource),
     changes: { offset: -4 },
   });
   assert.equal(negative.source, negativeSource.replace('Number = -5 {', 'Number = -4 {'));
   const positive = await createOperatingSettingsCandidate({
     source: negativeSource,
-    filename: 'negative-settings.ghost',
+    filename: 'negative-settings.ghost.md',
     expectedSourceSha256: hash(negativeSource),
     changes: { offset: 5 },
   });

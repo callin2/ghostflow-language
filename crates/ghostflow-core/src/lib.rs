@@ -1583,7 +1583,7 @@ mod tests {
     fn submit(r: &mut Runtime, a: bool, b: bool, c: bool, d: f64) {
         r.set_input("start", Value::Bool(a)).unwrap();
         r.set_input("stop", Value::Bool(b)).unwrap();
-        r.set_input("low-water", Value::Bool(c)).unwrap();
+        r.set_input("low_water", Value::Bool(c)).unwrap();
         r.set_input("moisture", Value::Number(d)).unwrap();
     }
     #[test]
@@ -1596,7 +1596,7 @@ mod tests {
         r.add_capability(Capability::new("actuator", "valve", Type::Bool))
             .unwrap();
         r.activate().unwrap();
-        assert_eq!(r.active_strategy(), Some("basic"));
+        assert_eq!(r.active_strategy(), Some("control"));
         submit(&mut r, true, false, false, 99.0);
         r.tick().unwrap();
         submit(&mut r, false, false, false, 99.0);
@@ -1611,6 +1611,6 @@ mod tests {
             Capability::new("sensor", "moisture", Type::Number),
         ];
         let ghost = r.replay(module, &caps, 1).unwrap();
-        assert_eq!(ghost[0].strategy, "moisture-aware");
+        assert_eq!(ghost[0].strategy, "control");
     }
 }

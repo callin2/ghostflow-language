@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { compileConstraints } from '../tools/constraints.mjs';
+import { extractLiterate } from '../tools/literate.mjs';
 import { bindStationPolicy, StationPolicyError } from '../runtimes/wasm/policy.mjs';
 import { GhostFlowStation } from '../runtimes/wasm/station.mjs';
 
-const source = fs.readFileSync(new URL('../examples/station-rules.ghost', import.meta.url), 'utf8');
-const artifact = compileConstraints(source, { filename: 'examples/station-rules.ghost' });
+const filename = 'examples/station-rules.ghost.md';
+const source = fs.readFileSync(new URL('../examples/station-rules.ghost.md', import.meta.url), 'utf8');
+const artifact = compileConstraints(extractLiterate(source, { filename }).code, { filename });
 
 function bindings(overrides = {}) {
   const value = {

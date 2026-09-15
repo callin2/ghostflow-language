@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { compileConstraints } from './constraints.mjs';
+import { extractLiterate } from './literate.mjs';
 import { bindStationPolicy } from '../runtimes/wasm/policy.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 import { GhostFlowStation } from '../runtimes/wasm/station.mjs';
@@ -15,9 +16,11 @@ import { ScheduledAdmission } from '../runtimes/wasm/scheduled-admission.mjs';
  * the VM and must command safe outputs even when a runtime/storage call fails.
  */
 export async function runStationDemo({ wasm, first, second, root, build }) {
-  const rulesSource = fs.readFileSync(path.join(root, 'examples/station-rules.ghost'), 'utf8') +
+  const rulesFilename = 'examples/station-rules.ghost.md';
+  const rulesDocument = fs.readFileSync(path.join(root, rulesFilename), 'utf8');
+  const rulesSource = extractLiterate(rulesDocument, { filename: rulesFilename }).code +
     '\nconstraints ExtraSchedule { once extra_starts per occurrence; }\n';
-  const rules = compileConstraints(rulesSource, { filename: 'examples/station-rules.ghost' });
+  const rules = compileConstraints(rulesSource, { filename: rulesFilename });
   const modes = { Auto: 'Auto', Manual: 'Manual', Configure: 'Configure' };
   const policy = bindStationPolicy(rules, {
     station: { id: 'station', config: { valveCount: 4, maxOpenValves: 4, dailyQuotaMs: 7_200_000, maxStartBudgetMs: 3_600_000 } },

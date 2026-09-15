@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
 import { compileControl, ControlCompileError } from '../tools/control.mjs';
+import { extractLiterate } from '../tools/literate.mjs';
 import { compileSource } from '../tools/toolchain.mjs';
 
 function solarControl(schedule, name = 'SolarFixture') {
@@ -109,8 +110,9 @@ test('Solar restricts sun tags, exact offsets, fallback, and operating metadata'
 });
 
 test('the existing DailySlots snapshot remains v1-compatible', () => {
-  const source = fs.readFileSync(new URL('../examples/scheduled-watering.ghost', import.meta.url), 'utf8');
-  const result = compileControl(source, { filename: 'examples/scheduled-watering.ghost' });
+  const filename = 'examples/scheduled-watering.ghost.md';
+  const source = extractLiterate(fs.readFileSync(new URL('../examples/scheduled-watering.ghost.md', import.meta.url), 'utf8'), { filename }).code;
+  const result = compileControl(source, { filename });
   assert.equal(result.manifest.format, 'GhostFlow/control-v1');
   assert.deepEqual(result.manifest.schedules, [{
     name: 'starts', timezone: 'Asia/Seoul', slots: [360, 375, 750, 1125], dueInput: '__gf_schedule_due_starts',

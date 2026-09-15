@@ -67,7 +67,7 @@
       "source": {
         "kind": "canonical-literate",
         "path": "examples/curriculum/pc-06-timer-patterns.ghost.md",
-        "sha256": "5a23760a949379849e5f4948148090bf7b86e75e5cf4a9cd5086e481aa69c1d0"
+        "sha256": "cea4b1a6738f6c7a3b72d36a3e2d7c6583ccaf15bfaa634bbc9549dcc99eac40"
       }
     },
     {
@@ -76,7 +76,7 @@
       "source": {
         "kind": "canonical-literate",
         "path": "examples/curriculum/pc-07-tank-hysteresis.ghost.md",
-        "sha256": "6b060154f7a2d18e65f60ea09b47616b1c991db7e9d48847e74f7343f14e29f6"
+        "sha256": "5d0d9a83edc3f49baf76cde55bbc5be185c3a3beb9ae49817dea6fc1749cd99a"
       }
     },
     {
@@ -85,7 +85,7 @@
       "source": {
         "kind": "canonical-literate",
         "path": "examples/curriculum/pc-08-manual-auto.ghost.md",
-        "sha256": "d08217d485548f1b1feae947939491aa444438c46a13ca3a9aa0425d33c5a06b"
+        "sha256": "5e4c54a20173ae15b798cd7fb2dad049a7351a9ee0f2a84a8fb24d84c11589cb"
       }
     },
     {
@@ -94,7 +94,7 @@
       "source": {
         "kind": "canonical-literate",
         "path": "examples/curriculum/pc-09-sequential-water-supply.ghost.md",
-        "sha256": "322433eda0f7c5e0503f5830a39011d67d9eaf8c70416e8ea68f389e19821947"
+        "sha256": "d54da891833a5c1454c8488c6fa2a2a0f2bd9e1e77e39b460b8601a484e00e54"
       }
     },
     {

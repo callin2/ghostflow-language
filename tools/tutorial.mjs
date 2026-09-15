@@ -30,7 +30,7 @@ const wasm = fs.readFileSync(wasmFile);
 const evidence = { format: 'GhostFlow/tutorial-evidence-v1', generatedAt: new Date().toISOString(), platform: `${os.platform()}/${os.arch()}`, virtualOnly: true, hardware: 'deferred-by-user', scenarios: [] };
 
 async function artifact(name) {
-  const filename = `examples/tutorial/${name}.ghost`;
+  const filename = `examples/tutorial/${name}.ghost.md`;
   const source = fs.readFileSync(path.join(root, filename), 'utf8');
   const compiled = await compileSource(source, { filename });
   const output = path.join(build, `${name}.gfb`);
@@ -53,7 +53,8 @@ function nativeParity(compiled, traces) {
 
 const latch = await artifact('01-latch');
 const markdown = fs.readFileSync(path.join(root, 'examples/tutorial/01-latch.ghost.md'), 'utf8');
-assert.equal(extractLiterate(markdown, { filename: 'examples/tutorial/01-latch.ghost.md' }).code, latch.source);
+assert.equal(latch.source, markdown);
+assert.ok(extractLiterate(markdown, { filename: 'examples/tutorial/01-latch.ghost.md' }).code.length > 0);
 assert.deepEqual((await compileSource(markdown, { filename: 'examples/tutorial/01-latch.ghost.md' })).bytes, latch.bytes);
 const latchRuntime = await ControlRuntime.instantiate(wasm, latch);
 const latchRows = [[true, false], [false, false], [true, true], [false, false], [true, false]]

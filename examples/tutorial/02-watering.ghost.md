@@ -1,5 +1,9 @@
-// HISTORICAL NON-EXECUTABLE EVIDENCE. Canonical source: 02-watering.ghost.md.
-// This raw pre-literate source is not a product compiler input or fallback.
+# Scheduled watering
+
+This canonical tutorial control opens each valve in turn on its selected daily
+slots and holds the pump only during each watering phase.
+
+```ghost
 control ScheduledWatering {
 
   schedule starts: DailySlots<15min> {
@@ -29,35 +33,20 @@ control ScheduledWatering {
   timer age = elapsed(phase);
 
   phase' = case phase {
-    Idle =>
-      if starts.due then Open1 else Idle;
-
-    Open1 =>
-      if age >= valve_delay then Water1 else Open1;
-
-    Water1 =>
-      if age >= water1_time then Stop1 else Water1;
-
-    Stop1 =>
-      if age >= pump_stop_delay then Switch else Stop1;
-
-    Switch =>
-      if age >= switch_delay then Open2 else Switch;
-
-    Open2 =>
-      if age >= valve_delay then Water2 else Open2;
-
-    Water2 =>
-      if age >= water2_time then Stop2 else Water2;
-
-    Stop2 =>
-      if age >= pump_stop_delay then Idle else Stop2;
+    Idle => if starts.due then Open1 else Idle;
+    Open1 => if age >= valve_delay then Water1 else Open1;
+    Water1 => if age >= water1_time then Stop1 else Water1;
+    Stop1 => if age >= pump_stop_delay then Switch else Stop1;
+    Switch => if age >= switch_delay then Open2 else Switch;
+    Open2 => if age >= valve_delay then Water2 else Open2;
+    Water2 => if age >= water2_time then Stop2 else Water2;
+    Stop2 => if age >= pump_stop_delay then Idle else Stop2;
   };
 
   valve1 <- phase' in {Open1, Water1, Stop1};
   valve2 <- phase' in {Open2, Water2, Stop2};
-  pump   <- phase' in {Water1, Water2};
-
+  pump <- phase' in {Water1, Water2};
   require pump => (valve1 || valve2);
   require !(valve1 && valve2);
 }
+```

@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { compile, parse, tokenize } from '../tools/gfb1.mjs';
-import { compileSource } from '../tools/toolchain.mjs';
+import { compileSource } from './helpers/literate-compile.mjs';
 import { FramedGhostFlowRuntime } from '../runtimes/wasm/framed-runtime.mjs';
 
 const root = path.resolve(new URL('..', import.meta.url).pathname);

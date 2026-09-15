@@ -236,7 +236,7 @@ mod tests {
                     value: Value::Bool(false),
                 },
                 ScanInput {
-                    name: "low-water".into(),
+                    name: "low_water".into(),
                     value: Value::Bool(false),
                 },
                 ScanInput {
@@ -340,7 +340,7 @@ mod tests {
             runtime.clear_inputs();
             runtime.set_input("start", Value::Bool(false)).unwrap();
             runtime.set_input("stop", Value::Bool(false)).unwrap();
-            runtime.set_input("low-water", Value::Bool(false)).unwrap();
+            runtime.set_input("low_water", Value::Bool(false)).unwrap();
             runtime.set_input("moisture", Value::Number(90.0)).unwrap();
             runtime
                 .set_input(RESERVED_CLOCK_INPUT, Value::Number(11.0))

@@ -39,9 +39,9 @@ is a path, so they support documents held in conversation or revision storage.
 The fixture's repository path belongs only to its test harness.
 
 `source.kind` is exactly `literate`. GhostFlow's canonical authored, reviewed,
-and versioned source is the literate document; this contract does not make a
-plain-code source a second product-authoring format. Legacy raw-code fixtures
-and import tooling remain outside this interaction contract.
+and versioned source is the literate document. Product/compiler input is
+canonical `.ghost.md` only: plain code is rejected and cannot be a supported
+authoring, import, artifact, or Interaction Schema fallback.
 
 Every descriptor has a public stable authored `id` and `name`, a semantic
 `kind`, compiler/source semantic `sourceType`, explicit `access`, and

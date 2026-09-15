@@ -1,37 +1,16 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { compile, parse, tokenize, CompileError } from '../tools/ghostc.mjs';
+import { compileSource } from '../tools/toolchain.mjs';
 
-const source = fs.readFileSync(new URL('../examples/irrigation.ghost', import.meta.url), 'utf8');
-const binary = compile(parse(tokenize(source)));
-assert.equal(binary.subarray(0, 4).toString(), 'GFB1');
-assert.ok(binary.length < 4096, `example bytecode is unexpectedly large: ${binary.length}`);
+const filename = 'examples/irrigation.ghost.md';
+const source = fs.readFileSync(new URL('../examples/irrigation.ghost.md', import.meta.url), 'utf8');
+const compilation = await compileSource(source, { filename });
+assert.equal(compilation.bytes.subarray(0, 4).toString(), 'GFB1');
+assert.ok(compilation.bytes.length < 4096, `example bytecode is unexpectedly large: ${compilation.bytes.length}`);
 
-assert.throws(() => compile(parse(tokenize(`
-  (module broken
-    (input x bool)
-    (state y bool false)
-    (strategy only 0
-      (device (has sensor x bool))
-      (next y input.missing)))
-`))), CompileError);
+await assert.rejects(
+  () => compileSource('control Broken { output pump: Bool; pump <- missing; }', { filename: 'broken.ghost' }),
+  /requires a canonical .ghost.md literate source/,
+);
 
-assert.throws(() => compile(parse(tokenize(`
-  (module unsafe
-    (input x bool)
-    (state y bool false)
-    (strategy a 0 (device (has actuator pump bool)) (intent pump true))
-    (strategy b 1 (device (has sensor x bool)) (intent valve true))
-    (requires pump valve))
-`))), CompileError);
-
-assert.throws(() => compile(parse(tokenize(`
-  (module broken
-    (input x number)
-    (state y bool false)
-    (strategy only 0
-      (device (has sensor x number))
-      (next y input.x)))
-`))), CompileError);
-
-console.log(`compiler tests passed (${binary.length} byte module)`);
+console.log(`compiler tests passed (${compilation.bytes.length} byte module)`);

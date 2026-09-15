@@ -25,6 +25,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/integration-contract.test.mjs',
   'tests/interaction-contract.test.mjs',
   'tests/interaction-corpus.test.mjs',
+  'tests/interaction-emission.test.mjs',
   'tests/intent-anchor-map.test.mjs',
   'tests/ledger.test.mjs',
   'tests/literate.test.mjs',
@@ -268,7 +269,7 @@ async function verify(nodeOnly, curriculumOnly) {
       report.cargo = (await gate('cargo', ['--version'])).trim();
       await gate('cargo', ['fmt', '--all', '--', '--check']);
       // Required before cargo test: core includes this generated test fixture.
-      await gate(process.execPath, ['tools/ghostc.mjs', 'examples/irrigation.ghost', 'build/irrigation.gfb']);
+      await gate(process.execPath, ['tools/ghostc.mjs', 'examples/irrigation.ghost.md', 'build/irrigation.gfb']);
       await gate('cargo', ['test', '--locked', '--offline', '--workspace']);
       await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-core', '--example', 'run']);
       await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-core', '--example', 'run', '--release']);

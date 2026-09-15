@@ -1,6 +1,7 @@
 # Latching pump tutorial
 
-This document explains the same small control as `01-latch.ghost`. The Markdown
+This document is the canonical small control; `01-latch.ghost` is retained only
+as non-executable historical evidence. The Markdown
 prose is not executable; only the top-level `ghost` fence is the source.
 
 The `watering` state holds its previous value when there is no new start. A stop

@@ -49,7 +49,8 @@ runtime output semantics.
 `traceMetadata` in the `GhostFlow/source-map-v1` envelope. The GFB and strict
 control manifest do not change. The persisted companion carries
 `sourceDocumentSha256` and `bytecodeSha256`, while the direct low-level
-`compileControl` companion remains source-container independent.
+The internal `compileControl` lowerer remains source-container independent; it is
+not a product compiler API. Product callers use literate-only `compileSource`.
 `restoreArtifactSourceMap` first validates the exact source-document SHA-256 and
 GFB SHA-256 against those companion identities, then the runtime module
 fingerprint, binding/node positions, generated timer pair, dependency targets and

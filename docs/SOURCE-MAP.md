@@ -38,7 +38,7 @@ release records can carry it using their existing source-identity contract.
 Old readers may use their existing nodes/lines; readers promising source recovery
 must require the new envelope and validate it, rather than reconstructing prose.
 
-`compileSource.sourceMap` remains an array. Direct low-level `compileControl`
+`compileSource.sourceMap` remains an array. Internal low-level `compileControl`
 callers and legacy `writeArtifact` results without sourceDocument retain their
 previous behavior; they do not claim source-preserving output. New compileSource
 results, including low-level legacy inputs, carry the original text and write a

@@ -1,3 +1,5 @@
+// HISTORICAL NON-EXECUTABLE EVIDENCE. Canonical source: 01-latch.ghost.md.
+// This raw pre-literate source is not a product compiler input or fallback.
 control LatchingPump {
   input start: Bool;
   input stop: Bool;

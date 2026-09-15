@@ -7,10 +7,11 @@ is determined by the compiler and the host tests described in
 
 ## Executable path
 
-`tools/toolchain.mjs` exposes `compileSource(source, {filename})`. Modern `.ghost`
-files use `tools/control.mjs`; `.ghost.md` uses the CommonMark extraction and
-original-position mapping in `tools/literate.mjs`. The legacy S-expression path
-remains for compatibility. Both lower through `tools/gfb1.mjs` to GFB1.
+`tools/toolchain.mjs` exposes `compileSource(source, {filename})` for canonical
+`.ghost.md` documents only. CommonMark extraction preserves original-position
+mapping through `tools/literate.mjs`; the extracted control lowers through
+`tools/gfb1.mjs` to GFB1. Superseded raw source is historical evidence, not a
+compiler input.
 
 Modern control supports inputs, configs, outputs, state, finite enums, pure
 functions, expression/next-state checks, elapsed timers, DailySlots, sensors and
@@ -37,7 +38,7 @@ driver disconnect handling are host/Driver policy and require separate evidence.
 
 | Item | Current representation | Role |
 |---|---|---|
-| Authoritative program | `.ghost.md` | Literate source with intent, code, comments and explanation; plain `.ghost` remains a low-level test/import input |
+| Authoritative program | `.ghost.md` | Literate source with intent, code, comments and explanation |
 | Generated executable | `.gfb`, GFB1 envelope version 1 | Binary IR consumed by the VM |
 | Generated control manifest | `GhostFlow/control-v1` | Typed host ports, timer/sensor/schedule requirements and bytecode hash |
 | Generated constraint policy | `GhostFlow/constraints-v1` | Lowered standalone constraint source, bound by the host |

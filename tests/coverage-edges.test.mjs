@@ -177,31 +177,38 @@ test('GF-TEST-coverage-literate-and-toolchain-errors: defensive source boundarie
     file: 'mapped.ghost.md', line: 7, column: 4,
   });
   await assert.rejects(() => compileSource('x'.repeat(1024 * 1024 + 1)), /source byte limit exceeded/);
-  await assert.rejects(() => compileSource('# prose', { filename: 'program.md' }), /literate sources must use .ghost.md/);
+  await assert.rejects(() => compileSource('# prose', { filename: 'program.md' }), /requires a canonical .ghost.md literate source/);
   await assert.rejects(
     () => compileSource('prose\n\n```ghost\ncontrol Broken { output x: Bool; x <- ; }\n```\n', { filename: 'broken.ghost.md' }),
     error => error.filename === 'broken.ghost.md' && error.line === 4 && /expected expression/.test(error.message),
   );
-  const legacy = await compileSource('(module Legacy (strategy run 0 (device true)))');
-  assert.equal(legacy.manifest, null);
-  assert.equal(legacy.bytes.subarray(0, 4).toString(), 'GFB1');
+  await assert.rejects(
+    () => compileSource('(module Legacy (strategy run 0 (device true)))', { filename: 'legacy.ghost' }),
+    /requires a canonical .ghost.md literate source/,
+  );
 });
 
 test('GF-TEST-coverage-runtime-lifecycle: hot swap, rewind, typed getters and wrapper guards', async t => {
-  const first = await compileSource(`control Lifecycle {
+  const first = await compileSource(`\`\`\`ghost
+control Lifecycle {
     input enabled: Bool;
     state held: Bool = false;
     held' = enabled;
     output result: Bool;
     result <- held';
-  }`);
-  const second = await compileSource(`control Lifecycle {
+  }
+\`\`\`
+`, { filename: 'lifecycle-first.ghost.md' });
+  const second = await compileSource(`\`\`\`ghost
+control Lifecycle {
     input enabled: Bool;
     state held: Bool = false;
     held' = !enabled;
     output result: Bool;
     result <- held';
-  }`);
+  }
+\`\`\`
+`, { filename: 'lifecycle-second.ghost.md' });
   const runtime = await GhostFlowRuntime.instantiate(wasm);
   t.after(() => runtime.dispose());
   runtime.load(first.bytes.buffer.slice(first.bytes.byteOffset, first.bytes.byteOffset + first.bytes.byteLength));

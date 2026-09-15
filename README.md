@@ -5,7 +5,7 @@ parsing, type checking and lowering; Rust owns verified bytecode execution,
 signals and station arbitration. Native and WASM tests share that Rust core.
 
 ```text
-.ghost / .ghost.md → compileSource → .gfb + manifest + source map
+.ghost.md → compileSource → .gfb + manifest + source map
                                          ↓
                          native / WASM portable Rust core
 ```

@@ -47,13 +47,6 @@ function literateOffsetMapper(source, extraction) {
   };
 }
 
-function sourceOffsetMapper(source) {
-  return (start, end) => {
-    if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end <= start || end > source.length) return null;
-    return { start, end };
-  };
-}
-
 function applyOnlyDeclaredLiteralEdits(source, replacements) {
   const ascending = [...replacements].sort((a, b) => a.start - b.start);
   let previousEnd = 0;
@@ -81,16 +74,15 @@ function applyOnlyDeclaredLiteralEdits(source, replacements) {
   return candidate;
 }
 
-export async function createOperatingSettingsCandidate({ source, filename = 'program.ghost', expectedSourceSha256, changes }) {
+export async function createOperatingSettingsCandidate({ source, filename = 'program.ghost.md', expectedSourceSha256, changes }) {
   if (typeof source !== 'string' || sha256(source) !== expectedSourceSha256) throw new Error('stale source hash');
+  if (!filename.endsWith('.ghost.md')) throw new Error('operating settings require a canonical .ghost.md literate source');
   if (!changes || typeof changes !== 'object' || Array.isArray(changes)) throw new Error('changes must be an object');
   // Snapshot primitive requests before compilation yields to caller code.
   const requestedEntries = Object.entries(changes);
   const before = await compileSource(source, { filename });
   const configs = new Map((before.manifest?.configs ?? []).map(config => [config.name, config]));
-  const mapOffset = filename.endsWith('.ghost.md')
-    ? literateOffsetMapper(source, extractLiterate(source, { filename }))
-    : sourceOffsetMapper(source);
+  const mapOffset = literateOffsetMapper(source, extractLiterate(source, { filename }));
   const replacements = [];
   for (const [name, requested] of requestedEntries) {
     const config = configs.get(name);

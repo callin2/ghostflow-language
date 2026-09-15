@@ -1,8 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import { compile, parse, tokenize } from './gfb1.mjs';
 import { attachIntentMetadata, remapSourceTrace, sourceMapRequiresTraceMetadata, verifySourceTraceMetadata } from './source-trace.mjs';
+import { emitInteractionSchema, restoreInteractionSchema } from './interaction-schema.mjs';
+
+export { emitInteractionSchema } from './interaction-schema.mjs';
 
 const SOURCE_LIMIT = 1024 * 1024;
 const SOURCE_DOCUMENT_FORMAT = 'GhostFlow/source-document-v1';
@@ -50,6 +52,8 @@ function sourceMapEnvelope(result, bytes) {
     nodes: result.sourceMap,
     lines: result.extractionMap ?? null,
     traceMetadata: result.traceMetadata ?? null,
+    interactionSchema: result.interactionSchema ?? null,
+    interactionSourceIdentity: result.interactionSourceIdentity ?? null,
   };
 }
 
@@ -63,7 +67,7 @@ function validateArtifactSourceMap(map, bytes, { expectedSourceSha256, requireTr
   const document = map.sourceDocument;
   if (!document || typeof document !== 'object' || Array.isArray(document)) throw new Error('source map sourceDocument must be an object');
   if (document.format !== SOURCE_DOCUMENT_FORMAT) throw new Error(`unsupported source document format ${String(document.format)}`);
-  if (document.kind !== 'literate' && document.kind !== 'plain') throw new Error('source document kind must be literate or plain');
+  if (document.kind !== 'literate') throw new Error('source document kind must be canonical literate');
   requireFilename(document.filename);
   requireSourceText(document.text);
   requireDigest(document.sha256, 'source document sha256');
@@ -88,7 +92,31 @@ function validateArtifactSourceMap(map, bytes, { expectedSourceSha256, requireTr
   } else if (sourceMapRequiresTraceMetadata(map.nodes) && (hasTraceMetadata || requireTraceMetadata)) {
     throw new Error('source map trace metadata is missing for a traceable control');
   }
-  return { document, traceMetadata: hasTraceMetadata ? map.traceMetadata : null };
+  const hasInteractionSchema = Object.hasOwn(map, 'interactionSchema') && map.interactionSchema !== null;
+  const hasInteractionIdentity = Object.hasOwn(map, 'interactionSourceIdentity') && map.interactionSourceIdentity !== null;
+  if (hasInteractionSchema !== hasInteractionIdentity) {
+    throw new Error('interaction schema and explicit source identity must be persisted together');
+  }
+  let interactionSchema = null;
+  let interactionSourceIdentity = null;
+  if (hasInteractionSchema) {
+    const identity = map.interactionSourceIdentity;
+    if (!identity || typeof identity !== 'object' || Array.isArray(identity)
+        || Object.keys(identity).length !== 2
+        || typeof identity.documentId !== 'string' || typeof identity.revisionId !== 'string'
+        || map.interactionSchema.source?.documentId !== identity.documentId
+        || map.interactionSchema.source?.revisionId !== identity.revisionId) {
+      throw new Error('interaction schema source identity does not match its persisted immutable identity');
+    }
+    interactionSchema = restoreInteractionSchema({
+      sourceDocument: document,
+      sourceMap: map.nodes,
+      traceMetadata: hasTraceMetadata ? map.traceMetadata : null,
+      bytes: artifactBytes,
+    }, map.interactionSchema);
+    interactionSourceIdentity = { documentId: identity.documentId, revisionId: identity.revisionId };
+  }
+  return { document, traceMetadata: hasTraceMetadata ? map.traceMetadata : null, interactionSchema, interactionSourceIdentity };
 }
 
 export function verifyArtifactSourceMap(map, bytes, options = {}) {
@@ -103,6 +131,8 @@ export function restoreArtifactSourceMap(map, bytes, options = {}) {
     sourceMap: map.nodes,
     extractionMap: map.lines,
     traceMetadata: restored.traceMetadata,
+    interactionSchema: restored.interactionSchema,
+    interactionSourceIdentity: restored.interactionSourceIdentity,
   };
 }
 
@@ -128,30 +158,21 @@ function remapSourceNodes(nodes, lines, mapPosition) {
   });
 }
 
-export async function compileSource(source, { filename = 'program.ghost' } = {}) {
+export async function compileSource(source, options = {}) {
+  if (!options || typeof options !== 'object' || Array.isArray(options)) throw new TypeError('compile options must be an object');
+  if (Object.hasOwn(options, 'interactionSchema')) {
+    throw new Error('interactionSchema is not a compile option; supply interactionSourceIdentity explicitly');
+  }
+  const { filename = 'program.ghost.md', interactionSourceIdentity } = options;
   requireFilename(filename, 'source filename');
   requireSourceText(source, `${filename}: source`);
-  let code = source, extraction = null;
-  if (filename.endsWith('.ghost.md')) {
-    const { extractLiterate } = await import('./literate.mjs');
-    extraction = extractLiterate(source, { filename });
-    code = extraction.code;
-  } else if (filename.endsWith('.md')) {
-    throw new Error(`${filename}: literate sources must use .ghost.md`);
-  }
-  if (!extraction) {
-    const lines = source.replace(/\r\n/g, '\n').split('\n');
-    const line = lines.findIndex(value => /^\s*\/\/.*ghostflow:link/.test(value));
-    if (line >= 0) {
-      const column = lines[line].indexOf('ghostflow:link') + 1;
-      throw new Error(`${filename}:${line + 1}:${column}: ghostflow link directives require a literate .ghost.md source`);
-    }
-  }
-  const legacy = code.trimStart().startsWith('(') || code.trimStart().startsWith(';');
+  if (!filename.endsWith('.ghost.md')) throw new Error(`${filename}: GhostFlow product compilation requires a canonical .ghost.md literate source`);
+  const { extractLiterate } = await import('./literate.mjs');
+  const extraction = extractLiterate(source, { filename });
+  const code = extraction.code;
   let result;
   try {
-    result = legacy ? { bytes: compile(parse(tokenize(code))), manifest: null, sourceMap: [] }
-      : (await import('./control.mjs')).compileControl(code, { filename });
+    result = (await import('./control.mjs')).compileControl(code, { filename });
   } catch (error) {
     if (extraction && Number.isInteger(error.line)) {
       const { mapSourcePosition } = await import('./literate.mjs');
@@ -165,7 +186,6 @@ export async function compileSource(source, { filename = 'program.ghost' } = {})
     throw error;
   }
   if (extraction && (extraction.anchors.length || extraction.linkDirectives.length)) {
-    if (legacy) throw new Error(`${filename}: ghostflow intent links require a control source`);
     const { parseControl } = await import('./control.mjs');
     const ast = parseControl(code, { filename });
     result = {
@@ -188,7 +208,7 @@ export async function compileSource(source, { filename = 'program.ghost' } = {})
   const digest = sha256(bytes);
   const sourceDocument = {
     format: SOURCE_DOCUMENT_FORMAT,
-    kind: extraction ? 'literate' : 'plain',
+    kind: 'literate',
     filename,
     text: source,
     sha256: sha256(source),
@@ -198,9 +218,18 @@ export async function compileSource(source, { filename = 'program.ghost' } = {})
     sourceDocumentSha256: sourceDocument.sha256,
     bytecodeSha256: digest,
   } : result.traceMetadata;
-  return { ...result, bytes, sourceDocument, traceMetadata,
+  const compilation = { ...result, bytes, sourceDocument, traceMetadata,
     manifest: result.manifest ? { ...result.manifest, bytecodeSha256: digest } : null,
-    extractionMap: extraction?.sourceMap ?? null, warnings: extraction?.warnings ?? [] };
+    extractionMap: extraction.sourceMap, warnings: extraction.warnings };
+  const schema = interactionSourceIdentity === undefined ? null : emitInteractionSchema(compilation, interactionSourceIdentity);
+  return {
+    ...compilation,
+    interactionSchema: schema,
+    interactionSourceIdentity: schema ? {
+      documentId: schema.source.documentId,
+      revisionId: schema.source.revisionId,
+    } : null,
+  };
 }
 
 export function writeArtifact(result, outputPath) {

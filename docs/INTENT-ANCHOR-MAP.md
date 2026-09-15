@@ -129,9 +129,8 @@ unsigned standalone map detects coordinated replacement.
   or front matter are not Markdown anchors.
 - Only top-level `ghost` fences execute, exactly as before. Link comments remain
   ordinary `//` comments to the GhostFlow lexer and produce no opcode.
-- Plain `.ghost` remains a low-level compatibility/import path. It has no
-  Markdown anchor namespace; a `ghostflow:link` directive there is rejected as a
-  broken reference rather than accepted with invented intent.
+- Plain `.ghost` is historical evidence only and is rejected by the product
+  compiler. It cannot supply an anchor namespace or an executable fallback.
 - Documents without anchor/link directives produce the same code, GFB bytes,
   node IDs, diagnostics, manifest, and runtime behavior as before.
 - Prose/comment-only changes alter `sourceDocument.sha256`. When executable token

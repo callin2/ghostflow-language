@@ -7,10 +7,10 @@ are virtual intents; tutorial results are written locally when the command runs.
 
 | Example | Source | What the runner checks |
 |---|---|---|
-| Latch | [01-latch.ghost](../examples/tutorial/01-latch.ghost) | Stop priority, retained state, pump/valve requirement; identical [literate source](../examples/tutorial/01-latch.ghost.md) |
-| Schedule | [02-watering.ghost](../examples/tutorial/02-watering.ghost) | Daily slot, elapsed timer, sequential valve states |
-| Moisture | [03-moisture.ghost](../examples/tutorial/03-moisture.ghost) | Median, stale/disconnect handling and recovery without automatic start |
-| Shared station | [04-extra-valves.ghost](../examples/tutorial/04-extra-valves.ghost) | Two controls sharing a station through [constraint source](../examples/station-rules.ghost) |
+| Latch | [01-latch.ghost.md](../examples/tutorial/01-latch.ghost.md) | Stop priority, retained state, pump/valve requirement |
+| Schedule | [02-watering.ghost.md](../examples/tutorial/02-watering.ghost.md) | Daily slot, elapsed timer, sequential valve states |
+| Moisture | [03-moisture.ghost.md](../examples/tutorial/03-moisture.ghost.md) | Median, stale/disconnect handling and recovery without automatic start |
+| Shared station | [04-extra-valves.ghost.md](../examples/tutorial/04-extra-valves.ghost.md) | Two controls sharing a station through its generated constraint policy |
 | Replay | Isolated VM using latch input snapshots | Deterministic repeat of recorded virtual inputs |
 
 Each control is compiled by the real `compileSource`. WASM traces supply exact
@@ -21,7 +21,7 @@ physical sampling, clock synchronization or MCU host behavior.
 For one control:
 
 ```sh
-node tools/ghostc.mjs examples/tutorial/01-latch.ghost build/tutorial/latch.gfb
+node tools/ghostc.mjs examples/tutorial/01-latch.ghost.md build/tutorial/latch.gfb
 cargo run --locked --offline -p ghostflow-core --example run -- build/tutorial/latch.gfb examples/tutorial/01-latch.csv
 ```
 

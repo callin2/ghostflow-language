@@ -107,9 +107,9 @@
       "id": "PC-08",
       "source": {
         "canonicalPath": "examples/curriculum/pc-08-manual-auto.ghost.md",
-        "canonicalSha256": "d08217d485548f1b1feae947939491aa444438c46a13ca3a9aa0425d33c5a06b",
+        "canonicalSha256": "5e4c54a20173ae15b798cd7fb2dad049a7351a9ee0f2a84a8fb24d84c11589cb",
         "executablePath": "examples/curriculum/pc-08-manual-auto.ghost.md",
-        "executableSha256": "d08217d485548f1b1feae947939491aa444438c46a13ca3a9aa0425d33c5a06b"
+        "executableSha256": "5e4c54a20173ae15b798cd7fb2dad049a7351a9ee0f2a84a8fb24d84c11589cb"
       },
       "inputs": ["manual_mode_request", "auto_mode_request", "manual_start", "auto_demand", "stop_ok", "overload_ok"],
       "outputs": ["pump_contactor"],
@@ -137,9 +137,9 @@
       "id": "PC-09",
       "source": {
         "canonicalPath": "examples/curriculum/pc-09-sequential-water-supply.ghost.md",
-        "canonicalSha256": "322433eda0f7c5e0503f5830a39011d67d9eaf8c70416e8ea68f389e19821947",
+        "canonicalSha256": "d54da891833a5c1454c8488c6fa2a2a0f2bd9e1e77e39b460b8601a484e00e54",
         "executablePath": "examples/curriculum/pc-09-sequential-water-supply.ghost.md",
-        "executableSha256": "322433eda0f7c5e0503f5830a39011d67d9eaf8c70416e8ea68f389e19821947"
+        "executableSha256": "d54da891833a5c1454c8488c6fa2a2a0f2bd9e1e77e39b460b8601a484e00e54"
       },
       "inputs": ["start_request", "open_limit", "close_limit", "stop_ok", "overload_ok"],
       "outputs": ["valve_open_contactor", "valve_close_contactor", "pump_contactor"],
