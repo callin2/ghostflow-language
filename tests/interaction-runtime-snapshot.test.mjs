@@ -20,6 +20,19 @@ const corpus = JSON.parse(fs.readFileSync(path.join(root, 'contracts/interaction
 const wasmBytes = fs.readFileSync(path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm'));
 const nativePath = path.join(root, 'target/release/examples/scan_tape');
 
+const directSource = `# Direct input to output
+
+The pump follows the enable input without authored state or a timer.
+
+\`\`\`ghost
+control DirectOutput {
+  input enabled: Bool;
+  output pump: Bool;
+  pump <- enabled;
+}
+\`\`\`
+`;
+
 function read(relative) {
   return fs.readFileSync(path.join(root, relative), 'utf8');
 }
@@ -342,6 +355,36 @@ control StateOnly {
   ]);
   assert.deepEqual(joinRuntimeSnapshot(artifact.interactionSchema, snapshot,
     expectedRuntimeIdentity(artifact.interactionSchema, 'run.state-only.1')), {
+    status: 'ready', staleReasons: [],
+  });
+});
+
+test('GF-TEST-interaction-runtime-snapshot-empty: direct control preserves native/WASM output parity with an identified empty observation', async () => {
+  const artifact = await compileSource(directSource, {
+    filename: 'direct-output.ghost.md',
+    interactionSourceIdentity: {
+      documentId: 'source.direct-output',
+      revisionId: 'revision.direct-output.1',
+    },
+  });
+  const scans = [{
+    completion: { kind: 'completed-scan', scanId: 0, logicalTimeMs: 125 },
+    inputs: [{ name: 'enabled', value: true }],
+  }];
+  const native = nativeRun(artifact, scans);
+  const wasm = await wasmRun(artifact, scans);
+  assert.deepEqual(wasm, native);
+  assert.equal(wasm[0].trace.safe.pump, true);
+
+  const snapshot = emitCompletedScanSnapshot({
+    compilation: artifact,
+    runId: 'run.direct-output.1',
+    completion: scans[0].completion,
+    trace: wasm[0].trace,
+  });
+  assert.deepEqual(snapshot.observations, []);
+  assert.deepEqual(joinRuntimeSnapshot(artifact.interactionSchema, snapshot,
+    expectedRuntimeIdentity(artifact.interactionSchema, 'run.direct-output.1')), {
     status: 'ready', staleReasons: [],
   });
 });

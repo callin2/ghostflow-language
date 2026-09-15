@@ -127,7 +127,6 @@ function expectedSchema(compilation, identityValue) {
       provenance: { sourceNode: { id: item.id, kind: 'timer' }, intentAnchorIds: anchors },
     });
   }
-  if (!descriptors.length) fail('control has no public state or timer descriptors');
   const schema = {
     format: INTERACTION_SCHEMA_FORMAT,
     version: INTERACTION_SCHEMA_VERSION,

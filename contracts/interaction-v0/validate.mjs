@@ -137,8 +137,8 @@ function validateSchema(schema, errors) {
   if (schema.version !== INTERACTION_SCHEMA_VERSION) issue(errors, 'schema.version', 'version', `must be ${INTERACTION_SCHEMA_VERSION}`);
   moduleIdentity(schema.module, 'schema.module', errors);
   sourceIdentity(schema.source, 'schema.source', errors);
-  if (!Array.isArray(schema.descriptors) || schema.descriptors.length === 0) {
-    issue(errors, 'schema.descriptors', 'descriptors', 'must be a non-empty array');
+  if (!Array.isArray(schema.descriptors)) {
+    issue(errors, 'schema.descriptors', 'descriptors', 'must be an array');
     return;
   }
   const ids = new Set();
