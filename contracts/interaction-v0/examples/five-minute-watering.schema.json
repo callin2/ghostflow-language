@@ -1,0 +1,61 @@
+{
+  "format": "GhostFlow/interaction-schema-v0",
+  "version": "0.1",
+  "module": {
+    "id": "FiveMinuteWatering",
+    "sha256": "debc311746754c859df1bfcf252f5080c174c425202362e7f6bf6719709460df"
+  },
+  "source": {
+    "format": "GhostFlow/source-document-v1",
+    "kind": "literate",
+    "path": "contracts/interaction-v0/examples/five-minute-watering.ghost.md",
+    "sha256": "4abdd35d79a05d70749e1d8a5b2cf5fd49f88cc2283eabea851e1b3dcadce3ad"
+  },
+  "descriptors": [
+    {
+      "id": "input.pressure",
+      "name": "pressure",
+      "kind": "input",
+      "sourceType": { "kind": "builtin", "name": "Number", "unit": null },
+      "access": ["read"],
+      "provenance": {
+        "sourceNode": { "id": 2, "kind": "input" },
+        "intentAnchorIds": ["GF-INT-FIXTURE-WATERING-V0"]
+      }
+    },
+    {
+      "id": "input.moisture",
+      "name": "moisture",
+      "kind": "input",
+      "sourceType": { "kind": "nominal", "name": "Percent", "unit": "percent" },
+      "access": ["read"],
+      "provenance": {
+        "sourceNode": { "id": 3, "kind": "input" },
+        "intentAnchorIds": ["GF-INT-FIXTURE-WATERING-V0"]
+      }
+    },
+    {
+      "id": "state.watering",
+      "name": "watering",
+      "kind": "state",
+      "sourceType": { "kind": "builtin", "name": "Bool", "unit": null },
+      "access": ["read"],
+      "provenance": {
+        "sourceNode": { "id": 8, "kind": "state" },
+        "intentAnchorIds": ["GF-INT-FIXTURE-WATERING-V0"]
+      }
+    },
+    {
+      "id": "timer.age",
+      "name": "age",
+      "kind": "timer",
+      "sourceType": { "kind": "builtin", "name": "Duration", "unit": "ms" },
+      "access": ["read"],
+      "operation": { "kind": "elapsed_since_change", "subjectId": "state.watering" },
+      "provenance": {
+        "sourceNode": { "id": 11, "kind": "timer" },
+        "intentAnchorIds": ["GF-INT-FIXTURE-WATERING-V0"]
+      }
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "format": "GhostFlow/runtime-snapshot-v0",
+  "version": "0.1",
+  "schema": {
+    "format": "GhostFlow/interaction-schema-v0",
+    "version": "0.1",
+    "sha256": "67dd056a030e46622caeaf629072d009888a17f730cab1ef8d1c4bb3a6fe7855"
+  },
+  "module": {
+    "id": "FiveMinuteWatering",
+    "sha256": "debc311746754c859df1bfcf252f5080c174c425202362e7f6bf6719709460df"
+  },
+  "source": {
+    "format": "GhostFlow/source-document-v1",
+    "kind": "literate",
+    "path": "contracts/interaction-v0/examples/five-minute-watering.ghost.md",
+    "sha256": "4abdd35d79a05d70749e1d8a5b2cf5fd49f88cc2283eabea851e1b3dcadce3ad"
+  },
+  "runId": "fixture-run-2026-09-15-a",
+  "completion": { "kind": "completed-scan", "scanId": 0, "logicalTimeMs": 0 },
+  "observations": [
+    { "descriptorId": "input.pressure", "status": "ready", "value": 0 },
+    { "descriptorId": "input.moisture", "status": "ready", "value": 0 },
+    { "descriptorId": "state.watering", "status": "ready", "value": false },
+    { "descriptorId": "timer.age", "status": "ready", "value": 0 }
+  ]
+}
