@@ -203,7 +203,6 @@ function validateTape(tape, fixture, inputTypes) {
     if (!Array.isArray(run.scans) || run.scans.length === 0) fail(`${runLabel}.scans must be non-empty`);
     const scanIds = new Set();
     let previousTime = null;
-    let previousScanId = null;
     for (const [scanIndex, scan] of run.scans.entries()) {
       const scanLabel = `${runLabel}.scans[${scanIndex}]`;
       exactObject(scan, ['completion', 'inputs'], scanLabel);
@@ -213,11 +212,9 @@ function validateTape(tape, fixture, inputTypes) {
       if (!Number.isSafeInteger(scanId) || scanId < 0) fail(`${scanLabel}.completion.scanId must be a non-negative safe integer`);
       if (!Number.isSafeInteger(logicalTimeMs) || logicalTimeMs < 0) fail(`${scanLabel}.completion.logicalTimeMs must be a non-negative safe integer`);
       if (scanIds.has(scanId)) fail(`${runLabel} has duplicate scanId ${scanId}`);
-      if (previousScanId !== null && scanId <= previousScanId) fail(`${runLabel} scanIds must increase strictly`);
+      if (scanId !== scanIndex) fail(`${runLabel} scanIds must be contiguous starting at zero (expected ${scanIndex}, got ${scanId})`);
       if (previousTime !== null && logicalTimeMs < previousTime) fail(`${runLabel} logical time reversal at scanId ${scanId}`);
-      if (scanIndex === 0 && scanId !== 0) fail(`${runLabel} must restart scan numbering at zero`);
       scanIds.add(scanId);
-      previousScanId = scanId;
       previousTime = logicalTimeMs;
 
       if (!Array.isArray(scan.inputs)) fail(`${scanLabel}.inputs must be an array of named values`);

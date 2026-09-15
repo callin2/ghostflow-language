@@ -100,6 +100,7 @@ test('GF-TEST-interaction-corpus-rejections: rejects tampered identities, unknow
   await rejectTapeMutation('five-minute-watering', tape => { tape.runs[0].scans[0].inputs.pop(); }, /every declared input exactly once/);
   await rejectTapeMutation('five-minute-watering', tape => { tape.runs[0].scans[2].completion.logicalTimeMs = 999; }, /logical time reversal/);
   await rejectTapeMutation('five-minute-watering', tape => { tape.runs[0].scans[2].completion.scanId = 1; }, /duplicate scanId 1/);
+  await rejectTapeMutation('five-minute-watering', tape => { tape.runs[0].scans.splice(1, 1); }, /scanIds must be contiguous starting at zero/);
   await rejectTapeMutation('multiple-values', tape => { tape.runs[0].scans[0].inputs[0].value = 0; }, /must be Bool/);
 
   const badSourceHash = clone(corpus);
