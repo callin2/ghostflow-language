@@ -119,3 +119,32 @@ replay, source and
 artifact preservation, tamper rejection, key rotation/revocation, capability and
 binding rejection, Buffer-less browser verification and byte-identical extraction
 through release native Rust and WASM GFB1 loaders.
+
+## Native verifier API
+
+`crates/ghostflow-package` accepts only exact canonical
+`GhostFlow/portable-package-v1` transport bytes (including its single trailing
+newline). It verifies the signed payload digest, trusted non-revoked Ed25519
+signature, compiler/runtime/binding identity, capability and manifest cross-links,
+artifact digests, GFB1 v1 header, canonical embedded manifest/source-map JSON,
+and the source-map's authoritative source-document linkage.
+
+The caller supplies a mandatory `TargetLoader`; the verifier does not return a
+copy of GFB1 bytes until that loader returns `Ok(true)`. `VerifiedPackage`
+returns detached source, manifest, source map and bytecode copies, together with
+the accepted signing key IDs.
+
+The native v1 slice intentionally does **not** duplicate the compiler-owned deep
+semantic validation of `sourceMap.traceMetadata`. That validation remains in the
+existing JS common verifier and is covered by the trusted package builder's
+fresh deterministic compiler replay before signing. Native verification does not
+accept raw GFB or a legacy fallback, and it never treats a caller-provided
+attestation as a trust authority.
+
+The current native crate targets Rust `std`, including the ESP-IDF Rust runtime
+used by Farm Device; a separate `no_std` package stack is not part of the
+Waveshare target. `VerifierLimits` bounds transport, signed payload, artifacts,
+signatures, capabilities and JSON depth. The Device consumer must select a
+device-sized profile, stage transport bytes outside the active program slot and
+invoke this verifier before atomic activation. Host verification alone is not
+evidence of MCU activation, relay operation or physical load movement.
