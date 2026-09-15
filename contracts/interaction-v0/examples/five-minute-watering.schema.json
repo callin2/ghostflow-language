@@ -1,0 +1,63 @@
+{
+  "format": "GhostFlow/interaction-schema-v0",
+  "version": "0.1",
+  "module": {
+    "id": "FiveMinuteWatering",
+    "moduleFingerprint": "b97f6afadf52d4ba",
+    "bytecodeSha256": "1731ed04a86f63f840a78cab0a0f17eb02ea76ee724c038ce1e35b97b0ec1416"
+  },
+  "source": {
+    "documentId": "source.fixture-five-minute-watering",
+    "revisionId": "revision.fixture-five-minute-watering-v0",
+    "format": "GhostFlow/source-document-v1",
+    "kind": "literate",
+    "sha256": "7eb5baa44b13ec059b1f50d63b589ab08674715ab3eb243d307aebadeda68fd9"
+  },
+  "descriptors": [
+    {
+      "id": "state.pressure",
+      "name": "pressure",
+      "kind": "state",
+      "sourceType": { "kind": "builtin", "name": "Number", "unit": null },
+      "access": ["read"],
+      "provenance": {
+        "sourceNode": { "id": 6, "kind": "state" },
+        "intentAnchorIds": ["GF-INT-FIXTURE-WATERING-V0"]
+      }
+    },
+    {
+      "id": "state.moisture",
+      "name": "moisture",
+      "kind": "state",
+      "sourceType": { "kind": "nominal", "name": "Percent", "unit": "percent" },
+      "access": ["read"],
+      "provenance": {
+        "sourceNode": { "id": 8, "kind": "state" },
+        "intentAnchorIds": ["GF-INT-FIXTURE-WATERING-V0"]
+      }
+    },
+    {
+      "id": "state.watering",
+      "name": "watering",
+      "kind": "state",
+      "sourceType": { "kind": "builtin", "name": "Bool", "unit": null },
+      "access": ["read"],
+      "provenance": {
+        "sourceNode": { "id": 10, "kind": "state" },
+        "intentAnchorIds": ["GF-INT-FIXTURE-WATERING-V0"]
+      }
+    },
+    {
+      "id": "timer.age",
+      "name": "age",
+      "kind": "timer",
+      "sourceType": { "kind": "builtin", "name": "Duration", "unit": "ms" },
+      "access": ["read"],
+      "operation": { "kind": "elapsed_since_change", "subjectId": "state.watering" },
+      "provenance": {
+        "sourceNode": { "id": 13, "kind": "timer" },
+        "intentAnchorIds": ["GF-INT-FIXTURE-WATERING-V0"]
+      }
+    }
+  ]
+}
