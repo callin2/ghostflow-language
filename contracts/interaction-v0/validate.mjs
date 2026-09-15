@@ -14,7 +14,6 @@ const BUILTIN_TYPES = new Map([
   ['Number', null],
   ['Duration', 'ms'],
 ]);
-const ACCESS = new Set(['read', 'write', 'execute']);
 const OBSERVATION_STATUS = new Set(['ready', 'unavailable', 'error']);
 
 function object(value) {
@@ -67,7 +66,7 @@ function sourceIdentity(value, path, errors) {
   publicId(value.documentId, `${path}.documentId`, errors);
   publicId(value.revisionId, `${path}.revisionId`, errors);
   if (value.format !== 'GhostFlow/source-document-v1') issue(errors, `${path}.format`, 'format', 'must be GhostFlow/source-document-v1');
-  if (value.kind !== 'literate' && value.kind !== 'plain') issue(errors, `${path}.kind`, 'source_kind', 'must be literate or plain');
+  if (value.kind !== 'literate') issue(errors, `${path}.kind`, 'source_kind', 'must be literate in the canonical product contract');
   sha256(value.sha256, `${path}.sha256`, errors);
 }
 
@@ -117,14 +116,8 @@ function descriptor(value, index, errors) {
   publicId(value.name, `${path}.name`, errors);
   if (!['state', 'timer'].includes(value.kind)) issue(errors, `${path}.kind`, 'descriptor_kind', 'v0 supports state and timer only');
   sourceType(value.sourceType, `${path}.sourceType`, errors);
-  if (!Array.isArray(value.access) || value.access.length === 0) issue(errors, `${path}.access`, 'access', 'must be a non-empty array');
-  else {
-    const seen = new Set();
-    value.access.forEach((entry, position) => {
-      if (!ACCESS.has(entry)) issue(errors, `${path}.access[${position}]`, 'access', 'must be read, write, or execute');
-      if (seen.has(entry)) issue(errors, `${path}.access[${position}]`, 'duplicate_access', 'must not repeat an access');
-      seen.add(entry);
-    });
+  if (!Array.isArray(value.access) || value.access.length !== 1 || value.access[0] !== 'read') {
+    issue(errors, `${path}.access`, 'access', 'must be exactly ["read"] for a v0 observation');
   }
   if (value.kind === 'timer') {
     if (exactObject(value.operation, ['kind', 'subjectId'], `${path}.operation`, errors)) {

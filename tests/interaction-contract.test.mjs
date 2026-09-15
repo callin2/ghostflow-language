@@ -151,6 +151,10 @@ test('GF-TEST-interaction-v0-rejection: rejects unknown fields, mismatched ident
   for (const kind of ['input', 'setting', 'command']) {
     expectInvalid((candidate) => { candidate.descriptors[0].kind = kind; }, 'descriptor_kind');
   }
+  expectInvalid((candidate) => { candidate.source.kind = 'plain'; }, 'source_kind');
+  for (const access of [['write'], ['execute'], ['read', 'write'], ['read', 'read']]) {
+    expectInvalid((candidate) => { candidate.descriptors[0].access = access; }, 'access');
+  }
   expectInvalid((candidate) => { candidate.descriptors[3].operation.subjectId = 'state.pressure'; }, 'timer_subject');
   expectInvalid((candidate) => { candidate.descriptors[3].operation.subjectId = 'timer.age'; }, 'timer_subject');
   expectInvalid((_schema, candidate) => { candidate.completion.kind = 'completed-tick'; }, 'completion');

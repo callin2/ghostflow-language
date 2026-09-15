@@ -38,10 +38,18 @@ lowercase SHA-256 of that revision's UTF-8 source bytes. Neither source identity
 is a path, so they support documents held in conversation or revision storage.
 The fixture's repository path belongs only to its test harness.
 
+`source.kind` is exactly `literate`. GhostFlow's canonical authored, reviewed,
+and versioned source is the literate document; this contract does not make a
+plain-code source a second product-authoring format. Legacy raw-code fixtures
+and import tooling remain outside this interaction contract.
+
 Every descriptor has a public stable authored `id` and `name`, a semantic
 `kind`, compiler/source semantic `sourceType`, explicit `access`, and
-provenance. v0 permits only `state` and `timer`; settings, commands, inputs,
-events, alarms, and explanations are later work owned by #70. `sourceType`
+provenance. v0 permits only `state` and `timer`, each with access exactly
+`["read"]`: both are observation-only internal values. Settings, commands,
+inputs, events, alarms, and explanations are later work owned by #70. This
+contract does not grant `write` or `execute` access before those designs exist.
+`sourceType`
 carries `builtin` `Bool`, `Number`, or `Duration`, or a named `nominal` type and
 semantic unit. Runtime JSON spelling never selects the type: `0` remains a
 `Number` or a `Duration` only because the static descriptor says which it is.
