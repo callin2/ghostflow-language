@@ -126,7 +126,9 @@ export function emitCompletedScanSnapshot({ compilation, schema, runId, completi
       || !Number.isSafeInteger(completion.logicalTimeMs) || completion.logicalTimeMs < 0) {
     throw new Error('interaction runtime snapshot: completion must be one non-negative completed scan');
   }
-  if (trace?.inputs?.__gf_now_ms !== completion.logicalTimeMs) {
+  const hasTimer = verifiedSchema.descriptors.some(descriptor => descriptor.kind === 'timer');
+  const hasTraceClock = object(trace?.inputs) && Object.hasOwn(trace.inputs, '__gf_now_ms');
+  if ((hasTimer || hasTraceClock) && trace?.inputs?.__gf_now_ms !== completion.logicalTimeMs) {
     throw new Error('interaction runtime snapshot: completed trace clock does not match completion');
   }
 

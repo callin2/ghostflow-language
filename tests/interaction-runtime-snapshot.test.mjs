@@ -298,6 +298,54 @@ test('GF-TEST-interaction-runtime-snapshot-statuses: false and zero are ready wh
   assert.equal(JSON.stringify(malformed).includes('__gf_'), false);
 });
 
+test('GF-TEST-interaction-runtime-snapshot-state-only: a completed state scan does not require a generated timer clock', async () => {
+  const source = `# State-only interaction fixture
+
+<!-- ghostflow:anchor id=GF-INT-FIXTURE-STATE-ONLY-V0 kind=intent status=unconfirmed origin=ai -->
+This fixture proves that an authored state remains observable without inventing a timer.
+
+\`\`\`ghost
+control StateOnly {
+  input enabled: Bool;
+  output active_output: Bool;
+
+  // ghostflow:link id=GF-INT-FIXTURE-STATE-ONLY-V0 relation=implements
+  state active: Bool = false;
+
+  active' = enabled;
+  active_output <- active';
+}
+\`\`\`
+`;
+  const artifact = await compileSource(source, {
+    filename: 'state-only.ghost.md',
+    interactionSourceIdentity: {
+      documentId: 'document.state-only',
+      revisionId: 'revision.state-only.1',
+    },
+  });
+  const scan = {
+    completion: { kind: 'completed-scan', scanId: 0, logicalTimeMs: 125 },
+    inputs: [{ name: 'enabled', value: true }],
+  };
+  const [outcome] = await wasmRun(artifact, [scan]);
+  assert.equal(Object.hasOwn(outcome.trace.inputs, '__gf_now_ms'), false);
+
+  const snapshot = emitCompletedScanSnapshot({
+    compilation: artifact,
+    runId: 'run.state-only.1',
+    completion: scan.completion,
+    trace: outcome.trace,
+  });
+  assert.deepEqual(snapshot.observations, [
+    { descriptorId: 'state.active', status: 'ready', value: true },
+  ]);
+  assert.deepEqual(joinRuntimeSnapshot(artifact.interactionSchema, snapshot,
+    expectedRuntimeIdentity(artifact.interactionSchema, 'run.state-only.1')), {
+    status: 'ready', staleReasons: [],
+  });
+});
+
 test('GF-TEST-interaction-runtime-snapshot-fail-closed: producer rejects schema or trace identity drift without exposing generated storage', async () => {
   const fixture = corpus.cases[0];
   const artifact = await compileFixture(fixture);
@@ -318,4 +366,10 @@ test('GF-TEST-interaction-runtime-snapshot-fail-closed: producer rejects schema 
     assert.equal(error.message.includes('__gf_'), false);
     return true;
   });
+  const missingTimerClock = structuredClone(outcome.trace);
+  delete missingTimerClock.inputs.__gf_now_ms;
+  assert.throws(() => emitCompletedScanSnapshot({ ...request, trace: missingTimerClock }), /completed trace clock does not match completion/);
+  const mismatchedTimerClock = structuredClone(outcome.trace);
+  mismatchedTimerClock.inputs.__gf_now_ms += 1;
+  assert.throws(() => emitCompletedScanSnapshot({ ...request, trace: mismatchedTimerClock }), /completed trace clock does not match completion/);
 });
