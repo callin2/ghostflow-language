@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
-members = ["crates/ghostflow-core", "runtimes/wasm"]
-default-members = ["crates/ghostflow-core", "runtimes/wasm"]
+members = ["crates/ghostflow-core", "crates/ghostflow-package", "runtimes/wasm"]
+default-members = ["crates/ghostflow-core", "crates/ghostflow-package", "runtimes/wasm"]
 
 [profile.release]
 opt-level = "z"
