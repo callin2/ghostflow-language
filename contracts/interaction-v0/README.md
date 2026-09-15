@@ -89,6 +89,11 @@ source can restart at `scanId: 0`. `completion` provides a non-negative
 `scanId` and logical milliseconds. A snapshot must have exactly one observation
 for every descriptor, including an explicit `unavailable` observation when no
 value exists; omission is invalid. v0 does not define a distinct tick identity.
+The framed host owns that completion identity. A control with a timer also has
+the compiler-generated private clock in its completed trace, and the producer
+requires that clock to equal `completion.logicalTimeMs`. A state-only control
+does not acquire a generated timer clock merely for observation; its completed
+frame remains sufficient, and no public or private timer is invented.
 
 Per-observation payload statuses are intentionally minimal:
 
