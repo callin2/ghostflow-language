@@ -2,8 +2,10 @@
 
 This contract is a renderer-neutral **host software** boundary for
 `GF-IR-1`/TASK-121.1. It defines static semantic descriptors separately from
-one completed runtime observation. It neither emits compiler metadata nor
-collects a runtime trace. Those producers are later implementation work.
+one completed runtime observation. Compiler emission is implemented by #71;
+#72 projects only already-completed native or WASM traces through
+`tools/interaction-runtime-snapshot.mjs`. That adapter never evaluates a scan,
+performs I/O, or changes requested/safe outputs.
 
 `GhostFlow/interaction-schema-v0` and `GhostFlow/runtime-snapshot-v0` each
 carry their own `version`. The version is a compatibility label, not an exact
@@ -59,7 +61,9 @@ least one literate intent anchor. The descriptor ID/name and anchor IDs are
 public and reject the reserved `__gf_` prefix; source-map node IDs are numeric
 compiler provenance, never generated VM-slot names. The fixture test verifies
 that each recorded node/kind and anchor link exists for this exact source
-revision. Compiler emission of descriptors remains later work.
+revision. Compiler emission of descriptors is implemented by #71. Runtime
+projection reconstructs and verifies that exact schema from the compiled
+canonical literate artifact before it emits a public snapshot.
 
 `timer.age` demonstrates `elapsed(watering)` as:
 
@@ -146,10 +150,14 @@ snapshot, or GFB files, are derived projections; the literate document remains
 the only canonical control source. The second program intentionally has no
 hand-maintained plain `.ghost` counterpart or fabricated runtime snapshot.
 
-These are host-side compile and corpus-integrity checks. They do not claim
-native/WASM replay, browser acceptance, firmware execution, or physical-device
-behavior; runtime and cross-product consumption are verified by their assigned
-downstream tasks.
+`tests/interaction-runtime-snapshot.test.mjs` replays each exact corpus source
+and tape through the release native framed runner and the actual framed WASM
+ABI. It projects both completed traces and requires byte-for-byte equal public
+snapshots, including timer logical-clock values. It also compares disabled,
+read-every-scan, and delayed-consumer runs: observation may not alter committed
+state, requested outputs, or safe outputs. This is host-side native/WASM
+evidence only; it does not claim browser acceptance, firmware execution, or
+physical-device behavior.
 
 The v0 alternative rejected here is putting `stale` beside `ready` in an
 untrusted observation. That would make a producer's assertion substitute for a

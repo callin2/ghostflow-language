@@ -111,3 +111,18 @@ revision identity.
 Acceptance requires explicit first-pass and cascading violations, mutex and
 satisfied cases, source locations and exact native/WASM equality. A passing source
 map unit test alone cannot establish runtime observation correctness.
+
+## Interaction v0 completed snapshots
+
+`tools/interaction-runtime-snapshot.mjs` is the narrow #72 adapter from an
+already-completed runtime trace to `GhostFlow/runtime-snapshot-v0`. It rebuilds
+the schema from the exact canonical literate compilation, joins schema/module/
+source/run identities, and emits values only by authored Interaction descriptor
+ID. It may resolve generated timer storage internally through
+`observeRuntimeValues`, but generated slot names never leave this boundary.
+Missing values become explicit `unavailable`; malformed observable state becomes
+explicit `error`; `stale` remains a consumer-only expected-identity join result.
+
+The adapter does not call `tick`, mutate a runtime, send commands, or apply
+outputs. Its native/WASM corpus test compares disabled, eager, and delayed
+observation runs so this property is executable rather than documentary.
