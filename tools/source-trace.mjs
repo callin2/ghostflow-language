@@ -613,3 +613,69 @@ export function observeSourceTrace(metadata, trace) {
     dependencies: metadata.dependencies, bindings, constraints,
   };
 }
+
+function observedScalar(values, name) {
+  if (!object(values) || !Object.hasOwn(values, name)) return null;
+  const value = values[name];
+  return typeof value === 'boolean' || typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+/**
+ * Projects authored state and timer declarations into stable, public runtime
+ * values. Generated `__gf_` storage names stay an implementation detail: a
+ * consumer receives the authored timer name and its Duration in integer ms.
+ *
+ * This observes a completed scan. Missing fields remain missing; they are not
+ * replaced with plausible zero/false values.
+ */
+export function observeRuntimeValues(metadata, trace) {
+  if (metadata?.format !== 'GhostFlow/source-trace-v1' || trace?.module !== metadata.moduleFingerprint) {
+    throw new Error('source/trace module identity mismatch');
+  }
+  if (!Array.isArray(metadata.bindings)) throw new Error('source trace bindings are unavailable');
+
+  const values = [];
+  const stateNames = new Set();
+  const timers = new Map();
+  for (const binding of metadata.bindings) {
+    if (binding?.kind === 'state' && typeof binding.name === 'string'
+        && !binding.name.startsWith('__gf_') && !stateNames.has(binding.name)) {
+      stateNames.add(binding.name);
+      const value = observedScalar(trace.stateAfter, binding.name);
+      if (value !== null) values.push({
+        kind: 'state', name: binding.name,
+        valueType: typeof value === 'boolean' ? 'Bool' : 'Number', value,
+      });
+      continue;
+    }
+    if (binding?.kind !== 'timer' || !object(binding.generated)) continue;
+    const { declaration, role } = binding.generated;
+    if (typeof declaration !== 'string' || !['since', 'initialized'].includes(role)) {
+      throw new Error('generated timer binding metadata is invalid');
+    }
+    const timer = timers.get(declaration) ?? { nodeId: binding.nodeId, source: binding.source };
+    if (timer.nodeId !== binding.nodeId || Object.hasOwn(timer, role)) {
+      throw new Error(`generated timer binding pair mismatch for ${declaration}`);
+    }
+    timer[role] = binding.name;
+    timers.set(declaration, timer);
+  }
+
+  for (const [name, timer] of timers) {
+    if (typeof timer.since !== 'string' || typeof timer.initialized !== 'string') {
+      throw new Error(`generated timer binding pair mismatch for ${name}`);
+    }
+    const initialized = observedScalar(trace.stateAfter, timer.initialized);
+    const since = observedScalar(trace.stateAfter, timer.since);
+    const now = observedScalar(trace.inputs, '__gf_now_ms');
+    if (typeof initialized !== 'boolean' || typeof since !== 'number' || typeof now !== 'number') continue;
+    const value = initialized ? now - since : 0;
+    if (!Number.isSafeInteger(value) || value < 0) throw new Error(`timer ${name} observation is not a non-negative safe integer`);
+    values.push({ kind: 'timer', name, valueType: 'Duration', unit: 'ms', value });
+  }
+  return Object.freeze({
+    format: 'GhostFlow/runtime-values-v1',
+    moduleFingerprint: metadata.moduleFingerprint,
+    values: Object.freeze(values.map(value => Object.freeze(value))),
+  });
+}

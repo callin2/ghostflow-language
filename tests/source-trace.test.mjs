@@ -8,7 +8,7 @@ import test from 'node:test';
 import { compileControl } from '../tools/control.mjs';
 import { compileLessonBundle, canonicalLessonJson } from '../tools/lesson.mjs';
 import { compileSource } from '../tools/toolchain.mjs';
-import { observeSourceTrace } from '../tools/source-trace.mjs';
+import { observeRuntimeValues, observeSourceTrace } from '../tools/source-trace.mjs';
 import { GhostFlowRuntime } from '../runtimes/wasm/ghostflow-runtime.mjs';
 
 const root = path.resolve(new URL('..', import.meta.url).pathname);
@@ -220,6 +220,40 @@ test('each authored timer binds its two generated runtime states to the timer de
       { field: 'stateAfter', observed: true, value: true },
     ],
   ]);
+
+  assert.deepEqual(observeRuntimeValues(direct.traceMetadata, {
+    module: direct.traceMetadata.moduleFingerprint,
+    inputs: { __gf_now_ms: 301_000 },
+    stateAfter: { running: true, __gf_timer_since_age: 1000, __gf_timer_initialized_age: true },
+  }), {
+    format: 'GhostFlow/runtime-values-v1',
+    moduleFingerprint: direct.traceMetadata.moduleFingerprint,
+    values: [
+      { kind: 'state', name: 'running', valueType: 'Bool', value: true },
+      { kind: 'timer', name: 'age', valueType: 'Duration', unit: 'ms', value: 300_000 },
+    ],
+  });
+});
+
+test('runtime values preserve false and zero and never expose generated timer storage', async () => {
+  const direct = await compileSource(timerSource, { filename: 'timer-values.ghost' });
+  const trace = {
+    module: direct.traceMetadata.moduleFingerprint,
+    inputs: { __gf_now_ms: 0 },
+    stateAfter: { running: false, __gf_timer_since_age: 0, __gf_timer_initialized_age: true },
+  };
+  const observed = observeRuntimeValues(direct.traceMetadata, trace);
+  assert.deepEqual(observed.values, [
+    { kind: 'state', name: 'running', valueType: 'Bool', value: false },
+    { kind: 'timer', name: 'age', valueType: 'Duration', unit: 'ms', value: 0 },
+  ]);
+  assert.equal(JSON.stringify(observed).includes('__gf_'), false);
+
+  delete trace.stateAfter.__gf_timer_since_age;
+  assert.deepEqual(observeRuntimeValues(direct.traceMetadata, trace).values, [
+    { kind: 'state', name: 'running', valueType: 'Bool', value: false },
+  ]);
+  assert.throws(() => observeRuntimeValues(direct.traceMetadata, { ...trace, module: 'stale' }), /identity mismatch/);
 });
 
 test('source observations bind state, next, requested, safe, and exact safety outcomes', async t => {

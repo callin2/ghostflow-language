@@ -81,6 +81,21 @@ captured inside the existing fixed-point safety loop, before that round's update
 The prior requested/safe maps and fault strings retain their exact semantics.
 The snapshots observe the algorithm; they must not affect any output decision.
 
+## Public runtime values
+
+`observeRuntimeValues(metadata, trace)` projects completed-scan values from the
+same compiler-owned bindings. Its `GhostFlow/runtime-values-v1` result currently
+contains authored `state` values and authored `timer` values. Timer values use
+the source declaration name, `Duration`, and exact non-negative integer
+milliseconds; generated `__gf_` storage names never appear in the result.
+
+The helper calculates an elapsed timer only when the trace contains its clock,
+initialized flag, and start time. Missing fields remain absent instead of being
+fabricated as zero. It requires an exact module fingerprint match and does not
+infer counters from arbitrary numeric states. A future `Int`/counter language
+surface must extend this contract explicitly rather than relying on UI naming
+conventions.
+
 ## Joining and evidence
 
 The official `observeSourceTrace` helper requires matching module and safety
