@@ -48,3 +48,6 @@ partial `npm run test:node` requires existing WASM and both release native build
 API acceptance, genuine farmer-language evaluation, firmware compatibility,
 board upload, GPIO, wiring, and physical operation require separately identified
 consumer tests. Do not attach those claims to a successful host report here.
+
+For revision-addressed GitHub Actions handoffs and their consumer verification
+limits, see [WASM CI artifacts](WASM-CI-ARTIFACTS.md).
