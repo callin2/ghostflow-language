@@ -8,9 +8,11 @@ import { extractLiterate } from './literate.mjs';
 import { compileSource } from './toolchain.mjs';
 import { CURRICULUM_REPLAY_MANIFEST, prepareCurriculumReplays, verifyCurriculumReplayWasm } from './curriculum-replay.mjs';
 import { PC01_PROJECTION, verifyPc01Projection } from './generate-pc-01-projection.mjs';
+import { verificationSourceHashes } from './verification-sources.mjs';
 
 // Deliberately explicit. Product/LLM/device tests belong to other repositories.
 export const LANGUAGE_TESTS = Object.freeze([
+  'tests/verified-wasm-artifact.test.mjs',
   'tests/boundary-conformance.test.mjs',
   'tests/compiler.test.mjs',
   'tests/constraints.test.mjs',
@@ -226,29 +228,12 @@ async function verify(nodeOnly, curriculumOnly) {
     console.log(`PLC curriculum catalog: PASS ${lessons.length} lessons, ${replay.scenarios.length} replay scenarios (${report.plcCurriculum.catalogSha256})`);
   }
 
-  function hashSource(relative) {
-    const absolute = path.join(root, relative);
-    const stat = fs.lstatSync(absolute);
-    if (stat.isSymbolicLink()) throw new Error(`source symlink is outside the export contract: ${relative}`);
-    if (stat.isDirectory()) {
-      for (const name of fs.readdirSync(absolute).sort()) {
-        if (!['target', 'node_modules', 'build', '.git'].includes(name)) hashSource(`${relative}/${name}`);
-      }
-    } else if (stat.isFile()) {
-      report.sourceSha256[relative] = createHash('sha256').update(fs.readFileSync(absolute)).digest('hex');
-    }
-  }
-
   try {
     const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
     if (pkg.name !== 'ghostflow-language') throw new Error('run this verifier in the standalone ghostflow-language export');
     if (Number(process.versions.node.split('.')[0]) < 22) throw new Error('Node.js 22 or newer is required');
     if (process.platform === 'win32') throw new Error('retained native tutorial paths require a POSIX host (macOS/Linux)');
-    for (const relative of [
-      'tools', 'crates/ghostflow-core', 'runtimes/wasm', 'runtimes/node/ledger.mjs',
-      'tests', 'examples', 'docs', 'contracts/integration-v1', 'contracts/interaction-v0', 'contracts/requirements', 'README.md', 'AGENTS.md', '.gitignore',
-      'Cargo.toml', 'Cargo.lock', 'package.json', 'package-lock.json', 'Makefile',
-    ]) hashSource(relative);
+    report.sourceSha256 = verificationSourceHashes(root);
     for (const test of LANGUAGE_TESTS) {
       if (!fs.statSync(path.join(root, test)).isFile()) throw new Error(`missing language test: ${test}`);
     }
