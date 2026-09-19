@@ -1,5 +1,6 @@
 # PC-09 — 밸브·펌프 순차 급수
 
+<!-- ghostflow:anchor id=GF-INT-PC09-SEQUENTIAL-WATERING-V1 kind=intent status=confirmed origin=imported -->
 > 교육용 시나리오: 밸브가 열린 위치를 확인한 다음 펌프를 운전하고, 급수
 > 시간이 끝나면 펌프를 먼저 멈춘 뒤 밸브를 닫는다. 출력 명령과 장치의
 > 물리적 위치를 분리해 표현한다.
@@ -41,8 +42,11 @@ control SequentialWaterSupply {
   config watering_time: Duration = 5min;
 
   type Phase = Idle | Opening | Settling | Watering | PumpStopping | Closing | FeedbackFault | Interrupted;
+  // ghostflow:link id=GF-INT-PC09-SEQUENTIAL-WATERING-V1 relation=implements
   state phase: Phase = Idle;
+  // ghostflow:link id=GF-INT-PC09-SEQUENTIAL-WATERING-V1 relation=implements
   state request_armed: Bool = false;
+  // ghostflow:link id=GF-INT-PC09-SEQUENTIAL-WATERING-V1 relation=implements
   timer age = elapsed(phase);
 
   let permit = stop_ok && overload_ok;

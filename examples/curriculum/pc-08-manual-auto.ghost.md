@@ -1,5 +1,6 @@
 # PC-08 — 수동·자동 운전 모드와 공통 허가
 
+<!-- ghostflow:anchor id=GF-INT-PC08-MANUAL-AUTO-REARM-V1 kind=intent status=confirmed origin=imported -->
 > 교육용 시나리오: 하나의 펌프를 수동 운전과 자동 운전으로 선택하고, 두
 > 모드에 공통으로 적용되는 정지·과부하 허가를 다룬다. 모드 전환이나 허가
 > 복구만으로 장비가 몰래 재기동하지 않도록, 새 운전 요청을 다시 확인한다.
@@ -41,10 +42,13 @@ control ManualAutoPump {
   output pump_contactor: Bool;
 
   type Mode = Off | Manual | Auto | ModeConflict;
+  // ghostflow:link id=GF-INT-PC08-MANUAL-AUTO-REARM-V1 relation=implements
   state mode: Mode = Off;
 
   type RunPhase = Stopped | Running;
+  // ghostflow:link id=GF-INT-PC08-MANUAL-AUTO-REARM-V1 relation=implements
   state run_phase: RunPhase = Stopped;
+  // ghostflow:link id=GF-INT-PC08-MANUAL-AUTO-REARM-V1 relation=implements
   state request_armed: Bool = false;
 
   let permit = stop_ok && overload_ok;

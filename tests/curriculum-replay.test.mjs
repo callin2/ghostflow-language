@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { compileSource } from '../tools/toolchain.mjs';
 import {
   CURRICULUM_REPLAY_IDS,
   prepareCurriculumReplays,
@@ -40,6 +41,25 @@ test('PC-01 projection verifier fails after an unregenerated canonical book revi
     assert.throws(() => verifyPc01Projection({ repositoryRoot }), /stale generated PC-01 projection/);
   } finally {
     fs.rmSync(repositoryRoot, { recursive: true });
+  }
+});
+
+test('all ten canonical curriculum sources emit a source-identified interaction schema with declared-state provenance', async () => {
+  const catalog = JSON.parse(fs.readFileSync(new URL('../examples/curriculum/catalog.json', import.meta.url), 'utf8'));
+  assert.equal(catalog.lessons.length, 10);
+  for (const lesson of catalog.lessons) {
+    const relative = lesson.id === 'PC-01' ? lesson.source.generatedPath : lesson.source.path;
+    const compilation = await compileSource(fs.readFileSync(new URL(`../${relative}`, import.meta.url), 'utf8'), {
+      filename: relative,
+      interactionSourceIdentity: {
+        documentId: `curriculum.${lesson.id.toLowerCase()}`,
+        revisionId: 'revision.curriculum-intent-anchors-v1',
+      },
+    });
+    assert.equal(compilation.interactionSchema.source.documentId, `curriculum.${lesson.id.toLowerCase()}`);
+    for (const descriptor of compilation.interactionSchema.descriptors) {
+      assert.ok(descriptor.provenance.intentAnchorIds.length > 0, `${lesson.id} ${descriptor.id} has intent provenance`);
+    }
   }
 });
 

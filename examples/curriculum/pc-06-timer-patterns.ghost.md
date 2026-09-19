@@ -1,5 +1,6 @@
 # PC-06 — 유지 요청과 독립 타이머 패턴
 
+<!-- ghostflow:anchor id=GF-INT-PC06-INDEPENDENT-TIMERS-V1 kind=intent status=confirmed origin=imported -->
 > 교육용 시나리오: 하나의 제어함에서 지연 ON, 지연 OFF, 최대 운전시간을
 > 함께 다루는 방법을 학습한다. 같은 입력을 여러 번 읽는 유지 수요와,
 > 한 번의 버튼 변화로 시작하는 momentary START 사건을 구별하는 예제다.
@@ -27,15 +28,21 @@ control TimerPatterns {
   config max_run: Duration = 10s;
 
   type OnPhase = OnIdle | OnWaiting | OnActive;
+  // ghostflow:link id=GF-INT-PC06-INDEPENDENT-TIMERS-V1 relation=implements
   state on_phase: OnPhase = OnIdle;
+  // ghostflow:link id=GF-INT-PC06-INDEPENDENT-TIMERS-V1 relation=implements
   timer on_age = elapsed(on_phase);
 
   type OffPhase = OffIdle | OffActive | OffHolding;
+  // ghostflow:link id=GF-INT-PC06-INDEPENDENT-TIMERS-V1 relation=implements
   state off_phase: OffPhase = OffIdle;
+  // ghostflow:link id=GF-INT-PC06-INDEPENDENT-TIMERS-V1 relation=implements
   timer off_age = elapsed(off_phase);
 
   type LimitPhase = LimitIdle | LimitRunning | LimitReached;
+  // ghostflow:link id=GF-INT-PC06-INDEPENDENT-TIMERS-V1 relation=implements
   state limit_phase: LimitPhase = LimitIdle;
+  // ghostflow:link id=GF-INT-PC06-INDEPENDENT-TIMERS-V1 relation=implements
   timer limit_age = elapsed(limit_phase);
 
   on_phase' = case on_phase {

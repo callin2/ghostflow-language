@@ -1,5 +1,6 @@
 # PC-07 — 탱크 수위 두 점 제어와 충돌 안전
 
+<!-- ghostflow:anchor id=GF-INT-PC07-TANK-HYSTERESIS-V1 kind=intent status=confirmed origin=imported -->
 > 교육용 시나리오: PLC 대체 교육과정의 상·하한 수위 제어를 두 개의
 > 디지털 수위 스위치와 명시적인 상태 전이로 학습하기 위한 예제다. 실제
 > 사용자 발화를 그대로 인용한 문서가 아니다.
@@ -25,6 +26,7 @@ control TankLevelHysteresis {
   output fill_pump: Bool;
 
   type Phase = Idle | Filling | SensorConflict;
+  // ghostflow:link id=GF-INT-PC07-TANK-HYSTERESIS-V1 relation=implements
   state phase: Phase = Idle;
 
   let conflict = high_level_reached && !low_level_reached;

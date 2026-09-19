@@ -1,5 +1,6 @@
 # PC-02 — START / STOP 자기유지와 새 시작 허가
 
+<!-- ghostflow:anchor id=GF-INT-PC02-START-STOP-REARM-V1 kind=intent status=confirmed origin=imported -->
 > 학습 시나리오: START를 눌러 운전을 시작하고, STOP이 들어오면 즉시
 > 멈춘다. STOP에서 복귀할 때 START를 계속 누르고 있더라도, START를
 > 놓았다가 다시 눌러야 재시작한다.
@@ -17,7 +18,9 @@ control StartStopPump {
   input start, stop_ok: Bool;
   output valve, pump: Bool;
 
+  // ghostflow:link id=GF-INT-PC02-START-STOP-REARM-V1 relation=implements
   state armed: Bool = false;
+  // ghostflow:link id=GF-INT-PC02-START-STOP-REARM-V1 relation=implements
   state running: Bool = false;
 
   let start_event = armed && start;

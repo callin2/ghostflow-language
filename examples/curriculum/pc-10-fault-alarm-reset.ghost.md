@@ -1,5 +1,6 @@
 # PC-10 — Fault·Alarm·Reset이 있는 순차 급수
 
+<!-- ghostflow:anchor id=GF-INT-PC10-FAULT-ALARM-RESET-V1 kind=intent status=confirmed origin=imported -->
 > 교육용 시나리오: 밸브를 열고 확인한 뒤 펌프를 운전한다. 정상 STOP은
 > 비고장 정지지만, 비상정지 관측·과부하·센서 모순·피드백 상실·구동 불가·
 > 이동 timeout은 원인을 붙잡아 두고 안전하게 멈춘다. 저수원은 예외적으로
@@ -89,10 +90,15 @@ control FaultAlarmResetWaterSupply {
   type FaultCause = None | EmergencyStop | Overload | LowSourceWater |
     ValveDriveUnavailable | SensorConflict | FeedbackLost | OpenTimeout | CloseTimeout;
 
+  // ghostflow:link id=GF-INT-PC10-FAULT-ALARM-RESET-V1 relation=implements
   state phase: Phase = Idle;
+  // ghostflow:link id=GF-INT-PC10-FAULT-ALARM-RESET-V1 relation=implements
   state fault_cause: FaultCause = None;
+  // ghostflow:link id=GF-INT-PC10-FAULT-ALARM-RESET-V1 relation=implements
   state request_armed: Bool = false;
+  // ghostflow:link id=GF-INT-PC10-FAULT-ALARM-RESET-V1 relation=implements
   state reset_armed: Bool = false;
+  // ghostflow:link id=GF-INT-PC10-FAULT-ALARM-RESET-V1 relation=implements
   timer age = elapsed(phase);
 
   let normal_permit = stop_ok && emergency_stop_ok && overload_ok && source_water_ok && valve_drive_ok;

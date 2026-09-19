@@ -1,5 +1,6 @@
 # PC-05 — 리미트 피드백과 밸브 방향전환
 
+<!-- ghostflow:anchor id=GF-INT-PC05-LIMIT-FEEDBACK-V1 kind=intent status=confirmed origin=imported -->
 > 교육용 시나리오: 사용자가 제공한 PLC 대체 교육과정의 리미트 스위치 단계를
 > 바탕으로 만든 학습 시나리오다. 직접 사용자 발화를 그대로 인용한 문서가 아니다.
 
@@ -23,8 +24,11 @@ control LimitFeedbackValve {
   config reversal_wait: Duration = 2s;
 
   type Phase = Stopped | Closed | Opening | Open | Closing | WaitOpen | WaitClose | SensorConflict;
+  // ghostflow:link id=GF-INT-PC05-LIMIT-FEEDBACK-V1 relation=implements
   state phase: Phase = Stopped;
+  // ghostflow:link id=GF-INT-PC05-LIMIT-FEEDBACK-V1 relation=implements
   state request_armed: Bool = false;
+  // ghostflow:link id=GF-INT-PC05-LIMIT-FEEDBACK-V1 relation=implements
   timer age = elapsed(phase);
 
   let permit = stop_ok && overload_ok;
