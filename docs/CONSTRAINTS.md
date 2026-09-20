@@ -16,7 +16,9 @@ lowerer다. 전체 DSL을 지원하는
 
 - 같은 관수 설비의 자동 운전, 수동 운전, 설정 모드는 서로 배타적이다.
 - 자동↔수동, 운전→설정 전환에는 사용자의 명시적 정지와 정지 완료가 필요하다.
-- 운전 조건의 적용은 정지한 설정 모드에서만 허용한다.
+- 운전 조건의 적용은 하나의 원자적 live 속성 이벤트로 한다 (목표 계약 — 미구현;
+  아래 「예제: 운전 설정 적용 — stopped 정책(구현)과 live 속성 이벤트」 참조).
+  [2026-09-20 개정: 「정지한 설정 모드에서만 허용한다」는 기존 결정을 #110에 따라 교체했다.]
 - 인터록, 동시에 열 수 있는 밸브 수, 설비 용량, 일일 운전 시간 등을 공통 제약으로
   선언한다. 개별 control을 추가해도 설비 전체 제약은 계속 적용한다.
 - 센서 노이즈와 데이터 단절 처리를 이름 있는, 자원이 제한된 신호 연산으로 제공한다.
@@ -44,6 +46,7 @@ constraints StationRules {
   allow enter(Auto, Manual, Configure)
     only when mode == Stopped && stopped(station);
 
+  // 현재 구현된 적용 정책 (lowerer 규칙: configureOnly); 목표 live 계약은 아래 절 참조
   allow apply(settings)
     only when mode == Configure && stopped(station);
 
@@ -176,18 +179,18 @@ VerifiedStop을 요구할 수 있다. 초기 안전 출력 순서·대기 값은
 허가 시 맞지 않으면 거부하고 자동으로 새 의미에 재해석하지 않는다. 이 revision은
 실제 사용량/중복 방지 원장의 초기화 키가 아니다.
 
-### 예제: 운전 설정은 정지한 설정 모드에서만 적용
+### 예제: 운전 설정 적용 — stopped 정책(구현)과 live 속성 이벤트(목표 계약, 미구현)
 
 다음 두 선언은 같은 설비 구성의 일부다. `settings`는 water1_time을 포함한 설정
 revision, `mode`와 `station`은 설비 관리자가 제공하는 이름이다.
 
 ```ghost
-// control 내부의 운전 설정 선언
-config water1_time: Duration = 5min;
+// control 내부의 운전 설정 선언 (속성 문법은 현재 컴파일러가 수용하는 형식)
+config water1_time: Duration = 5min { min = 1min; max = 30min; step = 1min; access = operator; apply = stopped; }
 ```
 
 ```ghost
-// 위 control이 사용하는 설비의 공통 규칙
+// 위 control이 사용하는 설비의 공통 규칙 (현재 구현된 stopped 정책)
 constraints EditInterlock {
   exclusive(automatic, manual, configuring);
 
@@ -199,9 +202,63 @@ constraints EditInterlock {
 }
 ```
 
-Auto 운전 중 5min을 8min으로 편집해도 활성 설정은 5min이다. 적용 요청은 거부한다.
-사용자가 정지하고 정리 절차가 끝난 뒤 Configure로 들어가면 후보 8min을 검증·적용할
-수 있다. 설정 세션 종료 후에는 Stopped이며, 새 운전 요청 없이 자동 재시작하지 않는다.
+위 형태가 **현재 구현된** 적용 정책이다. lowerer의 `configureOnly` 규칙은 조건을
+`mode == Configure && stopped(station)`로 고정한다. Auto 운전 중 5min을 8min으로
+편집해도 활성 설정은 5min이고 적용 요청은 거부한다. 사용자가 정지하고 정리 절차가
+끝난 뒤 Configure로 들어가면 후보 8min을 검증·적용할 수 있다.
+
+**목표 계약** ([language #89](https://github.com/callin2/ghostflow-language/issues/89)):
+동일한 canonical source와 동일한 compiled program/bytecode를 유지한 채,
+검증된 Settings Snapshot만 바꿔 서로 다른 실행 결과를 얻는다. 설정 변경은
+**하나의 원자적 live 속성 이벤트**로 들어온다.
+
+```ghost-draft
+// 목표 계약 (미구현): lowerer가 아직 수용하지 않는 설계 예제
+constraints EditInterlockLive {
+  allow enter(Auto, Manual, Configure)
+    only when mode == Stopped && stopped(station);
+
+  allow apply(settings)
+    only when settings.valid;
+}
+```
+
+- **원자적**: 이벤트는 선언된 설정 필드의 (name, value) 배치 전체를 운반한다.
+  `settings.valid`는 배치 전체를 적용 전에 검증하는 술어다(알려진 필드, 타입,
+  min/max/step 범위, source identity). 유효하면 배치 전체가 하나의 커밋으로
+  활성 snapshot에 적용되고, 무효하면 **아무것도 바뀌지 않는다** — 활성
+  snapshot은 그대로, 부분 적용이 없고, 거부 사유만 기록된다.
+- **프로그램 동일성 보존**: canonical source digest와 compiled program/bytecode
+  digest가 그대로다. snapshot은 프로그램이 아니라 프로그램 위에 오버레이되는
+  값이다. 재컴파일이 없다.
+- **run 동일성 보존**: 이벤트는 설비를 정지하지 않고 새 run을 요구하지 않는다.
+  진행 중 run은 같은 run identity로 계속되고, 교체된 snapshot은 커밋 이후의
+  다음 step boundary에서 평가에 보인다(평가 도중에 읽지 않는다).
+
+예: Auto 운전 중 5min → 8min 배치 이벤트가 오면, 8min이 선언된 범위·간격·
+source identity를 만족하면 배치 전체가 원자적으로 커밋되고 같은 run이 계속된다.
+배치가 무효하면 활성 설정은 5min 그대로이고 거부 사유만 기록된다.
+
+**미구현 표시**: 현재 구현된 적용 경로는 manifest 속성 `apply = stopped`,
+`configureOnly` 규칙, 그리고 source-edit 후보 워크플로(`tools/operating-settings.mjs`의
+`createOperatingSettingsCandidate`: config 리터럴 수정 → 재컴파일 → 새 revision
+교체)다. live 속성 이벤트는 목표 계약이며 아직 구현되지 않았다;
+GFB/manifest/constraints 스키마에는 live apply 정책 값이 없다.
+
+연구 출처(수정된): [language #89](https://github.com/callin2/ghostflow-language/issues/89),
+[system #54](https://github.com/callin2/farm_studio_system/issues/54).
+
+**남은 명세 충돌(식별됨)**:
+1. `tools/constraints.mjs` lowerer는 apply 조건을 고정한다: `allow apply(settings)`
+   는 정확히 `only when mode == Configure && stopped(station)`이어야 한다
+   (규칙 kind `configureOnly`, constraints-v1). live 규칙 kind가 없다.
+2. compiler의 manifest `apply = stopped` 속성과 host의 `acceptSettings` 경로는
+   stopped 정책을 인코딩한다 — GFB/manifest 스키마에 live 정책 값이 없다.
+3. `createOperatingSettingsCandidate`는 source-edit 워크플로(새 source, 새 GFB)
+   를 구현한다 — 현재 유일한 적용 경로다.
+4. 물리적 정지 의미(CommandedStop/VerifiedStop, 모드 진입 인터록)는 별개이며
+   그대로 유효하다 — 모드 전환은 여전히 stopped를 요구한다. 바뀌는 것은
+   *설정 적용*뿐이다.
 
 ## 장치 부가정보는 optional
 
@@ -255,7 +312,8 @@ constraints CapacityAdvice {
 어느 경우에도 장치 정보를 입력했다는 사실만으로 기본 규칙이 자동 강화되지는 않는다.
 
 부가정보를 입력하거나 장치를 발견했다고 필수 운전 조건을 자동 추가하지 않는다.
-필수 규칙으로 승격하는 것은 명시적인 설정 변경이며 정지한 설정 모드에서 적용한다.
+필수 규칙으로 승격하는 것은 명시적인 설정 변경이며 하나의 원자적 live 속성
+이벤트로 적용한다(목표 계약 — 미구현; 위 「예제: 운전 설정 적용」 참조).
 이미 활성화한 필수 규칙이 필요로 하는 정보를 제거하는 경우에는 해당 규칙도 함께
 수정하거나 제거해 검증해야 한다. 정보가 사라졌다는 이유로 필수 규칙을 몰래 해제하지 않는다.
 

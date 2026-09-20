@@ -85,6 +85,51 @@ Windows breakdown (this box — all gates individually verified green):
   failing-adjacent filenames contain 'wasm' (solar-scanframe-native-wasm) and
   the first sweep missed the scan_adapter site because of it.
 
+## M-110: correct the outdated stopped/new-run settings requirements (in progress)
+- Contract (doc-only, no code): in `docs/CONSTRAINTS.md` replace the
+  stopped/new-run settings framing with the #89 atomic live-property event
+  contract: ONE atomic event carrying a (name,value) batch of declared
+  config fields; whole-batch pre-validation (known name, type,
+  min/max/step, source identity); valid -> whole batch committed to the
+  active snapshot in one commit; invalid -> NOTHING changes (no partial
+  application, rejection reason recorded). Program identity preserved
+  (same canonical source digest + same compiled program/bytecode digest,
+  snapshot is an overlay, no recompile). Run identity preserved (no stop,
+  no new run; committed snapshot visible at the next step boundary after
+  commit, never mid-evaluation). Clearly marked NOT IMPLEMENTED (current:
+  manifest `apply = stopped` + source-edit candidate workflow). Link the
+  corrected research (#89 + farm_studio_system#54). Identify remaining
+  spec conflicts (manifest attribute / acceptSettings path, the
+  source-edit tool as the only implemented path, physical stop semantics
+  still valid for mode transitions).
+- 4 edit sites: line-19 user-decision bullet (revised WITH a dated note —
+  it is a recorded user decision), the StationRules sketch, the dedicated
+  section at 179-204 (restructured: implemented form + target contract),
+  line 258 (require-promotion sentence).
+- **KEY FINDING (oracle caught it, 3 red tests on first pass)**:
+  `tests/constraints.test.mjs` (a) carries an inline copy of the
+  StationRules sketch and (b) extracts EVERY ` ```ghost|text ` block starting
+  with `constraints` from docs/CONSTRAINTS.md and compiles it with the real
+  lowerer. `tools/constraints.mjs` HARD-CODES the apply condition: `allow
+  apply(settings)` must be exactly `only when mode == Configure &&
+  stopped(station)` (rule kind `configureOnly`, constraints-v1; the parser
+  error message says so verbatim). So the doc must keep the compilable
+  form in ghost/text fences, and the live form is shown in a `ghost-draft`
+  fence (outside the extractor's `ghost|text` alternation) labeled a
+  future design example — the doc's own header convention. Changing the
+  DSL = compiler change = out of scope for this doc issue (AGENTS.md:
+  compiler+runtime change together; new milestone if wanted).
+- Verified preconditions: the requirement catalog pins NO CONSTRAINTS.md
+  locators (no re-anchoring needed); the config attribute syntax shown in
+  the example is compiler-accepted (tests/operating-settings.test.mjs
+  compiles exactly that form); the doc header already labels future design
+  examples as such.
+- Oracle (re-run, never assert): full 40-file node suite (expect 377/377,
+  incl. the catalog validator) + `cargo test --locked --offline
+  --workspace` (71/71; doc-only change but re-run per discipline).
+- Delivery: branch `issue-110-live-settings-doc` -> PR to **dev** (NOT
+  main — established this session), body references #110.
+
 ## Backlog (unranked — user picks the task)
 - Guard relaxation (line 235) for end-to-end `npm test` on Windows — one-line
   contract change, now evidence-backed
