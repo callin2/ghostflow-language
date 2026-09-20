@@ -15,7 +15,7 @@ import { runStationDemo } from './station-demo.mjs';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const build = path.join(root, 'build/tutorial');
 const wasmFile = path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm');
-const native = path.join(root, 'target/debug/examples/run');
+const native = path.join(root, 'target/debug/examples/run' + (process.platform === 'win32' ? '.exe' : ''));
 function run(command, args) {
   const result = spawnSync(command, args, { cwd: root, encoding: 'utf8', maxBuffer: 8 * 1024 * 1024, timeout: 120_000 });
   if (result.status !== 0) throw new Error(`${command} ${args.join(' ')} failed\n${result.stderr}\n${result.stdout}`, { cause: result.error });

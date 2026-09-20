@@ -2,12 +2,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { interactionSchemaSha256 } from '../contracts/interaction-v0/validate.mjs';
 import { verifyInteractionCorpus } from '../contracts/interaction-v0/verify-corpus.mjs';
 import { compileSource, restoreArtifactSourceMap, writeArtifact } from '../tools/toolchain.mjs';
 
-const root = path.resolve(new URL('..', import.meta.url).pathname);
+const root = fileURLToPath(new URL('..', import.meta.url));
 const wateringPath = 'contracts/interaction-v0/examples/five-minute-watering.ghost.md';
 const multiplePath = 'contracts/interaction-v0/examples/multiple-values.ghost.md';
 const enumPhaseAgePath = 'contracts/interaction-v0/examples/enum-phase-age.ghost.md';

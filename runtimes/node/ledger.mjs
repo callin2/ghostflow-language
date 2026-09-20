@@ -14,10 +14,12 @@ function normalizedAbsolutePath(filename) {
 }
 
 /** Single-process, single-writer desktop reference storage, not ESP32 NVS.
- * A successful write means file fsync, atomic rename, and parent-directory
- * fsync completed. One process must own each normalized path; cross-process
- * ownership still requires an external storage owner. Filesystem/hardware
- * power-loss guarantees still apply.
+ * A successful write means file fsync, atomic rename, and (on POSIX hosts)
+ * parent-directory fsync completed. Windows rejects fsync on a directory
+ * fd (EPERM), so the directory sync is skipped there; the synced-file
+ * rename is the durability boundary on win32. One process must own each
+ * normalized path; cross-process ownership still requires an external
+ * storage owner. Filesystem/hardware power-loss guarantees still apply.
  */
 export class FileLedger {
   #filename;
@@ -73,8 +75,11 @@ export class FileLedger {
       await handle.writeFile(JSON.stringify({ format: FORMAT, sha256: sha256(copy), bytes: copy.toString('hex') }) + '\n');
       await handle.sync(); await handle.close(); handle = null;
       await rename(temporary, filename);
-      const parent = await open(directory, 'r');
-      try { await parent.sync(); } finally { await parent.close(); }
+      // POSIX durability idiom; Windows cannot fsync a directory fd (EPERM).
+      if (process.platform !== 'win32') {
+        const parent = await open(directory, 'r');
+        try { await parent.sync(); } finally { await parent.close(); }
+      }
       return true;
     } finally {
       try {
