@@ -18,6 +18,9 @@ lowerer다. 전체 DSL을 지원하는
 - 자동↔수동, 운전→설정 전환에는 사용자의 명시적 정지와 정지 완료가 필요하다.
 - 구조적 변경은 명시적 정지와 Configure 절차를 따른다. 제한된 runtime-adjustable 속성은
   아래의 운전 중 원자적 이벤트 계약을 따른다.
+- [2026-09-20 개정: 「모든 운전 조건 적용은 정지한 설정 모드에서만 허용한다」는 기존
+  결정을 #110에 따라 runtime-adjustable 속성 값에 한해 교체했다. 구조적 변경의 정지
+  및 Configure 절차는 유지한다.]
 - 인터록, 동시에 열 수 있는 밸브 수, 설비 용량, 일일 운전 시간 등을 공통 제약으로
   선언한다. 개별 control을 추가해도 설비 전체 제약은 계속 적용한다.
 - 센서 노이즈와 데이터 단절 처리를 이름 있는, 자원이 제한된 신호 연산으로 제공한다.
@@ -45,6 +48,7 @@ constraints StationRules {
   allow enter(Auto, Manual, Configure)
     only when mode == Stopped && stopped(station);
 
+  // 현재 구현된 적용 정책 (lowerer 규칙: configureOnly); 목표 live 계약은 아래 절 참조
   allow apply(settings)
     only when mode == Configure && stopped(station);
 
@@ -189,11 +193,18 @@ Runtime-adjustable 속성은 명시적으로 노출하기로 합의된 제한된
 ABI는 여기서 정하지 않으며 구체 메커니즘은 #89에서 다룬다. 예를 들어 급수 시간이나
 선언된 일정 interval 값은 속성일 수 있다. 기존 `config` 선언만으로는 노출·구현되지 않는다.
 Executable program/rules, 장치 binding/profile, dependency 또는 schedule structure 변경은
-구조적 변경이다. 일정에 속한다는 이유만으로 선언된 interval을 구조 변경으로 분류하지 않는다.
+구조적 변경이다. 일정에 속한다는 이유만으로 명시 노출된 interval 값을 구조 변경으로
+분류하지 않는다. 선택적 검사(check)를 필수화하는 것도 executable RULES를 바꾸므로
+구조적 변경이다. runtime-adjustable 속성 값만 live 적용 대상이며 bare config는 지원이 아니다.
 
 각 사용자 작업은 변경할 속성을 함께 담은 단일 논리 이벤트다. 전체 묶음을 검증하며,
 하나라도 무효이면 전부 거부하며 해당 이벤트로 인한 설정·상태·출력의 부분 변경은 없다.
-독립적인 운전 규칙 실행은 계속될 수 있다. 유효 이벤트는 활성 운전 중 처리될 때 적용한다.
+거부는 보통의 독립 운전 규칙 실행을 멈추지 않는다. 유효 이벤트는 활성 운전 중 처리될
+때 적용하며 다음 watering cycle/new run까지 지연시키지 않는다. 기존 snapshot은 한 평가에
+사용하며, 새 속성 값은 이벤트가 평가 경계에서 처리될 때 적용한다. 평가 중 snapshot을
+바꾸지 않는다. 기존 old/next snapshot 및 원자적 commit 규칙은 유지한다. 이벤트에서
+그 규칙으로의 정확한 매핑은 #89에서 정한다. 고정된 추가 대기나 다음 운전 cycle까지의
+지연은 요구하지 않는다.
 이를 임의의 program literal 변경으로 구현하지 않는다. 적용은 controller를 정지·재시작하거나
 source/bytecode를 재컴파일·갱신하거나 firmware를 갱신하지 않는다.
 기존 GhostFlow 규칙은 새 값을 읽어 이후 판단과 출력을 바꿀 수 있다. old/next snapshot,
@@ -210,19 +221,19 @@ candidate 계산 및 원자적 commit 규칙은 그대로 유지한다. 상태�
 전이, 사용량 원장 및 명시적 정지 절차는 계속 적용된다. ESP의 program/module 또는 firmware
 갱신은 그 ESP가 제어하는 모든 장치 작업을 정지시킨다.
 
-### 예제: 모드 전환과 구조적 설정 적용
+### 예제: 모드 전환과 stopped 설정 적용
 
 다음 두 선언은 같은 설비 구성의 일부다. `settings`는 구조적 구성 revision,
 `mode`와 `station`은 설비 관리자가 제공하는 이름이다. `config water1_time` 선언만으로
 해당 값이 runtime-adjustable로 노출되는 것은 아니다.
 
 ```ghost
-// control 내부의 운전 설정 선언
-config water1_time: Duration = 5min;
+// control 내부의 운전 설정 선언 (속성 문법은 현재 컴파일러가 수용하는 형식)
+config water1_time: Duration = 5min { min = 1min; max = 30min; step = 1min; access = operator; apply = stopped; }
 ```
 
 ```ghost
-// 위 control이 사용하는 설비의 공통 규칙
+// 위 control이 사용하는 설비의 공통 규칙 (현재 구현된 stopped 정책)
 constraints EditInterlock {
   exclusive(automatic, manual, configuring);
 
@@ -234,12 +245,75 @@ constraints EditInterlock {
 }
 ```
 
+위 형태가 **현재 구현된** 적용 정책이다. lowerer의 `configureOnly` 규칙은 조건을
+`mode == Configure && stopped(station)`로 고정한다. Auto 운전 중 5min을 8min으로
+편집해도 활성 설정은 5min이고 적용 요청은 거부한다. 사용자가 정지하고 정리 절차가
+끝난 뒤 Configure로 들어가면 후보 8min을 검증·적용할 수 있다.
+
+**목표 계약** ([language #89](https://github.com/callin2/ghostflow-language/issues/89)):
+동일한 canonical source와 동일한 compiled program/bytecode를 유지한 채,
+검증된 Settings Snapshot만 바꿔 서로 다른 실행 결과를 얻는다. 설정 변경은
+**하나의 원자적 live 속성 이벤트**로 들어온다.
+
+```ghost-draft
+// 비실행 설계 스케치: 미구현이며 채택된 syntax/API/ABI가 아니다.
+constraints EditInterlockLive {
+  allow enter(Auto, Manual, Configure)
+    only when mode == Stopped && stopped(station);
+
+  allow apply(settings)
+    only when settings.valid;
+}
+```
+
+- **원자적**: 이벤트는 명시적으로 선언·노출된 writable runtime-adjustable 속성의
+  (name, value) 배치 전체를 운반한다. bare config 및 읽기 전용 속성은 대상이 아니다.
+  `settings.valid`는 배치 전체를 적용 전에 검증하는 술어다(알려진 writable 속성,
+  접근 권한, 타입, min/max/step 범위, source identity). 유효하면 배치 전체가 하나의
+  커밋으로 활성 snapshot에 적용된다. 거부된 이벤트는 그 이벤트에 의한 어떠한 설정,
+  상태 또는 출력의 변경도 일으키지 않는다. 독립된 보통 운전 규칙 처리는 계속된다.
+- **프로그램 동일성 보존**: canonical source digest와 compiled program/bytecode
+  digest가 그대로다. snapshot은 프로그램이 아니라 프로그램 위에 오버레이되는
+  값이다. 재컴파일이 없다.
+- **run 동일성 보존**: 이벤트는 설비를 정지하지 않고 새 run을 요구하지 않는다.
+  진행 중 run은 같은 run identity로 계속되고, 교체된 snapshot은 이벤트 처리 경계에서
+  다음 평가에 보인다(평가 도중에 읽지 않는다). 다음 watering cycle까지 기다리지 않는다.
+
+예: Auto 운전 중 5min → 8min 배치 이벤트가 오면, 8min이 선언된 범위·간격·
+source identity를 만족하면 배치 전체가 원자적으로 커밋되고 같은 run이 계속된다.
+배치가 무효하면 활성 설정은 5min 그대로이고 거부 사유만 기록된다.
+
+**미구현 표시**: 현재 구현된 적용 경로는 manifest 속성 `apply = stopped`,
+`configureOnly` 규칙, 그리고 source-edit 후보 워크플로(`tools/operating-settings.mjs`의
+`createOperatingSettingsCandidate`: config 리터럴 수정 → 재컴파일 → 새 revision
+교체)다. live 속성 이벤트는 목표 계약이며 아직 구현되지 않았다;
+GFB/manifest/constraints 스키마에는 live apply 정책 값이 없다.
+
+연구 출처(수정된): [language #89](https://github.com/callin2/ghostflow-language/issues/89),
+[system #54](https://github.com/callin2/farm_studio_system/issues/54).
+
+**현재 구현과 목표 계약의 차이**:
+
+1. `tools/constraints.mjs` lowerer는 apply 조건을 고정한다: `allow apply(settings)`
+   는 정확히 `only when mode == Configure && stopped(station)`이어야 한다
+   (규칙 kind `configureOnly`, constraints-v1). live 규칙 kind가 없다.
+2. compiler는 manifest metadata에 `apply = stopped`만 허용하며 GFB/manifest 스키마에
+   live 정책 값이 없다. host의 `acceptSettings`는 control-v2 manifest format 수락
+   flag이며 Configure/lifecycle API나 stopped enforcement가 아니다.
+3. `createOperatingSettingsCandidate`는 source literal을 편집하고 재컴파일하는
+   워크플로다. 이는 같은 program에 값을 overlay하는 live 적용이 아니다. station의
+   `apply_config`는 별도의 정지한 Configure 경로다.
+4. 물리적 정지 의미(CommandedStop/VerifiedStop, 모드 진입 인터록)는 별개이며
+   그대로 유효하다 — 모드 전환은 여전히 stopped를 요구한다. 바뀌는 것은 runtime-adjustable
+   속성 값 적용뿐이다.
+
 이 stopped-only 규칙은 구조적 설정 적용 예이며 현재 station 경로의 제약이다. 별도로
 `water1_time`을 runtime-adjustable 속성으로 명시 노출한 설계라면, Auto 중 5min에서
 8min으로 바꾸는 한 사용자 작업은 하나의 이벤트로 검증·적용한다. 묶음에 무효 값이
 하나라도 있으면 이벤트 전체를 거부한다. 이는 승인된 규범 예시일 뿐 현재 `config`
 선언이나 구현이 제공하는 기능이 아니다. 구조적 변경은 정지하고 Configure에서 적용한 뒤,
-새 운전 요청을 받는다. 정지 후 자동 재시작하지 않는다.
+새 운전 요청을 받는다. 정지 후 자동 재시작하지 않는다. 구조적 변경에는 executable RULES의
+변경(예: 선택적 check를 필수화)도 포함된다.
 
 ## 장치 부가정보는 optional
 
@@ -293,7 +367,9 @@ constraints CapacityAdvice {
 어느 경우에도 장치 정보를 입력했다는 사실만으로 기본 규칙이 자동 강화되지는 않는다.
 
 부가정보를 입력하거나 장치를 발견했다고 필수 운전 조건을 자동 추가하지 않는다.
-필수 규칙으로 승격하는 것은 명시적인 설정 변경이며 정지한 설정 모드에서 적용한다.
+필수 규칙으로 승격하는 것은 executable RULES의 구조적 변경이다. 명시적으로 정지하고
+Configure 절차에서 변경·검증·적용해야 하며 runtime-adjustable 속성의 live 이벤트 대상이
+아니다.
 이미 활성화한 필수 규칙이 필요로 하는 정보를 제거하는 경우에는 해당 규칙도 함께
 수정하거나 제거해 검증해야 한다. 정보가 사라졌다는 이유로 필수 규칙을 몰래 해제하지 않는다.
 
