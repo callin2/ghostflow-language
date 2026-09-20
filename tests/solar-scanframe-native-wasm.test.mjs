@@ -3,14 +3,15 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { compileSource } from '../tools/toolchain.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 import { SolarSchedule } from '../runtimes/wasm/schedule.mjs';
 
-const root = path.resolve(new URL('..', import.meta.url).pathname);
+const root = fileURLToPath(new URL('..', import.meta.url));
 const wasmPath = path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm');
-const nativePath = path.join(root, 'target/release/examples/scan_adapter');
+const nativePath = path.join(root, 'target/release/examples/scan_adapter' + (process.platform === 'win32' ? '.exe' : ''));
 const sourcePath = path.join(root, 'examples/solar-watering.ghost.md');
 
 test('GF-TEST-solar-scanframe-native-wasm: actual Solar GFB replays one calendar tape across framed targets', async t => {

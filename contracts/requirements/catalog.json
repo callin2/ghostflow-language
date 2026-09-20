@@ -150,10 +150,7 @@
       "locator": {
         "path": "tests/output-conformance.test.mjs",
         "heading": "test('GF-TEST-output-native-wasm-differential: all 8DI vectors produce identical 8RO traces', async t =>",
-        "lines": [
-          41,
-          64
-        ],
+        "lines": [42,65],
         "sha256": "89aa0e2a70aae11f6369d7543fdceee5bb0cf673c65ca63ba0ad1f4ae266b0f4"
       },
       "selector": "native and release WASM produce identical eight-input/eight-output traces without pre-scan intent"
@@ -164,10 +161,7 @@
       "locator": {
         "path": "tests/runtime-conformance.test.mjs",
         "heading": "test('GF-TEST-snapshot-commit: old reads, explicit next reads, and untouched states', async t => {",
-        "lines": [
-          60,
-          82
-        ],
+        "lines": [61,83],
         "sha256": "e343ecf8e50a12b2fdf5c1148bd62fbbf199481615a80775247b06c5a906b17c"
       },
       "selector": "GF-TEST-snapshot-commit: old reads, explicit next reads, and untouched states"
@@ -178,10 +172,7 @@
       "locator": {
         "path": "tests/runtime-conformance.test.mjs",
         "heading": "for (const phase of ['transition', 'intent']) {",
-        "lines": [
-          84,
-          113
-        ],
+        "lines": [85,114],
         "sha256": "7b8d5b13405924c694effa5d3465c14a4d58bfd5ba97fdfe2014b2c5ee593849"
       },
       "selector": "native/release WASM transition and intent arithmetic failures preserve committed state, outputs, tick sequence and journal through recovery"
@@ -192,10 +183,7 @@
       "locator": {
         "path": "tests/runtime-conformance.test.mjs",
         "heading": "test('GF-TEST-generated-input-error: omitted generated clock rejects and recovers without defaults', async t => {",
-        "lines": [
-          115,
-          128
-        ],
+        "lines": [116,129],
         "sha256": "4747e523bd16c3f9d37a8a5a28fbdc4c15e453b15c434fb017d9ba6d407cf4ce"
       },
       "selector": "GF-TEST-generated-input-error: omitted generated clock rejects and recovers without defaults"
@@ -206,10 +194,7 @@
       "locator": {
         "path": "tests/runtime-conformance.test.mjs",
         "heading": "test('GF-TEST-safety-fixed-point: snapshot rounds are false-only and independent of constraint order', async t => {",
-        "lines": [
-          130,
-          145
-        ],
+        "lines": [131,146],
         "sha256": "fa041208405c0cdd51aee4f4106536680e7289996082aff108f64473c29d2415"
       },
       "selector": "GF-TEST-safety-fixed-point: snapshot rounds are false-only and independent of constraint order"
@@ -220,10 +205,7 @@
       "locator": {
         "path": "tests/runtime-conformance.test.mjs",
         "heading": "for (const [name, query, expected] of [",
-        "lines": [
-          147,
-          158
-        ],
+        "lines": [148,159],
         "sha256": "3bbd0ad6c54a8c72bdbf0b6bdd26cb3564205a6559b3a65dd6cdf2c31a6073e9"
       },
       "selector": "native/release WASM reject no strategy match and winning priority ties"
@@ -234,10 +216,7 @@
       "locator": {
         "path": "tests/runtime-conformance.test.mjs",
         "heading": "test('GF-TEST-load-error: every truncation and invalid format agree across targets', async t => {",
-        "lines": [
-          160,
-          173
-        ],
+        "lines": [161,174],
         "sha256": "04ec6b9b8d595b0af38fa44c118d37876f9795e884c5ca3db9969ff3b1ff3017"
       },
       "selector": "GF-TEST-load-error: every truncation and invalid format agree across targets"
@@ -248,10 +227,7 @@
       "locator": {
         "path": "tests/runtime-conformance.test.mjs",
         "heading": "test('GF-TEST-literate-runtime-equivalence: equivalent canonical literate documents deploy identical GFB and traces', async t => {",
-        "lines": [
-          175,
-          184
-        ],
+        "lines": [176,185],
         "sha256": "633b84bc5d12c46ee0757f4cca05a23e9f7988b18031ee3e83fd66d8ce0f029d"
       },
       "selector": "GF-TEST-literate-runtime-equivalence: equivalent canonical literate documents deploy identical GFB and traces"
@@ -262,10 +238,7 @@
       "locator": {
         "path": "tests/interaction-emission.test.mjs",
         "heading": "test('GF-TEST-interaction-emission-policy: product compilation is literate-only and identity is caller-supplied', async () => {",
-        "lines": [
-          64,
-          86
-        ],
+        "lines": [65,87],
         "sha256": "6f35522285ec4d6114ee75c603e7626ce38bfc18cb8c8e18fa7cc413d72fc845"
       },
       "selector": "GF-TEST-interaction-emission-policy: product compilation is literate-only and identity is caller-supplied"
@@ -276,10 +249,7 @@
       "locator": {
         "path": "tests/runtime-conformance.test.mjs",
         "heading": "test('GF-TEST-query-verifier: exact postfix errors and stack maximum across release targets', async t => {",
-        "lines": [
-          198,
-          215
-        ],
+        "lines": [199,216],
         "sha256": "8ea759ebfb56c2cd392a75a578aabd56584dacdffc4042dc985bc12e6a303340"
       },
       "selector": "GF-TEST-query-verifier: exact postfix errors and stack maximum across release targets"
@@ -290,10 +260,7 @@
       "locator": {
         "path": "tests/runtime-conformance.test.mjs",
         "heading": "test('GF-TEST-eager-if-error: unselected arithmetic branch still rejects without commit', async t => {",
-        "lines": [
-          217,
-          226
-        ],
+        "lines": [218,227],
         "sha256": "7feed8f5ae73b107ace0d1d08d9d5f32b54d8f53d7d4476e7695d5d23fe4be37"
       },
       "selector": "GF-TEST-eager-if-error: unselected arithmetic branch still rejects without commit"
@@ -304,10 +271,7 @@
       "locator": {
         "path": "tests/runtime-conformance.test.mjs",
         "heading": "test('GF-TEST-strategy-priority: only ties at the winning priority prevent activation', async t => {",
-        "lines": [
-          228,
-          236
-        ],
+        "lines": [229,237],
         "sha256": "ef318f93e8fb982b21ade82cdac612409ae5353d57230803d8f8844fe28fc0ee"
       },
       "selector": "GF-TEST-strategy-priority: only ties at the winning priority prevent activation"
