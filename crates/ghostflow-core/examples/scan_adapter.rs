@@ -59,6 +59,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     _ => return Err(format!("expected true/false for {name}").into()),
                 }),
                 Type::Number => Value::Number(raw.parse()?),
+                Type::Int => Value::Int(raw.parse()?),
             };
             inputs.push(ScanInput {
                 name: (*name).to_owned(),

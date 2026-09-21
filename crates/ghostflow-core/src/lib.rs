@@ -18,6 +18,7 @@ const MAX_MODULE_BYTES: usize = 1024 * 1024;
 pub enum Type {
     Bool = 1,
     Number = 2,
+    Int = 3,
 }
 
 impl Type {
@@ -34,6 +35,7 @@ impl Type {
 pub enum Value {
     Bool(bool),
     Number(f64),
+    Int(i32),
 }
 
 impl Value {
@@ -41,6 +43,7 @@ impl Value {
         match self {
             Self::Bool(_) => Type::Bool,
             Self::Number(_) => Type::Number,
+            Self::Int(_) => Type::Int,
         }
     }
 }
@@ -161,6 +164,7 @@ impl Module {
             let default = match value_type {
                 Type::Bool => Value::Bool(false),
                 Type::Number => Value::Number(0.0),
+                Type::Int => return Err(Error::new("unsupported GFB format")),
             };
             inputs.push(Field {
                 name,
@@ -188,6 +192,7 @@ impl Module {
                     _ => return Err(Error::new("invalid bool default")),
                 },
                 Type::Number => Value::Number(reader.f64()?),
+                Type::Int => return Err(Error::new("unsupported GFB format")),
             };
             states.push(Field {
                 name,
@@ -410,6 +415,7 @@ impl TickRecord {
                         let encoded = match value {
                             Value::Bool(v) => v.to_string(),
                             Value::Number(v) => v.to_string(),
+                            Value::Int(v) => v.to_string(),
                         };
                         format!("{}:{}", text(name), encoded)
                     })
@@ -988,8 +994,8 @@ fn verify_expression(
                     if a != b {
                         return Err(Error::new("eq types"));
                     }
-                } else if a != Type::Number || b != Type::Number {
-                    return Err(Error::new("number operands"));
+                } else if a != b || !matches!(a, Type::Number | Type::Int) {
+                    return Err(Error::new("numeric operands"));
                 }
                 type_push(&mut stack, &mut len, Type::Bool)?
             }
@@ -1008,6 +1014,24 @@ fn verify_expression(
                     return Err(Error::new("arithmetic expects numbers"));
                 }
                 type_push(&mut stack, &mut len, Type::Number)?;
+            }
+            23 => {
+                r.i32()?;
+                type_push(&mut stack, &mut len, Type::Int)?
+            }
+            24 => {
+                if type_pop(&mut stack, &mut len)? != Type::Int {
+                    return Err(Error::new("integer negation expects Int"));
+                }
+                type_push(&mut stack, &mut len, Type::Int)?
+            }
+            25..=29 => {
+                let right = type_pop(&mut stack, &mut len)?;
+                let left = type_pop(&mut stack, &mut len)?;
+                if left != Type::Int || right != Type::Int {
+                    return Err(Error::new("integer arithmetic expects Int operands"));
+                }
+                type_push(&mut stack, &mut len, Type::Int)?;
             }
             _ => return Err(Error::new("unknown expression opcode")),
         }
@@ -1094,6 +1118,10 @@ fn eval_expression(
                     (15, Value::Number(x), Value::Number(y)) => Value::Bool(x <= y),
                     (16, Value::Number(x), Value::Number(y)) => Value::Bool(x > y),
                     (17, Value::Number(x), Value::Number(y)) => Value::Bool(x >= y),
+                    (14, Value::Int(x), Value::Int(y)) => Value::Bool(x < y),
+                    (15, Value::Int(x), Value::Int(y)) => Value::Bool(x <= y),
+                    (16, Value::Int(x), Value::Int(y)) => Value::Bool(x > y),
+                    (17, Value::Int(x), Value::Int(y)) => Value::Bool(x >= y),
                     _ => return Err(Error::new("binary types")),
                 };
                 value_push(&mut s, &mut n, v)?
@@ -1126,6 +1154,39 @@ fn eval_expression(
                     return Err(Error::new("non-finite arithmetic result"));
                 }
                 value_push(&mut s, &mut n, Value::Number(value))?;
+            }
+            23 => {
+                let value = r.i32()?;
+                value_push(&mut s, &mut n, Value::Int(value))?;
+            }
+            24 => {
+                let Value::Int(value) = value_pop(&s, &mut n)? else {
+                    return Err(Error::new("integer negation expects Int"));
+                };
+                let value = value
+                    .checked_neg()
+                    .ok_or_else(|| Error::new("integer-overflow"))?;
+                value_push(&mut s, &mut n, Value::Int(value))?;
+            }
+            op @ 25..=29 => {
+                let right = value_pop(&s, &mut n)?;
+                let left = value_pop(&s, &mut n)?;
+                let (Value::Int(left), Value::Int(right)) = (left, right) else {
+                    return Err(Error::new("integer arithmetic expects Int operands"));
+                };
+                if matches!(op, 28 | 29) && right == 0 {
+                    return Err(Error::new("integer-division-by-zero"));
+                }
+                let value = match op {
+                    25 => left.checked_add(right),
+                    26 => left.checked_sub(right),
+                    27 => left.checked_mul(right),
+                    28 => left.checked_div(right),
+                    29 => left.checked_rem(right),
+                    _ => unreachable!(),
+                }
+                .ok_or_else(|| Error::new("integer-overflow"))?;
+                value_push(&mut s, &mut n, Value::Int(value))?;
             }
             _ => return Err(Error::new("unknown expression opcode")),
         }
@@ -1268,6 +1329,168 @@ impl<'a> Reader<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn expression_int(value: i32) -> Vec<u8> {
+        let mut code = vec![23];
+        code.extend(value.to_le_bytes());
+        code
+    }
+    fn expression_ints(left: i32, right: i32, opcode: u8) -> Vec<u8> {
+        let mut code = expression_int(left);
+        code.extend(expression_int(right));
+        code.push(opcode);
+        code
+    }
+    fn int_atomicity_module(second_default: i32, second_opcode: u8) -> Module {
+        let mut first_transition = vec![4, 0, 0];
+        first_transition.extend(expression_int(1));
+        first_transition.push(25);
+        let second_transition = vec![4, 1, 0, 3, 0, 0, second_opcode];
+        Module {
+            fingerprint: 85,
+            name: "int-atomicity".into(),
+            version: 1,
+            inputs: vec![Field {
+                name: "rhs".into(),
+                value_type: Type::Int,
+                default: Value::Int(0),
+            }],
+            states: vec![
+                Field {
+                    name: "first".into(),
+                    value_type: Type::Int,
+                    default: Value::Int(10),
+                },
+                Field {
+                    name: "second".into(),
+                    value_type: Type::Int,
+                    default: Value::Int(second_default),
+                },
+            ],
+            strategies: vec![Strategy {
+                name: "control".into(),
+                priority: 0,
+                query: vec![5, 1],
+                transitions: vec![
+                    Transition {
+                        state_index: 0,
+                        expression: first_transition,
+                    },
+                    Transition {
+                        state_index: 1,
+                        expression: second_transition,
+                    },
+                ],
+                intents: vec![Intent {
+                    name: "first".into(),
+                    value_type: Type::Int,
+                    expression: vec![5, 0, 0],
+                }],
+            }],
+            constraints: vec![],
+        }
+    }
+    #[test]
+    fn int_arithmetic_is_exact_with_signed_division_and_remainder() {
+        for (opcode, left, right, expected) in [
+            (25, 2, 3, 5),
+            (26, 2, 3, -1),
+            (27, 46_340, 46_340, 2_147_395_600),
+            (28, 7, 3, 2),
+            (28, -7, 3, -2),
+            (28, 7, -3, -2),
+            (28, -7, -3, 2),
+            (29, 7, 3, 1),
+            (29, -7, 3, -1),
+        ] {
+            let code = expression_ints(left, right, opcode);
+            assert_eq!(
+                verify_expression(&code, &[], &[], false).unwrap(),
+                Type::Int
+            );
+            assert_eq!(
+                eval_expression(&code, &[], &[], None).unwrap(),
+                Value::Int(expected)
+            );
+        }
+    }
+    #[test]
+    fn int_negation_and_comparison_preserve_i32_semantics() {
+        let mut negation = expression_int(-7);
+        negation.push(24);
+        assert_eq!(
+            eval_expression(&negation, &[], &[], None).unwrap(),
+            Value::Int(7)
+        );
+        for (opcode, expected) in [(14, true), (15, true), (16, false), (17, false)] {
+            assert_eq!(
+                eval_expression(&expression_ints(-2, 1, opcode), &[], &[], None).unwrap(),
+                Value::Bool(expected)
+            );
+        }
+    }
+    #[test]
+    fn int_faults_have_stable_reasons() {
+        for (code, reason) in [
+            (expression_ints(i32::MAX, 1, 25), "integer-overflow"),
+            (expression_ints(i32::MIN, 1, 26), "integer-overflow"),
+            (expression_ints(46_341, 46_341, 27), "integer-overflow"),
+            (expression_ints(i32::MIN, -1, 28), "integer-overflow"),
+            (expression_ints(1, 0, 28), "integer-division-by-zero"),
+            (expression_ints(1, 0, 29), "integer-division-by-zero"),
+        ] {
+            assert_eq!(
+                eval_expression(&code, &[], &[], None)
+                    .unwrap_err()
+                    .message(),
+                reason
+            );
+        }
+        let mut negation = expression_int(i32::MIN);
+        negation.push(24);
+        assert_eq!(
+            eval_expression(&negation, &[], &[], None)
+                .unwrap_err()
+                .message(),
+            "integer-overflow"
+        );
+    }
+    #[test]
+    fn int_overflow_rejects_tick_before_state_intent_or_journal_commit() {
+        let mut runtime = Runtime::new(4);
+        runtime.install(int_atomicity_module(i32::MAX, 25), false);
+        runtime.activate().unwrap();
+        runtime.set_input("rhs", Value::Int(0)).unwrap();
+        runtime.tick().unwrap();
+        assert_eq!(runtime.state("first"), Some(Value::Int(11)));
+        assert_eq!(runtime.intent("first"), Some(Value::Int(11)));
+        assert_eq!(runtime.journal().len(), 1);
+
+        runtime.set_input("rhs", Value::Int(1)).unwrap();
+        assert_eq!(runtime.tick().unwrap_err().message(), "integer-overflow");
+        assert_eq!(runtime.state("first"), Some(Value::Int(11)));
+        assert_eq!(runtime.intent("first"), Some(Value::Int(11)));
+        assert_eq!(runtime.journal().len(), 1);
+    }
+    #[test]
+    fn int_division_by_zero_rejects_tick_before_state_intent_or_journal_commit() {
+        let mut runtime = Runtime::new(4);
+        runtime.install(int_atomicity_module(12, 28), false);
+        runtime.activate().unwrap();
+        runtime.set_input("rhs", Value::Int(3)).unwrap();
+        runtime.tick().unwrap();
+        assert_eq!(runtime.state("first"), Some(Value::Int(11)));
+        assert_eq!(runtime.state("second"), Some(Value::Int(4)));
+
+        runtime.set_input("rhs", Value::Int(0)).unwrap();
+        assert_eq!(
+            runtime.tick().unwrap_err().message(),
+            "integer-division-by-zero"
+        );
+        assert_eq!(runtime.state("first"), Some(Value::Int(11)));
+        assert_eq!(runtime.state("second"), Some(Value::Int(4)));
+        assert_eq!(runtime.intent("first"), Some(Value::Int(11)));
+        assert_eq!(runtime.journal().len(), 1);
+    }
     fn expression_numbers(left: f64, right: f64, opcode: u8) -> Vec<u8> {
         let mut code = vec![2];
         code.extend(left.to_le_bytes());

@@ -71,6 +71,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     _ => return Err("expected true/false".into()),
                 }),
                 Type::Number => Value::Number(value.parse()?),
+                Type::Int => Value::Int(value.parse()?),
             };
             runtime.set_input(name, value)?;
         }
