@@ -15,12 +15,13 @@ const PARSER_DEPTH_LIMIT = 64;
 const NODE_LIMIT = 4096;
 const EXPANSION_NODE_LIMIT = 4096;
 const RESERVED_PREFIX = '__gf_';
-const SCALAR_TYPES = new Set(['Bool', 'Number', 'Percent', 'Duration']);
+const SCALAR_TYPES = new Set(['Bool', 'Int', 'Number', 'Percent', 'Duration']);
 const KEYWORDS = new Set([
   'control', 'fn', 'purefn', 'input', 'output', 'state', 'config', 'let',
   'type', 'enum', 'sensor', 'signal', 'schedule', 'timer', 'elapsed',
   'require', 'mutex', 'next', 'if', 'then', 'else', 'case', 'in', 'ok',
   'fault', 'true', 'false', 'adapt', 'constraints', 'check', 'limit',
+  'div',
 ]);
 
 export class ControlCompileError extends Error {
@@ -39,11 +40,12 @@ function isName(name) { return /^[A-Za-z_][A-Za-z0-9_]*$/.test(name); }
 function isReserved(name) { return name.startsWith(RESERVED_PREFIX); }
 function semanticType(type) { return { kind: type }; }
 const BOOL = semanticType('Bool');
+const INT = semanticType('Int');
 const NUMBER = semanticType('Number');
 const PERCENT = semanticType('Percent');
 const DURATION = semanticType('Duration');
 function sameType(a, b) { return a && b && a.kind === b.kind; }
-function isNumeric(type) { return type && ['Number', 'Percent', 'Duration'].includes(type.kind); }
+function isNumeric(type) { return type && ['Int', 'Number', 'Percent', 'Duration'].includes(type.kind); }
 function gfbType(type) { return type.kind === 'Bool' ? 'bool' : 'number'; }
 function gfbDefault(type, value) { return type.kind === 'Bool' ? (value ? 'true' : 'false') : String(value); }
 
@@ -74,7 +76,7 @@ function tokeniseControl(source, filename) {
     if (['<-', '=>', '->', '&&', '||', '<=', '>=', '==', '!=', '..'].includes(pair)) {
       take(); take(); add('symbol', pair, start); continue;
     }
-    if ('{}()[],:;=<>!+-*/|\'?.`'.includes(c)) { take(); add('symbol', c, start); continue; }
+    if ('{}()[],:;=<>!+-*/%|\'?.`'.includes(c)) { take(); add('symbol', c, start); continue; }
     if (c === '"') {
       let raw = take(), closed = false;
       while (at < source.length) {
@@ -95,7 +97,7 @@ function tokeniseControl(source, filename) {
       for (let n = 0; n < time[0].length; n++) take();
       add('time', time[0], start); continue;
     }
-    const number = /^(?:\d+(?:\.\d+)?|\.\d+)(?:ms|min|s|h|%)?/.exec(rest);
+    const number = /^(?:(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)(?:ms|min|s|h|%)?/.exec(rest);
     if (number) {
       for (let n = 0; n < number[0].length; n++) take();
       add('number', number[0], start); continue;
@@ -503,7 +505,7 @@ class ControlParser {
   }
 }
 
-const BIN_PREC = { '||': 1, '&&': 2, '==': 3, '!=': 3, '<': 3, '<=': 3, '>': 3, '>=': 3, '+': 5, '-': 5, '*': 6, '/': 6 };
+const BIN_PREC = { '||': 1, '&&': 2, '==': 3, '!=': 3, '<': 3, '<=': 3, '>': 3, '>=': 3, '+': 5, '-': 5, '*': 6, '/': 6, 'div': 6, '%': 6 };
 function copyLoc(token) { return { filename: token.filename, line: token.line, column: token.column, offset: token.offset, endOffset: token.endOffset, endLine: token.endLine ?? token.line, endColumn: token.endColumn ?? token.column }; }
 
 function rejectName(name, loc, label) {
@@ -567,10 +569,18 @@ function isOperatingConfigLiteral(node, type) {
 }
 function validateNominalConstant(type, value, loc) {
   if (value === undefined) return;
+  if (type.kind === 'Int' && (!Number.isInteger(value) || value < -2147483648 || value > 2147483647)) error(loc, 'constant Int arithmetic overflows');
   if (type.kind === 'Percent' && (!Number.isFinite(value) || value < 0 || value > 100)) error(loc, 'Percent constant must be between 0% and 100%');
   if (type.kind === 'Duration' && (!Number.isFinite(value) || value < 0 || !Number.isInteger(value))) error(loc, 'Duration constant must be a non-negative integer number of milliseconds');
 }
-function literal(raw, loc) {
+function isWholeLiteralNode(node) { return node?.kind === 'literal' && /^\d+$/.test(node.raw); }
+function intLiteral(raw, loc, negative = false) {
+  const magnitude = BigInt(raw);
+  const value = negative ? -magnitude : magnitude;
+  if (value < -2147483648n || value > 2147483647n) error(loc, 'Int literal is outside -2147483648..2147483647');
+  return { type: INT, sexpr: value.toString(), constant: Number(value) };
+}
+function literal(raw, loc, expected = null) {
   if (raw === 'true' || raw === 'false') return { type: BOOL, sexpr: raw, constant: raw === 'true' };
   const d = duration(raw, loc); if (d !== null) return { type: DURATION, sexpr: String(d), constant: d };
   if (raw.endsWith('%')) {
@@ -578,8 +588,17 @@ function literal(raw, loc) {
     if (!Number.isFinite(value) || value < 0 || value > 100) error(loc, 'Percent literal must be between 0% and 100%');
     validateNominalConstant(PERCENT, value, loc); return { type: PERCENT, sexpr: String(value), constant: value };
   }
+  if (/^\d+$/.test(raw)) {
+    if (expected?.kind === 'Number') {
+      const value = Number(raw);
+      if (!Number.isFinite(value)) error(loc, 'number literal must be finite');
+      return { type: NUMBER, sexpr: String(value), constant: value };
+    }
+    return intLiteral(raw, loc);
+  }
   const value = Number(raw);
   if (!Number.isFinite(value)) error(loc, 'number literal must be finite');
+  if (expected?.kind === 'Int') error(loc, 'Int literal must be a whole decimal numeral without a decimal point or exponent');
   return { type: NUMBER, sexpr: String(value), constant: value };
 }
 function sexpr(value) {
@@ -595,9 +614,10 @@ class Lowerer {
       format: 'GhostFlow/control-v1', name: ast.name, inputs: [], outputs: [], sensors: [], schedules: [], timers: [], signals: [], configs: [],
     };
     this.gfbInputs = []; this.gfbStates = []; this.constraints = []; this.hasClock = false;
+    this.usesInt = false;
     this.hasSolarSchedule = ast.body.some(item => item.kind === 'schedule' && item.scheduleType === 'Solar');
   }
-  lower() {
+  lower({ emitBytecode = true } = {}) {
     rejectName(this.ast.name, this.ast.loc, 'control');
     this.declare(); this.validateAndPopulate();
     const transitions = this.transitionForms();
@@ -612,6 +632,10 @@ class Lowerer {
       : ['all', ...this.manifest.outputs.map(output => ['has', 'actuator', output.name, gfbType(semanticType(output.type))])];
     const module = ['module', this.ast.name, ['version', '1'], ...this.gfbInputs, ...this.gfbStates,
       ['strategy', 'control', '0', ['device', deviceQuery], ...transitions, ...intents], ...this.constraints];
+    if (!emitBytecode) return { manifest: this.manifest, sourceMap: this.ast.sourceNodes };
+    if (this.usesInt) {
+      error(this.ast.loc, 'Int bytecode serialization is not available in GFB1 version 1');
+    }
     let bytes;
     try { bytes = compileGfb(sexprParse(sexprTokenize(sexpr(module)))); }
     catch (cause) {
@@ -642,7 +666,10 @@ class Lowerer {
     this.symbols.set(name, { category, loc });
   }
   resolveType(type) {
-    if (SCALAR_TYPES.has(type.name)) return semanticType(type.name);
+    if (SCALAR_TYPES.has(type.name)) {
+      if (type.name === 'Int') this.usesInt = true;
+      return semanticType(type.name);
+    }
     if (this.types.has(type.name)) return semanticType(type.name);
     error(type.loc, `unknown type ${type.name}`);
   }
@@ -687,12 +714,12 @@ class Lowerer {
         for (const name of item.names) { this.outputs.set(name, { name, type, loc: item.loc, expression: null }); this.symbols.get(name).type = type; this.manifest.outputs.push({ name, type: type.kind }); }
       }
       if (item.kind === 'state') {
-        const type = this.resolveType(item.type); const initial = this.expression(item.initial, new Map(), { allowNext: false });
+        const type = this.resolveType(item.type); const initial = this.expression(item.initial, new Map(), { allowNext: false }, [], type);
         if (!sameType(initial.type, type) || initial.constant === undefined) error(item.loc, 'state initial value must be a constant of the state type');
         this.states.set(item.name, { ...item, type, initial: initial.constant }); this.symbols.get(item.name).type = type; this.addState(item.name, type, initial.constant, item.loc);
       }
       if (item.kind === 'config') {
-        const type = this.resolveType(item.type); const value = this.expression(item.value, new Map(), { allowNext: false });
+        const type = this.resolveType(item.type); const value = this.expression(item.value, new Map(), { allowNext: false }, [], type);
         if (!sameType(value.type, type) || value.constant === undefined) error(item.loc, 'config value must be a constant of the declared type');
         this.symbols.get(item.name).type = type; this.symbols.get(item.name).value = value;
         const settings = item.settings ?? {};
@@ -836,7 +863,7 @@ class Lowerer {
         type: parameter.resolvedType,
         sexpr: gfbDefault(parameter.resolvedType, parameter.resolvedType.kind === 'Bool' ? false : 0),
       }]));
-      const value = this.expression(fn.body, scope, { allowNext: false, pureFunction: fn.name }, [fn.name]);
+      const value = this.expression(fn.body, scope, { allowNext: false, pureFunction: fn.name }, [fn.name], fn.resultType);
       if (!sameType(value.type, fn.resultType)) error(fn.loc, `function ${fn.name} returns ${value.type.kind}, expected ${fn.resultType.kind}`);
     }
   }
@@ -849,24 +876,25 @@ class Lowerer {
     if (status === 'done') return this.symbols.get(name).value;
     if (status === 'visiting') error(item.loc, `cyclic let definition involving ${name}`);
     this.letStates.set(name, 'visiting');
-    const value = this.expression(item.value, new Map(), { allowNext: false });
-    const annotation = item.annotation ? this.resolveType(item.annotation) : value.type;
-    if (!sameType(annotation, value.type)) error(item.loc, `let ${item.name} does not match annotation ${annotation.kind}`);
-    this.symbols.get(item.name).type = annotation; this.symbols.get(item.name).value = value;
+    const annotation = item.annotation ? this.resolveType(item.annotation) : null;
+    const value = this.expression(item.value, new Map(), { allowNext: false }, [], annotation);
+    const resolvedAnnotation = annotation ?? value.type;
+    if (!sameType(resolvedAnnotation, value.type)) error(item.loc, `let ${item.name} does not match annotation ${resolvedAnnotation.kind}`);
+    this.symbols.get(item.name).type = resolvedAnnotation; this.symbols.get(item.name).value = value;
     this.letStates.set(name, 'done');
     return value;
   }
   addNext(item) {
     const state = this.states.get(item.name); if (!state) error(item.loc, `unknown state ${item.name}`);
     if (this.nexts.has(item.name)) error(item.loc, `duplicate next state ${item.name}`);
-    const value = this.expression(item.value, new Map(), { allowNext: false });
+    const value = this.expression(item.value, new Map(), { allowNext: false }, [], state.type);
     if (!sameType(value.type, state.type)) error(item.loc, `next state ${item.name} must be ${state.type.kind}`);
     this.nexts.set(item.name, { ...item, value });
   }
   addConnection(item) {
     const output = this.outputs.get(item.name); if (!output) error(item.loc, `unknown output ${item.name}`);
     if (output.expression) error(item.loc, `duplicate output connection ${item.name}`);
-    const value = this.expression(item.value, new Map(), { allowNext: true });
+    const value = this.expression(item.value, new Map(), { allowNext: true }, [], output.type);
     if (!sameType(value.type, output.type)) error(item.loc, `output ${item.name} must be ${output.type.kind}`);
     output.expression = value;
   }
@@ -889,10 +917,10 @@ class Lowerer {
   disjunction(node) { return node.kind === 'binary' && node.op === '||' ? [...this.disjunction(node.left), ...this.disjunction(node.right)] : [this.outputName(node, 'require prerequisite')]; }
   conjunction(node) { return node.kind === 'binary' && node.op === '&&' ? [...this.conjunction(node.left), ...this.conjunction(node.right)] : [this.outputName(node, 'mutex member')]; }
   addMutex(names, loc) { if (names.length < 2 || names.length > 32) error(loc, 'mutex needs 2 to 32 Bool outputs'); for (const name of names) this.outputName({ kind: 'reference', name, loc }, 'mutex member'); this.constraints.push(['mutex', ...names]); }
-  expression(node, locals, options, callStack = []) {
+  expression(node, locals, options, callStack = [], expected = null) {
     if (++this.expansionNodes > EXPANSION_NODE_LIMIT) error(node.loc, `function expansion exceeds ${EXPANSION_NODE_LIMIT} node budget`);
-    const recurse = (child, childLocals = locals, childOptions = options) => this.expression(child, childLocals, childOptions, callStack);
-    if (node.kind === 'literal') return literal(node.raw, node.loc);
+    const recurse = (child, childLocals = locals, childOptions = options, childExpected = null) => this.expression(child, childLocals, childOptions, callStack, childExpected);
+    if (node.kind === 'literal') return literal(node.raw, node.loc, expected);
     if (node.kind === 'reference') {
       if (locals.has(node.name)) return locals.get(node.name);
       const member = this.enumMembers.get(node.name); if (member) return { type: semanticType(member.type), sexpr: String(member.value), constant: member.value };
@@ -936,13 +964,24 @@ class Lowerer {
       return { type: state.type, sexpr: `next.${node.name}` };
     }
     if (node.kind === 'unary') {
-      const value = recurse(node.value);
+      if (node.op === '-' && isWholeLiteralNode(node.value) && (!expected || expected.kind === 'Int')) {
+        return intLiteral(node.value.raw, node.loc, true);
+      }
+      const value = recurse(node.value, locals, options, expected);
       if (node.op === '!') { if (!sameType(value.type, BOOL)) error(node.loc, '! requires Bool'); return { type: BOOL, sexpr: ['not', value.sexpr], constant: value.constant === undefined ? undefined : !value.constant }; }
       if (node.op === '-') { if (!isNumeric(value.type)) error(node.loc, 'unary - requires numeric value'); const constant = value.constant === undefined ? undefined : -value.constant; validateNominalConstant(value.type, constant, node.loc); return { type: value.type, sexpr: ['sub', '0', value.sexpr], constant }; }
     }
-    if (node.kind === 'binary') return this.binary(node, recurse);
+    if (node.kind === 'binary') return this.binary(node, recurse, expected);
     if (node.kind === 'if') {
-      const test = recurse(node.test), yes = recurse(node.yes), no = recurse(node.no); if (!sameType(test.type, BOOL)) error(node.test.loc, 'if condition must be Bool'); if (!sameType(yes.type, no.type)) error(node.loc, 'if branches must have the same type');
+      const test = recurse(node.test);
+      let yes, no;
+      if (!expected && isWholeLiteralNode(node.yes) && !isWholeLiteralNode(node.no)) {
+        no = recurse(node.no); yes = recurse(node.yes, locals, options, no.type);
+      } else {
+        yes = recurse(node.yes, locals, options, expected);
+        no = recurse(node.no, locals, options, expected ?? (isWholeLiteralNode(node.no) ? yes.type : null));
+      }
+      if (!sameType(test.type, BOOL)) error(node.test.loc, 'if condition must be Bool'); if (!sameType(yes.type, no.type)) error(node.loc, 'if branches must have the same type');
       return { type: yes.type, sexpr: ['if', test.sexpr, yes.sexpr, no.sexpr], constant: test.constant === undefined ? undefined : (test.constant ? yes.constant : no.constant) };
     }
     if (node.kind === 'in') {
@@ -954,15 +993,24 @@ class Lowerer {
     if (node.kind === 'call') return this.callExpression(node, locals, options, callStack);
     error(node.loc, `unsupported expression node ${node.kind}`);
   }
-  binary(node, recurse) {
-    const left = recurse(node.left), right = recurse(node.right); const op = node.op;
+  binary(node, recurse, expected) {
+    let left, right;
+    if (isWholeLiteralNode(node.left) && !isWholeLiteralNode(node.right)) {
+      right = recurse(node.right); left = recurse(node.left, undefined, undefined, right.type);
+    } else if (isWholeLiteralNode(node.right) && !isWholeLiteralNode(node.left)) {
+      left = recurse(node.left); right = recurse(node.right, undefined, undefined, left.type);
+    } else {
+      left = recurse(node.left, undefined, undefined, expected);
+      right = recurse(node.right, undefined, undefined, expected);
+    }
+    const op = node.op;
     if (op === '&&' || op === '||') { if (!sameType(left.type, BOOL) || !sameType(right.type, BOOL)) error(node.loc, `${op} requires Bool operands`); return { type: BOOL, sexpr: [op === '&&' ? 'and' : 'or', left.sexpr, right.sexpr], constant: left.constant === undefined || right.constant === undefined ? undefined : (op === '&&' ? left.constant && right.constant : left.constant || right.constant) }; }
     if (['==', '!='].includes(op)) { if (!sameType(left.type, right.type)) error(node.loc, `${op} requires values of the same type`); const eq = left.constant === undefined || right.constant === undefined ? undefined : left.constant === right.constant; return { type: BOOL, sexpr: op === '==' ? ['eq', left.sexpr, right.sexpr] : ['not', ['eq', left.sexpr, right.sexpr]], constant: eq === undefined ? undefined : (op === '==' ? eq : !eq) }; }
     if (['<', '<=', '>', '>='].includes(op)) { if (!isNumeric(left.type) || !sameType(left.type, right.type)) error(node.loc, `${op} requires matching numeric types`); const values = left.constant === undefined || right.constant === undefined ? undefined : ({ '<': left.constant < right.constant, '<=': left.constant <= right.constant, '>': left.constant > right.constant, '>=': left.constant >= right.constant })[op]; return { type: BOOL, sexpr: [{ '<': 'lt', '<=': 'lte', '>': 'gt', '>=': 'gte' }[op], left.sexpr, right.sexpr], constant: values }; }
-    if (['+', '-', '*', '/'].includes(op)) {
+    if (['+', '-', '*', '/', 'div', '%'].includes(op)) {
       const type = arithmeticType(op, left.type, right.type, node.loc); const constants = left.constant === undefined || right.constant === undefined ? undefined : arithmetic(op, left.constant, right.constant, node.loc);
       validateNominalConstant(type, constants, node.loc);
-      return { type, sexpr: [{ '+': 'add', '-': 'sub', '*': 'mul', '/': 'div' }[op], left.sexpr, right.sexpr], constant: constants };
+      return { type, sexpr: [{ '+': 'add', '-': 'sub', '*': 'mul', '/': 'div', div: 'int-div', '%': 'int-rem' }[op], left.sexpr, right.sexpr], constant: constants };
     }
     if (op === '=>') error(node.loc, '=> is only valid in require declarations');
     error(node.loc, `unsupported operator ${op}`);
@@ -973,13 +1021,32 @@ class Lowerer {
       return this.expression({ kind: 'if', loc: node.loc, test: node.args[0], yes: node.args[1], no: node.args[2] }, locals, options, callStack);
     }
     if (node.name === 'elapsed' || node.name === 'hysteresis' || node.name === 'median') error(node.loc, `${node.name} is only valid in its declaration`);
+    if (node.name === 'number') {
+      if (node.args.length !== 1 || node.named.length) error(node.loc, 'number expects one Int argument');
+      const value = this.expression(node.args[0], locals, options, callStack, INT);
+      if (!sameType(value.type, INT)) error(node.args[0].loc, 'number argument must be Int');
+      return { type: NUMBER, sexpr: ['int-to-number', value.sexpr], constant: value.constant };
+    }
+    if (['int_exact', 'int_floor', 'int_ceil', 'int_trunc', 'int_nearest_even'].includes(node.name)) {
+      if (node.args.length !== 1 || node.named.length) error(node.loc, `${node.name} expects one Number argument`);
+      const value = this.expression(node.args[0], locals, options, callStack, NUMBER);
+      if (!sameType(value.type, NUMBER)) error(node.args[0].loc, `${node.name} argument must be Number`);
+      let constant;
+      if (value.constant !== undefined) {
+        if (node.name === 'int_exact' && !Number.isInteger(value.constant)) error(node.loc, 'int_exact constant must be integral');
+        constant = ({ int_exact: x => x, int_floor: Math.floor, int_ceil: Math.ceil, int_trunc: Math.trunc,
+          int_nearest_even: x => { const floor = Math.floor(x), fraction = x - floor; return fraction < 0.5 ? floor : fraction > 0.5 ? floor + 1 : floor % 2 === 0 ? floor : floor + 1; } })[node.name](value.constant);
+        if (!Number.isInteger(constant) || constant < -2147483648 || constant > 2147483647) error(node.loc, 'integer conversion constant is outside -2147483648..2147483647');
+      }
+      return { type: INT, sexpr: [node.name.replaceAll('_', '-'), value.sexpr], constant };
+    }
     const fn = this.functions.get(node.name); if (!fn) error(node.loc, `unknown function ${node.name}`);
     if (node.named.length || node.args.length !== fn.params.length) error(node.loc, `function ${node.name} expects ${fn.params.length} arguments`);
     if (callStack.includes(node.name)) error(node.loc, `recursive purefn ${node.name} is not supported`);
-    const args = node.args.map(arg => this.expression(arg, locals, options, callStack));
+    const args = node.args.map((arg, index) => this.expression(arg, locals, options, callStack, fn.params[index]?.resolvedType));
     for (let i = 0; i < args.length; i++) if (!sameType(args[i].type, fn.params[i].resolvedType)) error(node.args[i].loc, `argument ${i + 1} to ${node.name} must be ${fn.params[i].resolvedType.kind}`);
     const scope = new Map(locals); for (let i = 0; i < args.length; i++) scope.set(fn.params[i].name, args[i]);
-    const value = this.expression(fn.body, scope, { ...options, pureFunction: node.name }, [...callStack, node.name]); if (!sameType(value.type, fn.resultType)) error(fn.loc, `function ${node.name} returns ${value.type.kind}, expected ${fn.resultType.kind}`); return value;
+    const value = this.expression(fn.body, scope, { ...options, pureFunction: node.name }, [...callStack, node.name], fn.resultType); if (!sameType(value.type, fn.resultType)) error(fn.loc, `function ${node.name} returns ${value.type.kind}, expected ${fn.resultType.kind}`); return value;
   }
   caseExpression(node, locals, options, callStack) {
     if (node.value.kind === 'reference' && (this.sensors.has(node.value.name) || this.signals.has(node.value.name))) {
@@ -1042,14 +1109,21 @@ class Lowerer {
 
 function arithmeticType(op, left, right, loc) {
   if (!isNumeric(left) || !isNumeric(right)) error(loc, `${op} requires numeric operands`);
+  if (left.kind === 'Int' || right.kind === 'Int') {
+    if (!sameType(left, right)) error(loc, `${op} does not implicitly mix ${left.kind} and ${right.kind}`);
+    if (op === '/') error(loc, '/ is not defined for Int operands; use div or convert both operands to Number');
+    if (['+', '-', '*', 'div', '%'].includes(op)) return INT;
+  }
+  if (op === 'div' || op === '%') error(loc, `${op} requires Int operands`);
   if (op === '+' || op === '-') { if (!sameType(left, right)) error(loc, `${op} does not implicitly mix ${left.kind} and ${right.kind}`); return left; }
   if (op === '*') { if (sameType(left, NUMBER)) return right; if (sameType(right, NUMBER)) return left; error(loc, '* requires a Number scale factor'); }
   if (op === '/') { if (sameType(right, NUMBER)) return left; if (sameType(left, right)) return NUMBER; error(loc, '/ requires a Number divisor or matching units'); }
   error(loc, `unsupported arithmetic ${op}`);
 }
 function arithmetic(op, left, right, loc) {
-  if (op === '/' && right === 0) error(loc, 'constant division by zero');
-  const value = ({ '+': left + right, '-': left - right, '*': left * right, '/': left / right })[op];
+  if ((op === '/' || op === 'div' || op === '%') && right === 0) error(loc, op === '/' ? 'constant division by zero' : 'constant integer division by zero');
+  const value = ({ '+': left + right, '-': left - right, '*': left * right, '/': left / right,
+    div: Math.trunc(left / right), '%': left % right })[op];
   if (!Number.isFinite(value)) error(loc, 'constant arithmetic result is not finite'); return value;
 }
 
@@ -1058,12 +1132,12 @@ function arithmetic(op, left, right, loc) {
 function expressionStack(node) {
   if (!Array.isArray(node)) return 1;
   const [head, ...args] = node;
-  if (head === 'not') return expressionStack(args[0]);
+  if (['not', 'int-to-number', 'int-exact', 'int-floor', 'int-ceil', 'int-trunc', 'int-nearest-even'].includes(head)) return expressionStack(args[0]);
   if (head === 'if') {
     const condition = expressionStack(args[0]); const yes = expressionStack(args[1]); const no = expressionStack(args[2]);
     return Math.max(condition, 1 + yes, 2 + no);
   }
-  if (['and', 'or', 'eq', 'lt', 'lte', 'gt', 'gte', 'add', 'sub', 'mul', 'div'].includes(head)) {
+  if (['and', 'or', 'eq', 'lt', 'lte', 'gt', 'gte', 'add', 'sub', 'mul', 'div', 'int-div', 'int-rem'].includes(head)) {
     const left = expressionStack(args[0]), right = expressionStack(args[1]); return Math.max(left, 1 + right);
   }
   return 129; // Should be unreachable after typed lowering; reject conservatively.
@@ -1084,6 +1158,13 @@ export function compileControl(source, { filename = '<control>' } = {}) {
   if (typeof filename !== 'string' || !filename) internal('filename must be a non-empty string');
   const ast = new ControlParser(source, filename).parse();
   return new Lowerer(ast, filename).lower();
+}
+
+/** Parse and type-check control source without selecting a bytecode format. */
+export function typeCheckControl(source, { filename = '<control>' } = {}) {
+  if (typeof filename !== 'string' || !filename) internal('filename must be a non-empty string');
+  const ast = new ControlParser(source, filename).parse();
+  return new Lowerer(ast, filename).lower({ emitBytecode: false });
 }
 
 export function parseControl(source, { filename = '<control>' } = {}) {
