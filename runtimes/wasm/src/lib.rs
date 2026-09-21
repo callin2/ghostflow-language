@@ -118,6 +118,7 @@ pub unsafe extern "C" fn gf_add_capability(
     let ty = match value_type {
         1 => Type::Bool,
         2 => Type::Number,
+        3 => Type::Int,
         _ => return 0,
     };
     let result = h.runtime.add_capability(Capability::new(kind, name, ty));
@@ -162,6 +163,21 @@ pub unsafe extern "C" fn gf_set_number(
         return 0;
     };
     let result = h.runtime.set_input(name, Value::Number(value));
+    h.complete(result)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn gf_set_int(
+    handle: *mut Handle,
+    name: *const u8,
+    len: usize,
+    value: i32,
+) -> i32 {
+    let Some(h) = handle.as_mut() else { return 0 };
+    let Some(name) = input_name(name, len) else {
+        return 0;
+    };
+    let result = h.runtime.set_input(name, Value::Int(value));
     h.complete(result)
 }
 
@@ -244,6 +260,48 @@ pub unsafe extern "C" fn gf_get_intent_number(
     match value {
         Some(Value::Number(v)) => v,
         _ => 0.0,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn gf_get_state_int(
+    handle: *const Handle,
+    name: *const u8,
+    len: usize,
+    found: *mut i32,
+) -> i32 {
+    let Some(h) = handle.as_ref() else { return 0 };
+    let Some(name) = input_name(name, len) else {
+        return 0;
+    };
+    let value = h.runtime.state(name);
+    if let Some(out) = found.as_mut() {
+        *out = matches!(value, Some(Value::Int(_))) as i32;
+    }
+    match value {
+        Some(Value::Int(v)) => v,
+        _ => 0,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn gf_get_intent_int(
+    handle: *const Handle,
+    name: *const u8,
+    len: usize,
+    found: *mut i32,
+) -> i32 {
+    let Some(h) = handle.as_ref() else { return 0 };
+    let Some(name) = input_name(name, len) else {
+        return 0;
+    };
+    let value = h.runtime.intent(name);
+    if let Some(out) = found.as_mut() {
+        *out = matches!(value, Some(Value::Int(_))) as i32;
+    }
+    match value {
+        Some(Value::Int(v)) => v,
+        _ => 0,
     }
 }
 

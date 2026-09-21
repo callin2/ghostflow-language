@@ -41,9 +41,10 @@ function parse(tokens) {
   return ast;
 }
 
-const TYPE = { bool: 1, number: 2 };
+const TYPE = { bool: 1, number: 2, int: 3 };
 const OP = { bool:1, number:2, input:3, state:4, next:5, not:10, and:11, or:12,
-  eq:13, lt:14, lte:15, gt:16, gte:17, if:18, add:19, sub:20, mul:21, div:22 };
+  eq:13, lt:14, lte:15, gt:16, gte:17, if:18, add:19, sub:20, mul:21, div:22,
+  int:23, 'int-neg':24, 'int-add':25, 'int-sub':26, 'int-mul':27, 'int-div':28, 'int-rem':29 };
 
 class Writer {
   constructor() { this.parts = []; }
@@ -69,7 +70,7 @@ function scalarType(name) {
 
 function compileExpr(node, env, allowNext=false) {
   const w = new Writer();
-  let depth = 0, nodes = 0;
+  let depth = 0, nodes = 0, usesInt = false;
   function emit(n) {
     if (++depth > 128 || ++nodes > 4096) throw new CompileError('expression complexity limit exceeded');
     try { return emitNode(n); } finally { depth--; }
@@ -87,14 +88,17 @@ function compileExpr(node, env, allowNext=false) {
     }
     if (!Array.isArray(n) || n.length<1) throw new CompileError('invalid expression');
     const [head, ...args]=n;
+    if (head==='int') { if(args.length!==1 || typeof args[0] !== 'string' || !/^-?\d+$/.test(args[0])) throw new CompileError('int expects one signed decimal i32 literal'); const value=BigInt(args[0]);if(value < -2147483648n || value > 2147483647n)throw new CompileError('int literal outside i32 range');usesInt=true;w.u8(OP.int);w.i32(Number(value));return TYPE.int; }
+    if (head==='int-neg') { if(args.length!==1 || emit(args[0])!==TYPE.int) throw new CompileError('int-neg expects Int');usesInt=true;w.u8(OP[head]);return TYPE.int; }
+    if (['int-add','int-sub','int-mul','int-div','int-rem'].includes(head)) { if(args.length!==2)throw new CompileError(`${head} expects 2 arguments`);const a=emit(args[0]),b=emit(args[1]);if(a!==TYPE.int||b!==TYPE.int)throw new CompileError(`${head} expects Int operands`);usesInt=true;w.u8(OP[head]);return TYPE.int; }
     if (head==='not') { if(args.length!==1 || emit(args[0])!==TYPE.bool) throw new CompileError('not expects bool'); w.u8(OP.not); return TYPE.bool; }
     if (head==='and' || head==='or') { if(args.length!==2) throw new CompileError(`${head} expects 2 arguments`); const a=emit(args[0]),b=emit(args[1]); if(a!==TYPE.bool||b!==TYPE.bool) throw new CompileError(`${head} expects bools`); w.u8(OP[head]); return TYPE.bool; }
-    if (['eq','lt','lte','gt','gte'].includes(head)) { if(args.length!==2) throw new CompileError(`${head} expects 2 arguments`); const a=emit(args[0]),b=emit(args[1]); if(a!==b || (head!=='eq'&&a!==TYPE.number)) throw new CompileError(`bad operands for ${head}`); w.u8(OP[head]); return TYPE.bool; }
+    if (['eq','lt','lte','gt','gte'].includes(head)) { if(args.length!==2) throw new CompileError(`${head} expects 2 arguments`); const a=emit(args[0]),b=emit(args[1]); if(a!==b || (head!=='eq'&&a!==TYPE.number&&a!==TYPE.int)) throw new CompileError(`bad operands for ${head}`); if(a===TYPE.int)usesInt=true;w.u8(OP[head]); return TYPE.bool; }
     if (['add','sub','mul','div'].includes(head)) { if(args.length!==2) throw new CompileError(`${head} expects 2 arguments`); const a=emit(args[0]),b=emit(args[1]); if(a!==TYPE.number||b!==TYPE.number) throw new CompileError(`${head} expects numbers`); w.u8(OP[head]); return TYPE.number; }
     if (head==='if') { if(args.length!==3) throw new CompileError('if expects 3 arguments'); if(emit(args[0])!==TYPE.bool) throw new CompileError('if condition must be bool'); const a=emit(args[1]),b=emit(args[2]); if(a!==b) throw new CompileError('if branches must have same type'); w.u8(OP.if); return a; }
     throw new CompileError(`unknown expression ${head}`);
   }
-  const type=emit(node); return {type, bytes:w.finish()};
+  const type=emit(node); return {type, bytes:w.finish(),usesInt};
 }
 
 function compileQuery(node) {
@@ -120,7 +124,7 @@ function compile(ast) {
     const [head,...args]=form;
     if(head==='version') { version=Number(args[0]); if(args.length!==1||!Number.isInteger(version)||version<0||version>0xffffffff) throw new CompileError('invalid version'); }
     else if(head==='input') { if(args.length!==2) throw new CompileError('input expects name type'); assertName(args[0],'input'); inputs.push({name:args[0],type:scalarType(args[1])}); }
-    else if(head==='state') { if(args.length!==3) throw new CompileError('state expects name type default'); assertName(args[0],'state'); const type=scalarType(args[1]); let value; if(type===TYPE.bool){if(!['true','false'].includes(args[2]))throw new CompileError('bool default expected');value=args[2]==='true';}else{value=Number(args[2]);if(!Number.isFinite(value))throw new CompileError('number default expected');} states.push({name:args[0],type,value}); }
+    else if(head==='state') { if(args.length!==3) throw new CompileError('state expects name type default'); assertName(args[0],'state'); const type=scalarType(args[1]); let value; if(type===TYPE.bool){if(!['true','false'].includes(args[2]))throw new CompileError('bool default expected');value=args[2]==='true';}else if(type===TYPE.int){if(typeof args[2]!=='string'||!/^-?\d+$/.test(args[2]))throw new CompileError('int default expected');const exact=BigInt(args[2]);if(exact < -2147483648n||exact > 2147483647n)throw new CompileError('int default outside i32 range');value=Number(exact);}else{value=Number(args[2]);if(!Number.isFinite(value))throw new CompileError('number default expected');} states.push({name:args[0],type,value}); }
     else if(head==='strategy') strategies.push({raw:form});
     else if(head==='requires') { if(args.length!==2) throw new CompileError('requires expects target prerequisite'); constraints.push({kind:1,names:args}); }
     else if(head==='requires-any') { if(args.length<2||args.length>32) throw new CompileError('requires-any expects target and prerequisites'); constraints.push({kind:3,names:args}); }
@@ -137,8 +141,8 @@ function compile(ast) {
     let query=null; const transitions=[],intents=[];
     for(const f of forms){if(!Array.isArray(f))throw new CompileError('invalid strategy form');const [h,...a]=f;
       if(h==='device'){if(a.length!==1||query)throw new CompileError('strategy needs one device query');query=compileQuery(a[0]);}
-      else if(h==='next'){if(a.length!==2)throw new CompileError('next expects state expression');const st=env.states.get(a[0]);if(!st)throw new CompileError(`unknown state ${a[0]}`);const e=compileExpr(a[1],env,false);if(e.type!==st.type)throw new CompileError(`type mismatch for state ${a[0]}`);transitions.push({index:st.index,expr:e.bytes});}
-      else if(h==='intent'){if(a.length!==2)throw new CompileError('intent expects name expression');assertName(a[0],'intent');const e=compileExpr(a[1],env,true);intents.push({name:a[0],type:e.type,expr:e.bytes});}
+      else if(h==='next'){if(a.length!==2)throw new CompileError('next expects state expression');const st=env.states.get(a[0]);if(!st)throw new CompileError(`unknown state ${a[0]}`);const e=compileExpr(a[1],env,false);if(e.type!==st.type)throw new CompileError(`type mismatch for state ${a[0]}`);transitions.push({index:st.index,type:e.type,usesInt:e.usesInt,expr:e.bytes});}
+      else if(h==='intent'){if(a.length!==2)throw new CompileError('intent expects name expression');assertName(a[0],'intent');const e=compileExpr(a[1],env,true);intents.push({name:a[0],type:e.type,usesInt:e.usesInt,expr:e.bytes});}
       else throw new CompileError(`unknown strategy form ${h}`);
     }
     if(!query)throw new CompileError(`strategy ${sname} has no device query`); const seen=new Set();for(const t of transitions){if(seen.has(t.index))throw new CompileError('duplicate state transition');seen.add(t.index);} unique(intents,'intent');
@@ -147,9 +151,12 @@ function compile(ast) {
   });
   unique(compiledStrategies,'strategy'); if(!compiledStrategies.length)throw new CompileError('module needs a strategy');
   for(const c of constraints)for(const s of compiledStrategies){const available=new Map(s.intents.map(i=>[i.name,i.type]));for(const n of c.names){if(!available.has(n))throw new CompileError(`constraint intent ${n} is missing from strategy ${s.name}`);if(available.get(n)!==TYPE.bool)throw new CompileError(`constraint intent ${n} must be bool`);}}
-  const w=new Writer();w.bytes(UTF8.encode('GFB1'));w.u16(1);w.str(name);w.u32(version);
+  const intDeclarations=inputs.some(x=>x.type===TYPE.int)||states.some(x=>x.type===TYPE.int)||compiledStrategies.some(s=>s.intents.some(i=>i.type===TYPE.int));
+  const intExpressions=compiledStrategies.some(s=>s.transitions.some(t=>t.usesInt)||s.intents.some(i=>i.usesInt));
+  if(intExpressions&&!intDeclarations)throw new CompileError('integer expressions require an Int module boundary');
+  const w=new Writer();w.bytes(UTF8.encode('GFB1'));w.u16(intDeclarations?2:1);w.str(name);w.u32(version);
   w.u16(inputs.length);for(const x of inputs){w.str(x.name);w.u8(x.type);}
-  w.u16(states.length);for(const x of states){w.str(x.name);w.u8(x.type);if(x.type===TYPE.bool)w.u8(x.value?1:0);else w.f64(x.value);}
+  w.u16(states.length);for(const x of states){w.str(x.name);w.u8(x.type);if(x.type===TYPE.bool)w.u8(x.value?1:0);else if(x.type===TYPE.int)w.i32(x.value);else w.f64(x.value);}
   w.u16(compiledStrategies.length);for(const s of compiledStrategies){w.str(s.name);w.i32(s.priority);w.u32(s.query.length);w.bytes(s.query);w.u16(s.transitions.length);for(const t of s.transitions){w.u16(t.index);w.u32(t.expr.length);w.bytes(t.expr);}w.u16(s.intents.length);for(const i of s.intents){w.str(i.name);w.u8(i.type);w.u32(i.expr.length);w.bytes(i.expr);}}
   w.u16(constraints.length);for(const c of constraints){w.u8(c.kind);w.u16(c.names.length);for(const n of c.names)w.str(n);}
   return w.finish();

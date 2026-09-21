@@ -62,7 +62,8 @@ function encodeFrame(frame) {
     if (!Object.hasOwn(inputValues, index)) throw new TypeError(`inputs[${index}] must be present`);
     const input = inputValues[index];
     if (inputValues.length !== inputCount) throw new RangeError('inputs length changed during capture');
-    exactObject(input, ['name', 'value'], 'scan input');
+    const hasType = Object.hasOwn(input, 'type');
+    exactObject(input, hasType ? ['name', 'type', 'value'] : ['name', 'value'], 'scan input');
     const inputName = input.name;
     const inputValue = input.value;
     if (inputValues.length !== inputCount) throw new RangeError('inputs length changed during capture');
@@ -71,7 +72,11 @@ function encodeFrame(frame) {
     if (names.has(inputName)) throw new TypeError(`duplicate input ${inputName}`);
     names.add(inputName);
     let type, valueLength;
-    if (typeof inputValue === 'boolean') { type = 1; valueLength = 1; }
+    if (input.type === 'Int') {
+      if (!Number.isInteger(inputValue) || inputValue < -2147483648 || inputValue > 2147483647) throw new RangeError(`input ${inputName} must be a signed i32 integer`);
+      type = 3; valueLength = 4;
+    } else if (input.type !== undefined && !['Bool', 'Number', 'Percent', 'Duration'].includes(input.type)) throw new TypeError(`input ${inputName} has unsupported manifest type ${String(input.type)}`);
+    else if (typeof inputValue === 'boolean') { type = 1; valueLength = 1; }
     else if (typeof inputValue === 'number' && Number.isFinite(inputValue)) { type = 2; valueLength = 8; }
     else throw new TypeError(`input ${inputName} must be a boolean or finite number`);
     length += 2 + name.length + 1 + valueLength;
@@ -87,8 +92,9 @@ function encodeFrame(frame) {
     bytes.set(input.name, at); at += input.name.length;
     view.setUint8(at, input.type); at += 1;
     if (input.type === 1) view.setUint8(at, input.value ? 1 : 0);
+    else if (input.type === 3) view.setInt32(at, input.value, true);
     else view.setFloat64(at, input.value, true);
-    at += input.type === 1 ? 1 : 8;
+    at += input.type === 1 ? 1 : input.type === 3 ? 4 : 8;
   }
   return { scanId, logicalTimeMs, bytes };
 }
@@ -122,11 +128,11 @@ export class FramedGhostFlowRuntime {
 
   addCapability(kind, name, type) {
     this.#live();
-    if (type !== 'bool' && type !== 'number') throw new TypeError('capability type must be bool or number');
+    if (!['bool', 'number', 'int'].includes(type)) throw new TypeError('capability type must be bool, number, or int');
     const kindBytes = identifier(kind, 'capability kind');
     const nameBytes = identifier(name, 'capability name');
     this.#bytes(kindBytes, (kindPtr, kindLen) => this.#bytes(nameBytes, (namePtr, nameLen) =>
-      this.#check(this.wasm.gf_frame_add_capability(this.handle, kindPtr, kindLen, namePtr, nameLen, type === 'bool' ? 1 : 2))));
+      this.#check(this.wasm.gf_frame_add_capability(this.handle, kindPtr, kindLen, namePtr, nameLen, { bool: 1, number: 2, int: 3 }[type]))));
   }
 
   activate() { this.#live(); this.#check(this.wasm.gf_frame_activate(this.handle)); }

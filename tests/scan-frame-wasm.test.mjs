@@ -183,7 +183,7 @@ test('GF-TEST-scan-frame-wasm: ABI decoder rejects malformed packets before muta
   const cases = [
     [new Uint8Array([1, 0]), /truncated/],
     [new Uint8Array([0, 0, 0]), /trailing/],
-    [new Uint8Array([1, 0, 1, 0, 97, 3]), /type/],
+    [new Uint8Array([1, 0, 1, 0, 97, 4]), /type/],
     [new Uint8Array([1, 0, 1, 0, 97, 1, 2]), /exactly/],
     [new Uint8Array([1, 0, 1, 0, 0xff, 1, 1]), /UTF-8/],
     [new Uint8Array([129, 0]), /exceeds.*inputs/],

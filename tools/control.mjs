@@ -46,7 +46,7 @@ const PERCENT = semanticType('Percent');
 const DURATION = semanticType('Duration');
 function sameType(a, b) { return a && b && a.kind === b.kind; }
 function isNumeric(type) { return type && ['Int', 'Number', 'Percent', 'Duration'].includes(type.kind); }
-function gfbType(type) { return type.kind === 'Bool' ? 'bool' : 'number'; }
+function gfbType(type) { return type.kind === 'Bool' ? 'bool' : type.kind === 'Int' ? 'int' : 'number'; }
 function gfbDefault(type, value) { return type.kind === 'Bool' ? (value ? 'true' : 'false') : String(value); }
 
 function tokeniseControl(source, filename) {
@@ -578,7 +578,7 @@ function intLiteral(raw, loc, negative = false) {
   const magnitude = BigInt(raw);
   const value = negative ? -magnitude : magnitude;
   if (value < -2147483648n || value > 2147483647n) error(loc, 'Int literal is outside -2147483648..2147483647');
-  return { type: INT, sexpr: value.toString(), constant: Number(value) };
+  return { type: INT, sexpr: ['int', value.toString()], constant: Number(value) };
 }
 function literal(raw, loc, expected = null) {
   if (raw === 'true' || raw === 'false') return { type: BOOL, sexpr: raw, constant: raw === 'true' };
@@ -620,6 +620,7 @@ class Lowerer {
   lower({ emitBytecode = true } = {}) {
     rejectName(this.ast.name, this.ast.loc, 'control');
     this.declare(); this.validateAndPopulate();
+    if (this.usesInt) this.manifest.format = 'GhostFlow/control-v4';
     const transitions = this.transitionForms();
     const intents = this.intentForms();
     this.checkExpressionStacks([...transitions, ...intents]);
@@ -633,9 +634,6 @@ class Lowerer {
     const module = ['module', this.ast.name, ['version', '1'], ...this.gfbInputs, ...this.gfbStates,
       ['strategy', 'control', '0', ['device', deviceQuery], ...transitions, ...intents], ...this.constraints];
     if (!emitBytecode) return { manifest: this.manifest, sourceMap: this.ast.sourceNodes };
-    if (this.usesInt) {
-      error(this.ast.loc, 'Int bytecode serialization is not available in GFB1 version 1');
-    }
     let bytes;
     try { bytes = compileGfb(sexprParse(sexprTokenize(sexpr(module)))); }
     catch (cause) {
@@ -765,7 +763,7 @@ class Lowerer {
     const opts = item.options;
     const read = (node, expected, label, required = false) => {
       if (!node) { if (required) error(item.loc, `sensor ${item.name} requires ${label}`); return null; }
-      const out = this.expression(node, new Map(), { allowNext: false });
+      const out = this.expression(node, new Map(), { allowNext: false }, [], expected);
       if (!sameType(out.type, expected) || out.constant === undefined) error(node.loc, `${label} must be a constant ${expected.kind}`);
       return out.constant;
     };
@@ -969,7 +967,7 @@ class Lowerer {
       }
       const value = recurse(node.value, locals, options, expected);
       if (node.op === '!') { if (!sameType(value.type, BOOL)) error(node.loc, '! requires Bool'); return { type: BOOL, sexpr: ['not', value.sexpr], constant: value.constant === undefined ? undefined : !value.constant }; }
-      if (node.op === '-') { if (!isNumeric(value.type)) error(node.loc, 'unary - requires numeric value'); const constant = value.constant === undefined ? undefined : -value.constant; validateNominalConstant(value.type, constant, node.loc); return { type: value.type, sexpr: ['sub', '0', value.sexpr], constant }; }
+      if (node.op === '-') { if (!isNumeric(value.type)) error(node.loc, 'unary - requires numeric value'); const constant = value.constant === undefined ? undefined : -value.constant; validateNominalConstant(value.type, constant, node.loc); return { type: value.type, sexpr: value.type.kind === 'Int' ? ['int-neg', value.sexpr] : ['sub', '0', value.sexpr], constant }; }
     }
     if (node.kind === 'binary') return this.binary(node, recurse, expected);
     if (node.kind === 'if') {
@@ -1010,7 +1008,10 @@ class Lowerer {
     if (['+', '-', '*', '/', 'div', '%'].includes(op)) {
       const type = arithmeticType(op, left.type, right.type, node.loc); const constants = left.constant === undefined || right.constant === undefined ? undefined : arithmetic(op, left.constant, right.constant, node.loc);
       validateNominalConstant(type, constants, node.loc);
-      return { type, sexpr: [{ '+': 'add', '-': 'sub', '*': 'mul', '/': 'div', div: 'int-div', '%': 'int-rem' }[op], left.sexpr, right.sexpr], constant: constants };
+      const head = type.kind === 'Int'
+        ? ({ '+': 'int-add', '-': 'int-sub', '*': 'int-mul', div: 'int-div', '%': 'int-rem' })[op]
+        : ({ '+': 'add', '-': 'sub', '*': 'mul', '/': 'div' })[op];
+      return { type, sexpr: [head, left.sexpr, right.sexpr], constant: constants };
     }
     if (op === '=>') error(node.loc, '=> is only valid in require declarations');
     error(node.loc, `unsupported operator ${op}`);
@@ -1132,12 +1133,13 @@ function arithmetic(op, left, right, loc) {
 function expressionStack(node) {
   if (!Array.isArray(node)) return 1;
   const [head, ...args] = node;
-  if (['not', 'int-to-number', 'int-exact', 'int-floor', 'int-ceil', 'int-trunc', 'int-nearest-even'].includes(head)) return expressionStack(args[0]);
+  if (head === 'int') return 1;
+  if (['not', 'int-neg', 'int-to-number', 'int-exact', 'int-floor', 'int-ceil', 'int-trunc', 'int-nearest-even'].includes(head)) return expressionStack(args[0]);
   if (head === 'if') {
     const condition = expressionStack(args[0]); const yes = expressionStack(args[1]); const no = expressionStack(args[2]);
     return Math.max(condition, 1 + yes, 2 + no);
   }
-  if (['and', 'or', 'eq', 'lt', 'lte', 'gt', 'gte', 'add', 'sub', 'mul', 'div', 'int-div', 'int-rem'].includes(head)) {
+  if (['and', 'or', 'eq', 'lt', 'lte', 'gt', 'gte', 'add', 'sub', 'mul', 'div', 'int-add', 'int-sub', 'int-mul', 'int-div', 'int-rem'].includes(head)) {
     const left = expressionStack(args[0]), right = expressionStack(args[1]); return Math.max(left, 1 + right);
   }
   return 129; // Should be unreachable after typed lowering; reject conservatively.

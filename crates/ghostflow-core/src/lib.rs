@@ -22,10 +22,11 @@ pub enum Type {
 }
 
 impl Type {
-    fn from_byte(value: u8) -> Result<Self> {
+    fn from_byte(value: u8, format_version: u16) -> Result<Self> {
         match value {
             1 => Ok(Self::Bool),
             2 => Ok(Self::Number),
+            3 if format_version == 2 => Ok(Self::Int),
             _ => Err(Error::new("invalid type")),
         }
     }
@@ -123,6 +124,7 @@ struct Constraint {
 #[derive(Clone)]
 pub struct Module {
     fingerprint: u64,
+    format_version: u16,
     name: String,
     version: u32,
     inputs: Vec<Field>,
@@ -143,7 +145,8 @@ impl Module {
         if reader.take(4)? != b"GFB1" {
             return Err(Error::new("invalid GFB1 magic"));
         }
-        if reader.u16()? != 1 {
+        let format_version = reader.u16()?;
+        if !matches!(format_version, 1 | 2) {
             return Err(Error::new("unsupported GFB format"));
         }
         let name = reader.string()?;
@@ -160,11 +163,11 @@ impl Module {
             if !names.insert(name.clone()) {
                 return Err(Error::new("duplicate input"));
             }
-            let value_type = Type::from_byte(reader.u8()?)?;
+            let value_type = Type::from_byte(reader.u8()?, format_version)?;
             let default = match value_type {
                 Type::Bool => Value::Bool(false),
                 Type::Number => Value::Number(0.0),
-                Type::Int => return Err(Error::new("unsupported GFB format")),
+                Type::Int => Value::Int(0),
             };
             inputs.push(Field {
                 name,
@@ -184,7 +187,7 @@ impl Module {
             if !names.insert(name.clone()) {
                 return Err(Error::new("duplicate state"));
             }
-            let value_type = Type::from_byte(reader.u8()?)?;
+            let value_type = Type::from_byte(reader.u8()?, format_version)?;
             let default = match value_type {
                 Type::Bool => match reader.u8()? {
                     0 => Value::Bool(false),
@@ -192,7 +195,7 @@ impl Module {
                     _ => return Err(Error::new("invalid bool default")),
                 },
                 Type::Number => Value::Number(reader.f64()?),
-                Type::Int => return Err(Error::new("unsupported GFB format")),
+                Type::Int => Value::Int(reader.i32()?),
             };
             states.push(Field {
                 name,
@@ -214,7 +217,7 @@ impl Module {
             }
             let priority = reader.i32()?;
             let query = reader.blob()?;
-            verify_query(&query)?;
+            verify_query(&query, format_version)?;
 
             let transition_count = reader.u16()? as usize;
             if transition_count > state_count {
@@ -228,7 +231,7 @@ impl Module {
                     return Err(Error::new("invalid transition target"));
                 }
                 let expression = reader.blob()?;
-                let ty = verify_expression(&expression, &inputs, &states, false)?;
+                let ty = verify_expression(&expression, &inputs, &states, false, format_version)?;
                 if ty != states[state_index].value_type {
                     return Err(Error::new("transition type mismatch"));
                 }
@@ -249,9 +252,11 @@ impl Module {
                 if !intent_names.insert(name.clone()) {
                     return Err(Error::new("duplicate intent"));
                 }
-                let value_type = Type::from_byte(reader.u8()?)?;
+                let value_type = Type::from_byte(reader.u8()?, format_version)?;
                 let expression = reader.blob()?;
-                if verify_expression(&expression, &inputs, &states, true)? != value_type {
+                if verify_expression(&expression, &inputs, &states, true, format_version)?
+                    != value_type
+                {
                     return Err(Error::new("intent type mismatch"));
                 }
                 intents.push(Intent {
@@ -306,11 +311,23 @@ impl Module {
                 }
             }
         }
+        let has_int_type = inputs
+            .iter()
+            .chain(&states)
+            .any(|field| field.value_type == Type::Int)
+            || strategies
+                .iter()
+                .flat_map(|strategy| &strategy.intents)
+                .any(|intent| intent.value_type == Type::Int);
+        if format_version == 2 && !has_int_type {
+            return Err(Error::new("unsupported GFB format 2 without Int"));
+        }
         if !reader.finished() {
             return Err(Error::new("trailing module bytes"));
         }
         Ok(Self {
             fingerprint,
+            format_version,
             name,
             version,
             inputs,
@@ -787,7 +804,7 @@ fn select_strategy(m: &Module, caps: &[Capability]) -> Result<usize> {
     let mut winner: Option<(usize, i32)> = None;
     let mut ambiguous = false;
     for (i, s) in m.strategies.iter().enumerate() {
-        if !eval_query(&s.query, caps)? {
+        if !eval_query(&s.query, caps, m.format_version)? {
             continue;
         }
         match winner {
@@ -936,6 +953,7 @@ fn verify_expression(
     inputs: &[Field],
     states: &[Field],
     allow_next: bool,
+    format_version: u16,
 ) -> Result<Type> {
     let mut r = Reader::new(code);
     let mut stack: [Option<Type>; MAX_STACK] = [None; MAX_STACK];
@@ -1016,16 +1034,25 @@ fn verify_expression(
                 type_push(&mut stack, &mut len, Type::Number)?;
             }
             23 => {
+                if format_version != 2 {
+                    return Err(Error::new("integer opcode requires GFB format 2"));
+                }
                 r.i32()?;
                 type_push(&mut stack, &mut len, Type::Int)?
             }
             24 => {
+                if format_version != 2 {
+                    return Err(Error::new("integer opcode requires GFB format 2"));
+                }
                 if type_pop(&mut stack, &mut len)? != Type::Int {
                     return Err(Error::new("integer negation expects Int"));
                 }
                 type_push(&mut stack, &mut len, Type::Int)?
             }
             25..=29 => {
+                if format_version != 2 {
+                    return Err(Error::new("integer opcode requires GFB format 2"));
+                }
                 let right = type_pop(&mut stack, &mut len)?;
                 let left = type_pop(&mut stack, &mut len)?;
                 if left != Type::Int || right != Type::Int {
@@ -1211,10 +1238,10 @@ fn value_pop(s: &[Value; MAX_STACK], n: &mut usize) -> Result<Value> {
     *n -= 1;
     Ok(s[*n])
 }
-fn verify_query(code: &[u8]) -> Result<()> {
-    eval_query(code, &[]).map(|_| ())
+fn verify_query(code: &[u8], format_version: u16) -> Result<()> {
+    eval_query(code, &[], format_version).map(|_| ())
 }
-fn eval_query(code: &[u8], caps: &[Capability]) -> Result<bool> {
+fn eval_query(code: &[u8], caps: &[Capability], format_version: u16) -> Result<bool> {
     let mut r = Reader::new(code);
     let mut s = [false; MAX_STACK];
     let mut n = 0;
@@ -1223,7 +1250,7 @@ fn eval_query(code: &[u8], caps: &[Capability]) -> Result<bool> {
             1 => {
                 let kind = r.string()?;
                 let name = r.string()?;
-                let ty = Type::from_byte(r.u8()?)?;
+                let ty = Type::from_byte(r.u8()?, format_version)?;
                 if n >= MAX_STACK {
                     return Err(Error::new("query stack"));
                 }
@@ -1347,6 +1374,7 @@ mod tests {
         let second_transition = vec![4, 1, 0, 3, 0, 0, second_opcode];
         Module {
             fingerprint: 85,
+            format_version: 2,
             name: "int-atomicity".into(),
             version: 1,
             inputs: vec![Field {
@@ -1404,7 +1432,7 @@ mod tests {
         ] {
             let code = expression_ints(left, right, opcode);
             assert_eq!(
-                verify_expression(&code, &[], &[], false).unwrap(),
+                verify_expression(&code, &[], &[], false, 2).unwrap(),
                 Type::Int
             );
             assert_eq!(
@@ -1504,7 +1532,7 @@ mod tests {
         for (opcode, expected) in [(19, 9.0), (20, 3.0), (21, 18.0), (22, 2.0)] {
             let code = expression_numbers(6.0, 3.0, opcode);
             assert_eq!(
-                verify_expression(&code, &[], &[], false).unwrap(),
+                verify_expression(&code, &[], &[], false, 1).unwrap(),
                 Type::Number
             );
             assert_eq!(
@@ -1514,8 +1542,8 @@ mod tests {
         }
         assert!(eval_expression(&expression_numbers(1.0, 0.0, 22), &[], &[], None).is_err());
         assert!(eval_expression(&expression_numbers(f64::MAX, 2.0, 21), &[], &[], None).is_err());
-        assert!(verify_expression(&[1, 1, 1, 0, 19], &[], &[], false).is_err());
-        assert!(verify_expression(&[19], &[], &[], false).is_err());
+        assert!(verify_expression(&[1, 1, 1, 0, 19], &[], &[], false, 1).is_err());
+        assert!(verify_expression(&[19], &[], &[], false, 1).is_err());
     }
     #[test]
     fn safety_rechecks_or_after_mutex_regardless_of_source_order() {
@@ -1687,10 +1715,10 @@ mod tests {
     }
     #[test]
     fn constant_query_and_bounds_are_verified() {
-        assert!(eval_query(&[5, 1], &[]).unwrap());
-        assert!(!eval_query(&[5, 0], &[]).unwrap());
-        assert!(verify_query(&[5, 2]).is_err());
-        assert!(verify_query(&[5]).is_err());
+        assert!(eval_query(&[5, 1], &[], 1).unwrap());
+        assert!(!eval_query(&[5, 0], &[], 1).unwrap());
+        assert!(verify_query(&[5, 2], 1).is_err());
+        assert!(verify_query(&[5], 1).is_err());
         assert!(Module::load(&vec![0; MAX_MODULE_BYTES + 1]).is_err());
     }
     #[test]

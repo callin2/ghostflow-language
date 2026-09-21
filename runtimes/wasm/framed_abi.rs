@@ -102,6 +102,12 @@ impl<'a> PacketReader<'a> {
         ))
     }
 
+    fn i32(&mut self) -> Result<i32, String> {
+        Ok(i32::from_le_bytes(
+            self.take(4)?.try_into().expect("four-byte slice"),
+        ))
+    }
+
     fn finished(&self) -> bool {
         self.at == self.bytes.len()
     }
@@ -153,7 +159,8 @@ unsafe fn decode_frame(
                 }
                 Value::Number(number)
             }
-            _ => return Err("input type must be bool (1) or number (2)".into()),
+            3 => Value::Int(reader.i32()?),
+            _ => return Err("input type must be bool (1), number (2), or Int (3)".into()),
         };
         inputs.push(ScanInput { name, value });
     }
@@ -224,7 +231,8 @@ pub unsafe extern "C" fn gf_frame_add_capability(
     let value_type = match value_type {
         1 => Type::Bool,
         2 => Type::Number,
-        _ => return handle.failure("capability type must be bool (1) or number (2)"),
+        3 => Type::Int,
+        _ => return handle.failure("capability type must be bool (1), number (2), or Int (3)"),
     };
     match &mut handle.state {
         FramedState::Configuring(runtime) => {

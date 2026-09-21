@@ -6,8 +6,9 @@ import { validateSolarDescriptor } from './solar-schedule.mjs';
 const FORMAT = 'GhostFlow/control-v1';
 const SETTINGS_FORMAT = 'GhostFlow/control-v2';
 const SOLAR_FORMAT = 'GhostFlow/control-v3';
+const INTEGER_FORMAT = 'GhostFlow/control-v4';
 const RESERVED = '__gf_';
-const TYPES = new Set(['Bool', 'Number', 'Percent', 'Duration']);
+const TYPES = new Set(['Bool', 'Int', 'Number', 'Percent', 'Duration']);
 const SENSOR_TYPES = new Set(['Bool', 'Number', 'Percent']);
 const MAX_WINDOW = 31;
 const MAX_SAFE = Number.MAX_SAFE_INTEGER;
@@ -74,6 +75,8 @@ function finite(value, label) {
 function typedValue(value, valueType, label) {
   if (valueType === 'Bool') {
     if (typeof value !== 'boolean') throw new TypeError(`${label} must be boolean`);
+  } else if (valueType === 'Int') {
+    safeInteger(value, label, -2147483648, 2147483647);
   } else if (valueType === 'Duration') {
     safeInteger(value, label);
   } else {
@@ -150,9 +153,9 @@ function validateSettings(config, label) {
 function validateManifest(input, { acceptSettings = false, acceptSolar = false } = {}) {
   const manifest = record(input, 'manifest');
   keys(manifest, ['format', 'name', 'inputs', 'outputs', 'sensors', 'schedules', 'timers', 'signals', 'configs', 'bytecodeSha256'], [], 'manifest');
-  if (manifest.format !== FORMAT && !(manifest.format === SETTINGS_FORMAT && acceptSettings) && !(manifest.format === SOLAR_FORMAT && acceptSolar)) throw new Error(`unsupported manifest format ${String(manifest.format)}`);
-  const settingsManifest = manifest.format === SETTINGS_FORMAT;
-  const solarManifest = manifest.format === SOLAR_FORMAT;
+  if (manifest.format !== FORMAT && manifest.format !== INTEGER_FORMAT && !(manifest.format === SETTINGS_FORMAT && acceptSettings) && !(manifest.format === SOLAR_FORMAT && acceptSolar)) throw new Error(`unsupported manifest format ${String(manifest.format)}`);
+  const settingsManifest = manifest.format === SETTINGS_FORMAT || manifest.format === INTEGER_FORMAT;
+  const solarManifest = manifest.format === SOLAR_FORMAT || manifest.format === INTEGER_FORMAT;
   name(manifest.name, 'manifest.name');
   if (typeof manifest.bytecodeSha256 !== 'string' || !/^[0-9a-f]{64}$/.test(manifest.bytecodeSha256)) throw new Error('manifest.bytecodeSha256 must be a lowercase SHA-256 hex digest');
 
@@ -168,13 +171,14 @@ function validateManifest(input, { acceptSettings = false, acceptSolar = false }
     if (solar) validateSolarDescriptor(item);
     return copy(item);
   });
-  if (solarManifest && !schedules.some(item => item.kind === 'solar')) throw new Error('v3 manifest requires a Solar schedule');
+  if (manifest.format === SOLAR_FORMAT && !schedules.some(item => item.kind === 'solar')) throw new Error('v3 manifest requires a Solar schedule');
   const timers = validateList(manifest.timers, 'manifest.timers', ['name', 'state', 'clockInput']);
   const signals = validateList(manifest.signals, 'manifest.signals', ['name', 'sensor', 'onBelow', 'offAbove', 'initial', 'valueInput', 'okInput']);
   const configs = validateList(manifest.configs, 'manifest.configs', ['name', 'type', 'value'], settingsManifest ? ['settings', 'initialOffset', 'initialEndOffset'] : []);
 
   for (const item of inputs) { name(item.name, 'input.name'); type(item.type, `input ${item.name}.type`); }
   for (const item of outputs) { name(item.name, 'output.name'); type(item.type, `output ${item.name}.type`); }
+  if (manifest.format === INTEGER_FORMAT && ![...inputs, ...outputs, ...configs].some(item => item.type === 'Int')) throw new Error('v4 manifest requires an Int declaration');
   unique(inputs.map(item => item.name), 'input');
   unique(outputs.map(item => item.name), 'output');
   unique([...inputs, ...outputs].map(item => item.name), 'port');
@@ -323,7 +327,7 @@ async function instantiateControlRuntime(wasmBytes, { bytes: bytecode, manifest 
       // its own bounded 31-slot state and can be checkpointed independently.
       signals.set(item.name, { item, conditioner: new SignalConditioner(runtime.wasm, { ...sensorConfig(sensor), hysteresis: { onBelow: item.onBelow, offAbove: item.offAbove, initial: item.initial } }) });
     }
-    for (const output of checkedManifest.manifest.outputs) runtime.addCapability('actuator', output.name, output.type === 'Bool' ? 'bool' : 'number');
+    for (const output of checkedManifest.manifest.outputs) runtime.addCapability('actuator', output.name, output.type === 'Bool' ? 'bool' : output.type === 'Int' ? 'int' : 'number');
     runtime.activate();
   } catch (error) {
     for (const { conditioner } of signals.values()) conditioner.dispose();
@@ -394,6 +398,7 @@ export class ControlRuntime {
     for (const item of this.manifest.inputs) {
       const value = captured.inputValues.get(item.name);
       if (item.type === 'Bool') this.runtime.setBool(item.name, value);
+      else if (item.type === 'Int') this.runtime.setInt(item.name, value);
       else this.runtime.setNumber(item.name, value);
     }
     for (const [sensorName, entry] of this.sensors) {
@@ -491,18 +496,18 @@ export class ControlRuntime {
     try {
       const { sensorReadings, signalReadings } = this.#condition(captured.normalizedSamples, captured.nowMs);
       const frameInputs = [];
-      for (const item of this.manifest.inputs) frameInputs.push({ name: item.name, value: captured.inputValues.get(item.name) });
+      for (const item of this.manifest.inputs) frameInputs.push({ name: item.name, type: item.type, value: captured.inputValues.get(item.name) });
       for (const [, entry] of this.sensors) {
         const reading = sensorReadings.get(entry.item.name);
-        frameInputs.push({ name: entry.item.valueInput, value: reading.value });
-        frameInputs.push({ name: entry.item.okInput, value: reading.ok });
+        frameInputs.push({ name: entry.item.valueInput, type: entry.item.type, value: reading.value });
+        frameInputs.push({ name: entry.item.okInput, type: 'Bool', value: reading.ok });
       }
       for (const [, entry] of this.signals) {
         const reading = signalReadings.get(entry.item.name);
-        frameInputs.push({ name: entry.item.valueInput, value: reading.value });
-        frameInputs.push({ name: entry.item.okInput, value: reading.ok });
+        frameInputs.push({ name: entry.item.valueInput, type: 'Bool', value: reading.value });
+        frameInputs.push({ name: entry.item.okInput, type: 'Bool', value: reading.ok });
       }
-      for (const item of this.manifest.schedules) frameInputs.push({ name: item.dueInput, value: captured.dueValues.get(item.name) ?? false });
+      for (const item of this.manifest.schedules) frameInputs.push({ name: item.dueInput, type: 'Bool', value: captured.dueValues.get(item.name) ?? false });
 
       const scanId = this.#frameScanId;
       const outcome = this.runtime.scan({ scanId, logicalTimeMs: captured.nowMs, inputs: frameInputs });

@@ -37,9 +37,9 @@ export class GhostFlowRuntime {
   get journalLength() { return Number(this.wasm.gf_journal_len(this.handle)); }
 
   addCapability(kind, name, type) {
-    if (!['bool', 'number'].includes(type)) throw new Error('invalid capability type');
+    if (!['bool', 'number', 'int'].includes(type)) throw new Error('invalid capability type');
     this.#twoTexts(kind, name, (kp, kn, np, nn) =>
-      this.#check(this.wasm.gf_add_capability(this.handle, kp, kn, np, nn, type === 'number' ? 2 : 1)));
+      this.#check(this.wasm.gf_add_capability(this.handle, kp, kn, np, nn, { bool: 1, number: 2, int: 3 }[type])));
   }
 
   setBool(name, value) {
@@ -52,10 +52,28 @@ export class GhostFlowRuntime {
     this.#text(name, (p, n) => this.#check(this.wasm.gf_set_number(this.handle, p, n, value)));
   }
 
+  setInt(name, value) {
+    if (!Number.isInteger(value) || value < -2147483648 || value > 2147483647) throw new Error('expected signed i32 integer');
+    this.#text(name, (p, n) => this.#check(this.wasm.gf_set_int(this.handle, p, n, value)));
+  }
+
   stateBool(name) { return this.#getBool('gf_get_state_bool', name); }
   intentBool(name) { return this.#getBool('gf_get_intent_bool', name); }
   stateNumber(name) { return this.#getNumber('gf_get_state_number', name); }
   intentNumber(name) { return this.#getNumber('gf_get_intent_number', name); }
+  stateInt(name) { return this.#getInt('gf_get_state_int', name); }
+  intentInt(name) { return this.#getInt('gf_get_intent_int', name); }
+
+  #getInt(functionName, name) {
+    return this.#text(name, (p, n) => {
+      const found = this.wasm.gf_alloc(4);
+      try {
+        new DataView(this.wasm.memory.buffer).setInt32(found, 0, true);
+        const value = this.wasm[functionName](this.handle, p, n, found);
+        return new DataView(this.wasm.memory.buffer).getInt32(found, true) ? value : undefined;
+      } finally { this.wasm.gf_dealloc(found, 4); }
+    });
+  }
 
   #getNumber(functionName, name) {
     return this.#text(name, (p, n) => {

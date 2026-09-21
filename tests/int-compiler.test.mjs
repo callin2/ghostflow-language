@@ -81,9 +81,14 @@ test('N1-CONV-01/02: explicit conversions type-check and invalid constants diagn
   rejects('control ConversionRange { config x: Int = int_floor(2147483648.0); }', 'integer conversion constant is outside -2147483648..2147483647');
 });
 
-test('Int programs require the integer-capable serializer after type checking', () => {
-  assert.throws(
-    () => compileControl('control PendingGfb { output count: Int; count <- 1; }', { filename: 'pending.ghost' }),
-    /Int bytecode serialization is not available in GFB1 version 1/,
-  );
+test('Int programs use the distinct integer-capable GFB v2 format', () => {
+  const compiled = compileControl(`control IntegerGfb {
+    state minimum: Int = -2147483648;
+    state zero: Int = 0;
+    state maximum: Int = 2147483647;
+    output count: Int;
+    count <- maximum;
+  }`, { filename: 'integer-gfb.ghost' });
+  assert.equal(new DataView(compiled.bytes.buffer, compiled.bytes.byteOffset).getUint16(4, true), 2);
+  assert.equal(compiled.manifest.format, 'GhostFlow/control-v4');
 });
