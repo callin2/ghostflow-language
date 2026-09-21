@@ -6,7 +6,7 @@
   - node 40-file LANGUAGE_TESTS suite: **378/378 PASS, exit 0**
   - `cargo test --locked --offline --workspace`: **71/71 PASS**
   - prior state (still true): tutorial PASS exit 0 · fmt clean · release builds OK · resource_report PASS · full `npm test` still gated by the deliberate win32 guard at verify-language.mjs:235 (every gate behind it individually passes on this host)
-- Merged on `dev` this session: **#109** win32 host compat (`9a09c76`; suite 308/45 → 377/377) · **#111** live-property contract alignment · **#112** the #110 doc correction (→ `ce995c6`)
+- Merged on `dev` this session: **#109** win32 host compat (`9a09c76`; suite 308/45 → 378/378) · **#111** live-property contract alignment · **#112** the #110 doc correction (→ `ce995c6`). Note: earlier notes said "377/377" — that was a grep-counting artifact (`grep -c '^✔'` undercounts by 1); node's own tally says tests=378 pass=378. Read counts from the tool's summary lines, not progress lines.
 - Issue work: sub-issue #110 created under #89 this session and its doc work is merged — but **issue #110 itself is still `open`** (the `Fixes #110` link did not trip the auto-closer on the reconciled merge path). Closing it is the immediate pending action (user's call).
 - Env: Node 26 · rustfmt + wasm32 target present · cargo cache warm (`cargo fetch` first run) · gh authed as callin2 (PATH: `C:/Program Files/GitHub CLI`)
 - Next single action: close issue #110 (work is done and merged); then backlog picks
@@ -38,7 +38,7 @@ Windows breakdown (this box — all gates individually verified green):
    `-p ghostflow-core --example run` + `--example scan_tape` +
    `--example scan_adapter` (all `--locked --offline --release`)
 6. `node --test <the 40 files listed in LANGUAGE_TESTS>` — baseline GREEN
-   (377/377); judge regressions against green, not against a failure class
+   (378/378 per node's own tally `ℹ tests 378 / ℹ pass 378`); judge regressions against green, not against a failure class
 7. `node tools/tutorial.mjs` (self-builds the debug example; PASS = the
    last non-guarded full-oracle piece)
 
@@ -124,7 +124,7 @@ Windows breakdown (this box — all gates individually verified green):
   the example is compiler-accepted (tests/operating-settings.test.mjs
   compiles exactly that form); the doc header already labels future design
   examples as such.
-- Oracle (re-run, never assert): full 40-file node suite (expect 377/377,
+- Oracle (re-run, never assert): full 40-file node suite (expect 378/378;
   incl. the catalog validator) + `cargo test --locked --offline
   --workspace` (71/71; doc-only change but re-run per discipline).
 - Delivery: branch `issue-110-live-settings-doc` -> PR to **dev** (NOT
