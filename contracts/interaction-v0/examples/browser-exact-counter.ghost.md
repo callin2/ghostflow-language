@@ -10,6 +10,7 @@ control BrowserExactCounter {
   input DI5, DI6, DI7, DI8: Bool;
   output RO1, RO2, RO3, RO4: Bool;
   output RO5, RO6, RO7, RO8: Bool;
+  config counter_seed: Int = 0;
 
   // ghostflow:link id=GF-INT-FIXTURE-BROWSER-EXACT-COUNTER-V0 relation=implements meaning=counter
   state accepted_count: Int = 0;
