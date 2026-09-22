@@ -111,11 +111,13 @@ function descriptor(value, index, errors) {
   }
   const fields = value.kind === 'timer'
     ? ['id', 'name', 'kind', 'sourceType', 'access', 'operation', 'provenance']
+    : value.kind === 'setting'
+      ? ['id', 'name', 'kind', 'sourceType', 'access', 'authority', 'applyPolicy', 'label', 'constraint', 'provenance']
     : ['id', 'name', 'kind', 'sourceType', 'access', 'provenance'];
   if (!exactObject(value, fields, path, errors)) return;
   publicId(value.id, `${path}.id`, errors);
   publicId(value.name, `${path}.name`, errors);
-  if (!['state', 'timer', 'counter'].includes(value.kind)) issue(errors, `${path}.kind`, 'descriptor_kind', 'v0 supports state, timer, and counter only');
+  if (!['state', 'timer', 'counter', 'setting'].includes(value.kind)) issue(errors, `${path}.kind`, 'descriptor_kind', 'v0 supports state, timer, counter, and setting only');
   sourceType(value.sourceType, `${path}.sourceType`, errors);
   if (!Array.isArray(value.access) || value.access.length !== 1 || value.access[0] !== 'read') {
     issue(errors, `${path}.access`, 'access', 'must be exactly ["read"] for a v0 observation');
@@ -132,7 +134,23 @@ function descriptor(value, index, errors) {
   if (value.kind === 'counter' && (value.sourceType?.kind !== 'builtin' || value.sourceType?.name !== 'Int' || value.sourceType?.unit !== null)) {
     issue(errors, `${path}.sourceType`, 'counter_type', 'must be builtin Int with no unit');
   }
-  provenance(value.provenance, value.kind === 'counter' ? 'state' : value.kind, `${path}.provenance`, errors);
+  if (value.kind === 'setting') {
+    if (!['operator', 'designer'].includes(value.authority)) issue(errors, `${path}.authority`, 'setting_authority', 'must be operator or designer');
+    if (value.applyPolicy !== 'stopped') issue(errors, `${path}.applyPolicy`, 'setting_apply', 'must be stopped');
+    if (typeof value.label !== 'string' || value.label.length < 1 || value.label.length > 128) issue(errors, `${path}.label`, 'setting_label', 'must be 1 to 128 characters');
+    if (value.sourceType?.kind === 'builtin' && value.sourceType?.name === 'Bool') {
+      if (!exactObject(value.constraint, ['kind', 'values'], `${path}.constraint`, errors)
+          || value.constraint.kind !== 'choices' || JSON.stringify(value.constraint.values) !== '[false,true]') {
+        issue(errors, `${path}.constraint`, 'setting_constraint', 'Bool setting choices must be [false,true]');
+      }
+    } else if (exactObject(value.constraint, ['kind', 'min', 'max', 'step'], `${path}.constraint`, errors)) {
+      const { min, max, step } = value.constraint;
+      if (value.constraint.kind !== 'range' || ![min, max, step].every(Number.isFinite) || step <= 0 || min > max) {
+        issue(errors, `${path}.constraint`, 'setting_constraint', 'must be a finite ordered range with positive step');
+      }
+    }
+  }
+  provenance(value.provenance, value.kind === 'counter' ? 'state' : value.kind === 'setting' ? 'config' : value.kind, `${path}.provenance`, errors);
 }
 
 function validateSchema(schema, errors) {
@@ -179,7 +197,7 @@ function readyValue(type, value, path, errors) {
   }
 }
 
-function observation(value, type, index, errors) {
+function observation(value, descriptorValue, index, errors) {
   const path = `snapshot.observations[${index}]`;
   if (!object(value)) {
     issue(errors, path, 'shape', 'must be an object');
@@ -192,7 +210,17 @@ function observation(value, type, index, errors) {
         : ['descriptorId', 'status'];
   if (!exactObject(value, fields, path, errors)) return;
   publicId(value.descriptorId, `${path}.descriptorId`, errors);
-  if (value.status === 'ready') readyValue(type, value.value, `${path}.value`, errors);
+  if (value.status === 'ready') {
+    readyValue(descriptorValue?.sourceType, value.value, `${path}.value`, errors);
+    if (descriptorValue?.kind === 'setting') {
+      const constraint = descriptorValue.constraint;
+      if (constraint?.kind === 'range' && (typeof value.value !== 'number' || value.value < constraint.min || value.value > constraint.max
+          || Math.abs((value.value - constraint.min) / constraint.step - Math.round((value.value - constraint.min) / constraint.step)) > 1e-9)) {
+        issue(errors, `${path}.value`, 'setting_value', 'must satisfy the authored range and step');
+      }
+      if (constraint?.kind === 'choices' && !constraint.values?.includes(value.value)) issue(errors, `${path}.value`, 'setting_value', 'must be an authored choice');
+    }
+  }
   if (value.status === 'unavailable' && (typeof value.reason !== 'string' || !value.reason)) issue(errors, `${path}.reason`, 'observation_reason', 'must be non-empty');
   if (value.status === 'error' && (typeof value.error !== 'string' || !value.error)) issue(errors, `${path}.error`, 'observation_error', 'must be non-empty');
 }
@@ -220,15 +248,15 @@ function validateSnapshot(schema, snapshot, errors) {
     issue(errors, 'snapshot.observations', 'observations', 'must be an array');
     return;
   }
-  const types = new Map(schema.descriptors.map(entry => [entry.id, entry.sourceType]));
+  const descriptors = new Map(schema.descriptors.map(entry => [entry.id, entry]));
   const ids = new Set();
   snapshot.observations.forEach((entry, index) => {
-    observation(entry, types.get(entry?.descriptorId), index, errors);
-    if (!types.has(entry?.descriptorId)) issue(errors, `snapshot.observations[${index}].descriptorId`, 'unknown_descriptor', 'is absent from the static schema');
+    observation(entry, descriptors.get(entry?.descriptorId), index, errors);
+    if (!descriptors.has(entry?.descriptorId)) issue(errors, `snapshot.observations[${index}].descriptorId`, 'unknown_descriptor', 'is absent from the static schema');
     if (ids.has(entry?.descriptorId)) issue(errors, `snapshot.observations[${index}].descriptorId`, 'duplicate_descriptor', 'must occur once');
     ids.add(entry?.descriptorId);
   });
-  for (const descriptorId of types.keys()) if (!ids.has(descriptorId)) issue(errors, 'snapshot.observations', 'missing_observation', `must explicitly cover ${descriptorId}`);
+  for (const descriptorId of descriptors.keys()) if (!ids.has(descriptorId)) issue(errors, 'snapshot.observations', 'missing_observation', `must explicitly cover ${descriptorId}`);
 }
 
 function expectedJoin(schema, snapshot, expected) {

@@ -183,7 +183,7 @@ test('GF-TEST-interaction-v0-rejection: rejects unknown fields, mismatched ident
   ]) expectInvalid(mutate, 'identity_mismatch');
   expectInvalid((candidate) => { candidate.descriptors[0].id = '__gf_state_pressure'; }, 'public_identity');
   expectInvalid((_schema, candidate) => { candidate.observations.pop(); }, 'missing_observation');
-  for (const kind of ['input', 'setting', 'command']) {
+  for (const kind of ['input', 'command']) {
     expectInvalid((candidate) => { candidate.descriptors[0].kind = kind; }, 'descriptor_kind');
   }
   expectInvalid((candidate) => { candidate.source.kind = 'plain'; }, 'source_kind');

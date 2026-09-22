@@ -54,7 +54,10 @@ function sourceType(name) {
 }
 
 function validationSnapshot(schema) {
-  const valueFor = type => {
+  const valueFor = descriptor => {
+    if (descriptor.kind === 'setting' && descriptor.constraint.kind === 'range') return descriptor.constraint.min;
+    if (descriptor.kind === 'setting' && descriptor.constraint.kind === 'choices') return descriptor.constraint.values[0];
+    const type = descriptor.sourceType;
     if (type.kind === 'builtin' && type.name === 'Bool') return false;
     return 0;
   };
@@ -67,7 +70,7 @@ function validationSnapshot(schema) {
     runId: 'schema-validation',
     completion: { kind: 'completed-scan', scanId: 0, logicalTimeMs: 0 },
     observations: schema.descriptors.map(descriptor => ({
-      descriptorId: descriptor.id, status: 'ready', value: valueFor(descriptor.sourceType),
+      descriptorId: descriptor.id, status: 'ready', value: valueFor(descriptor),
     })),
   };
 }
@@ -105,14 +108,29 @@ function expectedSchema(compilation, identityValue) {
   }
   const declaredStates = new Map();
   for (const item of ast.body) if (item.kind === 'state') declaredStates.set(item.name, item.type.name);
+  const configs = new Map((manifest.configs ?? []).map(config => [config.name, config]));
   const descriptors = [];
   for (const item of ast.body) {
-    if (item.kind !== 'state' && item.kind !== 'timer') continue;
+    if (item.kind !== 'state' && item.kind !== 'timer' && item.kind !== 'config') continue;
+    const config = item.kind === 'config' ? configs.get(item.name) : null;
+    if (item.kind === 'config' && !config?.settings) continue;
     const node = nodeById.get(item.id);
     if (!node || node.kind !== item.kind) fail(`compiler source node is missing for ${item.kind}.${item.name}`);
     const links = linksByNode.get(`${item.id}\u0000${item.kind}`);
     if (!links?.length) fail(`${item.kind}.${item.name} has no literate intent-anchor provenance`);
     const anchors = links.map(link => link.anchorId);
+    if (item.kind === 'config') {
+      const settings = config.settings;
+      descriptors.push({
+        id: `setting.${item.name}`, name: item.name, kind: 'setting', sourceType: sourceType(config.type), access: ['read'],
+        authority: settings.access, applyPolicy: settings.apply ?? 'stopped', label: settings.label ?? item.name,
+        constraint: config.type === 'Bool'
+          ? { kind: 'choices', values: [false, true] }
+          : { kind: 'range', min: settings.min, max: settings.max, step: settings.step },
+        provenance: { sourceNode: { id: item.id, kind: 'config' }, intentAnchorIds: anchors },
+      });
+      continue;
+    }
     if (item.kind === 'state') {
       const counter = links.some(link => link.meaning === 'counter');
       if (counter && item.type.name !== 'Int') fail(`state.${item.name} counter meaning requires Int`);

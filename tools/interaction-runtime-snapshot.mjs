@@ -69,7 +69,14 @@ function timerClockMalformed(descriptor, trace) {
   return value !== undefined && (!Number.isSafeInteger(value) || value < 0);
 }
 
-function publicObservation(descriptor, values, trace) {
+function publicObservation(descriptor, values, trace, settings) {
+  if (descriptor.kind === 'setting') {
+    if (!settings.has(descriptor.name)) return { descriptorId: descriptor.id, status: 'unavailable', reason: 'runtime-value-unavailable' };
+    const value = settings.get(descriptor.name);
+    return typeMatches(descriptor.sourceType, value)
+      ? { descriptorId: descriptor.id, status: 'ready', value }
+      : { descriptorId: descriptor.id, status: 'error', error: 'runtime-value-type-mismatch' };
+  }
   const runtimeKind = descriptor.kind === 'counter' ? 'state' : descriptor.kind;
   const value = values.get(`${runtimeKind}\u0000${descriptor.name}`);
   if (value) {
@@ -144,6 +151,9 @@ export function emitCompletedScanSnapshot({ compilation, schema, runId, completi
     throw new Error('interaction runtime snapshot: runtime observation could not be verified');
   }
   const values = new Map(observed.values.map(value => [runtimeValueKey(value), value]));
+  const settings = new Map((compilation.manifest?.configs ?? [])
+    .filter(config => config?.settings)
+    .map(config => [config.name, config.value]));
   const snapshot = {
     format: 'GhostFlow/runtime-snapshot-v0',
     version: '0.1',
@@ -156,7 +166,7 @@ export function emitCompletedScanSnapshot({ compilation, schema, runId, completi
     source: { ...verifiedSchema.source },
     runId,
     completion: { ...completion },
-    observations: verifiedSchema.descriptors.map(descriptor => publicObservation(descriptor, values, trace)),
+    observations: verifiedSchema.descriptors.map(descriptor => publicObservation(descriptor, values, trace, settings)),
   };
   const validated = validateInteraction(verifiedSchema, snapshot);
   if (!validated.valid) throw new Error('interaction runtime snapshot: produced snapshot failed contract validation');
