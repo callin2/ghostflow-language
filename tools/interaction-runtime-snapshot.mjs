@@ -44,6 +44,7 @@ function runtimeSchema(compilation, suppliedSchema) {
 
 function typeMatches(type, value) {
   if (type?.kind === 'builtin' && type.name === 'Bool') return typeof value === 'boolean';
+  if (type?.kind === 'builtin' && type.name === 'Int') return Number.isInteger(value) && value >= -2147483648 && value <= 2147483647;
   if (type?.kind === 'builtin' && type.name === 'Number') return typeof value === 'number' && Number.isFinite(value);
   if (type?.kind === 'builtin' && type.name === 'Duration') return Number.isSafeInteger(value) && value >= 0;
   return type?.kind === 'nominal' && value !== null
@@ -55,6 +56,7 @@ function runtimeValueKey(value) {
 }
 
 function stateMalformed(descriptor, trace) {
+  if (descriptor.kind !== 'state' && descriptor.kind !== 'counter') return false;
   const stateAfter = trace?.stateAfter;
   if (!object(stateAfter) || !Object.hasOwn(stateAfter, descriptor.name)) return false;
   const value = stateAfter[descriptor.name];
@@ -68,13 +70,14 @@ function timerClockMalformed(descriptor, trace) {
 }
 
 function publicObservation(descriptor, values, trace) {
-  const value = values.get(`${descriptor.kind}\u0000${descriptor.name}`);
+  const runtimeKind = descriptor.kind === 'counter' ? 'state' : descriptor.kind;
+  const value = values.get(`${runtimeKind}\u0000${descriptor.name}`);
   if (value) {
     return typeMatches(descriptor.sourceType, value.value)
       ? { descriptorId: descriptor.id, status: 'ready', value: value.value }
       : { descriptorId: descriptor.id, status: 'error', error: 'runtime-value-type-mismatch' };
   }
-  if (descriptor.kind === 'state' && stateMalformed(descriptor, trace)) {
+  if ((descriptor.kind === 'state' || descriptor.kind === 'counter') && stateMalformed(descriptor, trace)) {
     return { descriptorId: descriptor.id, status: 'error', error: 'runtime-value-invalid' };
   }
   if (timerClockMalformed(descriptor, trace)) {

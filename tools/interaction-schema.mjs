@@ -48,7 +48,7 @@ function canonicalDocument(document) {
 }
 
 function sourceType(name) {
-  if (name === 'Bool' || name === 'Number') return { kind: 'builtin', name, unit: null };
+  if (name === 'Bool' || name === 'Int' || name === 'Number') return { kind: 'builtin', name, unit: null };
   if (name === 'Duration') return { kind: 'builtin', name, unit: 'ms' };
   return { kind: 'nominal', name, unit: name === 'Percent' ? 'percent' : null };
 }
@@ -99,9 +99,9 @@ function expectedSchema(compilation, identityValue) {
   for (const link of trace.intentLinks ?? []) {
     if (!link || !PUBLIC_ID.test(link.anchorId) || link.anchorId.startsWith('__gf_')) continue;
     const key = `${link.nodeId}\u0000${link.nodeKind}`;
-    const anchors = linksByNode.get(key) ?? [];
-    if (!anchors.includes(link.anchorId)) anchors.push(link.anchorId);
-    linksByNode.set(key, anchors);
+    const links = linksByNode.get(key) ?? [];
+    if (!links.some(entry => entry.anchorId === link.anchorId)) links.push(link);
+    linksByNode.set(key, links);
   }
   const declaredStates = new Map();
   for (const item of ast.body) if (item.kind === 'state') declaredStates.set(item.name, item.type.name);
@@ -110,11 +110,14 @@ function expectedSchema(compilation, identityValue) {
     if (item.kind !== 'state' && item.kind !== 'timer') continue;
     const node = nodeById.get(item.id);
     if (!node || node.kind !== item.kind) fail(`compiler source node is missing for ${item.kind}.${item.name}`);
-    const anchors = linksByNode.get(`${item.id}\u0000${item.kind}`);
-    if (!anchors?.length) fail(`${item.kind}.${item.name} has no literate intent-anchor provenance`);
+    const links = linksByNode.get(`${item.id}\u0000${item.kind}`);
+    if (!links?.length) fail(`${item.kind}.${item.name} has no literate intent-anchor provenance`);
+    const anchors = links.map(link => link.anchorId);
     if (item.kind === 'state') {
+      const counter = links.some(link => link.meaning === 'counter');
+      if (counter && item.type.name !== 'Int') fail(`state.${item.name} counter meaning requires Int`);
       descriptors.push({
-        id: `state.${item.name}`, name: item.name, kind: 'state', sourceType: sourceType(item.type.name), access: ['read'],
+        id: `${counter ? 'counter' : 'state'}.${item.name}`, name: item.name, kind: counter ? 'counter' : 'state', sourceType: sourceType(item.type.name), access: ['read'],
         provenance: { sourceNode: { id: item.id, kind: 'state' }, intentAnchorIds: anchors },
       });
       continue;

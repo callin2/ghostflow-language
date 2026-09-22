@@ -47,12 +47,16 @@ authoring, import, artifact, or Interaction Schema fallback.
 
 Every descriptor has a public stable authored `id` and `name`, a semantic
 `kind`, compiler/source semantic `sourceType`, explicit `access`, and
-provenance. v0 permits only `state` and `timer`, each with access exactly
-`["read"]`: both are observation-only internal values. Settings, commands,
+provenance. v0 permits `state`, `timer`, and `counter`, each with access exactly
+`["read"]`: all are observation-only internal values. A counter is an authored
+`Int` state whose existing literate link carries `meaning=counter`; an
+unannotated `Int`, an arbitrary `Number`, an integer-looking runtime value, or a
+name never implies counter meaning. Counter provenance therefore retains the
+authored source node kind `state`. Settings, commands,
 inputs, events, alarms, and explanations are later work owned by #70. This
 contract does not grant `write` or `execute` access before those designs exist.
 `sourceType`
-carries `builtin` `Bool`, `Number`, or `Duration`, or a named `nominal` type and
+carries `builtin` `Bool`, `Int`, `Number`, or `Duration`, or a named `nominal` type and
 semantic unit. Runtime JSON spelling never selects the type: `0` remains a
 `Number` or a `Duration` only because the static descriptor says which it is.
 

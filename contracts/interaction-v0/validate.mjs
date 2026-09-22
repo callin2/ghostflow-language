@@ -11,6 +11,7 @@ const SHA256 = /^[a-f0-9]{64}$/;
 const MODULE_FINGERPRINT = /^[a-f0-9]{16}$/;
 const BUILTIN_TYPES = new Map([
   ['Bool', null],
+  ['Int', null],
   ['Number', null],
   ['Duration', 'ms'],
 ]);
@@ -74,7 +75,7 @@ function sourceType(value, path, errors) {
   if (!exactObject(value, ['kind', 'name', 'unit'], path, errors)) return;
   if (value.kind !== 'builtin' && value.kind !== 'nominal') issue(errors, `${path}.kind`, 'source_type', 'must be builtin or nominal');
   if (value.kind === 'builtin') {
-    if (!BUILTIN_TYPES.has(value.name)) issue(errors, `${path}.name`, 'source_type', 'must be Bool, Number, or Duration');
+    if (!BUILTIN_TYPES.has(value.name)) issue(errors, `${path}.name`, 'source_type', 'must be Bool, Int, Number, or Duration');
     else if (value.unit !== BUILTIN_TYPES.get(value.name)) issue(errors, `${path}.unit`, 'unit', `must be ${BUILTIN_TYPES.get(value.name) ?? 'null'} for ${value.name}`);
   } else {
     publicId(value.name, `${path}.name`, errors);
@@ -114,7 +115,7 @@ function descriptor(value, index, errors) {
   if (!exactObject(value, fields, path, errors)) return;
   publicId(value.id, `${path}.id`, errors);
   publicId(value.name, `${path}.name`, errors);
-  if (!['state', 'timer'].includes(value.kind)) issue(errors, `${path}.kind`, 'descriptor_kind', 'v0 supports state and timer only');
+  if (!['state', 'timer', 'counter'].includes(value.kind)) issue(errors, `${path}.kind`, 'descriptor_kind', 'v0 supports state, timer, and counter only');
   sourceType(value.sourceType, `${path}.sourceType`, errors);
   if (!Array.isArray(value.access) || value.access.length !== 1 || value.access[0] !== 'read') {
     issue(errors, `${path}.access`, 'access', 'must be exactly ["read"] for a v0 observation');
@@ -128,7 +129,10 @@ function descriptor(value, index, errors) {
       issue(errors, `${path}.sourceType`, 'timer_type', 'must be builtin Duration in ms');
     }
   }
-  provenance(value.provenance, value.kind, `${path}.provenance`, errors);
+  if (value.kind === 'counter' && (value.sourceType?.kind !== 'builtin' || value.sourceType?.name !== 'Int' || value.sourceType?.unit !== null)) {
+    issue(errors, `${path}.sourceType`, 'counter_type', 'must be builtin Int with no unit');
+  }
+  provenance(value.provenance, value.kind === 'counter' ? 'state' : value.kind, `${path}.provenance`, errors);
 }
 
 function validateSchema(schema, errors) {
@@ -167,6 +171,7 @@ function sameIdentity(actual, expected, path, errors) {
 
 function readyValue(type, value, path, errors) {
   if (type?.kind === 'builtin' && type.name === 'Bool' && typeof value !== 'boolean') issue(errors, path, 'value_type', 'must be Bool from source semantics');
+  if (type?.kind === 'builtin' && type.name === 'Int' && (!Number.isInteger(value) || value < -2147483648 || value > 2147483647)) issue(errors, path, 'value_type', 'must be a signed i32 Int from source semantics');
   if (type?.kind === 'builtin' && type.name === 'Number' && (typeof value !== 'number' || !Number.isFinite(value))) issue(errors, path, 'value_type', 'must be finite Number from source semantics');
   if (type?.kind === 'builtin' && type.name === 'Duration' && (!Number.isSafeInteger(value) || value < 0)) issue(errors, path, 'value_type', 'must be a non-negative safe integer milliseconds Duration');
   if (type?.kind === 'nominal' && (value === null || !['boolean', 'number', 'string'].includes(typeof value) || (typeof value === 'number' && !Number.isFinite(value)))) {

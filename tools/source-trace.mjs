@@ -25,6 +25,7 @@ const INTENT_TARGET_KINDS = new Set([
 ]);
 const ANCHOR_FIELDS = ['id', 'kind', 'status', 'origin', 'directiveSource', 'source'];
 const LINK_FIELDS = ['anchorId', 'relation', 'nodeId', 'nodeKind', 'directiveSource', 'source', 'extractedDirectiveSource', 'extractedSource'];
+const COUNTER_LINK_FIELDS = [...LINK_FIELDS, 'meaning'];
 
 function object(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -290,6 +291,7 @@ export function attachIntentMetadata(metadata, { anchors, linkDirectives, ast, s
       validateDirective(linked);
       intentLinks.push({
         anchorId: linked.anchorId, relation: linked.relation, nodeId: node.id, nodeKind: node.kind,
+        ...(linked.meaning ? { meaning: linked.meaning } : {}),
         directiveSource: linked.directiveSource,
         source,
         extractedDirectiveSource: linked.extractedDirectiveSource,
@@ -427,10 +429,13 @@ export function verifySourceTraceMetadata(metadata, bytes, nodes, {
     if (metadata.intentLinks.length !== expectedLinks.length) throw new Error('intent link extraction count mismatch');
     const linkKeys = new Set();
     for (const [index, link] of metadata.intentLinks.entries()) {
-      requireExactFields(link, LINK_FIELDS, 'intent link');
+      requireExactFields(link, link.meaning === 'counter' ? COUNTER_LINK_FIELDS : LINK_FIELDS, 'intent link');
       if (typeof link.anchorId !== 'string' || !INTENT_RELATIONS.has(link.relation)
           || !Number.isInteger(link.nodeId) || !INTENT_TARGET_KINDS.has(link.nodeKind)) {
         throw new Error('intent link shape mismatch');
+      }
+      if (link.meaning === 'counter' && (link.relation !== 'implements' || link.nodeKind !== 'state')) {
+        throw new Error('counter meaning requires an implemented authored state');
       }
       requireRange(link.directiveSource, 'intent link directive', sourceDocument);
       requireRange(link.source, 'intent link source', sourceDocument);
@@ -445,6 +450,7 @@ export function verifySourceTraceMetadata(metadata, bytes, nodes, {
       }
       const expected = expectedLinks[index];
       if (!expected || link.anchorId !== expected.directive.anchorId || link.relation !== expected.directive.relation
+          || link.meaning !== expected.directive.meaning
           || link.nodeId !== expected.node.id || link.nodeKind !== expected.node.kind
           || !sameRange(link.directiveSource, expected.directive.directiveSource)
           || !sameRange(link.extractedDirectiveSource, expected.directive.extractedDirectiveSource)) {
