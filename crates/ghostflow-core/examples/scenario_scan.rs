@@ -64,7 +64,10 @@ mod tests {
         ])
         .unwrap();
 
-        assert_eq!(capabilities, vec![Capability::new("actuator", "pump", Type::Bool)]);
+        assert_eq!(
+            capabilities,
+            vec![Capability::new("actuator", "pump", Type::Bool)]
+        );
     }
 
     #[test]
@@ -75,7 +78,9 @@ mod tests {
         ])
         .unwrap_err();
 
-        assert!(error.to_string().contains("conflicting output types for pump"));
+        assert!(error
+            .to_string()
+            .contains("conflicting output types for pump"));
     }
 }
 

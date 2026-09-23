@@ -280,11 +280,7 @@ pub(crate) fn record(out: &mut impl Write, r: &TickRecord) -> fmt::Result {
                 if index > 0 {
                     out.write_char(',')?;
                 }
-                write!(
-                    out,
-                    "{{\"sourceDay\":{},\"occurrenceId\":",
-                    row.source_day,
-                )?;
+                write!(out, "{{\"sourceDay\":{},\"occurrenceId\":", row.source_day,)?;
                 text(out, &format!("{}:{}", trace.site, row.source_day))?;
                 out.write_str(",\"scheduledWallMs\":")?;
                 optional_u64(out, row.scheduled_wall_ms)?;

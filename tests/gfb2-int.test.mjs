@@ -154,7 +154,7 @@ test('GF-TEST-gfb2-int-rejection: versions and type tags fail closed', async () 
   const cases = [];
   const oldAsNew = Buffer.from(v1); oldAsNew.writeUInt16LE(2, 4); cases.push([oldAsNew, /format 2 without Int/]);
   const newAsOld = Buffer.from(v2); newAsOld.writeUInt16LE(1, 4); cases.push([newAsOld, /invalid type/]);
-  const unknownVersion = Buffer.from(v2); unknownVersion.writeUInt16LE(7, 4); cases.push([unknownVersion, /unsupported GFB format/]);
+  const unknownVersion = Buffer.from(v2); unknownVersion.writeUInt16LE(8, 4); cases.push([unknownVersion, /unsupported GFB format/]);
   const invalidType = Buffer.from(v2);
   const nameLength = invalidType.readUInt16LE(6);
   const inputTypeOffset = 6 + 2 + nameLength + 4 + 2 + 2 + 'selected'.length;

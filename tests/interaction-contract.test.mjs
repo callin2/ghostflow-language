@@ -2,12 +2,13 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { interactionSchemaSha256, validateInteraction } from '../contracts/interaction-v0/validate.mjs';
 import { canonicalJson } from '../tools/canonical-json.mjs';
 import { compileSource } from '../tools/toolchain.mjs';
 
-const root = path.resolve(new URL('..', import.meta.url).pathname);
+const root = fileURLToPath(new URL('..', import.meta.url));
 const fixtureSourcePath = 'contracts/interaction-v0/examples/five-minute-watering.ghost.md';
 const read = relative => JSON.parse(fs.readFileSync(path.join(root, relative), 'utf8'));
 const schema = read('contracts/interaction-v0/examples/five-minute-watering.schema.json');

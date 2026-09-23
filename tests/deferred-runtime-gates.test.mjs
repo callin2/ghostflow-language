@@ -18,7 +18,26 @@ for (const [id, gate] of [
   const { code } = extractLiterate(fixture.source, { filename: fixture.filename });
   assert.throws(() => compileControl(code), gate);
   const artifact = await compileSource(fixture.source, { filename: fixture.filename });
-  assert.equal(JSON.parse(artifact.bytes.toString('utf8')).executable, false);
+  const descriptor = JSON.parse(artifact.bytes.toString('utf8'));
+  assert.equal(descriptor.executable, false);
+  if (id === 'REF-04-026') {
+    const signal = descriptor.manifest.control.signals[0];
+    assert.deepEqual({
+      kind: signal.kind,
+      event: signal.event.name,
+      predicate: signal.predicate.name,
+      quality: signal.quality,
+      windowMs: signal.windowMs,
+      projections: signal.projections,
+    }, {
+      kind: 'after-event',
+      event: 'started',
+      predicate: 'valve_open',
+      quality: 'measured',
+      windowMs: 10_000,
+      projections: ['any', 'all'],
+    });
+  }
   await assert.rejects(() => ControlRuntime.instantiate(wasm, artifact), /manifest|descriptor/);
   const raw = await GhostFlowRuntime.instantiate(wasm);
   try {

@@ -457,8 +457,12 @@ wall clock은 입력 데이터이며 순서 기준은 논리 tick이다. 추가 
 
 교체는 후보 모듈 검증, 전략 선택, 상태 호환성 검사, 필요 시 고스트 비교를 거쳐
 tick 경계에서 확정한다. 실패하면 기존 모듈을 유지한다.
-관수 운전 조건을 바꾸는 모듈·설정·프로파일 적용에는 추가로 해당 설비의 명시적
-정지와 Configure 모드가 필요하다. tick 경계 적용만으로 이 진입 조건을 대신하지 않는다.
+모듈/program 교체와 firmware 갱신은 같은 ESP가 제어하는 모든 장치 작업을 정지시킨다.
+프로파일, binding, dependency, schedule structure 또는 규칙 변경도 명시적 정지와
+Configure 절차가 필요하다. 제한된 runtime-adjustable 속성은 구조적 변경 경로와 다르며,
+운전 중 적용 문법과 의미는 [Reference §5.1–5.2](reference/05-settings-and-observation.md)를 따른다.
+실행 경계는 [구현 범위](IMPLEMENTATION.md)를 참조한다.
+tick 경계 적용만으로 구조적 변경의 정지 요건을 대신하지 않는다.
 같은 module ID와 같은 이름·타입의 상태를 이전한다. 새 필드는 기본값,
 제거 필드는 제거한다. 같은 이름의 타입 변경은 명시적 migration 지원 전까지
 거부한다. 식별자 표기 변경도 자동 상태 이전으로 간주하지 않는다.

@@ -174,6 +174,25 @@ for (const entry of cases) {
         if (entry.expect === 'accept') {
           const bytes = fs.readFileSync(output);
           assert.ok(bytes.length > 0, `${entry.id}: empty compiled artifact`);
+          if (entry.id === 'REF-04-026') {
+            const descriptor = JSON.parse(bytes.toString('utf8'));
+            const signal = descriptor.manifest.control.signals[0];
+            assert.deepEqual({
+              kind: signal.kind,
+              event: signal.event.name,
+              predicate: signal.predicate.name,
+              quality: signal.quality,
+              windowMs: signal.windowMs,
+              projections: signal.projections,
+            }, {
+              kind: 'after-event',
+              event: 'started',
+              predicate: 'valve_open',
+              quality: 'measured',
+              windowMs: 10_000,
+              projections: ['any', 'all'],
+            });
+          }
           const map = JSON.parse(fs.readFileSync(`${output}.map.json`, 'utf8'));
           assert.equal(map.sourceDocument?.text, entry.source, `${entry.id}: original literate source not preserved`);
           assert.equal(map.sourceDocument?.sha256, createHash('sha256').update(entry.source).digest('hex'),

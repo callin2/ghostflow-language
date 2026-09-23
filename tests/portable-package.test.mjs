@@ -16,7 +16,7 @@ import { compileSource } from '../tools/toolchain.mjs';
 import { GhostFlowRuntime } from '../runtimes/wasm/ghostflow-runtime.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const nativePath = path.join(root, 'target/release/examples/run');
+const nativePath = path.join(root, 'target/release/examples/run' + (process.platform === 'win32' ? '.exe' : ''));
 const wasmPath = path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm');
 const encoder = new TextEncoder();
 const identity = Object.freeze({

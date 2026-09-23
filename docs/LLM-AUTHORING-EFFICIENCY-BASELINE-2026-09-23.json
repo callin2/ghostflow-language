@@ -17,7 +17,7 @@
       },
       {
         "file": "tools/ghostsim.mjs",
-        "sha256": "62c385ffe67eaca2d6ee908ffbc63df8e9025f4bc52fe9d1d1202fbcc9721271"
+        "sha256": "923d81de335b2f92ad5b27bcd4a62ae2e9c2fce65e8e821a0a5f2a16b669e4cf"
       },
       {
         "file": "tools/toolchain.mjs",
@@ -35,10 +35,10 @@
     "toonEncoder": "@toon-format/toon@4.1.1",
     "tokenizer": "tiktoken==0.12.0; cl100k_base",
     "packageLockSha256": "a14018dd135c1a73353858ae636dc6aff5e6dc27163d90227976fb5ff58e21c1",
-    "scenarioRunnerSha256": "82e6fb91e76c5cad6c7b14851f295f359c4f38dc24c4a91d31c5ab00b47cf2f1",
-    "rustCoreTreeSha256": "cb737d111b320f4a96cd9c2092e020d6e81f998e4beb0328651bdd76213800b2",
-    "referenceSourceDigest": "sha256:8d3321241fd3bc7c731ed3ebf9d65f58dfe47427bb81137a41210d804624eea4",
-    "digest": "82196b14903b9caeb017416e5627374a4bc12e28605a2a67f2415a4c2e81d915"
+    "scenarioRunnerSha256": "0b3e362b88417240d0545e6319b82bebacb91516efe4d9f89368d223e16a9448",
+    "rustCoreTreeSha256": "509dba7ee81e8f7edcc0e92c1fd8b95c7f5b818c732ed5db6438545e4dc894c3",
+    "referenceSourceDigest": "sha256:580ba6e568286dc69c0fff7e8e1257fffce194cb286d350acf4075731accbf90",
+    "digest": "cb1e9c331270eb8554718d0e347f97b9e130428e06a4e480ea442cb6954eb508"
   },
   "encoder": {
     "name": "@toon-format/toon",
@@ -211,14 +211,14 @@
         },
         {
           "id": "ref-05-01",
-          "bytes": 5505,
-          "responseBytes": 6106,
-          "digest": "sha256:f6c8774f8ea40759cd17120d849a2c10825344e0a4bc0d3a1fc339c39a4b24e8"
+          "bytes": 5945,
+          "responseBytes": 6551,
+          "digest": "sha256:b494bac21367d7b54f6b8c5565ed19d4ea2e5a77cd5dffda4f0fd64e63746d4b"
         }
       ],
       "referenceChunks": 2,
-      "referenceContentBytes": 6759,
-      "referenceResponseBytes": 7925,
+      "referenceContentBytes": 7199,
+      "referenceResponseBytes": 8370,
       "sourceIdentity": [
         {
           "documentId": "GF-CORPUS-SETTING",
@@ -384,7 +384,7 @@
       "correctionRounds": 0,
       "simulationRounds": 1,
       "diagnosticBytes": 0,
-      "simulationResultBytes": 1811,
+      "simulationResultBytes": 1847,
       "outcome": "simulated",
       "boundary": "The output is a virtual safe intent. It is not an applied or confirmed relay state.",
       "equivalenceChecks": {
@@ -412,12 +412,12 @@
   },
   "totals": {
     "referenceChunks": 15,
-    "referenceContentBytes": 33185,
-    "referenceResponseBytes": 41465,
+    "referenceContentBytes": 33625,
+    "referenceResponseBytes": 41910,
     "compileRounds": 16,
     "correctionRounds": 3,
     "simulationRounds": 1,
     "diagnosticBytes": 2044,
-    "simulationResultBytes": 1811
+    "simulationResultBytes": 1847
   }
 }

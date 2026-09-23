@@ -233,13 +233,13 @@ test('offline authoring corpus records bounded retrieval, compilation, correctio
   assert.ok(report.cases.every(item => item.referenceChunks > 0));
   assert.equal(report.cases.reduce((sum, item) => sum + item.simulationRounds, 0), 1);
   assert.deepEqual(report.totals, {
-    referenceChunks: 15, referenceContentBytes: 33185, referenceResponseBytes: 41465,
+    referenceChunks: 15, referenceContentBytes: 33625, referenceResponseBytes: 41910,
     compileRounds: 16, correctionRounds: 3, simulationRounds: 1,
-    diagnosticBytes: 2044, simulationResultBytes: 1811,
+    diagnosticBytes: 2044, simulationResultBytes: 1847,
   });
   assert.equal(report.tokenizer.version, '0.12.0');
-  assert.equal(report.sourceRevision.digest, '82196b14903b9caeb017416e5627374a4bc12e28605a2a67f2415a4c2e81d915');
-  assert.equal(report.sourceRevision.referenceSourceDigest, 'sha256:8d3321241fd3bc7c731ed3ebf9d65f58dfe47427bb81137a41210d804624eea4');
+  assert.equal(report.sourceRevision.digest, 'cb1e9c331270eb8554718d0e347f97b9e130428e06a4e480ea442cb6954eb508');
+  assert.equal(report.sourceRevision.referenceSourceDigest, 'sha256:580ba6e568286dc69c0fff7e8e1257fffce194cb286d350acf4075731accbf90');
   assert.deepEqual(report.tokenComparisons, {
     diagnostic: { toonBytes: 498, jsonBytes: 547, toonTokens: 176, jsonTokens: 174 },
     simulation: { toonBytes: 1810, jsonBytes: 1630, toonTokens: 581, jsonTokens: 506 },

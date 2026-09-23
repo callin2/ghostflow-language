@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { compile, parse, tokenize } from '../tools/gfb1.mjs';
 import { compileSource } from './helpers/literate-compile.mjs';
@@ -8,7 +9,7 @@ import { FramedGhostFlowRuntime } from '../runtimes/wasm/framed-runtime.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 import { observeRuntimeValues } from '../tools/source-trace.mjs';
 
-const root = path.resolve(new URL('..', import.meta.url).pathname);
+const root = fileURLToPath(new URL('..', import.meta.url));
 const wasmPath = path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm');
 const wasmBytes = fs.readFileSync(wasmPath);
 const moduleBytes = compile(parse(tokenize(`(module Frame

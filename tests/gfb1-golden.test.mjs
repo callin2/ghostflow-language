@@ -16,7 +16,7 @@ const artifactName = 'gfb1-golden-v1.gfb';
 const metadataName = 'gfb1-golden-v1.json';
 const sourcePath = path.join(fixtureDirectory, sourceName);
 const artifactPath = path.join(fixtureDirectory, artifactName);
-const nativePath = path.join(root, 'target/release/examples/run');
+const nativePath = path.join(root, 'target/release/examples/run' + (process.platform === 'win32' ? '.exe' : ''));
 const wasmPath = path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm');
 const fixedSourceSha256 = 'e5bd49cf3b7705d0ac6e4a4867a488b7f47c6d6873fb3c94ea6fb7faefc5ceee';
 const fixedGfbSha256 = 'aa579db225ebdd9fed2e8f29815b5ba5cceed22fd1164c01aaf8d8e6455640dc';

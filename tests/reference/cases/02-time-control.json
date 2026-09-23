@@ -325,7 +325,7 @@
     {
       "id": "REF-03-026",
       "references": [
-        "03-time-and-schedules.md#pulse-window-run"
+        "03-time-and-schedules.md#pulse-window-run-range"
       ],
       "rule": "Pulse는 crossing tick만, Window는 half-open interval의 첫 true 한 번만, Run은 admission부터 단조 duration 동안 활성화한다.",
       "scope": "runtime",
@@ -338,7 +338,7 @@
     {
       "id": "REF-03-027",
       "references": [
-        "03-time-and-schedules.md#pulse-window-run"
+        "03-time-and-schedules.md#pulse-window-run-range"
       ],
       "rule": "late interval은 half-open이며 run length와 grace를 구분하고 constraint 차단으로 run timer를 숨겨 pause하지 않는다.",
       "scope": "runtime",
@@ -1110,7 +1110,7 @@
       "status": "executable",
       "filename": "after-event.ghost.md",
       "expect": "accept",
-      "source": "# Evidence after event\n\n```ghost\ncontrol AfterEventEvidence {\n  event started: Event;\n  sensor valve_open: Bool;\n  signal opened = after_event(started, valve_open, window: 10s, quality: measured);\n  output confirmed: Bool;\n  confirmed <- opened |> recover(false);\n}\n```\n"
+      "source": "# Evidence after event\n\n```ghost\ncontrol AfterEventEvidence {\n  event started: Event;\n  sensor valve_open: Bool;\n  signal opened = after_event(started, valve_open, window: 10s, quality: measured);\n  output any_opened, all_opened: Bool;\n  any_opened <- after_event_any(opened) |> recover(false);\n  all_opened <- after_event_all(opened) |> recover(false);\n}\n```\n"
     },
     {
       "id": "REF-04-027",
