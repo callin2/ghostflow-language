@@ -194,12 +194,12 @@ function validateCanonicalUnit(item, label) {
   } else if (hasUnit) throw new Error(`${label}.canonicalUnit is forbidden for non-quantity type ${item.type}`);
 }
 
-function validateManifest(input, { acceptSettings = false, bytecodeFormat = null } = {}) {
+function validateManifest(input, { acceptSettings = false, bytecodeFormat = null, capabilities } = {}) {
   const manifest = record(input, 'manifest');
-  if (Object.hasOwn(manifest, 'adaptPolicy') || Object.hasOwn(manifest, 'strategies')) {
+  if ((Object.hasOwn(manifest, 'adaptPolicy') || Object.hasOwn(manifest, 'strategies')) && capabilities === undefined) {
     throw new Error('adapt strategy activation requires a capability-aware host; ControlRuntime cannot activate this manifest');
   }
-  keys(manifest, ['format', 'name', 'inputs', 'outputs', 'sensors', 'schedules', 'timers', 'signals', 'configs', 'bytecodeSha256'], [], 'manifest');
+  keys(manifest, ['format', 'name', 'inputs', 'outputs', 'sensors', 'schedules', 'timers', 'signals', 'configs', 'bytecodeSha256'], ['adaptPolicy', 'strategies'], 'manifest');
   if (manifest.format !== FORMAT && manifest.format !== INTEGER_FORMAT && !(manifest.format === SETTINGS_FORMAT && acceptSettings) && manifest.format !== SOLAR_FORMAT) throw new Error(`unsupported manifest format ${String(manifest.format)}`);
   const settingsManifest = manifest.format === SETTINGS_FORMAT || manifest.format === INTEGER_FORMAT;
   const solarManifest = manifest.format === SOLAR_FORMAT || manifest.format === INTEGER_FORMAT;
@@ -584,6 +584,24 @@ async function instantiateControlRuntime(wasmBytes, { bytes: bytecode, manifest 
     ? new DataView(compiledBytes.buffer, compiledBytes.byteOffset, compiledBytes.byteLength).getUint16(4, true)
     : null;
   const checkedManifest = validateManifest(manifest, { ...options, bytecodeFormat });
+  const suppliedCapabilities = options.capabilities;
+  const presentSensors = new Set(checkedManifest.manifest.sensors.filter(sensor => !sensor.optional).map(sensor => sensor.name));
+  if (suppliedCapabilities !== undefined) {
+    if (!Array.isArray(suppliedCapabilities) || suppliedCapabilities.length > MAX_LIST) throw new TypeError('capabilities must be a bounded array');
+    const seen = new Set();
+    for (const capability of suppliedCapabilities) {
+      record(capability, 'capability');
+      keys(capability, ['kind', 'name', 'type'], [], 'capability');
+      if (capability.kind !== 'sensor') throw new Error('virtual capabilities must have kind sensor');
+      const sensor = checkedManifest.sensorByName.get(capability.name);
+      if (!sensor) throw new Error(`unknown capability sensor ${capability.name}`);
+      if (seen.has(capability.name)) throw new Error(`duplicate capability sensor ${capability.name}`);
+      if (sensor.type !== capability.type) throw new Error(`capability sensor ${capability.name} type mismatch`);
+      seen.add(capability.name);
+      presentSensors.add(capability.name);
+    }
+  }
+  checkedManifest.presentSensors = suppliedCapabilities === undefined ? null : presentSensors;
   const hasWindows = checkedManifest.manifest.signals.some(item => item.kind === 'window');
   const hasTrueFor = checkedManifest.manifest.signals.some(item => item.kind === 'true-for');
   const hasSolar = checkedManifest.manifest.schedules.some(item => item.kind === 'solar');
@@ -619,6 +637,9 @@ async function instantiateControlRuntime(wasmBytes, { bytes: bytecode, manifest 
       signals.set(item.name, { item, conditioner: new SignalConditioner(runtime.wasm, { ...sensorConfig(sensor), hysteresis: { onBelow: item.onBelow, offAbove: item.offAbove, initial: item.initial } }) });
     }
     for (const output of checkedManifest.manifest.outputs) runtime.addCapability('actuator', output.name, output.type === 'Bool' ? 'bool' : output.type === 'Int' ? 'int' : 'number');
+    if (suppliedCapabilities !== undefined) for (const sensor of checkedManifest.manifest.sensors) {
+      if (presentSensors.has(sensor.name)) runtime.addCapability('sensor', sensor.name, sensor.type === 'Bool' ? 'bool' : 'number');
+    }
     if (hasSolar) runtime.activateSolar(options.solar);
     else if (temporal) runtime.activateTemporal(temporal); else runtime.activate();
   } catch (error) {
@@ -652,6 +673,7 @@ export class ControlRuntime {
   #faulted;
   #temporalEpoch;
   #hasSolar;
+  #presentSensors;
 
   constructor(runtime, manifest, sensors, signals, framed = false, temporalEpoch = null, hasSolar = false) {
     this.runtime = runtime;
@@ -671,6 +693,7 @@ export class ControlRuntime {
     this.#faulted = false;
     this.#temporalEpoch = temporalEpoch;
     this.#hasSolar = hasSolar;
+    this.#presentSensors = manifest.presentSensors;
   }
 
   /** Latest committed framed outcome; legacy entries deliberately expose none. */
@@ -767,7 +790,10 @@ export class ControlRuntime {
     record(inputs, 'inputs'); record(samples, 'samples'); record(due, 'due'); record(intervals, 'intervals');
     for (const key of Object.keys(inputs)) if (!this.inputNames.has(key)) throw new Error(`unknown input ${key}`);
     for (const item of this.manifest.inputs) if (!Object.prototype.hasOwnProperty.call(inputs, item.name)) throw new Error(`missing input ${item.name}`);
-    for (const key of Object.keys(samples)) if (!this.sensorByName.has(key)) throw new Error(`unknown sensor ${key}`);
+    for (const key of Object.keys(samples)) {
+      if (!this.sensorByName.has(key)) throw new Error(`unknown sensor ${key}`);
+      if (this.#presentSensors !== null && !this.#presentSensors.has(key)) throw new Error(`absent sensor capability ${key}`);
+    }
     for (const key of Object.keys(due)) {
       if (this.solarScheduleNames.has(key)) throw new Error(`due.${key} cannot supply a Solar due value`);
       if (!this.scheduleNames.has(key)) throw new Error(`unknown schedule ${key}`);

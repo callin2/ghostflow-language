@@ -17,6 +17,8 @@ flowchart LR
   Scenario[TOON scenario] --> S
   S -->|validated private JSON actions| Native[scenario_scan Rust process]
   Native -->|scan traces| S
+  S -->|sensor, temporal, or Solar facts| SimWasm[ControlRuntime Rust/WASM child]
+  SimWasm -->|virtual traces| S
   S -->|TOON or JSON result| LLM
   Human -->|interactive TTY| Live[ghostsim-console.mjs live mode]
   Live -->|persistent WASM Rust ScanDriver| Core[FramedGhostFlowRuntime]
@@ -45,12 +47,12 @@ and can record a replayable TOON scenario.
 
 The source map holds the complete document and immutable document/revision
 identity. `ghostsim` checks the map against the exact GFB bytes and manifest
-before starting the native runner. The result names the scenario SHA-256,
+before execution. The result names the scenario SHA-256,
 bytecode SHA-256, source document SHA-256 and filename, plus document/revision
 IDs when supplied. A malformed request or failed activation returns a rejected
 result with no scan rows. A runtime error returns only earlier committed scans
 and its action index. A host failure after runner invocation reports
-`host-error` with `traceComplete: false`; an empty scan list then means native
+`host-error` with `traceComplete: false`; an empty scan list then means child
 observations are unavailable, not that the runtime performed no scan. All
 failures exit nonzero.
 
@@ -64,8 +66,17 @@ Only a `scan` action evaluates the program. Its nonnegative `atMs` is a virtual
 clock value that cannot move backward. Input and key actions update held values;
 a later clock-only scan evaluates them again. The Rust core produces requested
 and safe **virtual intent** separately. Neither field says a relay moved.
-The Node host uses a private JSON transport to the native Rust process; JSON
-there is an internal bridge, not a second program or public scenario format.
+Plain input scenarios use a private JSON transport to the native Rust process.
+Sensor, certified interval, and Solar scenarios use the existing Rust/WASM
+`ControlRuntime` child with explicit observations and activation profiles.
+Both paths execute the portable Rust core; the transport is not another source
+language. Its window, sensor, and adaptation cases use framed scans; certified
+interval and Solar cases use the existing legacy WASM entry points with
+replay-local scan IDs assigned by the host. Timer time is supplied as monotonic
+`atMs`. Wall-clock, calendar,
+and Solar provider facts belong to the host binding, whether its source is an
+offline RTC or an optional NTP correction. The language's time semantics stay
+the same across those sources.
 Piped console mode accumulates one TOON scenario and replays it through the
 same `runScenario` path for each command redraw. It has explicit virtual time
 and no background clock. If a piped command or scan time fails after completed
@@ -107,6 +118,7 @@ descriptor and a physical I/O driver have different responsibilities.
 | --- | --- | --- |
 | Scenario / keyboard input driver | Holds typed logical inputs and key down/up state; converts explicit actions into a complete input snapshot. It never derives new sensor values from outputs. | [`scenario_scan.rs`](../crates/ghostflow-core/examples/scenario_scan.rs), [`KeyboardMapper`](../crates/ghostflow-core/src/keyboard.rs) |
 | Piped virtual-time host | Supplies `atMs` and explicit scan opportunities. Toggle commands append an input/key action and a scan at the current time; `scan N` advances to the supplied time. No background clock advances this session. | [`ghostsim.mjs`](../tools/ghostsim.mjs), [`ghostsim-console.mjs`](../tools/ghostsim-console.mjs) |
+| Sensor and provider scenario host | Conditions explicit sensor samples, accepts certified Bool intervals, and supplies Solar clock/provider facts. It uses explicit activation profiles and never reads RTC/NTP or a physical sensor itself. | [`scenario-sensors.mjs`](../tools/scenario-sensors.mjs), [`ControlRuntime`](../runtimes/wasm/control-runtime.mjs) |
 | Interactive TTY host | Owns one persistent WASM `FramedGhostFlowRuntime`/Rust `ScanDriver`; scans immediately and every 100 ms using elapsed wall time, and scans immediately after input toggles. Holds bounded display history (120 scans). No device I/O. | [`ghostsim-live.mjs`](../tools/ghostsim-live.mjs), [`ghostsim-console.mjs`](../tools/ghostsim-console.mjs) |
 | Framed scan driver | Owns one runtime and validates complete typed inputs, sequential scan IDs and nondecreasing logical time before evaluation. Successful scans advance its sequence/time. It performs no device I/O. | [`ScanDriver`](../crates/ghostflow-core/src/scan.rs) |
 | Portable Rust runtime | Loads GFB, activates supported capabilities, evaluates expressions, program state, timers and constraints, and emits a trace with requested/safe intents and faults. Native and WASM hosts use this core. | [`ghostflow-core`](../crates/ghostflow-core/src/lib.rs), [WASM adapter](../runtimes/wasm/README.md) |

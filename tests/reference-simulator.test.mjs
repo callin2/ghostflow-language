@@ -50,7 +50,51 @@ const behaviorOracles = {
     actions: [scan(0), input('temperature', 'Number', 30), scan(1), input('temperature', 'Number', 29), scan(2)],
     requested: [{ warm: false }, { warm: true }, { warm: false }],
   },
+  'REF-04-035': {
+    initial: { scheduled: true }, capabilities: [],
+    actions: [scan(0), input('scheduled', 'Bool', false), scan(1)],
+    requested: [{ pump: true }, { pump: false }],
+  },
 };
+
+function temporalOracle(id, manifest) {
+  if (!['REF-04-025', 'REF-04-027', 'REF-04-028', 'REF-04-029'].includes(id)) return null;
+  const sourceTag = manifest.signals[0].sources[0].tag;
+  if (id === 'REF-04-025') {
+    const interval = (id, startMs, endMs) => ({ kind: 'interval', name: 'hot', epoch: 11, id, startMs, endMs, value: true, quality: 'Measured' });
+    return {
+      temporal: { timeEpoch: 7, rootDensity: [], certifiedBoolRoots: [sourceTag], budget: { maxRetainedSamples: 1, maxBytes: 4_000_000 } },
+      actions: [scan(0), interval(1, 0, 100000), scan(100000), interval(2, 200000, 300000), scan(300000), interval(3, 300000, 600000), scan(600000)],
+      requested: [{ alarm: false }, { alarm: false }, { alarm: false }, { alarm: true }],
+      trace: [0, 100000, 100000, 400000],
+    };
+  }
+  const sample = (id, timestampMs, value) => ({ kind: 'sample', name: 'temperature', epoch: 5, id, timestampMs, value, quality: 'Good' });
+  return {
+    temporal: { timeEpoch: 5, rootDensity: [{ sourceTag, maxObservations: 2, intervalMs: 100000 }], budget: { maxRetainedSamples: 64, maxBytes: 33554432 } },
+    actions: [sample(1, 1000, 280), scan(1000), sample(2, 101000, 284), scan(101000)],
+    requested: [{ ready: true }, { ready: true }],
+    trace: id === 'REF-04-027' ? [282] : id === 'REF-04-028' ? [280, 284] : [0.04],
+  };
+}
+
+function solarOracle(id, manifest) {
+  if (!['REF-03-042', 'REF-03-045'].includes(id)) return null;
+  const facts = (monotonicMs, wallMs) => ({
+    clock: { monotonicMs, bootEpoch: 7, wallMs, trusted: true, uncertaintyMs: 0, sourceRevision: 'clock-v1' },
+    schedules: manifest.schedules.map((schedule, index) => ({
+      site: schedule.site, coverageFromWallMs: 0, coverageToWallMs: 2000,
+      rows: [{ sourceDay: 0, scheduledWallMs: index === 0 ? 1000 : null,
+        available: index === 0, providerRevision: 'solar-v1', contextRevision: 'site-v1' }],
+    })),
+  });
+  return {
+    solar: { bootEpoch: 7, terminalCapacity: 8 },
+    actions: [{ kind: 'scan', atMs: 0, solarFacts: facts(0, 900) },
+      { kind: 'scan', atMs: 100, solarFacts: facts(100, 1000) }],
+    requested: [{ due: false }, { due: true }],
+  };
+}
 
 function invoke(tool, args) {
   const result = spawnSync(process.execPath, [path.join(root, `tools/${tool}.mjs`), ...args], {
@@ -90,7 +134,7 @@ for (const entry of accepted) {
         throw new Error(`${entry.id}: accepted control source compiled to ${manifest.format}; ghostsim requires an executable control artifact`);
       }
       assert.ok(!standaloneDescriptors.has(entry.id), `${entry.id}: standalone declaration unexpectedly became executable`);
-      const oracle = behaviorOracles[entry.id];
+      const oracle = behaviorOracles[entry.id] ?? temporalOracle(entry.id, manifest) ?? solarOracle(entry.id, manifest);
       const initialInputs = manifest.inputs.filter(input => input.name !== '__gf_now_ms').map(input => {
         assert.ok(['Bool', 'Int', 'Number'].includes(input.type),
           `${entry.id}: unsupported external input ${input.name}: ${input.type}`);
@@ -101,6 +145,9 @@ for (const entry of accepted) {
       const scenario = path.join(dir, 'scenario.toon');
       fs.writeFileSync(scenario, encode({
         format: 'GhostFlow/scenario-v1', id: entry.id, initialInputs, keyBindings: [],
+        ...(oracle?.temporal ? { temporal: oracle.temporal } : {}),
+        ...(oracle?.capabilities ? { capabilities: oracle.capabilities } : {}),
+        ...(oracle?.solar ? { solar: oracle.solar } : {}),
         actions: oracle?.actions ?? [scan(0)],
       }) + '\n');
       const simulated = invoke('ghostsim', [artifact, scenario, '--format', 'json']);
@@ -113,7 +160,7 @@ for (const entry of accepted) {
       assert.equal(outcome.scenario.id, entry.id);
       assert.equal(outcome.scans.length, oracle?.requested.length ?? 1);
       assert.equal(outcome.scans[0].scanId, 0, `${entry.id}: first scan ID`);
-      assert.equal(outcome.scans[0].logicalTimeMs, 0);
+      assert.equal(outcome.scans[0].logicalTimeMs, (oracle?.actions ?? [scan(0)]).find(action => action.kind === 'scan').atMs);
       for (const [index, row] of outcome.scans.entries()) {
         assert.equal(row.scanId, index, `${entry.id}: scan ${index} ID`);
         assert.equal(row.logicalTimeMs, (oracle?.actions ?? [scan(0)]).filter(action => action.kind === 'scan')[index].atMs);
@@ -127,6 +174,16 @@ for (const entry of accepted) {
             assert.equal(row.safeVirtualIntent[name], expected, `${entry.id}: scan ${index} safe ${name}`);
           }
         }
+      }
+      if (oracle?.temporal) {
+        const values = entry.id === 'REF-04-025'
+          ? outcome.scans.map(row => row.trueForTrace[0].coveredMs)
+          : outcome.scans.at(-1).windowTrace.map(trace => trace.value);
+        assert.deepEqual(values, oracle.trace, `${entry.id}: temporal evidence trace`);
+      }
+      if (oracle?.solar) {
+        assert.equal(outcome.scans[1].scheduleTrace.length, manifest.schedules.length);
+        assert.equal(outcome.scans[1].scheduleTrace[0].observations[0].providerRevision, 'solar-v1');
       }
       record.outcome = 'passed';
       record.scans = outcome.scans.length;

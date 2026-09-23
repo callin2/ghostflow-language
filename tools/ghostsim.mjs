@@ -7,6 +7,8 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { decode, encode } from '@toon-format/toon';
 import { verifyArtifactSourceMap } from './toolchain.mjs';
+import { encodeTemporalProfile } from '../runtimes/wasm/temporal-profile.mjs';
+import { encodeSolarFacts, validateSolarActivation } from '../runtimes/wasm/solar-abi.mjs';
 
 const root = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const MAX_SCENARIO_BYTES = 256 * 1024;
@@ -26,6 +28,16 @@ function requireShape(value, keys, location) {
   }
 }
 
+function requireFields(value, required, optional, location) {
+  if (!object(value)) throw new Error(`${location}: expected object`);
+  for (const key of Object.keys(value)) if (![...required, ...optional].includes(key)) throw new Error(`${location}: unknown field ${key}`);
+  for (const key of required) if (!Object.hasOwn(value, key)) throw new Error(`${location}: missing field ${key}`);
+}
+
+function requireNonnegative(value, location) {
+  if (!Number.isSafeInteger(value) || value < 0) throw new Error(`${location}: expected exact nonnegative integer`);
+}
+
 function requireName(value, location) {
   if (typeof value !== 'string' || !value || /[\t\r\n]/u.test(value)) {
     throw new Error(`${location}: expected nonempty text without control separators`);
@@ -42,7 +54,7 @@ function requireTyped(input, location) {
 }
 
 export function validateScenario(scenario, manifest) {
-  requireShape(scenario, ['format', 'id', 'initialInputs', 'keyBindings', 'actions'], 'scenario');
+  requireFields(scenario, ['format', 'id', 'initialInputs', 'keyBindings', 'actions'], ['temporal', 'capabilities', 'solar'], 'scenario');
   if (scenario.format !== 'GhostFlow/scenario-v1') throw new Error('scenario.format: unsupported version');
   requireName(scenario.id, 'scenario.id');
   if (!Array.isArray(scenario.initialInputs)) throw new Error('initialInputs: expected array');
@@ -50,6 +62,24 @@ export function validateScenario(scenario, manifest) {
   if (!Array.isArray(scenario.actions) || scenario.actions.length > MAX_ACTIONS) {
     throw new Error(`actions: expected at most ${MAX_ACTIONS} actions`);
   }
+  if (scenario.temporal !== undefined) {
+    if (!manifest.signals?.some(signal => ['window', 'true-for'].includes(signal.kind))) {
+      throw new Error('temporal profile requires a temporal signal');
+    }
+    encodeTemporalProfile(scenario.temporal);
+  }
+  if (scenario.capabilities !== undefined) {
+    if (!Array.isArray(scenario.capabilities)) throw new Error('capabilities: expected array');
+    if (!manifest.adaptPolicy && !manifest.strategies) throw new Error('capabilities require an adapt control');
+  }
+  const hasSolar = manifest.schedules?.some(schedule => schedule.kind === 'solar') ?? false;
+  if (scenario.solar !== undefined) {
+    if (!hasSolar) throw new Error('solar activation requires a Solar schedule');
+    validateSolarActivation(scenario.solar);
+  } else if (hasSolar) throw new Error('Solar schedule requires explicit solar activation');
+  const sensors = new Map((manifest.sensors ?? []).map(sensor => [sensor.name, sensor.type]));
+  const intervalSources = new Set((manifest.signals ?? []).filter(signal => signal.kind === 'true-for')
+    .flatMap(signal => signal.sources.map(source => source.name)));
   const fields = new Map(manifest.inputs.filter(field => field.name !== '__gf_now_ms').map(field => [field.name, field.type]));
   const inputs = new Map();
   for (const [index, input] of scenario.initialInputs.entries()) {
@@ -77,6 +107,8 @@ export function validateScenario(scenario, manifest) {
   }
   let scans = 0;
   let previousTime = null;
+  const pendingSamples = new Set();
+  const pendingIntervals = new Set();
   for (const [index, action] of scenario.actions.entries()) {
     const location = `actions[${index}]`;
     if (!object(action)) throw new Error(`${location}: expected object`);
@@ -92,11 +124,42 @@ export function validateScenario(scenario, manifest) {
         if (!keys.has(action.key)) throw new Error(`${location}: unbound key ${action.key}`);
         if (!['down', 'up'].includes(action.event)) throw new Error(`${location}: key event must be down or up`);
         break;
+      case 'sample':
+        requireShape(action, ['kind', 'name', 'epoch', 'id', 'timestampMs', 'value', 'quality'], location);
+        if (!sensors.has(action.name)) throw new Error(`${location}: unknown sensor ${action.name}`);
+        if (pendingSamples.has(action.name)) throw new Error(`${location}: duplicate pending sample ${action.name}`);
+        for (const field of ['epoch', 'id', 'timestampMs']) requireNonnegative(action[field], `${location}.${field}`);
+        if (sensors.get(action.name) === 'Bool' ? typeof action.value !== 'boolean' : typeof action.value !== 'number' || !Number.isFinite(action.value)) {
+          throw new Error(`${location}: invalid sample value`);
+        }
+        if (!['Good', 'NotReady', 'Disconnected', 'Stale', 'Invalid'].includes(action.quality)) throw new Error(`${location}: unsupported sample quality`);
+        pendingSamples.add(action.name);
+        break;
+      case 'interval':
+        requireFields(action, ['kind', 'name', 'epoch', 'id', 'startMs', 'endMs', 'value', 'quality'], ['fault'], location);
+        if (!intervalSources.has(action.name)) throw new Error(`${location}: unknown certified interval source ${action.name}`);
+        if (scenario.temporal === undefined) throw new Error(`${location}: certified interval requires temporal profile`);
+        if (pendingIntervals.has(action.name)) throw new Error(`${location}: duplicate pending interval ${action.name}`);
+        for (const field of ['epoch', 'id', 'startMs', 'endMs']) requireNonnegative(action[field], `${location}.${field}`);
+        if (action.endMs < action.startMs) throw new Error(`${location}: endMs precedes startMs`);
+        if (typeof action.value !== 'boolean') throw new Error(`${location}: interval value must be Bool`);
+        if (!['Measured', 'Held', 'Constructed', 'Unavailable', 'Disconnected', 'Stale', 'Invalid', 'NotReady'].includes(action.quality)) throw new Error(`${location}: unsupported interval quality`);
+        if (action.fault !== undefined && !['Disconnected', 'Stale', 'Invalid', 'NotReady'].includes(action.fault)) throw new Error(`${location}: unsupported interval fault`);
+        pendingIntervals.add(action.name);
+        break;
       case 'scan':
-        requireShape(action, ['kind', 'atMs'], location);
+        requireFields(action, ['kind', 'atMs'], ['solarFacts'], location);
         if (!Number.isSafeInteger(action.atMs) || action.atMs < 0) throw new Error(`${location}: atMs must be an exact nonnegative integer`);
+        if (hasSolar) {
+          if (action.solarFacts === undefined) throw new Error(`${location}: Solar scan requires provider facts`);
+          encodeSolarFacts(action.solarFacts);
+          if (action.solarFacts.clock.monotonicMs !== action.atMs) throw new Error(`${location}: solar clock monotonicMs must match atMs`);
+          if (action.solarFacts.clock.bootEpoch !== scenario.solar.bootEpoch) throw new Error(`${location}: solar bootEpoch must match activation`);
+        } else if (action.solarFacts !== undefined) throw new Error(`${location}: solar facts require a Solar schedule`);
         if (previousTime !== null && action.atMs < previousTime) throw new Error(`${location}: logical time moved backwards`);
         previousTime = action.atMs;
+        pendingSamples.clear();
+        pendingIntervals.clear();
         if (++scans > MAX_SCANS) throw new Error(`${location}: scan budget ${MAX_SCANS} exceeded`);
         break;
       default: throw new Error(`${location}: unknown action kind ${String(action.kind)}`);
@@ -152,8 +215,7 @@ export function runScenario(artifactPath, scenarioPath, { format = 'toon' } = {}
     // Sensor conditioning is supplied by the existing WASM host; plain input
     // modules use the native framed runner. Neither path retries failed scans.
     const conditioned = (manifest.sensors?.length ?? 0) > 0
-      && !manifest.signals?.some(signal => ['window', 'true-for'].includes(signal.kind))
-      && !manifest.schedules?.some(schedule => schedule.kind === 'solar');
+      || manifest.schedules?.some(schedule => schedule.kind === 'solar');
     const executable = conditioned ? process.execPath : path.join(root, 'target/release/examples/scenario_scan');
     const arguments_ = conditioned
       ? [path.join(root, 'tools/scenario-sensors.mjs'), artifactPath, actionsPath]
@@ -185,6 +247,9 @@ export function runScenario(artifactPath, scenarioPath, { format = 'toon' } = {}
         faults: row.trace.faults,
         stateBefore: row.trace.stateBefore,
         stateAfter: row.trace.stateAfter,
+        ...(row.trace.windowTrace ? { windowTrace: row.trace.windowTrace } : {}),
+        ...(row.trace.trueForTrace ? { trueForTrace: row.trace.trueForTrace } : {}),
+        ...(row.trace.scheduleTrace ? { scheduleTrace: row.trace.scheduleTrace } : {}),
       }));
     } catch (error) {
       return hostError(error);

@@ -238,7 +238,7 @@ test('offline authoring corpus records bounded retrieval, compilation, correctio
     diagnosticBytes: 2044, simulationResultBytes: 1811,
   });
   assert.equal(report.tokenizer.version, '0.12.0');
-  assert.equal(report.sourceRevision.digest, '3da5e81c5d10f74c3d46807be2aa20b8dd9cded68070b871c547852e221ea9fe');
+  assert.equal(report.sourceRevision.digest, '82196b14903b9caeb017416e5627374a4bc12e28605a2a67f2415a4c2e81d915');
   assert.equal(report.sourceRevision.referenceSourceDigest, 'sha256:8d3321241fd3bc7c731ed3ebf9d65f58dfe47427bb81137a41210d804624eea4');
   assert.deepEqual(report.tokenComparisons, {
     diagnostic: { toonBytes: 498, jsonBytes: 547, toonTokens: 176, jsonTokens: 174 },

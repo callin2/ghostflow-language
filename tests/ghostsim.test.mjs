@@ -283,7 +283,7 @@ test('ghostsim rejects a control requiring external activation bindings without 
     const rejected = JSON.parse(result.stdout);
     assert.equal(rejected.outcome, 'rejected');
     assert.equal(rejected.error.location, 'activation');
-    assert.match(rejected.error.message, /true_for activation requires runtime bindings/);
+    assert.match(rejected.error.message, /window runtime requires an explicit temporal profile/);
     assert.deepEqual(rejected.scans, []);
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
