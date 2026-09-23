@@ -7,6 +7,9 @@ mod framed_abi;
 #[path = "../after_event_abi.rs"]
 mod after_event_abi;
 
+#[path = "../controller_abi.rs"]
+mod controller_abi;
+
 #[path = "../temporal_abi.rs"]
 mod temporal_abi;
 

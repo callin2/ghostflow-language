@@ -23,7 +23,7 @@ pub(crate) struct SolarRuntime {
 }
 pub(crate) struct StagedSolar {
     engines: Vec<SolarPulseEngine>,
-    pub projections: Vec<[Value; 1]>,
+    pub projections: Vec<[Value; 2]>,
     pub trace: Vec<SolarStageResult>,
 }
 impl SolarRuntime {
@@ -109,7 +109,18 @@ impl SolarRuntime {
                 false
             };
             let result = engine.commit(stage.evaluate(predicate)?)?;
-            staged.projections.push([Value::Bool(result.due)]);
+            let missed = result.observations.iter().any(|observation| {
+                matches!(
+                    observation.decision,
+                    crate::solar_admission::SolarDecision::ConditionsFalseAtPulse
+                        | crate::solar_admission::SolarDecision::Missed
+                        | crate::solar_admission::SolarDecision::ObservationGap
+                        | crate::solar_admission::SolarDecision::CorrectionPastHighWater
+                )
+            });
+            staged
+                .projections
+                .push([Value::Bool(result.due), Value::Bool(missed)]);
             staged.trace.push(result);
         }
         Ok(staged)

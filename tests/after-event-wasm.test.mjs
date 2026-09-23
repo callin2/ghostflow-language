@@ -32,6 +32,7 @@ test('canonical source binds event identity and predicate without choosing a sca
     assert.equal(runtime.source.text, source);
     assert.equal(runtime.source.event, 'started');
     assert.equal(runtime.source.predicate, 'valve_open');
+    assert.deepEqual(runtime.source.projections, ['any']);
     assert.match(runtime.source.sha256, /^[a-f0-9]{64}$/);
     assert.equal(Object.isFrozen(runtime.binding), true);
     assert.equal(Object.isFrozen(runtime.source), true);
@@ -73,6 +74,23 @@ test('native after_event WASM tracks overlapping identities and preserves half-o
     assert.equal(runtime.results.length, 2);
     runtime.stage(batch(11, [], null, [key(1)])); runtime.commit();
     assert.deepEqual(runtime.results.map(result => result.event.id), [2]);
+  } finally { runtime.dispose(); }
+});
+
+test('after_event_any aggregates the retained overlapping identity snapshot', async () => {
+  const runtime = await create();
+  try {
+    assert.deepEqual(runtime.any(), { ok: false, fault: 'NotReady' });
+    runtime.stage(batch(0, [event(1, 0)])); runtime.commit();
+    assert.deepEqual(runtime.any(), { ok: false, fault: 'NotReady' });
+    runtime.stage(batch(5, [event(2, 5)])); runtime.commit();
+    runtime.stage(batch(10, [], predicate(10))); runtime.commit();
+    assert.deepEqual(runtime.results.map(result => result.status), ['expired', 'satisfied']);
+    assert.deepEqual(runtime.any(), { ok: true, value: true });
+    assert.deepEqual(runtime.all(), { ok: true, value: false });
+    runtime.stage(batch(11, [], null, [key(2)])); runtime.commit();
+    assert.deepEqual(runtime.any(), { ok: true, value: false });
+    assert.deepEqual(runtime.all(), { ok: true, value: false });
   } finally { runtime.dispose(); }
 });
 

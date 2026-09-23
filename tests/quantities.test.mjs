@@ -167,7 +167,7 @@ control QuantityCompiler {
     { name: 'power', type: 'Power', canonicalUnit: 'W' },
   ]);
   assert.deepEqual(compiled.manifest.configs[0], {
-    name: 'desired', type: 'Temperature', canonicalUnit: 'K', value: 298.15,
+    name: 'desired', type: 'Temperature', canonicalUnit: 'K', displayUnit: '°C', value: 298.15,
     settings: { min: 291.15, max: 305.15, step: 0.5, access: 'operator', stepType: 'TemperatureDelta' },
     initialOffset: compiled.manifest.configs[0].initialOffset,
     initialEndOffset: compiled.manifest.configs[0].initialEndOffset,
@@ -304,10 +304,10 @@ control QuantitySetting {
     expectedSourceSha256: createHash('sha256').update(source).digest('hex'),
     changes: { target: 300.15 },
   });
-  assert.match(result.source, /Temperature = 300\.15K/);
+  assert.match(result.source, /Temperature = 27°C/);
   assert.deepEqual(
-    { value: result.manifest.configs[0].value, unit: result.manifest.configs[0].canonicalUnit, stepType: result.manifest.configs[0].settings.stepType },
-    { value: 300.15, unit: 'K', stepType: 'TemperatureDelta' },
+    { value: result.manifest.configs[0].value, unit: result.manifest.configs[0].canonicalUnit, displayUnit: result.manifest.configs[0].displayUnit, stepType: result.manifest.configs[0].settings.stepType },
+    { value: 300.15, unit: 'K', displayUnit: '°C', stepType: 'TemperatureDelta' },
   );
   const candidate = await compileSource(result.source, { filename: 'quantity-setting.ghost.md' });
   const wasm = fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
@@ -331,4 +331,29 @@ control QuantitySetting {
   const invalid = structuredClone(snapshot);
   invalid.observations[0].value = '298.15';
   assert.equal(validateInteraction(interaction.interactionSchema, invalid).valid, false);
+});
+
+test('Temperature setting unit selection is explicit, switchable, and required', async () => {
+  const source = `# Settings\n\n\`\`\`ghost\ncontrol UnitSetting {\n  config target: Temperature = 298.15K { min = 293.15K; max = 303.15K; step = 0.5ΔK; access = operator; }\n  output applied: Temperature;\n  applied <- target;\n}\n\`\`\`\n`;
+  const changed = await createOperatingSettingsCandidate({
+    source, filename: 'unit-setting.ghost.md', expectedSourceSha256: createHash('sha256').update(source).digest('hex'),
+    changes: { target: { value: 300.15, unit: '°C' } },
+  });
+  assert.match(changed.source, /Temperature = 27°C/);
+  assert.equal(changed.manifest.configs[0].displayUnit, '°C');
+  const switched = await createOperatingSettingsCandidate({
+    source: changed.source, filename: 'unit-setting.ghost.md', expectedSourceSha256: changed.sourceSha256,
+    changes: { target: { value: 301.15, unit: 'K' } },
+  });
+  assert.match(switched.source, /Temperature = 301\.15K/);
+  assert.equal(switched.manifest.configs[0].displayUnit, 'K');
+
+  const compiled = await compileSource(source, { filename: 'unit-setting.ghost.md' });
+  const wasm = fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
+  const config = { ...compiled.manifest.configs[0] };
+  delete config.displayUnit;
+  await assert.rejects(
+    () => ControlRuntime.instantiateSimulation(wasm, { ...compiled, manifest: { ...compiled.manifest, configs: [config] } }),
+    /displayUnit.*°C or K/,
+  );
 });

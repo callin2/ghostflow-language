@@ -216,3 +216,18 @@ export function formatCanonicalQuantityLiteral(type, value) {
   const suffix = canonicalUnitFor(type);
   return `${String(value)}${suffix}`;
 }
+
+export function formatTemperatureLiteral(value, displayUnit) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) throw new TypeError('temperature source formatting requires a finite canonical value');
+  if (displayUnit !== '°C' && displayUnit !== 'K') throw new TypeError('temperature displayUnit must be °C or K');
+  if (displayUnit === 'K') return `${String(value)}K`;
+  const converted = value - 273.15;
+  const simple = `${String(converted)}°C`;
+  if (quantityLiteral(simple)?.value === value) return simple;
+  for (let precision = 1; precision <= 17; precision += 1) {
+    const decimal = converted.toPrecision(precision).replace(/(?:\.0+|(?:(\.\d*?)0+))$/, '$1');
+    const candidate = `${decimal}°C`;
+    if (quantityLiteral(candidate)?.value === value) return candidate;
+  }
+  throw new RangeError('temperature cannot be represented exactly in selected displayUnit');
+}

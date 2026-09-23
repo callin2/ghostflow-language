@@ -6,6 +6,6 @@ control AfterEventEvidence {
   sensor valve_open: Bool;
   signal opened = after_event(started, valve_open, window: 10s, quality: measured);
   output confirmed: Bool;
-  confirmed <- opened |> recover(false);
+  confirmed <- after_event_any(opened) |> recover(false);
 }
 ```

@@ -460,8 +460,9 @@ requested/safe/applied/confirmed output은 서로 다른 관찰값이다.
 요청을 재개하고, 안전 제약이 허용할 때만 safe output을 낸다. 이는 새 admission이
 아니므로 `.due`를 다시 내지 않고 occurrence ID와 ledger를 유지한다.
 변경된 종료점이 현재 위치 이하이면 그 occurrence는 즉시 종결하며 재개하거나
-새로 admit하지 않는다. `DailySlots`의 `TimeSlots` 집합 변경은 이 시작 시각
-재계산 규칙이 아니라 §3.6의 slot 제거·추가 규칙을 따른다.
+새로 admit하지 않는다. `DailySlots`의 `TimeSlots` 변경은 §3.6의 stable slot key로
+retime과 제거·추가를 구분한다. key를 보존한 retime에는 이 Range 재계산 규칙을
+적용하고, 제거·추가에는 새 항목 baseline 규칙을 적용한다.
 
 ### occurrence identity와 중복 억제
 
@@ -548,15 +549,38 @@ Duration 목록으로 암묵 변환하지 않는다. `selected = watering_slots`
 accepted live edit는 다음 의미를 가진다.
 
 - event 전체를 type, grid, 중복, N, 권한, Program identity와 함께 atomic하게 검증한다.
-- 새로 추가한 slot은 effective event position에서 baseline을 세운다. 그 위치와 같거나
-  이미 지난 당일 slot은 내보내지 않고 미래 slot만 계획한다.
-- 제거는 미래 계획만 없애며 admit된 Run을 취소하지 않는다.
-- 다시 추가한 slot은 같은 `(schedule ID, local date, slot, DST fold)` identity를 쓴다.
-  이미 admit하거나 missed인 occurrence를 settings revision으로 다시 arm하지 않는다.
+- 런타임의 승인된 설정 상태는 각 항목에 표시 시각과 독립적인 opaque `slot key`를
+  보존한다. 이 key는 GhostFlow source 문법이 아니며 작성자가 정하지 않는다. 설정
+  event는 고유 event identity와 기준 settings revision을 가지며, retime은 기존
+  `slot key`와 새 `TimeOfDay`를 함께 식별한다. UI와 저장소가 순서나 표시 시각을
+  항목 identity로 대신해서는 안 된다.
+- retime은 같은 항목의 표시 시각만 바꾼다. `(schedule ID, local date, slot key,
+  DST fold)` occurrence identity와 admission/terminal ledger는 유지한다. 변경된
+  `TimeOfDay`는 planned time metadata다. 이미 admit된 Range를 미래로 옮기면 즉시
+  `.active = false`로 멈추고, 신뢰할 수 있는 시각이 새 시작점에 도달하면 같은
+  occurrence를 변경된 반열린 구간에서 다시 평가한다. `.due`를 다시 내거나 두 번째
+  admission을 만들지 않는다.
+- 예를 들어 `TimeSlots<1min,N>`에서 08:00의 `range(10min)` occurrence를 08:04에
+  admit한 뒤 그 항목을
+  08:07로 retime하면 event 적용 위치에서 멈춘다. 08:07의 accepted 판단에서 같은
+  occurrence를 다시 평가하며 `when`이 true이면 08:17까지 요청한다. occurrence ID,
+  slot key와 ledger는 그대로다. event가 08:07 판단 위치에 적용되면 §5.2의 순서에
+  따라 새 값을 먼저 적용하고 바로 같은 occurrence를 평가한다.
+- 새로 추가한 항목은 새 `slot key`를 만들고 effective event position에서 baseline을
+  세운다. 그 위치와 같거나 이미 지난 당일 slot은 내보내지 않고 미래 slot만 계획한다.
+- 제거는 해당 `slot key`의 미래 계획만 없앤다. 제거 후 같은 표시 시각을 추가하는
+  remove/add는 새 key와 새 occurrence이며 retime이 아니다. 제거는 admit된 Run을
+  취소하지 않는다. admit된 Range를 retime하려면 remove/add가 아니라 기존 key를
+  지정한 retime event여야 한다.
 - 설정 event와 schedule scan은 effective position의 전체 순서를 따른다. 처음 추가된
   바로 그 position에서는 due가 되지 않는다.
 - 재시작은 승인된 설정값을 복원할 수 있지만 pending queue를 만들지 않는다. occurrence
-  ledger의 수명은 일반 config와 별개다.
+  ledger의 수명은 일반 config와 별개다. 복원 상태에는 표시 시각뿐 아니라 slot key도
+  포함되어야 한다.
+
+retime 결과도 전체 `TimeSlots<G,N>` 값으로서 grid, 중복, N과 같은 schedule의 Range
+비중첩을 검증한다. 새 시각이 다른 항목의 Range와 겹치면 event 전체를 거부하고 기존
+값, slot key, settings revision, active occurrence와 ledger를 모두 유지한다.
 
 이 타입은 “15분마다”가 아니다. `[06:00, 18:45]`라는 특정 local clock slots를
 나타낸다. 주기를 설정값으로 바꾸는 Periodic과 의미가 다르다.

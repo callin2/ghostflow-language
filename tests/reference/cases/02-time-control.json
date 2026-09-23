@@ -1775,6 +1775,47 @@
       "when": "Admission is evaluated while the count remains unknown.",
       "then": "The case expression yields false and the protective limit rejects admission. The evaluation does not write a count event or create, consume, or release a reservation.",
       "reason": "Unknown accounting must fail closed without fabricating a count or reservation."
+    },
+    {
+      "id": "REF-03-081",
+      "references": ["03-time-and-schedules.md#36-선택된-dailyslots"],
+      "rule": "A TimeSlots retime preserves a stable slot identity independent of displayed TimeOfDay and reevaluates the same active Range occurrence.",
+      "scope": "runtime", "status": "specified",
+      "given": "A TimeSlots<1min,N> entry with opaque slot key K plans 08:00 with range(10min); its occurrence admits once at 08:04 with ledger entry L.",
+      "when": "An accepted setting event E at base revision R retimes K to 08:07, and a trusted accepted decision occurs at 08:07.",
+      "then": "The event position pauses the Range until the changed start. At 08:07 the same occurrence is reevaluated and, when=true, is active until 08:17. K, occurrence ID and L stay fixed; due remains false and no second admission is recorded.",
+      "reason": "The current runtime has no atomic TimeSlots retime event API carrying a stable entry key."
+    },
+    {
+      "id": "REF-03-082",
+      "references": ["03-time-and-schedules.md#36-선택된-dailyslots"],
+      "rule": "TimeSlots retime and remove/add have distinct identity and baseline effects.",
+      "scope": "runtime", "status": "specified",
+      "given": "A TimeSlots entry at 08:00 has opaque slot key K and an admitted or terminal occurrence in the current local date.",
+      "when": "One event retimes K to 08:07; in a separate run an event removes K and adds displayed time 08:07 without identifying K as a retime.",
+      "then": "Retime retains K and the occurrence ledger. Remove/add deletes K's future plan, creates a new key, establishes the ordinary add baseline, and never rearms or relabels K's occurrence.",
+      "reason": "The current settings artifact exposes only projected TimeSlots values and has no executable keyed edit operation."
+    },
+    {
+      "id": "REF-03-083",
+      "references": ["03-time-and-schedules.md#36-선택된-dailyslots"],
+      "rule": "A TimeSlots retime that creates overlapping Range intervals is rejected atomically without changing identity or ledger state.",
+      "scope": "runtime", "status": "specified",
+      "given": "One schedule has keyed entries K1 at 08:00 and K2 at 08:20, range(10min), settings revision R, and preserved occurrence ledger L.",
+      "when": "An event proposes retiming K2 to 08:07, which would overlap K1's 08:00-08:10 interval.",
+      "then": "The entire event is rejected. Both displayed times, K1, K2, revision R, active state and L remain unchanged.",
+      "reason": "The current runtime has no atomic TimeSlots retime event API or live Range overlap validator."
+    },
+    {
+      "id": "REF-03-084",
+      "references": ["03-time-and-schedules.md#36-선택된-dailyslots"],
+      "rule": "A TimeSlots value must reject a displayed time outside its declared grid; the 08:00 to 08:07 retime requires a grid containing 08:07.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "timeslots-retime-target-off-grid.ghost.md",
+      "expect": "reject",
+      "diagnosticPattern": "TimeSlots|grid|15-minute|align",
+      "source": "# Off-grid retime target projection\n\n```ghost\ncontrol OffGridRetimeTarget {\n  config watering_slots: TimeSlots<15min, 8> = [time`08:07`];\n  schedule starts: DailySlots<15min> {\n    timezone = \"Asia/Seoul\";\n    selected = watering_slots;\n    dst_missing = skip;\n    dst_repeated = first;\n    basis = pulse;\n    when = true;\n    clock = trusted_only;\n    gap = skip_after(60s);\n    recovery = baseline;\n    fallback = skip;\n  }\n  output due: Bool;\n  due <- starts.due;\n}\n```\n"
     }
   ]
 }

@@ -469,6 +469,10 @@ control ClimateTarget {
 ties-to-even 반올림을 한 번만 한다. 같은 물리량의 다른 unit은 변환 후 같은 의미값으로
 비교한다. artifact metadata는 nominal quantity identity와 canonical unit을 보존한다.
 표시 unit과 locale formatting은 UI metadata이며 제어 의미를 바꾸지 않는다.
+`Temperature` 운영 설정은 작성자가 선택한 `°C` 또는 `K`를 별도 `displayUnit` metadata로
+반드시 보존한다. 내부 값과 비교는 계속 canonical `K`를 사용한다. 이 metadata가 없거나
+모호하면 오류이며, 값의 크기나 canonical unit에서 표시 unit을 추론하거나 `°C`를 기본값으로
+사용하지 않는다.
 
 허용 연산은 다음으로 닫혀 있다.
 

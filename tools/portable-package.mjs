@@ -245,6 +245,13 @@ function manifestCanonicalUnit(descriptor, path) {
   } else if (hasUnit) fail('manifest-mismatch', `${path}.canonicalUnit is forbidden for non-quantity type ${descriptor.type}`);
 }
 
+function manifestDisplayUnit(config, path) {
+  const hasDisplayUnit = Object.hasOwn(config, 'displayUnit');
+  if (config.type === 'Temperature' && Object.hasOwn(config, 'settings')) {
+    if (!hasDisplayUnit || (config.displayUnit !== '°C' && config.displayUnit !== 'K')) fail('manifest-mismatch', `${path}.displayUnit must be explicitly °C or K`);
+  } else if (hasDisplayUnit) fail('manifest-mismatch', `${path}.displayUnit is forbidden without Temperature settings`);
+}
+
 function compareText(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
 }
@@ -658,6 +665,7 @@ export async function verifyPortablePackage(packageValue, options = {}) {
     if (!isPlainObject(config)) fail('manifest-mismatch', `manifest.configs[${index}] must be an object`);
     manifestCapabilityType(config.type, `manifest.configs[${index}].type`);
     manifestCanonicalUnit(config, `manifest.configs[${index}]`);
+    manifestDisplayUnit(config, `manifest.configs[${index}]`);
     manifestIntConfig(config, `manifest.configs[${index}]`);
     manifestTimeConfig(config, `manifest.configs[${index}]`);
   }

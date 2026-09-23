@@ -301,9 +301,17 @@ fn gfb5_forward_projection_and_wrong_type_are_rejected() {
 
 #[test]
 fn gfb5_projection_fields_indices_and_older_profiles_are_strict() {
+    Module::load(
+        &Fixture {
+            output: vec![58, 0, 0, 1],
+            ..Fixture::default()
+        }
+        .bytes(),
+    )
+    .expect("missed is schedule projection field 1");
     for (code, message) in [
         (vec![58, 1, 0, 0], "schedule projection index"),
-        (vec![58, 0, 0, 1], "schedule projection field"),
+        (vec![58, 0, 0, 2], "schedule projection field"),
         (vec![58, 0], "truncated bytecode"),
     ] {
         rejected(

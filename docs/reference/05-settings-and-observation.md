@@ -95,6 +95,11 @@ label과 소스·의도 provenance를 제공한다. renderer는 이 정보로 Du
 renderer가 정한다. `label`이나 widget 모양으로 설정 identity 또는 검증 규칙을 추론하지
 않는다.
 
+`Temperature` 설정 descriptor는 canonical `K` 값과 별도로 선택된 `displayUnit` (`°C` 또는
+`K`)을 반드시 포함한다. 숫자만 바꾸는 live event는 기존 `displayUnit`을 보존한다. 단위를
+바꾸려면 event가 새 unit을 명시해야 한다. 누락되거나 모호한 unit은 적용 전 오류이며,
+canonical 값이나 값의 크기에서 표시 unit을 추론하거나 기본 unit을 정하지 않는다.
+
 ### 기본값과 유효값
 
 기본값은 소스가 정한 값이고, 유효값은 특정 실행 위치에서 실제 식이 읽는 값이다.

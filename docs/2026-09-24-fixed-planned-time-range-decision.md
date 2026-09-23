@@ -67,12 +67,30 @@ the planned start. With a start of 08:00, admission at 08:04 and a change at
 five minutes makes the new end 08:05, so the same accepted decision ends the
 active Range. A start edit to 08:02 with ten minutes of Duration moves the end
 to 08:12. Neither setting event creates a new occurrence or resets its
-identity or admission ledger. Editing a `DailySlots` `TimeSlots` set follows
-[§3.6](reference/03-time-and-schedules.md#36-선택된-dailyslots): removed slots
-remove future plans, and added slots establish their own baseline. A set edit
-does not retime an admitted occurrence through this scalar start rule.
-The live start retiming rule is scoped to a scalar start setting; it does not
-define a general retiming rule for a set of slots.
+identity or admission ledger.
+
+A `DailySlots` `TimeSlots` entry has an opaque runtime slot key independent of
+its displayed `TimeOfDay`. This adds no GhostFlow source syntax. An accepted
+retime setting event identifies its own event, the base settings revision, the
+existing slot key and the replacement `TimeOfDay`. It changes planned-time
+metadata while preserving `(schedule ID, local date, slot key, DST fold)` as
+the occurrence identity. The accepted settings state persists that key across
+restart. List position and displayed time are not identity.
+
+Therefore, for a `TimeSlots<1min,N>` setting, retiming an admitted 08:00
+`range(10min)` entry to 08:07 pauses it at the event position and reevaluates
+the **same** occurrence at 08:07. If `when` is true, it can request output until
+08:17. It emits no second `due`, makes no second admission, and retains the
+ledger. When the event and the 08:07 scan share one effective position, the
+event is applied first and that completed decision reevaluates the same
+occurrence. A coarser grid that does not contain 08:07 rejects the event.
+
+Remove/add remains a distinct operation. Removal deletes future plans for the
+old slot key; adding even the same displayed time creates a new key and starts
+the ordinary baseline rule. Remove/add cannot be used to retime an admitted
+Range. A whole-value replacement that does not carry the existing key as an
+explicit retime is interpreted with these remove/add rules, not by guessing a
+match from order or displayed time.
 
 The order of setting events and scans follows the atomic live event contract in
 [§5.2](reference/05-settings-and-observation.md#52-소스-변경과-운영-설정-변경): the
@@ -109,5 +127,7 @@ declaration with a diagnostic. Static default values are checked at compile
 time. Restored effective settings are checked before activation; overlap
 rejects activation. A live setting event that would create overlap is rejected
 atomically, including overlap with the current admitted interval. This also
-applies to `DailySlots` set edits without changing their slot identity and
-removal/addition rules.
+applies to `DailySlots` edits. A retime validates the proposed displayed time
+without allocating a new slot key. Rejection preserves the old displayed time,
+slot key, settings revision, active occurrence and ledger. Remove/add keeps its
+separate identity and baseline rules.

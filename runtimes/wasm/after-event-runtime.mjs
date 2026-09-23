@@ -71,6 +71,7 @@ export class AfterEventRuntime {
     Object.defineProperty(runtime, 'source', { enumerable: true, value: Object.freeze({
       ...artifact.sourceDocument, signal, site: site.site,
       event: site.event.name, predicate: site.predicate.name,
+      projections: Object.freeze([...(site.projections ?? [])]),
       artifactSha256: artifact.manifest.bytecodeSha256,
     }) });
     return runtime;
@@ -106,6 +107,18 @@ export class AfterEventRuntime {
   commit() { this.#live(); this.#check(this.wasm.gf_after_event_commit(this.handle)); }
   rollback() { this.#live(); this.#check(this.wasm.gf_after_event_rollback(this.handle)); }
   get results() { this.#live(); return JSON.parse(this.#text('results')); }
+  any() {
+    const results = this.results;
+    if (results.some(result => result.status === 'satisfied')) return { ok: true, value: true };
+    if (results.length > 0 && results.every(result => result.status === 'expired')) return { ok: true, value: false };
+    return { ok: false, fault: 'NotReady' };
+  }
+  all() {
+    const results = this.results;
+    if (results.some(result => result.status === 'expired')) return { ok: true, value: false };
+    if (results.length > 0 && results.every(result => result.status === 'satisfied')) return { ok: true, value: true };
+    return { ok: false, fault: 'NotReady' };
+  }
   #live() { if (!this.handle) throw new Error('after_event runtime is disposed'); }
   #text(field) {
     const ptr = this.wasm[`gf_after_event_${field}_ptr`](this.handle);

@@ -64,6 +64,14 @@ function name(value, label, generated = false) {
   return value;
 }
 
+function portName(value, label) {
+  string(value, label);
+  if (value.length > MAX_NAME_LENGTH) throw new RangeError(`${label} exceeds ${MAX_NAME_LENGTH} characters`);
+  if (!/^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*$/u.test(value)) throw new Error(`${label} is not a logical port name`);
+  if (value.startsWith(RESERVED)) throw new Error(`${label} uses reserved prefix ${RESERVED}`);
+  return value;
+}
+
 function type(value, label) {
   if (!TYPES.has(value)) throw new Error(`${label} has unsupported type ${String(value)}`);
   return value;
@@ -199,7 +207,7 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
   if ((Object.hasOwn(manifest, 'adaptPolicy') || Object.hasOwn(manifest, 'strategies')) && capabilities === undefined) {
     throw new Error('adapt strategy activation requires a capability-aware host; ControlRuntime cannot activate this manifest');
   }
-  keys(manifest, ['format', 'name', 'inputs', 'outputs', 'sensors', 'schedules', 'timers', 'signals', 'configs', 'bytecodeSha256'], ['adaptPolicy', 'strategies'], 'manifest');
+  keys(manifest, ['format', 'name', 'inputs', 'outputs', 'sensors', 'schedules', 'timers', 'signals', 'configs', 'bytecodeSha256'], ['adaptPolicy', 'strategies', 'objectives', 'resources'], 'manifest');
   if (manifest.format !== FORMAT && manifest.format !== INTEGER_FORMAT && !(manifest.format === SETTINGS_FORMAT && acceptSettings) && manifest.format !== SOLAR_FORMAT) throw new Error(`unsupported manifest format ${String(manifest.format)}`);
   const settingsManifest = manifest.format === SETTINGS_FORMAT || manifest.format === INTEGER_FORMAT;
   const solarManifest = manifest.format === SOLAR_FORMAT || manifest.format === INTEGER_FORMAT;
@@ -255,12 +263,13 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
     else keys(item, ['name', 'sensor', 'onBelow', 'offAbove', 'initial', 'valueInput', 'okInput', 'faultInput'], [], `manifest.signals[${index}]`);
     return copy(item);
   });
-  const configs = validateList(manifest.configs, 'manifest.configs', ['name', 'type', 'value'], settingsManifest ? ['settings', 'initialOffset', 'initialEndOffset', 'canonicalUnit'] : ['canonicalUnit']);
+  const configs = validateList(manifest.configs, 'manifest.configs', ['name', 'type', 'value'], settingsManifest ? ['settings', 'initialOffset', 'initialEndOffset', 'canonicalUnit', 'displayUnit'] : ['canonicalUnit']);
+  const resources = manifest.resources === undefined ? [] : validateList(manifest.resources, 'manifest.resources', ['name', 'type'], []);
 
   for (const item of inputs) { name(item.name, 'input.name'); type(item.type, `input ${item.name}.type`); validateCanonicalUnit(item, `input ${item.name}`); }
-  for (const item of outputs) { name(item.name, 'output.name'); type(item.type, `output ${item.name}.type`); validateCanonicalUnit(item, `output ${item.name}`); }
+  for (const item of outputs) { portName(item.name, 'output.name'); type(item.type, `output ${item.name}.type`); validateCanonicalUnit(item, `output ${item.name}`); }
   const windows = signals.filter(item => item.kind === 'window');
-  if (manifest.format === INTEGER_FORMAT && ![2, 3, 4, 6].includes(bytecodeFormat)) throw new Error('v4 manifest requires GFB format 2, 3, 4 or 6');
+  if (manifest.format === INTEGER_FORMAT && ![2, 3, 4, 5, 6].includes(bytecodeFormat)) throw new Error('v4 manifest requires GFB format 2, 3, 4, 5 or 6');
   if (bytecodeFormat === 4 && (manifest.format !== INTEGER_FORMAT || !windows.length)) throw new Error('GFB format 4 requires a v4 window manifest');
   if (bytecodeFormat === 6 && (manifest.format !== INTEGER_FORMAT || !signals.some(item => item.kind === 'true-for'))) throw new Error('GFB format 6 requires a v4 true_for manifest');
   if (windows.length && bytecodeFormat !== 4) throw new Error('window manifest requires GFB format 4');
@@ -285,9 +294,18 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
     const hasOffsets = Object.prototype.hasOwnProperty.call(item, 'initialOffset') || Object.prototype.hasOwnProperty.call(item, 'initialEndOffset');
     if (!settingsManifest && (hasSettings || hasOffsets)) throw new Error(`v1 config ${item.name} cannot contain operating settings metadata`);
     if (settingsManifest && hasOffsets && !hasSettings) throw new Error(`v2 config ${item.name} literal offsets require settings`);
-    if (settingsManifest && hasSettings) item.settings = validateSettings(item, `config ${item.name}`);
+    if (settingsManifest && hasSettings) {
+      if (item.type === 'Temperature' && item.displayUnit !== '°C' && item.displayUnit !== 'K') throw new Error(`config ${item.name}.displayUnit must be explicitly °C or K`);
+      if (item.type !== 'Temperature' && Object.hasOwn(item, 'displayUnit')) throw new Error(`config ${item.name}.displayUnit is forbidden for ${item.type}`);
+      item.settings = validateSettings(item, `config ${item.name}`);
+    }
   }
   unique(configs.map(item => item.name), 'config');
+  for (const item of resources) {
+    name(item.name, 'resource.name');
+    if (item.type !== 'ContinuousActuator') throw new Error(`resource ${item.name} has unsupported type ${String(item.type)}`);
+  }
+  unique(resources.map(item => item.name), 'resource');
 
   const sensorByName = new Map();
   for (const item of sensors) {
@@ -346,6 +364,29 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
   }
   unique(sensors.map(item => item.name), 'sensor');
   if (new Set(sensorByName.keys()).size !== sensors.length) throw new Error('duplicate sensor name');
+
+  const objectives = manifest.objectives === undefined ? [] : validateList(manifest.objectives, 'manifest.objectives',
+    ['name', 'measure', 'target', 'manipulate', 'output', 'controller', 'binding', 'executable', 'bindings'], []);
+  if (objectives.length > 1) throw new Error('only one native objective is supported');
+  for (const objective of objectives) {
+    name(objective.name, 'objective.name');
+    if (objective.binding !== 'native-temperature-percent-v1') throw new Error(`objective ${objective.name} has unsupported binding`);
+    if (bytecodeFormat !== 7) throw new Error(`objective ${objective.name} requires verified GFB7 bytecode`);
+    const sensor = sensorByName.get(objective.measure);
+    if (!sensor || sensor.type !== 'Temperature' || sensor.canonicalUnit !== 'K') throw new Error(`objective ${objective.name} requires a canonical Temperature measure`);
+    const config = configs.find(item => item.name === objective.target);
+    if (!config || config.type !== 'Temperature' || config.canonicalUnit !== 'K') throw new Error(`objective ${objective.name} requires a canonical Temperature target`);
+    if (!['°C', 'K'].includes(config.displayUnit)) throw new Error(`objective ${objective.name} target displayUnit must be °C or K`);
+    const output = outputs.find(item => item.name === objective.bindings?.output);
+    if (!output || output.type !== 'Percent') throw new Error(`objective ${objective.name} requires a Percent output binding`);
+    keys(record(objective.bindings, `objective ${objective.name}.bindings`), ['output', 'measure', 'measureOk', 'target', 'safeMax'], [], `objective ${objective.name}.bindings`);
+    if (objective.bindings.measure !== sensor.valueInput || objective.bindings.measureOk !== sensor.okInput) throw new Error(`objective ${objective.name} measure binding mismatch`);
+    generated(objective.bindings.target, `${RESERVED}objective_target_${objective.name}`, `objective ${objective.name}.target binding`);
+    generated(objective.bindings.safeMax, `${RESERVED}objective_safe_max_${objective.name}`, `objective ${objective.name}.safeMax binding`);
+    keys(record(objective.output, `objective ${objective.name}.output`), ['min', 'max'], [], `objective ${objective.name}.output`);
+    finite(objective.output.min, `objective ${objective.name}.output.min`); finite(objective.output.max, `objective ${objective.name}.output.max`);
+    if (objective.output.min !== 0 || objective.output.max < 0 || objective.output.max > 100) throw new Error(`objective ${objective.name} has invalid Percent range`);
+  }
 
   const scheduleNames = new Set();
   for (const item of schedules) {
@@ -535,7 +576,8 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
 
   for (const item of inputs) if (item.name.startsWith(RESERVED)) throw new Error(`input ${item.name} uses reserved prefix`);
   for (const item of outputs) if (item.name.startsWith(RESERVED)) throw new Error(`output ${item.name} uses reserved prefix`);
-  const publicManifest = freeze({ ...copy(manifest), inputs, outputs, sensors, schedules, timers, signals, configs });
+  const publicManifest = freeze({ ...copy(manifest), inputs, outputs, sensors, schedules, timers, signals, configs,
+    ...(manifest.resources === undefined ? {} : { resources }), ...(manifest.objectives === undefined ? {} : { objectives }) });
   return { manifest: publicManifest, inputNames, sensorByName, scheduleNames, signalNames };
 }
 
@@ -658,6 +700,7 @@ export class ControlRuntime {
   }
 
   static async instantiateFramed(wasmBytes, artifact = {}, options = {}) {
+    if ((artifact.manifest?.objectives?.length ?? 0) > 0) throw new Error('framed native objectives are not supported');
     const initialized = await instantiateControlRuntime(wasmBytes, artifact, options, FramedGhostFlowRuntime.instantiate, false);
     return new ControlRuntime(initialized.runtime, initialized.checkedManifest, initialized.sensors, initialized.signals, true, initialized.temporalEpoch, initialized.hasSolar);
   }
@@ -685,6 +728,7 @@ export class ControlRuntime {
     this.solarScheduleNames = new Set(manifest.manifest.schedules.filter(item => item.kind === 'solar').map(item => item.name));
     this.trueForSignals = manifest.manifest.signals.filter(item => item.kind === 'true-for');
     this.trueForSources = new Set(this.trueForSignals.flatMap(item => item.sources.map(source => source.name)));
+    this.objectives = manifest.manifest.objectives ?? [];
     this.sensors = sensors;
     this.signals = signals;
     this.lastNowMs = null;
@@ -707,15 +751,15 @@ export class ControlRuntime {
    * Executes one caller-supplied snapshot. Sensor sampleMs is metadata for the
    * acquisition owner; this host never polls hardware or performs I/O.
    */
-  step({ nowMs, inputs = {}, samples = {}, due = {}, intervals = {}, solarFacts } = {}) {
-    if (this.#framed) return this.#stepFramed({ nowMs, inputs, samples, due, intervals, solarFacts });
-    return this.#stepLegacy({ nowMs, inputs, samples, due, intervals, solarFacts });
+  step({ nowMs, inputs = {}, samples = {}, due = {}, intervals = {}, objectiveSafeMax = {}, solarFacts } = {}) {
+    if (this.#framed) return this.#stepFramed({ nowMs, inputs, samples, due, intervals, objectiveSafeMax, solarFacts });
+    return this.#stepLegacy({ nowMs, inputs, samples, due, intervals, objectiveSafeMax, solarFacts });
   }
 
-  #stepLegacy({ nowMs, inputs = {}, samples = {}, due = {}, intervals = {}, solarFacts } = {}) {
+  #stepLegacy({ nowMs, inputs = {}, samples = {}, due = {}, intervals = {}, objectiveSafeMax = {}, solarFacts } = {}) {
     this.#live();
     if (this.#faulted) throw new Error('ControlRuntime is faulted; create a new instance');
-    const captured = this.#captureSnapshot({ nowMs, inputs, samples, due, intervals, solarFacts });
+    const captured = this.#captureSnapshot({ nowMs, inputs, samples, due, intervals, objectiveSafeMax, solarFacts });
     const transaction = this.#beginConditioners();
     let phase = 'prepare';
     try {
@@ -747,6 +791,11 @@ export class ControlRuntime {
         this.runtime.setBool(entry.item.okInput, reading.ok);
         this.runtime.setNumber(entry.item.faultInput, sensorFaultCode(reading));
       }
+      for (const objective of this.objectives) {
+        const target = this.manifest.configs.find(item => item.name === objective.target);
+        this.runtime.setNumber(objective.bindings.target, target.value);
+        this.runtime.setNumber(objective.bindings.safeMax, captured.objectiveSafeMax.get(objective.name));
+      }
       for (const item of this.manifest.schedules) if (item.kind !== 'solar') this.runtime.setBool(item.dueInput, captured.dueValues.get(item.name) ?? false);
       this.#setIntervals(captured.intervalValues, (name, value) => {
         if (value.type === 'Bool') this.runtime.setBool(name, value.value);
@@ -756,7 +805,7 @@ export class ControlRuntime {
       if (this.#hasSolar) this.runtime.setNumber(`${RESERVED}now_ms`, captured.nowMs);
       phase = 'dispatch';
       if (this.#hasSolar) this.runtime.tickSolar(captured.solarFacts);
-      else if (this.#temporalEpoch !== null || this.manifest.timers.length > 0 || this.manifest.signals.some(isVmSignal)) this.runtime.tickAt(captured.nowMs); else this.runtime.tick();
+      else if (this.objectives.length || this.#temporalEpoch !== null || this.manifest.timers.length > 0 || this.manifest.signals.some(isVmSignal)) this.runtime.tickAt(captured.nowMs); else this.runtime.tick();
       phase = 'committed';
       this.lastNowMs = captured.nowMs;
       this.#commitConditioners(transaction);
@@ -784,10 +833,10 @@ export class ControlRuntime {
     }
   }
 
-  #captureSnapshot({ nowMs, inputs = {}, samples = {}, due = {}, intervals = {}, solarFacts } = {}) {
+  #captureSnapshot({ nowMs, inputs = {}, samples = {}, due = {}, intervals = {}, objectiveSafeMax = {}, solarFacts } = {}) {
     safeInteger(nowMs, 'nowMs');
     if (this.lastNowMs !== null && nowMs < this.lastNowMs) throw new Error('nowMs must be monotonic');
-    record(inputs, 'inputs'); record(samples, 'samples'); record(due, 'due'); record(intervals, 'intervals');
+    record(inputs, 'inputs'); record(samples, 'samples'); record(due, 'due'); record(intervals, 'intervals'); record(objectiveSafeMax, 'objectiveSafeMax');
     for (const key of Object.keys(inputs)) if (!this.inputNames.has(key)) throw new Error(`unknown input ${key}`);
     for (const item of this.manifest.inputs) if (!Object.prototype.hasOwnProperty.call(inputs, item.name)) throw new Error(`missing input ${item.name}`);
     for (const key of Object.keys(samples)) {
@@ -807,6 +856,15 @@ export class ControlRuntime {
       if (clock.bootEpoch !== this.#temporalEpoch) throw new Error('solar facts clock.bootEpoch must match activation');
     }
     for (const key of Object.keys(intervals)) if (!this.trueForSources.has(key)) throw new Error(`unknown true_for source ${key}`);
+    const objectiveSafeValues = new Map();
+    for (const key of Object.keys(objectiveSafeMax)) if (!this.objectives.some(item => item.name === key)) throw new Error(`unknown objective ${key}`);
+    for (const objective of this.objectives) {
+      const value = Object.hasOwn(objectiveSafeMax, objective.name) ? objectiveSafeMax[objective.name] : objective.output.max;
+      if (typeof value !== 'number' || !Number.isFinite(value) || value < objective.output.min || value > objective.output.max) {
+        throw new RangeError(`objectiveSafeMax.${objective.name} must be within ${objective.output.min}..${objective.output.max}`);
+      }
+      objectiveSafeValues.set(objective.name, value);
+    }
 
     const inputValues = new Map();
     for (const item of this.manifest.inputs) {
@@ -850,7 +908,7 @@ export class ControlRuntime {
       const raw = Object.prototype.hasOwnProperty.call(intervals, sourceName) ? intervals[sourceName] : null;
       intervalValues.set(sourceName, this.#normalizeInterval(raw, sourceName, nowMs));
     }
-    return { nowMs, inputValues, normalizedSamples, dueValues, intervalValues, solarFacts };
+    return { nowMs, inputValues, normalizedSamples, dueValues, intervalValues, objectiveSafeMax: objectiveSafeValues, solarFacts };
   }
 
   #normalizeInterval(raw, sourceName, nowMs) {

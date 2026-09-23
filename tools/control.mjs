@@ -23,6 +23,7 @@ const FAULT_ENUMS = new Map([
   ['ClockFault', ['ClockUnknown', 'ZoneUnsupported']],
   ['CalendarFault', ['ClockUnknown', 'CalendarMissing', 'CalendarOutOfRange', 'ZoneUnsupported']],
   ['TemporalContextFault', ['ClockUnknown', 'LocationUnknown', 'EventUnavailable', 'PredictionMissing', 'PredictionStale', 'ZoneUnsupported']],
+  ['AccountingFault', ['ClockUnknown', 'LedgerMissing', 'LedgerCorrupt', 'LedgerIncomplete', 'CountOverflow']],
 ].map(([name, members]) => [name, new Map(members.map((member, index) => [member, index]))]));
 const FAULT_MEMBER_NAMES = new Set([...FAULT_ENUMS.values()].flatMap(members => [...members.keys()]));
 const KEYWORDS = new Set([
@@ -1503,7 +1504,14 @@ class Lowerer {
       ])
       : [['strategy', 'control', '0', ['device', deviceQuery], ...windows, ...solarForms, ...this.trueForForms(), ...transitions, ...intents]];
     const module = ['module', this.ast.name, ['version', '1'], ...this.gfbInputs, ...this.gfbStates, ...temporalForms,
-      ...strategyForms, ...this.constraints];
+      ...strategyForms, ...this.constraints,
+      ...[...this.objectives.values()].filter(objective => objective.binding === 'native-temperature-percent-v1').map(objective => [
+        'pid-objective', objective.name, objective.bindings.output, objective.bindings.measure,
+        objective.bindings.measureOk, objective.bindings.target, objective.bindings.safeMax,
+        String(objective.controller.periodMs), String(objective.controller.lateAfterMs), objective.controller.direction,
+        String(objective.controller.kp), String(objective.controller.ki), String(objective.controller.kd),
+        String(objective.controller.bias), String(objective.output.max), String(objective.controller.restart.output),
+      ])];
     if (!emitBytecode) return { manifest: this.manifest, sourceMap: this.ast.sourceNodes };
     const policySchedule = this.ast.body.find(item => item.kind === 'schedule' && item.scheduleType !== 'Solar'
       && Object.keys(item.policy ?? {}).some(key => key !== 'fallback'));
@@ -1627,7 +1635,8 @@ class Lowerer {
       stage: stage?.name ?? null, persistence: persistence.name,
       ...(call.name === 'count_events' ? { over: named.get('over').name } : {}) };
     this.accounts.set(item.name, descriptor); (this.manifest.accounts ??= []).push(descriptor);
-    this.symbols.get(item.name).type = semanticType(call.name === 'count_events' ? 'Int' : 'Duration');
+    this.symbols.get(item.name).type = call.name === 'count_events'
+      ? resultType(INT, semanticType('AccountingFault')) : DURATION;
   }
   validateAccountConstraints(item) {
     const limits = item.limits.map(limit => {
@@ -1733,9 +1742,15 @@ class Lowerer {
             if (isTimeType(type.kind) && (settings.max - settings.min) % settings.step !== 0) error(item.loc, 'time config max is not aligned to settings.step from settings.min');
           }
           this.manifest.format = 'GhostFlow/control-v2';
+          let displayUnit;
+          if (type.kind === 'Temperature') {
+            const literal = item.value.kind === 'literal' ? quantityLiteral(item.value.raw) : null;
+            if (!literal || (literal.suffix !== '°C' && literal.suffix !== 'K')) error(item.value.loc, 'Temperature operator config display unit must be explicitly °C or K');
+            displayUnit = literal.suffix;
+          }
           this.manifest.configs.push(manifestDescriptor(item.name, type, type.kind === 'TimeSlots'
             ? { type: `TimeSlots<${type.gridMs}ms,${type.capacity}>`, value: value.constant, gridMs: type.gridMs, capacity: type.capacity, settings }
-            : { value: value.constant, settings, initialOffset: item.value.loc.offset, initialEndOffset: item.value.loc.endOffset ?? item.value.loc.offset }));
+            : { value: value.constant, settings, initialOffset: item.value.loc.offset, initialEndOffset: item.value.loc.endOffset ?? item.value.loc.offset, ...(displayUnit ? { displayUnit } : {}) }));
         } else this.manifest.configs.push(manifestDescriptor(item.name, type, type.kind === 'TimeSlots'
           ? { type: `TimeSlots<${type.gridMs}ms,${type.capacity}>`, value: value.constant, gridMs: type.gridMs, capacity: type.capacity }
           : { value: value.constant }));
@@ -1865,11 +1880,96 @@ class Lowerer {
     const required = item.controller.kind === 'pid' ? ['period','late_after','direction','kp','ki','kd','bias','anti_windup','disabled','transfer','fault','restart']
       : item.controller.kind === 'pi' ? ['period','late_after','direction','kp','ki','bias','anti_windup','disabled','transfer','fault','restart'] : [];
     for (const key of required) if (!fields[key]) error(item.controller.loc, `controller ${item.controller.kind} requires ${key}`);
-    const descriptor = { name: item.name, measure, target, manipulate, output: { min: min.constant, max: max.constant }, controller: item.controller.kind, runtime: 'requires-native-controller-binding' };
+    if (item.controller.kind !== 'pid') {
+      const descriptor = { name: item.name, measure, target, manipulate, output: { min: min.constant, max: max.constant }, controller: item.controller.kind, runtime: 'requires-native-controller-binding' };
+      this.objectives.set(item.name, descriptor); (this.manifest.objectives ??= []).push(descriptor);
+      return;
+    }
+    for (const key of Object.keys(fields)) if (!required.includes(key)) error(fields[key].loc, `unsupported PID field ${key}`);
+    if (min.constant !== 0) error(item.outputMin.loc, 'native Temperature PID output minimum must be 0%');
+    const resource = this.ast.body.find(entry => entry.kind === 'resource' && entry.name === manipulate);
+    if (resource?.type !== 'ContinuousActuator' || resource.typeArgs?.length !== 1 || resource.typeArgs[0].name !== 'Percent') {
+      error(item.manipulate.loc, 'native Temperature PID manipulate must reference ContinuousActuator<Percent>.position');
+    }
+    const sensor = this.sensors.get(measure);
+    const targetSymbol = this.symbols.get(target);
+    if (sensor.type.kind !== 'Temperature' || targetSymbol.type.kind !== 'Temperature') {
+      error(item.loc, 'native PID objective requires Temperature measure and target');
+    }
+    const constant = (node, expected, label) => {
+      const value = this.expression(node, new Map(), { allowNext: false }, [], expected);
+      if (value.constant === undefined || !Number.isFinite(value.constant)) error(node.loc, `${label} must be a finite constant ${typeNameOf(expected)}`);
+      return value.constant;
+    };
+    const choice = (node, allowed, label) => {
+      if (node.kind !== 'reference' || !allowed.includes(node.name)) error(node.loc, `${label} must be ${allowed.join(' or ')}`);
+      return node.name;
+    };
+    const gain = (node, name, withTime, derivative = false) => {
+      if (node.kind !== 'call' || node.name !== name || node.args.length) error(node.loc, `${name} constructor is required`);
+      const named = new Map();
+      for (const entry of node.named) {
+        if (named.has(entry.name)) error(entry.loc, `duplicate ${name} argument ${entry.name}`);
+        named.set(entry.name, entry.value);
+      }
+      const keys = withTime ? ['output', 'error', 'time'] : ['output', 'error'];
+      if (named.size !== keys.length || keys.some(key => !named.has(key))) error(node.loc, `${name} requires ${keys.join(', ')}`);
+      const output = constant(named.get('output'), PERCENT, `${name} output`);
+      const errorValue = constant(named.get('error'), semanticType('TemperatureDelta'), `${name} error`);
+      if (output < 0 || errorValue <= 0) error(node.loc, `${name} requires nonnegative output and positive error`);
+      if (!withTime) return output / errorValue;
+      const timeMs = constant(named.get('time'), DURATION, `${name} time`);
+      if (timeMs <= 0) error(node.loc, `${name} time must be positive`);
+      const seconds = timeMs / 1000;
+      return derivative ? output * seconds / errorValue : output / errorValue / seconds;
+    };
+    const periodMs = constant(fields.period, DURATION, 'controller period');
+    const lateAfterMs = constant(fields.late_after, DURATION, 'controller late_after');
+    if (periodMs <= 0 || lateAfterMs < periodMs) error(item.controller.loc, 'PID requires period > 0 and late_after >= period');
+    const restart = fields.restart;
+    if (restart.kind !== 'call' || restart.name !== 'reset' || restart.args.length || restart.named.length !== 1 || restart.named[0].name !== 'output') {
+      error(restart.loc, 'PID restart requires reset(output: Percent)');
+    }
+    const restartOutput = constant(restart.named[0].value, PERCENT, 'PID restart output');
+    const bias = constant(fields.bias, PERCENT, 'PID bias');
+    if (bias < min.constant || bias > max.constant) error(fields.bias.loc, 'PID bias must be within the objective output range');
+    if (restartOutput < min.constant || restartOutput > max.constant) error(restart.loc, 'PID restart output must be within the objective output range');
+    const descriptor = {
+      name: item.name, measure, target, manipulate, output: { min: min.constant, max: max.constant },
+      controller: {
+        kind: 'pid', periodMs, lateAfterMs,
+        direction: choice(fields.direction, ['direct', 'reverse'], 'PID direction'),
+        kp: gain(fields.kp, 'proportional_gain', false),
+        ki: gain(fields.ki, 'integral_gain', true),
+        kd: gain(fields.kd, 'derivative_gain', true, true),
+        bias,
+        antiWindup: choice(fields.anti_windup, ['conditional_safe'], 'PID anti_windup'),
+        disabled: choice(fields.disabled, ['track_safe'], 'PID disabled'),
+        transfer: choice(fields.transfer, ['track_safe'], 'PID transfer'),
+        fault: choice(fields.fault, ['disable'], 'PID fault'),
+        restart: { mode: 'reset', output: restartOutput },
+      },
+      binding: 'native-temperature-percent-v1', executable: false,
+    };
+    const measureSource = this.sensors.get(measure);
+    const targetInput = this.generatedName('objective_target', item.name);
+    const safeMaxInput = this.generatedName('objective_safe_max', item.name);
+    if (!this.gfbInputs.some(input => input[1] === `${RESERVED_PREFIX}now_ms`)) this.addInput(`${RESERVED_PREFIX}now_ms`, NUMBER, item.loc);
+    this.addInput(targetInput, semanticType('Temperature'), item.loc);
+    this.addInput(safeMaxInput, PERCENT, item.loc);
+    descriptor.bindings = {
+      output: `${manipulate}.position`, measure: measureSource.valueInput, measureOk: measureSource.okInput,
+      target: targetInput, safeMax: safeMaxInput,
+    };
+    if (this.outputs.has(descriptor.bindings.output)) error(item.manipulate.loc, `objective output collides with authored output ${descriptor.bindings.output}`);
+    this.manifest.outputs.push(manifestDescriptor(descriptor.bindings.output, PERCENT));
     this.objectives.set(item.name, descriptor); (this.manifest.objectives ??= []).push(descriptor);
   }
   addDegraded(item) {
     if (!this.objectives.has(item.objective) && !this.standalone) error(item.loc, `unknown degraded objective ${item.objective}`);
+    if (this.objectives.get(item.objective)?.binding === 'native-temperature-percent-v1') {
+      error(item.loc, 'native PID objective does not support degraded control');
+    }
     if (!item.branches.length || !item.otherwise || !item.resume) error(item.loc, 'degraded policy requires at least one branch, exhaustive otherwise and resume');
     const priorities = new Set();
     const branches = item.branches.map(branch => {
@@ -2098,7 +2198,7 @@ class Lowerer {
       latitude: item.latitude, longitude: item.longitude,
       event: item.at.event, offsetMs: item.at.offsetMs, policy,
     });
-    this.schedules.set(item.name, { slot, loc: item.loc, projections: new Set(['due']) });
+    this.schedules.set(item.name, { slot, loc: item.loc, projections: new Set(['due', 'missed']) });
     this.symbols.get(item.name).type = { kind: 'Schedule' };
   }
   addTideSchedule(item) {
@@ -2808,6 +2908,9 @@ class Lowerer {
           error(node.loc, `optional sensor ${node.name} may only be read inside a strategy that matches it`);
         }
         const source = this.sensors.get(node.name) ?? this.resolveSignal(node.name);
+        if (source.descriptor?.kind === 'after-event') {
+          error(node.loc, `after_event signal ${node.name} requires after_event_for, after_event_any, or after_event_all`);
+        }
         if (source.lowered) return source.lowered;
         return {
           type: resultType(source.type, semanticType('SensorFault')),
@@ -2836,12 +2939,22 @@ class Lowerer {
         return { type: BOOL, sexpr: schedule.slot === undefined
           ? `input.${schedule.activeInput ?? schedule.dueInput}` : ['schedule-read', String(schedule.slot), 'active'] };
       }
+      if (node.member === 'missed' && !locals.has(node.base) && this.schedules.has(node.base)) {
+        if (options.pureFunction) error(node.loc, `fn ${options.pureFunction} cannot capture global ${node.base}`);
+        const schedule = this.schedules.get(node.base);
+        if (!schedule.projections?.has('missed')) error(node.loc, `schedule ${node.base} does not expose .missed`);
+        return { type: BOOL, sexpr: ['schedule-read', String(schedule.slot), 'missed'] };
+      }
       if (node.member === 'count' && !locals.has(node.base) && this.accounts.has(node.base)) {
         if (options.pureFunction) error(node.loc, `fn ${options.pureFunction} cannot capture global ${node.base}`);
         if (options.macroDefinition) error(node.loc, `syntax macro ${options.macroDefinition} cannot capture global ${node.base}`);
         const account = this.accounts.get(node.base);
         if (account.operation !== 'count_events') error(node.loc, 'only event accounts expose .count');
-        return { type: INT, sexpr: `account.${node.base}.count` };
+        return {
+          type: resultType(INT, semanticType('AccountingFault')),
+          ok: `account.${node.base}.count.ok`, value: `account.${node.base}.count.value`,
+          faultCode: `account.${node.base}.count.fault`, originTag: '0', origins: [],
+        };
       }
       error(node.loc, `unknown member ${node.base}.${node.member}`);
     }
@@ -3043,6 +3156,22 @@ class Lowerer {
     return node.id;
   }
   callExpression(node, locals, options, callStack, expected = null) {
+    if (node.name === 'after_event_any' || node.name === 'after_event_all') {
+      const mode = node.name.slice('after_event_'.length);
+      if (node.args.length !== 1 || node.named.length || node.args[0].kind !== 'reference') {
+        error(node.loc, `${node.name} expects one after_event signal`);
+      }
+      const signal = this.resolveSignal(node.args[0].name);
+      if (signal.descriptor?.kind !== 'after-event') error(node.args[0].loc, `${node.name} expects an after_event signal`);
+      const projections = signal.descriptor.projections ??= [];
+      if (!projections.includes(mode)) projections.push(mode);
+      return {
+        type: resultType(BOOL, semanticType('SensorFault')),
+        ok: 'false', value: 'false', faultCode: '3', originTag: numberAtom(signal.originTag),
+        origins: [{ tag: signal.originTag, nodeId: signal.originTag, kind: 'signal', name: node.args[0].name }],
+        afterEventProjection: { signal: node.args[0].name, mode },
+      };
+    }
     if (node.name === 'ifthenelse') {
       error(node.loc, 'removed alias ifthenelse; use if condition then value else value');
     }

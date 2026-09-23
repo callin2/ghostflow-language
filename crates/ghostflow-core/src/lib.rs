@@ -3,8 +3,11 @@ use std::fmt;
 
 pub mod accounting;
 pub mod after_event;
+pub mod controller;
 pub mod daily_slots;
 pub mod keyboard;
+pub mod objective_vm;
+pub mod range_schedule;
 pub mod resource_policy;
 pub mod scan;
 pub mod schedule_clock;
@@ -43,7 +46,7 @@ impl Type {
         match value {
             1 => Ok(Self::Bool),
             2 => Ok(Self::Number),
-            3 if matches!(format_version, 2 | 3 | 4 | 5 | 6) => Ok(Self::Int),
+            3 if matches!(format_version, 2 | 3 | 4 | 5 | 6 | 7) => Ok(Self::Int),
             _ => Err(Error::new("invalid type")),
         }
     }
@@ -152,6 +155,7 @@ pub struct Module {
     temporal: Option<temporal_vm::TemporalRequirements>,
     schedules: Option<schedule_vm::ScheduleRequirements>,
     true_fors: Option<true_for_vm::TrueForRequirements>,
+    objective: Option<objective_vm::ObjectiveDescriptor>,
 }
 
 impl Module {
@@ -167,7 +171,7 @@ impl Module {
             return Err(Error::new("invalid GFB1 magic"));
         }
         let format_version = reader.u16()?;
-        if !matches!(format_version, 1 | 2 | 3 | 4 | 5 | 6) {
+        if !matches!(format_version, 1 | 2 | 3 | 4 | 5 | 6 | 7) {
             return Err(Error::new("unsupported GFB format"));
         }
         let name = reader.string()?;
@@ -234,9 +238,10 @@ impl Module {
         } else {
             None
         };
-        let mut schedules = (format_version >= 5).then(|| schedule_vm::ScheduleRequirements {
-            strategies: Vec::new(),
-        });
+        let mut schedules =
+            matches!(format_version, 5 | 6).then(|| schedule_vm::ScheduleRequirements {
+                strategies: Vec::new(),
+            });
         let mut true_fors = (format_version == 6).then(|| true_for_vm::TrueForRequirements {
             strategies: Vec::new(),
         });
@@ -257,7 +262,7 @@ impl Module {
             verify_query(&query, format_version)?;
 
             let (windows, schedule_count, true_for_count, mut result_trace_bound) =
-                if format_version >= 5 {
+                if matches!(format_version, 5 | 6) {
                     let loaded = schedule_vm::load_prelude(
                         &mut reader,
                         &inputs,
@@ -459,6 +464,18 @@ impl Module {
         if format_version == 2 && !has_int_type && !has_int_expression {
             return Err(Error::new("unsupported GFB format 2 without Int"));
         }
+        let objective = if format_version == 7 {
+            if states.len() == MAX_STATES || strategies.iter().any(|s| s.intents.len() == 128) {
+                return Err(Error::new("objective resource limit exceeded"));
+            }
+            Some(objective_vm::ObjectiveDescriptor::load(
+                &mut reader,
+                &inputs,
+                &strategies,
+            )?)
+        } else {
+            None
+        };
         if !reader.finished() {
             return Err(Error::new("trailing module bytes"));
         }
@@ -474,6 +491,7 @@ impl Module {
             temporal,
             schedules,
             true_fors,
+            objective,
         })
     }
 
@@ -526,6 +544,15 @@ impl Module {
             .iter()
             .flat_map(|strategy| strategy.intents.iter())
             .map(|intent| (intent.name.as_str(), intent.value_type))
+            .chain(
+                self.objective
+                    .iter()
+                    .map(|objective| (objective.output.as_str(), Type::Number)),
+            )
+    }
+
+    pub fn objective_requirements(&self) -> Option<&objective_vm::ObjectiveDescriptor> {
+        self.objective.as_ref()
     }
 }
 
@@ -615,6 +642,7 @@ pub struct Runtime {
     temporal: Option<temporal_runtime::TemporalRuntime>,
     true_for_runtime: Option<true_for_runtime::TrueForRuntime>,
     solar_runtime: Option<solar_runtime::SolarRuntime>,
+    objective_runtime: Option<controller::Pid>,
 }
 
 impl Runtime {
@@ -633,17 +661,23 @@ impl Runtime {
             temporal: None,
             true_for_runtime: None,
             solar_runtime: None,
+            objective_runtime: None,
         }
     }
     pub fn install(&mut self, module: Module, preserve_state: bool) {
         // Installation is an explicit new temporal execution session.
-        if module.temporal.is_some() || self.temporal.is_some() {
+        if module.temporal.is_some()
+            || self.temporal.is_some()
+            || module.objective.is_some()
+            || self.objective_runtime.is_some()
+        {
             self.journal.clear();
             self.next_tick = 1;
         }
         self.temporal = None;
         self.true_for_runtime = None;
         self.solar_runtime = None;
+        self.objective_runtime = None;
         let old = if preserve_state {
             self.named_state()
         } else {
@@ -666,6 +700,11 @@ impl Runtime {
         self.last_time_ms = None;
     }
     pub fn hot_swap(&mut self, module: Module) -> Result<()> {
+        if module.objective.is_some() || self.objective_runtime.is_some() {
+            return Err(Error::new(
+                "objective hot swap requires explicit controller migration",
+            ));
+        }
         module.reject_unbound_schedules()?;
         if let Some(previous) = &self.module {
             previous.reject_unbound_schedules()?;
@@ -707,6 +746,7 @@ impl Runtime {
         Ok(())
     }
     pub fn uninstall(&mut self) {
+        self.objective_runtime = None;
         self.solar_runtime = None;
         self.true_for_runtime = None;
         if self.temporal.is_some() {
@@ -744,7 +784,21 @@ impl Runtime {
         if m.temporal.is_some() {
             return Err(Error::new("temporal activation requires runtime bindings"));
         }
-        self.active_strategy = Some(select_strategy(m, &self.capabilities)?);
+        let selected = select_strategy(m, &self.capabilities)?;
+        if let Some(objective) = &m.objective {
+            if self.objective_runtime.is_some() {
+                return Err(Error::new("objective is already activated"));
+            }
+            if !self.capabilities.iter().any(|cap| {
+                cap.kind == "actuator"
+                    && cap.name == objective.output
+                    && cap.value_type == Type::Number
+            }) {
+                return Err(Error::new("objective requires numeric actuator capability"));
+            }
+            self.objective_runtime = Some(controller::Pid::new(objective.config)?);
+        }
+        self.active_strategy = Some(selected);
         Ok(())
     }
     pub fn active_strategy(&self) -> Option<&str> {
@@ -1033,6 +1087,15 @@ impl Runtime {
                 return Err(Error::new("temporal-budget-exceeded"));
             }
         }
+        let objective_stage = match (&m.objective, &self.objective_runtime) {
+            (Some(descriptor), Some(runtime)) => Some(descriptor.stage(
+                runtime,
+                clock.ok_or_else(|| Error::new("objective requires monotonic clock"))? as u64,
+                &iv,
+            )?),
+            (None, None) => None,
+            _ => return Err(Error::new("objective runtime binding mismatch")),
+        };
         let solar_stage = if let Some(runtime) = &self.solar_runtime {
             let (snapshot, facts) = solar.expect("checked solar inputs");
             let temporal = m.temporal.as_ref().expect("solar clock binding");
@@ -1123,7 +1186,7 @@ impl Runtime {
             }
             Ok((requested, window_trace, true_for_trace))
         })();
-        let (requested, window_trace, true_for_trace) = match evaluated {
+        let (mut requested, window_trace, true_for_trace) = match evaluated {
             Ok(values) => values,
             Err(error) => {
                 if let Some(temporal) = &mut self.temporal {
@@ -1135,7 +1198,19 @@ impl Runtime {
                 return Err(error);
             }
         };
-        let (safe, faults, safety_trace) = apply_safety(requested.clone(), &m.constraints);
+        if let (Some(descriptor), Some(stage)) = (&m.objective, &objective_stage) {
+            requested.insert(
+                descriptor.output.clone(),
+                Value::Number(stage.result.requested_percent),
+            );
+        }
+        let (mut safe, faults, safety_trace) = apply_safety(requested.clone(), &m.constraints);
+        if let (Some(descriptor), Some(stage)) = (&m.objective, &objective_stage) {
+            safe.insert(
+                descriptor.output.clone(),
+                Value::Number(stage.result.safe_percent),
+            );
+        }
         let rec = TickRecord {
             module_fingerprint: m.fingerprint,
             tick: self.next_tick,
@@ -1167,6 +1242,12 @@ impl Runtime {
             self.solar_runtime
                 .as_mut()
                 .expect("solar runtime")
+                .commit(stage);
+        }
+        if let Some(stage) = objective_stage {
+            self.objective_runtime
+                .as_mut()
+                .expect("objective runtime")
                 .commit(stage);
         }
         self.next_tick = next_tick;
@@ -1211,6 +1292,11 @@ impl Runtime {
         &self.journal
     }
     pub fn rewind(&mut self, tick: u64) -> Result<()> {
+        if self.objective_runtime.is_some() {
+            return Err(Error::new(
+                "objective rewind requires controller checkpoint support",
+            ));
+        }
         if self.solar_runtime.is_some() {
             return Err(Error::new("solar rewind requires checkpoint support"));
         }
@@ -1263,6 +1349,11 @@ impl Runtime {
         caps: &[Capability],
         count: usize,
     ) -> Result<Vec<TickRecord>> {
+        if self.objective_runtime.is_some() || module.objective.is_some() {
+            return Err(Error::new(
+                "objective replay requires controller checkpoint support",
+            ));
+        }
         if self.temporal.is_some() || self.true_for_runtime.is_some() || module.temporal.is_some() {
             return Err(Error::new(
                 "temporal replay requires explicit bindings and peak budget",
@@ -1804,7 +1895,7 @@ fn verify_expression_with_prelude(
                 type_push(&mut stack, &mut len, Type::Int)?;
             }
             op @ 30..=31 => {
-                if !matches!(format_version, 3 | 4 | 5 | 6) {
+                if !matches!(format_version, 3 | 4 | 5 | 6 | 7) {
                     return Err(Error::new("branch opcode requires GFB format 3"));
                 }
                 let target = r.jump_target()?;
@@ -1821,13 +1912,13 @@ fn verify_expression_with_prelude(
                 reachable = op == 30;
             }
             32..=47 => {
-                if !matches!(format_version, 3 | 4 | 5 | 6) {
+                if !matches!(format_version, 3 | 4 | 5 | 6 | 7) {
                     return Err(Error::new("compact Number opcode requires GFB format 3"));
                 }
                 type_push(&mut stack, &mut len, Type::Number)?;
             }
             op @ 48..=53 => {
-                if !matches!(format_version, 3 | 4 | 5 | 6) {
+                if !matches!(format_version, 3 | 4 | 5 | 6 | 7) {
                     return Err(Error::new("conversion opcode requires GFB format 3"));
                 }
                 let (source, target) = if op == 48 {
@@ -1841,7 +1932,7 @@ fn verify_expression_with_prelude(
                 type_push(&mut stack, &mut len, target)?;
             }
             54 => {
-                if !matches!(format_version, 3 | 4 | 5 | 6) {
+                if !matches!(format_version, 3 | 4 | 5 | 6 | 7) {
                     return Err(Error::new("Duration guard requires GFB format 3"));
                 }
                 if type_pop(&mut stack, &mut len)? != Type::Number {
@@ -1850,7 +1941,7 @@ fn verify_expression_with_prelude(
                 type_push(&mut stack, &mut len, Type::Number)?;
             }
             55 => {
-                if !matches!(format_version, 3 | 4 | 5 | 6) {
+                if !matches!(format_version, 3 | 4 | 5 | 6 | 7) {
                     return Err(Error::new("DateTime guard requires GFB format 3"));
                 }
                 if type_pop(&mut stack, &mut len)? != Type::Number {
@@ -1859,7 +1950,7 @@ fn verify_expression_with_prelude(
                 type_push(&mut stack, &mut len, Type::Number)?;
             }
             56 => {
-                if !matches!(format_version, 3 | 4 | 5 | 6) {
+                if !matches!(format_version, 3 | 4 | 5 | 6 | 7) {
                     return Err(Error::new("Result trace requires GFB format 3"));
                 }
                 if r.u32()? == 0 {
@@ -2017,7 +2108,7 @@ fn eval_expression_with_preludes(
     trace: &mut ResultTraceBuffer,
     windows: &[[Value; 8]],
     true_fors: &[[Value; 7]],
-    schedules: &[[Value; 1]],
+    schedules: &[[Value; 2]],
 ) -> Result<Value> {
     let mut r = Reader::new(code);
     let mut s = [Value::Bool(false); MAX_STACK];
@@ -2681,6 +2772,7 @@ mod tests {
             schedules: None,
             true_fors: None,
             format_version: 2,
+            objective: None,
             name: "int-atomicity".into(),
             version: 1,
             inputs: vec![Field {

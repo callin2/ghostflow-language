@@ -73,7 +73,7 @@ test('event counts return Result and cannot be used as numbers directly', () => 
     output count: Bool;
     count <- starts.count >= 0;
   }`;
-  assert.throws(() => typeCheckControl(source), /Result<Int,AccountingFault>|expected Int|numeric/);
+  assert.throws(() => typeCheckControl(source), /Result<Int,AccountingFault>|expected Int|numeric|ordered types/);
 });
 
 test('pure functions cannot capture an accounting event count', () => {
@@ -88,7 +88,7 @@ test('pure functions cannot capture an accounting event count', () => {
 });
 
 test('syntax macros cannot capture an accounting event count', () => {
-  const source = `syntax captured(): Expr<Result<Int,AccountingFault>> { quote { starts.count } }
+  const source = `syntax captured(): Expr<Result<Int,AccountingFault> > { quote { starts.count } }
   control MacroAccountingCapture {
     event started: Event;
     account starts = count_events(started, over: local_day("UTC"), persistence: durable);

@@ -182,7 +182,7 @@ pub(crate) fn projection_type(schedule_count: usize, slot: u16, field: u8) -> Re
     if usize::from(slot) >= schedule_count {
         return Err(Error::new("schedule projection index"));
     }
-    if field != 0 {
+    if field > 1 {
         return Err(Error::new("schedule projection field"));
     }
     Ok(Type::Bool)

@@ -54,7 +54,7 @@ function requireTyped(input, location) {
 }
 
 export function validateScenario(scenario, manifest) {
-  requireFields(scenario, ['format', 'id', 'initialInputs', 'keyBindings', 'actions'], ['temporal', 'capabilities', 'solar'], 'scenario');
+  requireFields(scenario, ['format', 'id', 'initialInputs', 'keyBindings', 'actions'], ['temporal', 'capabilities', 'solar', 'actuatorBindings', 'plant'], 'scenario');
   if (scenario.format !== 'GhostFlow/scenario-v1') throw new Error('scenario.format: unsupported version');
   requireName(scenario.id, 'scenario.id');
   if (!Array.isArray(scenario.initialInputs)) throw new Error('initialInputs: expected array');
@@ -78,6 +78,61 @@ export function validateScenario(scenario, manifest) {
     validateSolarActivation(scenario.solar);
   } else if (hasSolar) throw new Error('Solar schedule requires explicit solar activation');
   const sensors = new Map((manifest.sensors ?? []).map(sensor => [sensor.name, sensor.type]));
+  const outputs = new Map((manifest.outputs ?? []).map(output => [output.name, output]));
+  if (scenario.actuatorBindings !== undefined) {
+    if (!Array.isArray(scenario.actuatorBindings)) throw new Error('actuatorBindings: expected array');
+    const actuators = new Set();
+    const boundOutputs = new Set();
+    for (const [index, binding] of scenario.actuatorBindings.entries()) {
+      const location = `actuatorBindings[${index}]`;
+      requireFields(binding, ['actuator', 'output', 'type', 'min', 'max'], ['feedbackSensor'], location);
+      requireName(binding.actuator, `${location}.actuator`);
+      if (actuators.has(binding.actuator)) throw new Error(`${location}: duplicate actuator ${binding.actuator}`);
+      if (boundOutputs.has(binding.output)) throw new Error(`${location}: duplicate output binding ${binding.output}`);
+      const output = outputs.get(binding.output);
+      if (!output) throw new Error(`${location}: unknown output ${binding.output}`);
+      if (output.type === 'Bool') throw new Error(`${location}: output ${binding.output} must be numeric`);
+      if (binding.type !== output.type) throw new Error(`${location}: type mismatch ${binding.output}`);
+      if (typeof binding.min !== 'number' || !Number.isFinite(binding.min)) throw new Error(`${location}: min must be finite`);
+      if (typeof binding.max !== 'number' || !Number.isFinite(binding.max)) throw new Error(`${location}: max must be finite`);
+      if (binding.min > binding.max) throw new Error(`${location}: min must be less than or equal to max`);
+      if (binding.feedbackSensor !== undefined) {
+        if (!sensors.has(binding.feedbackSensor)) throw new Error(`${location}: unknown feedback sensor ${binding.feedbackSensor}`);
+        if (sensors.get(binding.feedbackSensor) !== binding.type) throw new Error(`${location}: feedback sensor ${binding.feedbackSensor} type mismatch`);
+      }
+      actuators.add(binding.actuator);
+      boundOutputs.add(binding.output);
+    }
+  }
+  if (scenario.plant !== undefined) {
+    requireShape(scenario.plant, ['kind', 'sensor', 'actuator', 'epoch', 'initialTemperature', 'outsideTemperature', 'heatingKPerSecond', 'leakPerSecond', 'ventilationPerSecond'], 'plant');
+    const plant = scenario.plant;
+    if (plant.kind !== 'GhostFlow/greenhouse-temperature-v1') throw new Error('plant.kind: unsupported model');
+    if (sensors.get(plant.sensor) !== 'Temperature') throw new Error(`plant.sensor: ${plant.sensor} must be a Temperature sensor`);
+    const binding = scenario.actuatorBindings?.find(item => item.actuator === plant.actuator);
+    if (!binding) throw new Error(`plant.actuator: unknown virtual actuator ${plant.actuator}`);
+    if (binding.type !== 'Percent') throw new Error(`plant.actuator: ${plant.actuator} must have Percent type`);
+    requireNonnegative(plant.epoch, 'plant.epoch');
+    for (const field of ['initialTemperature', 'outsideTemperature']) {
+      requireShape(plant[field], ['value', 'unit'], `plant.${field}`);
+      if (typeof plant[field].value !== 'number' || !Number.isFinite(plant[field].value)) throw new Error(`plant.${field}.value: expected finite number`);
+      if (!['°C', 'K'].includes(plant[field].unit)) throw new Error(`plant.${field}.unit: expected °C or K`);
+      if ((plant[field].unit === 'K' ? plant[field].value : plant[field].value + 273.15) < 0) {
+        throw new Error(`plant.${field}: must not be below absolute zero`);
+      }
+    }
+    for (const field of ['heatingKPerSecond', 'leakPerSecond', 'ventilationPerSecond']) {
+      if (typeof plant[field] !== 'number' || !Number.isFinite(plant[field])) throw new Error(`plant.${field}: expected finite number`);
+    }
+    const objective = manifest.objectives?.find(item => item.measure === plant.sensor && item.bindings?.output === binding.output);
+    const target = objective && manifest.configs?.find(item => item.name === objective.target);
+    if (!objective || !target || !['°C', 'K'].includes(target.displayUnit)) {
+      throw new Error('plant: matching objective target requires explicit displayUnit °C or K');
+    }
+    for (const field of ['heatingKPerSecond', 'leakPerSecond', 'ventilationPerSecond']) {
+      if (plant[field] < 0) throw new Error(`plant.${field}: expected nonnegative number`);
+    }
+  }
   const intervalSources = new Set((manifest.signals ?? []).filter(signal => signal.kind === 'true-for')
     .flatMap(signal => signal.sources.map(source => source.name)));
   const fields = new Map(manifest.inputs.filter(field => field.name !== '__gf_now_ms').map(field => [field.name, field.type]));
@@ -127,6 +182,7 @@ export function validateScenario(scenario, manifest) {
       case 'sample':
         requireShape(action, ['kind', 'name', 'epoch', 'id', 'timestampMs', 'value', 'quality'], location);
         if (!sensors.has(action.name)) throw new Error(`${location}: unknown sensor ${action.name}`);
+        if (scenario.plant?.sensor === action.name) throw new Error(`${location}: plant sensor ${action.name} is generated by the plant`);
         if (pendingSamples.has(action.name)) throw new Error(`${location}: duplicate pending sample ${action.name}`);
         for (const field of ['epoch', 'id', 'timestampMs']) requireNonnegative(action[field], `${location}.${field}`);
         if (sensors.get(action.name) === 'Bool' ? typeof action.value !== 'boolean' : typeof action.value !== 'number' || !Number.isFinite(action.value)) {
@@ -199,7 +255,7 @@ export function runScenario(artifactPath, scenarioPath, { format = 'toon' } = {}
         sourceFilename: document.filename,
         ...(map.interactionSourceIdentity ? { sourceIdentity: map.interactionSourceIdentity } : {}),
       },
-      outputMeaning: 'virtual intent; no physical output applied or confirmed',
+      outputMeaning: 'virtual requested/safe intent and scenario-driver application; no physical output confirmed',
     };
     const encodeResult = result => (format === 'json' ? JSON.stringify(result) : encode(result)) + '\n';
     const hostError = error => {
@@ -215,6 +271,7 @@ export function runScenario(artifactPath, scenarioPath, { format = 'toon' } = {}
     // Sensor conditioning is supplied by the existing WASM host; plain input
     // modules use the native framed runner. Neither path retries failed scans.
     const conditioned = (manifest.sensors?.length ?? 0) > 0
+      || (scenario.actuatorBindings?.length ?? 0) > 0
       || manifest.schedules?.some(schedule => schedule.kind === 'solar');
     const executable = conditioned ? process.execPath : path.join(root, 'target/release/examples/scenario_scan');
     const arguments_ = conditioned
@@ -244,6 +301,8 @@ export function runScenario(artifactPath, scenarioPath, { format = 'toon' } = {}
         inputs: row.trace.inputs,
         requestedVirtualIntent: row.trace.requested,
         safeVirtualIntent: row.trace.safe,
+        ...(row.virtualActuators ? { virtualActuators: row.virtualActuators } : {}),
+        ...(row.plant ? { plant: row.plant } : {}),
         faults: row.trace.faults,
         stateBefore: row.trace.stateBefore,
         stateAfter: row.trace.stateAfter,
@@ -306,7 +365,7 @@ function rejectedScenario(artifactPath, scenarioPath, error, format) {
   const location = line ? `line:${line[1]}` : path?.[1] ?? 'scenario';
   const result = {
     format: 'GhostFlow/scenario-result-v1', scenario, artifact,
-    outcome: 'rejected', outputMeaning: 'virtual intent; no physical output applied or confirmed',
+    outcome: 'rejected', outputMeaning: 'virtual requested/safe intent and scenario-driver application; no physical output confirmed',
     scans: [], error: { location, message, ...(String(error.message).length > 4096 ? { diagnosticTruncated: true } : {}) },
   };
   return (format === 'json' ? JSON.stringify(result) : encode(result)) + '\n';

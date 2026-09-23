@@ -282,9 +282,11 @@ pub(crate) fn record(out: &mut impl Write, r: &TickRecord) -> fmt::Result {
                 }
                 write!(
                     out,
-                    "{{\"sourceDay\":{},\"scheduledWallMs\":",
-                    row.source_day
+                    "{{\"sourceDay\":{},\"occurrenceId\":",
+                    row.source_day,
                 )?;
+                text(out, &format!("{}:{}", trace.site, row.source_day))?;
+                out.write_str(",\"scheduledWallMs\":")?;
                 optional_u64(out, row.scheduled_wall_ms)?;
                 out.write_str(",\"decision\":")?;
                 text(out, &format!("{:?}", row.decision))?;

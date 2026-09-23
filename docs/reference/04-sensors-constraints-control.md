@@ -206,6 +206,11 @@ Temperature filter는 payload를 canonical kelvin domain의 affine weighted mean
 ```ghost
 signal hot_5m = true_for(hot, duration: 5min, quality: measured);
 signal opened = after_event(started, valve_open, window: 10s, quality: measured);
+input selected_start: EventId;
+output selected_opened, any_opened, all_opened: Bool;
+selected_opened <- after_event_for(opened, selected_start) |> recover(false);
+any_opened <- after_event_any(opened) |> recover(false);
+all_opened <- after_event_all(opened) |> recover(false);
 signal avg_temp = window_average(temperature, over: 10min,
   quality: measured, max_age: 2min);
 signal low_temp = window_min(temperature, over: 10min,
@@ -225,6 +230,21 @@ signal usable_temp = hold_last(temperature, for_at_most: 2min, quality: measured
   event identity별로 계산한다. 정확한 종료 경계는 제외한다. 겹치는 event도 identity별
   result를 독립적으로 유지하며 새 start event가 이전 pending 또는 completed result를
   덮어쓰지 않는다.
+- `after_event` signal 자체는 scalar 값이 아니며 Bool 식에서 직접 읽을 수 없다.
+  `after_event_for(signal, identity)`는 하나의 `EventId`를 명시적으로 선택한다. runtime은
+  identity의 source tag가 signal의 Event source와 같은지 검사하며, 다른 source의 identity는
+  false로 바꾸지 않고 scan을 identity binding 오류로 거부한다. `EventId`는 Driver가 전달한
+  불투명한 identity이며 source에서 임의의 숫자나 최신 event로 만들지 않는다.
+- `after_event_any(signal)`과 `after_event_all(signal)`은 accepted scan의 immutable retained
+  identity 집합 전체를 집계한다. `any`는 하나라도 satisfied이면 true이고, 모두 expired일 때만
+  false다. `all`은 하나라도 expired이면 false이고, 모두 satisfied일 때만 true다. 빈 집합이나
+  결과를 바꿀 수 있는 pending identity가 남아 있으면 `NotReady`다. 결정적인 true/false가 없는
+  경우 원래 predicate/source fault를 `NotReady`보다 우선하여 보존한다. 각 함수의 결과 타입은
+  `Result<Bool, SensorFault>`이며 `recover(false)` 같은 fallback은 작성자가 명시한다.
+- retained identity 수는 runtime profile의 고정된 finite capacity로 제한한다. pending이나 terminal
+  identity를 암묵적으로 evict하거나 새 start로 덮어쓰지 않는다. capacity 초과는 scan 전체를
+  원자적으로 거부한다. terminal result는 host가 해당 identity를 명시적으로 acknowledge할 때까지
+  addressable하고, pending identity는 acknowledge할 수 없다.
 - `window_average/min/max`는 `(t-d,t]` 안의 admissible 실제 관측만 사용하고 보간하지 않는다.
   admissible 관측이 없거나 최신 관측 age가 `max_age` 이상이면 `NotReady`다.
 - `window_rate`는 window의 가장 이른 admissible 관측과 가장 늦은 admissible 관측으로

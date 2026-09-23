@@ -185,8 +185,9 @@ function compileExpr(node, env, allowNext=false) {
       const slotValue=unsignedAtom(args[0],65535n,'schedule projection index');
       const slot=Number(slotValue), schedule=env.schedules[slot];
       if (!schedule) throw new CompileError('schedule projection index');
-      if (args[1]!=='due') throw new CompileError('schedule projection field');
-      w.u8(OP[head]);w.u16(slot);w.u8(0);
+      const field=new Map([['due',0],['missed',1]]).get(args[1]);
+      if (field===undefined) throw new CompileError('schedule projection field');
+      w.u8(OP[head]);w.u16(slot);w.u8(field);
       return TYPE.bool;
     }
     if (head==='trace-result') {
@@ -236,7 +237,7 @@ function compileQuery(node) {
 function compile(ast) {
   if (!Array.isArray(ast)||ast[0]!=='module'||typeof ast[1]!=='string') throw new CompileError('expected (module NAME ...)');
   const name=ast[1]; assertName(name,'module');
-  let version=1, temporalContext=null; const inputs=[], states=[], strategies=[], constraints=[], temporalRootForms=[];
+  let version=1, temporalContext=null; const inputs=[], states=[], strategies=[], constraints=[], temporalRootForms=[], objectives=[];
   for (const form of ast.slice(2)) {
     if(!Array.isArray(form)||!form.length) throw new CompileError('invalid module form');
     const [head,...args]=form;
@@ -249,6 +250,7 @@ function compile(ast) {
     else if(head==='requires') { if(args.length!==2) throw new CompileError('requires expects target prerequisite'); constraints.push({kind:1,names:args}); }
     else if(head==='requires-any') { if(args.length<2||args.length>32) throw new CompileError('requires-any expects target and prerequisites'); constraints.push({kind:3,names:args}); }
     else if(head==='mutex') { if(args.length<2) throw new CompileError('mutex needs at least 2 intents'); constraints.push({kind:2,names:args}); }
+    else if(head==='pid-objective') { if(args.length!==15)throw new CompileError('pid-objective expects 15 arguments');objectives.push(args); }
     else throw new CompileError(`unknown module form ${head}`);
   }
   const unique=(xs,label)=>{const s=new Set();for(const x of xs){if(s.has(x.name))throw new CompileError(`duplicate ${label} ${x.name}`);s.add(x.name);}};
@@ -410,7 +412,21 @@ function compile(ast) {
   const intDeclarations=inputs.some(x=>x.type===TYPE.int)||states.some(x=>x.type===TYPE.int)||compiledStrategies.some(s=>s.intents.some(i=>i.type===TYPE.int));
   const intExpressions=compiledStrategies.some(s=>s.transitions.some(t=>t.usesInt)||s.intents.some(i=>i.usesInt));
   const format3=compiledStrategies.some(s=>s.transitions.some(t=>t.usesFormat3)||s.intents.some(i=>i.usesFormat3));
-  const format=hasTrueFors?6:hasSchedules?5:temporal?4:format3?3:intDeclarations||intExpressions?2:1;
+  if(objectives.length&&(objectives.length!==1||compiledStrategies.length!==1||temporal||hasSchedules||hasTrueFors))throw new CompileError('GFB7 requires exactly one strategy and one non-temporal PID objective');
+  if(objectives.length&&(compiledStrategies[0].transitions.length||compiledStrategies[0].intents.length))throw new CompileError('GFB7 PID objective cannot mix authored transitions or intents');
+  const compiledObjectives=objectives.map(args=>{
+    const [objectiveName,outputPort,measureName,measureOkName,targetName,safeMaxName,periodAtom,lateAtom,directionAtom,...numberAtoms]=args;
+    assertName(objectiveName,'PID objective');assertName(outputPort,'PID output port');
+    const bindings=[measureName,measureOkName,targetName,safeMaxName].map(name=>env.inputs.get(name));
+    if(!bindings[0]||bindings[0].type!==TYPE.number||!bindings[1]||bindings[1].type!==TYPE.bool||!bindings[2]||bindings[2].type!==TYPE.number||!bindings[3]||bindings[3].type!==TYPE.number)throw new CompileError('invalid PID input binding');
+    const now=env.inputs.get('__gf_now_ms');if(!now||now.type!==TYPE.number)throw new CompileError('GFB7 PID requires __gf_now_ms Number input');
+    const period=unsignedAtom(periodAtom,9007199254740991n,'invalid PID period'),late=unsignedAtom(lateAtom,9007199254740991n,'invalid PID late_after');
+    if(period===0n||late<period)throw new CompileError('invalid PID timing');
+    const direction=directionAtom==='direct'?0:directionAtom==='reverse'?1:undefined;if(direction===undefined)throw new CompileError('invalid PID direction');
+    const numbers=numberAtoms.map((atom,index)=>finiteAtom(atom,index<3?0:-Infinity,Infinity,'invalid PID numeric field'));
+    return {name:objectiveName,outputPort,indices:bindings.map(binding=>binding.index),period,late,direction,numbers};
+  });
+  const format=objectives.length?7:hasTrueFors?6:hasSchedules?5:temporal?4:format3?3:intDeclarations||intExpressions?2:1;
   const w=new Writer();w.bytes(UTF8.encode('GFB1'));w.u16(format);w.str(name);w.u32(version);
   w.u16(inputs.length);for(const x of inputs){w.str(x.name);w.u8(x.type);}
   w.u16(states.length);for(const x of states){w.str(x.name);w.u8(x.type);if(x.type===TYPE.bool)w.u8(x.value?1:0);else if(x.type===TYPE.int)w.i32(x.value);else w.f64(x.value);}
@@ -420,6 +436,7 @@ function compile(ast) {
   const writeTrueFor=signal=>{w.u32(signal.site);w.str(signal.name);w.u32(signal.sourceTag);w.str(signal.sourceName);w.u64(signal.durationMs);for(const index of signal.indices)w.u16(index);};
   w.u16(compiledStrategies.length);for(const s of compiledStrategies){w.str(s.name);w.i32(s.priority);w.u32(s.query.length);w.bytes(s.query);if(temporal){if(taggedPreludes){w.u16(s.preludes.length);for(const prelude of s.preludes){w.u8(prelude.kind==='window'?0:prelude.kind==='schedule'?1:2);if(prelude.kind==='window')writeWindow(prelude.value);else if(prelude.kind==='schedule')writeSchedule(prelude.value);else writeTrueFor(prelude.value);}}else{w.u16(s.windows.length);for(const window of s.windows)writeWindow(window);}}w.u16(s.transitions.length);for(const t of s.transitions){w.u16(t.index);w.u32(t.expr.length);w.bytes(t.expr);}w.u16(s.intents.length);for(const i of s.intents){w.str(i.name);w.u8(i.type);w.u32(i.expr.length);w.bytes(i.expr);}}
   w.u16(constraints.length);for(const c of constraints){w.u8(c.kind);w.u16(c.names.length);for(const n of c.names)w.str(n);}
+  if(format===7){w.u16(compiledObjectives.length);for(const objective of compiledObjectives){w.str(objective.name);w.str(objective.outputPort);for(const index of objective.indices)w.u16(index);w.u64(objective.period);w.u64(objective.late);w.u8(objective.direction);for(const value of objective.numbers)w.f64(value);}}
   return w.finish();
 }
 
