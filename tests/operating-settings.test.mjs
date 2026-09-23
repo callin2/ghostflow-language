@@ -6,7 +6,7 @@ import { compileSource, literateDocument } from './helpers/literate-compile.mjs'
 import { createOperatingSettingsCandidate } from '../tools/operating-settings.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 
-const source = literateDocument(`// preserve this\ncontrol irrigation {\n  config duration: Duration = 5min { min = 1min; max = 20min; step = 1min; access = operator; apply = stopped; label = "관수"; }\n  state running: Bool = false;\n}`);
+const source = literateDocument(`// preserve this\ncontrol irrigation {\n  config duration: Duration = 5min { min = 1min; max = 20min; step = 1min; access = operator; label = "관수"; }\n  state running: Bool = false;\n}`);
 const hash = value => createHash('sha256').update(value).digest('hex');
 
 test('참조하지 않는 운영 설정은 GFB를 유지한다', async () => {
@@ -23,7 +23,7 @@ test('참조하는 duration 설정은 GFB 상수와 실제 WASM 출력만 바꾼
   // Concrete TASK43.2 reproduction: the config is part of an output expression,
   // so its literal must change the compiled constant. Exercise the explicit
   // v2 simulation consumer without stripping metadata or weakening v1.
-  const effectSource = literateDocument(`// source outside the literal stays byte-for-byte\ncontrol SettingsEffect {\n  config duration: Duration = 5min { min = 1min; max = 20min; step = 1min; access = operator; apply = stopped; }\n  output duration_ms: Duration;\n  duration_ms <- duration;\n}`);
+  const effectSource = literateDocument(`// source outside the literal stays byte-for-byte\ncontrol SettingsEffect {\n  config duration: Duration = 5min { min = 1min; max = 20min; step = 1min; access = operator; }\n  output duration_ms: Duration;\n  duration_ms <- duration;\n}`);
   const before = await compileSource(effectSource, { filename: 'settings-effect.ghost.md' });
   const result = await createOperatingSettingsCandidate({
     source: effectSource,
@@ -121,7 +121,7 @@ test('literate 후보는 Markdown 원문과 코드 위치를 보존하며 설정
     '',
     '```ghost',
     'control irrigation {',
-    '  config duration: Duration = 5min { min = 1min; max = 20min; step = 1min; access = operator; apply = stopped; label = "관수"; }',
+    '  config duration: Duration = 5min { min = 1min; max = 20min; step = 1min; access = operator; label = "관수"; }',
     '  state running: Bool = false;',
     '}',
     '```',
@@ -159,23 +159,23 @@ test('분리된 literate fence의 여러 설정과 무시된 중첩 ghost를 함
     '',
     '```ghost',
     'control irrigation {',
-    '  config duration: Duration = 5min { min = 1min; max = 20min; step = 1min; access = operator; apply = stopped; label = "관수 시간"; }',
+    '  config duration: Duration = 5min { min = 1min; max = 20min; step = 1min; access = operator; label = "관수 시간"; }',
     '```',
     '',
     '- ```ghost',
     '  control ignored {',
-    '    config phantom: Duration = 9min { min = 1min; max = 20min; step = 1min; access = operator; apply = stopped; }',
+    '    config phantom: Duration = 9min { min = 1min; max = 20min; step = 1min; access = operator; }',
     '  }',
     '  ```',
     '',
     '> ```ghost',
-    '> control quoted { config quoted: Duration = 9min { min = 1min; max = 20min; step = 1min; access = operator; apply = stopped; } }',
+    '> control quoted { config quoted: Duration = 9min { min = 1min; max = 20min; step = 1min; access = operator; } }',
     '> ```',
     '',
     '설명 fence 사이에도 🌾 문서 내용이 있다.',
     '',
     '~~~ghost',
-    '  config duty: Percent = 50% { min = 0%; max = 100%; step = 10%; access = operator; apply = stopped; label = "밸브 비율"; }',
+    '  config duty: Percent = 50% { min = 0%; max = 100%; step = 10%; access = operator; label = "밸브 비율"; }',
     '  state running: Bool = false;',
     '}',
     '~~~',

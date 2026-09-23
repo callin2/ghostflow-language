@@ -9,6 +9,7 @@ import {
 } from '../contracts/interaction-v0/validate.mjs';
 import { extractLiterate } from './literate.mjs';
 import { compileControl, parseControl } from './control.mjs';
+import { canonicalUnitFor, isQuantityType } from './quantities.mjs';
 
 const PUBLIC_ID = /^[A-Za-z][A-Za-z0-9._:-]{0,127}$/;
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -48,9 +49,9 @@ function canonicalDocument(document) {
 }
 
 function sourceType(name) {
-  if (name === 'Bool' || name === 'Int' || name === 'Number') return { kind: 'builtin', name, unit: null };
+  if (name === 'Bool' || name === 'Int' || name === 'Number' || name === 'Date' || name === 'TimeOfDay' || name === 'DateTime') return { kind: 'builtin', name, unit: null };
   if (name === 'Duration') return { kind: 'builtin', name, unit: 'ms' };
-  return { kind: 'nominal', name, unit: name === 'Percent' ? 'percent' : null };
+  return { kind: 'nominal', name, unit: name === 'Percent' ? 'percent' : isQuantityType(name) ? canonicalUnitFor(name) : null };
 }
 
 function validationSnapshot(schema) {
@@ -140,11 +141,19 @@ function expectedSchema(compilation, identityValue) {
       });
       continue;
     }
-    const subject = item.call?.args?.[0]?.name;
-    if (!declaredStates.has(subject)) fail(`timer.${item.name} must target an authored state`);
+    const continuous = item.call?.name === 'continuous_true';
+    const subject = item.call?.args?.[0];
+    if (continuous) {
+      const subjectNode = nodeById.get(subject?.id);
+      if (!subjectNode || subjectNode.id !== subject.id || subjectNode.kind !== subject.kind) {
+        fail(`timer.${item.name} continuous subject source node is missing`);
+      }
+    } else if (!declaredStates.has(subject?.name)) fail(`timer.${item.name} must target an authored state`);
     descriptors.push({
       id: `timer.${item.name}`, name: item.name, kind: 'timer', sourceType: sourceType('Duration'), access: ['read'],
-      operation: { kind: 'elapsed_since_change', subjectId: `state.${subject}` },
+      operation: continuous
+        ? { kind: 'continuous_true', subjectNodeId: subject.id }
+        : { kind: 'elapsed_since_change', subjectId: `state.${subject.name}` },
       provenance: { sourceNode: { id: item.id, kind: 'timer' }, intentAnchorIds: anchors },
     });
   }

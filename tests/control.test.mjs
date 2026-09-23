@@ -58,10 +58,10 @@ function inspectQuery(bytes) {
 
 // A deliberately small reader: it verifies only the GFB1 envelope fields the
 // front-end owns, without duplicating the compiler or runtime verifier.
-function inspectModule(bytes) { bytes = Buffer.from(bytes);
+function inspectModule(bytes, expectedFormat = 3) { bytes = Buffer.from(bytes);
   assert.equal(bytes.subarray(0, 4).toString(), 'GFB1');
   const state = { at: 4 };
-  assert.equal(bytes.readUInt16LE(state.at), 1); state.at += 2;
+  assert.equal(bytes.readUInt16LE(state.at), expectedFormat); state.at += 2;
   const name = readString(bytes, state); state.at += 4;
   const inputs = [];
   for (let count = bytes.readUInt16LE(state.at), i = (state.at += 2, 0); i < count; i++) {
@@ -151,7 +151,7 @@ control MoistureDemand {
   }
   signal dry = hysteresis(moisture,
     on_below: 30%, off_above: 35%, initial: false);
-  purefn latch(start: Bool, stop: Bool, previous: Bool) -> Bool {
+  fn latch(start: Bool, stop: Bool, previous: Bool) -> Bool {
     !stop && (start || previous);
   }
   config wait: Duration = 2s;
@@ -159,11 +159,11 @@ control MoistureDemand {
   state running: Bool = false;
   state amount: Number = 0;
   running' = latch(start, stop, running) && dry_ok;
-  amount' = ifthenelse(running, amount + scale, amount);
+  amount' = if running then amount + scale else amount;
   output pump, valve: Bool;
   output requested: Number;
   pump <- running';
-  valve <- next.running;
+  valve <- running';
   requested <- amount';
   require pump => (valve);
 }
@@ -176,11 +176,11 @@ assert.deepEqual(sensorResult.manifest.inputs, [
 assert.deepEqual(sensorResult.manifest.sensors, [{
   name: 'moisture', type: 'Percent', sampleMs: 1000, validMin: 0, validMax: 100,
   filter: 'median', window: 5, staleMs: 3000, recoverSamples: 3,
-  valueInput: '__gf_sensor_value_moisture', okInput: '__gf_sensor_ok_moisture', optional: true,
+  valueInput: '__gf_sensor_value_moisture', okInput: '__gf_sensor_ok_moisture', faultInput: '__gf_sensor_fault_moisture', optional: true,
 }]);
 assert.deepEqual(sensorResult.manifest.signals, [{
   name: 'dry', sensor: 'moisture', onBelow: 30, offAbove: 35, initial: false,
-  valueInput: '__gf_signal_value_dry', okInput: '__gf_signal_ok_dry',
+  valueInput: '__gf_signal_value_dry', okInput: '__gf_signal_ok_dry', faultInput: '__gf_signal_fault_dry',
 }]);
 assert.ok(sensorModule.inputs.some(field => field.name === '__gf_sensor_value_moisture'));
 assert.ok(sensorModule.inputs.some(field => field.name === '__gf_sensor_ok_moisture'));
@@ -239,7 +239,7 @@ control Basic {
 assert.equal(noSensor.manifest.sensors.length, 0);
 assert.equal(noSensor.manifest.schedules.length, 0);
 assert.equal(noSensor.manifest.timers.length, 0);
-assert.deepEqual(inspectModule(noSensor.bytes).inputs, [{ name: 'enable', type: 1 }]);
+assert.deepEqual(inspectModule(noSensor.bytes, 1).inputs, [{ name: 'enable', type: 1 }]);
 
 // The raw runtime must reject an output-bearing module before the host declares
 // its actuator. ControlRuntime is intentionally the virtual convenience host
@@ -252,6 +252,8 @@ try {
   rawRuntime.addCapability('actuator', 'pump', 'bool');
   rawRuntime.activate();
 } finally { rawRuntime.dispose(); }
+const adaptiveProgram = await compileSource('control Adaptive { sensor moisture?: Percent; output pump: Bool; adapt policy { strategy Wet priority 10 match (moisture: sensor<Percent>) { pump <- case moisture { ok(value) => value < 30%; fault(_) => false; }; } strategy Baseline priority 0 match always { pump <- false; } } }');
+await assert.rejects(ControlRuntime.instantiate(wasm, adaptiveProgram), /adapt strategy activation requires a capability-aware host/);
 const virtualRuntime = await ControlRuntime.instantiate(wasm, await compileSource(`
 control Basic {
   input enable: Bool;
@@ -269,7 +271,7 @@ control StateOnly {
   enabled' = !enabled;
 }
 `, { filename: 'state-only.ghost' });
-assert.deepEqual(inspectModule(outputless.bytes).strategyQueries, [{ kind: 'const', value: true }]);
+assert.deepEqual(inspectModule(outputless.bytes, 1).strategyQueries, [{ kind: 'const', value: true }]);
 
 expectError(`
 control OutputInitializer {
@@ -350,7 +352,7 @@ control Recursive {
   output pump: Bool;
   pump <- loop(true);
 }
-`, 'recursive purefn loop is not supported');
+`, 'recursive fn loop is not supported');
 
 expectError(`
 control MutualRecursive {
@@ -359,7 +361,7 @@ control MutualRecursive {
   output pump: Bool;
   pump <- first(true);
 }
-`, 'recursive purefn first is not supported');
+`, 'recursive fn first is not supported');
 
 expectError(`
 control CapturedInput {
@@ -367,7 +369,7 @@ control CapturedInput {
   fn hidden() -> Bool { enabled }
   output pump: Bool;
 }
-`, 'purefn hidden cannot capture global enabled');
+`, 'fn hidden cannot capture global enabled');
 
 expectError(`
 control CapturedState {
@@ -375,7 +377,7 @@ control CapturedState {
   fn hidden() -> Bool { held }
   output pump: Bool;
 }
-`, 'purefn hidden cannot capture global held');
+`, 'fn hidden cannot capture global held');
 
 expectError(`
 control LetCycle {
@@ -412,10 +414,29 @@ control Reserved {
 
 expectError(`
 control Unsupported {
-  adapt { }
+  adapt Policy { strategy }
   output pump: Bool;
 }
-`, 'unsupported construct adapt');
+`, 'expected strategy name');
+
+expectError(`
+control StrategyPriorityOverflow {
+  output pump: Bool;
+  adapt policy { strategy Baseline priority 2147483648 match always { pump <- false; } }
+}
+`, 'strategy priority must be in -2147483648..2147483647');
+
+expectError(`
+control OptionalSensorOutsideMatch {
+  sensor moisture?: Percent;
+  output pump: Bool;
+  adapt policy {
+    strategy Baseline priority 0 match always {
+      pump <- case moisture { ok(value) => value < 30%; fault(_) => false; };
+    }
+  }
+}
+`, 'optional sensor moisture may only be read inside a strategy that matches it');
 
 expectError(`
 control Constraints {

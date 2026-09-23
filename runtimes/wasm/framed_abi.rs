@@ -19,6 +19,8 @@ pub struct FramedHandle {
     state: FramedState,
     error: String,
     outcome: String,
+    replay: String,
+    resource_plan: String,
 }
 
 impl FramedHandle {
@@ -27,6 +29,8 @@ impl FramedHandle {
             state: FramedState::Configuring(Runtime::new(1024)),
             error: String::new(),
             outcome: String::new(),
+            replay: String::new(),
+            resource_plan: String::new(),
         }
     }
 
@@ -270,6 +274,39 @@ pub unsafe extern "C" fn gf_frame_activate(handle: *mut FramedHandle) -> i32 {
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn gf_frame_activate_temporal(
+    handle: *mut FramedHandle,
+    ptr: *const u8,
+    len: usize,
+) -> i32 {
+    let Some(handle) = handle.as_mut() else {
+        return 0;
+    };
+    let profile = match crate::temporal_abi::from_raw(ptr, len) {
+        Ok(profile) => profile,
+        Err(error) => return handle.failure(error),
+    };
+    // Decode and validate before moving the configuring Runtime. Failure retains it.
+    let state = std::mem::replace(&mut handle.state, FramedState::Configuring(Runtime::new(1)));
+    match state {
+        FramedState::Configuring(mut runtime) => match runtime.activate_with_temporal(&profile) {
+            Ok(()) => {
+                handle.state = FramedState::Active(runtime.into_scan_driver());
+                handle.success()
+            }
+            Err(error) => {
+                handle.state = FramedState::Configuring(runtime);
+                handle.failure(error.to_string())
+            }
+        },
+        FramedState::Active(driver) => {
+            handle.state = FramedState::Active(driver);
+            handle.failure("framed runtime is already active")
+        }
+    }
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn gf_frame_scan(
     handle: *mut FramedHandle,
     scan_id: u64,
@@ -318,6 +355,217 @@ pub unsafe extern "C" fn gf_frame_outcome_len(handle: *const FramedHandle) -> us
         .as_ref()
         .map(|handle| handle.outcome.len())
         .unwrap_or(0)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn gf_frame_replay_temporal(
+    handle: *mut FramedHandle,
+    ptr: *const u8,
+    len: usize,
+    count: u32,
+    max_peak_temporal_bytes: usize,
+    max_json_bytes: usize,
+) -> i32 {
+    let Some(h) = handle.as_mut() else { return 0 };
+    let result = crate::temporal_abi::from_raw(ptr, len).and_then(|profile| {
+        let FramedState::Active(driver) = &h.state else {
+            return Err("runtime is not active".into());
+        };
+        let records = driver
+            .replay_current_with_temporal(count as usize, &profile, max_peak_temporal_bytes)
+            .map_err(|error| error.to_string())?;
+        crate::replay_abi::framed(&records, h.replay.capacity(), max_json_bytes)
+    });
+    match result {
+        Ok(replay) => {
+            h.replay = replay;
+            h.success()
+        }
+        Err(error) => h.failure(error),
+    }
+}
+#[no_mangle]
+pub unsafe extern "C" fn gf_frame_replay_ptr(handle: *const FramedHandle) -> *const u8 {
+    handle
+        .as_ref()
+        .filter(|h| !h.replay.is_empty())
+        .map_or(std::ptr::null(), |h| h.replay.as_ptr())
+}
+#[no_mangle]
+pub unsafe extern "C" fn gf_frame_replay_len(handle: *const FramedHandle) -> usize {
+    handle.as_ref().map_or(0, |h| h.replay.len())
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn gf_frame_plan_temporal(
+    handle: *mut FramedHandle,
+    ptr: *const u8,
+    len: usize,
+    max_json_bytes: usize,
+) -> i32 {
+    let Some(h) = handle.as_mut() else { return 0 };
+    let result = crate::temporal_abi::from_raw(ptr, len).and_then(|profile| {
+        let runtime = match &h.state {
+            FramedState::Configuring(runtime) => runtime,
+            FramedState::Active(driver) => driver.runtime(),
+        };
+        let plan = runtime.plan_temporal(&profile).map_err(|e| e.to_string())?;
+        crate::replay_abi::resource_plan(&plan, h.resource_plan.capacity(), max_json_bytes)
+    });
+    match result {
+        Ok(plan) => {
+            h.resource_plan = plan;
+            h.success()
+        }
+        Err(error) => h.failure(error),
+    }
+}
+#[no_mangle]
+pub unsafe extern "C" fn gf_frame_plan_temporal_replay(
+    handle: *mut FramedHandle,
+    ptr: *const u8,
+    len: usize,
+    count: u32,
+    max_json_bytes: usize,
+) -> i32 {
+    let Some(h) = handle.as_mut() else { return 0 };
+    let result = crate::temporal_abi::from_raw(ptr, len).and_then(|profile| {
+        let FramedState::Active(runtime) = &h.state else {
+            return Err("runtime is not active".into());
+        };
+        let plan = runtime
+            .plan_current_temporal_replay(count as usize, &profile)
+            .map_err(|e| e.to_string())?;
+        crate::replay_abi::replay_plan(&plan, h.resource_plan.capacity(), max_json_bytes)
+    });
+    match result {
+        Ok(plan) => {
+            h.resource_plan = plan;
+            h.success()
+        }
+        Err(error) => h.failure(error),
+    }
+}
+#[no_mangle]
+pub unsafe extern "C" fn gf_frame_resource_plan_ptr(handle: *const FramedHandle) -> *const u8 {
+    handle
+        .as_ref()
+        .filter(|h| !h.resource_plan.is_empty())
+        .map_or(std::ptr::null(), |h| h.resource_plan.as_ptr())
+}
+#[no_mangle]
+pub unsafe extern "C" fn gf_frame_resource_plan_len(handle: *const FramedHandle) -> usize {
+    handle.as_ref().map_or(0, |h| h.resource_plan.len())
+}
+
+#[cfg(test)]
+mod replay_tests {
+    use super::*;
+    #[test]
+    fn resource_plan_is_static_bounded_and_success_only() {
+        let mut h = FramedHandle {
+            state: FramedState::Configuring(crate::replay_abi::tests::configured_runtime()),
+            error: String::new(),
+            outcome: "live".into(),
+            replay: "old replay".into(),
+            resource_plan: String::new(),
+        };
+        assert_eq!(unsafe { gf_frame_resource_plan_len(&h) }, 0);
+        let mut packet = profile_packet();
+        packet[16..20].copy_from_slice(&1_u32.to_le_bytes());
+        packet[20..24].copy_from_slice(&1_u32.to_le_bytes());
+        let invoke = |h: &mut _, p: &[u8], cap| unsafe {
+            gf_frame_plan_temporal(h, p.as_ptr(), p.len(), cap)
+        };
+        assert_eq!(invoke(&mut h, &packet, 100_000), 1);
+        assert!(h.resource_plan.contains("\"fitsBudget\":false"));
+        let prior = h.resource_plan.clone();
+        let cap = h.resource_plan.capacity();
+        for (p, max) in [
+            (&packet[..], cap + prior.len() - 1),
+            (&packet[..10], 100_000),
+        ] {
+            assert_eq!(invoke(&mut h, p, max), 0);
+            assert_eq!(h.resource_plan, prior);
+        }
+        assert_eq!(
+            unsafe {
+                gf_frame_plan_temporal_replay(&mut h, packet.as_ptr(), packet.len(), 1, 100_000)
+            },
+            0
+        );
+        assert_eq!(h.resource_plan, prior);
+        assert_eq!(h.replay, "old replay");
+        assert_eq!(invoke(&mut h, &packet, cap + prior.len()), 1);
+        assert!(
+            matches!(&h.state,FramedState::Configuring(runtime) if runtime.journal().is_empty() && runtime.temporal_resource_report().is_none())
+        );
+        assert_eq!(h.outcome, "live");
+    }
+    use crate::replay_abi::tests::{active_runtime, profile_packet, submit};
+    #[test]
+    fn framed_replay_preserves_outcome_sequence_and_last_success_after_failure() {
+        let mut runtime = active_runtime();
+        submit(&mut runtime, 0, 1, 20.0);
+        runtime.tick().unwrap();
+        let base = runtime.journal().back().unwrap().inputs.clone();
+        let mut driver = runtime.into_scan_driver();
+        for scan_id in 0..3 {
+            let now = (scan_id + 1) * 100;
+            let mut input = base.clone();
+            input.insert("id".into(), Value::Number((scan_id + 2) as f64));
+            input.insert("timestamp".into(), Value::Number(now as f64));
+            input.insert("value".into(), Value::Number((scan_id + 3) as f64 * 10.0));
+            driver
+                .scan(ScanFrameV1 {
+                    scan_id,
+                    logical_time_ms: now,
+                    inputs: input
+                        .into_iter()
+                        .filter(|(name, _)| name != "__gf_now_ms")
+                        .map(|(name, value)| ScanInput { name, value })
+                        .collect(),
+                })
+                .unwrap();
+        }
+        let mut h = FramedHandle {
+            state: FramedState::Active(driver),
+            error: String::new(),
+            outcome: "unchanged outcome".into(),
+            replay: String::new(),
+            resource_plan: String::new(),
+        };
+        let packet = profile_packet();
+        let invoke = |h: &mut FramedHandle, p: &[u8], count, peak, json| unsafe {
+            gf_frame_replay_temporal(h, p.as_ptr(), p.len(), count, peak, json)
+        };
+        assert_eq!(invoke(&mut h, &packet, 2, 20_000_000, 100_000), 1);
+        let prior = h.replay.clone();
+        let cap = h.replay.capacity();
+        assert!(prior.contains("\"checkpointTick\":2"));
+        assert!(prior.contains("\"scanId\":1,\"logicalTimeMs\":200"));
+        assert!(prior.contains("\"scanId\":2,\"logicalTimeMs\":300"));
+        for (count, peak, json) in [
+            (0, 20_000_000, 100_000),
+            (3, 20_000_000, 100_000),
+            (2, 1, 100_000),
+            (2, 20_000_000, cap + prior.len() - 1),
+        ] {
+            assert_eq!(invoke(&mut h, &packet, count, peak, json), 0);
+            assert_eq!(h.replay, prior);
+            assert_eq!(h.outcome, "unchanged outcome");
+        }
+        assert_eq!(invoke(&mut h, &packet[..10], 2, 20_000_000, 100_000), 0);
+        assert_eq!(h.replay, prior);
+        assert_eq!(invoke(&mut h, &packet, 2, 20_000_000, cap + prior.len()), 1);
+        let FramedState::Active(driver) = &h.state else {
+            panic!("active driver preserved")
+        };
+        assert_eq!(driver.next_scan_id(), Some(3));
+        assert_eq!(driver.scan_last_time_ms(), Some(300));
+        assert_eq!(driver.runtime().journal().back().unwrap().tick, 4);
+        assert_eq!(unsafe { gf_frame_replay_len(&h) }, prior.len());
+    }
 }
 
 #[no_mangle]

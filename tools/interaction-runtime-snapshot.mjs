@@ -47,6 +47,8 @@ function typeMatches(type, value) {
   if (type?.kind === 'builtin' && type.name === 'Int') return Number.isInteger(value) && value >= -2147483648 && value <= 2147483647;
   if (type?.kind === 'builtin' && type.name === 'Number') return typeof value === 'number' && Number.isFinite(value);
   if (type?.kind === 'builtin' && type.name === 'Duration') return Number.isSafeInteger(value) && value >= 0;
+  const timeMax = type?.name === 'Date' ? 2_932_896 : type?.name === 'TimeOfDay' ? 86_399_999 : type?.name === 'DateTime' ? 253_402_300_799_999 : null;
+  if (type?.kind === 'builtin' && timeMax !== null) return Number.isSafeInteger(value) && value >= 0 && value <= timeMax;
   return type?.kind === 'nominal' && value !== null
     && (typeof value === 'boolean' || typeof value === 'string' || typeof value === 'number' && Number.isFinite(value));
 }

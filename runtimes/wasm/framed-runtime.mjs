@@ -1,16 +1,22 @@
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
+import { NativeDispatchError } from './native-dispatch.mjs';
+import { encodeTemporalProfile } from './temporal-profile.mjs';
+import { temporalPlanRequest, temporalReplayPlanRequest, temporalReplayRequest } from './temporal-replay.mjs';
 const MAX_MODULE_BYTES = 1024 * 1024;
 const MAX_PACKET_BYTES = 65_536;
 const MAX_INPUTS = 128;
 const MAX_NAME_BYTES = 1_024;
 const RESERVED_CLOCK = '__gf_now_ms';
+const TIME_TYPES = new Set(['Date', 'TimeOfDay', 'DateTime']);
 const typedArrayByteLength = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(Uint8Array.prototype), 'byteLength').get;
 const arrayBufferByteLength = Object.getOwnPropertyDescriptor(ArrayBuffer.prototype, 'byteLength').get;
 const requiredFunctions = Object.freeze([
   'gf_alloc', 'gf_dealloc',
-  'gf_frame_create', 'gf_frame_destroy', 'gf_frame_load', 'gf_frame_add_capability', 'gf_frame_activate', 'gf_frame_scan',
+  'gf_frame_create', 'gf_frame_destroy', 'gf_frame_load', 'gf_frame_add_capability', 'gf_frame_activate', 'gf_frame_activate_temporal', 'gf_frame_scan',
   'gf_frame_outcome_ptr', 'gf_frame_outcome_len', 'gf_frame_error_ptr', 'gf_frame_error_len',
+  'gf_frame_replay_temporal', 'gf_frame_replay_ptr', 'gf_frame_replay_len',
+  'gf_frame_plan_temporal', 'gf_frame_plan_temporal_replay', 'gf_frame_resource_plan_ptr', 'gf_frame_resource_plan_len',
 ]);
 
 function exactObject(value, keys, label) {
@@ -75,7 +81,7 @@ function encodeFrame(frame) {
     if (input.type === 'Int') {
       if (!Number.isInteger(inputValue) || inputValue < -2147483648 || inputValue > 2147483647) throw new RangeError(`input ${inputName} must be a signed i32 integer`);
       type = 3; valueLength = 4;
-    } else if (input.type !== undefined && !['Bool', 'Number', 'Percent', 'Duration'].includes(input.type)) throw new TypeError(`input ${inputName} has unsupported manifest type ${String(input.type)}`);
+    } else if (input.type !== undefined && !['Bool', 'Number', 'Percent', 'Duration'].includes(input.type) && !TIME_TYPES.has(input.type) && !isQuantityType(input.type)) throw new TypeError(`input ${inputName} has unsupported manifest type ${String(input.type)}`);
     else if (typeof inputValue === 'boolean') { type = 1; valueLength = 1; }
     else if (typeof inputValue === 'number' && Number.isFinite(inputValue)) { type = 2; valueLength = 8; }
     else throw new TypeError(`input ${inputName} must be a boolean or finite number`);
@@ -136,18 +142,82 @@ export class FramedGhostFlowRuntime {
   }
 
   activate() { this.#live(); this.#check(this.wasm.gf_frame_activate(this.handle)); }
+  activateTemporal(profile) {
+    this.#live();
+    this.#bytes(encodeTemporalProfile(profile), (p, n) => this.#check(this.wasm.gf_frame_activate_temporal(this.handle, p, n)));
+  }
+
+  replayTemporal(options) {
+    const request = temporalReplayRequest(options);
+    return this.#bytes(request.profile, (p, n) => {
+      this.#check(this.wasm.gf_frame_replay_temporal(this.handle, p, n, request.count,
+        request.maxPeakTemporalBytes, request.maxJsonBytes));
+      return this.replay;
+    });
+  }
+
+  planTemporal(options) {
+    const request = temporalPlanRequest(options);
+    return this.#bytes(request.profile, (p, n) => {
+      this.#check(this.wasm.gf_frame_plan_temporal(this.handle, p, n, request.maxJsonBytes));
+      return this.resourcePlan;
+    });
+  }
+
+  planTemporalReplay(options) {
+    const request = temporalReplayPlanRequest(options);
+    return this.#bytes(request.profile, (p, n) => {
+      this.#check(this.wasm.gf_frame_plan_temporal_replay(this.handle, p, n, request.count, request.maxJsonBytes));
+      return this.resourcePlan;
+    });
+  }
 
   scan(frame) {
-    this.#live();
-    const encoded = encodeFrame(frame);
-    this.#bytes(encoded.bytes, (ptr, len) => this.#check(this.wasm.gf_frame_scan(this.handle, BigInt(encoded.scanId), BigInt(encoded.logicalTimeMs), ptr, len)));
-    return this.outcome;
+    this.dispatch(frame);
+    try { return this.outcome; }
+    catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new NativeDispatchError(message, { cause: error, committed: true });
+    }
+  }
+
+  dispatch(frame) {
+    let committed = false;
+    try {
+      this.#live();
+      const encoded = encodeFrame(frame);
+      this.#bytes(encoded.bytes, (ptr, len) => {
+        committed = null;
+        const ok = this.wasm.gf_frame_scan(this.handle, BigInt(encoded.scanId), BigInt(encoded.logicalTimeMs), ptr, len);
+        committed = Boolean(ok);
+        if (!ok) {
+          throw new Error(this.#lastError() || 'Framed GhostFlow operation failed');
+        }
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new NativeDispatchError(message, { cause: error, committed });
+    }
   }
 
   get outcome() {
     this.#live();
     const ptr = this.wasm.gf_frame_outcome_ptr(this.handle);
     const len = Number(this.wasm.gf_frame_outcome_len(this.handle));
+    return ptr && len ? JSON.parse(decoder.decode(new Uint8Array(this.wasm.memory.buffer, ptr, len))) : null;
+  }
+
+  get replay() {
+    this.#live();
+    const ptr = this.wasm.gf_frame_replay_ptr(this.handle);
+    const len = Number(this.wasm.gf_frame_replay_len(this.handle));
+    return ptr && len ? JSON.parse(decoder.decode(new Uint8Array(this.wasm.memory.buffer, ptr, len))) : null;
+  }
+
+  get resourcePlan() {
+    this.#live();
+    const ptr = this.wasm.gf_frame_resource_plan_ptr(this.handle);
+    const len = Number(this.wasm.gf_frame_resource_plan_len(this.handle));
     return ptr && len ? JSON.parse(decoder.decode(new Uint8Array(this.wasm.memory.buffer, ptr, len))) : null;
   }
 
@@ -185,3 +255,4 @@ function byteBuffer(value, label, maximum) {
   }
   throw new TypeError(`${label} must be a Uint8Array or ArrayBuffer`);
 }
+import { isQuantityType } from '../../tools/quantities.mjs';

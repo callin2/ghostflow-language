@@ -1,5 +1,11 @@
 # GhostFlow language ownership
 
+Read [Language Reference](docs/LANGUAGE-REFERENCE.md) before language,
+runtime, settings or Interaction IR work. Use it as the shared ground truth for
+language philosophy, syntax, semantics, and feature rationale. Keep implementation
+status and progress reports out of the reference. Update its relevant section
+and rationale when changing language semantics.
+
 This repository owns GhostFlow syntax, parsing, typing, lowering, GFB1 encoding,
 the portable Rust VM/signal/station engines, their WASM ABI, and the reference
 host adapters and conformance tests. Keep compiler and runtime changes together

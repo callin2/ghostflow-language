@@ -113,6 +113,13 @@ test('preserves original CRLF source bytes for hashing and rejects ignored neste
   })), 'literate-warnings');
 });
 
+test('counts bare CR source lines when validating lesson checkpoint spans', async () => {
+  const bareCr = await bundleJson(bundle => { bundle.source.text = bundle.source.text.replaceAll('\n', '\r'); });
+  const validated = await validateLessonBundle(bareCr);
+  assert.equal(validated.playback.checkpoints[0].sourceSpan.endLine, 8);
+  assert.equal(validated.source.text.includes('\r'), true);
+});
+
 test('uses browser globals when Buffer is unavailable', async () => {
   const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'Buffer');
   Object.defineProperty(globalThis, 'Buffer', { configurable: true, value: undefined });

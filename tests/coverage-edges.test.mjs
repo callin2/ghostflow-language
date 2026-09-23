@@ -16,19 +16,19 @@ function rejectsControl(source, diagnostic) {
   );
 }
 
-test('GF-TEST-coverage-declarations: enum forms, explicit mutex and constant arithmetic compile', () => {
+test('GF-TEST-coverage-declarations: canonical type forms, explicit mutex and constant arithmetic compile', () => {
   const result = compileControl(`
     control DeclarationEdges {
       input enabled: Bool;
-      enum Mode = Off | On;
-      enum Phase { Idle; Running };
+      type Mode = Off | On;
+      type Phase = Idle | Running;
       config sum: Number = 1 + 2;
       config difference: Number = 5 - 3;
-      config product: Duration = 2 * 1s;
+      config product: Duration = 2.0 * 1s;
       config quotient: Number = 6 / 3;
       state mode: Mode = Off;
       state phase: Phase = Idle;
-      next mode = if enabled then On else Off;
+      mode' = if enabled then On else Off;
       phase' = if enabled then Running else Idle;
       output first, second: Bool;
       first <- mode' in {On};
@@ -49,7 +49,7 @@ const invalidControls = [
   ['unsupported check', 'control X { check nope; }', 'unsupported construct check'],
   ['unexpected declaration', 'control X { nonsense; }', 'unexpected declaration nonsense'],
   ['unknown sensor option', 'control X { sensor s: Number { nope = 1; } }', 'unsupported sensor option nope'],
-  ['unsupported schedule kind', 'control X { schedule s: Weekly<15min> { timezone = "UTC"; selected = []; } }', 'only DailySlots<15min> schedules are supported'],
+  ['unsupported schedule kind', 'control X { schedule s: Weekly<15min> { timezone = "UTC"; selected = []; } }', 'only Daily, DailySlots<15min>, Periodic, Cron, Solar and Tide schedules are supported'],
   ['schedule timezone type', 'control X { schedule s: DailySlots<15min> { timezone = 1; selected = []; } }', 'timezone must be a string'],
   ['schedule selected item', 'control X { schedule s: DailySlots<15min> { timezone = "UTC"; selected = [true]; } }', 'selected entries must be HH:MM'],
   ['unknown schedule option', 'control X { schedule s: DailySlots<15min> { timezone = "UTC"; other = []; selected = []; } }', 'unsupported schedule option other'],
@@ -59,40 +59,40 @@ const invalidControls = [
   ['enum input type', 'control X { type Mode = Off | On; input x: Mode; }', 'input must use a scalar type'],
   ['enum output type', 'control X { type Mode = Off | On; output x: Mode; x <- Off; }', 'output must use a scalar type'],
   ['nonconstant state', 'control X { input x: Bool; state held: Bool = x; }', 'state initial value must be a constant'],
-  ['duration sensor', 'control X { sensor s: Duration; }', 'sensor type must be Bool, Number, or Percent'],
-  ['bool median', 'control X { sensor s: Bool { filter = median(3); } }', 'median filtering requires a Number or Percent sensor'],
-  ['bad median call', 'control X { sensor s: Number { filter = median(3, 5); } }', 'only filter = median(N) is supported'],
+  ['duration sensor', 'control X { sensor s: Duration; }', 'sensor type must be Bool, Number, Percent, or a physical quantity'],
+  ['bool median', 'control X { sensor s: Bool { filter = median(3); } }', 'numeric filtering requires a numeric sensor'],
+  ['bad median call', 'control X { sensor s: Number { filter = median(3, 5); } }', 'filter must be median(N), moving_average(N), or ema(alpha: Number)'],
   ['wrong schedule interval', 'control X { schedule s: DailySlots<5min> { timezone = "UTC"; selected = []; } }', 'only DailySlots<15min> is supported'],
   ['missing schedule timezone', 'control X { schedule s: DailySlots<15min> { selected = []; } }', 'schedule requires timezone'],
   ['missing schedule slots', 'control X { schedule s: DailySlots<15min> { timezone = "UTC"; } }', 'schedule requires selected slots'],
   ['bad signal form', 'control X { sensor s: Number; signal d = median(3); }', 'signal requires hysteresis'],
   ['bad signal sensor', 'control X { input x: Number; signal d = hysteresis(x, on_below: 1, off_above: 2, initial: false); }', 'hysteresis first argument must be a declared sensor'],
-  ['bool hysteresis', 'control X { sensor s: Bool; signal d = hysteresis(s, on_below: false, off_above: true, initial: false); }', 'hysteresis requires a Number or Percent sensor'],
+  ['bool hysteresis', 'control X { sensor s: Bool; signal d = hysteresis(s, on_below: false, off_above: true, initial: false); }', 'hysteresis requires a numeric sensor'],
   ['inverted hysteresis', 'control X { sensor s: Number; signal d = hysteresis(s, on_below: 2, off_above: 1, initial: false); }', 'on_below must be less than off_above'],
   ['bad timer call', 'control X { state s: Bool = false; timer t = median(3); }', 'timer requires elapsed(state)'],
   ['bad timer state', 'control X { input x: Bool; timer t = elapsed(x); }', 'elapsed argument must be a declared state'],
   ['duplicate function', 'control X { fn f() -> Bool { true } fn f() -> Bool { true } }', 'duplicate name f'],
   ['duplicate parameter', 'control X { fn f(x: Bool, x: Bool) -> Bool { x } }', 'duplicate function parameter x'],
-  ['function return mismatch', 'control X { fn f() -> Bool { 1 } }', 'function f returns Number, expected Bool'],
+  ['function return mismatch', 'control X { fn f() -> Bool { 1 } }', 'function f returns Int, expected Bool'],
   ['let annotation mismatch', 'control X { let x: Bool = 1; }', 'let x does not match annotation Bool'],
   ['unknown next state', "control X { missing' = true; }", 'unknown state missing'],
-  ['duplicate next state', "control X { state x: Bool = false; x' = true; next x = false; }", 'duplicate next state x'],
+  ['duplicate next state', "control X { state x: Bool = false; x' = true; x' = false; }", 'duplicate next state x'],
   ['unknown output connection', 'control X { missing <- true; }', 'unknown output missing'],
   ['unsupported require', 'control X { output a: Bool; a <- true; require a; }', 'require supports an implication'],
   ['non-output constraint', 'control X { input a: Bool; output b: Bool; b <- false; require a => b; }', 'must be a Bool output'],
   ['numeric mutex member', 'control X { output a: Number; output b: Bool; a <- 1; b <- false; mutex(a, b); }', 'must be a Bool output'],
   ['schedule direct reference', 'control X { schedule s: DailySlots<15min> { timezone = "UTC"; selected = []; } output x: Bool; x <- s; }', 'must be read as s.due'],
   ['function direct reference', 'control X { fn f() -> Bool { true } output x: Bool; x <- f; }', 'function f requires arguments'],
-  ['unknown input member', 'control X { output x: Bool; x <- input.nope; }', 'unknown input nope'],
-  ['unknown state member', 'control X { output x: Bool; x <- state.nope; }', 'unknown state nope'],
-  ['unknown next member', 'control X { output x: Bool; x <- next.nope; }', 'unknown state nope'],
+  ['removed input qualifier', 'control X { output x: Bool; x <- input.nope; }', 'removed qualified reference input.nope'],
+  ['removed state qualifier', 'control X { output x: Bool; x <- state.nope; }', 'removed qualified reference state.nope'],
+  ['removed next qualifier', 'control X { output x: Bool; x <- next.nope; }', 'removed qualified reference next.nope'],
   ['unknown member', 'control X { input x: Bool; output y: Bool; y <- x.nope; }', 'unknown member x.nope'],
   ['unary bool mismatch', 'control X { output x: Bool; x <- !1; }', '! requires Bool'],
   ['unary number mismatch', 'control X { output x: Number; x <- -true; }', 'unary - requires numeric value'],
   ['if condition mismatch', 'control X { output x: Bool; x <- if 1 then true else false; }', 'if condition must be Bool'],
   ['if branch mismatch', 'control X { output x: Bool; x <- if true then true else 1; }', 'if branches must have the same type'],
   ['membership mismatch', 'control X { output x: Bool; x <- 1 in {true}; }', 'in values must match'],
-  ['ifthenelse arity', 'control X { output x: Bool; x <- ifthenelse(true, false); }', 'ifthenelse requires three positional arguments'],
+  ['removed ifthenelse alias', 'control X { output x: Bool; x <- ifthenelse(true, false); }', 'removed alias ifthenelse'],
   ['unknown call', 'control X { output x: Bool; x <- missing(); }', 'unknown function missing'],
   ['constant division zero', 'control X { config x: Number = 1 / 0; }', 'constant division by zero'],
 ];

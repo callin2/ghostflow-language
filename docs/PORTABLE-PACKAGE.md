@@ -13,7 +13,7 @@ package
 ├─ payload
 │  ├─ format: GhostFlow/portable-payload-v1
 │  ├─ source: exact UTF-8 .ghost.md bytes + SHA-256
-│  ├─ bytecode: exact GFB1 v1 bytes + SHA-256
+│  ├─ bytecode: exact GFB profile 1/2/3/4 bytes + SHA-256
 │  ├─ manifest: exact canonical JSON bytes + SHA-256
 │  ├─ sourceMap: exact canonical JSON bytes + SHA-256
 │  └─ identity
@@ -104,8 +104,19 @@ channel map before invoking the package verifier.
 
 ## Compatibility and migration
 
-- Package v1 contains GFB1 format version 1. Existing raw GFB1 compilation and
-  loaders remain unchanged.
+- Package v1 contains one current GFB profile: 1, 2, 3 or 4. The signed bytecode
+  descriptor version is the decimal string of the actual little-endian header
+  version. Both JavaScript and Rust verifiers require an exact match before
+  invoking the target loader. Supported-but-mismatched versions report
+  `bytecode-version-mismatch`; unknown versions report `unsupported-bytecode-version`.
+  Int ports map to the distinct `int` capability type, including in profile 3.
+  The 17 physical quantity types map to machine capability `number`; their
+  input/output/sensor/config descriptors require the exact catalog `canonicalUnit`.
+  Input/output quantity records contain exactly `name`, `type`, and `canonicalUnit`.
+  Nonquantity records forbid that field. JavaScript and Rust reject missing,
+  incorrect, or unexpected unit metadata before invoking a target loader.
+  Compilation replay, signatures, artifact digests and target verification remain
+  required. See [BYTECODE.md](BYTECODE.md) for the current profile semantics.
 - Hosts that require signed deployment must not downgrade an invalid package to
   a raw `.gfb` path.
 - Unknown package, payload, bytecode, manifest, runtime-semantics or ABI versions
@@ -126,7 +137,7 @@ through release native Rust and WASM GFB1 loaders.
 `GhostFlow/portable-package-v1` transport bytes (including its single trailing
 newline). It verifies the signed payload digest, trusted non-revoked Ed25519
 signature, compiler/runtime/binding identity, capability and manifest cross-links,
-artifact digests, GFB1 v1 header, canonical embedded manifest/source-map JSON,
+artifact digests, GFB profile/header agreement, canonical embedded manifest/source-map JSON,
 and the source-map's authoritative source-document linkage.
 
 The caller supplies a mandatory `TargetLoader`; the verifier does not return a
@@ -140,6 +151,18 @@ existing JS common verifier and is covered by the trusted package builder's
 fresh deterministic compiler replay before signing. Native verification does not
 accept raw GFB or a legacy fallback, and it never treats a caller-provided
 attestation as a trust authority.
+
+For GFB profile 4, the native verifier checks the signed window descriptors and
+their machine bindings as part of the manifest and bytecode cross-links. Nested
+descriptors bind each `upstreamWindows` name, site and prior slot to the dependency
+list decoded from quality projections. Omitted, empty or rebound dependency lists
+are rejected before the target loader. Temporal
+activation is a separate runtime step: the caller supplies the explicit time
+epoch, root-density limits and retention budget after signature verification.
+Signature verification alone does not activate a temporal profile or prove window
+trace semantics. The native package slice does not recompile canonical JavaScript
+source or perform deep semantic trace replay. Descriptor verification alone does
+not establish the runtime's nested-window arithmetic or proof retention.
 
 The current native crate targets Rust `std`, including the ESP-IDF Rust runtime
 used by Farm Device; a separate `no_std` package stack is not part of the

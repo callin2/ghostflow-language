@@ -48,6 +48,7 @@ pub enum ErrorCode {
     SourceMapDigestMismatch,
     InvalidBytecodeFormat,
     UnsupportedBytecodeVersion,
+    BytecodeVersionMismatch,
     CompilerRevisionMismatch,
     UnsupportedRuntimeSemantics,
     UnsupportedRuntimeAbi,
@@ -95,6 +96,7 @@ impl ErrorCode {
             Self::SourceMapDigestMismatch => "source-map-digest-mismatch",
             Self::InvalidBytecodeFormat => "invalid-bytecode-format",
             Self::UnsupportedBytecodeVersion => "unsupported-bytecode-version",
+            Self::BytecodeVersionMismatch => "bytecode-version-mismatch",
             Self::CompilerRevisionMismatch => "compiler-revision-mismatch",
             Self::UnsupportedRuntimeSemantics => "unsupported-runtime-semantics",
             Self::UnsupportedRuntimeAbi => "unsupported-runtime-abi",
@@ -446,10 +448,10 @@ fn normalize_capabilities(
         .map(|(index, capability)| {
             require_identifier(&capability.kind, &format!("{label}[{index}].kind"))?;
             require_identifier(&capability.name, &format!("{label}[{index}].name"))?;
-            if capability.value_type != "bool" && capability.value_type != "number" {
+            if !matches!(capability.value_type.as_str(), "bool" | "number" | "int") {
                 return fail(
                     ErrorCode::InvalidCapabilities,
-                    format!("{label}[{index}].type must be bool or number"),
+                    format!("{label}[{index}].type must be bool, number or int"),
                 );
             }
             Ok(Capability {
@@ -634,28 +636,75 @@ fn decode_base64(value: &str, label: &str, maximum: usize) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 
-fn validate_gfb1(bytes: &[u8]) -> Result<()> {
+fn validate_gfb1(bytes: &[u8]) -> Result<u16> {
     if bytes.len() < 6 || &bytes[..4] != b"GFB1" {
         return fail(ErrorCode::InvalidBytecodeFormat, "bytecode is not GFB1");
     }
-    if bytes[4] != 1 || bytes[5] != 0 {
+    let version = u16::from_le_bytes([bytes[4], bytes[5]]);
+    if !matches!(version, 1..=4) {
         return fail(
             ErrorCode::UnsupportedBytecodeVersion,
-            "only GFB1 format version 1 is supported",
+            "supported GFB format versions are 1, 2, 3 and 4",
         );
     }
-    Ok(())
+    Ok(version)
 }
 
 fn manifest_capability_type(value: &str, label: &str) -> Result<&'static str> {
     match value {
         "Bool" => Ok("bool"),
-        "Number" | "Percent" | "Duration" => Ok("number"),
+        "Int" => Ok("int"),
+        "Number" | "Percent" | "Duration" | "Date" | "TimeOfDay" | "DateTime" => Ok("number"),
+        quantity if canonical_quantity_unit(quantity).is_some() => Ok("number"),
         _ => fail(
             ErrorCode::ManifestMismatch,
             format!("{label} is unsupported"),
         ),
     }
+}
+
+fn canonical_quantity_unit(value: &str) -> Option<&'static str> {
+    Some(match value {
+        "Temperature" => "K",
+        "TemperatureDelta" => "ΔK",
+        "RelativeHumidity" => "ratio",
+        "Pressure" => "Pa",
+        "VaporPressureDeficit" => "PaVPD",
+        "CO2Concentration" => "molar ratio",
+        "FlowRate" => "m3/s",
+        "Volume" => "m3",
+        "Length" => "m",
+        "Irradiance" => "W/m2",
+        "PPFD" => "mol/m2/s",
+        "Energy" => "J",
+        "Power" => "W",
+        "ElectricalCurrent" => "A",
+        "Voltage" => "V",
+        "Conductivity" => "S/m",
+        "Acidity" => "pH",
+        _ => return None,
+    })
+}
+
+fn manifest_canonical_unit(descriptor: &serde_json::Map<String, Value>, label: &str) -> Result<()> {
+    let expected = descriptor
+        .get("type")
+        .and_then(Value::as_str)
+        .and_then(canonical_quantity_unit);
+    if let Some(expected) = expected {
+        if descriptor.get("canonicalUnit").and_then(Value::as_str) != Some(expected) {
+            return fail(
+                ErrorCode::ManifestMismatch,
+                format!("{label}.canonicalUnit must be {expected}"),
+            );
+        }
+    } else if descriptor.contains_key("canonicalUnit") {
+        return fail(
+            ErrorCode::ManifestMismatch,
+            format!("{label}.canonicalUnit is forbidden for non-quantity types"),
+        );
+    }
+    Ok(())
 }
 
 fn value_object<'a>(value: &'a Value, label: &str) -> Result<&'a serde_json::Map<String, Value>> {
@@ -680,6 +729,798 @@ fn exact_keys(
         return fail(
             code,
             format!("{label} must contain exactly: {}", expected.join(", ")),
+        );
+    }
+    Ok(())
+}
+
+const DEBOUNCE_ROLES: [(&str, &str); 5] = [
+    ("stable", "stable"),
+    ("candidate", "candidate"),
+    ("candidateActive", "candidate_active"),
+    ("candidateSince", "candidate_since"),
+    ("lastSourceTag", "last_source_tag"),
+];
+const DEBOUNCE_SOURCE_ROLES: [(&str, &str); 2] =
+    [("lastEpoch", "source_epoch"), ("lastId", "source_id")];
+const HOLD_LAST_ROLES: [(&str, &str); 11] = [
+    ("available", "available"),
+    ("value", "value"),
+    ("heldSourceTag", "held_source_tag"),
+    ("heldEpoch", "held_epoch"),
+    ("heldId", "held_id"),
+    ("heldTimestamp", "held_timestamp"),
+    ("held", "held"),
+    ("age", "age"),
+    ("maskedFaultPresent", "masked_fault_present"),
+    ("maskedFaultCode", "masked_fault_code"),
+    ("maskedFaultOrigin", "masked_fault_origin"),
+];
+const SAMPLE_INPUTS: [(&str, &str); 4] = [
+    ("samplePresentInput", "present"),
+    ("sampleEpochInput", "epoch"),
+    ("sampleIdInput", "id"),
+    ("sampleTimestampInput", "timestamp"),
+];
+
+fn fault_members(name: &str) -> Option<&'static [&'static str]> {
+    match name {
+        "SensorFault" => Some(&["Disconnected", "Stale", "Invalid", "NotReady"]),
+        "ClockFault" => Some(&["ClockUnknown", "ZoneUnsupported"]),
+        "CalendarFault" => Some(&[
+            "ClockUnknown",
+            "CalendarMissing",
+            "CalendarOutOfRange",
+            "ZoneUnsupported",
+        ]),
+        "TemporalContextFault" => Some(&[
+            "ClockUnknown",
+            "LocationUnknown",
+            "EventUnavailable",
+            "PredictionMissing",
+            "PredictionStale",
+            "ZoneUnsupported",
+        ]),
+        _ => None,
+    }
+}
+
+fn window_payload_type(descriptor: &Value) -> Result<ghostflow_core::Type> {
+    use ghostflow_core::Type;
+    let operation = descriptor["operation"].as_str().unwrap_or("");
+    let payload = descriptor["payloadType"].as_str().unwrap_or("");
+    let valid = match operation {
+        "rate" => payload
+            .strip_prefix("Rate<")
+            .and_then(|value| value.strip_suffix('>'))
+            .is_some_and(|quantity| {
+                matches!(
+                    quantity,
+                    "Temperature"
+                        | "TemperatureDelta"
+                        | "Pressure"
+                        | "VaporPressureDeficit"
+                        | "FlowRate"
+                        | "Volume"
+                        | "Length"
+                        | "Irradiance"
+                        | "PPFD"
+                        | "Energy"
+                        | "Power"
+                        | "ElectricalCurrent"
+                        | "Voltage"
+                        | "Conductivity"
+                )
+            }),
+        "average" => {
+            matches!(payload, "Number" | "Percent") || canonical_quantity_unit(payload).is_some()
+        }
+        "min" | "max" => {
+            matches!(payload, "Int" | "Number" | "Percent")
+                || canonical_quantity_unit(payload).is_some()
+        }
+        _ => false,
+    };
+    if !valid {
+        return fail(
+            ErrorCode::ManifestMismatch,
+            "window operation/payload type is unsupported",
+        );
+    }
+    Ok(if payload == "Int" {
+        Type::Int
+    } else {
+        Type::Number
+    })
+}
+
+fn verify_window_descriptor<'a>(
+    signal: &'a Value,
+    slot: usize,
+    roots: &mut HashMap<&'a str, Option<u64>>,
+    tags: &mut HashMap<u64, &'a str>,
+) -> Result<()> {
+    let descriptor = value_object(signal, "window signal")?;
+    let mut fields = vec![
+        "kind",
+        "name",
+        "site",
+        "slot",
+        "operation",
+        "payloadType",
+        "errorType",
+        "quality",
+        "overMs",
+        "maxAgeMs",
+        "clockInput",
+        "timeEpochInput",
+        "sources",
+    ];
+    if descriptor.contains_key("upstreamWindows") {
+        fields.push("upstreamWindows");
+    }
+    exact_keys(
+        descriptor,
+        &fields,
+        "window signal",
+        ErrorCode::ManifestMismatch,
+    )?;
+    window_payload_type(signal)?;
+    if descriptor["slot"].as_u64() != Some(slot as u64)
+        || !descriptor["site"]
+            .as_u64()
+            .is_some_and(|value| value > 0 && value <= u32::MAX as u64)
+        || descriptor["errorType"].as_str() != Some("SensorFault")
+        || descriptor["quality"].as_str() != Some("measured")
+        || descriptor["clockInput"].as_str() != Some("__gf_now_ms")
+        || descriptor["timeEpochInput"].as_str() != Some("__gf_time_epoch")
+    {
+        return fail(
+            ErrorCode::ManifestMismatch,
+            "window slot/site/evidence/clock descriptor is invalid",
+        );
+    }
+    for field in ["overMs", "maxAgeMs"] {
+        if !descriptor[field]
+            .as_u64()
+            .is_some_and(|value| value > 0 && value <= 9_007_199_254_740_991)
+        {
+            return fail(
+                ErrorCode::ManifestMismatch,
+                "window duration must be an exact positive safe integer",
+            );
+        }
+    }
+    if let Some(dependencies) = descriptor.get("upstreamWindows") {
+        let dependencies = dependencies
+            .as_array()
+            .filter(|entries| !entries.is_empty() && entries.len() <= slot)
+            .ok_or_else(|| PortablePackageError {
+                code: ErrorCode::ManifestMismatch,
+                message: "window evidence dependencies must be a non-empty prior-window list"
+                    .into(),
+            })?;
+        let mut previous = None;
+        for dependency in dependencies {
+            let dependency = value_object(dependency, "window evidence dependency")?;
+            exact_keys(
+                dependency,
+                &["name", "site", "slot"],
+                "window evidence dependency",
+                ErrorCode::ManifestMismatch,
+            )?;
+            let position = dependency["slot"].as_u64();
+            if !position.is_some_and(|position| {
+                position < slot as u64 && previous.is_none_or(|prior| position > prior)
+            }) || !dependency["site"]
+                .as_u64()
+                .is_some_and(|site| site > 0 && site <= u32::MAX as u64)
+                || !dependency["name"]
+                    .as_str()
+                    .is_some_and(|name| !name.is_empty())
+            {
+                return fail(
+                    ErrorCode::ManifestMismatch,
+                    "invalid window evidence dependency",
+                );
+            }
+            previous = position;
+        }
+    }
+    let sources = descriptor["sources"]
+        .as_array()
+        .filter(|sources| !sources.is_empty() && sources.len() <= 128)
+        .ok_or_else(|| PortablePackageError {
+            code: ErrorCode::ManifestMismatch,
+            message: "window sources must be a bounded non-empty array".into(),
+        })?;
+    let mut previous_tag = 0;
+    let mut names = HashSet::new();
+    for source in sources {
+        let source = value_object(source, "window source")?;
+        exact_keys(
+            source,
+            &["name", "tag"],
+            "window source",
+            ErrorCode::ManifestMismatch,
+        )?;
+        let name = source["name"].as_str().unwrap_or("");
+        let tag = source["tag"].as_u64().unwrap_or(0);
+        if tag <= previous_tag || tag > u32::MAX as u64 || !names.insert(name) {
+            return fail(
+                ErrorCode::ManifestMismatch,
+                "window roots require unique names and ascending positive u32 tags",
+            );
+        }
+        previous_tag = tag;
+        let Some(root_tag) = roots.get_mut(name) else {
+            return fail(
+                ErrorCode::ManifestMismatch,
+                "window root must name a sensor with sample inputs",
+            );
+        };
+        if root_tag.is_some_and(|old| old != tag) || tags.get(&tag).is_some_and(|old| *old != name)
+        {
+            return fail(
+                ErrorCode::ManifestMismatch,
+                "window root tags must bind sensors consistently",
+            );
+        }
+        *root_tag = Some(tag);
+        tags.insert(tag, name);
+    }
+    Ok(())
+}
+
+fn verify_window_bindings(manifest: &Value, module: &ghostflow_core::Module) -> Result<()> {
+    use ghostflow_core::temporal::Operation;
+    let windows: Vec<_> = manifest["signals"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|signal| signal["kind"].as_str() == Some("window"))
+        .collect();
+    let Some(temporal) = module.temporal_requirements() else {
+        return if windows.is_empty() {
+            Ok(())
+        } else {
+            fail(
+                ErrorCode::ManifestMismatch,
+                "window manifest requires GFB format 4",
+            )
+        };
+    };
+    if windows.is_empty() || manifest["format"].as_str() != Some("GhostFlow/control-v4") {
+        return fail(
+            ErrorCode::ManifestMismatch,
+            "GFB format 4 requires a control-v4 window manifest",
+        );
+    }
+    let inputs: Vec<_> = module.input_fields().collect();
+    let mut used_roots = HashSet::new();
+    // The current flat manifest describes the window layout for every strategy.
+    for strategy in &temporal.strategies {
+        if strategy.windows.len() != windows.len() {
+            return fail(
+                ErrorCode::ManifestMismatch,
+                "manifest window count differs from bytecode",
+            );
+        }
+        for (actual, expected) in strategy.windows.iter().zip(&windows) {
+            let operation = match actual.operation {
+                Operation::Average => "average",
+                Operation::Min => "min",
+                Operation::Max => "max",
+                Operation::Rate => "rate",
+            };
+            if expected["name"].as_str() != Some(actual.name.as_str())
+                || expected["site"].as_u64() != Some(u64::from(actual.site))
+                || expected["operation"].as_str() != Some(operation)
+                || window_payload_type(expected)? != actual.payload_type
+                || expected["overMs"].as_u64() != Some(actual.over_ms)
+                || expected["maxAgeMs"].as_u64() != Some(actual.max_age_ms)
+            {
+                return fail(
+                    ErrorCode::ManifestMismatch,
+                    "window descriptor differs from bytecode",
+                );
+            }
+            let dependencies = expected.get("upstreamWindows").and_then(Value::as_array);
+            if dependencies.map_or(0, Vec::len) != actual.upstream_windows.len() {
+                return fail(
+                    ErrorCode::ManifestMismatch,
+                    "window evidence dependency count differs from bytecode",
+                );
+            }
+            for (index, expected_dependency) in actual
+                .upstream_windows
+                .iter()
+                .zip(dependencies.into_iter().flatten())
+            {
+                let upstream = &strategy.windows[usize::from(*index)];
+                if expected_dependency["slot"].as_u64() != Some(u64::from(*index))
+                    || expected_dependency["site"].as_u64() != Some(u64::from(upstream.site))
+                    || expected_dependency["name"].as_str() != Some(upstream.name.as_str())
+                {
+                    return fail(
+                        ErrorCode::ManifestMismatch,
+                        "window evidence dependency differs from bytecode",
+                    );
+                }
+            }
+            let sources = expected["sources"].as_array().unwrap();
+            if sources.len() != actual.roots.len() {
+                return fail(
+                    ErrorCode::ManifestMismatch,
+                    "window source count differs from bytecode",
+                );
+            }
+            for (index, expected_root) in actual.roots.iter().zip(sources) {
+                let root = &temporal.roots[usize::from(*index)];
+                if expected_root["name"].as_str() != Some(root.name.as_str())
+                    || expected_root["tag"].as_u64() != Some(u64::from(root.source_tag))
+                {
+                    return fail(
+                        ErrorCode::ManifestMismatch,
+                        "window root binding differs from bytecode",
+                    );
+                }
+                used_roots.insert(*index);
+                let sensor = manifest["sensors"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .find(|sensor| sensor["name"] == root.name)
+                    .expect("window root sensor validated before binding comparison");
+                for (field, input) in [
+                    ("samplePresentInput", root.present_input),
+                    ("sampleEpochInput", root.epoch_input),
+                    ("sampleIdInput", root.id_input),
+                    ("sampleTimestampInput", root.timestamp_input),
+                ] {
+                    if sensor[field].as_str() != Some(inputs[usize::from(input)].0) {
+                        return fail(
+                            ErrorCode::ManifestMismatch,
+                            "window root sample input differs from bytecode",
+                        );
+                    }
+                }
+            }
+        }
+    }
+    if used_roots.len() != temporal.roots.len() {
+        return fail(
+            ErrorCode::ManifestMismatch,
+            "bytecode has undeclared window roots",
+        );
+    }
+    Ok(())
+}
+
+fn verify_debounce_descriptors(
+    manifest: &serde_json::Map<String, Value>,
+    generated: &mut HashSet<String>,
+) -> Result<()> {
+    let sensors = manifest["sensors"].as_array().unwrap();
+    let signals = manifest["signals"].as_array().unwrap();
+    if sensors.len() > 128 || signals.len() > 128 {
+        return fail(
+            ErrorCode::ManifestMismatch,
+            "signal descriptor count exceeds 128",
+        );
+    }
+    let mut roots = HashMap::new();
+    for sensor in sensors {
+        let sensor = value_object(sensor, "sensor")?;
+        let count = SAMPLE_INPUTS
+            .iter()
+            .filter(|(key, _)| sensor.contains_key(*key))
+            .count();
+        if count == 0 {
+            continue;
+        }
+        if count != SAMPLE_INPUTS.len() {
+            return fail(
+                ErrorCode::ManifestMismatch,
+                "sensor sample inputs must form a complete four-field group",
+            );
+        }
+        let name =
+            sensor
+                .get("name")
+                .and_then(Value::as_str)
+                .ok_or_else(|| PortablePackageError {
+                    code: ErrorCode::ManifestMismatch,
+                    message: "sample sensor name must be a string".into(),
+                })?;
+        for (key, suffix) in SAMPLE_INPUTS {
+            let expected = format!("__gf_sensor_sample_{suffix}_{name}");
+            if sensor.get(key).and_then(Value::as_str) != Some(expected.as_str())
+                || !generated.insert(expected)
+            {
+                return fail(
+                    ErrorCode::ManifestMismatch,
+                    format!("sensor {name}.{key} must be its unique generated sample input"),
+                );
+            }
+        }
+        if roots.insert(name, None::<u64>).is_some() {
+            return fail(ErrorCode::ManifestMismatch, "duplicate sample sensor");
+        }
+    }
+    let mut tags = HashMap::new();
+    let mut private_states = HashSet::new();
+    let mut signal_names = HashSet::new();
+    let mut window_count = 0;
+    let mut window_sites = HashSet::new();
+    for signal in signals {
+        let descriptor = value_object(signal, "signal")?;
+        let name = descriptor.get("name").and_then(Value::as_str).unwrap_or("");
+        require_ghost_name(name, "signal.name")?;
+        if name.starts_with("__gf_") || !signal_names.insert(name) {
+            return fail(
+                ErrorCode::ManifestMismatch,
+                "signal name must be unique and public",
+            );
+        }
+        if !descriptor.contains_key("kind") {
+            continue;
+        }
+        if descriptor["kind"].as_str() == Some("window") {
+            verify_window_descriptor(signal, window_count, &mut roots, &mut tags)?;
+            if !window_sites.insert(descriptor["site"].as_u64().unwrap()) {
+                return fail(ErrorCode::ManifestMismatch, "duplicate window site");
+            }
+            window_count += 1;
+            continue;
+        }
+        let hold = descriptor["kind"].as_str() == Some("hold-last");
+        if !hold && descriptor["kind"].as_str() != Some("debounce") {
+            return fail(
+                ErrorCode::ManifestMismatch,
+                "unsupported signal descriptor kind",
+            );
+        }
+        let payload = descriptor
+            .get("payloadType")
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        let prefix = if hold { "hold_last" } else { "debounce" };
+        let roles: &[(&str, &str)] = if hold {
+            &HOLD_LAST_ROLES
+        } else {
+            &DEBOUNCE_ROLES
+        };
+        let scalar = manifest_capability_type(payload, "payload").is_ok();
+        let mut keys = vec![
+            "kind",
+            "name",
+            "payloadType",
+            "errorType",
+            "sourceMode",
+            "clockInput",
+            "sources",
+            "states",
+        ];
+        keys.extend(if hold {
+            ["forAtMostMs", "quality"]
+        } else {
+            ["stableForMs", "initial"]
+        });
+        if !scalar {
+            keys.push("members");
+        }
+        exact_keys(descriptor, &keys, prefix, ErrorCode::ManifestMismatch)?;
+        if !hold && payload == "Bool" {
+            if !descriptor["initial"].is_boolean() {
+                return fail(
+                    ErrorCode::ManifestMismatch,
+                    "Bool debounce initial must be Bool",
+                );
+            }
+        } else if !hold || !scalar {
+            require_ghost_name(payload, "signal.payloadType")?;
+            if manifest_capability_type(payload, "payload").is_ok()
+                || payload == "Result"
+                || payload.starts_with("__gf_")
+            {
+                return fail(
+                    ErrorCode::ManifestMismatch,
+                    if hold {
+                        "hold-last payload must be a supported scalar or finite enum"
+                    } else {
+                        "debounce payload must be Bool or a finite enum"
+                    },
+                );
+            }
+            let members = descriptor["members"]
+                .as_array()
+                .ok_or_else(|| PortablePackageError {
+                    code: ErrorCode::ManifestMismatch,
+                    message: "signal members must be an array".into(),
+                })?;
+            let mut seen = HashSet::new();
+            if members.is_empty() {
+                return fail(ErrorCode::ManifestMismatch, "signal enum must be nonempty");
+            }
+            for member in members {
+                let member = member.as_str().unwrap_or("");
+                require_ghost_name(member, "signal enum member")?;
+                if member.starts_with("__gf_") || !seen.insert(member) {
+                    return fail(
+                        ErrorCode::ManifestMismatch,
+                        "signal enum members must be unique public names",
+                    );
+                }
+            }
+            if let Some(expected) = fault_members(payload) {
+                if members
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .ne(expected.iter().copied())
+                {
+                    return fail(
+                        ErrorCode::ManifestMismatch,
+                        "signal built-in enum members do not match their type",
+                    );
+                }
+            }
+            if !hold
+                && !descriptor["initial"].as_f64().is_some_and(|value| {
+                    value.fract() == 0.0 && value >= 0.0 && value < members.len() as f64
+                })
+            {
+                return fail(
+                    ErrorCode::ManifestMismatch,
+                    "debounce initial is outside its enum domain",
+                );
+            }
+        }
+        if hold
+            && (descriptor["errorType"].as_str() != Some("SensorFault")
+                || descriptor["quality"].as_str() != Some("measured"))
+        {
+            return fail(
+                ErrorCode::ManifestMismatch,
+                "hold-last requires SensorFault and measured quality",
+            );
+        }
+        if !hold
+            && !(descriptor["errorType"].is_null()
+                || descriptor["errorType"]
+                    .as_str()
+                    .is_some_and(|name| fault_members(name).is_some()))
+        {
+            return fail(
+                ErrorCode::ManifestMismatch,
+                "debounce errorType must be null or a compiler fault enum",
+            );
+        }
+        let duration = if hold { "forAtMostMs" } else { "stableForMs" };
+        if !descriptor[duration].as_f64().is_some_and(|value| {
+            value.fract() == 0.0 && (1.0..=9_007_199_254_740_991.0).contains(&value)
+        }) {
+            return fail(
+                ErrorCode::ManifestMismatch,
+                format!("{prefix} {duration} must be a positive safe integer Duration"),
+            );
+        }
+        if descriptor["clockInput"].as_str() != Some("__gf_now_ms") {
+            return fail(
+                ErrorCode::ManifestMismatch,
+                "temporal signal clockInput must be __gf_now_ms",
+            );
+        }
+        let sources = descriptor["sources"]
+            .as_array()
+            .ok_or_else(|| PortablePackageError {
+                code: ErrorCode::ManifestMismatch,
+                message: "temporal signal sources must be an array".into(),
+            })?;
+        if sources.len() > 128
+            || (hold && sources.is_empty())
+            || descriptor["sourceMode"].as_str()
+                != Some(if sources.is_empty() { "scan" } else { "sample" })
+        {
+            return fail(
+                ErrorCode::ManifestMismatch,
+                "temporal signal sourceMode must match its bounded source list",
+            );
+        }
+        let mut previous_tag = 0;
+        let mut source_names = HashSet::new();
+        for source in sources {
+            let source = value_object(source, "temporal signal source")?;
+            exact_keys(
+                source,
+                &["name", "tag", "states"],
+                "temporal signal source",
+                ErrorCode::ManifestMismatch,
+            )?;
+            let source_name = source["name"].as_str().unwrap_or("");
+            let tag = source["tag"].as_u64().unwrap_or(0);
+            if tag <= previous_tag || tag > u32::MAX as u64 || !source_names.insert(source_name) {
+                return fail(
+                    ErrorCode::ManifestMismatch,
+                    "temporal signal sources must have unique names and ascending positive u32 tags",
+                );
+            }
+            previous_tag = tag;
+            let Some(root_tag) = roots.get_mut(source_name) else {
+                return fail(
+                    ErrorCode::ManifestMismatch,
+                    "temporal signal source must name a sensor with sample inputs",
+                );
+            };
+            if root_tag.is_some_and(|old| old != tag)
+                || tags.get(&tag).is_some_and(|old| *old != source_name)
+            {
+                return fail(
+                    ErrorCode::ManifestMismatch,
+                    "temporal signal source tags must bind roots consistently",
+                );
+            }
+            *root_tag = Some(tag);
+            tags.insert(tag, source_name);
+            let source_states = value_object(&source["states"], "temporal signal source states")?;
+            exact_keys(
+                source_states,
+                &DEBOUNCE_SOURCE_ROLES.map(|(role, _)| role),
+                "temporal signal source states",
+                ErrorCode::ManifestMismatch,
+            )?;
+            for (role, suffix) in DEBOUNCE_SOURCE_ROLES {
+                let expected = format!("__gf_{prefix}_{suffix}_{name}_{tag}");
+                if source_states[role].as_str() != Some(expected.as_str())
+                    || !private_states.insert(expected.clone())
+                    || generated.contains(&expected)
+                {
+                    return fail(
+                        ErrorCode::ManifestMismatch,
+                        format!("{prefix} source {role} must bind its unique generated state"),
+                    );
+                }
+            }
+        }
+        let states = value_object(&descriptor["states"], "temporal signal states")?;
+        exact_keys(
+            states,
+            &roles.iter().map(|(role, _)| *role).collect::<Vec<_>>(),
+            "temporal signal states",
+            ErrorCode::ManifestMismatch,
+        )?;
+        for &(role, suffix) in roles {
+            let expected = format!("__gf_{prefix}_{suffix}_{name}");
+            if states[role].as_str() != Some(expected.as_str())
+                || !private_states.insert(expected.clone())
+                || generated.contains(&expected)
+            {
+                return fail(
+                    ErrorCode::ManifestMismatch,
+                    format!("{prefix} {role} must bind its unique generated state"),
+                );
+            }
+        }
+    }
+    if roots.values().any(Option::is_none) {
+        return fail(
+            ErrorCode::ManifestMismatch,
+            "sensor sample inputs require a temporal signal consumer",
+        );
+    }
+    if private_states.len() > 128 {
+        return fail(
+            ErrorCode::ManifestMismatch,
+            "temporal signal generated resources exceed the 128 field profile",
+        );
+    }
+    Ok(())
+}
+
+fn verify_debounce_bindings(manifest: &Value, bytecode: &[u8]) -> Result<()> {
+    use ghostflow_core::{Module, Type, Value as MachineValue};
+    let module = Module::load(bytecode).map_err(|error| PortablePackageError {
+        code: ErrorCode::BytecodeRejected,
+        message: format!("native artifact validation failed: {error}"),
+    })?;
+    verify_window_bindings(manifest, &module)?;
+    let inputs: HashMap<_, _> = module.input_fields().collect();
+    let states: HashMap<_, _> = module
+        .state_fields()
+        .map(|(name, ty, value)| (name, (ty, value)))
+        .collect();
+    let mut expected_states = HashSet::new();
+    let mut expected_samples = HashSet::new();
+    for signal in manifest["signals"].as_array().unwrap() {
+        let hold = signal["kind"].as_str() == Some("hold-last");
+        if !hold && signal["kind"].as_str() != Some("debounce") {
+            continue;
+        }
+        if inputs.get("__gf_now_ms") != Some(&Type::Number) {
+            return fail(
+                ErrorCode::ManifestMismatch,
+                "temporal signal clock binding is missing or not Number",
+            );
+        }
+        let payload = signal["payloadType"].as_str().unwrap();
+        let initial = if hold {
+            match payload {
+                "Bool" => MachineValue::Bool(false),
+                "Int" => MachineValue::Int(0),
+                _ => MachineValue::Number(0.0),
+            }
+        } else if payload == "Bool" {
+            MachineValue::Bool(signal["initial"].as_bool().unwrap())
+        } else {
+            MachineValue::Number(signal["initial"].as_f64().unwrap())
+        };
+        let roles: &[(&str, &str)] = if hold {
+            &HOLD_LAST_ROLES
+        } else {
+            &DEBOUNCE_ROLES
+        };
+        for &(role, _) in roles {
+            let name = signal["states"][role].as_str().unwrap();
+            let default = match role {
+                "stable" | "candidate" | "value" => initial,
+                "candidateActive" | "available" | "held" | "maskedFaultPresent" => {
+                    MachineValue::Bool(false)
+                }
+                "heldId" => MachineValue::Number(-1.0),
+                "maskedFaultCode" => MachineValue::Number(3.0),
+                _ => MachineValue::Number(0.0),
+            };
+            if states.get(name) != Some(&(default.value_type(), default)) {
+                return fail(
+                    ErrorCode::ManifestMismatch,
+                    format!(
+                        "temporal signal state {name} has a missing or mismatched bytecode type/default"
+                    ),
+                );
+            }
+            expected_states.insert(name);
+        }
+        for source in signal["sources"].as_array().unwrap() {
+            for (role, _) in DEBOUNCE_SOURCE_ROLES {
+                let name = source["states"][role].as_str().unwrap();
+                let default = MachineValue::Number(if role == "lastId" { -1.0 } else { 0.0 });
+                if states.get(name) != Some(&(Type::Number, default)) {
+                    return fail(ErrorCode::ManifestMismatch, format!("temporal signal source state {name} has a missing or mismatched bytecode type/default"));
+                }
+                expected_states.insert(name);
+            }
+        }
+    }
+    for sensor in manifest["sensors"].as_array().unwrap() {
+        for (key, _) in SAMPLE_INPUTS {
+            if let Some(name) = sensor.get(key).and_then(Value::as_str) {
+                let ty = if key == "samplePresentInput" {
+                    Type::Bool
+                } else {
+                    Type::Number
+                };
+                if inputs.get(name) != Some(&ty) {
+                    return fail(
+                        ErrorCode::ManifestMismatch,
+                        format!(
+                            "sensor sample input {name} has a missing or mismatched bytecode type"
+                        ),
+                    );
+                }
+                expected_samples.insert(name);
+            }
+        }
+    }
+    if states.keys().any(|name| {
+        (name.starts_with("__gf_debounce_") || name.starts_with("__gf_hold_last_"))
+            && !expected_states.contains(name)
+    }) || inputs
+        .keys()
+        .any(|name| name.starts_with("__gf_sensor_sample_") && !expected_samples.contains(name))
+    {
+        return fail(
+            ErrorCode::ManifestMismatch,
+            "bytecode contains undeclared temporal signal bindings",
         );
     }
     Ok(())
@@ -752,6 +1593,56 @@ fn verify_manifest(
             );
         }
     }
+    // Existing timer clock inputs may be shared. New fault inputs must be
+    // distinct from every public/generated input and from each other.
+    let mut generated_names = HashSet::new();
+    for (field, keys) in [
+        ("inputs", &["name"][..]),
+        ("sensors", &["valueInput", "okInput"][..]),
+        ("signals", &["valueInput", "okInput"][..]),
+        ("schedules", &["dueInput"][..]),
+        ("timers", &["clockInput", "state"][..]),
+    ] {
+        for descriptor in object[field].as_array().unwrap() {
+            for key in keys {
+                if let Some(name) = descriptor.get(*key).and_then(Value::as_str) {
+                    generated_names.insert(name.to_owned());
+                }
+            }
+        }
+    }
+    for (field, prefix) in [("sensors", "sensor"), ("signals", "signal")] {
+        for (index, descriptor) in object[field].as_array().unwrap().iter().enumerate() {
+            if field == "signals"
+                && matches!(
+                    descriptor.get("kind").and_then(Value::as_str),
+                    Some("debounce" | "hold-last" | "window")
+                )
+            {
+                continue;
+            }
+            let label = format!("manifest.{field}[{index}]");
+            let descriptor = value_object(descriptor, &label)?;
+            let name = descriptor
+                .get("name")
+                .and_then(Value::as_str)
+                .ok_or_else(|| PortablePackageError {
+                    code: ErrorCode::ManifestMismatch,
+                    message: format!("{label}.name must be a string"),
+                })?;
+            require_ghost_name(name, &format!("{label}.name"))?;
+            let expected = format!("__gf_{prefix}_fault_{name}");
+            if descriptor.get("faultInput").and_then(Value::as_str) != Some(expected.as_str())
+                || !generated_names.insert(expected)
+            {
+                return fail(
+                    ErrorCode::ManifestMismatch,
+                    format!("{label}.faultInput must be its unique generated fault input"),
+                );
+            }
+        }
+    }
+    verify_debounce_descriptors(object, &mut generated_names)?;
     let mut expected = BTreeSet::<Capability>::new();
     for (field, kind) in [("inputs", "input"), ("outputs", "actuator")] {
         let mut names = HashSet::new();
@@ -763,9 +1654,18 @@ fn verify_manifest(
             })?;
         for (index, port) in ports.iter().enumerate() {
             let port = value_object(port, &format!("manifest.{field}[{index}]"))?;
+            let quantity = port
+                .get("type")
+                .and_then(Value::as_str)
+                .and_then(canonical_quantity_unit)
+                .is_some();
             exact_keys(
                 port,
-                &["name", "type"],
+                if quantity {
+                    &["name", "type", "canonicalUnit"]
+                } else {
+                    &["name", "type"]
+                },
                 &format!("manifest.{field}[{index}]"),
                 ErrorCode::ManifestMismatch,
             )?;
@@ -787,6 +1687,7 @@ fn verify_manifest(
                 })?,
                 &format!("manifest.{field}[{index}].type"),
             )?;
+            manifest_canonical_unit(port, &format!("manifest.{field}[{index}]"))?;
             expected.insert(Capability {
                 kind: kind.into(),
                 name: name.into(),
@@ -802,6 +1703,7 @@ fn verify_manifest(
         })?;
     for (index, sensor) in sensors.iter().enumerate() {
         let sensor = value_object(sensor, &format!("manifest.sensors[{index}]"))?;
+        manifest_canonical_unit(sensor, &format!("manifest.sensors[{index}]"))?;
         let name =
             sensor
                 .get("name")
@@ -827,6 +1729,123 @@ fn verify_manifest(
                 name: name.into(),
                 value_type: value_type.into(),
             });
+        }
+    }
+    for (index, config) in object["configs"].as_array().unwrap().iter().enumerate() {
+        let label = format!("manifest.configs[{index}]");
+        let config = value_object(config, &label)?;
+        manifest_canonical_unit(config, &label)?;
+        if config.get("type").and_then(Value::as_str) == Some("Int") {
+            let integer = |value: Option<&Value>| -> Option<i64> {
+                let value = value?.as_f64()?;
+                (value.fract() == 0.0 && (-2147483648.0..=2147483647.0).contains(&value))
+                    .then_some(value as i64)
+            };
+            let Some(value) = integer(config.get("value")) else {
+                return fail(
+                    ErrorCode::ManifestMismatch,
+                    format!("{label}.value is outside the Int range"),
+                );
+            };
+            if let Some(settings) = config.get("settings") {
+                let settings = value_object(settings, &format!("{label}.settings"))?;
+                let allowed = ["min", "max", "step", "access", "apply", "label"];
+                if settings.keys().any(|key| !allowed.contains(&key.as_str()))
+                    || !matches!(
+                        settings.get("access").and_then(Value::as_str),
+                        Some("operator" | "designer")
+                    )
+                    || settings
+                        .get("apply")
+                        .is_some_and(|value| value.as_str() != Some("stopped"))
+                    || settings.get("label").is_some_and(|value| {
+                        !value.as_str().is_some_and(|label| {
+                            // Match the compiler/JS descriptor's UTF-16 length bound.
+                            !label.is_empty() && label.encode_utf16().count() <= 128
+                        })
+                    })
+                {
+                    return fail(
+                        ErrorCode::ManifestMismatch,
+                        format!("{label}.settings has invalid Int metadata"),
+                    );
+                }
+                let valid = match (
+                    integer(settings.get("min")),
+                    integer(settings.get("max")),
+                    integer(settings.get("step")),
+                ) {
+                    (Some(min), Some(max), Some(step)) => {
+                        // i64 retains the full 4294967295-wide i32 difference.
+                        // A quotient tolerance would admit 1 on a MAX_INT grid.
+                        min <= value
+                            && value <= max
+                            && step > 0
+                            && (value - min) % step == 0
+                            && (max - min) % step == 0
+                    }
+                    _ => false,
+                };
+                if !valid {
+                    return fail(
+                        ErrorCode::ManifestMismatch,
+                        format!("{label}.settings does not match the Int range and exact step"),
+                    );
+                }
+            }
+        }
+        let maximum = match config.get("type").and_then(Value::as_str) {
+            Some("Date") => Some(2932896_f64),
+            Some("TimeOfDay") => Some(86399999_f64),
+            Some("DateTime") => Some(253402300799999_f64),
+            _ => None,
+        };
+        if let Some(maximum) = maximum {
+            let in_range = |value: f64| {
+                value.is_finite() && value.fract() == 0.0 && (0.0..=maximum).contains(&value)
+            };
+            let value = config.get("value").and_then(Value::as_f64);
+            if !value.is_some_and(in_range) {
+                return fail(
+                    ErrorCode::ManifestMismatch,
+                    format!("{label}.value is outside its time type range"),
+                );
+            }
+            if let Some(settings) = config.get("settings") {
+                let settings = value_object(settings, &format!("{label}.settings"))?;
+                let date = config.get("type").and_then(Value::as_str) == Some("Date");
+                let step_type = if date { "Int" } else { "Duration" };
+                let step_maximum = if date {
+                    2147483647_f64
+                } else {
+                    9007199254740991_f64
+                };
+                let min = settings.get("min").and_then(Value::as_f64);
+                let max = settings.get("max").and_then(Value::as_f64);
+                let step = settings.get("step").and_then(Value::as_f64);
+                let valid = match (min, max, step) {
+                    (Some(min), Some(max), Some(step)) => {
+                        in_range(min)
+                            && in_range(max)
+                            && min <= value.unwrap()
+                            && value.unwrap() <= max
+                            && step.is_finite()
+                            && step.fract() == 0.0
+                            && step > 0.0
+                            && step <= step_maximum
+                            && (value.unwrap() - min) % step == 0.0
+                            && (max - min) % step == 0.0
+                            && settings.get("stepType").and_then(Value::as_str) == Some(step_type)
+                    }
+                    _ => false,
+                };
+                if !valid {
+                    return fail(
+                        ErrorCode::ManifestMismatch,
+                        format!("{label}.settings does not match its time type range and step"),
+                    );
+                }
+            }
         }
     }
     let actual = identity.iter().cloned().collect::<BTreeSet<_>>();
@@ -1081,10 +2100,10 @@ pub fn verify_portable_package(
             "payload bytecode format must be GFB1",
         );
     }
-    if payload.bytecode.version != "1" {
+    if !matches!(payload.bytecode.version.as_str(), "1" | "2" | "3" | "4") {
         return fail(
             ErrorCode::UnsupportedBytecodeVersion,
-            "payload bytecode version must be 1",
+            "payload bytecode version must be 1, 2, 3 or 4",
         );
     }
     require_digest(&payload.bytecode.sha256, "payload.bytecode.sha256")?;
@@ -1144,7 +2163,12 @@ pub fn verify_portable_package(
             "source map SHA-256 does not match content",
         );
     }
-    validate_gfb1(&bytecode)?;
+    if validate_gfb1(&bytecode)?.to_string() != payload.bytecode.version {
+        return fail(
+            ErrorCode::BytecodeVersionMismatch,
+            "payload bytecode version does not match its GFB header",
+        );
+    }
     let source_text = String::from_utf8(source_bytes).map_err(|_| PortablePackageError {
         code: ErrorCode::InvalidUtf8,
         message: "source must be well-formed UTF-8".into(),
@@ -1157,6 +2181,7 @@ pub fn verify_portable_package(
         &bytecode_sha256,
         &identity.required_capabilities,
     )?;
+    verify_debounce_bindings(&manifest, &bytecode)?;
     verify_source_map(
         &source_map,
         &payload.source,
@@ -1406,6 +2431,215 @@ mod tests {
     }
 
     #[test]
+    fn signed_window_package_binds_gfb4_and_executes_in_the_native_core() {
+        use ghostflow_core::{
+            temporal::{RootDensity, TargetBudget},
+            temporal_runtime::TemporalActivation,
+            Module, Runtime, Type, Value as MachineValue,
+        };
+        let loader =
+            |bytes: &[u8], _: &TargetLoaderContext<'_>| -> std::result::Result<bool, String> {
+                Module::load(bytes)
+                    .map(|_| true)
+                    .map_err(|error| error.to_string())
+            };
+        let capabilities = vec![
+            Capability {
+                kind: "actuator".into(),
+                name: "pump".into(),
+                value_type: "bool".into(),
+            },
+            Capability {
+                kind: "sensor".into(),
+                name: "probe".into(),
+                value_type: "number".into(),
+            },
+        ];
+        let formats = strings(&["GhostFlow/control-v4"]);
+        let mut current = profile(&loader);
+        current.available_capabilities = &capabilities;
+        current.supported_manifest_formats = &formats;
+        let verified = verify_portable_package(&fixture_for("window-valid"), &current).unwrap();
+        let module = Module::load(&verified.bytecode_copy()).unwrap();
+        let root = module.temporal_requirements().unwrap().roots[0].source_tag;
+        let mut runtime = Runtime::new(2);
+        runtime.install(module, false);
+        runtime
+            .add_capability(ghostflow_core::Capability::new(
+                "actuator",
+                "pump",
+                Type::Bool,
+            ))
+            .unwrap();
+        runtime
+            .activate_with_temporal(&TemporalActivation {
+                root_density: vec![RootDensity {
+                    source_tag: root,
+                    max_observations: 3,
+                    interval_ms: 1000,
+                }],
+                budget: TargetBudget {
+                    max_retained_samples: 12,
+                    max_bytes: 1_000_000,
+                },
+                time_epoch: 5,
+            })
+            .unwrap();
+        let sensor = &verified.manifest["sensors"][0];
+        for (id, now, value, expected) in [(1, 1000, 280.0, false), (2, 1400, 284.0, true)] {
+            for (key, value) in [
+                ("valueInput", MachineValue::Number(value)),
+                ("okInput", MachineValue::Bool(true)),
+                ("faultInput", MachineValue::Number(0.0)),
+                ("samplePresentInput", MachineValue::Bool(true)),
+                ("sampleEpochInput", MachineValue::Number(1.0)),
+                ("sampleIdInput", MachineValue::Number(id as f64)),
+                ("sampleTimestampInput", MachineValue::Number(now as f64)),
+            ] {
+                runtime
+                    .set_input(sensor[key].as_str().unwrap(), value)
+                    .unwrap();
+            }
+            runtime
+                .set_input("__gf_time_epoch", MachineValue::Number(5.0))
+                .unwrap();
+            let trace = runtime.tick_at(now).unwrap();
+            assert_eq!(trace.safe_intents["pump"], MachineValue::Bool(expected));
+            if id == 2 {
+                assert_eq!(
+                    trace
+                        .window_trace
+                        .iter()
+                        .map(|entry| entry.outcome.value)
+                        .collect::<Vec<_>>(),
+                    vec![Some(282.0), Some(280.0), Some(284.0), Some(10.0)]
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn signed_window_manifest_substitutions_fail_before_native_loader() {
+        let called = std::cell::Cell::new(false);
+        let loader = |_: &[u8], _: &TargetLoaderContext<'_>| -> std::result::Result<bool, String> {
+            called.set(true);
+            Ok(true)
+        };
+        let capabilities = vec![
+            Capability {
+                kind: "actuator".into(),
+                name: "pump".into(),
+                value_type: "bool".into(),
+            },
+            Capability {
+                kind: "sensor".into(),
+                name: "probe".into(),
+                value_type: "number".into(),
+            },
+        ];
+        let formats = strings(&["GhostFlow/control-v1", "GhostFlow/control-v4"]);
+        let mut current = profile(&loader);
+        current.available_capabilities = &capabilities;
+        current.supported_manifest_formats = &formats;
+        for scenario in [
+            "window-zero-duration",
+            "window-duration-mismatch",
+            "window-operation-mismatch",
+            "window-slot-mismatch",
+            "window-site-mismatch",
+            "window-payload-mismatch",
+            "window-source-tag-mismatch",
+            "window-missing-signal",
+            "window-missing-sample-input",
+            "window-unknown-key",
+            "window-format-mismatch",
+            "window-clock-mismatch",
+            "window-bytecode-duration",
+        ] {
+            let error = verify_portable_package(&fixture_for(scenario), &current).unwrap_err();
+            assert_eq!(
+                error.code,
+                ErrorCode::ManifestMismatch,
+                "{scenario}: {error:?}"
+            );
+            assert!(!called.get(), "{scenario} reached target loader");
+        }
+    }
+
+    #[test]
+    fn signed_nested_window_dependencies_bind_to_verified_bytecode() {
+        let called = std::cell::Cell::new(false);
+        let loader =
+            |bytes: &[u8], _: &TargetLoaderContext<'_>| -> std::result::Result<bool, String> {
+                called.set(true);
+                ghostflow_core::Module::load(bytes)
+                    .map(|_| true)
+                    .map_err(|error| error.to_string())
+            };
+        let capabilities = vec![
+            Capability {
+                kind: "actuator".into(),
+                name: "pump".into(),
+                value_type: "bool".into(),
+            },
+            Capability {
+                kind: "sensor".into(),
+                name: "probe".into(),
+                value_type: "number".into(),
+            },
+        ];
+        let formats = strings(&["GhostFlow/control-v4"]);
+        let mut current = profile(&loader);
+        current.available_capabilities = &capabilities;
+        current.supported_manifest_formats = &formats;
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        for scenario in [
+            "valid",
+            "dependency-removed",
+            "dependency-empty",
+            "dependency-site",
+            "dependency-slot",
+            "dependency-name",
+            "dependency-unknown-key",
+            "dependency-null",
+            "dependency-object",
+            "dependency-negative-slot",
+            "dependency-huge-slot",
+            "dependency-negative-site",
+            "dependency-huge-site",
+        ] {
+            called.set(false);
+            let output = Command::new("node")
+                .arg(root.join("tests/native-window-derived-fixture.mjs"))
+                .arg(scenario)
+                .current_dir(&root)
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "fixture {scenario}: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            let result = verify_portable_package(&output.stdout, &current);
+            if scenario == "valid" {
+                let verified = result.unwrap();
+                assert!(called.get());
+                assert_eq!(
+                    verified.manifest["signals"][1]["upstreamWindows"][0]["name"],
+                    "inner"
+                );
+            } else {
+                assert_eq!(
+                    result.unwrap_err().code,
+                    ErrorCode::ManifestMismatch,
+                    "{scenario}"
+                );
+                assert!(!called.get(), "{scenario} reached target loader");
+            }
+        }
+    }
+
+    #[test]
     fn actual_js_package_verifies_before_native_loader_receives_gfb() {
         let bytes = fixture();
         let loader = |bytes: &[u8],
@@ -1532,6 +2766,972 @@ mod tests {
                 .code,
             ErrorCode::UnsupportedBytecodeVersion
         );
+    }
+
+    #[test]
+    fn signed_current_profiles_preserve_int_capability_identity() {
+        for version in 1..=3 {
+            let bytes = fixture_for(&format!("profile-{version}"));
+            let loader =
+                |bytes: &[u8], _: &TargetLoaderContext<'_>| -> std::result::Result<bool, String> {
+                    assert_eq!(u16::from_le_bytes([bytes[4], bytes[5]]), version);
+                    Ok(true)
+                };
+            let mut capabilities = capabilities();
+            let manifests = strings(&["GhostFlow/control-v1", "GhostFlow/control-v4"]);
+            if version >= 2 {
+                capabilities[0].value_type = "int".into();
+            }
+            let mut current = profile(&loader);
+            current.available_capabilities = &capabilities;
+            current.supported_manifest_formats = &manifests;
+            let verified = verify_portable_package(&bytes, &current).unwrap();
+            assert_eq!(
+                u16::from_le_bytes([verified.bytecode_copy()[4], verified.bytecode_copy()[5]]),
+                version
+            );
+        }
+    }
+
+    #[test]
+    fn signed_descriptor_mismatches_and_unknown_headers_fail_before_loader() {
+        for (scenario, code) in [
+            ("version-mismatch-1", "bytecode-version-mismatch"),
+            ("version-mismatch-2", "bytecode-version-mismatch"),
+            ("unsupported-header", "unsupported-bytecode-version"),
+        ] {
+            let bytes = fixture_for(scenario);
+            let loader =
+                |_: &[u8], _: &TargetLoaderContext<'_>| -> std::result::Result<bool, String> {
+                    panic!("loader must not run")
+                };
+            assert_eq!(
+                verify_portable_package(&bytes, &profile(&loader))
+                    .unwrap_err()
+                    .code
+                    .as_str(),
+                code
+            );
+        }
+    }
+
+    #[test]
+    fn signed_quantity_descriptors_require_exact_canonical_units_before_loading() {
+        let capabilities: Vec<_> = (0..17)
+            .flat_map(|index| {
+                [
+                    Capability {
+                        kind: "input".into(),
+                        name: format!("input_{index}"),
+                        value_type: "number".into(),
+                    },
+                    Capability {
+                        kind: "actuator".into(),
+                        name: format!("output_{index}"),
+                        value_type: "number".into(),
+                    },
+                ]
+            })
+            .chain([
+                Capability {
+                    kind: "input".into(),
+                    name: "enabled".into(),
+                    value_type: "bool".into(),
+                },
+                Capability {
+                    kind: "sensor".into(),
+                    name: "probe".into(),
+                    value_type: "number".into(),
+                },
+            ])
+            .collect();
+        let accept =
+            |_: &[u8], context: &TargetLoaderContext<'_>| -> std::result::Result<bool, String> {
+                assert_eq!(context.manifest["inputs"].as_array().unwrap().len(), 18);
+                assert_eq!(context.manifest["inputs"][0]["canonicalUnit"], "K");
+                assert_eq!(context.manifest["inputs"][16]["canonicalUnit"], "pH");
+                Ok(true)
+            };
+        let mut current = profile(&accept);
+        current.available_capabilities = &capabilities;
+        verify_portable_package(&fixture_for("quantity-valid"), &current).unwrap();
+        let reject_loader =
+            |_: &[u8], _: &TargetLoaderContext<'_>| -> std::result::Result<bool, String> {
+                panic!("invalid units must reject before loader")
+            };
+        current.target_loader = &reject_loader;
+        for scenario in [
+            "quantity-missing-unit",
+            "quantity-wrong-unit",
+            "quantity-extra-field",
+            "quantity-wrong-type",
+            "quantity-scalar-unit",
+            "quantity-sensor-unit",
+            "quantity-config-unit",
+            "quantity-scalar-config-unit",
+        ] {
+            let error = verify_portable_package(&fixture_for(scenario), &current).unwrap_err();
+            assert_eq!(
+                error.code,
+                ErrorCode::ManifestMismatch,
+                "{scenario}: {error:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn time_config_values_reject_invalid_numeric_representations() {
+        for (nominal, maximum) in [
+            ("Date", 2932896_f64),
+            ("TimeOfDay", 86399999_f64),
+            ("DateTime", 253402300799999_f64),
+        ] {
+            let mut manifest = serde_json::json!({
+                "format": "GhostFlow/control-v1", "name": "Times", "bytecodeSha256": "digest",
+                "inputs": [], "outputs": [], "sensors": [], "schedules": [], "timers": [], "signals": [],
+                "configs": [{"name": "value", "type": nominal, "value": 0}]
+            });
+            for valid in [0.0, maximum] {
+                manifest["configs"][0]["value"] = serde_json::json!(valid);
+                verify_manifest(&manifest, "GhostFlow/control-v1", "digest", &[]).unwrap();
+            }
+            for invalid in [
+                serde_json::json!(-1),
+                serde_json::json!(0.5),
+                serde_json::json!(maximum + 1.0),
+                serde_json::json!("0"),
+                Value::Null,
+            ] {
+                manifest["configs"][0]["value"] = invalid;
+                assert_eq!(
+                    verify_manifest(&manifest, "GhostFlow/control-v1", "digest", &[])
+                        .unwrap_err()
+                        .code,
+                    ErrorCode::ManifestMismatch
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn int_config_values_bounds_and_grid_are_exact() {
+        let manifest = serde_json::json!({
+            "format":"GhostFlow/control-v4", "name":"Ints", "bytecodeSha256":"digest",
+            "inputs":[], "outputs":[], "sensors":[], "signals":[], "schedules":[], "timers":[],
+            "configs":[{"name":"count", "type":"Int", "value":1,
+                "settings":{"min":-2147483648_i64, "max":2147483647_i64, "step":1, "access":"operator"}}]
+        });
+        verify_manifest(&manifest, "GhostFlow/control-v4", "digest", &[]).unwrap();
+        for value in [-2147483648_i64, 2147483647] {
+            let mut valid = manifest.clone();
+            valid["configs"][0]["value"] = serde_json::json!(value);
+            verify_manifest(&valid, "GhostFlow/control-v4", "digest", &[]).unwrap();
+        }
+        for field in ["value", "min", "max", "step"] {
+            for invalid in [
+                serde_json::json!(0.5),
+                serde_json::json!(2147483648_i64),
+                serde_json::json!(-2147483649_i64),
+                serde_json::json!("1"),
+                Value::Null,
+            ] {
+                let mut bad = manifest.clone();
+                if field == "value" {
+                    bad["configs"][0][field] = invalid;
+                } else {
+                    bad["configs"][0]["settings"][field] = invalid;
+                }
+                assert_eq!(
+                    verify_manifest(&bad, "GhostFlow/control-v4", "digest", &[])
+                        .unwrap_err()
+                        .code,
+                    ErrorCode::ManifestMismatch,
+                    "{field}"
+                );
+            }
+        }
+        for settings in [
+            serde_json::json!({"min":0,"max":2147483647,"step":2147483647,"access":"operator"}),
+            serde_json::json!({"min":2,"max":1,"step":1,"access":"operator"}),
+            serde_json::json!({"min":0,"max":2,"step":0,"access":"operator"}),
+            serde_json::json!({"min":0,"max":2,"step":-1,"access":"operator"}),
+            serde_json::json!({"min":1,"max":4,"step":2,"access":"operator"}),
+            serde_json::json!({"min":0,"max":2,"step":1,"access":"operator","stepType":"Int"}),
+        ] {
+            let mut bad = manifest.clone();
+            bad["configs"][0]["settings"] = settings;
+            assert_eq!(
+                verify_manifest(&bad, "GhostFlow/control-v4", "digest", &[])
+                    .unwrap_err()
+                    .code,
+                ErrorCode::ManifestMismatch
+            );
+        }
+        let mut wide = manifest.clone();
+        wide["configs"][0]["value"] = serde_json::json!(2147483646);
+        wide["configs"][0]["settings"] = serde_json::json!({"min":-2147483648_i64,"max":2147483646,"step":2147483647,"access":"operator"});
+        verify_manifest(&wide, "GhostFlow/control-v4", "digest", &[]).unwrap();
+        for access in ["operator", "designer"] {
+            let mut metadata = manifest.clone();
+            metadata["configs"][0]["settings"]["access"] = serde_json::json!(access);
+            metadata["configs"][0]["settings"]["apply"] = serde_json::json!("stopped");
+            metadata["configs"][0]["settings"]["label"] = serde_json::json!("🌿".repeat(64));
+            verify_manifest(&metadata, "GhostFlow/control-v4", "digest", &[]).unwrap();
+        }
+        let mut plain = manifest.clone();
+        plain["configs"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("settings");
+        verify_manifest(&plain, "GhostFlow/control-v4", "digest", &[]).unwrap();
+    }
+
+    #[test]
+    fn signed_int_settings_reject_invalid_domains_and_grid_before_loader() {
+        let capabilities = [Capability {
+            kind: "actuator".into(),
+            name: "count".into(),
+            value_type: "int".into(),
+        }];
+        let called = std::cell::Cell::new(false);
+        let accept = |bytes: &[u8],
+                      context: &TargetLoaderContext<'_>|
+         -> std::result::Result<bool, String> {
+            called.set(true);
+            for (index, expected) in [-2147483648_i64, 2147483647, 2147483646, 0, 0]
+                .into_iter()
+                .enumerate()
+            {
+                assert_eq!(
+                    context.manifest["configs"][index]["value"].as_i64(),
+                    Some(expected)
+                );
+                assert!(context.manifest["configs"][index]["settings"]
+                    .get("stepType")
+                    .is_none());
+            }
+            ghostflow_core::Module::load(bytes)
+                .map(|_| true)
+                .map_err(|error| error.to_string())
+        };
+        let mut current = profile(&accept);
+        current.available_capabilities = &capabilities;
+        let formats = strings(&["GhostFlow/control-v4"]);
+        current.supported_manifest_formats = &formats;
+        verify_portable_package(&fixture_for("int-settings-valid"), &current).unwrap();
+        assert!(called.get());
+        called.set(false);
+        let reject = |_: &[u8], _: &TargetLoaderContext<'_>| -> std::result::Result<bool, String> {
+            called.set(true);
+            Ok(true)
+        };
+        current.target_loader = &reject;
+        let mut scenarios = Vec::new();
+        for field in ["value", "min", "max", "step"] {
+            for kind in [
+                "fraction",
+                "underflow",
+                "overflow",
+                "string",
+                "null",
+                "missing",
+            ] {
+                scenarios.push(format!("int-settings-{field}-{kind}"));
+            }
+        }
+        scenarios.extend(
+            [
+                "step-zero",
+                "step-negative",
+                "inverted",
+                "default-grid",
+                "max-grid",
+                "outside-range",
+                "extra-step-type",
+                "plain-invalid",
+                "access-missing",
+                "access-invalid",
+                "access-null",
+                "apply-live",
+                "apply-null",
+                "label-empty",
+                "label-long",
+                "label-surrogates",
+                "label-number",
+                "unknown-key",
+                "object-null",
+            ]
+            .map(|case| format!("int-settings-{case}")),
+        );
+        for scenario in scenarios {
+            let error = match verify_portable_package(&fixture_for(&scenario), &current) {
+                Err(error) => error,
+                Ok(_) => panic!("{scenario}: invalid signed Int settings accepted"),
+            };
+            assert_eq!(
+                error.code,
+                ErrorCode::ManifestMismatch,
+                "{scenario}: {error:?}"
+            );
+            assert!(!called.get(), "{scenario} reached target loader");
+        }
+    }
+
+    #[test]
+    fn time_config_settings_preserve_nominal_step_and_grid() {
+        for (nominal, maximum, step_type, step_maximum) in [
+            ("Date", 2932896_f64, "Int", 2147483647_f64),
+            ("TimeOfDay", 86399999_f64, "Duration", 9007199254740991_f64),
+            (
+                "DateTime",
+                253402300799999_f64,
+                "Duration",
+                9007199254740991_f64,
+            ),
+        ] {
+            let mut manifest = serde_json::json!({
+                "format": "GhostFlow/control-v1", "name": "Times", "bytecodeSha256": "digest",
+                "inputs": [], "outputs": [], "sensors": [], "schedules": [], "timers": [], "signals": [],
+                "configs": [{"name": "value", "type": nominal, "value": 1,
+                    "settings": {"min": 0, "max": maximum, "step": 1, "stepType": step_type}}]
+            });
+            verify_manifest(&manifest, "GhostFlow/control-v1", "digest", &[]).unwrap();
+            let valid = manifest["configs"][0]["settings"].clone();
+            for (field, invalid) in [
+                ("min", serde_json::json!(-1)),
+                ("max", serde_json::json!(maximum + 1.0)),
+                ("min", serde_json::json!(2)),
+                ("max", serde_json::json!(0)),
+                ("step", serde_json::json!(2)),
+                ("step", serde_json::json!(0)),
+                ("step", serde_json::json!(0.5)),
+                ("step", serde_json::json!(step_maximum + 1.0)),
+                ("min", serde_json::json!("0")),
+                ("stepType", serde_json::json!("Number")),
+                ("stepType", Value::Null),
+            ] {
+                manifest["configs"][0]["settings"] = valid.clone();
+                manifest["configs"][0]["settings"][field] = invalid;
+                assert_eq!(
+                    verify_manifest(&manifest, "GhostFlow/control-v1", "digest", &[])
+                        .unwrap_err()
+                        .code,
+                    ErrorCode::ManifestMismatch,
+                    "{nominal}.{field}"
+                );
+            }
+            manifest["configs"][0]["value"] = serde_json::json!(0);
+            manifest["configs"][0]["settings"] =
+                serde_json::json!({"min": 0, "max": 3, "step": 2, "stepType": step_type});
+            assert_eq!(
+                verify_manifest(&manifest, "GhostFlow/control-v1", "digest", &[])
+                    .unwrap_err()
+                    .code,
+                ErrorCode::ManifestMismatch
+            );
+        }
+    }
+
+    #[test]
+    fn signed_time_descriptors_require_integral_bounded_configs_before_loading() {
+        let capabilities: Vec<_> = (0..3)
+            .flat_map(|index| {
+                ["input", "actuator"].map(|kind| Capability {
+                    kind: kind.into(),
+                    name: format!(
+                        "{}_{index}",
+                        if kind == "input" { "input" } else { "output" }
+                    ),
+                    value_type: "number".into(),
+                })
+            })
+            .collect();
+        let accept =
+            |_: &[u8], context: &TargetLoaderContext<'_>| -> std::result::Result<bool, String> {
+                for (index, nominal) in ["Date", "TimeOfDay", "DateTime"].iter().enumerate() {
+                    assert_eq!(context.manifest["inputs"][index]["type"], *nominal);
+                    assert!(context.manifest["inputs"][index]
+                        .get("canonicalUnit")
+                        .is_none());
+                }
+                for (index, value) in [0_u64, 2932896, 0, 86399999, 0, 253402300799999]
+                    .iter()
+                    .enumerate()
+                {
+                    assert_eq!(
+                        context.manifest["configs"][index]["value"].as_u64(),
+                        Some(*value)
+                    );
+                }
+                Ok(true)
+            };
+        let mut current = profile(&accept);
+        current.available_capabilities = &capabilities;
+        let formats = strings(&["GhostFlow/control-v2"]);
+        current.supported_manifest_formats = &formats;
+        verify_portable_package(&fixture_for("time-valid"), &current).unwrap();
+        let reject_loader =
+            |_: &[u8], _: &TargetLoaderContext<'_>| -> std::result::Result<bool, String> {
+                panic!("invalid time metadata must reject before loader")
+            };
+        current.target_loader = &reject_loader;
+        let mut scenarios = vec![
+            "time-port-unit".to_owned(),
+            "time-config-unit".to_owned(),
+            "time-wrong-type".to_owned(),
+            "time-config-string".to_owned(),
+            "time-config-null".to_owned(),
+            "time-config-missing".to_owned(),
+            "time-settings-step-type".to_owned(),
+            "time-settings-missing-step-type".to_owned(),
+            "time-settings-step-overflow".to_owned(),
+            "time-settings-grid".to_owned(),
+            "time-settings-range".to_owned(),
+        ];
+        for index in 0..3 {
+            for kind in ["negative", "fractional", "overflow"] {
+                scenarios.push(format!("time-config-{index}-{kind}"));
+            }
+        }
+        for scenario in scenarios {
+            let error = verify_portable_package(&fixture_for(&scenario), &current).unwrap_err();
+            assert_eq!(
+                error.code,
+                ErrorCode::ManifestMismatch,
+                "{scenario}: {error:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn hold_last_manifest_domains_and_private_roles_are_strict() {
+        let mut descriptor = serde_json::json!({
+            "kind":"hold-last", "name":"held", "payloadType":"Number",
+            "errorType":"SensorFault", "quality":"measured", "sourceMode":"sample",
+            "forAtMostMs":2000, "clockInput":"__gf_now_ms",
+            "sources":[{"name":"probe", "tag":7, "states":{
+                "lastEpoch":"__gf_hold_last_source_epoch_held_7",
+                "lastId":"__gf_hold_last_source_id_held_7"
+            }}], "states":{}
+        });
+        let roles = [
+            ("available", "available"),
+            ("value", "value"),
+            ("heldSourceTag", "held_source_tag"),
+            ("heldEpoch", "held_epoch"),
+            ("heldId", "held_id"),
+            ("heldTimestamp", "held_timestamp"),
+            ("held", "held"),
+            ("age", "age"),
+            ("maskedFaultPresent", "masked_fault_present"),
+            ("maskedFaultCode", "masked_fault_code"),
+            ("maskedFaultOrigin", "masked_fault_origin"),
+        ];
+        for (role, suffix) in roles {
+            descriptor["states"][role] = serde_json::json!(format!("__gf_hold_last_{suffix}_held"));
+        }
+        let manifest = serde_json::json!({
+            "format":"GhostFlow/control-v1", "name":"Hold", "bytecodeSha256":"digest",
+            "inputs":[], "outputs":[], "schedules":[], "timers":[], "configs":[],
+            "signals":[descriptor], "sensors":[{
+                "name":"probe", "type":"Number", "valueInput":"__gf_sensor_value_probe",
+                "okInput":"__gf_sensor_ok_probe", "faultInput":"__gf_sensor_fault_probe",
+                "samplePresentInput":"__gf_sensor_sample_present_probe",
+                "sampleEpochInput":"__gf_sensor_sample_epoch_probe",
+                "sampleIdInput":"__gf_sensor_sample_id_probe",
+                "sampleTimestampInput":"__gf_sensor_sample_timestamp_probe"
+            }]
+        });
+        let caps = [Capability {
+            kind: "sensor".into(),
+            name: "probe".into(),
+            value_type: "number".into(),
+        }];
+        verify_manifest(&manifest, "GhostFlow/control-v1", "digest", &caps).unwrap();
+        for payload in [
+            "Bool",
+            "Int",
+            "Percent",
+            "Duration",
+            "Date",
+            "TimeOfDay",
+            "DateTime",
+            "Temperature",
+        ] {
+            let mut valid = manifest.clone();
+            valid["signals"][0]["payloadType"] = serde_json::json!(payload);
+            verify_manifest(&valid, "GhostFlow/control-v1", "digest", &caps).unwrap();
+        }
+        for (field, bad) in [
+            ("quality", serde_json::json!("estimated")),
+            ("errorType", Value::Null),
+            ("errorType", serde_json::json!("ClockFault")),
+            ("sourceMode", serde_json::json!("scan")),
+            ("sources", serde_json::json!([])),
+            ("forAtMostMs", serde_json::json!(0)),
+            ("forAtMostMs", serde_json::json!(-1)),
+            ("forAtMostMs", serde_json::json!(0.5)),
+            ("forAtMostMs", serde_json::json!(9007199254740992_u64)),
+            ("payloadType", serde_json::json!("Result")),
+            ("members", serde_json::json!(["A"])),
+            ("initial", serde_json::json!(0)),
+        ] {
+            let mut invalid = manifest.clone();
+            invalid["signals"][0][field] = bad;
+            assert_eq!(
+                verify_manifest(&invalid, "GhostFlow/control-v1", "digest", &caps)
+                    .unwrap_err()
+                    .code,
+                ErrorCode::ManifestMismatch,
+                "{field}"
+            );
+        }
+        for (role, _) in roles {
+            let mut invalid = manifest.clone();
+            invalid["signals"][0]["states"]
+                .as_object_mut()
+                .unwrap()
+                .remove(role);
+            assert_eq!(
+                verify_manifest(&invalid, "GhostFlow/control-v1", "digest", &caps)
+                    .unwrap_err()
+                    .code,
+                ErrorCode::ManifestMismatch,
+                "missing {role}"
+            );
+        }
+        for payload in [
+            "Mode",
+            "SensorFault",
+            "ClockFault",
+            "CalendarFault",
+            "TemporalContextFault",
+        ] {
+            let mut enumeration = manifest.clone();
+            enumeration["signals"][0]["payloadType"] = serde_json::json!(payload);
+            let members = fault_members(payload).unwrap_or(&["Off", "On"]);
+            enumeration["signals"][0]["members"] = serde_json::json!(members);
+            verify_manifest(&enumeration, "GhostFlow/control-v1", "digest", &caps).unwrap();
+            enumeration["signals"][0]["members"] = serde_json::json!(["Off", "Off"]);
+            assert_eq!(
+                verify_manifest(&enumeration, "GhostFlow/control-v1", "digest", &caps)
+                    .unwrap_err()
+                    .code,
+                ErrorCode::ManifestMismatch,
+                "{payload} members"
+            );
+        }
+        let mut maximal_duration = manifest.clone();
+        maximal_duration["signals"][0]["forAtMostMs"] = serde_json::json!(9007199254740991_u64);
+        verify_manifest(&maximal_duration, "GhostFlow/control-v1", "digest", &caps).unwrap();
+        let mut bounded = manifest.clone();
+        bounded["signals"] = Value::Array(
+            (0..9)
+                .map(|index| {
+                    let mut signal = descriptor.clone();
+                    let name = format!("held{index}");
+                    signal["name"] = serde_json::json!(name);
+                    for (role, suffix) in roles {
+                        signal["states"][role] =
+                            serde_json::json!(format!("__gf_hold_last_{suffix}_{name}"));
+                    }
+                    for (role, suffix) in [("lastEpoch", "source_epoch"), ("lastId", "source_id")] {
+                        signal["sources"][0]["states"][role] =
+                            serde_json::json!(format!("__gf_hold_last_{suffix}_{name}_7"));
+                    }
+                    signal
+                })
+                .collect(),
+        );
+        verify_manifest(&bounded, "GhostFlow/control-v1", "digest", &caps).unwrap();
+        bounded["signals"].as_array_mut().unwrap().push(descriptor);
+        let error = verify_manifest(&bounded, "GhostFlow/control-v1", "digest", &caps).unwrap_err();
+        assert_eq!(error.code, ErrorCode::ManifestMismatch);
+        assert_eq!(
+            error.message,
+            "temporal signal generated resources exceed the 128 field profile"
+        );
+    }
+
+    #[test]
+    fn debounce_manifest_domains_and_private_roles_are_strict() {
+        let descriptor = serde_json::json!({
+            "kind": "debounce", "name": "stable", "payloadType": "Bool",
+            "errorType": null, "sourceMode": "scan", "stableForMs": 2000,
+            "initial": false, "clockInput": "__gf_now_ms", "sources": [],
+            "states": {
+                "stable": "__gf_debounce_stable_stable",
+                "candidate": "__gf_debounce_candidate_stable",
+                "candidateActive": "__gf_debounce_candidate_active_stable",
+                "candidateSince": "__gf_debounce_candidate_since_stable",
+                "lastSourceTag": "__gf_debounce_last_source_tag_stable"
+            }
+        });
+        let manifest = serde_json::json!({
+            "format": "GhostFlow/control-v1", "name": "Debounce", "bytecodeSha256": "digest",
+            "inputs": [], "outputs": [], "sensors": [], "schedules": [], "timers": [],
+            "configs": [], "signals": [descriptor]
+        });
+        verify_manifest(&manifest, "GhostFlow/control-v1", "digest", &[]).unwrap();
+        let mut enumeration = manifest.clone();
+        enumeration["signals"][0]["payloadType"] = serde_json::json!("Mode");
+        enumeration["signals"][0]["members"] = serde_json::json!(["Off", "On"]);
+        enumeration["signals"][0]["initial"] = serde_json::json!(0);
+        verify_manifest(&enumeration, "GhostFlow/control-v1", "digest", &[]).unwrap();
+        for name in [
+            "SensorFault",
+            "ClockFault",
+            "CalendarFault",
+            "TemporalContextFault",
+        ] {
+            let mut builtin = enumeration.clone();
+            builtin["signals"][0]["payloadType"] = serde_json::json!(name);
+            builtin["signals"][0]["members"] = serde_json::json!(fault_members(name).unwrap());
+            verify_manifest(&builtin, "GhostFlow/control-v1", "digest", &[]).unwrap();
+            builtin["signals"][0]["members"]
+                .as_array_mut()
+                .unwrap()
+                .reverse();
+            assert_eq!(
+                verify_manifest(&builtin, "GhostFlow/control-v1", "digest", &[])
+                    .unwrap_err()
+                    .code,
+                ErrorCode::ManifestMismatch,
+                "{name} fixed enum order"
+            );
+        }
+        for (field, bad) in [
+            ("stableForMs", serde_json::json!(0)),
+            ("stableForMs", serde_json::json!(-1)),
+            ("stableForMs", serde_json::json!(0.5)),
+            ("stableForMs", serde_json::json!(9007199254740992_u64)),
+            ("initial", serde_json::json!(0)),
+            ("payloadType", serde_json::json!("Number")),
+            ("errorType", serde_json::json!("UserFault")),
+            ("sourceMode", serde_json::json!("physical")),
+            ("clockInput", serde_json::json!("clock")),
+            ("members", serde_json::json!(["Off", "On"])),
+            ("kind", serde_json::json!("unknown")),
+        ] {
+            let mut invalid = manifest.clone();
+            invalid["signals"][0][field] = bad;
+            assert_eq!(
+                verify_manifest(&invalid, "GhostFlow/control-v1", "digest", &[])
+                    .unwrap_err()
+                    .code,
+                ErrorCode::ManifestMismatch,
+                "field {field}"
+            );
+        }
+        for bad in [
+            serde_json::json!([]),
+            serde_json::json!(["Off", "Off"]),
+            serde_json::json!(["Bad Member"]),
+        ] {
+            let mut invalid = enumeration.clone();
+            invalid["signals"][0]["members"] = bad;
+            assert_eq!(
+                verify_manifest(&invalid, "GhostFlow/control-v1", "digest", &[])
+                    .unwrap_err()
+                    .code,
+                ErrorCode::ManifestMismatch
+            );
+        }
+        for bad in [-1.0, 0.5, 2.0] {
+            let mut invalid = enumeration.clone();
+            invalid["signals"][0]["initial"] = serde_json::json!(bad);
+            assert_eq!(
+                verify_manifest(&invalid, "GhostFlow/control-v1", "digest", &[])
+                    .unwrap_err()
+                    .code,
+                ErrorCode::ManifestMismatch
+            );
+        }
+        for role in [
+            "stable",
+            "candidate",
+            "candidateActive",
+            "candidateSince",
+            "lastSourceTag",
+        ] {
+            let mut invalid = manifest.clone();
+            invalid["signals"][0]["states"]
+                .as_object_mut()
+                .unwrap()
+                .remove(role);
+            assert_eq!(
+                verify_manifest(&invalid, "GhostFlow/control-v1", "digest", &[])
+                    .unwrap_err()
+                    .code,
+                ErrorCode::ManifestMismatch,
+                "missing {role}"
+            );
+            invalid = manifest.clone();
+            invalid["signals"][0]["states"][role] = serde_json::json!("__gf_debounce_stable_other");
+            assert_eq!(
+                verify_manifest(&invalid, "GhostFlow/control-v1", "digest", &[])
+                    .unwrap_err()
+                    .code,
+                ErrorCode::ManifestMismatch,
+                "wrong {role}"
+            );
+        }
+        let mut oversized = manifest.clone();
+        oversized["signals"] = Value::Array(
+            (0..26)
+                .map(|index| {
+                    let mut signal = descriptor.clone();
+                    let name = format!("stable{index}");
+                    signal["name"] = serde_json::json!(name);
+                    for (role, suffix) in DEBOUNCE_ROLES {
+                        signal["states"][role] =
+                            serde_json::json!(format!("__gf_debounce_{suffix}_{name}"));
+                    }
+                    signal
+                })
+                .collect(),
+        );
+        assert_eq!(
+            verify_manifest(&oversized, "GhostFlow/control-v1", "digest", &[])
+                .unwrap_err()
+                .code,
+            ErrorCode::ManifestMismatch,
+            "26 raw debounce nodes exceed 128 private states"
+        );
+    }
+
+    #[test]
+    fn signed_hold_last_domains_and_bytecode_bindings_are_checked_before_target_loader() {
+        let capabilities: Vec<_> = [
+            ("input", "start", "bool"),
+            ("sensor", "probe", "number"),
+            ("sensor", "backup", "number"),
+            ("actuator", "measuredResult", "bool"),
+            ("actuator", "finiteResult", "bool"),
+            ("actuator", "booleanResult", "bool"),
+            ("actuator", "integerResult", "bool"),
+        ]
+        .into_iter()
+        .map(|(kind, name, value_type)| Capability {
+            kind: kind.into(),
+            name: name.into(),
+            value_type: value_type.into(),
+        })
+        .collect();
+        let accept =
+            |bytes: &[u8], _: &TargetLoaderContext<'_>| -> std::result::Result<bool, String> {
+                ghostflow_core::Module::load(bytes)
+                    .map(|_| true)
+                    .map_err(|error| error.to_string())
+            };
+        let mut current = profile(&accept);
+        current.available_capabilities = &capabilities;
+        let formats = strings(&["GhostFlow/control-v1", "GhostFlow/control-v4"]);
+        current.supported_manifest_formats = &formats;
+        verify_portable_package(&fixture_for("hold-basic-valid"), &current).unwrap();
+        let error =
+            match verify_portable_package(&fixture_for("hold-basic-bytecode-default"), &current) {
+                Err(error) => error,
+                Ok(_) => panic!("forged hold state default was accepted"),
+            };
+        assert_eq!(error.code, ErrorCode::ManifestMismatch);
+        verify_portable_package(&fixture_for("hold-valid"), &current).unwrap();
+        let called = std::cell::Cell::new(false);
+        let reject = |_: &[u8], _: &TargetLoaderContext<'_>| -> std::result::Result<bool, String> {
+            called.set(true);
+            Ok(true)
+        };
+        current.target_loader = &reject;
+        let mut scenarios: Vec<String> = [
+            "hold-duration-missing",
+            "hold-duration-zero",
+            "hold-duration-fraction",
+            "hold-duration-overflow",
+            "hold-quality",
+            "hold-error-type",
+            "hold-extra-field",
+            "hold-role-missing",
+            "hold-role-wrong",
+            "hold-payload-type",
+            "hold-enum-missing",
+            "hold-enum-duplicate",
+            "hold-enum-built-in",
+            "hold-source-empty",
+            "hold-source-mode",
+            "hold-source-unknown",
+            "hold-source-tag-zero",
+            "hold-source-reordered",
+            "hold-source-id-missing",
+            "hold-source-state-extra",
+            "hold-source-history-alias",
+            "hold-sample-missing",
+            "hold-sample-wrong",
+            "hold-descriptors-deleted",
+            "hold-bytecode-int-default",
+            "hold-bytecode-bool-default",
+            "hold-bytecode-source-id-default",
+            "hold-bytecode-source-epoch-default",
+            "hold-bytecode-state-name",
+            "hold-bytecode-source-state-name",
+            "hold-bytecode-sample-name",
+        ]
+        .into_iter()
+        .map(str::to_owned)
+        .collect();
+        scenarios.extend(HOLD_LAST_ROLES.map(|(role, _)| format!("hold-bytecode-default-{role}")));
+        for scenario in scenarios {
+            let error = verify_portable_package(&fixture_for(&scenario), &current).unwrap_err();
+            let expected = if scenario == "hold-duration-overflow" {
+                ErrorCode::InvalidCanonicalJson
+            } else {
+                ErrorCode::ManifestMismatch
+            };
+            assert_eq!(error.code, expected, "{scenario}: {error:?}");
+            assert!(!called.get(), "{scenario} reached target loader");
+        }
+    }
+
+    #[test]
+    fn signed_debounce_domains_and_bytecode_bindings_are_checked_before_target_loader() {
+        let capabilities = vec![
+            Capability {
+                kind: "input".into(),
+                name: "start".into(),
+                value_type: "bool".into(),
+            },
+            Capability {
+                kind: "sensor".into(),
+                name: "probe".into(),
+                value_type: "bool".into(),
+            },
+            Capability {
+                kind: "sensor".into(),
+                name: "backup".into(),
+                value_type: "bool".into(),
+            },
+            Capability {
+                kind: "actuator".into(),
+                name: "rawResult".into(),
+                value_type: "bool".into(),
+            },
+            Capability {
+                kind: "actuator".into(),
+                name: "finiteResult".into(),
+                value_type: "bool".into(),
+            },
+            Capability {
+                kind: "actuator".into(),
+                name: "measuredResult".into(),
+                value_type: "bool".into(),
+            },
+        ];
+        let accept =
+            |bytes: &[u8], _: &TargetLoaderContext<'_>| -> std::result::Result<bool, String> {
+                ghostflow_core::Module::load(bytes)
+                    .map(|_| true)
+                    .map_err(|error| error.to_string())
+            };
+        let mut current = profile(&accept);
+        current.available_capabilities = &capabilities;
+        verify_portable_package(&fixture_for("debounce-valid"), &current).unwrap();
+        let called = std::cell::Cell::new(false);
+        let reject = |_: &[u8], _: &TargetLoaderContext<'_>| -> std::result::Result<bool, String> {
+            called.set(true);
+            Ok(true)
+        };
+        current.target_loader = &reject;
+        for scenario in [
+            "debounce-duration-missing",
+            "debounce-duration-zero",
+            "debounce-duration-fraction",
+            "debounce-extra-field",
+            "debounce-role-missing",
+            "debounce-role-wrong",
+            "debounce-enum-missing",
+            "debounce-enum-duplicate",
+            "debounce-enum-initial",
+            "debounce-error-type",
+            "debounce-source-unknown",
+            "debounce-source-tag-zero",
+            "debounce-source-duplicate",
+            "debounce-source-states-missing",
+            "debounce-source-id-missing",
+            "debounce-source-epoch-name",
+            "debounce-source-state-extra",
+            "debounce-source-history-alias",
+            "debounce-sample-missing",
+            "debounce-sample-wrong",
+            "debounce-descriptors-deleted",
+            "debounce-bytecode-default",
+            "debounce-bytecode-state-name",
+            "debounce-bytecode-sample-name",
+            "debounce-bytecode-source-id-default",
+            "debounce-bytecode-source-epoch-default",
+            "debounce-bytecode-source-state-name",
+        ] {
+            let error = verify_portable_package(&fixture_for(scenario), &current).unwrap_err();
+            assert_eq!(
+                error.code,
+                ErrorCode::ManifestMismatch,
+                "{scenario}: {error:?}"
+            );
+            assert!(!called.get(), "{scenario} reached the target loader");
+        }
+    }
+
+    #[test]
+    fn signed_result_sensor_metadata_is_validated_before_loader() {
+        let capabilities = vec![
+            Capability {
+                kind: "sensor".into(),
+                name: "probe".into(),
+                value_type: "number".into(),
+            },
+            Capability {
+                kind: "actuator".into(),
+                name: "dry".into(),
+                value_type: "bool".into(),
+            },
+            Capability {
+                kind: "actuator".into(),
+                name: "held".into(),
+                value_type: "bool".into(),
+            },
+        ];
+        let accept =
+            |_: &[u8], context: &TargetLoaderContext<'_>| -> std::result::Result<bool, String> {
+                assert_eq!(
+                    context.manifest["sensors"][0]["faultInput"],
+                    "__gf_sensor_fault_probe"
+                );
+                assert_eq!(
+                    context.manifest["signals"][0]["faultInput"],
+                    "__gf_signal_fault_stable"
+                );
+                Ok(true)
+            };
+        let mut current = profile(&accept);
+        current.available_capabilities = &capabilities;
+        verify_portable_package(&fixture_for("result-valid"), &current).unwrap();
+        let reject = |_: &[u8], _: &TargetLoaderContext<'_>| -> std::result::Result<bool, String> {
+            panic!("invalid fault source must reject before loader")
+        };
+        current.target_loader = &reject;
+        for scenario in [
+            "result-sensor-missing",
+            "result-signal-missing",
+            "result-sensor-wrong",
+            "result-signal-wrong",
+            "result-sensor-collision",
+            "result-signal-collision",
+        ] {
+            let error = verify_portable_package(&fixture_for(scenario), &current).unwrap_err();
+            assert_eq!(
+                error.code,
+                ErrorCode::ManifestMismatch,
+                "{scenario}: {error:?}"
+            );
+        }
     }
 
     #[test]

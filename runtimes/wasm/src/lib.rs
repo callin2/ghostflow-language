@@ -4,16 +4,33 @@ use std::{slice, str};
 #[path = "../framed_abi.rs"]
 mod framed_abi;
 
+#[path = "../after_event_abi.rs"]
+mod after_event_abi;
+
+#[path = "../temporal_abi.rs"]
+mod temporal_abi;
+
+#[path = "../solar_abi.rs"]
+mod solar_abi;
+
+#[path = "../replay_abi.rs"]
+mod replay_abi;
+
 #[path = "../signals_abi.rs"]
 mod signals_abi;
 
 #[path = "../station_abi.rs"]
 mod station_abi;
 
+#[path = "../accounting_abi.rs"]
+mod accounting_abi;
+
 pub struct Handle {
     runtime: Runtime,
     error: String,
     trace: String,
+    replay: String,
+    resource_plan: String,
 }
 
 impl Handle {
@@ -37,6 +54,8 @@ pub extern "C" fn gf_create() -> *mut Handle {
         runtime: Runtime::new(1024),
         error: String::new(),
         trace: String::new(),
+        replay: String::new(),
+        resource_plan: String::new(),
     }))
 }
 
@@ -132,6 +151,37 @@ pub unsafe extern "C" fn gf_activate(handle: *mut Handle) -> i32 {
     h.complete(result)
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn gf_activate_temporal(
+    handle: *mut Handle,
+    ptr: *const u8,
+    len: usize,
+) -> i32 {
+    let Some(h) = handle.as_mut() else { return 0 };
+    let profile = match temporal_abi::from_raw_packet(ptr, len) {
+        Ok(profile) => profile,
+        Err(error) => {
+            h.error = error;
+            return 0;
+        }
+    };
+    let result = if profile.certified_bool_roots.is_empty() {
+        h.runtime.activate_with_temporal(&profile.activation)
+    } else if !profile.activation.root_density.is_empty() {
+        h.error = "certified interval activation does not accept point density".into();
+        return 0;
+    } else {
+        h.runtime.activate_with_certified_intervals(
+            &ghostflow_core::true_for_runtime::TrueForActivation {
+                certified_bool_roots: profile.certified_bool_roots,
+                time_epoch: profile.activation.time_epoch,
+                max_bytes: profile.activation.budget.max_bytes,
+            },
+        )
+    };
+    h.complete(result)
+}
+
 unsafe fn input_name<'a>(ptr: *const u8, len: usize) -> Option<&'a str> {
     text(ptr, len)
 }
@@ -199,6 +249,224 @@ pub unsafe extern "C" fn gf_tick_at(handle: *mut Handle, milliseconds: u64) -> i
 pub unsafe extern "C" fn gf_clear_inputs(handle: *mut Handle) {
     if let Some(h) = handle.as_mut() {
         h.runtime.clear_inputs();
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn gf_replay_temporal(
+    handle: *mut Handle,
+    ptr: *const u8,
+    len: usize,
+    count: u32,
+    max_peak_temporal_bytes: usize,
+    max_json_bytes: usize,
+) -> i32 {
+    let Some(h) = handle.as_mut() else { return 0 };
+    let result = temporal_abi::from_raw(ptr, len).and_then(|profile| {
+        let records = h
+            .runtime
+            .replay_current_with_temporal(count as usize, &profile, max_peak_temporal_bytes)
+            .map_err(|error| error.to_string())?;
+        replay_abi::legacy(&records, h.replay.capacity(), max_json_bytes)
+    });
+    match result {
+        Ok(replay) => {
+            h.replay = replay;
+            h.error.clear();
+            1
+        }
+        Err(error) => {
+            h.error = error;
+            0
+        }
+    }
+}
+#[no_mangle]
+pub unsafe extern "C" fn gf_replay_ptr(handle: *const Handle) -> *const u8 {
+    handle
+        .as_ref()
+        .filter(|h| !h.replay.is_empty())
+        .map_or(std::ptr::null(), |h| h.replay.as_ptr())
+}
+#[no_mangle]
+pub unsafe extern "C" fn gf_replay_len(handle: *const Handle) -> usize {
+    handle.as_ref().map_or(0, |h| h.replay.len())
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn gf_plan_temporal(
+    handle: *mut Handle,
+    ptr: *const u8,
+    len: usize,
+    max_json_bytes: usize,
+) -> i32 {
+    let Some(h) = handle.as_mut() else { return 0 };
+    let result = crate::temporal_abi::from_raw(ptr, len).and_then(|profile| {
+        let runtime = &h.runtime;
+        let plan = runtime.plan_temporal(&profile).map_err(|e| e.to_string())?;
+        crate::replay_abi::resource_plan(&plan, h.resource_plan.capacity(), max_json_bytes)
+    });
+    match result {
+        Ok(plan) => {
+            h.resource_plan = plan;
+            {
+                h.error.clear();
+                1
+            }
+        }
+        Err(error) => {
+            h.error = error;
+            0
+        }
+    }
+}
+#[no_mangle]
+pub unsafe extern "C" fn gf_plan_temporal_replay(
+    handle: *mut Handle,
+    ptr: *const u8,
+    len: usize,
+    count: u32,
+    max_json_bytes: usize,
+) -> i32 {
+    let Some(h) = handle.as_mut() else { return 0 };
+    let result = crate::temporal_abi::from_raw(ptr, len).and_then(|profile| {
+        let runtime = &h.runtime;
+        let plan = runtime
+            .plan_current_temporal_replay(count as usize, &profile)
+            .map_err(|e| e.to_string())?;
+        crate::replay_abi::replay_plan(&plan, h.resource_plan.capacity(), max_json_bytes)
+    });
+    match result {
+        Ok(plan) => {
+            h.resource_plan = plan;
+            {
+                h.error.clear();
+                1
+            }
+        }
+        Err(error) => {
+            h.error = error;
+            0
+        }
+    }
+}
+#[no_mangle]
+pub unsafe extern "C" fn gf_resource_plan_ptr(handle: *const Handle) -> *const u8 {
+    handle
+        .as_ref()
+        .filter(|h| !h.resource_plan.is_empty())
+        .map_or(std::ptr::null(), |h| h.resource_plan.as_ptr())
+}
+#[no_mangle]
+pub unsafe extern "C" fn gf_resource_plan_len(handle: *const Handle) -> usize {
+    handle.as_ref().map_or(0, |h| h.resource_plan.len())
+}
+
+#[cfg(test)]
+mod replay_tests {
+    use super::*;
+    #[test]
+    fn resource_plan_is_static_bounded_and_success_only() {
+        let mut h = Handle {
+            runtime: crate::replay_abi::tests::configured_runtime(),
+            error: String::new(),
+            trace: "live".into(),
+            replay: "old replay".into(),
+            resource_plan: String::new(),
+        };
+        assert_eq!(unsafe { gf_resource_plan_len(&h) }, 0);
+        let mut packet = profile_packet();
+        packet[16..20].copy_from_slice(&1_u32.to_le_bytes());
+        packet[20..24].copy_from_slice(&1_u32.to_le_bytes());
+        let invoke =
+            |h: &mut _, p: &[u8], cap| unsafe { gf_plan_temporal(h, p.as_ptr(), p.len(), cap) };
+        assert_eq!(invoke(&mut h, &packet, 100_000), 1);
+        assert!(h.resource_plan.contains("\"fitsBudget\":false"));
+        let prior = h.resource_plan.clone();
+        let cap = h.resource_plan.capacity();
+        for (p, max) in [
+            (&packet[..], cap + prior.len() - 1),
+            (&packet[..10], 100_000),
+        ] {
+            assert_eq!(invoke(&mut h, p, max), 0);
+            assert_eq!(h.resource_plan, prior);
+        }
+        assert_eq!(
+            unsafe { gf_plan_temporal_replay(&mut h, packet.as_ptr(), packet.len(), 1, 100_000) },
+            0
+        );
+        assert_eq!(h.resource_plan, prior);
+        assert_eq!(h.replay, "old replay");
+        assert_eq!(invoke(&mut h, &packet, cap + prior.len()), 1);
+        assert!(h.runtime.journal().is_empty());
+        assert!(h.runtime.temporal_resource_report().is_none());
+        assert_eq!(h.trace, "live");
+    }
+    use crate::replay_abi::tests::{active_runtime, profile_packet, submit};
+    #[test]
+    fn legacy_replay_rejection_preserves_live_and_previous_buffers_and_pending_inputs() {
+        let mut h = Handle {
+            runtime: active_runtime(),
+            error: String::new(),
+            trace: "unchanged trace".into(),
+            replay: String::new(),
+            resource_plan: String::new(),
+        };
+        assert_eq!(unsafe { gf_replay_len(&h) }, 0);
+        assert!(unsafe { gf_replay_ptr(&h) }.is_null());
+        for (time, id, value) in [(0, 1, 20.0), (100, 2, 30.0), (200, 3, 40.0)] {
+            submit(&mut h.runtime, time, id, value);
+            h.runtime.tick().unwrap();
+        }
+        let packet = profile_packet();
+        let invoke = |h: &mut Handle, p: &[u8], count, peak, json| unsafe {
+            gf_replay_temporal(h, p.as_ptr(), p.len(), count, peak, json)
+        };
+        assert_eq!(invoke(&mut h, &packet, 2, 20_000_000, 100_000), 1);
+        let prior = h.replay.clone();
+        let cap = h.replay.capacity();
+        assert!(prior.contains("\"checkpointTick\":1"));
+        assert!(prior.contains("\"value\":25"));
+        let journal = h
+            .runtime
+            .journal()
+            .iter()
+            .map(|r| r.to_json())
+            .collect::<Vec<_>>();
+        submit(&mut h.runtime, 300, 4, 80.0);
+        let mut wrong = packet.clone();
+        wrong[8] = 8;
+        for (p, count, peak, json) in [
+            (&packet[..], 0, 20_000_000, 100_000),
+            (&packet[..], 3, 20_000_000, 100_000),
+            (&packet[..], 2, 1, 100_000),
+            (&packet[..], 2, 20_000_000, cap + prior.len() - 1),
+            (&packet[..10], 2, 20_000_000, 100_000),
+            (&wrong[..], 2, 20_000_000, 100_000),
+        ] {
+            assert_eq!(invoke(&mut h, p, count, peak, json), 0);
+            assert_eq!(h.replay, prior);
+            assert_eq!(h.trace, "unchanged trace");
+            assert_eq!(
+                h.runtime
+                    .journal()
+                    .iter()
+                    .map(|r| r.to_json())
+                    .collect::<Vec<_>>(),
+                journal
+            );
+        }
+        assert_eq!(invoke(&mut h, &packet, 2, 20_000_000, cap + prior.len()), 1);
+        assert!(h.error.is_empty());
+        assert_eq!(
+            h.runtime.tick().unwrap().safe_intents["mean"],
+            Value::Number(42.5)
+        );
+        assert_eq!(h.replay, prior);
+        assert_eq!(
+            unsafe { gf_replay_temporal(std::ptr::null_mut(), std::ptr::null(), 0, 1, 1, 1) },
+            0
+        );
     }
 }
 

@@ -83,7 +83,7 @@ test('GF-TEST-interaction-setting-rejection: policy shape and snapshot values fa
   assert.equal(validateInteraction(artifact.interactionSchema, lossy).valid, false);
 
   const plain = await compileSource(source.replace(
-    'config enabled: Bool = false { access = operator; apply = stopped; label = "Enabled"; }',
+    'config enabled: Bool = false { access = operator; label = "Enabled"; }',
     'config enabled: Bool = false;',
   ), { filename: sourcePath, interactionSourceIdentity: identity });
   assert.equal(plain.interactionSchema.descriptors.some(descriptor => descriptor.name === 'enabled'), false);

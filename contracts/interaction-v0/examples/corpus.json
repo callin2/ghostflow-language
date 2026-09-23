@@ -14,8 +14,8 @@
       },
       "module": {
         "id": "FiveMinuteWatering",
-        "moduleFingerprint": "3eec53d45f3e2715",
-        "bytecodeSha256": "51332126c9877f46bc074ebe4c0c1a05ed6796752c9f4ddd6d3d0d2f5e3b1229"
+        "moduleFingerprint": "18052752a622baf5",
+        "bytecodeSha256": "acbf84f22c28aabd6c427ab454c937cfebd508bf254b27a1ab3fa390ba6dcd80"
       },
       "tapePath": "contracts/interaction-v0/examples/five-minute-watering.scan-tape.json",
       "projections": {
@@ -35,8 +35,8 @@
       },
       "module": {
         "id": "MultipleValues",
-        "moduleFingerprint": "10d9ff03a035b5db",
-        "bytecodeSha256": "482f342455ec754cc81eee6c07e134847721ff44e906cb52ad4b1eee93004e81"
+        "moduleFingerprint": "28617ad7636f1d49",
+        "bytecodeSha256": "d9053b923f12b38fdf5c2f4915d4d5e3fb021080bd91a3ec43e54b2c024467ca"
       },
       "tapePath": "contracts/interaction-v0/examples/multiple-values.scan-tape.json",
       "projections": {

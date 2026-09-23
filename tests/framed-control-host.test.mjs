@@ -91,7 +91,7 @@ control FramedGenerated {
   assert.equal(next.vm.safe.pump, true);
 });
 
-test('GF-TEST-framed-control-host: does not invoke legacy runtime exports and latches only post-conditioning failures', async () => {
+test('GF-TEST-framed-control-host: does not invoke legacy exports and latches an unknown dispatch trap', async () => {
   const legacyCalls = [];
   const forbidden = new Set(['gf_create', 'gf_destroy', 'gf_load', 'gf_activate', 'gf_tick', 'gf_tick_at', 'gf_set_bool', 'gf_set_number', 'gf_trace_ptr', 'gf_trace_len']);
   await withWasmExports(exports => new Proxy({ ...exports }, {
@@ -108,7 +108,7 @@ test('GF-TEST-framed-control-host: does not invoke legacy runtime exports and la
       const first = runtime.step({ nowMs: 0, inputs: { enabled: true } });
       assert.equal(first.vm.safe.pump, true);
       const committed = runtime.runtime.outcome;
-      runtime.runtime.scan = () => { throw new Error('injected framed dispatch failure'); };
+      runtime.runtime.dispatch = () => { throw new Error('injected framed dispatch failure'); };
       assert.throws(() => runtime.step({ nowMs: 1, inputs: { enabled: false } }), /injected framed dispatch failure/);
       assert.deepEqual(runtime.runtime.outcome, committed, 'the committed framed outcome remains available');
       assert.deepEqual(runtime.lastFrameOutcome, committed, 'the getter reads the live framed outcome, not a host cache');
@@ -167,7 +167,7 @@ control FramedValidation {
   assert.deepEqual(counts, { read: 2, update: 2 });
 });
 
-test('GF-TEST-framed-control-host: an actual core evaluation error latches after preserving the committed frame', async t => {
+test('GF-TEST-framed-control-host: a known core rejection preserves the committed frame and permits the same ID retry', async t => {
   const runtime = await framed(`
 control FramedCoreFault {
   input divisor: Number;
@@ -182,7 +182,9 @@ control FramedCoreFault {
   assert.throws(() => runtime.step({ nowMs: 1, inputs: { divisor: 0 } }), /division by zero/);
   assert.equal(runtime.lastNowMs, 0);
   assert.deepEqual(runtime.lastFrameOutcome, committed);
-  assert.throws(() => runtime.step({ nowMs: 1, inputs: { divisor: 1 } }), /faulted/);
+  const retry = runtime.step({ nowMs: 1, inputs: { divisor: 1 } });
+  assert.deepEqual(retry.frame, { scanId: 1, logicalTimeMs: 1 });
+  assert.equal(retry.vm.safe.pump, 1);
 });
 
 test('GF-TEST-framed-control-host: generated sensor and signal snapshots match legacy for the same artifact', async t => {

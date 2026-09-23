@@ -14,6 +14,9 @@ const BUILTIN_TYPES = new Map([
   ['Int', null],
   ['Number', null],
   ['Duration', 'ms'],
+  ['Date', null],
+  ['TimeOfDay', null],
+  ['DateTime', null],
 ]);
 const OBSERVATION_STATUS = new Set(['ready', 'unavailable', 'error']);
 
@@ -75,7 +78,7 @@ function sourceType(value, path, errors) {
   if (!exactObject(value, ['kind', 'name', 'unit'], path, errors)) return;
   if (value.kind !== 'builtin' && value.kind !== 'nominal') issue(errors, `${path}.kind`, 'source_type', 'must be builtin or nominal');
   if (value.kind === 'builtin') {
-    if (!BUILTIN_TYPES.has(value.name)) issue(errors, `${path}.name`, 'source_type', 'must be Bool, Int, Number, or Duration');
+    if (!BUILTIN_TYPES.has(value.name)) issue(errors, `${path}.name`, 'source_type', 'must be a supported builtin source type');
     else if (value.unit !== BUILTIN_TYPES.get(value.name)) issue(errors, `${path}.unit`, 'unit', `must be ${BUILTIN_TYPES.get(value.name) ?? 'null'} for ${value.name}`);
   } else {
     publicId(value.name, `${path}.name`, errors);
@@ -123,9 +126,17 @@ function descriptor(value, index, errors) {
     issue(errors, `${path}.access`, 'access', 'must be exactly ["read"] for a v0 observation');
   }
   if (value.kind === 'timer') {
-    if (exactObject(value.operation, ['kind', 'subjectId'], `${path}.operation`, errors)) {
-      if (value.operation.kind !== 'elapsed_since_change') issue(errors, `${path}.operation.kind`, 'timer_operation', 'must be elapsed_since_change');
-      publicId(value.operation.subjectId, `${path}.operation.subjectId`, errors);
+    const continuous = value.operation?.kind === 'continuous_true';
+    const operationFields = continuous ? ['kind', 'subjectNodeId'] : ['kind', 'subjectId'];
+    if (exactObject(value.operation, operationFields, `${path}.operation`, errors)) {
+      if (continuous) {
+        if (!Number.isInteger(value.operation.subjectNodeId) || value.operation.subjectNodeId < 1) {
+          issue(errors, `${path}.operation.subjectNodeId`, 'timer_subject', 'must be a positive compiler source node ID');
+        }
+      } else {
+        if (value.operation.kind !== 'elapsed_since_change') issue(errors, `${path}.operation.kind`, 'timer_operation', 'must be elapsed_since_change or continuous_true');
+        publicId(value.operation.subjectId, `${path}.operation.subjectId`, errors);
+      }
     }
     if (value.sourceType?.kind !== 'builtin' || value.sourceType?.name !== 'Duration' || value.sourceType?.unit !== 'ms') {
       issue(errors, `${path}.sourceType`, 'timer_type', 'must be builtin Duration in ms');
@@ -147,6 +158,17 @@ function descriptor(value, index, errors) {
       const { min, max, step } = value.constraint;
       if (value.constraint.kind !== 'range' || ![min, max, step].every(Number.isFinite) || step <= 0 || min > max) {
         issue(errors, `${path}.constraint`, 'setting_constraint', 'must be a finite ordered range with positive step');
+      }
+      if (value.sourceType?.kind === 'builtin' && value.sourceType.name === 'Int') {
+        for (const field of ['min', 'max', 'step']) {
+          const bound = value.constraint[field];
+          if (!Number.isInteger(bound) || bound < -2147483648 || bound > 2147483647 || (field === 'step' && bound <= 0)) {
+            issue(errors, `${path}.constraint.${field}`, 'setting_constraint', field === 'step' ? 'must be a positive signed i32 Int' : 'must be a signed i32 Int');
+          }
+        }
+        if ([min, max, step].every(Number.isInteger) && step > 0 && (max - min) % step !== 0) {
+          issue(errors, `${path}.constraint.max`, 'setting_constraint', 'must align to step from min');
+        }
       }
     }
   }
@@ -174,6 +196,7 @@ function validateSchema(schema, errors) {
   const descriptorsById = new Map(schema.descriptors.map(entry => [entry?.id, entry]));
   for (const entry of schema.descriptors) {
     if (entry?.kind !== 'timer') continue;
+    if (entry.operation?.kind === 'continuous_true') continue;
     const subject = descriptorsById.get(entry.operation?.subjectId);
     if (!subject || subject.kind !== 'state') {
       issue(errors, `schema.descriptors.${entry.id}.operation.subjectId`, 'timer_subject', 'must resolve to an authored state descriptor');
@@ -192,6 +215,8 @@ function readyValue(type, value, path, errors) {
   if (type?.kind === 'builtin' && type.name === 'Int' && (!Number.isInteger(value) || value < -2147483648 || value > 2147483647)) issue(errors, path, 'value_type', 'must be a signed i32 Int from source semantics');
   if (type?.kind === 'builtin' && type.name === 'Number' && (typeof value !== 'number' || !Number.isFinite(value))) issue(errors, path, 'value_type', 'must be finite Number from source semantics');
   if (type?.kind === 'builtin' && type.name === 'Duration' && (!Number.isSafeInteger(value) || value < 0)) issue(errors, path, 'value_type', 'must be a non-negative safe integer milliseconds Duration');
+  const timeMax = type?.name === 'Date' ? 2_932_896 : type?.name === 'TimeOfDay' ? 86_399_999 : type?.name === 'DateTime' ? 253_402_300_799_999 : null;
+  if (type?.kind === 'builtin' && timeMax !== null && (!Number.isSafeInteger(value) || value < 0 || value > timeMax)) issue(errors, path, 'value_type', `must be an integer ${type.name} in range`);
   if (type?.kind === 'nominal' && (value === null || !['boolean', 'number', 'string'].includes(typeof value) || (typeof value === 'number' && !Number.isFinite(value)))) {
     issue(errors, path, 'value_type', 'must be a finite JSON scalar for the declared nominal source type');
   }
@@ -214,8 +239,11 @@ function observation(value, descriptorValue, index, errors) {
     readyValue(descriptorValue?.sourceType, value.value, `${path}.value`, errors);
     if (descriptorValue?.kind === 'setting') {
       const constraint = descriptorValue.constraint;
+      const misaligned = constraint?.kind === 'range' && (descriptorValue.sourceType?.name === 'Int'
+        ? (value.value - constraint.min) % constraint.step !== 0
+        : Math.abs((value.value - constraint.min) / constraint.step - Math.round((value.value - constraint.min) / constraint.step)) > 1e-9);
       if (constraint?.kind === 'range' && (typeof value.value !== 'number' || value.value < constraint.min || value.value > constraint.max
-          || Math.abs((value.value - constraint.min) / constraint.step - Math.round((value.value - constraint.min) / constraint.step)) > 1e-9)) {
+          || misaligned)) {
         issue(errors, `${path}.value`, 'setting_value', 'must satisfy the authored range and step');
       }
       if (constraint?.kind === 'choices' && !constraint.values?.includes(value.value)) issue(errors, `${path}.value`, 'setting_value', 'must be an authored choice');
