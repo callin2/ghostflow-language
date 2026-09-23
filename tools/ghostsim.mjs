@@ -149,7 +149,16 @@ export function runScenario(artifactPath, scenarioPath, { format = 'toon' } = {}
         success: false,
       };
     };
-    const child = spawnSync(path.join(root, 'target/release/examples/scenario_scan'), [artifactPath, actionsPath], {
+    // Sensor conditioning is supplied by the existing WASM host; plain input
+    // modules use the native framed runner. Neither path retries failed scans.
+    const conditioned = (manifest.sensors?.length ?? 0) > 0
+      && !manifest.signals?.some(signal => ['window', 'true-for'].includes(signal.kind))
+      && !manifest.schedules?.some(schedule => schedule.kind === 'solar');
+    const executable = conditioned ? process.execPath : path.join(root, 'target/release/examples/scenario_scan');
+    const arguments_ = conditioned
+      ? [path.join(root, 'tools/scenario-sensors.mjs'), artifactPath, actionsPath]
+      : [artifactPath, actionsPath];
+    const child = spawnSync(executable, arguments_, {
       encoding: 'utf8', timeout: 20_000, maxBuffer: MAX_RESULT_BYTES + 4096,
     });
     if (child.error) return hostError(child.error);

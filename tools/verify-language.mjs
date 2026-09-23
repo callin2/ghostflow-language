@@ -16,6 +16,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/boundary-conformance.test.mjs',
   'tests/compiler.test.mjs',
   'tests/reference-cli.test.mjs',
+  'tests/reference-simulator.test.mjs',
   'tests/reference-query.test.mjs',
   'tests/authoring-efficiency.test.mjs',
   'tests/time-literals.test.mjs',

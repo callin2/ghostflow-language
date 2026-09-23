@@ -2,7 +2,7 @@
 //! this process owns keyboard state and submits only explicit scans to ScanDriver.
 use ghostflow_core::keyboard::{KeyEvent, KeyboardMapper};
 use ghostflow_core::scan::{ScanFrameV1, ScanInput};
-use ghostflow_core::{Capability, Module, Runtime, Value};
+use ghostflow_core::{Capability, Module, Runtime, Type, Value};
 use serde_json::{json, Value as Json};
 use std::{collections::BTreeMap, env, error::Error, fs};
 
@@ -32,16 +32,64 @@ fn typed(input: &Json) -> Result<Value, Box<dyn Error>> {
     }
 }
 
+fn output_capabilities(
+    fields: impl IntoIterator<Item = (String, Type)>,
+) -> Result<Vec<Capability>, Box<dyn Error>> {
+    let mut unique = BTreeMap::new();
+    for (name, value_type) in fields {
+        if let Some(existing) = unique.get(&name) {
+            if *existing != value_type {
+                return Err(format!("conflicting output types for {name}").into());
+            }
+        } else {
+            unique.insert(name, value_type);
+        }
+    }
+    Ok(unique
+        .into_iter()
+        .map(|(name, value_type)| Capability::new("actuator", name, value_type))
+        .collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ghostflow_core::Type;
+
+    #[test]
+    fn output_capabilities_deduplicate_identical_fields() {
+        let capabilities = output_capabilities([
+            ("pump".to_owned(), Type::Bool),
+            ("pump".to_owned(), Type::Bool),
+        ])
+        .unwrap();
+
+        assert_eq!(capabilities, vec![Capability::new("actuator", "pump", Type::Bool)]);
+    }
+
+    #[test]
+    fn output_capabilities_reject_conflicting_types() {
+        let error = output_capabilities([
+            ("pump".to_owned(), Type::Bool),
+            ("pump".to_owned(), Type::Number),
+        ])
+        .unwrap_err();
+
+        assert!(error.to_string().contains("conflicting output types for pump"));
+    }
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<_> = env::args().skip(1).collect();
     if args.len() != 2 {
         return Err("usage: scenario_scan <module.gfb> <actions.json>".into());
     }
     let module = Module::load(&fs::read(&args[0])?)?;
-    let capabilities: Vec<_> = module
-        .output_fields()
-        .map(|(name, ty)| Capability::new("actuator", name, ty))
-        .collect();
+    let capabilities = output_capabilities(
+        module
+            .output_fields()
+            .map(|(name, value_type)| (name.to_owned(), value_type)),
+    )?;
     let mut runtime = Runtime::new(256);
     runtime.install(module, false);
     for capability in capabilities {

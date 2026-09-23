@@ -6,9 +6,42 @@ import path from 'node:path';
 import test from 'node:test';
 import { encode, decode } from '@toon-format/toon';
 import { compileSource, writeArtifact } from '../tools/toolchain.mjs';
+import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 
 const root = path.resolve(new URL('..', import.meta.url).pathname);
 const cli = path.join(root, 'tools/ghostsim.mjs');
+
+test('ghostsim preserves NotReady for a sensor without supplied samples', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostsim-sensor-'));
+  const artifact = path.join(directory, 'sensor.gfb');
+  try {
+    const source = '```ghost\ncontrol Sensor { sensor moisture: Percent; output pump: Bool; pump <- case moisture { ok(value) => value < 30%; fault(_) => false; }; }\n```\n';
+    const compiled = await compileSource(source, { filename: 'sensor.ghost.md' });
+    writeArtifact(compiled, artifact);
+    const result = run(artifact, { format: 'GhostFlow/scenario-v1', id: 'missing-sensor', initialInputs: [], keyBindings: [], actions: [{ kind: 'scan', atMs: 0 }] });
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    const scan = JSON.parse(result.stdout).scans[0];
+    assert.equal(scan.requestedVirtualIntent.pump, false);
+    assert.equal(scan.safeVirtualIntent.pump, false);
+    assert.equal(scan.inputs.__gf_sensor_ok_moisture, false);
+    assert.notEqual(scan.inputs.__gf_sensor_fault_moisture, 0);
+    const runtime = await ControlRuntime.instantiateFramed(
+      fs.readFileSync(path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm')), compiled,
+    );
+    try {
+      const expected = runtime.step({ nowMs: 0 });
+      assert.equal(expected.sensors.moisture.quality, 'NotReady');
+      assert.deepEqual(scan.inputs, expected.vm.inputs);
+      assert.deepEqual(scan.requestedVirtualIntent, expected.vm.requested);
+      assert.deepEqual(scan.safeVirtualIntent, expected.vm.safe);
+      assert.deepEqual(scan.faults, expected.vm.faults);
+    } finally {
+      runtime.dispose();
+    }
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
 
 async function fixture() {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostsim-'));

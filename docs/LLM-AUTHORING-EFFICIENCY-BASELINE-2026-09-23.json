@@ -17,7 +17,7 @@
       },
       {
         "file": "tools/ghostsim.mjs",
-        "sha256": "296944c9e70ab66b72db4c75d4f104d702dc9e167211d8d1acd7fe77bc8e30e2"
+        "sha256": "f5cd04d3d238ec42bfedd1fdbb2ecb72d62a15f77567998f03d2b3f4703e0ed5"
       },
       {
         "file": "tools/toolchain.mjs",
@@ -35,10 +35,10 @@
     "toonEncoder": "@toon-format/toon@4.1.1",
     "tokenizer": "tiktoken==0.12.0; cl100k_base",
     "packageLockSha256": "a14018dd135c1a73353858ae636dc6aff5e6dc27163d90227976fb5ff58e21c1",
-    "scenarioRunnerSha256": "a1e5f13e1b40f1e0a8fd71523d88e92b61c82d765146fca5bd6f964aad270861",
+    "scenarioRunnerSha256": "82e6fb91e76c5cad6c7b14851f295f359c4f38dc24c4a91d31c5ab00b47cf2f1",
     "rustCoreTreeSha256": "cb737d111b320f4a96cd9c2092e020d6e81f998e4beb0328651bdd76213800b2",
     "referenceSourceDigest": "sha256:8d3321241fd3bc7c731ed3ebf9d65f58dfe47427bb81137a41210d804624eea4",
-    "digest": "17c04644e099c1e686deac43b2624c540780c75de031f0894b4652314ecef57d"
+    "digest": "3da5e81c5d10f74c3d46807be2aa20b8dd9cded68070b871c547852e221ea9fe"
   },
   "encoder": {
     "name": "@toon-format/toon",
