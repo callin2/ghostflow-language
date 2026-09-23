@@ -11,6 +11,9 @@ import { jsonSha256 } from './integration-contract.mjs';
 
 const cli = fileURLToPath(import.meta.url);
 const isObject = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+const hasFields = (value, fields) => isObject(value) &&
+  Object.keys(value).length === fields.length && fields.every(field => Object.hasOwn(value, field));
+const nonemptyText = value => typeof value === 'string' && Boolean(value.trim());
 const defaultProfile = () => ({
   format: 'GhostFlow/console-profile-v1', id: 'virtual Waveshare 8DI/8RO',
   inputs: Array.from({ length: 8 }, (_, i) => ({ name: `DI${i + 1}`, label: `DI${i + 1}`, type: 'Bool' })),
@@ -22,18 +25,24 @@ function profileFromFile(filename) {
   const source = bytes ? JSON.parse(bytes.toString('utf8')) : defaultProfile();
   let profile = source;
   if (source?.schema === 'GhostFlow/board-profile-v1') {
-    if (typeof source.id !== 'string' || !source.id || typeof source.revision !== 'string' || !source.revision ||
-      typeof source.boardModel !== 'string' || !source.boardModel || !isObject(source.endpoints)) {
+    if (!hasFields(source, ['schema', 'id', 'revision', 'boardModel', 'endpoints']) ||
+      !nonemptyText(source.id) || !nonemptyText(source.revision) ||
+      !nonemptyText(source.boardModel) || !isObject(source.endpoints)) {
       throw new Error('invalid board profile');
     }
     const inputs = []; const outputs = [];
+    const addresses = new Set();
     for (const [name, endpoint] of Object.entries(source.endpoints)) {
       if (!isObject(endpoint) || !['input', 'output'].includes(endpoint.direction)) {
         throw new Error(`invalid board endpoint direction ${name}`);
       }
-      if (typeof endpoint.type !== 'string' || !endpoint.type || typeof endpoint.driver !== 'string' || !endpoint.driver ||
-        typeof endpoint.address !== 'string' || !endpoint.address || !['high', 'low'].includes(endpoint.activeLevel) ||
+      if (!nonemptyText(name) || !hasFields(endpoint, ['direction', 'type', 'driver', 'address', 'activeLevel', 'safeLevel']) ||
+        !nonemptyText(endpoint.type) || !nonemptyText(endpoint.driver) || !nonemptyText(endpoint.address) ||
+        !['high', 'low'].includes(endpoint.activeLevel) ||
         ![0, 1].includes(endpoint.safeLevel)) throw new Error(`invalid board endpoint ${name}`);
+      const address = JSON.stringify([endpoint.driver, endpoint.address]);
+      if (addresses.has(address)) throw new Error(`duplicate board endpoint driver/address ${name}`);
+      addresses.add(address);
       (endpoint.direction === 'input' ? inputs : outputs).push({ name, label: name, type: endpoint.type });
     }
     profile = { format: 'GhostFlow/console-profile-v1', id: source.id, revision: source.revision, inputs, outputs };
@@ -180,39 +189,63 @@ export async function runConsole(args, commands, { panelOutput = process.stderr,
   let atMs = 0; let result;
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostsim-console-'));
   const scenarioPath = path.join(temporary, 'session.toon');
-  function scan() {
-    scenario.actions.push({ kind: 'scan', atMs });
-    fs.writeFileSync(scenarioPath, encode(scenario) + '\n');
-    const run = runScenario(options.artifact, scenarioPath, { format: 'json' });
+  function scan(action = null, time = atMs) {
+    const committedActions = scenario.actions.length;
+    if (action) scenario.actions.push(action);
+    scenario.actions.push({ kind: 'scan', atMs: time });
+    let run;
+    try {
+      fs.writeFileSync(scenarioPath, encode(scenario) + '\n');
+      run = runScenario(options.artifact, scenarioPath, { format: 'json' });
+    } catch (error) {
+      scenario.actions.length = committedActions;
+      throw error;
+    }
     result = JSON.parse(run.encoded);
+    atMs = time;
     panelOutput.write(panel(profile, bound, result.scans.at(-1), result));
     return run.success;
   }
   try {
-    for await (const raw of commands) {
-      const command = raw.trim();
-      if (!command) continue;
-      if (command === 'exit') break;
-      const named = /^toggle\s+(.+)$/u.exec(command);
-      if (/^[1-8]$/u.test(command) || named) {
-        const channel = named ? profile.inputs.find(item => item.name === named[1]) : profile.inputs[Number(command) - 1];
-        if (!channel) throw new Error(`unknown input channel ${named?.[1] ?? command}`);
-        const port = bound.get(channel.name);
-        if (!port || channel.type !== 'Bool') throw new Error(`input channel ${channel.name} is unbound or unsupported`);
-        const value = !values.get(port);
-        values.set(port, value);
-        const key = keyBindings.find(item => item.input === port)?.key;
-        scenario.actions.push(key ? { kind: 'key', key, event: value ? 'down' : 'up' } : { kind: 'input', name: port, type: 'Bool', value });
-        if (!scan()) break;
-      } else if (/^scan\s+\d+$/u.test(command)) {
-        const time = Number(command.slice(5).trim());
-        if (!Number.isSafeInteger(time) || time < atMs) throw new Error('scan time must be a nondecreasing safe integer');
-        atMs = time;
-        if (!scan()) break;
-      } else throw new Error(`unknown command ${command}`);
+    let failure;
+    try {
+      for await (const raw of commands) {
+        const command = raw.trim();
+        if (!command) continue;
+        if (command === 'exit') break;
+        const named = /^toggle\s+(.+)$/u.exec(command);
+        if (/^[1-8]$/u.test(command) || named) {
+          const channel = named ? profile.inputs.find(item => item.name === named[1]) : profile.inputs[Number(command) - 1];
+          if (!channel) throw new Error(`unknown input channel ${named?.[1] ?? command}`);
+          const port = bound.get(channel.name);
+          if (!port || channel.type !== 'Bool') throw new Error(`input channel ${channel.name} is unbound or unsupported`);
+          const value = !values.get(port);
+          const key = keyBindings.find(item => item.input === port)?.key;
+          const action = key ? { kind: 'key', key, event: value ? 'down' : 'up' } : { kind: 'input', name: port, type: 'Bool', value };
+          const success = scan(action);
+          values.set(port, value);
+          if (!success) break;
+        } else if (/^scan\s+\d+$/u.test(command)) {
+          const time = Number(command.slice(5).trim());
+          if (!Number.isSafeInteger(time) || time < atMs) throw new Error('scan time must be a nondecreasing safe integer');
+          if (!scan(null, time)) break;
+        } else throw new Error(`unknown command ${command}`);
+      }
+      if (!result) scan();
+    } catch (error) { failure = error; }
+    if (failure) {
+      result = {
+        ...(result ?? {
+          format: 'GhostFlow/scenario-result-v1', scenario: { id: scenario.id, sha256: null }, artifact: null,
+          outputMeaning: 'virtual intent; no physical output applied or confirmed', scans: [],
+        }),
+        outcome: 'command-error', error: { location: 'command', message: String(failure.message).slice(0, 4096) },
+      };
+      panelOutput.write(panel(profile, bound, result.scans.at(-1), result));
     }
-    if (!result) scan();
-    if (options.record) fs.copyFileSync(scenarioPath, options.record);
+    if (options.record && scenario.actions.some(action => action.kind === 'scan')) {
+      fs.writeFileSync(options.record, encode(scenario) + '\n');
+    }
     result.console = consoleIdentity;
     resultOutput.write(options.format === 'json' ? JSON.stringify(result) + '\n' : encode(result) + '\n');
     return result.outcome === 'completed' ? 0 : 1;
@@ -221,10 +254,10 @@ export async function runConsole(args, commands, { panelOutput = process.stderr,
 
 export async function* terminalCommands(input = process.stdin, promptOutput = process.stderr) {
   const wasRaw = Boolean(input.isRaw);
-  input.setRawMode(true);
-  input.resume();
   let line = null;
   try {
+    input.setRawMode(true);
+    input.resume();
     for await (const chunk of input) {
       for (const char of String(chunk)) {
         if (char === '\x03' || char === '\x04') {

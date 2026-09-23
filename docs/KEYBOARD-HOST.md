@@ -58,7 +58,10 @@ key is its channel ID. Each value has `direction` (`input` or `output`), `type`,
 IDs in the order they appear in the JSON file, separately for inputs and
 outputs. It uses direction and type for binding validation. It never opens
 the named driver or treats an address as a confirmed pin. All logical port
-bindings remain explicit with `--bind`.
+bindings remain explicit with `--bind`. The selected board profile must satisfy
+the integration contract's exact field sets, nonempty text fields, endpoint
+direction and level values, and unique `driver`/`address` pairs before its
+identity is shown or hashed.
 
 The alternative `GhostFlow/console-profile-v1` JSON below is a presentation-only
 Driver descriptor. Its `id`, ordered channels, labels, and types drive the
@@ -109,6 +112,13 @@ time, status/error, and `physical: unconfirmed`.
 
 `--record` writes the exact replayable TOON scenario. Replay it with
 `node tools/ghostsim.mjs build/program.gfb build/session.toon --format toon`.
+If a command or scan time is rejected after scans have completed, the final
+result has `outcome: command-error`, a `command` error, and the completed scan
+rows. This is a console session failure; runner input rejection uses
+`outcome: rejected` with no scans.
+The recorded scenario contains only the accepted actions and scans; it replays
+to the same scan rows and scenario identity. The rejected attempt is excluded.
+If no scan completed, no replayable scenario is recorded.
 The final result includes a `console` field containing the selected profile ID,
 revision when present, digest, bindings, and physical status. For a board profile,
 the digest uses the integration contract's canonical JSON SHA-256; for a console

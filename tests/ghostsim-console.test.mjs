@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -37,7 +38,10 @@ test('default virtual Waveshare panel toggles DI1 and records a replayable TOON 
     const result = decode(child.stdout, { strict: true });
     assert.deepEqual(result.scans.map(scan => scan.inputs.DI1), [true, false]);
     assert.deepEqual(result.scans.map(scan => scan.safeVirtualIntent.RO1), [true, false]);
-    assert.deepEqual(decode(runScenario(artifact, record).encoded, { strict: true }).scans, result.scans);
+    const replay = decode(runScenario(artifact, record).encoded, { strict: true });
+    const runnerProjection = { ...result };
+    delete runnerProjection.console;
+    assert.deepEqual(runnerProjection, replay);
     assert.equal(result.console.profile.id, 'virtual Waveshare 8DI/8RO');
     assert.deepEqual(result.console.bindings, [{ channel: 'DI1', port: 'DI1' }, { channel: 'RO1', port: 'RO1' }]);
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
@@ -47,17 +51,23 @@ test('selected 2DI/4RO profile uses explicit bindings and aligned unequal rows',
   const { directory, artifact } = await fixture('control Demo { input enabled: Bool; output motor: Bool; motor <- enabled; }');
   try {
     const profilePath = path.join(directory, 'profile.json');
-    fs.writeFileSync(profilePath, JSON.stringify({
-      format: 'GhostFlow/console-profile-v1', id: 'fixture-driver-2x4',
+    const profileBytes = Buffer.from(JSON.stringify({
+      format: 'GhostFlow/console-profile-v1', id: 'fixture-driver-2x4', revision: 'display-r3',
       inputs: ['A', 'B'].map(name => ({ name, label: name, type: 'Bool' })),
       outputs: ['R1', 'R2', 'R3', 'R4'].map(name => ({ name, label: name, type: 'Bool' })),
-    }));
+    }, null, 2) + '\n');
+    fs.writeFileSync(profilePath, profileBytes);
     const child = run(artifact, ['1', 'exit'], ['--profile', profilePath, '--bind', 'A=enabled', '--bind', 'R3=motor', '--format', 'json']);
     assert.equal(child.status, 0, child.stderr);
     assert.match(child.stderr, /fixture-driver-2x4/);
     assert.match(child.stderr, /R4 \(unbound\)/);
     assert.doesNotMatch(child.stderr, /DI8|RO8/);
-    assert.equal(JSON.parse(child.stdout).scans[0].safeVirtualIntent.motor, true);
+    const result = JSON.parse(child.stdout);
+    assert.equal(result.scans[0].safeVirtualIntent.motor, true);
+    assert.deepEqual(result.console.profile, {
+      id: 'fixture-driver-2x4', revision: 'display-r3',
+      sha256: createHash('sha256').update(profileBytes).digest('hex'),
+    });
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 });
 
@@ -125,17 +135,30 @@ test('TTY digits act without Enter, colon enters commands, and raw mode restores
   assert.match(displayed.join(''), /:scan 100/);
 });
 
+test('TTY raw mode restores when setup fails after enabling it', async () => {
+  const modes = [];
+  const input = {
+    isRaw: false,
+    setRawMode(value) { modes.push(value); this.isRaw = value; },
+    resume() { throw new Error('input unavailable'); },
+  };
+  await assert.rejects(async () => {
+    for await (const command of terminalCommands(input)) void command;
+  }, /input unavailable/);
+  assert.deepEqual(modes, [true, false]);
+});
+
 test('board-profile-v1 endpoint order and identity drive a 2DI/4RO console without installation claims', async () => {
   const { directory, artifact } = await fixture('control Demo { input enabled: Bool; output motor: Bool; motor <- enabled; }');
   try {
     const profilePath = path.join(directory, 'board.json');
-    const endpoint = direction => ({ direction, type: 'Bool', driver: 'fixture', address: 'fictional', activeLevel: 'high', safeLevel: 0 });
+    const endpoint = (direction, address) => ({ direction, type: 'Bool', driver: 'fixture', address, activeLevel: 'high', safeLevel: 0 });
     const board = {
       schema: 'GhostFlow/board-profile-v1', id: 'fixture-board', revision: 'r7', boardModel: 'FICTIONAL',
       endpoints: {
-        'input.2': endpoint('input'), 'relay.4': endpoint('output'),
-        'input.1': endpoint('input'), 'relay.1': endpoint('output'),
-        'relay.3': endpoint('output'), 'relay.2': endpoint('output'),
+        'input.2': endpoint('input', 'input.2'), 'relay.4': endpoint('output', 'relay.4'),
+        'input.1': endpoint('input', 'input.1'), 'relay.1': endpoint('output', 'relay.1'),
+        'relay.3': endpoint('output', 'relay.3'), 'relay.2': endpoint('output', 'relay.2'),
       },
     };
     fs.writeFileSync(profilePath, JSON.stringify(board));
@@ -156,6 +179,11 @@ test('board-profile-v1 endpoint order and identity drive a 2DI/4RO console witho
     for (const [change, diagnostic] of [
       [copy => { copy.endpoints['input.2'].direction = 'sideways'; }, /invalid board endpoint direction/],
       [copy => { copy.endpoints['input.2'].type = 'Int'; }, /type mismatch input\.2=enabled/],
+      [copy => { copy.unexpected = true; }, /invalid board profile/],
+      [copy => { copy.endpoints['input.2'].unexpected = true; }, /invalid board endpoint/],
+      [copy => { copy.endpoints['input.2'].address = 'relay.4'; }, /duplicate board endpoint/],
+      [copy => { copy.endpoints['input.2'].safeLevel = false; }, /invalid board endpoint/],
+      [copy => { copy.endpoints['input.2'].driver = '  '; }, /invalid board endpoint/],
     ]) {
       const invalid = structuredClone(board); change(invalid); fs.writeFileSync(profilePath, JSON.stringify(invalid));
       const rejected = run(artifact, ['1', 'exit'], options);
@@ -163,5 +191,46 @@ test('board-profile-v1 endpoint order and identity drive a 2DI/4RO console witho
       assert.match(rejected.stderr, diagnostic);
       assert.doesNotMatch(rejected.stderr, /KEY  INPUT/);
     }
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('rejected command preserves committed scans and records their exact replay', async () => {
+  const { directory, artifact, record } = await fixture('control Demo { input DI1: Bool; output RO1: Bool; RO1 <- DI1; }');
+  try {
+    for (const rejected of ['bad-command', 'scan 0']) {
+      const commands = rejected === 'scan 0' ? ['1', 'scan 100', rejected] : ['1', rejected];
+      const child = run(artifact, commands, ['--record', record, '--format', 'json']);
+      assert.equal(child.status, 1, child.stderr);
+      const result = JSON.parse(child.stdout);
+      assert.equal(result.outcome, 'command-error');
+      assert.equal(result.error.location, 'command');
+      assert.equal(result.scans.length, commands.length - 1);
+      assert.ok(result.error.message);
+      const recorded = decode(fs.readFileSync(record, 'utf8'), { strict: true });
+      assert.equal(recorded.actions.filter(action => action.kind === 'scan').length, commands.length - 1);
+      const replay = JSON.parse(runScenario(artifact, record, { format: 'json' }).encoded);
+      assert.equal(replay.outcome, 'completed');
+      for (const field of ['scans', 'scenario', 'artifact', 'outputMeaning']) {
+        assert.deepEqual(result[field], replay[field]);
+      }
+      assert.equal(result.scans[0].safeVirtualIntent.RO1, true);
+    }
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('scan budget rejects the attempted scan while retaining a replayable 256-scan prefix', async () => {
+  const { directory, artifact, record } = await fixture('control Demo { input DI1: Bool; output RO1: Bool; RO1 <- DI1; }');
+  try {
+    const child = run(artifact, Array.from({ length: 257 }, () => 'scan 0'), ['--record', record, '--format', 'json']);
+    assert.equal(child.status, 1, child.stderr);
+    const result = JSON.parse(child.stdout);
+    assert.equal(result.outcome, 'command-error');
+    assert.match(result.error.message, /scan budget 256 exceeded/);
+    assert.equal(result.scans.length, 256);
+    const recorded = decode(fs.readFileSync(record, 'utf8'), { strict: true });
+    assert.equal(recorded.actions.length, 256);
+    const replay = JSON.parse(runScenario(artifact, record, { format: 'json' }).encoded);
+    assert.deepEqual(result.scans, replay.scans);
+    assert.deepEqual(result.scenario, replay.scenario);
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 });
