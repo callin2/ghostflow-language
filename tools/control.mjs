@@ -34,16 +34,44 @@ const KEYWORDS = new Set([
 ]);
 
 export class ControlCompileError extends Error {
-  constructor(message, loc) {
+  constructor(message, loc, diagnosticCode) {
     super(loc ? `${loc.filename}:${loc.line}:${loc.column}: ${message}` : message);
     this.name = 'ControlCompileError';
     this.filename = loc?.filename;
     this.line = loc?.line;
     this.column = loc?.column;
+    this.loc = loc ? { ...loc } : undefined;
+    this.diagnosticCode = diagnosticCode;
   }
 }
 
 function error(loc, message) { throw new ControlCompileError(message, loc); }
+function typeError(loc, message) { throw new ControlCompileError(message, loc, 'GF_TYPE'); }
+
+// Recovery is limited to a completed declaration environment and one validation
+// phase. Never continue into lowering with partially populated expressions.
+const DIAGNOSTIC_LIMIT = 20;
+function checkIndependent(items, check) {
+  const errors = new Set();
+  for (const item of items) {
+    try { check(item); }
+    catch (cause) {
+      if (!(cause instanceof ControlCompileError) || !cause.loc) {
+        throw cause;
+      }
+      errors.add(cause);
+      if (errors.size > DIAGNOSTIC_LIMIT) break;
+    }
+  }
+  if (errors.size) {
+    const first = errors.values().next().value;
+    first.collectedErrors = [...errors].sort((a, b) =>
+      (a.filename < b.filename ? -1 : a.filename > b.filename ? 1 : 0)
+      || a.line - b.line || a.column - b.column).slice(0, DIAGNOSTIC_LIMIT);
+    if (errors.size > DIAGNOSTIC_LIMIT) first.diagnosticCollection = { limit: DIAGNOSTIC_LIMIT, truncated: true };
+    throw first;
+  }
+}
 function parseCron5(source, loc) {
   const fields = source.trim().split(/\s+/);
   if (fields.length !== 5) error(loc, 'cron5 requires exactly five fields');
@@ -1425,6 +1453,7 @@ class Lowerer {
     this.gfbInputs = []; this.gfbStates = []; this.constraints = []; this.hasClock = false;
     this.resultSites = [];
     this.usesInt = false;
+    this.failedLets = new Map();
     this.syntaxOnly = false;
     this.standalone = !!ast.standalone;
     this.hasSolarSchedule = ast.body.some(item => item.kind === 'schedule' && item.scheduleType === 'Solar');
@@ -1734,14 +1763,14 @@ class Lowerer {
     for (const item of this.ast.body) if (item.kind === 'timer') this.declareTimer(item);
     for (const item of this.ast.body) if (item.kind === 'timer') this.resolveTimer(item.name);
     this.validateFunctionBodies();
-    for (const item of this.ast.body) if (item.kind === 'let') this.addLet(item);
-    for (const item of this.ast.body) if (item.kind === 'next') this.addNext(item);
+    checkIndependent(this.ast.body.filter(item => item.kind === 'let'), item => this.addLet(item));
+    checkIndependent(this.ast.body.filter(item => item.kind === 'next'), item => this.addNext(item));
     if (this.adaptPolicy) {
       const connection = this.ast.body.find(item => item.kind === 'connection');
       if (connection) error(connection.loc, 'output connections in an adaptive control belong inside each strategy');
       this.addAdapt(this.adaptPolicy);
     } else {
-      for (const item of this.ast.body) if (item.kind === 'connection') this.addConnection(item);
+      checkIndependent(this.ast.body.filter(item => item.kind === 'connection'), item => this.addConnection(item));
       for (const output of this.outputs.values()) {
         if (!output.expression) error(output.loc, `output ${output.name} requires exactly one connection (${output.name} <- expression;)`);
       }
@@ -1798,7 +1827,7 @@ class Lowerer {
           if (!output) error(statement.loc, `unknown output ${statement.name}`);
           if (intents.has(statement.name)) error(statement.loc, `duplicate output connection ${statement.name} in strategy ${strategy.name}`);
           const value = this.expression(statement.value, localValues, { allowNext: false, strategy: strategy.name }, [], output.type);
-          if (!sameType(value.type, output.type)) error(statement.loc, `output ${statement.name} must be ${output.type.kind}`);
+          if (!sameType(value.type, output.type)) typeError(statement.loc, `output ${statement.name} must be ${output.type.kind}`);
           intents.set(statement.name, value.sexpr);
         }
       }
@@ -2664,6 +2693,14 @@ class Lowerer {
     return value;
   }
   resolveLet(name) {
+    if (this.failedLets.has(name)) throw this.failedLets.get(name);
+    try { return this.resolveLetValue(name); }
+    catch (cause) {
+      if (cause instanceof ControlCompileError) this.failedLets.set(name, cause);
+      throw cause;
+    }
+  }
+  resolveLetValue(name) {
     const item = this.lets.get(name); if (!item) internal(`missing let definition ${name}`);
     const status = this.letStates.get(name);
     if (status === 'done') return this.symbols.get(name).value;
@@ -2703,7 +2740,7 @@ class Lowerer {
     const output = this.outputs.get(item.name); if (!output) error(item.loc, `unknown output ${item.name}`);
     if (output.expression) error(item.loc, `duplicate output connection ${item.name}`);
     const value = this.expression(item.value, new Map(), { allowNext: true }, [], output.type);
-    if (!sameType(value.type, output.type)) error(item.loc, `output ${item.name} must be ${output.type.kind}`);
+    if (!sameType(value.type, output.type)) typeError(item.loc, `output ${item.name} must be ${output.type.kind}`);
     output.expression = value;
   }
   addConstraint(item) {

@@ -1,0 +1,423 @@
+{
+  "format": "GhostFlow/authoring-efficiency-baseline-v1",
+  "sourceRevision": {
+    "languagePackage": "ghostflow-language@0.1.0",
+    "toolchainFiles": [
+      {
+        "file": "tools/ghostc.mjs",
+        "sha256": "d214c27ae29bf903826108383a4c5d336785f11cfe6c3de926ac367c98f4ed9f"
+      },
+      {
+        "file": "tools/compile-source.mjs",
+        "sha256": "36c940e6239bffec6da9b448c527109df2171c765a10c786c5b3b5b9fe1323b7"
+      },
+      {
+        "file": "tools/reference-query.mjs",
+        "sha256": "c3f132fe8d3a39eaa023ad0ef4fe2b45feae98a9a3b85e33330bad4bb99993b8"
+      },
+      {
+        "file": "tools/ghostsim.mjs",
+        "sha256": "bb2df8873141d17eda856870bbc1f261d807da49336d15e9fda74e1cb30fbd26"
+      },
+      {
+        "file": "tools/toolchain.mjs",
+        "sha256": "6d1db3c7962888cfe21903c27b114b2582bf34b96142a1720c87e881da08a9a2"
+      },
+      {
+        "file": "package.json",
+        "sha256": "fb2a45f23fae181ea89da1c2de5c303bb187a285550eceee808fdac897e08df1"
+      },
+      {
+        "file": "package-lock.json",
+        "sha256": "a14018dd135c1a73353858ae636dc6aff5e6dc27163d90227976fb5ff58e21c1"
+      }
+    ],
+    "toonEncoder": "@toon-format/toon@4.1.1",
+    "tokenizer": "tiktoken==0.12.0; cl100k_base",
+    "packageLockSha256": "a14018dd135c1a73353858ae636dc6aff5e6dc27163d90227976fb5ff58e21c1",
+    "scenarioRunnerSha256": "a1e5f13e1b40f1e0a8fd71523d88e92b61c82d765146fca5bd6f964aad270861",
+    "rustCoreTreeSha256": "cb737d111b320f4a96cd9c2092e020d6e81f998e4beb0328651bdd76213800b2",
+    "referenceSourceDigest": "sha256:8d3321241fd3bc7c731ed3ebf9d65f58dfe47427bb81137a41210d804624eea4",
+    "digest": "fde986aac42070b423b90b55f6a3197cb2809c87b6dedf14c88fa63b453820ae"
+  },
+  "encoder": {
+    "name": "@toon-format/toon",
+    "version": "4.1.1"
+  },
+  "tokenizer": {
+    "name": "cl100k_base",
+    "package": "tiktoken",
+    "version": "0.12.0"
+  },
+  "cases": [
+    {
+      "id": "valid-control",
+      "intendedRule": "A confirmed start request runs the pump until a confirmed stop request.",
+      "referenceSections": [
+        {
+          "id": "ref-01-05",
+          "bytes": 2106,
+          "responseBytes": 2625,
+          "digest": "sha256:7376c6f448d3effc4eba3efe3e6d7773ec70c25fb13a952f686c390eb2a7f870"
+        },
+        {
+          "id": "ref-02-06",
+          "bytes": 1855,
+          "responseBytes": 2389,
+          "digest": "sha256:f1359461b47287b84d94ccdd3b6c5d25b0ca2c58547ba25f4a91ee00db60d0c1"
+        }
+      ],
+      "referenceChunks": 2,
+      "referenceContentBytes": 3961,
+      "referenceResponseBytes": 5014,
+      "sourceIdentity": [
+        {
+          "documentId": "GF-CORPUS-VALID",
+          "revisionId": "rev-1",
+          "sha256": "25216d8a564d8cd791584f4b77e2d7baddea36b2ef93aa3fae110a5ef8597514",
+          "result": "checked",
+          "diagnosticBytes": 0
+        }
+      ],
+      "scenarioIdentity": null,
+      "compileRounds": 2,
+      "correctionRounds": 0,
+      "simulationRounds": 0,
+      "diagnosticBytes": 0,
+      "simulationResultBytes": 0,
+      "outcome": "compiled",
+      "boundary": "Compiler conformance only; no physical I/O claim.",
+      "equivalenceChecks": {
+        "compilerOutcomeMatched": true,
+        "sourceIdentityPreserved": true,
+        "revisionDigestsDistinct": true,
+        "safeIntentMatched": null,
+        "openAssumptionPreserved": false
+      }
+    },
+    {
+      "id": "typo-correction",
+      "intendedRule": "The pump follows start unless stop is active.",
+      "referenceSections": [
+        {
+          "id": "ref-01-05",
+          "bytes": 2106,
+          "responseBytes": 2625,
+          "digest": "sha256:7376c6f448d3effc4eba3efe3e6d7773ec70c25fb13a952f686c390eb2a7f870"
+        },
+        {
+          "id": "ref-02-06",
+          "bytes": 1855,
+          "responseBytes": 2389,
+          "digest": "sha256:f1359461b47287b84d94ccdd3b6c5d25b0ca2c58547ba25f4a91ee00db60d0c1"
+        }
+      ],
+      "referenceChunks": 2,
+      "referenceContentBytes": 3961,
+      "referenceResponseBytes": 5014,
+      "sourceIdentity": [
+        {
+          "documentId": "GF-CORPUS-TYPO",
+          "revisionId": "rev-1",
+          "sha256": "0ee24680e278f0a6d43c010ee1e4bbfdca07e83a2a347d6ea25e93387dab857f",
+          "result": "diagnostic",
+          "diagnosticBytes": 499
+        },
+        {
+          "documentId": "GF-CORPUS-TYPO",
+          "revisionId": "rev-2",
+          "sha256": "30f4d6d7419b16b2ed9d53a464c0484deef835fb95a608bae1d0461d71a1b03b",
+          "result": "checked",
+          "diagnosticBytes": 0
+        }
+      ],
+      "scenarioIdentity": null,
+      "compileRounds": 3,
+      "correctionRounds": 1,
+      "simulationRounds": 0,
+      "diagnosticBytes": 499,
+      "simulationResultBytes": 0,
+      "outcome": "compiled_after_one_correction",
+      "boundary": "A misspelled input is a compiler error; correction preserves the document ID and changes its revision and digest.",
+      "equivalenceChecks": {
+        "compilerOutcomeMatched": true,
+        "sourceIdentityPreserved": true,
+        "revisionDigestsDistinct": true,
+        "safeIntentMatched": null,
+        "openAssumptionPreserved": false
+      }
+    },
+    {
+      "id": "type-correction",
+      "intendedRule": "The Bool pump output receives a Bool expression.",
+      "referenceSections": [
+        {
+          "id": "ref-02-01",
+          "bytes": 2226,
+          "responseBytes": 2730,
+          "digest": "sha256:589af34976aadc2c5ca5e518d22edb11fbe69ce9c76490e0a769c60138d5022b"
+        },
+        {
+          "id": "ref-02-06",
+          "bytes": 1855,
+          "responseBytes": 2389,
+          "digest": "sha256:f1359461b47287b84d94ccdd3b6c5d25b0ca2c58547ba25f4a91ee00db60d0c1"
+        }
+      ],
+      "referenceChunks": 2,
+      "referenceContentBytes": 4081,
+      "referenceResponseBytes": 5119,
+      "sourceIdentity": [
+        {
+          "documentId": "GF-CORPUS-TYPE",
+          "revisionId": "rev-1",
+          "sha256": "77951c879d14b3907f06c54a3630d95fc6c393d5ed530e2fc21c1ef9c72d99db",
+          "result": "diagnostic",
+          "diagnosticBytes": 494
+        },
+        {
+          "documentId": "GF-CORPUS-TYPE",
+          "revisionId": "rev-2",
+          "sha256": "73c01157d928a0a8263d34f83eba66212e3fe713111a3751d0a38482328afd9c",
+          "result": "checked",
+          "diagnosticBytes": 0
+        }
+      ],
+      "scenarioIdentity": null,
+      "compileRounds": 3,
+      "correctionRounds": 1,
+      "simulationRounds": 0,
+      "diagnosticBytes": 494,
+      "simulationResultBytes": 0,
+      "outcome": "compiled_after_one_correction",
+      "boundary": "A numeric literal cannot silently become a Bool.",
+      "equivalenceChecks": {
+        "compilerOutcomeMatched": true,
+        "sourceIdentityPreserved": true,
+        "revisionDigestsDistinct": true,
+        "safeIntentMatched": null,
+        "openAssumptionPreserved": false
+      }
+    },
+    {
+      "id": "missing-setting-correction",
+      "intendedRule": "A timer compares elapsed time with a declared Duration setting.",
+      "referenceSections": [
+        {
+          "id": "ref-03-02",
+          "bytes": 1254,
+          "responseBytes": 1819,
+          "digest": "sha256:eae4bf44a84ee34e843cfa843618459efd6d4b28f805117bfe9a0588a2371e93"
+        },
+        {
+          "id": "ref-05-01",
+          "bytes": 5505,
+          "responseBytes": 6106,
+          "digest": "sha256:f6c8774f8ea40759cd17120d849a2c10825344e0a4bc0d3a1fc339c39a4b24e8"
+        }
+      ],
+      "referenceChunks": 2,
+      "referenceContentBytes": 6759,
+      "referenceResponseBytes": 7925,
+      "sourceIdentity": [
+        {
+          "documentId": "GF-CORPUS-SETTING",
+          "revisionId": "rev-1",
+          "sha256": "0fd0cf1d6429f6a6ea4af091e3394740558f87668f4f799ec820e40ed4ee3f19",
+          "result": "diagnostic",
+          "diagnosticBytes": 531
+        },
+        {
+          "documentId": "GF-CORPUS-SETTING",
+          "revisionId": "rev-2",
+          "sha256": "63349456f4af5f2cb42a8325a2d215f6a1ea9cb1b0e3636f643eb907528ec3e0",
+          "result": "checked",
+          "diagnosticBytes": 0
+        }
+      ],
+      "scenarioIdentity": null,
+      "compileRounds": 3,
+      "correctionRounds": 1,
+      "simulationRounds": 0,
+      "diagnosticBytes": 531,
+      "simulationResultBytes": 0,
+      "outcome": "compiled_after_one_correction",
+      "boundary": "The compiler identifies an undeclared setting name; the example correction uses the existing declared setting.",
+      "equivalenceChecks": {
+        "compilerOutcomeMatched": true,
+        "sourceIdentityPreserved": true,
+        "revisionDigestsDistinct": true,
+        "safeIntentMatched": null,
+        "openAssumptionPreserved": false
+      }
+    },
+    {
+      "id": "unsupported-syntax",
+      "intendedRule": "No unsupported natural-language timer shorthand is accepted as executable syntax.",
+      "referenceSections": [
+        {
+          "id": "ref-01-04",
+          "bytes": 3812,
+          "responseBytes": 4365,
+          "digest": "sha256:418a3aeb92e7f497ceb111198baccbf6dda0938cd7463ad74e2c918ebf420bf2"
+        },
+        {
+          "id": "ref-01-06",
+          "bytes": 1237,
+          "responseBytes": 1792,
+          "digest": "sha256:8356d7b4678e3f9ff781bfeef7d6deebaa65dd8db2972c7db80b997fde2f4197"
+        },
+        {
+          "id": "ref-03-02",
+          "bytes": 1254,
+          "responseBytes": 1819,
+          "digest": "sha256:eae4bf44a84ee34e843cfa843618459efd6d4b28f805117bfe9a0588a2371e93"
+        }
+      ],
+      "referenceChunks": 3,
+      "referenceContentBytes": 6303,
+      "referenceResponseBytes": 7976,
+      "sourceIdentity": [
+        {
+          "documentId": "GF-CORPUS-UNSUPPORTED",
+          "revisionId": "rev-1",
+          "sha256": "9217a25a6796f507d387ee9fad428b340df497711ec07a16b8740e702d70f79e",
+          "result": "diagnostic",
+          "diagnosticBytes": 520
+        }
+      ],
+      "scenarioIdentity": null,
+      "compileRounds": 1,
+      "correctionRounds": 0,
+      "simulationRounds": 0,
+      "diagnosticBytes": 520,
+      "simulationResultBytes": 0,
+      "outcome": "unresolved_unsupported_request",
+      "boundary": "Ask for a supported expression or an explicit user decision; do not invent shorthand.",
+      "equivalenceChecks": {
+        "compilerOutcomeMatched": true,
+        "sourceIdentityPreserved": true,
+        "revisionDigestsDistinct": true,
+        "safeIntentMatched": null,
+        "openAssumptionPreserved": false
+      }
+    },
+    {
+      "id": "unconfirmed-assumption",
+      "intendedRule": "Only confirmed start/stop intent is executable while maximum run duration remains unanswered.",
+      "referenceSections": [
+        {
+          "id": "ref-01-02",
+          "bytes": 2989,
+          "responseBytes": 3595,
+          "digest": "sha256:845f6a0035c90e5bdf80cc7bc7213c3ec2a6ba94536326b43ade4bed2158e850"
+        },
+        {
+          "id": "ref-05-04",
+          "bytes": 1202,
+          "responseBytes": 1751,
+          "digest": "sha256:01708e7998737f386b898ab7da1b21ad7e6db2cd140d2868189b41deddbf3d90"
+        }
+      ],
+      "referenceChunks": 2,
+      "referenceContentBytes": 4191,
+      "referenceResponseBytes": 5346,
+      "sourceIdentity": [
+        {
+          "documentId": "GF-CORPUS-ASSUMPTION",
+          "revisionId": "rev-1",
+          "sha256": "34d6f194e866946242bd670f6f0b21ef194cee60c80ab5ee6eb3739bc91b782f",
+          "result": "checked",
+          "diagnosticBytes": 0
+        }
+      ],
+      "scenarioIdentity": null,
+      "compileRounds": 2,
+      "correctionRounds": 0,
+      "simulationRounds": 0,
+      "diagnosticBytes": 0,
+      "simulationResultBytes": 0,
+      "outcome": "compiled_with_open_assumption",
+      "boundary": "A syntactically valid document does not turn an unconfirmed operating value into policy.",
+      "equivalenceChecks": {
+        "compilerOutcomeMatched": true,
+        "sourceIdentityPreserved": true,
+        "revisionDigestsDistinct": true,
+        "safeIntentMatched": null,
+        "openAssumptionPreserved": true
+      }
+    },
+    {
+      "id": "virtual-timer",
+      "intendedRule": "A confirmed two-second virtual timer stops a request at the first scan whose elapsed time reaches the limit.",
+      "referenceSections": [
+        {
+          "id": "ref-02-08",
+          "bytes": 2675,
+          "responseBytes": 3252,
+          "digest": "sha256:5cf6edd05245bb77dc92577f35d74ca62b4e6e94243d053ca35187d4c3e63f1b"
+        },
+        {
+          "id": "ref-03-02",
+          "bytes": 1254,
+          "responseBytes": 1819,
+          "digest": "sha256:eae4bf44a84ee34e843cfa843618459efd6d4b28f805117bfe9a0588a2371e93"
+        }
+      ],
+      "referenceChunks": 2,
+      "referenceContentBytes": 3929,
+      "referenceResponseBytes": 5071,
+      "sourceIdentity": [
+        {
+          "documentId": "GF-CORPUS-TIMER",
+          "revisionId": "rev-1",
+          "sha256": "ab9dd394847be71d977de40c4b7355a21c5c1371ac623fad80323175c4bb3637",
+          "result": "checked",
+          "diagnosticBytes": 0
+        }
+      ],
+      "scenarioIdentity": {
+        "id": "corpus-virtual-timer",
+        "sha256": "3bbead6820f4df57814ab8be09617a9e44c007e7e89c7d8e37d3d094903d3d55"
+      },
+      "compileRounds": 2,
+      "correctionRounds": 0,
+      "simulationRounds": 1,
+      "diagnosticBytes": 0,
+      "simulationResultBytes": 1811,
+      "outcome": "simulated",
+      "boundary": "The output is a virtual safe intent. It is not an applied or confirmed relay state.",
+      "equivalenceChecks": {
+        "compilerOutcomeMatched": true,
+        "sourceIdentityPreserved": true,
+        "revisionDigestsDistinct": true,
+        "safeIntentMatched": true,
+        "openAssumptionPreserved": false
+      }
+    }
+  ],
+  "tokenComparisons": {
+    "diagnostic": {
+      "toonBytes": 498,
+      "jsonBytes": 547,
+      "toonTokens": 176,
+      "jsonTokens": 174
+    },
+    "simulation": {
+      "toonBytes": 1810,
+      "jsonBytes": 1630,
+      "toonTokens": 581,
+      "jsonTokens": 506
+    }
+  },
+  "totals": {
+    "referenceChunks": 15,
+    "referenceContentBytes": 33185,
+    "referenceResponseBytes": 41465,
+    "compileRounds": 16,
+    "correctionRounds": 3,
+    "simulationRounds": 1,
+    "diagnosticBytes": 2044,
+    "simulationResultBytes": 1811
+  }
+}

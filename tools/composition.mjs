@@ -13,7 +13,7 @@ export function resolveDocument(importer, locator) {
   }
   return `${importer.startsWith('/') || locator.startsWith('/') ? '/' : ''}${result.join('/')}`;
 }
-const fail = (loc, text) => { throw new ControlCompileError(text, loc); };
+const fail = (loc, text, code) => { throw new ControlCompileError(text, loc, code); };
 const typeKey = type => JSON.stringify(type, (key, value) => key === 'loc' ? undefined : value);
 const simpleKinds = new Set(['input', 'output', 'parameter', 'state', 'let', 'next', 'connection', 'instance', 'connect']);
 
@@ -39,17 +39,19 @@ export function compileComposition(source, filename, supplied) {
     if (active.has(key)) throw new Error(`executable import cycle at ${key}`);
     if (units.has(key)) return units.get(key);
     const extraction = extractLiterate(text, { filename: name });
-    const ast = parseControl(extraction.code, { filename: name });
+    let ast;
+    try { ast = parseControl(extraction.code, { filename: name }); }
+    catch (error) { error.diagnosticCode = 'GF_PARSE'; throw error; }
     validateCompositionStructure(ast);
     const unit = { ast, extraction, imports: new Map(), filename: name };
     units.set(key, unit); active.add(key);
     for (const entry of ast.imports) {
       const target = resolveDocument(name, entry.locator), document = documents.get(target);
-      if (!document) fail(entry.locatorLoc, `missing imported document ${entry.locator} in sourceClosure`);
-      if (document.revision !== entry.revision) fail(entry.loc, `import revision mismatch for ${entry.locator}`);
+      if (!document) fail(entry.locatorLoc, `missing imported document ${entry.locator} in sourceClosure`, 'GF_IMPORT');
+      if (document.revision !== entry.revision) fail(entry.loc, `import revision mismatch for ${entry.locator}`, 'GF_IMPORT');
       if (document.sha256 !== entry.sha256) fail(entry.digestLoc,
-        `import sha256 digest mismatch for ${entry.locator}: expected ${entry.sha256}, actual ${document.sha256}`);
-      if (active.has(target)) fail(entry.loc, `executable import cycle at ${entry.locator}`);
+        `import sha256 digest mismatch for ${entry.locator}: expected ${entry.sha256}, actual ${document.sha256}`, 'GF_IMPORT');
+      if (active.has(target)) fail(entry.loc, `executable import cycle at ${entry.locator}`, 'GF_IMPORT');
       used.add(target); unit.imports.set(entry.name, visit(document.text, target));
     }
     active.delete(key); return unit;

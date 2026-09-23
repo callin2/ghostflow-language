@@ -22,6 +22,7 @@
     "build:wasm": "cargo build --locked --offline -p ghostflow-wasm --target wasm32-unknown-unknown --release"
   },
   "dependencies": {
+    "@toon-format/toon": "4.1.1",
     "commonmark": "0.31.2",
     "suncalc": "2.0.2"
   }

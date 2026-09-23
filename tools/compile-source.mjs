@@ -9,6 +9,30 @@ export { emitInteractionSchema } from './interaction-schema.mjs';
 
 const SOURCE_LIMIT = 1024 * 1024;
 const SOURCE_DOCUMENT_FORMAT = 'GhostFlow/source-document-v1';
+const DIAGNOSTICS_FORMAT = 'GhostFlow/diagnostics-v1';
+
+function diagnosticSource(filename, source, identity) {
+  return { filename, sha256: sha256Hex(source), ...(identity ?? {}) };
+}
+
+function attachDiagnostic(error, code, source, identity, position, end, requestSource) {
+  if (!position) return;
+  const prefix = `${error.filename}:${error.line}:${error.column}: `;
+  const message = error.message.startsWith(prefix) ? error.message.slice(prefix.length) : error.message;
+  error.diagnosticEnvelope = {
+    format: DIAGNOSTICS_FORMAT,
+    source: diagnosticSource(source.filename, source.text, identity),
+    ...(requestSource ? { requestSource } : {}),
+    diagnostics: [{
+      code: error.diagnosticCode ?? code, severity: 'error', message,
+      span: {
+        file: position.file,
+        start: { line: position.line, column: position.column },
+        ...(end ? { end: { line: end.line, column: end.column } } : {}),
+      },
+    }],
+  };
+}
 
 function requireSourceText(text, label = 'source text') {
   if (!isWellFormedUnicode(text)) throw new Error(`${label} must be a well-formed UTF-8 string`);
@@ -56,10 +80,19 @@ export function compileSourceSync(source, options = {}) {
   requireFilename(filename, 'source filename');
   requireSourceText(source, `${filename}: source`);
   if (!filename.endsWith('.ghost.md')) throw new Error(`${filename}: GhostFlow product compilation requires a canonical .ghost.md literate source`);
-  const extraction = extractLiterate(source, { filename });
-  let result, composition;
+  let extraction;
+  try { extraction = extractLiterate(source, { filename }); }
+  catch (error) {
+    if (Number.isInteger(error.line) && Number.isInteger(error.column)) {
+      attachDiagnostic(error, 'GF_LITERATE', { filename, text: source }, interactionSourceIdentity,
+        { file: filename, line: error.line, column: error.column });
+    }
+    throw error;
+  }
+  let result, composition, stage = 'parse';
   try {
     const ast = parseControl(extraction.code, { filename });
+    stage = 'semantic';
     if (options.sourceClosure !== undefined && ast.imports?.length) {
       composition = compileComposition(source, filename, options.sourceClosure);
       result = composition.result;
@@ -74,24 +107,50 @@ export function compileSourceSync(source, options = {}) {
           ? compileTemporalDescriptorArtifact(extraction.code, { filename })
           : compileControl(extraction.code, { filename });
   } catch (error) {
-    const errorDocument = error.filename === filename ? null : options.sourceClosure?.find(document => resolveDocument('', document.filename) === error.filename);
-    const errorMap = errorDocument ? extractLiterate(errorDocument.text, { filename: error.filename }).sourceMap : extraction.sourceMap;
-    if (Number.isInteger(error.line) && (error.filename === filename || errorDocument)) {
-      let original = mapSourcePosition(errorMap, error.line, error.column ?? 1);
-      // Extraction appends a newline after the final authored code line. Its
-      // terminal EOF belongs to that line's insertion point, not a prose line
-      // or a generated separator between executable fences.
-      if (!original && error.line === errorMap.length + 1 && error.column === 1) {
-        const lastLine = errorMap.at(-1);
-        if (lastLine) original = mapSourcePosition(errorMap, errorMap.length, lastLine.length + 1);
+    // Map each independently checked error using the same canonical document
+    // path as a single failure. Preserve the original thrown error/message.
+    const failures = error.collectedErrors ?? [error];
+    const mapFailure = error => {
+      const errorDocument = error.filename === filename ? null : options.sourceClosure?.find(document => resolveDocument('', document.filename) === error.filename);
+      if (error.name === 'LiterateError' && errorDocument) {
+        attachDiagnostic(error, 'GF_LITERATE', { filename: errorDocument.filename, text: errorDocument.text }, undefined,
+          { file: error.filename, line: error.line, column: error.column }, undefined,
+          diagnosticSource(filename, source, interactionSourceIdentity));
+        return error.diagnosticEnvelope;
       }
-      if (original) {
-        const prefix = `${error.filename}:${error.line}:${error.column}: `;
-        const detail = error.message.startsWith(prefix) ? error.message.slice(prefix.length) : error.message;
-        error.message = `${original.file}:${original.line}:${original.column}: ${detail}`;
-        error.filename = original.file; error.line = original.line; error.column = original.column;
+      const errorMap = errorDocument ? extractLiterate(errorDocument.text, { filename: error.filename }).sourceMap : extraction.sourceMap;
+      if (Number.isInteger(error.line) && (error.filename === filename || errorDocument)) {
+        let original = mapSourcePosition(errorMap, error.line, error.column ?? 1);
+        // Extraction appends a newline after the final authored code line. Its
+        // terminal EOF belongs to that line's insertion point, not a prose line
+        // or a generated separator between executable fences.
+        if (!original && error.line === errorMap.length + 1 && error.column === 1) {
+          const lastLine = errorMap.at(-1);
+          if (lastLine) original = mapSourcePosition(errorMap, errorMap.length, lastLine.length + 1);
+        }
+        if (original) {
+          const originalEnd = Number.isInteger(error.loc?.endLine) && Number.isInteger(error.loc?.endColumn)
+            ? mapSourcePosition(errorMap, error.loc.endLine, error.loc.endColumn) : null;
+          const prefix = `${error.filename}:${error.line}:${error.column}: `;
+          const detail = error.message.startsWith(prefix) ? error.message.slice(prefix.length) : error.message;
+          error.message = `${original.file}:${original.line}:${original.column}: ${detail}`;
+          error.filename = original.file; error.line = original.line; error.column = original.column;
+          const errorSource = errorDocument
+            ? { filename: errorDocument.filename, text: errorDocument.text }
+            : { filename, text: source };
+          attachDiagnostic(error, stage === 'parse' ? 'GF_PARSE' : 'GF_SEMANTIC',
+            errorSource, errorDocument ? undefined : interactionSourceIdentity, original, originalEnd,
+            errorDocument ? diagnosticSource(filename, source, interactionSourceIdentity) : undefined);
+        }
       }
-    }
+      return error.diagnosticEnvelope;
+    };
+    const envelopes = failures.map(mapFailure).filter(Boolean);
+    if (!failures.includes(error)) mapFailure(error);
+    if (envelopes.length) error.diagnosticEnvelope = {
+      ...envelopes[0], diagnostics: envelopes.flatMap(envelope => envelope.diagnostics),
+      ...(error.diagnosticCollection ? { collection: error.diagnosticCollection } : {}),
+    };
     throw error;
   }
   if (extraction.anchors.length || extraction.linkDirectives.length) {
@@ -151,6 +210,8 @@ export function compileSourceSync(source, options = {}) {
   const schema = interactionSourceIdentity === undefined ? null : emitInteractionSchema(compilation, interactionSourceIdentity);
   return {
     ...compilation,
+    diagnosticEnvelope: { format: DIAGNOSTICS_FORMAT,
+      source: diagnosticSource(filename, source, interactionSourceIdentity), diagnostics: [] },
     interactionSchema: schema,
     interactionSourceIdentity: schema ? {
       documentId: schema.source.documentId,

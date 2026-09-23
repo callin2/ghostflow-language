@@ -1773,6 +1773,27 @@ npm run compile -- examples/scheduled-watering.ghost.md build/scheduled-watering
 `--check`는 소스를 컴파일하여 검사하지만 산출물을 기록하지 않는다.
 이 검사는 프로그램 실행이나 실제 센서·릴레이 동작 확인을 대신하지 않는다.
 
+LLM 호출은 다음 버전 형식의 TOON 요청 파일을 사용한다. 요청은 문서 경로와
+불변 문서·판본 ID를 가리킨다. 코드 본문을 요청에 복사하지 않는다.
+
+```toon
+format: GhostFlow/cli-request-v1
+operation: check
+source:
+  path: examples/scheduled-watering.ghost.md
+  documentId: watering
+  revisionId: rev-17
+```
+
+컴파일 요청은 `operation: compile`과 `artifactPath`를 추가한다. 결과는 기본적으로
+TOON이며 `--format json`은 같은 결과의 JSON 표현을 출력한다. 컴파일 오류는 종료 코드
+1과 원본 위치가 있는 진단을 반환한다. 잘못된 요청은 종료 코드 2와 `GF_CLI` 오류를 반환한다.
+
+```sh
+node tools/ghostc.mjs --request build/request.toon
+node tools/ghostc.mjs --request build/request.toon --format json
+```
+
 **왜 문서 전체를 넘기나요?** 실행 규칙과 작성 의도·소스 위치를 같은 정본 판본으로 처리하기 위해서다.
 
 **문법 근거**

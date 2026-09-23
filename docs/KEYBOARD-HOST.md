@@ -28,3 +28,93 @@ logical_time_ms,key,event
 The existing `run` CSV runner remains unchanged. The recorded event CSV is an
 audit stream for a host adapter; it is not accepted as the ordinary input
 matrix used by `run`.
+
+## Virtual-time ASCII console
+
+`ghostsim-console` uses the same `ghostsim` scenario runner. It reads one command
+per line from a terminal, redraws its panel on stderr after each scan, and writes
+one complete `GhostFlow/scenario-result-v1` document to stdout after `exit`.
+The result is TOON by default; `--format json` selects JSON. It never opens a
+physical Driver.
+
+```sh
+node tools/ghostsim-console.mjs build/program.gfb \
+  --bind DI1=start --bind DI2=stop --bind RO1=pump --bind RO2=valve \
+  --record build/session.toon
+```
+
+When `--profile` is absent, the layout is a **virtual Waveshare 8DI/8RO** with
+Bool `DI1`–`DI8` and `RO1`–`RO8`. The default name binds only to a manifest
+logical port with exactly the same name and type. Other logical ports need an
+explicit `--bind CHANNEL=port` assignment. This layout conveys no pin number,
+installed hardware, or site approval. Every logical output needs a binding.
+An unbound logical input needs an explicit `--input port=value` starting value;
+it cannot be toggled from the panel. Unused profile channels display `(unbound)`.
+
+A selected descriptor may use the existing `GhostFlow/board-profile-v1` schema:
+`schema`, `id`, `revision`, `boardModel`, and an `endpoints` object. Each endpoint
+key is its channel ID. Each value has `direction` (`input` or `output`), `type`,
+`driver`, `address`, `activeLevel`, and `safeLevel`. The console lists endpoint
+IDs in the order they appear in the JSON file, separately for inputs and
+outputs. It uses direction and type for binding validation. It never opens
+the named driver or treats an address as a confirmed pin. All logical port
+bindings remain explicit with `--bind`.
+
+The alternative `GhostFlow/console-profile-v1` JSON below is a presentation-only
+Driver descriptor. Its `id`, ordered channels, labels, and types drive the
+virtual panel; it carries no physical installation mapping.
+
+```json
+{
+  "format": "GhostFlow/console-profile-v1",
+  "id": "example-2DI-4RO",
+  "inputs": [
+    { "name": "A", "label": "Input A", "type": "Bool" },
+    { "name": "B", "label": "Input B", "type": "Bool" }
+  ],
+  "outputs": [
+    { "name": "R1", "label": "Relay 1", "type": "Bool" },
+    { "name": "R2", "label": "Relay 2", "type": "Bool" },
+    { "name": "R3", "label": "Relay 3", "type": "Bool" },
+    { "name": "R4", "label": "Relay 4", "type": "Bool" }
+  ]
+}
+```
+
+```sh
+node tools/ghostsim-console.mjs build/program.gfb \
+  --profile build/profile.json --bind A=start --bind B=stop \
+  --bind R1=pump --bind R2=valve --record build/session.toon
+```
+
+On a terminal, keys `1` through `8` toggle a bound Bool input immediately;
+Enter is not needed. Press `:` to enter a line command, then Enter. For later
+channels, enter `:toggle CHANNEL`, such as `:toggle DI9`. Enter `:scan 100`
+to scan at 100 ms with held input values. Enter `:exit` or press Ctrl-C to end.
+Raw terminal mode is restored on exit or error. When commands are piped through
+stdin, omit `:` and use one command per line.
+
+Each toggle records a key edge or typed input action and scans once at the
+current virtual time. Time starts at 0 ms and cannot move backward. If there
+were no commands, exit records one
+initial scan at 0 ms. For a non-Bool manifest input, supply `--input port=value`
+with a typed initial value. A non-Bool channel can appear in the descriptor,
+but its panel state is `unsupported` and it has no toggle shortcut.
+
+Rows align the input and output lists by index. Empty cells remain empty when
+one side is shorter. Bool values display ON or OFF; missing observations display
+`unobserved`. Output columns separately show requested and safe virtual intent.
+The panel reports the profile/Driver identity, exact bindings, scan ID, virtual
+time, status/error, and `physical: unconfirmed`.
+
+`--record` writes the exact replayable TOON scenario. Replay it with
+`node tools/ghostsim.mjs build/program.gfb build/session.toon --format toon`.
+The final result includes a `console` field containing the selected profile ID,
+revision when present, digest, bindings, and physical status. For a board profile,
+the digest uses the integration contract's canonical JSON SHA-256; for a console
+descriptor, it hashes the exact JSON file bytes. The replay
+has equivalent scans, outcome, artifact/source identity, and scenario digest;
+`ghostsim` does not add the console presentation metadata. The older keyboard
+example's `logical_time_ms,key,event` CSV needs explicit conversion into
+`GhostFlow/scenario-v1` initial inputs, key bindings, and ordered key/scan actions
+before it can be replayed by `ghostsim`.

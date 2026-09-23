@@ -16,6 +16,8 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/boundary-conformance.test.mjs',
   'tests/compiler.test.mjs',
   'tests/reference-cli.test.mjs',
+  'tests/reference-query.test.mjs',
+  'tests/authoring-efficiency.test.mjs',
   'tests/time-literals.test.mjs',
   'tests/date-time-control.test.mjs',
   'tests/quantities.test.mjs',
@@ -54,6 +56,8 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/compiler-parser-callsites.test.mjs',
   'tests/compiler-token-limit-diagnostics.test.mjs',
   'tests/compiler-cli-diagnostics.test.mjs',
+  'tests/ghostc-toon.test.mjs',
+  'tests/structured-diagnostics.test.mjs',
   'tests/compiler-semantic-diagnostics.test.mjs',
   'tests/compiler-interaction-diagnostics.test.mjs',
   'tests/compiler-control-diagnostics-extra.test.mjs',
@@ -125,6 +129,9 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/signals-wasm.test.mjs',
   'tests/scan-frame-wasm.test.mjs',
   'tests/scan-tape-parity.test.mjs',
+  'tests/ghostsim.test.mjs',
+  'tests/ghostsim-console.test.mjs',
+  'tests/authoring-workflow.test.mjs',
   'tests/station-wasm.test.mjs',
   'tests/toolchain.test.mjs',
   'tests/browser-toolchain.test.mjs',
@@ -168,6 +175,7 @@ async function verify(nodeOnly, curriculumOnly) {
   const wasmPath = path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm');
   const nativePath = path.join(root, 'target/release/examples/run');
   const framedNativePath = path.join(root, 'target/release/examples/scan_tape');
+  const scenarioNativePath = path.join(root, 'target/release/examples/scenario_scan');
   let wasmVerified = false;
 
   async function gate(command, arguments_) {
@@ -328,6 +336,7 @@ async function verify(nodeOnly, curriculumOnly) {
       if (!fs.existsSync(wasmPath)) throw new Error('WASM artifact missing; run npm test first');
       if (!fs.existsSync(nativePath)) throw new Error('release native artifact missing; run npm test first');
       if (!fs.existsSync(framedNativePath)) throw new Error('release framed native artifact missing; run npm test first');
+      if (!fs.existsSync(scenarioNativePath)) throw new Error('release scenario runner missing; run npm test first');
     } else {
       report.rustc = (await gate('rustc', ['--version'])).trim();
       report.cargo = (await gate('cargo', ['--version'])).trim();
@@ -339,6 +348,7 @@ async function verify(nodeOnly, curriculumOnly) {
       await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-core', '--example', 'run', '--release']);
       await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-core', '--example', 'scan_adapter', '--release']);
       await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-core', '--example', 'scan_tape', '--release']);
+      await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-core', '--example', 'scenario_scan', '--release']);
       await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-wasm', '--target', 'wasm32-unknown-unknown', '--release']);
       wasmVerified = true;
     }

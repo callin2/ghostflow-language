@@ -1,7 +1,21 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { compileSource } from '../tools/toolchain.mjs';
-import { ControlCompileError } from '../tools/control.mjs';
+import { ControlCompileError, compileComposedControl, parseControl } from '../tools/control.mjs';
+
+test('unexpected compiler failure after a source error remains visible and emits no artifact', () => {
+  const ast = parseControl('control Broken { output a, b: Bool; a <- 2; b <- true; }');
+  const failure = new Error('unexpected expression failure');
+  const second = ast.body.filter(item => item.kind === 'connection')[1];
+  // Fault injection at the composition adapter boundary exercises recovery
+  // without inventing source syntax that deliberately crashes the compiler.
+  Object.defineProperty(second, 'value', { get() { throw failure; } });
+  assert.throws(() => compileComposedControl(ast, '<control>'), error => {
+    assert.equal(error, failure);
+    assert.equal(error.bytes, undefined);
+    return true;
+  });
+});
 
 const filename = 'control-diagnostic-extra.ghost.md';
 const document = code => `# Additional control diagnostics\n\nThe prose is preserved.\n\n\`\`\`ghost\n${code}\n\`\`\`\n`;

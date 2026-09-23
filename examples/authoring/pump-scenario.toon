@@ -1,0 +1,22 @@
+format: GhostFlow/scenario-v1
+id: pump-permission-review
+initialInputs[3]{name,type,value}:
+  start,Bool,true
+  stop,Bool,false
+  permit_ok,Bool,false
+keyBindings[0]:
+actions[5]:
+  - kind: scan
+    atMs: 0
+  - kind: input
+    name: permit_ok
+    type: Bool
+    value: true
+  - kind: scan
+    atMs: 1
+  - kind: input
+    name: stop
+    type: Bool
+    value: true
+  - kind: scan
+    atMs: 2
