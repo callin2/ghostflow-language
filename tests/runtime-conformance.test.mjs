@@ -3,14 +3,15 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { compileSource } from './helpers/literate-compile.mjs';
 import { compile, parse, tokenize } from '../tools/gfb1.mjs';
 import { GhostFlowRuntime } from '../runtimes/wasm/ghostflow-runtime.mjs';
 
-const root = path.resolve(new URL('..', import.meta.url).pathname);
+const root = fileURLToPath(new URL('..', import.meta.url));
 const wasmBytes = fs.readFileSync(path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm'));
-const nativePath = path.join(root, 'target/release/examples/run');
+const nativePath = path.join(root, 'target/release/examples/run' + (process.platform === 'win32' ? '.exe' : ''));
 const gfb = source => compile(parse(tokenize(source)));
 
 // Feed identical deployed bytes and snapshots to two targets. The exact expected
@@ -214,15 +215,28 @@ test('GF-TEST-query-verifier: exact postfix errors and stack maximum across rele
   assert.deepEqual(outcomes[0].trace.safe, {});
 });
 
-test('GF-TEST-eager-if-error: unselected arithmetic branch still rejects without commit', async t => {
-  const bytes = gfb(`(module Eager (input divisor number) (state count number 0)
+test('GF-TEST-short-circuit-if: unselected arithmetic fault permits state and intent commit', async t => {
+  const bytes = gfb(`(module ShortCircuit (input divisor number) (state count number 0)
     (strategy run 0 (device true) (next count (add state.count 1))
       (intent result (if true 7 (div 1 input.divisor)))))`);
+  const { outcomes } = await differential(t, bytes, ['divisor'], [{ divisor: 0 }, { divisor: 1 }], [['result', 'number']]);
+  assert.equal(outcomes[0].trace.stateBefore.count, 0);
+  assert.equal(outcomes[0].trace.stateAfter.count, 1);
+  assert.equal(outcomes[0].trace.safe.result, 7);
+  assert.equal(outcomes[1].trace.stateBefore.count, 1);
+  assert.equal(outcomes[1].trace.stateAfter.count, 2);
+  assert.equal(outcomes[1].trace.safe.result, 7);
+});
+
+test('GF-TEST-selected-if-error: selected arithmetic fault rejects without partial commit', async t => {
+  const bytes = gfb(`(module SelectedFault (input divisor number) (state count number 0)
+    (strategy run 0 (device true) (next count (add state.count 1))
+      (intent result (if false 7 (div 1 input.divisor)))))`);
   const { outcomes } = await differential(t, bytes, ['divisor'], [{ divisor: 0 }, { divisor: 1 }], [['result', 'number']]);
   assert.deepEqual(outcomes[0], { status: 'ERROR', phase: 'tick', error: 'division by zero', journalLength: 0 });
   assert.equal(outcomes[1].trace.stateBefore.count, 0);
   assert.equal(outcomes[1].trace.stateAfter.count, 1);
-  assert.equal(outcomes[1].trace.safe.result, 7);
+  assert.equal(outcomes[1].trace.safe.result, 1);
 });
 
 test('GF-TEST-strategy-priority: only ties at the winning priority prevent activation', async t => {

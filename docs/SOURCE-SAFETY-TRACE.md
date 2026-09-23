@@ -82,6 +82,36 @@ captured inside the existing fixed-point safety loop, before that round's update
 The prior requested/safe maps and fault strings retain their exact semantics.
 The snapshots observe the algorithm; they must not affect any output decision.
 
+## Window evidence
+
+`windowSites` binds each aggregate declaration to its operation, nominal payload,
+durations, physical sources and optional prior `upstreamWindows`. Canonical
+source replay checks these bindings and the source/consumer dependencies.
+
+Rust `windowTrace` records contain immediate contributors, not a flattened set of
+sensor samples. Physical contributors retain `{sourceTag, epoch, id, timestampMs,
+value}`. Derived contributors retain `{kind: "derived", site, timeEpoch,
+admissionRevision, timestampMs, evaluatedAtMs, value, proofRoot}`. Their identities
+are local to the verified module, selected strategy and execution session. A time
+epoch alone is not a globally unique session identity.
+
+A record with derived contributors owns a `proof` array. Each `proofRoot` points
+to an aggregate tree in this flat preorder arena. Every node carries `childCount`
+and `subtreeSize`; physical leaves have zero children and size one. A derived node
+preserves its aggregate operation, original aggregate `value`, evaluation time and
+observation identity. `suppliedValue` is the payload supplied to its parent after
+any pure transform. A physical leaf's `value` is already the admitted transformed
+observation payload, so its `suppliedValue` is the same value; it does not claim to
+retain a separate raw driver reading.
+
+`observeSourceTrace` validates tree boundaries, prior-window identities, physical
+root membership, scalar domains, observation/evaluation times and complete proof
+coverage. It exposes the owned proof in `windowEvents` without recomputing aggregate
+arithmetic. A nested average counts immediate aggregate contributors once each,
+even when their proof trees share physical sample identities. Persisted or foreign
+trace data still requires the verified artifact/source envelope before these local
+site identities can be interpreted.
+
 ## Public runtime values
 
 `observeRuntimeValues(metadata, trace)` projects completed-scan values from the

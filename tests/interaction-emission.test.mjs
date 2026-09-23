@@ -2,12 +2,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { interactionSchemaSha256 } from '../contracts/interaction-v0/validate.mjs';
 import { verifyInteractionCorpus } from '../contracts/interaction-v0/verify-corpus.mjs';
 import { compileSource, restoreArtifactSourceMap, writeArtifact } from '../tools/toolchain.mjs';
 
-const root = path.resolve(new URL('..', import.meta.url).pathname);
+const root = fileURLToPath(new URL('..', import.meta.url));
 const wateringPath = 'contracts/interaction-v0/examples/five-minute-watering.ghost.md';
 const multiplePath = 'contracts/interaction-v0/examples/multiple-values.ghost.md';
 const enumPhaseAgePath = 'contracts/interaction-v0/examples/enum-phase-age.ghost.md';
@@ -146,4 +147,83 @@ test('GF-TEST-interaction-emission-enum-phase-age: enum state remains nominal an
   ]);
   assert.deepEqual(phase.provenance.intentAnchorIds, ['GF-INT-FIXTURE-ENUM-PHASE-AGE-V0']);
   assert.deepEqual(age.provenance.intentAnchorIds, ['GF-INT-FIXTURE-ENUM-PHASE-AGE-V0']);
+});
+
+test('GF-TEST-interaction-emission-continuous-true: descriptor and private roles retain the authored Bool subject provenance', async () => {
+  const source = `# Continuous true timer
+
+<!-- ghostflow:anchor id=GF-INT-CONTINUOUS-TRUE-V1 kind=intent status=confirmed origin=user -->
+The alarm uses one uninterrupted high interval.
+
+\`\`\`ghost
+control ContinuousTrueInteraction {
+  input hot: Bool;
+  output alarm: Bool;
+  // ghostflow:link id=GF-INT-CONTINUOUS-TRUE-V1 relation=implements
+  timer hot_for = continuous_true(hot);
+  alarm <- hot_for >= 5min;
+}
+\`\`\`
+`;
+  const compilation = await compileSource(source, {
+    filename: 'continuous-true-interaction.ghost.md',
+    interactionSourceIdentity: {
+      documentId: 'source.continuous-true-interaction',
+      revisionId: 'revision.continuous-true-interaction-v1',
+    },
+  });
+  assert.deepEqual(compilation.manifest.timers, [{
+    name: 'hot_for', mode: 'continuous-true', clockInput: '__gf_now_ms',
+  }]);
+  const timer = compilation.interactionSchema.descriptors.find(entry => entry.id === 'timer.hot_for');
+  assert.equal(timer.operation.kind, 'continuous_true');
+  const subject = compilation.sourceMap.find(node => node.id === timer.operation.subjectNodeId);
+  assert.equal(subject?.kind, 'reference');
+  assert.deepEqual(compilation.traceMetadata.bindings
+    .filter(entry => entry.kind === 'timer')
+    .map(entry => [entry.name, entry.generated]), [
+      ['__gf_timer_since_hot_for', { declaration: 'hot_for', role: 'since' }],
+      ['__gf_timer_was_true_hot_for', { declaration: 'hot_for', role: 'wasTrue' }],
+    ]);
+  const valueDependency = compilation.traceMetadata.dependencies.find(entry => (
+    entry.target.field === 'timerValue' && entry.target.name === 'hot_for'
+  ));
+  assert.ok(valueDependency.reads.some(read => read.field === 'inputs' && read.name === 'hot'));
+
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-continuous-timer-'));
+  try {
+    const artifact = path.join(temporary, 'continuous.gfb');
+    writeArtifact(compilation, artifact);
+    const bytes = fs.readFileSync(artifact);
+    const envelope = JSON.parse(fs.readFileSync(`${artifact}.map.json`, 'utf8'));
+    assert.equal(restoreArtifactSourceMap(envelope, bytes, {
+      manifest: compilation.manifest,
+    }).interactionSchema.descriptors[0].operation.kind, 'continuous_true');
+    assert.throws(() => restoreArtifactSourceMap(envelope, bytes), /requires its manifest descriptor/);
+
+    const missingDependency = structuredClone(envelope);
+    missingDependency.traceMetadata.dependencies = missingDependency.traceMetadata.dependencies.filter(entry => (
+      entry.target.field !== 'timerValue' || entry.target.name !== 'hot_for'
+    ));
+    assert.throws(() => restoreArtifactSourceMap(missingDependency, bytes, {
+      manifest: compilation.manifest,
+    }), /timer value dependency is missing/);
+
+    const missingConditionRead = structuredClone(envelope);
+    const timerValue = missingConditionRead.traceMetadata.dependencies.find(entry => (
+      entry.target.field === 'timerValue' && entry.target.name === 'hot_for'
+    ));
+    timerValue.reads = timerValue.reads.filter(read => read.name !== 'hot');
+    assert.throws(() => restoreArtifactSourceMap(missingConditionRead, bytes, {
+      manifest: compilation.manifest,
+    }), /dependencies do not match canonical source lowering/);
+
+    const wrongSourceMode = structuredClone(envelope);
+    wrongSourceMode.nodes.find(node => node.kind === 'timer').timerMode = 'elapsed';
+    assert.throws(() => restoreArtifactSourceMap(wrongSourceMode, bytes, {
+      manifest: compilation.manifest,
+    }), /mode does not match manifest descriptor/);
+  } finally {
+    fs.rmSync(temporary, { recursive: true, force: true });
+  }
 });

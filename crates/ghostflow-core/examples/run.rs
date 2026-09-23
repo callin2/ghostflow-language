@@ -1,14 +1,36 @@
 //! Virtual native runner. It never opens a GPIO, network, or serial device.
+#[path = "support/temporal_profile.rs"]
+mod temporal_profile;
+
 use ghostflow_core::{Capability, Module, Runtime, Type, Value};
 use std::{collections::BTreeSet, env, error::Error, fs};
+use temporal_profile::parse_temporal;
+
+const USAGE: &str = "usage: run <module.gfb> <inputs.csv> [--outcomes] [--temporal EPOCH MAX_SAMPLES MAX_BYTES TAG:MAX_OBSERVATIONS:INTERVAL_MS[,..]] (virtual outputs only)";
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<_> = env::args().skip(1).collect();
-    let outcomes = args.len() == 3 && args[2] == "--outcomes";
-    if args.len() != 2 && !outcomes {
-        return Err(
-            "usage: run <module.gfb> <inputs.csv> [--outcomes] (virtual outputs only)".into(),
-        );
+    if args.len() < 2 {
+        return Err(USAGE.into());
+    }
+    let mut outcomes = false;
+    let mut temporal = None;
+    let mut at = 2;
+    while at < args.len() {
+        match args[at].as_str() {
+            "--outcomes" if !outcomes => {
+                outcomes = true;
+                at += 1;
+            }
+            "--temporal" if temporal.is_none() && at + 4 < args.len() => {
+                temporal = parse_temporal(&args[at + 1..at + 5]);
+                if temporal.is_none() {
+                    return Err(USAGE.into());
+                }
+                at += 5;
+            }
+            _ => return Err(USAGE.into()),
+        }
     }
     let module = match Module::load(&fs::read(&args[0])?) {
         Ok(module) => module,
@@ -31,7 +53,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     for capability in capabilities {
         runtime.add_capability(capability)?;
     }
-    if let Err(error) = runtime.activate() {
+    let activation = match temporal.as_ref() {
+        Some(profile) => runtime.activate_with_temporal(profile),
+        None => runtime.activate(),
+    };
+    if let Err(error) = activation {
         if !outcomes {
             return Err(error.into());
         }
@@ -71,6 +97,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     _ => return Err("expected true/false".into()),
                 }),
                 Type::Number => Value::Number(value.parse()?),
+                Type::Int => Value::Int(value.parse()?),
             };
             runtime.set_input(name, value)?;
         }

@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { compileControl } from '../tools/control.mjs';
 import { compileLessonBundle, canonicalLessonJson } from '../tools/lesson.mjs';
@@ -11,9 +12,9 @@ import { compileSource } from './helpers/literate-compile.mjs';
 import { observeRuntimeValues, observeSourceTrace } from '../tools/source-trace.mjs';
 import { GhostFlowRuntime } from '../runtimes/wasm/ghostflow-runtime.mjs';
 
-const root = path.resolve(new URL('..', import.meta.url).pathname);
+const root = fileURLToPath(new URL('..', import.meta.url));
 const wasmPath = path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm');
-const nativePath = path.join(root, 'target/release/examples/run');
+const nativePath = path.join(root, 'target/release/examples/run' + (process.platform === 'win32' ? '.exe' : ''));
 
 const source = [
   'control TraceFixture {',
@@ -215,6 +216,7 @@ test('each authored timer binds its two generated runtime states to the timer de
     stateAfter: { __gf_timer_since_age: 2000, __gf_timer_initialized_age: true },
     requested: {}, safe: {},
     safetyTrace: { format: 'GhostFlow/safety-trace-v1', constraints: [] },
+    resultTrace: [],
   });
   assert.deepEqual(observed.bindings.filter(entry => entry.kind === 'timer').map(entry => entry.observations), [
     [

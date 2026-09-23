@@ -1,5 +1,6 @@
 # PC-04 — 정회전·역회전 방향전환 인터록
 
+<!-- ghostflow:anchor id=GF-INT-PC04-DIRECTION-INTERLOCK-V1 kind=intent status=confirmed origin=imported -->
 > 교육용 시나리오: 사용자가 제공한 PLC 대체 교육과정의 정회전/역회전 단계를
 > 바탕으로 만든 학습 시나리오다. 직접 사용자 발화를 그대로 인용한 문서가 아니다.
 
@@ -21,8 +22,11 @@ control DirectionChangeInterlock {
   config reversal_wait: Duration = 2s;
 
   type Phase = Stopped | Forward | Reverse | WaitForward | WaitReverse;
+  // ghostflow:link id=GF-INT-PC04-DIRECTION-INTERLOCK-V1 relation=implements
   state phase: Phase = Stopped;
+  // ghostflow:link id=GF-INT-PC04-DIRECTION-INTERLOCK-V1 relation=implements
   state start_armed: Bool = false;
+  // ghostflow:link id=GF-INT-PC04-DIRECTION-INTERLOCK-V1 relation=implements
   timer age = elapsed(phase);
 
   let permit = stop_ok && overload_ok;

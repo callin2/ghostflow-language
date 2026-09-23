@@ -18,7 +18,7 @@ function assertDependencyShape(compilation) {
   for (const dependency of compilation.traceMetadata.dependencies) {
     assert.deepEqual(Object.keys(dependency).sort(), ['reads', 'target']);
     assert.deepEqual(Object.keys(dependency.target).sort(), ['field', 'name']);
-    assert.ok(['stateAfter', 'requested'].includes(dependency.target.field));
+    assert.ok(['stateAfter', 'requested', 'timerValue'].includes(dependency.target.field));
     assert.match(dependency.target.name, /^[A-Za-z_][A-Za-z0-9_]*$/);
     for (const read of dependency.reads) {
       assert.deepEqual(Object.keys(read).sort(), ['field', 'name']);
@@ -38,8 +38,8 @@ const selfHold = `control SelfHold {
 
 test('self-hold dependencies map next state and requested intent to lowered fields', async () => {
   const compiled = await compileSource(selfHold, { filename: 'self-hold.ghost' });
-  // Stable predecessor pin 2c875407: dependency metadata must not alter this GFB.
-  assert.equal(createHash('sha256').update(compiled.bytes).digest('hex'), 'ffb94d0ee7e78cd0a012b986cecfe7cfdab57d3d9d51365b51a0c6d0f9b5a591');
+  // GFB3 short-circuit encoding: dependency metadata must not alter these bytes.
+  assert.equal(createHash('sha256').update(compiled.bytes).digest('hex'), '273976e0bcc83bad8401b679026403c5ff236478eff6e9562e2b9940c8e6af39');
   assertDependencyShape(compiled);
   assert.deepEqual(dependenciesFor(compiled, 'requested', 'RO1'), new Set(['stateAfter.running']));
   assert.deepEqual(dependenciesFor(compiled, 'stateAfter', 'running'), new Set([
@@ -92,6 +92,9 @@ test('implicit state hold and generated timer dependencies remain explicit witho
     `stateBefore.${generatedSince}`, 'stateBefore.running',
   ]));
   assert.deepEqual(dependenciesFor(timed, 'stateAfter', generatedInitialized), new Set());
+  assert.deepEqual(dependenciesFor(timed, 'timerValue', timer.name), new Set([
+    'inputs.__gf_now_ms', `stateBefore.${generatedInitialized}`, `stateBefore.${generatedSince}`,
+  ]));
   assert.ok(timed.traceMetadata.dependencies.every(entry => !('source' in entry) && !('source' in entry.target)));
 });
 
@@ -106,6 +109,7 @@ test('literate remap and observation retain static dependency metadata', async (
     module: compiled.traceMetadata.moduleFingerprint,
     inputs: {}, stateBefore: {}, stateAfter: {}, requested: {}, safe: {},
     safetyTrace: { format: 'GhostFlow/safety-trace-v1', constraints: [] },
+    resultTrace: [],
   };
   const observed = observeSourceTrace(compiled.traceMetadata, trace);
   assert.deepEqual(observed.dependencies, compiled.traceMetadata.dependencies);

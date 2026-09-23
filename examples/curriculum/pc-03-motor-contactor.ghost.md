@@ -1,5 +1,6 @@
 # PC-03 — 모터 접촉기 명령과 과부하 허가
 
+<!-- ghostflow:anchor id=GF-INT-PC03-MOTOR-PERMIT-REARM-V1 kind=intent status=confirmed origin=imported -->
 > 교육용 시나리오: PC-02의 자기유지에 모터의 과부하 보호 허가를 하나
 > 추가한다. 이 문서는 직접 사용자 발화가 아니라 curriculum/learning
 > scenario를 정의한다.
@@ -17,7 +18,9 @@ control MotorContactor {
   input start, stop_ok, overload_ok: Bool;
   output motor_contactor: Bool;
 
+  // ghostflow:link id=GF-INT-PC03-MOTOR-PERMIT-REARM-V1 relation=implements
   state armed: Bool = false;
+  // ghostflow:link id=GF-INT-PC03-MOTOR-PERMIT-REARM-V1 relation=implements
   state running: Bool = false;
 
   let permit = stop_ok && overload_ok;

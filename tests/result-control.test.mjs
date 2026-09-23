@@ -1,0 +1,228 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import test from 'node:test';
+import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
+import { compileSource } from './helpers/literate-compile.mjs';
+
+const wasm = fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
+const sample = (id, quality, value = 0, timestampMs = id) => ({ epoch: 1, id, timestampMs, quality, value });
+
+test('Result function parameters, constructors, and exhaustive nested fault cases lower to scalar control flow', async () => {
+  const compiled = await compileSource(`fn ready(value: Bool) -> Result<Bool, SensorFault> {
+    if value then ok(true) else fault(NotReady)
+  }
+  fn pass(value: Result<Bool, SensorFault>) -> Result<Bool, SensorFault> { value }
+  control ResultFunctions {
+    input request: Bool;
+    output accepted: Bool;
+    accepted <- case pass(ready(request)) {
+      ok(value) => value;
+      fault(reason) => case reason {
+        Disconnected => false; Stale => false; Invalid => false; NotReady => false;
+      };
+    };
+  }`, { filename: 'result-functions.ghost' });
+  const runtime = await ControlRuntime.instantiate(wasm, compiled);
+  try {
+    const accepted = runtime.step({ nowMs: 0, inputs: { request: true } });
+    assert.equal(accepted.vm.safe.accepted, true);
+    assert.equal(accepted.vm.resultTrace.at(-1).choice, 0);
+    const fallback = runtime.step({ nowMs: 1, inputs: { request: false } });
+    assert.equal(fallback.vm.safe.accepted, false);
+    assert.equal(fallback.vm.resultTrace.at(-1).choice, 4);
+    assert.ok(fallback.vm.resultTrace.at(-1).origin > 0);
+  } finally { runtime.dispose(); }
+
+});
+
+test('Result generic equality and contextual shared fault members are strict', async () => {
+  await assert.rejects(() => compileSource(`fn wrong(value: Result<Bool, ClockFault>) -> Result<Bool, CalendarFault> { value }
+control WrongResult {}`, { filename: 'wrong-result.ghost' }), /Result|CalendarFault|ClockFault|returns/);
+  await assert.rejects(() => compileSource(`control AmbiguousFault { let reason = ClockUnknown; }`, { filename: 'ambiguous-fault.ghost' }), /ambiguous|fault type/);
+  await assert.rejects(() => compileSource(`control StoredResult { state bad: Result<Bool, SensorFault> = ok(true); }`, { filename: 'stored-result.ghost' }), /scalar|state|Result/);
+});
+
+test('Result case branches retain expected Result and shared fault enum context', async () => {
+  await assert.doesNotReject(() => compileSource(`fn pass(value: Result<Bool, SensorFault>) -> Result<Bool, SensorFault> {
+    case value { ok(payload) => ok(payload); fault(reason) => fault(reason); }
+  }
+  fn clock(value: Result<Bool, CalendarFault>) -> CalendarFault {
+    case value { ok(_) => ClockUnknown; fault(reason) => reason; }
+  }
+  control ContextualResult {}`, { filename: 'contextual-result.ghost' }));
+});
+
+test('fault enum members cannot be shadowed by parameters, lets, or Result bindings', async () => {
+  await assert.doesNotReject(() => compileSource('control OrdinaryEnum { type Mine = Fresh | Used; }', { filename: 'ordinary-enum.ghost' }));
+  for (const [name, code] of [
+    ['parameter', 'fn bad(Stale: Bool) -> Bool { Stale } control Bad {}'],
+    ['let', 'control Bad { let Stale = false; }'],
+    ['case binding', 'control Bad { sensor value: Bool; let x = case value { ok(Stale) => Stale; fault(_) => false; }; }'],
+    ['enum declaration', 'control Bad { type Mine = Stale; }'],
+  ]) await assert.rejects(() => compileSource(code, { filename: `shadow-${name}.ghost` }), /reserved fault member/);
+});
+
+test('enum case selection preserves every transient Result field', async () => {
+  const compiled = await compileSource(`fn ready(value: Bool) -> Result<Bool, SensorFault> {
+    if value then ok(true) else fault(Stale)
+  }
+  control EnumResult {
+    type Mode = A | B;
+    fn choose(mode: Mode) -> Result<Bool, SensorFault> {
+      case mode { A => ready(true); B => ready(false); }
+    }
+    output value: Bool;
+    value <- case choose(B) { ok(payload) => payload; fault(_) => false; };
+  }`, { filename: 'enum-result.ghost' });
+  const runtime = await ControlRuntime.instantiate(wasm, compiled);
+  try { assert.equal(runtime.step({ nowMs: 0 }).vm.safe.value, false); }
+  finally { runtime.dispose(); }
+});
+
+test('pure function and Result callback scopes cannot capture caller parameters with enum names', async () => {
+  const compiled = await compileSource(`control LexicalScopes {
+    type Mode = A | B;
+    fn fixed(value: Bool) -> Mode { A }
+    fn ordinary(A: Mode) -> Mode { fixed(true) }
+    fn callback(value: Number) -> Mode { A }
+    fn transformed(A: Mode, result: Result<Number, SensorFault>) -> Mode {
+      result |> map(callback) |> recover(A)
+    }
+    output ordinary_changed, callback_changed: Bool;
+    ordinary_changed <- ordinary(B) == B;
+    callback_changed <- transformed(B, ok(1.0)) == B;
+  }`, { filename: 'lexical-scopes.ghost' });
+  const runtime = await ControlRuntime.instantiate(wasm, compiled);
+  try {
+    const safe = runtime.step({ nowMs: 0 }).vm.safe;
+    assert.equal(safe.ordinary_changed, false);
+    assert.equal(safe.callback_changed, false);
+  } finally { runtime.dispose(); }
+});
+
+test('named static Result transform aliases compose and cycles or scalar aliases reject', async () => {
+  const compiled = await compileSource(`control NamedTransform {
+    sensor moisture: Percent;
+    let is_dry = map(below(35%)) >> recover(false);
+    output dry: Bool;
+    dry <- moisture |> is_dry;
+  }`, { filename: 'named-transform.ghost' });
+  const runtime = await ControlRuntime.instantiate(wasm, compiled);
+  try {
+    assert.equal(runtime.step({ nowMs: 0, samples: { moisture: sample(0, 'Good', 30) } }).vm.safe.dry, true);
+  } finally { runtime.dispose(); }
+  await assert.rejects(() => compileSource(`control CyclicTransform {
+    sensor moisture: Percent; let first = second; let second = first; output dry: Bool; dry <- moisture |> first;
+  }`, { filename: 'cyclic-transform.ghost' }), /cyclic let/);
+  await assert.rejects(() => compileSource(`control ScalarAlias {
+    sensor moisture: Percent; let threshold = 35%; output dry: Bool; dry <- moisture |> threshold;
+  }`, { filename: 'scalar-transform.ghost' }), /not a static Result transform/);
+});
+
+test('Result pipeline precedence leaves DailySlots generic terminators intact', async () => {
+  await assert.doesNotReject(() => compileSource(`control ScheduleWithResultPrecedence {
+    schedule starts: DailySlots<15min> { timezone = "UTC"; selected = [06:00]; }
+    output due: Bool;
+    due <- starts.due;
+  }`, { filename: 'schedule-result-precedence.ghost' }));
+});
+
+test('REF-00-007 normal zero and fault fallback zero retain distinct result trace evidence', async () => {
+  const compiled = await compileSource(`control ZeroProvenance {
+    sensor reading: Number;
+    output value: Number;
+    value <- reading |> recover(0.0);
+  }`, { filename: 'zero-provenance.ghost' });
+  const runtime = await ControlRuntime.instantiate(wasm, compiled);
+  try {
+    const good = runtime.step({ nowMs: 0, samples: { reading: sample(0, 'Good') } });
+    assert.equal(good.vm.safe.value, 0);
+    assert.equal(good.sensors.reading.quality, 'Good');
+    assert.deepEqual(good.vm.resultTrace.map(({ choice, origin }) => ({ choice, origin })), [{ choice: 0, origin: 0 }]);
+    const fault = runtime.step({ nowMs: 1, samples: { reading: sample(1, 'Disconnected') } });
+    assert.equal(fault.vm.safe.value, 0);
+    assert.equal(fault.sensors.reading.quality, 'Disconnected');
+    assert.deepEqual(fault.vm.resultTrace.map(({ choice, origin }) => ({ choice, origin })), [{ choice: 1, origin: compiled.sourceMap.find(node => node.kind === 'sensor').id }]);
+  } finally { runtime.dispose(); }
+  const framed = await ControlRuntime.instantiateFramed(wasm, compiled);
+  try {
+    const fault = framed.step({ nowMs: 0, samples: { reading: sample(0, 'Disconnected') } });
+    assert.equal(fault.vm.safe.value, 0);
+    assert.equal(fault.vm.resultTrace[0].choice, 1);
+    assert.equal(fault.sensors.reading.quality, 'Disconnected');
+  } finally { framed.dispose(); }
+});
+
+test('legacy and framed Result hosts reject missing or forged sensor fault bindings', async () => {
+  const compiled = await compileSource(`control ResultBindings {
+    sensor reading: Number;
+    signal low = hysteresis(reading, on_below: 1.0, off_above: 2.0, initial: false);
+    output value: Bool;
+    value <- low |> recover(false);
+  }`, { filename: 'result-bindings.ghost' });
+  const missingSensor = structuredClone(compiled);
+  delete missingSensor.manifest.sensors[0].faultInput;
+  await assert.rejects(() => ControlRuntime.instantiate(wasm, missingSensor), /faultInput/);
+  const forgedSignal = structuredClone(compiled);
+  forgedSignal.manifest.signals[0].faultInput = '__gf_signal_fault_other';
+  await assert.rejects(() => ControlRuntime.instantiateFramed(wasm, forgedSignal), /faultInput/);
+});
+
+test('REF-04-003 all SensorFault reasons survive explicit fallback', async () => {
+  const compiled = await compileSource(`control FaultReasons {
+    sensor reading: Number { stale_after = 3s; }
+    output value: Number;
+    value <- reading |> recover(0.0);
+  }`, { filename: 'fault-reasons.ghost' });
+  const scenarios = [
+    ['Disconnected', { nowMs: 0, samples: { reading: sample(0, 'Disconnected') } }, 1],
+    ['Invalid', { nowMs: 0, samples: { reading: sample(0, 'Invalid') } }, 3],
+    ['NotReady', { nowMs: 0 }, 4],
+  ];
+  for (const [quality, frame, choice] of scenarios) {
+    const runtime = await ControlRuntime.instantiate(wasm, compiled);
+    try {
+      const outcome = runtime.step(frame);
+      assert.equal(outcome.sensors.reading.quality, quality);
+      assert.equal(outcome.vm.resultTrace[0].choice, choice);
+    } finally { runtime.dispose(); }
+  }
+  const staleRuntime = await ControlRuntime.instantiate(wasm, compiled);
+  try {
+    staleRuntime.step({ nowMs: 0, samples: { reading: sample(0, 'Good') } });
+    const stale = staleRuntime.step({ nowMs: 3001 });
+    assert.equal(stale.sensors.reading.quality, 'Stale');
+    assert.equal(stale.vm.resultTrace[0].choice, 2);
+  } finally { staleRuntime.dispose(); }
+});
+
+test('REF-04-005 map uses each current tick payload and faulted and_then callbacks stay unselected', async () => {
+  const mapped = await compileSource(`control CurrentMap {
+    sensor reading: Number;
+    output below: Bool;
+    below <- reading |> map(below(30.0)) |> recover(false);
+  }`, { filename: 'current-map.ghost' });
+  const mapRuntime = await ControlRuntime.instantiate(wasm, mapped);
+  try {
+    for (const [id, value, expected] of [[0, 20, true], [1, 40, false], [2, 20, true]]) {
+      assert.equal(mapRuntime.step({ nowMs: id, samples: { reading: sample(id, 'Good', value) } }).vm.safe.below, expected);
+    }
+  } finally { mapRuntime.dispose(); }
+
+  const skipped = await compileSource(`fn classify(value: Number) -> Result<Bool, SensorFault> {
+    if 7.0 / value > 0.0 then ok(true) else ok(false)
+  }
+  control SkipFaultingCallback {
+    sensor reading: Number;
+    state committed: Bool = true;
+    committed' = reading |> and_then(classify) |> recover(false);
+    output value: Bool;
+    value <- committed';
+  }`, { filename: 'skip-faulting-callback.ghost' });
+  const skipRuntime = await ControlRuntime.instantiate(wasm, skipped);
+  try {
+    assert.equal(skipRuntime.step({ nowMs: 0, samples: { reading: sample(0, 'Disconnected') } }).vm.stateAfter.committed, false);
+    assert.throws(() => skipRuntime.step({ nowMs: 1, samples: { reading: sample(1, 'Good', 0) } }), /division by zero|division-by-zero/);
+    assert.equal(skipRuntime.runtime.trace.stateAfter.committed, false);
+  } finally { skipRuntime.dispose(); }
+});

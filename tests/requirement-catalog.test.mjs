@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { readCatalog, requirementId, validateCatalog } from '../contracts/requirements/validate.mjs';
 
-const root = path.resolve(new URL('..', import.meta.url).pathname);
+const root = fileURLToPath(new URL('..', import.meta.url));
 const catalog = readCatalog({ root });
 
 test('requirement catalog has content-derived IDs and complete relation', () => {

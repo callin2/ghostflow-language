@@ -2,12 +2,13 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { interactionSchemaSha256, validateInteraction } from '../contracts/interaction-v0/validate.mjs';
 import { canonicalJson } from '../tools/canonical-json.mjs';
 import { compileSource } from '../tools/toolchain.mjs';
 
-const root = path.resolve(new URL('..', import.meta.url).pathname);
+const root = fileURLToPath(new URL('..', import.meta.url));
 const fixtureSourcePath = 'contracts/interaction-v0/examples/five-minute-watering.ghost.md';
 const read = relative => JSON.parse(fs.readFileSync(path.join(root, relative), 'utf8'));
 const schema = read('contracts/interaction-v0/examples/five-minute-watering.schema.json');
@@ -183,7 +184,7 @@ test('GF-TEST-interaction-v0-rejection: rejects unknown fields, mismatched ident
   ]) expectInvalid(mutate, 'identity_mismatch');
   expectInvalid((candidate) => { candidate.descriptors[0].id = '__gf_state_pressure'; }, 'public_identity');
   expectInvalid((_schema, candidate) => { candidate.observations.pop(); }, 'missing_observation');
-  for (const kind of ['input', 'setting', 'command']) {
+  for (const kind of ['input', 'command']) {
     expectInvalid((candidate) => { candidate.descriptors[0].kind = kind; }, 'descriptor_kind');
   }
   expectInvalid((candidate) => { candidate.source.kind = 'plain'; }, 'source_kind');

@@ -9,9 +9,10 @@ language PR19 / 1b04529 and web PR71 / a6999ad. No device or physical I/O.
 
 Add `ControlRuntime.instantiateFramed(wasmBytes, artifact, options = {})`.
 It uses the same manifest validation, bytecode digest verification, capability
-binding and existing Rust signal conditioners as the current entry. Default
-manifest acceptance remains v1; `acceptSettings` retains its existing meaning.
-Legacy `instantiate` and `instantiateSimulation` behavior remains unchanged.
+binding and existing Rust signal conditioners as the current entry. Manifest
+v1 and v4 are accepted; `acceptSettings` and `acceptSolar` opt into v2 and v3.
+Legacy `instantiate` and `instantiateSimulation` retain their public result
+shape; every entry now uses the same atomic conditioner transaction boundary.
 Use a shared constructor/helper, not copied conditioning or a second evaluator.
 
 Only the new entry owns `FramedGhostFlowRuntime`. At each `step` the host
@@ -37,14 +38,74 @@ its legacy tick namespace is distinct from the frame ID.
 plain-data committed outcome (null before the first scan, null in legacy mode).
 After disposal it rejects. Execution mode and frame counter stay private.
 
+`signals` contains conditioner readings. VM-owned `debounce` and `hold_last`
+states are in `vm.stateAfter`. For hold observations, pass the verified source
+trace metadata and `vm` to `observeSourceTrace`; `heldEvents` projects the
+Rust-computed Held payload, original sample identity, age and masked fault.
+The adapter and observer do not execute the hold expression or extend its TTL.
+
+### Temporal windows
+
+Temporal replay through both adapters is specified in
+[TEMPORAL-REPLAY.md](TEMPORAL-REPLAY.md).
+
+Both `instantiate` and `instantiateFramed` require `options.temporal` for GFB4
+window modules. Supply an explicit execution epoch, physical root density
+contracts and target temporal memory budgets:
+
+```js
+const options = {
+  temporal: {
+    timeEpoch: 5,
+    rootDensity: [{ sourceTag: 1, maxObservations: 3, intervalMs: 1000 }],
+    budget: { maxRetainedSamples: 12, maxBytes: 33554432 },
+  },
+};
+const runtime = await ControlRuntime.instantiateFramed(wasmBytes, artifact, options);
+```
+
+These are illustrative values, not device defaults. Source tags must match the
+compiled physical roots. Density is an acquisition upper bound; `sampleMs`
+does not establish it. Root tags are ascending and unique. Budget integers fit
+u32; epoch and intervals are exact safe integers. Non-window modules reject this
+option. The host captures it before asynchronous initialization; later caller
+mutation does not change the session. A different time epoch requires a new
+runtime instance. The host supplies the captured `__gf_time_epoch` on every scan.
+
+The Rust core computes windows. Their owned evidence is `vm.windowTrace`, with
+derived quality, immediate physical or aggregate identities and optional upstream
+fault. Nested aggregate contributors retain owned proof trees of their inputs;
+the observer does not flatten them into a different average. Observation time
+remains the newest contributing measurement time; evaluation time is separate.
+It is not a conditioner entry in `signals`. A rejected scan rolls back window
+history and conditioners together, so retry can reuse the same sample identity.
+`observeSourceTrace(verifiedMetadata, vm)` projects this as `windowEvents` linked
+to the authored declaration. Unavailable aggregates report their own NotReady
+site; an upstream fault remains separate. The source map records window sources,
+identity inputs, clocks and downstream window dependencies. Restoring a source
+map checks these links against canonical lowering.
+
+Low-level adapters expose `activateTemporal(profile)` with the same profile.
+Both use the bounded GFTA activation packet and independent Rust validation.
+The budget accounts for temporal storage and bounded retained traces. JSON
+buffers, host conditioners and caller-retained copies are outside that budget.
+Manifest validation checks structural domains and bytecode digest; canonical
+source/nominal-descriptor equivalence requires toolchain/package verification.
+
 All ordinary snapshot/type/time validation happens before conditioner mutation.
-If conditioning or VM dispatch subsequently throws, the framed host latches a
-fault: the committed VM outcome stays available, but further step attempts
-require a new host instance. Do not claim conditioner rollback or re-use a
-partially processed sample snapshot. This policy is new-entry-only; legacy
-recovery behavior remains unchanged. Validate/retry before conditioning remains
-possible. Global constraints yielding false outputs are successful scans, not
-host faults. Dispose releases all owned conditioners and the framed handle.
+The later Reference 4.15 atomic tick contract supersedes this design's original
+no-rollback limitation. Before conditioning, the host begins one Rust-owned
+transaction on every sensor and signal conditioner. Conditioning, generated
+input preparation, or a known native rejection rolls all of them back and keeps
+the accepted logical time and frame ID unchanged, so the caller can retry.
+
+A positive native scan commits every conditioner, logical time, and frame ID
+before decoding the outcome. A failure after that boundary cannot undo accepted
+state and terminates the host. A trap whose native commit status is unknown also
+terminates the host without fabricating rollback. The committed VM outcome stays
+available when its adapter remains readable. Global constraints yielding false
+outputs are successful scans, not host faults. Dispose releases all owned
+conditioners and the framed handle.
 
 ## Web consumer
 
@@ -76,7 +137,8 @@ instance/identity. Pause and one-step do not replace an epoch or skip frame IDs.
 Language: real built WASM, all existing gates, new-entry complete/generated
 input parity (timer, sensor/signal, schedule, constraints), frames with and
 without timers, safe identity progression and rejection, no legacy export calls,
-fault latch/committed-outcome preservation, old-artifact and disposal handling.
+known rejection rollback and same-ID retry, unknown/postcommit fault latching and
+committed-outcome preservation, old-artifact and disposal handling.
 Web: unit/type/build/source guard, strict no-reuse browser server, existing
 lesson/replay/source-trace and speed tests, plus accepted frame/epoch continuity,
 constraints, failed compile/reset, and invalid DI rejection before a host call.

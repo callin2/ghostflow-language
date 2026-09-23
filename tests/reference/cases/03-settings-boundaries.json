@@ -1,0 +1,1237 @@
+{
+  "chapterFiles": [
+    "05-settings-and-observation.md",
+    "06-composition-and-replay.md",
+    "07-semantic-rules-and-index.md",
+    "08-language-runtime-and-device-boundaries.md"
+  ],
+  "cases": [
+    {
+      "id": "REF-05-001",
+      "references": [
+        "05-settings-and-observation.md#51-config-선언"
+      ],
+      "rule": "Duration config의 타입, 기본값, 닫힌 범위, 증분, 권한, 라벨을 함께 선언할 수 있어야 한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "source": "# Duration 설정\n\n```ghost\ncontrol Settings {\n  config duration: Duration = 5min {\n    min = 1min;\n    max = 20min;\n    step = 1min;\n    access = operator;\n    label = \"관수 시간\";\n  }\n}\n```\n",
+      "filename": "config-duration-valid.ghost.md",
+      "expect": "accept"
+    },
+    {
+      "id": "REF-05-002",
+      "references": [
+        "05-settings-and-observation.md#51-config-선언"
+      ],
+      "rule": "Percent config는 0%와 100%를 포함하는 닫힌 범위를 허용해야 한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "source": "# Percent 설정\n\n```ghost\ncontrol Settings {\n  config duty: Percent = 100% { min = 0%; max = 100%; step = 10%; access = designer; label = \"출력 비율\"; }\n}\n```\n",
+      "filename": "config-percent-boundary.ghost.md",
+      "expect": "accept"
+    },
+    {
+      "id": "REF-05-003",
+      "references": [
+        "05-settings-and-observation.md#51-config-선언"
+      ],
+      "rule": "Bool config의 false 기본값은 값 없음이 아니라 유효한 명시 값이어야 한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "source": "# Bool 설정\n\n```ghost\ncontrol Settings {\n  config enabled: Bool = false { access = operator; label = \"자동 관수 사용\"; }\n}\n```\n",
+      "filename": "config-bool-false.ghost.md",
+      "expect": "accept"
+    },
+    {
+      "id": "REF-05-004",
+      "references": [
+        "05-settings-and-observation.md#51-config-선언"
+      ],
+      "rule": "config 기본값이 min보다 작으면 컴파일을 거부해야 한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "source": "# 범위 밖 기본값\n\n```ghost\ncontrol Settings {\n  config duration: Duration = 30s { min = 1min; max = 20min; step = 1min; access = operator; label = \"시간\"; }\n}\n```\n",
+      "filename": "config-default-below-min.ghost.md",
+      "expect": "reject",
+      "diagnosticPattern": "(config|default|range|min)"
+    },
+    {
+      "id": "REF-05-005",
+      "references": [
+        "05-settings-and-observation.md#51-config-선언"
+      ],
+      "rule": "config 기본값이 max보다 크면 컴파일을 거부해야 한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "source": "# 범위 밖 기본값\n\n```ghost\ncontrol Settings {\n  config duration: Duration = 21min { min = 1min; max = 20min; step = 1min; access = operator; label = \"시간\"; }\n}\n```\n",
+      "filename": "config-default-above-max.ghost.md",
+      "expect": "reject",
+      "diagnosticPattern": "(config|default|range|max)"
+    },
+    {
+      "id": "REF-05-006",
+      "references": [
+        "05-settings-and-observation.md#51-config-선언"
+      ],
+      "rule": "config의 min이 max보다 크면 컴파일을 거부해야 한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "source": "# 역전 범위\n\n```ghost\ncontrol Settings {\n  config duration: Duration = 5min { min = 20min; max = 1min; step = 1min; access = operator; label = \"시간\"; }\n}\n```\n",
+      "filename": "config-inverted-range.ghost.md",
+      "expect": "reject",
+      "diagnosticPattern": "(min|max|range)"
+    },
+    {
+      "id": "REF-05-007",
+      "references": [
+        "05-settings-and-observation.md#51-config-선언"
+      ],
+      "rule": "config의 step이 0이면 컴파일을 거부해야 한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "source": "# 영 증분\n\n```ghost\ncontrol Settings {\n  config duration: Duration = 5min { min = 1min; max = 20min; step = 0s; access = operator; label = \"시간\"; }\n}\n```\n",
+      "filename": "config-zero-step.ghost.md",
+      "expect": "reject",
+      "diagnosticPattern": "(step|positive|zero)"
+    },
+    {
+      "id": "REF-05-008",
+      "references": [
+        "05-settings-and-observation.md#51-config-선언"
+      ],
+      "rule": "config 기본값이 min 기준 step 격자에 맞지 않으면 컴파일을 거부해야 한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "source": "# 격자 밖 기본값\n\n```ghost\ncontrol Settings {\n  config duration: Duration = 2min { min = 1min; max = 9min; step = 2min; access = operator; label = \"시간\"; }\n}\n```\n",
+      "filename": "config-default-off-grid.ghost.md",
+      "expect": "reject",
+      "diagnosticPattern": "(step|grid|default)"
+    },
+    {
+      "id": "REF-05-009",
+      "references": [
+        "05-settings-and-observation.md#51-config-선언"
+      ],
+      "rule": "config의 min, max, step 타입이 선언 타입과 다르면 컴파일을 거부해야 한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "source": "# 메타데이터 타입 불일치\n\n```ghost\ncontrol Settings {\n  config duration: Duration = 5min { min = 1%; max = 20min; step = 1min; access = operator; label = \"시간\"; }\n}\n```\n",
+      "filename": "config-bound-type-mismatch.ghost.md",
+      "expect": "reject",
+      "diagnosticPattern": "(type|Duration|Percent|min)"
+    },
+    {
+      "id": "REF-05-010",
+      "references": [
+        "05-settings-and-observation.md#51-config-선언"
+      ],
+      "rule": "Bool config에 수치 min/max/step을 선언하면 거부해야 한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "source": "# Bool 범위 오류\n\n```ghost\ncontrol Settings {\n  config enabled: Bool = false { min = false; max = true; access = operator; label = \"사용\"; }\n}\n```\n",
+      "filename": "config-bool-range.ghost.md",
+      "expect": "reject",
+      "diagnosticPattern": "(Bool|min|max|range)"
+    },
+    {
+      "id": "REF-05-011",
+      "references": [
+        "05-settings-and-observation.md#51-config-선언"
+      ],
+      "rule": "같은 범위의 중복 config 이름은 모호하므로 거부해야 한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "source": "# 중복 설정\n\n```ghost\ncontrol Settings {\n  config duration: Duration = 5min { min = 1min; max = 20min; step = 1min; access = operator; label = \"A\"; }\n  config duration: Duration = 6min { min = 1min; max = 20min; step = 1min; access = operator; label = \"B\"; }\n}\n```\n",
+      "filename": "config-duplicate-name.ghost.md",
+      "expect": "reject",
+      "diagnosticPattern": "(duplicate|already|duration|name)"
+    },
+    {
+      "id": "REF-05-012",
+      "references": [
+        "05-settings-and-observation.md#기본값과-유효값"
+      ],
+      "rule": "override가 없으면 effectiveValue는 소스 defaultValue이고 두 값의 provenance는 구분되어야 한다.",
+      "scope": "runtime",
+      "status": "specified",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다.",
+      "given": "duration의 소스 기본값이 5min이고 받아들인 override가 없다.",
+      "when": "completed scan의 설정 snapshot을 생성한다.",
+      "then": "defaultValue와 effectiveValue가 모두 5min이고 override=false이며 source와 settings revision이 구분된다."
+    },
+    {
+      "id": "REF-05-013",
+      "references": [
+        "05-settings-and-observation.md#atomic-live-event"
+      ],
+      "rule": "여러 설정의 live 변경은 전부 유효할 때만 함께 적용해야 한다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "duration=5min, duty=50%이고 한 event가 duration=10min과 범위 밖 duty=110%를 요청한다.",
+      "when": "event를 검증하고 적용한다.",
+      "then": "event 전체를 거부하고 duration과 duty의 유효값 및 settings revision을 모두 유지한다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-05-014",
+      "references": [
+        "05-settings-and-observation.md#atomic-live-event"
+      ],
+      "rule": "승인된 live 변경은 같은 source, Program, runId에서 새 settings revision만 만들어야 한다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "operator가 유효한 duration 변경을 현재 Program과 기준 settings revision에 제출한다.",
+      "when": "event가 처리 위치에서 승인된다.",
+      "then": "source digest, Program identity, runId는 유지되고 settings revision과 effective event position만 갱신된다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-05-015",
+      "references": [
+        "05-settings-and-observation.md#atomic-live-event"
+      ],
+      "rule": "live 설정 변경은 state와 timer를 초기화하지 않아야 한다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "운전 timer가 6min이고 duration이 10min이다.",
+      "when": "duration을 5min으로 승인해 다음 판단을 수행한다.",
+      "then": "timer는 6min을 유지하고 새 5min과 비교하여 작성된 식의 결과로 운전을 종료한다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-05-016",
+      "references": [
+        "05-settings-and-observation.md#atomic-live-event"
+      ],
+      "rule": "designer 설정에 대한 operator event는 거부하고 기존 유효값을 보존해야 한다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "duty 설정은 access=designer이고 현재 값은 50%다.",
+      "when": "operator가 duty=60%를 요청한다.",
+      "then": "권한 위반으로 event를 거부하고 duty=50%와 기존 settings revision을 유지한다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-05-017",
+      "references": [
+        "05-settings-and-observation.md#생명주기와-임시-설정"
+      ],
+      "rule": "일반 live 설정은 실제 재시작 뒤 보존되지만 재시작은 새 runId를 만들어야 한다.",
+      "scope": "host",
+      "status": "specified",
+      "given": "승인된 일반 duration override와 현재 runId가 저장되어 있다.",
+      "when": "장치를 실제 재시작하고 같은 Program을 시작한다.",
+      "then": "override는 복원되며 새 runId가 발급되고 이전 실행 상태로 위장하지 않는다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-05-018",
+      "references": [
+        "05-settings-and-observation.md#생명주기와-임시-설정"
+      ],
+      "rule": "임시 설정은 Program에 결속하며 다른 Program에 자동 이관하지 않는다.",
+      "scope": "host",
+      "status": "specified",
+      "given": "Program P의 임시값과 새 Program Q가 있다.",
+      "when": "Q를 활성화한다.",
+      "then": "P의 override를 Q에 자동 적용하지 않는다. Q의 새 요청은 Q의 타입·범위·권한·수명으로 검증한다.",
+      "reason": "설정 event와 Program 교체를 실행하는 host 수용 사례다."
+    },
+    {
+      "id": "REF-05-019",
+      "references": [
+        "05-settings-and-observation.md#53-renderer-독립-관찰-모델"
+      ],
+      "rule": "renderer는 widget 선택과 무관하게 descriptor의 타입, 권한, 검증을 보존해야 한다.",
+      "scope": "renderer",
+      "status": "specified",
+      "given": "동일한 Duration descriptor를 시간 입력창과 slider가 각각 표시한다.",
+      "when": "두 UI에서 같은 off-grid 값을 제출한다.",
+      "then": "두 경로 모두 같은 typed validation 결과를 표시하며 widget이 허용값을 바꾸지 않는다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-05-020",
+      "references": [
+        "05-settings-and-observation.md#descriptor와-snapshot"
+      ],
+      "rule": "관찰 가능하다는 사실은 state, timer, output에 대한 쓰기 권한을 만들지 않아야 한다.",
+      "scope": "renderer",
+      "status": "specified",
+      "given": "output과 timer descriptor가 read 권한으로 노출되어 있다.",
+      "when": "metadata producer 또는 UI가 write 동작을 만들려 한다.",
+      "then": "write capability가 제공되지 않고 요청도 제출할 수 없다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-05-021",
+      "references": [
+        "05-settings-and-observation.md#descriptor와-snapshot"
+      ],
+      "rule": "snapshot은 한 completed scan에만 결속되고 false와 0을 ready 값으로 보존해야 한다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "한 completed scan에서 Bool=false와 Int=0이 계산된다.",
+      "when": "snapshot을 방출한다.",
+      "then": "두 값 모두 ready이며 unavailable이나 누락으로 변환되지 않고 동일 scanId를 가진다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-05-022",
+      "references": [
+        "05-settings-and-observation.md#event-command-result와-alarm"
+      ],
+      "rule": "event history의 누락을 마지막 snapshot으로 재구성하지 말고 sequence gap으로 보고해야 한다.",
+      "scope": "host",
+      "status": "specified",
+      "given": "소비자가 sequence 10 다음에 14를 받고 11–13 기록은 보존 범위에서 사라졌다.",
+      "when": "event stream을 전달한다.",
+      "then": "missed range 11–13을 명시하며 snapshot에서 가상 event를 만들지 않는다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-05-023",
+      "references": [
+        "05-settings-and-observation.md#explanation-dag"
+      ],
+      "rule": "explanation은 실제 평가된 경로만 supportsResult로 연결해야 한다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "short-circuit AND의 첫 항이 false여서 둘째 항을 평가하지 않았다.",
+      "when": "해당 output의 explanation DAG를 생성한다.",
+      "then": "첫 항의 false가 근거로 남고 둘째 항은 evaluated=false이며 실제 근거로 표시되지 않는다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-05-024",
+      "references": [
+        "05-settings-and-observation.md#54-정체성과-물리적-사실의-경계"
+      ],
+      "rule": "서로 다른 source, Program, settings, binding 또는 run의 관찰 기록을 정상 snapshot으로 합치지 않아야 한다.",
+      "scope": "host",
+      "status": "specified",
+      "given": "descriptor와 snapshot의 Program digest 또는 runId가 다르다.",
+      "when": "소비자가 둘을 결합한다.",
+      "then": "stale 또는 mismatch로 처리하고 현재 실행의 관찰값으로 제시하지 않는다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-05-025",
+      "references": [
+        "05-settings-and-observation.md#54-정체성과-물리적-사실의-경계"
+      ],
+      "rule": "출력 intent, Driver 적용 결과, 물리 feedback을 별도 사실로 보존해야 한다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "pump safe intent=true이고 Driver 결과와 feedback은 없다.",
+      "when": "관찰 결과를 생성한다.",
+      "then": "intent=true만 보고하고 applied와 confirmed는 unknown이며 펌프 동작으로 표현하지 않는다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-05-026",
+      "references": [
+        "05-settings-and-observation.md#event-command-result와-alarm"
+      ],
+      "rule": "command의 수신, 거부, 시작, 완료, 취소, 실패를 서로 다른 결과로 보존해야 한다.",
+      "scope": "runtime",
+      "status": "specified",
+      "reason": "명령 lifecycle은 runtime 관찰 계약이며 CLI 컴파일로 발생 순서를 관찰할 수 없다.",
+      "given": "동일 command ID의 요청 하나가 시작된 뒤 취소된다.",
+      "when": "command history와 현재 상태를 기록한다.",
+      "then": "received, started, cancelled occurrence를 같은 execution identity로 보존하고 completed 또는 failed로 바꾸지 않는다."
+    },
+    {
+      "id": "REF-05-027",
+      "references": [
+        "05-settings-and-observation.md#event-command-result와-alarm"
+      ],
+      "rule": "alarm은 현재 active snapshot과 raise/clear event를 함께 보존해야 한다.",
+      "scope": "runtime",
+      "status": "specified",
+      "reason": "알람은 외부 descriptor와 runtime event 계약이다. 전용 source 키워드를 추가하지 않으며 실제 raise/clear 발생을 관찰해야 한다.",
+      "given": "두 snapshot 사이에서 alarm이 raise된 뒤 clear된다.",
+      "when": "소비자가 event history와 마지막 snapshot을 조회한다.",
+      "then": "마지막 active=false와 별도로 raise/clear 두 event가 남아 짧은 발생을 잃지 않는다."
+    },
+    {
+      "id": "REF-05-028",
+      "references": [
+        "05-settings-and-observation.md#55-설계-이유와-근거"
+      ],
+      "rule": "typed 설정, atomic event, observation identity, 물리 사실 경계를 하나의 일관된 설정·관찰 계약으로 유지해야 한다.",
+      "scope": "tooling",
+      "status": "specified",
+      "reason": "여러 산출물의 metadata와 identity를 함께 감사하는 후속 reference harness가 필요하다.",
+      "given": "descriptor, settings event, snapshot, explanation, Driver result가 같은 실행에서 생성된다.",
+      "when": "교차 산출물의 identity와 provenance를 감사한다.",
+      "then": "타입·검증 의미가 일치하고 source, Program, settings, binding, run identity가 연결되며 물리 성공은 feedback 없이 생성되지 않는다."
+    },
+    {
+      "id": "REF-06-001",
+      "references": [
+        "06-composition-and-replay.md#61-하나의-의미-모델과-여러-그래프"
+      ],
+      "rule": "import, 계산, 상태 feedback, explanation, installation, timeline 그래프의 edge와 cycle 규칙을 서로 바꾸어 적용하지 않아야 한다.",
+      "scope": "design",
+      "status": "specified",
+      "given": "동일한 두 node 사이에 state feedback edge와 계산 dependency edge가 각각 존재한다.",
+      "when": "cycle 유효성을 분석한다.",
+      "then": "이전 tick state 경계의 feedback만 허용하고 같은 tick 계산 cycle은 거부한다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-06-002",
+      "references": [
+        "06-composition-and-replay.md#62-definition-instance와-논리-port"
+      ],
+      "rule": "같은 definition의 두 instance는 state, timer, settings, binding, provenance를 격리해야 한다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "동일 definition revision으로 east와 west instance를 만든다.",
+      "when": "east의 state와 setting만 변경한다.",
+      "then": "west의 state, timer, setting, binding revision과 trace는 변하지 않는다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-06-003",
+      "references": [
+        "06-composition-and-replay.md#62-definition-instance와-논리-port"
+      ],
+      "rule": "표시 이름, 파일 위치, 선언 순서 변경은 instance identity가 아니어야 한다.",
+      "scope": "tooling",
+      "status": "specified",
+      "given": "instance ID와 입력·시간 기록은 같고 선언 순서와 표시 이름만 바뀐다.",
+      "when": "identity-keyed trace를 비교한다.",
+      "then": "실행 결과와 instance identity는 같고 표시 metadata만 다르다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-06-004",
+      "references": [
+        "06-composition-and-replay.md#62-definition-instance와-논리-port"
+      ],
+      "rule": "logical Bool input은 물리 DI뿐 아니라 명시적 software input에도 bind될 수 있어야 한다.",
+      "scope": "host",
+      "status": "specified",
+      "given": "Bool logical port와 같은 의미 계약을 제공하는 software input이 있다.",
+      "when": "installation contract를 검증한다.",
+      "then": "물리 DI가 아니라는 이유만으로 거부하지 않고 동일 direction·semantic type 계약으로 판단한다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-06-005",
+      "references": [
+        "06-composition-and-replay.md#62-definition-instance와-논리-port"
+      ],
+      "rule": "타입과 direction만 맞아도 극성, 부하, fail-safe, 배선 증거가 없으면 물리 호환을 unknown으로 유지해야 한다.",
+      "scope": "driver",
+      "status": "specified",
+      "given": "Bool output channel의 타입과 direction만 확인되고 전기적 증거는 없다.",
+      "when": "설치 호환성을 판정한다.",
+      "then": "compatible 또는 physically verified로 승격하지 않고 unknown을 반환한다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-06-006",
+      "references": [
+        "06-composition-and-replay.md#62-definition-instance와-논리-port"
+      ],
+      "rule": "직접 GPIO, I/O 확장 채널, 통신형 릴레이 채널은 계약을 만족하면 physical endpoint가 될 수 있다.",
+      "scope": "driver",
+      "status": "specified",
+      "given": "세 endpoint가 동일 logical output의 direction·semantic·capability 계약을 충족한다.",
+      "when": "binding 후보를 평가한다.",
+      "then": "버스 기반이라는 이유로 제외하지 않으며 주소·채널·전송 절차는 Driver와 installation에 남긴다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-06-007",
+      "references": [
+        "06-composition-and-replay.md#63-parameters-settings-dependencies와-bindings"
+      ],
+      "rule": "import parameter, operator setting, dependency, binding의 생명주기와 변경 identity를 분리해야 한다.",
+      "scope": "tooling",
+      "status": "specified",
+      "given": "네 종류의 변경이 각각 제출된다.",
+      "when": "변경 계획과 revision 효과를 산출한다.",
+      "then": "parameter는 composition/source, setting은 settings, dependency는 closure, binding은 installation revision으로 분류한다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-06-008",
+      "references": [
+        "06-composition-and-replay.md#호환-장치-교체와-재컴파일-독립성"
+      ],
+      "rule": "같은 논리 장치 계약을 만족하는 장치나 Driver 교체는 소스 수정과 Program 재컴파일을 요구하지 않아야 한다.",
+      "scope": "host",
+      "status": "specified",
+      "given": "새 센서가 direction, 의미·단위·범위, 샘플 시각·품질·오류와 capability 계약을 모두 만족한다.",
+      "when": "설치 binding과 Driver revision을 교체한다.",
+      "then": "canonical source revision과 Program artifact를 유지하고 installation/Driver revision만 갱신한다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-06-009",
+      "references": [
+        "06-composition-and-replay.md#호환-장치-교체와-재컴파일-독립성"
+      ],
+      "rule": "기본 타입만 같은 장치는 샘플·품질·오류 계약이 다르면 호환 교체로 승인하지 않아야 한다.",
+      "scope": "host",
+      "status": "specified",
+      "given": "두 센서는 Number를 제공하지만 새 센서 주기가 기존 stale_after 요구를 만족하지 않는다.",
+      "when": "교체 호환성을 검사한다.",
+      "then": "호환 교체를 거부하고 소스 규칙을 자동 변경하지 않는다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-06-010",
+      "references": [
+        "06-composition-and-replay.md#64-import와-연결의-문법"
+      ],
+      "rule": "정확한 문서 digest로 고정한 import의 instance와 typed port를 연결할 수 있다.",
+      "scope": "compiler",
+      "status": "executable",
+      "source": "# Reference conformance\n\n```ghost\nimport Relay from \"./relay.ghost.md\" revision \"relay-r1\" sha256 \"27728be32fb620b6a136325324c5628c9b42f69b72ee0199e354486207719009\";\ncontrol Farm {\n  input start: Bool;\n  output pump: Bool;\n  instance east: Relay;\n  connect east.start <- start;\n  connect pump <- east.pump;\n}\n```\n",
+      "expect": "accept",
+      "files": {
+        "relay.ghost.md": "# Reference conformance\n\n```ghost\ncontrol Relay {\n  input start: Bool;\n  output pump: Bool;\n  pump <- start;\n}\n```\n"
+      }
+    },
+    {
+      "id": "REF-06-011",
+      "references": [
+        "06-composition-and-replay.md#64-import와-연결의-문법"
+      ],
+      "rule": "import closure는 latest 이름이 아니라 exact immutable revision과 digest를 고정해야 한다.",
+      "scope": "tooling",
+      "status": "specified",
+      "given": "root definition과 두 transitive dependency revision이 있다.",
+      "when": "composition manifest를 해석한다.",
+      "then": "모든 revision과 digest가 고정된 경우만 closure를 만들고 누락·불일치·cycle은 구체적으로 거부한다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-06-012",
+      "references": [
+        "06-composition-and-replay.md#65-조합-실행의-불변-규칙"
+      ],
+      "rule": "모든 state 전이는 같은 input snapshot과 이전 state snapshot을 읽고 함께 확정해야 한다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "한 tick에서 두 state 전이가 같은 input과 서로의 이전 값을 읽는다.",
+      "when": "tick을 평가한다.",
+      "then": "어느 전이도 다른 state의 이번 tick candidate를 읽지 않고 두 candidate를 원자적으로 확정한다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-06-013",
+      "references": [
+        "06-composition-and-replay.md#65-조합-실행의-불변-규칙"
+      ],
+      "rule": "선언·탐색 순서는 scheduler나 우선순위가 아니어야 한다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "의존성이 같은 두 조합 문서가 선언 순서만 다르다.",
+      "when": "동일 snapshot에서 실행한다.",
+      "then": "state와 requested/safe output 결과가 동일하다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-06-014",
+      "references": [
+        "06-composition-and-replay.md#65-조합-실행의-불변-규칙"
+      ],
+      "rule": "같은 logical output channel의 경쟁 direct writer는 last-writer로 해결하지 않고 거부해야 한다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "두 instance가 같은 authoritative output channel에 직접 쓴다.",
+      "when": "activation contract를 검증한다.",
+      "then": "두 writer를 식별하여 activation 전에 거부한다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-06-015",
+      "references": [
+        "06-composition-and-replay.md#66-resource와-contract"
+      ],
+      "rule": "조합 contract는 port direction/type, dependency revision, parameter bound, ownership, installation 호환성을 검사해야 한다.",
+      "scope": "tooling",
+      "status": "specified",
+      "given": "필수 dependency가 빠지고 output ownership이 충돌하는 후보가 있다.",
+      "when": "activation 전 contract 검사를 수행한다.",
+      "then": "영향받은 definition, instance, port, 기대값, 실제값, 근거 revision을 포함해 거부한다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-06-016",
+      "references": [
+        "06-composition-and-replay.md#67-조합된-설명과-provenance"
+      ],
+      "rule": "조합 explanation은 occurrence에서 exact source revision, settings와 binding revision까지의 provenance를 보존해야 한다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "같은 definition의 두 instance가 서로 다른 binding을 사용한다.",
+      "when": "각 output explanation을 생성한다.",
+      "then": "instance-qualified node를 유지하고 source 위치나 binding revision을 서로 합치지 않는다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-06-017",
+      "references": [
+        "06-composition-and-replay.md#68-replay-ghost와-branch"
+      ],
+      "rule": "replay는 기록한 입력, fault, 논리 시간, checkpoint를 같은 실행 core로 다시 계산해야 한다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "Program, settings, binding revision과 완전한 입력·fault·논리 tick 기록이 있다.",
+      "when": "같은 checkpoint에서 replay한다.",
+      "then": "각 논리 tick의 state와 requested/safe intent가 원 기록과 일치한다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-06-018",
+      "references": [
+        "06-composition-and-replay.md#68-replay-ghost와-branch"
+      ],
+      "rule": "ghost와 rewind는 물리 effect, 실제 ledger, 예약 발생 기록을 수정하지 않아야 한다.",
+      "scope": "host",
+      "status": "specified",
+      "given": "실제 timeline에서 분기한 ghost가 다른 output intent를 계산한다.",
+      "when": "ghost branch를 실행하고 rewind한다.",
+      "then": "physical effect sink가 호출되지 않고 원본 timeline, ledger, occurrence 기록은 변하지 않는다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-06-019",
+      "references": [
+        "06-composition-and-replay.md#68-replay-ghost와-branch"
+      ],
+      "rule": "기록에 없는 센서값은 replay가 자동 생성하지 않아야 한다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "branch 시점 이후 필수 센서 기록이 없다.",
+      "when": "what-if replay를 요청한다.",
+      "then": "값을 지어내지 않고 누락을 보고하며 제공된 가상 입력은 synthetic provenance로 표시한다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-06-020",
+      "references": [
+        "06-composition-and-replay.md#69-program-hot-replacement"
+      ],
+      "rule": "Program hot replacement는 후보를 검증하고 tick 경계에서 원자적으로 확정하며 실패 시 이전 Program을 유지해야 한다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "새 Program 후보의 required port가 설치 profile에 없다.",
+      "when": "hot replacement를 시도한다.",
+      "then": "교체를 거부하고 이전 Program과 run을 계속 사용한다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-06-021",
+      "references": [
+        "06-composition-and-replay.md#69-program-hot-replacement"
+      ],
+      "rule": "같은 module identity 아래 같은 이름과 타입의 state만 명시적 규칙에 따라 이전해야 한다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "후보가 기존 state의 타입을 Bool에서 Int로 바꾼다.",
+      "when": "state migration 없이 교체한다.",
+      "then": "타입 변경 state의 이전을 거부하고 교체를 확정하지 않는다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-06-022",
+      "references": [
+        "06-composition-and-replay.md#69-program-hot-replacement"
+      ],
+      "rule": "성공한 Program 교체는 새 artifact/source identity와 새 run 경계를 만들어야 한다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "호환성이 검증된 새 Program 후보가 있다.",
+      "when": "tick 경계에서 교체를 확정한다.",
+      "then": "새 runId와 artifact/source identity를 사용하고 이전 input cache를 버린 뒤 완전한 새 snapshot을 요구한다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-06-023",
+      "references": [
+        "06-composition-and-replay.md#610-syntax-quote-splice의-문법"
+      ],
+      "rule": "typed expression macro는 quote/splice로 확장한 뒤 일반 상태·타입 검사를 따른다.",
+      "scope": "compiler",
+      "status": "executable",
+      "source": "# Reference conformance\n\n```ghost\nsyntax hold(start: Expr<Bool>, stop: Expr<Bool>, held: Expr<Bool>): Expr<Bool> {\n  quote { !$(stop) && ($(start) || $(held)) }\n}\ncontrol Latch {\n  input start, stop: Bool;\n  state running: Bool = false;\n  output pump: Bool;\n  running' = @hold(start, stop, running);\n  pump <- running';\n}\n```\n",
+      "expect": "accept"
+    },
+    {
+      "id": "REF-06-024",
+      "references": [
+        "06-composition-and-replay.md#610-syntax-quote-splice의-문법"
+      ],
+      "rule": "구문 확장은 runtime 값, 외부 파일, network, clock을 읽거나 무제한 AST를 만들 수 없어야 한다.",
+      "scope": "design",
+      "status": "specified",
+      "given": "향후 확장기가 network read와 재귀 확장을 요청하는 macro를 받는다.",
+      "when": "compile-time capability와 자원 상한을 검사한다.",
+      "then": "확장을 거부하고 runtime 효과를 생성하지 않는다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-06-025",
+      "references": [
+        "06-composition-and-replay.md#611-설계-이유와-근거"
+      ],
+      "rule": "재사용은 pinned definition, instance identity, logical binding, effect 경계를 함께 보존해야 한다.",
+      "scope": "tooling",
+      "status": "specified",
+      "given": "재사용 가능한 behavior package를 검사한다.",
+      "when": "composition provenance와 실행 경계를 감사한다.",
+      "then": "exact definition closure, 분리된 instance, logical port, effect-free replay 연결이 모두 추적 가능하다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-07-001",
+      "references": [
+        "07-semantic-rules-and-index.md#71-이-장의-목적"
+      ],
+      "rule": "색인의 용어 등재는 그 용어를 예약어 또는 확정 문법으로 승격하지 않아야 한다.",
+      "scope": "tooling",
+      "status": "specified",
+      "given": "문법과 외부 관찰·설치 개념이 같은 색인에 있다.",
+      "when": "문법 상태를 분류한다.",
+      "then": "각 항목의 본문에서 source 문법·허용 위치·외부 계약을 구분한다. 일반 개념을 예약어로 추론하지 않는다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-07-002",
+      "references": [
+        "07-semantic-rules-and-index.md#72-잘못된-프로그램과-외부의-실패"
+      ],
+      "rule": "컴파일 오류, sensor fault, schedule Unknown, 설정 거절, 관측 mismatch를 서로 다른 진단 종류로 보존해야 한다.",
+      "scope": "tooling",
+      "status": "specified",
+      "given": "각 오류 종류의 대표 record가 있다.",
+      "when": "진단 catalog를 검사한다.",
+      "then": "원인·수정 주체·실행 효과가 다른 다섯 종류가 하나의 false 또는 generic failure로 합쳐지지 않는다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-07-003",
+      "references": [
+        "07-semantic-rules-and-index.md#72-잘못된-프로그램과-외부의-실패"
+      ],
+      "rule": "값 계산 오류가 난 tick은 state와 output을 부분 확정하지 않아야 한다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "한 state 계산은 성공하고 다른 계산은 0 나눗셈으로 실패한다.",
+      "when": "tick을 확정하려 한다.",
+      "then": "전체 tick을 실패로 처리하고 성공한 계산도 새 state/output으로 부분 commit하지 않는다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-07-004",
+      "references": [
+        "07-semantic-rules-and-index.md#73-거짓없음불확실함은-다르다"
+      ],
+      "rule": "false, 0, capability absence, sensor fault, Unknown, 빈 관측 목록을 구분해야 한다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "여섯 상태가 각각 입력 또는 관찰 결과로 주어진다.",
+      "when": "제어와 관찰 경계에서 직렬화한다.",
+      "then": "고유 상태와 provenance를 유지하며 어느 것도 다른 상태로 truthiness 변환되지 않는다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-07-005",
+      "references": [
+        "07-semantic-rules-and-index.md#73-거짓없음불확실함은-다르다"
+      ],
+      "rule": "Unknown을 부정하여 운전 허가를 만들 수 없어야 한다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "달력 판정이 Unknown(reason)이다.",
+      "when": "부정 조건으로 admission을 평가하려 한다.",
+      "then": "true 허가로 바꾸지 않고 Unknown 또는 명시 fallback 요구를 유지한다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-07-006",
+      "references": [
+        "07-semantic-rules-and-index.md#74-의미가-유지되는-변환"
+      ],
+      "rule": "최적화는 값뿐 아니라 오류 관찰과 필요한 의존 관계를 보존해야 한다.",
+      "scope": "compiler",
+      "status": "specified",
+      "given": "오류를 낼 수 있는 식 a에 대해 a * 0을 0으로 단순화하려 한다.",
+      "when": "최적화의 의미 동등성을 검사한다.",
+      "then": "원래 오류나 dependency 관찰을 제거한다면 변환을 적용하지 않는다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-07-007",
+      "references": [
+        "07-semantic-rules-and-index.md#74-의미가-유지되는-변환"
+      ],
+      "rule": "변환된 표현은 원본 선언, intent, 주석, source revision provenance를 보존해야 한다.",
+      "scope": "compiler",
+      "status": "specified",
+      "given": "공통 부분식 제거로 여러 source node가 하나의 실행 node에 합쳐진다.",
+      "when": "artifact와 explanation mapping을 생성한다.",
+      "then": "모든 원본 node와 intent 연결이 남고 변환 결과가 새 canonical source가 되지 않는다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-07-008",
+      "references": [
+        "07-semantic-rules-and-index.md#75-선언과-표기-찾아보기",
+        "07-semantic-rules-and-index.md#76-기호-찾아보기"
+      ],
+      "rule": "선언·표기·기호 색인의 모든 내부 링크는 존재하는 정확한 절로 연결되어야 한다.",
+      "scope": "tooling",
+      "status": "specified",
+      "given": "Reference 7의 §7.5와 §7.6 표를 파싱한다.",
+      "when": "각 상대 경로와 anchor를 해석한다.",
+      "then": "모든 대상 파일과 anchor가 존재하고 설계 표기 항목의 상태가 본문과 모순되지 않는다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-07-009",
+      "references": [
+        "07-semantic-rules-and-index.md#77-용어"
+      ],
+      "rule": "Program, Run, Tick, requested/safe intent, logical port/binding 용어를 identity와 효과 경계에 맞게 사용해야 한다.",
+      "scope": "tooling",
+      "status": "specified",
+      "given": "Reference 문서의 용어 사용 위치를 수집한다.",
+      "when": "§7.7 정의와 비교한다.",
+      "then": "Program과 Run, requested와 safe, logical과 physical을 같은 뜻으로 바꿔 쓴 위치가 없다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-07-010",
+      "references": [
+        "07-semantic-rules-and-index.md#78-원문에서-reference로-찾아가기"
+      ],
+      "rule": "원문별 색인은 구현 상태표가 아니라 설계 근거에서 Reference 위치로 가는 완전한 링크여야 한다.",
+      "scope": "tooling",
+      "status": "specified",
+      "given": "§7.8의 각 설계 근거 행을 읽는다.",
+      "when": "링크와 대상 범위를 검사한다.",
+      "then": "각 근거와 Reference 대상이 존재하며 이슈 상태나 완료 여부를 추론하는 필드가 없다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-08-001",
+      "references": [
+        "08-language-runtime-and-device-boundaries.md#81-분류-원칙-의미와-실행-수단"
+      ],
+      "rule": "새 FAQ 요구는 기존 의미 조합, 새 언어 의미, 외부 실행 수단을 먼저 분리해야 한다.",
+      "scope": "design",
+      "status": "specified",
+      "given": "사용자가 순차 관수 중 취소하면 밸브를 닫고 원위치 확인 뒤 Idle로 돌아가야 한다고 요구한다.",
+      "when": "책임 경계 검토를 수행한다.",
+      "then": "enum/state/case로 취소 순서를 표현하고 원위치 feedback은 Driver 입력 계약으로 분류하며 cancellation 전용 새 키워드를 만들지 않는다.",
+      "reason": "요구 분류는 compiler acceptance가 아니라 설계 검토 산출물이므로 reference tooling이 필요하다."
+    },
+    {
+      "id": "REF-08-002",
+      "references": [
+        "08-language-runtime-and-device-boundaries.md#82-계층별-책임"
+      ],
+      "rule": "컴파일러는 정본 문서와 설명 metadata를 보존하지만 물리 배선이나 실제 작동을 증명하지 않아야 한다.",
+      "scope": "tooling",
+      "status": "specified",
+      "given": "논리 port가 타입 검사를 통과한 artifact가 있다.",
+      "when": "compile 결과와 설치 보고서를 생성한다.",
+      "then": "compile success와 physical verification을 별도 상태로 표시한다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-08-003",
+      "references": [
+        "08-language-runtime-and-device-boundaries.md#82-계층별-책임"
+      ],
+      "rule": "데이터 제공자는 자료의 revision, coverage, validity, failure를 드러내고 별도 제어 언어를 만들지 않아야 한다.",
+      "scope": "host",
+      "status": "specified",
+      "given": "공휴일 provider가 만료된 지역 달력 자료를 보유한다.",
+      "when": "현재 날짜 판정을 공급한다.",
+      "then": "임의 Bool 결론 대신 자료 identity와 expiry 실패를 전달한다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-08-004",
+      "references": [
+        "08-language-runtime-and-device-boundaries.md#82-계층별-책임"
+      ],
+      "rule": "host는 Android gateway, cloud, 인터넷을 필수로 요구하지 않아야 한다.",
+      "scope": "host",
+      "status": "specified",
+      "given": "장치가 필요한 시계와 유효 자료를 로컬에서 제공한다.",
+      "when": "네트워크 없이 Program을 실행한다.",
+      "then": "계약을 충족하며 network disconnected와 data expired를 서로 다른 상태로 보고한다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-08-005",
+      "references": [
+        "08-language-runtime-and-device-boundaries.md#83-faq-전체-책임표"
+      ],
+      "rule": "FAQ 1–41은 각 요구가 빠짐없이 책임표의 행 또는 명시 범위에 포함되어야 한다.",
+      "scope": "tooling",
+      "status": "specified",
+      "given": "§8.3의 FAQ 링크와 범위 표기를 파싱한다.",
+      "when": "1부터 41까지 coverage를 계산한다.",
+      "then": "중복 허용 근거가 있는 연결 외에 누락된 번호가 없고 27–29 같은 범위는 모든 번호로 확장된다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-08-006",
+      "references": [
+        "08-language-runtime-and-device-boundaries.md#84-기능별로-지켜야-하는-경계"
+      ],
+      "rule": "일반 제어 조합 사례를 새 내장 키워드나 Driver의 숨은 정책으로 바꾸지 않아야 한다.",
+      "scope": "design",
+      "status": "specified",
+      "given": "자기유지, 단계 취소, 세 번 감지 요구가 있다.",
+      "when": "기능 분류를 수행한다.",
+      "then": "state·Bool·enum·case 조합과 입력 캡처 계약으로 분류하고 특수 내장 mode를 만들지 않는다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-08-007",
+      "references": [
+        "08-language-runtime-and-device-boundaries.md#84-기능별로-지켜야-하는-경계"
+      ],
+      "rule": "시간 provider가 만든 입력은 원인, 판본, occurrence identity를 잃은 Bool pulse로 축소하지 않아야 한다.",
+      "scope": "host",
+      "status": "specified",
+      "given": "같은 자료와 시간에서 계산한 solar occurrence가 있다.",
+      "when": "runtime 입력으로 전달한다.",
+      "then": "자료 revision, 유효성, occurrence identity를 보존하여 중복·누락을 판정할 수 있다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-08-008",
+      "references": [
+        "08-language-runtime-and-device-boundaries.md#84-기능별로-지켜야-하는-경계"
+      ],
+      "rule": "영속 설비 ledger는 안정적 설비 identity와 applied/confirmed 증거를 사용하고 UI 표시 시간을 사용하지 않아야 한다.",
+      "scope": "host",
+      "status": "specified",
+      "given": "자동·수동 요청과 Driver applied 기록, 화면 표시 시간이 서로 다르다.",
+      "when": "설비 사용량을 갱신한다.",
+      "then": "계약이 선택한 applied 또는 confirmed 증거만 동일 설비 identity에 집계한다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-08-009",
+      "references": [
+        "08-language-runtime-and-device-boundaries.md#84-기능별로-지켜야-하는-경계"
+      ],
+      "rule": "UI 사전 검증은 설정 event의 실행 경계 검증을 대신하지 않아야 한다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "UI가 유효하다고 표시한 설정 요청이 stale 기준 revision을 가진다.",
+      "when": "실행 경계가 요청을 받는다.",
+      "then": "현재 Program과 settings revision을 다시 검증하여 stale 요청 전체를 거부한다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-08-010",
+      "references": [
+        "08-language-runtime-and-device-boundaries.md#84-기능별로-지켜야-하는-경계"
+      ],
+      "rule": "논리 output의 원자적 확정, bus 명령 적용, 실제 장치 확인을 서로 다른 사실로 유지해야 한다.",
+      "scope": "driver",
+      "status": "specified",
+      "given": "두 output intent가 한 tick에서 함께 확정되지만 bus가 순차 전송한다.",
+      "when": "Driver 결과와 feedback을 기록한다.",
+      "then": "논리 동시성을 물리 동시 전환으로 주장하지 않고 각 applied/confirmed 시각을 별도로 남긴다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-08-011",
+      "references": [
+        "08-language-runtime-and-device-boundaries.md#85-변경과-재시작의-생명주기"
+      ],
+      "rule": "소스, settings, binding/Driver, state, 설비 기록, provider 자료, renderer 변경의 revision 경계를 분리해야 한다.",
+      "scope": "tooling",
+      "status": "specified",
+      "given": "각 종류의 변경 event와 artifact가 있다.",
+      "when": "변경 이력을 분류한다.",
+      "then": "서로 다른 owner와 revision/run 효과를 기록하고 하나의 generic update로 합치지 않는다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-08-012",
+      "references": [
+        "08-language-runtime-and-device-boundaries.md#85-변경과-재시작의-생명주기"
+      ],
+      "rule": "센서 filter와 freshness는 재부팅 뒤 기본적으로 초기화되어 NotReady부터 준비해야 한다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "재부팅 전에 정상 filter window와 마지막 유효 샘플이 있다.",
+      "when": "persistent resume opt-in 없이 새 run을 시작한다.",
+      "then": "이전 window와 freshness를 폐기하고 NotReady에서 새 유효 샘플을 모은다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-08-013",
+      "references": [
+        "08-language-runtime-and-device-boundaries.md#86-언어-결정과-작성자가-정하는-정책"
+      ],
+      "rule": "달력·DST 제공자는 §3의 명시 정책과 동일한 occurrence 결과를 공급한다.",
+      "scope": "host",
+      "status": "specified",
+      "given": "같은 Program, 날짜·zone·tzdb·calendar revision 및 gap/fold 정책을 두 host에 준다.",
+      "when": "같은 시간 snapshot으로 예약 발생을 평가한다.",
+      "then": "두 host의 occurrence identity와 due/Unknown가 같다. 인터넷 연결 여부가 의미를 바꾸지 않는다.",
+      "reason": "provider 자료와 예약 평가를 연결해야 하며 컴파일만으로 입증할 수 없다."
+    },
+    {
+      "id": "REF-08-014",
+      "references": [
+        "08-language-runtime-and-device-boundaries.md#86-언어-결정과-작성자가-정하는-정책"
+      ],
+      "rule": "typed 슬롯 설정의 live 변경과 운전 길이 변경은 각자 타입을 유지한다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "진행 중 운전과 공개한 Duration·슬롯 config가 있다.",
+      "when": "두 값을 한 atomic live event로 변경한다.",
+      "then": "state·timer·run은 유지한다. 슬롯 발생은 §3의 변경 경계를 따르며 Duration을 시각으로 해석하지 않는다.",
+      "reason": "실제 settings event와 발생 ledger를 관찰하는 runtime 사례다."
+    },
+    {
+      "id": "REF-08-015",
+      "references": [
+        "08-language-runtime-and-device-boundaries.md#86-언어-결정과-작성자가-정하는-정책"
+      ],
+      "rule": "state 초기화와 일반 config 지속성은 별도이며 정전 시간을 elapsed에 더하지 않는다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "운전 state와 2min timer, 보존된 5min override가 있고 복원 요청은 없다.",
+      "when": "실제 재시작 뒤 첫 판단을 한다.",
+      "then": "새 run에서 state 선언 초기값, elapsed 0ms, config 5min을 사용한다. 재가동은 소스 전이 조건으로만 결정한다.",
+      "reason": "재시작 경계를 실행해야 하며 컴파일 결과로 증명하지 않는다."
+    },
+    {
+      "id": "REF-08-016",
+      "references": [
+        "08-language-runtime-and-device-boundaries.md#86-언어-결정과-작성자가-정하는-정책"
+      ],
+      "rule": "설치 binding과 Driver 배포 형식은 source grammar 밖의 환경 계약이다.",
+      "scope": "host",
+      "status": "specified",
+      "given": "같은 논리 계약을 제공하는 GPIO와 RS485 Driver binding 후보가 있다.",
+      "when": "설치 판본만 교체한다.",
+      "then": "source/Program identity를 유지하며 binding/Driver 판본을 별도로 식별한다. FAQ 화살표를 source 문법으로 해석하지 않는다.",
+      "reason": "호환성·설치 교체 실행을 검증하는 host 사례이며 언어 미결정이 아니다."
+    },
+    {
+      "id": "REF-08-017",
+      "references": [
+        "08-language-runtime-and-device-boundaries.md#87-새-요구를-분류하는-순서"
+      ],
+      "rule": "같은 Program, 입력, 논리 시간, 설정 event, 시작 상태에는 장치·UI 종류와 무관하게 같은 제어 판단이 나와야 한다.",
+      "scope": "tooling",
+      "status": "specified",
+      "given": "두 host가 다른 Driver와 renderer를 사용하지만 논리 입력 기록과 모든 identity가 같다.",
+      "when": "replay 결과를 비교한다.",
+      "then": "state와 requested/safe intent가 같고 차이는 applied/confirmed 및 표시 계층에만 존재한다.",
+      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+    },
+    {
+      "id": "REF-05-101",
+      "references": [
+        "05-settings-and-observation.md#51-config-선언"
+      ],
+      "rule": "config는 apply = stopped 필드를 거부한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "source": "# Reference conformance\n\n```ghost\ncontrol Settings {\n  config duration: Duration = 5min { min = 1min; max = 10min; step = 1min; access = operator; apply = stopped; }\n}\n```\n",
+      "expect": "reject"
+    },
+    {
+      "id": "REF-05-102",
+      "references": [
+        "05-settings-and-observation.md#51-config-선언"
+      ],
+      "rule": "config는 apply = live 필드를 거부한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "source": "# Reference conformance\n\n```ghost\ncontrol Settings {\n  config duration: Duration = 5min { min = 1min; max = 10min; step = 1min; access = operator; apply = live; }\n}\n```\n",
+      "expect": "reject"
+    },
+    {
+      "id": "REF-05-103",
+      "references": [
+        "05-settings-and-observation.md#생명주기와-임시-설정"
+      ],
+      "scope": "host",
+      "status": "specified",
+      "rule": "임시 Run overlay는 run 경계에서 제거된다.",
+      "given": "일반값 5min 위 Run 임시값 8min이 활성이다.",
+      "when": "실제 재시작한다.",
+      "then": "첫 판단 전에 overlay가 제거되어 5min이며 새 run과 만료 provenance를 관찰한다.",
+      "reason": "설정 저장·run 경계 실행이 필요하다."
+    },
+    {
+      "id": "REF-05-104",
+      "references": [
+        "05-settings-and-observation.md#생명주기와-임시-설정"
+      ],
+      "scope": "host",
+      "status": "specified",
+      "rule": "Until 임시값의 만료는 복귀 설정 event다.",
+      "given": "일반값 5min과 신뢰 시각 10:00Z에 만료되는 8min overlay가 있다.",
+      "when": "정확히 10:00Z에서 다음 판단을 처리한다.",
+      "then": "overlay ID를 대상으로 복귀를 원자 적용한다. 유효값 5min, 새 settings revision이며 state와 timer는 reset하지 않는다.",
+      "reason": "만료 event 적용 경계를 관찰해야 한다."
+    },
+    {
+      "id": "REF-05-105",
+      "references": [
+        "05-settings-and-observation.md#생명주기와-임시-설정"
+      ],
+      "scope": "host",
+      "status": "specified",
+      "rule": "오래된 expiry는 새 일반 설정을 덮어쓰지 않는다.",
+      "given": "5min 위 8min 임시값을 일반 설정 6min으로 대체했다.",
+      "when": "옛 overlay의 만료 event가 도착한다.",
+      "then": "6min을 유지하며 이미 제거된 overlay에 대한 event로 식별한다.",
+      "reason": "event 순서와 identity 검증이 필요하다."
+    },
+    {
+      "id": "REF-05-106",
+      "references": [
+        "05-settings-and-observation.md#생명주기와-임시-설정"
+      ],
+      "scope": "host",
+      "status": "specified",
+      "rule": "복귀 실패를 정상 설정값으로 숨기지 않는다.",
+      "given": "Until overlay 만료에서 저장 또는 원자 적용이 실패한다.",
+      "when": "해당 config를 읽는 제어 판단을 요청한다.",
+      "then": "설정 unavailable과 복귀 실패를 관찰하며 성공 tick으로 확정하지 않는다. 물리 효과는 설치의 장애 계약을 따른다.",
+      "reason": "fault 주입이 필요한 host 수용 사례다."
+    },
+    {
+      "id": "REF-05-107",
+      "references": [
+        "05-settings-and-observation.md#재시작과-기억의-복원"
+      ],
+      "scope": "runtime",
+      "status": "specified",
+      "rule": "근거 없는 재시작 원인은 Unknown이다.",
+      "given": "Driver가 reset cause를 확인할 수 없다.",
+      "when": "새 run을 시작한다.",
+      "then": "restart_reason은 Unknown이고 한 run에서 고정된다. PowerOn 또는 정전 복구로 추측하지 않는다.",
+      "reason": "host 입력 생산자와 runtime을 연결해야 한다."
+    },
+    {
+      "id": "REF-06-101",
+      "references": [
+        "06-composition-and-replay.md#64-import와-연결의-문법"
+      ],
+      "rule": "pinned import에 revision을 생략하면 거부한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "source": "# Reference conformance\n\n```ghost\nimport Relay from \"./relay.ghost.md\" sha256 \"27728be32fb620b6a136325324c5628c9b42f69b72ee0199e354486207719009\";\ncontrol Farm {\n  input start: Bool;\n  output pump: Bool;\n  instance east: Relay;\n  connect east.start <- start;\n  connect pump <- east.pump;\n}\n```\n",
+      "expect": "reject",
+      "diagnosticPattern": "revision",
+      "files": {
+        "relay.ghost.md": "# Reference conformance\n\n```ghost\ncontrol Relay {\n  input start: Bool;\n  output pump: Bool;\n  pump <- start;\n}\n```\n"
+      }
+    },
+    {
+      "id": "REF-06-102",
+      "references": [
+        "06-composition-and-replay.md#64-import와-연결의-문법"
+      ],
+      "rule": "import digest와 실제 문서가 다르면 거부한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "source": "# Reference conformance\n\n```ghost\nimport Relay from \"./relay.ghost.md\" revision \"relay-r1\" sha256 \"0000000000000000000000000000000000000000000000000000000000000000\";\ncontrol Farm {\n  input start: Bool;\n  output pump: Bool;\n  instance east: Relay;\n  connect east.start <- start;\n  connect pump <- east.pump;\n}\n```\n",
+      "expect": "reject",
+      "diagnosticPattern": "digest|sha256|hash",
+      "files": {
+        "relay.ghost.md": "# Reference conformance\n\n```ghost\ncontrol Relay {\n  input start: Bool;\n  output pump: Bool;\n  pump <- start;\n}\n```\n"
+      }
+    },
+    {
+      "id": "REF-06-103",
+      "references": [
+        "06-composition-and-replay.md#64-import와-연결의-문법"
+      ],
+      "rule": "같은 입력 포트에 중복 공급자를 연결하면 거부한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "source": "# Reference conformance\n\n```ghost\nimport Relay from \"./relay.ghost.md\" revision \"relay-r1\" sha256 \"27728be32fb620b6a136325324c5628c9b42f69b72ee0199e354486207719009\";\ncontrol Farm {\n  input start: Bool;\n  output pump: Bool;\n  instance east: Relay;\n  connect east.start <- start;\n  connect east.start <- start;\n  connect pump <- east.pump;\n}\n```\n",
+      "expect": "reject",
+      "diagnosticPattern": "duplicate|already|supplier|중복",
+      "files": {
+        "relay.ghost.md": "# Reference conformance\n\n```ghost\ncontrol Relay {\n  input start: Bool;\n  output pump: Bool;\n  pump <- start;\n}\n```\n"
+      }
+    },
+    {
+      "id": "REF-06-104",
+      "references": [
+        "06-composition-and-replay.md#64-import와-연결의-문법"
+      ],
+      "rule": "physical bind는 제어 소스 문법이 아니다.",
+      "scope": "compiler",
+      "status": "executable",
+      "source": "# Reference conformance\n\n```ghost\ncontrol Binding {\n output pump: Bool;\n pump <- false;\n bind pump -> gpio17;\n}\n```\n",
+      "expect": "reject"
+    },
+    {
+      "id": "REF-06-105",
+      "references": [
+        "06-composition-and-replay.md#610-syntax-quote-splice의-문법"
+      ],
+      "rule": "macro 인자 타입 불일치를 거부한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "source": "# Reference conformance\n\n```ghost\nsyntax hold(start: Expr<Bool>, stop: Expr<Bool>, held: Expr<Bool>): Expr<Bool> {\n  quote { !$(stop) && ($(start) || $(held)) }\n}\ncontrol Latch {\n  input start, stop: Bool;\n  state running: Bool = false;\n  output pump: Bool;\n  running' = @hold(5min, stop, running);\n  pump <- running';\n}\n```\n",
+      "expect": "reject",
+      "diagnosticPattern": "type|Bool|Duration|타입"
+    },
+    {
+      "id": "REF-06-106",
+      "references": [
+        "06-composition-and-replay.md#610-syntax-quote-splice의-문법"
+      ],
+      "rule": "재귀 macro 확장을 거부한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "source": "# Reference conformance\n\n```ghost\nsyntax repeat(x: Expr<Bool>): Expr<Bool> { quote { @repeat($(x)) } }\ncontrol Recursion { output result: Bool; result <- @repeat(true); }\n```\n",
+      "expect": "reject",
+      "diagnosticPattern": "recurs|cycle|순환|재귀"
+    },
+    {
+      "id": "REF-05-108",
+      "references": [
+        "05-settings-and-observation.md#51-config-선언"
+      ],
+      "rule": "Int config는 정수 기본값과 정수 min/max/step 운영 메타데이터를 함께 선언할 수 있어야 한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "source": "# Int 설정\n\n```ghost\ncontrol IntSettings {\n  config count: Int = 1 { min = 0; max = 5; step = 1; access = operator; }\n}\n```\n",
+      "filename": "config-int-valid.ghost.md",
+      "expect": "accept"
+    },
+    {
+      "id": "REF-06-107",
+      "references": [
+        "06-composition-and-replay.md#610-syntax-quote-splice의-문법"
+      ],
+      "rule": "quote 밖의 splice를 거부한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "source": "# Reference conformance\n\n```ghost\ncontrol Splice { input start: Bool; output result: Bool; result <- $(start); }\n```\n",
+      "expect": "reject"
+    }
+  ]
+}

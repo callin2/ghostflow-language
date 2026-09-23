@@ -2,12 +2,13 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { verifyInteractionCorpus } from '../contracts/interaction-v0/verify-corpus.mjs';
 import { canonicalJson } from '../tools/canonical-json.mjs';
 import { compileSource } from '../tools/toolchain.mjs';
 
-const root = path.resolve(new URL('..', import.meta.url).pathname);
+const root = fileURLToPath(new URL('..', import.meta.url));
 const corpusPath = 'contracts/interaction-v0/examples/corpus.json';
 const read = relative => JSON.parse(fs.readFileSync(path.join(root, relative), 'utf8'));
 const corpus = read(corpusPath);

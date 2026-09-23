@@ -1,7 +1,8 @@
 # GhostFlow 공통 제약과 센서 신호 계약
 
-2026-09-05 · 공통 설계 계약. 유한 템플릿과 Rust station/sensor 참조 구현을 추가했다.
-전체 설계를 구현 완료한 것은 아니다. [구현 범위](IMPLEMENTATION.md), [추적성](TRACEABILITY.md) 참조.
+2026-09-24 · 공통 설계 계약. 운영 설정의 현재 문법과 의미는
+[Reference §5.1–5.2](reference/05-settings-and-observation.md)를 따른다.
+실행 범위는 [구현 범위](IMPLEMENTATION.md), [추적성](TRACEABILITY.md)을 참조한다.
 [선택한 control 문법](LANGUAGE-SURFACE.md)에 대한 후속 계약이다.
 
 아래에는 실행 가능한 부분과 미래 **설계 예제**가 함께 있다. control은 `ghostc`,
@@ -16,7 +17,11 @@ lowerer다. 전체 DSL을 지원하는
 
 - 같은 관수 설비의 자동 운전, 수동 운전, 설정 모드는 서로 배타적이다.
 - 자동↔수동, 운전→설정 전환에는 사용자의 명시적 정지와 정지 완료가 필요하다.
-- 운전 조건의 적용은 정지한 설정 모드에서만 허용한다.
+- 구조적 변경은 명시적 정지와 Configure 절차를 따른다. 제한된 runtime-adjustable 속성은
+  아래의 운전 중 원자적 이벤트 계약을 따른다.
+- [2026-09-20 개정: 「모든 운전 조건 적용은 정지한 설정 모드에서만 허용한다」는 기존
+  결정을 #110에 따라 runtime-adjustable 속성 값에 한해 교체했다. 구조적 변경의 정지
+  및 Configure 절차는 유지한다.]
 - 인터록, 동시에 열 수 있는 밸브 수, 설비 용량, 일일 운전 시간 등을 공통 제약으로
   선언한다. 개별 control을 추가해도 설비 전체 제약은 계속 적용한다.
 - 센서 노이즈와 데이터 단절 처리를 이름 있는, 자원이 제한된 신호 연산으로 제공한다.
@@ -44,6 +49,7 @@ constraints StationRules {
   allow enter(Auto, Manual, Configure)
     only when mode == Stopped && stopped(station);
 
+  // 구조적 구성 적용의 정지 조건 (lowerer 규칙: configureOnly); operator 설정 event와 구분
   allow apply(settings)
     only when mode == Configure && stopped(station);
 
@@ -142,7 +148,8 @@ Auto 또는 Manual
 막지 않는다. Auto 상태에서 펌프가 잠깐 꺼져 있거나 다음 예약을 기다린다고 해서
 Manual/Configure로 직접 넘어갈 수 있는 것은 아니다.
 
-설정 세션 동안은 재기동을 금지한다. 설정 변경을 검증·원자적으로 적용하고 설정
+이 절의 Configure 설정 세션과 `apply(settings)`는 구조적 구성 변경을 뜻한다.
+그 세션 동안은 재기동을 금지한다. 구조적 변경을 검증·원자적으로 적용하고 설정
 세션을 닫아 Stopped로 돌아온 뒤 별도의 운전 모드 진입을 받는다. 원격 API도 같은
 검사를 거치며 화면의 비활성화만으로 제약을 구현하지 않는다.
 
@@ -169,25 +176,64 @@ VerifiedStop을 요구할 수 있다. 초기 안전 출력 순서·대기 값은
 나중에 사용자 모르게 자동 전환하지 않는다. 재기동에는 새 명시적 요청이 필요하다.
 설정 중 소스 문서의 설명을 편집하는 것과 운전 조건을 실장치에 적용하는 것은 구분한다.
 
-설정 적용은 관련 control 버전·포트/공급 관계·제약·시간표·선택 검사·관련 메타데이터를
+구조적 Configure 적용은 관련 control 버전·포트/공급 관계·제약·시간표 구조·선택 검사·관련 메타데이터를
 포함한 하나의 설비 revision 단위다. 후보 전체 검증 후 원자적인 영속 활성 revision
 교체를 완료해야 적용 성공을 알린다. 전원 단절 후에는 이전 완전체 또는 새 완전체만
 선택하며 일부만 섞지 않는다. 요청은 작성 시점의 revision과 정지 세대를 포함한다.
 허가 시 맞지 않으면 거부하고 자동으로 새 의미에 재해석하지 않는다. 이 revision은
 실제 사용량/중복 방지 원장의 초기화 키가 아니다.
 
-### 예제: 운전 설정은 정지한 설정 모드에서만 적용
+### Runtime-adjustable 속성과 구조적 변경
 
-다음 두 선언은 같은 설비 구성의 일부다. `settings`는 water1_time을 포함한 설정
-revision, `mode`와 `station`은 설비 관리자가 제공하는 이름이다.
+운영 설정의 문법과 적용 의미는 [Reference §5.1–5.2](reference/05-settings-and-observation.md)가
+정한다. `config` metadata의 `access = operator`는 운전자가 바꿀 수 있는 설정을
+선언한다. `access = designer`나 운영자 권한을 선언하지 않은 값은 운영 설정 event로
+바꾸지 않는다. `apply` 필드는 없으며 `apply = stopped`와 `apply = live`는 모두
+현재 컴파일러가 거부한다.
+
+Executable program/rules, 장치 binding/profile, dependency 또는 schedule structure 변경은
+구조적 변경이다. 명시적으로 노출한 일정의 시작 시각·Duration 같은 값은 일정에 속한다는
+이유만으로 구조적 변경이 되지 않는다. 선택적 검사(check)를 필수화하는 것은 규칙 변경이다.
+구조적 변경은 명시적 정지와 Configure 절차를 따르며 운영 설정 event와 구분한다.
+
+각 운영자 작업은 변경할 설정을 함께 담은 하나의 atomic live event다. 배치 전체를
+검증하며 하나라도 무효이면 전체를 거부한다. 거부는 독립된 보통 운전 규칙을 멈추지
+않는다. 유효 event의 적용 위치부터 새 값을 읽으며 다음 watering cycle이나 새 run을
+기다리지 않는다. 평가 도중 snapshot을 바꾸지 않고 event와 scan의 순서는 Reference
+§5.2를 따른다. source/bytecode, program identity와 run identity는 유지하고 settings
+revision과 유효 event 위치를 기록한다. state와 timer를 암묵적으로 초기화하지 않는다.
+
+Temperature의 canonical 값과 `displayUnit` 보존은
+[Reference §5.1](reference/05-settings-and-observation.md#51-config-선언),
+진행 중인 Range의 설정 변경은
+[Reference §3.5](reference/03-time-and-schedules.md#35-schedule의-공통-의미)를 따른다.
+
+받아들인 일반 운영 설정은 물리 ESP 재시작 뒤에도 보존된다. 재시작은 새 run을
+만들며 이전 program state의 자동 복원을 뜻하지 않는다. 재시작 반응은 작성된 규칙이
+정하고 첫 판단 전 전기적 출력 의무는 Device 경계에 남는다. 부팅 시 자동/수동 정책을
+일괄 강제하지 않는다. 공유 자원 중재, station 모드 전이, 사용량 원장과 명시적 정지
+절차는 계속 적용된다. ESP의 program/module 또는 firmware 갱신은 그 ESP가 제어하는
+모든 장치 작업을 정지시킨다.
+
+### 예제: 운영 설정 선언과 구조적 Configure 적용
+
+다음은 control 본문에 넣는 운영 설정 선언 단편이다.
 
 ```ghost
-// control 내부의 운전 설정 선언
-config water1_time: Duration = 5min;
+config water1_time: Duration = 5min { min = 1min; max = 30min; step = 1min; access = operator; }
 ```
 
+위 선언의 운영자 변경 의미는 atomic live event다. 선언과 metadata를 컴파일할 수
+있다는 사실만으로 모든 host가 live event 전달·적용을 구현했다는 뜻은 아니다.
+`tools/operating-settings.mjs`의 `createOperatingSettingsCandidate`는 현재 소스 literal을
+편집하고 재컴파일하는 후보 작성 도구다. 이 경로는 같은 program의 live 설정 적용이
+아니며, 운영 설정 event의 대체 경로로 취급하지 않는다.
+
+아래 별도 제약의 `settings`는 **구조적 구성 revision**이다. 위 `water1_time`의
+운영자 변경에 정지 조건을 붙이는 예제가 아니다. `mode`와 `station`은 설비 관리자가
+제공하는 이름이다.
+
 ```ghost
-// 위 control이 사용하는 설비의 공통 규칙
 constraints EditInterlock {
   exclusive(automatic, manual, configuring);
 
@@ -199,9 +245,18 @@ constraints EditInterlock {
 }
 ```
 
-Auto 운전 중 5min을 8min으로 편집해도 활성 설정은 5min이다. 적용 요청은 거부한다.
-사용자가 정지하고 정리 절차가 끝난 뒤 Configure로 들어가면 후보 8min을 검증·적용할
-수 있다. 설정 세션 종료 후에는 Stopped이며, 새 운전 요청 없이 자동 재시작하지 않는다.
+`tools/constraints.mjs`의 `configureOnly` 규칙과 station의 `apply_config`는 정지한
+Configure 경로다. 구조적 후보를 검증·적용한 뒤 새 운전 요청을 받는다. 운영 설정
+event의 검증·적용 의미와 물리적 CommandedStop/VerifiedStop의 의미를 합치지 않는다.
+
+### 2026-09-20 연구 기록과 후속 결정
+
+[language #89](https://github.com/callin2/ghostflow-language/issues/89),
+[system #54](https://github.com/callin2/farm_studio_system/issues/54)의 당시 연구는
+stopped 설정 적용과 소스 수정·재컴파일 경로를 출발점으로 live 속성 이벤트를 논의했다.
+당시의 `apply = stopped` 예제, 미정 노출 문법, `settings.valid` 설계 스케치는
+역사 기록이며 현재 실행 문법이나 대체 계약이 아니다. 2026-09-22 이후 확정된
+operator 설정 문법과 atomic live 의미는 위 Reference §5.1–5.2를 따른다.
 
 ## 장치 부가정보는 optional
 
@@ -255,7 +310,9 @@ constraints CapacityAdvice {
 어느 경우에도 장치 정보를 입력했다는 사실만으로 기본 규칙이 자동 강화되지는 않는다.
 
 부가정보를 입력하거나 장치를 발견했다고 필수 운전 조건을 자동 추가하지 않는다.
-필수 규칙으로 승격하는 것은 명시적인 설정 변경이며 정지한 설정 모드에서 적용한다.
+필수 규칙으로 승격하는 것은 executable RULES의 구조적 변경이다. 명시적으로 정지하고
+Configure 절차에서 변경·검증·적용해야 하며 runtime-adjustable 속성의 live 이벤트 대상이
+아니다.
 이미 활성화한 필수 규칙이 필요로 하는 정보를 제거하는 경우에는 해당 규칙도 함께
 수정하거나 제거해 검증해야 한다. 정보가 사라졌다는 이유로 필수 규칙을 몰래 해제하지 않는다.
 
@@ -596,11 +653,13 @@ constraints DailyWatering {
 | 상황 | 기대 결과 |
 |---|---|
 | 자동 중 수동 진입 요청 | 거부하고 명시적 정지 경로를 안내; 자동 선점 없음 |
-| 모드 전환과 설정 적용이 같은 tick에 도착 | 이전 확정 모드/정지 조건으로 판정; 우회 적용 없음 |
+| 모드 전환과 구조적 설정 적용이 같은 tick에 도착 | 이전 확정 모드/정지 조건으로 판정; 우회 적용 없음 |
 | Auto와 Manual 진입 요청이 같은 tick에 도착 | 충돌하는 진입 모두 거부; 기존 모드 유지 |
 | Stop과 예약 발생이 같은 tick에 도착 | Stop 우선; 새 출력 없음, 발생은 종결 기록 |
 | 정지 요청 후 밸브 정리 단계가 진행 중 | Configure 진입 불가 |
-| 원격 API에서 운전 중 설정 변경 | UI와 동일하게 거부 |
+| 운전 중 runtime-adjustable 설정 이벤트 | 전체 검증 후 단일 이벤트로 적용; 유효 event 위치와 새 settings revision 기록 |
+| 운전 중 runtime-adjustable 묶음의 한 값이 무효 | 이벤트 전체 거부; 값·상태·출력 부분 변경 없음 |
+| 운전 중 구조적 설정 또는 program/profile 변경 | 거부; 명시적 정지와 Configure 절차 필요 |
 | 압력·유량 등 장치 부가정보를 전혀 입력하지 않음 | 기본 관수, 모드·밸브 수·시간 인터록 사용 가능 |
 | 선택적 용량 check에 필요한 필드가 없음 | 해당 분석만 Unknown; 0 치환·운전 차단·반복 고장 알림 없음 |
 | 일부 구역의 유량만 알려져 있음 | 충분한 정보가 있는 검사만 수행; 전체 용량 검증 성공으로 표시하지 않음 |
@@ -608,7 +667,7 @@ constraints DailyWatering {
 | 서로 다른 control이 같은 펌프에 밸브 2개씩 요청 | 설비 합계 4개로 검사; 허가 가능한 작업만 시작 |
 | 비활성 control이 pump=false를 요청 | 현재 사용권 소유자의 펌프를 끄지 않음 |
 | control의 단계 사이 펌프가 잠깐 꺼짐 | 급수 세션 사용권 유지; 다른 control에 허가하지 않음 |
-| Configure 적용 중 전원 단절 | 이전/새 revision 중 완전체만 복구; 관계와 제약의 부분 적용 없음 |
+| 구조적 Configure 적용 중 전원 단절 | 이전/새 revision 중 완전체만 복구; 관계와 제약의 부분 적용 없음 |
 | 모순된 필수 제약 추가 | 새 구성 적용 거부 또는 검증 실패 표시; 기존 구성 부분 변경 없음 |
 | 동일 센서 샘플을 여러 tick에서 읽음 | median/복구 카운터 중복 갱신 없음 |
 | 센서가 임계값 주변에서 흔들림 | 설정한 히스테리시스 구간에서는 판정 유지 |

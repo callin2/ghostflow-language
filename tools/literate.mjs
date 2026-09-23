@@ -13,7 +13,7 @@ export class LiterateError extends Error {
 
 const ANCHOR_ID = '[A-Za-z][A-Za-z0-9._:-]{0,127}';
 const ANCHOR = new RegExp(`^<!-- ghostflow:anchor id=(${ANCHOR_ID}) kind=(intent|premise|assumption) status=(confirmed|unconfirmed|superseded) origin=(user|operator|engineer|ai|imported) -->$`);
-const LINK = new RegExp(`^(\\s*)// ghostflow:link id=(${ANCHOR_ID}) relation=(implements|constrains|fallback|assumes)$`);
+const LINK = new RegExp(`^(\\s*)// ghostflow:link id=(${ANCHOR_ID}) relation=(implements|constrains|fallback|assumes)(?: meaning=(counter))?$`);
 
 function range(filename, firstLine, firstColumn, lastLine, lastColumn) {
   return { filename, line: firstLine, column: firstColumn, endLine: lastLine, endColumn: lastColumn + 1 };
@@ -28,7 +28,7 @@ function directiveColumn(line, marker) {
 export function extractLiterate(markdown, { filename = '<literate>' } = {}) {
   if (typeof markdown !== 'string') throw new TypeError('markdown must be a string');
   if (new TextEncoder().encode(markdown).byteLength > MAX_INPUT_BYTES) throw new RangeError('literate byte limit exceeded');
-  const lines = markdown.replace(/\r\n/g, '\n').split('\n');
+  const lines = markdown.replace(/\r\n?/g, '\n').split('\n');
   if (lines.length > MAX_INPUT_LINES) throw new RangeError('literate line limit exceeded');
   let frontMatterEnd = -1;
   if (lines[0] === '---') {
@@ -74,6 +74,7 @@ export function extractLiterate(markdown, { filename = '<literate>' } = {}) {
         const column = match[1].length + 1;
         linkDirectives.push({
           anchorId: match[2], relation: match[3],
+          ...(match[4] ? { meaning: match[4] } : {}),
           directiveSource: range(filename, originalLine, column, originalLine, line.length),
           extractedDirectiveSource: range(filename, extractedLine, column, extractedLine, line.length),
         });

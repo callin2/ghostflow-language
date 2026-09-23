@@ -1,0 +1,17 @@
+format: GhostFlow/scenario-v1
+id: corpus-virtual-timer
+initialInputs[2]{name,type,value}:
+  start,Bool,false
+  stop,Bool,false
+keyBindings[0]:
+actions[4]:
+  - kind: input
+    name: start
+    type: Bool
+    value: true
+  - kind: scan
+    atMs: 0
+  - kind: scan
+    atMs: 1999
+  - kind: scan
+    atMs: 2000

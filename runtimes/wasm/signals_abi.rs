@@ -23,6 +23,7 @@ pub struct SignalConfig {
 pub struct SignalHandle {
     sensor: Sensor,
     error: String,
+    checkpoint: Option<(Sensor, String)>,
 }
 
 fn config(raw: &SignalConfig) -> Result<SensorConfig, SensorFault> {
@@ -75,6 +76,7 @@ pub unsafe extern "C" fn gf_signal_create(raw: *const SignalConfig) -> *mut Sign
             Err(_) => return std::ptr::null_mut(),
         },
         error: String::new(),
+        checkpoint: None,
     }))
 }
 
@@ -83,6 +85,45 @@ pub unsafe extern "C" fn gf_signal_free(handle: *mut SignalHandle) {
     if !handle.is_null() {
         drop(Box::from_raw(handle));
     }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn gf_signal_begin(handle: *mut SignalHandle) -> i32 {
+    let Some(handle) = handle.as_mut() else {
+        return 0;
+    };
+    if handle.checkpoint.is_some() {
+        set_error(handle, "signal transaction already active");
+        return 0;
+    }
+    handle.checkpoint = Some((handle.sensor.clone(), handle.error.clone()));
+    1
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn gf_signal_commit(handle: *mut SignalHandle) -> i32 {
+    let Some(handle) = handle.as_mut() else {
+        return 0;
+    };
+    if handle.checkpoint.take().is_none() {
+        set_error(handle, "signal transaction is not active");
+        return 0;
+    }
+    1
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn gf_signal_rollback(handle: *mut SignalHandle) -> i32 {
+    let Some(handle) = handle.as_mut() else {
+        return 0;
+    };
+    let Some((sensor, error)) = handle.checkpoint.take() else {
+        set_error(handle, "signal transaction is not active");
+        return 0;
+    };
+    handle.sensor = sensor;
+    handle.error = error;
+    1
 }
 
 #[no_mangle]
@@ -123,6 +164,41 @@ pub unsafe extern "C" fn gf_signal_update(
             0
         }
     }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn gf_signal_has_sample(handle: *const SignalHandle) -> u32 {
+    handle
+        .as_ref()
+        .and_then(|h| h.sensor.accepted_sample_identity())
+        .is_some() as u32
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn gf_signal_sample_epoch(handle: *const SignalHandle) -> u64 {
+    handle
+        .as_ref()
+        .and_then(|h| h.sensor.accepted_sample_identity())
+        .map(|identity| identity.0)
+        .unwrap_or(0)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn gf_signal_sample_id(handle: *const SignalHandle) -> u64 {
+    handle
+        .as_ref()
+        .and_then(|h| h.sensor.accepted_sample_identity())
+        .map(|identity| identity.1)
+        .unwrap_or(0)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn gf_signal_sample_timestamp(handle: *const SignalHandle) -> u64 {
+    handle
+        .as_ref()
+        .and_then(|h| h.sensor.accepted_sample_identity())
+        .map(|identity| identity.2)
+        .unwrap_or(0)
 }
 
 #[no_mangle]
@@ -170,4 +246,91 @@ pub unsafe extern "C" fn gf_signal_last_error_ptr(handle: *const SignalHandle) -
 #[no_mangle]
 pub unsafe extern "C" fn gf_signal_last_error_len(handle: *const SignalHandle) -> usize {
     handle.as_ref().map(|h| h.error.len()).unwrap_or(0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn transaction_lifecycle_restores_complete_handle_and_keeps_handles_isolated() {
+        let mut handle = SignalHandle {
+            sensor: Sensor::new(SensorConfig::new(Filter::Ema(1.0), 0.0, 100.0, 10_000, 1))
+                .unwrap(),
+            error: "prior error".into(),
+            checkpoint: None,
+        };
+        let other = SignalHandle {
+            sensor: Sensor::new(SensorConfig::new(Filter::Median(3), -100.0, 200.0, 50, 2))
+                .unwrap(),
+            error: "other error".into(),
+            checkpoint: None,
+        };
+        unsafe {
+            assert_eq!(gf_signal_begin(std::ptr::null_mut()), 0);
+            assert_eq!(gf_signal_commit(std::ptr::null_mut()), 0);
+            assert_eq!(gf_signal_rollback(std::ptr::null_mut()), 0);
+            assert_eq!(gf_signal_commit(&mut handle), 0);
+            assert_eq!(gf_signal_rollback(&mut handle), 0);
+            assert_eq!(gf_signal_update(&mut handle, 1, 1, 1, 20.0, 1, 1), 1);
+            handle.error = "prior error".into();
+            assert_eq!(gf_signal_begin(&mut handle), 1);
+            assert_eq!(gf_signal_update(&mut handle, 2, 2, 2, 80.0, 1, 2), 1);
+            assert_eq!(handle.sensor.diagnostic_count(), 1);
+            assert_eq!(gf_signal_begin(&mut handle), 0);
+            assert_eq!(gf_signal_reset(&mut handle), 1);
+            assert_eq!(gf_signal_rollback(&mut handle), 1);
+            assert_eq!(handle.sensor.reading(1), Ok(20.0));
+            assert_eq!(handle.sensor.accepted_sample_identity(), Some((1, 1, 1)));
+            assert_eq!(handle.sensor.diagnostic_count(), 0);
+            assert_eq!(handle.error, "prior error");
+            assert_eq!(other.sensor.accepted_sample_identity(), None);
+            assert_eq!(other.sensor.config().filter, Filter::Median(3));
+            assert_eq!(other.error, "other error");
+            assert_eq!(gf_signal_begin(&mut handle), 1);
+            assert_eq!(gf_signal_update(&mut handle, 1, 2, 2, 40.0, 1, 2), 1);
+            assert_eq!(gf_signal_commit(&mut handle), 1);
+            assert_eq!(gf_signal_rollback(&mut handle), 0);
+            assert_eq!(handle.sensor.reading(2), Ok(40.0));
+            assert_eq!(gf_signal_begin(&mut handle), 1);
+            gf_signal_free(Box::into_raw(Box::new(handle)));
+        }
+        println!(
+            "Sensor={} checkpoint-slot={} SignalHandle={} bytes",
+            size_of::<Sensor>(),
+            size_of::<Option<(Sensor, String)>>(),
+            size_of::<SignalHandle>()
+        );
+    }
+
+    #[test]
+    fn sample_identity_exports_preserve_authoritative_tuple() {
+        let mut handle = SignalHandle {
+            sensor: Sensor::new(SensorConfig::new(Filter::Ema(1.0), 0.0, 100.0, 10_000, 1))
+                .unwrap(),
+            error: String::new(),
+            checkpoint: None,
+        };
+        unsafe {
+            assert_eq!(gf_signal_has_sample(std::ptr::null()), 0);
+            assert_eq!(gf_signal_sample_epoch(std::ptr::null()), 0);
+            assert_eq!(gf_signal_sample_id(std::ptr::null()), 0);
+            assert_eq!(gf_signal_sample_timestamp(std::ptr::null()), 0);
+            assert_eq!(gf_signal_has_sample(&handle), 0);
+            assert_eq!(
+                gf_signal_update(&mut handle, 3, 10, 100, 20.0, Quality::Good as u8, 100),
+                1
+            );
+            assert_eq!(
+                gf_signal_update(&mut handle, 3, 5, 150, 99.0, Quality::Good as u8, 150),
+                2
+            );
+            assert_eq!(gf_signal_has_sample(&handle), 1);
+            assert_eq!(gf_signal_sample_epoch(&handle), 3);
+            assert_eq!(gf_signal_sample_id(&handle), 10);
+            assert_eq!(gf_signal_sample_timestamp(&handle), 100);
+            assert_eq!(gf_signal_reset(&mut handle), 1);
+            assert_eq!(gf_signal_has_sample(&handle), 0);
+        }
+    }
 }

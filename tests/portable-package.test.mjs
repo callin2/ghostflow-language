@@ -16,7 +16,7 @@ import { compileSource } from '../tools/toolchain.mjs';
 import { GhostFlowRuntime } from '../runtimes/wasm/ghostflow-runtime.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const nativePath = path.join(root, 'target/release/examples/run');
+const nativePath = path.join(root, 'target/release/examples/run' + (process.platform === 'win32' ? '.exe' : ''));
 const wasmPath = path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm');
 const encoder = new TextEncoder();
 const identity = Object.freeze({
@@ -254,9 +254,16 @@ test('GF-TEST-portable-package-rejection: structure, integrity, trust and host c
   await expectsCode(() => verifyPortablePackage(invalidBase64, verifierOptions(current)), 'invalid-base64');
 
   const unsupportedBytecode = clone(packageValue);
-  unsupportedBytecode.payload.bytecode.version = '2';
+  unsupportedBytecode.payload.bytecode.version = '5';
   await resign(unsupportedBytecode, current);
   await expectsCode(() => verifyPortablePackage(unsupportedBytecode, verifierOptions(current)), 'unsupported-bytecode-version');
+  const unsupportedHeader = clone(packageValue);
+  const unsupportedBytes = Buffer.from(unsupportedHeader.payload.bytecode.contentBase64, 'base64');
+  unsupportedBytes.writeUInt16LE(5, 4);
+  unsupportedHeader.payload.bytecode.contentBase64 = base64(unsupportedBytes);
+  unsupportedHeader.payload.bytecode.sha256 = await digestHex(unsupportedBytes);
+  await resign(unsupportedHeader, current);
+  await expectsCode(() => verifyPortablePackage(unsupportedHeader, verifierOptions(current, () => assert.fail('unsupported header must reject before loader'))), 'unsupported-bytecode-version');
 
   const noncanonicalManifest = clone(packageValue);
   const manifest = JSON.parse(Buffer.from(noncanonicalManifest.payload.manifest.contentBase64, 'base64').toString('utf8'));
@@ -379,6 +386,76 @@ test('GF-TEST-portable-package-hosts: one verified package feeds byte-identical 
   assert.deepEqual([...native.bytecode.copy()], [...compilation.bytes]);
   assert.deepEqual([...wasm.bytecode.copy()], [...compilation.bytes]);
   assert.deepEqual([...native.bytecode.copy()], [...wasm.bytecode.copy()]);
+});
+
+test('GF-TEST-portable-package-profiles: signed packages preserve profiles 1, 2 and 3 with Int capabilities', async t => {
+  const current = await currentKeyPromise;
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-package-profiles-'));
+  t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
+  for (const [version, type, expression] of [[1, 'Number', 'value'], [2, 'Int', 'value'], [3, 'Int', 'if guard then value else 0']]) {
+    const compilation = await compileSource(`# Profile ${version}\n\n\`\`\`ghost\ncontrol Profile${version} { input guard: Bool; input value: ${type}; output result: ${type}; result <- ${expression}; }\n\`\`\`\n`, { filename: `profile-${version}.ghost.md` });
+    const capabilities = [{ kind: 'input', name: 'guard', type: 'bool' },
+      { kind: 'input', name: 'value', type: type.toLowerCase() }, { kind: 'actuator', name: 'result', type: type.toLowerCase() }];
+    const packageValue = await buildPortablePackage(compilation, { ...identity, requiredCapabilities: capabilities },
+      buildOptions([{ keyId: current.keyId, privateKey: current.privateKey }]));
+    assert.equal(packageValue.payload.bytecode.version, String(version));
+    const options = { ...verifierOptions(current), availableCapabilities: capabilities,
+      supportedManifestFormats: [compilation.manifest.format], verifyBytecode: async bytes => {
+        const modulePath = path.join(temporary, 'profile.gfb'), inputPath = path.join(temporary, 'profile.csv');
+        fs.writeFileSync(modulePath, bytes); fs.writeFileSync(inputPath, 'guard,value\ntrue,7\n');
+        const native = JSON.parse(execFileSync(nativePath, [modulePath, inputPath, '--outcomes'], { encoding: 'utf8' }).trim());
+        assert.equal(native.trace.safe.result, 7);
+        const runtime = await GhostFlowRuntime.instantiate(fs.readFileSync(wasmPath));
+        try { runtime.load(bytes); runtime.addCapability('actuator', 'result', type.toLowerCase()); runtime.activate(); }
+        finally { runtime.dispose(); }
+        return true;
+      } };
+    const verified = await verifyPortablePackage(packageValue, options);
+    assert.deepEqual([...verified.bytecode.copy()], [...compilation.bytes]);
+    for (const mismatch of [1, 2, 3].filter(value => value !== version)) {
+      const candidate = clone(packageValue);
+      candidate.payload.bytecode.version = String(mismatch);
+      await resign(candidate, current);
+      await expectsCode(() => verifyPortablePackage(candidate, { ...options, verifyBytecode: () => assert.fail('mismatch must reject before loader') }), 'bytecode-version-mismatch');
+    }
+  }
+});
+
+test('GF-TEST-portable-package-quantities: signed quantity ports map to number and preserve canonical units', async () => {
+  const current = await currentKeyPromise;
+  const compilation = await compileSource(`# Quantity package\n\n\`\`\`ghost\ncontrol QuantityPackage { input target: Temperature; output echoed: Temperature; echoed <- target; }\n\`\`\`\n`, { filename: 'quantity-package.ghost.md' });
+  const capabilities = [
+    { kind: 'actuator', name: 'echoed', type: 'number' },
+    { kind: 'input', name: 'target', type: 'number' },
+  ];
+  const packageValue = await buildPortablePackage(
+    compilation,
+    { ...identity, requiredCapabilities: capabilities },
+    buildOptions([{ keyId: current.keyId, privateKey: current.privateKey }]),
+  );
+  const options = {
+    ...verifierOptions(current),
+    availableCapabilities: capabilities,
+    verifyBytecode: () => true,
+  };
+  const verified = await verifyPortablePackage(packageValue, options);
+  assert.equal(verified.manifest.inputs[0].canonicalUnit, 'K');
+  assert.equal(verified.manifest.outputs[0].canonicalUnit, 'K');
+
+  for (const [label, mutate, code] of [
+    ['missing unit', manifest => { delete manifest.inputs[0].canonicalUnit; }, 'unknown-or-missing-field'],
+    ['wrong unit', manifest => { manifest.inputs[0].canonicalUnit = '°C'; }, 'manifest-mismatch'],
+    ['unit on nonquantity', manifest => { manifest.inputs[0] = { name: 'target', type: 'Number', canonicalUnit: 'K' }; }, 'unknown-or-missing-field'],
+  ]) {
+    const candidate = clone(packageValue);
+    const manifest = JSON.parse(Buffer.from(candidate.payload.manifest.contentBase64, 'base64').toString('utf8'));
+    mutate(manifest);
+    const manifestBytes = encoder.encode(canonicalJson(manifest));
+    candidate.payload.manifest.contentBase64 = base64(manifestBytes);
+    candidate.payload.manifest.sha256 = await digestHex(manifestBytes);
+    await resign(candidate, current);
+    await expectsCode(() => verifyPortablePackage(candidate, options), code, label);
+  }
 });
 
 test('GF-TEST-portable-package-browser: signed package verification does not require Buffer', async () => {
