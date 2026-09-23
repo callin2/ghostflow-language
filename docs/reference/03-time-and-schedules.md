@@ -18,6 +18,7 @@ provider record처럼 `text`로 표시한 구조는 실행 환경 계약이며 G
 [연속 Bool 타이머 계약](../CONTINUOUS-BOOL-TIMER-CONTRACT.md),
 [Solar 일정 계약](../SOLAR-SCHEDULE.md), [선택 문법](../LANGUAGE-SURFACE.md),
 [Programming in GhostFlow 6–7장](../ProgrammingInGhostflow.md)과
+[2026-09-24 고정 계획 시간 구간 결정](../2026-09-24-fixed-planned-time-range-decision.md),
 [#23](https://github.com/callin2/ghostflow-language/issues/23),
 [#46](https://github.com/callin2/ghostflow-language/issues/46),
 [#90](https://github.com/callin2/ghostflow-language/issues/90),
@@ -262,6 +263,7 @@ basis       := pulse
              | window(positive Duration)
              | run(positive Duration, on_time)
              | run(positive Duration, within(positive Duration))
+             | range(positive Duration)
 when        := Bool
 clock       := trusted_only
              | hold_trusted(positive Duration, terminal: skip)
@@ -269,14 +271,15 @@ gap         := skip_after(positive Duration)
 recovery    := baseline
 fallback    := skip
              | fixed_time(TimeOfDay, terminal: skip)  // Solar만
-cancel_when := Bool                                   // run에만 필수
+cancel_when := Bool                                   // run과 range에 필수
 ```
 
 공통 field는 모두 필수다. 조건 없는 admission은 `when = true`, 언어 수준 취소가
-없는 Run은 `cancel_when = false`라고 명시한다. `hold_trusted(d, terminal: skip)`은
+없는 Run 또는 Range는 `cancel_when = false`라고 명시한다. `hold_trusted(d, terminal: skip)`은
 마지막 trusted wall instant에 단조 경과를 더해 최대 d 동안만 사용한다. uncertainty는
 마지막 uncertainty에 같은 단조 경과를 더하며 `HeldClock` provenance를 남긴다.
-경계에서는 `ClockUnknown` 뒤 terminal skip이다. high-water는 바꾸지 않는다.
+경계에서는 `ClockUnknown` 뒤 새 admission 판단에 terminal skip을 적용한다.
+이미 admit한 Range의 단조 종료 시점은 유지한다. high-water는 바꾸지 않는다.
 
 `fixed_time`은 Solar에서만 쓸 수 있다. 해당 source local date의 fallback occurrence가
 admit되면 같은 occurrence ledger가 그 날짜의 Solar 사건을 소비하므로 provider가
@@ -301,8 +304,8 @@ schedule morning: Daily {
 }
 ```
 
-Trigger와 duration basis는 다른 축이다. Cron, Window, Run을 같은 종류의 대안으로
-나열하지 않는다. Cron은 언제 occurrence를 계획하는지, Window/Run은 planned instant
+Trigger와 duration basis는 다른 축이다. Cron, Window, Run, Range를 같은 종류의 대안으로
+나열하지 않는다. Cron은 언제 occurrence를 계획하는지, Window/Run/Range는 planned instant
 주변의 admission과 duration을 뜻한다. Schedule을 읽는 행위는 장치를 켜지 않는다.
 
 Schedule 판단은 `True`, `False`, `Unknown(reason)`과 사용한 revision을 낸다.
@@ -314,8 +317,10 @@ Schedule 판단은 `True`, `False`, `Unknown(reason)`과 사용한 revision을 �
 - `.due`: 하나의 occurrence가 admit된 accepted tick에서만 true인 pulse.
 - Window `.open`: `[planned, planned + length)` 안에서 현재 predicate까지 true인 level.
 - Run `.active`: admission 뒤 명시적 상태와 단조 timer로 표현되는 운전 구간.
+- Range `.active`: 계획 시작점에 묶인 현재 occurrence의 남은 구간. admit한 뒤에는
+  단조 시계로 끝을 판단하며 안전 제약으로 출력이 막혀도 구간은 계속 흐른다.
 
-Run duration은 실제 admission부터 단조 시간으로 잰다. `cancel_when`이 true인 accepted
+Run duration은 실제 admission부터 단조 시간으로 잰다. Run과 Range에서 `cancel_when`이 true인 accepted
 tick에서는 `.active`를 끝내되 occurrence를 다시 arm하지 않는다. requested output이 false이거나
 전역 constraint가 safe output을 막아도 숨겨서 일시정지하지 않는다. requested ON,
 safe ON, continuous safe ON의 시간은 필요한 경우 별도 명시 연산으로 잰다.
@@ -328,6 +333,7 @@ revision이 포함된다. 대표 disposition은 `Before`, `PredicateFalse`, `Alr
 
 - `ConditionsFalseAtPulse`: pulse crossing에서 조건이 거짓이었다.
 - `ObservationGap`: 신뢰할 수 없는 관측 gap이 admission interval과 겹쳤다.
+  Range에서는 열려 있는 구간의 비종결 관찰 근거이며 아래 회복 규칙을 따른다.
 - `LateStartExpired`: late interval이 끝났다.
 - `CorrectionPastHighWater`: 수정된 사건 시각이 이미 지난 high-water 뒤로 이동했다.
 - `EventWithdrawn`: provider가 아직 admit하지 않은 사건을 철회했다.
@@ -335,7 +341,7 @@ revision이 포함된다. 대표 disposition은 `Before`, `PredicateFalse`, `Alr
 `.due = false`만으로 ordinary false, Unknown fallback, 이미 접수한 사건, 놓친 사건을
 구분할 수 없으므로 이 evidence를 같은 accepted scan과 결속한다.
 
-### Pulse, Window, Run
+### Pulse, Window, Run, Range
 
 | basis | admission 의미 |
 |---|---|
@@ -343,9 +349,87 @@ revision이 포함된다. 대표 disposition은 `Before`, `PredicateFalse`, `Alr
 | `window(5min)` | `[planned, planned+5min)`에서 조건이 처음 true인 시점에 한 번 admit. 같은 occurrence에서 false→true가 반복돼도 재arm하지 않는다. |
 | `run(5min, on_time)` | observed crossing에서만 admit하고 admission부터 5분 운전한다. |
 | `run(5min, within(10min))` | `[planned, planned+10min)`에서 첫 admission을 허용한다. 10분은 grace이고 run length는 5분이다. |
+| `range(10min)` | 신뢰할 수 있는 현재 시각이 `[planned, planned+10min)` 안에 있고 `when`이 true이면 첫 관측·부팅·회복이 늦어도 한 번 admit한다. 끝은 계획 시작점 + 10분이다. |
+
+```ghost
+schedule morning_watering: Daily {
+  timezone = "Asia/Seoul";
+  at = time`08:00`;
+  dst_missing = skip;
+  dst_repeated = first;
+  basis = range(10min);
+  when = true;
+  cancel_when = false;
+  clock = trusted_only;
+  gap = skip_after(60s);
+  recovery = baseline;
+  fallback = skip;
+}
+```
 
 late interval은 half-open이다. 종료 경계에서 새로 admit하지 않는다. 예정 시간 08:00,
 `run(5min, within(10min))`이 08:02에 admit되면 08:07까지의 단조 run이다.
+
+`range(duration)`은 고정된 계획 시간 구간이다. 예를 들어 08:00에 계획된
+`range(10min)`을 신뢰할 수 있는 시각 08:04에 처음 관측하면 08:10까지 남은
+6분만 요청한다. 08:10 또는 그 뒤에 처음 관측하면 시작하지 않고
+`LateStartExpired`로 기록한다. `when`이 늦게 true가 되어도 종료 전이면 남은
+시간만 요청한다. 시작·재부팅·시계 신뢰 회복과 관측 gap에서도 동일하다.
+이는 Range에만 적용하는 명시적 부분 구간 admission이다. 다른 basis의
+`gap = skip_after(...)`와 `recovery = baseline` 규칙을 바꾸지 않는다.
+신뢰할 수 있는 현재 시각이 없으면 `Unknown(ClockUnknown)`이며 추정 시각으로
+새 Range를 admit하지 않는다. `clock = hold_trusted(...)`가 명시된 경우에는
+그 계약으로 유지된 시각과 불확실성을 사용한다. 진행 중인 Range는 이후
+wall trust나 hold가 만료되어도 기존 단조 종료 시점까지 진행한다. 단, 미래로
+옮긴 시작점을 기다리는 같은 occurrence의 재진입은 새 admission과 마찬가지로
+신뢰 가능한 시각 없이 허용하지 않는다. trust가 회복된 뒤에도 현재 구간이
+끝났다면 재진입하지 않는다.
+
+같은 schedule의 서로 다른 Range occurrence는 겹치면 안 된다. 두 반열린 구간의
+교집합이 비어 있지 않으면 오류다. 경계가 정확히 맞닿는 경우는 허용한다.
+예를 들어 `DailySlots`의 `selected = [08:00, 08:15]`와 `basis = range(30min)`은
+08:00–08:30과 08:15–08:45가 겹치므로 컴파일 오류다. 컴파일러는 trigger 정의와
+유효 설정으로 occurrence 간격의 비중첩을 증명할 수 있는 Range만 받는다.
+provider나 동적 recurrence의 간격을 증명할 수 없으면 추측하거나 하나를 선택하지
+않고 그 `range` 선언을 컴파일 진단으로 거부한다. 정적 기본값은 컴파일 때,
+복원한 설정을 포함한 유효값은 활성화 전에 검사한다. 유효값이 겹치면 활성화를
+거부한다. live 설정 변경으로 겹치면 event 전체를 원자적으로 거부한다. 두 검사는
+현재 admit한 구간과 새로 계획될 구간에도 적용한다.
+
+Range admission에서 occurrence의 계획 시작점과 그때의 유효 Duration으로 계획 종료점을
+확정한다. 이미 경과한 부분을 단조 시계 기준 잔여 시간으로 환산한다.
+admission 뒤 RTC/NTP 벽시계 보정은 진행 중인 종료 시점을 앞당기거나 늦추지
+않는다. 보정된 벽시계는 현재 occurrence가 종료된 뒤 후속 occurrence 판단에
+반영한다. 같은 occurrence의 신뢰 시각, 계획 시작점과 단조 경과 기준을
+함께 보존하여 보정 중에도 종료 시각을 재계산하지 않는다.
+
+단일 계획 시작 시각을 가진 trigger의 scalar 시작 시각 설정 또는 Duration이
+운영 설정이면 받아들인 atomic live event의
+적용 위치부터 현재 occurrence에도 적용한다. 변경된 시작 시각과 Duration으로
+현재 구간과 종료점을 다시 계산한다. occurrence ID와 이미 admit한 ledger는
+settings revision 변경에도 유지한다. admission 이후에는 보정 전의 안정된 시간
+기준을 단조 경과로 전진시켜 현재 위치와 남은 시간을 정한다. 예를 들어 08:00
+계획 `range(10min)`이 08:04에 admit된 뒤 08:07에 Duration을 12분으로 바꾸면
+08:12에 끝난다. 5분으로 줄이면 새 종료점 08:05가 이미 지났으므로 그 event가
+적용되는 판단에서 끝난다. 시작 시각을 08:02로 바꾸고 Duration을 10분으로
+유지하면 종료점은 08:12다. late admission 시각을 새 계획 시작점으로 사용하지
+않는다. 같은 위치에서 설정 event와 scan이 겹치면 §5.2의 event 적용 순서를
+먼저 확정하고 그 위치의 유효 설정으로 판단한다.
+
+전역 안전 제약이 출력을 막으면 safe output은 즉시 false지만 Range occurrence와
+단조 종료 시점은 유지된다. 제약이 종료 전에 풀리면 그때 남은 구간만 요청할
+수 있다. 막힌 시간은 끝에 덧붙이지 않는다. `cancel_when = true`는 해당 occurrence를
+종결하며, 다시 허용되어도 같은 occurrence를 재시작하지 않는다. `.active`와
+requested/safe/applied/confirmed output은 서로 다른 관찰값이다.
+
+시작 시각 변경으로 현재 위치가 새 계획 시작점보다 앞서면 해당 판단에서
+`.active = false`로 멈춘다. 새 시작점에 도달한 accepted tick에서 같은 occurrence의
+변경된 구간 안에 있는지 다시 판단한다. `when`이 true이면 현재 계획 종료점까지만
+요청을 재개하고, 안전 제약이 허용할 때만 safe output을 낸다. 이는 새 admission이
+아니므로 `.due`를 다시 내지 않고 occurrence ID와 ledger를 유지한다.
+변경된 종료점이 현재 위치 이하이면 그 occurrence는 즉시 종결하며 재개하거나
+새로 admit하지 않는다. `DailySlots`의 `TimeSlots` 집합 변경은 이 시작 시각
+재계산 규칙이 아니라 §3.6의 slot 제거·추가 규칙을 따른다.
 
 ### occurrence identity와 중복 억제
 
@@ -362,16 +446,27 @@ metadata이며 같은 사건을 새 사건으로 만들지 않는다.
 
 일정은 연속한 accepted snapshots의 monotonic delta와 양의 wall delta를 검사한다.
 명시한 `gap = skip_after(d)`의 d를 넘으면 `ObservationGap`이다. 이 정책은 그
-gap과 admission interval이 겹친 occurrence를 missed로 종결한다. Window나
-`within(...)`이 아직 열려 있어도 나중에 되살리지 않는다.
+gap과 admission interval이 겹친 Pulse, Window, Run occurrence를 missed로 종결한다.
+Window나 `within(...)`이 아직 열려 있어도 나중에 되살리지 않는다. Range에서
+구간 중의 `ObservationGap`은 gap의 관찰 근거이며 그 occurrence를 terminal missed로
+기록하지 않는다. 신뢰 가능한 현재 시각이 여전히 계획 구간 안이면 처음 admit해
+남은 시간만 요청할 수 있다. 종료 경계에 도달하면 `LateStartExpired`로 terminal
+missed를 기록하고 실행하지 않는다. 이미 terminal missed로 종결되거나 철회된
+occurrence는 구간 안이라는 이유로 되살리지 않는다. 특히 Tide의
+`CorrectionPastHighWater`와 `EventWithdrawn`은 Range에서도 terminal이다.
 
 `recovery = baseline`은 최초 부팅과 clock trust 회복에서 baseline만 세우고 과거
-occurrence를 몰아서 실행하지 않는다. wall rollback은 high-water와 admission ledger로
+occurrence를 몰아서 실행하지 않는다. Range는 아직 열려 있는 현재 구간에 한해
+남은 시간만 admit할 수 있다. wall rollback은 high-water와 admission ledger로
 중복을 막는다. catch-up, retry, replay 문법은 없다.
 
-연속한 accepted scan 사이에서 같은 schedule의 occurrence를 둘 이상 교차하면 새로 교차한
-occurrence를 모두 missed로 기록하고 어느 것도 admit하거나 실행하지 않는다. 정확히 하나만
-교차한 경우에는 ordinary admission 규칙을 그대로 적용한다.
+연속한 accepted scan 사이에서 같은 schedule의 occurrence를 둘 이상 교차하면
+Pulse, Window, Run의 새 occurrence를 모두 missed로 기록하고 어느 것도 admit하거나
+실행하지 않는다. Range는 이미 종료되거나 terminal missed/withdrawn으로 기록된
+occurrence를 실행하지 않고, 신뢰 가능한 현재 시각 안에 열린 구간의 현재
+occurrence를 남은 시간 동안 admit한다. 같은 schedule에 동시에 열린 두 Range
+구간은 허용되지 않으며 compile/live 설정 검증에서 거부한다.
+정확히 하나만 교차한 경우에는 각 basis의 ordinary admission 규칙을 적용한다.
 
 ## 3.6 선택된 DailySlots
 
@@ -772,7 +867,7 @@ requested/admitted/applied/confirmed 시작 또는 완료 중 어떤 event를 �
 이 장에서 확정한 공개 표기는 다음과 같다.
 
 - `date`, `time`, `datetime` tagged literal과 `continuous_true`.
-- 공통 schedule policy, `pulse/window/run`, `At`, `Daily`, `DailySlots`, `Periodic`,
+- 공통 schedule policy, `pulse/window/run/range`, `At`, `Daily`, `DailySlots`, `Periodic`,
   `Cron`, `Solar`, `Tide`.
 - `TimeSlots<G,N>` live setting, Periodic phase 변경, `cron5`, day/calendar/DST.
 - bounded `hold_trusted`, terminal fallback, stable natural-event provider identity.
