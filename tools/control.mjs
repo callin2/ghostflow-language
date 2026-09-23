@@ -2835,11 +2835,11 @@ class Lowerer {
     if (node.kind === 'if') {
       const test = recurse(node.test);
       let yes, no;
-      if (!expected && isWholeLiteralNode(node.yes) && !isWholeLiteralNode(node.no)) {
+      if (!expected && isContextualWholeLiteralNode(node.yes) && !isContextualWholeLiteralNode(node.no)) {
         no = recurse(node.no); yes = recurse(node.yes, locals, options, no.type);
       } else {
         yes = recurse(node.yes, locals, options, expected);
-        no = recurse(node.no, locals, options, expected ?? (isWholeLiteralNode(node.no) ? yes.type : null));
+        no = recurse(node.no, locals, options, expected ?? (isContextualWholeLiteralNode(node.no) ? yes.type : null));
       }
       if (!sameType(test.type, BOOL)) error(node.test.loc, 'if condition must be Bool'); if (!sameType(yes.type, no.type)) error(node.loc, 'if branches must have the same type');
       if (yes.type.kind === 'Result') return selectLowered(test.sexpr, yes, no);

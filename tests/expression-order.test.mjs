@@ -33,6 +33,60 @@ const cases = [
   ['a=true,b=false,c=true distinguishes short circuit grouping', { a: true, b: false, c: true }, true],
 ];
 
+test('REF §2.2 signed whole literals receive the common Number type of either if branch', async t => {
+  const document = `# Signed branch context
+
+\`\`\`ghost
+control SignedBranches {
+  input choose: Bool;
+  input measured: Number;
+  let first = if choose then -1 else measured;
+  let second = if choose then measured else -1;
+  let below_int = if choose then -2147483649 else measured;
+  let above_int = if choose then measured else 2147483648;
+  output first_out, second_out, below_int_out, above_int_out: Number;
+  first_out <- first;
+  second_out <- second;
+  below_int_out <- below_int;
+  above_int_out <- above_int;
+}
+\`\`\`
+`;
+  const compiled = await compileSource(document, { filename: 'signed-branches.ghost.md' });
+  const runtime = await GhostFlowRuntime.instantiate(fs.readFileSync(wasmPath));
+  t.after(() => runtime.dispose());
+  runtime.load(compiled.bytes);
+  const names = ['first_out', 'second_out', 'below_int_out', 'above_int_out'];
+  for (const name of names) runtime.addCapability('actuator', name, 'number');
+  runtime.activate();
+  for (const [choose, expected] of [[true, [-1, 2.5, -2147483649, 2.5]], [false, [2.5, -1, 2.5, 2147483648]]]) {
+    runtime.setNumber('measured', 2.5);
+    runtime.setBool('choose', choose);
+    runtime.tick();
+    assert.deepEqual(names.map(name => runtime.intentNumber(name)), expected);
+  }
+});
+
+test('REF §2.2 branch context never changes an already inferred Int binding', async () => {
+  const wrap = body => `# Branch type boundaries\n\n\`\`\`ghost\ncontrol BranchTypes {\n${body}\n}\n\`\`\`\n`;
+  for (const expression of ['if choose then exact else measured', 'if choose then measured else exact']) {
+    await assert.rejects(compileSource(wrap(`
+      input choose: Bool;
+      input measured: Number;
+      let exact = -1;
+      let selected = ${expression};
+      output result: Number;
+      result <- selected;
+    `), { filename: 'branch-types.ghost.md' }), /if branches must have the same type/);
+  }
+  await assert.rejects(compileSource(wrap(`
+    input choose: Bool;
+    let selected = if choose then -2147483649 else 0;
+    output result: Number;
+    result <- selected;
+  `), { filename: 'branch-types.ghost.md' }), /Int literal is outside/);
+});
+
 test('REF-01-079/080 native and WASM preserve expression precedence and associativity', async t => {
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-expression-order-'));
   t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
