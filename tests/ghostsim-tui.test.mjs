@@ -72,6 +72,35 @@ test('waveforms show only bounded recent samples and separate requested from saf
   assert.doesNotMatch(output, /\?{120}/);
 });
 
+test('live DI and requested/safe RO waveform segments color ON, OFF, and unknown values', () => {
+  const selected = profile([channel('DI1')], [channel('RO1')]);
+  const bound = new Map([['DI1', 'in'], ['RO1', 'out']]);
+  const history = [
+    row(1, { in: true }, { out: false }, { out: null }),
+    row(2, { in: false }, { out: true }, { out: false }),
+  ];
+  const frame = renderLivePanel(selected, bound, history.at(-1), history,
+    { columns: 100, rows: 12 });
+  const rows = frame.split('\n').filter(line => /DI1|RO1/.test(visible(line)));
+  assert.equal(rows.length, 1);
+  assert.match(rows[0], /\x1b\[32m-\x1b\[0m\x1b\[2;90m_\x1b\[0m/);
+  assert.match(rows[0], /R:\x1b\[2;90m_\x1b\[0m\x1b\[32m-\x1b\[0m/);
+  assert.match(rows[0], /S:\x1b\[33m\?\x1b\[0m\x1b\[2;90m_\x1b\[0m/);
+  assert.ok(rows.every(line => !line.includes('\x1b[32mDI1') && !line.includes('\x1b[33mRO1')));
+  assert.ok(rows.every(line => [...visible(line)].length <= 100));
+});
+
+test('colored waveform clipping preserves terminal width and resets style', () => {
+  const selected = profile([channel('DI1')], []);
+  const scans = Array.from({ length: 20 }, (_, i) => row(i, { input: i % 2 === 0 }));
+  const frame = renderLivePanel(selected, new Map([['DI1', 'input']]), scans.at(-1), scans,
+    { columns: 40, rows: 8 });
+  const lines = frame.slice('\x1b[H\x1b[2J'.length).split('\n');
+  assert.ok(lines.every(line => [...visible(line)].length <= 40));
+  assert.ok(lines.every(line => !/\x1b\[(?:32|2;90|33)m[^\x1b]*$/.test(line)));
+  assert.equal(lines.length, 5);
+});
+
 test('a frame filling the terminal does not scroll past its last row', () => {
   const selected = profile([channel('DI1')], [channel('RO1')]);
   const scan = row(0, { input: true }, { output: true }, { output: true });

@@ -17,11 +17,23 @@ function cells(value) {
 
 function fit(value, width) {
   if (width <= 0) return '';
-  let result = ''; let count = 0;
-  for (const cell of cells(value)) {
-    if (count + cell.width > width) break;
-    result += cell.segment; count += cell.width;
+  let result = ''; let count = 0; let styled = false; let clipped = false; let offset = 0;
+  const ansi = /\x1b\[[0-?]*[ -/]*m/gu;
+  const appendText = text => {
+    for (const cell of cells(text)) {
+      if (count + cell.width > width) { clipped = true; break; }
+      result += cell.segment; count += cell.width;
+    }
+  };
+  for (const match of String(value).matchAll(ansi)) {
+    appendText(String(value).slice(offset, match.index));
+    if (clipped) break;
+    result += match[0];
+    styled = match[0] !== '\x1b[0m';
+    offset = match.index + match[0].length;
   }
+  if (!clipped) appendText(String(value).slice(offset));
+  if (styled) result += '\x1b[0m';
   return result;
 }
 
@@ -43,7 +55,9 @@ function waveform(scans, port, field, width) {
   if (!port || width <= 0) return '';
   return scans.slice(-width).map(scan => {
     const value = scan?.[field]?.[port];
-    return value === true ? '-' : value === false ? '_' : '?';
+    const [symbol, color] = value === true ? ['-', '\x1b[32m']
+      : value === false ? ['_', '\x1b[2;90m'] : ['?', '\x1b[33m'];
+    return `${color}${symbol}\x1b[0m`;
   }).join('');
 }
 
