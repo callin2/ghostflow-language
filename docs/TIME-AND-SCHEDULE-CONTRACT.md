@@ -57,6 +57,17 @@ does not change the existing `elapsed(state)` timer described here.
 See [SOLAR-SCHEDULE.md](SOLAR-SCHEDULE.md) for implemented behavior. This proposal
 preserves those artifacts and requires explicit versioning for later semantics.
 
+## Approved Daily execution boundary — 2026-09-23
+
+The RTC/NTP/platform clock provider supplies each evaluation with wall and
+monotonic clock snapshots and wall-clock trust status. The GhostFlow runtime
+calculates `Daily` occurrence crossings, admission, missed occurrences and
+duplicate suppression, and manages the schedule ledger. Host storage persists
+that ledger across runtime restarts. The underlying time source can be replaced
+without changing `Daily` semantics. This assigns execution responsibility for
+the [Reference §3.5 schedule contract](reference/03-time-and-schedules.md#35-schedule의-공통-의미);
+it does not add a new language policy.
+
 ## Value and clock domains
 
 | Domain | Minimum contract | Notes |
