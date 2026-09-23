@@ -62,3 +62,25 @@ test('accounting declarations reject missing stage, persistence, and targets', (
   assert.throws(() => typeCheckControl('control X { resource p: BoolActuator; account a = on_time(p, stage: applied); output x: Bool; x <- true; }'), /persistence/);
   assert.throws(() => typeCheckControl('control X { account a = on_time(missing, stage: applied, persistence: durable); output x: Bool; x <- true; }'), /unknown resource/);
 });
+
+test('pure functions cannot capture an accounting event count', () => {
+  const source = `control PureAccountingCapture {
+    event started: Event;
+    account starts = count_events(started, over: local_day("UTC"), persistence: durable);
+    fn captured() -> Int { starts.count }
+    output count: Int;
+    count <- captured();
+  }`;
+  assert.throws(() => typeCheckControl(source), /fn captured cannot capture global starts/);
+});
+
+test('syntax macros cannot capture an accounting event count', () => {
+  const source = `syntax captured(): Expr<Int> { quote { starts.count } }
+  control MacroAccountingCapture {
+    event started: Event;
+    account starts = count_events(started, over: local_day("UTC"), persistence: durable);
+    output count: Int;
+    count <- @captured();
+  }`;
+  assert.throws(() => typeCheckControl(source), /syntax macro captured cannot capture global starts/);
+});

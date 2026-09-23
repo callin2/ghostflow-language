@@ -2800,6 +2800,8 @@ class Lowerer {
           ? `input.${schedule.activeInput ?? schedule.dueInput}` : ['schedule-read', String(schedule.slot), 'active'] };
       }
       if (node.member === 'count' && !locals.has(node.base) && this.accounts.has(node.base)) {
+        if (options.pureFunction) error(node.loc, `fn ${options.pureFunction} cannot capture global ${node.base}`);
+        if (options.macroDefinition) error(node.loc, `syntax macro ${options.macroDefinition} cannot capture global ${node.base}`);
         const account = this.accounts.get(node.base);
         if (account.operation !== 'count_events') error(node.loc, 'only event accounts expose .count');
         return { type: INT, sexpr: `account.${node.base}.count` };
