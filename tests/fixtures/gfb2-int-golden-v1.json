@@ -1,0 +1,7 @@
+{
+  "format": "GhostFlow/gfb2-int-golden-v1",
+  "source": "gfb2-int-golden-v1.ghost.md",
+  "sourceSha256": "a7fcb289b9100dc53bbbf6ac487c03147f09b3763b94c955a891a8e3b24de44a",
+  "artifact": "gfb2-int-golden-v1.gfb",
+  "gfbSha256": "bb1f8b1063bd795f64a791c76e47f1d158fd9009f6eb8f5bcd3bfe33fb098526"
+}

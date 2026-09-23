@@ -1,0 +1,95 @@
+{
+  "format": "GhostFlow/authoring-corpus-v1",
+  "sourceRevision": {
+    "languagePackage": "ghostflow-language@0.1.0",
+    "toolchainFiles": [
+      "tools/ghostc.mjs",
+      "tools/compile-source.mjs",
+      "tools/reference-query.mjs",
+      "tools/ghostsim.mjs",
+      "tools/toolchain.mjs",
+      "package.json",
+      "package-lock.json"
+    ],
+    "toonEncoder": "@toon-format/toon@4.1.1",
+    "tokenizer": "tiktoken==0.12.0; cl100k_base"
+  },
+  "cases": [
+    {
+      "id": "valid-control",
+      "documentId": "GF-CORPUS-VALID",
+      "intendedRule": "A confirmed start request runs the pump until a confirmed stop request.",
+      "referenceSections": ["ref-01-05", "ref-02-06"],
+      "revisions": [{"file": "valid-control.ghost.md", "revisionId": "rev-1", "expectedExit": 0}],
+      "outcome": "compiled",
+      "boundary": "Compiler conformance only; no physical I/O claim."
+    },
+    {
+      "id": "typo-correction",
+      "documentId": "GF-CORPUS-TYPO",
+      "intendedRule": "The pump follows start unless stop is active.",
+      "referenceSections": ["ref-01-05", "ref-02-06"],
+      "revisions": [
+        {"file": "typo-initial.ghost.md", "revisionId": "rev-1", "expectedExit": 1, "expectedDiagnostic": "GF_SEMANTIC"},
+        {"file": "typo-corrected.ghost.md", "revisionId": "rev-2", "expectedExit": 0, "corrects": true}
+      ],
+      "outcome": "compiled_after_one_correction",
+      "boundary": "A misspelled input is a compiler error; correction preserves the document ID and changes its revision and digest."
+    },
+    {
+      "id": "type-correction",
+      "documentId": "GF-CORPUS-TYPE",
+      "intendedRule": "The Bool pump output receives a Bool expression.",
+      "referenceSections": ["ref-02-01", "ref-02-06"],
+      "revisions": [
+        {"file": "type-initial.ghost.md", "revisionId": "rev-1", "expectedExit": 1, "expectedDiagnostic": "GF_TYPE"},
+        {"file": "type-corrected.ghost.md", "revisionId": "rev-2", "expectedExit": 0, "corrects": true}
+      ],
+      "outcome": "compiled_after_one_correction",
+      "boundary": "A numeric literal cannot silently become a Bool."
+    },
+    {
+      "id": "missing-setting-correction",
+      "documentId": "GF-CORPUS-SETTING",
+      "intendedRule": "A timer compares elapsed time with a declared Duration setting.",
+      "referenceSections": ["ref-03-02", "ref-05-01"],
+      "revisions": [
+        {"file": "setting-initial.ghost.md", "revisionId": "rev-1", "expectedExit": 1, "expectedDiagnostic": "GF_SEMANTIC"},
+        {"file": "setting-corrected.ghost.md", "revisionId": "rev-2", "expectedExit": 0, "corrects": true}
+      ],
+      "outcome": "compiled_after_one_correction",
+      "boundary": "The compiler identifies an undeclared setting name; the example correction uses the existing declared setting."
+    },
+    {
+      "id": "unsupported-syntax",
+      "documentId": "GF-CORPUS-UNSUPPORTED",
+      "intendedRule": "No unsupported natural-language timer shorthand is accepted as executable syntax.",
+      "referenceSections": ["ref-01-04", "ref-01-06", "ref-03-02"],
+      "revisions": [{"file": "unsupported-syntax.ghost.md", "revisionId": "rev-1", "expectedExit": 1, "expectedDiagnostic": "GF_PARSE"}],
+      "expectedFinalDiagnostic": "GF_PARSE",
+      "outcome": "unresolved_unsupported_request",
+      "boundary": "Ask for a supported expression or an explicit user decision; do not invent shorthand."
+    },
+    {
+      "id": "unconfirmed-assumption",
+      "documentId": "GF-CORPUS-ASSUMPTION",
+      "intendedRule": "Only confirmed start/stop intent is executable while maximum run duration remains unanswered.",
+      "referenceSections": ["ref-01-02", "ref-05-04"],
+      "revisions": [{"file": "unconfirmed-assumption.ghost.md", "revisionId": "rev-1", "expectedExit": 0}],
+      "openAssumption": true,
+      "outcome": "compiled_with_open_assumption",
+      "boundary": "A syntactically valid document does not turn an unconfirmed operating value into policy."
+    },
+    {
+      "id": "virtual-timer",
+      "documentId": "GF-CORPUS-TIMER",
+      "intendedRule": "A confirmed two-second virtual timer stops a request at the first scan whose elapsed time reaches the limit.",
+      "referenceSections": ["ref-02-08", "ref-03-02"],
+      "revisions": [{"file": "virtual-timer.ghost.md", "revisionId": "rev-1", "expectedExit": 0}],
+      "scenario": "virtual-timer-scenario.toon",
+      "expectedSafePump": [true, true, false],
+      "outcome": "simulated",
+      "boundary": "The output is a virtual safe intent. It is not an applied or confirmed relay state."
+    }
+  ]
+}

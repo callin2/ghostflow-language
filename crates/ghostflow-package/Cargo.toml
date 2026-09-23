@@ -6,6 +6,7 @@ license = "MIT"
 description = "Strict native verifier for signed GhostFlow portable packages"
 
 [dependencies]
+ghostflow-core = { path = "../ghostflow-core" }
 base64 = "0.22"
 ed25519-dalek = { version = "2", default-features = false, features = ["std"] }
 serde = { version = "1", features = ["derive"] }

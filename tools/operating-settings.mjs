@@ -1,8 +1,10 @@
 import { createHash } from 'node:crypto';
 import { compileSource } from './toolchain.mjs';
 import { extractLiterate } from './literate.mjs';
+import { QUANTITY_TYPES, formatCanonicalQuantityLiteral, formatTemperatureLiteral } from './quantities.mjs';
+import { TIME_TYPES, formatTimeLiteral, isTimeType, validateTimeValue } from './time-literals.mjs';
 
-const TYPES = new Set(['Number', 'Duration', 'Percent', 'Bool']);
+const TYPES = new Set(['Int', 'Number', 'Duration', 'Percent', 'Bool', ...TIME_TYPES, ...QUANTITY_TYPES]);
 const sha256 = source => createHash('sha256').update(source).digest('hex');
 
 function freezeObject(value) {
@@ -84,22 +86,40 @@ export async function createOperatingSettingsCandidate({ source, filename = 'pro
   const configs = new Map((before.manifest?.configs ?? []).map(config => [config.name, config]));
   const mapOffset = literateOffsetMapper(source, extractLiterate(source, { filename }));
   const replacements = [];
-  for (const [name, requested] of requestedEntries) {
+  for (const [name, request] of requestedEntries) {
     const config = configs.get(name);
     if (!config || !config.settings) throw new Error(`unknown or non-operator config ${name}`);
     if (config.settings.access !== 'operator') throw new Error(`config ${name} is not operator-editable`);
     const type = config.type;
+    const typedTemperatureRequest = type === 'Temperature' && request && typeof request === 'object' && !Array.isArray(request);
+    const requested = typedTemperatureRequest ? request.value : request;
+    let displayUnit = config.displayUnit;
+    if (type === 'Temperature') {
+      if (displayUnit !== '°C' && displayUnit !== 'K') throw new Error(`config ${name} is missing an explicit Temperature displayUnit`);
+      if (typedTemperatureRequest) {
+        if (!Object.hasOwn(request, 'value') || !Object.hasOwn(request, 'unit') || Object.keys(request).some(key => key !== 'value' && key !== 'unit')) throw new Error(`invalid typed Temperature change for ${name}`);
+        if (request.unit !== '°C' && request.unit !== 'K') throw new Error(`Temperature display unit for ${name} must be °C or K`);
+        displayUnit = request.unit;
+      }
+    }
     if (!TYPES.has(type) || typeof requested !== (type === 'Bool' ? 'boolean' : 'number')) throw new Error(`invalid type for ${name}`);
     if (type !== 'Bool') {
       const { min, max, step } = config.settings;
-      if (!Number.isFinite(requested) || requested < Number(min) || requested > Number(max) || Math.abs((requested - Number(min)) / Number(step) - Math.round((requested - Number(min)) / Number(step))) > 1e-9) throw new Error(`value outside range or step for ${name}`);
+      if (type === 'Int' && Number.isFinite(requested) && !Number.isInteger(requested)) throw new Error(`invalid type for ${name}`);
+      if (isTimeType(type)) {
+        try { validateTimeValue(type, requested, name); } catch { throw new Error(`value outside range or step for ${name}`); }
+      }
+      const misaligned = type === 'Int' || isTimeType(type)
+        ? (requested - Number(min)) % Number(step) !== 0
+        : Math.abs((requested - Number(min)) / Number(step) - Math.round((requested - Number(min)) / Number(step))) > 1e-9;
+      if (!Number.isFinite(requested) || requested < Number(min) || requested > Number(max) || misaligned) throw new Error(`value outside range or step for ${name}`);
     }
     const extractedStart = config.initialOffset;
     const extractedEnd = config.initialEndOffset;
     if (!Number.isInteger(extractedStart) || !Number.isInteger(extractedEnd) || extractedEnd <= extractedStart) throw new Error(`missing literal span for ${name}`);
     const span = mapOffset(extractedStart, extractedEnd);
     if (!span) throw new Error(`missing literal span for ${name}`);
-    const literal = type === 'Bool' ? String(requested) : type === 'Percent' ? `${requested}%` : type === 'Duration' ? `${requested}ms` : String(requested);
+    const literal = type === 'Bool' ? String(requested) : type === 'Percent' ? `${requested}%` : type === 'Duration' ? `${requested}ms` : isTimeType(type) ? formatTimeLiteral(type, requested) : type === 'Temperature' ? formatTemperatureLiteral(requested, displayUnit) : QUANTITY_TYPES.includes(type) ? formatCanonicalQuantityLiteral(type, requested) : String(requested);
     replacements.push({ ...span, literal });
   }
   const candidate = applyOnlyDeclaredLiteralEdits(source, replacements);

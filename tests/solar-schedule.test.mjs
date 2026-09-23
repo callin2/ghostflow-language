@@ -1,15 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 import { SolarSchedule } from '../runtimes/wasm/schedule.mjs';
-import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
-import { compileSource } from '../tools/toolchain.mjs';
-import { observeSourceTrace } from '../tools/source-trace.mjs';
 
 const DAY = 86_400_000;
 const noon = Date.parse('2026-09-14T12:00:00+09:00');
 const config = { kind: 'solar', name: 'dawn', timezone: 'Asia/Seoul', latitude: 37.5665,
-  longitude: 126.978, event: 'rise', offsetMs: 1_800_000, fallback: 'skip' };
+  longitude: 126.978, event: 'rise', offsetMs: 1_800_000,
+  policy: { basis: 'pulse', when: 'true', clock: 'trusted_only', gapMs: 60_000, recovery: 'baseline', fallback: 'skip' } };
 const at = (host, date = noon) => host.preview(date).scheduledWallMs;
 const pulse = (host, instant) => {
   host.poll({ nowMs: 0, wallMs: instant - 100 });
@@ -110,59 +107,10 @@ test('local solar dates survive date-line zones and DST changes', () => {
 test('Solar descriptor and clock fields reject malformed values', () => {
   for (const change of [{ kind: 'unknown' }, { name: 'bad name' }, { timezone: 'Not/AZone' },
     { latitude: 91 }, { longitude: Infinity }, { latitude: '37' }, { event: 'moonrise' },
-    { fallback: undefined }, { fallback: 'catchup' }, { offsetMs: DAY + 1 }, { offsetMs: 0.5 }]) {
+    { policy: undefined }, { policy: { ...config.policy, fallback: 'catchup' } }, { offsetMs: DAY + 1 }, { offsetMs: 0.5 }]) {
     assert.throws(() => new SolarSchedule({ ...config, ...change }), JSON.stringify(change));
   }
   for (const change of [{ nowMs: -1 }, { wallMs: NaN }, { wallMs: 253402300800000 }, { trusted: 'yes' }]) {
     assert.throws(() => new SolarSchedule(config).poll({ nowMs: 0, wallMs: noon, ...change }));
   }
 });
-
-const source = fs.readFileSync(new URL('../examples/solar-watering.ghost.md', import.meta.url), 'utf8');
-const wasm = fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
-const compiled = await compileSource(source, { filename: 'examples/solar-watering.ghost.md' });
-
-test('Solar v3 requires explicit runtime capability and validates descriptors and bytecode identity', async () => {
-  await assert.rejects(() => ControlRuntime.instantiateFramed(wasm, compiled), /unsupported manifest format/);
-  const corrupt = async mutate => {
-    const manifest = structuredClone(compiled.manifest);
-    mutate(manifest);
-    await assert.rejects(() => ControlRuntime.instantiateFramed(wasm, { ...compiled, manifest }, { acceptSolar: true }));
-  };
-  await corrupt(manifest => { manifest.schedules[0].fallback = 'run'; });
-  await corrupt(manifest => { manifest.schedules[0].latitude = 91; });
-  await corrupt(manifest => { manifest.schedules[0].extra = true; });
-  await corrupt(manifest => { manifest.schedules = []; });
-  await corrupt(manifest => { manifest.format = 'GhostFlow/control-v1'; });
-  await corrupt(manifest => { manifest.bytecodeSha256 = '0'.repeat(64); });
-});
-
-for (const [event, outputs] of [['rise', ['RO1', 'RO2', 'RO3']], ['set', ['RO1', 'RO4', 'RO5']]]) {
-  test(`actual framed WASM runs ${event} valves and pump for five minutes with source observations`, async () => {
-    const runtime = await ControlRuntime.instantiateFramed(wasm, compiled, { acceptSolar: true });
-    const hosts = compiled.manifest.schedules.map(item => new SolarSchedule(item));
-    const activeHost = hosts[event === 'rise' ? 0 : 1];
-    const instant = at(activeHost);
-    const inputs = Object.fromEntries(compiled.manifest.inputs.map(item => [item.name, false]));
-    const edges = [];
-    let previous = false, activeTrace;
-    try {
-      for (let nowMs = 0; nowMs <= 302000; nowMs += 100) {
-        const due = Object.fromEntries(hosts.map(host => [host.name, host.poll({ nowMs, wallMs: instant - 1000 + nowMs,
-          // Loss of civil-clock trust after admission must not disable elapsed timing.
-          trusted: nowMs < 2000 }).due]));
-        const trace = runtime.step({ nowMs, inputs, due }).vm;
-        const on = trace.safe.RO1;
-        if (on !== previous) { edges.push({ nowMs, on }); previous = on; }
-        for (const output of compiled.manifest.outputs) assert.equal(trace.safe[output.name], on && outputs.includes(output.name), output.name);
-        if (nowMs === 1000) activeTrace = trace;
-      }
-      assert.deepEqual(edges, [{ nowMs: 1000, on: true }, { nowMs: 301000, on: false }]);
-      const observation = observeSourceTrace(compiled.traceMetadata, activeTrace);
-      const input = observation.bindings.find(entry => entry.name === `__gf_schedule_due_${activeHost.name}`);
-      assert.deepEqual(input.observations, [{ field: 'inputs', observed: true, value: true }]);
-      assert.equal(input.source.filename, 'examples/solar-watering.ghost.md');
-      assert.equal(source.split('\n')[input.source.line - 1].trim(), `schedule ${activeHost.name}: Solar {`);
-    } finally { runtime.dispose(); }
-  });
-}

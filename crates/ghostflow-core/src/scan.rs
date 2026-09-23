@@ -42,6 +42,7 @@ pub type ScanOutcome = ScanOutcomeV1;
 /// without a self-reference and legacy setter/tick callers remain unchanged.
 pub struct ScanDriver {
     runtime: Runtime,
+    first_scan_tick: u64,
     next_scan_id: Option<u64>,
     last_time_ms: Option<u64>,
 }
@@ -57,6 +58,7 @@ impl ScanDriver {
     /// Creates an owning framed driver at scan ID zero.
     pub fn new(runtime: Runtime) -> Self {
         Self {
+            first_scan_tick: runtime.next_tick,
             runtime,
             next_scan_id: Some(0),
             last_time_ms: None,
@@ -192,6 +194,80 @@ impl ScanDriver {
 
     pub fn scan_last_time_ms(&self) -> Option<u64> {
         self.last_time_ms
+    }
+
+    /// Read-only same-program ghost replay of retained records from this scan run.
+    pub fn plan_current_temporal_replay(
+        &self,
+        count: usize,
+        activation: &crate::temporal_runtime::TemporalActivation,
+    ) -> Result<crate::temporal_runtime::TemporalReplayResourceReport> {
+        let skip = self
+            .runtime
+            .journal
+            .iter()
+            .take_while(|record| record.tick < self.first_scan_tick)
+            .count();
+        self.runtime
+            .plan_current_temporal_replay_range(skip, count, activation, true)
+    }
+    pub fn replay_current_with_temporal(
+        &self,
+        count: usize,
+        activation: &crate::temporal_runtime::TemporalActivation,
+        max_peak_temporal_bytes: usize,
+    ) -> Result<Vec<ScanOutcomeV1>> {
+        let plan = self.plan_current_temporal_replay(count, activation)?;
+        if !plan.ghost_fits_budget || plan.required_peak_temporal_bytes > max_peak_temporal_bytes {
+            return Err(Error::new("temporal-budget-exceeded"));
+        }
+        let skip = self
+            .runtime
+            .journal
+            .iter()
+            .take_while(|record| record.tick < self.first_scan_tick)
+            .count();
+        if count == 0 || count > self.runtime.journal.len() - skip {
+            return Err(Error::new(
+                "temporal replay count exceeds retained records or is zero",
+            ));
+        }
+        // Charge this adapter-owned output allocation while core replay and its
+        // returned records are also alive. Evidence payloads are moved, not cloned.
+        let width = std::mem::size_of::<ScanOutcomeV1>();
+        let required = count
+            .checked_mul(width)
+            .ok_or_else(|| Error::new("temporal-budget-exceeded"))?;
+        if required
+            .checked_add(self.runtime.temporal_memory_bytes().unwrap_or(0))
+            .is_none_or(|bytes| bytes > max_peak_temporal_bytes)
+        {
+            return Err(Error::new("temporal-budget-exceeded"));
+        }
+        let mut outcomes = Vec::new();
+        outcomes
+            .try_reserve_exact(count)
+            .map_err(|_| Error::new("temporal-allocation-failed"))?;
+        let available = outcomes
+            .capacity()
+            .checked_mul(width)
+            .and_then(|bytes| max_peak_temporal_bytes.checked_sub(bytes))
+            .ok_or_else(|| Error::new("temporal-budget-exceeded"))?;
+        let records = self
+            .runtime
+            .replay_current_temporal_range(skip, count, activation, available)?;
+        for trace in records {
+            let Some(Value::Number(time)) = trace.inputs.get(RESERVED_CLOCK_INPUT) else {
+                return Err(Error::new("temporal replay lacks recorded logical time"));
+            };
+            let logical_time_ms = *time as u64;
+            outcomes.push(ScanOutcomeV1 {
+                scan_id: trace.tick - self.first_scan_tick,
+                logical_time_ms,
+                trace,
+            });
+        }
+        Ok(outcomes)
     }
 }
 

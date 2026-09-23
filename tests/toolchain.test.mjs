@@ -62,6 +62,29 @@ function artifactMap(result) {
   };
 }
 
+test('schedule generated inputs preserve declaration bindings through artifact publication', async t => {
+  const source = '# Schedule provenance\n\n```ghost\ncontrol Schedules {\n'
+    + '  schedule dawn: Solar { timezone = "UTC"; latitude = 0; longitude = 0; at = sun`rise`; fallback = skip; }\n'
+    + '  schedule slots: DailySlots<15min> { timezone = "UTC"; selected = [06:00]; }\n'
+    + '  output pump: Bool;\n  pump <- dawn.due || slots.due;\n}\n```\n';
+  const result = await compileSource(source, { filename: 'schedules.ghost.md' });
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-schedule-map-'));
+  t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
+  const artifact = path.join(temporary, 'schedules.gfb');
+  writeArtifact(result, artifact);
+  const map = JSON.parse(fs.readFileSync(`${artifact}.map.json`, 'utf8'));
+  assert.deepEqual(verifyArtifactSourceMap(map, result.bytes), result.sourceDocument);
+  const bindings = map.traceMetadata.bindings.filter(binding => binding.kind === 'schedule');
+  assert.deepEqual(bindings.map(binding => binding.name), ['__gf_schedule_due_dawn', '__gf_schedule_due_slots']);
+  for (const binding of bindings) {
+    assert.deepEqual(binding.fields, ['inputs']);
+    assert.equal(map.nodes.find(node => node.id === binding.nodeId)?.kind, 'schedule');
+    const missing = clone(map);
+    missing.traceMetadata.bindings = missing.traceMetadata.bindings.filter(item => item.nodeId !== binding.nodeId);
+    assert.throws(() => verifyArtifactSourceMap(missing, result.bytes), /schedule binding count/);
+  }
+});
+
 test('source-preserving map recovers the exact CRLF literate document', async () => {
   const extracted = extractLiterate(markdown, { filename });
   const direct = compileControl(extracted.code, { filename });
@@ -248,6 +271,68 @@ test('traceable artifact-map restoration fails closed when trace provenance is a
   }
 });
 
+test('continuous timer restoration rejects descriptor, role, source-mode, and dependency tampering', async t => {
+  const result = await compileSource(`# Continuous timer trace
+
+\`\`\`ghost
+control ContinuousTrace {
+  input hot, backup: Bool;
+  timer hot_for = continuous_true(hot);
+  output ready: Bool;
+  ready <- hot_for >= 30ms;
+}
+\`\`\`
+`, { filename: 'continuous-trace.ghost.md' });
+  const map = artifactMap(result);
+  assert.equal(restoreArtifactSourceMap(map, result.bytes, {
+    manifest: result.manifest,
+  }).traceMetadata.moduleFingerprint, result.traceMetadata.moduleFingerprint);
+
+  const mutations = [
+    ['missing descriptor', value => { value.manifest.timers = []; }],
+    ['mixed descriptor', value => { value.manifest.timers[0].state = 'forged'; }],
+    ['legacy descriptor substitution', value => {
+      value.manifest.timers[0] = { name: 'hot_for', state: 'forged', clockInput: '__gf_now_ms' };
+    }],
+    ['legacy private role substitution', value => {
+      const binding = value.map.traceMetadata.bindings.find(entry => entry.generated?.role === 'wasTrue');
+      binding.generated.role = 'initialized';
+      binding.name = '__gf_timer_initialized_hot_for';
+    }],
+    ['source mode substitution', value => {
+      value.map.nodes.find(node => node.kind === 'timer').timerMode = 'elapsed';
+    }],
+    ['missing condition dependency read', value => {
+      const dependency = value.map.traceMetadata.dependencies.find(entry => (
+        entry.target.field === 'timerValue' && entry.target.name === 'hot_for'
+      ));
+      dependency.reads = dependency.reads.filter(read => read.name !== 'hot');
+    }],
+    ['extra condition dependency read', value => {
+      const dependency = value.map.traceMetadata.dependencies.find(entry => (
+        entry.target.field === 'timerValue' && entry.target.name === 'hot_for'
+      ));
+      dependency.reads.push({ field: 'inputs', name: 'forged' });
+    }],
+    ['substituted existing input read', value => {
+      const dependency = value.map.traceMetadata.dependencies.find(entry => (
+        entry.target.field === 'timerValue' && entry.target.name === 'hot_for'
+      ));
+      // A real, same-typed input passes name/type checks but is not the source dependency.
+      dependency.reads.find(read => read.name === 'hot').name = 'backup';
+    }, /value dependencies do not match canonical source lowering/],
+  ];
+  for (const [label, mutate, diagnostic = /timer|binding|descriptor|mode|dependenc|canonical/i] of mutations) {
+    await t.test(label, () => {
+      const candidate = { map: clone(map), manifest: clone(result.manifest) };
+      mutate(candidate);
+      assert.throws(() => restoreArtifactSourceMap(candidate.map, result.bytes, {
+        manifest: candidate.manifest,
+      }), diagnostic, label);
+    });
+  }
+});
+
 test('writeArtifact rejects an invalid envelope before replacing existing files', async () => {
   const result = await compileSource(markdown, { filename });
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-toolchain-'));
@@ -281,7 +366,7 @@ test('compileSource retains existing literate diagnostics and rejects non-UTF-8 
     '# Invalid literate control',
     '',
     '```ghost',
-    'control Invalid {',
+    'control InvalidFixture {',
     '  output pump: Bool;',
     '  pump <- missing;',
     '}',

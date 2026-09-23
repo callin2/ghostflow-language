@@ -9,6 +9,7 @@ import {
 } from '../contracts/interaction-v0/validate.mjs';
 import { extractLiterate } from './literate.mjs';
 import { compileControl, parseControl } from './control.mjs';
+import { canonicalUnitFor, isQuantityType } from './quantities.mjs';
 
 const PUBLIC_ID = /^[A-Za-z][A-Za-z0-9._:-]{0,127}$/;
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -48,13 +49,16 @@ function canonicalDocument(document) {
 }
 
 function sourceType(name) {
-  if (name === 'Bool' || name === 'Number') return { kind: 'builtin', name, unit: null };
+  if (name === 'Bool' || name === 'Int' || name === 'Number' || name === 'Date' || name === 'TimeOfDay' || name === 'DateTime') return { kind: 'builtin', name, unit: null };
   if (name === 'Duration') return { kind: 'builtin', name, unit: 'ms' };
-  return { kind: 'nominal', name, unit: name === 'Percent' ? 'percent' : null };
+  return { kind: 'nominal', name, unit: name === 'Percent' ? 'percent' : isQuantityType(name) ? canonicalUnitFor(name) : null };
 }
 
 function validationSnapshot(schema) {
-  const valueFor = type => {
+  const valueFor = descriptor => {
+    if (descriptor.kind === 'setting' && descriptor.constraint.kind === 'range') return descriptor.constraint.min;
+    if (descriptor.kind === 'setting' && descriptor.constraint.kind === 'choices') return descriptor.constraint.values[0];
+    const type = descriptor.sourceType;
     if (type.kind === 'builtin' && type.name === 'Bool') return false;
     return 0;
   };
@@ -67,7 +71,7 @@ function validationSnapshot(schema) {
     runId: 'schema-validation',
     completion: { kind: 'completed-scan', scanId: 0, logicalTimeMs: 0 },
     observations: schema.descriptors.map(descriptor => ({
-      descriptorId: descriptor.id, status: 'ready', value: valueFor(descriptor.sourceType),
+      descriptorId: descriptor.id, status: 'ready', value: valueFor(descriptor),
     })),
   };
 }
@@ -99,31 +103,57 @@ function expectedSchema(compilation, identityValue) {
   for (const link of trace.intentLinks ?? []) {
     if (!link || !PUBLIC_ID.test(link.anchorId) || link.anchorId.startsWith('__gf_')) continue;
     const key = `${link.nodeId}\u0000${link.nodeKind}`;
-    const anchors = linksByNode.get(key) ?? [];
-    if (!anchors.includes(link.anchorId)) anchors.push(link.anchorId);
-    linksByNode.set(key, anchors);
+    const links = linksByNode.get(key) ?? [];
+    if (!links.some(entry => entry.anchorId === link.anchorId)) links.push(link);
+    linksByNode.set(key, links);
   }
   const declaredStates = new Map();
   for (const item of ast.body) if (item.kind === 'state') declaredStates.set(item.name, item.type.name);
+  const configs = new Map((manifest.configs ?? []).map(config => [config.name, config]));
   const descriptors = [];
   for (const item of ast.body) {
-    if (item.kind !== 'state' && item.kind !== 'timer') continue;
+    if (item.kind !== 'state' && item.kind !== 'timer' && item.kind !== 'config') continue;
+    const config = item.kind === 'config' ? configs.get(item.name) : null;
+    if (item.kind === 'config' && !config?.settings) continue;
     const node = nodeById.get(item.id);
     if (!node || node.kind !== item.kind) fail(`compiler source node is missing for ${item.kind}.${item.name}`);
-    const anchors = linksByNode.get(`${item.id}\u0000${item.kind}`);
-    if (!anchors?.length) fail(`${item.kind}.${item.name} has no literate intent-anchor provenance`);
-    if (item.kind === 'state') {
+    const links = linksByNode.get(`${item.id}\u0000${item.kind}`);
+    if (!links?.length) fail(`${item.kind}.${item.name} has no literate intent-anchor provenance`);
+    const anchors = links.map(link => link.anchorId);
+    if (item.kind === 'config') {
+      const settings = config.settings;
       descriptors.push({
-        id: `state.${item.name}`, name: item.name, kind: 'state', sourceType: sourceType(item.type.name), access: ['read'],
+        id: `setting.${item.name}`, name: item.name, kind: 'setting', sourceType: sourceType(config.type), access: ['read'],
+        authority: settings.access, applyPolicy: settings.apply ?? 'stopped', label: settings.label ?? item.name,
+        constraint: config.type === 'Bool'
+          ? { kind: 'choices', values: [false, true] }
+          : { kind: 'range', min: settings.min, max: settings.max, step: settings.step },
+        provenance: { sourceNode: { id: item.id, kind: 'config' }, intentAnchorIds: anchors },
+      });
+      continue;
+    }
+    if (item.kind === 'state') {
+      const counter = links.some(link => link.meaning === 'counter');
+      if (counter && item.type.name !== 'Int') fail(`state.${item.name} counter meaning requires Int`);
+      descriptors.push({
+        id: `${counter ? 'counter' : 'state'}.${item.name}`, name: item.name, kind: counter ? 'counter' : 'state', sourceType: sourceType(item.type.name), access: ['read'],
         provenance: { sourceNode: { id: item.id, kind: 'state' }, intentAnchorIds: anchors },
       });
       continue;
     }
-    const subject = item.call?.args?.[0]?.name;
-    if (!declaredStates.has(subject)) fail(`timer.${item.name} must target an authored state`);
+    const continuous = item.call?.name === 'continuous_true';
+    const subject = item.call?.args?.[0];
+    if (continuous) {
+      const subjectNode = nodeById.get(subject?.id);
+      if (!subjectNode || subjectNode.id !== subject.id || subjectNode.kind !== subject.kind) {
+        fail(`timer.${item.name} continuous subject source node is missing`);
+      }
+    } else if (!declaredStates.has(subject?.name)) fail(`timer.${item.name} must target an authored state`);
     descriptors.push({
       id: `timer.${item.name}`, name: item.name, kind: 'timer', sourceType: sourceType('Duration'), access: ['read'],
-      operation: { kind: 'elapsed_since_change', subjectId: `state.${subject}` },
+      operation: continuous
+        ? { kind: 'continuous_true', subjectNodeId: subject.id }
+        : { kind: 'elapsed_since_change', subjectId: `state.${subject.name}` },
       provenance: { sourceNode: { id: item.id, kind: 'timer' }, intentAnchorIds: anchors },
     });
   }

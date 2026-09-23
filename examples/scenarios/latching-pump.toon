@@ -1,0 +1,29 @@
+format: GhostFlow/scenario-v1
+id: latching-pump-keyboard
+initialInputs[2]{name,type,value}:
+  start,Bool,false
+  stop,Bool,false
+keyBindings[2]{key,input}:
+  1,start
+  2,stop
+actions[8]:
+  - kind: scan
+    atMs: 0
+  - kind: key
+    key: 1
+    event: down
+  - kind: scan
+    atMs: 1
+  - kind: key
+    key: 1
+    event: up
+  - kind: scan
+    atMs: 2
+  - kind: key
+    key: 2
+    event: down
+  - kind: scan
+    atMs: 3
+  - kind: key
+    key: 2
+    event: up

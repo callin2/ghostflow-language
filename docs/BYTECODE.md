@@ -1,209 +1,262 @@
-# GFB1 bytecode
+# GFB bytecode
 
 All integers are little-endian. Strings are `u16 length` followed by UTF-8
-bytes. Programs are emitted in postfix order and evaluated by a bounded stack.
+bytes. Values use a bounded postfix stack; conditional expressions use forward
+branches. Public compilation accepts a complete canonical `.ghost.md` document.
+The S-expression representation in `tools/gfb1.mjs` is internal compiler IR.
 
-## Module envelope
+## Module envelope and format decision
 
-- magic: `GFB1`
-- format version: `u16` (`1`)
+- magic: `GFB1` (the envelope magic is unchanged)
+- format version: `u16`
 - module name: string
 - module version: `u32`
-- inputs: count + `(name, type)`
-- states: count + `(name, type, default value)`
-- strategies: count + strategy records
-- safety constraints: count + constraint records
+- inputs: `u16 count`, then `(name, type)` records
+- states: `u16 count`, then `(name, type, default value)` records
+- strategies: `u16 count`, then strategy records
+- safety constraints: `u16 count`, then constraint records
+- format 4 temporal header: after states, `nowInput`, `timeEpochInput`, and root table
+- format 4 temporal strategy table: after each query, window descriptors precede transitions/intents
 
-Types: `1=bool`, `2=number`.
+| Format | Compiler selection | Value types |
+|---|---|---|
+| 1 | Straight-line expressions without Int | `1=Bool`, `2=Number` |
+| 2 | Straight-line expressions with Int declarations or operations | Also `3=Int` |
+| 3 | Branches, dynamic Int/Number conversions, or time value guards | Bool, Number and Int |
+| 4 | Temporal window modules with physical roots and temporal clock inputs | Existing format 3 types plus bounded window descriptors |
 
-Each strategy contains name, signed priority, query bytecode, transition list,
-and intent list. Each expression is length-prefixed, enabling structural bounds
-and future skipping.
+The 2026-09-22 format decision introduces format 3 for Reference §2.6 evaluation.
+Formats 1 and 2 remain current compact profiles for straight-line programs.
+Superseded eager expression opcodes `11`, `12`, and `18` are rejected in **every**
+profile. Recompile sources containing those operations; loaders never translate
+or fall back to eager execution. Unsupported format numbers fail before activation.
+Existing straight-line golden vectors retain their exact bytes and hashes.
+
+Format 2 requires an Int declaration or instruction. Int immediate bytes do not
+count as opcodes. Format 3 permits Bool/Number-only branches. Its integer
+instructions and capability query type tags have the same meaning as format 2.
+
+Each strategy contains a name, signed priority, query blob, transitions, and
+intents. A blob has a `u32` byte-length prefix. Transitions name a state by `u16`
+index; intents have a name and result type. Defaults encode Bool as `u8`, Number
+as finite `f64`, and Int as signed `i32`.
 
 ## Expression opcodes
 
-- `1 BOOL_CONST u8`
-- `2 NUMBER_CONST f64`
-- `3 INPUT u16`
-- `4 STATE u16`
-- `5 NEXT_STATE u16`
-- `10 NOT`
-- `11 AND`
-- `12 OR`
-- `13 EQ`
-- `14 LT`
-- `15 LTE`
-- `16 GT`
-- `17 GTE`
-- `18 IF`
-- `19 ADD`
-- `20 SUB`
-- `21 MUL`
-- `22 DIV`
+| Opcode | Operands | Meaning |
+|---:|---|---|
+| 1 | `u8` | Bool constant, 0 or 1 |
+| 2 | `f64` | Finite Number constant |
+| 3 | `u16` | Input index |
+| 4 | `u16` | Previous state index |
+| 5 | `u16` | Next state index; intents only |
+| 10 | — | Boolean NOT |
+| 13 | — | Equal values of the same type |
+| 14–17 | — | Numeric LT, LTE, GT, GTE |
+| 19–22 | — | Number ADD, SUB, MUL, DIV |
+| 23 | `i32` | Int constant; formats 2 and 3 |
+| 24 | — | Checked Int negation |
+| 25–29 | — | Checked Int ADD, SUB, MUL, DIV, REM |
+| 30 | `u16 displacement` | Pop Bool; jump if false; format 3 |
+| 31 | `u16 displacement` | Unconditional jump; format 3 |
+| 32–47 | — | Number constant `opcode - 32` (0 through 15); format 3 |
+| 48 | — | Int to exact Number; formats 3 and 4 |
+| 49–53 | — | Number to Int: exact, floor, ceil, trunc, nearest-even; formats 3 and 4 |
+| 54 | — | Check Duration milliseconds, Number → Number; formats 3 and 4 |
+| 55 | — | Check DateTime UTC epoch milliseconds, Number → Number; formats 3 and 4 |
+| 56 | `u32 site` | Trace Result consumption; `[payload:T, choice:Number, origin:Number] → [payload:T]`; formats 3 and 4 |
+| 57 | `u16 slot, u8 field` | Temporal window projection: `0=ok`, `1=value`, `2=fault`, `3=origin`, `4=admissionRevision`, `5=newestTimestamp`, `6=count`, `7=quality`; format 4 |
 
-Arithmetic consumes two numbers and produces a finite number. Division by zero
-and non-finite results reject the entire tick before state/intent commit. `IF`
-is postfix/eager: both branch expressions must be valid to evaluate. It does not
-provide a way to hide division by zero in an unselected branch.
+The compiler uses compact Number constants in branched expressions to keep
+finite enum control programs within the same 4096-byte expression budget.
+These constants still have Number identity; they are unrelated to Int's opcode
+23 and type tag 3. Negative zero retains its ordinary `NUMBER_CONST f64` encoding
+and sign. Other Number values also keep the ordinary encoding. Formats 1 and 2
+reject the compact opcodes and retain their current straight-line bytes.
+
+Dynamic conversions consume one typed operand and produce one typed result.
+Number-to-Int operations round according to their explicit policy, then reject
+values outside `-2147483648..2147483647` with `integer-conversion-out-of-range`.
+For `int_exact`, a finite fractional value produces
+`integer-conversion-fractional` before the range check, including `2147483648.5`.
+Non-finite input remains invalid at the existing Number input boundary.
+Conversion faults reject the entire tick. Unselected branch conversions do not
+execute. Constant conversions retain compile-time diagnostics and literal lowering;
+their straight-line programs can still select format 1 or 2.
+
+`CHECK_DURATION` preserves a Number only when it is a finite integer in
+`0..9007199254740991`; otherwise it rejects the tick with `duration-out-of-range`.
+The source compiler emits the guard immediately after each dynamic Duration
+arithmetic operation, including unary minus. Invalid intermediate results cannot
+be hidden by later arithmetic. Constant Duration errors remain compile diagnostics.
+An unselected branch does not execute its guard. This opcode preserves the machine
+Number representation; it does not collapse the manifest's nominal Duration type.
+
+`CHECK_DATETIME` likewise preserves only finite integer UTC epoch milliseconds in
+`0..253402300799999`. Violations reject the tick with `datetime-out-of-range`.
+DateTime shifts use ordinary Number arithmetic followed immediately by this guard,
+so an invalid intermediate instant cannot be hidden by a later inverse shift.
+The instruction does not define arithmetic for Date or TimeOfDay.
+
+Arithmetic consumes the left operand followed by the right operand. Number
+division by zero and non-finite results reject the tick. Int arithmetic rejects
+overflow and zero divisors. Division truncates toward zero; remainder has the
+dividend's sign. `MIN div -1` overflows; `MIN % -1` is exactly zero.
+
+## Format 4 temporal window records
+
+Format 4 uses the existing `GFB1` envelope and `u16` format version `4`. It is
+selected only for modules containing at least one temporal window. Non-window
+modules retain their existing format selection. Format 4 includes all format 3
+expression operations.
+
+After the scalar state table, the module stores `u16 nowInput`, `u16
+timeEpochInput`, then `u16 rootCount`. These indices bind the reserved Number
+inputs `__gf_now_ms` and `__gf_time_epoch`. Each root stores a strictly
+increasing positive `u32 tag`, a name, and four `u16` input indices for present
+(`Bool`), epoch, id, and timestamp (`Number`). Clock and root input bindings must
+be distinct.
+
+Each strategy stores `u16 windowCount` before transitions and intents. A window
+record contains `u32 site`, name, operation (`0=average`, `1=min`, `2=max`,
+`3=rate`), payload type, `u64 overMs`, `u64 maxAgeMs`, then `u16 rootRefCount`
+and sorted `u16` root indices. It has six length-prefixed source expressions
+in this order: `ok` (Bool), `payload` (payload type), and `fault`, `origin`,
+`quality`, `sourceTag` (Number). Durations are in `1..2^53-1`.
+Average and rate use Number payloads; minimum and maximum may use Number or Int.
+Each scalar state count plus window count is limited to 128.
+
+Opcode 57 reads a window slot and field. Fields 0 and 1 have Bool and payload
+types respectively; fields 2 through 7 have Number type. Successful aggregate
+quality is `3`; unavailable quality is `0`. Formats 1 through 3 and device
+queries reject opcode 57. The verifier rejects invalid root/window sites,
+duplicate names, noncanonical root order, invalid durations, and source
+expression type mismatches before activation. Source expressions may read prior
+window slots only; transitions and intents may read all slots in their strategy.
+
+The sixth source expression is an evidence reference interpreted by quality:
+quality `1` selects a physical root tag; quality `3` selects a prior window site.
+These are distinct identity namespaces. Field-7 opcode-57 reads in the quality
+expression declare the prior-window evidence dependencies. Their physical roots
+must be included in the consumer's root references. Other window reads used only
+in control conditions do not declare evidence. Constant quality `3` alone cannot
+authorize an arbitrary upstream window. Both encoder and native loader validate
+these bindings before activation; no additional opcode or wire field is used.
+
+Nested-window manifest descriptors include a non-empty `upstreamWindows` array
+of `{name, site, slot}`, sorted by prior slot. Physical-only descriptors omit it.
+The `sources` array contains all transitive physical roots. Canonical package
+replay pins these fields; the native package verifier also checks them against
+the decoded prior-window dependencies.
+
+The `GhostFlow/control-v4` manifest binds the generated `__gf_now_ms` and
+`__gf_time_epoch` inputs and window signal descriptors. Density facts, target
+memory budgets, and the execution epoch are activation inputs; they are not
+invented by loading or encoded as authored manifest settings.
+
+Branch displacements count bytes from the end of the displacement immediate.
+They must be positive and land on an instruction boundary or the expression end.
+Backward edges, loops, targets outside the expression, and unreachable instruction
+bytes are invalid. Both outgoing paths are verified, including unselected paths.
+Every join requires identical stack height and types. Every path must finish with
+one value of the declared result type; stack capacity is 128 values.
+
+For `if condition then yes else no`, lowering is:
+
+```text
+condition
+JUMP_IF_FALSE(length(yes) + 3)
+yes
+JUMP(length(no))
+no
+```
+
+`left && right` lowers as `if left then right else false`.
+`left || right` lowers as `if left then true else right`. Conditions and selected
+branches execute left to right in Rust, on native and WASM. Unselected branches
+cannot produce runtime faults. Compile-time type/name errors still fail.
+
+For input index 0, `if guard then true else false` has these exact bytes:
+
+```text
+03 00 00  1e 05 00  01 01  1f 02 00  01 00
+INPUT(0)  JFALSE(5) TRUE   JUMP(2)   FALSE
+```
 
 ## Query opcodes
+
+Queries have a separate instruction namespace:
 
 - `1 HAS kind-string name-string type-u8`
 - `2 ALL u16-child-count`
 - `3 ANY u16-child-count`
 - `4 NOT`
-- `5 BOOL_CONST u8` (`0` or `1` only)
+- `5 BOOL_CONST u8` (0 or 1)
 
-Query bytecode is also postfix. The verifier checks stack balance, operand
-types, indices, expression result types, query result count, and fixed limits.
+These effect-free capability predicates retain postfix evaluation. Expression
+opcode retirement does not change query ALL/ANY. The verifier checks all query
+operands, capability types, stack bounds and the single Boolean result.
 
 ## Safety records and host manifest
 
-A constraint record is `kind:u8`, `arity:u16`, then that many name strings.
-Kinds are `1=requires` (exactly two names), `2=mutex` (2–32 names), and
-`3=requires-any` (target then 1–31 alternatives). Names must be distinct Boolean
-outputs. Each round reads one candidate snapshot and applies all false-only
-blocks together. Rounds stop at a fixed point; at most the output count can turn off.
+A constraint record is `kind:u8`, `arity:u16`, then that many distinct Boolean
+intent names. Kinds are `1=requires` (two names), `2=mutex` (2–32 names), and
+`3=requires-any` (target then 1–31 alternatives). Each round reads one candidate
+snapshot and applies all false-only blocks together until a fixed point.
 
-The envelope remains version 1. Older loaders reject unknown opcodes/kinds;
-they must not skip them or guess their meaning. Existing 0.1 artifacts remain valid.
-The loader bounds the whole module to 1 MiB, names to 128 UTF-8 bytes, input/state/
-intent and constraint counts to 128, strategies to 32, and blobs to 4096 bytes.
+Module limits are 1 MiB overall, 128 UTF-8 bytes per name, 128 inputs/states/
+intents/constraints, 32 strategies, and 4096 bytes per blob. In format 4, each
+strategy's scalar state count plus window count is also limited to 128. Runtime faults reject
+the tick before committing state, intents or the journal.
+Unknown expression/query opcodes and constraint kinds reject before activation.
 
-New control compilation also writes `.gfb.manifest.json` and `.gfb.map.json`.
-The manifest specifies nominal types and generated clock/sensor/schedule inputs;
-its `bytecodeSha256` detects accidental mismatching of bytecode. It is **not** a
-signature or authentication mechanism. Use only trusted compiler manifests.
-Missing generated input is a VM error, not zero or false supplied implicitly.
-See [the implementation contract](IMPLEMENTATION.md) for host responsibilities.
+Manifest schema and bytecode format are distinct contracts. A
+`GhostFlow/control-v4` manifest can bind Int-capable GFB format 2 or 3, and window
+manifests pair with GFB format 4. A branch
+alone does not require the Int manifest schema. `.gfb.manifest.json` preserves
+nominal types and generated inputs; `.gfb.map.json` preserves source mapping.
+The manifest's `bytecodeSha256` binds exact bytecode bytes, not authentication.
+Missing generated input is a runtime error. See [IMPLEMENTATION.md](IMPLEMENTATION.md).
 
-## Small executable MVP example
+## Conformance artifacts
 
-The following complete module is accepted by `tools/ghostc.mjs` and uses only
-the implemented S-expression MVP.
+`tests/fixtures/gfb1-golden-v1.ghost.md` and
+`tests/fixtures/gfb2-int-golden-v1.ghost.md` are authoritative literate sources for
+the corresponding tracked `.gfb` and digest metadata `.json` files. Node and
+browser compilation preserve the straight-line vectors. Native and WASM loaders
+reject invalid versions, malformed bytecode and retired eager instructions.
+`tests/gfb2-int.test.mjs` also fixes the format-3 branch bytes and exercises
+selected/unselected runtime faults through both hosts. Core Rust tests cover
+nested branch execution, branch joins, invalid indices and stack boundaries.
 
-```lisp
-(module postfix-demo
-  (version 1)
-  (input boolinput bool)
-  (input stop bool)
-  (state running bool false)
+## Result consumption diagnostics
 
-  (strategy basic 0
-    (device (has actuator pump bool))
-    (next running (and input.boolinput (not input.stop)))
-    (intent pump (and input.boolinput (not input.stop)))))
-```
+`TRACE_RESULT` (56) requires a positive u32 site. The compiler's internal form is
+`(trace-result site payload choice origin)`. Evaluation computes payload, choice,
+then origin before recording an event; the payload's value and type are unchanged.
+Choice is an exact Number integer in `0..65535`: zero means Ok, and a fault uses
+its error enum ordinal plus one. Origin is an exact Number integer in
+`0..4294967295`, with zero as the default. Invalid metadata rejects the tick with
+`result-trace-out-of-range`. Source metadata binds site and origin identifiers to
+the exact source revision and the error enum; the VM does not infer those names.
 
-Inputs are indexed in declaration order, starting at zero:
+Every committed TickRecord JSON has a dedicated `resultTrace` array of
+`{site, choice, origin}` events. Events follow execution order, including repeated
+sites. An unexecuted marker produces no event. Diagnostics never enter requested
+or safe actuator intents. A later fault discards the tick's entire diagnostic
+buffer along with its candidate state and intents. Rewind retains the selected
+journal record; ghost replay regenerates diagnostics from recorded inputs. There
+is no separate mutable diagnostic checkpoint state or new native/WASM C ABI.
 
-| index | declaration | type |
-|---:|---|---|
-| `0` | `boolinput` | bool |
-| `1` | `stop` | bool |
+The loader counts marker instructions in every transition, intent, and format 4
+window source expression. Forward-only control flow executes each instruction at
+most once per expression, so the module's expression bytes bound all events in a
+tick; copied expressions count separately. The 1 MiB module limit and five bytes
+per marker give a conservative upper bound of `floor(1,048,576 / 5) = 209715`
+markers before headers and other records further reduce it. At 12 bytes per
+event, that is at most 2516580 bytes before collection overhead; retained
+diagnostics also obey the existing bounded journal capacity.
 
-Therefore `input.boolinput` emits `INPUT 0`, while `input.stop` emits
-`INPUT 1`. The same testable expression, `boolinput && !stop` in infix
-notation, is written as `(and input.boolinput (not input.stop))` in the
-implemented source syntax. The compiler emits both the transition expression
-and the intent expression independently; this example happens to produce the
-same eight bytes for each.
-
-### Expression lowering and exact bytes
-
-The expression is emitted in postfix order. `u16` indices and all other
-integers are little-endian.
-
-| source fragment | opcode bytes | stack effect |
-|---|---|---|
-| `input.boolinput` | `03 00 00` | push bool input 0 |
-| `input.stop` | `03 01 00` | push bool input 1 |
-| `(not input.stop)` | `03 01 00 0a` | bool → bool |
-| `(and input.boolinput (not input.stop))` | `03 00 00 03 01 00 0a 0b` | bool, bool → bool |
-
-Thus the complete expression stream is:
-
-```text
-postfix: INPUT(0) INPUT(1) NOT AND
-opcode:  03 00 00 03 01 00 0a 0b
-length:  8 bytes
-```
-
-There is no per-opcode or per-operand length field. The expression is stored as
-a blob in a transition or intent record, and that enclosing record has a
-`u32` byte-length prefix. For this example the encoded fragment is therefore
-`08 00 00 00 03 00 00 03 01 00 0a 0b`; the first four bytes are the blob
-length, not an opcode. Query blobs use the same `u32` blob-length convention,
-but query `HAS` terms additionally contain length-prefixed UTF-8 strings.
-
-The bounded stack evaluates this as push `input[0]`, push `input[1]`, negate,
-then `AND`. The verifier checks indices, bool operands, and the final single
-value; transitions may not use `NEXT_STATE`, which is intent-only.
-
-### In-memory compiler check
-
-This uses the real compiler API in memory; no source or output file is needed:
-
-```sh
-node --input-type=module <<'EOF'
-import { compile, parse, tokenize } from './tools/ghostc.mjs';
-
-const source = `(module postfix-demo (version 1)
-  (input boolinput bool) (input stop bool) (state running bool false)
-  (strategy basic 0 (device (has actuator pump bool))
-    (next running (and input.boolinput (not input.stop)))
-    (intent pump (and input.boolinput (not input.stop)))))`;
-const bytes = compile(parse(tokenize(source)));
-const expected = Buffer.from([0x03, 0x00, 0x00, 0x03, 0x01, 0x00, 0x0a, 0x0b]);
-const first = bytes.indexOf(expected); const second = bytes.indexOf(expected, first + 1);
-console.log(bytes.length, first, second, expected.toString('hex'));
-EOF
-```
-
-The observed output is `132 101 122 0300000301000a0b`: a 132-byte GFB1 module,
-with the transition and intent blobs at those offsets; `08 00 00 00` precedes
-each. `Module::load` in `crates/ghostflow-core/src/lib.rs` verifies the bytes.
-
-## Implementation boundary
-
-This page describes current GFB1, not the later language design. `docs/LANGUAGE-SURFACE.md`
-and `docs/CONSTRAINTS.md` are the selected follow-up
-syntax/contract; their `control`, `sensor`, `schedule`, `check`, and mode
-examples are design examples and do not compile to GFB1 yet. Do not infer a new
-opcode from them.
-
-The compiler/core support only bool/number values, the listed opcodes, `requires`/`mutex`,
-and bounded in-memory execution. Pressure, flow, pump
-curves, other device metadata, and feedback sensors are optional: no mandatory
-GFB1 field or basic-safety requirement forces them. Capacity analysis or
-verified feedback must be an explicit future opt-in, not MVP bytecode behavior.
-
-## Tracked GFB1 golden vector
-
-`tests/fixtures/gfb1-golden-v1.ghost.md` is the authoritative literate source
-for the tracked `tests/fixtures/gfb1-golden-v1.gfb` artifact. The accompanying
-`gfb1-golden-v1.json` fixes these regression digests:
-
-- source SHA-256: `af7e2a824c337ace94e38ff82ef5a1344d75f2374e2581ef390f76f8ce8d92a0`
-- GFB SHA-256: `2a8ff8e4e26ce6ed7bd92404f0c94ca4d469dbcb672e5ea6e1243c06805a079b`
-
-`tests/gfb1-golden.test.mjs` recompiles the literate source with Node and with
-the existing GFB1 compiler in a Buffer-less browser-like VM. Both results must
-match the tracked artifact byte for byte and reproduce the fixed GFB digest.
-The same test sends those exact valid bytes, plus deterministic corruptions, to
-the release native and WASM loaders. Magic, format version, truncation, trailing
-bytes, query structure, and expression structure are independent fail-closed
-checks. These hashes are regression identities, not signatures or trust claims.
-
-The format version is the `u16` immediately after the `GFB1` magic; it is not the
-module's own version field. Current loaders accept format version `1` only. An
-unsupported format version must fail during load, before activation, without
-guessing, down-conversion, or fallback acceptance. Migration to a later bytecode
-format requires an explicit compiler/runtime compatibility decision and its own
-golden/conformance evidence; a later format is not accepted as GFB1 merely
-because part of its envelope resembles version 1.
-
-For distribution, [Portable GFB package v1](PORTABLE-PACKAGE.md) preserves these
-exact bytes and binds them to the authoritative literate source, manifest,
-source map, compiler/runtime identity, capabilities and installation binding.
-Packaging does not add, remove or rewrite a GFB1 byte.
+[Portable GFB packages](PORTABLE-PACKAGE.md) preserve exact bytecode and bind its
+source, manifest, source map, compiler/runtime identity and installation binding.
+Packaging never rewrites bytecode.

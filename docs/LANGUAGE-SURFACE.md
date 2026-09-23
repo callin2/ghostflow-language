@@ -66,8 +66,11 @@ control 안에서 유일하다. 출력은 타입만 선언하고 같은 이름�
 후속 [공통 제약 계약](CONSTRAINTS.md)은 이름 있는 `constraints` 묶음, 모드 진입
 인터록, 공유 설비 한도, 중복 예약 방지와 선택적 용량 분석을 정의한다. 위 bool
 출력 차단 알고리즘을 모든 제약에 일반화하지 않는다. 같은 설비의 자동·수동·설정
-모드는 배타적이다. 구조적 변경은 명시적 정지 후 Configure에서 적용한다. 승인됐으나
-미구현인 runtime-adjustable 속성 이벤트는 [공통 제약 계약](CONSTRAINTS.md)을 따른다.
+모드는 배타적이다. 구조적 변경은 명시적 정지 후 Configure에서 적용한다.
+운영 설정 선언과 atomic live event의 의미는
+[Reference §5.1–5.2](reference/05-settings-and-observation.md)를 따른다.
+문법·metadata 지원과 host의 live event 실행 지원은 구분하며 실행 범위는
+[구현 범위](IMPLEMENTATION.md)를 참조한다.
 
 센서의 median 필터, 히스테리시스, stale 감시와 복구 조건은 manifest와 Rust 센서
 런타임으로 연결한다. 준비 전 `NotReady`를 포함한 품질은 호스트 trace에 남는다.

@@ -1,14 +1,25 @@
 //! Virtual native ScanFrame adapter for cross-target conformance tests.
 //! It reads no device state and applies no physical output.
+#[path = "support/temporal_profile.rs"]
+mod temporal_profile;
+
 use ghostflow_core::scan::{ScanFrameV1, ScanInput};
 use ghostflow_core::{Capability, Module, Runtime, Type, Value};
 use std::{collections::BTreeSet, env, error::Error, fs};
+use temporal_profile::parse_temporal;
+
+const USAGE: &str = "usage: scan_adapter <module.gfb> <frames.csv> [--temporal EPOCH MAX_SAMPLES MAX_BYTES TAG:MAX_OBSERVATIONS:INTERVAL_MS[,..]]";
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<_> = env::args().skip(1).collect();
-    if args.len() != 2 {
-        return Err("usage: scan_adapter <module.gfb> <frames.csv>".into());
+    if args.len() < 2 {
+        return Err(USAGE.into());
     }
+    let temporal = match args.len() {
+        2 => None,
+        7 if args[2] == "--temporal" => Some(parse_temporal(&args[3..7]).ok_or(USAGE)?),
+        _ => return Err(USAGE.into()),
+    };
     let module = Module::load(&fs::read(&args[0])?)?;
     let capabilities: BTreeSet<_> = module
         .output_fields()
@@ -23,7 +34,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     for capability in capabilities {
         runtime.add_capability(capability)?;
     }
-    runtime.activate()?;
+    match temporal.as_ref() {
+        Some(profile) => runtime.activate_with_temporal(profile)?,
+        None => runtime.activate()?,
+    }
     let mut driver = runtime.into_scan_driver();
 
     let input = fs::read_to_string(&args[1])?;
@@ -59,6 +73,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     _ => return Err(format!("expected true/false for {name}").into()),
                 }),
                 Type::Number => Value::Number(raw.parse()?),
+                Type::Int => Value::Int(raw.parse()?),
             };
             inputs.push(ScanInput {
                 name: (*name).to_owned(),

@@ -300,6 +300,7 @@ pub struct HysteresisReading {
     pub quality: Quality,
 }
 
+#[derive(Clone)]
 struct FilterState {
     values: [f64; MAX_WINDOW],
     len: usize,
@@ -374,7 +375,7 @@ impl FilterState {
             }
             Filter::Ema(alpha) => {
                 self.ema = if self.ema_ready {
-                    self.ema + alpha * (value - self.ema)
+                    alpha * value + (1.0 - alpha) * self.ema
                 } else {
                     value
                 };
@@ -397,6 +398,9 @@ impl FilterState {
     }
 }
 
+/// Fixed-size conditioner state. Cloning retains the complete filter history,
+/// sample identity, recovery state and diagnostics for an in-memory transaction.
+#[derive(Clone)]
 pub struct Sensor {
     config: SensorConfig,
     state: FilterState,
@@ -433,6 +437,17 @@ impl Sensor {
 
     pub fn config(&self) -> SensorConfig {
         self.config
+    }
+
+    /// Epoch, ID and timestamp of the last accepted physical observation,
+    /// including observations whose quality is faulty or not ready.
+    /// Duplicate/older IDs and reads leave this identity unchanged.
+    pub fn accepted_sample_identity(&self) -> Option<(u64, u64, u64)> {
+        Some((
+            self.current_epoch?,
+            self.last_sample_id?,
+            self.last_sample_timestamp?,
+        ))
     }
 
     pub fn update(&mut self, sample: Sample, now_ms: u64) -> Result<UpdateResult, SensorFault> {
@@ -513,6 +528,7 @@ impl Sensor {
         }
         let filter_ready = self.state.ready(self.config.filter);
         if was_fault && !(filter_ready && self.recover_count >= self.config.recover_samples) {
+            self.fault = Some(SensorFault::NotReady);
             return Err(SensorFault::NotReady);
         }
         if filter_ready {
@@ -704,6 +720,37 @@ mod tests {
     }
 
     #[test]
+    fn accepted_identity_stays_bound_to_the_conditioned_reading() {
+        let mut s = sensor(Filter::Ema(1.0), 1);
+        assert_eq!(s.accepted_sample_identity(), None);
+        s.update(Sample::good(0, 0, 0, 10.0), 0).unwrap();
+        assert_eq!(s.accepted_sample_identity(), Some((0, 0, 0)));
+        s.update(Sample::good(0, 10, 100, 20.0), 100).unwrap();
+        for id in [10, 5] {
+            assert_eq!(
+                s.update(Sample::good(0, id, 150, 99.0), 150),
+                Ok(UpdateResult::Duplicate)
+            );
+            assert_eq!(s.accepted_sample_identity(), Some((0, 10, 100)));
+            assert_eq!(s.reading(150), Ok(20.0));
+        }
+        assert_eq!(
+            s.update(Sample::new(0, 11, 151, 0.0, Quality::Disconnected), 151),
+            Err(SensorFault::Disconnected)
+        );
+        assert_eq!(s.accepted_sample_identity(), Some((0, 11, 151)));
+        assert_eq!(s.read(151).quality, Quality::Disconnected);
+        assert_eq!(s.accepted_sample_identity(), Some((0, 11, 151)));
+        s.update(Sample::good(1, 0, 152, 30.0), 152).unwrap();
+        assert_eq!(s.accepted_sample_identity(), Some((1, 0, 152)));
+        s.reset();
+        assert_eq!(s.accepted_sample_identity(), None);
+        let max = 9_007_199_254_740_991;
+        s.update(Sample::good(max, max, max, 40.0), max).unwrap();
+        assert_eq!(s.accepted_sample_identity(), Some((max, max, max)));
+    }
+
+    #[test]
     fn moving_average_is_bounded_and_exact() {
         let mut s = sensor(Filter::MovingAverage(3), 1);
         assert!(s.update(good(1, 1, 10.0), 1).is_err());
@@ -841,6 +888,76 @@ mod tests {
             Err(SensorFault::ClockBackward)
         );
         assert!(s.diagnostics().any(|d| d == Diagnostic::ClockBackward));
+    }
+
+    #[test]
+    fn cloned_snapshot_restores_median_window_and_hysteresis_without_reset() {
+        let mut s = sensor(Filter::Median(3), 1);
+        for (id, value) in [(1, 20.0), (2, 30.0), (3, 40.0)] {
+            let _ = s.update(good(id, id, value), id);
+        }
+        assert_eq!(s.reading(3), Ok(30.0));
+        assert!(!s.hysteresis(3).value);
+        let checkpoint = s.clone();
+        s.update(good(4, 10, 0.0), 10).unwrap();
+        s.update(good(5, 20, 0.0), 20).unwrap();
+        assert!(s.hysteresis(20).value);
+        s = checkpoint;
+        assert_eq!(s.reading(3), Ok(30.0));
+        assert!(!s.hysteresis(3).value);
+        assert_eq!(s.accepted_sample_identity(), Some((1, 3, 3)));
+        s.update(good(4, 4, 80.0), 4).unwrap();
+        assert_eq!(s.reading(4), Ok(40.0));
+    }
+
+    #[test]
+    fn cloned_snapshot_restores_ema_fault_recovery_clock_and_diagnostics() {
+        let mut s = sensor(Filter::Ema(0.5), 2);
+        s.update(good(1, 1, 20.0), 1).unwrap();
+        s.update(good(2, 2, 40.0), 2).unwrap();
+        let ready = s.clone();
+        s.update(good(3, 3, 80.0), 3).unwrap();
+        assert_eq!(s.reading(3), Ok(55.0));
+        s = ready;
+        s.update(good(3, 3, 60.0), 3).unwrap();
+        assert_eq!(s.reading(3), Ok(45.0));
+        assert_eq!(
+            s.update(Sample::new(1, 4, 4, 0.0, Quality::Disconnected), 4),
+            Err(SensorFault::Disconnected)
+        );
+        assert_eq!(s.update(good(5, 5, 20.0), 5), Err(SensorFault::NotReady));
+        assert_eq!(s.update(good(5, 5, 99.0), 5), Ok(UpdateResult::Duplicate));
+        let checkpoint = s.clone();
+        let diagnostics: Vec<_> = s.diagnostics().collect();
+        s.update(good(6, 6, 40.0), 6).unwrap();
+        assert_eq!(s.reading(6), Ok(30.0));
+        s.update(Sample::good(2, 0, 7, 99.0), 7).unwrap();
+        assert_eq!(
+            s.update(Sample::good(2, 1, 6, 99.0), 6),
+            Err(SensorFault::ClockBackward)
+        );
+        s.reset();
+        s = checkpoint;
+        assert_eq!(s.config(), sensor(Filter::Ema(0.5), 2).config());
+        assert_eq!(s.reading(5), Err(SensorFault::NotReady));
+        assert_eq!(s.accepted_sample_identity(), Some((1, 5, 5)));
+        assert_eq!(s.diagnostics().collect::<Vec<_>>(), diagnostics);
+        assert_eq!(s.diagnostic_count(), 1);
+        s.update(good(6, 6, 40.0), 6).unwrap();
+        assert_eq!(s.reading(6), Ok(30.0));
+    }
+
+    #[test]
+    fn sensor_snapshot_is_fixed_inline_memory() {
+        assert!(!std::mem::needs_drop::<Sensor>());
+        assert!(!std::mem::needs_drop::<FilterState>());
+        let s = sensor(Filter::Median(MAX_WINDOW), MAX_WINDOW);
+        assert_eq!(std::mem::size_of_val(&s), std::mem::size_of_val(&s.clone()));
+        println!(
+            "Sensor={} bytes, FilterState={} bytes",
+            std::mem::size_of::<Sensor>(),
+            std::mem::size_of::<FilterState>()
+        );
     }
 
     #[test]

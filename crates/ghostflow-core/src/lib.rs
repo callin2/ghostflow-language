@@ -1,10 +1,30 @@
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fmt;
 
+pub mod accounting;
+pub mod after_event;
+pub mod controller;
+pub mod daily_slots;
+pub mod keyboard;
+pub mod objective_vm;
+pub mod range_schedule;
+pub mod resource_policy;
 pub mod scan;
+pub mod schedule_clock;
+pub mod schedule_vm;
 pub mod signals;
 pub mod solar;
+pub mod solar_admission;
+pub mod solar_runtime;
 pub mod station;
+pub mod temporal;
+pub mod temporal_evidence;
+pub mod temporal_runtime;
+pub mod temporal_vm;
+mod trace_json;
+pub mod true_for;
+pub mod true_for_runtime;
+pub mod true_for_vm;
 
 const MAX_INPUTS: usize = 128;
 const MAX_STATES: usize = 128;
@@ -18,13 +38,15 @@ const MAX_MODULE_BYTES: usize = 1024 * 1024;
 pub enum Type {
     Bool = 1,
     Number = 2,
+    Int = 3,
 }
 
 impl Type {
-    fn from_byte(value: u8) -> Result<Self> {
+    fn from_byte(value: u8, format_version: u16) -> Result<Self> {
         match value {
             1 => Ok(Self::Bool),
             2 => Ok(Self::Number),
+            3 if matches!(format_version, 2 | 3 | 4 | 5 | 6 | 7) => Ok(Self::Int),
             _ => Err(Error::new("invalid type")),
         }
     }
@@ -34,6 +56,7 @@ impl Type {
 pub enum Value {
     Bool(bool),
     Number(f64),
+    Int(i32),
 }
 
 impl Value {
@@ -41,6 +64,7 @@ impl Value {
         match self {
             Self::Bool(_) => Type::Bool,
             Self::Number(_) => Type::Number,
+            Self::Int(_) => Type::Int,
         }
     }
 }
@@ -110,6 +134,7 @@ struct Strategy {
     query: Vec<u8>,
     transitions: Vec<Transition>,
     intents: Vec<Intent>,
+    result_trace_bound: usize,
 }
 #[derive(Clone)]
 struct Constraint {
@@ -120,12 +145,17 @@ struct Constraint {
 #[derive(Clone)]
 pub struct Module {
     fingerprint: u64,
+    format_version: u16,
     name: String,
     version: u32,
     inputs: Vec<Field>,
     states: Vec<Field>,
     strategies: Vec<Strategy>,
     constraints: Vec<Constraint>,
+    temporal: Option<temporal_vm::TemporalRequirements>,
+    schedules: Option<schedule_vm::ScheduleRequirements>,
+    true_fors: Option<true_for_vm::TrueForRequirements>,
+    objective: Option<objective_vm::ObjectiveDescriptor>,
 }
 
 impl Module {
@@ -140,7 +170,8 @@ impl Module {
         if reader.take(4)? != b"GFB1" {
             return Err(Error::new("invalid GFB1 magic"));
         }
-        if reader.u16()? != 1 {
+        let format_version = reader.u16()?;
+        if !matches!(format_version, 1 | 2 | 3 | 4 | 5 | 6 | 7) {
             return Err(Error::new("unsupported GFB format"));
         }
         let name = reader.string()?;
@@ -157,10 +188,11 @@ impl Module {
             if !names.insert(name.clone()) {
                 return Err(Error::new("duplicate input"));
             }
-            let value_type = Type::from_byte(reader.u8()?)?;
+            let value_type = Type::from_byte(reader.u8()?, format_version)?;
             let default = match value_type {
                 Type::Bool => Value::Bool(false),
                 Type::Number => Value::Number(0.0),
+                Type::Int => Value::Int(0),
             };
             inputs.push(Field {
                 name,
@@ -180,7 +212,7 @@ impl Module {
             if !names.insert(name.clone()) {
                 return Err(Error::new("duplicate state"));
             }
-            let value_type = Type::from_byte(reader.u8()?)?;
+            let value_type = Type::from_byte(reader.u8()?, format_version)?;
             let default = match value_type {
                 Type::Bool => match reader.u8()? {
                     0 => Value::Bool(false),
@@ -188,6 +220,7 @@ impl Module {
                     _ => return Err(Error::new("invalid bool default")),
                 },
                 Type::Number => Value::Number(reader.f64()?),
+                Type::Int => Value::Int(reader.i32()?),
             };
             states.push(Field {
                 name,
@@ -196,10 +229,27 @@ impl Module {
             });
         }
 
+        let mut temporal = if matches!(format_version, 4 | 5 | 6) {
+            Some(temporal_vm::TemporalRequirements::load_header(
+                &mut reader,
+                &inputs,
+                format_version >= 5,
+            )?)
+        } else {
+            None
+        };
+        let mut schedules =
+            matches!(format_version, 5 | 6).then(|| schedule_vm::ScheduleRequirements {
+                strategies: Vec::new(),
+            });
+        let mut true_fors = (format_version == 6).then(|| true_for_vm::TrueForRequirements {
+            strategies: Vec::new(),
+        });
         let strategy_count = reader.u16()? as usize;
         if strategy_count == 0 || strategy_count > MAX_STRATEGIES {
             return Err(Error::new("invalid strategy count"));
         }
+        let mut has_int_expression = false;
         let mut strategies = Vec::with_capacity(strategy_count);
         names.clear();
         for _ in 0..strategy_count {
@@ -209,7 +259,47 @@ impl Module {
             }
             let priority = reader.i32()?;
             let query = reader.blob()?;
-            verify_query(&query)?;
+            verify_query(&query, format_version)?;
+
+            let (windows, schedule_count, true_for_count, mut result_trace_bound) =
+                if matches!(format_version, 5 | 6) {
+                    let loaded = schedule_vm::load_prelude(
+                        &mut reader,
+                        &inputs,
+                        &states,
+                        &temporal.as_ref().expect("format 5 header").roots,
+                        format_version,
+                    )?;
+                    let schedule_count = loaded.schedules.len();
+                    let true_for_count = loaded.true_fors.len();
+                    if let Some(requirements) = &mut true_fors {
+                        requirements.strategies.push(true_for_vm::TrueForStrategy {
+                            name: strategy_name.clone(),
+                            signals: loaded.true_fors,
+                        });
+                    }
+                    schedules
+                        .as_mut()
+                        .expect("format 5 schedules")
+                        .strategies
+                        .push(schedule_vm::ScheduleStrategy {
+                            name: strategy_name.clone(),
+                            schedules: loaded.schedules,
+                            prelude: loaded.order,
+                        });
+                    (
+                        loaded.windows,
+                        schedule_count,
+                        true_for_count,
+                        loaded.marker_count,
+                    )
+                } else if let Some(temporal) = &temporal {
+                    let (windows, markers) =
+                        temporal_vm::load_windows(&mut reader, &inputs, &states, &temporal.roots)?;
+                    (windows, 0, 0, markers)
+                } else {
+                    (Vec::new(), 0, 0, 0)
+                };
 
             let transition_count = reader.u16()? as usize;
             if transition_count > state_count {
@@ -223,7 +313,19 @@ impl Module {
                     return Err(Error::new("invalid transition target"));
                 }
                 let expression = reader.blob()?;
-                let ty = verify_expression(&expression, &inputs, &states, false)?;
+                let ty = verify_expression_with_prelude(
+                    &expression,
+                    &inputs,
+                    &states,
+                    false,
+                    format_version,
+                    &windows,
+                    schedule_count,
+                    true_for_count,
+                )?;
+                let (uses_int, marker_count) = expression_metadata(&expression)?;
+                has_int_expression |= uses_int;
+                result_trace_bound += marker_count;
                 if ty != states[state_index].value_type {
                     return Err(Error::new("transition type mismatch"));
                 }
@@ -244,15 +346,34 @@ impl Module {
                 if !intent_names.insert(name.clone()) {
                     return Err(Error::new("duplicate intent"));
                 }
-                let value_type = Type::from_byte(reader.u8()?)?;
+                let value_type = Type::from_byte(reader.u8()?, format_version)?;
                 let expression = reader.blob()?;
-                if verify_expression(&expression, &inputs, &states, true)? != value_type {
+                if verify_expression_with_prelude(
+                    &expression,
+                    &inputs,
+                    &states,
+                    true,
+                    format_version,
+                    &windows,
+                    schedule_count,
+                    true_for_count,
+                )? != value_type
+                {
                     return Err(Error::new("intent type mismatch"));
                 }
+                let (uses_int, marker_count) = expression_metadata(&expression)?;
+                has_int_expression |= uses_int;
+                result_trace_bound += marker_count;
                 intents.push(Intent {
                     name,
                     value_type,
                     expression,
+                });
+            }
+            if let Some(temporal) = &mut temporal {
+                temporal.strategies.push(temporal_vm::TemporalStrategy {
+                    name: strategy_name.clone(),
+                    windows,
                 });
             }
             strategies.push(Strategy {
@@ -261,9 +382,40 @@ impl Module {
                 query,
                 transitions,
                 intents,
+                result_trace_bound,
             });
         }
 
+        if format_version == 4
+            && temporal.as_ref().is_some_and(|requirements| {
+                requirements
+                    .strategies
+                    .iter()
+                    .all(|strategy| strategy.windows.is_empty())
+            })
+        {
+            return Err(Error::new("GFB format 4 requires a window"));
+        }
+        if format_version == 5
+            && schedules.as_ref().is_some_and(|requirements| {
+                requirements
+                    .strategies
+                    .iter()
+                    .all(|s| s.schedules.is_empty())
+            })
+        {
+            return Err(Error::new("GFB format 5 requires a schedule"));
+        }
+        if let Some(requirements) = &true_fors {
+            if requirements
+                .strategies
+                .iter()
+                .all(|strategy| strategy.signals.is_empty())
+            {
+                return Err(Error::new("GFB format 6 requires true_for"));
+            }
+            requirements.validate_bindings(temporal.as_ref().expect("format 6 header"))?;
+        }
         let constraint_count = reader.u16()? as usize;
         if constraint_count > 128 {
             return Err(Error::new("constraint limit exceeded"));
@@ -301,17 +453,45 @@ impl Module {
                 }
             }
         }
+        let has_int_type = inputs
+            .iter()
+            .chain(&states)
+            .any(|field| field.value_type == Type::Int)
+            || strategies
+                .iter()
+                .flat_map(|strategy| &strategy.intents)
+                .any(|intent| intent.value_type == Type::Int);
+        if format_version == 2 && !has_int_type && !has_int_expression {
+            return Err(Error::new("unsupported GFB format 2 without Int"));
+        }
+        let objective = if format_version == 7 {
+            if states.len() == MAX_STATES || strategies.iter().any(|s| s.intents.len() == 128) {
+                return Err(Error::new("objective resource limit exceeded"));
+            }
+            Some(objective_vm::ObjectiveDescriptor::load(
+                &mut reader,
+                &inputs,
+                &strategies,
+            )?)
+        } else {
+            None
+        };
         if !reader.finished() {
             return Err(Error::new("trailing module bytes"));
         }
         Ok(Self {
             fingerprint,
+            format_version,
             name,
             version,
             inputs,
             states,
             strategies,
             constraints,
+            temporal,
+            schedules,
+            true_fors,
+            objective,
         })
     }
 
@@ -321,16 +501,58 @@ impl Module {
     pub fn version(&self) -> u32 {
         self.version
     }
+    /// Verified requirements only. Loading does not activate or execute windows.
+    pub fn temporal_requirements(&self) -> Option<&temporal_vm::TemporalRequirements> {
+        self.temporal.as_ref()
+    }
+    /// Verified descriptors and dependency order only; activation requires schedule bindings.
+    pub fn schedule_requirements(&self) -> Option<&schedule_vm::ScheduleRequirements> {
+        self.schedules.as_ref()
+    }
+    /// Verified structure only; execution still requires certified interval bindings.
+    pub fn true_for_requirements(&self) -> Option<&true_for_vm::TrueForRequirements> {
+        self.true_fors.as_ref()
+    }
+
+    fn reject_unbound_schedules(&self) -> Result<()> {
+        if self.true_fors.is_some() {
+            return Err(Error::new("true_for activation requires runtime bindings"));
+        }
+        if self.schedules.as_ref().is_some_and(|requirements| {
+            requirements
+                .strategies
+                .iter()
+                .any(|strategy| !strategy.schedules.is_empty())
+        }) {
+            return Err(Error::new("schedule activation requires runtime bindings"));
+        }
+        Ok(())
+    }
     pub fn input_fields(&self) -> impl Iterator<Item = (&str, Type)> {
         self.inputs
             .iter()
             .map(|field| (field.name.as_str(), field.value_type))
+    }
+    /// Declared state names, machine types and initial values for artifact binding checks.
+    pub fn state_fields(&self) -> impl Iterator<Item = (&str, Type, Value)> {
+        self.states
+            .iter()
+            .map(|field| (field.name.as_str(), field.value_type, field.default))
     }
     pub fn output_fields(&self) -> impl Iterator<Item = (&str, Type)> {
         self.strategies
             .iter()
             .flat_map(|strategy| strategy.intents.iter())
             .map(|intent| (intent.name.as_str(), intent.value_type))
+            .chain(
+                self.objective
+                    .iter()
+                    .map(|objective| (objective.output.as_str(), Type::Number)),
+            )
+    }
+
+    pub fn objective_requirements(&self) -> Option<&objective_vm::ObjectiveDescriptor> {
+        self.objective.as_ref()
     }
 }
 
@@ -369,6 +591,13 @@ pub struct SafetyTraceFinal {
 }
 
 #[derive(Clone, Debug)]
+pub struct ResultTraceEvent {
+    pub site: u32,
+    pub choice: u16,
+    pub origin: u32,
+}
+
+#[derive(Clone, Debug)]
 pub struct TickRecord {
     pub module_fingerprint: u64,
     pub tick: u64,
@@ -380,71 +609,22 @@ pub struct TickRecord {
     pub safe_intents: NamedValues,
     pub faults: Vec<String>,
     pub safety_trace: SafetyTrace,
+    pub result_trace: Vec<ResultTraceEvent>,
+    pub window_trace: Vec<temporal_runtime::WindowTrace>,
+    pub true_for_trace: Vec<true_for_runtime::TrueForTrace>,
+    pub schedule_trace: Vec<solar_admission::SolarStageResult>,
 }
 
 impl TickRecord {
-    /// Stable, dependency-free diagnostic encoding shared by native and WASM runners.
+    /// Stable diagnostic encoding shared by native, WASM and bounded replay sinks.
+    pub fn write_json(&self, out: &mut impl fmt::Write) -> fmt::Result {
+        trace_json::record(out, self)
+    }
     pub fn to_json(&self) -> String {
-        fn text(value: &str) -> String {
-            let mut out = String::from("\"");
-            for ch in value.chars() {
-                match ch {
-                    '"' => out.push_str("\\\""),
-                    '\\' => out.push_str("\\\\"),
-                    '\n' => out.push_str("\\n"),
-                    '\r' => out.push_str("\\r"),
-                    '\t' => out.push_str("\\t"),
-                    c if c < ' ' => out.push_str(&format!("\\u{:04x}", c as u32)),
-                    c => out.push(c),
-                }
-            }
-            out.push('"');
-            out
-        }
-        fn values(items: &NamedValues) -> String {
-            format!(
-                "{{{}}}",
-                items
-                    .iter()
-                    .map(|(name, value)| {
-                        let encoded = match value {
-                            Value::Bool(v) => v.to_string(),
-                            Value::Number(v) => v.to_string(),
-                        };
-                        format!("{}:{}", text(name), encoded)
-                    })
-                    .collect::<Vec<_>>()
-                    .join(",")
-            )
-        }
-        fn strings(items: &[String]) -> String {
-            format!(
-                "[{}]",
-                items
-                    .iter()
-                    .map(|item| text(item))
-                    .collect::<Vec<_>>()
-                    .join(",")
-            )
-        }
-        fn safety_trace(trace: &SafetyTrace) -> String {
-            let constraints = trace.constraints.iter().map(|constraint| {
-                let first = constraint.first_violation.as_ref().map_or_else(|| "null".to_string(), |violation| {
-                    format!("{{\"round\":{},\"values\":{},\"blocked\":{}}}", violation.round, values(&violation.values), strings(&violation.blocked))
-                });
-                format!("{{\"index\":{},\"kind\":{},\"names\":{},\"firstViolation\":{},\"final\":{{\"round\":{},\"values\":{},\"satisfied\":{}}}}}",
-                    constraint.index, text(constraint.kind), strings(&constraint.names), first,
-                    constraint.final_evaluation.round, values(&constraint.final_evaluation.values), constraint.final_evaluation.satisfied)
-            }).collect::<Vec<_>>().join(",");
-            format!(
-                "{{\"format\":\"GhostFlow/safety-trace-v1\",\"constraints\":[{}]}}",
-                constraints
-            )
-        }
-        format!("{{\"tick\":{},\"module\":\"{:016x}\",\"strategy\":{},\"inputs\":{},\"stateBefore\":{},\"stateAfter\":{},\"requested\":{},\"safe\":{},\"faults\":[{}],\"safetyTrace\":{}}}",
-            self.tick, self.module_fingerprint, text(&self.strategy), values(&self.inputs),
-            values(&self.state_before), values(&self.state_after), values(&self.requested_intents),
-            values(&self.safe_intents), self.faults.iter().map(|fault| text(fault)).collect::<Vec<_>>().join(","), safety_trace(&self.safety_trace))
+        let mut out = String::new();
+        self.write_json(&mut out)
+            .expect("String formatting cannot fail");
+        out
     }
 }
 
@@ -459,6 +639,10 @@ pub struct Runtime {
     journal_capacity: usize,
     next_tick: u64,
     last_time_ms: Option<f64>,
+    temporal: Option<temporal_runtime::TemporalRuntime>,
+    true_for_runtime: Option<true_for_runtime::TrueForRuntime>,
+    solar_runtime: Option<solar_runtime::SolarRuntime>,
+    objective_runtime: Option<controller::Pid>,
 }
 
 impl Runtime {
@@ -474,9 +658,26 @@ impl Runtime {
             journal_capacity: journal_capacity.clamp(1, 4096),
             next_tick: 1,
             last_time_ms: None,
+            temporal: None,
+            true_for_runtime: None,
+            solar_runtime: None,
+            objective_runtime: None,
         }
     }
     pub fn install(&mut self, module: Module, preserve_state: bool) {
+        // Installation is an explicit new temporal execution session.
+        if module.temporal.is_some()
+            || self.temporal.is_some()
+            || module.objective.is_some()
+            || self.objective_runtime.is_some()
+        {
+            self.journal.clear();
+            self.next_tick = 1;
+        }
+        self.temporal = None;
+        self.true_for_runtime = None;
+        self.solar_runtime = None;
+        self.objective_runtime = None;
         let old = if preserve_state {
             self.named_state()
         } else {
@@ -499,6 +700,18 @@ impl Runtime {
         self.last_time_ms = None;
     }
     pub fn hot_swap(&mut self, module: Module) -> Result<()> {
+        if module.objective.is_some() || self.objective_runtime.is_some() {
+            return Err(Error::new(
+                "objective hot swap requires explicit controller migration",
+            ));
+        }
+        module.reject_unbound_schedules()?;
+        if let Some(previous) = &self.module {
+            previous.reject_unbound_schedules()?;
+        }
+        if module.temporal.is_some() || self.temporal.is_some() {
+            return Err(Error::new("temporal activation requires runtime bindings"));
+        }
         if let Some(previous) = &self.module {
             if previous.name != module.name {
                 return Err(Error::new("hot swap requires the same module identity"));
@@ -533,6 +746,13 @@ impl Runtime {
         Ok(())
     }
     pub fn uninstall(&mut self) {
+        self.objective_runtime = None;
+        self.solar_runtime = None;
+        self.true_for_runtime = None;
+        if self.temporal.is_some() {
+            self.journal.clear();
+        }
+        self.temporal = None;
         self.module = None;
         self.inputs.clear();
         self.state.clear();
@@ -560,12 +780,223 @@ impl Runtime {
             .module
             .as_ref()
             .ok_or_else(|| Error::new("no module installed"))?;
-        self.active_strategy = Some(select_strategy(m, &self.capabilities)?);
+        m.reject_unbound_schedules()?;
+        if m.temporal.is_some() {
+            return Err(Error::new("temporal activation requires runtime bindings"));
+        }
+        let selected = select_strategy(m, &self.capabilities)?;
+        if let Some(objective) = &m.objective {
+            if self.objective_runtime.is_some() {
+                return Err(Error::new("objective is already activated"));
+            }
+            if !self.capabilities.iter().any(|cap| {
+                cap.kind == "actuator"
+                    && cap.name == objective.output
+                    && cap.value_type == Type::Number
+            }) {
+                return Err(Error::new("objective requires numeric actuator capability"));
+            }
+            self.objective_runtime = Some(controller::Pid::new(objective.config)?);
+        }
+        self.active_strategy = Some(selected);
         Ok(())
     }
     pub fn active_strategy(&self) -> Option<&str> {
         let m = self.module.as_ref()?;
         Some(&m.strategies[self.active_strategy?].name)
+    }
+    /// Bind provider occurrence facts to a schedule-only GFB5 module.
+    /// Provider code must derive facts from the installed descriptor, including
+    /// timezone/location/offset and complete coverage. No host due bit is accepted.
+    pub fn activate_with_solar(
+        &mut self,
+        activation: &solar_runtime::SolarActivation,
+    ) -> Result<()> {
+        if self.active_strategy.is_some()
+            || self.temporal.is_some()
+            || self.true_for_runtime.is_some()
+            || self.solar_runtime.is_some()
+        {
+            return Err(Error::new("temporal session is already activated"));
+        }
+        let module = self
+            .module
+            .as_ref()
+            .ok_or_else(|| Error::new("no module installed"))?;
+        let requirements = module
+            .schedules
+            .as_ref()
+            .ok_or_else(|| Error::new("module has no schedule requirements"))?;
+        if module
+            .temporal
+            .as_ref()
+            .is_some_and(|r| r.strategies.iter().any(|s| !s.windows.is_empty()))
+            || module
+                .true_fors
+                .as_ref()
+                .is_some_and(|r| r.strategies.iter().any(|s| !s.signals.is_empty()))
+        {
+            return Err(Error::new("mixed solar preludes are not executable"));
+        }
+        let selected = select_strategy_bound(module, &self.capabilities)?;
+        let runtime = solar_runtime::SolarRuntime::new(
+            &requirements.strategies[selected].schedules,
+            activation,
+        )?;
+        self.solar_runtime = Some(runtime);
+        self.active_strategy = Some(selected);
+        Ok(())
+    }
+    pub fn tick_with_solar(
+        &mut self,
+        clock: schedule_clock::ClockSnapshot<'_>,
+        facts: &[solar_runtime::SolarInput<'_>],
+    ) -> Result<&TickRecord> {
+        self.tick_inner(Some((clock, facts)))
+    }
+    /// Native direct-source certified interval execution. Mixed preludes and replay
+    /// require separate integration and remain rejected.
+    pub fn activate_with_certified_intervals(
+        &mut self,
+        activation: &true_for_runtime::TrueForActivation,
+    ) -> Result<()> {
+        if self.true_for_runtime.is_some()
+            || self.temporal.is_some()
+            || self.active_strategy.is_some()
+        {
+            return Err(Error::new("temporal session is already activated"));
+        }
+        let module = self
+            .module
+            .as_ref()
+            .ok_or_else(|| Error::new("no module installed"))?;
+        let requirements = module
+            .true_fors
+            .as_ref()
+            .ok_or_else(|| Error::new("module has no certified interval requirements"))?;
+        if module.schedules.as_ref().is_some_and(|requirements| {
+            requirements
+                .strategies
+                .iter()
+                .any(|strategy| !strategy.schedules.is_empty())
+        }) || module.temporal.as_ref().is_some_and(|requirements| {
+            requirements
+                .strategies
+                .iter()
+                .any(|strategy| !strategy.windows.is_empty())
+        }) {
+            return Err(Error::new(
+                "mixed certified interval preludes are not executable",
+            ));
+        }
+        let roots: BTreeSet<u32> = requirements
+            .strategies
+            .iter()
+            .flat_map(|strategy| strategy.signals.iter().map(|signal| signal.source_tag))
+            .collect();
+        if !roots
+            .iter()
+            .copied()
+            .eq(activation.certified_bool_roots.iter().copied())
+        {
+            return Err(Error::new(
+                "certified interval activation root contract mismatch",
+            ));
+        }
+        let selected = select_strategy_bound(module, &self.capabilities)?;
+        let runtime = true_for_runtime::TrueForRuntime::new(
+            &requirements.strategies[selected].signals,
+            activation,
+            self.journal_capacity,
+            module.strategies[selected].result_trace_bound,
+        )?;
+        self.true_for_runtime = Some(runtime);
+        self.active_strategy = Some(selected);
+        Ok(())
+    }
+    pub fn certified_interval_memory_bytes(&self) -> Option<usize> {
+        self.true_for_runtime
+            .as_ref()
+            .map(|runtime| runtime.memory_bytes)
+    }
+    /// Activate window execution with driver facts and an explicit temporal-only budget.
+    /// Repeated activation is rejected; install explicitly starts a new session.
+    pub fn activate_with_temporal(
+        &mut self,
+        activation: &temporal_runtime::TemporalActivation,
+    ) -> Result<()> {
+        self.activate_with_temporal_limit(activation, activation.budget.max_bytes)
+    }
+    fn activate_with_temporal_limit(
+        &mut self,
+        activation: &temporal_runtime::TemporalActivation,
+        max_bytes: usize,
+    ) -> Result<()> {
+        if self.temporal.is_some() {
+            return Err(Error::new("temporal session is already activated"));
+        }
+        let module = self
+            .module
+            .as_ref()
+            .ok_or_else(|| Error::new("no module installed"))?;
+        module.reject_unbound_schedules()?;
+        let requirements = module
+            .temporal
+            .as_ref()
+            .ok_or_else(|| Error::new("module has no temporal requirements"))?;
+        let selected = select_strategy(module, &self.capabilities)?;
+        let temporal = temporal_runtime::TemporalRuntime::new(
+            requirements,
+            selected,
+            activation,
+            self.journal_capacity,
+            max_bytes,
+            module.strategies[selected].result_trace_bound,
+            module.fingerprint,
+            &module.strategies[selected].name,
+        )?;
+        self.temporal = Some(temporal);
+        self.active_strategy = Some(selected);
+        Ok(())
+    }
+    /// Reserved peak temporal-owned bytes, excluding scalar storage and caller clones.
+    pub fn temporal_memory_bytes(&self) -> Option<usize> {
+        self.temporal.as_ref().map(|temporal| temporal.memory_bytes)
+    }
+    pub fn temporal_resource_report(&self) -> Option<&temporal_runtime::TemporalResourceReport> {
+        self.temporal.as_ref().map(|temporal| &temporal.report)
+    }
+    pub fn plan_temporal(
+        &self,
+        activation: &temporal_runtime::TemporalActivation,
+    ) -> Result<temporal_runtime::TemporalResourceReport> {
+        self.plan_temporal_journal(activation, self.journal_capacity)
+    }
+    fn plan_temporal_journal(
+        &self,
+        activation: &temporal_runtime::TemporalActivation,
+        journal: usize,
+    ) -> Result<temporal_runtime::TemporalResourceReport> {
+        let module = self
+            .module
+            .as_ref()
+            .ok_or_else(|| Error::new("no module installed"))?;
+        module.reject_unbound_schedules()?;
+        let requirements = module
+            .temporal
+            .as_ref()
+            .ok_or_else(|| Error::new("module has no temporal requirements"))?;
+        let selected = select_strategy(module, &self.capabilities)?;
+        Ok(temporal_runtime::TemporalPlan::new(
+            requirements,
+            selected,
+            activation,
+            journal,
+            module.strategies[selected].result_trace_bound,
+            module.fingerprint,
+            &module.strategies[selected].name,
+        )?
+        .report)
     }
     pub fn set_input(&mut self, name: &str, value: Value) -> Result<()> {
         let m = self
@@ -587,6 +1018,20 @@ impl Runtime {
         Ok(())
     }
     pub fn tick(&mut self) -> Result<&TickRecord> {
+        self.tick_inner(None)
+    }
+    fn tick_inner(
+        &mut self,
+        solar: Option<(
+            schedule_clock::ClockSnapshot<'_>,
+            &[solar_runtime::SolarInput<'_>],
+        )>,
+    ) -> Result<&TickRecord> {
+        if self.solar_runtime.is_some() != solar.is_some() {
+            return Err(Error::new(
+                "solar tick requires activated occurrence bindings",
+            ));
+        }
         let m = self
             .module
             .as_ref()
@@ -629,16 +1074,143 @@ impl Runtime {
             .checked_add(1)
             .ok_or_else(|| Error::new("tick counter exhausted"))?;
         let mut next = self.state.clone();
-        for t in &strategy.transitions {
-            next[t.state_index] = eval_expression(&t.expression, &iv, &self.state, None)?;
+        let mut result_trace = ResultTraceBuffer {
+            events: Vec::new(),
+            bound: strategy.result_trace_bound,
+        };
+        if self.temporal.is_some() || self.true_for_runtime.is_some() {
+            result_trace
+                .events
+                .try_reserve_exact(strategy.result_trace_bound)
+                .map_err(|_| Error::new("temporal-allocation-failed"))?;
+            if result_trace.events.capacity() > strategy.result_trace_bound {
+                return Err(Error::new("temporal-budget-exceeded"));
+            }
         }
-        let mut requested = BTreeMap::new();
-        for intent in &strategy.intents {
-            let value = eval_expression(&intent.expression, &iv, &self.state, Some(&next))?;
-            debug_assert_eq!(value.value_type(), intent.value_type);
-            requested.insert(intent.name.clone(), value);
+        let objective_stage = match (&m.objective, &self.objective_runtime) {
+            (Some(descriptor), Some(runtime)) => Some(descriptor.stage(
+                runtime,
+                clock.ok_or_else(|| Error::new("objective requires monotonic clock"))? as u64,
+                &iv,
+            )?),
+            (None, None) => None,
+            _ => return Err(Error::new("objective runtime binding mismatch")),
+        };
+        let solar_stage = if let Some(runtime) = &self.solar_runtime {
+            let (snapshot, facts) = solar.expect("checked solar inputs");
+            let temporal = m.temporal.as_ref().expect("solar clock binding");
+            if temporal_runtime::exact(iv[usize::from(temporal.now_input)])?
+                != snapshot.monotonic_ms
+                || temporal_runtime::exact(iv[usize::from(temporal.time_epoch_input)])?
+                    != runtime.boot_epoch
+                || snapshot.boot_epoch != runtime.boot_epoch
+            {
+                return Err(Error::new("solar clock binding mismatch"));
+            }
+            Some(runtime.stage(
+                &m.schedules.as_ref().expect("solar descriptors").strategies[si].schedules,
+                snapshot,
+                facts,
+                &iv,
+                &self.state,
+                &mut result_trace,
+            )?)
+        } else {
+            None
+        };
+        let schedule_projections = solar_stage
+            .as_ref()
+            .map_or(&[][..], |stage| stage.projections.as_slice());
+        let evaluated = (|| {
+            let window_trace = if let Some(temporal) = &mut self.temporal {
+                temporal.stage(
+                    m.temporal.as_ref().expect("activated temporal module"),
+                    &iv,
+                    &self.state,
+                    &mut result_trace,
+                )?
+            } else {
+                Vec::new()
+            };
+            let true_for_trace = if let Some(runtime) = &mut self.true_for_runtime {
+                let temporal = m.temporal.as_ref().expect("certified clock bindings");
+                runtime.stage(
+                    &m.true_fors
+                        .as_ref()
+                        .expect("certified requirements")
+                        .strategies[self.active_strategy.expect("active strategy")]
+                    .signals,
+                    temporal::TimeContext {
+                        epoch: temporal_runtime::exact(iv[usize::from(temporal.time_epoch_input)])?,
+                        now_ms: temporal_runtime::exact(iv[usize::from(temporal.now_input)])?,
+                    },
+                    &iv,
+                )?
+            } else {
+                Vec::new()
+            };
+            let projections = self
+                .temporal
+                .as_ref()
+                .map_or(&[][..], |temporal| temporal.projections.as_slice());
+            let true_for_projections = self
+                .true_for_runtime
+                .as_ref()
+                .map_or(&[][..], |runtime| runtime.projections.as_slice());
+            for t in &strategy.transitions {
+                next[t.state_index] = eval_expression_with_preludes(
+                    &t.expression,
+                    &iv,
+                    &self.state,
+                    None,
+                    &mut result_trace,
+                    projections,
+                    true_for_projections,
+                    schedule_projections,
+                )?;
+            }
+            let mut requested = BTreeMap::new();
+            for intent in &strategy.intents {
+                let value = eval_expression_with_preludes(
+                    &intent.expression,
+                    &iv,
+                    &self.state,
+                    Some(&next),
+                    &mut result_trace,
+                    projections,
+                    true_for_projections,
+                    schedule_projections,
+                )?;
+                debug_assert_eq!(value.value_type(), intent.value_type);
+                requested.insert(intent.name.clone(), value);
+            }
+            Ok((requested, window_trace, true_for_trace))
+        })();
+        let (mut requested, window_trace, true_for_trace) = match evaluated {
+            Ok(values) => values,
+            Err(error) => {
+                if let Some(temporal) = &mut self.temporal {
+                    temporal.rollback();
+                }
+                if let Some(runtime) = &mut self.true_for_runtime {
+                    runtime.rollback();
+                }
+                return Err(error);
+            }
+        };
+        if let (Some(descriptor), Some(stage)) = (&m.objective, &objective_stage) {
+            requested.insert(
+                descriptor.output.clone(),
+                Value::Number(stage.result.requested_percent),
+            );
         }
-        let (safe, faults, safety_trace) = apply_safety(requested.clone(), &m.constraints);
+        let (mut safe, faults, safety_trace) = apply_safety(requested.clone(), &m.constraints);
+        if let (Some(descriptor), Some(stage)) = (&m.objective, &objective_stage) {
+            safe.insert(
+                descriptor.output.clone(),
+                Value::Number(stage.result.safe_percent),
+            );
+        }
         let rec = TickRecord {
             module_fingerprint: m.fingerprint,
             tick: self.next_tick,
@@ -650,7 +1222,34 @@ impl Runtime {
             safe_intents: safe.clone(),
             faults,
             safety_trace,
+            result_trace: result_trace.events,
+            window_trace,
+            true_for_trace,
+            schedule_trace: solar_stage
+                .as_ref()
+                .map_or_else(Vec::new, |stage| stage.trace.clone()),
         };
+        if let Some(temporal) = &mut self.temporal {
+            temporal.commit(
+                self.next_tick,
+                clock.expect("temporal clock binding") as u64,
+            );
+        }
+        if let Some(runtime) = &mut self.true_for_runtime {
+            runtime.commit();
+        }
+        if let Some(stage) = solar_stage {
+            self.solar_runtime
+                .as_mut()
+                .expect("solar runtime")
+                .commit(stage);
+        }
+        if let Some(stage) = objective_stage {
+            self.objective_runtime
+                .as_mut()
+                .expect("objective runtime")
+                .commit(stage);
+        }
         self.next_tick = next_tick;
         self.last_time_ms = clock.or(self.last_time_ms);
         self.state = next;
@@ -693,6 +1292,17 @@ impl Runtime {
         &self.journal
     }
     pub fn rewind(&mut self, tick: u64) -> Result<()> {
+        if self.objective_runtime.is_some() {
+            return Err(Error::new(
+                "objective rewind requires controller checkpoint support",
+            ));
+        }
+        if self.solar_runtime.is_some() {
+            return Err(Error::new("solar rewind requires checkpoint support"));
+        }
+        if self.true_for_runtime.is_some() {
+            return Err(Error::new("true_for rewind requires checkpoint support"));
+        }
         let m = self
             .module
             .as_ref()
@@ -706,7 +1316,7 @@ impl Runtime {
         if r.module_fingerprint != m.fingerprint {
             return Err(Error::new("rewind requires the recorded module version"));
         }
-        self.state = m
+        let restored_state = m
             .states
             .iter()
             .map(|f| {
@@ -717,6 +1327,10 @@ impl Runtime {
                     .ok_or_else(|| Error::new("incompatible journal state"))
             })
             .collect::<Result<_>>()?;
+        if let Some(temporal) = &mut self.temporal {
+            temporal.restore_tick(tick)?;
+        }
+        self.state = restored_state;
         self.safe_intents = r.safe_intents;
         while self.journal.back().is_some_and(|x| x.tick > tick) {
             self.journal.pop_back();
@@ -735,6 +1349,16 @@ impl Runtime {
         caps: &[Capability],
         count: usize,
     ) -> Result<Vec<TickRecord>> {
+        if self.objective_runtime.is_some() || module.objective.is_some() {
+            return Err(Error::new(
+                "objective replay requires controller checkpoint support",
+            ));
+        }
+        if self.temporal.is_some() || self.true_for_runtime.is_some() || module.temporal.is_some() {
+            return Err(Error::new(
+                "temporal replay requires explicit bindings and peak budget",
+            ));
+        }
         let mut g = Runtime::new(count.max(1));
         g.install(module, false);
         for c in caps {
@@ -762,6 +1386,190 @@ impl Runtime {
         }
         Ok(g.journal.into_iter().collect())
     }
+    /// Replay retained temporal history using explicit scratch and combined peak budgets.
+    /// Returned records own their evidence; caller retention after return is not bounded here.
+    pub fn replay_with_temporal(
+        &self,
+        module: Module,
+        caps: &[Capability],
+        count: usize,
+        activation: &temporal_runtime::TemporalActivation,
+        max_peak_temporal_bytes: usize,
+    ) -> Result<Vec<TickRecord>> {
+        self.replay_temporal_range(
+            module,
+            caps,
+            0,
+            count.min(self.journal.len()),
+            activation,
+            max_peak_temporal_bytes,
+        )
+    }
+
+    /// Fork the installed temporal program without changing the live execution.
+    pub fn replay_current_with_temporal(
+        &self,
+        count: usize,
+        activation: &temporal_runtime::TemporalActivation,
+        max_peak_temporal_bytes: usize,
+    ) -> Result<Vec<TickRecord>> {
+        self.replay_current_temporal_range(0, count, activation, max_peak_temporal_bytes)
+    }
+    pub fn plan_current_temporal_replay(
+        &self,
+        count: usize,
+        activation: &temporal_runtime::TemporalActivation,
+    ) -> Result<temporal_runtime::TemporalReplayResourceReport> {
+        self.plan_current_temporal_replay_range(0, count, activation, false)
+    }
+    fn plan_current_temporal_replay_range(
+        &self,
+        skip: usize,
+        count: usize,
+        activation: &temporal_runtime::TemporalActivation,
+        framed: bool,
+    ) -> Result<temporal_runtime::TemporalReplayResourceReport> {
+        if count == 0 || skip > self.journal.len() || count > self.journal.len() - skip {
+            return Err(Error::new(
+                "temporal replay count exceeds retained records or is zero",
+            ));
+        }
+        let source = self
+            .temporal
+            .as_ref()
+            .ok_or_else(|| Error::new("no temporal session to replay"))?;
+        source.check_activation_profile(activation)?;
+        let ghost = self.plan_temporal_journal(activation, count)?;
+        if ghost.strategy != source.report.strategy {
+            return Err(Error::new("incompatible temporal replay strategy"));
+        }
+        temporal_runtime::TemporalReplayResourceReport::new(
+            &source.report,
+            ghost,
+            count,
+            self.journal.len() - skip,
+            framed,
+        )
+    }
+
+    fn replay_current_temporal_range(
+        &self,
+        skip: usize,
+        count: usize,
+        activation: &temporal_runtime::TemporalActivation,
+        max_peak_temporal_bytes: usize,
+    ) -> Result<Vec<TickRecord>> {
+        if count == 0 || skip > self.journal.len() || count > self.journal.len() - skip {
+            return Err(Error::new(
+                "temporal replay count exceeds retained records or is zero",
+            ));
+        }
+        let module = self
+            .module
+            .as_ref()
+            .ok_or_else(|| Error::new("no module installed"))?
+            .clone();
+        self.replay_temporal_range(
+            module,
+            &self.capabilities,
+            skip,
+            count,
+            activation,
+            max_peak_temporal_bytes,
+        )
+    }
+
+    fn replay_temporal_range(
+        &self,
+        module: Module,
+        caps: &[Capability],
+        skip: usize,
+        count: usize,
+        activation: &temporal_runtime::TemporalActivation,
+        max_peak_temporal_bytes: usize,
+    ) -> Result<Vec<TickRecord>> {
+        let source = self
+            .temporal
+            .as_ref()
+            .ok_or_else(|| Error::new("no temporal session to replay"))?;
+        let original = self.module.as_ref().expect("temporal session has module");
+        if original.temporal != module.temporal {
+            return Err(Error::new("incompatible temporal replay descriptors"));
+        }
+        if original.input_fields().ne(module.input_fields())
+            || original
+                .states
+                .iter()
+                .map(|field| (&field.name, field.value_type))
+                .ne(module
+                    .states
+                    .iter()
+                    .map(|field| (&field.name, field.value_type)))
+        {
+            return Err(Error::new("incompatible temporal replay binding layout"));
+        }
+        let mut replay = Runtime::new(count.max(1));
+        replay.install(module, false);
+        for capability in caps {
+            replay.add_capability(capability.clone())?;
+        }
+        if count > 0 {
+            source.check_activation_profile(activation)?;
+        }
+        let plan = temporal_runtime::TemporalReplayResourceReport::new(
+            &source.report,
+            replay.plan_temporal(activation)?,
+            count,
+            self.journal.len() - skip,
+            false,
+        )?;
+        if !plan.ghost_fits_budget || plan.required_peak_temporal_bytes > max_peak_temporal_bytes {
+            return Err(Error::new("temporal-budget-exceeded"));
+        }
+        let available = plan.ghost_bytes;
+        replay.activate_with_temporal_limit(activation, available)?;
+        if replay.temporal.as_ref().expect("activated replay").strategy != source.strategy {
+            return Err(Error::new("incompatible temporal replay strategy"));
+        }
+        if let Some(first) = self.journal.get(skip).filter(|_| count > 0) {
+            let target = replay.module.as_ref().expect("installed replay module");
+            let restored = target
+                .states
+                .iter()
+                .map(|field| {
+                    first
+                        .state_before
+                        .get(&field.name)
+                        .copied()
+                        .filter(|v| v.value_type() == field.value_type)
+                        .ok_or_else(|| Error::new("incompatible journal state"))
+                })
+                .collect::<Result<Vec<_>>>()?;
+            replay.last_time_ms = replay
+                .temporal
+                .as_mut()
+                .expect("activated replay")
+                .seed_from(source, first.tick - 1)?
+                .map(|time| time as f64);
+            replay.state = restored;
+            replay.next_tick = first.tick;
+        }
+        for record in self.journal.iter().skip(skip).take(count) {
+            for (name, value) in &record.inputs {
+                replay.set_input(name, *value)?;
+            }
+            replay.tick()?;
+        }
+        let mut records = Vec::new();
+        records
+            .try_reserve_exact(count)
+            .map_err(|_| Error::new("temporal-allocation-failed"))?;
+        if records.capacity() != count {
+            return Err(Error::new("temporal-budget-exceeded"));
+        }
+        records.extend(replay.journal);
+        Ok(records)
+    }
     fn named_state(&self) -> NamedValues {
         self.module
             .as_ref()
@@ -778,10 +1586,14 @@ fn named(fields: &[Field], values: &[Value]) -> NamedValues {
         .collect()
 }
 fn select_strategy(m: &Module, caps: &[Capability]) -> Result<usize> {
+    m.reject_unbound_schedules()?;
+    select_strategy_bound(m, caps)
+}
+fn select_strategy_bound(m: &Module, caps: &[Capability]) -> Result<usize> {
     let mut winner: Option<(usize, i32)> = None;
     let mut ambiguous = false;
     for (i, s) in m.strategies.iter().enumerate() {
-        if !eval_query(&s.query, caps)? {
+        if !eval_query(&s.query, caps, m.format_version)? {
             continue;
         }
         match winner {
@@ -925,16 +1737,74 @@ fn apply_safety(
     (values, faults.into_iter().collect(), trace)
 }
 
+#[cfg(test)]
 fn verify_expression(
     code: &[u8],
     inputs: &[Field],
     states: &[Field],
     allow_next: bool,
+    format_version: u16,
+) -> Result<Type> {
+    verify_expression_with_windows(code, inputs, states, allow_next, format_version, &[])
+}
+
+#[cfg(test)]
+fn verify_expression_with_windows(
+    code: &[u8],
+    inputs: &[Field],
+    states: &[Field],
+    allow_next: bool,
+    format_version: u16,
+    windows: &[temporal_vm::WindowDescriptor],
+) -> Result<Type> {
+    verify_expression_with_prelude(
+        code,
+        inputs,
+        states,
+        allow_next,
+        format_version,
+        windows,
+        0,
+        0,
+    )
+}
+
+fn verify_expression_with_prelude(
+    code: &[u8],
+    inputs: &[Field],
+    states: &[Field],
+    allow_next: bool,
+    format_version: u16,
+    windows: &[temporal_vm::WindowDescriptor],
+    schedule_count: usize,
+    true_for_count: usize,
 ) -> Result<Type> {
     let mut r = Reader::new(code);
     let mut stack: [Option<Type>; MAX_STACK] = [None; MAX_STACK];
     let mut len = 0;
-    while !r.finished() {
+    let mut reachable = true;
+    let mut joins: BTreeMap<usize, Vec<Option<Type>>> = BTreeMap::new();
+    loop {
+        if joins
+            .first_key_value()
+            .is_some_and(|(target, _)| *target < r.at)
+        {
+            return Err(Error::new("jump target is not an instruction boundary"));
+        }
+        if let Some(incoming) = joins.remove(&r.at) {
+            if reachable && stack[..len] != incoming {
+                return Err(Error::new("branch stack mismatch"));
+            }
+            len = incoming.len();
+            stack[..len].copy_from_slice(&incoming);
+            reachable = true;
+        }
+        if r.finished() {
+            break;
+        }
+        if !reachable {
+            return Err(Error::new("unreachable expression instruction"));
+        }
         match r.u8()? {
             1 => {
                 if r.u8()? > 1 {
@@ -977,29 +1847,17 @@ fn verify_expression(
                 }
                 type_push(&mut stack, &mut len, Type::Bool)?
             }
-            op @ 11..=17 => {
+            op @ 13..=17 => {
                 let b = type_pop(&mut stack, &mut len)?;
                 let a = type_pop(&mut stack, &mut len)?;
-                if op == 11 || op == 12 {
-                    if a != Type::Bool || b != Type::Bool {
-                        return Err(Error::new("bool operands"));
-                    }
-                } else if op == 13 {
+                if op == 13 {
                     if a != b {
                         return Err(Error::new("eq types"));
                     }
-                } else if a != Type::Number || b != Type::Number {
-                    return Err(Error::new("number operands"));
+                } else if a != b || !matches!(a, Type::Number | Type::Int) {
+                    return Err(Error::new("numeric operands"));
                 }
                 type_push(&mut stack, &mut len, Type::Bool)?
-            }
-            18 => {
-                let no = type_pop(&mut stack, &mut len)?;
-                let yes = type_pop(&mut stack, &mut len)?;
-                if type_pop(&mut stack, &mut len)? != Type::Bool || yes != no {
-                    return Err(Error::new("if types"));
-                }
-                type_push(&mut stack, &mut len, yes)?
             }
             19..=22 => {
                 let right = type_pop(&mut stack, &mut len)?;
@@ -1009,6 +1867,139 @@ fn verify_expression(
                 }
                 type_push(&mut stack, &mut len, Type::Number)?;
             }
+            23 => {
+                if format_version < 2 {
+                    return Err(Error::new("integer opcode requires GFB format 2"));
+                }
+                r.i32()?;
+                type_push(&mut stack, &mut len, Type::Int)?
+            }
+            24 => {
+                if format_version < 2 {
+                    return Err(Error::new("integer opcode requires GFB format 2"));
+                }
+                if type_pop(&mut stack, &mut len)? != Type::Int {
+                    return Err(Error::new("integer negation expects Int"));
+                }
+                type_push(&mut stack, &mut len, Type::Int)?
+            }
+            25..=29 => {
+                if format_version < 2 {
+                    return Err(Error::new("integer opcode requires GFB format 2"));
+                }
+                let right = type_pop(&mut stack, &mut len)?;
+                let left = type_pop(&mut stack, &mut len)?;
+                if left != Type::Int || right != Type::Int {
+                    return Err(Error::new("integer arithmetic expects Int operands"));
+                }
+                type_push(&mut stack, &mut len, Type::Int)?;
+            }
+            op @ 30..=31 => {
+                if !matches!(format_version, 3 | 4 | 5 | 6 | 7) {
+                    return Err(Error::new("branch opcode requires GFB format 3"));
+                }
+                let target = r.jump_target()?;
+                if op == 30 && type_pop(&mut stack, &mut len)? != Type::Bool {
+                    return Err(Error::new("branch condition must be Bool"));
+                }
+                if let Some(incoming) = joins.get(&target) {
+                    if stack[..len] != *incoming {
+                        return Err(Error::new("branch stack mismatch"));
+                    }
+                } else {
+                    joins.insert(target, stack[..len].to_vec());
+                }
+                reachable = op == 30;
+            }
+            32..=47 => {
+                if !matches!(format_version, 3 | 4 | 5 | 6 | 7) {
+                    return Err(Error::new("compact Number opcode requires GFB format 3"));
+                }
+                type_push(&mut stack, &mut len, Type::Number)?;
+            }
+            op @ 48..=53 => {
+                if !matches!(format_version, 3 | 4 | 5 | 6 | 7) {
+                    return Err(Error::new("conversion opcode requires GFB format 3"));
+                }
+                let (source, target) = if op == 48 {
+                    (Type::Int, Type::Number)
+                } else {
+                    (Type::Number, Type::Int)
+                };
+                if type_pop(&mut stack, &mut len)? != source {
+                    return Err(Error::new("conversion operand type"));
+                }
+                type_push(&mut stack, &mut len, target)?;
+            }
+            54 => {
+                if !matches!(format_version, 3 | 4 | 5 | 6 | 7) {
+                    return Err(Error::new("Duration guard requires GFB format 3"));
+                }
+                if type_pop(&mut stack, &mut len)? != Type::Number {
+                    return Err(Error::new("Duration guard expects Number"));
+                }
+                type_push(&mut stack, &mut len, Type::Number)?;
+            }
+            55 => {
+                if !matches!(format_version, 3 | 4 | 5 | 6 | 7) {
+                    return Err(Error::new("DateTime guard requires GFB format 3"));
+                }
+                if type_pop(&mut stack, &mut len)? != Type::Number {
+                    return Err(Error::new("DateTime guard expects Number"));
+                }
+                type_push(&mut stack, &mut len, Type::Number)?;
+            }
+            56 => {
+                if !matches!(format_version, 3 | 4 | 5 | 6 | 7) {
+                    return Err(Error::new("Result trace requires GFB format 3"));
+                }
+                if r.u32()? == 0 {
+                    return Err(Error::new("Result trace site must be positive"));
+                }
+                if type_pop(&mut stack, &mut len)? != Type::Number
+                    || type_pop(&mut stack, &mut len)? != Type::Number
+                {
+                    return Err(Error::new("Result trace metadata expects Number"));
+                }
+                let payload = type_pop(&mut stack, &mut len)?;
+                type_push(&mut stack, &mut len, payload)?;
+            }
+            57 => {
+                if !matches!(format_version, 4 | 5 | 6) {
+                    return Err(Error::new("temporal projection requires GFB format 4"));
+                }
+                let slot = r.u16()?;
+                let field = r.u8()?;
+                type_push(
+                    &mut stack,
+                    &mut len,
+                    temporal_vm::projection_type(windows, slot, field)?,
+                )?;
+            }
+            58 => {
+                if !matches!(format_version, 5 | 6) {
+                    return Err(Error::new("schedule projection requires GFB format 5"));
+                }
+                let slot = r.u16()?;
+                let field = r.u8()?;
+                type_push(
+                    &mut stack,
+                    &mut len,
+                    schedule_vm::projection_type(schedule_count, slot, field)?,
+                )?;
+            }
+            59 => {
+                if format_version != 6 {
+                    return Err(Error::new("true_for projection requires GFB format 6"));
+                }
+                let slot = r.u16()?;
+                let field = r.u8()?;
+                type_push(
+                    &mut stack,
+                    &mut len,
+                    true_for_vm::projection_type(true_for_count, slot, field)?,
+                )?;
+            }
             _ => return Err(Error::new("unknown expression opcode")),
         }
     }
@@ -1016,6 +2007,43 @@ fn verify_expression(
         return Err(Error::new("expression result count"));
     }
     Ok(stack[0].unwrap())
+}
+
+fn expression_metadata(code: &[u8]) -> Result<(bool, usize)> {
+    let mut reader = Reader::new(code);
+    let mut uses_int = false;
+    let mut markers = 0;
+    while !reader.finished() {
+        match reader.u8()? {
+            1 => {
+                reader.take(1)?;
+            }
+            2 => {
+                reader.f64()?;
+            }
+            3..=5 => {
+                reader.u16()?;
+            }
+            23 => {
+                reader.i32()?;
+                uses_int = true;
+            }
+            24..=29 | 48..=53 => uses_int = true,
+            30..=31 => {
+                reader.u16()?;
+            }
+            10 | 13..=17 | 19..=22 | 32..=47 | 54..=55 => {}
+            56 => {
+                reader.u32()?;
+                markers += 1;
+            }
+            57 | 58 | 59 => {
+                reader.take(3)?;
+            }
+            _ => return Err(Error::new("unknown expression opcode")),
+        }
+    }
+    Ok((uses_int, markers))
 }
 fn type_push(s: &mut [Option<Type>; MAX_STACK], n: &mut usize, v: Type) -> Result<()> {
     if *n >= MAX_STACK {
@@ -1032,11 +2060,55 @@ fn type_pop(s: &mut [Option<Type>; MAX_STACK], n: &mut usize) -> Result<Type> {
     *n -= 1;
     Ok(s[*n].take().unwrap())
 }
+struct ResultTraceBuffer {
+    events: Vec<ResultTraceEvent>,
+    bound: usize,
+}
+
+#[cfg(test)]
 fn eval_expression(
     code: &[u8],
     inputs: &[Value],
     state: &[Value],
     next: Option<&[Value]>,
+) -> Result<Value> {
+    let mut trace = ResultTraceBuffer {
+        events: Vec::new(),
+        bound: expression_metadata(code)?.1,
+    };
+    eval_expression_traced(code, inputs, state, next, &mut trace)
+}
+
+#[cfg(test)]
+fn eval_expression_traced(
+    code: &[u8],
+    inputs: &[Value],
+    state: &[Value],
+    next: Option<&[Value]>,
+    trace: &mut ResultTraceBuffer,
+) -> Result<Value> {
+    eval_expression_with_windows(code, inputs, state, next, trace, &[])
+}
+
+fn eval_expression_with_windows(
+    code: &[u8],
+    inputs: &[Value],
+    state: &[Value],
+    next: Option<&[Value]>,
+    trace: &mut ResultTraceBuffer,
+    windows: &[[Value; 8]],
+) -> Result<Value> {
+    eval_expression_with_preludes(code, inputs, state, next, trace, windows, &[], &[])
+}
+fn eval_expression_with_preludes(
+    code: &[u8],
+    inputs: &[Value],
+    state: &[Value],
+    next: Option<&[Value]>,
+    trace: &mut ResultTraceBuffer,
+    windows: &[[Value; 8]],
+    true_fors: &[[Value; 7]],
+    schedules: &[[Value; 2]],
 ) -> Result<Value> {
     let mut r = Reader::new(code);
     let mut s = [Value::Bool(false); MAX_STACK];
@@ -1083,28 +2155,22 @@ fn eval_expression(
                 };
                 value_push(&mut s, &mut n, Value::Bool(!a))?
             }
-            op @ 11..=17 => {
+            op @ 13..=17 => {
                 let b = value_pop(&s, &mut n)?;
                 let a = value_pop(&s, &mut n)?;
                 let v = match (op, a, b) {
-                    (11, Value::Bool(x), Value::Bool(y)) => Value::Bool(x && y),
-                    (12, Value::Bool(x), Value::Bool(y)) => Value::Bool(x || y),
                     (13, x, y) => Value::Bool(x == y),
                     (14, Value::Number(x), Value::Number(y)) => Value::Bool(x < y),
                     (15, Value::Number(x), Value::Number(y)) => Value::Bool(x <= y),
                     (16, Value::Number(x), Value::Number(y)) => Value::Bool(x > y),
                     (17, Value::Number(x), Value::Number(y)) => Value::Bool(x >= y),
+                    (14, Value::Int(x), Value::Int(y)) => Value::Bool(x < y),
+                    (15, Value::Int(x), Value::Int(y)) => Value::Bool(x <= y),
+                    (16, Value::Int(x), Value::Int(y)) => Value::Bool(x > y),
+                    (17, Value::Int(x), Value::Int(y)) => Value::Bool(x >= y),
                     _ => return Err(Error::new("binary types")),
                 };
                 value_push(&mut s, &mut n, v)?
-            }
-            18 => {
-                let no = value_pop(&s, &mut n)?;
-                let yes = value_pop(&s, &mut n)?;
-                let Value::Bool(c) = value_pop(&s, &mut n)? else {
-                    return Err(Error::new("if condition"));
-                };
-                value_push(&mut s, &mut n, if c { yes } else { no })?
             }
             op @ 19..=22 => {
                 let right = value_pop(&s, &mut n)?;
@@ -1126,6 +2192,163 @@ fn eval_expression(
                     return Err(Error::new("non-finite arithmetic result"));
                 }
                 value_push(&mut s, &mut n, Value::Number(value))?;
+            }
+            23 => {
+                let value = r.i32()?;
+                value_push(&mut s, &mut n, Value::Int(value))?;
+            }
+            24 => {
+                let Value::Int(value) = value_pop(&s, &mut n)? else {
+                    return Err(Error::new("integer negation expects Int"));
+                };
+                let value = value
+                    .checked_neg()
+                    .ok_or_else(|| Error::new("integer-overflow"))?;
+                value_push(&mut s, &mut n, Value::Int(value))?;
+            }
+            op @ 25..=29 => {
+                let right = value_pop(&s, &mut n)?;
+                let left = value_pop(&s, &mut n)?;
+                let (Value::Int(left), Value::Int(right)) = (left, right) else {
+                    return Err(Error::new("integer arithmetic expects Int operands"));
+                };
+                if matches!(op, 28 | 29) && right == 0 {
+                    return Err(Error::new("integer-division-by-zero"));
+                }
+                let value = match op {
+                    25 => left.checked_add(right),
+                    26 => left.checked_sub(right),
+                    27 => left.checked_mul(right),
+                    28 => left.checked_div(right),
+                    29 if left == i32::MIN && right == -1 => Some(0),
+                    29 => left.checked_rem(right),
+                    _ => unreachable!(),
+                }
+                .ok_or_else(|| Error::new("integer-overflow"))?;
+                value_push(&mut s, &mut n, Value::Int(value))?;
+            }
+            op @ 30..=31 => {
+                let target = r.jump_target()?;
+                let jump = if op == 30 {
+                    let Value::Bool(condition) = value_pop(&s, &mut n)? else {
+                        return Err(Error::new("branch condition must be Bool"));
+                    };
+                    !condition
+                } else {
+                    true
+                };
+                if jump {
+                    r.at = target;
+                }
+            }
+            op @ 32..=47 => {
+                value_push(&mut s, &mut n, Value::Number(f64::from(op - 32)))?;
+            }
+            48 => {
+                let Value::Int(value) = value_pop(&s, &mut n)? else {
+                    return Err(Error::new("conversion operand type"));
+                };
+                value_push(&mut s, &mut n, Value::Number(f64::from(value)))?;
+            }
+            op @ 49..=53 => {
+                let Value::Number(value) = value_pop(&s, &mut n)? else {
+                    return Err(Error::new("conversion operand type"));
+                };
+                if op == 49 && value.fract() != 0.0 {
+                    return Err(Error::new("integer-conversion-fractional"));
+                }
+                let rounded = match op {
+                    49 => value,
+                    50 => value.floor(),
+                    51 => value.ceil(),
+                    52 => value.trunc(),
+                    53 => value.round_ties_even(),
+                    _ => unreachable!(),
+                };
+                if !(f64::from(i32::MIN)..=f64::from(i32::MAX)).contains(&rounded) {
+                    return Err(Error::new("integer-conversion-out-of-range"));
+                }
+                value_push(&mut s, &mut n, Value::Int(rounded as i32))?;
+            }
+            54 => {
+                let Value::Number(value) = value_pop(&s, &mut n)? else {
+                    return Err(Error::new("Duration guard expects Number"));
+                };
+                if !value.is_finite()
+                    || value.fract() != 0.0
+                    || !(0.0..=9_007_199_254_740_991.0).contains(&value)
+                {
+                    return Err(Error::new("duration-out-of-range"));
+                }
+                value_push(&mut s, &mut n, Value::Number(value))?;
+            }
+            55 => {
+                let Value::Number(value) = value_pop(&s, &mut n)? else {
+                    return Err(Error::new("DateTime guard expects Number"));
+                };
+                if !value.is_finite()
+                    || value.fract() != 0.0
+                    || !(0.0..=253_402_300_799_999.0).contains(&value)
+                {
+                    return Err(Error::new("datetime-out-of-range"));
+                }
+                value_push(&mut s, &mut n, Value::Number(value))?;
+            }
+            57 => {
+                let slot = usize::from(r.u16()?);
+                let field = usize::from(r.u8()?);
+                let value = windows
+                    .get(slot)
+                    .and_then(|window| window.get(field))
+                    .copied()
+                    .ok_or_else(|| Error::new("temporal projection unavailable"))?;
+                value_push(&mut s, &mut n, value)?;
+            }
+            58 => {
+                let slot = usize::from(r.u16()?);
+                let field = usize::from(r.u8()?);
+                let value = schedules
+                    .get(slot)
+                    .and_then(|schedule| schedule.get(field))
+                    .copied()
+                    .ok_or_else(|| Error::new("schedule projection unavailable"))?;
+                value_push(&mut s, &mut n, value)?;
+            }
+            59 => {
+                let slot = usize::from(r.u16()?);
+                let field = usize::from(r.u8()?);
+                let value = true_fors
+                    .get(slot)
+                    .and_then(|signal| signal.get(field))
+                    .copied()
+                    .ok_or_else(|| Error::new("true_for projection unavailable"))?;
+                value_push(&mut s, &mut n, value)?;
+            }
+            56 => {
+                let site = r.u32()?;
+                let Value::Number(origin) = value_pop(&s, &mut n)? else {
+                    return Err(Error::new("Result trace metadata expects Number"));
+                };
+                let Value::Number(choice) = value_pop(&s, &mut n)? else {
+                    return Err(Error::new("Result trace metadata expects Number"));
+                };
+                if !origin.is_finite()
+                    || origin.fract() != 0.0
+                    || !(0.0..=u32::MAX as f64).contains(&origin)
+                    || !choice.is_finite()
+                    || choice.fract() != 0.0
+                    || !(0.0..=u16::MAX as f64).contains(&choice)
+                {
+                    return Err(Error::new("result-trace-out-of-range"));
+                }
+                if site == 0 || n == 0 || trace.events.len() >= trace.bound {
+                    return Err(Error::new("Result trace instruction bound exceeded"));
+                }
+                trace.events.push(ResultTraceEvent {
+                    site,
+                    choice: choice as u16,
+                    origin: origin as u32,
+                });
             }
             _ => return Err(Error::new("unknown expression opcode")),
         }
@@ -1150,10 +2373,10 @@ fn value_pop(s: &[Value; MAX_STACK], n: &mut usize) -> Result<Value> {
     *n -= 1;
     Ok(s[*n])
 }
-fn verify_query(code: &[u8]) -> Result<()> {
-    eval_query(code, &[]).map(|_| ())
+fn verify_query(code: &[u8], format_version: u16) -> Result<()> {
+    eval_query(code, &[], format_version).map(|_| ())
 }
-fn eval_query(code: &[u8], caps: &[Capability]) -> Result<bool> {
+fn eval_query(code: &[u8], caps: &[Capability], format_version: u16) -> Result<bool> {
     let mut r = Reader::new(code);
     let mut s = [false; MAX_STACK];
     let mut n = 0;
@@ -1162,7 +2385,7 @@ fn eval_query(code: &[u8], caps: &[Capability]) -> Result<bool> {
             1 => {
                 let kind = r.string()?;
                 let name = r.string()?;
-                let ty = Type::from_byte(r.u8()?)?;
+                let ty = Type::from_byte(r.u8()?, format_version)?;
                 if n >= MAX_STACK {
                     return Err(Error::new("query stack"));
                 }
@@ -1236,8 +2459,21 @@ impl<'a> Reader<'a> {
     fn u16(&mut self) -> Result<u16> {
         Ok(u16::from_le_bytes(self.take(2)?.try_into().unwrap()))
     }
+    fn jump_target(&mut self) -> Result<usize> {
+        let offset = self.u16()? as usize;
+        if offset == 0 {
+            return Err(Error::new("jump must advance"));
+        }
+        self.at
+            .checked_add(offset)
+            .filter(|target| *target <= self.bytes.len())
+            .ok_or_else(|| Error::new("jump target outside expression"))
+    }
     fn u32(&mut self) -> Result<u32> {
         Ok(u32::from_le_bytes(self.take(4)?.try_into().unwrap()))
+    }
+    fn u64(&mut self) -> Result<u64> {
+        Ok(u64::from_le_bytes(self.take(8)?.try_into().unwrap()))
     }
     fn i32(&mut self) -> Result<i32> {
         Ok(i32::from_le_bytes(self.take(4)?.try_into().unwrap()))
@@ -1268,6 +2504,500 @@ impl<'a> Reader<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn conditional_expression(condition: bool, yes: &[u8], no: &[u8]) -> Vec<u8> {
+        let mut code = vec![1, u8::from(condition), 30];
+        code.extend(((yes.len() + 3) as u16).to_le_bytes());
+        code.extend(yes);
+        code.push(31);
+        code.extend((no.len() as u16).to_le_bytes());
+        code.extend(no);
+        code
+    }
+
+    #[test]
+    fn short_circuit_verifies_both_paths_and_executes_only_selected_path() {
+        let fault = expression_ints(1, 0, 28);
+        for condition in [false, true] {
+            let code = conditional_expression(condition, &expression_int(7), &fault);
+            assert_eq!(
+                verify_expression(&code, &[], &[], false, 3).unwrap(),
+                Type::Int
+            );
+            if condition {
+                assert_eq!(
+                    eval_expression(&code, &[], &[], None).unwrap(),
+                    Value::Int(7)
+                );
+            } else {
+                assert_eq!(
+                    eval_expression(&code, &[], &[], None)
+                        .unwrap_err()
+                        .message(),
+                    "integer-division-by-zero"
+                );
+            }
+        }
+        let nested = conditional_expression(false, &fault, &expression_int(9));
+        let mut code = expression_int(2);
+        code.extend(conditional_expression(true, &nested, &fault));
+        code.push(25);
+        assert_eq!(
+            verify_expression(&code, &[], &[], false, 3).unwrap(),
+            Type::Int
+        );
+        assert_eq!(
+            eval_expression(&code, &[], &[], None).unwrap(),
+            Value::Int(11)
+        );
+    }
+
+    #[test]
+    fn short_circuit_rejects_malformed_control_flow_and_stack_joins() {
+        let valid = conditional_expression(true, &[1, 1], &[1, 0]);
+        assert!(verify_expression(&valid, &[], &[], false, 3).is_ok());
+        for format in [1, 2] {
+            assert!(verify_expression(&valid, &[], &[], false, format).is_err());
+        }
+        for format in [1, 2, 3] {
+            for code in [
+                vec![1, 1, 1, 0, 11],
+                vec![1, 1, 1, 0, 12],
+                vec![1, 1, 1, 1, 1, 0, 18],
+            ] {
+                assert!(verify_expression(&code, &[], &[], false, format).is_err());
+            }
+        }
+        for code in [
+            vec![1, 1, 30],             // truncated displacement
+            vec![1, 1, 30, 0, 0],       // zero displacement
+            vec![1, 1, 30, 255, 255],   // out of bounds
+            vec![1, 1, 30, 1, 0, 1, 1], // target inside immediate
+            vec![1, 1, 31, 2, 0, 1, 0], // unreachable instruction
+            vec![30, 1, 0, 10],         // condition underflow
+            {
+                let mut code = expression_int(1);
+                code.extend([30, 2, 0, 1, 1]);
+                code
+            }, // non-Bool condition
+            conditional_expression(true, &[1, 1], &expression_int(1)), // type mismatch
+            conditional_expression(true, &[1, 1, 1, 0], &[1, 0]), // height mismatch
+            conditional_expression(true, &[1, 1], &[10]), // unselected underflow
+            conditional_expression(true, &[1, 1], &[3, 0, 0]), // unselected bad input
+            conditional_expression(true, &[1, 1], &[255]), // unselected unknown opcode
+            conditional_expression(true, &[1, 1], &vec![1; (MAX_STACK + 1) * 2]),
+        ] {
+            assert!(
+                verify_expression(&code, &[], &[], false, 3).is_err(),
+                "accepted {code:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn integer_minimum_remainder_negative_one_is_zero() {
+        assert_eq!(
+            eval_expression(&expression_ints(i32::MIN, -1, 29), &[], &[], None).unwrap(),
+            Value::Int(0)
+        );
+    }
+
+    #[test]
+    fn compact_number_constants_preserve_number_type_and_require_format_three() {
+        for value in 0..=15 {
+            let code = [32 + value];
+            assert_eq!(
+                verify_expression(&code, &[], &[], false, 3).unwrap(),
+                Type::Number
+            );
+            assert_eq!(
+                eval_expression(&code, &[], &[], None).unwrap(),
+                Value::Number(f64::from(value))
+            );
+            for format in [1, 2] {
+                assert!(verify_expression(&code, &[], &[], false, format).is_err());
+            }
+            assert!(!expression_metadata(&code).unwrap().0);
+        }
+    }
+
+    #[test]
+    fn dynamic_conversion_opcodes_check_profiles_and_operand_types() {
+        let number = {
+            let mut bytes = vec![2];
+            bytes.extend(1.5f64.to_le_bytes());
+            bytes
+        };
+        for opcode in 48..=53 {
+            let mut valid = if opcode == 48 {
+                expression_int(7)
+            } else {
+                number.clone()
+            };
+            valid.push(opcode);
+            assert_eq!(
+                verify_expression(&valid, &[], &[], false, 3).unwrap(),
+                if opcode == 48 {
+                    Type::Number
+                } else {
+                    Type::Int
+                }
+            );
+            assert!(expression_metadata(&valid).unwrap().0);
+            for format in [1, 2] {
+                assert!(verify_expression(&valid, &[], &[], false, format).is_err());
+            }
+            assert!(verify_expression(&[opcode], &[], &[], false, 3).is_err());
+            assert!(verify_expression(&[1, 1, opcode], &[], &[], false, 3).is_err());
+            let mut wrong = if opcode == 48 {
+                number.clone()
+            } else {
+                expression_int(7)
+            };
+            wrong.push(opcode);
+            assert!(verify_expression(&wrong, &[], &[], false, 3).is_err());
+        }
+    }
+
+    #[test]
+    fn duration_guard_verifies_profile_and_preserves_only_valid_milliseconds() {
+        let input = Field {
+            name: "value".into(),
+            value_type: Type::Number,
+            default: Value::Number(0.0),
+        };
+        let code = [3, 0, 0, 54];
+        assert_eq!(
+            verify_expression(&code, &[input.clone()], &[], false, 3).unwrap(),
+            Type::Number
+        );
+        assert!(!expression_metadata(&code).unwrap().0);
+        for format in [1, 2] {
+            assert!(verify_expression(&code, &[input.clone()], &[], false, format).is_err());
+        }
+        for invalid in [vec![54], vec![1, 1, 54], {
+            let mut code = expression_int(0);
+            code.push(54);
+            code
+        }] {
+            assert!(verify_expression(&invalid, &[], &[], false, 3).is_err());
+        }
+        for value in [0.0, 1.0, 9_007_199_254_740_991.0] {
+            assert_eq!(
+                eval_expression(&code, &[Value::Number(value)], &[], None).unwrap(),
+                Value::Number(value)
+            );
+        }
+        for value in [
+            -1.0,
+            0.5,
+            9_007_199_254_740_992.0,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            f64::NAN,
+        ] {
+            assert_eq!(
+                eval_expression(&code, &[Value::Number(value)], &[], None)
+                    .unwrap_err()
+                    .message(),
+                "duration-out-of-range"
+            );
+        }
+    }
+
+    #[test]
+    fn datetime_guard_verifies_profile_and_preserves_only_valid_epoch_milliseconds() {
+        let input = Field {
+            name: "value".into(),
+            value_type: Type::Number,
+            default: Value::Number(0.0),
+        };
+        let code = [3, 0, 0, 55];
+        assert_eq!(
+            verify_expression(&code, &[input.clone()], &[], false, 3).unwrap(),
+            Type::Number
+        );
+        assert!(!expression_metadata(&code).unwrap().0);
+        for format in [1, 2] {
+            assert!(verify_expression(&code, &[input.clone()], &[], false, format).is_err());
+        }
+        for invalid in [vec![55], vec![1, 1, 55], {
+            let mut code = expression_int(0);
+            code.push(55);
+            code
+        }] {
+            assert!(verify_expression(&invalid, &[], &[], false, 3).is_err());
+        }
+        for value in [0.0, 1.0, 253_402_300_799_999.0] {
+            assert_eq!(
+                eval_expression(&code, &[Value::Number(value)], &[], None).unwrap(),
+                Value::Number(value)
+            );
+        }
+        for value in [
+            -1.0,
+            0.5,
+            253_402_300_800_000.0,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            f64::NAN,
+        ] {
+            assert_eq!(
+                eval_expression(&code, &[Value::Number(value)], &[], None)
+                    .unwrap_err()
+                    .message(),
+                "datetime-out-of-range"
+            );
+        }
+    }
+
+    fn expression_int(value: i32) -> Vec<u8> {
+        let mut code = vec![23];
+        code.extend(value.to_le_bytes());
+        code
+    }
+    fn expression_ints(left: i32, right: i32, opcode: u8) -> Vec<u8> {
+        let mut code = expression_int(left);
+        code.extend(expression_int(right));
+        code.push(opcode);
+        code
+    }
+    fn int_atomicity_module(second_default: i32, second_opcode: u8) -> Module {
+        let mut first_transition = vec![4, 0, 0];
+        first_transition.extend(expression_int(1));
+        first_transition.push(25);
+        let second_transition = vec![4, 1, 0, 3, 0, 0, second_opcode];
+        Module {
+            fingerprint: 85,
+            temporal: None,
+            schedules: None,
+            true_fors: None,
+            format_version: 2,
+            objective: None,
+            name: "int-atomicity".into(),
+            version: 1,
+            inputs: vec![Field {
+                name: "rhs".into(),
+                value_type: Type::Int,
+                default: Value::Int(0),
+            }],
+            states: vec![
+                Field {
+                    name: "first".into(),
+                    value_type: Type::Int,
+                    default: Value::Int(10),
+                },
+                Field {
+                    name: "second".into(),
+                    value_type: Type::Int,
+                    default: Value::Int(second_default),
+                },
+            ],
+            strategies: vec![Strategy {
+                result_trace_bound: 0,
+                name: "control".into(),
+                priority: 0,
+                query: vec![5, 1],
+                transitions: vec![
+                    Transition {
+                        state_index: 0,
+                        expression: first_transition,
+                    },
+                    Transition {
+                        state_index: 1,
+                        expression: second_transition,
+                    },
+                ],
+                intents: vec![Intent {
+                    name: "first".into(),
+                    value_type: Type::Int,
+                    expression: vec![5, 0, 0],
+                }],
+            }],
+            constraints: vec![],
+        }
+    }
+    #[test]
+    fn int_arithmetic_is_exact_with_signed_division_and_remainder() {
+        for (opcode, left, right, expected) in [
+            (25, 2, 3, 5),
+            (26, 2, 3, -1),
+            (27, 46_340, 46_340, 2_147_395_600),
+            (28, 7, 3, 2),
+            (28, -7, 3, -2),
+            (28, 7, -3, -2),
+            (28, -7, -3, 2),
+            (29, 7, 3, 1),
+            (29, -7, 3, -1),
+        ] {
+            let code = expression_ints(left, right, opcode);
+            assert_eq!(
+                verify_expression(&code, &[], &[], false, 2).unwrap(),
+                Type::Int
+            );
+            assert_eq!(
+                eval_expression(&code, &[], &[], None).unwrap(),
+                Value::Int(expected)
+            );
+        }
+    }
+    #[test]
+    fn int_negation_and_comparison_preserve_i32_semantics() {
+        let mut negation = expression_int(-7);
+        negation.push(24);
+        assert_eq!(
+            eval_expression(&negation, &[], &[], None).unwrap(),
+            Value::Int(7)
+        );
+        for (opcode, expected) in [(14, true), (15, true), (16, false), (17, false)] {
+            assert_eq!(
+                eval_expression(&expression_ints(-2, 1, opcode), &[], &[], None).unwrap(),
+                Value::Bool(expected)
+            );
+        }
+    }
+    #[test]
+    fn int_faults_have_stable_reasons() {
+        for (code, reason) in [
+            (expression_ints(i32::MAX, 1, 25), "integer-overflow"),
+            (expression_ints(i32::MIN, 1, 26), "integer-overflow"),
+            (expression_ints(46_341, 46_341, 27), "integer-overflow"),
+            (expression_ints(i32::MIN, -1, 28), "integer-overflow"),
+            (expression_ints(1, 0, 28), "integer-division-by-zero"),
+            (expression_ints(1, 0, 29), "integer-division-by-zero"),
+        ] {
+            assert_eq!(
+                eval_expression(&code, &[], &[], None)
+                    .unwrap_err()
+                    .message(),
+                reason
+            );
+        }
+        let mut negation = expression_int(i32::MIN);
+        negation.push(24);
+        assert_eq!(
+            eval_expression(&negation, &[], &[], None)
+                .unwrap_err()
+                .message(),
+            "integer-overflow"
+        );
+    }
+    #[test]
+    fn result_trace_is_transactional_and_reproduced_by_ghost_replay_and_rewind() {
+        let mut module = int_atomicity_module(12, 28);
+        module.format_version = 3;
+        let expression = &mut module.strategies[0].transitions[0].expression;
+        expression.extend([2]);
+        expression.extend(3_f64.to_le_bytes());
+        expression.extend([2]);
+        expression.extend(17_f64.to_le_bytes());
+        expression.extend([56]);
+        expression.extend(5_u32.to_le_bytes());
+        module.strategies[0].result_trace_bound = expression_metadata(expression).unwrap().1;
+        let mut runtime = Runtime::new(3);
+        runtime.install(module.clone(), false);
+        runtime.activate().unwrap();
+        for rhs in [3, 2] {
+            runtime.set_input("rhs", Value::Int(rhs)).unwrap();
+            let record = runtime.tick().unwrap();
+            assert_eq!(record.result_trace.len(), 1);
+            let event = &record.result_trace[0];
+            assert_eq!((event.site, event.choice, event.origin), (5, 3, 17));
+        }
+        let before: Vec<_> = runtime.journal().iter().map(TickRecord::to_json).collect();
+        runtime.set_input("rhs", Value::Int(0)).unwrap();
+        assert_eq!(
+            runtime.tick().unwrap_err().message(),
+            "integer-division-by-zero"
+        );
+        assert_eq!(
+            runtime
+                .journal()
+                .iter()
+                .map(TickRecord::to_json)
+                .collect::<Vec<_>>(),
+            before
+        );
+        let replay = runtime.replay(module, &[], 2).unwrap();
+        assert_eq!(
+            replay.iter().map(TickRecord::to_json).collect::<Vec<_>>(),
+            before
+        );
+        runtime.rewind(replay[0].tick).unwrap();
+        runtime.set_input("rhs", Value::Int(2)).unwrap();
+        assert_eq!(runtime.tick().unwrap().to_json(), before[1]);
+    }
+
+    #[test]
+    fn result_trace_enforces_derived_instruction_bound_and_preserves_payload_bits() {
+        let mut code = vec![2];
+        code.extend((-0_f64).to_le_bytes());
+        code.push(2);
+        code.extend(0_f64.to_le_bytes());
+        code.push(2);
+        code.extend(0_f64.to_le_bytes());
+        code.push(56);
+        code.extend(1_u32.to_le_bytes());
+        assert_eq!(
+            verify_expression(&code, &[], &[], false, 3).unwrap(),
+            Type::Number
+        );
+        assert_eq!(expression_metadata(&code).unwrap(), (false, 1));
+        let mut trace = ResultTraceBuffer {
+            events: Vec::new(),
+            bound: 1,
+        };
+        let Value::Number(payload) =
+            eval_expression_traced(&code, &[], &[], None, &mut trace).unwrap()
+        else {
+            panic!("Number payload");
+        };
+        assert_eq!(payload.to_bits(), (-0_f64).to_bits());
+        assert_eq!(
+            eval_expression_traced(&code, &[], &[], None, &mut trace)
+                .unwrap_err()
+                .message(),
+            "Result trace instruction bound exceeded"
+        );
+        assert_eq!(trace.events.len(), 1);
+    }
+
+    #[test]
+    fn int_overflow_rejects_tick_before_state_intent_or_journal_commit() {
+        let mut runtime = Runtime::new(4);
+        runtime.install(int_atomicity_module(i32::MAX, 25), false);
+        runtime.activate().unwrap();
+        runtime.set_input("rhs", Value::Int(0)).unwrap();
+        runtime.tick().unwrap();
+        assert_eq!(runtime.state("first"), Some(Value::Int(11)));
+        assert_eq!(runtime.intent("first"), Some(Value::Int(11)));
+        assert_eq!(runtime.journal().len(), 1);
+
+        runtime.set_input("rhs", Value::Int(1)).unwrap();
+        assert_eq!(runtime.tick().unwrap_err().message(), "integer-overflow");
+        assert_eq!(runtime.state("first"), Some(Value::Int(11)));
+        assert_eq!(runtime.intent("first"), Some(Value::Int(11)));
+        assert_eq!(runtime.journal().len(), 1);
+    }
+    #[test]
+    fn int_division_by_zero_rejects_tick_before_state_intent_or_journal_commit() {
+        let mut runtime = Runtime::new(4);
+        runtime.install(int_atomicity_module(12, 28), false);
+        runtime.activate().unwrap();
+        runtime.set_input("rhs", Value::Int(3)).unwrap();
+        runtime.tick().unwrap();
+        assert_eq!(runtime.state("first"), Some(Value::Int(11)));
+        assert_eq!(runtime.state("second"), Some(Value::Int(4)));
+
+        runtime.set_input("rhs", Value::Int(0)).unwrap();
+        assert_eq!(
+            runtime.tick().unwrap_err().message(),
+            "integer-division-by-zero"
+        );
+        assert_eq!(runtime.state("first"), Some(Value::Int(11)));
+        assert_eq!(runtime.state("second"), Some(Value::Int(4)));
+        assert_eq!(runtime.intent("first"), Some(Value::Int(11)));
+        assert_eq!(runtime.journal().len(), 1);
+    }
     fn expression_numbers(left: f64, right: f64, opcode: u8) -> Vec<u8> {
         let mut code = vec![2];
         code.extend(left.to_le_bytes());
@@ -1281,7 +3011,7 @@ mod tests {
         for (opcode, expected) in [(19, 9.0), (20, 3.0), (21, 18.0), (22, 2.0)] {
             let code = expression_numbers(6.0, 3.0, opcode);
             assert_eq!(
-                verify_expression(&code, &[], &[], false).unwrap(),
+                verify_expression(&code, &[], &[], false, 1).unwrap(),
                 Type::Number
             );
             assert_eq!(
@@ -1291,8 +3021,8 @@ mod tests {
         }
         assert!(eval_expression(&expression_numbers(1.0, 0.0, 22), &[], &[], None).is_err());
         assert!(eval_expression(&expression_numbers(f64::MAX, 2.0, 21), &[], &[], None).is_err());
-        assert!(verify_expression(&[1, 1, 1, 0, 19], &[], &[], false).is_err());
-        assert!(verify_expression(&[19], &[], &[], false).is_err());
+        assert!(verify_expression(&[1, 1, 1, 0, 19], &[], &[], false, 1).is_err());
+        assert!(verify_expression(&[19], &[], &[], false, 1).is_err());
     }
     #[test]
     fn safety_rechecks_or_after_mutex_regardless_of_source_order() {
@@ -1366,6 +3096,10 @@ mod tests {
             safe_intents: safe,
             faults: vec![],
             safety_trace: trace,
+            result_trace: Vec::new(),
+            window_trace: Vec::new(),
+            true_for_trace: Vec::new(),
+            schedule_trace: Vec::new(),
         }
         .to_json();
         assert!(encoded.contains("\"format\":\"GhostFlow/safety-trace-v1\""));
@@ -1464,10 +3198,10 @@ mod tests {
     }
     #[test]
     fn constant_query_and_bounds_are_verified() {
-        assert!(eval_query(&[5, 1], &[]).unwrap());
-        assert!(!eval_query(&[5, 0], &[]).unwrap());
-        assert!(verify_query(&[5, 2]).is_err());
-        assert!(verify_query(&[5]).is_err());
+        assert!(eval_query(&[5, 1], &[], 1).unwrap());
+        assert!(!eval_query(&[5, 0], &[], 1).unwrap());
+        assert!(verify_query(&[5, 2], 1).is_err());
+        assert!(verify_query(&[5], 1).is_err());
         assert!(Module::load(&vec![0; MAX_MODULE_BYTES + 1]).is_err());
     }
     #[test]

@@ -6,58 +6,876 @@
     {
       "id": "GF-REQ-1fb35c19c0acf544",
       "statement": "`output name: Type;`은 intent 포트의 타입만 선언하고, 각 출력 이름에는 정확히 하나의 `name <- expression;` 연결이 있어야 한다.",
-      "source": { "path": "docs/LANGUAGE-SURFACE.md", "heading": "상태, 센서, 출력", "lines": [54, 58], "sha256": "8466742d17a57e736ce132e04103afdc6cbe8ec3c542d0df002a82af94a77fa6" },
+      "source": {
+        "path": "docs/LANGUAGE-SURFACE.md",
+        "heading": "상태, 센서, 출력",
+        "lines": [
+          40,
+          44
+        ],
+        "sha256": "17714fd8cb34cc18de7d2dd24e4f7635bc3f6569abc19d71d5a85afb6869ea63"
+      },
       "layer": "language",
-      "targets": ["parser", "compiler"],
-      "testIds": ["GF-TEST-output-connection-contract"]
+      "targets": [
+        "parser",
+        "compiler"
+      ],
+      "testIds": [
+        "GF-TEST-output-connection-contract"
+      ]
     },
-    {"id":"GF-REQ-cf3758241cf74c21","statement":"출력 연결은 이번 tick에 계산할 논리 requested intent를 만들며 safety resolution은 이와 다른 safe intent를 반환할 수 있다.","source":{"path":"docs/IMPLEMENTATION.md","heading":"Executable path","lines":[38,43],"sha256":"79aa62fd3135e596ec728554bcb88962dd5fe1681037b9ec741617346f2f365b"},"layer":"runtime","targets":["core-runtime","host-adapter"],"testIds":["GF-TEST-output-intent-lowering","GF-TEST-host-virtual-output","GF-TEST-output-native-wasm-differential","GF-TEST-safety-fixed-point"],"status":"implemented"},
+    {
+      "id": "GF-REQ-cf3758241cf74c21",
+      "statement": "출력 연결은 이번 tick에 계산할 논리 requested intent를 만들며 safety resolution은 이와 다른 safe intent를 반환할 수 있다.",
+      "source": {
+        "path": "docs/IMPLEMENTATION.md",
+        "heading": "Executable path",
+        "lines": [
+          8,
+          13
+        ],
+        "sha256": "861309e84773754aeeccabb77016a1eb1c33c587cefebde697e9d1e91996c110"
+      },
+      "layer": "runtime",
+      "targets": [
+        "core-runtime",
+        "host-adapter"
+      ],
+      "testIds": [
+        "GF-TEST-output-intent-lowering",
+        "GF-TEST-host-virtual-output",
+        "GF-TEST-output-native-wasm-differential",
+        "GF-TEST-safety-fixed-point"
+      ],
+      "status": "implemented"
+    },
     {
       "id": "GF-REQ-f15eea26cae81d4c",
       "statement": "부팅·계산 실패·호스트 연결 해제 때 출력을 OFF로 유지하거나 적용을 중단하는 startup/fail-safe 정책은 VM intent와 별개로 호스트/Driver가 소유한다.",
-      "source": { "path": "docs/IMPLEMENTATION.md", "heading": "Executable path", "lines": [41, 43], "sha256": "8a0170dd7d37a55501a3696f979d3b66cc0c856a49579594ce399c1b635199e5" },
+      "source": {
+        "path": "docs/IMPLEMENTATION.md",
+        "heading": "Executable path",
+        "lines": [
+          8,
+          10
+        ],
+        "sha256": "f7a5af48cd0a6ad18fbce35a5f015912a5b8df91fc3092da9e7a4f1cfb05bcea"
+      },
       "layer": "integration-boundary",
-      "targets": ["host-adapter", "device-driver-contract"],
-      "pendingReason": "이 language export에는 host/Driver startup and disconnect policy implementation or physical evidence가 없다."
+      "targets": [
+        "host-adapter",
+        "device-driver-contract"
+      ],
+      "pendingReason": "이 language export에는 host/Driver startup and disconnect policy implementation or physical evidence가 없다.",
+      "testIds": []
     },
-    {"id":"GF-REQ-2e0b884ee0469f0b","statement":"let/with와 모든 next 정의는 고정된 old state와 같은 입력 snapshot에서 계산한다.","source":{"path":"docs/LANGUAGE.md","heading":"7. Tick과 상태 읽기","lines":[297,299],"sha256":"73b621110e40f34aef484ad432d94f07b0c0023158b67f8481f292718ce4003a"},"layer":"runtime","targets":["core-runtime","compiler"],"pendingReason":"The modern let binding and simultaneous old-state/input reads are tested; legacy with syntax is not directly exercised by this focused case.","status":"partial","testIds":["GF-TEST-snapshot-commit"]},
-    {"id":"GF-REQ-cecf67b4c23c1825","statement":"계산이 성공하면 전이가 없는 필드를 포함한 candidate state를 만들고 모든 상태를 동시에 확정한다.","source":{"path":"docs/LANGUAGE.md","heading":"7. Tick과 상태 읽기","lines":[297,303],"sha256":"8902cb715a9526ef5bc9a0d14f22e68fd115f5121b049402384b73fcf78c5e06"},"layer":"runtime","targets":["core-runtime"],"testIds":["GF-TEST-snapshot-commit"],"status":"implemented"},
-    {"id":"GF-REQ-71df1f87975319e3","statement":"intent/emit은 old state를 읽고 next는 candidate state를 읽으며, next state 참조는 intent/emit에서만 허용한다.","source":{"path":"docs/LANGUAGE.md","heading":"7. Tick과 상태 읽기","lines":[300,307],"sha256":"9ec4534ac898e1d51849189d71e3420e0029edccc0722f597e88b3b6d9f7389b"},"layer":"language","targets":["compiler","core-runtime"],"testIds":["GF-TEST-next-reference-rejection","GF-TEST-snapshot-commit"],"status":"implemented"},
-    {"id":"GF-REQ-e2ff407ca51f6c02","statement":"출력 safety 제약은 같은 후보 snapshot에서 위반을 검사하고 출력은 false로만 만들며, 변경이 없을 때까지 반복한다.","source":{"path":"docs/LANGUAGE.md","heading":"8. 출력 제약","lines":[350,360],"sha256":"c4a656559c967430aed27ae3afee9d3b19960c1756bd1ca3adb995752418fec3"},"layer":"runtime","targets":["core-runtime","compiler"],"testIds":["GF-TEST-output-constraint-lowering","GF-TEST-safety-fixed-point"],"status":"implemented"},
-    {"id":"GF-REQ-2b7f1b842e57ff81","statement":"tick 실패 시 상태와 일반 출력 결과를 부분 확정하지 않고 오류를 호스트로 반환한다.","source":{"path":"docs/LANGUAGE.md","heading":"7. Tick과 상태 읽기","lines":[313,315],"sha256":"7a7ee7fe5ecfcd64328f073fb25d58be645da0df59d1c83e14a0f375139356a0"},"layer":"runtime","targets":["core-runtime","host-adapter"],"testIds":["GF-TEST-core-output-intent-atomicity","GF-TEST-error-atomicity","GF-TEST-generated-input-error","GF-TEST-eager-if-error"],"status":"implemented"},
-    {"id":"GF-REQ-59e95c542397c456","statement":"All next expressions read the same old state and input snapshot.","source":{"path":"docs/LANGUAGE-MVP-0.1.md","heading":"Tick semantics","lines":[46,46],"sha256":"f2e7d0336219d86b60acf29adcb8965446c9c897eda0bface6c6aa317b381ed3"},"layer":"runtime","targets":["core-runtime"],"status":"implemented","testIds":["GF-TEST-snapshot-commit"]},
-    {"id":"GF-REQ-217a5d2780525865","statement":"Computed next states commit simultaneously.","source":{"path":"docs/LANGUAGE-MVP-0.1.md","heading":"Tick semantics","lines":[47,47],"sha256":"f0b69fb75d17c74a5b536f001d6631c7fcad7894c33ab57fda23f7ee41da93f7"},"layer":"runtime","targets":["core-runtime"],"status":"implemented","testIds":["GF-TEST-snapshot-commit"]},
-    {"id":"GF-REQ-d9f669f061279c41","statement":"All intent expressions read committed next state.","source":{"path":"docs/LANGUAGE-MVP-0.1.md","heading":"Tick semantics","lines":[48,48],"sha256":"2182cd53ba4dce19060051f06069ebcff2020d6d49eb46177b5c1df5b72602aa"},"layer":"runtime","targets":["core-runtime"],"status":"pending","pendingReason":"Normative conflict: this MVP statement says all intents read committed next state, while docs/LANGUAGE.md section 7 and the current GFB runtime read old state unless NEXT_STATE is explicit. GF-TEST-snapshot-commit demonstrates the current behavior. Requires a documentation/semantic decision; no behavior was changed to satisfy this row."},
-    {"id":"GF-REQ-4860010b6b6dfa68","statement":"Safety constraints transform intents into safe outputs.","source":{"path":"docs/LANGUAGE-MVP-0.1.md","heading":"Tick semantics","lines":[49,49],"sha256":"7c98b45c23d2bfc992ff31731e98477761782a709a7a564b0dd0288b5ac71b77"},"layer":"runtime","targets":["core-runtime"],"status":"implemented","testIds":["GF-TEST-safety-fixed-point"]},
-    { "id": "GF-REQ-448f61c109f75e48", "statement": "DailySlots uses local-time quarter-hour positions, rejects duplicates/off-grid slots, and emits due once per selected date/slot.", "source": { "path": "docs/LANGUAGE-SURFACE.md", "heading": "장치 적응과 시간", "lines": [86, 91], "sha256": "22deb8acd078ea1330a20ed35437ea9679eefded8911d3dc03ea7f374ee817ab" }, "layer": "runtime", "targets": ["compiler", "host-adapter"], "status": "pending", "pendingReason": "No direct conformance evidence is recorded for this row in the current language suite." },
-    { "id": "GF-REQ-c6f71bedfd03c72c", "statement": "Elapsed timers reset at committed phase changes, start at zero, and create no thread.", "source": { "path": "docs/LANGUAGE-SURFACE.md", "heading": "장치 적응과 시간", "lines": [95, 99], "sha256": "eaf1d4e459ec2709671b08054e1ff3f1dd407343e206a056954a7000e5b27d71" }, "layer": "runtime", "targets": ["core-runtime", "host-adapter"], "status": "pending", "pendingReason": "No direct conformance evidence is recorded for this row in the current language suite." },
-    {"id":"GF-REQ-df9da41f0142b58e","statement":"Canonical .ghost.md documents use CommonMark extraction and one execution model.","source":{"path":"docs/LANGUAGE-SURFACE.md","heading":"Literate는 같은 언어의 문서형 입력","lines":[224,231],"sha256":"2605293614f98ec415c192944106ea2a31996f367d616690b2c746eb7c2626b9"},"layer":"language","targets":["compiler"],"status":"implemented","testIds":["GF-TEST-literate-runtime-equivalence"]},
-    {"id":"GF-REQ-5a2ad2d23819d5a4","statement":"Arithmetic produces finite numbers; division by zero/non-finite results reject before commit.","source":{"path":"docs/BYTECODE.md","heading":"Expression opcodes","lines":[44,46],"sha256":"cfc02ebadf883b9c2d32b1940caed5d7a3c93ba67a6738cf0cb82f021eea002a"},"layer":"runtime","targets":["core-runtime"],"status":"implemented","testIds":["GF-TEST-error-atomicity","GF-TEST-eager-if-error"]},
-    {"id":"GF-REQ-d924470b3917ca00","statement":"Safety rounds apply false-only blocks from one candidate snapshot to a fixed point.","source":{"path":"docs/BYTECODE.md","heading":"Safety records and host manifest","lines":[65,66],"sha256":"53c0a5780ec8e7db7e3c5348de4bc88a8383ac8f50f47a034669fa31721fccc8"},"layer":"runtime","targets":["core-runtime"],"status":"implemented","testIds":["GF-TEST-safety-fixed-point"]},
-    {"id":"GF-REQ-53e116f1e84fc3d8","statement":"Missing generated input is a VM error, never implicit zero or false.","source":{"path":"docs/BYTECODE.md","heading":"Safety records and host manifest","lines":[77,78],"sha256":"4b335329cfe258c759ab171fb53fcf90951010ce53c8c11186181dd80dd43493"},"layer":"runtime","targets":["core-runtime","host-adapter"],"status":"implemented","testIds":["GF-TEST-generated-input-error"]},
-    {"id":"GF-REQ-9943d6ed2f383726","statement":"compileSource accepts canonical .ghost.md documents only; plain source input is rejected.","source":{"path":"docs/IMPLEMENTATION.md","heading":"Executable path","lines":[10,16],"sha256":"55d388915c6a6657ca4d522955601a0d8645fe899e3a93e2e012554488d88a52"},"layer":"compiler","targets":["compiler"],"status":"implemented","testIds":["GF-TEST-interaction-emission-policy"]},
-    { "id": "GF-REQ-40e80d00a46a48a9", "statement": "The VM does not assign startup defaults or promise hardware application.", "source": { "path": "docs/IMPLEMENTATION.md", "heading": "Executable path", "lines": [38, 43], "sha256": "79aa62fd3135e596ec728554bcb88962dd5fe1681037b9ec741617346f2f365b" }, "layer": "integration-boundary", "targets": ["core-runtime", "host-adapter"], "status": "pending", "pendingReason": "No direct conformance evidence is recorded for this row in the current language suite." },
-    { "id": "GF-REQ-75a39a471405cf23", "statement": "Native CSV/WASM parity replays the same generated snapshots but does not prove another host generates identical data.", "source": { "path": "docs/IMPLEMENTATION.md", "heading": "Limits and consumer responsibilities", "lines": [82, 83], "sha256": "950f54e547cae3e57add16f43be2dc3442831d18e716ab813280f581346bdbd5" }, "layer": "runtime", "targets": ["core-runtime", "host-adapter"], "status": "pending", "pendingReason": "No direct conformance evidence is recorded for this row in the current language suite." },
-    { "id": "GF-REQ-066155a9212cda84", "statement": "Hardware uses semantic capabilities, not board/pin/product.", "source": { "path": "docs/LANGUAGE-MVP-0.1.md", "heading": "Design invariants", "lines": [5, 5], "sha256": "e62d20a219c0839a4b07eee34706d75ce793d18ea41259c0112a1b13062711f7" }, "layer": "language", "targets": ["core-runtime"], "status": "pending", "pendingReason": "No direct conformance evidence is recorded for this row in the current language suite." },
-    { "id": "GF-REQ-6bfe4b2dc130aaac", "statement": "Every active strategy is uniquely selected from a device profile.", "source": { "path": "docs/LANGUAGE-MVP-0.1.md", "heading": "Design invariants", "lines": [9, 9], "sha256": "10d560cb24f6c40ebdea4aa8b0faa6c13bba8770b4f1932bf21628076b010c41" }, "layer": "runtime", "targets": ["core-runtime"], "status": "pending", "pendingReason": "No direct conformance evidence is recorded for this row in the current language suite." },
-    {"id":"GF-REQ-8b603fb90a738632","statement":"No strategy match is activation error; ties at winning priority are ambiguity errors.","source":{"path":"docs/LANGUAGE-MVP-0.1.md","heading":"Device-query semantics","lines":[30,33],"sha256":"4fd8782a4a3e79d81cf7858841ddb12c3eed12e46dda22a0fe082382d2177baf"},"layer":"runtime","targets":["core-runtime"],"status":"implemented","testIds":["GF-TEST-activation-error","GF-TEST-strategy-priority"]},
-    { "id": "GF-REQ-eaa0086a0c08befa", "statement": "Strategy selection is stable during a tick and profile changes activate only at a safe boundary.", "source": { "path": "docs/LANGUAGE-MVP-0.1.md", "heading": "Device-query semantics", "lines": [35, 37], "sha256": "6aeceea80afd279ba9c640d499dc10fd94442f0297b93a908e6ae9f618bc7de9" }, "layer": "runtime", "targets": ["core-runtime", "host-adapter"], "status": "pending", "pendingReason": "No direct conformance evidence is recorded for this row in the current language suite." },
-    { "id": "GF-REQ-55b15414538ec690", "statement": "The journal records inputs, state before/after, requested/safe intents, strategy, and faults.", "source": { "path": "docs/LANGUAGE-MVP-0.1.md", "heading": "Tick semantics", "lines": [50, 51], "sha256": "cc0bd25eb48f77625fdce8add52051433a49dd0f3cfadd316b4c21b3959d0ade" }, "layer": "runtime", "targets": ["core-runtime"], "status": "pending", "pendingReason": "No direct conformance evidence is recorded for this row in the current language suite." },
-    { "id": "GF-REQ-47fc921c84c0185b", "statement": "Rewind restores recorded state without executing intents and replay runs an isolated VM shadow trace.", "source": { "path": "docs/LANGUAGE-MVP-0.1.md", "heading": "Time travel and ghost execution", "lines": [58, 60], "sha256": "40ff6fc616e54a5bd3d03a56a06e2b85299ca45089d96bfece08a99080998f0f" }, "layer": "runtime", "targets": ["core-runtime"], "status": "pending", "pendingReason": "No direct conformance evidence is recorded for this row in the current language suite." },
-    { "id": "GF-REQ-5cda7721b678dad9", "statement": "hot_swap verifies/selects/migrates/commits transactionally; incompatible state types are rejected.", "source": { "path": "docs/LANGUAGE-MVP-0.1.md", "heading": "Hot replacement", "lines": [69, 73], "sha256": "71be9289ac07196ff9d93f86dc03b3a87ed3ac47f74a8b9f9d6e800ebdf6294f" }, "layer": "runtime", "targets": ["compiler", "core-runtime"], "status": "pending", "pendingReason": "No direct conformance evidence is recorded for this row in the current language suite." },
-    { "id": "GF-REQ-02a325eb0ad35d10", "statement": "Public VM operations return status and diagnostics instead of language exceptions.", "source": { "path": "docs/LANGUAGE-MVP-0.1.md", "heading": "Error model", "lines": [77, 80], "sha256": "cdc479c4608fba0f84b31e09c14917e5f748b6582de2d1d56add291a4a31fd02" }, "layer": "runtime", "targets": ["core-runtime", "host-adapter"], "status": "pending", "pendingReason": "No direct conformance evidence is recorded for this row in the current language suite." },
-    { "id": "GF-REQ-007d278a06547d87", "statement": "Sensor faults remain recorded even when a fallback value is used.", "source": { "path": "docs/LANGUAGE-SURFACE.md", "heading": "상태, 센서, 출력", "lines": [54, 58], "sha256": "8466742d17a57e736ce132e04103afdc6cbe8ec3c542d0df002a82af94a77fa6" }, "layer": "runtime", "targets": ["host-adapter"], "status": "pending", "pendingReason": "No direct conformance evidence is recorded for this row in the current language suite." },
-    { "id": "GF-REQ-70afde1c39e4c76f", "statement": "Boolean requires/mutex constraints only block outputs; they do not solve arbitrary logic.", "source": { "path": "docs/LANGUAGE-SURFACE.md", "heading": "상태, 센서, 출력", "lines": [60, 64], "sha256": "4741b2cce0bf31916f06ce02227536f63b17e994090dba7996062e288e437c82" }, "layer": "runtime", "targets": ["compiler", "core-runtime"], "status": "pending", "pendingReason": "No direct conformance evidence is recorded for this row in the current language suite." },
-    { "id": "GF-REQ-edf32186a3bf1f5b", "statement": "Sensor conditioning quality including NotReady remains in the host trace.", "source": { "path": "docs/LANGUAGE-SURFACE.md", "heading": "상태, 센서, 출력", "lines": [71, 73], "sha256": "9acaa485351d5ef373b138e835a6c40bb689226cd56d75714001efa7c426dcc1" }, "layer": "runtime", "targets": ["host-adapter", "core-runtime"], "status": "pending", "pendingReason": "No direct conformance evidence is recorded for this row in the current language suite." },
-    { "id": "GF-REQ-535d7a37e2b751f1", "statement": "adapt priority syntax is an unimplemented design sketch.", "source": { "path": "docs/LANGUAGE-SURFACE.md", "heading": "장치 적응과 시간", "lines": [77, 80], "sha256": "c9cb564bf63f3171e1d76cd4d36b591560d461c7fb5dbd498e5c2e58d390707e" }, "layer": "design-only", "targets": ["compiler"], "status": "design-only", "pendingReason": "Design-only syntax; no implementation is claimed." },
-    { "id": "GF-REQ-4007ea17c7a73fc8", "statement": "Optional check shortage is Unknown and does not block; explicit required analysis gates start.", "source": { "path": "docs/LANGUAGE-SURFACE.md", "heading": "장치 적응과 시간", "lines": [82, 85], "sha256": "7204c2281eea8b8f35da64d494e0955ff01341679177503d79bf8cda7ac363c9" }, "layer": "runtime", "targets": ["core-runtime", "host-adapter"], "status": "pending", "pendingReason": "No direct conformance evidence is recorded for this row in the current language suite." },
-    { "id": "GF-REQ-12c17ffd0ba7e841", "statement": "GFB1 envelopes carry identity, inputs, defaulted states, strategies, and safety constraints.", "source": { "path": "docs/BYTECODE.md", "heading": "Module envelope", "lines": [8, 15], "sha256": "70f030f065751c1c717c7e3aa94bbf603850e31cf6e3def2b2eb42d74d9ad8e3" }, "layer": "artifact", "targets": ["compiler", "core-runtime"], "status": "pending", "pendingReason": "No direct conformance evidence is recorded for this row in the current language suite." },
-    {"id":"GF-REQ-1558ff26e4180f53","statement":"Query bytecode is postfix and verifier checks stack/types/indices/result/limits.","source":{"path":"docs/BYTECODE.md","heading":"Query opcodes","lines":[49,58],"sha256":"edf94f0de9d31dc6c87ca37b438cc0aa099811bef1c666b19524e34b49b1b061"},"layer":"artifact","targets":["compiler","core-runtime"],"status":"partial","pendingReason":"Native/release WASM query opcode, Bool, group, result count and 128-entry stack limits are tested; the combined statement also requires a complete expression type/index/result/limit matrix.","testIds":["GF-TEST-query-verifier"]},
-    { "id": "GF-REQ-307882bc0a89434d", "statement": "Constraint records encode requires/mutex/requires-any arities and distinct Bool outputs.", "source": { "path": "docs/BYTECODE.md", "heading": "Safety records and host manifest", "lines": [62, 64], "sha256": "fe9c6e4c8a620f0bfb7e8af5af8ef12bab3e8a497d2956c5d164a842b8bfccaa" }, "layer": "artifact", "targets": ["compiler", "core-runtime"], "status": "pending", "pendingReason": "No direct conformance evidence is recorded for this row in the current language suite." },
-    {"id":"GF-REQ-7ae00fc4723a0546","statement":"Loader rejects unknown opcodes/kinds and enforces finite module/name/count/blob bounds.","source":{"path":"docs/BYTECODE.md","heading":"Safety records and host manifest","lines":[68,71],"sha256":"cd77d8b9b55c347c4574ad00bfe3b20aedb3845ce9e2aac027e1f31da1cf6425"},"layer":"artifact","targets":["core-runtime"],"status":"partial","pendingReason":"Every truncation of the identified Tiny artifact, invalid magic/version, query opcode/Bool/stack faults are tested across release targets; complete name/count/blob and constraint-kind boundaries remain open.","testIds":["GF-TEST-load-error","GF-TEST-query-verifier"]},
-    { "id": "GF-REQ-034c869e13dc1555", "statement": "Compilation writes manifest/map; bytecodeSha256 is integrity, not authentication.", "source": { "path": "docs/BYTECODE.md", "heading": "Safety records and host manifest", "lines": [73, 76], "sha256": "4bd1125159a9d2b1a69b52285ee07dad39dfa1526d341a26d0b68e8d255f2420" }, "layer": "artifact", "targets": ["compiler", "host-adapter"], "status": "pending", "pendingReason": "No direct conformance evidence is recorded for this row in the current language suite." },
-    { "id": "GF-REQ-b0e491b83849f50a", "statement": "Modern control support is bounded and unsupported syntax is rejected.", "source": { "path": "docs/IMPLEMENTATION.md", "heading": "Executable path", "lines": [23, 28], "sha256": "7054e913356ccb527b06a2d662c6616b7eaeb41f810f55bf2fe624d3e3e1bb2f" }, "layer": "compiler", "targets": ["compiler"], "status": "pending", "pendingReason": "No direct conformance evidence is recorded for this row in the current language suite." },
-    { "id": "GF-REQ-d834773f30704ad1", "statement": "Installation bindings cannot silently override executable semantics; firmware/physical behavior is consumer-owned.", "source": { "path": "docs/IMPLEMENTATION.md", "heading": "Artifacts and versions", "lines": [73, 76], "sha256": "2f74458ad9d383da1f83297335f0b67c37c964bf5ba6e06a52e883b66c5e8382" }, "layer": "integration-boundary", "targets": ["host-adapter", "module:firmware"], "status": "pending", "pendingReason": "Consumer/API/device evidence is outside this export." }
+    {
+      "id": "GF-REQ-2e0b884ee0469f0b",
+      "statement": "let/with와 모든 next 정의는 고정된 old state와 같은 입력 snapshot에서 계산한다.",
+      "source": {
+        "path": "docs/LANGUAGE.md",
+        "heading": "7. Tick과 상태 읽기",
+        "lines": [
+          295,
+          297
+        ],
+        "sha256": "e88ec213e359cf38d7a829195b390a65eb38953e65a7d8220c7fc3c4c95effea"
+      },
+      "layer": "runtime",
+      "targets": [
+        "core-runtime",
+        "compiler"
+      ],
+      "pendingReason": "The modern let binding and simultaneous old-state/input reads are tested; legacy with syntax is not directly exercised by this focused case.",
+      "status": "partial",
+      "testIds": [
+        "GF-TEST-snapshot-commit"
+      ]
+    },
+    {
+      "id": "GF-REQ-cecf67b4c23c1825",
+      "statement": "계산이 성공하면 전이가 없는 필드를 포함한 candidate state를 만들고 모든 상태를 동시에 확정한다.",
+      "source": {
+        "path": "docs/LANGUAGE.md",
+        "heading": "7. Tick과 상태 읽기",
+        "lines": [
+          295,
+          301
+        ],
+        "sha256": "fdd4a472342511f6538653b6f46b4b9b3255e6e62b0ee58393f381775d00ccdd"
+      },
+      "layer": "runtime",
+      "targets": [
+        "core-runtime"
+      ],
+      "testIds": [
+        "GF-TEST-snapshot-commit"
+      ],
+      "status": "implemented"
+    },
+    {
+      "id": "GF-REQ-71df1f87975319e3",
+      "statement": "intent/emit은 old state를 읽고 next는 candidate state를 읽으며, next state 참조는 intent/emit에서만 허용한다.",
+      "source": {
+        "path": "docs/LANGUAGE.md",
+        "heading": "7. Tick과 상태 읽기",
+        "lines": [
+          295,
+          302
+        ],
+        "sha256": "94ceafc89d0fb8085a55d6549b698704f76074a077f77bdc974c9bdb91721df6"
+      },
+      "layer": "language",
+      "targets": [
+        "compiler",
+        "core-runtime"
+      ],
+      "testIds": [
+        "GF-TEST-next-reference-rejection",
+        "GF-TEST-snapshot-commit"
+      ],
+      "status": "implemented"
+    },
+    {
+      "id": "GF-REQ-e2ff407ca51f6c02",
+      "statement": "출력 safety 제약은 같은 후보 snapshot에서 위반을 검사하고 출력은 false로만 만들며, 변경이 없을 때까지 반복한다.",
+      "source": {
+        "path": "docs/LANGUAGE.md",
+        "heading": "8. 출력 제약",
+        "lines": [
+          343,
+          353
+        ],
+        "sha256": "4b3f39ed24b758a15e1a5c9252908de38d364eb82c25819d8942899cb795d252"
+      },
+      "layer": "runtime",
+      "targets": [
+        "core-runtime",
+        "compiler"
+      ],
+      "testIds": [
+        "GF-TEST-output-constraint-lowering",
+        "GF-TEST-safety-fixed-point"
+      ],
+      "status": "implemented"
+    },
+    {
+      "id": "GF-REQ-2b7f1b842e57ff81",
+      "statement": "tick 실패 시 상태와 일반 출력 결과를 부분 확정하지 않고 오류를 호스트로 반환한다.",
+      "source": {
+        "path": "docs/LANGUAGE.md",
+        "heading": "7. Tick과 상태 읽기",
+        "lines": [
+          295,
+          297
+        ],
+        "sha256": "e88ec213e359cf38d7a829195b390a65eb38953e65a7d8220c7fc3c4c95effea"
+      },
+      "layer": "runtime",
+      "targets": [
+        "core-runtime",
+        "host-adapter"
+      ],
+      "testIds": [
+        "GF-TEST-core-output-intent-atomicity",
+        "GF-TEST-error-atomicity",
+        "GF-TEST-generated-input-error",
+        "GF-TEST-selected-if-error"
+      ],
+      "status": "implemented"
+    },
+    {
+      "id": "GF-REQ-59e95c542397c456",
+      "statement": "All next expressions read the same old state and input snapshot.",
+      "source": {
+        "path": "docs/LANGUAGE-MVP-0.1.md",
+        "heading": "Tick semantics",
+        "lines": [
+          42,
+          42
+        ],
+        "sha256": "909155acbc4e71907554e719ddf7f7747412bb401a2aaaabe3c73f6f2ae0d990"
+      },
+      "layer": "runtime",
+      "targets": [
+        "core-runtime"
+      ],
+      "status": "implemented",
+      "testIds": [
+        "GF-TEST-snapshot-commit"
+      ]
+    },
+    {
+      "id": "GF-REQ-217a5d2780525865",
+      "statement": "Computed next states commit simultaneously.",
+      "source": {
+        "path": "docs/LANGUAGE-MVP-0.1.md",
+        "heading": "Tick semantics",
+        "lines": [
+          42,
+          42
+        ],
+        "sha256": "909155acbc4e71907554e719ddf7f7747412bb401a2aaaabe3c73f6f2ae0d990"
+      },
+      "layer": "runtime",
+      "targets": [
+        "core-runtime"
+      ],
+      "status": "implemented",
+      "testIds": [
+        "GF-TEST-snapshot-commit"
+      ]
+    },
+    {
+      "id": "GF-REQ-d9f669f061279c41",
+      "statement": "All intent expressions read committed next state.",
+      "source": {
+        "path": "docs/LANGUAGE-MVP-0.1.md",
+        "heading": "Tick semantics",
+        "lines": [
+          42,
+          42
+        ],
+        "sha256": "909155acbc4e71907554e719ddf7f7747412bb401a2aaaabe3c73f6f2ae0d990"
+      },
+      "layer": "runtime",
+      "targets": [
+        "core-runtime"
+      ],
+      "status": "pending",
+      "pendingReason": "Normative conflict: this MVP statement says all intents read committed next state, while docs/LANGUAGE.md section 7 and the current GFB runtime read old state unless NEXT_STATE is explicit. GF-TEST-snapshot-commit demonstrates the current behavior. Requires a documentation/semantic decision; no behavior was changed to satisfy this row.",
+      "testIds": []
+    },
+    {
+      "id": "GF-REQ-4860010b6b6dfa68",
+      "statement": "Safety constraints transform intents into safe outputs.",
+      "source": {
+        "path": "docs/LANGUAGE-MVP-0.1.md",
+        "heading": "Tick semantics",
+        "lines": [
+          42,
+          42
+        ],
+        "sha256": "909155acbc4e71907554e719ddf7f7747412bb401a2aaaabe3c73f6f2ae0d990"
+      },
+      "layer": "runtime",
+      "targets": [
+        "core-runtime"
+      ],
+      "status": "implemented",
+      "testIds": [
+        "GF-TEST-safety-fixed-point"
+      ]
+    },
+    {
+      "id": "GF-REQ-448f61c109f75e48",
+      "statement": "DailySlots uses local-time quarter-hour positions, rejects duplicates/off-grid slots, and emits due once per selected date/slot.",
+      "source": {
+        "path": "docs/LANGUAGE-SURFACE.md",
+        "heading": "장치 적응과 시간",
+        "lines": [
+          80,
+          84
+        ],
+        "sha256": "c9cb564bf63f3171e1d76cd4d36b591560d461c7fb5dbd498e5c2e58d390707e"
+      },
+      "layer": "runtime",
+      "targets": [
+        "compiler",
+        "host-adapter"
+      ],
+      "status": "pending",
+      "pendingReason": "No direct conformance evidence is recorded for this row in the current language suite.",
+      "testIds": []
+    },
+    {
+      "id": "GF-REQ-c6f71bedfd03c72c",
+      "statement": "Elapsed timers reset at committed phase changes, start at zero, and create no thread.",
+      "source": {
+        "path": "docs/LANGUAGE-SURFACE.md",
+        "heading": "장치 적응과 시간",
+        "lines": [
+          80,
+          83
+        ],
+        "sha256": "c9cb564bf63f3171e1d76cd4d36b591560d461c7fb5dbd498e5c2e58d390707e"
+      },
+      "layer": "runtime",
+      "targets": [
+        "core-runtime",
+        "host-adapter"
+      ],
+      "status": "pending",
+      "pendingReason": "No direct conformance evidence is recorded for this row in the current language suite.",
+      "testIds": []
+    },
+    {
+      "id": "GF-REQ-df9da41f0142b58e",
+      "statement": "Canonical .ghost.md documents use CommonMark extraction and one execution model.",
+      "source": {
+        "path": "docs/LANGUAGE-SURFACE.md",
+        "heading": "Literate는 같은 언어의 문서형 입력",
+        "lines": [
+          228,
+          234
+        ],
+        "sha256": "2605293614f98ec415c192944106ea2a31996f367d616690b2c746eb7c2626b9"
+      },
+      "layer": "language",
+      "targets": [
+        "compiler"
+      ],
+      "status": "implemented",
+      "testIds": [
+        "GF-TEST-literate-runtime-equivalence"
+      ]
+    },
+    {
+      "id": "GF-REQ-5a2ad2d23819d5a4",
+      "statement": "Arithmetic produces finite numbers; division by zero/non-finite results reject before commit.",
+      "source": {
+        "path": "docs/BYTECODE.md",
+        "heading": "Expression opcodes",
+        "lines": [
+          44,
+          48
+        ],
+        "sha256": "3f3cd61a644026610359422341b388e30dfb36339b6b1c5179f1cb923df68fb3"
+      },
+      "layer": "runtime",
+      "targets": [
+        "core-runtime"
+      ],
+      "status": "implemented",
+      "testIds": [
+        "GF-TEST-error-atomicity",
+        "GF-TEST-selected-if-error"
+      ]
+    },
+    {
+      "id": "GF-REQ-d924470b3917ca00",
+      "statement": "Safety rounds apply false-only blocks from one candidate snapshot to a fixed point.",
+      "source": {
+        "path": "docs/BYTECODE.md",
+        "heading": "Safety records and host manifest",
+        "lines": [
+          200,
+          203
+        ],
+        "sha256": "880372d3758ba426290e482974f7eabf3ebf75b4f4159c131631a9c20254427b"
+      },
+      "layer": "runtime",
+      "targets": [
+        "core-runtime"
+      ],
+      "status": "implemented",
+      "testIds": [
+        "GF-TEST-safety-fixed-point"
+      ]
+    },
+    {
+      "id": "GF-REQ-53e116f1e84fc3d8",
+      "statement": "Missing generated input is a VM error, never implicit zero or false.",
+      "source": {
+        "path": "docs/BYTECODE.md",
+        "heading": "Safety records and host manifest",
+        "lines": [
+          200,
+          200
+        ],
+        "sha256": "5bb0a87473dc5357394cb0c1cc770813b53d78dd66c4cbace3ff7e2db9ffec6c"
+      },
+      "layer": "runtime",
+      "targets": [
+        "core-runtime",
+        "host-adapter"
+      ],
+      "status": "implemented",
+      "testIds": [
+        "GF-TEST-generated-input-error"
+      ]
+    },
+    {
+      "id": "GF-REQ-9943d6ed2f383726",
+      "statement": "compileSource accepts canonical .ghost.md documents only; plain source input is rejected.",
+      "source": {
+        "path": "docs/IMPLEMENTATION.md",
+        "heading": "Executable path",
+        "lines": [
+          8,
+          14
+        ],
+        "sha256": "92c67941b2a3aa2a025b01718a8fa76b93a21baf82c4269295843ca3f00696b8"
+      },
+      "layer": "compiler",
+      "targets": [
+        "compiler"
+      ],
+      "status": "implemented",
+      "testIds": [
+        "GF-TEST-interaction-emission-policy"
+      ]
+    },
+    {
+      "id": "GF-REQ-40e80d00a46a48a9",
+      "statement": "The VM does not assign startup defaults or promise hardware application.",
+      "source": {
+        "path": "docs/IMPLEMENTATION.md",
+        "heading": "Executable path",
+        "lines": [
+          8,
+          13
+        ],
+        "sha256": "861309e84773754aeeccabb77016a1eb1c33c587cefebde697e9d1e91996c110"
+      },
+      "layer": "integration-boundary",
+      "targets": [
+        "core-runtime",
+        "host-adapter"
+      ],
+      "status": "pending",
+      "pendingReason": "No direct conformance evidence is recorded for this row in the current language suite.",
+      "testIds": []
+    },
+    {
+      "id": "GF-REQ-75a39a471405cf23",
+      "statement": "Native CSV/WASM parity replays the same generated snapshots but does not prove another host generates identical data.",
+      "source": {
+        "path": "docs/IMPLEMENTATION.md",
+        "heading": "Limits and consumer responsibilities",
+        "lines": [
+          78,
+          79
+        ],
+        "sha256": "988f17dcdb9eb934346aeab946e9ae1490363aabdc611b09b8604ed9e65e0583"
+      },
+      "layer": "runtime",
+      "targets": [
+        "core-runtime",
+        "host-adapter"
+      ],
+      "status": "pending",
+      "pendingReason": "No direct conformance evidence is recorded for this row in the current language suite.",
+      "testIds": []
+    },
+    {
+      "id": "GF-REQ-066155a9212cda84",
+      "statement": "Hardware uses semantic capabilities, not board/pin/product.",
+      "source": {
+        "path": "docs/LANGUAGE-MVP-0.1.md",
+        "heading": "Design invariants",
+        "lines": [
+          3,
+          3
+        ],
+        "sha256": "2c3883116854a02532133801730a7593d26454ad9d847dc53d2b5bcf3f350e10"
+      },
+      "layer": "language",
+      "targets": [
+        "core-runtime"
+      ],
+      "status": "pending",
+      "pendingReason": "No direct conformance evidence is recorded for this row in the current language suite.",
+      "testIds": []
+    },
+    {
+      "id": "GF-REQ-6bfe4b2dc130aaac",
+      "statement": "Every active strategy is uniquely selected from a device profile.",
+      "source": {
+        "path": "docs/LANGUAGE-MVP-0.1.md",
+        "heading": "Design invariants",
+        "lines": [
+          3,
+          3
+        ],
+        "sha256": "2c3883116854a02532133801730a7593d26454ad9d847dc53d2b5bcf3f350e10"
+      },
+      "layer": "runtime",
+      "targets": [
+        "core-runtime"
+      ],
+      "status": "pending",
+      "pendingReason": "No direct conformance evidence is recorded for this row in the current language suite.",
+      "testIds": []
+    },
+    {
+      "id": "GF-REQ-8b603fb90a738632",
+      "statement": "No strategy match is activation error; ties at winning priority are ambiguity errors.",
+      "source": {
+        "path": "docs/LANGUAGE-MVP-0.1.md",
+        "heading": "Device-query semantics",
+        "lines": [
+          28,
+          31
+        ],
+        "sha256": "3dc06841aaaa52a06f7e84d8612bce010ea941a4c9f69ff84eb817c789f57390"
+      },
+      "layer": "runtime",
+      "targets": [
+        "core-runtime"
+      ],
+      "status": "implemented",
+      "testIds": [
+        "GF-TEST-activation-error",
+        "GF-TEST-strategy-priority"
+      ]
+    },
+    {
+      "id": "GF-REQ-eaa0086a0c08befa",
+      "statement": "Strategy selection is stable during a tick and profile changes activate only at a safe boundary.",
+      "source": {
+        "path": "docs/LANGUAGE-MVP-0.1.md",
+        "heading": "Device-query semantics",
+        "lines": [
+          28,
+          30
+        ],
+        "sha256": "99f66388fe75e50d17f77e224c35fbae8feb4a1b4cce4053502a6b661b2519f7"
+      },
+      "layer": "runtime",
+      "targets": [
+        "core-runtime",
+        "host-adapter"
+      ],
+      "status": "pending",
+      "pendingReason": "No direct conformance evidence is recorded for this row in the current language suite.",
+      "testIds": []
+    },
+    {
+      "id": "GF-REQ-55b15414538ec690",
+      "statement": "The journal records inputs, state before/after, requested/safe intents, strategy, and faults.",
+      "source": {
+        "path": "docs/LANGUAGE-MVP-0.1.md",
+        "heading": "Tick semantics",
+        "lines": [
+          42,
+          43
+        ],
+        "sha256": "909155acbc4e71907554e719ddf7f7747412bb401a2aaaabe3c73f6f2ae0d990"
+      },
+      "layer": "runtime",
+      "targets": [
+        "core-runtime"
+      ],
+      "status": "pending",
+      "pendingReason": "No direct conformance evidence is recorded for this row in the current language suite.",
+      "testIds": []
+    },
+    {
+      "id": "GF-REQ-47fc921c84c0185b",
+      "statement": "Rewind restores recorded state without executing intents and replay runs an isolated VM shadow trace.",
+      "source": {
+        "path": "docs/LANGUAGE-MVP-0.1.md",
+        "heading": "Time travel and ghost execution",
+        "lines": [
+          56,
+          58
+        ],
+        "sha256": "9389268b60cc640634204ba9e59b85bffb700cd7e92596e9bfccbd7644eb4599"
+      },
+      "layer": "runtime",
+      "targets": [
+        "core-runtime"
+      ],
+      "status": "pending",
+      "pendingReason": "No direct conformance evidence is recorded for this row in the current language suite.",
+      "testIds": []
+    },
+    {
+      "id": "GF-REQ-5cda7721b678dad9",
+      "statement": "hot_swap verifies/selects/migrates/commits transactionally; incompatible state types are rejected.",
+      "source": {
+        "path": "docs/LANGUAGE-MVP-0.1.md",
+        "heading": "Hot replacement",
+        "lines": [
+          67,
+          71
+        ],
+        "sha256": "67b531f3f8477b9791212c4753e38dbd7dd5dcaabb515c486f30bf19b1ed75f8"
+      },
+      "layer": "runtime",
+      "targets": [
+        "compiler",
+        "core-runtime"
+      ],
+      "status": "pending",
+      "pendingReason": "No direct conformance evidence is recorded for this row in the current language suite.",
+      "testIds": []
+    },
+    {
+      "id": "GF-REQ-02a325eb0ad35d10",
+      "statement": "Public VM operations return status and diagnostics instead of language exceptions.",
+      "source": {
+        "path": "docs/LANGUAGE-MVP-0.1.md",
+        "heading": "Error model",
+        "lines": [
+          75,
+          78
+        ],
+        "sha256": "42593fb0524bd1280ad1d46b9fa6de9be7080496aac04e12c9fb5b8d503c8781"
+      },
+      "layer": "runtime",
+      "targets": [
+        "core-runtime",
+        "host-adapter"
+      ],
+      "status": "pending",
+      "pendingReason": "No direct conformance evidence is recorded for this row in the current language suite.",
+      "testIds": []
+    },
+    {
+      "id": "GF-REQ-007d278a06547d87",
+      "statement": "Sensor faults remain recorded even when a fallback value is used.",
+      "source": {
+        "path": "docs/LANGUAGE-SURFACE.md",
+        "heading": "상태, 센서, 출력",
+        "lines": [
+          40,
+          44
+        ],
+        "sha256": "17714fd8cb34cc18de7d2dd24e4f7635bc3f6569abc19d71d5a85afb6869ea63"
+      },
+      "layer": "runtime",
+      "targets": [
+        "host-adapter"
+      ],
+      "status": "pending",
+      "pendingReason": "No direct conformance evidence is recorded for this row in the current language suite.",
+      "testIds": []
+    },
+    {
+      "id": "GF-REQ-70afde1c39e4c76f",
+      "statement": "Boolean requires/mutex constraints only block outputs; they do not solve arbitrary logic.",
+      "source": {
+        "path": "docs/LANGUAGE-SURFACE.md",
+        "heading": "상태, 센서, 출력",
+        "lines": [
+          40,
+          44
+        ],
+        "sha256": "17714fd8cb34cc18de7d2dd24e4f7635bc3f6569abc19d71d5a85afb6869ea63"
+      },
+      "layer": "runtime",
+      "targets": [
+        "compiler",
+        "core-runtime"
+      ],
+      "status": "pending",
+      "pendingReason": "No direct conformance evidence is recorded for this row in the current language suite.",
+      "testIds": []
+    },
+    {
+      "id": "GF-REQ-edf32186a3bf1f5b",
+      "statement": "Sensor conditioning quality including NotReady remains in the host trace.",
+      "source": {
+        "path": "docs/LANGUAGE-SURFACE.md",
+        "heading": "상태, 센서, 출력",
+        "lines": [
+          40,
+          41
+        ],
+        "sha256": "bba5cba2c885f230bae28cf1ee6b2027f5203ed9cd1fd5d3a2d22b839635cd70"
+      },
+      "layer": "runtime",
+      "targets": [
+        "host-adapter",
+        "core-runtime"
+      ],
+      "status": "pending",
+      "pendingReason": "No direct conformance evidence is recorded for this row in the current language suite.",
+      "testIds": []
+    },
+    {
+      "id": "GF-REQ-535d7a37e2b751f1",
+      "statement": "adapt priority syntax is an unimplemented design sketch.",
+      "source": {
+        "path": "docs/LANGUAGE-SURFACE.md",
+        "heading": "장치 적응과 시간",
+        "lines": [
+          80,
+          83
+        ],
+        "sha256": "c9cb564bf63f3171e1d76cd4d36b591560d461c7fb5dbd498e5c2e58d390707e"
+      },
+      "layer": "design-only",
+      "targets": [
+        "compiler"
+      ],
+      "status": "design-only",
+      "pendingReason": "Design-only syntax; no implementation is claimed.",
+      "testIds": []
+    },
+    {
+      "id": "GF-REQ-4007ea17c7a73fc8",
+      "statement": "Optional check shortage is Unknown and does not block; explicit required analysis gates start.",
+      "source": {
+        "path": "docs/LANGUAGE-SURFACE.md",
+        "heading": "장치 적응과 시간",
+        "lines": [
+          80,
+          83
+        ],
+        "sha256": "c9cb564bf63f3171e1d76cd4d36b591560d461c7fb5dbd498e5c2e58d390707e"
+      },
+      "layer": "runtime",
+      "targets": [
+        "core-runtime",
+        "host-adapter"
+      ],
+      "status": "pending",
+      "pendingReason": "No direct conformance evidence is recorded for this row in the current language suite.",
+      "testIds": []
+    },
+    {
+      "id": "GF-REQ-12c17ffd0ba7e841",
+      "statement": "GFB1 envelopes carry identity, inputs, defaulted states, strategies, and safety constraints.",
+      "source": {
+        "path": "docs/BYTECODE.md",
+        "heading": "Module envelope and format decision",
+        "lines": [
+          8,
+          15
+        ],
+        "sha256": "8dc260c1693c00e06ccbedf8f04d3e421851287e78adff7c2cf30e4b5ed7c174"
+      },
+      "layer": "artifact",
+      "targets": [
+        "compiler",
+        "core-runtime"
+      ],
+      "status": "pending",
+      "pendingReason": "No direct conformance evidence is recorded for this row in the current language suite.",
+      "testIds": []
+    },
+    {
+      "id": "GF-REQ-1558ff26e4180f53",
+      "statement": "Query bytecode is postfix and verifier checks stack/types/indices/result/limits.",
+      "source": {
+        "path": "docs/BYTECODE.md",
+        "heading": "Query opcodes",
+        "lines": [
+          186,
+          196
+        ],
+        "sha256": "5d064d9b4ca10fc1b97bcda7c990bcff68489321017821957f168f15a77c5efb"
+      },
+      "layer": "artifact",
+      "targets": [
+        "compiler",
+        "core-runtime"
+      ],
+      "status": "partial",
+      "pendingReason": "Native/release WASM query opcode, Bool, group, result count and 128-entry stack limits are tested; the combined statement also requires a complete expression type/index/result/limit matrix.",
+      "testIds": [
+        "GF-TEST-query-verifier"
+      ]
+    },
+    {
+      "id": "GF-REQ-307882bc0a89434d",
+      "statement": "Constraint records encode requires/mutex/requires-any arities and distinct Bool outputs.",
+      "source": {
+        "path": "docs/BYTECODE.md",
+        "heading": "Safety records and host manifest",
+        "lines": [
+          200,
+          202
+        ],
+        "sha256": "bf6e287dba00081dfafeb4e1c8f2ac832fbb9b18c6ba8159701978f97a70a32b"
+      },
+      "layer": "artifact",
+      "targets": [
+        "compiler",
+        "core-runtime"
+      ],
+      "status": "pending",
+      "pendingReason": "No direct conformance evidence is recorded for this row in the current language suite.",
+      "testIds": []
+    },
+    {
+      "id": "GF-REQ-7ae00fc4723a0546",
+      "statement": "Loader rejects unknown opcodes/kinds and enforces finite module/name/count/blob bounds.",
+      "source": {
+        "path": "docs/BYTECODE.md",
+        "heading": "Safety records and host manifest",
+        "lines": [
+          200,
+          204
+        ],
+        "sha256": "38905a13f131769b7f6d39145d50b0af88998fe75b3da1ade3e4db08a4d9734c"
+      },
+      "layer": "artifact",
+      "targets": [
+        "core-runtime"
+      ],
+      "status": "partial",
+      "pendingReason": "Every truncation of the identified Tiny artifact, invalid magic/version, query opcode/Bool/stack faults are tested across release targets; complete name/count/blob and constraint-kind boundaries remain open.",
+      "testIds": [
+        "GF-TEST-load-error",
+        "GF-TEST-query-verifier"
+      ]
+    },
+    {
+      "id": "GF-REQ-034c869e13dc1555",
+      "statement": "Compilation writes manifest/map; bytecodeSha256 is integrity, not authentication.",
+      "source": {
+        "path": "docs/BYTECODE.md",
+        "heading": "Safety records and host manifest",
+        "lines": [
+          200,
+          206
+        ],
+        "sha256": "a6d2bd71d672ce1cf9413a204c025578aa4f65335901bba1e1a62732a55235af"
+      },
+      "layer": "artifact",
+      "targets": [
+        "compiler",
+        "host-adapter"
+      ],
+      "status": "pending",
+      "pendingReason": "No direct conformance evidence is recorded for this row in the current language suite.",
+      "testIds": []
+    },
+    {
+      "id": "GF-REQ-b0e491b83849f50a",
+      "statement": "Modern control support is bounded and unsupported syntax is rejected.",
+      "source": {
+        "path": "docs/IMPLEMENTATION.md",
+        "heading": "Executable path",
+        "lines": [
+          8,
+          13
+        ],
+        "sha256": "861309e84773754aeeccabb77016a1eb1c33c587cefebde697e9d1e91996c110"
+      },
+      "layer": "compiler",
+      "targets": [
+        "compiler"
+      ],
+      "status": "pending",
+      "pendingReason": "No direct conformance evidence is recorded for this row in the current language suite.",
+      "testIds": []
+    },
+    {
+      "id": "GF-REQ-d834773f30704ad1",
+      "statement": "Installation bindings cannot silently override executable semantics; firmware/physical behavior is consumer-owned.",
+      "source": {
+        "path": "docs/IMPLEMENTATION.md",
+        "heading": "Artifacts and versions",
+        "lines": [
+          45,
+          48
+        ],
+        "sha256": "3ec6524fc323397e8db764d16caff93481662ad2987d87521bf43c13744a0161"
+      },
+      "layer": "integration-boundary",
+      "targets": [
+        "host-adapter",
+        "module:firmware"
+      ],
+      "status": "pending",
+      "pendingReason": "Consumer/API/device evidence is outside this export.",
+      "testIds": []
+    }
   ],
   "tests": [
     {
@@ -67,8 +885,8 @@
         "path": "tests/control.test.mjs",
         "heading": "control OutputInitializer {",
         "lines": [
-          275,
-          293
+          277,
+          295
         ],
         "sha256": "80f6a330dec6957edfbb4712c37ec4ed95252b4adbd305ef6d7f2c1cb9eb9e71"
       },
@@ -84,7 +902,7 @@
           163,
           167
         ],
-        "sha256": "f9cd7a1bb89ba93be546565427cf0bb5e4b13980c5085c3fb96df854ee9a4de3"
+        "sha256": "d0ee91eef9cafc2172e05c599f161df432007eaddaf5301ea47d2b89429af388"
       },
       "selector": "sensor control declares typed outputs and lowers their connections"
     },
@@ -98,7 +916,7 @@
           244,
           263
         ],
-        "sha256": "6b8be777c1368aec00965bf621e275ce3c512ac53d5863825d79a275b932e7b2"
+        "sha256": "4f9ac92548a683b00467e4e052101ce17bd2fe1384d7579c74961f25c9f6cf99"
       },
       "selector": "virtual host observes a safe output from a compiled control"
     },
@@ -109,8 +927,8 @@
         "path": "tests/control.test.mjs",
         "heading": "control NextOutsideOutput {",
         "lines": [
-          332,
-          338
+          334,
+          340
         ],
         "sha256": "db94d45e6331faf2728e09b8ffcbe390e8ed2967540cd226121a2154f66c5611"
       },
@@ -135,12 +953,12 @@
       "file": "crates/ghostflow-core/src/lib.rs",
       "locator": {
         "path": "crates/ghostflow-core/src/lib.rs",
-        "heading": "fn output_intents_exist_only_after_a_successful_tick_and_reset_at_hot_swap()",
+        "heading": "fn monotonic_input_failure_is_atomic()",
         "lines": [
-          1517,
-          1555
+          3292,
+          3315
         ],
-        "sha256": "fad904bbab62b4ed435e7fcfda4abd5daec22b69c457aefe4b036415f1430731"
+        "sha256": "a2c0da526c428f08ab28088580ce6d8216cc5bd076b6a95a93570b54add5b7b1"
       },
       "selector": "core leaves intent absent before first successful tick, preserves it across failed ticks, and clears it at hot swap"
     },
@@ -255,15 +1073,18 @@
       "selector": "GF-TEST-query-verifier: exact postfix errors and stack maximum across release targets"
     },
     {
-      "id": "GF-TEST-eager-if-error",
+      "id": "GF-TEST-selected-if-error",
       "file": "tests/runtime-conformance.test.mjs",
       "locator": {
         "path": "tests/runtime-conformance.test.mjs",
-        "heading": "test('GF-TEST-eager-if-error: unselected arithmetic branch still rejects without commit', async t => {",
-        "lines": [218,227],
-        "sha256": "7feed8f5ae73b107ace0d1d08d9d5f32b54d8f53d7d4476e7695d5d23fe4be37"
+        "heading": "test('GF-TEST-selected-if-error: selected arithmetic fault rejects without partial commit', async t => {",
+        "lines": [
+          231,
+          240
+        ],
+        "sha256": "9d477b522e43c562b05c24412966bf5f15a81a13b0e59c76f18b87e5061ea869"
       },
-      "selector": "GF-TEST-eager-if-error: unselected arithmetic branch still rejects without commit"
+      "selector": "GF-TEST-selected-if-error: selected arithmetic fault rejects without partial commit"
     },
     {
       "id": "GF-TEST-strategy-priority",
@@ -271,7 +1092,10 @@
       "locator": {
         "path": "tests/runtime-conformance.test.mjs",
         "heading": "test('GF-TEST-strategy-priority: only ties at the winning priority prevent activation', async t => {",
-        "lines": [229,237],
+        "lines": [
+          242,
+          250
+        ],
         "sha256": "ef318f93e8fb982b21ade82cdac612409ae5353d57230803d8f8844fe28fc0ee"
       },
       "selector": "GF-TEST-strategy-priority: only ties at the winning priority prevent activation"

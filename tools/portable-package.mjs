@@ -1,5 +1,10 @@
 import { canonicalJson } from './canonical-json.mjs';
-import { sourceMapRequiresTraceMetadata, verifySourceTraceMetadata } from './source-trace.mjs';
+import { canonicalUnitFor, isQuantityType } from './quantities.mjs';
+import { isTimeType, validateTimeValue } from './time-literals.mjs';
+import { compileControl } from './control.mjs';
+import { extractLiterate } from './literate.mjs';
+import { equalBytes } from './sha256.mjs';
+import { remapSourceTrace, sourceMapRequiresTraceMetadata, verifySourceTraceMetadata } from './source-trace.mjs';
 
 const UTF8 = new TextEncoder();
 const UTF8_FATAL = new TextDecoder('utf-8', { fatal: true });
@@ -173,10 +178,78 @@ function capabilityKey(capability) {
 }
 
 function manifestCapabilityType(type, path) {
-  if (!['Bool', 'Number', 'Percent', 'Duration'].includes(type)) {
+  if (!['Bool', 'Number', 'Percent', 'Duration', 'Int'].includes(type) && !isTimeType(type) && !isQuantityType(type)) {
     fail('manifest-mismatch', `${path} is unsupported`);
   }
-  return type === 'Bool' ? 'bool' : 'number';
+  return type === 'Bool' ? 'bool' : type === 'Int' ? 'int' : 'number';
+}
+
+function manifestIntConfig(config, path) {
+  if (config.type !== 'Int') return;
+  const requireInt = (value, field) => {
+    if (!Number.isInteger(value) || value < -2147483648 || value > 2147483647) {
+      fail('manifest-mismatch', `${path}.${field} must be a signed i32 Int`);
+    }
+  };
+  requireInt(config.value, 'value');
+  if (!Object.hasOwn(config, 'settings')) return;
+  const settings = config.settings;
+  if (!isPlainObject(settings)) fail('manifest-mismatch', `${path}.settings must be an object`);
+  const allowed = new Set(['min', 'max', 'step', 'access', 'apply', 'label']);
+  for (const field of Object.keys(settings)) if (!allowed.has(field)) fail('manifest-mismatch', `${path}.settings.${field} is forbidden`);
+  for (const field of ['min', 'max', 'step']) requireInt(settings[field], `settings.${field}`);
+  if (!['operator', 'designer'].includes(settings.access)) fail('manifest-mismatch', `${path}.settings.access must be operator or designer`);
+  if (settings.apply !== undefined && settings.apply !== 'stopped') fail('manifest-mismatch', `${path}.settings.apply must be stopped`);
+  if (settings.label !== undefined && (typeof settings.label !== 'string' || settings.label.length < 1 || settings.label.length > 128)) {
+    fail('manifest-mismatch', `${path}.settings.label must be a string of 1 to 128 characters`);
+  }
+  if (settings.step <= 0 || settings.min > settings.max || config.value < settings.min || config.value > settings.max
+      || (config.value - settings.min) % settings.step !== 0 || (settings.max - settings.min) % settings.step !== 0) {
+    fail('manifest-mismatch', `${path}.settings range or grid is invalid for Int`);
+  }
+}
+
+function manifestTimeConfig(config, path) {
+  if (!isTimeType(config.type)) return;
+  try { validateTimeValue(config.type, config.value, `${path}.value`); }
+  catch (cause) { fail('manifest-mismatch', cause.message); }
+  if (!Object.hasOwn(config, 'settings')) return;
+  const allowedConfig = new Set(['name', 'type', 'value', 'settings', 'initialOffset', 'initialEndOffset']);
+  for (const field of Object.keys(config)) if (!allowedConfig.has(field)) fail('manifest-mismatch', `${path}.${field} is forbidden`);
+  const settings = config.settings;
+  if (!isPlainObject(settings)) fail('manifest-mismatch', `${path}.settings must be an object`);
+  const allowedSettings = new Set(['min', 'max', 'step', 'stepType', 'access', 'apply', 'label']);
+  for (const field of Object.keys(settings)) if (!allowedSettings.has(field)) fail('manifest-mismatch', `${path}.settings.${field} is forbidden`);
+  for (const field of ['min', 'max', 'step', 'stepType', 'access']) {
+    if (!Object.hasOwn(settings, field)) fail('manifest-mismatch', `${path}.settings.${field} is required`);
+  }
+  try {
+    validateTimeValue(config.type, settings.min, `${path}.settings.min`);
+    validateTimeValue(config.type, settings.max, `${path}.settings.max`);
+  } catch (cause) { fail('manifest-mismatch', cause.message); }
+  const date = config.type === 'Date';
+  const maxStep = date ? 2_147_483_647 : Number.MAX_SAFE_INTEGER;
+  if (!Number.isInteger(settings.step) || settings.step <= 0 || settings.step > maxStep) fail('manifest-mismatch', `${path}.settings.step must be a positive ${date ? 'Int' : 'Duration'}`);
+  if (settings.stepType !== (date ? 'Int' : 'Duration')) fail('manifest-mismatch', `${path}.settings.stepType must be ${date ? 'Int' : 'Duration'}`);
+  if (settings.min > settings.max || config.value < settings.min || config.value > settings.max
+      || (config.value - settings.min) % settings.step !== 0 || (settings.max - settings.min) % settings.step !== 0) {
+    fail('manifest-mismatch', `${path} time settings range or grid is invalid`);
+  }
+}
+
+function manifestCanonicalUnit(descriptor, path) {
+  const hasUnit = Object.hasOwn(descriptor, 'canonicalUnit');
+  if (isQuantityType(descriptor.type)) {
+    const expected = canonicalUnitFor(descriptor.type);
+    if (!hasUnit || descriptor.canonicalUnit !== expected) fail('manifest-mismatch', `${path}.canonicalUnit must be ${expected}`);
+  } else if (hasUnit) fail('manifest-mismatch', `${path}.canonicalUnit is forbidden for non-quantity type ${descriptor.type}`);
+}
+
+function manifestDisplayUnit(config, path) {
+  const hasDisplayUnit = Object.hasOwn(config, 'displayUnit');
+  if (config.type === 'Temperature' && Object.hasOwn(config, 'settings')) {
+    if (!hasDisplayUnit || (config.displayUnit !== '°C' && config.displayUnit !== 'K')) fail('manifest-mismatch', `${path}.displayUnit must be explicitly °C or K`);
+  } else if (hasDisplayUnit) fail('manifest-mismatch', `${path}.displayUnit is forbidden without Temperature settings`);
 }
 
 function compareText(left, right) {
@@ -194,8 +267,8 @@ function normalizeCapabilities(value, path, { requireSorted = false } = {}) {
       name: identifier(capability.name, `${path}[${index}].name`),
       type: capability.type,
     };
-    if (result.type !== 'bool' && result.type !== 'number') {
-      fail('invalid-capabilities', `${path}[${index}].type must be bool or number`);
+    if (!['bool', 'number', 'int'].includes(result.type)) {
+      fail('invalid-capabilities', `${path}[${index}].type must be bool, number or int`);
     }
     return result;
   });
@@ -223,7 +296,9 @@ function validateGfb1(bytes) {
   if (bytes.byteLength < 6 || bytes[0] !== 0x47 || bytes[1] !== 0x46 || bytes[2] !== 0x42 || bytes[3] !== 0x31) {
     fail('invalid-bytecode-format', 'bytecode is not GFB1');
   }
-  if (bytes[4] !== 1 || bytes[5] !== 0) fail('unsupported-bytecode-version', 'only GFB1 format version 1 is supported');
+  const version = bytes[4] | (bytes[5] << 8);
+  if (![1, 2, 3, 4].includes(version)) fail('unsupported-bytecode-version', 'supported GFB format versions are 1, 2, 3 and 4');
+  return String(version);
 }
 
 function sourceMapEnvelope(compilation) {
@@ -271,7 +346,7 @@ export async function buildPortablePackage(compilation, identityValue, { signers
   const sourceSha256 = await checkedDigest(sourceBytes, document.sha256, 'compilation.sourceDocument.sha256');
 
   const gfbBytes = bytesValue(compilation.bytes, 'compilation.bytes');
-  validateGfb1(gfbBytes);
+  const bytecodeVersion = validateGfb1(gfbBytes);
   const bytecodeSha256 = await checkedDigest(gfbBytes);
   if (!isPlainObject(compilation.manifest)) fail('missing-manifest', 'portable packages require a control manifest');
   if (compilation.manifest.bytecodeSha256 !== bytecodeSha256) fail('digest-mismatch', 'manifest bytecodeSha256 does not match GFB1');
@@ -323,7 +398,7 @@ export async function buildPortablePackage(compilation, identityValue, { signers
     },
     bytecode: {
       format: 'GFB1',
-      version: '1',
+      version: bytecodeVersion,
       sha256: bytecodeSha256,
       contentBase64: encodeBase64(gfbBytes),
     },
@@ -436,7 +511,7 @@ function validateEmbeddedArtifacts(payload) {
 
   exactObject(payload.bytecode, ['format', 'version', 'sha256', 'contentBase64'], 'payload.bytecode');
   if (payload.bytecode.format !== 'GFB1') fail('invalid-bytecode-format', 'payload bytecode format must be GFB1');
-  if (payload.bytecode.version !== '1') fail('unsupported-bytecode-version', 'payload bytecode version must be 1');
+  if (!['1', '2', '3', '4'].includes(payload.bytecode.version)) fail('unsupported-bytecode-version', 'payload bytecode version must be 1, 2, 3 or 4');
   digestValue(payload.bytecode.sha256, 'payload.bytecode.sha256');
 
   exactObject(payload.manifest, ['format', 'sha256', 'contentBase64'], 'payload.manifest');
@@ -501,13 +576,16 @@ export async function verifyPortablePackage(packageValue, options = {}) {
   if (bytecodeSha256 !== packageValue.payload.bytecode.sha256) fail('bytecode-digest-mismatch', 'GFB1 SHA-256 does not match content');
   if (manifestSha256 !== packageValue.payload.manifest.sha256) fail('manifest-digest-mismatch', 'manifest SHA-256 does not match content');
   if (sourceMapSha256 !== packageValue.payload.sourceMap.sha256) fail('source-map-digest-mismatch', 'source map SHA-256 does not match content');
-  validateGfb1(artifacts.bytecode);
+  if (validateGfb1(artifacts.bytecode) !== packageValue.payload.bytecode.version) {
+    fail('bytecode-version-mismatch', 'payload bytecode version does not match its GFB header');
+  }
 
   const sourceText = decodeUtf8(artifacts.sourceBytes, 'source');
   const manifest = parseCanonicalJson(artifacts.manifestBytes, 'manifest');
   const sourceMap = parseCanonicalJson(artifacts.sourceMapBytes, 'sourceMap');
   exactObject(manifest, ['format', 'name', 'inputs', 'outputs', 'sensors', 'schedules', 'timers', 'signals', 'configs', 'bytecodeSha256'], 'manifest');
   if (manifest.format !== packageValue.payload.manifest.format) fail('manifest-mismatch', 'manifest format does not match descriptor');
+  if (packageValue.payload.bytecode.version === '4' && manifest.format !== 'GhostFlow/control-v4') fail('manifest-mismatch', 'GFB format 4 requires a control-v4 manifest');
   ghostName(manifest.name, 'manifest.name');
   if (manifest.bytecodeSha256 !== bytecodeSha256) fail('manifest-mismatch', 'manifest bytecodeSha256 does not match GFB1');
   for (const field of ['inputs', 'outputs', 'sensors', 'schedules', 'timers', 'signals', 'configs']) {
@@ -516,9 +594,12 @@ export async function verifyPortablePackage(packageValue, options = {}) {
   const manifestPorts = new Map();
   for (const field of ['inputs', 'outputs']) {
     for (const [index, port] of manifest[field].entries()) {
-      exactObject(port, ['name', 'type'], `manifest.${field}[${index}]`);
+      const portPath = `manifest.${field}[${index}]`;
+      if (!isPlainObject(port)) fail('manifest-mismatch', `${portPath} must be an object`);
+      exactObject(port, isQuantityType(port.type) ? ['name', 'type', 'canonicalUnit'] : ['name', 'type'], portPath);
       const name = ghostName(port.name, `manifest.${field}[${index}].name`);
       manifestCapabilityType(port.type, `manifest.${field}[${index}].type`);
+      manifestCanonicalUnit(port, portPath);
       const key = `${field}\u0000${name}`;
       if (manifestPorts.has(key)) fail('manifest-mismatch', `duplicate manifest ${field} ${name}`);
       manifestPorts.set(key, port.type);
@@ -536,11 +617,57 @@ export async function verifyPortablePackage(packageValue, options = {}) {
       type: manifestCapabilityType(output.type, `manifest.outputs[${index}].type`),
     })),
   ]);
+  const generatedNames = new Set(manifest.inputs.map(input => input.name));
+  const addGenerated = (value, expected, path, { shared = false } = {}) => {
+    if (typeof value !== 'string' || value !== expected) fail('manifest-mismatch', `${path} must be ${expected}`);
+    if (!shared && generatedNames.has(value)) fail('manifest-mismatch', `${path} collides with another input binding`);
+    generatedNames.add(value);
+  };
   for (const [index, sensor] of manifest.sensors.entries()) {
     if (!isPlainObject(sensor)) fail('manifest-mismatch', `manifest.sensors[${index}] must be an object`);
     const name = ghostName(sensor.name, `manifest.sensors[${index}].name`);
     const type = manifestCapabilityType(sensor.type, `manifest.sensors[${index}].type`);
+    manifestCanonicalUnit(sensor, `manifest.sensors[${index}]`);
+    addGenerated(sensor.valueInput, `__gf_sensor_value_${name}`, `manifest.sensors[${index}].valueInput`);
+    addGenerated(sensor.okInput, `__gf_sensor_ok_${name}`, `manifest.sensors[${index}].okInput`);
+    addGenerated(sensor.faultInput, `__gf_sensor_fault_${name}`, `manifest.sensors[${index}].faultInput`);
+    const sampleFields = ['samplePresentInput', 'sampleEpochInput', 'sampleIdInput', 'sampleTimestampInput'];
+    if (sampleFields.some(field => Object.hasOwn(sensor, field))) {
+      for (const [position, suffix] of ['present', 'epoch', 'id', 'timestamp'].entries()) {
+        const field = sampleFields[position];
+        addGenerated(sensor[field], `__gf_sensor_sample_${suffix}_${name}`, `manifest.sensors[${index}].${field}`);
+      }
+    }
     if (sensor.optional !== true) expectedCapabilities.add(capabilityKey({ kind: 'sensor', name, type }));
+  }
+  for (const [index, signal] of manifest.signals.entries()) {
+    if (!isPlainObject(signal)) fail('manifest-mismatch', `manifest.signals[${index}] must be an object`);
+    const name = ghostName(signal.name, `manifest.signals[${index}].name`);
+    if (signal.kind === 'debounce' || signal.kind === 'hold-last' || signal.kind === 'window') {
+      addGenerated(signal.clockInput, '__gf_now_ms', `manifest.signals[${index}].clockInput`, { shared: true });
+      if (signal.kind === 'window') addGenerated(signal.timeEpochInput, '__gf_time_epoch', `manifest.signals[${index}].timeEpochInput`, { shared: true });
+      continue;
+    }
+    addGenerated(signal.valueInput, `__gf_signal_value_${name}`, `manifest.signals[${index}].valueInput`);
+    addGenerated(signal.okInput, `__gf_signal_ok_${name}`, `manifest.signals[${index}].okInput`);
+    addGenerated(signal.faultInput, `__gf_signal_fault_${name}`, `manifest.signals[${index}].faultInput`);
+  }
+  for (const [index, schedule] of manifest.schedules.entries()) {
+    if (!isPlainObject(schedule)) fail('manifest-mismatch', `manifest.schedules[${index}] must be an object`);
+    const name = ghostName(schedule.name, `manifest.schedules[${index}].name`);
+    addGenerated(schedule.dueInput, `__gf_schedule_due_${name}`, `manifest.schedules[${index}].dueInput`);
+  }
+  for (const [index, timer] of manifest.timers.entries()) {
+    if (!isPlainObject(timer)) fail('manifest-mismatch', `manifest.timers[${index}] must be an object`);
+    addGenerated(timer.clockInput, '__gf_now_ms', `manifest.timers[${index}].clockInput`, { shared: true });
+  }
+  for (const [index, config] of manifest.configs.entries()) {
+    if (!isPlainObject(config)) fail('manifest-mismatch', `manifest.configs[${index}] must be an object`);
+    manifestCapabilityType(config.type, `manifest.configs[${index}].type`);
+    manifestCanonicalUnit(config, `manifest.configs[${index}]`);
+    manifestDisplayUnit(config, `manifest.configs[${index}]`);
+    manifestIntConfig(config, `manifest.configs[${index}]`);
+    manifestTimeConfig(config, `manifest.configs[${index}]`);
   }
 
   exactObject(sourceMap, ['format', 'bytecodeSha256', 'sourceDocument', 'nodes', 'lines', 'traceMetadata'], 'sourceMap');
@@ -560,15 +687,74 @@ export async function verifyPortablePackage(packageValue, options = {}) {
     fail('source-map-mismatch', 'source map nodes/lines have an unsupported shape');
   }
   try {
+    const extraction = extractLiterate(sourceText, { filename: mappedDocument.filename });
+    const replay = compileControl(extraction.code, { filename: mappedDocument.filename });
+    if (!equalBytes(replay.bytes, artifacts.bytecode)) throw new Error('canonical source does not reproduce package bytecode');
+    const intConfigs = entries => entries.filter(entry => entry.type === 'Int');
+    if (canonicalJson(intConfigs(manifest.configs)) !== canonicalJson(intConfigs(replay.manifest.configs))) {
+      throw new Error('Int configs do not match canonical source lowering');
+    }
+    for (const kind of ['debounce', 'hold-last', 'window']) {
+      const descriptors = entries => entries.filter(entry => entry.kind === kind);
+      if (canonicalJson(descriptors(manifest.signals)) !== canonicalJson(descriptors(replay.manifest.signals))) {
+        throw new Error(`${kind} descriptors do not match canonical source lowering`);
+      }
+    }
+    const windowSources = new Set(replay.manifest.signals
+      .filter(signal => signal.kind === 'window')
+      .flatMap(signal => signal.sources.map(source => source.name)));
+    if (windowSources.size) {
+      const sensors = entries => entries.filter(sensor => windowSources.has(sensor.name));
+      if (canonicalJson(sensors(manifest.sensors)) !== canonicalJson(sensors(replay.manifest.sensors))) {
+        throw new Error('window source sensors do not match canonical source lowering');
+      }
+    }
+    const sampleBindings = entries => entries.map(entry => ({
+      name: entry.name,
+      ...Object.fromEntries(['samplePresentInput', 'sampleEpochInput', 'sampleIdInput', 'sampleTimestampInput']
+        .filter(field => Object.hasOwn(entry, field)).map(field => [field, entry[field]])),
+    })).filter(entry => Object.keys(entry).length > 1);
+    if (canonicalJson(sampleBindings(manifest.sensors)) !== canonicalJson(sampleBindings(replay.manifest.sensors))) {
+      throw new Error('debounce sample bindings do not match canonical source lowering');
+    }
     if (sourceMap.traceMetadata === null) {
-      if (sourceMapRequiresTraceMetadata(sourceMap.nodes)) throw new Error('trace metadata is required for this source map');
+      if (sourceMapRequiresTraceMetadata(replay.sourceMap) || replay.traceMetadata.resultSites.length) throw new Error('trace metadata is required for this source map');
     } else {
+      const continuousTimerNames = new Set(manifest.timers
+        .filter(timer => timer?.mode === 'continuous-true')
+        .map(timer => timer.name));
+      let expectedTimerDependencies;
+      let expectedResultSites;
+      let expectedSignalBindings;
+      let expectedSignalDependencies;
+      let expectedWindowSites;
+      let expectedWindowDependencies;
+      {
+        if (continuousTimerNames.size) expectedTimerDependencies = replay.traceMetadata.dependencies.filter(entry => (
+          entry.target.field === 'timerValue' && continuousTimerNames.has(entry.target.name)
+        ));
+        const mappedTrace = remapSourceTrace(replay.traceMetadata, extraction.sourceMap);
+        expectedResultSites = mappedTrace.resultSites;
+        expectedSignalBindings = mappedTrace.bindings.filter(entry => entry.kind === 'signal');
+        const signalStates = new Set(expectedSignalBindings.map(entry => entry.name));
+        expectedSignalDependencies = mappedTrace.dependencies.filter(entry => entry.target.field === 'stateAfter' && signalStates.has(entry.target.name));
+        expectedWindowSites = mappedTrace.windowSites;
+        expectedWindowDependencies = mappedTrace.dependencies.filter(entry => entry.target.field === 'windowTrace'
+          || entry.reads.some(read => read.field === 'windowTrace'));
+      }
       verifySourceTraceMetadata(sourceMap.traceMetadata, artifacts.bytecode, sourceMap.nodes, {
         sourceDocumentSha256: sourceSha256,
         bytecodeSha256,
         requireRevisionIdentity: true,
         sourceDocument: mappedDocument,
         extractionMap: sourceMap.lines,
+        timerDescriptors: manifest.timers,
+        expectedTimerDependencies,
+        expectedResultSites,
+        expectedSignalBindings,
+        expectedSignalDependencies,
+        expectedWindowSites,
+        expectedWindowDependencies,
       });
     }
   } catch (error) {
