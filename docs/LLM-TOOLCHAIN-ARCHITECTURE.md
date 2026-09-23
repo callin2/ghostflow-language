@@ -240,13 +240,14 @@ The physical path has additional responsibilities defined by
 
 ```plantuml
 @startuml
-title Physical scan: ownership contract, not CLI hardware verification
+title Physical scan: Device ownership and current firmware failure handling
 database "Approved profile + installation bindings" as Profile
 participant "Device scan host / clock" as Host
 participant "Sensor / input driver" as Input
 participant "ScanDriver + Rust Runtime" as Core
 participant "Physical output driver" as Output
 participant "Relay / load" as Load
+participant "Host observation stream" as Evidence
 participant "Independent observation" as Observer
 Profile -> Host: endpoint types, polarity, address, mapping and identities
 Host -> Core: install artifact; activate supported capabilities
@@ -256,17 +257,35 @@ Host -> Host: latch snapshot; assign scan ID and logical time
 Host -> Core: complete scan frame
 alt frame rejected or runtime evaluation error
   Core --> Host: error (no successful scan result)
-  note over Host,Output: Device owns failure output handling; no default policy inferred here.
+  Host -> Host: halt adapter; running=false; fault recorded
+  Host -> Output: attempt OFF mask (firmware error path)
+  Output --> Host: application result; physical state requires evidence
 else successful scan (possibly with constraint faults)
   Core -> Core: commit program state and requested/safe trace
   Core --> Host: safe intent + scan identity + faults
   Host -> Output: map safe logical intent through installation/polarity
   Output -> Load: attempt electrical output write
-  Output --> Host: application result (success/failure/unknown)
-  opt supported readback
+  alt write acknowledged
+    Output --> Host: applied mask = attempted mask
+  else write failed
+    Output --> Host: I/O error
+    Host -> Host: cached applied mask = unknown; cached latch = unknown
+  end
+  opt driver available and readback due
     Output -> Load: read output latch/register
     Load --> Output: observed register value
     Output --> Host: readback evidence with observation scope
+  end
+  Host -> Host: record_relay(available, applied, latch)
+  opt write/readback failure, latch mismatch or unavailable driver
+    Host -> Evidence: publish attempted safe mask + separate applied/latch evidence
+    Host -> Host: halt: running=false; fault; clear adapter live outputs
+    Host -> Evidence: publish halted/fault observation
+    note over Host,Output
+      A following firmware loop requests OFF through the same driver.
+      OFF is not assumed applied until acknowledged.
+      Resume is rejected while faulted; redeployment is required.
+    end note
   end
   opt independent physical observation available
     Observer -> Load: observe contact, terminal or delivered effect
@@ -275,7 +294,7 @@ else successful scan (possibly with constraint faults)
   note over Host,Core
     Core state already committed before output application.
     Driver failure does not roll back that scan through ScanDriver.
-    Recovery/feedback policy belongs to the Device integration.
+    Device halt policy is implemented; committed core state is retained.
   end note
 end
 @enduml
@@ -283,7 +302,11 @@ end
 
 ![Physical scan boundary sequence](assets/llm-toolchain-device.svg)
 
-This diagram is an ownership contract, not a connection made by `ghostsim`.
+This diagram combines the ownership contract with the current `farm-device`
+firmware failure path. It is not a connection made by `ghostsim` or hardware
+verification. Independent physical confirmation is a contract boundary;
+the current firmware observation reports intent, applied write and register
+latch only, with no relay-contact or load feedback.
 Device owns firmware, physical drivers, approved board profiles, clocks,
 watchdogs and output handling at boot or failure. Installation bindings select
 the actual endpoint for each logical port. Logical safe intent, driver-applied
@@ -300,6 +323,35 @@ mapping and physical evidence must be checked for the intended deployment.
 There is no end-to-end device deployment, hardware emulation or physical
 confirmation step in the commands below.
 
+The output evidence chain is already defined by
+[Reference §4.7](reference/04-sensors-constraints-control.md#47-requested-safe-applied-confirmed):
+requested intent, safe intent, applied command and confirmed feedback are
+different facts. The [command-result lifecycle](reference/05-settings-and-observation.md#event-command-result와-alarm)
+describes request receipt, rejection, start, completion, cancellation and failure;
+it does not make a completed core scan proof of a completed physical action.
+The [Interaction v0 contract](../contracts/interaction-v0/README.md) projects
+completed runtime observations and performs no I/O. Reference
+[§8.5](reference/08-language-runtime-and-device-boundaries.md#85-변경과-재시작의-생명주기)
+separately assigns restart/state restoration to an explicit policy and checkpoint
+contract; it does not require rolling back a successful core scan after an I/O
+failure.
+
+The current Device policy is visible in `farm-device/rust/firmware/src/ghostflow.rs`
+(`scan_with_clock`, `set_mask`, `record_relay`, then `halt`) and
+`farm-device/rust/ghostflow-adapter/src/lib.rs` (`halt`, `scan_inner`, `resume`).
+It preserves the attempted safe mask as an observation, stops further core
+evaluation, clears adapter live output intents and requests OFF on the next
+firmware loop. It retains the committed core state and rejects resume while
+faulted. This is an implemented Device policy, not a missing language transaction.
+
+This assessment was checked against clean `farm-device` revision
+[`6d2e97b`](https://github.com/callin2/farm-device/commit/6d2e97b243045e3b2dfbbb9bf205614e26eceba4),
+including `rust/ghostflow-adapter/tests/adapter.rs`'s
+`relay_fault_halts_clears_intent_and_trace_is_bounded` case. The test was read,
+not rerun for this documentation review. A later Device revision must be
+inspected before repeating the implementation claim. Neither that host test
+nor this diagram proves an actual relay contact reached OFF.
+
 ## What the sequences establish and leave open
 
 The offline ownership chain is coherent: hosts supply inputs and time, the Rust
@@ -309,7 +361,7 @@ with severity relative to the scenario that needs the missing behavior.
 
 | Finding | Consequence and severity | Required evidence or decision |
 | --- | --- | --- |
-| Core commit precedes physical output application. `ScanDriver` exposes no output-acknowledgement transaction. | **High for physical deployment:** a write failure can leave logical state ahead of the actual actuator. This ordering is not itself a runtime defect. | Device integration must define failure/recovery and feedback behavior, then exercise a failed write and subsequent scan. This CLI cannot establish that policy. |
+| Core commit precedes physical output application; the evidence stages remain separate. | **Defined boundary, not a missing policy:** current Device firmware records failed application, halts and requests OFF on the following loop without rolling back the committed core state. | Verify the intended firmware revision and failure path on the target device. CLI simulation does not certify output handling or physical OFF. |
 | No output-to-sensor plant model exists in the CLI. | **High for closed-loop claims:** safe pump intent cannot establish water flow, level change or sensor feedback. | Supply explicit scenario inputs or a separately specified plant model; independently observe physical effects for hardware claims. |
 | Console redraw replays the entire accumulated scenario; the scenario is bounded to 256 scans. | **Medium for interactive duration:** this is a bounded review session, not a continuous device host. | Keep acceptance scoped to bounded sessions. A persistent session would need its own lifecycle contract before implementation. |
 | A console recording omits its presentation profile/bindings; those exist in the final result. | **Low for logical replay; medium for panel reproduction:** the recorded logical scans are reproducible, but the original channel labels/layout cannot be recovered from TOON alone. | Retain the final console result and profile/binding arguments alongside the recording when panel identity matters. |

@@ -6,6 +6,13 @@ language philosophy, syntax, semantics, and feature rationale. Keep implementati
 status and progress reports out of the reference. Update its relevant section
 and rationale when changing language semantics.
 
+Before judging GhostFlow control/output lifecycle, simulator behavior, or Device
+output-failure policy, read [Reference §4.7](docs/reference/04-sensors-constraints-control.md#47-requested-safe-applied-confirmed)
+and the [physical sequence](docs/LLM-TOOLCHAIN-ARCHITECTURE.md#physical-driver-and-device-boundary).
+Distinguish command-result lifecycle from requested, safe, applied and confirmed
+output evidence. Check the actual `farm-device` firmware revision under review before
+claiming a policy is absent or physical behavior is verified.
+
 This repository owns GhostFlow syntax, parsing, typing, lowering, GFB1 encoding,
 the portable Rust VM/signal/station engines, their WASM ABI, and the reference
 host adapters and conformance tests. Keep compiler and runtime changes together
