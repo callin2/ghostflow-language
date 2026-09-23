@@ -17,7 +17,7 @@
       },
       {
         "file": "tools/ghostsim.mjs",
-        "sha256": "bb2df8873141d17eda856870bbc1f261d807da49336d15e9fda74e1cb30fbd26"
+        "sha256": "89ee4b5c93efe57116c473bfe941054ca76c58e9b959d1fb2906a199a9154b98"
       },
       {
         "file": "tools/toolchain.mjs",
@@ -38,7 +38,7 @@
     "scenarioRunnerSha256": "a1e5f13e1b40f1e0a8fd71523d88e92b61c82d765146fca5bd6f964aad270861",
     "rustCoreTreeSha256": "cb737d111b320f4a96cd9c2092e020d6e81f998e4beb0328651bdd76213800b2",
     "referenceSourceDigest": "sha256:8d3321241fd3bc7c731ed3ebf9d65f58dfe47427bb81137a41210d804624eea4",
-    "digest": "fde986aac42070b423b90b55f6a3197cb2809c87b6dedf14c88fa63b453820ae"
+    "digest": "0bf37a471367bdc22cf11e7110b2e6d6808a617afd7e9474fe3a759289b40d69"
   },
   "encoder": {
     "name": "@toon-format/toon",

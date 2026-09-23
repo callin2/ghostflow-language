@@ -122,17 +122,7 @@ export function runScenario(artifactPath, scenarioPath, { format = 'toon' } = {}
   try {
     const actionsPath = path.join(directory, 'actions.json');
     fs.writeFileSync(actionsPath, JSON.stringify(scenario));
-    const child = spawnSync(path.join(root, 'target/release/examples/scenario_scan'), [artifactPath, actionsPath], {
-      encoding: 'utf8', timeout: 20_000, maxBuffer: MAX_RESULT_BYTES + 4096,
-    });
-    if (child.error) throw child.error;
-    const rows = child.stdout.trim().split('\n').filter(Boolean).map(line => JSON.parse(line));
-    if (child.status === 0 && rows.length !== scanCount) throw new Error(`native runner returned ${rows.length} of ${scanCount} scans`);
-    const failed = child.status !== 0;
-    const diagnostic = child.stderr.trim() || `native runner exited ${child.status}`;
-    const indexedError = /^action\[(\d+)\]: (.*)$/u.exec(diagnostic);
-    const activationError = /^activation: (.*)$/u.exec(diagnostic);
-    const result = {
+    const identity = {
       format: 'GhostFlow/scenario-result-v1',
       scenario: { id: scenario.id, sha256: sha256(scenarioBytes) },
       artifact: {
@@ -141,9 +131,39 @@ export function runScenario(artifactPath, scenarioPath, { format = 'toon' } = {}
         sourceFilename: document.filename,
         ...(map.interactionSourceIdentity ? { sourceIdentity: map.interactionSourceIdentity } : {}),
       },
-      outcome: !failed ? 'completed' : indexedError ? 'runtime-error' : 'rejected',
       outputMeaning: 'virtual intent; no physical output applied or confirmed',
-      scans: rows.map(row => ({
+    };
+    const encodeResult = result => (format === 'json' ? JSON.stringify(result) : encode(result)) + '\n';
+    const hostError = error => {
+      const message = String(error.message ?? error).slice(0, 4096);
+      return {
+        encoded: encodeResult({
+          ...identity, outcome: 'host-error', traceComplete: false, scans: [],
+          error: { location: 'host', message: `native observations unavailable: ${message}` },
+        }),
+        success: false,
+      };
+    };
+    const child = spawnSync(path.join(root, 'target/release/examples/scenario_scan'), [artifactPath, actionsPath], {
+      encoding: 'utf8', timeout: 20_000, maxBuffer: MAX_RESULT_BYTES + 4096,
+    });
+    if (child.error) return hostError(child.error);
+    if (child.status === null) return hostError(new Error(`native runner terminated by ${child.signal ?? 'unknown signal'}`));
+    let rows;
+    try {
+      rows = child.stdout.trim().split('\n').filter(Boolean).map(line => JSON.parse(line));
+      if (child.status === 0 && rows.length !== scanCount) throw new Error(`native runner returned ${rows.length} of ${scanCount} scans`);
+    } catch (error) {
+      return hostError(error);
+    }
+    const failed = child.status !== 0;
+    const diagnostic = child.stderr.trim() || `native runner exited ${child.status}`;
+    const indexedError = /^action\[(\d+)\]: (.*)$/u.exec(diagnostic);
+    const activationError = /^activation: (.*)$/u.exec(diagnostic);
+    if (failed && !indexedError && !activationError) return hostError(new Error(diagnostic));
+    let scans;
+    try {
+      scans = rows.map(row => ({
         scanId: row.scanId, logicalTimeMs: row.logicalTimeMs,
         inputs: row.trace.inputs,
         requestedVirtualIntent: row.trace.requested,
@@ -151,13 +171,27 @@ export function runScenario(artifactPath, scenarioPath, { format = 'toon' } = {}
         faults: row.trace.faults,
         stateBefore: row.trace.stateBefore,
         stateAfter: row.trace.stateAfter,
-      })),
+      }));
+    } catch (error) {
+      return hostError(error);
+    }
+    const result = {
+      ...identity,
+      outcome: !failed ? 'completed' : indexedError ? 'runtime-error' : 'rejected',
+      scans,
       ...(failed ? { error: indexedError
         ? { actionIndex: Number(indexedError[1]), message: indexedError[2] }
         : { location: activationError ? 'activation' : 'runner', message: activationError ? activationError[1] : diagnostic } } : {}),
     };
-    const encoded = (format === 'json' ? JSON.stringify(result) : encode(result)) + '\n';
-    if (Buffer.byteLength(encoded) > MAX_RESULT_BYTES) throw new Error(`result budget ${MAX_RESULT_BYTES} bytes exceeded`);
+    let encoded;
+    try {
+      encoded = encodeResult(result);
+    } catch (error) {
+      return hostError(error);
+    }
+    if (Buffer.byteLength(encoded) > MAX_RESULT_BYTES) {
+      return hostError(new Error(`result budget ${MAX_RESULT_BYTES} bytes exceeded`));
+    }
     return { encoded, success: !failed };
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });

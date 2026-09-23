@@ -43,7 +43,16 @@ before starting the native runner. The result names the scenario SHA-256,
 bytecode SHA-256, source document SHA-256 and filename, plus document/revision
 IDs when supplied. A malformed request or failed activation returns a rejected
 result with no scan rows. A runtime error returns only earlier committed scans
-and its action index. Both exit nonzero.
+and its action index. A host failure after runner invocation reports
+`host-error` with `traceComplete: false`; an empty scan list then means native
+observations are unavailable, not that the runtime performed no scan. All
+failures exit nonzero.
+
+The scenario result is a deterministic replay artifact, not a live observation
+record. Its `scanId` is scoped to that replay and it has no `runId`. A host that
+publishes scans as observations must assign its own run identity and preserve
+the artifact, source, scenario, and scan identities together, as required by
+[Reference §5.4](reference/05-settings-and-observation.md#54-정체성과-물리적-사실의-경계).
 
 Only a `scan` action evaluates the program. Its nonnegative `atMs` is a virtual
 clock value that cannot move backward. Input and key actions update held values;
@@ -52,7 +61,9 @@ and safe **virtual intent** separately. Neither field says a relay moved.
 The Node host uses a private JSON transport to the native Rust process; JSON
 there is an internal bridge, not a second program or public scenario format.
 The console accumulates one TOON scenario and replays it through the same
-`runScenario` path for each redraw. It does not own a VM or clock.
+`runScenario` path for each redraw. It does not own a VM or clock. If a console
+command or scan time fails after completed scans, `command-error` retains those
+rows and `--record` saves only the accepted, replayable prefix.
 
 The selected [`GhostFlow/board-profile-v1`](KEYBOARD-HOST.md) or presentation-only
 Driver descriptor supplies the console's ordered input and output channel

@@ -171,6 +171,50 @@ test('ghostsim reports a runtime error as a versioned result without a false com
   }
 });
 
+test('ghostsim reports unavailable observations after native buffer and result budget failures', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostsim-host-error-'));
+  const artifact = path.join(directory, 'wide.gfb');
+  const inputNames = Array.from({ length: 100 }, (_, index) => `input_${index}_${'x'.repeat(30)}`);
+  const source = `\`\`\`ghost\ncontrol Wide {\n${inputNames.map(name => `  input ${name}: Bool;`).join('\n')}\n  output active: Bool;\n  active <- ${inputNames[0]};\n}\n\`\`\`\n`;
+  try {
+    writeArtifact(await compileSource(source, { filename: 'wide.ghost.md' }), artifact);
+    const scenario = {
+      format: 'GhostFlow/scenario-v1', id: 'wide-trace',
+      initialInputs: inputNames.map(name => ({ name, type: 'Bool', value: false })),
+      keyBindings: [], actions: Array.from({ length: 256 }, (_, atMs) => ({ kind: 'scan', atMs })),
+    };
+    const json = run(artifact, scenario, 'json');
+    assert.equal(json.status, 1, json.stderr);
+    const result = JSON.parse(json.stdout);
+    assert.equal(result.outcome, 'host-error', result.error.message);
+    assert.equal(result.traceComplete, false);
+    assert.deepEqual(result.scans, []);
+    assert.equal(result.scenario.id, scenario.id);
+    assert.equal(result.artifact.bytecodeSha256.length, 64);
+    const toon = run(artifact, scenario, 'toon');
+    assert.equal(toon.status, 1, toon.stderr);
+    assert.deepEqual(decode(toon.stdout, { strict: true }), result);
+    const encodedBudget = run(artifact, {
+      ...scenario, actions: scenario.actions.slice(0, 205),
+    }, 'toon');
+    assert.equal(encodedBudget.status, 1, encodedBudget.stderr);
+    const oversized = decode(encodedBudget.stdout, { strict: true });
+    assert.equal(oversized.outcome, 'host-error');
+    assert.match(oversized.error.message, /result budget/);
+    assert.equal(oversized.traceComplete, false);
+    assert.deepEqual(oversized.scans, []);
+    const jsonBudget = run(artifact, {
+      ...scenario, actions: scenario.actions.slice(0, 205),
+    }, 'json');
+    assert.equal(jsonBudget.status, 0, jsonBudget.stderr);
+    const jsonResult = JSON.parse(jsonBudget.stdout);
+    assert.equal(jsonResult.outcome, 'completed');
+    assert.equal(jsonResult.scans.length, 205);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test('ghostsim exposes requested and constrained safe values as separate virtual intents', async () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostsim-safe-'));
   const artifact = path.join(directory, 'safe.gfb');
