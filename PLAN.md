@@ -1,6 +1,59 @@
 # PLAN - ghostflow-language (session relay)
 
-## NOW — relay header (updated 2026-09-20, post-merge pull)
+## NOW — current handoff (2026-09-20)
+
+- Branch: `fix/mcu-deployment-blockers`, created from fetched `origin/dev` at
+  merge #112 `ce995c6`. Local only. No push or code changes; no demonstrated
+  compiler/runtime blocker. Any PR must target `dev` and fix only a proven
+  compiler/runtime defect that blocks MCU deployment.
+- PR #111 (`8a697bf`) merged: normative live-property distinctions. PR #112's
+  `docs/CONSTRAINTS.md` conflict was resolved by Luna + main review in
+  `84e0aa3ecd9973833ec8cf26c02b2c157bf354af`, pushed to the existing
+  `issue-110-live-settings-doc`, then merged into `dev` as `ce995c6` (per git
+  log). Conflict-tree verification: focused 6; `npm test` exit 0, including
+  59 core + 12 package Rust tests, 378 Node tests, WASM/native/tutorial gates.
+  Report `2861816a-cbf1-4e3c-a1a9-86f418ef9434` is in isolated
+  `/tmp/ghostflow-pr112.2CFJG7/repo/build/verification.json`. Host evidence
+  only; no MCU evidence. Prior untracked `docs/BEHAVIOR-COMPOSITION-RESEARCH.md`,
+  `docs/research/`, and `tasks/` are preserved, not new branch work.
+- Live properties remain target-unimplemented; a bare `config` declaration does
+  not expose a live runtime-adjustable property.
+  Structural executable/rule changes remain stopped in Configure. Exact
+  event-to-tick mapping is deferred to #89. Documentation is not firmware
+  delivery.
+- Read-only deployment check: user aims to launch, verify, and upload via
+  `https://172.30.1.77:5190/conversation`. Public GET 200 came only from scoped
+  `curl -k` after normal TLS failed issuer trust; no trusted browser verification.
+  Firmware manifest GET at
+  `/api/v1/studio/device-firmware/waveshare-esp32-s3-eth-8di-8ro-r8n16/stable/manifest.json`
+  returned 401 `session invalid`; offered image is unknown. Do not claim current
+  API process pin or observed board firmware.
+- Device `farm-device-dev` has dist firmware manifest 0.2.1. Device docs record
+  matching compiler/core pin `968db691433d5e15700437df89e5e1b1c6a24b5b` and a
+  successful build. The 0.2.1 build-verification scope excluded flashing and
+  current browser-to-MCU verification; it does not establish whether anyone has
+  flashed since. Coordinator: `farm_studio_system`; frontend
+  `farm_studio_frontend-dev` owns Browser USB; API `farm_studio_api` owns
+  compile/sign/delivery; Device `farm-device-dev` owns firmware/I/O.
+- Existing route remains canonical `.ghost.md` → API signed package → Browser
+  WebSerial → MCU validate/commit PAUSED/OFF → explicit RUN. No FSD bridge for
+  a new path. User asked to record status only; do not deploy.
+- Pending evidence: confirm Waveshare identity, no-load state, and current USB
+  host; authenticate and establish trusted HTTPS; inspect offered-vs-installed
+  firmware compatibility; install reviewed runtime only if needed; upload a
+  small known-good program; verify receipt/source/package/GFB identities and
+  PAUSED/OFF; then authorized RUN, observe, stop, and reboot-persistence in
+  PAUSED/OFF. Record hardware and physical checks separately. Implement on this
+  branch only if a proven language failure blocks the route.
+
+## Historical Windows relay — superseded (preserved evidence)
+
+The following Windows-host relay records the post-merge pull and the earlier
+session-close state. Its pending-action statements are superseded. Do not treat
+them as current instructions; see the current status above this historical
+record.
+
+## Historical NOW — Windows relay header (updated 2026-09-20, post-merge pull)
 - Last action: **pulled the repo; #110's doc work is MERGED** — PR #112 → `dev` as merge commit `ce995c6`. The doc was reconciled with **PR #111** (a parallel `docs/live-property-contract-alignment` effort on the same #110 subject, merged first as `c6f5528`): dev was merged into the #112 branch (`84e0aa3`) to reconcile the overlapping edits, then #112 merged cleanly. Final section = "Runtime-adjustable 속성과 구조적 변경" (normative, from #111) + "예제: 모드 전환과 stopped 설정 적용" (implemented form + my target live-event contract, `ghost-draft` fence, 미구현 marking, research links, sharpened conflict list). Read the merged section after the pull — coherent, no duplication/contradiction.
 - Oracle at handoff (re-run on merged dev tip `ce995c6`, this Windows host):
   - node 40-file LANGUAGE_TESTS suite: **378/378 PASS, exit 0**
@@ -12,6 +65,21 @@
 - Next single action: close issue #110 (work is done and merged); then backlog picks
 - Human-only residue: none functional; the merged Korean doc prose is machine-written (two parallel efforts, one merge) — user read of the CONSTRAINTS.md settings section is the residual human check (it is a normative spec doc)
 - Open vetoes / decisions: close #110 · delete remote branch win32-host-compat (and optionally issue-110-live-settings-doc) · win32 guard relaxation (one-liner, evidence-backed) · `.gitattributes` CRLF pin (repo decision) · DSL grammar change for a live `configureOnly` successor = new milestone (flagged as conflict #1 in the doc, NOT done)
+
+## Historical NOW — Windows relay header (updated 2026-09-20, session close before merge)
+- Last action: **issue #110 done** — `docs/CONSTRAINTS.md` corrected from the outdated stopped/new-run settings framing to the #89 atomic live-property-event contract (marked NOT IMPLEMENTED, research linked, 4 spec conflicts identified); **PR #112 open on `dev`** (3238f69, docs-only)
+- Oracle at handoff (2026-09-20, this Windows host, all re-run this session):
+  - node 40-file LANGUAGE_TESTS suite: **378/378 PASS** (constraints.test.mjs re-verified — it extracts+compiles every constraints block in the doc)
+  - `cargo test --locked --offline --workspace`: **71/71 PASS**
+  - prior state (still true): tutorial PASS exit 0 · fmt clean · release builds OK · resource_report PASS · full `npm test` still gated by the deliberate win32 guard at verify-language.mjs:235 (every gate behind it individually passes on this host)
+- Merged earlier this session: **PR #109 → `dev`** (merge commit 9a09c76) = the Windows-compat fix set (suite was 308/45 → 377/377; now 378/378 after #110's doc). Branch win32-host-compat still exists on the remote (deletable).
+- Issue work: #110 (doc, PR #112 open) · sub-issue created under #89 this session
+- Env: Node 26 · rustfmt + wasm32 target present · cargo cache warm (`cargo fetch` first run) · gh authed as callin2 (PATH: `C:/Program Files/GitHub CLI`)
+- Next single action: user merges (or I merge) PR #112; then backlog picks
+- Human-only residue: none functional; Korean doc prose is machine-written — user read of the CONSTRAINTS.md section is the residual human check (it is a normative spec doc)
+- Open vetoes / decisions: PR #112 merge (mine to do on request) · win32 guard relaxation (one-liner, evidence-backed) · `.gitattributes` CRLF pin (repo decision) · delete remote branch win32-host-compat · DSL grammar change for a live `configureOnly` successor = new milestone (flagged as conflict #1 in the doc, NOT done)
+
+## Historical milestones and backlog (preserved; not current instructions)
 
 ## What this repo is
 The GhostFlow language platform, a migration export: `.ghost.md` literate source
