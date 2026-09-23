@@ -142,6 +142,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/ghostsim-console.test.mjs',
   'tests/authoring-workflow.test.mjs',
   'tests/station-wasm.test.mjs',
+  'tests/station-stop-priority.test.mjs',
   'tests/toolchain.test.mjs',
   'tests/browser-toolchain.test.mjs',
   'tests/operating-settings.test.mjs',
