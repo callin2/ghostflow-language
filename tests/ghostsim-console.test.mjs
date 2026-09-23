@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -9,7 +10,7 @@ import test from 'node:test';
 import { decode } from '@toon-format/toon';
 import { compileSource, writeArtifact } from '../tools/toolchain.mjs';
 import { runScenario } from '../tools/ghostsim.mjs';
-import { terminalCommands } from '../tools/ghostsim-console.mjs';
+import { runLiveConsole, terminalCommands } from '../tools/ghostsim-console.mjs';
 import { jsonSha256 } from '../tools/integration-contract.mjs';
 
 const root = path.resolve(new URL('..', import.meta.url).pathname);
@@ -146,6 +147,179 @@ test('TTY raw mode restores when setup fails after enabling it', async () => {
     for await (const command of terminalCommands(input)) void command;
   }, /input unavailable/);
   assert.deepEqual(modes, [true, false]);
+});
+
+test('live TTY scans at zero and draws before any key or timer tick', async () => {
+  const { directory, artifact } = await fixture('control Demo { input DI1: Bool; output RO1: Bool; RO1 <- DI1; }');
+  const input = new EventEmitter();
+  const output = new EventEmitter();
+  const written = [];
+  const scans = [];
+  const modes = [];
+  input.isTTY = true;
+  input.isRaw = false;
+  input.resume = () => {};
+  input.pause = () => {};
+  input.setRawMode = value => { modes.push(value); input.isRaw = value; };
+  output.columns = 100;
+  output.rows = 30;
+  output.write = value => { written.push(value); return true; };
+  const resultOutput = { write: value => { written.push(value); return true; } };
+  let tick;
+  const running = runLiveConsole([artifact], {
+    input, output, resultOutput, now: () => 0,
+    setInterval: callback => { tick = callback; return 1; }, clearInterval: () => {},
+    createSession: async () => ({
+      manifest: { inputs: [{ name: 'DI1', type: 'Bool' }], outputs: [{ name: 'RO1', type: 'Bool' }] },
+      scan(atMs, typedInputs) {
+        scans.push({ atMs, typedInputs });
+        return { scanId: scans.length - 1, logicalTimeMs: atMs, inputs: { DI1: typedInputs[0].value }, requestedVirtualIntent: { RO1: false }, safeVirtualIntent: { RO1: false } };
+      },
+      dispose() {},
+    }),
+    renderPanel: (_profile, _bound, scan) => `PANEL ${scan.scanId} ${scan.logicalTimeMs}`,
+  });
+  try {
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(scans, [{ atMs: 0, typedInputs: [{ name: 'DI1', type: 'Bool', value: false }] }]);
+    assert.match(written.join(''), /PANEL 0 0/);
+    assert.equal(typeof tick, 'function');
+    input.emit('data', Buffer.from(':exit\r'));
+    assert.equal(await running, 0);
+    assert.deepEqual(modes, [true, false]);
+    assert.doesNotMatch(written.join(''), /GhostFlow\/scenario-result-v1/);
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('live TTY uses elapsed time, scans each tick once, toggles immediately, and bounds history', async () => {
+  const { directory, artifact } = await fixture('control Demo { input DI1: Bool; output RO1: Bool; RO1 <- DI1; }');
+  const input = new EventEmitter();
+  const output = new EventEmitter();
+  const scans = [];
+  const frames = [];
+  let current = 1000;
+  let tick;
+  let cleared = false;
+  input.isRaw = false;
+  input.setRawMode = value => { input.isRaw = value; };
+  input.resume = () => {};
+  input.pause = () => {};
+  output.columns = 80;
+  output.rows = 24;
+  output.write = () => true;
+  const running = runLiveConsole([artifact], {
+    input, output, resultOutput: { write() {} }, now: () => current,
+    setInterval: callback => { tick = callback; return 1; }, clearInterval: () => { cleared = true; },
+    createSession: async () => ({
+      manifest: { inputs: [{ name: 'DI1', type: 'Bool' }], outputs: [{ name: 'RO1', type: 'Bool' }] },
+      scan(atMs, typedInputs) {
+        scans.push([atMs, typedInputs[0].value]);
+        return { scanId: scans.length - 1, logicalTimeMs: atMs, inputs: { DI1: typedInputs[0].value }, requestedVirtualIntent: { RO1: typedInputs[0].value }, safeVirtualIntent: { RO1: typedInputs[0].value } };
+      },
+      dispose() {},
+    }),
+    renderPanel: (_profile, _bound, scan, history) => { frames.push([scan.scanId, history.length]); return 'frame'; },
+  });
+  try {
+    await new Promise(resolve => setImmediate(resolve));
+    current = 1107; tick();
+    current = 1400; tick();
+    input.emit('data', Buffer.from('1'));
+    assert.deepEqual(scans.slice(0, 4), [[0, false], [107, false], [400, false], [400, true]]);
+    for (let i = 0; i < 260; i++) { current += 100; tick(); }
+    assert.equal(scans.length, 264);
+    assert.ok(frames.at(-1)[1] <= 120);
+    input.emit('data', Buffer.from('\x03'));
+    assert.equal(await running, 0);
+    assert.equal(input.isRaw, false);
+    assert.equal(cleared, true);
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('live TTY rejects recording before opening a session', async () => {
+  const { directory, artifact, record } = await fixture('control Demo { input DI1: Bool; output RO1: Bool; RO1 <- DI1; }');
+  try {
+    let opened = false;
+    await assert.rejects(runLiveConsole([artifact, '--record', record], {
+      createSession: async () => { opened = true; },
+    }), /--record is unavailable in live TTY mode/);
+    assert.equal(opened, false);
+    assert.equal(fs.existsSync(record), false);
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('live TTY ignores escape key sequences even when split across input chunks', async () => {
+  const { directory, artifact } = await fixture('control Demo { input DI1, DI3, DI5: Bool; output RO1: Bool; RO1 <- DI1; }');
+  const input = new EventEmitter();
+  const output = new EventEmitter();
+  const scans = [];
+  input.isRaw = false;
+  input.setRawMode = value => { input.isRaw = value; };
+  input.resume = () => {};
+  input.pause = () => {};
+  output.write = () => true;
+  const running = runLiveConsole([artifact], {
+    input, output, resultOutput: { write() {} }, now: () => 0,
+    setInterval: () => 1, clearInterval: () => {},
+    createSession: async () => ({
+      manifest: { inputs: ['DI1', 'DI3', 'DI5'].map(name => ({ name, type: 'Bool' })), outputs: [{ name: 'RO1', type: 'Bool' }] },
+      scan(atMs, typedInputs) {
+        scans.push(typedInputs.map(input => input.value));
+        return { scanId: scans.length - 1, logicalTimeMs: atMs, inputs: Object.fromEntries(typedInputs.map(input => [input.name, input.value])), requestedVirtualIntent: { RO1: false }, safeVirtualIntent: { RO1: false } };
+      },
+      dispose() {},
+    }),
+    renderPanel: () => 'frame',
+  });
+  try {
+    await new Promise(resolve => setImmediate(resolve));
+    input.emit('data', Buffer.from('\x1b['));
+    input.emit('data', Buffer.from('3~\x1b[15~'));
+    assert.equal(scans.length, 1, 'Delete and F5 must not toggle digit inputs');
+    input.emit('data', Buffer.from('1'));
+    assert.deepEqual(scans.at(-1), [true, false, false]);
+    input.emit('data', Buffer.from('\x03'));
+    assert.equal(await running, 0);
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('live TTY restores terminal and disposes runtime when a scan fails', async () => {
+  const { directory, artifact } = await fixture('control Demo { input DI1: Bool; output RO1: Bool; RO1 <- DI1; }');
+  const input = new EventEmitter();
+  const output = new EventEmitter();
+  const writes = [];
+  let tick;
+  let disposed = false;
+  let cleared = false;
+  let current = 100;
+  input.isRaw = false;
+  input.setRawMode = value => { input.isRaw = value; };
+  input.resume = () => {};
+  input.pause = () => {};
+  output.write = value => { writes.push(value); return true; };
+  const running = runLiveConsole([artifact], {
+    input, output, resultOutput: { write() {} }, now: () => current,
+    setInterval: callback => { tick = callback; return 1; }, clearInterval: () => { cleared = true; },
+    createSession: async () => ({
+      manifest: { inputs: [{ name: 'DI1', type: 'Bool' }], outputs: [{ name: 'RO1', type: 'Bool' }] },
+      scan(atMs) {
+        if (atMs) throw new Error('virtual scan failed');
+        return { scanId: 0, logicalTimeMs: 0, inputs: { DI1: false }, requestedVirtualIntent: { RO1: false }, safeVirtualIntent: { RO1: false } };
+      },
+      dispose() { disposed = true; },
+    }),
+    renderPanel: () => 'frame',
+  });
+  try {
+    await new Promise(resolve => setImmediate(resolve));
+    current = 200;
+    tick();
+    assert.equal(await running, 1);
+    assert.equal(disposed, true);
+    assert.equal(cleared, true);
+    assert.equal(input.isRaw, false);
+    assert.match(writes.join(''), /\x1b\[\?25h\x1b\[\?1049l/);
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 });
 
 test('board-profile-v1 endpoint order and identity drive a 2DI/4RO console without installation claims', async () => {

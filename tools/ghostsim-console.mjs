@@ -4,9 +4,12 @@ import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
 import { createHash } from 'node:crypto';
+import { performance } from 'node:perf_hooks';
 import { fileURLToPath } from 'node:url';
 import { encode } from '@toon-format/toon';
 import { runScenario } from './ghostsim.mjs';
+import { createLiveSession } from './ghostsim-live.mjs';
+import { LIVE_HISTORY_LIMIT, renderLivePanel } from './ghostsim-tui.mjs';
 import { jsonSha256 } from './integration-contract.mjs';
 
 const cli = fileURLToPath(import.meta.url);
@@ -76,7 +79,7 @@ function parseArgs(args) {
     else if (key === '--input') options.inputs.push(value);
     else if (key === '--profile' && !options.profile) options.profile = value;
     else if (key === '--record' && !options.record) options.record = value;
-    else if (key === '--format' && ['toon', 'json'].includes(value)) options.format = value;
+    else if (key === '--format' && ['toon', 'json'].includes(value)) { options.format = value; options.explicitFormat = true; }
     else throw new Error(`unknown or repeated option ${key}`);
   }
   return options;
@@ -252,6 +255,154 @@ export async function runConsole(args, commands, { panelOutput = process.stderr,
   } finally { fs.rmSync(temporary, { recursive: true, force: true }); }
 }
 
+/** Run one persistent virtual session while the terminal remains interactive. */
+export async function runLiveConsole(args, {
+  input = process.stdin, output = process.stderr, resultOutput = process.stdout,
+  signals = process, now = () => performance.now(),
+  setInterval: startTimer = globalThis.setInterval,
+  clearInterval: stopTimer = globalThis.clearInterval,
+  createSession = createLiveSession, renderPanel = renderLivePanel,
+} = {}) {
+  const options = parseArgs(args);
+  if (options.record) throw new Error('--record is unavailable in live TTY mode; use piped commands for a bounded replay');
+  if (options.explicitFormat) throw new Error('--format is unavailable in live TTY mode; use piped commands for a structured result');
+  const profile = profileFromFile(options.profile);
+  const { manifest, bound, values } = setup(options.artifact, profile, options.bindings, options.inputs, !options.profile);
+  const inputTypes = manifest.inputs.filter(field => field.name !== '__gf_now_ms');
+  const session = await createSession(options.artifact);
+  let timer;
+  let entered = false;
+  let raw = false;
+  const wasRaw = Boolean(input.isRaw);
+  let resumed = false;
+  let lastScan;
+  let lastTime = 0;
+  let scanCount = 0;
+  let command = null;
+  let escape = null;
+  let escapeSequence = '';
+  let paste = false;
+  const history = [];
+  const start = now();
+  let finish;
+  const completed = new Promise(resolve => { finish = resolve; });
+  let stopped = false;
+  let finalError;
+  const time = () => Math.max(lastTime, Math.max(0, Math.floor(now() - start)));
+  const draw = (status = command === null ? 'running' : `command :${command}`, error) => {
+    output.write(renderPanel(profile, bound, lastScan, history, {
+      columns: output.columns, rows: output.rows, status, error,
+    }));
+  };
+  const scan = atMs => {
+    const inputs = inputTypes.map(field => ({ name: field.name, type: field.type, value: values.get(field.name) }));
+    const row = session.scan(atMs, inputs);
+    lastScan = row;
+    lastTime = atMs;
+    scanCount++;
+    history.push(row);
+    if (history.length > LIVE_HISTORY_LIMIT) history.shift();
+    draw();
+  };
+  const end = (code = 0, error) => {
+    if (stopped) return;
+    stopped = true;
+    if (error) {
+      try { draw('error', error); } catch { /* cleanup still runs */ }
+    }
+    finish({ code, error });
+  };
+  const toggle = channel => {
+    const port = bound.get(channel.name);
+    if (!port || channel.type !== 'Bool') throw new Error(`input channel ${channel.name} is unbound or unsupported`);
+    values.set(port, !values.get(port));
+    scan(time());
+  };
+  const onData = chunk => {
+    try {
+      for (const char of String(chunk)) {
+        if (stopped) break;
+        if (char === '\x03' || char === '\x04') { end(); break; }
+        if (char === '\x1b') { escape = 'start'; escapeSequence = ''; continue; }
+        if (escape === 'start') {
+          escape = char === '[' ? 'csi' : char === 'O' ? 'ss3' : null;
+          continue;
+        }
+        if (escape === 'csi') {
+          escapeSequence += char;
+          if (/^[\x40-\x7e]$/u.test(char)) {
+            if (escapeSequence === '200~') paste = true;
+            if (escapeSequence === '201~') paste = false;
+            escape = null;
+          }
+          continue;
+        }
+        if (escape === 'ss3') { escape = null; continue; }
+        if (paste) continue;
+        if (command === null) {
+          if (/^[1-8]$/u.test(char)) {
+            const channel = profile.inputs[Number(char) - 1];
+            if (channel) toggle(channel);
+          } else if (char === ':') { command = ''; draw(); }
+          continue;
+        }
+        if (char === '\r' || char === '\n') {
+          const value = command.trim();
+          command = null;
+          if (value === 'exit') { end(); break; }
+          const named = /^toggle\s+(.+)$/u.exec(value);
+          if (named) {
+            const channel = profile.inputs.find(item => item.name === named[1]);
+            if (!channel) throw new Error(`unknown input channel ${named[1]}`);
+            toggle(channel);
+          } else if (value) throw new Error(`unknown live command ${value}`);
+          else draw();
+        } else if (char === '\x7f' || char === '\b') {
+          command = command.slice(0, -1); draw();
+        } else if (char >= ' ' && char !== '\x7f') {
+          command += char; draw();
+        }
+      }
+    } catch (error) { end(1, error); }
+  };
+  const onTick = () => { if (!stopped) { try { scan(time()); } catch (error) { end(1, error); } } };
+  const onResize = () => { if (!stopped) { try { draw(); } catch (error) { end(1, error); } } };
+  const onSignal = () => end();
+  const onEnd = () => end();
+  try {
+    output.write('\x1b[?1049h\x1b[?25l');
+    entered = true;
+    scan(0);
+    raw = true;
+    input.setRawMode(true);
+    input.on('data', onData);
+    input.on('end', onEnd);
+    output.on?.('resize', onResize);
+    signals.on?.('SIGINT', onSignal);
+    signals.on?.('SIGTERM', onSignal);
+    input.resume();
+    resumed = true;
+    timer = startTimer(onTick, 100);
+    const { code, error } = await completed;
+    finalError = error;
+    return code;
+  } finally {
+    if (timer !== undefined) stopTimer(timer);
+    input.off?.('data', onData);
+    input.off?.('end', onEnd);
+    output.off?.('resize', onResize);
+    signals.off?.('SIGINT', onSignal);
+    signals.off?.('SIGTERM', onSignal);
+    if (resumed) input.pause?.();
+    if (raw) input.setRawMode(wasRaw);
+    if (entered) output.write('\x1b[?25h\x1b[?1049l');
+    session.dispose();
+    if (entered) resultOutput.write(finalError
+      ? `ghostsim-console: ${finalError.message}; ${scanCount} scans, ${lastTime} ms virtual time; physical unconfirmed\n`
+      : `ghostsim-console: ${scanCount} scans, ${lastTime} ms virtual time; physical unconfirmed\n`);
+  }
+}
+
 export async function* terminalCommands(input = process.stdin, promptOutput = process.stderr) {
   const wasRaw = Boolean(input.isRaw);
   let line = null;
@@ -289,10 +440,11 @@ export async function* terminalCommands(input = process.stdin, promptOutput = pr
 
 if (process.argv[1] && path.resolve(process.argv[1]) === cli) {
   try {
-    const commands = process.stdin.isTTY
-      ? terminalCommands(process.stdin, process.stderr)
-      : readline.createInterface({ input: process.stdin, terminal: false });
-    process.exitCode = await runConsole(process.argv.slice(2), commands);
+    if (process.stdin.isTTY) {
+      if (!process.stderr.isTTY) throw new Error('live console requires a terminal on stderr');
+      process.exitCode = await runLiveConsole(process.argv.slice(2));
+    }
+    else process.exitCode = await runConsole(process.argv.slice(2), readline.createInterface({ input: process.stdin, terminal: false }));
   } catch (error) {
     process.stderr.write(`ghostsim-console: ${error.message}\n`);
     process.exitCode = 1;

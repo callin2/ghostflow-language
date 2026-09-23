@@ -106,17 +106,22 @@ export function validateScenario(scenario, manifest) {
   return scans;
 }
 
-export function runScenario(artifactPath, scenarioPath, { format = 'toon' } = {}) {
-  if (!['toon', 'json'].includes(format)) throw new Error('--format must be toon or json');
-  const scenarioBytes = fs.readFileSync(scenarioPath);
-  if (scenarioBytes.length > MAX_SCENARIO_BYTES) throw new Error(`scenario exceeds ${MAX_SCENARIO_BYTES} bytes`);
-  const scenario = decode(new TextDecoder('utf-8', { fatal: true }).decode(scenarioBytes), { strict: true });
+export function loadVerifiedArtifact(artifactPath) {
   const artifactBytes = fs.readFileSync(artifactPath);
   const manifest = JSON.parse(fs.readFileSync(`${artifactPath}.manifest.json`, 'utf8'));
   const map = JSON.parse(fs.readFileSync(`${artifactPath}.map.json`, 'utf8'));
   const document = verifyArtifactSourceMap(map, artifactBytes, { manifest });
   if (!/^GhostFlow\/control-v[1-6]$/u.test(manifest.format)) throw new Error('artifact must be an executable control artifact');
   if (manifest.bytecodeSha256 !== sha256(artifactBytes)) throw new Error('artifact SHA-256 mismatch');
+  return { artifactBytes, manifest, map, document };
+}
+
+export function runScenario(artifactPath, scenarioPath, { format = 'toon' } = {}) {
+  if (!['toon', 'json'].includes(format)) throw new Error('--format must be toon or json');
+  const scenarioBytes = fs.readFileSync(scenarioPath);
+  if (scenarioBytes.length > MAX_SCENARIO_BYTES) throw new Error(`scenario exceeds ${MAX_SCENARIO_BYTES} bytes`);
+  const scenario = decode(new TextDecoder('utf-8', { fatal: true }).decode(scenarioBytes), { strict: true });
+  const { manifest, map, document } = loadVerifiedArtifact(artifactPath);
   const scanCount = validateScenario(scenario, manifest);
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostsim-run-'));
   try {

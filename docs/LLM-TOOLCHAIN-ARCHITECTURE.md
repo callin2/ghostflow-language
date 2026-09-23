@@ -18,8 +18,12 @@ flowchart LR
   S -->|validated private JSON actions| Native[scenario_scan Rust process]
   Native -->|scan traces| S
   S -->|TOON or JSON result| LLM
-  Human -->|raw number keys or line commands| Console[ghostsim-console.mjs]
+  Human -->|interactive TTY| Live[ghostsim-console.mjs live mode]
+  Live -->|persistent WASM Rust ScanDriver| Core[FramedGhostFlowRuntime]
+  Live -->|full-screen ASCII; 100 ms cadence| Human
+  Human -->|piped commands| Console[ghostsim-console.mjs piped mode]
   Profile[profile or Driver descriptor] --> Console
+  Profile --> Live
   Console -->|recorded TOON scenario| Scenario
   Console -->|same runScenario path| S
   Console -->|ASCII panel on stderr; final result on stdout| Human
@@ -32,10 +36,12 @@ The model path uses strict TOON for [Reference queries](../tools/reference-query
 [`GhostFlow/scenario-v1` and `scenario-result-v1`](../tools/ghostsim.mjs).
 `ghostc --request` returns typed diagnostics with source spans. The human
 `ghostc` command accepts the document path directly and prints short text
-diagnostics. The [ASCII console](KEYBOARD-HOST.md) accepts raw number keys 1–8
-without Enter in a TTY; `:` enters a line command such as `scan 100`. Its
-recorded TOON file is a normal scenario, and its final result adds `console`
-presentation identity to the simulator result.
+diagnostics. The [ASCII console](KEYBOARD-HOST.md) has two modes. Interactive
+TTY mode starts with an immediate scan, then uses one persistent Rust WASM
+runtime and ScanDriver at a 100 ms wall-clock cadence. Number keys 1–8 toggle
+Bool inputs and scan immediately; `:toggle CHANNEL` is also available. Piped
+mode consumes deterministic line commands, runs the existing scenario runner,
+and can record a replayable TOON scenario.
 
 The source map holds the complete document and immutable document/revision
 identity. `ghostsim` checks the map against the exact GFB bytes and manifest
@@ -60,10 +66,17 @@ a later clock-only scan evaluates them again. The Rust core produces requested
 and safe **virtual intent** separately. Neither field says a relay moved.
 The Node host uses a private JSON transport to the native Rust process; JSON
 there is an internal bridge, not a second program or public scenario format.
-The console accumulates one TOON scenario and replays it through the same
-`runScenario` path for each redraw. It does not own a VM or clock. If a console
-command or scan time fails after completed scans, `command-error` retains those
-rows and `--record` saves only the accepted, replayable prefix.
+Piped console mode accumulates one TOON scenario and replays it through the
+same `runScenario` path for each command redraw. It has explicit virtual time
+and no background clock. If a piped command or scan time fails after completed
+scans, `command-error` retains those rows and `--record` saves only the
+accepted, replayable prefix. Interactive TTY mode is separate: it owns one
+persistent activated Rust WASM `FramedGhostFlowRuntime`/`ScanDriver`, scans at
+startup and every 100 ms, and supplies elapsed wall time as nondecreasing
+virtual logical time. A key toggle also causes an immediate scan. Its display
+history is capped at 120 scans and redraws do not replay old actions. Both
+modes display only virtual inputs and requested/safe intent; neither applies
+physical output or confirms hardware state.
 
 The selected [`GhostFlow/board-profile-v1`](KEYBOARD-HOST.md) or presentation-only
 Driver descriptor supplies the console's ordered input and output channel
@@ -93,7 +106,8 @@ descriptor and a physical I/O driver have different responsibilities.
 | Component | Responsibility and state | Implementation |
 | --- | --- | --- |
 | Scenario / keyboard input driver | Holds typed logical inputs and key down/up state; converts explicit actions into a complete input snapshot. It never derives new sensor values from outputs. | [`scenario_scan.rs`](../crates/ghostflow-core/examples/scenario_scan.rs), [`KeyboardMapper`](../crates/ghostflow-core/src/keyboard.rs) |
-| Virtual-time host | Supplies `atMs` and explicit scan opportunities. The console's toggle command appends an input/key action and a scan at the current time; `scan N` advances to the supplied time. No background clock advances this CLI session. | [`ghostsim.mjs`](../tools/ghostsim.mjs), [`ghostsim-console.mjs`](../tools/ghostsim-console.mjs) |
+| Piped virtual-time host | Supplies `atMs` and explicit scan opportunities. Toggle commands append an input/key action and a scan at the current time; `scan N` advances to the supplied time. No background clock advances this session. | [`ghostsim.mjs`](../tools/ghostsim.mjs), [`ghostsim-console.mjs`](../tools/ghostsim-console.mjs) |
+| Interactive TTY host | Owns one persistent WASM `FramedGhostFlowRuntime`/Rust `ScanDriver`; scans immediately and every 100 ms using elapsed wall time, and scans immediately after input toggles. Holds bounded display history (120 scans). No device I/O. | [`ghostsim-live.mjs`](../tools/ghostsim-live.mjs), [`ghostsim-console.mjs`](../tools/ghostsim-console.mjs) |
 | Framed scan driver | Owns one runtime and validates complete typed inputs, sequential scan IDs and nondecreasing logical time before evaluation. Successful scans advance its sequence/time. It performs no device I/O. | [`ScanDriver`](../crates/ghostflow-core/src/scan.rs) |
 | Portable Rust runtime | Loads GFB, activates supported capabilities, evaluates expressions, program state, timers and constraints, and emits a trace with requested/safe intents and faults. Native and WASM hosts use this core. | [`ghostflow-core`](../crates/ghostflow-core/src/lib.rs), [WASM adapter](../runtimes/wasm/README.md) |
 | Virtual device view | Displays held inputs, requested/safe output banks and scan identity using the selected channel roster. The state consists of simulated input values, core program state and recorded observations; it has no separate actuator or plant model. | [ASCII panel and profile rules](KEYBOARD-HOST.md) |
@@ -114,10 +128,10 @@ The browser has its own input and pacing host. Farm Studio's
 Boolean snapshots and explicit logical time, then reads displayed outputs from
 the returned safe bank. `simulationPacer.ts` determines scan opportunities for
 interactive playback. These frontend components do not evaluate GhostFlow
-rules. Browser runtime state persists between scans, whereas the ASCII console
-reconstructs the current state by replaying its accumulated scenario in a fresh
-native process. Neither browser pacing nor the older real-time Rust keyboard
-example changes the CLI's explicit virtual-time contract.
+rules. Browser runtime state persists between scans. Interactive TTY mode also
+preserves runtime state in one live WASM session. Piped console mode reconstructs
+state by replaying its accumulated scenario in a fresh native process. The older
+real-time Rust keyboard example remains a separate host.
 
 ## Representative execution sequences
 
@@ -184,16 +198,16 @@ it is not automatically a runner failure. These paths are implemented in
 [`scenario_scan.rs`](../crates/ghostflow-core/examples/scenario_scan.rs), and
 [`ScanDriver`](../crates/ghostflow-core/src/scan.rs).
 
-### Toggle an input, inspect permission blocking, then replay
+### Piped mode: toggle an input, inspect permission blocking, then replay
 
-This is the console command sequence in the reproduction section below, using
+This is the piped console command sequence in the reproduction section below, using
 `pump-rev-2.ghost.md` and explicit DI/RO bindings. This pump has no program state
 or timer. The console owns the accumulated scenario; each `runScenario` call
 creates a fresh Rust process that reconstructs runtime state from the beginning.
 
 ```plantuml
 @startuml
-title Console pump: same-time toggles and recorded replay
+title Piped console pump: same-time toggles and recorded replay
 actor Human
 participant "ghostsim-console" as Console
 participant "ghostsim / runScenario" as Host
@@ -236,7 +250,7 @@ Host --> Human: TOON result (no console presentation envelope)
 @enduml
 ```
 
-![Console pump sequence](assets/llm-toolchain-console.svg)
+![Piped console pump sequence](assets/llm-toolchain-console.svg)
 
 Recording retains logical input/key actions and virtual scan times. The
 profile digest and DI/RO binding roster are added to the final console result,
@@ -374,7 +388,8 @@ with severity relative to the scenario that needs the missing behavior.
 | --- | --- | --- |
 | Core commit precedes physical output application; the evidence stages remain separate. | **Defined boundary, not a missing policy:** current Device firmware records failed application, halts and requests OFF on the following loop without rolling back the committed core state. | Verify the intended firmware revision and failure path on the target device. CLI simulation does not certify output handling or physical OFF. |
 | No output-to-sensor plant model exists in the CLI. | **High for closed-loop claims:** safe pump intent cannot establish water flow, level change or sensor feedback. | Supply explicit scenario inputs or a separately specified plant model; independently observe physical effects for hardware claims. |
-| Console redraw replays the entire accumulated scenario; the scenario is bounded to 256 scans. | **Medium for interactive duration:** this is a bounded review session, not a continuous device host. | Keep acceptance scoped to bounded sessions. A persistent session would need its own lifecycle contract before implementation. |
+| Piped console redraw replays the accumulated scenario; the scenario is bounded to 256 scans. | **Low for piped review:** this mode is deterministic and bounded. | Use it for command scripts and replayable records. |
+| Interactive TTY scans at 100 ms wall-clock cadence with 120 display samples retained. | **Host timing limit:** scheduler delays can affect actual scan intervals; runtime logical time uses elapsed wall time. | This is a virtual review view, not a deadline guarantee or device host. |
 | A console recording omits its presentation profile/bindings; those exist in the final result. | **Low for logical replay; medium for panel reproduction:** the recorded logical scans are reproducible, but the original channel labels/layout cannot be recovered from TOON alone. | Retain the final console result and profile/binding arguments alongside the recording when panel identity matters. |
 
 The pump permission sequence checks requested versus safe intent. The timer
@@ -405,7 +420,7 @@ printf '1\n3\nscan 5\nexit\n' | node tools/ghostsim-console.mjs build/authoring/
 node tools/ghostsim.mjs build/authoring/pump.gfb build/authoring/console.toon --format toon
 ```
 
-The check and compile results identify document `GF-EXAMPLE-PUMP`, revision
+This reproduction exercises **piped deterministic mode**. The check and compile results identify document `GF-EXAMPLE-PUMP`, revision
 `rev-2`, and the same full-document SHA-256. The scripted scenario scans at
 0, 1 and 2 ms; `pump` requested/safe values are `ON/OFF`, `ON/ON`, then
 `OFF/OFF`. The console example scans at 0, 0 and 5 ms. Its panel has eight
@@ -425,5 +440,8 @@ need external certified intervals, schedule bindings, or another host resource
 are rejected at activation. Host event ordering is tracked in
 [#115](https://github.com/callin2/ghostflow-language/issues/115), while
 temporal resources are described in [TEMPORAL-RESOURCES.md](TEMPORAL-RESOURCES.md);
-basic virtual-time simulation does not supply a hidden default policy. The
-console has no automatic scan cadence and does not prove physical behavior.
+basic virtual-time simulation does not supply a hidden default policy. Piped
+console mode has no automatic scan cadence. Interactive TTY mode scans at
+100 ms wall-clock cadence and immediately after toggles. Neither mode proves
+physical behavior: displayed outputs are requested and safe virtual intent,
+with no physical application or confirmation.

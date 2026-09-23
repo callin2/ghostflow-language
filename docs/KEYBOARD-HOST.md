@@ -29,18 +29,21 @@ The existing `run` CSV runner remains unchanged. The recorded event CSV is an
 audit stream for a host adapter; it is not accepted as the ordinary input
 matrix used by `run`.
 
-## Virtual-time ASCII console
+## Live ASCII console
 
-`ghostsim-console` uses the same `ghostsim` scenario runner. It reads one command
-per line from a terminal, redraws its panel on stderr after each scan, and writes
-one complete `GhostFlow/scenario-result-v1` document to stdout after `exit`.
-The result is TOON by default; `--format json` selects JSON. It never opens a
-physical Driver.
+In an interactive terminal, `ghostsim-console` starts a persistent virtual
+GhostFlow runtime. It scans at 0 ms and draws the first full-screen panel
+immediately, before any key is pressed. A 100 ms wall-clock timer supplies one
+new scan per tick. Logical time is elapsed monotonic time from startup; late
+timer callbacks scan once at the current elapsed time without replaying missed
+ticks. Each row shows recent input, requested output intent, and safe output
+intent as ASCII traces. The display uses the terminal's alternate screen and
+restores the screen, cursor, and raw keyboard mode when it ends. It never opens
+a physical Driver. Both stdin and stderr must be terminals for this live view.
 
 ```sh
 node tools/ghostsim-console.mjs build/program.gfb \
-  --bind DI1=start --bind DI2=stop --bind RO1=pump --bind RO2=valve \
-  --record build/session.toon
+  --bind DI1=start --bind DI2=stop --bind RO1=pump --bind RO2=valve
 ```
 
 When `--profile` is absent, the layout is a **virtual Waveshare 8DI/8RO** with
@@ -87,30 +90,49 @@ virtual panel; it carries no physical installation mapping.
 ```sh
 node tools/ghostsim-console.mjs build/program.gfb \
   --profile build/profile.json --bind A=start --bind B=stop \
-  --bind R1=pump --bind R2=valve --record build/session.toon
+  --bind R1=pump --bind R2=valve
 ```
 
-On a terminal, keys `1` through `8` toggle a bound Bool input immediately;
-Enter is not needed. Press `:` to enter a line command, then Enter. For later
-channels, enter `:toggle CHANNEL`, such as `:toggle DI9`. Enter `:scan 100`
-to scan at 100 ms with held input values. Enter `:exit` or press Ctrl-C to end.
-Raw terminal mode is restored on exit or error. When commands are piped through
-stdin, omit `:` and use one command per line.
+On a terminal, keys `1` through `8` toggle a bound Bool input and scan
+immediately; Enter is not needed. Press `:` to enter a command, then Enter.
+For later channels, enter `:toggle CHANNEL`, such as `:toggle DI9`. Enter
+`:exit` or press Ctrl-C to end. The panel starts at scan 0, and a short human
+summary follows exit. `--record` and `--format` are rejected in live TTY mode.
+An unbounded live run cannot fit the bounded `GhostFlow/scenario-v1` recording
+contract. Build the WASM runtime first with `npm run build:wasm` if
+`target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm` is absent.
+`:scan N` is a piped replay command; the interactive clock runs automatically.
 
-Each toggle records a key edge or typed input action and scans once at the
-current virtual time. Time starts at 0 ms and cannot move backward. If there
-were no commands, exit records one
-initial scan at 0 ms. For a non-Bool manifest input, supply `--input port=value`
-with a typed initial value. A non-Bool channel can appear in the descriptor,
-but its panel state is `unsupported` and it has no toggle shortcut.
+When commands are piped through stdin, omit `:` and use one command per line.
+This bounded replay mode runs the `ghostsim` scenario runner and writes one
+complete `GhostFlow/scenario-result-v1` document to stdout. It defaults to
+TOON; `--format json` selects JSON. The panel is printed to stderr after each
+scan.
+
+In piped replay mode, each toggle records a key edge or typed input action and
+scans once at the current virtual time. Time starts at 0 ms and cannot move
+backward. If there were no commands, exit records one initial scan at 0 ms.
+For a non-Bool manifest input in either mode, supply `--input port=value` with
+a typed initial value. A non-Bool channel can appear in the descriptor, but
+its panel state is `unsupported` and it has no toggle shortcut.
 
 Rows align the input and output lists by index. Empty cells remain empty when
 one side is shorter. Bool values display ON or OFF; missing observations display
 `unobserved`. Output columns separately show requested and safe virtual intent.
-The panel reports the profile/Driver identity, exact bindings, scan ID, virtual
-time, status/error, and `physical: unconfirmed`.
+The panel reports the profile/Driver identity, scan ID, virtual time,
+status/error, and `physical: unconfirmed`. The live panel keeps a bounded
+rolling trace of the latest 120 scans. Piped replay prints exact bindings.
 
-`--record` writes the exact replayable TOON scenario. Replay it with
+In piped replay mode, `--record` writes the exact replayable TOON scenario.
+For example:
+
+```sh
+printf '1\nscan 100\nexit\n' | node tools/ghostsim-console.mjs build/program.gfb \
+  --bind DI1=start --bind DI2=stop --bind RO1=pump --bind RO2=valve \
+  --record build/session.toon
+```
+
+Replay it with
 `node tools/ghostsim.mjs build/program.gfb build/session.toon --format toon`.
 If a command or scan time is rejected after scans have completed, the final
 result has `outcome: command-error`, a `command` error, and the completed scan
