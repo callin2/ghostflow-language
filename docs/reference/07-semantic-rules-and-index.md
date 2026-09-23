@@ -90,9 +90,9 @@ Bool 계산, 품질 처리, 존재 검사를 혼합하지 않는다.
 | 함수 합성·값 전달, `>>`, `\|>`, `map`, `and_then`, `recover` | [2. 타입·식·상태](02-types-expressions-state.md), [4. 센서와 제어](04-sensors-constraints-control.md) |
 | `Date`, `TimeOfDay`, `DateTime`, 벽시계·단조시간·논리시간 | [3. 시간과 예약](03-time-and-schedules.md) |
 | `timer`, `elapsed`, phase age, 연속 Bool 시간 | [3. 시간과 예약](03-time-and-schedules.md) |
-| `schedule`, `DailySlots`, `TimeSlots`, `timezone`, `selected`, `.due` | [3. 시간과 예약](03-time-and-schedules.md) |
+| `schedule`, `DailySlots`, `TimeSlots`, `timezone`, `selected`, `.due`, `.missed` | [3. 시간과 예약](03-time-and-schedules.md) |
 | `Solar`, 일출·일몰·달·조석, 위치·예측 맥락 | [3. 시간과 예약](03-time-and-schedules.md) |
-| `Schedule`, TriggerRule, DayRule, Pulse, Window, Run | [3. 시간과 예약](03-time-and-schedules.md) |
+| `Schedule`, TriggerRule, DayRule, Pulse, Window, Run, Range | [3. 시간과 예약](03-time-and-schedules.md) |
 | Cron, Periodic, 업무일·휴일·제외일, DST | [3. 시간과 예약](03-time-and-schedules.md) |
 | fallback, Unknown, 지연 시작·관측 공백·중복 발생 | [3. 시간과 예약](03-time-and-schedules.md) |
 | `sensor`, `sensor?`, `signal`, `ok`, `fault`, Result·Option | [4. 센서와 제어](04-sensors-constraints-control.md) |

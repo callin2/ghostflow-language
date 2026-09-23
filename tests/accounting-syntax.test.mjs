@@ -18,7 +18,10 @@ const source = `control AccountingSyntax {
     }
   }
   output ready: Bool;
-  ready <- normal_starts.count >= 0;
+  ready <- case normal_starts.count {
+    ok(count) => count >= 0;
+    fault(_) => false;
+  };
 }`;
 
 test('accounting syntax is represented in the checked manifest', () => {
@@ -63,11 +66,21 @@ test('accounting declarations reject missing stage, persistence, and targets', (
   assert.throws(() => typeCheckControl('control X { account a = on_time(missing, stage: applied, persistence: durable); output x: Bool; x <- true; }'), /unknown resource/);
 });
 
+test('event counts return Result and cannot be used as numbers directly', () => {
+  const source = `control DirectEventCountUse {
+    event started: Event;
+    account starts = count_events(started, over: local_day("UTC"), persistence: durable);
+    output count: Bool;
+    count <- starts.count >= 0;
+  }`;
+  assert.throws(() => typeCheckControl(source), /Result<Int,AccountingFault>|expected Int|numeric/);
+});
+
 test('pure functions cannot capture an accounting event count', () => {
   const source = `control PureAccountingCapture {
     event started: Event;
     account starts = count_events(started, over: local_day("UTC"), persistence: durable);
-    fn captured() -> Int { starts.count }
+    fn captured() -> Result<Int,AccountingFault> { starts.count }
     output count: Int;
     count <- captured();
   }`;
@@ -75,7 +88,7 @@ test('pure functions cannot capture an accounting event count', () => {
 });
 
 test('syntax macros cannot capture an accounting event count', () => {
-  const source = `syntax captured(): Expr<Int> { quote { starts.count } }
+  const source = `syntax captured(): Expr<Result<Int,AccountingFault>> { quote { starts.count } }
   control MacroAccountingCapture {
     event started: Event;
     account starts = count_events(started, over: local_day("UTC"), persistence: durable);

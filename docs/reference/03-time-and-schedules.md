@@ -341,6 +341,38 @@ revision이 포함된다. 대표 disposition은 `Before`, `PredicateFalse`, `Alr
 `.due = false`만으로 ordinary false, Unknown fallback, 이미 접수한 사건, 놓친 사건을
 구분할 수 없으므로 이 evidence를 같은 accepted scan과 결속한다.
 
+### 놓친 occurrence에 대한 소스 반응
+
+`schedule_name.missed`는 `Bool` 투영이다. 해당 schedule에서 하나 이상의 occurrence가
+이번 accepted scan에 **terminal missed**로 확정될 때만 true다. 한 scan에서 둘 이상을
+놓쳐도 값은 한 번 true이고, 다음 accepted scan에 새 terminal miss가 없으면 false다.
+control action은 이 값을 해당 accepted scan의 immutable snapshot에서 정확히 한 번 평가한다.
+이미 terminal missed로 기록된 occurrence를 재관찰하거나 checkpoint를 복원하는 것만으로
+다시 true가 되지 않는다. rejected scan은 이 pulse나 상태 전이를 확정하지 않는다.
+
+```ghost
+state missed_scans: Int = 0;
+missed_scans' = if morning.missed then missed_scans + 1 else missed_scans;
+output missed_alarm: Bool;
+missed_alarm <- morning.missed;
+```
+
+`.missed`는 일반 `Bool` 식이므로 작성자가 `if`, `case`, 상태 전이와 output 식에서
+반응을 선언한다. schedule 선언에 callback, per-occurrence handler 또는 자동 replay를
+추가하지 않는다. 여러 schedule의 miss에 scan당 한 번 반응하려면
+`morning.missed || evening.missed`를 한 식으로 평가한다.
+
+Bool pulse는 발생 횟수나 이유를 담지 않는다. 같은 accepted scan의 **순서 있는
+schedule observation**은 terminal missed occurrence마다 별도 record를 남긴다.
+각 record에는 안정적인 schedule ID, occurrence ID, planned instant,
+terminal miss reason(`ConditionsFalseAtPulse`, `ObservationGap`,
+`LateStartExpired`, `CorrectionPastHighWater`, `EventWithdrawn` 중 해당 값),
+definition/context/provider revision을 보존한다. 둘 이상이 한 scan에 확정되어도
+record를 합치거나 이유 하나로 요약하지 않는다. 재부팅 뒤 복원된 terminal ledger는
+중복 record와 pulse를 만들지 않는다. `Unknown`이나 Range의 아직 열린 구간에 대한
+비종결 `ObservationGap`은 `.missed`를 true로 만들지 않는다. 놓친 occurrence는 이후
+조건이 true가 되어도 자동 admit하거나 실행하지 않는다.
+
 ### Pulse, Window, Run, Range
 
 | basis | admission 의미 |
@@ -855,12 +887,22 @@ event normal_run_started: Event;
 account normal_starts = count_events(normal_run_started,
   over: local_day("Asia/Seoul"),
   persistence: durable);
-let today_starts = normal_starts.count;
+let under_daily_start_limit = case normal_starts.count {
+  ok(count) => count < 4;
+  fault(_) => false;
+};
 ```
 
 requested/admitted/applied/confirmed 시작 또는 완료 중 어떤 event를 생산할지, 세척 event를
 포함할지, 하루 한 번인지 매 N회인지, 세척 순서와 재시작은 사용자 program/policy다.
-같은 event ID의 재전달은 한 번만 세고 날짜 판정이 Unknown이면 count도 Unknown이다.
+`.count`의 타입은 `Result<Int, AccountingFault>`다. 같은 event ID의 재전달은 한 번만 센다.
+신뢰할 수 없는 local-day 경계는 `ClockUnknown`, 없거나 손상된 ledger는 각각
+`LedgerMissing`, `LedgerCorrupt`, 불완전해 정확한 횟수를 모르는 ledger는
+`LedgerIncomplete` fault다. 내부 u64 횟수가 `Int`의 최댓값을 넘으면 `CountOverflow`다.
+이 경우 0으로 대체하거나 정수 범위로 감아서는 안 된다. 위의 `case`는 성공 횟수와
+fault를 명시적으로 나누어 제어용 `Bool`을 만든다. **왜:** 불명 횟수를 0으로 취급하면 일일
+작업 한도를 초과할 수 있다. 보호 `limit`에서 사용량이 Unknown이면 `on_unknown = block`이
+실행을 차단한다.
 
 ## 3.11 확정된 시간 문법과 경계
 

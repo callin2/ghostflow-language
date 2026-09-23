@@ -643,7 +643,7 @@
       "status": "executable",
       "filename": "accounting-syntax.ghost.md",
       "expect": "accept",
-      "source": "# Accounting syntax\n\n```ghost\ncontrol AccountingSyntax {\n  resource pump1: BoolActuator;\n  event normal_run_started: Event;\n  config worst_case_on: Duration = 5min;\n  config stop_delay: Duration = 10s;\n  account pump_applied = on_time(pump1, stage: applied, persistence: durable);\n  account normal_starts = count_events(normal_run_started, over: local_day(\"Asia/Seoul\"), persistence: durable);\n  constraints PumpBudgets {\n    limit used(pump_applied, rolling(60s)) <= 30s { reserve = worst_case_on + stop_delay; on_unknown = block; }\n  }\n  output ready: Bool;\n  ready <- normal_starts.count >= 0;\n}\n```\n"
+      "source": "# Accounting syntax\n\n```ghost\ncontrol AccountingSyntax {\n  resource pump1: BoolActuator;\n  event normal_run_started: Event;\n  config worst_case_on: Duration = 5min;\n  config stop_delay: Duration = 10s;\n  account pump_applied = on_time(pump1, stage: applied, persistence: durable);\n  account normal_starts = count_events(normal_run_started, over: local_day(\"Asia/Seoul\"), persistence: durable);\n  constraints PumpBudgets {\n    limit used(pump_applied, rolling(60s)) <= 30s { reserve = worst_case_on + stop_delay; on_unknown = block; }\n  }\n  output ready: Bool;\n  ready <- case normal_starts.count { ok(count) => count >= 0; fault(_) => false; };\n}\n```\n"
     },
     {
       "id": "REF-03-051",
@@ -1695,6 +1695,86 @@
       "expect": "reject",
       "diagnosticPattern": "adapt|controller|reset|state|unknown",
       "source": "# Invalid adaptation reset\n\n```ghost\nconfig target_vpd: Pressure = 1.0kPa { min = 0.7kPa; max = 1.2kPa; step = 0.05kPa; access = operator; label = \"목표 VPD\"; }\nadapt_setting target_vpd_policy for target_vpd {\n  allowed = 0.7kPa .. 1.2kPa;\n  max_step = 0.05kPa;\n  max_change = 0.05kPa per 1h;\n  authority = optimizer;\n  controller_transition = reset(output: 0%);\n}\n```\n"
+    },
+    {
+      "id": "REF-03-073",
+      "references": ["03-time-and-schedules.md#35-schedule의-공통-의미"],
+      "rule": "Range admits only the remaining part of its planned half-open interval, including after boot, gap, or trust recovery.",
+      "scope": "runtime", "status": "specified",
+      "given": "DailySlots plans 08:00 with range(10min), when=true, and no terminal occurrence record.",
+      "when": "The first trusted observation is 08:04 after boot, gap, or trust recovery; separately it is exactly 08:10.",
+      "then": "At 08:04 the occurrence admits once and runs only to 08:10. At 08:10 it does not start and records LateStartExpired. Earlier expired occurrences do not replay.",
+      "reason": "The current DailySlots artifact has no executable native Range admission binding."
+    },
+    {
+      "id": "REF-03-074",
+      "references": ["03-time-and-schedules.md#35-schedule의-공통-의미"],
+      "rule": "The active Range deadline follows monotonic progress despite RTC/NTP wall corrections.",
+      "scope": "runtime", "status": "specified",
+      "given": "An 08:00 range(10min) occurrence admits at trusted wall 08:04 and monotonic zero.",
+      "when": "At monotonic three minutes the wall clock jumps forward or backward by twenty minutes.",
+      "then": "The active deadline remains monotonic six minutes in both cases. A rollback emits no second due for the same occurrence.",
+      "reason": "The current DailySlots artifact has no executable native Range clock binding."
+    },
+    {
+      "id": "REF-03-075",
+      "references": ["03-time-and-schedules.md#35-schedule의-공통-의미"],
+      "rule": "Safety blocking does not pause or extend a Range.",
+      "scope": "runtime", "status": "specified",
+      "given": "An 08:00 range(10min) occurrence is admitted and requests output at 08:04.",
+      "when": "A global safety constraint blocks safe output from 08:06 through 08:08, then clears.",
+      "then": "Safe output is false while blocked, resumes at 08:08, and is false at 08:10. Range active and requested output keep the planned end.",
+      "reason": "The current runtime has no executable Range plus global constraint scenario."
+    },
+    {
+      "id": "REF-03-076",
+      "references": ["03-time-and-schedules.md#35-schedule의-공통-의미"],
+      "rule": "Live Duration changes recompute the current Range end from its planned start.",
+      "scope": "runtime", "status": "specified",
+      "given": "An 08:00 range(duration=10min) occurrence admits at 08:04; stable monotonic progress reaches 08:07.",
+      "when": "An accepted live event extends duration to 12min; in a separate run another reduces it to 5min.",
+      "then": "The extension ends at 08:12. The reduction ends at its event position because 08:05 has passed. Neither emits another due or changes occurrence ID.",
+      "reason": "The current runtime has no atomic live settings event API for an active schedule."
+    },
+    {
+      "id": "REF-03-077",
+      "references": ["03-time-and-schedules.md#35-schedule의-공통-의미"],
+      "rule": "A live scalar start change can pause and reevaluate the same Range occurrence without readmission.",
+      "scope": "runtime", "status": "specified",
+      "given": "An 08:00 range(10min) occurrence admits at 08:04 and retains one occurrence ID.",
+      "when": "At 08:07 its scalar start changes to 08:08; trusted scans occur at 08:08 and 08:18.",
+      "then": "The edit immediately makes active=false. Active resumes at 08:08 and ends at 08:18; due remains false and identity fixed. A separate edit to 08:02 moves end to 08:12.",
+      "reason": "The current runtime has no atomic live scalar start event API for an active schedule."
+    },
+    {
+      "id": "REF-03-078",
+      "references": ["03-time-and-schedules.md#35-schedule의-공통-의미"],
+      "rule": "A live setting event that creates overlapping Range occurrences is rejected atomically.",
+      "scope": "runtime", "status": "specified",
+      "given": "One DailySlots schedule has 08:00 and 08:15 starts, each with range(duration=10min), and settings revision R.",
+      "when": "A live event proposes duration=20min or TimeSlots [08:00,08:15] with range(20min).",
+      "then": "The whole event is rejected; values, revision R, active occurrence, and ledger stay fixed. Duration=15min is valid because intervals only touch.",
+      "reason": "The current runtime has no atomic live settings event API for schedule overlap validation."
+    },
+    {
+      "id": "REF-03-079",
+      "references": ["03-time-and-schedules.md#310-시간-기반-사용량-제약"],
+      "rule": "Event count returns an exact Int or the corresponding AccountingFault.",
+      "scope": "runtime", "status": "specified",
+      "given": "A durable event account counts typed events over a local_day window.",
+      "when": "The ledger is missing, corrupt, incomplete, the local-day boundary is unknown, or the exact count exceeds Int's maximum; separately, the ledger and boundary are valid and the count fits Int.",
+      "then": "The valid case returns the exact Int. The other cases return LedgerMissing, LedgerCorrupt, LedgerIncomplete, ClockUnknown, or CountOverflow respectively; none substitutes zero or wraps the count.",
+      "reason": "Treating unknown or overflowing counts as zero can exceed a daily work limit."
+    },
+    {
+      "id": "REF-03-080",
+      "references": ["03-time-and-schedules.md#310-시간-기반-사용량-제약"],
+      "rule": "A fault-to-false count branch and protective on_unknown=block both prevent admission without accounting mutation.",
+      "scope": "runtime", "status": "specified",
+      "given": "A count result has an AccountingFault, control logic maps the fault branch to false, and a protective limit uses on_unknown=block.",
+      "when": "Admission is evaluated while the count remains unknown.",
+      "then": "The case expression yields false and the protective limit rejects admission. The evaluation does not write a count event or create, consume, or release a reservation.",
+      "reason": "Unknown accounting must fail closed without fabricating a count or reservation."
     }
   ]
 }

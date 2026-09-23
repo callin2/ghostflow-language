@@ -148,7 +148,7 @@ div ok fault import syntax
 `Int`, `Number`, `Percent`, `Duration`, `Result`, `SensorFault`, `Expr`, `Date`,
 `TimeOfDay`, `DateTime`, `TimeSlots`, `WorkCalendar`, `HolidayCalendar`,
 `TidePredictions`, `LunarEphemeris`, `BoolActuator`, `Event`, `ClockFault`,
-`CalendarFault`, `TemporalContextFault`와 2장의 물리량 타입은 내장 타입 namespace다. `number`,
+`CalendarFault`, `TemporalContextFault`, `AccountingFault`와 2장의 물리량 타입은 내장 타입 namespace다. `number`,
 `int_exact`, `int_floor`, `int_ceil`, `int_trunc`, `int_nearest_even`, `elapsed`,
 `median`, `hysteresis`, `date`, `time`, `datetime`, `cron5`, `sun`, `tide`, `day`,
 `moon`, `continuous_true`, `instant`, `civil`, `on_time`, `count_events`, `local_day_is`,
@@ -157,8 +157,9 @@ div ok fault import syntax
 접두사와 discard pattern `_`도 선언 이름으로 쓸 수 없다.
 
 schedule과 account가 제공하는 `.due`, `.open`, `.active`, `.count`는 해당 내장 타입의
-projection 이름이다. 다른 타입에 같은 member를 추측하거나 사용자 projection으로
-재정의하지 않는다.
+projection 이름이다. schedule의 `.missed`도 projection이다. 다른 타입에 같은 member를
+추측하거나 사용자 projection으로 재정의하지 않는다. `.missed` 의미는
+[§3.5](03-time-and-schedules.md#35-schedule의-공통-의미)를 참조한다.
 
 `from`, `revision`, `sha256`, `instance`, `connect`, `quote`와 `timezone`, `selected`,
 `basis`, `when`, `clock`, `gap`, `recovery`, `fallback`, `dst_missing`, `dst_repeated`,

@@ -25,6 +25,15 @@ test('boot, unavailable clock and large forward corrections skip catch-up', () =
   assert.throws(() => new DailySlots({ ...config, name: 'other' }, s.snapshot()), /identity/);
 });
 
+test('crossing multiple selected slots in one observation gap emits no catch-up occurrences', () => {
+  const s = new DailySlots(config);
+  const beforeFirstSlot = Date.parse('2026-09-05T05:59:59+09:00');
+  const afterSeveralSlots = Date.parse('2026-09-05T07:30:00+09:00');
+  assert.equal(s.poll({ nowMs: 0, wallMs: beforeFirstSlot }).reason, 'BootBaseline');
+  assert.equal(s.poll({ nowMs: 1_000, wallMs: afterSeveralSlots }).reason, 'ClockGapSkipped');
+  assert.equal(s.poll({ nowMs: 2_000, wallMs: afterSeveralSlots + 30_000 }).due, false);
+});
+
 test('DST repeated local slot has the same identity and is not re-issued', () => {
   const s = new DailySlots({ name: 'fall', timezone: 'America/New_York', slots: [90] });
   s.poll({ nowMs: 0, wallMs: Date.parse('2026-11-01T01:29:59-04:00') });

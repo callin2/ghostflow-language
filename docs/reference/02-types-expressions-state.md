@@ -197,7 +197,7 @@ let available = case moisture {
 
 `Result<T, E>`는 함수 parameter와 결과 타입에도 쓸 수 있다. `E`는 compiler가 정의한
 유한 fault enum이어야 한다. v1에는 `SensorFault`, `ClockFault`, `CalendarFault`,
-`TemporalContextFault`가 있다. `ok(expr)`와 `fault(reason)`은 이 내장 Result의
+`TemporalContextFault`, `AccountingFault`가 있다. `ok(expr)`와 `fault(reason)`은 이 내장 Result의
 constructor다. 사용자가 새 ADT, 새 Result error 타입 또는 constructor를 선언하는
 일반 문법은 없다. Result를 state, config, input, output의 scalar 값처럼 저장하거나
 installation binding에 노출하지 않는다.
@@ -211,6 +211,7 @@ installation binding에 노출하지 않는다.
 | `ClockFault` | `ClockUnknown`, `ZoneUnsupported` |
 | `CalendarFault` | `ClockUnknown`, `CalendarMissing`, `CalendarOutOfRange`, `ZoneUnsupported` |
 | `TemporalContextFault` | `ClockUnknown`, `LocationUnknown`, `EventUnavailable`, `PredictionMissing`, `PredictionStale`, `ZoneUnsupported` |
+| `AccountingFault` | `ClockUnknown`, `LedgerMissing`, `LedgerCorrupt`, `LedgerIncomplete`, `CountOverflow` |
 
 일부 이름은 여러 내장 fault enum에 속한다. `fault(reason)`에서는 기대하는 Result의
 오류 타입으로, `case reason`에서는 검사 대상의 오류 타입으로 member를 결정한다.
