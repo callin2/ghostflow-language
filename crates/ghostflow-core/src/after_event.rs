@@ -93,6 +93,34 @@ impl<const N: usize> AfterEvent<N> {
         &self.committed.slots
     }
 
+    pub fn any(&self) -> Option<bool> {
+        project_any(&self.committed.slots)
+    }
+
+    pub fn all(&self) -> Option<bool> {
+        project_all(&self.committed.slots)
+    }
+
+    pub fn staged_any(&self) -> Result<Option<bool>> {
+        Ok(project_any(
+            &self
+                .candidate
+                .as_ref()
+                .ok_or(TemporalError::NotStaged)?
+                .slots,
+        ))
+    }
+
+    pub fn staged_all(&self) -> Result<Option<bool>> {
+        Ok(project_all(
+            &self
+                .candidate
+                .as_ref()
+                .ok_or(TemporalError::NotStaged)?
+                .slots,
+        ))
+    }
+
     pub fn stage(&mut self, time: TimeContext, input: Input) -> Result<()> {
         let mut next = self.prepare(time)?;
         self.apply_input(time, &mut next, input)?;
@@ -242,5 +270,43 @@ impl<const N: usize> AfterEvent<N> {
     pub fn rollback(&mut self) -> Result<()> {
         self.candidate.take().ok_or(TemporalError::NotStaged)?;
         Ok(())
+    }
+}
+
+fn project_any<const N: usize>(slots: &[Option<EventResult>; N]) -> Option<bool> {
+    if slots
+        .iter()
+        .flatten()
+        .any(|result| matches!(result.status, Status::Satisfied { .. }))
+    {
+        Some(true)
+    } else if slots.iter().flatten().next().is_some()
+        && slots
+            .iter()
+            .flatten()
+            .all(|result| result.status == Status::Expired)
+    {
+        Some(false)
+    } else {
+        None
+    }
+}
+
+fn project_all<const N: usize>(slots: &[Option<EventResult>; N]) -> Option<bool> {
+    if slots
+        .iter()
+        .flatten()
+        .any(|result| result.status == Status::Expired)
+    {
+        Some(false)
+    } else if slots.iter().flatten().next().is_some()
+        && slots
+            .iter()
+            .flatten()
+            .all(|result| matches!(result.status, Status::Satisfied { .. }))
+    {
+        Some(true)
+    } else {
+        None
     }
 }

@@ -1520,8 +1520,6 @@ class Lowerer {
     const accountingResource = [...this.resources.values()].some(type => type === 'Station' || type === 'BoolActuator');
     if (accountingResource || this.accounts.size || this.ast.body.some(item => item.kind === 'account-constraints')) error(this.ast.loc,
       'accounting execution requires verified resource binding, ledger persistence, and runtime enforcement');
-    if (this.afterEvents.length) error(this.afterEvents[0].call.loc,
-      'after_event requires an identified Event delivery and per-identity result ABI, which is not yet supported');
     if (this.naturalConditions.length) error(this.naturalConditions[0].loc,
       'natural condition execution requires verified provider observations and a Result ABI');
     let bytes;
@@ -3198,9 +3196,21 @@ class Lowerer {
       if (signal.descriptor?.kind !== 'after-event') error(node.args[0].loc, `${node.name} expects an after_event signal`);
       const projections = signal.descriptor.projections ??= [];
       if (!projections.includes(mode)) projections.push(mode);
+      const projectionInputs = signal.descriptor.projectionInputs ??= {};
+      if (!projectionInputs[mode]) {
+        const value = this.generatedName(`after_event_${mode}_value`, node.args[0].name);
+        const ok = this.generatedName(`after_event_${mode}_ok`, node.args[0].name);
+        const fault = this.generatedName(`after_event_${mode}_fault`, node.args[0].name);
+        this.addInput(value, BOOL, node.loc);
+        this.addInput(ok, BOOL, node.loc);
+        this.addInput(fault, NUMBER, node.loc);
+        projectionInputs[mode] = { value, ok, fault };
+      }
+      const inputs = projectionInputs[mode];
       return {
         type: resultType(BOOL, semanticType('SensorFault')),
-        ok: 'false', value: 'false', faultCode: '3', originTag: numberAtom(signal.originTag),
+        ok: `input.${inputs.ok}`, value: `input.${inputs.value}`,
+        faultCode: `input.${inputs.fault}`, originTag: numberAtom(signal.originTag),
         origins: [{ tag: signal.originTag, nodeId: signal.originTag, kind: 'signal', name: node.args[0].name }],
         afterEventProjection: { signal: node.args[0].name, mode },
       };
@@ -3692,6 +3702,11 @@ export function compileTemporalDescriptorArtifact(source, { filename = '<control
   const natural = Boolean(checked.manifest.naturalConditions?.length);
   // An uncalled function may contain a temporal call without producing a site.
   if (!afterEvent && !natural) return new Lowerer(ast, filename).lower();
+  if (!natural && checked.manifest.signals
+    .filter(signal => signal.kind === 'after-event')
+    .every(signal => signal.projections?.length > 0)) {
+    return new Lowerer(ast, filename).lower();
+  }
   const manifest = {
     format: 'GhostFlow/temporal-descriptor-v1', executable: false,
     requiredRuntimeContracts: [

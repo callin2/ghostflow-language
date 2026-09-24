@@ -222,6 +222,32 @@ pub unsafe extern "C" fn gf_after_event_rollback(handle: *mut Handle) -> i32 {
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn gf_after_event_project(handle: *mut Handle, mode: u8, staged: i32) -> i32 {
+    let Some(h) = handle.as_mut() else { return 0 };
+    let result = match (mode, staged) {
+        (0, 0) => Ok(h.engine.any()),
+        (1, 0) => Ok(h.engine.all()),
+        (0, 1) => h.engine.staged_any().map_err(|error| format!("{error:?}")),
+        (1, 1) => h.engine.staged_all().map_err(|error| format!("{error:?}")),
+        _ => Err("invalid after_event projection".into()),
+    };
+    match result {
+        Ok(value) => {
+            h.error.clear();
+            match value {
+                None => 1,
+                Some(false) => 2,
+                Some(true) => 3,
+            }
+        }
+        Err(error) => {
+            h.error = error;
+            0
+        }
+    }
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn gf_after_event_results_ptr(handle: *const Handle) -> *const u8 {
     handle
         .as_ref()
