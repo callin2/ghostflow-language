@@ -297,7 +297,7 @@ function validateGfb1(bytes) {
     fail('invalid-bytecode-format', 'bytecode is not GFB1');
   }
   const version = bytes[4] | (bytes[5] << 8);
-  if (![1, 2, 3, 4].includes(version)) fail('unsupported-bytecode-version', 'supported GFB format versions are 1, 2, 3 and 4');
+  if (![1, 2, 3, 4, 10].includes(version)) fail('unsupported-bytecode-version', 'supported GFB format versions are 1, 2, 3, 4 and 10');
   return String(version);
 }
 
@@ -511,7 +511,7 @@ function validateEmbeddedArtifacts(payload) {
 
   exactObject(payload.bytecode, ['format', 'version', 'sha256', 'contentBase64'], 'payload.bytecode');
   if (payload.bytecode.format !== 'GFB1') fail('invalid-bytecode-format', 'payload bytecode format must be GFB1');
-  if (!['1', '2', '3', '4'].includes(payload.bytecode.version)) fail('unsupported-bytecode-version', 'payload bytecode version must be 1, 2, 3 or 4');
+  if (!['1', '2', '3', '4', '10'].includes(payload.bytecode.version)) fail('unsupported-bytecode-version', 'payload bytecode version must be 1, 2, 3, 4 or 10');
   digestValue(payload.bytecode.sha256, 'payload.bytecode.sha256');
 
   exactObject(payload.manifest, ['format', 'sha256', 'contentBase64'], 'payload.manifest');
@@ -583,9 +583,17 @@ export async function verifyPortablePackage(packageValue, options = {}) {
   const sourceText = decodeUtf8(artifacts.sourceBytes, 'source');
   const manifest = parseCanonicalJson(artifacts.manifestBytes, 'manifest');
   const sourceMap = parseCanonicalJson(artifacts.sourceMapBytes, 'sourceMap');
-  exactObject(manifest, ['format', 'name', 'inputs', 'outputs', 'sensors', 'schedules', 'timers', 'signals', 'configs', 'bytecodeSha256'], 'manifest');
+  const contextManifest = packageValue.payload.bytecode.version === '10';
+  const manifestKeys = ['format', 'name', 'inputs', 'outputs', 'sensors', 'schedules', 'timers', 'signals', 'configs', 'bytecodeSha256'];
+  if (contextManifest) {
+    for (const key of ['providers', 'calendars', 'naturalConditions', 'accounting', 'resources']) {
+      if (Object.hasOwn(manifest, key)) manifestKeys.push(key);
+    }
+  }
+  exactObject(manifest, manifestKeys, 'manifest');
   if (manifest.format !== packageValue.payload.manifest.format) fail('manifest-mismatch', 'manifest format does not match descriptor');
   if (packageValue.payload.bytecode.version === '4' && manifest.format !== 'GhostFlow/control-v4') fail('manifest-mismatch', 'GFB format 4 requires a control-v4 manifest');
+  if (contextManifest && manifest.format !== 'GhostFlow/control-v9') fail('manifest-mismatch', 'GFB format 10 requires a control-v9 manifest');
   ghostName(manifest.name, 'manifest.name');
   if (manifest.bytecodeSha256 !== bytecodeSha256) fail('manifest-mismatch', 'manifest bytecodeSha256 does not match GFB1');
   for (const field of ['inputs', 'outputs', 'sensors', 'schedules', 'timers', 'signals', 'configs']) {
@@ -655,7 +663,7 @@ export async function verifyPortablePackage(packageValue, options = {}) {
   for (const [index, schedule] of manifest.schedules.entries()) {
     if (!isPlainObject(schedule)) fail('manifest-mismatch', `manifest.schedules[${index}] must be an object`);
     const name = ghostName(schedule.name, `manifest.schedules[${index}].name`);
-    addGenerated(schedule.dueInput, `__gf_schedule_due_${name}`, `manifest.schedules[${index}].dueInput`);
+    if (!contextManifest) addGenerated(schedule.dueInput, `__gf_schedule_due_${name}`, `manifest.schedules[${index}].dueInput`);
   }
   for (const [index, timer] of manifest.timers.entries()) {
     if (!isPlainObject(timer)) fail('manifest-mismatch', `manifest.timers[${index}] must be an object`);
@@ -690,6 +698,12 @@ export async function verifyPortablePackage(packageValue, options = {}) {
     const extraction = extractLiterate(sourceText, { filename: mappedDocument.filename });
     const replay = compileControl(extraction.code, { filename: mappedDocument.filename });
     if (!equalBytes(replay.bytes, artifacts.bytecode)) throw new Error('canonical source does not reproduce package bytecode');
+    const replayManifest = contextManifest
+      ? { ...replay.manifest, bytecodeSha256 }
+      : replay.manifest;
+    if (contextManifest && canonicalJson(manifest) !== canonicalJson(replayManifest)) {
+      throw new Error('GFB10 manifest does not match canonical source lowering');
+    }
     const intConfigs = entries => entries.filter(entry => entry.type === 'Int');
     if (canonicalJson(intConfigs(manifest.configs)) !== canonicalJson(intConfigs(replay.manifest.configs))) {
       throw new Error('Int configs do not match canonical source lowering');

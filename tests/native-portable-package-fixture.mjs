@@ -48,6 +48,11 @@ const debounceScenario = scenario.startsWith('debounce-');
 const holdScenario = scenario.startsWith('hold-');
 const intSettingsScenario = scenario.startsWith('int-settings-');
 const windowScenario = scenario.startsWith('window-');
+const gfb10Scenario = scenario.startsWith('gfb10-');
+const gfb10Source = gfb10Scenario
+  ? JSON.parse(fs.readFileSync(path.join(root, 'tests/reference/cases/02-time-control.json'), 'utf8'))
+    .cases.find(entry => entry.id === 'REF-03-036').source
+  : null;
 const windowSource = `control WindowPackage {
   fn above(value: Temperature) -> Bool { value > 280K }
   sensor probe: Temperature;
@@ -137,8 +142,8 @@ const profileSource = {
   'profile-2': 'control Integer { input start, stop: Bool; state count: Int = 7; output pump: Int; output valve: Bool; pump <- count; valve <- start; }',
   'profile-3': 'control IntegerBranch { input start, stop: Bool; state count: Int = 7; output pump: Int; output valve: Bool; pump <- if start then count else 0; valve <- start; }',
 }[scenario];
-const source = (profileSource || quantitySource || timeSource || resultSource || debounceSource || holdSource || intSettingsSource || windowScenario) ? `# Package profile\n\n\`\`\`ghost\n${profileSource || quantitySource || timeSource || resultSource || debounceSource || holdSource || intSettingsSource || windowSource}\n\`\`\`\n`
-  : fs.readFileSync(path.join(root, 'examples/tutorial/01-latch.ghost.md'), 'utf8');
+const source = gfb10Source || ((profileSource || quantitySource || timeSource || resultSource || debounceSource || holdSource || intSettingsSource || windowScenario) ? `# Package profile\n\n\`\`\`ghost\n${profileSource || quantitySource || timeSource || resultSource || debounceSource || holdSource || intSettingsSource || windowSource}\n\`\`\`\n`
+  : fs.readFileSync(path.join(root, 'examples/tutorial/01-latch.ghost.md'), 'utf8'));
 const compilation = await compileSource(source, { filename: '01-latch.ghost.md' });
 if (scenario === 'profile-2' || scenario === 'profile-3') identity.requiredCapabilities[0].type = 'int';
 if (quantityScenario) identity.requiredCapabilities = [
@@ -169,17 +174,23 @@ if (windowScenario) identity.requiredCapabilities = [
   { kind: 'sensor', name: 'probe', type: 'number' },
   { kind: 'actuator', name: 'pump', type: 'bool' },
 ];
+if (gfb10Scenario) identity.requiredCapabilities = [{ kind: 'actuator', name: 'due', type: 'bool' }];
 const packageValue = await buildPortablePackage(compilation, identity, {
   signers: [{ keyId: 'test-current-2026', privateKey }],
   verifyCompilation: (text, { filename }) => compileSource(text, { filename }),
 });
-if (scenario === 'valid' || profileSource || scenario === 'quantity-valid' || scenario === 'time-valid' || scenario === 'result-valid' || scenario === 'debounce-valid' || scenario === 'hold-valid' || scenario === 'hold-basic-valid' || scenario === 'int-settings-valid' || scenario === 'window-valid') {
+if (scenario === 'valid' || profileSource || scenario === 'quantity-valid' || scenario === 'time-valid' || scenario === 'result-valid' || scenario === 'debounce-valid' || scenario === 'hold-valid' || scenario === 'hold-basic-valid' || scenario === 'int-settings-valid' || scenario === 'window-valid' || scenario === 'gfb10-valid') {
   process.stdout.write(serializePortablePackage(packageValue));
-} else if (quantityScenario || timeScenario || resultScenario || debounceScenario || holdScenario || intSettingsScenario || windowScenario || ['unsupported-bytecode-version', 'version-mismatch-1', 'version-mismatch-2', 'unsupported-header'].includes(scenario)) {
+} else if (quantityScenario || timeScenario || resultScenario || debounceScenario || holdScenario || intSettingsScenario || windowScenario || gfb10Scenario || ['unsupported-bytecode-version', 'version-mismatch-1', 'version-mismatch-2', 'unsupported-header'].includes(scenario)) {
   const candidate = JSON.parse(JSON.stringify(packageValue));
-  if (quantityScenario || timeScenario || resultScenario || debounceScenario || holdScenario || intSettingsScenario || windowScenario) {
+  if (quantityScenario || timeScenario || resultScenario || debounceScenario || holdScenario || intSettingsScenario || windowScenario || gfb10Scenario) {
     const manifest = JSON.parse(Buffer.from(candidate.payload.manifest.contentBase64, 'base64').toString('utf8'));
-    if (intSettingsScenario) {
+    if (gfb10Scenario) {
+      if (scenario === 'gfb10-periodic-anchor') manifest.schedules[0].anchor.instantMs += 1;
+      else if (scenario === 'gfb10-periodic-policy-missing') delete manifest.schedules[0].policy.clock;
+      else throw new Error(`unknown GFB10 scenario: ${scenario}`);
+    }
+    else if (intSettingsScenario) {
       const config = manifest.configs[0];
       const match = /^int-settings-(value|min|max|step)-(fraction|underflow|overflow|string|null|missing)$/.exec(scenario);
       if (match) {
