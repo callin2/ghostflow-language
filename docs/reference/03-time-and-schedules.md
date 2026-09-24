@@ -9,7 +9,8 @@ GhostFlow는 시간을 하나의 숫자로 취급하지 않는다. “5분 동�
 기준점을 임의로 바꾸어서도 안 된다. 이 장은 이 구분을 바탕으로 시간값, 타이머,
 반복 일정, 근무 달력, 자연 사건의 의미를 정의한다.
 
-이 장의 `ghost` 코드와 문법 블록은 최종 공개 표기다. ClockSnapshot, manifest와
+이 장의 `ghost` 코드와 문법 블록은 선택된 공개 언어 계약이다. 현재 compiler에서
+검증되거나 실행되는 범위가 더 좁은 곳은 해당 절에 명시한다. ClockSnapshot, manifest와
 provider record처럼 `text`로 표시한 구조는 실행 환경 계약이며 GhostFlow 소스가 아니다.
 일정의 실제 시계·달력·예측 자료는 로컬 장치나 선택적 gateway가 공급할 수 있다.
 네트워크나 특정 gateway는 언어 요구가 아니다.
@@ -208,15 +209,23 @@ resource pump1: BoolActuator;
 account pump_applied = on_time(pump1,
   stage: applied,
   persistence: durable);
-let used = used(pump_applied, rolling(60s));
-let allow = used < 30s;
+constraints PumpBudget {
+  limit used(pump_applied, rolling(60s)) <= 30s {
+    reserve = 1s;
+    on_unknown = block;
+  }
+}
 ```
+
+이 코드는 control 내부 accounting 선언의 단편이다. 현재 compiler는 유효한
+`limit used(...)`를 검증해 accounting descriptor를 만든다. 실행에는 별도의
+resource binding과 ledger enforcement가 필요하다.
 
 ```text
 used(t) = ON duration of x over (t - 60s, t]
 ```
 
-정확히 30초에 도달하면 추가 ON을 허용하지 않는다. 오래된 ON interval의 일부가
+`used + reserve`가 30초에 도달하면 추가 ON을 허용하지 않는다. 오래된 ON interval의 일부가
 창 밖으로 나가면 그만큼 즉시 예산이 돌아온다. 고정 분 bucket이나 현재 연속 구간만
 재는 방식으로 바꾸지 않는다. 여러 interval의 partial overlap을 합산하며, irregular
 scan에서도 같은 논리 시간 trace는 같은 결과를 내야 한다.
@@ -243,8 +252,9 @@ Schedule은 delayed call이나 background thread가 아니라 계속 평가하�
 value다. 현재 시점에서 trigger, day rule, predicate와 context를 평가해 occurrence를
 admit할지 판단한다. 충족하지 않은 pulse는 자동 대기열에 들어가지 않는다.
 
-공개 trigger 타입은 `At`, `Daily`, `DailySlots<G>`, `Periodic`, `Cron`, `Solar`,
-`Tide`다. 각 타입은 고유 trigger field와 다음 공통 policy field를 가진다.
+선택된 trigger 타입은 `At`, `Daily`, `DailySlots<G>`, `Periodic`, `Cron`, `Solar`,
+`Tide`다. 현재 compiler는 `At`을 받지 않고 `DailySlots<15min>`만 받는다.
+각 타입은 고유 trigger field와 다음 공통 policy field를 가진다.
 
 ```ghost
 schedule name: TriggerType {
@@ -271,22 +281,31 @@ gap         := skip_after(positive Duration)
 recovery    := baseline
 fallback    := skip
              | fixed_time(TimeOfDay, terminal: skip)  // Solar만
-cancel_when := Bool                                   // run과 range에 필수
+cancel_when := Bool                                   // 현재 civil range에 필수, Tide run에는 선택
 ```
 
 공통 field는 모두 필수다. 조건 없는 admission은 `when = true`, 언어 수준 취소가
-없는 Run 또는 Range는 `cancel_when = false`라고 명시한다. `hold_trusted(d, terminal: skip)`은
+없는 Run 또는 Range는 `cancel_when = false`라고 명시할 수 있다. 현재 compiler에서
+`cancel_when`은 `Tide`의 Run과 civil `range`에 허용되고 `range`에는 필수다.
+`pulse`에는 허용되지 않는다. `hold_trusted(d, terminal: skip)`은
 마지막 trusted wall instant에 단조 경과를 더해 최대 d 동안만 사용한다. uncertainty는
 마지막 uncertainty에 같은 단조 경과를 더하며 `HeldClock` provenance를 남긴다.
 경계에서는 `ClockUnknown` 뒤 새 admission 판단에 terminal skip을 적용한다.
 이미 admit한 Range의 단조 종료 시점은 유지한다. high-water는 바꾸지 않는다.
+
+현재 compiler는 `clock = trusted_only`, `fallback = skip`만 받는다.
+`window`, `run(_, on_time)`, `At`, `hold_trusted`, `fixed_time`은 선택된 설계 표기이며
+아직 compiler 지원 범위 밖이다. civil `range`는 현재 UTC timezone의 정적 non-overlap을
+증명할 수 있는 recurrence에서 type-check되지만 실행 bytecode로 내려가지 않는다.
+Tide의 `run(_, within(_))`은 지원한다.
 
 `fixed_time`은 Solar에서만 쓸 수 있다. 해당 source local date의 fallback occurrence가
 admit되면 같은 occurrence ledger가 그 날짜의 Solar 사건을 소비하므로 provider가
 회복되어도 중복하지 않는다. Tide는 예측 부재 시 사건 수와 identity를 알 수 없으므로
 `fallback = skip`만 허용한다.
 
-one-shot `At`은 ``at = datetime`...`;``을 쓰며 DST field가 없다. 매일 한 시각인 `Daily`는
+설계된 one-shot `At`은 ``at = datetime`...`;``을 쓰며 DST field가 없다.
+현재 compiler에는 `At` 구현이 없다. 매일 한 시각인 `Daily`는
 `timezone`, ``at = time`...`;``, `dst_missing`, `dst_repeated`를 요구한다. 예를 들면 다음과 같다.
 
 ```ghost
@@ -343,7 +362,9 @@ revision이 포함된다. 대표 disposition은 `Before`, `PredicateFalse`, `Alr
 
 ### 놓친 occurrence에 대한 소스 반응
 
-`schedule_name.missed`는 `Bool` 투영이다. 해당 schedule에서 하나 이상의 occurrence가
+`schedule_name.missed`는 `Bool` 투영이다. 현재 compiler는 Solar와 실행 가능한
+`pulse` civil schedule에 이 투영을 제공한다. `range` descriptor에서는 아직
+실행 투영으로 쓸 수 없다. 해당 schedule에서 하나 이상의 occurrence가
 이번 accepted scan에 **terminal missed**로 확정될 때만 true다. 한 scan에서 둘 이상을
 놓쳐도 값은 한 번 true이고, 다음 accepted scan에 새 terminal miss가 없으면 false다.
 control action은 이 값을 해당 accepted scan의 immutable snapshot에서 정확히 한 번 평가한다.
@@ -378,14 +399,14 @@ record를 합치거나 이유 하나로 요약하지 않는다. 재부팅 뒤 �
 | basis | admission 의미 |
 |---|---|
 | `pulse` | crossing tick에 조건이 모두 true일 때만 admit. 뒤늦게 true가 되어도 missed다. |
-| `window(5min)` | `[planned, planned+5min)`에서 조건이 처음 true인 시점에 한 번 admit. 같은 occurrence에서 false→true가 반복돼도 재arm하지 않는다. |
-| `run(5min, on_time)` | observed crossing에서만 admit하고 admission부터 5분 운전한다. |
-| `run(5min, within(10min))` | `[planned, planned+10min)`에서 첫 admission을 허용한다. 10분은 grace이고 run length는 5분이다. |
-| `range(10min)` | 신뢰할 수 있는 현재 시각이 `[planned, planned+10min)` 안에 있고 `when`이 true이면 첫 관측·부팅·회복이 늦어도 한 번 admit한다. 끝은 계획 시작점 + 10분이다. |
+| `window(5min)` (설계) | `[planned, planned+5min)`에서 조건이 처음 true인 시점에 한 번 admit. 같은 occurrence에서 false→true가 반복돼도 재arm하지 않는다. |
+| `run(5min, on_time)` (설계) | observed crossing에서만 admit하고 admission부터 5분 운전한다. |
+| `run(5min, within(10min))` (Tide) | `[planned, planned+10min)`에서 첫 admission을 허용한다. 10분은 grace이고 run length는 5분이다. |
+| `range(10min)` (civil contract) | 신뢰할 수 있는 현재 시각이 `[planned, planned+10min)` 안에 있고 `when`이 true이면 첫 관측·부팅·회복이 늦어도 한 번 admit한다. 끝은 계획 시작점 + 10분이다. 현재 bytecode 실행은 미지원이다. |
 
 ```ghost
 schedule morning_watering: Daily {
-  timezone = "Asia/Seoul";
+  timezone = "UTC";
   at = time`08:00`;
   dst_missing = skip;
   dst_repeated = first;
@@ -398,6 +419,9 @@ schedule morning_watering: Daily {
   fallback = skip;
 }
 ```
+
+이 `range` 예시는 현재 compiler에서 검증되는 계약이며 실행 가능한 control bytecode는
+아니다. 현재 civil `range`는 `UTC`와 recurrence non-overlap 조건이 필요하다.
 
 late interval은 half-open이다. 종료 경계에서 새로 admit하지 않는다. 예정 시간 08:00,
 `run(5min, within(10min))`이 08:02에 admit되면 08:07까지의 단조 run이다.
@@ -950,6 +974,9 @@ fault를 명시적으로 나누어 제어용 `Bool`을 만든다. **왜:** 불�
 - `TimeSlots<G,N>` live setting, Periodic phase 변경, `cron5`, day/calendar/DST.
 - bounded `hold_trusted`, terminal fallback, stable natural-event provider identity.
 - `on_time`, `used`, `rolling`, `local_day`, limit reservation과 persistence.
+
+이 목록은 선택된 언어 계약이다. 현재 compiler 지원 범위와 실행 가능한 bytecode 범위는
+§3.5와 §3.6의 구분을 따른다.
 
 작성자는 schedule의 start predicate, basis와 duration, Run cancellation, DST 선택,
 Periodic anchor/change policy, natural fallback, accounting stage/resource/reservation,
