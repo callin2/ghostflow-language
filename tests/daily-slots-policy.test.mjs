@@ -63,12 +63,16 @@ test('DailySlots type checking preserves explicit pulse policy and its declarati
   }]);
 });
 
-test('DailySlots descriptor retains policy while executable control remains closed', async () => {
-  assert.throws(() => compileControl(code), /DailySlots policy execution requires verified occurrence provider and native admission bindings/);
+test('literal DailySlots emits executable GFB9 while config-selected slots remain closed', async () => {
+  const control = compileControl(code);
+  assert.equal(control.manifest.format, 'GhostFlow/control-v8');
+  assert.equal(new DataView(control.bytes.buffer, control.bytes.byteOffset, control.bytes.byteLength).getUint16(4, true), 9);
   const compiled = await compileSource(fixture.source, { filename: fixture.filename });
-  assert.equal(compiled.manifest.format, 'GhostFlow/schedule-descriptor-v1');
-  assert.equal(JSON.parse(compiled.bytes).executable, false);
-  assert.equal('dueInput' in compiled.manifest.control.schedules[0], false);
+  assert.equal(compiled.manifest.format, 'GhostFlow/control-v8');
+
+  const configurable = code.replace('selected = [00:00, 06:15, 23:45];', 'selected = watering_slots;')
+    .replace('control DailySlotsValid {', 'control DailySlotsValid { config watering_slots: TimeSlots<15min, 8> = [time`06:15`];');
+  assert.throws(() => compileControl(configurable), /DailySlots policy execution requires verified occurrence provider and native admission bindings/);
 });
 
 test('DailySlots retains the authored predicate, DST choices and exact gap boundary', () => {
