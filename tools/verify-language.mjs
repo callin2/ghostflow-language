@@ -139,6 +139,8 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/ghostsim-continuous-io.test.mjs',
   'tests/ghostsim-temporal.test.mjs',
   'tests/ghostsim-solar.test.mjs',
+  'tests/daily-runtime.test.mjs',
+  'tests/ghostsim-daily.test.mjs',
   'tests/ghostsim-live.test.mjs',
   'tests/ghostsim-console.test.mjs',
   'tests/authoring-workflow.test.mjs',

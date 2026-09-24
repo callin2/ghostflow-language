@@ -12,14 +12,16 @@ let runtime;
 const certified = manifest.signals?.some(signal => signal.kind === 'true-for');
 const hasAfterEvent = manifest.signals?.some(signal => signal.kind === 'after-event');
 const hasSolar = manifest.schedules?.some(schedule => schedule.kind === 'solar');
+const hasDaily = manifest.schedules?.some(schedule => schedule.kind === 'daily');
 const hasObjective = (manifest.objectives?.length ?? 0) > 0;
 try {
-  const instantiate = certified || hasAfterEvent || hasSolar || hasObjective ? ControlRuntime.instantiate : ControlRuntime.instantiateFramed;
+  const instantiate = certified || hasAfterEvent || hasSolar || hasDaily || hasObjective ? ControlRuntime.instantiate : ControlRuntime.instantiateFramed;
   runtime = await instantiate.call(ControlRuntime, wasm, { bytes: artifactBytes, manifest }, {
     acceptSettings: true,
     ...(scenario.temporal === undefined ? {} : { temporal: scenario.temporal }),
     ...(scenario.afterEvent === undefined ? {} : { afterEvent: scenario.afterEvent }),
     ...(scenario.solar === undefined ? {} : { solar: scenario.solar }),
+    ...(scenario.schedule === undefined ? {} : { schedule: scenario.schedule }),
     ...(scenario.capabilities === undefined ? {} : { capabilities: scenario.capabilities }),
   });
 } catch (error) {
@@ -87,7 +89,8 @@ try {
             const binding = scenario.actuatorBindings?.find(item => item.output === objective.bindings.output);
             return [objective.name, binding?.max ?? objective.output.max];
           })),
-          ...(action.solarFacts === undefined ? {} : { solarFacts: action.solarFacts }) });
+          ...(action.solarFacts === undefined ? {} : { solarFacts: action.solarFacts }),
+          ...(action.scheduleFacts === undefined ? {} : { scheduleFacts: action.scheduleFacts }) });
         const virtualActuators = Object.fromEntries((scenario.actuatorBindings ?? []).map(binding => {
           const requested = outcome.vm.requested[binding.output];
           const safe = outcome.vm.safe[binding.output];
