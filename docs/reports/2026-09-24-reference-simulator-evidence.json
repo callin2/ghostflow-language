@@ -1,0 +1,446 @@
+{
+  "format": "GhostFlow/reference-simulator-audit-v1",
+  "auditDate": "2026-09-24",
+  "sourceRevision": "f809b4d327f8222acc4f00fa1277e02e8a8688df",
+  "commands": [
+    "cargo build --locked --offline -p ghostflow-core --example scenario_scan --release",
+    "cargo build --locked --offline -p ghostflow-wasm --target wasm32-unknown-unknown --release",
+    "node --test tests/reference-simulator.test.mjs tests/requirement-catalog.test.mjs"
+  ],
+  "summary": {
+    "passed": 70,
+    "failed": 10,
+    "noncontrol": 3
+  },
+  "notRunIds": [],
+  "results": [
+    {
+      "id": "REF-01-001",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-01-005",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-01-006",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-01-007",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-01-010",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-01-011",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-01-012",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-01-013",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-01-019",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-01-024",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-01-025",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-01-026",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-01-029",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-01-032",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-01-036",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-01-040",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-01-049",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-01-056",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v4"
+    },
+    {
+      "id": "REF-01-057",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-01-060",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v4"
+    },
+    {
+      "id": "REF-01-065",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v4"
+    },
+    {
+      "id": "REF-01-066",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-01-068",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-01-071",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-01-073",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-01-078",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-01-088",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-01-097",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-01-106",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-01-109",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-01-110",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v4"
+    },
+    {
+      "id": "REF-01-116",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-01-117",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-01-118",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-01-121",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-01-123",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-03-001",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-03-004",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-03-006",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-03-008",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-03-011",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-03-015",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-03-024",
+      "outcome": "failed",
+      "artifactFormat": "GhostFlow/schedule-descriptor-v1",
+      "reason": "REF-03-024: accepted control source compiled to GhostFlow/schedule-descriptor-v1; ghostsim requires an executable control artifact"
+    },
+    {
+      "id": "REF-03-032",
+      "outcome": "failed",
+      "artifactFormat": "GhostFlow/schedule-descriptor-v1",
+      "reason": "REF-03-032: accepted control source compiled to GhostFlow/schedule-descriptor-v1; ghostsim requires an executable control artifact"
+    },
+    {
+      "id": "REF-03-036",
+      "outcome": "failed",
+      "artifactFormat": "GhostFlow/schedule-descriptor-v1",
+      "reason": "REF-03-036: accepted control source compiled to GhostFlow/schedule-descriptor-v1; ghostsim requires an executable control artifact"
+    },
+    {
+      "id": "REF-03-038",
+      "outcome": "failed",
+      "artifactFormat": "GhostFlow/schedule-descriptor-v1",
+      "reason": "REF-03-038: accepted control source compiled to GhostFlow/schedule-descriptor-v1; ghostsim requires an executable control artifact"
+    },
+    {
+      "id": "REF-03-042",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v3"
+    },
+    {
+      "id": "REF-03-045",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v3"
+    },
+    {
+      "id": "REF-03-050",
+      "outcome": "failed",
+      "artifactFormat": "GhostFlow/accounting-v1",
+      "reason": "REF-03-050: accepted control source compiled to GhostFlow/accounting-v1; ghostsim requires an executable control artifact"
+    },
+    {
+      "id": "REF-03-057",
+      "outcome": "failed",
+      "artifactFormat": "GhostFlow/schedule-descriptor-v1",
+      "reason": "REF-03-057: accepted control source compiled to GhostFlow/schedule-descriptor-v1; ghostsim requires an executable control artifact"
+    },
+    {
+      "id": "REF-03-059",
+      "outcome": "failed",
+      "artifactFormat": "GhostFlow/schedule-descriptor-v1",
+      "reason": "REF-03-059: accepted control source compiled to GhostFlow/schedule-descriptor-v1; ghostsim requires an executable control artifact"
+    },
+    {
+      "id": "REF-03-060",
+      "outcome": "failed",
+      "artifactFormat": "GhostFlow/schedule-descriptor-v1",
+      "reason": "REF-03-060: accepted control source compiled to GhostFlow/schedule-descriptor-v1; ghostsim requires an executable control artifact"
+    },
+    {
+      "id": "REF-03-062",
+      "outcome": "failed",
+      "artifactFormat": "GhostFlow/temporal-descriptor-v1",
+      "reason": "REF-03-062: accepted control source compiled to GhostFlow/temporal-descriptor-v1; ghostsim requires an executable control artifact"
+    },
+    {
+      "id": "REF-04-001",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-04-004",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-04-006",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-04-013",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-04-017",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-04-020",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-04-021",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-04-022",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-04-025",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v4"
+    },
+    {
+      "id": "REF-04-026",
+      "outcome": "failed",
+      "artifactFormat": "GhostFlow/temporal-descriptor-v1",
+      "reason": "REF-04-026: accepted control source compiled to GhostFlow/temporal-descriptor-v1; ghostsim requires an executable control artifact"
+    },
+    {
+      "id": "REF-04-027",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v4"
+    },
+    {
+      "id": "REF-04-028",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v4"
+    },
+    {
+      "id": "REF-04-029",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v4"
+    },
+    {
+      "id": "REF-04-031",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-04-033",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-04-035",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-04-040",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-04-041",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-04-044",
+      "outcome": "noncontrol",
+      "artifactFormat": "GhostFlow/resource-policy-v1",
+      "reason": "standalone resource policy has no control to scan"
+    },
+    {
+      "id": "REF-04-045",
+      "outcome": "noncontrol",
+      "artifactFormat": "GhostFlow/resource-policy-v1",
+      "reason": "standalone resource policy has no control to scan"
+    },
+    {
+      "id": "REF-04-050",
+      "outcome": "noncontrol",
+      "artifactFormat": "GhostFlow/resource-policy-v1",
+      "reason": "standalone resource policy has no control to scan"
+    },
+    {
+      "id": "REF-04-058",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v2"
+    },
+    {
+      "id": "REF-04-061",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-04-063",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v2"
+    },
+    {
+      "id": "REF-05-001",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v2"
+    },
+    {
+      "id": "REF-05-002",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v2"
+    },
+    {
+      "id": "REF-05-003",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v2"
+    },
+    {
+      "id": "REF-06-010",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-06-023",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v1"
+    },
+    {
+      "id": "REF-05-108",
+      "outcome": "passed",
+      "artifactFormat": "GhostFlow/control-v2"
+    }
+  ]
+}
