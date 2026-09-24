@@ -23,12 +23,13 @@ test('Daily type checking preserves exact local time and common pulse policy', (
   }]);
 });
 
-test('Daily emits only a checked descriptor until native admission is bound', async () => {
-  assert.throws(() => compileControl(dailyCode), /Daily policy execution requires verified occurrence provider and native admission bindings/);
+test('Daily emits executable GFB8 while DailySlots remains descriptor-only', async () => {
+  const control = compileControl(dailyCode);
+  assert.equal(control.manifest.format, 'GhostFlow/control-v7');
+  assert.equal(new DataView(control.bytes.buffer, control.bytes.byteOffset, control.bytes.byteLength).getUint16(4, true), 8);
   const compiled = await compileSource(dailyFixture.source, { filename: dailyFixture.filename });
-  assert.equal(compiled.manifest.format, 'GhostFlow/schedule-descriptor-v1');
-  assert.equal(JSON.parse(compiled.bytes).executable, false);
-  assert.deepEqual(compiled.manifest.control.schedules, typeCheckControl(dailyCode).manifest.schedules);
+  assert.equal(compiled.manifest.format, 'GhostFlow/control-v7');
+  assert.deepEqual(compiled.manifest.schedules, typeCheckControl(dailyCode).manifest.schedules);
 });
 
 test('Daily retains midnight and the last millisecond without applying a slot grid', () => {
