@@ -2,9 +2,9 @@
 
 `runtimes/wasm/after-event-runtime.mjs` exposes the existing Rust
 `AfterEvent<32>` engine through WASM. JavaScript transports facts and reads native
-results; it does not evaluate event windows. This is an independent execution
-primitive. It does not activate a compiled control or choose a scalar projection
-for overlapping results.
+results; it does not evaluate event windows. `after_event_any` and
+`after_event_all` are explicit scalar projections over the retained native result
+set.
 
 ## Bind a site from canonical source
 
@@ -40,10 +40,9 @@ site. It does not execute outputs, state expressions, or other sites in the
 document, and it does not certify the document for device deployment.
 
 Native results remain `pending`, `satisfied`, or `expired` by identity. A stage
-and rollback preserves the previous results. The adapter has no scalar
-`Result<Bool, SensorFault>` conversion: one event may expire while another is
-satisfied in the same batch. Full `ControlRuntime` transaction integration still
-requires the source projection contract below.
+and rollback preserves the previous results. `any()` and `all()` read committed
+state. `stagedAny()` and `stagedAll()` expose the staged native aggregate to the
+control transaction without committing it.
 
 ## Low-level binding
 
@@ -106,14 +105,27 @@ The create/stage/commit/rollback/destroy exports use an opaque instance handle.
 Results and errors are UTF-8 strings exposed through pointer/length getters.
 Consumers copy those views before subsequent mutation or disposal.
 
-## Remaining control integration
+## Control and simulator integration
 
-The Reference requires independent results for overlapping starts. It does not
-specify which identity `opened |> recover(false)` selects. Choosing newest,
-oldest, any, or all would add language semantics. Until a projection contract is
-specified, the compiler's non-executable descriptor and `ControlRuntime` gate
-remain. The WASM primitive does not claim transactional integration with a control
-tick, checkpoint/replay, or deployment support.
+Executable controls must use `after_event_any(signal)` or
+`after_event_all(signal)`. Each start remains an independent Rust-owned result;
+the aggregate is computed only after the current scan's expiry, starts,
+acknowledgements, and measured predicate observation are staged. A successful VM
+scan commits both states. A rejected VM scan rolls back the tracker, VM, and
+logical time together.
+
+`ControlRuntime` derives event and predicate tags from the compiled manifest.
+Scenario callers supply only source epochs, IDs, timestamps, acknowledgements,
+and an activation time epoch. Private generated Result inputs cannot be supplied
+as ordinary inputs. A scan with no current measured predicate observation does
+not reuse or interpolate an earlier sample. Until a terminal native result
+exists, the projection is `Err(NotReady)` and follows the program's explicit
+Result handling.
+
+Each site has capacity 32. The WASM control and `ghostsim` paths support this
+contract. The plain native composite scenario runner has no identified Event
+transport, and this ABI does not claim device deployment or physical I/O support.
+An unused `after_event` declaration remains a checked non-executable descriptor.
 
 ## Natural provider blocker
 
@@ -135,5 +147,5 @@ Before executable lowering, define and verify:
    control tick/replay handling. A host Boolean alone cannot satisfy this contract.
 
 These are remaining implementation/interface decisions; no runtime conformance
-claim follows from successful descriptor compilation. Existing tests retain the
-executable rejection until this boundary is implemented.
+claim follows from successful descriptor compilation. Natural-condition tests
+retain the executable rejection until this boundary is implemented.

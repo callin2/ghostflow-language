@@ -10,13 +10,15 @@ validateScenario(scenario, manifest);
 const wasm = fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
 let runtime;
 const certified = manifest.signals?.some(signal => signal.kind === 'true-for');
+const hasAfterEvent = manifest.signals?.some(signal => signal.kind === 'after-event');
 const hasSolar = manifest.schedules?.some(schedule => schedule.kind === 'solar');
 const hasObjective = (manifest.objectives?.length ?? 0) > 0;
 try {
-  const instantiate = certified || hasSolar || hasObjective ? ControlRuntime.instantiate : ControlRuntime.instantiateFramed;
+  const instantiate = certified || hasAfterEvent || hasSolar || hasObjective ? ControlRuntime.instantiate : ControlRuntime.instantiateFramed;
   runtime = await instantiate.call(ControlRuntime, wasm, { bytes: artifactBytes, manifest }, {
     acceptSettings: true,
     ...(scenario.temporal === undefined ? {} : { temporal: scenario.temporal }),
+    ...(scenario.afterEvent === undefined ? {} : { afterEvent: scenario.afterEvent }),
     ...(scenario.solar === undefined ? {} : { solar: scenario.solar }),
     ...(scenario.capabilities === undefined ? {} : { capabilities: scenario.capabilities }),
   });
@@ -80,6 +82,7 @@ try {
           };
         }
         const outcome = runtime.step({ nowMs: action.atMs, inputs, samples, intervals,
+          ...(action.events === undefined ? {} : { events: action.events }),
           objectiveSafeMax: Object.fromEntries((manifest.objectives ?? []).map(objective => {
             const binding = scenario.actuatorBindings?.find(item => item.output === objective.bindings.output);
             return [objective.name, binding?.max ?? objective.output.max];
