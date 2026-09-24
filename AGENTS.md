@@ -45,6 +45,9 @@ are installed. It compiles the fixture required by Rust tests before invoking
 Cargo, builds the WASM/native runners, and executes the language tests/tutorial.
 Keep runnable FAQ and programming samples in the focused
 `tests/docs-runnable-examples.test.mjs` compiler check when changing them.
+After editing a document referenced by `contracts/requirements/catalog.json`,
+run `node --test tests/requirement-catalog.test.mjs`; relocate unchanged excerpt
+ranges when lines move, and preserve their expected hashes.
 Keep source and artifact hashes in release records. Generated verification and
 tutorial traces are execution evidence under ignored `build/`, separate from
 source releases. Report host validation separately from Device, API and farmer-UX
@@ -57,6 +60,10 @@ pinned, and measured behavior comparisons separate. Diagnose that contract befor
 changing a hash. Capture an intentional new benchmark in a new dated artifact and
 cover provenance changes and stored-record tampering with regression tests. See
 [`docs/2026-09-24-authoring-baseline-provenance.md`](docs/2026-09-24-authoring-baseline-provenance.md).
+When the programming book changes, run `npm run generate:pc01` before verification.
+The generator updates only PC-01 current source digests in the curriculum catalog
+and replay manifest. Keep replay frames, checkpoints, other lessons, and dated
+benchmark evidence fixed; diagnose any remaining mismatch rather than rewriting it.
 
 ## v1 clean break: canonical literate source only
 
