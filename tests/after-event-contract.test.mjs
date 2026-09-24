@@ -59,6 +59,11 @@ test('explicit after_event projections lower to private Result channels', () => 
   assert.deepEqual(compiled.manifest.inputs, []);
 });
 
+test('direct lowering rejects an after_event site without an explicit projection', () => {
+  assert.throws(() => compileControl(descriptorCode, { filename }),
+    /after_event requires an explicit after_event_any or after_event_all projection/);
+});
+
 test('canonical literate compilation emits executable control only for explicit projections', async () => {
   const artifact = await compileSource(document, { filename });
   assert.match(artifact.manifest.format, /^GhostFlow\/control-v[1-6]$/);

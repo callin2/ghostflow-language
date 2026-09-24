@@ -3625,7 +3625,12 @@ export function compileControl(source, { filename = '<control>', emitBytecode = 
       ? 'resource policy execution requires bounded queue and resource runtime binding'
       : 'named constraints require resource binding and runtime enforcement');
   }
-  return new Lowerer(ast, filename).lower({ emitBytecode });
+  const lowered = new Lowerer(ast, filename).lower({ emitBytecode });
+  if (lowered.manifest.signals.some(signal => signal.kind === 'after-event'
+    && !signal.projections?.length)) {
+    error(ast.loc, 'after_event requires an explicit after_event_any or after_event_all projection');
+  }
+  return lowered;
 }
 
 /** Internal composition adapter. The public API accepts canonical documents. */
