@@ -88,7 +88,7 @@ pub(crate) struct SolarRuntime {
 }
 pub(crate) struct StagedSolar {
     engines: Vec<SolarPulseEngine>,
-    pub projections: Vec<[Value; 2]>,
+    pub projections: Vec<[Value; 3]>,
     pub trace: Vec<SolarStageResult>,
 }
 impl SolarRuntime {
@@ -99,6 +99,16 @@ impl SolarRuntime {
         // Bound provider batches and terminal storage explicitly on MCU targets.
         if descriptors.is_empty() || !(1..=4096).contains(&activation.terminal_capacity) {
             return Err(Error::new("invalid solar activation capacity"));
+        }
+        if descriptors.iter().any(|d| {
+            matches!(
+                d,
+                PulseDescriptor::Context(_)
+                    | PulseDescriptor::Natural(_)
+                    | PulseDescriptor::Accounting(_)
+            )
+        }) {
+            return Err(Error::new("context descriptors require context activation"));
         }
         let engines = descriptors
             .iter()
@@ -219,9 +229,11 @@ impl SolarRuntime {
                         | crate::solar_admission::SolarDecision::CorrectionPastHighWater
                 )
             });
-            staged
-                .projections
-                .push([Value::Bool(result.due), Value::Bool(missed)]);
+            staged.projections.push([
+                Value::Bool(result.due),
+                Value::Bool(missed),
+                Value::Bool(false),
+            ]);
             staged.trace.push(result);
         }
         Ok(staged)

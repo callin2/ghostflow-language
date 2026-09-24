@@ -3,9 +3,16 @@ use std::fmt;
 
 pub mod accounting;
 pub mod after_event;
+pub mod context_runtime;
+#[cfg(test)]
+mod context_runtime_tests;
+pub mod context_schedule;
+pub mod context_vm;
 pub mod controller;
+pub mod cron_schedule;
 pub mod daily_slots;
 pub mod keyboard;
+pub mod natural_context;
 pub mod objective_vm;
 pub mod range_schedule;
 pub mod resource_policy;
@@ -25,6 +32,7 @@ mod trace_json;
 pub mod true_for;
 pub mod true_for_runtime;
 pub mod true_for_vm;
+pub mod work_calendar;
 
 const MAX_INPUTS: usize = 128;
 const MAX_STATES: usize = 128;
@@ -46,7 +54,7 @@ impl Type {
         match value {
             1 => Ok(Self::Bool),
             2 => Ok(Self::Number),
-            3 if matches!(format_version, 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9) => Ok(Self::Int),
+            3 if matches!(format_version, 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10) => Ok(Self::Int),
             _ => Err(Error::new("invalid type")),
         }
     }
@@ -171,7 +179,7 @@ impl Module {
             return Err(Error::new("invalid GFB1 magic"));
         }
         let format_version = reader.u16()?;
-        if !matches!(format_version, 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9) {
+        if !matches!(format_version, 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10) {
             return Err(Error::new("unsupported GFB format"));
         }
         let name = reader.string()?;
@@ -229,7 +237,7 @@ impl Module {
             });
         }
 
-        let mut temporal = if matches!(format_version, 4 | 5 | 6 | 8 | 9) {
+        let mut temporal = if matches!(format_version, 4 | 5 | 6 | 8 | 9 | 10) {
             Some(temporal_vm::TemporalRequirements::load_header(
                 &mut reader,
                 &inputs,
@@ -238,10 +246,11 @@ impl Module {
         } else {
             None
         };
-        let mut schedules =
-            matches!(format_version, 5 | 6 | 8 | 9).then(|| schedule_vm::ScheduleRequirements {
+        let mut schedules = matches!(format_version, 5 | 6 | 8 | 9 | 10).then(|| {
+            schedule_vm::ScheduleRequirements {
                 strategies: Vec::new(),
-            });
+            }
+        });
         let mut true_fors = (format_version == 6).then(|| true_for_vm::TrueForRequirements {
             strategies: Vec::new(),
         });
@@ -262,7 +271,7 @@ impl Module {
             verify_query(&query, format_version)?;
 
             let (windows, schedule_count, true_for_count, mut result_trace_bound) =
-                if matches!(format_version, 5 | 6 | 8 | 9) {
+                if matches!(format_version, 5 | 6 | 8 | 9 | 10) {
                     let loaded = schedule_vm::load_prelude(
                         &mut reader,
                         &inputs,
@@ -635,6 +644,7 @@ pub struct TickRecord {
     pub window_trace: Vec<temporal_runtime::WindowTrace>,
     pub true_for_trace: Vec<true_for_runtime::TrueForTrace>,
     pub schedule_trace: Vec<solar_admission::SolarStageResult>,
+    pub context_trace: Vec<context_vm::Observation>,
 }
 
 impl TickRecord {
@@ -664,6 +674,7 @@ pub struct Runtime {
     temporal: Option<temporal_runtime::TemporalRuntime>,
     true_for_runtime: Option<true_for_runtime::TrueForRuntime>,
     solar_runtime: Option<solar_runtime::SolarRuntime>,
+    context_runtime: Option<context_runtime::ContextRuntime>,
     objective_runtime: Option<controller::Pid>,
 }
 
@@ -683,6 +694,7 @@ impl Runtime {
             temporal: None,
             true_for_runtime: None,
             solar_runtime: None,
+            context_runtime: None,
             objective_runtime: None,
         }
     }
@@ -699,6 +711,7 @@ impl Runtime {
         self.temporal = None;
         self.true_for_runtime = None;
         self.solar_runtime = None;
+        self.context_runtime = None;
         self.objective_runtime = None;
         let old = if preserve_state {
             self.named_state()
@@ -827,6 +840,126 @@ impl Runtime {
         let m = self.module.as_ref()?;
         Some(&m.strategies[self.active_strategy?].name)
     }
+    /// Activate GFB10 with explicit provider bindings. No host-computed projections.
+    pub fn activate_with_context(
+        &mut self,
+        activation: &context_runtime::Activation,
+    ) -> Result<()> {
+        if self.active_strategy.is_some()
+            || self.solar_runtime.is_some()
+            || self.context_runtime.is_some()
+            || self.temporal.is_some()
+            || self.true_for_runtime.is_some()
+        {
+            return Err(Error::new("context session is already activated"));
+        }
+        let module = self
+            .module
+            .as_ref()
+            .ok_or_else(|| Error::new("no module installed"))?;
+        if module.format_version != 10 {
+            return Err(Error::new("context activation requires GFB10"));
+        }
+        if module
+            .temporal
+            .as_ref()
+            .is_some_and(|r| r.strategies.iter().any(|s| !s.windows.is_empty()))
+        {
+            return Err(Error::new(
+                "context and interval window preludes cannot be mixed",
+            ));
+        }
+        let selected = select_strategy_bound(module, &self.capabilities)?;
+        let requirements = module
+            .schedules
+            .as_ref()
+            .ok_or_else(|| Error::new("no context requirements"))?;
+        let runtime = context_runtime::ContextRuntime::new(
+            &requirements.strategies[selected].schedules,
+            activation,
+        )?;
+        self.context_runtime = Some(runtime);
+        self.active_strategy = Some(selected);
+        Ok(())
+    }
+    pub fn tick_with_context(
+        &mut self,
+        clock: schedule_clock::ClockSnapshot<'_>,
+        facts: &context_runtime::Facts,
+    ) -> Result<&TickRecord> {
+        if !self.module.as_ref().is_some_and(|m| m.format_version == 10) {
+            return Err(Error::new("context facts require GFB10"));
+        }
+        self.tick_inner(None, Some((clock, facts)))
+    }
+    pub fn context_checkpoint(&self) -> Result<Vec<u8>> {
+        let module = self
+            .module
+            .as_ref()
+            .ok_or_else(|| Error::new("no module installed"))?;
+        let selected = self
+            .active_strategy
+            .ok_or_else(|| Error::new("context is not active"))?;
+        let requirements = module
+            .schedules
+            .as_ref()
+            .ok_or_else(|| Error::new("no context requirements"))?;
+        self.context_runtime
+            .as_ref()
+            .ok_or_else(|| Error::new("no context runtime"))?
+            .snapshot(
+                &requirements.strategies[selected].schedules,
+                module.fingerprint,
+            )
+    }
+    pub fn context_state_json(&self) -> Result<String> {
+        let module = self
+            .module
+            .as_ref()
+            .ok_or_else(|| Error::new("no module installed"))?;
+        let selected = self
+            .active_strategy
+            .ok_or_else(|| Error::new("context is not active"))?;
+        let requirements = module
+            .schedules
+            .as_ref()
+            .ok_or_else(|| Error::new("no context requirements"))?;
+        self.context_runtime
+            .as_ref()
+            .ok_or_else(|| Error::new("no context runtime"))?
+            .state_json(
+                &requirements.strategies[selected].schedules,
+                module.fingerprint,
+            )
+    }
+    /// Restore durable identities and settings before the new run's first scan.
+    pub fn restore_context_checkpoint(&mut self, bytes: &[u8]) -> Result<()> {
+        if self.next_tick != 1 {
+            return Err(Error::new("restore context before the first scan"));
+        }
+        let module = self
+            .module
+            .as_ref()
+            .ok_or_else(|| Error::new("no module installed"))?;
+        let selected = self
+            .active_strategy
+            .ok_or_else(|| Error::new("context is not active"))?;
+        let requirements = module
+            .schedules
+            .as_ref()
+            .ok_or_else(|| Error::new("no context requirements"))?;
+        let restored = self
+            .context_runtime
+            .as_ref()
+            .ok_or_else(|| Error::new("no context runtime"))?
+            .restored(
+                &requirements.strategies[selected].schedules,
+                module.fingerprint,
+                bytes,
+            )?;
+        self.context_runtime = Some(restored);
+        Ok(())
+    }
     /// Bind provider occurrence facts to a schedule-only GFB5 module.
     /// Provider code must derive facts from the installed descriptor, including
     /// timezone/location/offset and complete coverage. No host due bit is accepted.
@@ -914,7 +1047,7 @@ impl Runtime {
         {
             return Err(Error::new("Solar facts cannot contain a civil fold"));
         }
-        self.tick_inner(Some((clock, facts)))
+        self.tick_inner(Some((clock, facts)), None)
     }
     pub fn tick_with_schedules(
         &mut self,
@@ -964,7 +1097,7 @@ impl Runtime {
                 facts: f.facts,
             })
             .collect();
-        self.tick_inner(Some((clock, &shared)))
+        self.tick_inner(Some((clock, &shared)), None)
     }
     /// Native direct-source certified interval execution. Mixed preludes and replay
     /// require separate integration and remain rejected.
@@ -1120,6 +1253,13 @@ impl Runtime {
             .iter()
             .position(|f| f.name == name)
             .ok_or_else(|| Error::new(format!("unknown input {name}")))?;
+        if m.format_version == 10
+            && (name.starts_with("__gf_natural_") || name.starts_with("__gf_accounting_"))
+        {
+            return Err(Error::new(
+                "Rust provider projections are not caller inputs",
+            ));
+        }
         if m.inputs[i].value_type != value.value_type() {
             return Err(Error::new("input type mismatch"));
         }
@@ -1130,7 +1270,7 @@ impl Runtime {
         Ok(())
     }
     pub fn tick(&mut self) -> Result<&TickRecord> {
-        self.tick_inner(None)
+        self.tick_inner(None, None)
     }
     fn tick_inner(
         &mut self,
@@ -1138,7 +1278,11 @@ impl Runtime {
             schedule_clock::ClockSnapshot<'_>,
             &[solar_runtime::SolarInput<'_>],
         )>,
+        context: Option<(schedule_clock::ClockSnapshot<'_>, &context_runtime::Facts)>,
     ) -> Result<&TickRecord> {
+        if self.context_runtime.is_some() != context.is_some() {
+            return Err(Error::new("context tick requires activated typed evidence"));
+        }
         if self.solar_runtime.is_some() != solar.is_some() {
             return Err(Error::new(
                 "solar tick requires activated occurrence bindings",
@@ -1152,11 +1296,17 @@ impl Runtime {
             .active_strategy
             .ok_or_else(|| Error::new("runtime is not active"))?;
         let strategy = &m.strategies[si];
-        let iv: Vec<Value> = self
+        let mut iv: Vec<Value> = self
             .inputs
             .iter()
             .enumerate()
             .map(|(i, v)| {
+                if m.format_version == 10
+                    && (m.inputs[i].name.starts_with("__gf_natural_")
+                        || m.inputs[i].name.starts_with("__gf_accounting_"))
+                {
+                    return Ok(m.inputs[i].default);
+                }
                 v.ok_or_else(|| Error::new(format!("missing input {}", m.inputs[i].name)))
             })
             .collect::<Result<_>>()?;
@@ -1208,6 +1358,37 @@ impl Runtime {
             (None, None) => None,
             _ => return Err(Error::new("objective runtime binding mismatch")),
         };
+        let context_stage = if let Some(runtime) = &self.context_runtime {
+            let (snapshot, facts) = context.ok_or_else(|| Error::new("missing context frame"))?;
+            let temporal = m
+                .temporal
+                .as_ref()
+                .ok_or_else(|| Error::new("context clock binding"))?;
+            if temporal_runtime::exact(iv[usize::from(temporal.now_input)])?
+                != snapshot.monotonic_ms
+                || temporal_runtime::exact(iv[usize::from(temporal.time_epoch_input)])?
+                    != runtime.boot_epoch
+                || snapshot.boot_epoch != runtime.boot_epoch
+            {
+                return Err(Error::new("context clock binding mismatch"));
+            }
+            let requirements = m
+                .schedules
+                .as_ref()
+                .ok_or_else(|| Error::new("missing context requirements"))?;
+            Some(runtime.stage(
+                &requirements.strategies[si].schedules,
+                snapshot,
+                facts,
+                &mut iv,
+                &self.state,
+                &mut result_trace,
+                m.fingerprint,
+                self.next_tick,
+            )?)
+        } else {
+            None
+        };
         let solar_stage = if let Some(runtime) = &self.solar_runtime {
             let (snapshot, facts) = solar.expect("checked solar inputs");
             let temporal = m.temporal.as_ref().expect("solar clock binding");
@@ -1230,9 +1411,13 @@ impl Runtime {
         } else {
             None
         };
-        let schedule_projections = solar_stage
-            .as_ref()
-            .map_or(&[][..], |stage| stage.projections.as_slice());
+        let schedule_projections = if let Some(stage) = &context_stage {
+            stage.projections.as_slice()
+        } else {
+            solar_stage
+                .as_ref()
+                .map_or(&[][..], |stage| stage.projections.as_slice())
+        };
         let evaluated = (|| {
             let window_trace = if let Some(temporal) = &mut self.temporal {
                 temporal.stage(
@@ -1340,6 +1525,9 @@ impl Runtime {
             schedule_trace: solar_stage
                 .as_ref()
                 .map_or_else(Vec::new, |stage| stage.trace.clone()),
+            context_trace: context_stage
+                .as_ref()
+                .map_or_else(Vec::new, |stage| stage.trace.clone()),
         };
         if let Some(temporal) = &mut self.temporal {
             temporal.commit(
@@ -1361,6 +1549,9 @@ impl Runtime {
                 .as_mut()
                 .expect("objective runtime")
                 .commit(stage);
+        }
+        if let Some(stage) = context_stage {
+            self.context_runtime = Some(stage.runtime);
         }
         self.next_tick = next_tick;
         self.last_time_ms = clock.or(self.last_time_ms);
@@ -2007,7 +2198,7 @@ fn verify_expression_with_prelude(
                 type_push(&mut stack, &mut len, Type::Int)?;
             }
             op @ 30..=31 => {
-                if !matches!(format_version, 3 | 4 | 5 | 6 | 7 | 8 | 9) {
+                if !matches!(format_version, 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10) {
                     return Err(Error::new("branch opcode requires GFB format 3"));
                 }
                 let target = r.jump_target()?;
@@ -2024,13 +2215,13 @@ fn verify_expression_with_prelude(
                 reachable = op == 30;
             }
             32..=47 => {
-                if !matches!(format_version, 3 | 4 | 5 | 6 | 7 | 8 | 9) {
+                if !matches!(format_version, 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10) {
                     return Err(Error::new("compact Number opcode requires GFB format 3"));
                 }
                 type_push(&mut stack, &mut len, Type::Number)?;
             }
             op @ 48..=53 => {
-                if !matches!(format_version, 3 | 4 | 5 | 6 | 7 | 8 | 9) {
+                if !matches!(format_version, 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10) {
                     return Err(Error::new("conversion opcode requires GFB format 3"));
                 }
                 let (source, target) = if op == 48 {
@@ -2044,7 +2235,7 @@ fn verify_expression_with_prelude(
                 type_push(&mut stack, &mut len, target)?;
             }
             54 => {
-                if !matches!(format_version, 3 | 4 | 5 | 6 | 7 | 8 | 9) {
+                if !matches!(format_version, 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10) {
                     return Err(Error::new("Duration guard requires GFB format 3"));
                 }
                 if type_pop(&mut stack, &mut len)? != Type::Number {
@@ -2053,7 +2244,7 @@ fn verify_expression_with_prelude(
                 type_push(&mut stack, &mut len, Type::Number)?;
             }
             55 => {
-                if !matches!(format_version, 3 | 4 | 5 | 6 | 7 | 8 | 9) {
+                if !matches!(format_version, 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10) {
                     return Err(Error::new("DateTime guard requires GFB format 3"));
                 }
                 if type_pop(&mut stack, &mut len)? != Type::Number {
@@ -2062,7 +2253,7 @@ fn verify_expression_with_prelude(
                 type_push(&mut stack, &mut len, Type::Number)?;
             }
             56 => {
-                if !matches!(format_version, 3 | 4 | 5 | 6 | 7 | 8 | 9) {
+                if !matches!(format_version, 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10) {
                     return Err(Error::new("Result trace requires GFB format 3"));
                 }
                 if r.u32()? == 0 {
@@ -2077,7 +2268,7 @@ fn verify_expression_with_prelude(
                 type_push(&mut stack, &mut len, payload)?;
             }
             57 => {
-                if !matches!(format_version, 4 | 5 | 6 | 8 | 9) {
+                if !matches!(format_version, 4 | 5 | 6 | 8 | 9 | 10) {
                     return Err(Error::new("temporal projection requires GFB format 4"));
                 }
                 let slot = r.u16()?;
@@ -2089,7 +2280,7 @@ fn verify_expression_with_prelude(
                 )?;
             }
             58 => {
-                if !matches!(format_version, 5 | 6 | 8 | 9) {
+                if !matches!(format_version, 5 | 6 | 8 | 9 | 10) {
                     return Err(Error::new("schedule projection requires GFB format 5"));
                 }
                 let slot = r.u16()?;
@@ -2097,7 +2288,7 @@ fn verify_expression_with_prelude(
                 type_push(
                     &mut stack,
                     &mut len,
-                    schedule_vm::projection_type(schedule_count, slot, field)?,
+                    schedule_vm::projection_type(schedule_count, slot, field, format_version)?,
                 )?;
             }
             59 => {
@@ -2220,7 +2411,7 @@ fn eval_expression_with_preludes(
     trace: &mut ResultTraceBuffer,
     windows: &[[Value; 8]],
     true_fors: &[[Value; 7]],
-    schedules: &[[Value; 2]],
+    schedules: &[[Value; 3]],
 ) -> Result<Value> {
     let mut r = Reader::new(code);
     let mut s = [Value::Bool(false); MAX_STACK];
@@ -3212,6 +3403,7 @@ mod tests {
             window_trace: Vec::new(),
             true_for_trace: Vec::new(),
             schedule_trace: Vec::new(),
+            context_trace: Vec::new(),
         }
         .to_json();
         assert!(encoded.contains("\"format\":\"GhostFlow/safety-trace-v1\""));

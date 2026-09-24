@@ -6,6 +6,7 @@ import { NativeDispatchError } from './native-dispatch.mjs';
 import { encodeTemporalProfile } from './temporal-profile.mjs';
 import { validateSolarDescriptor } from './solar-schedule.mjs';
 import { validateSolarActivation } from './solar-abi.mjs';
+import { encodeContextActivation, encodeContextFacts } from './context-abi.mjs';
 import { QUANTITY_TYPES, canonicalUnitFor, isQuantityType } from '../../tools/quantities.mjs';
 import { TIME_TYPES, isTimeType, validateTimeValue } from '../../tools/time-literals.mjs';
 
@@ -15,6 +16,7 @@ const SOLAR_FORMAT = 'GhostFlow/control-v3';
 const INTEGER_FORMAT = 'GhostFlow/control-v4';
 const SCHEDULE_FORMAT = 'GhostFlow/control-v7';
 const SCHEDULE_SLOTS_FORMAT = 'GhostFlow/control-v8';
+const CONTEXT_FORMAT = 'GhostFlow/control-v9';
 const RESERVED = '__gf_';
 const TYPES = new Set(['Bool', 'Int', 'Number', 'Percent', 'Duration', ...TIME_TYPES, ...QUANTITY_TYPES]);
 const SENSOR_TYPES = new Set(['Bool', 'Number', 'Percent', ...QUANTITY_TYPES]);
@@ -206,7 +208,56 @@ function validateCanonicalUnit(item, label) {
   } else if (hasUnit) throw new Error(`${label}.canonicalUnit is forbidden for non-quantity type ${item.type}`);
 }
 
+function validateContextManifest(input, bytecodeFormat) {
+  const manifest = record(input, 'manifest');
+  keys(manifest, ['format','name','inputs','outputs','sensors','schedules','timers','signals','configs','bytecodeSha256'],
+    ['providers','calendars','naturalConditions','accounting','resources'], 'manifest');
+  if (bytecodeFormat !== 10) throw new Error('control-v9 requires GFB10');
+  name(manifest.name, 'manifest.name');
+  if (!/^[0-9a-f]{64}$/.test(manifest.bytecodeSha256)) throw new Error('invalid bytecode SHA-256');
+  const inputs = validateList(manifest.inputs, 'manifest.inputs', ['name','type']);
+  const outputs = validateList(manifest.outputs, 'manifest.outputs', ['name','type']);
+  const schedules = validateList(manifest.schedules, 'manifest.schedules', ['kind','site','name','policy'],
+    ['timezone','source','event','offsetMs','anchor','every','intervalChange','cron5','fields','dstMissing','dstRepeated','atMs','day','gridMs','slots','selectedConfig']);
+  const configs = validateList(manifest.configs, 'manifest.configs', ['name','type','value'], ['settings','gridMs','capacity']);
+  const providers = validateList(manifest.providers ?? [], 'manifest.providers', ['name','type']);
+  const calendars = validateList(manifest.calendars ?? [], 'manifest.calendars', ['name','type']);
+  const naturals = validateList(manifest.naturalConditions ?? [], 'manifest.naturalConditions',
+    ['site','operation','provider','classification','result','projectionInputs']);
+  const accounting = manifest.accounting === undefined ? null : copy(record(manifest.accounting, 'manifest.accounting'));
+  if (manifest.sensors.length || manifest.signals.length || manifest.timers.length) throw new Error('GFB10 sensor/signal/timer mixing is not supported');
+  for (const item of inputs) { name(item.name, 'input.name'); if (item.name.startsWith(RESERVED)) throw new Error('reserved user input'); type(item.type, `input ${item.name}.type`); }
+  for (const item of outputs) { portName(item.name, 'output.name'); type(item.type, `output ${item.name}.type`); }
+  for (const item of schedules) {
+    name(item.name, 'schedule.name'); safeInteger(item.site, 'schedule.site', 1, 0xffff_ffff);
+    if (!['periodic','cron','daily','daily-slots','tide'].includes(item.kind)) throw new Error('unsupported context schedule kind');
+    if (item.kind === 'daily' && !['workday','offday'].includes(item.day?.kind)) throw new Error('context Daily requires WorkCalendar day');
+    if (item.kind === 'daily-slots' && !item.selectedConfig) throw new Error('context DailySlots requires TimeSlots config');
+    if (item.kind === 'tide' && !providers.some(p => p.name === item.source && p.type === 'TidePredictions')) throw new Error('unbound Tide provider');
+  }
+  for (const item of naturals) {
+    safeInteger(item.site, 'natural site', 1, 0xffff_ffff);
+    const expected = item.operation === 'tide_is' ? 'TidePredictions' : item.operation === 'moon_is' ? 'LunarEphemeris' : null;
+    if (!expected || !providers.some(p => p.name === item.provider && p.type === expected)) throw new Error('natural provider mismatch');
+    for (const role of ['ok','value','fault']) generated(item.projectionInputs[role], `${RESERVED}natural_${item.site}_${role}`, 'natural projection');
+  }
+  for (const item of configs) {
+    name(item.name, 'config.name');
+    if (item.type === 'Duration') typedValue(item.value, 'Duration', `config ${item.name}`);
+    else if (item.type.startsWith('TimeSlots<')) {
+      if (!Array.isArray(item.value) || item.value.length > item.capacity) throw new Error('invalid TimeSlots config');
+    } else throw new Error('unsupported GFB10 config type');
+  }
+  unique([...inputs,...outputs,...schedules,...configs,...providers,...calendars].map(item => item.name), 'context name');
+  unique([...schedules,...naturals].map(item => item.site), 'context site');
+  const normalized = freeze(copy({ ...manifest, inputs, outputs, schedules, configs, providers, calendars,
+    naturalConditions: naturals, ...(accounting === null ? {} : { accounting }) }));
+  return { manifest: normalized, inputNames: new Set(inputs.map(item => item.name)),
+    sensorByName: new Map(), scheduleNames: new Set(schedules.map(item => item.name)), signalNames: new Set() };
+}
+
 function validateManifest(input, { acceptSettings = false, bytecodeFormat = null, capabilities } = {}) {
+  if (input?.format === CONTEXT_FORMAT) return validateContextManifest(input, bytecodeFormat);
   const manifest = record(input, 'manifest');
   if ((Object.hasOwn(manifest, 'adaptPolicy') || Object.hasOwn(manifest, 'strategies')) && capabilities === undefined) {
     throw new Error('adapt strategy activation requires a capability-aware host; ControlRuntime cannot activate this manifest');
@@ -712,12 +763,21 @@ async function instantiateControlRuntime(wasmBytes, { bytes: bytecode, manifest 
   const hasWindows = checkedManifest.manifest.signals.some(item => item.kind === 'window');
   const hasTrueFor = checkedManifest.manifest.signals.some(item => item.kind === 'true-for');
   const hasAfterEvent = checkedManifest.manifest.signals.some(isAfterEvent);
+  const hasContext = checkedManifest.manifest.format === CONTEXT_FORMAT;
   const hasSolar = checkedManifest.manifest.schedules.some(item => item.kind === 'solar');
-  const hasSchedules = checkedManifest.manifest.schedules.some(item => ['daily', 'daily-slots'].includes(item.kind));
+  const hasSchedules = !hasContext && checkedManifest.manifest.schedules.some(item => ['daily', 'daily-slots'].includes(item.kind));
   let temporal = null;
+  if (hasContext) {
+    if (!supportsSchedules) throw new Error('framed context execution is not supported');
+    if (options.context === undefined) throw new Error('context activation profile is required');
+    encodeContextActivation(options.context);
+    if (options.schedule !== undefined || options.solar !== undefined || options.temporal !== undefined) throw new Error('context activation cannot mix legacy profiles');
+  }
   if (hasSolar && !supportsSchedules) throw new Error('framed Solar activation is not supported by this runtime');
   if (hasSchedules && !supportsSchedules) throw new Error('framed civil schedule activation is not supported by this runtime');
-  if (hasSchedules) {
+  if (hasContext) {
+    // The GFB10 Rust runtime owns the provider and settings state.
+  } else if (hasSchedules) {
     if (options.schedule === undefined) throw new Error('schedule activation profile is required');
     validateSolarActivation(options.schedule);
     if (options.solar !== undefined) throw new Error('civil schedule activation cannot use a Solar profile');
@@ -773,7 +833,8 @@ async function instantiateControlRuntime(wasmBytes, { bytes: bytecode, manifest 
     if (suppliedCapabilities !== undefined) for (const sensor of checkedManifest.manifest.sensors) {
       if (presentSensors.has(sensor.name)) runtime.addCapability('sensor', sensor.name, sensor.type === 'Bool' ? 'bool' : 'number');
     }
-    if (hasSchedules) runtime.activateSchedules(options.schedule);
+    if (hasContext) runtime.activateContext(options.context);
+    else if (hasSchedules) runtime.activateSchedules(options.schedule);
     else if (hasSolar) runtime.activateSolar(options.solar);
     else if (temporal) runtime.activateTemporal(temporal); else runtime.activate();
   } catch (error) {
@@ -784,22 +845,22 @@ async function instantiateControlRuntime(wasmBytes, { bytes: bytecode, manifest 
     throw error;
   }
   return { runtime, checkedManifest, sensors, signals, afterEvents, afterEventEpoch,
-    temporalEpoch: hasSchedules ? options.schedule.bootEpoch : hasSolar ? options.solar.bootEpoch : temporal?.timeEpoch ?? null,
-    hasSolar, hasSchedules };
+    temporalEpoch: hasContext ? options.context.bootEpoch : hasSchedules ? options.schedule.bootEpoch : hasSolar ? options.solar.bootEpoch : temporal?.timeEpoch ?? null,
+    hasSolar, hasSchedules, hasContext };
 }
 
 export class ControlRuntime {
   static async instantiate(wasmBytes, { bytes: bytecode, manifest } = {}, options = {}) {
     const initialized = await instantiateControlRuntime(wasmBytes, { bytes: bytecode, manifest }, options, GhostFlowRuntime.instantiate, true);
     return new ControlRuntime(initialized.runtime, initialized.checkedManifest, initialized.sensors, initialized.signals,
-      initialized.afterEvents, false, initialized.temporalEpoch, initialized.hasSolar, initialized.afterEventEpoch, initialized.hasSchedules);
+      initialized.afterEvents, false, initialized.temporalEpoch, initialized.hasSolar, initialized.afterEventEpoch, initialized.hasSchedules, initialized.hasContext);
   }
 
   static async instantiateFramed(wasmBytes, artifact = {}, options = {}) {
     if ((artifact.manifest?.objectives?.length ?? 0) > 0) throw new Error('framed native objectives are not supported');
     const initialized = await instantiateControlRuntime(wasmBytes, artifact, options, FramedGhostFlowRuntime.instantiate, false);
     return new ControlRuntime(initialized.runtime, initialized.checkedManifest, initialized.sensors, initialized.signals,
-      initialized.afterEvents, true, initialized.temporalEpoch, initialized.hasSolar, initialized.afterEventEpoch, initialized.hasSchedules);
+      initialized.afterEvents, true, initialized.temporalEpoch, initialized.hasSolar, initialized.afterEventEpoch, initialized.hasSchedules, initialized.hasContext);
   }
 
   // New simulation consumers opt into the v2 operating-settings contract.
@@ -814,10 +875,11 @@ export class ControlRuntime {
   #temporalEpoch;
   #hasSolar;
   #hasSchedules;
+  #hasContext;
   #afterEventEpoch;
   #presentSensors;
 
-  constructor(runtime, manifest, sensors, signals, afterEvents, framed = false, temporalEpoch = null, hasSolar = false, afterEventEpoch = null, hasSchedules = false) {
+  constructor(runtime, manifest, sensors, signals, afterEvents, framed = false, temporalEpoch = null, hasSolar = false, afterEventEpoch = null, hasSchedules = false, hasContext = false) {
     this.runtime = runtime;
     this.exports = runtime.wasm;
     this.manifest = manifest.manifest;
@@ -838,6 +900,7 @@ export class ControlRuntime {
     this.#temporalEpoch = temporalEpoch;
     this.#hasSolar = hasSolar;
     this.#hasSchedules = hasSchedules;
+    this.#hasContext = hasContext;
     this.#afterEventEpoch = afterEventEpoch;
     this.#presentSensors = manifest.presentSensors;
   }
@@ -853,15 +916,15 @@ export class ControlRuntime {
    * Executes one caller-supplied snapshot. Sensor sampleMs is metadata for the
    * acquisition owner; this host never polls hardware or performs I/O.
    */
-  step({ nowMs, inputs = {}, samples = {}, due = {}, intervals = {}, events = {}, objectiveSafeMax = {}, solarFacts, scheduleFacts } = {}) {
-    if (this.#framed) return this.#stepFramed({ nowMs, inputs, samples, due, intervals, events, objectiveSafeMax, solarFacts, scheduleFacts });
-    return this.#stepLegacy({ nowMs, inputs, samples, due, intervals, events, objectiveSafeMax, solarFacts, scheduleFacts });
+  step({ nowMs, inputs = {}, samples = {}, due = {}, intervals = {}, events = {}, objectiveSafeMax = {}, solarFacts, scheduleFacts, contextFacts } = {}) {
+    if (this.#framed) return this.#stepFramed({ nowMs, inputs, samples, due, intervals, events, objectiveSafeMax, solarFacts, scheduleFacts, contextFacts });
+    return this.#stepLegacy({ nowMs, inputs, samples, due, intervals, events, objectiveSafeMax, solarFacts, scheduleFacts, contextFacts });
   }
 
-  #stepLegacy({ nowMs, inputs = {}, samples = {}, due = {}, intervals = {}, events = {}, objectiveSafeMax = {}, solarFacts, scheduleFacts } = {}) {
+  #stepLegacy({ nowMs, inputs = {}, samples = {}, due = {}, intervals = {}, events = {}, objectiveSafeMax = {}, solarFacts, scheduleFacts, contextFacts } = {}) {
     this.#live();
     if (this.#faulted) throw new Error('ControlRuntime is faulted; create a new instance');
-    const captured = this.#captureSnapshot({ nowMs, inputs, samples, due, intervals, events, objectiveSafeMax, solarFacts, scheduleFacts });
+    const captured = this.#captureSnapshot({ nowMs, inputs, samples, due, intervals, events, objectiveSafeMax, solarFacts, scheduleFacts, contextFacts });
     const transaction = this.#beginConditioners();
     let afterEventTransaction = [];
     let phase = 'prepare';
@@ -901,7 +964,7 @@ export class ControlRuntime {
         this.runtime.setNumber(objective.bindings.target, target.value);
         this.runtime.setNumber(objective.bindings.safeMax, captured.objectiveSafeMax.get(objective.name));
       }
-      for (const item of this.manifest.schedules) if (!['solar', 'daily', 'daily-slots'].includes(item.kind)) this.runtime.setBool(item.dueInput, captured.dueValues.get(item.name) ?? false);
+      for (const item of this.manifest.schedules) if (!this.#hasContext && !['solar', 'daily', 'daily-slots'].includes(item.kind)) this.runtime.setBool(item.dueInput, captured.dueValues.get(item.name) ?? false);
       this.#setIntervals(captured.intervalValues, (name, value) => {
         if (value.type === 'Bool') this.runtime.setBool(name, value.value);
         else this.runtime.setNumber(name, value.value);
@@ -911,9 +974,10 @@ export class ControlRuntime {
         else this.runtime.setNumber(name, value.value);
       });
       if (this.#temporalEpoch !== null) this.runtime.setNumber(`${RESERVED}time_epoch`, this.#temporalEpoch);
-      if (this.#hasSolar || this.#hasSchedules) this.runtime.setNumber(`${RESERVED}now_ms`, captured.nowMs);
+      if (this.#hasSolar || this.#hasSchedules || this.#hasContext) this.runtime.setNumber(`${RESERVED}now_ms`, captured.nowMs);
       phase = 'dispatch';
-      if (this.#hasSchedules) this.runtime.tickSchedules(captured.scheduleFacts);
+      if (this.#hasContext) this.runtime.tickContext(captured.contextFacts);
+      else if (this.#hasSchedules) this.runtime.tickSchedules(captured.scheduleFacts);
       else if (this.#hasSolar) this.runtime.tickSolar(captured.solarFacts);
       else if (this.objectives.length || this.#temporalEpoch !== null || this.manifest.timers.length > 0 || this.manifest.signals.some(isVmSignal)) this.runtime.tickAt(captured.nowMs); else this.runtime.tick();
       phase = 'committed';
@@ -947,7 +1011,7 @@ export class ControlRuntime {
     }
   }
 
-  #captureSnapshot({ nowMs, inputs = {}, samples = {}, due = {}, intervals = {}, events = {}, objectiveSafeMax = {}, solarFacts, scheduleFacts } = {}) {
+  #captureSnapshot({ nowMs, inputs = {}, samples = {}, due = {}, intervals = {}, events = {}, objectiveSafeMax = {}, solarFacts, scheduleFacts, contextFacts } = {}) {
     safeInteger(nowMs, 'nowMs');
     if (this.lastNowMs !== null && nowMs < this.lastNowMs) throw new Error('nowMs must be monotonic');
     record(inputs, 'inputs'); record(samples, 'samples'); record(due, 'due'); record(intervals, 'intervals'); record(events, 'events'); record(objectiveSafeMax, 'objectiveSafeMax');
@@ -958,7 +1022,7 @@ export class ControlRuntime {
       if (this.#presentSensors !== null && !this.#presentSensors.has(key)) throw new Error(`absent sensor capability ${key}`);
     }
     for (const key of Object.keys(due)) {
-      if (this.solarScheduleNames.has(key) || this.manifest.schedules.some(item => ['daily', 'daily-slots'].includes(item.kind) && item.name === key)) throw new Error(`due.${key} cannot supply a runtime-owned due value`);
+      if (this.#hasContext || this.solarScheduleNames.has(key) || this.manifest.schedules.some(item => ['daily', 'daily-slots'].includes(item.kind) && item.name === key)) throw new Error(`due.${key} cannot supply a runtime-owned due value`);
       if (!this.scheduleNames.has(key)) throw new Error(`unknown schedule ${key}`);
     }
     if (this.#hasSolar && solarFacts === undefined) throw new Error('solar facts are required');
@@ -976,6 +1040,13 @@ export class ControlRuntime {
       const clock = record(scheduleFacts.clock, 'scheduleFacts.clock');
       if (clock.monotonicMs !== nowMs) throw new Error('schedule facts clock.monotonicMs must equal nowMs');
       if (clock.bootEpoch !== this.#temporalEpoch) throw new Error('schedule facts clock.bootEpoch must match activation');
+    }
+    if (this.#hasContext && contextFacts === undefined) throw new Error('context facts are required');
+    if (!this.#hasContext && contextFacts !== undefined) throw new Error('context facts require a GFB10 control');
+    if (this.#hasContext) {
+      encodeContextFacts(contextFacts);
+      if (contextFacts.clock.monotonicMs !== nowMs) throw new Error('context clock.monotonicMs must equal nowMs');
+      if (contextFacts.clock.bootEpoch !== this.#temporalEpoch) throw new Error('context bootEpoch must match activation');
     }
     for (const key of Object.keys(intervals)) if (!this.trueForSources.has(key)) throw new Error(`unknown true_for source ${key}`);
     const eventNames = new Set([...this.afterEvents.values()].map(entry => entry.item.event.name));
@@ -1058,7 +1129,7 @@ export class ControlRuntime {
       });
     }
     return { nowMs, inputValues, normalizedSamples, dueValues, intervalValues, eventValues,
-      objectiveSafeMax: objectiveSafeValues, solarFacts, scheduleFacts };
+      objectiveSafeMax: objectiveSafeValues, solarFacts, scheduleFacts, contextFacts };
   }
 
   #normalizeInterval(raw, sourceName, nowMs) {

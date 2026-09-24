@@ -61,6 +61,9 @@ pub enum PulseDescriptor {
     Solar(SolarPulseDescriptor),
     Daily(DailyPulseDescriptor),
     DailySlots(DailySlotsPulseDescriptor),
+    Context(crate::context_vm::ScheduleDescriptor),
+    Natural(crate::context_vm::NaturalDescriptor),
+    Accounting(crate::context_vm::AccountingDescriptor),
 }
 impl PulseDescriptor {
     pub fn site(&self) -> u32 {
@@ -68,6 +71,9 @@ impl PulseDescriptor {
             Self::Solar(d) => d.site,
             Self::Daily(d) => d.site,
             Self::DailySlots(d) => d.site,
+            Self::Context(d) => d.site,
+            Self::Natural(d) => d.site,
+            Self::Accounting(d) => d.site,
         }
     }
     pub fn gap_ms(&self) -> u64 {
@@ -75,6 +81,9 @@ impl PulseDescriptor {
             Self::Solar(d) => d.gap_ms,
             Self::Daily(d) => d.gap_ms,
             Self::DailySlots(d) => d.gap_ms,
+            Self::Context(d) => d.gap_ms,
+            Self::Natural(_) => 1,
+            Self::Accounting(_) => 1,
         }
     }
     pub fn when(&self) -> &[u8] {
@@ -82,6 +91,9 @@ impl PulseDescriptor {
             Self::Solar(d) => &d.when,
             Self::Daily(d) => &d.when,
             Self::DailySlots(d) => &d.when,
+            Self::Context(d) => &d.when,
+            Self::Natural(_) => &[],
+            Self::Accounting(_) => &[],
         }
     }
 }
@@ -219,7 +231,7 @@ pub(crate) fn load_prelude(
                     }));
                 (site, name)
             }
-            3 if matches!(format, 8 | 9) => {
+            3 if matches!(format, 8 | 9 | 10) => {
                 let site = reader.u32()?;
                 let name = reader.string()?;
                 let timezone = reader.string()?;
@@ -271,7 +283,7 @@ pub(crate) fn load_prelude(
                     }));
                 (site, name)
             }
-            4 if format == 9 => {
+            4 if matches!(format, 9 | 10) => {
                 let site = reader.u32()?;
                 let name = reader.string()?;
                 let timezone = reader.string()?;
@@ -343,6 +355,51 @@ pub(crate) fn load_prelude(
                     }));
                 (site, name)
             }
+            kind @ 5..=9 if format == 10 => {
+                let descriptor = crate::context_vm::load_schedule(reader, kind)?;
+                for expression in [&descriptor.when, &descriptor.cancel] {
+                    if verify_expression_with_prelude(
+                        expression,
+                        inputs,
+                        states,
+                        false,
+                        format,
+                        &result.windows,
+                        result.schedules.len(),
+                        result.true_fors.len(),
+                    )? != Type::Bool
+                    {
+                        return Err(Error::new("context predicate must be Bool"));
+                    }
+                    result.marker_count += expression_metadata(expression)?.1;
+                }
+                let identity = (descriptor.site, descriptor.name.clone());
+                result
+                    .order
+                    .push(PreludeEntry::Schedule(result.schedules.len() as u16));
+                result.schedules.push(PulseDescriptor::Context(descriptor));
+                identity
+            }
+            10 if format == 10 => {
+                let descriptor = crate::context_vm::load_natural(reader, inputs)?;
+                let identity = (descriptor.site, descriptor.name.clone());
+                result
+                    .order
+                    .push(PreludeEntry::Schedule(result.schedules.len() as u16));
+                result.schedules.push(PulseDescriptor::Natural(descriptor));
+                identity
+            }
+            11 if format == 10 => {
+                let descriptor = crate::context_vm::load_accounting(reader, inputs)?;
+                let identity = (descriptor.site, descriptor.name.clone());
+                result
+                    .order
+                    .push(PreludeEntry::Schedule(result.schedules.len() as u16));
+                result
+                    .schedules
+                    .push(PulseDescriptor::Accounting(descriptor));
+                identity
+            }
             2 if format == 6 => {
                 let signal = crate::true_for_vm::load(reader, inputs)?;
                 let identity = (signal.site, signal.name.clone());
@@ -364,11 +421,16 @@ pub(crate) fn load_prelude(
     Ok(result)
 }
 
-pub(crate) fn projection_type(schedule_count: usize, slot: u16, field: u8) -> Result<Type> {
+pub(crate) fn projection_type(
+    schedule_count: usize,
+    slot: u16,
+    field: u8,
+    format: u16,
+) -> Result<Type> {
     if usize::from(slot) >= schedule_count {
         return Err(Error::new("schedule projection index"));
     }
-    if field > 1 {
+    if field > if format == 10 { 2 } else { 1 } {
         return Err(Error::new("schedule projection field"));
     }
     Ok(Type::Bool)

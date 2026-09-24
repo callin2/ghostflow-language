@@ -16,6 +16,9 @@ mod temporal_abi;
 #[path = "../solar_abi.rs"]
 mod solar_abi;
 
+#[path = "../context_abi.rs"]
+mod context_abi;
+
 #[path = "../replay_abi.rs"]
 mod replay_abi;
 
@@ -34,6 +37,8 @@ pub struct Handle {
     trace: String,
     replay: String,
     resource_plan: String,
+    context_checkpoint: Vec<u8>,
+    context_state: String,
 }
 
 impl Handle {
@@ -59,6 +64,8 @@ pub extern "C" fn gf_create() -> *mut Handle {
         trace: String::new(),
         replay: String::new(),
         resource_plan: String::new(),
+        context_checkpoint: Vec::new(),
+        context_state: String::new(),
     }))
 }
 
@@ -376,6 +383,8 @@ mod replay_tests {
             trace: "live".into(),
             replay: "old replay".into(),
             resource_plan: String::new(),
+            context_checkpoint: Vec::new(),
+            context_state: String::new(),
         };
         assert_eq!(unsafe { gf_resource_plan_len(&h) }, 0);
         let mut packet = profile_packet();
@@ -414,6 +423,8 @@ mod replay_tests {
             trace: "unchanged trace".into(),
             replay: String::new(),
             resource_plan: String::new(),
+            context_checkpoint: Vec::new(),
+            context_state: String::new(),
         };
         assert_eq!(unsafe { gf_replay_len(&h) }, 0);
         assert!(unsafe { gf_replay_ptr(&h) }.is_null());

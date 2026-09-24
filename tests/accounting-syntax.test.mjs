@@ -12,7 +12,7 @@ const source = `control AccountingSyntax {
   account pump_applied = on_time(pump1, stage: applied, persistence: durable);
   account normal_starts = count_events(normal_run_started, over: local_day("Asia/Seoul"), persistence: durable);
   constraints PumpBudgets {
-    limit used(pump_applied, rolling(60s)) <= 30s {
+    limit used(pump_applied, rolling(10min)) <= 6min {
       reserve = worst_case_on + stop_delay;
       on_unknown = block;
     }
@@ -27,10 +27,17 @@ const source = `control AccountingSyntax {
 test('accounting syntax is represented in the checked manifest', () => {
   const { manifest } = typeCheckControl(source);
   assert.deepEqual(manifest.resources, [{ name: 'pump1', type: 'BoolActuator' }]);
-  assert.equal(manifest.accounts[0].stage, 'applied');
+  assert.deepEqual(manifest.accounts[0].evidenceBinding, {
+    kind: 'applied_interval', target: 'pump1', stage: 'applied', identity: 'receipt_id',
+  });
   assert.equal(manifest.accounts[1].operation, 'count_events');
+  assert.deepEqual(manifest.accounts[1].evidenceBinding, {
+    kind: 'typed_event', target: 'normal_run_started', identity: 'event_id',
+  });
+  assert.deepEqual(manifest.accounts[1].basis, { kind: 'local_day', zone: 'Asia/Seoul' });
   assert.deepEqual(manifest.accountingConstraints[0].limits[0], {
-    account: 'pump_applied', operator: '<=', basis: 'rolling', persistence: 'durable', onUnknown: 'block',
+    account: 'pump_applied', operator: '<=', basis: { kind: 'rolling', durationMs: 600_000 },
+    boundMs: 360_000, reserveMs: 310_000, persistence: 'durable', onUnknown: 'block',
   });
 });
 
@@ -38,26 +45,26 @@ test('accounting execution remains fail closed without runtime ledger bindings',
   assert.throws(() => compileControl(source), /accounting execution requires verified resource binding/);
 });
 
-test('public toolchain emits a checked non-executable accounting artifact', async () => {
+test('public toolchain emits one executable accounting control artifact with source bindings', async () => {
   const document = '# Accounting syntax\n\n```ghost\n' + source + '\n```\n';
   const artifact = await compileSource(document, { filename: 'accounting.ghost.md' });
-  const envelope = JSON.parse(new TextDecoder().decode(artifact.bytes));
-  assert.equal(envelope.format, 'GhostFlow/accounting-artifact-v1');
-  assert.equal(envelope.executable, false);
-  assert.equal(artifact.manifest.format, 'GhostFlow/accounting-v1');
-  assert.equal(artifact.manifest.control.accounts.length, 2);
-  assert.equal(artifact.manifest.sourceDocumentSha256, artifact.sourceDocument.sha256);
+  assert.equal(new TextDecoder().decode(artifact.bytes.slice(0, 4)), 'GFB1');
+  assert.equal(artifact.manifest.format, 'GhostFlow/control-v9');
+  assert.equal(artifact.manifest.accounting.bindings.length, 2);
+  assert.deepEqual(artifact.manifest.accounting.bindings[0].evidenceBinding, {
+    kind: 'applied_interval', target: 'pump1', stage: 'applied', identity: 'receipt_id',
+  });
   assert.equal(artifact.manifest.bytecodeSha256, sha256Hex(artifact.bytes));
   const sourceMap = {
     format: 'GhostFlow/source-map-v1', bytecodeSha256: artifact.manifest.bytecodeSha256,
     sourceDocument: artifact.sourceDocument, nodes: artifact.sourceMap,
-    lines: artifact.extractionMap, traceMetadata: null,
+    lines: artifact.extractionMap, traceMetadata: artifact.traceMetadata,
     interactionSchema: null, interactionSourceIdentity: null,
   };
   verifyArtifactSourceMap(sourceMap, artifact.bytes, { manifest: artifact.manifest });
   assert.throws(() => verifyArtifactSourceMap(sourceMap, artifact.bytes, {
-    manifest: { ...artifact.manifest, control: { ...artifact.manifest.control, accounts: [] } },
-  }), /accounting descriptor manifest does not match canonical source/);
+    manifest: { ...artifact.manifest, accounting: { ...artifact.manifest.accounting, bindings: [] } },
+  }), /accounting control manifest does not match canonical source/);
 });
 
 test('accounting declarations reject missing stage, persistence, and targets', () => {

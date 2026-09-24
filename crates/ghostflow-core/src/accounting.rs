@@ -8,6 +8,7 @@
 pub struct AccountingConfig {
     pub max_intervals: usize,
     pub max_events: usize,
+    pub max_reservations: usize,
     pub max_rolling_window_ms: u64,
 }
 
@@ -15,9 +16,11 @@ impl AccountingConfig {
     fn validate(self) -> Result<Self, AccountingError> {
         if self.max_intervals == 0
             || self.max_events == 0
+            || self.max_reservations == 0
             || self.max_rolling_window_ms == 0
             || self.max_intervals > u32::MAX as usize
             || self.max_events > u32::MAX as usize
+            || self.max_reservations > u32::MAX as usize
         {
             return Err(AccountingError::InvalidConfig);
         }
@@ -30,7 +33,10 @@ pub enum AccountingError {
     InvalidConfig,
     InvalidIdentity,
     InvalidInterval,
+    InvalidReservation,
+    EvidenceMissing,
     Capacity,
+    LimitExceeded,
     IdentityCollision,
     UnknownLedger,
     InvalidSnapshot,
@@ -42,7 +48,10 @@ impl std::fmt::Display for AccountingError {
             Self::InvalidConfig => "invalid accounting ledger configuration",
             Self::InvalidIdentity => "accounting identity must be non-zero",
             Self::InvalidInterval => "applied interval must have a positive duration",
+            Self::InvalidReservation => "invalid accounting reservation",
+            Self::EvidenceMissing => "accounting settlement evidence is missing",
             Self::Capacity => "accounting ledger capacity is exhausted",
+            Self::LimitExceeded => "accounting rolling limit would be exceeded",
             Self::IdentityCollision => "accounting identity was reused with different evidence",
             Self::UnknownLedger => "accounting ledger state is unknown",
             Self::InvalidSnapshot => "invalid accounting ledger snapshot",
@@ -65,8 +74,15 @@ pub enum RecordResult {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AdmissionResult {
+    Reserved,
+    Duplicate,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct AppliedSegment {
     receipt_id: [u8; 16],
+    reservation_id: Option<[u8; 16]>,
     resource_id: u32,
     start_ms: u64,
     end_ms: u64,
@@ -78,6 +94,24 @@ struct CountedEvent {
     event_id: [u8; 16],
     event_type: u32,
     local_day: i32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct RollingReservation {
+    reservation_id: [u8; 16],
+    resource_id: u32,
+    admitted_at_ms: u64,
+    window_ms: u64,
+    limit_ms: u64,
+    reserve_ms: u64,
+    state: ReservationState,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ReservationState {
+    Outstanding,
+    Settled([u8; 16]),
+    Cancelled([u8; 16]),
 }
 
 /// A bounded persistent ledger for applied ON segments and identified events.
@@ -92,6 +126,7 @@ pub struct AccountingLedger {
     known: bool,
     intervals: Vec<AppliedSegment>,
     events: Vec<CountedEvent>,
+    reservations: Vec<RollingReservation>,
 }
 
 impl AccountingLedger {
@@ -102,6 +137,7 @@ impl AccountingLedger {
             known: true,
             intervals: Vec::new(),
             events: Vec::new(),
+            reservations: Vec::new(),
         })
     }
 
@@ -131,6 +167,73 @@ impl AccountingLedger {
         end_ms: u64,
         local_day: i32,
     ) -> Result<RecordResult, AccountingError> {
+        self.record_applied_segment_inner(
+            None,
+            receipt_id,
+            resource_id,
+            start_ms,
+            end_ms,
+            local_day,
+        )
+    }
+
+    /// Record applied evidence explicitly correlated to one outstanding reservation.
+    pub fn record_reserved_applied_segment(
+        &mut self,
+        reservation_id: [u8; 16],
+        receipt_id: [u8; 16],
+        resource_id: u32,
+        start_ms: u64,
+        end_ms: u64,
+        local_day: i32,
+    ) -> Result<RecordResult, AccountingError> {
+        if !self.known {
+            return Err(AccountingError::UnknownLedger);
+        }
+        let Some(reservation) = self
+            .reservations
+            .iter()
+            .find(|entry| {
+                entry.reservation_id == reservation_id
+                    && entry.resource_id == resource_id
+                    && matches!(entry.state, ReservationState::Outstanding)
+            })
+            .copied()
+        else {
+            return Err(AccountingError::InvalidReservation);
+        };
+        if reservation_id == [0; 16]
+            || start_ms < reservation.admitted_at_ms
+            || end_ms
+                .checked_sub(start_ms)
+                .is_none_or(|duration| duration > reservation.reserve_ms)
+        {
+            return Err(AccountingError::InvalidReservation);
+        }
+        if self.intervals.iter().any(|entry| {
+            entry.reservation_id == Some(reservation_id) && entry.receipt_id != receipt_id
+        }) {
+            return Err(AccountingError::InvalidReservation);
+        }
+        self.record_applied_segment_inner(
+            Some(reservation_id),
+            receipt_id,
+            resource_id,
+            start_ms,
+            end_ms,
+            local_day,
+        )
+    }
+
+    fn record_applied_segment_inner(
+        &mut self,
+        reservation_id: Option<[u8; 16]>,
+        receipt_id: [u8; 16],
+        resource_id: u32,
+        start_ms: u64,
+        end_ms: u64,
+        local_day: i32,
+    ) -> Result<RecordResult, AccountingError> {
         if !self.known {
             return Err(AccountingError::UnknownLedger);
         }
@@ -142,6 +245,7 @@ impl AccountingLedger {
         }
         let incoming = AppliedSegment {
             receipt_id,
+            reservation_id,
             resource_id,
             start_ms,
             end_ms,
@@ -258,27 +362,176 @@ impl AccountingLedger {
         )
     }
 
+    /// Atomically reserve finite future usage against an observed rolling limit.
+    /// Outstanding reservations for the same physical resource are charged
+    /// conservatively in addition to the union of applied intervals.
+    pub fn reserve_rolling(
+        &mut self,
+        reservation_id: [u8; 16],
+        resource_id: u32,
+        admitted_at_ms: u64,
+        window_ms: u64,
+        limit_ms: u64,
+        reserve_ms: u64,
+    ) -> Result<AdmissionResult, AccountingError> {
+        if !self.known {
+            return Err(AccountingError::UnknownLedger);
+        }
+        if reservation_id == [0; 16]
+            || resource_id == 0
+            || window_ms == 0
+            || window_ms > self.config.max_rolling_window_ms
+            || limit_ms == 0
+            || reserve_ms == 0
+        {
+            return Err(AccountingError::InvalidReservation);
+        }
+        let incoming = RollingReservation {
+            reservation_id,
+            resource_id,
+            admitted_at_ms,
+            window_ms,
+            limit_ms,
+            reserve_ms,
+            state: ReservationState::Outstanding,
+        };
+        if let Some(existing) = self
+            .reservations
+            .iter()
+            .find(|entry| entry.reservation_id == reservation_id)
+        {
+            return if *existing == incoming {
+                Ok(AdmissionResult::Duplicate)
+            } else {
+                Err(AccountingError::IdentityCollision)
+            };
+        }
+        let LedgerRead::Known(applied_ms) =
+            self.used_rolling(resource_id, admitted_at_ms, window_ms)
+        else {
+            return Err(AccountingError::UnknownLedger);
+        };
+        let committed_ms = self
+            .reservations
+            .iter()
+            .filter(|entry| {
+                entry.resource_id == resource_id
+                    && matches!(entry.state, ReservationState::Outstanding)
+            })
+            .try_fold(applied_ms, |total, entry| {
+                total.checked_add(entry.reserve_ms)
+            })
+            .ok_or(AccountingError::LimitExceeded)?;
+        if committed_ms
+            .checked_add(reserve_ms)
+            .filter(|total| *total <= limit_ms)
+            .is_none()
+        {
+            return Err(AccountingError::LimitExceeded);
+        }
+        if self.reservations.len() == self.config.max_reservations {
+            return Err(AccountingError::Capacity);
+        }
+        self.reservations
+            .try_reserve(1)
+            .map_err(|_| AccountingError::Capacity)?;
+        self.reservations.push(incoming);
+        Ok(AdmissionResult::Reserved)
+    }
+
+    /// Settle a reservation only after its applied interval evidence is present.
+    pub fn settle_rolling(
+        &mut self,
+        reservation_id: [u8; 16],
+        applied_receipt_id: [u8; 16],
+    ) -> Result<RecordResult, AccountingError> {
+        if !self.known {
+            return Err(AccountingError::UnknownLedger);
+        }
+        if reservation_id == [0; 16] || applied_receipt_id == [0; 16] {
+            return Err(AccountingError::InvalidIdentity);
+        }
+        let index = self
+            .reservations
+            .iter()
+            .position(|entry| entry.reservation_id == reservation_id)
+            .ok_or(AccountingError::EvidenceMissing)?;
+        let reservation = self.reservations[index];
+        match reservation.state {
+            ReservationState::Settled(existing) if existing == applied_receipt_id => {
+                return Ok(RecordResult::Duplicate);
+            }
+            ReservationState::Outstanding => {}
+            ReservationState::Settled(_) | ReservationState::Cancelled(_) => {
+                return Err(AccountingError::IdentityCollision);
+            }
+        }
+        if !self.intervals.iter().any(|entry| {
+            entry.resource_id == reservation.resource_id
+                && entry.receipt_id == applied_receipt_id
+                && entry.reservation_id == Some(reservation_id)
+        }) {
+            return Err(AccountingError::EvidenceMissing);
+        }
+        self.reservations[index].state = ReservationState::Settled(applied_receipt_id);
+        Ok(RecordResult::Inserted)
+    }
+
+    /// Release a reservation using an identified caller-validated cancellation record.
+    pub fn cancel_rolling(
+        &mut self,
+        reservation_id: [u8; 16],
+        cancellation_evidence_id: [u8; 16],
+    ) -> Result<RecordResult, AccountingError> {
+        if !self.known {
+            return Err(AccountingError::UnknownLedger);
+        }
+        if reservation_id == [0; 16] || cancellation_evidence_id == [0; 16] {
+            return Err(AccountingError::InvalidIdentity);
+        }
+        let reservation = self
+            .reservations
+            .iter_mut()
+            .find(|entry| entry.reservation_id == reservation_id)
+            .ok_or(AccountingError::EvidenceMissing)?;
+        match reservation.state {
+            ReservationState::Cancelled(existing) if existing == cancellation_evidence_id => {
+                Ok(RecordResult::Duplicate)
+            }
+            ReservationState::Outstanding => {
+                reservation.state = ReservationState::Cancelled(cancellation_evidence_id);
+                Ok(RecordResult::Inserted)
+            }
+            ReservationState::Settled(_) | ReservationState::Cancelled(_) => {
+                Err(AccountingError::IdentityCollision)
+            }
+        }
+    }
+
     /// Encode a canonical bounded checkpoint. The host owns writing it durably.
     pub fn snapshot_bytes(&self) -> Result<Vec<u8>, AccountingError> {
         let capacity = self
             .intervals
             .len()
-            .checked_mul(40)
+            .checked_mul(56)
             .and_then(|size| size.checked_add(self.events.len().checked_mul(24)?))
-            .and_then(|size| size.checked_add(31))
+            .and_then(|size| size.checked_add(self.reservations.len().checked_mul(69)?))
+            .and_then(|size| size.checked_add(39))
             .ok_or(AccountingError::Capacity)?;
         let mut out = Vec::new();
         out.try_reserve_exact(capacity)
             .map_err(|_| AccountingError::Capacity)?;
         out.extend_from_slice(b"GFAC");
-        out.extend_from_slice(&1u16.to_le_bytes());
+        out.extend_from_slice(&3u16.to_le_bytes());
         out.push(u8::from(self.known));
         out.extend_from_slice(&(self.config.max_intervals as u32).to_le_bytes());
         out.extend_from_slice(&(self.config.max_events as u32).to_le_bytes());
+        out.extend_from_slice(&(self.config.max_reservations as u32).to_le_bytes());
         out.extend_from_slice(&self.config.max_rolling_window_ms.to_le_bytes());
         out.extend_from_slice(&(self.intervals.len() as u32).to_le_bytes());
         for item in &self.intervals {
             out.extend_from_slice(&item.receipt_id);
+            out.extend_from_slice(&item.reservation_id.unwrap_or([0; 16]));
             out.extend_from_slice(&item.resource_id.to_le_bytes());
             out.extend_from_slice(&item.start_ms.to_le_bytes());
             out.extend_from_slice(&item.end_ms.to_le_bytes());
@@ -289,6 +542,29 @@ impl AccountingLedger {
             out.extend_from_slice(&item.event_id);
             out.extend_from_slice(&item.event_type.to_le_bytes());
             out.extend_from_slice(&item.local_day.to_le_bytes());
+        }
+        out.extend_from_slice(&(self.reservations.len() as u32).to_le_bytes());
+        for item in &self.reservations {
+            out.extend_from_slice(&item.reservation_id);
+            out.extend_from_slice(&item.resource_id.to_le_bytes());
+            out.extend_from_slice(&item.admitted_at_ms.to_le_bytes());
+            out.extend_from_slice(&item.window_ms.to_le_bytes());
+            out.extend_from_slice(&item.limit_ms.to_le_bytes());
+            out.extend_from_slice(&item.reserve_ms.to_le_bytes());
+            match item.state {
+                ReservationState::Outstanding => {
+                    out.push(0);
+                    out.extend_from_slice(&[0; 16]);
+                }
+                ReservationState::Settled(evidence_id) => {
+                    out.push(1);
+                    out.extend_from_slice(&evidence_id);
+                }
+                ReservationState::Cancelled(evidence_id) => {
+                    out.push(2);
+                    out.extend_from_slice(&evidence_id);
+                }
+            }
         }
         let checksum = crc32(&out);
         out.extend_from_slice(&checksum.to_le_bytes());
@@ -313,7 +589,7 @@ impl AccountingLedger {
             bytes: payload,
             offset: 0,
         };
-        if reader.take(4)? != b"GFAC" || reader.u16()? != 1 {
+        if reader.take(4)? != b"GFAC" || reader.u16()? != 3 {
             return Err(AccountingError::InvalidSnapshot);
         }
         let known = match reader.u8()? {
@@ -323,6 +599,7 @@ impl AccountingLedger {
         };
         if reader.u32()? as usize != config.max_intervals
             || reader.u32()? as usize != config.max_events
+            || reader.u32()? as usize != config.max_reservations
             || reader.u64()? != config.max_rolling_window_ms
         {
             return Err(AccountingError::InvalidSnapshot);
@@ -337,6 +614,8 @@ impl AccountingLedger {
             .map_err(|_| AccountingError::Capacity)?;
         for _ in 0..interval_count {
             let receipt_id = reader.array16()?;
+            let raw_reservation_id = reader.array16()?;
+            let reservation_id = (raw_reservation_id != [0; 16]).then_some(raw_reservation_id);
             let resource_id = reader.u32()?;
             let start_ms = reader.u64()?;
             let end_ms = reader.u64()?;
@@ -352,6 +631,7 @@ impl AccountingLedger {
             }
             intervals.push(AppliedSegment {
                 receipt_id,
+                reservation_id,
                 resource_id,
                 start_ms,
                 end_ms,
@@ -384,6 +664,83 @@ impl AccountingLedger {
                 local_day,
             });
         }
+        let reservation_count = reader.u32()? as usize;
+        if reservation_count > config.max_reservations {
+            return Err(AccountingError::InvalidSnapshot);
+        }
+        let mut reservations = Vec::new();
+        reservations
+            .try_reserve_exact(reservation_count)
+            .map_err(|_| AccountingError::Capacity)?;
+        for _ in 0..reservation_count {
+            let reservation_id = reader.array16()?;
+            let resource_id = reader.u32()?;
+            let admitted_at_ms = reader.u64()?;
+            let window_ms = reader.u64()?;
+            let limit_ms = reader.u64()?;
+            let reserve_ms = reader.u64()?;
+            let state_tag = reader.u8()?;
+            let terminal_evidence_id = reader.array16()?;
+            let state = match state_tag {
+                0 if terminal_evidence_id == [0; 16] => ReservationState::Outstanding,
+                1 if terminal_evidence_id != [0; 16] => {
+                    ReservationState::Settled(terminal_evidence_id)
+                }
+                2 if terminal_evidence_id != [0; 16] => {
+                    ReservationState::Cancelled(terminal_evidence_id)
+                }
+                _ => return Err(AccountingError::InvalidSnapshot),
+            };
+            if reservation_id == [0; 16]
+                || resource_id == 0
+                || window_ms == 0
+                || window_ms > config.max_rolling_window_ms
+                || limit_ms == 0
+                || reserve_ms == 0
+                || reserve_ms > limit_ms
+                || reservations
+                    .iter()
+                    .any(|entry: &RollingReservation| entry.reservation_id == reservation_id)
+                || matches!(state, ReservationState::Settled(receipt_id)
+                    if !intervals.iter().any(|entry| entry.resource_id == resource_id
+                        && entry.receipt_id == receipt_id
+                        && entry.reservation_id == Some(reservation_id)))
+            {
+                return Err(AccountingError::InvalidSnapshot);
+            }
+            reservations.push(RollingReservation {
+                reservation_id,
+                resource_id,
+                admitted_at_ms,
+                window_ms,
+                limit_ms,
+                reserve_ms,
+                state,
+            });
+        }
+        for interval in &intervals {
+            let Some(reservation_id) = interval.reservation_id else {
+                continue;
+            };
+            let Some(reservation) = reservations.iter().find(|entry| {
+                entry.reservation_id == reservation_id && entry.resource_id == interval.resource_id
+            }) else {
+                return Err(AccountingError::InvalidSnapshot);
+            };
+            if interval.start_ms < reservation.admitted_at_ms
+                || interval
+                    .end_ms
+                    .checked_sub(interval.start_ms)
+                    .is_none_or(|duration| duration > reservation.reserve_ms)
+                || intervals
+                    .iter()
+                    .filter(|entry| entry.reservation_id == Some(reservation_id))
+                    .count()
+                    != 1
+            {
+                return Err(AccountingError::InvalidSnapshot);
+            }
+        }
         if reader.offset != payload.len() {
             return Err(AccountingError::InvalidSnapshot);
         }
@@ -392,6 +749,7 @@ impl AccountingLedger {
             known,
             intervals,
             events,
+            reservations,
         })
     }
 }

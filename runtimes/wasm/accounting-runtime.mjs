@@ -2,6 +2,7 @@
 import { compileSource } from '../../tools/browser-toolchain.mjs';
 
 const U64_MAX = 0xffff_ffff_ffff_ffffn;
+const encoder = new TextEncoder();
 
 function unsigned64(value, label) {
   if (typeof value === 'number' && Number.isSafeInteger(value)) value = BigInt(value);
@@ -24,24 +25,28 @@ export class AccountingRuntime {
   static async instantiateSource(wasmBytes, document, { filename = 'program.ghost.md', account, resourceId, eventType, config } = {}) {
     if (typeof account !== 'string' || !account) throw new TypeError('account name is required');
     const artifact = await compileSource(document, { filename });
-    const descriptor = artifact.manifest?.format === 'GhostFlow/accounting-v1'
-      ? artifact.manifest.control.accounts.find(item => item.name === account)
+    const descriptor = artifact.manifest?.format === 'GhostFlow/control-v9'
+      ? artifact.manifest.accounting?.bindings.find(item => item.name === account)
       : undefined;
     if (!descriptor) throw new Error(`source has no accounting account ${account}`);
     if (descriptor.persistence !== 'durable') throw new Error('unsupported accounting persistence');
+    const evidence = descriptor.evidenceBinding;
     let binding;
     if (descriptor.operation === 'on_time') {
-      if (descriptor.stage !== 'applied') throw new Error('unsupported accounting stage');
+      if (evidence?.kind !== 'applied_interval' || evidence.stage !== 'applied') throw new Error('unsupported accounting stage');
       if (resourceId === undefined || eventType !== undefined) throw new TypeError('resourceId is required for an on_time account');
-      binding = { operation: 'on_time', id: uint32(resourceId, 'resourceId') };
-    } else if (descriptor.operation === 'count_events' && descriptor.over === 'local_day') {
+      const limits = (artifact.manifest.accounting.constraints ?? [])
+        .flatMap(group => group.limits).filter(limit => limit.account === account);
+      binding = { operation: 'on_time', id: uint32(resourceId, 'resourceId'), limits };
+    } else if (descriptor.operation === 'count_events' && descriptor.basis?.kind === 'local_day') {
+      if (evidence?.kind !== 'typed_event') throw new Error('unsupported accounting evidence binding');
       if (eventType === undefined || resourceId !== undefined) throw new TypeError('eventType is required for a count_events account');
       binding = { operation: 'count_events', id: uint32(eventType, 'eventType') };
     } else throw new Error('unsupported accounting operation or basis');
     const runtime = await this.instantiate(wasmBytes, config);
     Object.defineProperty(runtime, 'binding', { enumerable: true, value: Object.freeze(binding) });
     Object.defineProperty(runtime, 'source', { enumerable: true, value: Object.freeze({
-      ...artifact.sourceDocument, account, target: descriptor.resourceOrEvent, stage: descriptor.stage,
+      ...artifact.sourceDocument, account, target: evidence.target, stage: evidence.stage ?? null,
       operation: descriptor.operation, artifactSha256: artifact.manifest.bytecodeSha256,
     }) });
     return runtime;
@@ -56,19 +61,23 @@ export class AccountingRuntime {
     if (!wasm || typeof wasm !== 'object') throw new TypeError('WASM exports are required');
     const required = [
       'gf_accounting_create', 'gf_accounting_destroy', 'gf_accounting_initialize_empty',
-      'gf_accounting_restore', 'gf_accounting_record_applied_segment', 'gf_accounting_record_event',
+      'gf_accounting_restore', 'gf_accounting_record_applied_segment',
+      'gf_accounting_record_reserved_segment', 'gf_accounting_record_event',
+      'gf_accounting_reserve_rolling', 'gf_accounting_settle_rolling', 'gf_accounting_cancel_rolling',
       'gf_accounting_used_rolling', 'gf_accounting_used_local_day', 'gf_accounting_event_count',
       'gf_accounting_snapshot', 'gf_accounting_snapshot_ptr', 'gf_accounting_snapshot_len',
       'gf_accounting_ack_persisted', 'gf_accounting_revision', 'gf_accounting_last_error_ptr',
-      'gf_accounting_last_error_len', 'gf_alloc', 'gf_dealloc', 'memory',
+      'gf_accounting_last_error_len', 'gf_activate_accounting', 'gf_tick_accounting',
+      'gf_alloc', 'gf_dealloc', 'memory',
     ];
     if (required.some(name => !wasm[name])) throw new Error('WASM module does not include the GhostFlow accounting ABI');
     if (!config || typeof config !== 'object' || Array.isArray(config)) throw new TypeError('accounting config is required');
     const maxIntervals = uint32(config.maxIntervals, 'maxIntervals');
     const maxEvents = uint32(config.maxEvents, 'maxEvents');
+    const maxReservations = uint32(config.maxReservations, 'maxReservations');
     const maxRollingWindowMs = unsigned64(config.maxRollingWindowMs, 'maxRollingWindowMs');
     this.wasm = wasm;
-    this.handle = wasm.gf_accounting_create(maxIntervals, maxEvents, maxRollingWindowMs);
+    this.handle = wasm.gf_accounting_create(maxIntervals, maxEvents, maxReservations, maxRollingWindowMs);
     if (!this.handle) throw new Error('invalid accounting ledger configuration');
   }
 
@@ -99,6 +108,17 @@ export class AccountingRuntime {
     return this.#recordResult(status, persist);
   }
 
+  async recordReservedAppliedSegment({ reservationId, receiptId, resourceId, startMs, endMs, localDay }, persist) {
+    this.#live();
+    this.#bound('on_time', resourceId);
+    identity(reservationId, 'reservationId'); identity(receiptId, 'receiptId'); uint32(resourceId, 'resourceId');
+    const status = this.#withTwoIdentities(reservationId, receiptId, (reservationPtr, receiptPtr) =>
+      this.wasm.gf_accounting_record_reserved_segment(
+        this.handle, reservationPtr, receiptPtr, resourceId, unsigned64(startMs, 'startMs'),
+        unsigned64(endMs, 'endMs'), uint32(localDay, 'localDay', { signed: true })));
+    return this.#recordResult(status, persist);
+  }
+
   async recordEvent({ eventId, eventType, localDay }, persist) {
     this.#live();
     this.#bound('count_events', eventType);
@@ -107,6 +127,35 @@ export class AccountingRuntime {
       this.handle, ptr, eventType, uint32(localDay, 'localDay', { signed: true }),
     ));
     return this.#recordResult(status, persist);
+  }
+
+  async reserveRolling({ reservationId, resourceId, admittedAtMs, windowMs, limitMs, reserveMs }, persist) {
+    this.#live();
+    this.#bound('on_time', resourceId);
+    identity(reservationId, 'reservationId'); uint32(resourceId, 'resourceId');
+    this.#boundAdmission(windowMs, limitMs, reserveMs);
+    const status = this.#withBytes(reservationId, ptr => this.wasm.gf_accounting_reserve_rolling(
+      this.handle, ptr, resourceId, unsigned64(admittedAtMs, 'admittedAtMs'),
+      unsigned64(windowMs, 'windowMs'), unsigned64(limitMs, 'limitMs'), unsigned64(reserveMs, 'reserveMs'),
+    ));
+    if (status === 3) return 'Rejected';
+    return this.#durableMutationResult(status, persist, 'accounting reservation failed');
+  }
+
+  async settleRolling({ reservationId, appliedReceiptId }, persist) {
+    this.#live();
+    identity(reservationId, 'reservationId'); identity(appliedReceiptId, 'appliedReceiptId');
+    const status = this.#withTwoIdentities(reservationId, appliedReceiptId, (reservationPtr, receiptPtr) =>
+      this.wasm.gf_accounting_settle_rolling(this.handle, reservationPtr, receiptPtr));
+    return this.#durableMutationResult(status, persist, 'accounting settlement failed');
+  }
+
+  async cancelRolling({ reservationId, cancellationEvidenceId }, persist) {
+    this.#live();
+    identity(reservationId, 'reservationId'); identity(cancellationEvidenceId, 'cancellationEvidenceId');
+    const status = this.#withTwoIdentities(reservationId, cancellationEvidenceId, (reservationPtr, evidencePtr) =>
+      this.wasm.gf_accounting_cancel_rolling(this.handle, reservationPtr, evidencePtr));
+    return this.#durableMutationResult(status, persist, 'accounting cancellation failed');
   }
 
   async persistPending(persist) {
@@ -137,10 +186,53 @@ export class AccountingRuntime {
     return this.#query('gf_accounting_event_count', [uint32(eventType, 'eventType'), uint32(localDay, 'localDay', { signed: true })]);
   }
 
+  activateControl(control, { bootEpoch, terminalCapacity } = {}) {
+    const handle = this.#controlHandle(control);
+    const capacity = uint32(terminalCapacity, 'terminalCapacity');
+    if (capacity === 0) throw new TypeError('terminalCapacity must be positive');
+    this.#checkControl(control, this.wasm.gf_activate_accounting(handle,
+      unsigned64(bootEpoch, 'bootEpoch'), capacity));
+  }
+
+  tickControl(control, { site, account, event, timezone, eventType, localDay,
+    monotonicMs, bootEpoch, wallMs, clockTrusted } = {}) {
+    const handle = this.#controlHandle(control);
+    this.#bound('count_events', eventType);
+    const texts = [account, event, timezone].map((value, index) => {
+      const label = ['account', 'event', 'timezone'][index];
+      if (typeof value !== 'string' || !value) throw new TypeError(`${label} is required`);
+      return encoder.encode(value);
+    });
+    if (localDay !== null && localDay !== undefined) uint32(localDay, 'localDay', { signed: true });
+    if (wallMs !== null && wallMs !== undefined) unsigned64(wallMs, 'wallMs');
+    if (typeof clockTrusted !== 'boolean') throw new TypeError('clockTrusted must be boolean');
+    const result = this.#withBytes(texts[0], (accountPtr, accountLen) =>
+      this.#withBytes(texts[1], (eventPtr, eventLen) =>
+        this.#withBytes(texts[2], (timezonePtr, timezoneLen) => this.wasm.gf_tick_accounting(
+          handle, this.handle, uint32(site, 'site'), accountPtr, accountLen, eventPtr, eventLen,
+          timezonePtr, timezoneLen, uint32(eventType, 'eventType'), localDay == null ? 0 : 1,
+          localDay ?? 0, unsigned64(monotonicMs, 'monotonicMs'), unsigned64(bootEpoch, 'bootEpoch'),
+          wallMs == null ? 0 : 1, wallMs == null ? 0n : unsigned64(wallMs, 'wallMs'), clockTrusted ? 1 : 0))));
+    this.#checkControl(control, result);
+    return control.trace;
+  }
+
   #bound(operation, id) {
     if (!this.binding) return;
     if (this.binding.operation !== operation) throw new Error('unsupported bound account operation');
     if (this.binding.id !== id) throw new Error(operation === 'on_time' ? 'wrong bound resource ID' : 'wrong bound Event type');
+  }
+
+  #boundAdmission(windowMs, limitMs, reserveMs) {
+    if (!this.binding) return;
+    const rolling = this.binding.limits.filter(limit => limit.basis.kind === 'rolling');
+    if (rolling.length !== 1) throw new Error('bound source requires exactly one rolling accounting limit');
+    const [limit] = rolling;
+    if (limit.operator !== '<=' || BigInt(limit.basis.durationMs) !== unsigned64(windowMs, 'windowMs')
+      || BigInt(limit.boundMs) !== unsigned64(limitMs, 'limitMs')
+      || BigInt(limit.reserveMs) !== unsigned64(reserveMs, 'reserveMs')) {
+      throw new Error('rolling admission does not match the bound source constraint');
+    }
   }
 
   async #recordResult(status, persist) {
@@ -149,6 +241,13 @@ export class AccountingRuntime {
     if (status !== 1) throw new Error('invalid accounting record status');
     await this.persistPending(persist);
     return 'Inserted';
+  }
+
+  async #durableMutationResult(status, persist, fallback) {
+    if (status === 0) throw new Error(this.#text('error') || fallback);
+    if (status !== 1 && status !== 2) throw new Error('invalid accounting mutation status');
+    await this.persistPending(persist);
+    return status === 1 ? 'Inserted' : 'Duplicate';
   }
 
   #query(name, args) {
@@ -168,6 +267,27 @@ export class AccountingRuntime {
       new Uint8Array(this.wasm.memory.buffer, ptr, bytes.length).set(bytes);
       return callback(ptr, bytes.length);
     } finally { this.wasm.gf_dealloc(ptr, bytes.length); }
+  }
+
+  #withTwoIdentities(first, second, callback) {
+    return this.#withBytes(first, firstPtr => this.#withBytes(second, secondPtr => callback(firstPtr, secondPtr)));
+  }
+
+  #controlHandle(control) {
+    this.#live();
+    if (!control || control.wasm !== this.wasm || !control.handle) {
+      throw new TypeError('control must be a live GhostFlow runtime from the same WASM instance');
+    }
+    return control.handle;
+  }
+
+  #checkControl(control, result) {
+    if (!result) {
+      const ptr = this.wasm.gf_last_error_ptr(control.handle);
+      const len = Number(this.wasm.gf_last_error_len(control.handle));
+      const message = len ? new TextDecoder().decode(new Uint8Array(this.wasm.memory.buffer, ptr, len)) : '';
+      throw new Error(message || 'accounting control operation failed');
+    }
   }
 
   #text(kind) {
