@@ -42,9 +42,9 @@ this report and the compact export to that local result.
 | Reference slice | Requirement/status evidence | Test evidence | Native/WASM/simulator status |
 | --- | --- | --- | --- |
 | 70 executable controls, including temporal windows, Solar and `REF-04-058` | accepted executable rows in `tests/reference/cases/*.json`; catalog integrity 5/5 | `tests/reference-simulator.test.mjs`; focused closed-loop PID | PASS in simulator using the built native runner; sensor/temporal/PID paths also load the built WASM runtime |
-| Schedule policy descriptors: `REF-03-024`, `032`, `036`, `038`, `057`, `059`, `060` | complete controls, emitted as `GhostFlow/schedule-descriptor-v1` | schedule descriptor artifact test PASS | FAIL in simulator: descriptor is explicitly non-executable; smallest repro below; owner [#90](https://github.com/callin2/ghostflow-language/issues/90) covers the official host/WASM schedule evaluator, with non-Periodic cases still needing explicit assignment |
-| Accounting descriptor: `REF-03-050` | complete control, emitted as `GhostFlow/accounting-v1` | accounting syntax/WASM focused tests PASS | FAIL in simulator: checked ledger ABI exists but the control descriptor has no simulator execution binding; no dedicated open owner issue found, so #132 must assign a follow-up before closure if executable simulator coverage is required |
-| Temporal descriptors: `REF-03-062`, `REF-04-026` | complete controls, emitted as `GhostFlow/temporal-descriptor-v1` | temporal descriptor artifact tests PASS | FAIL in simulator by explicit non-executable contract; owner [#95](https://github.com/callin2/ghostflow-language/issues/95) |
+| Schedule policy descriptors: `REF-03-024`, `032`, `036`, `038`, `057`, `059`, `060` | complete controls, emitted as `GhostFlow/schedule-descriptor-v1` | schedule descriptor artifact test PASS | FAIL in simulator: descriptor is explicitly non-executable; execution owner [#135](https://github.com/callin2/ghostflow-language/issues/135); semantic owner [#90](https://github.com/callin2/ghostflow-language/issues/90) |
+| Accounting descriptor: `REF-03-050` | complete control, emitted as `GhostFlow/accounting-v1` | accounting syntax/WASM focused tests PASS | FAIL in simulator: checked ledger ABI exists but the control descriptor has no simulator execution binding; execution owner [#136](https://github.com/callin2/ghostflow-language/issues/136) |
+| Temporal descriptors: `REF-03-062`, `REF-04-026` | complete controls, emitted as `GhostFlow/temporal-descriptor-v1` | temporal descriptor artifact tests PASS | FAIL in simulator by explicit non-executable contract; execution owner [#137](https://github.com/callin2/ghostflow-language/issues/137); semantic owner [#95](https://github.com/callin2/ghostflow-language/issues/95) |
 | Standalone resources: `REF-04-044`, `045`, `050` | accepted declarations with no control | artifact format checked by simulator suite | NONCONTROL, applicable neither to a scan nor to native/WASM execution |
 | Continuous objective: `REF-04-058` | executable Reference row; broader semantics remain tracked in [#94](https://github.com/callin2/ghostflow-language/issues/94) | Reference simulator PASS plus closed-loop focused tests 3/3 | PASS: native PID loop is deterministic; WASM artifact rejects malformed activation metadata. This does not complete all #94 acceptance criteria |
 
@@ -76,9 +76,10 @@ Focused artifact tests prove these are intentional checked
 descriptor outputs, not compiler crashes or corrupt artifacts.
 
 The smallest next implementation family is schedule descriptor execution because
-seven of ten failures share it and #90 already defines the official evaluator
-boundary. Keep accounting and temporal execution separate because their runtime
-state, persistence and observation contracts differ.
+seven of ten failures share it; #135 owns execution integration and #90 defines
+the official evaluator semantics. Keep #136 accounting and #137 temporal
+execution separate because their runtime state, persistence and observation
+contracts differ.
 
 ## Device support combinations
 
@@ -95,8 +96,8 @@ used as current-`dev` Device evidence.
 ## Acceptance disposition
 
 Issue #132's measurement criteria are satisfied: the exact SHA, commands, exit
-codes, interruption state, complete result artifact, current failures, existing
-owners, requirement status, and Device support boundaries are recorded. The ten
-RED cases remain product gaps owned by follow-up work; they are not a reason to
-keep this evidence-refresh issue open. Before closing, assign a dedicated owner
-for accounting simulator execution because no matching open issue was found.
+codes, interruption state, complete result artifact, current failures, owners,
+requirement status, and Device support boundaries are recorded. The ten RED
+cases remain product gaps owned by #135, #136 and #137; they are not a reason to
+keep this evidence-refresh issue open. Issue #132 can close after this report is
+merged.
