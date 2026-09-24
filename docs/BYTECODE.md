@@ -24,6 +24,15 @@ The S-expression representation in `tools/gfb1.mjs` is internal compiler IR.
 | 2 | Straight-line expressions with Int declarations or operations | Also `3=Int` |
 | 3 | Branches, dynamic Int/Number conversions, or time value guards | Bool, Number and Int |
 | 4 | Temporal window modules with physical roots and temporal clock inputs | Existing format 3 types plus bounded window descriptors |
+| 5 | Solar schedule prelude | Format 4 types plus tagged schedule descriptors |
+| 6 | Continuous `true_for` prelude | Temporal types plus true-for descriptors |
+| 7 | PID objective | Bool, Number and Int plus objective record |
+| 8 | Daily schedule prelude | Temporal types plus Daily descriptors |
+| 9 | DailySlots schedule prelude | Temporal types plus DailySlots descriptors |
+| 11 | Typed configuration streams and context execution | Context preludes and optional PID objective; replaces the prior format 10 context profile |
+
+These are compiler output profiles, not a promise that every host supports every
+profile. See the feature-specific ABI documents for record layouts and activation.
 
 The 2026-09-22 format decision introduces format 3 for Reference §2.6 evaluation.
 Formats 1 and 2 remain current compact profiles for straight-line programs.
@@ -65,7 +74,9 @@ as finite `f64`, and Int as signed `i32`.
 | 54 | — | Check Duration milliseconds, Number → Number; formats 3 and 4 |
 | 55 | — | Check DateTime UTC epoch milliseconds, Number → Number; formats 3 and 4 |
 | 56 | `u32 site` | Trace Result consumption; `[payload:T, choice:Number, origin:Number] → [payload:T]`; formats 3 and 4 |
-| 57 | `u16 slot, u8 field` | Temporal window projection: `0=ok`, `1=value`, `2=fault`, `3=origin`, `4=admissionRevision`, `5=newestTimestamp`, `6=count`, `7=quality`; format 4 |
+| 57 | `u16 slot, u8 field` | Temporal window projection: `0=ok`, `1=value`, `2=fault`, `3=origin`, `4=admissionRevision`, `5=newestTimestamp`, `6=count`, `7=quality`; temporal formats with windows |
+| 58 | `u16 slot, u8 field` | Schedule projection: `0=due`, `1=missed`, `2=active` (context profiles only for `active`); formats 5, 6, 8, 9 and 11 with schedules |
+| 59 | `u16 slot, u8 field` | Continuous `true_for` projection: `0=ok`, `1=value`, `2=fault`, `3=origin`, `4=start`, `5=end`, `6=covered`; format 6 |
 
 The compiler uses compact Number constants in branched expressions to keep
 finite enum control programs within the same 4096-byte expression budget.
