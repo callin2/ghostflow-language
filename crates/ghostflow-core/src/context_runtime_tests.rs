@@ -209,7 +209,11 @@ fn context_scan_rejects_inconsistent_frames_without_mutation() {
         .is_err());
     for epoch in [scan::SCAN_FRAME_V1_MAX_EXACT_INTEGER + 1, u64::MAX] {
         assert!(driver
-            .scan_with_context(context_frame(0, 0, 1), clock(epoch, 0, 99), &periodic_facts())
+            .scan_with_context(
+                context_frame(0, 0, 1),
+                clock(epoch, 0, 99),
+                &periodic_facts()
+            )
             .is_err());
     }
     assert!(driver.scan(context_frame(0, 0, 1)).is_err());
