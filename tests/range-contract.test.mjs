@@ -50,14 +50,24 @@ function periodic({ duration }) {
 
 test('range accepts adjacent DailySlots intervals and keeps the planned duration', async () => {
   const artifact = await compileSource(dailySlots(), { filename: 'range-adjacent.ghost.md' });
-  const schedule = artifact.manifest.schedules[0];
+  const schedule = artifact.manifest.control.schedules[0];
   assert.deepEqual(schedule.slots, [480, 495]);
   assert.deepEqual(schedule.policy.basis, { kind: 'range', durationMs: 900_000 });
+  assert.equal(schedule.policy.cancelWhen, 'false');
+  const midnight = await compileSource(dailySlots({ selected: '[23:45, 00:00]' }), { filename: 'range-midnight-adjacent.ghost.md' });
+  assert.deepEqual(midnight.manifest.control.schedules[0].slots, [0, 1425]);
+  const conditional = await compileSource(dailySlots().replace('control PlannedWatering {', 'control PlannedWatering { input stop: Bool;')
+    .replace('cancel_when = false', 'cancel_when = stop'), { filename: 'range-cancel-condition.ghost.md' });
+  assert.equal(conditional.manifest.control.schedules[0].policy.cancelWhen, 'input.stop');
 });
 
 test('range rejects overlapping static DailySlots intervals at compile time', async () => {
   await assert.rejects(
     () => compileSource(dailySlots({ duration: '30min' }), { filename: 'range-overlap.ghost.md' }),
+    error => /range/i.test(diagnostics(error)) && /overlap|non.?overlap/i.test(diagnostics(error)),
+  );
+  await assert.rejects(
+    () => compileSource(dailySlots({ selected: '[23:45, 00:00]', duration: '30min' }), { filename: 'range-midnight-overlap.ghost.md' }),
     error => /range/i.test(diagnostics(error)) && /overlap|non.?overlap/i.test(diagnostics(error)),
   );
 });
@@ -67,11 +77,19 @@ test('range rejects a zero duration, independently of overlap', async () => {
     () => compileSource(dailySlots({ selected: '[08:00]', duration: '0ms' }), { filename: 'range-zero.ghost.md' }),
     error => /range/i.test(diagnostics(error)) && /positive|zero|greater than 0/i.test(diagnostics(error)),
   );
+  await assert.rejects(
+    () => compileSource(dailySlots().replace('cancel_when = false', 'cancel_when = 1'), { filename: 'range-cancel-type.ghost.md' }),
+    error => /cancel_when must be Bool/i.test(diagnostics(error)),
+  );
+  await assert.rejects(
+    () => compileSource(dailySlots().replace('    cancel_when = false;\n', ''), { filename: 'range-cancel-missing.ghost.md' }),
+    error => /range basis requires cancel_when/i.test(diagnostics(error)),
+  );
 });
 
 test('range accepts a fixed-anchor Periodic interval that touches the next occurrence boundary', async () => {
   const artifact = await compileSource(periodic({ duration: '30min' }), { filename: 'periodic-range-adjacent.ghost.md' });
-  const schedule = artifact.manifest.schedules[0];
+  const schedule = artifact.manifest.control.schedules[0];
   assert.equal(schedule.every.initialMs, 1_800_000);
   assert.deepEqual(schedule.policy.basis, { kind: 'range', durationMs: 1_800_000 });
 });
@@ -97,7 +115,8 @@ test('overlapping live Duration candidate is rejected without changing the sourc
     error => /range/i.test(diagnostics(error)) && /overlap|non.?overlap/i.test(diagnostics(error)),
   );
   assert.match(source, /watering_duration: Duration = 10min/);
-  assert.equal(before.manifest.configs[0].value, 600_000);
+  assert.equal(before.manifest.format, 'GhostFlow/schedule-descriptor-v1');
+  assert.equal(before.manifest.control.configs[0].value, 600_000);
 });
 
 test('live Duration candidate accepts a boundary-touching interval', async () => {
@@ -109,6 +128,7 @@ test('live Duration candidate accepts a boundary-touching interval', async () =>
     source, filename: 'range-live-adjacent.ghost.md', expectedSourceSha256: sha256(source),
     changes: { watering_duration: 15 * 60_000 },
   });
-  assert.equal(candidate.manifest.configs[0].value, 900_000);
-  assert.deepEqual(candidate.manifest.schedules[0].slots, [480, 495]);
+  assert.equal(candidate.manifest.format, 'GhostFlow/schedule-descriptor-v1');
+  assert.equal(candidate.manifest.control.configs[0].value, 900_000);
+  assert.deepEqual(candidate.manifest.control.schedules[0].slots, [480, 495]);
 });

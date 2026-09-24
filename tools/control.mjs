@@ -880,7 +880,7 @@ class ControlParser {
           if (!this.matches(']')) do { const time = this.current(); if (time.kind !== 'time') error(time, 'selected entries must be HH:MM'); selected.push(this.take()); } while (this.maybe(','));
           this.expect(']');
         } else selected = this.identifier('selected requires HH:MM slots or a TimeSlots config');
-      } else if (['dst_missing', 'dst_repeated', 'basis', 'when', 'clock', 'gap', 'recovery', 'fallback'].includes(key.value)) {
+      } else if (['dst_missing', 'dst_repeated', 'basis', 'when', 'cancel_when', 'clock', 'gap', 'recovery', 'fallback'].includes(key.value)) {
         policy[key.value] = this.expression();
       } else error(key, `unsupported schedule option ${key.value}`);
       this.expect(';', 'expected ; after schedule option');
@@ -2159,7 +2159,30 @@ class Lowerer {
         dstMissing: choice('dst_missing', ['skip', 'next_valid']),
         dstRepeated: choice('dst_repeated', ['first', 'second', 'both', 'skip']),
       } : {};
-      const basis = choice('basis', ['pulse']);
+      let basis;
+      if (options.basis.kind === 'reference' && options.basis.name === 'pulse') {
+        if (options.cancel_when) error(options.cancel_when.loc, `${label} pulse basis does not use cancel_when`);
+        basis = 'pulse';
+      } else if (options.basis.kind === 'call' && options.basis.name === 'range'
+        && options.basis.args.length === 1 && !options.basis.named.length) {
+        const range = this.expression(options.basis.args[0], new Map(), { allowNext: false }, [], DURATION);
+        if (!sameType(range.type, DURATION) || !Number.isSafeInteger(range.constant) || range.constant <= 0) {
+          error(options.basis.loc, `${label} range requires a positive Duration`);
+        }
+        if (!options.cancel_when) error(item.loc, `${label} range basis requires cancel_when`);
+        let minimumSpacing;
+        if (trigger.kind === 'daily-slots') {
+          const starts = trigger.slots.map(minutes => minutes * 60_000);
+          minimumSpacing = starts.length === 1 ? 86_400_000 : Math.min(...starts.map((start, index) => {
+            const next = starts[(index + 1) % starts.length] + (index + 1 === starts.length ? 86_400_000 : 0);
+            return next - start;
+          }));
+        } else if (trigger.kind === 'daily') minimumSpacing = 86_400_000;
+        else if (trigger.kind === 'periodic') minimumSpacing = trigger.every.initialMs;
+        else error(options.basis.loc, `${label} range requires a statically bounded recurrence`);
+        if (range.constant > minimumSpacing) error(options.basis.loc, `${label} range occurrences must not overlap`);
+        basis = { kind: 'range', durationMs: range.constant };
+      } else error(options.basis.loc, `${label} basis must be pulse or range(positive Duration)`);
       const clock = choice('clock', ['trusted_only']);
       const recovery = choice('recovery', ['baseline']);
       const fallback = choice('fallback', ['skip']);
@@ -2173,10 +2196,17 @@ class Lowerer {
       }
       const predicate = this.expression(options.when, new Map(), { allowNext: false });
       if (!sameType(predicate.type, BOOL)) error(options.when.loc, `${label} when must be Bool`);
+      let cancelWhen;
+      if (options.cancel_when) {
+        const cancel = this.expression(options.cancel_when, new Map(), { allowNext: false });
+        if (!sameType(cancel.type, BOOL)) error(options.cancel_when.loc, `${label} cancel_when must be Bool`);
+        cancelWhen = cancel.sexpr;
+      }
       const slot = this.manifest.schedules.length;
       this.manifest.schedules.push({
         ...trigger, site: item.id, name: item.name, ...civilPolicy,
-        policy: { basis, when: predicate.sexpr, clock, gapMs: duration.constant, recovery, fallback },
+        policy: { basis, when: predicate.sexpr, ...(cancelWhen === undefined ? {} : { cancelWhen }),
+          clock, gapMs: duration.constant, recovery, fallback },
       });
       this.schedules.set(item.name, { slot, loc: item.loc });
       this.symbols.get(item.name).type = { kind: 'Schedule' };
