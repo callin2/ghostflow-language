@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
 import { GhostFlowRuntime } from '../runtimes/wasm/ghostflow-runtime.mjs';
+import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 import { encodeScheduleFacts } from '../runtimes/wasm/solar-abi.mjs';
 import { compileSource } from '../tools/toolchain.mjs';
 
@@ -62,4 +63,12 @@ test('DailySlots facts reject spoofed results, wrong identity, ordering and GFSF
   delete downgraded.schedules[0].rows[0].slotKey;
   delete downgraded.schedules[0].rows[0].minuteOfDay;
   assert.throws(() => runtime.tickSchedules(downgraded), /GFSF2.*GFB8/);
+
+  const mixedManifest = structuredClone(artifact.manifest);
+  mixedManifest.schedules.push({
+    kind: 'solar', site: site + 1, name: 'dawn', timezone: 'Asia/Seoul', latitude: 37.5, longitude: 127,
+    event: 'rise', offsetMs: 0, policy: { basis: 'pulse', when: 'true', clock: 'trusted_only', gapMs: 60_000, recovery: 'baseline', fallback: 'skip' },
+  });
+  await assert.rejects(() => ControlRuntime.instantiate(wasm(), { bytes: artifact.bytes, manifest: mixedManifest },
+    { schedule: { bootEpoch: 7, terminalCapacity: 8 } }), /v8 manifest requires GFB format 9 DailySlots schedules/);
 });

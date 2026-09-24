@@ -57,7 +57,7 @@ function encodeFacts(packet, version) {
     if (!schedule.site || sites.has(schedule.site)) throw new RangeError('invalid or duplicate schedule site');
     sites.add(schedule.site); u32(schedule.site);
     if (version >= 2) {
-      if (!(version === 3 ? ['solar', 'daily', 'daily-slots'] : ['solar', 'daily']).includes(schedule.kind)) throw new TypeError('invalid schedule kind');
+      if (!(version === 3 ? ['daily-slots'] : ['solar', 'daily']).includes(schedule.kind)) throw new TypeError('invalid schedule kind');
       u8({ solar: 0, daily: 1, 'daily-slots': 2 }[schedule.kind]);
     }
     u64(schedule.coverageFromWallMs, 'coverageFromWallMs'); u64(schedule.coverageToWallMs, 'coverageToWallMs');

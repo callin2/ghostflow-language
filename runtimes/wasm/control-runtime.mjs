@@ -264,7 +264,7 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
   if (manifest.format === SOLAR_FORMAT && !schedules.some(item => item.kind === 'solar')) throw new Error('v3 manifest requires a Solar schedule');
   if (schedules.some(item => item.kind === 'solar') && ![5, 9].includes(bytecodeFormat)) throw new Error('Solar manifest requires GFB format 5 or 9');
   if (manifest.format === SCHEDULE_FORMAT && (bytecodeFormat !== 8 || !schedules.length || schedules.some(item => item.kind !== 'daily'))) throw new Error('v7 manifest requires GFB format 8 Daily schedules');
-  if (manifest.format === SCHEDULE_SLOTS_FORMAT && (bytecodeFormat !== 9 || !schedules.some(item => item.kind === 'daily-slots') || schedules.some(item => !['solar', 'daily', 'daily-slots'].includes(item.kind)))) throw new Error('v8 manifest requires GFB format 9 with a DailySlots schedule');
+  if (manifest.format === SCHEDULE_SLOTS_FORMAT && (bytecodeFormat !== 9 || !schedules.length || schedules.some(item => item.kind !== 'daily-slots'))) throw new Error('v8 manifest requires GFB format 9 DailySlots schedules');
   if (!Array.isArray(manifest.timers) || manifest.timers.length > MAX_LIST) throw new TypeError('manifest.timers must be a bounded array');
   const timers = manifest.timers.map((timer, index) => {
     const item = record(timer, `manifest.timers[${index}]`);

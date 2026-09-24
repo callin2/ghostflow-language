@@ -262,6 +262,7 @@ function compile(ast) {
   const rawScheduleCount=strategies.reduce((total,{raw})=>total+raw.slice(3).filter(form=>Array.isArray(form)&&['solar-pulse','daily-pulse','daily-slots-pulse'].includes(form[0])).length,0);
   const hasDaily=strategies.some(({raw})=>raw.slice(3).some(form=>Array.isArray(form)&&form[0]==='daily-pulse'));
   const hasDailySlots=strategies.some(({raw})=>raw.slice(3).some(form=>Array.isArray(form)&&form[0]==='daily-slots-pulse'));
+  const hasSolar=strategies.some(({raw})=>raw.slice(3).some(form=>Array.isArray(form)&&form[0]==='solar-pulse'));
   const rawTrueForCount=strategies.reduce((total,{raw})=>total+raw.slice(3).filter(form=>Array.isArray(form)&&form[0]==='true-for').length,0);
   const rawPreludeCount=rawWindowCount+rawScheduleCount+rawTrueForCount;
   const hasSchedules=rawScheduleCount>0;
@@ -477,6 +478,7 @@ function compile(ast) {
     return {name:objectiveName,outputPort,indices:bindings.map(binding=>binding.index),period,late,direction,numbers};
   });
   if((hasDaily||hasDailySlots)&&(rawWindowCount||rawTrueForCount))throw new CompileError('mixed civil schedule temporal preludes are not executable');
+  if(hasDailySlots&&(hasDaily||hasSolar))throw new CompileError('mixed DailySlots schedule kinds are not executable');
   const format=hasDailySlots?9:hasDaily?8:objectives.length?7:hasTrueFors?6:hasSchedules?5:temporal?4:format3?3:intDeclarations||intExpressions?2:1;
   const w=new Writer();w.bytes(UTF8.encode('GFB1'));w.u16(format);w.str(name);w.u32(version);
   w.u16(inputs.length);for(const x of inputs){w.str(x.name);w.u8(x.type);}

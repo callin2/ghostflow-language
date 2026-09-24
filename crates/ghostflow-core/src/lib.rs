@@ -907,7 +907,11 @@ impl Runtime {
         {
             return Err(Error::new("civil schedules require schedule facts"));
         }
-        if facts.iter().flat_map(|f| f.facts.rows).any(|r| r.fold != 0) {
+        if facts
+            .iter()
+            .flat_map(|f| f.facts.rows)
+            .any(|r| r.fold != 0 || r.slot_key != 0 || r.minute_of_day != 0)
+        {
             return Err(Error::new("Solar facts cannot contain a civil fold"));
         }
         self.tick_inner(Some((clock, facts)))

@@ -14,9 +14,11 @@ the compiled predicate. Each pair is `(slotKey, minuteOfDay)`. Literal slot keys
 are `minuteOfDay + 1`, so they are stable under source reordering. Retiming is a
 new literal definition; this slice does not claim live key retention.
 
-`GhostFlow/control-v8` requires GFB9 and at least one DailySlots descriptor.
+`GhostFlow/control-v8` requires GFB9 and DailySlots-only descriptors.
 GFSF v3 adds `daily-slots` kind plus `slotKey` and `minuteOfDay` row fields.
 GFB8 remains bound to GFSF v2. A GFSF v2 packet cannot drive GFB9.
+Mixed Solar/Daily and DailySlots modules remain explicitly unsupported because
+the host exposes one activation and fact channel per civil schedule module.
 
 The terminal identity is `(sourceDay, slotKey, fold)` within its schedule site.
 `minuteOfDay` is always the declared slot minute. A provider may adjust the

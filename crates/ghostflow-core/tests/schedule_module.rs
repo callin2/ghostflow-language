@@ -1022,6 +1022,7 @@ fn daily_slots_gfb9_rejects_wrong_descriptor_or_fact_identity() {
         &[(2, 0)][..],
         &[(1, 1)][..],
         &[(16, 15), (1, 0)][..],
+        &[(u16::MAX, u16::MAX)][..],
     ] {
         let mut fixture = daily_slots_fixture();
         fixture.entries = vec![daily_slots_entry(slots, 0, &[1, 1])];
@@ -1384,6 +1385,15 @@ fn solar_site_epoch_fact_and_capacity_rejections_preserve_admission_state() {
             .unwrap_err()
             .message(),
         "solar provider revision exceeds limit"
+    );
+    assert_eq!(runtime.journal().len(), 1);
+    let mut forged_identity = SolarFact::available(0, 1000, "solar", "zone");
+    forged_identity.slot_key = 1;
+    assert_eq!(
+        solar_tick(&mut runtime, 1, 1000, &[forged_identity])
+            .unwrap_err()
+            .message(),
+        "Solar facts cannot contain a civil fold"
     );
     assert_eq!(runtime.journal().len(), 1);
     assert_eq!(

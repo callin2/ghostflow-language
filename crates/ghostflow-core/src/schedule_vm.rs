@@ -299,7 +299,7 @@ pub(crate) fn load_prelude(
                 for _ in 0..slot_count {
                     let key = reader.u16()?;
                     let minute = reader.u16()?;
-                    if key != minute + 1 || minute >= 1_440 || minute % 15 != 0 {
+                    if minute >= 1_440 || key != minute + 1 || minute % 15 != 0 {
                         return Err(Error::new("invalid DailySlots slot"));
                     }
                     if slots

@@ -73,6 +73,13 @@ test('literal DailySlots emits executable GFB9 while config-selected slots remai
   const configurable = code.replace('selected = [00:00, 06:15, 23:45];', 'selected = watering_slots;')
     .replace('control DailySlotsValid {', 'control DailySlotsValid { config watering_slots: TimeSlots<15min, 8> = [time`06:15`];');
   assert.throws(() => compileControl(configurable), /DailySlots policy execution requires verified occurrence provider and native admission bindings/);
+
+  const mixed = code.replace('output due: Bool;', `schedule morning: Daily {
+    timezone = "Asia/Seoul"; at = time\`06:30\`; dst_missing = skip; dst_repeated = first;
+    basis = pulse; when = true; clock = trusted_only; gap = skip_after(60s);
+    recovery = baseline; fallback = skip;
+  } output due: Bool;`);
+  assert.throws(() => compileControl(mixed), /mixed DailySlots schedule kinds are not executable/);
 });
 
 test('DailySlots retains the authored predicate, DST choices and exact gap boundary', () => {
