@@ -43,6 +43,8 @@ in `tools/verify-language.mjs`; never discover sibling product tests by wildcard
 Run `npm test` for host verification after dependencies and the WASM Rust target
 are installed. It compiles the fixture required by Rust tests before invoking
 Cargo, builds the WASM/native runners, and executes the language tests/tutorial.
+Keep runnable FAQ and programming samples in the focused
+`tests/docs-runnable-examples.test.mjs` compiler check when changing them.
 Keep source and artifact hashes in release records. Generated verification and
 tutorial traces are execution evidence under ignored `build/`, separate from
 source releases. Report host validation separately from Device, API and farmer-UX

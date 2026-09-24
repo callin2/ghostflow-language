@@ -628,7 +628,7 @@ control ScheduledPulse {
     recovery = baseline;
     fallback = skip;
   }
-  config run_time: Duration = 5min;
+  let run_time = 5min;
   type Phase = Idle | Watering;
   state phase: Phase = Idle;
   timer age = elapsed(phase);
@@ -729,18 +729,23 @@ control MoistureControl {
 control OptionalMoisture {
   sensor moisture?: Percent;
   output request: Bool;
-
-  request <- case moisture {
-    ok(value) => value < 30%;
-    fault(_) => false;
-  };
+  adapt moisture_policy {
+    strategy WithMoisture priority 100 match (moisture: sensor<Percent>) {
+      request <- case moisture {
+        ok(value) => value < 30%;
+        fault(_) => false;
+      };
+    }
+    strategy Baseline priority 0 match always {
+      request <- false;
+    }
+  }
 }
 ```
 
 `?`는 센서가 선택적인 설치 능력임을 나타내는 선언 정보다.
-정상값이 공급되면 비교하고, 읽을 수 없는 경우에는 이 프로그램이 선택한 거짓을
-사용한다. 미설치와 설치된 센서의 단절을 구분하려면 `adapt`와 `strategy`를
-선택된 capability 문법으로 표현한다. `?` 하나만으로 대체 전략이 생성되지는 않는다.
+설치된 센서의 정상값은 `WithMoisture`에서 비교하고, fault일 때는 거짓을 요청한다.
+미설치 때는 `Baseline`이 거짓을 요청한다. `?` 하나만으로 대체 전략이 생성되지는 않는다.
 자세한 규칙은 [Reference §4.5–4.6](reference/04-sensors-constraints-control.md#45-선택-sensor와-capability)을 따른다.
 
 **작은 실험:** E10의 켜짐·꺼짐 경계를 똑같이 만들면 어떤 문제가 생길까?

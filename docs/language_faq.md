@@ -294,7 +294,7 @@ control DailyWatering {
     recovery = baseline;
     fallback = skip;
   }
-  config duration: Duration = 5min;
+  let duration = 5min;
   state running: Bool = false;
   timer age = elapsed(running);
 
@@ -458,11 +458,11 @@ control CountThree {
   output done: Bool;
   state previous: Bool = false;
   state count: Int = 0;
-  let event = detected && !previous;
+  let rising = detected && !previous;
 
   previous' = detected;
   count' = if reset then 0
-    else if event && count < 3 then count + 1
+    else if rising && count < 3 then count + 1
     else count;
   done <- count' >= 3;
 }
@@ -517,27 +517,27 @@ config duration: Duration = 5min {
 <a id="q13"></a>
 ## 13. 고장이 사라져도 알람을 유지하고 리셋으로 해제하려면?
 
-fault의 현재값과 fault를 기억하는 상태를 나눈다.
-아래는 알람 기억만 다루는 예다. `fault = true`이면 원인이 남아 있다는 뜻이다.
+고장 입력의 현재값과 고장을 기억하는 상태를 나눈다.
+아래는 알람 기억만 다루는 예다. `fault_active = true`이면 원인이 남아 있다는 뜻이다.
 
 ```ghost
 control AlarmMemory {
-  input fault, reset: Bool;
+  input fault_active, reset: Bool;
   output alarm: Bool;
   state latched: Bool = false;
   state reset_armed: Bool = false;
   let reset_event = reset_armed && reset;
 
-  reset_armed' = !fault && !reset;
-  latched' = fault || (latched && !reset_event);
+  reset_armed' = !fault_active && !reset;
+  latched' = fault_active || (latched && !reset_event);
   alarm <- latched';
 }
 ```
 
 고장 원인이 사라져도 `latched`는 남는다. 원인이 사라진 뒤 reset의 해제와 새 누름을 받아야 지운다.
-fault와 reset이 동시에 참이면 fault가 이긴다. reset은 장비의 재시작 명령이 아니다.
+fault_active와 reset이 동시에 참이면 fault_active가 이긴다. reset은 장비의 재시작 명령이 아니다.
 
-**왜 `alarm <- fault`와 다른가요?** 현재 원인과 과거에 발생한 고장의 기억은 다른 정보이기 때문이다.
+**왜 `alarm <- fault_active`와 다른가요?** 현재 원인과 과거에 발생한 고장의 기억은 다른 정보이기 때문이다.
 장비 정리·위치 피드백·여러 고장 원인까지 포함한 사례는
 [고장 및 리셋 예제](../examples/curriculum/pc-10-fault-alarm-reset.ghost.md)를 참조한다.
 
@@ -545,7 +545,7 @@ fault와 reset이 동시에 참이면 fault가 이긴다. reset은 장비의 재
 
 - `state latched`, `reset_armed`, 다음 상태 `'`: [Reference §2.8 tick과 상태 snapshot](reference/02-types-expressions-state.md#28-tick과-상태-snapshot)
 - `let`, 순수한 사건 조건: [Reference §2.7 순수 함수와 계산 조합](reference/02-types-expressions-state.md#27-순수-함수와-계산-조합)
-- `fault || (latched && !reset_event)`: [Reference §2.6 표현식과 연산자](reference/02-types-expressions-state.md#26-표현식과-연산자)
+- `fault_active || (latched && !reset_event)`: [Reference §2.6 표현식과 연산자](reference/02-types-expressions-state.md#26-표현식과-연산자)
 
 <a id="q14"></a>
 ## 14. 두 출력을 동시에 켜지 못하게 하려면?
@@ -825,7 +825,9 @@ admit하고, 운전 시간은 기존 `duration`과 control state가 정한다. �
 
 요일 조건은 일정의 `on` 필드로 표현한다. 예를 들어 월요일부터 금요일까지
 오전 6시에 시작하려면 시각 조건과 다음 요일 조건을 조합한다.
-아래는 schedule 본문에 넣는 문법 단편이다.
+아래는 Reference의 선택된 문법 단편이다. 현재 compiler의 요일 범위 필터는 아직
+이 표기를 지원하지 않는다. 실행 가능한 일정에는 ``day`workday` `` 또는
+``day`offday` ``와 설치 calendar를 사용한다.
 
 ```ghost
 on = day`mon..fri`;
@@ -866,9 +868,13 @@ control UsageLimit {
   input request, usage_valid: Bool;
   input used: Duration;
   output device: Bool;
-  config limit: Duration = 1h;
+  config max_use: Duration = 1h;
 
-  device <- request && usage_valid && used < limit;
+  let within_limit = case max_use {
+    ok(value) => used < value;
+    fault(_) => false;
+  };
+  device <- request && usage_valid && within_limit;
 }
 ```
 
@@ -893,7 +899,7 @@ control UsageLimit {
 - `elapsed`와 누적의 차이: [Reference §3.2 상태 변경 뒤의 경과 시간](reference/03-time-and-schedules.md#32-상태-변경-뒤의-경과-시간)
 - 누적 대상·범위와 `account`·`on_time`·`used`: [Reference §3.4 누적 시간과 rolling budget](reference/03-time-and-schedules.md#34-누적-시간과-rolling-budget)
 - 자동·수동 통합 집계와 일일 한도: [Reference §3.10 시간 기반 사용량 제약](reference/03-time-and-schedules.md#310-시간-기반-사용량-제약)
-- `config limit`: [Reference §5.1 config 선언](reference/05-settings-and-observation.md#51-config-선언)
+- `config max_use`: [Reference §5.1 config 선언](reference/05-settings-and-observation.md#51-config-선언)
 
 <a id="q23"></a>
 ## 23. 자동·수동 운전과 상관없이 하루 동작 횟수에 따라 세척 운전을 할 수 있나요?
@@ -1285,7 +1291,7 @@ basis = run(10min, on_time);
 
 - 만조·간조 occurrence, offset, 사리·조금과 예측 수정: [Reference §3.9 달과 조석](reference/03-time-and-schedules.md#달과-조석)
 - 예측 불명·만료와 fallback: [Reference §3.9 자연 기준의 fallback과 회복](reference/03-time-and-schedules.md#자연-기준의-fallback과-회복)
-- 예약 시작과 `Run` 지속 시간: [Reference §3.5 Pulse, Window, Run](reference/03-time-and-schedules.md#pulse-window-run)
+- 예약 시작과 `Run` 지속 시간: [Reference §3.5 Pulse, Window, Run](reference/03-time-and-schedules.md#pulse-window-run-range)
 - 달력 시각과 단조 경과 시간: [Reference §3.1 시간값과 시계 영역](reference/03-time-and-schedules.md#31-시간값과-시계-영역)
 
 <a id="q31"></a>
@@ -1780,12 +1786,14 @@ LLM 호출은 다음 버전 형식의 TOON 요청 파일을 사용한다. 요청
 format: GhostFlow/cli-request-v1
 operation: check
 source:
-  path: examples/scheduled-watering.ghost.md
-  documentId: watering
-  revisionId: rev-17
+  path: examples/authoring/pump-rev-2.ghost.md
+  documentId: GF-EXAMPLE-PUMP
+  revisionId: rev-2
 ```
 
-컴파일 요청은 `operation: compile`과 `artifactPath`를 추가한다. 결과는 기본적으로
+위 문서에는 출력과 제약에 연결된 의도 anchor가 있다. 실행할 때 TOON 내용을
+`build/request.toon`에 저장한다. 컴파일 요청은 `operation: compile`과
+`artifactPath`를 추가한다. 결과는 기본적으로
 TOON이며 `--format json`은 같은 결과의 JSON 표현을 출력한다. 컴파일 오류는 종료 코드
 1과 원본 위치가 있는 진단을 반환한다. 잘못된 요청은 종료 코드 2와 `GF_CLI` 오류를 반환한다.
 
