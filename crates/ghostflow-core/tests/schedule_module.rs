@@ -1,4 +1,4 @@
-use ghostflow_core::schedule_vm::{PreludeEntry, SolarEvent};
+use ghostflow_core::schedule_vm::{PreludeEntry, PulseDescriptor, SolarEvent};
 use ghostflow_core::temporal::TargetBudget;
 use ghostflow_core::temporal_runtime::TemporalActivation;
 use ghostflow_core::{Module, Runtime, Value};
@@ -174,7 +174,9 @@ fn rejected(f: &Fixture, message: &str) {
 fn gfb5_schedule_only_loads_but_cannot_activate_or_hot_swap() {
     let module = Module::load(&Fixture::default().bytes()).unwrap();
     let requirements = module.schedule_requirements().unwrap();
-    let s = &requirements.strategies[0].schedules[0];
+    let PulseDescriptor::Solar(s) = &requirements.strategies[0].schedules[0] else {
+        panic!("expected Solar descriptor");
+    };
     assert_eq!(
         (s.site, s.name.as_str(), s.timezone.as_str()),
         (7, "dawn", "Europe/Paris")
@@ -753,6 +755,168 @@ fn solar_activation() -> ghostflow_core::solar_runtime::SolarActivation {
         boot_epoch: 3,
         terminal_capacity: 8,
     }
+}
+
+fn daily_entry(repeated: u8, when: &[u8]) -> Vec<u8> {
+    let mut b = vec![3];
+    b.extend(7u32.to_le_bytes());
+    string(&mut b, "morning");
+    string(&mut b, "Asia/Seoul");
+    b.extend(23_400_000u64.to_le_bytes());
+    b.extend([0, repeated, 0, 0, 0, 0]);
+    b.extend(60_000u64.to_le_bytes());
+    blob(&mut b, when);
+    b
+}
+
+fn daily_fixture() -> Fixture {
+    Fixture {
+        version: 8,
+        entries: vec![daily_entry(0, &[1, 1])],
+        ..Fixture::default()
+    }
+}
+
+fn daily_tick<'a>(
+    runtime: &'a mut Runtime,
+    now: u64,
+    wall: u64,
+    rows: &[ghostflow_core::solar_admission::SolarFact],
+    kind: ghostflow_core::solar_runtime::ScheduleKind,
+    coverage_to: u64,
+) -> ghostflow_core::Result<&'a ghostflow_core::TickRecord> {
+    use ghostflow_core::{
+        schedule_clock::{ClockSnapshot, ClockTrust},
+        solar_admission::SolarFacts,
+        solar_runtime::ScheduleInput,
+    };
+    runtime.set_input("__gf_now_ms", Value::Number(now as f64))?;
+    runtime.set_input("__gf_time_epoch", Value::Number(3.0))?;
+    runtime.tick_with_schedules(
+        ClockSnapshot {
+            monotonic_ms: now,
+            boot_epoch: 3,
+            wall_ms: Some(wall),
+            trust: ClockTrust::Trusted,
+            uncertainty_ms: Some(0),
+            source_revision: Some("clock-v1"),
+        },
+        &[ScheduleInput {
+            site: 7,
+            kind,
+            facts: SolarFacts {
+                coverage_from_wall_ms: 0,
+                coverage_to_wall_ms: coverage_to,
+                rows,
+            },
+        }],
+    )
+}
+
+#[test]
+fn daily_gfb8_descriptor_and_transport_are_distinct_and_checked() {
+    use ghostflow_core::solar_admission::SolarFact;
+    use ghostflow_core::solar_runtime::ScheduleKind;
+    let module = Module::load(&daily_fixture().bytes()).unwrap();
+    let PulseDescriptor::Daily(d) =
+        &module.schedule_requirements().unwrap().strategies[0].schedules[0]
+    else {
+        panic!("Daily descriptor required");
+    };
+    assert_eq!((d.at_ms, d.dst_missing, d.dst_repeated), (23_400_000, 0, 0));
+    let mut runtime = Runtime::new(8);
+    runtime.install(module, false);
+    assert!(runtime.activate_with_solar(&solar_activation()).is_err());
+    runtime
+        .activate_with_schedules(&solar_activation())
+        .unwrap();
+    let rows = [SolarFact::available(0, 1000, "iana-v1", "zone-v1")];
+    assert!(daily_tick(&mut runtime, 0, 900, &rows, ScheduleKind::Solar, 2000).is_err());
+    assert!(
+        !daily_tick(&mut runtime, 0, 900, &rows, ScheduleKind::Daily, 2000)
+            .unwrap()
+            .schedule_trace[0]
+            .due
+    );
+    assert!(solar_tick(&mut runtime, 100, 1000, &rows).is_err());
+    let tick = daily_tick(&mut runtime, 100, 1000, &rows, ScheduleKind::Daily, 2000).unwrap();
+    assert_eq!(tick.safe_intents["due"], Value::Bool(true));
+    assert_eq!(
+        tick.schedule_trace[0].observations[0].context_revision,
+        "zone-v1"
+    );
+    let mut old = daily_fixture();
+    old.version = 5;
+    assert!(Module::load(&old.bytes()).is_err());
+    let mut invalid = daily_fixture();
+    invalid.entries = vec![daily_entry(4, &[1, 1])];
+    assert!(Module::load(&invalid.bytes()).is_err());
+    let mut no_daily = Fixture::default();
+    no_daily.version = 8;
+    assert!(Module::load(&no_daily.bytes()).is_err());
+}
+
+#[test]
+fn daily_native_transaction_rolls_back_and_stale_coverage_preserves_unknown_reason() {
+    use ghostflow_core::solar_admission::SolarFact;
+    use ghostflow_core::solar_runtime::ScheduleKind::Daily;
+    let mut fixture = daily_fixture();
+    fixture.states = 1;
+    fixture.transition = Some(vec![58, 0, 0, 0]);
+    fixture.output_type = 2;
+    fixture.output = vec![33, 3, 0, 0, 2];
+    fixture.output.extend(11f64.to_le_bytes());
+    fixture.output.extend([20, 22]);
+    let mut runtime = Runtime::new(8);
+    runtime.install(Module::load(&fixture.bytes()).unwrap(), false);
+    runtime
+        .activate_with_schedules(&solar_activation())
+        .unwrap();
+    let rows = [SolarFact::available(0, 1000, "iana-v1", "zone-v1")];
+    daily_tick(&mut runtime, 10, 999, &rows, Daily, 2000).unwrap();
+    assert_eq!(
+        daily_tick(&mut runtime, 11, 1000, &rows, Daily, 2000)
+            .unwrap_err()
+            .message(),
+        "division by zero"
+    );
+    assert_eq!(runtime.journal().len(), 1);
+    assert_eq!(runtime.state("s0"), Some(Value::Bool(false)));
+    assert!(
+        daily_tick(&mut runtime, 12, 1000, &rows, Daily, 2000)
+            .unwrap()
+            .schedule_trace[0]
+            .due
+    );
+    let stale = daily_tick(&mut runtime, 13, 2001, &rows, Daily, 2000).unwrap();
+    assert!(!stale.schedule_trace[0].due);
+    assert_eq!(
+        stale.schedule_trace[0].unknown_reason.as_deref(),
+        Some("IncompleteCoverage")
+    );
+    assert!(stale.to_json().contains("IncompleteCoverage"));
+}
+
+#[test]
+fn daily_unavailable_context_preserves_reason_instead_of_ordinary_false() {
+    use ghostflow_core::{
+        solar_admission::{SolarDecision, SolarFact, SolarFactAvailability},
+        solar_runtime::ScheduleKind::Daily,
+    };
+    let mut runtime = Runtime::new(8);
+    runtime.install(Module::load(&daily_fixture().bytes()).unwrap(), false);
+    runtime
+        .activate_with_schedules(&solar_activation())
+        .unwrap();
+    let mut row = SolarFact::available(0, 1000, "iana-v1", "zone-v1");
+    row.availability = SolarFactAvailability::Unavailable;
+    row.scheduled_wall_ms = None;
+    let tick = daily_tick(&mut runtime, 0, 900, &[row], Daily, 2000).unwrap();
+    assert_eq!(tick.schedule_trace[0].decision, SolarDecision::Unknown);
+    assert_eq!(
+        tick.schedule_trace[0].unknown_reason.as_deref(),
+        Some("OccurrenceUnavailable")
+    );
 }
 fn solar_tick<'a>(
     runtime: &'a mut Runtime,

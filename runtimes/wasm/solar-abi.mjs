@@ -17,6 +17,12 @@ export function validateSolarActivation(profile) {
   return profile;
 }
 export function encodeSolarFacts(packet) {
+  return encodeFacts(packet, 1);
+}
+export function encodeScheduleFacts(packet) {
+  return encodeFacts(packet, 2);
+}
+function encodeFacts(packet, version) {
   fields(packet, ['clock', 'schedules'], 'solar facts');
   const { clock, schedules } = packet;
   fields(clock, ['monotonicMs', 'bootEpoch', 'wallMs', 'trusted', 'unknownReason', 'uncertaintyMs', 'sourceRevision'], 'clock');
@@ -37,7 +43,7 @@ export function encodeSolarFacts(packet) {
     u16(bytes.length); room(bytes.length); data.set(bytes, at); at += bytes.length;
   };
   for (const value of [71, 70, 83, 70]) u8(value); // GFSF
-  u16(1); u16(schedules.length);
+  u16(version); u16(schedules.length);
   u64(clock.monotonicMs, 'monotonicMs'); u64(clock.bootEpoch, 'bootEpoch');
   optional(clock.wallMs, 'wallMs'); optional(clock.uncertaintyMs, 'uncertaintyMs');
   u8(clock.trusted ? 1 : 0);
@@ -45,16 +51,21 @@ export function encodeSolarFacts(packet) {
   text(clock.sourceRevision ?? '', 'sourceRevision', true);
   const sites = new Set();
   for (const schedule of schedules) {
-    fields(schedule, ['site', 'coverageFromWallMs', 'coverageToWallMs', 'rows'], 'schedule');
+    fields(schedule, ['site', 'coverageFromWallMs', 'coverageToWallMs', 'rows', ...(version === 2 ? ['kind'] : [])], 'schedule');
     integer(schedule.site, 'site', 0xffffffff);
     if (!schedule.site || sites.has(schedule.site)) throw new RangeError('invalid or duplicate schedule site');
     sites.add(schedule.site); u32(schedule.site);
+    if (version === 2) {
+      if (!['solar', 'daily'].includes(schedule.kind)) throw new TypeError('invalid schedule kind');
+      u8(schedule.kind === 'daily' ? 1 : 0);
+    }
     u64(schedule.coverageFromWallMs, 'coverageFromWallMs'); u64(schedule.coverageToWallMs, 'coverageToWallMs');
     if (!Array.isArray(schedule.rows) || schedule.rows.length > 4096) throw new RangeError('invalid solar rows');
     u16(schedule.rows.length);
     for (const row of schedule.rows) {
-      fields(row, ['sourceDay', 'scheduledWallMs', 'available', 'providerRevision', 'contextRevision'], 'row');
+      fields(row, ['sourceDay', 'scheduledWallMs', 'available', 'providerRevision', 'contextRevision', ...(version === 2 ? ['fold'] : [])], 'row');
       u32(integer(row.sourceDay, 'sourceDay', 2932896));
+      if (version === 2) u8(integer(row.fold, 'fold', 2));
       if (typeof row.available !== 'boolean') throw new TypeError('row.available must be Bool');
       if (row.available !== (row.scheduledWallMs != null)) throw new TypeError('available occurrence requires scheduledWallMs');
       u8(row.available ? 1 : 0); optional(row.scheduledWallMs, 'scheduledWallMs');

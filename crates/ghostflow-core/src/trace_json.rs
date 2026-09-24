@@ -275,13 +275,25 @@ pub(crate) fn record(out: &mut impl Write, r: &TickRecord) -> fmt::Result {
                 trace.site, trace.due
             )?;
             text(out, &format!("{:?}", trace.decision))?;
+            if let Some(reason) = &trace.unknown_reason {
+                out.write_str(",\"unknownReason\":")?;
+                text(out, reason)?;
+            }
             out.write_str(",\"observations\":[")?;
             for (index, row) in trace.observations.iter().enumerate() {
                 if index > 0 {
                     out.write_char(',')?;
                 }
                 write!(out, "{{\"sourceDay\":{},\"occurrenceId\":", row.source_day,)?;
-                text(out, &format!("{}:{}", trace.site, row.source_day))?;
+                if row.fold == 0 {
+                    text(out, &format!("{}:{}", trace.site, row.source_day))?;
+                } else {
+                    text(
+                        out,
+                        &format!("{}:{}:{}", trace.site, row.source_day, row.fold),
+                    )?;
+                }
+                write!(out, ",\"fold\":{}", row.fold)?;
                 out.write_str(",\"scheduledWallMs\":")?;
                 optional_u64(out, row.scheduled_wall_ms)?;
                 out.write_str(",\"decision\":")?;

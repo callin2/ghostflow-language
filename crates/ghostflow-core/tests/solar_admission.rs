@@ -222,6 +222,7 @@ fn incomplete_or_malformed_provider_facts_fail_closed_before_staging() {
     let mut engine = SolarPulseEngine::new(41, 100, 7, 4).unwrap();
     let malformed = [SolarFact {
         source_day: 3,
+        fold: 0,
         scheduled_wall_ms: None,
         provider_revision: "provider-r1".into(),
         context_revision: "zone-r1".into(),

@@ -4,7 +4,7 @@ import { compileSource, verifyArtifactSourceMap } from '../tools/toolchain.mjs';
 import { compileControl } from '../tools/control.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 
-const source = `# Scheduled control\n\n\`\`\`ghost\ncontrol Water {\n  input allow: Bool;\n  schedule morning: Daily {\n    timezone = "Asia/Seoul"; at = time\`06:30\`;\n    dst_missing = skip; dst_repeated = first;\n    basis = pulse; when = allow; clock = trusted_only;\n    gap = skip_after(60s); recovery = baseline; fallback = skip;\n  }\n  output pump: Bool;\n  pump <- morning.due;\n}\n\`\`\`\n`;
+const source = `# Scheduled control\n\n\`\`\`ghost\ncontrol Water {\n  input allow: Bool;\n  schedule morning: Cron {\n    timezone = "Asia/Seoul"; at = cron5\`30 6 * * *\`;\n    dst_missing = skip; dst_repeated = first;\n    basis = pulse; when = allow; clock = trusted_only;\n    gap = skip_after(60s); recovery = baseline; fallback = skip;\n  }\n  output pump: Bool;\n  pump <- morning.due;\n}\n\`\`\`\n`;
 
 test('canonical source emits a source-bound non-executable schedule descriptor', async () => {
   const compiled = await compileSource(source, { filename: 'water.ghost.md' });

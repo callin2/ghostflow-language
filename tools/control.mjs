@@ -1489,6 +1489,7 @@ class Lowerer {
       ? 'true'
       : ['all', ...this.manifest.outputs.map(output => ['has', 'actuator', output.name, gfbType(semanticType(output.type))])];
     const solarForms = this.solarForms();
+    if (solarForms.some(form => form[0] === 'daily-pulse')) this.manifest.format = 'GhostFlow/control-v7';
     const temporalForms = this.windows.length || this.trueFors.length || solarForms.length ? [
       ['temporal-context', `${RESERVED_PREFIX}now_ms`, `${RESERVED_PREFIX}time_epoch`],
       ...[...this.temporalRoots.values()].sort((left, right) => left.tag - right.tag).map(root =>
@@ -1513,7 +1514,7 @@ class Lowerer {
         String(objective.controller.bias), String(objective.output.max), String(objective.controller.restart.output),
       ])];
     if (!emitBytecode) return { manifest: this.manifest, sourceMap: this.ast.sourceNodes };
-    const policySchedule = this.ast.body.find(item => item.kind === 'schedule' && item.scheduleType !== 'Solar'
+    const policySchedule = this.ast.body.find(item => item.kind === 'schedule' && !isExecutablePulseSchedule(item)
       && Object.keys(item.policy ?? {}).some(key => key !== 'fallback'));
     if (policySchedule) error(policySchedule.loc,
       `${policySchedule.scheduleType} policy execution requires verified occurrence provider and native admission bindings`);
@@ -2203,7 +2204,7 @@ class Lowerer {
         if (!sameType(cancel.type, BOOL)) error(options.cancel_when.loc, `${label} cancel_when must be Bool`);
         cancelWhen = cancel.sexpr;
       }
-      const slot = this.manifest.schedules.length;
+      const slot = this.manifest.schedules.filter(schedule => ['solar', 'daily'].includes(schedule.kind)).length;
       this.manifest.schedules.push({
         ...trigger, site: item.id, name: item.name, ...civilPolicy,
         policy: { basis, when: predicate.sexpr, ...(cancelWhen === undefined ? {} : { cancelWhen }),
@@ -2211,6 +2212,11 @@ class Lowerer {
       });
       this.schedules.set(item.name, { slot, loc: item.loc });
       this.symbols.get(item.name).type = { kind: 'Schedule' };
+      if (isExecutablePulseSchedule(item)) {
+        if (!this.hasClock) { this.addInput(`${RESERVED_PREFIX}now_ms`, NUMBER, item.loc); this.hasClock = true; }
+        if (!this.gfbInputs.some(input => input[1] === `${RESERVED_PREFIX}time_epoch`)) this.addInput(`${RESERVED_PREFIX}time_epoch`, NUMBER, item.loc);
+        this.schedules.set(item.name, { slot, loc: item.loc, projections: new Set(['due', 'missed']) });
+      }
   }
   addSolarSchedule(item) {
     for (const field of ['timezone', 'latitude', 'longitude', 'at', 'fallback']) {
@@ -2222,7 +2228,7 @@ class Lowerer {
     const policy = this.naturalSchedulePolicy(item, false);
     if (!this.hasClock) { this.addInput(`${RESERVED_PREFIX}now_ms`, NUMBER, item.loc); this.hasClock = true; }
     if (!this.gfbInputs.some(input => input[1] === `${RESERVED_PREFIX}time_epoch`)) this.addInput(`${RESERVED_PREFIX}time_epoch`, NUMBER, item.loc);
-    const slot = this.manifest.schedules.filter(schedule => schedule.kind === 'solar').length;
+    const slot = this.manifest.schedules.filter(schedule => ['solar', 'daily'].includes(schedule.kind)).length;
     this.manifest.format = 'GhostFlow/control-v3';
     this.manifest.schedules.push({
       kind: 'solar', site: item.id, name: item.name, timezone: item.timezone,
@@ -3387,7 +3393,11 @@ class Lowerer {
     ]);
   }
   solarForms() {
-    return this.manifest.schedules.filter(schedule => schedule.kind === 'solar').map(schedule => [
+    return this.manifest.schedules.filter(schedule => schedule.kind === 'solar' || schedule.kind === 'daily' && schedule.policy.basis === 'pulse' && schedule.policy.clock === 'trusted_only' && !schedule.day).map(schedule => schedule.kind === 'daily' ? [
+      'daily-pulse', String(schedule.site), schedule.name, schedule.timezone, String(schedule.atMs),
+      schedule.dstMissing, schedule.dstRepeated, schedule.policy.basis, schedule.policy.clock,
+      String(schedule.policy.gapMs), schedule.policy.recovery, schedule.policy.fallback, schedule.policy.when,
+    ] : [
       'solar-pulse', String(schedule.site), schedule.name, schedule.timezone,
       String(schedule.latitude), String(schedule.longitude), schedule.event,
       String(schedule.offsetMs), schedule.policy.basis, schedule.policy.clock,
@@ -3414,7 +3424,7 @@ class Lowerer {
     if (this.gfbInputs.length > INPUT_LIMIT) error(this.ast.loc, `input budget exceeded (${INPUT_LIMIT})`);
     if (this.gfbStates.length > STATE_LIMIT) error(this.ast.loc, `state budget exceeded (${STATE_LIMIT})`);
     if (this.gfbStates.length + this.windows.length + this.trueFors.length
-      + this.manifest.schedules.filter(schedule => schedule.kind === 'solar').length > STATE_LIMIT) error(this.ast.loc, 'temporal state limit exceeded');
+      + this.manifest.schedules.filter(schedule => ['solar', 'daily'].includes(schedule.kind)).length > STATE_LIMIT) error(this.ast.loc, 'temporal state limit exceeded');
     if (STRATEGY_LIMIT < 1) error(this.ast.loc, 'strategy budget is invalid');
     if (this.constraints.some(x => x.length - 1 > 32)) error(this.ast.loc, 'constraint arity exceeds 32');
   }
@@ -3631,6 +3641,13 @@ export function compileControl(source, { filename = '<control>', emitBytecode = 
     error(ast.loc, 'after_event requires an explicit after_event_any or after_event_all projection');
   }
   return lowered;
+}
+
+/** Only this bounded civil pulse slice has a VM/provider transport. */
+export function isExecutablePulseSchedule(item) {
+  return item.scheduleType === 'Solar' || item.scheduleType === 'Daily'
+    && !item.on && !item.calendar && item.at?.kind === 'literal' && item.at.raw.startsWith('time`')
+    && item.policy?.basis?.name === 'pulse' && item.policy?.clock?.name === 'trusted_only';
 }
 
 /** Internal composition adapter. The public API accepts canonical documents. */
