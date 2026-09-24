@@ -54,14 +54,16 @@ composition. GFB1 limits include 128 inputs, 128 states, 32 strategies, 128
 constraints, expression depth/nodes of 128/4096, and bounded expression and
 query sizes ([`tools/gfb1.mjs`](../../tools/gfb1.mjs)).
 
-R2 fixes the source/instance distinction: canonical source remains authoritative
+As developed in [R2: authority and identity](GF-COMPOSE-R2-AUTHORITY-IDENTITY.md),
+the source/instance distinction keeps canonical source authoritative
 and an instance needs an opaque identity with isolated state and provenance.
-The updated R2 also fixes that conversational memory is provenance and
+R2 also fixes that conversational memory is provenance and
 authoring context, not automatic execution-rule or physical-binding authority.
 Memory-to-decision-to-source linkage, retention, and tombstone behavior remain
 R2/API-system questions. Its installation-constraint boundary remains
 unresolved. This document does not select a constraint artifact, overlay, or
-enforcement owner.
+enforcement owner. See also [R5: composition contracts and diagnostics](GF-COMPOSE-R5-CONTRACTS.md)
+for the related compatibility and evidence proposal.
 
 ## Tables and examples
 

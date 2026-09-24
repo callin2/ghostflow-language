@@ -21,10 +21,14 @@ and evidence summaries; their unresolved choices remain unresolved here.
 
 Current evidence establishes the following:
 
-- `compileConstraints` accepts `exclusive`, bounded `require` forms,
-  `allow(enter/apply)`, `limit on_time`, `once`, and non-blocking `check
-  pump_capacity`; unsupported expressions fail compilation
+- `compileConstraints` accepts `exclusive`, bounded `require` forms, the
+  standalone `allow(enter/apply)` forms, `limit on_time`, `once`, and
+  non-blocking `check pump_capacity`; unsupported expressions fail compilation
   ([`tools/constraints.mjs`](../../tools/constraints.mjs)).
+- This is historical standalone-compiler evidence. The language reference
+  retains `allow enter(...)` for the `ghostrules` parser and says the earlier
+  `allow apply(settings) ... Configure` rule is superseded by the approved live
+  property event decision; see [Reference §4.10](../reference/04-sensors-constraints-control.md#410-mode와-live-settings).
 - Constraint phase is significant. Output relations apply to final output
   candidates; enter/apply rules apply at request entry; capacity checks apply
   to a new-work authorization path ([`docs/CONSTRAINTS.md`](../CONSTRAINTS.md)).
@@ -44,7 +48,10 @@ Current evidence establishes the following:
   ([`docs/SOURCE-SAFETY-TRACE.md`](../SOURCE-SAFETY-TRACE.md)).
 - R2 system-memory #68 is a fixed boundary for this document: conversational
   memory is provenance/authoring context, not execution-rule or binding
-  authority. Installation-constraint authority under system #62 remains open.
+  authority ([R2: authority and identity](GF-COMPOSE-R2-AUTHORITY-IDENTITY.md)).
+  Installation-constraint authority under system #62 remains open. See also
+  [R3: composition execution](GF-COMPOSE-R3-EXECUTION.md) for the related
+  execution proposal and its limits.
 
 ### Evidence classes
 
