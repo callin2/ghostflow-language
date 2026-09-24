@@ -1,5 +1,5 @@
-//! GFB7's single Temperature -> Percent objective descriptor. This profile uses
-//! the GFB3 body, followed by one objective; temporal/schedule preludes are absent.
+//! Single Temperature -> Percent objective descriptor. GFB11 binds the target
+//! to a protected config Result; GFB7 retains its scalar objective layout.
 use crate::controller::{Direction, Pid, PidConfig, PidStage};
 use crate::{Error, Field, Reader, Result, Strategy, Type, Value};
 
@@ -10,6 +10,7 @@ pub struct ObjectiveDescriptor {
     pub measure_input: u16,
     pub measure_ok_input: u16,
     pub target_input: u16,
+    pub target_ok_input: Option<u16>,
     pub safe_max_input: u16,
     pub config: PidConfig,
 }
@@ -19,8 +20,9 @@ impl ObjectiveDescriptor {
         reader: &mut Reader<'_>,
         inputs: &[Field],
         strategies: &[Strategy],
+        config_result: bool,
     ) -> Result<Self> {
-        if reader.u16()? != 1 || strategies.len() != 1 {
+        if strategies.len() != 1 {
             return Err(Error::new(
                 "GFB7 requires exactly one objective and strategy",
             ));
@@ -31,6 +33,11 @@ impl ObjectiveDescriptor {
         let measure_ok_input = reader.u16()?;
         let target_input = reader.u16()?;
         let safe_max_input = reader.u16()?;
+        let target_ok_input = if config_result {
+            Some(reader.u16()?)
+        } else {
+            None
+        };
         for (index, expected) in [
             (measure_input, Type::Number),
             (measure_ok_input, Type::Bool),
@@ -43,6 +50,20 @@ impl ObjectiveDescriptor {
             {
                 return Err(Error::new("invalid objective input binding"));
             }
+        }
+        if target_ok_input.is_some_and(|index| {
+            inputs
+                .get(usize::from(index))
+                .is_none_or(|field| field.value_type != Type::Bool)
+                || [
+                    measure_input,
+                    measure_ok_input,
+                    target_input,
+                    safe_max_input,
+                ]
+                .contains(&index)
+        }) {
+            return Err(Error::new("invalid objective target Result binding"));
         }
         let indices = [
             measure_input,
@@ -93,6 +114,7 @@ impl ObjectiveDescriptor {
             measure_input,
             measure_ok_input,
             target_input,
+            target_ok_input,
             safe_max_input,
             config,
         })
@@ -110,11 +132,20 @@ impl ObjectiveDescriptor {
                 _ => Err(Error::new("invalid objective numeric input")),
             }
         };
-        let measurement = match inputs[usize::from(self.measure_ok_input)] {
+        let mut measurement = match inputs[usize::from(self.measure_ok_input)] {
             Value::Bool(true) => Some(number(self.measure_input)?),
             Value::Bool(false) => None,
             _ => return Err(Error::new("invalid objective quality input")),
         };
+        // The authored PID fault=disable policy applies to either input rail.
+        // A target fault never substitutes its historical successful value.
+        if let Some(index) = self.target_ok_input {
+            match inputs[usize::from(index)] {
+                Value::Bool(true) => {}
+                Value::Bool(false) => measurement = None,
+                _ => return Err(Error::new("invalid objective target quality input")),
+            }
+        }
         controller.begin(
             now_ms,
             measurement,

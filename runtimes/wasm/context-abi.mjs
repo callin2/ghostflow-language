@@ -1,4 +1,4 @@
-// GFB10 context activation and GFSF4 provider/settings evidence.
+// GFB11 context activation and GFSF5 provider/settings evidence.
 const utf8 = new TextEncoder();
 const LIMIT = 65_536;
 const MAX_EXACT = Number.MAX_SAFE_INTEGER;
@@ -23,9 +23,13 @@ class Writer {
   u8(n) { this.room(1); this.view.setUint8(this.at++, n); }
   u16(n) { this.room(2); this.view.setUint16(this.at, n, true); this.at += 2; }
   u32(n) { this.room(4); this.view.setUint32(this.at, n, true); this.at += 4; }
+  i32(n) { this.room(4); this.view.setInt32(this.at, n, true); this.at += 4; }
+  f64(n) { this.room(8); this.view.setFloat64(this.at, n, true); this.at += 8; }
   u64(n, label) { integer(n, label); this.room(8); this.view.setBigUint64(this.at, BigInt(n), true); this.at += 8; }
   raw64(n, label) {
-    const value = typeof n === 'bigint' ? n : typeof n === 'string' && /^[0-9]+$/u.test(n) ? BigInt(n) : n;
+    const value = typeof n === 'bigint' ? n
+      : typeof n === 'string' && /^[0-9a-f]{16}$/u.test(n) ? BigInt(`0x${n}`)
+        : typeof n === 'string' && /^[0-9]+$/u.test(n) ? BigInt(n) : n;
     if (typeof value !== 'bigint' || value < 0n || value > 0xffff_ffff_ffff_ffffn) throw new RangeError(`invalid ${label}`);
     this.room(8); this.view.setBigUint64(this.at, value, true); this.at += 8;
   }
@@ -109,7 +113,7 @@ export function encodeContextActivation(profile) {
 
 export function encodeContextFacts(packet) {
   const p = object(packet, ['clock','natural','schedules','settings'], 'context facts');
-  const writer = new Writer(); writer.raw([71,70,83,70]); writer.u16(4);
+  const writer = new Writer(); writer.raw([71,70,83,70]); writer.u16(5);
   const c = object(p.clock, ['monotonicMs','bootEpoch','wallMs','uncertaintyMs','trusted','unknownReason','sourceRevision'], 'clock');
   writer.u64(c.monotonicMs, 'clock.monotonicMs'); writer.u64(c.bootEpoch, 'clock.bootEpoch');
   writer.optional(c.wallMs, 'clock.wallMs'); writer.optional(c.uncertaintyMs, 'clock.uncertaintyMs');
@@ -162,21 +166,40 @@ export function encodeContextFacts(packet) {
   }
   writer.u8(p.settings == null ? 0 : 1);
   if (p.settings != null) {
-    const e = object(p.settings, ['programFingerprint','eventId','baseRevision','position','changes'], 'settings');
+    const e = object(p.settings, ['programFingerprint','eventId','baseRevision','position','origin','changes'], 'settings');
     writer.raw64(e.programFingerprint, 'settings.programFingerprint'); writer.str(e.eventId, 'settings.eventId');
     writer.u64(e.baseRevision, 'settings.baseRevision'); writer.u64(e.position, 'settings.position');
+    if (!['operatorEdit','producerObservation'].includes(e.origin)) throw new TypeError('invalid settings.origin');
+    writer.u8(e.origin === 'operatorEdit' ? 0 : 1);
     const changes = bounded(e.changes, 'settings.changes'); if (!changes.length) throw new RangeError('empty settings event');
     writer.u16(changes.length); const changed = new Set();
     for (const [index, value] of changes.entries()) {
-      const change = object(value, ['site','kind','durationMs','slots'], `settings.changes[${index}]`);
-      const site = integer(change.site, 'settings site', 0xffff_ffff);
-      if (!site || changed.has(site)) throw new RangeError('duplicate settings site');
-      changed.add(site); writer.u32(site);
-      if (change.kind === 'duration') { writer.u8(0); writer.u64(change.durationMs, 'durationMs'); }
-      else if (change.kind === 'slots') { writer.u8(1); const slots = bounded(change.slots, 'settings slots', 4096); writer.u16(slots.length);
-        for (const [at, item] of slots.entries()) { const slot = object(item, ['key','minuteOfDay'], `settings.slots[${at}]`);
-          writer.u64(slot.key, 'slot.key'); writer.u16(integer(slot.minuteOfDay, 'slot.minuteOfDay', 1439)); }
-      } else throw new TypeError('invalid settings change kind');
+      const change = object(value, ['configId','result'], `settings.changes[${index}]`);
+      const id = integer(change.configId, 'configId', 0xffff_ffff);
+      if (!id || changed.has(id)) throw new RangeError('invalid or duplicate configId');
+      changed.add(id); writer.u32(id);
+      const result = object(change.result, ['ok','type','value','fault'], `settings.changes[${index}].result`);
+      if (result.ok === false) {
+        if (result.type !== undefined || result.value !== undefined || !['SettingsInvalid','SettingsUnavailable'].includes(result.fault)) throw new TypeError('invalid settings fault Result');
+        writer.u8(1); writer.u8(result.fault === 'SettingsInvalid' ? 0 : 1);
+      } else if (result.ok === true) {
+        if (result.fault !== undefined) throw new TypeError('invalid settings success Result');
+        writer.u8(0); writer.str(result.type, 'settings type');
+        if (typeof result.value === 'boolean') { writer.u8(0); writer.u8(result.value ? 1 : 0); }
+        else if (result.type === 'Int') {
+          if (!Number.isInteger(result.value) || result.value < -2147483648 || result.value > 2147483647) throw new RangeError('invalid settings Int');
+          writer.u8(1); writer.i32(result.value);
+        } else if (typeof result.value === 'number') {
+          if (!Number.isFinite(result.value)) throw new RangeError('invalid settings Number');
+          writer.u8(2); writer.f64(result.value);
+        } else {
+          const slotValue = object(result.value, ['kind','entries'], 'settings TimeSlots');
+          if (slotValue.kind !== 'slots') throw new TypeError('invalid settings value');
+          writer.u8(3); const slots = bounded(slotValue.entries, 'settings slots', 4096); writer.u16(slots.length);
+          for (const [at, item] of slots.entries()) { const slot = object(item, ['key','minuteOfDay'], `settings.slots[${at}]`);
+            writer.u64(slot.key, 'slot.key'); writer.u16(integer(slot.minuteOfDay, 'slot.minuteOfDay', 1439)); }
+        }
+      } else throw new TypeError('settings result.ok must be Bool');
     }
   }
   return writer.finish();

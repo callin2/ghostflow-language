@@ -19,7 +19,7 @@ control DirectionChangeInterlock {
   input forward_start, reverse_start, stop_ok, overload_ok: Bool;
   output forward_contactor, reverse_contactor: Bool;
 
-  config reversal_wait: Duration = 2s;
+  let reversal_wait = 2s;
 
   type Phase = Stopped | Forward | Reverse | WaitForward | WaitReverse;
   // ghostflow:link id=GF-INT-PC04-DIRECTION-INTERLOCK-V1 relation=implements

@@ -4,6 +4,7 @@ import test from 'node:test';
 import { compileControl, typeCheckControl } from '../tools/control.mjs';
 import { extractLiterate } from '../tools/literate.mjs';
 import { compileSource } from '../tools/toolchain.mjs';
+import { GhostFlowRuntime } from '../runtimes/wasm/ghostflow-runtime.mjs';
 
 const fixture = JSON.parse(fs.readFileSync(new URL('./reference/cases/02-time-control.json', import.meta.url)))
   .cases.find(entry => entry.id === 'REF-03-032');
@@ -63,7 +64,7 @@ test('DailySlots type checking preserves explicit pulse policy and its declarati
   }]);
 });
 
-test('literal DailySlots emits GFB9 and config-selected slots emit GFB10', async () => {
+test('literal DailySlots emits GFB9 and config-selected slots emit GFB11', async t => {
   const control = compileControl(code);
   assert.equal(control.manifest.format, 'GhostFlow/control-v8');
   assert.equal(new DataView(control.bytes.buffer, control.bytes.byteOffset, control.bytes.byteLength).getUint16(4, true), 9);
@@ -73,9 +74,18 @@ test('literal DailySlots emits GFB9 and config-selected slots emit GFB10', async
   const configurable = code.replace('selected = [00:00, 06:15, 23:45];', 'selected = watering_slots;')
     .replace('control DailySlotsValid {', 'control DailySlotsValid { config watering_slots: TimeSlots<15min, 8> = [time`06:15`];');
   const configured = compileControl(configurable);
-  assert.equal(configured.manifest.format, 'GhostFlow/control-v9');
+  assert.equal(configured.manifest.format, 'GhostFlow/control-v10');
   assert.equal(configured.manifest.schedules[0].selectedConfig, 'watering_slots');
-  assert.equal(new DataView(configured.bytes.buffer, configured.bytes.byteOffset, configured.bytes.byteLength).getUint16(4, true), 10);
+  assert.equal(new DataView(configured.bytes.buffer, configured.bytes.byteOffset, configured.bytes.byteLength).getUint16(4, true), 11);
+  const wasm = fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
+  const runtime = await GhostFlowRuntime.instantiate(wasm);
+  t.after(() => runtime.dispose());
+  runtime.load(configured.bytes);
+  for (const output of configured.manifest.outputs) {
+    runtime.addCapability('actuator', output.name,
+      output.type === 'Bool' ? 'bool' : output.type === 'Int' ? 'int' : 'number');
+  }
+  runtime.activateContext({ bootEpoch: 7, terminalCapacity: 8, bindings: [] });
 
   const mixed = code.replace('output due: Bool;', `schedule morning: Daily {
     timezone = "Asia/Seoul"; at = time\`06:30\`; dst_missing = skip; dst_repeated = first;

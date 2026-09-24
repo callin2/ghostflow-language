@@ -61,6 +61,21 @@ export class GhostFlowRuntime {
     catch (cause) { throw new NativeDispatchError(cause.message, { cause, committed: false }); }
     this.#bytes(packet, (p, n) => this.#dispatch(() => this.wasm.gf_tick_context(this.handle, p, n)));
   }
+  contextSnapshot() {
+    this.#live();
+    this.#check(this.wasm.gf_context_checkpoint(this.handle));
+    const statePtr = this.wasm.gf_context_state_ptr(this.handle);
+    const stateLen = Number(this.wasm.gf_context_state_len(this.handle));
+    const bytesPtr = this.wasm.gf_context_checkpoint_ptr(this.handle);
+    const bytesLen = Number(this.wasm.gf_context_checkpoint_len(this.handle));
+    return {
+      state: JSON.parse(decoder.decode(new Uint8Array(this.wasm.memory.buffer, statePtr, stateLen))),
+      bytes: new Uint8Array(this.wasm.memory.buffer, bytesPtr, bytesLen).slice(),
+    };
+  }
+  restoreContextCheckpoint(bytes) {
+    this.#bytes(bytes, (p, n) => this.#check(this.wasm.gf_restore_context_checkpoint(this.handle, p, n)));
+  }
   replayTemporal(options) {
     const request = temporalReplayRequest(options);
     return this.#bytes(request.profile, (p, n) => {

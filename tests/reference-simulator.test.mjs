@@ -281,7 +281,7 @@ for (const entry of accepted) {
       assert.equal(compiled.status, 0, `${entry.id}: compiler failed: ${compiled.stderr}`);
       const manifest = JSON.parse(fs.readFileSync(`${artifact}.manifest.json`, 'utf8'));
       record.artifactFormat = manifest.format;
-      if (!/^GhostFlow\/control-v[1-9]$/.test(manifest.format)) {
+      if (!/^GhostFlow\/control-v(?:[1-9]|10)$/.test(manifest.format)) {
         if (standaloneDescriptors.has(entry.id)) {
           assert.equal(manifest.format, standaloneDescriptors.get(entry.id),
             `${entry.id}: unexpected standalone descriptor format`);
@@ -302,6 +302,11 @@ for (const entry of accepted) {
             ? oracle.initial[input.name] : input.type === 'Bool' ? false : 0 };
       });
       const scenario = path.join(dir, 'scenario.toon');
+      const actions = (oracle?.actions ?? [scan(0)]).map(action => (
+        manifest.format === 'GhostFlow/control-v10' && action.kind === 'scan' && !action.contextFacts
+          ? { ...action, contextFacts: contextFacts(action.atMs, action.atMs) }
+          : action
+      ));
       fs.writeFileSync(scenario, encode({
         format: 'GhostFlow/scenario-v1', id: entry.id, initialInputs, keyBindings: [],
         ...(oracle?.temporal ? { temporal: oracle.temporal } : {}),
@@ -309,9 +314,11 @@ for (const entry of accepted) {
         ...(oracle?.capabilities ? { capabilities: oracle.capabilities } : {}),
         ...(oracle?.solar ? { solar: oracle.solar } : {}),
         ...(oracle?.schedule ? { schedule: oracle.schedule } : {}),
-        ...(oracle?.context ? { context: oracle.context } : {}),
+        ...(oracle?.context ? { context: oracle.context }
+          : manifest.format === 'GhostFlow/control-v10'
+            ? { context: { bootEpoch: 7, terminalCapacity: 8, bindings: [] } } : {}),
         ...(oracle?.accounting ? { accounting: oracle.accounting } : {}),
-        actions: oracle?.actions ?? [scan(0)],
+        actions,
       }) + '\n');
       const simulated = invoke('ghostsim', [artifact, scenario, '--format', 'json']);
       const outcome = JSON.parse(simulated.stdout);
@@ -323,7 +330,7 @@ for (const entry of accepted) {
       assert.equal(outcome.scenario.id, entry.id);
       assert.equal(outcome.scans.length, oracle?.requested.length ?? 1);
       assert.equal(outcome.scans[0].scanId, 0, `${entry.id}: first scan ID`);
-      assert.equal(outcome.scans[0].logicalTimeMs, (oracle?.actions ?? [scan(0)]).find(action => action.kind === 'scan').atMs);
+      assert.equal(outcome.scans[0].logicalTimeMs, actions.find(action => action.kind === 'scan').atMs);
       for (const [index, row] of outcome.scans.entries()) {
         assert.equal(row.scanId, index, `${entry.id}: scan ${index} ID`);
         assert.equal(row.logicalTimeMs, (oracle?.actions ?? [scan(0)]).filter(action => action.kind === 'scan')[index].atMs);

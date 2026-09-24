@@ -1,9 +1,11 @@
-//! GFSF4 facts and GFCA1 activation. Only typed evidence crosses the host boundary.
+//! GFSF5 facts and GFCA1 activation. Only typed evidence crosses the host boundary.
 use ghostflow_core::{
     context_runtime::{Activation, Facts},
     context_vm::*,
     schedule_clock::{ClockSnapshot, ClockTrust},
+    settings_stream::ConfigValue,
     work_calendar::{DayClass, DayException, WorkCalendarSnapshot},
+    Value,
 };
 
 const MAX_PACKET: usize = 65_536;
@@ -244,34 +246,68 @@ fn settings(r: &mut Reader<'_>) -> Result<SettingsEvent, String> {
     let event_id = r.text(false)?;
     let base_revision = r.exact()?;
     let position = r.exact()?;
+    let origin = match r.u8()? {
+        0 => SettingsOrigin::OperatorEdit,
+        1 => SettingsOrigin::ProducerObservation,
+        _ => return Err("invalid settings origin".into()),
+    };
     let count = r.count(128)?;
     let mut changes = Vec::with_capacity(count);
     for _ in 0..count {
-        let site = r.u32()?;
-        let value = match r.u8()? {
-            0 => SettingValue::Duration(r.exact()?),
-            1 => {
-                let count = r.count(1440)?;
-                let mut slots = Vec::with_capacity(count);
-                for _ in 0..count {
-                    slots.push((r.exact()?, r.u16()?));
-                }
-                SettingValue::Slots(slots)
+        let id = r.u32()?;
+        let (semantic_type, result) = match r.u8()? {
+            0 => {
+                let semantic_type = r.text(false)?;
+                let value = match r.u8()? {
+                    0 => ConfigValue::Scalar(Value::Bool(r.flag()?)),
+                    1 => ConfigValue::Scalar(Value::Int(i32::from_le_bytes(
+                        r.take(4)?.try_into().unwrap(),
+                    ))),
+                    2 => {
+                        let value = f64::from_le_bytes(r.take(8)?.try_into().unwrap());
+                        if !value.is_finite() {
+                            return Err("nonfinite settings payload".into());
+                        }
+                        ConfigValue::Scalar(Value::Number(value))
+                    }
+                    3 => {
+                        let count = r.count(4096)?;
+                        let mut slots = Vec::with_capacity(count);
+                        for _ in 0..count {
+                            slots.push((r.exact()?, r.u16()?));
+                        }
+                        ConfigValue::Slots(slots)
+                    }
+                    _ => return Err("invalid settings value tag".into()),
+                };
+                (semantic_type, Ok(value))
             }
-            _ => return Err("invalid settings value tag".into()),
+            1 => {
+                let fault = r.u8()?;
+                if fault > 1 {
+                    return Err("invalid settings fault".into());
+                }
+                (String::new(), Err(fault))
+            }
+            _ => return Err("invalid settings Result tag".into()),
         };
-        changes.push(SettingChange { site, value });
+        changes.push(SettingChange {
+            id,
+            semantic_type,
+            result,
+        });
     }
     Ok(SettingsEvent {
         program_fingerprint,
         event_id,
         base_revision,
         position,
+        origin,
         changes,
     })
 }
 
-struct Packet {
+pub(crate) struct Packet {
     monotonic_ms: u64,
     boot_epoch: u64,
     wall_ms: Option<u64>,
@@ -279,7 +315,38 @@ struct Packet {
     trusted: bool,
     reason: String,
     revision: String,
-    facts: Facts,
+    pub(crate) facts: Facts,
+}
+
+impl Packet {
+    pub(crate) fn clock(&self) -> ClockSnapshot<'_> {
+        ClockSnapshot {
+            monotonic_ms: self.monotonic_ms,
+            boot_epoch: self.boot_epoch,
+            wall_ms: self.wall_ms,
+            uncertainty_ms: self.uncertainty_ms,
+            trust: if self.trusted {
+                ClockTrust::Trusted
+            } else {
+                ClockTrust::Unknown(&self.reason)
+            },
+            source_revision: (!self.revision.is_empty()).then_some(self.revision.as_str()),
+        }
+    }
+}
+
+pub(crate) unsafe fn activation_from_raw(ptr: *const u8, len: usize) -> Result<Activation, String> {
+    if ptr.is_null() || len > MAX_PACKET {
+        return Err("invalid context activation pointer/length".into());
+    }
+    decode_activation(std::slice::from_raw_parts(ptr, len))
+}
+
+pub(crate) unsafe fn facts_from_raw(ptr: *const u8, len: usize) -> Result<Packet, String> {
+    if ptr.is_null() || len > MAX_PACKET {
+        return Err("invalid context facts pointer/length".into());
+    }
+    decode_facts(std::slice::from_raw_parts(ptr, len))
 }
 
 fn decode_activation(bytes: &[u8]) -> Result<Activation, String> {
@@ -304,7 +371,7 @@ fn decode_activation(bytes: &[u8]) -> Result<Activation, String> {
 
 fn decode_facts(bytes: &[u8]) -> Result<Packet, String> {
     let mut r = Reader { bytes, at: 0 };
-    if bytes.len() > MAX_PACKET || r.take(4)? != b"GFSF" || r.u16()? != 4 {
+    if bytes.len() > MAX_PACKET || r.take(4)? != b"GFSF" || r.u16()? != 5 {
         return Err("invalid context facts header".into());
     }
     let monotonic_ms = r.exact()?;
@@ -477,5 +544,38 @@ mod tests {
     fn arbitrary_projection_payload_and_legacy_versions_are_rejected() {
         assert!(decode_facts(b"GFSF\x03\x00").is_err());
         assert!(decode_facts(b"GFSF\x04\x00\x01").is_err());
+    }
+    #[test]
+    fn stream_semantic_payload_survives_decode_but_invalid_representation_rejects() {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(&1u64.to_le_bytes());
+        bytes.extend_from_slice(&1u16.to_le_bytes());
+        bytes.push(b'e');
+        bytes.extend_from_slice(&0u64.to_le_bytes());
+        bytes.extend_from_slice(&1u64.to_le_bytes());
+        bytes.push(0); // host-authenticated operator edit origin
+        bytes.extend_from_slice(&1u16.to_le_bytes());
+        bytes.extend_from_slice(&7u32.to_le_bytes());
+        bytes.push(0); // ok rail; negativity is a semantic Duration error, not malformed bytes.
+        bytes.extend_from_slice(&8u16.to_le_bytes());
+        bytes.extend_from_slice(b"Duration");
+        bytes.push(2);
+        bytes.extend_from_slice(&(-1f64).to_le_bytes());
+        let event = settings(&mut Reader {
+            bytes: &bytes,
+            at: 0,
+        })
+        .unwrap();
+        assert_eq!(
+            event.changes[0].result,
+            Ok(ConfigValue::Scalar(Value::Number(-1.0)))
+        );
+        let end = bytes.len();
+        bytes[end - 8..].copy_from_slice(&f64::NAN.to_le_bytes());
+        assert!(settings(&mut Reader {
+            bytes: &bytes,
+            at: 0
+        })
+        .is_err());
     }
 }

@@ -131,7 +131,8 @@ for (const [name, declaration, expected] of [
   test(`config accepts ${name} and emits exact metadata`, () => {
     const { initialOffset, initialEndOffset, ...actual } = oneConfig(declaration);
     assert.ok(Number.isInteger(initialOffset) && initialEndOffset > initialOffset);
-    assert.deepEqual(actual, expected);
+    assert.deepEqual(actual, { ...expected, id: actual.id });
+    assert.ok(Number.isInteger(actual.id) && actual.id > 0);
   });
 }
 

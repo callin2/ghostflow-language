@@ -8,6 +8,7 @@ export const RESULT_FAULT_MEMBERS = Object.freeze({
   CalendarFault: Object.freeze(['ClockUnknown', 'CalendarMissing', 'CalendarOutOfRange', 'ZoneUnsupported']),
   TemporalContextFault: Object.freeze(['ClockUnknown', 'LocationUnknown', 'EventUnavailable', 'PredictionMissing', 'PredictionStale', 'ZoneUnsupported']),
   AccountingFault: Object.freeze(['ClockUnknown', 'LedgerMissing', 'LedgerCorrupt', 'LedgerIncomplete', 'CountOverflow']),
+  SettingsFault: Object.freeze(['SettingsInvalid', 'SettingsUnavailable']),
 });
 
 /** Diagnostic identity matching the portable core; NOT a cryptographic digest. */
@@ -543,11 +544,11 @@ export function verifySourceTraceMetadata(metadata, bytes, nodes, {
     if (!Array.isArray(site.origins)) throw new Error('result trace origins must be an array');
     const originTags = new Set();
     for (const origin of site.origins) {
-      const named = origin?.kind === 'sensor' || origin?.kind === 'signal' || origin?.kind === 'natural-condition';
+      const named = origin?.kind === 'sensor' || origin?.kind === 'signal' || origin?.kind === 'natural-condition' || origin?.kind === 'config';
       requireExactFields(origin, named ? ['tag', 'nodeId', 'kind', 'name'] : ['tag', 'nodeId', 'kind'], 'result trace origin');
       if (!Number.isInteger(origin.tag) || origin.tag < 1 || origin.tag > 0xffff_ffff
           || origin.nodeId !== origin.tag || originTags.has(origin.tag)
-          || !['sensor', 'signal', 'fault', 'natural-condition'].includes(origin.kind)) throw new Error('result trace origin identity mismatch');
+          || !['sensor', 'signal', 'fault', 'natural-condition', 'config'].includes(origin.kind)) throw new Error('result trace origin identity mismatch');
       originTags.add(origin.tag);
       const originNode = nodeById.get(origin.nodeId);
       if (!originNode || originNode.kind !== (['fault', 'natural-condition'].includes(origin.kind) ? 'call' : origin.kind)) throw new Error('result trace origin source mismatch');

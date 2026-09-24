@@ -2,8 +2,10 @@ const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 import { NativeDispatchError } from './native-dispatch.mjs';
 import { encodeTemporalProfile } from './temporal-profile.mjs';
+import { encodeContextActivation, encodeContextFacts } from './context-abi.mjs';
 import { temporalPlanRequest, temporalReplayPlanRequest, temporalReplayRequest } from './temporal-replay.mjs';
 const MAX_MODULE_BYTES = 1024 * 1024;
+const MAX_CHECKPOINT_BYTES = 4 * 1024 * 1024;
 const MAX_PACKET_BYTES = 65_536;
 const MAX_INPUTS = 128;
 const MAX_NAME_BYTES = 1_024;
@@ -17,6 +19,9 @@ const requiredFunctions = Object.freeze([
   'gf_frame_outcome_ptr', 'gf_frame_outcome_len', 'gf_frame_error_ptr', 'gf_frame_error_len',
   'gf_frame_replay_temporal', 'gf_frame_replay_ptr', 'gf_frame_replay_len',
   'gf_frame_plan_temporal', 'gf_frame_plan_temporal_replay', 'gf_frame_resource_plan_ptr', 'gf_frame_resource_plan_len',
+  'gf_frame_activate_context', 'gf_frame_scan_context', 'gf_frame_context_checkpoint',
+  'gf_frame_context_checkpoint_ptr', 'gf_frame_context_checkpoint_len',
+  'gf_frame_context_state_ptr', 'gf_frame_context_state_len', 'gf_frame_restore_context_checkpoint',
 ]);
 
 function exactObject(value, keys, label) {
@@ -146,6 +151,26 @@ export class FramedGhostFlowRuntime {
     this.#live();
     this.#bytes(encodeTemporalProfile(profile), (p, n) => this.#check(this.wasm.gf_frame_activate_temporal(this.handle, p, n)));
   }
+  activateContext(profile) {
+    this.#bytes(encodeContextActivation(profile), (p, n) =>
+      this.#check(this.wasm.gf_frame_activate_context(this.handle, p, n)));
+  }
+  contextSnapshot() {
+    this.#live();
+    this.#check(this.wasm.gf_frame_context_checkpoint(this.handle));
+    const statePtr = this.wasm.gf_frame_context_state_ptr(this.handle);
+    const stateLen = Number(this.wasm.gf_frame_context_state_len(this.handle));
+    const bytesPtr = this.wasm.gf_frame_context_checkpoint_ptr(this.handle);
+    const bytesLen = Number(this.wasm.gf_frame_context_checkpoint_len(this.handle));
+    return {
+      state: JSON.parse(decoder.decode(new Uint8Array(this.wasm.memory.buffer, statePtr, stateLen))),
+      bytes: new Uint8Array(this.wasm.memory.buffer, bytesPtr, bytesLen).slice(),
+    };
+  }
+  restoreContextCheckpoint(bytes) {
+    this.#bytes(byteBuffer(bytes, 'context checkpoint', MAX_CHECKPOINT_BYTES), (p, n) =>
+      this.#check(this.wasm.gf_frame_restore_context_checkpoint(this.handle, p, n)));
+  }
 
   replayTemporal(options) {
     const request = temporalReplayRequest(options);
@@ -194,6 +219,26 @@ export class FramedGhostFlowRuntime {
           throw new Error(this.#lastError() || 'Framed GhostFlow operation failed');
         }
       });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new NativeDispatchError(message, { cause: error, committed });
+    }
+  }
+
+  dispatchContext(frame, facts) {
+    let committed = false;
+    try {
+      this.#live();
+      const encoded = encodeFrame(frame);
+      const context = encodeContextFacts(facts);
+      this.#bytes(encoded.bytes, (framePtr, frameLen) =>
+        this.#bytes(context, (contextPtr, contextLen) => {
+          committed = null;
+          const ok = this.wasm.gf_frame_scan_context(this.handle, BigInt(encoded.scanId),
+            BigInt(encoded.logicalTimeMs), framePtr, frameLen, contextPtr, contextLen);
+          committed = Boolean(ok);
+          if (!ok) throw new Error(this.#lastError() || 'Framed GhostFlow context operation failed');
+        }));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       throw new NativeDispatchError(message, { cause: error, committed });

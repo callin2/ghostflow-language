@@ -78,7 +78,7 @@ const TESTS = Object.freeze([
   'tests/deferred-runtime-gates.test.mjs',
   'tests/coverage-defensive-runtime.test.mjs',
   'tests/natural-schedule-contract.test.mjs', 'tests/solar-schedule.test.mjs',
-  'tests/temporary-operating-setting.test.mjs', 'tests/time-literals.test.mjs',
+  'tests/time-literals.test.mjs',
   'tests/true-for-lowering.test.mjs', 'tests/true-for-wasm.test.mjs',
   'tests/verified-wasm-artifact.test.mjs', 'tests/window-wasm.test.mjs',
 ]);

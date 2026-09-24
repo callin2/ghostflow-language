@@ -1,11 +1,8 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
 import test from 'node:test';
 import { compileSource } from '../tools/toolchain.mjs';
-import { createOperatingSettingsCandidate } from '../tools/operating-settings.mjs';
 
 const document = body => `# Planned watering range\n\n\`\`\`ghost\n${body}\n\`\`\`\n`;
-const sha256 = value => createHash('sha256').update(value).digest('hex');
 const diagnostics = error => (error.diagnosticEnvelope?.diagnostics ?? []).map(item => item.message).join('\n');
 
 function dailySlots({ selected = '[08:00, 08:15]', duration = '15min', config = '', timezone = 'UTC', dstMissing = 'skip', dstRepeated = 'first' } = {}) {
@@ -139,34 +136,28 @@ test('range rejects a fixed-anchor Periodic interval that overlaps the next occu
   );
 });
 
-test('overlapping live Duration candidate is rejected without changing the source', async () => {
-  const source = dailySlots({
-    duration: 'watering_duration',
-    config: 'config watering_duration: Duration = 10min { min = 5min; max = 30min; step = 5min; access = operator; }',
-  });
-  const before = await compileSource(source, { filename: 'range-live-duration.ghost.md' });
+test('overlapping fixed Duration is rejected', async () => {
+  const source = dailySlots({ duration: 'watering_duration', config: 'let watering_duration = 20min;' });
   await assert.rejects(
-    () => createOperatingSettingsCandidate({
-      source, filename: 'range-live-duration.ghost.md', expectedSourceSha256: sha256(source),
-      changes: { watering_duration: 20 * 60_000 },
-    }),
+    () => compileSource(source, { filename: 'range-fixed-overlap.ghost.md' }),
     error => /range/i.test(diagnostics(error)) && /overlap|non.?overlap/i.test(diagnostics(error)),
   );
-  assert.match(source, /watering_duration: Duration = 10min/);
-  assert.equal(before.manifest.format, 'GhostFlow/schedule-descriptor-v1');
-  assert.equal(before.manifest.control.configs[0].value, 600_000);
 });
 
-test('live Duration candidate accepts a boundary-touching interval', async () => {
-  const source = dailySlots({
-    duration: 'watering_duration',
-    config: 'config watering_duration: Duration = 10min { min = 5min; max = 30min; step = 5min; access = operator; }',
-  });
-  const candidate = await createOperatingSettingsCandidate({
-    source, filename: 'range-live-adjacent.ghost.md', expectedSourceSha256: sha256(source),
-    changes: { watering_duration: 15 * 60_000 },
-  });
+test('fixed Duration accepts a boundary-touching interval', async () => {
+  const source = dailySlots({ duration: 'watering_duration', config: 'let watering_duration = 15min;' });
+  const candidate = await compileSource(source, { filename: 'range-fixed-adjacent.ghost.md' });
   assert.equal(candidate.manifest.format, 'GhostFlow/schedule-descriptor-v1');
-  assert.equal(candidate.manifest.control.configs[0].value, 900_000);
   assert.deepEqual(candidate.manifest.control.schedules[0].slots, [480, 495]);
+});
+
+test('Result-backed range duration fails closed instead of folding an initial config value', async () => {
+  const source = dailySlots({
+    duration: 'case watering_duration { ok(value) => value; fault(_) => 5min; }',
+    config: 'config watering_duration: Duration = 10min { min = 5min; max = 15min; step = 5min; access = operator; }',
+  });
+  await assert.rejects(
+    () => compileSource(source, { filename: 'range-result-duration.ghost.md' }),
+    error => /range requires a positive Duration/i.test(diagnostics(error)),
+  );
 });

@@ -16,7 +16,7 @@ const SOLAR_FORMAT = 'GhostFlow/control-v3';
 const INTEGER_FORMAT = 'GhostFlow/control-v4';
 const SCHEDULE_FORMAT = 'GhostFlow/control-v7';
 const SCHEDULE_SLOTS_FORMAT = 'GhostFlow/control-v8';
-const CONTEXT_FORMAT = 'GhostFlow/control-v9';
+const STREAM_CONTEXT_FORMAT = 'GhostFlow/control-v10';
 const RESERVED = '__gf_';
 const TYPES = new Set(['Bool', 'Int', 'Number', 'Percent', 'Duration', ...TIME_TYPES, ...QUANTITY_TYPES]);
 const SENSOR_TYPES = new Set(['Bool', 'Number', 'Percent', ...QUANTITY_TYPES]);
@@ -140,11 +140,11 @@ function generated(value, expected, label) {
   if (value !== expected) throw new Error(`${label} must be ${expected}`);
 }
 
-function validateSettings(config, label) {
+function validateSettings(config, label, { stream = false } = {}) {
   const settings = record(config.settings, `${label}.settings`);
-  keys(settings, ['access'], ['min', 'max', 'step', 'stepType', 'apply', 'label'], `${label}.settings`);
+  keys(settings, ['access'], ['min', 'max', 'step', 'stepType', ...(stream ? [] : ['apply']), 'label'], `${label}.settings`);
   if (settings.access !== 'operator' && settings.access !== 'designer') throw new Error(`${label}.settings.access must be operator or designer`);
-  if (settings.apply !== undefined && settings.apply !== 'stopped') throw new Error(`${label}.settings.apply must be stopped`);
+  if (!stream && settings.apply !== undefined && settings.apply !== 'stopped') throw new Error(`${label}.settings.apply must be stopped`);
   if (settings.label !== undefined && (typeof settings.label !== 'string' || settings.label.length === 0 || settings.label.length > 128)) {
     throw new Error(`${label}.settings.label must be a string of 1 to 128 characters`);
   }
@@ -195,7 +195,7 @@ function validateSettings(config, label) {
   }
 
   const normalized = copy(settings);
-  if (normalized.apply === undefined) normalized.apply = 'stopped';
+  if (!stream && normalized.apply === undefined) normalized.apply = 'stopped';
   return normalized;
 }
 
@@ -211,23 +211,38 @@ function validateCanonicalUnit(item, label) {
 function validateContextManifest(input, bytecodeFormat) {
   const manifest = record(input, 'manifest');
   keys(manifest, ['format','name','inputs','outputs','sensors','schedules','timers','signals','configs','bytecodeSha256'],
-    ['providers','calendars','naturalConditions','accounting','resources'], 'manifest');
-  if (bytecodeFormat !== 10) throw new Error('control-v9 requires GFB10');
+    ['providers','calendars','naturalConditions','accounting','resources','objectives','adaptSettings'], 'manifest');
+  if (bytecodeFormat !== 11) throw new Error('control-v10 requires GFB11');
   name(manifest.name, 'manifest.name');
   if (!/^[0-9a-f]{64}$/.test(manifest.bytecodeSha256)) throw new Error('invalid bytecode SHA-256');
-  const inputs = validateList(manifest.inputs, 'manifest.inputs', ['name','type']);
-  const outputs = validateList(manifest.outputs, 'manifest.outputs', ['name','type']);
+  const inputs = validateList(manifest.inputs, 'manifest.inputs', ['name','type'], ['canonicalUnit']);
+  const outputs = validateList(manifest.outputs, 'manifest.outputs', ['name','type'], ['canonicalUnit']);
   const schedules = validateList(manifest.schedules, 'manifest.schedules', ['kind','site','name','policy'],
     ['timezone','source','event','offsetMs','anchor','every','intervalChange','cron5','fields','dstMissing','dstRepeated','atMs','day','gridMs','slots','selectedConfig']);
-  const configs = validateList(manifest.configs, 'manifest.configs', ['name','type','value'], ['settings','gridMs','capacity']);
+  const configs = validateList(manifest.configs, 'manifest.configs', ['name','type','value'],
+    ['id','settings','gridMs','capacity','initialOffset','initialEndOffset','canonicalUnit','displayUnit']);
+  const sensors = validateList(manifest.sensors, 'manifest.sensors',
+    ['name','type','sampleMs','validMin','validMax','filter','window','staleMs','recoverSamples','valueInput','okInput','faultInput'],
+    ['optional','alpha','canonicalUnit','samplePresentInput','sampleEpochInput','sampleIdInput','sampleTimestampInput']);
+  const objectives = validateList(manifest.objectives ?? [], 'manifest.objectives',
+    ['name','measure','target','manipulate','output','controller','binding','executable','bindings']);
+  const resources = validateList(manifest.resources ?? [], 'manifest.resources', ['name','type']);
+  const adaptSettings = validateList(manifest.adaptSettings ?? [], 'manifest.adaptSettings',
+    ['name','target','authority','runtime'], ['targetId','targetType']);
   const providers = validateList(manifest.providers ?? [], 'manifest.providers', ['name','type']);
   const calendars = validateList(manifest.calendars ?? [], 'manifest.calendars', ['name','type']);
   const naturals = validateList(manifest.naturalConditions ?? [], 'manifest.naturalConditions',
     ['site','operation','provider','classification','result','projectionInputs']);
   const accounting = manifest.accounting === undefined ? null : copy(record(manifest.accounting, 'manifest.accounting'));
-  if (manifest.sensors.length || manifest.signals.length || manifest.timers.length) throw new Error('GFB10 sensor/signal/timer mixing is not supported');
-  for (const item of inputs) { name(item.name, 'input.name'); if (item.name.startsWith(RESERVED)) throw new Error('reserved user input'); type(item.type, `input ${item.name}.type`); }
-  for (const item of outputs) { portName(item.name, 'output.name'); type(item.type, `output ${item.name}.type`); }
+  if (manifest.signals.length) throw new Error('context signal mixing is not supported');
+  if (sensors.length && (!objectives.length || sensors.length !== 1)) throw new Error('context sensors require one PID objective');
+  const timers = validateList(manifest.timers, 'manifest.timers', ['name','state','clockInput']);
+  for (const item of timers) {
+    name(item.name, 'timer.name'); name(item.state, `timer ${item.name}.state`);
+    if (item.clockInput !== `${RESERVED}now_ms`) throw new Error(`timer ${item.name}.clockInput must be ${RESERVED}now_ms`);
+  }
+  for (const item of inputs) { name(item.name, 'input.name'); if (item.name.startsWith(RESERVED)) throw new Error('reserved user input'); type(item.type, `input ${item.name}.type`); validateCanonicalUnit(item, `input ${item.name}`); }
+  for (const item of outputs) { portName(item.name, 'output.name'); type(item.type, `output ${item.name}.type`); validateCanonicalUnit(item, `output ${item.name}`); }
   for (const item of schedules) {
     name(item.name, 'schedule.name'); safeInteger(item.site, 'schedule.site', 1, 0xffff_ffff);
     if (!['periodic','cron','daily','daily-slots','tide'].includes(item.kind)) throw new Error('unsupported context schedule kind');
@@ -243,21 +258,65 @@ function validateContextManifest(input, bytecodeFormat) {
   }
   for (const item of configs) {
     name(item.name, 'config.name');
+    validateCanonicalUnit(item, `config ${item.name}`);
+    safeInteger(item.id, `config ${item.name}.id`, 1, 0xffff_ffff);
     if (item.type === 'Duration') typedValue(item.value, 'Duration', `config ${item.name}`);
     else if (item.type.startsWith('TimeSlots<')) {
       if (!Array.isArray(item.value) || item.value.length > item.capacity) throw new Error('invalid TimeSlots config');
-    } else throw new Error('unsupported GFB10 config type');
+    } else typedValue(item.value, item.type, `config ${item.name}`);
+    if (item.settings) {
+      if (item.type.startsWith('TimeSlots<')) {
+        const settings = record(item.settings, `config ${item.name}.settings`);
+        keys(settings, ['access'], ['label'], `config ${item.name}.settings`);
+        if (!['operator','designer'].includes(settings.access)) throw new Error(`config ${item.name}.settings.access must be operator or designer`);
+      } else item.settings = validateSettings(item, `config ${item.name}`, { stream: true });
+    }
   }
-  unique([...inputs,...outputs,...schedules,...configs,...providers,...calendars].map(item => item.name), 'context name');
+  unique(configs.map(item => item.id), 'config id');
+  unique([...inputs,...outputs,...schedules,...configs,...providers,...calendars,...timers,...sensors,...objectives,...adaptSettings].map(item => item.name), 'context name');
   unique([...schedules,...naturals].map(item => item.site), 'context site');
-  const normalized = freeze(copy({ ...manifest, inputs, outputs, schedules, configs, providers, calendars,
-    naturalConditions: naturals, ...(accounting === null ? {} : { accounting }) }));
+  for (const sensor of sensors) {
+    name(sensor.name, 'sensor.name');
+    if (sensor.type !== 'Temperature' || sensor.canonicalUnit !== 'K') throw new Error('context PID sensor must be canonical Temperature');
+    for (const field of ['sampleMs','staleMs','recoverSamples','window']) if (sensor[field] !== null) safeInteger(sensor[field], `sensor ${sensor.name}.${field}`, 1);
+    if (sensor.filter !== null) throw new Error('context PID sensor filtering is not supported');
+    optionalFinite(sensor.validMin, `sensor ${sensor.name}.validMin`);
+    optionalFinite(sensor.validMax, `sensor ${sensor.name}.validMax`);
+    if (sensor.validMin !== null && sensor.validMax !== null && sensor.validMin > sensor.validMax) throw new Error('context PID sensor range is inverted');
+    for (const [role,prefix] of [['valueInput','sensor_value'],['okInput','sensor_ok'],['faultInput','sensor_fault']])
+      generated(sensor[role], `${RESERVED}${prefix}_${sensor.name}`, `sensor ${sensor.name}.${role}`);
+  }
+  if (objectives.length > 1) throw new Error('only one context PID objective is supported');
+  for (const objective of objectives) {
+    name(objective.name, 'objective.name');
+    if (objective.binding !== 'native-temperature-percent-v1' || objective.executable !== false) throw new Error('unsupported context PID objective binding');
+    const sensor = sensors.find(item => item.name === objective.measure);
+    const target = configs.find(item => item.name === objective.target);
+    if (!sensor || !target || target.type !== 'Temperature' || target.canonicalUnit !== 'K') throw new Error('context PID measure/target binding mismatch');
+    if (!['°C','K'].includes(target.displayUnit)) throw new Error('context PID target display unit is required');
+    const binding = record(objective.bindings, `objective ${objective.name}.bindings`);
+    keys(binding, ['output','measure','measureOk','target','targetOk','safeMax'], [], `objective ${objective.name}.bindings`);
+    if (binding.measure !== sensor.valueInput || binding.measureOk !== sensor.okInput
+      || binding.target !== `${RESERVED}config_${target.id}_value` || binding.targetOk !== `${RESERVED}config_${target.id}_ok`)
+      throw new Error('context PID protected Result binding mismatch');
+    generated(binding.safeMax, `${RESERVED}objective_safe_max_${objective.name}`, 'context PID safeMax');
+    if (!outputs.some(output => output.name === binding.output && output.type === 'Percent')) throw new Error('context PID output binding mismatch');
+  }
+  for (const adapt of adaptSettings) {
+    name(adapt.name, 'adapt_setting.name');
+    const target = configs.find(item => item.name === adapt.target);
+    if (!target || adapt.runtime !== 'requires-host-settings-event-validation') throw new Error('invalid adaptation proposal descriptor');
+    if (adapt.targetId !== undefined && adapt.targetId !== target.id || adapt.targetType !== undefined && adapt.targetType !== target.type)
+      throw new Error('adaptation proposal target identity mismatch');
+  }
+  const normalized = freeze(copy({ ...manifest, inputs, outputs, schedules, configs, providers, calendars, timers,
+    sensors, objectives, resources, adaptSettings, naturalConditions: naturals, ...(accounting === null ? {} : { accounting }) }));
   return { manifest: normalized, inputNames: new Set(inputs.map(item => item.name)),
-    sensorByName: new Map(), scheduleNames: new Set(schedules.map(item => item.name)), signalNames: new Set() };
+    sensorByName: new Map(sensors.map(item => [item.name,item])), scheduleNames: new Set(schedules.map(item => item.name)), signalNames: new Set() };
 }
 
 function validateManifest(input, { acceptSettings = false, bytecodeFormat = null, capabilities } = {}) {
-  if (input?.format === CONTEXT_FORMAT) return validateContextManifest(input, bytecodeFormat);
+  if (input?.format === STREAM_CONTEXT_FORMAT) return validateContextManifest(input, bytecodeFormat);
   const manifest = record(input, 'manifest');
   if ((Object.hasOwn(manifest, 'adaptPolicy') || Object.hasOwn(manifest, 'strategies')) && capabilities === undefined) {
     throw new Error('adapt strategy activation requires a capability-aware host; ControlRuntime cannot activate this manifest');
@@ -763,12 +822,11 @@ async function instantiateControlRuntime(wasmBytes, { bytes: bytecode, manifest 
   const hasWindows = checkedManifest.manifest.signals.some(item => item.kind === 'window');
   const hasTrueFor = checkedManifest.manifest.signals.some(item => item.kind === 'true-for');
   const hasAfterEvent = checkedManifest.manifest.signals.some(isAfterEvent);
-  const hasContext = checkedManifest.manifest.format === CONTEXT_FORMAT;
+  const hasContext = checkedManifest.manifest.format === STREAM_CONTEXT_FORMAT;
   const hasSolar = checkedManifest.manifest.schedules.some(item => item.kind === 'solar');
   const hasSchedules = !hasContext && checkedManifest.manifest.schedules.some(item => ['daily', 'daily-slots'].includes(item.kind));
   let temporal = null;
   if (hasContext) {
-    if (!supportsSchedules) throw new Error('framed context execution is not supported');
     if (options.context === undefined) throw new Error('context activation profile is required');
     encodeContextActivation(options.context);
     if (options.schedule !== undefined || options.solar !== undefined || options.temporal !== undefined) throw new Error('context activation cannot mix legacy profiles');
@@ -776,7 +834,7 @@ async function instantiateControlRuntime(wasmBytes, { bytes: bytecode, manifest 
   if (hasSolar && !supportsSchedules) throw new Error('framed Solar activation is not supported by this runtime');
   if (hasSchedules && !supportsSchedules) throw new Error('framed civil schedule activation is not supported by this runtime');
   if (hasContext) {
-    // The GFB10 Rust runtime owns the provider and settings state.
+    // The Rust runtime owns the provider and settings state.
   } else if (hasSchedules) {
     if (options.schedule === undefined) throw new Error('schedule activation profile is required');
     validateSolarActivation(options.schedule);
@@ -863,12 +921,6 @@ export class ControlRuntime {
       initialized.afterEvents, true, initialized.temporalEpoch, initialized.hasSolar, initialized.afterEventEpoch, initialized.hasSchedules, initialized.hasContext);
   }
 
-  // New simulation consumers opt into the v2 operating-settings contract.
-  // The original instantiate entry point remains a strict v1 consumer.
-  static async instantiateSimulation(wasmBytes, artifact = {}) {
-    return ControlRuntime.instantiate(wasmBytes, artifact, { acceptSettings: true });
-  }
-
   #frameScanId;
   #framed;
   #faulted;
@@ -910,6 +962,16 @@ export class ControlRuntime {
     this.#live();
     if (!this.#framed) return null;
     return this.runtime.outcome;
+  }
+  contextSnapshot() {
+    this.#live();
+    if (!this.#hasContext) throw new Error('context snapshot requires a context control');
+    return this.runtime.contextSnapshot();
+  }
+  restoreContextCheckpoint(bytes) {
+    this.#live();
+    if (!this.#hasContext) throw new Error('context restore requires a context control');
+    this.runtime.restoreContextCheckpoint(bytes);
   }
 
   /**
@@ -960,8 +1022,10 @@ export class ControlRuntime {
         this.runtime.setNumber(entry.item.faultInput, sensorFaultCode(reading));
       }
       for (const objective of this.objectives) {
-        const target = this.manifest.configs.find(item => item.name === objective.target);
-        this.runtime.setNumber(objective.bindings.target, target.value);
+        if (!this.#hasContext) {
+          const target = this.manifest.configs.find(item => item.name === objective.target);
+          this.runtime.setNumber(objective.bindings.target, target.value);
+        }
         this.runtime.setNumber(objective.bindings.safeMax, captured.objectiveSafeMax.get(objective.name));
       }
       for (const item of this.manifest.schedules) if (!this.#hasContext && !['solar', 'daily', 'daily-slots'].includes(item.kind)) this.runtime.setBool(item.dueInput, captured.dueValues.get(item.name) ?? false);
@@ -1357,7 +1421,7 @@ export class ControlRuntime {
         frameInputs.push({ name: entry.item.okInput, type: 'Bool', value: reading.ok });
         frameInputs.push({ name: entry.item.faultInput, type: 'Number', value: sensorFaultCode(reading) });
       }
-      for (const item of this.manifest.schedules) if (!['solar', 'daily', 'daily-slots'].includes(item.kind)) {
+      for (const item of this.manifest.schedules) if (!this.#hasContext && !['solar', 'daily', 'daily-slots'].includes(item.kind)) {
         frameInputs.push({ name: item.dueInput, type: 'Bool', value: captured.dueValues.get(item.name) ?? false });
       }
       this.#setIntervals(captured.intervalValues, (name, value) => frameInputs.push({ name, type: value.type, value: value.value }));
@@ -1366,7 +1430,9 @@ export class ControlRuntime {
       if (this.#temporalEpoch !== null) frameInputs.push({ name: `${RESERVED}time_epoch`, type: 'Number', value: this.#temporalEpoch });
 
       phase = 'dispatch';
-      this.runtime.dispatch({ scanId, logicalTimeMs: captured.nowMs, inputs: frameInputs });
+      const frame = { scanId, logicalTimeMs: captured.nowMs, inputs: frameInputs };
+      if (this.#hasContext) this.runtime.dispatchContext(frame, captured.contextFacts);
+      else this.runtime.dispatch(frame);
       phase = 'committed';
       this.lastNowMs = captured.nowMs;
       this.#frameScanId = scanId === MAX_SAFE ? null : scanId + 1;

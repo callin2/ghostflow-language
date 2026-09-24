@@ -197,10 +197,14 @@ let available = case moisture {
 
 `Result<T, E>`는 함수 parameter와 결과 타입에도 쓸 수 있다. `E`는 compiler가 정의한
 유한 fault enum이어야 한다. v1에는 `SensorFault`, `ClockFault`, `CalendarFault`,
-`TemporalContextFault`, `AccountingFault`가 있다. `ok(expr)`와 `fault(reason)`은 이 내장 Result의
+`TemporalContextFault`, `AccountingFault`, `SettingsFault`가 있다. `ok(expr)`와 `fault(reason)`은 이 내장 Result의
 constructor다. 사용자가 새 ADT, 새 Result error 타입 또는 constructor를 선언하는
 일반 문법은 없다. Result를 state, config, input, output의 scalar 값처럼 저장하거나
-installation binding에 노출하지 않는다.
+installation binding에 노출하지 않는다. `config x: T = initial`은 Result를 scalar 저장소로
+선언하는 문법이 아니다. payload가 `T`인 설정 stream을 선언하며, 식에서 `x`를 읽은
+타입은 `Result<T, SettingsFault>`다. 초기 emission은 `ok(initial)`이다. 현재 error rail을
+소스 기본값이나 이전 성공값으로 바꾸지 않는다. [§5.2](05-settings-and-observation.md#설정-stream과-현재-observation)의
+stream 규칙을 따른다.
 
 내장 fault enum의 member는 다음으로 고정한다. 시간·달력·자연 사건의 이름은
 [3장의 Unknown 원인](03-time-and-schedules.md#자연-기준의-fallback과-회복)과 같다.
@@ -212,6 +216,7 @@ installation binding에 노출하지 않는다.
 | `CalendarFault` | `ClockUnknown`, `CalendarMissing`, `CalendarOutOfRange`, `ZoneUnsupported` |
 | `TemporalContextFault` | `ClockUnknown`, `LocationUnknown`, `EventUnavailable`, `PredictionMissing`, `PredictionStale`, `ZoneUnsupported` |
 | `AccountingFault` | `ClockUnknown`, `LedgerMissing`, `LedgerCorrupt`, `LedgerIncomplete`, `CountOverflow` |
+| `SettingsFault` | `SettingsInvalid`, `SettingsUnavailable` |
 
 일부 이름은 여러 내장 fault enum에 속한다. `fault(reason)`에서는 기대하는 Result의
 오류 타입으로, `case reason`에서는 검사 대상의 오류 타입으로 member를 결정한다.
@@ -249,7 +254,7 @@ Result 흐름에는 다음 compiler-known 정적 변환을 사용할 수 있다.
 
 | 표기 | 값 의미 |
 |---|---|
-| `ok(value)` / `fault(reason)` | 정상 payload 또는 sensor fault constructor |
+| `ok(value)` / `fault(reason)` | 정상 payload 또는 해당 Result의 내장 fault constructor |
 | `below(limit)` | 호환되는 ordered payload를 받아 `value < limit`을 반환하는 정적 변환 |
 | `map(f)` | `Ok(x)`는 `Ok(f(x))`, `Err(e)`는 그대로 전달하는 단항 함수 |
 | `and_then(f)` | `Ok(x)`는 Result를 반환하는 `f(x)`로 연결하고 `Err(e)`는 전달 |
@@ -459,9 +464,13 @@ control ClimateTarget {
     min = 18°C;
     max = 32°C;
     step = 0.5Δ°C;
+    access = operator;
   }
   output heat: Bool;
-  heat <- inside_temperature < target_temperature;
+  heat <- case target_temperature {
+    ok(target) => inside_temperature < target;
+    fault(reason) => false;
+  };
 }
 ```
 

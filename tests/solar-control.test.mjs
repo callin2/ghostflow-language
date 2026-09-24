@@ -111,7 +111,7 @@ test('Solar restricts sun tags, exact offsets, fallback, and operating metadata'
     '  enabled <- false;',
     '}',
   ].join('\n'), /expected ; after let declaration/, { line: 2, column: 18 });
-  expectError(solarControl(dawn.replace('  schedule dawn', '  config duration: Duration = 5min { min = 1min; max = 10min; step = 1min; access = operator; }\n  schedule dawn')), /Solar schedules cannot be combined with operating settings metadata yet/, { line: 2, column: 3 });
+  expectError(solarControl(dawn.replace('  schedule dawn', '  config duration: Duration = 5min { min = 1min; max = 10min; step = 1min; access = operator; }\n  schedule dawn')), /config streams cannot mix with legacy Solar\/DailySlots context execution/, { line: 1, column: 1 });
 });
 
 test('the existing DailySlots snapshot remains v1-compatible', () => {

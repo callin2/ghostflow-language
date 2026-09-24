@@ -124,7 +124,7 @@ function expectedSchema(compilation, identityValue) {
       const settings = config.settings;
       descriptors.push({
         id: `setting.${item.name}`, name: item.name, kind: 'setting', sourceType: sourceType(config.type), access: ['read'],
-        authority: settings.access, applyPolicy: settings.apply ?? 'stopped', label: settings.label ?? item.name,
+        authority: settings.access, applyPolicy: 'live', label: settings.label ?? item.name,
         constraint: config.type === 'Bool'
           ? { kind: 'choices', values: [false, true] }
           : { kind: 'range', min: settings.min, max: settings.max, step: settings.step },

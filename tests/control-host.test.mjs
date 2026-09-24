@@ -238,39 +238,45 @@ test('rejects malformed manifest and mismatched bytecode hash', async () => {
   await assert.rejects(() => ControlRuntime.instantiate(wasmBytes, { ...compiled, manifest: { ...compiled.manifest, inputs: [{ ...compiled.manifest.inputs[0], extra: true }] } }), /unknown key/);
 });
 
-test('accepts compiler-emitted v2 settings and executes the compiled config value', async () => {
+test('accepts compiler-emitted Result settings and executes the initial stream value', async () => {
   const compiled = await compileSource(`
 control SettingsHost {
   config duration: Duration = 5min { min = 1min; max = 20min; step = 1min; access = operator; label = "관수 시간"; }
   output enabled: Bool;
-  enabled <- duration > 0min;
+  enabled <- case duration { ok(value) => value > 0min; fault(_) => false; };
 }
 `, { filename: 'settings-host.ghost' });
-  assert.equal(compiled.manifest.format, 'GhostFlow/control-v2');
+  assert.equal(compiled.manifest.format, 'GhostFlow/control-v10');
   assert.deepEqual(compiled.manifest.configs[0].settings, {
     min: 60000, max: 1200000, step: 60000, access: 'operator', label: '관수 시간',
   });
-  const runtime = await ControlRuntime.instantiateSimulation(wasmBytes, compiled);
+  const runtime = await ControlRuntime.instantiate(wasmBytes, compiled,
+    { context: { bootEpoch: 1, terminalCapacity: 8, bindings: [] } });
   try {
-    assert.equal(runtime.manifest.configs[0].settings.apply, 'stopped');
-    const result = runtime.step({ nowMs: 0 });
+    assert.equal(runtime.manifest.configs[0].settings.apply, undefined);
+    const result = runtime.step({ nowMs: 0, contextFacts: {
+      clock: { monotonicMs: 0, bootEpoch: 1, wallMs: 0, uncertaintyMs: 0,
+        trusted: true, unknownReason: null, sourceRevision: 'host-settings-clock-v1' },
+      natural: [], schedules: [], settings: null,
+    } });
     assert.equal(result.vm.safe?.enabled ?? result.vm.safeIntents?.enabled, true);
+    assert.deepEqual(runtime.contextSnapshot().state.settings[0].result, { ok: true, value: 300000 });
   } finally { runtime.dispose(); }
 });
 
-test('strictly validates v2 settings metadata and keeps v1 metadata-free', async () => {
-  const v2 = await compileSource('control V2 { config level: Percent = 50% { min = 0%; max = 100%; step = 10%; access = designer; label = "Level"; } output ready: Bool; ready <- level >= 0%; }', { filename: 'v2-settings.ghost' });
+test('strictly validates live stream settings metadata and keeps fixed let controls metadata-free', async () => {
+  const v2 = await compileSource('control V2 { config level: Percent = 50% { min = 0%; max = 100%; step = 10%; access = designer; label = "Level"; } output ready: Bool; ready <- case level { ok(value) => value >= 0%; fault(_) => false; }; }', { filename: 'v2-settings.ghost' });
   const invalid = change => ({ ...v2, manifest: { ...v2.manifest, configs: [{ ...v2.manifest.configs[0], settings: { ...v2.manifest.configs[0].settings, ...change } }] } });
-  await assert.rejects(() => ControlRuntime.instantiateSimulation(wasmBytes, invalid({ access: 'viewer' })), /access/);
-  await assert.rejects(() => ControlRuntime.instantiateSimulation(wasmBytes, invalid({ apply: 'running' })), /apply/);
-  await assert.rejects(() => ControlRuntime.instantiateSimulation(wasmBytes, invalid({ min: 10, max: 20, step: 3 })), /aligned/);
-  await assert.rejects(() => ControlRuntime.instantiateSimulation(wasmBytes, invalid({ label: 'x'.repeat(129) })), /label/);
-  await assert.rejects(() => ControlRuntime.instantiateSimulation(wasmBytes, invalid({ min: '0' })), /must be/);
-  await assert.rejects(() => ControlRuntime.instantiateSimulation(wasmBytes, { ...v2, manifest: { ...v2.manifest, configs: [{ ...v2.manifest.configs[0], initialOffset: '0' }] } }), /Offset|offset/);
+  await assert.rejects(() => ControlRuntime.instantiate(wasmBytes, invalid({ access: 'viewer' })), /access/);
+  await assert.rejects(() => ControlRuntime.instantiate(wasmBytes, invalid({ apply: 'running' })), /apply/);
+  await assert.rejects(() => ControlRuntime.instantiate(wasmBytes, invalid({ min: 10, max: 20, step: 3 })), /aligned/);
+  await assert.rejects(() => ControlRuntime.instantiate(wasmBytes, invalid({ label: 'x'.repeat(129) })), /label/);
+  await assert.rejects(() => ControlRuntime.instantiate(wasmBytes, invalid({ min: '0' })), /must be/);
+  await assert.rejects(() => ControlRuntime.instantiate(wasmBytes, { ...v2, manifest: { ...v2.manifest, configs: [{ ...v2.manifest.configs[0], initialOffset: '0' }] } }), /Offset|offset/);
 
-  const v1 = await compileSource('control V1 { config duration: Duration = 5min; output ready: Bool; ready <- duration > 0min; }', { filename: 'v1-settings.ghost' });
+  const v1 = await compileSource('control V1 { let duration = 5min; output ready: Bool; ready <- duration > 0min; }', { filename: 'v1-settings.ghost' });
   assert.equal(v1.manifest.format, 'GhostFlow/control-v1');
-  await assert.rejects(() => ControlRuntime.instantiate(wasmBytes, { ...v1, manifest: { ...v1.manifest, configs: [{ ...v1.manifest.configs[0], settings: { access: 'operator' } }] } }), /unknown key|v1 config/);
+  await assert.rejects(() => ControlRuntime.instantiate(wasmBytes, { ...v1, manifest: { ...v1.manifest, configs: [{ name: 'duration', type: 'Duration', value: 300000, settings: { access: 'operator' } }] } }), /unknown key|v1 config/);
 });
 
 test('deep-copies and freezes the validated manifest', async () => {
@@ -289,16 +295,18 @@ test('deep-copies and freezes the validated manifest', async () => {
   } finally { runtime.dispose(); }
 });
 
-test('freezes nested v2 settings and preserves the bytecode hash boundary', async () => {
-  const compiled = await compileSource('control FrozenSettings { config level: Percent = 50% { min = 0%; max = 100%; step = 10%; access = operator; } output ready: Bool; ready <- level > 0%; }', { filename: 'frozen-settings.ghost' });
-  const runtime = await ControlRuntime.instantiateSimulation(wasmBytes, compiled);
+test('freezes nested stream settings and preserves the bytecode hash boundary', async () => {
+  const compiled = await compileSource('control FrozenSettings { config level: Percent = 50% { min = 0%; max = 100%; step = 10%; access = operator; } output ready: Bool; ready <- case level { ok(value) => value > 0%; fault(_) => false; }; }', { filename: 'frozen-settings.ghost' });
+  const runtime = await ControlRuntime.instantiate(wasmBytes, compiled,
+    { context: { bootEpoch: 1, terminalCapacity: 8, bindings: [] } });
   try {
     assert.equal(Object.isFrozen(runtime.manifest.configs[0]), true);
     assert.equal(Object.isFrozen(runtime.manifest.configs[0].settings), true);
     assert.equal(runtime.manifest.bytecodeSha256, compiled.manifest.bytecodeSha256);
     assert.throws(() => { runtime.manifest.configs[0].settings.access = 'designer'; }, TypeError);
   } finally { runtime.dispose(); }
-  await assert.rejects(() => ControlRuntime.instantiateSimulation(wasmBytes, { ...compiled, manifest: { ...compiled.manifest, bytecodeSha256: '0'.repeat(64) } }), /SHA-256/);
+  await assert.rejects(() => ControlRuntime.instantiate(wasmBytes, { ...compiled, manifest: { ...compiled.manifest, bytecodeSha256: '0'.repeat(64) } },
+    { context: { bootEpoch: 1, terminalCapacity: 8, bindings: [] } }), /SHA-256/);
 });
 
 test('routes non-finite and finite out-of-range numeric sensor payloads to core Invalid', async () => {

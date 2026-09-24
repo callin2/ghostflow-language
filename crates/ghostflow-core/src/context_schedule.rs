@@ -549,6 +549,39 @@ impl Engine {
         Ok(())
     }
 
+    pub fn stage_settings_fault(
+        &self,
+        desc: &ScheduleDescriptor,
+        clock: ClockSnapshot<'_>,
+        facts: &ScheduleEvidence,
+        fault: u8,
+    ) -> Result<(Self, Decision)> {
+        Self::validate_rows(desc, facts)?;
+        let mut staged = self.clone();
+        staged.clock.poll(clock)?;
+        Ok((
+            staged,
+            Decision {
+                observations: vec![crate::context_vm::Observation {
+                    site: desc.site,
+                    occurrence_id: String::new(),
+                    planned_ms: None,
+                    decision: format!(
+                        "Unknown({})",
+                        if fault == 0 {
+                            "SettingsInvalid"
+                        } else {
+                            "SettingsUnavailable"
+                        }
+                    ),
+                    provider_revision: String::new(),
+                    context_revision: String::new(),
+                }],
+                ..Default::default()
+            },
+        ))
+    }
+
     fn apply_setting(
         &mut self,
         desc: &ScheduleDescriptor,
@@ -560,8 +593,11 @@ impl Engine {
             return Ok(());
         };
         match (&desc.definition, change) {
-            (ScheduleDefinition::Periodic { every, .. }, SettingValue::Duration(interval)) => {
-                if !every.operator_editable
+            (
+                ScheduleDefinition::Periodic { every, .. },
+                SettingValue::Duration(interval) | SettingValue::SharedDuration(interval),
+            ) => {
+                if !every.operator_editable && !matches!(change, SettingValue::SharedDuration(_))
                     || *interval < every.min_ms
                     || *interval > every.max_ms
                     || (interval - every.min_ms) % every.step_ms != 0
@@ -580,9 +616,11 @@ impl Engine {
                     capacity,
                     ..
                 },
-                SettingValue::Slots(entries),
+                SettingValue::Slots(entries) | SettingValue::SharedSlots(entries),
             ) => {
-                if !operator_editable || entries.len() > usize::from(*capacity) {
+                if !operator_editable && !matches!(change, SettingValue::SharedSlots(_))
+                    || entries.len() > usize::from(*capacity)
+                {
                     return Err(invalid("TimeSlots edit unauthorized or exceeds capacity"));
                 }
                 let mut keys = BTreeSet::new();
@@ -606,6 +644,15 @@ impl Engine {
                             .ok_or_else(|| invalid("TimeSlots key exhausted"))?;
                         self.added_at_wall.insert(fresh, at);
                         fresh
+                    } else if matches!(change, SettingValue::SharedSlots(_)) {
+                        if !self.slots.contains(&(key, minute)) {
+                            self.added_at_wall.insert(key, wall_ms.unwrap_or(0));
+                        }
+                        self.next_slot_key = self.next_slot_key.max(
+                            key.checked_add(1)
+                                .ok_or_else(|| invalid("TimeSlots key exhausted"))?,
+                        );
+                        key
                     } else {
                         let Some((_, old_minute)) =
                             self.slots.iter().find(|(existing, _)| *existing == key)
@@ -1180,6 +1227,7 @@ mod tests {
                 epoch_id: "instant:1000".into(),
                 anchor_ms: 1_000,
                 every: DurationSetting {
+                    id: 1,
                     name: "interval".into(),
                     operator_editable: editable,
                     initial_ms: 1_000,
@@ -1555,6 +1603,7 @@ mod tests {
             name: "starts".into(),
             gap_ms: 10_000,
             definition: ScheduleDefinition::ConfigDailySlots {
+                config_id: 3,
                 timezone: "UTC".into(),
                 setting: "watering_slots".into(),
                 operator_editable: true,

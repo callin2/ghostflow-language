@@ -112,13 +112,7 @@ assert.deepEqual(scheduledResult.manifest, {
   }],
   timers: [{ name: 'age', state: 'phase', clockInput: '__gf_now_ms' }],
   signals: [],
-  configs: [
-    { name: 'water1_time', type: 'Duration', value: 300000 },
-    { name: 'water2_time', type: 'Duration', value: 300000 },
-    { name: 'valve_delay', type: 'Duration', value: 2000 },
-    { name: 'pump_stop_delay', type: 'Duration', value: 2000 },
-    { name: 'switch_delay', type: 'Duration', value: 2000 },
-  ],
+  configs: [],
 });
 assert.ok(scheduledModule.inputs.some(field => field.name === '__gf_schedule_due_starts' && field.type === 1));
 assert.ok(scheduledModule.inputs.some(field => field.name === '__gf_now_ms' && field.type === 2));
@@ -154,7 +148,7 @@ control MoistureDemand {
   fn latch(start: Bool, stop: Bool, previous: Bool) -> Bool {
     !stop && (start || previous);
   }
-  config wait: Duration = 2s;
+  let wait = 2s;
   let dry_ok = case dry { ok(value) => value; fault(_) => false; };
   state running: Bool = false;
   state amount: Number = 0;

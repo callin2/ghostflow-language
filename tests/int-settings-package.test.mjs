@@ -14,7 +14,7 @@ test('signed Int settings preserve exact bounds and reject malformed metadata be
   const keyId = 'int-settings-test-key';
   const identity = {
     compilerRevision: 'int-settings-test', runtimeSemantics: 'GhostFlow/runtime-semantics-v1',
-    runtimeAbi: 'GhostFlow/framed-scan-abi-v1', requiredCapabilities: [], bindingRevision: 'int-settings-test-binding',
+    runtimeAbi: 'GhostFlow/context-scan-abi-v5', requiredCapabilities: [], bindingRevision: 'int-settings-test-binding',
   };
   const packaged = await buildPortablePackage(compilation, identity, {
     signers: [{ keyId, privateKey: key.privateKey }], verifyCompilation: compileSource,
@@ -23,7 +23,7 @@ test('signed Int settings preserve exact bounds and reject malformed metadata be
     trustedKeys: [{ keyId, publicKey: key.publicKey }], revokedKeyIds: [],
     expectedCompilerRevision: identity.compilerRevision,
     supportedRuntimeSemantics: [identity.runtimeSemantics], supportedRuntimeAbis: [identity.runtimeAbi],
-    supportedManifestFormats: ['GhostFlow/control-v2'], availableCapabilities: [],
+    supportedManifestFormats: ['GhostFlow/control-v10'], availableCapabilities: [],
     expectedBindingRevision: identity.bindingRevision, verifyBytecode: async () => true,
   };
   const verified = await verifyPortablePackage(packaged, options);
@@ -49,7 +49,7 @@ test('signed Int settings preserve exact bounds and reject malformed metadata be
     ['unexpected stepType', c => { c.settings.stepType = 'Int'; }, 'settings.stepType is forbidden'],
     ['missing access', c => { delete c.settings.access; }, 'settings.access must be operator or designer'],
     ['invalid access', c => { c.settings.access = 'viewer'; }, 'settings.access must be operator or designer'],
-    ['invalid apply policy', c => { c.settings.apply = 'running'; }, 'settings.apply must be stopped'],
+    ['obsolete apply policy', c => { c.settings.apply = 'stopped'; }, 'settings.apply is forbidden'],
     ['empty label', c => { c.settings.label = ''; }, 'settings.label must be a string of 1 to 128 characters'],
     ['non-string label', c => { c.settings.label = 1; }, 'settings.label must be a string of 1 to 128 characters'],
     ['oversized label', c => { c.settings.label = 'x'.repeat(129); }, 'settings.label must be a string of 1 to 128 characters'],
@@ -73,7 +73,7 @@ test('signed Int settings preserve exact bounds and reject malformed metadata be
     await assert.rejects(() => verifyPortablePackage(changed, options), error => {
       assert.ok(error instanceof PortablePackageError);
       assert.equal(error.code, message === null ? 'source-map-mismatch' : 'manifest-mismatch');
-      if (message === null) assert.equal(error.cause?.message, 'Int configs do not match canonical source lowering');
+      if (message === null) assert.equal(error.cause?.message, 'config streams do not match canonical source lowering');
       else assert.equal(error.message, `manifest.configs[0].${message}`);
       return true;
     });
