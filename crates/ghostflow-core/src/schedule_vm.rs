@@ -41,27 +41,47 @@ pub struct DailyPulseDescriptor {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct DailySlotsPulseDescriptor {
+    pub site: u32,
+    pub name: String,
+    pub timezone: String,
+    pub grid_ms: u64,
+    /// 0 skip, 1 next_valid.
+    pub dst_missing: u8,
+    /// 0 first, 1 second, 2 both, 3 skip.
+    pub dst_repeated: u8,
+    pub gap_ms: u64,
+    /// Stable literal definition keys paired with their declared civil minute.
+    pub slots: Vec<(u16, u16)>,
+    pub when: Vec<u8>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum PulseDescriptor {
     Solar(SolarPulseDescriptor),
     Daily(DailyPulseDescriptor),
+    DailySlots(DailySlotsPulseDescriptor),
 }
 impl PulseDescriptor {
     pub fn site(&self) -> u32 {
         match self {
             Self::Solar(d) => d.site,
             Self::Daily(d) => d.site,
+            Self::DailySlots(d) => d.site,
         }
     }
     pub fn gap_ms(&self) -> u64 {
         match self {
             Self::Solar(d) => d.gap_ms,
             Self::Daily(d) => d.gap_ms,
+            Self::DailySlots(d) => d.gap_ms,
         }
     }
     pub fn when(&self) -> &[u8] {
         match self {
             Self::Solar(d) => &d.when,
             Self::Daily(d) => &d.when,
+            Self::DailySlots(d) => &d.when,
         }
     }
 }
@@ -247,6 +267,78 @@ pub(crate) fn load_prelude(
                         dst_missing,
                         dst_repeated,
                         gap_ms,
+                        when,
+                    }));
+                (site, name)
+            }
+            4 if format == 9 => {
+                let site = reader.u32()?;
+                let name = reader.string()?;
+                let timezone = reader.string()?;
+                let grid_ms = reader.u64()?;
+                let dst_missing = reader.u8()?;
+                let dst_repeated = reader.u8()?;
+                if timezone.is_empty() || grid_ms != 900_000 || dst_missing > 1 || dst_repeated > 3
+                {
+                    return Err(Error::new("invalid DailySlots descriptor"));
+                }
+                for _ in 0..4 {
+                    if reader.u8()? != 0 {
+                        return Err(Error::new("unsupported DailySlots policy"));
+                    }
+                }
+                let gap_ms = reader.u64()?;
+                if !(1..=9_007_199_254_740_991).contains(&gap_ms) {
+                    return Err(Error::new("invalid schedule gap"));
+                }
+                let slot_count = usize::from(reader.u16()?);
+                if !(1..=96).contains(&slot_count) {
+                    return Err(Error::new("invalid DailySlots slots"));
+                }
+                let mut slots = Vec::with_capacity(slot_count);
+                for _ in 0..slot_count {
+                    let key = reader.u16()?;
+                    let minute = reader.u16()?;
+                    if key != minute + 1 || minute >= 1_440 || minute % 15 != 0 {
+                        return Err(Error::new("invalid DailySlots slot"));
+                    }
+                    if slots
+                        .last()
+                        .is_some_and(|(_, previous)| *previous >= minute)
+                    {
+                        return Err(Error::new("invalid DailySlots slot order"));
+                    }
+                    slots.push((key, minute));
+                }
+                let when = reader.blob()?;
+                if verify_expression_with_prelude(
+                    &when,
+                    inputs,
+                    states,
+                    false,
+                    format,
+                    &result.windows,
+                    result.schedules.len(),
+                    result.true_fors.len(),
+                )? != Type::Bool
+                {
+                    return Err(Error::new("schedule predicate must be Bool"));
+                }
+                result.marker_count += expression_metadata(&when)?.1;
+                result
+                    .order
+                    .push(PreludeEntry::Schedule(result.schedules.len() as u16));
+                result
+                    .schedules
+                    .push(PulseDescriptor::DailySlots(DailySlotsPulseDescriptor {
+                        site,
+                        name: name.clone(),
+                        timezone,
+                        grid_ms,
+                        dst_missing,
+                        dst_repeated,
+                        gap_ms,
+                        slots,
                         when,
                     }));
                 (site, name)

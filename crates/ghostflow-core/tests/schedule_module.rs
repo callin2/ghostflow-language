@@ -777,6 +777,49 @@ fn daily_fixture() -> Fixture {
     }
 }
 
+fn daily_slots_entry(slots: &[(u16, u16)], repeated: u8, when: &[u8]) -> Vec<u8> {
+    let mut b = vec![4];
+    b.extend(7u32.to_le_bytes());
+    string(&mut b, "selected");
+    string(&mut b, "Asia/Seoul");
+    b.extend(900_000u64.to_le_bytes());
+    b.extend([0, repeated, 0, 0, 0, 0]);
+    b.extend(60_000u64.to_le_bytes());
+    b.extend((slots.len() as u16).to_le_bytes());
+    for (key, minute) in slots {
+        b.extend(key.to_le_bytes());
+        b.extend(minute.to_le_bytes());
+    }
+    blob(&mut b, when);
+    b
+}
+
+fn daily_slots_fixture() -> Fixture {
+    Fixture {
+        version: 9,
+        entries: vec![daily_slots_entry(&[(1, 0), (376, 25 * 15)], 0, &[1, 1])],
+        ..Fixture::default()
+    }
+}
+
+fn slot_fact(
+    source_day: i32,
+    slot_key: u16,
+    minute_of_day: u16,
+    scheduled_wall_ms: u64,
+) -> ghostflow_core::solar_admission::SolarFact {
+    ghostflow_core::solar_admission::SolarFact {
+        source_day,
+        slot_key,
+        minute_of_day,
+        fold: 0,
+        scheduled_wall_ms: Some(scheduled_wall_ms),
+        provider_revision: "iana-v1".into(),
+        context_revision: "zone-v1".into(),
+        availability: ghostflow_core::solar_admission::SolarFactAvailability::Available,
+    }
+}
+
 fn daily_tick<'a>(
     runtime: &'a mut Runtime,
     now: u64,
@@ -925,6 +968,80 @@ fn daily_unavailable_context_preserves_reason_instead_of_ordinary_false() {
         tick.schedule_trace[0].observations[0].provider_revision,
         "iana-v1"
     );
+}
+
+#[test]
+fn daily_slots_gfb9_uses_descriptor_slot_identity_and_native_ledger() {
+    use ghostflow_core::solar_admission::SolarDecision;
+    use ghostflow_core::solar_runtime::ScheduleKind::DailySlots;
+
+    let module = Module::load(&daily_slots_fixture().bytes()).unwrap();
+    let PulseDescriptor::DailySlots(d) =
+        &module.schedule_requirements().unwrap().strategies[0].schedules[0]
+    else {
+        panic!("DailySlots descriptor required");
+    };
+    assert_eq!(d.slots, [(1, 0), (376, 375)]);
+    assert_eq!((d.grid_ms, d.dst_missing, d.dst_repeated), (900_000, 0, 0));
+
+    let mut runtime = Runtime::new(8);
+    runtime.install(module, false);
+    runtime
+        .activate_with_schedules(&solar_activation())
+        .unwrap();
+    let row = [slot_fact(4, 376, 375, 1000)];
+    assert!(
+        !daily_tick(&mut runtime, 0, 999, &row, DailySlots, 2000)
+            .unwrap()
+            .schedule_trace[0]
+            .due
+    );
+    let tick = daily_tick(&mut runtime, 1, 1000, &row, DailySlots, 2000).unwrap();
+    assert!(tick.schedule_trace[0].due);
+    assert_eq!(tick.schedule_trace[0].observations[0].slot_key, 376);
+    assert!(tick.to_json().contains("\"occurrenceId\":\"7:4:376:0\""));
+
+    let corrected = [slot_fact(4, 376, 375, 1100)];
+    let duplicate = daily_tick(&mut runtime, 2, 1100, &corrected, DailySlots, 2000).unwrap();
+    assert!(!duplicate.schedule_trace[0].due);
+    assert_eq!(
+        duplicate.schedule_trace[0].decision,
+        SolarDecision::AlreadyTerminal
+    );
+}
+
+#[test]
+fn daily_slots_gfb9_rejects_wrong_descriptor_or_fact_identity() {
+    use ghostflow_core::solar_runtime::ScheduleKind::DailySlots;
+
+    for slots in [
+        &[][..],
+        &[(2, 0)][..],
+        &[(1, 1)][..],
+        &[(16, 15), (1, 0)][..],
+    ] {
+        let mut fixture = daily_slots_fixture();
+        fixture.entries = vec![daily_slots_entry(slots, 0, &[1, 1])];
+        assert!(Module::load(&fixture.bytes()).is_err());
+    }
+    let mut wrong_kind = daily_slots_fixture();
+    wrong_kind.entries = vec![daily_entry(0, &[1, 1])];
+    assert!(Module::load(&wrong_kind.bytes()).is_err());
+
+    let mut runtime = Runtime::new(8);
+    runtime.install(Module::load(&daily_slots_fixture().bytes()).unwrap(), false);
+    runtime
+        .activate_with_schedules(&solar_activation())
+        .unwrap();
+    let wrong = [slot_fact(4, 377, 375, 1000)];
+    assert_eq!(
+        daily_tick(&mut runtime, 0, 999, &wrong, DailySlots, 2000)
+            .unwrap_err()
+            .message(),
+        "DailySlots fact violates descriptor"
+    );
+    let valid = [slot_fact(4, 376, 375, 1000)];
+    assert!(daily_tick(&mut runtime, 0, 999, &valid, DailySlots, 2000).is_ok());
 }
 fn solar_tick<'a>(
     runtime: &'a mut Runtime,

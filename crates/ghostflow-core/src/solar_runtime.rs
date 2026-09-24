@@ -22,6 +22,7 @@ pub struct SolarInput<'a> {
 pub enum ScheduleKind {
     Solar,
     Daily,
+    DailySlots,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -44,21 +45,36 @@ pub(crate) fn validate_kinds(
         }
         match descriptor {
             PulseDescriptor::Solar(_) if input.kind == ScheduleKind::Solar => {
-                if input.facts.rows.iter().any(|r| r.fold != 0) {
-                    return Err(Error::new("Solar facts cannot contain a civil fold"));
-                }
-            }
-            PulseDescriptor::Daily(d) if input.kind == ScheduleKind::Daily => {
                 if input
                     .facts
                     .rows
                     .iter()
-                    .any(|r| match (d.dst_repeated, r.fold) {
-                        (_, 0) | (0, 1) | (1, 2) | (2, 1 | 2) => false,
-                        _ => true,
-                    })
+                    .any(|r| r.fold != 0 || r.slot_key != 0 || r.minute_of_day != 0)
                 {
+                    return Err(Error::new("Solar facts cannot contain a civil fold"));
+                }
+            }
+            PulseDescriptor::Daily(d) if input.kind == ScheduleKind::Daily => {
+                if input.facts.rows.iter().any(|r| {
+                    r.slot_key != 0
+                        || r.minute_of_day != 0
+                        || match (d.dst_repeated, r.fold) {
+                            (_, 0) | (0, 1) | (1, 2) | (2, 1 | 2) => false,
+                            _ => true,
+                        }
+                }) {
                     return Err(Error::new("Daily fact violates DST repeated policy"));
+                }
+            }
+            PulseDescriptor::DailySlots(d) if input.kind == ScheduleKind::DailySlots => {
+                if input.facts.rows.iter().any(|r| {
+                    !d.slots.contains(&(r.slot_key, r.minute_of_day))
+                        || match (d.dst_repeated, r.fold) {
+                            (_, 0) | (0, 1) | (1, 2) | (2, 1 | 2) => false,
+                            _ => true,
+                        }
+                }) {
+                    return Err(Error::new("DailySlots fact violates descriptor"));
                 }
             }
             _ => return Err(Error::new("schedule fact kind mismatch")),
@@ -133,7 +149,10 @@ impl SolarRuntime {
         for ((descriptor, input), engine) in descriptors.iter().zip(facts).zip(&mut staged.engines)
         {
             let mut unknown_reason = None;
-            if matches!(descriptor, PulseDescriptor::Daily(_)) {
+            if matches!(
+                descriptor,
+                PulseDescriptor::Daily(_) | PulseDescriptor::DailySlots(_)
+            ) {
                 if input.facts.rows.iter().any(|r| {
                     r.availability == crate::solar_admission::SolarFactAvailability::Unavailable
                 }) {
@@ -171,14 +190,18 @@ impl SolarRuntime {
                 false
             };
             let mut result = engine.commit(stage.evaluate(predicate)?)?;
-            if matches!(descriptor, PulseDescriptor::Daily(_))
-                && result.decision == crate::solar_admission::SolarDecision::Unknown
+            if matches!(
+                descriptor,
+                PulseDescriptor::Daily(_) | PulseDescriptor::DailySlots(_)
+            ) && result.decision == crate::solar_admission::SolarDecision::Unknown
             {
                 result
                     .observations
                     .extend(input.facts.rows.iter().map(|row| {
                         crate::solar_admission::SolarObservation {
                             source_day: row.source_day,
+                            slot_key: row.slot_key,
+                            minute_of_day: row.minute_of_day,
                             fold: row.fold,
                             scheduled_wall_ms: row.scheduled_wall_ms,
                             decision: crate::solar_admission::SolarDecision::Unknown,
