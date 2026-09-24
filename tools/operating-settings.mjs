@@ -83,7 +83,8 @@ export async function createOperatingSettingsCandidate({ source, filename = 'pro
   // Snapshot primitive requests before compilation yields to caller code.
   const requestedEntries = Object.entries(changes);
   const before = await compileSource(source, { filename });
-  const configs = new Map((before.manifest?.configs ?? []).map(config => [config.name, config]));
+  const beforeControl = before.manifest?.control ?? before.manifest;
+  const configs = new Map((beforeControl?.configs ?? []).map(config => [config.name, config]));
   const mapOffset = literateOffsetMapper(source, extractLiterate(source, { filename }));
   const replacements = [];
   for (const [name, request] of requestedEntries) {
