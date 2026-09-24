@@ -48,6 +48,14 @@ tutorial traces are execution evidence under ignored `build/`, separate from
 source releases. Report host validation separately from Device, API and farmer-UX
 validation.
 
+Never overwrite a historical benchmark or its pinned digest merely because a
+legitimate source change made CI report identity drift. Keep current provenance
+derived from the checked-out files, historical snapshot integrity independently
+pinned, and measured behavior comparisons separate. Diagnose that contract before
+changing a hash. Capture an intentional new benchmark in a new dated artifact and
+cover provenance changes and stored-record tampering with regression tests. See
+[`docs/2026-09-24-authoring-baseline-provenance.md`](docs/2026-09-24-authoring-baseline-provenance.md).
+
 ## v1 clean break: canonical literate source only
 
 - This pre-1.0 toolchain accepts canonical `.ghost.md` literate documents for

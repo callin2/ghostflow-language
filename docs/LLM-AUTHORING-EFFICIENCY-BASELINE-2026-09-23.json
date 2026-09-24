@@ -36,9 +36,9 @@
     "tokenizer": "tiktoken==0.12.0; cl100k_base",
     "packageLockSha256": "a14018dd135c1a73353858ae636dc6aff5e6dc27163d90227976fb5ff58e21c1",
     "scenarioRunnerSha256": "0b3e362b88417240d0545e6319b82bebacb91516efe4d9f89368d223e16a9448",
-    "rustCoreTreeSha256": "8ae4d08259afdbc9427b885adfde0b24326cb76aeda56cd65ca6bf6314afeb20",
+    "rustCoreTreeSha256": "0328c9f3bee0c6de653635268b77eb4a14833413963efaf4047ce377b0e774a4",
     "referenceSourceDigest": "sha256:580ba6e568286dc69c0fff7e8e1257fffce194cb286d350acf4075731accbf90",
-    "digest": "ef319b0e8cdb83363b8a988a3938d8da51c8f986131b61ec5c96e447a349394c"
+    "digest": "45f4efc0e2a8c7d227d04622ed4dc61ee63430646fd0751dd4e332fd35f5323f"
   },
   "encoder": {
     "name": "@toon-format/toon",
