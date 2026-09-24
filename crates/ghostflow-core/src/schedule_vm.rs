@@ -235,7 +235,7 @@ pub(crate) fn load_prelude(
                     }));
                 (site, name)
             }
-            3 if matches!(format, 8 | 9 | 11) => {
+            3 if matches!(format, 8 | 9 | 10 | 11) => {
                 let site = reader.u32()?;
                 let name = reader.string()?;
                 let timezone = reader.string()?;
@@ -287,7 +287,7 @@ pub(crate) fn load_prelude(
                     }));
                 (site, name)
             }
-            4 if matches!(format, 9 | 11) => {
+            4 if matches!(format, 9 | 10 | 11) => {
                 let site = reader.u32()?;
                 let name = reader.string()?;
                 let timezone = reader.string()?;
@@ -359,8 +359,9 @@ pub(crate) fn load_prelude(
                     }));
                 (site, name)
             }
-            kind @ 5..=9 if format == 11 => {
-                let descriptor = crate::context_vm::load_schedule(reader, kind, &result.schedules)?;
+            kind @ 5..=9 if matches!(format, 10 | 11) => {
+                let descriptor =
+                    crate::context_vm::load_schedule(reader, kind, format, &result.schedules)?;
                 for expression in [&descriptor.when, &descriptor.cancel] {
                     if verify_expression_with_prelude(
                         expression,
@@ -384,7 +385,7 @@ pub(crate) fn load_prelude(
                 result.schedules.push(PulseDescriptor::Context(descriptor));
                 identity
             }
-            10 if format == 11 => {
+            10 if matches!(format, 10 | 11) => {
                 let descriptor = crate::context_vm::load_natural(reader, inputs)?;
                 let identity = (descriptor.site, descriptor.name.clone());
                 result
@@ -393,7 +394,7 @@ pub(crate) fn load_prelude(
                 result.schedules.push(PulseDescriptor::Natural(descriptor));
                 identity
             }
-            11 if format == 11 => {
+            11 if matches!(format, 10 | 11) => {
                 let descriptor = crate::context_vm::load_accounting(reader, inputs)?;
                 let identity = (descriptor.site, descriptor.name.clone());
                 result
@@ -443,7 +444,7 @@ pub(crate) fn projection_type(
     if usize::from(slot) >= schedule_count {
         return Err(Error::new("schedule projection index"));
     }
-    if field > if format == 11 { 2 } else { 1 } {
+    if field > if matches!(format, 10 | 11) { 2 } else { 1 } {
         return Err(Error::new("schedule projection field"));
     }
     Ok(Type::Bool)

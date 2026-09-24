@@ -6,6 +6,7 @@ import test from 'node:test';
 import { decode, encode } from '@toon-format/toon';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import os from 'node:os';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const corpus = path.join(root, 'examples/authoring/corpus');
@@ -14,6 +15,8 @@ const baselinePath = path.join(root, 'docs/LLM-AUTHORING-EFFICIENCY-BASELINE-202
 const measurementPath = path.join(root, 'docs/LLM-AUTHORING-EFFICIENCY-MEASUREMENT-2026-09-24.json');
 const work = path.join(root, 'build/authoring-efficiency-corpus');
 const sha256 = value => createHash('sha256').update(value).digest('hex');
+// Reviewed snapshot retained at c7233b1. Live reports derive their own identity.
+const HISTORICAL_SOURCE_REVISION_DIGEST = '45f4efc0e2a8c7d227d04622ed4dc61ee63430646fd0751dd4e332fd35f5323f';
 const HISTORICAL_BASELINE_SHA256 = '828f7f7fd33d915fb06c79b3f8d95bfdf13c98e962752ddc1cb79760f9c574c0';
 
 function historicalBaseline(bytes) {
@@ -39,6 +42,97 @@ function filesUnder(directory) {
     return entry.isDirectory() ? filesUnder(file) : [file];
   }).sort();
 }
+
+function sourceRevisionDigest(sourceRevision) {
+  const { digest: _digest, ...identity } = sourceRevision;
+  return sha256(JSON.stringify(identity));
+}
+
+function collectSourceRevision(repositoryRoot, declared, referenceSourceDigest) {
+  const sourceRevision = {
+    ...declared,
+    toolchainFiles: declared.toolchainFiles.map(file => ({
+      file, sha256: sha256(fs.readFileSync(path.join(repositoryRoot, file))),
+    })),
+    packageLockSha256: sha256(fs.readFileSync(path.join(repositoryRoot, 'package-lock.json'))),
+    scenarioRunnerSha256: sha256(fs.readFileSync(path.join(repositoryRoot, 'crates/ghostflow-core/examples/scenario_scan.rs'))),
+    rustCoreTreeSha256: sha256(filesUnder(path.join(repositoryRoot, 'crates/ghostflow-core/src'))
+      .map(file => `${path.relative(repositoryRoot, file)}\0${sha256(fs.readFileSync(file))}`).join('\n')),
+    referenceSourceDigest,
+  };
+  return { ...sourceRevision, digest: sourceRevisionDigest(sourceRevision) };
+}
+
+function benchmarkEvidence(report) {
+  const { sourceRevision: _sourceRevision, ...evidence } = report;
+  return evidence;
+}
+
+function assertHistoricalBaseline(baseline) {
+  assert.equal(baseline.sourceRevision.digest, sourceRevisionDigest(baseline.sourceRevision),
+    'stored authoring baseline source identity is internally inconsistent');
+  assert.equal(baseline.sourceRevision.digest, HISTORICAL_SOURCE_REVISION_DIGEST,
+    'stored authoring baseline source identity differs from the reviewed snapshot');
+}
+
+function assertBenchmarkEvidence(current, baseline) {
+  assertHistoricalBaseline(baseline);
+  assert.deepEqual(benchmarkEvidence(current), benchmarkEvidence(baseline));
+}
+
+test('live authoring provenance changes independently from the reviewed benchmark', t => {
+  const repositoryRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-authoring-provenance-'));
+  t.after(() => fs.rmSync(repositoryRoot, { recursive: true, force: true }));
+  for (const directory of ['tools', 'docs', 'crates/ghostflow-core/examples', 'crates/ghostflow-core/src/nested']) {
+    fs.mkdirSync(path.join(repositoryRoot, directory), { recursive: true });
+  }
+  fs.writeFileSync(path.join(repositoryRoot, 'tools/compiler.mjs'), 'compiler\n');
+  fs.writeFileSync(path.join(repositoryRoot, 'package-lock.json'), '{}\n');
+  fs.writeFileSync(path.join(repositoryRoot, 'crates/ghostflow-core/examples/scenario_scan.rs'), 'runner\n');
+  fs.writeFileSync(path.join(repositoryRoot, 'crates/ghostflow-core/src/a.rs'), 'alpha\n');
+  fs.writeFileSync(path.join(repositoryRoot, 'crates/ghostflow-core/src/nested/b.rs'), 'beta\n');
+  const referenceFile = path.join(repositoryRoot, 'docs/reference.txt');
+  fs.writeFileSync(referenceFile, 'reference\n');
+  const declared = {
+    languagePackage: 'ghostflow-language@test', toolchainFiles: ['tools/compiler.mjs'],
+    toonEncoder: 'toon@test', tokenizer: 'tokens@test',
+  };
+  const referenceDigest = `sha256:${sha256(fs.readFileSync(referenceFile))}`;
+  const first = collectSourceRevision(repositoryRoot, declared, referenceDigest);
+  assert.equal(first.rustCoreTreeSha256, '765d208bbe43459684f729329fb2fbe05607395d36b34f325e9aaef879ae1761');
+  assert.equal(first.digest, 'd0823fafcc964998618ba1df2dd7992575358f693046e2f30cde90dd358e682b');
+
+  const baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf8'));
+  const current = structuredClone(baseline);
+  current.sourceRevision = first;
+  assert.doesNotThrow(() => assertBenchmarkEvidence(current, baseline));
+
+  fs.writeFileSync(path.join(repositoryRoot, 'crates/ghostflow-core/src/a.rs'), 'changed\n');
+  const changedIdentity = collectSourceRevision(repositoryRoot, declared, referenceDigest);
+  assert.notEqual(changedIdentity.rustCoreTreeSha256, first.rustCoreTreeSha256);
+  assert.notEqual(changedIdentity.digest, first.digest);
+  current.sourceRevision = changedIdentity;
+  assert.doesNotThrow(() => assertBenchmarkEvidence(current, baseline));
+
+  fs.writeFileSync(referenceFile, 'changed reference\n');
+  const changedReferenceIdentity = collectSourceRevision(repositoryRoot, declared,
+    `sha256:${sha256(fs.readFileSync(referenceFile))}`);
+  assert.notEqual(changedReferenceIdentity.referenceSourceDigest, changedIdentity.referenceSourceDigest);
+  assert.notEqual(changedReferenceIdentity.digest, changedIdentity.digest);
+  current.sourceRevision = changedReferenceIdentity;
+  assert.doesNotThrow(() => assertBenchmarkEvidence(current, baseline));
+
+  const tamperedIdentity = structuredClone(baseline);
+  tamperedIdentity.sourceRevision.rustCoreTreeSha256 = '0'.repeat(64);
+  tamperedIdentity.sourceRevision.digest = sourceRevisionDigest(tamperedIdentity.sourceRevision);
+  assert.throws(() => assertBenchmarkEvidence(current, tamperedIdentity), /differs from the reviewed snapshot/);
+
+  const changedMeasurement = structuredClone(current);
+  changedMeasurement.totals.compileRounds += 1;
+  assert.throws(() => assertBenchmarkEvidence(changedMeasurement, baseline));
+  assert.throws(() => collectSourceRevision(repositoryRoot,
+    { ...declared, toolchainFiles: ['tools/missing.mjs'] }, referenceDigest), /ENOENT/);
+});
 
 function run(script, args, { input, cwd = root, env = process.env } = {}) {
   const result = spawnSync(process.execPath, [path.join(root, script), ...args], {
@@ -88,14 +182,7 @@ test('offline authoring corpus records bounded retrieval, compilation, correctio
 
   const report = {
     format: 'GhostFlow/authoring-efficiency-baseline-v1',
-    sourceRevision: {
-      ...manifest.sourceRevision,
-      toolchainFiles: manifest.sourceRevision.toolchainFiles.map(file => ({ file, sha256: sha256(fs.readFileSync(path.join(root, file))) })),
-      packageLockSha256: sha256(fs.readFileSync(path.join(root, 'package-lock.json'))),
-      scenarioRunnerSha256: sha256(fs.readFileSync(path.join(root, 'crates/ghostflow-core/examples/scenario_scan.rs'))),
-      rustCoreTreeSha256: sha256(filesUnder(path.join(root, 'crates/ghostflow-core/src'))
-        .map(file => `${path.relative(root, file)}\0${sha256(fs.readFileSync(file))}`).join('\n')),
-    },
+    sourceRevision: null,
     encoder: { name: '@toon-format/toon', version: '4.1.1' },
     tokenizer: { name: 'cl100k_base', package: 'tiktoken', version: '0.12.0' },
     cases: [],
@@ -243,13 +330,10 @@ test('offline authoring corpus records bounded retrieval, compilation, correctio
 
   assert.equal(report.cases.length, 7);
   assert.equal(referenceSourceDigests.size, 1);
-  report.sourceRevision.referenceSourceDigest = [...referenceSourceDigests][0];
-  report.sourceRevision.digest = sha256(JSON.stringify({
-    ...report.sourceRevision,
-    digest: undefined,
-  }));
+  report.sourceRevision = collectSourceRevision(root, manifest.sourceRevision, [...referenceSourceDigests][0]);
   assert.ok(report.cases.every(item => item.referenceChunks > 0));
   assert.equal(report.cases.reduce((sum, item) => sum + item.simulationRounds, 0), 1);
+  assert.match(report.sourceRevision.referenceSourceDigest, /^sha256:[a-f0-9]{64}$/u);
   if (process.env.GF_AUTHORING_REPORT === '1') process.stdout.write(`AUTHORING_EFFICIENCY_REPORT=${JSON.stringify(report)}\n`);
   assert.equal(report.tokenizer.version, '0.12.0');
   assert.deepEqual(behavior(report), behavior(baseline));

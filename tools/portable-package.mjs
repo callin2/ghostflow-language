@@ -301,7 +301,7 @@ function validateGfb1(bytes) {
     fail('invalid-bytecode-format', 'bytecode is not GFB1');
   }
   const version = bytes[4] | (bytes[5] << 8);
-  if (![1, 2, 3, 4, 11].includes(version)) fail('unsupported-bytecode-version', 'supported GFB format versions are 1, 2, 3, 4 and 11');
+  if (![1, 2, 3, 4, 10, 11].includes(version)) fail('unsupported-bytecode-version', 'supported GFB format versions are 1, 2, 3, 4, 10 and 11');
   return String(version);
 }
 
@@ -531,7 +531,7 @@ function validateEmbeddedArtifacts(payload) {
 
   exactObject(payload.bytecode, ['format', 'version', 'sha256', 'contentBase64'], 'payload.bytecode');
   if (payload.bytecode.format !== 'GFB1') fail('invalid-bytecode-format', 'payload bytecode format must be GFB1');
-  if (!['1', '2', '3', '4', '11'].includes(payload.bytecode.version)) fail('unsupported-bytecode-version', 'payload bytecode version must be 1, 2, 3, 4 or 11');
+  if (!['1', '2', '3', '4', '10', '11'].includes(payload.bytecode.version)) fail('unsupported-bytecode-version', 'payload bytecode version must be 1, 2, 3, 4, 10 or 11');
   digestValue(payload.bytecode.sha256, 'payload.bytecode.sha256');
 
   exactObject(payload.manifest, ['format', 'sha256', 'contentBase64'], 'payload.manifest');
@@ -603,9 +603,17 @@ export async function verifyPortablePackage(packageValue, options = {}) {
   const sourceText = decodeUtf8(artifacts.sourceBytes, 'source');
   const manifest = parseCanonicalJson(artifacts.manifestBytes, 'manifest');
   const sourceMap = parseCanonicalJson(artifacts.sourceMapBytes, 'sourceMap');
-  exactObject(manifest, ['format', 'name', 'inputs', 'outputs', 'sensors', 'schedules', 'timers', 'signals', 'configs', 'bytecodeSha256'], 'manifest');
+  const contextManifest = packageValue.payload.bytecode.version === '10';
+  const manifestKeys = ['format', 'name', 'inputs', 'outputs', 'sensors', 'schedules', 'timers', 'signals', 'configs', 'bytecodeSha256'];
+  if (contextManifest) {
+    for (const key of ['providers', 'calendars', 'naturalConditions', 'accounting', 'resources']) {
+      if (Object.hasOwn(manifest, key)) manifestKeys.push(key);
+    }
+  }
+  exactObject(manifest, manifestKeys, 'manifest');
   if (manifest.format !== packageValue.payload.manifest.format) fail('manifest-mismatch', 'manifest format does not match descriptor');
   if (packageValue.payload.bytecode.version === '4' && manifest.format !== 'GhostFlow/control-v4') fail('manifest-mismatch', 'GFB format 4 requires a control-v4 manifest');
+  if (contextManifest && manifest.format !== 'GhostFlow/control-v9') fail('manifest-mismatch', 'GFB format 10 requires a control-v9 manifest');
   if (packageValue.payload.bytecode.version === '11' && manifest.format !== 'GhostFlow/control-v10') fail('manifest-mismatch', 'GFB format 11 requires a control-v10 manifest');
   validateConfigStreamPackageProfile(manifest, packageValue.payload.bytecode.version, identity.runtimeAbi);
   ghostName(manifest.name, 'manifest.name');
@@ -677,7 +685,7 @@ export async function verifyPortablePackage(packageValue, options = {}) {
   for (const [index, schedule] of manifest.schedules.entries()) {
     if (!isPlainObject(schedule)) fail('manifest-mismatch', `manifest.schedules[${index}] must be an object`);
     const name = ghostName(schedule.name, `manifest.schedules[${index}].name`);
-    addGenerated(schedule.dueInput, `__gf_schedule_due_${name}`, `manifest.schedules[${index}].dueInput`);
+    if (!contextManifest) addGenerated(schedule.dueInput, `__gf_schedule_due_${name}`, `manifest.schedules[${index}].dueInput`);
   }
   for (const [index, timer] of manifest.timers.entries()) {
     if (!isPlainObject(timer)) fail('manifest-mismatch', `manifest.timers[${index}] must be an object`);
@@ -714,7 +722,27 @@ export async function verifyPortablePackage(packageValue, options = {}) {
   if (!Array.isArray(sourceMap.nodes) || (sourceMap.lines !== null && !Array.isArray(sourceMap.lines))) {
     fail('source-map-mismatch', 'source map nodes/lines have an unsupported shape');
   }
-  try {
+  if (contextManifest) {
+    // The current compiler emits GFB11 for context source. A signed GFB10
+    // artifact cannot be reproduced by recompiling it with that compiler.
+    // Keep its source map bound to the signed source and bytecode, then require
+    // the target's native GFB10 loader below to accept the exact bytes.
+    try {
+      const extraction = extractLiterate(sourceText, { filename: mappedDocument.filename });
+      if (canonicalJson(sourceMap.lines) !== canonicalJson(extraction.sourceMap)) {
+        throw new Error('GFB10 extraction map does not match canonical source');
+      }
+      if (sourceMap.traceMetadata !== null) {
+        verifySourceTraceMetadata(sourceMap.traceMetadata, artifacts.bytecode, sourceMap.nodes, {
+          sourceDocumentSha256: sourceSha256, bytecodeSha256,
+          requireRevisionIdentity: true, sourceDocument: mappedDocument,
+          extractionMap: sourceMap.lines, timerDescriptors: manifest.timers,
+        });
+      }
+    } catch (error) {
+      fail('source-map-mismatch', 'GFB10 source map does not match signed artifacts', error);
+    }
+  } else try {
     const extraction = extractLiterate(sourceText, { filename: mappedDocument.filename });
     const replay = compileControl(extraction.code, { filename: mappedDocument.filename });
     if (!equalBytes(replay.bytes, artifacts.bytecode)) throw new Error('canonical source does not reproduce package bytecode');

@@ -6,7 +6,10 @@
 
 use std::collections::BTreeSet;
 
-use crate::{Error, Result, Runtime, TickRecord, Value};
+use crate::{
+    context_runtime::Facts, schedule_clock::ClockSnapshot, Error, Result, Runtime, TickRecord,
+    Value,
+};
 
 pub const SCAN_FRAME_V1_MAX_EXACT_INTEGER: u64 = 9_007_199_254_740_991;
 pub const RESERVED_CLOCK_INPUT: &str = "__gf_now_ms";
@@ -156,35 +159,46 @@ impl ScanDriver {
         self.scan_inner(frame, None)
     }
 
-    /// One immutable input/evidence frame, evaluated by the same context transaction
-    /// as the setter API. Neither a failed VM nor rejected evidence consumes its ID.
+    /// Evaluates a complete context frame with explicit clock and context facts.
+    /// Reserved clocks come from the snapshot; protected Results come from the
+    /// core. Failed evaluation commits neither context nor scan sequencing.
     pub fn scan_with_context(
         &mut self,
         frame: ScanFrameV1,
-        clock: crate::schedule_clock::ClockSnapshot<'_>,
-        facts: &crate::context_runtime::Facts,
+        clock: ClockSnapshot<'_>,
+        facts: &Facts,
     ) -> Result<ScanOutcomeV1> {
         if clock.monotonic_ms != frame.logical_time_ms {
-            return Err(Error::new("context clock differs from frame logical time"));
+            return Err(Error::new(
+                "context clock does not match frame logical time",
+            ));
+        }
+        if self.runtime.context_runtime.is_none() {
+            return Err(Error::new(
+                "context scan requires an activated context runtime",
+            ));
         }
         self.scan_inner(frame, Some((clock, facts)))
     }
 
     fn derived_input(&self, name: &str) -> bool {
         name == RESERVED_CLOCK_INPUT
-            || self.runtime.context_runtime.is_some()
-                && ["__gf_config_", "__gf_natural_", "__gf_accounting_"]
-                    .iter()
-                    .any(|prefix| name.starts_with(prefix))
+            || (self.runtime.context_runtime.is_some()
+                && ((name == "__gf_time_epoch"
+                    && self
+                        .runtime
+                        .module
+                        .as_ref()
+                        .is_some_and(|m| m.format_version == 10))
+                    || ["__gf_config_", "__gf_natural_", "__gf_accounting_"]
+                        .iter()
+                        .any(|prefix| name.starts_with(prefix))))
     }
 
     fn scan_inner(
         &mut self,
         frame: ScanFrameV1,
-        context: Option<(
-            crate::schedule_clock::ClockSnapshot<'_>,
-            &crate::context_runtime::Facts,
-        )>,
+        context: Option<(ClockSnapshot<'_>, &Facts)>,
     ) -> Result<ScanOutcomeV1> {
         self.validate_scan_frame(&frame)?;
 
@@ -198,13 +212,25 @@ impl ScanDriver {
                 return Err(error);
             }
         }
+        let derive_epoch = self
+            .runtime
+            .module
+            .as_ref()
+            .is_some_and(|m| m.format_version == 10);
         let result = if let Some((clock, facts)) = context {
-            self.runtime
-                .set_input(
-                    RESERVED_CLOCK_INPUT,
-                    Value::Number(frame.logical_time_ms as f64),
-                )
-                .and_then(|_| self.runtime.tick_with_context(clock, facts))
+            let clock_input = self.runtime.set_input(
+                RESERVED_CLOCK_INPUT,
+                Value::Number(clock.monotonic_ms as f64),
+            );
+            let clock_input = if derive_epoch {
+                clock_input.and_then(|()| {
+                    self.runtime
+                        .set_input("__gf_time_epoch", Value::Number(clock.boot_epoch as f64))
+                })
+            } else {
+                clock_input
+            };
+            clock_input.and_then(|()| self.runtime.tick_with_context(clock, facts))
         } else {
             self.runtime.tick_at(frame.logical_time_ms)
         };

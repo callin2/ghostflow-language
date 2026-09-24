@@ -641,12 +641,16 @@ fn validate_gfb1(bytes: &[u8]) -> Result<u16> {
         return fail(ErrorCode::InvalidBytecodeFormat, "bytecode is not GFB1");
     }
     let version = u16::from_le_bytes([bytes[4], bytes[5]]);
-    if !matches!(version, 1..=4 | 11) {
+    if !matches!(version, 1..=4 | 10 | 11) {
         return fail(
             ErrorCode::UnsupportedBytecodeVersion,
-            "supported GFB format versions are 1, 2, 3, 4 and 11",
+            "supported GFB format versions are 1, 2, 3, 4, 10 and 11",
         );
     }
+    ghostflow_core::Module::load(bytes).map_err(|error| PortablePackageError {
+        code: ErrorCode::BytecodeRejected,
+        message: format!("native artifact validation failed: {error}"),
+    })?;
     Ok(version)
 }
 
@@ -990,6 +994,14 @@ fn verify_window_bindings(manifest: &Value, module: &ghostflow_core::Module) -> 
             )
         };
     };
+    if windows.is_empty()
+        && temporal
+            .strategies
+            .iter()
+            .all(|strategy| strategy.windows.is_empty())
+    {
+        return Ok(());
+    }
     if windows.is_empty() || manifest["format"].as_str() != Some("GhostFlow/control-v4") {
         return fail(
             ErrorCode::ManifestMismatch,
@@ -1614,6 +1626,143 @@ fn verify_debounce_bindings(manifest: &Value, bytecode: &[u8]) -> Result<()> {
     Ok(())
 }
 
+fn verify_gfb10_periodic_bindings(manifest: &Value, bytecode: &[u8]) -> Result<()> {
+    use ghostflow_core::context_vm::ScheduleDefinition;
+    use ghostflow_core::schedule_vm::PulseDescriptor;
+
+    let module = ghostflow_core::Module::load(bytecode).map_err(|error| PortablePackageError {
+        code: ErrorCode::BytecodeRejected,
+        message: format!("native artifact validation failed: {error}"),
+    })?;
+    let mut encoded = HashMap::new();
+    if let Some(requirements) = module.schedule_requirements() {
+        for descriptor in requirements
+            .strategies
+            .iter()
+            .flat_map(|strategy| &strategy.schedules)
+        {
+            let PulseDescriptor::Context(descriptor) = descriptor else {
+                continue;
+            };
+            if !matches!(descriptor.definition, ScheduleDefinition::Periodic { .. }) {
+                continue;
+            }
+            if encoded
+                .insert(descriptor.site, descriptor)
+                .is_some_and(|previous| previous != descriptor)
+            {
+                return fail(
+                    ErrorCode::ManifestMismatch,
+                    "GFB10 Periodic site has inconsistent strategy descriptors",
+                );
+            }
+        }
+    }
+
+    let schedules = manifest["schedules"].as_array().unwrap();
+    let periodic: Vec<_> = schedules
+        .iter()
+        .filter(|schedule| schedule["kind"].as_str() == Some("periodic"))
+        .collect();
+    if periodic.len() != encoded.len() {
+        return fail(
+            ErrorCode::ManifestMismatch,
+            "GFB10 Periodic manifest count differs from bytecode",
+        );
+    }
+    let configs = manifest["configs"].as_array().unwrap();
+    for schedule in periodic {
+        let object = value_object(schedule, "GFB10 Periodic schedule")?;
+        exact_keys(
+            object,
+            &[
+                "kind",
+                "every",
+                "anchor",
+                "intervalChange",
+                "site",
+                "name",
+                "policy",
+            ],
+            "GFB10 Periodic schedule",
+            ErrorCode::ManifestMismatch,
+        )?;
+        let site = schedule["site"]
+            .as_u64()
+            .and_then(|site| u32::try_from(site).ok());
+        let Some(actual) = site.and_then(|site| encoded.remove(&site)) else {
+            return fail(
+                ErrorCode::ManifestMismatch,
+                "GFB10 Periodic site does not match bytecode",
+            );
+        };
+        let ScheduleDefinition::Periodic {
+            epoch_id,
+            anchor_ms,
+            every,
+        } = &actual.definition
+        else {
+            unreachable!("Periodic descriptors were filtered above")
+        };
+        let anchor = value_object(&schedule["anchor"], "GFB10 Periodic anchor")?;
+        let every_value = value_object(&schedule["every"], "GFB10 Periodic every")?;
+        let policy = value_object(&schedule["policy"], "GFB10 Periodic policy")?;
+        let expected_epoch = format!("instant:{anchor_ms}");
+        if schedule.get("name").and_then(Value::as_str) != Some(actual.name.as_str())
+            || schedule.get("intervalChange").and_then(Value::as_str) != Some("preserve_anchor")
+            || policy.get("basis").and_then(Value::as_str) != Some("pulse")
+            || policy.get("clock").and_then(Value::as_str) != Some("trusted_only")
+            || policy.get("recovery").and_then(Value::as_str) != Some("baseline")
+            || policy.get("fallback").and_then(Value::as_str) != Some("skip")
+            || policy.get("gapMs").and_then(Value::as_u64) != Some(actual.gap_ms)
+            || anchor.get("kind").and_then(Value::as_str) != Some("instant")
+            || anchor.get("instantMs").and_then(Value::as_u64) != Some(*anchor_ms)
+            || epoch_id != &expected_epoch
+            || every_value.get("config").and_then(Value::as_str) != Some(every.name.as_str())
+            || every_value.get("initialMs").and_then(Value::as_u64) != Some(every.initial_ms)
+            || every_value.get("expression").and_then(Value::as_str)
+                != Some(every.initial_ms.to_string().as_str())
+        {
+            return fail(
+                ErrorCode::ManifestMismatch,
+                "GFB10 Periodic descriptor does not match bytecode",
+            );
+        }
+        let Some(config) = configs
+            .iter()
+            .find(|config| config["name"].as_str() == Some(every.name.as_str()))
+        else {
+            return fail(
+                ErrorCode::ManifestMismatch,
+                "GFB10 Periodic config is missing",
+            );
+        };
+        let settings = config.get("settings").and_then(Value::as_object);
+        let (min_ms, max_ms, step_ms, operator_editable) =
+            settings.map_or((1, 9_007_199_254_740_991, 1, false), |settings| {
+                (
+                    settings.get("min").and_then(Value::as_u64).unwrap_or(0),
+                    settings.get("max").and_then(Value::as_u64).unwrap_or(0),
+                    settings.get("step").and_then(Value::as_u64).unwrap_or(0),
+                    settings.get("access").and_then(Value::as_str) == Some("operator"),
+                )
+            });
+        if config.get("type").and_then(Value::as_str) != Some("Duration")
+            || config.get("value").and_then(Value::as_u64) != Some(every.initial_ms)
+            || min_ms != every.min_ms
+            || max_ms != every.max_ms
+            || step_ms != every.step_ms
+            || operator_editable != every.operator_editable
+        {
+            return fail(
+                ErrorCode::ManifestMismatch,
+                "GFB10 Periodic config does not match bytecode",
+            );
+        }
+    }
+    Ok(())
+}
+
 fn verify_manifest(
     manifest: &Value,
     descriptor_format: &str,
@@ -2190,11 +2339,11 @@ pub fn verify_portable_package(
     }
     if !matches!(
         payload.bytecode.version.as_str(),
-        "1" | "2" | "3" | "4" | "11"
+        "1" | "2" | "3" | "4" | "10" | "11"
     ) {
         return fail(
             ErrorCode::UnsupportedBytecodeVersion,
-            "payload bytecode version must be 1, 2, 3, 4 or 11",
+            "payload bytecode version must be 1, 2, 3, 4, 10 or 11",
         );
     }
     require_digest(&payload.bytecode.sha256, "payload.bytecode.sha256")?;
@@ -2254,7 +2403,8 @@ pub fn verify_portable_package(
             "source map SHA-256 does not match content",
         );
     }
-    if validate_gfb1(&bytecode)?.to_string() != payload.bytecode.version {
+    let bytecode_version = validate_gfb1(&bytecode)?;
+    if bytecode_version.to_string() != payload.bytecode.version {
         return fail(
             ErrorCode::BytecodeVersionMismatch,
             "payload bytecode version does not match its GFB header",
@@ -2275,6 +2425,12 @@ pub fn verify_portable_package(
     })?;
     let manifest = parse_embedded_canonical_json(&manifest_bytes, "manifest", profile.limits)?;
     let source_map = parse_embedded_canonical_json(&source_map_bytes, "sourceMap", profile.limits)?;
+    if bytecode_version == 10 && manifest["format"].as_str() != Some("GhostFlow/control-v9") {
+        return fail(
+            ErrorCode::ManifestMismatch,
+            "GFB format 10 requires a control-v9 manifest",
+        );
+    }
     verify_manifest(
         &manifest,
         &payload.manifest.format,
@@ -2282,6 +2438,9 @@ pub fn verify_portable_package(
         &identity.required_capabilities,
     )?;
     verify_debounce_bindings(&manifest, &bytecode)?;
+    if bytecode_version == 10 {
+        verify_gfb10_periodic_bindings(&manifest, &bytecode)?;
+    }
     verify_source_map(
         &source_map,
         &payload.source,
@@ -2872,6 +3031,125 @@ mod tests {
                 .code,
             ErrorCode::UnsupportedBytecodeVersion
         );
+    }
+
+    #[test]
+    fn structurally_valid_gfb10_package_reaches_native_loader() {
+        let bytes = fixture_for("gfb10-valid");
+        let context_abis = strings(&["GhostFlow/context-scan-abi-v1"]);
+        let loader =
+            |bytes: &[u8], _: &TargetLoaderContext<'_>| -> std::result::Result<bool, String> {
+                ghostflow_core::Module::load(bytes)
+                    .map(|_| true)
+                    .map_err(|error| error.to_string())
+            };
+        let capabilities = vec![Capability {
+            kind: "actuator".into(),
+            name: "due".into(),
+            value_type: "bool".into(),
+        }];
+        let formats = strings(&["GhostFlow/control-v9"]);
+        let mut current = profile(&loader);
+        current.available_capabilities = &capabilities;
+        current.supported_manifest_formats = &formats;
+        current.supported_runtime_abis = &context_abis;
+        current.expected_compiler_revision = "gfb10-package-test";
+        current.expected_binding_revision = "gfb10-package-test-binding";
+
+        let verified = verify_portable_package(&bytes, &current).unwrap();
+        assert_eq!(&verified.bytecode_copy()[4..6], &[10, 0]);
+
+        let mut runtime = ghostflow_core::Runtime::new(8);
+        runtime.install(
+            ghostflow_core::Module::load(&verified.bytecode_copy()).unwrap(),
+            false,
+        );
+        runtime
+            .add_capability(ghostflow_core::Capability::new(
+                "actuator",
+                "due",
+                ghostflow_core::Type::Bool,
+            ))
+            .unwrap();
+        runtime
+            .activate_with_context(&ghostflow_core::context_runtime::Activation {
+                boot_epoch: 1,
+                terminal_capacity: 8,
+                bindings: vec![],
+            })
+            .unwrap();
+        let outcome = runtime
+            .into_scan_driver()
+            .scan_with_context(
+                ghostflow_core::scan::ScanFrameV1 {
+                    scan_id: 0,
+                    logical_time_ms: 0,
+                    inputs: vec![],
+                },
+                ghostflow_core::schedule_clock::ClockSnapshot {
+                    boot_epoch: 1,
+                    monotonic_ms: 0,
+                    wall_ms: Some(1_790_812_799_999),
+                    uncertainty_ms: Some(0),
+                    trust: ghostflow_core::schedule_clock::ClockTrust::Trusted,
+                    source_revision: Some("gfb10-pinned-test"),
+                },
+                &ghostflow_core::context_runtime::Facts {
+                    schedules: vec![ghostflow_core::context_vm::ScheduleEvidence {
+                        site: 14,
+                        coverage_start_ms: 1_790_812_799_998,
+                        coverage_end_ms: 1_790_812_800_000,
+                        provider: None,
+                        calendar: None,
+                        rows: vec![],
+                    }],
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        assert_eq!(
+            outcome.trace.safe_intents["due"],
+            ghostflow_core::Value::Bool(false)
+        );
+        assert_eq!(
+            outcome.trace.inputs["__gf_time_epoch"],
+            ghostflow_core::Value::Number(1.0)
+        );
+    }
+
+    #[test]
+    fn malformed_gfb10_fails_structural_validation() {
+        let error = validate_gfb1(b"GFB1\x0a\x00").unwrap_err();
+        assert_eq!(error.code, ErrorCode::BytecodeRejected);
+    }
+
+    #[test]
+    fn signed_gfb10_periodic_manifest_substitution_fails_before_loader() {
+        let context_abis = strings(&["GhostFlow/context-scan-abi-v1"]);
+        let loader = |_: &[u8], _: &TargetLoaderContext<'_>| -> std::result::Result<bool, String> {
+            panic!("loader must not run")
+        };
+        let capabilities = vec![Capability {
+            kind: "actuator".into(),
+            name: "due".into(),
+            value_type: "bool".into(),
+        }];
+        let formats = strings(&["GhostFlow/control-v9"]);
+        let mut current = profile(&loader);
+        current.available_capabilities = &capabilities;
+        current.supported_manifest_formats = &formats;
+        current.supported_runtime_abis = &context_abis;
+        current.expected_compiler_revision = "gfb10-package-test";
+        current.expected_binding_revision = "gfb10-package-test-binding";
+
+        for scenario in ["gfb10-periodic-anchor", "gfb10-periodic-policy-missing"] {
+            let bytes = fixture_for(scenario);
+            assert_eq!(
+                verify_portable_package(&bytes, &current).unwrap_err().code,
+                ErrorCode::ManifestMismatch,
+                "{scenario}"
+            );
+        }
     }
 
     #[test]

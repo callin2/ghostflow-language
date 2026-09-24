@@ -48,6 +48,28 @@ const debounceScenario = scenario.startsWith('debounce-');
 const holdScenario = scenario.startsWith('hold-');
 const intSettingsScenario = scenario.startsWith('int-settings-');
 const windowScenario = scenario.startsWith('window-');
+const gfb10Scenario = scenario.startsWith('gfb10-');
+if (gfb10Scenario) {
+  const pinned = JSON.parse(fs.readFileSync(path.join(root, 'tests/fixtures/gfb10-periodic-package-payload.json'), 'utf8'));
+  const candidate = { format: 'GhostFlow/portable-package-v1', payload: pinned.payload };
+  if (scenario !== 'gfb10-valid') {
+    const manifest = JSON.parse(Buffer.from(candidate.payload.manifest.contentBase64, 'base64').toString('utf8'));
+    if (scenario === 'gfb10-periodic-anchor') manifest.schedules[0].anchor.instantMs += 1;
+    else if (scenario === 'gfb10-periodic-policy-missing') delete manifest.schedules[0].policy.clock;
+    else throw new Error(`unknown GFB10 scenario: ${scenario}`);
+    const bytes = encoder.encode(canonicalJson(manifest));
+    candidate.payload.manifest.contentBase64 = Buffer.from(bytes).toString('base64');
+    candidate.payload.manifest.sha256 = Buffer.from(await crypto.subtle.digest('SHA-256', bytes)).toString('hex');
+  }
+  const payloadBytes = encoder.encode(canonicalJson(candidate.payload));
+  candidate.payloadSha256 = Buffer.from(await crypto.subtle.digest('SHA-256', payloadBytes)).toString('hex');
+  candidate.signatures = [{
+    algorithm: 'Ed25519', keyId: 'test-current-2026',
+    signatureBase64: Buffer.from(await crypto.subtle.sign('Ed25519', privateKey, payloadBytes)).toString('base64'),
+  }];
+  process.stdout.write(serializePortablePackage(candidate));
+  process.exit(0);
+}
 const configTimerScenario = scenario === 'config-timer-valid';
 if (intSettingsScenario || timeScenario || quantityScenario || configTimerScenario) identity.runtimeAbi = 'GhostFlow/context-scan-abi-v5';
 if (configTimerScenario) identity.requiredCapabilities = [

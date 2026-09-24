@@ -45,6 +45,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/long-tick-state.test.mjs',
   'tests/duration-runtime.test.mjs',
   'tests/portable-package.test.mjs',
+  'tests/gfb10-package.test.mjs',
   'tests/control-host.test.mjs',
   'tests/control-runtime-atomicity.test.mjs',
   'tests/native-dispatch-status.test.mjs',
@@ -365,6 +366,7 @@ async function verify(nodeOnly, curriculumOnly) {
       await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-core', '--example', 'run', '--release']);
       await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-core', '--example', 'scan_adapter', '--release']);
       await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-core', '--example', 'scan_tape', '--release']);
+      await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-core', '--example', 'context_tape', '--release']);
       await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-core', '--example', 'scenario_scan', '--release']);
       await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-wasm', '--target', 'wasm32-unknown-unknown', '--release']);
       wasmVerified = true;

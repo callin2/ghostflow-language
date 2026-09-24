@@ -55,7 +55,7 @@ impl Type {
         match value {
             1 => Ok(Self::Bool),
             2 => Ok(Self::Number),
-            3 if matches!(format_version, 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 11) => Ok(Self::Int),
+            3 if matches!(format_version, 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11) => Ok(Self::Int),
             _ => Err(Error::new("invalid type")),
         }
     }
@@ -180,7 +180,7 @@ impl Module {
             return Err(Error::new("invalid GFB1 magic"));
         }
         let format_version = reader.u16()?;
-        if !matches!(format_version, 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 11) {
+        if !matches!(format_version, 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11) {
             return Err(Error::new("unsupported GFB format"));
         }
         let name = reader.string()?;
@@ -238,7 +238,7 @@ impl Module {
             });
         }
 
-        let mut temporal = if matches!(format_version, 4 | 5 | 6 | 8 | 9 | 11) {
+        let mut temporal = if matches!(format_version, 4 | 5 | 6 | 8 | 9 | 10 | 11) {
             Some(temporal_vm::TemporalRequirements::load_header(
                 &mut reader,
                 &inputs,
@@ -247,7 +247,7 @@ impl Module {
         } else {
             None
         };
-        let mut schedules = matches!(format_version, 5 | 6 | 8 | 9 | 11).then(|| {
+        let mut schedules = matches!(format_version, 5 | 6 | 8 | 9 | 10 | 11).then(|| {
             schedule_vm::ScheduleRequirements {
                 strategies: Vec::new(),
             }
@@ -272,7 +272,7 @@ impl Module {
             verify_query(&query, format_version)?;
 
             let (windows, schedule_count, true_for_count, mut result_trace_bound) =
-                if matches!(format_version, 5 | 6 | 8 | 9 | 11) {
+                if matches!(format_version, 5 | 6 | 8 | 9 | 10 | 11) {
                     let loaded = schedule_vm::load_prelude(
                         &mut reader,
                         &inputs,
@@ -867,7 +867,7 @@ impl Runtime {
         let m = self.module.as_ref()?;
         Some(&m.strategies[self.active_strategy?].name)
     }
-    /// Activate GFB11 with explicit provider bindings. No host-computed projections.
+    /// Activate a context module with explicit provider bindings. No host-computed projections.
     pub fn activate_with_context(
         &mut self,
         activation: &context_runtime::Activation,
@@ -884,8 +884,8 @@ impl Runtime {
             .module
             .as_ref()
             .ok_or_else(|| Error::new("no module installed"))?;
-        if module.format_version != 11 {
-            return Err(Error::new("context activation requires GFB11"));
+        if !matches!(module.format_version, 10 | 11) {
+            return Err(Error::new("context activation requires GFB10 or GFB11"));
         }
         if module
             .temporal
@@ -929,8 +929,12 @@ impl Runtime {
         clock: schedule_clock::ClockSnapshot<'_>,
         facts: &context_runtime::Facts,
     ) -> Result<&TickRecord> {
-        if !self.module.as_ref().is_some_and(|m| m.format_version == 11) {
-            return Err(Error::new("context facts require GFB11"));
+        if !self
+            .module
+            .as_ref()
+            .is_some_and(|m| matches!(m.format_version, 10 | 11))
+        {
+            return Err(Error::new("context facts require GFB10 or GFB11"));
         }
         self.tick_inner(None, Some((clock, facts)))
     }
@@ -1295,10 +1299,10 @@ impl Runtime {
             .iter()
             .position(|f| f.name == name)
             .ok_or_else(|| Error::new(format!("unknown input {name}")))?;
-        if m.format_version == 11
+        if matches!(m.format_version, 10 | 11)
             && (name.starts_with("__gf_natural_")
                 || name.starts_with("__gf_accounting_")
-                || name.starts_with("__gf_config_"))
+                || (m.format_version == 11 && name.starts_with("__gf_config_")))
         {
             return Err(Error::new(
                 "Rust provider projections are not caller inputs",
@@ -1345,10 +1349,10 @@ impl Runtime {
             .iter()
             .enumerate()
             .map(|(i, v)| {
-                if m.format_version == 11
+                if matches!(m.format_version, 10 | 11)
                     && (m.inputs[i].name.starts_with("__gf_natural_")
                         || m.inputs[i].name.starts_with("__gf_accounting_")
-                        || m.inputs[i].name.starts_with("__gf_config_"))
+                        || (m.format_version == 11 && m.inputs[i].name.starts_with("__gf_config_")))
                 {
                     return Ok(m.inputs[i].default);
                 }
@@ -2243,7 +2247,7 @@ fn verify_expression_with_prelude(
                 type_push(&mut stack, &mut len, Type::Int)?;
             }
             op @ 30..=31 => {
-                if !matches!(format_version, 3 | 4 | 5 | 6 | 7 | 8 | 9 | 11) {
+                if !matches!(format_version, 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11) {
                     return Err(Error::new("branch opcode requires GFB format 3"));
                 }
                 let target = r.jump_target()?;
@@ -2260,13 +2264,13 @@ fn verify_expression_with_prelude(
                 reachable = op == 30;
             }
             32..=47 => {
-                if !matches!(format_version, 3 | 4 | 5 | 6 | 7 | 8 | 9 | 11) {
+                if !matches!(format_version, 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11) {
                     return Err(Error::new("compact Number opcode requires GFB format 3"));
                 }
                 type_push(&mut stack, &mut len, Type::Number)?;
             }
             op @ 48..=53 => {
-                if !matches!(format_version, 3 | 4 | 5 | 6 | 7 | 8 | 9 | 11) {
+                if !matches!(format_version, 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11) {
                     return Err(Error::new("conversion opcode requires GFB format 3"));
                 }
                 let (source, target) = if op == 48 {
@@ -2280,7 +2284,7 @@ fn verify_expression_with_prelude(
                 type_push(&mut stack, &mut len, target)?;
             }
             54 => {
-                if !matches!(format_version, 3 | 4 | 5 | 6 | 7 | 8 | 9 | 11) {
+                if !matches!(format_version, 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11) {
                     return Err(Error::new("Duration guard requires GFB format 3"));
                 }
                 if type_pop(&mut stack, &mut len)? != Type::Number {
@@ -2289,7 +2293,7 @@ fn verify_expression_with_prelude(
                 type_push(&mut stack, &mut len, Type::Number)?;
             }
             55 => {
-                if !matches!(format_version, 3 | 4 | 5 | 6 | 7 | 8 | 9 | 11) {
+                if !matches!(format_version, 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11) {
                     return Err(Error::new("DateTime guard requires GFB format 3"));
                 }
                 if type_pop(&mut stack, &mut len)? != Type::Number {
@@ -2298,7 +2302,7 @@ fn verify_expression_with_prelude(
                 type_push(&mut stack, &mut len, Type::Number)?;
             }
             56 => {
-                if !matches!(format_version, 3 | 4 | 5 | 6 | 7 | 8 | 9 | 11) {
+                if !matches!(format_version, 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11) {
                     return Err(Error::new("Result trace requires GFB format 3"));
                 }
                 if r.u32()? == 0 {
@@ -2313,7 +2317,7 @@ fn verify_expression_with_prelude(
                 type_push(&mut stack, &mut len, payload)?;
             }
             57 => {
-                if !matches!(format_version, 4 | 5 | 6 | 8 | 9 | 11) {
+                if !matches!(format_version, 4 | 5 | 6 | 8 | 9 | 10 | 11) {
                     return Err(Error::new("temporal projection requires GFB format 4"));
                 }
                 let slot = r.u16()?;
@@ -2325,7 +2329,7 @@ fn verify_expression_with_prelude(
                 )?;
             }
             58 => {
-                if !matches!(format_version, 5 | 6 | 8 | 9 | 11) {
+                if !matches!(format_version, 5 | 6 | 8 | 9 | 10 | 11) {
                     return Err(Error::new("schedule projection requires GFB format 5"));
                 }
                 let slot = r.u16()?;

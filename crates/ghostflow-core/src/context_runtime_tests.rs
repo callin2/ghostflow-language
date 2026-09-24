@@ -169,6 +169,125 @@ fn periodic_facts() -> context_runtime::Facts {
     }
 }
 
+fn framed_periodic() -> scan::ScanDriver {
+    let mut runtime = Runtime::new(8);
+    runtime.install(periodic(), false);
+    runtime
+        .activate_with_context(&context_runtime::Activation {
+            boot_epoch: 1,
+            terminal_capacity: 16,
+            bindings: vec![],
+        })
+        .unwrap();
+    runtime.into_scan_driver()
+}
+
+fn context_frame(scan_id: u64, time: u64, rhs: i32) -> scan::ScanFrameV1 {
+    scan::ScanFrameV1 {
+        scan_id,
+        logical_time_ms: time,
+        inputs: vec![
+            scan::ScanInput {
+                name: "__gf_time_epoch".into(),
+                value: Value::Number(1.0),
+            },
+            scan::ScanInput {
+                name: "rhs".into(),
+                value: Value::Int(rhs),
+            },
+        ],
+    }
+}
+
+#[test]
+fn context_scan_latches_host_epoch_and_commits_periodic_intents() {
+    let mut driver = framed_periodic();
+    let first = driver
+        .scan_with_context(context_frame(0, 0, 1), clock(1, 0, 99), &periodic_facts())
+        .unwrap();
+    assert_eq!(first.trace.inputs["__gf_now_ms"], Value::Number(0.0));
+    assert_eq!(first.trace.inputs["__gf_time_epoch"], Value::Number(1.0));
+    assert_eq!(first.trace.safe_intents["allowed"], Value::Bool(false));
+    let due = driver
+        .scan_with_context(context_frame(1, 1, 1), clock(1, 1, 100), &periodic_facts())
+        .unwrap();
+    assert_eq!(due.scan_id, 1);
+    assert_eq!(due.logical_time_ms, 1);
+    assert_eq!(due.trace.safe_intents["allowed"], Value::Bool(true));
+    assert_eq!(driver.next_scan_id(), Some(2));
+    assert_eq!(driver.scan_last_time_ms(), Some(1));
+    assert!(driver
+        .scan_with_context(context_frame(2, 0, 1), clock(1, 0, 101), &periodic_facts())
+        .is_err());
+    assert!(driver
+        .scan_with_context(context_frame(2, 2, 1), clock(2, 2, 101), &periodic_facts())
+        .is_err());
+    assert_eq!(driver.next_scan_id(), Some(2));
+    assert_eq!(driver.scan_last_time_ms(), Some(1));
+}
+
+#[test]
+fn context_scan_rejects_inconsistent_frames_without_mutation() {
+    let mut driver = framed_periodic();
+    let before = driver.runtime().context_checkpoint().unwrap();
+    assert!(driver
+        .scan_with_context(context_frame(0, 0, 1), clock(1, 1, 99), &periodic_facts())
+        .is_err());
+    for name in ["__gf_now_ms", "__gf_time_epoch"] {
+        let mut frame = context_frame(0, 0, 1);
+        frame.inputs[0].name = name.into();
+        frame.inputs[0].value = Value::Number(0.0);
+        assert!(driver
+            .scan_with_context(frame, clock(1, 0, 99), &periodic_facts())
+            .is_err());
+    }
+    assert!(driver
+        .scan_with_context(context_frame(1, 0, 1), clock(1, 0, 99), &periodic_facts())
+        .is_err());
+    for epoch in [scan::SCAN_FRAME_V1_MAX_EXACT_INTEGER + 1, u64::MAX] {
+        assert!(driver
+            .scan_with_context(
+                context_frame(0, 0, 1),
+                clock(epoch, 0, 99),
+                &periodic_facts()
+            )
+            .is_err());
+    }
+    assert!(driver.scan(context_frame(0, 0, 1)).is_err());
+    assert_eq!(driver.runtime().context_checkpoint().unwrap(), before);
+    assert_eq!(driver.next_scan_id(), Some(0));
+    assert_eq!(driver.scan_last_time_ms(), None);
+    assert!(driver.runtime().journal.is_empty());
+}
+
+#[test]
+fn context_scan_failure_keeps_occurrence_and_sequence_available_for_retry() {
+    let mut driver = framed_periodic();
+    driver
+        .scan_with_context(context_frame(0, 0, 1), clock(1, 0, 99), &periodic_facts())
+        .unwrap();
+    let before = driver.runtime().context_checkpoint().unwrap();
+    for (rhs, facts) in [
+        (1, context_runtime::Facts::default()),
+        (0, periodic_facts()),
+    ] {
+        assert!(driver
+            .scan_with_context(context_frame(1, 1, rhs), clock(1, 1, 100), &facts)
+            .is_err());
+        assert_eq!(driver.runtime().context_checkpoint().unwrap(), before);
+        assert_eq!(driver.runtime().state("counter"), Some(Value::Int(10)));
+        assert_eq!(driver.runtime().journal.len(), 1);
+        assert!(driver.runtime().inputs.iter().all(Option::is_none));
+        assert_eq!(driver.next_scan_id(), Some(1));
+        assert_eq!(driver.scan_last_time_ms(), Some(0));
+    }
+    let retry = driver
+        .scan_with_context(context_frame(1, 1, 1), clock(1, 1, 100), &periodic_facts())
+        .unwrap();
+    assert_eq!(retry.trace.safe_intents["allowed"], Value::Bool(true));
+    assert_eq!(driver.next_scan_id(), Some(2));
+}
+
 #[test]
 fn rejected_vm_scan_rolls_back_live_event_then_durable_restore_keeps_accepted_phase() {
     let mut runtime = Runtime::new(8);
@@ -315,6 +434,30 @@ fn natural_results_are_protected_and_wrong_station_rejects_without_consuming_sca
     assert!(missing.context_trace[0]
         .decision
         .contains("PredictionMissing"));
+
+    let mut driver = runtime.into_scan_driver();
+    let mut frame = scan::ScanFrameV1 {
+        scan_id: 0,
+        logical_time_ms: 2,
+        inputs: vec![
+            scan::ScanInput {
+                name: "__gf_natural_7_value".into(),
+                value: Value::Bool(true),
+            },
+            scan::ScanInput {
+                name: "__gf_time_epoch".into(),
+                value: Value::Number(1.0),
+            },
+        ],
+    };
+    assert!(driver
+        .scan_with_context(frame.clone(), clock(1, 2, 52), &Default::default())
+        .is_err());
+    frame.inputs.remove(0);
+    let missing = driver
+        .scan_with_context(frame, clock(1, 2, 52), &Default::default())
+        .unwrap();
+    assert_eq!(missing.trace.safe_intents["allowed"], Value::Bool(false));
 }
 
 #[test]

@@ -53,7 +53,7 @@ TOON is 49 bytes smaller for the diagnostic but uses 2 more tokenizer tokens. Th
 
 ## Pinned inputs
 
-The corpus manifest names every source and toolchain file used by the run. The baseline records their SHA-256 values, the package lock, the Rust core source tree, the native scenario runner, and the retrieved Reference source digest. The aggregate toolchain/retrieval identity is `82196b14903b9caeb017416e5627374a4bc12e28605a2a67f2415a4c2e81d915`; the Reference source digest is `sha256:8d3321241fd3bc7c731ed3ebf9d65f58dfe47427bb81137a41210d804624eea4`.
+The corpus manifest names every source and toolchain file used by the run. The machine-readable baseline retains the reviewed source identity from `c7233b1` under its legacy dated filename; its aggregate identity is `45f4efc0e2a8c7d227d04622ed4dc61ee63430646fd0751dd4e332fd35f5323f`. Repeated runs derive and report the current source identity from the checked-out files, then compare the measured cases, bounds, diagnostics, simulation, and token evidence with this snapshot. Ordinary source changes therefore produce new live provenance without rewriting the historical benchmark. A deliberate new benchmark requires a new dated artifact.
 
 The encoder is pinned to `@toon-format/toon@4.1.1`. The tokenizer is pinned to `tiktoken==0.12.0` / `cl100k_base`. Source documents, revision IDs, and their digests appear in the generated report. Rebuild or rebaseline only after reviewing the changed source, encoder, tokenizer, or runtime evidence.
 
