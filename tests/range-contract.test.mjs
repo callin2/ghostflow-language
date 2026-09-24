@@ -8,14 +8,14 @@ const document = body => `# Planned watering range\n\n\`\`\`ghost\n${body}\n\`\`
 const sha256 = value => createHash('sha256').update(value).digest('hex');
 const diagnostics = error => (error.diagnosticEnvelope?.diagnostics ?? []).map(item => item.message).join('\n');
 
-function dailySlots({ selected = '[08:00, 08:15]', duration = '15min', config = '' } = {}) {
+function dailySlots({ selected = '[08:00, 08:15]', duration = '15min', config = '', timezone = 'UTC', dstMissing = 'skip', dstRepeated = 'first' } = {}) {
   return document(`control PlannedWatering {
   ${config}
   schedule watering: DailySlots<15min> {
-    timezone = "UTC";
+    timezone = "${timezone}";
     selected = ${selected};
-    dst_missing = skip;
-    dst_repeated = first;
+    dst_missing = ${dstMissing};
+    dst_repeated = ${dstRepeated};
     basis = range(${duration});
     when = true;
     cancel_when = false;
@@ -35,6 +35,26 @@ function periodic({ duration }) {
     every = 30min;
     anchor = instant(datetime\`2026-10-01T00:00:00Z\`);
     interval_change = preserve_anchor;
+    basis = range(${duration});
+    when = true;
+    cancel_when = false;
+    clock = trusted_only;
+    gap = skip_after(60s);
+    recovery = baseline;
+    fallback = skip;
+  }
+  output pump: Bool;
+  pump <- watering.active;
+}`);
+}
+
+function daily({ duration = '24h', timezone = 'America/New_York', dstMissing = 'skip', dstRepeated = 'first' } = {}) {
+  return document(`control PlannedDailyWatering {
+  schedule watering: Daily {
+    timezone = "${timezone}";
+    at = time\`08:00\`;
+    dst_missing = ${dstMissing};
+    dst_repeated = ${dstRepeated};
     basis = range(${duration});
     when = true;
     cancel_when = false;
@@ -70,6 +90,18 @@ test('range rejects overlapping static DailySlots intervals at compile time', as
     () => compileSource(dailySlots({ selected: '[23:45, 00:00]', duration: '30min' }), { filename: 'range-midnight-overlap.ghost.md' }),
     error => /range/i.test(diagnostics(error)) && /overlap|non.?overlap/i.test(diagnostics(error)),
   );
+  await assert.rejects(
+    () => compileSource(dailySlots({ selected: '[01:30]', duration: '90min', timezone: 'America/New_York', dstRepeated: 'both' }), { filename: 'range-dst-fold.ghost.md' }),
+    error => /range/i.test(diagnostics(error)) && /non.?overlap.*cannot be proved/i.test(diagnostics(error)),
+  );
+  await assert.rejects(
+    () => compileSource(daily(), { filename: 'range-dst-day.ghost.md' }),
+    error => /range/i.test(diagnostics(error)) && /non.?overlap.*cannot be proved/i.test(diagnostics(error)),
+  );
+  await assert.rejects(
+    () => compileSource(dailySlots({ selected: '[02:30]', duration: '15min', timezone: 'America/New_York', dstMissing: 'next_valid' }), { filename: 'range-dst-gap.ghost.md' }),
+    error => /range/i.test(diagnostics(error)) && /non.?overlap.*cannot be proved/i.test(diagnostics(error)),
+  );
 });
 
 test('range rejects a zero duration, independently of overlap', async () => {
@@ -98,6 +130,12 @@ test('range rejects a fixed-anchor Periodic interval that overlaps the next occu
   await assert.rejects(
     () => compileSource(periodic({ duration: '40min' }), { filename: 'periodic-range-overlap.ghost.md' }),
     error => /range/i.test(diagnostics(error)) && /overlap|non.?overlap/i.test(diagnostics(error)),
+  );
+  const civil = periodic({ duration: '30min' })
+    .replace('anchor = instant(datetime`2026-10-01T00:00:00Z`);', 'anchor = civil(date`2026-10-01`, time`01:30`);\n    timezone = "America/New_York";\n    dst_missing = skip;\n    dst_repeated = both;');
+  await assert.rejects(
+    () => compileSource(civil, { filename: 'periodic-civil-range.ghost.md' }),
+    error => /range/i.test(diagnostics(error)) && /non.?overlap.*cannot be proved/i.test(diagnostics(error)),
   );
 });
 

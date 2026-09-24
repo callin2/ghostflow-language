@@ -2170,6 +2170,9 @@ class Lowerer {
           error(options.basis.loc, `${label} range requires a positive Duration`);
         }
         if (!options.cancel_when) error(item.loc, `${label} range basis requires cancel_when`);
+        if (civil && (trigger.kind === 'periodic' || item.timezone !== 'UTC')) {
+          error(options.basis.loc, `${label} range recurrence non-overlap cannot be proved for this civil timezone or anchor`);
+        }
         let minimumSpacing;
         if (trigger.kind === 'daily-slots') {
           const starts = trigger.slots.map(minutes => minutes * 60_000);
