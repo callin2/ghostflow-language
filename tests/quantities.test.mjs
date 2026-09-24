@@ -1,10 +1,8 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import test from 'node:test';
 import { compileControl, ControlCompileError } from '../tools/control.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
-import { createOperatingSettingsCandidate } from '../tools/operating-settings.mjs';
 import { emitCompletedScanSnapshot } from '../tools/interaction-runtime-snapshot.mjs';
 import { validateInteraction } from '../contracts/interaction-v0/validate.mjs';
 import { compileSource } from './helpers/literate-compile.mjs';
@@ -167,13 +165,13 @@ control QuantityCompiler {
     { name: 'power', type: 'Power', canonicalUnit: 'W' },
   ]);
   assert.deepEqual(compiled.manifest.configs[0], {
-    name: 'desired', type: 'Temperature', canonicalUnit: 'K', displayUnit: '°C', value: 298.15,
+    name: 'desired', type: 'Temperature', canonicalUnit: 'K', displayUnit: '°C', id: compiled.manifest.configs[0].id, value: 298.15,
     settings: { min: 291.15, max: 305.15, step: 0.5, access: 'operator', stepType: 'TemperatureDelta' },
     initialOffset: compiled.manifest.configs[0].initialOffset,
     initialEndOffset: compiled.manifest.configs[0].initialEndOffset,
   });
   assert.deepEqual(compiled.manifest.configs[1], {
-    name: 'pressure_limit', type: 'Pressure', canonicalUnit: 'Pa', value: 100000,
+    name: 'pressure_limit', type: 'Pressure', canonicalUnit: 'Pa', id: compiled.manifest.configs[1].id, value: 100000,
     settings: { min: 50000, max: 150000, step: 1000, access: 'designer' },
     initialOffset: compiled.manifest.configs[1].initialOffset,
     initialEndOffset: compiled.manifest.configs[1].initialEndOffset,
@@ -273,10 +271,11 @@ test('runtime strictly validates quantity canonical units and Temperature settin
     input humidity: RelativeHumidity;
     output target: Temperature;
     config desired: Temperature = 25°C { min = 20°C; max = 30°C; step = 1ΔK; access = operator; }
-    target <- desired;
+    target <- case desired { ok(value) => value; fault(_) => 0K; };
   }`, { filename: 'quantity-manifest.ghost' });
   const wasm = fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
-  const instantiate = manifest => ControlRuntime.instantiateSimulation(wasm, { ...compiled, manifest });
+  const instantiate = manifest => ControlRuntime.instantiate(wasm, { ...compiled, manifest },
+    { context: { bootEpoch: 1, terminalCapacity: 8, bindings: [] } });
   const input = compiled.manifest.inputs[0];
   const config = compiled.manifest.configs[0];
   await assert.rejects(() => instantiate({ ...compiled.manifest, inputs: [{ name: input.name, type: input.type }] }), /canonicalUnit.*required/);
@@ -285,7 +284,7 @@ test('runtime strictly validates quantity canonical units and Temperature settin
   await assert.rejects(() => instantiate({ ...compiled.manifest, configs: [{ ...config, settings: { ...config.settings, stepType: undefined } }] }), /stepType/);
 });
 
-test('quantity operating settings preserve source units and interaction schema nominal identity', async () => {
+test('quantity settings stream preserves canonical units and interaction schema nominal identity', async () => {
   const source = `<!-- ghostflow:anchor id=GF-INT-QUANTITY-SETTING kind=intent status=confirmed origin=user -->
 Set the target temperature.
 
@@ -294,25 +293,35 @@ control QuantitySetting {
   // ghostflow:link id=GF-INT-QUANTITY-SETTING relation=implements
   config target: Temperature = 25°C { min = 20°C; max = 30°C; step = 0.5ΔK; access = operator; }
   output applied: Temperature;
-  applied <- target;
+  output settings_fault: Bool;
+  applied <- case target { ok(value) => value; fault(_) => 0K; };
+  settings_fault <- case target { ok(_) => false; fault(_) => true; };
 }
 \`\`\`
 `;
-  const result = await createOperatingSettingsCandidate({
-    source,
-    filename: 'quantity-setting.ghost.md',
-    expectedSourceSha256: createHash('sha256').update(source).digest('hex'),
-    changes: { target: 300.15 },
-  });
-  assert.match(result.source, /Temperature = 27°C/);
+  const candidate = await compileSource(source, { filename: 'quantity-setting.ghost.md' });
   assert.deepEqual(
-    { value: result.manifest.configs[0].value, unit: result.manifest.configs[0].canonicalUnit, displayUnit: result.manifest.configs[0].displayUnit, stepType: result.manifest.configs[0].settings.stepType },
-    { value: 300.15, unit: 'K', displayUnit: '°C', stepType: 'TemperatureDelta' },
+    { value: candidate.manifest.configs[0].value, unit: candidate.manifest.configs[0].canonicalUnit,
+      displayUnit: candidate.manifest.configs[0].displayUnit, stepType: candidate.manifest.configs[0].settings.stepType },
+    { value: 298.15, unit: 'K', displayUnit: '°C', stepType: 'TemperatureDelta' },
   );
-  const candidate = await compileSource(result.source, { filename: 'quantity-setting.ghost.md' });
   const wasm = fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
-  const runtime = await ControlRuntime.instantiateSimulation(wasm, candidate);
-  try { assert.equal(runtime.step({ nowMs: 0 }).vm.safe.applied, 300.15); }
+  const runtime = await ControlRuntime.instantiate(wasm, candidate,
+    { context: { bootEpoch: 1, terminalCapacity: 8, bindings: [] } });
+  try {
+    const fingerprint = runtime.contextSnapshot().state.programFingerprint;
+    const result = runtime.step({ nowMs: 0, contextFacts: {
+      clock: { monotonicMs: 0, bootEpoch: 1, wallMs: 0, uncertaintyMs: 0, trusted: true,
+        unknownReason: null, sourceRevision: 'quantity-clock-v1' },
+      natural: [], schedules: [], settings: {
+        programFingerprint: fingerprint, eventId: 'quantity-setting-1', baseRevision: 0, position: 1,
+        origin: 'operatorEdit', changes: [{ configId: candidate.manifest.configs[0].id,
+          result: { ok: true, type: 'Temperature', value: 300.15 } }],
+      },
+    } });
+    assert.equal(result.vm.safe.applied, 300.15);
+    assert.equal(result.vm.safe.settings_fault, false);
+  }
   finally { runtime.dispose(); }
 
   const interaction = await compileSource(source, {
@@ -320,11 +329,16 @@ control QuantitySetting {
     interactionSourceIdentity: { documentId: 'source.quantity-setting', revisionId: 'revision.quantity-setting-v1' },
   });
   assert.deepEqual(interaction.interactionSchema.descriptors[0].sourceType, { kind: 'nominal', name: 'Temperature', unit: 'K' });
+  const interactionRuntime = await ControlRuntime.instantiate(wasm, interaction,
+    { context: { bootEpoch: 1, terminalCapacity: 8, bindings: [] } });
+  const settingsState = interactionRuntime.contextSnapshot().state;
+  interactionRuntime.dispose();
   const snapshot = emitCompletedScanSnapshot({
     compilation: interaction,
     runId: 'run.quantity-setting',
     completion: { kind: 'completed-scan', scanId: 0, logicalTimeMs: 0 },
     trace: { module: interaction.traceMetadata.moduleFingerprint, inputs: {}, stateAfter: {} },
+    settingsState,
   });
   assert.deepEqual(snapshot.observations, [{ descriptorId: 'setting.target', status: 'ready', value: 298.15 }]);
   assert.equal(validateInteraction(interaction.interactionSchema, snapshot).valid, true);
@@ -333,27 +347,27 @@ control QuantitySetting {
   assert.equal(validateInteraction(interaction.interactionSchema, invalid).valid, false);
 });
 
-test('Temperature setting unit selection is explicit, switchable, and required', async () => {
-  const source = `# Settings\n\n\`\`\`ghost\ncontrol UnitSetting {\n  config target: Temperature = 298.15K { min = 293.15K; max = 303.15K; step = 0.5ΔK; access = operator; }\n  output applied: Temperature;\n  applied <- target;\n}\n\`\`\`\n`;
-  const changed = await createOperatingSettingsCandidate({
-    source, filename: 'unit-setting.ghost.md', expectedSourceSha256: createHash('sha256').update(source).digest('hex'),
-    changes: { target: { value: 300.15, unit: '°C' } },
-  });
-  assert.match(changed.source, /Temperature = 27°C/);
-  assert.equal(changed.manifest.configs[0].displayUnit, '°C');
-  const switched = await createOperatingSettingsCandidate({
-    source: changed.source, filename: 'unit-setting.ghost.md', expectedSourceSha256: changed.sourceSha256,
-    changes: { target: { value: 301.15, unit: 'K' } },
-  });
-  assert.match(switched.source, /Temperature = 301\.15K/);
-  assert.equal(switched.manifest.configs[0].displayUnit, 'K');
-
+test('Temperature setting display unit and stream type retain nominal identity', async () => {
+  const source = `# Settings\n\n\`\`\`ghost\ncontrol UnitSetting {\n  config target: Temperature = 298.15K { min = 293.15K; max = 303.15K; step = 0.5ΔK; access = operator; }\n  output applied: Temperature;\n  applied <- case target { ok(value) => value; fault(_) => 0K; };\n}\n\`\`\`\n`;
   const compiled = await compileSource(source, { filename: 'unit-setting.ghost.md' });
+  assert.equal(compiled.manifest.configs[0].displayUnit, 'K');
   const wasm = fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
-  const config = { ...compiled.manifest.configs[0] };
-  delete config.displayUnit;
-  await assert.rejects(
-    () => ControlRuntime.instantiateSimulation(wasm, { ...compiled, manifest: { ...compiled.manifest, configs: [config] } }),
-    /displayUnit.*°C or K/,
-  );
+  const runtime = await ControlRuntime.instantiate(wasm, compiled,
+    { context: { bootEpoch: 1, terminalCapacity: 8, bindings: [] } });
+  try {
+    const before = runtime.contextSnapshot();
+    const result = runtime.step({ nowMs: 0, contextFacts: {
+      clock: { monotonicMs: 0, bootEpoch: 1, wallMs: 0, uncertaintyMs: 0, trusted: true,
+        unknownReason: null, sourceRevision: 'unit-setting-clock' },
+      natural: [], schedules: [], settings: {
+        programFingerprint: before.state.programFingerprint, eventId: 'wrong-unit-type', baseRevision: 0,
+        position: 1, origin: 'operatorEdit', changes: [{ configId: compiled.manifest.configs[0].id,
+          result: { ok: true, type: 'Number', value: 300.15 } }],
+      },
+    } });
+    assert.equal(result.vm.safe.applied, 0);
+    const after = runtime.contextSnapshot().state;
+    assert.equal(after.settingsRevision, 1);
+    assert.deepEqual(after.settings[0].result, { ok: false, fault: 'SettingsInvalid' });
+  } finally { runtime.dispose(); }
 });

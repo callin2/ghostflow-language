@@ -251,7 +251,7 @@ function compile(ast) {
     else if(head==='requires') { if(args.length!==2) throw new CompileError('requires expects target prerequisite'); constraints.push({kind:1,names:args}); }
     else if(head==='requires-any') { if(args.length<2||args.length>32) throw new CompileError('requires-any expects target and prerequisites'); constraints.push({kind:3,names:args}); }
     else if(head==='mutex') { if(args.length<2) throw new CompileError('mutex needs at least 2 intents'); constraints.push({kind:2,names:args}); }
-    else if(head==='pid-objective') { if(args.length!==15)throw new CompileError('pid-objective expects 15 arguments');objectives.push(args); }
+    else if(head==='pid-objective') { if(args.length!==15&&args.length!==16)throw new CompileError('pid-objective expects 15 or 16 arguments');objectives.push(args); }
     else throw new CompileError(`unknown module form ${head}`);
   }
   const unique=(xs,label)=>{const s=new Set();for(const x of xs){if(s.has(x.name))throw new CompileError(`duplicate ${label} ${x.name}`);s.add(x.name);}};
@@ -261,8 +261,8 @@ function compile(ast) {
   const env={inputs:new Map(inputs.map((x,i)=>[x.name,{...x,index:i}])),states:new Map(states.map((x,i)=>[x.name,{...x,index:i}]))};
   const rawWindowCount=strategies.reduce((total,{raw})=>total+raw.slice(3).filter(form=>Array.isArray(form)&&form[0]==='window').length,0);
   const contextHeads=['periodic-pulse','cron-pulse','calendar-daily-pulse','tide-run','config-daily-slots-pulse'];
-  const rawScheduleCount=strategies.reduce((total,{raw})=>total+raw.slice(3).filter(form=>Array.isArray(form)&&['solar-pulse','daily-pulse','daily-slots-pulse',...contextHeads].includes(form[0])).length,0);
-  const hasContext=strategies.some(({raw})=>raw.slice(3).some(form=>Array.isArray(form)&&[...contextHeads,'natural-result','accounting-result'].includes(form[0])));
+  const rawScheduleCount=strategies.reduce((total,{raw})=>total+raw.slice(3).filter(form=>Array.isArray(form)&&['solar-pulse','daily-pulse','daily-slots-pulse','config-stream',...contextHeads].includes(form[0])).length,0);
+  const hasContext=strategies.some(({raw})=>raw.slice(3).some(form=>Array.isArray(form)&&['config-stream',...contextHeads,'natural-result','accounting-result'].includes(form[0])));
   const rawNaturalCount=strategies.reduce((total,{raw})=>total+raw.slice(3).filter(form=>Array.isArray(form)&&['natural-result','accounting-result'].includes(form[0])).length,0);
   const hasDaily=strategies.some(({raw})=>raw.slice(3).some(form=>Array.isArray(form)&&form[0]==='daily-pulse'));
   const hasDailySlots=strategies.some(({raw})=>raw.slice(3).some(form=>Array.isArray(form)&&form[0]==='daily-slots-pulse'));
@@ -454,6 +454,39 @@ function compile(ast) {
         const schedule={site,name:scheduleName,timezone,gridMs,dstMissing,dstRepeated,gapMs,slots,when};
         schedules.push(schedule);preludes.push({kind:'daily-slots',value:schedule});
       }
+      else if(h==='config-stream'){
+        if(!temporal||seenExecutable||a.length!==9)throw new CompileError('invalid config stream prelude');
+        const [idAtom,configName,semanticType,kindName,editable,payload,okName,valueName,faultName]=a;
+        const site=Number(unsignedAtom(idAtom,4294967295n,'invalid config id'));
+        if(!site||preludeSites.has(site))throw new CompileError('invalid or duplicate config id');
+        preludeSites.add(site);assertName(configName,'config');
+        if(preludeNames.has(configName))throw new CompileError('duplicate prelude name');preludeNames.add(configName);
+        if(!wellFormedShortString(semanticType)||!['true','false'].includes(editable)||!Array.isArray(payload))throw new CompileError('invalid config descriptor');
+        const kind={Bool:0,Int:1,TimeSlots:3}[kindName]??(kindName===semanticType?2:undefined);
+        if(kind===undefined || kind===0&&semanticType!=='Bool'||kind===1&&semanticType!=='Int')throw new CompileError('invalid config payload type');
+        let detail;
+        if(kind===3){
+          if(payload[0]!=='slots'||payload.length<3||[okName,valueName,faultName].some(name=>name!=='none'))throw new CompileError('invalid TimeSlots config');
+          const grid=unsignedAtom(payload[1],86400000n,'invalid TimeSlots grid');
+          const capacity=Number(unsignedAtom(payload[2],65535n,'invalid TimeSlots capacity'));
+          const slots=payload.slice(3).map(atom=>Number(unsignedAtom(atom,1439n,'invalid TimeSlots minute')));
+          if(!grid||86400000n%grid||!capacity||slots.length>capacity||slots.some((minute,index)=>index>0&&minute<=slots[index-1]||BigInt(minute)*60000n%grid))throw new CompileError('invalid TimeSlots config');
+          detail={grid,capacity,slots,indices:[65535,65535,65535]};
+        }else{
+          if(payload[0]!=='scalar'||payload.length!==3||!['none','bounds'].includes(Array.isArray(payload[2])?payload[2][0]:payload[2]))throw new CompileError('invalid scalar config');
+          const parse=atom=>kind===0?atom==='true'?true:atom==='false'?false:(()=>{throw new CompileError('invalid Bool config');})():kind===1?Number(signedAtom(atom,-2147483648n,2147483647n,'invalid Int config')):finiteAtom(atom,-Infinity,Infinity,'invalid Number config');
+          const initial=parse(payload[1]);const bounds=payload[2]==='none'?null:payload[2];
+          if(bounds&&(kind===0||bounds.length!==4))throw new CompileError('invalid config bounds');
+          const parsedBounds=bounds?bounds.slice(1).map(parse):null;
+          const bindings=[okName,valueName,faultName].map(name=>env.inputs.get(name));
+          if(bindings.some((entry,index)=>!entry||entry.type!==[TYPE.bool,[TYPE.bool,TYPE.int,TYPE.number][kind],TYPE.number][index]))throw new CompileError('invalid config Result projection');
+          if(new Set(bindings.map(entry=>entry.index)).size!==3)throw new CompileError('duplicate config Result projection');
+          for(const entry of bindings)if(certifiedInputs.has(entry.index))throw new CompileError('duplicate protected input');else certifiedInputs.add(entry.index);
+          detail={initial,bounds:parsedBounds,indices:bindings.map(entry=>entry.index)};
+        }
+        const config={site,name:configName,semanticType,kind,editable:editable==='true'?1:0,detail};
+        schedules.push(config);preludes.push({kind:'config-stream',value:config});
+      }
       else if(contextHeads.includes(h)){
         if(!temporal||seenExecutable)throw new CompileError('context schedule requires temporal prelude before execution');
         const [siteAtom,scheduleName,gapAtom,...payload]=a;
@@ -463,8 +496,8 @@ function compile(ast) {
         if(preludeNames.has(scheduleName))throw new CompileError('duplicate prelude name');preludeNames.add(scheduleName);
         const gapMs=unsignedAtom(gapAtom,9007199254740991n,'invalid schedule gap');
         if(!gapMs)throw new CompileError('invalid schedule gap');
-        const expected={ 'periodic-pulse':10,'cron-pulse':10,'calendar-daily-pulse':8,'tide-run':8,'config-daily-slots-pulse':10 }[h];
-        if(payload.length!==expected)throw new CompileError(`${h} has invalid arity`);
+        const expected={ 'cron-pulse':10,'calendar-daily-pulse':8,'tide-run':8,'config-daily-slots-pulse':6 }[h];
+        if(h==='periodic-pulse'?![5,6].includes(payload.length):payload.length!==expected)throw new CompileError(`${h} has invalid arity`);
         const [whenForm,cancelForm]=payload.slice(-2);
         const when=compileExpr(whenForm,contextEnv(),false),cancel=compileExpr(cancelForm,contextEnv(),false);
         if(when.type!==TYPE.bool||cancel.type!==TYPE.bool||when.bytes.length>4096||cancel.bytes.length>4096)throw new CompileError('invalid context schedule predicate');
@@ -474,14 +507,12 @@ function compile(ast) {
         const repeated=value=>{const index=['first','second','both','skip'].indexOf(value);if(index<0)throw new CompileError('invalid DST repeated policy');return index;};
         let detail;
         if(h==='periodic-pulse'){
-          const [epoch,anchor,setting,editable,initial,min,max,step]=data;
-          if(!['true','false'].includes(editable))throw new CompileError('invalid Periodic setting access');
-          detail={epoch:text(epoch),anchor:unsignedAtom(anchor,253402300799999n,'invalid Periodic anchor'),setting:text(setting),editable:editable==='true'?1:0,
-            initial:unsignedAtom(initial,9007199254740991n,'invalid Periodic interval'),
-            min:unsignedAtom(min,9007199254740991n,'invalid Periodic bound'),
-            max:unsignedAtom(max,9007199254740991n,'invalid Periodic bound'),
-            step:unsignedAtom(step,9007199254740991n,'invalid Periodic step')};
-          if(!detail.initial||!detail.min||detail.min>detail.max||!detail.step||detail.initial<detail.min||detail.initial>detail.max)throw new CompileError('invalid Periodic setting');
+          const [epoch,anchor,configIdAtom,literalAtom]=data;
+          const configId=Number(unsignedAtom(configIdAtom,4294967295n,'invalid Periodic config id'));
+          if(configId===0&&literalAtom===undefined||configId!==0&&literalAtom!==undefined)throw new CompileError('invalid Periodic interval source');
+          detail={epoch:text(epoch),anchor:unsignedAtom(anchor,253402300799999n,'invalid Periodic anchor'),configId,
+            literal:literalAtom===undefined?null:unsignedAtom(literalAtom,9007199254740991n,'invalid Periodic interval')};
+          if(detail.literal===0n)throw new CompileError('invalid Periodic interval');
         }else if(h==='cron-pulse'){
           const [timezone,missing,fold,...fields]=data;
           detail={timezone:text(timezone),missing:dst(missing),repeated:repeated(fold),fields:fields.map((field,index)=>{
@@ -505,14 +536,10 @@ function compile(ast) {
             within:unsignedAtom(within,9007199254740991n,'invalid Tide within')};
           if(!detail.run||!detail.within)throw new CompileError('invalid Tide duration');
         }else{
-          const [timezone,setting,editable,grid,capacity,slots,missing,fold]=data;
-          if(!['true','false'].includes(editable))throw new CompileError('invalid TimeSlots setting access');
-          if(!Array.isArray(slots)||slots[0]!=='slots')throw new CompileError('invalid TimeSlots initial value');
-          detail={timezone:text(timezone),setting:text(setting),editable:editable==='true'?1:0,grid:unsignedAtom(grid,86400000n,'invalid TimeSlots grid'),
-            capacity:Number(unsignedAtom(capacity,65535n,'invalid TimeSlots capacity')),
-            slots:slots.slice(1).map(atom=>Number(unsignedAtom(atom,1439n,'invalid TimeSlots minute'))),
+          const [timezone,configIdAtom,missing,fold]=data;
+          detail={timezone:text(timezone),configId:Number(unsignedAtom(configIdAtom,4294967295n,'invalid TimeSlots config id')),
             missing:dst(missing),repeated:repeated(fold)};
-          if(!detail.grid||86400000n%detail.grid||!detail.capacity||detail.slots.length>detail.capacity||detail.slots.some((minute,index)=>index>0&&minute<=detail.slots[index-1]||BigInt(minute)*60000n%detail.grid))throw new CompileError('invalid TimeSlots initial value');
+          if(!detail.configId)throw new CompileError('invalid TimeSlots config id');
         }
         const schedule={site,name:scheduleName,gapMs,when,cancel,detail};
         schedules.push(schedule);preludes.push({kind:h,value:schedule});
@@ -559,23 +586,27 @@ function compile(ast) {
   const intDeclarations=inputs.some(x=>x.type===TYPE.int)||states.some(x=>x.type===TYPE.int)||compiledStrategies.some(s=>s.intents.some(i=>i.type===TYPE.int));
   const intExpressions=compiledStrategies.some(s=>s.transitions.some(t=>t.usesInt)||s.intents.some(i=>i.usesInt));
   const format3=compiledStrategies.some(s=>s.transitions.some(t=>t.usesFormat3)||s.intents.some(i=>i.usesFormat3));
-  if(objectives.length&&(objectives.length!==1||compiledStrategies.length!==1||temporal||hasSchedules||hasTrueFors))throw new CompileError('GFB7 requires exactly one strategy and one non-temporal PID objective');
+  if(objectives.length&&(objectives.length!==1||compiledStrategies.length!==1||temporal&&!hasContext||hasSchedules&&!hasContext||hasTrueFors))throw new CompileError('PID requires exactly one strategy and no legacy temporal prelude');
   if(objectives.length&&(compiledStrategies[0].transitions.length||compiledStrategies[0].intents.length))throw new CompileError('GFB7 PID objective cannot mix authored transitions or intents');
   const compiledObjectives=objectives.map(args=>{
-    const [objectiveName,outputPort,measureName,measureOkName,targetName,safeMaxName,periodAtom,lateAtom,directionAtom,...numberAtoms]=args;
+    const [objectiveName,outputPort,measureName,measureOkName,targetName,safeMaxName,...tail]=args;
+    const [targetOkName,periodAtom,lateAtom,directionAtom,...numberAtoms]=hasContext?tail:[null,...tail];
+    if(hasContext&&args.length!==16||!hasContext&&args.length!==15)throw new CompileError('PID objective form does not match context format');
     assertName(objectiveName,'PID objective');assertName(outputPort,'PID output port');
     const bindings=[measureName,measureOkName,targetName,safeMaxName].map(name=>env.inputs.get(name));
     if(!bindings[0]||bindings[0].type!==TYPE.number||!bindings[1]||bindings[1].type!==TYPE.bool||!bindings[2]||bindings[2].type!==TYPE.number||!bindings[3]||bindings[3].type!==TYPE.number)throw new CompileError('invalid PID input binding');
+    const targetOk=hasContext?env.inputs.get(targetOkName):null;
+    if(hasContext&&(!targetOk||targetOk.type!==TYPE.bool))throw new CompileError('invalid PID target Result binding');
     const now=env.inputs.get('__gf_now_ms');if(!now||now.type!==TYPE.number)throw new CompileError('GFB7 PID requires __gf_now_ms Number input');
     const period=unsignedAtom(periodAtom,9007199254740991n,'invalid PID period'),late=unsignedAtom(lateAtom,9007199254740991n,'invalid PID late_after');
     if(period===0n||late<period)throw new CompileError('invalid PID timing');
     const direction=directionAtom==='direct'?0:directionAtom==='reverse'?1:undefined;if(direction===undefined)throw new CompileError('invalid PID direction');
     const numbers=numberAtoms.map((atom,index)=>finiteAtom(atom,index<3?0:-Infinity,Infinity,'invalid PID numeric field'));
-    return {name:objectiveName,outputPort,indices:bindings.map(binding=>binding.index),period,late,direction,numbers};
+    return {name:objectiveName,outputPort,indices:bindings.map(binding=>binding.index),targetOkIndex:targetOk?.index,period,late,direction,numbers};
   });
   if((hasDaily||hasDailySlots)&&(rawWindowCount||rawTrueForCount))throw new CompileError('mixed civil schedule temporal preludes are not executable');
   if(hasDailySlots&&(hasDaily||hasSolar))throw new CompileError('mixed DailySlots schedule kinds are not executable');
-  const format=hasContext?10:hasDailySlots?9:hasDaily?8:objectives.length?7:hasTrueFors?6:hasSchedules?5:temporal?4:format3?3:intDeclarations||intExpressions?2:1;
+  const format=hasContext?11:hasDailySlots?9:hasDaily?8:objectives.length?7:hasTrueFors?6:hasSchedules?5:temporal?4:format3?3:intDeclarations||intExpressions?2:1;
   const w=new Writer();w.bytes(UTF8.encode('GFB1'));w.u16(format);w.str(name);w.u32(version);
   w.u16(inputs.length);for(const x of inputs){w.str(x.name);w.u8(x.type);}
   w.u16(states.length);for(const x of states){w.str(x.name);w.u8(x.type);if(x.type===TYPE.bool)w.u8(x.value?1:0);else if(x.type===TYPE.int)w.i32(x.value);else w.f64(x.value);}
@@ -585,21 +616,26 @@ function compile(ast) {
   const writeDaily=schedule=>{w.u32(schedule.site);w.str(schedule.name);w.str(schedule.timezone);w.u64(schedule.atMs);w.u8(schedule.dstMissing);w.u8(schedule.dstRepeated);w.u8(0);w.u8(0);w.u8(0);w.u8(0);w.u64(schedule.gapMs);w.u32(schedule.when.bytes.length);w.bytes(schedule.when.bytes);};
   const writeDailySlots=schedule=>{w.u32(schedule.site);w.str(schedule.name);w.str(schedule.timezone);w.u64(schedule.gridMs);w.u8(schedule.dstMissing);w.u8(schedule.dstRepeated);w.u8(0);w.u8(0);w.u8(0);w.u8(0);w.u64(schedule.gapMs);w.u16(schedule.slots.length);for(const slot of schedule.slots){w.u16(slot.key);w.u16(slot.minute);}w.u32(schedule.when.bytes.length);w.bytes(schedule.when.bytes);};
   const writeTrueFor=signal=>{w.u32(signal.site);w.str(signal.name);w.u32(signal.sourceTag);w.str(signal.sourceName);w.u64(signal.durationMs);for(const index of signal.indices)w.u16(index);};
-  const writeContext=prelude=>{const x=prelude.value,d=x.detail;w.u32(x.site);w.str(x.name);if(prelude.kind==='natural-result'){
+  const writeContext=prelude=>{const x=prelude.value,d=x.detail;w.u32(x.site);w.str(x.name);if(prelude.kind==='config-stream'){
+    w.str(x.semanticType);w.u8(x.kind);w.u8(x.editable);
+    if(x.kind===3){w.u64(d.grid);w.u16(d.capacity);w.u16(d.slots.length);for(const minute of d.slots)w.u16(minute);}
+    else{const put=value=>x.kind===0?w.u8(value?1:0):x.kind===1?w.i32(value):w.f64(value);put(d.initial);w.u8(d.bounds?1:0);if(d.bounds)for(const value of d.bounds)put(value);}
+    for(const index of d.indices)w.u16(index);return;
+  }if(prelude.kind==='natural-result'){
     w.u8(x.kind);w.str(x.provider);w.str(x.classification);for(const index of x.indices)w.u16(index);return;
   }if(prelude.kind==='accounting-result'){
     w.str(x.account);w.str(x.event);w.str(x.timezone);for(const index of x.indices)w.u16(index);return;
   }w.u64(x.gapMs);
-    if(prelude.kind==='periodic-pulse'){w.str(d.epoch);w.u64(d.anchor);w.str(d.setting);w.u8(d.editable);for(const key of ['initial','min','max','step'])w.u64(d[key]);}
+    if(prelude.kind==='periodic-pulse'){w.str(d.epoch);w.u64(d.anchor);w.u32(d.configId);if(d.configId===0)w.u64(d.literal);}
     else if(prelude.kind==='cron-pulse'){w.str(d.timezone);w.u8(d.missing);w.u8(d.repeated);for(const field of d.fields){w.u8(field.length);for(const value of field)w.u8(value);}}
     else if(prelude.kind==='calendar-daily-pulse'){w.str(d.timezone);w.u64(d.at);w.str(d.calendar);w.u8(d.offday);w.u8(d.missing);w.u8(d.repeated);}
     else if(prelude.kind==='tide-run'){w.str(d.timezone);w.str(d.provider);w.u8(d.high);w.i64(d.offset);w.u64(d.run);w.u64(d.within);}
-    else {w.str(d.timezone);w.str(d.setting);w.u8(d.editable);w.u64(d.grid);w.u16(d.capacity);w.u16(d.slots.length);for(const minute of d.slots)w.u16(minute);w.u8(d.missing);w.u8(d.repeated);}
+    else {w.str(d.timezone);w.u32(d.configId);w.u8(d.missing);w.u8(d.repeated);}
     for(const expression of [x.when,x.cancel]){w.u32(expression.bytes.length);w.bytes(expression.bytes);}
   };
-  w.u16(compiledStrategies.length);for(const s of compiledStrategies){w.str(s.name);w.i32(s.priority);w.u32(s.query.length);w.bytes(s.query);if(temporal){if(taggedPreludes){w.u16(s.preludes.length);for(const prelude of s.preludes){const tag={'window':0,'schedule':1,'true-for':2,'daily':3,'daily-slots':4,'periodic-pulse':5,'cron-pulse':6,'calendar-daily-pulse':7,'tide-run':8,'config-daily-slots-pulse':9,'natural-result':10,'accounting-result':11}[prelude.kind];w.u8(tag);if(tag>=5)writeContext(prelude);else if(prelude.kind==='window')writeWindow(prelude.value);else if(prelude.kind==='schedule')writeSchedule(prelude.value);else if(prelude.kind==='daily')writeDaily(prelude.value);else if(prelude.kind==='daily-slots')writeDailySlots(prelude.value);else writeTrueFor(prelude.value);}}else{w.u16(s.windows.length);for(const window of s.windows)writeWindow(window);}}w.u16(s.transitions.length);for(const t of s.transitions){w.u16(t.index);w.u32(t.expr.length);w.bytes(t.expr);}w.u16(s.intents.length);for(const i of s.intents){w.str(i.name);w.u8(i.type);w.u32(i.expr.length);w.bytes(i.expr);}}
+  w.u16(compiledStrategies.length);for(const s of compiledStrategies){w.str(s.name);w.i32(s.priority);w.u32(s.query.length);w.bytes(s.query);if(temporal){if(taggedPreludes){w.u16(s.preludes.length);for(const prelude of s.preludes){const tag={'window':0,'schedule':1,'true-for':2,'daily':3,'daily-slots':4,'periodic-pulse':5,'cron-pulse':6,'calendar-daily-pulse':7,'tide-run':8,'config-daily-slots-pulse':9,'natural-result':10,'accounting-result':11,'config-stream':12}[prelude.kind];w.u8(tag);if(tag>=5)writeContext(prelude);else if(prelude.kind==='window')writeWindow(prelude.value);else if(prelude.kind==='schedule')writeSchedule(prelude.value);else if(prelude.kind==='daily')writeDaily(prelude.value);else if(prelude.kind==='daily-slots')writeDailySlots(prelude.value);else writeTrueFor(prelude.value);}}else{w.u16(s.windows.length);for(const window of s.windows)writeWindow(window);}}w.u16(s.transitions.length);for(const t of s.transitions){w.u16(t.index);w.u32(t.expr.length);w.bytes(t.expr);}w.u16(s.intents.length);for(const i of s.intents){w.str(i.name);w.u8(i.type);w.u32(i.expr.length);w.bytes(i.expr);}}
   w.u16(constraints.length);for(const c of constraints){w.u8(c.kind);w.u16(c.names.length);for(const n of c.names)w.str(n);}
-  if(format===7){w.u16(compiledObjectives.length);for(const objective of compiledObjectives){w.str(objective.name);w.str(objective.outputPort);for(const index of objective.indices)w.u16(index);w.u64(objective.period);w.u64(objective.late);w.u8(objective.direction);for(const value of objective.numbers)w.f64(value);}}
+  if(format===7||format===11){w.u16(compiledObjectives.length);for(const objective of compiledObjectives){w.str(objective.name);w.str(objective.outputPort);for(const index of objective.indices)w.u16(index);if(format===11)w.u16(objective.targetOkIndex);w.u64(objective.period);w.u64(objective.late);w.u8(objective.direction);for(const value of objective.numbers)w.f64(value);}}
   return w.finish();
 }
 

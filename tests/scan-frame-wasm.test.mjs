@@ -464,6 +464,9 @@ test('GF-TEST-scan-frame-wasm: wrapper rejects non-buffer and oversized module i
     'gf_frame_outcome_ptr', 'gf_frame_outcome_len', 'gf_frame_error_ptr', 'gf_frame_error_len',
     'gf_frame_replay_temporal', 'gf_frame_replay_ptr', 'gf_frame_replay_len',
     'gf_frame_plan_temporal', 'gf_frame_plan_temporal_replay', 'gf_frame_resource_plan_ptr', 'gf_frame_resource_plan_len',
+    'gf_frame_activate_context', 'gf_frame_scan_context', 'gf_frame_context_checkpoint',
+    'gf_frame_context_checkpoint_ptr', 'gf_frame_context_checkpoint_len',
+    'gf_frame_context_state_ptr', 'gf_frame_context_state_len', 'gf_frame_restore_context_checkpoint',
   ].map(name => [name, () => 1]));
   const runtime = new FramedGhostFlowRuntime({ memory, gf_alloc: () => { allocations += 1; return 1; }, gf_frame_create: () => 1, gf_frame_scan: () => { scans += 1; return 1; }, ...functions });
   t.after(() => runtime.dispose());

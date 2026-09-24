@@ -641,10 +641,10 @@ fn validate_gfb1(bytes: &[u8]) -> Result<u16> {
         return fail(ErrorCode::InvalidBytecodeFormat, "bytecode is not GFB1");
     }
     let version = u16::from_le_bytes([bytes[4], bytes[5]]);
-    if !matches!(version, 1..=4 | 10) {
+    if !matches!(version, 1..=4 | 10 | 11) {
         return fail(
             ErrorCode::UnsupportedBytecodeVersion,
-            "supported GFB format versions are 1, 2, 3, 4 and 10",
+            "supported GFB format versions are 1, 2, 3, 4, 10 and 11",
         );
     }
     ghostflow_core::Module::load(bytes).map_err(|error| PortablePackageError {
@@ -1429,13 +1429,101 @@ fn verify_debounce_descriptors(
     Ok(())
 }
 
+fn verify_config_bindings(manifest: &Value, module: &ghostflow_core::Module) -> Result<()> {
+    use ghostflow_core::{
+        schedule_vm::PulseDescriptor, settings_stream::ConfigValue, Value as MachineValue,
+    };
+    let mismatch = |message: &str| PortablePackageError {
+        code: ErrorCode::ManifestMismatch,
+        message: message.into(),
+    };
+    let temporal = module
+        .temporal_requirements()
+        .ok_or_else(|| mismatch("config streams require context clock bindings"))?;
+    let schedules = module
+        .schedule_requirements()
+        .ok_or_else(|| mismatch("config streams require context descriptors"))?;
+    if module.objective_requirements().is_some()
+        || temporal.strategies.iter().any(|s| !s.windows.is_empty())
+        || module
+            .true_for_requirements()
+            .is_some_and(|r| r.strategies.iter().any(|s| !s.signals.is_empty()))
+        || !manifest["schedules"].as_array().unwrap().is_empty()
+        || !manifest["signals"].as_array().unwrap().is_empty()
+    {
+        return Err(mismatch(
+            "portable GFB11 profile supports config streams without schedule/objective preludes",
+        ));
+    }
+    let configs = manifest["configs"].as_array().unwrap();
+    if configs.is_empty() {
+        return Err(mismatch("portable GFB11 profile requires config streams"));
+    }
+    let scalar_matches = |actual: MachineValue, expected: &Value| match actual {
+        MachineValue::Bool(value) => expected.as_bool() == Some(value),
+        MachineValue::Int(value) => expected.as_i64() == Some(i64::from(value)),
+        MachineValue::Number(value) => expected.as_f64() == Some(value),
+    };
+    for strategy in &schedules.strategies {
+        if strategy.schedules.len() != configs.len() {
+            return Err(mismatch("manifest config count differs from bytecode"));
+        }
+        let mut ids = HashSet::new();
+        for descriptor in &strategy.schedules {
+            let PulseDescriptor::Config(config) = descriptor else {
+                return Err(mismatch(
+                    "portable context profile requires config-only preludes",
+                ));
+            };
+            if config.kind == 3 {
+                return Err(mismatch("portable config profile requires scalar payloads"));
+            }
+            let expected = configs
+                .iter()
+                .find(|entry| entry["id"].as_u64() == Some(u64::from(config.id)))
+                .ok_or_else(|| mismatch("manifest config identity differs from bytecode"))?;
+            if !ids.insert(config.id)
+                || expected["name"].as_str() != Some(config.name.as_str())
+                || expected["type"].as_str() != Some(config.semantic_type.as_str())
+                || (expected["settings"]["access"].as_str() == Some("operator"))
+                    != config.operator_editable
+                || expected["settings"].get("apply").is_some()
+            {
+                return Err(mismatch("manifest config descriptor differs from bytecode"));
+            }
+            let ConfigValue::Scalar(initial) = config.initial else {
+                return Err(mismatch("portable config profile requires scalar payloads"));
+            };
+            let initial_matches = scalar_matches(initial, &expected["value"]);
+            let bounds_match = match config.bounds {
+                Some((min, max, step)) => [("min", min), ("max", max), ("step", step)]
+                    .iter()
+                    .all(|(name, value)| scalar_matches(*value, &expected["settings"][*name])),
+                None => ["min", "max", "step"]
+                    .iter()
+                    .all(|name| expected["settings"].get(*name).is_none()),
+            };
+            if !initial_matches || !bounds_match {
+                return Err(mismatch(
+                    "manifest config initial value or bounds differ from bytecode",
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
 fn verify_debounce_bindings(manifest: &Value, bytecode: &[u8]) -> Result<()> {
     use ghostflow_core::{Module, Type, Value as MachineValue};
     let module = Module::load(bytecode).map_err(|error| PortablePackageError {
         code: ErrorCode::BytecodeRejected,
         message: format!("native artifact validation failed: {error}"),
     })?;
-    verify_window_bindings(manifest, &module)?;
+    if u16::from_le_bytes([bytecode[4], bytecode[5]]) == 11 {
+        verify_config_bindings(manifest, &module)?;
+    } else {
+        verify_window_bindings(manifest, &module)?;
+    }
     let inputs: HashMap<_, _> = module.input_fields().collect();
     let states: HashMap<_, _> = module
         .state_fields()
@@ -2251,11 +2339,11 @@ pub fn verify_portable_package(
     }
     if !matches!(
         payload.bytecode.version.as_str(),
-        "1" | "2" | "3" | "4" | "10"
+        "1" | "2" | "3" | "4" | "10" | "11"
     ) {
         return fail(
             ErrorCode::UnsupportedBytecodeVersion,
-            "payload bytecode version must be 1, 2, 3, 4 or 10",
+            "payload bytecode version must be 1, 2, 3, 4, 10 or 11",
         );
     }
     require_digest(&payload.bytecode.sha256, "payload.bytecode.sha256")?;
@@ -2320,6 +2408,15 @@ pub fn verify_portable_package(
         return fail(
             ErrorCode::BytecodeVersionMismatch,
             "payload bytecode version does not match its GFB header",
+        );
+    }
+    if (payload.bytecode.version == "11") != (payload.manifest.format == "GhostFlow/control-v10")
+        || (payload.bytecode.version == "11")
+            != (identity.runtime_abi == "GhostFlow/context-scan-abi-v5")
+    {
+        return fail(
+            ErrorCode::ManifestMismatch,
+            "GFB11 requires control-v10 and context-scan-abi-v5",
         );
     }
     let source_text = String::from_utf8(source_bytes).map_err(|_| PortablePackageError {
@@ -2575,8 +2672,14 @@ mod tests {
         }]));
         let revoked = Box::leak(Box::new(Vec::new()));
         let semantics = Box::leak(Box::new(strings(&["GhostFlow/runtime-semantics-v1"])));
-        let abis = Box::leak(Box::new(strings(&["GhostFlow/framed-scan-abi-v1"])));
-        let manifests = Box::leak(Box::new(strings(&["GhostFlow/control-v1"])));
+        let abis = Box::leak(Box::new(strings(&[
+            "GhostFlow/framed-scan-abi-v1",
+            "GhostFlow/context-scan-abi-v5",
+        ])));
+        let manifests = Box::leak(Box::new(strings(&[
+            "GhostFlow/control-v1",
+            "GhostFlow/control-v10",
+        ])));
         let capabilities = Box::leak(Box::new(capabilities()));
         VerificationProfile {
             trusted_keys: keys,
@@ -2933,6 +3036,7 @@ mod tests {
     #[test]
     fn structurally_valid_gfb10_package_reaches_native_loader() {
         let bytes = fixture_for("gfb10-valid");
+        let context_abis = strings(&["GhostFlow/context-scan-abi-v1"]);
         let loader =
             |bytes: &[u8], _: &TargetLoaderContext<'_>| -> std::result::Result<bool, String> {
                 ghostflow_core::Module::load(bytes)
@@ -2948,9 +3052,69 @@ mod tests {
         let mut current = profile(&loader);
         current.available_capabilities = &capabilities;
         current.supported_manifest_formats = &formats;
+        current.supported_runtime_abis = &context_abis;
+        current.expected_compiler_revision = "gfb10-package-test";
+        current.expected_binding_revision = "gfb10-package-test-binding";
 
         let verified = verify_portable_package(&bytes, &current).unwrap();
         assert_eq!(&verified.bytecode_copy()[4..6], &[10, 0]);
+
+        let mut runtime = ghostflow_core::Runtime::new(8);
+        runtime.install(
+            ghostflow_core::Module::load(&verified.bytecode_copy()).unwrap(),
+            false,
+        );
+        runtime
+            .add_capability(ghostflow_core::Capability::new(
+                "actuator",
+                "due",
+                ghostflow_core::Type::Bool,
+            ))
+            .unwrap();
+        runtime
+            .activate_with_context(&ghostflow_core::context_runtime::Activation {
+                boot_epoch: 1,
+                terminal_capacity: 8,
+                bindings: vec![],
+            })
+            .unwrap();
+        let outcome = runtime
+            .into_scan_driver()
+            .scan_with_context(
+                ghostflow_core::scan::ScanFrameV1 {
+                    scan_id: 0,
+                    logical_time_ms: 0,
+                    inputs: vec![],
+                },
+                ghostflow_core::schedule_clock::ClockSnapshot {
+                    boot_epoch: 1,
+                    monotonic_ms: 0,
+                    wall_ms: Some(1_790_812_799_999),
+                    uncertainty_ms: Some(0),
+                    trust: ghostflow_core::schedule_clock::ClockTrust::Trusted,
+                    source_revision: Some("gfb10-pinned-test"),
+                },
+                &ghostflow_core::context_runtime::Facts {
+                    schedules: vec![ghostflow_core::context_vm::ScheduleEvidence {
+                        site: 14,
+                        coverage_start_ms: 1_790_812_799_998,
+                        coverage_end_ms: 1_790_812_800_000,
+                        provider: None,
+                        calendar: None,
+                        rows: vec![],
+                    }],
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        assert_eq!(
+            outcome.trace.safe_intents["due"],
+            ghostflow_core::Value::Bool(false)
+        );
+        assert_eq!(
+            outcome.trace.inputs["__gf_time_epoch"],
+            ghostflow_core::Value::Number(1.0)
+        );
     }
 
     #[test]
@@ -2961,6 +3125,7 @@ mod tests {
 
     #[test]
     fn signed_gfb10_periodic_manifest_substitution_fails_before_loader() {
+        let context_abis = strings(&["GhostFlow/context-scan-abi-v1"]);
         let loader = |_: &[u8], _: &TargetLoaderContext<'_>| -> std::result::Result<bool, String> {
             panic!("loader must not run")
         };
@@ -2973,6 +3138,9 @@ mod tests {
         let mut current = profile(&loader);
         current.available_capabilities = &capabilities;
         current.supported_manifest_formats = &formats;
+        current.supported_runtime_abis = &context_abis;
+        current.expected_compiler_revision = "gfb10-package-test";
+        current.expected_binding_revision = "gfb10-package-test-binding";
 
         for scenario in ["gfb10-periodic-anchor", "gfb10-periodic-policy-missing"] {
             let bytes = fixture_for(scenario);
@@ -3232,7 +3400,7 @@ mod tests {
         };
         let mut current = profile(&accept);
         current.available_capabilities = &capabilities;
-        let formats = strings(&["GhostFlow/control-v4"]);
+        let formats = strings(&["GhostFlow/control-v10"]);
         current.supported_manifest_formats = &formats;
         verify_portable_package(&fixture_for("int-settings-valid"), &current).unwrap();
         assert!(called.get());
@@ -3291,6 +3459,107 @@ mod tests {
             );
             assert!(!called.get(), "{scenario} reached target loader");
         }
+    }
+
+    #[test]
+    fn signed_config_stream_package_binds_manifest_and_context_abi_before_loader() {
+        let reject = |_: &[u8], _: &TargetLoaderContext<'_>| -> std::result::Result<bool, String> {
+            panic!("inconsistent signed config package must reject before target loader")
+        };
+        let mut current = profile(&reject);
+        let capabilities = vec![Capability {
+            kind: "actuator".into(),
+            name: "count".into(),
+            value_type: "int".into(),
+        }];
+        current.available_capabilities = &capabilities;
+        for scenario in [
+            "int-settings-bytecode-mismatch",
+            "int-settings-context-abi-mismatch",
+        ] {
+            assert_eq!(
+                verify_portable_package(&fixture_for(scenario), &current)
+                    .unwrap_err()
+                    .code,
+                ErrorCode::ManifestMismatch,
+                "{scenario}"
+            );
+        }
+    }
+
+    #[test]
+    fn signed_config_stream_with_elapsed_timer_preserves_native_execution() {
+        let accept = |bytes: &[u8],
+                      context: &TargetLoaderContext<'_>|
+         -> std::result::Result<bool, String> {
+            assert_eq!(context.manifest["timers"][0]["name"], "age");
+            let module = ghostflow_core::Module::load(bytes).map_err(|e| e.to_string())?;
+            let mut runtime = ghostflow_core::Runtime::new(4);
+            runtime.install(module, false);
+            runtime
+                .add_capability(ghostflow_core::Capability {
+                    kind: "actuator".into(),
+                    name: "pump".into(),
+                    value_type: ghostflow_core::Type::Bool,
+                })
+                .map_err(|e| e.to_string())?;
+            runtime
+                .activate_with_context(&ghostflow_core::context_runtime::Activation {
+                    boot_epoch: 1,
+                    terminal_capacity: 16,
+                    bindings: vec![],
+                })
+                .map_err(|e| e.to_string())?;
+            for (mono, expected) in [(0, true), (2_000, false)] {
+                for (name, value) in [
+                    ("start", ghostflow_core::Value::Bool(true)),
+                    ("__gf_now_ms", ghostflow_core::Value::Number(mono as f64)),
+                    ("__gf_time_epoch", ghostflow_core::Value::Number(1.0)),
+                ] {
+                    runtime.set_input(name, value).map_err(|e| e.to_string())?;
+                }
+                let record = runtime
+                    .tick_with_context(
+                        ghostflow_core::schedule_clock::ClockSnapshot {
+                            boot_epoch: 1,
+                            monotonic_ms: mono,
+                            wall_ms: None,
+                            uncertainty_ms: None,
+                            trust: ghostflow_core::schedule_clock::ClockTrust::Unknown(
+                                "not-required",
+                            ),
+                            source_revision: None,
+                        },
+                        &ghostflow_core::context_runtime::Facts {
+                            natural: vec![],
+                            schedules: vec![],
+                            settings: None,
+                            accounting: vec![],
+                        },
+                    )
+                    .map_err(|e| e.to_string())?;
+                assert_eq!(
+                    record.safe_intents["pump"],
+                    ghostflow_core::Value::Bool(expected)
+                );
+            }
+            Ok(true)
+        };
+        let mut current = profile(&accept);
+        let capabilities = [
+            Capability {
+                kind: "actuator".into(),
+                name: "pump".into(),
+                value_type: "bool".into(),
+            },
+            Capability {
+                kind: "input".into(),
+                name: "start".into(),
+                value_type: "bool".into(),
+            },
+        ];
+        current.available_capabilities = &capabilities;
+        verify_portable_package(&fixture_for("config-timer-valid"), &current).unwrap();
     }
 
     #[test]
@@ -3383,7 +3652,7 @@ mod tests {
             };
         let mut current = profile(&accept);
         current.available_capabilities = &capabilities;
-        let formats = strings(&["GhostFlow/control-v2"]);
+        let formats = strings(&["GhostFlow/control-v10"]);
         current.supported_manifest_formats = &formats;
         verify_portable_package(&fixture_for("time-valid"), &current).unwrap();
         let reject_loader =

@@ -24,6 +24,7 @@ const FAULT_ENUMS = new Map([
   ['CalendarFault', ['ClockUnknown', 'CalendarMissing', 'CalendarOutOfRange', 'ZoneUnsupported']],
   ['TemporalContextFault', ['ClockUnknown', 'LocationUnknown', 'EventUnavailable', 'PredictionMissing', 'PredictionStale', 'ZoneUnsupported']],
   ['AccountingFault', ['ClockUnknown', 'LedgerMissing', 'LedgerCorrupt', 'LedgerIncomplete', 'CountOverflow']],
+  ['SettingsFault', ['SettingsInvalid', 'SettingsUnavailable']],
 ].map(([name, members]) => [name, new Map(members.map((member, index) => [member, index]))]));
 const FAULT_MEMBER_NAMES = new Set([...FAULT_ENUMS.values()].flatMap(members => [...members.keys()]));
 const KEYWORDS = new Set([
@@ -1453,6 +1454,7 @@ class Lowerer {
     this.objectives = new Map(); this.degradedPolicies = new Map(); this.adaptSettings = new Map();
     this.gfbInputs = []; this.gfbStates = []; this.constraints = []; this.hasClock = false;
     this.resultSites = [];
+    this.configStreams = [];
     this.usesInt = false;
     this.failedLets = new Map();
     this.syntaxOnly = false;
@@ -1492,6 +1494,9 @@ class Lowerer {
       : ['all', ...this.manifest.outputs.map(output => ['has', 'actuator', output.name, gfbType(semanticType(output.type))])];
     const solarForms = this.solarForms();
     const contextForms = emitBytecode ? this.contextForms() : [];
+    if (emitBytecode && this.configStreams.length && solarForms.length) {
+      error(this.ast.loc, 'config streams cannot mix with legacy Solar/DailySlots context execution; use fixed let values or a config-aware schedule');
+    }
     if (accountingExecution) {
       const bindings = this.manifest.accounts ?? [];
       const constraints = this.manifest.accountingConstraints ?? [];
@@ -1505,7 +1510,7 @@ class Lowerer {
       delete this.manifest.accounts;
       delete this.manifest.accountingConstraints;
     }
-    if (contextForms.length) this.manifest.format = 'GhostFlow/control-v9';
+    if (contextForms.length) this.manifest.format = 'GhostFlow/control-v10';
     else if (solarForms.some(form => form[0] === 'daily-slots-pulse')) this.manifest.format = 'GhostFlow/control-v8';
     else if (solarForms.some(form => form[0] === 'daily-pulse')) this.manifest.format = 'GhostFlow/control-v7';
     const temporalForms = this.windows.length || this.trueFors.length || solarForms.length || contextForms.length ? [
@@ -1527,6 +1532,7 @@ class Lowerer {
       ...[...this.objectives.values()].filter(objective => objective.binding === 'native-temperature-percent-v1').map(objective => [
         'pid-objective', objective.name, objective.bindings.output, objective.bindings.measure,
         objective.bindings.measureOk, objective.bindings.target, objective.bindings.safeMax,
+        objective.bindings.targetOk,
         String(objective.controller.periodMs), String(objective.controller.lateAfterMs), objective.controller.direction,
         String(objective.controller.kp), String(objective.controller.ki), String(objective.controller.kd),
         String(objective.controller.bias), String(objective.output.max), String(objective.controller.restart.output),
@@ -1708,6 +1714,7 @@ class Lowerer {
     // Functions are declarations, so calls may precede their definitions both
     // inside the control and in the top-level pure-function prelude.
     for (const item of this.ast.body) if (item.kind === 'function') this.addFunction(item);
+    for (const item of this.ast.body) if (item.kind === 'let') this.lets.set(item.name, item);
     for (const item of this.ast.body) {
       if (item.kind === 'resource') {
         if (!['BoolActuator', 'Station', 'ContinuousActuator'].includes(item.type)) error(item.loc, `unsupported resource type ${item.type}`);
@@ -1753,10 +1760,26 @@ class Lowerer {
           }
           value.constant.sort((a, b) => a - b);
         }
-        this.symbols.get(item.name).type = type; this.symbols.get(item.name).value = value;
+        const symbol = this.symbols.get(item.name);
+        const resultInputs = type.kind === 'TimeSlots' ? null : Object.fromEntries(['ok', 'value', 'fault'].map(role =>
+          [role, `${RESERVED_PREFIX}config_${item.id}_${role}`]));
+        if (!this.hasClock) { this.addInput(`${RESERVED_PREFIX}now_ms`, NUMBER, item.loc); this.hasClock = true; }
+        if (!this.gfbInputs.some(input => input[1] === `${RESERVED_PREFIX}time_epoch`)) {
+          this.addInput(`${RESERVED_PREFIX}time_epoch`, NUMBER, item.loc);
+        }
+        if (resultInputs) {
+          this.addInput(resultInputs.ok, semanticType('Bool'), item.loc);
+          this.addInput(resultInputs.value, type, item.loc);
+          this.addInput(resultInputs.fault, semanticType('Number'), item.loc);
+        }
+        symbol.id = item.id;
+        symbol.type = resultType(type, semanticType('SettingsFault'));
+        symbol.payloadType = type;
+        symbol.value = value;
+        symbol.resultInputs = resultInputs;
+        this.configStreams.push({ id: item.id, name: item.name, type, resultInputs });
         const settings = item.settings ?? {};
         if (Object.keys(settings).length) {
-          if (this.hasSolarSchedule) error(item.loc, 'Solar schedules cannot be combined with operating settings metadata yet');
           if (type.kind === 'TimeSlots') {
             if (item.value.kind !== 'list') error(item.value.loc, 'TimeSlots initial value must be a finite list literal');
             if (settings.min !== undefined || settings.max !== undefined || settings.step !== undefined) error(item.loc, 'TimeSlots config does not use numeric bounds');
@@ -1797,11 +1820,11 @@ class Lowerer {
             displayUnit = literal.suffix;
           }
           this.manifest.configs.push(manifestDescriptor(item.name, type, type.kind === 'TimeSlots'
-            ? { type: `TimeSlots<${type.gridMs}ms,${type.capacity}>`, value: value.constant, gridMs: type.gridMs, capacity: type.capacity, settings }
-            : { value: value.constant, settings, initialOffset: item.value.loc.offset, initialEndOffset: item.value.loc.endOffset ?? item.value.loc.offset, ...(displayUnit ? { displayUnit } : {}) }));
+            ? { id: item.id, type: `TimeSlots<${type.gridMs}ms,${type.capacity}>`, value: value.constant, gridMs: type.gridMs, capacity: type.capacity, settings }
+            : { id: item.id, value: value.constant, settings, initialOffset: item.value.loc.offset, initialEndOffset: item.value.loc.endOffset ?? item.value.loc.offset, ...(displayUnit ? { displayUnit } : {}) }));
         } else this.manifest.configs.push(manifestDescriptor(item.name, type, type.kind === 'TimeSlots'
-          ? { type: `TimeSlots<${type.gridMs}ms,${type.capacity}>`, value: value.constant, gridMs: type.gridMs, capacity: type.capacity }
-          : { value: value.constant }));
+          ? { id: item.id, type: `TimeSlots<${type.gridMs}ms,${type.capacity}>`, value: value.constant, gridMs: type.gridMs, capacity: type.capacity }
+          : { id: item.id, value: value.constant }));
       }
       if (item.kind === 'sensor') this.addSensor(item);
       if (item.kind === 'event') this.events.set(item.name, item);
@@ -1820,7 +1843,6 @@ class Lowerer {
       if (item.kind === 'degraded') this.addDegraded(item);
       if (item.kind === 'adapt-setting') this.addAdaptSetting(item);
     }
-    for (const item of this.ast.body) if (item.kind === 'let') this.lets.set(item.name, item);
     for (const item of this.ast.body) if (item.kind === 'signal') this.signalDecls.set(item.name, item);
     for (const item of this.ast.body) if (item.kind === 'signal') this.resolveSignal(item.name);
     for (const item of this.ast.body) if (item.kind === 'timer') this.declareTimer(item);
@@ -1941,7 +1963,7 @@ class Lowerer {
     }
     const sensor = this.sensors.get(measure);
     const targetSymbol = this.symbols.get(target);
-    if (sensor.type.kind !== 'Temperature' || targetSymbol.type.kind !== 'Temperature') {
+    if (sensor.type.kind !== 'Temperature' || targetSymbol.category !== 'config' || targetSymbol.payloadType?.kind !== 'Temperature') {
       error(item.loc, 'native PID objective requires Temperature measure and target');
     }
     const constant = (node, expected, label) => {
@@ -2000,14 +2022,14 @@ class Lowerer {
       binding: 'native-temperature-percent-v1', executable: false,
     };
     const measureSource = this.sensors.get(measure);
-    const targetInput = this.generatedName('objective_target', item.name);
+    const targetInput = targetSymbol.resultInputs.value;
+    const targetOkInput = targetSymbol.resultInputs.ok;
     const safeMaxInput = this.generatedName('objective_safe_max', item.name);
     if (!this.gfbInputs.some(input => input[1] === `${RESERVED_PREFIX}now_ms`)) this.addInput(`${RESERVED_PREFIX}now_ms`, NUMBER, item.loc);
-    this.addInput(targetInput, semanticType('Temperature'), item.loc);
     this.addInput(safeMaxInput, PERCENT, item.loc);
     descriptor.bindings = {
       output: `${manipulate}.position`, measure: measureSource.valueInput, measureOk: measureSource.okInput,
-      target: targetInput, safeMax: safeMaxInput,
+      target: targetInput, targetOk: targetOkInput, safeMax: safeMaxInput,
     };
     if (this.outputs.has(descriptor.bindings.output)) error(item.manipulate.loc, `objective output collides with authored output ${descriptor.bindings.output}`);
     this.manifest.outputs.push(manifestDescriptor(descriptor.bindings.output, PERCENT));
@@ -2037,7 +2059,9 @@ class Lowerer {
     if (item.fields.controller_transition) error(item.fields.controller_transition.loc, 'adapt_setting cannot reset controller state');
     const allowed = item.fields.allowed; if (!item.fields.allowedMax) error(allowed.loc, 'adapt_setting allowed requires a range');
     const maxChange = item.fields.max_change;
-    this.adaptSettings.set(item.name, { name: item.name, target: item.target, authority: item.fields.authority.name ?? null, runtime: 'requires-host-settings-event-validation' });
+    this.adaptSettings.set(item.name, { name: item.name, target: item.target, targetId: target.id,
+      targetType: typeNameOf(target.payloadType), authority: item.fields.authority.name ?? null,
+      runtime: 'requires-host-settings-event-validation' });
     (this.manifest.adaptSettings ??= []).push(this.adaptSettings.get(item.name));
   }
   addSensor(item) {
@@ -2117,8 +2141,8 @@ class Lowerer {
     if (!Array.isArray(item.selected)) {
       selectedConfig = item.selected.value;
       const symbol = this.symbols.get(selectedConfig);
-      if (!symbol || symbol.category !== 'config' || symbol.type?.kind !== 'TimeSlots') error(item.selected, 'DailySlots selected reference must name a TimeSlots config');
-      if (symbol.type.gridMs !== interval.constant) error(item.selected, `TimeSlots grid ${symbol.type.gridMs}ms does not match DailySlots grid ${interval.constant}ms`);
+      if (!symbol || symbol.category !== 'config' || symbol.payloadType?.kind !== 'TimeSlots') error(item.selected, 'DailySlots selected reference must name a TimeSlots config');
+      if (symbol.payloadType.gridMs !== interval.constant) error(item.selected, `TimeSlots grid ${symbol.payloadType.gridMs}ms does not match DailySlots grid ${interval.constant}ms`);
       slots = symbol.value.constant.map(ms => ms / 60_000);
     } else {
       const seen = new Set();
@@ -2152,9 +2176,17 @@ class Lowerer {
     for (const field of ['every', 'anchor', 'interval_change']) {
       if (!item[field]) error(item.loc, `Periodic schedule requires ${field}`);
     }
-    const every = this.expression(item.every, new Map(), { allowNext: false });
+    const config = item.every.kind === 'reference' && this.symbols.get(item.every.name)?.category === 'config'
+      ? this.symbols.get(item.every.name) : null;
+    const every = config ? config.value : this.expression(item.every, new Map(), { allowNext: false });
     if (!sameType(every.type, DURATION) || !Number.isSafeInteger(every.constant) || every.constant <= 0) {
       error(item.every.loc, 'Periodic every must be a positive Duration constant or config');
+    }
+    if (config) {
+      const declaration = this.manifest.configs.find(entry => entry.id === config.id);
+      if (declaration?.settings?.min !== undefined && declaration.settings.min <= 0) {
+        error(item.every.loc, 'Periodic interval config minimum must be positive');
+      }
     }
     const change = item.interval_change;
     if (change.kind !== 'reference' || !['preserve_anchor', 'preserve_next', 'restart_after_change'].includes(change.name)) {
@@ -2181,8 +2213,8 @@ class Lowerer {
     if (anchor.kind !== 'civil' && (item.timezone !== null || item.policy.dst_missing || item.policy.dst_repeated)) {
       error(item.loc, 'Periodic timezone and DST policies require a civil anchor');
     }
-    const interval = { expression: every.sexpr, initialMs: every.constant };
-    if (item.every.kind === 'reference' && this.symbols.get(item.every.name)?.category === 'config') interval.config = item.every.name;
+    const interval = { expression: config ? item.every.name : every.sexpr, initialMs: every.constant };
+    if (config) { interval.config = item.every.name; interval.configId = config.id; }
     return this.addCivilSchedulePolicy(item, { kind: 'periodic', every: interval,
       anchor, intervalChange: change.name }, anchor.kind === 'civil');
   }
@@ -2253,7 +2285,7 @@ class Lowerer {
         if (!sameType(cancel.type, BOOL)) error(options.cancel_when.loc, `${label} cancel_when must be Bool`);
         cancelWhen = cancel.sexpr;
       }
-      const slot = this.manifest.schedules.filter(schedule => ['solar', 'daily', 'daily-slots', 'periodic', 'cron'].includes(schedule.kind)).length;
+      const slot = this.configStreams.length + this.manifest.schedules.filter(schedule => ['solar', 'daily', 'daily-slots', 'periodic', 'cron'].includes(schedule.kind)).length;
       this.manifest.schedules.push({
         ...trigger, site: item.id, name: item.name, ...civilPolicy,
         policy: { basis, when: predicate.sexpr, ...(cancelWhen === undefined ? {} : { cancelWhen }),
@@ -2297,7 +2329,7 @@ class Lowerer {
     const policy = this.naturalSchedulePolicy(item, true);
     if (!this.hasClock) { this.addInput(`${RESERVED_PREFIX}now_ms`, NUMBER, item.loc); this.hasClock = true; }
     if (!this.gfbInputs.some(input => input[1] === `${RESERVED_PREFIX}time_epoch`)) this.addInput(`${RESERVED_PREFIX}time_epoch`, NUMBER, item.loc);
-    const slot = this.manifest.schedules.length;
+    const slot = this.configStreams.length + this.manifest.schedules.length;
     this.manifest.schedules.push({
       kind: 'tide', site: item.id, name: item.name, source: provider.name, timezone: item.timezone,
       event: item.at.event, offsetMs: item.at.offsetMs, policy,
@@ -2983,7 +3015,17 @@ class Lowerer {
       if (symbol.category === 'state') return { type: symbol.type, sexpr: `state.${node.name}` };
       if (options.parameterConstant && !['parameter', 'function'].includes(symbol.category)) error(node.loc, 'parameter default must be a constant independent of inputs, state and settings');
       if (symbol.category === 'parameter') return this.resolveParameter(node.name);
-      if (symbol.category === 'config') return symbol.value;
+      if (symbol.category === 'config') {
+        if (!symbol.resultInputs) error(node.loc, `TimeSlots config ${node.name} requires a schedule consumer`);
+        const inputs = symbol.resultInputs;
+        return {
+          type: symbol.type,
+          ok: `input.${inputs.ok}`, value: `input.${inputs.value}`,
+          faultCode: `input.${inputs.fault}`, originTag: numberAtom(symbol.id),
+          origins: [{ tag: symbol.id, nodeId: symbol.id,
+            kind: 'config', name: node.name }], sample: scanSample(),
+        };
+      }
       if (symbol.category === 'let') return this.resolveLet(node.name);
       if (symbol.category === 'timer') {
         const timer = this.resolveTimer(node.name);
@@ -3148,6 +3190,9 @@ class Lowerer {
       right = recurse(node.right, undefined, undefined, expected);
     }
     const op = node.op;
+    if (left.type?.kind === 'Result' || right.type?.kind === 'Result') {
+      error(node.loc, `${op} cannot use Result directly; handle ok(...) and fault(...) with case`);
+    }
     if (op === '&&' || op === '||') { if (!sameType(left.type, BOOL) || !sameType(right.type, BOOL)) error(node.loc, `${op} requires Bool operands`); return { type: BOOL, sexpr: [op === '&&' ? 'and' : 'or', left.sexpr, right.sexpr], constant: left.constant === undefined || right.constant === undefined ? undefined : (op === '&&' ? left.constant && right.constant : left.constant || right.constant) }; }
     if (['==', '!='].includes(op)) { if (!sameType(left.type, right.type)) error(node.loc, `${op} requires values of the same type`); const eq = left.constant === undefined || right.constant === undefined ? undefined : left.constant === right.constant; return { type: BOOL, sexpr: op === '==' ? ['eq', left.sexpr, right.sexpr] : ['not', ['eq', left.sexpr, right.sexpr]], constant: eq === undefined ? undefined : (op === '==' ? eq : !eq) }; }
     if (['<', '<=', '>', '>='].includes(op)) { if ((!isNumeric(left.type) && left.type?.kind !== 'Rate' && !['DateTime', 'TimeOfDay'].includes(left.type?.kind)) || !sameType(left.type, right.type)) error(node.loc, `${op} requires matching ordered types`); const values = left.constant === undefined || right.constant === undefined ? undefined : ({ '<': left.constant < right.constant, '<=': left.constant <= right.constant, '>': left.constant > right.constant, '>=': left.constant >= right.constant })[op]; return { type: BOOL, sexpr: [{ '<': 'lt', '<=': 'lte', '>': 'gt', '>=': 'gte' }[op], left.sexpr, right.sexpr], constant: values }; }
@@ -3477,21 +3522,32 @@ class Lowerer {
     ]);
   }
   contextForms() {
+    const configForms = this.configStreams.map(stream => {
+      const config = this.manifest.configs.find(item => item.id === stream.id);
+      if (!config) internal(`missing config stream ${stream.name}`);
+      const type = stream.type;
+      const payload = type.kind === 'TimeSlots'
+        ? ['slots', String(type.gridMs), String(type.capacity), ...config.value.map(ms => String(ms / 60_000))]
+        : ['scalar', gfbDefault(type, config.value), config.settings?.min === undefined ? 'none'
+          : ['bounds', ...['min', 'max', 'step'].map(key => gfbDefault(type, config.settings[key]))]];
+      const inputs = stream.resultInputs;
+      return ['config-stream', String(stream.id), stream.name, config.type, type.kind,
+        config.settings?.access === 'operator' ? 'true' : 'false', payload,
+        inputs?.ok ?? 'none', inputs?.value ?? 'none', inputs?.fault ?? 'none'];
+    });
     const scheduleForms = this.manifest.schedules.filter(schedule => ['periodic', 'cron', 'tide'].includes(schedule.kind)
       || schedule.kind === 'daily' && schedule.day?.calendar
       || schedule.kind === 'daily-slots' && schedule.selectedConfig).map(schedule => {
       const base = [String(schedule.site), schedule.name, String(schedule.policy.gapMs)];
       const when = schedule.policy.when, cancel = schedule.policy.cancelWhen ?? 'false';
       if (schedule.kind === 'periodic') {
-        const config = this.manifest.configs.find(item => item.name === schedule.every.config);
-        const settings = config?.settings ?? { min: 1, max: Number.MAX_SAFE_INTEGER, step: 1 };
-        if (!config || config.type !== 'Duration' || schedule.anchor.kind !== 'instant'
+        const config = this.manifest.configs.find(item => item.id === schedule.every.configId);
+        if (config && config.type !== 'Duration' || schedule.anchor.kind !== 'instant'
           || schedule.intervalChange !== 'preserve_anchor' || schedule.policy.basis !== 'pulse') {
-          error(this.ast.loc, 'Periodic executable slice requires instant anchor, Duration config and preserve_anchor pulse');
+          error(this.ast.loc, 'Periodic executable slice requires instant anchor, Duration interval and preserve_anchor pulse');
         }
         return ['periodic-pulse', ...base, `instant:${schedule.anchor.instantMs}`, String(schedule.anchor.instantMs),
-          config.name, settings.access === 'operator' ? 'true' : 'false', String(config.value),
-          String(settings.min), String(settings.max), String(settings.step), when, cancel];
+          String(config?.id ?? 0), ...(config ? [] : [String(schedule.every.initialMs)]), when, cancel];
       }
       if (schedule.kind === 'cron') {
         if (schedule.policy.basis !== 'pulse') error(this.ast.loc, 'Cron executable slice requires pulse');
@@ -3510,9 +3566,8 @@ class Lowerer {
       }
       const config = this.manifest.configs.find(item => item.name === schedule.selectedConfig);
       if (!config || schedule.policy.basis !== 'pulse') error(this.ast.loc, 'TimeSlots executable slice requires config and pulse');
-      return ['config-daily-slots-pulse', ...base, schedule.timezone, config.name,
-        config.settings?.access === 'operator' ? 'true' : 'false', String(schedule.gridMs),
-        String(config.capacity), ['slots', ...schedule.slots.map(String)], schedule.dstMissing, schedule.dstRepeated, when, cancel];
+      return ['config-daily-slots-pulse', ...base, schedule.timezone, String(config.id),
+        schedule.dstMissing, schedule.dstRepeated, when, cancel];
     });
     const naturalForms = this.manifest.naturalConditions?.map(condition => [
       'natural-result', String(condition.site), `natural_${condition.site}`,
@@ -3524,7 +3579,7 @@ class Lowerer {
       account.evidenceBinding.target, account.basis.zone,
       account.resultInputs.ok, account.resultInputs.value, account.resultInputs.fault,
     ]);
-    return [...scheduleForms, ...naturalForms, ...accountingForms];
+    return [...configForms, ...scheduleForms, ...naturalForms, ...accountingForms];
   }
   windowForms() {
     return this.windows.map(({ descriptor, source, sample, outputType }) => [

@@ -19,6 +19,7 @@ pub mod resource_policy;
 pub mod scan;
 pub mod schedule_clock;
 pub mod schedule_vm;
+pub mod settings_stream;
 pub mod signals;
 pub mod solar;
 pub mod solar_admission;
@@ -54,7 +55,7 @@ impl Type {
         match value {
             1 => Ok(Self::Bool),
             2 => Ok(Self::Number),
-            3 if matches!(format_version, 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10) => Ok(Self::Int),
+            3 if matches!(format_version, 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11) => Ok(Self::Int),
             _ => Err(Error::new("invalid type")),
         }
     }
@@ -179,7 +180,7 @@ impl Module {
             return Err(Error::new("invalid GFB1 magic"));
         }
         let format_version = reader.u16()?;
-        if !matches!(format_version, 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10) {
+        if !matches!(format_version, 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11) {
             return Err(Error::new("unsupported GFB format"));
         }
         let name = reader.string()?;
@@ -237,7 +238,7 @@ impl Module {
             });
         }
 
-        let mut temporal = if matches!(format_version, 4 | 5 | 6 | 8 | 9 | 10) {
+        let mut temporal = if matches!(format_version, 4 | 5 | 6 | 8 | 9 | 10 | 11) {
             Some(temporal_vm::TemporalRequirements::load_header(
                 &mut reader,
                 &inputs,
@@ -246,7 +247,7 @@ impl Module {
         } else {
             None
         };
-        let mut schedules = matches!(format_version, 5 | 6 | 8 | 9 | 10).then(|| {
+        let mut schedules = matches!(format_version, 5 | 6 | 8 | 9 | 10 | 11).then(|| {
             schedule_vm::ScheduleRequirements {
                 strategies: Vec::new(),
             }
@@ -271,7 +272,7 @@ impl Module {
             verify_query(&query, format_version)?;
 
             let (windows, schedule_count, true_for_count, mut result_trace_bound) =
-                if matches!(format_version, 5 | 6 | 8 | 9 | 10) {
+                if matches!(format_version, 5 | 6 | 8 | 9 | 10 | 11) {
                     let loaded = schedule_vm::load_prelude(
                         &mut reader,
                         &inputs,
@@ -495,15 +496,41 @@ impl Module {
         if format_version == 2 && !has_int_type && !has_int_expression {
             return Err(Error::new("unsupported GFB format 2 without Int"));
         }
-        let objective = if format_version == 7 {
+        let objective_count = if matches!(format_version, 7 | 11) {
+            reader.u16()?
+        } else {
+            0
+        };
+        if objective_count > 1 || format_version == 7 && objective_count != 1 {
+            return Err(Error::new("invalid objective count"));
+        }
+        let objective = if objective_count == 1 {
             if states.len() == MAX_STATES || strategies.iter().any(|s| s.intents.len() == 128) {
                 return Err(Error::new("objective resource limit exceeded"));
             }
-            Some(objective_vm::ObjectiveDescriptor::load(
+            let descriptor = objective_vm::ObjectiveDescriptor::load(
                 &mut reader,
                 &inputs,
                 &strategies,
-            )?)
+                format_version == 11,
+            )?;
+            if format_version == 11
+                && !schedules.as_ref().is_some_and(|requirements| {
+                    requirements.strategies.iter().all(|strategy| {
+                        strategy.schedules.iter().any(|entry| {
+                            matches!(entry, schedule_vm::PulseDescriptor::Config(config)
+                        if config.semantic_type == "Temperature"
+                            && config.value_input == descriptor.target_input
+                            && Some(config.ok_input) == descriptor.target_ok_input)
+                        })
+                    })
+                })
+            {
+                return Err(Error::new(
+                    "objective target must bind a Temperature config Result",
+                ));
+            }
+            Some(descriptor)
         } else {
             None
         };
@@ -840,7 +867,7 @@ impl Runtime {
         let m = self.module.as_ref()?;
         Some(&m.strategies[self.active_strategy?].name)
     }
-    /// Activate GFB10 with explicit provider bindings. No host-computed projections.
+    /// Activate a context module with explicit provider bindings. No host-computed projections.
     pub fn activate_with_context(
         &mut self,
         activation: &context_runtime::Activation,
@@ -857,8 +884,8 @@ impl Runtime {
             .module
             .as_ref()
             .ok_or_else(|| Error::new("no module installed"))?;
-        if module.format_version != 10 {
-            return Err(Error::new("context activation requires GFB10"));
+        if !matches!(module.format_version, 10 | 11) {
+            return Err(Error::new("context activation requires GFB10 or GFB11"));
         }
         if module
             .temporal
@@ -878,6 +905,21 @@ impl Runtime {
             &requirements.strategies[selected].schedules,
             activation,
         )?;
+        let objective_runtime = module
+            .objective
+            .as_ref()
+            .map(|objective| {
+                if !self.capabilities.iter().any(|cap| {
+                    cap.kind == "actuator"
+                        && cap.name == objective.output
+                        && cap.value_type == Type::Number
+                }) {
+                    return Err(Error::new("objective requires numeric actuator capability"));
+                }
+                controller::Pid::new(objective.config)
+            })
+            .transpose()?;
+        self.objective_runtime = objective_runtime;
         self.context_runtime = Some(runtime);
         self.active_strategy = Some(selected);
         Ok(())
@@ -887,8 +929,12 @@ impl Runtime {
         clock: schedule_clock::ClockSnapshot<'_>,
         facts: &context_runtime::Facts,
     ) -> Result<&TickRecord> {
-        if !self.module.as_ref().is_some_and(|m| m.format_version == 10) {
-            return Err(Error::new("context facts require GFB10"));
+        if !self
+            .module
+            .as_ref()
+            .is_some_and(|m| matches!(m.format_version, 10 | 11))
+        {
+            return Err(Error::new("context facts require GFB10 or GFB11"));
         }
         self.tick_inner(None, Some((clock, facts)))
     }
@@ -1253,8 +1299,10 @@ impl Runtime {
             .iter()
             .position(|f| f.name == name)
             .ok_or_else(|| Error::new(format!("unknown input {name}")))?;
-        if m.format_version == 10
-            && (name.starts_with("__gf_natural_") || name.starts_with("__gf_accounting_"))
+        if matches!(m.format_version, 10 | 11)
+            && (name.starts_with("__gf_natural_")
+                || name.starts_with("__gf_accounting_")
+                || (m.format_version == 11 && name.starts_with("__gf_config_")))
         {
             return Err(Error::new(
                 "Rust provider projections are not caller inputs",
@@ -1301,9 +1349,10 @@ impl Runtime {
             .iter()
             .enumerate()
             .map(|(i, v)| {
-                if m.format_version == 10
+                if matches!(m.format_version, 10 | 11)
                     && (m.inputs[i].name.starts_with("__gf_natural_")
-                        || m.inputs[i].name.starts_with("__gf_accounting_"))
+                        || m.inputs[i].name.starts_with("__gf_accounting_")
+                        || (m.format_version == 11 && m.inputs[i].name.starts_with("__gf_config_")))
                 {
                     return Ok(m.inputs[i].default);
                 }
@@ -1349,15 +1398,6 @@ impl Runtime {
                 return Err(Error::new("temporal-budget-exceeded"));
             }
         }
-        let objective_stage = match (&m.objective, &self.objective_runtime) {
-            (Some(descriptor), Some(runtime)) => Some(descriptor.stage(
-                runtime,
-                clock.ok_or_else(|| Error::new("objective requires monotonic clock"))? as u64,
-                &iv,
-            )?),
-            (None, None) => None,
-            _ => return Err(Error::new("objective runtime binding mismatch")),
-        };
         let context_stage = if let Some(runtime) = &self.context_runtime {
             let (snapshot, facts) = context.ok_or_else(|| Error::new("missing context frame"))?;
             let temporal = m
@@ -1388,6 +1428,15 @@ impl Runtime {
             )?)
         } else {
             None
+        };
+        let objective_stage = match (&m.objective, &self.objective_runtime) {
+            (Some(descriptor), Some(runtime)) => Some(descriptor.stage(
+                runtime,
+                clock.ok_or_else(|| Error::new("objective requires monotonic clock"))? as u64,
+                &iv,
+            )?),
+            (None, None) => None,
+            _ => return Err(Error::new("objective runtime binding mismatch")),
         };
         let solar_stage = if let Some(runtime) = &self.solar_runtime {
             let (snapshot, facts) = solar.expect("checked solar inputs");
@@ -2198,7 +2247,7 @@ fn verify_expression_with_prelude(
                 type_push(&mut stack, &mut len, Type::Int)?;
             }
             op @ 30..=31 => {
-                if !matches!(format_version, 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10) {
+                if !matches!(format_version, 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11) {
                     return Err(Error::new("branch opcode requires GFB format 3"));
                 }
                 let target = r.jump_target()?;
@@ -2215,13 +2264,13 @@ fn verify_expression_with_prelude(
                 reachable = op == 30;
             }
             32..=47 => {
-                if !matches!(format_version, 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10) {
+                if !matches!(format_version, 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11) {
                     return Err(Error::new("compact Number opcode requires GFB format 3"));
                 }
                 type_push(&mut stack, &mut len, Type::Number)?;
             }
             op @ 48..=53 => {
-                if !matches!(format_version, 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10) {
+                if !matches!(format_version, 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11) {
                     return Err(Error::new("conversion opcode requires GFB format 3"));
                 }
                 let (source, target) = if op == 48 {
@@ -2235,7 +2284,7 @@ fn verify_expression_with_prelude(
                 type_push(&mut stack, &mut len, target)?;
             }
             54 => {
-                if !matches!(format_version, 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10) {
+                if !matches!(format_version, 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11) {
                     return Err(Error::new("Duration guard requires GFB format 3"));
                 }
                 if type_pop(&mut stack, &mut len)? != Type::Number {
@@ -2244,7 +2293,7 @@ fn verify_expression_with_prelude(
                 type_push(&mut stack, &mut len, Type::Number)?;
             }
             55 => {
-                if !matches!(format_version, 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10) {
+                if !matches!(format_version, 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11) {
                     return Err(Error::new("DateTime guard requires GFB format 3"));
                 }
                 if type_pop(&mut stack, &mut len)? != Type::Number {
@@ -2253,7 +2302,7 @@ fn verify_expression_with_prelude(
                 type_push(&mut stack, &mut len, Type::Number)?;
             }
             56 => {
-                if !matches!(format_version, 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10) {
+                if !matches!(format_version, 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11) {
                     return Err(Error::new("Result trace requires GFB format 3"));
                 }
                 if r.u32()? == 0 {
@@ -2268,7 +2317,7 @@ fn verify_expression_with_prelude(
                 type_push(&mut stack, &mut len, payload)?;
             }
             57 => {
-                if !matches!(format_version, 4 | 5 | 6 | 8 | 9 | 10) {
+                if !matches!(format_version, 4 | 5 | 6 | 8 | 9 | 10 | 11) {
                     return Err(Error::new("temporal projection requires GFB format 4"));
                 }
                 let slot = r.u16()?;
@@ -2280,7 +2329,7 @@ fn verify_expression_with_prelude(
                 )?;
             }
             58 => {
-                if !matches!(format_version, 5 | 6 | 8 | 9 | 10) {
+                if !matches!(format_version, 5 | 6 | 8 | 9 | 10 | 11) {
                     return Err(Error::new("schedule projection requires GFB format 5"));
                 }
                 let slot = r.u16()?;

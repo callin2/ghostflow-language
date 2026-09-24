@@ -21,7 +21,7 @@ control LimitFeedbackValve {
   input open_request, close_request, open_limit, close_limit, stop_ok, overload_ok: Bool;
   output valve_open_contactor, valve_close_contactor: Bool;
 
-  config reversal_wait: Duration = 2s;
+  let reversal_wait = 2s;
 
   type Phase = Stopped | Closed | Opening | Open | Closing | WaitOpen | WaitClose | SensorConflict;
   // ghostflow:link id=GF-INT-PC05-LIMIT-FEEDBACK-V1 relation=implements

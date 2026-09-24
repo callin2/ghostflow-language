@@ -208,7 +208,7 @@ async function execute(runtimeFactory, wasmBytes, prepared, runtimeName) {
 
 export async function verifyCurriculumReplayWasm(wasmBytes, options = {}) {
   const prepared = options.prepared ?? await prepareCurriculumReplays(options);
-  const legacy = await execute(ControlRuntime.instantiateSimulation.bind(ControlRuntime), wasmBytes, prepared, 'host-simulation');
+  const legacy = await execute(ControlRuntime.instantiate.bind(ControlRuntime), wasmBytes, prepared, 'host-simulation');
   const framed = await execute(ControlRuntime.instantiateFramed.bind(ControlRuntime), wasmBytes, prepared, 'framed-wasm');
   return { legacy, framed };
 }

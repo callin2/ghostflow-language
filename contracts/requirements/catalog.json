@@ -885,8 +885,8 @@
         "path": "tests/control.test.mjs",
         "heading": "control OutputInitializer {",
         "lines": [
-          277,
-          295
+          271,
+          289
         ],
         "sha256": "80f6a330dec6957edfbb4712c37ec4ed95252b4adbd305ef6d7f2c1cb9eb9e71"
       },
@@ -899,8 +899,8 @@
         "path": "tests/control.test.mjs",
         "heading": "output pump, valve: Bool;",
         "lines": [
-          163,
-          167
+          157,
+          161
         ],
         "sha256": "d0ee91eef9cafc2172e05c599f161df432007eaddaf5301ea47d2b89429af388"
       },
@@ -913,8 +913,8 @@
         "path": "tests/control.test.mjs",
         "heading": "// The raw runtime must reject an output-bearing module before the host declares",
         "lines": [
-          244,
-          263
+          238,
+          257
         ],
         "sha256": "4f9ac92548a683b00467e4e052101ce17bd2fe1384d7579c74961f25c9f6cf99"
       },
@@ -927,8 +927,8 @@
         "path": "tests/control.test.mjs",
         "heading": "control NextOutsideOutput {",
         "lines": [
-          334,
-          340
+          328,
+          334
         ],
         "sha256": "db94d45e6331faf2728e09b8ffcbe390e8ed2967540cd226121a2154f66c5611"
       },
@@ -941,8 +941,8 @@
         "path": "tests/control.test.mjs",
         "heading": "assert.deepEqual(scheduledModule.constraints, [",
         "lines": [
-          134,
-          138
+          128,
+          132
         ],
         "sha256": "ab6bce6424e5a97aa3e1dbf4d2d9a6c7274733ce61601608fa6e453c36ad7461"
       },
@@ -955,8 +955,8 @@
         "path": "crates/ghostflow-core/src/lib.rs",
         "heading": "fn monotonic_input_failure_is_atomic()",
         "lines": [
-          3596,
-          3619
+          3641,
+          3664
         ],
         "sha256": "a2c0da526c428f08ab28088580ce6d8216cc5bd076b6a95a93570b54add5b7b1"
       },

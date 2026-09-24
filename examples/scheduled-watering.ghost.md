@@ -31,11 +31,11 @@ control ScheduledWatering {
 2초를 둔다. 이 시간들은 실제 장치의 동작 확인을 대신하는 센서값은 아니다.
 
 ```ghost
-  config water1_time: Duration = 5min;
-  config water2_time: Duration = 5min;
-  config valve_delay: Duration = 2s;
-  config pump_stop_delay: Duration = 2s;
-  config switch_delay: Duration = 2s;
+  let water1_time = 5min;
+  let water2_time = 5min;
+  let valve_delay = 2s;
+  let pump_stop_delay = 2s;
+  let switch_delay = 2s;
 
   output pump, valve1, valve2: Bool;
 ```

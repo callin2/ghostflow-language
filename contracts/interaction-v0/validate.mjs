@@ -147,7 +147,7 @@ function descriptor(value, index, errors) {
   }
   if (value.kind === 'setting') {
     if (!['operator', 'designer'].includes(value.authority)) issue(errors, `${path}.authority`, 'setting_authority', 'must be operator or designer');
-    if (value.applyPolicy !== 'stopped') issue(errors, `${path}.applyPolicy`, 'setting_apply', 'must be stopped');
+    if (value.applyPolicy !== 'live') issue(errors, `${path}.applyPolicy`, 'setting_apply', 'must be live');
     if (typeof value.label !== 'string' || value.label.length < 1 || value.label.length > 128) issue(errors, `${path}.label`, 'setting_label', 'must be 1 to 128 characters');
     if (value.sourceType?.kind === 'builtin' && value.sourceType?.name === 'Bool') {
       if (!exactObject(value.constraint, ['kind', 'values'], `${path}.constraint`, errors)

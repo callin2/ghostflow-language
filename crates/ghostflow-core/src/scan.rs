@@ -76,12 +76,8 @@ impl ScanDriver {
         self.runtime
     }
 
-    fn derived_input(&self, name: &str) -> bool {
-        name == RESERVED_CLOCK_INPUT
-            || (self.runtime.context_runtime.is_some()
-                && (name == "__gf_time_epoch"
-                    || name.starts_with("__gf_natural_")
-                    || name.starts_with("__gf_accounting_")))
+    pub fn restore_context_checkpoint(&mut self, bytes: &[u8]) -> Result<()> {
+        self.runtime.restore_context_checkpoint(bytes)
     }
 
     /// Validates a complete host frame without changing runtime state, inputs,
@@ -163,7 +159,7 @@ impl ScanDriver {
         self.scan_inner(frame, None)
     }
 
-    /// Evaluates a complete GFB10 frame with explicit clock and context facts.
+    /// Evaluates a complete context frame with explicit clock and context facts.
     /// Reserved clocks come from the snapshot; protected Results come from the
     /// core. Failed evaluation commits neither context nor scan sequencing.
     pub fn scan_with_context(
@@ -185,6 +181,20 @@ impl ScanDriver {
         self.scan_inner(frame, Some((clock, facts)))
     }
 
+    fn derived_input(&self, name: &str) -> bool {
+        name == RESERVED_CLOCK_INPUT
+            || (self.runtime.context_runtime.is_some()
+                && ((name == "__gf_time_epoch"
+                    && self
+                        .runtime
+                        .module
+                        .as_ref()
+                        .is_some_and(|m| m.format_version == 10))
+                    || ["__gf_config_", "__gf_natural_", "__gf_accounting_"]
+                        .iter()
+                        .any(|prefix| name.starts_with(prefix))))
+    }
+
     fn scan_inner(
         &mut self,
         frame: ScanFrameV1,
@@ -202,17 +212,25 @@ impl ScanDriver {
                 return Err(error);
             }
         }
+        let derive_epoch = self
+            .runtime
+            .module
+            .as_ref()
+            .is_some_and(|m| m.format_version == 10);
         let result = if let Some((clock, facts)) = context {
-            self.runtime
-                .set_input(
-                    RESERVED_CLOCK_INPUT,
-                    Value::Number(clock.monotonic_ms as f64),
-                )
-                .and_then(|()| {
+            let clock_input = self.runtime.set_input(
+                RESERVED_CLOCK_INPUT,
+                Value::Number(clock.monotonic_ms as f64),
+            );
+            let clock_input = if derive_epoch {
+                clock_input.and_then(|()| {
                     self.runtime
                         .set_input("__gf_time_epoch", Value::Number(clock.boot_epoch as f64))
                 })
-                .and_then(|()| self.runtime.tick_with_context(clock, facts))
+            } else {
+                clock_input
+            };
+            clock_input.and_then(|()| self.runtime.tick_with_context(clock, facts))
         } else {
             self.runtime.tick_at(frame.logical_time_ms)
         };

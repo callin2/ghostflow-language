@@ -38,8 +38,8 @@ control SequentialWaterSupply {
   input start_request, open_limit, close_limit, stop_ok, overload_ok: Bool;
   output valve_open_contactor, valve_close_contactor, pump_contactor: Bool;
 
-  config settle_delay: Duration = 2s;
-  config watering_time: Duration = 5min;
+  let settle_delay = 2s;
+  let watering_time = 5min;
 
   type Phase = Idle | Opening | Settling | Watering | PumpStopping | Closing | FeedbackFault | Interrupted;
   // ghostflow:link id=GF-INT-PC09-SEQUENTIAL-WATERING-V1 relation=implements

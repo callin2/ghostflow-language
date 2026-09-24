@@ -17,7 +17,7 @@ const readJson = relative => JSON.parse(read(relative));
 
 const wateringIdentity = {
   documentId: 'source.fixture-five-minute-watering',
-  revisionId: 'revision.fixture-five-minute-watering-v1',
+  revisionId: 'revision.fixture-five-minute-watering-v2',
 };
 
 const directSource = `# Direct input to output

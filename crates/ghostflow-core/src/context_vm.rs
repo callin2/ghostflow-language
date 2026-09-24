@@ -5,6 +5,7 @@ use crate::{Error, Field, Reader, Result, Type};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct DurationSetting {
+    pub id: u32,
     pub name: String,
     pub operator_editable: bool,
     pub initial_ms: u64,
@@ -43,6 +44,7 @@ pub enum ScheduleDefinition {
         within_ms: u64,
     },
     ConfigDailySlots {
+        config_id: u32,
         timezone: String,
         setting: String,
         operator_editable: bool,
@@ -146,22 +148,29 @@ pub struct ScheduleEvidence {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SettingValue {
     Duration(u64),
+    SharedDuration(u64),
     /// Full keyed value: existing key retimes; absent key removes; key 0 adds.
     Slots(Vec<(u64, u16)>),
+    /// Already validated/allocated by the shared config stream, not host input.
+    SharedSlots(Vec<(u64, u16)>),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SettingChange {
-    pub site: u32,
-    pub value: SettingValue,
+pub use crate::settings_stream::ConfigEmission as SettingChange;
+
+/// Authenticated by the host boundary; this tag is not an authentication token.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SettingsOrigin {
+    OperatorEdit,
+    ProducerObservation,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct SettingsEvent {
     pub program_fingerprint: u64,
     pub event_id: String,
     pub base_revision: u64,
     pub position: u64,
+    pub origin: SettingsOrigin,
     pub changes: Vec<SettingChange>,
 }
 
@@ -215,7 +224,12 @@ fn dst(reader: &mut Reader<'_>) -> Result<(u8, u8)> {
     Ok(pair)
 }
 
-pub(crate) fn load_schedule(reader: &mut Reader<'_>, kind: u8) -> Result<ScheduleDescriptor> {
+pub(crate) fn load_schedule(
+    reader: &mut Reader<'_>,
+    kind: u8,
+    format: u16,
+    prior: &[crate::schedule_vm::PulseDescriptor],
+) -> Result<ScheduleDescriptor> {
     let site = reader.u32()?;
     let name = text(reader)?;
     let gap_ms = exact(reader)?;
@@ -226,15 +240,66 @@ pub(crate) fn load_schedule(reader: &mut Reader<'_>, kind: u8) -> Result<Schedul
         5 => {
             let epoch_id = text(reader)?;
             let anchor_ms = exact(reader)?;
-            let name = text(reader)?;
-            let operator_editable = flag(reader)?;
-            let every = DurationSetting {
-                name,
-                operator_editable,
-                initial_ms: exact(reader)?,
-                min_ms: exact(reader)?,
-                max_ms: exact(reader)?,
-                step_ms: exact(reader)?,
+            let every = if format == 10 {
+                DurationSetting {
+                    id: 0,
+                    name: text(reader)?,
+                    operator_editable: flag(reader)?,
+                    initial_ms: exact(reader)?,
+                    min_ms: exact(reader)?,
+                    max_ms: exact(reader)?,
+                    step_ms: exact(reader)?,
+                }
+            } else {
+                let id = reader.u32()?;
+                if id == 0 {
+                    let interval = exact(reader)?;
+                    DurationSetting {
+                        id,
+                        name: String::new(),
+                        operator_editable: false,
+                        initial_ms: interval,
+                        min_ms: interval,
+                        max_ms: interval,
+                        step_ms: 1,
+                    }
+                } else {
+                    let config = prior
+                        .iter()
+                        .find_map(|p| match p {
+                            crate::schedule_vm::PulseDescriptor::Config(c) if c.id == id => Some(c),
+                            _ => None,
+                        })
+                        .ok_or_else(|| Error::new("Periodic config must precede consumer"))?;
+                    if config.semantic_type != "Duration" {
+                        return Err(Error::new("Periodic config must be Duration"));
+                    }
+                    let crate::settings_stream::ConfigValue::Scalar(crate::Value::Number(initial)) =
+                        config.initial
+                    else {
+                        return Err(Error::new("invalid Duration config"));
+                    };
+                    let (min, max, step) = config.bounds.map_or(
+                        (1.0, 9_007_199_254_740_991.0, 1.0),
+                        |(a, b, c)| match (a, b, c) {
+                            (
+                                crate::Value::Number(a),
+                                crate::Value::Number(b),
+                                crate::Value::Number(c),
+                            ) => (a, b, c),
+                            _ => (0.0, 0.0, 0.0),
+                        },
+                    );
+                    DurationSetting {
+                        id,
+                        name: config.name.clone(),
+                        operator_editable: config.operator_editable,
+                        initial_ms: initial as u64,
+                        min_ms: min as u64,
+                        max_ms: max as u64,
+                        step_ms: step as u64,
+                    }
+                }
             };
             if every.min_ms == 0
                 || every.step_ms == 0
@@ -327,32 +392,59 @@ pub(crate) fn load_schedule(reader: &mut Reader<'_>, kind: u8) -> Result<Schedul
         }
         9 => {
             let timezone = text(reader)?;
-            let setting = text(reader)?;
-            let operator_editable = flag(reader)?;
-            let grid_ms = exact(reader)?;
-            let capacity = reader.u16()?;
-            let count = reader.u16()?;
-            if grid_ms == 0
-                || 86_400_000 % grid_ms != 0
-                || capacity == 0
-                || capacity > 1440
-                || count > capacity
-            {
-                return Err(Error::new("invalid configured slots bound"));
-            }
-            let mut initial_minutes = Vec::with_capacity(usize::from(count));
-            for _ in 0..count {
-                let minute = reader.u16()?;
-                if minute >= 1440
-                    || u64::from(minute) * 60_000 % grid_ms != 0
-                    || initial_minutes.last().is_some_and(|last| *last >= minute)
-                {
-                    return Err(Error::new("invalid configured slot"));
-                }
-                initial_minutes.push(minute);
-            }
+            let (config_id, setting, operator_editable, grid_ms, capacity, initial_minutes) =
+                if format == 10 {
+                    let setting = text(reader)?;
+                    let operator_editable = flag(reader)?;
+                    let grid_ms = exact(reader)?;
+                    let capacity = reader.u16()?;
+                    let count = reader.u16()?;
+                    if grid_ms == 0
+                        || 86_400_000 % grid_ms != 0
+                        || capacity == 0
+                        || capacity > 1440
+                        || count > capacity
+                    {
+                        return Err(Error::new("invalid configured slots bound"));
+                    }
+                    let mut minutes = Vec::with_capacity(usize::from(count));
+                    for _ in 0..count {
+                        let minute = reader.u16()?;
+                        if minute >= 1440
+                            || u64::from(minute) * 60_000 % grid_ms != 0
+                            || minutes.last().is_some_and(|last| *last >= minute)
+                        {
+                            return Err(Error::new("invalid configured slot"));
+                        }
+                        minutes.push(minute);
+                    }
+                    (0, setting, operator_editable, grid_ms, capacity, minutes)
+                } else {
+                    let config_id = reader.u32()?;
+                    let config = prior
+                        .iter()
+                        .find_map(|p| match p {
+                            crate::schedule_vm::PulseDescriptor::Config(c) if c.id == config_id => {
+                                Some(c)
+                            }
+                            _ => None,
+                        })
+                        .ok_or_else(|| Error::new("TimeSlots config must precede consumer"))?;
+                    let crate::settings_stream::ConfigValue::Slots(slots) = &config.initial else {
+                        return Err(Error::new("DailySlots config must be TimeSlots"));
+                    };
+                    (
+                        config_id,
+                        config.name.clone(),
+                        config.operator_editable,
+                        config.grid_ms,
+                        config.capacity,
+                        slots.iter().map(|(_, minute)| *minute).collect(),
+                    )
+                };
             let (dst_missing, dst_repeated) = dst(reader)?;
             ScheduleDefinition::ConfigDailySlots {
+                config_id,
                 timezone,
                 setting,
                 operator_editable,

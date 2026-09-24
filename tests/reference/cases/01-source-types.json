@@ -1137,7 +1137,7 @@
       "rule": "Temperature, Pressure와 FlowRate는 승인된 unit suffix literal을 사용한다.",
       "scope": "compiler",
       "status": "executable",
-      "source": "# Physical quantity literals\n\n```ghost\ncontrol PhysicalQuantityLiterals {\n  config target: Temperature = 25°C;\n  config pressure_limit: Pressure = 101.3kPa;\n  config irrigation_rate: FlowRate = 5L/min;\n  output valid: Bool;\n  valid <- target < 77°F && pressure_limit > 1bar && irrigation_rate > 1mL/min;\n}\n```\n",
+      "source": "# Physical quantity literals\n\n```ghost\ncontrol PhysicalQuantityLiterals {\n  let target: Temperature = 25°C;\n  let pressure_limit: Pressure = 101.3kPa;\n  let irrigation_rate: FlowRate = 5L/min;\n  output valid: Bool;\n  valid <- target < 77°F && pressure_limit > 1bar && irrigation_rate > 1mL/min;\n}\n```\n",
       "filename": "physical-quantity-literals.ghost.md",
       "expect": "accept"
     },

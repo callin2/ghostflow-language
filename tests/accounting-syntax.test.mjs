@@ -7,8 +7,8 @@ import { sha256Hex } from '../tools/sha256.mjs';
 const source = `control AccountingSyntax {
   resource pump1: BoolActuator;
   event normal_run_started: Event;
-  config worst_case_on: Duration = 5min;
-  config stop_delay: Duration = 10s;
+  let worst_case_on: Duration = 5min;
+  let stop_delay: Duration = 10s;
   account pump_applied = on_time(pump1, stage: applied, persistence: durable);
   account normal_starts = count_events(normal_run_started, over: local_day("Asia/Seoul"), persistence: durable);
   constraints PumpBudgets {
@@ -49,7 +49,7 @@ test('public toolchain emits one executable accounting control artifact with sou
   const document = '# Accounting syntax\n\n```ghost\n' + source + '\n```\n';
   const artifact = await compileSource(document, { filename: 'accounting.ghost.md' });
   assert.equal(new TextDecoder().decode(artifact.bytes.slice(0, 4)), 'GFB1');
-  assert.equal(artifact.manifest.format, 'GhostFlow/control-v9');
+  assert.equal(artifact.manifest.format, 'GhostFlow/control-v10');
   assert.equal(artifact.manifest.accounting.bindings.length, 2);
   assert.deepEqual(artifact.manifest.accounting.bindings[0].evidenceBinding, {
     kind: 'applied_interval', target: 'pump1', stage: 'applied', identity: 'receipt_id',
@@ -73,6 +73,11 @@ test('accounting declarations reject missing stage, persistence, and targets', (
   assert.throws(() => typeCheckControl('control X { account a = on_time(missing, stage: applied, persistence: durable); output x: Bool; x <- true; }'), /unknown resource/);
 });
 
+test('static accounting reserve rejects a live config Result without an explicit policy', () => {
+  const live = source.replace('let worst_case_on: Duration', 'config worst_case_on: Duration');
+  assert.throws(() => typeCheckControl(live), /Result|reserve|Duration/);
+});
+
 test('event counts return Result and cannot be used as numbers directly', () => {
   const source = `control DirectEventCountUse {
     event started: Event;
@@ -80,7 +85,7 @@ test('event counts return Result and cannot be used as numbers directly', () => 
     output count: Bool;
     count <- starts.count >= 0;
   }`;
-  assert.throws(() => typeCheckControl(source), /Result<Int,AccountingFault>|expected Int|numeric|ordered types/);
+  assert.throws(() => typeCheckControl(source), /Result<Int,AccountingFault>|expected Int|numeric|ordered types|cannot use Result directly/);
 });
 
 test('pure functions cannot capture an accounting event count', () => {

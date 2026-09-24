@@ -700,6 +700,13 @@ objective는 다음을 연결한다.
 - `controller`: Hysteresis/On-Off, PI 또는 PID policy.
 - `output`: actuator capability 안의 허용 range.
 
+config를 참조하는 `target`은 §5.2의 현재 `Result<T, SettingsFault>` observation을
+소비한다. `T`는 measure와 호환되는 quantity다. `ok(value)`는 현재 setpoint이며
+`fault(reason)`은 명시한 controller fault policy로 간다. 초기값이나 이전 성공 target을
+암묵 대입하지 않는다. 실행 가능한 Temperature/Percent PID profile의 `fault = disable`은
+target fault도 즉시 disable하며, 회복은 기존 deadline과 `track_safe` 정책을 따른다.
+성공 target 변경 자체는 controller state를 reset하지 않는다.
+
 continuous actuator capability는 value quantity/type, range, 선택 resolution, safe value,
 rate/slew limit, feedback availability를 표현한다. 0–10V, PWM, VFD, Modbus, servo는
 source objective가 아니라 Device binding이다.

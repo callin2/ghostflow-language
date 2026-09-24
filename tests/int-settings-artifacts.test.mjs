@@ -19,7 +19,7 @@ control IntSettings {
   // ghostflow:link id=GF-INT-SETTINGS relation=implements
   config count: Int = ${value} { min = ${min}; max = ${max}; step = ${step}; access = operator; label = "Count"; }
   output result: Int;
-  result <- count;
+  result <- case count { ok(value) => value; fault(_) => 0; };
 }
 \`\`\`
 `;
@@ -37,8 +37,16 @@ async function compile(settings = {}) {
 }
 
 async function run(artifact) {
-  const runtime = await ControlRuntime.instantiateSimulation(wasm, artifact);
-  try { return runtime.step({ nowMs: 0 }); }
+  const runtime = await ControlRuntime.instantiate(wasm, artifact,
+    { context: { bootEpoch: 1, terminalCapacity: 8, bindings: [] } });
+  try {
+    const completion = runtime.step({ nowMs: 0, contextFacts: {
+      clock: { monotonicMs: 0, bootEpoch: 1, wallMs: 0, uncertaintyMs: 0,
+        trusted: true, unknownReason: null, sourceRevision: 'int-settings-clock-v1' },
+      natural: [], schedules: [], settings: null,
+    } });
+    return { ...completion, settingsState: runtime.contextSnapshot().state };
+  }
   finally { runtime.dispose(); }
 }
 
@@ -48,7 +56,7 @@ async function snapshot(artifact, runId = 'int-settings') {
     compilation: artifact,
     runId,
     completion: { kind: 'completed-scan', scanId: 0, logicalTimeMs: 0 },
-    trace: completion.vm,
+    trace: completion.vm, settingsState: completion.settingsState,
   });
 }
 
@@ -140,7 +148,7 @@ test('runtime reports the precise malformed Int setting field before instantiati
   for (const [name, mutate, message] of cases) await t.test(name, async () => {
     const manifest = structuredClone(artifact.manifest);
     mutate(manifest);
-    await assert.rejects(() => ControlRuntime.instantiateSimulation(wasm, { ...artifact, manifest }),
+    await assert.rejects(() => ControlRuntime.instantiate(wasm, { ...artifact, manifest }),
       error => error instanceof Error && error.message === message);
   });
 
@@ -148,7 +156,7 @@ test('runtime reports the precise malformed Int setting field before instantiati
     const gridArtifact = await compile({ value: 0, min: 0, max: 6, step: 2 });
     const manifest = structuredClone(gridArtifact.manifest);
     manifest.configs[0].settings.max = 5;
-    await assert.rejects(() => ControlRuntime.instantiateSimulation(wasm, { ...gridArtifact, manifest }),
+    await assert.rejects(() => ControlRuntime.instantiate(wasm, { ...gridArtifact, manifest }),
       error => error instanceof Error && error.message === 'config count.settings.max is not aligned to settings.step from settings.min');
   });
 });
