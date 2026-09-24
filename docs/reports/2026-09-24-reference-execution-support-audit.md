@@ -37,6 +37,25 @@ commands, Reference ID, outcome, artifact format and failure reason. The origina
 generated artifact remains under ignored `build/`; its full SHA-256 above binds
 this report and the compact export to that local result.
 
+## Full host CI cross-check
+
+The docs-only [PR #138](https://github.com/callin2/ghostflow-language/pull/138)
+run reports the same full host-gate result as the audited `f809b4d` baseline:
+17 failures, comprising seven `range-contract.test.mjs` cases and the ten
+Reference descriptor RED cases above. The range fixtures fail on unsupported
+`cancel_when`; the Reference cases emit the documented schedule, accounting and
+temporal descriptors without simulator execution. Current run:
+[WASM current job 107491461721](https://github.com/callin2/ghostflow-language/actions/runs/35955043922/job/107491461721).
+Baseline run:
+[f809b4d WASM current job 107424821836](https://github.com/callin2/ghostflow-language/actions/runs/35933373257/job/107424821836).
+The frontend-pin job passed in the PR run:
+[job 107491461612](https://github.com/callin2/ghostflow-language/actions/runs/35955043922/job/107491461612).
+
+The full-host failure count is not the targeted Reference simulator count: this
+audit's focused command remains **70 passed, 10 failed, 3 noncontrol**. PR #138
+changes reports only; the compared job has no new regression or infrastructure
+failure.
+
 ## Reference to requirement and execution evidence
 
 | Reference slice | Requirement/status evidence | Test evidence | Native/WASM/simulator status |
