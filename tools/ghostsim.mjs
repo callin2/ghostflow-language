@@ -9,6 +9,7 @@ import { decode, encode } from '@toon-format/toon';
 import { verifyArtifactSourceMap } from './toolchain.mjs';
 import { encodeTemporalProfile } from '../runtimes/wasm/temporal-profile.mjs';
 import { encodeSolarFacts, validateSolarActivation } from '../runtimes/wasm/solar-abi.mjs';
+import { AFTER_EVENT_CAPACITY } from '../runtimes/wasm/after-event-runtime.mjs';
 
 const root = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const MAX_SCENARIO_BYTES = 256 * 1024;
@@ -54,7 +55,7 @@ function requireTyped(input, location) {
 }
 
 export function validateScenario(scenario, manifest) {
-  requireFields(scenario, ['format', 'id', 'initialInputs', 'keyBindings', 'actions'], ['temporal', 'capabilities', 'solar', 'actuatorBindings', 'plant'], 'scenario');
+  requireFields(scenario, ['format', 'id', 'initialInputs', 'keyBindings', 'actions'], ['temporal', 'afterEvent', 'capabilities', 'solar', 'actuatorBindings', 'plant'], 'scenario');
   if (scenario.format !== 'GhostFlow/scenario-v1') throw new Error('scenario.format: unsupported version');
   requireName(scenario.id, 'scenario.id');
   if (!Array.isArray(scenario.initialInputs)) throw new Error('initialInputs: expected array');
@@ -68,6 +69,11 @@ export function validateScenario(scenario, manifest) {
     }
     encodeTemporalProfile(scenario.temporal);
   }
+  const afterEventSignals = (manifest.signals ?? []).filter(signal => signal.kind === 'after-event');
+  if (afterEventSignals.length) {
+    requireShape(scenario.afterEvent, ['timeEpoch'], 'afterEvent');
+    requireNonnegative(scenario.afterEvent.timeEpoch, 'afterEvent.timeEpoch');
+  } else if (scenario.afterEvent !== undefined) throw new Error('afterEvent profile requires an after_event signal');
   if (scenario.capabilities !== undefined) {
     if (!Array.isArray(scenario.capabilities)) throw new Error('capabilities: expected array');
     if (!manifest.adaptPolicy && !manifest.strategies) throw new Error('capabilities require an adapt control');
@@ -164,6 +170,7 @@ export function validateScenario(scenario, manifest) {
   let previousTime = null;
   const pendingSamples = new Set();
   const pendingIntervals = new Set();
+  const eventNames = new Set(afterEventSignals.map(signal => signal.event.name));
   for (const [index, action] of scenario.actions.entries()) {
     const location = `actions[${index}]`;
     if (!object(action)) throw new Error(`${location}: expected object`);
@@ -204,8 +211,29 @@ export function validateScenario(scenario, manifest) {
         pendingIntervals.add(action.name);
         break;
       case 'scan':
-        requireFields(action, ['kind', 'atMs'], ['solarFacts'], location);
+        requireFields(action, ['kind', 'atMs'], ['solarFacts', 'events'], location);
         if (!Number.isSafeInteger(action.atMs) || action.atMs < 0) throw new Error(`${location}: atMs must be an exact nonnegative integer`);
+        if (action.events !== undefined) {
+          if (!eventNames.size) throw new Error(`${location}: events require an after_event signal`);
+          if (!object(action.events)) throw new Error(`${location}.events: expected object`);
+          for (const [eventName, batch] of Object.entries(action.events)) {
+            if (!eventNames.has(eventName)) throw new Error(`${location}.events: unknown Event source ${eventName}`);
+            requireShape(batch, ['starts', 'acknowledgements'], `${location}.events.${eventName}`);
+            for (const [field, withTime] of [['starts', true], ['acknowledgements', false]]) {
+              if (!Array.isArray(batch[field]) || batch[field].length > AFTER_EVENT_CAPACITY) {
+                throw new Error(`${location}.events.${eventName}.${field}: expected at most ${AFTER_EVENT_CAPACITY} entries`);
+              }
+              for (const [itemIndex, item] of batch[field].entries()) {
+                requireShape(item, withTime ? ['sourceEpoch', 'id', 'atMs'] : ['sourceEpoch', 'id'],
+                  `${location}.events.${eventName}.${field}[${itemIndex}]`);
+                for (const key of withTime ? ['sourceEpoch', 'id', 'atMs'] : ['sourceEpoch', 'id']) {
+                  requireNonnegative(item[key], `${location}.events.${eventName}.${field}[${itemIndex}].${key}`);
+                }
+                if (withTime && item.atMs > action.atMs) throw new Error(`${location}.events.${eventName}.${field}[${itemIndex}].atMs: future event`);
+              }
+            }
+          }
+        }
         if (hasSolar) {
           if (action.solarFacts === undefined) throw new Error(`${location}: Solar scan requires provider facts`);
           encodeSolarFacts(action.solarFacts);
@@ -272,7 +300,8 @@ export function runScenario(artifactPath, scenarioPath, { format = 'toon' } = {}
     // modules use the native framed runner. Neither path retries failed scans.
     const conditioned = (manifest.sensors?.length ?? 0) > 0
       || (scenario.actuatorBindings?.length ?? 0) > 0
-      || manifest.schedules?.some(schedule => schedule.kind === 'solar');
+      || manifest.schedules?.some(schedule => schedule.kind === 'solar')
+      || manifest.signals?.some(signal => signal.kind === 'after-event');
     const executable = conditioned ? process.execPath : path.join(root, 'target/release/examples/scenario_scan');
     const arguments_ = conditioned
       ? [path.join(root, 'tools/scenario-sensors.mjs'), artifactPath, actionsPath]

@@ -58,7 +58,26 @@ const behaviorOracles = {
 };
 
 function temporalOracle(id, manifest) {
-  if (!['REF-04-025', 'REF-04-027', 'REF-04-028', 'REF-04-029'].includes(id)) return null;
+  if (!['REF-04-025', 'REF-04-026', 'REF-04-027', 'REF-04-028', 'REF-04-029'].includes(id)) return null;
+  if (id === 'REF-04-026') {
+    const signal = manifest.signals.find(item => item.kind === 'after-event');
+    const event = (id, atMs) => ({ sourceEpoch: 2, id, atMs });
+    const events = starts => ({ [signal.event.name]: { starts, acknowledgements: [] } });
+    return {
+      afterEvent: { timeEpoch: 7 },
+      actions: [
+        { kind: 'scan', atMs: 0, events: events([event(1, 0)]) },
+        { kind: 'scan', atMs: 5_000, events: events([event(2, 5_000)]) },
+        { kind: 'sample', name: signal.predicate.name, epoch: 3, id: 1, timestampMs: 10_000, value: true, quality: 'Good' },
+        { kind: 'scan', atMs: 10_000 },
+      ],
+      requested: [
+        { any_opened: false, all_opened: false },
+        { any_opened: false, all_opened: false },
+        { any_opened: true, all_opened: false },
+      ],
+    };
+  }
   const sourceTag = manifest.signals[0].sources[0].tag;
   if (id === 'REF-04-025') {
     const interval = (id, startMs, endMs) => ({ kind: 'interval', name: 'hot', epoch: 11, id, startMs, endMs, value: true, quality: 'Measured' });
@@ -146,6 +165,7 @@ for (const entry of accepted) {
       fs.writeFileSync(scenario, encode({
         format: 'GhostFlow/scenario-v1', id: entry.id, initialInputs, keyBindings: [],
         ...(oracle?.temporal ? { temporal: oracle.temporal } : {}),
+        ...(oracle?.afterEvent ? { afterEvent: oracle.afterEvent } : {}),
         ...(oracle?.capabilities ? { capabilities: oracle.capabilities } : {}),
         ...(oracle?.solar ? { solar: oracle.solar } : {}),
         actions: oracle?.actions ?? [scan(0)],

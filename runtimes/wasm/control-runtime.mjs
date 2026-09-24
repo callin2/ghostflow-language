@@ -1,6 +1,7 @@
 import { GhostFlowRuntime } from './ghostflow-runtime.mjs';
 import { FramedGhostFlowRuntime } from './framed-runtime.mjs';
 import { SignalConditioner } from './signals.mjs';
+import { AFTER_EVENT_CAPACITY, AfterEventRuntime } from './after-event-runtime.mjs';
 import { NativeDispatchError } from './native-dispatch.mjs';
 import { encodeTemporalProfile } from './temporal-profile.mjs';
 import { validateSolarDescriptor } from './solar-schedule.mjs';
@@ -24,6 +25,7 @@ const MAX_SCHEDULE_SLOTS = 96;
 const SENSOR_FAULT_CODE = Object.freeze({ Disconnected: 0, Stale: 1, Invalid: 2, NotReady: 3 });
 const HOLD_STATE_ROLES = ['available', 'value', 'heldSourceTag', 'heldEpoch', 'heldId', 'heldTimestamp', 'held', 'age', 'maskedFaultPresent', 'maskedFaultCode', 'maskedFaultOrigin'];
 const isVmSignal = item => item.kind === 'debounce' || item.kind === 'hold-last' || item.kind === 'window';
+const isAfterEvent = item => item.kind === 'after-event';
 const RATE_TYPES = new Set(['Temperature', 'TemperatureDelta', 'Pressure', 'VaporPressureDeficit', 'FlowRate', 'Volume', 'Length', 'Irradiance', 'PPFD', 'Energy', 'Power', 'ElectricalCurrent', 'Voltage', 'Conductivity']);
 
 function record(value, label) {
@@ -260,6 +262,9 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
     else if (item.kind === 'true-for') keys(item,
       ['kind', 'name', 'site', 'slot', 'payloadType', 'errorType', 'quality', 'durationMs', 'clockInput', 'timeEpochInput', 'sources', 'intervalInputs'],
       [], `manifest.signals[${index}]`);
+    else if (isAfterEvent(item)) keys(item,
+      ['kind', 'name', 'site', 'payloadType', 'errorType', 'quality', 'windowMs', 'event', 'predicate', 'projections', 'projectionInputs'],
+      [], `manifest.signals[${index}]`);
     else keys(item, ['name', 'sensor', 'onBelow', 'offAbove', 'initial', 'valueInput', 'okInput', 'faultInput'], [], `manifest.signals[${index}]`);
     return copy(item);
   });
@@ -280,7 +285,8 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
   if (declarationNames.length > MAX_NAMES) throw new RangeError(`manifest names exceed ${MAX_NAMES}`);
   unique(declarationNames, 'declaration');
   const generatedTotal = sensors.reduce((count, item) => count + 3 + (item.samplePresentInput === undefined ? 0 : 4), 0)
-    + signals.reduce((count, item) => count + (isVmSignal(item) ? 0 : 3), 0)
+    + signals.reduce((count, item) => count + (isVmSignal(item) ? 0
+      : isAfterEvent(item) ? item.projections.length * 3 : 3), 0)
     + schedules.filter(item => item.kind !== 'solar').length + timers.length * 2 + (timers.length > 0 || signals.some(isVmSignal) ? 1 : 0) + (windows.length ? 1 : 0);
   if (generatedTotal > MAX_NAMES) throw new RangeError(`generated manifest names exceed ${MAX_NAMES}`);
   const inputNames = new Set(inputs.map(item => item.name));
@@ -501,6 +507,37 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
       signalNames.add(item.name);
       continue;
     }
+    if (isAfterEvent(item)) {
+      safeInteger(item.site, `signal ${item.name}.site`, 1, 0xffff_ffff);
+      if (item.payloadType !== 'Bool' || item.errorType !== 'SensorFault' || item.quality !== 'measured') {
+        throw new Error(`signal ${item.name} after_event requires Bool measured SensorFault evidence`);
+      }
+      safeInteger(item.windowMs, `signal ${item.name}.windowMs`, 1);
+      for (const [role, source] of [['event', item.event], ['predicate', item.predicate]]) {
+        keys(record(source, `signal ${item.name}.${role}`), ['name', 'tag'], [], `signal ${item.name}.${role}`);
+        name(source.name, `signal ${item.name}.${role}.name`);
+        safeInteger(source.tag, `signal ${item.name}.${role}.tag`, 1, 0xffff_ffff);
+      }
+      const predicate = sensorByName.get(item.predicate.name);
+      if (!predicate || predicate.type !== 'Bool') throw new Error(`signal ${item.name} predicate must bind a Bool sensor`);
+      if (!Array.isArray(item.projections) || !item.projections.length || item.projections.length > 2) {
+        throw new Error(`signal ${item.name}.projections must be a non-empty bounded array`);
+      }
+      unique(item.projections, `signal ${item.name} projection`);
+      keys(record(item.projectionInputs, `signal ${item.name}.projectionInputs`), item.projections, [], `signal ${item.name}.projectionInputs`);
+      for (const mode of item.projections) {
+        if (!['any', 'all'].includes(mode)) throw new Error(`signal ${item.name} has unsupported projection ${mode}`);
+        const inputs = record(item.projectionInputs[mode], `signal ${item.name}.projectionInputs.${mode}`);
+        keys(inputs, ['value', 'ok', 'fault'], [], `signal ${item.name}.projectionInputs.${mode}`);
+        for (const role of ['value', 'ok', 'fault']) {
+          name(inputs[role], `signal ${item.name}.projectionInputs.${mode}.${role}`, true);
+          generated(inputs[role], `${RESERVED}after_event_${mode}_${role}_${item.name}`,
+            `signal ${item.name}.projectionInputs.${mode}.${role}`);
+        }
+      }
+      signalNames.add(item.name);
+      continue;
+    }
     if (isVmSignal(item)) {
       const hold = item.kind === 'hold-last';
       const prefix = hold ? 'hold_last' : 'debounce';
@@ -568,8 +605,10 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
   unique([
     ...sensors.flatMap(item => [item.valueInput, item.okInput, item.faultInput]),
     ...sensors.flatMap(item => [item.samplePresentInput, item.sampleEpochInput, item.sampleIdInput, item.sampleTimestampInput].filter(Boolean)),
-    ...signals.flatMap(item => item.kind === 'true-for' || isVmSignal(item) ? [] : [item.valueInput, item.okInput, item.faultInput]),
+    ...signals.flatMap(item => item.kind === 'true-for' || isVmSignal(item) || isAfterEvent(item) ? [] : [item.valueInput, item.okInput, item.faultInput]),
     ...signals.flatMap(item => item.kind === 'true-for' ? INTERVAL_FIELDS.map(field => item.intervalInputs[field]) : []),
+    ...signals.flatMap(item => isAfterEvent(item)
+      ? Object.values(item.projectionInputs).flatMap(inputs => [inputs.value, inputs.ok, inputs.fault]) : []),
     ...schedules.map(item => item.dueInput).filter(Boolean),
     ...new Set([...timers.flatMap(item => [item.clockInput, item.state].filter(Boolean)), ...windows.flatMap(item => [item.clockInput, item.timeEpochInput])]),
   ], 'generated input');
@@ -646,6 +685,7 @@ async function instantiateControlRuntime(wasmBytes, { bytes: bytecode, manifest 
   checkedManifest.presentSensors = suppliedCapabilities === undefined ? null : presentSensors;
   const hasWindows = checkedManifest.manifest.signals.some(item => item.kind === 'window');
   const hasTrueFor = checkedManifest.manifest.signals.some(item => item.kind === 'true-for');
+  const hasAfterEvent = checkedManifest.manifest.signals.some(isAfterEvent);
   const hasSolar = checkedManifest.manifest.schedules.some(item => item.kind === 'solar');
   let temporal = null;
   if (hasSolar) {
@@ -662,21 +702,38 @@ async function instantiateControlRuntime(wasmBytes, { bytes: bytecode, manifest 
   } else if (options.temporal !== undefined) {
     throw new Error('temporal profile requires a window module');
   }
+  let afterEventEpoch = null;
+  if (hasAfterEvent) {
+    const profile = record(options.afterEvent, 'afterEvent');
+    keys(profile, ['timeEpoch'], [], 'afterEvent');
+    afterEventEpoch = safeInteger(profile.timeEpoch, 'afterEvent.timeEpoch');
+  } else if (options.afterEvent !== undefined) {
+    throw new Error('afterEvent profile requires an after_event signal');
+  }
   const digest = await sha256(compiledBytes);
   if (digest !== checkedManifest.manifest.bytecodeSha256) throw new Error('bytecode SHA-256 does not match manifest');
 
   const runtime = await instantiateRuntime(wasm);
   const sensors = new Map();
   const signals = new Map();
+  const afterEvents = new Map();
   try {
     runtime.load(compiledBytes);
     for (const item of checkedManifest.manifest.sensors) sensors.set(item.name, { item, conditioner: new SignalConditioner(runtime.wasm, sensorConfig(item)) });
     for (const item of checkedManifest.manifest.signals) {
-      if (isVmSignal(item) || item.kind === 'true-for') continue;
+      if (isVmSignal(item) || item.kind === 'true-for' || isAfterEvent(item)) continue;
       const sensor = checkedManifest.sensorByName.get(item.sensor);
       // Signals intentionally duplicate the sensor conditioner: each node owns
       // its own bounded 31-slot state and can be checkpointed independently.
       signals.set(item.name, { item, conditioner: new SignalConditioner(runtime.wasm, { ...sensorConfig(sensor), hysteresis: { onBelow: item.onBelow, offAbove: item.offAbove, initial: item.initial } }) });
+    }
+    for (const item of checkedManifest.manifest.signals.filter(isAfterEvent)) {
+      const tracker = await AfterEventRuntime.instantiate(wasm, {
+        windowMs: item.windowMs,
+        eventSourceTag: item.event.tag,
+        predicateSourceTag: item.predicate.tag,
+      });
+      afterEvents.set(item.name, { item, runtime: tracker });
     }
     for (const output of checkedManifest.manifest.outputs) runtime.addCapability('actuator', output.name, output.type === 'Bool' ? 'bool' : output.type === 'Int' ? 'int' : 'number');
     if (suppliedCapabilities !== undefined) for (const sensor of checkedManifest.manifest.sensors) {
@@ -685,24 +742,28 @@ async function instantiateControlRuntime(wasmBytes, { bytes: bytecode, manifest 
     if (hasSolar) runtime.activateSolar(options.solar);
     else if (temporal) runtime.activateTemporal(temporal); else runtime.activate();
   } catch (error) {
+    for (const { runtime: tracker } of afterEvents.values()) tracker.dispose();
     for (const { conditioner } of signals.values()) conditioner.dispose();
     for (const { conditioner } of sensors.values()) conditioner.dispose();
     runtime.dispose();
     throw error;
   }
-  return { runtime, checkedManifest, sensors, signals, temporalEpoch: hasSolar ? options.solar.bootEpoch : temporal?.timeEpoch ?? null, hasSolar };
+  return { runtime, checkedManifest, sensors, signals, afterEvents, afterEventEpoch,
+    temporalEpoch: hasSolar ? options.solar.bootEpoch : temporal?.timeEpoch ?? null, hasSolar };
 }
 
 export class ControlRuntime {
   static async instantiate(wasmBytes, { bytes: bytecode, manifest } = {}, options = {}) {
     const initialized = await instantiateControlRuntime(wasmBytes, { bytes: bytecode, manifest }, options, GhostFlowRuntime.instantiate, true);
-    return new ControlRuntime(initialized.runtime, initialized.checkedManifest, initialized.sensors, initialized.signals, false, initialized.temporalEpoch, initialized.hasSolar);
+    return new ControlRuntime(initialized.runtime, initialized.checkedManifest, initialized.sensors, initialized.signals,
+      initialized.afterEvents, false, initialized.temporalEpoch, initialized.hasSolar, initialized.afterEventEpoch);
   }
 
   static async instantiateFramed(wasmBytes, artifact = {}, options = {}) {
     if ((artifact.manifest?.objectives?.length ?? 0) > 0) throw new Error('framed native objectives are not supported');
     const initialized = await instantiateControlRuntime(wasmBytes, artifact, options, FramedGhostFlowRuntime.instantiate, false);
-    return new ControlRuntime(initialized.runtime, initialized.checkedManifest, initialized.sensors, initialized.signals, true, initialized.temporalEpoch, initialized.hasSolar);
+    return new ControlRuntime(initialized.runtime, initialized.checkedManifest, initialized.sensors, initialized.signals,
+      initialized.afterEvents, true, initialized.temporalEpoch, initialized.hasSolar, initialized.afterEventEpoch);
   }
 
   // New simulation consumers opt into the v2 operating-settings contract.
@@ -716,9 +777,10 @@ export class ControlRuntime {
   #faulted;
   #temporalEpoch;
   #hasSolar;
+  #afterEventEpoch;
   #presentSensors;
 
-  constructor(runtime, manifest, sensors, signals, framed = false, temporalEpoch = null, hasSolar = false) {
+  constructor(runtime, manifest, sensors, signals, afterEvents, framed = false, temporalEpoch = null, hasSolar = false, afterEventEpoch = null) {
     this.runtime = runtime;
     this.exports = runtime.wasm;
     this.manifest = manifest.manifest;
@@ -731,12 +793,14 @@ export class ControlRuntime {
     this.objectives = manifest.manifest.objectives ?? [];
     this.sensors = sensors;
     this.signals = signals;
+    this.afterEvents = afterEvents;
     this.lastNowMs = null;
     this.#framed = framed;
     this.#frameScanId = 0;
     this.#faulted = false;
     this.#temporalEpoch = temporalEpoch;
     this.#hasSolar = hasSolar;
+    this.#afterEventEpoch = afterEventEpoch;
     this.#presentSensors = manifest.presentSensors;
   }
 
@@ -751,19 +815,22 @@ export class ControlRuntime {
    * Executes one caller-supplied snapshot. Sensor sampleMs is metadata for the
    * acquisition owner; this host never polls hardware or performs I/O.
    */
-  step({ nowMs, inputs = {}, samples = {}, due = {}, intervals = {}, objectiveSafeMax = {}, solarFacts } = {}) {
-    if (this.#framed) return this.#stepFramed({ nowMs, inputs, samples, due, intervals, objectiveSafeMax, solarFacts });
-    return this.#stepLegacy({ nowMs, inputs, samples, due, intervals, objectiveSafeMax, solarFacts });
+  step({ nowMs, inputs = {}, samples = {}, due = {}, intervals = {}, events = {}, objectiveSafeMax = {}, solarFacts } = {}) {
+    if (this.#framed) return this.#stepFramed({ nowMs, inputs, samples, due, intervals, events, objectiveSafeMax, solarFacts });
+    return this.#stepLegacy({ nowMs, inputs, samples, due, intervals, events, objectiveSafeMax, solarFacts });
   }
 
-  #stepLegacy({ nowMs, inputs = {}, samples = {}, due = {}, intervals = {}, objectiveSafeMax = {}, solarFacts } = {}) {
+  #stepLegacy({ nowMs, inputs = {}, samples = {}, due = {}, intervals = {}, events = {}, objectiveSafeMax = {}, solarFacts } = {}) {
     this.#live();
     if (this.#faulted) throw new Error('ControlRuntime is faulted; create a new instance');
-    const captured = this.#captureSnapshot({ nowMs, inputs, samples, due, intervals, objectiveSafeMax, solarFacts });
+    const captured = this.#captureSnapshot({ nowMs, inputs, samples, due, intervals, events, objectiveSafeMax, solarFacts });
     const transaction = this.#beginConditioners();
+    let afterEventTransaction = [];
     let phase = 'prepare';
     try {
-      const { sensorReadings, signalReadings } = this.#condition(captured.normalizedSamples, captured.nowMs);
+      const { sensorReadings, signalReadings, observedSensors } = this.#condition(captured.normalizedSamples, captured.nowMs);
+      const staged = this.#stageAfterEvents(captured, sensorReadings, observedSensors);
+      afterEventTransaction = staged.trackers;
 
       for (const item of this.manifest.inputs) {
         const value = captured.inputValues.get(item.name);
@@ -801,6 +868,10 @@ export class ControlRuntime {
         if (value.type === 'Bool') this.runtime.setBool(name, value.value);
         else this.runtime.setNumber(name, value.value);
       });
+      this.#setAfterEventProjections(staged.projections, (name, value) => {
+        if (value.type === 'Bool') this.runtime.setBool(name, value.value);
+        else this.runtime.setNumber(name, value.value);
+      });
       if (this.#temporalEpoch !== null) this.runtime.setNumber(`${RESERVED}time_epoch`, this.#temporalEpoch);
       if (this.#hasSolar) this.runtime.setNumber(`${RESERVED}now_ms`, captured.nowMs);
       phase = 'dispatch';
@@ -809,6 +880,7 @@ export class ControlRuntime {
       phase = 'committed';
       this.lastNowMs = captured.nowMs;
       this.#commitConditioners(transaction);
+      this.#commitAfterEvents(afterEventTransaction);
       const trace = this.runtime.trace;
       return {
         vm: trace,
@@ -817,11 +889,14 @@ export class ControlRuntime {
       };
     } catch (error) {
       if (phase === 'prepare' || (phase === 'dispatch' && error instanceof NativeDispatchError && error.committed === false)) {
-        this.#rollbackConditioners(transaction, error);
+        this.#rollbackPrepared(transaction, afterEventTransaction, error);
       } else {
         if (phase === 'dispatch' && error instanceof NativeDispatchError && error.committed === true) {
           this.lastNowMs = captured.nowMs;
-          try { this.#commitConditioners(transaction); }
+          try {
+            this.#commitConditioners(transaction);
+            this.#commitAfterEvents(afterEventTransaction);
+          }
           catch (commitError) {
             this.#faulted = true;
             throw new AggregateError([error, commitError], 'postcommit conditioner finalization failed');
@@ -833,10 +908,10 @@ export class ControlRuntime {
     }
   }
 
-  #captureSnapshot({ nowMs, inputs = {}, samples = {}, due = {}, intervals = {}, objectiveSafeMax = {}, solarFacts } = {}) {
+  #captureSnapshot({ nowMs, inputs = {}, samples = {}, due = {}, intervals = {}, events = {}, objectiveSafeMax = {}, solarFacts } = {}) {
     safeInteger(nowMs, 'nowMs');
     if (this.lastNowMs !== null && nowMs < this.lastNowMs) throw new Error('nowMs must be monotonic');
-    record(inputs, 'inputs'); record(samples, 'samples'); record(due, 'due'); record(intervals, 'intervals'); record(objectiveSafeMax, 'objectiveSafeMax');
+    record(inputs, 'inputs'); record(samples, 'samples'); record(due, 'due'); record(intervals, 'intervals'); record(events, 'events'); record(objectiveSafeMax, 'objectiveSafeMax');
     for (const key of Object.keys(inputs)) if (!this.inputNames.has(key)) throw new Error(`unknown input ${key}`);
     for (const item of this.manifest.inputs) if (!Object.prototype.hasOwnProperty.call(inputs, item.name)) throw new Error(`missing input ${item.name}`);
     for (const key of Object.keys(samples)) {
@@ -856,6 +931,8 @@ export class ControlRuntime {
       if (clock.bootEpoch !== this.#temporalEpoch) throw new Error('solar facts clock.bootEpoch must match activation');
     }
     for (const key of Object.keys(intervals)) if (!this.trueForSources.has(key)) throw new Error(`unknown true_for source ${key}`);
+    const eventNames = new Set([...this.afterEvents.values()].map(entry => entry.item.event.name));
+    for (const key of Object.keys(events)) if (!eventNames.has(key)) throw new Error(`unknown Event source ${key}`);
     const objectiveSafeValues = new Map();
     for (const key of Object.keys(objectiveSafeMax)) if (!this.objectives.some(item => item.name === key)) throw new Error(`unknown objective ${key}`);
     for (const objective of this.objectives) {
@@ -908,7 +985,33 @@ export class ControlRuntime {
       const raw = Object.prototype.hasOwnProperty.call(intervals, sourceName) ? intervals[sourceName] : null;
       intervalValues.set(sourceName, this.#normalizeInterval(raw, sourceName, nowMs));
     }
-    return { nowMs, inputValues, normalizedSamples, dueValues, intervalValues, objectiveSafeMax: objectiveSafeValues, solarFacts };
+    const eventValues = new Map();
+    for (const eventName of eventNames) {
+      const raw = Object.hasOwn(events, eventName) ? record(events[eventName], `events.${eventName}`) : { starts: [], acknowledgements: [] };
+      keys(raw, ['starts', 'acknowledgements'], [], `events.${eventName}`);
+      const normalize = (items, label, withTime) => {
+        if (!Array.isArray(items) || items.length > AFTER_EVENT_CAPACITY) throw new RangeError(`${label} exceeds ${AFTER_EVENT_CAPACITY} entries`);
+        return items.map((item, index) => {
+          const at = record(item, `${label}[${index}]`);
+          keys(at, withTime ? ['sourceEpoch', 'id', 'atMs'] : ['sourceEpoch', 'id'], [], `${label}[${index}]`);
+          const value = {
+            sourceEpoch: safeInteger(at.sourceEpoch, `${label}[${index}].sourceEpoch`),
+            id: safeInteger(at.id, `${label}[${index}].id`),
+          };
+          if (withTime) {
+            value.atMs = safeInteger(at.atMs, `${label}[${index}].atMs`);
+            if (value.atMs > nowMs) throw new RangeError(`${label}[${index}].atMs cannot be in the future`);
+          }
+          return value;
+        });
+      };
+      eventValues.set(eventName, {
+        starts: normalize(raw.starts, `events.${eventName}.starts`, true),
+        acknowledgements: normalize(raw.acknowledgements, `events.${eventName}.acknowledgements`, false),
+      });
+    }
+    return { nowMs, inputValues, normalizedSamples, dueValues, intervalValues, eventValues,
+      objectiveSafeMax: objectiveSafeValues, solarFacts };
   }
 
   #normalizeInterval(raw, sourceName, nowMs) {
@@ -949,10 +1052,113 @@ export class ControlRuntime {
     }
   }
 
+  #stageAfterEvents(captured, sensorReadings, observedSensors) {
+    const trackers = [];
+    const projections = new Map();
+    try {
+      for (const [name, entry] of this.afterEvents) {
+        const batch = captured.eventValues.get(entry.item.event.name);
+        const sample = captured.normalizedSamples.get(entry.item.predicate.name);
+        const hasObservation = observedSensors.has(entry.item.predicate.name)
+          && sample.timestampMs === captured.nowMs;
+        const reading = sensorReadings.get(entry.item.predicate.name);
+        entry.runtime.stage({
+          time: { epoch: this.#afterEventEpoch, nowMs: captured.nowMs },
+          starts: batch.starts.map(event => ({
+            sourceTag: entry.item.event.tag,
+            sourceEpoch: event.sourceEpoch,
+            id: event.id,
+            timeEpoch: this.#afterEventEpoch,
+            atMs: event.atMs,
+          })),
+          predicate: hasObservation && reading.ok ? {
+            sourceTag: entry.item.predicate.tag,
+            atMs: captured.nowMs,
+            value: reading.value,
+            quality: 'measured',
+          } : null,
+          acknowledgements: batch.acknowledgements.map(key => ({
+            sourceTag: entry.item.event.tag,
+            sourceEpoch: key.sourceEpoch,
+            id: key.id,
+          })),
+        });
+        trackers.push(entry.runtime);
+        const values = new Map();
+        for (const mode of entry.item.projections) {
+          const projected = mode === 'any' ? entry.runtime.stagedAny() : entry.runtime.stagedAll();
+          values.set(mode, projected.ok ? projected : {
+            ok: false,
+            fault: reading.ok ? 'NotReady' : reading.quality,
+          });
+        }
+        projections.set(name, values);
+      }
+      return { trackers, projections };
+    } catch (error) {
+      this.#rollbackAfterEvents(trackers, error);
+    }
+  }
+
+  #setAfterEventProjections(projections, set) {
+    for (const [name, values] of projections) {
+      const descriptor = this.afterEvents.get(name).item;
+      for (const [mode, result] of values) {
+        const inputs = descriptor.projectionInputs[mode];
+        set(inputs.value, { type: 'Bool', value: result.ok ? result.value : false });
+        set(inputs.ok, { type: 'Bool', value: result.ok });
+        set(inputs.fault, { type: 'Number', value: result.ok ? 0 : SENSOR_FAULT_CODE[result.fault] });
+      }
+    }
+  }
+
+  #commitAfterEvents(trackers) {
+    const failures = [];
+    for (const tracker of trackers) {
+      try { tracker.commit(); } catch (error) { failures.push(error); }
+    }
+    if (failures.length) throw new AggregateError(failures, 'after_event transaction commit failed');
+  }
+
+  #rollbackAfterEvents(trackers, cause) {
+    const failures = [];
+    for (const tracker of [...trackers].reverse()) {
+      try { tracker.rollback(); } catch (error) { failures.push(error); }
+    }
+    if (failures.length) {
+      this.#faulted = true;
+      throw new AggregateError([cause, ...failures], 'after_event transaction rollback failed');
+    }
+    throw cause;
+  }
+
+  #rollbackPrepared(conditioners, trackers, cause) {
+    const failures = [];
+    try { this.#rollbackConditioners(conditioners, cause); } catch (error) { failures.push(error); }
+    try { this.#rollbackAfterEvents(trackers, cause); } catch (error) {
+      if (error !== cause) failures.push(error);
+    }
+    if (failures.length) {
+      this.#faulted = true;
+      throw new AggregateError([cause, ...failures], 'prepared transaction rollback failed');
+    }
+    throw cause;
+  }
+
   #condition(normalizedSamples, nowMs) {
     const sensorReadings = new Map();
+    const observedSensors = new Set();
     for (const [sensorName, entry] of this.sensors) {
-      const raw = normalizedSamples.has(sensorName) ? entry.conditioner.update(normalizedSamples.get(sensorName), nowMs) : entry.conditioner.read(nowMs);
+      const sample = normalizedSamples.get(sensorName);
+      const before = sample === undefined ? null : entry.conditioner.sampleIdentity();
+      const raw = sample === undefined ? entry.conditioner.read(nowMs) : entry.conditioner.update(sample, nowMs);
+      if (sample !== undefined) {
+        const after = entry.conditioner.sampleIdentity();
+        if (after?.epoch === sample.epoch && after.id === sample.id && after.timestampMs === sample.timestampMs
+          && (before?.epoch !== after.epoch || before.id !== after.id || before.timestampMs !== after.timestampMs)) {
+          observedSensors.add(sensorName);
+        }
+      }
       sensorReadings.set(sensorName, hostReading(raw, entry.item.type));
     }
     const signalReadings = new Map();
@@ -960,7 +1166,7 @@ export class ControlRuntime {
       const raw = normalizedSamples.has(entry.item.sensor) ? entry.conditioner.update(normalizedSamples.get(entry.item.sensor), nowMs) : entry.conditioner.read(nowMs);
       signalReadings.set(signalName, { ok: raw.ok, value: raw.ok ? Boolean(raw.dry) : false, quality: raw.quality, dry: raw.ok ? Boolean(raw.dry) : false });
     }
-    return { sensorReadings, signalReadings };
+    return { sensorReadings, signalReadings, observedSensors };
   }
 
   #beginConditioners() {
@@ -1006,9 +1212,12 @@ export class ControlRuntime {
 
     const scanId = this.#frameScanId;
     const transaction = this.#beginConditioners();
+    let afterEventTransaction = [];
     let phase = 'prepare';
     try {
-      const { sensorReadings, signalReadings } = this.#condition(captured.normalizedSamples, captured.nowMs);
+      const { sensorReadings, signalReadings, observedSensors } = this.#condition(captured.normalizedSamples, captured.nowMs);
+      const staged = this.#stageAfterEvents(captured, sensorReadings, observedSensors);
+      afterEventTransaction = staged.trackers;
       const frameInputs = [];
       for (const item of this.manifest.inputs) frameInputs.push({ name: item.name, type: item.type, value: captured.inputValues.get(item.name) });
       for (const [, entry] of this.sensors) {
@@ -1032,6 +1241,8 @@ export class ControlRuntime {
       }
       for (const item of this.manifest.schedules) frameInputs.push({ name: item.dueInput, type: 'Bool', value: captured.dueValues.get(item.name) ?? false });
       this.#setIntervals(captured.intervalValues, (name, value) => frameInputs.push({ name, type: value.type, value: value.value }));
+      this.#setAfterEventProjections(staged.projections,
+        (name, value) => frameInputs.push({ name, type: value.type, value: value.value }));
       if (this.#temporalEpoch !== null) frameInputs.push({ name: `${RESERVED}time_epoch`, type: 'Number', value: this.#temporalEpoch });
 
       phase = 'dispatch';
@@ -1040,6 +1251,7 @@ export class ControlRuntime {
       this.lastNowMs = captured.nowMs;
       this.#frameScanId = scanId === MAX_SAFE ? null : scanId + 1;
       this.#commitConditioners(transaction);
+      this.#commitAfterEvents(afterEventTransaction);
       const outcome = this.runtime.outcome;
       return {
         vm: outcome.trace,
@@ -1049,12 +1261,15 @@ export class ControlRuntime {
       };
     } catch (error) {
       if (phase === 'prepare' || (phase === 'dispatch' && error instanceof NativeDispatchError && error.committed === false)) {
-        this.#rollbackConditioners(transaction, error);
+        this.#rollbackPrepared(transaction, afterEventTransaction, error);
       } else {
         if (phase === 'dispatch' && error instanceof NativeDispatchError && error.committed === true) {
           this.lastNowMs = captured.nowMs;
           this.#frameScanId = scanId === MAX_SAFE ? null : scanId + 1;
-          try { this.#commitConditioners(transaction); }
+          try {
+            this.#commitConditioners(transaction);
+            this.#commitAfterEvents(afterEventTransaction);
+          }
           catch (commitError) {
             this.#faulted = true;
             throw new AggregateError([error, commitError], 'postcommit conditioner finalization failed');
@@ -1067,6 +1282,7 @@ export class ControlRuntime {
   }
 
   dispose() {
+    for (const { runtime } of this.afterEvents.values()) runtime.dispose();
     for (const { conditioner } of this.signals.values()) conditioner.dispose();
     for (const { conditioner } of this.sensors.values()) conditioner.dispose();
     this.runtime.dispose();

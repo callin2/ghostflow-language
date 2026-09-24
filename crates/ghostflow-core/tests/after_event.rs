@@ -285,3 +285,33 @@ fn batch_rollback_and_restage_preserve_the_original_candidate() {
     );
     assert!(tracker.result(event(2, 100).key).is_none());
 }
+
+#[test]
+fn native_any_and_all_project_staged_identity_results() {
+    let mut tracker = AfterEvent::<2>::new(10).unwrap();
+    assert_eq!(tracker.any(), None);
+    assert_eq!(tracker.all(), None);
+    tracker
+        .stage_batch(time(100), &[event(1, 100)], None, &[])
+        .unwrap();
+    assert_eq!(tracker.staged_any().unwrap(), None);
+    assert_eq!(tracker.staged_all().unwrap(), None);
+    tracker.commit().unwrap();
+    tracker
+        .stage_batch(
+            time(110),
+            &[event(2, 110)],
+            Some(Observation {
+                at_ms: 110,
+                value: true,
+                quality: EvidenceQuality::Measured,
+            }),
+            &[],
+        )
+        .unwrap();
+    assert_eq!(tracker.staged_any().unwrap(), Some(true));
+    assert_eq!(tracker.staged_all().unwrap(), Some(false));
+    tracker.rollback().unwrap();
+    assert_eq!(tracker.any(), None);
+    assert_eq!(tracker.all(), None);
+}

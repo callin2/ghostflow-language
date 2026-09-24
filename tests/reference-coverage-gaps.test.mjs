@@ -35,9 +35,10 @@ test('Reference coverage exercises valid enum lowering and Tide schedule binding
   assert.equal(checked.manifest.schedules[0].kind, 'tide');
 });
 
-test('Reference coverage emits temporal descriptor artifacts through the direct API', () => {
+test('Reference after_event coverage lowers explicit projections through the direct API', () => {
   const source = fs.readFileSync(new URL('./fixtures/after-event-evidence.ghost.md', import.meta.url), 'utf8');
   const code = extractLiterate(source, { filename: 'after-event-evidence.ghost.md' }).code;
   const artifact = compileTemporalDescriptorArtifact(code, { filename: 'after-event-evidence.ghost.md' });
-  assert.equal(artifact.manifest.format, 'GhostFlow/temporal-descriptor-v1');
+  assert.match(artifact.manifest.format, /^GhostFlow\/control-v[1-6]$/);
+  assert.deepEqual(artifact.manifest.signals[0].projections, ['any']);
 });
