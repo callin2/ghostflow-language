@@ -219,7 +219,7 @@ pub(crate) fn load_prelude(
                     }));
                 (site, name)
             }
-            3 if format == 8 => {
+            3 if matches!(format, 8 | 9) => {
                 let site = reader.u32()?;
                 let name = reader.string()?;
                 let timezone = reader.string()?;

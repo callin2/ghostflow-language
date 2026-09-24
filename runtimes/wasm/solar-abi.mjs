@@ -20,7 +20,8 @@ export function encodeSolarFacts(packet) {
   return encodeFacts(packet, 1);
 }
 export function encodeScheduleFacts(packet) {
-  return encodeFacts(packet, 2);
+  const version = packet?.schedules?.some(schedule => schedule?.kind === 'daily-slots') ? 3 : 2;
+  return encodeFacts(packet, version);
 }
 function encodeFacts(packet, version) {
   fields(packet, ['clock', 'schedules'], 'solar facts');
@@ -51,21 +52,37 @@ function encodeFacts(packet, version) {
   text(clock.sourceRevision ?? '', 'sourceRevision', true);
   const sites = new Set();
   for (const schedule of schedules) {
-    fields(schedule, ['site', 'coverageFromWallMs', 'coverageToWallMs', 'rows', ...(version === 2 ? ['kind'] : [])], 'schedule');
+    fields(schedule, ['site', 'coverageFromWallMs', 'coverageToWallMs', 'rows', ...(version >= 2 ? ['kind'] : [])], 'schedule');
     integer(schedule.site, 'site', 0xffffffff);
     if (!schedule.site || sites.has(schedule.site)) throw new RangeError('invalid or duplicate schedule site');
     sites.add(schedule.site); u32(schedule.site);
-    if (version === 2) {
-      if (!['solar', 'daily'].includes(schedule.kind)) throw new TypeError('invalid schedule kind');
-      u8(schedule.kind === 'daily' ? 1 : 0);
+    if (version >= 2) {
+      if (!(version === 3 ? ['solar', 'daily', 'daily-slots'] : ['solar', 'daily']).includes(schedule.kind)) throw new TypeError('invalid schedule kind');
+      u8({ solar: 0, daily: 1, 'daily-slots': 2 }[schedule.kind]);
     }
     u64(schedule.coverageFromWallMs, 'coverageFromWallMs'); u64(schedule.coverageToWallMs, 'coverageToWallMs');
     if (!Array.isArray(schedule.rows) || schedule.rows.length > 4096) throw new RangeError('invalid solar rows');
     u16(schedule.rows.length);
+    let previousIdentity = null;
     for (const row of schedule.rows) {
-      fields(row, ['sourceDay', 'scheduledWallMs', 'available', 'providerRevision', 'contextRevision', ...(version === 2 ? ['fold'] : [])], 'row');
+      fields(row, ['sourceDay', 'scheduledWallMs', 'available', 'providerRevision', 'contextRevision', ...(version >= 2 ? ['fold'] : []), ...(version === 3 ? ['slotKey', 'minuteOfDay'] : [])], 'row');
       u32(integer(row.sourceDay, 'sourceDay', 2932896));
-      if (version === 2) u8(integer(row.fold, 'fold', 2));
+      if (version === 3) {
+        const slotKey = integer(row.slotKey, 'slotKey', 1440);
+        const minute = integer(row.minuteOfDay, 'minuteOfDay', 1439);
+        if (schedule.kind === 'daily-slots') {
+          if (!slotKey || slotKey !== minute + 1 || minute % 15) throw new RangeError('invalid DailySlots row identity');
+        } else if (slotKey !== 0 || minute !== 0) throw new RangeError('non-DailySlots row has slot identity');
+        u16(slotKey); u16(minute);
+      }
+      if (version >= 2) u8(integer(row.fold, 'fold', 2));
+      const identity = version === 3 ? [row.sourceDay, row.slotKey, row.fold]
+        : version === 2 ? [row.sourceDay, row.fold] : [row.sourceDay];
+      if (previousIdentity !== null) {
+        const changed = identity.findIndex((value, index) => value !== previousIdentity[index]);
+        if (changed < 0 || identity[changed] < previousIdentity[changed]) throw new RangeError('schedule rows must be ordered by occurrence identity');
+      }
+      previousIdentity = identity;
       if (typeof row.available !== 'boolean') throw new TypeError('row.available must be Bool');
       if (row.available !== (row.scheduledWallMs != null)) throw new TypeError('available occurrence requires scheduledWallMs');
       u8(row.available ? 1 : 0); optional(row.scheduledWallMs, 'scheduledWallMs');

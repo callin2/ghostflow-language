@@ -835,25 +835,28 @@ fn daily_tick<'a>(
     };
     runtime.set_input("__gf_now_ms", Value::Number(now as f64))?;
     runtime.set_input("__gf_time_epoch", Value::Number(3.0))?;
-    runtime.tick_with_schedules(
-        ClockSnapshot {
-            monotonic_ms: now,
-            boot_epoch: 3,
-            wall_ms: Some(wall),
-            trust: ClockTrust::Trusted,
-            uncertainty_ms: Some(0),
-            source_revision: Some("clock-v1"),
+    let clock = ClockSnapshot {
+        monotonic_ms: now,
+        boot_epoch: 3,
+        wall_ms: Some(wall),
+        trust: ClockTrust::Trusted,
+        uncertainty_ms: Some(0),
+        source_revision: Some("clock-v1"),
+    };
+    let facts = [ScheduleInput {
+        site: 7,
+        kind,
+        facts: SolarFacts {
+            coverage_from_wall_ms: 0,
+            coverage_to_wall_ms: coverage_to,
+            rows,
         },
-        &[ScheduleInput {
-            site: 7,
-            kind,
-            facts: SolarFacts {
-                coverage_from_wall_ms: 0,
-                coverage_to_wall_ms: coverage_to,
-                rows,
-            },
-        }],
-    )
+    }];
+    if kind == ghostflow_core::solar_runtime::ScheduleKind::DailySlots {
+        runtime.tick_with_daily_slots(clock, &facts)
+    } else {
+        runtime.tick_with_schedules(clock, &facts)
+    }
 }
 
 #[test]
@@ -1042,6 +1045,60 @@ fn daily_slots_gfb9_rejects_wrong_descriptor_or_fact_identity() {
     );
     let valid = [slot_fact(4, 376, 375, 1000)];
     assert!(daily_tick(&mut runtime, 0, 999, &valid, DailySlots, 2000).is_ok());
+}
+
+#[test]
+fn daily_slots_capacity_and_downstream_failure_roll_back_the_whole_tick() {
+    use ghostflow_core::solar_runtime::ScheduleKind::DailySlots;
+
+    let mut fixture = daily_slots_fixture();
+    fixture.states = 1;
+    fixture.transition = Some(vec![58, 0, 0, 0]);
+    fixture.output_type = 2;
+    fixture.output = vec![33, 3, 0, 0, 2];
+    fixture.output.extend(11f64.to_le_bytes());
+    fixture.output.extend([20, 22]);
+    let mut runtime = Runtime::new(8);
+    runtime.install(Module::load(&fixture.bytes()).unwrap(), false);
+    runtime
+        .activate_with_schedules(&solar_activation())
+        .unwrap();
+    let row = [slot_fact(4, 376, 375, 1000)];
+    daily_tick(&mut runtime, 10, 999, &row, DailySlots, 2000).unwrap();
+    assert_eq!(
+        daily_tick(&mut runtime, 11, 1000, &row, DailySlots, 2000)
+            .unwrap_err()
+            .message(),
+        "division by zero"
+    );
+    assert_eq!(runtime.journal().len(), 1);
+    assert_eq!(runtime.state("s0"), Some(Value::Bool(false)));
+    assert!(
+        daily_tick(&mut runtime, 12, 1000, &row, DailySlots, 2000)
+            .unwrap()
+            .schedule_trace[0]
+            .due
+    );
+
+    let mut capacity = Runtime::new(8);
+    capacity.install(Module::load(&daily_slots_fixture().bytes()).unwrap(), false);
+    capacity
+        .activate_with_schedules(&ghostflow_core::solar_runtime::SolarActivation {
+            boot_epoch: 3,
+            terminal_capacity: 1,
+        })
+        .unwrap();
+    let first = [slot_fact(4, 1, 0, 1000)];
+    daily_tick(&mut capacity, 0, 999, &first, DailySlots, 2000).unwrap();
+    daily_tick(&mut capacity, 1, 1000, &first, DailySlots, 2000).unwrap();
+    let second = [slot_fact(4, 376, 375, 1100)];
+    assert_eq!(
+        daily_tick(&mut capacity, 2, 1100, &second, DailySlots, 2000)
+            .unwrap_err()
+            .message(),
+        "solar terminal ledger capacity exceeded"
+    );
+    assert_eq!(capacity.journal().len(), 2);
 }
 fn solar_tick<'a>(
     runtime: &'a mut Runtime,

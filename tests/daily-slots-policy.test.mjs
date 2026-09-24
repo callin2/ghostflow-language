@@ -23,7 +23,7 @@ test('Daily type checking preserves exact local time and common pulse policy', (
   }]);
 });
 
-test('Daily emits executable GFB8 while DailySlots remains descriptor-only', async () => {
+test('Daily emits executable GFB8 without changing its descriptor contract', async () => {
   const control = compileControl(dailyCode);
   assert.equal(control.manifest.format, 'GhostFlow/control-v7');
   assert.equal(new DataView(control.bytes.buffer, control.bytes.byteOffset, control.bytes.byteLength).getUint16(4, true), 8);

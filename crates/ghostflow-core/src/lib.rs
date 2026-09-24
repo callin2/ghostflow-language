@@ -921,9 +921,30 @@ impl Runtime {
             .module
             .as_ref()
             .ok_or_else(|| Error::new("no module installed"))?;
-        if !matches!(module.format_version, 8 | 9) {
-            return Err(Error::new("schedule facts require GFB8 or GFB9"));
+        if module.format_version != 8 {
+            return Err(Error::new("GFSF2 schedule facts require GFB8"));
         }
+        self.tick_with_schedule_inputs(clock, facts)
+    }
+    pub fn tick_with_daily_slots(
+        &mut self,
+        clock: schedule_clock::ClockSnapshot<'_>,
+        facts: &[solar_runtime::ScheduleInput<'_>],
+    ) -> Result<&TickRecord> {
+        if !self.module.as_ref().is_some_and(|m| m.format_version == 9) {
+            return Err(Error::new("GFSF3 schedule facts require GFB9"));
+        }
+        self.tick_with_schedule_inputs(clock, facts)
+    }
+    fn tick_with_schedule_inputs(
+        &mut self,
+        clock: schedule_clock::ClockSnapshot<'_>,
+        facts: &[solar_runtime::ScheduleInput<'_>],
+    ) -> Result<&TickRecord> {
+        let module = self
+            .module
+            .as_ref()
+            .ok_or_else(|| Error::new("no module installed"))?;
         let selected = self
             .active_strategy
             .ok_or_else(|| Error::new("no active strategy"))?;

@@ -14,6 +14,7 @@ const SETTINGS_FORMAT = 'GhostFlow/control-v2';
 const SOLAR_FORMAT = 'GhostFlow/control-v3';
 const INTEGER_FORMAT = 'GhostFlow/control-v4';
 const SCHEDULE_FORMAT = 'GhostFlow/control-v7';
+const SCHEDULE_SLOTS_FORMAT = 'GhostFlow/control-v8';
 const RESERVED = '__gf_';
 const TYPES = new Set(['Bool', 'Int', 'Number', 'Percent', 'Duration', ...TIME_TYPES, ...QUANTITY_TYPES]);
 const SENSOR_TYPES = new Set(['Bool', 'Number', 'Percent', ...QUANTITY_TYPES]);
@@ -211,7 +212,7 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
     throw new Error('adapt strategy activation requires a capability-aware host; ControlRuntime cannot activate this manifest');
   }
   keys(manifest, ['format', 'name', 'inputs', 'outputs', 'sensors', 'schedules', 'timers', 'signals', 'configs', 'bytecodeSha256'], ['adaptPolicy', 'strategies', 'objectives', 'resources'], 'manifest');
-  if (manifest.format !== FORMAT && manifest.format !== INTEGER_FORMAT && !(manifest.format === SETTINGS_FORMAT && acceptSettings) && manifest.format !== SOLAR_FORMAT && manifest.format !== SCHEDULE_FORMAT) throw new Error(`unsupported manifest format ${String(manifest.format)}`);
+  if (manifest.format !== FORMAT && manifest.format !== INTEGER_FORMAT && !(manifest.format === SETTINGS_FORMAT && acceptSettings) && manifest.format !== SOLAR_FORMAT && manifest.format !== SCHEDULE_FORMAT && manifest.format !== SCHEDULE_SLOTS_FORMAT) throw new Error(`unsupported manifest format ${String(manifest.format)}`);
   const settingsManifest = manifest.format === SETTINGS_FORMAT || manifest.format === INTEGER_FORMAT;
   const solarManifest = manifest.format === SOLAR_FORMAT || manifest.format === INTEGER_FORMAT;
   name(manifest.name, 'manifest.name');
@@ -222,22 +223,32 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
   const sensors = validateList(manifest.sensors, 'manifest.sensors', ['name', 'type', 'sampleMs', 'validMin', 'validMax', 'filter', 'window', 'staleMs', 'recoverSamples', 'valueInput', 'okInput', 'faultInput'], ['optional', 'alpha', 'canonicalUnit', 'samplePresentInput', 'sampleEpochInput', 'sampleIdInput', 'sampleTimestampInput']);
   if (!Array.isArray(manifest.schedules) || manifest.schedules.length > MAX_LIST) throw new TypeError('manifest.schedules must be a bounded array');
   const schedules = manifest.schedules.map((schedule, index) => {
-    const solar = solarManifest && schedule?.kind === 'solar';
-    const daily = manifest.format === SCHEDULE_FORMAT && schedule?.kind === 'daily';
+    const solar = (solarManifest || manifest.format === SCHEDULE_SLOTS_FORMAT) && schedule?.kind === 'solar';
+    const daily = [SCHEDULE_FORMAT, SCHEDULE_SLOTS_FORMAT].includes(manifest.format) && schedule?.kind === 'daily';
+    const dailySlots = manifest.format === SCHEDULE_SLOTS_FORMAT && schedule?.kind === 'daily-slots';
     const fields = solar ? ['kind', 'site', 'name', 'timezone', 'latitude', 'longitude', 'event', 'offsetMs', 'policy']
       : daily ? ['kind', 'atMs', 'site', 'name', 'timezone', 'dstMissing', 'dstRepeated', 'policy']
-        : ['name', 'timezone', 'slots', 'dueInput'];
-    const optional = solar || daily ? [] : ['gridMs', 'selectedConfig', 'policy'];
+        : dailySlots ? ['kind', 'gridMs', 'slots', 'site', 'name', 'timezone', 'dstMissing', 'dstRepeated', 'policy']
+          : ['name', 'timezone', 'slots', 'dueInput'];
+    const optional = solar || daily || dailySlots ? [] : ['gridMs', 'selectedConfig', 'policy'];
     const item = record(schedule, `manifest.schedules[${index}]`);
     keys(item, fields, optional, `manifest.schedules[${index}]`);
-    if (solar || daily) {
+    if (solar || daily || dailySlots) {
       if (solar) validateSolarDescriptor(item);
       else {
         name(item.name, `schedule ${item.name}.name`);
         if (typeof item.timezone !== 'string' || !item.timezone) throw new TypeError(`schedule ${item.name}.timezone must be nonempty text`);
         try { new Intl.DateTimeFormat('en-US', { timeZone: item.timezone }); }
         catch { throw new Error(`schedule ${item.name}.timezone must be a supported IANA timezone`); }
-        safeInteger(item.atMs, `schedule ${item.name}.atMs`, 0, 86_399_999);
+        if (daily) safeInteger(item.atMs, `schedule ${item.name}.atMs`, 0, 86_399_999);
+        else {
+          if (item.gridMs !== 900_000) throw new Error(`schedule ${item.name}.gridMs is unsupported`);
+          if (!Array.isArray(item.slots) || !item.slots.length || item.slots.length > MAX_SCHEDULE_SLOTS) throw new Error(`schedule ${item.name}.slots is invalid`);
+          for (let index = 0; index < item.slots.length; index += 1) {
+            safeInteger(item.slots[index], `schedule ${item.name}.slots[${index}]`, 0, 1439);
+            if (item.slots[index] % 15 || index > 0 && item.slots[index - 1] >= item.slots[index]) throw new Error(`schedule ${item.name}.slots is invalid`);
+          }
+        }
         if (!['skip', 'next_valid'].includes(item.dstMissing)) throw new Error(`schedule ${item.name}.dstMissing is unsupported`);
         if (!['first', 'second', 'both', 'skip'].includes(item.dstRepeated)) throw new Error(`schedule ${item.name}.dstRepeated is unsupported`);
       }
@@ -251,8 +262,9 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
     return copy(item);
   });
   if (manifest.format === SOLAR_FORMAT && !schedules.some(item => item.kind === 'solar')) throw new Error('v3 manifest requires a Solar schedule');
-  if (schedules.some(item => item.kind === 'solar') && bytecodeFormat !== 5) throw new Error('Solar manifest requires GFB format 5');
+  if (schedules.some(item => item.kind === 'solar') && ![5, 9].includes(bytecodeFormat)) throw new Error('Solar manifest requires GFB format 5 or 9');
   if (manifest.format === SCHEDULE_FORMAT && (bytecodeFormat !== 8 || !schedules.length || schedules.some(item => item.kind !== 'daily'))) throw new Error('v7 manifest requires GFB format 8 Daily schedules');
+  if (manifest.format === SCHEDULE_SLOTS_FORMAT && (bytecodeFormat !== 9 || !schedules.some(item => item.kind === 'daily-slots') || schedules.some(item => !['solar', 'daily', 'daily-slots'].includes(item.kind)))) throw new Error('v8 manifest requires GFB format 9 with a DailySlots schedule');
   if (!Array.isArray(manifest.timers) || manifest.timers.length > MAX_LIST) throw new TypeError('manifest.timers must be a bounded array');
   const timers = manifest.timers.map((timer, index) => {
     const item = record(timer, `manifest.timers[${index}]`);
@@ -414,12 +426,12 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
     string(item.timezone, `schedule ${item.name}.timezone`);
     try { new Intl.DateTimeFormat('en-US', { timeZone: item.timezone }).format(0); }
     catch { throw new Error(`schedule ${item.name}.timezone is not an Intl timezone`); }
-    if (!['solar', 'daily'].includes(item.kind)) {
+    if (!['solar', 'daily', 'daily-slots'].includes(item.kind)) {
       if (!Array.isArray(item.slots) || item.slots.length > MAX_SCHEDULE_SLOTS) throw new RangeError(`schedule ${item.name}.slots must contain at most ${MAX_SCHEDULE_SLOTS} slots`);
       for (const slot of item.slots) { safeInteger(slot, `schedule ${item.name}.slot`, 0, 1439); if (slot % 15 !== 0) throw new Error(`schedule ${item.name}.slot must be a 15-minute boundary`); }
       unique(item.slots, `schedule ${item.name}.slot`);
     }
-    if (!['solar', 'daily'].includes(item.kind)) {
+    if (!['solar', 'daily', 'daily-slots'].includes(item.kind)) {
       name(item.dueInput, `schedule ${item.name}.dueInput`, true);
       generated(item.dueInput, `${RESERVED}schedule_due_${item.name}`, `schedule ${item.name}.dueInput`);
     }
@@ -701,14 +713,14 @@ async function instantiateControlRuntime(wasmBytes, { bytes: bytecode, manifest 
   const hasTrueFor = checkedManifest.manifest.signals.some(item => item.kind === 'true-for');
   const hasAfterEvent = checkedManifest.manifest.signals.some(isAfterEvent);
   const hasSolar = checkedManifest.manifest.schedules.some(item => item.kind === 'solar');
-  const hasSchedules = checkedManifest.manifest.schedules.some(item => item.kind === 'daily');
+  const hasSchedules = checkedManifest.manifest.schedules.some(item => ['daily', 'daily-slots'].includes(item.kind));
   let temporal = null;
   if (hasSolar && !supportsSchedules) throw new Error('framed Solar activation is not supported by this runtime');
-  if (hasSchedules && !supportsSchedules) throw new Error('framed Daily schedule activation is not supported by this runtime');
+  if (hasSchedules && !supportsSchedules) throw new Error('framed civil schedule activation is not supported by this runtime');
   if (hasSchedules) {
     if (options.schedule === undefined) throw new Error('schedule activation profile is required');
     validateSolarActivation(options.schedule);
-    if (options.solar !== undefined) throw new Error('Daily schedule activation cannot use a Solar profile');
+    if (options.solar !== undefined) throw new Error('civil schedule activation cannot use a Solar profile');
     if (options.temporal !== undefined) throw new Error('schedule activation cannot use a temporal profile');
   } else if (hasSolar) {
     if (options.solar === undefined) throw new Error('Solar activation profile is required');
@@ -723,7 +735,7 @@ async function instantiateControlRuntime(wasmBytes, { bytes: bytecode, manifest 
   } else if (options.temporal !== undefined) {
     throw new Error('temporal profile requires a window module');
   }
-  if (!hasSchedules && options.schedule !== undefined) throw new Error('schedule profile requires a Daily schedule');
+  if (!hasSchedules && options.schedule !== undefined) throw new Error('schedule profile requires a Daily or DailySlots schedule');
   let afterEventEpoch = null;
   if (hasAfterEvent) {
     const profile = record(options.afterEvent, 'afterEvent');
@@ -889,7 +901,7 @@ export class ControlRuntime {
         this.runtime.setNumber(objective.bindings.target, target.value);
         this.runtime.setNumber(objective.bindings.safeMax, captured.objectiveSafeMax.get(objective.name));
       }
-      for (const item of this.manifest.schedules) if (!['solar', 'daily'].includes(item.kind)) this.runtime.setBool(item.dueInput, captured.dueValues.get(item.name) ?? false);
+      for (const item of this.manifest.schedules) if (!['solar', 'daily', 'daily-slots'].includes(item.kind)) this.runtime.setBool(item.dueInput, captured.dueValues.get(item.name) ?? false);
       this.#setIntervals(captured.intervalValues, (name, value) => {
         if (value.type === 'Bool') this.runtime.setBool(name, value.value);
         else this.runtime.setNumber(name, value.value);
@@ -946,7 +958,7 @@ export class ControlRuntime {
       if (this.#presentSensors !== null && !this.#presentSensors.has(key)) throw new Error(`absent sensor capability ${key}`);
     }
     for (const key of Object.keys(due)) {
-      if (this.solarScheduleNames.has(key) || this.manifest.schedules.some(item => item.kind === 'daily' && item.name === key)) throw new Error(`due.${key} cannot supply a runtime-owned due value`);
+      if (this.solarScheduleNames.has(key) || this.manifest.schedules.some(item => ['daily', 'daily-slots'].includes(item.kind) && item.name === key)) throw new Error(`due.${key} cannot supply a runtime-owned due value`);
       if (!this.scheduleNames.has(key)) throw new Error(`unknown schedule ${key}`);
     }
     if (this.#hasSolar && solarFacts === undefined) throw new Error('solar facts are required');
@@ -958,7 +970,7 @@ export class ControlRuntime {
       if (clock.bootEpoch !== this.#temporalEpoch) throw new Error('solar facts clock.bootEpoch must match activation');
     }
     if (this.#hasSchedules && scheduleFacts === undefined) throw new Error('schedule facts are required');
-    if (!this.#hasSchedules && scheduleFacts !== undefined) throw new Error('schedule facts require a Daily schedule');
+    if (!this.#hasSchedules && scheduleFacts !== undefined) throw new Error('schedule facts require a Daily or DailySlots schedule');
     if (this.#hasSchedules) {
       record(scheduleFacts, 'scheduleFacts');
       const clock = record(scheduleFacts.clock, 'scheduleFacts.clock');
@@ -1274,7 +1286,9 @@ export class ControlRuntime {
         frameInputs.push({ name: entry.item.okInput, type: 'Bool', value: reading.ok });
         frameInputs.push({ name: entry.item.faultInput, type: 'Number', value: sensorFaultCode(reading) });
       }
-      for (const item of this.manifest.schedules) frameInputs.push({ name: item.dueInput, type: 'Bool', value: captured.dueValues.get(item.name) ?? false });
+      for (const item of this.manifest.schedules) if (!['solar', 'daily', 'daily-slots'].includes(item.kind)) {
+        frameInputs.push({ name: item.dueInput, type: 'Bool', value: captured.dueValues.get(item.name) ?? false });
+      }
       this.#setIntervals(captured.intervalValues, (name, value) => frameInputs.push({ name, type: value.type, value: value.value }));
       this.#setAfterEventProjections(staged.projections,
         (name, value) => frameInputs.push({ name, type: value.type, value: value.value }));
