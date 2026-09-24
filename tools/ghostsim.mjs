@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { decode, encode } from '@toon-format/toon';
 import { verifyArtifactSourceMap } from './toolchain.mjs';
 import { encodeTemporalProfile } from '../runtimes/wasm/temporal-profile.mjs';
-import { encodeSolarFacts, validateSolarActivation } from '../runtimes/wasm/solar-abi.mjs';
+import { encodeScheduleFacts, encodeSolarFacts, validateSolarActivation } from '../runtimes/wasm/solar-abi.mjs';
 import { AFTER_EVENT_CAPACITY } from '../runtimes/wasm/after-event-runtime.mjs';
 
 const root = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
@@ -55,7 +55,7 @@ function requireTyped(input, location) {
 }
 
 export function validateScenario(scenario, manifest) {
-  requireFields(scenario, ['format', 'id', 'initialInputs', 'keyBindings', 'actions'], ['temporal', 'afterEvent', 'capabilities', 'solar', 'actuatorBindings', 'plant'], 'scenario');
+  requireFields(scenario, ['format', 'id', 'initialInputs', 'keyBindings', 'actions'], ['temporal', 'afterEvent', 'capabilities', 'solar', 'schedule', 'actuatorBindings', 'plant'], 'scenario');
   if (scenario.format !== 'GhostFlow/scenario-v1') throw new Error('scenario.format: unsupported version');
   requireName(scenario.id, 'scenario.id');
   if (!Array.isArray(scenario.initialInputs)) throw new Error('initialInputs: expected array');
@@ -79,10 +79,15 @@ export function validateScenario(scenario, manifest) {
     if (!manifest.adaptPolicy && !manifest.strategies) throw new Error('capabilities require an adapt control');
   }
   const hasSolar = manifest.schedules?.some(schedule => schedule.kind === 'solar') ?? false;
+  const hasDaily = manifest.schedules?.some(schedule => schedule.kind === 'daily') ?? false;
   if (scenario.solar !== undefined) {
     if (!hasSolar) throw new Error('solar activation requires a Solar schedule');
     validateSolarActivation(scenario.solar);
   } else if (hasSolar) throw new Error('Solar schedule requires explicit solar activation');
+  if (scenario.schedule !== undefined) {
+    if (!hasDaily) throw new Error('schedule activation requires a Daily schedule');
+    validateSolarActivation(scenario.schedule);
+  } else if (hasDaily) throw new Error('Daily schedule requires explicit schedule activation');
   const sensors = new Map((manifest.sensors ?? []).map(sensor => [sensor.name, sensor.type]));
   const outputs = new Map((manifest.outputs ?? []).map(output => [output.name, output]));
   if (scenario.actuatorBindings !== undefined) {
@@ -211,7 +216,7 @@ export function validateScenario(scenario, manifest) {
         pendingIntervals.add(action.name);
         break;
       case 'scan':
-        requireFields(action, ['kind', 'atMs'], ['solarFacts', 'events'], location);
+        requireFields(action, ['kind', 'atMs'], ['solarFacts', 'scheduleFacts', 'events'], location);
         if (!Number.isSafeInteger(action.atMs) || action.atMs < 0) throw new Error(`${location}: atMs must be an exact nonnegative integer`);
         if (action.events !== undefined) {
           if (!eventNames.size) throw new Error(`${location}: events require an after_event signal`);
@@ -240,6 +245,12 @@ export function validateScenario(scenario, manifest) {
           if (action.solarFacts.clock.monotonicMs !== action.atMs) throw new Error(`${location}: solar clock monotonicMs must match atMs`);
           if (action.solarFacts.clock.bootEpoch !== scenario.solar.bootEpoch) throw new Error(`${location}: solar bootEpoch must match activation`);
         } else if (action.solarFacts !== undefined) throw new Error(`${location}: solar facts require a Solar schedule`);
+        if (hasDaily) {
+          if (action.scheduleFacts === undefined) throw new Error(`${location}: Daily scan requires provider facts`);
+          encodeScheduleFacts(action.scheduleFacts);
+          if (action.scheduleFacts.clock.monotonicMs !== action.atMs) throw new Error(`${location}: schedule clock.monotonicMs must match atMs`);
+          if (action.scheduleFacts.clock.bootEpoch !== scenario.schedule.bootEpoch) throw new Error(`${location}: schedule bootEpoch must match activation`);
+        } else if (action.scheduleFacts !== undefined) throw new Error(`${location}: schedule facts require a Daily schedule`);
         if (previousTime !== null && action.atMs < previousTime) throw new Error(`${location}: logical time moved backwards`);
         previousTime = action.atMs;
         pendingSamples.clear();
@@ -258,7 +269,7 @@ export function loadVerifiedArtifact(artifactPath) {
   const manifest = JSON.parse(fs.readFileSync(`${artifactPath}.manifest.json`, 'utf8'));
   const map = JSON.parse(fs.readFileSync(`${artifactPath}.map.json`, 'utf8'));
   const document = verifyArtifactSourceMap(map, artifactBytes, { manifest });
-  if (!/^GhostFlow\/control-v[1-6]$/u.test(manifest.format)) throw new Error('artifact must be an executable control artifact');
+  if (!/^GhostFlow\/control-v[1-7]$/u.test(manifest.format)) throw new Error('artifact must be an executable control artifact');
   if (manifest.bytecodeSha256 !== sha256(artifactBytes)) throw new Error('artifact SHA-256 mismatch');
   return { artifactBytes, manifest, map, document };
 }
@@ -301,6 +312,7 @@ export function runScenario(artifactPath, scenarioPath, { format = 'toon' } = {}
     const conditioned = (manifest.sensors?.length ?? 0) > 0
       || (scenario.actuatorBindings?.length ?? 0) > 0
       || manifest.schedules?.some(schedule => schedule.kind === 'solar')
+      || manifest.schedules?.some(schedule => schedule.kind === 'daily')
       || manifest.signals?.some(signal => signal.kind === 'after-event');
     const executable = conditioned ? process.execPath : path.join(root, 'target/release/examples/scenario_scan');
     const arguments_ = conditioned

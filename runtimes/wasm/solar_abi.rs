@@ -2,7 +2,7 @@
 use ghostflow_core::{
     schedule_clock::{ClockSnapshot, ClockTrust},
     solar_admission::{SolarFact, SolarFactAvailability, SolarFacts},
-    solar_runtime::{SolarActivation, SolarInput},
+    solar_runtime::{ScheduleInput, ScheduleKind, SolarActivation, SolarInput},
 };
 
 const MAX_PACKET: usize = 65_536;
@@ -19,6 +19,7 @@ struct Packet {
 }
 struct Facts {
     site: u32,
+    kind: ScheduleKind,
     from: u64,
     to: u64,
     rows: Vec<SolarFact>,
@@ -79,12 +80,12 @@ impl Reader<'_> {
         String::from_utf8(self.take(len)?.to_vec()).map_err(|_| "invalid solar UTF-8".into())
     }
 }
-fn decode(bytes: &[u8]) -> Result<Packet, String> {
+fn decode(bytes: &[u8], version: u16) -> Result<Packet, String> {
     if bytes.len() > MAX_PACKET {
         return Err("solar packet exceeds 65536 bytes".into());
     }
     let mut reader = Reader { bytes, at: 0 };
-    if reader.take(4)? != b"GFSF" || reader.u16()? != 1 {
+    if reader.take(4)? != b"GFSF" || reader.u16()? != version {
         return Err("invalid solar packet header".into());
     }
     let count = usize::from(reader.u16()?);
@@ -109,6 +110,15 @@ fn decode(bytes: &[u8]) -> Result<Packet, String> {
         if site == 0 || packet.schedules.iter().any(|item| item.site == site) {
             return Err("invalid or duplicate solar site".into());
         }
+        let kind = if version == 2 {
+            match reader.u8()? {
+                0 => ScheduleKind::Solar,
+                1 => ScheduleKind::Daily,
+                _ => return Err("invalid schedule kind".into()),
+            }
+        } else {
+            ScheduleKind::Solar
+        };
         let from = reader.u64()?;
         let to = reader.u64()?;
         let count = usize::from(reader.u16()?);
@@ -120,6 +130,10 @@ fn decode(bytes: &[u8]) -> Result<Packet, String> {
             let source_day = reader.u32()?;
             if source_day > 2_932_896 {
                 return Err("invalid solar source day".into());
+            }
+            let fold = if version == 2 { reader.u8()? } else { 0 };
+            if fold > 2 {
+                return Err("invalid occurrence fold".into());
             }
             let available = reader.flag()?;
             let scheduled_wall_ms = reader.optional()?;
@@ -133,6 +147,7 @@ fn decode(bytes: &[u8]) -> Result<Packet, String> {
             }
             rows.push(SolarFact {
                 source_day: source_day as i32,
+                fold,
                 scheduled_wall_ms,
                 provider_revision,
                 context_revision,
@@ -145,6 +160,7 @@ fn decode(bytes: &[u8]) -> Result<Packet, String> {
         }
         packet.schedules.push(Facts {
             site,
+            kind,
             from,
             to,
             rows,
@@ -176,12 +192,39 @@ pub unsafe extern "C" fn gf_tick_solar(
     ptr: *const u8,
     len: usize,
 ) -> i32 {
+    tick_facts(handle, ptr, len, 1)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn gf_activate_schedules(
+    handle: *mut super::Handle,
+    boot_epoch: u64,
+    terminal_capacity: u32,
+) -> i32 {
+    let Some(h) = handle.as_mut() else { return 0 };
+    let result = h.runtime.activate_with_schedules(&SolarActivation {
+        boot_epoch,
+        terminal_capacity: terminal_capacity as usize,
+    });
+    h.complete(result)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn gf_tick_schedules(
+    handle: *mut super::Handle,
+    ptr: *const u8,
+    len: usize,
+) -> i32 {
+    tick_facts(handle, ptr, len, 2)
+}
+
+unsafe fn tick_facts(handle: *mut super::Handle, ptr: *const u8, len: usize, version: u16) -> i32 {
     let Some(h) = handle.as_mut() else { return 0 };
     if ptr.is_null() || len > MAX_PACKET {
         h.error = "invalid solar packet pointer or length".into();
         return 0;
     }
-    let packet = match decode(std::slice::from_raw_parts(ptr, len)) {
+    let packet = match decode(std::slice::from_raw_parts(ptr, len), version) {
         Ok(packet) => packet,
         Err(error) => {
             h.error = error;
@@ -200,23 +243,32 @@ pub unsafe extern "C" fn gf_tick_solar(
             },
         })
         .collect();
-    let result = h
-        .runtime
-        .tick_with_solar(
-            ClockSnapshot {
-                monotonic_ms: packet.monotonic_ms,
-                boot_epoch: packet.boot_epoch,
-                wall_ms: packet.wall_ms,
-                uncertainty_ms: packet.uncertainty_ms,
-                source_revision: (!packet.revision.is_empty()).then_some(packet.revision.as_str()),
-                trust: if packet.trusted {
-                    ClockTrust::Trusted
-                } else {
-                    ClockTrust::Unknown(&packet.reason)
-                },
-            },
-            &facts,
-        )
-        .map(|_| ());
+    let clock = ClockSnapshot {
+        monotonic_ms: packet.monotonic_ms,
+        boot_epoch: packet.boot_epoch,
+        wall_ms: packet.wall_ms,
+        uncertainty_ms: packet.uncertainty_ms,
+        source_revision: (!packet.revision.is_empty()).then_some(packet.revision.as_str()),
+        trust: if packet.trusted {
+            ClockTrust::Trusted
+        } else {
+            ClockTrust::Unknown(&packet.reason)
+        },
+    };
+    let result = if version == 1 {
+        h.runtime.tick_with_solar(clock, &facts)
+    } else {
+        let inputs: Vec<_> = facts
+            .iter()
+            .zip(&packet.schedules)
+            .map(|(input, encoded)| ScheduleInput {
+                site: input.site,
+                kind: encoded.kind,
+                facts: input.facts,
+            })
+            .collect();
+        h.runtime.tick_with_schedules(clock, &inputs)
+    }
+    .map(|_| ());
     h.complete(result)
 }

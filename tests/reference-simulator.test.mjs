@@ -115,6 +115,24 @@ function solarOracle(id, manifest) {
   };
 }
 
+function dailyOracle(id, manifest) {
+  if (id !== 'REF-03-024') return null;
+  const scheduledWallMs = Date.UTC(2026, 8, 23, 21, 30);
+  const facts = (monotonicMs, wallMs) => ({
+    clock: { monotonicMs, bootEpoch: 7, wallMs, trusted: true, uncertaintyMs: 0, sourceRevision: 'clock-v1' },
+    schedules: [{ kind: 'daily', site: manifest.schedules[0].site,
+      coverageFromWallMs: scheduledWallMs - 1, coverageToWallMs: scheduledWallMs,
+      rows: [{ sourceDay: 20_720, fold: 0, scheduledWallMs, available: true,
+        providerRevision: 'iana-v1', contextRevision: 'tzdb-v1' }] }],
+  });
+  return {
+    schedule: { bootEpoch: 7, terminalCapacity: 8 },
+    actions: [{ kind: 'scan', atMs: 0, scheduleFacts: facts(0, scheduledWallMs - 1) },
+      { kind: 'scan', atMs: 1, scheduleFacts: facts(1, scheduledWallMs) }],
+    requested: [{ due: false }, { due: true }],
+  };
+}
+
 function invoke(tool, args) {
   const result = spawnSync(process.execPath, [path.join(root, `tools/${tool}.mjs`), ...args], {
     cwd: root, encoding: 'utf8', timeout: 20_000, maxBuffer: 2 * 1024 * 1024,
@@ -142,7 +160,7 @@ for (const entry of accepted) {
       assert.equal(compiled.status, 0, `${entry.id}: compiler failed: ${compiled.stderr}`);
       const manifest = JSON.parse(fs.readFileSync(`${artifact}.manifest.json`, 'utf8'));
       record.artifactFormat = manifest.format;
-      if (!/^GhostFlow\/control-v[1-6]$/.test(manifest.format)) {
+      if (!/^GhostFlow\/control-v[1-7]$/.test(manifest.format)) {
         if (standaloneDescriptors.has(entry.id)) {
           assert.equal(manifest.format, standaloneDescriptors.get(entry.id),
             `${entry.id}: unexpected standalone descriptor format`);
@@ -153,7 +171,8 @@ for (const entry of accepted) {
         throw new Error(`${entry.id}: accepted control source compiled to ${manifest.format}; ghostsim requires an executable control artifact`);
       }
       assert.ok(!standaloneDescriptors.has(entry.id), `${entry.id}: standalone declaration unexpectedly became executable`);
-      const oracle = behaviorOracles[entry.id] ?? temporalOracle(entry.id, manifest) ?? solarOracle(entry.id, manifest);
+      const oracle = behaviorOracles[entry.id] ?? temporalOracle(entry.id, manifest)
+        ?? solarOracle(entry.id, manifest) ?? dailyOracle(entry.id, manifest);
       const initialInputs = manifest.inputs.filter(input => input.name !== '__gf_now_ms').map(input => {
         assert.ok(['Bool', 'Int', 'Number'].includes(input.type),
           `${entry.id}: unsupported external input ${input.name}: ${input.type}`);
@@ -168,6 +187,7 @@ for (const entry of accepted) {
         ...(oracle?.afterEvent ? { afterEvent: oracle.afterEvent } : {}),
         ...(oracle?.capabilities ? { capabilities: oracle.capabilities } : {}),
         ...(oracle?.solar ? { solar: oracle.solar } : {}),
+        ...(oracle?.schedule ? { schedule: oracle.schedule } : {}),
         actions: oracle?.actions ?? [scan(0)],
       }) + '\n');
       const simulated = invoke('ghostsim', [artifact, scenario, '--format', 'json']);

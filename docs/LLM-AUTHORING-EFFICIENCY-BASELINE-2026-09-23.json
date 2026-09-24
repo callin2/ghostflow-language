@@ -9,7 +9,7 @@
       },
       {
         "file": "tools/compile-source.mjs",
-        "sha256": "36c940e6239bffec6da9b448c527109df2171c765a10c786c5b3b5b9fe1323b7"
+        "sha256": "55ce51e238a567eefbbfc9d245178289d1f9d25c56fe9e11942b453010723487"
       },
       {
         "file": "tools/reference-query.mjs",
@@ -17,7 +17,7 @@
       },
       {
         "file": "tools/ghostsim.mjs",
-        "sha256": "c3e53922067cf2d30ed5c6232f90d8767ccaffb9353d07b76401b69ed407d7fe"
+        "sha256": "437e48af920b33e0428010817cc1a1658c755dc7e36d1f5d80fbcebf31134f02"
       },
       {
         "file": "tools/toolchain.mjs",
@@ -36,9 +36,9 @@
     "tokenizer": "tiktoken==0.12.0; cl100k_base",
     "packageLockSha256": "a14018dd135c1a73353858ae636dc6aff5e6dc27163d90227976fb5ff58e21c1",
     "scenarioRunnerSha256": "0b3e362b88417240d0545e6319b82bebacb91516efe4d9f89368d223e16a9448",
-    "rustCoreTreeSha256": "726f93e557295d804f75eb4c809b925956cf2d6e8836f9aaddd34cc549868020",
+    "rustCoreTreeSha256": "6d72764717e65415e6c385594a943db2f57f1e777dc3ccd778adbd6660c20e89",
     "referenceSourceDigest": "sha256:580ba6e568286dc69c0fff7e8e1257fffce194cb286d350acf4075731accbf90",
-    "digest": "6e102f020545ae97367969df671f776af7f0592cf2456291da6bdeec37b51957"
+    "digest": "9be637840bcb46cf313eef23cbf5aae2295673428ca75a4d7ca42d00829b80b9"
   },
   "encoder": {
     "name": "@toon-format/toon",

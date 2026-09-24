@@ -26,6 +26,46 @@ pub struct SolarPulseDescriptor {
     pub when: Vec<u8>,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct DailyPulseDescriptor {
+    pub site: u32,
+    pub name: String,
+    pub timezone: String,
+    pub at_ms: u64,
+    /// 0 skip, 1 next_valid.
+    pub dst_missing: u8,
+    /// 0 first, 1 second, 2 both, 3 skip.
+    pub dst_repeated: u8,
+    pub gap_ms: u64,
+    pub when: Vec<u8>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum PulseDescriptor {
+    Solar(SolarPulseDescriptor),
+    Daily(DailyPulseDescriptor),
+}
+impl PulseDescriptor {
+    pub fn site(&self) -> u32 {
+        match self {
+            Self::Solar(d) => d.site,
+            Self::Daily(d) => d.site,
+        }
+    }
+    pub fn gap_ms(&self) -> u64 {
+        match self {
+            Self::Solar(d) => d.gap_ms,
+            Self::Daily(d) => d.gap_ms,
+        }
+    }
+    pub fn when(&self) -> &[u8] {
+        match self {
+            Self::Solar(d) => &d.when,
+            Self::Daily(d) => &d.when,
+        }
+    }
+}
+
 /// Slots are dense within their own kind; order is shared across both kinds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PreludeEntry {
@@ -37,7 +77,7 @@ pub enum PreludeEntry {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ScheduleStrategy {
     pub name: String,
-    pub schedules: Vec<SolarPulseDescriptor>,
+    pub schedules: Vec<PulseDescriptor>,
     pub prelude: Vec<PreludeEntry>,
 }
 
@@ -49,7 +89,7 @@ pub struct ScheduleRequirements {
 
 pub(crate) struct LoadedPrelude {
     pub windows: Vec<temporal_vm::WindowDescriptor>,
-    pub schedules: Vec<SolarPulseDescriptor>,
+    pub schedules: Vec<PulseDescriptor>,
     pub true_fors: Vec<crate::true_for_vm::TrueForDescriptor>,
     pub order: Vec<PreludeEntry>,
     pub marker_count: usize,
@@ -144,20 +184,74 @@ pub(crate) fn load_prelude(
                 result
                     .order
                     .push(PreludeEntry::Schedule(result.schedules.len() as u16));
-                result.schedules.push(SolarPulseDescriptor {
-                    site,
-                    name: name.clone(),
-                    timezone,
-                    latitude,
-                    longitude,
-                    event,
-                    offset_ms,
-                    gap_ms,
-                    when,
-                });
+                result
+                    .schedules
+                    .push(PulseDescriptor::Solar(SolarPulseDescriptor {
+                        site,
+                        name: name.clone(),
+                        timezone,
+                        latitude,
+                        longitude,
+                        event,
+                        offset_ms,
+                        gap_ms,
+                        when,
+                    }));
                 (site, name)
             }
-            2 if format >= 6 => {
+            3 if format == 8 => {
+                let site = reader.u32()?;
+                let name = reader.string()?;
+                let timezone = reader.string()?;
+                let at_ms = reader.u64()?;
+                let dst_missing = reader.u8()?;
+                let dst_repeated = reader.u8()?;
+                if timezone.is_empty() || at_ms >= 86_400_000 || dst_missing > 1 || dst_repeated > 3
+                {
+                    return Err(Error::new("invalid Daily descriptor"));
+                }
+                for _ in 0..4 {
+                    if reader.u8()? != 0 {
+                        return Err(Error::new("unsupported Daily policy"));
+                    }
+                }
+                let gap_ms = reader.u64()?;
+                if !(1..=9_007_199_254_740_991).contains(&gap_ms) {
+                    return Err(Error::new("invalid schedule gap"));
+                }
+                let when = reader.blob()?;
+                if verify_expression_with_prelude(
+                    &when,
+                    inputs,
+                    states,
+                    false,
+                    format,
+                    &result.windows,
+                    result.schedules.len(),
+                    result.true_fors.len(),
+                )? != Type::Bool
+                {
+                    return Err(Error::new("schedule predicate must be Bool"));
+                }
+                result.marker_count += expression_metadata(&when)?.1;
+                result
+                    .order
+                    .push(PreludeEntry::Schedule(result.schedules.len() as u16));
+                result
+                    .schedules
+                    .push(PulseDescriptor::Daily(DailyPulseDescriptor {
+                        site,
+                        name: name.clone(),
+                        timezone,
+                        at_ms,
+                        dst_missing,
+                        dst_repeated,
+                        gap_ms,
+                        when,
+                    }));
+                (site, name)
+            }
+            2 if format == 6 => {
                 let signal = crate::true_for_vm::load(reader, inputs)?;
                 let identity = (signal.site, signal.name.clone());
                 result
