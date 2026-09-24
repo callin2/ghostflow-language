@@ -4,16 +4,16 @@
   "caseId": "five-minute-watering",
   "source": {
     "documentId": "source.fixture-five-minute-watering",
-    "revisionId": "revision.fixture-five-minute-watering-v1",
+    "revisionId": "revision.fixture-five-minute-watering-v2",
     "format": "GhostFlow/source-document-v1",
     "kind": "literate",
-    "sha256": "46bdeaf16279db1b4148efce305f34eafabe9051c83ead94a331a402ef1cc5ba"
+    "sha256": "ef46838b4add032d03f4cb5fc29ce3c00ef73dbafe9d91c244fa1a78adbfb9f6"
   },
   "tapeId": "tape.five-minute-watering.v2",
   "digest": {
     "algorithm": "SHA-256",
     "strategy": "canonical-json-excluding-digest-v1",
-    "sha256": "db7ce4778b04044ab0ed7d289b7b4ed172ec21e4d45c74dcdc9b93fa13d2391d"
+    "sha256": "7273b7c9c1f0e124234877295819f25fc93a9c421d1513854bda3feb2dc38f99"
   },
   "runs": [
     {

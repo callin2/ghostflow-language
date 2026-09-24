@@ -223,11 +223,11 @@ Temperature의 canonical 값과 `displayUnit` 보존은
 config water1_time: Duration = 5min { min = 1min; max = 30min; step = 1min; access = operator; }
 ```
 
-위 선언의 운영자 변경 의미는 atomic live event다. 선언과 metadata를 컴파일할 수
-있다는 사실만으로 모든 host가 live event 전달·적용을 구현했다는 뜻은 아니다.
-`tools/operating-settings.mjs`의 `createOperatingSettingsCandidate`는 현재 소스 literal을
-편집하고 재컴파일하는 후보 작성 도구다. 이 경로는 같은 program의 live 설정 적용이
-아니며, 운영 설정 event의 대체 경로로 취급하지 않는다.
+위 선언의 운영자 변경은 같은 program의 typed Result stream에 대한 atomic live
+emission이다. 소비자는 `case water1_time { ok(value) => ...; fault(reason) => ...; }`로
+현재 관측값을 처리한다. 전달 방식은 소비자 소스와 분리되며, 동일한 설정 변경을 위해
+소스 literal을 편집하거나 재컴파일하지 않는다. 정확한 경계는
+`docs/OPERATOR-SETTINGS-STREAM.md`에 기록한다.
 
 아래 별도 제약의 `settings`는 **구조적 구성 revision**이다. 위 `water1_time`의
 운영자 변경에 정지 조건을 붙이는 예제가 아니다. `mode`와 `station`은 설비 관리자가

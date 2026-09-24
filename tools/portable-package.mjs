@@ -184,7 +184,7 @@ function manifestCapabilityType(type, path) {
   return type === 'Bool' ? 'bool' : type === 'Int' ? 'int' : 'number';
 }
 
-function manifestIntConfig(config, path) {
+function manifestIntConfig(config, path, stream = false) {
   if (config.type !== 'Int') return;
   const requireInt = (value, field) => {
     if (!Number.isInteger(value) || value < -2147483648 || value > 2147483647) {
@@ -195,7 +195,7 @@ function manifestIntConfig(config, path) {
   if (!Object.hasOwn(config, 'settings')) return;
   const settings = config.settings;
   if (!isPlainObject(settings)) fail('manifest-mismatch', `${path}.settings must be an object`);
-  const allowed = new Set(['min', 'max', 'step', 'access', 'apply', 'label']);
+  const allowed = new Set(stream ? ['min', 'max', 'step', 'access', 'label'] : ['min', 'max', 'step', 'access', 'apply', 'label']);
   for (const field of Object.keys(settings)) if (!allowed.has(field)) fail('manifest-mismatch', `${path}.settings.${field} is forbidden`);
   for (const field of ['min', 'max', 'step']) requireInt(settings[field], `settings.${field}`);
   if (!['operator', 'designer'].includes(settings.access)) fail('manifest-mismatch', `${path}.settings.access must be operator or designer`);
@@ -209,16 +209,20 @@ function manifestIntConfig(config, path) {
   }
 }
 
-function manifestTimeConfig(config, path) {
+function manifestTimeConfig(config, path, stream = false) {
   if (!isTimeType(config.type)) return;
   try { validateTimeValue(config.type, config.value, `${path}.value`); }
   catch (cause) { fail('manifest-mismatch', cause.message); }
   if (!Object.hasOwn(config, 'settings')) return;
-  const allowedConfig = new Set(['name', 'type', 'value', 'settings', 'initialOffset', 'initialEndOffset']);
+  const allowedConfig = new Set(stream
+    ? ['id', 'name', 'type', 'value', 'settings', 'initialOffset', 'initialEndOffset']
+    : ['name', 'type', 'value', 'settings', 'initialOffset', 'initialEndOffset']);
   for (const field of Object.keys(config)) if (!allowedConfig.has(field)) fail('manifest-mismatch', `${path}.${field} is forbidden`);
   const settings = config.settings;
   if (!isPlainObject(settings)) fail('manifest-mismatch', `${path}.settings must be an object`);
-  const allowedSettings = new Set(['min', 'max', 'step', 'stepType', 'access', 'apply', 'label']);
+  const allowedSettings = new Set(stream
+    ? ['min', 'max', 'step', 'stepType', 'access', 'label']
+    : ['min', 'max', 'step', 'stepType', 'access', 'apply', 'label']);
   for (const field of Object.keys(settings)) if (!allowedSettings.has(field)) fail('manifest-mismatch', `${path}.settings.${field} is forbidden`);
   for (const field of ['min', 'max', 'step', 'stepType', 'access']) {
     if (!Object.hasOwn(settings, field)) fail('manifest-mismatch', `${path}.settings.${field} is required`);
@@ -297,8 +301,23 @@ function validateGfb1(bytes) {
     fail('invalid-bytecode-format', 'bytecode is not GFB1');
   }
   const version = bytes[4] | (bytes[5] << 8);
-  if (![1, 2, 3, 4].includes(version)) fail('unsupported-bytecode-version', 'supported GFB format versions are 1, 2, 3 and 4');
+  if (![1, 2, 3, 4, 11].includes(version)) fail('unsupported-bytecode-version', 'supported GFB format versions are 1, 2, 3, 4 and 11');
   return String(version);
+}
+
+function validateConfigStreamPackageProfile(manifest, version, runtimeAbi) {
+  const stream = version === '11';
+  if (stream !== (manifest.format === 'GhostFlow/control-v10')
+    || stream !== (runtimeAbi === 'GhostFlow/context-scan-abi-v5')) {
+    fail('unsupported-runtime-abi', 'GFB11, control-v10 and context-scan-abi-v5 must be selected together');
+  }
+  if (!stream) return;
+  if (!Array.isArray(manifest.configs) || !manifest.configs.length
+    || ['schedules','signals','naturalConditions','providers','calendars','objectives','adaptSettings']
+      .some(field => manifest[field] !== undefined && (!Array.isArray(manifest[field]) || manifest[field].length))
+    || manifest.accounting !== undefined) {
+    fail('unsupported-bytecode-version', 'signed GFB11 profile currently requires config-only context execution');
+  }
 }
 
 function sourceMapEnvelope(compilation) {
@@ -358,6 +377,7 @@ export async function buildPortablePackage(compilation, identityValue, { signers
   }
 
   const identity = normalizeIdentity(identityValue);
+  validateConfigStreamPackageProfile(compilation.manifest, bytecodeVersion, identity.runtimeAbi);
   if (typeof verifyCompilation !== 'function') {
     fail('compiler-replay-required', 'portable package signing requires a fresh compileSource replay');
   }
@@ -511,7 +531,7 @@ function validateEmbeddedArtifacts(payload) {
 
   exactObject(payload.bytecode, ['format', 'version', 'sha256', 'contentBase64'], 'payload.bytecode');
   if (payload.bytecode.format !== 'GFB1') fail('invalid-bytecode-format', 'payload bytecode format must be GFB1');
-  if (!['1', '2', '3', '4'].includes(payload.bytecode.version)) fail('unsupported-bytecode-version', 'payload bytecode version must be 1, 2, 3 or 4');
+  if (!['1', '2', '3', '4', '11'].includes(payload.bytecode.version)) fail('unsupported-bytecode-version', 'payload bytecode version must be 1, 2, 3, 4 or 11');
   digestValue(payload.bytecode.sha256, 'payload.bytecode.sha256');
 
   exactObject(payload.manifest, ['format', 'sha256', 'contentBase64'], 'payload.manifest');
@@ -586,6 +606,8 @@ export async function verifyPortablePackage(packageValue, options = {}) {
   exactObject(manifest, ['format', 'name', 'inputs', 'outputs', 'sensors', 'schedules', 'timers', 'signals', 'configs', 'bytecodeSha256'], 'manifest');
   if (manifest.format !== packageValue.payload.manifest.format) fail('manifest-mismatch', 'manifest format does not match descriptor');
   if (packageValue.payload.bytecode.version === '4' && manifest.format !== 'GhostFlow/control-v4') fail('manifest-mismatch', 'GFB format 4 requires a control-v4 manifest');
+  if (packageValue.payload.bytecode.version === '11' && manifest.format !== 'GhostFlow/control-v10') fail('manifest-mismatch', 'GFB format 11 requires a control-v10 manifest');
+  validateConfigStreamPackageProfile(manifest, packageValue.payload.bytecode.version, identity.runtimeAbi);
   ghostName(manifest.name, 'manifest.name');
   if (manifest.bytecodeSha256 !== bytecodeSha256) fail('manifest-mismatch', 'manifest bytecodeSha256 does not match GFB1');
   for (const field of ['inputs', 'outputs', 'sensors', 'schedules', 'timers', 'signals', 'configs']) {
@@ -666,8 +688,14 @@ export async function verifyPortablePackage(packageValue, options = {}) {
     manifestCapabilityType(config.type, `manifest.configs[${index}].type`);
     manifestCanonicalUnit(config, `manifest.configs[${index}]`);
     manifestDisplayUnit(config, `manifest.configs[${index}]`);
-    manifestIntConfig(config, `manifest.configs[${index}]`);
-    manifestTimeConfig(config, `manifest.configs[${index}]`);
+    const stream = packageValue.payload.bytecode.version === '11';
+    if (stream && (!Number.isInteger(config.id) || config.id <= 0 || config.id > 0xffff_ffff)) fail('manifest-mismatch', `manifest.configs[${index}].id must be a positive u32`);
+    manifestIntConfig(config, `manifest.configs[${index}]`, stream);
+    manifestTimeConfig(config, `manifest.configs[${index}]`, stream);
+  }
+  if (packageValue.payload.bytecode.version === '11'
+      && new Set(manifest.configs.map(config => config.id)).size !== manifest.configs.length) {
+    fail('manifest-mismatch', 'GFB11 config IDs must be unique');
   }
 
   exactObject(sourceMap, ['format', 'bytecodeSha256', 'sourceDocument', 'nodes', 'lines', 'traceMetadata'], 'sourceMap');
@@ -690,6 +718,10 @@ export async function verifyPortablePackage(packageValue, options = {}) {
     const extraction = extractLiterate(sourceText, { filename: mappedDocument.filename });
     const replay = compileControl(extraction.code, { filename: mappedDocument.filename });
     if (!equalBytes(replay.bytes, artifacts.bytecode)) throw new Error('canonical source does not reproduce package bytecode');
+    if (packageValue.payload.bytecode.version === '11'
+        && canonicalJson(manifest.configs) !== canonicalJson(replay.manifest.configs)) {
+      throw new Error('config streams do not match canonical source lowering');
+    }
     const intConfigs = entries => entries.filter(entry => entry.type === 'Int');
     if (canonicalJson(intConfigs(manifest.configs)) !== canonicalJson(intConfigs(replay.manifest.configs))) {
       throw new Error('Int configs do not match canonical source lowering');

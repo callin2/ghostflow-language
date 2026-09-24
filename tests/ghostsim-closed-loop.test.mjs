@@ -20,13 +20,17 @@ async function execute(t, source, id) {
   const scenarioPath = path.join(directory, 'greenhouse.toon');
   fs.writeFileSync(scenarioPath, encode({
     format: 'GhostFlow/scenario-v1', id, initialInputs: [], keyBindings: [],
+    context: { bootEpoch: 9, terminalCapacity: 8, bindings: [] },
     actuatorBindings: [{ actuator: 'roof-vent', output: 'roof_vent.position', type: 'Percent', min: 0, max: 80 }],
     plant: {
       kind: 'GhostFlow/greenhouse-temperature-v1', sensor: 'inside_temperature', actuator: 'roof-vent', epoch: 9,
       initialTemperature: { value: 30, unit: '°C' }, outsideTemperature: { value: 20, unit: '°C' }, heatingKPerSecond: 0.001,
       leakPerSecond: 0.0001, ventilationPerSecond: 0.001,
     },
-    actions: [{ kind: 'scan', atMs: 0 }, { kind: 'scan', atMs: 10_000 }, { kind: 'scan', atMs: 20_000 }],
+    actions: [0, 10_000, 20_000].map(atMs => ({ kind: 'scan', atMs,
+      contextFacts: { clock: { monotonicMs: atMs, bootEpoch: 9, wallMs: atMs,
+        uncertaintyMs: 0, trusted: true, unknownReason: null, sourceRevision: 'pid-clock-v1' },
+      natural: [], schedules: [], settings: null } })),
   }) + '\n');
   const invoke = () => spawnSync(process.execPath, [cli, artifact, scenarioPath, '--format', 'json'], {
     encoding: 'utf8', timeout: 10_000,
@@ -72,6 +76,7 @@ test('native objective activation rejects missing target display unit before a s
   const artifact = await compileSource(reference.source, { filename: reference.filename });
   delete artifact.manifest.configs[0].displayUnit;
   const wasm = fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
-  await assert.rejects(() => ControlRuntime.instantiate(wasm, artifact, { acceptSettings: true }),
-    /displayUnit must be (?:explicitly )?°C or K/);
+  await assert.rejects(() => ControlRuntime.instantiate(wasm, artifact,
+    { context: { bootEpoch: 9, terminalCapacity: 8, bindings: [] } }),
+  /display unit is required/);
 });

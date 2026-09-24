@@ -14,10 +14,10 @@ for (const id of ['REF-03-062', 'REF-03-050']) test(`${id}: executable Result re
   if (id === 'REF-03-050') {
     assert.throws(() => compileControl(code), /accounting execution requires verified resource binding/);
   } else {
-    assert.equal(compileControl(code).manifest.format, 'GhostFlow/control-v9');
+    assert.equal(compileControl(code).manifest.format, 'GhostFlow/control-v10');
   }
   const artifact = await compileSource(fixture.source, { filename: fixture.filename });
-  assert.equal(artifact.manifest.format, 'GhostFlow/control-v9');
-  assert.equal(new DataView(artifact.bytes.buffer, artifact.bytes.byteOffset, artifact.bytes.byteLength).getUint16(4, true), 10);
+  assert.equal(artifact.manifest.format, 'GhostFlow/control-v10');
+  assert.equal(new DataView(artifact.bytes.buffer, artifact.bytes.byteOffset, artifact.bytes.byteLength).getUint16(4, true), 11);
   await assert.rejects(() => ControlRuntime.instantiate(wasm, artifact), /context activation profile is required/);
 });

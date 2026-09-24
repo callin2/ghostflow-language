@@ -1,5 +1,6 @@
 //! Transactional Rust-owned natural Result and schedule execution.
 
+use crate::settings_stream::{ConfigStream, ConfigValue, SETTINGS_INVALID, SETTINGS_UNAVAILABLE};
 use crate::{
     context_vm::*,
     eval_expression_with_preludes,
@@ -79,6 +80,7 @@ impl AccountingInput {
 #[derive(Clone)]
 pub(crate) struct ContextRuntime {
     engines: Vec<Option<crate::context_schedule::Engine>>,
+    configs: Vec<ConfigStream>,
     bindings: Vec<ProviderBinding>,
     pub boot_epoch: u64,
     settings_revision: u64,
@@ -140,7 +142,7 @@ impl ContextRuntime {
                     if d.kind == NaturalKind::Tide { 0 } else { 1 },
                     None,
                 )),
-                PulseDescriptor::Accounting(_) => None,
+                PulseDescriptor::Accounting(_) | PulseDescriptor::Config(_) => None,
                 PulseDescriptor::Context(d) => match &d.definition {
                     ScheduleDefinition::TideRun {
                         provider, timezone, ..
@@ -181,6 +183,13 @@ impl ContextRuntime {
         }
         Ok(Self {
             engines,
+            configs: descriptors
+                .iter()
+                .filter_map(|d| match d {
+                    PulseDescriptor::Config(d) => Some(ConfigStream::new(d.clone())),
+                    _ => None,
+                })
+                .collect::<Result<_>>()?,
             bindings: activation.bindings.clone(),
             boot_epoch: activation.boot_epoch,
             settings_revision: 0,
@@ -420,15 +429,90 @@ impl ContextRuntime {
                     .is_some_and(|last| event.position <= last)
                 || self.event_ids.contains(&event.event_id)
                 || event.changes.is_empty()
-                || event.changes.len() > expected
+                || event.changes.len() > self.configs.len()
                 || self.event_ids.len() >= self.capacity
             {
                 return Err(invalid("invalid or stale settings transaction"));
             }
             let mut changes = BTreeSet::new();
+            let mut candidates = Vec::new();
+            let mut group_fault = None;
+            let mut explicit_fault = None;
             for change in &event.changes {
-                if !changes.insert(change.site) || !sites.contains(&change.site) {
+                let Some((index, config)) = self
+                    .configs
+                    .iter()
+                    .enumerate()
+                    .find(|(_, c)| c.descriptor.id == change.id)
+                else {
+                    return Err(invalid("unknown settings stream target"));
+                };
+                if !changes.insert(change.id)
+                    || event.origin == SettingsOrigin::OperatorEdit
+                        && !config.descriptor.operator_editable
+                {
                     return Err(invalid("invalid settings target"));
+                }
+                match &change.result {
+                    Err(fault) if *fault <= SETTINGS_UNAVAILABLE => {
+                        if explicit_fault.is_some_and(|old| old != *fault) {
+                            return Err(invalid("conflicting explicit settings faults"));
+                        }
+                        explicit_fault = Some(*fault);
+                    }
+                    Err(_) => return Err(invalid("invalid settings fault tag")),
+                    Ok(value) => {
+                        if matches!(value, ConfigValue::Scalar(Value::Number(n)) if !n.is_finite())
+                        {
+                            return Err(invalid("nonfinite settings packet"));
+                        }
+                        if !bounded(&change.semantic_type)
+                            || matches!(value, ConfigValue::Slots(slots) if slots.len() > 4096)
+                        {
+                            return Err(invalid("settings payload exceeds transport bounds"));
+                        }
+                        if let Some((value, next_key)) =
+                            config.validate(&change.semantic_type, value)
+                        {
+                            if !config.descriptor.operator_editable
+                                && value != config.descriptor.initial
+                            {
+                                return Err(invalid(
+                                    "producer cannot change readonly config payload",
+                                ));
+                            }
+                            candidates.push((index, value, next_key));
+                        } else {
+                            group_fault = Some(SETTINGS_INVALID);
+                            staged.trace.push(Observation {
+                                site: change.id,
+                                occurrence_id: event.event_id.clone(),
+                                planned_ms: None,
+                                decision: if change.semantic_type != config.descriptor.semantic_type
+                                {
+                                    "SettingsTypeMismatch".into()
+                                } else {
+                                    "SettingsPayloadInvalid".into()
+                                },
+                                provider_revision: self.settings_revision.to_string(),
+                                context_revision: config.descriptor.name.clone(),
+                            });
+                        }
+                    }
+                }
+            }
+            if let Some(fault) = group_fault.or(explicit_fault) {
+                for config in &mut staged.runtime.configs {
+                    if changes.contains(&config.descriptor.id) {
+                        config.current = Err(fault);
+                    }
+                }
+            } else {
+                for (index, value, next_key) in candidates {
+                    let config = &mut staged.runtime.configs[index];
+                    config.current = Ok(value.clone());
+                    config.last_success = value;
+                    config.next_key = next_key;
                 }
             }
             staged.runtime.settings_revision = self
@@ -437,6 +521,21 @@ impl ContextRuntime {
                 .ok_or_else(|| invalid("settings revision exhausted"))?;
             staged.runtime.last_event_position = Some(event.position);
             staged.runtime.event_ids.insert(event.event_id.clone());
+        }
+        for config in &staged.runtime.configs {
+            config.project(inputs);
+            staged.trace.push(Observation {
+                site: config.descriptor.id,
+                occurrence_id: String::new(),
+                planned_ms: None,
+                decision: match &config.current {
+                    Ok(_) => "SettingsOk".into(),
+                    Err(0) => "SettingsInvalid".into(),
+                    Err(_) => "SettingsUnavailable".into(),
+                },
+                provider_revision: staged.runtime.settings_revision.to_string(),
+                context_revision: config.descriptor.name.clone(),
+            });
         }
         // Natural projections are complete before any schedule predicate runs.
         for descriptor in descriptors {
@@ -524,23 +623,49 @@ impl ContextRuntime {
                 };
                 let when = evaluate(&d.when, trace)?;
                 let cancel = evaluate(&d.cancel, trace)?;
-                let change = facts
+                let config_id = match &d.definition {
+                    ScheduleDefinition::Periodic { every, .. } => every.id,
+                    ScheduleDefinition::ConfigDailySlots { config_id, .. } => *config_id,
+                    _ => 0,
+                };
+                let config = staged
+                    .runtime
+                    .configs
+                    .iter()
+                    .find(|c| c.descriptor.id == config_id);
+                let changed = facts
                     .settings
                     .as_ref()
-                    .and_then(|e| e.changes.iter().find(|c| c.site == d.site))
-                    .map(|c| &c.value);
+                    .is_some_and(|e| e.changes.iter().any(|c| c.id == config_id));
+                let change = if changed {
+                    config.and_then(|c| match &c.current {
+                        Ok(ConfigValue::Scalar(Value::Number(n))) => {
+                            Some(SettingValue::SharedDuration(*n as u64))
+                        }
+                        Ok(ConfigValue::Slots(slots)) => {
+                            Some(SettingValue::SharedSlots(slots.clone()))
+                        }
+                        _ => None,
+                    })
+                } else {
+                    None
+                };
                 let engine = self.engines[index]
                     .as_ref()
                     .ok_or_else(|| invalid("context engine binding mismatch"))?;
-                let (next, decision) = engine.stage(
-                    d,
-                    clock,
-                    evidence,
-                    when,
-                    cancel,
-                    change,
-                    staged.runtime.settings_revision,
-                )?;
+                let (next, decision) = if let Some(Err(fault)) = config.map(|c| &c.current) {
+                    engine.stage_settings_fault(d, clock, evidence, *fault)?
+                } else {
+                    engine.stage(
+                        d,
+                        clock,
+                        evidence,
+                        when,
+                        cancel,
+                        change.as_ref(),
+                        staged.runtime.settings_revision,
+                    )?
+                };
                 staged.runtime.engines[index] = Some(next);
                 staged.projections.push([
                     Value::Bool(decision.due),

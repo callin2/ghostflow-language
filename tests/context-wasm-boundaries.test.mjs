@@ -81,7 +81,7 @@ function restore(runtime, bytes) {
   }
 }
 
-test('GFB10 natural Result inputs reject caller spoofing', async () => {
+test('GFB11 natural Result inputs reject caller spoofing', async () => {
   const compiled = await artifact('REF-03-062');
   const runtime = await runtimeFor(compiled);
   const protectedInput = compiled.manifest.naturalConditions[0].projectionInputs.ok;
@@ -89,7 +89,7 @@ test('GFB10 natural Result inputs reject caller spoofing', async () => {
   runtime.dispose();
 });
 
-test('wrong GFCA binding and malformed GFSF4 are atomic', async () => {
+test('wrong GFCA binding and malformed GFSF5 are atomic', async () => {
   const compiled = await artifact('REF-03-062');
   const runtime = await runtimeFor(compiled);
   const tide = binding('tide', 'harbor_tides', 'Asia/Seoul', 'neap');

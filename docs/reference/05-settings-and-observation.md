@@ -36,13 +36,16 @@ control OperatorSettings {
 }
 ```
 
-`config name: Type = default { ... }`은 이름, 타입, 소스 기본값과 설정 메타데이터를
-한 선언으로 묶는다.
+`config name: Type = default { ... }`은 payload 타입이 `Type`이고 초기 emission이
+`ok(default)`인 typed stream을 선언한다. 이름, 소스 초기값과 검증 메타데이터를
+한 선언으로 묶는다. `access`는 변경 권한이며 stream의 타입을 바꾸지 않는다.
+운영자 변경을 허용하지 않는 config도 같은 Result 읽기 규칙을 따른다. 바뀌지 않는
+계산 상수가 목적이면 일반 `let`의 상수 식을 사용한다.
 
 | 항목 | 의미 | 규칙 |
 |---|---|---|
 | 타입 | 값의 의미와 표현 범위 | 실행식과 설정 입력에 같은 타입 규칙을 적용한다. |
-| 기본값 | override가 없을 때 사용하는 작성자 값 | canonical `.ghost.md`의 일부다. |
+| 기본값 | 최초 `ok` emission의 payload | canonical `.ghost.md`의 일부이며 오류 때의 fallback이 아니다. |
 | `min`, `max` | 닫힌 허용 범위 | 타입이 같고 `min <= max`여야 하며 양 끝값을 허용한다. |
 | `step` | `min`을 기준으로 한 허용 격자 | 0보다 커야 하며 `(value - min)`이 step에 맞지 않으면 거부한다. Temperature의 차이는 TemperatureDelta다. |
 | `access = operator` | 운전자가 바꿀 수 있는 설정 | 선언된 범위 안의 typed 설정 event만 허용한다. |
@@ -55,8 +58,9 @@ control OperatorSettings {
 
 수치 설정의 기본값도 `min..max` 안에 있고 `min` 기준 step 격자에 맞아야 한다. `Bool`은
 선택 가능한 두 값이 타입 자체에 있으므로 수치 범위와 증분을 두지 않는다. `false`, `0`,
-`0%`는 값 없음이 아니라 유효한 명시 값이다. 알 수 없는 설정, 중복된 설정, 타입 불일치,
-범위 초과, 증분 불일치, `designer` 설정에 대한 운영자 변경은 거부한다.
+`0%`는 값 없음이 아니라 유효한 명시 값이다. 알 수 없는 대상·중복 대상·권한 없는 변경은
+stream admission 전에 거부한다. 식별되고 권한이 확인된 변경의 payload가 타입·범위·증분
+검증에 실패하면 §5.2의 error emission을 만든다. 실패한 payload를 성공값으로 적용하지 않는다.
 
 `Int` 설정의 기본값·`min`·`max`·`step`은 모두 signed 32-bit 정수다.
 `step`은 양수이며 기본값과 `max` 모두 `min`에서 시작하는 정수 격자 위에 있어야 한다.
@@ -102,15 +106,18 @@ canonical 값이나 값의 크기에서 표시 unit을 추론하거나 기본 un
 
 ### 기본값과 유효값
 
-기본값은 소스가 정한 값이고, 유효값은 특정 실행 위치에서 실제 식이 읽는 값이다.
+기본값은 소스가 정한 초기 payload이고, 유효 observation은 특정 실행 위치에서 식이
+읽는 최신 `Result<Type, SettingsFault>`다.
 
 ```text
-해당 setting의 받아들인 override가 있음 → override 값
-없음                                  → 소스 기본값
+최초 observation                       → ok(소스 초기값)
+이후 받아들인 정상 emission             → ok(새 payload)
+이후 받아들인 오류 emission             → fault(SettingsFault)
 ```
 
-관찰자는 `defaultValue`, `effectiveValue`, override 여부, settings revision과 적용 위치를
-구분할 수 있어야 한다. 유효값은 프로그램 소스나 실행 상태의 복사본이 아니다.
+관찰자는 `defaultValue`, 현재 Result의 status·payload 또는 fault, settings revision과
+적용 위치를 구분할 수 있어야 한다. 이전 성공값을 이력으로 보관할 수 있지만 현재
+fault를 숨기는 effective value로 제공하지 않는다.
 
 ## 5.2 소스 변경과 운영 설정 변경
 
@@ -126,16 +133,73 @@ canonical 값이나 값의 크기에서 표시 unit을 추론하거나 기본 un
 소스 리터럴을 바꾸거나 재컴파일하지 않는다. 이 구분은 “5분을 10분으로 바꿔 줘”가
 영구 기본값 수정인지 이번 운전 설정인지 검토 가능하게 한다.
 
+### 설정 stream과 현재 observation
+
+설정의 producer는 WebUI, 네트워크 메시지, MQTT, EC11 같은 물리 조작기 등일 수 있다.
+producer의 교체는 consumer 프로그램의 식이나 stream 의미를 바꾸지 않는다. 특정
+프로토콜, RxJS 또는 UI 라이브러리를 언어 의미로 요구하지 않는다.
+
+`access`는 값 편집 권한이다. 정당한 producer가 `designer` 또는 읽기 전용 config의
+오류를 보고하거나 선언된 초기 payload로 회복하는 것을 금지하지 않는다. 다른 payload로
+바꾸는 것은 여전히 값 편집이며 권한 검사를 받는다. host는 producer observation과
+operator edit의 출처·권한을 admission 전에 확인한다. packet의 origin 표기만으로
+인증됐다고 간주하지 않으며 consumer 식은 origin으로 분기하지 않는다.
+
+각 stream은 유효한 초기값을 한 번 제공한 뒤 순서가 있는 `ok(value)` 또는
+`fault(reason)` observation을 제공한다. fault는 stream 종료가 아니다. 다음 정상
+emission으로 회복할 수 있다. 메시지가 없다는 사실만으로 fault를 만들지 않으며,
+unavailable 판정은 명시된 producer 계약의 `fault(SettingsUnavailable)` emission이다.
+
+일반 제어식은 기존 Result 문법으로 두 rail을 명시적으로 처리한다.
+
+```ghost
+config duration: Duration = 5min {
+  min = 1min; max = 20min; step = 1min; access = operator;
+}
+let within_duration = case duration {
+  ok(value) => age < value;
+  fault(reason) => false;
+};
+```
+
+여기서 `false`는 작성자가 고른 오류 처리다. 언어가 정지, 기본값, 이전 성공값을 대신
+선택하지 않는다. `map`, `and_then`, `recover` 같은 기존 Result 연산도 각 연산의 타입
+규칙대로 사용할 수 있다. `TimeSlots`도 같은 성공·오류 observation을 가지며, 목록을
+소비하는 `DailySlots`가 직접 오류를 처리한다. 목록을 임의 scalar로 변환하지 않는다.
+
+모든 consumer는 한 논리 평가 위치에서 같은 config observation을 읽는다. 일정의
+`every`와 제어식의 운전 duration이 서로 다른 설정 복사본을 읽어서는 안 된다.
+평가 중 도착한 emission은 그 평가의 immutable view를 바꾸지 않고 다음 순서 위치에
+놓인다. 이 평가 경계는 stream 의미를 구현하는 방법이며, 설정을 scan loop 전용
+명령으로 정의하지 않는다. DI snapshot도 같은 평가에서 고정하지만 일반 Bool 입력에
+설정 revision이나 EventId를 붙이라고 요구하지 않는다.
+
 ### atomic live event
 
-`operator` 설정 변경은 하나의 atomic live event다.
+여러 설정의 연관된 변경은 명시된 대상 집합을 가진 하나의 atomic live emission이다.
 
 1. event가 대상으로 삼는 Program과 settings 기준 revision을 확인한다.
-2. 한 동작에 든 모든 값을 타입·범위·증분·권한 규칙으로 함께 검증한다.
-3. 하나라도 잘못되면 event 전체를 거부하고 어떤 설정도 바꾸지 않는다.
-4. 받아들이면 처리된 event 위치부터 모든 값을 함께 유효하게 한다.
+2. 대상 집합이 비어 있지 않고 중복 없이 식별되며 producer에게 권한이 있는지 확인한다.
+   손상된 envelope, 알 수 없는 대상, 다른 Program, stale 기준 revision, 권한 실패는
+   admission 전에 거부한다. 식별할 수 없는 stream에 오류 emission을 만들지 않는다.
+3. 식별된 동작의 모든 payload를 타입·범위·증분·목록 capacity 규칙으로 함께 검증한다.
+   전부 유효하면 대상 모두에 `ok(value)`를 함께 emit한다. 하나라도 실패하면 대상
+   모두에 `fault(SettingsInvalid)`를 함께 emit한다. 유효한 일부만 `ok`로 바꾸지 않는다.
+   실패 원인과 해당 항목은 진단 provenance에 남긴다. 명시적 producer unavailable도
+   대상 묶음 전체에 `fault(SettingsUnavailable)`을 emit한다.
+   한 묶음에 서로 다른 명시 fault code가 있으면 불일치 packet으로 거부한다. 임의의
+   오류 우선순위를 추측하지 않는다. 실제 payload 검증 실패가 있으면 묶음 전체의
+   `SettingsInvalid` observation이다.
+4. 받아들인 성공 또는 오류 emission은 settings revision과 effective position을 가지며
+   그 위치부터 대상 observation 전체가 함께 유효하다. 대상이 아닌 stream은 변하지 않는다.
 5. 같은 canonical source, compiled Program과 `runId`를 유지한다.
 6. state와 timer를 초기화하지 않는다. 현재 제어식이 새 유효값을 읽어 결과를 정한다.
+
+`fault` emission의 수락과 transport 거부를 혼동하지 않는다. 오류 rail도 consumer가
+관찰할 새 상태다. 이미 수락된 emission을 이후 제어 평가 실패 때문에 취소하지 않는다.
+아직 수락하지 않은 emission과 평가를 한 transaction으로 제출한 API라면 그 transaction
+실패 시 emission도 미수락 상태로 남기며 같은 identity로 재시도할 수 있다. 미수락 동작을
+이미 effective라고 응답하지 않는다. producer 재전송은 같은 emission을 중복 적용하지 않는다.
 
 따라서 운전 중 `duration`을 10분에서 5분으로 줄이면, 이미 경과한 시간과 새 제한을
 다음 판단에서 비교할 수 있다. “다음 회차”, 정지, reset, 재컴파일 또는 새 run을
@@ -153,7 +217,10 @@ typed 값, actor, 권한, 이유, 생성 event, settings revision, 시작 위치
 rollback provenance와 복귀 대상을 명시해야 한다. 다른 Program revision에는 이전 override를
 자동으로 붙이지 않는다. 새 revision에 대해 다시 검증하고 명시적으로 승인해야 한다.
 
-받아들인 일반 live 설정은 실제 장치 재시작 뒤에도 보존한다. 재시작은 새 `runId`를 만든다.
+받아들인 일반 live 설정의 최신 Result와 revision은 실제 장치 재시작 뒤에도 보존한다.
+마지막 observation이 fault이면 fault를 복원하며 초기값으로 바꾸지 않는다. 복원할 최신
+observation이 있으면 첫 제어 판단 전에 초기 emission 이후의 이력을 반영한다.
+재시작은 새 `runId`를 만든다.
 임시 변경은 일반 설정 위에 놓는 **한 층의 overlay**다. 소스 키워드를 추가하지 않고
 설정 event의 다음 의미로 정의한다.
 

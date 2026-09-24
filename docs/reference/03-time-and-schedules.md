@@ -546,6 +546,12 @@ Duration 목록으로 암묵 변환하지 않는다. `selected = watering_slots`
 설정의 G가 정확히 같아야 한다. literal `selected`는 기존의 간결한 `HH:MM`을 쓰고
 설정값은 일반 `time` literal을 쓴다.
 
+`selected = watering_slots`는 §5.2의 `Result<TimeSlots<G,N>, SettingsFault>` stream을
+소비한다. 현재 observation이 fault이면 같은 원인의 `Unknown`을 남기고 새 occurrence를
+admit하지 않는다. 이전 성공 목록이나 빈 목록으로 대신하지 않는다. 다음 `ok` emission은
+아래 identity·retime·baseline 규칙으로 적용한다. fault 자체는 이미 admit한 Run의 취소가
+아니며 별도의 명시된 cancellation 규칙을 대신하지 않는다.
+
 accepted live edit는 다음 의미를 가진다.
 
 - event 전체를 type, grid, 중복, N, 권한, Program identity와 함께 atomic하게 검증한다.
@@ -605,7 +611,7 @@ schedule watering: Periodic {
 }
 ```
 
-`every`는 양의 `Duration`이어야 한다. config 참조라면 semantic type도 Duration이어야
+`every`의 성공 payload는 양의 `Duration`이어야 한다. config 참조라면 선언한 payload type도 Duration이어야
 하며 Bool, Percent, 단위 없는 Number는 타입 오류다. runtime boot time을 숨은 anchor로
 쓰지 않는다. anchor는 다음 중 하나다.
 
@@ -616,9 +622,15 @@ schedule watering: Periodic {
   제공해야 활성화할 수 있다. 재부팅 뒤 보존하며 boot time으로 대체하지 않는다.
 
 운영자가 interval을 바꾸는 경우 #105/#110의 최신 결정을 따른다. 한 번의 설정 동작은
-같은 program과 같은 run 안의 atomic live-property event다. 여러 값 중 하나라도
-타입·범위·step·권한 검증에 실패하면 전부 거부한다. 성공하면 settings revision과
-effective event position이 바뀌고, 해당 위치 이후 일정 판단은 새 값을 사용한다.
+같은 program과 같은 run 안의 atomic stream emission이다. 설정 stream의 성공·오류
+rail과 묶음 검증은 §5.2를 따른다. `every = irrigation_interval`은 해당 config의
+`Result<Duration, SettingsFault>`를 소비하는 전용 문법이다. `ok(interval)`이면 아래
+phase 정책으로 새 interval을 사용한다. `fault(reason)`이면 `Unknown(reason)`을
+보존하고 새 occurrence를 admit하지 않는다. 이전 성공 interval로 계속 실행하거나
+초기값으로 돌아가지 않는다. 이후 `ok`로 회복하면 그 effective position부터 phase
+정책을 적용하며 오류 동안의 과거 occurrence를 catch-up하지 않는다. 이미 admit한
+occurrence의 identity와 실행은 소급해서 바꾸지 않는다. settings revision과
+effective event position은 성공·오류 observation 모두를 식별한다.
 source/bytecode를 다시 쓰거나 새 run을 만들지 않는다. `every`가 설정이면
 `interval_change`를 항상 명시한다.
 
@@ -629,7 +641,7 @@ source/bytecode를 다시 쓰거나 새 run을 만들지 않는다. `every`가 �
 - `restart_after_change`: effective position을 새 anchor로 삼고 new every 뒤에 첫
   occurrence를 만든다. 설정 event 자체는 due가 아니다.
 
-각 accepted 변경은 durable phase revision을 만든다. 이전 future occurrence는 철회하고
+각 accepted 성공 변경은 durable phase revision을 만든다. 이전 future occurrence는 철회하고
 이미 admit한 것은 유지한다. source occurrence key는 `(periodic epoch ID, phase revision,
 ordinal)`이며 과거 occurrence를 catch-up하지 않는다.
 

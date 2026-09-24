@@ -64,6 +64,7 @@ pub enum PulseDescriptor {
     Context(crate::context_vm::ScheduleDescriptor),
     Natural(crate::context_vm::NaturalDescriptor),
     Accounting(crate::context_vm::AccountingDescriptor),
+    Config(crate::settings_stream::ConfigDescriptor),
 }
 impl PulseDescriptor {
     pub fn site(&self) -> u32 {
@@ -74,6 +75,7 @@ impl PulseDescriptor {
             Self::Context(d) => d.site,
             Self::Natural(d) => d.site,
             Self::Accounting(d) => d.site,
+            Self::Config(d) => d.id,
         }
     }
     pub fn gap_ms(&self) -> u64 {
@@ -84,6 +86,7 @@ impl PulseDescriptor {
             Self::Context(d) => d.gap_ms,
             Self::Natural(_) => 1,
             Self::Accounting(_) => 1,
+            Self::Config(_) => 1,
         }
     }
     pub fn when(&self) -> &[u8] {
@@ -94,6 +97,7 @@ impl PulseDescriptor {
             Self::Context(d) => &d.when,
             Self::Natural(_) => &[],
             Self::Accounting(_) => &[],
+            Self::Config(_) => &[],
         }
     }
 }
@@ -231,7 +235,7 @@ pub(crate) fn load_prelude(
                     }));
                 (site, name)
             }
-            3 if matches!(format, 8 | 9 | 10) => {
+            3 if matches!(format, 8 | 9 | 11) => {
                 let site = reader.u32()?;
                 let name = reader.string()?;
                 let timezone = reader.string()?;
@@ -283,7 +287,7 @@ pub(crate) fn load_prelude(
                     }));
                 (site, name)
             }
-            4 if matches!(format, 9 | 10) => {
+            4 if matches!(format, 9 | 11) => {
                 let site = reader.u32()?;
                 let name = reader.string()?;
                 let timezone = reader.string()?;
@@ -355,8 +359,8 @@ pub(crate) fn load_prelude(
                     }));
                 (site, name)
             }
-            kind @ 5..=9 if format == 10 => {
-                let descriptor = crate::context_vm::load_schedule(reader, kind)?;
+            kind @ 5..=9 if format == 11 => {
+                let descriptor = crate::context_vm::load_schedule(reader, kind, &result.schedules)?;
                 for expression in [&descriptor.when, &descriptor.cancel] {
                     if verify_expression_with_prelude(
                         expression,
@@ -380,7 +384,7 @@ pub(crate) fn load_prelude(
                 result.schedules.push(PulseDescriptor::Context(descriptor));
                 identity
             }
-            10 if format == 10 => {
+            10 if format == 11 => {
                 let descriptor = crate::context_vm::load_natural(reader, inputs)?;
                 let identity = (descriptor.site, descriptor.name.clone());
                 result
@@ -389,7 +393,7 @@ pub(crate) fn load_prelude(
                 result.schedules.push(PulseDescriptor::Natural(descriptor));
                 identity
             }
-            11 if format == 10 => {
+            11 if format == 11 => {
                 let descriptor = crate::context_vm::load_accounting(reader, inputs)?;
                 let identity = (descriptor.site, descriptor.name.clone());
                 result
@@ -398,6 +402,15 @@ pub(crate) fn load_prelude(
                 result
                     .schedules
                     .push(PulseDescriptor::Accounting(descriptor));
+                identity
+            }
+            12 if format == 11 => {
+                let descriptor = crate::settings_stream::load(reader, inputs)?;
+                let identity = (descriptor.id, descriptor.name.clone());
+                result
+                    .order
+                    .push(PreludeEntry::Schedule(result.schedules.len() as u16));
+                result.schedules.push(PulseDescriptor::Config(descriptor));
                 identity
             }
             2 if format == 6 => {
@@ -430,7 +443,7 @@ pub(crate) fn projection_type(
     if usize::from(slot) >= schedule_count {
         return Err(Error::new("schedule projection index"));
     }
-    if field > if format == 10 { 2 } else { 1 } {
+    if field > if format == 11 { 2 } else { 1 } {
         return Err(Error::new("schedule projection field"));
     }
     Ok(Type::Bool)

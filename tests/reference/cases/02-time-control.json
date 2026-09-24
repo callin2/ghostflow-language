@@ -643,7 +643,7 @@
       "status": "executable",
       "filename": "accounting-syntax.ghost.md",
       "expect": "accept",
-      "source": "# Accounting syntax\n\n```ghost\ncontrol AccountingSyntax {\n  resource pump1: BoolActuator;\n  event normal_run_started: Event;\n  config worst_case_on: Duration = 5min;\n  config stop_delay: Duration = 10s;\n  account pump_applied = on_time(pump1, stage: applied, persistence: durable);\n  account normal_starts = count_events(normal_run_started, over: local_day(\"Asia/Seoul\"), persistence: durable);\n  constraints PumpBudgets {\n    limit used(pump_applied, rolling(10min)) <= 6min { reserve = worst_case_on + stop_delay; on_unknown = block; }\n  }\n  output ready: Bool;\n  ready <- case normal_starts.count { ok(count) => count >= 0; fault(_) => false; };\n}\n```\n"
+      "source": "# Accounting syntax\n\n```ghost\ncontrol AccountingSyntax {\n  resource pump1: BoolActuator;\n  event normal_run_started: Event;\n  let worst_case_on: Duration = 5min;\n  let stop_delay: Duration = 10s;\n  account pump_applied = on_time(pump1, stage: applied, persistence: durable);\n  account normal_starts = count_events(normal_run_started, over: local_day(\"Asia/Seoul\"), persistence: durable);\n  constraints PumpBudgets {\n    limit used(pump_applied, rolling(10min)) <= 6min { reserve = worst_case_on + stop_delay; on_unknown = block; }\n  }\n  output ready: Bool;\n  ready <- case normal_starts.count { ok(count) => count >= 0; fault(_) => false; };\n}\n```\n"
     },
     {
       "id": "REF-03-051",

@@ -35,7 +35,7 @@ elapsed(watering), exact 5min cutoff.”
 ```ghost
 control FiveMinuteWatering {
   input DI1, DI2, DI3, DI4, DI5, DI6, DI7, DI8: Bool;
-  config watering_limit: Duration = 5min;
+  let watering_limit = 5min;
   output RO1, RO2, RO3, RO4, RO5, RO6, RO7, RO8: Bool;
 
   // ghostflow:link id=GF-INT-FIXTURE-WATERING-V1 relation=implements

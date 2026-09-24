@@ -13,9 +13,7 @@ const certified = manifest.signals?.some(signal => signal.kind === 'true-for');
 const hasAfterEvent = manifest.signals?.some(signal => signal.kind === 'after-event');
 const hasSolar = manifest.schedules?.some(schedule => schedule.kind === 'solar');
 const hasDaily = manifest.schedules?.some(schedule => ['daily', 'daily-slots'].includes(schedule.kind));
-const hasContext = manifest.format === 'GhostFlow/control-v9' && ((manifest.naturalConditions?.length ?? 0) > 0 ||
-  manifest.schedules?.some(schedule => ['periodic', 'cron', 'tide'].includes(schedule.kind) ||
-    schedule.kind === 'daily' && schedule.day?.calendar || schedule.kind === 'daily-slots' && schedule.selectedConfig));
+const hasContext = manifest.format === 'GhostFlow/control-v10';
 const hasObjective = (manifest.objectives?.length ?? 0) > 0;
 try {
   const instantiate = certified || hasAfterEvent || hasSolar || hasDaily || hasContext || hasObjective ? ControlRuntime.instantiate : ControlRuntime.instantiateFramed;
@@ -116,6 +114,7 @@ try {
         }));
         if (plantState !== null) plantState.appliedPercent = virtualActuators[scenario.plant.actuator].applied;
         console.log(JSON.stringify({ scanId: outcome.frame?.scanId ?? scanId, logicalTimeMs: action.atMs, trace: outcome.vm,
+          ...(manifest.format === 'GhostFlow/control-v10' ? { settingsState: runtime.contextSnapshot().state } : {}),
           ...(scenario.actuatorBindings === undefined ? {} : { virtualActuators }), ...(plant === undefined ? {} : { plant }) }));
         scanId += 1;
         samples = {};

@@ -11,11 +11,11 @@ control ScheduledWatering {
     selected = [06:00, 06:15, 12:30, 18:45];
   }
 
-  config water1_time: Duration = 5min;
-  config water2_time: Duration = 5min;
-  config valve_delay: Duration = 2s;
-  config pump_stop_delay: Duration = 2s;
-  config switch_delay: Duration = 2s;
+  let water1_time = 5min;
+  let water2_time = 5min;
+  let valve_delay = 2s;
+  let pump_stop_delay = 2s;
+  let switch_delay = 2s;
 
   output pump, valve1, valve2: Bool;
 

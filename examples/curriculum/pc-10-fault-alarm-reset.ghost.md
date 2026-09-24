@@ -80,10 +80,10 @@ control FaultAlarmResetWaterSupply {
     source_water_ok, valve_drive_ok, open_limit, close_limit: Bool;
   output valve_open_contactor, valve_close_contactor, pump_contactor, alarm: Bool;
 
-  config settle_delay: Duration = 2s;
-  config watering_time: Duration = 5min;
-  config opening_timeout: Duration = 10s;
-  config closing_timeout: Duration = 10s;
+  let settle_delay = 2s;
+  let watering_time = 5min;
+  let opening_timeout = 10s;
+  let closing_timeout = 10s;
 
   type Phase = Idle | Opening | Settling | Watering | PumpStopping | Closing |
     FaultPumpStopping | FaultClosing | Faulted;

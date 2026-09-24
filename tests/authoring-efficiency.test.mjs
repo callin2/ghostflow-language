@@ -11,8 +11,27 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const corpus = path.join(root, 'examples/authoring/corpus');
 const manifestPath = path.join(corpus, 'manifest.json');
 const baselinePath = path.join(root, 'docs/LLM-AUTHORING-EFFICIENCY-BASELINE-2026-09-23.json');
+const measurementPath = path.join(root, 'docs/LLM-AUTHORING-EFFICIENCY-MEASUREMENT-2026-09-24.json');
 const work = path.join(root, 'build/authoring-efficiency-corpus');
 const sha256 = value => createHash('sha256').update(value).digest('hex');
+const HISTORICAL_BASELINE_SHA256 = '828f7f7fd33d915fb06c79b3f8d95bfdf13c98e962752ddc1cb79760f9c574c0';
+
+function historicalBaseline(bytes) {
+  assert.equal(sha256(bytes), HISTORICAL_BASELINE_SHA256, 'historical benchmark evidence changed');
+  return JSON.parse(bytes);
+}
+
+function behavior(record) {
+  return {
+    cases: record.cases.map(({ id, outcome, boundary, compileRounds, correctionRounds,
+      simulationRounds, equivalenceChecks }) => ({ id, outcome, boundary, compileRounds,
+      correctionRounds, simulationRounds, equivalenceChecks })),
+    referenceChunks: record.totals.referenceChunks,
+    compileRounds: record.totals.compileRounds,
+    correctionRounds: record.totals.correctionRounds,
+    simulationRounds: record.totals.simulationRounds,
+  };
+}
 
 function filesUnder(directory) {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
@@ -62,7 +81,7 @@ function countTokens(payloads) {
 
 test('offline authoring corpus records bounded retrieval, compilation, correction, and simulation evidence', t => {
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-  const baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf8'));
+  const baseline = historicalBaseline(fs.readFileSync(baselinePath));
   fs.rmSync(work, { recursive: true, force: true });
   fs.mkdirSync(work, { recursive: true });
   t.after(() => fs.rmSync(work, { recursive: true, force: true }));
@@ -194,7 +213,6 @@ test('offline authoring corpus records bounded retrieval, compilation, correctio
     });
   }
 
-  report.tokenComparisons = baseline.tokenComparisons;
   if (process.env.GF_AUTHORING_RECOMPUTE_TOKENS === '1') {
     const tokenizer = countTokens(Object.fromEntries(Object.entries(tokenPayloads).map(([name, payload]) => ({
       [name]: { toon: encode(payload), json: JSON.stringify(payload) },
@@ -232,18 +250,27 @@ test('offline authoring corpus records bounded retrieval, compilation, correctio
   }));
   assert.ok(report.cases.every(item => item.referenceChunks > 0));
   assert.equal(report.cases.reduce((sum, item) => sum + item.simulationRounds, 0), 1);
-  assert.deepEqual(report.totals, {
-    referenceChunks: 15, referenceContentBytes: 33625, referenceResponseBytes: 41910,
-    compileRounds: 16, correctionRounds: 3, simulationRounds: 1,
-    diagnosticBytes: 2044, simulationResultBytes: 1847,
-  });
-  assert.equal(report.tokenizer.version, '0.12.0');
-  assert.equal(report.sourceRevision.digest, '45f4efc0e2a8c7d227d04622ed4dc61ee63430646fd0751dd4e332fd35f5323f');
-  assert.equal(report.sourceRevision.referenceSourceDigest, 'sha256:580ba6e568286dc69c0fff7e8e1257fffce194cb286d350acf4075731accbf90');
-  assert.deepEqual(report.tokenComparisons, {
-    diagnostic: { toonBytes: 498, jsonBytes: 547, toonTokens: 176, jsonTokens: 174 },
-    simulation: { toonBytes: 1810, jsonBytes: 1630, toonTokens: 581, jsonTokens: 506 },
-  });
-  assert.deepEqual(report, baseline);
   if (process.env.GF_AUTHORING_REPORT === '1') process.stdout.write(`AUTHORING_EFFICIENCY_REPORT=${JSON.stringify(report)}\n`);
+  assert.equal(report.tokenizer.version, '0.12.0');
+  assert.deepEqual(behavior(report), behavior(baseline));
+});
+
+test('dated authoring evidence is immutable while fresh source provenance may evolve', () => {
+  const historicalBytes = fs.readFileSync(baselinePath);
+  const baseline = historicalBaseline(historicalBytes);
+  const measurementBytes = fs.readFileSync(measurementPath);
+  assert.equal(sha256(measurementBytes), '7953770d063959b864f9df36b769beb7f368ccf31db6ad1f924be6dea0be199e');
+  const measurement = JSON.parse(measurementBytes);
+  assert.equal(measurement.format, baseline.format);
+  assert.equal(measurement.sourceRevision.digest, sha256(JSON.stringify({
+    ...measurement.sourceRevision, digest: undefined,
+  })));
+  assert.notEqual(measurement.sourceRevision.digest, baseline.sourceRevision.digest);
+  assert.notEqual(measurement.sourceRevision.referenceSourceDigest, baseline.sourceRevision.referenceSourceDigest);
+  assert.notEqual(measurement.totals.referenceContentBytes, baseline.totals.referenceContentBytes);
+  assert.deepEqual(behavior(measurement), behavior(baseline));
+
+  const tamper = oldValue => Buffer.from(historicalBytes.toString().replace(oldValue, `${oldValue}tampered`));
+  assert.throws(() => historicalBaseline(tamper('33625')), /historical benchmark evidence changed/);
+  assert.throws(() => historicalBaseline(tamper(baseline.sourceRevision.digest)), /historical benchmark evidence changed/);
 });

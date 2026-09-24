@@ -21,6 +21,8 @@ pub struct FramedHandle {
     outcome: String,
     replay: String,
     resource_plan: String,
+    context_checkpoint: Vec<u8>,
+    context_state: String,
 }
 
 impl FramedHandle {
@@ -31,6 +33,8 @@ impl FramedHandle {
             outcome: String::new(),
             replay: String::new(),
             resource_plan: String::new(),
+            context_checkpoint: Vec::new(),
+            context_state: String::new(),
         }
     }
 
@@ -338,6 +342,130 @@ pub unsafe extern "C" fn gf_frame_scan(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn gf_frame_activate_context(
+    handle: *mut FramedHandle,
+    ptr: *const u8,
+    len: usize,
+) -> i32 {
+    let Some(h) = handle.as_mut() else { return 0 };
+    let profile = match crate::context_abi::activation_from_raw(ptr, len) {
+        Ok(profile) => profile,
+        Err(error) => return h.failure(error),
+    };
+    let state = std::mem::replace(&mut h.state, FramedState::Configuring(Runtime::new(1)));
+    match state {
+        FramedState::Configuring(mut runtime) => match runtime.activate_with_context(&profile) {
+            Ok(()) => {
+                h.state = FramedState::Active(runtime.into_scan_driver());
+                h.success()
+            }
+            Err(error) => {
+                h.state = FramedState::Configuring(runtime);
+                h.failure(error.to_string())
+            }
+        },
+        FramedState::Active(driver) => {
+            h.state = FramedState::Active(driver);
+            h.failure("framed runtime is already active")
+        }
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn gf_frame_scan_context(
+    handle: *mut FramedHandle,
+    scan_id: u64,
+    logical_time_ms: u64,
+    ptr: *const u8,
+    len: usize,
+    context_ptr: *const u8,
+    context_len: usize,
+) -> i32 {
+    let Some(h) = handle.as_mut() else { return 0 };
+    let frame = match decode_frame(ptr, len, scan_id, logical_time_ms) {
+        Ok(frame) => frame,
+        Err(error) => return h.failure(error),
+    };
+    let packet = match crate::context_abi::facts_from_raw(context_ptr, context_len) {
+        Ok(packet) => packet,
+        Err(error) => return h.failure(error),
+    };
+    let result = match &mut h.state {
+        FramedState::Active(driver) => {
+            driver.scan_with_context(frame, packet.clock(), &packet.facts)
+        }
+        _ => return h.failure("framed runtime is not active"),
+    };
+    match result {
+        Ok(outcome) => {
+            h.outcome = format!("{{\"format\":\"GhostFlow/scan-outcome-v1\",\"scanId\":{},\"logicalTimeMs\":{},\"trace\":{}}}", outcome.scan_id, outcome.logical_time_ms, outcome.trace.to_json());
+            h.success()
+        }
+        Err(error) => h.failure(error.to_string()),
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn gf_frame_context_checkpoint(handle: *mut FramedHandle) -> i32 {
+    let Some(h) = handle.as_mut() else { return 0 };
+    let FramedState::Active(driver) = &h.state else {
+        return h.failure("framed runtime is not active");
+    };
+    match driver.runtime().context_checkpoint().and_then(|bytes| {
+        driver
+            .runtime()
+            .context_state_json()
+            .map(|state| (bytes, state))
+    }) {
+        Ok((bytes, state)) => {
+            h.context_checkpoint = bytes;
+            h.context_state = state;
+            h.success()
+        }
+        Err(error) => h.failure(error.to_string()),
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn gf_frame_context_checkpoint_ptr(handle: *const FramedHandle) -> *const u8 {
+    handle
+        .as_ref()
+        .map_or(std::ptr::null(), |h| h.context_checkpoint.as_ptr())
+}
+#[no_mangle]
+pub unsafe extern "C" fn gf_frame_context_checkpoint_len(handle: *const FramedHandle) -> usize {
+    handle.as_ref().map_or(0, |h| h.context_checkpoint.len())
+}
+#[no_mangle]
+pub unsafe extern "C" fn gf_frame_context_state_ptr(handle: *const FramedHandle) -> *const u8 {
+    handle
+        .as_ref()
+        .map_or(std::ptr::null(), |h| h.context_state.as_ptr())
+}
+#[no_mangle]
+pub unsafe extern "C" fn gf_frame_context_state_len(handle: *const FramedHandle) -> usize {
+    handle.as_ref().map_or(0, |h| h.context_state.len())
+}
+#[no_mangle]
+pub unsafe extern "C" fn gf_frame_restore_context_checkpoint(
+    handle: *mut FramedHandle,
+    ptr: *const u8,
+    len: usize,
+) -> i32 {
+    let Some(h) = handle.as_mut() else { return 0 };
+    if ptr.is_null() || len > 4 * 1024 * 1024 {
+        return h.failure("invalid context checkpoint pointer/length");
+    }
+    let FramedState::Active(driver) = &mut h.state else {
+        return h.failure("framed runtime is not active");
+    };
+    match driver.restore_context_checkpoint(slice::from_raw_parts(ptr, len)) {
+        Ok(()) => h.success(),
+        Err(error) => h.failure(error.to_string()),
+    }
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn gf_frame_outcome_ptr(handle: *const FramedHandle) -> *const u8 {
     let Some(handle) = handle.as_ref() else {
         return std::ptr::null();
@@ -469,6 +597,8 @@ mod replay_tests {
             outcome: "live".into(),
             replay: "old replay".into(),
             resource_plan: String::new(),
+            context_checkpoint: Vec::new(),
+            context_state: String::new(),
         };
         assert_eq!(unsafe { gf_frame_resource_plan_len(&h) }, 0);
         let mut packet = profile_packet();
@@ -534,6 +664,8 @@ mod replay_tests {
             outcome: "unchanged outcome".into(),
             replay: String::new(),
             resource_plan: String::new(),
+            context_checkpoint: Vec::new(),
+            context_state: String::new(),
         };
         let packet = profile_packet();
         let invoke = |h: &mut FramedHandle, p: &[u8], count, peak, json| unsafe {

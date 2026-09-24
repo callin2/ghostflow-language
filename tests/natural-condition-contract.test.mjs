@@ -33,10 +33,10 @@ test('natural condition reference retains typed provider queries', () => {
   }
 });
 
-test('natural condition execution binds protected Results in GFB10', () => {
+test('natural condition execution binds protected Results in GFB11', () => {
   const compiled = compileControl(source, { filename: fixture.filename });
-  assert.equal(compiled.manifest.format, 'GhostFlow/control-v9');
-  assert.equal(new DataView(compiled.bytes.buffer, compiled.bytes.byteOffset, compiled.bytes.byteLength).getUint16(4, true), 10);
+  assert.equal(compiled.manifest.format, 'GhostFlow/control-v10');
+  assert.equal(new DataView(compiled.bytes.buffer, compiled.bytes.byteOffset, compiled.bytes.byteLength).getUint16(4, true), 11);
 });
 
 test('natural conditions require their matching logical provider type', () => {
