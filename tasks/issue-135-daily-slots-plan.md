@@ -11,14 +11,14 @@ non-executable descriptor until keyed settings edits and persistence exist.
 
 ## Steps
 
-1. Add GFB9/control-v8 for the literal DailySlots descriptor and stable literal
+1. [x] Add GFB9/control-v8 for the literal DailySlots descriptor and stable literal
    slot keys.
-2. Extend Rust schedule facts and admission identity to source day, slot key and
+2. [x] Extend Rust schedule facts and admission identity to source day, slot key and
    DST fold. Rust retains predicate, crossing, terminal ledger and transaction
    ownership.
-3. Add GFSF v3, public WASM and ghostsim integration with explicit provider
+3. [x] Add GFSF v3, public WASM and ghostsim integration with explicit provider
    facts. Reject missing, stale, malformed and caller-computed outcomes.
-4. Prove the unchanged Reference source through native, WASM and simulator
+4. [x] Prove the unchanged Reference source through native, WASM and simulator
    tests, including bounded capacity and atomic rollback.
 
 No Device revision, physical output claim, Reference source or expectation
