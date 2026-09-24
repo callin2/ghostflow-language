@@ -703,9 +703,8 @@ async function instantiateControlRuntime(wasmBytes, { bytes: bytecode, manifest 
   const hasSolar = checkedManifest.manifest.schedules.some(item => item.kind === 'solar');
   const hasSchedules = checkedManifest.manifest.schedules.some(item => item.kind === 'daily');
   let temporal = null;
-  if (hasSolar || hasSchedules) {
-    if (!supportsSchedules) throw new Error('framed schedule activation is not supported by this runtime');
-  }
+  if (hasSolar && !supportsSchedules) throw new Error('framed Solar activation is not supported by this runtime');
+  if (hasSchedules && !supportsSchedules) throw new Error('framed Daily schedule activation is not supported by this runtime');
   if (hasSchedules) {
     if (options.schedule === undefined) throw new Error('schedule activation profile is required');
     validateSolarActivation(options.schedule);
