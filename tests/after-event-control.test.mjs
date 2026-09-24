@@ -66,6 +66,69 @@ test('missing observations remain NotReady and generated Result inputs cannot be
   }), /unknown input __gf_after_event_any_value_opened/);
 });
 
+test('an older delivered sample is not interpolated to the current scan', async t => {
+  const artifact = await compileSource(source, { filename: 'after-event-control.ghost.md' });
+  const runtime = await ControlRuntime.instantiate(wasm, artifact, { afterEvent: { timeEpoch: 7 } });
+  t.after(() => runtime.dispose());
+  runtime.step({ nowMs: 0, inputs: { divisor: 1 }, events: eventBatch([start(1, 0)]) });
+  const stale = runtime.step({
+    nowMs: 1,
+    inputs: { divisor: 1 },
+    samples: { valve_open: sample(1, 0, true) },
+  });
+  assert.equal(stale.vm.safe.any_opened, false);
+  assert.equal(stale.vm.resultTrace.at(-2).choice, 4);
+  assert.equal(runtime.afterEvents.get('opened').runtime.results[0].status, 'pending');
+  const fresh = runtime.step({
+    nowMs: 2,
+    inputs: { divisor: 1 },
+    samples: { valve_open: sample(2, 2, true) },
+  });
+  assert.equal(fresh.vm.safe.any_opened, true);
+  assert.equal(runtime.afterEvents.get('opened').runtime.results[0].status, 'satisfied');
+});
+
+test('a duplicate sample identity cannot satisfy a newly delivered start', async t => {
+  const artifact = await compileSource(source, { filename: 'after-event-control.ghost.md' });
+  const runtime = await ControlRuntime.instantiate(wasm, artifact, { afterEvent: { timeEpoch: 7 } });
+  t.after(() => runtime.dispose());
+  runtime.step({
+    nowMs: 0,
+    inputs: { divisor: 1 },
+    samples: { valve_open: sample(1, 0, true) },
+    events: eventBatch([start(1, 0)]),
+  });
+  const duplicate = runtime.step({
+    nowMs: 0,
+    inputs: { divisor: 1 },
+    samples: { valve_open: sample(1, 0, true) },
+    events: eventBatch([start(2, 0)], [{ sourceEpoch: 2, id: 1 }]),
+  });
+  assert.equal(duplicate.vm.safe.any_opened, false);
+  assert.equal(runtime.afterEvents.get('opened').runtime.results[0].status, 'pending');
+});
+
+test('a predicate source fault persists until a fresh accepted observation recovers it', async t => {
+  const artifact = await compileSource(source, { filename: 'after-event-control.ghost.md' });
+  const runtime = await ControlRuntime.instantiate(wasm, artifact, { afterEvent: { timeEpoch: 7 } });
+  t.after(() => runtime.dispose());
+  const faulted = runtime.step({
+    nowMs: 0,
+    inputs: { divisor: 1 },
+    samples: { valve_open: sample(1, 0, false, 'Disconnected') },
+    events: eventBatch([start(1, 0)]),
+  });
+  assert.equal(faulted.vm.resultTrace.at(-2).choice, 1);
+  const missing = runtime.step({ nowMs: 1, inputs: { divisor: 1 } });
+  assert.equal(missing.vm.resultTrace.at(-2).choice, 1);
+  const recovered = runtime.step({
+    nowMs: 2,
+    inputs: { divisor: 1 },
+    samples: { valve_open: sample(2, 2, true) },
+  });
+  assert.equal(recovered.vm.safe.any_opened, true);
+});
+
 test('a rejected VM scan rolls back tracker identity, result, and logical time', async t => {
   const artifact = await compileSource(source, { filename: 'after-event-control.ghost.md' });
   const runtime = await ControlRuntime.instantiate(wasm, artifact, { afterEvent: { timeEpoch: 7 } });

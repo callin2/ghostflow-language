@@ -828,8 +828,8 @@ export class ControlRuntime {
     let afterEventTransaction = [];
     let phase = 'prepare';
     try {
-      const { sensorReadings, signalReadings } = this.#condition(captured.normalizedSamples, captured.nowMs);
-      const staged = this.#stageAfterEvents(captured, sensorReadings);
+      const { sensorReadings, signalReadings, observedSensors } = this.#condition(captured.normalizedSamples, captured.nowMs);
+      const staged = this.#stageAfterEvents(captured, sensorReadings, observedSensors);
       afterEventTransaction = staged.trackers;
 
       for (const item of this.manifest.inputs) {
@@ -1052,13 +1052,15 @@ export class ControlRuntime {
     }
   }
 
-  #stageAfterEvents(captured, sensorReadings) {
+  #stageAfterEvents(captured, sensorReadings, observedSensors) {
     const trackers = [];
     const projections = new Map();
     try {
       for (const [name, entry] of this.afterEvents) {
         const batch = captured.eventValues.get(entry.item.event.name);
-        const hasObservation = captured.normalizedSamples.has(entry.item.predicate.name);
+        const sample = captured.normalizedSamples.get(entry.item.predicate.name);
+        const hasObservation = observedSensors.has(entry.item.predicate.name)
+          && sample.timestampMs === captured.nowMs;
         const reading = sensorReadings.get(entry.item.predicate.name);
         entry.runtime.stage({
           time: { epoch: this.#afterEventEpoch, nowMs: captured.nowMs },
@@ -1087,7 +1089,7 @@ export class ControlRuntime {
           const projected = mode === 'any' ? entry.runtime.stagedAny() : entry.runtime.stagedAll();
           values.set(mode, projected.ok ? projected : {
             ok: false,
-            fault: hasObservation && !reading.ok ? reading.quality : 'NotReady',
+            fault: reading.ok ? 'NotReady' : reading.quality,
           });
         }
         projections.set(name, values);
@@ -1145,8 +1147,18 @@ export class ControlRuntime {
 
   #condition(normalizedSamples, nowMs) {
     const sensorReadings = new Map();
+    const observedSensors = new Set();
     for (const [sensorName, entry] of this.sensors) {
-      const raw = normalizedSamples.has(sensorName) ? entry.conditioner.update(normalizedSamples.get(sensorName), nowMs) : entry.conditioner.read(nowMs);
+      const sample = normalizedSamples.get(sensorName);
+      const before = sample === undefined ? null : entry.conditioner.sampleIdentity();
+      const raw = sample === undefined ? entry.conditioner.read(nowMs) : entry.conditioner.update(sample, nowMs);
+      if (sample !== undefined) {
+        const after = entry.conditioner.sampleIdentity();
+        if (after?.epoch === sample.epoch && after.id === sample.id && after.timestampMs === sample.timestampMs
+          && (before?.epoch !== after.epoch || before.id !== after.id || before.timestampMs !== after.timestampMs)) {
+          observedSensors.add(sensorName);
+        }
+      }
       sensorReadings.set(sensorName, hostReading(raw, entry.item.type));
     }
     const signalReadings = new Map();
@@ -1154,7 +1166,7 @@ export class ControlRuntime {
       const raw = normalizedSamples.has(entry.item.sensor) ? entry.conditioner.update(normalizedSamples.get(entry.item.sensor), nowMs) : entry.conditioner.read(nowMs);
       signalReadings.set(signalName, { ok: raw.ok, value: raw.ok ? Boolean(raw.dry) : false, quality: raw.quality, dry: raw.ok ? Boolean(raw.dry) : false });
     }
-    return { sensorReadings, signalReadings };
+    return { sensorReadings, signalReadings, observedSensors };
   }
 
   #beginConditioners() {
@@ -1203,8 +1215,8 @@ export class ControlRuntime {
     let afterEventTransaction = [];
     let phase = 'prepare';
     try {
-      const { sensorReadings, signalReadings } = this.#condition(captured.normalizedSamples, captured.nowMs);
-      const staged = this.#stageAfterEvents(captured, sensorReadings);
+      const { sensorReadings, signalReadings, observedSensors } = this.#condition(captured.normalizedSamples, captured.nowMs);
+      const staged = this.#stageAfterEvents(captured, sensorReadings, observedSensors);
       afterEventTransaction = staged.trackers;
       const frameInputs = [];
       for (const item of this.manifest.inputs) frameInputs.push({ name: item.name, type: item.type, value: captured.inputValues.get(item.name) });

@@ -117,8 +117,9 @@ logical time together.
 `ControlRuntime` derives event and predicate tags from the compiled manifest.
 Scenario callers supply only source epochs, IDs, timestamps, acknowledgements,
 and an activation time epoch. Private generated Result inputs cannot be supplied
-as ordinary inputs. A scan with no current measured predicate observation does
-not reuse or interpolate an earlier sample. Until a terminal native result
+as ordinary inputs. Only a newly accepted measured sample whose timestamp equals
+the scan time is an observation; duplicate, held, and older samples are not
+reused or interpolated. Until a terminal native result
 exists, the projection is `Err(NotReady)` and follows the program's explicit
 Result handling.
 
