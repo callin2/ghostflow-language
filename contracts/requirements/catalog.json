@@ -955,10 +955,10 @@
         "path": "crates/ghostflow-core/src/lib.rs",
         "heading": "fn monotonic_input_failure_is_atomic()",
         "lines": [
-          3292,
-          3315
+          3357,
+          3379
         ],
-        "sha256": "f4def404d5ccd92e8b73ec6041ca3cd20b757c3637bcf107007e709916d700fc"
+        "sha256": "a9a83443a83a4ad006cf9ee304d0f38b8bb14332b54bda1fa0c9ffecc2a583fc"
       },
       "selector": "core leaves intent absent before first successful tick, preserves it across failed ticks, and clears it at hot swap"
     },
