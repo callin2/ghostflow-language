@@ -110,10 +110,11 @@ fn decode(bytes: &[u8], version: u16) -> Result<Packet, String> {
         if site == 0 || packet.schedules.iter().any(|item| item.site == site) {
             return Err("invalid or duplicate solar site".into());
         }
-        let kind = if version == 2 {
+        let kind = if version >= 2 {
             match reader.u8()? {
                 0 => ScheduleKind::Solar,
                 1 => ScheduleKind::Daily,
+                2 if version == 3 => ScheduleKind::DailySlots,
                 _ => return Err("invalid schedule kind".into()),
             }
         } else {
@@ -131,7 +132,12 @@ fn decode(bytes: &[u8], version: u16) -> Result<Packet, String> {
             if source_day > 2_932_896 {
                 return Err("invalid solar source day".into());
             }
-            let fold = if version == 2 { reader.u8()? } else { 0 };
+            let (slot_key, minute_of_day) = if version == 3 {
+                (reader.u16()?, reader.u16()?)
+            } else {
+                (0, 0)
+            };
+            let fold = if version >= 2 { reader.u8()? } else { 0 };
             if fold > 2 {
                 return Err("invalid occurrence fold".into());
             }
@@ -147,6 +153,8 @@ fn decode(bytes: &[u8], version: u16) -> Result<Packet, String> {
             }
             rows.push(SolarFact {
                 source_day: source_day as i32,
+                slot_key,
+                minute_of_day,
                 fold,
                 scheduled_wall_ms,
                 provider_revision,
@@ -215,7 +223,19 @@ pub unsafe extern "C" fn gf_tick_schedules(
     ptr: *const u8,
     len: usize,
 ) -> i32 {
-    tick_facts(handle, ptr, len, 2)
+    if ptr.is_null() || len < 6 || len > MAX_PACKET {
+        let Some(h) = handle.as_mut() else { return 0 };
+        h.error = "invalid solar packet pointer or length".into();
+        return 0;
+    }
+    let header = std::slice::from_raw_parts(ptr, 6);
+    let version = u16::from_le_bytes([header[4], header[5]]);
+    if !matches!(version, 2 | 3) {
+        let Some(h) = handle.as_mut() else { return 0 };
+        h.error = "invalid solar packet header".into();
+        return 0;
+    }
+    tick_facts(handle, ptr, len, version)
 }
 
 unsafe fn tick_facts(handle: *mut super::Handle, ptr: *const u8, len: usize, version: u16) -> i32 {
@@ -267,7 +287,11 @@ unsafe fn tick_facts(handle: *mut super::Handle, ptr: *const u8, len: usize, ver
                 facts: input.facts,
             })
             .collect();
-        h.runtime.tick_with_schedules(clock, &inputs)
+        if version == 3 {
+            h.runtime.tick_with_daily_slots(clock, &inputs)
+        } else {
+            h.runtime.tick_with_schedules(clock, &inputs)
+        }
     }
     .map(|_| ());
     h.complete(result)

@@ -1489,7 +1489,8 @@ class Lowerer {
       ? 'true'
       : ['all', ...this.manifest.outputs.map(output => ['has', 'actuator', output.name, gfbType(semanticType(output.type))])];
     const solarForms = this.solarForms();
-    if (solarForms.some(form => form[0] === 'daily-pulse')) this.manifest.format = 'GhostFlow/control-v7';
+    if (solarForms.some(form => form[0] === 'daily-slots-pulse')) this.manifest.format = 'GhostFlow/control-v8';
+    else if (solarForms.some(form => form[0] === 'daily-pulse')) this.manifest.format = 'GhostFlow/control-v7';
     const temporalForms = this.windows.length || this.trueFors.length || solarForms.length ? [
       ['temporal-context', `${RESERVED_PREFIX}now_ms`, `${RESERVED_PREFIX}time_epoch`],
       ...[...this.temporalRoots.values()].sort((left, right) => left.tag - right.tag).map(root =>
@@ -2204,7 +2205,7 @@ class Lowerer {
         if (!sameType(cancel.type, BOOL)) error(options.cancel_when.loc, `${label} cancel_when must be Bool`);
         cancelWhen = cancel.sexpr;
       }
-      const slot = this.manifest.schedules.filter(schedule => ['solar', 'daily'].includes(schedule.kind)).length;
+      const slot = this.manifest.schedules.filter(schedule => ['solar', 'daily', 'daily-slots'].includes(schedule.kind)).length;
       this.manifest.schedules.push({
         ...trigger, site: item.id, name: item.name, ...civilPolicy,
         policy: { basis, when: predicate.sexpr, ...(cancelWhen === undefined ? {} : { cancelWhen }),
@@ -3393,10 +3394,17 @@ class Lowerer {
     ]);
   }
   solarForms() {
-    return this.manifest.schedules.filter(schedule => schedule.kind === 'solar' || schedule.kind === 'daily' && schedule.policy.basis === 'pulse' && schedule.policy.clock === 'trusted_only' && !schedule.day).map(schedule => schedule.kind === 'daily' ? [
+    return this.manifest.schedules.filter(schedule => schedule.kind === 'solar'
+      || ['daily', 'daily-slots'].includes(schedule.kind) && schedule.policy.basis === 'pulse'
+        && schedule.policy.clock === 'trusted_only' && !schedule.day && !schedule.selectedConfig).map(schedule => schedule.kind === 'daily' ? [
       'daily-pulse', String(schedule.site), schedule.name, schedule.timezone, String(schedule.atMs),
       schedule.dstMissing, schedule.dstRepeated, schedule.policy.basis, schedule.policy.clock,
       String(schedule.policy.gapMs), schedule.policy.recovery, schedule.policy.fallback, schedule.policy.when,
+    ] : schedule.kind === 'daily-slots' ? [
+      'daily-slots-pulse', String(schedule.site), schedule.name, schedule.timezone, String(schedule.gridMs),
+      schedule.dstMissing, schedule.dstRepeated, schedule.policy.basis, schedule.policy.clock,
+      String(schedule.policy.gapMs), schedule.policy.recovery, schedule.policy.fallback,
+      ['slots', ...schedule.slots.map(minute => ['slot', String(minute + 1), String(minute)])], schedule.policy.when,
     ] : [
       'solar-pulse', String(schedule.site), schedule.name, schedule.timezone,
       String(schedule.latitude), String(schedule.longitude), schedule.event,
@@ -3645,9 +3653,11 @@ export function compileControl(source, { filename = '<control>', emitBytecode = 
 
 /** Only this bounded civil pulse slice has a VM/provider transport. */
 export function isExecutablePulseSchedule(item) {
-  return item.scheduleType === 'Solar' || item.scheduleType === 'Daily'
+  return item.scheduleType === 'Solar' || (item.scheduleType === 'Daily'
     && !item.on && !item.calendar && item.at?.kind === 'literal' && item.at.raw.startsWith('time`')
-    && item.policy?.basis?.name === 'pulse' && item.policy?.clock?.name === 'trusted_only';
+    && item.policy?.basis?.name === 'pulse' && item.policy?.clock?.name === 'trusted_only')
+    || (item.scheduleType === 'DailySlots' && Array.isArray(item.selected)
+    && item.policy?.basis?.name === 'pulse' && item.policy?.clock?.name === 'trusted_only');
 }
 
 /** Internal composition adapter. The public API accepts canonical documents. */

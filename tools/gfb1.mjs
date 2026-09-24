@@ -259,8 +259,10 @@ function compile(ast) {
   for(const c of constraints){if(c.names.length>32||new Set(c.names).size!==c.names.length)throw new CompileError('invalid constraint names or arity');for(const n of c.names)assertName(n,'constraint');}
   const env={inputs:new Map(inputs.map((x,i)=>[x.name,{...x,index:i}])),states:new Map(states.map((x,i)=>[x.name,{...x,index:i}]))};
   const rawWindowCount=strategies.reduce((total,{raw})=>total+raw.slice(3).filter(form=>Array.isArray(form)&&form[0]==='window').length,0);
-  const rawScheduleCount=strategies.reduce((total,{raw})=>total+raw.slice(3).filter(form=>Array.isArray(form)&&['solar-pulse','daily-pulse'].includes(form[0])).length,0);
+  const rawScheduleCount=strategies.reduce((total,{raw})=>total+raw.slice(3).filter(form=>Array.isArray(form)&&['solar-pulse','daily-pulse','daily-slots-pulse'].includes(form[0])).length,0);
   const hasDaily=strategies.some(({raw})=>raw.slice(3).some(form=>Array.isArray(form)&&form[0]==='daily-pulse'));
+  const hasDailySlots=strategies.some(({raw})=>raw.slice(3).some(form=>Array.isArray(form)&&form[0]==='daily-slots-pulse'));
+  const hasSolar=strategies.some(({raw})=>raw.slice(3).some(form=>Array.isArray(form)&&form[0]==='solar-pulse'));
   const rawTrueForCount=strategies.reduce((total,{raw})=>total+raw.slice(3).filter(form=>Array.isArray(form)&&form[0]==='true-for').length,0);
   const rawPreludeCount=rawWindowCount+rawScheduleCount+rawTrueForCount;
   const hasSchedules=rawScheduleCount>0;
@@ -418,6 +420,35 @@ function compile(ast) {
         const schedule={site,name:scheduleName,timezone,atMs,dstMissing,dstRepeated,gapMs,when};
         schedules.push(schedule);preludes.push({kind:'daily',value:schedule});
       }
+      else if(h==='daily-slots-pulse'){
+        if(!temporal)throw new CompileError('temporal module requires one temporal-context');
+        if(seenExecutable)throw new CompileError('stateful prelude declarations must precede transitions and intents');
+        if(a.length!==13)throw new CompileError('daily-slots-pulse expects 13 arguments');
+        const [siteAtom,scheduleName,timezone,gridAtom,missingAtom,repeatedAtom,basisAtom,clockAtom,gapAtom,recoveryAtom,fallbackAtom,slotsForm,whenForm]=a;
+        const site=Number(unsignedAtom(siteAtom,4294967295n,'invalid schedule site'));
+        if(site===0||preludeSites.has(site))throw new CompileError('invalid or duplicate prelude site');preludeSites.add(site);
+        assertName(scheduleName,'schedule');if(preludeNames.has(scheduleName))throw new CompileError('duplicate prelude name');preludeNames.add(scheduleName);
+        if(!wellFormedShortString(timezone))throw new CompileError('invalid DailySlots timezone');
+        const gridMs=unsignedAtom(gridAtom,86399999n,'invalid DailySlots grid');
+        if(gridMs!==900000n)throw new CompileError('unsupported DailySlots grid');
+        const dstMissing=['skip','next_valid'].indexOf(missingAtom),dstRepeated=['first','second','both','skip'].indexOf(repeatedAtom);
+        if(dstMissing<0||dstRepeated<0)throw new CompileError('invalid DailySlots DST policy');
+        if(basisAtom!=='pulse'||clockAtom!=='trusted_only'||recoveryAtom!=='baseline'||fallbackAtom!=='skip')throw new CompileError('unsupported DailySlots policy');
+        const gapMs=unsignedAtom(gapAtom,9007199254740991n,'invalid schedule gap');if(gapMs===0n)throw new CompileError('invalid schedule gap');
+        if(!Array.isArray(slotsForm)||slotsForm[0]!=='slots'||slotsForm.length<2||slotsForm.length>97)throw new CompileError('invalid DailySlots slots');
+        const slots=slotsForm.slice(1).map(form=>{
+          if(!Array.isArray(form)||form[0]!=='slot'||form.length!==3)throw new CompileError('invalid DailySlots slot');
+          const key=Number(unsignedAtom(form[1],1440n,'invalid DailySlots slot key'));
+          const minute=Number(unsignedAtom(form[2],1439n,'invalid DailySlots minute'));
+          if(key!==minute+1||minute%15)throw new CompileError('invalid DailySlots slot');
+          return {key,minute};
+        });
+        if(slots.some((slot,index)=>index>0&&slot.minute<=slots[index-1].minute))throw new CompileError('invalid DailySlots slot order');
+        const when=compileExpr(whenForm,{...env,windows,schedules},false);
+        if(when.type!==TYPE.bool||when.bytes.length>4096)throw new CompileError('invalid DailySlots predicate');
+        const schedule={site,name:scheduleName,timezone,gridMs,dstMissing,dstRepeated,gapMs,slots,when};
+        schedules.push(schedule);preludes.push({kind:'daily-slots',value:schedule});
+      }
       else if(h==='next'){seenExecutable=true;if(a.length!==2)throw new CompileError('next expects state expression');const st=env.states.get(a[0]);if(!st)throw new CompileError(`unknown state ${a[0]}`);const e=compileExpr(a[1],{...env,windows:temporal?windows:undefined,schedules:hasSchedules?schedules:undefined,trueFors:hasTrueFors?trueFors:undefined},false);if(e.type!==st.type)throw new CompileError(`type mismatch for state ${a[0]}`);transitions.push({index:st.index,type:e.type,usesInt:e.usesInt,usesFormat3:e.usesFormat3,expr:e.bytes});}
       else if(h==='intent'){seenExecutable=true;if(a.length!==2)throw new CompileError('intent expects name expression');assertName(a[0],'intent');const e=compileExpr(a[1],{...env,windows:temporal?windows:undefined,schedules:hasSchedules?schedules:undefined,trueFors:hasTrueFors?trueFors:undefined},true);intents.push({name:a[0],type:e.type,usesInt:e.usesInt,usesFormat3:e.usesFormat3,expr:e.bytes});}
       else throw new CompileError(`unknown strategy form ${h}`);
@@ -446,8 +477,9 @@ function compile(ast) {
     const numbers=numberAtoms.map((atom,index)=>finiteAtom(atom,index<3?0:-Infinity,Infinity,'invalid PID numeric field'));
     return {name:objectiveName,outputPort,indices:bindings.map(binding=>binding.index),period,late,direction,numbers};
   });
-  if(hasDaily&&(rawWindowCount||rawTrueForCount))throw new CompileError('mixed Daily temporal preludes are not executable');
-  const format=hasDaily?8:objectives.length?7:hasTrueFors?6:hasSchedules?5:temporal?4:format3?3:intDeclarations||intExpressions?2:1;
+  if((hasDaily||hasDailySlots)&&(rawWindowCount||rawTrueForCount))throw new CompileError('mixed civil schedule temporal preludes are not executable');
+  if(hasDailySlots&&(hasDaily||hasSolar))throw new CompileError('mixed DailySlots schedule kinds are not executable');
+  const format=hasDailySlots?9:hasDaily?8:objectives.length?7:hasTrueFors?6:hasSchedules?5:temporal?4:format3?3:intDeclarations||intExpressions?2:1;
   const w=new Writer();w.bytes(UTF8.encode('GFB1'));w.u16(format);w.str(name);w.u32(version);
   w.u16(inputs.length);for(const x of inputs){w.str(x.name);w.u8(x.type);}
   w.u16(states.length);for(const x of states){w.str(x.name);w.u8(x.type);if(x.type===TYPE.bool)w.u8(x.value?1:0);else if(x.type===TYPE.int)w.i32(x.value);else w.f64(x.value);}
@@ -455,8 +487,9 @@ function compile(ast) {
   const writeWindow=window=>{w.u32(window.site);w.str(window.name);w.u8(window.operation);w.u8(window.payloadType);w.u64(window.overMs);w.u64(window.maxAgeMs);w.u16(window.rootRefs.length);for(const root of window.rootRefs)w.u16(root);for(const expression of window.source){w.u32(expression.bytes.length);w.bytes(expression.bytes);}};
   const writeSchedule=schedule=>{w.u32(schedule.site);w.str(schedule.name);w.str(schedule.timezone);w.f64(schedule.latitude);w.f64(schedule.longitude);w.u8(schedule.event);w.i64(schedule.offsetMs);w.u8(0);w.u8(0);w.u8(0);w.u8(0);w.u64(schedule.gapMs);w.u32(schedule.when.bytes.length);w.bytes(schedule.when.bytes);};
   const writeDaily=schedule=>{w.u32(schedule.site);w.str(schedule.name);w.str(schedule.timezone);w.u64(schedule.atMs);w.u8(schedule.dstMissing);w.u8(schedule.dstRepeated);w.u8(0);w.u8(0);w.u8(0);w.u8(0);w.u64(schedule.gapMs);w.u32(schedule.when.bytes.length);w.bytes(schedule.when.bytes);};
+  const writeDailySlots=schedule=>{w.u32(schedule.site);w.str(schedule.name);w.str(schedule.timezone);w.u64(schedule.gridMs);w.u8(schedule.dstMissing);w.u8(schedule.dstRepeated);w.u8(0);w.u8(0);w.u8(0);w.u8(0);w.u64(schedule.gapMs);w.u16(schedule.slots.length);for(const slot of schedule.slots){w.u16(slot.key);w.u16(slot.minute);}w.u32(schedule.when.bytes.length);w.bytes(schedule.when.bytes);};
   const writeTrueFor=signal=>{w.u32(signal.site);w.str(signal.name);w.u32(signal.sourceTag);w.str(signal.sourceName);w.u64(signal.durationMs);for(const index of signal.indices)w.u16(index);};
-  w.u16(compiledStrategies.length);for(const s of compiledStrategies){w.str(s.name);w.i32(s.priority);w.u32(s.query.length);w.bytes(s.query);if(temporal){if(taggedPreludes){w.u16(s.preludes.length);for(const prelude of s.preludes){w.u8(prelude.kind==='window'?0:prelude.kind==='schedule'?1:prelude.kind==='daily'?3:2);if(prelude.kind==='window')writeWindow(prelude.value);else if(prelude.kind==='schedule')writeSchedule(prelude.value);else if(prelude.kind==='daily')writeDaily(prelude.value);else writeTrueFor(prelude.value);}}else{w.u16(s.windows.length);for(const window of s.windows)writeWindow(window);}}w.u16(s.transitions.length);for(const t of s.transitions){w.u16(t.index);w.u32(t.expr.length);w.bytes(t.expr);}w.u16(s.intents.length);for(const i of s.intents){w.str(i.name);w.u8(i.type);w.u32(i.expr.length);w.bytes(i.expr);}}
+  w.u16(compiledStrategies.length);for(const s of compiledStrategies){w.str(s.name);w.i32(s.priority);w.u32(s.query.length);w.bytes(s.query);if(temporal){if(taggedPreludes){w.u16(s.preludes.length);for(const prelude of s.preludes){w.u8(prelude.kind==='window'?0:prelude.kind==='schedule'?1:prelude.kind==='daily'?3:prelude.kind==='daily-slots'?4:2);if(prelude.kind==='window')writeWindow(prelude.value);else if(prelude.kind==='schedule')writeSchedule(prelude.value);else if(prelude.kind==='daily')writeDaily(prelude.value);else if(prelude.kind==='daily-slots')writeDailySlots(prelude.value);else writeTrueFor(prelude.value);}}else{w.u16(s.windows.length);for(const window of s.windows)writeWindow(window);}}w.u16(s.transitions.length);for(const t of s.transitions){w.u16(t.index);w.u32(t.expr.length);w.bytes(t.expr);}w.u16(s.intents.length);for(const i of s.intents){w.str(i.name);w.u8(i.type);w.u32(i.expr.length);w.bytes(i.expr);}}
   w.u16(constraints.length);for(const c of constraints){w.u8(c.kind);w.u16(c.names.length);for(const n of c.names)w.str(n);}
   if(format===7){w.u16(compiledObjectives.length);for(const objective of compiledObjectives){w.str(objective.name);w.str(objective.outputPort);for(const index of objective.indices)w.u16(index);w.u64(objective.period);w.u64(objective.late);w.u8(objective.direction);for(const value of objective.numbers)w.f64(value);}}
   return w.finish();

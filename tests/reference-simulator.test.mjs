@@ -116,13 +116,14 @@ function solarOracle(id, manifest) {
 }
 
 function dailyOracle(id, manifest) {
-  if (id !== 'REF-03-024') return null;
-  const scheduledWallMs = Date.UTC(2026, 8, 23, 21, 30);
+  if (!['REF-03-024', 'REF-03-032'].includes(id)) return null;
+  const slots = id === 'REF-03-032';
+  const scheduledWallMs = Date.UTC(2026, 8, 23, slots ? 15 : 21, slots ? 0 : 30);
   const facts = (monotonicMs, wallMs) => ({
     clock: { monotonicMs, bootEpoch: 7, wallMs, trusted: true, uncertaintyMs: 0, sourceRevision: 'clock-v1' },
-    schedules: [{ kind: 'daily', site: manifest.schedules[0].site,
+    schedules: [{ kind: slots ? 'daily-slots' : 'daily', site: manifest.schedules[0].site,
       coverageFromWallMs: scheduledWallMs - 1, coverageToWallMs: scheduledWallMs,
-      rows: [{ sourceDay: 20_720, fold: 0, scheduledWallMs, available: true,
+      rows: [{ sourceDay: 20_720, ...(slots ? { slotKey: 1, minuteOfDay: 0 } : {}), fold: 0, scheduledWallMs, available: true,
         providerRevision: 'iana-v1', contextRevision: 'tzdb-v1' }] }],
   });
   return {
@@ -160,7 +161,7 @@ for (const entry of accepted) {
       assert.equal(compiled.status, 0, `${entry.id}: compiler failed: ${compiled.stderr}`);
       const manifest = JSON.parse(fs.readFileSync(`${artifact}.manifest.json`, 'utf8'));
       record.artifactFormat = manifest.format;
-      if (!/^GhostFlow\/control-v[1-7]$/.test(manifest.format)) {
+      if (!/^GhostFlow\/control-v[1-8]$/.test(manifest.format)) {
         if (standaloneDescriptors.has(entry.id)) {
           assert.equal(manifest.format, standaloneDescriptors.get(entry.id),
             `${entry.id}: unexpected standalone descriptor format`);

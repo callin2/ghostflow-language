@@ -12,7 +12,7 @@ let runtime;
 const certified = manifest.signals?.some(signal => signal.kind === 'true-for');
 const hasAfterEvent = manifest.signals?.some(signal => signal.kind === 'after-event');
 const hasSolar = manifest.schedules?.some(schedule => schedule.kind === 'solar');
-const hasDaily = manifest.schedules?.some(schedule => schedule.kind === 'daily');
+const hasDaily = manifest.schedules?.some(schedule => ['daily', 'daily-slots'].includes(schedule.kind));
 const hasObjective = (manifest.objectives?.length ?? 0) > 0;
 try {
   const instantiate = certified || hasAfterEvent || hasSolar || hasDaily || hasObjective ? ControlRuntime.instantiate : ControlRuntime.instantiateFramed;
