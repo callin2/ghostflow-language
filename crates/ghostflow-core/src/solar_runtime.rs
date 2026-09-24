@@ -132,23 +132,20 @@ impl SolarRuntime {
         };
         for ((descriptor, input), engine) in descriptors.iter().zip(facts).zip(&mut staged.engines)
         {
-            let mut clock = clock;
-            if matches!(descriptor, PulseDescriptor::Daily(_))
-                && matches!(clock.trust, crate::schedule_clock::ClockTrust::Trusted)
-            {
+            let mut unknown_reason = None;
+            if matches!(descriptor, PulseDescriptor::Daily(_)) {
                 if input.facts.rows.iter().any(|r| {
                     r.availability == crate::solar_admission::SolarFactAvailability::Unavailable
                 }) {
-                    clock.trust =
-                        crate::schedule_clock::ClockTrust::Unknown("OccurrenceUnavailable");
+                    unknown_reason = Some("OccurrenceUnavailable");
                 } else if clock.wall_ms.is_some_and(|wall| {
                     wall < input.facts.coverage_from_wall_ms
                         || wall > input.facts.coverage_to_wall_ms
                 }) {
-                    clock.trust = crate::schedule_clock::ClockTrust::Unknown("IncompleteCoverage");
+                    unknown_reason = Some("IncompleteCoverage");
                 }
             }
-            let stage = engine.begin(clock, input.facts)?;
+            let stage = engine.begin_with_unknown(clock, input.facts, unknown_reason)?;
             // Evaluate on the admitted crossing only. A false condition is a
             // terminal per-occurrence outcome; later ticks cannot re-fire it.
             let predicate = if stage
@@ -173,7 +170,23 @@ impl SolarRuntime {
             } else {
                 false
             };
-            let result = engine.commit(stage.evaluate(predicate)?)?;
+            let mut result = engine.commit(stage.evaluate(predicate)?)?;
+            if matches!(descriptor, PulseDescriptor::Daily(_))
+                && result.decision == crate::solar_admission::SolarDecision::Unknown
+            {
+                result
+                    .observations
+                    .extend(input.facts.rows.iter().map(|row| {
+                        crate::solar_admission::SolarObservation {
+                            source_day: row.source_day,
+                            fold: row.fold,
+                            scheduled_wall_ms: row.scheduled_wall_ms,
+                            decision: crate::solar_admission::SolarDecision::Unknown,
+                            provider_revision: row.provider_revision.clone(),
+                            context_revision: row.context_revision.clone(),
+                        }
+                    }));
+            }
             let missed = result.observations.iter().any(|observation| {
                 matches!(
                     observation.decision,

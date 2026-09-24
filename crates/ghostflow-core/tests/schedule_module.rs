@@ -917,6 +917,14 @@ fn daily_unavailable_context_preserves_reason_instead_of_ordinary_false() {
         tick.schedule_trace[0].unknown_reason.as_deref(),
         Some("OccurrenceUnavailable")
     );
+    assert_eq!(
+        tick.schedule_trace[0].observations[0].context_revision,
+        "zone-v1"
+    );
+    assert_eq!(
+        tick.schedule_trace[0].observations[0].provider_revision,
+        "iana-v1"
+    );
 }
 fn solar_tick<'a>(
     runtime: &'a mut Runtime,

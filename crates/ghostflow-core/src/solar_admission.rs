@@ -137,6 +137,15 @@ impl SolarPulseEngine {
         snapshot: ClockSnapshot<'a>,
         facts: SolarFacts<'a>,
     ) -> Result<SolarStage> {
+        self.begin_with_unknown(snapshot, facts, None)
+    }
+
+    pub(crate) fn begin_with_unknown<'a>(
+        &self,
+        snapshot: ClockSnapshot<'a>,
+        facts: SolarFacts<'a>,
+        unknown_reason: Option<&str>,
+    ) -> Result<SolarStage> {
         validate_facts(facts)?;
         if facts.rows.len() > self.terminal_capacity {
             return Err(Error::new(
@@ -153,6 +162,16 @@ impl SolarPulseEngine {
             observations: Vec::new(),
             unknown_reason: clock.unknown_reason.map(str::to_owned),
         };
+        if let Some(reason) = unknown_reason {
+            result.decision = SolarDecision::Unknown;
+            result.unknown_reason = Some(clock.unknown_reason.unwrap_or(reason).to_owned());
+            return Ok(SolarStage {
+                engine,
+                result,
+                base_generation,
+                evaluated: true,
+            });
+        }
         if matches!(clock.disposition, ClockDisposition::BootBaseline) {
             result.decision = SolarDecision::BootBaseline;
             terminalize_past(
