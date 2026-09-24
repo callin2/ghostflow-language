@@ -26,7 +26,127 @@ const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-reference-sim
 const results = [];
 const scan = atMs => ({ kind: 'scan', atMs });
 const input = (name, type, value) => ({ kind: 'input', name, type, value });
+const contextClock = (monotonicMs, wallMs) => ({
+  monotonicMs, bootEpoch: 7, wallMs, uncertaintyMs: 0, trusted: true,
+  unknownReason: null, sourceRevision: 'clock-ref-v1',
+});
+const contextBinding = (kind, provider, timezone, criteria) => ({
+  kind, provider, namespace: `${provider}-namespace`, station: `${provider}-station`,
+  bindingRevision: `${provider}-binding-v1`, location: `${provider}-location`,
+  timezone, criteria, maxUncertaintyMs: 0,
+});
+const contextFacts = (monotonicMs, wallMs, schedules = [], natural = []) => ({
+  clock: contextClock(monotonicMs, wallMs), natural, schedules, settings: null,
+});
+const civilRow = ({ sourceDay, slotKey = 0, minuteOfDay, instantMs }) => ({
+  sourceDay, slotKey, minuteOfDay, fold: 0, eventId: '', eventKind: 'civil',
+  instantMs, withdrawn: false, providerRevision: 'civil-provider-v1', contextRevision: 'civil-context-v1',
+});
+const scheduleFacts = (site, from, to, rows, { provider = null, calendar = null } = {}) => ({
+  site, coverageStartMs: from, coverageEndMs: to, provider, calendar, rows,
+});
+const naturalObservation = (binding, classifications, from, to) => ({
+  binding, providerRevision: `${binding.provider}-provider-v1`, coverageStartMs: from,
+  coverageEndMs: to, expiresAtMs: to + 1, uncertaintyMs: 0, fault: null, classifications,
+});
+const fridaySixSeoul = Date.UTC(2026, 8, 24, 21);
+const fridaySourceDay = Date.UTC(2026, 8, 25) / 86_400_000;
 const behaviorOracles = {
+  'REF-03-036': {
+    context: { bootEpoch: 7, terminalCapacity: 8, bindings: [] },
+    actions: [
+      { kind: 'scan', atMs: 0, contextFacts: contextFacts(0, 1_790_812_799_999,
+        [scheduleFacts(14, 1_790_812_799_998, 1_790_812_800_001, [])]) },
+      { kind: 'scan', atMs: 1, contextFacts: contextFacts(1, 1_790_812_800_000,
+        [scheduleFacts(14, 1_790_812_799_998, 1_790_812_800_001, [])]) },
+    ],
+    requested: [{ due: false }, { due: true }],
+  },
+  'REF-03-038': {
+    context: { bootEpoch: 7, terminalCapacity: 8, bindings: [] },
+    actions: [
+      { kind: 'scan', atMs: 0, contextFacts: contextFacts(0, fridaySixSeoul - 1,
+        [scheduleFacts(10, fridaySixSeoul - 2, fridaySixSeoul + 1,
+          [civilRow({ sourceDay: fridaySourceDay, minuteOfDay: 360, instantMs: fridaySixSeoul })])]) },
+      { kind: 'scan', atMs: 1, contextFacts: contextFacts(1, fridaySixSeoul,
+        [scheduleFacts(10, fridaySixSeoul - 2, fridaySixSeoul + 1,
+          [civilRow({ sourceDay: fridaySourceDay, minuteOfDay: 360, instantMs: fridaySixSeoul })])]) },
+    ],
+    requested: [{ due: false }, { due: true }],
+  },
+  'REF-03-057': {
+    context: { bootEpoch: 7, terminalCapacity: 8, bindings: [] },
+    actions: [
+      { kind: 'scan', atMs: 0, contextFacts: contextFacts(0, fridaySixSeoul - 1,
+        [scheduleFacts(16, fridaySixSeoul - 2, fridaySixSeoul + 1,
+          [civilRow({ sourceDay: fridaySourceDay, slotKey: 1, minuteOfDay: 360, instantMs: fridaySixSeoul })])]) },
+      { kind: 'scan', atMs: 1, contextFacts: contextFacts(1, fridaySixSeoul,
+        [scheduleFacts(16, fridaySixSeoul - 2, fridaySixSeoul + 1,
+          [civilRow({ sourceDay: fridaySourceDay, slotKey: 1, minuteOfDay: 360, instantMs: fridaySixSeoul })])]) },
+    ],
+    requested: [{ due: false }, { due: true }],
+  },
+  'REF-03-059': (() => {
+    const binding = contextBinding('calendar', 'workers', 'Asia/Seoul', 'workday');
+    const calendar = { calendarId: 'workers', revision: 'workers-v1', timezone: 'Asia/Seoul',
+      coveredFromDate: fridaySourceDay - 1, coveredToDateExclusive: fridaySourceDay + 2,
+      expiresAtMs: fridaySixSeoul + 2, weeklyWorkMask: 0b0111110, holidayPolicy: 'off',
+      holidays: [], exceptions: [] };
+    const evidence = scheduleFacts(12, fridaySixSeoul - 2, fridaySixSeoul + 1,
+      [civilRow({ sourceDay: fridaySourceDay, minuteOfDay: 360, instantMs: fridaySixSeoul })],
+      { calendar });
+    return {
+      context: { bootEpoch: 7, terminalCapacity: 8, bindings: [binding] },
+      actions: [
+        { kind: 'scan', atMs: 0, contextFacts: contextFacts(0, fridaySixSeoul - 1, [evidence]) },
+        { kind: 'scan', atMs: 1, contextFacts: contextFacts(1, fridaySixSeoul, [evidence]) },
+      ],
+      requested: [{ due: false }, { due: true }],
+    };
+  })(),
+  'REF-03-060': (() => {
+    const binding = contextBinding('tide', 'harbor_tides', 'Asia/Seoul', 'high');
+    const provider = naturalObservation(binding, ['high'], 0, 2_000);
+    const row = { sourceDay: 0, slotKey: 0, minuteOfDay: 0, fold: 0, eventId: 'high-1',
+      eventKind: 'high', instantMs: 1_801_000, withdrawn: false,
+      providerRevision: 'harbor_tides-provider-v1', contextRevision: 'harbor-context-v1' };
+    const evidence = scheduleFacts(16, 0, 2_000, [row], { provider });
+    return {
+      context: { bootEpoch: 7, terminalCapacity: 8, bindings: [binding] },
+      actions: [
+        { kind: 'scan', atMs: 0, contextFacts: contextFacts(0, 0, [evidence]) },
+        { kind: 'scan', atMs: 1_000, contextFacts: contextFacts(1_000, 1_000, [evidence]) },
+      ],
+      requested: [{ active: false }, { active: true }],
+    };
+  })(),
+  'REF-03-062': (() => {
+    const tide = contextBinding('tide', 'harbor_tides', 'Asia/Seoul', 'neap');
+    const moon = contextBinding('moon', 'moon', 'UTC', 'full');
+    return {
+      context: { bootEpoch: 7, terminalCapacity: 8, bindings: [tide, moon] },
+      actions: [{ kind: 'scan', atMs: 1_000, contextFacts: contextFacts(1_000, 1_000, [], [
+        naturalObservation(tide, ['neap'], 0, 2_000),
+        naturalObservation(moon, ['full'], 0, 2_000),
+      ]) }],
+      requested: [{ allowed: true }],
+    };
+  })(),
+  'REF-03-050': {
+    accounting: {
+      config: { maxIntervals: 8, maxEvents: 8, maxReservations: 8, maxRollingWindowMs: 600000 },
+      bootEpoch: 3, terminalCapacity: 8,
+      bindings: [
+        { account: 'pump_applied', evidenceStream: 'pump1', resourceId: 7 },
+        { account: 'normal_starts', evidenceStream: 'normal_run_started', eventType: 9 },
+      ],
+    },
+    actions: [
+      { kind: 'accountingEvent', stream: 'normal_run_started', eventId: '32323232323232323232323232323232', localDay: 100 },
+      { kind: 'scan', atMs: 1, accountingFacts: { localDay: 100, wallMs: 1700000000001, clockTrusted: true } },
+    ],
+    requested: [{ ready: true }],
+  },
   'REF-01-097': {
     actions: [scan(0), input('request', 'Bool', true), scan(1), input('request', 'Bool', false), scan(2)],
     requested: [{ pump: false }, { pump: true }, { pump: false }],
@@ -161,7 +281,7 @@ for (const entry of accepted) {
       assert.equal(compiled.status, 0, `${entry.id}: compiler failed: ${compiled.stderr}`);
       const manifest = JSON.parse(fs.readFileSync(`${artifact}.manifest.json`, 'utf8'));
       record.artifactFormat = manifest.format;
-      if (!/^GhostFlow\/control-v[1-8]$/.test(manifest.format)) {
+      if (!/^GhostFlow\/control-v[1-9]$/.test(manifest.format)) {
         if (standaloneDescriptors.has(entry.id)) {
           assert.equal(manifest.format, standaloneDescriptors.get(entry.id),
             `${entry.id}: unexpected standalone descriptor format`);
@@ -189,6 +309,8 @@ for (const entry of accepted) {
         ...(oracle?.capabilities ? { capabilities: oracle.capabilities } : {}),
         ...(oracle?.solar ? { solar: oracle.solar } : {}),
         ...(oracle?.schedule ? { schedule: oracle.schedule } : {}),
+        ...(oracle?.context ? { context: oracle.context } : {}),
+        ...(oracle?.accounting ? { accounting: oracle.accounting } : {}),
         actions: oracle?.actions ?? [scan(0)],
       }) + '\n');
       const simulated = invoke('ghostsim', [artifact, scenario, '--format', 'json']);

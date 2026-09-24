@@ -74,7 +74,8 @@ function temporalBytes(journalCapacity) {
 const LIVE_ORACLE = temporalBytes(1024);
 const REPLAY_ORACLE = temporalBytes(3);
 const LEGACY_REPLAY_PEAK = LIVE_ORACLE.bytes + REPLAY_ORACLE.bytes + 3 * 24;
-const FRAMED_REPLAY_PEAK = LEGACY_REPLAY_PEAK + 3 * 176;
+// TickRecord now retains a context trace Vec; ScanOutcomeV1 is 192 bytes on wasm32.
+const FRAMED_REPLAY_PEAK = LEGACY_REPLAY_PEAK + 3 * 192;
 
 function profile(sourceTag, changes = {}) {
   return {
@@ -214,8 +215,7 @@ for (const framed of [false, true]) test(`${framed ? 'framed' : 'legacy'} replay
   assert.equal(replayPlan.liveBytes, activationPlan.accountedTemporalBytes);
   assert.equal(replayPlan.ghostBytes, REPLAY_ORACLE.bytes);
   assert.equal(replayPlan.returnHeaderBytes, 3 * 24);
-  // ScanOutcomeV1 is 176 bytes on the wasm32 target layout.
-  assert.equal(replayPlan.frameHeaderBytes, framed ? 3 * 176 : 0);
+  assert.equal(replayPlan.frameHeaderBytes, framed ? 3 * 192 : 0);
   const replayPeak = framed ? FRAMED_REPLAY_PEAK : LEGACY_REPLAY_PEAK;
   assert.equal(replayPlan.requiredPeakTemporalBytes, replayPeak);
   assert.equal(replayPlan.ghostFitsBudget, true);

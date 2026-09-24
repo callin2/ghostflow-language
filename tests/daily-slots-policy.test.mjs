@@ -63,7 +63,7 @@ test('DailySlots type checking preserves explicit pulse policy and its declarati
   }]);
 });
 
-test('literal DailySlots emits executable GFB9 while config-selected slots remain closed', async () => {
+test('literal DailySlots emits GFB9 and config-selected slots emit GFB10', async () => {
   const control = compileControl(code);
   assert.equal(control.manifest.format, 'GhostFlow/control-v8');
   assert.equal(new DataView(control.bytes.buffer, control.bytes.byteOffset, control.bytes.byteLength).getUint16(4, true), 9);
@@ -72,7 +72,10 @@ test('literal DailySlots emits executable GFB9 while config-selected slots remai
 
   const configurable = code.replace('selected = [00:00, 06:15, 23:45];', 'selected = watering_slots;')
     .replace('control DailySlotsValid {', 'control DailySlotsValid { config watering_slots: TimeSlots<15min, 8> = [time`06:15`];');
-  assert.throws(() => compileControl(configurable), /DailySlots policy execution requires verified occurrence provider and native admission bindings/);
+  const configured = compileControl(configurable);
+  assert.equal(configured.manifest.format, 'GhostFlow/control-v9');
+  assert.equal(configured.manifest.schedules[0].selectedConfig, 'watering_slots');
+  assert.equal(new DataView(configured.bytes.buffer, configured.bytes.byteOffset, configured.bytes.byteLength).getUint16(4, true), 10);
 
   const mixed = code.replace('output due: Bool;', `schedule morning: Daily {
     timezone = "Asia/Seoul"; at = time\`06:30\`; dst_missing = skip; dst_repeated = first;

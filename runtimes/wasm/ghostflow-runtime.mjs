@@ -3,6 +3,7 @@ const decoder = new TextDecoder();
 import { NativeDispatchError } from './native-dispatch.mjs';
 import { encodeTemporalProfile } from './temporal-profile.mjs';
 import { encodeSolarFacts, encodeScheduleFacts, validateSolarActivation } from './solar-abi.mjs';
+import { encodeContextActivation, encodeContextFacts } from './context-abi.mjs';
 import { temporalPlanRequest, temporalReplayPlanRequest, temporalReplayRequest } from './temporal-replay.mjs';
 
 export class GhostFlowRuntime {
@@ -49,6 +50,16 @@ export class GhostFlowRuntime {
     try { packet = encodeScheduleFacts(facts); }
     catch (cause) { throw new NativeDispatchError(cause.message, { cause, committed: false }); }
     this.#bytes(packet, (p, n) => this.#dispatch(() => this.wasm.gf_tick_schedules(this.handle, p, n)));
+  }
+  activateContext(profile) {
+    const packet = encodeContextActivation(profile);
+    this.#bytes(packet, (p, n) => this.#check(this.wasm.gf_activate_context(this.handle, p, n)));
+  }
+  tickContext(facts) {
+    let packet;
+    try { packet = encodeContextFacts(facts); }
+    catch (cause) { throw new NativeDispatchError(cause.message, { cause, committed: false }); }
+    this.#bytes(packet, (p, n) => this.#dispatch(() => this.wasm.gf_tick_context(this.handle, p, n)));
   }
   replayTemporal(options) {
     const request = temporalReplayRequest(options);

@@ -1,7 +1,16 @@
 //! C ABI for the caller-validated, bounded accounting ledger primitive.
 
-use ghostflow_core::accounting::{AccountingConfig, AccountingLedger, LedgerRead, RecordResult};
+use ghostflow_core::accounting::{
+    AccountingConfig, AccountingError, AccountingLedger, AdmissionResult, LedgerRead, RecordResult,
+};
+use ghostflow_core::{
+    context_runtime::{AccountingInput, Activation, Facts},
+    schedule_clock::{ClockSnapshot, ClockTrust},
+    Value,
+};
 use std::slice;
+
+use crate::Handle;
 
 pub struct AccountingHandle {
     config: AccountingConfig,
@@ -11,6 +20,7 @@ pub struct AccountingHandle {
     revision: u64,
     snapshot_revision: Option<u64>,
     persisted_revision: u64,
+    unavailable_fault: u8,
 }
 
 impl AccountingHandle {
@@ -43,9 +53,28 @@ impl AccountingHandle {
             true
         } else {
             self.ledger.mark_unknown();
+            self.unavailable_fault = 3;
             self.snapshot_revision = None;
             self.error = "accounting revision overflow".into();
             false
+        }
+    }
+
+    fn complete_admission(&mut self, result: Result<AdmissionResult, AccountingError>) -> i32 {
+        match result {
+            Ok(AdmissionResult::Reserved) => {
+                self.error.clear();
+                1
+            }
+            Ok(AdmissionResult::Duplicate) => {
+                self.error.clear();
+                2
+            }
+            Err(AccountingError::LimitExceeded) => {
+                self.error.clear();
+                3
+            }
+            Err(error) => self.fail(error),
         }
     }
 }
@@ -61,11 +90,13 @@ unsafe fn identity(ptr: *const u8) -> Option<[u8; 16]> {
 pub extern "C" fn gf_accounting_create(
     max_intervals: u32,
     max_events: u32,
+    max_reservations: u32,
     max_rolling_window_ms: u64,
 ) -> *mut AccountingHandle {
     let config = AccountingConfig {
         max_intervals: max_intervals as usize,
         max_events: max_events as usize,
+        max_reservations: max_reservations as usize,
         max_rolling_window_ms,
     };
     match AccountingLedger::unknown(config) {
@@ -77,9 +108,92 @@ pub extern "C" fn gf_accounting_create(
             revision: 0,
             snapshot_revision: None,
             persisted_revision: 0,
+            unavailable_fault: 1,
         })),
         Err(_) => std::ptr::null_mut(),
     }
+}
+
+/// Prepare a durable reservation. Status 1 is not an output grant: the host
+/// must snapshot, persist, and acknowledge this revision before starting work.
+/// Status 2 is an exact duplicate and status 3 is an atomic limit rejection.
+#[no_mangle]
+pub unsafe extern "C" fn gf_accounting_reserve_rolling(
+    handle: *mut AccountingHandle,
+    reservation_id: *const u8,
+    resource_id: u32,
+    admitted_at_ms: u64,
+    window_ms: u64,
+    limit_ms: u64,
+    reserve_ms: u64,
+) -> i32 {
+    let Some(handle) = handle.as_mut() else {
+        return 0;
+    };
+    let Some(reservation_id) = identity(reservation_id) else {
+        return handle.fail("invalid reservation identity");
+    };
+    let result = handle.ledger.reserve_rolling(
+        reservation_id,
+        resource_id,
+        admitted_at_ms,
+        window_ms,
+        limit_ms,
+        reserve_ms,
+    );
+    let status = handle.complete_admission(result);
+    if status == 1 && !handle.advance_revision() {
+        return 0;
+    }
+    status
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn gf_accounting_settle_rolling(
+    handle: *mut AccountingHandle,
+    reservation_id: *const u8,
+    applied_receipt_id: *const u8,
+) -> i32 {
+    let Some(handle) = handle.as_mut() else {
+        return 0;
+    };
+    let (Some(reservation_id), Some(applied_receipt_id)) =
+        (identity(reservation_id), identity(applied_receipt_id))
+    else {
+        return handle.fail("invalid settlement identity");
+    };
+    let result = handle
+        .ledger
+        .settle_rolling(reservation_id, applied_receipt_id);
+    let status = handle.complete(result);
+    if status == 1 && !handle.advance_revision() {
+        return 0;
+    }
+    status
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn gf_accounting_cancel_rolling(
+    handle: *mut AccountingHandle,
+    reservation_id: *const u8,
+    cancellation_evidence_id: *const u8,
+) -> i32 {
+    let Some(handle) = handle.as_mut() else {
+        return 0;
+    };
+    let (Some(reservation_id), Some(cancellation_evidence_id)) =
+        (identity(reservation_id), identity(cancellation_evidence_id))
+    else {
+        return handle.fail("invalid cancellation identity");
+    };
+    let result = handle
+        .ledger
+        .cancel_rolling(reservation_id, cancellation_evidence_id);
+    let status = handle.complete(result);
+    if status == 1 && !handle.advance_revision() {
+        return 0;
+    }
+    status
 }
 
 #[no_mangle]
@@ -98,6 +212,7 @@ pub unsafe extern "C" fn gf_accounting_initialize_empty(handle: *mut AccountingH
     match AccountingLedger::new(handle.config) {
         Ok(ledger) => {
             handle.ledger = ledger;
+            handle.unavailable_fault = 1;
             if !handle.advance_revision() {
                 return 0;
             }
@@ -130,6 +245,7 @@ pub unsafe extern "C" fn gf_accounting_restore(
     match AccountingLedger::restore(handle.config, bytes) {
         Ok(ledger) => {
             handle.ledger = ledger;
+            handle.unavailable_fault = 1;
             handle.revision = 0;
             handle.persisted_revision = 0;
             handle.snapshot_revision = Some(0);
@@ -138,10 +254,117 @@ pub unsafe extern "C" fn gf_accounting_restore(
         }
         Err(error) => {
             handle.ledger.mark_unknown();
+            handle.unavailable_fault = 2;
             let _ = handle.advance_revision();
             handle.fail(error)
         }
     }
+}
+
+/// Activate one GFB10 accounting control. Provider bindings are empty because
+/// accounting Results are produced only from the paired Rust ledger.
+#[no_mangle]
+pub unsafe extern "C" fn gf_activate_accounting(
+    control: *mut Handle,
+    boot_epoch: u64,
+    terminal_capacity: u32,
+) -> i32 {
+    let Some(control) = control.as_mut() else {
+        return 0;
+    };
+    let activation = Activation {
+        boot_epoch,
+        terminal_capacity: terminal_capacity as usize,
+        bindings: Vec::new(),
+    };
+    let result = control.runtime.activate_with_context(&activation);
+    control.complete(result)
+}
+
+/// Tick a GFB10 control with a Result constructed inside Rust from the exact
+/// durable ledger revision. No caller-supplied ok/count/fault projection exists.
+#[no_mangle]
+pub unsafe extern "C" fn gf_tick_accounting(
+    control: *mut Handle,
+    accounting: *mut AccountingHandle,
+    site: u32,
+    account_ptr: *const u8,
+    account_len: usize,
+    event_ptr: *const u8,
+    event_len: usize,
+    timezone_ptr: *const u8,
+    timezone_len: usize,
+    event_type: u32,
+    local_day_present: i32,
+    local_day: i32,
+    monotonic_ms: u64,
+    boot_epoch: u64,
+    wall_ms_present: i32,
+    wall_ms: u64,
+    clock_trusted: i32,
+) -> i32 {
+    let (Some(control), Some(accounting)) = (control.as_mut(), accounting.as_ref()) else {
+        return 0;
+    };
+    if !matches!(local_day_present, 0 | 1)
+        || !matches!(wall_ms_present, 0 | 1)
+        || !matches!(clock_trusted, 0 | 1)
+    {
+        control.error = "invalid accounting presence/trust flag".into();
+        return 0;
+    }
+    let (Some(account), Some(event), Some(timezone)) = (
+        crate::text(account_ptr, account_len),
+        crate::text(event_ptr, event_len),
+        crate::text(timezone_ptr, timezone_len),
+    ) else {
+        control.error = "invalid accounting binding text".into();
+        return 0;
+    };
+    let input = match AccountingInput::from_ledger(
+        site,
+        account.into(),
+        event.into(),
+        timezone.into(),
+        &accounting.ledger,
+        event_type,
+        (local_day_present != 0).then_some(local_day),
+        accounting.persisted_revision == accounting.revision,
+        accounting.unavailable_fault,
+    ) {
+        Ok(input) => input,
+        Err(error) => return control.complete(Err(error)),
+    };
+    if monotonic_ms > 9_007_199_254_740_991 || boot_epoch > 9_007_199_254_740_991 {
+        control.error = "accounting clock exceeds exact Number range".into();
+        return 0;
+    }
+    let facts = Facts {
+        accounting: vec![input],
+        ..Facts::default()
+    };
+    let clock = ClockSnapshot {
+        monotonic_ms,
+        boot_epoch,
+        wall_ms: (wall_ms_present != 0).then_some(wall_ms),
+        trust: if clock_trusted != 0 {
+            ClockTrust::Trusted
+        } else {
+            ClockTrust::Unknown("ClockUnknown")
+        },
+        uncertainty_ms: None,
+        source_revision: Some("accounting-v1"),
+    };
+    let result = (|| {
+        control
+            .runtime
+            .set_input("__gf_now_ms", Value::Number(monotonic_ms as f64))?;
+        control
+            .runtime
+            .set_input("__gf_time_epoch", Value::Number(boot_epoch as f64))?;
+        control.runtime.tick_with_context(clock, &facts).map(|_| ())
+    })();
+    control.complete(result)
 }
 
 #[no_mangle]
@@ -158,6 +381,7 @@ pub unsafe extern "C" fn gf_accounting_record_applied_segment(
     };
     let Some(receipt_id) = identity(receipt_id) else {
         handle.ledger.mark_unknown();
+        handle.unavailable_fault = 3;
         let _ = handle.advance_revision();
         return handle.fail("invalid interval receipt identity");
     };
@@ -172,6 +396,48 @@ pub unsafe extern "C" fn gf_accounting_record_applied_segment(
         }
     } else if status == 0 {
         handle.ledger.mark_unknown();
+        handle.unavailable_fault = 3;
+        let _ = handle.advance_revision();
+    }
+    status
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn gf_accounting_record_reserved_segment(
+    handle: *mut AccountingHandle,
+    reservation_id: *const u8,
+    receipt_id: *const u8,
+    resource_id: u32,
+    start_ms: u64,
+    end_ms: u64,
+    local_day: i32,
+) -> i32 {
+    let Some(handle) = handle.as_mut() else {
+        return 0;
+    };
+    let (Some(reservation_id), Some(receipt_id)) = (identity(reservation_id), identity(receipt_id))
+    else {
+        handle.ledger.mark_unknown();
+        handle.unavailable_fault = 3;
+        let _ = handle.advance_revision();
+        return handle.fail("invalid reserved interval identity");
+    };
+    let result = handle.ledger.record_reserved_applied_segment(
+        reservation_id,
+        receipt_id,
+        resource_id,
+        start_ms,
+        end_ms,
+        local_day,
+    );
+    let status = handle.complete(result);
+    if status == 1 {
+        if !handle.advance_revision() {
+            return 0;
+        }
+    } else if status == 0 {
+        handle.ledger.mark_unknown();
+        handle.unavailable_fault = 3;
         let _ = handle.advance_revision();
     }
     status
@@ -189,6 +455,7 @@ pub unsafe extern "C" fn gf_accounting_record_event(
     };
     let Some(event_id) = identity(event_id) else {
         handle.ledger.mark_unknown();
+        handle.unavailable_fault = 3;
         let _ = handle.advance_revision();
         return handle.fail("invalid event identity");
     };
@@ -200,6 +467,7 @@ pub unsafe extern "C" fn gf_accounting_record_event(
         }
     } else if status == 0 {
         handle.ledger.mark_unknown();
+        handle.unavailable_fault = 3;
         let _ = handle.advance_revision();
     }
     status
@@ -359,7 +627,7 @@ mod tests {
 
     #[test]
     fn wasm_abi_records_queries_snapshots_and_restores() {
-        let handle = gf_accounting_create(4, 4, 60_000);
+        let handle = gf_accounting_create(4, 4, 4, 60_000);
         assert!(!handle.is_null());
         unsafe {
             let mut count = 0;

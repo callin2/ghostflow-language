@@ -13,15 +13,19 @@ const certified = manifest.signals?.some(signal => signal.kind === 'true-for');
 const hasAfterEvent = manifest.signals?.some(signal => signal.kind === 'after-event');
 const hasSolar = manifest.schedules?.some(schedule => schedule.kind === 'solar');
 const hasDaily = manifest.schedules?.some(schedule => ['daily', 'daily-slots'].includes(schedule.kind));
+const hasContext = manifest.format === 'GhostFlow/control-v9' && ((manifest.naturalConditions?.length ?? 0) > 0 ||
+  manifest.schedules?.some(schedule => ['periodic', 'cron', 'tide'].includes(schedule.kind) ||
+    schedule.kind === 'daily' && schedule.day?.calendar || schedule.kind === 'daily-slots' && schedule.selectedConfig));
 const hasObjective = (manifest.objectives?.length ?? 0) > 0;
 try {
-  const instantiate = certified || hasAfterEvent || hasSolar || hasDaily || hasObjective ? ControlRuntime.instantiate : ControlRuntime.instantiateFramed;
+  const instantiate = certified || hasAfterEvent || hasSolar || hasDaily || hasContext || hasObjective ? ControlRuntime.instantiate : ControlRuntime.instantiateFramed;
   runtime = await instantiate.call(ControlRuntime, wasm, { bytes: artifactBytes, manifest }, {
     acceptSettings: true,
     ...(scenario.temporal === undefined ? {} : { temporal: scenario.temporal }),
     ...(scenario.afterEvent === undefined ? {} : { afterEvent: scenario.afterEvent }),
     ...(scenario.solar === undefined ? {} : { solar: scenario.solar }),
     ...(scenario.schedule === undefined ? {} : { schedule: scenario.schedule }),
+    ...(scenario.context === undefined ? {} : { context: scenario.context }),
     ...(scenario.capabilities === undefined ? {} : { capabilities: scenario.capabilities }),
   });
 } catch (error) {
@@ -90,7 +94,8 @@ try {
             return [objective.name, binding?.max ?? objective.output.max];
           })),
           ...(action.solarFacts === undefined ? {} : { solarFacts: action.solarFacts }),
-          ...(action.scheduleFacts === undefined ? {} : { scheduleFacts: action.scheduleFacts }) });
+          ...(action.scheduleFacts === undefined ? {} : { scheduleFacts: action.scheduleFacts }),
+          ...(action.contextFacts === undefined ? {} : { contextFacts: action.contextFacts }) });
         const virtualActuators = Object.fromEntries((scenario.actuatorBindings ?? []).map(binding => {
           const requested = outcome.vm.requested[binding.output];
           const safe = outcome.vm.safe[binding.output];

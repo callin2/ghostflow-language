@@ -4,7 +4,7 @@ import { restoreInteractionSchema } from './interaction-schema.mjs';
 import { remapSourceTrace, sourceMapRequiresTraceMetadata, verifySourceTraceMetadata } from './source-trace.mjs';
 import { compileSource as compileCanonicalSource, compileSourceSync, emitInteractionSchema } from './compile-source.mjs';
 import { canonicalJson } from './canonical-json.mjs';
-import { compileAccountingDescriptorArtifact, compileControl, compileResourcePolicyArtifact, compileScheduleDescriptorArtifact, compileTemporalDescriptorArtifact } from './control.mjs';
+import { compileAccountingControl, compileAccountingDescriptorArtifact, compileControl, compileResourcePolicyArtifact, compileScheduleDescriptorArtifact, compileTemporalDescriptorArtifact } from './control.mjs';
 import { extractLiterate } from './literate.mjs';
 import { equalBytes, isWellFormedUnicode, sha256Hex, utf8ByteLength } from './sha256.mjs';
 
@@ -104,8 +104,16 @@ function canonicalTraceMetadata(document, bytes, manifest) {
     .filter(timer => timer?.mode === 'continuous-true')
     .map(timer => timer.name));
   const extraction = extractLiterate(document.text, { filename: document.filename });
-  const replay = compileControl(extraction.code, { filename: document.filename });
+  const replay = manifest?.accounting
+    ? compileAccountingControl(extraction.code, { filename: document.filename })
+    : compileControl(extraction.code, { filename: document.filename });
   if (!equalBytes(replay.bytes, bytes)) throw new Error('canonical source does not reproduce artifact bytecode');
+  if (manifest?.accounting) {
+    const { bytecodeSha256: _digest, ...persisted } = manifest;
+    if (canonicalJson(persisted) !== canonicalJson(replay.manifest)) {
+      throw new Error('accounting control manifest does not match canonical source');
+    }
+  }
   const mappedTrace = remapSourceTrace(replay.traceMetadata, extraction.sourceMap);
   const expectedSignalBindings = mappedTrace.bindings.filter(entry => entry.kind === 'signal');
   const signalStates = new Set(expectedSignalBindings.map(entry => entry.name));

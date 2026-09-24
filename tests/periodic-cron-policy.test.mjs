@@ -47,11 +47,13 @@ test('Periodic persisted_epoch remains an activation requirement with no hidden 
 });
 
 for (const fixture of [periodic, cron]) {
-  test(`${fixture.id} emits only a checked descriptor until native admission is bound`, async () => {
-    assert.throws(() => compileControl(code(fixture)), /policy execution requires verified occurrence provider and native admission bindings/);
+  test(`${fixture.id} emits executable GFB10 with source schedule identity`, async () => {
+    const direct = compileControl(code(fixture));
+    assert.equal(direct.manifest.format, 'GhostFlow/control-v9');
     const compiled = await compileSource(fixture.source, { filename: fixture.filename });
-    assert.equal(compiled.manifest.format, 'GhostFlow/schedule-descriptor-v1');
-    assert.equal(JSON.parse(compiled.bytes).executable, false);
+    assert.equal(compiled.manifest.format, 'GhostFlow/control-v9');
+    assert.equal(compiled.manifest.schedules[0].site, direct.manifest.schedules[0].site);
+    assert.equal(new DataView(compiled.bytes.buffer, compiled.bytes.byteOffset, compiled.bytes.byteLength).getUint16(4, true), 10);
   });
   for (const field of ['basis', 'when', 'clock', 'gap', 'recovery', 'fallback']) {
     test(`${fixture.id} requires explicit ${field}`, () => {

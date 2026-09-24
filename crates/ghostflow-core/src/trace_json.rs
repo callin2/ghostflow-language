@@ -35,6 +35,32 @@ fn values(out: &mut impl Write, items: &NamedValues) -> fmt::Result {
     }
     out.write_char('}')
 }
+fn context_traces(out: &mut impl Write, r: &TickRecord) -> fmt::Result {
+    if !r.context_trace.is_empty() {
+        out.write_str(",\"contextTrace\":[")?;
+        for (index, observation) in r.context_trace.iter().enumerate() {
+            if index > 0 {
+                out.write_char(',')?;
+            }
+            write!(out, "{{\"site\":{},\"occurrenceId\":", observation.site)?;
+            text(out, &observation.occurrence_id)?;
+            out.write_str(",\"plannedWallMs\":")?;
+            match observation.planned_ms {
+                Some(value) => write!(out, "{value}")?,
+                None => out.write_str("null")?,
+            }
+            out.write_str(",\"decision\":")?;
+            text(out, &observation.decision)?;
+            out.write_str(",\"providerRevision\":")?;
+            text(out, &observation.provider_revision)?;
+            out.write_str(",\"contextRevision\":")?;
+            text(out, &observation.context_revision)?;
+            out.write_char('}')?;
+        }
+        out.write_char(']')?;
+    }
+    Ok(())
+}
 fn certified_traces(out: &mut impl Write, r: &TickRecord) -> fmt::Result {
     if !r.true_for_trace.is_empty() {
         out.write_str(",\"trueForTrace\":[")?;
@@ -263,6 +289,7 @@ pub(crate) fn record(out: &mut impl Write, r: &TickRecord) -> fmt::Result {
         out.write_char(']')?;
     }
     certified_traces(out, r)?;
+    context_traces(out, r)?;
     if !r.schedule_trace.is_empty() {
         out.write_str(",\"scheduleTrace\":[")?;
         for (index, trace) in r.schedule_trace.iter().enumerate() {
@@ -349,6 +376,7 @@ mod tests {
             window_trace: vec![],
             true_for_trace: vec![],
             schedule_trace: vec![],
+            context_trace: vec![],
         };
         assert_eq!(r.to_json(),concat!(
             "{\"tick\":2,\"module\":\"0000000000000001\",\"strategy\":\"λ\\\"\\\\\\n\\u0001\",",
