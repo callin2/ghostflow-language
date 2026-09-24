@@ -55,3 +55,18 @@ downgrade rejection. Ghostsim and the independent reference oracle expect
 This is virtual schedule execution. It does not verify an IANA provider,
 firmware support, Device timing, requested/applied/confirmed physical outputs,
 or the unsupported config-selected schedule.
+
+## Verification result
+
+The post-review full `npm test` run on commit `d27f3c4` reported 2564 tests:
+2382 passed, 7 failed, 0 cancelled, 0 skipped, and 175 TODO. REF-03-032
+passed. The seven existing simulator gaps were REF-03-036, REF-03-038,
+REF-03-050, REF-03-057, REF-03-059, REF-03-060, and REF-03-062. They cover
+other schedule, accounting, and natural-condition slices.
+
+The 175 TODO entries are all Reference cases with status `specified`; they are
+reported separately because compiler acceptance cannot prove their execution
+contract. By scope they comprise 104 runtime, 32 host, 20 tooling, 7 driver,
+7 design, 3 renderer, and 2 compiler cases. Examples include untrusted wall
+clock handling (REF-03-010), Driver sample identity (REF-04-010), and renderer
+independence (REF-05-019). They are not reduced or reclassified by this slice.
