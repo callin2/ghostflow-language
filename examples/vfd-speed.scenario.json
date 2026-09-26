@@ -1,0 +1,21 @@
+{
+  "format": "GhostFlow/vfd-speed-scenario-v1",
+  "sourceSha256": "3319ddd9e8bd5c486586f4e3e94c3e78f62402c4541a712f97e9509cb5d996c3",
+  "inputs": {
+    "potentiometer_v": { "unit": "V", "min": 0, "max": 10 }
+  },
+  "outputs": {
+    "speed_v": { "unit": "V" },
+    "speed_hz": { "unit": "Hz" }
+  },
+  "frames": [
+    { "atMs": 0, "inputs": { "start": false, "stop": false, "potentiometer_v": 0 }, "expectedSafe": { "run": false, "speed_v": 0, "speed_hz": 0 } },
+    { "atMs": 1, "inputs": { "start": true, "stop": false, "potentiometer_v": 5 }, "expectedSafe": { "run": true, "speed_v": 5, "speed_hz": 25 } },
+    { "atMs": 2, "inputs": { "start": false, "stop": false, "potentiometer_v": 10 }, "expectedSafe": { "run": true, "speed_v": 10, "speed_hz": 50 } },
+    { "atMs": 3, "inputs": { "start": false, "stop": true, "potentiometer_v": 5 }, "expectedSafe": { "run": false, "speed_v": 5, "speed_hz": 25 } },
+    { "atMs": 4, "inputs": { "start": false, "stop": false, "potentiometer_v": 0 }, "expectedSafe": { "run": false, "speed_v": 0, "speed_hz": 0 } },
+    { "atMs": 5, "inputs": { "start": true, "stop": true, "potentiometer_v": 10 }, "expectedSafe": { "run": false, "speed_v": 10, "speed_hz": 50 } },
+    { "atMs": 6, "inputs": { "start": true, "stop": false, "potentiometer_v": 0 }, "expectedSafe": { "run": true, "speed_v": 0, "speed_hz": 0 } },
+    { "atMs": 7, "inputs": { "start": false, "stop": false, "potentiometer_v": 5 }, "expectedSafe": { "run": true, "speed_v": 5, "speed_hz": 25 } }
+  ]
+}

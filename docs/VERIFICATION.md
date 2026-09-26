@@ -39,6 +39,19 @@ adapter tests use injected ABI objects; real compiled WASM behavior is separatel
 exercised by control/station tests and tutorial parity. Tests are source-level
 conformance coverage, not a proof of all runtime or device behavior.
 
+The canonical `examples/vfd-speed.ghost.md` regression compiles a mixed Bool/Number
+control and checks eight sequential `vm.safe` frames in the release WASM. It
+also checks the emitted input/output types. The original failure occurred with
+WASM SHA-256 `3a8450b3001e04f52fe6a3a2e7d4cde0c16316171e69f345483ecde2d319ef36`:
+that binary rejected the 232-byte GFB before the first scan with `unknown expression opcode`.
+Rebuilding WASM from language revision `fa0a005e43bd98ce0cb22e49b263d89ee796cd30`
+produced SHA-256 `b4495901b3399c57ed0a0b204b4d226b03819bcc251c368d9dcfa82b147c32b3`
+and passed all eight frames. The earlier binary's build revision is unknown;
+these observations establish an incompatible reused binary, not a source
+compiler/loader defect. The full `npm test` rebuilds WASM before this regression;
+it fails if that fresh compiler/runtime pair is incompatible. The partial
+`npm run test:node` fails when reusing an incompatible WASM binary.
+
 `build/verification.json` is the latest full host result. Unique files in
 `build/verification-runs/` retain previous results; `build/tutorial/` contains
 the regenerated programs and traces. All are ignored execution evidence. The
