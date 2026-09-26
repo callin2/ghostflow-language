@@ -51,6 +51,13 @@ these observations establish an incompatible reused binary, not a source
 compiler/loader defect. The full `npm test` rebuilds WASM before this regression;
 it fails if that fresh compiler/runtime pair is incompatible. The partial
 `npm run test:node` fails when reusing an incompatible WASM binary.
+After a verified build, `node --test tests/vfd-speed.test.mjs` is the focused
+headless invocation. Each successful run writes a new file under
+`build/vfd-speed-runs/` with the expected scenario separate from observed VM
+traces, source and scenario hashes, compiler revision and source-tree hash,
+bytecode hash, and WASM hash. The test also rejects missing inputs, wrong Bool
+and Number types, NaN, and infinity before any scan. These are virtual control
+outputs; the trace does not measure motor speed or physical voltage.
 
 `build/verification.json` is the latest full host result. Unique files in
 `build/verification-runs/` retain previous results; `build/tutorial/` contains
