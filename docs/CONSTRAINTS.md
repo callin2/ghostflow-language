@@ -6,11 +6,14 @@
 [선택한 control 문법](LANGUAGE-SURFACE.md)에 대한 후속 계약이다.
 
 아래에는 실행 가능한 부분과 미래 **설계 예제**가 함께 있다. control은 `ghostc`,
-유한한 named constraints는 canonical `.ghost.md` 문서를 `ghostrules`로 따로
-컴파일한다. CLI는 최상위 `ghost` fenced code만 정확히 추출하며 plain `.ghost` 입력을
-거절한다. `tools/constraints.mjs`의 `compileConstraints`는 이 추출 코드만 받는 내부
-lowerer다. 전체 DSL을 지원하는
-범용 solver는 아니다. `constraints` 예제의 설비·포트 이름은 설치 구성에 바인딩해야 한다.
+이 문서의 `constraints Name { ... }` 독립 형식은 canonical `.ghost.md` 문서를
+`ghostrules`로 따로 컴파일한다. 이 독립 형식은 `ghostc` 입력이 아니다.
+[Reference §4.8](reference/04-sensors-constraints-control.md#48-공통-constraints-표기와-연산)의
+`constraints Name for resource { ... }` 표기는 `ghostc` 문법이다. 두 compiler의
+지원 규칙 범위는 다르다. CLI는 최상위 `ghost` fenced code만 정확히 추출하며 plain
+`.ghost` 입력을 거절한다. `tools/constraints.mjs`의 `compileConstraints`는 이 추출
+코드만 받는 내부 lowerer다. 전체 DSL을 지원하는 범용 solver는 아니다.
+`constraints` 예제의 설비·포트 이름은 설치 구성에 바인딩해야 한다.
 완결된 control과 control 내부에 넣는 단편을 각 예제에서 구분한다.
 
 ## 이번 대화에서 정한 방향
@@ -38,7 +41,7 @@ lowerer다. 전체 DSL을 지원하는
 장치 프로파일이 정의한 설비 범위에는 공유 제약을 붙인다. 여러 control이 같은
 펌프를 참조하면 물리 펌프 ID 하나의 제약과 사용량을 공유한다.
 
-아래는 설비 구성에 연결하는 문법 스케치다. `station`, `pump1`, `settings`,
+아래는 `ghostrules`로 컴파일하는 독립 형식의 설비 구성 예제다. `station`, `pump1`, `settings`,
 `starts`는 설비/설정/시간표의 안정적인 ID에 연결되고, `pump1.valves`는 미리
 등록된 공급 관계의 유한한 밸브 집합이다. 발견한 순서나 표시 이름으로 연결하지 않는다.
 
@@ -74,7 +77,7 @@ constraints StationRules {
 | limit | 누적 시간·횟수·소비량 상한 | 남은 예산 검사와 한도에서 동작 차단 |
 | once ... per occurrence | 예약 발생 단위의 중복 억제 | 이미 접수한 같은 발생은 재실행하지 않음 |
 | check | 선택 정보를 활용하는 비차단 분석 | Pass / Violation / Unknown 진단; 실행을 차단하지 않음 |
-| warn ... when | 결과에 영향을 주지 않는 진단 조건 | 원인과 대상을 가진 경고 이벤트 기록 |
+| warn ... when | 미래 설계 표기; 현재 두 parser 모두 거절 | 원인과 대상을 가진 경고 이벤트 기록 |
 
 기존 한 줄 `require`도 같은 제약 모델로 내려간다. 경고는 제약 위반을 허용하는
 예외가 아니며, 경고를 지워도 필수 제약이 해제되지 않는다. 알림 전송은 호스트가

@@ -138,9 +138,9 @@ pump <- request;
 다음 언어 단어는 사용자 이름으로 쓸 수 없다.
 
 ```text
-control fn input output state config parameter let type sensor signal schedule timer
-calendar provider resource event account require mutex if then else case in true false
-div ok fault import syntax
+control fn input output state config let type sensor signal schedule timer
+calendar provider event require mutex if then else case in true false
+div ok fault syntax adapt constraints check limit quote instance connect elapsed
 ```
 
 `purefn`, `enum`, `next`, `ifthenelse`, `not`, `and`, `or`, `is`, `isnt`도 제거된
@@ -161,12 +161,13 @@ projection 이름이다. schedule의 `.missed`도 projection이다. 다른 타�
 추측하거나 사용자 projection으로 재정의하지 않는다. `.missed` 의미는
 [§3.5](03-time-and-schedules.md#35-schedule의-공통-의미)를 참조한다.
 
-`from`, `revision`, `sha256`, `instance`, `connect`, `quote`와 `timezone`, `selected`,
+`parameter`, `resource`, `account`, `import`, `from`, `revision`, `sha256`와 `timezone`, `selected`,
 `basis`, `when`, `clock`, `gap`, `recovery`, `fallback`, `dst_missing`, `dst_repeated`,
 `sample`, `valid`, `filter`, `stale_after`, `recover_after`, `samples`, `min`, `max`,
 `step`, `access`, `label`은 해당 문법 위치에서만 특별한 **문맥 단어**다. 다른 위치의
-식별자까지 전역 예약하지 않는다. `adapt`, `has`, `constraints`, `check`, `limit`의
-문맥은 [4장](04-sensors-constraints-control.md)이 정한다.
+식별자까지 전역 예약하지 않는다. `has`의 문맥은
+[4장](04-sensors-constraints-control.md)이 정한다. `adapt`, `constraints`, `check`,
+`limit`, `quote`, `instance`, `connect`는 문법 위치와 무관하게 예약된다.
 
 ### 공백, 문장 끝과 주석
 
@@ -239,7 +240,7 @@ parameter, instance, connect와 typed expression macro 문법은
 규칙은 [다음 장](02-types-expressions-state.md)에서 다룬다.
 
 ```text
-input_decl       ::= 'input' name_list ':' type ';'
+input_decl       ::= 'input' name_list ':' type [ '=' expr ] ';'
 sensor_decl      ::= 'sensor' Identifier [ '?' ] ':' type
                      ( ';' | '{' { sensor_setting ';' } '}' )
 output_decl      ::= 'output' name_list ':' type ';'
@@ -254,13 +255,16 @@ function_decl    ::= 'fn' Identifier '(' [ parameter_list ] ')' '->' type
 next_definition  ::= Identifier "'" '=' expr ';'
 output_connection ::= Identifier '<-' expr ';'
 signal_decl      ::= 'signal' Identifier '=' expr ';'
-timer_decl       ::= 'timer' Identifier '=' 'elapsed' '(' Identifier ')' ';'
-constraint       ::= 'require' expr [ '=>' expr ] ';'
-                   | 'mutex' name_list ';'
+timer_decl       ::= 'timer' Identifier '=' ( 'elapsed' '(' Identifier ')'
+                     | 'continuous_true' '(' expr ')' ) ';'
+constraint       ::= 'require' ( '!' expr | expr '=>' expr ) ';'
                    | 'mutex' '(' name_list ')' ';'
 name_list        ::= Identifier { ',' Identifier }
 parameter_list   ::= Identifier ':' type { ',' Identifier ':' type }
 ```
+
+현재 parser는 `input` initializer를 읽지만 실행 입력의 초기값으로 사용하지 않는다.
+입력값은 host가 공급한다. 실행 의미를 기대하는 소스에는 initializer를 쓰지 않는다.
 
 `schedule`은 일반 선언 골격과 달리 타입별 설정 block을 갖는다. 확정된 일일 슬롯
 형태는 다음과 같다.

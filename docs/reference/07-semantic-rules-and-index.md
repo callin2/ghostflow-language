@@ -101,7 +101,7 @@ Bool 계산, 품질 처리, 존재 검사를 혼합하지 않는다.
 | `adapt`, capability, 전략 선택 | [4. 센서와 제어](04-sensors-constraints-control.md) |
 | 장치 질의의 `match`, `where`, `strategy`, `priority` | [4. 센서와 제어](04-sensors-constraints-control.md) |
 | `require`, `mutex`, `constraints`, `exclusive`, `allow` | [4. 센서와 제어](04-sensors-constraints-control.md) |
-| `check`, `warn`, `limit`, `once ... per occurrence` | [4. 센서와 제어](04-sensors-constraints-control.md) |
+| `check`, `limit`, `once ... per occurrence`; `warn` (설계, parser 미지원) | [4. 센서와 제어](04-sensors-constraints-control.md) |
 | count_on, any_on, 공유 자원·모드·중재 | [4. 센서와 제어](04-sensors-constraints-control.md) |
 | 일일 ON-time, rolling-window budget | [4. 센서와 제어](04-sensors-constraints-control.md) |
 | objective, PI/PID, 연속 actuator feedback | [4. 센서와 제어](04-sensors-constraints-control.md) |

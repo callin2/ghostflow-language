@@ -5,7 +5,7 @@
 
 | ID | 확정된 결정 요지 | Reference | 검증 형태 |
 |---|---|---|---|
-| `REF-00-010` | 재사용한 두 instance의 기억과 provenance는 격리된다 | [../LANGUAGE-REFERENCE.md](<../../docs/LANGUAGE-REFERENCE.md#10-조합해도-책임과-비용을-추적할-수-있게-한다>) | `specified` |
+| `REF-00-010` | 재사용한 두 instance의 기억과 provenance는 격리된다 | [docs/LANGUAGE-REFERENCE.md §10](<../../docs/LANGUAGE-REFERENCE.md#10-조합해도-책임과-비용을-추적할-수-있게-한다>) | `specified` |
 | `REF-01-044` | 제거된 purefn 별칭은 fn으로 자동 해석하지 않고 migration 진단으로 거부한다. | [01-source-and-syntax.md](<../../docs/reference/01-source-and-syntax.md#16-대표-표기-참고-별칭과-역사적-대안>) | `executable` |
 | `REF-01-045` | control 값 선언은 종류가 달라도 하나의 namespace를 공유하며 같은 이름을 다시 선언할 수 없다. | [01-source-and-syntax.md](<../../docs/reference/01-source-and-syntax.md#17-소스-규칙의-장별-경계>)<br>[01-source-and-syntax.md](<../../docs/reference/01-source-and-syntax.md#이름-범위와-해석>) | `executable` |
 | `REF-01-056` | 기대 numeric type이 없는 정수 모양 literal은 Int이고 소수점 또는 지수 literal은 Number다. | [02-types-expressions-state.md](<../../docs/reference/02-types-expressions-state.md#22-리터럴과-기대-타입>) | `executable` |
