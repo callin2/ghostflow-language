@@ -4,12 +4,12 @@
   "schema": {
     "format": "GhostFlow/interaction-schema-v0",
     "version": "0.1",
-    "sha256": "dac491c84a24cb0dbf04fd2d3b7a4d0f0a01c61b540c0ec666ebc1cd1150abc4"
+    "sha256": "ffcff6b90e92e0f9f0da2f78455aadef01aaeb87093025abd27e786ec095a857"
   },
   "module": {
     "id": "FiveMinuteWatering",
-    "moduleFingerprint": "3eec53d45f3e2715",
-    "bytecodeSha256": "51332126c9877f46bc074ebe4c0c1a05ed6796752c9f4ddd6d3d0d2f5e3b1229"
+    "moduleFingerprint": "18052752a622baf5",
+    "bytecodeSha256": "acbf84f22c28aabd6c427ab454c937cfebd508bf254b27a1ab3fa390ba6dcd80"
   },
   "source": {
     "documentId": "source.fixture-five-minute-watering",

@@ -6,6 +6,8 @@ import test from 'node:test';
 import { compile, parse, tokenize } from '../tools/gfb1.mjs';
 import { compileSource } from './helpers/literate-compile.mjs';
 import { FramedGhostFlowRuntime } from '../runtimes/wasm/framed-runtime.mjs';
+import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
+import { observeRuntimeValues } from '../tools/source-trace.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const wasmPath = path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm');
@@ -95,12 +97,212 @@ test('GF-TEST-scan-frame-wasm: generated timer lowering receives logical frame t
   runtime.load(timerModule.bytes);
   runtime.addCapability('actuator', 'expired', 'bool');
   runtime.activate();
-  const first = runtime.scan({ scanId: 0, logicalTimeMs: 0, inputs: [{ name: 'enabled', value: true }] });
-  const expiry = runtime.scan({ scanId: 1, logicalTimeMs: 100, inputs: [{ name: 'enabled', value: true }] });
+  const scans = [0, 0, 99, 100, 101].map((logicalTimeMs, scanId) => runtime.scan({
+    scanId, logicalTimeMs, inputs: [{ name: 'enabled', value: true }],
+  }));
+  const [first, repeated, before, expiry, after] = scans;
   assert.equal(first.trace.inputs.__gf_now_ms, 0);
   assert.equal(first.trace.safe.expired, false);
+  assert.equal(repeated.trace.safe.expired, false);
+  assert.equal(before.trace.safe.expired, false);
   assert.equal(expiry.trace.inputs.__gf_now_ms, 100);
   assert.equal(expiry.trace.safe.expired, true);
+  assert.equal(after.trace.safe.expired, true);
+  assert.deepEqual(scans.map(outcome => observeRuntimeValues(timerModule.traceMetadata, outcome.trace)
+    .values.find(value => value.kind === 'timer' && value.name === 'age').value), [0, 0, 99, 100, 101]);
+});
+
+test('GF-TEST-scan-frame-wasm-continuous-true: measures only one uninterrupted true interval', async t => {
+  const compiled = await compileSource(`control ContinuousTrueTimer {
+    input hot: Bool;
+    timer hot_for = continuous_true(hot);
+    output expired: Bool;
+    expired <- hot_for >= 30ms;
+  }`, { filename: 'continuous-true-timer.ghost' });
+  const runtime = await FramedGhostFlowRuntime.instantiate(wasmBytes);
+  t.after(() => runtime.dispose());
+  runtime.load(compiled.bytes);
+  runtime.addCapability('actuator', 'expired', 'bool');
+  runtime.activate();
+
+  const trace = [
+    [100, true], [100, true], [129, true], [130, true], [131, true],
+    [160, false], [1000, false], [1010, true], [1039, true], [1040, false],
+    [1041, true], [1070, true], [1071, true], [1072, true],
+  ].map(([logicalTimeMs, hot], scanId) => runtime.scan({
+    scanId, logicalTimeMs, inputs: [{ name: 'hot', value: hot }],
+  }));
+
+  assert.deepEqual(trace.map(outcome => outcome.trace.safe.expired), [
+    false, false, false, true, true, false, false, false, false, false,
+    false, false, true, true,
+  ]);
+  assert.deepEqual(trace.map(outcome => observeRuntimeValues(compiled.traceMetadata, outcome.trace)
+    .values.find(value => value.kind === 'timer' && value.name === 'hot_for').value), [
+    0, 0, 29, 30, 31, 0, 0, 0, 29, 0, 0, 29, 30, 31,
+  ]);
+});
+
+test('GF-TEST-scan-frame-wasm-continuous-true-rejection: rejected time rollback does not reset the interval', async t => {
+  const compiled = await compileSource(`control ContinuousTrueRollback {
+    input hot: Bool;
+    timer hot_for = continuous_true(hot);
+    output expired: Bool;
+    expired <- hot_for >= 50ms;
+  }`, { filename: 'continuous-true-rollback.ghost' });
+  const runtime = await FramedGhostFlowRuntime.instantiate(wasmBytes);
+  t.after(() => runtime.dispose());
+  runtime.load(compiled.bytes);
+  runtime.addCapability('actuator', 'expired', 'bool');
+  runtime.activate();
+
+  const committed = runtime.scan({
+    scanId: 0, logicalTimeMs: 100, inputs: [{ name: 'hot', value: true }],
+  });
+  assert.equal(committed.trace.safe.expired, false);
+  assert.throws(() => runtime.scan({
+    scanId: 1, logicalTimeMs: 99, inputs: [{ name: 'hot', value: false }],
+  }), /logical time moved backwards/);
+  assert.deepEqual(runtime.outcome, committed);
+  const recovered = runtime.scan({
+    scanId: 1, logicalTimeMs: 150, inputs: [{ name: 'hot', value: true }],
+  });
+  assert.equal(recovered.trace.safe.expired, true);
+  assert.equal(observeRuntimeValues(compiled.traceMetadata, recovered.trace)
+    .values.find(value => value.kind === 'timer' && value.name === 'hot_for').value, 50);
+});
+
+test('GF-TEST-scan-frame-wasm-continuous-true-instances: timers keep independent intervals and resets', async t => {
+  const compiled = await compileSource(`control ContinuousTrueInstances {
+    input hot_a, hot_b: Bool;
+    timer a_for = continuous_true(hot_a);
+    timer b_for = continuous_true(hot_b);
+    output a_ready, b_ready: Bool;
+    a_ready <- a_for >= 20ms;
+    b_ready <- b_for >= 20ms;
+  }`, { filename: 'continuous-true-instances.ghost' });
+  const runtime = await FramedGhostFlowRuntime.instantiate(wasmBytes);
+  t.after(() => runtime.dispose());
+  runtime.load(compiled.bytes);
+  runtime.addCapability('actuator', 'a_ready', 'bool');
+  runtime.addCapability('actuator', 'b_ready', 'bool');
+  runtime.activate();
+
+  const outcomes = [
+    [100, true, false], [110, true, true], [120, true, true], [130, false, true],
+  ].map(([logicalTimeMs, hotA, hotB], scanId) => runtime.scan({
+    scanId, logicalTimeMs, inputs: [{ name: 'hot_a', value: hotA }, { name: 'hot_b', value: hotB }],
+  }));
+  assert.deepEqual(outcomes.map(outcome => [outcome.trace.safe.a_ready, outcome.trace.safe.b_ready]), [
+    [false, false], [false, false], [true, false], [false, true],
+  ]);
+  assert.deepEqual(outcomes.map(outcome => Object.fromEntries(observeRuntimeValues(compiled.traceMetadata, outcome.trace)
+    .values.filter(value => value.kind === 'timer').map(value => [value.name, value.value]))), [
+    { a_for: 0, b_for: 0 }, { a_for: 10, b_for: 0 },
+    { a_for: 20, b_for: 10 }, { a_for: 0, b_for: 20 },
+  ]);
+});
+
+test('GF-TEST-scan-frame-wasm-continuous-true-dependencies: forward references resolve and timer cycles reject', async () => {
+  const forward = await compileSource(`control ContinuousTrueForward {
+    input hot: Bool;
+    timer qualified = continuous_true(raw >= 5ms);
+    timer raw = continuous_true(hot);
+    output ready: Bool;
+    ready <- qualified >= 1ms;
+  }`, { filename: 'continuous-true-forward.ghost' });
+  assert.deepEqual(forward.manifest.timers.map(timer => timer.name), ['qualified', 'raw']);
+
+  await assert.rejects(() => compileSource(`control ContinuousTrueCycle {
+    timer first = continuous_true(second >= 1ms);
+    timer second = continuous_true(first >= 1ms);
+    output ready: Bool;
+    ready <- false;
+  }`, { filename: 'continuous-true-cycle.ghost' }), /cyclic timer definition involving/);
+  await assert.rejects(() => compileSource(`control ContinuousTrueLetCycle {
+    let condition = active_for >= 1ms;
+    timer active_for = continuous_true(condition);
+    output ready: Bool;
+    ready <- false;
+  }`, { filename: 'continuous-true-let-cycle.ghost' }), /cyclic timer definition involving/);
+});
+
+// Reference §2.7 and §3.3: declaration order cannot change the dependency graph's meaning.
+for (const [order, declarations] of [
+  ['forward', 'timer qualified = continuous_true(condition); let condition = raw >= 5ms; timer raw = continuous_true(hot);'],
+  ['reverse', 'timer raw = continuous_true(hot); let condition = raw >= 5ms; timer qualified = continuous_true(condition);'],
+]) {
+  test(`continuous timer/let ${order} declarations execute the same expected intervals`, async t => {
+    const compiled = await compileSource(`control TimerOrder {
+      input hot: Bool;
+      ${declarations}
+      output ready: Bool;
+      ready <- qualified >= 1ms;
+    }`);
+    const runtime = await FramedGhostFlowRuntime.instantiate(wasmBytes);
+    t.after(() => runtime.dispose());
+    runtime.load(compiled.bytes);
+    runtime.addCapability('actuator', 'ready', 'bool');
+    runtime.activate();
+    const observations = [[0, true], [4, true], [5, true], [6, true], [7, false], [100, true], [105, true], [106, true]]
+      .map(([logicalTimeMs, hot], scanId) => {
+        const outcome = runtime.scan({ scanId, logicalTimeMs, inputs: [{ name: 'hot', value: hot }] });
+        const timers = Object.fromEntries(observeRuntimeValues(compiled.traceMetadata, outcome.trace).values
+          .filter(value => value.kind === 'timer').map(value => [value.name, value.value]));
+        return [timers.raw, timers.qualified, outcome.trace.safe.ready];
+      });
+    assert.deepEqual(observations, [
+      [0, 0, false], [4, 0, false], [5, 0, false], [6, 1, true],
+      [0, 0, false], [0, 0, false], [5, 0, false], [6, 1, true],
+    ]);
+  });
+}
+
+test('GF-TEST-scan-frame-wasm-continuous-true-state: unprimed state condition uses the accepted pre-transition snapshot', async t => {
+  const compiled = await compileSource(`control ContinuousTrueStateSnapshot {
+    input enabled: Bool;
+    state active: Bool = false;
+    timer active_for = continuous_true(active);
+    active' = enabled;
+    output expired: Bool;
+    expired <- active_for >= 50ms;
+  }`, { filename: 'continuous-true-state-snapshot.ghost' });
+  const runtime = await FramedGhostFlowRuntime.instantiate(wasmBytes);
+  t.after(() => runtime.dispose());
+  runtime.load(compiled.bytes);
+  runtime.addCapability('actuator', 'expired', 'bool');
+  runtime.activate();
+
+  const expired = [[100, true], [150, true], [200, true], [250, false], [300, false]]
+    .map(([logicalTimeMs, enabled], scanId) => runtime.scan({
+      scanId, logicalTimeMs, inputs: [{ name: 'enabled', value: enabled }],
+    }).trace.safe.expired);
+  assert.deepEqual(expired, [false, false, true, true, false]);
+});
+
+test('GF-TEST-scan-frame-wasm-continuous-true-manifest: consumer accepts the exact mode and rejects mixed or unknown descriptors', async () => {
+  const compiled = await compileSource(`control ContinuousTrueManifest {
+    input hot: Bool;
+    timer hot_for = continuous_true(hot);
+    output ready: Bool;
+    ready <- hot_for >= 1ms;
+  }`, { filename: 'continuous-true-manifest.ghost' });
+  const runtime = await ControlRuntime.instantiateFramed(wasmBytes, compiled);
+  runtime.dispose();
+  const withTimer = timer => ({
+    ...compiled,
+    manifest: { ...compiled.manifest, timers: [timer] },
+  });
+  const descriptor = compiled.manifest.timers[0];
+  await assert.rejects(() => ControlRuntime.instantiateFramed(wasmBytes, withTimer({
+    ...descriptor, state: 'forged',
+  })), /unknown key state/);
+  await assert.rejects(() => ControlRuntime.instantiateFramed(wasmBytes, withTimer({
+    ...descriptor, mode: 'continuous',
+  })), /unsupported mode/);
+  await assert.rejects(() => ControlRuntime.instantiateFramed(wasmBytes, withTimer({
+    ...descriptor, extra: true,
+  })), /unknown key extra/);
 });
 
 test('GF-TEST-scan-frame-wasm: frame properties are latched once before packet allocation', async t => {
@@ -184,7 +386,7 @@ test('GF-TEST-scan-frame-wasm: ABI decoder rejects malformed packets before muta
   const cases = [
     [new Uint8Array([1, 0]), /truncated/],
     [new Uint8Array([0, 0, 0]), /trailing/],
-    [new Uint8Array([1, 0, 1, 0, 97, 3]), /type/],
+    [new Uint8Array([1, 0, 1, 0, 97, 4]), /type/],
     [new Uint8Array([1, 0, 1, 0, 97, 1, 2]), /exactly/],
     [new Uint8Array([1, 0, 1, 0, 0xff, 1, 1]), /UTF-8/],
     [new Uint8Array([129, 0]), /exceeds.*inputs/],
@@ -258,8 +460,10 @@ test('GF-TEST-scan-frame-wasm: wrapper rejects non-buffer and oversized module i
   let scans = 0;
   const memory = new WebAssembly.Memory({ initial: 1 });
   const functions = Object.fromEntries([
-    'gf_dealloc', 'gf_frame_destroy', 'gf_frame_load', 'gf_frame_add_capability', 'gf_frame_activate',
+    'gf_dealloc', 'gf_frame_destroy', 'gf_frame_load', 'gf_frame_add_capability', 'gf_frame_activate', 'gf_frame_activate_temporal',
     'gf_frame_outcome_ptr', 'gf_frame_outcome_len', 'gf_frame_error_ptr', 'gf_frame_error_len',
+    'gf_frame_replay_temporal', 'gf_frame_replay_ptr', 'gf_frame_replay_len',
+    'gf_frame_plan_temporal', 'gf_frame_plan_temporal_replay', 'gf_frame_resource_plan_ptr', 'gf_frame_resource_plan_len',
   ].map(name => [name, () => 1]));
   const runtime = new FramedGhostFlowRuntime({ memory, gf_alloc: () => { allocations += 1; return 1; }, gf_frame_create: () => 1, gf_frame_scan: () => { scans += 1; return 1; }, ...functions });
   t.after(() => runtime.dispose());

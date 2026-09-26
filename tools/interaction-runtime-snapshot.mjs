@@ -44,8 +44,11 @@ function runtimeSchema(compilation, suppliedSchema) {
 
 function typeMatches(type, value) {
   if (type?.kind === 'builtin' && type.name === 'Bool') return typeof value === 'boolean';
+  if (type?.kind === 'builtin' && type.name === 'Int') return Number.isInteger(value) && value >= -2147483648 && value <= 2147483647;
   if (type?.kind === 'builtin' && type.name === 'Number') return typeof value === 'number' && Number.isFinite(value);
   if (type?.kind === 'builtin' && type.name === 'Duration') return Number.isSafeInteger(value) && value >= 0;
+  const timeMax = type?.name === 'Date' ? 2_932_896 : type?.name === 'TimeOfDay' ? 86_399_999 : type?.name === 'DateTime' ? 253_402_300_799_999 : null;
+  if (type?.kind === 'builtin' && timeMax !== null) return Number.isSafeInteger(value) && value >= 0 && value <= timeMax;
   return type?.kind === 'nominal' && value !== null
     && (typeof value === 'boolean' || typeof value === 'string' || typeof value === 'number' && Number.isFinite(value));
 }
@@ -55,6 +58,7 @@ function runtimeValueKey(value) {
 }
 
 function stateMalformed(descriptor, trace) {
+  if (descriptor.kind !== 'state' && descriptor.kind !== 'counter') return false;
   const stateAfter = trace?.stateAfter;
   if (!object(stateAfter) || !Object.hasOwn(stateAfter, descriptor.name)) return false;
   const value = stateAfter[descriptor.name];
@@ -67,14 +71,22 @@ function timerClockMalformed(descriptor, trace) {
   return value !== undefined && (!Number.isSafeInteger(value) || value < 0);
 }
 
-function publicObservation(descriptor, values, trace) {
-  const value = values.get(`${descriptor.kind}\u0000${descriptor.name}`);
+function publicObservation(descriptor, values, trace, settings) {
+  if (descriptor.kind === 'setting') {
+    if (!settings.has(descriptor.name)) return { descriptorId: descriptor.id, status: 'unavailable', reason: 'runtime-value-unavailable' };
+    const value = settings.get(descriptor.name);
+    return typeMatches(descriptor.sourceType, value)
+      ? { descriptorId: descriptor.id, status: 'ready', value }
+      : { descriptorId: descriptor.id, status: 'error', error: 'runtime-value-type-mismatch' };
+  }
+  const runtimeKind = descriptor.kind === 'counter' ? 'state' : descriptor.kind;
+  const value = values.get(`${runtimeKind}\u0000${descriptor.name}`);
   if (value) {
     return typeMatches(descriptor.sourceType, value.value)
       ? { descriptorId: descriptor.id, status: 'ready', value: value.value }
       : { descriptorId: descriptor.id, status: 'error', error: 'runtime-value-type-mismatch' };
   }
-  if (descriptor.kind === 'state' && stateMalformed(descriptor, trace)) {
+  if ((descriptor.kind === 'state' || descriptor.kind === 'counter') && stateMalformed(descriptor, trace)) {
     return { descriptorId: descriptor.id, status: 'error', error: 'runtime-value-invalid' };
   }
   if (timerClockMalformed(descriptor, trace)) {
@@ -141,6 +153,9 @@ export function emitCompletedScanSnapshot({ compilation, schema, runId, completi
     throw new Error('interaction runtime snapshot: runtime observation could not be verified');
   }
   const values = new Map(observed.values.map(value => [runtimeValueKey(value), value]));
+  const settings = new Map((compilation.manifest?.configs ?? [])
+    .filter(config => config?.settings)
+    .map(config => [config.name, config.value]));
   const snapshot = {
     format: 'GhostFlow/runtime-snapshot-v0',
     version: '0.1',
@@ -153,7 +168,7 @@ export function emitCompletedScanSnapshot({ compilation, schema, runId, completi
     source: { ...verifiedSchema.source },
     runId,
     completion: { ...completion },
-    observations: verifiedSchema.descriptors.map(descriptor => publicObservation(descriptor, values, trace)),
+    observations: verifiedSchema.descriptors.map(descriptor => publicObservation(descriptor, values, trace, settings)),
   };
   const validated = validateInteraction(verifiedSchema, snapshot);
   if (!validated.valid) throw new Error('interaction runtime snapshot: produced snapshot failed contract validation');

@@ -1,13 +1,38 @@
 import { attachIntentMetadata, remapSourceTrace } from './source-trace.mjs';
 import { emitInteractionSchema } from './interaction-schema.mjs';
 import { extractLiterate, mapSourcePosition } from './literate.mjs';
-import { compileControl, parseControl } from './control.mjs';
+import { compileAccountingDescriptorArtifact, compileControl, compileResourcePolicyArtifact, compileScheduleDescriptorArtifact, compileTemporalDescriptorArtifact, hasTemporalDescriptorCalls, parseControl } from './control.mjs';
 import { isWellFormedUnicode, sha256Hex, utf8ByteLength } from './sha256.mjs';
+import { compileComposition, resolveDocument } from './composition.mjs';
 
 export { emitInteractionSchema } from './interaction-schema.mjs';
 
 const SOURCE_LIMIT = 1024 * 1024;
 const SOURCE_DOCUMENT_FORMAT = 'GhostFlow/source-document-v1';
+const DIAGNOSTICS_FORMAT = 'GhostFlow/diagnostics-v1';
+
+function diagnosticSource(filename, source, identity) {
+  return { filename, sha256: sha256Hex(source), ...(identity ?? {}) };
+}
+
+function attachDiagnostic(error, code, source, identity, position, end, requestSource) {
+  if (!position) return;
+  const prefix = `${error.filename}:${error.line}:${error.column}: `;
+  const message = error.message.startsWith(prefix) ? error.message.slice(prefix.length) : error.message;
+  error.diagnosticEnvelope = {
+    format: DIAGNOSTICS_FORMAT,
+    source: diagnosticSource(source.filename, source.text, identity),
+    ...(requestSource ? { requestSource } : {}),
+    diagnostics: [{
+      code: error.diagnosticCode ?? code, severity: 'error', message,
+      span: {
+        file: position.file,
+        start: { line: position.line, column: position.column },
+        ...(end ? { end: { line: end.line, column: end.column } } : {}),
+      },
+    }],
+  };
+}
 
 function requireSourceText(text, label = 'source text') {
   if (!isWellFormedUnicode(text)) throw new Error(`${label} must be a well-formed UTF-8 string`);
@@ -42,6 +67,11 @@ function remapSourceNodes(nodes, lines) {
 
 /** Environment-neutral product compiler: canonical literate input only. */
 export async function compileSource(source, options = {}) {
+  return compileSourceSync(source, options);
+}
+
+/** Deterministic core also used when verifying persisted artifacts. */
+export function compileSourceSync(source, options = {}) {
   if (!options || typeof options !== 'object' || Array.isArray(options)) throw new TypeError('compile options must be an object');
   if (Object.hasOwn(options, 'interactionSchema')) {
     throw new Error('interactionSchema is not a compile option; supply interactionSourceIdentity explicitly');
@@ -50,19 +80,77 @@ export async function compileSource(source, options = {}) {
   requireFilename(filename, 'source filename');
   requireSourceText(source, `${filename}: source`);
   if (!filename.endsWith('.ghost.md')) throw new Error(`${filename}: GhostFlow product compilation requires a canonical .ghost.md literate source`);
-  const extraction = extractLiterate(source, { filename });
-  let result;
-  try {
-    result = compileControl(extraction.code, { filename });
-  } catch (error) {
-    if (Number.isInteger(error.line)) {
-      const original = mapSourcePosition(extraction.sourceMap, error.line, error.column ?? 1);
-      if (original) {
-        const detail = error.message.replace(/^.*?:\d+:\d+:\s*/, '');
-        error.message = `${filename}:${original.line}:${original.column}: ${detail}`;
-        error.filename = original.file; error.line = original.line; error.column = original.column;
-      }
+  let extraction;
+  try { extraction = extractLiterate(source, { filename }); }
+  catch (error) {
+    if (Number.isInteger(error.line) && Number.isInteger(error.column)) {
+      attachDiagnostic(error, 'GF_LITERATE', { filename, text: source }, interactionSourceIdentity,
+        { file: filename, line: error.line, column: error.column });
     }
+    throw error;
+  }
+  let result, composition, stage = 'parse';
+  try {
+    const ast = parseControl(extraction.code, { filename });
+    stage = 'semantic';
+    if (options.sourceClosure !== undefined && ast.imports?.length) {
+      composition = compileComposition(source, filename, options.sourceClosure);
+      result = composition.result;
+    } else result = ast.kind === 'resource-policy'
+      ? compileResourcePolicyArtifact(extraction.code, { filename })
+      : ast.body.some(item => item.kind === 'account' || item.kind === 'account-constraints')
+        ? compileAccountingDescriptorArtifact(extraction.code, { filename })
+      : ast.body.some(item => item.kind === 'schedule' && item.scheduleType !== 'Solar'
+        && Object.keys(item.policy ?? {}).some(key => key !== 'fallback'))
+        ? compileScheduleDescriptorArtifact(extraction.code, { filename })
+        : hasTemporalDescriptorCalls(ast)
+          ? compileTemporalDescriptorArtifact(extraction.code, { filename })
+          : compileControl(extraction.code, { filename });
+  } catch (error) {
+    // Map each independently checked error using the same canonical document
+    // path as a single failure. Preserve the original thrown error/message.
+    const failures = error.collectedErrors ?? [error];
+    const mapFailure = error => {
+      const errorDocument = error.filename === filename ? null : options.sourceClosure?.find(document => resolveDocument('', document.filename) === error.filename);
+      if (error.name === 'LiterateError' && errorDocument) {
+        attachDiagnostic(error, 'GF_LITERATE', { filename: errorDocument.filename, text: errorDocument.text }, undefined,
+          { file: error.filename, line: error.line, column: error.column }, undefined,
+          diagnosticSource(filename, source, interactionSourceIdentity));
+        return error.diagnosticEnvelope;
+      }
+      const errorMap = errorDocument ? extractLiterate(errorDocument.text, { filename: error.filename }).sourceMap : extraction.sourceMap;
+      if (Number.isInteger(error.line) && (error.filename === filename || errorDocument)) {
+        let original = mapSourcePosition(errorMap, error.line, error.column ?? 1);
+        // Extraction appends a newline after the final authored code line. Its
+        // terminal EOF belongs to that line's insertion point, not a prose line
+        // or a generated separator between executable fences.
+        if (!original && error.line === errorMap.length + 1 && error.column === 1) {
+          const lastLine = errorMap.at(-1);
+          if (lastLine) original = mapSourcePosition(errorMap, errorMap.length, lastLine.length + 1);
+        }
+        if (original) {
+          const originalEnd = Number.isInteger(error.loc?.endLine) && Number.isInteger(error.loc?.endColumn)
+            ? mapSourcePosition(errorMap, error.loc.endLine, error.loc.endColumn) : null;
+          const prefix = `${error.filename}:${error.line}:${error.column}: `;
+          const detail = error.message.startsWith(prefix) ? error.message.slice(prefix.length) : error.message;
+          error.message = `${original.file}:${original.line}:${original.column}: ${detail}`;
+          error.filename = original.file; error.line = original.line; error.column = original.column;
+          const errorSource = errorDocument
+            ? { filename: errorDocument.filename, text: errorDocument.text }
+            : { filename, text: source };
+          attachDiagnostic(error, stage === 'parse' ? 'GF_PARSE' : 'GF_SEMANTIC',
+            errorSource, errorDocument ? undefined : interactionSourceIdentity, original, originalEnd,
+            errorDocument ? diagnosticSource(filename, source, interactionSourceIdentity) : undefined);
+        }
+      }
+      return error.diagnosticEnvelope;
+    };
+    const envelopes = failures.map(mapFailure).filter(Boolean);
+    if (!failures.includes(error)) mapFailure(error);
+    if (envelopes.length) error.diagnosticEnvelope = {
+      ...envelopes[0], diagnostics: envelopes.flatMap(envelope => envelope.diagnostics),
+      ...(error.diagnosticCollection ? { collection: error.diagnosticCollection } : {}),
+    };
     throw error;
   }
   if (extraction.anchors.length || extraction.linkDirectives.length) {
@@ -88,8 +176,19 @@ export async function compileSource(source, options = {}) {
     text: source,
     sha256: sha256Hex(source),
   };
+  const mapFor = name => composition?.units.get(resolveDocument('', name))?.extraction.sourceMap ?? extraction.sourceMap;
+  const mappedTrace = composition ? (() => {
+    const trace = { ...result.traceMetadata };
+    for (const key of ['bindings', 'constraints', 'resultSites', 'windowSites', 'intentLinks']) if (Array.isArray(trace[key])) {
+      trace[key] = trace[key].map(entry => {
+        const shell = { bindings: [], constraints: [], resultSites: [], [key]: [entry] };
+        return remapSourceTrace(shell, mapFor(entry.source.filename))[key][0];
+      });
+    }
+    return trace;
+  })() : remapSourceTrace(result.traceMetadata, extraction.sourceMap);
   const traceMetadata = result.traceMetadata ? {
-    ...remapSourceTrace(result.traceMetadata, extraction.sourceMap),
+    ...mappedTrace,
     sourceDocumentSha256: sourceDocument.sha256,
     bytecodeSha256: digest,
   } : result.traceMetadata;
@@ -97,15 +196,22 @@ export async function compileSource(source, options = {}) {
     ...result,
     bytes,
     sourceDocument,
-    sourceMap: remapSourceNodes(result.sourceMap, extraction.sourceMap),
+    sourceMap: composition ? result.sourceMap.map(node => remapSourceNodes([node], mapFor(node.filename))[0]) : remapSourceNodes(result.sourceMap, extraction.sourceMap),
+    ...(composition ? { sourceClosure: composition.closure } : {}),
     traceMetadata,
-    manifest: result.manifest ? { ...result.manifest, bytecodeSha256: digest } : null,
+    manifest: result.manifest ? {
+      ...result.manifest, bytecodeSha256: digest,
+      ...(['GhostFlow/schedule-descriptor-v1', 'GhostFlow/accounting-v1', 'GhostFlow/temporal-descriptor-v1'].includes(result.manifest.format)
+        ? { sourceDocumentSha256: sourceDocument.sha256 } : {}),
+    } : null,
     extractionMap: extraction.sourceMap,
     warnings: extraction.warnings,
   };
   const schema = interactionSourceIdentity === undefined ? null : emitInteractionSchema(compilation, interactionSourceIdentity);
   return {
     ...compilation,
+    diagnosticEnvelope: { format: DIAGNOSTICS_FORMAT,
+      source: diagnosticSource(filename, source, interactionSourceIdentity), diagnostics: [] },
     interactionSchema: schema,
     interactionSourceIdentity: schema ? {
       documentId: schema.source.documentId,

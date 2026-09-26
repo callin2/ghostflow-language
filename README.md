@@ -4,6 +4,12 @@ GhostFlow's language compiler and portable execution platform. JavaScript owns
 parsing, type checking and lowering; Rust owns verified bytecode execution,
 signals and station arbitration. Native and WASM tests share that Rust core.
 
+Start with the [Language Reference](docs/LANGUAGE-REFERENCE.md), the shared
+ground truth for language philosophy, syntax, semantics, and the reasons behind
+its features.
+
+For task-oriented examples, see the [GhostFlow Coding FAQ](docs/language_faq.md).
+
 ```text
 .ghost.md → compileSource → .gfb + manifest + source map
                                          ↓

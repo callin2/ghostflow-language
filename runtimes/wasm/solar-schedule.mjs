@@ -26,9 +26,9 @@ export function validateSolarDescriptor(value) {
   }
   if (!['rise', 'set'].includes(value.event)) throw new TypeError('Solar event must be rise or set');
   if (!Number.isSafeInteger(value.offsetMs) || Math.abs(value.offsetMs) > DAY_MS) throw new RangeError('Solar offset must be integer milliseconds within 24 hours');
-  if (value.fallback !== 'skip') throw new TypeError('Solar requires explicit fallback skip');
+  if (!value.policy || value.policy.fallback !== 'skip') throw new TypeError('Solar requires explicit fallback skip');
   return Object.freeze({ kind: 'solar', name: value.name, timezone: value.timezone, latitude: value.latitude,
-    longitude: value.longitude, event: value.event, offsetMs: value.offsetMs, fallback: value.fallback });
+    longitude: value.longitude, event: value.event, offsetMs: value.offsetMs, policy: value.policy });
 }
 
 export class SolarSchedule {

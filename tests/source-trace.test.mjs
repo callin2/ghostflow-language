@@ -216,6 +216,7 @@ test('each authored timer binds its two generated runtime states to the timer de
     stateAfter: { __gf_timer_since_age: 2000, __gf_timer_initialized_age: true },
     requested: {}, safe: {},
     safetyTrace: { format: 'GhostFlow/safety-trace-v1', constraints: [] },
+    resultTrace: [],
   });
   assert.deepEqual(observed.bindings.filter(entry => entry.kind === 'timer').map(entry => entry.observations), [
     [

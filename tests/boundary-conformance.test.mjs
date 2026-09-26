@@ -171,13 +171,17 @@ function balancedOr(count) {
   return `(or ${balancedOr(middle)} ${balancedOr(count - middle)})`;
 }
 
-test('GF-TEST-61.3-GFB-EXPRESSION-SIZE: accepts encoded intent below 4096 bytes and rejects the next size', () => {
-  const makeSource = count => gfbModule({
+test('GF-TEST-61.3-GFB-EXPRESSION-SIZE: accepts 4096 encoded bytes and rejects 4097 bytes', () => {
+  // A short-circuit OR tree with N Bool leaves uses 2*N + 8*(N-1) bytes.
+  // 410 leaves use 4092 bytes; each surrounding NOT adds exactly one byte.
+  const makeSource = padding => gfbModule({
     strategies: 1,
     intentNames: [],
-  }).replace('(device true) )', `(device true) (intent result ${balancedOr(count)}))`);
-  assert.doesNotThrow(() => compileGfbSource(makeSource(1365)));
-  assert.throws(() => compileGfbSource(makeSource(1366)), error => error instanceof GfbCompileError && error.message.includes('strategy resource limit exceeded'));
+  }).replace('(device true) )', `(device true) (intent result ${'(not '.repeat(padding)}${balancedOr(410)}${')'.repeat(padding)}))`);
+  const bytes = Buffer.from(compileGfbSource(makeSource(4)));
+  // The single intent ends immediately before the empty u16 constraint count.
+  assert.equal(bytes.readUInt32LE(bytes.length - 4096 - 6), 4096);
+  assert.throws(() => compileGfbSource(makeSource(5)), error => error instanceof GfbCompileError && error.message.includes('strategy resource limit exceeded'));
 });
 
 const boolDecisionBoundaries = [

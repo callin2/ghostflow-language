@@ -3,8 +3,8 @@
   "version": "0.1",
   "module": {
     "id": "FiveMinuteWatering",
-    "moduleFingerprint": "3eec53d45f3e2715",
-    "bytecodeSha256": "51332126c9877f46bc074ebe4c0c1a05ed6796752c9f4ddd6d3d0d2f5e3b1229"
+    "moduleFingerprint": "18052752a622baf5",
+    "bytecodeSha256": "acbf84f22c28aabd6c427ab454c937cfebd508bf254b27a1ab3fa390ba6dcd80"
   },
   "source": {
     "documentId": "source.fixture-five-minute-watering",

@@ -1,0 +1,1821 @@
+{
+  "chapterFiles": [
+    "03-time-and-schedules.md",
+    "04-sensors-constraints-control.md"
+  ],
+  "cases": [
+    {
+      "id": "REF-03-001",
+      "references": [
+        "03-time-and-schedules.md#duration"
+      ],
+      "rule": "Duration은 0 이상의 정수와 ms, s, min, h 단위를 사용하며 0ms도 타입의 유효값이다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "duration-units.ghost.md",
+      "expect": "accept",
+      "source": "# Duration units\n\n```ghost\ncontrol DurationUnits {\n  config zero: Duration = 0ms;\n  config seconds: Duration = 2s;\n  config minutes: Duration = 3min;\n  config hours: Duration = 1h;\n  output ready: Bool;\n  ready <- true;\n}\n```\n"
+    },
+    {
+      "id": "REF-03-002",
+      "references": [
+        "03-time-and-schedules.md#duration"
+      ],
+      "rule": "음수 Duration 리터럴은 거부한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "negative-duration.ghost.md",
+      "expect": "reject",
+      "diagnosticPattern": "Duration|negative|음수|literal|parse",
+      "source": "# Negative duration\n\n```ghost\ncontrol NegativeDuration {\n  config delay: Duration = -1ms;\n  output ready: Bool;\n  ready <- true;\n}\n```\n"
+    },
+    {
+      "id": "REF-03-003",
+      "references": [
+        "03-time-and-schedules.md#duration"
+      ],
+      "rule": "분수 밀리초 Duration 리터럴은 거부한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "fractional-duration.ghost.md",
+      "expect": "reject",
+      "diagnosticPattern": "Duration|integer|fraction|정수|literal|parse",
+      "source": "# Fractional duration\n\n```ghost\ncontrol FractionalDuration {\n  config delay: Duration = 0.5ms;\n  output ready: Bool;\n  ready <- true;\n}\n```\n"
+    },
+    {
+      "id": "REF-03-004",
+      "references": [
+        "03-time-and-schedules.md#duration"
+      ],
+      "rule": "Duration의 포함 상한 2^53-1 밀리초는 허용한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "duration-max.ghost.md",
+      "expect": "accept",
+      "source": "# Maximum duration\n\n```ghost\ncontrol DurationMaximum {\n  config maximum: Duration = 9007199254740991ms;\n  output ready: Bool;\n  ready <- true;\n}\n```\n"
+    },
+    {
+      "id": "REF-03-005",
+      "references": [
+        "03-time-and-schedules.md#duration"
+      ],
+      "rule": "2^53-1 밀리초를 넘는 Duration은 거부한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "duration-overflow.ghost.md",
+      "expect": "reject",
+      "diagnosticPattern": "Duration|range|overflow|범위",
+      "source": "# Duration overflow\n\n```ghost\ncontrol DurationOverflow {\n  config too_large: Duration = 9007199254740992ms;\n  output ready: Bool;\n  ready <- true;\n}\n```\n"
+    },
+    {
+      "id": "REF-03-006",
+      "references": [
+        "03-time-and-schedules.md#duration"
+      ],
+      "rule": "Duration 덧셈은 범위 안의 검사된 Duration을 반환한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "duration-add.ghost.md",
+      "expect": "accept",
+      "source": "# Duration addition\n\n```ghost\ncontrol DurationAddition {\n  output ready: Bool;\n  let total = 1s + 2s;\n  ready <- total == 3s;\n}\n```\n"
+    },
+    {
+      "id": "REF-03-007",
+      "references": [
+        "03-time-and-schedules.md#duration"
+      ],
+      "rule": "Duration 뺄셈 결과가 음수이면 거부한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "duration-underflow.ghost.md",
+      "expect": "reject",
+      "diagnosticPattern": "Duration|negative|underflow|범위|음수",
+      "source": "# Duration underflow\n\n```ghost\ncontrol DurationUnderflow {\n  output ready: Bool;\n  let invalid = 1s - 2s;\n  ready <- invalid == 0ms;\n}\n```\n"
+    },
+    {
+      "id": "REF-03-008",
+      "references": [
+        "03-time-and-schedules.md#date-timeofday-datetime"
+      ],
+      "rule": "date/time/datetime tagged literal은 exact Gregorian·millisecond 값을 만들며 DateTime은 Z 또는 -14:00..+14:00 숫자 offset을 요구한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "time-literal-boundaries.ghost.md",
+      "expect": "accept",
+      "source": "# Time literal boundaries\n\n```ghost\ncontrol TimeLiteralBoundaries {\n  let first_date = date`1970-01-01`;\n  let last_date = date`9999-12-31`;\n  let midnight = time`00:00`;\n  let last_time = time`23:59:59.999`;\n  let east = datetime`2026-09-22T06:30:00+14:00`;\n  let west = datetime`2026-09-22T06:30:00-14:00`;\n  output ready: Bool;\n  ready <- first_date != last_date && midnight <= last_time && west != east;\n}\n```\n"
+    },
+    {
+      "id": "REF-03-009",
+      "references": [
+        "03-time-and-schedules.md#달력-시계와-단조-시계"
+      ],
+      "rule": "한 tick은 immutable clock snapshot 하나를 쓰며 같은 run의 monotonicMs 감소나 비정수·범위 밖 값은 상태 변경 전에 거부한다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "accepted snapshot monotonicMs=1000 뒤 다음 snapshot이 999이고 이전 state는 Idle이다.",
+      "when": "다음 tick을 평가한다.",
+      "then": "tick을 거부하고 state와 timer state를 Idle 시점 그대로 유지한다.",
+      "reason": "ClockSnapshot 검증은 ghostc 정적 컴파일이 아니라 runtime scan 입력 계약이다."
+    },
+    {
+      "id": "REF-03-010",
+      "references": [
+        "03-time-and-schedules.md#달력-시계와-단조-시계"
+      ],
+      "rule": "untrusted wall clock은 일정에 쓰지 않고, wall 보정은 단조 타이머를 바꾸지 않으며 clock hold에는 명시된 허용시간과 최종 fallback이 필요하다.",
+      "scope": "host",
+      "status": "specified",
+      "given": "5분 run이 monotonic 100초에 시작했고 wall clock이 10분 뒤로 보정되며 quality가 Unknown으로 바뀐다.",
+      "when": "monotonic 220초 snapshot을 공급한다.",
+      "then": "run elapsed는 120초이고 새 wall 일정은 admit하지 않으며 host는 출처·신뢰도와 명시된 hold/fallback 정책을 기록한다.",
+      "reason": "NTP/RTC 신뢰 판정과 snapshot 공급은 host 책임이다."
+    },
+    {
+      "id": "REF-03-011",
+      "references": [
+        "03-time-and-schedules.md#32-상태-변경-뒤의-경과-시간"
+      ],
+      "rule": "elapsed(state)는 선언된 state의 마지막 확정 변경 이후 단조 경과를 나타내는 선택 문법이다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "elapsed-state.ghost.md",
+      "expect": "accept",
+      "source": "# Elapsed state\n\n```ghost\ncontrol ElapsedState {\n  input start: Bool;\n  state running: Bool = false;\n  timer age = elapsed(running);\n  output pump: Bool;\n  running' = start || running;\n  pump <- running' && age < 5min;\n}\n```\n"
+    },
+    {
+      "id": "REF-03-012",
+      "references": [
+        "03-time-and-schedules.md#32-상태-변경-뒤의-경과-시간"
+      ],
+      "rule": "elapsed의 대상은 input이 아니라 state여야 한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "elapsed-input.ghost.md",
+      "expect": "reject",
+      "diagnosticPattern": "elapsed|state|subject|timer",
+      "source": "# Invalid elapsed subject\n\n```ghost\ncontrol ElapsedInput {\n  input running: Bool;\n  timer age = elapsed(running);\n  output pump: Bool;\n  pump <- age < 5min;\n}\n```\n"
+    },
+    {
+      "id": "REF-03-013",
+      "references": [
+        "03-time-and-schedules.md#32-상태-변경-뒤의-경과-시간"
+      ],
+      "rule": "elapsed는 초기 0ms이고 Bool의 양방향 변경 tick에서 0ms로 재시작한 뒤 accepted tick의 단조 차이를 낸다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "running=false로 monotonic 0에 시작하고 100에 true, 250에 유지, 300에 false로 확정한다.",
+      "when": "각 accepted tick에서 elapsed(running)을 읽는다.",
+      "then": "값은 0ms, 0ms, 150ms, 0ms 순서다.",
+      "reason": "컴파일은 timer trace를 실행하지 않는다."
+    },
+    {
+      "id": "REF-03-014",
+      "references": [
+        "03-time-and-schedules.md#32-상태-변경-뒤의-경과-시간"
+      ],
+      "rule": "한 tick에서는 첫 조건 전이만 확정하며 rejected tick은 timer를 진행시키지 않고 대기 중에도 stop·fault·전역 제약을 매 tick 평가한다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "Open 단계가 age=2s 경계에 도달한 tick에 다음 두 단계의 조건도 참이고, 다음 scan 하나는 거부되며 stop=true다.",
+      "when": "경계 tick, rejected tick, 다음 accepted tick을 처리한다.",
+      "then": "경계 tick에는 한 단계만 전이하고 rejected tick은 state/timer를 바꾸지 않으며 다음 accepted tick에서 stop과 제약을 즉시 평가한다.",
+      "reason": "tick 수용과 원자적 전이는 runtime 의미다."
+    },
+    {
+      "id": "REF-03-015",
+      "references": [
+        "03-time-and-schedules.md#33-bool이-연속으로-참인-시간"
+      ],
+      "rule": "continuous_true(Bool)는 uninterrupted true interval을 재는 공개 timer 선언이며 elapsed와 누적 ON과 구분된다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "continuous-true.ghost.md",
+      "expect": "accept",
+      "source": "# Continuous true timer\n\n```ghost\ncontrol ContinuousTrue {\n  input hot: Bool;\n  timer hot_for = continuous_true(hot);\n  output alarm: Bool;\n  alarm <- hot_for >= 5min;\n}\n```\n"
+    },
+    {
+      "id": "REF-03-016",
+      "references": [
+        "03-time-and-schedules.md#33-bool이-연속으로-참인-시간"
+      ],
+      "rule": "continuous-true는 첫 true와 같은 timestamp 반복에서 0이고 이후 차이를 내며 false에서 즉시 0으로 reset한다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "c trace가 (100,true),(100,true),(140,true),(160,false),(200,true),(230,true)다.",
+      "when": "각 accepted tick에서 timer를 읽는다.",
+      "then": "0ms, 0ms, 40ms, 0ms, 0ms, 30ms를 반환한다.",
+      "reason": "tick별 timer state 전이는 compiler CLI가 아니라 runtime trace로 검증한다."
+    },
+    {
+      "id": "REF-03-017",
+      "references": [
+        "03-time-and-schedules.md#33-bool이-연속으로-참인-시간"
+      ],
+      "rule": "각 continuous-true timer는 상태를 공유하지 않고 Result<Bool,SensorFault>를 암묵 Bool로 바꾸지 않는다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "같은 Bool에서 생성한 timer A는 100에, B는 120에 활성화되고 입력은 150에 SensorFault가 된다.",
+      "when": "timer state와 fault를 처리한다.",
+      "then": "A와 B의 since는 독립적이며 fault는 작성자의 명시 case 없이 true로 계수되지 않는다.",
+      "reason": "공개 continuous timer 문법이 아직 없다."
+    },
+    {
+      "id": "REF-03-018",
+      "references": [
+        "03-time-and-schedules.md#34-누적-시간과-rolling-budget"
+      ],
+      "rule": "상태 age, 연속 true, 작업 누적 ON, sliding-window ON, local-day 물리 accounting은 서로 다른 시간 의미다.",
+      "scope": "design",
+      "status": "specified",
+      "given": "펌프가 10초 ON, 10초 OFF, 20초 ON이고 상태 phase는 전체 40초 동안 유지된다.",
+      "when": "각 시간 질문을 계산한다.",
+      "then": "phase age는 40초, 현재 continuous ON은 20초, 작업 누적 ON은 30초이며 window/day 값은 각 계약의 범위와 accounting target으로 별도 계산한다.",
+      "reason": "서로 다른 시간 관측값의 구분은 실행 trace와 ledger 상태가 필요한 설계 계약이다."
+    },
+    {
+      "id": "REF-03-019",
+      "references": [
+        "03-time-and-schedules.md#34-누적-시간과-rolling-budget"
+      ],
+      "rule": "rolling window는 (t-window,t]의 partial overlap을 합산하며 정확히 limit에서 추가 ON을 막는다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "window=60s, limit=30s이고 ON interval이 (0,20]과 (30,40]이며 t=40s다.",
+      "when": "새 ON admission을 평가한다.",
+      "then": "used=30s이므로 차단하고 t=65s에는 첫 interval의 5초만 남아 used=15s가 되어 그만큼 예산이 복구된다.",
+      "reason": "partial-overlap 합산과 admission 차단은 compiler CLI가 아니라 runtime ledger로 검증한다."
+    },
+    {
+      "id": "REF-03-020",
+      "references": [
+        "03-time-and-schedules.md#34-누적-시간과-rolling-budget"
+      ],
+      "rule": "같은 논리 interval trace는 irregular scan에서도 동일한 rolling used를 내고 fixed bucket이나 현재 구간만으로 근사하지 않는다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "동일 ON/OFF 경계를 가진 trace를 1초 scan과 7·13·9초 irregular scan으로 관측한다.",
+      "when": "동일 logical time t에서 60초 window used를 계산한다.",
+      "then": "두 실행은 모든 interval의 partial overlap을 합친 동일 used를 낸다.",
+      "reason": "scan 독립 적분은 runtime 의미다."
+    },
+    {
+      "id": "REF-03-021",
+      "references": [
+        "03-time-and-schedules.md#34-누적-시간과-rolling-budget"
+      ],
+      "rule": "accounting target은 requested, safe, applied, confirmed 중 명시하며 safe 차단 시간이나 feedback 없는 물리 유량을 잘못 계수하지 않는다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "manual request는 20초 true지만 저수위 제약으로 safe=false이고 feedback capability가 없다.",
+      "when": "safe budget과 confirmed 물리 사용량을 계산한다.",
+      "then": "safe used는 0초이고 confirmed 사용량은 알 수 없으며 request 20초와 분리해 기록한다.",
+      "reason": "이는 compiler acceptance가 아닌 accounting stage 계약이다."
+    },
+    {
+      "id": "REF-03-022",
+      "references": [
+        "03-time-and-schedules.md#34-누적-시간과-rolling-budget"
+      ],
+      "rule": "rolling window와 최대 ON은 유한해야 하며 재부팅 시 checkpoint 복원, window 동안 차단, 명시적 non-durable 중 선택한 정책 없이 보호 예산을 reset하지 않는다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "재부팅 직전 60초 window에서 28초를 사용했고 durable checkpoint가 없다.",
+      "when": "재부팅 뒤 새 ON을 요청한다.",
+      "then": "선택한 보수 정책에 따라 차단하거나 명시 non-durable 계약을 따르며 used를 암묵 0으로 만들지 않는다.",
+      "reason": "checkpoint 복원과 reboot 후 차단은 runtime persistence 정책의 동작 계약이다."
+    },
+    {
+      "id": "REF-03-023",
+      "references": [
+        "03-time-and-schedules.md#35-schedule의-공통-의미"
+      ],
+      "rule": "Schedule은 매 tick 평가하는 typed reactive value이며 실패한 pulse를 자동 queue하지 않고 읽기만으로 장치를 켜지 않는다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "08:00 pulse에서 predicate=false이고 08:01에 true가 되며 출력 state는 Idle이다.",
+      "when": "schedule과 output을 평가한다.",
+      "then": "08:00 occurrence는 missed이고 08:01에 due나 output ON이 생기지 않는다.",
+      "reason": "Schedule admission은 host/runtime 동작이다."
+    },
+    {
+      "id": "REF-03-024",
+      "references": [
+        "03-time-and-schedules.md#35-schedule의-공통-의미"
+      ],
+      "rule": "trigger와 basis는 별도 typed field이고 Daily schedule은 명시 timezone·DST·basis·when·clock·gap·recovery·fallback을 가진다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "daily-schedule-policy.ghost.md",
+      "expect": "accept",
+      "source": "# Daily schedule policy\n\n```ghost\ncontrol DailySchedulePolicy {\n  schedule morning: Daily {\n    timezone = \"Asia/Seoul\";\n    at = time`06:30`;\n    dst_missing = skip;\n    dst_repeated = first;\n    basis = pulse;\n    when = true;\n    clock = trusted_only;\n    gap = skip_after(60s);\n    recovery = baseline;\n    fallback = skip;\n  }\n  output due: Bool;\n  due <- morning.due;\n}\n```\n"
+    },
+    {
+      "id": "REF-03-025",
+      "references": [
+        "03-time-and-schedules.md#35-schedule의-공통-의미"
+      ],
+      "rule": "Schedule 판단은 True/False/Unknown(reason)와 revision을 내며 fallback=skip은 Unknown 이유를 보존한 채 due=false로 투영한다.",
+      "scope": "host",
+      "status": "specified",
+      "given": "Solar provider가 PredictionStale을 반환하고 fallback=skip이다.",
+      "when": "occurrence 판단을 projection한다.",
+      "then": "due=false지만 observation은 Unknown(PredictionStale), definition/provider/context revision을 보존한다.",
+      "reason": "provider context와 observation 생성은 host 책임이다."
+    },
+    {
+      "id": "REF-03-026",
+      "references": [
+        "03-time-and-schedules.md#pulse-window-run-range"
+      ],
+      "rule": "Pulse는 crossing tick만, Window는 half-open interval의 첫 true 한 번만, Run은 admission부터 단조 duration 동안 활성화한다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "planned=08:00, predicate가 08:02 true, 08:03 false, 08:04 true이며 Window=5min, Run=5min within=10min이다.",
+      "when": "각 basis를 독립 평가한다.",
+      "then": "Pulse는 missed, Window는 08:02 한 번 admit하고 재arm하지 않으며 Run은 08:02 admit 후 monotonic 5분 active다.",
+      "reason": "basis 동작은 runtime 의미다."
+    },
+    {
+      "id": "REF-03-027",
+      "references": [
+        "03-time-and-schedules.md#pulse-window-run-range"
+      ],
+      "rule": "late interval은 half-open이며 run length와 grace를 구분하고 constraint 차단으로 run timer를 숨겨 pause하지 않는다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "planned=08:00, Run(5min,within(10min))이 08:02에 admit되고 08:04~08:06 safe output이 차단된다.",
+      "when": "active와 admission 경계를 계산한다.",
+      "then": "run은 08:07에 끝나고 08:10 경계의 새 admission은 거부되며 차단 시간은 run을 연장하지 않는다.",
+      "reason": "run 및 constraint 시간의 상호작용은 runtime 계약이다."
+    },
+    {
+      "id": "REF-03-028",
+      "references": [
+        "03-time-and-schedules.md#35-schedule의-공통-의미"
+      ],
+      "rule": "각 accepted scan은 schedule ID·definition revision·결정·disposition·occurrence ID·planned instant·local/source date·provider/context revision을 Bool projection과 함께 기록한다.",
+      "scope": "host",
+      "status": "specified",
+      "given": "이미 admit한 Solar occurrence를 다음 scan에서 다시 관측한다.",
+      "when": "due=false observation을 기록한다.",
+      "then": "AlreadyAdmitted disposition과 동일 occurrence identity 및 모든 revision/context 필드를 같은 scan에 결속한다.",
+      "reason": "evidence 저장과 provider metadata는 host 책임이다."
+    },
+    {
+      "id": "REF-03-029",
+      "references": [
+        "03-time-and-schedules.md#occurrence-identity와-중복-억제"
+      ],
+      "rule": "stable schedule ID와 source occurrence key가 identity이며 definition/provider revision과 수정된 planned time은 같은 사건을 새 사건으로 만들지 않는다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "admit된 tide event E의 provider revision과 planned time이 바뀐다.",
+      "when": "수정 occurrence를 처리한다.",
+      "then": "E는 AlreadyAdmitted로 남고 두 번째 run을 만들지 않는다; 별도 일정은 새 schedule ID가 필요하다.",
+      "reason": "occurrence ledger와 중복 억제는 runtime 계약이다."
+    },
+    {
+      "id": "REF-03-030",
+      "references": [
+        "03-time-and-schedules.md#관측-gap과-회복"
+      ],
+      "rule": "maxObservationGap을 넘는 gap이 admission interval과 겹치면 skip 정책은 occurrence를 missed로 종결하고 열린 Window/within도 되살리지 않는다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "08:00~08:05 Window, max gap 60초이고 accepted snapshots가 07:59:50 다음 08:02:00이다.",
+      "when": "08:02 scan에서 복귀한다.",
+      "then": "ObservationGap missed로 종결하고 predicate가 true여도 admit하지 않는다.",
+      "reason": "연속 snapshot과 ledger 처리는 runtime 의미다."
+    },
+    {
+      "id": "REF-03-031",
+      "references": [
+        "03-time-and-schedules.md#관측-gap과-회복"
+      ],
+      "rule": "최초 부팅과 clock trust 회복은 baseline만 세우고 catch-up하지 않으며 wall rollback은 high-water와 ledger로 중복을 막는다.",
+      "scope": "host",
+      "status": "specified",
+      "given": "06:10 부팅 전에 06:00 slot이 있었고 이후 wall clock이 05:55로 rollback했다가 06:00을 다시 지난다.",
+      "when": "host가 schedule snapshots를 공급한다.",
+      "then": "부팅 시 과거 slot을 실행하지 않고 rollback 뒤 같은 local occurrence도 재실행하지 않는다.",
+      "reason": "wall clock 관측과 durable admission ledger의 host/runtime 통합 계약이다."
+    },
+    {
+      "id": "REF-03-032",
+      "references": [
+        "03-time-and-schedules.md#36-선택된-dailyslots"
+      ],
+      "rule": "DailySlots<15min>은 IANA timezone과 15분 격자의 고유 local slots를 받는 선택 문법이다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "daily-slots.ghost.md",
+      "expect": "accept",
+      "source": "# Daily slots\n\n```ghost\ncontrol DailySlotsValid {\n  schedule starts: DailySlots<15min> {\n    timezone = \"Asia/Seoul\";\n    selected = [00:00, 06:15, 23:45];\n    dst_missing = skip;\n    dst_repeated = first;\n    basis = pulse;\n    when = true;\n    clock = trusted_only;\n    gap = skip_after(60s);\n    recovery = baseline;\n    fallback = skip;\n  }\n  output due: Bool;\n  due <- starts.due;\n}\n```\n"
+    },
+    {
+      "id": "REF-03-033",
+      "references": [
+        "03-time-and-schedules.md#36-선택된-dailyslots"
+      ],
+      "rule": "DailySlots의 중복 slot은 거부한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "daily-slots-duplicate.ghost.md",
+      "expect": "reject",
+      "diagnosticPattern": "duplicate|slot|selected|중복",
+      "source": "# Duplicate daily slot\n\n```ghost\ncontrol DuplicateSlot {\n  schedule starts: DailySlots<15min> {\n    timezone = \"Asia/Seoul\";\n    selected = [06:00, 06:00];\n    dst_missing = skip;\n    dst_repeated = first;\n    basis = pulse;\n    when = true;\n    clock = trusted_only;\n    gap = skip_after(60s);\n    recovery = baseline;\n    fallback = skip;\n  }\n  output due: Bool;\n  due <- starts.due;\n}\n```\n"
+    },
+    {
+      "id": "REF-03-034",
+      "references": [
+        "03-time-and-schedules.md#36-선택된-dailyslots"
+      ],
+      "rule": "DailySlots<15min>의 격자 밖 시각은 거부한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "daily-slots-off-grid.ghost.md",
+      "expect": "reject",
+      "diagnosticPattern": "15|grid|slot|selected|격자",
+      "source": "# Off-grid daily slot\n\n```ghost\ncontrol OffGridSlot {\n  schedule starts: DailySlots<15min> {\n    timezone = \"Asia/Seoul\";\n    selected = [06:10];\n    dst_missing = skip;\n    dst_repeated = first;\n    basis = pulse;\n    when = true;\n    clock = trusted_only;\n    gap = skip_after(60s);\n    recovery = baseline;\n    fallback = skip;\n  }\n  output due: Bool;\n  due <- starts.due;\n}\n```\n"
+    },
+    {
+      "id": "REF-03-035",
+      "references": [
+        "03-time-and-schedules.md#36-선택된-dailyslots"
+      ],
+      "rule": "DailySlots due는 crossing 첫 tick의 단발 pulse이고 부팅 전·gap·recovery 전 slot을 catch-up하거나 rollback 뒤 재실행하지 않으며 15분마다라는 주기가 아니다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "selected=[06:00,18:45], host가 05:59:50 뒤 06:00:05와 06:00:10을 관측한다.",
+      "when": "due를 평가한다.",
+      "then": "06:00:05에만 true이며 06:00:10에는 false이고 다른 15분 격자에는 발생하지 않는다.",
+      "reason": "crossing과 duplicate suppression은 runtime 의미다."
+    },
+    {
+      "id": "REF-03-036",
+      "references": [
+        "03-time-and-schedules.md#periodic"
+      ],
+      "rule": "Periodic은 양의 Duration every, explicit anchor와 interval_change 및 공통 schedule policy를 요구한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "periodic-schedule.ghost.md",
+      "expect": "accept",
+      "source": "# Periodic schedule\n\n```ghost\ncontrol PeriodicSchedule {\n  config interval: Duration = 15min;\n  schedule cycle: Periodic {\n    every = interval;\n    anchor = instant(datetime`2026-10-01T00:00:00Z`);\n    interval_change = preserve_anchor;\n    basis = pulse;\n    when = true;\n    clock = trusted_only;\n    gap = skip_after(60s);\n    recovery = baseline;\n    fallback = skip;\n  }\n  output due: Bool;\n  due <- cycle.due;\n}\n```\n"
+    },
+    {
+      "id": "REF-03-037",
+      "references": [
+        "03-time-and-schedules.md#periodic",
+        "04-sensors-constraints-control.md#410-mode와-live-settings"
+      ],
+      "rule": "Periodic interval live 변경은 같은 program/run의 atomic settings event이며 과거 occurrence를 내지 않고 phase 연속 규칙은 명시해야 한다.",
+      "scope": "host",
+      "status": "specified",
+      "given": "한 event가 interval=10min과 다른 invalid setting을 함께 변경하려 한다.",
+      "when": "event를 검증한다.",
+      "then": "전체 event를 거부하고 settings revision, bytecode, run identity, phase를 바꾸지 않는다.",
+      "reason": "운영 설정 event의 원자 적용과 revision 관리는 host 책임이다."
+    },
+    {
+      "id": "REF-03-038",
+      "references": [
+        "03-time-and-schedules.md#cron5"
+      ],
+      "rule": "Cron은 minute hour day-of-month month day-of-week 순서의 cron5 literal과 명시 timezone·DST·공통 policy를 요구한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "cron5-schedule.ghost.md",
+      "expect": "accept",
+      "source": "# Cron5 schedule\n\n```ghost\ncontrol Cron5Schedule {\n  schedule weekday_morning: Cron {\n    timezone = \"Asia/Seoul\";\n    at = cron5`0 6 * * 1-5`;\n    dst_missing = skip;\n    dst_repeated = first;\n    basis = pulse;\n    when = true;\n    clock = trusted_only;\n    gap = skip_after(60s);\n    recovery = baseline;\n    fallback = skip;\n  }\n  output due: Bool;\n  due <- weekday_morning.due;\n}\n```\n"
+    },
+    {
+      "id": "REF-03-039",
+      "references": [
+        "03-time-and-schedules.md#38-dst-자정과-work-calendar"
+      ],
+      "rule": "civil recurrence는 nonexistent time의 skip/next_valid와 fold의 first/second/both/skip을 명시하고 both는 서로 다른 occurrence key를 쓴다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "DST spring gap의 02:30과 fall fold의 01:30 일정이 있다.",
+      "when": "각 명시 정책으로 occurrence를 생성한다.",
+      "then": "gap은 skip 또는 next valid로 처리하고 fold both는 first와 second를 별도 key로 정확히 한 번씩 생성한다.",
+      "reason": "DST gap/fold별 occurrence 생성은 compiler CLI가 아니라 timezone database를 가진 runtime trace로 검증한다."
+    },
+    {
+      "id": "REF-03-040",
+      "references": [
+        "03-time-and-schedules.md#38-dst-자정과-work-calendar"
+      ],
+      "rule": "자연 사건 offset의 day filter는 scheduled start local Date에 적용하고 이미 admit한 Run은 자정이나 day 변경으로 멈추지 않는다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "source date 월요일 00:10의 event에 -30min offset을 적용해 일요일 23:40에 시작한다.",
+      "when": "월요일 전용 day filter와 active run을 평가한다.",
+      "then": "filter는 일요일 scheduled date를 기준으로 거부하며 이미 admit된 별도 run은 자정 통과로 중단하지 않는다.",
+      "reason": "scheduled local Date 기준 filter와 admit 뒤 run 지속은 runtime occurrence trace로 검증한다."
+    },
+    {
+      "id": "REF-03-041",
+      "references": [
+        "03-time-and-schedules.md#38-dst-자정과-work-calendar"
+      ],
+      "rule": "work calendar는 예외, holiday policy, weekly pattern 순으로 판단하고 충돌 예외는 invalid이며 missing/out-of-range는 workday와 offday 모두 Unknown이다.",
+      "scope": "host",
+      "status": "specified",
+      "given": "같은 날짜에 workday와 offday 예외가 충돌하거나 snapshot coverage 밖이다.",
+      "when": "day eligibility를 판정한다.",
+      "then": "충돌은 invalid이고 coverage 밖은 Unknown이며 !workday로 offday 허가를 만들지 않고 overnight interval은 shift 계약 전 분할을 요구한다.",
+      "reason": "calendar snapshot 공급, coverage 검증, 충돌 거부는 host 책임이다."
+    },
+    {
+      "id": "REF-03-042",
+      "references": [
+        "03-time-and-schedules.md#선택된-solar-표기"
+      ],
+      "rule": "Solar는 trigger field와 basis·when·clock·gap·recovery·fallback 공통 policy를 정확히 하나씩 갖는다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "solar-valid.ghost.md",
+      "expect": "accept",
+      "source": "# Solar schedule\n\n```ghost\ncontrol SolarValid {\n  schedule dawn: Solar {\n    timezone = \"Asia/Seoul\";\n    latitude = 37.5665;\n    longitude = 126.9780;\n    at = sun`rise + 30min`;\n    basis = pulse;\n    when = true;\n    clock = trusted_only;\n    gap = skip_after(60s);\n    recovery = baseline;\n    fallback = skip;\n  }\n  output due: Bool;\n  due <- dawn.due;\n}\n```\n"
+    },
+    {
+      "id": "REF-03-043",
+      "references": [
+        "03-time-and-schedules.md#선택된-solar-표기"
+      ],
+      "rule": "Solar 필수 field가 없으면 거부한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "solar-missing-fallback.ghost.md",
+      "expect": "reject",
+      "diagnosticPattern": "Solar|fallback|required|missing",
+      "source": "# Missing Solar fallback\n\n```ghost\ncontrol SolarMissingFallback {\n  schedule dawn: Solar {\n    timezone = \"Asia/Seoul\";\n    latitude = 37.5665;\n    longitude = 126.9780;\n    at = sun`rise`;\n    basis = pulse;\n    when = true;\n    clock = trusted_only;\n    gap = skip_after(60s);\n    recovery = baseline;\n  }\n  output due: Bool;\n  due <- dawn.due;\n}\n```\n"
+    },
+    {
+      "id": "REF-03-044",
+      "references": [
+        "03-time-and-schedules.md#선택된-solar-표기"
+      ],
+      "rule": "Solar latitude -90..90과 longitude -180..180 밖의 유한 literal은 거부한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "solar-coordinate-range.ghost.md",
+      "expect": "reject",
+      "diagnosticPattern": "latitude|longitude|range|Solar",
+      "source": "# Invalid Solar coordinate\n\n```ghost\ncontrol SolarCoordinateRange {\n  schedule dawn: Solar {\n    timezone = \"Asia/Seoul\";\n    latitude = 90.0001;\n    longitude = 126.9780;\n    at = sun`rise`;\n    basis = pulse;\n    when = true;\n    clock = trusted_only;\n    gap = skip_after(60s);\n    recovery = baseline;\n    fallback = skip;\n  }\n  output due: Bool;\n  due <- dawn.due;\n}\n```\n"
+    },
+    {
+      "id": "REF-03-045",
+      "references": [
+        "03-time-and-schedules.md#선택된-solar-표기"
+      ],
+      "rule": "Solar at은 rise/set과 whole-number Duration offset만 허용하고 offset magnitude는 24시간 이하이며 0을 포함한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "solar-at-boundaries.ghost.md",
+      "expect": "accept",
+      "source": "# Solar at boundaries\n\n```ghost\ncontrol SolarAtBoundaries {\n  schedule dawn: Solar { timezone = \"UTC\"; latitude = 0.0; longitude = 0.0; at = sun`rise + 0ms`; basis = pulse; when = true; clock = trusted_only; gap = skip_after(60s); recovery = baseline; fallback = skip; }\n  schedule dusk: Solar { timezone = \"UTC\"; latitude = 0.0; longitude = 0.0; at = sun`set - 24h`; basis = pulse; when = true; clock = trusted_only; gap = skip_after(60s); recovery = baseline; fallback = skip; }\n  output due: Bool;\n  due <- dawn.due || dusk.due;\n}\n```\n"
+    },
+    {
+      "id": "REF-03-046",
+      "references": [
+        "03-time-and-schedules.md#선택된-solar-표기"
+      ],
+      "rule": "Solar at의 24시간 초과 offset이나 임의 표현식/interpolation은 거부한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "solar-offset-too-large.ghost.md",
+      "expect": "reject",
+      "diagnosticPattern": "Solar|offset|24|at|range",
+      "source": "# Solar offset too large\n\n```ghost\ncontrol SolarOffsetTooLarge {\n  schedule dawn: Solar {\n    timezone = \"UTC\";\n    latitude = 0.0;\n    longitude = 0.0;\n    at = sun`rise + 24h + 1ms`;\n    basis = pulse;\n    when = true;\n    clock = trusted_only;\n    gap = skip_after(60s);\n    recovery = baseline;\n    fallback = skip;\n  }\n  output due: Bool;\n  due <- dawn.due;\n}\n```\n"
+    },
+    {
+      "id": "REF-03-047",
+      "references": [
+        "03-time-and-schedules.md#선택된-solar-표기",
+        "03-time-and-schedules.md#달과-조석",
+        "03-time-and-schedules.md#자연-기준의-fallback과-회복"
+      ],
+      "rule": "자연 일정은 원인별 Unknown과 terminal fallback을 보존하고 Solar는 sea-level event이며 tide는 stable provider event ID를 써서 correction/withdrawal을 처리한다.",
+      "scope": "host",
+      "status": "specified",
+      "given": "provider tide E가 수정되어 high-water 과거로 이동하고 별도 Solar 위치 context가 없으며 이미 admit한 run이 있다.",
+      "when": "provider revision과 fallback을 처리한다.",
+      "then": "tide E는 CorrectionPastHighWater로 missed, Solar는 LocationUnknown 후 skip, 기존 run은 취소하지 않으며 지형·날씨나 달 위상으로 사건을 추측하지 않는다.",
+      "reason": "자연 provider context, revision, stable event identity 처리는 host 책임이다."
+    },
+    {
+      "id": "REF-03-048",
+      "references": [
+        "03-time-and-schedules.md#310-시간-기반-사용량-제약"
+      ],
+      "rule": "local-day budget은 rolling 24h와 다르고 같은 physical resource의 final applied ON을 control과 mode 전체에서 한 번만 계수하며 자정에서 분할한다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "pump1 applied ON이 서울 시간 23:50~00:10이고 두 control이 겹쳐 같은 resource를 요청한다.",
+      "when": "날짜별 ledger를 정산한다.",
+      "then": "각 날짜에 10분씩 기록하고 겹친 physical ON은 이중 계수하지 않으며 rolling 24h 값과 별도다.",
+      "reason": "day budget 공개 문법과 ledger runtime이 아직 compiler-only assertion이 아니다."
+    },
+    {
+      "id": "REF-03-049",
+      "references": [
+        "03-time-and-schedules.md#310-시간-기반-사용량-제약"
+      ],
+      "rule": "새 작업은 최악 ON과 stop delay를 예약하고 수동 운전은 finite lease/cutoff를 가지며 불확실한 사용은 보수 처리한다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "남은 budget 6분, 작업 최대 ON 5분과 stop delay 2분이다.",
+      "when": "작업 시작을 요청한다.",
+      "then": "7분 예약이 불가능하므로 시작을 거부하고 전원 단절로 불확실한 예약도 명시 정책 없이 반환하지 않는다.",
+      "reason": "resource reservation은 runtime/resource manager 의미다."
+    },
+    {
+      "id": "REF-03-050",
+      "references": [
+        "03-time-and-schedules.md#310-시간-기반-사용량-제약",
+        "03-time-and-schedules.md#311-확정된-시간-문법과-경계"
+      ],
+      "rule": "resource/event/account/used/rolling/local_day/limit 문법은 stage·persistence·reservation을 명시하고 time budget, event count, occurrence once를 분리한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "accounting-syntax.ghost.md",
+      "expect": "accept",
+      "source": "# Accounting syntax\n\n```ghost\ncontrol AccountingSyntax {\n  resource pump1: BoolActuator;\n  event normal_run_started: Event;\n  config worst_case_on: Duration = 5min;\n  config stop_delay: Duration = 10s;\n  account pump_applied = on_time(pump1, stage: applied, persistence: durable);\n  account normal_starts = count_events(normal_run_started, over: local_day(\"Asia/Seoul\"), persistence: durable);\n  constraints PumpBudgets {\n    limit used(pump_applied, rolling(60s)) <= 30s { reserve = worst_case_on + stop_delay; on_unknown = block; }\n  }\n  output ready: Bool;\n  ready <- case normal_starts.count { ok(count) => count >= 0; fault(_) => false; };\n}\n```\n"
+    },
+    {
+      "id": "REF-03-051",
+      "references": ["03-time-and-schedules.md#date-timeofday-datetime"],
+      "rule": "존재하지 않는 Gregorian date literal은 거부한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "invalid-date.ghost.md",
+      "expect": "reject",
+      "diagnosticPattern": "date|Gregorian|invalid|존재",
+      "source": "# Invalid date\n\n```ghost\ncontrol InvalidDate {\n  let impossible = date`2026-02-30`;\n  output ready: Bool;\n  ready <- true;\n}\n```\n"
+    },
+    {
+      "id": "REF-03-052",
+      "references": ["03-time-and-schedules.md#date-timeofday-datetime"],
+      "rule": "DateTime literal은 Z 또는 숫자 UTC offset이 없으면 거부한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "datetime-without-offset.ghost.md",
+      "expect": "reject",
+      "diagnosticPattern": "datetime|offset|timezone|Z",
+      "source": "# DateTime without offset\n\n```ghost\ncontrol DateTimeWithoutOffset {\n  let instant = datetime`2026-09-22T06:30:00`;\n  output ready: Bool;\n  ready <- true;\n}\n```\n"
+    },
+    {
+      "id": "REF-03-053",
+      "references": ["03-time-and-schedules.md#33-bool이-연속으로-참인-시간"],
+      "rule": "continuous_true는 sensor Result<Bool,SensorFault>를 암묵 Bool로 받지 않는다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "continuous-true-result.ghost.md",
+      "expect": "reject",
+      "diagnosticPattern": "continuous_true|Bool|Result|sensor|type",
+      "source": "# Continuous true Result rejection\n\n```ghost\ncontrol ContinuousTrueResult {\n  sensor hot: Bool;\n  timer hot_for = continuous_true(hot);\n  output alarm: Bool;\n  alarm <- hot_for >= 5min;\n}\n```\n"
+    },
+    {
+      "id": "REF-03-054",
+      "references": ["03-time-and-schedules.md#35-schedule의-공통-의미"],
+      "rule": "새 Schedule profile은 when을 포함한 모든 공통 policy field를 명시해야 한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "schedule-missing-when.ghost.md",
+      "expect": "reject",
+      "diagnosticPattern": "schedule|when|required|missing",
+      "source": "# Schedule missing when\n\n```ghost\ncontrol ScheduleMissingWhen {\n  schedule morning: Daily {\n    timezone = \"Asia/Seoul\";\n    at = time`06:30`;\n    dst_missing = skip;\n    dst_repeated = first;\n    basis = pulse;\n    clock = trusted_only;\n    gap = skip_after(60s);\n    recovery = baseline;\n    fallback = skip;\n  }\n  output due: Bool;\n  due <- morning.due;\n}\n```\n"
+    },
+    {
+      "id": "REF-03-055",
+      "references": ["03-time-and-schedules.md#periodic"],
+      "rule": "Periodic every는 양의 Duration이어야 하므로 0ms를 거부한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "periodic-zero-every.ghost.md",
+      "expect": "reject",
+      "diagnosticPattern": "Periodic|every|positive|Duration|zero",
+      "source": "# Periodic zero interval\n\n```ghost\ncontrol PeriodicZeroInterval {\n  schedule cycle: Periodic {\n    every = 0ms;\n    anchor = instant(datetime`2026-10-01T00:00:00Z`);\n    interval_change = preserve_anchor;\n    basis = pulse;\n    when = true;\n    clock = trusted_only;\n    gap = skip_after(60s);\n    recovery = baseline;\n    fallback = skip;\n  }\n  output due: Bool;\n  due <- cycle.due;\n}\n```\n"
+    },
+    {
+      "id": "REF-03-056",
+      "references": ["03-time-and-schedules.md#cron5"],
+      "rule": "cron5는 day-of-month와 day-of-week를 동시에 제한한 규칙을 거부한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "cron5-dom-dow.ghost.md",
+      "expect": "reject",
+      "diagnosticPattern": "cron5|day-of-month|day-of-week|DOM|DOW",
+      "source": "# Cron DOM and DOW conflict\n\n```ghost\ncontrol CronDomDowConflict {\n  schedule invalid: Cron {\n    timezone = \"UTC\";\n    at = cron5`0 6 1 * 1`;\n    dst_missing = skip;\n    dst_repeated = first;\n    basis = pulse;\n    when = true;\n    clock = trusted_only;\n    gap = skip_after(60s);\n    recovery = baseline;\n    fallback = skip;\n  }\n  output due: Bool;\n  due <- invalid.due;\n}\n```\n"
+    },
+    {
+      "id": "REF-03-057",
+      "references": ["03-time-and-schedules.md#36-선택된-dailyslots"],
+      "rule": "TimeSlots<G,N> config는 finite unique TimeOfDay set을 DailySlots의 같은 grid에 연결한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "daily-slots-config.ghost.md",
+      "expect": "accept",
+      "source": "# Editable daily slots\n\n```ghost\ncontrol EditableDailySlots {\n  config watering_slots: TimeSlots<15min, 8> = [time`06:00`, time`18:45`] { access = operator; label = \"Start times\"; }\n  schedule starts: DailySlots<15min> {\n    timezone = \"Asia/Seoul\";\n    selected = watering_slots;\n    dst_missing = skip;\n    dst_repeated = first;\n    basis = pulse;\n    when = true;\n    clock = trusted_only;\n    gap = skip_after(60s);\n    recovery = baseline;\n    fallback = skip;\n  }\n  output due: Bool;\n  due <- starts.due;\n}\n```\n"
+    },
+    {
+      "id": "REF-03-058",
+      "references": ["03-time-and-schedules.md#36-선택된-dailyslots"],
+      "rule": "DailySlots grid와 연결한 TimeSlots config grid가 다르면 거부한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "daily-slots-grid-mismatch.ghost.md",
+      "expect": "reject",
+      "diagnosticPattern": "TimeSlots|DailySlots|grid|15min|30min",
+      "source": "# Daily slots grid mismatch\n\n```ghost\ncontrol DailySlotsGridMismatch {\n  config watering_slots: TimeSlots<30min, 8> = [time`06:00`];\n  schedule starts: DailySlots<15min> {\n    timezone = \"Asia/Seoul\";\n    selected = watering_slots;\n    dst_missing = skip;\n    dst_repeated = first;\n    basis = pulse;\n    when = true;\n    clock = trusted_only;\n    gap = skip_after(60s);\n    recovery = baseline;\n    fallback = skip;\n  }\n  output due: Bool;\n  due <- starts.due;\n}\n```\n"
+    },
+    {
+      "id": "REF-03-059",
+      "references": ["03-time-and-schedules.md#38-dst-자정과-work-calendar"],
+      "rule": "workday/offday day rule은 선언된 WorkCalendar logical provider와 결합한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "work-calendar-day-rule.ghost.md",
+      "expect": "accept",
+      "source": "# Work calendar day rule\n\n```ghost\ncontrol WorkCalendarDayRule {\n  calendar workers: WorkCalendar;\n  schedule work_start: Daily {\n    timezone = \"Asia/Seoul\";\n    at = time`06:00`;\n    on = day`workday`;\n    calendar = workers;\n    dst_missing = skip;\n    dst_repeated = first;\n    basis = pulse;\n    when = true;\n    clock = trusted_only;\n    gap = skip_after(60s);\n    recovery = baseline;\n    fallback = skip;\n  }\n  output due: Bool;\n  due <- work_start.due;\n}\n```\n"
+    },
+    {
+      "id": "REF-03-060",
+      "references": ["03-time-and-schedules.md#달과-조석"],
+      "rule": "Tide schedule은 TidePredictions provider와 high/low event offset 및 전체 schedule policy를 명시한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "tide-schedule.ghost.md",
+      "expect": "accept",
+      "source": "# Tide schedule\n\n```ghost\ncontrol TideSchedule {\n  input stop, unsafe_level: Bool;\n  provider harbor_tides: TidePredictions;\n  schedule high: Tide {\n    source = harbor_tides;\n    timezone = \"Asia/Seoul\";\n    at = tide`high - 30min`;\n    basis = run(10min, within(5min));\n    when = true;\n    cancel_when = stop || unsafe_level;\n    clock = trusted_only;\n    gap = skip_after(60s);\n    recovery = baseline;\n    fallback = skip;\n  }\n  output active: Bool;\n  active <- high.active;\n}\n```\n"
+    },
+    {
+      "id": "REF-03-061",
+      "references": ["03-time-and-schedules.md#달과-조석"],
+      "rule": "spring/neap 분류는 instant가 아니므로 Tide at offset operand로 거부한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "tide-class-as-event.ghost.md",
+      "expect": "reject",
+      "diagnosticPattern": "tide|spring|event|high|low|type",
+      "source": "# Tide class is not an event\n\n```ghost\ncontrol TideClassAsEvent {\n  provider harbor_tides: TidePredictions;\n  schedule invalid: Tide {\n    source = harbor_tides;\n    timezone = \"Asia/Seoul\";\n    at = tide`spring - 30min`;\n    basis = pulse;\n    when = true;\n    clock = trusted_only;\n    gap = skip_after(60s);\n    recovery = baseline;\n    fallback = skip;\n  }\n  output due: Bool;\n  due <- invalid.due;\n}\n```\n"
+    },
+    {
+      "id": "REF-03-062",
+      "references": ["03-time-and-schedules.md#달과-조석"],
+      "rule": "tide_is와 moon_is는 quality-aware Result 조건이며 일반 control은 explicit case로 Bool을 선택한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "natural-conditions.ghost.md",
+      "expect": "accept",
+      "source": "# Natural conditions\n\n```ghost\ncontrol NaturalConditions {\n  provider harbor_tides: TidePredictions;\n  provider moon: LunarEphemeris;\n  let neap = tide_is(harbor_tides, tide`neap`);\n  let full = moon_is(moon, moon`full`);\n  let neap_ok = case neap { ok(value) => value; fault(_) => false; };\n  let full_ok = case full { ok(value) => value; fault(_) => false; };\n  output allowed: Bool;\n  allowed <- neap_ok && full_ok;\n}\n```\n"
+    },
+    {
+      "id": "REF-03-063",
+      "references": ["03-time-and-schedules.md#310-시간-기반-사용량-제약"],
+      "rule": "보호 limit는 volatile accounting ledger를 사용할 수 없다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "volatile-protective-limit.ghost.md",
+      "expect": "reject",
+      "diagnosticPattern": "volatile|limit|persistence|protect",
+      "source": "# Volatile protective limit\n\n```ghost\ncontrol VolatileProtectiveLimit {\n  resource pump1: BoolActuator;\n  account pump_use = on_time(pump1, stage: applied, persistence: volatile);\n  constraints InvalidBudget {\n    limit used(pump_use, rolling(60s)) <= 30s { reserve = 10s; on_unknown = block; }\n  }\n  output ready: Bool;\n  ready <- true;\n}\n```\n"
+    },
+    {
+      "id": "REF-04-001",
+      "references": [
+        "04-sensors-constraints-control.md#41-sensor와-result-품질"
+      ],
+      "rule": "sensor 선언 타입은 정상 payload 타입이고 읽기 결과는 Result<T,SensorFault>로 분기한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "sensor-result-case.ghost.md",
+      "expect": "accept",
+      "source": "# Sensor Result case\n\n```ghost\ncontrol SensorResultCase {\n  sensor low_water: Bool;\n  let water_ok = case low_water { ok(low) => !low; fault(_) => false; };\n  output pump: Bool;\n  pump <- water_ok;\n}\n```\n"
+    },
+    {
+      "id": "REF-04-002",
+      "references": [
+        "04-sensors-constraints-control.md#41-sensor와-result-품질"
+      ],
+      "rule": "sensor Result를 payload Number처럼 직접 비교하지 않는다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "sensor-direct-compare.ghost.md",
+      "expect": "reject",
+      "diagnosticPattern": "Result|sensor|compare|Percent|type",
+      "source": "# Direct sensor comparison\n\n```ghost\ncontrol DirectSensorCompare {\n  sensor moisture: Percent;\n  let dry = moisture < 30%;\n  output pump: Bool;\n  pump <- dry;\n}\n```\n"
+    },
+    {
+      "id": "REF-04-003",
+      "references": [
+        "04-sensors-constraints-control.md#41-sensor와-result-품질"
+      ],
+      "rule": "Disconnected, Stale, Invalid, NotReady는 구별하고 명시 default도 fault provenance나 recovery state를 정상으로 바꾸지 않는다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "동일 sensor가 차례로 연결 단절, freshness 초과, 범위 밖 값, filter 미준비 상태가 된다.",
+      "when": "작성자가 false default를 선택한다.",
+      "then": "제어값은 false일 수 있지만 네 fault 종류와 시각은 각각 기록되고 recovery counter는 진행하지 않는다.",
+      "reason": "fault 생성·provenance·recovery는 runtime/driver sample 의미다."
+    },
+    {
+      "id": "REF-04-004",
+      "references": [
+        "04-sensors-constraints-control.md#41-sensor와-result-품질"
+      ],
+      "rule": "below, map, and_then, recover는 compatible quantity와 Result 오류 보존을 따르는 순수 변환이다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "result-static-transforms.ghost.md",
+      "expect": "accept",
+      "source": "# Static Result transforms\n\n```ghost\ncontrol StaticResultTransforms {\n  sensor moisture: Percent;\n  let dry = moisture |> map(below(30%)) |> recover(false);\n  output pump: Bool;\n  pump <- dry;\n}\n```\n"
+    },
+    {
+      "id": "REF-04-005",
+      "references": [
+        "04-sensors-constraints-control.md#41-sensor와-result-품질"
+      ],
+      "rule": "map은 stream scheduler가 아니라 각 tick 현재 Result에 대한 순수 계산이다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "같은 sample Result가 세 tick 반복된다.",
+      "when": "map(f)를 각 tick 평가한다.",
+      "then": "현재 payload 투영만 계산하고 별도 task, queue, sample 또는 state update를 만들지 않는다.",
+      "reason": "실행 횟수와 side effect 부재는 runtime 의미다."
+    },
+    {
+      "id": "REF-04-006",
+      "references": [
+        "04-sensors-constraints-control.md#42-샘플-계약과-sensor-처리-순서"
+      ],
+      "rule": "선택 sensor 설정은 양의 sample/stale Duration, payload와 같은 closed valid range, stateful filter, 양의 recover samples를 선언한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "sensor-settings.ghost.md",
+      "expect": "accept",
+      "source": "# Sensor settings\n\n```ghost\ncontrol SensorSettings {\n  sensor moisture: Percent {\n    sample = 1s;\n    valid = 0% .. 100%;\n    filter = median(5);\n    stale_after = 3s;\n    recover_after = 3 samples;\n  }\n  output ready: Bool;\n  ready <- true;\n}\n```\n"
+    },
+    {
+      "id": "REF-04-007",
+      "references": [
+        "04-sensors-constraints-control.md#42-샘플-계약과-sensor-처리-순서"
+      ],
+      "rule": "sensor sample은 양의 Duration이어야 하므로 0ms를 거부한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "sensor-zero-sample.ghost.md",
+      "expect": "reject",
+      "diagnosticPattern": "sample|positive|Duration|zero",
+      "source": "# Zero sample interval\n\n```ghost\ncontrol ZeroSampleInterval {\n  sensor moisture: Percent { sample = 0ms; }\n  output ready: Bool;\n  ready <- true;\n}\n```\n"
+    },
+    {
+      "id": "REF-04-008",
+      "references": [
+        "04-sensors-constraints-control.md#42-샘플-계약과-sensor-처리-순서"
+      ],
+      "rule": "sensor stale_after는 양의 Duration이어야 하므로 0ms를 거부한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "sensor-zero-stale.ghost.md",
+      "expect": "reject",
+      "diagnosticPattern": "stale_after|positive|Duration|zero",
+      "source": "# Zero stale interval\n\n```ghost\ncontrol ZeroStaleInterval {\n  sensor moisture: Percent { stale_after = 0ms; }\n  output ready: Bool;\n  ready <- true;\n}\n```\n"
+    },
+    {
+      "id": "REF-04-009",
+      "references": [
+        "04-sensors-constraints-control.md#42-샘플-계약과-sensor-처리-순서"
+      ],
+      "rule": "recover_after는 양의 정수 samples여야 하므로 0 samples를 거부한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "sensor-zero-recovery.ghost.md",
+      "expect": "reject",
+      "diagnosticPattern": "recover_after|samples|positive|zero",
+      "source": "# Zero recovery samples\n\n```ghost\ncontrol ZeroRecoverySamples {\n  sensor moisture: Percent { recover_after = 0 samples; }\n  output ready: Bool;\n  ready <- true;\n}\n```\n"
+    },
+    {
+      "id": "REF-04-010",
+      "references": [
+        "04-sensors-constraints-control.md#42-샘플-계약과-sensor-처리-순서"
+      ],
+      "rule": "Driver sample identity는 같은 물리 sample을 filter/recovery에 한 번만 넣고 valid 검사를 filter보다 먼저 하며 재평가는 freshness를 갱신하지 않는다.",
+      "scope": "driver",
+      "status": "specified",
+      "given": "sample ID 7의 101% 값이 세 tick 반복되고 다음 새 ID 8은 29%다.",
+      "when": "driver metadata를 runtime에 공급한다.",
+      "then": "ID 7은 Invalid로 즉시 전달되어 filter에 들어가지 않고 ID 8만 한 번 들어가며 sample timestamp만 freshness 기준이 된다.",
+      "reason": "source/sample identity와 timestamp 품질은 Driver 입력 계약이다."
+    },
+    {
+      "id": "REF-04-011",
+      "references": [
+        "04-sensors-constraints-control.md#42-샘플-계약과-sensor-처리-순서"
+      ],
+      "rule": "fault 뒤 filter를 비우고 filter readiness와 recover_after를 모두 만족할 때까지 NotReady이며 epoch 변경과 reboot는 연속 복구를 이어 붙이지 않는다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "median(5), recover_after=3 sensor가 fault 뒤 새 유효 sample 3개를 받고 source epoch가 바뀐 뒤 2개를 더 받는다.",
+      "when": "복구 품질을 계산한다.",
+      "then": "첫 3개와 epoch 뒤 2개를 합치지 않고 계속 NotReady이며 새 epoch에서 5개가 채워져야 정상이다.",
+      "reason": "filter/recovery state는 runtime 의미다."
+    },
+    {
+      "id": "REF-04-012",
+      "references": [
+        "04-sensors-constraints-control.md#42-샘플-계약과-sensor-처리-순서"
+      ],
+      "rule": "Disconnected와 Invalid는 즉시 전달하고 마지막 유효값은 stale_after 경계 전까지만 쓰며 reboot는 명시 persistent continuity 없이는 NotReady에서 시작한다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "마지막 유효 sample timestamp=0, stale_after=3s이고 2999ms와 3000ms에 scan한 뒤 reboot한다.",
+      "when": "품질을 평가한다.",
+      "then": "2999ms까지 유효 hold, 3000ms부터 Stale이고 reboot 뒤 오래된 값을 허가에 복원하지 않고 NotReady다.",
+      "reason": "freshness와 reboot restoration은 runtime 계약이다."
+    },
+    {
+      "id": "REF-04-013",
+      "references": [
+        "04-sensors-constraints-control.md#median"
+      ],
+      "rule": "median(n)의 n은 홀수 정수 1..31이며 경계값 1과 31을 허용한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "median-boundaries.ghost.md",
+      "expect": "accept",
+      "source": "# Median boundaries\n\n```ghost\ncontrol MedianBoundaries {\n  sensor fast: Percent { filter = median(1); }\n  sensor robust: Percent { filter = median(31); }\n  output ready: Bool;\n  ready <- true;\n}\n```\n"
+    },
+    {
+      "id": "REF-04-014",
+      "references": [
+        "04-sensors-constraints-control.md#median"
+      ],
+      "rule": "median의 짝수 window 크기는 거부한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "median-even.ghost.md",
+      "expect": "reject",
+      "diagnosticPattern": "median|odd|홀수|window",
+      "source": "# Even median window\n\n```ghost\ncontrol EvenMedian {\n  sensor moisture: Percent { filter = median(4); }\n  output ready: Bool;\n  ready <- true;\n}\n```\n"
+    },
+    {
+      "id": "REF-04-015",
+      "references": [
+        "04-sensors-constraints-control.md#median"
+      ],
+      "rule": "median window가 1..31 밖이면 거부한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "median-too-large.ghost.md",
+      "expect": "reject",
+      "diagnosticPattern": "median|31|range|window",
+      "source": "# Oversized median window\n\n```ghost\ncontrol OversizedMedian {\n  sensor moisture: Percent { filter = median(33); }\n  output ready: Bool;\n  ready <- true;\n}\n```\n"
+    },
+    {
+      "id": "REF-04-016",
+      "references": [
+        "04-sensors-constraints-control.md#median"
+      ],
+      "rule": "median은 n개 유효 새 payload 전에는 NotReady이고 spike를 포함해 정렬한 가운데 값을 내며 fault 뒤 window를 비운다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "median(5)에 28%,29%,90%,28%,29%가 새 sample로 들어온다.",
+      "when": "각 sample 뒤 결과를 읽고 이어 fault를 넣는다.",
+      "then": "앞의 4개까지 NotReady, 5번째에 29%, fault 뒤 다시 NotReady다.",
+      "reason": "filter window state와 output trace는 runtime 의미다."
+    },
+    {
+      "id": "REF-04-017",
+      "references": [
+        "04-sensors-constraints-control.md#hysteresis"
+      ],
+      "rule": "선택 hysteresis는 ordered Result와 같은 타입의 두 threshold, 엄격한 on_below<off_above, Bool initial을 요구한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "hysteresis-valid.ghost.md",
+      "expect": "accept",
+      "source": "# Hysteresis\n\n```ghost\ncontrol HysteresisValid {\n  sensor moisture: Percent;\n  signal dry = hysteresis(moisture, on_below: 30%, off_above: 35%, initial: false);\n  let dry_ok = case dry { ok(value) => value; fault(_) => false; };\n  output pump: Bool;\n  pump <- dry_ok;\n}\n```\n"
+    },
+    {
+      "id": "REF-04-018",
+      "references": [
+        "04-sensors-constraints-control.md#hysteresis"
+      ],
+      "rule": "hysteresis의 on_below가 off_above 이상이면 거부한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "hysteresis-invalid-order.ghost.md",
+      "expect": "reject",
+      "diagnosticPattern": "hysteresis|on_below|off_above|order|threshold",
+      "source": "# Invalid hysteresis order\n\n```ghost\ncontrol HysteresisInvalidOrder {\n  sensor moisture: Percent;\n  signal dry = hysteresis(moisture, on_below: 35%, off_above: 30%, initial: false);\n  output ready: Bool;\n  ready <- true;\n}\n```\n"
+    },
+    {
+      "id": "REF-04-019",
+      "references": [
+        "04-sensors-constraints-control.md#hysteresis"
+      ],
+      "rule": "hysteresis는 below/above에서만 전이하고 경계와 사이에서는 유지하며 fault를 정상 Bool로 가장하지 않는다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "initial=false, thresholds 30%/35%, payload가 30%,29%,33%,35%,36%,fault 순서다.",
+      "when": "signal을 갱신한다.",
+      "then": "false,true,true,true,false,fault 순서이며 fault에서 마지막 false를 ok(false)로 내지 않는다.",
+      "reason": "stateful signal trace는 runtime 의미다."
+    },
+    {
+      "id": "REF-04-020",
+      "references": [
+        "04-sensors-constraints-control.md#bounded-signal-연산의-설계-계약"
+      ],
+      "rule": "debounce는 후보가 양의 안정 Duration 동안 연속 같을 때만 안정값을 바꾸고 안정값·후보·후보 시작 단조 시각을 보존한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "debounce-signal.ghost.md",
+      "expect": "accept",
+      "source": "# Debounce\n\n```ghost\ncontrol DebounceSignal {\n  input start: Bool;\n  signal stable_start = debounce(start, stable_for: 2s, initial: false);\n  output request: Bool;\n  request <- stable_start;\n}\n```\n"
+    },
+    {
+      "id": "REF-04-021",
+      "references": [
+        "04-sensors-constraints-control.md#bounded-signal-연산의-설계-계약"
+      ],
+      "rule": "moving_average(n)는 최근 n개 유효 새 numeric sample만 평균하고 부분 window는 NotReady이며 상태는 n개로 bounded다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "moving-average.ghost.md",
+      "expect": "accept",
+      "source": "# Moving average\n\n```ghost\ncontrol MovingAverage {\n  sensor moisture: Percent { filter = moving_average(3); }\n  output ready: Bool;\n  ready <- true;\n}\n```\n"
+    },
+    {
+      "id": "REF-04-022",
+      "references": [
+        "04-sensors-constraints-control.md#bounded-signal-연산의-설계-계약"
+      ],
+      "rule": "ema alpha는 유한 0<alpha<=1이고 첫 유효 sample로 seed하며 recover 전 정상 결과를 내지 않는다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "ema-filter.ghost.md",
+      "expect": "accept",
+      "source": "# EMA\n\n```ghost\ncontrol EmaFilter {\n  sensor temperature: Temperature { filter = ema(alpha: 0.25); }\n  output ready: Bool;\n  ready <- true;\n}\n```\n"
+    },
+    {
+      "id": "REF-04-023",
+      "references": [
+        "04-sensors-constraints-control.md#bounded-signal-연산의-설계-계약"
+      ],
+      "rule": "stale_after는 마지막 실제 유효 sample age가 경계에 도달하면 Stale이며 재평가와 filter output 시간이 freshness를 연장하지 않는다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "sample timestamp=1000ms, stale_after=3s이고 filter output을 매 tick 재평가한다.",
+      "when": "3999ms와 4000ms에 읽는다.",
+      "then": "3999ms까지 유효하고 4000ms부터 Stale이다.",
+      "reason": "freshness age 계산은 runtime 의미다."
+    },
+    {
+      "id": "REF-04-024",
+      "references": [
+        "04-sensors-constraints-control.md#bounded-signal-연산의-설계-계약"
+      ],
+      "rule": "signal 연산은 새 sample에서만 갱신하고 고정 계산·상태 상한을 가지며 합성해도 명시 case/recover 전 quality를 보존한다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "median→EMA 합성 입력이 fault이고 같은 fault sample이 반복된다.",
+      "when": "여러 tick을 평가한다.",
+      "then": "어느 연산도 반복 sample로 state를 늘리거나 fault를 ok로 바꾸지 않으며 정적 state bound 안에 머문다.",
+      "reason": "합성 runtime 및 자원 계약이다."
+    },
+    {
+      "id": "REF-04-025",
+      "references": [
+        "04-sensors-constraints-control.md#44-temporal-evidence"
+      ],
+      "rule": "condition for d는 양의 Duration 동안 uninterrupted admissible true여야 하고 false 또는 허용되지 않은 quality에서 reset한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "true-for.ghost.md",
+      "expect": "accept",
+      "source": "# True for evidence\n\n```ghost\ncontrol TrueForEvidence {\n  sensor hot: Bool;\n  signal sustained = true_for(hot, duration: 5min, quality: measured);\n  output alarm: Bool;\n  alarm <- sustained |> recover(false);\n}\n```\n"
+    },
+    {
+      "id": "REF-04-026",
+      "references": [
+        "04-sensors-constraints-control.md#44-temporal-evidence"
+      ],
+      "rule": "within d는 기준 사건 뒤 half-open interval에서만 조건 성립을 인정한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "after-event.ghost.md",
+      "expect": "accept",
+      "source": "# Evidence after event\n\n```ghost\ncontrol AfterEventEvidence {\n  event started: Event;\n  sensor valve_open: Bool;\n  signal opened = after_event(started, valve_open, window: 10s, quality: measured);\n  output any_opened, all_opened: Bool;\n  any_opened <- after_event_any(opened) |> recover(false);\n  all_opened <- after_event_all(opened) |> recover(false);\n}\n```\n"
+    },
+    {
+      "id": "REF-04-027",
+      "references": [
+        "04-sensors-constraints-control.md#44-temporal-evidence"
+      ],
+      "rule": "average(x,d)는 quality-aware timestamped observation만 사용하고 sparse sample을 연속 measured truth로 보간하지 않는다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "window-average.ghost.md",
+      "expect": "accept",
+      "source": "# Window average\n\n```ghost\ncontrol WindowAverage {\n  sensor temperature: Temperature;\n  signal average_temperature = window_average(temperature, over: 10min, quality: measured, max_age: 2min);\n  output ready: Bool;\n  ready <- true;\n}\n```\n"
+    },
+    {
+      "id": "REF-04-028",
+      "references": [
+        "04-sensors-constraints-control.md#44-temporal-evidence"
+      ],
+      "rule": "min/max는 window의 admissible observation 극값만 계산한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "window-extrema.ghost.md",
+      "expect": "accept",
+      "source": "# Window extrema\n\n```ghost\ncontrol WindowExtrema {\n  sensor temperature: Temperature;\n  signal minimum_temperature = window_min(temperature, over: 10min, quality: measured, max_age: 2min);\n  signal maximum_temperature = window_max(temperature, over: 10min, quality: measured, max_age: 2min);\n  output ready: Bool;\n  ready <- true;\n}\n```\n"
+    },
+    {
+      "id": "REF-04-029",
+      "references": [
+        "04-sensors-constraints-control.md#44-temporal-evidence"
+      ],
+      "rule": "window_rate는 지원되는 ordered numeric payload의 두 관측 차이를 시간으로 나눈 식 전용 Rate<Q>를 만들며 저장·자유 산술을 허용하지 않는다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "window-rate.ghost.md",
+      "expect": "accept",
+      "source": "# Window rate\n\n```ghost\ncontrol WindowRate {\n  sensor temperature: Temperature;\n  signal warming_rate = window_rate(temperature, over: 10min, quality: measured, max_age: 2min);\n  output ready: Bool;\n  ready <- true;\n}\n```\n"
+    },
+    {
+      "id": "REF-04-030",
+      "references": [
+        "04-sensors-constraints-control.md#44-temporal-evidence"
+      ],
+      "rule": "rising/falling은 현재 accepted evidence와 직전 accepted evidence만 비교한다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "accepted values 10, fault, 12, 11 순서다.",
+      "when": "방향 evidence를 계산한다.",
+      "then": "fault는 accepted evidence가 아니고 12에서 rising, 11에서 falling이다.",
+      "reason": "accepted evidence의 연속 관측 의미는 compiler CLI가 실행하지 않으므로 runtime 관찰 harness가 필요하다."
+    },
+    {
+      "id": "REF-04-031",
+      "references": [
+        "04-sensors-constraints-control.md#44-temporal-evidence"
+      ],
+      "rule": "hold는 명시 Duration과 quality policy 안에서만 이전 값을 유지하고 Held provenance를 낸다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "hold-last.ghost.md",
+      "expect": "accept",
+      "source": "# Bounded hold\n\n```ghost\ncontrol HoldLast {\n  sensor temperature: Temperature;\n  signal usable_temperature = hold_last(temperature, for_at_most: 2min, quality: measured);\n  output ready: Bool;\n  ready <- true;\n}\n```\n"
+    },
+    {
+      "id": "REF-04-032",
+      "references": [
+        "04-sensors-constraints-control.md#44-temporal-evidence"
+      ],
+      "rule": "모든 temporal window는 미래 sample을 보지 않고 monotonic time·missed scan·sparse observation·reboot/checkpoint와 유한 memory bound를 명시한다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "simulation trace에 현재 t=10 뒤 future sample t=20이 미리 로드되어 있고 checkpoint가 없다.",
+      "when": "t=10 window를 평가하고 reboot한다.",
+      "then": "t=20 sample은 사용하지 않고 무한 history query를 거부하며 reboot 정책에 따라 bounded state를 복원하거나 NotReady로 시작한다.",
+      "reason": "simulation/runtime window contract다."
+    },
+    {
+      "id": "REF-04-033",
+      "references": [
+        "04-sensors-constraints-control.md#45-선택-sensor와-capability"
+      ],
+      "rule": "sensor name? 선택 표기는 설치 profile capability가 optional임을 선언한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "optional-sensor.ghost.md",
+      "expect": "accept",
+      "source": "# Optional sensor\n\n```ghost\ncontrol OptionalSensor {\n  sensor moisture?: Percent;\n  output pump: Bool;\n  pump <- false;\n}\n```\n"
+    },
+    {
+      "id": "REF-04-034",
+      "references": [
+        "04-sensors-constraints-control.md#45-선택-sensor와-capability"
+      ],
+      "rule": "capability absence(Option)와 설치된 sensor fault(Result)는 다르며 ?가 fallback이나 fault 시 strategy 전환을 만들지 않는다.",
+      "scope": "host",
+      "status": "specified",
+      "given": "profile A에는 moisture가 없고 profile B에는 존재하지만 Disconnected다.",
+      "when": "adaptation strategy를 선택한다.",
+      "then": "A만 absence branch 후보이고 B는 선택된 strategy 안에서 Result fault로 처리하며 자동 하위 strategy 전환을 하지 않는다.",
+      "reason": "profile capability의 존재·장애 구분과 binding은 compiler CLI 밖의 host 관찰이 필요하다."
+    },
+    {
+      "id": "REF-04-035",
+      "references": [
+        "04-sensors-constraints-control.md#45-선택-sensor와-capability"
+      ],
+      "rule": "optional capability는 adapt strategy의 match 안에서만 읽고 최대 i32 priority 하나를 선택하며 absence를 0·정상값으로 바꾸지 않는다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "capability-strategies.ghost.md",
+      "expect": "accept",
+      "source": "# Capability strategies\n\n```ghost\ncontrol CapabilityStrategies {\n  sensor moisture?: Percent;\n  input scheduled: Bool;\n  output pump: Bool;\n  adapt irrigation_policy {\n    strategy WithMoisture priority 100 match (moisture: sensor<Percent>) {\n      let request = case moisture { ok(value) => scheduled && value < 30%; fault(_) => false; };\n      pump <- request;\n    }\n    strategy Baseline priority 0 match always { pump <- scheduled; }\n  }\n}\n```\n"
+    },
+    {
+      "id": "REF-04-036",
+      "references": [
+        "04-sensors-constraints-control.md#46-device-query와-strategy-선택"
+      ],
+      "rule": "profile capability key는 finite (kind,name,type)이며 같은 kind/name 중복을 금지하고 match 쉼표는 AND다.",
+      "scope": "host",
+      "status": "specified",
+      "given": "profile에 pump actuator<bool> 두 개가 같은 이름으로 있고 strategy가 pump와 valve를 match한다.",
+      "when": "profile과 strategy를 활성화 검증한다.",
+      "then": "중복 profile은 거부하고 둘 중 하나만 존재하는 profile은 AND match에 실패한다.",
+      "reason": "설치 profile의 중복 capability와 match 결과는 compiler CLI 밖의 host 검증이 필요하다."
+    },
+    {
+      "id": "REF-04-037",
+      "references": [
+        "04-sensors-constraints-control.md#46-device-query와-strategy-선택"
+      ],
+      "rule": "where는 matched capability metadata와 상수 Bool 조합만 읽고 sample/state/next-state/current value를 읽지 않는다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "where-runtime-value.ghost.md",
+      "expect": "reject",
+      "source": "# Invalid runtime value in where\n\n```ghost\ncontrol InvalidWhereValue {\n  sensor moisture?: Percent;\n  output pump: Bool;\n  adapt irrigation_policy {\n    strategy Wet priority 10 match (moisture: sensor<Percent>) where moisture < 30% { pump <- true; }\n    strategy Baseline priority 0 match always { pump <- false; }\n  }\n}\n```\n",
+      "diagnosticPattern": "where|metadata|sample|runtime|moisture"
+    },
+    {
+      "id": "REF-04-038",
+      "references": [
+        "04-sensors-constraints-control.md#46-device-query와-strategy-선택"
+      ],
+      "rule": "일치 strategy 중 최대 정수 priority가 유일해야 하고 동률은 ambiguity, 없음은 activation error이며 선언 순서는 tie-break가 아니다.",
+      "scope": "host",
+      "status": "specified",
+      "given": "일치 strategy A와 B가 priority 10으로 동률이다.",
+      "when": "activation selection을 수행한다.",
+      "then": "ambiguity error로 활성화하지 않고 마지막 선언을 선택하지 않는다.",
+      "reason": "strategy selection은 host activation 계약이다."
+    },
+    {
+      "id": "REF-04-039",
+      "references": [
+        "04-sensors-constraints-control.md#46-device-query와-strategy-선택"
+      ],
+      "rule": "profile은 후보와 port type을 모두 검증한 뒤 tick 경계에서 원자 적용하며 현재 sensor fault를 absence로 바꿔 strategy를 전환하지 않는다.",
+      "scope": "host",
+      "status": "specified",
+      "given": "새 profile 후보의 선택 strategy port type이 맞지 않고 현재 strategy sensor는 Stale이다.",
+      "when": "profile 변경을 요청한다.",
+      "then": "후보 전체를 거부해 현재 profile을 유지하고 Stale은 현재 strategy Result로 처리한다.",
+      "reason": "profile lifecycle과 atomic boundary는 host 책임이다."
+    },
+    {
+      "id": "REF-04-040",
+      "references": [
+        "04-sensors-constraints-control.md#47-requested-safe-applied-confirmed"
+      ],
+      "rule": "선택 require target=>prerequisite 출력 제약은 requested intent를 safe intent로 제한한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "output-require.ghost.md",
+      "expect": "accept",
+      "source": "# Output require\n\n```ghost\ncontrol OutputRequire {\n  input run: Bool;\n  output pump, valve: Bool;\n  pump <- run;\n  valve <- run;\n  require pump => valve;\n}\n```\n"
+    },
+    {
+      "id": "REF-04-041",
+      "references": [
+        "04-sensors-constraints-control.md#47-requested-safe-applied-confirmed"
+      ],
+      "rule": "선택 Bool conflict 제약은 동시에 true인 후보를 표현할 수 있다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "output-conflict.ghost.md",
+      "expect": "accept",
+      "source": "# Output conflict\n\n```ghost\ncontrol OutputConflict {\n  input go_forward, go_reverse: Bool;\n  output forward, reverse: Bool;\n  forward <- go_forward;\n  reverse <- go_reverse;\n  require !(forward && reverse);\n}\n```\n"
+    },
+    {
+      "id": "REF-04-042",
+      "references": [
+        "04-sensors-constraints-control.md#47-requested-safe-applied-confirmed"
+      ],
+      "rule": "prerequisite false는 target을 false로 만들지만 제약은 false를 true로 만들지 않으며 여러 제약은 같은 snapshot에서 순서 독립적으로 false 방향 fixpoint를 구한다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "requested pump=true,valve=false이고 별도 conflict group 두 출력도 모두 true다.",
+      "when": "constraints를 적용한다.",
+      "then": "safe pump=false이고 conflict 출력도 모두 false이며 valve를 true로 만들지 않고 선언 순서가 결과를 바꾸지 않는다.",
+      "reason": "constraint solver 동작은 runtime 의미다."
+    },
+    {
+      "id": "REF-04-043",
+      "references": [
+        "04-sensors-constraints-control.md#47-requested-safe-applied-confirmed"
+      ],
+      "rule": "safe intent는 Driver applied command나 physical confirmed state가 아니며 각 단계는 별도 provenance와 quality를 가진다.",
+      "scope": "driver",
+      "status": "specified",
+      "given": "safe valve=true지만 Driver 적용이 실패하고 limit switch는 false다.",
+      "when": "제어 결과를 기록한다.",
+      "then": "requested/safe=true, applied=fault, confirmed=false를 분리하고 safe를 실제 개방 증거로 쓰지 않는다.",
+      "reason": "applied/feedback는 Driver 경계다."
+    },
+    {
+      "id": "REF-04-044",
+      "references": [
+        "04-sensors-constraints-control.md#48-공통-constraints-표기와-연산"
+      ],
+      "rule": "exclusive/allow enter/require/limit/once/check/warn은 서로 다른 적용 단계와 결과를 가지며 필수 제약은 모두 AND이고 priority로 완화하지 않는다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "named-constraints.ghost.md",
+      "expect": "accept",
+      "source": "# Named constraints\n\n```ghost\nresource station: Station;\nresource pump1: BoolActuator;\nconstraints StationRules for station {\n  exclusive at admission { automatic, manual, configuring };\n  require at safe_output count_on({ pump1 }) <= 1;\n  require at safe_output any_on({ pump1 });\n}\n```\n"
+    },
+    {
+      "id": "REF-04-045",
+      "references": [
+        "04-sensors-constraints-control.md#48-공통-constraints-표기와-연산"
+      ],
+      "rule": "count_on은 final candidate의 distinct physical items를 세고 any_on은 명시 finite 집합을 보며 빈 집합은 각각 0과 false다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "empty-constraint-set.ghost.md",
+      "expect": "accept",
+      "source": "# Empty finite set\n\n```ghost\nresource station: Station;\nconstraints EmptySetRules for station {\n  require at safe_output count_on({}) == 0;\n  require at safe_output any_on({}) == false;\n}\n```\n"
+    },
+    {
+      "id": "REF-04-046",
+      "references": [
+        "04-sensors-constraints-control.md#48-공통-constraints-표기와-연산"
+      ],
+      "rule": "on_time은 stable resource와 accounting stage의 merged ON이고 stopped는 session·cleanup·lease·evidence 완료이며 단순 pump=false가 아니다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "pump=false지만 valve cleanup과 lease 반환이 끝나지 않았고 두 control의 applied ON이 겹친다.",
+      "when": "stopped와 on_time을 계산한다.",
+      "then": "stopped=false이고 겹친 physical ON은 한 번만 계수한다.",
+      "reason": "resource/session ledger runtime 의미다."
+    },
+    {
+      "id": "REF-04-047",
+      "references": [
+        "04-sensors-constraints-control.md#48-공통-constraints-표기와-연산"
+      ],
+      "rule": "pump_capacity는 단위가 맞는 동일 조건 모델로 Pass/Violation/Unknown을 내며 check는 비차단이고 require == Pass만 Unknown/Violation을 차단한다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "curve context가 없어 pump_capacity=Unknown이다.",
+      "when": "check 선언과 require Pass 선언을 각각 평가한다.",
+      "then": "check는 진단만 내고 운전을 허용하지만 require는 새 시작을 차단하며 flow와 pressure를 직접 합하지 않는다.",
+      "reason": "analysis 결과와 enforcement runtime 의미다."
+    },
+    {
+      "id": "REF-04-048",
+      "references": [
+        "04-sensors-constraints-control.md#49-공유-자원과-arbitration"
+      ],
+      "rule": "공유 pump의 resource manager가 유일한 final writer이며 비활성 control의 false나 last write가 owner를 끄지 않는다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "control A가 pump lease를 소유해 true를 요청하고 비활성 B가 false를 요청한다.",
+      "when": "같은 tick intents를 arbitrate한다.",
+      "then": "A의 session 정책에 따른 final intent를 유지하고 B의 false로 끄지 않는다.",
+      "reason": "shared resource arbitration은 runtime 의미다."
+    },
+    {
+      "id": "REF-04-049",
+      "references": [
+        "04-sensors-constraints-control.md#49-공유-자원과-arbitration"
+      ],
+      "rule": "기본 공유 pump lease는 pre-open부터 cleanup/stop evidence까지 전체 session에 배타적이며 중간 pump OFF로 넘기지 않는다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "A session이 단계 사이 pump OFF이고 cleanup 전 B가 시작 요청한다.",
+      "when": "lease admission을 평가한다.",
+      "then": "A가 ownership을 유지하고 B는 명시 queue/admission 정책을 따른다.",
+      "reason": "session lease lifecycle은 runtime/resource manager 계약이다."
+    },
+    {
+      "id": "REF-04-050",
+      "references": [
+        "04-sensors-constraints-control.md#49-공유-자원과-arbitration"
+      ],
+      "rule": "같은 tick 요청은 한 snapshot에서 lease와 budget을 함께 예약하고 bounded queue/expiry와 명시 tie policy를 쓰며 concurrent/preemption은 opt-in이다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "shared-resource-policy.ghost.md",
+      "expect": "accept",
+      "source": "# Shared resource policy\n\n```ghost\nresource pump1: BoolActuator;\nresource_policy shared_pump for pump1 {\n  lease = session;\n  concurrency = 1;\n  admission = reserve_all;\n  queue = fifo(max: 8, expires_after: 10min, tie: request_id);\n  preempt = never;\n}\n```\n"
+    },
+    {
+      "id": "REF-04-051",
+      "references": [
+        "04-sensors-constraints-control.md#49-공유-자원과-arbitration"
+      ],
+      "rule": "arbitration은 선택 policy/revision, 각 request, safety clamp를 trace하고 safety·manual·automatic·adaptive 범주를 단순 보편 priority로 가정하지 않는다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "temperature 70%, humidity 40%, policy P가 70%를 선택하고 wind max가 20%다.",
+      "when": "final safe target을 계산한다.",
+      "then": "selected=70%, clamp=20%, final=20%와 모든 request/policy revision을 기록한다.",
+      "reason": "policy execution과 trace는 runtime 의미다."
+    },
+    {
+      "id": "REF-04-052",
+      "references": [
+        "04-sensors-constraints-control.md#410-mode와-live-settings"
+      ],
+      "rule": "Auto/Manual/Configure 전환은 stop→start 억제→cleanup→stop evidence→Stopped→진입 순서이며 같은 tick 충돌 진입은 모두 거부하고 Stop이 우선한다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "운전 중 같은 tick에 Stop, Manual 진입, Configure 진입이 요청된다.",
+      "when": "mode transition을 처리한다.",
+      "then": "새 시작과 두 진입을 거부하고 Stop/cleanup을 진행하며 요청을 저장해 나중에 몰래 전환하지 않는다.",
+      "reason": "mode state machine은 runtime 의미다."
+    },
+    {
+      "id": "REF-04-053",
+      "references": [
+        "04-sensors-constraints-control.md#410-mode와-live-settings"
+      ],
+      "rule": "CommandedStop과 VerifiedStop은 구분하고 feedback 없는 설비에 VerifiedStop을 전역 기본으로 강제하지 않으며 전송만으로 실패한 stop을 완료라 하지 않는다.",
+      "scope": "driver",
+      "status": "specified",
+      "given": "stop command 전송은 성공했지만 feedback이 timeout되고 station 정책은 VerifiedStop을 요구한다.",
+      "when": "stop evidence를 판정한다.",
+      "then": "CommandedStop만 성립하고 VerifiedStop/Stopped는 성립하지 않는다.",
+      "reason": "command 적용과 physical feedback은 Driver 경계다."
+    },
+    {
+      "id": "REF-04-054",
+      "references": [
+        "04-sensors-constraints-control.md#410-mode와-live-settings"
+      ],
+      "rule": "operator settings 변경은 같은 program/run의 atomic event이며 전부 검증 후 revision/effective position부터 적용하고 timer/state를 reset하지 않는다.",
+      "scope": "host",
+      "status": "specified",
+      "given": "watering limit 10분→5분과 권한 없는 gain 변경이 한 event에 있고 elapsed=6분이다.",
+      "when": "event를 적용한다.",
+      "then": "권한 실패로 전체 거부해 limit도 10분이고 state/timer/run identity가 유지된다; 유효 event라면 다음 판단에서 현재 elapsed와 새 limit을 비교한다.",
+      "reason": "settings validation/revision/effective position은 host 책임이다."
+    },
+    {
+      "id": "REF-04-055",
+      "references": [
+        "04-sensors-constraints-control.md#411-accounting과-budget"
+      ],
+      "rule": "applied accounting은 자동·수동·여러 control의 merged physical ON을 세고 rejected/queued/constraint-blocked 시간은 제외하며 confirmed flow에는 feedback quality가 필요하다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "10초 request 중 3초 queue, 2초 constraint block, 5초 applied ON이며 flow feedback이 없다.",
+      "when": "applied와 confirmed ledgers를 계산한다.",
+      "then": "applied used=5초이고 confirmed flow는 Unknown이며 request 10초로 대체하지 않는다.",
+      "reason": "accounting ledger는 runtime/driver evidence 계약이다."
+    },
+    {
+      "id": "REF-04-056",
+      "references": [
+        "04-sensors-constraints-control.md#411-accounting과-budget"
+      ],
+      "rule": "local day, rolling window, occurrence once는 별도 ledger이고 clock rollback/revision/power cycle로 확정 사용량을 줄이거나 reset하지 않는다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "같은 occurrence가 재요청되고 day budget은 충분하며 rolling limit은 경계에 있고 power cycle이 발생한다.",
+      "when": "admission을 재평가한다.",
+      "then": "once가 중복을 막고 rolling 경계도 추가 ON을 막으며 reboot 뒤 두 ledger를 암묵 reset하지 않는다.",
+      "reason": "복수 ledger의 지속 의미는 runtime 계약이다."
+    },
+    {
+      "id": "REF-04-057",
+      "references": [
+        "04-sensors-constraints-control.md#411-accounting과-budget"
+      ],
+      "rule": "새 작업은 worst-case ON+stop delay를 예약하고 finite manual lease를 쓰며 사용 후 applied interval로 정산하고 불확실 예약은 보수 처리한다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "remaining=8min, worst ON=7min, stop delay=2min이다.",
+      "when": "자동 작업 또는 무기한 수동 요청을 admit한다.",
+      "then": "9분 예약이 안 되어 자동 시작을 거부하고 수동도 남은 budget 안의 finite cutoff 없이는 admit하지 않는다.",
+      "reason": "reservation과 settlement는 runtime resource 계약이다."
+    },
+    {
+      "id": "REF-04-058",
+      "references": [
+        "04-sensors-constraints-control.md#412-continuous-control-objective"
+      ],
+      "rule": "continuous objective는 quality measure, compatible target, semantic actuator target, controller policy, capability 교집합 output range를 연결한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "continuous-objective.ghost.md",
+      "expect": "accept",
+      "source": "# Continuous objective\n\n```ghost\nsensor inside_temperature: Temperature;\nconfig target_temperature: Temperature = 25°C { min = 10°C; max = 40°C; step = 0.5Δ°C; access = operator; label = \"목표 온도\"; }\nresource roof_vent: ContinuousActuator<Percent>;\nobjective greenhouse_temperature {\n  measure = inside_temperature;\n  target = target_temperature;\n  manipulate = roof_vent.position;\n  output = 0% .. 80%;\n  controller = pid {\n    period = 10s;\n    late_after = 30s;\n    direction = reverse;\n    kp = proportional_gain(output: 2%, error: 1Δ°C);\n    ki = integral_gain(output: 0.1%, error: 1Δ°C, time: 1s);\n    kd = derivative_gain(output: 1%, time: 1s, error: 1Δ°C);\n    bias = 0%;\n    anti_windup = conditional_safe;\n    disabled = track_safe;\n    transfer = track_safe;\n    fault = disable;\n    restart = reset(output: 0%);\n  }\n}\n```\n"
+    },
+    {
+      "id": "REF-04-059",
+      "references": [
+        "04-sensors-constraints-control.md#pipid-의미에-필요한-항목"
+      ],
+      "rule": "PI/PID는 양의 sample period, compatible finite values, direction, dimensioned gains, output clamp, anti-windup, enable, bumpless transfer, fault, restart 정책을 모두 명시해야 한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "incomplete-pid.ghost.md",
+      "expect": "reject",
+      "source": "# Incomplete PID policy\n\n```ghost\nsensor inside_temperature: Temperature;\nconfig target_temperature: Temperature = 25°C { min = 10°C; max = 40°C; step = 0.5Δ°C; access = operator; label = \"목표 온도\"; }\nresource roof_vent: ContinuousActuator<Percent>;\nobjective incomplete_temperature {\n  measure = inside_temperature;\n  target = target_temperature;\n  manipulate = roof_vent.position;\n  output = 0% .. 80%;\n  controller = pid { period = 10s; direction = reverse; kp = proportional_gain(output: 2%, error: 1Δ°C); }\n}\n```\n",
+      "diagnosticPattern": "pid|missing|controller|policy|ki|kd|fault|restart"
+    },
+    {
+      "id": "REF-04-060",
+      "references": [
+        "04-sensors-constraints-control.md#pipid-의미에-필요한-항목"
+      ],
+      "rule": "controller output은 requested target이고 arbitration/safety가 safe target을 clamp하며 anti-windup은 effective saturation 반영 정책을 명시한다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "PID requested=92%, wind safe max=20%, Driver applied=20%, feedback=17%다.",
+      "when": "controller와 constraint를 갱신한다.",
+      "then": "네 단계를 분리 기록하고 integral이 requested 92%만 보고 무한히 쌓이지 않도록 선택 anti-windup 정책을 적용한다.",
+      "reason": "controller state와 constraint interaction은 runtime 의미다."
+    },
+    {
+      "id": "REF-04-061",
+      "references": [
+        "04-sensors-constraints-control.md#413-explicit-fallback과-degraded-control"
+      ],
+      "rule": "degraded fallback은 capability, admissible quality, output bounds, authority를 명시하고 전역 constraints/resource/mode를 우회하지 않는다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "degraded-control.ghost.md",
+      "expect": "accept",
+      "source": "# Degraded control\n\n```ghost\ndegraded TemperatureFallback for greenhouse_temperature {\n  branch Backup priority 100 when backup_temperature quality in { measured }\n    use objective backup_temperature_control authority automatic_degraded output 0% .. 30%;\n  otherwise disable;\n  recover primary after 3 samples;\n  resume = require_start;\n}\n```\n"
+    },
+    {
+      "id": "REF-04-062",
+      "references": [
+        "04-sensors-constraints-control.md#413-explicit-fallback과-degraded-control"
+      ],
+      "rule": "sensor recovery는 정상 evidence 준비일 뿐 자동 restart·원 objective 복귀·timer 복원을 뜻하지 않는다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "recover_after를 충족했지만 이전 run은 fault로 중단됐다.",
+      "when": "sensor가 정상으로 돌아온다.",
+      "then": "새 start request를 만들거나 중단 run timer를 복원하지 않고 별도 recovery policy/event를 기다린다.",
+      "reason": "recovery와 control lifecycle은 runtime 의미다."
+    },
+    {
+      "id": "REF-04-063",
+      "references": [
+        "04-sensors-constraints-control.md#414-bounded-adaptation"
+      ],
+      "rule": "adaptation은 program/output 직접 권한이 아니라 typed setting/setpoint bounded proposal이며 value·source/model·evidence·program/settings identity를 포함한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "bounded-adaptation.ghost.md",
+      "expect": "accept",
+      "source": "# Bounded adaptation\n\n```ghost\nconfig target_vpd: Pressure = 1.0kPa { min = 0.7kPa; max = 1.2kPa; step = 0.05kPa; access = operator; label = \"목표 VPD\"; }\nadapt_setting target_vpd_policy for target_vpd {\n  allowed = 0.7kPa .. 1.2kPa;\n  max_step = 0.05kPa;\n  max_change = 0.05kPa per 1h;\n  authority = optimizer;\n}\n```\n"
+    },
+    {
+      "id": "REF-04-064",
+      "references": [
+        "04-sensors-constraints-control.md#414-bounded-adaptation"
+      ],
+      "rule": "adaptation은 type/range/step/rate/authority를 local 검증해 여러 값을 atomic settings event로 적용하고 trace에 전후값·provenance·reason·identities·position을 남긴다.",
+      "scope": "host",
+      "status": "specified",
+      "given": "두 property proposal 중 하나가 hourly rate limit을 넘는다.",
+      "when": "host가 proposal event를 검증한다.",
+      "then": "둘 다 적용하지 않고 rejection reason과 program/settings identity를 기록하며 revision을 바꾸지 않는다.",
+      "reason": "proposal validation과 settings revision은 host 책임이다."
+    },
+    {
+      "id": "REF-04-065",
+      "references": [
+        "04-sensors-constraints-control.md#415-타입-자원과-설명-규칙"
+      ],
+      "rule": "서로 다른 quantity와 Result/Option을 암묵 연산하지 않고 state bound를 정적으로 계산하며 tick 실패 시 어느 sensor/controller/resource state도 부분 확정하지 않는다.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "pressure+flow 계산과 unbounded window가 포함된 tick이 controller update 뒤 resource update에서 실패한다.",
+      "when": "검증과 tick commit을 수행한다.",
+      "then": "타입/자원 검증에서 거부하고 모든 state를 이전 snapshot으로 유지하며 Unknown/timeout을 proof success로 보지 않는다.",
+      "reason": "원자 commit과 bounded resource enforcement는 compiler/runtime 공동 계약이며 실행 결과를 명시한다."
+    },
+    {
+      "id": "REF-04-066",
+      "references": [
+        "04-sensors-constraints-control.md#415-타입-자원과-설명-규칙"
+      ],
+      "rule": "설명은 sample/filter/quality, predicate/time evidence, controller, arbitration, clamp/safe, applied/confirmed, budget release, 모든 identity/revision을 구분하고 UI animation에서 제어 의미를 만들지 않는다.",
+      "scope": "host",
+      "status": "specified",
+      "given": "budget으로 start가 차단되고 화면 output animation은 OFF다.",
+      "when": "explanation과 next release를 표시한다.",
+      "then": "기록된 intervals에서 계산한 used/limit/block/next release와 관련 revisions를 보여주며 animation 시각으로 budget을 재계산하지 않는다.",
+      "reason": "관찰/explanation 조립은 host/UI 소비 경계다."
+    },
+    {
+      "id": "REF-04-067",
+      "references": [
+        "04-sensors-constraints-control.md#416-확정된-control-문법과-장별-경계"
+      ],
+      "rule": "Reference 04가 확정한 control 표면과 다른 장이 소유한 rolling accounting·일반 quantity/quality·binding/settings record 경계를 일관되게 유지한다.",
+      "scope": "tooling",
+      "status": "specified",
+      "given": "Reference 04와 2·3·5·6장의 소유 범위를 함께 읽는다.",
+      "when": "남은 결정 목록과 선택 문법 표기를 감사한다.",
+      "then": "control 문법은 선택 표기로 남고 rolling accounting, 일반 quantity/quality, binding/settings record만 소유 장으로 연결된다.",
+      "reason": "장 사이의 소유권과 색인 일관성은 문서 tooling 검사가 필요하다."
+    },
+    {
+      "id": "REF-04-068",
+      "references": [
+        "04-sensors-constraints-control.md#bounded-signal-연산의-설계-계약"
+      ],
+      "rule": "moving_average n은 양수여야 한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "moving-average-zero.ghost.md",
+      "expect": "reject",
+      "diagnosticPattern": "moving_average|positive|profile|window",
+      "source": "# Invalid bounded filter\n\n```ghost\ncontrol InvalidFilter {\n  sensor value: Number { filter = moving_average(0); }\n  output ready: Bool;\n  ready <- true;\n}\n```\n"
+    },
+    {
+      "id": "REF-04-069",
+      "references": [
+        "04-sensors-constraints-control.md#bounded-signal-연산의-설계-계약"
+      ],
+      "rule": "ema alpha는 0보다 크고 1 이하여야 한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "ema-zero-alpha.ghost.md",
+      "expect": "reject",
+      "diagnosticPattern": "ema|alpha|positive|range",
+      "source": "# Invalid bounded filter\n\n```ghost\ncontrol InvalidFilter {\n  sensor value: Number { filter = ema(alpha: 0.0); }\n  output ready: Bool;\n  ready <- true;\n}\n```\n"
+    },
+    {
+      "id": "REF-04-070",
+      "references": [
+        "04-sensors-constraints-control.md#bounded-signal-연산의-설계-계약"
+      ],
+      "rule": "debounce stable_for는 양의 Duration이어야 한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "debounce-zero-duration.ghost.md",
+      "expect": "reject",
+      "diagnosticPattern": "debounce|stable_for|positive|Duration",
+      "source": "# Invalid debounce\n\n```ghost\ncontrol InvalidDebounce {\n  input start: Bool;\n  signal stable = debounce(start, stable_for: 0s, initial: false);\n  output request: Bool;\n  request <- stable;\n}\n```\n"
+    },
+    {
+      "id": "REF-04-071",
+      "references": [
+        "04-sensors-constraints-control.md#413-explicit-fallback과-degraded-control"
+      ],
+      "rule": "degraded control은 exhaustive otherwise branch를 요구한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "degraded-missing-otherwise.ghost.md",
+      "expect": "reject",
+      "diagnosticPattern": "degraded|otherwise|exhaustive",
+      "source": "# Missing degraded otherwise\n\n```ghost\ndegraded MissingOtherwise for greenhouse_temperature {\n  branch Backup priority 100 when backup_temperature quality in { measured }\n    use objective backup_temperature_control authority automatic_degraded output 0% .. 30%;\n  recover primary after 3 samples;\n  resume = require_start;\n}\n```\n"
+    },
+    {
+      "id": "REF-04-072",
+      "references": [
+        "04-sensors-constraints-control.md#414-bounded-adaptation"
+      ],
+      "rule": "adaptation setting event는 controller state reset 정책을 선언할 수 없다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "adaptation-reset-state.ghost.md",
+      "expect": "reject",
+      "diagnosticPattern": "adapt|controller|reset|state|unknown",
+      "source": "# Invalid adaptation reset\n\n```ghost\nconfig target_vpd: Pressure = 1.0kPa { min = 0.7kPa; max = 1.2kPa; step = 0.05kPa; access = operator; label = \"목표 VPD\"; }\nadapt_setting target_vpd_policy for target_vpd {\n  allowed = 0.7kPa .. 1.2kPa;\n  max_step = 0.05kPa;\n  max_change = 0.05kPa per 1h;\n  authority = optimizer;\n  controller_transition = reset(output: 0%);\n}\n```\n"
+    },
+    {
+      "id": "REF-03-073",
+      "references": ["03-time-and-schedules.md#35-schedule의-공통-의미"],
+      "rule": "Range admits only the remaining part of its planned half-open interval, including after boot, gap, or trust recovery.",
+      "scope": "runtime", "status": "specified",
+      "given": "DailySlots plans 08:00 with range(10min), when=true, and no terminal occurrence record.",
+      "when": "The first trusted observation is 08:04 after boot, gap, or trust recovery; separately it is exactly 08:10.",
+      "then": "At 08:04 the occurrence admits once and runs only to 08:10. At 08:10 it does not start and records LateStartExpired. Earlier expired occurrences do not replay.",
+      "reason": "The current DailySlots artifact has no executable native Range admission binding."
+    },
+    {
+      "id": "REF-03-074",
+      "references": ["03-time-and-schedules.md#35-schedule의-공통-의미"],
+      "rule": "The active Range deadline follows monotonic progress despite RTC/NTP wall corrections.",
+      "scope": "runtime", "status": "specified",
+      "given": "An 08:00 range(10min) occurrence admits at trusted wall 08:04 and monotonic zero.",
+      "when": "At monotonic three minutes the wall clock jumps forward or backward by twenty minutes.",
+      "then": "The active deadline remains monotonic six minutes in both cases. A rollback emits no second due for the same occurrence.",
+      "reason": "The current DailySlots artifact has no executable native Range clock binding."
+    },
+    {
+      "id": "REF-03-075",
+      "references": ["03-time-and-schedules.md#35-schedule의-공통-의미"],
+      "rule": "Safety blocking does not pause or extend a Range.",
+      "scope": "runtime", "status": "specified",
+      "given": "An 08:00 range(10min) occurrence is admitted and requests output at 08:04.",
+      "when": "A global safety constraint blocks safe output from 08:06 through 08:08, then clears.",
+      "then": "Safe output is false while blocked, resumes at 08:08, and is false at 08:10. Range active and requested output keep the planned end.",
+      "reason": "The current runtime has no executable Range plus global constraint scenario."
+    },
+    {
+      "id": "REF-03-076",
+      "references": ["03-time-and-schedules.md#35-schedule의-공통-의미"],
+      "rule": "Live Duration changes recompute the current Range end from its planned start.",
+      "scope": "runtime", "status": "specified",
+      "given": "An 08:00 range(duration=10min) occurrence admits at 08:04; stable monotonic progress reaches 08:07.",
+      "when": "An accepted live event extends duration to 12min; in a separate run another reduces it to 5min.",
+      "then": "The extension ends at 08:12. The reduction ends at its event position because 08:05 has passed. Neither emits another due or changes occurrence ID.",
+      "reason": "The current runtime has no atomic live settings event API for an active schedule."
+    },
+    {
+      "id": "REF-03-077",
+      "references": ["03-time-and-schedules.md#35-schedule의-공통-의미"],
+      "rule": "A live scalar start change can pause and reevaluate the same Range occurrence without readmission.",
+      "scope": "runtime", "status": "specified",
+      "given": "An 08:00 range(10min) occurrence admits at 08:04 and retains one occurrence ID.",
+      "when": "At 08:07 its scalar start changes to 08:08; trusted scans occur at 08:08 and 08:18.",
+      "then": "The edit immediately makes active=false. Active resumes at 08:08 and ends at 08:18; due remains false and identity fixed. A separate edit to 08:02 moves end to 08:12.",
+      "reason": "The current runtime has no atomic live scalar start event API for an active schedule."
+    },
+    {
+      "id": "REF-03-078",
+      "references": ["03-time-and-schedules.md#35-schedule의-공통-의미"],
+      "rule": "A live setting event that creates overlapping Range occurrences is rejected atomically.",
+      "scope": "runtime", "status": "specified",
+      "given": "One DailySlots schedule has 08:00 and 08:15 starts, each with range(duration=10min), and settings revision R.",
+      "when": "A live event proposes duration=20min or TimeSlots [08:00,08:15] with range(20min).",
+      "then": "The whole event is rejected; values, revision R, active occurrence, and ledger stay fixed. Duration=15min is valid because intervals only touch.",
+      "reason": "The current runtime has no atomic live settings event API for schedule overlap validation."
+    },
+    {
+      "id": "REF-03-079",
+      "references": ["03-time-and-schedules.md#310-시간-기반-사용량-제약"],
+      "rule": "Event count returns an exact Int or the corresponding AccountingFault.",
+      "scope": "runtime", "status": "specified",
+      "given": "A durable event account counts typed events over a local_day window.",
+      "when": "The ledger is missing, corrupt, incomplete, the local-day boundary is unknown, or the exact count exceeds Int's maximum; separately, the ledger and boundary are valid and the count fits Int.",
+      "then": "The valid case returns the exact Int. The other cases return LedgerMissing, LedgerCorrupt, LedgerIncomplete, ClockUnknown, or CountOverflow respectively; none substitutes zero or wraps the count.",
+      "reason": "Treating unknown or overflowing counts as zero can exceed a daily work limit."
+    },
+    {
+      "id": "REF-03-080",
+      "references": ["03-time-and-schedules.md#310-시간-기반-사용량-제약"],
+      "rule": "A fault-to-false count branch and protective on_unknown=block both prevent admission without accounting mutation.",
+      "scope": "runtime", "status": "specified",
+      "given": "A count result has an AccountingFault, control logic maps the fault branch to false, and a protective limit uses on_unknown=block.",
+      "when": "Admission is evaluated while the count remains unknown.",
+      "then": "The case expression yields false and the protective limit rejects admission. The evaluation does not write a count event or create, consume, or release a reservation.",
+      "reason": "Unknown accounting must fail closed without fabricating a count or reservation."
+    },
+    {
+      "id": "REF-03-081",
+      "references": ["03-time-and-schedules.md#36-선택된-dailyslots"],
+      "rule": "A TimeSlots retime preserves a stable slot identity independent of displayed TimeOfDay and reevaluates the same active Range occurrence.",
+      "scope": "runtime", "status": "specified",
+      "given": "A TimeSlots<1min,N> entry with opaque slot key K plans 08:00 with range(10min); its occurrence admits once at 08:04 with ledger entry L.",
+      "when": "An accepted setting event E at base revision R retimes K to 08:07, and a trusted accepted decision occurs at 08:07.",
+      "then": "The event position pauses the Range until the changed start. At 08:07 the same occurrence is reevaluated and, when=true, is active until 08:17. K, occurrence ID and L stay fixed; due remains false and no second admission is recorded.",
+      "reason": "The current runtime has no atomic TimeSlots retime event API carrying a stable entry key."
+    },
+    {
+      "id": "REF-03-082",
+      "references": ["03-time-and-schedules.md#36-선택된-dailyslots"],
+      "rule": "TimeSlots retime and remove/add have distinct identity and baseline effects.",
+      "scope": "runtime", "status": "specified",
+      "given": "A TimeSlots entry at 08:00 has opaque slot key K and an admitted or terminal occurrence in the current local date.",
+      "when": "One event retimes K to 08:07; in a separate run an event removes K and adds displayed time 08:07 without identifying K as a retime.",
+      "then": "Retime retains K and the occurrence ledger. Remove/add deletes K's future plan, creates a new key, establishes the ordinary add baseline, and never rearms or relabels K's occurrence.",
+      "reason": "The current settings artifact exposes only projected TimeSlots values and has no executable keyed edit operation."
+    },
+    {
+      "id": "REF-03-083",
+      "references": ["03-time-and-schedules.md#36-선택된-dailyslots"],
+      "rule": "A TimeSlots retime that creates overlapping Range intervals is rejected atomically without changing identity or ledger state.",
+      "scope": "runtime", "status": "specified",
+      "given": "One schedule has keyed entries K1 at 08:00 and K2 at 08:20, range(10min), settings revision R, and preserved occurrence ledger L.",
+      "when": "An event proposes retiming K2 to 08:07, which would overlap K1's 08:00-08:10 interval.",
+      "then": "The entire event is rejected. Both displayed times, K1, K2, revision R, active state and L remain unchanged.",
+      "reason": "The current runtime has no atomic TimeSlots retime event API or live Range overlap validator."
+    },
+    {
+      "id": "REF-03-084",
+      "references": ["03-time-and-schedules.md#36-선택된-dailyslots"],
+      "rule": "A TimeSlots value must reject a displayed time outside its declared grid; the 08:00 to 08:07 retime requires a grid containing 08:07.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "timeslots-retime-target-off-grid.ghost.md",
+      "expect": "reject",
+      "diagnosticPattern": "TimeSlots|grid|15-minute|align",
+      "source": "# Off-grid retime target projection\n\n```ghost\ncontrol OffGridRetimeTarget {\n  config watering_slots: TimeSlots<15min, 8> = [time`08:07`];\n  schedule starts: DailySlots<15min> {\n    timezone = \"Asia/Seoul\";\n    selected = watering_slots;\n    dst_missing = skip;\n    dst_repeated = first;\n    basis = pulse;\n    when = true;\n    clock = trusted_only;\n    gap = skip_after(60s);\n    recovery = baseline;\n    fallback = skip;\n  }\n  output due: Bool;\n  due <- starts.due;\n}\n```\n"
+    }
+  ]
+}

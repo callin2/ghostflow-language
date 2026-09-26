@@ -11,8 +11,12 @@ const SHA256 = /^[a-f0-9]{64}$/;
 const MODULE_FINGERPRINT = /^[a-f0-9]{16}$/;
 const BUILTIN_TYPES = new Map([
   ['Bool', null],
+  ['Int', null],
   ['Number', null],
   ['Duration', 'ms'],
+  ['Date', null],
+  ['TimeOfDay', null],
+  ['DateTime', null],
 ]);
 const OBSERVATION_STATUS = new Set(['ready', 'unavailable', 'error']);
 
@@ -74,7 +78,7 @@ function sourceType(value, path, errors) {
   if (!exactObject(value, ['kind', 'name', 'unit'], path, errors)) return;
   if (value.kind !== 'builtin' && value.kind !== 'nominal') issue(errors, `${path}.kind`, 'source_type', 'must be builtin or nominal');
   if (value.kind === 'builtin') {
-    if (!BUILTIN_TYPES.has(value.name)) issue(errors, `${path}.name`, 'source_type', 'must be Bool, Number, or Duration');
+    if (!BUILTIN_TYPES.has(value.name)) issue(errors, `${path}.name`, 'source_type', 'must be a supported builtin source type');
     else if (value.unit !== BUILTIN_TYPES.get(value.name)) issue(errors, `${path}.unit`, 'unit', `must be ${BUILTIN_TYPES.get(value.name) ?? 'null'} for ${value.name}`);
   } else {
     publicId(value.name, `${path}.name`, errors);
@@ -110,25 +114,65 @@ function descriptor(value, index, errors) {
   }
   const fields = value.kind === 'timer'
     ? ['id', 'name', 'kind', 'sourceType', 'access', 'operation', 'provenance']
+    : value.kind === 'setting'
+      ? ['id', 'name', 'kind', 'sourceType', 'access', 'authority', 'applyPolicy', 'label', 'constraint', 'provenance']
     : ['id', 'name', 'kind', 'sourceType', 'access', 'provenance'];
   if (!exactObject(value, fields, path, errors)) return;
   publicId(value.id, `${path}.id`, errors);
   publicId(value.name, `${path}.name`, errors);
-  if (!['state', 'timer'].includes(value.kind)) issue(errors, `${path}.kind`, 'descriptor_kind', 'v0 supports state and timer only');
+  if (!['state', 'timer', 'counter', 'setting'].includes(value.kind)) issue(errors, `${path}.kind`, 'descriptor_kind', 'v0 supports state, timer, counter, and setting only');
   sourceType(value.sourceType, `${path}.sourceType`, errors);
   if (!Array.isArray(value.access) || value.access.length !== 1 || value.access[0] !== 'read') {
     issue(errors, `${path}.access`, 'access', 'must be exactly ["read"] for a v0 observation');
   }
   if (value.kind === 'timer') {
-    if (exactObject(value.operation, ['kind', 'subjectId'], `${path}.operation`, errors)) {
-      if (value.operation.kind !== 'elapsed_since_change') issue(errors, `${path}.operation.kind`, 'timer_operation', 'must be elapsed_since_change');
-      publicId(value.operation.subjectId, `${path}.operation.subjectId`, errors);
+    const continuous = value.operation?.kind === 'continuous_true';
+    const operationFields = continuous ? ['kind', 'subjectNodeId'] : ['kind', 'subjectId'];
+    if (exactObject(value.operation, operationFields, `${path}.operation`, errors)) {
+      if (continuous) {
+        if (!Number.isInteger(value.operation.subjectNodeId) || value.operation.subjectNodeId < 1) {
+          issue(errors, `${path}.operation.subjectNodeId`, 'timer_subject', 'must be a positive compiler source node ID');
+        }
+      } else {
+        if (value.operation.kind !== 'elapsed_since_change') issue(errors, `${path}.operation.kind`, 'timer_operation', 'must be elapsed_since_change or continuous_true');
+        publicId(value.operation.subjectId, `${path}.operation.subjectId`, errors);
+      }
     }
     if (value.sourceType?.kind !== 'builtin' || value.sourceType?.name !== 'Duration' || value.sourceType?.unit !== 'ms') {
       issue(errors, `${path}.sourceType`, 'timer_type', 'must be builtin Duration in ms');
     }
   }
-  provenance(value.provenance, value.kind, `${path}.provenance`, errors);
+  if (value.kind === 'counter' && (value.sourceType?.kind !== 'builtin' || value.sourceType?.name !== 'Int' || value.sourceType?.unit !== null)) {
+    issue(errors, `${path}.sourceType`, 'counter_type', 'must be builtin Int with no unit');
+  }
+  if (value.kind === 'setting') {
+    if (!['operator', 'designer'].includes(value.authority)) issue(errors, `${path}.authority`, 'setting_authority', 'must be operator or designer');
+    if (value.applyPolicy !== 'stopped') issue(errors, `${path}.applyPolicy`, 'setting_apply', 'must be stopped');
+    if (typeof value.label !== 'string' || value.label.length < 1 || value.label.length > 128) issue(errors, `${path}.label`, 'setting_label', 'must be 1 to 128 characters');
+    if (value.sourceType?.kind === 'builtin' && value.sourceType?.name === 'Bool') {
+      if (!exactObject(value.constraint, ['kind', 'values'], `${path}.constraint`, errors)
+          || value.constraint.kind !== 'choices' || JSON.stringify(value.constraint.values) !== '[false,true]') {
+        issue(errors, `${path}.constraint`, 'setting_constraint', 'Bool setting choices must be [false,true]');
+      }
+    } else if (exactObject(value.constraint, ['kind', 'min', 'max', 'step'], `${path}.constraint`, errors)) {
+      const { min, max, step } = value.constraint;
+      if (value.constraint.kind !== 'range' || ![min, max, step].every(Number.isFinite) || step <= 0 || min > max) {
+        issue(errors, `${path}.constraint`, 'setting_constraint', 'must be a finite ordered range with positive step');
+      }
+      if (value.sourceType?.kind === 'builtin' && value.sourceType.name === 'Int') {
+        for (const field of ['min', 'max', 'step']) {
+          const bound = value.constraint[field];
+          if (!Number.isInteger(bound) || bound < -2147483648 || bound > 2147483647 || (field === 'step' && bound <= 0)) {
+            issue(errors, `${path}.constraint.${field}`, 'setting_constraint', field === 'step' ? 'must be a positive signed i32 Int' : 'must be a signed i32 Int');
+          }
+        }
+        if ([min, max, step].every(Number.isInteger) && step > 0 && (max - min) % step !== 0) {
+          issue(errors, `${path}.constraint.max`, 'setting_constraint', 'must align to step from min');
+        }
+      }
+    }
+  }
+  provenance(value.provenance, value.kind === 'counter' ? 'state' : value.kind === 'setting' ? 'config' : value.kind, `${path}.provenance`, errors);
 }
 
 function validateSchema(schema, errors) {
@@ -152,6 +196,7 @@ function validateSchema(schema, errors) {
   const descriptorsById = new Map(schema.descriptors.map(entry => [entry?.id, entry]));
   for (const entry of schema.descriptors) {
     if (entry?.kind !== 'timer') continue;
+    if (entry.operation?.kind === 'continuous_true') continue;
     const subject = descriptorsById.get(entry.operation?.subjectId);
     if (!subject || subject.kind !== 'state') {
       issue(errors, `schema.descriptors.${entry.id}.operation.subjectId`, 'timer_subject', 'must resolve to an authored state descriptor');
@@ -167,14 +212,17 @@ function sameIdentity(actual, expected, path, errors) {
 
 function readyValue(type, value, path, errors) {
   if (type?.kind === 'builtin' && type.name === 'Bool' && typeof value !== 'boolean') issue(errors, path, 'value_type', 'must be Bool from source semantics');
+  if (type?.kind === 'builtin' && type.name === 'Int' && (!Number.isInteger(value) || value < -2147483648 || value > 2147483647)) issue(errors, path, 'value_type', 'must be a signed i32 Int from source semantics');
   if (type?.kind === 'builtin' && type.name === 'Number' && (typeof value !== 'number' || !Number.isFinite(value))) issue(errors, path, 'value_type', 'must be finite Number from source semantics');
   if (type?.kind === 'builtin' && type.name === 'Duration' && (!Number.isSafeInteger(value) || value < 0)) issue(errors, path, 'value_type', 'must be a non-negative safe integer milliseconds Duration');
+  const timeMax = type?.name === 'Date' ? 2_932_896 : type?.name === 'TimeOfDay' ? 86_399_999 : type?.name === 'DateTime' ? 253_402_300_799_999 : null;
+  if (type?.kind === 'builtin' && timeMax !== null && (!Number.isSafeInteger(value) || value < 0 || value > timeMax)) issue(errors, path, 'value_type', `must be an integer ${type.name} in range`);
   if (type?.kind === 'nominal' && (value === null || !['boolean', 'number', 'string'].includes(typeof value) || (typeof value === 'number' && !Number.isFinite(value)))) {
     issue(errors, path, 'value_type', 'must be a finite JSON scalar for the declared nominal source type');
   }
 }
 
-function observation(value, type, index, errors) {
+function observation(value, descriptorValue, index, errors) {
   const path = `snapshot.observations[${index}]`;
   if (!object(value)) {
     issue(errors, path, 'shape', 'must be an object');
@@ -187,7 +235,20 @@ function observation(value, type, index, errors) {
         : ['descriptorId', 'status'];
   if (!exactObject(value, fields, path, errors)) return;
   publicId(value.descriptorId, `${path}.descriptorId`, errors);
-  if (value.status === 'ready') readyValue(type, value.value, `${path}.value`, errors);
+  if (value.status === 'ready') {
+    readyValue(descriptorValue?.sourceType, value.value, `${path}.value`, errors);
+    if (descriptorValue?.kind === 'setting') {
+      const constraint = descriptorValue.constraint;
+      const misaligned = constraint?.kind === 'range' && (descriptorValue.sourceType?.name === 'Int'
+        ? (value.value - constraint.min) % constraint.step !== 0
+        : Math.abs((value.value - constraint.min) / constraint.step - Math.round((value.value - constraint.min) / constraint.step)) > 1e-9);
+      if (constraint?.kind === 'range' && (typeof value.value !== 'number' || value.value < constraint.min || value.value > constraint.max
+          || misaligned)) {
+        issue(errors, `${path}.value`, 'setting_value', 'must satisfy the authored range and step');
+      }
+      if (constraint?.kind === 'choices' && !constraint.values?.includes(value.value)) issue(errors, `${path}.value`, 'setting_value', 'must be an authored choice');
+    }
+  }
   if (value.status === 'unavailable' && (typeof value.reason !== 'string' || !value.reason)) issue(errors, `${path}.reason`, 'observation_reason', 'must be non-empty');
   if (value.status === 'error' && (typeof value.error !== 'string' || !value.error)) issue(errors, `${path}.error`, 'observation_error', 'must be non-empty');
 }
@@ -215,15 +276,15 @@ function validateSnapshot(schema, snapshot, errors) {
     issue(errors, 'snapshot.observations', 'observations', 'must be an array');
     return;
   }
-  const types = new Map(schema.descriptors.map(entry => [entry.id, entry.sourceType]));
+  const descriptors = new Map(schema.descriptors.map(entry => [entry.id, entry]));
   const ids = new Set();
   snapshot.observations.forEach((entry, index) => {
-    observation(entry, types.get(entry?.descriptorId), index, errors);
-    if (!types.has(entry?.descriptorId)) issue(errors, `snapshot.observations[${index}].descriptorId`, 'unknown_descriptor', 'is absent from the static schema');
+    observation(entry, descriptors.get(entry?.descriptorId), index, errors);
+    if (!descriptors.has(entry?.descriptorId)) issue(errors, `snapshot.observations[${index}].descriptorId`, 'unknown_descriptor', 'is absent from the static schema');
     if (ids.has(entry?.descriptorId)) issue(errors, `snapshot.observations[${index}].descriptorId`, 'duplicate_descriptor', 'must occur once');
     ids.add(entry?.descriptorId);
   });
-  for (const descriptorId of types.keys()) if (!ids.has(descriptorId)) issue(errors, 'snapshot.observations', 'missing_observation', `must explicitly cover ${descriptorId}`);
+  for (const descriptorId of descriptors.keys()) if (!ids.has(descriptorId)) issue(errors, 'snapshot.observations', 'missing_observation', `must explicitly cover ${descriptorId}`);
 }
 
 function expectedJoin(schema, snapshot, expected) {

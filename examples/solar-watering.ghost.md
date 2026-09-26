@@ -17,6 +17,11 @@ control SolarWateringFixture {
     latitude = 37.5665;
     longitude = 126.9780;
     at = sun`rise + 30min`;
+    basis = pulse;
+    when = true;
+    clock = trusted_only;
+    gap = skip_after(60s);
+    recovery = baseline;
     fallback = skip;
   }
 
@@ -25,6 +30,11 @@ control SolarWateringFixture {
     latitude = 37.5665;
     longitude = 126.9780;
     at = sun`set - 30min`;
+    basis = pulse;
+    when = true;
+    clock = trusted_only;
+    gap = skip_after(60s);
+    recovery = baseline;
     fallback = skip;
   }
 

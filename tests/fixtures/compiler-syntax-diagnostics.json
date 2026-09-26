@@ -1,0 +1,1280 @@
+{
+  "cases": [
+    {
+      "id": "lexer-unterminated-date",
+      "code": "control Bad { let value = date`2026-01-01; }",
+      "valid": "control Good { let value = date`2026-01-01`; }",
+      "at": "date`",
+      "message": "unterminated date literal"
+    },
+    {
+      "id": "lexer-unterminated-time",
+      "code": "control Bad { let value = time`06:30; }",
+      "valid": "control Good { let value = time`06:30`; }",
+      "at": "time`",
+      "message": "unterminated time literal"
+    },
+    {
+      "id": "lexer-unterminated-datetime",
+      "code": "control Bad { let value = datetime`2026-01-01T00:00:00Z; }",
+      "valid": "control Good { let value = datetime`2026-01-01T00:00:00Z`; }",
+      "at": "datetime`",
+      "message": "unterminated datetime literal"
+    },
+    {
+      "id": "lexer-unterminated-string",
+      "code": "control Bad { schedule starts: DailySlots<15min> { timezone = \"UTC; selected = []; } }",
+      "valid": "control Good { schedule starts: DailySlots<15min> { timezone = \"UTC\"; selected = []; } }",
+      "at": "\"UTC",
+      "message": "unterminated string literal"
+    },
+    {
+      "id": "lexer-invalid-string",
+      "code": "control Bad { schedule starts: DailySlots<15min> { timezone = \"\\q\"; selected = []; } }",
+      "valid": "control Good { schedule starts: DailySlots<15min> { timezone = \"UTC\"; selected = []; } }",
+      "at": "\"\\q\"",
+      "message": "invalid string literal"
+    },
+    {
+      "id": "parser-removed-prelude-purefn",
+      "code": "purefn ready() -> Bool { true } control Bad {}",
+      "valid": "fn ready() -> Bool { true } control Good {}",
+      "at": "purefn",
+      "message": "removed alias purefn; use fn"
+    },
+    {
+      "id": "parser-control-declaration",
+      "code": "module Bad {}",
+      "valid": "control Good {}",
+      "at": "module",
+      "message": "expected control declaration"
+    },
+    {
+      "id": "parser-control-name",
+      "code": "control 1 {}",
+      "valid": "control Good {}",
+      "at": "1",
+      "message": "expected control name"
+    },
+    {
+      "id": "parser-control-open-brace",
+      "code": "control Bad;",
+      "valid": "control Good {}",
+      "at": ";",
+      "message": "expected { after control name"
+    },
+    {
+      "id": "parser-unclosed-control",
+      "code": "control Bad { let value = true;",
+      "valid": "control Good { let value = true; }",
+      "at": "control",
+      "message": "unclosed control block"
+    },
+    {
+      "id": "parser-trailing-token",
+      "code": "control Bad {} extra",
+      "valid": "control Good {}",
+      "at": "extra",
+      "message": "unexpected trailing token extra"
+    },
+    {
+      "id": "parser-removed-enum",
+      "code": "control Bad { enum Mode = Off | On; }",
+      "valid": "control Good { type Mode = Off | On; }",
+      "at": "enum",
+      "message": "removed alias enum; use type Name = A | B;"
+    },
+    {
+      "id": "parser-removed-declaration-purefn",
+      "code": "control Bad { purefn ready() -> Bool { true } }",
+      "valid": "control Good { fn ready() -> Bool { true } }",
+      "at": "purefn",
+      "message": "removed alias purefn; use fn"
+    },
+    {
+      "id": "parser-removed-next",
+      "code": "control Bad { state ready: Bool = false; next ready = true; }",
+      "valid": "control Good { state ready: Bool = false; ready' = true; }",
+      "at": "next",
+      "message": "removed alias next; use stateName' = expression;"
+    },
+    {
+      "id": "parser-empty-adapt-policy",
+      "code": "control Bad { adapt Strategy {} }",
+      "valid": "control Good {}",
+      "at": "adapt",
+      "message": "adapt policy requires at least one strategy"
+    },
+    {
+      "id": "parser-unsupported-constraints-declaration",
+      "code": "control Bad { constraints {} }",
+      "valid": "control Good {}",
+      "at": "{",
+      "occurrence": 2,
+      "message": "expected constraints name"
+    },
+    {
+      "id": "parser-unsupported-check",
+      "code": "control Bad { check ready; }",
+      "valid": "control Good {}",
+      "at": "check",
+      "message": "unsupported construct check"
+    },
+    {
+      "id": "parser-unexpected-declaration",
+      "code": "control Bad { mystery value; }",
+      "valid": "control Good { let value = true; }",
+      "at": "mystery",
+      "message": "unexpected declaration mystery"
+    },
+    {
+      "id": "parser-output-initializer",
+      "code": "control Bad { output ready: Bool = false; }",
+      "valid": "control Good { output ready: Bool; ready <- false; }",
+      "at": "= false",
+      "message": "output declarations are type-only; connect each output with `name <- expression;`"
+    },
+    {
+      "id": "parser-result-type-comma",
+      "code": "control Bad { fn pass(value: Result<Bool SensorFault>) -> Bool { false } }",
+      "valid": "control Good { fn pass(value: Result<Bool, SensorFault>) -> Bool { false } }",
+      "at": "SensorFault",
+      "message": "Result type requires payload and error types"
+    },
+    {
+      "id": "parser-result-type-close",
+      "code": "control Bad { fn pass(value: Result<Bool, SensorFault) -> Bool { false } }",
+      "valid": "control Good { fn pass(value: Result<Bool, SensorFault>) -> Bool { false } }",
+      "at": ") ->",
+      "message": "Result type requires closing >"
+    },
+    {
+      "id": "parser-config-duplicate-option",
+      "code": "control Bad { config enabled: Bool = false { label = \"A\"; label = \"B\"; } }",
+      "valid": "control Good { config enabled: Bool = false { access = operator; label = \"A\"; } }",
+      "at": "label = \"B\"",
+      "message": "duplicate config option label"
+    },
+    {
+      "id": "parser-config-label-string",
+      "code": "control Bad { config enabled: Bool = false { label = true; } }",
+      "valid": "control Good { config enabled: Bool = false { access = operator; label = \"Enabled\"; } }",
+      "at": "true",
+      "message": "config label must be a string"
+    },
+    {
+      "id": "parser-config-negative-literal",
+      "code": "control Bad { config level: Number = 1.0 { min = -false; max = 2.0; step = 1.0; access = operator; } }",
+      "valid": "control Good { config level: Number = 1.0 { min = 0.0; max = 2.0; step = 1.0; access = operator; } }",
+      "at": "false",
+      "message": "config option negative value must be a number literal"
+    },
+    {
+      "id": "parser-config-literal",
+      "code": "control Bad { config enabled: Bool = false { access = (operator); } }",
+      "valid": "control Good { config enabled: Bool = false { access = operator; } }",
+      "at": "(operator)",
+      "message": "config option access must be a literal"
+    },
+    {
+      "id": "parser-function-result-arrow",
+      "code": "control Bad { fn ready() Bool { true } }",
+      "valid": "control Good { fn ready() -> Bool { true } }",
+      "at": "Bool",
+      "message": "function requires -> result type"
+    },
+    {
+      "id": "parser-function-body-close",
+      "code": "control Bad { fn ready() -> Bool { true; output value: Bool; value <- false; }",
+      "valid": "control Good { fn ready() -> Bool { true } output value: Bool; value <- false; }",
+      "at": "output",
+      "message": "expected } after function body"
+    },
+    {
+      "id": "parser-sensor-unsupported-option",
+      "code": "control Bad { sensor value: Number { unknown = 1.0; } }",
+      "valid": "control Good { sensor value: Number { sample = 1s; } }",
+      "at": "unknown",
+      "message": "unsupported sensor option unknown"
+    },
+    {
+      "id": "parser-sensor-valid-range",
+      "code": "control Bad { sensor value: Number { valid = 0.0, 1.0; } }",
+      "valid": "control Good { sensor value: Number { valid = 0.0 .. 1.0; } }",
+      "at": ", 1.0",
+      "message": "valid expects .."
+    },
+    {
+      "id": "parser-sensor-recover-samples",
+      "code": "control Bad { sensor value: Number { recover_after = 2 ticks; } }",
+      "valid": "control Good { sensor value: Number { recover_after = 2 samples; } }",
+      "at": "ticks",
+      "message": "recover_after expects samples"
+    },
+    {
+      "id": "parser-signal-equals",
+      "code": "control Bad { sensor value: Number; signal ready hysteresis(value, on_below: 1.0, off_above: 2.0, initial: false); }",
+      "valid": "control Good { sensor value: Number; signal ready = hysteresis(value, on_below: 1.0, off_above: 2.0, initial: false); }",
+      "at": "hysteresis",
+      "message": "signal requires ="
+    },
+    {
+      "id": "parser-schedule-kind",
+      "code": "control Bad { schedule starts: Weekly<15min> { timezone = \"UTC\"; selected = []; } }",
+      "valid": "control Good { schedule starts: DailySlots<15min> { timezone = \"UTC\"; selected = []; } }",
+      "at": "Weekly",
+      "message": "only Daily, DailySlots<15min>, Periodic, Cron, Solar and Tide schedules are supported"
+    },
+    {
+      "id": "parser-schedule-timezone-string",
+      "code": "control Bad { schedule starts: DailySlots<15min> { timezone = UTC; selected = []; } }",
+      "valid": "control Good { schedule starts: DailySlots<15min> { timezone = \"UTC\"; selected = []; } }",
+      "at": "UTC",
+      "message": "timezone must be a string"
+    },
+    {
+      "id": "parser-schedule-selected-time",
+      "code": "control Bad { schedule starts: DailySlots<15min> { timezone = \"UTC\"; selected = [true]; } }",
+      "valid": "control Good { schedule starts: DailySlots<15min> { timezone = \"UTC\"; selected = [06:00]; } }",
+      "at": "true",
+      "message": "selected entries must be HH:MM"
+    },
+    {
+      "id": "parser-schedule-option",
+      "code": "control Bad { schedule starts: DailySlots<15min> { timezone = \"UTC\"; other = []; selected = []; } }",
+      "valid": "control Good { schedule starts: DailySlots<15min> { timezone = \"UTC\"; selected = []; } }",
+      "at": "other",
+      "message": "unsupported schedule option other"
+    },
+    {
+      "id": "parser-solar-duplicate-option",
+      "code": "control Bad { schedule sun: Solar { timezone = \"UTC\"; timezone = \"UTC\"; } }",
+      "valid": "control Good { schedule sun: Solar { timezone = \"UTC\"; latitude = 0.0; longitude = 0.0; at = sun`rise`; fallback = skip; } }",
+      "at": "timezone = \"UTC\"",
+      "occurrence": 2,
+      "message": "duplicate Solar schedule option timezone"
+    },
+    {
+      "id": "parser-solar-coordinate-literal",
+      "code": "control Bad { schedule sun: Solar { latitude = north; } }",
+      "valid": "control Good { schedule sun: Solar { timezone = \"UTC\"; latitude = 0.0; longitude = 0.0; at = sun`rise`; fallback = skip; } }",
+      "at": "north",
+      "message": "Solar latitude must be a signed finite numeric literal"
+    },
+    {
+      "id": "parser-solar-coordinate-range",
+      "code": "control Bad { schedule sun: Solar { latitude = 91.0; } }",
+      "valid": "control Good { schedule sun: Solar { timezone = \"UTC\"; latitude = 90.0; longitude = 180.0; at = sun`rise`; fallback = skip; } }",
+      "at": "91.0",
+      "message": "Solar latitude must be between -90 and 90"
+    },
+    {
+      "id": "parser-solar-tag",
+      "code": "control Bad { schedule sun: Solar { at = moon`rise`; } }",
+      "valid": "control Good { schedule sun: Solar { timezone = \"UTC\"; latitude = 0.0; longitude = 0.0; at = sun`rise`; fallback = skip; } }",
+      "at": "moon",
+      "message": "Solar at must use sun`rise` or sun`set`"
+    },
+    {
+      "id": "parser-solar-event",
+      "code": "control Bad { schedule sun: Solar { at = sun`noon`; } }",
+      "valid": "control Good { schedule sun: Solar { timezone = \"UTC\"; latitude = 0.0; longitude = 0.0; at = sun`set`; fallback = skip; } }",
+      "at": "noon",
+      "message": "Solar event must be rise or set"
+    },
+    {
+      "id": "parser-solar-offset",
+      "code": "control Bad { schedule sun: Solar { at = sun`rise+soon`; } }",
+      "valid": "control Good { schedule sun: Solar { timezone = \"UTC\"; latitude = 0.0; longitude = 0.0; at = sun`rise+1min`; fallback = skip; } }",
+      "at": "soon",
+      "message": "Solar offset must be an integer duration literal"
+    },
+    {
+      "id": "parser-solar-fallback",
+      "code": "control Bad { schedule sun: Solar { fallback = retry; } }",
+      "valid": "control Good { schedule sun: Solar { timezone = \"UTC\"; latitude = 0.0; longitude = 0.0; at = sun`rise`; fallback = skip; } }",
+      "at": "retry",
+      "message": "Solar fallback must be skip"
+    },
+    {
+      "id": "parser-solar-option",
+      "code": "control Bad { schedule sun: Solar { provider = local; } }",
+      "valid": "control Good { schedule sun: Solar { timezone = \"UTC\"; latitude = 0.0; longitude = 0.0; at = sun`rise`; fallback = skip; } }",
+      "at": "provider",
+      "message": "unsupported Solar schedule option provider"
+    },
+    {
+      "id": "parser-require-implication",
+      "code": "control Bad { output ready: Bool; require ready; ready <- false; }",
+      "valid": "control Good { output ready, permit: Bool; require ready => permit; ready <- false; permit <- false; }",
+      "at": "; ready <-",
+      "message": "require supports an implication with =>"
+    },
+    {
+      "id": "parser-expression",
+      "code": "control Bad { let value = ; }",
+      "valid": "control Good { let value = true; }",
+      "at": "; }",
+      "message": "expected expression, found ;"
+    },
+    {
+      "id": "parser-expression-unsupported-adapt",
+      "code": "control Bad { let value = adapt; }",
+      "valid": "control Good { let value = true; }",
+      "at": "adapt",
+      "message": "unsupported construct adapt"
+    },
+    {
+      "id": "parser-call-close",
+      "code": "control Bad { let value = number(1; }",
+      "valid": "control Good { let value = number(1); }",
+      "at": "; }",
+      "message": "expected ) after arguments"
+    },
+    {
+      "id": "parser-empty-set",
+      "code": "control Bad { type Mode = Off | On; state mode: Mode = Off; let empty = mode in {}; }",
+      "valid": "control Good { type Mode = Off | On; state mode: Mode = Off; let selected = mode in {Off}; }",
+      "at": "in {}",
+      "message": "in set must not be empty"
+    },
+    {
+      "id": "parser-case-binding",
+      "code": "control Bad { sensor value: Bool; let ready = case value { ok(1) => true; fault(_) => false; }; }",
+      "valid": "control Good { sensor value: Bool; let ready = case value { ok(v) => v; fault(_) => false; }; }",
+      "at": "1",
+      "message": "expected case binding"
+    },
+    {
+      "id": "parser-input-name",
+      "code": "control Bad { input : Bool; }",
+      "valid": "control Good { input ready: Bool; }",
+      "at": ": Bool",
+      "message": "expected input name"
+    },
+    {
+      "id": "parser-input-colon",
+      "code": "control Bad { input ready Bool; }",
+      "valid": "control Good { input ready: Bool; }",
+      "at": "Bool",
+      "message": "expected : after input name"
+    },
+    {
+      "id": "parser-type-name",
+      "code": "control Bad { input ready: ; }",
+      "valid": "control Good { input ready: Bool; }",
+      "at": "; }",
+      "message": "expected type name"
+    },
+    {
+      "id": "parser-input-semicolon",
+      "code": "control Bad { input ready: Bool }",
+      "valid": "control Good { input ready: Bool; }",
+      "at": "}",
+      "message": "expected ; after input declaration"
+    },
+    {
+      "id": "parser-state-name",
+      "code": "control Bad { state : Bool = false; }",
+      "valid": "control Good { state ready: Bool = false; }",
+      "at": ": Bool",
+      "message": "expected state name"
+    },
+    {
+      "id": "parser-state-colon",
+      "code": "control Bad { state ready Bool = false; }",
+      "valid": "control Good { state ready: Bool = false; }",
+      "at": "Bool",
+      "message": "expected :"
+    },
+    {
+      "id": "parser-state-initial",
+      "code": "control Bad { state ready: Bool false; }",
+      "valid": "control Good { state ready: Bool = false; }",
+      "at": "false",
+      "message": "state requires an initial value"
+    },
+    {
+      "id": "parser-state-semicolon",
+      "code": "control Bad { state ready: Bool = false }",
+      "valid": "control Good { state ready: Bool = false; }",
+      "at": "}",
+      "message": "expected ; after state declaration"
+    },
+    {
+      "id": "parser-config-name",
+      "code": "control Bad { config : Bool = false; }",
+      "valid": "control Good { config enabled: Bool = false; }",
+      "at": ": Bool",
+      "message": "expected config name"
+    },
+    {
+      "id": "parser-config-value",
+      "code": "control Bad { config enabled: Bool false; }",
+      "valid": "control Good { config enabled: Bool = false; }",
+      "at": "false",
+      "message": "config requires a value"
+    },
+    {
+      "id": "parser-config-option-name",
+      "code": "control Bad { config enabled: Bool = false { = operator; } }",
+      "valid": "control Good { config enabled: Bool = false { access = operator; } }",
+      "at": "= operator",
+      "message": "expected config option"
+    },
+    {
+      "id": "parser-config-option-equals",
+      "code": "control Bad { config enabled: Bool = false { access operator; } }",
+      "valid": "control Good { config enabled: Bool = false { access = operator; } }",
+      "at": "operator",
+      "message": "expected = after config option access"
+    },
+    {
+      "id": "parser-config-option-semicolon",
+      "code": "control Bad { config enabled: Bool = false { access = operator } }",
+      "valid": "control Good { config enabled: Bool = false { access = operator; } }",
+      "at": "}",
+      "message": "expected ; after config option"
+    },
+    {
+      "id": "parser-config-semicolon",
+      "code": "control Bad { config enabled: Bool = false }",
+      "valid": "control Good { config enabled: Bool = false; }",
+      "at": "}",
+      "message": "expected ; after config declaration"
+    },
+    {
+      "id": "parser-let-name",
+      "code": "control Bad { let = true; }",
+      "valid": "control Good { let ready = true; }",
+      "at": "= true",
+      "message": "expected let name"
+    },
+    {
+      "id": "parser-let-equals",
+      "code": "control Bad { let ready true; }",
+      "valid": "control Good { let ready = true; }",
+      "at": "true",
+      "message": "let requires ="
+    },
+    {
+      "id": "parser-let-semicolon",
+      "code": "control Bad { let ready = true }",
+      "valid": "control Good { let ready = true; }",
+      "at": "}",
+      "message": "expected ; after let declaration"
+    },
+    {
+      "id": "parser-type-declaration-name",
+      "code": "control Bad { type = Off; }",
+      "valid": "control Good { type Mode = Off; }",
+      "at": "= Off",
+      "message": "expected type name"
+    },
+    {
+      "id": "parser-type-equals",
+      "code": "control Bad { type Mode Off; }",
+      "valid": "control Good { type Mode = Off; }",
+      "at": "Off",
+      "message": "type requires ="
+    },
+    {
+      "id": "parser-enum-member",
+      "code": "control Bad { type Mode = ; }",
+      "valid": "control Good { type Mode = Off; }",
+      "at": "; }",
+      "message": "expected enum member"
+    },
+    {
+      "id": "parser-type-semicolon",
+      "code": "control Bad { type Mode = Off }",
+      "valid": "control Good { type Mode = Off; }",
+      "at": "}",
+      "message": "expected ; after type declaration"
+    },
+    {
+      "id": "parser-function-name",
+      "code": "control Bad { fn () -> Bool { true } }",
+      "valid": "control Good { fn ready() -> Bool { true } }",
+      "at": "()",
+      "message": "expected function name"
+    },
+    {
+      "id": "parser-function-open-paren",
+      "code": "control Bad { fn ready -> Bool { true } }",
+      "valid": "control Good { fn ready() -> Bool { true } }",
+      "at": "->",
+      "message": "expected ( after function name"
+    },
+    {
+      "id": "parser-parameter-name",
+      "code": "control Bad { fn ready(: Bool) -> Bool { true } }",
+      "valid": "control Good { fn ready(value: Bool) -> Bool { value } }",
+      "at": ": Bool",
+      "message": "expected parameter name"
+    },
+    {
+      "id": "parser-parameter-type-separator",
+      "code": "control Bad { fn ready(value Bool) -> Bool { true } }",
+      "valid": "control Good { fn ready(value: Bool) -> Bool { value } }",
+      "at": "Bool",
+      "message": "parameter requires a type"
+    },
+    {
+      "id": "parser-function-close-paren",
+      "code": "control Bad { fn ready(value: Bool -> Bool { true } }",
+      "valid": "control Good { fn ready(value: Bool) -> Bool { value } }",
+      "at": "->",
+      "message": "expected )"
+    },
+    {
+      "id": "parser-function-body-open",
+      "code": "control Bad { fn ready() -> Bool true }",
+      "valid": "control Good { fn ready() -> Bool { true } }",
+      "at": "true",
+      "message": "expected { before function body"
+    },
+    {
+      "id": "parser-sensor-name",
+      "code": "control Bad { sensor : Number; }",
+      "valid": "control Good { sensor value: Number; }",
+      "at": ": Number",
+      "message": "expected sensor name"
+    },
+    {
+      "id": "parser-sensor-option-name",
+      "code": "control Bad { sensor value: Number { = 1s; } }",
+      "valid": "control Good { sensor value: Number { sample = 1s; } }",
+      "at": "= 1s",
+      "message": "expected sensor option"
+    },
+    {
+      "id": "parser-sensor-option-equals",
+      "code": "control Bad { sensor value: Number { sample 1s; } }",
+      "valid": "control Good { sensor value: Number { sample = 1s; } }",
+      "at": "1s",
+      "message": "expected = after sample"
+    },
+    {
+      "id": "parser-sensor-option-semicolon",
+      "code": "control Bad { sensor value: Number { sample = 1s } }",
+      "valid": "control Good { sensor value: Number { sample = 1s; } }",
+      "at": "}",
+      "message": "expected ; after sensor option"
+    },
+    {
+      "id": "parser-sensor-semicolon",
+      "code": "control Bad { sensor value: Number }",
+      "valid": "control Good { sensor value: Number; }",
+      "at": "}",
+      "message": "expected ; after sensor declaration"
+    },
+    {
+      "id": "parser-signal-name",
+      "code": "control Bad { signal = true; }",
+      "valid": "control Good { sensor value: Number; signal ready = hysteresis(value, on_below: 1.0, off_above: 2.0, initial: false); }",
+      "at": "= true",
+      "message": "expected signal name"
+    },
+    {
+      "id": "parser-signal-semicolon",
+      "code": "control Bad { sensor value: Number; signal ready = hysteresis(value, on_below: 1.0, off_above: 2.0, initial: false) }",
+      "valid": "control Good { sensor value: Number; signal ready = hysteresis(value, on_below: 1.0, off_above: 2.0, initial: false); }",
+      "at": "}",
+      "message": "expected ; after signal declaration"
+    },
+    {
+      "id": "parser-schedule-name",
+      "code": "control Bad { schedule : DailySlots<15min> { timezone = \"UTC\"; selected = []; } }",
+      "valid": "control Good { schedule starts: DailySlots<15min> { timezone = \"UTC\"; selected = []; } }",
+      "at": ": DailySlots",
+      "message": "expected schedule name"
+    },
+    {
+      "id": "parser-schedule-type",
+      "code": "control Bad { schedule starts: <15min> { timezone = \"UTC\"; selected = []; } }",
+      "valid": "control Good { schedule starts: DailySlots<15min> { timezone = \"UTC\"; selected = []; } }",
+      "at": "<15min",
+      "message": "expected schedule type"
+    },
+    {
+      "id": "parser-schedule-close-generic",
+      "code": "control Bad { schedule starts: DailySlots<15min { timezone = \"UTC\"; selected = []; } }",
+      "valid": "control Good { schedule starts: DailySlots<15min> { timezone = \"UTC\"; selected = []; } }",
+      "at": "{ timezone",
+      "message": "expected > after DailySlots interval"
+    },
+    {
+      "id": "parser-schedule-body-open",
+      "code": "control Bad { schedule starts: DailySlots<15min> timezone = \"UTC\"; }",
+      "valid": "control Good { schedule starts: DailySlots<15min> { timezone = \"UTC\"; selected = []; } }",
+      "at": "timezone",
+      "message": "expected { after schedule type"
+    },
+    {
+      "id": "parser-schedule-option-semicolon",
+      "code": "control Bad { schedule starts: DailySlots<15min> { timezone = \"UTC\" selected = []; } }",
+      "valid": "control Good { schedule starts: DailySlots<15min> { timezone = \"UTC\"; selected = []; } }",
+      "at": "selected",
+      "message": "expected ; after schedule option"
+    },
+    {
+      "id": "parser-solar-body-open",
+      "code": "control Bad { schedule sun: Solar timezone = \"UTC\"; }",
+      "valid": "control Good { schedule sun: Solar { timezone = \"UTC\"; latitude = 0.0; longitude = 0.0; at = sun`rise`; fallback = skip; } }",
+      "at": "timezone",
+      "message": "expected { after Solar"
+    },
+    {
+      "id": "parser-solar-option-name",
+      "code": "control Bad { schedule sun: Solar { = \"UTC\"; } }",
+      "valid": "control Good { schedule sun: Solar { timezone = \"UTC\"; latitude = 0.0; longitude = 0.0; at = sun`rise`; fallback = skip; } }",
+      "at": "= \"UTC\"",
+      "message": "expected Solar schedule option"
+    },
+    {
+      "id": "parser-solar-option-equals",
+      "code": "control Bad { schedule sun: Solar { timezone \"UTC\"; } }",
+      "valid": "control Good { schedule sun: Solar { timezone = \"UTC\"; latitude = 0.0; longitude = 0.0; at = sun`rise`; fallback = skip; } }",
+      "at": "\"UTC\"",
+      "message": "expected = after Solar schedule option timezone"
+    },
+    {
+      "id": "parser-solar-tag-open",
+      "code": "control Bad { schedule sun: Solar { at = sun rise; } }",
+      "valid": "control Good { schedule sun: Solar { timezone = \"UTC\"; latitude = 0.0; longitude = 0.0; at = sun`rise`; fallback = skip; } }",
+      "at": "rise",
+      "message": "Solar at must use a sun tagged literal"
+    },
+    {
+      "id": "parser-solar-event-identifier",
+      "code": "control Bad { schedule sun: Solar { at = sun`1`; } }",
+      "valid": "control Good { schedule sun: Solar { timezone = \"UTC\"; latitude = 0.0; longitude = 0.0; at = sun`rise`; fallback = skip; } }",
+      "at": "1",
+      "message": "Solar event must be rise or set"
+    },
+    {
+      "id": "parser-solar-tag-close",
+      "code": "control Bad { schedule sun: Solar { at = sun`rise; } }",
+      "valid": "control Good { schedule sun: Solar { timezone = \"UTC\"; latitude = 0.0; longitude = 0.0; at = sun`rise`; fallback = skip; } }",
+      "at": "; }",
+      "message": "Solar at tagged literal must end with `"
+    },
+    {
+      "id": "parser-solar-option-semicolon",
+      "code": "control Bad { schedule sun: Solar { timezone = \"UTC\" } }",
+      "valid": "control Good { schedule sun: Solar { timezone = \"UTC\"; latitude = 0.0; longitude = 0.0; at = sun`rise`; fallback = skip; } }",
+      "at": "}",
+      "message": "expected ; after Solar schedule option"
+    },
+    {
+      "id": "parser-timer-name",
+      "code": "control Bad { timer = continuous_true(true); }",
+      "valid": "control Good { timer active = continuous_true(true); }",
+      "at": "= continuous",
+      "message": "expected timer name"
+    },
+    {
+      "id": "parser-timer-equals",
+      "code": "control Bad { timer active continuous_true(true); }",
+      "valid": "control Good { timer active = continuous_true(true); }",
+      "at": "continuous_true",
+      "message": "expected ="
+    },
+    {
+      "id": "parser-timer-semicolon",
+      "code": "control Bad { timer active = continuous_true(true) }",
+      "valid": "control Good { timer active = continuous_true(true); }",
+      "at": "}",
+      "message": "expected ; after timer declaration"
+    },
+    {
+      "id": "parser-next-equals",
+      "code": "control Bad { state ready: Bool = false; ready' true; }",
+      "valid": "control Good { state ready: Bool = false; ready' = true; }",
+      "at": "true",
+      "message": "next state requires ="
+    },
+    {
+      "id": "parser-next-semicolon",
+      "code": "control Bad { state ready: Bool = false; ready' = true }",
+      "valid": "control Good { state ready: Bool = false; ready' = true; }",
+      "at": "}",
+      "message": "expected ; after next state"
+    },
+    {
+      "id": "parser-connection-semicolon",
+      "code": "control Bad { output ready: Bool; ready <- false }",
+      "valid": "control Good { output ready: Bool; ready <- false; }",
+      "at": "}",
+      "message": "expected ; after output connection"
+    },
+    {
+      "id": "parser-require-semicolon",
+      "code": "control Bad { output ready, permit: Bool; require ready => permit ready <- false; permit <- false; }",
+      "valid": "control Good { output ready, permit: Bool; require ready => permit; ready <- false; permit <- false; }",
+      "at": "ready <-",
+      "message": "expected ; after require"
+    },
+    {
+      "id": "parser-mutex-open",
+      "code": "control Bad { mutex ready); }",
+      "valid": "control Good { output ready, permit: Bool; ready <- false; permit <- false; mutex(ready, permit); }",
+      "at": "ready",
+      "message": "expected ("
+    },
+    {
+      "id": "parser-mutex-output",
+      "code": "control Bad { mutex(); }",
+      "valid": "control Good { output ready, permit: Bool; ready <- false; permit <- false; mutex(ready, permit); }",
+      "at": ")",
+      "message": "expected mutex output"
+    },
+    {
+      "id": "parser-mutex-close",
+      "code": "control Bad { mutex(ready; }",
+      "valid": "control Good { output ready, permit: Bool; ready <- false; permit <- false; mutex(ready, permit); }",
+      "at": "; }",
+      "message": "expected )"
+    },
+    {
+      "id": "parser-if-then",
+      "code": "control Bad { let ready = if true false else true; }",
+      "valid": "control Good { let ready = if true then false else true; }",
+      "at": "false",
+      "message": "if requires then"
+    },
+    {
+      "id": "parser-if-else",
+      "code": "control Bad { let ready = if true then false true; }",
+      "valid": "control Good { let ready = if true then false else true; }",
+      "at": "true; }",
+      "message": "if requires else"
+    },
+    {
+      "id": "parser-member-name",
+      "code": "control Bad { let due = starts.; }",
+      "valid": "control Good { schedule starts: DailySlots<15min> { timezone = \"UTC\"; selected = []; } let due = starts.due; }",
+      "at": "; }",
+      "message": "expected member after ."
+    },
+    {
+      "id": "parser-group-close",
+      "code": "control Bad { let ready = (true; }",
+      "valid": "control Good { let ready = (true); }",
+      "at": "; }",
+      "message": "expected )"
+    },
+    {
+      "id": "parser-in-open",
+      "code": "control Bad { type Mode = Off | On; state mode: Mode = Off; let selected = mode in Off; }",
+      "valid": "control Good { type Mode = Off | On; state mode: Mode = Off; let selected = mode in {Off}; }",
+      "at": "Off; }",
+      "occurrence": 3,
+      "message": "in requires {"
+    },
+    {
+      "id": "parser-in-close",
+      "code": "control Bad { type Mode = Off | On; state mode: Mode = Off; let selected = mode in {Off; }",
+      "valid": "control Good { type Mode = Off | On; state mode: Mode = Off; let selected = mode in {Off}; }",
+      "at": "; }",
+      "message": "expected } after in set"
+    },
+    {
+      "id": "parser-case-open",
+      "code": "control Bad { type Mode = Off | On; state mode: Mode = Off; let selected = case mode Off => false; }",
+      "valid": "control Good { type Mode = Off | On; state mode: Mode = Off; let selected = case mode { Off => false; On => true; }; }",
+      "at": "Off =>",
+      "occurrence": 3,
+      "message": "case requires {"
+    },
+    {
+      "id": "parser-case-pattern",
+      "code": "control Bad { type Mode = Off | On; state mode: Mode = Off; let selected = case mode { 1 => false; }; }",
+      "valid": "control Good { type Mode = Off | On; state mode: Mode = Off; let selected = case mode { Off => false; On => true; }; }",
+      "at": "1 =>",
+      "message": "expected case pattern"
+    },
+    {
+      "id": "parser-case-binding-close",
+      "code": "control Bad { sensor value: Bool; let ready = case value { ok(v => v; fault(_) => false; }; }",
+      "valid": "control Good { sensor value: Bool; let ready = case value { ok(v) => v; fault(_) => false; }; }",
+      "at": "=> v",
+      "message": "expected )"
+    },
+    {
+      "id": "parser-case-arrow",
+      "code": "control Bad { type Mode = Off | On; state mode: Mode = Off; let selected = case mode { Off false; On => true; }; }",
+      "valid": "control Good { type Mode = Off | On; state mode: Mode = Off; let selected = case mode { Off => false; On => true; }; }",
+      "at": "false",
+      "message": "case pattern requires =>"
+    },
+    {
+      "id": "parser-output-name",
+      "code": "control Bad { output : Bool; }",
+      "valid": "control Good { output ready: Bool; ready <- false; }",
+      "at": ": Bool",
+      "message": "expected output name"
+    },
+    {
+      "id": "parser-output-colon",
+      "code": "control Bad { output ready Bool; }",
+      "valid": "control Good { output ready: Bool; ready <- false; }",
+      "at": "Bool",
+      "message": "expected : after output name"
+    },
+    {
+      "id": "parser-output-semicolon",
+      "code": "control Bad { output ready: Bool }",
+      "valid": "control Good { output ready: Bool; ready <- false; }",
+      "at": "}",
+      "message": "expected ; after output declaration"
+    },
+    {
+      "id": "parser-config-label-negative",
+      "code": "control Bad { config enabled: Bool = false { label = -1; } }",
+      "valid": "control Good { config enabled: Bool = false { access = operator; label = \"Enabled\"; } }",
+      "at": "-1",
+      "message": "config label must be a string"
+    },
+    {
+      "id": "parser-limit-declaration",
+      "code": "control Bad { limit ready; }",
+      "valid": "control Good {}",
+      "at": "limit",
+      "message": "unsupported construct limit"
+    },
+    {
+      "id": "parser-expression-unsupported-constraints",
+      "code": "control Bad { let value = constraints; }",
+      "valid": "control Good { let value = true; }",
+      "at": "constraints",
+      "message": "unsupported construct constraints"
+    },
+    {
+      "id": "parser-schedule-colon",
+      "code": "control Bad { schedule starts DailySlots<15min> { timezone = \"UTC\"; selected = []; } }",
+      "valid": "control Good { schedule starts: DailySlots<15min> { timezone = \"UTC\"; selected = []; } }",
+      "at": "DailySlots",
+      "message": "expected :"
+    },
+    {
+      "id": "parser-schedule-open-generic",
+      "code": "control Bad { schedule starts: DailySlots 15min> { timezone = \"UTC\"; selected = []; } }",
+      "valid": "control Good { schedule starts: DailySlots<15min> { timezone = \"UTC\"; selected = []; } }",
+      "at": "15min",
+      "message": "expected <"
+    },
+    {
+      "id": "parser-schedule-interval-expression",
+      "code": "control Bad { schedule starts: DailySlots<> { timezone = \"UTC\"; selected = []; } }",
+      "valid": "control Good { schedule starts: DailySlots<15min> { timezone = \"UTC\"; selected = []; } }",
+      "at": ">",
+      "message": "expected expression, found >"
+    },
+    {
+      "id": "parser-schedule-option-name",
+      "code": "control Bad { schedule starts: DailySlots<15min> { = \"UTC\"; } }",
+      "valid": "control Good { schedule starts: DailySlots<15min> { timezone = \"UTC\"; selected = []; } }",
+      "at": "= \"UTC\"",
+      "message": "expected schedule option"
+    },
+    {
+      "id": "parser-schedule-option-equals",
+      "code": "control Bad { schedule starts: DailySlots<15min> { timezone \"UTC\"; } }",
+      "valid": "control Good { schedule starts: DailySlots<15min> { timezone = \"UTC\"; selected = []; } }",
+      "at": "\"UTC\"",
+      "message": "expected ="
+    },
+    {
+      "id": "parser-schedule-selected-open",
+      "code": "control Bad { schedule starts: DailySlots<15min> { selected = 06:00]; } }",
+      "valid": "control Good { schedule starts: DailySlots<15min> { timezone = \"UTC\"; selected = [06:00]; } }",
+      "at": "06:00",
+      "message": "selected requires HH:MM slots or a TimeSlots config"
+    },
+    {
+      "id": "parser-schedule-selected-close",
+      "code": "control Bad { schedule starts: DailySlots<15min> { selected = [06:00; } }",
+      "valid": "control Good { schedule starts: DailySlots<15min> { timezone = \"UTC\"; selected = [06:00]; } }",
+      "at": "; }",
+      "message": "expected ]"
+    },
+    {
+      "id": "parser-solar-timezone-string",
+      "code": "control Bad { schedule sun: Solar { timezone = UTC; } }",
+      "valid": "control Good { schedule sun: Solar { timezone = \"UTC\"; latitude = 0.0; longitude = 0.0; at = sun`rise`; fallback = skip; } }",
+      "at": "UTC",
+      "message": "Solar timezone must be a string"
+    },
+    {
+      "id": "parser-solar-fallback-identifier",
+      "code": "control Bad { schedule sun: Solar { fallback = 1; } }",
+      "valid": "control Good { schedule sun: Solar { timezone = \"UTC\"; latitude = 0.0; longitude = 0.0; at = sun`rise`; fallback = skip; } }",
+      "at": "1",
+      "message": "Solar fallback must be skip"
+    },
+    {
+      "id": "parser-solar-tag-identifier",
+      "code": "control Bad { schedule sun: Solar { at = 1; } }",
+      "valid": "control Good { schedule sun: Solar { timezone = \"UTC\"; latitude = 0.0; longitude = 0.0; at = sun`rise`; fallback = skip; } }",
+      "at": "1",
+      "message": "Solar at must use sun`rise` or sun`set`"
+    },
+    {
+      "id": "parser-solar-longitude-range",
+      "code": "control Bad { schedule sun: Solar { longitude = -181.0; } }",
+      "valid": "control Good { schedule sun: Solar { timezone = \"UTC\"; latitude = 0.0; longitude = -180.0; at = sun`rise`; fallback = skip; } }",
+      "at": "181.0",
+      "message": "Solar longitude must be between -180 and 180"
+    },
+    {
+      "id": "parser-mutex-semicolon",
+      "code": "control Bad { mutex(ready, permit) }",
+      "valid": "control Good { output ready, permit: Bool; ready <- false; permit <- false; mutex(ready, permit); }",
+      "at": "}",
+      "message": "expected ;"
+    },
+    {
+      "id": "parser-config-colon",
+      "code": "control Bad { config enabled Bool = false; }",
+      "valid": "control Good { config enabled: Bool = false; }",
+      "at": "Bool",
+      "message": "expected :"
+    },
+    {
+      "id": "parser-sensor-colon",
+      "code": "control Bad { sensor value Number; }",
+      "valid": "control Good { sensor value: Number; }",
+      "at": "Number",
+      "message": "expected :"
+    }
+  ],
+  "literateCases": [
+    {
+      "id": "literate-front-matter",
+      "filename": "front-matter.ghost.md",
+      "markdown": "---\ntitle: Open",
+      "line": 1,
+      "column": 1,
+      "message": "unclosed front matter"
+    },
+    {
+      "id": "literate-unknown-tag",
+      "filename": "unknown-tag.ghost.md",
+      "markdown": "```ghost-python\ncontrol Bad {}\n```",
+      "line": 1,
+      "column": 1,
+      "message": "unknown ghost tag"
+    },
+    {
+      "id": "literate-fence-attributes",
+      "filename": "attributes.ghost.md",
+      "markdown": "```ghost title=demo\ncontrol Bad {}\n```",
+      "line": 1,
+      "column": 1,
+      "message": "unsupported ghost fence attributes"
+    },
+    {
+      "id": "literate-unclosed-fence",
+      "filename": "unclosed.ghost.md",
+      "markdown": "```ghost\ncontrol Bad {}",
+      "line": 1,
+      "column": 1,
+      "message": "unclosed ghost fence"
+    },
+    {
+      "id": "literate-no-code",
+      "filename": "no-code.ghost.md",
+      "markdown": "# Prose only",
+      "line": 1,
+      "column": 1,
+      "message": "no executable ghost code"
+    },
+    {
+      "id": "literate-malformed-link",
+      "filename": "malformed-link.ghost.md",
+      "markdown": "```ghost\n// ghostflow:link bad\ncontrol Bad {}\n```",
+      "line": 2,
+      "column": 4,
+      "message": "malformed ghostflow link directive"
+    },
+    {
+      "id": "literate-malformed-anchor",
+      "filename": "malformed-anchor.ghost.md",
+      "markdown": "<!-- ghostflow:anchor bad -->\nBody.\n\n```ghost\ncontrol Bad {}\n```",
+      "line": 1,
+      "column": 6,
+      "message": "malformed ghostflow anchor directive"
+    },
+    {
+      "id": "literate-anchor-body",
+      "filename": "anchor-body.ghost.md",
+      "markdown": "<!-- ghostflow:anchor id=GF-ONE kind=intent status=confirmed origin=user -->\n# Heading\n\n```ghost\ncontrol Bad {}\n```",
+      "line": 1,
+      "column": 1,
+      "message": "ghostflow anchor requires one following top-level paragraph or block quote"
+    }
+  ],
+  "additionalCaseIds": [
+    "resource-parser-source-limit",
+    "resource-token-limit",
+    "resource-parser-depth",
+    "resource-ast-node-limit",
+    "lexer-unexpected-unicode",
+    "literate-crlf-remap",
+    "literate-multiple-fences"
+  ],
+  "ingressCaseIds": [
+    "literate non-string input",
+    "literate byte limit",
+    "literate line limit",
+    "existing:literate-nested-warning",
+    "non-string source",
+    "malformed Unicode source",
+    "oversized source",
+    "non-literate filename",
+    "empty filename",
+    "NUL filename",
+    "malformed Unicode filename",
+    "null options",
+    "non-object options",
+    "removed interactionSchema option",
+    "confirmed assumption",
+    "duplicate anchor",
+    "unknown linked anchor",
+    "orphan link",
+    "duplicate identical link",
+    "superseded anchor link",
+    "assumes requires unconfirmed assumption",
+    "non-assumes relation rejects assumption",
+    "CLI mapped syntax --check/build",
+    "CLI adjacent valid --check/build",
+    "CLI empty arguments",
+    "CLI missing build output",
+    "CLI extra build operand",
+    "CLI unknown flag",
+    "CLI duplicate check flag",
+    "CLI extra check operand",
+    "CLI invalid continuation --check/build",
+    "CLI truncated sequence --check/build",
+    "CLI lone continuation --check/build",
+    "CLI BOM source identity",
+    "CLI missing input ENOENT"
+  ],
+  "siteCoverage": [
+    { "sites": ["compileSource/compiled-module-byte-limit"], "cases": [], "delegatesTo": "tests/compiler-semantic-diagnostics.test.mjs: compiled-module-byte-limit; tasks/compiler-semantic-diagnostics-coverage.md: Post-compilation module envelope. Named expression reuse reaches this public guard; the valid neighboring artifact is 1,044,663 bytes." },
+    { "sites": ["control.mjs:111"], "cases": ["resource-parser-source-limit"] },
+    { "sites": ["control.mjs:121"], "cases": ["resource-token-limit"] },
+    { "sites": ["control.mjs:141"], "cases": ["lexer-unterminated-date", "lexer-unterminated-time", "lexer-unterminated-datetime"] },
+    { "sites": ["control.mjs:159"], "cases": ["lexer-unterminated-string"] },
+    { "sites": ["control.mjs:160"], "cases": ["lexer-invalid-string"] },
+    { "sites": ["control.mjs:187"], "cases": ["lexer-unexpected-unicode"] },
+    { "sites": ["control.mjs:205-206"], "cases": [], "delegatesTo": "Each expect call site below maps its supplied diagnostic to a case." },
+    { "sites": ["control.mjs:209-212"], "cases": [], "delegatesTo": "Each identifier call site below maps its supplied diagnostic to a case." },
+    { "sites": ["control.mjs:216"], "cases": ["resource-ast-node-limit"] },
+    { "sites": ["control.mjs:226"], "cases": ["resource-parser-depth"] },
+    { "sites": ["control.mjs:231"], "cases": ["parser-removed-prelude-purefn"] },
+    { "sites": ["control.mjs:233"], "cases": ["parser-control-declaration"] },
+    { "sites": ["control.mjs:234"], "cases": ["parser-control-name"] },
+    { "sites": ["control.mjs:235"], "cases": ["parser-control-open-brace"] },
+    { "sites": ["control.mjs:238"], "cases": ["parser-unclosed-control"] },
+    { "sites": ["control.mjs:242"], "cases": ["parser-trailing-token"] },
+    { "sites": ["control.mjs:254"], "cases": ["parser-removed-enum"] },
+    { "sites": ["control.mjs:256"], "cases": ["parser-removed-declaration-purefn"] },
+    { "sites": ["control.mjs:263"], "cases": ["parser-removed-next"] },
+    { "sites": ["control.mjs:265"], "cases": ["parser-unsupported-constraints-declaration"] },
+    { "sites": ["control.mjs:266"], "cases": ["parser-unsupported-check", "parser-limit-declaration"] },
+    { "sites": ["control.mjs:270"], "cases": ["parser-unexpected-declaration"] },
+    { "sites": ["control.mjs:273-275"], "cases": ["parser-input-name", "parser-output-name", "parser-mutex-output"] },
+    { "sites": ["control.mjs:279"], "cases": ["parser-type-name", "parser-type-declaration-name"] },
+    { "sites": ["control.mjs:283"], "cases": ["parser-result-type-comma"] },
+    { "sites": ["control.mjs:285"], "cases": ["parser-result-type-close"] },
+    { "sites": ["control.mjs:292"], "cases": ["parser-input-colon", "parser-output-colon"] },
+    { "sites": ["control.mjs:295"], "cases": ["parser-output-initializer"] },
+    { "sites": ["control.mjs:299"], "cases": ["parser-input-semicolon", "parser-output-semicolon"] },
+    { "sites": ["control.mjs:303"], "cases": ["parser-state-name"] },
+    { "sites": ["control.mjs:304"], "cases": ["parser-state-colon", "parser-state-initial"] },
+    { "sites": ["control.mjs:305"], "cases": ["parser-state-semicolon"] },
+    { "sites": ["control.mjs:309"], "cases": ["parser-config-name"] },
+    { "sites": ["control.mjs:310"], "cases": ["parser-config-colon", "parser-config-value"] },
+    { "sites": ["control.mjs:315"], "cases": ["parser-config-option-name"] },
+    { "sites": ["control.mjs:316"], "cases": ["parser-config-duplicate-option"] },
+    { "sites": ["control.mjs:317"], "cases": ["parser-config-option-equals"] },
+    { "sites": ["control.mjs:321", "control.mjs:322"], "cases": ["parser-config-label-negative", "parser-config-label-string"] },
+    { "sites": ["control.mjs:325"], "cases": ["parser-config-negative-literal"] },
+    { "sites": ["control.mjs:326"], "cases": ["parser-config-literal"] },
+    { "sites": ["control.mjs:329"], "cases": ["parser-config-option-semicolon"] },
+    { "sites": ["control.mjs:333"], "cases": ["parser-config-semicolon"] },
+    { "sites": ["control.mjs:338"], "cases": ["parser-let-name"] },
+    { "sites": ["control.mjs:341"], "cases": ["parser-let-equals", "parser-let-semicolon"] },
+    { "sites": ["control.mjs:345"], "cases": ["parser-type-declaration-name"] },
+    { "sites": ["control.mjs:346", "control.mjs:347"], "cases": ["parser-type-equals", "parser-enum-member"] },
+    { "sites": ["control.mjs:348"], "cases": ["parser-type-semicolon"] },
+    { "sites": ["control.mjs:369"], "cases": ["parser-function-name"] },
+    { "sites": ["control.mjs:370"], "cases": ["parser-function-open-paren"] },
+    { "sites": ["control.mjs:373"], "cases": ["parser-parameter-name", "parser-parameter-type-separator"] },
+    { "sites": ["control.mjs:377"], "cases": ["parser-function-close-paren", "parser-function-result-arrow"] },
+    { "sites": ["control.mjs:378"], "cases": ["parser-function-body-open"] },
+    { "sites": ["control.mjs:379"], "cases": ["parser-function-body-close"] },
+    { "sites": ["control.mjs:383"], "cases": ["parser-sensor-name"] },
+    { "sites": ["control.mjs:384"], "cases": ["parser-sensor-colon"] },
+    { "sites": ["control.mjs:387"], "cases": ["parser-sensor-option-name", "parser-sensor-option-equals"] },
+    { "sites": ["control.mjs:389"], "cases": ["parser-sensor-valid-range"] },
+    { "sites": ["control.mjs:394"], "cases": ["parser-sensor-recover-samples"] },
+    { "sites": ["control.mjs:395"], "cases": ["parser-sensor-unsupported-option"] },
+    { "sites": ["control.mjs:396"], "cases": ["parser-sensor-option-semicolon"] },
+    { "sites": ["control.mjs:399"], "cases": ["parser-sensor-semicolon"] },
+    { "sites": ["control.mjs:403"], "cases": ["parser-signal-name", "parser-signal-equals"] },
+    { "sites": ["control.mjs:404"], "cases": ["parser-signal-semicolon"] },
+    { "sites": ["control.mjs:408"], "cases": ["parser-schedule-name", "parser-schedule-colon"] },
+    { "sites": ["control.mjs:409"], "cases": ["parser-schedule-type"] },
+    { "sites": ["control.mjs:411"], "cases": ["parser-schedule-kind"] },
+    { "sites": ["control.mjs:623"], "cases": ["parser-empty-adapt-policy"] },
+    { "sites": ["control.mjs:412"], "cases": ["parser-schedule-open-generic", "parser-schedule-interval-expression", "parser-schedule-close-generic"] },
+    { "sites": ["control.mjs:413"], "cases": ["parser-schedule-body-open"] },
+    { "sites": ["control.mjs:415"], "cases": ["parser-schedule-option-name", "parser-schedule-option-equals"] },
+    { "sites": ["control.mjs:416"], "cases": ["parser-schedule-timezone-string"] },
+    { "sites": ["control.mjs:418"], "cases": ["parser-schedule-selected-open"] },
+    { "sites": ["control.mjs:419"], "cases": ["parser-schedule-selected-time"] },
+    { "sites": ["control.mjs:420"], "cases": ["parser-schedule-selected-close"] },
+    { "sites": ["control.mjs:421"], "cases": ["parser-schedule-option"] },
+    { "sites": ["control.mjs:422"], "cases": ["parser-schedule-option-semicolon"] },
+    { "sites": ["control.mjs:428"], "cases": ["parser-solar-body-open"] },
+    { "sites": ["control.mjs:432"], "cases": ["parser-solar-option-name"] },
+    { "sites": ["control.mjs:433"], "cases": ["parser-solar-duplicate-option"] },
+    { "sites": ["control.mjs:435"], "cases": ["parser-solar-option-equals"] },
+    { "sites": ["control.mjs:438"], "cases": ["parser-solar-timezone-string"] },
+    { "sites": ["control.mjs:445", "control.mjs:446"], "cases": ["parser-solar-fallback-identifier", "parser-solar-fallback"] },
+    { "sites": ["control.mjs:448"], "cases": ["parser-solar-option"] },
+    { "sites": ["control.mjs:449"], "cases": ["parser-solar-option-semicolon"] },
+    { "sites": ["control.mjs:458"], "cases": ["parser-solar-coordinate-literal"] },
+    { "sites": ["control.mjs:464"], "cases": ["parser-solar-coordinate-range", "parser-solar-longitude-range"] },
+    { "sites": ["control.mjs:469", "control.mjs:470"], "cases": ["parser-solar-tag-identifier", "parser-solar-tag"] },
+    { "sites": ["control.mjs:471"], "cases": ["parser-solar-tag-open"] },
+    { "sites": ["control.mjs:472", "control.mjs:473"], "cases": ["parser-solar-event-identifier", "parser-solar-event"] },
+    { "sites": ["control.mjs:478"], "cases": ["parser-solar-offset"] },
+    { "sites": ["control.mjs:482"], "cases": ["parser-solar-tag-close"] },
+    { "sites": ["control.mjs:486"], "cases": ["parser-timer-name", "parser-timer-equals"] },
+    { "sites": ["control.mjs:487"], "cases": ["parser-timer-semicolon"] },
+    { "sites": ["control.mjs:493"], "cases": ["parser-next-equals", "parser-next-semicolon"] },
+    { "sites": ["control.mjs:498"], "cases": ["parser-connection-semicolon"] },
+    { "sites": ["control.mjs:506"], "cases": ["parser-require-implication"] },
+    { "sites": ["control.mjs:509"], "cases": ["parser-require-semicolon"] },
+    { "sites": ["control.mjs:513"], "cases": ["parser-mutex-open", "parser-mutex-output", "parser-mutex-close", "parser-mutex-semicolon"] },
+    { "sites": ["control.mjs:537"], "cases": ["parser-if-then", "parser-if-else"] },
+    { "sites": ["control.mjs:541"], "cases": ["parser-expression-unsupported-adapt", "parser-expression-unsupported-constraints"] },
+    { "sites": ["control.mjs:544"], "cases": ["parser-member-name"] },
+    { "sites": ["control.mjs:559"], "cases": ["parser-group-close"] },
+    { "sites": ["control.mjs:564"], "cases": ["parser-expression", "parser-schedule-interval-expression"] },
+    { "sites": ["control.mjs:575"], "cases": ["parser-call-close"] },
+    { "sites": ["control.mjs:579"], "cases": ["parser-in-open"] },
+    { "sites": ["control.mjs:581"], "cases": ["parser-in-close"] },
+    { "sites": ["control.mjs:582"], "cases": ["parser-empty-set"] },
+    { "sites": ["control.mjs:586"], "cases": ["parser-case-open"] },
+    { "sites": ["control.mjs:588"], "cases": ["parser-case-pattern"] },
+    { "sites": ["control.mjs:589"], "cases": ["parser-case-binding", "parser-case-binding-close"] },
+    { "sites": ["control.mjs:590"], "cases": ["parser-case-arrow"] },
+    { "sites": ["literate.mjs:29"], "cases": ["literate non-string input"] },
+    { "sites": ["literate.mjs:30"], "cases": ["literate byte limit"] },
+    { "sites": ["literate.mjs:32"], "cases": ["literate line limit"] },
+    { "sites": ["literate.mjs:36"], "cases": ["literate-front-matter"] },
+    { "sites": ["literate.mjs:53"], "cases": ["existing:literate-nested-warning"] },
+    { "sites": ["literate.mjs:59-60"], "cases": ["literate-unknown-tag", "literate-fence-attributes"] },
+    { "sites": ["literate.mjs:63"], "cases": ["literate-unclosed-fence"] },
+    { "sites": ["literate.mjs:82"], "cases": ["literate-malformed-link"] },
+    { "sites": ["literate.mjs:87"], "cases": ["literate-no-code"] },
+    { "sites": ["literate.mjs:94-95"], "cases": ["literate-malformed-anchor"] },
+    { "sites": ["literate.mjs:99-100"], "cases": ["literate-anchor-body"] },
+    { "sites": ["compile-source.mjs:45"], "cases": ["null options", "non-object options"] },
+    { "sites": ["compile-source.mjs:46-48"], "cases": ["removed interactionSchema option"] },
+    { "sites": ["compile-source.mjs:50"], "cases": ["empty filename", "NUL filename", "malformed Unicode filename"] },
+    { "sites": ["compile-source.mjs:51"], "cases": ["non-string source", "malformed Unicode source", "oversized source"] },
+    { "sites": ["compile-source.mjs:52"], "cases": ["non-literate filename"] },
+    { "sites": ["compile-source.mjs:55-66"], "cases": ["literate-crlf-remap", "literate-multiple-fences", "parser-output-initializer"] },
+    { "sites": ["source-trace.mjs:99"], "cases": ["confirmed assumption"] },
+    { "sites": ["source-trace.mjs:280"], "cases": ["duplicate anchor"] },
+    { "sites": ["source-trace.mjs:299"], "cases": ["unknown linked anchor"] },
+    { "sites": ["source-trace.mjs:300-302"], "cases": ["superseded anchor link"] },
+    { "sites": ["source-trace.mjs:303-306"], "cases": ["assumes requires unconfirmed assumption"] },
+    { "sites": ["source-trace.mjs:307-309"], "cases": ["non-assumes relation rejects assumption"] },
+    { "sites": ["source-trace.mjs:317-319"], "cases": ["orphan link"] },
+    { "sites": ["source-trace.mjs:335-339"], "cases": ["duplicate identical link"] },
+    { "sites": ["ghostc.mjs:14-16"], "cases": ["CLI empty arguments", "CLI missing build output", "CLI extra build operand", "CLI unknown flag", "CLI duplicate check flag", "CLI extra check operand"] },
+    { "sites": ["ghostc.mjs:20-25"], "cases": ["CLI invalid continuation --check/build", "CLI truncated sequence --check/build", "CLI lone continuation --check/build", "CLI BOM source identity", "CLI missing input ENOENT"] },
+    { "sites": ["ghostc.mjs:26-32"], "cases": ["CLI mapped syntax --check/build", "CLI adjacent valid --check/build"] }
+  ],
+  "existingCoverage": [
+    {
+      "family": "removed syntax and parser edge diagnostics",
+      "file": "tests/control-source-validation.test.mjs",
+      "needle": "['next', 'control X"
+    },
+    {
+      "family": "lexer, declaration, schedule, and expression diagnostics",
+      "file": "tests/coverage-edges.test.mjs",
+      "needle": "unterminated string"
+    },
+    {
+      "family": "CommonMark fence extraction diagnostics",
+      "file": "tests/literate.test.mjs",
+      "needle": "unclosed ghost fence"
+    },
+    {
+      "family": "literate-to-source diagnostic remapping",
+      "file": "tests/toolchain.test.mjs",
+      "needle": "compileSource retains existing literate diagnostics"
+    },
+    {
+      "family": "intent anchor and link author diagnostics",
+      "file": "tests/intent-anchor-map.test.mjs",
+      "needle": "GF-TEST-intent-anchor-diagnostics"
+    }
+  ],
+  "unreachable": [
+    {
+      "site": "tokeniseControl/non-string",
+      "reason": "The canonical compile ingress validates source text before calling the control lexer."
+    },
+    {
+      "site": "ControlParser.enumDecl",
+      "reason": "The declaration dispatcher rejects the removed enum alias before this unused parser method can run."
+    },
+    {
+      "site": "ControlParser.nextStatement(true)",
+      "reason": "The declaration dispatcher rejects the removed next alias and only calls nextStatement(false)."
+    },
+    {
+      "site": "ControlParser.nextStatement/apostrophe-expect",
+      "reason": "The dispatcher calls nextStatement(false) only after observing the apostrophe token."
+    },
+    {
+      "site": "ControlParser.connection/name-and-arrow-guards",
+      "reason": "The dispatcher calls connection only for an identifier immediately followed by <-."
+    },
+    {
+      "site": "ControlParser.call/open-paren-expect",
+      "reason": "prefix calls the call parser only after observing the opening parenthesis."
+    },
+    {
+      "site": "ControlParser.declaration/eof-default",
+      "reason": "The enclosing control loop reports unclosed control block before declaration sees EOF."
+    },
+    {
+      "site": "numberAtom/non-finite",
+      "reason": "This is an internal lowering invariant after finite numeric validation, not a source syntax diagnostic."
+    },
+    {
+      "site": "attachIntentMetadata/context-shape",
+      "reason": "Canonical compileSource constructs all six context fields internally before calling this helper."
+    },
+    {
+      "site": "attachIntentMetadata/anchor-classification-shape",
+      "reason": "The literate anchor grammar rejects invalid classifications before source-trace attachment; the confirmed-assumption cross-field rule remains reachable and tested."
+    },
+    {
+      "site": "attachIntentMetadata/link-shape-and-duplicate-location",
+      "reason": "The literate extractor constructs one validated link object per physical source line, so malformed shape and duplicate extracted locations are artifact API guards."
+    }
+  ]
+}

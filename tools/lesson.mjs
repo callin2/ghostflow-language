@@ -198,7 +198,7 @@ export async function validateLessonBundle(jsonText) {
   exactObject(parsed.playback, ['durationMs', 'checkpoints'], 'playback');
   const durationMs = safeInteger(parsed.playback.durationMs, 'playback.durationMs', 0, DURATION_LIMIT);
   const { scenarios, ids } = validateScenarios(parsed.scenarios);
-  const sourceLineCount = source.text.replace(/\r\n/g, '\n').split('\n').length;
+  const sourceLineCount = source.text.replace(/\r\n?/g, '\n').split('\n').length;
   const checkpoints = validateCheckpoints(parsed.playback.checkpoints, durationMs, sourceLineCount, ids);
   const toolchain = validateToolchain(parsed.toolchain); // Structural identity only; it proves neither trust nor compatibility.
   const bundleSha256 = boundedString(parsed.bundleSha256, 'bundleSha256', 64);

@@ -21,6 +21,11 @@ const dawn = [
   '    latitude = 37.5665;',
   '    longitude = 126.9780;',
   '    at = sun`rise + 30min`;',
+  '    basis = pulse;',
+  '    when = true;',
+  '    clock = trusted_only;',
+  '    gap = skip_after(60s);',
+  '    recovery = baseline;',
   '    fallback = skip;',
   '  }',
 ].join('\n');
@@ -35,27 +40,27 @@ function expectError(source, message, { line, column } = {}) {
   });
 }
 
-test('Solar lowers exact v3 descriptors and reuses generated Bool due inputs', () => {
+test('Solar lowers a strict native provider descriptor without a generated due input', () => {
   const source = solarControl(dawn);
   const result = compileControl(source, { filename: 'solar-fixture.ghost' });
 
   assert.equal(result.manifest.format, 'GhostFlow/control-v3');
   assert.deepEqual(result.manifest.schedules, [{
-    kind: 'solar', name: 'dawn', timezone: 'Asia/Seoul', latitude: 37.5665,
+    kind: 'solar', site: 8, name: 'dawn', timezone: 'Asia/Seoul', latitude: 37.5665,
     longitude: 126.978, event: 'rise', offsetMs: 1_800_000,
-    fallback: 'skip', dueInput: '__gf_schedule_due_dawn',
+    policy: { basis: 'pulse', when: 'true', clock: 'trusted_only', gapMs: 60_000, recovery: 'baseline', fallback: 'skip' },
   }]);
-  assert.ok(result.manifest.inputs.every(input => input.name !== '__gf_schedule_due_dawn'));
+  assert.equal(Object.hasOwn(result.manifest.schedules[0], 'dueInput'), false);
   assert.ok(result.sourceMap.some(node => node.kind === 'schedule' && node.line === 2 && node.column === 3));
 });
 
 test('Solar accepts zero and negative offsets plus rise and set without offsets', () => {
   const source = [
     'control SolarOffsets {',
-    '  schedule dawn: Solar { timezone = "UTC"; latitude = -90; longitude = 180; at = sun`rise + 0ms`; fallback = skip; }',
-    '  schedule dusk: Solar { timezone = "UTC"; latitude = 90; longitude = -180; at = sun`set - 24h`; fallback = skip; }',
-    '  schedule plain_rise: Solar { timezone = "UTC"; latitude = 0; longitude = 0; at = sun`rise`; fallback = skip; }',
-    '  schedule plain_set: Solar { timezone = "UTC"; latitude = 0; longitude = 0; at = sun`set`; fallback = skip; }',
+    '  schedule dawn: Solar { timezone = "UTC"; latitude = -90; longitude = 180; at = sun`rise + 0ms`; basis = pulse; when = true; clock = trusted_only; gap = skip_after(60s); recovery = baseline; fallback = skip; }',
+    '  schedule dusk: Solar { timezone = "UTC"; latitude = 90; longitude = -180; at = sun`set - 24h`; basis = pulse; when = true; clock = trusted_only; gap = skip_after(60s); recovery = baseline; fallback = skip; }',
+    '  schedule plain_rise: Solar { timezone = "UTC"; latitude = 0; longitude = 0; at = sun`rise`; basis = pulse; when = true; clock = trusted_only; gap = skip_after(60s); recovery = baseline; fallback = skip; }',
+    '  schedule plain_set: Solar { timezone = "UTC"; latitude = 0; longitude = 0; at = sun`set`; basis = pulse; when = true; clock = trusted_only; gap = skip_after(60s); recovery = baseline; fallback = skip; }',
     '  output enabled: Bool;',
     '  enabled <- dawn.due || dusk.due || plain_rise.due || plain_set.due;',
     '}',
@@ -88,7 +93,7 @@ test('Solar and DailySlots can coexist without changing the DailySlots descripto
 test('Solar rejects missing, duplicate, unknown, nonliteral, and out-of-range fields at source locations', () => {
   expectError(solarControl(dawn.replace('    fallback = skip;\n', '')), /Solar schedule requires fallback/, { line: 2, column: 3 });
   expectError(solarControl(dawn.replace('    latitude = 37.5665;', '    latitude = 37.5665;\n    latitude = 37.5;')), /duplicate Solar schedule option latitude/, { line: 5, column: 5 });
-  expectError(solarControl(dawn.replace('    fallback = skip;', '    unknown = 1;\n    fallback = skip;')), /unsupported Solar schedule option unknown/, { line: 7, column: 5 });
+  expectError(solarControl(dawn.replace('    fallback = skip;', '    unknown = 1;\n    fallback = skip;')), /unsupported Solar schedule option unknown/, { line: 12, column: 5 });
   expectError(solarControl(dawn.replace('latitude = 37.5665', 'latitude = 90.0001')), /Solar latitude must be between -90 and 90/, { line: 4, column: 16 });
   expectError(solarControl(dawn.replace('longitude = 126.9780', 'longitude = latitude')), /Solar longitude must be a signed finite numeric literal/, { line: 5, column: 17 });
   expectError(solarControl(dawn.replace('Asia/Seoul', 'Not/AZone')), /Solar timezone must be a supported IANA timezone/);
@@ -98,7 +103,7 @@ test('Solar restricts sun tags, exact offsets, fallback, and operating metadata'
   expectError(solarControl(dawn.replace('sun`rise + 30min`', 'sun`noon + 30min`')), /Solar event must be rise or set/, { line: 6, column: 14 });
   expectError(solarControl(dawn.replace('30min', '30.5min')), /Solar offset must be an integer duration literal/, { line: 6, column: 21 });
   expectError(solarControl(dawn.replace('30min', '25h')), /Solar offset magnitude must not exceed 24h/, { line: 6, column: 21 });
-  expectError(solarControl(dawn.replace('fallback = skip', 'fallback = queue')), /Solar fallback must be skip/, { line: 7, column: 16 });
+  expectError(solarControl(dawn.replace('fallback = skip', 'fallback = queue')), /Solar fallback must be skip/, { line: 12, column: 16 });
   expectError([
     'control TaggedOutsideSolar {',
     '  let event = sun`rise`;',
@@ -123,7 +128,7 @@ test('the canonical Solar literate fixture preserves original schedule locations
   const source = fs.readFileSync(new URL('../examples/solar-watering.ghost.md', import.meta.url), 'utf8');
   const result = await compileSource(source, { filename: 'examples/solar-watering.ghost.md' });
   assert.equal(result.manifest.format, 'GhostFlow/control-v3');
-  assert.deepEqual(result.manifest.schedules.map(({ name, event, offsetMs, fallback }) => ({ name, event, offsetMs, fallback })), [
+  assert.deepEqual(result.manifest.schedules.map(({ name, event, offsetMs, policy }) => ({ name, event, offsetMs, fallback: policy.fallback })), [
     { name: 'dawn', event: 'rise', offsetMs: 1_800_000, fallback: 'skip' },
     { name: 'dusk', event: 'set', offsetMs: -1_800_000, fallback: 'skip' },
   ]);

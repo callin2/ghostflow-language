@@ -3,12 +3,16 @@
 //! It deliberately performs no GhostFlow evaluation: every well-formed row is
 //! handed unchanged to `ScanDriver`, whose outcome JSON is shared with WASM.
 
+#[path = "support/temporal_profile.rs"]
+mod temporal_profile;
+
 use std::{env, error::Error, fs, io::Read};
 
 use ghostflow_core::{
     scan::{ScanFrameV1, ScanInput},
     Capability, Module, Runtime, Value,
 };
+use temporal_profile::parse_temporal;
 
 const MAX_MODULE_BYTES: usize = 1_024 * 1_024;
 const MAX_TAPE_BYTES: usize = 1_024 * 1_024;
@@ -16,12 +20,18 @@ const MAX_ROW_BYTES: usize = 65_536;
 const MAX_ATTEMPTS: usize = 4_096;
 const MAX_INPUTS: usize = 128;
 const MAX_NAME_BYTES: usize = 1_024;
+const USAGE: &str = "usage: scan_tape <module.gfb> <tape.tsv> [--temporal EPOCH MAX_SAMPLES MAX_BYTES TAG:MAX_OBSERVATIONS:INTERVAL_MS[,..]]";
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<_> = env::args().skip(1).collect();
-    if args.len() != 2 {
-        return Err("usage: scan_tape <module.gfb> <tape.tsv>".into());
+    if args.len() < 2 {
+        return Err(USAGE.into());
     }
+    let temporal = match args.len() {
+        2 => None,
+        7 if args[2] == "--temporal" => Some(parse_temporal(&args[3..7]).ok_or(USAGE)?),
+        _ => return Err(USAGE.into()),
+    };
     let module_bytes = read_bounded(&args[0], MAX_MODULE_BYTES, "module")?;
     let tape_bytes = read_bounded(&args[1], MAX_TAPE_BYTES, "tape")?;
     let module = Module::load(&module_bytes)?;
@@ -34,7 +44,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     for capability in capabilities {
         runtime.add_capability(capability)?;
     }
-    runtime.activate()?;
+    match temporal.as_ref() {
+        Some(profile) => runtime.activate_with_temporal(profile)?,
+        None => runtime.activate()?,
+    }
     let mut driver = runtime.into_scan_driver();
 
     let tape = std::str::from_utf8(&tape_bytes).map_err(|_| "tape must be UTF-8")?;

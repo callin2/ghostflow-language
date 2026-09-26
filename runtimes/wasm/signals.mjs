@@ -133,6 +133,31 @@ export class SignalConditioner {
     };
   }
 
+  sampleIdentity() {
+    this.#assertLive();
+    if (this.wasm.gf_signal_has_sample(this.handle) === 0) return null;
+    return {
+      epoch: safeInteger(Number(this.wasm.gf_signal_sample_epoch(this.handle)), 'sample identity epoch'),
+      id: safeInteger(Number(this.wasm.gf_signal_sample_id(this.handle)), 'sample identity id'),
+      timestampMs: safeInteger(Number(this.wasm.gf_signal_sample_timestamp(this.handle)), 'sample identity timestampMs'),
+    };
+  }
+
+  begin() {
+    this.#assertLive();
+    if (!this.wasm.gf_signal_begin(this.handle)) throw new Error(this.#lastError() || 'signal transaction begin failed');
+  }
+
+  commit() {
+    this.#assertLive();
+    if (!this.wasm.gf_signal_commit(this.handle)) throw new Error(this.#lastError() || 'signal transaction commit failed');
+  }
+
+  rollback() {
+    this.#assertLive();
+    if (!this.wasm.gf_signal_rollback(this.handle)) throw new Error(this.#lastError() || 'signal transaction rollback failed');
+  }
+
   reset() {
     this.#assertLive();
     if (!this.wasm.gf_signal_reset(this.handle)) throw new Error(this.#lastError() || 'signal reset failed');
