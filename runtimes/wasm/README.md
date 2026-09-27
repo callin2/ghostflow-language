@@ -21,6 +21,18 @@ Use `requestStop()` synchronously and apply its safe directive before awaiting
 storage. `advance()` returns an actionable safe directive on lease/day expiry.
 On any runtime error a physical host must fail safe, not reuse a stale intent.
 
+For a plain core program, `GhostFlowRuntime.replayCore({ count, maxJsonBytes })`
+replays a positive number of retained scans, no more than the retained journal
+length. `maxJsonBytes` is a positive byte budget for the existing bounded replay
+JSON buffer. The result uses the existing `GhostFlow/temporal-replay-v1` legacy
+envelope and includes `checkpointTick` plus the replayed records; the envelope
+name does not make a plain program temporal. Replay keeps the live state,
+pending inputs and previous successful replay buffer unchanged on failure.
+The VM checks its recorded module and strategy. The host must keep the same
+source revision, settings events and capability bindings for same-program
+evidence. Temporal, provider and objective sessions use their separate replay
+contracts or remain unsupported by this entry point.
+
 See [the tutorial](../../docs/TUTORIAL.md),
 [implementation boundaries](../../docs/IMPLEMENTATION.md), and
 [verification evidence](../../docs/VERIFICATION.md). Run all software gates with

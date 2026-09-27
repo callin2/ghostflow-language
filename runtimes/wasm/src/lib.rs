@@ -291,6 +291,31 @@ pub unsafe extern "C" fn gf_replay_temporal(
         }
     }
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn gf_replay_core(
+    handle: *mut Handle,
+    count: u32,
+    max_json_bytes: usize,
+) -> i32 {
+    let Some(h) = handle.as_mut() else { return 0 };
+    let result = h
+        .runtime
+        .replay_current(count as usize)
+        .map_err(|error| error.to_string())
+        .and_then(|records| replay_abi::legacy(&records, h.replay.capacity(), max_json_bytes));
+    match result {
+        Ok(replay) => {
+            h.replay = replay;
+            h.error.clear();
+            1
+        }
+        Err(error) => {
+            h.error = error;
+            0
+        }
+    }
+}
 #[no_mangle]
 pub unsafe extern "C" fn gf_replay_ptr(handle: *const Handle) -> *const u8 {
     handle

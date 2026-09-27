@@ -1695,6 +1695,8 @@ impl Runtime {
         self.inputs.fill(None);
         Ok(())
     }
+    /// Compare retained inputs from the earliest retained checkpoint under a
+    /// supplied module and capability set, including intentional branch runs.
     pub fn replay(
         &self,
         module: Module,
@@ -1729,6 +1731,7 @@ impl Runtime {
                     }
                 }
             }
+            g.next_tick = initial.tick;
         }
         for r in self.journal.iter().take(count) {
             for (n, v) in &r.inputs {
@@ -1737,6 +1740,31 @@ impl Runtime {
             g.tick()?;
         }
         Ok(g.journal.into_iter().collect())
+    }
+    /// Replay retained records with the installed module and active capability context.
+    /// The VM checks its own module/strategy identity; source and settings revisions
+    /// belong to the caller's recorded execution context.
+    pub fn replay_current(&self, count: usize) -> Result<Vec<TickRecord>> {
+        if count == 0 || count > self.journal.len() {
+            return Err(Error::new(
+                "replay count exceeds retained records or is zero",
+            ));
+        }
+        let module = self
+            .module
+            .as_ref()
+            .ok_or_else(|| Error::new("no module installed"))?;
+        let strategy = self
+            .active_strategy()
+            .ok_or_else(|| Error::new("no active strategy"))?;
+        if self.journal.iter().take(count).any(|record| {
+            record.module_fingerprint != module.fingerprint || record.strategy != strategy
+        }) {
+            return Err(Error::new(
+                "replay requires the recorded module and strategy",
+            ));
+        }
+        self.replay(module.clone(), &self.capabilities, count)
     }
     /// Replay retained temporal history using explicit scratch and combined peak budgets.
     /// Returned records own their evidence; caller retention after return is not bounded here.
@@ -3277,6 +3305,68 @@ mod tests {
         runtime.rewind(replay[0].tick).unwrap();
         runtime.set_input("rhs", Value::Int(2)).unwrap();
         assert_eq!(runtime.tick().unwrap().to_json(), before[1]);
+    }
+
+    #[test]
+    fn retained_plain_core_replay_preserves_logical_tick_after_rollover() {
+        let module = int_atomicity_module(12, 28);
+        let mut runtime = Runtime::new(2);
+        runtime.install(module.clone(), false);
+        runtime.activate().unwrap();
+        assert!(runtime.replay(module.clone(), &[], 1).unwrap().is_empty());
+        assert!(runtime.replay_current(1).is_err());
+        for rhs in [3, 2] {
+            runtime.set_input("rhs", Value::Int(rhs)).unwrap();
+            runtime.tick().unwrap();
+        }
+        runtime.set_input("rhs", Value::Int(0)).unwrap();
+        assert_eq!(
+            runtime.tick().unwrap_err().message(),
+            "integer-division-by-zero"
+        );
+        runtime.set_input("rhs", Value::Int(4)).unwrap();
+        runtime.tick().unwrap();
+        let original: Vec<_> = runtime.journal().iter().map(TickRecord::to_json).collect();
+        assert_eq!(runtime.journal().front().unwrap().tick, 2);
+        let replayed = runtime.replay(module.clone(), &[], 2).unwrap();
+        assert_eq!(
+            replayed.iter().map(TickRecord::to_json).collect::<Vec<_>>(),
+            original
+        );
+        assert_eq!(
+            runtime
+                .replay_current(2)
+                .unwrap()
+                .iter()
+                .map(TickRecord::to_json)
+                .collect::<Vec<_>>(),
+            original
+        );
+        assert_eq!(
+            runtime
+                .journal()
+                .iter()
+                .map(TickRecord::to_json)
+                .collect::<Vec<_>>(),
+            original
+        );
+        assert!(runtime.replay(module.clone(), &[], 0).unwrap().is_empty());
+        assert_eq!(runtime.replay(module.clone(), &[], 3).unwrap().len(), 2);
+        assert!(runtime.replay_current(0).is_err());
+        assert!(runtime.replay_current(3).is_err());
+
+        let mut alternate = module;
+        alternate.fingerprint += 1;
+        let compared = runtime.replay(alternate.clone(), &[], 2).unwrap();
+        assert_eq!(
+            compared
+                .iter()
+                .map(|record| record.tick)
+                .collect::<Vec<_>>(),
+            vec![2, 3]
+        );
+        runtime.hot_swap(alternate).unwrap();
+        assert!(runtime.replay_current(2).is_err());
     }
 
     #[test]
