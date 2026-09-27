@@ -7,6 +7,9 @@ signals and station arbitration. Native and WASM tests share that Rust core.
 Start with the [Language Reference](docs/LANGUAGE-REFERENCE.md), the shared
 ground truth for language philosophy, syntax, semantics, and the reasons behind
 its features.
+See the [Reference feature status](docs/REFERENCE-FEATURE-STATUS.md) for current
+ownership, maturity and executable evidence. The Reference defines semantics;
+the status view records acceptance evidence.
 
 For task-oriented examples, see the [GhostFlow Coding FAQ](docs/language_faq.md).
 The `.ghost.md` files under `examples/` are the canonical compilable documents.
