@@ -83,6 +83,8 @@ formats. Run them alone with `npm run test:contract`. See
 [implementation boundaries](docs/IMPLEMENTATION.md),
 [verification](docs/VERIFICATION.md), and [ownership](AGENTS.md).
 
+This project is licensed under the [MIT License](LICENSE).
+
 No prior `build/` results, POC, firmware, live model connector, site installation,
 or private chat archive is carried into this export. Run the host gate in this
 checkout to produce its own evidence.
