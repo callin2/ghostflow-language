@@ -52,6 +52,7 @@ const TESTS = Object.freeze([
   'tests/schedule-descriptor-artifact.test.mjs', 'tests/gfb2-int.test.mjs',
   'tests/int-compiler.test.mjs', 'tests/lesson.test.mjs', 'tests/interaction-corpus.test.mjs',
   'tests/temporal-resource-plan-wasm.test.mjs', 'tests/temporal-replay-wasm.test.mjs',
+  'tests/core-replay-wasm.test.mjs', 'tests/core-irrigation-proof.test.mjs',
   'tests/range-contract.test.mjs', 'tests/issue-90-settings-stream.test.mjs',
   'tests/state-snapshot-reference.test.mjs', 'tests/solar-provider-wasm.test.mjs',
   'tests/gfb4-window.test.mjs', 'tests/gfb5-schedule.test.mjs',
