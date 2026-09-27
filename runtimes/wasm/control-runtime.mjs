@@ -1427,7 +1427,7 @@ export class ControlRuntime {
       this.#setIntervals(captured.intervalValues, (name, value) => frameInputs.push({ name, type: value.type, value: value.value }));
       this.#setAfterEventProjections(staged.projections,
         (name, value) => frameInputs.push({ name, type: value.type, value: value.value }));
-      if (this.#temporalEpoch !== null) frameInputs.push({ name: `${RESERVED}time_epoch`, type: 'Number', value: this.#temporalEpoch });
+      if (this.#temporalEpoch !== null && !this.#hasContext) frameInputs.push({ name: `${RESERVED}time_epoch`, type: 'Number', value: this.#temporalEpoch });
 
       phase = 'dispatch';
       const frame = { scanId, logicalTimeMs: captured.nowMs, inputs: frameInputs };

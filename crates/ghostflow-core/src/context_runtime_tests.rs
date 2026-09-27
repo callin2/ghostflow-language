@@ -186,16 +186,10 @@ fn context_frame(scan_id: u64, time: u64, rhs: i32) -> scan::ScanFrameV1 {
     scan::ScanFrameV1 {
         scan_id,
         logical_time_ms: time,
-        inputs: vec![
-            scan::ScanInput {
-                name: "__gf_time_epoch".into(),
-                value: Value::Number(1.0),
-            },
-            scan::ScanInput {
-                name: "rhs".into(),
-                value: Value::Int(rhs),
-            },
-        ],
+        inputs: vec![scan::ScanInput {
+            name: "rhs".into(),
+            value: Value::Int(rhs),
+        }],
     }
 }
 
@@ -237,9 +231,10 @@ fn context_scan_rejects_inconsistent_frames_without_mutation() {
         let mut frame = context_frame(0, 0, 1);
         frame.inputs[0].name = name.into();
         frame.inputs[0].value = Value::Number(0.0);
-        assert!(driver
+        let error = driver
             .scan_with_context(frame, clock(1, 0, 99), &periodic_facts())
-            .is_err());
+            .unwrap_err();
+        assert_eq!(error.to_string(), "reserved input is runtime-derived");
     }
     assert!(driver
         .scan_with_context(context_frame(1, 0, 1), clock(1, 0, 99), &periodic_facts())
@@ -258,6 +253,10 @@ fn context_scan_rejects_inconsistent_frames_without_mutation() {
     assert_eq!(driver.next_scan_id(), Some(0));
     assert_eq!(driver.scan_last_time_ms(), None);
     assert!(driver.runtime().journal.is_empty());
+    let accepted = driver
+        .scan_with_context(context_frame(0, 0, 1), clock(1, 0, 99), &periodic_facts())
+        .unwrap();
+    assert_eq!((accepted.scan_id, accepted.logical_time_ms), (0, 0));
 }
 
 #[test]
@@ -439,16 +438,10 @@ fn natural_results_are_protected_and_wrong_station_rejects_without_consuming_sca
     let mut frame = scan::ScanFrameV1 {
         scan_id: 0,
         logical_time_ms: 2,
-        inputs: vec![
-            scan::ScanInput {
-                name: "__gf_natural_7_value".into(),
-                value: Value::Bool(true),
-            },
-            scan::ScanInput {
-                name: "__gf_time_epoch".into(),
-                value: Value::Number(1.0),
-            },
-        ],
+        inputs: vec![scan::ScanInput {
+            name: "__gf_natural_7_value".into(),
+            value: Value::Bool(true),
+        }],
     };
     assert!(driver
         .scan_with_context(frame.clone(), clock(1, 2, 52), &Default::default())
@@ -1093,16 +1086,10 @@ fn framed_context_commits_native_identity_and_retries_rejected_emissions() {
     let frame = |id, time, rhs| ScanFrameV1 {
         scan_id: id,
         logical_time_ms: time,
-        inputs: vec![
-            ScanInput {
-                name: "__gf_time_epoch".into(),
-                value: Value::Number(1.0),
-            },
-            ScanInput {
-                name: "rhs".into(),
-                value: Value::Int(rhs),
-            },
-        ],
+        inputs: vec![ScanInput {
+            name: "rhs".into(),
+            value: Value::Int(rhs),
+        }],
     };
     let mut facts = periodic_facts();
     let first = driver
@@ -1132,7 +1119,7 @@ fn framed_context_commits_native_identity_and_retries_rejected_emissions() {
         .scan_with_context(frame(1, 1, 1), clock(1, 2, 101), &facts)
         .is_err());
     let mut forged = frame(1, 1, 1);
-    forged.inputs[1] = ScanInput {
+    forged.inputs[0] = ScanInput {
         name: "__gf_config_6_value".into(),
         value: Value::Number(999.0),
     };
@@ -1168,8 +1155,7 @@ fn framed_context_commits_native_identity_and_retries_rejected_emissions() {
         reboot.runtime().context_state_json().unwrap(),
         driver.runtime().context_state_json().unwrap()
     );
-    let mut new_frame = frame(0, 0, 1);
-    new_frame.inputs[0].value = Value::Number(2.0);
+    let new_frame = frame(0, 0, 1);
     assert_eq!(
         reboot
             .scan_with_context(new_frame, clock(2, 0, 101), &periodic_facts())

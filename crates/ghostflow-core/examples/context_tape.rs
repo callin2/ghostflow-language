@@ -1,10 +1,11 @@
-//! Bounded HIL transport for explicit Periodic context frames. All decisions
+//! Bounded HIL transport for explicit Periodic or settings context frames. All decisions
 //! and frame commits belong to the shared Rust ScanDriver.
 use ghostflow_core::{
     context_runtime::{Activation, Facts},
-    context_vm::ScheduleEvidence,
+    context_vm::{ScheduleEvidence, SettingChange, SettingsEvent, SettingsOrigin},
     scan::{ScanFrameV1, ScanInput},
     schedule_clock::{ClockSnapshot, ClockTrust},
+    settings_stream::ConfigValue,
     Capability, Module, Runtime, Value,
 };
 use serde_json::{json, Value as Json};
@@ -52,6 +53,65 @@ fn text(value: &Json) -> Result<&str> {
         .ok_or_else(|| "invalid context text".into())
 }
 
+fn settings_event(value: &Json) -> Result<Option<SettingsEvent>> {
+    if value.is_null() {
+        return Ok(None);
+    }
+    let fingerprint = value["programFingerprint"]
+        .as_u64()
+        .or_else(|| u64::from_str_radix(value["programFingerprint"].as_str()?, 16).ok())
+        .ok_or("invalid program fingerprint")?;
+    let origin = match text(&value["origin"])? {
+        "operatorEdit" => SettingsOrigin::OperatorEdit,
+        "producerObservation" => SettingsOrigin::ProducerObservation,
+        _ => return Err("invalid settings origin".into()),
+    };
+    let mut changes = Vec::new();
+    for change in array(&value["changes"], 128)? {
+        let result = &change["result"];
+        let (semantic_type, result) = match result["ok"].as_bool() {
+            Some(false) => {
+                let fault = match text(&result["fault"])? {
+                    "SettingsInvalid" => 0,
+                    "SettingsUnavailable" => 1,
+                    _ => return Err("invalid settings fault".into()),
+                };
+                (String::new(), Err(fault))
+            }
+            Some(true) => {
+                let semantic_type = text(&result["type"])?.to_owned();
+                let value = match semantic_type.as_str() {
+                    "Bool" => Value::Bool(result["value"].as_bool().ok_or("invalid Bool setting")?),
+                    "Int" => Value::Int(i32::try_from(
+                        result["value"].as_i64().ok_or("invalid Int setting")?,
+                    )?),
+                    _ => Value::Number(
+                        result["value"]
+                            .as_f64()
+                            .filter(|n| n.is_finite())
+                            .ok_or("invalid numeric setting")?,
+                    ),
+                };
+                (semantic_type, Ok(ConfigValue::Scalar(value)))
+            }
+            None => return Err("invalid settings Result".into()),
+        };
+        changes.push(SettingChange {
+            id: u32::try_from(integer(&change["configId"])?)?,
+            semantic_type,
+            result,
+        });
+    }
+    Ok(Some(SettingsEvent {
+        program_fingerprint: fingerprint,
+        event_id: text(&value["eventId"])?.to_owned(),
+        base_revision: integer(&value["baseRevision"])?,
+        position: integer(&value["position"])?,
+        origin,
+        changes,
+    }))
+}
+
 fn main() -> Result<()> {
     let args: Vec<_> = env::args().skip(1).collect();
     if args.len() != 2 {
@@ -67,7 +127,8 @@ fn main() -> Result<()> {
         .map(|(name, kind)| Capability::new("actuator", name, kind))
         .collect();
     let tape: Json = serde_json::from_slice(&read(&args[1])?)?;
-    if tape["profile"] != "context-periodic-v1" {
+    let settings_profile = tape["profile"] == "context-settings-v1";
+    if !settings_profile && tape["profile"] != "context-periodic-v1" {
         return Err("unsupported context tape profile".into());
     }
     let activation = &tape["activation"];
@@ -119,6 +180,9 @@ fn main() -> Result<()> {
                     "Periodic tape cannot supply providers, calendars or occurrence rows".into(),
                 );
             }
+            if settings_profile {
+                return Err("settings tape cannot supply schedules".into());
+            }
             schedules.push(ScheduleEvidence {
                 site: u32::try_from(integer(&schedule["site"])?)?,
                 coverage_start_ms: integer(&schedule["coverageStartMs"])?,
@@ -146,7 +210,15 @@ fn main() -> Result<()> {
                 Some(text(&clock["sourceRevision"])?)
             },
         };
-        let outcome = driver.scan_with_context(
+        let settings = if settings_profile {
+            settings_event(&step["settings"])?
+        } else {
+            if !step["settings"].is_null() {
+                return Err("Periodic tape cannot supply settings".into());
+            }
+            None
+        };
+        let result = driver.scan_with_context(
             ScanFrameV1 {
                 scan_id: integer(&step["scanId"])?,
                 logical_time_ms: integer(&step["logicalTimeMs"])?,
@@ -155,17 +227,37 @@ fn main() -> Result<()> {
             snapshot,
             &Facts {
                 schedules,
+                settings,
                 ..Default::default()
             },
-        )?;
-        let trace: Json = serde_json::from_str(&outcome.trace.to_json())?;
-        println!(
-            "{}",
-            json!({ "accepted": true, "outcome": {
-                "format": "GhostFlow/scan-outcome-v1", "scanId": outcome.scan_id,
-                "logicalTimeMs": outcome.logical_time_ms, "trace": trace,
-            }})
         );
+        let state = if settings_profile {
+            Some(serde_json::from_str::<Json>(
+                &driver.runtime().context_state_json()?,
+            )?)
+        } else {
+            None
+        };
+        match result {
+            Ok(outcome) => {
+                let trace: Json = serde_json::from_str(&outcome.trace.to_json())?;
+                let mut record = json!({ "accepted": true, "outcome": {
+                    "format": "GhostFlow/scan-outcome-v1", "scanId": outcome.scan_id,
+                    "logicalTimeMs": outcome.logical_time_ms, "trace": trace,
+                }});
+                if settings_profile {
+                    record["settings"] = state.unwrap_or(Json::Null);
+                }
+                println!("{record}");
+            }
+            Err(error) if settings_profile => println!(
+                "{}",
+                json!({
+                    "accepted": false, "error": error.to_string(), "settings": state,
+                })
+            ),
+            Err(error) => return Err(error.into()),
+        }
     }
     Ok(())
 }
