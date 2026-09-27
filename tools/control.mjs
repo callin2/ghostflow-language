@@ -5,7 +5,7 @@
  * to the existing GFB1 S-expression compiler.  It does not evaluate source,
  * load modules, or execute user supplied code.
  */
-import { tokenize as sexprTokenize, parse as sexprParse, compile as compileGfb, CompileError } from './gfb1.mjs';
+import { compile as compileGfb, CompileError } from './gfb1.mjs';
 import { buildSourceTrace } from './source-trace.mjs';
 import { QUANTITY_TYPES, canonicalUnitFor, isQuantityType, quantityLiteral, quantitySuffixAt } from './quantities.mjs';
 import { TIME_TYPES, isTimeType, parseTimeLiteral, validateTimeValue } from './time-literals.mjs';
@@ -1397,6 +1397,13 @@ function sexpr(value) {
   return String(value);
 }
 
+function canonicalModuleForm(value, depth = 0) {
+  if (depth > 128) throw new CompileError('syntax nesting limit exceeded');
+  return Array.isArray(value)
+    ? value.map(child => canonicalModuleForm(child, depth + 1))
+    : String(value);
+}
+
 function loweredExpressionUsesInt(value) {
   if (!Array.isArray(value)) return false;
   if (value[0] === 'int' || (typeof value[0] === 'string' && value[0].startsWith('int-'))) return true;
@@ -1546,7 +1553,10 @@ class Lowerer {
     if (!accountingExecution && (accountingResource || this.accounts.size || this.ast.body.some(item => item.kind === 'account-constraints'))) error(this.ast.loc,
       'accounting execution requires verified resource binding, ledger persistence, and runtime enforcement');
     let bytes;
-    try { bytes = compileGfb(sexprParse(sexprTokenize(sexpr(module)))); }
+    try {
+      if (new TextEncoder().encode(sexpr(module)).length > 1024 * 1024) throw new CompileError('source byte limit exceeded');
+      bytes = compileGfb(canonicalModuleForm(module));
+    }
     catch (cause) {
       const message = cause instanceof Error ? cause.message : String(cause);
       error(this.ast.loc, `GFB1 lowering rejected control: ${message}`);
