@@ -20,22 +20,21 @@ behavior stays outside this language export.
 
 ## Current inventory
 
-The catalog currently contains 41 atomic rows across the requested execution
-specification slice: 8 seed output/tick rows, 12 MVP rows, 9 implemented-
-surface rows, 8 GFB1 bytecode rows, and 5 implementation-boundary rows. These
-rows deliberately keep direct evidence links small and leave uncovered
+The catalog currently contains 42 atomic rows across the requested execution
+specification slice. They keep direct evidence links small and leave uncovered
 behavior as `pending` rather than upgrading documentation to an acceptance
-claim. The seed rows overlap the named documents; the category counts are
-inventory slices, not a claim that every prose sentence is independently
-rowed.
+claim. The rows overlap the named documents; they do not independently catalog
+every prose sentence.
 
-After the TASK-61 conformance expansion, these 41 rows have 15 `implemented`,
-4 `partial`, 21 `pending`, and 1 `design-only` statuses, linked to 17 source-backed
-test records. Here `implemented` means the exact statement has focused automated
+The current catalog has 16 `implemented`, 4 `partial`, 21 `pending`, and 1
+`design-only` statuses, linked to 18 source-backed test records. Here
+`implemented` means the exact statement has focused automated
 evidence in this catalog; it is not exhaustive language, platform, or physical
 assurance. The validator rejects `implemented` rows with unresolved pending
-reasons or without tests. See `docs/TASK-61-CONFORMANCE.md` for the bounded
-evidence and remaining conflicts.
+reasons or without tests. `GF-REQ-d9f669f061279c41` retains the superseded MVP
+wording, ID, and excerpt hash as historical evidence; `GF-REQ-fe719c3299fc1258`
+links the accepted old-state/explicit-next rule to current tests. See
+`docs/TASK-61-CONFORMANCE.md` for the dated TASK-61 baseline.
 
 The catalog does not row explanatory prose, historical alternatives, repeated
 examples, or consumer-owned physical/API behavior. Remaining language details

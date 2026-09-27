@@ -243,8 +243,32 @@
         "core-runtime"
       ],
       "status": "pending",
-      "pendingReason": "Normative conflict: this MVP statement says all intents read committed next state, while docs/LANGUAGE.md section 7 and the current GFB runtime read old state unless NEXT_STATE is explicit. GF-TEST-snapshot-commit demonstrates the current behavior. Requires a documentation/semantic decision; no behavior was changed to satisfy this row.",
+      "pendingReason": "Superseded historical MVP statement. The accepted rule reads unprimed state from the old snapshot and explicit next-state references from candidate state; this old claim must not be counted as implemented.",
+      "supersededBy": "GF-REQ-fe719c3299fc1258",
       "testIds": []
+    },
+    {
+      "id": "GF-REQ-fe719c3299fc1258",
+      "statement": "In intent expressions, unprimed state reads the old snapshot and explicit next-state references read candidate state; candidate state and requested/safe intents commit together when evaluation finishes without error, including when constraints block an output.",
+      "source": {
+        "path": "docs/LANGUAGE-MVP-0.1.md",
+        "heading": "Tick semantics",
+        "lines": [
+          48,
+          51
+        ],
+        "sha256": "76659f078c5585064f2434722574f689e7f4f2a57645b1b2268ba8287ce9f755"
+      },
+      "layer": "runtime",
+      "targets": [
+        "core-runtime"
+      ],
+      "status": "implemented",
+      "testIds": [
+        "GF-TEST-snapshot-commit",
+        "GF-TEST-error-atomicity",
+        "GF-TEST-safety-fixed-point"
+      ]
     },
     {
       "id": "GF-REQ-4860010b6b6dfa68",
