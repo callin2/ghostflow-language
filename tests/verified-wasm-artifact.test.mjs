@@ -8,6 +8,15 @@ import { verificationSourceHashes, assertVerificationSources } from '../tools/ve
 
 const verifiedWasmWorkflow = fs.readFileSync(new URL('../.github/workflows/verified-wasm.yml', import.meta.url), 'utf8');
 
+test('language verification registers every selected test once', () => {
+  const source = fs.readFileSync(new URL('../tools/verify-language.mjs', import.meta.url), 'utf8');
+  const list = source.match(/export const LANGUAGE_TESTS = Object\.freeze\(\[([\s\S]*?)\]\);/);
+  assert.ok(list, 'explicit language test list is required');
+  const entries = [...list[1].matchAll(/'([^']+\.test\.mjs)'/g)].map(match => match[1]);
+  assert.ok(entries.length > 0);
+  assert.deepEqual(entries, [...new Set(entries)], 'duplicate test registration');
+});
+
 function namedStep(workflow, name) {
   const start = workflow.indexOf(`      - name: ${name}\n`);
   assert.notEqual(start, -1, `workflow step missing: ${name}`);
