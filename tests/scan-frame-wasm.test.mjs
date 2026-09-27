@@ -144,8 +144,11 @@ test('GF-TEST-scan-frame-wasm-continuous-true: measures only one uninterrupted t
 });
 
 test('GF-TEST-scan-frame-wasm-continuous-true-rejection: rejected time rollback does not reset the interval', async t => {
+  // REF-03-009: the 1000→999 attempt must preserve both Idle and timer state.
   const compiled = await compileSource(`control ContinuousTrueRollback {
     input hot: Bool;
+    state idle: Bool = true;
+    idle' = if hot then idle else false;
     timer hot_for = continuous_true(hot);
     output expired: Bool;
     expired <- hot_for >= 50ms;
@@ -157,17 +160,25 @@ test('GF-TEST-scan-frame-wasm-continuous-true-rejection: rejected time rollback 
   runtime.activate();
 
   const committed = runtime.scan({
-    scanId: 0, logicalTimeMs: 100, inputs: [{ name: 'hot', value: true }],
+    scanId: 0, logicalTimeMs: 1000, inputs: [{ name: 'hot', value: true }],
   });
   assert.equal(committed.trace.safe.expired, false);
+  assert.equal(committed.trace.stateAfter.idle, true);
+  for (const logicalTimeMs of [-1, 0.5, Number.NaN, Number.MAX_SAFE_INTEGER + 1]) {
+    assert.throws(() => runtime.scan({
+      scanId: 1, logicalTimeMs, inputs: [{ name: 'hot', value: false }],
+    }), /logicalTimeMs must be a non-negative safe integer/);
+    assert.deepEqual(runtime.outcome, committed, 'invalid clock values cannot publish state or output');
+  }
   assert.throws(() => runtime.scan({
-    scanId: 1, logicalTimeMs: 99, inputs: [{ name: 'hot', value: false }],
+    scanId: 1, logicalTimeMs: 999, inputs: [{ name: 'hot', value: false }],
   }), /logical time moved backwards/);
   assert.deepEqual(runtime.outcome, committed);
   const recovered = runtime.scan({
-    scanId: 1, logicalTimeMs: 150, inputs: [{ name: 'hot', value: true }],
+    scanId: 1, logicalTimeMs: 1050, inputs: [{ name: 'hot', value: true }],
   });
   assert.equal(recovered.trace.safe.expired, true);
+  assert.equal(recovered.trace.stateAfter.idle, true);
   assert.equal(observeRuntimeValues(compiled.traceMetadata, recovered.trace)
     .values.find(value => value.kind === 'timer' && value.name === 'hot_for').value, 50);
 });
@@ -464,6 +475,9 @@ test('GF-TEST-scan-frame-wasm: wrapper rejects non-buffer and oversized module i
     'gf_frame_outcome_ptr', 'gf_frame_outcome_len', 'gf_frame_error_ptr', 'gf_frame_error_len',
     'gf_frame_replay_temporal', 'gf_frame_replay_ptr', 'gf_frame_replay_len',
     'gf_frame_plan_temporal', 'gf_frame_plan_temporal_replay', 'gf_frame_resource_plan_ptr', 'gf_frame_resource_plan_len',
+    'gf_frame_activate_context', 'gf_frame_scan_context', 'gf_frame_context_checkpoint',
+    'gf_frame_context_checkpoint_ptr', 'gf_frame_context_checkpoint_len',
+    'gf_frame_context_state_ptr', 'gf_frame_context_state_len', 'gf_frame_restore_context_checkpoint',
   ].map(name => [name, () => 1]));
   const runtime = new FramedGhostFlowRuntime({ memory, gf_alloc: () => { allocations += 1; return 1; }, gf_frame_create: () => 1, gf_frame_scan: () => { scans += 1; return 1; }, ...functions });
   t.after(() => runtime.dispose());

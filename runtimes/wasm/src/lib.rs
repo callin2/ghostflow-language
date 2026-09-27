@@ -16,6 +16,9 @@ mod temporal_abi;
 #[path = "../solar_abi.rs"]
 mod solar_abi;
 
+#[path = "../context_abi.rs"]
+mod context_abi;
+
 #[path = "../replay_abi.rs"]
 mod replay_abi;
 
@@ -34,6 +37,8 @@ pub struct Handle {
     trace: String,
     replay: String,
     resource_plan: String,
+    context_checkpoint: Vec<u8>,
+    context_state: String,
 }
 
 impl Handle {
@@ -59,6 +64,8 @@ pub extern "C" fn gf_create() -> *mut Handle {
         trace: String::new(),
         replay: String::new(),
         resource_plan: String::new(),
+        context_checkpoint: Vec::new(),
+        context_state: String::new(),
     }))
 }
 
@@ -284,6 +291,31 @@ pub unsafe extern "C" fn gf_replay_temporal(
         }
     }
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn gf_replay_core(
+    handle: *mut Handle,
+    count: u32,
+    max_json_bytes: usize,
+) -> i32 {
+    let Some(h) = handle.as_mut() else { return 0 };
+    let result = h
+        .runtime
+        .replay_current(count as usize)
+        .map_err(|error| error.to_string())
+        .and_then(|records| replay_abi::legacy(&records, h.replay.capacity(), max_json_bytes));
+    match result {
+        Ok(replay) => {
+            h.replay = replay;
+            h.error.clear();
+            1
+        }
+        Err(error) => {
+            h.error = error;
+            0
+        }
+    }
+}
 #[no_mangle]
 pub unsafe extern "C" fn gf_replay_ptr(handle: *const Handle) -> *const u8 {
     handle
@@ -376,6 +408,8 @@ mod replay_tests {
             trace: "live".into(),
             replay: "old replay".into(),
             resource_plan: String::new(),
+            context_checkpoint: Vec::new(),
+            context_state: String::new(),
         };
         assert_eq!(unsafe { gf_resource_plan_len(&h) }, 0);
         let mut packet = profile_packet();
@@ -414,6 +448,8 @@ mod replay_tests {
             trace: "unchanged trace".into(),
             replay: String::new(),
             resource_plan: String::new(),
+            context_checkpoint: Vec::new(),
+            context_state: String::new(),
         };
         assert_eq!(unsafe { gf_replay_len(&h) }, 0);
         assert!(unsafe { gf_replay_ptr(&h) }.is_null());

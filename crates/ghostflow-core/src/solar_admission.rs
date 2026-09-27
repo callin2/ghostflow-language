@@ -22,6 +22,12 @@ pub enum SolarFactAvailability {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SolarFact {
     pub source_day: i32,
+    /// Stable slot key within a DailySlots definition; zero for other schedules.
+    pub slot_key: u16,
+    /// Declared civil minute; zero for other schedules.
+    pub minute_of_day: u16,
+    /// Civil recurrence fold. Solar facts always use zero.
+    pub fold: u8,
     pub scheduled_wall_ms: Option<u64>,
     pub provider_revision: String,
     pub context_revision: String,
@@ -37,6 +43,9 @@ impl SolarFact {
     ) -> Self {
         Self {
             source_day,
+            slot_key: 0,
+            minute_of_day: 0,
+            fold: 0,
             scheduled_wall_ms: Some(scheduled_wall_ms),
             provider_revision: provider.to_owned(),
             context_revision: context.to_owned(),
@@ -70,6 +79,9 @@ pub enum SolarDecision {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SolarObservation {
     pub source_day: i32,
+    pub slot_key: u16,
+    pub minute_of_day: u16,
+    pub fold: u8,
     pub scheduled_wall_ms: Option<u64>,
     pub decision: SolarDecision,
     pub provider_revision: String,
@@ -82,6 +94,7 @@ pub struct SolarStageResult {
     pub due: bool,
     pub decision: SolarDecision,
     pub observations: Vec<SolarObservation>,
+    pub unknown_reason: Option<String>,
 }
 
 #[derive(Debug)]
@@ -89,7 +102,7 @@ pub struct SolarPulseEngine {
     site: u32,
     gap_ms: u64,
     clock: ScheduleClockGate,
-    terminal_days: Vec<i32>,
+    terminal_days: Vec<(i32, u16, u8)>,
     terminal_capacity: usize,
     generation: u64,
     owner_id: u32,
@@ -132,6 +145,15 @@ impl SolarPulseEngine {
         snapshot: ClockSnapshot<'a>,
         facts: SolarFacts<'a>,
     ) -> Result<SolarStage> {
+        self.begin_with_unknown(snapshot, facts, None)
+    }
+
+    pub(crate) fn begin_with_unknown<'a>(
+        &self,
+        snapshot: ClockSnapshot<'a>,
+        facts: SolarFacts<'a>,
+        unknown_reason: Option<&str>,
+    ) -> Result<SolarStage> {
         validate_facts(facts)?;
         if facts.rows.len() > self.terminal_capacity {
             return Err(Error::new(
@@ -146,7 +168,18 @@ impl SolarPulseEngine {
             due: false,
             decision: SolarDecision::Before,
             observations: Vec::new(),
+            unknown_reason: clock.unknown_reason.map(str::to_owned),
         };
+        if let Some(reason) = unknown_reason {
+            result.decision = SolarDecision::Unknown;
+            result.unknown_reason = Some(clock.unknown_reason.unwrap_or(reason).to_owned());
+            return Ok(SolarStage {
+                engine,
+                result,
+                base_generation,
+                evaluated: true,
+            });
+        }
         if matches!(clock.disposition, ClockDisposition::BootBaseline) {
             result.decision = SolarDecision::BootBaseline;
             terminalize_past(
@@ -197,6 +230,7 @@ impl SolarPulseEngine {
         };
         if previous_wall < facts.coverage_from_wall_ms || current_wall > facts.coverage_to_wall_ms {
             result.decision = SolarDecision::Unknown;
+            result.unknown_reason = Some("IncompleteCoverage".into());
             return Ok(SolarStage {
                 engine,
                 result,
@@ -211,7 +245,7 @@ impl SolarPulseEngine {
             let corrections: Vec<&SolarFact> = facts
                 .rows
                 .iter()
-                .filter(|fact| !engine.terminal_days.contains(&fact.source_day))
+                .filter(|fact| !engine.terminal_days.contains(&identity(fact)))
                 .filter(|fact| fact.availability == SolarFactAvailability::Available)
                 .filter(|fact| {
                     fact.scheduled_wall_ms
@@ -222,8 +256,8 @@ impl SolarPulseEngine {
                 ensure_capacity(&engine, corrections.len())?;
                 had_correction = true;
                 for fact in corrections {
-                    correction_days.push(fact.source_day);
-                    engine.terminal_days.push(fact.source_day);
+                    correction_days.push(identity(fact));
+                    engine.terminal_days.push(identity(fact));
                     result
                         .observations
                         .push(observation(fact, SolarDecision::CorrectionPastHighWater));
@@ -234,7 +268,7 @@ impl SolarPulseEngine {
             .rows
             .iter()
             .filter(|fact| fact.availability == SolarFactAvailability::Available)
-            .filter(|fact| !correction_days.contains(&fact.source_day))
+            .filter(|fact| !correction_days.contains(&identity(fact)))
             .filter(|fact| {
                 fact.scheduled_wall_ms
                     .is_some_and(|at| at > previous_wall && at <= current_wall)
@@ -256,7 +290,7 @@ impl SolarPulseEngine {
         let crossed: Vec<&SolarFact> = all_crossed
             .iter()
             .copied()
-            .filter(|fact| !engine.terminal_days.contains(&fact.source_day))
+            .filter(|fact| !engine.terminal_days.contains(&identity(fact)))
             .collect();
         if crossed.is_empty() {
             result.decision = SolarDecision::AlreadyTerminal;
@@ -270,7 +304,7 @@ impl SolarPulseEngine {
         if observation_gap {
             ensure_capacity(&engine, crossed.len())?;
             for fact in &crossed {
-                engine.terminal_days.push(fact.source_day);
+                engine.terminal_days.push(identity(fact));
                 result
                     .observations
                     .push(observation(fact, SolarDecision::ObservationGap));
@@ -286,7 +320,7 @@ impl SolarPulseEngine {
         if crossed.len() >= 2 {
             ensure_capacity(&engine, crossed.len())?;
             for fact in crossed {
-                engine.terminal_days.push(fact.source_day);
+                engine.terminal_days.push(identity(fact));
                 result
                     .observations
                     .push(observation(fact, SolarDecision::Missed));
@@ -300,7 +334,7 @@ impl SolarPulseEngine {
             });
         }
         let fact = crossed[0];
-        if engine.terminal_days.contains(&fact.source_day) {
+        if engine.terminal_days.contains(&identity(fact)) {
             result.decision = SolarDecision::AlreadyTerminal;
         } else {
             result
@@ -366,7 +400,8 @@ impl SolarStage {
             return Ok(self);
         }
         let pending_index = pending[0];
-        let day = self.result.observations[pending_index].source_day;
+        let row = &self.result.observations[pending_index];
+        let day = (row.source_day, row.slot_key, row.fold);
         if self.engine.terminal_days.contains(&day) {
             self.result.decision = SolarDecision::AlreadyTerminal;
             self.result.observations[pending_index].decision = SolarDecision::AlreadyTerminal;
@@ -395,6 +430,9 @@ impl SolarStage {
 fn observation(fact: &SolarFact, decision: SolarDecision) -> SolarObservation {
     SolarObservation {
         source_day: fact.source_day,
+        slot_key: fact.slot_key,
+        minute_of_day: fact.minute_of_day,
+        fold: fact.fold,
         scheduled_wall_ms: fact.scheduled_wall_ms,
         decision,
         provider_revision: fact.provider_revision.clone(),
@@ -414,13 +452,13 @@ fn terminalize_past(
     let past: Vec<&SolarFact> = facts
         .rows
         .iter()
-        .filter(|fact| !engine.terminal_days.contains(&fact.source_day))
+        .filter(|fact| !engine.terminal_days.contains(&identity(fact)))
         .filter(|fact| fact.availability == SolarFactAvailability::Available)
         .filter(|fact| fact.scheduled_wall_ms.is_some_and(|at| at <= current_wall))
         .collect();
     ensure_capacity(engine, past.len())?;
     for fact in past {
-        engine.terminal_days.push(fact.source_day);
+        engine.terminal_days.push(identity(fact));
         result
             .observations
             .push(observation(fact, SolarDecision::Missed));
@@ -444,6 +482,9 @@ fn validate_facts(facts: SolarFacts<'_>) -> Result<()> {
         if !(0..=MAX_SOURCE_DAY).contains(&fact.source_day) {
             return Err(Error::new("solar fact source day is out of range"));
         }
+        if fact.fold > 2 {
+            return Err(Error::new("invalid occurrence fold"));
+        }
         if fact.availability == SolarFactAvailability::Available && fact.scheduled_wall_ms.is_none()
         {
             return Err(Error::new("available solar fact has no scheduled time"));
@@ -459,10 +500,14 @@ fn validate_facts(facts: SolarFacts<'_>) -> Result<()> {
                 return Err(Error::new("solar fact is outside coverage"));
             }
         }
-        if previous.is_some_and(|day| day >= fact.source_day) {
+        if previous.is_some_and(|key| key >= identity(fact)) {
             return Err(Error::new("solar facts must be ordered by source day"));
         }
-        previous = Some(fact.source_day);
+        previous = Some(identity(fact));
     }
     Ok(())
+}
+
+fn identity(fact: &SolarFact) -> (i32, u16, u8) {
+    (fact.source_day, fact.slot_key, fact.fold)
 }

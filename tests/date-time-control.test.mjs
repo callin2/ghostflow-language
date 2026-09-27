@@ -6,7 +6,6 @@ import { validateInteraction } from '../contracts/interaction-v0/validate.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 import { compileControl, ControlCompileError } from '../tools/control.mjs';
 import { emitCompletedScanSnapshot } from '../tools/interaction-runtime-snapshot.mjs';
-import { createOperatingSettingsCandidate } from '../tools/operating-settings.mjs';
 import { canonicalJson } from '../tools/canonical-json.mjs';
 import { buildPortablePackage, PortablePackageError, verifyPortablePackage } from '../tools/portable-package.mjs';
 import { compileSource } from './helpers/literate-compile.mjs';
@@ -56,7 +55,13 @@ test('compiler admits canonical time scalars, settings grids, and DateTime arith
     output ordered: Bool;
     let previous = now - 1ms;
     shifted <- now + 1ms;
-    ordered <- opening < time\`07:00\` && previous < now && now <= deadline && day == date\`1970-01-01\`;
+    ordered <- case opening {
+      ok(opening_value) => case deadline {
+        ok(deadline_value) => opening_value < time\`07:00\` && previous < now && now <= deadline_value && day == date\`1970-01-01\`;
+        fault(_) => false;
+      };
+      fault(_) => false;
+    };
   }`, { filename: 'calendar-values.ghost' });
   assert.deepEqual(compiled.manifest.inputs, [{ name: 'now', type: 'DateTime' }]);
   assert.deepEqual(compiled.manifest.outputs, [
@@ -136,7 +141,7 @@ test('runtime rejects noninteger and out-of-range public time values and metadat
     input day: Date;
     input time: TimeOfDay;
     input instant: DateTime;
-    config epoch: DateTime = datetime\`1970-01-01T00:00:00Z\`;
+    let epoch = datetime\`1970-01-01T00:00:00Z\`;
     output same: Bool;
     same <- instant == epoch;
   }`, { filename: 'time-boundary.ghost' });
@@ -160,7 +165,7 @@ test('runtime rejects noninteger and out-of-range public time values and metadat
   }), /canonicalUnit.*forbidden|unknown key/);
 });
 
-test('time operating settings rewrite canonical tagged source and interaction snapshots validate bounds', async () => {
+test('time settings stream updates the same artifact and interaction snapshots validate bounds', async () => {
   const source = `<!-- ghostflow:anchor id=GF-INT-DATETIME-SETTING kind=intent status=confirmed origin=user -->
 Set the deadline.
 
@@ -179,34 +184,46 @@ control DateTimeSetting {
     min = date\`2026-09-01\`; max = date\`2026-09-30\`; step = 1; access = operator;
   }
   output applied: DateTime;
-  applied <- deadline;
+  output settings_fault: Bool;
+  applied <- case deadline { ok(value) => value; fault(_) => datetime\`1970-01-01T00:00:00Z\`; };
+  settings_fault <- case deadline { ok(_) => false; fault(_) => true; };
 }
 \`\`\`
 `;
-  const candidate = await createOperatingSettingsCandidate({
-    source,
-    filename: 'datetime-setting.ghost.md',
-    expectedSourceSha256: createHash('sha256').update(source).digest('hex'),
-    changes: { deadline: 1_790_038_800_000, opening: 24_300_000, planting_day: 20_719 },
-  });
-  assert.match(candidate.source, /datetime`2026-09-22T01:00:00\.000Z`/);
-  assert.match(candidate.source, /time`06:45:00\.000`/);
-  assert.match(candidate.source, /date`2026-09-23`/);
-
-  const compilation = await compileSource(candidate.source, {
+  const compilation = await compileSource(source, {
     filename: 'datetime-setting.ghost.md',
     interactionSourceIdentity: { documentId: 'source.datetime-setting', revisionId: 'revision.datetime-setting-v1' },
   });
   assert.deepEqual(compilation.interactionSchema.descriptors[0].sourceType, { kind: 'builtin', name: 'DateTime', unit: null });
-  const runtime = await ControlRuntime.instantiateSimulation(wasm, compilation);
+  const runtime = await ControlRuntime.instantiate(wasm, compilation,
+    { context: { bootEpoch: 1, terminalCapacity: 8, bindings: [] } });
   let trace;
-  try { trace = runtime.step({ nowMs: 0 }).vm; assert.equal(trace.safe.applied, 1_790_038_800_000); }
+  let settingsState;
+  try {
+    const fingerprint = runtime.contextSnapshot().state.programFingerprint;
+    trace = runtime.step({ nowMs: 0, contextFacts: {
+      clock: { monotonicMs: 0, bootEpoch: 1, wallMs: 0, uncertaintyMs: 0, trusted: true,
+        unknownReason: null, sourceRevision: 'datetime-test-clock' },
+      natural: [], schedules: [], settings: {
+        programFingerprint: fingerprint, eventId: 'datetime-settings-1', baseRevision: 0, position: 1,
+        origin: 'operatorEdit', changes: [
+          { configId: compilation.manifest.configs[0].id, result: { ok: true, type: 'DateTime', value: 1_790_038_800_000 } },
+          { configId: compilation.manifest.configs[1].id, result: { ok: true, type: 'TimeOfDay', value: 24_300_000 } },
+          { configId: compilation.manifest.configs[2].id, result: { ok: true, type: 'Date', value: 20_719 } },
+        ],
+      },
+    } }).vm;
+    assert.equal(trace.safe.applied, 1_790_038_800_000);
+    assert.equal(trace.safe.settings_fault, false);
+    settingsState = runtime.contextSnapshot().state;
+  }
   finally { runtime.dispose(); }
   const snapshot = emitCompletedScanSnapshot({
     compilation,
     runId: 'run.datetime-setting',
     completion: { kind: 'completed-scan', scanId: 0, logicalTimeMs: 0 },
     trace,
+    settingsState,
   });
   assert.equal(validateInteraction(compilation.interactionSchema, snapshot).valid, true);
   const invalid = structuredClone(snapshot);
@@ -219,7 +236,7 @@ test('signed portable package admits time config metadata and rejects a re-signe
   const compilation = await compileSource(source, { filename: 'packaged-date.ghost.md' });
   const key = await packageKey();
   const identity = {
-    compilerRevision: 'datetime-test', runtimeSemantics: 'GhostFlow/runtime-semantics-v1', runtimeAbi: 'GhostFlow/framed-scan-abi-v1',
+    compilerRevision: 'datetime-test', runtimeSemantics: 'GhostFlow/runtime-semantics-v1', runtimeAbi: 'GhostFlow/context-scan-abi-v5',
     requiredCapabilities: [], bindingRevision: 'datetime-test-binding',
   };
   const packageValue = await buildPortablePackage(compilation, identity, {
@@ -229,7 +246,7 @@ test('signed portable package admits time config metadata and rejects a re-signe
   const options = {
     trustedKeys: [{ keyId: key.keyId, publicKey: key.publicKey }], revokedKeyIds: [],
     expectedCompilerRevision: identity.compilerRevision, supportedRuntimeSemantics: [identity.runtimeSemantics],
-    supportedRuntimeAbis: [identity.runtimeAbi], supportedManifestFormats: ['GhostFlow/control-v2'],
+    supportedRuntimeAbis: [identity.runtimeAbi], supportedManifestFormats: ['GhostFlow/control-v10'],
     availableCapabilities: [], expectedBindingRevision: identity.bindingRevision, verifyBytecode: async () => true,
   };
   const verified = await verifyPortablePackage(packageValue, options);

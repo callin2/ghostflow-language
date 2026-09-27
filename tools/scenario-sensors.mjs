@@ -10,14 +10,20 @@ validateScenario(scenario, manifest);
 const wasm = fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
 let runtime;
 const certified = manifest.signals?.some(signal => signal.kind === 'true-for');
+const hasAfterEvent = manifest.signals?.some(signal => signal.kind === 'after-event');
 const hasSolar = manifest.schedules?.some(schedule => schedule.kind === 'solar');
+const hasDaily = manifest.schedules?.some(schedule => ['daily', 'daily-slots'].includes(schedule.kind));
+const hasContext = manifest.format === 'GhostFlow/control-v10';
 const hasObjective = (manifest.objectives?.length ?? 0) > 0;
 try {
-  const instantiate = certified || hasSolar || hasObjective ? ControlRuntime.instantiate : ControlRuntime.instantiateFramed;
+  const instantiate = certified || hasAfterEvent || hasSolar || hasDaily || hasContext || hasObjective ? ControlRuntime.instantiate : ControlRuntime.instantiateFramed;
   runtime = await instantiate.call(ControlRuntime, wasm, { bytes: artifactBytes, manifest }, {
     acceptSettings: true,
     ...(scenario.temporal === undefined ? {} : { temporal: scenario.temporal }),
+    ...(scenario.afterEvent === undefined ? {} : { afterEvent: scenario.afterEvent }),
     ...(scenario.solar === undefined ? {} : { solar: scenario.solar }),
+    ...(scenario.schedule === undefined ? {} : { schedule: scenario.schedule }),
+    ...(scenario.context === undefined ? {} : { context: scenario.context }),
     ...(scenario.capabilities === undefined ? {} : { capabilities: scenario.capabilities }),
   });
 } catch (error) {
@@ -80,11 +86,14 @@ try {
           };
         }
         const outcome = runtime.step({ nowMs: action.atMs, inputs, samples, intervals,
+          ...(action.events === undefined ? {} : { events: action.events }),
           objectiveSafeMax: Object.fromEntries((manifest.objectives ?? []).map(objective => {
             const binding = scenario.actuatorBindings?.find(item => item.output === objective.bindings.output);
             return [objective.name, binding?.max ?? objective.output.max];
           })),
-          ...(action.solarFacts === undefined ? {} : { solarFacts: action.solarFacts }) });
+          ...(action.solarFacts === undefined ? {} : { solarFacts: action.solarFacts }),
+          ...(action.scheduleFacts === undefined ? {} : { scheduleFacts: action.scheduleFacts }),
+          ...(action.contextFacts === undefined ? {} : { contextFacts: action.contextFacts }) });
         const virtualActuators = Object.fromEntries((scenario.actuatorBindings ?? []).map(binding => {
           const requested = outcome.vm.requested[binding.output];
           const safe = outcome.vm.safe[binding.output];
@@ -105,6 +114,7 @@ try {
         }));
         if (plantState !== null) plantState.appliedPercent = virtualActuators[scenario.plant.actuator].applied;
         console.log(JSON.stringify({ scanId: outcome.frame?.scanId ?? scanId, logicalTimeMs: action.atMs, trace: outcome.vm,
+          ...(manifest.format === 'GhostFlow/control-v10' ? { settingsState: runtime.contextSnapshot().state } : {}),
           ...(scenario.actuatorBindings === undefined ? {} : { virtualActuators }), ...(plant === undefined ? {} : { plant }) }));
         scanId += 1;
         samples = {};

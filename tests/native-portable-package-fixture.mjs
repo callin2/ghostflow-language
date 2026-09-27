@@ -48,6 +48,34 @@ const debounceScenario = scenario.startsWith('debounce-');
 const holdScenario = scenario.startsWith('hold-');
 const intSettingsScenario = scenario.startsWith('int-settings-');
 const windowScenario = scenario.startsWith('window-');
+const gfb10Scenario = scenario.startsWith('gfb10-');
+if (gfb10Scenario) {
+  const pinned = JSON.parse(fs.readFileSync(path.join(root, 'tests/fixtures/gfb10-periodic-package-payload.json'), 'utf8'));
+  const candidate = { format: 'GhostFlow/portable-package-v1', payload: pinned.payload };
+  if (scenario !== 'gfb10-valid') {
+    const manifest = JSON.parse(Buffer.from(candidate.payload.manifest.contentBase64, 'base64').toString('utf8'));
+    if (scenario === 'gfb10-periodic-anchor') manifest.schedules[0].anchor.instantMs += 1;
+    else if (scenario === 'gfb10-periodic-policy-missing') delete manifest.schedules[0].policy.clock;
+    else throw new Error(`unknown GFB10 scenario: ${scenario}`);
+    const bytes = encoder.encode(canonicalJson(manifest));
+    candidate.payload.manifest.contentBase64 = Buffer.from(bytes).toString('base64');
+    candidate.payload.manifest.sha256 = Buffer.from(await crypto.subtle.digest('SHA-256', bytes)).toString('hex');
+  }
+  const payloadBytes = encoder.encode(canonicalJson(candidate.payload));
+  candidate.payloadSha256 = Buffer.from(await crypto.subtle.digest('SHA-256', payloadBytes)).toString('hex');
+  candidate.signatures = [{
+    algorithm: 'Ed25519', keyId: 'test-current-2026',
+    signatureBase64: Buffer.from(await crypto.subtle.sign('Ed25519', privateKey, payloadBytes)).toString('base64'),
+  }];
+  process.stdout.write(serializePortablePackage(candidate));
+  process.exit(0);
+}
+const configTimerScenario = scenario === 'config-timer-valid';
+if (intSettingsScenario || timeScenario || quantityScenario || configTimerScenario) identity.runtimeAbi = 'GhostFlow/context-scan-abi-v5';
+if (configTimerScenario) identity.requiredCapabilities = [
+  { kind: 'actuator', name: 'pump', type: 'bool' },
+  { kind: 'input', name: 'start', type: 'bool' },
+];
 const windowSource = `control WindowPackage {
   fn above(value: Temperature) -> Bool { value > 280K }
   sensor probe: Temperature;
@@ -65,7 +93,7 @@ const intSettingsSource = intSettingsScenario ? `control IntSettingsPackage {
   config exact: Int = 0 { min = 0; max = 2147483647; step = 2147483647; access = operator; }
   config plain: Int = 0;
   output count: Int;
-  count <- wide;
+  count <- case wide { ok(value) => value; fault(_) => 0; };
 }` : null;
 const holdSource = scenario.startsWith('hold-basic-') ? `control HoldPackage {
   input start: Bool;
@@ -137,7 +165,9 @@ const profileSource = {
   'profile-2': 'control Integer { input start, stop: Bool; state count: Int = 7; output pump: Int; output valve: Bool; pump <- count; valve <- start; }',
   'profile-3': 'control IntegerBranch { input start, stop: Bool; state count: Int = 7; output pump: Int; output valve: Bool; pump <- if start then count else 0; valve <- start; }',
 }[scenario];
-const source = (profileSource || quantitySource || timeSource || resultSource || debounceSource || holdSource || intSettingsSource || windowScenario) ? `# Package profile\n\n\`\`\`ghost\n${profileSource || quantitySource || timeSource || resultSource || debounceSource || holdSource || intSettingsSource || windowSource}\n\`\`\`\n`
+const source = configTimerScenario
+  ? fs.readFileSync(path.join(root, 'examples/authoring/corpus/setting-corrected.ghost.md'), 'utf8')
+  : (profileSource || quantitySource || timeSource || resultSource || debounceSource || holdSource || intSettingsSource || windowScenario) ? `# Package profile\n\n\`\`\`ghost\n${profileSource || quantitySource || timeSource || resultSource || debounceSource || holdSource || intSettingsSource || windowSource}\n\`\`\`\n`
   : fs.readFileSync(path.join(root, 'examples/tutorial/01-latch.ghost.md'), 'utf8');
 const compilation = await compileSource(source, { filename: '01-latch.ghost.md' });
 if (scenario === 'profile-2' || scenario === 'profile-3') identity.requiredCapabilities[0].type = 'int';
@@ -173,7 +203,7 @@ const packageValue = await buildPortablePackage(compilation, identity, {
   signers: [{ keyId: 'test-current-2026', privateKey }],
   verifyCompilation: (text, { filename }) => compileSource(text, { filename }),
 });
-if (scenario === 'valid' || profileSource || scenario === 'quantity-valid' || scenario === 'time-valid' || scenario === 'result-valid' || scenario === 'debounce-valid' || scenario === 'hold-valid' || scenario === 'hold-basic-valid' || scenario === 'int-settings-valid' || scenario === 'window-valid') {
+if (scenario === 'valid' || profileSource || configTimerScenario || scenario === 'quantity-valid' || scenario === 'time-valid' || scenario === 'result-valid' || scenario === 'debounce-valid' || scenario === 'hold-valid' || scenario === 'hold-basic-valid' || scenario === 'int-settings-valid' || scenario === 'window-valid') {
   process.stdout.write(serializePortablePackage(packageValue));
 } else if (quantityScenario || timeScenario || resultScenario || debounceScenario || holdScenario || intSettingsScenario || windowScenario || ['unsupported-bytecode-version', 'version-mismatch-1', 'version-mismatch-2', 'unsupported-header'].includes(scenario)) {
   const candidate = JSON.parse(JSON.stringify(packageValue));
@@ -190,6 +220,8 @@ if (scenario === 'valid' || profileSource || scenario === 'quantity-valid' || sc
       else if (scenario === 'int-settings-step-negative') config.settings.step = -1;
       else if (scenario === 'int-settings-inverted') { config.settings.min = 1; config.settings.max = 0; }
       else if (scenario === 'int-settings-default-grid') manifest.configs[3].value = 1;
+      else if (scenario === 'int-settings-bytecode-mismatch') manifest.configs[3].value = 2147483647;
+      else if (scenario === 'int-settings-context-abi-mismatch') candidate.payload.identity.runtimeAbi = 'GhostFlow/framed-scan-abi-v1';
       else if (scenario === 'int-settings-max-grid') manifest.configs[2].settings.max = 2147483647;
       else if (scenario === 'int-settings-outside-range') config.settings.min = -2147483647;
       else if (scenario === 'int-settings-extra-step-type') config.settings.stepType = 'Int';

@@ -14,7 +14,7 @@ test('natural condition reference retains typed provider queries', () => {
     { name: 'harbor_tides', type: 'TidePredictions' },
     { name: 'moon', type: 'LunarEphemeris' },
   ]);
-  assert.deepEqual(manifest.naturalConditions.map(({ site, ...condition }) => condition), [
+  assert.deepEqual(manifest.naturalConditions.map(({ site, projectionInputs, ...condition }) => condition), [
     {
       operation: 'tide_is', provider: 'harbor_tides', classification: 'neap',
       result: { value: 'Bool', error: 'TemporalContextFault' },
@@ -25,13 +25,18 @@ test('natural condition reference retains typed provider queries', () => {
     },
   ]);
   assert.ok(manifest.naturalConditions.every(condition => Number.isSafeInteger(condition.site)));
+  for (const condition of manifest.naturalConditions) {
+    assert.deepEqual(condition.projectionInputs, {
+      ok: `__gf_natural_${condition.site}_ok`, value: `__gf_natural_${condition.site}_value`,
+      fault: `__gf_natural_${condition.site}_fault`,
+    });
+  }
 });
 
-test('natural condition execution remains fail-closed without provider observations', () => {
-  assert.throws(
-    () => compileControl(source, { filename: fixture.filename }),
-    /natural condition execution requires verified provider observations and a Result ABI/,
-  );
+test('natural condition execution binds protected Results in GFB11', () => {
+  const compiled = compileControl(source, { filename: fixture.filename });
+  assert.equal(compiled.manifest.format, 'GhostFlow/control-v10');
+  assert.equal(new DataView(compiled.bytes.buffer, compiled.bytes.byteOffset, compiled.bytes.byteLength).getUint16(4, true), 11);
 });
 
 test('natural conditions require their matching logical provider type', () => {

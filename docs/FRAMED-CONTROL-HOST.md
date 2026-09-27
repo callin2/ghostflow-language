@@ -10,7 +10,9 @@ language PR19 / 1b04529 and web PR71 / a6999ad. No device or physical I/O.
 Add `ControlRuntime.instantiateFramed(wasmBytes, artifact, options = {})`.
 It uses the same manifest validation, bytecode digest verification, capability
 binding and existing Rust signal conditioners as the current entry. Manifest
-v1 and v4 are accepted; `acceptSettings` and `acceptSolar` opt into v2 and v3.
+v1 and v4 are accepted; `acceptSettings` opts into v2. v3 is accepted without
+an opt-in. Current host validation also accepts v7, v8 and v10 under their
+feature-specific bytecode contracts. There is no `acceptSolar` option.
 Legacy `instantiate` and `instantiateSimulation` retain their public result
 shape; every entry now uses the same atomic conditioner transaction boundary.
 Use a shared constructor/helper, not copied conditioning or a second evaluator.

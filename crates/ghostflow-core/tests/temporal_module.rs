@@ -436,7 +436,7 @@ fn gfb4_preserves_existing_expression_stack_and_total_state_limits() {
     f.output = vec![57, 0, 0, 0];
     rejected(&f, "intent type mismatch");
     f = Fixture::default();
-    f.version = 8;
+    f.version = 255;
     rejected(&f, "unsupported GFB format");
 }
 

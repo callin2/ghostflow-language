@@ -1,7 +1,7 @@
 import { attachIntentMetadata, remapSourceTrace } from './source-trace.mjs';
 import { emitInteractionSchema } from './interaction-schema.mjs';
 import { extractLiterate, mapSourcePosition } from './literate.mjs';
-import { compileAccountingDescriptorArtifact, compileControl, compileResourcePolicyArtifact, compileScheduleDescriptorArtifact, compileTemporalDescriptorArtifact, hasTemporalDescriptorCalls, parseControl } from './control.mjs';
+import { compileAccountingControl, compileControl, compileResourcePolicyArtifact, compileScheduleDescriptorArtifact, compileTemporalDescriptorArtifact, hasTemporalDescriptorCalls, isExecutablePulseSchedule, parseControl } from './control.mjs';
 import { isWellFormedUnicode, sha256Hex, utf8ByteLength } from './sha256.mjs';
 import { compileComposition, resolveDocument } from './composition.mjs';
 
@@ -99,8 +99,8 @@ export function compileSourceSync(source, options = {}) {
     } else result = ast.kind === 'resource-policy'
       ? compileResourcePolicyArtifact(extraction.code, { filename })
       : ast.body.some(item => item.kind === 'account' || item.kind === 'account-constraints')
-        ? compileAccountingDescriptorArtifact(extraction.code, { filename })
-      : ast.body.some(item => item.kind === 'schedule' && item.scheduleType !== 'Solar'
+        ? compileAccountingControl(extraction.code, { filename })
+      : ast.body.some(item => item.kind === 'schedule' && !isExecutablePulseSchedule(item)
         && Object.keys(item.policy ?? {}).some(key => key !== 'fallback'))
         ? compileScheduleDescriptorArtifact(extraction.code, { filename })
         : hasTemporalDescriptorCalls(ast)
@@ -201,7 +201,7 @@ export function compileSourceSync(source, options = {}) {
     traceMetadata,
     manifest: result.manifest ? {
       ...result.manifest, bytecodeSha256: digest,
-      ...(['GhostFlow/schedule-descriptor-v1', 'GhostFlow/accounting-v1', 'GhostFlow/temporal-descriptor-v1'].includes(result.manifest.format)
+      ...(['GhostFlow/schedule-descriptor-v1', 'GhostFlow/temporal-descriptor-v1'].includes(result.manifest.format)
         ? { sourceDocumentSha256: sourceDocument.sha256 } : {}),
     } : null,
     extractionMap: extraction.sourceMap,

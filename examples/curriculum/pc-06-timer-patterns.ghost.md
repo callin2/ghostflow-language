@@ -23,9 +23,9 @@ control TimerPatterns {
   input on_delay_request, off_delay_request, limited_request, stop_ok: Bool;
   output on_delayed, off_delayed, limited_run: Bool;
 
-  config on_delay: Duration = 2s;
-  config off_delay: Duration = 3s;
-  config max_run: Duration = 10s;
+  let on_delay = 2s;
+  let off_delay = 3s;
+  let max_run = 10s;
 
   type OnPhase = OnIdle | OnWaiting | OnActive;
   // ghostflow:link id=GF-INT-PC06-INDEPENDENT-TIMERS-V1 relation=implements

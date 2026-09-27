@@ -14,7 +14,8 @@ const check = source => typeCheckControl(source).manifest.schedules[0];
 test('Periodic retains its setting identity, exact anchor and phase policy', () => {
   const descriptor = check(code(periodic));
   assert.equal(descriptor.kind, 'periodic');
-  assert.deepEqual(descriptor.every, { expression: '900000', initialMs: 900000, config: 'interval' });
+  assert.deepEqual(descriptor.every,
+    { expression: 'interval', initialMs: 900000, config: 'interval', configId: 2 });
   assert.deepEqual(descriptor.anchor, { kind: 'instant', instantMs: Date.UTC(2026, 9, 1) });
   assert.equal(descriptor.intervalChange, 'preserve_anchor');
   assert.deepEqual(descriptor.policy, { basis: 'pulse', when: 'true', clock: 'trusted_only', gapMs: 60000, recovery: 'baseline', fallback: 'skip' });
@@ -47,11 +48,13 @@ test('Periodic persisted_epoch remains an activation requirement with no hidden 
 });
 
 for (const fixture of [periodic, cron]) {
-  test(`${fixture.id} emits only a checked descriptor until native admission is bound`, async () => {
-    assert.throws(() => compileControl(code(fixture)), /policy execution requires verified occurrence provider and native admission bindings/);
+  test(`${fixture.id} emits executable GFB11 with source schedule identity`, async () => {
+    const direct = compileControl(code(fixture));
+    assert.equal(direct.manifest.format, 'GhostFlow/control-v10');
     const compiled = await compileSource(fixture.source, { filename: fixture.filename });
-    assert.equal(compiled.manifest.format, 'GhostFlow/schedule-descriptor-v1');
-    assert.equal(JSON.parse(compiled.bytes).executable, false);
+    assert.equal(compiled.manifest.format, 'GhostFlow/control-v10');
+    assert.equal(compiled.manifest.schedules[0].site, direct.manifest.schedules[0].site);
+    assert.equal(new DataView(compiled.bytes.buffer, compiled.bytes.byteOffset, compiled.bytes.byteLength).getUint16(4, true), 11);
   });
   for (const field of ['basis', 'when', 'clock', 'gap', 'recovery', 'fallback']) {
     test(`${fixture.id} requires explicit ${field}`, () => {

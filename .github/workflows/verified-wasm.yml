@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - dev
   workflow_dispatch:
     inputs:
       source_sha:
@@ -75,6 +76,7 @@ jobs:
           fi
 
       - name: Set up Node.js 22
+        id: verified_node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
@@ -101,6 +103,23 @@ jobs:
       - name: Run source verification
         working-directory: source
         run: npm test
+
+      - name: Set up Node.js 24 for current-source coverage
+        if: ${{ matrix.label == 'current' }}
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+
+      - name: Run current-source coverage gate
+        if: ${{ matrix.label == 'current' }}
+        working-directory: source
+        run: npm run test:coverage
+
+      - name: Restore verified Node.js for packaging
+        if: ${{ matrix.label == 'current' }}
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: ${{ steps.verified_node.outputs.node-version }}
 
       - name: Package verified WASM handoff
         id: package

@@ -44,14 +44,14 @@ does not borrow CSS cascade or source-order precedence.
 1. Missing inputs are rejected; hosts must submit an explicit fault/status
    input if absence is meaningful.
 2. All `next` expressions read the same old state and input snapshot.
-3. Computed next states are committed simultaneously.
-4. All `intent` expressions read the committed next state.
+3. All next-state expressions produce one candidate state; none commits early.
+4. In intent expressions, unprimed state reads the old snapshot; explicit next-state references read candidate state.
 5. Safety constraints transform intents into safe outputs.
-6. The journal records input, old/new state, requested/safe intents, strategy,
-   and faults.
+6. When evaluation finishes without error, even if constraints block an output,
+   candidate state and requested/safe intents commit together; the journal records input, old/new state, both intents, strategy, and faults.
 
-`next.NAME` is valid only in intent expressions. This prevents transition order
-from leaking into semantics.
+`next.NAME` (modern `NAME'`) is valid only in intent expressions. This prevents
+transition order from leaking into semantics. See [Reference §2.8](reference/02-types-expressions-state.md#28-tick과-상태-snapshot).
 
 ## Time travel and ghost execution
 

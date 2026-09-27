@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { compileSource } from '../tools/toolchain.mjs';
+import { compileSource as compileBrowserSource } from '../tools/browser-toolchain.mjs';
 import { verificationSourceHashes } from '../tools/verification-sources.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 
@@ -14,28 +15,48 @@ const scenarioPath = new URL('../examples/vfd-speed.scenario.json', import.meta.
 const wasmPath = new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url);
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 
-test('canonical VFD program replays eight sequential frames in official WASM', async () => {
+test('canonical VFD source and scenario execute eight independent framed WASM oracles', async () => {
   const source = fs.readFileSync(sourcePath, 'utf8');
   const scenario = JSON.parse(fs.readFileSync(scenarioPath, 'utf8'));
   assert.equal(scenario.format, 'GhostFlow/vfd-speed-scenario-v1');
   assert.equal(sha256(source), scenario.sourceSha256);
   assert.deepEqual(scenario.inputs, { potentiometer_v: { unit: 'V', min: 0, max: 10 } });
   assert.deepEqual(scenario.outputs, { speed_v: { unit: 'V' }, speed_hz: { unit: 'Hz' } });
-  const artifact = await compileSource(source, { filename: 'VfdSpeed.ghost.md' });
+  const artifact = await compileSource(source, { filename: 'vfd-speed.ghost.md' });
+  const browserArtifact = await compileBrowserSource(source, { filename: 'vfd-speed.ghost.md' });
+  assert.deepEqual([...browserArtifact.bytes], [...artifact.bytes]);
+  assert.deepEqual(browserArtifact.manifest, artifact.manifest);
+  assert.equal(browserArtifact.sourceDocument.text, source);
   assert.deepEqual(artifact.manifest.inputs.map(({ name, type }) => [name, type]), [
     ['start', 'Bool'], ['stop', 'Bool'], ['potentiometer_v', 'Number'],
   ]);
   assert.deepEqual(artifact.manifest.outputs.map(({ name, type }) => [name, type]), [
     ['run', 'Bool'], ['speed_v', 'Number'], ['speed_hz', 'Number'],
   ]);
+  assert.equal(artifact.sourceDocument.text, source);
+  const independent = [
+    [false, false, 0, false, 0, 0],
+    [true, false, 5, true, 5, 25],
+    [false, false, 10, true, 10, 50],
+    [false, true, 5, false, 5, 25],
+    [false, false, 0, false, 0, 0],
+    [true, true, 10, false, 10, 50],
+    [true, false, 0, true, 0, 0],
+    [false, false, 5, true, 5, 25],
+  ];
 
   const wasm = fs.readFileSync(wasmPath);
-  const runtime = await ControlRuntime.instantiateSimulation(wasm, artifact);
+  const runtime = await ControlRuntime.instantiateFramed(wasm, artifact);
   const observed = [];
   try {
-    assert.equal(scenario.frames.length, 8);
-    for (const { atMs, inputs, expectedSafe } of scenario.frames) {
+    assert.equal(scenario.frames.length, independent.length);
+    for (const [index, { atMs, inputs, expectedSafe }] of scenario.frames.entries()) {
+      const [start, stop, potentiometer_v, run, speed_v, speed_hz] = independent[index];
+      assert.equal(atMs, index);
+      assert.deepEqual(inputs, { start, stop, potentiometer_v });
+      assert.deepEqual(expectedSafe, { run, speed_v, speed_hz });
       const result = runtime.step({ nowMs: atMs, inputs });
+      assert.deepEqual(result.frame, { scanId: index, logicalTimeMs: atMs });
       assert.deepEqual(result.vm.safe, expectedSafe, `frame ${atMs}`);
       observed.push({ atMs, inputs, vm: result.vm });
     }
@@ -68,7 +89,7 @@ test('canonical VFD program replays eight sequential frames in official WASM', a
 
 test('VFD typed inputs reject missing and invalid values before a scan', async () => {
   const artifact = await compileSource(fs.readFileSync(sourcePath, 'utf8'), { filename: 'VfdSpeed.ghost.md' });
-  const runtime = await ControlRuntime.instantiateSimulation(fs.readFileSync(wasmPath), artifact);
+  const runtime = await ControlRuntime.instantiateFramed(fs.readFileSync(wasmPath), artifact);
   const valid = { start: false, stop: false, potentiometer_v: 0 };
   try {
     assert.throws(() => runtime.step({ nowMs: 0, inputs: { start: false, stop: false } }), /missing input potentiometer_v/);
@@ -77,11 +98,12 @@ test('VFD typed inputs reject missing and invalid values before a scan', async (
     for (const invalid of [false, Number.NaN, Number.POSITIVE_INFINITY]) {
       assert.throws(() => runtime.step({ nowMs: 0, inputs: { ...valid, potentiometer_v: invalid } }), /inputs.potentiometer_v must be finite/);
     }
-    assert.equal(runtime.runtime.journalLength, 0);
+    assert.equal(runtime.lastFrameOutcome, null);
     const first = runtime.step({ nowMs: 0, inputs: valid });
+    assert.deepEqual(first.frame, { scanId: 0, logicalTimeMs: 0 });
     assert.deepEqual(first.vm.safe, { run: false, speed_v: 0, speed_hz: 0 });
     assert.equal(typeof first.vm.inputs.potentiometer_v, 'number');
-    assert.equal(runtime.runtime.journalLength, 1);
+    assert.equal(runtime.lastFrameOutcome.scanId, 0);
   } finally {
     runtime.dispose();
   }

@@ -6,7 +6,10 @@
 
 use std::collections::BTreeSet;
 
-use crate::{Error, Result, Runtime, TickRecord, Value};
+use crate::{
+    context_runtime::Facts, schedule_clock::ClockSnapshot, Error, Result, Runtime, TickRecord,
+    Value,
+};
 
 pub const SCAN_FRAME_V1_MAX_EXACT_INTEGER: u64 = 9_007_199_254_740_991;
 pub const RESERVED_CLOCK_INPUT: &str = "__gf_now_ms";
@@ -73,6 +76,10 @@ impl ScanDriver {
         self.runtime
     }
 
+    pub fn restore_context_checkpoint(&mut self, bytes: &[u8]) -> Result<()> {
+        self.runtime.restore_context_checkpoint(bytes)
+    }
+
     /// Validates a complete host frame without changing runtime state, inputs,
     /// sequence, clock, journal, or output intents.
     pub fn validate_scan_frame(&self, frame: &ScanFrameV1) -> Result<()> {
@@ -109,7 +116,7 @@ impl ScanDriver {
         let expected_input_count = module
             .inputs
             .iter()
-            .filter(|field| field.name != RESERVED_CLOCK_INPUT)
+            .filter(|field| !self.derived_input(&field.name))
             .count();
         if frame.inputs.len() != expected_input_count {
             return Err(Error::new(format!(
@@ -120,8 +127,8 @@ impl ScanDriver {
 
         let mut supplied = BTreeSet::new();
         for input in &frame.inputs {
-            if input.name == RESERVED_CLOCK_INPUT {
-                return Err(Error::new("reserved clock input is host-derived"));
+            if self.derived_input(&input.name) {
+                return Err(Error::new("reserved input is runtime-derived"));
             }
             if !supplied.insert(input.name.as_str()) {
                 return Err(Error::new(format!("duplicate input {}", input.name)));
@@ -139,7 +146,7 @@ impl ScanDriver {
             }
         }
         for field in &module.inputs {
-            if field.name != RESERVED_CLOCK_INPUT && !supplied.contains(field.name.as_str()) {
+            if !self.derived_input(&field.name) && !supplied.contains(field.name.as_str()) {
                 return Err(Error::new(format!("missing input {}", field.name)));
             }
         }
@@ -149,6 +156,50 @@ impl ScanDriver {
     /// Evaluates one complete, validated host frame. Only a successful core
     /// evaluation advances the scan sequence and logical clock.
     pub fn scan(&mut self, frame: ScanFrameV1) -> Result<ScanOutcomeV1> {
+        self.scan_inner(frame, None)
+    }
+
+    /// Evaluates a complete context frame with explicit clock and context facts.
+    /// Reserved clocks come from the snapshot; protected Results come from the
+    /// core. Failed evaluation commits neither context nor scan sequencing.
+    pub fn scan_with_context(
+        &mut self,
+        frame: ScanFrameV1,
+        clock: ClockSnapshot<'_>,
+        facts: &Facts,
+    ) -> Result<ScanOutcomeV1> {
+        if clock.monotonic_ms != frame.logical_time_ms {
+            return Err(Error::new(
+                "context clock does not match frame logical time",
+            ));
+        }
+        if self.runtime.context_runtime.is_none() {
+            return Err(Error::new(
+                "context scan requires an activated context runtime",
+            ));
+        }
+        self.scan_inner(frame, Some((clock, facts)))
+    }
+
+    fn derived_input(&self, name: &str) -> bool {
+        name == RESERVED_CLOCK_INPUT
+            || (self.runtime.context_runtime.is_some()
+                && ((name == "__gf_time_epoch"
+                    && self
+                        .runtime
+                        .module
+                        .as_ref()
+                        .is_some_and(|m| matches!(m.format_version, 10 | 11)))
+                    || ["__gf_config_", "__gf_natural_", "__gf_accounting_"]
+                        .iter()
+                        .any(|prefix| name.starts_with(prefix))))
+    }
+
+    fn scan_inner(
+        &mut self,
+        frame: ScanFrameV1,
+        context: Option<(ClockSnapshot<'_>, &Facts)>,
+    ) -> Result<ScanOutcomeV1> {
         self.validate_scan_frame(&frame)?;
 
         // Never combine a framed scan with pending legacy setter values.
@@ -161,7 +212,29 @@ impl ScanDriver {
                 return Err(error);
             }
         }
-        let trace = match self.runtime.tick_at(frame.logical_time_ms) {
+        let derive_epoch = self
+            .runtime
+            .module
+            .as_ref()
+            .is_some_and(|m| matches!(m.format_version, 10 | 11));
+        let result = if let Some((clock, facts)) = context {
+            let clock_input = self.runtime.set_input(
+                RESERVED_CLOCK_INPUT,
+                Value::Number(clock.monotonic_ms as f64),
+            );
+            let clock_input = if derive_epoch {
+                clock_input.and_then(|()| {
+                    self.runtime
+                        .set_input("__gf_time_epoch", Value::Number(clock.boot_epoch as f64))
+                })
+            } else {
+                clock_input
+            };
+            clock_input.and_then(|()| self.runtime.tick_with_context(clock, facts))
+        } else {
+            self.runtime.tick_at(frame.logical_time_ms)
+        };
+        let trace = match result {
             Ok(record) => record.clone(),
             Err(error) => {
                 // A rejected core evaluation must not leave a partial frame for
@@ -342,6 +415,9 @@ mod tests {
     #[test]
     fn rejected_frames_do_not_advance_sequence_time_or_mutate_state() {
         let mut driver = active_runtime(false).into_scan_driver();
+        assert!(driver
+            .scan(frame(0, SCAN_FRAME_V1_MAX_EXACT_INTEGER + 1))
+            .is_err());
         let missing = ScanFrameV1 {
             inputs: frame(0, 0).inputs[..3].to_vec(),
             ..frame(0, 0)

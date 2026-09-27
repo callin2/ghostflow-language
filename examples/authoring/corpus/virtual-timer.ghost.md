@@ -7,7 +7,7 @@
 control VirtualTimer {
   input start, stop: Bool;
   output pump: Bool;
-  config max_run: Duration = 2s;
+  let max_run = 2s;
   type Phase = Idle | Running | Done;
   // ghostflow:link id=GF-CORPUS-TIMER-INTENT relation=implements
   state phase: Phase = Idle;

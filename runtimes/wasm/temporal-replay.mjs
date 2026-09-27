@@ -29,6 +29,14 @@ export function temporalReplayRequest(value) {
   };
 }
 
+export function coreReplayRequest(value) {
+  exact(value, ['count', 'maxJsonBytes'], 'core replay request');
+  return {
+    count: positiveU32(value.count, 'count'),
+    maxJsonBytes: positiveU32(value.maxJsonBytes, 'maxJsonBytes'),
+  };
+}
+
 export function temporalPlanRequest(value) {
   exact(value, ['profile', 'maxJsonBytes'], 'temporal plan request');
   return {

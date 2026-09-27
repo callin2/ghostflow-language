@@ -9,9 +9,9 @@ control ExtraValves {
     timezone = "Asia/Seoul";
     selected = [19:15];
   }
-  config water_time: Duration = 5min;
-  config valve_delay: Duration = 2s;
-  config stop_delay: Duration = 2s;
+  let water_time = 5min;
+  let valve_delay = 2s;
+  let stop_delay = 2s;
   type Phase = Idle | Open3 | Water3 | Stop3 | Switch | Open4 | Water4 | Stop4;
   state phase: Phase = Idle;
   timer age = elapsed(phase);

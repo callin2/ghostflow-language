@@ -94,6 +94,18 @@ test('after_event_any aggregates the retained overlapping identity snapshot', as
   } finally { runtime.dispose(); }
 });
 
+test('native projections expose staged results without committing tracker state', async () => {
+  const runtime = await create();
+  try {
+    runtime.stage(batch(0, [event(1, 0)], predicate(0)));
+    assert.deepEqual(runtime.stagedAny(), { ok: true, value: true });
+    assert.deepEqual(runtime.stagedAll(), { ok: true, value: true });
+    assert.deepEqual(runtime.any(), { ok: false, fault: 'NotReady' });
+    runtime.rollback();
+    assert.deepEqual(runtime.any(), { ok: false, fault: 'NotReady' });
+  } finally { runtime.dispose(); }
+});
+
 test('native after_event WASM does not accept Held evidence or consume a failed batch', async () => {
   const runtime = await create();
   try {

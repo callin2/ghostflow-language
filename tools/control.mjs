@@ -5,7 +5,7 @@
  * to the existing GFB1 S-expression compiler.  It does not evaluate source,
  * load modules, or execute user supplied code.
  */
-import { tokenize as sexprTokenize, parse as sexprParse, compile as compileGfb, CompileError } from './gfb1.mjs';
+import { compile as compileGfb, CompileError } from './gfb1.mjs';
 import { buildSourceTrace } from './source-trace.mjs';
 import { QUANTITY_TYPES, canonicalUnitFor, isQuantityType, quantityLiteral, quantitySuffixAt } from './quantities.mjs';
 import { TIME_TYPES, isTimeType, parseTimeLiteral, validateTimeValue } from './time-literals.mjs';
@@ -24,6 +24,7 @@ const FAULT_ENUMS = new Map([
   ['CalendarFault', ['ClockUnknown', 'CalendarMissing', 'CalendarOutOfRange', 'ZoneUnsupported']],
   ['TemporalContextFault', ['ClockUnknown', 'LocationUnknown', 'EventUnavailable', 'PredictionMissing', 'PredictionStale', 'ZoneUnsupported']],
   ['AccountingFault', ['ClockUnknown', 'LedgerMissing', 'LedgerCorrupt', 'LedgerIncomplete', 'CountOverflow']],
+  ['SettingsFault', ['SettingsInvalid', 'SettingsUnavailable']],
 ].map(([name, members]) => [name, new Map(members.map((member, index) => [member, index]))]));
 const FAULT_MEMBER_NAMES = new Set([...FAULT_ENUMS.values()].flatMap(members => [...members.keys()]));
 const KEYWORDS = new Set([
@@ -880,7 +881,7 @@ class ControlParser {
           if (!this.matches(']')) do { const time = this.current(); if (time.kind !== 'time') error(time, 'selected entries must be HH:MM'); selected.push(this.take()); } while (this.maybe(','));
           this.expect(']');
         } else selected = this.identifier('selected requires HH:MM slots or a TimeSlots config');
-      } else if (['dst_missing', 'dst_repeated', 'basis', 'when', 'clock', 'gap', 'recovery', 'fallback'].includes(key.value)) {
+      } else if (['dst_missing', 'dst_repeated', 'basis', 'when', 'cancel_when', 'clock', 'gap', 'recovery', 'fallback'].includes(key.value)) {
         policy[key.value] = this.expression();
       } else error(key, `unsupported schedule option ${key.value}`);
       this.expect(';', 'expected ; after schedule option');
@@ -1396,6 +1397,13 @@ function sexpr(value) {
   return String(value);
 }
 
+function canonicalModuleForm(value, depth = 0) {
+  if (depth > 128) throw new CompileError('syntax nesting limit exceeded');
+  return Array.isArray(value)
+    ? value.map(child => canonicalModuleForm(child, depth + 1))
+    : String(value);
+}
+
 function loweredExpressionUsesInt(value) {
   if (!Array.isArray(value)) return false;
   if (value[0] === 'int' || (typeof value[0] === 'string' && value[0].startsWith('int-'))) return true;
@@ -1445,7 +1453,7 @@ class Lowerer {
     this.ast = ast; this.filename = filename; this.symbols = new Map(); this.types = new Map(); this.enumMembers = new Map();
     this.functions = new Map(); this.macros = new Map(); this.nexts = new Map(); this.outputs = new Map(); this.states = new Map(); this.timers = new Map(); this.timerStates = new Map();
     this.sensors = new Map(); this.events = new Map(); this.calendars = new Map(); this.providers = new Map(); this.signals = new Map(); this.signalDecls = new Map(); this.resolvingSignals = new Set(); this.generatedSignals = [];
-    this.windows = []; this.temporalRoots = new Map(); this.trueFors = []; this.afterEvents = []; this.naturalConditions = [];
+    this.windows = []; this.temporalRoots = new Map(); this.trueFors = []; this.afterEvents = []; this.naturalConditions = []; this.accountingResults = [];
     this.schedules = new Map(); this.lets = new Map(); this.letStates = new Map(); this.resources = new Map(); this.accounts = new Map(); this.expansionNodes = 0; this.manifest = {
       format: 'GhostFlow/control-v1', name: ast.name, inputs: [], outputs: [], sensors: [], schedules: [], timers: [], signals: [], configs: [],
     };
@@ -1453,14 +1461,17 @@ class Lowerer {
     this.objectives = new Map(); this.degradedPolicies = new Map(); this.adaptSettings = new Map();
     this.gfbInputs = []; this.gfbStates = []; this.constraints = []; this.hasClock = false;
     this.resultSites = [];
+    this.configStreams = [];
     this.usesInt = false;
     this.failedLets = new Map();
     this.syntaxOnly = false;
+    this.accountingExecution = false;
     this.standalone = !!ast.standalone;
     this.hasSolarSchedule = ast.body.some(item => item.kind === 'schedule' && item.scheduleType === 'Solar');
   }
-  lower({ emitBytecode = true } = {}) {
+  lower({ emitBytecode = true, accountingExecution = false } = {}) {
     this.syntaxOnly = !emitBytecode;
+    this.accountingExecution = accountingExecution;
     validateCompositionStructure(this.ast);
     if (this.ast.imports.length) error(this.ast.imports[0].loc,
       'import execution requires a verified source closure and composition lowering, which are not yet supported');
@@ -1489,7 +1500,27 @@ class Lowerer {
       ? 'true'
       : ['all', ...this.manifest.outputs.map(output => ['has', 'actuator', output.name, gfbType(semanticType(output.type))])];
     const solarForms = this.solarForms();
-    const temporalForms = this.windows.length || this.trueFors.length || solarForms.length ? [
+    const contextForms = emitBytecode ? this.contextForms() : [];
+    if (emitBytecode && this.configStreams.length && solarForms.length) {
+      error(this.ast.loc, 'config streams cannot mix with legacy Solar/DailySlots context execution; use fixed let values or a config-aware schedule');
+    }
+    if (accountingExecution) {
+      const bindings = this.manifest.accounts ?? [];
+      const constraints = this.manifest.accountingConstraints ?? [];
+      if (!bindings.length || bindings.some(binding => binding.persistence !== 'durable'
+        || binding.operation === 'on_time' && binding.evidenceBinding.stage !== 'applied'
+        || binding.operation === 'count_events' && binding.basis.kind !== 'local_day')
+        || constraints.some(group => group.limits.some(limit => limit.basis.kind !== 'rolling' || limit.operator !== '<='))) {
+        error(this.ast.loc, 'executable accounting requires durable applied/local_day bindings and <= rolling limits');
+      }
+      this.manifest.accounting = { bindings, constraints };
+      delete this.manifest.accounts;
+      delete this.manifest.accountingConstraints;
+    }
+    if (contextForms.length) this.manifest.format = 'GhostFlow/control-v10';
+    else if (solarForms.some(form => form[0] === 'daily-slots-pulse')) this.manifest.format = 'GhostFlow/control-v8';
+    else if (solarForms.some(form => form[0] === 'daily-pulse')) this.manifest.format = 'GhostFlow/control-v7';
+    const temporalForms = this.windows.length || this.trueFors.length || solarForms.length || contextForms.length ? [
       ['temporal-context', `${RESERVED_PREFIX}now_ms`, `${RESERVED_PREFIX}time_epoch`],
       ...[...this.temporalRoots.values()].sort((left, right) => left.tag - right.tag).map(root =>
         ['temporal-root', String(root.tag), root.name, root.inputs.present, root.inputs.epoch, root.inputs.id, root.inputs.timestamp]),
@@ -1500,32 +1531,32 @@ class Lowerer {
           ...this.manifest.outputs.map(output => ['has', 'actuator', output.name, gfbType(semanticType(output.type))]),
           ...strategy.match.capabilities.map(capability => ['has', capability.kind, capability.role, gfbType(capability.resolvedType)]),
         ]]], ...transitions, ...this.windowForms(), ...this.trueForForms(),
-        ...solarForms, ...strategy.intents.map(([name, expression]) => ['intent', name, expression]),
+          ...solarForms, ...contextForms, ...strategy.intents.map(([name, expression]) => ['intent', name, expression]),
       ])
-      : [['strategy', 'control', '0', ['device', deviceQuery], ...windows, ...solarForms, ...this.trueForForms(), ...transitions, ...intents]];
+      : [['strategy', 'control', '0', ['device', deviceQuery], ...windows, ...solarForms, ...contextForms, ...this.trueForForms(), ...transitions, ...intents]];
     const module = ['module', this.ast.name, ['version', '1'], ...this.gfbInputs, ...this.gfbStates, ...temporalForms,
       ...strategyForms, ...this.constraints,
       ...[...this.objectives.values()].filter(objective => objective.binding === 'native-temperature-percent-v1').map(objective => [
         'pid-objective', objective.name, objective.bindings.output, objective.bindings.measure,
         objective.bindings.measureOk, objective.bindings.target, objective.bindings.safeMax,
+        objective.bindings.targetOk,
         String(objective.controller.periodMs), String(objective.controller.lateAfterMs), objective.controller.direction,
         String(objective.controller.kp), String(objective.controller.ki), String(objective.controller.kd),
         String(objective.controller.bias), String(objective.output.max), String(objective.controller.restart.output),
       ])];
     if (!emitBytecode) return { manifest: this.manifest, sourceMap: this.ast.sourceNodes };
-    const policySchedule = this.ast.body.find(item => item.kind === 'schedule' && item.scheduleType !== 'Solar'
+    const policySchedule = this.ast.body.find(item => item.kind === 'schedule' && !isExecutablePulseSchedule(item)
       && Object.keys(item.policy ?? {}).some(key => key !== 'fallback'));
     if (policySchedule) error(policySchedule.loc,
       `${policySchedule.scheduleType} policy execution requires verified occurrence provider and native admission bindings`);
     const accountingResource = [...this.resources.values()].some(type => type === 'Station' || type === 'BoolActuator');
-    if (accountingResource || this.accounts.size || this.ast.body.some(item => item.kind === 'account-constraints')) error(this.ast.loc,
+    if (!accountingExecution && (accountingResource || this.accounts.size || this.ast.body.some(item => item.kind === 'account-constraints'))) error(this.ast.loc,
       'accounting execution requires verified resource binding, ledger persistence, and runtime enforcement');
-    if (this.afterEvents.length) error(this.afterEvents[0].call.loc,
-      'after_event requires an identified Event delivery and per-identity result ABI, which is not yet supported');
-    if (this.naturalConditions.length) error(this.naturalConditions[0].loc,
-      'natural condition execution requires verified provider observations and a Result ABI');
     let bytes;
-    try { bytes = compileGfb(sexprParse(sexprTokenize(sexpr(module)))); }
+    try {
+      if (new TextEncoder().encode(sexpr(module)).length > 1024 * 1024) throw new CompileError('source byte limit exceeded');
+      bytes = compileGfb(canonicalModuleForm(module));
+    }
     catch (cause) {
       const message = cause instanceof Error ? cause.message : String(cause);
       error(this.ast.loc, `GFB1 lowering rejected control: ${message}`);
@@ -1631,10 +1662,26 @@ class Lowerer {
       const over = named.get('over');
       if (!over || over.kind !== 'call' || !['local_day', 'rolling'].includes(over.name)) error(item.loc, 'count_events requires over: local_day(...) or rolling(...)');
     }
-    const descriptor = { name: item.name, operation: call.name, resourceOrEvent: first.name,
-      stage: stage?.name ?? null, persistence: persistence.name,
-      ...(call.name === 'count_events' ? { over: named.get('over').name } : {}) };
+    const evidenceBinding = call.name === 'on_time'
+      ? { kind: 'applied_interval', target: first.name, stage: stage.name, identity: 'receipt_id' }
+      : { kind: 'typed_event', target: first.name, identity: 'event_id' };
+    const basis = call.name === 'count_events' ? this.accountingBasis(named.get('over'), item.loc) : undefined;
+    let resultInputs;
+    if (this.accountingExecution && call.name === 'count_events') {
+      if (!this.hasClock) { this.addInput(`${RESERVED_PREFIX}now_ms`, NUMBER, item.loc); this.hasClock = true; }
+      if (!this.gfbInputs.some(input => input[1] === `${RESERVED_PREFIX}time_epoch`)) {
+        this.addInput(`${RESERVED_PREFIX}time_epoch`, NUMBER, item.loc);
+      }
+      resultInputs = Object.fromEntries(['ok', 'value', 'fault'].map(role =>
+        [role, `${RESERVED_PREFIX}accounting_${item.id}_${role}`]));
+      this.addInput(resultInputs.ok, BOOL, item.loc);
+      this.addInput(resultInputs.value, INT, item.loc);
+      this.addInput(resultInputs.fault, NUMBER, item.loc);
+    }
+    const descriptor = { name: item.name, operation: call.name, persistence: persistence.name, evidenceBinding,
+      ...(basis ? { site: item.id, basis, resultInputs } : {}) };
     this.accounts.set(item.name, descriptor); (this.manifest.accounts ??= []).push(descriptor);
+    if (resultInputs) this.accountingResults.push(descriptor);
     this.symbols.get(item.name).type = call.name === 'count_events'
       ? resultType(INT, semanticType('AccountingFault')) : DURATION;
   }
@@ -1647,9 +1694,26 @@ class Lowerer {
       const basis = call.args[1];
       if (!basis || basis.kind !== 'call' || !['rolling', 'local_day'].includes(basis.name)) error(limit.loc, 'used requires rolling(...) or local_day(...)');
       if (!limit.policy.reserve || limit.policy.onUnknown !== 'block') error(limit.loc, 'limit requires reserve and on_unknown: block');
-      return { account: account.name, operator: limit.op, basis: basis.name, persistence: account.persistence, onUnknown: limit.policy.onUnknown };
+      const checkedBound = this.expression(limit.bound, new Map(), { allowNext: false }, [], DURATION);
+      const checkedReserve = this.expression(limit.policy.reserve, new Map(), { allowNext: false }, [], DURATION);
+      if (!sameType(checkedBound.type, DURATION) || !Number.isSafeInteger(checkedBound.constant) || checkedBound.constant <= 0) error(limit.bound.loc, 'accounting limit bound must be a positive constant Duration');
+      if (!sameType(checkedReserve.type, DURATION) || !Number.isSafeInteger(checkedReserve.constant) || checkedReserve.constant <= 0) error(limit.policy.reserve.loc, 'accounting reserve must be a positive constant Duration');
+      return { account: account.name, operator: limit.op, basis: this.accountingBasis(basis, limit.loc),
+        boundMs: checkedBound.constant, reserveMs: checkedReserve.constant,
+        persistence: account.persistence, onUnknown: limit.policy.onUnknown };
     });
     (this.manifest.accountingConstraints ??= []).push({ name: item.name, limits });
+  }
+  accountingBasis(basis, loc) {
+    if (basis.named.length || basis.args.length !== 1) error(loc, `${basis.name} accounting basis requires exactly one argument`);
+    if (basis.name === 'local_day') {
+      const zone = basis.args[0];
+      if (zone.kind !== 'literal' || typeof zone.raw !== 'string' || !zone.raw) error(zone.loc, 'local_day requires a non-empty timezone literal');
+      return { kind: 'local_day', zone: zone.raw };
+    }
+    const duration = this.expression(basis.args[0], new Map(), { allowNext: false }, [], DURATION);
+    if (!sameType(duration.type, DURATION) || !Number.isSafeInteger(duration.constant) || duration.constant <= 0) error(basis.loc, 'rolling requires a positive constant Duration');
+    return { kind: 'rolling', durationMs: duration.constant };
   }
   addState(name, type, value, loc) {
     this.gfbStates.push(['state', name, gfbType(type), gfbDefault(type, value)]);
@@ -1660,6 +1724,7 @@ class Lowerer {
     // Functions are declarations, so calls may precede their definitions both
     // inside the control and in the top-level pure-function prelude.
     for (const item of this.ast.body) if (item.kind === 'function') this.addFunction(item);
+    for (const item of this.ast.body) if (item.kind === 'let') this.lets.set(item.name, item);
     for (const item of this.ast.body) {
       if (item.kind === 'resource') {
         if (!['BoolActuator', 'Station', 'ContinuousActuator'].includes(item.type)) error(item.loc, `unsupported resource type ${item.type}`);
@@ -1705,10 +1770,26 @@ class Lowerer {
           }
           value.constant.sort((a, b) => a - b);
         }
-        this.symbols.get(item.name).type = type; this.symbols.get(item.name).value = value;
+        const symbol = this.symbols.get(item.name);
+        const resultInputs = type.kind === 'TimeSlots' ? null : Object.fromEntries(['ok', 'value', 'fault'].map(role =>
+          [role, `${RESERVED_PREFIX}config_${item.id}_${role}`]));
+        if (!this.hasClock) { this.addInput(`${RESERVED_PREFIX}now_ms`, NUMBER, item.loc); this.hasClock = true; }
+        if (!this.gfbInputs.some(input => input[1] === `${RESERVED_PREFIX}time_epoch`)) {
+          this.addInput(`${RESERVED_PREFIX}time_epoch`, NUMBER, item.loc);
+        }
+        if (resultInputs) {
+          this.addInput(resultInputs.ok, semanticType('Bool'), item.loc);
+          this.addInput(resultInputs.value, type, item.loc);
+          this.addInput(resultInputs.fault, semanticType('Number'), item.loc);
+        }
+        symbol.id = item.id;
+        symbol.type = resultType(type, semanticType('SettingsFault'));
+        symbol.payloadType = type;
+        symbol.value = value;
+        symbol.resultInputs = resultInputs;
+        this.configStreams.push({ id: item.id, name: item.name, type, resultInputs });
         const settings = item.settings ?? {};
         if (Object.keys(settings).length) {
-          if (this.hasSolarSchedule) error(item.loc, 'Solar schedules cannot be combined with operating settings metadata yet');
           if (type.kind === 'TimeSlots') {
             if (item.value.kind !== 'list') error(item.value.loc, 'TimeSlots initial value must be a finite list literal');
             if (settings.min !== undefined || settings.max !== undefined || settings.step !== undefined) error(item.loc, 'TimeSlots config does not use numeric bounds');
@@ -1749,11 +1830,11 @@ class Lowerer {
             displayUnit = literal.suffix;
           }
           this.manifest.configs.push(manifestDescriptor(item.name, type, type.kind === 'TimeSlots'
-            ? { type: `TimeSlots<${type.gridMs}ms,${type.capacity}>`, value: value.constant, gridMs: type.gridMs, capacity: type.capacity, settings }
-            : { value: value.constant, settings, initialOffset: item.value.loc.offset, initialEndOffset: item.value.loc.endOffset ?? item.value.loc.offset, ...(displayUnit ? { displayUnit } : {}) }));
+            ? { id: item.id, type: `TimeSlots<${type.gridMs}ms,${type.capacity}>`, value: value.constant, gridMs: type.gridMs, capacity: type.capacity, settings }
+            : { id: item.id, value: value.constant, settings, initialOffset: item.value.loc.offset, initialEndOffset: item.value.loc.endOffset ?? item.value.loc.offset, ...(displayUnit ? { displayUnit } : {}) }));
         } else this.manifest.configs.push(manifestDescriptor(item.name, type, type.kind === 'TimeSlots'
-          ? { type: `TimeSlots<${type.gridMs}ms,${type.capacity}>`, value: value.constant, gridMs: type.gridMs, capacity: type.capacity }
-          : { value: value.constant }));
+          ? { id: item.id, type: `TimeSlots<${type.gridMs}ms,${type.capacity}>`, value: value.constant, gridMs: type.gridMs, capacity: type.capacity }
+          : { id: item.id, value: value.constant }));
       }
       if (item.kind === 'sensor') this.addSensor(item);
       if (item.kind === 'event') this.events.set(item.name, item);
@@ -1772,7 +1853,6 @@ class Lowerer {
       if (item.kind === 'degraded') this.addDegraded(item);
       if (item.kind === 'adapt-setting') this.addAdaptSetting(item);
     }
-    for (const item of this.ast.body) if (item.kind === 'let') this.lets.set(item.name, item);
     for (const item of this.ast.body) if (item.kind === 'signal') this.signalDecls.set(item.name, item);
     for (const item of this.ast.body) if (item.kind === 'signal') this.resolveSignal(item.name);
     for (const item of this.ast.body) if (item.kind === 'timer') this.declareTimer(item);
@@ -1893,7 +1973,7 @@ class Lowerer {
     }
     const sensor = this.sensors.get(measure);
     const targetSymbol = this.symbols.get(target);
-    if (sensor.type.kind !== 'Temperature' || targetSymbol.type.kind !== 'Temperature') {
+    if (sensor.type.kind !== 'Temperature' || targetSymbol.category !== 'config' || targetSymbol.payloadType?.kind !== 'Temperature') {
       error(item.loc, 'native PID objective requires Temperature measure and target');
     }
     const constant = (node, expected, label) => {
@@ -1952,14 +2032,14 @@ class Lowerer {
       binding: 'native-temperature-percent-v1', executable: false,
     };
     const measureSource = this.sensors.get(measure);
-    const targetInput = this.generatedName('objective_target', item.name);
+    const targetInput = targetSymbol.resultInputs.value;
+    const targetOkInput = targetSymbol.resultInputs.ok;
     const safeMaxInput = this.generatedName('objective_safe_max', item.name);
     if (!this.gfbInputs.some(input => input[1] === `${RESERVED_PREFIX}now_ms`)) this.addInput(`${RESERVED_PREFIX}now_ms`, NUMBER, item.loc);
-    this.addInput(targetInput, semanticType('Temperature'), item.loc);
     this.addInput(safeMaxInput, PERCENT, item.loc);
     descriptor.bindings = {
       output: `${manipulate}.position`, measure: measureSource.valueInput, measureOk: measureSource.okInput,
-      target: targetInput, safeMax: safeMaxInput,
+      target: targetInput, targetOk: targetOkInput, safeMax: safeMaxInput,
     };
     if (this.outputs.has(descriptor.bindings.output)) error(item.manipulate.loc, `objective output collides with authored output ${descriptor.bindings.output}`);
     this.manifest.outputs.push(manifestDescriptor(descriptor.bindings.output, PERCENT));
@@ -1989,7 +2069,9 @@ class Lowerer {
     if (item.fields.controller_transition) error(item.fields.controller_transition.loc, 'adapt_setting cannot reset controller state');
     const allowed = item.fields.allowed; if (!item.fields.allowedMax) error(allowed.loc, 'adapt_setting allowed requires a range');
     const maxChange = item.fields.max_change;
-    this.adaptSettings.set(item.name, { name: item.name, target: item.target, authority: item.fields.authority.name ?? null, runtime: 'requires-host-settings-event-validation' });
+    this.adaptSettings.set(item.name, { name: item.name, target: item.target, targetId: target.id,
+      targetType: typeNameOf(target.payloadType), authority: item.fields.authority.name ?? null,
+      runtime: 'requires-host-settings-event-validation' });
     (this.manifest.adaptSettings ??= []).push(this.adaptSettings.get(item.name));
   }
   addSensor(item) {
@@ -2069,8 +2151,8 @@ class Lowerer {
     if (!Array.isArray(item.selected)) {
       selectedConfig = item.selected.value;
       const symbol = this.symbols.get(selectedConfig);
-      if (!symbol || symbol.category !== 'config' || symbol.type?.kind !== 'TimeSlots') error(item.selected, 'DailySlots selected reference must name a TimeSlots config');
-      if (symbol.type.gridMs !== interval.constant) error(item.selected, `TimeSlots grid ${symbol.type.gridMs}ms does not match DailySlots grid ${interval.constant}ms`);
+      if (!symbol || symbol.category !== 'config' || symbol.payloadType?.kind !== 'TimeSlots') error(item.selected, 'DailySlots selected reference must name a TimeSlots config');
+      if (symbol.payloadType.gridMs !== interval.constant) error(item.selected, `TimeSlots grid ${symbol.payloadType.gridMs}ms does not match DailySlots grid ${interval.constant}ms`);
       slots = symbol.value.constant.map(ms => ms / 60_000);
     } else {
       const seen = new Set();
@@ -2104,9 +2186,17 @@ class Lowerer {
     for (const field of ['every', 'anchor', 'interval_change']) {
       if (!item[field]) error(item.loc, `Periodic schedule requires ${field}`);
     }
-    const every = this.expression(item.every, new Map(), { allowNext: false });
+    const config = item.every.kind === 'reference' && this.symbols.get(item.every.name)?.category === 'config'
+      ? this.symbols.get(item.every.name) : null;
+    const every = config ? config.value : this.expression(item.every, new Map(), { allowNext: false });
     if (!sameType(every.type, DURATION) || !Number.isSafeInteger(every.constant) || every.constant <= 0) {
       error(item.every.loc, 'Periodic every must be a positive Duration constant or config');
+    }
+    if (config) {
+      const declaration = this.manifest.configs.find(entry => entry.id === config.id);
+      if (declaration?.settings?.min !== undefined && declaration.settings.min <= 0) {
+        error(item.every.loc, 'Periodic interval config minimum must be positive');
+      }
     }
     const change = item.interval_change;
     if (change.kind !== 'reference' || !['preserve_anchor', 'preserve_next', 'restart_after_change'].includes(change.name)) {
@@ -2133,8 +2223,8 @@ class Lowerer {
     if (anchor.kind !== 'civil' && (item.timezone !== null || item.policy.dst_missing || item.policy.dst_repeated)) {
       error(item.loc, 'Periodic timezone and DST policies require a civil anchor');
     }
-    const interval = { expression: every.sexpr, initialMs: every.constant };
-    if (item.every.kind === 'reference' && this.symbols.get(item.every.name)?.category === 'config') interval.config = item.every.name;
+    const interval = { expression: config ? item.every.name : every.sexpr, initialMs: every.constant };
+    if (config) { interval.config = item.every.name; interval.configId = config.id; }
     return this.addCivilSchedulePolicy(item, { kind: 'periodic', every: interval,
       anchor, intervalChange: change.name }, anchor.kind === 'civil');
   }
@@ -2159,7 +2249,33 @@ class Lowerer {
         dstMissing: choice('dst_missing', ['skip', 'next_valid']),
         dstRepeated: choice('dst_repeated', ['first', 'second', 'both', 'skip']),
       } : {};
-      const basis = choice('basis', ['pulse']);
+      let basis;
+      if (options.basis.kind === 'reference' && options.basis.name === 'pulse') {
+        if (options.cancel_when) error(options.cancel_when.loc, `${label} pulse basis does not use cancel_when`);
+        basis = 'pulse';
+      } else if (options.basis.kind === 'call' && options.basis.name === 'range'
+        && options.basis.args.length === 1 && !options.basis.named.length) {
+        const range = this.expression(options.basis.args[0], new Map(), { allowNext: false }, [], DURATION);
+        if (!sameType(range.type, DURATION) || !Number.isSafeInteger(range.constant) || range.constant <= 0) {
+          error(options.basis.loc, `${label} range requires a positive Duration`);
+        }
+        if (!options.cancel_when) error(item.loc, `${label} range basis requires cancel_when`);
+        if (civil && (trigger.kind === 'periodic' || item.timezone !== 'UTC')) {
+          error(options.basis.loc, `${label} range recurrence non-overlap cannot be proved for this civil timezone or anchor`);
+        }
+        let minimumSpacing;
+        if (trigger.kind === 'daily-slots') {
+          const starts = trigger.slots.map(minutes => minutes * 60_000);
+          minimumSpacing = starts.length === 1 ? 86_400_000 : Math.min(...starts.map((start, index) => {
+            const next = starts[(index + 1) % starts.length] + (index + 1 === starts.length ? 86_400_000 : 0);
+            return next - start;
+          }));
+        } else if (trigger.kind === 'daily') minimumSpacing = 86_400_000;
+        else if (trigger.kind === 'periodic') minimumSpacing = trigger.every.initialMs;
+        else error(options.basis.loc, `${label} range requires a statically bounded recurrence`);
+        if (range.constant > minimumSpacing) error(options.basis.loc, `${label} range occurrences must not overlap`);
+        basis = { kind: 'range', durationMs: range.constant };
+      } else error(options.basis.loc, `${label} basis must be pulse or range(positive Duration)`);
       const clock = choice('clock', ['trusted_only']);
       const recovery = choice('recovery', ['baseline']);
       const fallback = choice('fallback', ['skip']);
@@ -2173,13 +2289,25 @@ class Lowerer {
       }
       const predicate = this.expression(options.when, new Map(), { allowNext: false });
       if (!sameType(predicate.type, BOOL)) error(options.when.loc, `${label} when must be Bool`);
-      const slot = this.manifest.schedules.length;
+      let cancelWhen;
+      if (options.cancel_when) {
+        const cancel = this.expression(options.cancel_when, new Map(), { allowNext: false });
+        if (!sameType(cancel.type, BOOL)) error(options.cancel_when.loc, `${label} cancel_when must be Bool`);
+        cancelWhen = cancel.sexpr;
+      }
+      const slot = this.configStreams.length + this.manifest.schedules.filter(schedule => ['solar', 'daily', 'daily-slots', 'periodic', 'cron'].includes(schedule.kind)).length;
       this.manifest.schedules.push({
         ...trigger, site: item.id, name: item.name, ...civilPolicy,
-        policy: { basis, when: predicate.sexpr, clock, gapMs: duration.constant, recovery, fallback },
+        policy: { basis, when: predicate.sexpr, ...(cancelWhen === undefined ? {} : { cancelWhen }),
+          clock, gapMs: duration.constant, recovery, fallback },
       });
       this.schedules.set(item.name, { slot, loc: item.loc });
       this.symbols.get(item.name).type = { kind: 'Schedule' };
+      if (isExecutablePulseSchedule(item)) {
+        if (!this.hasClock) { this.addInput(`${RESERVED_PREFIX}now_ms`, NUMBER, item.loc); this.hasClock = true; }
+        if (!this.gfbInputs.some(input => input[1] === `${RESERVED_PREFIX}time_epoch`)) this.addInput(`${RESERVED_PREFIX}time_epoch`, NUMBER, item.loc);
+        this.schedules.set(item.name, { slot, loc: item.loc, projections: new Set(['due', 'missed']) });
+      }
   }
   addSolarSchedule(item) {
     for (const field of ['timezone', 'latitude', 'longitude', 'at', 'fallback']) {
@@ -2191,7 +2319,7 @@ class Lowerer {
     const policy = this.naturalSchedulePolicy(item, false);
     if (!this.hasClock) { this.addInput(`${RESERVED_PREFIX}now_ms`, NUMBER, item.loc); this.hasClock = true; }
     if (!this.gfbInputs.some(input => input[1] === `${RESERVED_PREFIX}time_epoch`)) this.addInput(`${RESERVED_PREFIX}time_epoch`, NUMBER, item.loc);
-    const slot = this.manifest.schedules.filter(schedule => schedule.kind === 'solar').length;
+    const slot = this.manifest.schedules.filter(schedule => ['solar', 'daily'].includes(schedule.kind)).length;
     this.manifest.format = 'GhostFlow/control-v3';
     this.manifest.schedules.push({
       kind: 'solar', site: item.id, name: item.name, timezone: item.timezone,
@@ -2209,7 +2337,9 @@ class Lowerer {
     try { new Intl.DateTimeFormat('en-US', { timeZone: item.timezone }); }
     catch { error(item.loc, 'Tide timezone must be a supported IANA timezone'); }
     const policy = this.naturalSchedulePolicy(item, true);
-    const slot = this.manifest.schedules.length;
+    if (!this.hasClock) { this.addInput(`${RESERVED_PREFIX}now_ms`, NUMBER, item.loc); this.hasClock = true; }
+    if (!this.gfbInputs.some(input => input[1] === `${RESERVED_PREFIX}time_epoch`)) this.addInput(`${RESERVED_PREFIX}time_epoch`, NUMBER, item.loc);
+    const slot = this.configStreams.length + this.manifest.schedules.length;
     this.manifest.schedules.push({
       kind: 'tide', site: item.id, name: item.name, source: provider.name, timezone: item.timezone,
       event: item.at.event, offsetMs: item.at.offsetMs, policy,
@@ -2895,7 +3025,17 @@ class Lowerer {
       if (symbol.category === 'state') return { type: symbol.type, sexpr: `state.${node.name}` };
       if (options.parameterConstant && !['parameter', 'function'].includes(symbol.category)) error(node.loc, 'parameter default must be a constant independent of inputs, state and settings');
       if (symbol.category === 'parameter') return this.resolveParameter(node.name);
-      if (symbol.category === 'config') return symbol.value;
+      if (symbol.category === 'config') {
+        if (!symbol.resultInputs) error(node.loc, `TimeSlots config ${node.name} requires a schedule consumer`);
+        const inputs = symbol.resultInputs;
+        return {
+          type: symbol.type,
+          ok: `input.${inputs.ok}`, value: `input.${inputs.value}`,
+          faultCode: `input.${inputs.fault}`, originTag: numberAtom(symbol.id),
+          origins: [{ tag: symbol.id, nodeId: symbol.id,
+            kind: 'config', name: node.name }], sample: scanSample(),
+        };
+      }
       if (symbol.category === 'let') return this.resolveLet(node.name);
       if (symbol.category === 'timer') {
         const timer = this.resolveTimer(node.name);
@@ -2952,8 +3092,10 @@ class Lowerer {
         if (account.operation !== 'count_events') error(node.loc, 'only event accounts expose .count');
         return {
           type: resultType(INT, semanticType('AccountingFault')),
-          ok: `account.${node.base}.count.ok`, value: `account.${node.base}.count.value`,
-          faultCode: `account.${node.base}.count.fault`, originTag: '0', origins: [],
+          ok: account.resultInputs ? `input.${account.resultInputs.ok}` : `account.${node.base}.count.ok`,
+          value: account.resultInputs ? `input.${account.resultInputs.value}` : `account.${node.base}.count.value`,
+          faultCode: account.resultInputs ? `input.${account.resultInputs.fault}` : `account.${node.base}.count.fault`,
+          originTag: '0', origins: [],
         };
       }
       error(node.loc, `unknown member ${node.base}.${node.member}`);
@@ -3058,6 +3200,9 @@ class Lowerer {
       right = recurse(node.right, undefined, undefined, expected);
     }
     const op = node.op;
+    if (left.type?.kind === 'Result' || right.type?.kind === 'Result') {
+      error(node.loc, `${op} cannot use Result directly; handle ok(...) and fault(...) with case`);
+    }
     if (op === '&&' || op === '||') { if (!sameType(left.type, BOOL) || !sameType(right.type, BOOL)) error(node.loc, `${op} requires Bool operands`); return { type: BOOL, sexpr: [op === '&&' ? 'and' : 'or', left.sexpr, right.sexpr], constant: left.constant === undefined || right.constant === undefined ? undefined : (op === '&&' ? left.constant && right.constant : left.constant || right.constant) }; }
     if (['==', '!='].includes(op)) { if (!sameType(left.type, right.type)) error(node.loc, `${op} requires values of the same type`); const eq = left.constant === undefined || right.constant === undefined ? undefined : left.constant === right.constant; return { type: BOOL, sexpr: op === '==' ? ['eq', left.sexpr, right.sexpr] : ['not', ['eq', left.sexpr, right.sexpr]], constant: eq === undefined ? undefined : (op === '==' ? eq : !eq) }; }
     if (['<', '<=', '>', '>='].includes(op)) { if ((!isNumeric(left.type) && left.type?.kind !== 'Rate' && !['DateTime', 'TimeOfDay'].includes(left.type?.kind)) || !sameType(left.type, right.type)) error(node.loc, `${op} requires matching ordered types`); const values = left.constant === undefined || right.constant === undefined ? undefined : ({ '<': left.constant < right.constant, '<=': left.constant <= right.constant, '>': left.constant > right.constant, '>=': left.constant >= right.constant })[op]; return { type: BOOL, sexpr: [{ '<': 'lt', '<=': 'lte', '>': 'gt', '>=': 'gte' }[op], left.sexpr, right.sexpr], constant: values }; }
@@ -3165,9 +3310,21 @@ class Lowerer {
       if (signal.descriptor?.kind !== 'after-event') error(node.args[0].loc, `${node.name} expects an after_event signal`);
       const projections = signal.descriptor.projections ??= [];
       if (!projections.includes(mode)) projections.push(mode);
+      const projectionInputs = signal.descriptor.projectionInputs ??= {};
+      if (!projectionInputs[mode]) {
+        const value = this.generatedName(`after_event_${mode}_value`, node.args[0].name);
+        const ok = this.generatedName(`after_event_${mode}_ok`, node.args[0].name);
+        const fault = this.generatedName(`after_event_${mode}_fault`, node.args[0].name);
+        this.addInput(value, BOOL, node.loc);
+        this.addInput(ok, BOOL, node.loc);
+        this.addInput(fault, NUMBER, node.loc);
+        projectionInputs[mode] = { value, ok, fault };
+      }
+      const inputs = projectionInputs[mode];
       return {
         type: resultType(BOOL, semanticType('SensorFault')),
-        ok: 'false', value: 'false', faultCode: '3', originTag: numberAtom(signal.originTag),
+        ok: `input.${inputs.ok}`, value: `input.${inputs.value}`,
+        faultCode: `input.${inputs.fault}`, originTag: numberAtom(signal.originTag),
         origins: [{ tag: signal.originTag, nodeId: signal.originTag, kind: 'signal', name: node.args[0].name }],
         afterEventProjection: { signal: node.args[0].name, mode },
       };
@@ -3192,15 +3349,26 @@ class Lowerer {
         ? ['spring', 'neap']
         : ['new', 'waxing_crescent', 'first_quarter', 'waxing_gibbous', 'full', 'waning_gibbous', 'last_quarter', 'waning_crescent'];
       if (!match || !allowed.includes(match[1])) error(classificationNode.loc, `${node.name} classification must be ${allowed.join(' or ')}`);
+      const projectionInputs = {
+        ok: this.generatedName(`natural_${node.id}`, 'ok'),
+        value: this.generatedName(`natural_${node.id}`, 'value'),
+        fault: this.generatedName(`natural_${node.id}`, 'fault'),
+      };
+      this.addInput(projectionInputs.ok, BOOL, node.loc);
+      this.addInput(projectionInputs.value, BOOL, node.loc);
+      this.addInput(projectionInputs.fault, NUMBER, node.loc);
+      if (!this.hasClock) { this.addInput(`${RESERVED_PREFIX}now_ms`, NUMBER, node.loc); this.hasClock = true; }
+      if (!this.gfbInputs.some(input => input[1] === `${RESERVED_PREFIX}time_epoch`)) this.addInput(`${RESERVED_PREFIX}time_epoch`, NUMBER, node.loc);
       const descriptor = {
         site: node.id, operation: node.name, provider: provider.name, classification: match[1],
-        result: { value: 'Bool', error: 'TemporalContextFault' },
+        result: { value: 'Bool', error: 'TemporalContextFault' }, projectionInputs,
       };
       this.naturalConditions.push({ ...descriptor, loc: node.loc });
       (this.manifest.naturalConditions ??= []).push(descriptor);
       return {
         type: resultType(BOOL, semanticType('TemporalContextFault')),
-        ok: 'false', value: 'false', faultCode: '0', originTag: numberAtom(node.id),
+        ok: `input.${projectionInputs.ok}`, value: `input.${projectionInputs.value}`,
+        faultCode: `input.${projectionInputs.fault}`, originTag: numberAtom(node.id),
         origins: [{ tag: node.id, nodeId: node.id, kind: 'natural-condition', name: node.name }],
         sample: scanSample(),
       };
@@ -3344,13 +3512,84 @@ class Lowerer {
     ]);
   }
   solarForms() {
-    return this.manifest.schedules.filter(schedule => schedule.kind === 'solar').map(schedule => [
+    return this.manifest.schedules.filter(schedule => schedule.kind === 'solar'
+      || ['daily', 'daily-slots'].includes(schedule.kind) && schedule.policy.basis === 'pulse'
+        && schedule.policy.clock === 'trusted_only' && !schedule.day && !schedule.selectedConfig).map(schedule => schedule.kind === 'daily' ? [
+      'daily-pulse', String(schedule.site), schedule.name, schedule.timezone, String(schedule.atMs),
+      schedule.dstMissing, schedule.dstRepeated, schedule.policy.basis, schedule.policy.clock,
+      String(schedule.policy.gapMs), schedule.policy.recovery, schedule.policy.fallback, schedule.policy.when,
+    ] : schedule.kind === 'daily-slots' ? [
+      'daily-slots-pulse', String(schedule.site), schedule.name, schedule.timezone, String(schedule.gridMs),
+      schedule.dstMissing, schedule.dstRepeated, schedule.policy.basis, schedule.policy.clock,
+      String(schedule.policy.gapMs), schedule.policy.recovery, schedule.policy.fallback,
+      ['slots', ...schedule.slots.map(minute => ['slot', String(minute + 1), String(minute)])], schedule.policy.when,
+    ] : [
       'solar-pulse', String(schedule.site), schedule.name, schedule.timezone,
       String(schedule.latitude), String(schedule.longitude), schedule.event,
       String(schedule.offsetMs), schedule.policy.basis, schedule.policy.clock,
       String(schedule.policy.gapMs), schedule.policy.recovery, schedule.policy.fallback,
       schedule.policy.when,
     ]);
+  }
+  contextForms() {
+    const configForms = this.configStreams.map(stream => {
+      const config = this.manifest.configs.find(item => item.id === stream.id);
+      if (!config) internal(`missing config stream ${stream.name}`);
+      const type = stream.type;
+      const payload = type.kind === 'TimeSlots'
+        ? ['slots', String(type.gridMs), String(type.capacity), ...config.value.map(ms => String(ms / 60_000))]
+        : ['scalar', gfbDefault(type, config.value), config.settings?.min === undefined ? 'none'
+          : ['bounds', ...['min', 'max', 'step'].map(key => gfbDefault(type, config.settings[key]))]];
+      const inputs = stream.resultInputs;
+      return ['config-stream', String(stream.id), stream.name, config.type, type.kind,
+        config.settings?.access === 'operator' ? 'true' : 'false', payload,
+        inputs?.ok ?? 'none', inputs?.value ?? 'none', inputs?.fault ?? 'none'];
+    });
+    const scheduleForms = this.manifest.schedules.filter(schedule => ['periodic', 'cron', 'tide'].includes(schedule.kind)
+      || schedule.kind === 'daily' && schedule.day?.calendar
+      || schedule.kind === 'daily-slots' && schedule.selectedConfig).map(schedule => {
+      const base = [String(schedule.site), schedule.name, String(schedule.policy.gapMs)];
+      const when = schedule.policy.when, cancel = schedule.policy.cancelWhen ?? 'false';
+      if (schedule.kind === 'periodic') {
+        const config = this.manifest.configs.find(item => item.id === schedule.every.configId);
+        if (config && config.type !== 'Duration' || schedule.anchor.kind !== 'instant'
+          || schedule.intervalChange !== 'preserve_anchor' || schedule.policy.basis !== 'pulse') {
+          error(this.ast.loc, 'Periodic executable slice requires instant anchor, Duration interval and preserve_anchor pulse');
+        }
+        return ['periodic-pulse', ...base, `instant:${schedule.anchor.instantMs}`, String(schedule.anchor.instantMs),
+          String(config?.id ?? 0), ...(config ? [] : [String(schedule.every.initialMs)]), when, cancel];
+      }
+      if (schedule.kind === 'cron') {
+        if (schedule.policy.basis !== 'pulse') error(this.ast.loc, 'Cron executable slice requires pulse');
+        return ['cron-pulse', ...base, schedule.timezone, schedule.dstMissing, schedule.dstRepeated,
+          ...schedule.fields.map((field, index) => ['field', ...(field ?? Array.from({ length: [60, 24, 31, 12, 7][index] }, (_, at) => at + (index === 2 || index === 3 ? 1 : 0)))]), when, cancel];
+      }
+      if (schedule.kind === 'daily') {
+        if (!['workday', 'offday'].includes(schedule.day.kind) || schedule.policy.basis !== 'pulse') error(this.ast.loc, 'WorkCalendar executable slice requires workday/offday pulse');
+        return ['calendar-daily-pulse', ...base, schedule.timezone, String(schedule.atMs), schedule.day.calendar,
+          schedule.day.kind, schedule.dstMissing, schedule.dstRepeated, when, cancel];
+      }
+      if (schedule.kind === 'tide') {
+        if (schedule.policy.basis?.kind !== 'run') error(this.ast.loc, 'Tide executable slice requires Run basis');
+        return ['tide-run', ...base, schedule.timezone, schedule.source, schedule.event, String(schedule.offsetMs),
+          String(schedule.policy.basis.durationMs), String(schedule.policy.basis.admission.durationMs), when, cancel];
+      }
+      const config = this.manifest.configs.find(item => item.name === schedule.selectedConfig);
+      if (!config || schedule.policy.basis !== 'pulse') error(this.ast.loc, 'TimeSlots executable slice requires config and pulse');
+      return ['config-daily-slots-pulse', ...base, schedule.timezone, String(config.id),
+        schedule.dstMissing, schedule.dstRepeated, when, cancel];
+    });
+    const naturalForms = this.manifest.naturalConditions?.map(condition => [
+      'natural-result', String(condition.site), `natural_${condition.site}`,
+      condition.operation === 'tide_is' ? 'tide' : 'moon', condition.provider, condition.classification,
+      condition.projectionInputs.ok, condition.projectionInputs.value, condition.projectionInputs.fault,
+    ]) ?? [];
+    const accountingForms = this.accountingResults.map(account => [
+      'accounting-result', String(account.site), `accounting_${account.site}`, account.name,
+      account.evidenceBinding.target, account.basis.zone,
+      account.resultInputs.ok, account.resultInputs.value, account.resultInputs.fault,
+    ]);
+    return [...configForms, ...scheduleForms, ...naturalForms, ...accountingForms];
   }
   windowForms() {
     return this.windows.map(({ descriptor, source, sample, outputType }) => [
@@ -3371,7 +3610,7 @@ class Lowerer {
     if (this.gfbInputs.length > INPUT_LIMIT) error(this.ast.loc, `input budget exceeded (${INPUT_LIMIT})`);
     if (this.gfbStates.length > STATE_LIMIT) error(this.ast.loc, `state budget exceeded (${STATE_LIMIT})`);
     if (this.gfbStates.length + this.windows.length + this.trueFors.length
-      + this.manifest.schedules.filter(schedule => schedule.kind === 'solar').length > STATE_LIMIT) error(this.ast.loc, 'temporal state limit exceeded');
+      + this.manifest.schedules.filter(schedule => ['solar', 'daily'].includes(schedule.kind)).length > STATE_LIMIT) error(this.ast.loc, 'temporal state limit exceeded');
     if (STRATEGY_LIMIT < 1) error(this.ast.loc, 'strategy budget is invalid');
     if (this.constraints.some(x => x.length - 1 > 32)) error(this.ast.loc, 'constraint arity exceeds 32');
   }
@@ -3582,7 +3821,39 @@ export function compileControl(source, { filename = '<control>', emitBytecode = 
       ? 'resource policy execution requires bounded queue and resource runtime binding'
       : 'named constraints require resource binding and runtime enforcement');
   }
-  return new Lowerer(ast, filename).lower({ emitBytecode });
+  const lowered = new Lowerer(ast, filename).lower({ emitBytecode });
+  if (lowered.manifest.signals.some(signal => signal.kind === 'after-event'
+    && !signal.projections?.length)) {
+    error(ast.loc, 'after_event requires an explicit after_event_any or after_event_all projection');
+  }
+  return lowered;
+}
+
+/** Compile the bounded accounting slice to one executable GFB10 control. */
+export function compileAccountingControl(source, { filename = '<control>' } = {}) {
+  if (typeof filename !== 'string' || !filename) internal('filename must be a non-empty string');
+  const ast = new ControlParser(source, filename).parse();
+  if (ast.kind !== 'control' || !ast.body.some(item => item.kind === 'account' || item.kind === 'account-constraints')) {
+    error(ast.loc, 'expected a control with accounting declarations');
+  }
+  return new Lowerer(ast, filename).lower({ emitBytecode: true, accountingExecution: true });
+}
+
+/** Only this bounded civil pulse slice has a VM/provider transport. */
+export function isExecutablePulseSchedule(item) {
+  return item.scheduleType === 'Solar' || (item.scheduleType === 'Daily'
+    && (!item.on && !item.calendar || item.on && item.calendar && ['day`workday`', 'day`offday`'].includes(item.on.value))
+    && item.at?.kind === 'literal' && item.at.raw.startsWith('time`')
+    && item.policy?.basis?.name === 'pulse' && item.policy?.clock?.name === 'trusted_only')
+    || (item.scheduleType === 'DailySlots' && item.selected
+    && item.policy?.basis?.name === 'pulse' && item.policy?.clock?.name === 'trusted_only')
+    || (item.scheduleType === 'Periodic' && item.anchor?.kind === 'call' && item.anchor.name === 'instant'
+    && item.interval_change?.name === 'preserve_anchor'
+    && item.policy?.basis?.name === 'pulse' && item.policy?.clock?.name === 'trusted_only')
+    || (item.scheduleType === 'Cron' && item.policy?.basis?.name === 'pulse'
+    && item.policy?.clock?.name === 'trusted_only')
+    || (item.scheduleType === 'Tide' && item.policy?.basis?.name === 'run'
+    && item.policy?.clock?.name === 'trusted_only');
 }
 
 /** Internal composition adapter. The public API accepts canonical documents. */
@@ -3619,29 +3890,6 @@ export function compileScheduleDescriptorArtifact(source, { filename = '<control
   return { bytes, manifest, sourceMap: checked.sourceMap };
 }
 
-/** Type-checked accounting contract. These bytes cannot be loaded as control bytecode. */
-export function compileAccountingDescriptorArtifact(source, { filename = '<control>' } = {}) {
-  const ast = new ControlParser(source, filename).parse();
-  if (ast.kind !== 'control' || !ast.body.some(item => item.kind === 'account' || item.kind === 'account-constraints')) {
-    error(ast.loc, 'expected a control with accounting declarations');
-  }
-  if (ast.body.some(item => item.kind === 'schedule' && item.scheduleType !== 'Solar'
-    && Object.keys(item.policy ?? {}).some(key => key !== 'fallback'))) {
-    error(ast.loc, 'combined accounting and schedule descriptor artifacts are not supported');
-  }
-  const checked = new Lowerer(ast, filename).lower({ emitBytecode: false });
-  if ((checked.manifest.accountingConstraints ?? []).some(group =>
-    group.limits?.some(limit => limit.persistence === 'volatile'))) {
-    error(ast.loc, 'protective limit cannot use a volatile accounting ledger');
-  }
-  const manifest = { format: 'GhostFlow/accounting-v1', control: checked.manifest };
-  const bytes = new TextEncoder().encode(JSON.stringify({
-    format: 'GhostFlow/accounting-artifact-v1', executable: false,
-    controlSource: source, manifest,
-  }));
-  return { bytes, manifest, sourceMap: checked.sourceMap };
-}
-
 /** Locate deferred temporal operators without treating arbitrary source text as syntax. */
 export function hasTemporalDescriptorCalls(node) {
   if (!node || typeof node !== 'object') return false;
@@ -3659,6 +3907,12 @@ export function compileTemporalDescriptorArtifact(source, { filename = '<control
   const natural = Boolean(checked.manifest.naturalConditions?.length);
   // An uncalled function may contain a temporal call without producing a site.
   if (!afterEvent && !natural) return new Lowerer(ast, filename).lower();
+  if (natural && !afterEvent) return new Lowerer(ast, filename).lower();
+  if (!natural && checked.manifest.signals
+    .filter(signal => signal.kind === 'after-event')
+    .every(signal => signal.projections?.length > 0)) {
+    return new Lowerer(ast, filename).lower();
+  }
   const manifest = {
     format: 'GhostFlow/temporal-descriptor-v1', executable: false,
     requiredRuntimeContracts: [

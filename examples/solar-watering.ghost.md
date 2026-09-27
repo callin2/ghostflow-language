@@ -10,7 +10,7 @@
 
 ```ghost
 control SolarWateringFixture {
-  config duration: Duration = 5min;
+  let duration = 5min;
 
   schedule dawn: Solar {
     timezone = "Asia/Seoul";

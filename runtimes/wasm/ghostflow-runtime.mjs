@@ -2,8 +2,9 @@ const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 import { NativeDispatchError } from './native-dispatch.mjs';
 import { encodeTemporalProfile } from './temporal-profile.mjs';
-import { encodeSolarFacts, validateSolarActivation } from './solar-abi.mjs';
-import { temporalPlanRequest, temporalReplayPlanRequest, temporalReplayRequest } from './temporal-replay.mjs';
+import { encodeSolarFacts, encodeScheduleFacts, validateSolarActivation } from './solar-abi.mjs';
+import { encodeContextActivation, encodeContextFacts } from './context-abi.mjs';
+import { coreReplayRequest, temporalPlanRequest, temporalReplayPlanRequest, temporalReplayRequest } from './temporal-replay.mjs';
 
 export class GhostFlowRuntime {
   static async instantiate(wasmBytes, imports = {}) {
@@ -39,6 +40,42 @@ export class GhostFlowRuntime {
     catch (cause) { throw new NativeDispatchError(cause.message, { cause, committed: false }); }
     this.#bytes(packet, (p, n) => this.#dispatch(() => this.wasm.gf_tick_solar(this.handle, p, n)));
   }
+  activateSchedules(profile) {
+    validateSolarActivation(profile);
+    this.#live();
+    this.#check(this.wasm.gf_activate_schedules(this.handle, BigInt(profile.bootEpoch), profile.terminalCapacity));
+  }
+  tickSchedules(facts) {
+    let packet;
+    try { packet = encodeScheduleFacts(facts); }
+    catch (cause) { throw new NativeDispatchError(cause.message, { cause, committed: false }); }
+    this.#bytes(packet, (p, n) => this.#dispatch(() => this.wasm.gf_tick_schedules(this.handle, p, n)));
+  }
+  activateContext(profile) {
+    const packet = encodeContextActivation(profile);
+    this.#bytes(packet, (p, n) => this.#check(this.wasm.gf_activate_context(this.handle, p, n)));
+  }
+  tickContext(facts) {
+    let packet;
+    try { packet = encodeContextFacts(facts); }
+    catch (cause) { throw new NativeDispatchError(cause.message, { cause, committed: false }); }
+    this.#bytes(packet, (p, n) => this.#dispatch(() => this.wasm.gf_tick_context(this.handle, p, n)));
+  }
+  contextSnapshot() {
+    this.#live();
+    this.#check(this.wasm.gf_context_checkpoint(this.handle));
+    const statePtr = this.wasm.gf_context_state_ptr(this.handle);
+    const stateLen = Number(this.wasm.gf_context_state_len(this.handle));
+    const bytesPtr = this.wasm.gf_context_checkpoint_ptr(this.handle);
+    const bytesLen = Number(this.wasm.gf_context_checkpoint_len(this.handle));
+    return {
+      state: JSON.parse(decoder.decode(new Uint8Array(this.wasm.memory.buffer, statePtr, stateLen))),
+      bytes: new Uint8Array(this.wasm.memory.buffer, bytesPtr, bytesLen).slice(),
+    };
+  }
+  restoreContextCheckpoint(bytes) {
+    this.#bytes(bytes, (p, n) => this.#check(this.wasm.gf_restore_context_checkpoint(this.handle, p, n)));
+  }
   replayTemporal(options) {
     const request = temporalReplayRequest(options);
     return this.#bytes(request.profile, (p, n) => {
@@ -46,6 +83,12 @@ export class GhostFlowRuntime {
         request.maxPeakTemporalBytes, request.maxJsonBytes));
       return this.replay;
     });
+  }
+  replayCore(options) {
+    const request = coreReplayRequest(options);
+    this.#live();
+    this.#check(this.wasm.gf_replay_core(this.handle, request.count, request.maxJsonBytes));
+    return this.replay;
   }
   planTemporal(options) {
     const request = temporalPlanRequest(options);

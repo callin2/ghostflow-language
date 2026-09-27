@@ -15,7 +15,7 @@ const source = `# Long tick state
 \`\`\`ghost
 control LongTickState {
   input start, stop: Bool;
-  config dwell: Duration = 1s;
+  let dwell = 1s;
   type Phase = Idle | One | Two;
   state phase: Phase = Idle;
   timer age = elapsed(phase);

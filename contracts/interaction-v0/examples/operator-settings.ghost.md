@@ -14,6 +14,9 @@ control OperatorSettings {
   config enabled: Bool = false { access = operator; label = "Enabled"; }
 
   output ready: Bool;
-  ready <- enabled && duration > 0min && duty > 0%;
+  let current_enabled = case enabled { ok(value) => value; fault(_) => false; };
+  let current_duration = case duration { ok(value) => value; fault(_) => 0ms; };
+  let current_duty = case duty { ok(value) => value; fault(_) => 0%; };
+  ready <- current_enabled && current_duration > 0min && current_duty > 0%;
 }
 ```

@@ -52,7 +52,7 @@ test('ControlRuntime executes compiled Solar from provider facts and rejects hos
   });
   try {
     assert.throws(() => runtime.step({ nowMs: 0, inputs: { allow: true }, due: { dawn: true },
-      solarFacts: facts(descriptor.site, 0, 900) }), /due.*Solar|Solar.*due/);
+      solarFacts: facts(descriptor.site, 0, 900) }), /due\.dawn cannot supply a runtime-owned due value/);
     assert.throws(() => runtime.step({ nowMs: 0, inputs: { allow: true } }), /solar facts/i);
     assert.equal(runtime.step({ nowMs: 0, inputs: { allow: true },
       solarFacts: facts(descriptor.site, 0, 900) }).vm.safe.due, false);

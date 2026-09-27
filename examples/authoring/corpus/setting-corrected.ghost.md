@@ -12,7 +12,11 @@ control SettingPump {
   state running: Bool = false;
   // ghostflow:link id=GF-CORPUS-SETTING-INTENT relation=implements
   timer age = elapsed(running);
-  running' = if !start then false else if age >= run_duration then false else true;
+  let effective_duration = case run_duration {
+    ok(value) => value;
+    fault(_) => 0ms;
+  };
+  running' = if !start then false else if age >= effective_duration then false else true;
   // ghostflow:link id=GF-CORPUS-SETTING-INTENT relation=implements
   pump <- running';
 }

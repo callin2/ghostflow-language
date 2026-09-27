@@ -8,7 +8,9 @@ import { fileURLToPath } from 'node:url';
 import { decode, encode } from '@toon-format/toon';
 import { verifyArtifactSourceMap } from './toolchain.mjs';
 import { encodeTemporalProfile } from '../runtimes/wasm/temporal-profile.mjs';
-import { encodeSolarFacts, validateSolarActivation } from '../runtimes/wasm/solar-abi.mjs';
+import { encodeScheduleFacts, encodeSolarFacts, validateSolarActivation } from '../runtimes/wasm/solar-abi.mjs';
+import { encodeContextActivation, encodeContextFacts } from '../runtimes/wasm/context-abi.mjs';
+import { AFTER_EVENT_CAPACITY } from '../runtimes/wasm/after-event-runtime.mjs';
 
 const root = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const MAX_SCENARIO_BYTES = 256 * 1024;
@@ -37,6 +39,9 @@ function requireFields(value, required, optional, location) {
 function requireNonnegative(value, location) {
   if (!Number.isSafeInteger(value) || value < 0) throw new Error(`${location}: expected exact nonnegative integer`);
 }
+function requireI32(value, location) {
+  if (!Number.isInteger(value) || value < -2147483648 || value > 2147483647) throw new Error(`${location}: expected signed 32-bit integer`);
+}
 
 function requireName(value, location) {
   if (typeof value !== 'string' || !value || /[\t\r\n]/u.test(value)) {
@@ -54,7 +59,7 @@ function requireTyped(input, location) {
 }
 
 export function validateScenario(scenario, manifest) {
-  requireFields(scenario, ['format', 'id', 'initialInputs', 'keyBindings', 'actions'], ['temporal', 'capabilities', 'solar', 'actuatorBindings', 'plant'], 'scenario');
+  requireFields(scenario, ['format', 'id', 'initialInputs', 'keyBindings', 'actions'], ['temporal', 'afterEvent', 'capabilities', 'solar', 'schedule', 'context', 'accounting', 'actuatorBindings', 'plant'], 'scenario');
   if (scenario.format !== 'GhostFlow/scenario-v1') throw new Error('scenario.format: unsupported version');
   requireName(scenario.id, 'scenario.id');
   if (!Array.isArray(scenario.initialInputs)) throw new Error('initialInputs: expected array');
@@ -68,15 +73,59 @@ export function validateScenario(scenario, manifest) {
     }
     encodeTemporalProfile(scenario.temporal);
   }
+  const afterEventSignals = (manifest.signals ?? []).filter(signal => signal.kind === 'after-event');
+  if (afterEventSignals.length) {
+    requireShape(scenario.afterEvent, ['timeEpoch'], 'afterEvent');
+    requireNonnegative(scenario.afterEvent.timeEpoch, 'afterEvent.timeEpoch');
+  } else if (scenario.afterEvent !== undefined) throw new Error('afterEvent profile requires an after_event signal');
   if (scenario.capabilities !== undefined) {
     if (!Array.isArray(scenario.capabilities)) throw new Error('capabilities: expected array');
     if (!manifest.adaptPolicy && !manifest.strategies) throw new Error('capabilities require an adapt control');
   }
   const hasSolar = manifest.schedules?.some(schedule => schedule.kind === 'solar') ?? false;
+  const hasDaily = manifest.schedules?.some(schedule => schedule.kind === 'daily') ?? false;
+  const hasDailySlots = manifest.schedules?.some(schedule => schedule.kind === 'daily-slots') ?? false;
+  const hasCivilSchedule = hasDaily || hasDailySlots;
+  const hasContext = manifest.format === 'GhostFlow/control-v10';
+  if (hasContext) {
+    if (scenario.context === undefined) throw new Error('context control requires explicit context activation');
+    encodeContextActivation(scenario.context);
+  } else if (scenario.context !== undefined) throw new Error('context activation requires a context control');
+  const accountingBindings = manifest.accounting?.bindings ?? [];
+  if (scenario.accounting !== undefined) {
+    if (!accountingBindings.length) throw new Error('accounting activation requires accounting declarations');
+    requireShape(scenario.accounting, ['config', 'bootEpoch', 'terminalCapacity', 'bindings'], 'accounting');
+    requireShape(scenario.accounting.config, ['maxIntervals', 'maxEvents', 'maxReservations', 'maxRollingWindowMs'], 'accounting.config');
+    for (const field of ['maxIntervals', 'maxEvents', 'maxReservations', 'maxRollingWindowMs', 'bootEpoch', 'terminalCapacity']) {
+      const owner = ['bootEpoch', 'terminalCapacity'].includes(field) ? scenario.accounting : scenario.accounting.config;
+      requireNonnegative(owner[field], `accounting.${field}`);
+    }
+    if (!Array.isArray(scenario.accounting.bindings)) throw new Error('accounting.bindings: expected array');
+    const supplied = new Map();
+    for (const [index, binding] of scenario.accounting.bindings.entries()) {
+      const location = `accounting.bindings[${index}]`;
+      requireFields(binding, ['account', 'evidenceStream'], ['resourceId', 'eventType'], location);
+      requireName(binding.account, `${location}.account`); requireName(binding.evidenceStream, `${location}.evidenceStream`);
+      const declared = accountingBindings.find(item => item.name === binding.account);
+      if (!declared) throw new Error(`${location}: unknown account ${binding.account}`);
+      if (supplied.has(binding.account)) throw new Error(`${location}: duplicate account ${binding.account}`);
+      if (binding.evidenceStream !== declared.evidenceBinding.target) throw new Error(`${location}: evidence stream mismatch`);
+      const idField = declared.operation === 'on_time' ? 'resourceId' : 'eventType';
+      requireNonnegative(binding[idField], `${location}.${idField}`);
+      if (Object.hasOwn(binding, idField === 'resourceId' ? 'eventType' : 'resourceId')) throw new Error(`${location}: wrong binding ID kind`);
+      supplied.set(binding.account, binding);
+    }
+    for (const binding of accountingBindings) if (!supplied.has(binding.name)) throw new Error(`accounting.bindings: missing account ${binding.name}`);
+  } else if (accountingBindings.length) throw new Error('accounting declarations require explicit accounting activation');
   if (scenario.solar !== undefined) {
     if (!hasSolar) throw new Error('solar activation requires a Solar schedule');
     validateSolarActivation(scenario.solar);
   } else if (hasSolar) throw new Error('Solar schedule requires explicit solar activation');
+  if (scenario.schedule !== undefined) {
+    if (hasContext) throw new Error('context control cannot use legacy schedule activation');
+    if (!hasCivilSchedule) throw new Error('schedule activation requires a Daily or DailySlots schedule');
+    validateSolarActivation(scenario.schedule);
+  } else if (hasCivilSchedule && !hasContext) throw new Error('civil schedule requires explicit schedule activation');
   const sensors = new Map((manifest.sensors ?? []).map(sensor => [sensor.name, sensor.type]));
   const outputs = new Map((manifest.outputs ?? []).map(output => [output.name, output]));
   if (scenario.actuatorBindings !== undefined) {
@@ -164,6 +213,7 @@ export function validateScenario(scenario, manifest) {
   let previousTime = null;
   const pendingSamples = new Set();
   const pendingIntervals = new Set();
+  const eventNames = new Set(afterEventSignals.map(signal => signal.event.name));
   for (const [index, action] of scenario.actions.entries()) {
     const location = `actions[${index}]`;
     if (!object(action)) throw new Error(`${location}: expected object`);
@@ -203,15 +253,63 @@ export function validateScenario(scenario, manifest) {
         if (action.fault !== undefined && !['Disconnected', 'Stale', 'Invalid', 'NotReady'].includes(action.fault)) throw new Error(`${location}: unsupported interval fault`);
         pendingIntervals.add(action.name);
         break;
+      case 'accountingEvent': {
+        requireShape(action, ['kind', 'stream', 'eventId', 'localDay'], location);
+        if (!scenario.accounting) throw new Error(`${location}: accounting event requires accounting activation`);
+        const binding = scenario.accounting.bindings.find(item => item.evidenceStream === action.stream && item.eventType !== undefined);
+        if (!binding) throw new Error(`${location}: unknown accounting Event stream ${action.stream}`);
+        if (typeof action.eventId !== 'string' || !/^[0-9a-f]{32}$/u.test(action.eventId)) throw new Error(`${location}.eventId: expected 16-byte lowercase hex identity`);
+        requireI32(action.localDay, `${location}.localDay`);
+        break;
+      }
       case 'scan':
-        requireFields(action, ['kind', 'atMs'], ['solarFacts'], location);
+        requireFields(action, ['kind', 'atMs'], ['solarFacts', 'scheduleFacts', 'contextFacts', 'accountingFacts', 'events'], location);
         if (!Number.isSafeInteger(action.atMs) || action.atMs < 0) throw new Error(`${location}: atMs must be an exact nonnegative integer`);
+        if (action.events !== undefined) {
+          if (!eventNames.size) throw new Error(`${location}: events require an after_event signal`);
+          if (!object(action.events)) throw new Error(`${location}.events: expected object`);
+          for (const [eventName, batch] of Object.entries(action.events)) {
+            if (!eventNames.has(eventName)) throw new Error(`${location}.events: unknown Event source ${eventName}`);
+            requireShape(batch, ['starts', 'acknowledgements'], `${location}.events.${eventName}`);
+            for (const [field, withTime] of [['starts', true], ['acknowledgements', false]]) {
+              if (!Array.isArray(batch[field]) || batch[field].length > AFTER_EVENT_CAPACITY) {
+                throw new Error(`${location}.events.${eventName}.${field}: expected at most ${AFTER_EVENT_CAPACITY} entries`);
+              }
+              for (const [itemIndex, item] of batch[field].entries()) {
+                requireShape(item, withTime ? ['sourceEpoch', 'id', 'atMs'] : ['sourceEpoch', 'id'],
+                  `${location}.events.${eventName}.${field}[${itemIndex}]`);
+                for (const key of withTime ? ['sourceEpoch', 'id', 'atMs'] : ['sourceEpoch', 'id']) {
+                  requireNonnegative(item[key], `${location}.events.${eventName}.${field}[${itemIndex}].${key}`);
+                }
+                if (withTime && item.atMs > action.atMs) throw new Error(`${location}.events.${eventName}.${field}[${itemIndex}].atMs: future event`);
+              }
+            }
+          }
+        }
         if (hasSolar) {
           if (action.solarFacts === undefined) throw new Error(`${location}: Solar scan requires provider facts`);
           encodeSolarFacts(action.solarFacts);
           if (action.solarFacts.clock.monotonicMs !== action.atMs) throw new Error(`${location}: solar clock monotonicMs must match atMs`);
           if (action.solarFacts.clock.bootEpoch !== scenario.solar.bootEpoch) throw new Error(`${location}: solar bootEpoch must match activation`);
         } else if (action.solarFacts !== undefined) throw new Error(`${location}: solar facts require a Solar schedule`);
+        if (hasCivilSchedule && !hasContext) {
+          if (action.scheduleFacts === undefined) throw new Error(`${location}: civil schedule scan requires provider facts`);
+          encodeScheduleFacts(action.scheduleFacts);
+          if (action.scheduleFacts.clock.monotonicMs !== action.atMs) throw new Error(`${location}: schedule clock.monotonicMs must match atMs`);
+          if (action.scheduleFacts.clock.bootEpoch !== scenario.schedule.bootEpoch) throw new Error(`${location}: schedule bootEpoch must match activation`);
+        } else if (action.scheduleFacts !== undefined) throw new Error(`${location}: schedule facts require a Daily or DailySlots schedule`);
+        if (hasContext) {
+          if (action.contextFacts === undefined) throw new Error(`${location}: context scan requires typed facts`);
+          encodeContextFacts(action.contextFacts);
+          if (action.contextFacts.clock.monotonicMs !== action.atMs) throw new Error(`${location}: context clock monotonicMs must match atMs`);
+          if (action.contextFacts.clock.bootEpoch !== scenario.context.bootEpoch) throw new Error(`${location}: context bootEpoch must match activation`);
+        } else if (action.contextFacts !== undefined) throw new Error(`${location}: context facts require a context control`);
+        if (scenario.accounting) {
+          requireShape(action.accountingFacts, ['localDay', 'wallMs', 'clockTrusted'], `${location}.accountingFacts`);
+          requireI32(action.accountingFacts.localDay, `${location}.accountingFacts.localDay`);
+          requireNonnegative(action.accountingFacts.wallMs, `${location}.accountingFacts.wallMs`);
+          if (typeof action.accountingFacts.clockTrusted !== 'boolean') throw new Error(`${location}.accountingFacts.clockTrusted: expected Bool`);
+        } else if (action.accountingFacts !== undefined) throw new Error(`${location}: accounting facts require accounting activation`);
         if (previousTime !== null && action.atMs < previousTime) throw new Error(`${location}: logical time moved backwards`);
         previousTime = action.atMs;
         pendingSamples.clear();
@@ -230,7 +328,7 @@ export function loadVerifiedArtifact(artifactPath) {
   const manifest = JSON.parse(fs.readFileSync(`${artifactPath}.manifest.json`, 'utf8'));
   const map = JSON.parse(fs.readFileSync(`${artifactPath}.map.json`, 'utf8'));
   const document = verifyArtifactSourceMap(map, artifactBytes, { manifest });
-  if (!/^GhostFlow\/control-v[1-6]$/u.test(manifest.format)) throw new Error('artifact must be an executable control artifact');
+  if (!/^GhostFlow\/control-v(?:[1-9]|10)$/u.test(manifest.format)) throw new Error('artifact must be an executable control artifact');
   if (manifest.bytecodeSha256 !== sha256(artifactBytes)) throw new Error('artifact SHA-256 mismatch');
   return { artifactBytes, manifest, map, document };
 }
@@ -271,11 +369,18 @@ export function runScenario(artifactPath, scenarioPath, { format = 'toon' } = {}
     // Sensor conditioning is supplied by the existing WASM host; plain input
     // modules use the native framed runner. Neither path retries failed scans.
     const conditioned = (manifest.sensors?.length ?? 0) > 0
+      || (manifest.accounting?.bindings?.length ?? 0) > 0
       || (scenario.actuatorBindings?.length ?? 0) > 0
-      || manifest.schedules?.some(schedule => schedule.kind === 'solar');
+      || manifest.schedules?.some(schedule => schedule.kind === 'solar')
+      || manifest.schedules?.some(schedule => schedule.kind === 'daily')
+      || manifest.schedules?.some(schedule => schedule.kind === 'daily-slots')
+      || (manifest.naturalConditions?.length ?? 0) > 0
+      || manifest.format === 'GhostFlow/control-v10'
+      || manifest.schedules?.some(schedule => ['periodic','cron','tide'].includes(schedule.kind))
+      || manifest.signals?.some(signal => signal.kind === 'after-event');
     const executable = conditioned ? process.execPath : path.join(root, 'target/release/examples/scenario_scan');
     const arguments_ = conditioned
-      ? [path.join(root, 'tools/scenario-sensors.mjs'), artifactPath, actionsPath]
+      ? [path.join(root, manifest.accounting?.bindings?.length ? 'tools/scenario-accounting.mjs' : 'tools/scenario-sensors.mjs'), artifactPath, actionsPath]
       : [artifactPath, actionsPath];
     const child = spawnSync(executable, arguments_, {
       encoding: 'utf8', timeout: 20_000, maxBuffer: MAX_RESULT_BYTES + 4096,
@@ -309,6 +414,7 @@ export function runScenario(artifactPath, scenarioPath, { format = 'toon' } = {}
         ...(row.trace.windowTrace ? { windowTrace: row.trace.windowTrace } : {}),
         ...(row.trace.trueForTrace ? { trueForTrace: row.trace.trueForTrace } : {}),
         ...(row.trace.scheduleTrace ? { scheduleTrace: row.trace.scheduleTrace } : {}),
+        ...(row.settingsState ? { settingsState: row.settingsState } : {}),
       }));
     } catch (error) {
       return hostError(error);

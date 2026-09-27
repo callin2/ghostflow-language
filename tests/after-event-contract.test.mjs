@@ -46,18 +46,28 @@ for (const [label, before, after, diagnostic] of [
   assert.throws(() => typeCheckControl(descriptorCode.replace(before, after), { filename }), diagnostic);
 });
 
-test('executable lowering rejects after_event until event binding and result ABI exist', () => {
-  assert.throws(() => compileControl(descriptorCode, { filename }), error => {
-    assert.equal(error.filename, filename);
-    assert.equal(error.line, 4);
-    assert.equal(error.column, 19);
-    assert.match(error.message, /after_event requires an identified Event delivery and per-identity result ABI, which is not yet supported/);
-    return true;
+test('explicit after_event projections lower to private Result channels', () => {
+  const compiled = compileControl(code, { filename });
+  assert.match(compiled.manifest.format, /^GhostFlow\/control-v[1-6]$/);
+  assert.deepEqual(compiled.manifest.signals[0].projectionInputs, {
+    any: {
+      value: '__gf_after_event_any_value_opened',
+      ok: '__gf_after_event_any_ok_opened',
+      fault: '__gf_after_event_any_fault_opened',
+    },
   });
+  assert.deepEqual(compiled.manifest.inputs, []);
 });
 
-test('canonical literate compilation emits the checked temporal descriptor artifact', async () => {
-  const artifact = await compileSource(descriptorDocument, { filename });
-  assert.equal(artifact.manifest.format, 'GhostFlow/temporal-descriptor-v1');
-  assert.equal(artifact.manifest.control.signals[0].kind, 'after-event');
+test('direct lowering rejects an after_event site without an explicit projection', () => {
+  assert.throws(() => compileControl(descriptorCode, { filename }),
+    /after_event requires an explicit after_event_any or after_event_all projection/);
+});
+
+test('canonical literate compilation emits executable control only for explicit projections', async () => {
+  const artifact = await compileSource(document, { filename });
+  assert.match(artifact.manifest.format, /^GhostFlow\/control-v[1-6]$/);
+  const descriptor = await compileSource(descriptorDocument, { filename });
+  assert.equal(descriptor.manifest.format, 'GhostFlow/temporal-descriptor-v1');
+  assert.equal(descriptor.manifest.control.signals[0].kind, 'after-event');
 });

@@ -1,4 +1,4 @@
-// Host transport for the native per-identity engine. No scalar signal projection.
+// Host transport for the native per-identity engine and explicit any/all projections.
 import { compileSource } from '../../tools/browser-toolchain.mjs';
 
 const decoder = new TextDecoder();
@@ -61,9 +61,9 @@ export class AfterEventRuntime {
   static async instantiateSource(wasmBytes, document, { filename = 'program.ghost.md', signal } = {}) {
     if (typeof signal !== 'string' || !signal) throw new TypeError('after_event signal name is required');
     const artifact = await compileSource(document, { filename });
-    const site = artifact.manifest?.format === 'GhostFlow/temporal-descriptor-v1'
-      ? artifact.manifest.control.signals.find(item => item.kind === 'after-event' && item.name === signal)
-      : undefined;
+    const signals = artifact.manifest?.format === 'GhostFlow/temporal-descriptor-v1'
+      ? artifact.manifest.control.signals : artifact.manifest?.signals;
+    const site = signals?.find(item => item.kind === 'after-event' && item.name === signal);
     if (!site) throw new Error(`source has no after_event signal ${signal}`);
     const runtime = await this.instantiate(wasmBytes, {
       windowMs: site.windowMs, eventSourceTag: site.event.tag, predicateSourceTag: site.predicate.tag,
@@ -107,18 +107,10 @@ export class AfterEventRuntime {
   commit() { this.#live(); this.#check(this.wasm.gf_after_event_commit(this.handle)); }
   rollback() { this.#live(); this.#check(this.wasm.gf_after_event_rollback(this.handle)); }
   get results() { this.#live(); return JSON.parse(this.#text('results')); }
-  any() {
-    const results = this.results;
-    if (results.some(result => result.status === 'satisfied')) return { ok: true, value: true };
-    if (results.length > 0 && results.every(result => result.status === 'expired')) return { ok: true, value: false };
-    return { ok: false, fault: 'NotReady' };
-  }
-  all() {
-    const results = this.results;
-    if (results.some(result => result.status === 'expired')) return { ok: true, value: false };
-    if (results.length > 0 && results.every(result => result.status === 'satisfied')) return { ok: true, value: true };
-    return { ok: false, fault: 'NotReady' };
-  }
+  any() { return this.#project('any', false); }
+  all() { return this.#project('all', false); }
+  stagedAny() { return this.#project('any', true); }
+  stagedAll() { return this.#project('all', true); }
   #live() { if (!this.handle) throw new Error('after_event runtime is disposed'); }
   #text(field) {
     const ptr = this.wasm[`gf_after_event_${field}_ptr`](this.handle);
@@ -126,4 +118,11 @@ export class AfterEventRuntime {
     return decoder.decode(new Uint8Array(this.wasm.memory.buffer, ptr, len));
   }
   #check(result) { if (!result) throw new Error(this.#text('error') || 'after_event operation failed'); }
+  #project(mode, staged) {
+    this.#live();
+    const result = this.wasm.gf_after_event_project(this.handle, mode === 'any' ? 0 : 1, staged ? 1 : 0);
+    this.#check(result);
+    if (result === 1) return { ok: false, fault: 'NotReady' };
+    return { ok: true, value: result === 3 };
+  }
 }

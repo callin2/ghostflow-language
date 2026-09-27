@@ -7,10 +7,10 @@
       "sourcePath": "contracts/interaction-v0/examples/five-minute-watering.ghost.md",
       "source": {
         "documentId": "source.fixture-five-minute-watering",
-        "revisionId": "revision.fixture-five-minute-watering-v1",
+        "revisionId": "revision.fixture-five-minute-watering-v2",
         "format": "GhostFlow/source-document-v1",
         "kind": "literate",
-        "sha256": "46bdeaf16279db1b4148efce305f34eafabe9051c83ead94a331a402ef1cc5ba"
+        "sha256": "ef46838b4add032d03f4cb5fc29ce3c00ef73dbafe9d91c244fa1a78adbfb9f6"
       },
       "module": {
         "id": "FiveMinuteWatering",

@@ -1,5 +1,10 @@
 # Reference 테스트 작성 후 기준 결과
 
+이 기록의 `../../build/` 경로는 저장소 루트의 로컬 생성 산출물을 가리킨다.
+`build/`는 git 추적 대상이 아니므로 저장소에서 링크가 열리지 않을 수 있다.
+기록된 수치는 당시 실행 기록이며, 파일이 없는 checkout에서 재검증된 결과로
+해석하지 않는다. 새 검증은 현재 소스에서 테스트를 다시 실행해 별도 기록한다.
+
 ## 최신 전체 실행: batch11 (2026-09-23)
 
 `npm test` exit 1. Node 1,962건: 1,767 pass, 31 fail, 164 TODO, 0 skip.
@@ -11,9 +16,9 @@ Rust workspace 검사와 native/WASM 빌드는 통과했다. Tutorial은 Node �
 버전 fixture 1건, 이동된 문서 locator 때문에 실패한 catalog 테스트 2건이다.
 후속 수정과 부분 재검증은 별도 기록한다. 이 전체 실행의 수치를 소급 변경하지 않는다.
 
-근거: `build/compiler-runtime-batch11-full.log`,
-`build/compiler-runtime-batch11-reference-results.json`,
-`build/compiler-runtime-batch11-verification.json`.
+근거: `../../build/compiler-runtime-batch11-full.log`,
+`../../build/compiler-runtime-batch11-reference-results.json`,
+`../../build/compiler-runtime-batch11-verification.json`.
 이후 fixture/catalog/이 기록의 변경으로 전체 실행의 source hash와 현재 트리는 다르다.
 전체 Reference 및 compiler/runtime 목표는 미완료다.
 
@@ -22,7 +27,7 @@ GFB2 미래 버전 fixture를 4에서 5로 고친 거부 검사도 통과했다.
 문서 이동 locator는 기존 hash를 보존했다. GFB4 설명이 추가된 두 문단은
 기존 요구문·상태·테스트 관계를 유지하고 인용 범위와 hash만 갱신했다.
 비Reference 실패 4건은 모두 부분 재검증으로 해소했다. 전체 gate는 재실행하지 않았다.
-근거: `build/window-native-green.log`, `build/catalog-gfb2-focused.log` 및
+근거: `../../build/window-native-green.log`, `../../build/catalog-gfb2-focused.log` 및
 `node --test tests/requirement-catalog.test.mjs`의 5/5 결과.
 
 2026-09-22, Node.js v25.2.1에서 `npm run test:reference`를 실행했다.

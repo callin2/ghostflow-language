@@ -2,10 +2,11 @@
 
 Tracking: language issue #22 / integration `TASK-85.1` / review R14.
 
-This document is the design input for N2–N4. It does not claim that the parser,
-GFB format or VM already implements an integer type. The confirmed product
+This document records the N2–N4 design and its acceptance vectors. `Int` is now
+implemented by the parser, GFB encoder and portable VM. The confirmed product
 principle is that counts and repetition totals remain exact within a declared
-range; the spelling below remains a reviewable language proposal until R14.
+range. Historical recommendation and proposal wording below records the design
+process; the current source contract is the Language Reference.
 
 ## Confirmed intent and current boundary
 
@@ -14,12 +15,13 @@ range; the spelling below remains a reviewable language proposal until R14.
 - Integer values and integer results must remain exact within the supported
   range. Precision loss, wrapping and saturation are never silent.
 - Browser/WASM and ESP32 use the same value and fault semantics.
-- The current implementation has only `Bool` and `Number`. `Number` is Rust
-  `f64`, GFB1 stores each numeric constant/default as an eight-byte `f64`, and
-  the JS/WASM boundary exposes it as a JavaScript `number`.
-- Current GFB1 arithmetic has add, subtract, multiply and divide. Division by
-  zero or a non-finite result rejects the tick before state/intent commit. It
-  has no integer type, integer conversion or remainder opcode.
+- The current implementation has `Bool`, `Number` (`f64`) and `Int` (`i32`).
+  GFB encodes Number constants/defaults as eight-byte `f64` and Int
+  constants/defaults as four-byte signed `i32`. The JS/WASM boundary exposes
+  both numeric values as JavaScript `number` with Int range validation.
+- GFB implements checked Int arithmetic, division, remainder and explicit
+  conversions. Division by zero, overflow, invalid conversion or a non-finite
+  Number result rejects the tick before state/intent commit.
 - Date/time, monotonic clock and identifier widths are separate contracts.
   This proposal must not force an epoch timestamp into the integer count type.
 
@@ -172,7 +174,7 @@ surface spelling.
 | N1-GFB-02 | old GFB1 presented as the new integer-capable format and vice versa | fail closed; never reinterpret `NUMBER_CONST` as `Int` | N4 |
 | N1-ABI-01 | minimum/maximum `Int` input and output | exact native/WASM exchange and identical trace values | N4 |
 
-The proposed N4 allocation is intentionally explicit so the vectors can become
+The N4 allocation, originally proposed here, is implemented and fixed by
 byte-level tests:
 
 | Boundary | Integer-capable proposal |
@@ -181,11 +183,11 @@ byte-level tests:
 | Type tag | `3 = Int` (`1 = Bool`, `2 = Number` unchanged) |
 | Constant/default | signed little-endian `i32` |
 | Opcodes | `23 INT_CONST`, `24 INT_NEG`, `25 INT_ADD`, `26 INT_SUB`, `27 INT_MUL`, `28 INT_DIV`, `29 INT_REM` |
-| Conversion opcodes | `30 INT_TO_NUMBER`, `31 NUMBER_TO_INT_EXACT`, `32 ...FLOOR`, `33 ...CEIL`, `34 ...TRUNC`, `35 ...NEAREST_EVEN` |
+| Conversion opcodes | `48 INT_TO_NUMBER`, `49 NUMBER_TO_INT_EXACT`, `50 ...FLOOR`, `51 ...CEIL`, `52 ...TRUNC`, `53 ...NEAREST_EVEN`; `30` and `31` are branch opcodes |
 | Manifest | `GhostFlow/control-v4`, nominal type spelling `Int` |
-| Runtime identity | `GhostFlow/runtime-semantics-v2` |
-| Framed ABI | `GhostFlow/framed-scan-abi-v2`; input/capability type tag `3`, four little-endian `i32` bytes |
-| Package | `GhostFlow/portable-package-v2`; binds bytecode version, manifest and runtime/ABI identities |
+| Runtime identity | `GhostFlow/runtime-semantics-v1` |
+| Framed ABI | `GhostFlow/framed-scan-abi-v1`; input/capability type tag `3`, four little-endian `i32` bytes |
+| Package | `GhostFlow/portable-package-v1`; binds bytecode version, manifest and runtime/ABI identities |
 | Trace/outcome JSON | JSON number plus manifest-declared `Int`; decoder requires integral `i32` range before exposing it |
 
 The Browser frame encoder selects type tag `3` from the verified manifest, not

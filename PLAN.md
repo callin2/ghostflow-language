@@ -1,6 +1,14 @@
 # PLAN - ghostflow-language (session relay)
 
-## NOW — current handoff (2026-09-20)
+## Documentation review baseline (2026-09-25)
+
+Documentation corrections were checked against `dev` at `ca62aa1` and
+`DOCS-REVIEW-REPORT.md`. This is a dated source baseline, not a claim about the
+current checkout. Host, API, Device and physical acceptance remain separate.
+The dated handoffs below are historical evidence, not current branch or deployment
+instructions.
+
+## Historical handoff (2026-09-20)
 
 - Branch: `fix/mcu-deployment-blockers`, created from fetched `origin/dev` at
   merge #112 `ce995c6`. Local only. No push or code changes; no demonstrated

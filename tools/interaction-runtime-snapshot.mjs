@@ -74,7 +74,9 @@ function timerClockMalformed(descriptor, trace) {
 function publicObservation(descriptor, values, trace, settings) {
   if (descriptor.kind === 'setting') {
     if (!settings.has(descriptor.name)) return { descriptorId: descriptor.id, status: 'unavailable', reason: 'runtime-value-unavailable' };
-    const value = settings.get(descriptor.name);
+    const result = settings.get(descriptor.name);
+    if (!result.ok) return { descriptorId: descriptor.id, status: 'error', error: result.fault };
+    const value = result.value;
     return typeMatches(descriptor.sourceType, value)
       ? { descriptorId: descriptor.id, status: 'ready', value }
       : { descriptorId: descriptor.id, status: 'error', error: 'runtime-value-type-mismatch' };
@@ -131,7 +133,7 @@ export function joinRuntimeSnapshot(schema, snapshot, expected) {
  * This function neither ticks nor reads a runtime; observation therefore cannot
  * alter state, requested outputs, or safety-filtered outputs.
  */
-export function emitCompletedScanSnapshot({ compilation, schema, runId, completion, trace } = {}) {
+export function emitCompletedScanSnapshot({ compilation, schema, runId, completion, trace, settingsState } = {}) {
   const verifiedSchema = runtimeSchema(compilation, schema);
   exactObject(completion, ['kind', 'scanId', 'logicalTimeMs'], 'completion');
   if (completion.kind !== 'completed-scan' || !Number.isSafeInteger(completion.scanId) || completion.scanId < 0
@@ -153,9 +155,28 @@ export function emitCompletedScanSnapshot({ compilation, schema, runId, completi
     throw new Error('interaction runtime snapshot: runtime observation could not be verified');
   }
   const values = new Map(observed.values.map(value => [runtimeValueKey(value), value]));
-  const settings = new Map((compilation.manifest?.configs ?? [])
-    .filter(config => config?.settings)
-    .map(config => [config.name, config.value]));
+  const configs = compilation.manifest?.configs ?? [];
+  const settings = new Map();
+  if (configs.length) {
+    if (!object(settingsState) || settingsState.programFingerprint !== compilation.traceMetadata.moduleFingerprint
+        || !Number.isSafeInteger(settingsState.settingsRevision) || settingsState.settingsRevision < 0
+        || !Array.isArray(settingsState.settings) || settingsState.settings.length !== configs.length) {
+      throw new Error('interaction runtime snapshot: current Rust settings state is required');
+    }
+    const declared = new Map(configs.map(config => [config.id, config]));
+    for (const item of settingsState.settings) {
+      const config = declared.get(item?.id), result = item?.result;
+      if (!config || item.name !== config.name || item.type !== config.type || settings.has(item.name)
+          || !object(result) || typeof result.ok !== 'boolean'
+          || result.ok && !Object.hasOwn(result, 'value')
+          || !result.ok && !['SettingsInvalid','SettingsUnavailable'].includes(result.fault)) {
+        throw new Error('interaction runtime snapshot: settings state identity or Result mismatch');
+      }
+      settings.set(item.name, result);
+    }
+  } else if (settingsState !== undefined) {
+    throw new Error('interaction runtime snapshot: unexpected settings state');
+  }
   const snapshot = {
     format: 'GhostFlow/runtime-snapshot-v0',
     version: '0.1',

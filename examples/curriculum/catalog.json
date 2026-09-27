@@ -21,8 +21,8 @@
         "anchor": "ch01",
         "example": "E01",
         "generatedPath": "examples/curriculum/generated/pc-01-e01.generated.ghost.md",
-        "documentSha256": "2a15073d64267057d0a40c913929e86cc5c5ea239d1b2d477db2ba4153fc612c",
-        "projectionSha256": "362c9f3c39771a2f0f2861ea82438020267a6dbbbb41335d61df0b2119112016"
+        "documentSha256": "00654e0779875f022eaebf63b2aa568f5feb1141846e7d1b2f5d0c7d343d6e10",
+        "projectionSha256": "12560862028202b521e209829bc4d24296f0d4cbb69df525cff065588930b180"
       }
     },
     {
@@ -49,7 +49,7 @@
       "source": {
         "kind": "canonical-literate",
         "path": "examples/curriculum/pc-04-direction-interlock.ghost.md",
-        "sha256": "b82249d8542fe10376d5a5d4a35199ab0e2a01fe3ca362ffd67024ce8aa3b516"
+        "sha256": "f50e73582f8fbae8678ab3fb76f428a56d5d1df283a10d0ae58fcc3d08f7ae27"
       }
     },
     {
@@ -58,7 +58,7 @@
       "source": {
         "kind": "canonical-literate",
         "path": "examples/curriculum/pc-05-limit-feedback.ghost.md",
-        "sha256": "688e438b42a2acd9a9b5d0ea3b724917e16f760599599251ff15d804d1663087"
+        "sha256": "ed0fa48243a9e627dce12ce0c4086478db907368228facc61f3c2d088c5dfd9e"
       }
     },
     {
@@ -67,7 +67,7 @@
       "source": {
         "kind": "canonical-literate",
         "path": "examples/curriculum/pc-06-timer-patterns.ghost.md",
-        "sha256": "435a4fdee45db5d7b1d489f1d0fa5d08efe0982e368d6e6b77905102abe9a32d"
+        "sha256": "d6bb1c1807b902dc3e202b4bfc216081e8afb0ae0ff1fd9e31b7c887232675e8"
       }
     },
     {
@@ -94,7 +94,7 @@
       "source": {
         "kind": "canonical-literate",
         "path": "examples/curriculum/pc-09-sequential-water-supply.ghost.md",
-        "sha256": "88e1a90096b9278a1286d846537c8f002b7a9a647f32e675bd4a7ece45f50d68"
+        "sha256": "02652715e118208011a2d7667e048cfe1b063fcb6286fe3bb3d2b4bbc992366f"
       }
     },
     {
@@ -103,7 +103,7 @@
       "source": {
         "kind": "canonical-literate",
         "path": "examples/curriculum/pc-10-fault-alarm-reset.ghost.md",
-        "sha256": "c4d71c11af3d7d8614b070acfccc03e6a8ffbf77ab9c93167c71cf8c98d74c12"
+        "sha256": "f3fa613105d47381fdcdd8a16046ca39f376c6eaa1918d1514dfb0e8cff9c5d3"
       }
     }
   ]

@@ -243,8 +243,32 @@
         "core-runtime"
       ],
       "status": "pending",
-      "pendingReason": "Normative conflict: this MVP statement says all intents read committed next state, while docs/LANGUAGE.md section 7 and the current GFB runtime read old state unless NEXT_STATE is explicit. GF-TEST-snapshot-commit demonstrates the current behavior. Requires a documentation/semantic decision; no behavior was changed to satisfy this row.",
+      "pendingReason": "Superseded historical MVP statement. The accepted rule reads unprimed state from the old snapshot and explicit next-state references from candidate state; this old claim must not be counted as implemented.",
+      "supersededBy": "GF-REQ-fe719c3299fc1258",
       "testIds": []
+    },
+    {
+      "id": "GF-REQ-fe719c3299fc1258",
+      "statement": "In intent expressions, unprimed state reads the old snapshot and explicit next-state references read candidate state; candidate state and requested/safe intents commit together when evaluation finishes without error, including when constraints block an output.",
+      "source": {
+        "path": "docs/LANGUAGE-MVP-0.1.md",
+        "heading": "Tick semantics",
+        "lines": [
+          48,
+          51
+        ],
+        "sha256": "76659f078c5585064f2434722574f689e7f4f2a57645b1b2268ba8287ce9f755"
+      },
+      "layer": "runtime",
+      "targets": [
+        "core-runtime"
+      ],
+      "status": "implemented",
+      "testIds": [
+        "GF-TEST-snapshot-commit",
+        "GF-TEST-error-atomicity",
+        "GF-TEST-safety-fixed-point"
+      ]
     },
     {
       "id": "GF-REQ-4860010b6b6dfa68",
@@ -337,8 +361,8 @@
         "path": "docs/BYTECODE.md",
         "heading": "Expression opcodes",
         "lines": [
-          44,
-          48
+          53,
+          57
         ],
         "sha256": "3f3cd61a644026610359422341b388e30dfb36339b6b1c5179f1cb923df68fb3"
       },
@@ -359,8 +383,8 @@
         "path": "docs/BYTECODE.md",
         "heading": "Safety records and host manifest",
         "lines": [
-          200,
-          203
+          211,
+          214
         ],
         "sha256": "880372d3758ba426290e482974f7eabf3ebf75b4f4159c131631a9c20254427b"
       },
@@ -380,8 +404,8 @@
         "path": "docs/BYTECODE.md",
         "heading": "Safety records and host manifest",
         "lines": [
-          200,
-          200
+          211,
+          211
         ],
         "sha256": "5bb0a87473dc5357394cb0c1cc770813b53d78dd66c4cbace3ff7e2db9ffec6c"
       },
@@ -444,7 +468,7 @@
         "path": "docs/IMPLEMENTATION.md",
         "heading": "Limits and consumer responsibilities",
         "lines": [
-          78,
+          79,
           79
         ],
         "sha256": "988f17dcdb9eb934346aeab946e9ae1490363aabdc611b09b8604ed9e65e0583"
@@ -754,8 +778,8 @@
         "path": "docs/BYTECODE.md",
         "heading": "Query opcodes",
         "lines": [
-          186,
-          196
+          197,
+          207
         ],
         "sha256": "5d064d9b4ca10fc1b97bcda7c990bcff68489321017821957f168f15a77c5efb"
       },
@@ -777,8 +801,8 @@
         "path": "docs/BYTECODE.md",
         "heading": "Safety records and host manifest",
         "lines": [
-          200,
-          202
+          211,
+          213
         ],
         "sha256": "bf6e287dba00081dfafeb4e1c8f2ac832fbb9b18c6ba8159701978f97a70a32b"
       },
@@ -798,8 +822,8 @@
         "path": "docs/BYTECODE.md",
         "heading": "Safety records and host manifest",
         "lines": [
-          200,
-          204
+          211,
+          215
         ],
         "sha256": "38905a13f131769b7f6d39145d50b0af88998fe75b3da1ade3e4db08a4d9734c"
       },
@@ -821,8 +845,8 @@
         "path": "docs/BYTECODE.md",
         "heading": "Safety records and host manifest",
         "lines": [
-          200,
-          206
+          211,
+          216
         ],
         "sha256": "a6d2bd71d672ce1cf9413a204c025578aa4f65335901bba1e1a62732a55235af"
       },
@@ -885,8 +909,8 @@
         "path": "tests/control.test.mjs",
         "heading": "control OutputInitializer {",
         "lines": [
-          277,
-          295
+          271,
+          289
         ],
         "sha256": "80f6a330dec6957edfbb4712c37ec4ed95252b4adbd305ef6d7f2c1cb9eb9e71"
       },
@@ -899,8 +923,8 @@
         "path": "tests/control.test.mjs",
         "heading": "output pump, valve: Bool;",
         "lines": [
-          163,
-          167
+          157,
+          161
         ],
         "sha256": "d0ee91eef9cafc2172e05c599f161df432007eaddaf5301ea47d2b89429af388"
       },
@@ -913,8 +937,8 @@
         "path": "tests/control.test.mjs",
         "heading": "// The raw runtime must reject an output-bearing module before the host declares",
         "lines": [
-          244,
-          263
+          238,
+          257
         ],
         "sha256": "4f9ac92548a683b00467e4e052101ce17bd2fe1384d7579c74961f25c9f6cf99"
       },
@@ -927,8 +951,8 @@
         "path": "tests/control.test.mjs",
         "heading": "control NextOutsideOutput {",
         "lines": [
-          334,
-          340
+          328,
+          334
         ],
         "sha256": "db94d45e6331faf2728e09b8ffcbe390e8ed2967540cd226121a2154f66c5611"
       },
@@ -941,8 +965,8 @@
         "path": "tests/control.test.mjs",
         "heading": "assert.deepEqual(scheduledModule.constraints, [",
         "lines": [
-          134,
-          138
+          128,
+          132
         ],
         "sha256": "ab6bce6424e5a97aa3e1dbf4d2d9a6c7274733ce61601608fa6e453c36ad7461"
       },
@@ -955,10 +979,10 @@
         "path": "crates/ghostflow-core/src/lib.rs",
         "heading": "fn monotonic_input_failure_is_atomic()",
         "lines": [
-          3292,
-          3315
+        3736,
+        3758
         ],
-        "sha256": "a2c0da526c428f08ab28088580ce6d8216cc5bd076b6a95a93570b54add5b7b1"
+        "sha256": "a9a83443a83a4ad006cf9ee304d0f38b8bb14332b54bda1fa0c9ffecc2a583fc"
       },
       "selector": "core leaves intent absent before first successful tick, preserves it across failed ticks, and clears it at hot swap"
     },

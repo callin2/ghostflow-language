@@ -31,7 +31,8 @@ WASM. Every accepted entry still passes the same name/type/duplicate validation.
 `gf_frame_scan(handle, scan_id:u64, logical_time_ms:u64, bytes:*const u8, len:usize)`
 returns1 success/0 failure. IDs/time have core safe-integer validation. The payload
 is little-endian: u16 input count, then for each entry u16 UTF8 name byte length,
-name bytes, u8 type (1 Bool,2 Number), then u8 Bool (exactly0/1) or f64 Number.
+name bytes, u8 type (1 Bool, 2 Number, 3 Int), then u8 Bool (exactly 0/1),
+f64 Number, or four-byte little-endian signed i32 Int.
 No trailing bytes. Names must be nonempty valid UTF8 and at most1024 bytes; count
 at most128; total packet at most65536 bytes. These ABI envelope limits are separate
 from source syntax limits. Reject packet limits before slicing/allocating entries.
@@ -61,7 +62,8 @@ handle, has instantiate/load/addCapability/activate/scan/dispose and outcome.
 `scan({scanId,logicalTimeMs,inputs:[{name,value}]})` explicitly carries IDs and
 full inputs; no internal auto-increment on error, inferred false or old setters.
 Validate exact fields, safe IDs, finite values, Unicode and budgets before
-allocation. Copies data synchronously. Boolean/number type follows JS value type.
+allocation. Copies data synchronously. Boolean/Number type follows JS value type;
+Int uses declared `type: 'Int'` and a checked signed i32 value.
 Outcome JSON contains only plain data. Methods after dispose throw; disposal is
 idempotent. Check required exports and fail clearly on an old WASM artifact.
 No change to ControlRuntime/frontend yet: D6 owns that integration and pins.

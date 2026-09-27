@@ -4,7 +4,7 @@ import { restoreInteractionSchema } from './interaction-schema.mjs';
 import { remapSourceTrace, sourceMapRequiresTraceMetadata, verifySourceTraceMetadata } from './source-trace.mjs';
 import { compileSource as compileCanonicalSource, compileSourceSync, emitInteractionSchema } from './compile-source.mjs';
 import { canonicalJson } from './canonical-json.mjs';
-import { compileAccountingDescriptorArtifact, compileControl, compileResourcePolicyArtifact, compileScheduleDescriptorArtifact, compileTemporalDescriptorArtifact } from './control.mjs';
+import { compileAccountingControl, compileControl, compileResourcePolicyArtifact, compileScheduleDescriptorArtifact, compileTemporalDescriptorArtifact } from './control.mjs';
 import { extractLiterate } from './literate.mjs';
 import { equalBytes, isWellFormedUnicode, sha256Hex, utf8ByteLength } from './sha256.mjs';
 
@@ -71,19 +71,6 @@ function canonicalTraceMetadata(document, bytes, manifest) {
       expectedWindowSites: [], expectedWindowDependencies: [], requiresTraceMetadata: false,
     };
   }
-  if (manifest?.format === 'GhostFlow/accounting-v1') {
-    if (manifest.bytecodeSha256 !== sha256Hex(bytes)) throw new Error('accounting descriptor manifest SHA-256 does not match artifact');
-    if (manifest.sourceDocumentSha256 !== document.sha256) throw new Error('accounting descriptor source identity does not match canonical source');
-    const extraction = extractLiterate(document.text, { filename: document.filename });
-    const replay = compileAccountingDescriptorArtifact(extraction.code, { filename: document.filename });
-    if (!equalBytes(replay.bytes, bytes)) throw new Error('canonical source does not reproduce accounting descriptor artifact');
-    const { bytecodeSha256: _digest, sourceDocumentSha256: _sourceDigest, ...persisted } = manifest;
-    if (JSON.stringify(persisted) !== JSON.stringify(replay.manifest)) throw new Error('accounting descriptor manifest does not match canonical source');
-    return {
-      expectedResultSites: [], expectedSignalBindings: [], expectedSignalDependencies: [],
-      expectedWindowSites: [], expectedWindowDependencies: [], requiresTraceMetadata: false,
-    };
-  }
   if (manifest?.format === 'GhostFlow/resource-policy-v1') {
     if (manifest.bytecodeSha256 !== sha256Hex(bytes)) {
       throw new Error('resource policy manifest bytecode SHA-256 does not match artifact');
@@ -104,8 +91,16 @@ function canonicalTraceMetadata(document, bytes, manifest) {
     .filter(timer => timer?.mode === 'continuous-true')
     .map(timer => timer.name));
   const extraction = extractLiterate(document.text, { filename: document.filename });
-  const replay = compileControl(extraction.code, { filename: document.filename });
+  const replay = manifest?.accounting
+    ? compileAccountingControl(extraction.code, { filename: document.filename })
+    : compileControl(extraction.code, { filename: document.filename });
   if (!equalBytes(replay.bytes, bytes)) throw new Error('canonical source does not reproduce artifact bytecode');
+  if (manifest?.accounting) {
+    const { bytecodeSha256: _digest, ...persisted } = manifest;
+    if (canonicalJson(persisted) !== canonicalJson(replay.manifest)) {
+      throw new Error('accounting control manifest does not match canonical source');
+    }
+  }
   const mappedTrace = remapSourceTrace(replay.traceMetadata, extraction.sourceMap);
   const expectedSignalBindings = mappedTrace.bindings.filter(entry => entry.kind === 'signal');
   const signalStates = new Set(expectedSignalBindings.map(entry => entry.name));

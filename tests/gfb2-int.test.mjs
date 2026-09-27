@@ -154,7 +154,7 @@ test('GF-TEST-gfb2-int-rejection: versions and type tags fail closed', async () 
   const cases = [];
   const oldAsNew = Buffer.from(v1); oldAsNew.writeUInt16LE(2, 4); cases.push([oldAsNew, /format 2 without Int/]);
   const newAsOld = Buffer.from(v2); newAsOld.writeUInt16LE(1, 4); cases.push([newAsOld, /invalid type/]);
-  const unknownVersion = Buffer.from(v2); unknownVersion.writeUInt16LE(8, 4); cases.push([unknownVersion, /unsupported GFB format/]);
+  const unknownVersion = Buffer.from(v2); unknownVersion.writeUInt16LE(255, 4); cases.push([unknownVersion, /unsupported GFB format/]);
   const invalidType = Buffer.from(v2);
   const nameLength = invalidType.readUInt16LE(6);
   const inputTypeOffset = 6 + 2 + nameLength + 4 + 2 + 2 + 'selected'.length;
@@ -276,8 +276,9 @@ const integerOperations = [
   ]],
 ];
 
+test('REF-01-062 REF-01-064: native and WASM preserve i32 arithmetic boundaries and exact faults', async suite => {
 for (const [name, expression, rows] of integerOperations) {
-  test(`GF-TEST-gfb2-int-runtime-${name}: native and WASM produce the exact i32 results and faults`, async t => {
+  await suite.test(`GF-TEST-gfb2-int-runtime-${name}: native and WASM produce the exact i32 results and faults`, async t => {
     const wasmBytes = fs.readFileSync(wasmPath);
     const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-gfb2-int-edges-'));
     t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
@@ -324,6 +325,7 @@ for (const [name, expression, rows] of integerOperations) {
     );
   });
 }
+});
 
 test('GF-TEST-gfb2-int-fault-atomicity: rejected intent arithmetic preserves state, intent, and tick', async t => {
   const artifact = await compileSource(`# Integer fault atomicity
@@ -469,9 +471,10 @@ test('GF-TEST-gfb3-loader: native and WASM reject malformed branches and retired
   }
 });
 
+test('REF-01-086: if, and, and or short-circuit faulting branches on native and WASM', async suite => {
 for (const [name, expression, safeGuard, faultGuard, outputType, expected] of shortCircuitCases) {
   for (const [branch, guard] of [['unselected', safeGuard], ['selected', faultGuard]]) {
-  test(`GF-TEST-gfb2-int-short-circuit-${name}-${branch}: ${branch} faulting branch follows its evaluation contract`, async t => {
+  await suite.test(`GF-TEST-gfb2-int-short-circuit-${name}-${branch}: ${branch} faulting branch follows its evaluation contract`, async t => {
     const artifact = await compileSource(`# Integer ${name} short circuit
 
 \`\`\`ghost
@@ -518,6 +521,7 @@ control Integer${name[0].toUpperCase()}${name.slice(1)}ShortCircuit {
   });
   }
 }
+});
 
 test('GF-TEST-gfb2-int-rounding: native and WASM preserve ties-to-even on both signs', async t => {
   const artifact = await compileSource(`# Integer rounding\n\n\`\`\`ghost\ncontrol IntegerRounding {\n  input run: Bool;\n  output valid: Bool;\n  valid <- run\n    && int_nearest_even(1.5) == 2\n    && int_nearest_even(2.5) == 2\n    && int_nearest_even(-1.5) == -2\n    && int_nearest_even(-2.5) == -2;\n}\n\`\`\`\n`, { filename: 'integer-rounding.ghost.md' });

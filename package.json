@@ -10,7 +10,7 @@
   "scripts": {
     "test": "node tools/verify-language.mjs",
     "test:node": "node tools/verify-language.mjs --node-only",
-    "test:compiler": "node --test tests/compiler.test.mjs tests/int-compiler.test.mjs tests/constraints.test.mjs tests/literate.test.mjs tests/toolchain.test.mjs tests/interaction-emission.test.mjs tests/browser-toolchain.test.mjs",
+    "test:compiler": "node --test tests/compiler.test.mjs tests/docs-runnable-examples.test.mjs tests/int-compiler.test.mjs tests/constraints.test.mjs tests/literate.test.mjs tests/toolchain.test.mjs tests/interaction-emission.test.mjs tests/browser-toolchain.test.mjs",
     "test:contract": "node --test tests/integration-contract.test.mjs",
     "test:reference": "node --test tests/reference-cli.test.mjs",
     "test:coverage": "node tools/coverage-language.mjs",

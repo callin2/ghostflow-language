@@ -231,6 +231,9 @@ signal usable_temp = hold_last(temperature, for_at_most: 2min, quality: measured
   result를 독립적으로 유지하며 새 start event가 이전 pending 또는 completed result를
   덮어쓰지 않는다.
 - `after_event` signal 자체는 scalar 값이 아니며 Bool 식에서 직접 읽을 수 없다.
+  현재 compiler는 명시적인 `after_event_for`, `after_event_any`, `after_event_all`
+  투영과 runtime binding이 있는 경우 실행 control로 내린다. 투영 없는 선언은
+  실행 control로 받아들이지 않는다.
   `after_event_for(signal, identity)`는 하나의 `EventId`를 명시적으로 선택한다. runtime은
   identity의 source tag가 signal의 Event source와 같은지 검사하며, 다른 source의 identity는
   false로 바꾸지 않고 scan을 identity binding 오류로 거부한다. `EventId`는 Driver가 전달한
@@ -389,6 +392,8 @@ v1 문법이 아니다. optional role은 해당 role을 match한 strategy 안에
 ## 4.6 device query와 strategy 선택
 
 다음은 선택된 control 문법이다.
+현재 compiler는 typed `match`와 `match always`를 받는다. `where`와 type을 생략한
+presence-only match는 아직 지원하지 않는다. 아래 `where` 예시는 설계 표기다.
 
 ```ghost
 adapt irrigation_policy {
@@ -472,8 +477,15 @@ confirmed feedback은 출처와 품질을 따로 가진다.
 
 ## 4.8 공통 constraints 표기와 연산
 
-다음 `constraints` 블록은 선택된 표기다. 규칙은 안정적인 설비 ID와
-유한한 port/resource 집합에 bind한다.
+다음 `constraints` 블록은 선택된 설계 표기다. 규칙은 안정적인 설비 ID와
+유한한 port/resource 집합에 bind한다. 현재 resource-policy named parser는
+`constraints Name for resource { exclusive at admission { ... }; require at safe_output ...; }`
+만 받는다. 이 문법은 resource binding과 runtime enforcement가 없으면 실행 control로
+내려가지 않는다. `ghostrules`의 standalone parser는 별도
+`constraints Name { ... }` 문법으로 `exclusive(...)`, `allow`, `limit`, `once`,
+`check`를 검증한다. control 안의 accounting 제약은 또 다른
+`constraints Name { limit used(account, basis) <= bound { ... } }` 형태다(§3.10).
+세 형태의 결과를 같은 실행 계약으로 간주하지 않는다.
 
 ```ghost
 constraints StationRules for station {
@@ -493,15 +505,17 @@ constraints StationRules for station {
 
 | 표기 | 인수 | 적용 단계와 의미 |
 |---|---|---|
-| `exclusive(a, b, ...)` | 같은 scope의 mode/activity 2개 이상 | 동시에 활성화하지 않는다. 충돌하는 새 진입을 거부하고 기존 상태를 유지한다. |
-| `allow enter(M...) only when p` | 유한 mode 집합과 Bool 전제 | mode 진입 요청 시 p를 검사한다. stop 요청 자체를 막지 않는다. |
+| `exclusive at admission { a, b, ... }` (resource-policy); `exclusive(a, b, ...)` (`ghostrules`) | 같은 scope의 mode/activity 2개 이상 | 동시에 활성화하지 않는다. 충돌하는 새 진입을 거부하고 기존 상태를 유지한다. |
+| `allow enter(M...) only when p` (`ghostrules`) | 유한 mode 집합과 Bool 전제 | mode 진입 요청 시 p를 검사한다. stop 요청 자체를 막지 않는다. 현재 parser의 `p`는 정확히 `mode == Stopped && stopped(station)` 형태다. |
 | `require p` | 출력/허가 단계가 정해진 Bool 불변조건 | 시작 전 허가와 실행 중 감시에 모두 쓰며 Unknown을 통과로 보지 않는다. |
 | `limit q <= bound per basis` | typed quantity, 같은 타입 bound, day/window basis | 남은 예산을 검사하고 한도 경계에서 추가 동작을 차단한다. |
 | `once schedule per occurrence` | schedule ID와 occurrence identity | 같은 occurrence의 재접수를 막는다. 시간 budget과 별도 ledger다. |
 | `check analysis(args)` | optional 정보에 의존하는 analysis | `Pass/Violation/Unknown`을 내는 비차단 분석이다. |
-| `warn id when p` | 안정적인 경고 ID와 Bool | 결과를 바꾸지 않고 원인·대상과 함께 진단 event를 낸다. |
+| `warn id when p` (설계) | 안정적인 경고 ID와 Bool | 결과를 바꾸지 않고 원인·대상과 함께 진단 event를 낸다. 현재 두 parser 모두 받지 않는다. |
 
-허용 target은 `admission`, `safe_output`, `monitor`다. 기존 control 내부의 target 없는
+현재 named parser의 target은 `exclusive`의 `admission`과 finite-set `require`의
+`safe_output`이다. `monitor`는 선택된 설계 target이며 현재 parser가 받지 않는다.
+기존 control 내부의 target 없는
 Bool `require`는 `safe_output`을 뜻한다. 각 규칙은 적용 단계를 가진다. 출력 관계를 mode 진입 규칙처럼 처리하거나, 비차단
 check를 safety require로 암묵 승격하지 않는다. 필수 제약은 모두 AND로 만족해야 한다.
 arbitration은 허용 영역 안에서 어떤 요청을 채택할지 정하는 별도 정책이다. priority
@@ -686,7 +700,7 @@ objective greenhouse_temperature {
     anti_windup = conditional_safe;
     disabled = track_safe;
     transfer = track_safe;
-    fault = degraded TemperatureFallback;
+    fault = disable;
     restart = reset(output: 0%);
   }
 }
@@ -699,6 +713,13 @@ objective는 다음을 연결한다.
 - `manipulate`: continuous actuator의 semantic target.
 - `controller`: Hysteresis/On-Off, PI 또는 PID policy.
 - `output`: actuator capability 안의 허용 range.
+
+config를 참조하는 `target`은 §5.2의 현재 `Result<T, SettingsFault>` observation을
+소비한다. `T`는 measure와 호환되는 quantity다. `ok(value)`는 현재 setpoint이며
+`fault(reason)`은 명시한 controller fault policy로 간다. 초기값이나 이전 성공 target을
+암묵 대입하지 않는다. 실행 가능한 Temperature/Percent PID profile의 `fault = disable`은
+target fault도 즉시 disable하며, 회복은 기존 deadline과 `track_safe` 정책을 따른다.
+성공 target 변경 자체는 controller state를 reset하지 않는다.
 
 continuous actuator capability는 value quantity/type, range, 선택 resolution, safe value,
 rate/slew limit, feedback availability를 표현한다. 0–10V, PWM, VFD, Modbus, servo는
@@ -757,9 +778,11 @@ continuous PID output을 고빈도 time-proportioning으로 자동 변환하지 
 capability/safety 계약이 없으면 relay에는 hysteresis/on-off가 적합하다.
 
 첫 accepted sample은 previous error와 previous measurement를 현재값으로 초기화하고 D=0이며
-가상의 이전 interval을 적분하지 않는다. `fault`는 `disable` 또는 `degraded Name`이다.
+가상의 이전 interval을 적분하지 않는다. 현재 PID `fault`는 `disable`만 받는다.
+`degraded Name`은 선택된 설계 대안이며 현재 compiler가 받지 않는다.
 `bias`, `anti_windup`, `disabled`, `transfer`, `fault`, `restart`는 생략할 수 없다. restart는 typed
-output을 쓰는 `reset(output: value)` 또는 continuity가 검증된 `checkpoint`다.
+output을 쓰는 `reset(output: value)`다. continuity가 검증된 `checkpoint`는
+선택된 설계 대안이며 현재 compiler가 받지 않는다.
 `reset(output:v)`는 첫 accepted sample에서 integral tracking state를 정해 첫 unclamped
 requested가 명시한 `v`가 되게 한다. disable과
 manual→auto transfer는 현재 safe target을 추적한다. setpoint와 gain은 typed operator settings가
@@ -807,7 +830,8 @@ degraded TemperatureFallback for greenhouse_temperature {
 ```
 
 성립한 branch 중 최대 i32 priority 하나를 선택하며 동률은 ambiguity error다. 선언 순서는
-선택 기준이 아니다. `otherwise`는 필수이고 `disable` 또는 완전한 branch다. resume은
+선택 기준이 아니다. `otherwise`는 필수이고 현재 compiler는 `disable`만 받는다.
+완전한 branch는 선택된 설계 대안이며 아직 지원하지 않는다. resume은
 `require_start`, `automatic`, `stay_degraded` 중 하나를 반드시 쓴다. `automatic`도 새 start
 권한을 만들지 않고 기존 session이 유효할 때만 primary로 복귀한다. fallback authority는
 primary보다 높아질 수 없고 safety authority를 가질 수 없다.

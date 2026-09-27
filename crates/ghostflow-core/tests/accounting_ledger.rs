@@ -1,17 +1,205 @@
 use ghostflow_core::accounting::{
-    AccountingConfig, AccountingError, AccountingLedger, LedgerRead, RecordResult,
+    AccountingConfig, AccountingError, AccountingLedger, AdmissionResult, LedgerRead, RecordResult,
 };
 
 fn config() -> AccountingConfig {
     AccountingConfig {
         max_intervals: 8,
         max_events: 8,
+        max_reservations: 8,
         max_rolling_window_ms: 60_000,
     }
 }
 
+#[test]
+fn rolling_admission_rejects_reference_reservation_without_mutation() {
+    let mut ledger = AccountingLedger::new(config()).unwrap();
+    let before = ledger.snapshot_bytes().unwrap();
+
+    assert_eq!(
+        ledger.reserve_rolling(id(20), 7, 1_000, 60_000, 30_000, 310_000),
+        Err(AccountingError::LimitExceeded)
+    );
+    assert_eq!(ledger.snapshot_bytes().unwrap(), before);
+}
+
+#[test]
+fn rolling_admission_accounts_for_applied_and_outstanding_time() {
+    let mut ledger = AccountingLedger::new(config()).unwrap();
+    ledger
+        .record_applied_segment(id(1), 7, 0, 20_000, 100)
+        .unwrap();
+
+    assert_eq!(
+        ledger.reserve_rolling(id(20), 7, 20_000, 60_000, 30_000, 10_000),
+        Ok(AdmissionResult::Reserved)
+    );
+    assert_eq!(
+        ledger.reserve_rolling(id(20), 7, 20_000, 60_000, 30_000, 10_000),
+        Ok(AdmissionResult::Duplicate)
+    );
+    let before_rejection = ledger.snapshot_bytes().unwrap();
+    assert_eq!(
+        ledger.reserve_rolling(id(21), 7, 20_000, 60_000, 30_000, 1),
+        Err(AccountingError::LimitExceeded)
+    );
+    assert_eq!(ledger.snapshot_bytes().unwrap(), before_rejection);
+}
+
+#[test]
+fn reservations_restore_and_unknown_ledgers_fail_closed() {
+    let mut ledger = AccountingLedger::new(config()).unwrap();
+    ledger
+        .reserve_rolling(id(20), 7, 20_000, 60_000, 30_000, 30_000)
+        .unwrap();
+    let snapshot = ledger.snapshot_bytes().unwrap();
+    let mut restored = AccountingLedger::restore(config(), &snapshot).unwrap();
+    assert_eq!(
+        restored.reserve_rolling(id(21), 7, 20_000, 60_000, 30_000, 1),
+        Err(AccountingError::LimitExceeded)
+    );
+
+    let mut unknown = AccountingLedger::unknown(config()).unwrap();
+    assert_eq!(
+        unknown.reserve_rolling(id(22), 7, 20_000, 60_000, 30_000, 1),
+        Err(AccountingError::UnknownLedger)
+    );
+}
+
+#[test]
+fn settlement_requires_matching_applied_evidence_and_releases_reserved_charge() {
+    let mut ledger = AccountingLedger::new(config()).unwrap();
+    ledger
+        .reserve_rolling(id(20), 7, 20_000, 60_000, 30_000, 20_000)
+        .unwrap();
+    let before = ledger.snapshot_bytes().unwrap();
+    assert_eq!(
+        ledger.settle_rolling(id(20), id(2)),
+        Err(AccountingError::EvidenceMissing)
+    );
+    assert_eq!(ledger.snapshot_bytes().unwrap(), before);
+
+    ledger
+        .record_applied_segment(id(2), 7, 15_000, 20_000, 100)
+        .unwrap();
+    assert_eq!(
+        ledger.settle_rolling(id(20), id(2)),
+        Err(AccountingError::EvidenceMissing)
+    );
+    let before_historical_link = ledger.snapshot_bytes().unwrap();
+    assert_eq!(
+        ledger.record_reserved_applied_segment(id(20), id(3), 7, 15_000, 20_000, 100),
+        Err(AccountingError::InvalidReservation)
+    );
+    assert_eq!(ledger.snapshot_bytes().unwrap(), before_historical_link);
+    ledger
+        .record_reserved_applied_segment(id(20), id(3), 7, 20_000, 25_000, 100)
+        .unwrap();
+    let before_second_receipt = ledger.snapshot_bytes().unwrap();
+    assert_eq!(
+        ledger.record_reserved_applied_segment(id(20), id(4), 7, 25_000, 30_000, 100),
+        Err(AccountingError::InvalidReservation)
+    );
+    assert_eq!(ledger.snapshot_bytes().unwrap(), before_second_receipt);
+    assert_eq!(
+        ledger.settle_rolling(id(20), id(3)),
+        Ok(RecordResult::Inserted)
+    );
+    assert_eq!(
+        ledger.settle_rolling(id(20), id(3)),
+        Ok(RecordResult::Duplicate)
+    );
+    let restored = AccountingLedger::restore(config(), &ledger.snapshot_bytes().unwrap()).unwrap();
+    assert_eq!(restored.used_local_day(7, 100), LedgerRead::Known(10_000));
+    assert_eq!(
+        ledger.reserve_rolling(id(21), 7, 20_000, 60_000, 30_000, 25_000),
+        Ok(AdmissionResult::Reserved)
+    );
+}
+
+#[test]
+fn restore_rejects_linked_receipts_that_bypass_reservation_invariants() {
+    let mut ledger = AccountingLedger::new(config()).unwrap();
+    ledger
+        .reserve_rolling(id(20), 7, 20_000, 60_000, 30_000, 20_000)
+        .unwrap();
+    ledger
+        .record_reserved_applied_segment(id(20), id(3), 7, 20_000, 25_000, 100)
+        .unwrap();
+    let mut pre_admission = ledger.snapshot_bytes().unwrap();
+    pre_admission[67..75].copy_from_slice(&19_999u64.to_le_bytes());
+    rechecksum(&mut pre_admission);
+    assert_eq!(
+        AccountingLedger::restore(config(), &pre_admission),
+        Err(AccountingError::InvalidSnapshot)
+    );
+
+    let mut duplicate_link = AccountingLedger::new(config()).unwrap();
+    duplicate_link
+        .reserve_rolling(id(20), 7, 20_000, 60_000, 30_000, 20_000)
+        .unwrap();
+    duplicate_link
+        .record_applied_segment(id(2), 7, 20_000, 21_000, 100)
+        .unwrap();
+    duplicate_link
+        .record_reserved_applied_segment(id(20), id(3), 7, 21_000, 22_000, 100)
+        .unwrap();
+    let mut duplicate_link = duplicate_link.snapshot_bytes().unwrap();
+    duplicate_link[47..63].copy_from_slice(&id(20));
+    rechecksum(&mut duplicate_link);
+    assert_eq!(
+        AccountingLedger::restore(config(), &duplicate_link),
+        Err(AccountingError::InvalidSnapshot)
+    );
+}
+
+#[test]
+fn cancellation_evidence_is_stable_idempotent_and_restored() {
+    let mut ledger = AccountingLedger::new(config()).unwrap();
+    ledger
+        .reserve_rolling(id(20), 7, 20_000, 60_000, 30_000, 30_000)
+        .unwrap();
+    assert_eq!(
+        ledger.cancel_rolling(id(20), id(30)),
+        Ok(RecordResult::Inserted)
+    );
+    assert_eq!(
+        ledger.cancel_rolling(id(20), id(30)),
+        Ok(RecordResult::Duplicate)
+    );
+    let before_collision = ledger.snapshot_bytes().unwrap();
+    assert_eq!(
+        ledger.cancel_rolling(id(20), id(31)),
+        Err(AccountingError::IdentityCollision)
+    );
+    assert_eq!(ledger.snapshot_bytes().unwrap(), before_collision);
+
+    let snapshot = ledger.snapshot_bytes().unwrap();
+    let mut restored = AccountingLedger::restore(config(), &snapshot).unwrap();
+    assert_eq!(
+        restored.reserve_rolling(id(21), 7, 20_000, 60_000, 30_000, 30_000),
+        Ok(AdmissionResult::Reserved)
+    );
+}
+
 fn id(value: u8) -> [u8; 16] {
     [value; 16]
+}
+
+fn crc32(bytes: &[u8]) -> u32 {
+    let mut crc = !0u32;
+    for byte in bytes {
+        crc ^= u32::from(*byte);
+        for _ in 0..8 {
+            crc = (crc >> 1) ^ (0xedb8_8320u32 & 0u32.wrapping_sub(crc & 1));
+        }
+    }
+    !crc
+}
+
+fn rechecksum(snapshot: &mut Vec<u8>) {
+    snapshot.truncate(snapshot.len() - 4);
+    snapshot.extend_from_slice(&crc32(snapshot).to_le_bytes());
 }
 
 #[test]
