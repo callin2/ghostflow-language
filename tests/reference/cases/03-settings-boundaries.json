@@ -148,6 +148,7 @@
     },
     {
       "id": "REF-05-012",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/273",
       "references": [
         "05-settings-and-observation.md#기본값과-유효값"
       ],
@@ -161,6 +162,7 @@
     },
     {
       "id": "REF-05-013",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/274",
       "references": [
         "05-settings-and-observation.md#atomic-live-event"
       ],
@@ -174,6 +176,7 @@
     },
     {
       "id": "REF-05-014",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/275",
       "references": [
         "05-settings-and-observation.md#atomic-live-event"
       ],
@@ -187,6 +190,7 @@
     },
     {
       "id": "REF-05-015",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/276",
       "references": [
         "05-settings-and-observation.md#atomic-live-event"
       ],
@@ -200,6 +204,7 @@
     },
     {
       "id": "REF-05-016",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/277",
       "references": [
         "05-settings-and-observation.md#atomic-live-event"
       ],
@@ -213,6 +218,7 @@
     },
     {
       "id": "REF-05-017",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/278",
       "references": [
         "05-settings-and-observation.md#생명주기와-임시-설정"
       ],
@@ -226,6 +232,7 @@
     },
     {
       "id": "REF-05-018",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/279",
       "references": [
         "05-settings-and-observation.md#생명주기와-임시-설정"
       ],
@@ -239,6 +246,7 @@
     },
     {
       "id": "REF-05-019",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/280",
       "references": [
         "05-settings-and-observation.md#53-renderer-독립-관찰-모델"
       ],
@@ -252,6 +260,7 @@
     },
     {
       "id": "REF-05-020",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/281",
       "references": [
         "05-settings-and-observation.md#descriptor와-snapshot"
       ],
@@ -278,6 +287,7 @@
     },
     {
       "id": "REF-05-022",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/282",
       "references": [
         "05-settings-and-observation.md#event-command-result와-alarm"
       ],
@@ -291,6 +301,7 @@
     },
     {
       "id": "REF-05-023",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/283",
       "references": [
         "05-settings-and-observation.md#explanation-dag"
       ],
@@ -304,6 +315,7 @@
     },
     {
       "id": "REF-05-024",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/284",
       "references": [
         "05-settings-and-observation.md#54-정체성과-물리적-사실의-경계"
       ],
@@ -317,6 +329,7 @@
     },
     {
       "id": "REF-05-025",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/285",
       "references": [
         "05-settings-and-observation.md#54-정체성과-물리적-사실의-경계"
       ],
@@ -330,6 +343,7 @@
     },
     {
       "id": "REF-05-026",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/286",
       "references": [
         "05-settings-and-observation.md#event-command-result와-alarm"
       ],
@@ -343,6 +357,7 @@
     },
     {
       "id": "REF-05-027",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/287",
       "references": [
         "05-settings-and-observation.md#event-command-result와-alarm"
       ],
@@ -356,6 +371,7 @@
     },
     {
       "id": "REF-05-028",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/288",
       "references": [
         "05-settings-and-observation.md#55-설계-이유와-근거"
       ],
@@ -369,6 +385,7 @@
     },
     {
       "id": "REF-06-001",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/289",
       "references": [
         "06-composition-and-replay.md#61-하나의-의미-모델과-여러-그래프"
       ],
@@ -382,6 +399,7 @@
     },
     {
       "id": "REF-06-002",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/290",
       "references": [
         "06-composition-and-replay.md#62-definition-instance와-논리-port"
       ],
@@ -395,6 +413,7 @@
     },
     {
       "id": "REF-06-003",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/291",
       "references": [
         "06-composition-and-replay.md#62-definition-instance와-논리-port"
       ],
@@ -408,6 +427,7 @@
     },
     {
       "id": "REF-06-004",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/292",
       "references": [
         "06-composition-and-replay.md#62-definition-instance와-논리-port"
       ],
@@ -421,6 +441,7 @@
     },
     {
       "id": "REF-06-005",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/293",
       "references": [
         "06-composition-and-replay.md#62-definition-instance와-논리-port"
       ],
@@ -434,6 +455,7 @@
     },
     {
       "id": "REF-06-006",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/294",
       "references": [
         "06-composition-and-replay.md#62-definition-instance와-논리-port"
       ],
@@ -447,6 +469,7 @@
     },
     {
       "id": "REF-06-007",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/295",
       "references": [
         "06-composition-and-replay.md#63-parameters-settings-dependencies와-bindings"
       ],
@@ -460,6 +483,7 @@
     },
     {
       "id": "REF-06-008",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/296",
       "references": [
         "06-composition-and-replay.md#호환-장치-교체와-재컴파일-독립성"
       ],
@@ -473,6 +497,7 @@
     },
     {
       "id": "REF-06-009",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/297",
       "references": [
         "06-composition-and-replay.md#호환-장치-교체와-재컴파일-독립성"
       ],
@@ -500,6 +525,7 @@
     },
     {
       "id": "REF-06-011",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/298",
       "references": [
         "06-composition-and-replay.md#64-import와-연결의-문법"
       ],
@@ -526,6 +552,7 @@
     },
     {
       "id": "REF-06-013",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/299",
       "references": [
         "06-composition-and-replay.md#65-조합-실행의-불변-규칙"
       ],
@@ -539,6 +566,7 @@
     },
     {
       "id": "REF-06-014",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/300",
       "references": [
         "06-composition-and-replay.md#65-조합-실행의-불변-규칙"
       ],
@@ -552,6 +580,7 @@
     },
     {
       "id": "REF-06-015",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/301",
       "references": [
         "06-composition-and-replay.md#66-resource와-contract"
       ],
@@ -565,6 +594,7 @@
     },
     {
       "id": "REF-06-016",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/302",
       "references": [
         "06-composition-and-replay.md#67-조합된-설명과-provenance"
       ],
@@ -591,6 +621,7 @@
     },
     {
       "id": "REF-06-018",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/303",
       "references": [
         "06-composition-and-replay.md#68-replay-ghost와-branch"
       ],
@@ -604,6 +635,7 @@
     },
     {
       "id": "REF-06-019",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/304",
       "references": [
         "06-composition-and-replay.md#68-replay-ghost와-branch"
       ],
@@ -617,6 +649,7 @@
     },
     {
       "id": "REF-06-020",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/305",
       "references": [
         "06-composition-and-replay.md#69-program-hot-replacement"
       ],
@@ -630,6 +663,7 @@
     },
     {
       "id": "REF-06-021",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/306",
       "references": [
         "06-composition-and-replay.md#69-program-hot-replacement"
       ],
@@ -643,6 +677,7 @@
     },
     {
       "id": "REF-06-022",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/307",
       "references": [
         "06-composition-and-replay.md#69-program-hot-replacement"
       ],
@@ -667,6 +702,7 @@
     },
     {
       "id": "REF-06-024",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/308",
       "references": [
         "06-composition-and-replay.md#610-syntax-quote-splice의-문법"
       ],
@@ -680,6 +716,7 @@
     },
     {
       "id": "REF-06-025",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/309",
       "references": [
         "06-composition-and-replay.md#611-설계-이유와-근거"
       ],
@@ -693,6 +730,7 @@
     },
     {
       "id": "REF-07-001",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/310",
       "references": [
         "07-semantic-rules-and-index.md#71-이-장의-목적"
       ],
@@ -706,6 +744,7 @@
     },
     {
       "id": "REF-07-002",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/311",
       "references": [
         "07-semantic-rules-and-index.md#72-잘못된-프로그램과-외부의-실패"
       ],
@@ -732,6 +771,7 @@
     },
     {
       "id": "REF-07-004",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/312",
       "references": [
         "07-semantic-rules-and-index.md#73-거짓없음불확실함은-다르다"
       ],
@@ -745,6 +785,7 @@
     },
     {
       "id": "REF-07-005",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/313",
       "references": [
         "07-semantic-rules-and-index.md#73-거짓없음불확실함은-다르다"
       ],
@@ -771,6 +812,7 @@
     },
     {
       "id": "REF-07-007",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/314",
       "references": [
         "07-semantic-rules-and-index.md#74-의미가-유지되는-변환"
       ],
@@ -784,6 +826,7 @@
     },
     {
       "id": "REF-07-008",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/315",
       "references": [
         "07-semantic-rules-and-index.md#75-선언과-표기-찾아보기",
         "07-semantic-rules-and-index.md#76-기호-찾아보기"
@@ -798,6 +841,7 @@
     },
     {
       "id": "REF-07-009",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/316",
       "references": [
         "07-semantic-rules-and-index.md#77-용어"
       ],
@@ -811,6 +855,7 @@
     },
     {
       "id": "REF-07-010",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/317",
       "references": [
         "07-semantic-rules-and-index.md#78-원문에서-reference로-찾아가기"
       ],
@@ -824,6 +869,7 @@
     },
     {
       "id": "REF-08-001",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/318",
       "references": [
         "08-language-runtime-and-device-boundaries.md#81-분류-원칙-의미와-실행-수단"
       ],
@@ -837,6 +883,7 @@
     },
     {
       "id": "REF-08-002",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/319",
       "references": [
         "08-language-runtime-and-device-boundaries.md#82-계층별-책임"
       ],
@@ -850,6 +897,7 @@
     },
     {
       "id": "REF-08-003",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/320",
       "references": [
         "08-language-runtime-and-device-boundaries.md#82-계층별-책임"
       ],
@@ -863,6 +911,7 @@
     },
     {
       "id": "REF-08-004",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/321",
       "references": [
         "08-language-runtime-and-device-boundaries.md#82-계층별-책임"
       ],
@@ -876,6 +925,7 @@
     },
     {
       "id": "REF-08-005",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/322",
       "references": [
         "08-language-runtime-and-device-boundaries.md#83-faq-전체-책임표"
       ],
@@ -889,6 +939,7 @@
     },
     {
       "id": "REF-08-006",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/323",
       "references": [
         "08-language-runtime-and-device-boundaries.md#84-기능별로-지켜야-하는-경계"
       ],
@@ -902,6 +953,7 @@
     },
     {
       "id": "REF-08-007",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/324",
       "references": [
         "08-language-runtime-and-device-boundaries.md#84-기능별로-지켜야-하는-경계"
       ],
@@ -915,6 +967,7 @@
     },
     {
       "id": "REF-08-008",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/325",
       "references": [
         "08-language-runtime-and-device-boundaries.md#84-기능별로-지켜야-하는-경계"
       ],
@@ -928,6 +981,7 @@
     },
     {
       "id": "REF-08-009",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/326",
       "references": [
         "08-language-runtime-and-device-boundaries.md#84-기능별로-지켜야-하는-경계"
       ],
@@ -941,6 +995,7 @@
     },
     {
       "id": "REF-08-010",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/327",
       "references": [
         "08-language-runtime-and-device-boundaries.md#84-기능별로-지켜야-하는-경계"
       ],
@@ -954,6 +1009,7 @@
     },
     {
       "id": "REF-08-011",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/328",
       "references": [
         "08-language-runtime-and-device-boundaries.md#85-변경과-재시작의-생명주기"
       ],
@@ -967,6 +1023,7 @@
     },
     {
       "id": "REF-08-012",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/329",
       "references": [
         "08-language-runtime-and-device-boundaries.md#85-변경과-재시작의-생명주기"
       ],
@@ -980,6 +1037,7 @@
     },
     {
       "id": "REF-08-013",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/330",
       "references": [
         "08-language-runtime-and-device-boundaries.md#86-언어-결정과-작성자가-정하는-정책"
       ],
@@ -993,6 +1051,7 @@
     },
     {
       "id": "REF-08-014",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/331",
       "references": [
         "08-language-runtime-and-device-boundaries.md#86-언어-결정과-작성자가-정하는-정책"
       ],
@@ -1006,6 +1065,7 @@
     },
     {
       "id": "REF-08-015",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/332",
       "references": [
         "08-language-runtime-and-device-boundaries.md#86-언어-결정과-작성자가-정하는-정책"
       ],
@@ -1019,6 +1079,7 @@
     },
     {
       "id": "REF-08-016",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/333",
       "references": [
         "08-language-runtime-and-device-boundaries.md#86-언어-결정과-작성자가-정하는-정책"
       ],
@@ -1032,6 +1093,7 @@
     },
     {
       "id": "REF-08-017",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/334",
       "references": [
         "08-language-runtime-and-device-boundaries.md#87-새-요구를-분류하는-순서"
       ],
@@ -1067,6 +1129,7 @@
     },
     {
       "id": "REF-05-103",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/335",
       "references": [
         "05-settings-and-observation.md#생명주기와-임시-설정"
       ],
@@ -1080,6 +1143,7 @@
     },
     {
       "id": "REF-05-104",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/336",
       "references": [
         "05-settings-and-observation.md#생명주기와-임시-설정"
       ],
@@ -1093,6 +1157,7 @@
     },
     {
       "id": "REF-05-105",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/337",
       "references": [
         "05-settings-and-observation.md#생명주기와-임시-설정"
       ],
@@ -1106,6 +1171,7 @@
     },
     {
       "id": "REF-05-106",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/338",
       "references": [
         "05-settings-and-observation.md#생명주기와-임시-설정"
       ],
@@ -1119,6 +1185,7 @@
     },
     {
       "id": "REF-05-107",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/339",
       "references": [
         "05-settings-and-observation.md#재시작과-기억의-복원"
       ],
