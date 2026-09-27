@@ -102,6 +102,17 @@ jobs:
         working-directory: source
         run: npm test
 
+      - name: Set up Node.js 24 for current-source coverage
+        if: ${{ matrix.label == 'current' }}
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+
+      - name: Run current-source coverage gate
+        if: ${{ matrix.label == 'current' }}
+        working-directory: source
+        run: npm run test:coverage
+
       - name: Package verified WASM handoff
         id: package
         run: node ci/tools/package-verified-wasm.mjs source handoff

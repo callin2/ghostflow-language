@@ -87,3 +87,31 @@ test('handoff rejects omitted, extra and changed source evidence', t => {
   fs.writeFileSync(path.join(root, 'runtimes/wasm/fixture.txt'), 'changed fixture');
   assert.throws(() => assertVerificationSources(root, hashes), /source changed/);
 });
+
+test('current-source WASM CI runs the coverage gate after verification and before packaging', () => {
+  const workflow = fs.readFileSync(new URL('../.github/workflows/verified-wasm.yml', import.meta.url), 'utf8');
+  const check = source => {
+    const steps = source.split(/^      - name: /m).slice(1);
+    const names = steps.map(step => step.split('\n', 1)[0]);
+    const verified = names.indexOf('Run source verification');
+    const node24 = names.indexOf('Set up Node.js 24 for current-source coverage');
+    const covered = names.indexOf('Run current-source coverage gate');
+    const packaged = names.indexOf('Package verified WASM handoff');
+    assert.ok(verified >= 0 && node24 > verified && covered > node24 && packaged > covered,
+      'coverage must follow source verification and precede packaging');
+    assert.match(steps[node24], /\n        if: \$\{\{ matrix\.label == 'current' \}\}\n/);
+    assert.match(steps[node24], /\n          node-version: 24\n/);
+    const coverage = steps[covered];
+    assert.match(coverage, /\n        if: \$\{\{ matrix\.label == 'current' \}\}\n/);
+    assert.match(coverage, /\n        working-directory: source\n/);
+    assert.match(coverage, /\n        run: npm run test:coverage\n/);
+  };
+  check(workflow);
+  assert.throws(() => check(workflow.replace('run: npm run test:coverage', 'run: npm test')));
+  assert.throws(() => check(workflow.replace(
+    "      - name: Run current-source coverage gate\n        if: ${{ matrix.label == 'current' }}",
+    "      - name: Run current-source coverage gate\n        if: ${{ success() }}")));
+  assert.throws(() => check(workflow.replace('Run source verification', 'MOVED')
+    .replace('Run current-source coverage gate', 'Run source verification')
+    .replace('MOVED', 'Run current-source coverage gate')));
+});

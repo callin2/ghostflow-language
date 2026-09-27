@@ -144,3 +144,20 @@ test('a rejected VM scan rolls back tracker identity, result, and logical time',
   assert.equal(runtime.lastNowMs, null);
   assert.equal(scan(1).vm.safe.any_opened, true);
 });
+
+test('invalid event delivery cannot consume an identity before a valid scan', async t => {
+  const artifact = await compileSource(source, { filename: 'after-event-control.ghost.md' });
+  const runtime = await ControlRuntime.instantiate(wasm, artifact, { afterEvent: { timeEpoch: 7 } });
+  t.after(() => runtime.dispose());
+  assert.throws(() => runtime.step({
+    nowMs: 1, inputs: { divisor: 1 }, events: eventBatch([start(1, 2)]),
+  }), /atMs cannot be in the future/);
+  assert.deepEqual(runtime.afterEvents.get('opened').runtime.results, []);
+  assert.equal(runtime.lastNowMs, null);
+  const committed = runtime.step({
+    nowMs: 1, inputs: { divisor: 1 }, samples: { valve_open: sample(1, 1, true) },
+    events: eventBatch([start(1, 1)]),
+  });
+  assert.equal(committed.vm.safe.any_opened, true);
+  assert.equal(runtime.lastNowMs, 1);
+});

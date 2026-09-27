@@ -26,6 +26,7 @@ const TESTS = Object.freeze([
   'tests/result-control.test.mjs', 'tests/result-provenance.test.mjs',
   'tests/source-trace.test.mjs', 'tests/interaction-settings.test.mjs',
   'tests/periodic-cron-policy.test.mjs', 'tests/daily-slots-policy.test.mjs',
+  'tests/daily-runtime.test.mjs', 'tests/daily-slots-runtime.test.mjs',
   'tests/solar-control.test.mjs', 'tests/solar-control-runtime.test.mjs',
   'tests/true-for-integration.test.mjs', 'tests/true-for-driver-contract.test.mjs',
   'tests/true-for-profile.test.mjs',
@@ -40,14 +41,18 @@ const TESTS = Object.freeze([
   'tests/long-tick-state.test.mjs', 'tests/resource-policy-artifact.test.mjs',
   'tests/compiler-cli-diagnostics.test.mjs', 'tests/compiler-interaction-diagnostics.test.mjs',
   'tests/accounting-syntax.test.mjs', 'tests/gfb5-native.test.mjs', 'tests/gfb6-native.test.mjs',
+  'tests/gfb7-pid-contract.test.mjs',
   'tests/output-conformance.test.mjs',
   'tests/after-event-contract.test.mjs', 'tests/natural-condition-contract.test.mjs',
+  'tests/after-event-control.test.mjs', 'tests/context-wasm-boundaries.test.mjs',
+  'tests/config-native-wasm-parity.test.mjs',
   'tests/macro-composition-contract.test.mjs', 'tests/objective-adapt-structural.test.mjs',
   'tests/import-header.test.mjs', 'tests/import-cli-digest.test.mjs',
   'tests/named-constraints.test.mjs', 'tests/resource-policy.test.mjs',
   'tests/schedule-descriptor-artifact.test.mjs', 'tests/gfb2-int.test.mjs',
   'tests/int-compiler.test.mjs', 'tests/lesson.test.mjs', 'tests/interaction-corpus.test.mjs',
   'tests/temporal-resource-plan-wasm.test.mjs', 'tests/temporal-replay-wasm.test.mjs',
+  'tests/range-contract.test.mjs', 'tests/issue-90-settings-stream.test.mjs',
   'tests/state-snapshot-reference.test.mjs', 'tests/solar-provider-wasm.test.mjs',
   'tests/gfb4-window.test.mjs', 'tests/gfb5-schedule.test.mjs',
   'tests/portable-package.test.mjs', 'tests/import-composition.test.mjs',
@@ -108,20 +113,24 @@ async function run(command, args, options = {}) {
   });
 }
 
-function mergeCoverage(entries) {
+function mergeCoverage(entries, sourceLengths) {
   const scripts = new Map();
   for (const entry of entries) for (const script of entry.result ?? []) {
     if (!script.url?.startsWith('file:')) continue;
     const filename = fileURLToPath(script.url);
     const relative = path.relative(root, filename);
     if (!TARGETS.includes(relative)) continue;
+    // Only on-disk source offsets may contribute to a real target. Browser VM
+    // transforms also have distinct synthetic URLs in their harnesses.
+    if (script.functions?.[0]?.ranges?.[0]?.endOffset !== sourceLengths.get(relative)) continue;
     const functions = scripts.get(relative) ?? new Map(); scripts.set(relative, functions);
     for (const fn of script.functions ?? []) {
       if (!fn.functionName) continue; // top-level module execution would falsely cover every line.
       const first = fn.ranges?.[0]; if (!first) continue;
       const key = `${fn.functionName}:${first.startOffset}:${first.endOffset}`;
-      const saved = functions.get(key) ?? { name: fn.functionName, range: first, count: 0, ranges: new Map() };
+      const saved = functions.get(key) ?? { name: fn.functionName, range: first, count: 0, ranges: new Map(), partitions: [] };
       saved.count = Math.max(saved.count, first.count);
+      saved.partitions.push(fn.ranges);
       for (const range of fn.ranges) {
         const rangeKey = `${range.startOffset}:${range.endOffset}`;
         const old = saved.ranges.get(rangeKey) ?? { ...range, count: 0 };
@@ -130,8 +139,31 @@ function mergeCoverage(entries) {
       functions.set(key, saved);
     }
   }
+  // V8 may emit a zero-count child range in one process and only a positive
+  // enclosing range in another. The missing child inherits that process's
+  // closest enclosing count; maxing identical range keys alone undercounts it.
+  for (const functions of scripts.values()) for (const fn of functions.values()) {
+    for (const range of fn.ranges.values()) {
+      range.count = Math.max(...fn.partitions.map(partition => {
+        const enclosing = partition.filter(candidate => candidate.startOffset <= range.startOffset
+          && candidate.endOffset >= range.endOffset);
+        const narrowest = Math.min(...enclosing.map(candidate => candidate.endOffset - candidate.startOffset));
+        return Math.max(...enclosing.filter(candidate => candidate.endOffset - candidate.startOffset === narrowest)
+          .map(candidate => candidate.count));
+      }));
+    }
+    delete fn.partitions;
+  }
   return scripts;
 }
+
+function requireRealReports(scripts, targets = TARGETS) {
+  for (const target of targets) {
+    if (!scripts.has(target)) throw new Error(`coverage has no real-source report for ${target}`);
+  }
+}
+
+export { mergeCoverage, requireRealReports };
 
 async function summarize(scripts) {
   const files = {};
@@ -159,13 +191,20 @@ async function summarize(scripts) {
   return files;
 }
 
+async function main() {
 if (Number(process.versions.node.split('.')[0]) < 24) throw new Error('coverage gate requires Node.js 24 built-in V8 coverage');
 const coverageDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ghostflow-v8-coverage-'));
 try {
+  // Artifact-writer tests create temporary files beneath this ignored directory.
+  await fs.mkdir(path.join(root, 'build'), { recursive: true });
   const result = await run(process.execPath, ['--test', ...TESTS], { env: { ...process.env, NODE_V8_COVERAGE: coverageDir } });
   if (result.status !== 0 || result.error || result.signal) throw new Error(`coverage test allowlist failed: ${result.error ?? result.signal ?? result.status}`);
   const reports = await Promise.all((await fs.readdir(coverageDir)).filter(name => name.endsWith('.json')).map(async name => JSON.parse(await fs.readFile(path.join(coverageDir, name), 'utf8'))));
-  const files = await summarize(mergeCoverage(reports));
+  const sourceLengths = new Map(await Promise.all(TARGETS.map(async target =>
+    [target, (await fs.readFile(path.join(root, target), 'utf8')).length])));
+  const scripts = mergeCoverage(reports, sourceLengths);
+  requireRealReports(scripts);
+  const files = await summarize(scripts);
   const totals = {
     functions: aggregate(files, 'functions'),
     lines: aggregate(files, 'lines'),
@@ -186,3 +225,6 @@ try {
 } finally {
   await fs.rm(coverageDir, { recursive: true, force: true });
 }
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main();

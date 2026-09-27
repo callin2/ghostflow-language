@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import test from 'node:test';
 import { compileSource } from '../tools/toolchain.mjs';
 import { GhostFlowRuntime } from '../runtimes/wasm/ghostflow-runtime.mjs';
+import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 import { encodeScheduleFacts, encodeSolarFacts } from '../runtimes/wasm/solar-abi.mjs';
 
 const entry = JSON.parse(fs.readFileSync(new URL('./reference/cases/02-time-control.json', import.meta.url))).cases.find(e => e.id === 'REF-03-024');
@@ -47,4 +48,20 @@ test('Daily facts require distinct kind/fold transport and forbid computed due',
   assert.throws(() => encodeScheduleFacts(badFold), /fold/);
   const spoof = structuredClone(packet); spoof.schedules[0].due = true;
   assert.throws(() => encodeScheduleFacts(spoof), /unexpected schedule.due/);
+});
+
+test('ControlRuntime admits Daily occurrence only after valid runtime-owned schedule facts', async t => {
+  const artifact = await compileSource(entry.source, { filename: entry.filename });
+  await assert.rejects(() => ControlRuntime.instantiate(wasm(), artifact), /schedule activation profile is required/);
+  const runtime = await ControlRuntime.instantiate(wasm(), artifact,
+    { schedule: { bootEpoch: 7, terminalCapacity: 8 } });
+  t.after(() => runtime.dispose());
+  const site = artifact.manifest.schedules[0].site;
+  assert.throws(() => runtime.step({ nowMs: 0, due: { morning: true },
+    scheduleFacts: facts(site, 0, planned - 100) }), /runtime-owned due value/);
+  assert.equal(runtime.step({ nowMs: 0, scheduleFacts: facts(site, 0, planned - 100) }).vm.safe.due, false);
+  assert.throws(() => runtime.step({ nowMs: 100,
+    scheduleFacts: facts(site, 100, planned, { kind: 'solar' }) }), /kind mismatch/);
+  assert.equal(runtime.lastNowMs, 0);
+  assert.equal(runtime.step({ nowMs: 100, scheduleFacts: facts(site, 100, planned) }).vm.safe.due, true);
 });
