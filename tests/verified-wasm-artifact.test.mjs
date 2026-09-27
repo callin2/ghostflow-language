@@ -6,6 +6,62 @@ import os from 'node:os';
 import path from 'node:path';
 import { verificationSourceHashes, assertVerificationSources } from '../tools/verification-sources.mjs';
 
+const verifiedWasmWorkflow = fs.readFileSync(new URL('../.github/workflows/verified-wasm.yml', import.meta.url), 'utf8');
+
+test('language verification registers every selected test once', () => {
+  const source = fs.readFileSync(new URL('../tools/verify-language.mjs', import.meta.url), 'utf8');
+  const list = source.match(/export const LANGUAGE_TESTS = Object\.freeze\(\[([\s\S]*?)\]\);/);
+  assert.ok(list, 'explicit language test list is required');
+  const entries = [...list[1].matchAll(/'([^']+\.test\.mjs)'/g)].map(match => match[1]);
+  assert.ok(entries.length > 0);
+  assert.deepEqual(entries, [...new Set(entries)], 'duplicate test registration');
+});
+
+function namedStep(workflow, name) {
+  const start = workflow.indexOf(`      - name: ${name}\n`);
+  assert.notEqual(start, -1, `workflow step missing: ${name}`);
+  const next = workflow.indexOf('\n      - name: ', start + 1);
+  return workflow.slice(start, next === -1 ? undefined : next);
+}
+
+function assertVerifiedWasmWorkflowContract(workflow) {
+  const pushTrigger = workflow.match(/^  push:\n([\s\S]*?)(?=^  workflow_dispatch:)/m)?.[1] ?? '';
+  assert.match(pushTrigger, /^    branches:\n      - main\n      - dev\n/m,
+    'verified WASM push trigger must include main and dev');
+
+  const currentMatrix = workflow.match(/          - label: current\n([\s\S]*?)(?=          - label: frontend-pin)/)?.[1] ?? '';
+  assert.match(currentMatrix, /source_sha: .*github\.event_name == 'push' && github\.sha/,
+    'current source for push events must be the exact pushed commit SHA');
+
+  assert.match(namedStep(workflow, 'Checkout tested source'), /ref: \$\{\{ matrix\.source_sha \}\}/,
+    'tested source checkout must use the selected source SHA');
+  const verifyStep = namedStep(workflow, 'Verify tested source commit');
+  assert.match(verifyStep, /git rev-parse HEAD/);
+  assert.match(verifyStep, /actual_source_sha.*EXPECTED_SOURCE_SHA/,
+    'tested checkout must be compared with the selected source SHA');
+
+  const verifyIndex = workflow.indexOf('      - name: Verify tested source commit\n');
+  const npmIndex = workflow.indexOf('      - name: Run source verification\n');
+  const packageIndex = workflow.indexOf('      - name: Package verified WASM handoff\n');
+  assert.ok(verifyIndex !== -1 && npmIndex > verifyIndex && packageIndex > npmIndex,
+    'source checkout verification and full source verification must precede packaging');
+  const sourceTestStep = namedStep(workflow, 'Run source verification');
+  assert.match(sourceTestStep, /working-directory: source/);
+  assert.match(sourceTestStep, /run: npm test/,
+    'the tested source must pass the full npm test gate');
+  const node24Index = workflow.indexOf('      - name: Set up Node.js 24 for current-source coverage\n');
+  const coverageIndex = workflow.indexOf('      - name: Run current-source coverage gate\n');
+  assert.ok(node24Index > npmIndex && coverageIndex > node24Index && packageIndex > coverageIndex,
+    'current-source coverage must run after full verification and before packaging');
+  const node24Step = namedStep(workflow, 'Set up Node.js 24 for current-source coverage');
+  assert.match(node24Step, /if: \$\{\{ matrix\.label == 'current' \}\}/);
+  assert.match(node24Step, /node-version: 24/);
+  const coverageStep = namedStep(workflow, 'Run current-source coverage gate');
+  assert.match(coverageStep, /if: \$\{\{ matrix\.label == 'current' \}\}/);
+  assert.match(coverageStep, /working-directory: source/);
+  assert.match(coverageStep, /run: npm run test:coverage/);
+}
+
 // Report-validation fixtures only. These tests do not claim to build/run WASM.
 const binary = { bytes: 100, sha256: 'a'.repeat(64) };
 function fixture() {
@@ -88,30 +144,24 @@ test('handoff rejects omitted, extra and changed source evidence', t => {
   assert.throws(() => assertVerificationSources(root, hashes), /source changed/);
 });
 
-test('current-source WASM CI runs the coverage gate after verification and before packaging', () => {
-  const workflow = fs.readFileSync(new URL('../.github/workflows/verified-wasm.yml', import.meta.url), 'utf8');
-  const check = source => {
-    const steps = source.split(/^      - name: /m).slice(1);
-    const names = steps.map(step => step.split('\n', 1)[0]);
-    const verified = names.indexOf('Run source verification');
-    const node24 = names.indexOf('Set up Node.js 24 for current-source coverage');
-    const covered = names.indexOf('Run current-source coverage gate');
-    const packaged = names.indexOf('Package verified WASM handoff');
-    assert.ok(verified >= 0 && node24 > verified && covered > node24 && packaged > covered,
-      'coverage must follow source verification and precede packaging');
-    assert.match(steps[node24], /\n        if: \$\{\{ matrix\.label == 'current' \}\}\n/);
-    assert.match(steps[node24], /\n          node-version: 24\n/);
-    const coverage = steps[covered];
-    assert.match(coverage, /\n        if: \$\{\{ matrix\.label == 'current' \}\}\n/);
-    assert.match(coverage, /\n        working-directory: source\n/);
-    assert.match(coverage, /\n        run: npm run test:coverage\n/);
-  };
-  check(workflow);
-  assert.throws(() => check(workflow.replace('run: npm run test:coverage', 'run: npm test')));
-  assert.throws(() => check(workflow.replace(
-    "      - name: Run current-source coverage gate\n        if: ${{ matrix.label == 'current' }}",
-    "      - name: Run current-source coverage gate\n        if: ${{ success() }}")));
-  assert.throws(() => check(workflow.replace('Run source verification', 'MOVED')
-    .replace('Run current-source coverage gate', 'Run source verification')
-    .replace('MOVED', 'Run current-source coverage gate')));
+test('verified WASM workflow binds full verification to the exact pushed source', () => {
+  assert.doesNotThrow(() => assertVerifiedWasmWorkflowContract(verifiedWasmWorkflow));
+
+  const mutations = [
+    ['dev push trigger', source => source.replace('      - dev\n', '')],
+    ['push source SHA', source => source.replace("github.event_name == 'push' && github.sha", "github.event_name == 'push' && inputs.source_sha")],
+    ['tested checkout verification', source => source.replace(/      - name: Verify tested source commit\n[\s\S]*?(?=      - name: Set up Node\.js)/, '')],
+    ['full source test gate', source => source.replace('        run: npm test\n', '        run: npm run test:node\n')],
+    ['coverage command', source => source.replace('        run: npm run test:coverage\n', '        run: npm test\n')],
+    ['coverage matrix condition', source => source.replace(
+      "      - name: Run current-source coverage gate\n        if: ${{ matrix.label == 'current' }}",
+      "      - name: Run current-source coverage gate\n        if: ${{ success() }}")],
+    ['coverage ordering', source => source.replace('Run source verification', 'MOVED')
+      .replace('Run current-source coverage gate', 'Run source verification')
+      .replace('MOVED', 'Run current-source coverage gate')],
+  ];
+
+  for (const [name, mutate] of mutations) {
+    assert.throws(() => assertVerifiedWasmWorkflowContract(mutate(verifiedWasmWorkflow)), undefined, name);
+  }
 });

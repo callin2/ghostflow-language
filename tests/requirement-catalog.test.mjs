@@ -9,7 +9,7 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const catalog = readCatalog({ root });
 
 test('requirement catalog has content-derived IDs and complete relation', () => {
-  assert.deepEqual(validateCatalog(catalog, { root }), { requirements: 41, tests: 18, linkedTests: 18 });
+  assert.deepEqual(validateCatalog(catalog, { root }), { requirements: 42, tests: 18, linkedTests: 18 });
   for (const requirement of catalog.requirements) assert.equal(requirement.id, requirementId(requirement.statement));
 });
 
@@ -54,4 +54,25 @@ test('catalog cannot mark incomplete evidence implemented or point a test at ano
   mismatched.tests[0].file = mismatched.tests[1].file === mismatched.tests[0].file
     ? 'tests/runtime-conformance.test.mjs' : mismatched.tests[1].file;
   assert.throws(() => validateCatalog(mismatched, { root }), /file and locator.path disagree/);
+});
+
+test('superseded MVP intent-read claim retains its identity and points to tested current semantics', () => {
+  const historical = catalog.requirements.find(row => row.id === 'GF-REQ-d9f669f061279c41');
+  assert.equal(historical.statement, 'All intent expressions read committed next state.');
+  assert.equal(historical.source.sha256, '909155acbc4e71907554e719ddf7f7747412bb401a2aaaabe3c73f6f2ae0d990');
+  assert.equal(historical.status, 'pending');
+
+  const current = catalog.requirements.find(row => row.id === historical.supersededBy);
+  assert.equal(current?.statement,
+    'In intent expressions, unprimed state reads the old snapshot and explicit next-state references read candidate state; candidate state and requested/safe intents commit together when evaluation finishes without error, including when constraints block an output.');
+  assert.equal(current.status, 'implemented');
+  assert.deepEqual(current.testIds, [
+    'GF-TEST-snapshot-commit', 'GF-TEST-error-atomicity', 'GF-TEST-safety-fixed-point',
+  ]);
+
+  const mvp = fs.readFileSync(path.join(root, 'docs/LANGUAGE-MVP-0.1.md'), 'utf8');
+  assert.match(mvp, /unprimed state reads the old snapshot/);
+  assert.match(mvp, /explicit next-state references read candidate state/);
+  assert.match(mvp, /even if constraints block an output/);
+  assert.doesNotMatch(mvp, /All `intent` expressions read the committed next state/);
 });

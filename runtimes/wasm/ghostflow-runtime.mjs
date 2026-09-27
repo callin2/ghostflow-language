@@ -4,7 +4,7 @@ import { NativeDispatchError } from './native-dispatch.mjs';
 import { encodeTemporalProfile } from './temporal-profile.mjs';
 import { encodeSolarFacts, encodeScheduleFacts, validateSolarActivation } from './solar-abi.mjs';
 import { encodeContextActivation, encodeContextFacts } from './context-abi.mjs';
-import { temporalPlanRequest, temporalReplayPlanRequest, temporalReplayRequest } from './temporal-replay.mjs';
+import { coreReplayRequest, temporalPlanRequest, temporalReplayPlanRequest, temporalReplayRequest } from './temporal-replay.mjs';
 
 export class GhostFlowRuntime {
   static async instantiate(wasmBytes, imports = {}) {
@@ -83,6 +83,12 @@ export class GhostFlowRuntime {
         request.maxPeakTemporalBytes, request.maxJsonBytes));
       return this.replay;
     });
+  }
+  replayCore(options) {
+    const request = coreReplayRequest(options);
+    this.#live();
+    this.#check(this.wasm.gf_replay_core(this.handle, request.count, request.maxJsonBytes));
+    return this.replay;
   }
   planTemporal(options) {
     const request = temporalPlanRequest(options);
