@@ -6,6 +6,42 @@ import os from 'node:os';
 import path from 'node:path';
 import { verificationSourceHashes, assertVerificationSources } from '../tools/verification-sources.mjs';
 
+const verifiedWasmWorkflow = fs.readFileSync(new URL('../.github/workflows/verified-wasm.yml', import.meta.url), 'utf8');
+
+function namedStep(workflow, name) {
+  const start = workflow.indexOf(`      - name: ${name}\n`);
+  assert.notEqual(start, -1, `workflow step missing: ${name}`);
+  const next = workflow.indexOf('\n      - name: ', start + 1);
+  return workflow.slice(start, next === -1 ? undefined : next);
+}
+
+function assertVerifiedWasmWorkflowContract(workflow) {
+  const pushTrigger = workflow.match(/^  push:\n([\s\S]*?)(?=^  workflow_dispatch:)/m)?.[1] ?? '';
+  assert.match(pushTrigger, /^    branches:\n      - main\n      - dev\n/m,
+    'verified WASM push trigger must include main and dev');
+
+  const currentMatrix = workflow.match(/          - label: current\n([\s\S]*?)(?=          - label: frontend-pin)/)?.[1] ?? '';
+  assert.match(currentMatrix, /source_sha: .*github\.event_name == 'push' && github\.sha/,
+    'current source for push events must be the exact pushed commit SHA');
+
+  assert.match(namedStep(workflow, 'Checkout tested source'), /ref: \$\{\{ matrix\.source_sha \}\}/,
+    'tested source checkout must use the selected source SHA');
+  const verifyStep = namedStep(workflow, 'Verify tested source commit');
+  assert.match(verifyStep, /git rev-parse HEAD/);
+  assert.match(verifyStep, /actual_source_sha.*EXPECTED_SOURCE_SHA/,
+    'tested checkout must be compared with the selected source SHA');
+
+  const verifyIndex = workflow.indexOf('      - name: Verify tested source commit\n');
+  const npmIndex = workflow.indexOf('      - name: Run source verification\n');
+  const packageIndex = workflow.indexOf('      - name: Package verified WASM handoff\n');
+  assert.ok(verifyIndex !== -1 && npmIndex > verifyIndex && packageIndex > npmIndex,
+    'source checkout verification and full source verification must precede packaging');
+  const sourceTestStep = namedStep(workflow, 'Run source verification');
+  assert.match(sourceTestStep, /working-directory: source/);
+  assert.match(sourceTestStep, /run: npm test/,
+    'the tested source must pass the full npm test gate');
+}
+
 // Report-validation fixtures only. These tests do not claim to build/run WASM.
 const binary = { bytes: 100, sha256: 'a'.repeat(64) };
 function fixture() {
@@ -86,4 +122,19 @@ test('handoff rejects omitted, extra and changed source evidence', t => {
   assert.throws(() => assertVerificationSources(root, { ...hashes, 'unknown.txt': 'a'.repeat(64) }), /hash set/);
   fs.writeFileSync(path.join(root, 'runtimes/wasm/fixture.txt'), 'changed fixture');
   assert.throws(() => assertVerificationSources(root, hashes), /source changed/);
+});
+
+test('verified WASM workflow binds full verification to the exact pushed source', () => {
+  assert.doesNotThrow(() => assertVerifiedWasmWorkflowContract(verifiedWasmWorkflow));
+
+  const mutations = [
+    ['dev push trigger', source => source.replace('      - dev\n', '')],
+    ['push source SHA', source => source.replace("github.event_name == 'push' && github.sha", "github.event_name == 'push' && inputs.source_sha")],
+    ['tested checkout verification', source => source.replace(/      - name: Verify tested source commit\n[\s\S]*?(?=      - name: Set up Node\.js)/, '')],
+    ['full source test gate', source => source.replace('        run: npm test\n', '        run: npm run test:node\n')],
+  ];
+
+  for (const [name, mutate] of mutations) {
+    assert.throws(() => assertVerifiedWasmWorkflowContract(mutate(verifiedWasmWorkflow)), undefined, name);
+  }
 });
