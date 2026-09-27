@@ -73,6 +73,58 @@ function indexChapter(file) {
 
 const chapters = new Map(chapterFiles.map(file => [file, indexChapter(file)]));
 
+function issueLinkErrors(entries, externallyCovered) {
+  const errors = [];
+  const linkedIssues = new Map();
+  for (const entry of entries) {
+    if (entry.issue === undefined) {
+      if (entry.status !== 'executable' && !externallyCovered.has(entry.id)) {
+        errors.push(`${entry.id}: pending case needs an issue backlink`);
+      }
+      continue;
+    }
+    const match = typeof entry.issue === 'string'
+      ? /^https:\/\/github\.com\/callin2\/ghostflow-language\/issues\/([1-9]\d*)$/.exec(entry.issue)
+      : null;
+    if (!match) {
+      errors.push(`${entry.id}: invalid ghostflow-language issue URL`);
+      continue;
+    }
+    const previous = linkedIssues.get(match[1]);
+    if (previous) errors.push(`${entry.id}: issue #${match[1]} already linked by ${previous}`);
+    else linkedIssues.set(match[1], entry.id);
+  }
+  return errors;
+}
+
+test('Reference issue backlinks: pending cases linked and all supplied URLs unique', () => {
+  const errors = issueLinkErrors(cases, externalOracleIds);
+  assert.equal(errors.length, 0, `${errors.length} backlink errors: ${errors.slice(0, 8).join('; ')}`);
+});
+
+test('Reference issue backlinks reject missing, malformed, wrong-repository and duplicate links', () => {
+  const link = number => `https://github.com/callin2/ghostflow-language/issues/${number}`;
+  const covered = new Set(['COVERED']);
+  assert.deepEqual(issueLinkErrors([
+    { id: 'EXEC', status: 'executable' },
+    { id: 'COVERED', status: 'specified' },
+    { id: 'GRADUATED', status: 'executable', issue: link(12) },
+    { id: 'PENDING', status: 'specified', issue: link(13) },
+  ], covered), []);
+  assert.deepEqual(issueLinkErrors([
+    { id: 'MISSING', status: 'decision' },
+    { id: 'MALFORMED', status: 'specified', issue: 'https://github.com/callin2/ghostflow-language/issues/0' },
+    { id: 'WRONG-REPO', status: 'specified', issue: 'https://github.com/callin2/farm_studio_system/issues/14' },
+    { id: 'FIRST', status: 'executable', issue: link(15) },
+    { id: 'DUPLICATE', status: 'specified', issue: link(15) },
+  ], covered), [
+    'MISSING: pending case needs an issue backlink',
+    'MALFORMED: invalid ghostflow-language issue URL',
+    'WRONG-REPO: invalid ghostflow-language issue URL',
+    'DUPLICATE: issue #15 already linked by FIRST',
+  ]);
+});
+
 test('Reference catalog: unique cases, valid citations, concrete oracles, every numbered section accounted for', () => {
   catalogValidation = 'failed';
   assert.deepEqual(featureValidationErrors, [], 'external oracle links must resolve to active named tests');

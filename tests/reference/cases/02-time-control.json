@@ -119,6 +119,7 @@
     },
     {
       "id": "REF-03-010",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/203",
       "references": [
         "03-time-and-schedules.md#달력-시계와-단조-시계"
       ],
@@ -157,6 +158,7 @@
     },
     {
       "id": "REF-03-013",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/204",
       "references": [
         "03-time-and-schedules.md#32-상태-변경-뒤의-경과-시간"
       ],
@@ -170,6 +172,7 @@
     },
     {
       "id": "REF-03-014",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/205",
       "references": [
         "03-time-and-schedules.md#32-상태-변경-뒤의-경과-시간"
       ],
@@ -195,6 +198,7 @@
     },
     {
       "id": "REF-03-016",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/206",
       "references": [
         "03-time-and-schedules.md#33-bool이-연속으로-참인-시간"
       ],
@@ -208,6 +212,7 @@
     },
     {
       "id": "REF-03-017",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/207",
       "references": [
         "03-time-and-schedules.md#33-bool이-연속으로-참인-시간"
       ],
@@ -221,6 +226,7 @@
     },
     {
       "id": "REF-03-018",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/208",
       "references": [
         "03-time-and-schedules.md#34-누적-시간과-rolling-budget"
       ],
@@ -234,6 +240,7 @@
     },
     {
       "id": "REF-03-019",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/209",
       "references": [
         "03-time-and-schedules.md#34-누적-시간과-rolling-budget"
       ],
@@ -247,6 +254,7 @@
     },
     {
       "id": "REF-03-020",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/210",
       "references": [
         "03-time-and-schedules.md#34-누적-시간과-rolling-budget"
       ],
@@ -260,6 +268,7 @@
     },
     {
       "id": "REF-03-021",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/211",
       "references": [
         "03-time-and-schedules.md#34-누적-시간과-rolling-budget"
       ],
@@ -273,6 +282,7 @@
     },
     {
       "id": "REF-03-022",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/212",
       "references": [
         "03-time-and-schedules.md#34-누적-시간과-rolling-budget"
       ],
@@ -286,6 +296,7 @@
     },
     {
       "id": "REF-03-023",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/213",
       "references": [
         "03-time-and-schedules.md#35-schedule의-공통-의미"
       ],
@@ -311,6 +322,7 @@
     },
     {
       "id": "REF-03-025",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/214",
       "references": [
         "03-time-and-schedules.md#35-schedule의-공통-의미"
       ],
@@ -324,6 +336,7 @@
     },
     {
       "id": "REF-03-026",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/215",
       "references": [
         "03-time-and-schedules.md#pulse-window-run-range"
       ],
@@ -337,6 +350,7 @@
     },
     {
       "id": "REF-03-027",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/216",
       "references": [
         "03-time-and-schedules.md#pulse-window-run-range"
       ],
@@ -350,6 +364,7 @@
     },
     {
       "id": "REF-03-028",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/217",
       "references": [
         "03-time-and-schedules.md#35-schedule의-공통-의미"
       ],
@@ -363,6 +378,7 @@
     },
     {
       "id": "REF-03-029",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/218",
       "references": [
         "03-time-and-schedules.md#occurrence-identity와-중복-억제"
       ],
@@ -376,6 +392,7 @@
     },
     {
       "id": "REF-03-030",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/219",
       "references": [
         "03-time-and-schedules.md#관측-gap과-회복"
       ],
@@ -389,6 +406,7 @@
     },
     {
       "id": "REF-03-031",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/220",
       "references": [
         "03-time-and-schedules.md#관측-gap과-회복"
       ],
@@ -440,6 +458,7 @@
     },
     {
       "id": "REF-03-035",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/221",
       "references": [
         "03-time-and-schedules.md#36-선택된-dailyslots"
       ],
@@ -465,6 +484,7 @@
     },
     {
       "id": "REF-03-037",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/222",
       "references": [
         "03-time-and-schedules.md#periodic",
         "04-sensors-constraints-control.md#410-mode와-live-settings"
@@ -491,6 +511,7 @@
     },
     {
       "id": "REF-03-039",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/223",
       "references": [
         "03-time-and-schedules.md#38-dst-자정과-work-calendar"
       ],
@@ -504,6 +525,7 @@
     },
     {
       "id": "REF-03-040",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/224",
       "references": [
         "03-time-and-schedules.md#38-dst-자정과-work-calendar"
       ],
@@ -517,6 +539,7 @@
     },
     {
       "id": "REF-03-041",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/225",
       "references": [
         "03-time-and-schedules.md#38-dst-자정과-work-calendar"
       ],
@@ -593,6 +616,7 @@
     },
     {
       "id": "REF-03-047",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/226",
       "references": [
         "03-time-and-schedules.md#선택된-solar-표기",
         "03-time-and-schedules.md#달과-조석",
@@ -608,6 +632,7 @@
     },
     {
       "id": "REF-03-048",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/227",
       "references": [
         "03-time-and-schedules.md#310-시간-기반-사용량-제약"
       ],
@@ -621,6 +646,7 @@
     },
     {
       "id": "REF-03-049",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/228",
       "references": [
         "03-time-and-schedules.md#310-시간-기반-사용량-제약"
       ],
@@ -811,6 +837,7 @@
     },
     {
       "id": "REF-04-003",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/229",
       "references": [
         "04-sensors-constraints-control.md#41-sensor와-result-품질"
       ],
@@ -836,6 +863,7 @@
     },
     {
       "id": "REF-04-005",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/230",
       "references": [
         "04-sensors-constraints-control.md#41-sensor와-result-품질"
       ],
@@ -900,6 +928,7 @@
     },
     {
       "id": "REF-04-010",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/231",
       "references": [
         "04-sensors-constraints-control.md#42-샘플-계약과-sensor-처리-순서"
       ],
@@ -913,6 +942,7 @@
     },
     {
       "id": "REF-04-011",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/232",
       "references": [
         "04-sensors-constraints-control.md#42-샘플-계약과-sensor-처리-순서"
       ],
@@ -926,6 +956,7 @@
     },
     {
       "id": "REF-04-012",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/233",
       "references": [
         "04-sensors-constraints-control.md#42-샘플-계약과-sensor-처리-순서"
       ],
@@ -977,6 +1008,7 @@
     },
     {
       "id": "REF-04-016",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/234",
       "references": [
         "04-sensors-constraints-control.md#median"
       ],
@@ -1015,6 +1047,7 @@
     },
     {
       "id": "REF-04-019",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/235",
       "references": [
         "04-sensors-constraints-control.md#hysteresis"
       ],
@@ -1064,6 +1097,7 @@
     },
     {
       "id": "REF-04-023",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/236",
       "references": [
         "04-sensors-constraints-control.md#bounded-signal-연산의-설계-계약"
       ],
@@ -1077,6 +1111,7 @@
     },
     {
       "id": "REF-04-024",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/237",
       "references": [
         "04-sensors-constraints-control.md#bounded-signal-연산의-설계-계약"
       ],
@@ -1150,6 +1185,7 @@
     },
     {
       "id": "REF-04-030",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/238",
       "references": [
         "04-sensors-constraints-control.md#44-temporal-evidence"
       ],
@@ -1175,6 +1211,7 @@
     },
     {
       "id": "REF-04-032",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/239",
       "references": [
         "04-sensors-constraints-control.md#44-temporal-evidence"
       ],
@@ -1200,6 +1237,7 @@
     },
     {
       "id": "REF-04-034",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/240",
       "references": [
         "04-sensors-constraints-control.md#45-선택-sensor와-capability"
       ],
@@ -1225,6 +1263,7 @@
     },
     {
       "id": "REF-04-036",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/241",
       "references": [
         "04-sensors-constraints-control.md#46-device-query와-strategy-선택"
       ],
@@ -1251,6 +1290,7 @@
     },
     {
       "id": "REF-04-038",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/242",
       "references": [
         "04-sensors-constraints-control.md#46-device-query와-strategy-선택"
       ],
@@ -1264,6 +1304,7 @@
     },
     {
       "id": "REF-04-039",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/243",
       "references": [
         "04-sensors-constraints-control.md#46-device-query와-strategy-선택"
       ],
@@ -1314,6 +1355,7 @@
     },
     {
       "id": "REF-04-043",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/244",
       "references": [
         "04-sensors-constraints-control.md#47-requested-safe-applied-confirmed"
       ],
@@ -1351,6 +1393,7 @@
     },
     {
       "id": "REF-04-046",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/245",
       "references": [
         "04-sensors-constraints-control.md#48-공통-constraints-표기와-연산"
       ],
@@ -1364,6 +1407,7 @@
     },
     {
       "id": "REF-04-047",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/246",
       "references": [
         "04-sensors-constraints-control.md#48-공통-constraints-표기와-연산"
       ],
@@ -1377,6 +1421,7 @@
     },
     {
       "id": "REF-04-048",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/247",
       "references": [
         "04-sensors-constraints-control.md#49-공유-자원과-arbitration"
       ],
@@ -1390,6 +1435,7 @@
     },
     {
       "id": "REF-04-049",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/248",
       "references": [
         "04-sensors-constraints-control.md#49-공유-자원과-arbitration"
       ],
@@ -1415,6 +1461,7 @@
     },
     {
       "id": "REF-04-051",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/249",
       "references": [
         "04-sensors-constraints-control.md#49-공유-자원과-arbitration"
       ],
@@ -1428,6 +1475,7 @@
     },
     {
       "id": "REF-04-052",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/250",
       "references": [
         "04-sensors-constraints-control.md#410-mode와-live-settings"
       ],
@@ -1441,6 +1489,7 @@
     },
     {
       "id": "REF-04-053",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/251",
       "references": [
         "04-sensors-constraints-control.md#410-mode와-live-settings"
       ],
@@ -1454,6 +1503,7 @@
     },
     {
       "id": "REF-04-054",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/252",
       "references": [
         "04-sensors-constraints-control.md#410-mode와-live-settings"
       ],
@@ -1467,6 +1517,7 @@
     },
     {
       "id": "REF-04-055",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/253",
       "references": [
         "04-sensors-constraints-control.md#411-accounting과-budget"
       ],
@@ -1480,6 +1531,7 @@
     },
     {
       "id": "REF-04-056",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/254",
       "references": [
         "04-sensors-constraints-control.md#411-accounting과-budget"
       ],
@@ -1493,6 +1545,7 @@
     },
     {
       "id": "REF-04-057",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/255",
       "references": [
         "04-sensors-constraints-control.md#411-accounting과-budget"
       ],
@@ -1531,6 +1584,7 @@
     },
     {
       "id": "REF-04-060",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/256",
       "references": [
         "04-sensors-constraints-control.md#pipid-의미에-필요한-항목"
       ],
@@ -1556,6 +1610,7 @@
     },
     {
       "id": "REF-04-062",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/257",
       "references": [
         "04-sensors-constraints-control.md#413-explicit-fallback과-degraded-control"
       ],
@@ -1581,6 +1636,7 @@
     },
     {
       "id": "REF-04-064",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/258",
       "references": [
         "04-sensors-constraints-control.md#414-bounded-adaptation"
       ],
@@ -1594,6 +1650,7 @@
     },
     {
       "id": "REF-04-065",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/259",
       "references": [
         "04-sensors-constraints-control.md#415-타입-자원과-설명-규칙"
       ],
@@ -1607,6 +1664,7 @@
     },
     {
       "id": "REF-04-066",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/260",
       "references": [
         "04-sensors-constraints-control.md#415-타입-자원과-설명-규칙"
       ],
@@ -1620,6 +1678,7 @@
     },
     {
       "id": "REF-04-067",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/261",
       "references": [
         "04-sensors-constraints-control.md#416-확정된-control-문법과-장별-경계"
       ],
@@ -1698,6 +1757,7 @@
     },
     {
       "id": "REF-03-073",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/262",
       "references": ["03-time-and-schedules.md#35-schedule의-공통-의미"],
       "rule": "Range admits only the remaining part of its planned half-open interval, including after boot, gap, or trust recovery.",
       "scope": "runtime", "status": "specified",
@@ -1708,6 +1768,7 @@
     },
     {
       "id": "REF-03-074",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/263",
       "references": ["03-time-and-schedules.md#35-schedule의-공통-의미"],
       "rule": "The active Range deadline follows monotonic progress despite RTC/NTP wall corrections.",
       "scope": "runtime", "status": "specified",
@@ -1718,6 +1779,7 @@
     },
     {
       "id": "REF-03-075",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/264",
       "references": ["03-time-and-schedules.md#35-schedule의-공통-의미"],
       "rule": "Safety blocking does not pause or extend a Range.",
       "scope": "runtime", "status": "specified",
@@ -1728,6 +1790,7 @@
     },
     {
       "id": "REF-03-076",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/265",
       "references": ["03-time-and-schedules.md#35-schedule의-공통-의미"],
       "rule": "Live Duration changes recompute the current Range end from its planned start.",
       "scope": "runtime", "status": "specified",
@@ -1738,6 +1801,7 @@
     },
     {
       "id": "REF-03-077",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/266",
       "references": ["03-time-and-schedules.md#35-schedule의-공통-의미"],
       "rule": "A live scalar start change can pause and reevaluate the same Range occurrence without readmission.",
       "scope": "runtime", "status": "specified",
@@ -1748,6 +1812,7 @@
     },
     {
       "id": "REF-03-078",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/267",
       "references": ["03-time-and-schedules.md#35-schedule의-공통-의미"],
       "rule": "A live setting event that creates overlapping Range occurrences is rejected atomically.",
       "scope": "runtime", "status": "specified",
@@ -1758,6 +1823,7 @@
     },
     {
       "id": "REF-03-079",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/268",
       "references": ["03-time-and-schedules.md#310-시간-기반-사용량-제약"],
       "rule": "Event count returns an exact Int or the corresponding AccountingFault.",
       "scope": "runtime", "status": "specified",
@@ -1768,6 +1834,7 @@
     },
     {
       "id": "REF-03-080",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/269",
       "references": ["03-time-and-schedules.md#310-시간-기반-사용량-제약"],
       "rule": "A fault-to-false count branch and protective on_unknown=block both prevent admission without accounting mutation.",
       "scope": "runtime", "status": "specified",
@@ -1778,6 +1845,7 @@
     },
     {
       "id": "REF-03-081",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/270",
       "references": ["03-time-and-schedules.md#36-선택된-dailyslots"],
       "rule": "A TimeSlots retime preserves a stable slot identity independent of displayed TimeOfDay and reevaluates the same active Range occurrence.",
       "scope": "runtime", "status": "specified",
@@ -1788,6 +1856,7 @@
     },
     {
       "id": "REF-03-082",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/271",
       "references": ["03-time-and-schedules.md#36-선택된-dailyslots"],
       "rule": "TimeSlots retime and remove/add have distinct identity and baseline effects.",
       "scope": "runtime", "status": "specified",
@@ -1798,6 +1867,7 @@
     },
     {
       "id": "REF-03-083",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/272",
       "references": ["03-time-and-schedules.md#36-선택된-dailyslots"],
       "rule": "A TimeSlots retime that creates overlapping Range intervals is rejected atomically without changing identity or ledger state.",
       "scope": "runtime", "status": "specified",
