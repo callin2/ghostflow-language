@@ -31,7 +31,7 @@ const TESTS = Object.freeze([
   'tests/true-for-profile.test.mjs',
   'tests/control-runtime-atomicity.test.mjs', 'tests/native-dispatch-status.test.mjs',
   'tests/framed-control-host.test.mjs', 'tests/scan-frame-wasm.test.mjs',
-  'tests/gfb1-browser.test.mjs', 'tests/gfb4-browser.test.mjs', 'tests/gfb5-browser.test.mjs',
+  'tests/gfb1-browser.test.mjs', 'tests/core-ir.test.mjs', 'tests/gfb4-browser.test.mjs', 'tests/gfb5-browser.test.mjs',
   'tests/browser-toolchain.test.mjs', 'tests/hold-last-runtime.test.mjs',
   'tests/debounce-runtime.test.mjs', 'tests/duration-runtime.test.mjs',
   'tests/datetime-runtime.test.mjs', 'tests/int-settings-artifacts.test.mjs',
@@ -83,7 +83,7 @@ const TESTS = Object.freeze([
   'tests/verified-wasm-artifact.test.mjs', 'tests/window-wasm.test.mjs',
 ]);
 const TARGETS = Object.freeze([
-  'tools/control.mjs', 'tools/gfb1.mjs', 'tools/literate.mjs', 'tools/toolchain.mjs',
+  'tools/control.mjs', 'tools/gfb1.mjs', 'tools/core-ir.mjs', 'tools/literate.mjs', 'tools/toolchain.mjs',
   'runtimes/wasm/control-runtime.mjs', 'runtimes/wasm/ghostflow-runtime.mjs',
 ]);
 const EXCLUDED = Object.freeze([{ test: 'tests/requirement-catalog.test.mjs', reason: 'catalog status is a separate requirement-governance gate, not language execution coverage' }]);

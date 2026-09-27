@@ -1,4 +1,4 @@
-class CompileError extends Error {}
+import { CompileError, lowerExpression } from './core-ir.mjs';
 
 const UTF8 = new TextEncoder();
 
@@ -115,110 +115,73 @@ function windowQualityDependencies(node, found = new Set()) {
   return found;
 }
 
-function compileExpr(node, env, allowNext=false) {
-  let w = new Writer();
-  let depth = 0, nodes = 0, usesInt = false, usesFormat3 = false;
+function compileExpr(node, env, allowNext = false) {
+  const ir = lowerExpression(node, env, allowNext);
+  let w = new Writer(), usesInt = false, usesFormat3 = false;
   function containsBranch(n) {
-    return Array.isArray(n) && (['if', 'and', 'or'].includes(n[0]) || n.slice(1).some(containsBranch));
+    if (['conditional', 'logical_and', 'logical_or'].includes(n.kind)) return true;
+    return Object.values(n).some(value => value && typeof value === 'object' && containsBranch(value));
   }
-  const compactNumbers = containsBranch(node);
-  function emitBranch(condition, yes, no, logicalOperator = null) {
-    if (emit(condition)!==TYPE.bool) throw new CompileError(logicalOperator ? `${logicalOperator} expects bools` : 'if condition must be bool');
+  const compactNumbers = containsBranch(ir);
+  function branch(condition, yes, no) {
+    emit(condition);
     const outer = w;
-    w = new Writer(); const yesType = emit(yes), yesBytes = w.finish();
-    w = new Writer(); const noType = emit(no), noBytes = w.finish();
+    w = new Writer(); emit(yes); const yesBytes = w.finish();
+    w = new Writer(); emit(no); const noBytes = w.finish();
     w = outer;
-    if (yesType!==noType) throw new CompileError(logicalOperator ? `${logicalOperator} expects bools` : 'if branches must have same type');
-    if (yesBytes.length+3>65535 || noBytes.length>65535) throw new CompileError('expression complexity limit exceeded');
-    w.u8(OP.branchFalse); w.u16(yesBytes.length+3); w.bytes(yesBytes);
+    if (yesBytes.length + 3 > 65535 || noBytes.length > 65535) throw new CompileError('expression complexity limit exceeded');
+    w.u8(OP.branchFalse); w.u16(yesBytes.length + 3); w.bytes(yesBytes);
     w.u8(OP.jump); w.u16(noBytes.length); w.bytes(noBytes);
     usesFormat3 = true;
-    return yesType;
   }
   function emit(n) {
-    if (++depth > 128 || ++nodes > 4096) throw new CompileError('expression complexity limit exceeded');
-    try { return emitNode(n); } finally { depth--; }
+    switch (n.kind) {
+      case 'literal':
+        if (n.type === 'Bool') { w.u8(OP.bool); w.u8(n.value ? 1 : 0); }
+        else if (n.type === 'Int') { usesInt = true; w.u8(OP.int); w.i32(n.value); }
+        else if (compactNumbers && Number.isInteger(n.value) && n.value >= 0 && n.value <= 15 && !Object.is(n.value, -0)) w.u8(32 + n.value);
+        else { w.u8(OP.number); w.f64(n.value); }
+        return;
+      case 'input': case 'previous_state': case 'candidate_next':
+        w.u8(OP[n.kind === 'input' ? 'input' : n.kind === 'previous_state' ? 'state' : 'next']);
+        w.u16(n.index); return;
+      case 'true_for_projection': case 'window_projection': case 'schedule_projection': {
+        const operation = n.kind === 'true_for_projection' ? 'true-for-read' : n.kind === 'window_projection' ? 'window-read' : 'schedule-read';
+        const fields = operation === 'true-for-read' ? ['ok','value','fault','origin','start','end','covered']
+          : operation === 'window-read' ? ['ok','value','fault','origin','revision','timestamp','count','quality']
+            : ['due','missed','active'];
+        w.u8(OP[operation]); w.u16(n.slot); w.u8(fields.indexOf(n.field)); return;
+      }
+      case 'result_trace':
+        emit(n.payload); emit(n.choice); emit(n.origin);
+        usesFormat3 = true; w.u8(OP['trace-result']); w.u32(n.site); return;
+      case 'integer_negation':
+        emit(n.operand); usesInt = true; w.u8(OP['int-neg']); return;
+      case 'integer_arithmetic':
+        emit(n.left); emit(n.right); usesInt = true; w.u8(OP['int-' + n.operation]); return;
+      case 'logical_not':
+        emit(n.operand); w.u8(OP.not); return;
+      case 'logical_and':
+        branch(n.left, n.right, { kind: 'literal', type: 'Bool', value: false }); return;
+      case 'logical_or':
+        branch(n.left, { kind: 'literal', type: 'Bool', value: true }, n.right); return;
+      case 'conditional':
+        branch(n.condition, n.whenTrue, n.whenFalse); return;
+      case 'comparison':
+        emit(n.left); emit(n.right);
+        if (n.left.type === 'Int') usesInt = true;
+        w.u8(OP[n.operation]); return;
+      case 'arithmetic':
+        emit(n.left); emit(n.right); w.u8(OP[n.operation]); return;
+      case 'conversion':
+        emit(n.operand); usesInt = true; usesFormat3 = true; w.u8(OP[n.operation]); return;
+      case 'time_guard':
+        emit(n.operand); usesFormat3 = true; w.u8(OP[n.operation]); return;
+      default: throw new CompileError('invalid semantic expression IR');
+    }
   }
-  function emitNode(n) {
-    if (n === 'true' || n === 'false') { w.u8(OP.bool); w.u8(n === 'true' ? 1 : 0); return TYPE.bool; }
-    if (typeof n === 'string' && /^-?(\d+(\.\d*)?|\.\d+)$/.test(n)) {
-      const value = Number(n);
-      if (!Number.isFinite(value)) throw new CompileError('non-finite number');
-      if (compactNumbers && Number.isInteger(value) && value>=0 && value<=15 && !Object.is(value,-0)) w.u8(32+value);
-      else { w.u8(OP.number); w.f64(value); }
-      return TYPE.number;
-    }
-    if (typeof n === 'string') {
-      const dot=n.indexOf('.'); if (dot<1) throw new CompileError(`unknown atom ${n}`);
-      const ns=n.slice(0,dot), name=n.slice(dot+1);
-      if (ns==='input') { const x=env.inputs.get(name); if(!x) throw new CompileError(`unknown input ${name}`); w.u8(OP.input); w.u16(x.index); return x.type; }
-      if (ns==='state') { const x=env.states.get(name); if(!x) throw new CompileError(`unknown state ${name}`); w.u8(OP.state); w.u16(x.index); return x.type; }
-      if (ns==='next') { if(!allowNext) throw new CompileError('next.* is allowed only in intents'); const x=env.states.get(name); if(!x) throw new CompileError(`unknown state ${name}`); w.u8(OP.next); w.u16(x.index); return x.type; }
-      throw new CompileError(`unknown namespace ${ns}`);
-    }
-    if (!Array.isArray(n) || n.length<1) throw new CompileError('invalid expression');
-    const [head, ...args]=n;
-    if (head==='true-for-read') {
-      if (!env.trueFors) throw new CompileError('true-for-read requires GFB format 6');
-      if (args.length!==2) throw new CompileError('true-for-read expects slot and field');
-      const slot=Number(unsignedAtom(args[0],65535n,'true_for projection index'));
-      if (!env.trueFors[slot]) throw new CompileError('true_for projection index');
-      const field=new Map([['ok',0],['value',1],['fault',2],['origin',3],['start',4],['end',5],['covered',6]]).get(args[1]);
-      if (field===undefined) throw new CompileError('true_for projection field');
-      w.u8(OP[head]);w.u16(slot);w.u8(field);
-      return field<=1?TYPE.bool:TYPE.number;
-    }
-    if (head==='window-read') {
-      if (!env.windows) throw new CompileError('window-read requires GFB format 4');
-      if (args.length!==2) throw new CompileError('window-read expects slot and field');
-      const slotValue=unsignedAtom(args[0],65535n,'temporal projection index');
-      const slot=Number(slotValue), window=env.windows[slot];
-      if (!window) throw new CompileError('temporal projection index');
-      const fields=new Map([['ok',0],['value',1],['fault',2],['origin',3],['revision',4],['timestamp',5],['count',6],['quality',7]]);
-      const field=fields.get(args[1]); if(field===undefined)throw new CompileError('temporal projection field');
-      w.u8(OP[head]);w.u16(slot);w.u8(field);
-      return field===0?TYPE.bool:field===1?window.payloadType:TYPE.number;
-    }
-    if (head==='schedule-read') {
-      if (!env.schedules) throw new CompileError('schedule-read requires GFB format 5');
-      if (args.length!==2) throw new CompileError('schedule-read expects slot and field');
-      const slotValue=unsignedAtom(args[0],65535n,'schedule projection index');
-      const slot=Number(slotValue), schedule=env.schedules[slot];
-      if (!schedule) throw new CompileError('schedule projection index');
-      const field=new Map([['due',0],['missed',1],['active',2]]).get(args[1]);
-      if (field===undefined) throw new CompileError('schedule projection field');
-      if (field===2 && !env.contextSchedules) throw new CompileError('schedule active requires GFB10');
-      w.u8(OP[head]);w.u16(slot);w.u8(field);
-      return TYPE.bool;
-    }
-    if (head==='trace-result') {
-      if(args.length!==4 || typeof args[0]!=='string' || !/^\d+$/.test(args[0]) || Number(args[0])<1 || Number(args[0])>4294967295) throw new CompileError('trace-result expects a positive u32 site, payload, Number choice and Number origin');
-      const type=emit(args[1]);
-      if(emit(args[2])!==TYPE.number || emit(args[3])!==TYPE.number) throw new CompileError('trace-result metadata must be Number');
-      usesFormat3=true; w.u8(OP[head]); w.u32(Number(args[0])); return type;
-    }
-    if (head==='int') { if(args.length!==1 || typeof args[0] !== 'string' || !/^-?\d+$/.test(args[0])) throw new CompileError('int expects one signed decimal i32 literal'); const value=BigInt(args[0]);if(value < -2147483648n || value > 2147483647n)throw new CompileError('int literal outside i32 range');usesInt=true;w.u8(OP.int);w.i32(Number(value));return TYPE.int; }
-    if (head==='int-neg') { if(args.length!==1 || emit(args[0])!==TYPE.int) throw new CompileError('int-neg expects Int');usesInt=true;w.u8(OP[head]);return TYPE.int; }
-    if (['int-add','int-sub','int-mul','int-div','int-rem'].includes(head)) { if(args.length!==2)throw new CompileError(`${head} expects 2 arguments`);const a=emit(args[0]),b=emit(args[1]);if(a!==TYPE.int||b!==TYPE.int)throw new CompileError(`${head} expects Int operands`);usesInt=true;w.u8(OP[head]);return TYPE.int; }
-    if (head==='not') { if(args.length!==1 || emit(args[0])!==TYPE.bool) throw new CompileError('not expects bool'); w.u8(OP.not); return TYPE.bool; }
-    if (head==='and' || head==='or') { if(args.length!==2) throw new CompileError(`${head} expects 2 arguments`); return head==='and' ? emitBranch(args[0],args[1],'false',head) : emitBranch(args[0],'true',args[1],head); }
-    if (['eq','lt','lte','gt','gte'].includes(head)) { if(args.length!==2) throw new CompileError(`${head} expects 2 arguments`); const a=emit(args[0]),b=emit(args[1]); if(a!==b || (head!=='eq'&&a!==TYPE.number&&a!==TYPE.int)) throw new CompileError(`bad operands for ${head}`); if(a===TYPE.int)usesInt=true;w.u8(OP[head]); return TYPE.bool; }
-    if (['add','sub','mul','div'].includes(head)) { if(args.length!==2) throw new CompileError(`${head} expects 2 arguments`); const a=emit(args[0]),b=emit(args[1]); if(a!==TYPE.number||b!==TYPE.number) throw new CompileError(`${head} expects numbers`); w.u8(OP[head]); return TYPE.number; }
-    if (head==='if') { if(args.length!==3) throw new CompileError('if expects 3 arguments'); return emitBranch(...args); }
-    if (['int-to-number','int-exact','int-floor','int-ceil','int-trunc','int-nearest-even'].includes(head)) {
-      const sourceType = head==='int-to-number' ? TYPE.int : TYPE.number;
-      if (args.length!==1 || emit(args[0])!==sourceType) throw new CompileError(`${head} expects one ${sourceType===TYPE.int?'Int':'Number'} operand`);
-      usesInt = true; usesFormat3 = true;
-      w.u8(OP[head]);
-      return head==='int-to-number' ? TYPE.number : TYPE.int;
-    }
-    if (head==='check-duration' || head==='check-datetime') {
-      if (args.length!==1 || emit(args[0])!==TYPE.number) throw new CompileError(`${head} expects one Number operand`);
-      usesFormat3 = true; w.u8(OP[head]); return TYPE.number;
-    }
-    throw new CompileError(`unknown expression ${head}`);
-  }
-  const type=emit(node); return {type, bytes:w.finish(),usesInt,usesFormat3};
+  emit(ir);
+  return { type: TYPE[ir.type.toLowerCase()], bytes: w.finish(), usesInt, usesFormat3 };
 }
 
 function compileQuery(node) {
