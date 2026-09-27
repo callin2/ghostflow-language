@@ -9,13 +9,264 @@
         "heading": "1.1 왜 문서 하나가 소스인가"
       },
       "owner": "CORE",
-      "maturity": "EXPERIMENTAL",
+      "maturity": "STABLE",
       "coreScope": true,
       "requiredEvidence": [
         "compile",
         "native_wasm"
       ],
       "evidence": [
+        {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-001 [compiler] 제품 컴파일 입력은 설명과 실행 규칙을 함께 담은 완전한 .ghost.md 문서 하나여야 한다.",
+              "caseId": "REF-01-001",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-002 [compiler] 일반 .ghost 파일은 제품 실행 입력이나 .ghost.md의 대체 입력이 아니다.",
+              "caseId": "REF-01-002",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-005 [compiler] 최상위 backtick fence의 info string이 정확히 ghost이면 실행 코드로 추출한다.",
+              "caseId": "REF-01-005",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-006 [compiler] 최상위 tilde fence의 info string이 정확히 ghost이면 실행 코드로 추출한다.",
+              "caseId": "REF-01-006",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-007 [compiler] 여러 최상위 ghost fence는 문서 순서대로 이어져 하나의 control을 이룬다.",
+              "caseId": "REF-01-007",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-008 [compiler] 실행 코드가 없는 문서는 진단한다.",
+              "caseId": "REF-01-008",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-009 [compiler] 닫히지 않은 최상위 ghost fence는 진단한다.",
+              "caseId": "REF-01-009",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-010 [compiler] ghost가 아닌 info string의 fenced block은 실행 코드가 아니다.",
+              "caseId": "REF-01-010",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-011 [compiler] 목록 안에 중첩된 ghost fence는 실행 코드가 아니다.",
+              "caseId": "REF-01-011",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-012 [compiler] 인용문 안에 중첩된 ghost fence는 실행 코드가 아니다.",
+              "caseId": "REF-01-012",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-013 [compiler] 더 긴 표시용 fence 안에 문자로 적힌 ghost fence는 실행 코드가 아니다.",
+              "caseId": "REF-01-013",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-014 [compiler] ghost에 속성이 붙거나 ghost-python처럼 정확히 일치하지 않는 실행 유사 태그는 진단한다.",
+              "caseId": "REF-01-014",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-015 [compiler] fence 경계가 토큰 한가운데를 나누면 compiler는 토큰을 자동 복구하지 않는다.",
+              "caseId": "REF-01-015",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-016 [compiler] 여러 fence를 합친 코드의 진단은 원본 .ghost.md 파일·행·열을 가리킨다.",
+              "caseId": "REF-01-016",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-032 [compiler] 식별자는 ASCII 문자 또는 underscore로 시작하고 이후 ASCII 문자·digit·underscore를 쓰며 대소문자를 구별한다.",
+              "caseId": "REF-01-032",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-033 [compiler] digit로 시작하는 이름은 식별자가 아니다.",
+              "caseId": "REF-01-033",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-034 [compiler] 내부용 __gf_ 접두사는 사용자 선언 이름으로 쓸 수 없다.",
+              "caseId": "REF-01-034",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-035 [compiler] 선언의 줄바꿈은 필수 세미콜론을 대신하지 않는다.",
+              "caseId": "REF-01-035",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-036 [compiler] 함수의 마지막 결과식은 세미콜론을 생략할 수 있다.",
+              "caseId": "REF-01-036",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-037 [compiler] # 및 /* ... */는 대표 control 문법의 코드 주석이 아니다.",
+              "caseId": "REF-01-037",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-038 [compiler] =>는 case branch 또는 출력 제약 관계에만 쓰며 일반 논리 연산자가 아니다.",
+              "caseId": "REF-01-038",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-039 [compiler] 기본 program에는 정확히 하나의 control 선언이 있으며 여러 control을 자동 합치지 않는다.",
+              "caseId": "REF-01-039",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-043 [compiler] 같은 종류의 선언 이름은 범위에서 유일해야 한다.",
+              "caseId": "REF-01-043",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-044 [compiler] 제거된 purefn 별칭은 fn으로 자동 해석하지 않고 migration 진단으로 거부한다.",
+              "caseId": "REF-01-044",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-045 [compiler] control 값 선언은 종류가 달라도 하나의 namespace를 공유하며 같은 이름을 다시 선언할 수 없다.",
+              "caseId": "REF-01-045",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/toolchain.test.mjs",
+              "testId": "comment-only literate revisions retain GFB and node identity but change source identity",
+              "caseId": "REF-01-004",
+              "assertionClass": "identity",
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/toolchain.test.mjs",
+              "testId": "source-preserving map recovers the exact CRLF literate document",
+              "caseId": "REF-01-017",
+              "assertionClass": "identity",
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
+            }
+          ]
+        },
         {
           "stage": "native_wasm",
           "status": "verified",
@@ -32,13 +283,39 @@
           ]
         }
       ],
-      "gaps": [
-        "Exact frozen compile and target-parity matrix pending #170."
-      ],
+      "gaps": [],
       "issues": [
         170
       ],
-      "referenceCaseIds": []
+      "referenceCaseIds": [
+        "REF-01-001",
+        "REF-01-002",
+        "REF-01-005",
+        "REF-01-006",
+        "REF-01-007",
+        "REF-01-008",
+        "REF-01-009",
+        "REF-01-010",
+        "REF-01-011",
+        "REF-01-012",
+        "REF-01-013",
+        "REF-01-014",
+        "REF-01-015",
+        "REF-01-016",
+        "REF-01-032",
+        "REF-01-033",
+        "REF-01-034",
+        "REF-01-035",
+        "REF-01-036",
+        "REF-01-037",
+        "REF-01-038",
+        "REF-01-039",
+        "REF-01-043",
+        "REF-01-044",
+        "REF-01-045",
+        "REF-01-004",
+        "REF-01-017"
+      ]
     },
     {
       "id": "intent-provenance",
@@ -48,7 +325,7 @@
         "heading": "1.2 원문, 위치와 의도 연결"
       },
       "owner": "CORE",
-      "maturity": "EXPERIMENTAL",
+      "maturity": "STABLE",
       "coreScope": true,
       "requiredEvidence": [
         "compile",
@@ -63,17 +340,177 @@
               "path": "tests/intent-anchor-map.test.mjs",
               "testId": "GF-TEST-intent-anchor: explicit literate anchors bind to compiler nodes without changing execution artifacts",
               "assertionClass": "identity"
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-019 [compiler] 정확한 필드 순서와 허용값을 가진 최상위 HTML 의도 앵커는 바로 뒤 최상위 문단 하나를 가리킨다.",
+              "caseId": "REF-01-019",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-020 [compiler] 앵커 id는 문자로 시작하고 허용 문자만 사용하며 최대 128자다.",
+              "caseId": "REF-01-020",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-021 [compiler] 앵커 id는 문서 안에서 유일해야 한다.",
+              "caseId": "REF-01-021",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-022 [compiler] assumption 앵커는 confirmed 상태일 수 없다.",
+              "caseId": "REF-01-022",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-023 [compiler] heading은 앵커 본문이 아니다.",
+              "caseId": "REF-01-023",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-024 [compiler] 앵커와 최상위 본문 사이에는 빈 줄 하나를 둘 수 있다.",
+              "caseId": "REF-01-024",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-025 [compiler] whole-line link 주석의 implements 관계는 바로 다음 추적 가능 문장 하나에 연결된다.",
+              "caseId": "REF-01-025",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-026 [compiler] assumes 관계는 unconfirmed assumption 앵커만 가리킬 수 있다.",
+              "caseId": "REF-01-026",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-027 [compiler] implements, constrains, fallback 관계는 assumption 앵커를 가리킬 수 없다.",
+              "caseId": "REF-01-027",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-028 [compiler] superseded 앵커는 현재 실행 노드에 연결할 수 없다.",
+              "caseId": "REF-01-028",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-029 [compiler] 서로 다른 여러 연속 link line은 같은 바로 다음 추적 가능 문장을 가리킬 수 있다.",
+              "caseId": "REF-01-029",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-030 [compiler] link line 뒤의 빈 줄은 링크를 고아로 만든다.",
+              "caseId": "REF-01-030",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-031 [compiler] link line 뒤의 일반 주석은 링크를 고아로 만든다.",
+              "caseId": "REF-01-031",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/toolchain.test.mjs",
+              "testId": "REF-00-001: equal control bytes retain separate original intent and document revisions",
+              "caseId": "REF-00-001",
+              "assertionClass": "identity",
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
+            }
+          ]
+        },
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/core-irrigation-proof.test.mjs",
+              "testId": "PC-02 core irrigation proof links canonical intent, state, pump and valve across native/WASM replay",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
             }
           ]
         }
       ],
-      "gaps": [
-        "Exact frozen runtime trace matrix pending #170."
-      ],
+      "gaps": [],
       "issues": [
         170
       ],
-      "referenceCaseIds": []
+      "referenceCaseIds": [
+        "REF-01-019",
+        "REF-01-020",
+        "REF-01-021",
+        "REF-01-022",
+        "REF-01-023",
+        "REF-01-024",
+        "REF-01-025",
+        "REF-01-026",
+        "REF-01-027",
+        "REF-01-028",
+        "REF-01-029",
+        "REF-01-030",
+        "REF-01-031",
+        "REF-00-001"
+      ]
     },
     {
       "id": "bool",
@@ -83,13 +520,37 @@
         "heading": "2.1 값 종류"
       },
       "owner": "CORE",
-      "maturity": "EXPERIMENTAL",
+      "maturity": "STABLE",
       "coreScope": true,
       "requiredEvidence": [
         "compile",
         "native_wasm"
       ],
       "evidence": [
+        {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-046 [compiler] Bool은 true와 false뿐이며 숫자나 문자열 truthiness가 없다.",
+              "caseId": "REF-01-046",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-00-005 [compiler] 시간을 Bool로 암묵 변환하지 않는다",
+              "caseId": "REF-00-005",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            }
+          ]
+        },
         {
           "stage": "native_wasm",
           "status": "verified",
@@ -102,17 +563,31 @@
                 "native",
                 "wasm"
               ]
+            },
+            {
+              "path": "tests/core-irrigation-proof.test.mjs",
+              "testId": "PC-02 core irrigation proof links canonical intent, state, pump and valve across native/WASM replay",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
             }
           ]
         }
       ],
-      "gaps": [
-        "Bool positive, negative, boundary matrix pending #170."
-      ],
+      "gaps": [],
       "issues": [
         170
       ],
-      "referenceCaseIds": []
+      "referenceCaseIds": [
+        "REF-01-046",
+        "REF-00-005"
+      ]
     },
     {
       "id": "int",
@@ -122,13 +597,78 @@
         "heading": "2.3 정확한 정수 설계"
       },
       "owner": "CORE",
-      "maturity": "EXPERIMENTAL",
+      "maturity": "STABLE",
       "coreScope": true,
       "requiredEvidence": [
         "compile",
         "native_wasm"
       ],
       "evidence": [
+        {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-056 [compiler] 기대 numeric type이 없는 정수 모양 literal은 Int이고 소수점 또는 지수 literal은 Number다.",
+              "caseId": "REF-01-056",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-060 [compiler] Int literal은 signed 32-bit 범위를 원래 십진 digit에서 검사하고 -2147483648만 음의 경계로 허용한다.",
+              "caseId": "REF-01-060",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-061 [compiler] digit separator는 Int literal 계약에 포함되지 않는다.",
+              "caseId": "REF-01-061",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-065 [compiler] Int와 Number 변환은 반올림 정책을 이름으로 드러내며 fractional, out-of-range 원인을 구분한다.",
+              "caseId": "REF-01-065",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-110 [compiler] Int div와 %는 0 방향 몫과 피제수 부호의 나머지를 만든다.",
+              "caseId": "REF-01-110",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-111 [compiler] i32 양의 경계를 넘는 Int literal은 compile 진단이다.",
+              "caseId": "REF-01-111",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative",
+                "boundary"
+              ]
+            }
+          ]
+        },
         {
           "stage": "native_wasm",
           "status": "verified",
@@ -141,17 +681,68 @@
                 "native",
                 "wasm"
               ]
+            },
+            {
+              "path": "tests/gfb2-int.test.mjs",
+              "testId": "REF-01-062 REF-01-064: native and WASM preserve i32 arithmetic boundaries and exact faults",
+              "caseId": "REF-01-062",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/int-division-identity.test.mjs",
+              "testId": "REF-01-063 native and WASM signed division preserve quotient/remainder identity",
+              "caseId": "REF-01-063",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/gfb2-int.test.mjs",
+              "testId": "REF-01-062 REF-01-064: native and WASM preserve i32 arithmetic boundaries and exact faults",
+              "caseId": "REF-01-064",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
             }
           ]
         }
       ],
-      "gaps": [
-        "Full frozen exactness matrix pending #170."
-      ],
+      "gaps": [],
       "issues": [
         170
       ],
-      "referenceCaseIds": []
+      "referenceCaseIds": [
+        "REF-01-056",
+        "REF-01-060",
+        "REF-01-061",
+        "REF-01-065",
+        "REF-01-110",
+        "REF-01-111",
+        "REF-01-062",
+        "REF-01-063",
+        "REF-01-064"
+      ]
     },
     {
       "id": "number",
@@ -161,13 +752,46 @@
         "heading": "2.3 정확한 정수 설계"
       },
       "owner": "CORE",
-      "maturity": "EXPERIMENTAL",
+      "maturity": "STABLE",
       "coreScope": true,
       "requiredEvidence": [
         "compile",
         "native_wasm"
       ],
       "evidence": [
+        {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-047 [compiler] Number는 유한한 binary64 값이며 NaN과 Infinity는 값이 아니다.",
+              "caseId": "REF-01-047",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-057 [compiler] 이미 정해진 Number 문맥의 정수 모양 literal은 처음부터 Number로 해석하며 runtime Int-to-Number 변환이 아니다.",
+              "caseId": "REF-01-057",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-066 [compiler] Number는 같은 타입 operand끼리 산술과 비교를 하며 결과가 유한해야 한다.",
+              "caseId": "REF-01-066",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive"
+              ]
+            }
+          ]
+        },
         {
           "stage": "native_wasm",
           "status": "verified",
@@ -180,17 +804,50 @@
                 "native",
                 "wasm"
               ]
+            },
+            {
+              "path": "tests/runtime-conformance.test.mjs",
+              "testId": "GF-TEST-selected-if-error: selected arithmetic fault rejects without partial commit",
+              "caseId": "REF-01-067",
+              "assertionClass": "rollback",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/scan-tape-parity.test.mjs",
+              "testId": "REF-01-067: non-finite Number result faults atomically on native and WASM",
+              "caseId": "REF-01-067",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
             }
           ]
         }
       ],
-      "gaps": [
-        "Number finite/range and target-parity oracles pending #170."
-      ],
+      "gaps": [],
       "issues": [
         170
       ],
-      "referenceCaseIds": []
+      "referenceCaseIds": [
+        "REF-01-047",
+        "REF-01-057",
+        "REF-01-066",
+        "REF-01-067"
+      ]
     },
     {
       "id": "percent",
@@ -200,20 +857,67 @@
         "heading": "2.9 물리량과 단위"
       },
       "owner": "CORE",
-      "maturity": "EXPERIMENTAL",
+      "maturity": "STABLE",
       "coreScope": true,
       "requiredEvidence": [
         "compile",
         "native_wasm"
       ],
-      "evidence": [],
-      "gaps": [
-        "Exact Percent literal, bound and runtime oracle linkage pending #170."
+      "evidence": [
+        {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-048 [compiler] Percent literal은 수치 뒤 %로 구분하며 값 범위는 0부터 100까지다.",
+              "caseId": "REF-01-048",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-054 [compiler] Percent와 Duration과 일반 수치는 표기가 비슷해도 서로 암묵 비교하거나 변환하지 않는다.",
+              "caseId": "REF-01-054",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative",
+                "boundary"
+              ]
+            }
+          ]
+        },
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/scan-tape-parity.test.mjs",
+              "testId": "REF core Percent and Duration source units retain exact native and WASM values",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
+            }
+          ]
+        }
       ],
+      "gaps": [],
       "issues": [
         170
       ],
-      "referenceCaseIds": []
+      "referenceCaseIds": [
+        "REF-01-048",
+        "REF-01-054"
+      ]
     },
     {
       "id": "duration",
@@ -223,20 +927,155 @@
         "heading": "3.1 시간값과 시계 영역"
       },
       "owner": "CORE",
-      "maturity": "EXPERIMENTAL",
+      "maturity": "STABLE",
       "coreScope": true,
       "requiredEvidence": [
         "compile",
         "native_wasm"
       ],
-      "evidence": [],
-      "gaps": [
-        "Exact Duration unit and boundary oracle linkage pending #170."
+      "evidence": [
+        {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-049 [compiler] Duration literal은 비음수 정수와 ms, s, min, h 중 하나를 붙여 쓴다.",
+              "caseId": "REF-01-049",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-050 [compiler] Duration은 소수 단위 표기를 쓰지 않으며 반 초는 0.5s가 아니라 500ms로 쓴다.",
+              "caseId": "REF-01-050",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-051 [compiler] Duration literal은 음수일 수 없다.",
+              "caseId": "REF-01-051",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-03-001 [compiler] Duration은 0 이상의 정수와 ms, s, min, h 단위를 사용하며 0ms도 타입의 유효값이다.",
+              "caseId": "REF-03-001",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-03-002 [compiler] 음수 Duration 리터럴은 거부한다.",
+              "caseId": "REF-03-002",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-03-003 [compiler] 분수 밀리초 Duration 리터럴은 거부한다.",
+              "caseId": "REF-03-003",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-03-004 [compiler] Duration의 포함 상한 2^53-1 밀리초는 허용한다.",
+              "caseId": "REF-03-004",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-03-005 [compiler] 2^53-1 밀리초를 넘는 Duration은 거부한다.",
+              "caseId": "REF-03-005",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-03-006 [compiler] Duration 덧셈은 범위 안의 검사된 Duration을 반환한다.",
+              "caseId": "REF-03-006",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-03-007 [compiler] Duration 뺄셈 결과가 음수이면 거부한다.",
+              "caseId": "REF-03-007",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative",
+                "boundary"
+              ]
+            }
+          ]
+        },
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/scan-tape-parity.test.mjs",
+              "testId": "REF core Percent and Duration source units retain exact native and WASM values",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
+            }
+          ]
+        }
       ],
+      "gaps": [],
       "issues": [
         170
       ],
-      "referenceCaseIds": []
+      "referenceCaseIds": [
+        "REF-01-049",
+        "REF-01-050",
+        "REF-01-051",
+        "REF-03-001",
+        "REF-03-002",
+        "REF-03-003",
+        "REF-03-004",
+        "REF-03-005",
+        "REF-03-006",
+        "REF-03-007"
+      ]
     },
     {
       "id": "typed-input-config",
@@ -246,13 +1085,163 @@
         "heading": "5.1 `config` 선언"
       },
       "owner": "CORE",
-      "maturity": "EXPERIMENTAL",
+      "maturity": "STABLE",
       "coreScope": true,
       "requiredEvidence": [
         "compile",
         "native_wasm"
       ],
       "evidence": [
+        {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-114 [compiler] 입력은 직접 이름으로 읽으며 제거된 input.name 표기는 거부한다.",
+              "caseId": "REF-01-114",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-05-001 [compiler] Duration config의 타입, 기본값, 닫힌 범위, 증분, 권한, 라벨을 함께 선언할 수 있어야 한다.",
+              "caseId": "REF-05-001",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-05-002 [compiler] Percent config는 0%와 100%를 포함하는 닫힌 범위를 허용해야 한다.",
+              "caseId": "REF-05-002",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-05-003 [compiler] Bool config의 false 기본값은 값 없음이 아니라 유효한 명시 값이어야 한다.",
+              "caseId": "REF-05-003",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-05-004 [compiler] config 기본값이 min보다 작으면 컴파일을 거부해야 한다.",
+              "caseId": "REF-05-004",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-05-005 [compiler] config 기본값이 max보다 크면 컴파일을 거부해야 한다.",
+              "caseId": "REF-05-005",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-05-006 [compiler] config의 min이 max보다 크면 컴파일을 거부해야 한다.",
+              "caseId": "REF-05-006",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-05-007 [compiler] config의 step이 0이면 컴파일을 거부해야 한다.",
+              "caseId": "REF-05-007",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-05-008 [compiler] config 기본값이 min 기준 step 격자에 맞지 않으면 컴파일을 거부해야 한다.",
+              "caseId": "REF-05-008",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-05-009 [compiler] config의 min, max, step 타입이 선언 타입과 다르면 컴파일을 거부해야 한다.",
+              "caseId": "REF-05-009",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-05-010 [compiler] Bool config에 수치 min/max/step을 선언하면 거부해야 한다.",
+              "caseId": "REF-05-010",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-05-011 [compiler] 같은 범위의 중복 config 이름은 모호하므로 거부해야 한다.",
+              "caseId": "REF-05-011",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-05-101 [compiler] config는 apply = stopped 필드를 거부한다.",
+              "caseId": "REF-05-101",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-05-102 [compiler] config는 apply = live 필드를 거부한다.",
+              "caseId": "REF-05-102",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-05-108 [compiler] Int config는 정수 기본값과 정수 min/max/step 운영 메타데이터를 함께 선언할 수 있어야 한다.",
+              "caseId": "REF-05-108",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive"
+              ]
+            }
+          ]
+        },
         {
           "stage": "native_wasm",
           "status": "verified",
@@ -264,17 +1253,66 @@
               "targets": [
                 "wasm"
               ]
+            },
+            {
+              "path": "tests/config-native-wasm-parity.test.mjs",
+              "testId": "GF-TEST-config-native-wasm-parity: bounded Duration and Percent defaults, updates, faults, and rollback match native and WASM",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            }
+          ]
+        },
+        {
+          "stage": "host_simulation",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/interaction-runtime-snapshot.test.mjs",
+              "testId": "GF-TEST-interaction-runtime-snapshot-statuses: false and zero are ready while missing and malformed values are explicit",
+              "caseId": "REF-05-021",
+              "assertionClass": "observation",
+              "targets": [
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
             }
           ]
         }
       ],
-      "gaps": [
-        "Source config bounds and typed input matrix pending #170; HOST observation is separate."
-      ],
+      "gaps": [],
       "issues": [
-        170
+        170,
+        185
       ],
-      "referenceCaseIds": []
+      "referenceCaseIds": [
+        "REF-01-114",
+        "REF-05-001",
+        "REF-05-002",
+        "REF-05-003",
+        "REF-05-004",
+        "REF-05-005",
+        "REF-05-006",
+        "REF-05-007",
+        "REF-05-008",
+        "REF-05-009",
+        "REF-05-010",
+        "REF-05-011",
+        "REF-05-101",
+        "REF-05-102",
+        "REF-05-108",
+        "REF-05-021"
+      ]
     },
     {
       "id": "pure-expressions",
@@ -284,13 +1322,172 @@
         "heading": "2.6 표현식과 연산자"
       },
       "owner": "CORE",
-      "maturity": "EXPERIMENTAL",
+      "maturity": "STABLE",
       "coreScope": true,
       "requiredEvidence": [
         "compile",
         "native_wasm"
       ],
       "evidence": [
+        {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-040 [compiler] top-level fn 선언은 control보다 앞에 둘 수 있고 매개변수와 결과 타입을 명시한다.",
+              "caseId": "REF-01-040",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-041 [compiler] 함수는 control 입력이나 상태를 암묵적으로 포획할 수 없고 필요한 값을 매개변수로 받아야 한다.",
+              "caseId": "REF-01-041",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-042 [compiler] let은 선언 순서와 무관한 비순환 의존 그래프이며 상호 순환은 오류다.",
+              "caseId": "REF-01-042",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-058 [compiler] untyped let의 initializer 타입은 뒤 사용처가 거꾸로 바꾸지 않는다.",
+              "caseId": "REF-01-058",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-059 [compiler] 충돌하는 numeric 기대 타입은 overload를 추측하지 않고 진단한다.",
+              "caseId": "REF-01-059",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-081 [compiler] 비교 연쇄는 허용하지 않으며 두 비교를 &&로 명시해야 한다.",
+              "caseId": "REF-01-081",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-082 [compiler] 동등 및 순서 비교는 호환되는 같은 타입 사이에서만 허용한다.",
+              "caseId": "REF-01-082",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-083 [compiler] if condition은 Bool이어야 한다.",
+              "caseId": "REF-01-083",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-084 [compiler] if의 두 branch는 같은 타입이어야 한다.",
+              "caseId": "REF-01-084",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-085 [compiler] 선택되지 않는 if branch도 정적으로 타입 검사한다.",
+              "caseId": "REF-01-085",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-087 [compiler] 역사적 not, and, or, is, isnt는 대표 !, &&, ||, ==, !=의 alias가 아니다.",
+              "caseId": "REF-01-087",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-088 [compiler] 함수는 선언한 매개변수로 순수 계산하고 마지막 식의 값을 반환한다.",
+              "caseId": "REF-01-088",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-089 [compiler] 대표 함수 문법에는 return 문이 없다.",
+              "caseId": "REF-01-089",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-090 [compiler] 재귀 함수 호출은 허용하지 않는다.",
+              "caseId": "REF-01-090",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-091 [compiler] 함수 사이의 순환 호출도 허용하지 않는다.",
+              "caseId": "REF-01-091",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-092 [compiler] 일반 함수 이름은 값으로 저장할 수 없으며 일반 고차 함수와 runtime 함수 선택을 만들지 않는다.",
+              "caseId": "REF-01-092",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-115 [compiler] 제거된 ifthenelse 호출은 canonical if/then/else로 자동 해석하지 않는다.",
+              "caseId": "REF-01-115",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            }
+          ]
+        },
         {
           "stage": "native_wasm",
           "status": "verified",
@@ -303,17 +1500,108 @@
                 "native",
                 "wasm"
               ]
+            },
+            {
+              "path": "tests/expression-order.test.mjs",
+              "testId": "REF-01-079/080 native and WASM preserve expression precedence and associativity",
+              "caseId": "REF-01-079",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/expression-order.test.mjs",
+              "testId": "REF-01-079/080 native and WASM preserve expression precedence and associativity",
+              "caseId": "REF-01-080",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/gfb2-int.test.mjs",
+              "testId": "REF-01-086: if, and, and or short-circuit faulting branches on native and WASM",
+              "caseId": "REF-01-086",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/scan-tape-parity.test.mjs",
+              "testId": "REF-01-093: let is recomputed from each tick input",
+              "caseId": "REF-01-093",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive"
+              ]
+            },
+            {
+              "path": "tests/scan-tape-parity.test.mjs",
+              "testId": "REF-07-006: multiplication by zero keeps a faulting operand and its dependency",
+              "caseId": "REF-07-006",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
             }
           ]
         }
       ],
-      "gaps": [
-        "Complete frozen operator matrix pending #170."
-      ],
+      "gaps": [],
       "issues": [
         170
       ],
-      "referenceCaseIds": []
+      "referenceCaseIds": [
+        "REF-01-040",
+        "REF-01-041",
+        "REF-01-042",
+        "REF-01-058",
+        "REF-01-059",
+        "REF-01-081",
+        "REF-01-082",
+        "REF-01-083",
+        "REF-01-084",
+        "REF-01-085",
+        "REF-01-087",
+        "REF-01-088",
+        "REF-01-089",
+        "REF-01-090",
+        "REF-01-091",
+        "REF-01-092",
+        "REF-01-115",
+        "REF-01-079",
+        "REF-01-080",
+        "REF-01-086",
+        "REF-01-093",
+        "REF-07-006"
+      ]
     },
     {
       "id": "state-next",
@@ -323,13 +1611,82 @@
         "heading": "2.8 tick과 상태 snapshot"
       },
       "owner": "CORE",
-      "maturity": "EXPERIMENTAL",
+      "maturity": "STABLE",
       "coreScope": true,
       "requiredEvidence": [
         "compile",
         "native_wasm"
       ],
       "evidence": [
+        {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-095 [compiler] 다음 상태 식에서는 다른 primed 다음 상태를 읽을 수 없다.",
+              "caseId": "REF-01-095",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-096 [compiler] let에서는 primed 다음 상태를 참조할 수 없다.",
+              "caseId": "REF-01-096",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-097 [compiler] 출력 연결은 이번 tick의 primed candidate state를 읽을 수 있다.",
+              "caseId": "REF-01-097",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-100 [compiler] 하나의 state에는 둘 이상의 다음 상태 정의를 둘 수 없다.",
+              "caseId": "REF-01-100",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-101 [compiler] state 초기값은 선언 타입과 같은 상수이며 입력이나 다른 상태를 읽어 계산할 수 없다.",
+              "caseId": "REF-01-101",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-01-113 [compiler] 제거된 next state 문장은 primed 다음 상태 정의로 자동 해석하지 않는다.",
+              "caseId": "REF-01-113",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-00-003 [compiler] state 경계 없는 조합 피드백은 거부한다",
+              "caseId": "REF-00-003",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            }
+          ]
+        },
         {
           "stage": "native_wasm",
           "status": "verified",
@@ -342,17 +1699,96 @@
                 "native",
                 "wasm"
               ]
+            },
+            {
+              "path": "tests/scan-tape-parity.test.mjs",
+              "testId": "REF-01-094: simultaneous swap is independent of next-definition source order",
+              "caseId": "REF-01-094",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive"
+              ]
+            },
+            {
+              "path": "tests/runtime-conformance.test.mjs",
+              "testId": "GF-TEST-snapshot-commit: old reads, explicit next reads, and untouched states",
+              "caseId": "REF-01-098",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/runtime-conformance.test.mjs",
+              "testId": "GF-TEST-snapshot-commit: old reads, explicit next reads, and untouched states",
+              "caseId": "REF-01-099",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/long-tick-state.test.mjs",
+              "testId": "long logical-time jumps commit one finite state phase per accepted tick on native and WASM",
+              "caseId": "REF-01-105",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/runtime-conformance.test.mjs",
+              "testId": "GF-TEST-snapshot-commit: old reads, explicit next reads, and untouched states",
+              "caseId": "REF-06-012",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive"
+              ]
             }
           ]
         }
       ],
-      "gaps": [
-        "Positive, negative, boundary matrix pending #170."
-      ],
+      "gaps": [],
       "issues": [
         170
       ],
-      "referenceCaseIds": []
+      "referenceCaseIds": [
+        "REF-01-095",
+        "REF-01-096",
+        "REF-01-097",
+        "REF-01-100",
+        "REF-01-101",
+        "REF-01-113",
+        "REF-01-094",
+        "REF-01-098",
+        "REF-01-099",
+        "REF-01-105",
+        "REF-06-012",
+        "REF-00-003"
+      ]
     },
     {
       "id": "logical-time",
@@ -362,7 +1798,7 @@
         "heading": "3.1 시간값과 시계 영역"
       },
       "owner": "CORE",
-      "maturity": "EXPERIMENTAL",
+      "maturity": "STABLE",
       "coreScope": true,
       "requiredEvidence": [
         "native_wasm"
@@ -380,17 +1816,45 @@
                 "native",
                 "wasm"
               ]
+            },
+            {
+              "path": "tests/scan-frame-wasm.test.mjs",
+              "testId": "GF-TEST-scan-frame-wasm-continuous-true-rejection: rejected time rollback does not reset the interval",
+              "caseId": "REF-03-009",
+              "assertionClass": "rollback",
+              "targets": [
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/scan-tape-parity.test.mjs",
+              "testId": "REF-03-009: plain core scans preserve equal and exact large logical times on native and WASM",
+              "caseId": "REF-03-009",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
             }
           ]
         }
       ],
-      "gaps": [
-        "Out-of-order and boundary proof pending #170."
-      ],
+      "gaps": [],
       "issues": [
         170
       ],
-      "referenceCaseIds": []
+      "referenceCaseIds": [
+        "REF-03-009"
+      ]
     },
     {
       "id": "requested-safe",
@@ -400,13 +1864,37 @@
         "heading": "4.8 공통 constraints 표기와 연산"
       },
       "owner": "CORE",
-      "maturity": "EXPERIMENTAL",
+      "maturity": "STABLE",
       "coreScope": true,
       "requiredEvidence": [
         "compile",
         "native_wasm"
       ],
       "evidence": [
+        {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-04-040 [compiler] 선택 require target=>prerequisite 출력 제약은 requested intent를 safe intent로 제한한다.",
+              "caseId": "REF-04-040",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive"
+              ]
+            },
+            {
+              "path": "tests/reference-cli.test.mjs",
+              "testId": "REF-04-041 [compiler] 선택 Bool conflict 제약은 동시에 true인 후보를 표현할 수 있다.",
+              "caseId": "REF-04-041",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive"
+              ]
+            }
+          ]
+        },
         {
           "stage": "native_wasm",
           "status": "verified",
@@ -419,17 +1907,61 @@
                 "native",
                 "wasm"
               ]
+            },
+            {
+              "path": "tests/scan-tape-parity.test.mjs",
+              "testId": "REF-00-008: low-water constraint retains the requested pump and its blocking reason",
+              "caseId": "REF-00-008",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/runtime-conformance.test.mjs",
+              "testId": "GF-TEST-safety-fixed-point: snapshot rounds are false-only and independent of constraint order",
+              "caseId": "REF-04-042",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/scan-tape-parity.test.mjs",
+              "testId": "REF core blocked constraint commits state while preserving requested and safe intents",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
             }
           ]
         }
       ],
-      "gaps": [
-        "Complete requested/safe matrix pending #170."
-      ],
+      "gaps": [],
       "issues": [
         170
       ],
-      "referenceCaseIds": []
+      "referenceCaseIds": [
+        "REF-04-040",
+        "REF-04-041",
+        "REF-00-008",
+        "REF-04-042"
+      ]
     },
     {
       "id": "atomic-tick",
@@ -439,7 +1971,7 @@
         "heading": "2.8 tick과 상태 snapshot"
       },
       "owner": "CORE",
-      "maturity": "EXPERIMENTAL",
+      "maturity": "STABLE",
       "coreScope": true,
       "requiredEvidence": [
         "native_wasm"
@@ -457,17 +1989,72 @@
                 "native",
                 "wasm"
               ]
+            },
+            {
+              "path": "tests/runtime-conformance.test.mjs",
+              "testId": "GF-TEST-selected-if-error: selected arithmetic fault rejects without partial commit",
+              "caseId": "REF-01-102",
+              "assertionClass": "rollback",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/runtime-conformance.test.mjs",
+              "testId": "GF-TEST-selected-if-error: selected arithmetic fault rejects without partial commit",
+              "caseId": "REF-07-003",
+              "assertionClass": "rollback",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/core-irrigation-proof.test.mjs",
+              "testId": "pump permission source links a blocked request to the authored require node",
+              "assertionClass": "runtime-value",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/scan-tape-parity.test.mjs",
+              "testId": "REF core blocked constraint commits state while preserving requested and safe intents",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
             }
           ]
         }
       ],
-      "gaps": [
-        "Accepted, constraint-blocked and evaluation-error matrix pending #170."
-      ],
+      "gaps": [],
       "issues": [
         170
       ],
-      "referenceCaseIds": []
+      "referenceCaseIds": [
+        "REF-01-102",
+        "REF-07-003"
+      ]
     },
     {
       "id": "source-trace",
@@ -477,7 +2064,7 @@
         "heading": "1.2 원문, 위치와 의도 연결"
       },
       "owner": "CORE",
-      "maturity": "EXPERIMENTAL",
+      "maturity": "STABLE",
       "coreScope": true,
       "requiredEvidence": [
         "native_wasm"
@@ -495,17 +2082,47 @@
                 "native",
                 "wasm"
               ]
+            },
+            {
+              "path": "tests/core-irrigation-proof.test.mjs",
+              "testId": "pump permission source links a blocked request to the authored require node",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
+            }
+          ]
+        },
+        {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/toolchain.test.mjs",
+              "testId": "source-map verification rejects tampering, malformed source fields, and wrong revisions",
+              "caseId": "REF-01-018",
+              "assertionClass": "identity",
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
             }
           ]
         }
       ],
-      "gaps": [
-        "Frozen cause trace proof pending #170; full explanation DAG is #88."
-      ],
+      "gaps": [],
       "issues": [
         170
       ],
-      "referenceCaseIds": []
+      "referenceCaseIds": [
+        "REF-01-018"
+      ]
     },
     {
       "id": "retained-replay",
@@ -515,7 +2132,7 @@
         "heading": "6.8 replay, ghost와 branch"
       },
       "owner": "CORE",
-      "maturity": "EXPERIMENTAL",
+      "maturity": "STABLE",
       "coreScope": true,
       "requiredEvidence": [
         "native_wasm"
@@ -523,19 +2140,62 @@
       "evidence": [
         {
           "stage": "native_wasm",
-          "status": "gap",
-          "refs": []
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/scan-tape-parity.test.mjs",
+              "testId": "REF-00-004: fixed start-stop tape gives identical state and intent in independent runtimes",
+              "caseId": "REF-00-004",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive"
+              ]
+            },
+            {
+              "path": "tests/core-replay-wasm.test.mjs",
+              "testId": "REF-06-017: retained plain-core replay matches fixed native and WASM execution context",
+              "caseId": "REF-06-017",
+              "assertionClass": "replay",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/core-replay-wasm.test.mjs",
+              "testId": "REF-06-017: retained plain-core replay matches fixed native and WASM execution context",
+              "caseId": "REF-06-017",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            }
+          ]
         }
       ],
-      "gaps": [
-        "REF-06-017 same-checkpoint input/fault/time replay proof pending #178."
-      ],
+      "gaps": [],
       "issues": [
         178,
         170
       ],
       "referenceCaseIds": [
-        "REF-06-017"
+        "REF-06-017",
+        "REF-00-004"
       ]
     },
     {
@@ -949,6 +2609,20 @@
                 "native",
                 "wasm"
               ]
+            },
+            {
+              "path": "tests/interaction-runtime-snapshot.test.mjs",
+              "testId": "GF-TEST-interaction-runtime-snapshot-statuses: false and zero are ready while missing and malformed values are explicit",
+              "caseId": "REF-05-021",
+              "assertionClass": "observation",
+              "targets": [
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
             }
           ]
         }
@@ -960,7 +2634,9 @@
         70,
         74
       ],
-      "referenceCaseIds": []
+      "referenceCaseIds": [
+        "REF-05-021"
+      ]
     },
     {
       "id": "composition-import",

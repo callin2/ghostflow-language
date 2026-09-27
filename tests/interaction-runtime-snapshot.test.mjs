@@ -318,6 +318,7 @@ test('GF-TEST-interaction-runtime-snapshot-statuses: false and zero are ready wh
     { descriptorId: 'state.watering', status: 'ready', value: false },
     { descriptorId: 'timer.age', status: 'ready', value: 0 },
   ]);
+  assert.equal(ready.completion.scanId, tape.runs[0].scans[0].completion.scanId, 'REF-05-021 values share one completed scan');
   const unavailableTrace = structuredClone(outcome.trace);
   delete unavailableTrace.stateAfter.request_was_high;
   const unavailable = emitCompletedScanSnapshot({

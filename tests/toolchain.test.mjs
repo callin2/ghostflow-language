@@ -161,6 +161,39 @@ test('comment-only literate revisions retain GFB and node identity but change so
   }
 });
 
+test('REF-00-001: equal control bytes retain separate original intent and document revisions', async () => {
+  const control = [
+    '```ghost',
+    'control RevisionedIntent {',
+    '  input request: Bool;',
+    '  // ghostflow:link id=GF-INT-REQUEST relation=implements',
+    '  output pump: Bool;',
+    '  pump <- request;',
+    '}',
+    '```',
+    '',
+  ].join('\n');
+  const source = prose => `<!-- ghostflow:anchor id=GF-INT-REQUEST kind=intent status=confirmed origin=user -->
+${prose}
+
+${control}`;
+  const texts = [source('Turn on the pump when requested.'), source('Supply water when requested.')];
+  const [first, second] = await Promise.all(texts.map((text, index) => compileSource(text, {
+    filename: `intent-revision-${index}.ghost.md`,
+  })));
+  assert.deepEqual(first.bytes, second.bytes);
+  assert.notEqual(first.sourceDocument.sha256, second.sourceDocument.sha256);
+  for (const [index, compilation] of [first, second].entries()) {
+    assert.equal(compilation.sourceDocument.text, texts[index]);
+    const restored = restoreArtifactSourceMap(artifactMap(compilation), compilation.bytes);
+    assert.equal(restored.sourceDocument.text, texts[index]);
+    assert.deepEqual(restored.traceMetadata.intentLinks, compilation.traceMetadata.intentLinks);
+    assert.throws(() => verifyArtifactSourceMap(artifactMap(compilation), compilation.bytes, {
+      expectedSourceSha256: [first, second][1 - index].sourceDocument.sha256,
+    }), /expected revision/);
+  }
+});
+
 test('source-map verification rejects tampering, malformed source fields, and wrong revisions', async () => {
   const result = await compileSource(markdown, { filename });
   const map = {
