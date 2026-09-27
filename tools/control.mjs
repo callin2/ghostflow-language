@@ -5,7 +5,7 @@
  * to the existing GFB1 S-expression compiler.  It does not evaluate source,
  * load modules, or execute user supplied code.
  */
-import { tokenize as sexprTokenize, parse as sexprParse, compile as compileGfb, CompileError } from './gfb1.mjs';
+import { compile as compileGfb, CompileError } from './gfb1.mjs';
 import { buildSourceTrace } from './source-trace.mjs';
 import { QUANTITY_TYPES, canonicalUnitFor, isQuantityType, quantityLiteral, quantitySuffixAt } from './quantities.mjs';
 import { TIME_TYPES, isTimeType, parseTimeLiteral, validateTimeValue } from './time-literals.mjs';
@@ -1397,6 +1397,13 @@ function sexpr(value) {
   return String(value);
 }
 
+function canonicalModuleForm(value, depth = 0) {
+  if (depth > 128) throw new CompileError('syntax nesting limit exceeded');
+  return Array.isArray(value)
+    ? value.map(child => canonicalModuleForm(child, depth + 1))
+    : String(value);
+}
+
 function loweredExpressionUsesInt(value) {
   if (!Array.isArray(value)) return false;
   if (value[0] === 'int' || (typeof value[0] === 'string' && value[0].startsWith('int-'))) return true;
@@ -1546,7 +1553,10 @@ class Lowerer {
     if (!accountingExecution && (accountingResource || this.accounts.size || this.ast.body.some(item => item.kind === 'account-constraints'))) error(this.ast.loc,
       'accounting execution requires verified resource binding, ledger persistence, and runtime enforcement');
     let bytes;
-    try { bytes = compileGfb(sexprParse(sexprTokenize(sexpr(module)))); }
+    try {
+      if (new TextEncoder().encode(sexpr(module)).length > 1024 * 1024) throw new CompileError('source byte limit exceeded');
+      bytes = compileGfb(canonicalModuleForm(module));
+    }
     catch (cause) {
       const message = cause instanceof Error ? cause.message : String(cause);
       error(this.ast.loc, `GFB1 lowering rejected control: ${message}`);
@@ -3875,29 +3885,6 @@ export function compileScheduleDescriptorArtifact(source, { filename = '<control
   const manifest = { format: 'GhostFlow/schedule-descriptor-v1', control: checked.manifest };
   const bytes = new TextEncoder().encode(JSON.stringify({
     format: 'GhostFlow/schedule-descriptor-artifact-v1', executable: false,
-    controlSource: source, manifest,
-  }));
-  return { bytes, manifest, sourceMap: checked.sourceMap };
-}
-
-/** Type-checked accounting contract. These bytes cannot be loaded as control bytecode. */
-export function compileAccountingDescriptorArtifact(source, { filename = '<control>' } = {}) {
-  const ast = new ControlParser(source, filename).parse();
-  if (ast.kind !== 'control' || !ast.body.some(item => item.kind === 'account' || item.kind === 'account-constraints')) {
-    error(ast.loc, 'expected a control with accounting declarations');
-  }
-  if (ast.body.some(item => item.kind === 'schedule' && item.scheduleType !== 'Solar'
-    && Object.keys(item.policy ?? {}).some(key => key !== 'fallback'))) {
-    error(ast.loc, 'combined accounting and schedule descriptor artifacts are not supported');
-  }
-  const checked = new Lowerer(ast, filename).lower({ emitBytecode: false });
-  if ((checked.manifest.accountingConstraints ?? []).some(group =>
-    group.limits?.some(limit => limit.persistence === 'volatile'))) {
-    error(ast.loc, 'protective limit cannot use a volatile accounting ledger');
-  }
-  const manifest = { format: 'GhostFlow/accounting-v1', control: checked.manifest };
-  const bytes = new TextEncoder().encode(JSON.stringify({
-    format: 'GhostFlow/accounting-artifact-v1', executable: false,
     controlSource: source, manifest,
   }));
   return { bytes, manifest, sourceMap: checked.sourceMap };

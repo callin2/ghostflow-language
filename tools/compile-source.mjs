@@ -201,7 +201,7 @@ export function compileSourceSync(source, options = {}) {
     traceMetadata,
     manifest: result.manifest ? {
       ...result.manifest, bytecodeSha256: digest,
-      ...(['GhostFlow/schedule-descriptor-v1', 'GhostFlow/accounting-v1', 'GhostFlow/temporal-descriptor-v1'].includes(result.manifest.format)
+      ...(['GhostFlow/schedule-descriptor-v1', 'GhostFlow/temporal-descriptor-v1'].includes(result.manifest.format)
         ? { sourceDocumentSha256: sourceDocument.sha256 } : {}),
     } : null,
     extractionMap: extraction.sourceMap,

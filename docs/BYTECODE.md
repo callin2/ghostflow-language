@@ -271,3 +271,13 @@ diagnostics also obey the existing bounded journal capacity.
 [Portable GFB packages](PORTABLE-PACKAGE.md) preserve exact bytecode and bind its
 source, manifest, source map, compiler/runtime identity and installation binding.
 Packaging never rewrites bytecode.
+
+## Compiler stage boundary
+
+The location-aware Surface AST passes through checked source lowering, then an
+in-memory typed Core IR. That IR has resolved input/state references, semantic
+expression types and operators, requested intents, Bool constraints, and explicit
+extension descriptors for temporal, config, quality, and objective behavior.
+The S-expression form named above is the internal lowering input to this stage.
+Only the GFB emitter maps the Core IR to numeric opcodes, selects a format, and
+writes bytes. This separation changes no GFB wire version or runtime contract.

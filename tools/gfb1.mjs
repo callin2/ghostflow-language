@@ -1,4 +1,4 @@
-class CompileError extends Error {}
+import { CompileError, lowerExpression } from './core-ir.mjs';
 
 const UTF8 = new TextEncoder();
 
@@ -115,127 +115,102 @@ function windowQualityDependencies(node, found = new Set()) {
   return found;
 }
 
-function compileExpr(node, env, allowNext=false) {
-  let w = new Writer();
-  let depth = 0, nodes = 0, usesInt = false, usesFormat3 = false;
+function emitExpression(ir) {
+  let w = new Writer(), usesInt = false, usesFormat3 = false;
   function containsBranch(n) {
-    return Array.isArray(n) && (['if', 'and', 'or'].includes(n[0]) || n.slice(1).some(containsBranch));
+    if (['conditional', 'logical_and', 'logical_or'].includes(n.kind)) return true;
+    return Object.values(n).some(value => value && typeof value === 'object' && containsBranch(value));
   }
-  const compactNumbers = containsBranch(node);
-  function emitBranch(condition, yes, no, logicalOperator = null) {
-    if (emit(condition)!==TYPE.bool) throw new CompileError(logicalOperator ? `${logicalOperator} expects bools` : 'if condition must be bool');
+  const compactNumbers = containsBranch(ir);
+  function branch(condition, yes, no) {
+    emit(condition);
     const outer = w;
-    w = new Writer(); const yesType = emit(yes), yesBytes = w.finish();
-    w = new Writer(); const noType = emit(no), noBytes = w.finish();
+    w = new Writer(); emit(yes); const yesBytes = w.finish();
+    w = new Writer(); emit(no); const noBytes = w.finish();
     w = outer;
-    if (yesType!==noType) throw new CompileError(logicalOperator ? `${logicalOperator} expects bools` : 'if branches must have same type');
-    if (yesBytes.length+3>65535 || noBytes.length>65535) throw new CompileError('expression complexity limit exceeded');
-    w.u8(OP.branchFalse); w.u16(yesBytes.length+3); w.bytes(yesBytes);
+    if (yesBytes.length + 3 > 65535 || noBytes.length > 65535) throw new CompileError('expression complexity limit exceeded');
+    w.u8(OP.branchFalse); w.u16(yesBytes.length + 3); w.bytes(yesBytes);
     w.u8(OP.jump); w.u16(noBytes.length); w.bytes(noBytes);
     usesFormat3 = true;
-    return yesType;
   }
   function emit(n) {
-    if (++depth > 128 || ++nodes > 4096) throw new CompileError('expression complexity limit exceeded');
-    try { return emitNode(n); } finally { depth--; }
+    switch (n.kind) {
+      case 'literal':
+        if (n.type === 'Bool') { w.u8(OP.bool); w.u8(n.value ? 1 : 0); }
+        else if (n.type === 'Int') { usesInt = true; w.u8(OP.int); w.i32(n.value); }
+        else if (compactNumbers && Number.isInteger(n.value) && n.value >= 0 && n.value <= 15 && !Object.is(n.value, -0)) w.u8(32 + n.value);
+        else { w.u8(OP.number); w.f64(n.value); }
+        return;
+      case 'input': case 'previous_state': case 'candidate_next':
+        w.u8(OP[n.kind === 'input' ? 'input' : n.kind === 'previous_state' ? 'state' : 'next']);
+        w.u16(n.index); return;
+      case 'true_for_projection': case 'window_projection': case 'schedule_projection': {
+        const operation = n.kind === 'true_for_projection' ? 'true-for-read' : n.kind === 'window_projection' ? 'window-read' : 'schedule-read';
+        const fields = operation === 'true-for-read' ? ['ok','value','fault','origin','start','end','covered']
+          : operation === 'window-read' ? ['ok','value','fault','origin','revision','timestamp','count','quality']
+            : ['due','missed','active'];
+        w.u8(OP[operation]); w.u16(n.slot); w.u8(fields.indexOf(n.field)); return;
+      }
+      case 'result_trace':
+        emit(n.payload); emit(n.choice); emit(n.origin);
+        usesFormat3 = true; w.u8(OP['trace-result']); w.u32(n.site); return;
+      case 'integer_negation':
+        emit(n.operand); usesInt = true; w.u8(OP['int-neg']); return;
+      case 'integer_arithmetic':
+        emit(n.left); emit(n.right); usesInt = true; w.u8(OP['int-' + n.operation]); return;
+      case 'logical_not':
+        emit(n.operand); w.u8(OP.not); return;
+      case 'logical_and':
+        branch(n.left, n.right, { kind: 'literal', type: 'Bool', value: false }); return;
+      case 'logical_or':
+        branch(n.left, { kind: 'literal', type: 'Bool', value: true }, n.right); return;
+      case 'conditional':
+        branch(n.condition, n.whenTrue, n.whenFalse); return;
+      case 'comparison':
+        emit(n.left); emit(n.right);
+        if (n.left.type === 'Int') usesInt = true;
+        w.u8(OP[n.operation]); return;
+      case 'arithmetic':
+        emit(n.left); emit(n.right); w.u8(OP[n.operation]); return;
+      case 'conversion':
+        emit(n.operand); usesInt = true; usesFormat3 = true; w.u8(OP[n.operation]); return;
+      case 'time_guard':
+        emit(n.operand); usesFormat3 = true; w.u8(OP[n.operation]); return;
+      default: throw new CompileError('invalid semantic expression IR');
+    }
   }
-  function emitNode(n) {
-    if (n === 'true' || n === 'false') { w.u8(OP.bool); w.u8(n === 'true' ? 1 : 0); return TYPE.bool; }
-    if (typeof n === 'string' && /^-?(\d+(\.\d*)?|\.\d+)$/.test(n)) {
-      const value = Number(n);
-      if (!Number.isFinite(value)) throw new CompileError('non-finite number');
-      if (compactNumbers && Number.isInteger(value) && value>=0 && value<=15 && !Object.is(value,-0)) w.u8(32+value);
-      else { w.u8(OP.number); w.f64(value); }
-      return TYPE.number;
-    }
-    if (typeof n === 'string') {
-      const dot=n.indexOf('.'); if (dot<1) throw new CompileError(`unknown atom ${n}`);
-      const ns=n.slice(0,dot), name=n.slice(dot+1);
-      if (ns==='input') { const x=env.inputs.get(name); if(!x) throw new CompileError(`unknown input ${name}`); w.u8(OP.input); w.u16(x.index); return x.type; }
-      if (ns==='state') { const x=env.states.get(name); if(!x) throw new CompileError(`unknown state ${name}`); w.u8(OP.state); w.u16(x.index); return x.type; }
-      if (ns==='next') { if(!allowNext) throw new CompileError('next.* is allowed only in intents'); const x=env.states.get(name); if(!x) throw new CompileError(`unknown state ${name}`); w.u8(OP.next); w.u16(x.index); return x.type; }
-      throw new CompileError(`unknown namespace ${ns}`);
-    }
-    if (!Array.isArray(n) || n.length<1) throw new CompileError('invalid expression');
-    const [head, ...args]=n;
-    if (head==='true-for-read') {
-      if (!env.trueFors) throw new CompileError('true-for-read requires GFB format 6');
-      if (args.length!==2) throw new CompileError('true-for-read expects slot and field');
-      const slot=Number(unsignedAtom(args[0],65535n,'true_for projection index'));
-      if (!env.trueFors[slot]) throw new CompileError('true_for projection index');
-      const field=new Map([['ok',0],['value',1],['fault',2],['origin',3],['start',4],['end',5],['covered',6]]).get(args[1]);
-      if (field===undefined) throw new CompileError('true_for projection field');
-      w.u8(OP[head]);w.u16(slot);w.u8(field);
-      return field<=1?TYPE.bool:TYPE.number;
-    }
-    if (head==='window-read') {
-      if (!env.windows) throw new CompileError('window-read requires GFB format 4');
-      if (args.length!==2) throw new CompileError('window-read expects slot and field');
-      const slotValue=unsignedAtom(args[0],65535n,'temporal projection index');
-      const slot=Number(slotValue), window=env.windows[slot];
-      if (!window) throw new CompileError('temporal projection index');
-      const fields=new Map([['ok',0],['value',1],['fault',2],['origin',3],['revision',4],['timestamp',5],['count',6],['quality',7]]);
-      const field=fields.get(args[1]); if(field===undefined)throw new CompileError('temporal projection field');
-      w.u8(OP[head]);w.u16(slot);w.u8(field);
-      return field===0?TYPE.bool:field===1?window.payloadType:TYPE.number;
-    }
-    if (head==='schedule-read') {
-      if (!env.schedules) throw new CompileError('schedule-read requires GFB format 5');
-      if (args.length!==2) throw new CompileError('schedule-read expects slot and field');
-      const slotValue=unsignedAtom(args[0],65535n,'schedule projection index');
-      const slot=Number(slotValue), schedule=env.schedules[slot];
-      if (!schedule) throw new CompileError('schedule projection index');
-      const field=new Map([['due',0],['missed',1],['active',2]]).get(args[1]);
-      if (field===undefined) throw new CompileError('schedule projection field');
-      if (field===2 && !env.contextSchedules) throw new CompileError('schedule active requires GFB10');
-      w.u8(OP[head]);w.u16(slot);w.u8(field);
-      return TYPE.bool;
-    }
-    if (head==='trace-result') {
-      if(args.length!==4 || typeof args[0]!=='string' || !/^\d+$/.test(args[0]) || Number(args[0])<1 || Number(args[0])>4294967295) throw new CompileError('trace-result expects a positive u32 site, payload, Number choice and Number origin');
-      const type=emit(args[1]);
-      if(emit(args[2])!==TYPE.number || emit(args[3])!==TYPE.number) throw new CompileError('trace-result metadata must be Number');
-      usesFormat3=true; w.u8(OP[head]); w.u32(Number(args[0])); return type;
-    }
-    if (head==='int') { if(args.length!==1 || typeof args[0] !== 'string' || !/^-?\d+$/.test(args[0])) throw new CompileError('int expects one signed decimal i32 literal'); const value=BigInt(args[0]);if(value < -2147483648n || value > 2147483647n)throw new CompileError('int literal outside i32 range');usesInt=true;w.u8(OP.int);w.i32(Number(value));return TYPE.int; }
-    if (head==='int-neg') { if(args.length!==1 || emit(args[0])!==TYPE.int) throw new CompileError('int-neg expects Int');usesInt=true;w.u8(OP[head]);return TYPE.int; }
-    if (['int-add','int-sub','int-mul','int-div','int-rem'].includes(head)) { if(args.length!==2)throw new CompileError(`${head} expects 2 arguments`);const a=emit(args[0]),b=emit(args[1]);if(a!==TYPE.int||b!==TYPE.int)throw new CompileError(`${head} expects Int operands`);usesInt=true;w.u8(OP[head]);return TYPE.int; }
-    if (head==='not') { if(args.length!==1 || emit(args[0])!==TYPE.bool) throw new CompileError('not expects bool'); w.u8(OP.not); return TYPE.bool; }
-    if (head==='and' || head==='or') { if(args.length!==2) throw new CompileError(`${head} expects 2 arguments`); return head==='and' ? emitBranch(args[0],args[1],'false',head) : emitBranch(args[0],'true',args[1],head); }
-    if (['eq','lt','lte','gt','gte'].includes(head)) { if(args.length!==2) throw new CompileError(`${head} expects 2 arguments`); const a=emit(args[0]),b=emit(args[1]); if(a!==b || (head!=='eq'&&a!==TYPE.number&&a!==TYPE.int)) throw new CompileError(`bad operands for ${head}`); if(a===TYPE.int)usesInt=true;w.u8(OP[head]); return TYPE.bool; }
-    if (['add','sub','mul','div'].includes(head)) { if(args.length!==2) throw new CompileError(`${head} expects 2 arguments`); const a=emit(args[0]),b=emit(args[1]); if(a!==TYPE.number||b!==TYPE.number) throw new CompileError(`${head} expects numbers`); w.u8(OP[head]); return TYPE.number; }
-    if (head==='if') { if(args.length!==3) throw new CompileError('if expects 3 arguments'); return emitBranch(...args); }
-    if (['int-to-number','int-exact','int-floor','int-ceil','int-trunc','int-nearest-even'].includes(head)) {
-      const sourceType = head==='int-to-number' ? TYPE.int : TYPE.number;
-      if (args.length!==1 || emit(args[0])!==sourceType) throw new CompileError(`${head} expects one ${sourceType===TYPE.int?'Int':'Number'} operand`);
-      usesInt = true; usesFormat3 = true;
-      w.u8(OP[head]);
-      return head==='int-to-number' ? TYPE.number : TYPE.int;
-    }
-    if (head==='check-duration' || head==='check-datetime') {
-      if (args.length!==1 || emit(args[0])!==TYPE.number) throw new CompileError(`${head} expects one Number operand`);
-      usesFormat3 = true; w.u8(OP[head]); return TYPE.number;
-    }
-    throw new CompileError(`unknown expression ${head}`);
-  }
-  const type=emit(node); return {type, bytes:w.finish(),usesInt,usesFormat3};
+  emit(ir);
+  return { type: TYPE[ir.type.toLowerCase()], bytes: w.finish(), usesInt, usesFormat3 };
 }
 
-function compileQuery(node) {
+function checkedExpression(form, env, allowNext = false) {
+  const expression = lowerExpression(form, env, allowNext);
+  return { type: TYPE[expression.type.toLowerCase()], expression };
+}
+
+function lowerQuery(node) {
+  if (node === 'true' || node === 'false') return {kind:'literal',value:node==='true'};
+  if (!Array.isArray(node)||node.length<1) throw new CompileError('invalid device query');
+  const [head,...args]=node;
+  if(head==='has') { if(args.length!==3) throw new CompileError('has expects kind name type'); assertName(args[0],'capability kind'); assertName(args[1],'capability'); return {kind:'capability',capabilityKind:args[0],name:args[1],type:({1:'Bool',2:'Number',3:'Int'})[scalarType(args[2])]}; }
+  if(head==='all'||head==='any') { if(args.length<1) throw new CompileError(`${head} needs children`); return {kind:head,children:args.map(lowerQuery)}; }
+  if(head==='not') { if(args.length!==1) throw new CompileError('query not expects one child'); return {kind:'not',child:lowerQuery(args[0])}; }
+  throw new CompileError(`unknown device query ${head}`);
+}
+
+function emitQuery(query) {
   const w=new Writer();
-  function emit(n) {
-    if (n === 'true' || n === 'false') { w.u8(5); w.u8(n === 'true' ? 1 : 0); return; }
-    if (!Array.isArray(n)||n.length<1) throw new CompileError('invalid device query');
-    const [head,...args]=n;
-    if(head==='has') { if(args.length!==3) throw new CompileError('has expects kind name type'); assertName(args[0],'capability kind'); assertName(args[1],'capability'); w.u8(1); w.str(args[0]); w.str(args[1]); w.u8(scalarType(args[2])); return; }
-    if(head==='all'||head==='any') { if(args.length<1) throw new CompileError(`${head} needs children`); for(const a of args) emit(a); w.u8(head==='all'?2:3); w.u16(args.length); return; }
-    if(head==='not') { if(args.length!==1) throw new CompileError('query not expects one child'); emit(args[0]); w.u8(4); return; }
-    throw new CompileError(`unknown device query ${head}`);
+  function emit(node) {
+    if(node.kind==='literal'){w.u8(5);w.u8(node.value?1:0);return;}
+    if(node.kind==='capability'){w.u8(1);w.str(node.capabilityKind);w.str(node.name);w.u8(TYPE[node.type.toLowerCase()]);return;}
+    if(node.kind==='all'||node.kind==='any'){for(const child of node.children)emit(child);w.u8(node.kind==='all'?2:3);w.u16(node.children.length);return;}
+    if(node.kind==='not'){emit(node.child);w.u8(4);return;}
+    throw new CompileError('invalid semantic device query IR');
   }
-  emit(node); return w.finish();
+  emit(query);return w.finish();
 }
 
-function compile(ast) {
+function lowerCoreModule(ast) {
   if (!Array.isArray(ast)||ast[0]!=='module'||typeof ast[1]!=='string') throw new CompileError('expected (module NAME ...)');
   const name=ast[1]; assertName(name,'module');
   let version=1, temporalContext=null; const inputs=[], states=[], strategies=[], constraints=[], temporalRootForms=[], objectives=[];
@@ -301,7 +276,7 @@ function compile(ast) {
     let query=null,seenExecutable=false; const windows=[],schedules=[],trueFors=[],preludes=[],transitions=[],intents=[],windowSites=new Set(),windowNames=new Set(),preludeSites=new Set(),preludeNames=new Set();
     const contextEnv=()=>({...env,windows,schedules,trueFors:hasTrueFors?trueFors:undefined,contextSchedules:hasContext});
     for(const f of forms){if(!Array.isArray(f))throw new CompileError('invalid strategy form');const [h,...a]=f;
-      if(h==='device'){if(a.length!==1||query)throw new CompileError('strategy needs one device query');query=compileQuery(a[0]);}
+      if(h==='device'){if(a.length!==1||query)throw new CompileError('strategy needs one device query');query=lowerQuery(a[0]);}
       else if(h==='window'){
         if(!temporal)throw new CompileError('temporal module requires one temporal-context');
         if(seenExecutable)throw new CompileError(taggedPreludes?'stateful prelude declarations must precede transitions and intents':'window declarations must precede transitions and intents');
@@ -331,9 +306,8 @@ function compile(ast) {
         if(!Array.isArray(sourceForm)||sourceForm[0]!=='source'||sourceForm.length!==7)throw new CompileError('window source expects ok, payload, fault, origin, quality and source tag');
         const sourceEnv={...env,windows,schedules:hasSchedules?schedules:undefined,trueFors:hasTrueFors?trueFors:undefined};const expected=[TYPE.bool,payloadType,TYPE.number,TYPE.number,TYPE.number,TYPE.number];
         const source=sourceForm.slice(1).map((expression,index)=>{
-          const compiled=compileExpr(expression,sourceEnv,false);
+          const compiled=checkedExpression(expression,sourceEnv,false);
           if(compiled.type!==expected[index])throw new CompileError('temporal source expression type mismatch');
-          if(compiled.bytes.length>4096)throw new CompileError('strategy resource limit exceeded');
           return compiled;
         });
         const evidenceDependencies=[...windowQualityDependencies(sourceForm[5])].sort((left,right)=>left-right);
@@ -400,9 +374,8 @@ function compile(ast) {
         const gapMs=unsignedAtom(gapAtom,9007199254740991n,'invalid schedule gap');if(gapMs===0n)throw new CompileError('invalid schedule gap');
         if(recoveryAtom!=='baseline')throw new CompileError('unsupported Solar recovery');
         if(fallbackAtom!=='skip')throw new CompileError('unsupported Solar fallback');
-        const when=compileExpr(whenForm,{...env,windows,schedules,trueFors:hasTrueFors?trueFors:undefined},false);
+        const when=checkedExpression(whenForm,{...env,windows,schedules,trueFors:hasTrueFors?trueFors:undefined},false);
         if(when.type!==TYPE.bool)throw new CompileError('schedule predicate must be bool');
-        if(when.bytes.length>4096)throw new CompileError('strategy resource limit exceeded');
         const schedule={site,name:scheduleName,timezone,latitude,longitude,event,offsetMs,gapMs,when};
         schedules.push(schedule);preludes.push({kind:'schedule',value:schedule});
       }
@@ -420,8 +393,8 @@ function compile(ast) {
         if(dstMissing<0||dstRepeated<0)throw new CompileError('invalid Daily DST policy');
         if(basisAtom!=='pulse'||clockAtom!=='trusted_only'||recoveryAtom!=='baseline'||fallbackAtom!=='skip')throw new CompileError('unsupported Daily policy');
         const gapMs=unsignedAtom(gapAtom,9007199254740991n,'invalid schedule gap');if(gapMs===0n)throw new CompileError('invalid schedule gap');
-        const when=compileExpr(whenForm,{...env,windows,schedules},false);
-        if(when.type!==TYPE.bool||when.bytes.length>4096)throw new CompileError('invalid Daily predicate');
+        const when=checkedExpression(whenForm,{...env,windows,schedules},false);
+        if(when.type!==TYPE.bool)throw new CompileError('invalid Daily predicate');
         const schedule={site,name:scheduleName,timezone,atMs,dstMissing,dstRepeated,gapMs,when};
         schedules.push(schedule);preludes.push({kind:'daily',value:schedule});
       }
@@ -449,8 +422,8 @@ function compile(ast) {
           return {key,minute};
         });
         if(slots.some((slot,index)=>index>0&&slot.minute<=slots[index-1].minute))throw new CompileError('invalid DailySlots slot order');
-        const when=compileExpr(whenForm,{...env,windows,schedules},false);
-        if(when.type!==TYPE.bool||when.bytes.length>4096)throw new CompileError('invalid DailySlots predicate');
+        const when=checkedExpression(whenForm,{...env,windows,schedules},false);
+        if(when.type!==TYPE.bool)throw new CompileError('invalid DailySlots predicate');
         const schedule={site,name:scheduleName,timezone,gridMs,dstMissing,dstRepeated,gapMs,slots,when};
         schedules.push(schedule);preludes.push({kind:'daily-slots',value:schedule});
       }
@@ -499,8 +472,8 @@ function compile(ast) {
         const expected={ 'cron-pulse':10,'calendar-daily-pulse':8,'tide-run':8,'config-daily-slots-pulse':6 }[h];
         if(h==='periodic-pulse'?![5,6].includes(payload.length):payload.length!==expected)throw new CompileError(`${h} has invalid arity`);
         const [whenForm,cancelForm]=payload.slice(-2);
-        const when=compileExpr(whenForm,contextEnv(),false),cancel=compileExpr(cancelForm,contextEnv(),false);
-        if(when.type!==TYPE.bool||cancel.type!==TYPE.bool||when.bytes.length>4096||cancel.bytes.length>4096)throw new CompileError('invalid context schedule predicate');
+        const when=checkedExpression(whenForm,contextEnv(),false),cancel=checkedExpression(cancelForm,contextEnv(),false);
+        if(when.type!==TYPE.bool||cancel.type!==TYPE.bool)throw new CompileError('invalid context schedule predicate');
         const data=payload.slice(0,-2);
         const text=value=>{if(!wellFormedShortString(value))throw new CompileError('invalid context text');return value;};
         const dst=value=>{const index=['skip','next_valid'].indexOf(value);if(index<0)throw new CompileError('invalid DST missing policy');return index;};
@@ -572,20 +545,17 @@ function compile(ast) {
         for(const entry of bindings)if(certifiedInputs.has(entry.index))throw new CompileError('duplicate protected input');else certifiedInputs.add(entry.index);
         preludes.push({kind:'accounting-result',value:{site,name:resultName,account,event,timezone,indices:bindings.map(entry=>entry.index)}});
       }
-      else if(h==='next'){seenExecutable=true;if(a.length!==2)throw new CompileError('next expects state expression');const st=env.states.get(a[0]);if(!st)throw new CompileError(`unknown state ${a[0]}`);const e=compileExpr(a[1],{...env,windows:temporal?windows:undefined,schedules:hasSchedules?schedules:undefined,trueFors:hasTrueFors?trueFors:undefined,contextSchedules:hasContext},false);if(e.type!==st.type)throw new CompileError(`type mismatch for state ${a[0]}`);transitions.push({index:st.index,type:e.type,usesInt:e.usesInt,usesFormat3:e.usesFormat3,expr:e.bytes});}
-      else if(h==='intent'){seenExecutable=true;if(a.length!==2)throw new CompileError('intent expects name expression');assertName(a[0],'intent');const e=compileExpr(a[1],{...env,windows:temporal?windows:undefined,schedules:hasSchedules?schedules:undefined,trueFors:hasTrueFors?trueFors:undefined,contextSchedules:hasContext},true);intents.push({name:a[0],type:e.type,usesInt:e.usesInt,usesFormat3:e.usesFormat3,expr:e.bytes});}
+      else if(h==='next'){seenExecutable=true;if(a.length!==2)throw new CompileError('next expects state expression');const st=env.states.get(a[0]);if(!st)throw new CompileError(`unknown state ${a[0]}`);const e=checkedExpression(a[1],{...env,windows:temporal?windows:undefined,schedules:hasSchedules?schedules:undefined,trueFors:hasTrueFors?trueFors:undefined,contextSchedules:hasContext},false);if(e.type!==st.type)throw new CompileError(`type mismatch for state ${a[0]}`);transitions.push({index:st.index,type:e.type,expression:e.expression});}
+      else if(h==='intent'){seenExecutable=true;if(a.length!==2)throw new CompileError('intent expects name expression');assertName(a[0],'intent');const e=checkedExpression(a[1],{...env,windows:temporal?windows:undefined,schedules:hasSchedules?schedules:undefined,trueFors:hasTrueFors?trueFors:undefined,contextSchedules:hasContext},true);intents.push({name:a[0],type:e.type,expression:e.expression});}
       else throw new CompileError(`unknown strategy form ${h}`);
     }
     if(!query)throw new CompileError(`strategy ${sname} has no device query`); const seen=new Set();for(const t of transitions){if(seen.has(t.index))throw new CompileError('duplicate state transition');seen.add(t.index);} unique(intents,'intent');
     if(states.length+preludes.length>128)throw new CompileError('temporal state limit exceeded');
-    if(intents.length>128||query.length>4096||transitions.some(t=>t.expr.length>4096)||intents.some(i=>i.expr.length>4096))throw new CompileError('strategy resource limit exceeded');
+    if(intents.length>128)throw new CompileError('strategy resource limit exceeded');
     return {name:sname,priority,query,windows,schedules,preludes,transitions,intents};
   });
   unique(compiledStrategies,'strategy'); if(!compiledStrategies.length)throw new CompileError('module needs a strategy');
   for(const c of constraints)for(const s of compiledStrategies){const available=new Map(s.intents.map(i=>[i.name,i.type]));for(const n of c.names){if(!available.has(n))throw new CompileError(`constraint intent ${n} is missing from strategy ${s.name}`);if(available.get(n)!==TYPE.bool)throw new CompileError(`constraint intent ${n} must be bool`);}}
-  const intDeclarations=inputs.some(x=>x.type===TYPE.int)||states.some(x=>x.type===TYPE.int)||compiledStrategies.some(s=>s.intents.some(i=>i.type===TYPE.int));
-  const intExpressions=compiledStrategies.some(s=>s.transitions.some(t=>t.usesInt)||s.intents.some(i=>i.usesInt));
-  const format3=compiledStrategies.some(s=>s.transitions.some(t=>t.usesFormat3)||s.intents.some(i=>i.usesFormat3));
   if(objectives.length&&(objectives.length!==1||compiledStrategies.length!==1||temporal&&!hasContext||hasSchedules&&!hasContext||hasTrueFors))throw new CompileError('PID requires exactly one strategy and no legacy temporal prelude');
   if(objectives.length&&(compiledStrategies[0].transitions.length||compiledStrategies[0].intents.length))throw new CompileError('GFB7 PID objective cannot mix authored transitions or intents');
   const compiledObjectives=objectives.map(args=>{
@@ -606,37 +576,108 @@ function compile(ast) {
   });
   if((hasDaily||hasDailySlots)&&(rawWindowCount||rawTrueForCount))throw new CompileError('mixed civil schedule temporal preludes are not executable');
   if(hasDailySlots&&(hasDaily||hasSolar))throw new CompileError('mixed DailySlots schedule kinds are not executable');
-  const format=hasContext?11:hasDailySlots?9:hasDaily?8:objectives.length?7:hasTrueFors?6:hasSchedules?5:temporal?4:format3?3:intDeclarations||intExpressions?2:1;
+  const semanticType = code => ({1:'Bool',2:'Number',3:'Int'})[code];
+  const missingPolicy=['skip','next_valid'],repeatedPolicy=['first','second','both','skip'];
+  const semanticPrelude=prelude=>{
+    const {kind,value}=prelude;
+    if(kind==='window'){
+      value.operation=['average','min','max','rate'][value.operation];
+      value.payloadType=semanticType(value.payloadType);
+      value.source=value.source.map(source=>({...source,type:semanticType(source.type)}));
+    }else if(kind==='schedule')value.event=['rise','set'][value.event];
+    else if(kind==='daily'||kind==='daily-slots'){
+      value.dstMissing=missingPolicy[value.dstMissing];value.dstRepeated=repeatedPolicy[value.dstRepeated];
+    }else if(kind==='config-stream'){
+      value.kind=['Bool','Int','Number','TimeSlots'][value.kind];value.editable=Boolean(value.editable);
+    }else if(kind==='natural-result')value.kind=['tide','moon'][value.kind];
+    else if(value.detail){
+      const detail=value.detail;
+      if('missing' in detail)detail.missing=missingPolicy[detail.missing];
+      if('repeated' in detail)detail.repeated=repeatedPolicy[detail.repeated];
+      if('offday' in detail)detail.offday=detail.offday?'offday':'workday';
+      if('high' in detail)detail.high=detail.high?'high':'low';
+    }
+    if(value.when)value.when={...value.when,type:semanticType(value.when.type)};
+    if(value.cancel)value.cancel={...value.cancel,type:semanticType(value.cancel.type)};
+    return prelude;
+  };
+  const semanticStrategies = compiledStrategies.map(strategy => ({
+    name:strategy.name,priority:strategy.priority,query:strategy.query,
+    transitions:strategy.transitions.map(transition => ({...transition,type:semanticType(transition.type)})),
+    intents:strategy.intents.map(intent => ({...intent,type:semanticType(intent.type)})),
+    extensions:{preludes:strategy.preludes.map(semanticPrelude)},
+  }));
+  return {name,version,
+    inputs:inputs.map((input,index)=>({...input,index,type:semanticType(input.type)})),
+    states:states.map((state,index)=>({...state,index,type:semanticType(state.type)})),
+    strategies:semanticStrategies,
+    constraints:constraints.map(constraint=>({...constraint,kind:({1:'requires',2:'mutex',3:'requires_any'})[constraint.kind]})),
+    temporal:temporal?{nowInput:temporal.nowInput,timeEpochInput:temporal.timeEpochInput,roots:temporal.roots}:null,
+    objectives:compiledObjectives.map(objective=>({...objective,direction:objective.direction?'reverse':'direct'}))};
+}
+
+function emitGfb(moduleIr) {
+  const {name,version,inputs,states,strategies,constraints,temporal,objectives:compiledObjectives}=moduleIr;
+  const preludeKinds=new Set(strategies.flatMap(strategy=>strategy.extensions.preludes.map(prelude=>prelude.kind)));
+  const hasContext=['config-stream','periodic-pulse','cron-pulse','calendar-daily-pulse','tide-run',
+    'config-daily-slots-pulse','natural-result','accounting-result'].some(kind=>preludeKinds.has(kind));
+  const hasDailySlots=preludeKinds.has('daily-slots'),hasDaily=preludeKinds.has('daily');
+  const hasTrueFors=preludeKinds.has('true-for');
+  const hasSchedules=[...preludeKinds].some(kind=>kind!=='window'&&kind!=='true-for'&&kind!=='natural-result'&&kind!=='accounting-result');
+  const taggedPreludes=hasSchedules||hasTrueFors||hasContext;
+  const hasPid=compiledObjectives.length>0;
+  const intDeclarations=inputs.some(input=>input.type==='Int')||states.some(state=>state.type==='Int')
+    ||strategies.some(strategy=>strategy.intents.some(intent=>intent.type==='Int'));
+  const encode = (entry, message = 'strategy resource limit exceeded') => {
+    const compiled = emitExpression(entry.expression);
+    if (compiled.bytes.length > 4096) throw new CompileError(message);
+    return compiled;
+  };
+  const encodeRecord = entry => { const compiled=encode(entry);return {...entry,...compiled,type:entry.type,expr:compiled.bytes}; };
+  const compiledStrategies = strategies.map(strategy => ({...strategy,query:emitQuery(strategy.query),
+    preludes:strategy.extensions.preludes,
+    windows:strategy.extensions.preludes.filter(prelude=>prelude.kind==='window').map(prelude=>prelude.value),
+    transitions: strategy.transitions.map(encodeRecord),
+    intents: strategy.intents.map(encodeRecord),
+  }));
+  if(compiledStrategies.some(strategy=>strategy.query.length>4096))throw new CompileError('strategy resource limit exceeded');
+  const intExpressions=compiledStrategies.some(s=>s.transitions.some(t=>t.usesInt)||s.intents.some(i=>i.usesInt));
+  const format3=compiledStrategies.some(s=>s.transitions.some(t=>t.usesFormat3)||s.intents.some(i=>i.usesFormat3));
+  const format=hasContext?11:hasDailySlots?9:hasDaily?8:hasPid?7:hasTrueFors?6:hasSchedules?5:temporal?4:format3?3:intDeclarations||intExpressions?2:1;
   const w=new Writer();w.bytes(UTF8.encode('GFB1'));w.u16(format);w.str(name);w.u32(version);
-  w.u16(inputs.length);for(const x of inputs){w.str(x.name);w.u8(x.type);}
-  w.u16(states.length);for(const x of states){w.str(x.name);w.u8(x.type);if(x.type===TYPE.bool)w.u8(x.value?1:0);else if(x.type===TYPE.int)w.i32(x.value);else w.f64(x.value);}
+  const typeCode=type=>TYPE[type.toLowerCase()];
+  w.u16(inputs.length);for(const x of inputs){w.str(x.name);w.u8(typeCode(x.type));}
+  w.u16(states.length);for(const x of states){w.str(x.name);w.u8(typeCode(x.type));if(x.type==='Bool')w.u8(x.value?1:0);else if(x.type==='Int')w.i32(x.value);else w.f64(x.value);}
   if(temporal){w.u16(temporal.nowInput);w.u16(temporal.timeEpochInput);w.u16(temporal.roots.length);for(const root of temporal.roots){w.u32(root.tag);w.str(root.name);for(const index of root.indices)w.u16(index);}}
-  const writeWindow=window=>{w.u32(window.site);w.str(window.name);w.u8(window.operation);w.u8(window.payloadType);w.u64(window.overMs);w.u64(window.maxAgeMs);w.u16(window.rootRefs.length);for(const root of window.rootRefs)w.u16(root);for(const expression of window.source){w.u32(expression.bytes.length);w.bytes(expression.bytes);}};
-  const writeSchedule=schedule=>{w.u32(schedule.site);w.str(schedule.name);w.str(schedule.timezone);w.f64(schedule.latitude);w.f64(schedule.longitude);w.u8(schedule.event);w.i64(schedule.offsetMs);w.u8(0);w.u8(0);w.u8(0);w.u8(0);w.u64(schedule.gapMs);w.u32(schedule.when.bytes.length);w.bytes(schedule.when.bytes);};
-  const writeDaily=schedule=>{w.u32(schedule.site);w.str(schedule.name);w.str(schedule.timezone);w.u64(schedule.atMs);w.u8(schedule.dstMissing);w.u8(schedule.dstRepeated);w.u8(0);w.u8(0);w.u8(0);w.u8(0);w.u64(schedule.gapMs);w.u32(schedule.when.bytes.length);w.bytes(schedule.when.bytes);};
-  const writeDailySlots=schedule=>{w.u32(schedule.site);w.str(schedule.name);w.str(schedule.timezone);w.u64(schedule.gridMs);w.u8(schedule.dstMissing);w.u8(schedule.dstRepeated);w.u8(0);w.u8(0);w.u8(0);w.u8(0);w.u64(schedule.gapMs);w.u16(schedule.slots.length);for(const slot of schedule.slots){w.u16(slot.key);w.u16(slot.minute);}w.u32(schedule.when.bytes.length);w.bytes(schedule.when.bytes);};
+  const missingCode=value=>['skip','next_valid'].indexOf(value),repeatedCode=value=>['first','second','both','skip'].indexOf(value);
+  const writeWindow=window=>{w.u32(window.site);w.str(window.name);w.u8(['average','min','max','rate'].indexOf(window.operation));w.u8(typeCode(window.payloadType));w.u64(window.overMs);w.u64(window.maxAgeMs);w.u16(window.rootRefs.length);for(const root of window.rootRefs)w.u16(root);for(const expression of window.source){const bytes=encode(expression).bytes;w.u32(bytes.length);w.bytes(bytes);}};
+  const writeSchedule=schedule=>{w.u32(schedule.site);w.str(schedule.name);w.str(schedule.timezone);w.f64(schedule.latitude);w.f64(schedule.longitude);w.u8(schedule.event==='rise'?0:1);w.i64(schedule.offsetMs);w.u8(0);w.u8(0);w.u8(0);w.u8(0);w.u64(schedule.gapMs);const bytes=encode(schedule.when).bytes;w.u32(bytes.length);w.bytes(bytes);};
+  const writeDaily=schedule=>{w.u32(schedule.site);w.str(schedule.name);w.str(schedule.timezone);w.u64(schedule.atMs);w.u8(missingCode(schedule.dstMissing));w.u8(repeatedCode(schedule.dstRepeated));w.u8(0);w.u8(0);w.u8(0);w.u8(0);w.u64(schedule.gapMs);const bytes=encode(schedule.when,'invalid Daily predicate').bytes;w.u32(bytes.length);w.bytes(bytes);};
+  const writeDailySlots=schedule=>{w.u32(schedule.site);w.str(schedule.name);w.str(schedule.timezone);w.u64(schedule.gridMs);w.u8(missingCode(schedule.dstMissing));w.u8(repeatedCode(schedule.dstRepeated));w.u8(0);w.u8(0);w.u8(0);w.u8(0);w.u64(schedule.gapMs);w.u16(schedule.slots.length);for(const slot of schedule.slots){w.u16(slot.key);w.u16(slot.minute);}const bytes=encode(schedule.when,'invalid DailySlots predicate').bytes;w.u32(bytes.length);w.bytes(bytes);};
   const writeTrueFor=signal=>{w.u32(signal.site);w.str(signal.name);w.u32(signal.sourceTag);w.str(signal.sourceName);w.u64(signal.durationMs);for(const index of signal.indices)w.u16(index);};
   const writeContext=prelude=>{const x=prelude.value,d=x.detail;w.u32(x.site);w.str(x.name);if(prelude.kind==='config-stream'){
-    w.str(x.semanticType);w.u8(x.kind);w.u8(x.editable);
-    if(x.kind===3){w.u64(d.grid);w.u16(d.capacity);w.u16(d.slots.length);for(const minute of d.slots)w.u16(minute);}
-    else{const put=value=>x.kind===0?w.u8(value?1:0):x.kind===1?w.i32(value):w.f64(value);put(d.initial);w.u8(d.bounds?1:0);if(d.bounds)for(const value of d.bounds)put(value);}
+    w.str(x.semanticType);w.u8(['Bool','Int','Number','TimeSlots'].indexOf(x.kind));w.u8(x.editable?1:0);
+    if(x.kind==='TimeSlots'){w.u64(d.grid);w.u16(d.capacity);w.u16(d.slots.length);for(const minute of d.slots)w.u16(minute);}
+    else{const put=value=>x.kind==='Bool'?w.u8(value?1:0):x.kind==='Int'?w.i32(value):w.f64(value);put(d.initial);w.u8(d.bounds?1:0);if(d.bounds)for(const value of d.bounds)put(value);}
     for(const index of d.indices)w.u16(index);return;
   }if(prelude.kind==='natural-result'){
-    w.u8(x.kind);w.str(x.provider);w.str(x.classification);for(const index of x.indices)w.u16(index);return;
+    w.u8(x.kind==='tide'?0:1);w.str(x.provider);w.str(x.classification);for(const index of x.indices)w.u16(index);return;
   }if(prelude.kind==='accounting-result'){
     w.str(x.account);w.str(x.event);w.str(x.timezone);for(const index of x.indices)w.u16(index);return;
   }w.u64(x.gapMs);
     if(prelude.kind==='periodic-pulse'){w.str(d.epoch);w.u64(d.anchor);w.u32(d.configId);if(d.configId===0)w.u64(d.literal);}
-    else if(prelude.kind==='cron-pulse'){w.str(d.timezone);w.u8(d.missing);w.u8(d.repeated);for(const field of d.fields){w.u8(field.length);for(const value of field)w.u8(value);}}
-    else if(prelude.kind==='calendar-daily-pulse'){w.str(d.timezone);w.u64(d.at);w.str(d.calendar);w.u8(d.offday);w.u8(d.missing);w.u8(d.repeated);}
-    else if(prelude.kind==='tide-run'){w.str(d.timezone);w.str(d.provider);w.u8(d.high);w.i64(d.offset);w.u64(d.run);w.u64(d.within);}
-    else {w.str(d.timezone);w.u32(d.configId);w.u8(d.missing);w.u8(d.repeated);}
-    for(const expression of [x.when,x.cancel]){w.u32(expression.bytes.length);w.bytes(expression.bytes);}
+    else if(prelude.kind==='cron-pulse'){w.str(d.timezone);w.u8(missingCode(d.missing));w.u8(repeatedCode(d.repeated));for(const field of d.fields){w.u8(field.length);for(const value of field)w.u8(value);}}
+    else if(prelude.kind==='calendar-daily-pulse'){w.str(d.timezone);w.u64(d.at);w.str(d.calendar);w.u8(d.offday==='offday'?1:0);w.u8(missingCode(d.missing));w.u8(repeatedCode(d.repeated));}
+    else if(prelude.kind==='tide-run'){w.str(d.timezone);w.str(d.provider);w.u8(d.high==='high'?1:0);w.i64(d.offset);w.u64(d.run);w.u64(d.within);}
+    else {w.str(d.timezone);w.u32(d.configId);w.u8(missingCode(d.missing));w.u8(repeatedCode(d.repeated));}
+    for(const expression of [x.when,x.cancel]){const bytes=encode(expression,'invalid context schedule predicate').bytes;w.u32(bytes.length);w.bytes(bytes);}
   };
-  w.u16(compiledStrategies.length);for(const s of compiledStrategies){w.str(s.name);w.i32(s.priority);w.u32(s.query.length);w.bytes(s.query);if(temporal){if(taggedPreludes){w.u16(s.preludes.length);for(const prelude of s.preludes){const tag={'window':0,'schedule':1,'true-for':2,'daily':3,'daily-slots':4,'periodic-pulse':5,'cron-pulse':6,'calendar-daily-pulse':7,'tide-run':8,'config-daily-slots-pulse':9,'natural-result':10,'accounting-result':11,'config-stream':12}[prelude.kind];w.u8(tag);if(tag>=5)writeContext(prelude);else if(prelude.kind==='window')writeWindow(prelude.value);else if(prelude.kind==='schedule')writeSchedule(prelude.value);else if(prelude.kind==='daily')writeDaily(prelude.value);else if(prelude.kind==='daily-slots')writeDailySlots(prelude.value);else writeTrueFor(prelude.value);}}else{w.u16(s.windows.length);for(const window of s.windows)writeWindow(window);}}w.u16(s.transitions.length);for(const t of s.transitions){w.u16(t.index);w.u32(t.expr.length);w.bytes(t.expr);}w.u16(s.intents.length);for(const i of s.intents){w.str(i.name);w.u8(i.type);w.u32(i.expr.length);w.bytes(i.expr);}}
-  w.u16(constraints.length);for(const c of constraints){w.u8(c.kind);w.u16(c.names.length);for(const n of c.names)w.str(n);}
-  if(format===7||format===11){w.u16(compiledObjectives.length);for(const objective of compiledObjectives){w.str(objective.name);w.str(objective.outputPort);for(const index of objective.indices)w.u16(index);if(format===11)w.u16(objective.targetOkIndex);w.u64(objective.period);w.u64(objective.late);w.u8(objective.direction);for(const value of objective.numbers)w.f64(value);}}
+  w.u16(compiledStrategies.length);for(const s of compiledStrategies){w.str(s.name);w.i32(s.priority);w.u32(s.query.length);w.bytes(s.query);if(temporal){if(taggedPreludes){w.u16(s.preludes.length);for(const prelude of s.preludes){const tag={'window':0,'schedule':1,'true-for':2,'daily':3,'daily-slots':4,'periodic-pulse':5,'cron-pulse':6,'calendar-daily-pulse':7,'tide-run':8,'config-daily-slots-pulse':9,'natural-result':10,'accounting-result':11,'config-stream':12}[prelude.kind];w.u8(tag);if(tag>=5)writeContext(prelude);else if(prelude.kind==='window')writeWindow(prelude.value);else if(prelude.kind==='schedule')writeSchedule(prelude.value);else if(prelude.kind==='daily')writeDaily(prelude.value);else if(prelude.kind==='daily-slots')writeDailySlots(prelude.value);else writeTrueFor(prelude.value);}}else{w.u16(s.windows.length);for(const window of s.windows)writeWindow(window);}}w.u16(s.transitions.length);for(const t of s.transitions){w.u16(t.index);w.u32(t.expr.length);w.bytes(t.expr);}w.u16(s.intents.length);for(const i of s.intents){w.str(i.name);w.u8(typeCode(i.type));w.u32(i.expr.length);w.bytes(i.expr);}}
+  w.u16(constraints.length);for(const c of constraints){w.u8(({requires:1,mutex:2,requires_any:3})[c.kind]);w.u16(c.names.length);for(const n of c.names)w.str(n);}
+  if(format===7||format===11){w.u16(compiledObjectives.length);for(const objective of compiledObjectives){w.str(objective.name);w.str(objective.outputPort);for(const index of objective.indices)w.u16(index);if(format===11)w.u16(objective.targetOkIndex);w.u64(objective.period);w.u64(objective.late);w.u8(objective.direction==='direct'?0:1);for(const value of objective.numbers)w.f64(value);}}
   return w.finish();
 }
 
-export { tokenize, parse, compile, CompileError };
+function compile(ast) { return emitGfb(lowerCoreModule(ast)); }
+
+export { tokenize, parse, compile, CompileError, lowerCoreModule, emitGfb };
