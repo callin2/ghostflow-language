@@ -3890,29 +3890,6 @@ export function compileScheduleDescriptorArtifact(source, { filename = '<control
   return { bytes, manifest, sourceMap: checked.sourceMap };
 }
 
-/** Type-checked accounting contract. These bytes cannot be loaded as control bytecode. */
-export function compileAccountingDescriptorArtifact(source, { filename = '<control>' } = {}) {
-  const ast = new ControlParser(source, filename).parse();
-  if (ast.kind !== 'control' || !ast.body.some(item => item.kind === 'account' || item.kind === 'account-constraints')) {
-    error(ast.loc, 'expected a control with accounting declarations');
-  }
-  if (ast.body.some(item => item.kind === 'schedule' && item.scheduleType !== 'Solar'
-    && Object.keys(item.policy ?? {}).some(key => key !== 'fallback'))) {
-    error(ast.loc, 'combined accounting and schedule descriptor artifacts are not supported');
-  }
-  const checked = new Lowerer(ast, filename).lower({ emitBytecode: false });
-  if ((checked.manifest.accountingConstraints ?? []).some(group =>
-    group.limits?.some(limit => limit.persistence === 'volatile'))) {
-    error(ast.loc, 'protective limit cannot use a volatile accounting ledger');
-  }
-  const manifest = { format: 'GhostFlow/accounting-v1', control: checked.manifest };
-  const bytes = new TextEncoder().encode(JSON.stringify({
-    format: 'GhostFlow/accounting-artifact-v1', executable: false,
-    controlSource: source, manifest,
-  }));
-  return { bytes, manifest, sourceMap: checked.sourceMap };
-}
-
 /** Locate deferred temporal operators without treating arbitrary source text as syntax. */
 export function hasTemporalDescriptorCalls(node) {
   if (!node || typeof node !== 'object') return false;
