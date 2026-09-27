@@ -25,7 +25,7 @@ test('GFB1 compiles in a browser-like VM realm without Buffer', () => {
     'globalThis.__gfb1 = { tokenize, parse, compile, CompileError };',
   );
   const context = vm.createContext({ TextEncoder, Uint8Array, DataView, Map, Set, Array, Object, JSON, Number, String, RegExp, Error });
-  vm.runInContext(`${irSource}\n${moduleSource}`, context, { filename: modulePath.pathname });
+  vm.runInContext(`${irSource}\n${moduleSource}`, context, { filename: 'ghostflow-browser-vm/gfb1-bundle.mjs' });
   assert.equal(vm.runInContext('typeof Buffer', context), 'undefined');
   const browserBytes = vm.runInContext(`__gfb1.compile(__gfb1.parse(__gfb1.tokenize(${JSON.stringify(source)})))`, context);
   const nodeBytes = compile(parse(tokenize(source)));

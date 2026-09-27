@@ -3,6 +3,10 @@ import fs from 'node:fs';
 import test from 'node:test';
 import { compileControl, typeCheckControl } from '../tools/control.mjs';
 import { extractLiterate } from '../tools/literate.mjs';
+import { compileSource } from '../tools/toolchain.mjs';
+import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
+
+const wasm = fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
 
 const cases = JSON.parse(fs.readFileSync(new URL('./reference/cases/02-time-control.json', import.meta.url))).cases;
 const fixture = id => cases.find(entry => entry.id === id);
@@ -52,7 +56,14 @@ test('Solar policy remains executable through the native solar runtime path', ()
 });
 
 for (const id of ['REF-03-059', 'REF-03-060']) {
-  test(`${id} execution remains fail-closed without provider and native admission bindings`, () => {
-    assert.throws(() => compileControl(code(id)), /policy execution requires verified occurrence provider and native admission bindings/);
+  test(`${id} emits GFB11 but requires provider admission bindings at activation`, async () => {
+    const entry = fixture(id);
+    const artifact = await compileSource(entry.source, { filename: entry.filename });
+    assert.equal(artifact.bytes.subarray(0, 4).toString(), 'GFB1');
+    assert.equal(artifact.bytes.readUInt16LE(4), 11);
+    await assert.rejects(() => ControlRuntime.instantiate(wasm, artifact), /context activation profile is required/);
+    await assert.rejects(() => ControlRuntime.instantiate(wasm, artifact, {
+      context: { bootEpoch: 7, terminalCapacity: 8, bindings: [] },
+    }), /missing declared provider binding/);
   });
 }

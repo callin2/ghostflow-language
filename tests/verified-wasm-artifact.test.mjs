@@ -49,6 +49,25 @@ function assertVerifiedWasmWorkflowContract(workflow) {
   assert.match(sourceTestStep, /working-directory: source/);
   assert.match(sourceTestStep, /run: npm test/,
     'the tested source must pass the full npm test gate');
+  const node24Index = workflow.indexOf('      - name: Set up Node.js 24 for current-source coverage\n');
+  const coverageIndex = workflow.indexOf('      - name: Run current-source coverage gate\n');
+  assert.ok(node24Index > npmIndex && coverageIndex > node24Index && packageIndex > coverageIndex,
+    'current-source coverage must run after full verification and before packaging');
+  const node24Step = namedStep(workflow, 'Set up Node.js 24 for current-source coverage');
+  assert.match(node24Step, /if: \$\{\{ matrix\.label == 'current' \}\}/);
+  assert.match(node24Step, /node-version: 24/);
+  const coverageStep = namedStep(workflow, 'Run current-source coverage gate');
+  assert.match(coverageStep, /if: \$\{\{ matrix\.label == 'current' \}\}/);
+  assert.match(coverageStep, /working-directory: source/);
+  assert.match(coverageStep, /run: npm run test:coverage/);
+  const verifiedNodeStep = namedStep(workflow, 'Set up Node.js 22');
+  assert.match(verifiedNodeStep, /\n        id: verified_node\n/);
+  const restoreIndex = workflow.indexOf('      - name: Restore verified Node.js for packaging\n');
+  assert.ok(restoreIndex > coverageIndex && packageIndex > restoreIndex,
+    'the verified Node version must be restored after coverage and before packaging');
+  const restoreStep = namedStep(workflow, 'Restore verified Node.js for packaging');
+  assert.match(restoreStep, /if: \$\{\{ matrix\.label == 'current' \}\}/);
+  assert.match(restoreStep, /node-version: \$\{\{ steps\.verified_node\.outputs\.node-version \}\}/);
 }
 
 // Report-validation fixtures only. These tests do not claim to build/run WASM.
@@ -141,6 +160,21 @@ test('verified WASM workflow binds full verification to the exact pushed source'
     ['push source SHA', source => source.replace("github.event_name == 'push' && github.sha", "github.event_name == 'push' && inputs.source_sha")],
     ['tested checkout verification', source => source.replace(/      - name: Verify tested source commit\n[\s\S]*?(?=      - name: Set up Node\.js)/, '')],
     ['full source test gate', source => source.replace('        run: npm test\n', '        run: npm run test:node\n')],
+    ['coverage command', source => source.replace('        run: npm run test:coverage\n', '        run: npm test\n')],
+    ['coverage matrix condition', source => source.replace(
+      "      - name: Run current-source coverage gate\n        if: ${{ matrix.label == 'current' }}",
+      "      - name: Run current-source coverage gate\n        if: ${{ success() }}")],
+    ['coverage ordering', source => source.replace('Run source verification', 'MOVED')
+      .replace('Run current-source coverage gate', 'Run source verification')
+      .replace('MOVED', 'Run current-source coverage gate')],
+    ['verified Node restoration', source => source.replace(/      - name: Restore verified Node\.js for packaging\n[\s\S]*?(?=      - name: Package verified WASM handoff)/, '')],
+    ['restoration condition', source => source.replace(
+      "      - name: Restore verified Node.js for packaging\n        if: ${{ matrix.label == 'current' }}",
+      "      - name: Restore verified Node.js for packaging\n        if: ${{ success() }}")],
+    ['restoration version', source => source.replace('steps.verified_node.outputs.node-version', '24')],
+    ['restoration order', source => source.replace('Restore verified Node.js for packaging', 'MOVED')
+      .replace('Package verified WASM handoff', 'Restore verified Node.js for packaging')
+      .replace('MOVED', 'Package verified WASM handoff')],
   ];
 
   for (const [name, mutate] of mutations) {

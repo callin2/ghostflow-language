@@ -5,33 +5,32 @@ import { compileSource, verifyArtifactSourceMap } from '../tools/toolchain.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 
 const cases = JSON.parse(fs.readFileSync(new URL('./reference/cases/02-time-control.json', import.meta.url))).cases;
-for (const id of ['REF-03-062']) test(`${id}: compile a checked temporal descriptor without claiming executable control`, async () => {
+const wasm = fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
+
+for (const id of ['REF-03-062']) test(`${id}: compile source-bound executable natural conditions`, async () => {
   const fixture = cases.find(entry => entry.id === id);
   const compiled = await compileSource(fixture.source, { filename: fixture.filename });
-  const artifact = JSON.parse(compiled.bytes.toString('utf8'));
-  assert.equal(artifact.format, 'GhostFlow/temporal-descriptor-artifact-v1');
-  assert.equal(artifact.executable, false);
-  assert.equal(compiled.manifest.executable, false);
-  assert.equal(compiled.manifest.sourceDocumentSha256, compiled.sourceDocument.sha256);
-  assert.equal(artifact.controlSource.includes('output '), true);
-  const descriptor = compiled.manifest.control;
-  assert.deepEqual(descriptor.naturalConditions.map(item => item.operation), ['tide_is', 'moon_is']);
-  assert.deepEqual(compiled.manifest.requiredRuntimeContracts, ['natural-provider-observations']);
-  await assert.rejects(() => ControlRuntime.instantiate(new Uint8Array(), compiled), /manifest.*(unknown key|unsupported)/);
+  assert.equal(compiled.bytes.subarray(0, 4).toString(), 'GFB1');
+  assert.equal(compiled.bytes.readUInt16LE(4), 11);
+  assert.equal(compiled.manifest.format, 'GhostFlow/control-v10');
+  assert.deepEqual(compiled.manifest.naturalConditions.map(item => item.operation), ['tide_is', 'moon_is']);
+  await assert.rejects(() => ControlRuntime.instantiate(wasm, compiled), /context activation profile is required/);
+  await assert.rejects(() => ControlRuntime.instantiate(wasm, compiled, {
+    context: { bootEpoch: 7, terminalCapacity: 8, bindings: [] },
+  }), /missing declared provider binding/);
   const envelope = {
     format: 'GhostFlow/source-map-v1', bytecodeSha256: compiled.manifest.bytecodeSha256,
     sourceDocument: compiled.sourceDocument, nodes: compiled.sourceMap,
-    lines: compiled.extractionMap, traceMetadata: null,
-    interactionSchema: null, interactionSourceIdentity: null,
+    lines: compiled.extractionMap, traceMetadata: compiled.traceMetadata ?? null,
+    interactionSchema: compiled.interactionSchema ?? null,
+    interactionSourceIdentity: compiled.interactionSourceIdentity ?? null,
   };
   verifyArtifactSourceMap(envelope, compiled.bytes, { manifest: compiled.manifest });
-  assert.throws(() => verifyArtifactSourceMap(envelope, compiled.bytes, {
-    manifest: { ...compiled.manifest, executable: true },
-  }), /temporal descriptor manifest does not match canonical source/);
-  assert.throws(() => verifyArtifactSourceMap(envelope, compiled.bytes, {
-    manifest: { ...compiled.manifest, sourceDocumentSha256: '0'.repeat(64) },
-  }), /temporal descriptor source identity/);
-  assert.throws(() => verifyArtifactSourceMap(envelope, compiled.bytes, {
-    manifest: { ...compiled.manifest, control: { ...descriptor, outputs: [] } },
-  }), /temporal descriptor manifest does not match canonical source/);
+  const altered = Buffer.from(compiled.bytes);
+  altered[altered.length - 1] ^= 1;
+  assert.throws(() => verifyArtifactSourceMap(envelope, altered, { manifest: compiled.manifest }),
+    /source map bytecode SHA-256 does not match artifact/);
+  assert.throws(() => verifyArtifactSourceMap({ ...envelope,
+    sourceDocument: { ...envelope.sourceDocument, sha256: '0'.repeat(64) },
+  }, compiled.bytes, { manifest: compiled.manifest }), /source document SHA-256 does not match text/);
 });

@@ -32,7 +32,7 @@ function browserCompile() {
     'globalThis.__gfb1 = { tokenize, parse, compile };',
   );
   const context = vm.createContext({ TextEncoder, Uint8Array, DataView, Map, Set, Array, Object, JSON, Number, String, RegExp, Error, BigInt });
-  vm.runInContext(`${irSource}\n${moduleSource}`, context, { filename: modulePath.pathname });
+  vm.runInContext(`${irSource}\n${moduleSource}`, context, { filename: 'ghostflow-browser-vm/gfb1-bundle.mjs' });
   assert.equal(vm.runInContext('typeof Buffer', context), 'undefined');
   return vm.runInContext(`__gfb1.compile(__gfb1.parse(__gfb1.tokenize(${JSON.stringify(source)})))`, context);
 }

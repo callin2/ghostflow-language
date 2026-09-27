@@ -5,6 +5,7 @@ import { dirname, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { GhostFlowRuntime } from '../runtimes/wasm/ghostflow-runtime.mjs';
+import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 import { compileSource } from '../tools/compile-source.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -80,6 +81,32 @@ function restore(runtime, bytes) {
     runtime.wasm.gf_dealloc(ptr, bytes.length);
   }
 }
+
+test('ControlRuntime context checkpoint restores occurrence dedupe and rejects corrupt bytes', async t => {
+  const compiled = await artifact('REF-03-036');
+  const profile = { context: { bootEpoch: 7, terminalCapacity: 8, bindings: [] } };
+  const original = await ControlRuntime.instantiate(wasmBytes, compiled, profile);
+  const restored = await ControlRuntime.instantiate(wasmBytes, compiled, profile);
+  t.after(() => { original.dispose(); restored.dispose(); });
+  const planned = 1_790_812_800_000;
+  const site = compiled.manifest.schedules[0].site;
+  const packet = (monotonicMs, wallMs) => ({
+    nowMs: monotonicMs,
+    contextFacts: facts(monotonicMs, wallMs, [{
+      site, coverageStartMs: planned - 2, coverageEndMs: planned + 1,
+      provider: null, calendar: null, rows: [],
+    }]),
+  });
+  assert.equal(original.step(packet(0, planned - 1)).vm.safe.due, false);
+  assert.equal(original.step(packet(1, planned)).vm.safe.due, true);
+  const checkpoint = original.contextSnapshot().bytes;
+  assert.ok(checkpoint.length > 0);
+  assert.throws(() => restored.restoreContextCheckpoint(Uint8Array.of(1, 2, 3)), /checkpoint|restore|invalid/i);
+  restored.restoreContextCheckpoint(checkpoint);
+  assert.deepEqual(restored.contextSnapshot().state, original.contextSnapshot().state);
+  assert.equal(restored.step(packet(0, planned - 1)).vm.safe.due, false);
+  assert.equal(restored.step(packet(1, planned)).vm.safe.due, false);
+});
 
 test('GFB11 natural Result inputs reject caller spoofing', async () => {
   const compiled = await artifact('REF-03-062');
