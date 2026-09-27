@@ -21,7 +21,7 @@ test('GFB1 compiles in a browser-like VM realm without Buffer', () => {
   const moduleSource = fs.readFileSync(modulePath, 'utf8').replace(
     "import { CompileError, lowerExpression } from './core-ir.mjs';", '')
     .replace(
-    'export { tokenize, parse, compile, CompileError };',
+    'export { tokenize, parse, compile, CompileError, lowerCoreModule, emitGfb };',
     'globalThis.__gfb1 = { tokenize, parse, compile, CompileError };',
   );
   const context = vm.createContext({ TextEncoder, Uint8Array, DataView, Map, Set, Array, Object, JSON, Number, String, RegExp, Error });
