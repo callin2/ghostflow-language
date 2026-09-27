@@ -415,6 +415,9 @@ mod tests {
     #[test]
     fn rejected_frames_do_not_advance_sequence_time_or_mutate_state() {
         let mut driver = active_runtime(false).into_scan_driver();
+        assert!(driver
+            .scan(frame(0, SCAN_FRAME_V1_MAX_EXACT_INTEGER + 1))
+            .is_err());
         let missing = ScanFrameV1 {
             inputs: frame(0, 0).inputs[..3].to_vec(),
             ..frame(0, 0)
