@@ -545,7 +545,7 @@
         "path": "docs/reference/02-types-expressions-state.md",
         "heading": "2.5 sensor 결과와 명시적 오류 흐름"
       },
-      "owner": "LIBRARY",
+      "owner": "CORE",
       "maturity": "EXPERIMENTAL",
       "coreScope": false,
       "requiredEvidence": [],
