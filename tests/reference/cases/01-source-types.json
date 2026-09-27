@@ -27,6 +27,7 @@
     },
     {
       "id": "REF-01-003",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/196",
       "references": ["01-source-and-syntax.md#11-왜-문서-하나가-소스인가"],
       "rule": "편집기·폼·그래프는 정본 문서의 보기일 수 있지만 독립된 제어 원본을 만들 수 없다.",
       "scope": "design",
@@ -583,6 +584,7 @@
     },
     {
       "id": "REF-01-055",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/197",
       "references": ["02-types-expressions-state.md#21-값-종류"],
       "rule": "Percent는 단순 Number가 아니며 Duration은 달력 시각과 다른 타입이다.",
       "scope": "design",
@@ -784,6 +786,7 @@
     },
     {
       "id": "REF-01-074",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/198",
       "references": ["02-types-expressions-state.md#25-sensor-결과와-명시적-오류-흐름"],
       "rule": "fault를 fallback 값으로 바꾸어 판단해도 원래 sensor fault 기록은 정상값으로 바뀌지 않는다.",
       "scope": "runtime",
@@ -795,6 +798,7 @@
     },
     {
       "id": "REF-01-075",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/199",
       "references": ["02-types-expressions-state.md#25-sensor-결과와-명시적-오류-흐름"],
       "rule": "선택 sensor의 미설치와 설치된 sensor의 Disconnected, Stale, Invalid, NotReady fault는 서로 구분한다.",
       "scope": "runtime",
@@ -817,6 +821,7 @@
     },
     {
       "id": "REF-01-077",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/200",
       "references": ["02-types-expressions-state.md#25-sensor-결과와-명시적-오류-흐름"],
       "rule": "hysteresis는 두 경계 사이에서 이전 판단을 유지하며 그 기억은 checkpoint와 replay 대상이다.",
       "scope": "runtime",
@@ -1100,6 +1105,7 @@
     },
     {
       "id": "REF-01-103",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/201",
       "references": ["02-types-expressions-state.md#타이머도-상태다"],
       "rule": "elapsed timer는 대상 상태가 마지막으로 확정 변경된 뒤의 단조 경과 시간이며 초기값과 변경 직후 값은 0이다.",
       "scope": "runtime",
@@ -1111,6 +1117,7 @@
     },
     {
       "id": "REF-01-104",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/202",
       "references": ["02-types-expressions-state.md#타이머도-상태다"],
       "rule": "Bool timer는 false→true와 true→false 양방향 확정 변경에서 새 구간을 시작한다.",
       "scope": "runtime",
