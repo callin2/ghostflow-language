@@ -181,8 +181,6 @@ if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.ar
       if (!check) writeArtifact(result, names[1]);
       const artifactKind = result.manifest?.format === 'GhostFlow/resource-policy-v1'
         ? 'checked resource policy artifact (not executable control)'
-        : result.manifest?.format === 'GhostFlow/accounting-v1'
-          ? 'checked accounting artifact (not executable control)'
         : result.manifest?.format === 'GhostFlow/schedule-descriptor-v1'
           ? 'checked schedule descriptor artifact (not executable control)'
         : result.manifest?.format === 'GhostFlow/temporal-descriptor-v1'
