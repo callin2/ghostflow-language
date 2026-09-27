@@ -158,6 +158,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/toolchain.test.mjs',
   'tests/browser-toolchain.test.mjs',
   'tests/operating-settings.test.mjs',
+  'tests/config-native-wasm-parity.test.mjs',
   'tests/issue-90-settings-stream.test.mjs',
 ]);
 
