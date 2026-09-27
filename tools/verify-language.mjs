@@ -51,6 +51,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/control-runtime-atomicity.test.mjs',
   'tests/native-dispatch-status.test.mjs',
   'tests/framed-control-host.test.mjs',
+  'tests/consumer-framed-compatibility.test.mjs',
   'tests/control.test.mjs',
   'tests/control-source-validation.test.mjs',
   'tests/compiler-syntax-diagnostics.test.mjs',
