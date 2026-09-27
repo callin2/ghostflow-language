@@ -71,8 +71,177 @@ async function compare(source, tape, filename) {
   assertParity(native, wasm);
   assert.deepEqual(nativeRun(artifact.bytes, tape), native, 'a fresh native driver must replay the same compiled tape exactly');
   assert.deepEqual(await wasmRun(artifact, tape), wasm, 'a fresh WASM driver must replay the same compiled tape exactly');
-  return { native, wasm };
+  return { artifact, native, wasm };
 }
+
+test('REF core Percent and Duration source units retain exact native and WASM values', async () => {
+  const { artifact, native } = await compare(`
+control TypedUnits {
+  input gate: Bool;
+  output ready: Bool;
+  output duration_ms: Duration;
+  output duty_pct: Percent;
+  let duration = 5min;
+  let duty = 100%;
+  ready <- gate && duration == 300000ms && duty == 100%;
+  duration_ms <- duration;
+  duty_pct <- duty;
+}
+`, [row(0, 0, [{ name: 'gate', value: false }]), row(1, 1, [{ name: 'gate', value: true }])], 'typed-units.ghost');
+  assert.deepEqual(artifact.manifest.configs, []);
+  assert.deepEqual(native.map(item => item.outcome.trace.safe.ready), [false, true]);
+  assert.deepEqual(native.map(item => item.outcome.trace.safe.duration_ms), [300_000, 300_000]);
+  assert.deepEqual(native.map(item => item.outcome.trace.safe.duty_pct), [100, 100]);
+});
+
+test('REF-01-067: non-finite Number result faults atomically on native and WASM', async () => {
+  const { native } = await compare(`
+control FiniteNumber {
+  input value: Number;
+  state accepted: Number = 0.0;
+  accepted' = value * 2.0;
+  output result: Number;
+  result <- accepted';
+}
+`, [
+    row(0, 0, [{ name: 'value', value: Number.MAX_VALUE }]),
+    row(0, 0, [{ name: 'value', value: 1.0 }]),
+  ], 'finite-number.ghost');
+  assert.deepEqual(native.map(item => item.accepted), [false, true]);
+  assert.match(native[0].error, /non-finite arithmetic result/);
+  assert.equal(native[1].outcome.trace.stateBefore.accepted, 0);
+  assert.equal(native[1].outcome.trace.stateAfter.accepted, 2);
+  assert.equal(native[1].outcome.trace.safe.result, 2);
+});
+
+test('REF-03-009: plain core scans preserve equal and exact large logical times on native and WASM', async () => {
+  const times = [0, 0, 4_294_967_295, 4_294_967_296, Number.MAX_SAFE_INTEGER];
+  const { native } = await compare(`
+control CoreClock {
+  input start: Bool;
+  state running: Bool = false;
+  running' = running || start;
+  output pump: Bool;
+  pump <- running';
+}
+`, times.map((logicalTimeMs, scanId) => row(scanId, logicalTimeMs,
+    [{ name: 'start', value: scanId === 0 }])), 'core-clock.ghost');
+  assert.deepEqual(native.map(item => item.outcome.logicalTimeMs), times);
+  assert.deepEqual(native.map(item => item.outcome.trace.stateAfter.running), times.map(() => true));
+});
+
+test('REF core blocked constraint commits state while preserving requested and safe intents', async () => {
+  const { native } = await compare(`
+control BlockedCommit {
+  input request, permit: Bool;
+  state count: Int = 0;
+  count' = count + 1;
+  output pump, allowed: Bool;
+  pump <- request;
+  allowed <- permit;
+  require pump => allowed;
+}
+`, [
+    row(0, 0, [{ name: 'request', value: true }, { name: 'permit', value: false }]),
+    row(1, 1, [{ name: 'request', value: false }, { name: 'permit', value: true }]),
+  ], 'blocked-commit.ghost');
+  assert.deepEqual(native.map(item => item.accepted), [true, true]);
+  assert.deepEqual(native.map(item => item.outcome.trace.stateAfter.count), [1, 2]);
+  assert.deepEqual([native[0].outcome.trace.requested.pump, native[0].outcome.trace.safe.pump], [true, false]);
+  assert.deepEqual(native[0].outcome.trace.safetyTrace.constraints[0].firstViolation.blocked, ['pump']);
+});
+
+test('REF-00-008: low-water constraint retains the requested pump and its blocking reason', async () => {
+  const { artifact, native } = await compare(`
+control LowWater {
+  input request, low_water: Bool;
+  output pump, water_ok: Bool;
+  pump <- request;
+  water_ok <- !low_water;
+  require pump => water_ok;
+}
+`, [row(0, 0, [{ name: 'request', value: true }, { name: 'low_water', value: true }])], 'low-water.ghost');
+  const trace = native[0].outcome.trace;
+  assert.deepEqual([trace.requested.pump, trace.safe.pump], [true, false]);
+  assert.equal(trace.inputs.low_water, true);
+  assert.equal(trace.safetyTrace.constraints[0].kind, 'requires');
+  assert.deepEqual(trace.safetyTrace.constraints[0].firstViolation.blocked, ['pump']);
+  assert.ok(artifact.traceMetadata.dependencies.some(entry => entry.target.field === 'requested'
+    && entry.target.name === 'water_ok' && entry.reads.some(read => read.field === 'inputs' && read.name === 'low_water')));
+});
+
+test('REF-00-004: fixed start-stop tape gives identical state and intent in independent runtimes', async () => {
+  const { native } = await compare(`
+control ReplayStartStop {
+  input start, stop: Bool;
+  state running: Bool = false;
+  running' = !stop && (start || running);
+  output pump: Bool;
+  pump <- running';
+}
+`, [
+    row(0, 0, [{ name: 'start', value: false }, { name: 'stop', value: false }]),
+    row(1, 100, [{ name: 'start', value: true }, { name: 'stop', value: false }]),
+    row(2, 200, [{ name: 'start', value: false }, { name: 'stop', value: true }]),
+  ], 'replay-start-stop.ghost');
+  assert.deepEqual(native.map(item => item.outcome.trace.stateAfter.running), [false, true, false]);
+  assert.deepEqual(native.map(item => item.outcome.trace.requested.pump), [false, true, false]);
+  assert.deepEqual(native.map(item => item.outcome.trace.safe.pump), [false, true, false]);
+});
+
+test('REF-01-093: let is recomputed from each tick input', async () => {
+  const { native } = await compare(`
+control LetEachTick {
+  input request: Bool;
+  let current = request;
+  output pump: Bool;
+  pump <- current;
+}
+`, [
+    row(0, 0, [{ name: 'request', value: true }]),
+    row(1, 1, [{ name: 'request', value: false }]),
+  ], 'let-each-tick.ghost');
+  assert.deepEqual(native.map(item => item.outcome.trace.requested.pump), [true, false]);
+});
+
+test('REF-01-094: simultaneous swap is independent of next-definition source order', async () => {
+  for (const transitions of [
+    "left' = if swap then right else left; right' = if swap then left else right;",
+    "right' = if swap then left else right; left' = if swap then right else left;",
+  ]) {
+    const { native } = await compare(`
+control Swap {
+  input swap: Bool;
+  state left: Bool = true;
+  state right: Bool = false;
+  ${transitions}
+  output left_out, right_out: Bool;
+  left_out <- left';
+  right_out <- right';
+}
+`, [row(0, 0, [{ name: 'swap', value: true }])], 'swap.ghost');
+    assert.deepEqual(native[0].outcome.trace.stateAfter, { left: false, right: true });
+    assert.deepEqual(native[0].outcome.trace.requested, { left_out: false, right_out: true });
+  }
+});
+
+test('REF-07-006: multiplication by zero keeps a faulting operand and its dependency', async () => {
+  const { artifact, native } = await compare(`
+control FaultingProduct {
+  input divisor: Number;
+  output result: Number;
+  result <- (1.0 / divisor) * 0.0;
+}
+`, [
+    row(0, 0, [{ name: 'divisor', value: 0 }]),
+    row(0, 0, [{ name: 'divisor', value: 1 }]),
+  ], 'faulting-product.ghost');
+  assert.deepEqual(native.map(item => item.accepted), [false, true]);
+  assert.match(native[0].error, /division by zero/);
+  assert.equal(native[1].outcome.trace.safe.result, 0);
+  assert.ok(artifact.traceMetadata.dependencies.some(entry => entry.target.field === 'requested'
+    && entry.target.name === 'result' && entry.reads.some(read => read.field === 'inputs' && read.name === 'divisor')));
+});
 
 test('GF-TEST-scan-tape-parity: timer boundaries and 32-bit logical time remain exact', async () => {
   const tape = [

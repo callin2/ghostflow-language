@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { executableReferenceSelector } from '../../tools/reference-evidence.mjs';
+import { frozenCompilerCaseIds, frozenSpecifiedCaseIds } from '../../tools/reference-evidence.mjs';
 
 export const root = fileURLToPath(new URL('../../', import.meta.url));
 export const catalogPath = path.join(root, 'contracts/feature-status/catalog.json');
@@ -12,10 +14,13 @@ const stages = new Set(['compile', 'native_wasm', 'host_simulation', 'driver_app
 const owners = new Set(['CORE', 'LIBRARY', 'HOST', 'DRIVER', 'PRODUCT_BOUNDARY']);
 const maturities = new Set(['STABLE', 'EXPERIMENTAL', 'DESIGN']);
 const assertions = new Set(['identity', 'type-boundary', 'runtime-value', 'target-parity', 'rollback', 'compile-policy', 'observation', 'simulation', 'replay']);
-const requiredIds = new Set([
+const frozenConstructIds = new Set([
   'source-literate', 'intent-provenance', 'bool', 'int', 'number', 'percent', 'duration',
   'typed-input-config', 'pure-expressions', 'state-next', 'logical-time', 'requested-safe',
-  'atomic-tick', 'source-trace', 'retained-replay', 'enum-result', 'temporal-duration',
+  'atomic-tick', 'source-trace', 'retained-replay',
+]);
+const requiredIds = new Set([
+  ...frozenConstructIds, 'enum-result', 'temporal-duration',
   'temporal-window', 'daily-schedule', 'periodic-cron', 'solar-schedule', 'sensor-quality',
   'filter-hysteresis', 'resource-arbitration', 'control-objectives', 'control-adaptation',
   'settings-live', 'settings-observation', 'interaction-observation', 'composition-import',
@@ -66,6 +71,8 @@ export function validateCatalog(catalog) {
   const fail = (id, message) => errors.push(`${id}: ${message}`);
   if (catalog?.schemaVersion !== 1 || !Array.isArray(catalog.entries)) return ['invalid feature-status catalog schema'];
   const ids = new Set();
+  const frozen = new Set([...frozenCompilerCaseIds, ...frozenSpecifiedCaseIds]);
+  const linkedFrozen = new Set();
   const referenceCases = new Map();
   for (const file of referenceCatalogs) for (const entry of JSON.parse(fs.readFileSync(path.join(root, file), 'utf8')).cases) referenceCases.set(entry.id, entry);
   const verifier = fs.readFileSync(path.join(root, 'tools/verify-language.mjs'), 'utf8');
@@ -117,10 +124,11 @@ export function validateCatalog(catalog) {
         if (ref.assertionClass === 'target-parity' && (!Array.isArray(ref.targets) || ref.targets.length !== 2)) fail(id, 'target-parity requires native and wasm');
         if (ref.testId) {
           const testSource = fs.existsSync(path.join(root, ref.path)) ? fs.readFileSync(path.join(root, ref.path), 'utf8') : '';
-          if (!namedSelector(testSource, ref.testId)) fail(id, `unresolved or inactive named test ${ref.testId}`);
+          if (!namedSelector(testSource, ref.testId) && !executableReferenceSelector(ref, referenceCases.get(ref.caseId))) fail(id, `unresolved or inactive named test ${ref.testId}`);
         }
         if (ref.caseId && !referenceCases.has(ref.caseId)) fail(id, `unresolved Reference case ${ref.caseId}`);
         if (ref.caseId && !entry.referenceCaseIds.includes(ref.caseId)) fail(id, `evidence case ${ref.caseId} is not listed on row`);
+        if (entry.coreScope && evidence.status === 'verified' && frozen.has(ref.caseId)) linkedFrozen.add(ref.caseId);
         if (!ref.testId) fail(id, 'evidence reference needs exact named testId');
       }
     }
@@ -131,18 +139,50 @@ export function validateCatalog(catalog) {
     }
     if (entry.maturity === 'DESIGN' && (successfulRuntime || verified.has('compile'))) fail(id, 'DESIGN cannot claim compiled or runtime evidence');
     if (entry.coreScope && ['driver_application', 'physical_confirmation'].some(stage => verified.has(stage))) fail(id, 'frozen core evidence cannot claim Driver or physical confirmation');
+    if (entry.coreScope) {
+      const coreRefs = entry.evidence.filter(evidence => evidence.status === 'verified').flatMap(evidence => evidence.refs);
+      const polarities = new Set(coreRefs.flatMap(ref => ref.polarities ?? []));
+      for (const polarity of ['positive', 'negative', 'boundary']) if (!polarities.has(polarity)) fail(id, `frozen core lacks ${polarity} oracle polarity`);
+      if (entry.maturity === 'STABLE' && entry.requiredEvidence.includes('native_wasm')) {
+        const runtimeRefs = entry.evidence.filter(evidence => evidence.stage === 'native_wasm' && evidence.status === 'verified')
+          .flatMap(evidence => evidence.refs);
+        if (!runtimeRefs.some(ref => ref.assertionClass === 'target-parity'
+          && ref.targets?.includes('native') && ref.targets?.includes('wasm'))) {
+          fail(id, 'STABLE frozen core needs one exact native/WASM target-parity oracle');
+        }
+        if (id === 'retained-replay' && !runtimeRefs.some(ref => ref.assertionClass === 'replay'
+          && ref.targets?.includes('native') && ref.targets?.includes('wasm'))) {
+          fail(id, 'STABLE retained replay needs a separate replay oracle');
+        }
+      }
+    }
     for (const caseId of entry.referenceCaseIds ?? []) {
       const refCase = referenceCases.get(caseId);
       if (!refCase) fail(id, `unknown Reference case ${caseId}`);
       else if (entry.maturity === 'STABLE' && refCase.status === 'specified' && !(entry.evidence ?? []).some(e => e.status === 'verified' && e.refs?.some(r => r.caseId === caseId && r.testId))) fail(id, `STABLE specified ${caseId} has no exact executed named-test oracle`);
+      if (entry.coreScope && !frozen.has(caseId)) fail(id, `case ${caseId} is outside the finite frozen core set`);
     }
   }
+  for (const caseId of frozenCompilerCaseIds) {
+    if (referenceCases.get(caseId)?.status !== 'executable') fail(caseId, 'frozen compiler case is not executable');
+    if (!linkedFrozen.has(caseId)) fail(caseId, 'frozen compiler case lacks a verified exact core oracle');
+  }
+  for (const caseId of frozenSpecifiedCaseIds) {
+    if (referenceCases.get(caseId)?.status !== 'specified') fail(caseId, 'frozen external case is not specified');
+    if (!linkedFrozen.has(caseId)) fail(caseId, 'frozen specified case lacks a verified exact core oracle');
+  }
   for (const id of requiredIds) if (!ids.has(id)) fail(id, 'required principal feature row is missing');
+  for (const id of frozenConstructIds) {
+    const entry = catalog.entries.find(candidate => candidate.id === id);
+    if (entry && (entry.owner !== 'CORE' || !entry.coreScope || entry.maturity !== 'STABLE')) {
+      fail(id, 'frozen core must remain CORE, coreScope true, and STABLE');
+    }
+  }
   return errors;
 }
 
 export function renderStatus(catalog) {
-  const rows = ['# Reference feature maturity and evidence', '', 'Each row describes the named Reference clause, not its whole chapter. `CORE` owns compiler/runtime primitives beyond the frozen Core 0.1; `coreScope` marks frozen membership. `LIBRARY` means outside that frozen contract and does not assert that a user-authored pure library exists. External-owner maturity reflects evidence in this toolchain, not a release judgment on another module.', '', 'A verified link identifies an exact active test selector and its assertion class in the catalog. It establishes an executable oracle link; the current full verification gate determines whether it passes. Compile, native/WASM, host simulation, Driver application, and physical confirmation are separate stages.', '', '| Feature | Owner | Maturity | Clause | Evidence / gap | Issues |', '|---|---|---|---|---|---|'];
+  const rows = ['# Reference feature maturity and evidence', '', 'Each row describes the named Reference clause, not its whole chapter. `CORE` owns compiler/runtime primitives beyond the frozen Core 0.1; `coreScope` marks frozen membership. `LIBRARY` means outside that frozen contract and does not assert that a user-authored pure library exists. External-owner maturity reflects evidence in this toolchain, not a release judgment on another module.', '', 'A verified link identifies an exact active test selector and its assertion class in the catalog. It establishes an executable oracle link; the current full verification gate determines whether it passes. Compile, native/WASM, host simulation, Driver application, and physical confirmation are separate stages.', '', 'Source-checked Percent and Duration carry their units and bounds through compilation, then lower to Number values in the VM. Frozen source/constraint trace provenance is narrower than the full evaluated-path explanation DAG (#88). Core replay covers retained same-program scans; persisted Host restoration and physical effects are separate contracts.', '', '| Feature | Owner | Maturity | Clause | Evidence / gap | Issues |', '|---|---|---|---|---|---|'];
   for (const e of catalog.entries) {
     const evidence = e.evidence.flatMap(x => x.refs.map(r => `${x.stage}${r.targets ? ` [${r.targets.join('+')}]` : ''}: [${r.testId}](../${r.path})${r.caseId ? ` (${r.caseId})` : ''}`));
     rows.push(`| ${e.family} | ${e.owner} | ${e.maturity} | [${e.clause.heading}](../${e.clause.path}) | ${[...evidence, ...e.gaps].join('; ') || 'No evidence claimed'} | ${e.issues.map(i => `#${i}`).join(', ') || '—'} |`);

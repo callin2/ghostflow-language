@@ -30,8 +30,12 @@ import 사례는 `files`에 완전한 의존 `.ghost.md` 원문을 함께 둔다
 import는 그 원문의 정확한 SHA-256을 고정한다. 의존 파일도 같은 임시 디렉터리에 작성한다.
 
 상세 결과는 `build/reference-tests.json`에 저장한다. `results`와 `summary`에는 실제 실행한
-컴파일 사례만 기록한다. `catalogCounts`와 `pendingCatalog`는 필터와 무관한 전체 명세 목록이며
-실행 결과가 아니다. 이름 필터로 실행한 결과는 전체 수용 결과로 사용하지 않는다.
+컴파일 사례만 기록한다. `externallyCoveredCatalog`는
+[`feature-status` 카탈로그](../../contracts/feature-status/catalog.json)에 연결된 정확한 활성 테스트
+selector를 표시한다. 이 CLI가 외부 oracle을 실행했다는 뜻은 아니다. 전체 언어 gate의 통과 결과가
+실행 증거다. `pendingCatalog`에는 외부 oracle도 없는 `specified`/`decision` 사례만 남는다.
+`catalogCounts`와 frozen core 수치는 필터와 무관한 전체 목록의 링크 수이며 실행 결과가 아니다.
+이름 필터로 실행한 결과는 전체 수용 결과로 사용하지 않는다.
 카탈로그 검사 자체가 필터로 제외되면 `catalogValidation`은 `not-run`이다.
 
 ## 사례의 상태
@@ -39,7 +43,7 @@ import는 그 원문의 정확한 SHA-256을 고정한다. 의존 파일도 같�
 | 상태 | 의미 | 실행 보고 |
 |---|---|---|
 | `executable` | 확정 문법의 컴파일 수용/거부 사례 | 실제 CLI 호출; 기대와 다르면 실패 |
-| `specified` | 입력·행동·기대 결과가 작성된 런타임·환경·Driver·UI·도구 계약 | TODO로 표시; 검증 통과 수에 포함하지 않음 |
+| `specified` | 입력·행동·기대 결과가 작성된 런타임·환경·Driver·UI·도구 계약 | 활성 외부 oracle 링크가 있으면 `externally-covered`; 없으면 TODO. 어느 쪽도 CLI 실행 통과 수에 포함하지 않음 |
 | `decision` | 기대 의미 또는 결정 경계는 있으나 확정 문법·정책이 필요한 사례 | 필요한 결정을 reason에 기록; TODO이며 지원 증거가 아님 |
 
 언어의 모든 항목을 컴파일 성공만으로 검증할 수는 없다. 타이머의 실제 경과,
