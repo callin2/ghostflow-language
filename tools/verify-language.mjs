@@ -12,6 +12,7 @@ import { verificationSourceHashes } from './verification-sources.mjs';
 
 // Deliberately explicit. Product/LLM/device tests belong to other repositories.
 export const LANGUAGE_TESTS = Object.freeze([
+  'tests/doc-translations.test.mjs',
   'tests/verified-wasm-artifact.test.mjs',
   'tests/boundary-conformance.test.mjs',
   'tests/compiler.test.mjs',
@@ -353,6 +354,7 @@ async function verify(nodeOnly, curriculumOnly) {
     if (Number(process.versions.node.split('.')[0]) < 22) throw new Error('Node.js 22 or newer is required');
     if (process.platform === 'win32') throw new Error('retained native tutorial paths require a POSIX host (macOS/Linux)');
     report.sourceSha256 = verificationSourceHashes(root);
+    await gate(process.execPath, ['tools/check-doc-translations.mjs']);
     for (const test of LANGUAGE_TESTS) {
       if (!fs.statSync(path.join(root, test)).isFile()) throw new Error(`missing language test: ${test}`);
     }

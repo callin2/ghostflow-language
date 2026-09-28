@@ -1,0 +1,133 @@
+<!-- translation-source: docs/DOCUMENTATION.md -->
+
+[English original](DOCUMENTATION.md) · [언어 정책](DOCUMENTATION-LANGUAGES.ko.md)
+
+# 문서 목록
+
+각 행은 같은 문서의 완전한 영어와 한국어 버전으로 연결된다.
+기존 정본 소스 경로는 보존한다. 번역된 프로그램 예제는 읽기용 문서다.
+컴파일할 때는 원본 `.ghost.md`를 사용한다. 보고서, 생성된 증거와 테스트 입력의
+개별 제외 사유는 [목록 파일](translations.json)에 기록한다.
+
+| 문서 | English | 한국어 |
+|---|---|---|
+| `AGENTS.md` | [English](../AGENTS.md) | [한국어](../AGENTS.ko.md) |
+| `README.md` | [English](../README.md) | [한국어](../README.ko.md) |
+| `contracts/integration-v1/README.md` | [English](../contracts/integration-v1/README.md) | [한국어](../contracts/integration-v1/README.ko.md) |
+| `contracts/interaction-v0/README.md` | [English](../contracts/interaction-v0/README.md) | [한국어](../contracts/interaction-v0/README.ko.md) |
+| `contracts/requirements/README.md` | [English](../contracts/requirements/README.md) | [한국어](../contracts/requirements/README.ko.md) |
+| `docs/2026-09-24-authoring-baseline-provenance.md` | [English](2026-09-24-authoring-baseline-provenance.md) | [한국어](2026-09-24-authoring-baseline-provenance.ko.md) |
+| `docs/2026-09-24-fixed-planned-time-range-decision.md` | [English](2026-09-24-fixed-planned-time-range-decision.md) | [한국어](2026-09-24-fixed-planned-time-range-decision.ko.md) |
+| `docs/ACCOUNTING-LEDGER-ABI.md` | [English](ACCOUNTING-LEDGER-ABI.md) | [한국어](ACCOUNTING-LEDGER-ABI.ko.md) |
+| `docs/AFTER-EVENT-WASM-ABI.md` | [English](AFTER-EVENT-WASM-ABI.md) | [한국어](AFTER-EVENT-WASM-ABI.ko.md) |
+| `docs/BEHAVIOR-COMPOSITION-RESEARCH.md` | [English](BEHAVIOR-COMPOSITION-RESEARCH.md) | [한국어](BEHAVIOR-COMPOSITION-RESEARCH.ko.md) |
+| `docs/BYTECODE.md` | [English](BYTECODE.md) | [한국어](BYTECODE.ko.md) |
+| `docs/COMPILER-DIAGNOSTICS.md` | [English](COMPILER-DIAGNOSTICS.md) | [한국어](COMPILER-DIAGNOSTICS.ko.md) |
+| `docs/CONSTRAINTS.md` | [English](CONSTRAINTS.en.md) | [한국어](CONSTRAINTS.md) |
+| `docs/CONTEXT-EXECUTION-ABI.md` | [English](CONTEXT-EXECUTION-ABI.md) | [한국어](CONTEXT-EXECUTION-ABI.ko.md) |
+| `docs/CONTINUOUS-BOOL-TIMER-CONTRACT.md` | [English](CONTINUOUS-BOOL-TIMER-CONTRACT.md) | [한국어](CONTINUOUS-BOOL-TIMER-CONTRACT.ko.md) |
+| `docs/DESIGN-NOTES.md` | [English](DESIGN-NOTES.md) | [한국어](DESIGN-NOTES.ko.md) |
+| `docs/DOCUMENTATION-LANGUAGES.md` | [English](DOCUMENTATION-LANGUAGES.md) | [한국어](DOCUMENTATION-LANGUAGES.ko.md) |
+| `docs/DOCUMENTATION.md` | [English](DOCUMENTATION.md) | [한국어](DOCUMENTATION.ko.md) |
+| `docs/EXACT-INTEGER-CONTRACT.md` | [English](EXACT-INTEGER-CONTRACT.md) | [한국어](EXACT-INTEGER-CONTRACT.ko.md) |
+| `docs/FRAMED-CONTROL-HOST.md` | [English](FRAMED-CONTROL-HOST.md) | [한국어](FRAMED-CONTROL-HOST.ko.md) |
+| `docs/GFB5-SCHEDULE-PRELUDE.md` | [English](GFB5-SCHEDULE-PRELUDE.md) | [한국어](GFB5-SCHEDULE-PRELUDE.ko.md) |
+| `docs/IMPLEMENTATION.md` | [English](IMPLEMENTATION.md) | [한국어](IMPLEMENTATION.ko.md) |
+| `docs/INTENT-ANCHOR-MAP.md` | [English](INTENT-ANCHOR-MAP.md) | [한국어](INTENT-ANCHOR-MAP.ko.md) |
+| `docs/KEYBOARD-HOST.md` | [English](KEYBOARD-HOST.md) | [한국어](KEYBOARD-HOST.ko.md) |
+| `docs/LANGUAGE-EXAMPLES.md` | [English](LANGUAGE-EXAMPLES.en.md) | [한국어](LANGUAGE-EXAMPLES.md) |
+| `docs/LANGUAGE-MVP-0.1.md` | [English](LANGUAGE-MVP-0.1.md) | [한국어](LANGUAGE-MVP-0.1.ko.md) |
+| `docs/LANGUAGE-REFERENCE.md` | [English](LANGUAGE-REFERENCE.en.md) | [한국어](LANGUAGE-REFERENCE.md) |
+| `docs/LANGUAGE-SURFACE.md` | [English](LANGUAGE-SURFACE.en.md) | [한국어](LANGUAGE-SURFACE.md) |
+| `docs/LANGUAGE.md` | [English](LANGUAGE.en.md) | [한국어](LANGUAGE.md) |
+| `docs/LESSON-BUNDLE.md` | [English](LESSON-BUNDLE.md) | [한국어](LESSON-BUNDLE.ko.md) |
+| `docs/LITERATE.md` | [English](LITERATE.en.md) | [한국어](LITERATE.md) |
+| `docs/LLM-AUTHORING-WORKFLOW.md` | [English](LLM-AUTHORING-WORKFLOW.md) | [한국어](LLM-AUTHORING-WORKFLOW.ko.md) |
+| `docs/LLM-TOOLCHAIN-ARCHITECTURE.md` | [English](LLM-TOOLCHAIN-ARCHITECTURE.md) | [한국어](LLM-TOOLCHAIN-ARCHITECTURE.ko.md) |
+| `docs/OPERATOR-SETTINGS-STREAM.md` | [English](OPERATOR-SETTINGS-STREAM.md) | [한국어](OPERATOR-SETTINGS-STREAM.ko.md) |
+| `docs/PORTABLE-PACKAGE.md` | [English](PORTABLE-PACKAGE.md) | [한국어](PORTABLE-PACKAGE.ko.md) |
+| `docs/ProgrammingInGhostflow.md` | [English](ProgrammingInGhostflow.en.md) | [한국어](ProgrammingInGhostflow.md) |
+| `docs/REFERENCE-QUERY.md` | [English](REFERENCE-QUERY.md) | [한국어](REFERENCE-QUERY.ko.md) |
+| `docs/SCAN-FRAME-WASM.md` | [English](SCAN-FRAME-WASM.md) | [한국어](SCAN-FRAME-WASM.ko.md) |
+| `docs/SCAN-TAPE-PARITY.md` | [English](SCAN-TAPE-PARITY.md) | [한국어](SCAN-TAPE-PARITY.ko.md) |
+| `docs/SCENARIO-RUNNER.md` | [English](SCENARIO-RUNNER.md) | [한국어](SCENARIO-RUNNER.ko.md) |
+| `docs/SOLAR-SCHEDULE.md` | [English](SOLAR-SCHEDULE.md) | [한국어](SOLAR-SCHEDULE.ko.md) |
+| `docs/SOURCE-MAP.md` | [English](SOURCE-MAP.md) | [한국어](SOURCE-MAP.ko.md) |
+| `docs/SOURCE-SAFETY-TRACE.md` | [English](SOURCE-SAFETY-TRACE.md) | [한국어](SOURCE-SAFETY-TRACE.ko.md) |
+| `docs/SUNCALC-ATTRIBUTION.md` | [English](SUNCALC-ATTRIBUTION.md) | [한국어](SUNCALC-ATTRIBUTION.ko.md) |
+| `docs/TEMPORAL-DESCRIPTOR-ARTIFACT.md` | [English](TEMPORAL-DESCRIPTOR-ARTIFACT.md) | [한국어](TEMPORAL-DESCRIPTOR-ARTIFACT.ko.md) |
+| `docs/TEMPORAL-REPLAY.md` | [English](TEMPORAL-REPLAY.md) | [한국어](TEMPORAL-REPLAY.ko.md) |
+| `docs/TEMPORAL-RESOURCES.md` | [English](TEMPORAL-RESOURCES.md) | [한국어](TEMPORAL-RESOURCES.ko.md) |
+| `docs/TESTING.md` | [English](TESTING.md) | [한국어](TESTING.ko.md) |
+| `docs/TIME-AND-SCHEDULE-CONTRACT.md` | [English](TIME-AND-SCHEDULE-CONTRACT.md) | [한국어](TIME-AND-SCHEDULE-CONTRACT.ko.md) |
+| `docs/TRACEABILITY.md` | [English](TRACEABILITY.md) | [한국어](TRACEABILITY.ko.md) |
+| `docs/TUTORIAL.md` | [English](TUTORIAL.md) | [한국어](TUTORIAL.ko.md) |
+| `docs/VERIFICATION.md` | [English](VERIFICATION.md) | [한국어](VERIFICATION.ko.md) |
+| `docs/WASM-CI-ARTIFACTS.md` | [English](WASM-CI-ARTIFACTS.md) | [한국어](WASM-CI-ARTIFACTS.ko.md) |
+| `docs/language_faq.md` | [English](language_faq.en.md) | [한국어](language_faq.md) |
+| `docs/plans/2026-09-28-semantic-kernel.md` | [English](plans/2026-09-28-semantic-kernel.md) | [한국어](plans/2026-09-28-semantic-kernel.ko.md) |
+| `docs/reference/01-source-and-syntax.md` | [English](reference/01-source-and-syntax.en.md) | [한국어](reference/01-source-and-syntax.md) |
+| `docs/reference/02-types-expressions-state.md` | [English](reference/02-types-expressions-state.en.md) | [한국어](reference/02-types-expressions-state.md) |
+| `docs/reference/03-time-and-schedules.md` | [English](reference/03-time-and-schedules.en.md) | [한국어](reference/03-time-and-schedules.md) |
+| `docs/reference/04-sensors-constraints-control.md` | [English](reference/04-sensors-constraints-control.en.md) | [한국어](reference/04-sensors-constraints-control.md) |
+| `docs/reference/05-settings-and-observation.md` | [English](reference/05-settings-and-observation.en.md) | [한국어](reference/05-settings-and-observation.md) |
+| `docs/reference/06-composition-and-replay.md` | [English](reference/06-composition-and-replay.en.md) | [한국어](reference/06-composition-and-replay.md) |
+| `docs/reference/07-semantic-rules-and-index.md` | [English](reference/07-semantic-rules-and-index.en.md) | [한국어](reference/07-semantic-rules-and-index.md) |
+| `docs/reference/08-language-runtime-and-device-boundaries.md` | [English](reference/08-language-runtime-and-device-boundaries.en.md) | [한국어](reference/08-language-runtime-and-device-boundaries.md) |
+| `docs/research/GF-COMPOSE-R1-USER-OUTCOMES.md` | [English](research/GF-COMPOSE-R1-USER-OUTCOMES.md) | [한국어](research/GF-COMPOSE-R1-USER-OUTCOMES.ko.md) |
+| `docs/research/GF-COMPOSE-R2-AUTHORITY-IDENTITY.md` | [English](research/GF-COMPOSE-R2-AUTHORITY-IDENTITY.md) | [한국어](research/GF-COMPOSE-R2-AUTHORITY-IDENTITY.ko.md) |
+| `docs/research/GF-COMPOSE-R3-EXECUTION.md` | [English](research/GF-COMPOSE-R3-EXECUTION.md) | [한국어](research/GF-COMPOSE-R3-EXECUTION.ko.md) |
+| `docs/research/GF-COMPOSE-R4-PORTS-BINDINGS.md` | [English](research/GF-COMPOSE-R4-PORTS-BINDINGS.md) | [한국어](research/GF-COMPOSE-R4-PORTS-BINDINGS.ko.md) |
+| `docs/research/GF-COMPOSE-R5-CONTRACTS.md` | [English](research/GF-COMPOSE-R5-CONTRACTS.md) | [한국어](research/GF-COMPOSE-R5-CONTRACTS.ko.md) |
+| `docs/research/GF-COMPOSE-R6-OVERRIDES.md` | [English](research/GF-COMPOSE-R6-OVERRIDES.md) | [한국어](research/GF-COMPOSE-R6-OVERRIDES.ko.md) |
+| `docs/research/GF-COMPOSE-R7-PACKAGES.md` | [English](research/GF-COMPOSE-R7-PACKAGES.md) | [한국어](research/GF-COMPOSE-R7-PACKAGES.ko.md) |
+| `docs/research/GF-COMPOSE-R8-INCIDENT-EVIDENCE.md` | [English](research/GF-COMPOSE-R8-INCIDENT-EVIDENCE.md) | [한국어](research/GF-COMPOSE-R8-INCIDENT-EVIDENCE.ko.md) |
+| `docs/research/GF-COMPOSE-R9-ACCEPTANCE.md` | [English](research/GF-COMPOSE-R9-ACCEPTANCE.md) | [한국어](research/GF-COMPOSE-R9-ACCEPTANCE.ko.md) |
+| `examples/authoring/pump-rev-1.ghost.md` | [English](../examples/authoring/pump-rev-1.ghost.md) | [한국어](../examples/authoring/pump-rev-1.ghost.ko.md) |
+| `examples/authoring/pump-rev-2.ghost.md` | [English](../examples/authoring/pump-rev-2.ghost.md) | [한국어](../examples/authoring/pump-rev-2.ghost.ko.md) |
+| `examples/curriculum/pc-02-start-stop.ghost.md` | [English](../examples/curriculum/pc-02-start-stop.ghost.en.md) | [한국어](../examples/curriculum/pc-02-start-stop.ghost.md) |
+| `examples/curriculum/pc-03-motor-contactor.ghost.md` | [English](../examples/curriculum/pc-03-motor-contactor.ghost.en.md) | [한국어](../examples/curriculum/pc-03-motor-contactor.ghost.md) |
+| `examples/curriculum/pc-04-direction-interlock.ghost.md` | [English](../examples/curriculum/pc-04-direction-interlock.ghost.en.md) | [한국어](../examples/curriculum/pc-04-direction-interlock.ghost.md) |
+| `examples/curriculum/pc-05-limit-feedback.ghost.md` | [English](../examples/curriculum/pc-05-limit-feedback.ghost.en.md) | [한국어](../examples/curriculum/pc-05-limit-feedback.ghost.md) |
+| `examples/curriculum/pc-06-timer-patterns.ghost.md` | [English](../examples/curriculum/pc-06-timer-patterns.ghost.en.md) | [한국어](../examples/curriculum/pc-06-timer-patterns.ghost.md) |
+| `examples/curriculum/pc-07-tank-hysteresis.ghost.md` | [English](../examples/curriculum/pc-07-tank-hysteresis.ghost.en.md) | [한국어](../examples/curriculum/pc-07-tank-hysteresis.ghost.md) |
+| `examples/curriculum/pc-08-manual-auto.ghost.md` | [English](../examples/curriculum/pc-08-manual-auto.ghost.en.md) | [한국어](../examples/curriculum/pc-08-manual-auto.ghost.md) |
+| `examples/curriculum/pc-09-sequential-water-supply.ghost.md` | [English](../examples/curriculum/pc-09-sequential-water-supply.ghost.en.md) | [한국어](../examples/curriculum/pc-09-sequential-water-supply.ghost.md) |
+| `examples/curriculum/pc-10-fault-alarm-reset.ghost.md` | [English](../examples/curriculum/pc-10-fault-alarm-reset.ghost.en.md) | [한국어](../examples/curriculum/pc-10-fault-alarm-reset.ghost.md) |
+| `examples/irrigation.ghost.md` | [English](../examples/irrigation.ghost.md) | [한국어](../examples/irrigation.ghost.ko.md) |
+| `examples/scheduled-watering.ghost.md` | [English](../examples/scheduled-watering.ghost.en.md) | [한국어](../examples/scheduled-watering.ghost.md) |
+| `examples/solar-watering.ghost.md` | [English](../examples/solar-watering.ghost.en.md) | [한국어](../examples/solar-watering.ghost.md) |
+| `examples/station-rules.ghost.md` | [English](../examples/station-rules.ghost.md) | [한국어](../examples/station-rules.ghost.ko.md) |
+| `examples/tutorial/01-latch.ghost.md` | [English](../examples/tutorial/01-latch.ghost.md) | [한국어](../examples/tutorial/01-latch.ghost.ko.md) |
+| `examples/tutorial/02-watering.ghost.md` | [English](../examples/tutorial/02-watering.ghost.md) | [한국어](../examples/tutorial/02-watering.ghost.ko.md) |
+| `examples/tutorial/03-moisture.ghost.md` | [English](../examples/tutorial/03-moisture.ghost.md) | [한국어](../examples/tutorial/03-moisture.ghost.ko.md) |
+| `examples/tutorial/04-extra-valves.ghost.md` | [English](../examples/tutorial/04-extra-valves.ghost.md) | [한국어](../examples/tutorial/04-extra-valves.ghost.ko.md) |
+| `examples/vfd-speed.ghost.md` | [English](../examples/vfd-speed.ghost.md) | [한국어](../examples/vfd-speed.ghost.ko.md) |
+| `runtimes/wasm/README.md` | [English](../runtimes/wasm/README.md) | [한국어](../runtimes/wasm/README.ko.md) |
+| `tasks/after-event-design.md` | [English](../tasks/after-event-design.md) | [한국어](../tasks/after-event-design.ko.md) |
+| `tasks/civil-schedule-reference-integration.md` | [English](../tasks/civil-schedule-reference-integration.md) | [한국어](../tasks/civil-schedule-reference-integration.ko.md) |
+| `tasks/compiler-diagnostics-plan.md` | [English](../tasks/compiler-diagnostics-plan.md) | [한국어](../tasks/compiler-diagnostics-plan.ko.md) |
+| `tasks/debounce-design.md` | [English](../tasks/debounce-design.md) | [한국어](../tasks/debounce-design.ko.md) |
+| `tasks/hold-last-design.md` | [English](../tasks/hold-last-design.md) | [한국어](../tasks/hold-last-design.ko.md) |
+| `tasks/import-validation-plan.md` | [English](../tasks/import-validation-plan.md) | [한국어](../tasks/import-validation-plan.ko.md) |
+| `tasks/issue-135-daily-slots-plan.md` | [English](../tasks/issue-135-daily-slots-plan.md) | [한국어](../tasks/issue-135-daily-slots-plan.ko.md) |
+| `tasks/issue-135-plan.md` | [English](../tasks/issue-135-plan.md) | [한국어](../tasks/issue-135-plan.ko.md) |
+| `tasks/issue-137-plan.md` | [English](../tasks/issue-137-plan.md) | [한국어](../tasks/issue-137-plan.ko.md) |
+| `tasks/plan.md` | [English](../tasks/plan.md) | [한국어](../tasks/plan.ko.md) |
+| `tasks/reference-compliance-plan.md` | [English](../tasks/reference-compliance-plan.en.md) | [한국어](../tasks/reference-compliance-plan.md) |
+| `tasks/result-provenance-design.md` | [English](../tasks/result-provenance-design.md) | [한국어](../tasks/result-provenance-design.ko.md) |
+| `tasks/schedule-clock-design.md` | [English](../tasks/schedule-clock-design.md) | [한국어](../tasks/schedule-clock-design.ko.md) |
+| `tasks/schedule-pulse-design.md` | [English](../tasks/schedule-pulse-design.md) | [한국어](../tasks/schedule-pulse-design.ko.md) |
+| `tasks/schedule-wire-design.md` | [English](../tasks/schedule-wire-design.md) | [한국어](../tasks/schedule-wire-design.ko.md) |
+| `tasks/sensor-atomicity-design.md` | [English](../tasks/sensor-atomicity-design.md) | [한국어](../tasks/sensor-atomicity-design.ko.md) |
+| `tasks/solar-native-admission-integration.md` | [English](../tasks/solar-native-admission-integration.md) | [한국어](../tasks/solar-native-admission-integration.ko.md) |
+| `tasks/temporal-adapter-replay-design.md` | [English](../tasks/temporal-adapter-replay-design.md) | [한국어](../tasks/temporal-adapter-replay-design.ko.md) |
+| `tasks/temporal-layout-evidence.md` | [English](../tasks/temporal-layout-evidence.md) | [한국어](../tasks/temporal-layout-evidence.ko.md) |
+| `tasks/temporal-policy-decisions.md` | [English](../tasks/temporal-policy-decisions.md) | [한국어](../tasks/temporal-policy-decisions.ko.md) |
+| `tasks/temporal-resource-plan-design.md` | [English](../tasks/temporal-resource-plan-design.md) | [한국어](../tasks/temporal-resource-plan-design.ko.md) |
+| `tasks/true-for-driver-contract.md` | [English](../tasks/true-for-driver-contract.md) | [한국어](../tasks/true-for-driver-contract.ko.md) |
+| `tasks/window-derived-design.md` | [English](../tasks/window-derived-design.md) | [한국어](../tasks/window-derived-design.ko.md) |
+| `tasks/window-evidence-design.md` | [English](../tasks/window-evidence-design.md) | [한국어](../tasks/window-evidence-design.ko.md) |
+| `tasks/window-gfb4-design.md` | [English](../tasks/window-gfb4-design.md) | [한국어](../tasks/window-gfb4-design.ko.md) |
+| `tests/reference/DECISIONS.md` | [English](../tests/reference/DECISIONS.en.md) | [한국어](../tests/reference/DECISIONS.md) |
+| `tests/reference/README.md` | [English](../tests/reference/README.en.md) | [한국어](../tests/reference/README.md) |
