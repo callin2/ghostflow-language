@@ -50,7 +50,7 @@ constraints StationRules {
   allow enter(Auto, Manual, Configure)
     only when mode == Stopped && stopped(station);
 
-  // 구조적 구성 적용의 정지 조건 (lowerer 규칙: configureOnly); operator 설정 event와 구분
+  // Stop condition for applying structural configuration (lowerer rule: configureOnly); distinct from operator setting events
   allow apply(settings)
     only when mode == Configure && stopped(station);
 
