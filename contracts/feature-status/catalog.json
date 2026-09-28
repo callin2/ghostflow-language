@@ -3140,6 +3140,18 @@
               "targets": [
                 "wasm"
               ]
+            },
+            {
+              "path": "tests/restart-reason-boundary.test.mjs",
+              "testId": "REF-05-107 [runtime] 근거 없는 재시작 원인은 Unknown이다.",
+              "caseId": "REF-05-107",
+              "assertionClass": "observation",
+              "targets": [
+                "wasm"
+              ],
+              "polarities": [
+                "boundary"
+              ]
             }
           ]
         }
@@ -3147,8 +3159,12 @@
       "gaps": [
         "Host simulation does not establish Driver application or physical confirmation."
       ],
-      "issues": [],
-      "referenceCaseIds": []
+      "issues": [
+        339
+      ],
+      "referenceCaseIds": [
+        "REF-05-107"
+      ]
     },
     {
       "id": "driver-boundary",
