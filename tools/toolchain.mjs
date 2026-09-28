@@ -112,6 +112,7 @@ function canonicalTraceMetadata(document, bytes, manifest) {
     expectedSignalBindings,
     expectedSignalDependencies: mappedTrace.dependencies.filter(entry => entry.target.field === 'stateAfter' && signalStates.has(entry.target.name)),
     expectedWindowSites: mappedTrace.windowSites,
+    expectedDerivations: mappedTrace.derivations ?? [],
     expectedWindowDependencies: mappedTrace.dependencies.filter(entry => entry.target.field === 'windowTrace'
       || entry.reads.some(read => read.field === 'windowTrace')),
     requiresTraceMetadata: sourceMapRequiresTraceMetadata(replay.sourceMap) || replay.traceMetadata.resultSites.length > 0,
@@ -173,7 +174,7 @@ function validateArtifactSourceMap(map, bytes, { expectedSourceSha256, requireTr
   }
   const hasTraceMetadata = Object.hasOwn(map, 'traceMetadata');
   const { expectedTimerDependencies, expectedResultSites, expectedSignalBindings, expectedSignalDependencies,
-    expectedWindowSites, expectedWindowDependencies, requiresTraceMetadata } = canonicalTraceMetadata(document, artifactBytes, manifest);
+    expectedWindowSites, expectedWindowDependencies, expectedDerivations, requiresTraceMetadata } = canonicalTraceMetadata(document, artifactBytes, manifest);
   if (hasTraceMetadata && map.traceMetadata !== null) {
     verifySourceTraceMetadata(map.traceMetadata, artifactBytes, map.nodes, {
       sourceDocumentSha256: document.sha256,
@@ -187,6 +188,7 @@ function validateArtifactSourceMap(map, bytes, { expectedSourceSha256, requireTr
       expectedSignalBindings,
       expectedSignalDependencies,
       expectedWindowSites,
+      expectedDerivations,
       expectedWindowDependencies,
     });
   } else if (requiresTraceMetadata && (hasTraceMetadata || requireTraceMetadata)) {
