@@ -528,3 +528,73 @@ test('REF-05-103 [host] 임시 Run overlay는 run 경계에서 제거된다.', a
   assert.equal(nextRun.contextSnapshot().state.settingsRevision, 0);
   assert.deepEqual(nextRun.contextSnapshot().state.settings[0].result, { ok: true, value: 300_000 });
 });
+
+test('REF-08-015 [runtime] state 초기화와 일반 config 지속성은 별도이며 정전 시간을 elapsed에 더하지 않는다.', async t => {
+  const referenceCases = JSON.parse(fs.readFileSync(
+    new URL('./reference/cases/03-settings-boundaries.json', import.meta.url), 'utf8')).cases;
+  const ref08015 = referenceCases.find(entry => entry.id === 'REF-08-015');
+  const chapter08 = fs.readFileSync(
+    new URL('../docs/reference/08-language-runtime-and-device-boundaries.md', import.meta.url), 'utf8');
+  assert.equal(ref08015?.issue, 'https://github.com/callin2/ghostflow-language/issues/332');
+  assert.match(ref08015.rule, /state 초기화와 일반 config 지속성은 별도/);
+  assert.match(ref08015.rule, /정전 시간을 elapsed에 더하지 않는다/);
+  assert.match(ref08015.given, /운전 state와 2min timer/);
+  assert.match(ref08015.then, /새 run에서 state 선언 초기값/);
+  assert.match(ref08015.then, /elapsed 0ms/);
+  assert.match(ref08015.then, /config 5min/);
+  assert.match(chapter08, /state·타이머·필터 내부 기억 \| 언어 실행 의미/);
+  assert.match(chapter08, /재시작 복원은 명시한 정책과 checkpoint 계약 필요/);
+  assert.match(chapter08, /operator config의 유효값 \| 언어의 live 설정 계약/);
+  assert.match(chapter08, /일반 설정은 실제 재시작 후 보존/);
+
+  const compiled = await compileSource(`# Restart state timer config boundary\n\n\`\`\`ghost\ncontrol RestartBoundary {
+  input start: Bool;
+  config duration: Duration = 3min { min = 1min; max = 20min; step = 1min; access = operator; }
+  state running: Bool = false;
+  timer age = elapsed(running);
+  running' = running || start;
+  output active: Bool;
+  output age_ms: Duration;
+  output seconds: Number;
+  active <- running;
+  age_ms <- age;
+  seconds <- case duration { ok(value) => value / 1s; fault(_) => -1.0; };
+}\n\`\`\`\n`, { filename: 'restart-state-timer-config.ghost.md' });
+  const firstRun = await ControlRuntime.instantiate(wasmBytes(), compiled,
+    { context: { bootEpoch: 15, terminalCapacity: 8, bindings: [] } });
+  t.after(() => firstRun.dispose());
+  const fingerprint = firstRun.contextSnapshot().state.programFingerprint;
+  const configId = compiled.manifest.configs[0].id;
+  const facts = (position, settings, bootEpoch = 15) => ({
+    clock: { monotonicMs: position, bootEpoch, wallMs: 5_000 + position,
+      uncertaintyMs: 0, trusted: true, unknownReason: null, sourceRevision: `restart-boundary-clock-${bootEpoch}` },
+    natural: [], schedules: [], settings,
+  });
+  const ordinary5min = (baseRevision, position, eventId = 'ordinary-5min') => ({
+    programFingerprint: fingerprint,
+    eventId,
+    baseRevision,
+    position,
+    origin: 'operatorEdit',
+    changes: [{ configId, result: { ok: true, type: 'Duration', value: 300_000 } }],
+  });
+
+  assert.deepEqual(firstRun.contextSnapshot().state.settings[0].result, { ok: true, value: 180_000 });
+  const start = firstRun.step({ nowMs: 1, inputs: { start: true }, contextFacts: facts(1, ordinary5min(0, 1)) });
+  assert.equal(start.vm.safe.active, false);
+  assert.equal(start.vm.safe.seconds, 300);
+  const afterTwoMinutes = firstRun.step({ nowMs: 120_000, inputs: { start: false }, contextFacts: facts(120_000, null) });
+  assert.equal(afterTwoMinutes.vm.safe.active, true);
+  assert.ok(afterTwoMinutes.vm.safe.age_ms >= 119_000);
+
+  const nextRun = await ControlRuntime.instantiate(wasmBytes(), compiled,
+    { context: { bootEpoch: 16, terminalCapacity: 8, bindings: [] } });
+  t.after(() => nextRun.dispose());
+  const firstDecision = nextRun.step({ nowMs: 1, inputs: { start: false }, contextFacts: facts(1,
+    ordinary5min(0, 1, 'preserved-ordinary-5min-at-new-run'), 16) });
+  assert.equal(firstDecision.vm.safe.active, false, 'new run starts from declared state initial value');
+  assert.equal(firstDecision.vm.safe.age_ms, 0, 'outage time is not added to elapsed');
+  assert.equal(firstDecision.vm.safe.seconds, 300, 'ordinary config persistence supplies 5min');
+  assert.equal(nextRun.contextSnapshot().state.settingsRevision, 1);
+  assert.deepEqual(nextRun.contextSnapshot().state.settings[0].result, { ok: true, value: 300_000 });
+});

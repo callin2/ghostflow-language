@@ -2595,6 +2595,19 @@
                 "positive",
                 "boundary"
               ]
+            },
+            {
+              "path": "tests/issue-90-settings-stream.test.mjs",
+              "testId": "REF-08-015 [runtime] state 초기화와 일반 config 지속성은 별도이며 정전 시간을 elapsed에 더하지 않는다.",
+              "caseId": "REF-08-015",
+              "assertionClass": "runtime-value",
+              "targets": [
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
             }
           ]
         }
@@ -2607,13 +2620,15 @@
         338,
         337,
         336,
-        335
+        335,
+        332
       ],
       "referenceCaseIds": [
         "REF-05-106",
         "REF-05-105",
         "REF-05-104",
-        "REF-05-103"
+        "REF-05-103",
+        "REF-08-015"
       ]
     },
     {
