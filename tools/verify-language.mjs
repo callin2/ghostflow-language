@@ -26,6 +26,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/reference-simulator.test.mjs',
   'tests/adapt-control-host.test.mjs',
   'tests/reference-query.test.mjs',
+  'tests/reference-index-links.test.mjs',
   'tests/authoring-efficiency.test.mjs',
   'tests/time-literals.test.mjs',
   'tests/date-time-control.test.mjs',
