@@ -2853,6 +2853,56 @@
       ]
     },
     {
+      "id": "reference-terms-boundaries",
+      "family": "Reference identity and effect boundary terms",
+      "clause": {
+        "path": "docs/reference/07-semantic-rules-and-index.md",
+        "heading": "7.7 용어"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [
+        "compile"
+      ],
+      "evidence": [
+        {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/reference-terms-boundaries.test.mjs",
+              "testId": "REF-07-009: boundary terms have separate identity and effect definitions",
+              "caseId": "REF-07-009",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive"
+              ]
+            },
+            {
+              "path": "tests/reference-terms-boundaries.test.mjs",
+              "testId": "REF-07-009: Reference prose does not collapse Program/Run, requested/safe, or logical/physical",
+              "caseId": "REF-07-009",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "The oracle checks Reference term definitions and selected non-collapse prose; it does not prove every downstream product UI label or external integration document."
+      ],
+      "issues": [
+        316
+      ],
+      "referenceCaseIds": [
+        "REF-07-009"
+      ]
+    },
+    {
       "id": "host-boundary",
       "family": "Host scheduling, persistence and simulation",
       "clause": {
