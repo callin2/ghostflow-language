@@ -2944,6 +2944,57 @@
       ]
     },
     {
+      "id": "compiler-physical-boundary",
+      "family": "Compiler metadata preservation and physical verification boundary",
+      "clause": {
+        "path": "docs/reference/08-language-runtime-and-device-boundaries.md",
+        "heading": "8.2 계층별 책임"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [
+        "compile"
+      ],
+      "evidence": [
+        {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/reference-layer-boundaries.test.mjs",
+              "testId": "REF-08-002: compiler/tooling preserves source metadata but does not prove physical operation",
+              "caseId": "REF-08-002",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-layer-boundaries.test.mjs",
+              "testId": "REF-08-002: FAQ compiler row separates compile checks from physical verification",
+              "caseId": "REF-08-002",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "The oracle verifies Reference responsibility boundaries; it does not prove an external installer or Driver produces a physical verification report."
+      ],
+      "issues": [
+        319
+      ],
+      "referenceCaseIds": [
+        "REF-08-002"
+      ]
+    },
+    {
       "id": "host-boundary",
       "family": "Host scheduling, persistence and simulation",
       "clause": {
