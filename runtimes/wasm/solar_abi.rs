@@ -7,7 +7,7 @@ use ghostflow_core::{
 
 const MAX_PACKET: usize = 65_536;
 const MAX_EXACT: u64 = (1_u64 << 53) - 1;
-struct Packet {
+pub(crate) struct Packet {
     monotonic_ms: u64,
     boot_epoch: u64,
     wall_ms: Option<u64>,
@@ -16,6 +16,59 @@ struct Packet {
     reason: String,
     revision: String,
     schedules: Vec<Facts>,
+}
+impl Packet {
+    pub(crate) fn clock(&self) -> ClockSnapshot<'_> {
+        ClockSnapshot {
+            monotonic_ms: self.monotonic_ms,
+            boot_epoch: self.boot_epoch,
+            wall_ms: self.wall_ms,
+            uncertainty_ms: self.uncertainty_ms,
+            source_revision: (!self.revision.is_empty()).then_some(self.revision.as_str()),
+            trust: if self.trusted {
+                ClockTrust::Trusted
+            } else {
+                ClockTrust::Unknown(&self.reason)
+            },
+        }
+    }
+    pub(crate) fn inputs(&self) -> Vec<ScheduleInput<'_>> {
+        self.schedules
+            .iter()
+            .map(|item| ScheduleInput {
+                site: item.site,
+                kind: item.kind,
+                facts: SolarFacts {
+                    coverage_from_wall_ms: item.from,
+                    coverage_to_wall_ms: item.to,
+                    rows: &item.rows,
+                },
+            })
+            .collect()
+    }
+}
+
+pub(crate) unsafe fn schedules_from_raw(
+    ptr: *const u8,
+    len: usize,
+) -> Result<(Packet, u16), String> {
+    if ptr.is_null() || !(6..=MAX_PACKET).contains(&len) {
+        return Err("invalid schedule packet pointer or length".into());
+    }
+    let bytes = std::slice::from_raw_parts(ptr, len);
+    let version = u16::from_le_bytes([bytes[4], bytes[5]]);
+    if !matches!(version, 2 | 3) {
+        return Err("invalid schedule packet version".into());
+    }
+    let packet = decode(bytes, version)?;
+    if packet
+        .schedules
+        .iter()
+        .any(|item| item.kind == ScheduleKind::Solar)
+    {
+        return Err("framed Solar activation is not supported".into());
+    }
+    Ok((packet, version))
 }
 struct Facts {
     site: u32,

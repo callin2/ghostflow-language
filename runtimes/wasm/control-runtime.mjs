@@ -832,7 +832,6 @@ async function instantiateControlRuntime(wasmBytes, { bytes: bytecode, manifest 
     if (options.schedule !== undefined || options.solar !== undefined || options.temporal !== undefined) throw new Error('context activation cannot mix legacy profiles');
   }
   if (hasSolar && !supportsSchedules) throw new Error('framed Solar activation is not supported by this runtime');
-  if (hasSchedules && !supportsSchedules) throw new Error('framed civil schedule activation is not supported by this runtime');
   if (hasContext) {
     // The Rust runtime owns the provider and settings state.
   } else if (hasSchedules) {
@@ -1427,11 +1426,12 @@ export class ControlRuntime {
       this.#setIntervals(captured.intervalValues, (name, value) => frameInputs.push({ name, type: value.type, value: value.value }));
       this.#setAfterEventProjections(staged.projections,
         (name, value) => frameInputs.push({ name, type: value.type, value: value.value }));
-      if (this.#temporalEpoch !== null && !this.#hasContext) frameInputs.push({ name: `${RESERVED}time_epoch`, type: 'Number', value: this.#temporalEpoch });
+      if (this.#temporalEpoch !== null && !this.#hasContext && !this.#hasSchedules) frameInputs.push({ name: `${RESERVED}time_epoch`, type: 'Number', value: this.#temporalEpoch });
 
       phase = 'dispatch';
       const frame = { scanId, logicalTimeMs: captured.nowMs, inputs: frameInputs };
       if (this.#hasContext) this.runtime.dispatchContext(frame, captured.contextFacts);
+      else if (this.#hasSchedules) this.runtime.dispatchSchedules(frame, captured.scheduleFacts);
       else this.runtime.dispatch(frame);
       phase = 'committed';
       this.lastNowMs = captured.nowMs;

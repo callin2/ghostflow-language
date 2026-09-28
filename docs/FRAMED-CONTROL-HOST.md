@@ -148,3 +148,33 @@ constraints, failed compile/reset, and invalid DI rejection before a host call.
 The language prerequisite can merge after its own exact-head gates; parent D6
 cannot be Done until Web pins and exercises that artifact. D9 native framed-tape
 parity and D7/D8/D11 device integration remain separate tasks.
+
+## Civil schedules (issue #366)
+
+For framed civil `Daily` and `DailySlots`, the host activates the schedule
+profile with `{bootEpoch, terminalCapacity}`. The provider supplies GFSF v2/v3
+schedule-fact packets separately at scan time; activation does not produce
+packets, and schedule facts are not ordinary generated input entries.
+`clock.monotonicMs` must equal `frame.logicalTimeMs` exactly.
+
+The runtime exports `gf_frame_activate_schedules` and
+`gf_frame_scan_schedules`; the JavaScript host uses `activateSchedules` and
+`dispatchSchedules`. The host must require matching WASM exports before using
+this path.
+
+Rust owns occurrence admission and the occurrence ledger. The host validates
+the complete declared and generated input set and the schedule-fact packet
+before execution; it must not
+derive or supply runtime `due`, `ok` or `fault` results. A rejected frame must
+follow the existing commit boundary: a known rejection rolls back and permits
+retry with the same frame identity, while failure after native commit preserves
+the original committed frame result and cannot be retried as an uncommitted
+frame. For example, an invalid schedule-fact packet is rejected before frame
+commit; a valid retry uses the same frame identity. Regression coverage is in
+`tests/framed-control-host.test.mjs` and
+`crates/ghostflow-core/tests/schedule_module.rs`.
+
+Framed Solar schedules remain unsupported.
+
+Prevention rule: verify the actual public runtime interface before making mock
+assumptions. Mock coverage alone does not establish runtime capability.

@@ -1014,6 +1014,92 @@ fn daily_slots_gfb9_uses_descriptor_slot_identity_and_native_ledger() {
 }
 
 #[test]
+fn framed_daily_slots_rejected_scan_preserves_sequence_state_and_admission_for_retry() {
+    use ghostflow_core::{
+        scan::{ScanFrameV1, ScanInput},
+        schedule_clock::{ClockSnapshot, ClockTrust},
+        solar_admission::SolarFacts,
+        solar_runtime::{ScheduleInput, ScheduleKind},
+    };
+    // Reuse the existing downstream-error fixture: time 11 divides by zero
+    // after admission staging, rather than merely failing transport validation.
+    let mut fixture = daily_slots_fixture();
+    fixture.states = 1;
+    fixture.transition = Some(vec![58, 0, 0, 0]);
+    fixture.output_type = 2;
+    fixture.output = vec![33, 3, 0, 0, 2];
+    fixture.output.extend(11f64.to_le_bytes());
+    fixture.output.extend([20, 22]);
+    let mut runtime = Runtime::new(8);
+    runtime.install(Module::load(&fixture.bytes()).unwrap(), false);
+    runtime
+        .activate_with_schedules(&solar_activation())
+        .unwrap();
+    let mut driver = runtime.into_scan_driver();
+    let rows = [slot_fact(4, 376, 375, 1000)];
+    let facts = [ScheduleInput {
+        site: 7,
+        kind: ScheduleKind::DailySlots,
+        facts: SolarFacts {
+            coverage_from_wall_ms: 0,
+            coverage_to_wall_ms: 2000,
+            rows: &rows,
+        },
+    }];
+    let frame = |scan_id, logical_time_ms| ScanFrameV1 {
+        scan_id,
+        logical_time_ms,
+        inputs: vec![],
+    };
+    let clock = |monotonic_ms, wall_ms| ClockSnapshot {
+        monotonic_ms,
+        boot_epoch: 3,
+        wall_ms: Some(wall_ms),
+        uncertainty_ms: Some(0),
+        source_revision: Some("clock-v1"),
+        trust: ClockTrust::Trusted,
+    };
+    driver
+        .scan_with_schedules(frame(0, 10), clock(10, 999), &facts, 3)
+        .unwrap();
+    assert_eq!(
+        driver
+            .scan_with_schedules(frame(1, 11), clock(11, 1000), &facts, 3)
+            .unwrap_err()
+            .message(),
+        "division by zero"
+    );
+    assert_eq!(driver.next_scan_id(), Some(1));
+    assert_eq!(driver.scan_last_time_ms(), Some(10));
+    assert_eq!(driver.runtime().journal().len(), 1);
+    assert_eq!(driver.runtime().state("s0"), Some(Value::Bool(false)));
+    assert!(driver
+        .scan_with_schedules(frame(1, 12), clock(13, 1000), &facts, 3)
+        .is_err());
+    let mut forged = frame(1, 12);
+    forged.inputs.push(ScanInput {
+        name: "__gf_time_epoch".into(),
+        value: Value::Number(3.0),
+    });
+    assert!(driver
+        .scan_with_schedules(forged, clock(12, 1000), &facts, 3)
+        .is_err());
+    let admitted = driver
+        .scan_with_schedules(frame(1, 12), clock(12, 1000), &facts, 3)
+        .unwrap();
+    assert_eq!((admitted.scan_id, admitted.logical_time_ms), (1, 12));
+    assert!(admitted.trace.schedule_trace[0].due);
+    assert!(driver
+        .scan_with_schedules(frame(1, 12), clock(12, 1000), &facts, 3)
+        .is_err());
+    let next = driver
+        .scan_with_schedules(frame(2, 13), clock(13, 1100), &facts, 3)
+        .unwrap();
+    assert!(!next.trace.schedule_trace[0].due);
+    assert_eq!(driver.runtime().journal().len(), 3);
+}
+
+#[test]
 fn daily_slots_gfb9_rejects_wrong_descriptor_or_fact_identity() {
     use ghostflow_core::solar_runtime::ScheduleKind::DailySlots;
 
