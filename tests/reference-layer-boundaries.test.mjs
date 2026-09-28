@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
+import { compileSource } from '../tools/toolchain.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const referenceDir = path.join(root, 'docs/reference');
@@ -119,6 +120,61 @@ test('REF-08-004: host execution does not require Android, cloud, or internet an
   const combined = [layerSection, chapter03].join('\n');
   assert.doesNotMatch(combined, /(?:Android|cloud|클라우드|인터넷|gateway|게이트웨이).{0,30}(?:필수 구성이다|필수 요구다|must be required|is required)/i);
   assert.doesNotMatch(combined, /(?:네트워크 단절|network disconnected).{0,30}(?:자료 만료|data expired|시각 불명|time unknown).{0,20}(?:같은 상태|동일 상태|same state)/i);
+});
+
+test('REF-08-016 [host] 설치 binding과 Driver 배포 형식은 source grammar 밖의 환경 계약이다.', async () => {
+  const referenceCases = JSON.parse(fs.readFileSync(
+    path.join(root, 'tests/reference/cases/03-settings-boundaries.json'), 'utf8')).cases;
+  const ref08016 = referenceCases.find(entry => entry.id === 'REF-08-016');
+  const chapter08 = readReference('08-language-runtime-and-device-boundaries.md');
+  const chapter06 = readReference('06-composition-and-replay.md');
+  assert.equal(ref08016?.issue, 'https://github.com/callin2/ghostflow-language/issues/333');
+  assert.match(ref08016.rule, /설치 binding과 Driver 배포 형식은 source grammar 밖의 환경 계약이다/);
+  assert.match(ref08016.given, /GPIO와 RS485 Driver binding 후보/);
+  assert.match(ref08016.then, /source\/Program identity를 유지/);
+  assert.match(ref08016.then, /binding\/Driver 판본을 별도로 식별/);
+  assert.match(ref08016.then, /FAQ 화살표를 source 문법으로 해석하지 않는다/);
+
+  const layers = tableByFirstCell(section(chapter08, '8.2 계층별 책임'));
+  const language = layers.get('언어 사양');
+  const binding = layers.get('설치 profile·binding');
+  assert.ok(language, 'missing language layer row');
+  assert.ok(binding, 'missing installation profile/binding row');
+  assert.match(language[1], /장치 주소, UI 모양, 저장 매체를 제어 문법으로 만들지 않는다/);
+  assert.match(binding[0], /논리 역할과 실제 endpoint 연결/);
+  assert.match(binding[1], /연결만 바뀌는 것과 소스 규칙 변경을 구분한다/);
+  assert.match(chapter08, /직접 GPIO, 확장 채널, RS485 장치 주소는\s+설치 binding과 Driver의 책임이다/);
+  assert.match(chapter08, /호환 교체만으로 소스 수정·재컴파일을 요구하지 않는다/);
+  assert.match(chapter08, /설치 저장 형식·실제 핀\/주소·Driver 배포 방식/);
+  assert.match(chapter08, /저장 매체, UI component, 통신 protocol도 언어 문법을 결정하기 위한 선행 조건이 아니다/);
+  assert.match(chapter06, /physical endpoint는 별도 profile과 binding revision이 소유한다/);
+  assert.match(chapter06, /버스 주소·채널 선택·전송 절차는 Driver와 설치 연결이 소유한다/);
+  assert.match(chapter06, /Driver 자체의 배포 판본은 실행 환경에서 관리한다/);
+  assert.match(chapter06, /`bind`는 제어 소스 문법이 아니다/);
+
+  const source = `# Logical port\n\n\`\`\`ghost\ncontrol LogicalPump {
+  input start: Bool;
+  output pump: Bool;
+  pump <- start;
+}\n\`\`\`\n`;
+  const compiled = await compileSource(source, { filename: 'logical-pump.ghost.md' });
+  const sourceIdentity = {
+    source: compiled.sourceDocument.sha256,
+    program: compiled.manifest.bytecodeSha256,
+  };
+  const gpioBinding = { bindingRevision: 'install-gpio-r1', driverRevision: 'gpio-relay-1.0.0', endpoint: 'gpio:17' };
+  const rs485Binding = { bindingRevision: 'install-rs485-r2', driverRevision: 'rs485-relay-2.1.0', endpoint: 'rs485:7/channel/1' };
+  assert.notDeepEqual(gpioBinding, rs485Binding);
+  assert.deepEqual(sourceIdentity, { source: compiled.sourceDocument.sha256, program: compiled.manifest.bytecodeSha256 });
+
+  const grammarSketches = [
+    'control BadArrow { input start: Bool; output pump: Bool; start -> pump; }',
+    'control BadBind { bind pump to GPIO17; output pump: Bool; pump <- false; }',
+    'control BadRs485 { output pump: Bool; pump <- RS485(7, 1); }',
+  ];
+  for (const sketch of grammarSketches) {
+    await assert.rejects(() => compileSource(`\`\`\`ghost\n${sketch}\n\`\`\`\n`, { filename: 'external-binding-sketch.ghost.md' }));
+  }
 });
 
 test('REF-08-006: ordinary control combinations stay in language constructs and input-capture contracts', () => {
