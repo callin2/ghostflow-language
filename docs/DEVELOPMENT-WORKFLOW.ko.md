@@ -73,6 +73,24 @@ npm run docs:index
 npm run docs:check
 ```
 
+항상 실행되는 Verified WASM 워크플로는
+[이슈 #357](https://github.com/callin2/ghostflow-language/issues/357)에 따라 정확한
+변경 집합을 분류합니다. README, CONTRIBUTING, `docs/DOCUMENTATION` 영문/한국어
+쌍, `INDEX.md`, `docs/INDEX.md`, 네 개의
+`docs/assets/readme-{hero,intent,replay,trace}.svg` 파일만 경량 문서 경로에 해당합니다.
+`docs/translations.json`도 해당 일반 문서 쌍의 추가, 삭제 또는 해시 변경만 있으면
+해당합니다. 다른 문서 쌍과 정책 메타데이터는 동일해야 합니다. 알 수 없는 경로,
+혼합 변경, `.ghost.md`, 명세, 계약, 검증 정책 및 안전하지 않은 파일 모드는 전체
+검증이 필요합니다. 빈 변경 집합이나 비교할 수 없는 변경도 전체 검증이 필요합니다.
+PR은 merge-base와 head를 비교합니다. push는 정확한 이전 커밋과 현재 커밋을 비교합니다.
+
+문서 경로는 스크립트 없이 Node 의존성을 설치하고 전체 `docs:check` 게이트와
+집중된 경로 분류 테스트를 실행합니다. WASM 아티팩트는 생성하지 않습니다.
+수동 워크플로 실행은 항상 전체 검증을 실행합니다. 정확한 SHA의 아티팩트가
+필요하면 수동으로 실행합니다. 최종 `Verification result` 검사는 분류와 선택된
+경로의 성공을 요구합니다. 병합 전에 성공을 확인해야 합니다. 브랜치 보호 설정은
+변경하지 않습니다. 이 검사가 플랫폼에서 강제되는 필수 검사 규칙을 만들지는 않습니다.
+
 `docs:check`는 CI에서 사용하는 검사 전용 게이트입니다. 검사기를 변경했다면 해당
 테스트를 실행합니다.
 
