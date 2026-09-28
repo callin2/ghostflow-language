@@ -417,3 +417,66 @@ test('REF-05-105 [host] 오래된 expiry는 새 일반 설정을 덮어쓰지 �
   assert.equal(state.settingsRevision, 2);
   assert.deepEqual(state.settings[0].result, { ok: true, value: 360_000 });
 });
+
+test('REF-05-104 [host] Until 임시값의 만료는 복귀 설정 event다.', async t => {
+  const referenceCases = JSON.parse(fs.readFileSync(
+    new URL('./reference/cases/03-settings-boundaries.json', import.meta.url), 'utf8')).cases;
+  const ref05104 = referenceCases.find(entry => entry.id === 'REF-05-104');
+  const settingsChapter = fs.readFileSync(
+    new URL('../docs/reference/05-settings-and-observation.md', import.meta.url), 'utf8');
+  assert.equal(ref05104?.issue, 'https://github.com/callin2/ghostflow-language/issues/336');
+  assert.match(ref05104.rule, /Until 임시값의 만료는 복귀 설정 event다/);
+  assert.match(ref05104.given, /일반값 5min/);
+  assert.match(ref05104.when, /정확히 10:00Z/);
+  assert.match(ref05104.then, /유효값 5min/);
+  assert.match(ref05104.then, /새 settings revision/);
+  assert.match(ref05104.then, /state와 timer는 reset하지 않는다/);
+  assert.match(settingsChapter, /만료·취소 \| 원래 overlay ID를 대상으로 하는 atomic settings event다/);
+  assert.match(settingsChapter, /완료된 settings revision과 적용 위치를 남긴다/);
+
+  const compiled = await compileSource(`# Until expiry return\n\n\`\`\`ghost\ncontrol UntilExpiryReturn {
+  input tick: Bool;
+  config duration: Duration = 5min { min = 1min; max = 20min; step = 1min; access = operator; }
+  state seen: Bool = false;
+  timer age = elapsed(seen);
+  seen' = seen || tick;
+  output seconds: Number;
+  output remembered: Bool;
+  output age_ms: Duration;
+  seconds <- case duration { ok(value) => value / 1s; fault(_) => -1.0; };
+  remembered <- seen;
+  age_ms <- age;
+}\n\`\`\`\n`, { filename: 'until-expiry-return.ghost.md' });
+  const runtime = await ControlRuntime.instantiate(wasmBytes(), compiled,
+    { context: { bootEpoch: 12, terminalCapacity: 8, bindings: [] } });
+  t.after(() => runtime.dispose());
+  const fingerprint = runtime.contextSnapshot().state.programFingerprint;
+  const configId = compiled.manifest.configs[0].id;
+  const facts = (position, settings) => ({
+    clock: { monotonicMs: position, bootEpoch: 12, wallMs: Date.parse('2026-09-29T10:00:00.000Z') + position,
+      uncertaintyMs: 0, trusted: true, unknownReason: null, sourceRevision: 'until-expiry-clock-v1' },
+    natural: [], schedules: [], settings,
+  });
+  const event = (eventId, baseRevision, position, value) => ({
+    programFingerprint: fingerprint,
+    eventId,
+    baseRevision,
+    position,
+    origin: 'operatorEdit',
+    changes: [{ configId, result: { ok: true, type: 'Duration', value } }],
+  });
+
+  const overlay = runtime.step({ nowMs: 1_000, inputs: { tick: true }, contextFacts: facts(1_000,
+    event('until-overlay-8min-expires-at-10z', 0, 1, 480_000)) });
+  assert.equal(overlay.vm.safe.seconds, 480);
+  assert.equal(overlay.vm.safe.remembered, false);
+  assert.equal(runtime.contextSnapshot().state.settingsRevision, 1);
+
+  const returned = runtime.step({ nowMs: 61_000, inputs: { tick: false }, contextFacts: facts(61_000,
+    event('until-overlay-8min-return-to-5min', 1, 2, 300_000)) });
+  assert.equal(returned.vm.safe.seconds, 300);
+  assert.equal(returned.vm.safe.remembered, true, 'state is not reset by expiry return');
+  assert.ok(returned.vm.safe.age_ms > 0, 'timer memory continues across expiry return');
+  assert.equal(runtime.contextSnapshot().state.settingsRevision, 2);
+  assert.deepEqual(runtime.contextSnapshot().state.settings[0].result, { ok: true, value: 300_000 });
+});

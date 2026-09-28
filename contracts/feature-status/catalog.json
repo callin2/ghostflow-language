@@ -2569,6 +2569,19 @@
               "polarities": [
                 "boundary"
               ]
+            },
+            {
+              "path": "tests/issue-90-settings-stream.test.mjs",
+              "testId": "REF-05-104 [host] Until 임시값의 만료는 복귀 설정 event다.",
+              "caseId": "REF-05-104",
+              "assertionClass": "runtime-value",
+              "targets": [
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
             }
           ]
         }
@@ -2579,11 +2592,13 @@
       "issues": [
         74,
         338,
-        337
+        337,
+        336
       ],
       "referenceCaseIds": [
         "REF-05-106",
-        "REF-05-105"
+        "REF-05-105",
+        "REF-05-104"
       ]
     },
     {
