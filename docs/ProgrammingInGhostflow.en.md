@@ -72,6 +72,7 @@ from its language examples.
 10. [Stopping, changing, and comparing](#ch10)
 11. [Files and literate programs](#ch11)
 12. [One device, multiple controls](#ch12)
+13. [Built-in functions and operations](#ch13)
 
 Appendices: [A. Specification guide](#appendix-a) · [B. Learning through errors](#appendix-b)
 
@@ -1008,6 +1009,205 @@ definition revision → import → instance + typed connect
 ```
 
 Use `adapt`, capability checks, common constraints, shared resources, replay, and hot replacement only at their prescribed locations and with their defined types and contracts. Syntax and semantic DAG rules follow [Reference §6](reference/06-composition-and-replay.md); device/Driver/binding responsibilities follow [Reference §8](reference/08-language-runtime-and-device-boundaries.md). Do not assume an arbitrary separate policy language inside ordinary `control`.
+
+<a id="ch13"></a>
+## 13. Built-in functions and operations
+
+A builtin is an operation the compiler already knows. A `fn` is a calculation you declare, such as E07's function. A familiar name does not make a function builtin: there are no general `abs`, `min`, `max`, `clamp`, `sqrt`, `pow` or `round` expression functions. Declare a suitable `fn` when the language permits its calculation.
+
+This chapter audits dev revision `c1bbbe35cbe5acf16118707f8afc14619153d918` for [#369](https://github.com/callin2/ghostflow-language/issues/369).
+It covers all **48 primary callable spellings** and **3 additional host-policy spellings**. The tables distinguish ordinary calls, declaration constructors and restricted transforms. Signatures below are fragments; the linked tests contain complete examples. They are not extra independent source documents.
+
+First ask where the operation is permitted. Then inspect its input and result types. Finally ask whether it remembers samples or state, requires a clock/provider, or returns a fault. A successful compile can produce a checked descriptor rather than executable control. Even executable control needs the stated runtime inputs and bindings. None of these operations proves physical output effect.
+
+### 13.1 Numbers and explicit Result construction
+
+Use conversions when the intended numeric representation changes. `Int` is exact signed 32-bit; `Number` is floating point. These functions take exactly one positional argument. For example, `int_floor(-1.2)` is -2, while `int_trunc(-1.2)` is -1. A halfway value such as 2.5 rounds to 2 with nearest-even; 3.5 rounds to 4.
+
+| Builtin | Signature and purpose | Context, boundaries and example |
+|---|---|---|
+| `number` | `number(x: Int) -> Number`: change representation explicitly | Ordinary expression, no state. [Integer examples](../tests/int-compiler.test.mjs). |
+| `int_exact` | `int_exact(x: Number) -> Int`: require an integral value | Reject fractional or out-of-range values. [Conversions](../tests/dynamic-int-conversions.test.mjs). |
+| `int_floor` | `int_floor(x: Number) -> Int`: round toward negative infinity | Converted value must fit Int. [Conversions](../tests/dynamic-int-conversions.test.mjs). |
+| `int_ceil` | `int_ceil(x: Number) -> Int`: round toward positive infinity | Converted value must fit Int. [Conversions](../tests/dynamic-int-conversions.test.mjs). |
+| `int_trunc` | `int_trunc(x: Number) -> Int`: discard fraction toward zero | Converted value must fit Int. [Conversions](../tests/dynamic-int-conversions.test.mjs). |
+| `int_nearest_even` | `int_nearest_even(x: Number) -> Int`: nearest integer, ties to even | Converted value must fit Int. [Conversions](../tests/dynamic-int-conversions.test.mjs). |
+| `ok` | `ok(value: T) -> Result<T,E>`: construct success | An expected Result type determines T and compiler-owned E. [Result examples](../tests/result-control.test.mjs). |
+| `fault` | `fault(reason: E) -> Result<T,E>`: construct failure | Expected Result type required; keep the typed reason and source origin. [Result examples](../tests/result-control.test.mjs). |
+| `rate` | `rate(delta: Q-difference, time: Duration) -> Rate<Q>`: build a comparison rate | Expected Rate context; positive time; Temperature uses TemperatureDelta. Canonical difference is divided by seconds. [Rate examples](../tests/window-control.test.mjs). |
+
+Invalid constant conversions fail compilation. Dynamic numeric errors prevent successful evaluation; they are not sensor Results that `recover` can catch. `Rate<Q>` is expression-only: use a `window_rate` signal and a `rate` threshold for comparison. It is not a general config/state/input/output storage type.
+Source: [expression calls](../tools/control.mjs), [integer contract](EXACT-INTEGER-CONTRACT.md).
+
+### 13.2 Keep quality until you choose a response
+
+A sensor's failed reading is not a normal zero. A Result pipeline carries either a value or its error. E10 demonstrates explicit failure handling. Use `result |> map(transform)`, `result |> and_then(transform)` or `result |> recover(default)`; `>>` combines static transforms. These are compiler-known transforms, not arbitrary first-class functions.
+
+| Builtin | Signature and purpose | Context, boundaries and example |
+|---|---|---|
+| `map` | `map(T -> U)`: Result<T,E> -> Result<U,E> | Unary named fn or `below(limit)`; U must not be Result. Preserve failure. [Pipelines](../tests/result-control.test.mjs). |
+| `and_then` | `and_then(T -> Result<U,E>)`: Result<T,E> -> Result<U,E> | Unary named fn; same E required. Existing failure bypasses the transform. [Pipelines](../tests/result-control.test.mjs). |
+| `recover` | `recover(default: T)`: Result<T,E> -> T | Explicit same-type fallback; records the fault and origin in trace. `recover(false)` is an author decision. [Provenance](../tests/result-provenance.test.mjs). |
+| `below` | `below(limit: T)`: transform T -> Bool using strict `<` | Only as a map transform. Ordered numeric, Rate, DateTime or TimeOfDay; same-type limit. and_then(below(...)) is rejected because Bool is not Result. [Pipelines](../tests/result-control.test.mjs). |
+
+Source: [static transform lowering](../tools/control.mjs). Recovering a value does not make the original measurement trustworthy.
+For E10's Percent sensor, the fragment `moisture |> map(below(30%)) |> recover(false)` requests false on fault. This threshold calculation has no hysteresis memory.
+
+### 13.3 Filter samples, then use hysteresis to retain a decision
+
+A filter smooths measured values. Hysteresis remembers a Bool decision across a band. They solve different problems and can be used together. Declare a numeric sensor and select one filter with `filter = ...`. Filters consume new valid physical samples; repeated scans do not add sample weight.
+For example, E10's `filter = median(3);` selects three actual samples, while `filter = ema(alpha: 0.25);` gives each new sample one quarter of the update weight.
+
+| Builtin | Signature and purpose | Context, boundaries and example |
+|---|---|---|
+| `median` | `median(n)`: middle of the last n valid samples | Sensor filter only; constant odd integer 1..31. Partial window is NotReady. [Filters](../tests/signals-wasm.test.mjs). |
+| `moving_average` | `moving_average(n)`: arithmetic mean of last n valid samples | Sensor filter only; constant integer 1..31. Partial window is NotReady. [Filters](../tests/signals-wasm.test.mjs). |
+| `ema` | `ema(alpha: Number)`: weighted new sample and previous value | Sensor filter only; constant finite 0 < alpha <= 1. Seed first valid sample; recovery rules still apply. [Filters](../tests/signals-wasm.test.mjs). |
+| `hysteresis` | `hysteresis(sensor, on_below: T, off_above: T, initial: Bool) -> Result<Bool,SensorFault>` | Signal declaration; direct numeric sensor; constant thresholds with same T and on_below < off_above. [Hysteresis boundaries and faults](../tests/signals-wasm.test.mjs). |
+
+Consider E10's moisture control: `signal dry = hysteresis(moisture, on_below: 30%, off_above: 35%, initial: false);`.
+Below 30% sets dry true. Above 35% sets it false. Every value in the **closed band [30%,35%]**, including both equalities, preserves the prior Bool while quality is good. This prevents small fluctuations from switching the decision repeatedly.
+
+The following sequence refers to good filtered readings, after readiness, rather than raw samples before the filter.
+
+| Good filtered moisture | Retained dry value | Reason |
+|---|---|---|
+| 30% after startup | false | Equality retains initial false. |
+| 35% | false | Upper equality also retains false. |
+| 29% | true | Strictly below lower threshold. |
+| 30% | true | Lower equality retains true. |
+| 33% | true | Inside the band. |
+| 35% | true | Upper equality retains true. |
+| 36% | false | Strictly above upper threshold. |
+
+`initial` is the starting retained value, not permission to ignore a missing sample. Before readiness, or after Disconnected/Stale/Invalid, the public result is a fault. Processing resets to initial; good samples must satisfy recovery/filter requirements again. A recovered in-band sample therefore starts from initial, rather than continuing the pre-fault decision. If initial is true, it still does not turn a failed Result into `ok(true)`. E10 chooses its output response using `case`.
+
+The [Rust conditioner](../crates/ghostflow-core/src/signals.rs) uses strict comparisons and resets hysteresis processing on faults. The linked WASM test contains “retains either prior state exactly at both thresholds” and fault/recovery examples. This chapter describes those contracts; editing documentation does not create a new hardware test.
+
+### 13.4 Time, samples and events are different evidence
+
+Declare these operations with `signal name = constructor(...);`. A monotonic timer counting scans is not proof that a physical condition remained true between scans. Use certified evidence when continuity matters.
+For a declared Temperature sensor, `signal recent = hold_last(temperature, for_at_most: 2min, quality: measured);` limits reuse of its last good sample. It still needs an explicit Result response before an output can use it.
+
+| Builtin | Signature and purpose | Context, boundaries and example |
+|---|---|---|
+| `debounce` | `debounce(source, stable_for: Duration, initial: T) -> T or Result<T,E>`: accept a stable candidate | Bool or finite enum; positive constant duration and matching constant initial. Candidate changes restart its age; faults reset. Sample sources preserve lineage; plain values use scans. [Debounce](../tests/debounce-control.test.mjs). |
+| `true_for` | `true_for(BoolSensor, duration: Duration, quality: measured) -> Result<Bool,SensorFault>`: prove continuous true | Direct declared Bool sensor, positive constant duration. Driver-certified intervals; false/inadmissible quality resets. Boundary reaching duration is true. [Certified source](../tests/fixtures/true-for-certified.ghost.md). |
+| `after_event` | `after_event(Event, BoolSensor, window: Duration, quality: measured)`: retain per-event evidence | Positive constant window; event identities and predicate samples required. Predicate is tested in [eventTime,eventTime+window). Signal itself is not scalar. [Event source](../tests/fixtures/after-event-evidence.ghost.md). |
+| `after_event_any` | `after_event_any(signal) -> Result<Bool,SensorFault>`: project existential event result | One after_event signal. Decisive true can establish any; otherwise unresolved identities/faults remain relevant. [Projection examples](../tests/after-event-control.test.mjs). |
+| `after_event_all` | `after_event_all(signal) -> Result<Bool,SensorFault>`: project universal event result | One after_event signal. Decisive false can establish all=false; empty/pending sets without decisive evidence yield NotReady, not automatic permission. [Projection examples](../tests/after-event-control.test.mjs). |
+| `window_average` | `window_average(source, over: Duration, quality: measured, max_age: Duration)` | Result<numeric/physical,SensorFault> with physical sample lineage. Return same payload, except Int -> Number. [Windows](../tests/window-control.test.mjs). |
+| `window_min` | `window_min(source, over: Duration, quality: measured, max_age: Duration)` | Same admissible payloads as average; Result of the minimum, same payload type. [Windows](../tests/window-control.test.mjs). |
+| `window_max` | `window_max(source, over: Duration, quality: measured, max_age: Duration)` | Same admissible payloads as average; Result of the maximum, same payload type. [Windows](../tests/window-control.test.mjs). |
+| `window_rate` | `window_rate(source, over: Duration, quality: measured, max_age: Duration) -> Result<Rate<Q>,SensorFault>` | Supported linear physical quantity; earliest/latest observations at distinct times. Temperature difference uses delta K. Number/Int/Percent, RelativeHumidity, CO2 and Acidity are not accepted inputs. [Rate examples](../tests/window-control.test.mjs). |
+| `hold_last` | `hold_last(source, for_at_most: Duration, quality: measured) -> Result<T,SensorFault>`: temporarily reuse a good sample | Physical lineage required; positive constant duration. Preserve actual timestamp, held age and masked fault; never refresh it by reevaluation. [Hold examples](../tests/hold-last-control.test.mjs). |
+| `elapsed` | `elapsed(state) -> Duration`: age since a state change | Timer declaration only; declared state, explicit monotonic clock; resets on change. [E08](#ch06). |
+| `continuous_true` | `continuous_true(BoolExpression) -> Duration`: age of continuously true scan observations | Timer declaration only; starts at zero on first true scan, resets on false. It does not certify the unobserved interval. [Timer examples](../tests/compiler.test.mjs). |
+
+Window `over` and `max_age` are positive constant Durations. Use actual admissible observations in **(now-over,now]**, without interpolation. No observations, or newest age **>= max_age**, means NotReady. A current source fault is preserved. A rate requires two distinct observation times. Window composition retains aggregate/sample provenance; clock-only scans do not fabricate new observations.
+
+An after_event-only program with any/all projection can compile to executable control with event-runtime bindings. An unprojected after_event, or its combination with natural conditions, can produce an `executable:false` temporal descriptor. `after_event_for` is covered under unsupported names below.
+Source: [signal/timer lowering](../tools/control.mjs), [temporal Reference](reference/04-sensors-constraints-control.md).
+
+### 13.5 Natural facts and schedule policy constructors
+
+A provider supplies observations or predictions; the program decides what they permit. These two ordinary calls return uncertainty explicitly.
+
+| Builtin | Signature and purpose | Context, boundaries and example |
+|---|---|---|
+| `tide_is` | ``tide_is(provider, tide`spring` or tide`neap`) -> Result<Bool,TemporalContextFault>`` | Declared TidePredictions provider. Missing/stale prediction or clock context is a fault. [Natural conditions](../tests/natural-condition-contract.test.mjs). |
+| `moon_is` | ``moon_is(provider, moon`phase`) -> Result<Bool,TemporalContextFault>`` | LunarEphemeris provider; phases: new, waxing_crescent, first_quarter, waxing_gibbous, full, waning_gibbous, last_quarter, waning_crescent. [Natural conditions](../tests/natural-condition-contract.test.mjs). |
+
+The tagged literals in these signatures are notation fragments. Both calls require runtime/provider facts and cannot capture a global provider inside a pure fn.
+
+The following constructors are valid only in schedule fields. They do not return freely stored expression values. Durations here are positive constants.
+For example, `gap = skip_after(10min);` declares a gap policy. Tide's `basis = run(5min, within(10min));` allows admission within ten minutes, then runs for five minutes from admission.
+
+| Builtin | Signature and purpose | Context, boundaries and example |
+|---|---|---|
+| `instant` | `instant(DateTime)`: absolute Periodic anchor | Constant DateTime; current executable slice uses preserve_anchor and pulse. [Periodic](../tests/periodic-cron-policy.test.mjs). |
+| `civil` | `civil(Date, TimeOfDay)`: civil Periodic anchor | Constant date/time; checked descriptor contract, outside current Periodic bytecode slice. [Periodic](../tests/periodic-cron-policy.test.mjs). |
+| `skip_after` | `skip_after(Duration)`: bound acceptable observation gap | Schedule gap field; larger gaps use explicit skip/baseline policy. [Policies](../tests/periodic-cron-policy.test.mjs). |
+| `range` | `range(Duration)`: planned civil interval | Schedule basis; nonoverlap must be provable and cancel_when explicit. Descriptor-only; no control bytecode. [Range contract](../tests/schedule-descriptor-artifact.test.mjs). |
+| `run` | `run(Duration, within(Duration))`: Tide run from admission | Tide basis; first Duration is run length. Admission must occur inside the grace interval. [Tide](../tests/natural-schedule-contract.test.mjs). |
+| `within` | `within(Duration)`: Tide admission grace | Only second argument of Tide run; [planned,planned+grace), exact end excluded. It does not extend run length. [Tide](../tests/natural-schedule-contract.test.mjs). |
+
+Current executable schedule slices use trusted clock, baseline recovery and skip fallback. Daily/slots/Cron use pulse; Periodic requires instant+preserve_anchor; Tide uses run+within. A civil contract accepted into a descriptor is not an executable schedule.
+Source: [schedule lowering and slice selection](../tools/control.mjs), [time Reference](reference/03-time-and-schedules.md).
+
+### 13.6 Account for use before granting more
+
+An account records evidence, rather than predicting use from an animation or requested output. Applied receipts differ from requested intent; durable accounting needs a ledger and verified resource bindings.
+For a bound resource pump, the declaration fragment `account pumping = on_time(pump, stage: applied, persistence: durable);` chooses applied evidence. The linked accounting examples also declare the resource and limit policies.
+
+| Builtin | Signature and purpose | Context, boundaries and example |
+|---|---|---|
+| `on_time` | `on_time(resource, stage: applied, persistence: durable)`: Duration account | Account declaration; bounded executable slice accepts durable/applied only. Requested/safe/confirmed alternatives can be checked but are not this executable binding. [Accounting](../tests/accounting-syntax.test.mjs). |
+| `count_events` | `count_events(Event, over: local_day("zone"), persistence: durable)`: event account | Account declaration; .count returns Result<Int,AccountingFault>. Executable slice requires durable/local_day; duplicate event identities do not double count. [Accounting](../tests/accounting-syntax.test.mjs). |
+| `used` | `used(account, rolling(Duration))`: inspect accounted Duration | Only accounting constraint limit position. Executable limit uses <=, positive bound/reserve and on_unknown=block. [Limits](../tests/accounting-syntax.test.mjs). |
+| `rolling` | `rolling(Duration)`: trailing accounting basis | Positive constant duration; count_events rolling is descriptor/check scope, outside executable event-count slice. [Limits](../tests/accounting-syntax.test.mjs). |
+| `local_day` | `local_day("timezone")`: civil-day accounting basis | Nonempty literal timezone; clock/calendar/ledger required. It is not a fixed 24-hour rolling window. [Accounting](../tests/accounting-syntax.test.mjs). |
+| `count_on` | `count_on({resources}) -> Int`: count true candidate resources | Named resource constraints, not ordinary expressions. Finite distinct Bool resource set; empty -> 0. Host policy binding required. [Named constraints](../tests/named-constraints.test.mjs). |
+| `any_on` | `any_on({resources}) -> Bool`: test candidate resources | Same restricted context; empty -> false. Evaluation stage is declared by the constraint. [Named constraints](../tests/named-constraints.test.mjs). |
+
+A standalone named resource policy becomes a host-policy artifact. It is not ordinary VM control. Source: [accounting/resource constraints](../tools/control.mjs).
+
+### 13.7 PID constructors belong to an objective
+
+A controller computes requested targets. Later constraints may restrict them. These constructors set gains and restart policy; they are not general unit-algebra functions. The current native binding is a Temperature sensor, Temperature config target and `ContinuousActuator<Percent>`, with output minimum 0%. Non-PID controller kinds can carry binding-required metadata; a parsed `pi` or `on_off` is not proof of a running controller.
+
+| Builtin | Signature and purpose | Context, boundaries and example |
+|---|---|---|
+| `proportional_gain` | `proportional_gain(output: Percent, error: TemperatureDelta)`: P gain | PID kp field; constants, output >=0, error >0; output/error. [Controller examples](../tests/gfb7-pid-contract.test.mjs). |
+| `integral_gain` | `integral_gain(output: Percent, error: TemperatureDelta, time: Duration)`: I gain | PID ki; same bounds plus time >0; output/error/seconds. [Controller examples](../tests/gfb7-pid-contract.test.mjs). |
+| `derivative_gain` | `derivative_gain(output: Percent, error: TemperatureDelta, time: Duration)`: D gain | PID kd; same bounds plus time >0; output*seconds/error. [Controller examples](../tests/gfb7-pid-contract.test.mjs). |
+| `reset` | `reset(output: Percent)`: explicit restart target | PID restart field; constant inside objective output range. First accepted sample initializes tracking; it is not an arbitrary state reset call. [Controller examples](../tests/gfb7-pid-contract.test.mjs). |
+
+Zero gain output disables that term. Period must be positive and late_after >= period. Explicit direction, bias, anti-windup, disabled/transfer, fault and restart policies govern lifecycle; stale/missing measurements are not silently accepted. See [controller lowering](../tools/control.mjs) and [continuous control Reference](reference/04-sensors-constraints-control.md).
+For example, `kp = proportional_gain(output: 2%, error: 1Δ°C);` declares two percentage points per degree of temperature error. `restart = reset(output: 0%);` explicitly chooses the first tracked target.
+
+### 13.8 The separate host-policy grammar
+
+The `ghostrules` adapter checks a narrow station-policy grammar. Its apparent calls are contextual forms, not additions to ordinary control expressions. Existing [station rules](../examples/station-rules.ghost.md) and [constraint tests](../tests/constraints.test.mjs) demonstrate complete policies.
+
+| Builtin | Signature and purpose | Context, boundaries and example |
+|---|---|---|
+| `stopped` | `stopped(station)`: require stopped station | Only allow enter/apply policy conditions with their specified mode. Host station state, not physical motor proof. [Rules](../examples/station-rules.ghost.md). |
+| `pump_capacity` | `pump_capacity(pump)`: request a capacity check | Only require ... == Pass or check policy clauses. Host policy artifact; not a numeric capacity expression. [Rules](../examples/station-rules.ghost.md). |
+| `day` | `day("timezone")`: civil day for a daily limit | Only `limit on_time(pump) <= Duration per day("zone")`; valid IANA timezone, nonempty <=128 chars. [Rules](../examples/station-rules.ghost.md). |
+
+In this grammar `count_on(pump.valves)`, `any_on(pump.valves)` and `on_time(pump)` are restricted forms with different argument shapes from §13.6. They produce max-valves, pump-needs-valve and daily-limit policy clauses. Do not move these spellings into arbitrary `let` expressions. `exclusive`, `allow`, `require`, `limit`, `once` and `check` introduce clauses. `warn` is rejected.
+Source: [host-policy parser](../tools/constraints.mjs).
+
+### 13.9 Adjacent syntax and unavailable alternatives
+
+The following are useful alongside builtins, but are **not callable functions**.
+
+| Syntax | Meaning and current boundary |
+|---|---|
+| Daily, DailySlots<15min>, Periodic, Cron, Solar, Tide | Schedule declaration types. DailySlots execution uses a fixed 15-minute grid; Cron has five validated fields. |
+| pulse; time/date/datetime/cron5/day/sun/tide/moon tagged literals | Policy value and typed notation. ``sun`rise` ``/``sun`set` `` are not sunrise()/sunset() calls. |
+| TimeSlots<grid,capacity> | Config type: positive grid dividing 24h, positive capacity, finite unique aligned TimeOfDay list. No TimeSlots(...) call. |
+| `Result<T,E>`; `Rate<Q>` | Typed result and expression-only rate. E is compiler-owned; nested Result payload is rejected. |
+| schedule.due; schedule.active; schedule.missed | Bool projections; .missed requires exposed projection. Active occurrence is not applied output. No method calls. |
+| eventAccount.count | Result<Int,AccountingFault> projection; only count_events accounts. |
+| resource.on/position/valves | Contextual resource/policy endpoints, not generic methods. |
+| sample, valid, filter, stale_after, recover_after, samples | Sensor declaration fields/notation. In particular stale_after is not an expression call. |
+| on_below, off_above, initial; min, max, step, access, label | Named arguments or config fields, not functions. |
+| if/case/in; >> and \|>; fn/type/state/config/timer/signal | Syntax, operators and declarations. Qualified input.name/state.name/next.name are removed aliases. |
+
+[Parser and member/type rules](../tools/control.mjs) define these positions. The complete types and units are in [Reference Chapter 2](reference/02-types-expressions-state.md).
+
+| Selected/reference spelling | Current status; do not claim execution |
+|---|---|
+| after_event_for(signal, EventId) | Reference describes per-identity projection, but current compiler has no call dispatcher; unknown function. Use supported any/all only when their meaning matches intent. |
+| window(Duration) schedule basis | Design alternative, not accepted current basis. This is distinct from supported window_average/min/max/rate signals. |
+| run(Duration, on_time) | Design alternative; supported Tide run requires within(Duration). |
+| range(Duration); civil(Date,TimeOfDay) | Checked descriptor contracts as explained above; not current bytecode slices. |
+| PID checkpoint; degraded Name | Selected design alternatives unsupported by current native PID fault/restart policies. |
+| ifthenelse, purefn, enum, next | Removed aliases. Use canonical if ... then ... else, fn, type and primed state. |
+
+Do not infer support from a name appearing in a diagnostic or design example. Check the compiler path and artifact kind. [Chapter coverage check](../tests/programming-builtins.test.mjs) keeps both languages aligned with the compiler's callable dispatch and verifies documented entries have signatures, context and example links.
 
 <a id="appendix-a"></a>
 ## Appendix A. Specification guide
