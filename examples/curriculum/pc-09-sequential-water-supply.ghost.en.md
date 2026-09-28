@@ -9,7 +9,7 @@
 > watering time ends, stop the pump first and then close the valve. Represent
 > output commands separately from the device's physical position.
 
-This is the sole canonical literate executable source for PC-09. It preserves
+The linked original is the sole canonical literate executable source for PC-09. It preserves
 and compares [tutorial/02 time-based sequencing](../tutorial/02-watering.ghost.md)
 and [tutorial/04 shared pump](../tutorial/04-extra-valves.ghost.md). Tutorial/02
 is a basic example that sequences stages by time alone; tutorial/04 covers the

@@ -9,7 +9,7 @@
 > run time in one control cabinet. This example distinguishes maintained demand,
 > which stays true across scans, from a momentary START event triggered by a press.
 
-This is the sole canonical literate executable source for PC-06. It preserves
+The linked original is the sole canonical literate executable source for PC-06. It preserves
 and references lesson [E08 DelayedStart](../../docs/ProgrammingInGhostflow.md#e08--입력이-2초-유지되면-켜기)
 and [tutorial/02-watering](../tutorial/02-watering.ghost.md). E08 introduces a
 state and `elapsed(phase)`; the tutorial shows a watering sequence. This lesson

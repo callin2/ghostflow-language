@@ -6,7 +6,7 @@
 
 This document contains both explanation and GhostFlow code. It runs through the
 control/literate compiler and manifest-aware host. It is a virtual tutorial,
-not physical output. This is the canonical executable program;
+not physical output. The linked original is the canonical executable program;
 `scheduled-watering.ghost` is non-executable historical evidence.
 
 At each selected time, water zone 1 and then zone 2. Both zones share one pump.

@@ -9,7 +9,7 @@
 > latching behavior. This document defines a curriculum learning scenario; it
 > does not quote a direct user statement.
 
-This is the sole canonical literate executable source for PC-03. It reuses
+The linked original is the sole canonical literate executable source for PC-03. It reuses
 PC-02's fresh-start event and restart inhibition, and preserves the existing
 basic latching example in lesson [E03](../../docs/ProgrammingInGhostflow.md#ch03).
 

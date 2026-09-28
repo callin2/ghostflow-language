@@ -8,7 +8,7 @@
 > Learning scenario: A learning scenario based on the limit-switch stage of the
 > user's PLC-replacement curriculum. This document is not a direct user quote.
 
-This is the sole canonical literate executable source for PC-05. It preserves
+The linked original is the sole canonical literate executable source for PC-05. It preserves
 and references lesson [E06 DirectionInterlock](../../docs/ProgrammingInGhostflow.md#e06--두-방향을-동시에-요청하면)
 and the [PC-04 direction-change interlock](./pc-04-direction-interlock.ghost.md).
 E06's `mutex` blocks simultaneous output requests; PC-04's wait state prevents

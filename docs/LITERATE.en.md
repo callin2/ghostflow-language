@@ -125,7 +125,7 @@ The choice allows explanations to be placed naturally inside a control while pre
 ## Relationship between compilation and runtime
 
 ```text
-.ghost.md → 코드 추출 → 같은 파서 → 같은 타입·시간·자원 검사 → .gfb
+.ghost.md → code extraction → same parser → same type/time/resource checks → .gfb
 ```
 
 If the extracted code is the same, the type graph and execution semantics must be the same.

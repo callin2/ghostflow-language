@@ -9,7 +9,7 @@
 > curriculum using two digital level switches and explicit state transitions.
 > This document is not a direct user quote.
 
-This is the sole canonical literate executable source for PC-07. It preserves
+The linked original is the sole canonical literate executable source for PC-07. It preserves
 and references the distinct [tutorial/03-moisture](../tutorial/03-moisture.ghost.md),
 which covers a continuous moisture sensor with median filtering, quality states,
 and hysteresis. This lesson addresses tank filling with physical upper/lower

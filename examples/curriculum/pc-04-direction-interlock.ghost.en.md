@@ -8,7 +8,7 @@
 > Learning scenario: A learning scenario based on the forward/reverse stage of
 > the user's PLC-replacement curriculum. This document is not a direct user quote.
 
-This is the sole canonical literate executable source for PC-04. It preserves
+The linked original is the sole canonical literate executable source for PC-04. It preserves
 and references the existing lesson
 [E06 DirectionInterlock](../../docs/ProgrammingInGhostflow.md#e06--두-방향을-동시에-요청하면).
 E06 demonstrates a small safety constraint that blocks simultaneous output

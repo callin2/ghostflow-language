@@ -9,7 +9,7 @@
 > handle stop/overload permissions common to both modes. Require a fresh run
 > request so a mode change or permission recovery cannot silently restart equipment.
 
-This is the sole canonical literate executable source for PC-08. It combines
+The linked original is the sole canonical literate executable source for PC-08. It combines
 the [PC-03 manual start/latching](./pc-03-motor-contactor.ghost.md) and
 [PC-07 automatic demand](./pc-07-tank-hysteresis.ghost.md) examples without
 replacing them. The existing [station mode rules](../station-rules.ghost.md)

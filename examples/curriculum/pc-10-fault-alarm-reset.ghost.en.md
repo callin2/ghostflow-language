@@ -11,7 +11,7 @@
 > its cause and stops safely. Low source water is a special case: only with the
 > valve confirmed open may the pump stop first and the valve then close.
 
-This is the sole canonical literate executable source for PC-10. PC-09
+The linked original is the sole canonical literate executable source for PC-10. PC-09
 [sequential valve/pump water supply](pc-09-sequential-water-supply.ghost.md)
 preserves the normal sequence and feedback; [PC-05 limit feedback](pc-05-limit-feedback.ghost.md)
 preserves valve-position observations. This lesson replaces neither. It adds

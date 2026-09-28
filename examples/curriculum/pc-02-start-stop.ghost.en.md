@@ -9,7 +9,7 @@
 > STOP is asserted. After STOP clears, operation may restart only after START
 > has been released and pressed again, even if it was held during the stop.
 
-This is the sole executable source for PC-02. The basic latching behavior and
+The linked original is the sole executable source for PC-02. The basic latching behavior and
 the requirement that `pump` implies `valve` are preserved in lesson
 [E03](../../docs/ProgrammingInGhostflow.md#ch03). This example adds the stop
 path, a fresh-start event, and restart inhibition.

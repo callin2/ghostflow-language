@@ -137,12 +137,12 @@ Multiple automatic controls of one pump coordinate resource use under the same A
 Do not automatically impose one global mode on independent facilities.
 
 ```text
-Auto 또는 Manual
-  → 명시적 정지 요청
-  → 진행 작업의 정지 절차 / 새 시작 억제
-  → 정지 완료
+Auto or Manual
+  → explicit stop request
+  → stop procedure for ongoing work / inhibit new starts
+  → stopping complete
   → Stopped
-  → Auto 또는 Manual 또는 Configure 진입 요청
+  → request entry into Auto, Manual, or Configure
 ```
 
 `enter` rules check requests to enter modes other than Stopped.

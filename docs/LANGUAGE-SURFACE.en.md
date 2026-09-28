@@ -126,7 +126,7 @@ control LatchingPump {
   output pump, valve: Bool;
   state running: Bool = false;
 
-  // stop과 start가 같은 tick에 오면 stop이 이긴다.
+  // If stop and start arrive in the same tick, stop wins.
   running' = !stop && enabled && (start || running);
   valve <- running';
   pump <- running';
@@ -204,14 +204,14 @@ External Stop, shared-resource permission, duplicate-occurrence suppression, and
 The following is therefore an **extension sketch** showing only the intent of the `has moisture` guarded scope described above, not code establishing complete syntax or an execution contract.
 
 ```text
-// 확장 스케치 — 실제 adapt 블록의 표기와 우선순위는 아직 미확정.
-// has moisture 보호 범위 안에서만 optional moisture를 읽는다.
+// Extension sketch — the actual adapt block notation and precedence are not yet settled.
+// Read optional moisture only within the has moisture guarded scope.
 has moisture {
-  // 정상 moisture 값을 이용해 관수 시간을 조정하는 계산을 둘 수 있다.
-  // 일시적 sensor fault는 설치 없음과 구분해 별도로 처리한다.
+  // A calculation could adjust watering time using a valid moisture value.
+  // Handle a transient sensor fault separately from the sensor being absent.
 }
 
-// moisture가 없으면 기본 시간표/타이머 control은 그대로 동작한다.
+// Without moisture, the basic schedule/timer control continues to operate unchanged.
 ```
 
 Moisture is thus an optional capability used only in a profile where it is installed. It is not required to begin basic watering.
