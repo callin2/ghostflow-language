@@ -11,6 +11,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | --- | --- | --- |
 | [AGENTS.ko.md](AGENTS.ko.md) | GhostFlow 언어 소유권 | md |
 | [AGENTS.md](AGENTS.md) | GhostFlow language ownership | md |
+| [CONTRIBUTING.ko.md](CONTRIBUTING.ko.md) | GhostFlow 기여 안내 | md |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Contributing to GhostFlow | md |
 | [DOCS-REVIEW-REPORT.md](DOCS-REVIEW-REPORT.md) | GhostFlow Documentation Review — Findings Report | md |
 | [PLAN.md](PLAN.md) | PLAN - ghostflow-language (session relay) | md |
 | [README.ko.md](README.ko.md) | 의도를 잃지 않는 제어. | md |
@@ -402,4 +404,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-297 documents.
+299 documents.

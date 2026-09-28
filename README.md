@@ -135,6 +135,9 @@ GhostFlow is **pre-1.0**. The reference includes implemented semantics and futur
 design. Use the feature status and [verification guide](docs/VERIFICATION.md) to
 check what has acceptance evidence today.
 
+Start with the [coding-agent contribution guide](CONTRIBUTING.md) before making
+changes.
+
 <details>
 <summary><strong>Compiler entry points, packages, and focused checks</strong></summary>
 
