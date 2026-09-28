@@ -1216,7 +1216,7 @@ Do not infer support from a name appearing in a diagnostic or design example. Ch
 
 ### One physical temperature, three source units
 
-A Temperature sensor retains its physical type. Celsius, Fahrenheit and Kelvin are source/display units; the runtime uses canonical kelvin. These three independent heater examples express the same rule: below 18°C turn demand ON; above 22°C turn it OFF. Equality at either threshold and the closed band preserve the previous good decision. Faults inhibit the heater and reset retained hysteresis to initial false; one new good sample is required for these median(1) examples. Missing samples are NotReady; age >= 3s is Stale.
+A Temperature sensor retains its physical type. Celsius, Fahrenheit and Kelvin are source/display units; the runtime uses canonical kelvin. These three independent heater examples express the same rule: below 18°C turn demand ON; above 22°C turn it OFF. Equality at either threshold and the closed band preserve the previous good decision. Faults inhibit the heater and reset retained hysteresis to initial false; one new good sample is required for these median(1) examples. Before the first sample, the sensor is NotReady. The last good sample can remain usable between deliveries until its age >= 3s, when it becomes Stale.
 
 | Physical boundary | Celsius | Fahrenheit | Kelvin |
 |---|---|---|---|
