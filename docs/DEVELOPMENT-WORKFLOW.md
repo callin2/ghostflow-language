@@ -1,0 +1,99 @@
+# Efficient development workflow
+
+This procedure covers feature work, bug fixes, documentation additions and
+documentation updates in the GhostFlow language repository. It keeps the task
+contract and verification focused. It does not replace repository policy in
+`AGENTS.md` or [`VERIFICATION.md`](VERIFICATION.md).
+
+Related work: [#348](https://github.com/callin2/ghostflow-language/issues/348)
+and the shared [doc-index skill](https://github.com/callin2/doc-index/issues/2).
+
+## 1. Establish the working context
+
+Start new GhostFlow work from `dev`. Confirm the actual repository root and
+branch, record the exact Git base SHA, and check the worktree for existing
+changes. Never infer branch contents from a named temporary checkout. Read the
+local `AGENTS.md` and search the document index before reading relevant design,
+documentation or source files, for every task type:
+
+```sh
+npm run docs:find -- --limit 8 QUERY
+```
+
+This searches indexed Markdown/HTML paths, titles and types. It is not full-text
+search. Use `rg` or open the identified files when prose or source content must
+be searched. Do not repeat the index search or source investigation during
+handoffs unless new evidence requires it.
+
+## 2. Set one task contract
+
+State the requested outcome, scope, remaining acceptance criteria, hard
+prerequisites, and the focused verification command. Separate work that is
+complete, blocked by a real prerequisite, and independently actionable. Keep
+unrequested cleanup out of scope.
+
+| Work | Entry and required result | Focused verification |
+| --- | --- | --- |
+| Feature | Confirm the owning module and relevant contract. Implement the requested behavior and its meaningful coverage. | Run the narrow test for the changed behavior, then required repository CI. |
+| Bug fix | Capture a failing reproduction first. Preserve the existing test oracle and add the smallest regression check. | Show the reproduction fails before the fix and passes after it; run required repository CI. |
+| Documentation addition | Confirm audience and canonical location. Add matching English/Korean documents, translation links and source markers, and manifest/catalog entries. | `npm run docs:check`; run any focused example or requirement-catalog check that applies. |
+| Documentation update | Edit both language versions and update affected manifest/catalog metadata. Keep the canonical original authoritative, match executable examples across translations and preserve historical records. For authorized source or semantic changes, edit the canonical original first, then regenerate affected derived outputs and run appropriate checks. Translation-only work leaves program code unchanged. | `npm run docs:check`; run focused example or requirement-catalog checks when affected. |
+
+## 3. Assign a complete bounded handoff
+
+Use the cheapest capable worker: Luna for mechanical work, Sol for substantive
+implementation, and Astra for exceptionally difficult or unresolved work.
+Independent, non-overlapping units may run in parallel. Give one worker each
+complete bounded unit, including implementation, tests and documentation where
+needed. Avoid serial investigation, implementation and testing handoffs. The
+main agent owns design, priority, integration and final review.
+
+```text
+Outcome:
+Scope and owned files:
+Completed / blocked / independent:
+Acceptance criteria:
+Prerequisites and constraints:
+Focused verification command:
+Return: changed files, commands and results, remaining risks or blockers.
+```
+
+## 4. Verify once, at the right depth
+
+Run static checks first, then focused tests, then required full CI. Do not weaken
+tests or gates to obtain a pass. Reuse previous evidence only when source,
+dependencies, toolchain, configuration and relevant environment inputs match.
+Report each command, exit status, useful counts and any remaining limit.
+
+For documentation batches, regenerate the index once after the batch, then
+check translations and index freshness:
+
+```sh
+npm run docs:index
+npm run docs:check
+```
+
+`docs:check` is the check-only CI gate. If changing a checker, run its focused
+tests:
+
+```sh
+node --test tests/doc-translations.test.mjs tests/doc-index.test.mjs
+```
+
+Reports are exempt from translation but remain indexed. A body-only edit may
+leave indexed metadata unchanged; inspect the source when confirming content.
+Agent maintenance and CI checks are not a filesystem watcher.
+
+## 5. Close the task and improve repeatability
+
+Report the exact change, evidence and commands, exit status, relevant counts,
+limits, and linked issue or pull request. Do not repeat a full review when
+automated results pass and no semantic, design or safety question remains.
+Measure bottlenecks before proposing a CI cadence change. Check disk space before
+heavy builds. Batch external writes and update only affected fields.
+
+Before closing, identify repeated review steps that an existing static check can
+replace. Then consider the smallest justified automation for any remaining
+repeated operation. Add it within the authorized scope; keep dynamic tests or
+hardware evidence where static checks cannot establish behavior. Routine work
+does not require a separate approval request.

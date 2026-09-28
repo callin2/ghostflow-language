@@ -32,6 +32,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/DEFERRED-EXECUTION-GATE-AUDIT.md](DEFERRED-EXECUTION-GATE-AUDIT.md) | Deferred execution gate audit | md |
 | [docs/DESIGN-NOTES.ko.md](DESIGN-NOTES.ko.md) | 언어 설계 메모 | md |
 | [docs/DESIGN-NOTES.md](DESIGN-NOTES.md) | Language design notes | md |
+| [docs/DEVELOPMENT-WORKFLOW.ko.md](DEVELOPMENT-WORKFLOW.ko.md) | 효율적인 개발 절차 | md |
+| [docs/DEVELOPMENT-WORKFLOW.md](DEVELOPMENT-WORKFLOW.md) | Efficient development workflow | md |
 | [docs/DOCUMENTATION-LANGUAGES.ko.md](DOCUMENTATION-LANGUAGES.ko.md) | 문서 언어 | md |
 | [docs/DOCUMENTATION-LANGUAGES.md](DOCUMENTATION-LANGUAGES.md) | Documentation languages | md |
 | [docs/DOCUMENTATION.ko.md](DOCUMENTATION.ko.md) | 문서 목록 | md |
@@ -188,4 +190,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.ko.md](research/GF-COMPOSE-R9-ACCEPTANCE.ko.md) | GF-COMPOSE R9: acceptance와 구현 인계 | md |
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.md](research/GF-COMPOSE-R9-ACCEPTANCE.md) | GF-COMPOSE R9: acceptance and implementation handoff | md |
 
-154 documents.
+156 documents.

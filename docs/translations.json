@@ -5,8 +5,8 @@
       "source": "AGENTS.md",
       "sourceLanguage": "en",
       "translation": "AGENTS.ko.md",
-      "sourceSha256": "f068120b53f3015f52db728139cbe9e0370a947d81bce0f2b681c3c751f5b526",
-      "translationSha256": "87ea98a91145a07b061e9f28ac47cd0e0d42d8a7dc10f05190245638b2da2b2b"
+      "sourceSha256": "c30dac9249d673c2ed139b988e5a16b9a7827a90c9702bd0c91719c93ee1c6ac",
+      "translationSha256": "dfeef08c67773a97dbe094abada25c8d41b243b744127cc618a53162f4a2075e"
     },
     {
       "source": "contracts/integration-v1/README.md",
@@ -107,18 +107,25 @@
       "translationSha256": "31ac48d476fbaedcdab50a0b0211c79e7d5388b21603b4f1ba4ddf65f596cee6"
     },
     {
+      "source": "docs/DEVELOPMENT-WORKFLOW.md",
+      "sourceLanguage": "en",
+      "translation": "docs/DEVELOPMENT-WORKFLOW.ko.md",
+      "sourceSha256": "1f60816aeccf5b2507aff43a53832bf0336b99d54d0bc7a436c05219d44d63ee",
+      "translationSha256": "0d98e1ab50ed9681eee788dd6637588b4586c94ac2746efa3c4c7346e2af4740"
+    },
+    {
       "source": "docs/DOCUMENTATION-LANGUAGES.md",
       "sourceLanguage": "en",
       "translation": "docs/DOCUMENTATION-LANGUAGES.ko.md",
-      "sourceSha256": "d88caf18f39504810771bebf596b1ba0962becb48e99c7e5e658eda6aab32a99",
-      "translationSha256": "a51f98d3bfc7e9ee4fa5f118fee193d99af63b8b3b797258f4d38777a2a5cbfa"
+      "sourceSha256": "8151777006a444b56631ba1837392f9fc32162bc0743887f46834fe49ed4beef",
+      "translationSha256": "7ee89e1882a9442279ed4201c901df226628b763d514fe89781242e4d5753248"
     },
     {
       "source": "docs/DOCUMENTATION.md",
       "sourceLanguage": "en",
       "translation": "docs/DOCUMENTATION.ko.md",
-      "sourceSha256": "b1a02d36b6b69952908bb8800b1b17db4284e52449300e8c04542073891976b6",
-      "translationSha256": "acccb6c67f99fe07fd3432ea71d7552477648681ea0ada466d0da52744d0bf74"
+      "sourceSha256": "278239dae1fac7e4a729711b6273689d9e68574cdfdbd37b035bdc0de8c44fc0",
+      "translationSha256": "d979bbbb1a5c2d03c60c9809774c2267234b8f8fcdeec6b06b75459fa4e8e068"
     },
     {
       "source": "docs/EXACT-INTEGER-CONTRACT.md",
@@ -642,8 +649,8 @@
       "source": "README.md",
       "sourceLanguage": "en",
       "translation": "README.ko.md",
-      "sourceSha256": "f112c33dfb030d2611fe8291334e7f3b95660deb5a2810a19c471f66908843dd",
-      "translationSha256": "b4ea21ead0a54f891f76b2d1435762f1434e7924c3c77750ed7a7bce45eba41a"
+      "sourceSha256": "58ed8ddd62df09c33bcfca82363812f8be90b6118e72ebc4f7873d571aa8d14b",
+      "translationSha256": "af9569922fdb8dded2effff08f140f959d92189e57b41004d5c79374acc341ff"
     },
     {
       "source": "runtimes/wasm/README.md",
@@ -1058,6 +1065,10 @@
     {
       "path": "tests/reference/EDGE-CASES.md",
       "reason": "Dated edge-case verification and outstanding-failure report."
+    },
+    {
+      "path": "INDEX.md",
+      "reason": "Generated repository-wide Markdown/HTML path and title index; regenerated from Git working files, not authored reader prose."
     }
   ]
 }
