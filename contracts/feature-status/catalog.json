@@ -3211,6 +3211,19 @@
               "polarities": [
                 "boundary"
               ]
+            },
+            {
+              "path": "tests/ghostsim.test.mjs",
+              "testId": "REF-08-017 [tooling] 같은 Program, 입력, 논리 시간, 설정 event, 시작 상태에는 장치·UI 종류와 무관하게 같은 제어 판단이 나와야 한다.",
+              "caseId": "REF-08-017",
+              "assertionClass": "replay",
+              "targets": [
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
             }
           ]
         }
@@ -3219,10 +3232,12 @@
         "Host simulation does not establish Driver application or physical confirmation."
       ],
       "issues": [
-        339
+        339,
+        334
       ],
       "referenceCaseIds": [
-        "REF-05-107"
+        "REF-05-107",
+        "REF-08-017"
       ]
     },
     {
