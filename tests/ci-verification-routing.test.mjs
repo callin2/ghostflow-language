@@ -115,7 +115,7 @@ test('workflow always triggers, routes both lanes, and preserves full verificati
     assert.ok(lane.includes(`if: \${{ needs.classify.outputs.mode == '${mode}' }}`));
   }
   assert.match(docs, /npm ci --ignore-scripts/); assert.match(docs, /npm run docs:check/);
-  assert.match(docs, /node --test tests\/ci-verification-routing.test.mjs/);
+  assert.match(docs, /node --test tests\/ci-verification-routing.test.mjs tests\/doc-index.test.mjs/);
   assert.doesNotMatch(docs, /rustup|cargo|coverage|npm test|upload-artifact/);
   for (const command of ['run: npm test', 'run: npm run test:coverage', 'node ci/tools/package-verified-wasm.mjs source handoff', 'Upload failure verification report']) assert.ok(verify.includes(command));
   assert.match(result, /needs: \[classify, docs, verify\]/);

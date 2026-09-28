@@ -86,11 +86,14 @@ also require full verification. PRs compare the merge-base with the head; pushes
 compare the exact previous commit with the current commit.
 
 The documentation lane installs Node dependencies without scripts, runs the whole
-`docs:check` gate and focused routing tests, and produces no WASM artifact. Manual
+`docs:check` gate, doc-index contract regressions and focused routing tests, and produces no WASM artifact. Manual
 workflow dispatch always runs full verification; use it when an exact-SHA artifact
 is needed. The final `Verification result` check requires successful classification
 and the selected lane. Require it green before merging. Branch protection settings
 are unchanged; this check does not create a platform-enforced required-check rule.
+
+Before broadening the lightweight allowlist, inspect existing tests that read the
+proposed paths and retain their applicable assertions in that lane.
 
 `docs:check` is the check-only CI gate. If changing a checker, run its focused
 tests:
