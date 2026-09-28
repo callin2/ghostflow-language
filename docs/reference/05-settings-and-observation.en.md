@@ -89,7 +89,7 @@ These changes have different meanings.
 | Editing source defaults, expressions, declarations | document revision, source digest, usually program artifact | New canonical `.ghost.md` candidate for review |
 | Operating settings event | settings revision and effective event position | Effective value change within the same source, Program, and run |
 
-Source editing modifies the original Markdown. It must be a new document revision preserving prose, comments, fences, line breaks, and original bytes, rather than masquerading as a settings overlay. Conversely, operating settings do not change source literals or recompile. This distinction makes it reviewable whether “change 5 minutes to 10 minutes” means a permanent default edit or settings for this operation.
+Source editing modifies the original Markdown. It must be a new document revision preserving prose, comments, fences, line breaks, and original bytes, rather than masquerading as a settings overlay. Intent anchors, confirmed premises, unconfirmed assumptions, and source-map provenance are revalidated on the new revision. Conversely, operating settings do not change source literals or recompile. API/Web/FSD consumers submit a new `.ghost.md` candidate for a permanent default edit, and submit a typed settings event to tune the same Program during operation. Do not revive the deleted source-candidate helper as an implicit fallback or leave it as an active consumer path. This distinction makes it reviewable whether “change 5 minutes to 10 minutes” means a permanent default edit or settings for this operation.
 
 ### Settings streams and current observations
 
