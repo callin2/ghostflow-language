@@ -1,0 +1,8 @@
+{
+  "repository": "https://github.com/callin2/doc-index",
+  "commit": "e28738eae249b44bdf356c626191af2c80de04ac",
+  "files": {
+    "docs-index.mjs": "685f776b2aff007dc75d069ded7d35564ce59a45c1c4992ac79d89abd00938c4",
+    "docs-find.mjs": "032bb1038af0a4168baad212a22e91a956567aad176e685126cdce2fe00890c6"
+  }
+}

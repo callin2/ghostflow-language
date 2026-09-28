@@ -1,5 +1,7 @@
 # ghostflow-language
 
+Follow the [development workflow](docs/DEVELOPMENT-WORKFLOW.md). Use `npm run docs:find -- --limit 8 QUERY` for document discovery. After a documentation edit batch, run `npm run docs:index` and `npm run docs:check`.
+
 [English / 한국어 documentation](docs/DOCUMENTATION.md) · [한국어 README](README.ko.md)
 
 GhostFlow's language compiler and portable execution platform. JavaScript owns

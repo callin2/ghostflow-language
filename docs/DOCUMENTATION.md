@@ -25,6 +25,7 @@ evidence and test inputs have explicit exclusions in [the manifest](translations
 | `docs/CONTEXT-EXECUTION-ABI.md` | [English](CONTEXT-EXECUTION-ABI.md) | [한국어](CONTEXT-EXECUTION-ABI.ko.md) |
 | `docs/CONTINUOUS-BOOL-TIMER-CONTRACT.md` | [English](CONTINUOUS-BOOL-TIMER-CONTRACT.md) | [한국어](CONTINUOUS-BOOL-TIMER-CONTRACT.ko.md) |
 | `docs/DESIGN-NOTES.md` | [English](DESIGN-NOTES.md) | [한국어](DESIGN-NOTES.ko.md) |
+| `docs/DEVELOPMENT-WORKFLOW.md` | [English](DEVELOPMENT-WORKFLOW.md) | [한국어](DEVELOPMENT-WORKFLOW.ko.md) |
 | `docs/DOCUMENTATION-LANGUAGES.md` | [English](DOCUMENTATION-LANGUAGES.md) | [한국어](DOCUMENTATION-LANGUAGES.ko.md) |
 | `docs/DOCUMENTATION.md` | [English](DOCUMENTATION.md) | [한국어](DOCUMENTATION.ko.md) |
 | `docs/EXACT-INTEGER-CONTRACT.md` | [English](EXACT-INTEGER-CONTRACT.md) | [한국어](EXACT-INTEGER-CONTRACT.ko.md) |

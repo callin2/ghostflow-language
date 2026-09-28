@@ -3,6 +3,8 @@
 
 # GhostFlow 언어 소유권
 
+범위가 제한된 검색, 위임 실행과 증거 재사용에는 [개발 작업 흐름](docs/DEVELOPMENT-WORKFLOW.ko.md)을 따르세요. `npm run docs:find -- --limit 8 QUERY`로 문서 경로와 제목을 찾으세요. 문서 편집 묶음이 끝나면 `npm run docs:index`, 이어서 `npm run docs:check`를 실행하세요.
+
 언어, 런타임, 설정 또는 Interaction IR 작업 전 [언어 참조](docs/LANGUAGE-REFERENCE.md)를 읽으세요. 언어 철학, 문법, 의미, 기능의 근거에 대한 공통 기준으로 사용하세요. 참조 문서에는 구현 상태와 진행 보고를 넣지 마세요. 언어 의미를 바꾸면 관련 절과 근거를 함께 갱신하세요.
 
 GhostFlow 제어/출력 수명 주기, 시뮬레이터 동작, Device 출력 실패 정책을 판단하기 전에 [참조 §4.7](docs/reference/04-sensors-constraints-control.md#47-requested-safe-applied-confirmed)과 [물리 순서](docs/LLM-TOOLCHAIN-ARCHITECTURE.md#physical-driver-and-device-boundary)를 읽으세요. 명령 결과 수명 주기와 요청, 안전, 적용, 확인된 출력 증거를 구별하세요. 정책이 없는지 또는 물리 동작이 검증되었는지 주장하기 전에 검토 대상인 실제 `farm-device` 펌웨어 리비전을 확인하세요.

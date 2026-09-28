@@ -1,6 +1,8 @@
 <!-- translation-source: docs/DOCUMENTATION-LANGUAGES.md -->
 # 문서 언어
 
+[개발 작업 흐름](DEVELOPMENT-WORKFLOW.ko.md)은 탐색과 검증을 통합합니다. `npm run docs:find -- --limit 8 QUERY`는 쓰기 없이 최신 상태를 검사하고 저장소 Markdown/HTML 경로와 제목을 검색합니다. 편집 묶음이 끝날 때마다 `npm run docs:index`는 `docs/INDEX.md`, 이어서 루트 `INDEX.md`를 재생성합니다. `npm run docs:check`는 번역 검증, 고정된 색인 도구 출처와 두 색인의 최신 상태 검사를 결합하여 무거운 빌드 전에 실행합니다.
+
 이 정책은 보고서를 제외한 모든 문서에 영어와 한국어 버전이 있어야 한다는
 2026-09-28 사용자 요청을 기록한다. 추적: [#344](https://github.com/callin2/ghostflow-language/issues/344).
 
