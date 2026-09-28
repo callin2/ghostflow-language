@@ -3253,6 +3253,23 @@
       "requiredEvidence": [],
       "evidence": [
         {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/reference-layer-boundaries.test.mjs",
+              "testId": "REF-08-016 [host] 설치 binding과 Driver 배포 형식은 source grammar 밖의 환경 계약이다.",
+              "caseId": "REF-08-016",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            }
+          ]
+        },
+        {
           "stage": "driver_application",
           "status": "not-claimed",
           "refs": []
@@ -3266,8 +3283,12 @@
       "gaps": [
         "No Device revision or physical effect oracle is linked in this toolchain."
       ],
-      "issues": [],
-      "referenceCaseIds": []
+      "issues": [
+        333
+      ],
+      "referenceCaseIds": [
+        "REF-08-016"
+      ]
     },
     {
       "id": "product-boundary",
