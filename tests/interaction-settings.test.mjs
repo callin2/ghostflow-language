@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { validateInteraction } from '../contracts/interaction-v0/validate.mjs';
-import { emitCompletedScanSnapshot } from '../tools/interaction-runtime-snapshot.mjs';
+import { emitCompletedScanSnapshot, prepareCompletedScanSnapshot } from '../tools/interaction-runtime-snapshot.mjs';
 import { compileSource } from '../tools/toolchain.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 
@@ -66,6 +66,28 @@ test('GF-TEST-interaction-setting-snapshot: completed projection uses current Ru
     completion: { kind: 'completed-scan', scanId: 0, logicalTimeMs: 0 },
     ...completed,
   });
+  const producer = prepareCompletedScanSnapshot({ compilation: artifact, runId: 'run.operator-settings-v0' });
+  const request = { completion: { kind: 'completed-scan', scanId: 0, logicalTimeMs: 0 }, ...completed };
+  assert.deepEqual(producer.emit(request), snapshot);
+  for (let scan = 0; scan < 3; scan++) {
+    assert.throws(() => producer.emit({ completion: request.completion, trace: completed.trace }), /current Rust settings state/);
+    for (const mutate of [
+      state => { state.programFingerprint = '0'.repeat(16); },
+      state => { state.settingsRevision = -1; },
+      state => { state.settings[0].id = -1; },
+      state => { state.settings[0].result = { ok: false, fault: 'invented' }; },
+      state => { state.settings[0].result = { ok: true }; },
+    ]) {
+      const settingsState = structuredClone(completed.settingsState);
+      mutate(settingsState);
+      assert.throws(() => producer.emit({ ...request, settingsState }));
+    }
+  }
+  const wrongType = structuredClone(completed.settingsState);
+  wrongType.settings[0].result.value = 0.5;
+  assert.deepEqual(producer.emit({ ...request, settingsState: wrongType }).observations[0], {
+    descriptorId: 'setting.duration', status: 'error', error: 'runtime-value-type-mismatch',
+  });
   assert.deepEqual(snapshot.observations, [
     { descriptorId: 'setting.duration', status: 'ready', value: 300000 },
     { descriptorId: 'setting.duty', status: 'ready', value: 50 },
@@ -76,6 +98,8 @@ test('GF-TEST-interaction-setting-snapshot: completed projection uses current Ru
     compilation: artifact, runId: 'run.missing-settings',
     completion: { kind: 'completed-scan', scanId: 0, logicalTimeMs: 0 }, trace: completed.trace,
   }), /current Rust settings state is required/);
+  artifact.manifest.configs[0].name = 'changed';
+  assert.deepEqual(producer.emit(request), snapshot, 'prepared config descriptors are privately owned');
 });
 
 test('GF-TEST-interaction-setting-error: current fault rail is visible without manifest fallback', async () => {
@@ -97,6 +121,8 @@ test('GF-TEST-interaction-setting-error: current fault rail is visible without m
     const snapshot = emitCompletedScanSnapshot({ compilation: artifact,
       runId: 'run.operator-settings-fault', completion: { kind: 'completed-scan', scanId: 0, logicalTimeMs: 1 },
       trace: outcome.vm, settingsState: runtime.contextSnapshot().state });
+    const producer = prepareCompletedScanSnapshot({ compilation: artifact, runId: 'run.operator-settings-fault' });
+    assert.deepEqual(producer.emit({ completion: { kind: 'completed-scan', scanId: 0, logicalTimeMs: 1 }, trace: outcome.vm, settingsState: runtime.contextSnapshot().state }), snapshot);
     assert.deepEqual(snapshot.observations[0], {
       descriptorId: 'setting.duration', status: 'error', error: 'SettingsUnavailable',
     });

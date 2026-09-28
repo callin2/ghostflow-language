@@ -9,6 +9,7 @@ import test from 'node:test';
 import { compileSource } from '../tools/toolchain.mjs';
 import {
   emitCompletedScanSnapshot,
+  prepareCompletedScanSnapshot,
   expectedRuntimeIdentity,
   joinRuntimeSnapshot,
 } from '../tools/interaction-runtime-snapshot.mjs';
@@ -118,11 +119,13 @@ async function executeWasm(artifact, run, mode) {
   const snapshots = [];
   const joins = [];
   const events = [];
+  const producer = prepareCompletedScanSnapshot({ compilation: artifact, runId: run.runId });
   const observe = (outcome, scan) => {
     events.push(`observe:${scan.completion.scanId}`);
     const snapshot = emitCompletedScanSnapshot({
       compilation: artifact, runId: run.runId, completion: scan.completion, trace: outcome.trace,
     });
+    assert.deepEqual(producer.emit({ completion: scan.completion, trace: outcome.trace }), snapshot);
     snapshots.push(snapshot);
     joins.push(joinRuntimeSnapshot(artifact.interactionSchema, snapshot,
       expectedRuntimeIdentity(artifact.interactionSchema, run.runId)));
@@ -170,6 +173,9 @@ test('GF-TEST-interaction-runtime-snapshot: exact corpus source/tape produces id
       const wasmSnapshots = wasm.map((outcome, index) => emitCompletedScanSnapshot({
         compilation: artifact, runId: run.runId, completion: run.scans[index].completion, trace: outcome.trace,
       }));
+      const producer = prepareCompletedScanSnapshot({ compilation: artifact, runId: run.runId });
+      assert.deepEqual(native.map((outcome, index) => producer.emit({ completion: run.scans[index].completion, trace: outcome.trace })), nativeSnapshots);
+      assert.deepEqual(wasm.map((outcome, index) => producer.emit({ completion: run.scans[index].completion, trace: outcome.trace })), wasmSnapshots);
       assert.deepEqual(wasmSnapshots, nativeSnapshots, `${fixture.caseId}/${run.runId}: native and WASM snapshot projection must match`);
       for (const snapshot of wasmSnapshots) {
         assert.deepEqual(joinRuntimeSnapshot(artifact.interactionSchema, snapshot,
@@ -186,6 +192,72 @@ test('GF-TEST-interaction-runtime-snapshot: exact corpus source/tape produces id
       }
     }
   }
+});
+
+test('GF-TEST-interaction-runtime-prepared: owned static data is verified once and isolated across scans', async t => {
+  const fixture = corpus.cases[0];
+  const artifact = await compileFixture(fixture);
+  const tape = JSON.parse(read(fixture.tapePath));
+  const run = tape.runs[0];
+  const [outcome] = await wasmRun(artifact, run.scans.slice(0, 1));
+  const request = { completion: run.scans[0].completion, trace: outcome.trace };
+  const baseline = emitCompletedScanSnapshot({ compilation: artifact, runId: run.runId, ...request });
+  const suppliedSchema = structuredClone(artifact.interactionSchema);
+  let sourceReads = 0;
+  const document = artifact.sourceDocument;
+  Object.defineProperty(artifact, 'sourceDocument', { configurable: true, get() { sourceReads++; return document; } });
+  // Instrument the owned copy too: accessing only the caller once would not
+  // detect accidentally reparsing the copied source or rehashing copied bytes.
+  const clone = structuredClone;
+  let ownedSourceReads = 0, ownedByteReads = 0;
+  const copySpy = t.mock.method(globalThis, 'structuredClone', value => {
+    const copied = clone(value);
+    if (copied?.sourceDocument && copied?.bytes && copied?.interactionSchema) {
+      const text = copied.sourceDocument.text, bytes = copied.bytes;
+      Object.defineProperty(copied.sourceDocument, 'text', { enumerable: true, get() { ownedSourceReads++; return text; } });
+      Object.defineProperty(copied, 'bytes', { enumerable: true, get() { ownedByteReads++; return bytes; } });
+    }
+    return copied;
+  });
+  const producer = prepareCompletedScanSnapshot({ compilation: artifact, schema: suppliedSchema, runId: run.runId });
+  copySpy.mock.restore();
+  assert.ok(ownedSourceReads > 0 && ownedByteReads > 0, 'activation must verify source and bytecode');
+  const verifiedReads = { source: ownedSourceReads, bytes: ownedByteReads };
+  assert.equal(sourceReads, 1, 'copy the canonical document once at preparation');
+  assert.ok(Object.isFrozen(producer));
+  assert.ok(Object.isFrozen(producer.expected));
+  const assertFrozen = value => {
+    if (value !== null && typeof value === 'object') {
+      assert.ok(Object.isFrozen(value));
+      Object.values(value).forEach(assertFrozen);
+    }
+  };
+  assertFrozen(producer.schema);
+  assert.equal(Object.isFrozen(suppliedSchema), false, 'never freeze caller-owned schema');
+  assert.equal(Object.isFrozen(document), false, 'never freeze caller-owned artifact');
+  const first = producer.emit(request);
+  assert.deepEqual(first, baseline);
+  // One-shot snapshots have mutable nested data; each emission must own its data.
+  first.module.id = 'changed';
+  first.source.documentId = 'changed';
+  first.completion.scanId = 999;
+  first.observations[0].value = true;
+  suppliedSchema.descriptors[0].name = 'changed';
+  artifact.interactionSchema.descriptors[0].name = 'changed';
+  artifact.traceMetadata.moduleFingerprint = '0'.repeat(16);
+  artifact.traceMetadata.bindings.length = 0;
+  artifact.bytes.fill(0);
+  Object.defineProperty(artifact, 'sourceDocument', { get() { throw new Error('static source revisited'); } });
+  for (let index = 0; index < 100; index++) {
+    assert.deepEqual(producer.emit(request), baseline);
+  }
+  assert.equal(sourceReads, 1, 'static artifact verification must not recur during emit');
+  assert.deepEqual({ source: ownedSourceReads, bytes: ownedByteReads }, verifiedReads, 'no copied source access or byte verification during emits');
+  assert.throws(() => { producer.schema.descriptors[0].access.push('write'); }, TypeError);
+  assert.deepEqual(joinRuntimeSnapshot(producer.schema, producer.emit(request), producer.expected), { status: 'ready', staleReasons: [] });
+  const fresh = await compileFixture(fixture);
+  const restarted = prepareCompletedScanSnapshot({ compilation: fresh, runId: 'run.restarted' });
+  assert.deepEqual(joinRuntimeSnapshot(producer.schema, restarted.emit(request), producer.expected), { status: 'stale', staleReasons: ['runId'] });
 });
 
 test('GF-TEST-interaction-runtime-snapshot-enum-phase-age: completed WASM scan observes nominal phase and elapsed phase age', async () => {
@@ -442,4 +514,35 @@ test('GF-TEST-interaction-runtime-snapshot-fail-closed: producer rejects schema 
   const mismatchedTimerClock = structuredClone(outcome.trace);
   mismatchedTimerClock.inputs.__gf_now_ms += 1;
   assert.throws(() => emitCompletedScanSnapshot({ ...request, trace: mismatchedTimerClock }), /completed trace clock does not match completion/);
+  assert.throws(() => prepareCompletedScanSnapshot({ ...request, schema: tamperedSchema }), /interaction schema:/);
+  for (const mutate of [
+    candidate => { candidate.bytes[0] ^= 1; },
+    candidate => { candidate.sourceDocument.text += '\nchanged'; },
+    candidate => { candidate.interactionSchema.descriptors[0].access.push('write'); },
+  ]) {
+    const candidate = structuredClone(artifact);
+    mutate(candidate);
+    assert.throws(() => prepareCompletedScanSnapshot({ compilation: candidate, runId: request.runId }));
+  }
+  assert.throws(() => prepareCompletedScanSnapshot({ compilation: artifact, runId: {} }), /runId/);
+  const producer = prepareCompletedScanSnapshot(request);
+  for (let scan = 0; scan < 3; scan++) {
+    assert.throws(() => producer.emit({ ...request, trace: rejectedTrace }), /runtime observation could not be verified/);
+    for (const trace of [missingTimerClock, mismatchedTimerClock]) {
+      assert.throws(() => producer.emit({ ...request, trace }), /completed trace clock does not match completion/);
+    }
+    for (const completion of [undefined, { ...request.completion, extra: true },
+      { ...request.completion, kind: 'in-progress' }, { ...request.completion, scanId: -1 },
+      { ...request.completion, logicalTimeMs: 0.5 }]) {
+      assert.throws(() => producer.emit({ ...request, completion }), /completion/);
+    }
+    const malformed = structuredClone(producer.emit(request));
+    malformed.observations[0].status = 'stale';
+    assert.throws(() => joinRuntimeSnapshot(producer.schema, malformed, producer.expected), /failed contract validation/);
+    assert.throws(() => joinRuntimeSnapshot(producer.schema, producer.emit(request), { ...producer.expected, extra: true }), /expected identity/);
+    for (const [field, reason] of [['sourceRevisionId', 'source.revisionId'], ['sourceSha256', 'source.sha256'], ['runId', 'runId']]) {
+      const expected = { ...producer.expected, [field]: field === 'sourceSha256' ? '0'.repeat(64) : 'different' };
+      assert.deepEqual(joinRuntimeSnapshot(producer.schema, producer.emit(request), expected), { status: 'stale', staleReasons: [reason] });
+    }
+  }
 });

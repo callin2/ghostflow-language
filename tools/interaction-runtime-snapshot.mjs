@@ -27,6 +27,14 @@ function sameJson(left, right) {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
+function freezeOwned(value) {
+  if (value !== null && typeof value === 'object') {
+    Object.values(value).forEach(freezeOwned);
+    Object.freeze(value);
+  }
+  return value;
+}
+
 function runtimeSchema(compilation, suppliedSchema) {
   if (!compilation?.interactionSchema) {
     throw new Error('interaction runtime snapshot: an emitted Interaction Schema is required');
@@ -133,14 +141,47 @@ export function joinRuntimeSnapshot(schema, snapshot, expected) {
  * This function neither ticks nor reads a runtime; observation therefore cannot
  * alter state, requested outputs, or safety-filtered outputs.
  */
+export function prepareCompletedScanSnapshot({ compilation, schema, runId } = {}) {
+  // Own every verification input before verification. Never retain or freeze a
+  // caller-owned artifact, schema, or typed byte buffer across scan calls.
+  let owned = structuredClone({
+    interactionSchema: compilation?.interactionSchema,
+    sourceDocument: compilation?.sourceDocument,
+    sourceMap: compilation?.sourceMap,
+    traceMetadata: compilation?.traceMetadata,
+    manifest: compilation?.manifest,
+    bytes: compilation?.bytes,
+  });
+  const verifiedSchema = freezeOwned(runtimeSchema(owned, schema === undefined ? undefined : structuredClone(schema)));
+  if (typeof runId !== 'string' || !/^[A-Za-z][A-Za-z0-9._:-]{0,127}$/.test(runId) || runId.startsWith('__gf_')) {
+    throw new Error('interaction runtime snapshot: runId must be a public execution epoch');
+  }
+  const traceMetadata = freezeOwned(owned.traceMetadata);
+  const configs = freezeOwned(owned.manifest?.configs ?? []);
+  const expected = expectedRuntimeIdentity(verifiedSchema, runId);
+  const hasTimer = verifiedSchema.descriptors.some(descriptor => descriptor.kind === 'timer');
+  // Byte buffers and canonical source are verification-only, not closure state.
+  owned = null;
+  return Object.freeze({
+    schema: verifiedSchema,
+    expected,
+    emit: ({ completion, trace, settingsState } = {}) => emitVerifiedSnapshot({
+      verifiedSchema, traceMetadata, configs, expected, hasTimer, completion, trace, settingsState,
+    }),
+  });
+}
+
+/** One-shot callers use the same owned and verified producer path. */
 export function emitCompletedScanSnapshot({ compilation, schema, runId, completion, trace, settingsState } = {}) {
-  const verifiedSchema = runtimeSchema(compilation, schema);
+  return prepareCompletedScanSnapshot({ compilation, schema, runId }).emit({ completion, trace, settingsState });
+}
+
+function emitVerifiedSnapshot({ verifiedSchema, traceMetadata, configs, expected, hasTimer, completion, trace, settingsState }) {
   exactObject(completion, ['kind', 'scanId', 'logicalTimeMs'], 'completion');
   if (completion.kind !== 'completed-scan' || !Number.isSafeInteger(completion.scanId) || completion.scanId < 0
       || !Number.isSafeInteger(completion.logicalTimeMs) || completion.logicalTimeMs < 0) {
     throw new Error('interaction runtime snapshot: completion must be one non-negative completed scan');
   }
-  const hasTimer = verifiedSchema.descriptors.some(descriptor => descriptor.kind === 'timer');
   const hasTraceClock = object(trace?.inputs) && Object.hasOwn(trace.inputs, '__gf_now_ms');
   if ((hasTimer || hasTraceClock) && trace?.inputs?.__gf_now_ms !== completion.logicalTimeMs) {
     throw new Error('interaction runtime snapshot: completed trace clock does not match completion');
@@ -148,17 +189,16 @@ export function emitCompletedScanSnapshot({ compilation, schema, runId, completi
 
   let observed;
   try {
-    observed = observeRuntimeValues(compilation.traceMetadata, trace);
+    observed = observeRuntimeValues(traceMetadata, trace);
   } catch {
     // The source-trace adapter may inspect generated timer slots internally;
     // do not expose those implementation names through this public boundary.
     throw new Error('interaction runtime snapshot: runtime observation could not be verified');
   }
   const values = new Map(observed.values.map(value => [runtimeValueKey(value), value]));
-  const configs = compilation.manifest?.configs ?? [];
   const settings = new Map();
   if (configs.length) {
-    if (!object(settingsState) || settingsState.programFingerprint !== compilation.traceMetadata.moduleFingerprint
+    if (!object(settingsState) || settingsState.programFingerprint !== traceMetadata.moduleFingerprint
         || !Number.isSafeInteger(settingsState.settingsRevision) || settingsState.settingsRevision < 0
         || !Array.isArray(settingsState.settings) || settingsState.settings.length !== configs.length) {
       throw new Error('interaction runtime snapshot: current Rust settings state is required');
@@ -183,11 +223,11 @@ export function emitCompletedScanSnapshot({ compilation, schema, runId, completi
     schema: {
       format: verifiedSchema.format,
       version: verifiedSchema.version,
-      sha256: interactionSchemaSha256(verifiedSchema),
+      sha256: expected.schemaSha256,
     },
     module: { ...verifiedSchema.module },
     source: { ...verifiedSchema.source },
-    runId,
+    runId: expected.runId,
     completion: { ...completion },
     observations: verifiedSchema.descriptors.map(descriptor => publicObservation(descriptor, values, trace, settings)),
   };

@@ -6,7 +6,7 @@ import test from 'node:test';
 import { validateInteraction } from '../contracts/interaction-v0/validate.mjs';
 import { FramedGhostFlowRuntime } from '../runtimes/wasm/framed-runtime.mjs';
 import { compileSource, restoreArtifactSourceMap, writeArtifact } from '../tools/toolchain.mjs';
-import { emitCompletedScanSnapshot } from '../tools/interaction-runtime-snapshot.mjs';
+import { emitCompletedScanSnapshot, prepareCompletedScanSnapshot } from '../tools/interaction-runtime-snapshot.mjs';
 
 const root = path.resolve(new URL('..', import.meta.url).pathname);
 const sourcePath = 'contracts/interaction-v0/examples/exact-counter.ghost.md';
@@ -60,6 +60,7 @@ test('GF-TEST-interaction-counter-runtime: completed WASM scans project every i3
   runtime.load(artifact.bytes);
   runtime.addCapability('actuator', 'selected_out', 'int');
   runtime.activate();
+  const producer = prepareCompletedScanSnapshot({ compilation: artifact, runId: 'run.exact-counter-v0' });
 
   for (const [scanId, value] of [-2147483648, 0, 2147483647].entries()) {
     const outcome = runtime.scan({
@@ -73,6 +74,7 @@ test('GF-TEST-interaction-counter-runtime: completed WASM scans project every i3
       completion: { kind: 'completed-scan', scanId, logicalTimeMs: scanId },
       trace: outcome.trace,
     });
+    assert.deepEqual(producer.emit({ completion: { kind: 'completed-scan', scanId, logicalTimeMs: scanId }, trace: outcome.trace }), snapshot);
     assert.deepEqual(snapshot.observations, [
       { descriptorId: 'counter.accepted_count', status: 'ready', value },
       { descriptorId: 'state.exact_sample', status: 'ready', value },
