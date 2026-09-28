@@ -46,6 +46,7 @@ Node dependencies와 같은 revision에서 빌드한 native/WASM 산출물이 �
 `node --test tests/programming-book-simulation.test.mjs`로 실행한다. 전체 빌드·검증 순서는
 [Verification](VERIFICATION.md)을 따른다. `tests/docs-runnable-examples.test.mjs`의 compiler 검사는
 runtime 빌드 없이도 실행할 수 있다. 이 근거는 논리 실행이며 물리 장치 검증은 별도다.
+14장은 E16–E21 온도·climate 센서 프로그램을 추가한다. 실제 ghostsim scan과 독립 수치 WASM 검사는 `tests/programming-book-simulation.test.mjs`, `tests/programming-climate.test.mjs`에 있다.
 
 ## 목차
 
@@ -70,6 +71,7 @@ runtime 빌드 없이도 실행할 수 있다. 이 근거는 논리 실행이며
 11. [파일과 literate 프로그램](#ch11)
 12. [하나의 장치, 여러 control](#ch12)
 13. [내장함수와 내장 연산](#ch13)
+14. [온도 단위와 공기 VPD 제어](#ch14)
 
 부록: [A. 명세 길잡이](#appendix-a) · [B. 오류로 배우기](#appendix-b)
 
@@ -1222,6 +1224,276 @@ gain의 output이 0이면 그 항을 비활성화한다. period는 양수이고 
 
 진단이나 설계 예제에 이름이 나온다고 지원을 추론하지 않는다. 컴파일러 경로와 artifact 종류를 확인한다. [장 coverage 검사](../tests/programming-builtins.test.mjs)는 두 언어의 항목을 컴파일러 호출 dispatch와 맞추고 시그니처·문맥·예제 링크가 있는지 검사한다.
 
+<a id="ch14"></a>
+## 14. 온도 단위와 공기 VPD 제어
+
+### 같은 물리 온도를 세 단위로 쓰기
+
+Temperature 센서는 물리 타입을 보존한다. 섭씨·화씨·켈빈은 소스·표시 단위이며 런타임은 정규 켈빈을 쓴다. 독립된 히터 예제 세 개는 같은 규칙이다. 18°C보다 낮으면 요구 ON, 22°C보다 높으면 OFF다. 두 임계값과 같은 값과 닫힌 구간 내부는 이전 정상 판단을 유지한다. 오류는 히터를 억제하고 히스테리시스를 initial false로 되돌린다. median(1) 예제는 새 정상 샘플 하나로 복구한다. 첫 샘플 전에는 NotReady다. 마지막 정상 샘플은 다음 샘플 전달 사이에도 사용 가능하며, 나이 >= 3s가 되면 Stale이다.
+
+| 물리 경계 | 섭씨 | 화씨 | 켈빈 |
+|---|---|---|---|
+| 히터 하한 | 18°C | 64.4°F | 291.15K |
+| 히터 상한 | 22°C | 71.6°F | 295.15K |
+| 히터 유효 범위 | −40–50°C | −40–122°F | 233.15–323.15K |
+
+literal은 정확하게 변환한 뒤 binary64로 반올림한다. 정규 런타임 샘플에 64.4를 그대로 넣지 않는다. 64.4°F는 291.15K다. Driver binding은 공급 단위와 물리량을 식별한다. [물리 타입](reference/02-types-expressions-state.md)과 [히스테리시스](#ch13)를 참조한다.
+
+### E16 — 섭씨 히터
+
+```ghost
+// E16
+control CelsiusHeater {
+  sensor air: Temperature {
+    sample = 1s;
+    valid = -40°C .. 50°C;
+    filter = median(1);
+    stale_after = 3s;
+    recover_after = 1 samples;
+  }
+  signal cold = hysteresis(air,
+    on_below: 18°C, off_above: 22°C, initial: false);
+  output heater: Bool;
+  heater <- cold |> recover(false);
+}
+```
+
+### E17 — 화씨 히터
+
+```ghost
+// E17
+control FahrenheitHeater {
+  sensor air: Temperature {
+    sample = 1s;
+    valid = -40°F .. 122°F;
+    filter = median(1);
+    stale_after = 3s;
+    recover_after = 1 samples;
+  }
+  signal cold = hysteresis(air,
+    on_below: 64.4°F, off_above: 71.6°F, initial: false);
+  output heater: Bool;
+  heater <- cold |> recover(false);
+}
+```
+
+### E18 — 켈빈 히터
+
+```ghost
+// E18
+control KelvinHeater {
+  sensor air: Temperature {
+    sample = 1s;
+    valid = 233.15K .. 323.15K;
+    filter = median(1);
+    stale_after = 3s;
+    recover_after = 1 samples;
+  }
+  signal cold = hysteresis(air,
+    on_below: 291.15K, off_above: 295.15K, initial: false);
+  output heater: Bool;
+  heater <- cold |> recover(false);
+}
+```
+
+### 온도와 상대습도로 공기 VPD 구하기
+
+공기 VPD는 포화 수증기압에서 실제 공기 수증기압을 뺀 값이다. 같은 시점의 공기 온도 T(°C)와 공기 상대습도 RH로 `0.6108 * exp(17.27*T/(T+237.3)) * (1-RH/100)` kPa를 계산한다. 포화 관계와 상대습도 정의는 [FAO-56 3장 식 10–11](https://www.fao.org/4/x0490e/x0490e07.htm)에 근거한다. 순간 공기 계산이며 FAO의 일일 증발산 추정이 아니다. 잎 VPD에는 잎 온도도 필요하며 여기서는 계산하지 않는다.
+
+GhostFlow에는 exp 내장 함수가 없다. 각 완전한 예제는 일반 pure fn `exp_0_3_1`을 작성한다. 고정 14차 Taylor 다항식을 Horner 형식으로 평가한다. air 센서의 선언 범위는 **0–50°C**다. 따라서 지수는 **0–3.006**으로 함수의 명시적 0–3.1 범위 안이다. 온도가 범위 밖이면 센서는 Invalid를 반환하고 수식을 평가하지 않는다. 근사를 외삽하지 않는다. [독립 수치 검사](../tests/programming-climate.test.mjs)는 0.1°C 격자와 습도 경계에서 실제 런타임 값을 호스트 Math.exp와 비교하여 절대 오차 **0.001 kPa 이하**를 요구한다. 예상값 구현에 다항식을 복사하지 않고 원본 세 개를 모두 확인한다.
+
+`(t - 0°C) / 1Δ°C`는 섭씨 Number를 명시적으로 얻는다. `rh / 100%RH`는 [RH 비율 계약](reference/02-types-expressions-state.md)으로 typed 습도를 정규화한다. 마지막에 `0.6108kPaVPD`를 곱해 VaporPressureDeficit를 보존한다. RelativeHumidity는 공기 습도이며 E10의 토양 수분 Percent가 아니다.
+
+빛은 **PPFD** 타입이며 `umol/m2/s`(µmol·m⁻²·s⁻¹)를 쓴다. 광합성 관련 광자 수를 나타낸다. lux는 사람 시각에 가중된 조도다. 보편적인 lux→PPFD 변환은 없다. 검증된 PPFD 센서·binding을 사용한다. 빛은 **출력 허용 조건**이며 같은 T/RH의 계산 VPD를 바꾸지 않는다.
+
+### 독립된 학습 정책 세 가지
+
+임계값은 예시 소스 의도이지 보편적 작물 권장값이 아니다. 가습 요구가 습도 상승을 증명하지 않는다. 환기는 외기 조건에 좌우된다. 관수 요구는 토양 물 추정이나 펌프 순서가 아니다. 온실 물리 모델은 없다. 설치가 actuator binding, 적합성, 물리 효과 검증을 맡는다.
+
+| 예제 | ON | OFF | 빛 조건 |
+|---|---|---|---|
+| E19 가습 요구 | VPD > 1.2 kPa | VPD < 1.0 kPa | PPFD >= 200 µmol·m⁻²·s⁻¹ |
+| E20 환기 요구 | VPD < 0.4 kPa | VPD > 0.6 kPa | PPFD >= 200 µmol·m⁻²·s⁻¹ |
+| E21 관수 요구 | VPD > 1.0 kPa | VPD < 0.8 kPa | PPFD >= 300 µmol·m⁻²·s⁻¹ |
+
+계산한 Result는 선언 센서가 아니므로 센서 전용 hysteresis 생성자로 처리할 수 없다. 아래 명시적 Bool state는 같은 엄격한 ON/OFF·유지 구간 의도를 나타낸다. 온도·RH 오류는 demand를 지운다. 밤 또는 빛 오류는 climate demand 기억을 유지할 수 있지만 출력을 억제한다. 복구는 현재 정상 증거로 판단한다. 타이머나 추가 자동 모드는 없다. climate 오류 때 `air_vpd_value = 0`은 명시적 표시 대체값이다. **vpd_valid와 함께 읽는다**. false는 측정된 VPD 0을 뜻하지 않는다. 빛 오류는 출력을 억제하지만 정상 T/RH 계산을 무효화하지 않는다.
+
+### E19 — 높은 VPD 가습 요구
+
+```ghost
+// E19
+fn exp_0_3_1(x: Number) -> Number {
+  1 + x / 1 * (1 + x / 2 * (1 + x / 3 * (1 + x / 4 * (1 + x / 5 * (1 + x / 6 * (1 + x / 7 * (1 + x / 8 * (1 + x / 9 * (1 + x / 10 * (1 + x / 11 * (1 + x / 12 * (1 + x / 13 * (1 + x / 14 * (1))))))))))))))
+}
+fn air_vpd(t: Temperature, rh: RelativeHumidity) -> VaporPressureDeficit {
+  0.6108kPaVPD * exp_0_3_1(
+    17.27 * ((t - 0°C) / 1Δ°C) / (((t - 0°C) / 1Δ°C) + 237.3)
+  ) * (1 - rh / 100%RH)
+}
+control HumidificationDemand {
+  sensor air: Temperature {
+    sample = 1s; valid = 0°C .. 50°C;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor humidity: RelativeHumidity {
+    sample = 1s; valid = 0%RH .. 100%RH;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor light: PPFD {
+    sample = 1s; valid = 0umol/m2/s .. 3000umol/m2/s;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  let climate: Result<VaporPressureDeficit, SensorFault> = case air {
+    ok(t) => case humidity {
+      ok(rh) => ok(air_vpd(t, rh));
+      fault(reason) => fault(reason);
+    };
+    fault(reason) => fault(reason);
+  };
+  let daylight = case light {
+    ok(ppfd) => ppfd >= 200umol/m2/s;
+    fault(_) => false;
+  };
+  state demand: Bool = false;
+  demand' = case climate {
+    ok(value) => if value > 1.2kPaVPD then true
+      else if value < 1.0kPaVPD then false else demand;
+    fault(_) => false;
+  };
+  output air_vpd_value: VaporPressureDeficit;
+  output vpd_valid, humidify_demand: Bool;
+  air_vpd_value <- climate |> recover(0kPaVPD);
+  vpd_valid <- case climate { ok(_) => true; fault(_) => false; };
+  humidify_demand <- daylight && demand';
+}
+```
+
+### E20 — 낮은 VPD 환기 요구
+
+```ghost
+// E20
+fn exp_0_3_1(x: Number) -> Number {
+  1 + x / 1 * (1 + x / 2 * (1 + x / 3 * (1 + x / 4 * (1 + x / 5 * (1 + x / 6 * (1 + x / 7 * (1 + x / 8 * (1 + x / 9 * (1 + x / 10 * (1 + x / 11 * (1 + x / 12 * (1 + x / 13 * (1 + x / 14 * (1))))))))))))))
+}
+fn air_vpd(t: Temperature, rh: RelativeHumidity) -> VaporPressureDeficit {
+  0.6108kPaVPD * exp_0_3_1(
+    17.27 * ((t - 0°C) / 1Δ°C) / (((t - 0°C) / 1Δ°C) + 237.3)
+  ) * (1 - rh / 100%RH)
+}
+control VentilationDemand {
+  sensor air: Temperature {
+    sample = 1s; valid = 0°C .. 50°C;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor humidity: RelativeHumidity {
+    sample = 1s; valid = 0%RH .. 100%RH;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor light: PPFD {
+    sample = 1s; valid = 0umol/m2/s .. 3000umol/m2/s;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  let climate: Result<VaporPressureDeficit, SensorFault> = case air {
+    ok(t) => case humidity {
+      ok(rh) => ok(air_vpd(t, rh));
+      fault(reason) => fault(reason);
+    };
+    fault(reason) => fault(reason);
+  };
+  let daylight = case light {
+    ok(ppfd) => ppfd >= 200umol/m2/s;
+    fault(_) => false;
+  };
+  state demand: Bool = false;
+  demand' = case climate {
+    ok(value) => if value < 0.4kPaVPD then true
+      else if value > 0.6kPaVPD then false else demand;
+    fault(_) => false;
+  };
+  output air_vpd_value: VaporPressureDeficit;
+  output vpd_valid, ventilate_demand: Bool;
+  air_vpd_value <- climate |> recover(0kPaVPD);
+  vpd_valid <- case climate { ok(_) => true; fault(_) => false; };
+  ventilate_demand <- daylight && demand';
+}
+```
+
+### E21 — VPD와 빛에 따른 관수 요구
+
+```ghost
+// E21
+fn exp_0_3_1(x: Number) -> Number {
+  1 + x / 1 * (1 + x / 2 * (1 + x / 3 * (1 + x / 4 * (1 + x / 5 * (1 + x / 6 * (1 + x / 7 * (1 + x / 8 * (1 + x / 9 * (1 + x / 10 * (1 + x / 11 * (1 + x / 12 * (1 + x / 13 * (1 + x / 14 * (1))))))))))))))
+}
+fn air_vpd(t: Temperature, rh: RelativeHumidity) -> VaporPressureDeficit {
+  0.6108kPaVPD * exp_0_3_1(
+    17.27 * ((t - 0°C) / 1Δ°C) / (((t - 0°C) / 1Δ°C) + 237.3)
+  ) * (1 - rh / 100%RH)
+}
+control IrrigationDemand {
+  sensor air: Temperature {
+    sample = 1s; valid = 0°C .. 50°C;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor humidity: RelativeHumidity {
+    sample = 1s; valid = 0%RH .. 100%RH;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor light: PPFD {
+    sample = 1s; valid = 0umol/m2/s .. 3000umol/m2/s;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  let climate: Result<VaporPressureDeficit, SensorFault> = case air {
+    ok(t) => case humidity {
+      ok(rh) => ok(air_vpd(t, rh));
+      fault(reason) => fault(reason);
+    };
+    fault(reason) => fault(reason);
+  };
+  let daylight = case light {
+    ok(ppfd) => ppfd >= 300umol/m2/s;
+    fault(_) => false;
+  };
+  state demand: Bool = false;
+  demand' = case climate {
+    ok(value) => if value > 1.0kPaVPD then true
+      else if value < 0.8kPaVPD then false else demand;
+    fault(_) => false;
+  };
+  output air_vpd_value: VaporPressureDeficit;
+  output vpd_valid, irrigation_demand: Bool;
+  air_vpd_value <- climate |> recover(0kPaVPD);
+  vpd_valid <- case climate { ok(_) => true; fault(_) => false; };
+  irrigation_demand <- daylight && demand';
+}
+```
+
+### 실행하고 입력 하나를 바꾸며 관찰하기
+
+E15처럼 E16–E21 fence를 각각 완전한 .ghost.md 문서로 컴파일한다. `node --test tests/programming-climate.test.mjs tests/programming-book-simulation.test.mjs`로 compiler와 실제 ghostsim/WASM scan을 확인한다. native/WASM artifact의 build provenance가 맞아야 한다. [검증](VERIFICATION.md)에 build 전제가 있다. 테스트는 임시 scenario artifact를 쓰며 하드웨어를 구동하지 않는다.
+
+온라인 reader의 기본값은 E10의 시간 의존 센서 소스를 이용한 **24시간 합성 일변화 profile**이다. 온도·RH·PPFD는 아래 지점 사이를 선형으로 변하며 연속 반복한다. 06–18에는 온도가 내려가지 않으며 18–06에는 빛이 정확히 0이다. 학습용 입력 궤적이며 온실 모델이나 actuator 피드백이 아니다. 선언된 샘플 간격마다 새 타입 센서 증거를 공급한다. 실제 WASM 프로그램이 VPD와 제어 요구를 계산한다.
+
+| simulation 시각 | 기온 °C | RH % | PPFD µmol·m⁻²·s⁻¹ | 관찰 |
+|---|---|---|---|---|
+| 00 | 18 | 90 | 0 | 초기 히터 OFF; 빛 조건 요구 OFF |
+| 03 | 17 | 92 | 0 | 히터 ON |
+| 06 | 16 | 94 | 0 | 일출; 히터 ON |
+| 09 | 22 | 85 | 500 | 낮은 VPD 환기 ON; 정확히 22°C에서 히터 ON 유지 |
+| 12 | 28 | 60 | 1000 | 가습·관수 요구 ON; 히터·환기 OFF |
+| 15 | 31 | 45 | 650 | 높은 VPD 요구 ON 유지 |
+| 18 | 31 | 60 | 0 | 일몰; 빛 조건 요구 OFF |
+| 21 | 23 | 80 | 0 | 야간 냉각; 히터는 아직 OFF |
+| 24 | 18 | 90 | 0 | 연속 반복 경계; 히터는 18°C 미만에서만 ON |
+
+각 예제를 simulation 00:00에서 실행한다. E16–E21의 기본값은 1000× 배속과 24시간 timing chart이다. 09·12·15·18시 부근을 비교한다. 실제 시간당 처리량은 컴퓨터에 따라 다르다. 배속은 실제 시간당 simulation 시간만 바꾼다. 임계값과 일변화 profile은 바뀌지 않는다. Pause는 simulation 시간을 멈춘다. 09시의 히터 ON은 온도가 22°C를 엄격히 넘으면 해제된다. 독립 프로그램이므로 히터와 환기의 interlock을 뜻하지 않는다. 단위 선택은 물리값을 바꾸지 않고 입력·표시 단위를 바꾼다. 17°C = 62.6°F = 290.15K이다. E16–E18의 하루 판단은 같아야 한다.
+
+일정값과 수동 단일 패킷 모드는 개별 경계 실험에 쓸 수 있다. 선택적인 디버깅 소스이며 일변화에 따른 판단 관찰을 대신하지 않는다.
+
+Stale은 단일 패킷 모드 또는 샘플 공급 중단으로 시험한 뒤 simulation 시간을 선언된 3s 경계까지 진행한다. 반복하는 일정값 소스 샘플은 새 증거이므로 오래된 것으로 처리하지 않는다. Disconnected는 해당 샘플 품질을 선택한다. 새로 전달된 실패도 실패다. 오래된 Good 패킷을 새 샘플처럼 반복 재사용해서 단절을 흉내 내지 않는다.
+
+히터에서 18 → 17 → 18 → 22 → 23°C, 센서 오류, 복구를 관찰한다. VPD controller별로 온도를 25°C에 고정하고 RH를 바꿔 임계값을 넘긴다. 다음에는 PPFD만 바꾼다. requested/safe demand, air_vpd_value, vpd_valid를 비교한다. 누락, Invalid, Disconnected, 오래된 샘플을 시험한다. 관련 오류는 즉시 출력을 억제해야 한다. 수치 관계를 확인할 때 T/RH를 함께 바꾼다. 논리 요구, 성공한 scan, 가상 actuator를 물리 효과 확인으로 해석하지 않는다.
+
 <a id="appendix-a"></a>
 ## 부록 A. 명세 길잡이
 
@@ -1345,5 +1617,7 @@ sensor를 payload처럼 바로 비교하지 않는다. `case` 또는 Reference �
 
 <a id="appendix-c"></a>
 ## 부록 C. 문서 유지 규칙
+
+시간에 따라 변하는 환경을 요청한 학습 시나리오는 기본 소스로 관련 ON/OFF 판단을 시간에 따라 실행해야 한다. 기존 book simulation 테스트에 독립적인 전환 checkpoint를 유지한다. 일정한 정상 입력만으로는 그 의도를 검증할 수 없다. 일변화 검증은 기존 오류·엄격한 경계 scan을 보완한다.
 
 Language Reference는 규범 기준이다. 이 사용 안내서에서 발견한 상충이나 빠진 예는 해당 Reference 절을 먼저 확인한 뒤 고친다. 문법·의미 변경은 Reference의 문법, 규칙, 이유와 예제를 갱신하고 여기서 학습 경로와 코드를 동기화한다. 학습에 필요한 구현 경계는 근거 문서에 연결하고, 변동하는 진행률·테스트 수·산출물 해시·지원 보드 목록은 그 문서에서 관리한다. 예제 compiler 검사는 `tests/docs-runnable-examples.test.mjs`를 재사용한다. 책 변경 뒤 `npm run generate:pc01`로 파생 출처를 갱신하며 과거 replay·benchmark 근거는 고치지 않는다.

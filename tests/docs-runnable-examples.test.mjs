@@ -39,6 +39,12 @@ for (const [id, section, marker, nextMarker] of [
   ['Programming E12', programming, '### E12 —', '### E13 —'],
   ['Programming E13', programming, '### E13 —', '### E11 —'],
   ['Programming E14', programming, '### E14 —', '### E15 —'],
+  ['Programming E16', programming, '### E16 —', '### E17 —'],
+  ['Programming E17', programming, '### E17 —', '### E18 —'],
+  ['Programming E18', programming, '### E18 —', '### E19 —'],
+  ['Programming E19', programming, '### E19 —', '### E20 —'],
+  ['Programming E20', programming, '### E20 —', '### E21 —'],
+  ['Programming E21', programming, '### E21 —', '<a id="appendix-a"></a>'],
 ]) {
   test(`${id} remains executable GhostFlow`, () => {
     const compiled = compileSourceSync(example(section, marker, nextMarker), { filename: `${id}.ghost.md` });
