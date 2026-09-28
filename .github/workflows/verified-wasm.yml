@@ -17,8 +17,56 @@ permissions:
   contents: read
 
 jobs:
+  classify:
+    name: Classify verification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      mode: ${{ steps.route.outputs.mode }}
+    steps:
+      - name: Checkout CI source and comparison history
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+          submodules: false
+      - name: Set up Node.js 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+      - name: Classify exact changed paths
+        id: route
+        run: node tools/ci-verification-routing.mjs classify
+
+  docs:
+    name: Verify documentation
+    needs: classify
+    if: ${{ needs.classify.outputs.mode == 'docs' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout documentation source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          submodules: false
+      - name: Set up Node.js 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+      - name: Install documentation dependencies
+        run: npm ci --ignore-scripts
+      - name: Check all documentation translations and indexes
+        run: npm run docs:check
+      - name: Test verification routing and final result
+        run: node --test tests/ci-verification-routing.test.mjs
+
   verify:
     name: Verify WASM (${{ matrix.label }})
+    needs: classify
+    if: ${{ needs.classify.outputs.mode == 'full' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
@@ -142,3 +190,25 @@ jobs:
           path: source/build/verification.json
           if-no-files-found: error
           retention-days: 14
+
+  result:
+    name: Verification result
+    needs: [classify, docs, verify]
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout result gate
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          submodules: false
+      - name: Set up Node.js 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+      - name: Require successful selected verification
+        env:
+          VERIFICATION_NEEDS: ${{ toJSON(needs) }}
+        run: node tools/ci-verification-routing.mjs result

@@ -117,8 +117,8 @@
       "source": "docs/DEVELOPMENT-WORKFLOW.md",
       "sourceLanguage": "en",
       "translation": "docs/DEVELOPMENT-WORKFLOW.ko.md",
-      "sourceSha256": "1f60816aeccf5b2507aff43a53832bf0336b99d54d0bc7a436c05219d44d63ee",
-      "translationSha256": "0d98e1ab50ed9681eee788dd6637588b4586c94ac2746efa3c4c7346e2af4740"
+      "sourceSha256": "cb499b97431b0eb62bb7dc658d96ed59890b9c5ce1db5139924ab29e58cd919f",
+      "translationSha256": "ea370f9d8fd06b7357c7d9f9b0a08a8893c5a920d11a5913eba928e68ed6ba5d"
     },
     {
       "source": "docs/DOCUMENTATION-LANGUAGES.md",
@@ -502,8 +502,8 @@
       "source": "docs/VERIFICATION.md",
       "sourceLanguage": "en",
       "translation": "docs/VERIFICATION.ko.md",
-      "sourceSha256": "91c6831355d81ef5c2ea73ed0e14b3dde47f70cd51e4951c297cae26b53572a8",
-      "translationSha256": "cd16aa9fe033e641b8ddd07e0886342376f6275514554c9fa47b79861974bc33"
+      "sourceSha256": "8ad3c97a02b2be5b40974d245f5170247407d9490b0c77407332db9e6c1c3015",
+      "translationSha256": "e60f1452fe52f46f9e43cef0ecb92930d8b74e57842dfcee05a189194b656b80"
     },
     {
       "source": "docs/WASM-CI-ARTIFACTS.md",

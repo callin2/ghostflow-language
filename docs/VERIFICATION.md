@@ -71,3 +71,20 @@ consumer tests. Do not attach those claims to a successful host report here.
 
 For revision-addressed GitHub Actions handoffs and their consumer verification
 limits, see [WASM CI artifacts](WASM-CI-ARTIFACTS.md).
+
+Under [issue #357](https://github.com/callin2/ghostflow-language/issues/357), the
+always-triggered Verified WASM workflow selects either documentation checks or
+the existing full `Verify WASM (current)` / `Verify WASM (frontend-pin)` jobs.
+The conservative ordinary-document allowlist and exact-diff rules are recorded
+in [Development workflow](DEVELOPMENT-WORKFLOW.md). All other changes and manual
+dispatches run full verification. Use manual dispatch with `source_sha` when an
+exact revision needs a verified WASM handoff; documentation-only success does
+not build WASM or establish compiler/runtime behavior.
+
+The final `Verification result` check runs even when a lane is skipped or fails.
+It fails for failed, cancelled or skipped classification, a missing/unknown mode,
+or an unsuccessful selected lane. Only the nonselected lane may be skipped;
+unexpected failure, cancellation or a missing result in that lane also fails.
+This result must be green before merge; existing branch protections are unchanged.
+Routing and result propagation are regression-tested by
+`tests/ci-verification-routing.test.mjs`, also listed in the full language suite.
