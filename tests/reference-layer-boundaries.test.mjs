@@ -101,3 +101,22 @@ test('REF-08-003: data providers expose data identity, coverage, validity, and f
   assert.doesNotMatch(combined, /(?:공휴일|holiday|calendar).{0,40}(?:임의|arbitrary).{0,20}Bool/i);
   assert.doesNotMatch(combined, /(?:expiry|만료).{0,40}(?:true|false|Bool|불리언)\s*(?:로|으로)?\s*(?:대체|변환|축소)/i);
 });
+
+test('REF-08-004: host execution does not require Android, cloud, or internet and distinguishes offline data states', () => {
+  const chapter08 = readReference('08-language-runtime-and-device-boundaries.md');
+  const layerSection = section(chapter08, '8.2 계층별 책임');
+
+  assert.match(layerSection, /실행 환경\(host\)은 제어 프로그램을 실행시키는 장치 또는 프로세스/);
+  assert.match(layerSection, /Android 게이트웨이나 클라우드를 필수 구성으로 뜻하지 않는다\./);
+  assert.match(layerSection, /장치가 필요한 시계와 유효 자료를 로컬에 갖고 있으면 인터넷 없이도 계약을 이행할 수 있다\./);
+  assert.match(layerSection, /네트워크 단절과 자료 만료·시각 불명은 각각 다른 상태다\./);
+
+  const chapter03 = readReference('03-time-and-schedules.md');
+  assert.match(chapter03, /일정의 실제 시계·달력·예측 자료는 로컬 장치나 선택적 gateway가 공급할 수 있다\./);
+  assert.match(chapter03, /네트워크나 특정 gateway는 언어 요구가 아니다\./);
+  assert.match(chapter03, /언어는 자료의 ID, revision, coverage, expiry를 요구할 뿐 인터넷을\s+요구하지 않는다\./);
+
+  const combined = [layerSection, chapter03].join('\n');
+  assert.doesNotMatch(combined, /(?:Android|cloud|클라우드|인터넷|gateway|게이트웨이).{0,30}(?:필수 구성이다|필수 요구다|must be required|is required)/i);
+  assert.doesNotMatch(combined, /(?:네트워크 단절|network disconnected).{0,30}(?:자료 만료|data expired|시각 불명|time unknown).{0,20}(?:같은 상태|동일 상태|same state)/i);
+});
