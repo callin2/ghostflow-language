@@ -23,7 +23,7 @@ function section(markdown, heading) {
 }
 
 function tableRows(markdown) {
-  return markdown.split(/\r?\n/).filter(line => /^\|.+\|$/.test(line) && !/^\|[-: ]+\|$/.test(line));
+  return markdown.split(/\r?\n/).filter(line => /^\|.+\|$/.test(line) && !/^\|\s*:?-+:?\s*(\|\s*:?-+:?\s*)+\|$/.test(line));
 }
 
 function anchors(markdown) {
@@ -47,6 +47,37 @@ function links(markdown) {
   return [...markdown.matchAll(/\[[^\]]+\]\(([^)]+)\)/g)].map(match => match[1]);
 }
 
+function cells(row) {
+  return row.slice(1, -1).split('|').map(cell => cell.trim());
+}
+
+function markdownWithoutLinks(text) {
+  return text.replace(/\[[^\]]+\]\([^)]+\)/g, '').trim();
+}
+
+function assertResolvableLocalLinks(markdown, baseDir) {
+  const errors = [];
+  const cache = new Map();
+  const loadAnchors = file => {
+    const absolute = path.join(baseDir, file);
+    if (!cache.has(absolute)) cache.set(absolute, anchors(fs.readFileSync(absolute, 'utf8')));
+    return cache.get(absolute);
+  };
+
+  for (const target of links(markdown).filter(link => !/^https?:\/\//.test(link))) {
+    const [file, anchor, extra] = target.split('#');
+    if (extra !== undefined) errors.push(`${target}: invalid multi-anchor target`);
+    const absolute = path.join(baseDir, file);
+    if (!fs.existsSync(absolute)) {
+      errors.push(`${target}: missing target file`);
+      continue;
+    }
+    if (anchor && !loadAnchors(file).has(anchor)) errors.push(`${target}: missing target anchor`);
+  }
+
+  assert.deepEqual(errors, []);
+}
+
 test('REF-07-008: syntax and symbol index links resolve to exact Reference sections', () => {
   const chapter = readReference('07-semantic-rules-and-index.md');
   const sections = [
@@ -56,25 +87,9 @@ test('REF-07-008: syntax and symbol index links resolve to exact Reference secti
   const parsedRows = sections.flatMap(tableRows);
   assert.ok(parsedRows.length > 20, 'index tables must remain substantive');
 
-  const errors = [];
-  const cache = new Map();
-  const loadAnchors = file => {
-    if (!cache.has(file)) cache.set(file, anchors(readReference(file)));
-    return cache.get(file);
-  };
-
-  for (const target of sections.flatMap(links)) {
-    const [file, anchor, extra] = target.split('#');
-    if (extra !== undefined) errors.push(`${target}: invalid multi-anchor target`);
-    if (!file || file.startsWith('http') || path.basename(file) !== file) errors.push(`${target}: expected same-directory Reference chapter link`);
-    if (!fs.existsSync(path.join(referenceDir, file))) {
-      errors.push(`${target}: missing target file`);
-      continue;
-    }
-    if (anchor && !loadAnchors(file).has(anchor)) errors.push(`${target}: missing target anchor`);
-  }
-
-  assert.deepEqual(errors, []);
+  assertResolvableLocalLinks(sections.join('\n'), referenceDir);
+  const badTargets = sections.flatMap(links).filter(target => !/^https?:\/\//.test(target) && (!target.split('#')[0] || path.basename(target.split('#')[0]) !== target.split('#')[0]));
+  assert.deepEqual(badTargets, [], 'index tables must link only to same-directory Reference chapter files');
 });
 
 test('REF-07-008: syntax index status markers do not hide parser support', () => {
@@ -86,5 +101,27 @@ test('REF-07-008: syntax index status markers do not hide parser support', () =>
   ]);
   for (const row of syntaxRows) {
     assert.doesNotMatch(row, /구현 상태|완료|TODO|todo|지원됨|미완료/, `syntax index row must not become an implementation status table: ${row}`);
+  }
+});
+
+test('REF-07-010: source-to-Reference index links design rationale to exact Reference locations only', () => {
+  const chapter = readReference('07-semantic-rules-and-index.md');
+  const sourceIndex = section(chapter, '7.8 원문에서 reference로 찾아가기');
+  assertResolvableLocalLinks(sourceIndex, referenceDir);
+
+  const rows = tableRows(sourceIndex).slice(1);
+  assert.equal(rows.length, 13, 'source-to-Reference index must cover each design-rationale row');
+  for (const row of rows) {
+    const [rationale, locations] = cells(row);
+    assert.ok(rationale, `missing design rationale: ${row}`);
+    assert.ok(locations, `missing Reference location: ${row}`);
+    assert.doesNotMatch(row, /이슈 상태|작업 진척|구현 상태|완료|TODO|todo|지원됨|미완료|closed|open/i, `source index row must not be a progress/status table: ${row}`);
+
+    const referenceLinks = links(locations);
+    assert.ok(referenceLinks.length > 0, `Reference location cell needs exact links: ${row}`);
+    assert.equal(markdownWithoutLinks(locations).replace(/[,.·、，\s]/g, ''), '', `Reference location cell must not contain unlinked target prose: ${row}`);
+    for (const target of referenceLinks) {
+      assert.match(target, /^0[1-8]-[^#]+\.md#[^#]+$/, `Reference location must be an anchored Reference chapter link: ${target}`);
+    }
   }
 });
