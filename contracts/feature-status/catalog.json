@@ -2545,6 +2545,18 @@
               "targets": [
                 "wasm"
               ]
+            },
+            {
+              "path": "tests/issue-90-settings-stream.test.mjs",
+              "testId": "REF-05-106 [host] 복귀 실패를 정상 설정값으로 숨기지 않는다.",
+              "caseId": "REF-05-106",
+              "assertionClass": "runtime-value",
+              "targets": [
+                "wasm"
+              ],
+              "polarities": [
+                "boundary"
+              ]
             }
           ]
         }
@@ -2553,9 +2565,12 @@
         "Linked snapshot does not establish atomic multi-setting events or persistence."
       ],
       "issues": [
-        74
+        74,
+        338
       ],
-      "referenceCaseIds": []
+      "referenceCaseIds": [
+        "REF-05-106"
+      ]
     },
     {
       "id": "settings-observation",

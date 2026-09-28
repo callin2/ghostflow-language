@@ -320,3 +320,47 @@ test('Issue #90 readonly streams accept producer fault/recovery and reject opera
   assert.equal(recovered.vm.safe.available, true);
   assert.deepEqual(runtime.contextSnapshot().state.settings[0].result, { ok: true, value: 300_000 });
 });
+
+test('REF-05-106 [host] 복귀 실패를 정상 설정값으로 숨기지 않는다.', async t => {
+  const referenceCases = JSON.parse(fs.readFileSync(
+    new URL('./reference/cases/03-settings-boundaries.json', import.meta.url), 'utf8')).cases;
+  const ref05106 = referenceCases.find(entry => entry.id === 'REF-05-106');
+  const settingsChapter = fs.readFileSync(
+    new URL('../docs/reference/05-settings-and-observation.md', import.meta.url), 'utf8');
+  assert.equal(ref05106?.issue, 'https://github.com/callin2/ghostflow-language/issues/338');
+  assert.match(ref05106.rule, /복귀 실패를 정상 설정값으로 숨기지 않는다/);
+  assert.match(ref05106.given, /Until overlay 만료/);
+  assert.match(ref05106.then, /설정 unavailable과 복귀 실패를 관찰/);
+  assert.match(ref05106.then, /성공 tick으로 확정하지 않는다/);
+  assert.match(settingsChapter, /\| 복귀 실패 \| 성공한 복귀로 기록하지 않는다\./);
+  assert.match(settingsChapter, /설정 유효성을 unavailable로 보고/);
+  assert.match(settingsChapter, /물리 출력 대응은 설치의 명시된 장애 계약을 따른다/);
+
+  const readonlyDocument = fs.readFileSync(
+    new URL('./fixtures/issue-90-readonly-settings.ghost.md', import.meta.url), 'utf8');
+  const compiled = await compileSource(readonlyDocument, { filename: 'issue-90-readonly-settings.ghost.md' });
+  const runtime = await ControlRuntime.instantiate(wasmBytes(), compiled,
+    { context: { bootEpoch: 10, terminalCapacity: 8, bindings: [] } });
+  t.after(() => runtime.dispose());
+  const fingerprint = runtime.contextSnapshot().state.programFingerprint;
+  const facts = (position, settings) => ({
+    clock: { monotonicMs: position, bootEpoch: 10, wallMs: 2_000 + position,
+      uncertaintyMs: 0, trusted: true, unknownReason: null, sourceRevision: 'return-failure-clock-v1' },
+    natural: [], schedules: [], settings,
+  });
+  assert.deepEqual(runtime.contextSnapshot().state.settings[0].result, { ok: true, value: 300_000 });
+  const returnFailure = {
+    programFingerprint: fingerprint,
+    eventId: 'until-overlay-return-failure',
+    baseRevision: 0,
+    position: 1,
+    origin: 'producerObservation',
+    changes: [{ configId: compiled.manifest.configs[0].id, result: { ok: false, fault: 'SettingsUnavailable' } }],
+  };
+  const unavailable = runtime.step({ nowMs: 1, contextFacts: facts(1, returnFailure) });
+  assert.equal(unavailable.vm.safe.available, false);
+  const state = runtime.contextSnapshot().state;
+  assert.equal(state.settingsRevision, 1);
+  assert.deepEqual(state.settings[0].result, { ok: false, fault: 'SettingsUnavailable' });
+  assert.notDeepEqual(state.settings[0].result, { ok: true, value: 300_000 });
+});
