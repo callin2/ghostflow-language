@@ -29,10 +29,10 @@ flowchart LR
   Human -->|파이프 명령| Console[ghostsim-console.mjs 파이프 모드]
   Profile[프로필 또는 Driver 설명자] --> Console
   Profile --> Live
-  Console -->|recorded TOON scenario| Scenario
-  Console -->|same runScenario path| S
+  Console -->|기록된 TOON 시나리오| Scenario
+  Console -->|같은 runScenario 경로| S
   Console -->|stderr의 ASCII 패널; stdout의 최종 결과| Human
-  A -. separate browser adapter .-> WASM[WASM reference runtime]
+  A -. 별도 브라우저 어댑터 .-> WASM[WASM 참조 런타임]
   Device[Device 소유 범위: 펌웨어 및 물리 I/O] -. 프로필 메타데이터만 .-> Profile
 ```
 
