@@ -364,3 +364,56 @@ test('REF-05-106 [host] 복귀 실패를 정상 설정값으로 숨기지 않는
   assert.deepEqual(state.settings[0].result, { ok: false, fault: 'SettingsUnavailable' });
   assert.notDeepEqual(state.settings[0].result, { ok: true, value: 300_000 });
 });
+
+test('REF-05-105 [host] 오래된 expiry는 새 일반 설정을 덮어쓰지 않는다.', async t => {
+  const referenceCases = JSON.parse(fs.readFileSync(
+    new URL('./reference/cases/03-settings-boundaries.json', import.meta.url), 'utf8')).cases;
+  const ref05105 = referenceCases.find(entry => entry.id === 'REF-05-105');
+  const settingsChapter = fs.readFileSync(
+    new URL('../docs/reference/05-settings-and-observation.md', import.meta.url), 'utf8');
+  assert.equal(ref05105?.issue, 'https://github.com/callin2/ghostflow-language/issues/337');
+  assert.match(ref05105.rule, /오래된 expiry는 새 일반 설정을 덮어쓰지 않는다/);
+  assert.match(ref05105.given, /5min 위 8min 임시값을 일반 설정 6min으로 대체했다/);
+  assert.match(ref05105.then, /6min을 유지/);
+  assert.match(ref05105.then, /이미 제거된 overlay에 대한 event로 식별/);
+  assert.match(settingsChapter, /새 일반 설정 \| 해당 setting의 overlay를 같은 event에서 제거하고 새 일반값을 적용한다/);
+  assert.match(settingsChapter, /이전 expiry가 새 값을 덮어쓰지 않는다/);
+
+  const compiled = await compileSource(`# Stale expiry settings\n\n\`\`\`ghost\ncontrol StaleExpiry {
+  config duration: Duration = 5min { min = 1min; max = 20min; step = 1min; access = operator; }
+  output seconds: Number;
+  seconds <- case duration { ok(value) => value / 1s; fault(_) => -1.0; };
+}\n\`\`\`\n`, { filename: 'stale-expiry-settings.ghost.md' });
+  const runtime = await ControlRuntime.instantiate(wasmBytes(), compiled,
+    { context: { bootEpoch: 11, terminalCapacity: 8, bindings: [] } });
+  t.after(() => runtime.dispose());
+  const fingerprint = runtime.contextSnapshot().state.programFingerprint;
+  const configId = compiled.manifest.configs[0].id;
+  const facts = (position, settings) => ({
+    clock: { monotonicMs: position, bootEpoch: 11, wallMs: 3_000 + position,
+      uncertaintyMs: 0, trusted: true, unknownReason: null, sourceRevision: 'stale-expiry-clock-v1' },
+    natural: [], schedules: [], settings,
+  });
+  const event = (eventId, baseRevision, position, value) => ({
+    programFingerprint: fingerprint,
+    eventId,
+    baseRevision,
+    position,
+    origin: 'operatorEdit',
+    changes: [{ configId, result: { ok: true, type: 'Duration', value } }],
+  });
+
+  assert.deepEqual(runtime.contextSnapshot().state.settings[0].result, { ok: true, value: 300_000 });
+  assert.equal(runtime.step({ nowMs: 1, contextFacts: facts(1,
+    event('temp-overlay-8min', 0, 1, 480_000)) }).vm.safe.seconds, 480);
+  assert.equal(runtime.contextSnapshot().state.settingsRevision, 1);
+  assert.equal(runtime.step({ nowMs: 2, contextFacts: facts(2,
+    event('ordinary-6min-removes-overlay', 1, 2, 360_000)) }).vm.safe.seconds, 360);
+  assert.equal(runtime.contextSnapshot().state.settingsRevision, 2);
+
+  const staleExpiryReturn = event('stale-expiry-return-to-5min', 1, 3, 300_000);
+  assert.throws(() => runtime.step({ nowMs: 3, contextFacts: facts(3, staleExpiryReturn) }), /stale settings transaction/);
+  const state = runtime.contextSnapshot().state;
+  assert.equal(state.settingsRevision, 2);
+  assert.deepEqual(state.settings[0].result, { ok: true, value: 360_000 });
+});

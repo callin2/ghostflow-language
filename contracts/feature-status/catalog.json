@@ -2557,6 +2557,18 @@
               "polarities": [
                 "boundary"
               ]
+            },
+            {
+              "path": "tests/issue-90-settings-stream.test.mjs",
+              "testId": "REF-05-105 [host] 오래된 expiry는 새 일반 설정을 덮어쓰지 않는다.",
+              "caseId": "REF-05-105",
+              "assertionClass": "runtime-value",
+              "targets": [
+                "wasm"
+              ],
+              "polarities": [
+                "boundary"
+              ]
             }
           ]
         }
@@ -2566,10 +2578,12 @@
       ],
       "issues": [
         74,
-        338
+        338,
+        337
       ],
       "referenceCaseIds": [
-        "REF-05-106"
+        "REF-05-106",
+        "REF-05-105"
       ]
     },
     {
