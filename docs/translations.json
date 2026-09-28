@@ -271,8 +271,8 @@
       "source": "docs/ProgrammingInGhostflow.md",
       "sourceLanguage": "ko",
       "translation": "docs/ProgrammingInGhostflow.en.md",
-      "sourceSha256": "508530b8b958b82dc85c95a9cb43577931a733a9a7a59d4a92cec6d2d417a2b4",
-      "translationSha256": "2b710a4c080d7195503ccf85ae61e42bad8d77b207fcb1865d2221c726703114"
+      "sourceSha256": "146a4b24497bafc4e4c45c0e3561ab0f1877425854fc0dd32fb61a560599c503",
+      "translationSha256": "05523c8b654fa1e7aff692ba9e8cbf49b34d72cffcec3c5f08ade710a4931a5b"
     },
     {
       "source": "docs/REFERENCE-QUERY.md",
@@ -327,8 +327,8 @@
       "source": "docs/reference/07-semantic-rules-and-index.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/07-semantic-rules-and-index.en.md",
-      "sourceSha256": "c3d2fa6f9a5d583fd73ff3c7951a2d8fdbccc6ab3158d39a055160a2ac3d4f4d",
-      "translationSha256": "fc5fd3e8cd3fedcaa761f8e67b20838ddf6bd779d89c809e49039cfeaf60869a"
+      "sourceSha256": "97bf0399f5d58be12f4b34ba4f4ef71e6117720f4d364c2bf39a0f16f09a5976",
+      "translationSha256": "15e30c72439d3ad43d73be473fc29c99b337c2c05035137754a846776be71b16"
     },
     {
       "source": "docs/reference/08-language-runtime-and-device-boundaries.md",

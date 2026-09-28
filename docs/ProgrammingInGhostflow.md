@@ -69,6 +69,7 @@ runtime 빌드 없이도 실행할 수 있다. 이 근거는 논리 실행이며
 10. [멈추고, 바꾸고, 비교하기](#ch10)
 11. [파일과 literate 프로그램](#ch11)
 12. [하나의 장치, 여러 control](#ch12)
+13. [내장함수와 내장 연산](#ch13)
 
 부록: [A. 명세 길잡이](#appendix-a) · [B. 오류로 배우기](#appendix-b)
 
@@ -1021,6 +1022,205 @@ definition revision → import → instance + typed connect
 ```
 
 `adapt`, capability 검사, 공통 constraints, 공유 resource, replay와 hot replacement는 각자 정해진 위치·타입·계약으로만 쓴다. 문법과 semantic DAG 규칙은 [Reference §6](reference/06-composition-and-replay.md), 장치·Driver·binding의 책임은 [Reference §8](reference/08-language-runtime-and-device-boundaries.md)을 따른다. 일반 `control` 안에서 임의의 별도 policy 언어가 있다고 가정하지 않는다.
+
+<a id="ch13"></a>
+## 13. 내장함수와 내장 연산
+
+내장 함수는 컴파일러가 이미 아는 연산이다. `fn`은 E07처럼 작성자가 선언하는 계산이다. 익숙한 이름이라고 내장 함수가 되지는 않는다. 일반 표현식용 `abs`, `min`, `max`, `clamp`, `sqrt`, `pow`, `round`는 없다. 언어가 허용하는 계산이라면 필요한 `fn`을 직접 선언한다.
+
+이 장은 [#369](https://github.com/callin2/ghostflow-language/issues/369)를 위해 dev 리비전 `c1bbbe35cbe5acf16118707f8afc14619153d918`을 확인했다.
+**주요 호출 이름 48개**와 **호스트 정책 전용 이름 3개**를 모두 다룬다. 표는 일반 호출, 선언 생성자, 제한된 변환을 구분한다. 아래 시그니처는 단편이다. 링크한 테스트에 완전한 예제가 있다. 이 단편들을 별도의 원본 프로그램으로 취급하지 않는다.
+
+먼저 연산을 쓸 수 있는 위치를 확인한다. 다음으로 입력과 결과 타입을 읽는다. 마지막으로 샘플·상태를 기억하는지, 시계·provider가 필요한지, 오류를 반환하는지 확인한다. 컴파일 성공은 실행 제어가 아니라 검증된 descriptor를 뜻할 수도 있다. 실행 제어도 명시된 런타임 입력과 binding이 필요하다. 어떤 연산도 물리 출력 효과를 증명하지 않는다.
+
+### 13.1 숫자 변환과 명시적 Result 생성
+
+숫자 표현을 바꾸려는 의도가 있을 때 변환을 쓴다. `Int`는 정확한 부호 있는 32비트 정수이고 `Number`는 부동소수점이다. 다음 변환은 위치 인자 하나를 받는다. 예를 들어 `int_floor(-1.2)`는 -2, `int_trunc(-1.2)`는 -1이다. nearest-even은 중간값 2.5를 2로, 3.5를 4로 바꾼다.
+
+| 내장 이름 | 시그니처와 목적 | 문맥, 경계와 예제 |
+|---|---|---|
+| `number` | `number(x: Int) -> Number`: 표현을 명시적으로 바꾸기 | 일반 표현식, 상태 없음. [정수 예제](../tests/int-compiler.test.mjs). |
+| `int_exact` | `int_exact(x: Number) -> Int`: 정수인 값만 허용 | 소수 또는 범위 밖 값을 거부한다. [변환](../tests/dynamic-int-conversions.test.mjs). |
+| `int_floor` | `int_floor(x: Number) -> Int`: 음의 무한대 방향 | 변환값이 Int 범위 안이어야 한다. [변환](../tests/dynamic-int-conversions.test.mjs). |
+| `int_ceil` | `int_ceil(x: Number) -> Int`: 양의 무한대 방향 | 변환값이 Int 범위 안이어야 한다. [변환](../tests/dynamic-int-conversions.test.mjs). |
+| `int_trunc` | `int_trunc(x: Number) -> Int`: 0 방향으로 소수 제거 | 변환값이 Int 범위 안이어야 한다. [변환](../tests/dynamic-int-conversions.test.mjs). |
+| `int_nearest_even` | `int_nearest_even(x: Number) -> Int`: 가장 가까운 정수, 동률이면 짝수 | 변환값이 Int 범위 안이어야 한다. [변환](../tests/dynamic-int-conversions.test.mjs). |
+| `ok` | `ok(value: T) -> Result<T,E>`: 성공 만들기 | 기대 Result 타입이 T와 컴파일러 소유 E를 정한다. [Result 예제](../tests/result-control.test.mjs). |
+| `fault` | `fault(reason: E) -> Result<T,E>`: 실패 만들기 | 기대 Result 타입 필요; 타입이 있는 이유와 원본 출처를 보존한다. [Result 예제](../tests/result-control.test.mjs). |
+| `rate` | `rate(delta: Q-difference, time: Duration) -> Rate<Q>`: 비교용 변화율 만들기 | 기대 Rate 문맥, 양수 시간; Temperature는 TemperatureDelta 사용. 정규 차이를 초로 나눈다. [변화율](../tests/window-control.test.mjs). |
+
+잘못된 상수 변환은 컴파일 오류다. 동적 숫자 오류는 성공적인 평가를 막는다. `recover`로 처리하는 센서 Result가 아니다. `Rate<Q>`는 표현식 전용이다. `window_rate` signal과 `rate` 임계값을 비교한다. 일반 config/state/input/output 저장 타입이 아니다.
+근거: [표현식 호출](../tools/control.mjs), [정수 계약](EXACT-INTEGER-CONTRACT.md).
+
+### 13.2 대응을 고를 때까지 품질 보존하기
+
+센서의 실패한 읽기는 정상적인 0이 아니다. Result 파이프라인은 값 또는 오류를 전달한다. E10은 실패 대응을 명시한다. `result |> map(transform)`, `result |> and_then(transform)`, `result |> recover(default)`를 쓴다. `>>`는 정적 변환을 합성한다. 임의의 일급 함수가 아니라 컴파일러가 아는 변환이다.
+
+| 내장 이름 | 시그니처와 목적 | 문맥, 경계와 예제 |
+|---|---|---|
+| `map` | `map(T -> U)`: Result<T,E> -> Result<U,E> | 단항 이름 있는 fn 또는 `below(limit)`; U는 Result 불가. 실패 보존. [파이프라인](../tests/result-control.test.mjs). |
+| `and_then` | `and_then(T -> Result<U,E>)`: Result<T,E> -> Result<U,E> | 단항 이름 있는 fn, 같은 E 필요. 기존 실패에서는 변환을 건너뛴다. [파이프라인](../tests/result-control.test.mjs). |
+| `recover` | `recover(default: T)`: Result<T,E> -> T | 같은 타입의 명시적 대체값; trace에 오류와 출처 기록. `recover(false)`는 작성자의 결정이다. [출처](../tests/result-provenance.test.mjs). |
+| `below` | `below(limit: T)`: 엄격한 `<`로 T -> Bool 변환 | map 변환으로만 사용. 순서 있는 숫자, Rate, DateTime, TimeOfDay; 같은 타입 임계값. Bool은 Result가 아니므로 and_then(below(...))는 거부된다. [파이프라인](../tests/result-control.test.mjs). |
+
+근거: [정적 변환 lowering](../tools/control.mjs). 값을 복구해도 원래 측정이 신뢰할 수 있게 되는 것은 아니다.
+E10의 Percent 센서에서 `moisture |> map(below(30%)) |> recover(false)` 단편은 오류 때 false를 요청한다. 이 임계값 계산에는 히스테리시스 기억이 없다.
+
+### 13.3 샘플을 필터링하고 히스테리시스로 판단 유지하기
+
+필터는 측정값을 평활화한다. 히스테리시스는 구간 안에서 Bool 판단을 기억한다. 서로 다른 문제를 해결하며 함께 쓸 수 있다. 숫자 센서를 선언하고 `filter = ...`에서 필터 하나를 고른다. 필터는 새 유효 물리 샘플을 소비한다. 반복 scan은 샘플 가중치를 추가하지 않는다.
+예를 들어 E10의 `filter = median(3);`는 실제 샘플 세 개를 선택한다. `filter = ema(alpha: 0.25);`는 새 샘플에 갱신 가중치의 4분의 1을 준다.
+
+| 내장 이름 | 시그니처와 목적 | 문맥, 경계와 예제 |
+|---|---|---|
+| `median` | `median(n)`: 최근 n개 유효 샘플의 중앙값 | 센서 filter 전용; 상수 홀수 정수 1..31. 미완성 창은 NotReady. [필터](../tests/signals-wasm.test.mjs). |
+| `moving_average` | `moving_average(n)`: 최근 n개 유효 샘플의 산술평균 | 센서 filter 전용; 상수 정수 1..31. 미완성 창은 NotReady. [필터](../tests/signals-wasm.test.mjs). |
+| `ema` | `ema(alpha: Number)`: 새 샘플과 이전값의 가중 평균 | 센서 filter 전용; 유한 상수 0 < alpha <= 1. 첫 유효 샘플로 시작하며 복구 규칙 적용. [필터](../tests/signals-wasm.test.mjs). |
+| `hysteresis` | `hysteresis(sensor, on_below: T, off_above: T, initial: Bool) -> Result<Bool,SensorFault>` | signal 선언; 직접 선언한 숫자 센서; 같은 T의 상수 임계값, on_below < off_above. [경계와 오류](../tests/signals-wasm.test.mjs). |
+
+E10의 수분 제어를 보자. `signal dry = hysteresis(moisture, on_below: 30%, off_above: 35%, initial: false);`.
+30%보다 낮으면 dry를 true로 바꾼다. 35%보다 높으면 false로 바꾼다. 품질이 좋을 때 **닫힌 구간 [30%,35%]**의 모든 값은 이전 Bool을 유지한다. 두 임계값과 정확히 같을 때도 유지한다. 작은 변동 때문에 판단이 계속 바뀌는 것을 막는다.
+
+다음 순서는 준비 조건을 충족한 뒤 품질 좋은 필터 결과를 뜻한다. 필터 전의 원시 샘플 순서가 아니다.
+
+| 품질 좋은 필터 수분값 | 유지되는 dry | 이유 |
+|---|---|---|
+| 시작 뒤 30% | false | 같으므로 초기 false 유지. |
+| 35% | false | 상한과 같아도 false 유지. |
+| 29% | true | 하한보다 엄격히 낮음. |
+| 30% | true | 하한과 같아 true 유지. |
+| 33% | true | 구간 내부. |
+| 35% | true | 상한과 같아 true 유지. |
+| 36% | false | 상한보다 엄격히 높음. |
+
+`initial`은 처음 기억할 값이지, 샘플 누락을 무시할 권한이 아니다. 준비 전이나 Disconnected/Stale/Invalid 뒤 공개 결과는 fault다. 처리 상태는 initial로 돌아간다. 좋은 샘플도 복구·필터 조건을 다시 충족해야 한다. 따라서 복구된 구간 내부 샘플은 오류 전 판단이 아니라 initial에서 시작한다. initial이 true여도 실패한 Result가 `ok(true)`가 되지는 않는다. E10은 `case`로 출력 대응을 선택한다.
+
+[Rust conditioner](../crates/ghostflow-core/src/signals.rs)는 엄격한 비교를 사용하고 오류 때 히스테리시스 처리를 초기화한다. 링크한 WASM 테스트의 “retains either prior state exactly at both thresholds” 및 오류·복구 예제가 근거다. 이 장은 그 계약을 설명한다. 문서 수정이 새로운 하드웨어 시험을 만들지는 않는다.
+
+### 13.4 시간, 샘플, 사건은 서로 다른 증거다
+
+`signal name = constructor(...);`로 다음 연산을 선언한다. scan을 세는 단조 타이머는 scan 사이에도 물리 조건이 계속 참이었다는 증거가 아니다. 연속성이 중요하면 인증된 증거를 쓴다.
+선언된 Temperature 센서에 `signal recent = hold_last(temperature, for_at_most: 2min, quality: measured);`를 쓰면 마지막 좋은 샘플의 재사용을 제한한다. 출력에 사용하려면 여전히 명시적 Result 대응이 필요하다.
+
+| 내장 이름 | 시그니처와 목적 | 문맥, 경계와 예제 |
+|---|---|---|
+| `debounce` | `debounce(source, stable_for: Duration, initial: T) -> T or Result<T,E>`: 안정된 후보 채택 | Bool/유한 enum, 양수 상수 시간과 같은 타입 상수 initial. 후보 변경 때 나이 재시작; 오류 때 초기화. 샘플 출처 보존; 일반값은 scan 사용. [Debounce](../tests/debounce-control.test.mjs). |
+| `true_for` | `true_for(BoolSensor, duration: Duration, quality: measured) -> Result<Bool,SensorFault>`: 연속 참 증명 | 직접 선언한 Bool 센서, 양수 상수 시간. Driver 인증 구간; false/부적합 품질 때 초기화. 시간 경계에 도달하면 true. [인증 소스](../tests/fixtures/true-for-certified.ghost.md). |
+| `after_event` | `after_event(Event, BoolSensor, window: Duration, quality: measured)`: 사건별 증거 유지 | 양수 상수 창; 사건 식별자와 predicate 샘플 필요. [eventTime,eventTime+window)에서 판단. signal 자체는 스칼라가 아니다. [사건 소스](../tests/fixtures/after-event-evidence.ghost.md). |
+| `after_event_any` | `after_event_any(signal) -> Result<Bool,SensorFault>`: 하나라도 만족하는 사건 결과 | after_event signal 하나. 결정적 true로 any를 확정할 수 있다. 그 밖에는 미결 식별자·오류가 남는다. [투영 예제](../tests/after-event-control.test.mjs). |
+| `after_event_all` | `after_event_all(signal) -> Result<Bool,SensorFault>`: 모든 사건의 결과 | after_event signal 하나. 결정적 false로 all=false 확정 가능. 결정 증거가 없는 빈 집합·미결 집합은 자동 허용이 아니라 NotReady. [투영 예제](../tests/after-event-control.test.mjs). |
+| `window_average` | `window_average(source, over: Duration, quality: measured, max_age: Duration)` | 물리 샘플 출처가 있는 Result<숫자/물리량,SensorFault>. 같은 payload 반환, 단 Int -> Number. [창](../tests/window-control.test.mjs). |
+| `window_min` | `window_min(source, over: Duration, quality: measured, max_age: Duration)` | average와 같은 허용 payload; 같은 payload 타입의 최솟값 Result. [창](../tests/window-control.test.mjs). |
+| `window_max` | `window_max(source, over: Duration, quality: measured, max_age: Duration)` | average와 같은 허용 payload; 같은 payload 타입의 최댓값 Result. [창](../tests/window-control.test.mjs). |
+| `window_rate` | `window_rate(source, over: Duration, quality: measured, max_age: Duration) -> Result<Rate<Q>,SensorFault>` | 지원 선형 물리량; 서로 다른 시각의 첫·끝 관측. 온도 차이는 delta K. Number/Int/Percent, RelativeHumidity, CO2, Acidity 입력 불가. [변화율](../tests/window-control.test.mjs). |
+| `hold_last` | `hold_last(source, for_at_most: Duration, quality: measured) -> Result<T,SensorFault>`: 좋은 샘플 임시 재사용 | 물리 출처와 양수 상수 시간 필요. 실제 timestamp, 유지 나이, 가려진 오류 보존; 재평가로 갱신하지 않는다. [유지 예제](../tests/hold-last-control.test.mjs). |
+| `elapsed` | `elapsed(state) -> Duration`: 상태 변경 뒤 나이 | timer 선언 전용; 선언된 state와 명시적 단조 시계; 변경 때 초기화. [E08](#ch06). |
+| `continuous_true` | `continuous_true(BoolExpression) -> Duration`: 연속 참 scan 관측의 나이 | timer 선언 전용; 첫 true scan에서 0, false 때 초기화. 관측하지 않은 구간을 인증하지 않는다. [타이머](../tests/compiler.test.mjs). |
+
+창의 `over`, `max_age`는 양수 상수 Duration이다. **(now-over,now]**의 실제 허용 관측을 사용하고 보간하지 않는다. 관측이 없거나 가장 새 관측의 나이가 **>= max_age**이면 NotReady다. 현재 소스 오류는 보존한다. 변화율에는 서로 다른 관측 시각 두 개가 필요하다. 창 합성은 집계·샘플 출처를 보존한다. 시계만 진행하는 scan은 새 관측을 만들지 않는다.
+
+after_event만 있고 any/all 투영이 있는 프로그램은 사건 런타임 binding과 함께 실행 제어로 컴파일될 수 있다. 투영 없는 after_event나 자연 조건과의 결합은 `executable:false` temporal descriptor가 될 수 있다. `after_event_for`는 아래 미지원 목록에서 설명한다.
+근거: [signal/timer lowering](../tools/control.mjs), [시간 증거 Reference](reference/04-sensors-constraints-control.md).
+
+### 13.5 자연 사실과 예약 정책 생성자
+
+provider는 관측·예측을 공급한다. 프로그램은 무엇을 허용할지 결정한다. 다음 일반 호출 두 개는 불확실성을 명시적으로 반환한다.
+
+| 내장 이름 | 시그니처와 목적 | 문맥, 경계와 예제 |
+|---|---|---|
+| `tide_is` | ``tide_is(provider, tide`spring` or tide`neap`) -> Result<Bool,TemporalContextFault>`` | 선언된 TidePredictions provider. 예측 누락·노후 또는 시계 문맥 실패는 fault. [자연 조건](../tests/natural-condition-contract.test.mjs). |
+| `moon_is` | ``moon_is(provider, moon`phase`) -> Result<Bool,TemporalContextFault>`` | LunarEphemeris provider; 위상: new, waxing_crescent, first_quarter, waxing_gibbous, full, waning_gibbous, last_quarter, waning_crescent. [자연 조건](../tests/natural-condition-contract.test.mjs). |
+
+시그니처 안의 tagged literal은 표기 단편이다. 두 호출 모두 런타임·provider 사실이 필요하다. pure fn에서 전역 provider를 캡처할 수 없다.
+
+다음 생성자는 schedule 필드에서만 쓴다. 일반 표현식 저장값을 반환하지 않는다. 여기의 Duration은 양수 상수다.
+예를 들어 `gap = skip_after(10min);`은 공백 정책이다. Tide의 `basis = run(5min, within(10min));`은 10분 안의 승인을 허용하고 승인부터 5분 운전한다.
+
+| 내장 이름 | 시그니처와 목적 | 문맥, 경계와 예제 |
+|---|---|---|
+| `instant` | `instant(DateTime)`: Periodic의 절대 anchor | 상수 DateTime; 현재 실행 경로는 preserve_anchor와 pulse 사용. [Periodic](../tests/periodic-cron-policy.test.mjs). |
+| `civil` | `civil(Date, TimeOfDay)`: Periodic의 민간시 anchor | 상수 날짜·시각; 검증 descriptor 계약, 현재 Periodic bytecode 경로 밖. [Periodic](../tests/periodic-cron-policy.test.mjs). |
+| `skip_after` | `skip_after(Duration)`: 허용 관측 공백 제한 | schedule gap 필드; 더 큰 공백에는 명시적 skip/baseline 정책 사용. [정책](../tests/periodic-cron-policy.test.mjs). |
+| `range` | `range(Duration)`: 계획된 민간시 구간 | schedule basis; 비중첩 증명과 명시적 cancel_when 필요. descriptor 전용, 제어 bytecode 없음. [Range 계약](../tests/schedule-descriptor-artifact.test.mjs). |
+| `run` | `run(Duration, within(Duration))`: 승인부터 Tide 운전 | Tide basis; 첫 Duration은 운전 길이. 유예 구간 안에서 첫 승인 필요. [Tide](../tests/natural-schedule-contract.test.mjs). |
+| `within` | `within(Duration)`: Tide 승인 유예 | Tide run의 둘째 인자 전용; [planned,planned+grace), 정확한 끝 제외. 운전 길이를 늘리지 않는다. [Tide](../tests/natural-schedule-contract.test.mjs). |
+
+현재 실행 예약은 신뢰 시계, baseline 복구, skip fallback을 사용한다. Daily/slots/Cron은 pulse, Periodic은 instant+preserve_anchor, Tide는 run+within이다. descriptor로 허용된 민간시 계약을 실행 예약으로 취급하지 않는다.
+근거: [예약 lowering과 경로 선택](../tools/control.mjs), [시간 Reference](reference/03-time-and-schedules.md).
+
+### 13.6 더 허용하기 전에 사용량 계상하기
+
+account는 화면 애니메이션이나 요청 출력으로 사용량을 예측하지 않고 증거를 기록한다. applied receipt와 requested intent는 다르다. durable 계상에는 ledger와 검증된 resource binding이 필요하다.
+binding된 resource pump에 선언 단편 `account pumping = on_time(pump, stage: applied, persistence: durable);`를 쓰면 applied 증거를 고른다. 링크한 계상 예제는 resource와 limit 정책도 선언한다.
+
+| 내장 이름 | 시그니처와 목적 | 문맥, 경계와 예제 |
+|---|---|---|
+| `on_time` | `on_time(resource, stage: applied, persistence: durable)`: Duration account | account 선언; 제한된 실행 경로는 durable/applied만 허용. requested/safe/confirmed 대안은 검사 가능하나 이 실행 binding은 아니다. [계상](../tests/accounting-syntax.test.mjs). |
+| `count_events` | `count_events(Event, over: local_day("zone"), persistence: durable)`: 사건 account | account 선언; .count는 Result<Int,AccountingFault>. 실행은 durable/local_day 필요; 중복 사건 식별자를 다시 세지 않는다. [계상](../tests/accounting-syntax.test.mjs). |
+| `used` | `used(account, rolling(Duration))`: 계상된 Duration 조회 | accounting constraint의 limit 위치 전용. 실행 limit은 <=, 양수 bound/reserve, on_unknown=block 필요. [한도](../tests/accounting-syntax.test.mjs). |
+| `rolling` | `rolling(Duration)`: 뒤로 이동하는 계상 기준 | 양수 상수 시간; count_events rolling은 descriptor/검사 범위이며 사건 수 실행 경로 밖. [한도](../tests/accounting-syntax.test.mjs). |
+| `local_day` | `local_day("timezone")`: 민간시 하루 기준 | 비어 있지 않은 literal timezone; 시계·달력·ledger 필요. 고정 24시간 rolling 창이 아니다. [계상](../tests/accounting-syntax.test.mjs). |
+| `count_on` | `count_on({resources}) -> Int`: 참인 후보 자원 수 | 이름 있는 resource 제약, 일반 표현식 아님. 유한하고 서로 다른 Bool resource 집합; 빈 집합 -> 0. 호스트 정책 binding 필요. [이름 있는 제약](../tests/named-constraints.test.mjs). |
+| `any_on` | `any_on({resources}) -> Bool`: 후보 자원 검사 | 같은 제한 문맥; 빈 집합 -> false. 제약이 평가 단계를 선언한다. [이름 있는 제약](../tests/named-constraints.test.mjs). |
+
+독립된 이름 있는 resource 정책은 호스트 정책 artifact가 된다. 일반 VM 제어가 아니다. 근거: [계상·resource 제약](../tools/control.mjs).
+
+### 13.7 PID 생성자는 objective에 속한다
+
+controller는 요청 목표값을 계산한다. 뒤의 제약이 제한할 수 있다. 다음 생성자는 gain과 재시작 정책을 정하며 일반 단위 대수 함수가 아니다. 현재 native binding은 Temperature 센서, Temperature config 목표, `ContinuousActuator<Percent>`이며 출력 하한은 0%다. PID 이외 종류는 binding 필요 메타데이터를 가질 수 있다. `pi`, `on_off`가 파싱된다고 운전 controller가 증명되지는 않는다.
+
+| 내장 이름 | 시그니처와 목적 | 문맥, 경계와 예제 |
+|---|---|---|
+| `proportional_gain` | `proportional_gain(output: Percent, error: TemperatureDelta)`: P gain | PID kp 필드; 상수, output >=0, error >0; output/error. [Controller 예제](../tests/gfb7-pid-contract.test.mjs). |
+| `integral_gain` | `integral_gain(output: Percent, error: TemperatureDelta, time: Duration)`: I gain | PID ki; 같은 범위와 time >0; output/error/seconds. [Controller 예제](../tests/gfb7-pid-contract.test.mjs). |
+| `derivative_gain` | `derivative_gain(output: Percent, error: TemperatureDelta, time: Duration)`: D gain | PID kd; 같은 범위와 time >0; output*seconds/error. [Controller 예제](../tests/gfb7-pid-contract.test.mjs). |
+| `reset` | `reset(output: Percent)`: 명시적 재시작 목표 | PID restart 필드; objective 출력 범위 안의 상수. 첫 허용 샘플에서 tracking 초기화; 임의 상태 reset 호출 아님. [Controller 예제](../tests/gfb7-pid-contract.test.mjs). |
+
+gain의 output이 0이면 그 항을 비활성화한다. period는 양수이고 late_after >= period다. 명시적 direction, bias, anti-windup, disabled/transfer, fault, restart 정책이 생명주기를 정한다. 오래되거나 누락된 측정을 조용히 허용하지 않는다. [Controller lowering](../tools/control.mjs)과 [연속 제어 Reference](reference/04-sensors-constraints-control.md)를 참조한다.
+예를 들어 `kp = proportional_gain(output: 2%, error: 1Δ°C);`는 온도 오차 1도당 2퍼센트포인트를 정한다. `restart = reset(output: 0%);`는 첫 tracking 목표를 명시적으로 고른다.
+
+### 13.8 별도의 호스트 정책 문법
+
+`ghostrules` adapter는 제한된 station 정책 문법을 검사한다. 호출처럼 보이는 형식도 문맥 전용이다. 일반 control 표현식에 함수가 추가되는 것이 아니다. 기존 [station 규칙](../examples/station-rules.ghost.md)과 [제약 테스트](../tests/constraints.test.mjs)에 완전한 정책이 있다.
+
+| 내장 이름 | 시그니처와 목적 | 문맥, 경계와 예제 |
+|---|---|---|
+| `stopped` | `stopped(station)`: 정지 station 요구 | 지정된 mode와 함께 allow enter/apply 정책 조건에서만 사용. 호스트 station 상태이며 물리 모터 정지 증명 아님. [규칙](../examples/station-rules.ghost.md). |
+| `pump_capacity` | `pump_capacity(pump)`: 용량 검사 요구 | require ... == Pass 또는 check 정책 절 전용. 호스트 정책 artifact이며 숫자 용량 표현식 아님. [규칙](../examples/station-rules.ghost.md). |
+| `day` | `day("timezone")`: 일일 한도의 민간시 하루 | `limit on_time(pump) <= Duration per day("zone")` 전용; 유효 IANA timezone, 비어 있지 않은 128자 이하 문자열. [규칙](../examples/station-rules.ghost.md). |
+
+이 문법의 `count_on(pump.valves)`, `any_on(pump.valves)`, `on_time(pump)`은 §13.6과 인자 모양이 다른 제한 형식이다. 각각 max-valves, pump-needs-valve, daily-limit 정책 절을 만든다. 임의의 `let` 표현식으로 옮기지 않는다. `exclusive`, `allow`, `require`, `limit`, `once`, `check`는 절을 시작한다. `warn`은 거부된다.
+근거: [호스트 정책 parser](../tools/constraints.mjs).
+
+### 13.9 인접 문법과 사용할 수 없는 대안
+
+다음은 내장 연산과 함께 쓰지만 **호출 함수가 아니다**.
+
+| 문법 | 의미와 현재 경계 |
+|---|---|
+| Daily, DailySlots<15min>, Periodic, Cron, Solar, Tide | schedule 선언 타입. DailySlots 실행은 고정 15분 격자; Cron은 검증된 필드 다섯 개. |
+| pulse; time/date/datetime/cron5/day/sun/tide/moon tagged literals | 정책값과 typed 표기. ``sun`rise` ``/``sun`set` ``은 sunrise()/sunset() 호출이 아니다. |
+| TimeSlots<grid,capacity> | config 타입: 24h를 나누는 양수 grid, 양수 capacity, 유한·고유·격자 정렬 TimeOfDay 목록. TimeSlots(...) 호출 없음. |
+| `Result<T,E>`; `Rate<Q>` | typed 결과와 표현식 전용 변화율. E는 컴파일러 소유; 중첩 Result payload 거부. |
+| schedule.due; schedule.active; schedule.missed | Bool 투영; .missed는 노출된 투영 필요. active occurrence와 applied output은 다르다. 메서드 호출 없음. |
+| eventAccount.count | Result<Int,AccountingFault> 투영; count_events account만 사용. |
+| resource.on/position/valves | 문맥 전용 resource/정책 endpoint, 일반 메서드 아님. |
+| sample, valid, filter, stale_after, recover_after, samples | 센서 선언 필드·표기. 특히 stale_after는 표현식 호출이 아니다. |
+| on_below, off_above, initial; min, max, step, access, label | 이름 있는 인자 또는 config 필드, 함수 아님. |
+| if/case/in; >> and \|>; fn/type/state/config/timer/signal | 문법, 연산자, 선언. input.name/state.name/next.name은 제거된 alias. |
+
+[Parser와 member/type 규칙](../tools/control.mjs)이 위치를 정한다. 전체 타입과 단위는 [Reference 2장](reference/02-types-expressions-state.md)에 있다.
+
+| 선택된/Reference 표기 | 현재 상태; 실행을 주장하지 않는다 |
+|---|---|
+| after_event_for(signal, EventId) | Reference는 식별자별 투영을 설명하지만 현재 컴파일러 호출 dispatcher가 없어 unknown function이다. 의도가 맞을 때만 지원 any/all을 쓴다. |
+| window(Duration) schedule basis | 설계 대안, 현재 허용 basis 아님. 지원 window_average/min/max/rate signal과 다르다. |
+| run(Duration, on_time) | 설계 대안; 지원 Tide run은 within(Duration) 필요. |
+| range(Duration); civil(Date,TimeOfDay) | 위에서 설명한 검증 descriptor 계약; 현재 bytecode 경로 아님. |
+| PID checkpoint; degraded Name | 현재 native PID fault/restart 정책에서 미지원인 선택 설계 대안. |
+| ifthenelse, purefn, enum, next | 제거된 alias. 정규 if ... then ... else, fn, type, prime state 사용. |
+
+진단이나 설계 예제에 이름이 나온다고 지원을 추론하지 않는다. 컴파일러 경로와 artifact 종류를 확인한다. [장 coverage 검사](../tests/programming-builtins.test.mjs)는 두 언어의 항목을 컴파일러 호출 dispatch와 맞추고 시그니처·문맥·예제 링크가 있는지 검사한다.
 
 <a id="appendix-a"></a>
 ## 부록 A. 명세 길잡이

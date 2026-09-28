@@ -105,9 +105,14 @@ test('REF-07-008: syntax index status markers do not hide parser support', () =>
 });
 
 test('REF-07-010: source-to-Reference index links design rationale to exact Reference locations only', () => {
+  // Both language versions must preserve exact destinations. Previously only
+  // the Korean source was checked, allowing its translation to retain old prose.
+  const translation = section(readReference('07-semantic-rules-and-index.en.md'), '7.8 From original documents to the reference');
+  assertResolvableLocalLinks(translation, referenceDir);
   const chapter = readReference('07-semantic-rules-and-index.md');
   const sourceIndex = section(chapter, '7.8 원문에서 reference로 찾아가기');
   assertResolvableLocalLinks(sourceIndex, referenceDir);
+  assert.deepEqual(links(translation), links(sourceIndex), 'translated index preserves every source link destination');
 
   const rows = tableRows(sourceIndex).slice(1);
   assert.equal(rows.length, 13, 'source-to-Reference index must cover each design-rationale row');
