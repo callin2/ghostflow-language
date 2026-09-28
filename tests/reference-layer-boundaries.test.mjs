@@ -71,3 +71,33 @@ test('REF-08-002: FAQ compiler row separates compile checks from physical verifi
   assert.doesNotMatch(combined, /컴파일(?:\s|·|-)*(?:성공|검사).{0,20}(?:물리(?:\s|·|-)*(?:검증|작동).{0,10}(?:완료|성공|증명)|실제(?:\s|·|-)*작동.{0,10}(?:완료|성공|증명))/);
   assert.doesNotMatch(combined, /physical(?:\s|_|-)*verification.{0,20}(?:compile|success)/i);
 });
+
+test('REF-08-003: data providers expose data identity, coverage, validity, and failures without a second control language', () => {
+  const chapter08 = readReference('08-language-runtime-and-device-boundaries.md');
+  const layers = tableByFirstCell(section(chapter08, '8.2 계층별 책임'));
+  const provider = layers.get('실행 환경·데이터 제공자');
+  assert.ok(provider, 'missing execution-environment/data-provider layer row');
+  const [responsibility, boundary] = provider;
+
+  assert.match(responsibility, /시계와 신뢰도/);
+  assert.match(responsibility, /날짜·자연 사건 자료/);
+  assert.match(boundary, /공급한 자료의 판본·적용 범위·유효성·실패를 드러낸다\./);
+  assert.match(boundary, /별도 제어 언어를 만들지 않는다\./);
+
+  const faqRows = tableRows(section(chapter08, '8.3 FAQ 전체 책임표')).slice(1).map(cells);
+  const calendarRow = faqRows.find(([faq]) => /language_faq\.md#q21/.test(faq) && /language_faq\.md#q27/.test(faq) && /language_faq\.md#q29/.test(faq));
+  assert.ok(calendarRow, 'missing weekday/holiday/DST FAQ row');
+  assert.match(calendarRow[3], /달력·시간대 자료와 판본·범위 공급/);
+
+  const timeJudgment = section(chapter08, '8.4 기능별로 지켜야 하는 경계');
+  assert.match(timeJudgment, /생성 입력은 원인과 판본을 잃은 임의 Bool 펄스로 축소하지 않는다\./);
+
+  const chapter03 = readReference('03-time-and-schedules.md');
+  assert.match(chapter03, /`calendar_is`는\s+`Result<Bool, CalendarFault>`를 반환한다\./);
+  assert.match(chapter03, /Schedule의 `on`은 같은 fault를 Unknown으로\s+보존해 명시 fallback으로 보내지만 일반 식은 `case` 없이 Bool로 바꾸지 않는다\./);
+  assert.match(chapter03, /언어는 자료의 ID, revision, coverage, expiry를 요구할 뿐 인터넷을\s+요구하지 않는다\./);
+
+  const combined = [boundary, calendarRow.join(' '), timeJudgment, chapter03].join('\n');
+  assert.doesNotMatch(combined, /(?:공휴일|holiday|calendar).{0,40}(?:임의|arbitrary).{0,20}Bool/i);
+  assert.doesNotMatch(combined, /(?:expiry|만료).{0,40}(?:true|false|Bool|불리언)\s*(?:로|으로)?\s*(?:대체|변환|축소)/i);
+});

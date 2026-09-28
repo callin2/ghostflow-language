@@ -2995,6 +2995,47 @@
       ]
     },
     {
+      "id": "provider-data-boundary",
+      "family": "Provider data identity coverage validity and failure boundary",
+      "clause": {
+        "path": "docs/reference/08-language-runtime-and-device-boundaries.md",
+        "heading": "8.2 계층별 책임"
+      },
+      "owner": "HOST",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [
+        "compile"
+      ],
+      "evidence": [
+        {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/reference-layer-boundaries.test.mjs",
+              "testId": "REF-08-003: data providers expose data identity, coverage, validity, and failures without a second control language",
+              "caseId": "REF-08-003",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "The oracle verifies Reference responsibility boundaries and calendar-provider prose; it does not prove a Farm Studio API or host provider implementation emits these records."
+      ],
+      "issues": [
+        320
+      ],
+      "referenceCaseIds": [
+        "REF-08-003"
+      ]
+    },
+    {
       "id": "host-boundary",
       "family": "Host scheduling, persistence and simulation",
       "clause": {
