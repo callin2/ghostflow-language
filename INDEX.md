@@ -13,8 +13,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [AGENTS.md](AGENTS.md) | GhostFlow language ownership | md |
 | [DOCS-REVIEW-REPORT.md](DOCS-REVIEW-REPORT.md) | GhostFlow Documentation Review — Findings Report | md |
 | [PLAN.md](PLAN.md) | PLAN - ghostflow-language (session relay) | md |
-| [README.ko.md](README.ko.md) | ghostflow-language | md |
-| [README.md](README.md) | ghostflow-language | md |
+| [README.ko.md](README.ko.md) | 의도를 잃지 않는 제어. | md |
+| [README.md](README.md) | Control that stays true to intent. | md |
 
 ## contracts/integration-v1/
 

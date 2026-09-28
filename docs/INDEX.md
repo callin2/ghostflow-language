@@ -128,6 +128,10 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/assets/llm-toolchain-console.svg](assets/llm-toolchain-console.svg) | llm-toolchain-console.svg | svg |
 | [docs/assets/llm-toolchain-device.svg](assets/llm-toolchain-device.svg) | llm-toolchain-device.svg | svg |
 | [docs/assets/llm-toolchain-timer.svg](assets/llm-toolchain-timer.svg) | llm-toolchain-timer.svg | svg |
+| [docs/assets/readme-hero.svg](assets/readme-hero.svg) | readme-hero.svg | svg |
+| [docs/assets/readme-intent.svg](assets/readme-intent.svg) | readme-intent.svg | svg |
+| [docs/assets/readme-replay.svg](assets/readme-replay.svg) | readme-replay.svg | svg |
+| [docs/assets/readme-trace.svg](assets/readme-trace.svg) | readme-trace.svg | svg |
 
 ## docs/plans/
 
@@ -190,4 +194,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.ko.md](research/GF-COMPOSE-R9-ACCEPTANCE.ko.md) | GF-COMPOSE R9: acceptance와 구현 인계 | md |
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.md](research/GF-COMPOSE-R9-ACCEPTANCE.md) | GF-COMPOSE R9: acceptance and implementation handoff | md |
 
-156 documents.
+160 documents.
