@@ -2582,6 +2582,19 @@
                 "positive",
                 "boundary"
               ]
+            },
+            {
+              "path": "tests/issue-90-settings-stream.test.mjs",
+              "testId": "REF-05-103 [host] 임시 Run overlay는 run 경계에서 제거된다.",
+              "caseId": "REF-05-103",
+              "assertionClass": "runtime-value",
+              "targets": [
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
             }
           ]
         }
@@ -2593,12 +2606,14 @@
         74,
         338,
         337,
-        336
+        336,
+        335
       ],
       "referenceCaseIds": [
         "REF-05-106",
         "REF-05-105",
-        "REF-05-104"
+        "REF-05-104",
+        "REF-05-103"
       ]
     },
     {

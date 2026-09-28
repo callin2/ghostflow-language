@@ -480,3 +480,51 @@ test('REF-05-104 [host] Until 임시값의 만료는 복귀 설정 event다.', a
   assert.equal(runtime.contextSnapshot().state.settingsRevision, 2);
   assert.deepEqual(runtime.contextSnapshot().state.settings[0].result, { ok: true, value: 300_000 });
 });
+
+test('REF-05-103 [host] 임시 Run overlay는 run 경계에서 제거된다.', async t => {
+  const referenceCases = JSON.parse(fs.readFileSync(
+    new URL('./reference/cases/03-settings-boundaries.json', import.meta.url), 'utf8')).cases;
+  const ref05103 = referenceCases.find(entry => entry.id === 'REF-05-103');
+  const settingsChapter = fs.readFileSync(
+    new URL('../docs/reference/05-settings-and-observation.md', import.meta.url), 'utf8');
+  assert.equal(ref05103?.issue, 'https://github.com/callin2/ghostflow-language/issues/335');
+  assert.match(ref05103.rule, /임시 Run overlay는 run 경계에서 제거된다/);
+  assert.match(ref05103.given, /일반값 5min 위 Run 임시값 8min/);
+  assert.match(ref05103.then, /첫 판단 전에 overlay가 제거되어 5min/);
+  assert.match(settingsChapter, /\| `Run` \| 현재 run에서만 유효하다\. run이 끝나면 overlay를 제거한다\. \|/);
+  assert.match(settingsChapter, /재시작은 새 `runId`를 만든다/);
+
+  const compiled = await compileSource(`# Run overlay removal\n\n\`\`\`ghost\ncontrol RunOverlayRemoval {
+  config duration: Duration = 5min { min = 1min; max = 20min; step = 1min; access = operator; }
+  output seconds: Number;
+  seconds <- case duration { ok(value) => value / 1s; fault(_) => -1.0; };
+}\n\`\`\`\n`, { filename: 'run-overlay-removal.ghost.md' });
+  const firstRun = await ControlRuntime.instantiate(wasmBytes(), compiled,
+    { context: { bootEpoch: 13, terminalCapacity: 8, bindings: [] } });
+  t.after(() => firstRun.dispose());
+  const fingerprint = firstRun.contextSnapshot().state.programFingerprint;
+  const configId = compiled.manifest.configs[0].id;
+  const facts = (position, settings, bootEpoch = 13) => ({
+    clock: { monotonicMs: position, bootEpoch, wallMs: 4_000 + position,
+      uncertaintyMs: 0, trusted: true, unknownReason: null, sourceRevision: `run-overlay-clock-${bootEpoch}` },
+    natural: [], schedules: [], settings,
+  });
+  const runOverlay = {
+    programFingerprint: fingerprint,
+    eventId: 'run-overlay-8min',
+    baseRevision: 0,
+    position: 1,
+    origin: 'operatorEdit',
+    changes: [{ configId, result: { ok: true, type: 'Duration', value: 480_000 } }],
+  };
+  assert.equal(firstRun.step({ nowMs: 1, contextFacts: facts(1, runOverlay) }).vm.safe.seconds, 480);
+  assert.deepEqual(firstRun.contextSnapshot().state.settings[0].result, { ok: true, value: 480_000 });
+
+  const nextRun = await ControlRuntime.instantiate(wasmBytes(), compiled,
+    { context: { bootEpoch: 14, terminalCapacity: 8, bindings: [] } });
+  t.after(() => nextRun.dispose());
+  const firstDecision = nextRun.step({ nowMs: 0, contextFacts: facts(0, null, 14) });
+  assert.equal(firstDecision.vm.safe.seconds, 300);
+  assert.equal(nextRun.contextSnapshot().state.settingsRevision, 0);
+  assert.deepEqual(nextRun.contextSnapshot().state.settings[0].result, { ok: true, value: 300_000 });
+});
