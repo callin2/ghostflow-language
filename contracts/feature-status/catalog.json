@@ -3077,6 +3077,47 @@
       ]
     },
     {
+      "id": "general-control-boundary",
+      "family": "Ordinary control combinations and input capture boundary",
+      "clause": {
+        "path": "docs/reference/08-language-runtime-and-device-boundaries.md",
+        "heading": "8.4 기능별로 지켜야 하는 경계"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [
+        "compile"
+      ],
+      "evidence": [
+        {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/reference-layer-boundaries.test.mjs",
+              "testId": "REF-08-006: ordinary control combinations stay in language constructs and input-capture contracts",
+              "caseId": "REF-08-006",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "The oracle verifies Reference design boundaries; it does not implement a new primitive or prove host/Driver pulse-capture behavior."
+      ],
+      "issues": [
+        323
+      ],
+      "referenceCaseIds": [
+        "REF-08-006"
+      ]
+    },
+    {
       "id": "host-boundary",
       "family": "Host scheduling, persistence and simulation",
       "clause": {

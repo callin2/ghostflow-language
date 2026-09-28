@@ -120,3 +120,21 @@ test('REF-08-004: host execution does not require Android, cloud, or internet an
   assert.doesNotMatch(combined, /(?:Android|cloud|클라우드|인터넷|gateway|게이트웨이).{0,30}(?:필수 구성이다|필수 요구다|must be required|is required)/i);
   assert.doesNotMatch(combined, /(?:네트워크 단절|network disconnected).{0,30}(?:자료 만료|data expired|시각 불명|time unknown).{0,20}(?:같은 상태|동일 상태|same state)/i);
 });
+
+test('REF-08-006: ordinary control combinations stay in language constructs and input-capture contracts', () => {
+  const chapter08 = readReference('08-language-runtime-and-device-boundaries.md');
+  const featureBoundaries = section(chapter08, '8.4 기능별로 지켜야 하는 경계');
+  const [generalControl] = featureBoundaries.split(/\n### 시간 판단과 자료 제공\n/);
+
+  assert.match(generalControl, /자기유지, 탱크 충전, 단계별 취소는 기존 state·Bool·enum·case의 조합이다\./);
+  assert.match(generalControl, /런타임은 상태 전이 의미를 제공하고 작성자는 재시작·취소·완료 정책을 선택한다\./);
+  assert.match(generalControl, /Driver에 별도 자기유지나 취소 순서를 숨기지 않는다\./);
+  assert.match(generalControl, /FAQ의 Bool 알람 래치도 자동으로 alarm record나 외부 통지 서비스가 되지는 않는다\./);
+  assert.match(generalControl, /FAQ 11의 `done`은 3회에 도달한 뒤 유지되는 Bool 값이며 1회성 완료 펄스가 아니다\./);
+  assert.match(generalControl, /3에서 계수를 멈추는 것도 그 예제의 조건식이며 Int 연산 자체의 포화 규칙이 아니다\./);
+  assert.match(generalControl, /판단 사이에 발생했다 사라진 물리 펄스까지\s+세어야 한다면 Driver·입력 생산자의 캡처와 전달 계약이 필요하다\./);
+  assert.match(generalControl, /정확 정수 타입만으로\s+물리 사건의 무손실 관측을 보장하지 않는다\./);
+
+  assert.doesNotMatch(generalControl, /(?:자기유지|탱크 충전|단계별 취소|알람 래치|세 번 감지).{0,30}(?:내장 mode|내장 모드|특수 keyword|special built-in|primitive)/i);
+  assert.doesNotMatch(generalControl, /Driver.{0,30}(?:숨긴다|숨겨야|hidden policy|별도 자기유지.*제공)/i);
+});
