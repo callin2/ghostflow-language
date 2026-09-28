@@ -3,9 +3,103 @@ import fs from 'node:fs';
 import test from 'node:test';
 import { compileSource } from './helpers/literate-compile.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
+import { FramedGhostFlowRuntime } from '../runtimes/wasm/framed-runtime.mjs';
 
 const wasmPath = new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url);
 const wasmBytes = fs.readFileSync(wasmPath);
+
+async function civilArtifact() {
+  const book = fs.readFileSync(new URL('../docs/ProgrammingInGhostflow.md', import.meta.url), 'utf8');
+  const section = book.slice(book.indexOf('### E09 —'), book.indexOf('### E10 —'));
+  const code = section.match(/```ghost\n([\s\S]*?)\n```/)[1];
+  return compileSource(code, { filename: 'E09-framed.ghost' });
+}
+const civilStart = Date.UTC(2026, 8, 24, 21);
+function civilFacts(site, atMs) {
+  return { clock: { monotonicMs: atMs, bootEpoch: 7, wallMs: civilStart - 1 + atMs,
+    trusted: true, uncertaintyMs: 0, sourceRevision: 'framed-test-clock-v1' },
+  schedules: [{ kind: 'daily-slots', site, coverageFromWallMs: civilStart - 1,
+    coverageToWallMs: civilStart + 300001, rows: [{ sourceDay: 20721, slotKey: 361,
+      minuteOfDay: 360, fold: 0, available: true, scheduledWallMs: civilStart,
+      providerRevision: 'framed-test-provider-v1', contextRevision: 'framed-test-context-v1' }] }] };
+}
+
+test('framed civil E09 preserves canonical admission and five-minute boundary', async t => {
+  const artifact = await civilArtifact(), site = artifact.manifest.schedules[0].site;
+  const runtime = await ControlRuntime.instantiateFramed(wasmBytes, artifact,
+    { schedule: { bootEpoch: 7, terminalCapacity: 8 } });
+  t.after(() => runtime.dispose());
+  assert.throws(() => runtime.step({ nowMs: 0, inputs: {}, due: { starts: true }, scheduleFacts: civilFacts(site, 0) }), /runtime-owned due/);
+  assert.throws(() => runtime.step({ nowMs: 0, inputs: {}, scheduleFacts: civilFacts(site, 1) }), /must equal nowMs/);
+  for (const [scanId, [atMs, on, phase]] of [[0, false, 0], [1, true, 1], [2, true, 1], [300000, true, 1], [300001, false, 0]].entries()) {
+    const result = runtime.step({ nowMs: atMs, inputs: {}, scheduleFacts: civilFacts(site, atMs) });
+    assert.deepEqual(result.frame, { scanId, logicalTimeMs: atMs });
+    assert.equal(result.vm.safe.pump, on); assert.equal(result.vm.safe.valve, on);
+    assert.equal(result.vm.stateAfter.phase, phase);
+  }
+});
+
+test('raw framed civil rejects forged clock, malformed facts and duplicate scans without consuming admission', async t => {
+  const artifact = await civilArtifact(), site = artifact.manifest.schedules[0].site;
+  const runtime = await FramedGhostFlowRuntime.instantiate(wasmBytes);
+  t.after(() => runtime.dispose());
+  runtime.load(artifact.bytes);
+  for (const output of artifact.manifest.outputs) runtime.addCapability('actuator', output.name, 'bool');
+  runtime.activateSchedules({ bootEpoch: 7, terminalCapacity: 8 });
+  const frame = (scanId, logicalTimeMs) => ({ scanId, logicalTimeMs, inputs: [] });
+  const rejected = fn => assert.throws(fn, error => error.committed === false);
+  rejected(() => runtime.dispatchSchedules(frame(0, 0), civilFacts(site, 1)));
+  rejected(() => runtime.dispatchSchedules({ ...frame(0, 0), inputs: [{ name: '__gf_time_epoch', type: 'Number', value: 7 }] }, civilFacts(site, 0)));
+  rejected(() => runtime.dispatchSchedules({ ...frame(0, 0), inputs: [{ name: '__gf_schedule_due_starts', type: 'Bool', value: true }] }, civilFacts(site, 0)));
+  const malformed = civilFacts(site, 0); malformed.schedules[0].rows[0].slotKey = 362;
+  rejected(() => runtime.dispatchSchedules(frame(0, 0), malformed));
+  runtime.dispatchSchedules(frame(0, 0), civilFacts(site, 0));
+  assert.equal(runtime.outcome.trace.safe.pump, false);
+  rejected(() => runtime.dispatchSchedules(frame(0, 0), civilFacts(site, 0)));
+  const original = runtime.wasm;
+  runtime.wasm = { ...original, gf_frame_scan_schedules: (...args) => original.gf_frame_scan_schedules(...args.slice(0, -1), 5) };
+  rejected(() => runtime.dispatchSchedules(frame(1, 1), civilFacts(site, 1)));
+  runtime.wasm = original;
+  const wrongSlot = civilFacts(site, 1);
+  wrongSlot.schedules[0].rows[0].minuteOfDay = 375;
+  wrongSlot.schedules[0].rows[0].slotKey = 376;
+  rejected(() => runtime.dispatchSchedules(frame(1, 1), wrongSlot));
+  const mismatched = civilFacts(site + 1, 1);
+  rejected(() => runtime.dispatchSchedules(frame(1, 1), mismatched));
+  runtime.dispatchSchedules(frame(1, 1), civilFacts(site, 1));
+  assert.equal(runtime.outcome.trace.safe.pump, true);
+  rejected(() => runtime.dispatchSchedules(frame(1, 1), civilFacts(site, 1)));
+  runtime.dispatchSchedules(frame(2, 2), civilFacts(site, 2));
+  assert.equal(runtime.outcome.scanId, 2);
+  assert.equal(runtime.outcome.trace.stateAfter.phase, 1);
+});
+
+test('civil framed ABI requires real schedule exports', async () => {
+  for (const name of ['gf_frame_activate_schedules', 'gf_frame_scan_schedules']) {
+    await withWasmExports(exports => Object.fromEntries(Object.entries(exports).filter(([key]) => key !== name)), async () => {
+      await assert.rejects(FramedGhostFlowRuntime.instantiate(wasmBytes), new RegExp(`missing ${name}`));
+    });
+  }
+});
+
+test('framed Daily uses GFSF2 with runtime-owned crossing', async t => {
+  const entry = JSON.parse(fs.readFileSync(new URL('./reference/cases/02-time-control.json', import.meta.url))).cases.find(item => item.id === 'REF-03-024');
+  const artifact = await compileSource(entry.source, { filename: entry.filename });
+  const runtime = await ControlRuntime.instantiateFramed(wasmBytes, artifact,
+    { schedule: { bootEpoch: 7, terminalCapacity: 8 } });
+  t.after(() => runtime.dispose());
+  const planned = Date.parse('2026-09-23T21:30:00Z');
+  for (const [scanId, wallMs, due] of [[0, planned - 100, false], [1, planned, true], [2, planned + 1, false]]) {
+    const scheduleFacts = { clock: { monotonicMs: scanId, bootEpoch: 7, wallMs, trusted: true },
+      schedules: [{ kind: 'daily', site: artifact.manifest.schedules[0].site,
+        coverageFromWallMs: planned - 1000, coverageToWallMs: planned + 1000,
+        rows: [{ sourceDay: Date.UTC(2026, 8, 24) / 86400000, fold: 0, available: true,
+          scheduledWallMs: planned, providerRevision: 'daily-test-v1', contextRevision: 'daily-context-v1' }] }] };
+    const result = runtime.step({ nowMs: scanId, scheduleFacts });
+    assert.deepEqual(result.frame, { scanId, logicalTimeMs: scanId });
+    assert.equal(result.vm.safe.due, due);
+  }
+});
 
 async function framed(source, filename = 'framed-host.ghost') {
   return ControlRuntime.instantiateFramed(wasmBytes, await compileSource(source, { filename }));

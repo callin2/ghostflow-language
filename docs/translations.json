@@ -145,8 +145,8 @@
       "source": "docs/FRAMED-CONTROL-HOST.md",
       "sourceLanguage": "en",
       "translation": "docs/FRAMED-CONTROL-HOST.ko.md",
-      "sourceSha256": "b1f200c3d002d0a9480e7cbdb4b47aa47a49f2be77c1044d291efa1d1694a3d3",
-      "translationSha256": "f55fb62782613df81623e7942438850100b78ddc695e43feee6cd68ad245cb23"
+      "sourceSha256": "c2350a0294f5c986fc6719ab8e4e8bcfd84cb7403bd3d26487cbb3af06e722b5",
+      "translationSha256": "10382be6fe85764fae64d833912ffb53b11ce987cfd9aaa5974e6b29e6633faf"
     },
     {
       "source": "docs/GFB5-SCHEDULE-PRELUDE.md",
@@ -511,6 +511,13 @@
       "translation": "docs/WASM-CI-ARTIFACTS.ko.md",
       "sourceSha256": "445b303cf3637ea375370a2306b469b501aa522e5b1e7a1dbcb0ac5624e7bc69",
       "translationSha256": "5b7865addfbe86ac622a48d73b84e802842d2c275b9c5045f6faa89cd4902eb4"
+    },
+    {
+      "source": "CHANGELOG.md",
+      "sourceLanguage": "en",
+      "translation": "CHANGELOG.ko.md",
+      "sourceSha256": "77cc38f6689d276f01e31fb017b3e61ba56b003ddd9b8891a82080141865967e",
+      "translationSha256": "2cf27daf8d02f1c08ce769bd301338ea886a1390eeff931e27d02ac58e74f16e"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",

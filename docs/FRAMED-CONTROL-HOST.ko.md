@@ -135,3 +135,30 @@ source-trace 및 속도 테스트, 승인 프레임/epoch 연속성, 제약, 컴
 언어 선행 작업은 자체 exact-head gate를 통과하면 병합할 수 있다. Web이 산출물을
 고정하고 실행하기 전까지 상위 D6는 Done이 될 수 없다. D9 네이티브 framed-tape 동등성과
 D7/D8/D11 장치 통합은 별도 작업이다.
+
+## 민간 시간 일정 (이슈 #366)
+
+Framed 민간 시간 `Daily` 및 `DailySlots`에서는 호스트가
+`{bootEpoch, terminalCapacity}`로 일정 프로필을 활성화한다. Provider는 GFSF v2/v3
+일정 사실 패킷을 스캔 시점에 별도로 제공한다. 활성화가 패킷을 생성하지 않으며 일정
+사실은 일반 생성 입력 항목이 아니다. `clock.monotonicMs`는 `frame.logicalTimeMs`와
+정확히 같아야 한다.
+
+런타임은 `gf_frame_activate_schedules` 및 `gf_frame_scan_schedules`를 export하고,
+JavaScript 호스트는 `activateSchedules` 및 `dispatchSchedules`를 사용한다. 호스트는
+이 경로를 사용하기 전에 일치하는 WASM export가 있는지 확인해야 한다.
+
+발생 승인과 발생 원장은 Rust가 소유한다. 호스트는 실행 전에 선언 입력과 생성 입력
+전체 및 일정 사실 패킷을 검증해야 한다. 런타임 `due`, `ok`, `fault` 결과를 계산하거나
+제공해서는 안 된다.
+거부된 프레임은 기존 커밋 경계를 따라야 한다. 확인된 거부는 롤백되어 같은 프레임
+식별자로 재시도할 수 있다. 네이티브 커밋 후 실패하면 원래 커밋 결과를 보존하며,
+미커밋 프레임처럼 재시도할 수 없다. 예를 들어 잘못된 일정 사실 패킷은 프레임 커밋 전에
+거부되고, 유효한 재시도는 같은 프레임 식별자를 사용한다. 회귀 테스트는
+`tests/framed-control-host.test.mjs`와
+`crates/ghostflow-core/tests/schedule_module.rs`에 있다.
+
+Framed Solar 일정은 계속 지원되지 않는다.
+
+예방 규칙: mock을 전제로 삼기 전에 실제 공개 런타임 인터페이스를 확인한다. Mock
+테스트만으로 런타임 역량을 입증할 수 없다.

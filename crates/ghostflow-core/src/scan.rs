@@ -7,8 +7,8 @@
 use std::collections::BTreeSet;
 
 use crate::{
-    context_runtime::Facts, schedule_clock::ClockSnapshot, Error, Result, Runtime, TickRecord,
-    Value,
+    context_runtime::Facts, schedule_clock::ClockSnapshot, solar_runtime::ScheduleInput, Error,
+    Result, Runtime, TickRecord, Value,
 };
 
 pub const SCAN_FRAME_V1_MAX_EXACT_INTEGER: u64 = 9_007_199_254_740_991;
@@ -156,7 +156,7 @@ impl ScanDriver {
     /// Evaluates one complete, validated host frame. Only a successful core
     /// evaluation advances the scan sequence and logical clock.
     pub fn scan(&mut self, frame: ScanFrameV1) -> Result<ScanOutcomeV1> {
-        self.scan_inner(frame, None)
+        self.scan_inner(frame, None, None)
     }
 
     /// Evaluates a complete context frame with explicit clock and context facts.
@@ -178,11 +178,43 @@ impl ScanDriver {
                 "context scan requires an activated context runtime",
             ));
         }
-        self.scan_inner(frame, Some((clock, facts)))
+        self.scan_inner(frame, Some((clock, facts)), None)
+    }
+
+    /// Dispatches civil occurrence facts through the same framed transaction.
+    /// The core derives admission and retains its ledger only on success.
+    pub fn scan_with_schedules(
+        &mut self,
+        frame: ScanFrameV1,
+        clock: ClockSnapshot<'_>,
+        facts: &[ScheduleInput<'_>],
+        version: u16,
+    ) -> Result<ScanOutcomeV1> {
+        if clock.monotonic_ms != frame.logical_time_ms {
+            return Err(Error::new(
+                "schedule clock does not match frame logical time",
+            ));
+        }
+        if self.runtime.solar_runtime.is_none() {
+            return Err(Error::new(
+                "schedule scan requires an activated civil runtime",
+            ));
+        }
+        if !matches!(version, 2 | 3) {
+            return Err(Error::new("unsupported framed schedule packet version"));
+        }
+        self.scan_inner(frame, None, Some((clock, facts, version)))
     }
 
     fn derived_input(&self, name: &str) -> bool {
         name == RESERVED_CLOCK_INPUT
+            || (name == "__gf_time_epoch"
+                && self.runtime.solar_runtime.is_some()
+                && self
+                    .runtime
+                    .module
+                    .as_ref()
+                    .is_some_and(|m| matches!(m.format_version, 8 | 9)))
             || (self.runtime.context_runtime.is_some()
                 && ((name == "__gf_time_epoch"
                     && self
@@ -199,6 +231,7 @@ impl ScanDriver {
         &mut self,
         frame: ScanFrameV1,
         context: Option<(ClockSnapshot<'_>, &Facts)>,
+        schedules: Option<(ClockSnapshot<'_>, &[ScheduleInput<'_>], u16)>,
     ) -> Result<ScanOutcomeV1> {
         self.validate_scan_frame(&frame)?;
 
@@ -231,6 +264,23 @@ impl ScanDriver {
                 clock_input
             };
             clock_input.and_then(|()| self.runtime.tick_with_context(clock, facts))
+        } else if let Some((clock, facts, version)) = schedules {
+            self.runtime
+                .set_input(
+                    RESERVED_CLOCK_INPUT,
+                    Value::Number(clock.monotonic_ms as f64),
+                )
+                .and_then(|()| {
+                    self.runtime
+                        .set_input("__gf_time_epoch", Value::Number(clock.boot_epoch as f64))
+                })
+                .and_then(|()| {
+                    if version == 3 {
+                        self.runtime.tick_with_daily_slots(clock, facts)
+                    } else {
+                        self.runtime.tick_with_schedules(clock, facts)
+                    }
+                })
         } else {
             self.runtime.tick_at(frame.logical_time_ms)
         };

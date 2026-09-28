@@ -372,6 +372,74 @@ pub unsafe extern "C" fn gf_frame_activate_context(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn gf_frame_activate_schedules(
+    handle: *mut FramedHandle,
+    boot_epoch: u64,
+    terminal_capacity: u32,
+) -> i32 {
+    let Some(h) = handle.as_mut() else { return 0 };
+    let state = std::mem::replace(&mut h.state, FramedState::Configuring(Runtime::new(1)));
+    match state {
+        FramedState::Configuring(mut runtime) => {
+            let result =
+                runtime.activate_with_schedules(&ghostflow_core::solar_runtime::SolarActivation {
+                    boot_epoch,
+                    terminal_capacity: terminal_capacity as usize,
+                });
+            match result {
+                Ok(()) => {
+                    h.state = FramedState::Active(runtime.into_scan_driver());
+                    h.success()
+                }
+                Err(error) => {
+                    h.state = FramedState::Configuring(runtime);
+                    h.failure(error.to_string())
+                }
+            }
+        }
+        FramedState::Active(driver) => {
+            h.state = FramedState::Active(driver);
+            h.failure("framed runtime is already active")
+        }
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn gf_frame_scan_schedules(
+    handle: *mut FramedHandle,
+    scan_id: u64,
+    logical_time_ms: u64,
+    ptr: *const u8,
+    len: usize,
+    schedule_ptr: *const u8,
+    schedule_len: usize,
+) -> i32 {
+    let Some(h) = handle.as_mut() else { return 0 };
+    let frame = match decode_frame(ptr, len, scan_id, logical_time_ms) {
+        Ok(frame) => frame,
+        Err(error) => return h.failure(error),
+    };
+    let (packet, version) = match crate::solar_abi::schedules_from_raw(schedule_ptr, schedule_len) {
+        Ok(packet) => packet,
+        Err(error) => return h.failure(error),
+    };
+    let inputs = packet.inputs();
+    let result = match &mut h.state {
+        FramedState::Active(driver) => {
+            driver.scan_with_schedules(frame, packet.clock(), &inputs, version)
+        }
+        _ => return h.failure("framed runtime is not active"),
+    };
+    match result {
+        Ok(outcome) => {
+            h.outcome = format!("{{\"format\":\"GhostFlow/scan-outcome-v1\",\"scanId\":{},\"logicalTimeMs\":{},\"trace\":{}}}", outcome.scan_id, outcome.logical_time_ms, outcome.trace.to_json());
+            h.success()
+        }
+        Err(error) => h.failure(error.to_string()),
+    }
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn gf_frame_scan_context(
     handle: *mut FramedHandle,
     scan_id: u64,

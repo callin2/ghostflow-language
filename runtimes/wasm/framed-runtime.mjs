@@ -3,6 +3,7 @@ const decoder = new TextDecoder();
 import { NativeDispatchError } from './native-dispatch.mjs';
 import { encodeTemporalProfile } from './temporal-profile.mjs';
 import { encodeContextActivation, encodeContextFacts } from './context-abi.mjs';
+import { encodeScheduleFacts, validateSolarActivation } from './solar-abi.mjs';
 import { temporalPlanRequest, temporalReplayPlanRequest, temporalReplayRequest } from './temporal-replay.mjs';
 const MAX_MODULE_BYTES = 1024 * 1024;
 const MAX_CHECKPOINT_BYTES = 4 * 1024 * 1024;
@@ -20,6 +21,7 @@ const requiredFunctions = Object.freeze([
   'gf_frame_replay_temporal', 'gf_frame_replay_ptr', 'gf_frame_replay_len',
   'gf_frame_plan_temporal', 'gf_frame_plan_temporal_replay', 'gf_frame_resource_plan_ptr', 'gf_frame_resource_plan_len',
   'gf_frame_activate_context', 'gf_frame_scan_context', 'gf_frame_context_checkpoint',
+  'gf_frame_activate_schedules', 'gf_frame_scan_schedules',
   'gf_frame_context_checkpoint_ptr', 'gf_frame_context_checkpoint_len',
   'gf_frame_context_state_ptr', 'gf_frame_context_state_len', 'gf_frame_restore_context_checkpoint',
 ]);
@@ -155,6 +157,11 @@ export class FramedGhostFlowRuntime {
     this.#bytes(encodeContextActivation(profile), (p, n) =>
       this.#check(this.wasm.gf_frame_activate_context(this.handle, p, n)));
   }
+  activateSchedules(profile) {
+    this.#live();
+    validateSolarActivation(profile);
+    this.#check(this.wasm.gf_frame_activate_schedules(this.handle, BigInt(profile.bootEpoch), profile.terminalCapacity));
+  }
   contextSnapshot() {
     this.#live();
     this.#check(this.wasm.gf_frame_context_checkpoint(this.handle));
@@ -238,6 +245,26 @@ export class FramedGhostFlowRuntime {
             BigInt(encoded.logicalTimeMs), framePtr, frameLen, contextPtr, contextLen);
           committed = Boolean(ok);
           if (!ok) throw new Error(this.#lastError() || 'Framed GhostFlow context operation failed');
+        }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new NativeDispatchError(message, { cause: error, committed });
+    }
+  }
+
+  dispatchSchedules(frame, facts) {
+    let committed = false;
+    try {
+      this.#live();
+      const encoded = encodeFrame(frame);
+      const schedules = encodeScheduleFacts(facts);
+      this.#bytes(encoded.bytes, (framePtr, frameLen) =>
+        this.#bytes(schedules, (schedulePtr, scheduleLen) => {
+          committed = null;
+          const ok = this.wasm.gf_frame_scan_schedules(this.handle, BigInt(encoded.scanId),
+            BigInt(encoded.logicalTimeMs), framePtr, frameLen, schedulePtr, scheduleLen);
+          committed = Boolean(ok);
+          if (!ok) throw new Error(this.#lastError() || 'Framed GhostFlow schedule operation failed');
         }));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
