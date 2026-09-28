@@ -35,6 +35,17 @@ when they change execution semantics.
 
 ## Working here
 
+Maintain complete English and Korean versions of authored documentation, including
+philosophy, architecture, specifications, toolchain guides, design plans and
+educational examples. Reports and execution evidence may remain in one language.
+Keep existing source paths and add a sibling `.en.md` or `.ko.md` translation;
+translated examples are reading projections, never new canonical compile inputs.
+Update both versions and their reviewed hashes in `docs/translations.json` in the
+same change. Record each report, generated artifact or test-data exclusion there
+with its reason. Run `npm run docs:check`; hashes establish freshness, not semantic
+translation quality. See `docs/DOCUMENTATION-LANGUAGES.md` for the full policy and
+`docs/DOCUMENTATION.md` for the English/Korean document catalog.
+
 Use `apply_patch` for source edits and preserve unrelated work. Do not add product
 servers, POC UI, credentials, model connectors, board firmware, device calls, or
 imported conversation records to this repository. Keep tests explicitly listed

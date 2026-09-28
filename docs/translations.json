@@ -1,0 +1,1063 @@
+{
+  "format": "GhostFlow/document-translations-v1",
+  "documents": [
+    {
+      "source": "AGENTS.md",
+      "sourceLanguage": "en",
+      "translation": "AGENTS.ko.md",
+      "sourceSha256": "f068120b53f3015f52db728139cbe9e0370a947d81bce0f2b681c3c751f5b526",
+      "translationSha256": "87ea98a91145a07b061e9f28ac47cd0e0d42d8a7dc10f05190245638b2da2b2b"
+    },
+    {
+      "source": "contracts/integration-v1/README.md",
+      "sourceLanguage": "en",
+      "translation": "contracts/integration-v1/README.ko.md",
+      "sourceSha256": "2b6915116de0e5058fbec4d2937c49aadd6daa30b4b44228325cf3aaac69d594",
+      "translationSha256": "5b02675dc63286d77698b87af00de5b70e7b9b9c24836ce29d61a053b0f40c39"
+    },
+    {
+      "source": "contracts/interaction-v0/README.md",
+      "sourceLanguage": "en",
+      "translation": "contracts/interaction-v0/README.ko.md",
+      "sourceSha256": "61608af393b00bcd34f14d9d62501de659bfb62d112ba5c4d3a17e76cd5420ab",
+      "translationSha256": "79e6e9428747503174de4247a752f932d3f459a635a73fa5419be56c14330525"
+    },
+    {
+      "source": "contracts/requirements/README.md",
+      "sourceLanguage": "en",
+      "translation": "contracts/requirements/README.ko.md",
+      "sourceSha256": "e0621603ae5d3cecd1af5191d724dafc7d7cb58b9fb1c72a827e5ad05441fc06",
+      "translationSha256": "6c759e16293c9c6f914a0f5c713591582fbbfb6e51ac942915ca11e1ef35c237"
+    },
+    {
+      "source": "docs/2026-09-24-authoring-baseline-provenance.md",
+      "sourceLanguage": "en",
+      "translation": "docs/2026-09-24-authoring-baseline-provenance.ko.md",
+      "sourceSha256": "db80991fb0eebc1aa9b19a331aba4617562c91b26bcbe7751394c44071cb46d0",
+      "translationSha256": "61fb0d7077c3ef19692e415f59a02b07a2d2e74efa717a8d5237a67e36de4244"
+    },
+    {
+      "source": "docs/2026-09-24-fixed-planned-time-range-decision.md",
+      "sourceLanguage": "en",
+      "translation": "docs/2026-09-24-fixed-planned-time-range-decision.ko.md",
+      "sourceSha256": "3e2cfdefa84c454c7170e8506bceffcba6a4e61f38308e97c2b1daeecb1a85f1",
+      "translationSha256": "07bb73580e74eecaacbe3d6c5cb9f86d5a20abb4f839429408dc08078fafb76b"
+    },
+    {
+      "source": "docs/ACCOUNTING-LEDGER-ABI.md",
+      "sourceLanguage": "en",
+      "translation": "docs/ACCOUNTING-LEDGER-ABI.ko.md",
+      "sourceSha256": "04deadb4cde208d55eacc3e356bc35f45f8f3651466ad5dd672945eb3b27ce26",
+      "translationSha256": "6e6ffdadb040e5e82fd7c7bb324068eab7d1e4c7fe6197e27fbede47c6eab77e"
+    },
+    {
+      "source": "docs/AFTER-EVENT-WASM-ABI.md",
+      "sourceLanguage": "en",
+      "translation": "docs/AFTER-EVENT-WASM-ABI.ko.md",
+      "sourceSha256": "eb1e2ebd6a6b26384fde989d108abc88a5ace57a9d64d9b3c4e7e04c2cd940b7",
+      "translationSha256": "35776975416dd3a88d0b8e2db93082c92acc0496c305f751bd80020035a02b97"
+    },
+    {
+      "source": "docs/BEHAVIOR-COMPOSITION-RESEARCH.md",
+      "sourceLanguage": "en",
+      "translation": "docs/BEHAVIOR-COMPOSITION-RESEARCH.ko.md",
+      "sourceSha256": "f7e848ebd1497c9691ed19cb2397b291c13def050a82c767de0689879ba221f9",
+      "translationSha256": "5d9f8e8e6f2f1f157858be60e978050d48450dc716095bcd673f1804a5c475b5"
+    },
+    {
+      "source": "docs/BYTECODE.md",
+      "sourceLanguage": "en",
+      "translation": "docs/BYTECODE.ko.md",
+      "sourceSha256": "1ff79e043d5cf57bcd9c81e0b4cb1422e56db76ca4f1bef02ab1198c76575483",
+      "translationSha256": "7c021c623754136b6861fa1cc2098283160732d3d3c873ec88879d79c936f75d"
+    },
+    {
+      "source": "docs/COMPILER-DIAGNOSTICS.md",
+      "sourceLanguage": "en",
+      "translation": "docs/COMPILER-DIAGNOSTICS.ko.md",
+      "sourceSha256": "64a29c1a6aa72717d9e8d4d392ac89cab036769719587ed2f6c237e45b646f20",
+      "translationSha256": "fda15ee6c3e7d2c1e51a33308270bec9261e352c2a4819399006043412f7df2e"
+    },
+    {
+      "source": "docs/CONSTRAINTS.md",
+      "sourceLanguage": "ko",
+      "translation": "docs/CONSTRAINTS.en.md",
+      "sourceSha256": "47b065d6db2c9d7c0c27873ec19a37b78587c041678b86662100e231c0f932d3",
+      "translationSha256": "04bf9cfc6c5decf38cdd266d41b9e49a7879bfc19c778b7065b31a44029816d8"
+    },
+    {
+      "source": "docs/CONTEXT-EXECUTION-ABI.md",
+      "sourceLanguage": "en",
+      "translation": "docs/CONTEXT-EXECUTION-ABI.ko.md",
+      "sourceSha256": "c347bba55bd5b61e9540cf552009b0af07d0017ac7ea5c8679988de27523ff39",
+      "translationSha256": "0b5d44da9325f0045a1cad6759009127881ea2e1bd4b3daa01c99dcdb9567918"
+    },
+    {
+      "source": "docs/CONTINUOUS-BOOL-TIMER-CONTRACT.md",
+      "sourceLanguage": "en",
+      "translation": "docs/CONTINUOUS-BOOL-TIMER-CONTRACT.ko.md",
+      "sourceSha256": "0dab492361744b4b351a0641d667e70e7d2691dc73d0a1be88e68e2563e839b3",
+      "translationSha256": "cc6864f7cc213cb052c0c6212510fec4069f5358e5a81c7f46830e043ad7fa39"
+    },
+    {
+      "source": "docs/DESIGN-NOTES.md",
+      "sourceLanguage": "en",
+      "translation": "docs/DESIGN-NOTES.ko.md",
+      "sourceSha256": "1576c22db22edbdfd7824edaab350479bb75db3ae517cbbc8220aecfad57d6cf",
+      "translationSha256": "31ac48d476fbaedcdab50a0b0211c79e7d5388b21603b4f1ba4ddf65f596cee6"
+    },
+    {
+      "source": "docs/DOCUMENTATION-LANGUAGES.md",
+      "sourceLanguage": "en",
+      "translation": "docs/DOCUMENTATION-LANGUAGES.ko.md",
+      "sourceSha256": "d88caf18f39504810771bebf596b1ba0962becb48e99c7e5e658eda6aab32a99",
+      "translationSha256": "a51f98d3bfc7e9ee4fa5f118fee193d99af63b8b3b797258f4d38777a2a5cbfa"
+    },
+    {
+      "source": "docs/DOCUMENTATION.md",
+      "sourceLanguage": "en",
+      "translation": "docs/DOCUMENTATION.ko.md",
+      "sourceSha256": "b1a02d36b6b69952908bb8800b1b17db4284e52449300e8c04542073891976b6",
+      "translationSha256": "acccb6c67f99fe07fd3432ea71d7552477648681ea0ada466d0da52744d0bf74"
+    },
+    {
+      "source": "docs/EXACT-INTEGER-CONTRACT.md",
+      "sourceLanguage": "en",
+      "translation": "docs/EXACT-INTEGER-CONTRACT.ko.md",
+      "sourceSha256": "654c80b551bb0ee31100df03552c2eb940869c37ef468763f104879fa58b59a9",
+      "translationSha256": "d4bc85a4d0727bc3efa99274dfc4e28416d2f71ca98d4a7a74d7d01faa187b92"
+    },
+    {
+      "source": "docs/FRAMED-CONTROL-HOST.md",
+      "sourceLanguage": "en",
+      "translation": "docs/FRAMED-CONTROL-HOST.ko.md",
+      "sourceSha256": "b1f200c3d002d0a9480e7cbdb4b47aa47a49f2be77c1044d291efa1d1694a3d3",
+      "translationSha256": "f55fb62782613df81623e7942438850100b78ddc695e43feee6cd68ad245cb23"
+    },
+    {
+      "source": "docs/GFB5-SCHEDULE-PRELUDE.md",
+      "sourceLanguage": "en",
+      "translation": "docs/GFB5-SCHEDULE-PRELUDE.ko.md",
+      "sourceSha256": "00270823cd5984f894f87d0e5efccbe4573b2e39b8275cf4236b561fbaa24780",
+      "translationSha256": "a17bd1101b0e53befb3fbdb7d3918ea3186f430c00e74111f1d90c6742d51f0a"
+    },
+    {
+      "source": "docs/IMPLEMENTATION.md",
+      "sourceLanguage": "en",
+      "translation": "docs/IMPLEMENTATION.ko.md",
+      "sourceSha256": "fa830fc1a9b8bec982f6b4ee9ea2e9c858126d5492941e360500e0249853946d",
+      "translationSha256": "3cfe09433bc8b317f82e5709c07ae5c6afeac937bfb18894999aaa3db64f0720"
+    },
+    {
+      "source": "docs/INTENT-ANCHOR-MAP.md",
+      "sourceLanguage": "en",
+      "translation": "docs/INTENT-ANCHOR-MAP.ko.md",
+      "sourceSha256": "692fcaae6b7cc4e49909cdf68dea04e7af369102a1b8b5ea716fedce12051f13",
+      "translationSha256": "269b5ba220189b1ba95f77ea59f96ed94df5db6ec45e56348d467511a33f4bda"
+    },
+    {
+      "source": "docs/KEYBOARD-HOST.md",
+      "sourceLanguage": "en",
+      "translation": "docs/KEYBOARD-HOST.ko.md",
+      "sourceSha256": "6ab82d0a230fe0532aac730aca5d599073d054fbe1d996c9319352f83df43669",
+      "translationSha256": "524da14e55d00f7f5593e68d534e7b12c5fb7f26d29e3c6d9f53c7b323507d8d"
+    },
+    {
+      "source": "docs/language_faq.md",
+      "sourceLanguage": "ko",
+      "translation": "docs/language_faq.en.md",
+      "sourceSha256": "967f77ae9492ab3e2b0773287a506373dc709c0ea151b55742449d1dae9ec997",
+      "translationSha256": "ebe898ae24a53d8b53f417eac45f5a2ca78bb3ac0288a6ba114113294e4dd9a2"
+    },
+    {
+      "source": "docs/LANGUAGE-EXAMPLES.md",
+      "sourceLanguage": "ko",
+      "translation": "docs/LANGUAGE-EXAMPLES.en.md",
+      "sourceSha256": "345f06e1e81a54260f1917a9deadc337e52b56857df14184cc13f7bd828de0ba",
+      "translationSha256": "0196dd88548ec918906b7ebb20e09b66ff2d9c39c965cd1ae5e2e64626d45005"
+    },
+    {
+      "source": "docs/LANGUAGE-MVP-0.1.md",
+      "sourceLanguage": "en",
+      "translation": "docs/LANGUAGE-MVP-0.1.ko.md",
+      "sourceSha256": "99e02d32cacb5135d6b55de5523cfa5523fc1ba2cc98a4d25f8ad72527d94325",
+      "translationSha256": "3e4ff94f3c1eee79d6f61fe0aaaa1590fc7d576192258bcab7682335fcea1454"
+    },
+    {
+      "source": "docs/LANGUAGE-REFERENCE.md",
+      "sourceLanguage": "ko",
+      "translation": "docs/LANGUAGE-REFERENCE.en.md",
+      "sourceSha256": "7ad71823428dc65f3d41e150ef253431696be4daaeb1e8c1db86a23a338c0309",
+      "translationSha256": "c76ad9196743b3568d698790b0f50cd9533cd691c2882609b7f148e065320be4"
+    },
+    {
+      "source": "docs/LANGUAGE-SURFACE.md",
+      "sourceLanguage": "ko",
+      "translation": "docs/LANGUAGE-SURFACE.en.md",
+      "sourceSha256": "075ab2e7ddc2d8d53c1ed0abc7508f7992403f5cc0b8f11256bffde8d94967d2",
+      "translationSha256": "73d9ba7d4b6a9c6380c1de621d593853bcee415fbeb06490f4721f909aa5bc24"
+    },
+    {
+      "source": "docs/LANGUAGE.md",
+      "sourceLanguage": "ko",
+      "translation": "docs/LANGUAGE.en.md",
+      "sourceSha256": "87309349a2389e2ba251976c40c48c29b9af88a06e9b547491df69aba7b4896e",
+      "translationSha256": "842ed2a308b8e52f78462310d832c396781e77c567f3c95ea5bdabc69b00be34"
+    },
+    {
+      "source": "docs/LESSON-BUNDLE.md",
+      "sourceLanguage": "en",
+      "translation": "docs/LESSON-BUNDLE.ko.md",
+      "sourceSha256": "9c0c9069a89bd425a547629ca8c5f0ec8f84cf987617a2d5e1d24a2750031675",
+      "translationSha256": "eac5787ae0f4c478bafaf40761e60038c81ef33c9a466c5a54b36be86b05f85c"
+    },
+    {
+      "source": "docs/LITERATE.md",
+      "sourceLanguage": "ko",
+      "translation": "docs/LITERATE.en.md",
+      "sourceSha256": "8a1b2bbc672bc2627bb44e344a826435625a9a9858bf3e21611bba8593acabc3",
+      "translationSha256": "26260509d459aa235824ab4f296f34aec61e6ae71d2f7a01a5abfc6e5b5e29bc"
+    },
+    {
+      "source": "docs/LLM-AUTHORING-WORKFLOW.md",
+      "sourceLanguage": "en",
+      "translation": "docs/LLM-AUTHORING-WORKFLOW.ko.md",
+      "sourceSha256": "fafcd4825e3f3da3e47d5b2468aaf2454a98be0f048a6e70323c1bab4934c8ab",
+      "translationSha256": "ec4fe458680df122ea2d6db936ba6dacf2f788b36af9dcc278b83573791816dc"
+    },
+    {
+      "source": "docs/LLM-TOOLCHAIN-ARCHITECTURE.md",
+      "sourceLanguage": "en",
+      "translation": "docs/LLM-TOOLCHAIN-ARCHITECTURE.ko.md",
+      "sourceSha256": "552ed610b15cd292e4bba9eb7cada9b3c8ea8cf6e43f449d7fd878641d769168",
+      "translationSha256": "5417a34fdeaae2297acf21fb6d2eea0b87b2b309de248410031f9cc9e208ca5a"
+    },
+    {
+      "source": "docs/OPERATOR-SETTINGS-STREAM.md",
+      "sourceLanguage": "en",
+      "translation": "docs/OPERATOR-SETTINGS-STREAM.ko.md",
+      "sourceSha256": "4e0cf058ea1e0481b34e4dc9600b0f46de621fed9c08f8625717f35db5cf3bda",
+      "translationSha256": "8150d7237994c84949a9943be0d276ee4966d37c748a6b6f3ea9f9fc37859fcf"
+    },
+    {
+      "source": "docs/plans/2026-09-28-semantic-kernel.md",
+      "sourceLanguage": "en",
+      "translation": "docs/plans/2026-09-28-semantic-kernel.ko.md",
+      "sourceSha256": "614bcd0aa8c0d7ccd585c10c8f61e7a70508885edbca3cac232bd2e1f3f32c31",
+      "translationSha256": "74bde0aa93fbf8a8fc5e2916bbca23771be330f9b89b344aa582cdc6f77b4878"
+    },
+    {
+      "source": "docs/PORTABLE-PACKAGE.md",
+      "sourceLanguage": "en",
+      "translation": "docs/PORTABLE-PACKAGE.ko.md",
+      "sourceSha256": "79f4db479c1dfecdd9cf3c24f5ed4ad21854311c9e5f4481a5a8932d14e3e34c",
+      "translationSha256": "995ba07feef5a14a3e4dc299ff09bd8c5e913ecbfd03ec7e70fed1dbfbf1d2ec"
+    },
+    {
+      "source": "docs/ProgrammingInGhostflow.md",
+      "sourceLanguage": "ko",
+      "translation": "docs/ProgrammingInGhostflow.en.md",
+      "sourceSha256": "00654e0779875f022eaebf63b2aa568f5feb1141846e7d1b2f5d0c7d343d6e10",
+      "translationSha256": "f6fc705d6bb6184b7c9fd98e2450fac88c13a47bd3a78b828f1a5b04a2f6e9ab"
+    },
+    {
+      "source": "docs/REFERENCE-QUERY.md",
+      "sourceLanguage": "en",
+      "translation": "docs/REFERENCE-QUERY.ko.md",
+      "sourceSha256": "9ac5375868fe6cc2442b213966eb387384909574bbe4ea32c03fc2fe65b865f7",
+      "translationSha256": "ad56786fae51b1039bdd520aaee7ea6ca0a60ee9e5596000affb0f025dc7dd4f"
+    },
+    {
+      "source": "docs/reference/01-source-and-syntax.md",
+      "sourceLanguage": "ko",
+      "translation": "docs/reference/01-source-and-syntax.en.md",
+      "sourceSha256": "0ce85a809713cf57f62928cc1dfca222109e3cd8ed04bb2247e51bdea14c4dfe",
+      "translationSha256": "32a713f82c3603e9d25534b46e8cb4c3eb94fad47857f3693887fcb4e020080f"
+    },
+    {
+      "source": "docs/reference/02-types-expressions-state.md",
+      "sourceLanguage": "ko",
+      "translation": "docs/reference/02-types-expressions-state.en.md",
+      "sourceSha256": "bf8baf9bdaba410b8e1c9252f1088c852cb9c322aad4955b04b689973504fc70",
+      "translationSha256": "175515e153fb06d8ce77c059ae3b234a37a7471f490d29958cc9c37a00f9a808"
+    },
+    {
+      "source": "docs/reference/03-time-and-schedules.md",
+      "sourceLanguage": "ko",
+      "translation": "docs/reference/03-time-and-schedules.en.md",
+      "sourceSha256": "16bc8c99babdec6464fe4b140b9232714541e4056aa777cc50b9eea8262ad315",
+      "translationSha256": "d3318ef7c4645bf6df9ddb6830a4dc29103f83fbfe13bb95a82f512bde2b1dae"
+    },
+    {
+      "source": "docs/reference/04-sensors-constraints-control.md",
+      "sourceLanguage": "ko",
+      "translation": "docs/reference/04-sensors-constraints-control.en.md",
+      "sourceSha256": "33e6a6bbbc04195548481e37eaa696e839ebce41f69da75991852dda2e606af8",
+      "translationSha256": "a524d5e38b69b99f22665a710e4aab73e536280812236c7aa79ded8d957348eb"
+    },
+    {
+      "source": "docs/reference/05-settings-and-observation.md",
+      "sourceLanguage": "ko",
+      "translation": "docs/reference/05-settings-and-observation.en.md",
+      "sourceSha256": "a5afcc48a57ff4cd7a59e80150bff76e18129be392b109a7aefdc05993b4f7c7",
+      "translationSha256": "4e2b1c4cdcd0fd65c91a36dfd56c2df9cfd9d99021c8ef363963a3db468537fa"
+    },
+    {
+      "source": "docs/reference/06-composition-and-replay.md",
+      "sourceLanguage": "ko",
+      "translation": "docs/reference/06-composition-and-replay.en.md",
+      "sourceSha256": "2b761d3ed8c43c06f86570529829b0eb3e69064f44c02e5b4dc32c1089f1d706",
+      "translationSha256": "6247baee1f9c49bc768af3e5b768bc7d055d923b1ae3225410ffa42e812db547"
+    },
+    {
+      "source": "docs/reference/07-semantic-rules-and-index.md",
+      "sourceLanguage": "ko",
+      "translation": "docs/reference/07-semantic-rules-and-index.en.md",
+      "sourceSha256": "c3d2fa6f9a5d583fd73ff3c7951a2d8fdbccc6ab3158d39a055160a2ac3d4f4d",
+      "translationSha256": "fc5fd3e8cd3fedcaa761f8e67b20838ddf6bd779d89c809e49039cfeaf60869a"
+    },
+    {
+      "source": "docs/reference/08-language-runtime-and-device-boundaries.md",
+      "sourceLanguage": "ko",
+      "translation": "docs/reference/08-language-runtime-and-device-boundaries.en.md",
+      "sourceSha256": "70fff5261ac1711546121fba88d0914532967c7ca71a5fab07ca3811fc14454a",
+      "translationSha256": "2980330865774036b79e3fba65b235c9c059e5d6e200da01ae51870defab95d8"
+    },
+    {
+      "source": "docs/research/GF-COMPOSE-R1-USER-OUTCOMES.md",
+      "sourceLanguage": "en",
+      "translation": "docs/research/GF-COMPOSE-R1-USER-OUTCOMES.ko.md",
+      "sourceSha256": "d97f1c936e7068300930c5170ac65cc4f6ee942cd2e7232f0eb664babddb0632",
+      "translationSha256": "4953bfc291599b52008d3ed3e5401b3e66352ab29b23188c248569efe9fd7380"
+    },
+    {
+      "source": "docs/research/GF-COMPOSE-R2-AUTHORITY-IDENTITY.md",
+      "sourceLanguage": "en",
+      "translation": "docs/research/GF-COMPOSE-R2-AUTHORITY-IDENTITY.ko.md",
+      "sourceSha256": "bdec1f38bcc47f3d035b0ac9bc8f89ea747e215c9bfb4b3f3e2db1edd39c692e",
+      "translationSha256": "e2465d8f6e7bc301792454165676e569f00de975b6018e98c4005ac1292d01d3"
+    },
+    {
+      "source": "docs/research/GF-COMPOSE-R3-EXECUTION.md",
+      "sourceLanguage": "en",
+      "translation": "docs/research/GF-COMPOSE-R3-EXECUTION.ko.md",
+      "sourceSha256": "0d5156ace450284d322ac5e22b297b629cac2fe55a17a6b3e34c533345b02e46",
+      "translationSha256": "7b9626b26a76ef3c5038e08308be68cf80f224c0d1662c131e389808e39736d8"
+    },
+    {
+      "source": "docs/research/GF-COMPOSE-R4-PORTS-BINDINGS.md",
+      "sourceLanguage": "en",
+      "translation": "docs/research/GF-COMPOSE-R4-PORTS-BINDINGS.ko.md",
+      "sourceSha256": "ca81a24007ebb4fc21012e4da696566e7e054e4ca8bd1b6711a142863cdf35aa",
+      "translationSha256": "0be1a2bd84bf180b98f46d1be9debad8b24970758d1d21342297ae1b9e189fcd"
+    },
+    {
+      "source": "docs/research/GF-COMPOSE-R5-CONTRACTS.md",
+      "sourceLanguage": "en",
+      "translation": "docs/research/GF-COMPOSE-R5-CONTRACTS.ko.md",
+      "sourceSha256": "9044e82bc0e4d1279b55d04a834d3b2ed80f631b4138b29a5ca4709c07240b7a",
+      "translationSha256": "6ab3d2d6044060817f6553fbc83d42e0f3ccc2681761cab1a1c45129467672ba"
+    },
+    {
+      "source": "docs/research/GF-COMPOSE-R6-OVERRIDES.md",
+      "sourceLanguage": "en",
+      "translation": "docs/research/GF-COMPOSE-R6-OVERRIDES.ko.md",
+      "sourceSha256": "ccdb0444611ddc6bde92c6edd22e6b9041e20c71841d5fb1a910f74f922bb140",
+      "translationSha256": "8341b9309952ef600cb94181268514d0c2293cb0841b6e3ba4d4d32ebaca4259"
+    },
+    {
+      "source": "docs/research/GF-COMPOSE-R7-PACKAGES.md",
+      "sourceLanguage": "en",
+      "translation": "docs/research/GF-COMPOSE-R7-PACKAGES.ko.md",
+      "sourceSha256": "d89dc293189708ab9e1cf2d40a4f127ead2808e0b78c93b5263b65f51f508995",
+      "translationSha256": "0e70cb23720af1fcb53159421ebf4e985fdec783ab57257e7268dadb4ad2e087"
+    },
+    {
+      "source": "docs/research/GF-COMPOSE-R8-INCIDENT-EVIDENCE.md",
+      "sourceLanguage": "en",
+      "translation": "docs/research/GF-COMPOSE-R8-INCIDENT-EVIDENCE.ko.md",
+      "sourceSha256": "832faa0ba624cc29aa9ffe57cc1adb4b091151523e7300c93f2f7d12942a9921",
+      "translationSha256": "d02bf674dc8c0efd077cfc6a22501819744242a3d920532f3abdf319d387742e"
+    },
+    {
+      "source": "docs/research/GF-COMPOSE-R9-ACCEPTANCE.md",
+      "sourceLanguage": "en",
+      "translation": "docs/research/GF-COMPOSE-R9-ACCEPTANCE.ko.md",
+      "sourceSha256": "3e4b9327b5efb9a793ec94b4af76d12204313062aafed1e8e108c6f52c52c6a8",
+      "translationSha256": "84599489a826d529bb01196c6f78035cd15475c8c6cdc6dbadf7f86d2f1136f1"
+    },
+    {
+      "source": "docs/SCAN-FRAME-WASM.md",
+      "sourceLanguage": "en",
+      "translation": "docs/SCAN-FRAME-WASM.ko.md",
+      "sourceSha256": "415d9248546fead35e4cf8a099a496d9783170045d219a09c2ca2a8acfccf1e3",
+      "translationSha256": "76e07552e03b1f545d6069f9cae4f021bce5b1ed6ca4cdfdd6f6bb003132f77c"
+    },
+    {
+      "source": "docs/SCAN-TAPE-PARITY.md",
+      "sourceLanguage": "en",
+      "translation": "docs/SCAN-TAPE-PARITY.ko.md",
+      "sourceSha256": "51e6571ff7b4fed1aee1bd738f163a93c7e1db2d841c6f6c4aeab507048fc4d3",
+      "translationSha256": "ee7ba16de9de4f3ece13fd6062747ae89658de1833beee6c5d5ecac6dae7a37c"
+    },
+    {
+      "source": "docs/SCENARIO-RUNNER.md",
+      "sourceLanguage": "en",
+      "translation": "docs/SCENARIO-RUNNER.ko.md",
+      "sourceSha256": "acf0e76d7e4ccd6a1f90a15c5fb7051df27f4d60e07f76f1668952fed9b034b6",
+      "translationSha256": "b424e88850f75407c3aeaa5c455886f5d70a04da7059c9dc3bac64bed2e5af84"
+    },
+    {
+      "source": "docs/SOLAR-SCHEDULE.md",
+      "sourceLanguage": "en",
+      "translation": "docs/SOLAR-SCHEDULE.ko.md",
+      "sourceSha256": "2ba439a2dd02804b1097524cf0aca243cd1b2f4c8f7ea8e918919c546f1897d1",
+      "translationSha256": "ad5b334f6c20320c4022cb438bbfd7e2292640c0610da0451f600e6021e4c74e"
+    },
+    {
+      "source": "docs/SOURCE-MAP.md",
+      "sourceLanguage": "en",
+      "translation": "docs/SOURCE-MAP.ko.md",
+      "sourceSha256": "c194af46893ea1c2f9e15310f1c4cc6a45a395180093f622a01eaba482db5558",
+      "translationSha256": "dedcb89b78b1d4001c8069afba14b6304dfd384d30522deddb1c6fd9241cb678"
+    },
+    {
+      "source": "docs/SOURCE-SAFETY-TRACE.md",
+      "sourceLanguage": "en",
+      "translation": "docs/SOURCE-SAFETY-TRACE.ko.md",
+      "sourceSha256": "1659bddb02eef09f77bb918d16b3ac4b9fa22e9d15b48bc2bd78889fa409b7b1",
+      "translationSha256": "d2c1f8b06c4613ea81e5fd0c9c563524ba5b3c85834379f650476ccc6e950c8e"
+    },
+    {
+      "source": "docs/SUNCALC-ATTRIBUTION.md",
+      "sourceLanguage": "en",
+      "translation": "docs/SUNCALC-ATTRIBUTION.ko.md",
+      "sourceSha256": "00ceab82638613a1ebaa872d7524119985792f6f2085e637b3dab643eec94663",
+      "translationSha256": "554446f78381abf017e9b21322ad108e44674278caa31661290b6987856e116e"
+    },
+    {
+      "source": "docs/TEMPORAL-DESCRIPTOR-ARTIFACT.md",
+      "sourceLanguage": "en",
+      "translation": "docs/TEMPORAL-DESCRIPTOR-ARTIFACT.ko.md",
+      "sourceSha256": "186b8df99c9acde621db9de3494fab2f94329d6b8fae261b03ecbb74db6fab38",
+      "translationSha256": "965c4b39e5802943f9b6164766598486fb98817f8faa93168ad85f5dfe426db4"
+    },
+    {
+      "source": "docs/TEMPORAL-REPLAY.md",
+      "sourceLanguage": "en",
+      "translation": "docs/TEMPORAL-REPLAY.ko.md",
+      "sourceSha256": "e2c95a5fbdadc33f0ba4aae5c726c0e77aaa9783dec958e2d157d9ef14292ace",
+      "translationSha256": "03da40b77309ae3b975bd842d4c3b763251006613f3e5fcf97a076fa19c8f764"
+    },
+    {
+      "source": "docs/TEMPORAL-RESOURCES.md",
+      "sourceLanguage": "en",
+      "translation": "docs/TEMPORAL-RESOURCES.ko.md",
+      "sourceSha256": "de3fb5f13b5b2775cb7aefe6c72919893c802b337ea37eb377287b6ca3bff1f9",
+      "translationSha256": "f4317481f1801e9e87d8a43f054ece82494b3fb5cc005377debb412a766bafd0"
+    },
+    {
+      "source": "docs/TESTING.md",
+      "sourceLanguage": "en",
+      "translation": "docs/TESTING.ko.md",
+      "sourceSha256": "c4cdeb1d10847754bbbe1d39235378414ed106a2d3b092f727707fa17131b4f2",
+      "translationSha256": "52dcef147020d5f823487eb4fca0de54a40a8d99b8cfad9195619eef23977dd8"
+    },
+    {
+      "source": "docs/TIME-AND-SCHEDULE-CONTRACT.md",
+      "sourceLanguage": "en",
+      "translation": "docs/TIME-AND-SCHEDULE-CONTRACT.ko.md",
+      "sourceSha256": "0892ae6a28a954fafcea0b709c3fa4e109f469dba5ad539ec2465935f1b1d29e",
+      "translationSha256": "bad312527213b96a024c52d30a0957647d40bcc215505eef5a602b99ddc3bfc0"
+    },
+    {
+      "source": "docs/TRACEABILITY.md",
+      "sourceLanguage": "en",
+      "translation": "docs/TRACEABILITY.ko.md",
+      "sourceSha256": "14f57f5ca4946fd82bfc582188b98b5170614e1e8bfab38ae4be6ec0c70be6e3",
+      "translationSha256": "07b52235320359a392f2dbdd8243e5af9f651c6cfc80a8846bd48cb9d9745939"
+    },
+    {
+      "source": "docs/TUTORIAL.md",
+      "sourceLanguage": "en",
+      "translation": "docs/TUTORIAL.ko.md",
+      "sourceSha256": "4be74757127bcfb50f2c888106a14f12bcba584aa03f3a21d7c031dab3ec5f39",
+      "translationSha256": "e193425a6ded09373d5e49d078f20bd0dac73614174d432d049aa99d024546ec"
+    },
+    {
+      "source": "docs/VERIFICATION.md",
+      "sourceLanguage": "en",
+      "translation": "docs/VERIFICATION.ko.md",
+      "sourceSha256": "91c6831355d81ef5c2ea73ed0e14b3dde47f70cd51e4951c297cae26b53572a8",
+      "translationSha256": "cd16aa9fe033e641b8ddd07e0886342376f6275514554c9fa47b79861974bc33"
+    },
+    {
+      "source": "docs/WASM-CI-ARTIFACTS.md",
+      "sourceLanguage": "en",
+      "translation": "docs/WASM-CI-ARTIFACTS.ko.md",
+      "sourceSha256": "445b303cf3637ea375370a2306b469b501aa522e5b1e7a1dbcb0ac5624e7bc69",
+      "translationSha256": "5b7865addfbe86ac622a48d73b84e802842d2c275b9c5045f6faa89cd4902eb4"
+    },
+    {
+      "source": "examples/authoring/pump-rev-1.ghost.md",
+      "sourceLanguage": "en",
+      "translation": "examples/authoring/pump-rev-1.ghost.ko.md",
+      "sourceSha256": "114ff191589b73cafa777bea233f03538857dea25b40b4d227f0eda34624804f",
+      "translationSha256": "6f3103e653e5c68e7148aec67b3c577d61a7615d32bd792ef56d354598921ef0"
+    },
+    {
+      "source": "examples/authoring/pump-rev-2.ghost.md",
+      "sourceLanguage": "en",
+      "translation": "examples/authoring/pump-rev-2.ghost.ko.md",
+      "sourceSha256": "06779bfa8291e771edda314214187670381c4edbb949a55895ba5a27cd0b2c05",
+      "translationSha256": "0f84c49d3a9faeff256b75fe03c11c203b4ec53b0b9bbe8a0a9f2a86c7bf9e89"
+    },
+    {
+      "source": "examples/curriculum/pc-02-start-stop.ghost.md",
+      "sourceLanguage": "ko",
+      "translation": "examples/curriculum/pc-02-start-stop.ghost.en.md",
+      "sourceSha256": "7e85d0541383c95d38a8176c496343627367c1b9aa9829320ddd4dc2a477593a",
+      "translationSha256": "a6983247ad448a1a6d32edf19cf87dcd2c19ea725002ce24cc9d4337a2702d53"
+    },
+    {
+      "source": "examples/curriculum/pc-03-motor-contactor.ghost.md",
+      "sourceLanguage": "ko",
+      "translation": "examples/curriculum/pc-03-motor-contactor.ghost.en.md",
+      "sourceSha256": "a44ac8295c000f850bf26e0607abba99268c845f83d7ede66b4618b327964291",
+      "translationSha256": "eb374c63500d36c9e5fd7c2b32129a7cc5c1331af73c685d9d281ccecbbb86de"
+    },
+    {
+      "source": "examples/curriculum/pc-04-direction-interlock.ghost.md",
+      "sourceLanguage": "ko",
+      "translation": "examples/curriculum/pc-04-direction-interlock.ghost.en.md",
+      "sourceSha256": "f50e73582f8fbae8678ab3fb76f428a56d5d1df283a10d0ae58fcc3d08f7ae27",
+      "translationSha256": "ccd8c0d54af3ae8c6804edf425f1510465900e59d44b7c32452f70ccfb68b241"
+    },
+    {
+      "source": "examples/curriculum/pc-05-limit-feedback.ghost.md",
+      "sourceLanguage": "ko",
+      "translation": "examples/curriculum/pc-05-limit-feedback.ghost.en.md",
+      "sourceSha256": "ed0fa48243a9e627dce12ce0c4086478db907368228facc61f3c2d088c5dfd9e",
+      "translationSha256": "a857e9e7df8143242f97914eba6f6f1934ffe7abbed2db9674c9c1beba81c041"
+    },
+    {
+      "source": "examples/curriculum/pc-06-timer-patterns.ghost.md",
+      "sourceLanguage": "ko",
+      "translation": "examples/curriculum/pc-06-timer-patterns.ghost.en.md",
+      "sourceSha256": "d6bb1c1807b902dc3e202b4bfc216081e8afb0ae0ff1fd9e31b7c887232675e8",
+      "translationSha256": "626a81edba8782493e7931409ab7b3c1f73f65ab6a8f130c56c74ceb9a9e93ba"
+    },
+    {
+      "source": "examples/curriculum/pc-07-tank-hysteresis.ghost.md",
+      "sourceLanguage": "ko",
+      "translation": "examples/curriculum/pc-07-tank-hysteresis.ghost.en.md",
+      "sourceSha256": "4296356703356889993c9417c8770bc3f172f110098f82788dbedffc4ffbe418",
+      "translationSha256": "ae58f3e451bd26b399d54947f1910ed3b7a0ddbf09b11c67f07973e2373c44a7"
+    },
+    {
+      "source": "examples/curriculum/pc-08-manual-auto.ghost.md",
+      "sourceLanguage": "ko",
+      "translation": "examples/curriculum/pc-08-manual-auto.ghost.en.md",
+      "sourceSha256": "23d5282723b78b81410558d102a2e7b01f68d0d0fea89180b93e767dd74927c6",
+      "translationSha256": "e4e7b4163dd2d1166cdd0bbaa2e1cb5814d161cb20258b7dd6f026c0788ce57d"
+    },
+    {
+      "source": "examples/curriculum/pc-09-sequential-water-supply.ghost.md",
+      "sourceLanguage": "ko",
+      "translation": "examples/curriculum/pc-09-sequential-water-supply.ghost.en.md",
+      "sourceSha256": "02652715e118208011a2d7667e048cfe1b063fcb6286fe3bb3d2b4bbc992366f",
+      "translationSha256": "cf3b4649813073cfb056127f7ba9384e5f2b735c1db97b7e371bb6482925cae5"
+    },
+    {
+      "source": "examples/curriculum/pc-10-fault-alarm-reset.ghost.md",
+      "sourceLanguage": "ko",
+      "translation": "examples/curriculum/pc-10-fault-alarm-reset.ghost.en.md",
+      "sourceSha256": "f3fa613105d47381fdcdd8a16046ca39f376c6eaa1918d1514dfb0e8cff9c5d3",
+      "translationSha256": "ed30f7b2cae3e8ab2ee890f4347e6e671fe17de3e50b72de0e23780a4e69af04"
+    },
+    {
+      "source": "examples/irrigation.ghost.md",
+      "sourceLanguage": "en",
+      "translation": "examples/irrigation.ghost.ko.md",
+      "sourceSha256": "7970f5d43c7a895b5ef1731e8dfa98fe8efe914a31f2388d44ef4926bc6dfd92",
+      "translationSha256": "ba789b2f3e7b5f468c05f692cc25ee43d81c279b4c0c71bd970832f8e3b06caa"
+    },
+    {
+      "source": "examples/scheduled-watering.ghost.md",
+      "sourceLanguage": "ko",
+      "translation": "examples/scheduled-watering.ghost.en.md",
+      "sourceSha256": "a41f34a835c27f76f7c5f9bf49f32b28a11452fa9d57eae470530e14e0118c38",
+      "translationSha256": "612072f39e8e17c585c96076a0230da40b1e023fdfdea68fa34276652bd053b5"
+    },
+    {
+      "source": "examples/solar-watering.ghost.md",
+      "sourceLanguage": "ko",
+      "translation": "examples/solar-watering.ghost.en.md",
+      "sourceSha256": "3306a31ef107061afecc3cac8d136fde90b687acd701ce79a2a1148b809b74af",
+      "translationSha256": "21dd2ee4701b812b431ef07dca8c8019eba6ecf5931489c6da373e0572a64de9"
+    },
+    {
+      "source": "examples/station-rules.ghost.md",
+      "sourceLanguage": "en",
+      "translation": "examples/station-rules.ghost.ko.md",
+      "sourceSha256": "a2be97a7d654e3143144e58e378318297bc6afa9ef9cc4804e1cf67870ab93f5",
+      "translationSha256": "30b99475ce13bc0b0e711d9167bc7fc0bde441c8a5676672afdac41662e530ca"
+    },
+    {
+      "source": "examples/tutorial/01-latch.ghost.md",
+      "sourceLanguage": "en",
+      "translation": "examples/tutorial/01-latch.ghost.ko.md",
+      "sourceSha256": "10ad51975845c985b0abe7b33163122044a3a9ae9e1c9f6fe8f549dbce3324df",
+      "translationSha256": "6c44ba1f7d421aa6e3cfd92a2973336df6782156a0d1a850a34e45901ac45ee9"
+    },
+    {
+      "source": "examples/tutorial/02-watering.ghost.md",
+      "sourceLanguage": "en",
+      "translation": "examples/tutorial/02-watering.ghost.ko.md",
+      "sourceSha256": "e363db31d9a01218ba52c75d1bf5fe2f15add32b5c50e0cf7b222b931fc4c6ad",
+      "translationSha256": "8ba6956528839452958f8b7148d3ded5a3e0c0b56c50d4498540c1a190fc6ca3"
+    },
+    {
+      "source": "examples/tutorial/03-moisture.ghost.md",
+      "sourceLanguage": "en",
+      "translation": "examples/tutorial/03-moisture.ghost.ko.md",
+      "sourceSha256": "539d85a8ca8926a4f0e7870a4519d2965f4a1fec97372fc96c1bd400bff13ac8",
+      "translationSha256": "4b9b540505d136ae5c5ace3eb25b805fe5e3ec5ef00b53721e30de2ab9a53717"
+    },
+    {
+      "source": "examples/tutorial/04-extra-valves.ghost.md",
+      "sourceLanguage": "en",
+      "translation": "examples/tutorial/04-extra-valves.ghost.ko.md",
+      "sourceSha256": "bf427a5aac53678420404d3cdb2b94e6c6922bc0e58c145e8e5ac09d93174d4a",
+      "translationSha256": "c27ce2721c9a18932ef56e6cd3a71ede97f9c1465363a4b3577999822f3bda59"
+    },
+    {
+      "source": "examples/vfd-speed.ghost.md",
+      "sourceLanguage": "en",
+      "translation": "examples/vfd-speed.ghost.ko.md",
+      "sourceSha256": "3319ddd9e8bd5c486586f4e3e94c3e78f62402c4541a712f97e9509cb5d996c3",
+      "translationSha256": "f46cf41933e3f207c626e34f370745bace295491b6aaa31aaaca2347a3cda908"
+    },
+    {
+      "source": "README.md",
+      "sourceLanguage": "en",
+      "translation": "README.ko.md",
+      "sourceSha256": "f112c33dfb030d2611fe8291334e7f3b95660deb5a2810a19c471f66908843dd",
+      "translationSha256": "b4ea21ead0a54f891f76b2d1435762f1434e7924c3c77750ed7a7bce45eba41a"
+    },
+    {
+      "source": "runtimes/wasm/README.md",
+      "sourceLanguage": "en",
+      "translation": "runtimes/wasm/README.ko.md",
+      "sourceSha256": "62390206de54ce92b51cb4041e1a8e76762508f29cbef1bd4c83663e6056a657",
+      "translationSha256": "92fd2b7370b4ea4d07943fa02462ca173096eef86889b540bf658c6beb8ef540"
+    },
+    {
+      "source": "tasks/after-event-design.md",
+      "sourceLanguage": "en",
+      "translation": "tasks/after-event-design.ko.md",
+      "sourceSha256": "c50add303d4b8f678440ad15ac1a1bf9c719daff54ae4d7d0e05abc48c585bcd",
+      "translationSha256": "aa69bc37f86d1be2cea1360d62087ccdd35093dffee3cf12a35e19ce3975dab9"
+    },
+    {
+      "source": "tasks/civil-schedule-reference-integration.md",
+      "sourceLanguage": "en",
+      "translation": "tasks/civil-schedule-reference-integration.ko.md",
+      "sourceSha256": "b736ffb1710ec2e789906a39c6f4613597e64ac27d2a6d475d387e8d5c2d2935",
+      "translationSha256": "75cd6e8d2d62bd7d7113e71608da0598cbe40f4f1cc625cff70cf8c23b95741a"
+    },
+    {
+      "source": "tasks/compiler-diagnostics-plan.md",
+      "sourceLanguage": "en",
+      "translation": "tasks/compiler-diagnostics-plan.ko.md",
+      "sourceSha256": "ae219b6d854a7560e548977d2a18f613d39990e70a3291e6e7c75186a7752e25",
+      "translationSha256": "3ce3a2b2cb176f04ca95d86678863a109dc4172ea232d25782f0b16895e0b18d"
+    },
+    {
+      "source": "tasks/debounce-design.md",
+      "sourceLanguage": "en",
+      "translation": "tasks/debounce-design.ko.md",
+      "sourceSha256": "b26c12cf22197e2fa3391c021a8a62a35a6e316b8eb5a3dcf1f733ac587b6881",
+      "translationSha256": "cbc384d9c2afdab873544cba45cded6db70536a673f919c4a08ac3fa43e59ade"
+    },
+    {
+      "source": "tasks/hold-last-design.md",
+      "sourceLanguage": "en",
+      "translation": "tasks/hold-last-design.ko.md",
+      "sourceSha256": "9f129055380934cd74ca863ed1106a4915bbec9e25c5676cc5bd12181bb8741f",
+      "translationSha256": "e96b2531c7d70d99f135bbd3f790c5b762985e812af2f08cfdd794810f552902"
+    },
+    {
+      "source": "tasks/import-validation-plan.md",
+      "sourceLanguage": "en",
+      "translation": "tasks/import-validation-plan.ko.md",
+      "sourceSha256": "0e1e5b78f68bb6f5e526d30b5be5b65f9c6232f8d83d10476ff602ec8a4a083a",
+      "translationSha256": "815b34b71c485badb70740d633ce1e458da825f9ecf79b07bcbd48420ed623de"
+    },
+    {
+      "source": "tasks/issue-135-daily-slots-plan.md",
+      "sourceLanguage": "en",
+      "translation": "tasks/issue-135-daily-slots-plan.ko.md",
+      "sourceSha256": "ba7aa3c6c9da04044662950b2ddd370e33c96fd8795c156762c101b3c844bbe5",
+      "translationSha256": "3ad15b51880a185e32de249ad4538c29f39eef3476f39d88ac6965c9ae1a5b2b"
+    },
+    {
+      "source": "tasks/issue-135-plan.md",
+      "sourceLanguage": "en",
+      "translation": "tasks/issue-135-plan.ko.md",
+      "sourceSha256": "c5752e3de440d0a85beb49b4c9834ca62cd8fed8f8d766ec4245f69fe72037d8",
+      "translationSha256": "c0c6be82cb8cade0f5d907f4a154130079649d570c0aa068e0ac6df7f4699a95"
+    },
+    {
+      "source": "tasks/issue-137-plan.md",
+      "sourceLanguage": "en",
+      "translation": "tasks/issue-137-plan.ko.md",
+      "sourceSha256": "9e2811560a7c0ca7936eb162df5872ae7ba4f17c2cca6ce74bf46fa73ae47f98",
+      "translationSha256": "3128ffbb8e38f1ff2dc02e2c60293930ad7b69cb8cc67b8e1b6c7313a3346019"
+    },
+    {
+      "source": "tasks/plan.md",
+      "sourceLanguage": "en",
+      "translation": "tasks/plan.ko.md",
+      "sourceSha256": "97d8d16e0443a51a9bd0e38a16b2b2c382ae6edbe33354d0698fe3fa54be938b",
+      "translationSha256": "4a8054c0daa6302bce5f1f5cfb352a43506b4bd42e10fe40e4073b2f6ac81d13"
+    },
+    {
+      "source": "tasks/reference-compliance-plan.md",
+      "sourceLanguage": "ko",
+      "translation": "tasks/reference-compliance-plan.en.md",
+      "sourceSha256": "7f6699d60eb12a91d73f0703a71a2257eed968c909de73b645fe4f85e0a1196f",
+      "translationSha256": "bbc77444b6afdc172907bb7f1d8fc404aee1284193ae6d8410ec1b0c381664d3"
+    },
+    {
+      "source": "tasks/result-provenance-design.md",
+      "sourceLanguage": "en",
+      "translation": "tasks/result-provenance-design.ko.md",
+      "sourceSha256": "cf156a03c92be3230534b63f999145320f7b906d17227b3ced72943a58d5ac25",
+      "translationSha256": "b48543973412be91fe6156de9b97c349b6c86b4223bc6242bab1305017dac15b"
+    },
+    {
+      "source": "tasks/schedule-clock-design.md",
+      "sourceLanguage": "en",
+      "translation": "tasks/schedule-clock-design.ko.md",
+      "sourceSha256": "ef57f6527c1269942757bbe304666e07e49bac33f8125e8a59b54a9bac78c301",
+      "translationSha256": "37eb6c05aaee5cb0661a774a4d39cdc18707002c088c6b0b9c64c8f807fcab67"
+    },
+    {
+      "source": "tasks/schedule-pulse-design.md",
+      "sourceLanguage": "en",
+      "translation": "tasks/schedule-pulse-design.ko.md",
+      "sourceSha256": "af7184068273eefeec3be7a84c9f9227570f23dbf6908874cf0ff46cf90d61ed",
+      "translationSha256": "83ee5c46f2d3d7f0a58d117147a70c4777df640f5a235fb2abeb9e127da8d9f1"
+    },
+    {
+      "source": "tasks/schedule-wire-design.md",
+      "sourceLanguage": "en",
+      "translation": "tasks/schedule-wire-design.ko.md",
+      "sourceSha256": "c99fd1e5ff47cd6a8dae79ff7c4b051e5d6a047454baea1b79a5b2125a25f170",
+      "translationSha256": "2a9162558007c5ec605d0c965896c841b82990196861ccd32e2739b9a6aba8ec"
+    },
+    {
+      "source": "tasks/sensor-atomicity-design.md",
+      "sourceLanguage": "en",
+      "translation": "tasks/sensor-atomicity-design.ko.md",
+      "sourceSha256": "f62c0d4d78d229eafb7ece74907649e24983e308a9ca0edbdabd59080811318e",
+      "translationSha256": "02703618a485a214e6092f4114bb56a7b69e9211408a24c708965fe6c5d6513f"
+    },
+    {
+      "source": "tasks/solar-native-admission-integration.md",
+      "sourceLanguage": "en",
+      "translation": "tasks/solar-native-admission-integration.ko.md",
+      "sourceSha256": "465ee3dbd8a054de71a0354a5c69400a4073a9a87d618a7022c0a30ded43bec3",
+      "translationSha256": "8c8ae649244741101a59ab24c1c0aa9277fce8364bdb87263b5be53b19763955"
+    },
+    {
+      "source": "tasks/temporal-adapter-replay-design.md",
+      "sourceLanguage": "en",
+      "translation": "tasks/temporal-adapter-replay-design.ko.md",
+      "sourceSha256": "9f4513ae31604d8630bc0f32191369caed1f4b85cd1eed572737e504b409d9e8",
+      "translationSha256": "2cab39cb2addda0a1e724c7e2e15a253b812b4b749c15a15fe1c8e297e625e10"
+    },
+    {
+      "source": "tasks/temporal-layout-evidence.md",
+      "sourceLanguage": "en",
+      "translation": "tasks/temporal-layout-evidence.ko.md",
+      "sourceSha256": "a8de4b9545e59193196d0679b7cb236652f91914ceeab4dd916731b9ed144ecb",
+      "translationSha256": "18eca8652c949ab73abc27202b2a03ae6d57599977b6c5e7858de9d483b3c3bd"
+    },
+    {
+      "source": "tasks/temporal-policy-decisions.md",
+      "sourceLanguage": "en",
+      "translation": "tasks/temporal-policy-decisions.ko.md",
+      "sourceSha256": "0f150d708b2d85120d1ec84bef5d6527984b446828f32c1a68e097f5d264da90",
+      "translationSha256": "f359bd89f29902481fcc2e3ee734dea4d9ee76a8dae6a7a0b2f9369dcccc6687"
+    },
+    {
+      "source": "tasks/temporal-resource-plan-design.md",
+      "sourceLanguage": "en",
+      "translation": "tasks/temporal-resource-plan-design.ko.md",
+      "sourceSha256": "eba4ce9cce963a103578097e204f108a6cda365ddcec2e87067b72113266baa7",
+      "translationSha256": "b4cca6d4122cc805b7de1e4603b7653aaa98a63004a4d9b3af6696cdaf2b361c"
+    },
+    {
+      "source": "tasks/true-for-driver-contract.md",
+      "sourceLanguage": "en",
+      "translation": "tasks/true-for-driver-contract.ko.md",
+      "sourceSha256": "bb480d028926a55820000f9dc35378f7c63cd32c7c43bf5c3735f31b7728c284",
+      "translationSha256": "3ae3dfd52d9c81b002ac7540f4cc57b01e4e8d91402963947538e7110d7f5db5"
+    },
+    {
+      "source": "tasks/window-derived-design.md",
+      "sourceLanguage": "en",
+      "translation": "tasks/window-derived-design.ko.md",
+      "sourceSha256": "656c567d6cce1433f625884cbceefdba13f204fb8c5303f00e22b8de590c9847",
+      "translationSha256": "0236d587c7369b3a519f51af81c870d650cace73cecdae336da81c68c571cf94"
+    },
+    {
+      "source": "tasks/window-evidence-design.md",
+      "sourceLanguage": "en",
+      "translation": "tasks/window-evidence-design.ko.md",
+      "sourceSha256": "0579243287a2a202911a42240faf9a655048e3d1c5d12647a06ef86400a9ae38",
+      "translationSha256": "c251e7faf5eac1cb9ee82c726e36944ee7c3409c55f346211adcdc78b5e33362"
+    },
+    {
+      "source": "tasks/window-gfb4-design.md",
+      "sourceLanguage": "en",
+      "translation": "tasks/window-gfb4-design.ko.md",
+      "sourceSha256": "8630308e9c7b50ad00dfc9ca3a19c61b58a050428a8f79043b21a52011dfdddc",
+      "translationSha256": "a20725eedc1eba16cff8cc5b0456f1ae2efd8d29c3f4f84aba6675c61876d142"
+    },
+    {
+      "source": "tests/reference/DECISIONS.md",
+      "sourceLanguage": "ko",
+      "translation": "tests/reference/DECISIONS.en.md",
+      "sourceSha256": "cb019fb29a9c3492530dcd28030dcdba6db66ae8b14434971bd30c65c7b2fdf0",
+      "translationSha256": "bc88eee6e4eb1d8f608df6aab0e0462f0fa1ed9a3a19a65bcbde5fd27a23c616"
+    },
+    {
+      "source": "tests/reference/README.md",
+      "sourceLanguage": "ko",
+      "translation": "tests/reference/README.en.md",
+      "sourceSha256": "fea55ecafa747d86445dd2f35176146d9bf10c4c852d3f6655847910ab351245",
+      "translationSha256": "69680266a80bad7bf72ff3a7b11ebbbbaa6086b4562e04bc33c398c6918b5896"
+    }
+  ],
+  "exclusions": [
+    {
+      "path": "contracts/interaction-v0/examples/browser-exact-counter.ghost.md",
+      "reason": "Executable test or benchmark input fixture, not authored reader documentation; canonical source identity is retained."
+    },
+    {
+      "path": "contracts/interaction-v0/examples/enum-phase-age.ghost.md",
+      "reason": "Executable test or benchmark input fixture, not authored reader documentation; canonical source identity is retained."
+    },
+    {
+      "path": "contracts/interaction-v0/examples/exact-counter.ghost.md",
+      "reason": "Executable test or benchmark input fixture, not authored reader documentation; canonical source identity is retained."
+    },
+    {
+      "path": "contracts/interaction-v0/examples/five-minute-watering.ghost.md",
+      "reason": "Executable test or benchmark input fixture, not authored reader documentation; canonical source identity is retained."
+    },
+    {
+      "path": "contracts/interaction-v0/examples/multiple-values.ghost.md",
+      "reason": "Executable test or benchmark input fixture, not authored reader documentation; canonical source identity is retained."
+    },
+    {
+      "path": "contracts/interaction-v0/examples/operator-settings.ghost.md",
+      "reason": "Executable test or benchmark input fixture, not authored reader documentation; canonical source identity is retained."
+    },
+    {
+      "path": "DOCS-REVIEW-REPORT.md",
+      "reason": "Historical audit, verification or measurement report; no independent language specification."
+    },
+    {
+      "path": "docs/DEFERRED-EXECUTION-GATE-AUDIT.md",
+      "reason": "Historical audit, verification or measurement report; no independent language specification."
+    },
+    {
+      "path": "docs/INDEX.md",
+      "reason": "Generated retrieval index; bilingual reader catalog is DOCUMENTATION.md/.ko.md."
+    },
+    {
+      "path": "docs/LLM-AUTHORING-EFFICIENCY-2026-09-23.md",
+      "reason": "Dated benchmark report and reproduction evidence; historical source hashes are retained."
+    },
+    {
+      "path": "docs/LLM-AUTHORING-EFFICIENCY-MEASUREMENT-2026-09-24.md",
+      "reason": "Historical audit, verification or measurement report; no independent language specification."
+    },
+    {
+      "path": "docs/REFERENCE-FEATURE-STATUS.md",
+      "reason": "Generated implementation-maturity/evidence report from the feature-status catalog, verified byte-for-byte by its existing generator test."
+    },
+    {
+      "path": "docs/REFERENCE-SIMULATOR-BASELINE-2026-09-23.md",
+      "reason": "Historical audit, verification or measurement report; no independent language specification."
+    },
+    {
+      "path": "docs/reports/2026-09-24-issue-135-daily-abi.md",
+      "reason": "Historical audit, verification or measurement report; no independent language specification."
+    },
+    {
+      "path": "docs/reports/2026-09-24-issue-135-daily-slots-abi.md",
+      "reason": "Historical audit, verification or measurement report; no independent language specification."
+    },
+    {
+      "path": "docs/reports/2026-09-24-range-cancel-acceptance.md",
+      "reason": "Historical audit, verification or measurement report; no independent language specification."
+    },
+    {
+      "path": "docs/reports/2026-09-24-reference-execution-support-audit.md",
+      "reason": "Historical audit, verification or measurement report; no independent language specification."
+    },
+    {
+      "path": "docs/SEPARATION-VALIDATION.md",
+      "reason": "Dated repository migration verification report."
+    },
+    {
+      "path": "docs/TASK-61-CONFORMANCE.md",
+      "reason": "Historical audit, verification or measurement report; no independent language specification."
+    },
+    {
+      "path": "docs/TASK-62-COVERAGE.md",
+      "reason": "Historical audit, verification or measurement report; no independent language specification."
+    },
+    {
+      "path": "examples/authoring/corpus/setting-corrected.ghost.md",
+      "reason": "Executable test or benchmark input fixture, not authored reader documentation; canonical source identity is retained."
+    },
+    {
+      "path": "examples/authoring/corpus/setting-initial.ghost.md",
+      "reason": "Executable test or benchmark input fixture, not authored reader documentation; canonical source identity is retained."
+    },
+    {
+      "path": "examples/authoring/corpus/type-corrected.ghost.md",
+      "reason": "Executable test or benchmark input fixture, not authored reader documentation; canonical source identity is retained."
+    },
+    {
+      "path": "examples/authoring/corpus/type-initial.ghost.md",
+      "reason": "Executable test or benchmark input fixture, not authored reader documentation; canonical source identity is retained."
+    },
+    {
+      "path": "examples/authoring/corpus/typo-corrected.ghost.md",
+      "reason": "Executable test or benchmark input fixture, not authored reader documentation; canonical source identity is retained."
+    },
+    {
+      "path": "examples/authoring/corpus/typo-initial.ghost.md",
+      "reason": "Executable test or benchmark input fixture, not authored reader documentation; canonical source identity is retained."
+    },
+    {
+      "path": "examples/authoring/corpus/unconfirmed-assumption.ghost.md",
+      "reason": "Executable test or benchmark input fixture, not authored reader documentation; canonical source identity is retained."
+    },
+    {
+      "path": "examples/authoring/corpus/unsupported-syntax.ghost.md",
+      "reason": "Executable test or benchmark input fixture, not authored reader documentation; canonical source identity is retained."
+    },
+    {
+      "path": "examples/authoring/corpus/valid-control.ghost.md",
+      "reason": "Executable test or benchmark input fixture, not authored reader documentation; canonical source identity is retained."
+    },
+    {
+      "path": "examples/authoring/corpus/virtual-timer.ghost.md",
+      "reason": "Executable test or benchmark input fixture, not authored reader documentation; canonical source identity is retained."
+    },
+    {
+      "path": "examples/curriculum/generated/pc-01-e01.generated.ghost.md",
+      "reason": "Generated canonical source projection of the programming book; translate the authored book instead."
+    },
+    {
+      "path": "PLAN.md",
+      "reason": "Historical session handoff and dated verification report."
+    },
+    {
+      "path": "tasks/compiler-control-diagnostics-extra.md",
+      "reason": "Dated compiler diagnostic audit report."
+    },
+    {
+      "path": "tasks/compiler-diagnostics-current-audit.md",
+      "reason": "Historical audit, verification or measurement report; no independent language specification."
+    },
+    {
+      "path": "tasks/compiler-diagnostics-inventory.md",
+      "reason": "Historical mechanical discovery snapshot and audit evidence."
+    },
+    {
+      "path": "tasks/compiler-diagnostics-latest-audit.md",
+      "reason": "Historical audit, verification or measurement report; no independent language specification."
+    },
+    {
+      "path": "tasks/compiler-ingress-diagnostics-extra.md",
+      "reason": "Compiler ingress diagnostic gap audit report."
+    },
+    {
+      "path": "tasks/compiler-int-settings-gap.md",
+      "reason": "Focused compiler acceptance-gap execution report."
+    },
+    {
+      "path": "tasks/compiler-interaction-diagnostics-coverage.md",
+      "reason": "Historical audit, verification or measurement report; no independent language specification."
+    },
+    {
+      "path": "tasks/compiler-parser-callsites-coverage.md",
+      "reason": "Historical audit, verification or measurement report; no independent language specification."
+    },
+    {
+      "path": "tasks/compiler-semantic-diagnostics-coverage.md",
+      "reason": "Historical audit, verification or measurement report; no independent language specification."
+    },
+    {
+      "path": "tasks/compiler-window-diagnostics-coverage.md",
+      "reason": "Historical audit, verification or measurement report; no independent language specification."
+    },
+    {
+      "path": "tasks/github-spec-issue-audit.md",
+      "reason": "Historical audit, verification or measurement report; no independent language specification."
+    },
+    {
+      "path": "tasks/issue-114-reference-analysis-2026-09-23.md",
+      "reason": "Dated source-review and issue-mapping report, not a normative specification."
+    },
+    {
+      "path": "tasks/reference-evidence.md",
+      "reason": "Historical test-evidence mapping report."
+    },
+    {
+      "path": "tasks/todo.md",
+      "reason": "Historical project progress and verification checklist report."
+    },
+    {
+      "path": "tests/fixtures/after-event-evidence.ghost.md",
+      "reason": "Executable test or benchmark input fixture, not authored reader documentation; canonical source identity is retained."
+    },
+    {
+      "path": "tests/fixtures/gfb1-golden-v1.ghost.md",
+      "reason": "Executable test or benchmark input fixture, not authored reader documentation; canonical source identity is retained."
+    },
+    {
+      "path": "tests/fixtures/gfb2-int-golden-v1.ghost.md",
+      "reason": "Executable test or benchmark input fixture, not authored reader documentation; canonical source identity is retained."
+    },
+    {
+      "path": "tests/fixtures/issue-90-readonly-settings.ghost.md",
+      "reason": "Executable test or benchmark input fixture, not authored reader documentation; canonical source identity is retained."
+    },
+    {
+      "path": "tests/fixtures/issue-90-settings-periodic.ghost.md",
+      "reason": "Executable test or benchmark input fixture, not authored reader documentation; canonical source identity is retained."
+    },
+    {
+      "path": "tests/fixtures/true-for-certified.ghost.md",
+      "reason": "Executable test or benchmark input fixture, not authored reader documentation; canonical source identity is retained."
+    },
+    {
+      "path": "tests/reference/BASELINE.md",
+      "reason": "Historical audit, verification or measurement report; no independent language specification."
+    },
+    {
+      "path": "tests/reference/EDGE-CASES.md",
+      "reason": "Dated edge-case verification and outstanding-failure report."
+    }
+  ]
+}

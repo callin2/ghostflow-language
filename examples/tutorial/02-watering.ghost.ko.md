@@ -1,0 +1,56 @@
+<!-- translation-source: examples/tutorial/02-watering.ghost.md -->
+[English original](02-watering.ghost.md)
+> 읽기용 번역본입니다. 컴파일할 때는 링크된 원본 `.ghost.md`를 사용하세요.
+
+# 예약 관수
+
+링크된 원본의 정본 튜토리얼 제어는 선택된 일일 슬롯에 밸브를 차례로 열고 각 관수 단계에서만
+펌프를 유지한다.
+
+```ghost
+control ScheduledWatering {
+
+  schedule starts: DailySlots<15min> {
+    timezone = "Asia/Seoul";
+    selected = [06:00, 06:15, 12:30, 18:45];
+  }
+
+  let water1_time = 5min;
+  let water2_time = 5min;
+  let valve_delay = 2s;
+  let pump_stop_delay = 2s;
+  let switch_delay = 2s;
+
+  output pump, valve1, valve2: Bool;
+
+  type Phase =
+      Idle
+    | Open1
+    | Water1
+    | Stop1
+    | Switch
+    | Open2
+    | Water2
+    | Stop2;
+
+  state phase: Phase = Idle;
+  timer age = elapsed(phase);
+
+  phase' = case phase {
+    Idle => if starts.due then Open1 else Idle;
+    Open1 => if age >= valve_delay then Water1 else Open1;
+    Water1 => if age >= water1_time then Stop1 else Water1;
+    Stop1 => if age >= pump_stop_delay then Switch else Stop1;
+    Switch => if age >= switch_delay then Open2 else Switch;
+    Open2 => if age >= valve_delay then Water2 else Open2;
+    Water2 => if age >= water2_time then Stop2 else Water2;
+    Stop2 => if age >= pump_stop_delay then Idle else Stop2;
+  };
+
+  valve1 <- phase' in {Open1, Water1, Stop1};
+  valve2 <- phase' in {Open2, Water2, Stop2};
+  pump <- phase' in {Water1, Water2};
+  require pump => (valve1 || valve2);
+  require !(valve1 && valve2);
+}
+```
