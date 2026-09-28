@@ -27,6 +27,26 @@ E11은 표기 안내다. E08의 enum·elapsed, E09의 일정, E10/E14의 센서�
 - 여기서 출력은 논리적 intent다. 물리 GPIO, 릴레이, 센서 수집은 binding과 Driver의 책임이다.
 - 정확한 문법은 [Reference 문법 색인](reference/07-semantic-rules-and-index.md#75-선언과-표기-찾아보기)에서 찾는다. 설계 철학은 [Language Reference](LANGUAGE-REFERENCE.md#설계-철학), 계층별 책임은 [Reference 8장](reference/08-language-runtime-and-device-boundaries.md#83-faq-전체-책임표)을 본다.
 
+### 예제의 실행 검증 경로
+
+[예제 실행 검사](../tests/programming-book-simulation.test.mjs)는 현재 원본을 컴파일하고
+명시적인 입력·논리 시각·관측으로 상태와 requested/safe intent를 검사한다.
+E01–E10, E12–E15와 PC-01–PC-10은 public `ghostsim` 경로를 사용한다.
+E02/E08은 설정 Result와 context facts, E09는 civil schedule facts,
+E10/E14와 tutorial/03은 sensor samples와 필요한 capability를 공급한다.
+일반 입력·상태 예제는 native Rust, 해당 conditioner가 필요한 예제는 같은 core의 WASM을 실행한다.
+
+tutorial/04는 기존 public `ControlRuntime`·`DailySlots` WASM 호스트 경로에서 일정 사건과
+순차 출력을 검사한다. station-rules는 `ghostrules`로 컴파일한 정책을 binding한 뒤
+WASM `GhostFlowStation`의 출력 허가와 Stop을 검사한다. 두 심화 경로를 `ghostsim` CLI
+실행으로 분류하지 않는다. E11은 표기 안내이고 E90–E97은 의도한 compiler 진단을 검사한다.
+diagram·합성 설명은 실행 소스가 아니며, 소스 변경 실험은 별도 파생 후보로 검사한다.
+
+Node dependencies와 같은 revision에서 빌드한 native/WASM 산출물이 있으면
+`node --test tests/programming-book-simulation.test.mjs`로 실행한다. 전체 빌드·검증 순서는
+[Verification](VERIFICATION.md)을 따른다. `tests/docs-runnable-examples.test.mjs`의 compiler 검사는
+runtime 빌드 없이도 실행할 수 있다. 이 근거는 논리 실행이며 물리 장치 검증은 별도다.
+
 ## 목차
 
 ### 먼저 실습할 경로 — PLC에서 GhostFlow로
@@ -351,7 +371,7 @@ PC-07은 [canonical literate 원본](../examples/curriculum/pc-07-tank-hysteresi
 상한만 참이고 하한이 거짓이면 물리 순서와 모순되므로 `SensorConflict`에서 출력이
 꺼진다. 충돌 해소 scan은 한 번 `Idle`로 복구한 뒤 정상 평가를 재개한다. 공통 정지·
 보호와 fault latch/reset은 이 수위 개념에 섞지 않고 PC-08/PC-10에서 결합한다.
-기존 tutorial/03의 연속 센서 median·quality·hysteresis 예제는 별개로 보존한다.
+기존 [tutorial/03](../examples/tutorial/03-moisture.ghost.md)의 연속 센서 median·quality·hysteresis 예제는 별개로 보존한다.
 
 ### PC-08 — 수동·자동의 출력 소유권을 바꾸기
 
@@ -652,6 +672,7 @@ native와 WASM은 같은 Rust core에서 식·상태·타이머·제약을 실�
 
 현재 CLI 시뮬레이터는 입력과 requested/safe intent를 보여 주는 가상 I/O다.
 펌프 intent로 탱크 수위나 센서값을 자동 생성하는 plant model은 없다.
+별도로 명시한 온실 온도 plant model은 지원하며, 그 가상 적용·feedback도 물리 장치의 근거가 아니다.
 piped mode는 명시한 scan에서만 진행하고, interactive TTY는 실제 경과시간을 공급한다.
 일정·센서·인증 interval은 해당 호스트 capability가 필요하다. 실행 경로와 재현 명령은
 [Authoring and virtual simulation architecture](LLM-TOOLCHAIN-ARCHITECTURE.md#reproduce-the-public-path)를 따른다.
@@ -711,8 +732,9 @@ control ScheduledPulse {
 이 소스에는 대기열이 없다. 이미 Watering일 때 다른 시작 사건이 와도 저장하지 않는다.
 일정의 occurrence identity, 중복 억제, missed 처리와 replay evidence는 Reference §3.5의 계약을 따른다. 다른 일정의 교차·누락을 임의 catch-up하지 않는다.
 
-**작은 실험:** Watering 도중 `starts.due=true`를 다시 공급한다면 종료 시각이
-뒤로 밀릴까? 답은 코드에서 Watering 분기가 무엇을 읽는지에 있다.
+**독해 질문:** Watering 분기가 다른 시작 사건을 읽어 종료 시각을 바꾸는가?
+현재 선택된 두 시각의 간격은 5분보다 길다. 이 질문은 분기 독해이며,
+public simulator에 숨겨진 `starts.due` 입력을 주입하는 실행 시나리오가 아니다.
 
 
 ### 달력 시각과 자연 사건

@@ -6,9 +6,20 @@ import path from 'node:path';
 import test from 'node:test';
 import { encode } from '@toon-format/toon';
 import { compileSource, writeArtifact } from '../tools/toolchain.mjs';
+import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
+import { DailySlots } from '../runtimes/wasm/schedule.mjs';
+import { GhostFlowStation } from '../runtimes/wasm/station.mjs';
+import { bindStationPolicy } from '../runtimes/wasm/policy.mjs';
 
 const root = path.resolve(new URL('..', import.meta.url).pathname);
 const book = fs.readFileSync(path.join(root, 'docs/ProgrammingInGhostflow.md'), 'utf8');
+const bookRuntimeIds = new Set();
+function bookTest(id, title, body) {
+  assert.ok(!bookRuntimeIds.has(id), `duplicate runtime example ${id}`);
+  bookRuntimeIds.add(id);
+  test(`Programming ${id} ${title}`, body);
+}
+
 const replay = JSON.parse(fs.readFileSync(path.join(root, 'examples/curriculum/replay-scenarios.json'), 'utf8'));
 
 function bookSource(id) {
@@ -100,7 +111,7 @@ const plainCases = [
 ];
 
 for (const [id, frames] of plainCases) {
-  test(`Programming ${id} compiles and executes its teaching oracle through ghostsim`, async () => {
+  bookTest(id, 'compiles and executes its teaching oracle through ghostsim', async () => {
     await simulate(id, bookSource(id), frames);
   });
 }
@@ -178,7 +189,7 @@ for (const [id, sourcePath, frames] of additionalLessons) {
 
 const measured = (name, id, atMs, value, quality = 'Good') => ({ kind: 'sample', name, epoch: 1, id, timestampMs: atMs, value, quality });
 
-test('Programming E10 simulates median readiness, retained thresholds and exact stale boundary', async () => {
+bookTest('E10', 'simulates median readiness, retained thresholds and exact stale boundary', async () => {
   const values = [29, 90, 28, 30, 30, 30, 36, 36];
   const expected = [false, false, true, true, true, true, true, false];
   const frames = values.map((value, index) => ({
@@ -193,7 +204,7 @@ test('Programming E10 simulates median readiness, retained thresholds and exact 
   assert.equal(result.scans.at(-1).inputs.__gf_sensor_ok_moisture, false);
 });
 
-test('Programming E14 simulates installed, faulted and absent optional sensor capabilities', async () => {
+bookTest('E14', 'simulates installed, faulted and absent optional sensor capabilities', async () => {
   await simulate('E14-absent', bookSource('E14'), [frame(0, {}, { request: false })], { capabilities: [] });
   const present = [
     frame(0, {}, { request: false }),
@@ -214,7 +225,7 @@ test('Programming advanced tutorial03 simulates filter readiness, latch and stop
   await simulate('tutorial03', fs.readFileSync(path.join(root, 'examples/tutorial/03-moisture.ghost.md'), 'utf8'), frames);
 });
 
-test('Programming E09 simulates admitted DailySlots and the five-minute boundary', async () => {
+bookTest('E09', 'simulates admitted DailySlots and the five-minute boundary', async () => {
   const source = bookSource('E09');
   const compiled = await compileSource(source, { filename: 'E09.ghost.md' });
   const site = compiled.manifest.schedules[0].site;
@@ -223,7 +234,7 @@ test('Programming E09 simulates admitted DailySlots and the five-minute boundary
     clock: { monotonicMs: atMs, bootEpoch: 7, wallMs: startWallMs - 1 + atMs,
       trusted: true, uncertaintyMs: 0, sourceRevision: 'book-clock-v1' },
     schedules: [{ kind: 'daily-slots', site, coverageFromWallMs: startWallMs - 1, coverageToWallMs: startWallMs + 300_001,
-      rows: [{ sourceDay: 20_721, slotKey: 360, minuteOfDay: 360, fold: 0, scheduledWallMs: startWallMs,
+      rows: [{ sourceDay: 20_721, slotKey: 361, minuteOfDay: 360, fold: 0, scheduledWallMs: startWallMs,
         available: true, providerRevision: 'book-civil-v1', contextRevision: 'book-tzdb-v1' }] }],
   });
   const frames = [[0, false, 0], [1, true, 1], [2, true, 1], [300000, true, 1], [300001, false, 0]]
@@ -236,12 +247,13 @@ const contextFacts = (atMs, settings = null) => ({ clock: {
   monotonicMs: atMs, bootEpoch: 7, wallMs: 1_790_812_800_000 + atMs, uncertaintyMs: 0,
   trusted: true, unknownReason: null, sourceRevision: 'book-settings-clock-v1',
 }, natural: [], schedules: [], settings });
-const settingsEmission = (fingerprint, configId, atMs, baseRevision, result) => ({
-  programFingerprint: fingerprint, eventId: `book-settings-${atMs}`, baseRevision, position: atMs,
+// Settings position is the one-based accepted scan ordinal, not logical milliseconds.
+const settingsEmission = (fingerprint, configId, scanPosition, baseRevision, result) => ({
+  programFingerprint: fingerprint, eventId: `book-settings-${scanPosition}`, baseRevision, position: scanPosition,
   origin: 'producerObservation', changes: [{ configId, result }],
 });
 
-test('Programming E02 simulates healthy config, explicit fault fallback and recovery', async () => {
+bookTest('E02', 'simulates healthy config, explicit fault fallback and recovery', async () => {
   const source = bookSource('E02');
   const probe = await simulate('E02', source, [{ ...frame(0, { level: 29 }, { pump: true }), facts: { contextFacts: contextFacts(0) } }], { context });
   const fingerprint = probe.scans[0].settingsState.programFingerprint;
@@ -249,13 +261,13 @@ test('Programming E02 simulates healthy config, explicit fault fallback and reco
   const id = compiled.manifest.configs.find(item => item.name === 'threshold').id;
   const frames = [frame(0, { level: 29 }, { pump: true }), frame(1, { level: 30 }, { pump: false }),
     frame(2, { level: 31 }, { pump: false }), frame(3, { level: 29 }, { pump: false }), frame(4, { level: 29 }, { pump: true })];
-  for (const entry of frames) entry.facts = { contextFacts: contextFacts(entry.atMs,
-    entry.atMs === 3 ? settingsEmission(fingerprint, id, 3, 0, { ok: false, fault: 'SettingsUnavailable' })
-      : entry.atMs === 4 ? settingsEmission(fingerprint, id, 4, 1, { ok: true, type: 'Percent', value: 30 }) : null) };
+  for (const [index, entry] of frames.entries()) entry.facts = { contextFacts: contextFacts(entry.atMs,
+    entry.atMs === 3 ? settingsEmission(fingerprint, id, index + 1, 0, { ok: false, fault: 'SettingsUnavailable' })
+      : entry.atMs === 4 ? settingsEmission(fingerprint, id, index + 1, 1, { ok: true, type: 'Percent', value: 30 }) : null) };
   await simulate('E02', source, frames, { context });
 });
 
-test('Programming E08 simulates timer boundaries and cancellation on config fault', async () => {
+bookTest('E08', 'simulates timer boundaries and cancellation on config fault', async () => {
   const source = bookSource('E08');
   const probe = await simulate('E08', source, [{ ...frame(0, { start: false }, { motor: false }), facts: { contextFacts: contextFacts(0) } }], { context });
   const fingerprint = probe.scans[0].settingsState.programFingerprint;
@@ -263,10 +275,131 @@ test('Programming E08 simulates timer boundaries and cancellation on config faul
   const id = compiled.manifest.configs.find(item => item.name === 'delay').id;
   const frames = [[0, false, 0], [1000, true, 1], [2999, true, 1], [3000, true, 2], [4000, false, 0],
     [5000, true, 1], [6000, true, 0], [6001, true, 1], [8000, true, 1], [8001, true, 2]]
-    .map(([atMs, start, phase]) => ({ ...frame(atMs, { start }, { motor: phase === 2 }, { phase }), facts: {
+    .map(([atMs, start, phase], index) => ({ ...frame(atMs, { start }, { motor: phase === 2 }, { phase }), facts: {
       contextFacts: contextFacts(atMs,
-        atMs === 6000 ? settingsEmission(fingerprint, id, atMs, 0, { ok: false, fault: 'SettingsUnavailable' })
-          : atMs === 6001 ? settingsEmission(fingerprint, id, atMs, 1, { ok: true, type: 'Duration', value: 2000 }) : null),
+        atMs === 6000 ? settingsEmission(fingerprint, id, index + 1, 0, { ok: false, fault: 'SettingsUnavailable' })
+          : atMs === 6001 ? settingsEmission(fingerprint, id, index + 1, 1, { ok: true, type: 'Duration', value: 2000 }) : null),
     } }));
   await simulate('E08', source, frames, { context });
+});
+
+test('Programming advanced tutorial04 compiles and simulates its existing public WASM schedule host', async () => {
+  const sourcePath = 'examples/tutorial/04-extra-valves.ghost.md';
+  const compiled = await compileSource(fs.readFileSync(path.join(root, sourcePath), 'utf8'), { filename: sourcePath });
+  const wasm = fs.readFileSync(path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm'));
+  const runtime = await ControlRuntime.instantiate(wasm, compiled);
+  try {
+    const scheduler = new DailySlots(compiled.manifest.schedules[0]);
+    const scheduled = Date.parse('2026-09-25T19:15:00+09:00');
+    assert.equal(scheduler.poll({ nowMs: 0, wallMs: scheduled - 1000 }).due, false);
+    const event = scheduler.poll({ nowMs: 1000, wallMs: scheduled });
+    assert.equal(event.due, true);
+    const times = [0, 1000, 2999, 3000, 303000, 305000, 307000, 309000, 609000, 611000];
+    const phases = [0, 1, 1, 2, 3, 4, 5, 6, 7, 0];
+    for (const [index, nowMs] of times.entries()) {
+      const row = runtime.step({ nowMs, due: { extra_starts: nowMs === 1000 && event.due } });
+      const phase = phases[index];
+      const expected = { pump: [2, 6].includes(phase), valve3: [1, 2, 3].includes(phase), valve4: [5, 6, 7].includes(phase) };
+      assert.equal(row.vm.stateAfter.phase, phase, `tutorial04 phase at ${nowMs}`);
+      assert.deepEqual(row.vm.requested, expected, `tutorial04 requested at ${nowMs}`);
+      assert.deepEqual(row.vm.safe, expected, `tutorial04 safe at ${nowMs}`);
+    }
+  } finally { runtime.dispose(); }
+});
+
+test('Programming advanced station policy compiles through ghostrules and authorizes/stops in actual WASM', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-book-station-'));
+  let station;
+  try {
+    const output = path.join(directory, 'station-rules.json');
+    const cli = spawnSync(process.execPath, [path.join(root, 'tools/ghostrules.mjs'),
+      path.join(root, 'examples/station-rules.ghost.md'), output], { encoding: 'utf8' });
+    assert.equal(cli.status, 0, cli.stdout + cli.stderr);
+    const artifact = JSON.parse(fs.readFileSync(output, 'utf8'));
+    const policy = bindStationPolicy(artifact, {
+      station: { id: 'station', config: { valveCount: 4, maxOpenValves: 2, dailyQuotaMs: 3_600_000, maxStartBudgetMs: 1000 } },
+      pump: { id: 'pump1' }, settings: { id: 'settings' }, schedules: { starts: { id: 'starts', timezone: 'Asia/Seoul' } },
+      modeAliases: { Auto: 'Auto', Manual: 'Manual', Configure: 'Configure' },
+      activityAliases: { automatic: 'Auto', manual: 'Manual', configuring: 'Configure' },
+    });
+    assert.equal(policy.stationConfig.maxOpenValves, 2);
+    station = await GhostFlowStation.instantiate(fs.readFileSync(path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm')), policy.stationConfig);
+    station.synchronizeDay({ day: 20_721, nowMs: 0n, nextDayDeadlineMs: 10_000n });
+    station.enter({ requestId: 1n, ...station.claim, mode: 'Auto' });
+    await station.start({ requestId: 2n, ...station.claim, sessionId: 77n, ownerId: 88n,
+      mode: 'Auto', valves: 1n, budgetMs: 100n, occurrenceId: 501n, nowMs: 10n }, async () => true);
+    assert.equal(station.authorizeOutput({ sessionId: 77n, pumpOn: true, valves: 1n, nowMs: 10n }).pumpOn, true);
+    assert.throws(() => station.authorizeOutput({ sessionId: 77n, pumpOn: true, valves: 0n, nowMs: 10n }), /valve|pump/i);
+    const stopped = station.requestStop({ requestId: 3n, ...station.claim });
+    assert.deepEqual(stopped, { forceSafeOutputs: true, reason: 'StopRequested' });
+    assert.throws(() => station.authorizeOutput({ sessionId: 77n, pumpOn: true, valves: 1n, nowMs: 11n }), /stop/i);
+    assert.throws(() => station.enter({ requestId: 4n, ...station.claim, mode: 'Manual' }), /not stopped/i);
+  } finally {
+    station?.dispose();
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+const errorExamples = [
+  ['E90', /expected ; after input declaration/], ['E91', /requires matching ordered types/],
+  ['E92', /next state references are allowed only in output expressions/], ['E93', /unexpected trailing token control/],
+  ['E94', /Int literal is outside/], ['E95', /case for Mode must be exhaustive/],
+  ['E96', /duplicate output connection lamp/], ['E97', /cannot use Result directly/],
+];
+for (const [id, diagnostic] of errorExamples) {
+  test(`Programming ${id} is rejected by public compiler diagnostics before simulation`, () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-book-invalid-'));
+    try {
+      const section = book.slice(book.indexOf(`### ${id} —`));
+      const code = section.match(/```ghost-error\n([\s\S]*?)\n```/);
+      assert.ok(code, `missing ${id} error fence`);
+      const filename = path.join(directory, `${id}.ghost.md`);
+      fs.writeFileSync(filename, `# ${id}\n\n\`\`\`ghost\n${code[1]}\n\`\`\`\n`);
+      const cli = spawnSync(process.execPath, [path.join(root, 'tools/ghostc.mjs'), '--check', filename], { encoding: 'utf8' });
+      assert.equal(cli.status, 1);
+      assert.match(cli.stderr + cli.stdout, diagnostic);
+    } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+  });
+}
+
+test('Programming source experiments simulate changed priorities and explicit old-state reads', async () => {
+  await simulate('E01-invert', bookSource('E01').replace('lamp <- switch_on', 'lamp <- !switch_on'), [
+    frame(0, { switch_on: false }, { lamp: true }), frame(1, { switch_on: true }, { lamp: false }),
+  ]);
+  await simulate('E02-inclusive', bookSource('E02').replace('level < value', 'level <= value'),
+    [29, 30, 31].map((level, atMs) => ({ ...frame(atMs, { level }, { pump: level <= 30 }), facts: { contextFacts: contextFacts(atMs) } })), { context });
+  await simulate('E03-old-state-output', bookSource('E03').replace("pump <- running'", 'pump <- running'), [
+    frame(0, { start: true, stop: false }, { valve: true, pump: false }, { running: true }),
+    frame(1, { start: false, stop: false }, { valve: true, pump: true }, { running: true }),
+    frame(2, { start: false, stop: true }, { valve: false, pump: false }, { running: false }, { valve: false, pump: true }),
+  ]);
+  await simulate('E06-request-experiment', bookSource('E03').replace("pump <- running'", 'pump <- start'), [
+    frame(0, { start: true, stop: false }, { valve: true, pump: true }, { running: true }),
+    frame(1, { start: false, stop: false }, { valve: true, pump: false }, { running: true }),
+  ]);
+  await simulate('chapter10-priority-B', bookSource('E03').replace('!stop && (start || running)', 'start || (!stop && running)'), [
+    frame(0, { start: true, stop: true }, { valve: true, pump: true }, { running: true }),
+  ]);
+  await simulate('E08-late-observation', bookSource('E08'), [[0, false, false], [1000, true, false], [2999, true, false], [3500, true, true]]
+    .map(([atMs, start, motor]) => ({ ...frame(atMs, { start }, { motor }), facts: { contextFacts: contextFacts(atMs) } })), { context });
+});
+
+test('Programming E10 equal-threshold experiment produces the real compiler diagnostic', async () => {
+  await assert.rejects(compileSource(bookSource('E10').replace('off_above: 35%', 'off_above: 30%'),
+    { filename: 'E10-equal-thresholds.ghost.md' }), /hysteresis on_below must be less than off_above/);
+});
+
+test('Programming inventory assigns every fence and numbered example to executable, diagnostic or explanatory coverage', () => {
+  const numbered = [...book.matchAll(/^### (E\d+) —/gm)].map(match => match[1]).sort();
+  assert.deepEqual(numbered, [...bookRuntimeIds, ...errorExamples.map(([id]) => id), 'E11'].sort());
+  const fences = [...book.matchAll(/^`{3,4}([^`\n]+)$/gm)].map(match => match[1]);
+  const counts = Object.fromEntries([...new Set(fences)].map(kind => [kind, fences.filter(item => item === kind).length]));
+  assert.deepEqual(counts, { ghost: bookRuntimeIds.size + 1, text: 3, markdown: 1, sh: 1, 'ghost-error': errorExamples.length });
+  const catalog = JSON.parse(fs.readFileSync(path.join(root, 'examples/curriculum/catalog.json'), 'utf8'));
+  assert.deepEqual(catalog.lessons.map(lesson => lesson.id).sort(), [...replay.scenarios.map(lesson => lesson.id), ...additionalLessons.map(([id]) => id)].sort());
+  const links = [...book.matchAll(/\]\(\.\.\/(examples\/[^)#]+\.ghost\.md)(?:#[^)]*)?\)/g)].map(match => match[1]);
+  const checkedLinks = [...replay.scenarios.filter(lesson => lesson.id !== 'PC-01').map(lesson => lesson.source.executablePath),
+    ...additionalLessons.map(([, sourcePath]) => sourcePath), 'examples/station-rules.ghost.md',
+    'examples/tutorial/03-moisture.ghost.md', 'examples/tutorial/04-extra-valves.ghost.md'];
+  assert.deepEqual([...new Set(links)].sort(), checkedLinks.sort());
 });

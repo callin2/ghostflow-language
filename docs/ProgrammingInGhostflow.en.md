@@ -31,6 +31,25 @@ or physical device behavior. Do not read Chapters 11–12's composition/replacem
 - Outputs here are logical intent. Physical GPIO, relays, and sensor collection belong to bindings and Drivers.
 - Find exact syntax in the [Reference syntax index](reference/07-semantic-rules-and-index.md#75-선언과-표기-찾아보기). See [Language Reference](LANGUAGE-REFERENCE.md#설계-철학) for design philosophy and [Reference Chapter 8](reference/08-language-runtime-and-device-boundaries.md#83-faq-전체-책임표) for responsibilities by layer.
 
+### Example execution verification paths
+
+The [example execution check](../tests/programming-book-simulation.test.mjs) compiles current originals and
+checks state and requested/safe intents using explicit inputs, logical time, and observations.
+E01–E10, E12–E15 and PC-01–PC-10 use public `ghostsim` paths.
+E02/E08 supply config Results and context facts; E09 supplies civil schedule facts;
+E10/E14 and tutorial/03 supply sensor samples and required capabilities.
+Plain input/state examples execute native Rust; examples requiring the corresponding conditioner execute WASM of the same core.
+
+tutorial/04 checks schedule events and sequential outputs through the existing public `ControlRuntime`/`DailySlots` WASM host.
+station-rules compiles a policy with `ghostrules`, binds it, and checks output authorization and Stop in WASM `GhostFlowStation`.
+These two advanced paths are not classified as `ghostsim` CLI execution. E11 is notation guidance; E90–E97 check intended compiler diagnostics.
+Diagrams and composition explanations are not executable source; source-mutation experiments are checked as separate derived candidates.
+
+With Node dependencies and native/WASM artifacts built from the same revision, run
+`node --test tests/programming-book-simulation.test.mjs`. Follow [Verification](VERIFICATION.md) for the complete build/verification sequence.
+The compiler check in `tests/docs-runnable-examples.test.mjs` also runs without runtime builds.
+This evidence establishes logical execution; physical device verification is separate.
+
 ## Contents
 
 ### First practical path — from PLC to GhostFlow
@@ -351,7 +370,7 @@ does not turn on because there was no previous low-level event.
 An upper limit true with a lower limit false contradicts the physical order, so output is
 off in `SensorConflict`. The conflict-clearing scan first returns to `Idle`, then normal evaluation resumes.
 Do not mix common stop/protection and fault latch/reset into this water-level concept; combine them in PC-08/PC-10.
-Retain tutorial/03's continuous-sensor median/quality/hysteresis example separately.
+Retain [tutorial/03](../examples/tutorial/03-moisture.ghost.md)'s continuous-sensor median/quality/hysteresis example separately.
 
 ### PC-08 — Changing output ownership between manual and automatic
 
@@ -645,6 +664,7 @@ Concrete frame and Driver APIs are host contracts. Do not add platform branches 
 
 The current CLI simulator provides virtual I/O displaying inputs and requested/safe intents.
 It has no plant model automatically deriving tank levels or sensor values from pump intent.
+An explicitly configured greenhouse-temperature plant model is supported; its virtual application and feedback are not physical device evidence.
 Piped mode advances only at explicit scans; interactive TTY supplies elapsed wall time.
 Schedules, sensors, and certified intervals require the corresponding host capabilities. Follow
 [Authoring and virtual simulation architecture](LLM-TOOLCHAIN-ARCHITECTURE.md#reproduce-the-public-path) for execution paths and reproduction commands.
@@ -703,8 +723,9 @@ list values of the same type, such as `phase' in {Opening, Watering, Closing}`.
 This source has no queue. Another start event arriving during Watering is not stored.
 Schedule occurrence identity, duplicate suppression, missed handling, and replay evidence follow Reference §3.5. Do not arbitrarily catch up overlaps or omissions from other schedules.
 
-**Small experiment:** If `starts.due=true` is supplied again during Watering, will the end time
-move later? The answer lies in what the Watering branch reads.
+**Reading question:** Does the Watering branch read another start event to change its end time?
+The two selected times here are more than five minutes apart. This is branch reading,
+not an execution scenario injecting a hidden `starts.due` input into the public simulator.
 
 ### Calendar time and natural events
 
