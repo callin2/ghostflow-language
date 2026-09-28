@@ -60,8 +60,8 @@ jobs:
         run: npm ci --ignore-scripts
       - name: Check all documentation translations and indexes
         run: npm run docs:check
-      - name: Test verification routing and final result
-        run: node --test tests/ci-verification-routing.test.mjs
+      - name: Test documentation contracts, verification routing and final result
+        run: node --test tests/ci-verification-routing.test.mjs tests/doc-index.test.mjs
 
   verify:
     name: Verify WASM (${{ matrix.label }})
