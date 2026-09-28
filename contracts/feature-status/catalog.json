@@ -2800,6 +2800,47 @@
       ]
     },
     {
+      "id": "reference-index-links",
+      "family": "Reference syntax and symbol index links",
+      "clause": {
+        "path": "docs/reference/07-semantic-rules-and-index.md",
+        "heading": "7.5 선언과 표기 찾아보기"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [
+        "compile"
+      ],
+      "evidence": [
+        {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/reference-index-links.test.mjs",
+              "testId": "REF-07-008: syntax and symbol index links resolve to exact Reference sections",
+              "caseId": "REF-07-008",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "The oracle verifies Reference index structure and status-marker consistency; it does not prove every linked target's full prose semantics."
+      ],
+      "issues": [
+        315
+      ],
+      "referenceCaseIds": [
+        "REF-07-008"
+      ]
+    },
+    {
       "id": "host-boundary",
       "family": "Host scheduling, persistence and simulation",
       "clause": {
