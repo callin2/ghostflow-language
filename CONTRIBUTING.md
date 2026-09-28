@@ -51,6 +51,15 @@ check the current supported scope and evidence. Use
 their limits. Run relevant focused checks and required repository CI. Do not
 weaken or skip a check to get a pass.
 
+CI routes ordinary README, contribution, catalog, index and README illustration-only
+changes through `docs:check` and path-routing regressions. Code, executable
+examples, specifications, contracts, verification policy, mixed changes and
+unknown paths require full current/frontend-pin verification and coverage. See
+the [development workflow](docs/DEVELOPMENT-WORKFLOW.md) for the exact allowlist.
+Docs-only CI emits no verified WASM artifact; manually run the full workflow with
+the exact `source_sha` if one is needed. This routing does not skip relevant local
+checks. Require the final `Verification result` to be green before merging.
+
 ## Report evidence clearly
 
 Open pull requests against `dev`. Explain the user-visible change and why it is
