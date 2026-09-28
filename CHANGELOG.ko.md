@@ -5,6 +5,15 @@
 
 ## 미출시
 
+### 2026-09-29 — 명시적 상대습도 비율 ([#371](https://github.com/callin2/ghostflow-language/issues/371))
+
+Reference §2.9는 기존에 거부하던 `RelativeHumidity / RelativeHumidity -> Number`를
+허용한다. 예를 들어 `60%RH / 100%RH`는 작성한 공기 VPD 계산에 사용할 `0.6`이다.
+그 밖의 RH 산술, 서로 다른 물리량의 나눗셈, 암묵적 숫자 변환은 계속 금지한다.
+상수·동적 0 나눗셈은 기존 진단·tick 거부를 따른다. 기존 나눗셈 bytecode를 사용하며
+GFB/ABI 변경이나 소스 이행은 없다. `tests/relative-humidity-ratio.test.mjs`에서 상수,
+nominal 경계 거부, native/WASM 결과를 검증한다.
+
 ### 2026-09-28 — framed 민간 시간 일정 버그 수정 ([#366](https://github.com/callin2/ghostflow-language/issues/366))
 
 수정 전에는 framed 민간 시간 일정이 거부됐다. 이제 `Daily`와 `DailySlots`는 동일한
