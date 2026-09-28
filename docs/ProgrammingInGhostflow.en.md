@@ -49,6 +49,7 @@ With Node dependencies and native/WASM artifacts built from the same revision, r
 `node --test tests/programming-book-simulation.test.mjs`. Follow [Verification](VERIFICATION.md) for the complete build/verification sequence.
 The compiler check in `tests/docs-runnable-examples.test.mjs` also runs without runtime builds.
 This evidence establishes logical execution; physical device verification is separate.
+Chapter 14 adds E16–E21 temperature/climate sensor programs. Their actual ghostsim scans and independent numerical WASM checks are in `tests/programming-book-simulation.test.mjs` and `tests/programming-climate.test.mjs`.
 
 ## Contents
 
@@ -73,6 +74,7 @@ from its language examples.
 11. [Files and literate programs](#ch11)
 12. [One device, multiple controls](#ch12)
 13. [Built-in functions and operations](#ch13)
+14. [Temperature units and air-VPD control](#ch14)
 
 Appendices: [A. Specification guide](#appendix-a) · [B. Learning through errors](#appendix-b)
 
@@ -1209,6 +1211,276 @@ The following are useful alongside builtins, but are **not callable functions**.
 
 Do not infer support from a name appearing in a diagnostic or design example. Check the compiler path and artifact kind. [Chapter coverage check](../tests/programming-builtins.test.mjs) keeps both languages aligned with the compiler's callable dispatch and verifies documented entries have signatures, context and example links.
 
+<a id="ch14"></a>
+## 14. Temperature units and air-VPD control
+
+### One physical temperature, three source units
+
+A Temperature sensor retains its physical type. Celsius, Fahrenheit and Kelvin are source/display units; the runtime uses canonical kelvin. These three independent heater examples express the same rule: below 18°C turn demand ON; above 22°C turn it OFF. Equality at either threshold and the closed band preserve the previous good decision. Faults inhibit the heater and reset retained hysteresis to initial false; one new good sample is required for these median(1) examples. Missing samples are NotReady; age >= 3s is Stale.
+
+| Physical boundary | Celsius | Fahrenheit | Kelvin |
+|---|---|---|---|
+| Lower heater threshold | 18°C | 64.4°F | 291.15K |
+| Upper heater threshold | 22°C | 71.6°F | 295.15K |
+| Heater valid range | −40–50°C | −40–122°F | 233.15–323.15K |
+
+Literal conversion is exact before binary64 rounding. Do not feed a value such as 64.4 directly to a canonical runtime sample: 64.4°F means 291.15K. Driver bindings identify the supplied unit and quantity. See [physical types](reference/02-types-expressions-state.md) and [hysteresis](#ch13).
+
+### E16 — Celsius heater
+
+```ghost
+// E16
+control CelsiusHeater {
+  sensor air: Temperature {
+    sample = 1s;
+    valid = -40°C .. 50°C;
+    filter = median(1);
+    stale_after = 3s;
+    recover_after = 1 samples;
+  }
+  signal cold = hysteresis(air,
+    on_below: 18°C, off_above: 22°C, initial: false);
+  output heater: Bool;
+  heater <- cold |> recover(false);
+}
+```
+
+### E17 — Fahrenheit heater
+
+```ghost
+// E17
+control FahrenheitHeater {
+  sensor air: Temperature {
+    sample = 1s;
+    valid = -40°F .. 122°F;
+    filter = median(1);
+    stale_after = 3s;
+    recover_after = 1 samples;
+  }
+  signal cold = hysteresis(air,
+    on_below: 64.4°F, off_above: 71.6°F, initial: false);
+  output heater: Bool;
+  heater <- cold |> recover(false);
+}
+```
+
+### E18 — Kelvin heater
+
+```ghost
+// E18
+control KelvinHeater {
+  sensor air: Temperature {
+    sample = 1s;
+    valid = 233.15K .. 323.15K;
+    filter = median(1);
+    stale_after = 3s;
+    recover_after = 1 samples;
+  }
+  signal cold = hysteresis(air,
+    on_below: 291.15K, off_above: 295.15K, initial: false);
+  output heater: Bool;
+  heater <- cold |> recover(false);
+}
+```
+
+### Air VPD from temperature and relative humidity
+
+Air VPD is saturation vapour pressure minus actual air vapour pressure. For simultaneous air temperature T in °C and air relative humidity RH, use `0.6108 * exp(17.27*T/(T+237.3)) * (1-RH/100)` kPa. The saturation relation and relative-humidity definition come from [FAO-56, Chapter 3, equations 10–11](https://www.fao.org/4/x0490e/x0490e07.htm). This is an instantaneous air calculation, not FAO's daily evapotranspiration estimate. Leaf VPD additionally depends on leaf temperature; it is not calculated here.
+
+GhostFlow has no exp builtin. Each complete example authors `exp_0_3_1` as an ordinary pure fn: a fixed 14th-order Taylor polynomial, evaluated in Horner form. The declared air sensor domain is **0–50°C**, so the exponent is **0–3.006**, inside the function's stated 0–3.1 domain. Outside that temperature range the sensor returns Invalid and the formula is not evaluated. Do not extrapolate the approximation. The [independent numerical check](../tests/programming-climate.test.mjs) compares real runtime values with host Math.exp on a 0.1°C grid and humidity boundaries, requiring absolute error <= **0.001 kPa**. It checks all three originals, rather than copying their polynomial into an expected-value implementation.
+
+`(t - 0°C) / 1Δ°C` explicitly obtains a Number in Celsius. `rh / 100%RH` explicitly normalizes typed humidity, using [the RH ratio contract](reference/02-types-expressions-state.md). The final multiplication by `0.6108kPaVPD` preserves VaporPressureDeficit. RelativeHumidity is air humidity, not E10's soil-moisture Percent.
+
+Light is typed **PPFD**, using `umol/m2/s` (µmol·m⁻²·s⁻¹). It counts photosynthetically relevant photons. Lux is illuminance weighted for human vision; there is no universal lux-to-PPFD conversion. Use a verified PPFD sensor/binding. Light **gates output eligibility** and never modifies calculated VPD at fixed T/RH.
+
+### Three independent teaching policies
+
+Thresholds are illustrative source intent, not universal crop recommendations. A humidifier demand is not proof that humidity rises; ventilation depends on outdoor conditions; irrigation demand is not a soil-water estimate or a pump sequence. These examples have no greenhouse physical model. The installation owns actuator binding, suitability and physical effect verification.
+
+| Example | ON | OFF | Light gate |
+|---|---|---|---|
+| E19 humidification demand | VPD > 1.2 kPa | VPD < 1.0 kPa | PPFD >= 200 µmol·m⁻²·s⁻¹ |
+| E20 ventilation demand | VPD < 0.4 kPa | VPD > 0.6 kPa | PPFD >= 200 µmol·m⁻²·s⁻¹ |
+| E21 irrigation demand | VPD > 1.0 kPa | VPD < 0.8 kPa | PPFD >= 300 µmol·m⁻²·s⁻¹ |
+
+A calculated Result is not a declared sensor, so the sensor-only hysteresis constructor cannot consume it. The explicit Bool state below expresses the same strict ON/OFF/dead-band intent. Temperature/RH faults clear demand. Night or light fault inhibits the output while climate demand may remain remembered. Recovery uses current good evidence; no timer or extra automatic mode is introduced. `air_vpd_value = 0` on climate fault is an explicit display placeholder. **Read vpd_valid with it**: false does not mean measured zero VPD. A light fault inhibits the output without invalidating a still-good T/RH calculation.
+
+### E19 — High-VPD humidification demand
+
+```ghost
+// E19
+fn exp_0_3_1(x: Number) -> Number {
+  1 + x / 1 * (1 + x / 2 * (1 + x / 3 * (1 + x / 4 * (1 + x / 5 * (1 + x / 6 * (1 + x / 7 * (1 + x / 8 * (1 + x / 9 * (1 + x / 10 * (1 + x / 11 * (1 + x / 12 * (1 + x / 13 * (1 + x / 14 * (1))))))))))))))
+}
+fn air_vpd(t: Temperature, rh: RelativeHumidity) -> VaporPressureDeficit {
+  0.6108kPaVPD * exp_0_3_1(
+    17.27 * ((t - 0°C) / 1Δ°C) / (((t - 0°C) / 1Δ°C) + 237.3)
+  ) * (1 - rh / 100%RH)
+}
+control HumidificationDemand {
+  sensor air: Temperature {
+    sample = 1s; valid = 0°C .. 50°C;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor humidity: RelativeHumidity {
+    sample = 1s; valid = 0%RH .. 100%RH;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor light: PPFD {
+    sample = 1s; valid = 0umol/m2/s .. 3000umol/m2/s;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  let climate: Result<VaporPressureDeficit, SensorFault> = case air {
+    ok(t) => case humidity {
+      ok(rh) => ok(air_vpd(t, rh));
+      fault(reason) => fault(reason);
+    };
+    fault(reason) => fault(reason);
+  };
+  let daylight = case light {
+    ok(ppfd) => ppfd >= 200umol/m2/s;
+    fault(_) => false;
+  };
+  state demand: Bool = false;
+  demand' = case climate {
+    ok(value) => if value > 1.2kPaVPD then true
+      else if value < 1.0kPaVPD then false else demand;
+    fault(_) => false;
+  };
+  output air_vpd_value: VaporPressureDeficit;
+  output vpd_valid, humidify_demand: Bool;
+  air_vpd_value <- climate |> recover(0kPaVPD);
+  vpd_valid <- case climate { ok(_) => true; fault(_) => false; };
+  humidify_demand <- daylight && demand';
+}
+```
+
+### E20 — Low-VPD ventilation demand
+
+```ghost
+// E20
+fn exp_0_3_1(x: Number) -> Number {
+  1 + x / 1 * (1 + x / 2 * (1 + x / 3 * (1 + x / 4 * (1 + x / 5 * (1 + x / 6 * (1 + x / 7 * (1 + x / 8 * (1 + x / 9 * (1 + x / 10 * (1 + x / 11 * (1 + x / 12 * (1 + x / 13 * (1 + x / 14 * (1))))))))))))))
+}
+fn air_vpd(t: Temperature, rh: RelativeHumidity) -> VaporPressureDeficit {
+  0.6108kPaVPD * exp_0_3_1(
+    17.27 * ((t - 0°C) / 1Δ°C) / (((t - 0°C) / 1Δ°C) + 237.3)
+  ) * (1 - rh / 100%RH)
+}
+control VentilationDemand {
+  sensor air: Temperature {
+    sample = 1s; valid = 0°C .. 50°C;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor humidity: RelativeHumidity {
+    sample = 1s; valid = 0%RH .. 100%RH;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor light: PPFD {
+    sample = 1s; valid = 0umol/m2/s .. 3000umol/m2/s;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  let climate: Result<VaporPressureDeficit, SensorFault> = case air {
+    ok(t) => case humidity {
+      ok(rh) => ok(air_vpd(t, rh));
+      fault(reason) => fault(reason);
+    };
+    fault(reason) => fault(reason);
+  };
+  let daylight = case light {
+    ok(ppfd) => ppfd >= 200umol/m2/s;
+    fault(_) => false;
+  };
+  state demand: Bool = false;
+  demand' = case climate {
+    ok(value) => if value < 0.4kPaVPD then true
+      else if value > 0.6kPaVPD then false else demand;
+    fault(_) => false;
+  };
+  output air_vpd_value: VaporPressureDeficit;
+  output vpd_valid, ventilate_demand: Bool;
+  air_vpd_value <- climate |> recover(0kPaVPD);
+  vpd_valid <- case climate { ok(_) => true; fault(_) => false; };
+  ventilate_demand <- daylight && demand';
+}
+```
+
+### E21 — VPD and light irrigation demand
+
+```ghost
+// E21
+fn exp_0_3_1(x: Number) -> Number {
+  1 + x / 1 * (1 + x / 2 * (1 + x / 3 * (1 + x / 4 * (1 + x / 5 * (1 + x / 6 * (1 + x / 7 * (1 + x / 8 * (1 + x / 9 * (1 + x / 10 * (1 + x / 11 * (1 + x / 12 * (1 + x / 13 * (1 + x / 14 * (1))))))))))))))
+}
+fn air_vpd(t: Temperature, rh: RelativeHumidity) -> VaporPressureDeficit {
+  0.6108kPaVPD * exp_0_3_1(
+    17.27 * ((t - 0°C) / 1Δ°C) / (((t - 0°C) / 1Δ°C) + 237.3)
+  ) * (1 - rh / 100%RH)
+}
+control IrrigationDemand {
+  sensor air: Temperature {
+    sample = 1s; valid = 0°C .. 50°C;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor humidity: RelativeHumidity {
+    sample = 1s; valid = 0%RH .. 100%RH;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor light: PPFD {
+    sample = 1s; valid = 0umol/m2/s .. 3000umol/m2/s;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  let climate: Result<VaporPressureDeficit, SensorFault> = case air {
+    ok(t) => case humidity {
+      ok(rh) => ok(air_vpd(t, rh));
+      fault(reason) => fault(reason);
+    };
+    fault(reason) => fault(reason);
+  };
+  let daylight = case light {
+    ok(ppfd) => ppfd >= 300umol/m2/s;
+    fault(_) => false;
+  };
+  state demand: Bool = false;
+  demand' = case climate {
+    ok(value) => if value > 1.0kPaVPD then true
+      else if value < 0.8kPaVPD then false else demand;
+    fault(_) => false;
+  };
+  output air_vpd_value: VaporPressureDeficit;
+  output vpd_valid, irrigation_demand: Bool;
+  air_vpd_value <- climate |> recover(0kPaVPD);
+  vpd_valid <- case climate { ok(_) => true; fault(_) => false; };
+  irrigation_demand <- daylight && demand';
+}
+```
+
+### Run, observe and change one input
+
+Compile each E16–E21 fence separately as a complete .ghost.md document, as in E15. Run `node --test tests/programming-climate.test.mjs tests/programming-book-simulation.test.mjs` for compiler and actual ghostsim/WASM scans; native/WASM artifacts must have matching build provenance. [Verification](VERIFICATION.md) describes the build prerequisites. The test writes disposable scenario artifacts and never drives hardware.
+
+The online reader defaults to a coordinated **24-hour synthetic daily profile**, using the time-dependent sensor source introduced with E10. Temperature, RH and PPFD vary linearly between the following knots and repeat continuously. Temperature never decreases during 06–18; light is exactly zero during 18–06. This is an illustrative input trajectory, not a greenhouse model or actuator feedback. Each declared sample interval supplies new typed sensor evidence; the actual WASM program computes VPD and control demand.
+
+| Simulated hour | Air °C | RH % | PPFD µmol·m⁻²·s⁻¹ | Observe |
+|---|---|---|---|---|
+| 00 | 18 | 90 | 0 | Initial heater OFF; light-gated demands OFF |
+| 03 | 17 | 92 | 0 | Heater ON |
+| 06 | 16 | 94 | 0 | Sunrise; heater ON |
+| 09 | 22 | 85 | 500 | Low-VPD ventilation ON; heater retains ON at exact 22°C |
+| 12 | 28 | 60 | 1000 | Humidification and irrigation demand ON; heater/ventilation OFF |
+| 15 | 31 | 45 | 650 | High-VPD demands remain ON |
+| 18 | 31 | 60 | 0 | Sunset; light-gated demands OFF |
+| 21 | 23 | 80 | 0 | Night cooling; heater still OFF |
+| 24 | 18 | 90 | 0 | Continuous loop boundary; heater turns ON only below 18°C |
+
+Run each example from simulated 00:00. E16–E21 default to 1000× speed and a 24-hour timing chart; compare 09, 12, 15 and 18. Actual wall-clock throughput depends on the computer. Speed changes simulated time per wall-clock time; it does not change thresholds or the daily profile. Pause freezes simulation time. Heater ON at 09 disappears as temperature rises strictly above 22°C. These are independent programs, so no interlock between heater and ventilation is implied. Unit selection changes entry/display units without changing physical values: 17°C = 62.6°F = 290.15K. E16–E18 must make identical decisions across the day.
+
+Constant-value and manual single-packet modes remain useful for individual boundary experiments. They are optional debugging sources, rather than substitutes for observing changing daily decisions.
+
+For Stale, use single-packet mode or stop sample delivery, then advance simulation time to the declared 3s boundary. Repeated constant-source samples are fresh evidence and should not become stale. To demonstrate Disconnected, choose that sample quality; a newly delivered failure remains a failure. Do not simulate disconnection by repeatedly reusing an old Good packet as if it were fresh.
+
+For the heater, observe 18 → 17 → 18 → 22 → 23°C, then a sensor fault and recovery. For each VPD controller, hold temperature at 25°C, change RH to cross its thresholds, and then change only PPFD. Compare requested/safe demand, air_vpd_value and vpd_valid. Try absent, Invalid, Disconnected and stale samples; each relevant fault must inhibit output immediately. Change T/RH together when checking the numerical relation. Do not interpret logical demand, a successful scan or a virtual actuator as a physically confirmed effect.
+
 <a id="appendix-a"></a>
 ## Appendix A. Specification guide
 
@@ -1332,5 +1604,7 @@ Do not directly compare a sensor as if it were its payload. Use `case` or an exp
 
 <a id="appendix-c"></a>
 ## Appendix C. Document maintenance rules
+
+When a learning scenario requests a time-varying environment, its default source must exercise the relevant ON/OFF decisions over time. Keep independent transition checkpoints in the existing book simulation test; constant valid inputs alone cannot verify that intent. Daily-profile checks complement the existing fault and strict-boundary scans.
 
 The Language Reference is normative. For conflicts or missing examples found in this guide, check the relevant Reference section before correcting them. Syntax/semantic changes update Reference syntax, rules, reasons, and examples, then synchronize this guide's learning path and code. Link implementation boundaries needed for learning to evidence documents; maintain changing progress, test counts, artifact hashes, and supported-board lists there. Reuse `tests/docs-runnable-examples.test.mjs` for compiler checks. After book changes, run `npm run generate:pc01` to refresh derived provenance; preserve historical replay and benchmark evidence.
