@@ -36,6 +36,8 @@ npm run docs:find -- --limit 8 QUERY
 실패할 의미 있는 회귀 검사를 추가하세요. 기존 검사 기준과 저장소 게이트를
 유지하세요. 언어 동작을 바꿀 때는 정본 `.ghost.md` 소스와
 `AGENTS.md`에 설명된 소유권 경계를 지키세요.
+언어 규칙 변경과 실제 언어 동작을 바꾸는 버그 수정은 [개발 작업 흐름](docs/DEVELOPMENT-WORKFLOW.ko.md#언어-규칙-변경-기록)에 따라
+루트 changelog 두 파일에 기록하세요.
 
 ## 코드와 문서를 함께 변경하기
 

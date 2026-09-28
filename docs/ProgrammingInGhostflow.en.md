@@ -6,7 +6,7 @@
 
 Reading, running, and explaining electrical control as code
 
-**User guide · Based on Language Reference syntax dated 2026-09-22**
+**User guide · Language Reference basis · dev reviewed 2026-09-28**
 
 ## This document's role
 
@@ -14,12 +14,41 @@ GhostFlow is a reactive control language describing state changes and device out
 
 If this document differs from the Reference, follow the Reference. These examples demonstrate notation and semantics selected in the current specification. They do not claim completed implementation, runtime availability, or board deployability. Reflect syntax changes in the Reference first, then align this guide's examples.
 
+This review uses dev revision `3982e6bf71cf5880286fcea017cb355ab222428d`. Check subsequent implementation scope in
+[Implementation](IMPLEMENTATION.md) and [feature maturity and executable evidence](REFERENCE-FEATURE-STATUS.md).
+The [Semantic Kernel 0.1 review plan](plans/2026-09-28-semantic-kernel.md) provides background for the frozen minimum semantic contract.
+The whole Reference and this whole book are not included in that stable scope.
+
+The independent controls E01–E10 and E12–E14, and E15's literate document, are checked by the current compiler tests.
+E11 is notation guidance. E08's enum/elapsed, E09's schedule, and E10/E14's sensor/adaptation include
+features outside the frozen core. Compilation does not establish activation of required runtime capabilities
+or physical device behavior. Do not read Chapters 11–12's composition/replacement contracts as completed implementation instructions.
+
 ### How to read
 
 - Each `ghost` example is an independent program. Do not concatenate all examples into one file.
 - An actual program is a complete `.ghost.md` document. Top-level `ghost` fences combine in document order into one control root. Paragraphs and intent explanations remain part of the source document.
 - Outputs here are logical intent. Physical GPIO, relays, and sensor collection belong to bindings and Drivers.
 - Find exact syntax in the [Reference syntax index](reference/07-semantic-rules-and-index.md#75-선언과-표기-찾아보기). See [Language Reference](LANGUAGE-REFERENCE.md#설계-철학) for design philosophy and [Reference Chapter 8](reference/08-language-runtime-and-device-boundaries.md#83-faq-전체-책임표) for responsibilities by layer.
+
+### Example execution verification paths
+
+The [example execution check](../tests/programming-book-simulation.test.mjs) compiles current originals and
+checks state and requested/safe intents using explicit inputs, logical time, and observations.
+E01–E10, E12–E15 and PC-01–PC-10 use public `ghostsim` paths.
+E02/E08 supply config Results and context facts; E09 supplies civil schedule facts;
+E10/E14 and tutorial/03 supply sensor samples and required capabilities.
+Plain input/state examples execute native Rust; examples requiring the corresponding conditioner execute WASM of the same core.
+
+tutorial/04 checks schedule events and sequential outputs through the existing public `ControlRuntime`/`DailySlots` WASM host.
+station-rules compiles a policy with `ghostrules`, binds it, and checks output authorization and Stop in WASM `GhostFlowStation`.
+These two advanced paths are not classified as `ghostsim` CLI execution. E11 is notation guidance; E90–E97 check intended compiler diagnostics.
+Diagrams and composition explanations are not executable source; source-mutation experiments are checked as separate derived candidates.
+
+With Node dependencies and native/WASM artifacts built from the same revision, run
+`node --test tests/programming-book-simulation.test.mjs`. Follow [Verification](VERIFICATION.md) for the complete build/verification sequence.
+The compiler check in `tests/docs-runnable-examples.test.mjs` also runs without runtime builds.
+This evidence establishes logical execution; physical device verification is separate.
 
 ## Contents
 
@@ -114,7 +143,7 @@ to virtual switches/LEDs and device I/O.
 ### Try changing it
 
 Change the connection to `lamp <- !switch_on;`. `!` inverts true and false.
-Before running the code, predict the three output cells in the table above.
+Before running the code, predict the two output cells in the table above.
 
 <a id="ch02"></a>
 ## 2. Names, values, types, and expressions
@@ -135,6 +164,7 @@ Write Korean explanations in `//` comments or literate prose. Identifiers themse
 | Type | Example | Meaning |
 |---|---|---|
 | `Bool` | `true`, `false` | True or false |
+| `Int` | `120`, `-2` | Exact signed 32-bit integer |
 | `Number` | `3`, `0.5`, `-2` | General numeric values, represented internally as f64 |
 | `Percent` | `30%` | Percentage values. Literal/input range is 0–100 |
 | `Duration` | `250ms`, `2s`, `5min`, `1h` | Nonnegative time length with millisecond resolution |
@@ -143,6 +173,9 @@ Write Korean explanations in `//` comments or literate prose. Identifiers themse
 `Percent` and `Number` cannot be compared directly. `Int` is an exact integer for quantities and counts;
 `Number` is approximate numeric data for measurements and similar uses. Exact ranges and conversions follow
 [Reference §2.1–2.3](reference/02-types-expressions-state.md#21-값-종류).
+
+Without an expected numeric type, whole-number literals are `Int`; decimal or exponent literals are `Number`.
+In an already established `Number` context, `3` is interpreted as Number from the start.
 
 `Duration` literals use nonnegative integers with `ms`, `s`, `min`, or `h` units.
 Write half a second as `500ms`. Detailed ranges and operations follow Reference §3.1.
@@ -156,8 +189,6 @@ Counted values, such as fruit quantities or repetition counts, must be exact int
 must be exactly `121`. In contrast, measured real values such as temperature `24.3` can be approximate
 within tolerances defined by the sensor and domain.
 
-`Int` preserves exact values within the signed 32-bit range. Overflow is not hidden through wrapping or saturation.
-
 GhostFlow represents exact counts with signed 32-bit `Int`. Out-of-range values and invalid conversions
 produce diagnostics or explicit runtime faults instead of silently wrapping or rounding.
 Use `Number` for measured real values. See [Reference §2.3](reference/02-types-expressions-state.md#23-정확한-정수-설계) for details.
@@ -165,6 +196,12 @@ Use `Number` for measured real values. See [Reference §2.3](reference/02-types-
 Dates and times use `date`, `time`, and `datetime` tagged literals. DateTime requires
 a time-zone offset. Date/time and monotonic elapsed time have different meanings.
 Follow [Reference §3.1](reference/03-time-and-schedules.md#31-시간값과-시계-영역).
+
+Distinguish values whose units affect control decisions, such as temperature, flow, and voltage, from general `Number`.
+For example, `25°C` for `Temperature`, `5L/min` for `FlowRate`, and `24V` for `Voltage` have fixed physical quantity types and units.
+Allowed units, conversions, and operations follow
+[Reference §2.9](reference/02-types-expressions-state.md#29-물리량과-단위).
+`Rate<Q>` is an expression-only temporal-window type, not a general input/output/state type.
 
 ### E02 — Naming inputs, settings, and calculations separately
 
@@ -175,7 +212,10 @@ Turn on the water-supply output when water level is below the setting.
 control ThresholdControl {
   input level: Percent;
   config threshold: Percent = 30%;
-  let low = level < threshold;
+  let low = case threshold {
+    ok(value) => level < value;
+    fault(_) => false;
+  };
 
   output pump: Bool;
   pump <- low;
@@ -186,9 +226,12 @@ control ThresholdControl {
 and `low` is the calculation comparing them. Changing a default in source creates a new document revision.
 Operational changes can be applied as typed atomic live events only for settings exposed with `access = operator`.
 The metadata contract follows [Reference §5](reference/05-settings-and-observation.md#51-config-선언).
+Reading `config threshold: Percent` yields `Result<Percent, SettingsFault>`.
+Its initial value is `ok(30%)`; later error observations do not automatically recover to the default.
+This example chooses `low=false` on fault. This is not a language-wide fallback or a physical fail-safe guarantee.
 `let` names a calculation; it is not stored memory.
 
-| `level` | `threshold` | `low` / `pump` |
+| `level` | Healthy `threshold` payload | `low` / `pump` |
 |---|---|---|
 | `29%` | `30%` | `true` |
 | `30%` | `30%` | `false` |
@@ -327,7 +370,7 @@ does not turn on because there was no previous low-level event.
 An upper limit true with a lower limit false contradicts the physical order, so output is
 off in `SensorConflict`. The conflict-clearing scan first returns to `Idle`, then normal evaluation resumes.
 Do not mix common stop/protection and fault latch/reset into this water-level concept; combine them in PC-08/PC-10.
-Retain tutorial/03's continuous-sensor median/quality/hysteresis example separately.
+Retain [tutorial/03](../examples/tutorial/03-moisture.ghost.md)'s continuous-sensor median/quality/hysteresis example separately.
 
 ### PC-08 — Changing output ownership between manual and automatic
 
@@ -341,7 +384,8 @@ on conflict, Off, and mode-change scans.
 The shared `request_armed` recognizes a new true as a start event only after first observing
 the selected demand false in a stable mode. Thus, changing modes while running or recovering
 stop/overload permission does not restart with demand already on. Losing demand during Auto
-immediately stops operation. Retain `station-rules.ghost` and tutorial/04
+immediately stops operation. Retain [station-rules.ghost.md](../examples/station-rules.ghost.md) and
+[tutorial/04](../examples/tutorial/04-extra-valves.ghost.md)
 as advanced material on multiple controls and shared-resource arbitration.
 
 This example handles mode conflicts through explicit state and output expressions. Coil closure or pump rotation
@@ -432,8 +476,18 @@ with `let` when multiple transitions need them.
 **Design reason:** Explicit previous and next states preserve the “basis for this evaluation”
 while updating state simultaneously. This distinction grounds timing comparisons and values displayed beside source.
 
+A successful tick calculates candidate next from this tick's input snapshot and previous state, then requested and safe intents,
+and atomically commits state and intent records. A runtime fault in a selected expression rejects the tick without partial updates.
+Output-constraint blocking differs from this evaluation failure and does not cancel the successful tick's state commit.
+
 <a id="ch04"></a>
 ## 4. Output intent and final outputs
+
+“Final outputs” in this chapter means the runtime's **safe intent**. `<-` creates **requested intent**, which constraints restrict.
+**Applied** is evidence of a command applied by a Driver; **confirmed** is separate feedback evidence such as a limit or encoder.
+A true safe intent does not establish relay or pump operation. Read
+[Reference §4.7](reference/04-sensors-constraints-control.md#47-requested-safe-applied-confirmed) and the
+[physical Driver boundary](LLM-TOOLCHAIN-ARCHITECTURE.md#physical-driver-and-device-boundary) together.
 
 ### E05 — Requests to turn on and permitted outputs
 
@@ -558,12 +612,15 @@ control DelayedStart {
   timer age = elapsed(phase);
   output motor: Bool;
 
-  phase' = case phase {
-    Idle => if start then Waiting else Idle;
-    Waiting =>
-      if !start then Idle
-      else if age >= delay then Running else Waiting;
-    Running => if start then Running else Idle;
+  phase' = case delay {
+    ok(value) => case phase {
+      Idle => if start then Waiting else Idle;
+      Waiting =>
+        if !start then Idle
+        else if age >= value then Running else Waiting;
+      Running => if start then Running else Idle;
+    };
+    fault(_) => Idle;
   };
 
   motor <- phase' == Running;
@@ -573,6 +630,11 @@ control DelayedStart {
 `type Phase = ...` defines a type of named finite states.
 `case phase` selects the expression for the current stage to calculate the next stage.
 All cases must be covered, and both `if` results must have the same type.
+
+`delay` is `Result<Duration, SettingsFault>`. Compare time with its payload only in `ok(value)`.
+On a config fault, this example cancels the pending wait and transitions to `Idle`, keeping output intent off.
+A later valid config and `start=true` begin a new wait. `2s` is the initial `ok` payload, not an error fallback.
+This is this example's policy, not a language/Driver default or a physical fail-safe guarantee.
 
 `elapsed(phase)` is **elapsed time since phase's last committed change**.
 The timer resets to zero at the commit point of the tick changing `Idle` to `Waiting`.
@@ -596,8 +658,16 @@ Advance logical time faster than real waiting time. Given identical logical time
 the same evaluation must result regardless of speed.
 
 The boundaries for timer calculation time, DI input sets, and final RO outputs must be shared.
-Simulation Drivers implement them in virtual environments; real-time Drivers do so on ESP32.
+Native and WASM execute expressions, state, timers, and constraints in the same Rust core. The host supplies inputs,
+logical time, and scan opportunities; actual Device I/O Drivers form a separate boundary.
 Concrete frame and Driver APIs are host contracts. Do not add platform branches to this source.
+
+The current CLI simulator provides virtual I/O displaying inputs and requested/safe intents.
+It has no plant model automatically deriving tank levels or sensor values from pump intent.
+An explicitly configured greenhouse-temperature plant model is supported; its virtual application and feedback are not physical device evidence.
+Piped mode advances only at explicit scans; interactive TTY supplies elapsed wall time.
+Schedules, sensors, and certified intervals require the corresponding host capabilities. Follow
+[Authoring and virtual simulation architecture](LLM-TOOLCHAIN-ARCHITECTURE.md#reproduce-the-public-path) for execution paths and reproduction commands.
 
 **Small experiment:** Move the tick after 2999ms to 3500ms. The motor turns on at that tick.
 The timer condition is two seconds, but observation and transition occur at tick times.
@@ -653,8 +723,9 @@ list values of the same type, such as `phase' in {Opening, Watering, Closing}`.
 This source has no queue. Another start event arriving during Watering is not stored.
 Schedule occurrence identity, duplicate suppression, missed handling, and replay evidence follow Reference §3.5. Do not arbitrarily catch up overlaps or omissions from other schedules.
 
-**Small experiment:** If `starts.due=true` is supplied again during Watering, will the end time
-move later? The answer lies in what the Watering branch reads.
+**Reading question:** Does the Watering branch read another start event to change its end time?
+The two selected times here are more than five minutes apart. This is branch reading,
+not an execution scenario injecting a hidden `starts.due` input into the public simulator.
 
 ### Calendar time and natural events
 
@@ -712,8 +783,10 @@ With healthy quality and `enabled=true`, that value leads to a dry decision and 
 
 `ok(value)` names a healthy result. `_` in `fault(_)` means the specific error value
 is unused in this calculation. Even if `false` is chosen as the fallback value, original quality information
-remains in execution records. `ok` and `fault` are current sensor/signal case patterns,
-not a provision of general-purpose Result constructors.
+remains in execution records. Here, `ok` and `fault` are case patterns. The current language also provides
+`ok(...)`/`fault(...)` constructors for built-in `Result<T, E>` with compiler-owned fault types, and static
+`map`, `and_then`, and `recover` transforms. Distinguish these from user-defined error ADTs or general higher-order functions.
+Follow [Reference §2.5](reference/02-types-expressions-state.md#25-sensor-결과와-명시적-오류-흐름).
 
 ### E14 — An optional sensor
 
@@ -912,6 +985,18 @@ Exact extraction rules are in [Reference §1.1](reference/01-source-and-syntax.m
 
 File placement does not replace import relationships. `import` specifies immutable source identity; `instance` and `connect` connect typed logical ports. Review changed originals as new revisions. Imports, instances, bindings, and provenance follow [Reference §6.2–6.7](reference/06-composition-and-replay.md).
 
+Distinguish compiler contract checking of pinned imports, instances, and ports from runtime execution.
+Composition runtime activation is not a completed feature. For a single-control exercise, save the entire document as in E15,
+then check and compile it from the language repository root:
+
+```sh
+node tools/ghostc.mjs --check follow-switch.ghost.md
+node tools/ghostc.mjs follow-switch.ghost.md build/follow-switch.gfb
+```
+
+Node dependencies are required. GFB, manifest, and source map are derived artifacts; `.ghost.md` remains the editable original.
+Do not compile this whole book as one executable document.
+
 <a id="ch12"></a>
 ## 12. One device, multiple controls
 
@@ -1048,4 +1133,4 @@ Do not directly compare a sensor as if it were its payload. Use `case` or an exp
 <a id="appendix-c"></a>
 ## Appendix C. Document maintenance rules
 
-The Language Reference is normative. For conflicts or missing examples found in this guide, check the relevant Reference section before correcting them. Syntax/semantic changes update Reference syntax, rules, reasons, and examples, then synchronize this guide's learning path and code. Do not record implementation status, test counts, hashes, or supported boards in this guide.
+The Language Reference is normative. For conflicts or missing examples found in this guide, check the relevant Reference section before correcting them. Syntax/semantic changes update Reference syntax, rules, reasons, and examples, then synchronize this guide's learning path and code. Link implementation boundaries needed for learning to evidence documents; maintain changing progress, test counts, artifact hashes, and supported-board lists there. Reuse `tests/docs-runnable-examples.test.mjs` for compiler checks. After book changes, run `npm run generate:pc01` to refresh derived provenance; preserve historical replay and benchmark evidence.
