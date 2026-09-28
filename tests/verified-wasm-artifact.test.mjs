@@ -29,6 +29,11 @@ function assertVerifiedWasmWorkflowContract(workflow) {
   assert.match(pushTrigger, /^    branches:\n      - main\n      - dev\n/m,
     'verified WASM push trigger must include main and dev');
 
+  // Scope job contracts before locating step names shared by other CI lanes.
+  const verifyJob = workflow.match(/^  verify:\n([\s\S]*?)(?=^  [\w-]+:\n|(?![\s\S]))/m)?.[1];
+  assert.ok(verifyJob, 'full verified WASM job is required');
+  workflow = verifyJob;
+
   const currentMatrix = workflow.match(/          - label: current\n([\s\S]*?)(?=          - label: frontend-pin)/)?.[1] ?? '';
   assert.match(currentMatrix, /source_sha: .*github\.event_name == 'push' && github\.sha/,
     'current source for push events must be the exact pushed commit SHA');
@@ -168,6 +173,7 @@ test('verified WASM workflow binds full verification to the exact pushed source'
       .replace('Run current-source coverage gate', 'Run source verification')
       .replace('MOVED', 'Run current-source coverage gate')],
     ['verified Node restoration', source => source.replace(/      - name: Restore verified Node\.js for packaging\n[\s\S]*?(?=      - name: Package verified WASM handoff)/, '')],
+    ['verified Node identity', source => source.replace('        id: verified_node\n', '        id: another_node\n')],
     ['restoration condition', source => source.replace(
       "      - name: Restore verified Node.js for packaging\n        if: ${{ matrix.label == 'current' }}",
       "      - name: Restore verified Node.js for packaging\n        if: ${{ success() }}")],

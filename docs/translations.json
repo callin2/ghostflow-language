@@ -33,8 +33,8 @@
       "source": "CONTRIBUTING.md",
       "sourceLanguage": "en",
       "translation": "CONTRIBUTING.ko.md",
-      "sourceSha256": "ce89f389f600525af5e2b8dad4e2fa6ead5d31d36fc4c1f9b3c8c21c29e94ce7",
-      "translationSha256": "b59f7cfc21ad6f81cbafb6d26af289c18dd2a3b9d27b0a394384d1c6ddfe055c"
+      "sourceSha256": "833621081d6514ace98b61fc6aa6047a47b85c7578094660897b38223d4f8c7c",
+      "translationSha256": "cac372008da76c1cc97b1d5c548c5d3ef8df509bda8b33f3c122496487f69d82"
     },
     {
       "source": "docs/2026-09-24-authoring-baseline-provenance.md",
@@ -117,8 +117,8 @@
       "source": "docs/DEVELOPMENT-WORKFLOW.md",
       "sourceLanguage": "en",
       "translation": "docs/DEVELOPMENT-WORKFLOW.ko.md",
-      "sourceSha256": "1f60816aeccf5b2507aff43a53832bf0336b99d54d0bc7a436c05219d44d63ee",
-      "translationSha256": "0d98e1ab50ed9681eee788dd6637588b4586c94ac2746efa3c4c7346e2af4740"
+      "sourceSha256": "83fbae074513859ced03d45226c1de09a4c3f03d868f85b4e6f900166df94db2",
+      "translationSha256": "e6f52212326ea80262ab6f93894d5dc028f98eb9eb1afc0f4a2b78a27a410829"
     },
     {
       "source": "docs/DOCUMENTATION-LANGUAGES.md",
@@ -502,8 +502,8 @@
       "source": "docs/VERIFICATION.md",
       "sourceLanguage": "en",
       "translation": "docs/VERIFICATION.ko.md",
-      "sourceSha256": "91c6831355d81ef5c2ea73ed0e14b3dde47f70cd51e4951c297cae26b53572a8",
-      "translationSha256": "cd16aa9fe033e641b8ddd07e0886342376f6275514554c9fa47b79861974bc33"
+      "sourceSha256": "8ad3c97a02b2be5b40974d245f5170247407d9490b0c77407332db9e6c1c3015",
+      "translationSha256": "e60f1452fe52f46f9e43cef0ecb92930d8b74e57842dfcee05a189194b656b80"
     },
     {
       "source": "docs/WASM-CI-ARTIFACTS.md",

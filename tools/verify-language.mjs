@@ -15,6 +15,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/doc-translations.test.mjs',
   'tests/doc-index.test.mjs',
   'tests/verified-wasm-artifact.test.mjs',
+  'tests/ci-verification-routing.test.mjs',
   'tests/boundary-conformance.test.mjs',
   'tests/compiler.test.mjs',
   'tests/docs-runnable-examples.test.mjs',

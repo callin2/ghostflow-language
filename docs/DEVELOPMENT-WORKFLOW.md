@@ -73,6 +73,28 @@ npm run docs:index
 npm run docs:check
 ```
 
+The always-triggered Verified WASM workflow routes exact diffs under
+[issue #357](https://github.com/callin2/ghostflow-language/issues/357). Only the
+README, CONTRIBUTING and `docs/DOCUMENTATION` English/Korean pairs, `INDEX.md`,
+`docs/INDEX.md` and the four `docs/assets/readme-{hero,intent,replay,trace}.svg`
+files qualify for the lightweight documentation lane. `docs/translations.json`
+also qualifies when only those ordinary document pairs are added, removed or
+have their hashes updated; all other pairs and policy metadata must stay identical.
+Unknown paths, mixed changes, `.ghost.md`, specifications, contracts, verification
+policy and unsafe file modes require full verification. Empty or unresolved diffs
+also require full verification. PRs compare the merge-base with the head; pushes
+compare the exact previous commit with the current commit.
+
+The documentation lane installs Node dependencies without scripts, runs the whole
+`docs:check` gate, doc-index contract regressions and focused routing tests, and produces no WASM artifact. Manual
+workflow dispatch always runs full verification; use it when an exact-SHA artifact
+is needed. The final `Verification result` check requires successful classification
+and the selected lane. Require it green before merging. Branch protection settings
+are unchanged; this check does not create a platform-enforced required-check rule.
+
+Before broadening the lightweight allowlist, inspect existing tests that read the
+proposed paths and retain their applicable assertions in that lane.
+
 `docs:check` is the check-only CI gate. If changing a checker, run its focused
 tests:
 
