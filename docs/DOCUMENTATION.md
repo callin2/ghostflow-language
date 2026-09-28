@@ -11,6 +11,7 @@ evidence and test inputs have explicit exclusions in [the manifest](translations
 |---|---|---|
 | `AGENTS.md` | [English](../AGENTS.md) | [한국어](../AGENTS.ko.md) |
 | `README.md` | [English](../README.md) | [한국어](../README.ko.md) |
+| `CONTRIBUTING.md` | [English](../CONTRIBUTING.md) | [한국어](../CONTRIBUTING.ko.md) |
 | `contracts/integration-v1/README.md` | [English](../contracts/integration-v1/README.md) | [한국어](../contracts/integration-v1/README.ko.md) |
 | `contracts/interaction-v0/README.md` | [English](../contracts/interaction-v0/README.md) | [한국어](../contracts/interaction-v0/README.ko.md) |
 | `contracts/requirements/README.md` | [English](../contracts/requirements/README.md) | [한국어](../contracts/requirements/README.ko.md) |

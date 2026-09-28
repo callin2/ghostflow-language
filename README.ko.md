@@ -134,6 +134,8 @@ GhostFlow는 **1.0 이전** 단계입니다. 참조 문서는 구현된 의미�
 함께 담습니다. 현재 수용 증거는 기능 상태와 [검증 안내](docs/VERIFICATION.ko.md)에서
 확인하세요.
 
+변경을 시작하기 전에 [코딩 에이전트 기여 안내](CONTRIBUTING.ko.md)를 확인하세요.
+
 <details>
 <summary><strong>컴파일러 진입점, 패키지, 집중 검사</strong></summary>
 

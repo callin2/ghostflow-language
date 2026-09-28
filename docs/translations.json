@@ -30,6 +30,13 @@
       "translationSha256": "6c759e16293c9c6f914a0f5c713591582fbbfb6e51ac942915ca11e1ef35c237"
     },
     {
+      "source": "CONTRIBUTING.md",
+      "sourceLanguage": "en",
+      "translation": "CONTRIBUTING.ko.md",
+      "sourceSha256": "ce89f389f600525af5e2b8dad4e2fa6ead5d31d36fc4c1f9b3c8c21c29e94ce7",
+      "translationSha256": "b59f7cfc21ad6f81cbafb6d26af289c18dd2a3b9d27b0a394384d1c6ddfe055c"
+    },
+    {
       "source": "docs/2026-09-24-authoring-baseline-provenance.md",
       "sourceLanguage": "en",
       "translation": "docs/2026-09-24-authoring-baseline-provenance.ko.md",
@@ -124,8 +131,8 @@
       "source": "docs/DOCUMENTATION.md",
       "sourceLanguage": "en",
       "translation": "docs/DOCUMENTATION.ko.md",
-      "sourceSha256": "278239dae1fac7e4a729711b6273689d9e68574cdfdbd37b035bdc0de8c44fc0",
-      "translationSha256": "d979bbbb1a5c2d03c60c9809774c2267234b8f8fcdeec6b06b75459fa4e8e068"
+      "sourceSha256": "cc67fbc0f5f1d349eada884889dd0fe811eb2ff7c50eaeb57dd033c0bec36cf5",
+      "translationSha256": "5ef9946a143b7915a3a44f8fbbe4b572b6817ce4944424a5db7c0fb8e0c91d09"
     },
     {
       "source": "docs/EXACT-INTEGER-CONTRACT.md",
@@ -649,8 +656,8 @@
       "source": "README.md",
       "sourceLanguage": "en",
       "translation": "README.ko.md",
-      "sourceSha256": "8da7880f5f4beb6cc90b67b744c4432f6fd1bf9ae4a0d808f60cd02e4795f956",
-      "translationSha256": "ce11be190304fa3acb40f4256ae5302d51fe90d2458191cb7669d99ed8a4821d"
+      "sourceSha256": "1d7192ab055955f0152f079c830986463ceee2f10813d9b3f20823cad87d6959",
+      "translationSha256": "77dce46e6c6d6dee565b2f125d311f3034fadf042ae07a5e12df388b23b85d8e"
     },
     {
       "source": "runtimes/wasm/README.md",
