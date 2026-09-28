@@ -61,6 +61,67 @@ function artifactMap(compilation) {
   };
 }
 
+test('GF-TEST-require-derivations: lowering retains origins without claiming semantic proof', async () => {
+  const source = `<!-- ghostflow:anchor id=GF-CONSTRAINT kind=premise status=confirmed origin=engineer -->
+Keep the original output constraint.
+
+<!-- ghostflow:anchor id=GF-ASSUMPTION kind=assumption status=unconfirmed origin=ai -->
+This premise remains unconfirmed.
+
+\`\`\`ghost
+control Derivations {
+  input request: Bool;
+  output pump, backup, spare: Bool;
+  pump <- request;
+  backup <- request;
+  spare <- request;
+  // original comment retained
+  // ghostflow:link id=GF-CONSTRAINT relation=constrains
+  // ghostflow:link id=GF-ASSUMPTION relation=assumes
+  require !(pump && backup);
+  require pump => (backup || spare);
+  require pump => backup;
+  require !(pump && backup && spare);
+}
+\`\`\`
+`;
+  const compilation = await compileSource(source, { filename: 'derivations.ghost.md' });
+  const records = compilation.traceMetadata.derivations;
+  assert.equal(records.length, 4);
+  assert.deepEqual(records.map(record => record.target.kind), ['mutex', 'requires-any', 'requires', 'mutex']);
+  for (const record of records) {
+    assert.equal(record.relation, 'lowered-as');
+    assert.equal(record.status, 'compiler-derived');
+    assert.equal(record.semanticVerification, 'not-proven');
+    assert.equal(record.originNodeIds[record.originNodeIds.length - 1], record.nodeId);
+    assert.ok(record.originNodeIds.every(id => compilation.sourceMap.some(node => node.id === id)));
+  }
+  assert.deepEqual(records.map(record => record.originNodeIds.length), [5, 6, 4, 7]);
+  assert.equal(compilation.traceMetadata.intentLinks[0].nodeId, records[0].nodeId);
+  assert.equal(compilation.traceMetadata.intentAnchors[1].status, 'unconfirmed');
+  const map = artifactMap(compilation);
+  assert.deepEqual(restoreArtifactSourceMap(map, compilation.bytes).traceMetadata.derivations, records);
+  for (const mutate of [
+    trace => { delete trace.derivations; },
+    trace => { trace.derivations.pop(); },
+    trace => { trace.derivations.push(clone(trace.derivations[0])); },
+    trace => { trace.derivations[0].originNodeIds.pop(); },
+    trace => { trace.derivations[0].target.names.reverse(); },
+    trace => { trace.derivations[0].semanticVerification = 'proven'; },
+    trace => { trace.derivations[0].relation = 'equivalent'; },
+    trace => { trace.derivations[3].status = 'runtime-evaluated'; },
+  ]) {
+    const candidate = clone(map);
+    mutate(candidate.traceMetadata);
+    assert.throws(() => restoreArtifactSourceMap(candidate, compilation.bytes), /derivation/);
+  }
+  const revised = await compileSource(source.replace('original comment retained', 'revised original comment').replace('Keep the original', 'Preserve the original'), { filename: 'derivations.ghost.md' });
+  assert.equal(revised.sourceDocument.text.includes('revised original comment'), true);
+  assert.notEqual(revised.sourceDocument.sha256, compilation.sourceDocument.sha256);
+  assert.deepEqual(revised.bytes, compilation.bytes);
+  assert.deepEqual(revised.traceMetadata.derivations, records);
+});
+
 test('GF-TEST-intent-anchor: explicit literate anchors bind to compiler nodes without changing execution artifacts', async () => {
   const compilation = await compileSource(document, { filename });
   const baseline = await compileSource(codeOnly, { filename });

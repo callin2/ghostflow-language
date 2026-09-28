@@ -357,6 +357,27 @@ export function buildSourceTrace(ast, constraints, bytes, transitions = [], inte
   });
   const sourceConstraints = ast.body.filter(node => node.kind === 'require' || node.kind === 'mutex');
   if (sourceConstraints.length !== constraints.length) throw new Error('constraint source mapping mismatch');
+  // Record the existing compiler lowering, not a proof of Boolean equivalence.
+  const derivations = sourceConstraints.flatMap((node, index) => {
+    if (node.kind !== 'require') return [];
+    const origins = new Set();
+    const visit = value => {
+      if (!value || typeof value !== 'object') return;
+      if (Number.isInteger(value.id)) origins.add(value.id);
+      for (const child of Object.values(value)) visit(child);
+    };
+    visit(node);
+    const [kind, ...names] = constraints[index];
+    return [{
+      id: `require:${node.id}`, nodeId: node.id,
+      originNodeIds: [...origins].sort((a, b) => a - b),
+      target: { index, kind, names },
+      rule: kind === 'mutex' ? 'require-negated-conjunction-to-mutex-v1'
+        : kind === 'requires-any' ? 'require-disjunction-to-requires-any-v1' : 'require-implication-to-requires-v1',
+      scope: 'same-module-bool-output-constraint', relation: 'lowered-as',
+      status: 'compiler-derived', semanticVerification: 'not-proven',
+    }];
+  });
   return {
     format: 'GhostFlow/source-trace-v1', moduleFingerprint: moduleFingerprint(bytes), bindings,
     dependencies: [...windowDependencies(generatedWindows), ...dependenciesForForms(transitions, intents, generatedTimers, windowSites)],
@@ -366,6 +387,7 @@ export function buildSourceTrace(ast, constraints, bytes, transitions = [], inte
     resultSites: resultSites.map(site => ({
       ...site, source: { ...site.source }, origins: site.origins.map(origin => ({ ...origin })),
     })),
+    ...(derivations.length ? { derivations } : {}),
     ...(windowSites.length ? { windowSites } : {}),
   };
 }
@@ -455,18 +477,24 @@ export function verifySourceTraceMetadata(metadata, bytes, nodes, {
   sourceDocumentSha256, bytecodeSha256, requireRevisionIdentity = false, sourceDocument, extractionMap,
   timerDescriptors, expectedTimerDependencies, expectedResultSites, expectedSignalBindings, expectedSignalDependencies,
   expectedWindowSites, expectedWindowDependencies,
+  expectedDerivations = [],
 } = {}) {
   if (!object(metadata) || metadata.format !== 'GhostFlow/source-trace-v1') {
     throw new Error('source trace metadata format mismatch');
   }
   const allowedMetadataFields = new Set([
     'format', 'moduleFingerprint', 'bindings', 'dependencies', 'constraints', 'resultSites',
-    'windowSites', 'sourceDocumentSha256', 'bytecodeSha256', 'intentAnchors', 'intentLinks',
+    'windowSites', 'sourceDocumentSha256', 'bytecodeSha256', 'intentAnchors', 'intentLinks', 'derivations',
   ]);
   if (Object.keys(metadata).some(field => !allowedMetadataFields.has(field))) {
     throw new Error('source trace metadata fields mismatch');
   }
   if (!(bytes instanceof Uint8Array)) throw new Error('source trace bytes must be a Uint8Array');
+  const derivations = metadata.derivations ?? [];
+  if ((Object.hasOwn(metadata, 'derivations') && (!Array.isArray(derivations) || !derivations.length))
+      || canonicalJson(derivations) !== canonicalJson(expectedDerivations)) {
+    throw new Error('constraint derivations do not match canonical compiler lowering');
+  }
   if (metadata.moduleFingerprint !== moduleFingerprint(bytes)) {
     throw new Error('source trace module fingerprint mismatch');
   }

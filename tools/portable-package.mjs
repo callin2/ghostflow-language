@@ -789,11 +789,13 @@ export async function verifyPortablePackage(packageValue, options = {}) {
       let expectedSignalDependencies;
       let expectedWindowSites;
       let expectedWindowDependencies;
+      let expectedDerivations;
       {
         if (continuousTimerNames.size) expectedTimerDependencies = replay.traceMetadata.dependencies.filter(entry => (
           entry.target.field === 'timerValue' && continuousTimerNames.has(entry.target.name)
         ));
         const mappedTrace = remapSourceTrace(replay.traceMetadata, extraction.sourceMap);
+        expectedDerivations = mappedTrace.derivations ?? [];
         expectedResultSites = mappedTrace.resultSites;
         expectedSignalBindings = mappedTrace.bindings.filter(entry => entry.kind === 'signal');
         const signalStates = new Set(expectedSignalBindings.map(entry => entry.name));
@@ -815,6 +817,7 @@ export async function verifyPortablePackage(packageValue, options = {}) {
         expectedSignalDependencies,
         expectedWindowSites,
         expectedWindowDependencies,
+        expectedDerivations,
       });
     }
   } catch (error) {

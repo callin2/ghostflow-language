@@ -155,6 +155,45 @@ Diagnostics identify the original filename, line, and column and cover:
 Acceptance is compiler/source-map evidence only. It is not frontend navigation,
 firmware integration, GPIO output, relay movement, or physical load evidence.
 
+## Compiler constraint derivations (#31, bounded acceptance)
+
+The compiler adds optional `traceMetadata.derivations` for every authored `require`.
+These records describe current constraint lowering. They do not change source,
+manifest, bytecode or runtime behavior. Authored `mutex` has no derivation record.
+
+Each record contains:
+
+- `id`: `require:<nodeId>`, identifying the authored require in this revision.
+- `nodeId` and sorted `originNodeIds`: the require and every original expression
+  node, including operators and output references removed or flattened by lowering.
+  These IDs join the unchanged source map and intent links. Source text and anchor
+  classification remain authoritative; an assumption remains unconfirmed.
+- `target`: compiled constraint `index`, `kind` and ordered `names`.
+- `rule`: `require-implication-to-requires-v1`,
+  `require-disjunction-to-requires-any-v1`, or
+  `require-negated-conjunction-to-mutex-v1`.
+- `scope`: `same-module-bool-output-constraint`; `relation`: `lowered-as`;
+  `status`: `compiler-derived`; `semanticVerification`: `not-proven`.
+
+The existing document SHA-256 and bytecode SHA-256 bind these records to exact
+source and compiled revisions. Source-map recovery and portable-package validation
+rederive and compare the complete records through canonical compiler replay.
+Missing, extra or altered records and unsupported proof/status claims are rejected.
+Replay establishes compiler consistency, never semantic equivalence or runtime
+evaluation, inferred satisfaction, output blocking or physical evidence.
+
+In particular, `require !(a && b && c)` currently lowers to `mutex(a,b,c)`.
+Ordinary Boolean not-all and at-most-one differ when exactly two outputs are true.
+This record must therefore remain `not-proven`, even after successful replay.
+The two-output case and flattened disjunction exercise provenance retention; this
+change does not decide or change the three-output language behavior.
+
+#31's existing anchor acceptance and current lowering provenance are covered.
+Its additional eliminated-check/replacement-guarantee and merged-node proof
+acceptance remains open under #42. A future pass must supply independently
+validated semantic evidence before claiming a verified replacement relation.
+This metadata is not a CSE engine, SMT solver or proof framework.
+
 ## Deliberate non-goals
 
 - Natural-language interpretation, tacit-premise discovery, confirmation UI,

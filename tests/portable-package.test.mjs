@@ -178,6 +178,28 @@ control IntentPackage {
   await expectsCode(() => verifyPortablePackage(candidate, verifierOptions(current)), 'source-map-mismatch');
 });
 
+test('GF-TEST-portable-package-derivations: signed records cannot lose origins or assert semantic proof', async () => {
+  const { compilation, current, packageValue } = await fixture();
+  assert.equal(compilation.traceMetadata.derivations.length, 1);
+  const verified = await verifyPortablePackage(packageValue, verifierOptions(current));
+  assert.deepEqual(verified.sourceMap.traceMetadata.derivations, compilation.traceMetadata.derivations);
+  for (const mutate of [
+    trace => { delete trace.derivations; },
+    trace => { trace.derivations[0].originNodeIds.pop(); },
+    trace => { trace.derivations[0].semanticVerification = 'proven'; },
+    trace => { trace.derivations[0].rule = 'unverified-optimizer-proof'; },
+  ]) {
+    const candidate = clone(packageValue);
+    const map = JSON.parse(Buffer.from(candidate.payload.sourceMap.contentBase64, 'base64').toString('utf8'));
+    mutate(map.traceMetadata);
+    const mapBytes = encoder.encode(canonicalJson(map));
+    candidate.payload.sourceMap.contentBase64 = base64(mapBytes);
+    candidate.payload.sourceMap.sha256 = await digestHex(mapBytes);
+    await resign(candidate, current);
+    await expectsCode(() => verifyPortablePackage(candidate, verifierOptions(current)), 'source-map-mismatch');
+  }
+});
+
 test('GF-TEST-portable-package-trust: key rotation accepts a new active signer and rejects a solely revoked signer', async () => {
   const { compilation, current } = await fixture();
   const next = await nextKeyPromise;
