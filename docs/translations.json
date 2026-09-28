@@ -327,8 +327,8 @@
       "source": "docs/reference/07-semantic-rules-and-index.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/07-semantic-rules-and-index.en.md",
-      "sourceSha256": "c3d2fa6f9a5d583fd73ff3c7951a2d8fdbccc6ab3158d39a055160a2ac3d4f4d",
-      "translationSha256": "fc5fd3e8cd3fedcaa761f8e67b20838ddf6bd779d89c809e49039cfeaf60869a"
+      "sourceSha256": "97bf0399f5d58be12f4b34ba4f4ef71e6117720f4d364c2bf39a0f16f09a5976",
+      "translationSha256": "15e30c72439d3ad43d73be473fc29c99b337c2c05035137754a846776be71b16"
     },
     {
       "source": "docs/reference/08-language-runtime-and-device-boundaries.md",
