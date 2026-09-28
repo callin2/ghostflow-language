@@ -1,5 +1,7 @@
 # GhostFlow language ownership
 
+Use the [development workflow](docs/DEVELOPMENT-WORKFLOW.md) for bounded search, delegated execution and evidence reuse. Find document paths and titles with `npm run docs:find -- --limit 8 QUERY`. After one documentation edit batch, run `npm run docs:index`, then `npm run docs:check`.
+
 Read [Language Reference](docs/LANGUAGE-REFERENCE.md) before language,
 runtime, settings or Interaction IR work. Use it as the shared ground truth for
 language philosophy, syntax, semantics, and feature rationale. Keep implementation

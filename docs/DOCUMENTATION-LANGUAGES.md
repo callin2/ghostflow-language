@@ -1,5 +1,7 @@
 # Documentation languages
 
+The [development workflow](DEVELOPMENT-WORKFLOW.md) unifies discovery and verification. `npm run docs:find -- --limit 8 QUERY` checks freshness without writes and searches repository Markdown/HTML paths and titles. After each completed edit batch, `npm run docs:index` regenerates `docs/INDEX.md` then root `INDEX.md`. `npm run docs:check` combines translation validation, pinned index-tool provenance and both index freshness checks before heavy builds.
+
 This policy records the user's 2026-09-28 request for English and Korean
 versions of every document except reports. Tracking: [#344](https://github.com/callin2/ghostflow-language/issues/344).
 

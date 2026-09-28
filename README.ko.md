@@ -3,6 +3,8 @@
 
 # ghostflow-language
 
+[개발 작업 흐름](docs/DEVELOPMENT-WORKFLOW.ko.md)을 따르세요. `npm run docs:find -- --limit 8 QUERY`로 문서를 찾으세요. 문서 편집 묶음이 끝나면 `npm run docs:index`와 `npm run docs:check`를 실행하세요.
+
 GhostFlow 언어 컴파일러 및 이식 가능한 실행 플랫폼입니다. JavaScript가 파싱, 형식 검사, 하향 변환을 담당합니다. Rust는 검증된 바이트코드 실행, 신호 처리, 스테이션 중재를 담당합니다. 네이티브와 WASM 테스트는 동일한 Rust 코어를 사용합니다.
 
 언어 철학, 문법, 의미, 기능의 근거를 공유하는 기준인 [언어 참조](docs/LANGUAGE-REFERENCE.md)부터 시작하세요. 현재 소유권, 성숙도, 실행 증거는 [참조 기능 상태](docs/REFERENCE-FEATURE-STATUS.md)를 확인하세요. 참조 문서는 의미를 정의하고, 상태 문서는 수용 증거를 기록합니다.
