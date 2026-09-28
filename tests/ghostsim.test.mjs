@@ -4,11 +4,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { encode, decode } from '@toon-format/toon';
 import { compileSource, writeArtifact } from '../tools/toolchain.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 
-const root = path.resolve(new URL('..', import.meta.url).pathname);
+const root = fileURLToPath(new URL('..', import.meta.url));
 const cli = path.join(root, 'tools/ghostsim.mjs');
 
 test('ghostsim preserves NotReady for a sensor without supplied samples', async () => {
@@ -264,6 +265,81 @@ test('ghostsim exposes requested and constrained safe values as separate virtual
     const scan = JSON.parse(result.stdout).scans[0];
     assert.equal(scan.requestedVirtualIntent.pump, true);
     assert.equal(scan.safeVirtualIntent.pump, false);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('REF-08-017 [tooling] 같은 Program, 입력, 논리 시간, 설정 event, 시작 상태에는 장치·UI 종류와 무관하게 같은 제어 판단이 나와야 한다.', async () => {
+  const referenceCases = JSON.parse(fs.readFileSync(
+    path.join(root, 'tests/reference/cases/03-settings-boundaries.json'), 'utf8')).cases;
+  const ref08017 = referenceCases.find(entry => entry.id === 'REF-08-017');
+  const chapter = fs.readFileSync(
+    path.join(root, 'docs/reference/08-language-runtime-and-device-boundaries.md'), 'utf8');
+  assert.equal(ref08017?.issue, 'https://github.com/callin2/ghostflow-language/issues/334');
+  assert.match(ref08017.rule, /같은 Program, 입력, 논리 시간, 설정 event, 시작 상태/);
+  assert.match(ref08017.given, /두 host가 다른 Driver와 renderer/);
+  assert.match(ref08017.then, /state와 requested\/safe intent가 같고/);
+  assert.match(ref08017.then, /applied\/confirmed 및 표시 계층/);
+  assert.match(chapter, /동일한 Program, 입력·논리 시간·설정 event와 시작 상태/);
+  assert.match(chapter, /같은 제어 판단을 설명할 수 있어야 한다/);
+  assert.match(chapter, /장치나 UI의 종류가 그 판단에 숨은 차이를 만들면/);
+
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostsim-replay-boundary-'));
+  const artifact = path.join(directory, 'replay-boundary.gfb');
+  const source = `\`\`\`ghost
+control ReplayBoundary {
+  input enabled: Bool;
+  state latched: Bool = false;
+  latched' = latched || enabled;
+  output pump, permit: Bool;
+  pump <- enabled || latched;
+  permit <- false;
+  require pump => permit;
+}
+\`\`\`
+`;
+  try {
+    writeArtifact(await compileSource(source, { filename: 'replay-boundary.ghost.md' }), artifact);
+    const scenario = {
+      format: 'GhostFlow/scenario-v1', id: 'same-logical-record',
+      initialInputs: [{ name: 'enabled', type: 'Bool', value: true }],
+      keyBindings: [], actions: [{ kind: 'scan', atMs: 0 }, { kind: 'scan', atMs: 1000 }],
+    };
+    const hostA = { driver: 'relay-gpio-v1', renderer: 'desktop-slider', applied: { pump: 'queued' } };
+    const hostB = { driver: 'modbus-v2', renderer: 'touch-dial', confirmed: { pump: 'unknown' } };
+    assert.notDeepEqual(hostA, hostB);
+
+    const resultA = run(artifact, scenario);
+    const resultB = run(artifact, structuredClone(scenario));
+    assert.equal(resultA.status, 0, resultA.stderr);
+    assert.equal(resultB.status, 0, resultB.stderr);
+    const replayA = JSON.parse(resultA.stdout);
+    const replayB = JSON.parse(resultB.stdout);
+    const logicalTrace = replay => replay.scans.map(scan => ({
+      stateAfter: scan.stateAfter,
+      requestedVirtualIntent: scan.requestedVirtualIntent,
+      safeVirtualIntent: scan.safeVirtualIntent,
+    }));
+    assert.deepEqual(logicalTrace(replayA), logicalTrace(replayB));
+    assert.deepEqual(logicalTrace(replayA), [
+      {
+        stateAfter: { latched: true },
+        requestedVirtualIntent: { pump: true, permit: false },
+        safeVirtualIntent: { pump: false, permit: false },
+      },
+      {
+        stateAfter: { latched: true },
+        requestedVirtualIntent: { pump: true, permit: false },
+        safeVirtualIntent: { pump: false, permit: false },
+      },
+    ]);
+    for (const scan of replayA.scans) {
+      assert.equal('applied' in scan, false);
+      assert.equal('confirmed' in scan, false);
+      assert.equal('renderer' in scan, false);
+      assert.equal('driver' in scan, false);
+    }
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }
