@@ -3635,6 +3635,7 @@ function arithmeticRule(op, left, right, loc) {
   if (!isNumeric(left) || !isNumeric(right)) error(loc, `${op} requires numeric operands`);
   if (isQuantityType(left.kind) || isQuantityType(right.kind)) {
     const result = kind => ({ type: semanticType(kind) });
+    if (op === '/' && left.kind === 'RelativeHumidity' && right.kind === 'RelativeHumidity') return result('Number');
     if (op === '-' && left.kind === 'Temperature' && right.kind === 'Temperature') return result('TemperatureDelta');
     if ((op === '+' || op === '-') && left.kind === 'Temperature' && right.kind === 'TemperatureDelta') return result('Temperature');
     if ((op === '+' || op === '-') && sameType(left, right) && LINEAR_QUANTITIES.has(left.kind)) return result(left.kind);

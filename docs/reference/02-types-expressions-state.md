@@ -490,7 +490,8 @@ ties-to-even 반올림을 한 번만 한다. 같은 물리량의 다른 unit은 
   나눌 수 있다. 같은 타입의 나눗셈 결과는 `Number`다.
 - `Temperature - Temperature`는 `TemperatureDelta`, `Temperature + TemperatureDelta`와
   `Temperature - TemperatureDelta`는 `Temperature`다. 두 절대 온도를 더할 수 없다.
-- `RelativeHumidity`, `CO2Concentration`, `Acidity`는 같은 타입끼리 비교만 한다.
+- `RelativeHumidity`는 같은 타입끼리 비교하고 명시적 `RelativeHumidity / RelativeHumidity -> Number`를 사용한다. 예를 들어 `60%RH / 100%RH`는 `0.6`이다. 그 밖의 산술과 암묵적 숫자 변환은 금지한다. 0으로 나누면 기존 상수 진단 또는 동적 tick 거부를 따른다. 정규화가 센서 품질을 지우지는 않는다.
+- `CO2Concentration`, `Acidity`는 같은 타입끼리 비교만 한다.
 - `FlowRate * Duration`은 `Volume`, `Volume / Duration`은 `FlowRate`,
   `Power * Duration`은 `Energy`, `Energy / Duration`은 `Power`,
   `Voltage * ElectricalCurrent`는 `Power`다. 곱셈은 두 operand 순서 모두 허용한다.

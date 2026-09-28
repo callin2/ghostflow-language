@@ -292,8 +292,8 @@
       "source": "docs/reference/02-types-expressions-state.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/02-types-expressions-state.en.md",
-      "sourceSha256": "bf8baf9bdaba410b8e1c9252f1088c852cb9c322aad4955b04b689973504fc70",
-      "translationSha256": "175515e153fb06d8ce77c059ae3b234a37a7471f490d29958cc9c37a00f9a808"
+      "sourceSha256": "a748546d34ff5d3c612393463edfb65c919ba80134f527444a6568860274fc35",
+      "translationSha256": "568e5c6eba69f05992addc0a9e682bf3a2da795eefd6679801c17a60715f1277"
     },
     {
       "source": "docs/reference/03-time-and-schedules.md",
@@ -313,8 +313,8 @@
       "source": "docs/reference/05-settings-and-observation.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/05-settings-and-observation.en.md",
-      "sourceSha256": "3d05ee001c5ac94dcb88600ebc1db0bd078a7373626bf6468b3f04d1930a86e4",
-      "translationSha256": "851dd8b8cccf950fd059747cce699a0f90d0b25af82eceb609437fd31f3c20ad"
+      "sourceSha256": "cf1ba40154722315c43a79168d60a9bfb537a71aced24c40fe1d6862d0a54fd3",
+      "translationSha256": "a76274c49719a028f9307364f20015056baa905aa1fdbb9c18542d0fc46518c0"
     },
     {
       "source": "docs/reference/06-composition-and-replay.md",
@@ -516,8 +516,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "77cc38f6689d276f01e31fb017b3e61ba56b003ddd9b8891a82080141865967e",
-      "translationSha256": "2cf27daf8d02f1c08ce769bd301338ea886a1390eeff931e27d02ac58e74f16e"
+      "sourceSha256": "1d81f0694495dcba579b0fdbe4ede73ef319a977c4f1cffd1ff4c1d0054afd77",
+      "translationSha256": "05e49c48e6ff80a85fc634403f593dbe9161c4ae9be15befffc42214a6f5ea6f"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",
