@@ -129,9 +129,13 @@ fault를 숨기는 effective value로 제공하지 않는다.
 | 운영 설정 event | settings revision과 effective event position | 같은 소스·Program·run에서 유효값 변경 |
 
 소스 편집은 원문 Markdown을 수정한다. prose, 주석, fence, 줄바꿈과 원본 byte를 보존한
-새 문서 revision이어야 하며, 설정 overlay로 위장하지 않는다. 반대로 운영 설정은
-소스 리터럴을 바꾸거나 재컴파일하지 않는다. 이 구분은 “5분을 10분으로 바꿔 줘”가
-영구 기본값 수정인지 이번 운전 설정인지 검토 가능하게 한다.
+새 문서 revision이어야 하며, 설정 overlay로 위장하지 않는다. 의도 anchor, 확인된
+전제, 미확인 assumption, source-map provenance도 새 revision에서 다시 검증한다.
+반대로 운영 설정은 소스 리터럴을 바꾸거나 재컴파일하지 않는다. API/Web/FSD
+consumer는 영구 기본값 수정이면 새 `.ghost.md` 후보를 제출하고, 같은 Program을
+운전 중 조정하려면 typed settings event를 제출한다. 삭제된 source-candidate helper를
+암묵 fallback으로 되살리거나 활성 consumer 경로로 남기지 않는다. 이 구분은 “5분을
+10분으로 바꿔 줘”가 영구 기본값 수정인지 이번 운전 설정인지 검토 가능하게 한다.
 
 ### 설정 stream과 현재 observation
 

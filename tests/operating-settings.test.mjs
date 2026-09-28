@@ -45,14 +45,69 @@ test('ordinary Duration consumer reads the current Result in the same artifact',
   const artifact = await compileSource(source, { filename: 'settings-effect.ghost.md' });
   const runtime = await ControlRuntime.instantiate(wasm(), artifact, activation);
   try {
-    const fingerprint = runtime.contextSnapshot().state.programFingerprint;
+    const initial = runtime.contextSnapshot();
+    const fingerprint = initial.state.programFingerprint;
     assert.equal(runtime.step({ nowMs: 0, contextFacts: facts(0) }).vm.safe.duration_ms, 300_000);
     const edited = { programFingerprint: fingerprint, eventId: 'duration-10m', baseRevision: 0,
       position: 2, origin: 'operatorEdit', changes: [{ configId: artifact.manifest.configs[0].id,
         result: { ok: true, type: 'Duration', value: 600_000 } }] };
     assert.equal(runtime.step({ nowMs: 1, contextFacts: facts(1, edited) }).vm.safe.duration_ms, 600_000);
+    const afterEdit = runtime.contextSnapshot().state;
     assert.equal(artifact.manifest.configs[0].value, 300_000);
-    assert.equal(runtime.contextSnapshot().state.settingsRevision, 1);
+    assert.equal(afterEdit.programFingerprint, fingerprint);
+    assert.equal(afterEdit.runId, initial.state.runId);
+    assert.equal(afterEdit.settingsRevision, 1);
+  } finally { runtime.dispose(); }
+});
+
+test('editing a source default is a new source and Program candidate, not a live settings event', async () => {
+  const source = defaultValue => `<!-- ghostflow:anchor id=GF-INT-SETTINGS-BOUNDARY kind=intent status=confirmed origin=user -->
+Tune watering duration deliberately.
+
+<!-- ghostflow:anchor id=GF-ASSUME-SETTINGS-BOUNDARY kind=assumption status=unconfirmed origin=ai -->
+The author must review whether a duration request is permanent or operational.
+
+\`\`\`ghost
+control SettingsBoundary {
+  // ghostflow:link id=GF-INT-SETTINGS-BOUNDARY relation=implements
+  config duration: Duration = ${defaultValue} { min = 1min; max = 20min; step = 1min; access = operator; }
+  output duration_ms: Duration;
+  duration_ms <- case duration { ok(value) => value; fault(_) => 0ms; };
+}
+\`\`\`
+`;
+  const defaultFive = await compileSource(source('5min'), { filename: 'settings-boundary.ghost.md' });
+  const defaultTen = await compileSource(source('10min'), { filename: 'settings-boundary.ghost.md' });
+  assert.notEqual(defaultTen.sourceDocument.sha256, defaultFive.sourceDocument.sha256);
+  assert.notEqual(defaultTen.manifest.bytecodeSha256, defaultFive.manifest.bytecodeSha256);
+  assert.equal(defaultFive.manifest.configs[0].value, 300_000);
+  assert.equal(defaultTen.manifest.configs[0].value, 600_000);
+  assert.deepEqual(defaultTen.traceMetadata.intentAnchors.map(anchor => ({ kind: anchor.kind, status: anchor.status })), [
+    { kind: 'intent', status: 'confirmed' },
+    { kind: 'assumption', status: 'unconfirmed' },
+  ]);
+
+  const runtime = await ControlRuntime.instantiate(wasm(), defaultFive, activation);
+  try {
+    const initial = runtime.contextSnapshot().state;
+    runtime.step({ nowMs: 0, contextFacts: facts(0, {
+      programFingerprint: initial.programFingerprint,
+      eventId: 'duration-10m-live',
+      baseRevision: 0,
+      position: 1,
+      origin: 'operatorEdit',
+      changes: [{
+        configId: defaultFive.manifest.configs[0].id,
+        result: { ok: true, type: 'Duration', value: 600_000 },
+      }],
+    }) });
+    const afterLiveEdit = runtime.contextSnapshot().state;
+    assert.equal(afterLiveEdit.programFingerprint, initial.programFingerprint);
+    assert.equal(afterLiveEdit.runId, initial.runId);
+    assert.equal(afterLiveEdit.settingsRevision, 1);
+    assert.equal(defaultFive.manifest.bytecodeSha256, runtime.manifest.bytecodeSha256);
+    assert.equal(defaultFive.manifest.configs[0].value, 300_000);
+    assert.deepEqual(afterLiveEdit.settings[0].result, { ok: true, value: 600_000 });
   } finally { runtime.dispose(); }
 });
 

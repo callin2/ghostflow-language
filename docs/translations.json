@@ -313,8 +313,8 @@
       "source": "docs/reference/05-settings-and-observation.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/05-settings-and-observation.en.md",
-      "sourceSha256": "a5afcc48a57ff4cd7a59e80150bff76e18129be392b109a7aefdc05993b4f7c7",
-      "translationSha256": "4e2b1c4cdcd0fd65c91a36dfd56c2df9cfd9d99021c8ef363963a3db468537fa"
+      "sourceSha256": "3d05ee001c5ac94dcb88600ebc1db0bd078a7373626bf6468b3f04d1930a86e4",
+      "translationSha256": "851dd8b8cccf950fd059747cce699a0f90d0b25af82eceb609437fd31f3c20ad"
     },
     {
       "source": "docs/reference/06-composition-and-replay.md",
