@@ -39,6 +39,22 @@ unrequested cleanup out of scope.
 | Documentation addition | Confirm audience and canonical location. Add matching English/Korean documents, translation links and source markers, and manifest/catalog entries. | `npm run docs:check`; run any focused example or requirement-catalog check that applies. |
 | Documentation update | Edit both language versions and update affected manifest/catalog metadata. Keep the canonical original authoritative, match executable examples across translations and preserve historical records. For authorized source or semantic changes, edit the canonical original first, then regenerate affected derived outputs and run appropriate checks. Translation-only work leaves program code unchanged. | `npm run docs:check`; run focused example or requirement-catalog checks when affected. |
 
+### Language-rule changelog
+
+Any change to accepted syntax, types, evaluation, state, time, output or
+constraint meaning or semantic-error behavior; or a bug fix that changes observable
+language behavior must add an entry to root `CHANGELOG.md` and `CHANGELOG.ko.md`
+in the same PR. Create this pair with an `Unreleased` / `미출시` section on the
+first such change; do not invent historical changes or release versions. Record the
+date, affected rule/reference section, concise before→after behavior and reason,
+compatibility or migration impact when applicable, a minimal example and
+regression evidence, and the issue/PR link. Label a fix restoring documented
+behavior as a bug fix, not a new specification decision. Update affected
+Reference sections, examples, English/Korean docs and tests together, and
+preserve prior entries. Language-rule/profile, GFB/ABI and package versions are
+distinct. Typo, translation or layout edits alone need no semantic entry. When
+the pair is created, follow the normal documentation index/check policy.
+
 ## 3. Assign a complete bounded handoff
 
 Use the cheapest capable worker: Luna for mechanical work, Sol for substantive

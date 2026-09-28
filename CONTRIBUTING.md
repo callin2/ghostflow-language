@@ -37,6 +37,9 @@ For a bug, capture a failing reproduction before changing code. Add a meaningful
 regression check that would fail without the fix. Keep the existing test oracle
 and repository gates intact. For language behavior, preserve the canonical
 `.ghost.md` source and the ownership boundaries described in `AGENTS.md`.
+Record language-rule changes and bug fixes that change observable language
+behavior in both root changelog files as described in the
+[development workflow](docs/DEVELOPMENT-WORKFLOW.md#language-rule-changelog).
 
 ## Change and document together
 

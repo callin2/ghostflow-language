@@ -2,13 +2,23 @@
 
 전기 제어를 코드로 읽고, 실행하고, 설명하기
 
-**사용 안내서 · Language Reference 2026-09-22 문법 기준**
+**사용 안내서 · Language Reference 기준 · 2026-09-28 dev 검토**
 
 ## 이 문서의 역할
 
 GhostFlow는 센서와 사용자 입력으로부터 상태 변화와 장치 출력 의도를 기술하는 반응형 제어 언어다. 이 문서는 처음 프로그램을 읽고 쓰는 학습 경로다. 언어의 규범 문법·타입·평가·시간 계약은 [Language Reference](LANGUAGE-REFERENCE.md)와 각 장의 상세 문서가 기준이다. 코딩 상황별 답은 [GhostFlow Coding FAQ](language_faq.md)를 참조한다.
 
 Reference와 이 문서가 다르면 Reference를 따른다. 이 문서의 예제는 현재 명세에서 선택된 표기와 의미를 보여 준다. 구현 완료 여부, 런타임 가용성, 보드 배포 가능성을 주장하지 않는다. 변경된 문법은 Reference에 먼저 반영하고 이 사용 안내서의 예제를 맞춘다.
+
+이번 검토 기준은 dev revision `3982e6bf71cf5880286fcea017cb355ab222428d`다. 이후 구현 범위는
+[Implementation](IMPLEMENTATION.md)과 [기능별 성숙도·실행 근거](REFERENCE-FEATURE-STATUS.md)에서 확인한다.
+[Semantic Kernel 0.1 검토 계획](plans/2026-09-28-semantic-kernel.ko.md)은 동결된 최소 의미 계약의 배경이다.
+Reference 전체 또는 이 책 전체가 그 안정 범위에 포함되는 것은 아니다.
+
+E01–E10, E12–E14의 독립 control과 E15의 literate 문서는 현재 compiler 검사 대상이다.
+E11은 표기 안내다. E08의 enum·elapsed, E09의 일정, E10/E14의 센서·적응은
+동결 core 밖의 기능을 포함한다. 컴파일 성공은 필요한 runtime capability의 활성화나
+물리 장치 동작을 증명하지 않는다. 11–12장의 합성·교체 계약은 구현 완료 지침으로 읽지 않는다.
 
 ### 읽는 방법
 
@@ -111,7 +121,7 @@ NC에서 raw 접점이 반대로 보이는 것은 입력 정규화의 문제다.
 ### 바꾸어 보기
 
 연결식을 `lamp <- !switch_on;`으로 바꾸자. `!`는 참과 거짓을 뒤집는다.
-코드를 실행하기 전에 위 표의 출력 세 칸을 먼저 예측해 보자.
+코드를 실행하기 전에 위 표의 출력 두 칸을 먼저 예측해 보자.
 
 
 <a id="ch02"></a>
@@ -133,6 +143,7 @@ NC에서 raw 접점이 반대로 보이는 것은 입력 정규화의 문제다.
 | 타입 | 예 | 읽는 의미 |
 |---|---|---|
 | `Bool` | `true`, `false` | 참 또는 거짓 |
+| `Int` | `120`, `-2` | signed 32-bit 정확한 정수 |
 | `Number` | `3`, `0.5`, `-2` | 일반 수치, 내부 표현은 f64 |
 | `Percent` | `30%` | 백분율 값. 리터럴·입력 범위는 0~100 |
 | `Duration` | `250ms`, `2s`, `5min`, `1h` | 밀리초 해상도의 비음수 시간 길이 |
@@ -141,6 +152,9 @@ NC에서 raw 접점이 반대로 보이는 것은 입력 정규화의 문제다.
 `Percent`와 `Number`를 그대로 비교할 수 없다. `Int`는 개수·횟수 같은 정확한 정수고,
 `Number`는 측정 등에 쓰는 근사 수치다. 정확한 범위와 변환은
 [Reference §2.1–2.3](reference/02-types-expressions-state.md#21-값-종류)을 따른다.
+
+기대하는 수치 타입이 없는 정수 모양 리터럴은 `Int`이고, 소수점·지수 리터럴은
+`Number`다. 이미 `Number`로 정해진 문맥의 `3`은 처음부터 Number로 해석한다.
 
 `Duration` literal은 음수가 아닌 정수와 `ms`, `s`, `min`, `h` 단위를 사용한다.
 반 초는 `500ms`로 쓴다. 자세한 범위와 연산은 Reference §3.1을 따른다.
@@ -154,8 +168,6 @@ NC에서 raw 접점이 반대로 보이는 것은 입력 정규화의 문제다.
 정확히 `121`이어야 한다. 반면 온도 `24.3` 같은 측정 실수는 센서와 도메인이 정한
 허용 오차 안의 근삿값으로 다룰 수 있다.
 
-`Int`는 signed 32-bit 범위에서 정확한 값을 보존한다. overflow는 wrap이나 saturation으로 숨기지 않는다.
-
 GhostFlow는 signed 32-bit `Int`로 정확한 계수를 표현한다. 범위 초과와 잘못된
 변환은 조용히 wrap하거나 반올림하지 않고 진단 또는 명시적 runtime fault로 처리한다.
 측정 실수는 `Number`를 사용한다. 자세한 규칙은 [Reference §2.3](reference/02-types-expressions-state.md#23-정확한-정수-설계)에서 확인한다.
@@ -163,6 +175,12 @@ GhostFlow는 signed 32-bit `Int`로 정확한 계수를 표현한다. 범위 초
 날짜와 시각은 `date`, `time`, `datetime` tagged literal로 쓴다. DateTime에는
 시간대 offset이 필요하다. 날짜시각과 단조 경과시간은 서로 다른 의미다.
 [Reference §3.1](reference/03-time-and-schedules.md#31-시간값과-시계-영역)을 따른다.
+
+온도·유량·전압처럼 단위가 판단을 바꾸는 값은 일반 `Number`와 구분한다.
+예를 들어 `Temperature`의 `25°C`, `FlowRate`의 `5L/min`, `Voltage`의 `24V`는
+고정된 물리량 타입과 단위를 가진다. 허용 단위·변환·연산은
+[Reference §2.9](reference/02-types-expressions-state.md#29-물리량과-단위)를 따른다.
+`Rate<Q>`는 시간창 계산의 식 전용 타입이며 일반 input/output/state 타입이 아니다.
 
 ### E02 — 입력, 설정, 계산에 각각 이름 붙이기
 
@@ -173,7 +191,10 @@ GhostFlow는 signed 32-bit `Int`로 정확한 계수를 표현한다. 범위 초
 control ThresholdControl {
   input level: Percent;
   config threshold: Percent = 30%;
-  let low = level < threshold;
+  let low = case threshold {
+    ok(value) => level < value;
+    fault(_) => false;
+  };
 
   output pump: Bool;
   pump <- low;
@@ -184,9 +205,12 @@ control ThresholdControl {
 `low`는 두 값을 비교한 계산이다. 기본값을 소스에서 바꾸면 새 문서 revision이 된다.
 운영 중 변경은 `access = operator`로 공개한 설정에 한해 typed atomic live event로
 적용할 수 있다. 메타데이터 계약은 [Reference §5](reference/05-settings-and-observation.md#51-config-선언)를 따른다.
+`config threshold: Percent`의 읽기 타입은 `Result<Percent, SettingsFault>`다.
+최초 값은 `ok(30%)`이며 이후 오류 observation이 생기면 기본값으로 자동 복구하지 않는다.
+이 예제는 fault에서 `low=false`를 선택한다. 언어의 공통 fallback이나 물리 fail-safe 보장은 아니다.
 `let`은 저장해 두는 메모리가 아니라 계산에 붙인 이름이다.
 
-| `level` | `threshold` | `low` / `pump` |
+| `level` | `threshold`의 정상 payload | `low` / `pump` |
 |---|---|---|
 | `29%` | `30%` | `true` |
 | `30%` | `30%` | `false` |
@@ -341,7 +365,8 @@ PC-03의 수동 시작·자기유지와 PC-07의 자동 수요를 하나의 펌�
 공통 `request_armed`는 안정된 모드에서 선택된 요구가 거짓인 것을 먼저 관찰한 뒤에만
 새 참을 시작 사건으로 인정한다. 따라서 운전 중 모드를 바꾸거나 정지·과부하 허가가
 복구되어도 이미 켜져 있던 요구로 재기동하지 않는다. Auto 운전 중 수요가 사라지면
-즉시 정지한다. 기존 `station-rules.ghost`와 tutorial/04는 복수 control·공유 자원
+즉시 정지한다. 기존 [station-rules.ghost.md](../examples/station-rules.ghost.md)와
+[tutorial/04](../examples/tutorial/04-extra-valves.ghost.md)는 복수 control·공유 자원
 중재라는 심화 범위로 그대로 보존한다.
 
 이 예제는 모드 충돌을 명시적인 상태와 출력 식으로 다룬다. 코일 폐쇄나 펌프 회전은
@@ -434,9 +459,20 @@ control TwoStates {
 **설계 이유:** 이전 상태와 다음 상태를 명시하면 “이번 판단의 근거”를 보존하면서
 상태를 동시에 갱신할 수 있다. 이 구분이 타이밍 비교와 소스 옆 값 표시의 기준이 된다.
 
+성공한 tick은 이번 입력 snapshot과 이전 state에서 candidate next를 계산하고, requested intent와
+safe intent를 계산한 뒤 상태와 intent 기록을 원자적으로 확정한다. 선택된 식의 runtime
+fault는 부분 갱신 없이 tick을 거부한다. 출력 제약의 차단은 이 평가 실패와 다르며,
+성공한 tick의 상태 확정을 취소하지 않는다.
+
 
 <a id="ch04"></a>
 ## 4. 출력 의도와 최종 출력
+
+이 장의 «최종 출력»은 runtime의 **safe intent**다. `<-`는 **requested intent**를 만들고,
+제약은 이를 제한한다. **applied**는 Driver가 적용한 command의 근거이고,
+**confirmed**는 limit·encoder 같은 별도 feedback의 근거다. safe가 참이어도 실제 릴레이나
+펌프가 동작했다고 말할 수 없다. [Reference §4.7](reference/04-sensors-constraints-control.md#47-requested-safe-applied-confirmed)과
+[물리 Driver 경계](LLM-TOOLCHAIN-ARCHITECTURE.md#physical-driver-and-device-boundary)를 함께 읽는다.
 
 ### E05 — 켜 달라는 요청과 허용되는 출력
 
@@ -563,12 +599,15 @@ control DelayedStart {
   timer age = elapsed(phase);
   output motor: Bool;
 
-  phase' = case phase {
-    Idle => if start then Waiting else Idle;
-    Waiting =>
-      if !start then Idle
-      else if age >= delay then Running else Waiting;
-    Running => if start then Running else Idle;
+  phase' = case delay {
+    ok(value) => case phase {
+      Idle => if start then Waiting else Idle;
+      Waiting =>
+        if !start then Idle
+        else if age >= value then Running else Waiting;
+      Running => if start then Running else Idle;
+    };
+    fault(_) => Idle;
   };
 
   motor <- phase' == Running;
@@ -578,6 +617,12 @@ control DelayedStart {
 `type Phase = ...`는 이름 있는 유한 상태들의 타입이다.
 `case phase`는 현재 단계에 해당하는 식을 골라 다음 단계를 계산한다.
 모든 경우를 적어야 하며 `if`의 두 결과는 같은 타입이어야 한다.
+
+`delay`는 `Result<Duration, SettingsFault>`다. `ok(value)`에서만 그 payload로 시간을 비교한다.
+이 예제는 config fault 때 대기를 취소하고 `Idle`로 전이해 출력 intent를 끈다.
+이후 유효한 config와 `start=true`를 읽으면 새 대기를 시작한다. `2s`는 최초 `ok`의
+payload이며 오류 fallback이 아니다. 이 선택은 이 예제의 정책이고 언어·Driver의
+기본 정책이나 물리 fail-safe 보장이 아니다.
 
 `elapsed(phase)`는 **phase가 마지막으로 확정 변경된 이후의 경과 시간**이다.
 `Idle`에서 `Waiting`으로 바뀐 tick의 확정 시점에 타이머가 0으로 재설정된다.
@@ -601,8 +646,15 @@ control DelayedStart {
 같다면 배속에 상관없이 같은 판단이 나와야 한다.
 
 타이머 계산에 필요한 시각, DI 입력 묶음, 최종 RO 출력의 경계는 공통이어야 한다.
-가상 환경에서는 시뮬레이션 Driver가, ESP32에서는 실시간 Driver가 그 경계를 구현한다.
+native와 WASM은 같은 Rust core에서 식·상태·타이머·제약을 실행한다. 호스트는 입력과
+논리 시각·scan 기회를 공급하며, Device의 실제 I/O Driver는 별도 경계다.
 프레임과 Driver의 구체 API는 호스트 계약이며 이 소스에 플랫폼 분기를 넣지 않는다.
+
+현재 CLI 시뮬레이터는 입력과 requested/safe intent를 보여 주는 가상 I/O다.
+펌프 intent로 탱크 수위나 센서값을 자동 생성하는 plant model은 없다.
+piped mode는 명시한 scan에서만 진행하고, interactive TTY는 실제 경과시간을 공급한다.
+일정·센서·인증 interval은 해당 호스트 capability가 필요하다. 실행 경로와 재현 명령은
+[Authoring and virtual simulation architecture](LLM-TOOLCHAIN-ARCHITECTURE.md#reproduce-the-public-path)를 따른다.
 
 **작은 실험:** 2999ms 다음 tick을 3500ms로 옮겨 보자. 모터는 그 tick에서 켜진다.
 타이머 조건은 2초지만 관찰과 전이는 tick 시점에서 이루어진다.
@@ -719,8 +771,10 @@ control MoistureControl {
 
 `ok(value)`는 정상 결과에 이름을 붙인다. `fault(_)`의 `_`는 여기서 오류의 구체 값을
 계산에 사용하지 않는다는 뜻이다. 대체값을 `false`로 선택해도 원래의 품질 정보는
-실행 기록에 남는다. `ok`와 `fault`는 현재 센서·신호 case의 패턴이고 범용 Result
-생성자를 제공한다는 뜻은 아니다.
+실행 기록에 남는다. 여기서 `ok`와 `fault`는 case 패턴이다. 현재 언어에는
+compiler-owned fault 타입을 가진 내장 `Result<T, E>`의 `ok(...)`·`fault(...)` 생성자와
+정적 `map`·`and_then`·`recover` 변환도 있다. 사용자 정의 오류 ADT나 일반 고차 함수와는
+구분한다. [Reference §2.5](reference/02-types-expressions-state.md#25-sensor-결과와-명시적-오류-흐름)를 따른다.
 
 ### E14 — 선택적인 센서
 
@@ -922,6 +976,18 @@ control LiterateSwitch {
 
 파일 배치는 import 관계를 대신하지 않는다. `import`는 immutable source identity를 지정하고, `instance`와 `connect`는 typed logical port를 연결한다. 변경된 원본은 새 revision으로 검토한다. import·instance·binding과 provenance는 [Reference §6.2–6.7](reference/06-composition-and-replay.md)을 따른다.
 
+현재 pinned import·instance·port는 compiler의 계약 검사와 runtime 실행을 구분해야 한다.
+합성 runtime 활성화는 완료된 기능으로 취급하지 않는다. 단일 control 실습은 E15처럼
+전체 문서를 저장한 뒤 language repository root에서 다음 명령으로 검사·컴파일한다.
+
+```sh
+node tools/ghostc.mjs --check follow-switch.ghost.md
+node tools/ghostc.mjs follow-switch.ghost.md build/follow-switch.gfb
+```
+
+Node dependencies가 필요하다. 결과 GFB와 manifest·source map은 파생 산출물이고,
+편집 원본은 `.ghost.md`다. 이 책 전체를 하나의 실행 문서로 컴파일하지 않는다.
+
 <a id="ch12"></a>
 ## 12. 하나의 장치, 여러 control
 
@@ -1058,4 +1124,4 @@ sensor를 payload처럼 바로 비교하지 않는다. `case` 또는 Reference �
 <a id="appendix-c"></a>
 ## 부록 C. 문서 유지 규칙
 
-Language Reference는 규범 기준이다. 이 사용 안내서에서 발견한 상충이나 빠진 예는 해당 Reference 절을 먼저 확인한 뒤 고친다. 문법·의미 변경은 Reference의 문법, 규칙, 이유와 예제를 갱신하고 여기서 학습 경로와 코드를 동기화한다. 구현 상태·테스트 수·해시·지원 보드는 이 사용 안내서에 기록하지 않는다.
+Language Reference는 규범 기준이다. 이 사용 안내서에서 발견한 상충이나 빠진 예는 해당 Reference 절을 먼저 확인한 뒤 고친다. 문법·의미 변경은 Reference의 문법, 규칙, 이유와 예제를 갱신하고 여기서 학습 경로와 코드를 동기화한다. 학습에 필요한 구현 경계는 근거 문서에 연결하고, 변동하는 진행률·테스트 수·산출물 해시·지원 보드 목록은 그 문서에서 관리한다. 예제 compiler 검사는 `tests/docs-runnable-examples.test.mjs`를 재사용한다. 책 변경 뒤 `npm run generate:pc01`로 파생 출처를 갱신하며 과거 replay·benchmark 근거는 고치지 않는다.
