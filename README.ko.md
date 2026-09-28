@@ -76,8 +76,12 @@ flowchart TB
     driver --> world
   end
   intent --> driver
+  classDef default fill:#f1f6f5,stroke:#6d858b,color:#102b35
   classDef accent fill:#e2f7f0,stroke:#168574,color:#102b35
   class source,intent accent
+  style language fill:#f8faf9,stroke:#8ba1a5,color:#102b35
+  style external fill:#f8faf9,stroke:#8ba1a5,color:#102b35
+  linkStyle default stroke:#526d76,color:#102b35
 ```
 
 언어는 요청 의도와 안전 의도를 계산합니다. 호스트와 드라이버가 물리적 효과를
