@@ -1,53 +1,100 @@
-# ghostflow-language
+<p align="center">
+  <img src="docs/assets/readme-hero.svg" alt="GhostFlow" width="840">
+</p>
 
-Follow the [development workflow](docs/DEVELOPMENT-WORKFLOW.md). Use `npm run docs:find -- --limit 8 QUERY` for document discovery. After a documentation edit batch, run `npm run docs:index` and `npm run docs:check`.
+<div align="center">
 
-[English / 한국어 documentation](docs/DOCUMENTATION.md) · [한국어 README](README.ko.md)
+# Control that stays true to intent.
 
-GhostFlow's language compiler and portable execution platform. JavaScript owns
-parsing, type checking and lowering; Rust owns verified bytecode execution,
-signals and station arbitration. Native and WASM tests share that Rust core.
+</div>
 
-Start with the [Language Reference](docs/LANGUAGE-REFERENCE.en.md), the shared
-ground truth for language philosophy, syntax, semantics, and the reasons behind
-its features.
-See the [Reference feature status](docs/REFERENCE-FEATURE-STATUS.md) for current
-ownership, maturity and executable evidence. The Reference defines semantics;
-the status view records acceptance evidence.
+<p align="center">A control language that brings human intent, executable rules, and explainable decisions into one readable source.</p>
 
-For task-oriented examples, see the [GhostFlow Coding FAQ](docs/language_faq.en.md).
-The `.ghost.md` files under `examples/` are the canonical compilable documents.
-The adjacent `.ghost` files are historical, non-executable evidence.
-Keep runnable FAQ and programming examples compilable; the focused
-`tests/docs-runnable-examples.test.mjs` check runs in the compiler and host gates.
+**English** · [한국어](README.ko.md)
 
-```text
-.ghost.md → compileSource → .gfb + manifest + source map
-                                         ↓
-                         native / WASM portable Rust core
+<p align="center">
+  <a href="https://github.com/callin2/ghostflow-language/actions/workflows/verified-wasm.yml"><img src="https://github.com/callin2/ghostflow-language/actions/workflows/verified-wasm.yml/badge.svg?branch=main" alt="Verified WASM — main"></a>
+  · <a href="LICENSE">MIT License</a>
+</p>
+
+## Our vision
+
+People who understand a process should be able to describe how it ought to work,
+check its behavior, and understand why it acted. From a watering system to wider
+automation, our vision is to keep that understanding present throughout the life
+of the control program.
+
+GhostFlow starts with a human-readable **`.ghost.md` document**. Intent,
+explanation, and executable rules live together. Compiled code, diagrams, and
+traces are derived views of that source. AI may help write a candidate document.
+The compiler validates the program; the runtime executes it **without an LLM**.
+
+<table>
+  <tr>
+    <td width="33%" valign="top">
+      <img src="docs/assets/readme-intent.svg" width="40" height="40" alt=""><br>
+      <strong>Intent preserved</strong><br>
+      Read the reason beside the rule. Keep confirmed intent distinct from assumptions.
+    </td>
+    <td width="33%" valign="top">
+      <img src="docs/assets/readme-replay.svg" width="40" height="40" alt=""><br>
+      <strong>Decisions replayable</strong><br>
+      Revisit a decision with the same inputs, previous state, effective settings, and time.
+    </td>
+    <td width="33%" valign="top">
+      <img src="docs/assets/readme-trace.svg" width="40" height="40" alt=""><br>
+      <strong>Reasons traceable</strong><br>
+      Follow source maps and execution evidence back to the document and its revision.
+    </td>
+  </tr>
+</table>
+
+**See the idea in source:** [a start/stop latch](examples/tutorial/01-latch.ghost.md)
+puts a familiar control rule in a literate document.
+[The language philosophy](docs/LANGUAGE-REFERENCE.en.md#design-philosophy)
+explains the design behind it.
+
+## One source. One execution core.
+
+JavaScript parses, type-checks, and lowers the canonical document. The same
+portable Rust core executes the compiled GFB on native and WASM targets.
+
+```mermaid
+flowchart TB
+  source["Human intent + executable rules<br>Canonical .ghost.md"]
+  subgraph language["GhostFlow language · this repository"]
+    compiler["JavaScript compiler<br>Parse · type-check · lower"]
+    artifacts["GFB + manifest + source map<br>Source / revision identity"]
+    core["Same portable Rust core<br>Native · WASM"]
+    intent["Requested intent → safe intent"]
+    compiler --> artifacts --> core --> intent
+  end
+  source --> compiler
+  conditions["Inputs · previous state<br>Effective settings · time"] --> core
+  subgraph external["External ownership · host / Device"]
+    driver["Host / driver<br>Bindings · output application"]
+    world["Physical world<br>Applied / confirmed evidence"]
+    driver --> world
+  end
+  intent --> driver
+  classDef accent fill:#e2f7f0,stroke:#168574,color:#102b35
+  class source,intent accent
 ```
 
-`tools/browser-toolchain.mjs` is the public browser/Worker compiler entry. It
-accepts the same complete canonical `.ghost.md` document and immutable source
-identity as the Node entry, but has no Node I/O dependency. `tools/toolchain.mjs`
-is the Node wrapper and artifact read/write boundary.
+The language computes requested and safe intents. The host and driver apply
+physical effects. **An intent is not confirmation that a relay moved.** Replay
+checks virtual decisions; physical confirmation needs separate device evidence.
 
-Product deployment wraps the `.ghost.md` result with
-`tools/portable-package.mjs`: one signed package preserves the exact source, GFB,
-manifest, source map and host-compatibility identity. Browser and Device
-consumers use the same verifier contract before passing recovered GFB bytes to
-their WASM or native loader. See [Portable GFB package v1](docs/PORTABLE-PACKAGE.md).
+The API owns LLM authoring, installation context, source storage, and deployment
+orchestration. The frontend owns interaction and visualization. Device firmware
+owns board mappings and physical I/O. These modules build and release separately.
+See [implementation boundaries](docs/IMPLEMENTATION.md) and
+[the toolchain architecture](docs/LLM-TOOLCHAIN-ARCHITECTURE.md).
 
-This repository contains `tools/` compiler/CLI/tutorial code,
-`crates/ghostflow-core`, `runtimes/wasm`, the reference Node ledger adapter,
-selected `tests/`, language `docs/`, and virtual `examples/`. Existing relative
-imports and semantics are preserved by the migration export.
+## Try it locally
 
-## Local verification
-
-Use Node.js 22 or newer with npm, and a Rust toolchain supporting Cargo lockfile
-v4 with `rustfmt` and `wasm32-unknown-unknown`. The retained tutorial expects a
-POSIX native runner path; use macOS or Linux. Setup may download dependencies:
+Use **Node.js 22+**, npm, and Rust with Cargo lockfile v4 support. The retained
+tutorial runs on macOS or Linux. Setup may download dependencies.
 
 ```sh
 npm ci --ignore-scripts
@@ -56,46 +103,62 @@ rustup target add wasm32-unknown-unknown
 npm test
 ```
 
-`npm test` runs host checks only and writes `build/verification.json` plus a unique
-run record. It generates `build/irrigation.gfb` before Rust tests, because one
-existing unit test embeds that fixture. Cargo gates use `--locked --offline` and
-a local `target/`; both Rust crates currently have only workspace dependencies.
-
-For a modern source example:
+Then compile and run the watering example:
 
 ```sh
 npm run compile:example
 npm run tutorial
 ```
 
-`npm run test:compiler` checks compiler/literate/constraints behavior without a
-WASM build. `npm run test:node` runs the explicit language Node suite against an
-already built WASM artifact and records a separate partial report; it does not
-replace the full host gate. See [the tutorial](docs/TUTORIAL.md).
+`npm test` verifies the host toolchain and writes `build/verification.json` plus
+a unique run record. It generates the Rust fixture before testing, then builds
+the native/WASM runners. Cargo gates use `--locked --offline` and local `target/`.
+Host results do not establish physical I/O behavior.
 
-## Source, generated artifacts and consumers
+## Learn & explore
 
-Authoritative logic is GhostFlow source. GFB1 is generated binary code, and
-`GhostFlow/control-v1` is the generated host manifest format. Standalone
-`constraints` sources compile to `GhostFlow/constraints-v1`. JSON encoding alone
-does not make deployment, site metadata or conversation records a control program.
+| Start here | What you will find |
+| --- | --- |
+| [Language Reference](docs/LANGUAGE-REFERENCE.en.md) | Philosophy, syntax, semantics, and feature rationale |
+| [Tutorial](docs/TUTORIAL.md) · [canonical examples](examples/) | Control rules you can read and run |
+| [Coding FAQ](docs/language_faq.en.md) | Task-oriented programming guidance |
+| [Reference feature status](docs/REFERENCE-FEATURE-STATUS.md) | Current maturity, ownership, and executable evidence |
+| [English / 한국어 documentation](docs/DOCUMENTATION.md) | The bilingual document catalog |
 
-The API project supplies installation facts to its LLM and invokes this compiler
-on the resulting complete source. The Device project consumes a pinned core and
-artifact bundle, validates its supported features, and owns I/O. The frontend
-project presents the farmer experience. API and firmware are released separately;
-host tests here do not establish farmer intent quality or GPIO behavior.
+## Current scope & contributing
 
-Release/bundle consumers must identify exact source/bytecode/manifest hashes,
-compiler/core revision, and supported profile/ABI. `contracts/integration-v1` and
-`tools/integration-contract.mjs` carry the integration team's pure identity/evidence
-checks and fictional fixture; they do not execute a deployment or change compiler
-formats. Run them alone with `npm run test:contract`. See
-[implementation boundaries](docs/IMPLEMENTATION.md),
-[verification](docs/VERIFICATION.md), and [ownership](AGENTS.md).
+GhostFlow is **pre-1.0**. The reference includes implemented semantics and future
+design. Use the feature status and [verification guide](docs/VERIFICATION.md) to
+check what has acceptance evidence today.
 
-This project is licensed under the [MIT License](LICENSE).
+<details>
+<summary><strong>Compiler entry points, packages, and focused checks</strong></summary>
 
-No prior `build/` results, POC, firmware, live model connector, site installation,
-or private chat archive is carried into this export. Run the host gate in this
-checkout to produce its own evidence.
+- `tools/browser-toolchain.mjs` exposes the compiler for browsers/Workers without
+  Node I/O. `tools/toolchain.mjs` wraps the same compiler for Node artifact I/O.
+  Both accept the complete canonical `.ghost.md` document and immutable source identity.
+- `tools/portable-package.mjs` produces a signed package preserving source, GFB,
+  manifest, source map, and host-compatibility identity. Browser and Device
+  consumers share the verifier contract. See [Portable GFB package v1](docs/PORTABLE-PACKAGE.md).
+- `crates/ghostflow-core` owns execution, signals, and station arbitration.
+  `runtimes/wasm` and `runtimes/node/ledger.mjs` are reference host adapters.
+  Generated artifacts are projections. Historical adjacent `.ghost` files are
+  non-executable evidence, not supported source inputs.
+- `npm run test:compiler` checks compiler behavior without building WASM.
+  `npm run test:node` uses an already-built WASM artifact and records partial host
+  evidence. `npm run test:contract` checks integration identity/evidence contracts.
+  Partial checks do not replace `npm test`.
+- Release consumers preserve exact source/bytecode/manifest hashes, compiler/core
+  revision, and supported profile/ABI. This checkout carries no prior build
+  evidence, firmware, live model connector, site data, or private chat archive.
+
+</details>
+
+Follow the [development workflow](docs/DEVELOPMENT-WORKFLOW.md) and
+[repository ownership rules](AGENTS.md). Keep English and Korean documentation
+together. Existing automation checks translation freshness, executable-fence
+parity, and document indexes: run `npm run docs:index`, then `npm run docs:check`
+after a documentation batch. Runnable FAQ and programming samples are also
+checked by `tests/docs-runnable-examples.test.mjs` in the compiler and host gates.
+
+Released under the [MIT License](LICENSE).
