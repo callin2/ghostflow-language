@@ -2903,6 +2903,47 @@
       ]
     },
     {
+      "id": "reference-faq-coverage",
+      "family": "Reference FAQ responsibility table coverage",
+      "clause": {
+        "path": "docs/reference/08-language-runtime-and-device-boundaries.md",
+        "heading": "8.3 FAQ 전체 책임표"
+      },
+      "owner": "PRODUCT_BOUNDARY",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [
+        "compile"
+      ],
+      "evidence": [
+        {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/reference-faq-coverage.test.mjs",
+              "testId": "REF-08-005: FAQ responsibility table covers every FAQ 1 through 41 exactly by links and ranges",
+              "caseId": "REF-08-005",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "The oracle verifies FAQ table coverage and range expansion; it does not prove each row's prose assigns the correct downstream owner implementation."
+      ],
+      "issues": [
+        322
+      ],
+      "referenceCaseIds": [
+        "REF-08-005"
+      ]
+    },
+    {
       "id": "host-boundary",
       "family": "Host scheduling, persistence and simulation",
       "clause": {
