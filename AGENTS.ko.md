@@ -7,6 +7,10 @@
 
 언어, 런타임, 설정 또는 Interaction IR 작업 전 [언어 참조](docs/LANGUAGE-REFERENCE.md)를 읽으세요. 언어 철학, 문법, 의미, 기능의 근거에 대한 공통 기준으로 사용하세요. 참조 문서에는 구현 상태와 진행 보고를 넣지 마세요. 언어 의미를 바꾸면 관련 절과 근거를 함께 갱신하세요.
 
+언어 규칙 변경과 실제 언어 동작을 바꾸는 버그 수정은 같은 PR에서 루트
+`CHANGELOG.md` 및 `CHANGELOG.ko.md`에 기록하세요. 자세한 절차는
+[언어 규칙 변경 기록](docs/DEVELOPMENT-WORKFLOW.ko.md#언어-규칙-변경-기록)을 따르세요.
+
 GhostFlow 제어/출력 수명 주기, 시뮬레이터 동작, Device 출력 실패 정책을 판단하기 전에 [참조 §4.7](docs/reference/04-sensors-constraints-control.md#47-requested-safe-applied-confirmed)과 [물리 순서](docs/LLM-TOOLCHAIN-ARCHITECTURE.md#physical-driver-and-device-boundary)를 읽으세요. 명령 결과 수명 주기와 요청, 안전, 적용, 확인된 출력 증거를 구별하세요. 정책이 없는지 또는 물리 동작이 검증되었는지 주장하기 전에 검토 대상인 실제 `farm-device` 펌웨어 리비전을 확인하세요.
 
 이 저장소는 GhostFlow 문법, 파싱, 형식 검사, 하향 변환, GFB1 인코딩, 이식 가능한 Rust VM/신호/스테이션 엔진, WASM ABI, 참조 호스트 어댑터와 적합성 테스트를 소유합니다. 실행 의미가 바뀌는 컴파일러 및 런타임 변경은 함께 관리하세요.

@@ -54,7 +54,8 @@ function requireTyped(input, location) {
   requireName(input.name, `${location}.name`);
   const valid = input.type === 'Bool' ? typeof input.value === 'boolean'
     : input.type === 'Int' ? Number.isInteger(input.value) && input.value >= -2147483648 && input.value <= 2147483647
-      : input.type === 'Number' ? typeof input.value === 'number' && Number.isFinite(input.value) : false;
+      : input.type === 'Number' ? typeof input.value === 'number' && Number.isFinite(input.value)
+        : input.type === 'Percent' ? typeof input.value === 'number' && Number.isFinite(input.value) && input.value >= 0 && input.value <= 100 : false;
   if (!valid) throw new Error(`${location}: invalid ${input.type} value`);
 }
 

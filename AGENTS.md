@@ -8,6 +8,10 @@ language philosophy, syntax, semantics, and feature rationale. Keep implementati
 status and progress reports out of the reference. Update its relevant section
 and rationale when changing language semantics.
 
+Record every language-rule change and bug fix that changes observable language
+behavior in root `CHANGELOG.md` and `CHANGELOG.ko.md` in the same PR. Follow the
+[language-rule changelog procedure](docs/DEVELOPMENT-WORKFLOW.md#language-rule-changelog).
+
 Before judging GhostFlow control/output lifecycle, simulator behavior, or Device
 output-failure policy, read [Reference §4.7](docs/reference/04-sensors-constraints-control.md#47-requested-safe-applied-confirmed)
 and the [physical sequence](docs/LLM-TOOLCHAIN-ARCHITECTURE.md#physical-driver-and-device-boundary).
