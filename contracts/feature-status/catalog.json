@@ -2826,6 +2826,16 @@
                 "positive",
                 "negative"
               ]
+            },
+            {
+              "path": "tests/reference-index-links.test.mjs",
+              "testId": "REF-07-010: source-to-Reference index links design rationale to exact Reference locations only",
+              "caseId": "REF-07-010",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "negative"
+              ]
             }
           ]
         }
@@ -2834,10 +2844,12 @@
         "The oracle verifies Reference index structure and status-marker consistency; it does not prove every linked target's full prose semantics."
       ],
       "issues": [
-        315
+        315,
+        317
       ],
       "referenceCaseIds": [
-        "REF-07-008"
+        "REF-07-008",
+        "REF-07-010"
       ]
     },
     {
