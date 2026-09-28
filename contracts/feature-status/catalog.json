@@ -3036,6 +3036,47 @@
       ]
     },
     {
+      "id": "host-offline-boundary",
+      "family": "Host local offline execution and distinct data failure states",
+      "clause": {
+        "path": "docs/reference/08-language-runtime-and-device-boundaries.md",
+        "heading": "8.2 계층별 책임"
+      },
+      "owner": "HOST",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [
+        "compile"
+      ],
+      "evidence": [
+        {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/reference-layer-boundaries.test.mjs",
+              "testId": "REF-08-004: host execution does not require Android, cloud, or internet and distinguishes offline data states",
+              "caseId": "REF-08-004",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "The oracle verifies Reference host-boundary prose; it does not prove a firmware image or hardware device can run offline."
+      ],
+      "issues": [
+        321
+      ],
+      "referenceCaseIds": [
+        "REF-08-004"
+      ]
+    },
+    {
       "id": "host-boundary",
       "family": "Host scheduling, persistence and simulation",
       "clause": {
