@@ -46,11 +46,12 @@ for (const [id, section, marker, nextMarker] of [
   ['Programming E19', programming, '### E19 —', '### E20 —'],
   ['Programming E20', programming, '### E20 —', '### E21 —'],
   ['Programming E21', programming, '### E21 —', '<a id="appendix-a"></a>'],
-  ...Array.from({ length: 10 }, (_, index) => {
+  ...Array.from({ length: 11 }, (_, index) => {
     const id = `E${String(index + 23).padStart(2, '0')}`;
-    const next = index === 9 ? null : `### E${String(index + 24).padStart(2, '0')} —`;
+    if (id === 'E31') return null;
+    const next = index >= 9 ? null : `### E${String(index + 24).padStart(2, '0')} —`;
     return [`Programming ${id}`, programming, `### ${id} —`, next];
-  }),
+  }).filter(Boolean),
 ]) {
   test(`${id} remains executable GhostFlow`, () => {
     const compiled = compileSourceSync(example(section, marker, nextMarker), { filename: `${id}.ghost.md` });
@@ -84,6 +85,21 @@ test('Programming E22 compiles only with its pinned generated source closure', (
     'Programming E22 translation must preserve executable code');
   assert.throws(() => compileSourceSync(canonical, { filename: generated.manifest.root.filename }), /verified source closure/);
   assert.match(compileSourceSync(canonical, { filename: generated.manifest.root.filename, sourceClosure }).manifest.format, /^GhostFlow\/control-v\d+$/);
+});
+
+test('Programming E31 imports the canonical irrigation and ventilation controls', () => {
+  const generated = deriveProgrammingBookImportPackage(programming);
+  const composition = generated.manifest.compositions[0];
+  const sourceClosure = composition.imports.map(item => ({
+    filename: item.filename, revision: item.revision, text: generated.files.get(item.filename),
+  }));
+  const canonical = generated.files.get(composition.root.filename);
+  assert.equal(example(programmingEnglish, '### E31 —', '### E32 —'), example(programming, '### E31 —', '### E32 —'),
+    'Programming E31 translation must preserve executable code');
+  assert.deepEqual(composition.imports.map(item => item.filename), ['E21.ghost.md', 'E20.ghost.md']);
+  assert.throws(() => compileSourceSync(canonical, { filename: composition.root.filename }), /verified source closure/);
+  const compiled = compileSourceSync(canonical, { filename: composition.root.filename, sourceClosure });
+  assert.deepEqual(compiled.manifest.outputs.map(item => item.name), ['irrigation_demand', 'ventilate_demand']);
 });
 
 for (const [id, marker, nextMarker, mutation] of [

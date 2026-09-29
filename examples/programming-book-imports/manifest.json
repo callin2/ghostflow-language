@@ -27,5 +27,37 @@
         "example": "E20"
       }
     }
+  ],
+  "compositions": [
+    {
+      "root": {
+        "filename": "E31.ghost.md",
+        "sha256": "41ac68cc0debd86e4161e0dd0f1a274934e404d3a0d0f08f99f380a7b1f23c77",
+        "canonicalSource": {
+          "path": "docs/ProgrammingInGhostflow.md",
+          "example": "E31"
+        }
+      },
+      "imports": [
+        {
+          "filename": "E21.ghost.md",
+          "revision": "7e135b93ea4c4988d305f992db277a6d8581a271",
+          "sha256": "d461a2a0f722271a172ce4c3d66665dad8f3a58a54079712e4bd3adb55f003a0",
+          "canonicalSource": {
+            "path": "docs/ProgrammingInGhostflow.md",
+            "example": "E21"
+          }
+        },
+        {
+          "filename": "E20.ghost.md",
+          "revision": "7e135b93ea4c4988d305f992db277a6d8581a271",
+          "sha256": "bbf57007c5973684660747c515bb2534124d50341647b2282bd2ca32852a724b",
+          "canonicalSource": {
+            "path": "docs/ProgrammingInGhostflow.md",
+            "example": "E20"
+          }
+        }
+      ]
+    }
   ]
 }

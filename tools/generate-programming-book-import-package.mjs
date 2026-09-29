@@ -11,6 +11,7 @@ export const PROGRAMMING_BOOK_IMPORT_DIRECTORY = 'examples/programming-book-impo
 const reviewed = Object.freeze({
   E19: 'ef80061222c5c671b8b78d8fae733b543e51149c7e5d2c7d5e2bb2cc41fbdb30',
   E20: 'bbf57007c5973684660747c515bb2534124d50341647b2282bd2ca32852a724b',
+  E21: 'd461a2a0f722271a172ce4c3d66665dad8f3a58a54079712e4bd3adb55f003a0',
 });
 const root = fileURLToPath(new URL('../', import.meta.url));
 const sha256 = text => createHash('sha256').update(text).digest('hex');
@@ -30,12 +31,18 @@ function section(document, id) {
 
 export function deriveProgrammingBookImportPackage(document) {
   if (typeof document !== 'string') throw new TypeError('Programming in GhostFlow document must be text');
-  const files = new Map(['E19', 'E20', 'E22'].map(id => [`${id}.ghost.md`, section(document, id)]));
+  const files = new Map(['E19', 'E20', 'E21', 'E22', 'E31'].map(id => [`${id}.ghost.md`, section(document, id)]));
   for (const [id, expected] of Object.entries(reviewed)) {
     const actual = sha256(files.get(`${id}.ghost.md`));
     if (actual !== expected) throw new Error(`${id} reviewed canonical section changed: expected ${expected}, actual ${actual}`);
   }
   const canonicalSource = example => ({ path: PROGRAMMING_BOOK_DOCUMENT, example });
+  const source = example => ({
+    filename: `${example}.ghost.md`,
+    revision: PROGRAMMING_BOOK_IMPORT_REVISION,
+    sha256: sha256(files.get(`${example}.ghost.md`)),
+    canonicalSource: canonicalSource(example),
+  });
   const manifest = {
     format: 'GhostFlow/programming-book-import-package-v1',
     root: {
@@ -49,6 +56,14 @@ export function deriveProgrammingBookImportPackage(document) {
       sha256: sha256(files.get(`${example}.ghost.md`)),
       canonicalSource: canonicalSource(example),
     })),
+    compositions: [{
+      root: {
+        filename: 'E31.ghost.md',
+        sha256: sha256(files.get('E31.ghost.md')),
+        canonicalSource: canonicalSource('E31'),
+      },
+      imports: ['E21', 'E20'].map(source),
+    }],
   };
   return { manifest, files };
 }

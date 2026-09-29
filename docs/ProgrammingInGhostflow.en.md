@@ -92,8 +92,9 @@ At each stage, first consider how the device should behave. Then see how to expr
 12. [One device, multiple controls](#ch12)
 13. [Built-in functions and operations](#ch13)
 14. [Temperature units and air-VPD control](#ch14)
+15. [Named physical quantities and units](#ch15)
 
-Appendices: [A. Specification guide](#appendix-a) · [B. Learning through errors](#appendix-b) · [C. Document maintenance rules](#appendix-c) · [D. Technical articles for ten audiences](#appendix-d)
+Appendices: [A. Specification guide](#appendix-a) · [B. Learning through errors](#appendix-b) · [C. Document maintenance rules](#appendix-c) · [D. Examples by audience](#appendix-d)
 
 
 <a id="ch01"></a>
@@ -223,6 +224,7 @@ For example, `25°C` for `Temperature`, `5L/min` for `FlowRate`, and `24V` for `
 Allowed units, conversions, and operations follow
 [Reference §2.9](reference/02-types-expressions-state.md#29-물리량과-단위).
 `Rate<Q>` is an expression-only temporal-window type, not a general input/output/state type.
+Chapter 15 gives examples of mixing units and operating across physical quantities.
 
 ### E02 — Naming inputs, settings, and calculations separately
 
@@ -1547,6 +1549,148 @@ For Stale, use single-packet mode or stop sample delivery, then advance simulati
 
 For the heater, observe 18 → 17 → 18 → 22 → 23°C, then a sensor fault and recovery. For each VPD controller, hold temperature at 25°C, change RH to cross its thresholds, and then change only PPFD. Compare requested/safe demand, air_vpd_value and vpd_valid. Try absent, Invalid, Disconnected and stale samples; each relevant fault must inhibit output immediately. Change T/RH together when checking the numerical relation. Do not interpret logical demand, a successful scan or a virtual actuator as a physically confirmed effect.
 
+<a id="ch15"></a>
+## 15. Named physical quantities and units
+
+Chapter 6 covers `Duration`; Chapter 7 covers dates and times. This chapter focuses on the
+17 named physical quantities whose units change how a measurement is understood. Keeping
+their types instead of converting them to untyped `Number` lets the compiler catch
+comparisons between unrelated sensor readings. `Rate<Q>` is derived in time windows and
+is expression-only, not a separate physical quantity catalog entry; Chapter 13 covers it.
+
+### Each physical quantity has its own type
+
+These literals show valid spellings for each type. Reference §2.9 lists every accepted
+unit and its canonical unit. GhostFlow converts different units of the same type to the
+canonical unit in an expression. Conversion does not change the quantity's type.
+
+| Named type | Literal example | Meaning |
+|---|---|---|
+| `Temperature` | `25°C`, `77°F`, `298.15K` | Absolute temperature |
+| `TemperatureDelta` | `5Δ°C`, `9Δ°F` | Difference in temperature |
+| `RelativeHumidity` | `70%RH` | Relative humidity |
+| `Pressure` | `100kPa` | Pressure |
+| `VaporPressureDeficit` | `1kPaVPD` | Difference between saturation and actual vapor pressure |
+| `CO2Concentration` | `800ppm` | Carbon dioxide mole fraction |
+| `FlowRate` | `5L/min` | Volumetric flow rate |
+| `Volume` | `20L` | Volume |
+| `Length` | `35cm` | Length |
+| `Irradiance` | `300W/m2` | Radiant power per area |
+| `PPFD` | `600umol/m2/s` | Photosynthetic photon flux per area and time |
+| `Energy` | `1kWh` | Energy |
+| `Power` | `150W` | Power |
+| `ElectricalCurrent` | `800mA` | Electric current |
+| `Voltage` | `24V` | Voltage |
+| `Conductivity` | `1.5mS/cm` | Electrical conductivity |
+| `Acidity` | `6.5pH` | Acidity measure |
+
+### Units of the same quantity can be combined
+
+`25°C` and `77°F` have different numbers and unit spellings, but both are `Temperature`.
+Either can be compared with a sensor value of that type. `5Δ°C` and `9Δ°F` are also the
+same temperature difference. An absolute temperature and a temperature difference are
+different types. Subtracting two temperatures produces `TemperatureDelta`; adding or
+subtracting a delta to a temperature is allowed. Adding two absolute temperatures is not.
+
+GhostFlow does not perform arbitrary dimensional algebra. It allows addition and subtraction
+of the same linear quantity, comparisons of the same type, and multiplication or division
+by a numeric scalar. Products between quantities are limited to defined relationships:
+`FlowRate * Duration -> Volume`, `Power * Duration -> Energy`, and
+`Voltage * ElectricalCurrent -> Power`. Undefined combinations such as `Pressure + Length`
+and implicit conversion to untyped `Number` are errors.
+
+| Valid expression | Result | Invalid mixture example |
+|---|---|---|
+| `room < 25°C && room < 77°F` | Temperature comparisons | `room + room` — adding absolute temperatures |
+| `change >= 5Δ°C && change >= 9Δ°F` | Temperature-difference comparisons | `room > change` — comparing temperature with a delta |
+| `flow * 1min` | `Volume` | `flow + 20L` — adding flow rate and volume |
+| `voltage * current` | `Power` | `pressure > vpd` — comparing pressure and VPD |
+| `power * 1h` | `Energy` | `irradiance > ppfd` — comparing different light quantities |
+
+### Keep sensor light units distinct
+
+Greenhouse sensors may report related light measurements in different units.
+`Irradiance` in `W/m2` is radiant power reaching an area. `PPFD` in `umol/m2/s` counts
+photons in the photosynthetically active band. They have different physical types, so
+they cannot be compared directly or use each other's thresholds. There is no universal
+conversion factor without a validated conversion that accounts for the spectrum.
+
+The current quantity catalog has no `Lux` type. Do not relabel a lux sensor value as PPFD.
+Lux measures illuminance weighted for human vision. A verified conversion must account for
+the light spectrum, sensor calibration, and optics. Declare that conversion at a sensor
+binding or validated preprocessing boundary, and keep the resulting type consistent with
+the actual unit. Declare sensors separately when they measure different quantities.
+
+### E33 — Check mixed units and quantities in one control
+
+This example uses all named physical quantities in the supported catalog. It shows both
+allowed relationships such as temperature/delta, flow/volume, and voltage/current, and
+separate sensor declarations for radiant irradiance and PPFD.
+
+```ghost
+// E33
+control PhysicalQuantityUnits {
+  input air: Temperature;
+  input temperature_change: TemperatureDelta;
+  input humidity: RelativeHumidity;
+  input pressure: Pressure;
+  input vpd: VaporPressureDeficit;
+  input co2: CO2Concentration;
+  input flow: FlowRate;
+  input tank_volume: Volume;
+  input pipe_length: Length;
+  sensor irradiance: Irradiance {
+    sample = 1s; valid = 0W/m2 .. 1500W/m2;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor ppfd: PPFD {
+    sample = 1s; valid = 0umol/m2/s .. 3000umol/m2/s;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  input stored_energy: Energy;
+  input rated_power: Power;
+  input current: ElectricalCurrent;
+  input voltage: Voltage;
+  input conductivity: Conductivity;
+  input acidity: Acidity;
+
+  output temperature_ok, change_ok, humidity_ok, pressure_ok, vpd_ok: Bool;
+  output co2_ok, volume_ok, length_ok, irradiance_ok, ppfd_ok: Bool;
+  output energy_ok, power_ok, current_ok, voltage_ok, conductivity_ok, acidity_ok: Bool;
+  output pumped_volume: Volume;
+  output motor_power: Power;
+  output hourly_energy: Energy;
+
+  let motor_load = voltage * current;
+  temperature_ok <- air >= 25°C && air >= 77°F;
+  change_ok <- temperature_change >= 5Δ°C && temperature_change >= 9Δ°F;
+  humidity_ok <- humidity >= 70%RH;
+  pressure_ok <- pressure >= 100kPa;
+  vpd_ok <- vpd >= 1kPaVPD;
+  co2_ok <- co2 >= 800ppm;
+  volume_ok <- tank_volume >= 20L;
+  length_ok <- pipe_length >= 35cm;
+  irradiance_ok <- case irradiance { ok(value) => value >= 300W/m2; fault(_) => false; };
+  ppfd_ok <- case ppfd { ok(value) => value >= 600umol/m2/s; fault(_) => false; };
+  energy_ok <- stored_energy >= 1kWh;
+  power_ok <- rated_power >= 150W;
+  current_ok <- current >= 800mA;
+  voltage_ok <- voltage >= 24V;
+  conductivity_ok <- conductivity >= 1.5mS/cm;
+  acidity_ok <- acidity <= 6.5pH;
+  pumped_volume <- flow * 1min;
+  motor_power <- motor_load;
+  hourly_energy <- motor_load * 1h;
+}
+```
+
+`pressure > vpd`, `irradiance > ppfd`, `humidity > 70%`, `air + air`, and
+`flow + tank_volume` are rejected because their types differ or the operation is undefined.
+When a sensor unit changes, check that it remains an accepted unit of the same quantity.
+When it changes to another quantity, such as a light conversion, verify the conversion's
+source and accuracy separately. These examples explain type rules; they do not replace
+sensor calibration or equipment operating limits.
+
 <a id="appendix-a"></a>
 ## Appendix A. Specification guide
 
@@ -1676,7 +1820,7 @@ When a learning scenario requests a time-varying environment, its default source
 The Language Reference is normative. For conflicts or missing examples found in this guide, check the relevant Reference section before correcting them. Syntax/semantic changes update Reference syntax, rules, reasons, and examples, then synchronize this guide's learning path and code. Link implementation boundaries needed for learning to evidence documents; maintain changing progress, test counts, artifact hashes, and supported-board lists there. Reuse `tests/docs-runnable-examples.test.mjs` for compiler checks. After book changes, run `npm run generate:pc01` to refresh derived provenance; preserve historical replay and benchmark evidence.
 
 <a id="appendix-d"></a>
-## Appendix D. Technical articles and examples for ten audiences
+## Appendix D. Examples by audience
 
 These ten articles show how people with different jobs can approach the same control language. Each example is a standalone, executable `ghost` fence that you can run in PIG and explore with different input sequences. The results show logical control only. Boards, drivers, wiring, and field checks remain responsible for actual contacts, valves, and motors.
 
@@ -1855,24 +1999,46 @@ control FarmerDirectedWatering {
 }
 ```
 
-### E31 — Makers and automation learners: combine two beds and expose the shared resource
+### E31 — Makers and automation learners: bring watering and ventilation examples together
 
 > “Plenty of examples. Hard to combine them?”
 
-The dry-soil rule for bed A and bed B is easy to write separately. When the examples meet, their shared source and pump change the problem. This program keeps each valve request and asks the shared pump to run whenever either bed needs water. If the source is not ready, it blocks all three outputs.
+This example imports the original irrigation program E21 and ventilation program E20 instead of copying either one. The root control connects the same air, humidity, and light inputs to both programs while keeping their sensor processing and internal state separate. It exposes their outputs independently as `irrigation_demand` and `ventilate_demand`.
 
-The code also makes simultaneous watering visible: both valves can open when both beds are dry. The author must check whether the pump flow and piping can support that. If only one bed may run at a time, decide a priority, rotation, and wait policy before writing it into the source instead of letting the program choose a winner by accident.
+Both demands can be true at once. Before connecting them to shared power or outputs, decide which combinations are allowed and define any priority. The imports pin each original revision and hash. Check the combined program's memory and compute needs before placing it on the board.
 
 ```ghost
 // E31
-control TwoBedWatering {
-  input bed_a_needs_water, bed_b_needs_water, source_ready: Bool;
-  output bed_a_valve, bed_b_valve, shared_pump: Bool;
-
-  bed_a_valve <- source_ready && bed_a_needs_water;
-  bed_b_valve <- source_ready && bed_b_needs_water;
-  shared_pump <- source_ready && (bed_a_needs_water || bed_b_needs_water);
-  require shared_pump => (bed_a_valve || bed_b_valve);
+import Irrigation from "./E21.ghost.md"
+  revision "7e135b93ea4c4988d305f992db277a6d8581a271"
+  sha256 "d461a2a0f722271a172ce4c3d66665dad8f3a58a54079712e4bd3adb55f003a0";
+import Ventilation from "./E20.ghost.md"
+  revision "7e135b93ea4c4988d305f992db277a6d8581a271"
+  sha256 "bbf57007c5973684660747c515bb2534124d50341647b2282bd2ca32852a724b";
+control CombinedGreenhouseDemands {
+  sensor air: Temperature {
+    sample = 1s; valid = 0°C .. 50°C;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor humidity: RelativeHumidity {
+    sample = 1s; valid = 0%RH .. 100%RH;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor light: PPFD {
+    sample = 1s; valid = 0umol/m2/s .. 3000umol/m2/s;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  output irrigation_demand, ventilate_demand: Bool;
+  instance watering: Irrigation;
+  instance fan: Ventilation;
+  connect watering.air <- air;
+  connect watering.humidity <- humidity;
+  connect watering.light <- light;
+  connect fan.air <- air;
+  connect fan.humidity <- humidity;
+  connect fan.light <- light;
+  connect irrigation_demand <- watering.irrigation_demand;
+  connect ventilate_demand <- fan.ventilate_demand;
 }
 ```
 

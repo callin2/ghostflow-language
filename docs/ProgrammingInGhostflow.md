@@ -88,8 +88,9 @@ E11은 표기를 설명하는 예제이고, E90–E97은 일부러 잘못된 코
 12. [하나의 장치, 여러 control](#ch12)
 13. [내장함수와 내장 연산](#ch13)
 14. [온도 단위와 공기 VPD 제어](#ch14)
+15. [이름 있는 물리량과 단위](#ch15)
 
-부록: [A. 명세 길잡이](#appendix-a) · [B. 오류로 배우기](#appendix-b) · [C. 문서 유지 규칙](#appendix-c) · [D. 관심그룹별 기술 블로그](#appendix-d)
+부록: [A. 명세 길잡이](#appendix-a) · [B. 오류로 배우기](#appendix-b) · [C. 문서 유지 규칙](#appendix-c) · [D. 관심그룹별 예제](#appendix-d)
 
 <a id="ch01"></a>
 ## 1. 스위치 하나와 출력 하나
@@ -220,6 +221,7 @@ GhostFlow는 signed 32-bit `Int`로 정확한 계수를 표현한다. 범위 초
 고정된 물리량 타입과 단위를 가진다. 허용 단위·변환·연산은
 [Reference §2.9](reference/02-types-expressions-state.md#29-물리량과-단위)를 따른다.
 `Rate<Q>`는 시간창 계산의 식 전용 타입이며 일반 input/output/state 타입이 아니다.
+단위 혼용과 물리량 사이의 연산은 [15장](#ch15)에서 예제로 설명한다.
 
 ### E02 — 입력, 설정, 계산에 각각 이름 붙이기
 
@@ -1558,6 +1560,145 @@ Stale은 단일 패킷 모드 또는 샘플 공급 중단으로 시험한 뒤 si
 
 히터에서 18 → 17 → 18 → 22 → 23°C, 센서 오류, 복구를 관찰한다. VPD controller별로 온도를 25°C에 고정하고 RH를 바꿔 임계값을 넘긴다. 다음에는 PPFD만 바꾼다. requested/safe demand, air_vpd_value, vpd_valid를 비교한다. 누락, Invalid, Disconnected, 오래된 샘플을 시험한다. 관련 오류는 즉시 출력을 억제해야 한다. 수치 관계를 확인할 때 T/RH를 함께 바꾼다. 논리 요구, 성공한 scan, 가상 actuator를 물리 효과 확인으로 해석하지 않는다.
 
+<a id="ch15"></a>
+## 15. 이름 있는 물리량과 단위
+
+6장의 `Duration`과 7장의 날짜·시각은 이 장의 대상이 아니다. 여기서는 온도, 압력,
+광량처럼 값의 단위가 제어 의미를 바꾸는 17개 이름 있는 물리량을 다룬다. 단위가
+없는 `Number`로 바꾸지 않고 타입을 유지하면, 같은 숫자라도 서로 다른 센서의 측정값을
+잘못 비교하는 일을 컴파일 단계에서 막을 수 있다. `Rate<Q>`는 시간창에서 파생되는
+식 전용 타입이며 별도 물리량 catalog 항목이 아니므로 13장에서 다룬다.
+
+### 물리량마다 구분되는 타입
+
+아래 리터럴은 각 타입의 유효한 표기 예다. `Reference §2.9`에는 전체 허용 단위와
+정규 단위가 있다. 소스에서 같은 타입의 서로 다른 단위를 섞으면 GhostFlow가 정규 단위로
+변환한다. 변환은 물리량 타입을 바꾸지 않는다.
+
+| 이름 있는 타입 | 리터럴 예 | 무엇을 나타내나 |
+|---|---|---|
+| `Temperature` | `25°C`, `77°F`, `298.15K` | 절대 온도 |
+| `TemperatureDelta` | `5Δ°C`, `9Δ°F` | 온도 차이 |
+| `RelativeHumidity` | `70%RH` | 상대습도 |
+| `Pressure` | `100kPa` | 압력 |
+| `VaporPressureDeficit` | `1kPaVPD` | 포화 수증기압과 실제 수증기압의 차이 |
+| `CO2Concentration` | `800ppm` | 이산화탄소 몰분율 |
+| `FlowRate` | `5L/min` | 체적 유량 |
+| `Volume` | `20L` | 체적 |
+| `Length` | `35cm` | 길이 |
+| `Irradiance` | `300W/m2` | 면적당 복사 에너지 출력 |
+| `PPFD` | `600umol/m2/s` | 광합성 유효 파장대 광자의 면적·시간당 개수 |
+| `Energy` | `1kWh` | 에너지 |
+| `Power` | `150W` | 전력 |
+| `ElectricalCurrent` | `800mA` | 전류 |
+| `Voltage` | `24V` | 전압 |
+| `Conductivity` | `1.5mS/cm` | 전기 전도도 |
+| `Acidity` | `6.5pH` | 산도 지표 |
+
+### 같은 물리량의 단위는 함께 쓸 수 있다
+
+`25°C`와 `77°F`는 서로 다른 숫자와 단위 표기지만 같은 `Temperature`다. 따라서 센서
+값을 어느 쪽으로 받았든 같은 타입의 경계와 비교할 수 있다. `5Δ°C`와 `9Δ°F`도 같은
+온도 차이다. 단, 절대 온도와 온도 차이는 다른 타입이다. 두 온도의 차는
+`TemperatureDelta`이고, 온도에 차이를 더하거나 빼는 연산은 허용된다. 두 절대 온도를
+서로 더하는 것은 허용되지 않는다.
+
+GhostFlow는 모든 단위 조합을 임의로 계산하지 않는다. 같은 선형 물리량끼리의 덧셈·뺄셈,
+같은 타입의 비교와 수치 스칼라 곱셈·나눗셈을 허용한다. 물리량끼리의 곱은 정해진 관계만
+가능하다. 예를 들어 `FlowRate * Duration -> Volume`, `Power * Duration -> Energy`,
+`Voltage * ElectricalCurrent -> Power`다. `Pressure + Length`처럼 관계가 정의되지 않은
+조합이나 단위 없는 `Number`로의 암묵 변환은 오류다.
+
+| 가능한 식 | 결과 | 불가능한 혼합 예 |
+|---|---|---|
+| `room < 25°C && room < 77°F` | 온도 비교 | `room + room` — 절대 온도끼리 더하기 |
+| `change >= 5Δ°C && change >= 9Δ°F` | 온도 차 비교 | `room > change` — 절대 온도와 차이 비교 |
+| `flow * 1min` | `Volume` | `flow + 20L` — 유량과 체적 더하기 |
+| `voltage * current` | `Power` | `pressure > vpd` — 압력과 VPD 비교 |
+| `power * 1h` | `Energy` | `irradiance > ppfd` — 서로 다른 광량 타입 비교 |
+
+### 센서의 광량 단위를 혼동하지 않기
+
+온실 센서는 비슷한 이름의 빛 측정값을 서로 다른 단위로 낼 수 있다. `Irradiance`의
+`W/m2`는 면적에 도달하는 복사 출력이다. `PPFD`의 `umol/m2/s`는 광합성에 유효한
+파장대 광자의 흐름을 센다. 두 값은 물리량 타입부터 다르므로 직접 비교하거나 서로의
+임계값을 대신 쓸 수 없다. 스펙트럼을 고려한 검증된 변환 없이는 일반적인 환산 계수도
+없다.
+
+현재 물리량 catalog에는 `Lux` 타입이 없다. Lux 센서 값을 PPFD로 이름만 바꾸어 연결하면
+안 된다. Lux는 사람 눈의 감도에 따른 조도이므로 광원의 스펙트럼, 센서 보정, 광학 조건을
+반영한 검증된 변환이 필요하다. 변환은 센서 binding이나 검증된 전처리 경계에서 명시하고,
+나오는 타입을 실제 단위와 맞춰야 한다. 입력마다 타입을 확인하려면 센서 선언도 분리한다.
+
+### E33 — 서로 다른 단위와 물리량을 한 제어에서 확인하기
+
+이 예제는 지원 catalog의 모든 이름 있는 물리량을 사용한다. 온도·온도 차, 유량·체적,
+전압·전류처럼 허용된 관계는 결과 타입까지 드러낸다. 복사 조도 센서와 PPFD 센서는 별도
+타입으로 선언한다.
+
+```ghost
+// E33
+control PhysicalQuantityUnits {
+  input air: Temperature;
+  input temperature_change: TemperatureDelta;
+  input humidity: RelativeHumidity;
+  input pressure: Pressure;
+  input vpd: VaporPressureDeficit;
+  input co2: CO2Concentration;
+  input flow: FlowRate;
+  input tank_volume: Volume;
+  input pipe_length: Length;
+  sensor irradiance: Irradiance {
+    sample = 1s; valid = 0W/m2 .. 1500W/m2;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor ppfd: PPFD {
+    sample = 1s; valid = 0umol/m2/s .. 3000umol/m2/s;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  input stored_energy: Energy;
+  input rated_power: Power;
+  input current: ElectricalCurrent;
+  input voltage: Voltage;
+  input conductivity: Conductivity;
+  input acidity: Acidity;
+
+  output temperature_ok, change_ok, humidity_ok, pressure_ok, vpd_ok: Bool;
+  output co2_ok, volume_ok, length_ok, irradiance_ok, ppfd_ok: Bool;
+  output energy_ok, power_ok, current_ok, voltage_ok, conductivity_ok, acidity_ok: Bool;
+  output pumped_volume: Volume;
+  output motor_power: Power;
+  output hourly_energy: Energy;
+
+  let motor_load = voltage * current;
+  temperature_ok <- air >= 25°C && air >= 77°F;
+  change_ok <- temperature_change >= 5Δ°C && temperature_change >= 9Δ°F;
+  humidity_ok <- humidity >= 70%RH;
+  pressure_ok <- pressure >= 100kPa;
+  vpd_ok <- vpd >= 1kPaVPD;
+  co2_ok <- co2 >= 800ppm;
+  volume_ok <- tank_volume >= 20L;
+  length_ok <- pipe_length >= 35cm;
+  irradiance_ok <- case irradiance { ok(value) => value >= 300W/m2; fault(_) => false; };
+  ppfd_ok <- case ppfd { ok(value) => value >= 600umol/m2/s; fault(_) => false; };
+  energy_ok <- stored_energy >= 1kWh;
+  power_ok <- rated_power >= 150W;
+  current_ok <- current >= 800mA;
+  voltage_ok <- voltage >= 24V;
+  conductivity_ok <- conductivity >= 1.5mS/cm;
+  acidity_ok <- acidity <= 6.5pH;
+  pumped_volume <- flow * 1min;
+  motor_power <- motor_load;
+  hourly_energy <- motor_load * 1h;
+}
+```
+
+`pressure > vpd`, `irradiance > ppfd`, `humidity > 70%`, `air + air`, `flow + tank_volume`는
+타입이 다르거나 정의되지 않은 연산이므로 거부된다. 센서의 단위가 바뀌면 같은 물리량의
+허용 단위인지 확인하고, 광량처럼 다른 물리량으로 바뀌는 경우에는 변환 출처와 정확성을
+별도로 검증한다. 이 장의 단위 예제는 계산 규칙을 설명하며, 실제 센서 보정이나 장비의
+운전 한계를 대신하지 않는다.
+
 <a id="appendix-a"></a>
 ## 부록 A. 명세 길잡이
 
@@ -1687,7 +1828,7 @@ sensor를 payload처럼 바로 비교하지 않는다. `case` 또는 Reference �
 Language Reference는 규범 기준이다. 이 사용 안내서에서 발견한 상충이나 빠진 예는 해당 Reference 절을 먼저 확인한 뒤 고친다. 문법·의미 변경은 Reference의 문법, 규칙, 이유와 예제를 갱신하고 여기서 학습 경로와 코드를 동기화한다. 학습에 필요한 구현 경계는 근거 문서에 연결하고, 변동하는 진행률·테스트 수·산출물 해시·지원 보드 목록은 그 문서에서 관리한다. 예제 compiler 검사는 `tests/docs-runnable-examples.test.mjs`를 재사용한다. 책 변경 뒤 `npm run generate:pc01`로 파생 출처를 갱신하며 과거 replay·benchmark 근거는 고치지 않는다.
 
 <a id="appendix-d"></a>
-## 부록 D. 관심그룹별 기술 블로그와 예제
+## 부록 D. 관심그룹별 예제
 
 같은 제어 언어를 서로 다른 일을 하는 사람들이 어떻게 읽을 수 있는지 보여 주는 열 편이다. 각 예제는 독립 프로그램이며 실행 가능한 `ghost` fence다. PIG에서는 코드를 실행하고 입력 순서를 바꿔 볼 수 있다. 결과는 논리 제어의 예시다. 실제 접점·밸브·모터의 작동은 보드, Driver, 배선과 현장 확인이 따로 책임진다.
 
@@ -1866,24 +2007,46 @@ control FarmerDirectedWatering {
 }
 ```
 
-### E31 — 메이커·자동화 입문자: 두 화단을 합치며 공유 자원을 드러내기
+### E31 — 메이커·자동화 입문자: 관수와 환풍기 예제를 가져와 함께 쓰기
 
 > “예제는 많은데, 합치기는 어려웠죠?”
 
-화단 A와 B의 건조 판단은 각각 쉬워도, 두 예제를 합치면 급수원과 펌프가 공유되는 순간 규칙이 달라진다. 이 프로그램은 두 구역의 밸브 요구를 유지하고 어느 하나라도 물을 필요로 하면 공용 펌프를 요청한다. 급수원이 준비되지 않으면 모든 출력을 막는다.
+관수 예제 E21과 환기 예제 E20을 원문 복사 없이 import한다. 루트 제어는 공통 온도·습도·빛 입력을 두 프로그램에 연결하고, 각 프로그램의 센서 처리와 내부 상태는 독립적으로 둔다. 출력도 `irrigation_demand`와 `ventilate_demand`로 나눠 공개한다.
 
-두 화단이 동시에 건조하면 두 밸브가 함께 열리는 동작도 코드에 드러난다. 펌프 유량과 배관이 이를 감당할지는 작성자가 확인해야 한다. 한 번에 한 구역만 허용해야 한다면 임의로 고르기보다 우선순위·교대·대기시간 정책을 먼저 정해 소스에 표현하면 된다.
+두 요구가 동시에 참일 수 있다. 이를 같은 전원이나 출력에 연결하려면 허용 조건과 우선순위를 먼저 정해야 한다. import에는 원본 판본과 해시가 고정되고, 실제 보드에 싣기 전에는 조합한 프로그램의 메모리와 계산량도 확인한다.
 
 ```ghost
 // E31
-control TwoBedWatering {
-  input bed_a_needs_water, bed_b_needs_water, source_ready: Bool;
-  output bed_a_valve, bed_b_valve, shared_pump: Bool;
-
-  bed_a_valve <- source_ready && bed_a_needs_water;
-  bed_b_valve <- source_ready && bed_b_needs_water;
-  shared_pump <- source_ready && (bed_a_needs_water || bed_b_needs_water);
-  require shared_pump => (bed_a_valve || bed_b_valve);
+import Irrigation from "./E21.ghost.md"
+  revision "7e135b93ea4c4988d305f992db277a6d8581a271"
+  sha256 "d461a2a0f722271a172ce4c3d66665dad8f3a58a54079712e4bd3adb55f003a0";
+import Ventilation from "./E20.ghost.md"
+  revision "7e135b93ea4c4988d305f992db277a6d8581a271"
+  sha256 "bbf57007c5973684660747c515bb2534124d50341647b2282bd2ca32852a724b";
+control CombinedGreenhouseDemands {
+  sensor air: Temperature {
+    sample = 1s; valid = 0°C .. 50°C;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor humidity: RelativeHumidity {
+    sample = 1s; valid = 0%RH .. 100%RH;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor light: PPFD {
+    sample = 1s; valid = 0umol/m2/s .. 3000umol/m2/s;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  output irrigation_demand, ventilate_demand: Bool;
+  instance watering: Irrigation;
+  instance fan: Ventilation;
+  connect watering.air <- air;
+  connect watering.humidity <- humidity;
+  connect watering.light <- light;
+  connect fan.air <- air;
+  connect fan.humidity <- humidity;
+  connect fan.light <- light;
+  connect irrigation_demand <- watering.irrigation_demand;
+  connect ventilate_demand <- fan.ventilate_demand;
 }
 ```
 

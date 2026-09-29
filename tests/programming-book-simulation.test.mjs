@@ -145,11 +145,6 @@ const plainCases = [
     frame(1, { enabled: true, watering_window: true, soil_needs_water: true, source_ready: true }, { pump_request: true, source_attention: false }),
     frame(2, { enabled: true, watering_window: false, soil_needs_water: true, source_ready: true }, { pump_request: false, source_attention: false }),
   ]],
-  ['E31', [
-    frame(0, { bed_a_needs_water: true, bed_b_needs_water: false, source_ready: true }, { bed_a_valve: true, bed_b_valve: false, shared_pump: true }),
-    frame(1, { bed_a_needs_water: true, bed_b_needs_water: true, source_ready: true }, { bed_a_valve: true, bed_b_valve: true, shared_pump: true }),
-    frame(2, { bed_a_needs_water: true, bed_b_needs_water: true, source_ready: false }, { bed_a_valve: false, bed_b_valve: false, shared_pump: false }),
-  ]],
   ['E32', [
     frame(0, { soil_moisture: 20, threshold: 35 }, { pump_request: true }),
     frame(1, { soil_moisture: 40, threshold: 35 }, { pump_request: false }),
@@ -539,12 +534,12 @@ test('Programming E10 equal-threshold experiment produces the real compiler diag
 });
 
 test('Programming inventory assigns every fence and numbered example to executable, diagnostic or explanatory coverage', () => {
-  const importPackageExamples = ['E22'];
+  const compileOnlyExamples = ['E22', 'E31', 'E33'];
   const numbered = [...book.matchAll(/^### (E\d+) —/gm)].map(match => match[1]).sort();
-  assert.deepEqual(numbered, [...bookRuntimeIds, ...importPackageExamples, ...errorExamples.map(([id]) => id), 'E11'].sort());
+  assert.deepEqual(numbered, [...bookRuntimeIds, ...compileOnlyExamples, ...errorExamples.map(([id]) => id), 'E11'].sort());
   const fences = [...book.matchAll(/^`{3,4}([^`\n]+)$/gm)].map(match => match[1]);
   const counts = Object.fromEntries([...new Set(fences)].map(kind => [kind, fences.filter(item => item === kind).length]));
-  assert.deepEqual(counts, { ghost: bookRuntimeIds.size + importPackageExamples.length + 1, text: 3, markdown: 1, sh: 1, 'ghost-error': errorExamples.length });
+  assert.deepEqual(counts, { ghost: bookRuntimeIds.size + compileOnlyExamples.length + 1, text: 3, markdown: 1, sh: 1, 'ghost-error': errorExamples.length });
   const catalog = JSON.parse(fs.readFileSync(path.join(root, 'examples/curriculum/catalog.json'), 'utf8'));
   assert.deepEqual(catalog.lessons.map(lesson => lesson.id).sort(), [...replay.scenarios.map(lesson => lesson.id), ...additionalLessons.map(([id]) => id)].sort());
   const links = [...book.matchAll(/\]\(\.\.\/(examples\/[^)#]+\.ghost\.md)(?:#[^)]*)?\)/g)].map(match => match[1]);
