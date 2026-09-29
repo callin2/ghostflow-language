@@ -147,6 +147,12 @@ sensor 포트는 일반 값 포트로 품질을 지우지 않는다. sensor 연�
 sample·quality 계약을 가진 root sensor에서 instance sensor로만 허용한다.
 각 instance가 선언한 필터와 freshness 규칙은 계속 적용된다.
 
+Sensor 연결은 payload 타입, 선택성, 선언한 sample 간격이 일치해야 한다. 같은 root의
+원본 sample identity·timestamp·quality·value를 각 instance에 공급한다. Root에서 이미
+처리한 값으로 대체하지 않는다. 각 instance는 독립적인 filter·복구·stale 상태를 소유한다.
+함수 인자와 case 바인딩은 지역 scope를 유지하며 definition의 함수와 호출은 instance별로
+격리한다.
+
 `bind`는 제어 소스 문법이 아니다. 설치 binding이 root 논리 포트를 실제 endpoint에
 연결한다. GPIO·버스 주소와 credential을 이 프로그램에 넣지 않는다.
 

@@ -22,6 +22,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/programming-builtins.test.mjs',
   'tests/programming-book-simulation.test.mjs',
   'tests/programming-climate.test.mjs',
+  'tests/programming-book-import-package.test.mjs',
   'tests/ghostsim-input-validation.test.mjs',
   'tests/reference-cli.test.mjs',
   'tests/feature-status.test.mjs',

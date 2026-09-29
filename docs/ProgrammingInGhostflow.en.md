@@ -49,7 +49,7 @@ With Node dependencies and native/WASM artifacts built from the same revision, r
 `node --test tests/programming-book-simulation.test.mjs`. Follow [Verification](VERIFICATION.md) for the complete build/verification sequence.
 The compiler check in `tests/docs-runnable-examples.test.mjs` also runs without runtime builds.
 This evidence establishes logical execution; physical device verification is separate.
-Chapter 14 adds E16–E21 temperature/climate sensor programs. Their actual ghostsim scans and independent numerical WASM checks are in `tests/programming-book-simulation.test.mjs` and `tests/programming-climate.test.mjs`.
+Chapter 14 adds E16–E22 temperature/climate sensor programs. Their actual ghostsim scans and independent numerical WASM checks are in `tests/programming-book-simulation.test.mjs`, `tests/programming-climate.test.mjs`, and `tests/programming-book-import-package.test.mjs`.
 
 ## Contents
 
@@ -1455,9 +1455,57 @@ control IrrigationDemand {
 }
 ```
 
+### E22 — Run two existing VPD controls together through imports
+
+E22 does not copy the E19 or E20 source. It imports complete `.ghost.md`
+documents generated from those two original sections, pinned by exact revision
+and SHA-256. One raw sample packet for `air`, `humidity`, and `light` fans out
+to both instances, while each instance retains its own sensor conditioner and
+`demand` state. The root exposes both demands. Its common VPD observation uses
+the `high` instance's `air_vpd_value` and `vpd_valid`, calculated from the same
+inputs.
+
+```ghost
+// E22
+import HighVpd from "./E19.ghost.md"
+  revision "7e135b93ea4c4988d305f992db277a6d8581a271"
+  sha256 "ef80061222c5c671b8b78d8fae733b543e51149c7e5d2c7d5e2bb2cc41fbdb30";
+import LowVpd from "./E20.ghost.md"
+  revision "7e135b93ea4c4988d305f992db277a6d8581a271"
+  sha256 "bbf57007c5973684660747c515bb2534124d50341647b2282bd2ca32852a724b";
+control CombinedVpdDemands {
+  sensor air: Temperature {
+    sample = 1s; valid = 0°C .. 50°C;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor humidity: RelativeHumidity {
+    sample = 1s; valid = 0%RH .. 100%RH;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor light: PPFD {
+    sample = 1s; valid = 0umol/m2/s .. 3000umol/m2/s;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  output air_vpd_value: VaporPressureDeficit;
+  output vpd_valid, humidify_demand, ventilate_demand: Bool;
+  instance high: HighVpd;
+  instance low: LowVpd;
+  connect high.air <- air;
+  connect high.humidity <- humidity;
+  connect high.light <- light;
+  connect low.air <- air;
+  connect low.humidity <- humidity;
+  connect low.light <- light;
+  connect air_vpd_value <- high.air_vpd_value;
+  connect vpd_valid <- high.vpd_valid;
+  connect humidify_demand <- high.humidify_demand;
+  connect ventilate_demand <- low.ventilate_demand;
+}
+```
+
 ### Run, observe and change one input
 
-Compile each E16–E21 fence separately as a complete .ghost.md document, as in E15. Run `node --test tests/programming-climate.test.mjs tests/programming-book-simulation.test.mjs` for compiler and actual ghostsim/WASM scans; native/WASM artifacts must have matching build provenance. [Verification](VERIFICATION.md) describes the build prerequisites. The test writes disposable scenario artifacts and never drives hardware.
+Compile each E16–E21 fence separately as a complete .ghost.md document, as in E15. Compile E22 with the generated `examples/programming-book-imports` source closure. Run `node --test tests/programming-climate.test.mjs tests/programming-book-simulation.test.mjs tests/programming-book-import-package.test.mjs` for compiler and actual ghostsim/WASM scans; native/WASM artifacts must have matching build provenance. [Verification](VERIFICATION.md) describes the build prerequisites. The test writes disposable scenario artifacts and never drives hardware.
 
 The online reader defaults to a coordinated **24-hour synthetic daily profile**, using the time-dependent sensor source introduced with E10. Temperature, RH and PPFD vary linearly between the following knots and repeat continuously. Temperature never decreases during 06–18; light is exactly zero during 18–06. This is an illustrative input trajectory, not a greenhouse model or actuator feedback. Each declared sample interval supplies new typed sensor evidence; the actual WASM program computes VPD and control demand.
 

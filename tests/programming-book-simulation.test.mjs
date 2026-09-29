@@ -493,11 +493,12 @@ test('Programming E10 equal-threshold experiment produces the real compiler diag
 });
 
 test('Programming inventory assigns every fence and numbered example to executable, diagnostic or explanatory coverage', () => {
+  const importPackageExamples = ['E22'];
   const numbered = [...book.matchAll(/^### (E\d+) —/gm)].map(match => match[1]).sort();
-  assert.deepEqual(numbered, [...bookRuntimeIds, ...errorExamples.map(([id]) => id), 'E11'].sort());
+  assert.deepEqual(numbered, [...bookRuntimeIds, ...importPackageExamples, ...errorExamples.map(([id]) => id), 'E11'].sort());
   const fences = [...book.matchAll(/^`{3,4}([^`\n]+)$/gm)].map(match => match[1]);
   const counts = Object.fromEntries([...new Set(fences)].map(kind => [kind, fences.filter(item => item === kind).length]));
-  assert.deepEqual(counts, { ghost: bookRuntimeIds.size + 1, text: 3, markdown: 1, sh: 1, 'ghost-error': errorExamples.length });
+  assert.deepEqual(counts, { ghost: bookRuntimeIds.size + importPackageExamples.length + 1, text: 3, markdown: 1, sh: 1, 'ghost-error': errorExamples.length });
   const catalog = JSON.parse(fs.readFileSync(path.join(root, 'examples/curriculum/catalog.json'), 'utf8'));
   assert.deepEqual(catalog.lessons.map(lesson => lesson.id).sort(), [...replay.scenarios.map(lesson => lesson.id), ...additionalLessons.map(([id]) => id)].sort());
   const links = [...book.matchAll(/\]\(\.\.\/(examples\/[^)#]+\.ghost\.md)(?:#[^)]*)?\)/g)].map(match => match[1]);

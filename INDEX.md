@@ -295,6 +295,14 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | --- | --- | --- |
 | [examples/curriculum/generated/pc-01-e01.generated.ghost.md](examples/curriculum/generated/pc-01-e01.generated.ghost.md) | PC-01 — E01 executable projection | md |
 
+## examples/programming-book-imports/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [examples/programming-book-imports/E19.ghost.md](examples/programming-book-imports/E19.ghost.md) | E19.ghost.md | md |
+| [examples/programming-book-imports/E20.ghost.md](examples/programming-book-imports/E20.ghost.md) | E20.ghost.md | md |
+| [examples/programming-book-imports/E22.ghost.md](examples/programming-book-imports/E22.ghost.md) | E22.ghost.md | md |
+
 ## examples/tutorial/
 
 | Path | Title | Type |
@@ -406,4 +414,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-301 documents.
+304 documents.

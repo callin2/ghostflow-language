@@ -17,6 +17,7 @@
     "test:coverage": "node tools/coverage-language.mjs",
     "test:mutation:output": "node tools/mutation-output-contract.mjs",
     "generate:pc01": "node tools/generate-pc-01-projection.mjs --write",
+    "generate:pig-imports": "node tools/generate-programming-book-import-package.mjs --write",
     "tutorial": "node tools/tutorial.mjs",
     "compile": "node tools/ghostc.mjs",
     "compile:example": "node tools/ghostc.mjs examples/scheduled-watering.ghost.md build/scheduled-watering.gfb",

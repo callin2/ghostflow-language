@@ -105,6 +105,13 @@ Parameters are declared inside the definition's control. For example, `parameter
 
 A `connect` source is a root input or instance output; a sink is an instance input or root output. Types must match exactly. Each input has one supplier; all required inputs must be connected. Root outputs are defined by either ordinary `<- expr` or `connect`, never both. Do not erase sensor-port quality into ordinary value ports. Sensor connections are allowed only from root sensors to instance sensors with the same payload type and sample/quality contract. Each instance's declared filter and freshness rules continue to apply.
 
+Sensor connections require matching payload type, optionality and declared sample
+interval. Each instance receives the same root raw sample identity, timestamp,
+quality and value. A root's already-conditioned reading is not substituted.
+Instances own independent filter, recovery and stale state. Function parameters
+and case bindings retain lexical scope; definition functions and calls are
+isolated per instance.
+
 `bind` is not control source syntax. Installation bindings connect root logical ports to actual endpoints. Do not place GPIO addresses, bus addresses, or credentials in this program.
 
 Composition rules are as follows.

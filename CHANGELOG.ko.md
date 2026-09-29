@@ -5,6 +5,17 @@
 
 ## 미출시
 
+### 2026-09-29 — 고정 sensor·함수 합성 ([#377](https://github.com/callin2/ghostflow-language/issues/377))
+
+Reference §6.4의 sensor 연결과 import 순수 함수가 미지원 거부 대신 실행된다.
+예: `connect high.air <- air;`는 root 원본 sample을 `high`의 변경하지 않은 sensor
+conditioning에 공급한다. Payload·선택성·sample 간격은 일치해야 한다. 함수·지역 이름은
+격리한다. 공개 root sensor는 `manifest.sensors`에 둔다. 이 프로그램을 활성화하는
+consumer는 `manifest.sensorInstances` routing을 지원해야 한다. 기존 단독 프로그램과
+GFB·WASM·frame 인터페이스는 바뀌지 않는다. `tests/composition-execution.test.mjs`는
+filter·fault·recovery·stale·rollback·잘못된 연결·provenance·native/WASM conditioning
+frame 일치를 검사한다.
+
 ### 2026-09-29 — 명시적 상대습도 비율 ([#371](https://github.com/callin2/ghostflow-language/issues/371))
 
 Reference §2.9는 기존에 거부하던 `RelativeHumidity / RelativeHumidity -> Number`를
