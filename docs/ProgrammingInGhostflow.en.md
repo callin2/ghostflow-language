@@ -4,62 +4,79 @@
 
 # Programming in GhostFlow
 
-Reading, running, and explaining electrical control as code
+Write device behavior as code, then understand it by running it
 
 **User guide · Language Reference basis · dev reviewed 2026-09-28**
 
-## This document's role
+## Before you begin
 
-GhostFlow is a reactive control language describing state changes and device output intent from sensors and user inputs. This document provides a learning path for reading and writing your first programs. The [Language Reference](LANGUAGE-REFERENCE.md) and its detailed chapters define normative syntax, types, evaluation, and time contracts. See the [GhostFlow Coding FAQ](language_faq.md) for answers to particular coding situations.
+Imagine wanting a lamp to turn on when you press a switch, water to run at a set time, or a pump to stop when water is low.
 
-If this document differs from the Reference, follow the Reference. These examples demonstrate notation and semantics selected in the current specification. They do not claim completed implementation, runtime availability, or board deployability. Reflect syntax changes in the Reference first, then align this guide's examples.
+Each task is simple on its own. But as conditions grow and devices work together, it becomes harder to see what turns on, when it happens, and why it stops.
 
-This review uses dev revision `3982e6bf71cf5880286fcea017cb355ab222428d`. Check subsequent implementation scope in
-[Implementation](IMPLEMENTATION.md) and [feature maturity and executable evidence](REFERENCE-FEATURE-STATUS.md).
-The [Semantic Kernel 0.1 review plan](plans/2026-09-28-semantic-kernel.md) provides background for the frozen minimum semantic contract.
-The whole Reference and this whole book are not included in that stable scope.
+GhostFlow is a language for writing these conditions and actions as code. It describes how states change in response to sensors or user input, and what actions to request from devices.
 
-The independent controls E01–E10 and E12–E14, and E15's literate document, are checked by the current compiler tests.
-E11 is notation guidance. E08's enum/elapsed, E09's schedule, and E10/E14's sensor/adaptation include
-features outside the frozen core. Compilation does not establish activation of required runtime capabilities
-or physical device behavior. Do not read Chapters 11–12's composition/replacement contracts as completed implementation instructions.
+This guide starts with simple examples and works through reading and changing them. We begin by turning one output on and off with a switch, then expand to programs that remember state, wait for time, and change their behavior based on sensor values.
 
-### How to read
+For exact syntax and behavior rules, see the [Language Reference](LANGUAGE-REFERENCE.md). This guide teaches through examples; the Reference defines the language. If their explanations differ, follow the Reference. When syntax changes, update the Reference first, then align this guide's examples.
 
-- Each `ghost` example is an independent program. Do not concatenate all examples into one file.
-- An actual program is a complete `.ghost.md` document. Top-level `ghost` fences combine in document order into one control root. Paragraphs and intent explanations remain part of the source document.
-- Outputs here are logical intent. Physical GPIO, relays, and sensor collection belong to bindings and Drivers.
-- Find exact syntax in the [Reference syntax index](reference/07-semantic-rules-and-index.md#75-선언과-표기-찾아보기). See [Language Reference](LANGUAGE-REFERENCE.md#설계-철학) for design philosophy and [Reference Chapter 8](reference/08-language-runtime-and-device-boundaries.md#83-faq-전체-책임표) for responsibilities by layer.
+For questions that come up while writing code, also see the [GhostFlow Coding FAQ](language_faq.md).
 
-### Example execution verification paths
+### Before reading the examples
 
-The [example execution check](../tests/programming-book-simulation.test.mjs) compiles current originals and
-checks state and requested/safe intents using explicit inputs, logical time, and observations.
-E01–E10, E12–E15 and PC-01–PC-10 use public `ghostsim` paths.
-E02/E08 supply config Results and context facts; E09 supplies civil schedule facts;
-E10/E14 and tutorial/03 supply sensor samples and required capabilities.
-Plain input/state examples execute native Rust; examples requiring the corresponding conditioner execute WASM of the same core.
+An example in this guide does not mean that its feature is ready to use on a physical board.
 
-tutorial/04 checks schedule events and sequential outputs through the existing public `ControlRuntime`/`DailySlots` WASM host.
-station-rules compiles a policy with `ghostrules`, binds it, and checks output authorization and Stop in WASM `GhostFlowStation`.
-These two advanced paths are not classified as `ghostsim` CLI execution. E11 is notation guidance; E90–E97 check intended compiler diagnostics.
-Diagrams and composition explanations are not executable source; source-mutation experiments are checked as separate derived candidates.
+Compilation, support in the execution environment, and the behavior of a real device each need separate verification. This guide explains how to write and read code according to the current specification. It does not claim that every feature is implemented or ready for board deployment.
 
-With Node dependencies and native/WASM artifacts built from the same revision, run
-`node --test tests/programming-book-simulation.test.mjs`. Follow [Verification](VERIFICATION.md) for the complete build/verification sequence.
-The compiler check in `tests/docs-runnable-examples.test.mjs` also runs without runtime builds.
-This evidence establishes logical execution; physical device verification is separate.
-Chapter 14 adds E16–E22 temperature/climate sensor programs. Their actual ghostsim scans and independent numerical WASM checks are in `tests/programming-book-simulation.test.mjs`, `tests/programming-climate.test.mjs`, and `tests/programming-book-import-package.test.mjs`.
+This document review is based on dev revision `3982e6bf71cf5880286fcea017cb355ab222428d`. See [Implementation](IMPLEMENTATION.md) and [feature maturity and executable evidence](REFERENCE-FEATURE-STATUS.md) for later implementation and verification status.
+
+The [Semantic Kernel 0.1 review plan](plans/2026-09-28-semantic-kernel.md) explains the background and core scope whose behavior was prioritized for definition. Not every feature in the Reference or this guide is part of that scope.
+
+The compiler tests cover independent control programs E01–E10 and E12–E14, and the literate document E15. E11 explains notation; it is not an executable example.
+
+E08's `enum` and `elapsed`, E09's schedules, and E10/E14's sensor and adaptation features include behavior outside that core scope. Do not read the program composition and replacement explanations in Chapters 11–12 as instructions for features that are fully implemented.
+
+### How to read the examples
+
+**Run each example separately.** Every `ghost` example is an independent program. Do not join all the book's examples into one file and run them together.
+
+**Explanations are part of the program document.** An actual program is written as a `.ghost.md` document. If its code is split across several top-level `ghost` blocks, read the blocks from top to bottom as one control program. Keep the paragraphs and explanations of why the program should behave a certain way in the source document too.
+
+**Distinguish code output from device behavior.** An output here is a value that requests an action from a device. Producing a value that says to turn on a pump does not turn on a real pump by itself. A binding connects that value to a GPIO or relay, and a Driver handles the hardware. Reading sensor values is also handled there.
+
+For exact notation, see the [Reference syntax index](reference/07-semantic-rules-and-index.md#75-선언과-표기-찾아보기). The [design philosophy](LANGUAGE-REFERENCE.md#설계-철학) explains why the language is designed this way. [Reference Chapter 8](reference/08-language-runtime-and-device-boundaries.md#83-faq-전체-책임표) describes responsibilities across the language, execution environment, and device.
+
+### How are the examples checked?
+
+The [example execution check](../tests/programming-book-simulation.test.mjs) compiles original examples, runs them with specified inputs and test times, then checks state changes, requested intent, and safe intent.
+
+Examples need different inputs and execution environments, so their checks vary.
+
+E01–E10, E12–E15, and PC-01–PC-10 are checked through the public `ghostsim` path. E02/E08 receive configuration Results and context facts; E09 receives civil schedule facts. E10/E14 and tutorial/03 receive sensor samples and the execution capabilities they need.
+
+Ordinary input and state examples run in native Rust. Examples that need the corresponding conditioner use a WASM build of the same core.
+
+tutorial/04 checks schedule events and sequential outputs in the existing `ControlRuntime`/`DailySlots` WASM host. station-rules compiles a policy with `ghostrules`, binds it, then checks output authorization and `Stop` in WASM `GhostFlowStation`. These advanced examples are checked separately from the `ghostsim` CLI path.
+
+E11 explains notation. E90–E97 check whether the compiler reports expected errors for intentionally invalid code. Diagrams and explanations of program composition are not executed. Source-mutation experiments are checked separately from the originals.
+
+To run the example check directly, you need Node dependencies and native/WASM artifacts built from the same revision. Then run `node --test tests/programming-book-simulation.test.mjs`. See [Verification](VERIFICATION.md) for the full build and verification sequence.
+
+The compiler check in `tests/docs-runnable-examples.test.mjs` can run without building the runtime.
+
+Chapter 14 introduces E16–E22 examples using temperature and climate sensors. Checks for `ghostsim` control calculations and independent WASM numerical calculations are in `tests/programming-book-simulation.test.mjs`, `tests/programming-climate.test.mjs`, and `tests/programming-book-import-package.test.mjs`.
+
+These steps check program logic and calculations. Whether real sensors and devices behave as intended must be verified separately.
 
 ## Contents
 
-### First practical path — from PLC to GhostFlow
+### From PLC to GhostFlow — start with practice
 
-The ten-stage learning path starts with buttons and lamps, then extends to START/STOP, motors, interlocks, limits, timers,
-water levels, Manual/Auto, sequential control, and fault recovery. Examine each stage's control intent separately
-from its language examples.
+The ten-stage practice path starts with buttons and lamps. It then covers START/STOP, motors, interlocks, limits, timers, water levels, Manual/Auto operation, sequential control, and fault recovery.
 
-### Language chapters
+At each stage, first consider how the device should behave. Then see how to express that behavior in GhostFlow code.
+
+### Browse by topic
 
 1. [One switch and one output](#ch01)
 2. [Names, values, types, and expressions](#ch02)
@@ -77,6 +94,7 @@ from its language examples.
 14. [Temperature units and air-VPD control](#ch14)
 
 Appendices: [A. Specification guide](#appendix-a) · [B. Learning through errors](#appendix-b)
+
 
 <a id="ch01"></a>
 ## 1. One switch and one output
