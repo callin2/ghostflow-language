@@ -27,7 +27,15 @@ trace, provenance를 비교한 뒤 수용한다. Closure 상한은 문서 128개
 전이적 소스 해석, 잘못된 연결, 누락 입력, 인자 오류,
 미사용 출력 타입 검사, 산출물/provenance 변조를 다룬다.
 
-아직 미지원: sensor/filter/timer/schedule/config/function/enum/resource/constraint
+[#377](https://github.com/callin2/ghostflow-language/issues/377)에서 sensor와 순수 함수 합성을 추가했다.
+Root 원본 패킷을 독립적인 instance conditioner에 나누어 공급한다. 공개 sensor는
+`manifest.sensors`에, 비공개 descriptor는 `sourceSensor`, `instance`, `port`를 가진
+`manifest.sensorInstances`에 둔다. Payload·선택성·선언한 sample 간격은 일치해야 한다.
+함수 인자와 case 바인딩은 lexical scope를 유지한다. 독립 filter·fault·recovery·stale,
+scan rollback·비공개 패킷 거부·소스 복원·실제 conditioning frame의 native/WASM 비교를
+집중 테스트한다. GFB·ABI·frame protocol은 바뀌지 않는다.
+
+아직 미지원: timer/schedule/config/enum/resource/constraint
 선언의 합성, imported intent-link 확장, qualified 공개 function/type export.
 Instance 의미를 조용히 잃는 대신 명시적으로 실패한다.
 Imported revision label은 공급된 closure 식별자와 비교한다.

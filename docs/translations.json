@@ -159,8 +159,8 @@
       "source": "docs/IMPLEMENTATION.md",
       "sourceLanguage": "en",
       "translation": "docs/IMPLEMENTATION.ko.md",
-      "sourceSha256": "fa830fc1a9b8bec982f6b4ee9ea2e9c858126d5492941e360500e0249853946d",
-      "translationSha256": "3cfe09433bc8b317f82e5709c07ae5c6afeac937bfb18894999aaa3db64f0720"
+      "sourceSha256": "e9f89dde19c8e4029eee0844de483dee019c64acd5c8cd3e15e2f9abd64ea7f5",
+      "translationSha256": "06e76601727ebad397047b36d822d3a458b7c28b160d689a83b74bd390376d39"
     },
     {
       "source": "docs/INTENT-ANCHOR-MAP.md",
@@ -271,8 +271,8 @@
       "source": "docs/ProgrammingInGhostflow.md",
       "sourceLanguage": "ko",
       "translation": "docs/ProgrammingInGhostflow.en.md",
-      "sourceSha256": "b6f326a8103359ae39ad6c0cd2f7cfbf43495fccc7ad7831c81a79b77bdc3a44",
-      "translationSha256": "f361bb6816e15b5d25427301e569735078d833a68b9923e1fd3232eeb748f61a"
+      "sourceSha256": "3513827fb551ee27290b86ca6088a56ef5aef2632a53b808f34d5906ddc4728e",
+      "translationSha256": "c995dca5433eab1ac250951492444897d05bcc88926fd5aeb4da519af787390b"
     },
     {
       "source": "docs/REFERENCE-QUERY.md",
@@ -320,8 +320,8 @@
       "source": "docs/reference/06-composition-and-replay.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/06-composition-and-replay.en.md",
-      "sourceSha256": "2b761d3ed8c43c06f86570529829b0eb3e69064f44c02e5b4dc32c1089f1d706",
-      "translationSha256": "6247baee1f9c49bc768af3e5b768bc7d055d923b1ae3225410ffa42e812db547"
+      "sourceSha256": "076ff98562d2217402e8f3bd556d600e85fd0ed02e5a93ef5997b55864c1a573",
+      "translationSha256": "a93acee1b5c1783146fde77d6e87e63edb07beffdc17c0d7abe6d2bf892af7c6"
     },
     {
       "source": "docs/reference/07-semantic-rules-and-index.md",
@@ -516,8 +516,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "1d81f0694495dcba579b0fdbe4ede73ef319a977c4f1cffd1ff4c1d0054afd77",
-      "translationSha256": "05e49c48e6ff80a85fc634403f593dbe9161c4ae9be15befffc42214a6f5ea6f"
+      "sourceSha256": "778d8121584695210fc233e665ed08254c402a04078d267beeb4b1f9f337ecea",
+      "translationSha256": "d3625b86d6f440bbd621fd3bf54ab56adf43e9f47d5901cad1c63f2a26632ac7"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",
@@ -712,8 +712,8 @@
       "source": "tasks/import-validation-plan.md",
       "sourceLanguage": "en",
       "translation": "tasks/import-validation-plan.ko.md",
-      "sourceSha256": "0e1e5b78f68bb6f5e526d30b5be5b65f9c6232f8d83d10476ff602ec8a4a083a",
-      "translationSha256": "815b34b71c485badb70740d633ce1e458da825f9ecf79b07bcbd48420ed623de"
+      "sourceSha256": "b8a09ab3b5885ccb913f7950fe34cf3e971912e5282c4d975ad215fd56326f3b",
+      "translationSha256": "b2e19518afea13d9e90293cb4e80995a86016d44c9e78eb24764d383672c26e2"
     },
     {
       "source": "tasks/issue-135-daily-slots-plan.md",
@@ -987,6 +987,18 @@
     {
       "path": "examples/curriculum/generated/pc-01-e01.generated.ghost.md",
       "reason": "Generated canonical source projection of the programming book; translate the authored book instead."
+    },
+    {
+      "path": "examples/programming-book-imports/E19.ghost.md",
+      "reason": "Generated exact canonical section from the bilingual programming book; translate the authored book instead."
+    },
+    {
+      "path": "examples/programming-book-imports/E20.ghost.md",
+      "reason": "Generated exact canonical section from the bilingual programming book; translate the authored book instead."
+    },
+    {
+      "path": "examples/programming-book-imports/E22.ghost.md",
+      "reason": "Generated exact canonical section from the bilingual programming book; translate the authored book instead."
     },
     {
       "path": "PLAN.md",

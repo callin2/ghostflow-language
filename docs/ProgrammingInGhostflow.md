@@ -46,7 +46,7 @@ Node dependencies와 같은 revision에서 빌드한 native/WASM 산출물이 �
 `node --test tests/programming-book-simulation.test.mjs`로 실행한다. 전체 빌드·검증 순서는
 [Verification](VERIFICATION.md)을 따른다. `tests/docs-runnable-examples.test.mjs`의 compiler 검사는
 runtime 빌드 없이도 실행할 수 있다. 이 근거는 논리 실행이며 물리 장치 검증은 별도다.
-14장은 E16–E21 온도·climate 센서 프로그램을 추가한다. 실제 ghostsim scan과 독립 수치 WASM 검사는 `tests/programming-book-simulation.test.mjs`, `tests/programming-climate.test.mjs`에 있다.
+14장은 E16–E22 온도·climate 센서 프로그램을 추가한다. 실제 ghostsim scan과 독립 수치 WASM 검사는 `tests/programming-book-simulation.test.mjs`, `tests/programming-climate.test.mjs`, `tests/programming-book-import-package.test.mjs`에 있다.
 
 ## 목차
 
@@ -1468,9 +1468,57 @@ control IrrigationDemand {
 }
 ```
 
+### E22 — 기존 VPD 제어 두 개를 import로 함께 실행하기
+
+E22는 E19와 E20의 원문을 복사하지 않는다. 두 원본 section에서 생성한 완전한
+`.ghost.md` 문서를 정확한 revision과 SHA-256으로 고정해 import한다. `air`,
+`humidity`, `light`의 한 raw sample packet은 두 instance에 함께 전달되지만, 각
+instance의 sensor conditioner와 `demand` state는 독립적이다. root는 두 demand를
+모두 공개하고, 같은 입력에서 계산한 공통 VPD 관측은 `high` instance의
+`air_vpd_value`와 `vpd_valid`를 공개한다.
+
+```ghost
+// E22
+import HighVpd from "./E19.ghost.md"
+  revision "7e135b93ea4c4988d305f992db277a6d8581a271"
+  sha256 "ef80061222c5c671b8b78d8fae733b543e51149c7e5d2c7d5e2bb2cc41fbdb30";
+import LowVpd from "./E20.ghost.md"
+  revision "7e135b93ea4c4988d305f992db277a6d8581a271"
+  sha256 "bbf57007c5973684660747c515bb2534124d50341647b2282bd2ca32852a724b";
+control CombinedVpdDemands {
+  sensor air: Temperature {
+    sample = 1s; valid = 0°C .. 50°C;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor humidity: RelativeHumidity {
+    sample = 1s; valid = 0%RH .. 100%RH;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor light: PPFD {
+    sample = 1s; valid = 0umol/m2/s .. 3000umol/m2/s;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  output air_vpd_value: VaporPressureDeficit;
+  output vpd_valid, humidify_demand, ventilate_demand: Bool;
+  instance high: HighVpd;
+  instance low: LowVpd;
+  connect high.air <- air;
+  connect high.humidity <- humidity;
+  connect high.light <- light;
+  connect low.air <- air;
+  connect low.humidity <- humidity;
+  connect low.light <- light;
+  connect air_vpd_value <- high.air_vpd_value;
+  connect vpd_valid <- high.vpd_valid;
+  connect humidify_demand <- high.humidify_demand;
+  connect ventilate_demand <- low.ventilate_demand;
+}
+```
+
 ### 실행하고 입력 하나를 바꾸며 관찰하기
 
-E15처럼 E16–E21 fence를 각각 완전한 .ghost.md 문서로 컴파일한다. `node --test tests/programming-climate.test.mjs tests/programming-book-simulation.test.mjs`로 compiler와 실제 ghostsim/WASM scan을 확인한다. native/WASM artifact의 build provenance가 맞아야 한다. [검증](VERIFICATION.md)에 build 전제가 있다. 테스트는 임시 scenario artifact를 쓰며 하드웨어를 구동하지 않는다.
+E15처럼 E16–E21 fence를 각각 완전한 .ghost.md 문서로 컴파일한다. E22는 생성된
+`examples/programming-book-imports` source closure와 함께 컴파일한다. `node --test tests/programming-climate.test.mjs tests/programming-book-simulation.test.mjs tests/programming-book-import-package.test.mjs`로 compiler와 실제 ghostsim/WASM scan을 확인한다. native/WASM artifact의 build provenance가 맞아야 한다. [검증](VERIFICATION.md)에 build 전제가 있다. 테스트는 임시 scenario artifact를 쓰며 하드웨어를 구동하지 않는다.
 
 온라인 reader의 기본값은 E10의 시간 의존 센서 소스를 이용한 **24시간 합성 일변화 profile**이다. 온도·RH·PPFD는 아래 지점 사이를 선형으로 변하며 연속 반복한다. 06–18에는 온도가 내려가지 않으며 18–06에는 빛이 정확히 0이다. 학습용 입력 궤적이며 온실 모델이나 actuator 피드백이 아니다. 선언된 샘플 간격마다 새 타입 센서 증거를 공급한다. 실제 WASM 프로그램이 VPD와 제어 요구를 계산한다.
 

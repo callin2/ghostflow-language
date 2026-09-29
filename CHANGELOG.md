@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### 2026-09-29 — pinned sensor and function composition ([#377](https://github.com/callin2/ghostflow-language/issues/377))
+
+Reference §6.4 sensor connections and imported pure functions now execute, instead
+of being rejected as unsupported composition. For example, `connect high.air <- air;`
+feeds the root raw sample into `high`'s own unchanged sensor conditioning. Payload,
+optionality and sample interval must match. Function/local names remain isolated.
+Public root sensors stay in `manifest.sensors`; consumers activating these programs
+must support `manifest.sensorInstances` routing. Existing standalone programs and
+GFB/WASM/frame interfaces are unchanged. `tests/composition-execution.test.mjs`
+checks filtering, faults, recovery, staleness, rollback, invalid wiring, provenance
+and native/WASM conditioned-frame parity.
+
 ### 2026-09-29 — explicit relative-humidity ratio ([#371](https://github.com/callin2/ghostflow-language/issues/371))
 
 Reference §2.9 now permits `RelativeHumidity / RelativeHumidity -> Number`,
