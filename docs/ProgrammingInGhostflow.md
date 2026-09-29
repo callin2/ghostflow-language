@@ -1,62 +1,78 @@
 # Programming in GhostFlow
 
-전기 제어를 코드로 읽고, 실행하고, 설명하기
+장치의 동작을 코드로 적고, 실행해 보며 이해하기
 
 **사용 안내서 · Language Reference 기준 · 2026-09-28 dev 검토**
 
-## 이 문서의 역할
+## 시작하기 전에
 
-GhostFlow는 센서와 사용자 입력으로부터 상태 변화와 장치 출력 의도를 기술하는 반응형 제어 언어다. 이 문서는 처음 프로그램을 읽고 쓰는 학습 경로다. 언어의 규범 문법·타입·평가·시간 계약은 [Language Reference](LANGUAGE-REFERENCE.md)와 각 장의 상세 문서가 기준이다. 코딩 상황별 답은 [GhostFlow Coding FAQ](language_faq.md)를 참조한다.
+스위치를 누르면 램프가 켜지고, 정해진 시간이 되면 물을 주고, 물이 부족하면 펌프가 멈추게 하고 싶다고 해볼게요.
 
-Reference와 이 문서가 다르면 Reference를 따른다. 이 문서의 예제는 현재 명세에서 선택된 표기와 의미를 보여 준다. 구현 완료 여부, 런타임 가용성, 보드 배포 가능성을 주장하지 않는다. 변경된 문법은 Reference에 먼저 반영하고 이 사용 안내서의 예제를 맞춘다.
+하나씩 보면 단순한 일이에요. 그런데 조건이 늘어나고 여러 장치가 함께 움직이기 시작하면, 무엇이 언제 켜지고 왜 멈추는지 알아보기 어려워지죠.
 
-이번 검토 기준은 dev revision `3982e6bf71cf5880286fcea017cb355ab222428d`다. 이후 구현 범위는
-[Implementation](IMPLEMENTATION.md)과 [기능별 성숙도·실행 근거](REFERENCE-FEATURE-STATUS.md)에서 확인한다.
-[Semantic Kernel 0.1 검토 계획](plans/2026-09-28-semantic-kernel.ko.md)은 동결된 최소 의미 계약의 배경이다.
-Reference 전체 또는 이 책 전체가 그 안정 범위에 포함되는 것은 아니다.
+GhostFlow는 이런 조건과 동작을 코드로 적는 언어예요. 센서값이나 사용자의 조작에 따라 어떤 상태로 바뀌고, 장치에 어떤 동작을 요청할지 정하는 거예요.
 
-E01–E10, E12–E14의 독립 control과 E15의 literate 문서는 현재 compiler 검사 대상이다.
-E11은 표기 안내다. E08의 enum·elapsed, E09의 일정, E10/E14의 센서·적응은
-동결 core 밖의 기능을 포함한다. 컴파일 성공은 필요한 runtime capability의 활성화나
-물리 장치 동작을 증명하지 않는다. 11–12장의 합성·교체 계약은 구현 완료 지침으로 읽지 않는다.
+이 안내서에서는 간단한 예제부터 하나씩 읽고 바꿔볼 거예요. 스위치 하나로 출력을 켜고 끄는 것부터 시작해서, 상태를 기억하고, 시간을 기다리고, 센서값에 따라 동작을 바꾸는 프로그램으로 넓혀갑니다.
 
-### 읽는 방법
+문법과 동작 규칙을 정확하게 확인할 때는 [Language Reference](LANGUAGE-REFERENCE.md)를 보면 돼요. 이 안내서는 예제로 배우는 글이고, Reference는 언어의 기준을 정한 문서예요. 두 문서의 설명이 다르다면 Reference를 따라주세요. 문법이 바뀔 때도 Reference를 먼저 고치고, 그에 맞춰 이 안내서의 예제를 수정해요.
 
-- 각 `ghost` 예제는 독립 프로그램이다. 한 파일에 모두 이어 붙이지 않는다.
-- 실제 프로그램은 완전한 `.ghost.md` 문서다. 최상위 `ghost` fence들을 문서 순서대로 합쳐 하나의 control root를 이룬다. 문단과 의도 설명은 소스 문서의 일부로 보존된다.
-- 여기서 출력은 논리적 intent다. 물리 GPIO, 릴레이, 센서 수집은 binding과 Driver의 책임이다.
-- 정확한 문법은 [Reference 문법 색인](reference/07-semantic-rules-and-index.md#75-선언과-표기-찾아보기)에서 찾는다. 설계 철학은 [Language Reference](LANGUAGE-REFERENCE.md#설계-철학), 계층별 책임은 [Reference 8장](reference/08-language-runtime-and-device-boundaries.md#83-faq-전체-책임표)을 본다.
+코드를 작성하다가 궁금한 점이 생기면 [GhostFlow Coding FAQ](language_faq.md)도 함께 참고해주세요.
 
-### 예제의 실행 검증 경로
+### 예제를 읽기 전에 알아둘 점
 
-[예제 실행 검사](../tests/programming-book-simulation.test.mjs)는 현재 원본을 컴파일하고
-명시적인 입력·논리 시각·관측으로 상태와 requested/safe intent를 검사한다.
-E01–E10, E12–E15와 PC-01–PC-10은 public `ghostsim` 경로를 사용한다.
-E02/E08은 설정 Result와 context facts, E09는 civil schedule facts,
-E10/E14와 tutorial/03은 sensor samples와 필요한 capability를 공급한다.
-일반 입력·상태 예제는 native Rust, 해당 conditioner가 필요한 예제는 같은 core의 WASM을 실행한다.
+이 안내서에 예제가 있다고 해서, 그 기능을 지금 바로 보드에 올려 쓸 수 있다는 뜻은 아니에요.
 
-tutorial/04는 기존 public `ControlRuntime`·`DailySlots` WASM 호스트 경로에서 일정 사건과
-순차 출력을 검사한다. station-rules는 `ghostrules`로 컴파일한 정책을 binding한 뒤
-WASM `GhostFlowStation`의 출력 허가와 Stop을 검사한다. 두 심화 경로를 `ghostsim` CLI
-실행으로 분류하지 않는다. E11은 표기 안내이고 E90–E97은 의도한 compiler 진단을 검사한다.
-diagram·합성 설명은 실행 소스가 아니며, 소스 변경 실험은 별도 파생 후보로 검사한다.
+코드가 컴파일되는 것, 실행 환경이 그 기능을 지원하는 것, 실제 장치가 의도대로 움직이는 것은 각각 따로 확인해야 해요. 이 안내서는 현재 명세에 맞춰 코드를 어떻게 쓰고 읽는지 설명하지만, 모든 기능의 구현이나 보드 배포가 끝났다는 뜻은 아니에요.
 
-Node dependencies와 같은 revision에서 빌드한 native/WASM 산출물이 있으면
-`node --test tests/programming-book-simulation.test.mjs`로 실행한다. 전체 빌드·검증 순서는
-[Verification](VERIFICATION.md)을 따른다. `tests/docs-runnable-examples.test.mjs`의 compiler 검사는
-runtime 빌드 없이도 실행할 수 있다. 이 근거는 논리 실행이며 물리 장치 검증은 별도다.
-14장은 E16–E22 온도·climate 센서 프로그램을 추가한다. 실제 ghostsim scan과 독립 수치 WASM 검사는 `tests/programming-book-simulation.test.mjs`, `tests/programming-climate.test.mjs`, `tests/programming-book-import-package.test.mjs`에 있다.
+이번 문서 검토는 dev revision `3982e6bf71cf5880286fcea017cb355ab222428d`를 기준으로 했어요. 이후에 어떤 기능이 구현되었고 어디까지 확인했는지는 [Implementation](IMPLEMENTATION.md)과 [기능별 성숙도·실행 근거](REFERENCE-FEATURE-STATUS.md)에서 확인해주세요.
+
+[Semantic Kernel 0.1 검토 계획](plans/2026-09-28-semantic-kernel.ko.md)에는 우선 동작 규칙을 고정하기로 한 핵심 범위와 그 배경이 정리되어 있어요. Reference나 이 안내서에 나오는 모든 기능이 그 범위에 들어가는 것은 아니에요.
+
+E01–E10, E12–E14의 독립 제어 프로그램과 E15의 설명·코드가 함께 있는 문서는 컴파일러 검사 대상이에요. E11은 실행 예제가 아니라 표기를 설명하는 예제예요.
+
+E08의 `enum`·`elapsed`, E09의 일정, E10/E14의 센서·적응 기능에는 아직 그 핵심 범위에 포함되지 않은 내용도 있어요. 11–12장의 프로그램 합성과 교체에 관한 설명도, 구현이 모두 끝난 기능의 사용법으로 받아들이지는 말아주세요.
+
+### 예제는 이렇게 읽어주세요
+
+**예제는 하나씩 따로 실행해주세요.** 각 `ghost` 예제는 독립된 프로그램이에요. 책에 나온 예제를 전부 한 파일에 이어 붙여 실행하는 방식은 아니에요.
+
+**설명도 프로그램의 일부예요.** 실제 프로그램은 `.ghost.md` 문서로 작성해요. 한 프로그램의 코드를 여러 `ghost` 코드 블록으로 나눠 적었다면, 문서 최상위에 있는 블록들을 위에서부터 합쳐 하나의 제어 프로그램으로 읽어요. 코드 사이에 적은 문단이나 “왜 이렇게 동작해야 하는지”에 대한 설명도 소스 문서에 함께 남아요.
+
+**코드의 출력과 실제 장치의 동작은 구분해주세요.** 여기서 출력은 장치에 어떤 동작을 요청할지 계산한 값이에요. 코드에서 펌프를 켜라는 값을 만들었다고 실제 펌프가 바로 켜지는 건 아니에요. 그 값을 어느 GPIO나 릴레이에 연결할지 정하는 설정(binding)과, 하드웨어를 다루는 Driver가 따로 필요해요. 센서에서 값을 읽어오는 일도 이쪽에서 맡아요.
+
+정확한 표기가 궁금하면 [Reference 문법 색인](reference/07-semantic-rules-and-index.md#75-선언과-표기-찾아보기)을 찾아보세요. 왜 이런 방식으로 설계했는지는 [설계 철학](LANGUAGE-REFERENCE.md#설계-철학)에, 언어·실행 환경·장치가 각각 맡는 일은 [Reference 8장](reference/08-language-runtime-and-device-boundaries.md#83-faq-전체-책임표)에 정리되어 있어요.
+
+### 예제는 어떻게 확인하나요?
+
+[예제 실행 검사](../tests/programming-book-simulation.test.mjs)에서는 원본 예제를 컴파일한 뒤, 입력값과 시험용 시각을 정해 프로그램을 실행해요. 그런 다음 상태가 어떻게 바뀌었는지, 어떤 출력을 요청했는지(requested intent), 안전 조건을 반영한 출력은 무엇인지(safe intent)를 확인해요.
+
+예제마다 필요한 입력과 실행 환경이 달라서, 검사 방법도 조금씩 달라요.
+
+E01–E10, E12–E15와 PC-01–PC-10은 공개된 `ghostsim` 실행 경로로 검사해요. E02/E08에는 설정 처리 결과(`Result`)와 실행 맥락 정보(`context facts`)를, E09에는 달력·시각을 기준으로 한 일정 정보(`civil schedule facts`)를 넣어요. E10/E14와 tutorial/03에는 센서 샘플을 공급하고, 예제에 필요한 실행 기능(`capability`)도 갖춰줘요.
+
+일반적인 입력·상태 예제는 네이티브 Rust로 실행해요. 해당 입력 처리기(`conditioner`)가 필요한 예제는 같은 핵심 코드를 WASM으로 빌드한 버전을 사용해요.
+
+tutorial/04는 기존에 공개된 `ControlRuntime`·`DailySlots` WASM 실행 환경에서 일정에 따른 이벤트와 순차 출력을 확인해요. station-rules는 `ghostrules`로 컴파일한 정책을 연결한 뒤, WASM `GhostFlowStation`에서 출력 허가와 `Stop` 동작을 확인하고요. 이 두 심화 예제는 `ghostsim` CLI로 실행한 검사와 구분해요.
+
+E11은 표기를 설명하는 예제이고, E90–E97은 일부러 잘못된 코드를 넣었을 때 컴파일러가 예상한 오류를 알려주는지 확인하는 예제예요. 그림이나 프로그램 합성에 관한 설명 자체를 실행하는 것은 아니에요. 소스를 바꿔보는 실험도 원본과 구분해서 검사해요.
+
+직접 검사를 실행하려면 Node 의존성과 같은 revision에서 빌드한 네이티브/WASM 파일이 필요해요. 준비가 끝나면 `node --test tests/programming-book-simulation.test.mjs`를 실행하면 돼요. 전체 빌드와 검증 순서는 [Verification](VERIFICATION.md)에 정리되어 있어요.
+
+컴파일러 검사인 `tests/docs-runnable-examples.test.mjs`는 런타임을 빌드하지 않아도 실행할 수 있어요.
+
+14장에는 온도와 기후 센서를 다루는 E16–E22 예제가 나와요. `ghostsim`의 제어 계산과 별도의 WASM 수치 계산을 확인하는 검사는 `tests/programming-book-simulation.test.mjs`, `tests/programming-climate.test.mjs`, `tests/programming-book-import-package.test.mjs`에 있어요.
+
+여기까지는 프로그램의 논리와 계산을 확인하는 과정이에요. 실제 센서와 장치를 연결했을 때도 의도대로 동작하는지는 별도로 확인해야 해요.
 
 ## 목차
 
-### 먼저 실습할 경로 — PLC에서 GhostFlow로
+### PLC에서 GhostFlow로 — 실습부터 시작하기
 
-10단계 학습 경로는 버튼·램프에서 시작해 START/STOP, 모터, 인터록, 리미트, 타이머,
-수위, Manual/Auto, 순차제어와 고장 복구로 확장한다. 단계별 제어 의도를 언어 예제와
-구분해 확인한다.
+버튼과 램프부터 시작하는 10단계 실습 과정이에요. START/STOP, 모터, 인터록, 리미트, 타이머, 수위, 수동/자동 운전, 순차제어와 고장 복구까지 차례로 다뤄요.
 
-### 언어별 장
+각 단계에서는 먼저 “장치가 어떻게 움직여야 하는지”를 살펴보고, 그 동작을 GhostFlow 코드로 어떻게 적는지 확인해주세요.
+
+### 주제별로 살펴보기
 
 1. [스위치 하나와 출력 하나](#ch01)
 2. [이름, 값, 타입, 표현식](#ch02)
