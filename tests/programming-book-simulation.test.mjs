@@ -108,6 +108,52 @@ const plainCases = [
   ['E12', [frame(0, { a: 6, b: 2 }, { sum: 8, difference: 4, product: 12, quotient: 3, negative: -6, equal: false, different: true, less: false, at_most: false, greater: true, at_least: true })]],
   ['E13', [frame(0, { a: 6, b: 2 }, { result: 3 }), frame(1, { a: 6, b: 0 }, { result: 0 })]],
   ['E15', [frame(0, { switch_on: false }, { lamp: false }), frame(1, { switch_on: true }, { lamp: true })]],
+  ['E23', [
+    frame(0, { start: false, stop: false, jam_clear: true, reset: false }, { conveyor: false, fault_lamp: false }, { running: false, fault_latched: false, start_armed: true }),
+    frame(1, { start: true, stop: false, jam_clear: true, reset: false }, { conveyor: true, fault_lamp: false }, { running: true, fault_latched: false, start_armed: false }),
+    frame(2, { start: false, stop: false, jam_clear: true, reset: false }, { conveyor: true, fault_lamp: false }, { running: true, fault_latched: false, start_armed: true }),
+    frame(3, { start: false, stop: false, jam_clear: false, reset: false }, { conveyor: false, fault_lamp: true }, { running: false, fault_latched: true, start_armed: false }),
+    frame(4, { start: false, stop: false, jam_clear: true, reset: false }, { conveyor: false, fault_lamp: true }, { running: false, fault_latched: true, start_armed: false }),
+    frame(5, { start: false, stop: false, jam_clear: true, reset: true }, { conveyor: false, fault_lamp: false }, { running: false, fault_latched: false, start_armed: true }),
+    frame(6, { start: true, stop: false, jam_clear: true, reset: false }, { conveyor: true, fault_lamp: false }, { running: true, fault_latched: false, start_armed: false }),
+  ]],
+  ['E24', [
+    frame(0, { open_request: true, close_request: false, stop: false, open_limit: false }, { open_command: true, close_command: false, moving_open: true, open_confirmed: false }, { target_open: true }),
+    frame(1, { open_request: false, close_request: false, stop: false, open_limit: true }, { open_command: true, close_command: false, moving_open: false, open_confirmed: true }, { target_open: true }),
+    frame(2, { open_request: false, close_request: true, stop: false, open_limit: true }, { open_command: false, close_command: true, moving_open: false, open_confirmed: true }, { target_open: false }),
+    frame(3, { open_request: false, close_request: false, stop: true, open_limit: false }, { open_command: false, close_command: false, moving_open: false, open_confirmed: false }, { target_open: false }),
+  ]],
+  ['E25', [
+    frame(0, { stop_ok: true, forward_request: true, reverse_request: false }, { forward_command: true, reverse_command: false, conflict: false }),
+    frame(1, { stop_ok: true, forward_request: true, reverse_request: true }, { forward_command: false, reverse_command: false, conflict: true }),
+    frame(2, { stop_ok: false, forward_request: false, reverse_request: true }, { forward_command: false, reverse_command: false, conflict: false }),
+  ]],
+  ['E26', [frame(0, { watering_window: true, soil_needs_water: true, source_ready: true }, { pump_request: true }), frame(1, { watering_window: true, soil_needs_water: false, source_ready: true }, { pump_request: false })]],
+  ['E27', [frame(0, { enabled: true, light_schedule: true, ventilation_request: false, drain_request: true, drain_path_ready: false }, { grow_light: true, circulation_fan: false, drain_pump: false, warning: true })]],
+  ['E28', [
+    frame(0, { fill_request: true, stop_ok: true, valve_open_limit: false, source_full: false }, { valve_open_command: true, pump_command: false }, { filling: true }),
+    frame(1, { fill_request: false, stop_ok: true, valve_open_limit: true, source_full: false }, { valve_open_command: true, pump_command: true }, { filling: true }),
+    frame(2, { fill_request: false, stop_ok: true, valve_open_limit: true, source_full: true }, { valve_open_command: false, pump_command: false }, { filling: false }),
+  ]],
+  ['E29', [
+    frame(0, { fill_request: true, stop_ok: true, valve_open_limit: false }, { valve_open_command: true, pump_command: false, waiting_for_valve: true }),
+    frame(1, { fill_request: true, stop_ok: true, valve_open_limit: true }, { valve_open_command: true, pump_command: true, waiting_for_valve: false }),
+    frame(2, { fill_request: true, stop_ok: false, valve_open_limit: false }, { valve_open_command: false, pump_command: false, waiting_for_valve: false }),
+  ]],
+  ['E30', [
+    frame(0, { enabled: true, watering_window: true, soil_needs_water: true, source_ready: false }, { pump_request: false, source_attention: true }),
+    frame(1, { enabled: true, watering_window: true, soil_needs_water: true, source_ready: true }, { pump_request: true, source_attention: false }),
+    frame(2, { enabled: true, watering_window: false, soil_needs_water: true, source_ready: true }, { pump_request: false, source_attention: false }),
+  ]],
+  ['E31', [
+    frame(0, { bed_a_needs_water: true, bed_b_needs_water: false, source_ready: true }, { bed_a_valve: true, bed_b_valve: false, shared_pump: true }),
+    frame(1, { bed_a_needs_water: true, bed_b_needs_water: true, source_ready: true }, { bed_a_valve: true, bed_b_valve: true, shared_pump: true }),
+    frame(2, { bed_a_needs_water: true, bed_b_needs_water: true, source_ready: false }, { bed_a_valve: false, bed_b_valve: false, shared_pump: false }),
+  ]],
+  ['E32', [
+    frame(0, { soil_moisture: 20, threshold: 35 }, { pump_request: true }),
+    frame(1, { soil_moisture: 40, threshold: 35 }, { pump_request: false }),
+  ]],
 ];
 
 for (const [id, frames] of plainCases) {

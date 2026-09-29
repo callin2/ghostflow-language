@@ -89,7 +89,7 @@ E11은 표기를 설명하는 예제이고, E90–E97은 일부러 잘못된 코
 13. [내장함수와 내장 연산](#ch13)
 14. [온도 단위와 공기 VPD 제어](#ch14)
 
-부록: [A. 명세 길잡이](#appendix-a) · [B. 오류로 배우기](#appendix-b)
+부록: [A. 명세 길잡이](#appendix-a) · [B. 오류로 배우기](#appendix-b) · [C. 문서 유지 규칙](#appendix-c) · [D. 관심그룹별 기술 블로그](#appendix-d)
 
 <a id="ch01"></a>
 ## 1. 스위치 하나와 출력 하나
@@ -1685,3 +1685,223 @@ sensor를 payload처럼 바로 비교하지 않는다. `case` 또는 Reference �
 시간에 따라 변하는 환경을 요청한 학습 시나리오는 기본 소스로 관련 ON/OFF 판단을 시간에 따라 실행해야 한다. 기존 book simulation 테스트에 독립적인 전환 checkpoint를 유지한다. 일정한 정상 입력만으로는 그 의도를 검증할 수 없다. 일변화 검증은 기존 오류·엄격한 경계 scan을 보완한다.
 
 Language Reference는 규범 기준이다. 이 사용 안내서에서 발견한 상충이나 빠진 예는 해당 Reference 절을 먼저 확인한 뒤 고친다. 문법·의미 변경은 Reference의 문법, 규칙, 이유와 예제를 갱신하고 여기서 학습 경로와 코드를 동기화한다. 학습에 필요한 구현 경계는 근거 문서에 연결하고, 변동하는 진행률·테스트 수·산출물 해시·지원 보드 목록은 그 문서에서 관리한다. 예제 compiler 검사는 `tests/docs-runnable-examples.test.mjs`를 재사용한다. 책 변경 뒤 `npm run generate:pc01`로 파생 출처를 갱신하며 과거 replay·benchmark 근거는 고치지 않는다.
+
+<a id="appendix-d"></a>
+## 부록 D. 관심그룹별 기술 블로그와 예제
+
+같은 제어 언어를 서로 다른 일을 하는 사람들이 어떻게 읽을 수 있는지 보여 주는 열 편이다. 각 예제는 독립 프로그램이며 실행 가능한 `ghost` fence다. PIG에서는 코드를 실행하고 입력 순서를 바꿔 볼 수 있다. 결과는 논리 제어의 예시다. 실제 접점·밸브·모터의 작동은 보드, Driver, 배선과 현장 확인이 따로 책임진다.
+
+### E23 — PLC 개발자: 고장 원인에서 출력까지 한 번에 따라가기
+
+> “왜 멈췄는지, 다시 추리하지 않도록.”
+
+컨베이어가 갑자기 멈추면 “시작 버튼을 다시 눌러 보자”보다 “어떤 조건이 운전을 끊었나”가 먼저다. 이 프로그램은 jam 입력이 사라진 scan에서 운전 상태를 내리고 고장을 기억한다. 원인이 해소된 뒤 reset을 눌러도 시작 버튼을 놓았다 다시 누르기 전까지 컨베이어는 다시 켜지지 않는다.
+
+입력을 `start=true`, `jam_clear=false`, `reset=false`로 바꿔 실행하면 `fault_latched`와 `fault_lamp`가 켜지고 `running`과 `conveyor`는 꺼진다. jam을 복구한 뒤 reset을 누르면 고장 기억만 해제된다. 어느 입력과 상태가 출력 판단에 쓰였는지 소스에서 바로 따라갈 수 있다. jam 검출의 전기적 의미와 비상정지 회로는 별도로 설계해야 한다.
+
+```ghost
+// E23
+control TraceableConveyor {
+  input start, stop, jam_clear, reset: Bool;
+  state running: Bool = false;
+  state fault_latched: Bool = false;
+  state start_armed: Bool = true;
+  let fault_next = (fault_latched && !reset) || !jam_clear;
+
+  fault_latched' = fault_next;
+  start_armed' = !fault_next && !start;
+  running' = !stop && jam_clear && !fault_latched && (running || (start_armed && start));
+
+  output conveyor, fault_lamp: Bool;
+  conveyor <- running';
+  fault_lamp <- fault_next;
+}
+```
+
+### E24 — 웹 개발자: 화면의 목표와 장치 피드백을 분리하기
+
+> “이제, 화면 밖의 세상을 프로그래밍하세요.”
+
+대시보드에서 “열기”를 눌렀다는 사실과 밸브가 실제 열린 위치에 도달했다는 사실은 다르다. 웹 개발자는 요청 상태와 서버 응답 상태를 나누어 다루지만, 장치 UI에서는 둘이 같은 초록색 아이콘으로 뭉개지기 쉽다. 여기서는 `target_open`을 명령 상태로 기억하고 limit 입력을 별도의 확인 신호로 보여 준다.
+
+`open_request`를 한 번 넣으면 명령이 유지되고 `open_limit`를 참으로 바꾸기 전까지 “이동 중” 표시가 켜진다. close 요청은 열기 요청보다 우선한다. 화면은 목표, 출력 명령, 물리 피드백을 서로 다른 값으로 렌더링할 수 있다. limit가 실제 위치를 정확히 반영하는지는 설치와 장치 진단의 책임이다.
+
+```ghost
+// E24
+control ValvePanelState {
+  input open_request, close_request, stop, open_limit: Bool;
+  state target_open: Bool = false;
+
+  target_open' = !stop && !close_request && (open_request || target_open);
+
+  output open_command, close_command, moving_open, open_confirmed: Bool;
+  open_command <- !stop && target_open';
+  close_command <- !stop && !target_open';
+  moving_open <- !stop && target_open' && !open_limit;
+  open_confirmed <- open_limit;
+  require !(open_command && close_command);
+}
+```
+
+### E25 — 펌웨어 개발자: 겹친 방향 명령을 보드에 올리기 전에 잡기
+
+> “릴레이를 켜기 전에, 로직부터 돌려보세요.”
+
+정회전과 역회전 입력이 같은 scan에 참이 되는 상황은 버튼, 통신 패킷, 접점 bounce에서 생길 수 있다. 이 예제는 어느 한쪽을 임의로 고르지 않고 양쪽 구동 명령을 모두 끈다. PIG에서 정상 요청, 정지 허가 상실, 충돌 입력을 번갈아 주면 각 출력의 결과를 보드에 올리기 전에 살필 수 있다.
+
+이 식은 펌웨어 업로드 전 논리 우선순위를 읽는 첫 단계다. 소프트웨어 상호 배제만으로 접촉기의 동시 투입이나 모터의 관성 회전을 막을 수는 없다. 장치에는 적절한 전기·기계 인터록과 독립 보호가 필요하다. 정·역전환 대기시간을 요구하는 설비에는 명시적 상태와 피드백을 더해야 한다.
+
+```ghost
+// E25
+control DirectionRequestGate {
+  input stop_ok, forward_request, reverse_request: Bool;
+  output forward_command, reverse_command, conflict: Bool;
+
+  forward_command <- stop_ok && forward_request && !reverse_request;
+  reverse_command <- stop_ok && reverse_request && !forward_request;
+  conflict <- forward_request && reverse_request;
+  require !(forward_command && reverse_command);
+}
+```
+
+### E26 — AI 개발자: 생성된 규칙 옆에 검토할 의도를 남기기
+
+> “AI가 작성해도, 동작의 이유는 남아야 하니까.”
+
+AI가 만든 제어식이 컴파일된다는 사실만으로 생성 결과의 의도까지 확인되지는 않는다. 리뷰어에게는 어떤 현장 전제가 있었는지, 그 전제가 어느 식에 반영됐는지, 무엇을 시뮬레이션해야 하는지가 이어진 문서가 필요하다. `.ghost.md`는 설명과 실행 코드를 한 원본에 두고, 컴파일러는 최상위 `ghost` fence를 원래 위치 정보와 함께 읽는다.
+
+아래 코드는 “급수 시간대가 열려 있고 토양이 건조하며 급수원이 준비됐을 때만 펌프를 요청한다”는 규칙이다. 실제 프로젝트에서는 설명에 AI가 가정한 센서 극성이나 미결 현장 결정을 표시하고 담당자가 확인한 뒤 revision으로 남긴다. 문서 형식이 AI의 정확성을 보증하지는 않지만 검토 대상을 코드 안에 숨기지 않는다.
+
+```ghost
+// E26
+control ReviewedWateringRule {
+  input watering_window, soil_needs_water, source_ready: Bool;
+  output pump_request: Bool;
+
+  pump_request <- watering_window && soil_needs_water && source_ready;
+}
+```
+
+### E27 — ESP32·제어보드 제조사: I/O 목록에 실제 용도를 연결하기
+
+> “좋은 보드에, 쓰임새를 더하세요.”
+
+입력 8개와 출력 8개를 나열한 데이터시트만으로는 고객이 보드로 무엇을 만들지 상상하기 어렵다. 이 예제는 생장등, 순환팬, 배수펌프와 경고 출력을 운영 조건에 연결한다. 제조사는 고객이 자기 보드와 대조해 볼 논리 역할을 제품 예제로 제시할 수 있다.
+
+출력 이름은 GPIO 번호가 아니라 장치 역할이다. `grow_light`를 어느 채널에 연결할지, `source_ready`를 어떤 센서로 공급할지는 보드 binding과 Driver가 결정한다. 따라서 소스 하나가 모든 보드에서 자동 호환된다고 약속하지 않고, 보드별로 확인한 연결표와 묶어 제공할 수 있다.
+
+```ghost
+// E27
+control BoardShowcase {
+  input enabled, light_schedule, ventilation_request: Bool;
+  input drain_request, drain_path_ready: Bool;
+  output grow_light, circulation_fan, drain_pump, warning: Bool;
+
+  grow_light <- enabled && light_schedule;
+  circulation_fan <- enabled && ventilation_request;
+  drain_pump <- enabled && drain_request && drain_path_ready;
+  warning <- drain_request && !drain_path_ready;
+}
+```
+
+### E28 — 제어반·설비 통합업체: 밸브 확인 뒤에 펌프를 요청하기
+
+> “설비와 함께, 동작의 이유도 납품하세요.”
+
+시운전에서 자주 놓치는 차이는 “밸브를 열라고 명령했다”와 “열림 limit가 들어왔다” 사이에 있다. 둘을 같은 조건으로 다루면 배관 상태가 확인되기 전에 펌프가 먼저 요청될 수 있다. 이 예제는 충전 요구를 기억하되 열림 피드백이 확인될 때까지 펌프 출력을 막는다.
+
+`fill_request`를 주고 `valve_open_limit=false`로 두면 밸브 명령만 켜진다. limit를 참으로 바꾸면 다음 scan에서 펌프 요청이 켜진다. 종료 또는 source-full 입력은 상태를 지우고 출력을 멈춘다. 설치자는 limit 극성, 밸브 timeout, 정지 후 복구를 현장 계약에 맞게 더해야 한다.
+
+```ghost
+// E28
+control ConfirmedValveFill {
+  input fill_request, stop_ok, valve_open_limit, source_full: Bool;
+  state filling: Bool = false;
+
+  filling' = stop_ok && !source_full && (fill_request || filling);
+
+  output valve_open_command, pump_command: Bool;
+  valve_open_command <- filling';
+  pump_command <- filling' && valve_open_limit;
+  require pump_command => valve_open_command;
+}
+```
+
+### E29 — 유지보수 담당자: 기다림과 고장을 구별할 단서를 남기기
+
+> “만든 사람이 없어도, 고칠 실마리는 남도록.”
+
+장비를 넘겨받은 담당자가 “펌프가 왜 아직 안 도나”에 답하려면 요청과 피드백을 볼 수 있어야 한다. 아래 제어는 밸브 열림을 기다리는 동안 pump를 끄고 `waiting_for_valve`를 켠다. limit가 들어오면 기다림 표시는 꺼지고 펌프 명령이 나온다. 정지 허가가 내려가면 출력과 대기 표시를 해제한다.
+
+이 표시는 밸브 이동 시간이 정상 범위인지 판단하지 않는다. 화면과 기록에서 “대기 중”을 timeout 고장과 구분하고, 인수인계 문서에는 limit 입력의 채널·극성·점검 방법을 함께 적어야 한다. 다음 담당자가 원래 작성자를 찾지 않고 어느 입력부터 확인할지 알게 하는 것이 이 예제의 목표다.
+
+```ghost
+// E29
+control ValveWaitDiagnosis {
+  input fill_request, stop_ok, valve_open_limit: Bool;
+  output valve_open_command, pump_command, waiting_for_valve: Bool;
+
+  valve_open_command <- fill_request && stop_ok;
+  pump_command <- fill_request && stop_ok && valve_open_limit;
+  waiting_for_valve <- fill_request && stop_ok && !valve_open_limit;
+}
+```
+
+### E30 — 농부·현장 운영자: 물 줄 때는 농부가 정하고 반복은 기계에 맡기기
+
+> “판단은 농부가. 반복은 기계가.”
+
+관수 정책은 수분값 하나로 정해지지 않는다. 작물과 작업자의 판단은 `enabled`와 `watering_window`에 담고, 이 예제는 정한 시간대에 토양이 건조하며 급수원이 준비된 경우에만 펌프를 요청한다. 급수원이 준비되지 않으면 운영 화면에 그 이유를 보여 준다.
+
+`watering_window`는 달력·기상·작업 계획을 대신하는 숨은 기본값이 아니다. 농부가 선택한 일정 정책을 실행 환경이 공급하는 입력이다. 사용자는 시간대나 건조 기준을 바꾸고, 같은 규칙의 반복은 제어에 맡길 수 있다. 센서 위치와 보정, 관수량, 작물별 기준은 현장에서 정해야 한다.
+
+```ghost
+// E30
+control FarmerDirectedWatering {
+  input enabled, watering_window, soil_needs_water, source_ready: Bool;
+  output pump_request, source_attention: Bool;
+
+  pump_request <- enabled && watering_window && soil_needs_water && source_ready;
+  source_attention <- enabled && watering_window && soil_needs_water && !source_ready;
+}
+```
+
+### E31 — 메이커·자동화 입문자: 두 화단을 합치며 공유 자원을 드러내기
+
+> “예제는 많은데, 합치기는 어려웠죠?”
+
+화단 A와 B의 건조 판단은 각각 쉬워도, 두 예제를 합치면 급수원과 펌프가 공유되는 순간 규칙이 달라진다. 이 프로그램은 두 구역의 밸브 요구를 유지하고 어느 하나라도 물을 필요로 하면 공용 펌프를 요청한다. 급수원이 준비되지 않으면 모든 출력을 막는다.
+
+두 화단이 동시에 건조하면 두 밸브가 함께 열리는 동작도 코드에 드러난다. 펌프 유량과 배관이 이를 감당할지는 작성자가 확인해야 한다. 한 번에 한 구역만 허용해야 한다면 임의로 고르기보다 우선순위·교대·대기시간 정책을 먼저 정해 소스에 표현하면 된다.
+
+```ghost
+// E31
+control TwoBedWatering {
+  input bed_a_needs_water, bed_b_needs_water, source_ready: Bool;
+  output bed_a_valve, bed_b_valve, shared_pump: Bool;
+
+  bed_a_valve <- source_ready && bed_a_needs_water;
+  bed_b_valve <- source_ready && bed_b_needs_water;
+  shared_pump <- source_ready && (bed_a_needs_water || bed_b_needs_water);
+  require shared_pump => (bed_a_valve || bed_b_valve);
+}
+```
+
+### E32 — 오픈소스 사용자: 장비보다 먼저 자기 제어 규칙을 보유하기
+
+> “회사가 사라져도, 제어는 남아야 하니까.”
+
+장비 공급자나 온라인 서비스가 바뀌어도 사용자는 승인한 제어 규칙을 읽고 보관할 수 있어야 한다. 이 독립 예제는 토양 수분과 임계값을 입력으로 받고, 두 값의 비교 규칙을 소스에 드러낸다. 구독 화면이나 원격 계정이 제어 판단의 비공개 원본이 되지 않는다.
+
+`.ghost.md` 파일과 Language Reference, compiler revision을 함께 보관하면 검토하고 다시 생성할 출처가 남는다. 다른 보드에서 실행하려면 해당 보드의 지원 runtime과 I/O binding을 확인해야 한다. 프로그램 소유권이 이식을 보장하지는 않지만 제어 의도를 특정 공급자만 읽을 수 있는 바이너리에 가두지 않는 출발점이다.
+
+```ghost
+// E32
+control OwnedWateringRule {
+  input soil_moisture, threshold: Percent;
+  output pump_request: Bool;
+  pump_request <- soil_moisture < threshold;
+}
+```
+
+이 열 편을 관통하는 GhostFlow의 약속은 장치를 움직이는 데서 끝나지 않는다. 입력과 규칙에서 출력 의도까지의 이유를 소스에 남겨 다음 사람이 검토하고 이어갈 수 있게 한다.

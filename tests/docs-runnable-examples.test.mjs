@@ -11,7 +11,7 @@ const programmingEnglish = fs.readFileSync(new URL('../docs/ProgrammingInGhostfl
 function example(section, marker, nextMarker) {
   const start = section.indexOf(marker);
   assert.notEqual(start, -1, `missing example ${marker}`);
-  const sectionEnd = section.indexOf(nextMarker, start + marker.length);
+  const sectionEnd = nextMarker ? section.indexOf(nextMarker, start + marker.length) : section.length;
   assert.notEqual(sectionEnd, -1, `missing following section after ${marker}`);
   const next = section.indexOf('```ghost\n', start);
   assert.notEqual(next, -1, `missing GhostFlow fence in ${marker}`);
@@ -46,6 +46,11 @@ for (const [id, section, marker, nextMarker] of [
   ['Programming E19', programming, '### E19 —', '### E20 —'],
   ['Programming E20', programming, '### E20 —', '### E21 —'],
   ['Programming E21', programming, '### E21 —', '<a id="appendix-a"></a>'],
+  ...Array.from({ length: 10 }, (_, index) => {
+    const id = `E${String(index + 23).padStart(2, '0')}`;
+    const next = index === 9 ? null : `### E${String(index + 24).padStart(2, '0')} —`;
+    return [`Programming ${id}`, programming, `### ${id} —`, next];
+  }),
 ]) {
   test(`${id} remains executable GhostFlow`, () => {
     const compiled = compileSourceSync(example(section, marker, nextMarker), { filename: `${id}.ghost.md` });

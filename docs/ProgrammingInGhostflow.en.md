@@ -93,7 +93,7 @@ At each stage, first consider how the device should behave. Then see how to expr
 13. [Built-in functions and operations](#ch13)
 14. [Temperature units and air-VPD control](#ch14)
 
-Appendices: [A. Specification guide](#appendix-a) · [B. Learning through errors](#appendix-b)
+Appendices: [A. Specification guide](#appendix-a) · [B. Learning through errors](#appendix-b) · [C. Document maintenance rules](#appendix-c) · [D. Technical articles for ten audiences](#appendix-d)
 
 
 <a id="ch01"></a>
@@ -1674,3 +1674,223 @@ Do not directly compare a sensor as if it were its payload. Use `case` or an exp
 When a learning scenario requests a time-varying environment, its default source must exercise the relevant ON/OFF decisions over time. Keep independent transition checkpoints in the existing book simulation test; constant valid inputs alone cannot verify that intent. Daily-profile checks complement the existing fault and strict-boundary scans.
 
 The Language Reference is normative. For conflicts or missing examples found in this guide, check the relevant Reference section before correcting them. Syntax/semantic changes update Reference syntax, rules, reasons, and examples, then synchronize this guide's learning path and code. Link implementation boundaries needed for learning to evidence documents; maintain changing progress, test counts, artifact hashes, and supported-board lists there. Reuse `tests/docs-runnable-examples.test.mjs` for compiler checks. After book changes, run `npm run generate:pc01` to refresh derived provenance; preserve historical replay and benchmark evidence.
+
+<a id="appendix-d"></a>
+## Appendix D. Technical articles and examples for ten audiences
+
+These ten articles show how people with different jobs can approach the same control language. Each example is a standalone, executable `ghost` fence that you can run in PIG and explore with different input sequences. The results show logical control only. Boards, drivers, wiring, and field checks remain responsible for actual contacts, valves, and motors.
+
+### E23 — PLC developers: trace a fault from its cause to the output
+
+> “No more guessing why the system stopped.”
+
+When a conveyor stops unexpectedly, the useful question is “Which condition stopped it?” This program drops the running state and remembers the jam as soon as the input clears in a scan. Even after the cause is gone, resetting the fault does not restart the conveyor until the operator releases and presses Start again.
+
+Run one scan with `start=true`, `jam_clear=false`, and `reset=false`. `fault_latched` and `fault_lamp` turn on while `running` and `conveyor` turn off. Clear the jam, then reset: the fault memory clears by itself, but the drive remains stopped. You can follow the inputs and state used for each output directly in the source. The electrical meaning of a jam detector and the emergency-stop circuit still need separate design.
+
+```ghost
+// E23
+control TraceableConveyor {
+  input start, stop, jam_clear, reset: Bool;
+  state running: Bool = false;
+  state fault_latched: Bool = false;
+  state start_armed: Bool = true;
+  let fault_next = (fault_latched && !reset) || !jam_clear;
+
+  fault_latched' = fault_next;
+  start_armed' = !fault_next && !start;
+  running' = !stop && jam_clear && !fault_latched && (running || (start_armed && start));
+
+  output conveyor, fault_lamp: Bool;
+  conveyor <- running';
+  fault_lamp <- fault_next;
+}
+```
+
+### E24 — Web developers: separate the screen’s target from device feedback
+
+> “Now program the world beyond the screen.”
+
+Clicking “open” on a dashboard does not mean a valve has reached its open position. Web developers already distinguish requested state from a server response, but device interfaces often collapse both into the same green icon. Here, `target_open` remembers the requested command while the limit input reports confirmation separately.
+
+Set `open_request` for one scan and the command stays active. The “moving” indicator stays on until `open_limit` becomes true. A close request takes priority over an open request. The interface can render the target, output command, and physical feedback as separate values. The installation and device diagnostics determine whether the limit signal represents the actual position accurately.
+
+```ghost
+// E24
+control ValvePanelState {
+  input open_request, close_request, stop, open_limit: Bool;
+  state target_open: Bool = false;
+
+  target_open' = !stop && !close_request && (open_request || target_open);
+
+  output open_command, close_command, moving_open, open_confirmed: Bool;
+  open_command <- !stop && target_open';
+  close_command <- !stop && !target_open';
+  moving_open <- !stop && target_open' && !open_limit;
+  open_confirmed <- open_limit;
+  require !(open_command && close_command);
+}
+```
+
+### E25 — Firmware developers: catch conflicting direction commands before flashing
+
+> “Run the logic before you energize a relay.”
+
+Forward and reverse requests can arrive in the same scan through buttons, network packets, or contact bounce. This example refuses to choose one arbitrarily and turns both drive commands off. Change the inputs in PIG to explore a normal request, a lost stop permission, and a conflict before putting the logic on a board.
+
+This is a first step for understanding logical priority before a firmware upload. Software mutual exclusion alone cannot prevent simultaneous contactor operation or motor coast-down. The device needs appropriate electrical and mechanical interlocks and independent protection. Systems that require a reversal delay need explicit state and feedback as well.
+
+```ghost
+// E25
+control DirectionRequestGate {
+  input stop_ok, forward_request, reverse_request: Bool;
+  output forward_command, reverse_command, conflict: Bool;
+
+  forward_command <- stop_ok && forward_request && !reverse_request;
+  reverse_command <- stop_ok && reverse_request && !forward_request;
+  conflict <- forward_request && reverse_request;
+  require !(forward_command && reverse_command);
+}
+```
+
+### E26 — AI developers: keep reviewable intent beside generated rules
+
+> “Even when AI writes it, the reason for the behavior must remain.”
+
+A generated control program compiling does not confirm what the generator intended. Reviewers need one document that connects the field assumptions, the rule that encodes them, and the input sequences worth simulating. A `.ghost.md` file keeps prose and executable code in one source, and the compiler reads its top-level `ghost` fences with their original locations.
+
+The rule below requests a pump only when the watering window is open, the soil needs water, and the source is ready. In a real project, mark assumptions such as sensor polarity and unresolved field decisions in the prose, then have a responsible person confirm them in a source revision. The document format cannot guarantee AI accuracy, but it prevents the review target from hiding inside generated code.
+
+```ghost
+// E26
+control ReviewedWateringRule {
+  input watering_window, soil_needs_water, source_ready: Bool;
+  output pump_request: Bool;
+
+  pump_request <- watering_window && soil_needs_water && source_ready;
+}
+```
+
+### E27 — ESP32 and controller-board makers: connect I/O counts to real uses
+
+> “Give a good board more ways to be useful.”
+
+A data sheet listing eight inputs and eight outputs still leaves customers guessing what they can build. This example connects a grow light, circulation fan, drain pump, and warning output to operating conditions. A board maker can show the logical roles customers could map to their own hardware.
+
+Output names represent device roles, not GPIO numbers. The board binding and driver decide which channel drives `grow_light` and which sensor supplies `source_ready`. This lets a manufacturer publish a project example with a board-specific wiring map instead of promising that one source works automatically on every board.
+
+```ghost
+// E27
+control BoardShowcase {
+  input enabled, light_schedule, ventilation_request: Bool;
+  input drain_request, drain_path_ready: Bool;
+  output grow_light, circulation_fan, drain_pump, warning: Bool;
+
+  grow_light <- enabled && light_schedule;
+  circulation_fan <- enabled && ventilation_request;
+  drain_pump <- enabled && drain_request && drain_path_ready;
+  warning <- drain_request && !drain_path_ready;
+}
+```
+
+### E28 — Panel builders and integrators: wait for valve confirmation before requesting the pump
+
+> “Deliver the reason for the behavior along with the equipment.”
+
+Commissioning often exposes the difference between “command the valve open” and “receive the open limit.” Treating them as the same condition can request the pump before the piping state is confirmed. This example remembers the fill request but blocks the pump output until it receives open feedback.
+
+Set `fill_request` while `valve_open_limit=false`: only the valve command turns on. When the limit becomes true, the pump request turns on in the next scan. A stop or full-source input clears the state and stops both outputs. The installer must still define the limit polarity, valve timeout, and recovery after a stop for the actual site.
+
+```ghost
+// E28
+control ConfirmedValveFill {
+  input fill_request, stop_ok, valve_open_limit, source_full: Bool;
+  state filling: Bool = false;
+
+  filling' = stop_ok && !source_full && (fill_request || filling);
+
+  output valve_open_command, pump_command: Bool;
+  valve_open_command <- filling';
+  pump_command <- filling' && valve_open_limit;
+  require pump_command => valve_open_command;
+}
+```
+
+### E29 — Maintenance teams: leave a clue that separates waiting from failure
+
+> “Leave a repair trail that survives the original author.”
+
+Someone inheriting a machine needs to see both the request and the feedback to answer “Why hasn’t the pump started?” This controller keeps the pump off while it waits for the valve to open, and turns on `waiting_for_valve`. When the limit arrives, the waiting indicator turns off and the pump command appears. Losing stop permission clears both outputs and the waiting indicator.
+
+This indicator does not decide whether the valve has exceeded its normal travel time. The interface and logs should keep “waiting” distinct from a timeout fault, and the handover notes should identify the limit input’s channel, polarity, and inspection method. The goal is to help the next maintainer know which input to inspect without calling the original author.
+
+```ghost
+// E29
+control ValveWaitDiagnosis {
+  input fill_request, stop_ok, valve_open_limit: Bool;
+  output valve_open_command, pump_command, waiting_for_valve: Bool;
+
+  valve_open_command <- fill_request && stop_ok;
+  pump_command <- fill_request && stop_ok && valve_open_limit;
+  waiting_for_valve <- fill_request && stop_ok && !valve_open_limit;
+}
+```
+
+### E30 — Farmers and operators: choose when to water; let the controller repeat it
+
+> “The farmer decides. The machine repeats.”
+
+An irrigation policy is not just a moisture reading. The farmer’s crop and work decisions appear here as `enabled` and `watering_window`; the controller requests water only when the soil is dry during that chosen window and the source is ready. If the source is unavailable, it exposes the reason to the operator.
+
+`watering_window` is not a hidden default that stands in for the calendar, weather, or work plan. It is an input supplied by the execution environment according to a schedule the farmer chose. The operator can change the window or moisture rule and let the controller repeat the same decision. Sensor placement and calibration, water volume, and crop-specific thresholds still belong to field practice.
+
+```ghost
+// E30
+control FarmerDirectedWatering {
+  input enabled, watering_window, soil_needs_water, source_ready: Bool;
+  output pump_request, source_attention: Bool;
+
+  pump_request <- enabled && watering_window && soil_needs_water && source_ready;
+  source_attention <- enabled && watering_window && soil_needs_water && !source_ready;
+}
+```
+
+### E31 — Makers and automation learners: combine two beds and expose the shared resource
+
+> “Plenty of examples. Hard to combine them?”
+
+The dry-soil rule for bed A and bed B is easy to write separately. When the examples meet, their shared source and pump change the problem. This program keeps each valve request and asks the shared pump to run whenever either bed needs water. If the source is not ready, it blocks all three outputs.
+
+The code also makes simultaneous watering visible: both valves can open when both beds are dry. The author must check whether the pump flow and piping can support that. If only one bed may run at a time, decide a priority, rotation, and wait policy before writing it into the source instead of letting the program choose a winner by accident.
+
+```ghost
+// E31
+control TwoBedWatering {
+  input bed_a_needs_water, bed_b_needs_water, source_ready: Bool;
+  output bed_a_valve, bed_b_valve, shared_pump: Bool;
+
+  bed_a_valve <- source_ready && bed_a_needs_water;
+  bed_b_valve <- source_ready && bed_b_needs_water;
+  shared_pump <- source_ready && (bed_a_needs_water || bed_b_needs_water);
+  require shared_pump => (bed_a_valve || bed_b_valve);
+}
+```
+
+### E32 — Open-source users: own the control rule before the hardware
+
+> “The control should survive the company.”
+
+Even if a device vendor or online service changes, users should be able to read and keep the rule they approved. This standalone example takes soil moisture and its threshold as inputs, and spells out the comparison in the source. A subscription screen or remote account is not the private source of the control decision.
+
+Keeping the `.ghost.md` file with the Language Reference and compiler revision preserves material for review and regeneration. Running it on another board still depends on that board’s supported runtime and I/O bindings. Program ownership does not guarantee portability, but it keeps the control intent from being trapped in a binary only one supplier can read.
+
+```ghost
+// E32
+control OwnedWateringRule {
+  input soil_moisture, threshold: Percent;
+  output pump_request: Bool;
+  pump_request <- soil_moisture < threshold;
+}
+```
+
+The shared GhostFlow promise is larger than moving a device. It keeps the reasoning from input and rule through output intent in the source so another person can review and continue the work.
