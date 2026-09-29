@@ -360,7 +360,8 @@ Permitted operations are closed to the following.
 - Compare values of the same nominal quantity.
 - Linear physical quantities support same-type `+`, `-`, and unary `-` and multiplication or division by `Number`. Same-type division produces `Number`.
 - `Temperature - Temperature` produces `TemperatureDelta`; `Temperature + TemperatureDelta` and `Temperature - TemperatureDelta` produce `Temperature`. Two absolute temperatures cannot be added.
-- `RelativeHumidity`, `CO2Concentration`, and `Acidity` support only same-type comparisons.
+- `RelativeHumidity` supports same-type comparisons and explicit `RelativeHumidity / RelativeHumidity -> Number`. For example, `60%RH / 100%RH` is `0.6`. Its other arithmetic and implicit numeric conversion remain forbidden. A zero divisor retains the ordinary constant diagnostic or dynamic tick rejection; normalization does not erase sensor quality.
+- `CO2Concentration` and `Acidity` support only same-type comparisons.
 - `FlowRate * Duration` produces `Volume`; `Volume / Duration` produces `FlowRate`; `Power * Duration` produces `Energy`; `Energy / Duration` produces `Power`; `Voltage * ElectricalCurrent` produces `Power`. Multiplication permits either operand order.
 - `VaporPressureDeficit` is a nominal type distinct from `Pressure`, even though its canonical scale matches pressure. Unspecified cross-quantity operations and numeric-type conversions are errors.
 

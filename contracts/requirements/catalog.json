@@ -468,8 +468,8 @@
         "path": "docs/IMPLEMENTATION.md",
         "heading": "Limits and consumer responsibilities",
         "lines": [
-          79,
-          79
+          92,
+          92
         ],
         "sha256": "988f17dcdb9eb934346aeab946e9ae1490363aabdc611b09b8604ed9e65e0583"
       },
@@ -886,8 +886,8 @@
         "path": "docs/IMPLEMENTATION.md",
         "heading": "Artifacts and versions",
         "lines": [
-          45,
-          48
+          58,
+          61
         ],
         "sha256": "3ec6524fc323397e8db764d16caff93481662ad2987d87521bf43c13744a0161"
       },

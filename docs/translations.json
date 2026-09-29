@@ -19,8 +19,8 @@
       "source": "contracts/interaction-v0/README.md",
       "sourceLanguage": "en",
       "translation": "contracts/interaction-v0/README.ko.md",
-      "sourceSha256": "61608af393b00bcd34f14d9d62501de659bfb62d112ba5c4d3a17e76cd5420ab",
-      "translationSha256": "79e6e9428747503174de4247a752f932d3f459a635a73fa5419be56c14330525"
+      "sourceSha256": "6c15aa4740eb129ab4ba8bc28a3ae59fb6745a79e836e5f0d9014ee2bbf73240",
+      "translationSha256": "7266be204c0e43a14dc641f8a2d3c4b4616b9fc1a74fa5ef051f7c154719faf8"
     },
     {
       "source": "contracts/requirements/README.md",
@@ -159,8 +159,8 @@
       "source": "docs/IMPLEMENTATION.md",
       "sourceLanguage": "en",
       "translation": "docs/IMPLEMENTATION.ko.md",
-      "sourceSha256": "fa830fc1a9b8bec982f6b4ee9ea2e9c858126d5492941e360500e0249853946d",
-      "translationSha256": "3cfe09433bc8b317f82e5709c07ae5c6afeac937bfb18894999aaa3db64f0720"
+      "sourceSha256": "e9f89dde19c8e4029eee0844de483dee019c64acd5c8cd3e15e2f9abd64ea7f5",
+      "translationSha256": "06e76601727ebad397047b36d822d3a458b7c28b160d689a83b74bd390376d39"
     },
     {
       "source": "docs/INTENT-ANCHOR-MAP.md",
@@ -271,8 +271,8 @@
       "source": "docs/ProgrammingInGhostflow.md",
       "sourceLanguage": "ko",
       "translation": "docs/ProgrammingInGhostflow.en.md",
-      "sourceSha256": "508530b8b958b82dc85c95a9cb43577931a733a9a7a59d4a92cec6d2d417a2b4",
-      "translationSha256": "2b710a4c080d7195503ccf85ae61e42bad8d77b207fcb1865d2221c726703114"
+      "sourceSha256": "14f4ed3e7b755adee1778d1c6d06a754a202afa80f48d99ed22c53f9afbfddee",
+      "translationSha256": "e1bfd15a68aece08032f4b4efc66e22896581f49522e2d70242f69b5ea86a502"
     },
     {
       "source": "docs/REFERENCE-QUERY.md",
@@ -292,8 +292,8 @@
       "source": "docs/reference/02-types-expressions-state.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/02-types-expressions-state.en.md",
-      "sourceSha256": "bf8baf9bdaba410b8e1c9252f1088c852cb9c322aad4955b04b689973504fc70",
-      "translationSha256": "175515e153fb06d8ce77c059ae3b234a37a7471f490d29958cc9c37a00f9a808"
+      "sourceSha256": "a748546d34ff5d3c612393463edfb65c919ba80134f527444a6568860274fc35",
+      "translationSha256": "568e5c6eba69f05992addc0a9e682bf3a2da795eefd6679801c17a60715f1277"
     },
     {
       "source": "docs/reference/03-time-and-schedules.md",
@@ -313,22 +313,22 @@
       "source": "docs/reference/05-settings-and-observation.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/05-settings-and-observation.en.md",
-      "sourceSha256": "a5afcc48a57ff4cd7a59e80150bff76e18129be392b109a7aefdc05993b4f7c7",
-      "translationSha256": "4e2b1c4cdcd0fd65c91a36dfd56c2df9cfd9d99021c8ef363963a3db468537fa"
+      "sourceSha256": "cf1ba40154722315c43a79168d60a9bfb537a71aced24c40fe1d6862d0a54fd3",
+      "translationSha256": "a76274c49719a028f9307364f20015056baa905aa1fdbb9c18542d0fc46518c0"
     },
     {
       "source": "docs/reference/06-composition-and-replay.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/06-composition-and-replay.en.md",
-      "sourceSha256": "2b761d3ed8c43c06f86570529829b0eb3e69064f44c02e5b4dc32c1089f1d706",
-      "translationSha256": "6247baee1f9c49bc768af3e5b768bc7d055d923b1ae3225410ffa42e812db547"
+      "sourceSha256": "076ff98562d2217402e8f3bd556d600e85fd0ed02e5a93ef5997b55864c1a573",
+      "translationSha256": "a93acee1b5c1783146fde77d6e87e63edb07beffdc17c0d7abe6d2bf892af7c6"
     },
     {
       "source": "docs/reference/07-semantic-rules-and-index.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/07-semantic-rules-and-index.en.md",
-      "sourceSha256": "c3d2fa6f9a5d583fd73ff3c7951a2d8fdbccc6ab3158d39a055160a2ac3d4f4d",
-      "translationSha256": "fc5fd3e8cd3fedcaa761f8e67b20838ddf6bd779d89c809e49039cfeaf60869a"
+      "sourceSha256": "97bf0399f5d58be12f4b34ba4f4ef71e6117720f4d364c2bf39a0f16f09a5976",
+      "translationSha256": "15e30c72439d3ad43d73be473fc29c99b337c2c05035137754a846776be71b16"
     },
     {
       "source": "docs/reference/08-language-runtime-and-device-boundaries.md",
@@ -516,8 +516,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "77cc38f6689d276f01e31fb017b3e61ba56b003ddd9b8891a82080141865967e",
-      "translationSha256": "2cf27daf8d02f1c08ce769bd301338ea886a1390eeff931e27d02ac58e74f16e"
+      "sourceSha256": "778d8121584695210fc233e665ed08254c402a04078d267beeb4b1f9f337ecea",
+      "translationSha256": "d3625b86d6f440bbd621fd3bf54ab56adf43e9f47d5901cad1c63f2a26632ac7"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",
@@ -712,8 +712,8 @@
       "source": "tasks/import-validation-plan.md",
       "sourceLanguage": "en",
       "translation": "tasks/import-validation-plan.ko.md",
-      "sourceSha256": "0e1e5b78f68bb6f5e526d30b5be5b65f9c6232f8d83d10476ff602ec8a4a083a",
-      "translationSha256": "815b34b71c485badb70740d633ce1e458da825f9ecf79b07bcbd48420ed623de"
+      "sourceSha256": "b8a09ab3b5885ccb913f7950fe34cf3e971912e5282c4d975ad215fd56326f3b",
+      "translationSha256": "b2e19518afea13d9e90293cb4e80995a86016d44c9e78eb24764d383672c26e2"
     },
     {
       "source": "tasks/issue-135-daily-slots-plan.md",
@@ -987,6 +987,18 @@
     {
       "path": "examples/curriculum/generated/pc-01-e01.generated.ghost.md",
       "reason": "Generated canonical source projection of the programming book; translate the authored book instead."
+    },
+    {
+      "path": "examples/programming-book-imports/E19.ghost.md",
+      "reason": "Generated exact canonical section from the bilingual programming book; translate the authored book instead."
+    },
+    {
+      "path": "examples/programming-book-imports/E20.ghost.md",
+      "reason": "Generated exact canonical section from the bilingual programming book; translate the authored book instead."
+    },
+    {
+      "path": "examples/programming-book-imports/E22.ghost.md",
+      "reason": "Generated exact canonical section from the bilingual programming book; translate the authored book instead."
     },
     {
       "path": "PLAN.md",

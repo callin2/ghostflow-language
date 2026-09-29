@@ -23,7 +23,16 @@ trace and provenance before accepting it. Closure bounds are 128 documents,
 transitive source resolution, invalid connections, missing inputs, argument
 errors, unused-output type checking and artifact/provenance tampering.
 
-Still unsupported: composition of sensor/filter/timer/schedule/config/function/
+Sensor and pure-function composition was added under [#377](https://github.com/callin2/ghostflow-language/issues/377).
+Root raw packets fan out to independent instance conditioners. Public sensors stay
+in `manifest.sensors`; private descriptors are in `manifest.sensorInstances` with
+`sourceSensor`, `instance`, and `port`. Payload, optionality and declared sampling
+interval must match. Function parameters and case bindings remain lexical.
+Focused coverage includes independent filtering, faults, recovery, staleness,
+scan rollback, private-packet rejection, source restoration and native/WASM
+comparison of actual conditioned frames. GFB/ABI/frame protocol is unchanged.
+
+Still unsupported: composition of timer/schedule/config/
 enum/resource/constraint declarations, imported intent-link expansion, and
 qualified public function/type exports. These fail explicitly rather than
 silently losing their instance semantics. Imported revision labels are checked

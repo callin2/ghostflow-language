@@ -1,0 +1,31 @@
+{
+  "format": "GhostFlow/programming-book-import-package-v1",
+  "root": {
+    "filename": "E22.ghost.md",
+    "sha256": "3a6980e9d5ceaf4d6bcf76a17e5f05d4460b5da4245bb3c8a1ff0881d6c085aa",
+    "canonicalSource": {
+      "path": "docs/ProgrammingInGhostflow.md",
+      "example": "E22"
+    }
+  },
+  "imports": [
+    {
+      "filename": "E19.ghost.md",
+      "revision": "7e135b93ea4c4988d305f992db277a6d8581a271",
+      "sha256": "ef80061222c5c671b8b78d8fae733b543e51149c7e5d2c7d5e2bb2cc41fbdb30",
+      "canonicalSource": {
+        "path": "docs/ProgrammingInGhostflow.md",
+        "example": "E19"
+      }
+    },
+    {
+      "filename": "E20.ghost.md",
+      "revision": "7e135b93ea4c4988d305f992db277a6d8581a271",
+      "sha256": "bbf57007c5973684660747c515bb2534124d50341647b2282bd2ca32852a724b",
+      "canonicalSource": {
+        "path": "docs/ProgrammingInGhostflow.md",
+        "example": "E20"
+      }
+    }
+  ]
+}

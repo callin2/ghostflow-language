@@ -20,6 +20,19 @@ Node builtin or `Buffer` dependency and executes it with `Buffer` unavailable.
 It does not add a browser runner or claim Vite/Chromium Worker evidence; that
 consumer integration belongs to the Farm Studio Web boundary.
 
+Pinned composition supplies `sourceClosure: [{filename, revision, text}]` and
+accepts unchanged sensor and pure-function definitions.
+Functions and their calls are scoped per instance, preserving local bindings.
+Root sensor packets fan out before conditioning. Each instance owns its original
+filter, freshness and recovery state. `manifest.sensors` contains public ports;
+optional `manifest.sensorInstances` contains private descriptors with `sourceSensor`,
+`instance` and `port`. Hosts accept packets only for public sensors. Sensor
+connections require exact payload, optionality and declared sample interval.
+Artifact restoration verifies this routing against the full source closure.
+The generated input slots use existing GFB and WASM/frame interfaces. Tests compare
+actual conditioned frames against the native framed VM; they do not claim a
+native raw-sensor scenario host. See [#377](https://github.com/callin2/ghostflow-language/issues/377).
+
 Modern control supports inputs, configs, outputs, state, finite enums, pure
 functions, expression/next-state checks, elapsed timers, DailySlots, sensors and
 signals within the existing bounded profile. Standalone constraints use canonical

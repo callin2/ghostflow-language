@@ -2545,6 +2545,69 @@
               "targets": [
                 "wasm"
               ]
+            },
+            {
+              "path": "tests/issue-90-settings-stream.test.mjs",
+              "testId": "REF-05-106 [host] 복귀 실패를 정상 설정값으로 숨기지 않는다.",
+              "caseId": "REF-05-106",
+              "assertionClass": "runtime-value",
+              "targets": [
+                "wasm"
+              ],
+              "polarities": [
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/issue-90-settings-stream.test.mjs",
+              "testId": "REF-05-105 [host] 오래된 expiry는 새 일반 설정을 덮어쓰지 않는다.",
+              "caseId": "REF-05-105",
+              "assertionClass": "runtime-value",
+              "targets": [
+                "wasm"
+              ],
+              "polarities": [
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/issue-90-settings-stream.test.mjs",
+              "testId": "REF-05-104 [host] Until 임시값의 만료는 복귀 설정 event다.",
+              "caseId": "REF-05-104",
+              "assertionClass": "runtime-value",
+              "targets": [
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/issue-90-settings-stream.test.mjs",
+              "testId": "REF-05-103 [host] 임시 Run overlay는 run 경계에서 제거된다.",
+              "caseId": "REF-05-103",
+              "assertionClass": "runtime-value",
+              "targets": [
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/issue-90-settings-stream.test.mjs",
+              "testId": "REF-08-015 [runtime] state 초기화와 일반 config 지속성은 별도이며 정전 시간을 elapsed에 더하지 않는다.",
+              "caseId": "REF-08-015",
+              "assertionClass": "runtime-value",
+              "targets": [
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
             }
           ]
         }
@@ -2553,9 +2616,20 @@
         "Linked snapshot does not establish atomic multi-setting events or persistence."
       ],
       "issues": [
-        74
+        74,
+        338,
+        337,
+        336,
+        335,
+        332
       ],
-      "referenceCaseIds": []
+      "referenceCaseIds": [
+        "REF-05-106",
+        "REF-05-105",
+        "REF-05-104",
+        "REF-05-103",
+        "REF-08-015"
+      ]
     },
     {
       "id": "settings-observation",
@@ -2800,6 +2874,324 @@
       ]
     },
     {
+      "id": "reference-index-links",
+      "family": "Reference syntax and symbol index links",
+      "clause": {
+        "path": "docs/reference/07-semantic-rules-and-index.md",
+        "heading": "7.5 선언과 표기 찾아보기"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [
+        "compile"
+      ],
+      "evidence": [
+        {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/reference-index-links.test.mjs",
+              "testId": "REF-07-008: syntax and symbol index links resolve to exact Reference sections",
+              "caseId": "REF-07-008",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-index-links.test.mjs",
+              "testId": "REF-07-010: source-to-Reference index links design rationale to exact Reference locations only",
+              "caseId": "REF-07-010",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "The oracle verifies Reference index structure and status-marker consistency; it does not prove every linked target's full prose semantics."
+      ],
+      "issues": [
+        315,
+        317
+      ],
+      "referenceCaseIds": [
+        "REF-07-008",
+        "REF-07-010"
+      ]
+    },
+    {
+      "id": "reference-terms-boundaries",
+      "family": "Reference identity and effect boundary terms",
+      "clause": {
+        "path": "docs/reference/07-semantic-rules-and-index.md",
+        "heading": "7.7 용어"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [
+        "compile"
+      ],
+      "evidence": [
+        {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/reference-terms-boundaries.test.mjs",
+              "testId": "REF-07-009: boundary terms have separate identity and effect definitions",
+              "caseId": "REF-07-009",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive"
+              ]
+            },
+            {
+              "path": "tests/reference-terms-boundaries.test.mjs",
+              "testId": "REF-07-009: Reference prose does not collapse Program/Run, requested/safe, or logical/physical",
+              "caseId": "REF-07-009",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "The oracle checks Reference term definitions and selected non-collapse prose; it does not prove every downstream product UI label or external integration document."
+      ],
+      "issues": [
+        316
+      ],
+      "referenceCaseIds": [
+        "REF-07-009"
+      ]
+    },
+    {
+      "id": "reference-faq-coverage",
+      "family": "Reference FAQ responsibility table coverage",
+      "clause": {
+        "path": "docs/reference/08-language-runtime-and-device-boundaries.md",
+        "heading": "8.3 FAQ 전체 책임표"
+      },
+      "owner": "PRODUCT_BOUNDARY",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [
+        "compile"
+      ],
+      "evidence": [
+        {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/reference-faq-coverage.test.mjs",
+              "testId": "REF-08-005: FAQ responsibility table covers every FAQ 1 through 41 exactly by links and ranges",
+              "caseId": "REF-08-005",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "The oracle verifies FAQ table coverage and range expansion; it does not prove each row's prose assigns the correct downstream owner implementation."
+      ],
+      "issues": [
+        322
+      ],
+      "referenceCaseIds": [
+        "REF-08-005"
+      ]
+    },
+    {
+      "id": "compiler-physical-boundary",
+      "family": "Compiler metadata preservation and physical verification boundary",
+      "clause": {
+        "path": "docs/reference/08-language-runtime-and-device-boundaries.md",
+        "heading": "8.2 계층별 책임"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [
+        "compile"
+      ],
+      "evidence": [
+        {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/reference-layer-boundaries.test.mjs",
+              "testId": "REF-08-002: compiler/tooling preserves source metadata but does not prove physical operation",
+              "caseId": "REF-08-002",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/reference-layer-boundaries.test.mjs",
+              "testId": "REF-08-002: FAQ compiler row separates compile checks from physical verification",
+              "caseId": "REF-08-002",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "The oracle verifies Reference responsibility boundaries; it does not prove an external installer or Driver produces a physical verification report."
+      ],
+      "issues": [
+        319
+      ],
+      "referenceCaseIds": [
+        "REF-08-002"
+      ]
+    },
+    {
+      "id": "provider-data-boundary",
+      "family": "Provider data identity coverage validity and failure boundary",
+      "clause": {
+        "path": "docs/reference/08-language-runtime-and-device-boundaries.md",
+        "heading": "8.2 계층별 책임"
+      },
+      "owner": "HOST",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [
+        "compile"
+      ],
+      "evidence": [
+        {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/reference-layer-boundaries.test.mjs",
+              "testId": "REF-08-003: data providers expose data identity, coverage, validity, and failures without a second control language",
+              "caseId": "REF-08-003",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "The oracle verifies Reference responsibility boundaries and calendar-provider prose; it does not prove a Farm Studio API or host provider implementation emits these records."
+      ],
+      "issues": [
+        320
+      ],
+      "referenceCaseIds": [
+        "REF-08-003"
+      ]
+    },
+    {
+      "id": "host-offline-boundary",
+      "family": "Host local offline execution and distinct data failure states",
+      "clause": {
+        "path": "docs/reference/08-language-runtime-and-device-boundaries.md",
+        "heading": "8.2 계층별 책임"
+      },
+      "owner": "HOST",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [
+        "compile"
+      ],
+      "evidence": [
+        {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/reference-layer-boundaries.test.mjs",
+              "testId": "REF-08-004: host execution does not require Android, cloud, or internet and distinguishes offline data states",
+              "caseId": "REF-08-004",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "The oracle verifies Reference host-boundary prose; it does not prove a firmware image or hardware device can run offline."
+      ],
+      "issues": [
+        321
+      ],
+      "referenceCaseIds": [
+        "REF-08-004"
+      ]
+    },
+    {
+      "id": "general-control-boundary",
+      "family": "Ordinary control combinations and input capture boundary",
+      "clause": {
+        "path": "docs/reference/08-language-runtime-and-device-boundaries.md",
+        "heading": "8.4 기능별로 지켜야 하는 경계"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [
+        "compile"
+      ],
+      "evidence": [
+        {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/reference-layer-boundaries.test.mjs",
+              "testId": "REF-08-006: ordinary control combinations stay in language constructs and input-capture contracts",
+              "caseId": "REF-08-006",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "The oracle verifies Reference design boundaries; it does not implement a new primitive or prove host/Driver pulse-capture behavior."
+      ],
+      "issues": [
+        323
+      ],
+      "referenceCaseIds": [
+        "REF-08-006"
+      ]
+    },
+    {
       "id": "host-boundary",
       "family": "Host scheduling, persistence and simulation",
       "clause": {
@@ -2822,6 +3214,31 @@
               "targets": [
                 "wasm"
               ]
+            },
+            {
+              "path": "tests/restart-reason-boundary.test.mjs",
+              "testId": "REF-05-107 [runtime] 근거 없는 재시작 원인은 Unknown이다.",
+              "caseId": "REF-05-107",
+              "assertionClass": "observation",
+              "targets": [
+                "wasm"
+              ],
+              "polarities": [
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/ghostsim.test.mjs",
+              "testId": "REF-08-017 [tooling] 같은 Program, 입력, 논리 시간, 설정 event, 시작 상태에는 장치·UI 종류와 무관하게 같은 제어 판단이 나와야 한다.",
+              "caseId": "REF-08-017",
+              "assertionClass": "replay",
+              "targets": [
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
             }
           ]
         }
@@ -2829,8 +3246,14 @@
       "gaps": [
         "Host simulation does not establish Driver application or physical confirmation."
       ],
-      "issues": [],
-      "referenceCaseIds": []
+      "issues": [
+        339,
+        334
+      ],
+      "referenceCaseIds": [
+        "REF-05-107",
+        "REF-08-017"
+      ]
     },
     {
       "id": "driver-boundary",
@@ -2845,6 +3268,23 @@
       "requiredEvidence": [],
       "evidence": [
         {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/reference-layer-boundaries.test.mjs",
+              "testId": "REF-08-016 [host] 설치 binding과 Driver 배포 형식은 source grammar 밖의 환경 계약이다.",
+              "caseId": "REF-08-016",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            }
+          ]
+        },
+        {
           "stage": "driver_application",
           "status": "not-claimed",
           "refs": []
@@ -2858,8 +3298,12 @@
       "gaps": [
         "No Device revision or physical effect oracle is linked in this toolchain."
       ],
-      "issues": [],
-      "referenceCaseIds": []
+      "issues": [
+        333
+      ],
+      "referenceCaseIds": [
+        "REF-08-016"
+      ]
     },
     {
       "id": "product-boundary",

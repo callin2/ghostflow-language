@@ -15,7 +15,7 @@ export function resolveDocument(importer, locator) {
 }
 const fail = (loc, text, code) => { throw new ControlCompileError(text, loc, code); };
 const typeKey = type => JSON.stringify(type, (key, value) => key === 'loc' ? undefined : value);
-const simpleKinds = new Set(['input', 'output', 'parameter', 'state', 'let', 'next', 'connection', 'instance', 'connect']);
+const simpleKinds = new Set(['input', 'output', 'parameter', 'state', 'let', 'next', 'connection', 'instance', 'connect', 'sensor', 'function']);
 
 /** Verify the complete supplied closure, then compose ASTs without generating source. */
 export function compileComposition(source, filename, supplied) {
@@ -59,6 +59,7 @@ export function compileComposition(source, filename, supplied) {
   const root = visit(source, filename);
   let nextId = 1, expanded = 0, transformed = 0;
   const sourceNodes = [], instances = [], compositionChecks = [];
+  const sensorBindings = new Map();
   const allBodies = [];
   function instantiate(unit, path, argumentsList = [], callerTransform = value => value) {
     if (++expanded > 128) fail(unit.ast.loc, 'composition instance limit exceeded');
@@ -70,6 +71,7 @@ export function compileComposition(source, filename, supplied) {
     for (const node of unit.ast.body) {
       for (const name of node.names ?? (node.name ? [node.name] : [])) names.set(name, `${prefix}${name}`);
       if (node.kind === 'input' || node.kind === 'output') for (const name of node.names) ports.set(name, { kind: node.kind, type: node.type });
+      if (node.kind === 'sensor') ports.set(node.name, { kind: 'sensor', type: node.type, optional: node.optional });
       if (node.kind === 'connection') outputs.set(node.name, node.value);
     }
     for (const node of unit.ast.sourceNodes) {
@@ -94,11 +96,18 @@ export function compileComposition(source, filename, supplied) {
       const expr = outputs.get(name), result = typeof expr === 'function' ? expr() : transform(expr);
       resolving.delete(name); return result;
     }
-    function transform(value) {
+    function transform(value, locals = new Set()) {
       if (!value || typeof value !== 'object') return value;
       if (++transformed > 65_536) fail(unit.ast.loc, 'composition expression expansion limit exceeded');
-      if (Array.isArray(value)) return value.map(transform);
-      if (value.kind === 'reference' && ports.get(value.name)?.kind === 'input' && path) {
+      if (Array.isArray(value)) return value.map(child => transform(child, locals));
+      if (value.kind === 'function') {
+        return { ...value, id: ids.get(value.id), name: names.get(value.name),
+          body: transform(value.body, new Set(value.params.map(param => param.name))) };
+      }
+      if (value.kind === 'case') return { ...value, id: ids.get(value.id),
+        value: transform(value.value, locals), branches: value.branches.map(branch => ({ ...branch,
+          body: transform(branch.body, new Set([...locals, ...(branch.binding ? [branch.binding] : [])])) })) };
+      if (value.kind === 'reference' && !locals.has(value.name) && ports.get(value.name)?.kind === 'input' && path) {
         const provider = inputs.get(value.name);
         if (!provider) fail(value.loc, `missing required input ${path}.${value.name}`);
         return provider();
@@ -107,9 +116,9 @@ export function compileComposition(source, filename, supplied) {
       for (const [key, child] of Object.entries(value)) {
         if (key === 'loc') result[key] = child;
         else if (key === 'id') result[key] = ids.get(child) ?? child;
-        else if (key === 'name' && value.kind && names.has(child)) result[key] = names.get(child);
+        else if (key === 'name' && value.kind && names.has(child) && !locals.has(child)) result[key] = names.get(child);
         else if (key === 'names') result[key] = child.map(name => names.get(name) ?? name);
-        else result[key] = transform(child);
+        else result[key] = transform(child, locals);
       }
       return result;
     }
@@ -117,12 +126,20 @@ export function compileComposition(source, filename, supplied) {
       const endpoint = (entry, direction) => {
         const owner = entry.instance ? children.get(entry.instance) : { ports };
         const port = owner.ports.get(entry.port);
-        if (!port || port.kind !== direction) fail(entry.loc, `unknown ${direction} port ${entry.path}`);
+        if (!port || port.kind !== direction && !(direction === 'input' && port.kind === 'sensor')) fail(entry.loc, `unknown ${direction} port ${entry.path}`);
         return { owner, port };
       };
       const sink = endpoint(connection.sink, connection.sink.instance ? 'input' : 'output');
       const origin = endpoint(connection.source, connection.source.instance ? 'output' : 'input');
       if (typeKey(sink.port.type) !== typeKey(origin.port.type)) fail(connection.sink.loc, `port type mismatch for ${connection.sink.path}`);
+      if (sink.port.kind === 'sensor' || origin.port.kind === 'sensor') {
+        if (sink.port.kind !== 'sensor' || origin.port.kind !== 'sensor' || !connection.sink.instance || connection.source.instance)
+          fail(connection.sink.loc, 'sensor connection requires a root sensor source and an instance sensor sink');
+        if (sink.port.optional !== origin.port.optional)
+          fail(connection.sink.loc, `sensor sample contract mismatch for ${connection.sink.path}`);
+        sink.owner.inputs.set(connection.sink.port, { sensor: names.get(connection.source.port), loc: connection.sink.loc });
+        continue;
+      }
       const provider = connection.source.instance
         ? () => origin.owner.output(connection.source.port)
         : () => transform({ kind: 'reference', id: connection.id, loc: connection.source.loc, name: connection.source.port });
@@ -130,11 +147,12 @@ export function compileComposition(source, filename, supplied) {
       else outputs.set(connection.sink.port, provider);
     }
     const deferred = () => {
-      if (path) for (const [name, port] of ports) if (port.kind === 'input' && !inputs.has(name)) fail(unit.ast.loc, `missing required input ${path}.${name}`);
+      if (path) for (const [name, port] of ports) if (['input', 'sensor'].includes(port.kind) && !inputs.has(name)) fail(unit.ast.loc, `missing required input ${path}.${name}`);
       const body = [];
       for (const node of unit.ast.body) {
         if (['instance', 'connect', 'connection'].includes(node.kind) || (path && ['input', 'output'].includes(node.kind))) continue;
         const copy = transform(node);
+        if (node.kind === 'sensor' && path) sensorBindings.set(copy.name, { sourceSensor: inputs.get(node.name).sensor, instance: path, port: node.name, loc: inputs.get(node.name).loc });
         if (node.kind === 'parameter' && overrides.has(node.name)) copy.value = overrides.get(node.name);
         body.push(copy);
       }
@@ -157,6 +175,26 @@ export function compileComposition(source, filename, supplied) {
   const body = allBodies.flatMap(resolve => resolve());
   const ast = { ...root.ast, imports: [], body, sourceNodes, compositionChecks };
   const result = compileComposedControl(ast, filename);
+  if (sensorBindings.size) {
+    const publicSource = name => {
+      const visited = new Set();
+      while (sensorBindings.has(name)) {
+        if (visited.has(name)) fail(root.ast.loc, 'sensor connection cycle');
+        visited.add(name); name = sensorBindings.get(name).sourceSensor;
+      }
+      return name;
+    };
+    const byName = new Map(result.manifest.sensors.map(sensor => [sensor.name, sensor]));
+    result.manifest.sensorInstances = result.manifest.sensors.filter(sensor => sensorBindings.has(sensor.name))
+      .map(sensor => {
+        const { loc, ...binding } = sensorBindings.get(sensor.name);
+        const sourceSensor = publicSource(sensor.name), source = byName.get(sourceSensor);
+        if (!source || source.sampleMs !== sensor.sampleMs || !!source.optional !== !!sensor.optional)
+          fail(loc, `sensor sample contract mismatch for ${binding.instance}.${binding.port}`);
+        return { ...sensor, ...binding, sourceSensor };
+      });
+    result.manifest.sensors = result.manifest.sensors.filter(sensor => !sensorBindings.has(sensor.name));
+  }
   const closure = { format: 'GhostFlow/source-closure-v1', documents: [...used].sort().map(key => documents.get(key)), instances };
   return { result, closure, units };
 }

@@ -320,3 +320,281 @@ test('Issue #90 readonly streams accept producer fault/recovery and reject opera
   assert.equal(recovered.vm.safe.available, true);
   assert.deepEqual(runtime.contextSnapshot().state.settings[0].result, { ok: true, value: 300_000 });
 });
+
+test('REF-05-106 [host] 복귀 실패를 정상 설정값으로 숨기지 않는다.', async t => {
+  const referenceCases = JSON.parse(fs.readFileSync(
+    new URL('./reference/cases/03-settings-boundaries.json', import.meta.url), 'utf8')).cases;
+  const ref05106 = referenceCases.find(entry => entry.id === 'REF-05-106');
+  const settingsChapter = fs.readFileSync(
+    new URL('../docs/reference/05-settings-and-observation.md', import.meta.url), 'utf8');
+  assert.equal(ref05106?.issue, 'https://github.com/callin2/ghostflow-language/issues/338');
+  assert.match(ref05106.rule, /복귀 실패를 정상 설정값으로 숨기지 않는다/);
+  assert.match(ref05106.given, /Until overlay 만료/);
+  assert.match(ref05106.then, /설정 unavailable과 복귀 실패를 관찰/);
+  assert.match(ref05106.then, /성공 tick으로 확정하지 않는다/);
+  assert.match(settingsChapter, /\| 복귀 실패 \| 성공한 복귀로 기록하지 않는다\./);
+  assert.match(settingsChapter, /설정 유효성을 unavailable로 보고/);
+  assert.match(settingsChapter, /물리 출력 대응은 설치의 명시된 장애 계약을 따른다/);
+
+  const readonlyDocument = fs.readFileSync(
+    new URL('./fixtures/issue-90-readonly-settings.ghost.md', import.meta.url), 'utf8');
+  const compiled = await compileSource(readonlyDocument, { filename: 'issue-90-readonly-settings.ghost.md' });
+  const runtime = await ControlRuntime.instantiate(wasmBytes(), compiled,
+    { context: { bootEpoch: 10, terminalCapacity: 8, bindings: [] } });
+  t.after(() => runtime.dispose());
+  const fingerprint = runtime.contextSnapshot().state.programFingerprint;
+  const facts = (position, settings) => ({
+    clock: { monotonicMs: position, bootEpoch: 10, wallMs: 2_000 + position,
+      uncertaintyMs: 0, trusted: true, unknownReason: null, sourceRevision: 'return-failure-clock-v1' },
+    natural: [], schedules: [], settings,
+  });
+  assert.deepEqual(runtime.contextSnapshot().state.settings[0].result, { ok: true, value: 300_000 });
+  const returnFailure = {
+    programFingerprint: fingerprint,
+    eventId: 'until-overlay-return-failure',
+    baseRevision: 0,
+    position: 1,
+    origin: 'producerObservation',
+    changes: [{ configId: compiled.manifest.configs[0].id, result: { ok: false, fault: 'SettingsUnavailable' } }],
+  };
+  const unavailable = runtime.step({ nowMs: 1, contextFacts: facts(1, returnFailure) });
+  assert.equal(unavailable.vm.safe.available, false);
+  const state = runtime.contextSnapshot().state;
+  assert.equal(state.settingsRevision, 1);
+  assert.deepEqual(state.settings[0].result, { ok: false, fault: 'SettingsUnavailable' });
+  assert.notDeepEqual(state.settings[0].result, { ok: true, value: 300_000 });
+});
+
+test('REF-05-105 [host] 오래된 expiry는 새 일반 설정을 덮어쓰지 않는다.', async t => {
+  const referenceCases = JSON.parse(fs.readFileSync(
+    new URL('./reference/cases/03-settings-boundaries.json', import.meta.url), 'utf8')).cases;
+  const ref05105 = referenceCases.find(entry => entry.id === 'REF-05-105');
+  const settingsChapter = fs.readFileSync(
+    new URL('../docs/reference/05-settings-and-observation.md', import.meta.url), 'utf8');
+  assert.equal(ref05105?.issue, 'https://github.com/callin2/ghostflow-language/issues/337');
+  assert.match(ref05105.rule, /오래된 expiry는 새 일반 설정을 덮어쓰지 않는다/);
+  assert.match(ref05105.given, /5min 위 8min 임시값을 일반 설정 6min으로 대체했다/);
+  assert.match(ref05105.then, /6min을 유지/);
+  assert.match(ref05105.then, /이미 제거된 overlay에 대한 event로 식별/);
+  assert.match(settingsChapter, /새 일반 설정 \| 해당 setting의 overlay를 같은 event에서 제거하고 새 일반값을 적용한다/);
+  assert.match(settingsChapter, /이전 expiry가 새 값을 덮어쓰지 않는다/);
+
+  const compiled = await compileSource(`# Stale expiry settings\n\n\`\`\`ghost\ncontrol StaleExpiry {
+  config duration: Duration = 5min { min = 1min; max = 20min; step = 1min; access = operator; }
+  output seconds: Number;
+  seconds <- case duration { ok(value) => value / 1s; fault(_) => -1.0; };
+}\n\`\`\`\n`, { filename: 'stale-expiry-settings.ghost.md' });
+  const runtime = await ControlRuntime.instantiate(wasmBytes(), compiled,
+    { context: { bootEpoch: 11, terminalCapacity: 8, bindings: [] } });
+  t.after(() => runtime.dispose());
+  const fingerprint = runtime.contextSnapshot().state.programFingerprint;
+  const configId = compiled.manifest.configs[0].id;
+  const facts = (position, settings) => ({
+    clock: { monotonicMs: position, bootEpoch: 11, wallMs: 3_000 + position,
+      uncertaintyMs: 0, trusted: true, unknownReason: null, sourceRevision: 'stale-expiry-clock-v1' },
+    natural: [], schedules: [], settings,
+  });
+  const event = (eventId, baseRevision, position, value) => ({
+    programFingerprint: fingerprint,
+    eventId,
+    baseRevision,
+    position,
+    origin: 'operatorEdit',
+    changes: [{ configId, result: { ok: true, type: 'Duration', value } }],
+  });
+
+  assert.deepEqual(runtime.contextSnapshot().state.settings[0].result, { ok: true, value: 300_000 });
+  assert.equal(runtime.step({ nowMs: 1, contextFacts: facts(1,
+    event('temp-overlay-8min', 0, 1, 480_000)) }).vm.safe.seconds, 480);
+  assert.equal(runtime.contextSnapshot().state.settingsRevision, 1);
+  assert.equal(runtime.step({ nowMs: 2, contextFacts: facts(2,
+    event('ordinary-6min-removes-overlay', 1, 2, 360_000)) }).vm.safe.seconds, 360);
+  assert.equal(runtime.contextSnapshot().state.settingsRevision, 2);
+
+  const staleExpiryReturn = event('stale-expiry-return-to-5min', 1, 3, 300_000);
+  assert.throws(() => runtime.step({ nowMs: 3, contextFacts: facts(3, staleExpiryReturn) }), /stale settings transaction/);
+  const state = runtime.contextSnapshot().state;
+  assert.equal(state.settingsRevision, 2);
+  assert.deepEqual(state.settings[0].result, { ok: true, value: 360_000 });
+});
+
+test('REF-05-104 [host] Until 임시값의 만료는 복귀 설정 event다.', async t => {
+  const referenceCases = JSON.parse(fs.readFileSync(
+    new URL('./reference/cases/03-settings-boundaries.json', import.meta.url), 'utf8')).cases;
+  const ref05104 = referenceCases.find(entry => entry.id === 'REF-05-104');
+  const settingsChapter = fs.readFileSync(
+    new URL('../docs/reference/05-settings-and-observation.md', import.meta.url), 'utf8');
+  assert.equal(ref05104?.issue, 'https://github.com/callin2/ghostflow-language/issues/336');
+  assert.match(ref05104.rule, /Until 임시값의 만료는 복귀 설정 event다/);
+  assert.match(ref05104.given, /일반값 5min/);
+  assert.match(ref05104.when, /정확히 10:00Z/);
+  assert.match(ref05104.then, /유효값 5min/);
+  assert.match(ref05104.then, /새 settings revision/);
+  assert.match(ref05104.then, /state와 timer는 reset하지 않는다/);
+  assert.match(settingsChapter, /만료·취소 \| 원래 overlay ID를 대상으로 하는 atomic settings event다/);
+  assert.match(settingsChapter, /완료된 settings revision과 적용 위치를 남긴다/);
+
+  const compiled = await compileSource(`# Until expiry return\n\n\`\`\`ghost\ncontrol UntilExpiryReturn {
+  input tick: Bool;
+  config duration: Duration = 5min { min = 1min; max = 20min; step = 1min; access = operator; }
+  state seen: Bool = false;
+  timer age = elapsed(seen);
+  seen' = seen || tick;
+  output seconds: Number;
+  output remembered: Bool;
+  output age_ms: Duration;
+  seconds <- case duration { ok(value) => value / 1s; fault(_) => -1.0; };
+  remembered <- seen;
+  age_ms <- age;
+}\n\`\`\`\n`, { filename: 'until-expiry-return.ghost.md' });
+  const runtime = await ControlRuntime.instantiate(wasmBytes(), compiled,
+    { context: { bootEpoch: 12, terminalCapacity: 8, bindings: [] } });
+  t.after(() => runtime.dispose());
+  const fingerprint = runtime.contextSnapshot().state.programFingerprint;
+  const configId = compiled.manifest.configs[0].id;
+  const facts = (position, settings) => ({
+    clock: { monotonicMs: position, bootEpoch: 12, wallMs: Date.parse('2026-09-29T10:00:00.000Z') + position,
+      uncertaintyMs: 0, trusted: true, unknownReason: null, sourceRevision: 'until-expiry-clock-v1' },
+    natural: [], schedules: [], settings,
+  });
+  const event = (eventId, baseRevision, position, value) => ({
+    programFingerprint: fingerprint,
+    eventId,
+    baseRevision,
+    position,
+    origin: 'operatorEdit',
+    changes: [{ configId, result: { ok: true, type: 'Duration', value } }],
+  });
+
+  const overlay = runtime.step({ nowMs: 1_000, inputs: { tick: true }, contextFacts: facts(1_000,
+    event('until-overlay-8min-expires-at-10z', 0, 1, 480_000)) });
+  assert.equal(overlay.vm.safe.seconds, 480);
+  assert.equal(overlay.vm.safe.remembered, false);
+  assert.equal(runtime.contextSnapshot().state.settingsRevision, 1);
+
+  const returned = runtime.step({ nowMs: 61_000, inputs: { tick: false }, contextFacts: facts(61_000,
+    event('until-overlay-8min-return-to-5min', 1, 2, 300_000)) });
+  assert.equal(returned.vm.safe.seconds, 300);
+  assert.equal(returned.vm.safe.remembered, true, 'state is not reset by expiry return');
+  assert.ok(returned.vm.safe.age_ms > 0, 'timer memory continues across expiry return');
+  assert.equal(runtime.contextSnapshot().state.settingsRevision, 2);
+  assert.deepEqual(runtime.contextSnapshot().state.settings[0].result, { ok: true, value: 300_000 });
+});
+
+test('REF-05-103 [host] 임시 Run overlay는 run 경계에서 제거된다.', async t => {
+  const referenceCases = JSON.parse(fs.readFileSync(
+    new URL('./reference/cases/03-settings-boundaries.json', import.meta.url), 'utf8')).cases;
+  const ref05103 = referenceCases.find(entry => entry.id === 'REF-05-103');
+  const settingsChapter = fs.readFileSync(
+    new URL('../docs/reference/05-settings-and-observation.md', import.meta.url), 'utf8');
+  assert.equal(ref05103?.issue, 'https://github.com/callin2/ghostflow-language/issues/335');
+  assert.match(ref05103.rule, /임시 Run overlay는 run 경계에서 제거된다/);
+  assert.match(ref05103.given, /일반값 5min 위 Run 임시값 8min/);
+  assert.match(ref05103.then, /첫 판단 전에 overlay가 제거되어 5min/);
+  assert.match(settingsChapter, /\| `Run` \| 현재 run에서만 유효하다\. run이 끝나면 overlay를 제거한다\. \|/);
+  assert.match(settingsChapter, /재시작은 새 `runId`를 만든다/);
+
+  const compiled = await compileSource(`# Run overlay removal\n\n\`\`\`ghost\ncontrol RunOverlayRemoval {
+  config duration: Duration = 5min { min = 1min; max = 20min; step = 1min; access = operator; }
+  output seconds: Number;
+  seconds <- case duration { ok(value) => value / 1s; fault(_) => -1.0; };
+}\n\`\`\`\n`, { filename: 'run-overlay-removal.ghost.md' });
+  const firstRun = await ControlRuntime.instantiate(wasmBytes(), compiled,
+    { context: { bootEpoch: 13, terminalCapacity: 8, bindings: [] } });
+  t.after(() => firstRun.dispose());
+  const fingerprint = firstRun.contextSnapshot().state.programFingerprint;
+  const configId = compiled.manifest.configs[0].id;
+  const facts = (position, settings, bootEpoch = 13) => ({
+    clock: { monotonicMs: position, bootEpoch, wallMs: 4_000 + position,
+      uncertaintyMs: 0, trusted: true, unknownReason: null, sourceRevision: `run-overlay-clock-${bootEpoch}` },
+    natural: [], schedules: [], settings,
+  });
+  const runOverlay = {
+    programFingerprint: fingerprint,
+    eventId: 'run-overlay-8min',
+    baseRevision: 0,
+    position: 1,
+    origin: 'operatorEdit',
+    changes: [{ configId, result: { ok: true, type: 'Duration', value: 480_000 } }],
+  };
+  assert.equal(firstRun.step({ nowMs: 1, contextFacts: facts(1, runOverlay) }).vm.safe.seconds, 480);
+  assert.deepEqual(firstRun.contextSnapshot().state.settings[0].result, { ok: true, value: 480_000 });
+
+  const nextRun = await ControlRuntime.instantiate(wasmBytes(), compiled,
+    { context: { bootEpoch: 14, terminalCapacity: 8, bindings: [] } });
+  t.after(() => nextRun.dispose());
+  const firstDecision = nextRun.step({ nowMs: 0, contextFacts: facts(0, null, 14) });
+  assert.equal(firstDecision.vm.safe.seconds, 300);
+  assert.equal(nextRun.contextSnapshot().state.settingsRevision, 0);
+  assert.deepEqual(nextRun.contextSnapshot().state.settings[0].result, { ok: true, value: 300_000 });
+});
+
+test('REF-08-015 [runtime] state 초기화와 일반 config 지속성은 별도이며 정전 시간을 elapsed에 더하지 않는다.', async t => {
+  const referenceCases = JSON.parse(fs.readFileSync(
+    new URL('./reference/cases/03-settings-boundaries.json', import.meta.url), 'utf8')).cases;
+  const ref08015 = referenceCases.find(entry => entry.id === 'REF-08-015');
+  const chapter08 = fs.readFileSync(
+    new URL('../docs/reference/08-language-runtime-and-device-boundaries.md', import.meta.url), 'utf8');
+  assert.equal(ref08015?.issue, 'https://github.com/callin2/ghostflow-language/issues/332');
+  assert.match(ref08015.rule, /state 초기화와 일반 config 지속성은 별도/);
+  assert.match(ref08015.rule, /정전 시간을 elapsed에 더하지 않는다/);
+  assert.match(ref08015.given, /운전 state와 2min timer/);
+  assert.match(ref08015.then, /새 run에서 state 선언 초기값/);
+  assert.match(ref08015.then, /elapsed 0ms/);
+  assert.match(ref08015.then, /config 5min/);
+  assert.match(chapter08, /state·타이머·필터 내부 기억 \| 언어 실행 의미/);
+  assert.match(chapter08, /재시작 복원은 명시한 정책과 checkpoint 계약 필요/);
+  assert.match(chapter08, /operator config의 유효값 \| 언어의 live 설정 계약/);
+  assert.match(chapter08, /일반 설정은 실제 재시작 후 보존/);
+
+  const compiled = await compileSource(`# Restart state timer config boundary\n\n\`\`\`ghost\ncontrol RestartBoundary {
+  input start: Bool;
+  config duration: Duration = 3min { min = 1min; max = 20min; step = 1min; access = operator; }
+  state running: Bool = false;
+  timer age = elapsed(running);
+  running' = running || start;
+  output active: Bool;
+  output age_ms: Duration;
+  output seconds: Number;
+  active <- running;
+  age_ms <- age;
+  seconds <- case duration { ok(value) => value / 1s; fault(_) => -1.0; };
+}\n\`\`\`\n`, { filename: 'restart-state-timer-config.ghost.md' });
+  const firstRun = await ControlRuntime.instantiate(wasmBytes(), compiled,
+    { context: { bootEpoch: 15, terminalCapacity: 8, bindings: [] } });
+  t.after(() => firstRun.dispose());
+  const fingerprint = firstRun.contextSnapshot().state.programFingerprint;
+  const configId = compiled.manifest.configs[0].id;
+  const facts = (position, settings, bootEpoch = 15) => ({
+    clock: { monotonicMs: position, bootEpoch, wallMs: 5_000 + position,
+      uncertaintyMs: 0, trusted: true, unknownReason: null, sourceRevision: `restart-boundary-clock-${bootEpoch}` },
+    natural: [], schedules: [], settings,
+  });
+  const ordinary5min = (baseRevision, position, eventId = 'ordinary-5min') => ({
+    programFingerprint: fingerprint,
+    eventId,
+    baseRevision,
+    position,
+    origin: 'operatorEdit',
+    changes: [{ configId, result: { ok: true, type: 'Duration', value: 300_000 } }],
+  });
+
+  assert.deepEqual(firstRun.contextSnapshot().state.settings[0].result, { ok: true, value: 180_000 });
+  const start = firstRun.step({ nowMs: 1, inputs: { start: true }, contextFacts: facts(1, ordinary5min(0, 1)) });
+  assert.equal(start.vm.safe.active, false);
+  assert.equal(start.vm.safe.seconds, 300);
+  const afterTwoMinutes = firstRun.step({ nowMs: 120_000, inputs: { start: false }, contextFacts: facts(120_000, null) });
+  assert.equal(afterTwoMinutes.vm.safe.active, true);
+  assert.ok(afterTwoMinutes.vm.safe.age_ms >= 119_000);
+
+  const nextRun = await ControlRuntime.instantiate(wasmBytes(), compiled,
+    { context: { bootEpoch: 16, terminalCapacity: 8, bindings: [] } });
+  t.after(() => nextRun.dispose());
+  const firstDecision = nextRun.step({ nowMs: 1, inputs: { start: false }, contextFacts: facts(1,
+    ordinary5min(0, 1, 'preserved-ordinary-5min-at-new-run'), 16) });
+  assert.equal(firstDecision.vm.safe.active, false, 'new run starts from declared state initial value');
+  assert.equal(firstDecision.vm.safe.age_ms, 0, 'outage time is not added to elapsed');
+  assert.equal(firstDecision.vm.safe.seconds, 300, 'ordinary config persistence supplies 5min');
+  assert.equal(nextRun.contextSnapshot().state.settingsRevision, 1);
+  assert.deepEqual(nextRun.contextSnapshot().state.settings[0].result, { ok: true, value: 300_000 });
+});

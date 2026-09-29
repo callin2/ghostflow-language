@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+### 2026-09-29 — pinned sensor and function composition ([#377](https://github.com/callin2/ghostflow-language/issues/377))
+
+Reference §6.4 sensor connections and imported pure functions now execute, instead
+of being rejected as unsupported composition. For example, `connect high.air <- air;`
+feeds the root raw sample into `high`'s own unchanged sensor conditioning. Payload,
+optionality and sample interval must match. Function/local names remain isolated.
+Public root sensors stay in `manifest.sensors`; consumers activating these programs
+must support `manifest.sensorInstances` routing. Existing standalone programs and
+GFB/WASM/frame interfaces are unchanged. `tests/composition-execution.test.mjs`
+checks filtering, faults, recovery, staleness, rollback, invalid wiring, provenance
+and native/WASM conditioned-frame parity.
+
+### 2026-09-29 — explicit relative-humidity ratio ([#371](https://github.com/callin2/ghostflow-language/issues/371))
+
+Reference §2.9 now permits `RelativeHumidity / RelativeHumidity -> Number`,
+previously rejected. For example, `60%RH / 100%RH` produces `0.6` for an authored
+air-VPD calculation. All other RH arithmetic, cross-quantity division and implicit
+numeric conversion remain forbidden. Constant/dynamic zero division retains the
+existing diagnostic/tick rejection. The compiler uses existing division bytecode;
+no GFB/ABI change or source migration is required. Regression coverage:
+`tests/relative-humidity-ratio.test.mjs` (constants, nominal rejections and native/WASM outcomes).
+
 ### 2026-09-28 — framed civil schedule bug fix ([#366](https://github.com/callin2/ghostflow-language/issues/366))
 
 Before this fix, framed civil schedules were rejected. They now use the same

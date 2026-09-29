@@ -77,6 +77,21 @@ revision. Compiler emission of descriptors is implemented by #71. Runtime
 projection reconstructs and verifies that exact schema from the compiled
 canonical literate artifact before it emits a public snapshot.
 
+For a repeated completed-scan stream, activate
+`prepareCompletedScanSnapshot({ compilation, schema?, runId })` once per
+compiled artifact and execution epoch. It returns a frozen
+`{ schema, expected, emit({ completion, trace, settingsState? }) }` producer.
+Preparation copies the static artifact inputs before verifying the exact schema.
+Its schema is deeply immutable; trace metadata and config descriptors are private
+immutable copies. Verification-only source and byte buffers are discarded.
+Caller mutations and edits to a previous snapshot cannot affect later emissions.
+`expected` is computed once for `joinRuntimeSnapshot(schema, snapshot, expected)`.
+Each emit still checks completion, logical clock, trace module identity, current
+Rust settings, observation types, the Interaction contract and generated-name
+exclusion. Recompile or restart by preparing a new producer with the new run ID.
+Keep the producer in its Worker or host; functions are not transport payloads.
+`emitCompletedScanSnapshot` remains the one-shot form of this same verified path.
+
 `timer.age` demonstrates `elapsed(watering)` as:
 
 ```json

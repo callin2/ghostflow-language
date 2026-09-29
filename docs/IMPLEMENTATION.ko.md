@@ -7,6 +7,17 @@
 
 ## 실행 경로
 
+고정 import 합성은 변경하지 않은 sensor와 순수 함수 정의를 받는다. 함수와 호출은
+instance별 이름으로 분리하며 지역 바인딩을 보존한다. Root sensor 원본 패킷을
+conditioning 전에 나누어 공급한다. 각 instance는 원래 filter·freshness·recovery
+상태를 독립적으로 소유한다. `manifest.sensors`는 공개 포트이고 선택적
+`manifest.sensorInstances`는 `sourceSensor`, `instance`, `port`를 포함하는 비공개
+descriptor다. 호스트는 공개 sensor 이름의 패킷만 받는다. 연결은 payload·선택성·선언한
+sample 간격이 일치해야 한다. 산출물 복원은 전체 source closure로 routing을 검증한다.
+생성 입력은 기존 GFB·WASM·frame 인터페이스를 사용한다. 테스트는 실제 conditioning된
+frame을 native framed VM과 비교하며 native 원본 sensor scenario 호스트를 주장하지 않는다.
+관련 작업: [#377](https://github.com/callin2/ghostflow-language/issues/377).
+
 `tools/browser-toolchain.mjs`는 정본 `.ghost.md` 문서만 받는 `compileSource(source, {filename, interactionSourceIdentity})`를 제공하며 브라우저 Worker에서 가져와도 안전합니다. `tools/toolchain.mjs`는 같은 환경 중립 컴파일러를 Node에서 감싸고 아티팩트 파일 시스템 I/O를 담당합니다. CommonMark 추출은 `tools/literate.mjs`를 통해 원래 위치 매핑을 보존합니다. 추출된 제어는 `tools/gfb1.mjs`를 거쳐 GFB1로 하향 변환됩니다. 공개 컴파일러 경계 양쪽에서 일반 소스는 거부됩니다.
 
 언어 제품군은 이 브라우저 진입점의 로컬 import 그래프에 Node 내장 모듈이나 `Buffer` 의존성이 없는지 확인하고, `Buffer`를 사용할 수 없는 상태로 실행합니다. 브라우저 러너를 추가하거나 Vite/Chromium Worker 증거를 주장하지 않습니다. 해당 소비자 통합은 Farm Studio Web 경계의 책임입니다.

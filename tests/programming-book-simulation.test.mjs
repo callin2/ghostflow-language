@@ -189,6 +189,109 @@ for (const [id, sourcePath, frames] of additionalLessons) {
 
 const measured = (name, id, atMs, value, quality = 'Good') => ({ kind: 'sample', name, epoch: 1, id, timestampMs: atMs, value, quality });
 
+for (const id of ['E16', 'E17', 'E18']) {
+  bookTest(id, 'runs equivalent heater thresholds, negative temperature, faults and recovery through ghostsim', async () => {
+    // Exact canonical golden values avoid a second, rounded host affine
+    // conversion: -40 + 273.15 is one ulp below literal 233.15 in JS.
+    const readings = [[291.15, false], [290.15, true], [291.15, true], [295.15, true], [296.15, false], [295.15, false],
+      [233.15, true], [293.15, false, 'Disconnected'], [293.15, false], [290.15, true]];
+    const frames = [frame(0, {}, { heater: false })];
+    for (const [index, [kelvin, expected, quality = 'Good']] of readings.entries()) {
+      const now = index + 1;
+      frames.push({ ...frame(now, {}, { heater: expected }),
+        actions: [measured('air', now, now, kelvin, quality)] });
+    }
+    frames.push(frame(3010, {}, { heater: false })); // exact last-sample age 3s
+    frames.push({ ...frame(3011, {}, { heater: true }), actions: [measured('air', 11, 3011, 290.15)] });
+    await simulate(id, bookSource(id), frames);
+  });
+}
+
+for (const [id, output, rhOn, rhBand, rhOff, gate] of [
+  ['E19', 'humidify_demand', 0.5, 0.65, 0.7, 0.0002],
+  ['E20', 'ventilate_demand', 0.9, 0.85, 0.8, 0.0002],
+  ['E21', 'irrigation_demand', 0.5, 0.72, 0.76, 0.0003],
+]) {
+  bookTest(id, 'runs actual climate demand, light gating, fault inhibition and recovery through ghostsim', async () => {
+    const frames = [frame(0, {}, { [output]: false, vpd_valid: false, air_vpd_value: 0 })];
+    const add = (now, rh, expected, { light = 0.0005, air = 298.15, lightQuality = 'Good',
+      humidityQuality = 'Good', airQuality = 'Good', valid = true } = {}) => {
+      frames.push({ ...frame(now, {}, { [output]: expected, vpd_valid: valid, ...(valid ? {} : { air_vpd_value: 0 }) }),
+        actions: [measured('air', now, now, air, airQuality), measured('humidity', now, now, rh, humidityQuality),
+          measured('light', now, now, light, lightQuality)] });
+    };
+    add(1, rhOn, true);
+    add(2, rhBand, true);
+    add(3, rhOff, false);
+    add(4, rhBand, false);
+    add(5, rhOn, true, { light: gate }); // light equality is inclusive
+    add(6, rhOn, false, { light: 0.0001 });
+    add(7, rhOn, false, { lightQuality: 'Invalid' });
+    add(8, rhOn, true);
+    add(9, rhOn, false, { humidityQuality: 'Disconnected', valid: false });
+    add(10, rhBand, false); // fault cleared retained climate demand
+    add(11, rhOn, true);
+    add(12, rhOn, false, { airQuality: 'Invalid', valid: false });
+    add(13, rhOn, true);
+    add(14, 1.1, false, { valid: false }); // outside RH sensor domain
+    add(15, rhOn, true);
+    add(16, rhOn, false, { air: 324.15, valid: false }); // outside approximation domain
+    add(17, 1, id === 'E20', { air: 273.15 }); // true zero VPD, still valid
+    add(18, rhOn, true);
+    frames.push(frame(3018, {}, { [output]: false, vpd_valid: false, air_vpd_value: 0 }));
+    add(3020, rhOn, true);
+    const result = await simulate(id, bookSource(id), frames);
+    const lightOnly = [5, 6, 7, 8].map(index => result.scans[index].safeVirtualIntent.air_vpd_value);
+    assert.ok(lightOnly.every(value => value === lightOnly[0]), `${id}: light never changes fixed T/RH VPD`);
+    assert.equal(result.scans[7].safeVirtualIntent.vpd_valid, true, 'light fault does not invalidate good T/RH');
+    assert.equal(result.scans[17].safeVirtualIntent.air_vpd_value, 0);
+    assert.equal(result.scans[17].safeVirtualIntent.vpd_valid, true, 'measured zero differs from fault placeholder');
+  });
+}
+
+// Independent physical checkpoints exercise changing decisions; a constant
+// valid input cannot substitute for a requested daily environment simulation.
+const dailyClimate = [
+  [0, 291.15, 0.90, 0, false, false, false, false],
+  [3, 290.15, 0.92, 0, true, false, false, false],
+  [6, 289.15, 0.94, 0, true, false, false, false],
+  [9, 295.15, 0.85, 0.0005, true, false, true, false],
+  [12, 301.15, 0.60, 0.001, false, true, false, true],
+  [15, 304.15, 0.45, 0.00065, false, true, false, true],
+  [18, 304.15, 0.60, 0, false, false, false, false],
+  [21, 296.15, 0.80, 0, false, false, false, false],
+  [24, 291.15, 0.90, 0, false, false, false, false],
+  [27, 290.15, 0.92, 0, true, false, false, false],
+];
+for (const [id, output, expectedIndex] of [
+  ['E16', 'heater', 4], ['E17', 'heater', 4], ['E18', 'heater', 4],
+  ['E19', 'humidify_demand', 5], ['E20', 'ventilate_demand', 6], ['E21', 'irrigation_demand', 7],
+]) {
+  test(`Programming ${id} daily environment changes real control decisions and repeats`, async () => {
+    // Sparse checkpoint scans intentionally omit the heater's 09 equality:
+    // a multi-hour sample gap resets hysteresis on Stale. Continuous reader
+    // sampling retains ON there; the separate boundary test proves equality.
+    const checkpoints = expectedIndex === 4 ? dailyClimate.filter(([hour]) => hour !== 9) : dailyClimate;
+    const frames = checkpoints.map((checkpoint, index) => {
+      const [hour, air, humidity, light] = checkpoint;
+      const now = hour * 3_600_000;
+      return { ...frame(now, {}, { [output]: checkpoint[expectedIndex], ...(expectedIndex > 4 ? { vpd_valid: true } : {}) }),
+        actions: [measured('air', index + 1, now, air), ...(expectedIndex > 4
+          ? [measured('humidity', index + 1, now, humidity), measured('light', index + 1, now, light)] : [])] };
+    });
+    assert.equal(new Set(frames.map(item => item.safe[output])).size, 2, 'daily oracle must include ON and OFF');
+    const result = await simulate(`${id}-daily`, bookSource(id), frames);
+    if (expectedIndex > 4) {
+      for (const [index, [, kelvin, rh]] of dailyClimate.entries()) {
+        const t = kelvin - 273.15;
+        const expectedPa = 610.8 * Math.exp(17.27 * t / (t + 237.3)) * (1 - rh);
+        assert.ok(Math.abs(result.scans[index].safeVirtualIntent.air_vpd_value - expectedPa) <= 1,
+          `${id} daily checkpoint ${index}: independent air-VPD oracle`);
+      }
+    }
+  });
+}
+
 bookTest('E10', 'simulates median readiness, retained thresholds and exact stale boundary', async () => {
   const values = [29, 90, 28, 30, 30, 30, 36, 36];
   const expected = [false, false, true, true, true, true, true, false];
@@ -390,11 +493,12 @@ test('Programming E10 equal-threshold experiment produces the real compiler diag
 });
 
 test('Programming inventory assigns every fence and numbered example to executable, diagnostic or explanatory coverage', () => {
+  const importPackageExamples = ['E22'];
   const numbered = [...book.matchAll(/^### (E\d+) —/gm)].map(match => match[1]).sort();
-  assert.deepEqual(numbered, [...bookRuntimeIds, ...errorExamples.map(([id]) => id), 'E11'].sort());
+  assert.deepEqual(numbered, [...bookRuntimeIds, ...importPackageExamples, ...errorExamples.map(([id]) => id), 'E11'].sort());
   const fences = [...book.matchAll(/^`{3,4}([^`\n]+)$/gm)].map(match => match[1]);
   const counts = Object.fromEntries([...new Set(fences)].map(kind => [kind, fences.filter(item => item === kind).length]));
-  assert.deepEqual(counts, { ghost: bookRuntimeIds.size + 1, text: 3, markdown: 1, sh: 1, 'ghost-error': errorExamples.length });
+  assert.deepEqual(counts, { ghost: bookRuntimeIds.size + importPackageExamples.length + 1, text: 3, markdown: 1, sh: 1, 'ghost-error': errorExamples.length });
   const catalog = JSON.parse(fs.readFileSync(path.join(root, 'examples/curriculum/catalog.json'), 'utf8'));
   assert.deepEqual(catalog.lessons.map(lesson => lesson.id).sort(), [...replay.scenarios.map(lesson => lesson.id), ...additionalLessons.map(([id]) => id)].sort());
   const links = [...book.matchAll(/\]\(\.\.\/(examples\/[^)#]+\.ghost\.md)(?:#[^)]*)?\)/g)].map(match => match[1]);

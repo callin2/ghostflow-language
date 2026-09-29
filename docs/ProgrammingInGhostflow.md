@@ -1,61 +1,78 @@
 # Programming in GhostFlow
 
-전기 제어를 코드로 읽고, 실행하고, 설명하기
+장치의 동작을 코드로 적고, 실행해 보며 이해하기
 
 **사용 안내서 · Language Reference 기준 · 2026-09-28 dev 검토**
 
-## 이 문서의 역할
+## 시작하기 전에
 
-GhostFlow는 센서와 사용자 입력으로부터 상태 변화와 장치 출력 의도를 기술하는 반응형 제어 언어다. 이 문서는 처음 프로그램을 읽고 쓰는 학습 경로다. 언어의 규범 문법·타입·평가·시간 계약은 [Language Reference](LANGUAGE-REFERENCE.md)와 각 장의 상세 문서가 기준이다. 코딩 상황별 답은 [GhostFlow Coding FAQ](language_faq.md)를 참조한다.
+스위치를 누르면 램프가 켜지고, 정해진 시간이 되면 물을 주고, 물이 부족하면 펌프가 멈추게 하고 싶다고 해볼게요.
 
-Reference와 이 문서가 다르면 Reference를 따른다. 이 문서의 예제는 현재 명세에서 선택된 표기와 의미를 보여 준다. 구현 완료 여부, 런타임 가용성, 보드 배포 가능성을 주장하지 않는다. 변경된 문법은 Reference에 먼저 반영하고 이 사용 안내서의 예제를 맞춘다.
+하나씩 보면 단순한 일이에요. 그런데 조건이 늘어나고 여러 장치가 함께 움직이기 시작하면, 무엇이 언제 켜지고 왜 멈추는지 알아보기 어려워지죠.
 
-이번 검토 기준은 dev revision `3982e6bf71cf5880286fcea017cb355ab222428d`다. 이후 구현 범위는
-[Implementation](IMPLEMENTATION.md)과 [기능별 성숙도·실행 근거](REFERENCE-FEATURE-STATUS.md)에서 확인한다.
-[Semantic Kernel 0.1 검토 계획](plans/2026-09-28-semantic-kernel.ko.md)은 동결된 최소 의미 계약의 배경이다.
-Reference 전체 또는 이 책 전체가 그 안정 범위에 포함되는 것은 아니다.
+GhostFlow는 이런 조건과 동작을 코드로 적는 언어예요. 센서값이나 사용자의 조작에 따라 어떤 상태로 바뀌고, 장치에 어떤 동작을 요청할지 정하는 거예요.
 
-E01–E10, E12–E14의 독립 control과 E15의 literate 문서는 현재 compiler 검사 대상이다.
-E11은 표기 안내다. E08의 enum·elapsed, E09의 일정, E10/E14의 센서·적응은
-동결 core 밖의 기능을 포함한다. 컴파일 성공은 필요한 runtime capability의 활성화나
-물리 장치 동작을 증명하지 않는다. 11–12장의 합성·교체 계약은 구현 완료 지침으로 읽지 않는다.
+이 안내서에서는 간단한 예제부터 하나씩 읽고 바꿔볼 거예요. 스위치 하나로 출력을 켜고 끄는 것부터 시작해서, 상태를 기억하고, 시간을 기다리고, 센서값에 따라 동작을 바꾸는 프로그램으로 넓혀갑니다.
 
-### 읽는 방법
+문법과 동작 규칙을 정확하게 확인할 때는 [Language Reference](LANGUAGE-REFERENCE.md)를 보면 돼요. 이 안내서는 예제로 배우는 글이고, Reference는 언어의 기준을 정한 문서예요. 두 문서의 설명이 다르다면 Reference를 따라주세요. 문법이 바뀔 때도 Reference를 먼저 고치고, 그에 맞춰 이 안내서의 예제를 수정해요.
 
-- 각 `ghost` 예제는 독립 프로그램이다. 한 파일에 모두 이어 붙이지 않는다.
-- 실제 프로그램은 완전한 `.ghost.md` 문서다. 최상위 `ghost` fence들을 문서 순서대로 합쳐 하나의 control root를 이룬다. 문단과 의도 설명은 소스 문서의 일부로 보존된다.
-- 여기서 출력은 논리적 intent다. 물리 GPIO, 릴레이, 센서 수집은 binding과 Driver의 책임이다.
-- 정확한 문법은 [Reference 문법 색인](reference/07-semantic-rules-and-index.md#75-선언과-표기-찾아보기)에서 찾는다. 설계 철학은 [Language Reference](LANGUAGE-REFERENCE.md#설계-철학), 계층별 책임은 [Reference 8장](reference/08-language-runtime-and-device-boundaries.md#83-faq-전체-책임표)을 본다.
+코드를 작성하다가 궁금한 점이 생기면 [GhostFlow Coding FAQ](language_faq.md)도 함께 참고해주세요.
 
-### 예제의 실행 검증 경로
+### 예제를 읽기 전에 알아둘 점
 
-[예제 실행 검사](../tests/programming-book-simulation.test.mjs)는 현재 원본을 컴파일하고
-명시적인 입력·논리 시각·관측으로 상태와 requested/safe intent를 검사한다.
-E01–E10, E12–E15와 PC-01–PC-10은 public `ghostsim` 경로를 사용한다.
-E02/E08은 설정 Result와 context facts, E09는 civil schedule facts,
-E10/E14와 tutorial/03은 sensor samples와 필요한 capability를 공급한다.
-일반 입력·상태 예제는 native Rust, 해당 conditioner가 필요한 예제는 같은 core의 WASM을 실행한다.
+이 안내서에 예제가 있다고 해서, 그 기능을 지금 바로 보드에 올려 쓸 수 있다는 뜻은 아니에요.
 
-tutorial/04는 기존 public `ControlRuntime`·`DailySlots` WASM 호스트 경로에서 일정 사건과
-순차 출력을 검사한다. station-rules는 `ghostrules`로 컴파일한 정책을 binding한 뒤
-WASM `GhostFlowStation`의 출력 허가와 Stop을 검사한다. 두 심화 경로를 `ghostsim` CLI
-실행으로 분류하지 않는다. E11은 표기 안내이고 E90–E97은 의도한 compiler 진단을 검사한다.
-diagram·합성 설명은 실행 소스가 아니며, 소스 변경 실험은 별도 파생 후보로 검사한다.
+코드가 컴파일되는 것, 실행 환경이 그 기능을 지원하는 것, 실제 장치가 의도대로 움직이는 것은 각각 따로 확인해야 해요. 이 안내서는 현재 명세에 맞춰 코드를 어떻게 쓰고 읽는지 설명하지만, 모든 기능의 구현이나 보드 배포가 끝났다는 뜻은 아니에요.
 
-Node dependencies와 같은 revision에서 빌드한 native/WASM 산출물이 있으면
-`node --test tests/programming-book-simulation.test.mjs`로 실행한다. 전체 빌드·검증 순서는
-[Verification](VERIFICATION.md)을 따른다. `tests/docs-runnable-examples.test.mjs`의 compiler 검사는
-runtime 빌드 없이도 실행할 수 있다. 이 근거는 논리 실행이며 물리 장치 검증은 별도다.
+이번 문서 검토는 dev revision `3982e6bf71cf5880286fcea017cb355ab222428d`를 기준으로 했어요. 이후에 어떤 기능이 구현되었고 어디까지 확인했는지는 [Implementation](IMPLEMENTATION.md)과 [기능별 성숙도·실행 근거](REFERENCE-FEATURE-STATUS.md)에서 확인해주세요.
+
+[Semantic Kernel 0.1 검토 계획](plans/2026-09-28-semantic-kernel.ko.md)에는 우선 동작 규칙을 고정하기로 한 핵심 범위와 그 배경이 정리되어 있어요. Reference나 이 안내서에 나오는 모든 기능이 그 범위에 들어가는 것은 아니에요.
+
+E01–E10, E12–E14의 독립 제어 프로그램과 E15의 설명·코드가 함께 있는 문서는 컴파일러 검사 대상이에요. E11은 실행 예제가 아니라 표기를 설명하는 예제예요.
+
+E08의 `enum`·`elapsed`, E09의 일정, E10/E14의 센서·적응 기능에는 아직 그 핵심 범위에 포함되지 않은 내용도 있어요. 11–12장의 프로그램 합성과 교체에 관한 설명도, 구현이 모두 끝난 기능의 사용법으로 받아들이지는 말아주세요.
+
+### 예제는 이렇게 읽어주세요
+
+**예제는 하나씩 따로 실행해주세요.** 각 `ghost` 예제는 독립된 프로그램이에요. 책에 나온 예제를 전부 한 파일에 이어 붙여 실행하는 방식은 아니에요.
+
+**설명도 프로그램의 일부예요.** 실제 프로그램은 `.ghost.md` 문서로 작성해요. 한 프로그램의 코드를 여러 `ghost` 코드 블록으로 나눠 적었다면, 문서 최상위에 있는 블록들을 위에서부터 합쳐 하나의 제어 프로그램으로 읽어요. 코드 사이에 적은 문단이나 “왜 이렇게 동작해야 하는지”에 대한 설명도 소스 문서에 함께 남아요.
+
+**코드의 출력과 실제 장치의 동작은 구분해주세요.** 여기서 출력은 장치에 어떤 동작을 요청할지 계산한 값이에요. 코드에서 펌프를 켜라는 값을 만들었다고 실제 펌프가 바로 켜지는 건 아니에요. 그 값을 어느 GPIO나 릴레이에 연결할지 정하는 설정(binding)과, 하드웨어를 다루는 Driver가 따로 필요해요. 센서에서 값을 읽어오는 일도 이쪽에서 맡아요.
+
+정확한 표기가 궁금하면 [Reference 문법 색인](reference/07-semantic-rules-and-index.md#75-선언과-표기-찾아보기)을 찾아보세요. 왜 이런 방식으로 설계했는지는 [설계 철학](LANGUAGE-REFERENCE.md#설계-철학)에, 언어·실행 환경·장치가 각각 맡는 일은 [Reference 8장](reference/08-language-runtime-and-device-boundaries.md#83-faq-전체-책임표)에 정리되어 있어요.
+
+### 예제는 어떻게 확인하나요?
+
+[예제 실행 검사](../tests/programming-book-simulation.test.mjs)에서는 원본 예제를 컴파일한 뒤, 입력값과 시험용 시각을 정해 프로그램을 실행해요. 그런 다음 상태가 어떻게 바뀌었는지, 어떤 출력을 요청했는지(requested intent), 안전 조건을 반영한 출력은 무엇인지(safe intent)를 확인해요.
+
+예제마다 필요한 입력과 실행 환경이 달라서, 검사 방법도 조금씩 달라요.
+
+E01–E10, E12–E15와 PC-01–PC-10은 공개된 `ghostsim` 실행 경로로 검사해요. E02/E08에는 설정 처리 결과(`Result`)와 실행 맥락 정보(`context facts`)를, E09에는 달력·시각을 기준으로 한 일정 정보(`civil schedule facts`)를 넣어요. E10/E14와 tutorial/03에는 센서 샘플을 공급하고, 예제에 필요한 실행 기능(`capability`)도 갖춰줘요.
+
+일반적인 입력·상태 예제는 네이티브 Rust로 실행해요. 해당 입력 처리기(`conditioner`)가 필요한 예제는 같은 핵심 코드를 WASM으로 빌드한 버전을 사용해요.
+
+tutorial/04는 기존에 공개된 `ControlRuntime`·`DailySlots` WASM 실행 환경에서 일정에 따른 이벤트와 순차 출력을 확인해요. station-rules는 `ghostrules`로 컴파일한 정책을 연결한 뒤, WASM `GhostFlowStation`에서 출력 허가와 `Stop` 동작을 확인하고요. 이 두 심화 예제는 `ghostsim` CLI로 실행한 검사와 구분해요.
+
+E11은 표기를 설명하는 예제이고, E90–E97은 일부러 잘못된 코드를 넣었을 때 컴파일러가 예상한 오류를 알려주는지 확인하는 예제예요. 그림이나 프로그램 합성에 관한 설명 자체를 실행하는 것은 아니에요. 소스를 바꿔보는 실험도 원본과 구분해서 검사해요.
+
+직접 검사를 실행하려면 Node 의존성과 같은 revision에서 빌드한 네이티브/WASM 파일이 필요해요. 준비가 끝나면 `node --test tests/programming-book-simulation.test.mjs`를 실행하면 돼요. 전체 빌드와 검증 순서는 [Verification](VERIFICATION.md)에 정리되어 있어요.
+
+컴파일러 검사인 `tests/docs-runnable-examples.test.mjs`는 런타임을 빌드하지 않아도 실행할 수 있어요.
+
+14장에는 온도와 기후 센서를 다루는 E16–E22 예제가 나와요. `ghostsim`의 제어 계산과 별도의 WASM 수치 계산을 확인하는 검사는 `tests/programming-book-simulation.test.mjs`, `tests/programming-climate.test.mjs`, `tests/programming-book-import-package.test.mjs`에 있어요.
+
+여기까지는 프로그램의 논리와 계산을 확인하는 과정이에요. 실제 센서와 장치를 연결했을 때도 의도대로 동작하는지는 별도로 확인해야 해요.
 
 ## 목차
 
-### 먼저 실습할 경로 — PLC에서 GhostFlow로
+### PLC에서 GhostFlow로 — 실습부터 시작하기
 
-10단계 학습 경로는 버튼·램프에서 시작해 START/STOP, 모터, 인터록, 리미트, 타이머,
-수위, Manual/Auto, 순차제어와 고장 복구로 확장한다. 단계별 제어 의도를 언어 예제와
-구분해 확인한다.
+버튼과 램프부터 시작하는 10단계 실습 과정이에요. START/STOP, 모터, 인터록, 리미트, 타이머, 수위, 수동/자동 운전, 순차제어와 고장 복구까지 차례로 다뤄요.
 
-### 언어별 장
+각 단계에서는 먼저 “장치가 어떻게 움직여야 하는지”를 살펴보고, 그 동작을 GhostFlow 코드로 어떻게 적는지 확인해주세요.
+
+### 주제별로 살펴보기
 
 1. [스위치 하나와 출력 하나](#ch01)
 2. [이름, 값, 타입, 표현식](#ch02)
@@ -69,6 +86,8 @@ runtime 빌드 없이도 실행할 수 있다. 이 근거는 논리 실행이며
 10. [멈추고, 바꾸고, 비교하기](#ch10)
 11. [파일과 literate 프로그램](#ch11)
 12. [하나의 장치, 여러 control](#ch12)
+13. [내장함수와 내장 연산](#ch13)
+14. [온도 단위와 공기 VPD 제어](#ch14)
 
 부록: [A. 명세 길잡이](#appendix-a) · [B. 오류로 배우기](#appendix-b)
 
@@ -1022,6 +1041,523 @@ definition revision → import → instance + typed connect
 
 `adapt`, capability 검사, 공통 constraints, 공유 resource, replay와 hot replacement는 각자 정해진 위치·타입·계약으로만 쓴다. 문법과 semantic DAG 규칙은 [Reference §6](reference/06-composition-and-replay.md), 장치·Driver·binding의 책임은 [Reference §8](reference/08-language-runtime-and-device-boundaries.md)을 따른다. 일반 `control` 안에서 임의의 별도 policy 언어가 있다고 가정하지 않는다.
 
+<a id="ch13"></a>
+## 13. 내장함수와 내장 연산
+
+내장 함수는 컴파일러가 이미 아는 연산이다. `fn`은 E07처럼 작성자가 선언하는 계산이다. 익숙한 이름이라고 내장 함수가 되지는 않는다. 일반 표현식용 `abs`, `min`, `max`, `clamp`, `sqrt`, `pow`, `round`는 없다. 언어가 허용하는 계산이라면 필요한 `fn`을 직접 선언한다.
+
+이 장은 [#369](https://github.com/callin2/ghostflow-language/issues/369)를 위해 dev 리비전 `c1bbbe35cbe5acf16118707f8afc14619153d918`을 확인했다.
+**주요 호출 이름 48개**와 **호스트 정책 전용 이름 3개**를 모두 다룬다. 표는 일반 호출, 선언 생성자, 제한된 변환을 구분한다. 아래 시그니처는 단편이다. 링크한 테스트에 완전한 예제가 있다. 이 단편들을 별도의 원본 프로그램으로 취급하지 않는다.
+
+먼저 연산을 쓸 수 있는 위치를 확인한다. 다음으로 입력과 결과 타입을 읽는다. 마지막으로 샘플·상태를 기억하는지, 시계·provider가 필요한지, 오류를 반환하는지 확인한다. 컴파일 성공은 실행 제어가 아니라 검증된 descriptor를 뜻할 수도 있다. 실행 제어도 명시된 런타임 입력과 binding이 필요하다. 어떤 연산도 물리 출력 효과를 증명하지 않는다.
+
+### 13.1 숫자 변환과 명시적 Result 생성
+
+숫자 표현을 바꾸려는 의도가 있을 때 변환을 쓴다. `Int`는 정확한 부호 있는 32비트 정수이고 `Number`는 부동소수점이다. 다음 변환은 위치 인자 하나를 받는다. 예를 들어 `int_floor(-1.2)`는 -2, `int_trunc(-1.2)`는 -1이다. nearest-even은 중간값 2.5를 2로, 3.5를 4로 바꾼다.
+
+| 내장 이름 | 시그니처와 목적 | 문맥, 경계와 예제 |
+|---|---|---|
+| `number` | `number(x: Int) -> Number`: 표현을 명시적으로 바꾸기 | 일반 표현식, 상태 없음. [정수 예제](../tests/int-compiler.test.mjs). |
+| `int_exact` | `int_exact(x: Number) -> Int`: 정수인 값만 허용 | 소수 또는 범위 밖 값을 거부한다. [변환](../tests/dynamic-int-conversions.test.mjs). |
+| `int_floor` | `int_floor(x: Number) -> Int`: 음의 무한대 방향 | 변환값이 Int 범위 안이어야 한다. [변환](../tests/dynamic-int-conversions.test.mjs). |
+| `int_ceil` | `int_ceil(x: Number) -> Int`: 양의 무한대 방향 | 변환값이 Int 범위 안이어야 한다. [변환](../tests/dynamic-int-conversions.test.mjs). |
+| `int_trunc` | `int_trunc(x: Number) -> Int`: 0 방향으로 소수 제거 | 변환값이 Int 범위 안이어야 한다. [변환](../tests/dynamic-int-conversions.test.mjs). |
+| `int_nearest_even` | `int_nearest_even(x: Number) -> Int`: 가장 가까운 정수, 동률이면 짝수 | 변환값이 Int 범위 안이어야 한다. [변환](../tests/dynamic-int-conversions.test.mjs). |
+| `ok` | `ok(value: T) -> Result<T,E>`: 성공 만들기 | 기대 Result 타입이 T와 컴파일러 소유 E를 정한다. [Result 예제](../tests/result-control.test.mjs). |
+| `fault` | `fault(reason: E) -> Result<T,E>`: 실패 만들기 | 기대 Result 타입 필요; 타입이 있는 이유와 원본 출처를 보존한다. [Result 예제](../tests/result-control.test.mjs). |
+| `rate` | `rate(delta: Q-difference, time: Duration) -> Rate<Q>`: 비교용 변화율 만들기 | 기대 Rate 문맥, 양수 시간; Temperature는 TemperatureDelta 사용. 정규 차이를 초로 나눈다. [변화율](../tests/window-control.test.mjs). |
+
+잘못된 상수 변환은 컴파일 오류다. 동적 숫자 오류는 성공적인 평가를 막는다. `recover`로 처리하는 센서 Result가 아니다. `Rate<Q>`는 표현식 전용이다. `window_rate` signal과 `rate` 임계값을 비교한다. 일반 config/state/input/output 저장 타입이 아니다.
+근거: [표현식 호출](../tools/control.mjs), [정수 계약](EXACT-INTEGER-CONTRACT.md).
+
+### 13.2 대응을 고를 때까지 품질 보존하기
+
+센서의 실패한 읽기는 정상적인 0이 아니다. Result 파이프라인은 값 또는 오류를 전달한다. E10은 실패 대응을 명시한다. `result |> map(transform)`, `result |> and_then(transform)`, `result |> recover(default)`를 쓴다. `>>`는 정적 변환을 합성한다. 임의의 일급 함수가 아니라 컴파일러가 아는 변환이다.
+
+| 내장 이름 | 시그니처와 목적 | 문맥, 경계와 예제 |
+|---|---|---|
+| `map` | `map(T -> U)`: Result<T,E> -> Result<U,E> | 단항 이름 있는 fn 또는 `below(limit)`; U는 Result 불가. 실패 보존. [파이프라인](../tests/result-control.test.mjs). |
+| `and_then` | `and_then(T -> Result<U,E>)`: Result<T,E> -> Result<U,E> | 단항 이름 있는 fn, 같은 E 필요. 기존 실패에서는 변환을 건너뛴다. [파이프라인](../tests/result-control.test.mjs). |
+| `recover` | `recover(default: T)`: Result<T,E> -> T | 같은 타입의 명시적 대체값; trace에 오류와 출처 기록. `recover(false)`는 작성자의 결정이다. [출처](../tests/result-provenance.test.mjs). |
+| `below` | `below(limit: T)`: 엄격한 `<`로 T -> Bool 변환 | map 변환으로만 사용. 순서 있는 숫자, Rate, DateTime, TimeOfDay; 같은 타입 임계값. Bool은 Result가 아니므로 and_then(below(...))는 거부된다. [파이프라인](../tests/result-control.test.mjs). |
+
+근거: [정적 변환 lowering](../tools/control.mjs). 값을 복구해도 원래 측정이 신뢰할 수 있게 되는 것은 아니다.
+E10의 Percent 센서에서 `moisture |> map(below(30%)) |> recover(false)` 단편은 오류 때 false를 요청한다. 이 임계값 계산에는 히스테리시스 기억이 없다.
+
+### 13.3 샘플을 필터링하고 히스테리시스로 판단 유지하기
+
+필터는 측정값을 평활화한다. 히스테리시스는 구간 안에서 Bool 판단을 기억한다. 서로 다른 문제를 해결하며 함께 쓸 수 있다. 숫자 센서를 선언하고 `filter = ...`에서 필터 하나를 고른다. 필터는 새 유효 물리 샘플을 소비한다. 반복 scan은 샘플 가중치를 추가하지 않는다.
+예를 들어 E10의 `filter = median(3);`는 실제 샘플 세 개를 선택한다. `filter = ema(alpha: 0.25);`는 새 샘플에 갱신 가중치의 4분의 1을 준다.
+
+| 내장 이름 | 시그니처와 목적 | 문맥, 경계와 예제 |
+|---|---|---|
+| `median` | `median(n)`: 최근 n개 유효 샘플의 중앙값 | 센서 filter 전용; 상수 홀수 정수 1..31. 미완성 창은 NotReady. [필터](../tests/signals-wasm.test.mjs). |
+| `moving_average` | `moving_average(n)`: 최근 n개 유효 샘플의 산술평균 | 센서 filter 전용; 상수 정수 1..31. 미완성 창은 NotReady. [필터](../tests/signals-wasm.test.mjs). |
+| `ema` | `ema(alpha: Number)`: 새 샘플과 이전값의 가중 평균 | 센서 filter 전용; 유한 상수 0 < alpha <= 1. 첫 유효 샘플로 시작하며 복구 규칙 적용. [필터](../tests/signals-wasm.test.mjs). |
+| `hysteresis` | `hysteresis(sensor, on_below: T, off_above: T, initial: Bool) -> Result<Bool,SensorFault>` | signal 선언; 직접 선언한 숫자 센서; 같은 T의 상수 임계값, on_below < off_above. [경계와 오류](../tests/signals-wasm.test.mjs). |
+
+E10의 수분 제어를 보자. `signal dry = hysteresis(moisture, on_below: 30%, off_above: 35%, initial: false);`.
+30%보다 낮으면 dry를 true로 바꾼다. 35%보다 높으면 false로 바꾼다. 품질이 좋을 때 **닫힌 구간 [30%,35%]**의 모든 값은 이전 Bool을 유지한다. 두 임계값과 정확히 같을 때도 유지한다. 작은 변동 때문에 판단이 계속 바뀌는 것을 막는다.
+
+다음 순서는 준비 조건을 충족한 뒤 품질 좋은 필터 결과를 뜻한다. 필터 전의 원시 샘플 순서가 아니다.
+
+| 품질 좋은 필터 수분값 | 유지되는 dry | 이유 |
+|---|---|---|
+| 시작 뒤 30% | false | 같으므로 초기 false 유지. |
+| 35% | false | 상한과 같아도 false 유지. |
+| 29% | true | 하한보다 엄격히 낮음. |
+| 30% | true | 하한과 같아 true 유지. |
+| 33% | true | 구간 내부. |
+| 35% | true | 상한과 같아 true 유지. |
+| 36% | false | 상한보다 엄격히 높음. |
+
+`initial`은 처음 기억할 값이지, 샘플 누락을 무시할 권한이 아니다. 준비 전이나 Disconnected/Stale/Invalid 뒤 공개 결과는 fault다. 처리 상태는 initial로 돌아간다. 좋은 샘플도 복구·필터 조건을 다시 충족해야 한다. 따라서 복구된 구간 내부 샘플은 오류 전 판단이 아니라 initial에서 시작한다. initial이 true여도 실패한 Result가 `ok(true)`가 되지는 않는다. E10은 `case`로 출력 대응을 선택한다.
+
+[Rust conditioner](../crates/ghostflow-core/src/signals.rs)는 엄격한 비교를 사용하고 오류 때 히스테리시스 처리를 초기화한다. 링크한 WASM 테스트의 “retains either prior state exactly at both thresholds” 및 오류·복구 예제가 근거다. 이 장은 그 계약을 설명한다. 문서 수정이 새로운 하드웨어 시험을 만들지는 않는다.
+
+### 13.4 시간, 샘플, 사건은 서로 다른 증거다
+
+`signal name = constructor(...);`로 다음 연산을 선언한다. scan을 세는 단조 타이머는 scan 사이에도 물리 조건이 계속 참이었다는 증거가 아니다. 연속성이 중요하면 인증된 증거를 쓴다.
+선언된 Temperature 센서에 `signal recent = hold_last(temperature, for_at_most: 2min, quality: measured);`를 쓰면 마지막 좋은 샘플의 재사용을 제한한다. 출력에 사용하려면 여전히 명시적 Result 대응이 필요하다.
+
+| 내장 이름 | 시그니처와 목적 | 문맥, 경계와 예제 |
+|---|---|---|
+| `debounce` | `debounce(source, stable_for: Duration, initial: T) -> T or Result<T,E>`: 안정된 후보 채택 | Bool/유한 enum, 양수 상수 시간과 같은 타입 상수 initial. 후보 변경 때 나이 재시작; 오류 때 초기화. 샘플 출처 보존; 일반값은 scan 사용. [Debounce](../tests/debounce-control.test.mjs). |
+| `true_for` | `true_for(BoolSensor, duration: Duration, quality: measured) -> Result<Bool,SensorFault>`: 연속 참 증명 | 직접 선언한 Bool 센서, 양수 상수 시간. Driver 인증 구간; false/부적합 품질 때 초기화. 시간 경계에 도달하면 true. [인증 소스](../tests/fixtures/true-for-certified.ghost.md). |
+| `after_event` | `after_event(Event, BoolSensor, window: Duration, quality: measured)`: 사건별 증거 유지 | 양수 상수 창; 사건 식별자와 predicate 샘플 필요. [eventTime,eventTime+window)에서 판단. signal 자체는 스칼라가 아니다. [사건 소스](../tests/fixtures/after-event-evidence.ghost.md). |
+| `after_event_any` | `after_event_any(signal) -> Result<Bool,SensorFault>`: 하나라도 만족하는 사건 결과 | after_event signal 하나. 결정적 true로 any를 확정할 수 있다. 그 밖에는 미결 식별자·오류가 남는다. [투영 예제](../tests/after-event-control.test.mjs). |
+| `after_event_all` | `after_event_all(signal) -> Result<Bool,SensorFault>`: 모든 사건의 결과 | after_event signal 하나. 결정적 false로 all=false 확정 가능. 결정 증거가 없는 빈 집합·미결 집합은 자동 허용이 아니라 NotReady. [투영 예제](../tests/after-event-control.test.mjs). |
+| `window_average` | `window_average(source, over: Duration, quality: measured, max_age: Duration)` | 물리 샘플 출처가 있는 Result<숫자/물리량,SensorFault>. 같은 payload 반환, 단 Int -> Number. [창](../tests/window-control.test.mjs). |
+| `window_min` | `window_min(source, over: Duration, quality: measured, max_age: Duration)` | average와 같은 허용 payload; 같은 payload 타입의 최솟값 Result. [창](../tests/window-control.test.mjs). |
+| `window_max` | `window_max(source, over: Duration, quality: measured, max_age: Duration)` | average와 같은 허용 payload; 같은 payload 타입의 최댓값 Result. [창](../tests/window-control.test.mjs). |
+| `window_rate` | `window_rate(source, over: Duration, quality: measured, max_age: Duration) -> Result<Rate<Q>,SensorFault>` | 지원 선형 물리량; 서로 다른 시각의 첫·끝 관측. 온도 차이는 delta K. Number/Int/Percent, RelativeHumidity, CO2, Acidity 입력 불가. [변화율](../tests/window-control.test.mjs). |
+| `hold_last` | `hold_last(source, for_at_most: Duration, quality: measured) -> Result<T,SensorFault>`: 좋은 샘플 임시 재사용 | 물리 출처와 양수 상수 시간 필요. 실제 timestamp, 유지 나이, 가려진 오류 보존; 재평가로 갱신하지 않는다. [유지 예제](../tests/hold-last-control.test.mjs). |
+| `elapsed` | `elapsed(state) -> Duration`: 상태 변경 뒤 나이 | timer 선언 전용; 선언된 state와 명시적 단조 시계; 변경 때 초기화. [E08](#ch06). |
+| `continuous_true` | `continuous_true(BoolExpression) -> Duration`: 연속 참 scan 관측의 나이 | timer 선언 전용; 첫 true scan에서 0, false 때 초기화. 관측하지 않은 구간을 인증하지 않는다. [타이머](../tests/compiler.test.mjs). |
+
+창의 `over`, `max_age`는 양수 상수 Duration이다. **(now-over,now]**의 실제 허용 관측을 사용하고 보간하지 않는다. 관측이 없거나 가장 새 관측의 나이가 **>= max_age**이면 NotReady다. 현재 소스 오류는 보존한다. 변화율에는 서로 다른 관측 시각 두 개가 필요하다. 창 합성은 집계·샘플 출처를 보존한다. 시계만 진행하는 scan은 새 관측을 만들지 않는다.
+
+after_event만 있고 any/all 투영이 있는 프로그램은 사건 런타임 binding과 함께 실행 제어로 컴파일될 수 있다. 투영 없는 after_event나 자연 조건과의 결합은 `executable:false` temporal descriptor가 될 수 있다. `after_event_for`는 아래 미지원 목록에서 설명한다.
+근거: [signal/timer lowering](../tools/control.mjs), [시간 증거 Reference](reference/04-sensors-constraints-control.md).
+
+### 13.5 자연 사실과 예약 정책 생성자
+
+provider는 관측·예측을 공급한다. 프로그램은 무엇을 허용할지 결정한다. 다음 일반 호출 두 개는 불확실성을 명시적으로 반환한다.
+
+| 내장 이름 | 시그니처와 목적 | 문맥, 경계와 예제 |
+|---|---|---|
+| `tide_is` | ``tide_is(provider, tide`spring` or tide`neap`) -> Result<Bool,TemporalContextFault>`` | 선언된 TidePredictions provider. 예측 누락·노후 또는 시계 문맥 실패는 fault. [자연 조건](../tests/natural-condition-contract.test.mjs). |
+| `moon_is` | ``moon_is(provider, moon`phase`) -> Result<Bool,TemporalContextFault>`` | LunarEphemeris provider; 위상: new, waxing_crescent, first_quarter, waxing_gibbous, full, waning_gibbous, last_quarter, waning_crescent. [자연 조건](../tests/natural-condition-contract.test.mjs). |
+
+시그니처 안의 tagged literal은 표기 단편이다. 두 호출 모두 런타임·provider 사실이 필요하다. pure fn에서 전역 provider를 캡처할 수 없다.
+
+다음 생성자는 schedule 필드에서만 쓴다. 일반 표현식 저장값을 반환하지 않는다. 여기의 Duration은 양수 상수다.
+예를 들어 `gap = skip_after(10min);`은 공백 정책이다. Tide의 `basis = run(5min, within(10min));`은 10분 안의 승인을 허용하고 승인부터 5분 운전한다.
+
+| 내장 이름 | 시그니처와 목적 | 문맥, 경계와 예제 |
+|---|---|---|
+| `instant` | `instant(DateTime)`: Periodic의 절대 anchor | 상수 DateTime; 현재 실행 경로는 preserve_anchor와 pulse 사용. [Periodic](../tests/periodic-cron-policy.test.mjs). |
+| `civil` | `civil(Date, TimeOfDay)`: Periodic의 민간시 anchor | 상수 날짜·시각; 검증 descriptor 계약, 현재 Periodic bytecode 경로 밖. [Periodic](../tests/periodic-cron-policy.test.mjs). |
+| `skip_after` | `skip_after(Duration)`: 허용 관측 공백 제한 | schedule gap 필드; 더 큰 공백에는 명시적 skip/baseline 정책 사용. [정책](../tests/periodic-cron-policy.test.mjs). |
+| `range` | `range(Duration)`: 계획된 민간시 구간 | schedule basis; 비중첩 증명과 명시적 cancel_when 필요. descriptor 전용, 제어 bytecode 없음. [Range 계약](../tests/schedule-descriptor-artifact.test.mjs). |
+| `run` | `run(Duration, within(Duration))`: 승인부터 Tide 운전 | Tide basis; 첫 Duration은 운전 길이. 유예 구간 안에서 첫 승인 필요. [Tide](../tests/natural-schedule-contract.test.mjs). |
+| `within` | `within(Duration)`: Tide 승인 유예 | Tide run의 둘째 인자 전용; [planned,planned+grace), 정확한 끝 제외. 운전 길이를 늘리지 않는다. [Tide](../tests/natural-schedule-contract.test.mjs). |
+
+현재 실행 예약은 신뢰 시계, baseline 복구, skip fallback을 사용한다. Daily/slots/Cron은 pulse, Periodic은 instant+preserve_anchor, Tide는 run+within이다. descriptor로 허용된 민간시 계약을 실행 예약으로 취급하지 않는다.
+근거: [예약 lowering과 경로 선택](../tools/control.mjs), [시간 Reference](reference/03-time-and-schedules.md).
+
+### 13.6 더 허용하기 전에 사용량 계상하기
+
+account는 화면 애니메이션이나 요청 출력으로 사용량을 예측하지 않고 증거를 기록한다. applied receipt와 requested intent는 다르다. durable 계상에는 ledger와 검증된 resource binding이 필요하다.
+binding된 resource pump에 선언 단편 `account pumping = on_time(pump, stage: applied, persistence: durable);`를 쓰면 applied 증거를 고른다. 링크한 계상 예제는 resource와 limit 정책도 선언한다.
+
+| 내장 이름 | 시그니처와 목적 | 문맥, 경계와 예제 |
+|---|---|---|
+| `on_time` | `on_time(resource, stage: applied, persistence: durable)`: Duration account | account 선언; 제한된 실행 경로는 durable/applied만 허용. requested/safe/confirmed 대안은 검사 가능하나 이 실행 binding은 아니다. [계상](../tests/accounting-syntax.test.mjs). |
+| `count_events` | `count_events(Event, over: local_day("zone"), persistence: durable)`: 사건 account | account 선언; .count는 Result<Int,AccountingFault>. 실행은 durable/local_day 필요; 중복 사건 식별자를 다시 세지 않는다. [계상](../tests/accounting-syntax.test.mjs). |
+| `used` | `used(account, rolling(Duration))`: 계상된 Duration 조회 | accounting constraint의 limit 위치 전용. 실행 limit은 <=, 양수 bound/reserve, on_unknown=block 필요. [한도](../tests/accounting-syntax.test.mjs). |
+| `rolling` | `rolling(Duration)`: 뒤로 이동하는 계상 기준 | 양수 상수 시간; count_events rolling은 descriptor/검사 범위이며 사건 수 실행 경로 밖. [한도](../tests/accounting-syntax.test.mjs). |
+| `local_day` | `local_day("timezone")`: 민간시 하루 기준 | 비어 있지 않은 literal timezone; 시계·달력·ledger 필요. 고정 24시간 rolling 창이 아니다. [계상](../tests/accounting-syntax.test.mjs). |
+| `count_on` | `count_on({resources}) -> Int`: 참인 후보 자원 수 | 이름 있는 resource 제약, 일반 표현식 아님. 유한하고 서로 다른 Bool resource 집합; 빈 집합 -> 0. 호스트 정책 binding 필요. [이름 있는 제약](../tests/named-constraints.test.mjs). |
+| `any_on` | `any_on({resources}) -> Bool`: 후보 자원 검사 | 같은 제한 문맥; 빈 집합 -> false. 제약이 평가 단계를 선언한다. [이름 있는 제약](../tests/named-constraints.test.mjs). |
+
+독립된 이름 있는 resource 정책은 호스트 정책 artifact가 된다. 일반 VM 제어가 아니다. 근거: [계상·resource 제약](../tools/control.mjs).
+
+### 13.7 PID 생성자는 objective에 속한다
+
+controller는 요청 목표값을 계산한다. 뒤의 제약이 제한할 수 있다. 다음 생성자는 gain과 재시작 정책을 정하며 일반 단위 대수 함수가 아니다. 현재 native binding은 Temperature 센서, Temperature config 목표, `ContinuousActuator<Percent>`이며 출력 하한은 0%다. PID 이외 종류는 binding 필요 메타데이터를 가질 수 있다. `pi`, `on_off`가 파싱된다고 운전 controller가 증명되지는 않는다.
+
+| 내장 이름 | 시그니처와 목적 | 문맥, 경계와 예제 |
+|---|---|---|
+| `proportional_gain` | `proportional_gain(output: Percent, error: TemperatureDelta)`: P gain | PID kp 필드; 상수, output >=0, error >0; output/error. [Controller 예제](../tests/gfb7-pid-contract.test.mjs). |
+| `integral_gain` | `integral_gain(output: Percent, error: TemperatureDelta, time: Duration)`: I gain | PID ki; 같은 범위와 time >0; output/error/seconds. [Controller 예제](../tests/gfb7-pid-contract.test.mjs). |
+| `derivative_gain` | `derivative_gain(output: Percent, error: TemperatureDelta, time: Duration)`: D gain | PID kd; 같은 범위와 time >0; output*seconds/error. [Controller 예제](../tests/gfb7-pid-contract.test.mjs). |
+| `reset` | `reset(output: Percent)`: 명시적 재시작 목표 | PID restart 필드; objective 출력 범위 안의 상수. 첫 허용 샘플에서 tracking 초기화; 임의 상태 reset 호출 아님. [Controller 예제](../tests/gfb7-pid-contract.test.mjs). |
+
+gain의 output이 0이면 그 항을 비활성화한다. period는 양수이고 late_after >= period다. 명시적 direction, bias, anti-windup, disabled/transfer, fault, restart 정책이 생명주기를 정한다. 오래되거나 누락된 측정을 조용히 허용하지 않는다. [Controller lowering](../tools/control.mjs)과 [연속 제어 Reference](reference/04-sensors-constraints-control.md)를 참조한다.
+예를 들어 `kp = proportional_gain(output: 2%, error: 1Δ°C);`는 온도 오차 1도당 2퍼센트포인트를 정한다. `restart = reset(output: 0%);`는 첫 tracking 목표를 명시적으로 고른다.
+
+### 13.8 별도의 호스트 정책 문법
+
+`ghostrules` adapter는 제한된 station 정책 문법을 검사한다. 호출처럼 보이는 형식도 문맥 전용이다. 일반 control 표현식에 함수가 추가되는 것이 아니다. 기존 [station 규칙](../examples/station-rules.ghost.md)과 [제약 테스트](../tests/constraints.test.mjs)에 완전한 정책이 있다.
+
+| 내장 이름 | 시그니처와 목적 | 문맥, 경계와 예제 |
+|---|---|---|
+| `stopped` | `stopped(station)`: 정지 station 요구 | 지정된 mode와 함께 allow enter/apply 정책 조건에서만 사용. 호스트 station 상태이며 물리 모터 정지 증명 아님. [규칙](../examples/station-rules.ghost.md). |
+| `pump_capacity` | `pump_capacity(pump)`: 용량 검사 요구 | require ... == Pass 또는 check 정책 절 전용. 호스트 정책 artifact이며 숫자 용량 표현식 아님. [규칙](../examples/station-rules.ghost.md). |
+| `day` | `day("timezone")`: 일일 한도의 민간시 하루 | `limit on_time(pump) <= Duration per day("zone")` 전용; 유효 IANA timezone, 비어 있지 않은 128자 이하 문자열. [규칙](../examples/station-rules.ghost.md). |
+
+이 문법의 `count_on(pump.valves)`, `any_on(pump.valves)`, `on_time(pump)`은 §13.6과 인자 모양이 다른 제한 형식이다. 각각 max-valves, pump-needs-valve, daily-limit 정책 절을 만든다. 임의의 `let` 표현식으로 옮기지 않는다. `exclusive`, `allow`, `require`, `limit`, `once`, `check`는 절을 시작한다. `warn`은 거부된다.
+근거: [호스트 정책 parser](../tools/constraints.mjs).
+
+### 13.9 인접 문법과 사용할 수 없는 대안
+
+다음은 내장 연산과 함께 쓰지만 **호출 함수가 아니다**.
+
+| 문법 | 의미와 현재 경계 |
+|---|---|
+| Daily, DailySlots<15min>, Periodic, Cron, Solar, Tide | schedule 선언 타입. DailySlots 실행은 고정 15분 격자; Cron은 검증된 필드 다섯 개. |
+| pulse; time/date/datetime/cron5/day/sun/tide/moon tagged literals | 정책값과 typed 표기. ``sun`rise` ``/``sun`set` ``은 sunrise()/sunset() 호출이 아니다. |
+| TimeSlots<grid,capacity> | config 타입: 24h를 나누는 양수 grid, 양수 capacity, 유한·고유·격자 정렬 TimeOfDay 목록. TimeSlots(...) 호출 없음. |
+| `Result<T,E>`; `Rate<Q>` | typed 결과와 표현식 전용 변화율. E는 컴파일러 소유; 중첩 Result payload 거부. |
+| schedule.due; schedule.active; schedule.missed | Bool 투영; .missed는 노출된 투영 필요. active occurrence와 applied output은 다르다. 메서드 호출 없음. |
+| eventAccount.count | Result<Int,AccountingFault> 투영; count_events account만 사용. |
+| resource.on/position/valves | 문맥 전용 resource/정책 endpoint, 일반 메서드 아님. |
+| sample, valid, filter, stale_after, recover_after, samples | 센서 선언 필드·표기. 특히 stale_after는 표현식 호출이 아니다. |
+| on_below, off_above, initial; min, max, step, access, label | 이름 있는 인자 또는 config 필드, 함수 아님. |
+| if/case/in; >> and \|>; fn/type/state/config/timer/signal | 문법, 연산자, 선언. input.name/state.name/next.name은 제거된 alias. |
+
+[Parser와 member/type 규칙](../tools/control.mjs)이 위치를 정한다. 전체 타입과 단위는 [Reference 2장](reference/02-types-expressions-state.md)에 있다.
+
+| 선택된/Reference 표기 | 현재 상태; 실행을 주장하지 않는다 |
+|---|---|
+| after_event_for(signal, EventId) | Reference는 식별자별 투영을 설명하지만 현재 컴파일러 호출 dispatcher가 없어 unknown function이다. 의도가 맞을 때만 지원 any/all을 쓴다. |
+| window(Duration) schedule basis | 설계 대안, 현재 허용 basis 아님. 지원 window_average/min/max/rate signal과 다르다. |
+| run(Duration, on_time) | 설계 대안; 지원 Tide run은 within(Duration) 필요. |
+| range(Duration); civil(Date,TimeOfDay) | 위에서 설명한 검증 descriptor 계약; 현재 bytecode 경로 아님. |
+| PID checkpoint; degraded Name | 현재 native PID fault/restart 정책에서 미지원인 선택 설계 대안. |
+| ifthenelse, purefn, enum, next | 제거된 alias. 정규 if ... then ... else, fn, type, prime state 사용. |
+
+진단이나 설계 예제에 이름이 나온다고 지원을 추론하지 않는다. 컴파일러 경로와 artifact 종류를 확인한다. [장 coverage 검사](../tests/programming-builtins.test.mjs)는 두 언어의 항목을 컴파일러 호출 dispatch와 맞추고 시그니처·문맥·예제 링크가 있는지 검사한다.
+
+<a id="ch14"></a>
+## 14. 온도 단위와 공기 VPD 제어
+
+### 같은 물리 온도를 세 단위로 쓰기
+
+Temperature 센서는 물리 타입을 보존한다. 섭씨·화씨·켈빈은 소스·표시 단위이며 런타임은 정규 켈빈을 쓴다. 독립된 히터 예제 세 개는 같은 규칙이다. 18°C보다 낮으면 요구 ON, 22°C보다 높으면 OFF다. 두 임계값과 같은 값과 닫힌 구간 내부는 이전 정상 판단을 유지한다. 오류는 히터를 억제하고 히스테리시스를 initial false로 되돌린다. median(1) 예제는 새 정상 샘플 하나로 복구한다. 첫 샘플 전에는 NotReady다. 마지막 정상 샘플은 다음 샘플 전달 사이에도 사용 가능하며, 나이 >= 3s가 되면 Stale이다.
+
+| 물리 경계 | 섭씨 | 화씨 | 켈빈 |
+|---|---|---|---|
+| 히터 하한 | 18°C | 64.4°F | 291.15K |
+| 히터 상한 | 22°C | 71.6°F | 295.15K |
+| 히터 유효 범위 | −40–50°C | −40–122°F | 233.15–323.15K |
+
+literal은 정확하게 변환한 뒤 binary64로 반올림한다. 정규 런타임 샘플에 64.4를 그대로 넣지 않는다. 64.4°F는 291.15K다. Driver binding은 공급 단위와 물리량을 식별한다. [물리 타입](reference/02-types-expressions-state.md)과 [히스테리시스](#ch13)를 참조한다.
+
+### E16 — 섭씨 히터
+
+```ghost
+// E16
+control CelsiusHeater {
+  sensor air: Temperature {
+    sample = 1s;
+    valid = -40°C .. 50°C;
+    filter = median(1);
+    stale_after = 3s;
+    recover_after = 1 samples;
+  }
+  signal cold = hysteresis(air,
+    on_below: 18°C, off_above: 22°C, initial: false);
+  output heater: Bool;
+  heater <- cold |> recover(false);
+}
+```
+
+### E17 — 화씨 히터
+
+```ghost
+// E17
+control FahrenheitHeater {
+  sensor air: Temperature {
+    sample = 1s;
+    valid = -40°F .. 122°F;
+    filter = median(1);
+    stale_after = 3s;
+    recover_after = 1 samples;
+  }
+  signal cold = hysteresis(air,
+    on_below: 64.4°F, off_above: 71.6°F, initial: false);
+  output heater: Bool;
+  heater <- cold |> recover(false);
+}
+```
+
+### E18 — 켈빈 히터
+
+```ghost
+// E18
+control KelvinHeater {
+  sensor air: Temperature {
+    sample = 1s;
+    valid = 233.15K .. 323.15K;
+    filter = median(1);
+    stale_after = 3s;
+    recover_after = 1 samples;
+  }
+  signal cold = hysteresis(air,
+    on_below: 291.15K, off_above: 295.15K, initial: false);
+  output heater: Bool;
+  heater <- cold |> recover(false);
+}
+```
+
+### 온도와 상대습도로 공기 VPD 구하기
+
+공기 VPD는 포화 수증기압에서 실제 공기 수증기압을 뺀 값이다. 같은 시점의 공기 온도 T(°C)와 공기 상대습도 RH로 `0.6108 * exp(17.27*T/(T+237.3)) * (1-RH/100)` kPa를 계산한다. 포화 관계와 상대습도 정의는 [FAO-56 3장 식 10–11](https://www.fao.org/4/x0490e/x0490e07.htm)에 근거한다. 순간 공기 계산이며 FAO의 일일 증발산 추정이 아니다. 잎 VPD에는 잎 온도도 필요하며 여기서는 계산하지 않는다.
+
+GhostFlow에는 exp 내장 함수가 없다. 각 완전한 예제는 일반 pure fn `exp_0_3_1`을 작성한다. 고정 14차 Taylor 다항식을 Horner 형식으로 평가한다. air 센서의 선언 범위는 **0–50°C**다. 따라서 지수는 **0–3.006**으로 함수의 명시적 0–3.1 범위 안이다. 온도가 범위 밖이면 센서는 Invalid를 반환하고 수식을 평가하지 않는다. 근사를 외삽하지 않는다. [독립 수치 검사](../tests/programming-climate.test.mjs)는 0.1°C 격자와 습도 경계에서 실제 런타임 값을 호스트 Math.exp와 비교하여 절대 오차 **0.001 kPa 이하**를 요구한다. 예상값 구현에 다항식을 복사하지 않고 원본 세 개를 모두 확인한다.
+
+`(t - 0°C) / 1Δ°C`는 섭씨 Number를 명시적으로 얻는다. `rh / 100%RH`는 [RH 비율 계약](reference/02-types-expressions-state.md)으로 typed 습도를 정규화한다. 마지막에 `0.6108kPaVPD`를 곱해 VaporPressureDeficit를 보존한다. RelativeHumidity는 공기 습도이며 E10의 토양 수분 Percent가 아니다.
+
+빛은 **PPFD** 타입이며 `umol/m2/s`(µmol·m⁻²·s⁻¹)를 쓴다. 광합성 관련 광자 수를 나타낸다. lux는 사람 시각에 가중된 조도다. 보편적인 lux→PPFD 변환은 없다. 검증된 PPFD 센서·binding을 사용한다. 빛은 **출력 허용 조건**이며 같은 T/RH의 계산 VPD를 바꾸지 않는다.
+
+### 독립된 학습 정책 세 가지
+
+임계값은 예시 소스 의도이지 보편적 작물 권장값이 아니다. 가습 요구가 습도 상승을 증명하지 않는다. 환기는 외기 조건에 좌우된다. 관수 요구는 토양 물 추정이나 펌프 순서가 아니다. 온실 물리 모델은 없다. 설치가 actuator binding, 적합성, 물리 효과 검증을 맡는다.
+
+| 예제 | ON | OFF | 빛 조건 |
+|---|---|---|---|
+| E19 가습 요구 | VPD > 1.2 kPa | VPD < 1.0 kPa | PPFD >= 200 µmol·m⁻²·s⁻¹ |
+| E20 환기 요구 | VPD < 0.4 kPa | VPD > 0.6 kPa | PPFD >= 200 µmol·m⁻²·s⁻¹ |
+| E21 관수 요구 | VPD > 1.0 kPa | VPD < 0.8 kPa | PPFD >= 300 µmol·m⁻²·s⁻¹ |
+
+계산한 Result는 선언 센서가 아니므로 센서 전용 hysteresis 생성자로 처리할 수 없다. 아래 명시적 Bool state는 같은 엄격한 ON/OFF·유지 구간 의도를 나타낸다. 온도·RH 오류는 demand를 지운다. 밤 또는 빛 오류는 climate demand 기억을 유지할 수 있지만 출력을 억제한다. 복구는 현재 정상 증거로 판단한다. 타이머나 추가 자동 모드는 없다. climate 오류 때 `air_vpd_value = 0`은 명시적 표시 대체값이다. **vpd_valid와 함께 읽는다**. false는 측정된 VPD 0을 뜻하지 않는다. 빛 오류는 출력을 억제하지만 정상 T/RH 계산을 무효화하지 않는다.
+
+### E19 — 높은 VPD 가습 요구
+
+```ghost
+// E19
+fn exp_0_3_1(x: Number) -> Number {
+  1 + x / 1 * (1 + x / 2 * (1 + x / 3 * (1 + x / 4 * (1 + x / 5 * (1 + x / 6 * (1 + x / 7 * (1 + x / 8 * (1 + x / 9 * (1 + x / 10 * (1 + x / 11 * (1 + x / 12 * (1 + x / 13 * (1 + x / 14 * (1))))))))))))))
+}
+fn air_vpd(t: Temperature, rh: RelativeHumidity) -> VaporPressureDeficit {
+  0.6108kPaVPD * exp_0_3_1(
+    17.27 * ((t - 0°C) / 1Δ°C) / (((t - 0°C) / 1Δ°C) + 237.3)
+  ) * (1 - rh / 100%RH)
+}
+control HumidificationDemand {
+  sensor air: Temperature {
+    sample = 1s; valid = 0°C .. 50°C;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor humidity: RelativeHumidity {
+    sample = 1s; valid = 0%RH .. 100%RH;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor light: PPFD {
+    sample = 1s; valid = 0umol/m2/s .. 3000umol/m2/s;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  let climate: Result<VaporPressureDeficit, SensorFault> = case air {
+    ok(t) => case humidity {
+      ok(rh) => ok(air_vpd(t, rh));
+      fault(reason) => fault(reason);
+    };
+    fault(reason) => fault(reason);
+  };
+  let daylight = case light {
+    ok(ppfd) => ppfd >= 200umol/m2/s;
+    fault(_) => false;
+  };
+  state demand: Bool = false;
+  demand' = case climate {
+    ok(value) => if value > 1.2kPaVPD then true
+      else if value < 1.0kPaVPD then false else demand;
+    fault(_) => false;
+  };
+  output air_vpd_value: VaporPressureDeficit;
+  output vpd_valid, humidify_demand: Bool;
+  air_vpd_value <- climate |> recover(0kPaVPD);
+  vpd_valid <- case climate { ok(_) => true; fault(_) => false; };
+  humidify_demand <- daylight && demand';
+}
+```
+
+### E20 — 낮은 VPD 환기 요구
+
+```ghost
+// E20
+fn exp_0_3_1(x: Number) -> Number {
+  1 + x / 1 * (1 + x / 2 * (1 + x / 3 * (1 + x / 4 * (1 + x / 5 * (1 + x / 6 * (1 + x / 7 * (1 + x / 8 * (1 + x / 9 * (1 + x / 10 * (1 + x / 11 * (1 + x / 12 * (1 + x / 13 * (1 + x / 14 * (1))))))))))))))
+}
+fn air_vpd(t: Temperature, rh: RelativeHumidity) -> VaporPressureDeficit {
+  0.6108kPaVPD * exp_0_3_1(
+    17.27 * ((t - 0°C) / 1Δ°C) / (((t - 0°C) / 1Δ°C) + 237.3)
+  ) * (1 - rh / 100%RH)
+}
+control VentilationDemand {
+  sensor air: Temperature {
+    sample = 1s; valid = 0°C .. 50°C;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor humidity: RelativeHumidity {
+    sample = 1s; valid = 0%RH .. 100%RH;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor light: PPFD {
+    sample = 1s; valid = 0umol/m2/s .. 3000umol/m2/s;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  let climate: Result<VaporPressureDeficit, SensorFault> = case air {
+    ok(t) => case humidity {
+      ok(rh) => ok(air_vpd(t, rh));
+      fault(reason) => fault(reason);
+    };
+    fault(reason) => fault(reason);
+  };
+  let daylight = case light {
+    ok(ppfd) => ppfd >= 200umol/m2/s;
+    fault(_) => false;
+  };
+  state demand: Bool = false;
+  demand' = case climate {
+    ok(value) => if value < 0.4kPaVPD then true
+      else if value > 0.6kPaVPD then false else demand;
+    fault(_) => false;
+  };
+  output air_vpd_value: VaporPressureDeficit;
+  output vpd_valid, ventilate_demand: Bool;
+  air_vpd_value <- climate |> recover(0kPaVPD);
+  vpd_valid <- case climate { ok(_) => true; fault(_) => false; };
+  ventilate_demand <- daylight && demand';
+}
+```
+
+### E21 — VPD와 빛에 따른 관수 요구
+
+```ghost
+// E21
+fn exp_0_3_1(x: Number) -> Number {
+  1 + x / 1 * (1 + x / 2 * (1 + x / 3 * (1 + x / 4 * (1 + x / 5 * (1 + x / 6 * (1 + x / 7 * (1 + x / 8 * (1 + x / 9 * (1 + x / 10 * (1 + x / 11 * (1 + x / 12 * (1 + x / 13 * (1 + x / 14 * (1))))))))))))))
+}
+fn air_vpd(t: Temperature, rh: RelativeHumidity) -> VaporPressureDeficit {
+  0.6108kPaVPD * exp_0_3_1(
+    17.27 * ((t - 0°C) / 1Δ°C) / (((t - 0°C) / 1Δ°C) + 237.3)
+  ) * (1 - rh / 100%RH)
+}
+control IrrigationDemand {
+  sensor air: Temperature {
+    sample = 1s; valid = 0°C .. 50°C;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor humidity: RelativeHumidity {
+    sample = 1s; valid = 0%RH .. 100%RH;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor light: PPFD {
+    sample = 1s; valid = 0umol/m2/s .. 3000umol/m2/s;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  let climate: Result<VaporPressureDeficit, SensorFault> = case air {
+    ok(t) => case humidity {
+      ok(rh) => ok(air_vpd(t, rh));
+      fault(reason) => fault(reason);
+    };
+    fault(reason) => fault(reason);
+  };
+  let daylight = case light {
+    ok(ppfd) => ppfd >= 300umol/m2/s;
+    fault(_) => false;
+  };
+  state demand: Bool = false;
+  demand' = case climate {
+    ok(value) => if value > 1.0kPaVPD then true
+      else if value < 0.8kPaVPD then false else demand;
+    fault(_) => false;
+  };
+  output air_vpd_value: VaporPressureDeficit;
+  output vpd_valid, irrigation_demand: Bool;
+  air_vpd_value <- climate |> recover(0kPaVPD);
+  vpd_valid <- case climate { ok(_) => true; fault(_) => false; };
+  irrigation_demand <- daylight && demand';
+}
+```
+
+### E22 — 기존 VPD 제어 두 개를 import로 함께 실행하기
+
+E22는 E19와 E20의 원문을 복사하지 않는다. 두 원본 section에서 생성한 완전한
+`.ghost.md` 문서를 정확한 revision과 SHA-256으로 고정해 import한다. `air`,
+`humidity`, `light`의 한 raw sample packet은 두 instance에 함께 전달되지만, 각
+instance의 sensor conditioner와 `demand` state는 독립적이다. root는 두 demand를
+모두 공개하고, 같은 입력에서 계산한 공통 VPD 관측은 `high` instance의
+`air_vpd_value`와 `vpd_valid`를 공개한다.
+
+```ghost
+// E22
+import HighVpd from "./E19.ghost.md"
+  revision "7e135b93ea4c4988d305f992db277a6d8581a271"
+  sha256 "ef80061222c5c671b8b78d8fae733b543e51149c7e5d2c7d5e2bb2cc41fbdb30";
+import LowVpd from "./E20.ghost.md"
+  revision "7e135b93ea4c4988d305f992db277a6d8581a271"
+  sha256 "bbf57007c5973684660747c515bb2534124d50341647b2282bd2ca32852a724b";
+control CombinedVpdDemands {
+  sensor air: Temperature {
+    sample = 1s; valid = 0°C .. 50°C;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor humidity: RelativeHumidity {
+    sample = 1s; valid = 0%RH .. 100%RH;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor light: PPFD {
+    sample = 1s; valid = 0umol/m2/s .. 3000umol/m2/s;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  output air_vpd_value: VaporPressureDeficit;
+  output vpd_valid, humidify_demand, ventilate_demand: Bool;
+  instance high: HighVpd;
+  instance low: LowVpd;
+  connect high.air <- air;
+  connect high.humidity <- humidity;
+  connect high.light <- light;
+  connect low.air <- air;
+  connect low.humidity <- humidity;
+  connect low.light <- light;
+  connect air_vpd_value <- high.air_vpd_value;
+  connect vpd_valid <- high.vpd_valid;
+  connect humidify_demand <- high.humidify_demand;
+  connect ventilate_demand <- low.ventilate_demand;
+}
+```
+
+### 실행하고 입력 하나를 바꾸며 관찰하기
+
+E15처럼 E16–E21 fence를 각각 완전한 .ghost.md 문서로 컴파일한다. E22는 생성된
+`examples/programming-book-imports` source closure와 함께 컴파일한다. `node --test tests/programming-climate.test.mjs tests/programming-book-simulation.test.mjs tests/programming-book-import-package.test.mjs`로 compiler와 실제 ghostsim/WASM scan을 확인한다. native/WASM artifact의 build provenance가 맞아야 한다. [검증](VERIFICATION.md)에 build 전제가 있다. 테스트는 임시 scenario artifact를 쓰며 하드웨어를 구동하지 않는다.
+
+온라인 reader의 기본값은 E10의 시간 의존 센서 소스를 이용한 **24시간 합성 일변화 profile**이다. 온도·RH·PPFD는 아래 지점 사이를 선형으로 변하며 연속 반복한다. 06–18에는 온도가 내려가지 않으며 18–06에는 빛이 정확히 0이다. 학습용 입력 궤적이며 온실 모델이나 actuator 피드백이 아니다. 선언된 샘플 간격마다 새 타입 센서 증거를 공급한다. 실제 WASM 프로그램이 VPD와 제어 요구를 계산한다.
+
+| simulation 시각 | 기온 °C | RH % | PPFD µmol·m⁻²·s⁻¹ | 관찰 |
+|---|---|---|---|---|
+| 00 | 18 | 90 | 0 | 초기 히터 OFF; 빛 조건 요구 OFF |
+| 03 | 17 | 92 | 0 | 히터 ON |
+| 06 | 16 | 94 | 0 | 일출; 히터 ON |
+| 09 | 22 | 85 | 500 | 낮은 VPD 환기 ON; 정확히 22°C에서 히터 ON 유지 |
+| 12 | 28 | 60 | 1000 | 가습·관수 요구 ON; 히터·환기 OFF |
+| 15 | 31 | 45 | 650 | 높은 VPD 요구 ON 유지 |
+| 18 | 31 | 60 | 0 | 일몰; 빛 조건 요구 OFF |
+| 21 | 23 | 80 | 0 | 야간 냉각; 히터는 아직 OFF |
+| 24 | 18 | 90 | 0 | 연속 반복 경계; 히터는 18°C 미만에서만 ON |
+
+각 예제를 simulation 00:00에서 실행한다. E16–E21의 기본값은 1000× 배속과 24시간 timing chart이다. 09·12·15·18시 부근을 비교한다. 실제 시간당 처리량은 컴퓨터에 따라 다르다. 배속은 실제 시간당 simulation 시간만 바꾼다. 임계값과 일변화 profile은 바뀌지 않는다. Pause는 simulation 시간을 멈춘다. 09시의 히터 ON은 온도가 22°C를 엄격히 넘으면 해제된다. 독립 프로그램이므로 히터와 환기의 interlock을 뜻하지 않는다. 단위 선택은 물리값을 바꾸지 않고 입력·표시 단위를 바꾼다. 17°C = 62.6°F = 290.15K이다. E16–E18의 하루 판단은 같아야 한다.
+
+일정값과 수동 단일 패킷 모드는 개별 경계 실험에 쓸 수 있다. 선택적인 디버깅 소스이며 일변화에 따른 판단 관찰을 대신하지 않는다.
+
+Stale은 단일 패킷 모드 또는 샘플 공급 중단으로 시험한 뒤 simulation 시간을 선언된 3s 경계까지 진행한다. 반복하는 일정값 소스 샘플은 새 증거이므로 오래된 것으로 처리하지 않는다. Disconnected는 해당 샘플 품질을 선택한다. 새로 전달된 실패도 실패다. 오래된 Good 패킷을 새 샘플처럼 반복 재사용해서 단절을 흉내 내지 않는다.
+
+히터에서 18 → 17 → 18 → 22 → 23°C, 센서 오류, 복구를 관찰한다. VPD controller별로 온도를 25°C에 고정하고 RH를 바꿔 임계값을 넘긴다. 다음에는 PPFD만 바꾼다. requested/safe demand, air_vpd_value, vpd_valid를 비교한다. 누락, Invalid, Disconnected, 오래된 샘플을 시험한다. 관련 오류는 즉시 출력을 억제해야 한다. 수치 관계를 확인할 때 T/RH를 함께 바꾼다. 논리 요구, 성공한 scan, 가상 actuator를 물리 효과 확인으로 해석하지 않는다.
+
 <a id="appendix-a"></a>
 ## 부록 A. 명세 길잡이
 
@@ -1145,5 +1681,7 @@ sensor를 payload처럼 바로 비교하지 않는다. `case` 또는 Reference �
 
 <a id="appendix-c"></a>
 ## 부록 C. 문서 유지 규칙
+
+시간에 따라 변하는 환경을 요청한 학습 시나리오는 기본 소스로 관련 ON/OFF 판단을 시간에 따라 실행해야 한다. 기존 book simulation 테스트에 독립적인 전환 checkpoint를 유지한다. 일정한 정상 입력만으로는 그 의도를 검증할 수 없다. 일변화 검증은 기존 오류·엄격한 경계 scan을 보완한다.
 
 Language Reference는 규범 기준이다. 이 사용 안내서에서 발견한 상충이나 빠진 예는 해당 Reference 절을 먼저 확인한 뒤 고친다. 문법·의미 변경은 Reference의 문법, 규칙, 이유와 예제를 갱신하고 여기서 학습 경로와 코드를 동기화한다. 학습에 필요한 구현 경계는 근거 문서에 연결하고, 변동하는 진행률·테스트 수·산출물 해시·지원 보드 목록은 그 문서에서 관리한다. 예제 compiler 검사는 `tests/docs-runnable-examples.test.mjs`를 재사용한다. 책 변경 뒤 `npm run generate:pc01`로 파생 출처를 갱신하며 과거 replay·benchmark 근거는 고치지 않는다.

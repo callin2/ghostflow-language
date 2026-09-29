@@ -321,7 +321,7 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
   if ((Object.hasOwn(manifest, 'adaptPolicy') || Object.hasOwn(manifest, 'strategies')) && capabilities === undefined) {
     throw new Error('adapt strategy activation requires a capability-aware host; ControlRuntime cannot activate this manifest');
   }
-  keys(manifest, ['format', 'name', 'inputs', 'outputs', 'sensors', 'schedules', 'timers', 'signals', 'configs', 'bytecodeSha256'], ['adaptPolicy', 'strategies', 'objectives', 'resources'], 'manifest');
+  keys(manifest, ['format', 'name', 'inputs', 'outputs', 'sensors', 'schedules', 'timers', 'signals', 'configs', 'bytecodeSha256'], ['adaptPolicy', 'strategies', 'objectives', 'resources', 'sensorInstances'], 'manifest');
   if (manifest.format !== FORMAT && manifest.format !== INTEGER_FORMAT && !(manifest.format === SETTINGS_FORMAT && acceptSettings) && manifest.format !== SOLAR_FORMAT && manifest.format !== SCHEDULE_FORMAT && manifest.format !== SCHEDULE_SLOTS_FORMAT) throw new Error(`unsupported manifest format ${String(manifest.format)}`);
   const settingsManifest = manifest.format === SETTINGS_FORMAT || manifest.format === INTEGER_FORMAT;
   const solarManifest = manifest.format === SOLAR_FORMAT || manifest.format === INTEGER_FORMAT;
@@ -331,6 +331,7 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
   const inputs = validateList(manifest.inputs, 'manifest.inputs', ['name', 'type'], ['canonicalUnit']);
   const outputs = validateList(manifest.outputs, 'manifest.outputs', ['name', 'type'], ['canonicalUnit']);
   const sensors = validateList(manifest.sensors, 'manifest.sensors', ['name', 'type', 'sampleMs', 'validMin', 'validMax', 'filter', 'window', 'staleMs', 'recoverSamples', 'valueInput', 'okInput', 'faultInput'], ['optional', 'alpha', 'canonicalUnit', 'samplePresentInput', 'sampleEpochInput', 'sampleIdInput', 'sampleTimestampInput']);
+  const sensorInstances = validateList(manifest.sensorInstances ?? [], 'manifest.sensorInstances', ['name', 'type', 'sampleMs', 'validMin', 'validMax', 'filter', 'window', 'staleMs', 'recoverSamples', 'valueInput', 'okInput', 'faultInput', 'sourceSensor', 'instance', 'port'], ['optional', 'alpha', 'canonicalUnit', 'samplePresentInput', 'sampleEpochInput', 'sampleIdInput', 'sampleTimestampInput']);
   if (!Array.isArray(manifest.schedules) || manifest.schedules.length > MAX_LIST) throw new TypeError('manifest.schedules must be a bounded array');
   const schedules = manifest.schedules.map((schedule, index) => {
     const solar = (solarManifest || manifest.format === SCHEDULE_SLOTS_FORMAT) && schedule?.kind === 'solar';
@@ -450,7 +451,7 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
   unique(resources.map(item => item.name), 'resource');
 
   const sensorByName = new Map();
-  for (const item of sensors) {
+  for (const item of [...sensors, ...sensorInstances]) {
     name(item.name, 'sensor.name');
     type(item.type, `sensor ${item.name}.type`);
     validateCanonicalUnit(item, `sensor ${item.name}`);
@@ -502,10 +503,18 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
       for (const field of sampleFields) { name(item[field], `sensor ${item.name}.${field}`, true); generated(item[field], expected[field], `sensor ${item.name}.${field}`); }
     }
     if (item.optional !== undefined && typeof item.optional !== 'boolean') throw new TypeError(`sensor ${item.name}.optional must be boolean`);
-    sensorByName.set(item.name, item);
+    if (!sensorInstances.includes(item)) sensorByName.set(item.name, item);
   }
-  unique(sensors.map(item => item.name), 'sensor');
+  unique([...sensors, ...sensorInstances].map(item => item.name), 'sensor');
   if (new Set(sensorByName.keys()).size !== sensors.length) throw new Error('duplicate sensor name');
+  for (const item of sensorInstances) {
+    name(item.sourceSensor, 'sensor sourceSensor'); name(item.port, 'sensor port');
+    if (typeof item.instance !== 'string' || !/^[A-Za-z_][A-Za-z_0-9]*(?:\.[A-Za-z_][A-Za-z_0-9]*)*$/.test(item.instance)) throw new Error('invalid sensor instance');
+    const source = sensorByName.get(item.sourceSensor);
+    if (!source || source.type !== item.type || source.sampleMs !== item.sampleMs || !!source.optional !== !!item.optional) throw new Error(`sensor instance ${item.name} source contract mismatch`);
+    const expected = `instance_${item.instance.split('.').map(part => `${part.length}_${part}`).join('_')}_${item.port}`;
+    if (item.name !== expected) throw new Error('sensor instance name mismatch');
+  }
 
   const objectives = manifest.objectives === undefined ? [] : validateList(manifest.objectives, 'manifest.objectives',
     ['name', 'measure', 'target', 'manipulate', 'output', 'controller', 'binding', 'executable', 'bindings'], []);
@@ -752,6 +761,7 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
   for (const item of inputs) if (item.name.startsWith(RESERVED)) throw new Error(`input ${item.name} uses reserved prefix`);
   for (const item of outputs) if (item.name.startsWith(RESERVED)) throw new Error(`output ${item.name} uses reserved prefix`);
   const publicManifest = freeze({ ...copy(manifest), inputs, outputs, sensors, schedules, timers, signals, configs,
+    ...(manifest.sensorInstances === undefined ? {} : { sensorInstances }),
     ...(manifest.resources === undefined ? {} : { resources }), ...(manifest.objectives === undefined ? {} : { objectives }) });
   return { manifest: publicManifest, inputNames, sensorByName, scheduleNames, signalNames };
 }
@@ -870,7 +880,7 @@ async function instantiateControlRuntime(wasmBytes, { bytes: bytecode, manifest 
   const afterEvents = new Map();
   try {
     runtime.load(compiledBytes);
-    for (const item of checkedManifest.manifest.sensors) sensors.set(item.name, { item, conditioner: new SignalConditioner(runtime.wasm, sensorConfig(item)) });
+    for (const item of [...checkedManifest.manifest.sensors, ...(checkedManifest.manifest.sensorInstances ?? [])]) sensors.set(item.name, { item, conditioner: new SignalConditioner(runtime.wasm, sensorConfig(item)) });
     for (const item of checkedManifest.manifest.signals) {
       if (isVmSignal(item) || item.kind === 'true-for' || isAfterEvent(item)) continue;
       const sensor = checkedManifest.sensorByName.get(item.sensor);
@@ -887,8 +897,8 @@ async function instantiateControlRuntime(wasmBytes, { bytes: bytecode, manifest 
       afterEvents.set(item.name, { item, runtime: tracker });
     }
     for (const output of checkedManifest.manifest.outputs) runtime.addCapability('actuator', output.name, output.type === 'Bool' ? 'bool' : output.type === 'Int' ? 'int' : 'number');
-    if (suppliedCapabilities !== undefined) for (const sensor of checkedManifest.manifest.sensors) {
-      if (presentSensors.has(sensor.name)) runtime.addCapability('sensor', sensor.name, sensor.type === 'Bool' ? 'bool' : 'number');
+    if (suppliedCapabilities !== undefined) for (const sensor of [...checkedManifest.manifest.sensors, ...(checkedManifest.manifest.sensorInstances ?? [])]) {
+      if (presentSensors.has(sensor.sourceSensor ?? sensor.name)) runtime.addCapability('sensor', sensor.name, sensor.type === 'Bool' ? 'bool' : 'number');
     }
     if (hasContext) runtime.activateContext(options.context);
     else if (hasSchedules) runtime.activateSchedules(options.schedule);
@@ -1008,7 +1018,7 @@ export class ControlRuntime {
         this.runtime.setNumber(entry.item.faultInput, sensorFaultCode(reading));
         if (entry.item.samplePresentInput !== undefined) {
           const identity = entry.conditioner.sampleIdentity();
-          this.runtime.setBool(entry.item.samplePresentInput, captured.normalizedSamples.has(sensorName) && identity !== null);
+          this.runtime.setBool(entry.item.samplePresentInput, captured.normalizedSamples.has(entry.item.sourceSensor ?? sensorName) && identity !== null);
           this.runtime.setNumber(entry.item.sampleEpochInput, identity?.epoch ?? 0);
           this.runtime.setNumber(entry.item.sampleIdInput, identity?.id ?? 0);
           this.runtime.setNumber(entry.item.sampleTimestampInput, identity?.timestampMs ?? 0);
@@ -1330,7 +1340,7 @@ export class ControlRuntime {
     const sensorReadings = new Map();
     const observedSensors = new Set();
     for (const [sensorName, entry] of this.sensors) {
-      const sample = normalizedSamples.get(sensorName);
+      const sample = normalizedSamples.get(entry.item.sourceSensor ?? sensorName);
       const before = sample === undefined ? null : entry.conditioner.sampleIdentity();
       const raw = sample === undefined ? entry.conditioner.read(nowMs) : entry.conditioner.update(sample, nowMs);
       if (sample !== undefined) {
@@ -1408,7 +1418,7 @@ export class ControlRuntime {
         frameInputs.push({ name: entry.item.faultInput, type: 'Number', value: sensorFaultCode(reading) });
         if (entry.item.samplePresentInput !== undefined) {
           const identity = entry.conditioner.sampleIdentity();
-          frameInputs.push({ name: entry.item.samplePresentInput, type: 'Bool', value: captured.normalizedSamples.has(entry.item.name) && identity !== null });
+          frameInputs.push({ name: entry.item.samplePresentInput, type: 'Bool', value: captured.normalizedSamples.has(entry.item.sourceSensor ?? entry.item.name) && identity !== null });
           frameInputs.push({ name: entry.item.sampleEpochInput, type: 'Number', value: identity?.epoch ?? 0 });
           frameInputs.push({ name: entry.item.sampleIdInput, type: 'Number', value: identity?.id ?? 0 });
           frameInputs.push({ name: entry.item.sampleTimestampInput, type: 'Number', value: identity?.timestampMs ?? 0 });

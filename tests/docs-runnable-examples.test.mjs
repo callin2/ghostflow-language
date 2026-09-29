@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
 import { compileSourceSync } from '../tools/compile-source.mjs';
+import { deriveProgrammingBookImportPackage } from '../tools/generate-programming-book-import-package.mjs';
 
 const faq = fs.readFileSync(new URL('../docs/language_faq.md', import.meta.url), 'utf8');
 const programming = fs.readFileSync(new URL('../docs/ProgrammingInGhostflow.md', import.meta.url), 'utf8');
@@ -39,6 +40,12 @@ for (const [id, section, marker, nextMarker] of [
   ['Programming E12', programming, '### E12 —', '### E13 —'],
   ['Programming E13', programming, '### E13 —', '### E11 —'],
   ['Programming E14', programming, '### E14 —', '### E15 —'],
+  ['Programming E16', programming, '### E16 —', '### E17 —'],
+  ['Programming E17', programming, '### E17 —', '### E18 —'],
+  ['Programming E18', programming, '### E18 —', '### E19 —'],
+  ['Programming E19', programming, '### E19 —', '### E20 —'],
+  ['Programming E20', programming, '### E20 —', '### E21 —'],
+  ['Programming E21', programming, '### E21 —', '<a id="appendix-a"></a>'],
 ]) {
   test(`${id} remains executable GhostFlow`, () => {
     const compiled = compileSourceSync(example(section, marker, nextMarker), { filename: `${id}.ghost.md` });
@@ -60,6 +67,18 @@ test('Programming E15 compiles the complete literate document in both languages'
     assert.match(compiled.manifest.format, /^GhostFlow\/control-v\d+$/);
     assert.ok(compiled.bytes.length > 0);
   }
+});
+
+test('Programming E22 compiles only with its pinned generated source closure', () => {
+  const generated = deriveProgrammingBookImportPackage(programming);
+  const sourceClosure = generated.manifest.imports.map(item => ({
+    filename: item.filename, revision: item.revision, text: generated.files.get(item.filename),
+  }));
+  const canonical = generated.files.get(generated.manifest.root.filename);
+  assert.equal(example(programmingEnglish, '### E22 —', '### Run, observe'), example(programming, '### E22 —', '### 실행하고'),
+    'Programming E22 translation must preserve executable code');
+  assert.throws(() => compileSourceSync(canonical, { filename: generated.manifest.root.filename }), /verified source closure/);
+  assert.match(compileSourceSync(canonical, { filename: generated.manifest.root.filename, sourceClosure }).manifest.format, /^GhostFlow\/control-v\d+$/);
 });
 
 for (const [id, marker, nextMarker, mutation] of [

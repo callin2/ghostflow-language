@@ -4,61 +4,79 @@
 
 # Programming in GhostFlow
 
-Reading, running, and explaining electrical control as code
+Write device behavior as code, then understand it by running it
 
 **User guide · Language Reference basis · dev reviewed 2026-09-28**
 
-## This document's role
+## Before you begin
 
-GhostFlow is a reactive control language describing state changes and device output intent from sensors and user inputs. This document provides a learning path for reading and writing your first programs. The [Language Reference](LANGUAGE-REFERENCE.md) and its detailed chapters define normative syntax, types, evaluation, and time contracts. See the [GhostFlow Coding FAQ](language_faq.md) for answers to particular coding situations.
+Imagine wanting a lamp to turn on when you press a switch, water to run at a set time, or a pump to stop when water is low.
 
-If this document differs from the Reference, follow the Reference. These examples demonstrate notation and semantics selected in the current specification. They do not claim completed implementation, runtime availability, or board deployability. Reflect syntax changes in the Reference first, then align this guide's examples.
+Each task is simple on its own. But as conditions grow and devices work together, it becomes harder to see what turns on, when it happens, and why it stops.
 
-This review uses dev revision `3982e6bf71cf5880286fcea017cb355ab222428d`. Check subsequent implementation scope in
-[Implementation](IMPLEMENTATION.md) and [feature maturity and executable evidence](REFERENCE-FEATURE-STATUS.md).
-The [Semantic Kernel 0.1 review plan](plans/2026-09-28-semantic-kernel.md) provides background for the frozen minimum semantic contract.
-The whole Reference and this whole book are not included in that stable scope.
+GhostFlow is a language for writing these conditions and actions as code. It describes how states change in response to sensors or user input, and what actions to request from devices.
 
-The independent controls E01–E10 and E12–E14, and E15's literate document, are checked by the current compiler tests.
-E11 is notation guidance. E08's enum/elapsed, E09's schedule, and E10/E14's sensor/adaptation include
-features outside the frozen core. Compilation does not establish activation of required runtime capabilities
-or physical device behavior. Do not read Chapters 11–12's composition/replacement contracts as completed implementation instructions.
+This guide starts with simple examples and works through reading and changing them. We begin by turning one output on and off with a switch, then expand to programs that remember state, wait for time, and change their behavior based on sensor values.
 
-### How to read
+For exact syntax and behavior rules, see the [Language Reference](LANGUAGE-REFERENCE.md). This guide teaches through examples; the Reference defines the language. If their explanations differ, follow the Reference. When syntax changes, update the Reference first, then align this guide's examples.
 
-- Each `ghost` example is an independent program. Do not concatenate all examples into one file.
-- An actual program is a complete `.ghost.md` document. Top-level `ghost` fences combine in document order into one control root. Paragraphs and intent explanations remain part of the source document.
-- Outputs here are logical intent. Physical GPIO, relays, and sensor collection belong to bindings and Drivers.
-- Find exact syntax in the [Reference syntax index](reference/07-semantic-rules-and-index.md#75-선언과-표기-찾아보기). See [Language Reference](LANGUAGE-REFERENCE.md#설계-철학) for design philosophy and [Reference Chapter 8](reference/08-language-runtime-and-device-boundaries.md#83-faq-전체-책임표) for responsibilities by layer.
+For questions that come up while writing code, also see the [GhostFlow Coding FAQ](language_faq.md).
 
-### Example execution verification paths
+### Before reading the examples
 
-The [example execution check](../tests/programming-book-simulation.test.mjs) compiles current originals and
-checks state and requested/safe intents using explicit inputs, logical time, and observations.
-E01–E10, E12–E15 and PC-01–PC-10 use public `ghostsim` paths.
-E02/E08 supply config Results and context facts; E09 supplies civil schedule facts;
-E10/E14 and tutorial/03 supply sensor samples and required capabilities.
-Plain input/state examples execute native Rust; examples requiring the corresponding conditioner execute WASM of the same core.
+An example in this guide does not mean that its feature is ready to use on a physical board.
 
-tutorial/04 checks schedule events and sequential outputs through the existing public `ControlRuntime`/`DailySlots` WASM host.
-station-rules compiles a policy with `ghostrules`, binds it, and checks output authorization and Stop in WASM `GhostFlowStation`.
-These two advanced paths are not classified as `ghostsim` CLI execution. E11 is notation guidance; E90–E97 check intended compiler diagnostics.
-Diagrams and composition explanations are not executable source; source-mutation experiments are checked as separate derived candidates.
+Compilation, support in the execution environment, and the behavior of a real device each need separate verification. This guide explains how to write and read code according to the current specification. It does not claim that every feature is implemented or ready for board deployment.
 
-With Node dependencies and native/WASM artifacts built from the same revision, run
-`node --test tests/programming-book-simulation.test.mjs`. Follow [Verification](VERIFICATION.md) for the complete build/verification sequence.
-The compiler check in `tests/docs-runnable-examples.test.mjs` also runs without runtime builds.
-This evidence establishes logical execution; physical device verification is separate.
+This document review is based on dev revision `3982e6bf71cf5880286fcea017cb355ab222428d`. See [Implementation](IMPLEMENTATION.md) and [feature maturity and executable evidence](REFERENCE-FEATURE-STATUS.md) for later implementation and verification status.
+
+The [Semantic Kernel 0.1 review plan](plans/2026-09-28-semantic-kernel.md) explains the background and core scope whose behavior was prioritized for definition. Not every feature in the Reference or this guide is part of that scope.
+
+The compiler tests cover independent control programs E01–E10 and E12–E14, and the literate document E15. E11 explains notation; it is not an executable example.
+
+E08's `enum` and `elapsed`, E09's schedules, and E10/E14's sensor and adaptation features include behavior outside that core scope. Do not read the program composition and replacement explanations in Chapters 11–12 as instructions for features that are fully implemented.
+
+### How to read the examples
+
+**Run each example separately.** Every `ghost` example is an independent program. Do not join all the book's examples into one file and run them together.
+
+**Explanations are part of the program document.** An actual program is written as a `.ghost.md` document. If its code is split across several top-level `ghost` blocks, read the blocks from top to bottom as one control program. Keep the paragraphs and explanations of why the program should behave a certain way in the source document too.
+
+**Distinguish code output from device behavior.** An output here is a value that requests an action from a device. Producing a value that says to turn on a pump does not turn on a real pump by itself. A binding connects that value to a GPIO or relay, and a Driver handles the hardware. Reading sensor values is also handled there.
+
+For exact notation, see the [Reference syntax index](reference/07-semantic-rules-and-index.md#75-선언과-표기-찾아보기). The [design philosophy](LANGUAGE-REFERENCE.md#설계-철학) explains why the language is designed this way. [Reference Chapter 8](reference/08-language-runtime-and-device-boundaries.md#83-faq-전체-책임표) describes responsibilities across the language, execution environment, and device.
+
+### How are the examples checked?
+
+The [example execution check](../tests/programming-book-simulation.test.mjs) compiles original examples, runs them with specified inputs and test times, then checks state changes, requested intent, and safe intent.
+
+Examples need different inputs and execution environments, so their checks vary.
+
+E01–E10, E12–E15, and PC-01–PC-10 are checked through the public `ghostsim` path. E02/E08 receive configuration Results and context facts; E09 receives civil schedule facts. E10/E14 and tutorial/03 receive sensor samples and the execution capabilities they need.
+
+Ordinary input and state examples run in native Rust. Examples that need the corresponding conditioner use a WASM build of the same core.
+
+tutorial/04 checks schedule events and sequential outputs in the existing `ControlRuntime`/`DailySlots` WASM host. station-rules compiles a policy with `ghostrules`, binds it, then checks output authorization and `Stop` in WASM `GhostFlowStation`. These advanced examples are checked separately from the `ghostsim` CLI path.
+
+E11 explains notation. E90–E97 check whether the compiler reports expected errors for intentionally invalid code. Diagrams and explanations of program composition are not executed. Source-mutation experiments are checked separately from the originals.
+
+To run the example check directly, you need Node dependencies and native/WASM artifacts built from the same revision. Then run `node --test tests/programming-book-simulation.test.mjs`. See [Verification](VERIFICATION.md) for the full build and verification sequence.
+
+The compiler check in `tests/docs-runnable-examples.test.mjs` can run without building the runtime.
+
+Chapter 14 introduces E16–E22 examples using temperature and climate sensors. Checks for `ghostsim` control calculations and independent WASM numerical calculations are in `tests/programming-book-simulation.test.mjs`, `tests/programming-climate.test.mjs`, and `tests/programming-book-import-package.test.mjs`.
+
+These steps check program logic and calculations. Whether real sensors and devices behave as intended must be verified separately.
 
 ## Contents
 
-### First practical path — from PLC to GhostFlow
+### From PLC to GhostFlow — start with practice
 
-The ten-stage learning path starts with buttons and lamps, then extends to START/STOP, motors, interlocks, limits, timers,
-water levels, Manual/Auto, sequential control, and fault recovery. Examine each stage's control intent separately
-from its language examples.
+The ten-stage practice path starts with buttons and lamps. It then covers START/STOP, motors, interlocks, limits, timers, water levels, Manual/Auto operation, sequential control, and fault recovery.
 
-### Language chapters
+At each stage, first consider how the device should behave. Then see how to express that behavior in GhostFlow code.
+
+### Browse by topic
 
 1. [One switch and one output](#ch01)
 2. [Names, values, types, and expressions](#ch02)
@@ -72,8 +90,11 @@ from its language examples.
 10. [Stopping, changing, and comparing](#ch10)
 11. [Files and literate programs](#ch11)
 12. [One device, multiple controls](#ch12)
+13. [Built-in functions and operations](#ch13)
+14. [Temperature units and air-VPD control](#ch14)
 
 Appendices: [A. Specification guide](#appendix-a) · [B. Learning through errors](#appendix-b)
+
 
 <a id="ch01"></a>
 ## 1. One switch and one output
@@ -1009,6 +1030,523 @@ definition revision → import → instance + typed connect
 
 Use `adapt`, capability checks, common constraints, shared resources, replay, and hot replacement only at their prescribed locations and with their defined types and contracts. Syntax and semantic DAG rules follow [Reference §6](reference/06-composition-and-replay.md); device/Driver/binding responsibilities follow [Reference §8](reference/08-language-runtime-and-device-boundaries.md). Do not assume an arbitrary separate policy language inside ordinary `control`.
 
+<a id="ch13"></a>
+## 13. Built-in functions and operations
+
+A builtin is an operation the compiler already knows. A `fn` is a calculation you declare, such as E07's function. A familiar name does not make a function builtin: there are no general `abs`, `min`, `max`, `clamp`, `sqrt`, `pow` or `round` expression functions. Declare a suitable `fn` when the language permits its calculation.
+
+This chapter audits dev revision `c1bbbe35cbe5acf16118707f8afc14619153d918` for [#369](https://github.com/callin2/ghostflow-language/issues/369).
+It covers all **48 primary callable spellings** and **3 additional host-policy spellings**. The tables distinguish ordinary calls, declaration constructors and restricted transforms. Signatures below are fragments; the linked tests contain complete examples. They are not extra independent source documents.
+
+First ask where the operation is permitted. Then inspect its input and result types. Finally ask whether it remembers samples or state, requires a clock/provider, or returns a fault. A successful compile can produce a checked descriptor rather than executable control. Even executable control needs the stated runtime inputs and bindings. None of these operations proves physical output effect.
+
+### 13.1 Numbers and explicit Result construction
+
+Use conversions when the intended numeric representation changes. `Int` is exact signed 32-bit; `Number` is floating point. These functions take exactly one positional argument. For example, `int_floor(-1.2)` is -2, while `int_trunc(-1.2)` is -1. A halfway value such as 2.5 rounds to 2 with nearest-even; 3.5 rounds to 4.
+
+| Builtin | Signature and purpose | Context, boundaries and example |
+|---|---|---|
+| `number` | `number(x: Int) -> Number`: change representation explicitly | Ordinary expression, no state. [Integer examples](../tests/int-compiler.test.mjs). |
+| `int_exact` | `int_exact(x: Number) -> Int`: require an integral value | Reject fractional or out-of-range values. [Conversions](../tests/dynamic-int-conversions.test.mjs). |
+| `int_floor` | `int_floor(x: Number) -> Int`: round toward negative infinity | Converted value must fit Int. [Conversions](../tests/dynamic-int-conversions.test.mjs). |
+| `int_ceil` | `int_ceil(x: Number) -> Int`: round toward positive infinity | Converted value must fit Int. [Conversions](../tests/dynamic-int-conversions.test.mjs). |
+| `int_trunc` | `int_trunc(x: Number) -> Int`: discard fraction toward zero | Converted value must fit Int. [Conversions](../tests/dynamic-int-conversions.test.mjs). |
+| `int_nearest_even` | `int_nearest_even(x: Number) -> Int`: nearest integer, ties to even | Converted value must fit Int. [Conversions](../tests/dynamic-int-conversions.test.mjs). |
+| `ok` | `ok(value: T) -> Result<T,E>`: construct success | An expected Result type determines T and compiler-owned E. [Result examples](../tests/result-control.test.mjs). |
+| `fault` | `fault(reason: E) -> Result<T,E>`: construct failure | Expected Result type required; keep the typed reason and source origin. [Result examples](../tests/result-control.test.mjs). |
+| `rate` | `rate(delta: Q-difference, time: Duration) -> Rate<Q>`: build a comparison rate | Expected Rate context; positive time; Temperature uses TemperatureDelta. Canonical difference is divided by seconds. [Rate examples](../tests/window-control.test.mjs). |
+
+Invalid constant conversions fail compilation. Dynamic numeric errors prevent successful evaluation; they are not sensor Results that `recover` can catch. `Rate<Q>` is expression-only: use a `window_rate` signal and a `rate` threshold for comparison. It is not a general config/state/input/output storage type.
+Source: [expression calls](../tools/control.mjs), [integer contract](EXACT-INTEGER-CONTRACT.md).
+
+### 13.2 Keep quality until you choose a response
+
+A sensor's failed reading is not a normal zero. A Result pipeline carries either a value or its error. E10 demonstrates explicit failure handling. Use `result |> map(transform)`, `result |> and_then(transform)` or `result |> recover(default)`; `>>` combines static transforms. These are compiler-known transforms, not arbitrary first-class functions.
+
+| Builtin | Signature and purpose | Context, boundaries and example |
+|---|---|---|
+| `map` | `map(T -> U)`: Result<T,E> -> Result<U,E> | Unary named fn or `below(limit)`; U must not be Result. Preserve failure. [Pipelines](../tests/result-control.test.mjs). |
+| `and_then` | `and_then(T -> Result<U,E>)`: Result<T,E> -> Result<U,E> | Unary named fn; same E required. Existing failure bypasses the transform. [Pipelines](../tests/result-control.test.mjs). |
+| `recover` | `recover(default: T)`: Result<T,E> -> T | Explicit same-type fallback; records the fault and origin in trace. `recover(false)` is an author decision. [Provenance](../tests/result-provenance.test.mjs). |
+| `below` | `below(limit: T)`: transform T -> Bool using strict `<` | Only as a map transform. Ordered numeric, Rate, DateTime or TimeOfDay; same-type limit. and_then(below(...)) is rejected because Bool is not Result. [Pipelines](../tests/result-control.test.mjs). |
+
+Source: [static transform lowering](../tools/control.mjs). Recovering a value does not make the original measurement trustworthy.
+For E10's Percent sensor, the fragment `moisture |> map(below(30%)) |> recover(false)` requests false on fault. This threshold calculation has no hysteresis memory.
+
+### 13.3 Filter samples, then use hysteresis to retain a decision
+
+A filter smooths measured values. Hysteresis remembers a Bool decision across a band. They solve different problems and can be used together. Declare a numeric sensor and select one filter with `filter = ...`. Filters consume new valid physical samples; repeated scans do not add sample weight.
+For example, E10's `filter = median(3);` selects three actual samples, while `filter = ema(alpha: 0.25);` gives each new sample one quarter of the update weight.
+
+| Builtin | Signature and purpose | Context, boundaries and example |
+|---|---|---|
+| `median` | `median(n)`: middle of the last n valid samples | Sensor filter only; constant odd integer 1..31. Partial window is NotReady. [Filters](../tests/signals-wasm.test.mjs). |
+| `moving_average` | `moving_average(n)`: arithmetic mean of last n valid samples | Sensor filter only; constant integer 1..31. Partial window is NotReady. [Filters](../tests/signals-wasm.test.mjs). |
+| `ema` | `ema(alpha: Number)`: weighted new sample and previous value | Sensor filter only; constant finite 0 < alpha <= 1. Seed first valid sample; recovery rules still apply. [Filters](../tests/signals-wasm.test.mjs). |
+| `hysteresis` | `hysteresis(sensor, on_below: T, off_above: T, initial: Bool) -> Result<Bool,SensorFault>` | Signal declaration; direct numeric sensor; constant thresholds with same T and on_below < off_above. [Hysteresis boundaries and faults](../tests/signals-wasm.test.mjs). |
+
+Consider E10's moisture control: `signal dry = hysteresis(moisture, on_below: 30%, off_above: 35%, initial: false);`.
+Below 30% sets dry true. Above 35% sets it false. Every value in the **closed band [30%,35%]**, including both equalities, preserves the prior Bool while quality is good. This prevents small fluctuations from switching the decision repeatedly.
+
+The following sequence refers to good filtered readings, after readiness, rather than raw samples before the filter.
+
+| Good filtered moisture | Retained dry value | Reason |
+|---|---|---|
+| 30% after startup | false | Equality retains initial false. |
+| 35% | false | Upper equality also retains false. |
+| 29% | true | Strictly below lower threshold. |
+| 30% | true | Lower equality retains true. |
+| 33% | true | Inside the band. |
+| 35% | true | Upper equality retains true. |
+| 36% | false | Strictly above upper threshold. |
+
+`initial` is the starting retained value, not permission to ignore a missing sample. Before readiness, or after Disconnected/Stale/Invalid, the public result is a fault. Processing resets to initial; good samples must satisfy recovery/filter requirements again. A recovered in-band sample therefore starts from initial, rather than continuing the pre-fault decision. If initial is true, it still does not turn a failed Result into `ok(true)`. E10 chooses its output response using `case`.
+
+The [Rust conditioner](../crates/ghostflow-core/src/signals.rs) uses strict comparisons and resets hysteresis processing on faults. The linked WASM test contains “retains either prior state exactly at both thresholds” and fault/recovery examples. This chapter describes those contracts; editing documentation does not create a new hardware test.
+
+### 13.4 Time, samples and events are different evidence
+
+Declare these operations with `signal name = constructor(...);`. A monotonic timer counting scans is not proof that a physical condition remained true between scans. Use certified evidence when continuity matters.
+For a declared Temperature sensor, `signal recent = hold_last(temperature, for_at_most: 2min, quality: measured);` limits reuse of its last good sample. It still needs an explicit Result response before an output can use it.
+
+| Builtin | Signature and purpose | Context, boundaries and example |
+|---|---|---|
+| `debounce` | `debounce(source, stable_for: Duration, initial: T) -> T or Result<T,E>`: accept a stable candidate | Bool or finite enum; positive constant duration and matching constant initial. Candidate changes restart its age; faults reset. Sample sources preserve lineage; plain values use scans. [Debounce](../tests/debounce-control.test.mjs). |
+| `true_for` | `true_for(BoolSensor, duration: Duration, quality: measured) -> Result<Bool,SensorFault>`: prove continuous true | Direct declared Bool sensor, positive constant duration. Driver-certified intervals; false/inadmissible quality resets. Boundary reaching duration is true. [Certified source](../tests/fixtures/true-for-certified.ghost.md). |
+| `after_event` | `after_event(Event, BoolSensor, window: Duration, quality: measured)`: retain per-event evidence | Positive constant window; event identities and predicate samples required. Predicate is tested in [eventTime,eventTime+window). Signal itself is not scalar. [Event source](../tests/fixtures/after-event-evidence.ghost.md). |
+| `after_event_any` | `after_event_any(signal) -> Result<Bool,SensorFault>`: project existential event result | One after_event signal. Decisive true can establish any; otherwise unresolved identities/faults remain relevant. [Projection examples](../tests/after-event-control.test.mjs). |
+| `after_event_all` | `after_event_all(signal) -> Result<Bool,SensorFault>`: project universal event result | One after_event signal. Decisive false can establish all=false; empty/pending sets without decisive evidence yield NotReady, not automatic permission. [Projection examples](../tests/after-event-control.test.mjs). |
+| `window_average` | `window_average(source, over: Duration, quality: measured, max_age: Duration)` | Result<numeric/physical,SensorFault> with physical sample lineage. Return same payload, except Int -> Number. [Windows](../tests/window-control.test.mjs). |
+| `window_min` | `window_min(source, over: Duration, quality: measured, max_age: Duration)` | Same admissible payloads as average; Result of the minimum, same payload type. [Windows](../tests/window-control.test.mjs). |
+| `window_max` | `window_max(source, over: Duration, quality: measured, max_age: Duration)` | Same admissible payloads as average; Result of the maximum, same payload type. [Windows](../tests/window-control.test.mjs). |
+| `window_rate` | `window_rate(source, over: Duration, quality: measured, max_age: Duration) -> Result<Rate<Q>,SensorFault>` | Supported linear physical quantity; earliest/latest observations at distinct times. Temperature difference uses delta K. Number/Int/Percent, RelativeHumidity, CO2 and Acidity are not accepted inputs. [Rate examples](../tests/window-control.test.mjs). |
+| `hold_last` | `hold_last(source, for_at_most: Duration, quality: measured) -> Result<T,SensorFault>`: temporarily reuse a good sample | Physical lineage required; positive constant duration. Preserve actual timestamp, held age and masked fault; never refresh it by reevaluation. [Hold examples](../tests/hold-last-control.test.mjs). |
+| `elapsed` | `elapsed(state) -> Duration`: age since a state change | Timer declaration only; declared state, explicit monotonic clock; resets on change. [E08](#ch06). |
+| `continuous_true` | `continuous_true(BoolExpression) -> Duration`: age of continuously true scan observations | Timer declaration only; starts at zero on first true scan, resets on false. It does not certify the unobserved interval. [Timer examples](../tests/compiler.test.mjs). |
+
+Window `over` and `max_age` are positive constant Durations. Use actual admissible observations in **(now-over,now]**, without interpolation. No observations, or newest age **>= max_age**, means NotReady. A current source fault is preserved. A rate requires two distinct observation times. Window composition retains aggregate/sample provenance; clock-only scans do not fabricate new observations.
+
+An after_event-only program with any/all projection can compile to executable control with event-runtime bindings. An unprojected after_event, or its combination with natural conditions, can produce an `executable:false` temporal descriptor. `after_event_for` is covered under unsupported names below.
+Source: [signal/timer lowering](../tools/control.mjs), [temporal Reference](reference/04-sensors-constraints-control.md).
+
+### 13.5 Natural facts and schedule policy constructors
+
+A provider supplies observations or predictions; the program decides what they permit. These two ordinary calls return uncertainty explicitly.
+
+| Builtin | Signature and purpose | Context, boundaries and example |
+|---|---|---|
+| `tide_is` | ``tide_is(provider, tide`spring` or tide`neap`) -> Result<Bool,TemporalContextFault>`` | Declared TidePredictions provider. Missing/stale prediction or clock context is a fault. [Natural conditions](../tests/natural-condition-contract.test.mjs). |
+| `moon_is` | ``moon_is(provider, moon`phase`) -> Result<Bool,TemporalContextFault>`` | LunarEphemeris provider; phases: new, waxing_crescent, first_quarter, waxing_gibbous, full, waning_gibbous, last_quarter, waning_crescent. [Natural conditions](../tests/natural-condition-contract.test.mjs). |
+
+The tagged literals in these signatures are notation fragments. Both calls require runtime/provider facts and cannot capture a global provider inside a pure fn.
+
+The following constructors are valid only in schedule fields. They do not return freely stored expression values. Durations here are positive constants.
+For example, `gap = skip_after(10min);` declares a gap policy. Tide's `basis = run(5min, within(10min));` allows admission within ten minutes, then runs for five minutes from admission.
+
+| Builtin | Signature and purpose | Context, boundaries and example |
+|---|---|---|
+| `instant` | `instant(DateTime)`: absolute Periodic anchor | Constant DateTime; current executable slice uses preserve_anchor and pulse. [Periodic](../tests/periodic-cron-policy.test.mjs). |
+| `civil` | `civil(Date, TimeOfDay)`: civil Periodic anchor | Constant date/time; checked descriptor contract, outside current Periodic bytecode slice. [Periodic](../tests/periodic-cron-policy.test.mjs). |
+| `skip_after` | `skip_after(Duration)`: bound acceptable observation gap | Schedule gap field; larger gaps use explicit skip/baseline policy. [Policies](../tests/periodic-cron-policy.test.mjs). |
+| `range` | `range(Duration)`: planned civil interval | Schedule basis; nonoverlap must be provable and cancel_when explicit. Descriptor-only; no control bytecode. [Range contract](../tests/schedule-descriptor-artifact.test.mjs). |
+| `run` | `run(Duration, within(Duration))`: Tide run from admission | Tide basis; first Duration is run length. Admission must occur inside the grace interval. [Tide](../tests/natural-schedule-contract.test.mjs). |
+| `within` | `within(Duration)`: Tide admission grace | Only second argument of Tide run; [planned,planned+grace), exact end excluded. It does not extend run length. [Tide](../tests/natural-schedule-contract.test.mjs). |
+
+Current executable schedule slices use trusted clock, baseline recovery and skip fallback. Daily/slots/Cron use pulse; Periodic requires instant+preserve_anchor; Tide uses run+within. A civil contract accepted into a descriptor is not an executable schedule.
+Source: [schedule lowering and slice selection](../tools/control.mjs), [time Reference](reference/03-time-and-schedules.md).
+
+### 13.6 Account for use before granting more
+
+An account records evidence, rather than predicting use from an animation or requested output. Applied receipts differ from requested intent; durable accounting needs a ledger and verified resource bindings.
+For a bound resource pump, the declaration fragment `account pumping = on_time(pump, stage: applied, persistence: durable);` chooses applied evidence. The linked accounting examples also declare the resource and limit policies.
+
+| Builtin | Signature and purpose | Context, boundaries and example |
+|---|---|---|
+| `on_time` | `on_time(resource, stage: applied, persistence: durable)`: Duration account | Account declaration; bounded executable slice accepts durable/applied only. Requested/safe/confirmed alternatives can be checked but are not this executable binding. [Accounting](../tests/accounting-syntax.test.mjs). |
+| `count_events` | `count_events(Event, over: local_day("zone"), persistence: durable)`: event account | Account declaration; .count returns Result<Int,AccountingFault>. Executable slice requires durable/local_day; duplicate event identities do not double count. [Accounting](../tests/accounting-syntax.test.mjs). |
+| `used` | `used(account, rolling(Duration))`: inspect accounted Duration | Only accounting constraint limit position. Executable limit uses <=, positive bound/reserve and on_unknown=block. [Limits](../tests/accounting-syntax.test.mjs). |
+| `rolling` | `rolling(Duration)`: trailing accounting basis | Positive constant duration; count_events rolling is descriptor/check scope, outside executable event-count slice. [Limits](../tests/accounting-syntax.test.mjs). |
+| `local_day` | `local_day("timezone")`: civil-day accounting basis | Nonempty literal timezone; clock/calendar/ledger required. It is not a fixed 24-hour rolling window. [Accounting](../tests/accounting-syntax.test.mjs). |
+| `count_on` | `count_on({resources}) -> Int`: count true candidate resources | Named resource constraints, not ordinary expressions. Finite distinct Bool resource set; empty -> 0. Host policy binding required. [Named constraints](../tests/named-constraints.test.mjs). |
+| `any_on` | `any_on({resources}) -> Bool`: test candidate resources | Same restricted context; empty -> false. Evaluation stage is declared by the constraint. [Named constraints](../tests/named-constraints.test.mjs). |
+
+A standalone named resource policy becomes a host-policy artifact. It is not ordinary VM control. Source: [accounting/resource constraints](../tools/control.mjs).
+
+### 13.7 PID constructors belong to an objective
+
+A controller computes requested targets. Later constraints may restrict them. These constructors set gains and restart policy; they are not general unit-algebra functions. The current native binding is a Temperature sensor, Temperature config target and `ContinuousActuator<Percent>`, with output minimum 0%. Non-PID controller kinds can carry binding-required metadata; a parsed `pi` or `on_off` is not proof of a running controller.
+
+| Builtin | Signature and purpose | Context, boundaries and example |
+|---|---|---|
+| `proportional_gain` | `proportional_gain(output: Percent, error: TemperatureDelta)`: P gain | PID kp field; constants, output >=0, error >0; output/error. [Controller examples](../tests/gfb7-pid-contract.test.mjs). |
+| `integral_gain` | `integral_gain(output: Percent, error: TemperatureDelta, time: Duration)`: I gain | PID ki; same bounds plus time >0; output/error/seconds. [Controller examples](../tests/gfb7-pid-contract.test.mjs). |
+| `derivative_gain` | `derivative_gain(output: Percent, error: TemperatureDelta, time: Duration)`: D gain | PID kd; same bounds plus time >0; output*seconds/error. [Controller examples](../tests/gfb7-pid-contract.test.mjs). |
+| `reset` | `reset(output: Percent)`: explicit restart target | PID restart field; constant inside objective output range. First accepted sample initializes tracking; it is not an arbitrary state reset call. [Controller examples](../tests/gfb7-pid-contract.test.mjs). |
+
+Zero gain output disables that term. Period must be positive and late_after >= period. Explicit direction, bias, anti-windup, disabled/transfer, fault and restart policies govern lifecycle; stale/missing measurements are not silently accepted. See [controller lowering](../tools/control.mjs) and [continuous control Reference](reference/04-sensors-constraints-control.md).
+For example, `kp = proportional_gain(output: 2%, error: 1Δ°C);` declares two percentage points per degree of temperature error. `restart = reset(output: 0%);` explicitly chooses the first tracked target.
+
+### 13.8 The separate host-policy grammar
+
+The `ghostrules` adapter checks a narrow station-policy grammar. Its apparent calls are contextual forms, not additions to ordinary control expressions. Existing [station rules](../examples/station-rules.ghost.md) and [constraint tests](../tests/constraints.test.mjs) demonstrate complete policies.
+
+| Builtin | Signature and purpose | Context, boundaries and example |
+|---|---|---|
+| `stopped` | `stopped(station)`: require stopped station | Only allow enter/apply policy conditions with their specified mode. Host station state, not physical motor proof. [Rules](../examples/station-rules.ghost.md). |
+| `pump_capacity` | `pump_capacity(pump)`: request a capacity check | Only require ... == Pass or check policy clauses. Host policy artifact; not a numeric capacity expression. [Rules](../examples/station-rules.ghost.md). |
+| `day` | `day("timezone")`: civil day for a daily limit | Only `limit on_time(pump) <= Duration per day("zone")`; valid IANA timezone, nonempty <=128 chars. [Rules](../examples/station-rules.ghost.md). |
+
+In this grammar `count_on(pump.valves)`, `any_on(pump.valves)` and `on_time(pump)` are restricted forms with different argument shapes from §13.6. They produce max-valves, pump-needs-valve and daily-limit policy clauses. Do not move these spellings into arbitrary `let` expressions. `exclusive`, `allow`, `require`, `limit`, `once` and `check` introduce clauses. `warn` is rejected.
+Source: [host-policy parser](../tools/constraints.mjs).
+
+### 13.9 Adjacent syntax and unavailable alternatives
+
+The following are useful alongside builtins, but are **not callable functions**.
+
+| Syntax | Meaning and current boundary |
+|---|---|
+| Daily, DailySlots<15min>, Periodic, Cron, Solar, Tide | Schedule declaration types. DailySlots execution uses a fixed 15-minute grid; Cron has five validated fields. |
+| pulse; time/date/datetime/cron5/day/sun/tide/moon tagged literals | Policy value and typed notation. ``sun`rise` ``/``sun`set` `` are not sunrise()/sunset() calls. |
+| TimeSlots<grid,capacity> | Config type: positive grid dividing 24h, positive capacity, finite unique aligned TimeOfDay list. No TimeSlots(...) call. |
+| `Result<T,E>`; `Rate<Q>` | Typed result and expression-only rate. E is compiler-owned; nested Result payload is rejected. |
+| schedule.due; schedule.active; schedule.missed | Bool projections; .missed requires exposed projection. Active occurrence is not applied output. No method calls. |
+| eventAccount.count | Result<Int,AccountingFault> projection; only count_events accounts. |
+| resource.on/position/valves | Contextual resource/policy endpoints, not generic methods. |
+| sample, valid, filter, stale_after, recover_after, samples | Sensor declaration fields/notation. In particular stale_after is not an expression call. |
+| on_below, off_above, initial; min, max, step, access, label | Named arguments or config fields, not functions. |
+| if/case/in; >> and \|>; fn/type/state/config/timer/signal | Syntax, operators and declarations. Qualified input.name/state.name/next.name are removed aliases. |
+
+[Parser and member/type rules](../tools/control.mjs) define these positions. The complete types and units are in [Reference Chapter 2](reference/02-types-expressions-state.md).
+
+| Selected/reference spelling | Current status; do not claim execution |
+|---|---|
+| after_event_for(signal, EventId) | Reference describes per-identity projection, but current compiler has no call dispatcher; unknown function. Use supported any/all only when their meaning matches intent. |
+| window(Duration) schedule basis | Design alternative, not accepted current basis. This is distinct from supported window_average/min/max/rate signals. |
+| run(Duration, on_time) | Design alternative; supported Tide run requires within(Duration). |
+| range(Duration); civil(Date,TimeOfDay) | Checked descriptor contracts as explained above; not current bytecode slices. |
+| PID checkpoint; degraded Name | Selected design alternatives unsupported by current native PID fault/restart policies. |
+| ifthenelse, purefn, enum, next | Removed aliases. Use canonical if ... then ... else, fn, type and primed state. |
+
+Do not infer support from a name appearing in a diagnostic or design example. Check the compiler path and artifact kind. [Chapter coverage check](../tests/programming-builtins.test.mjs) keeps both languages aligned with the compiler's callable dispatch and verifies documented entries have signatures, context and example links.
+
+<a id="ch14"></a>
+## 14. Temperature units and air-VPD control
+
+### One physical temperature, three source units
+
+A Temperature sensor retains its physical type. Celsius, Fahrenheit and Kelvin are source/display units; the runtime uses canonical kelvin. These three independent heater examples express the same rule: below 18°C turn demand ON; above 22°C turn it OFF. Equality at either threshold and the closed band preserve the previous good decision. Faults inhibit the heater and reset retained hysteresis to initial false; one new good sample is required for these median(1) examples. Before the first sample, the sensor is NotReady. The last good sample can remain usable between deliveries until its age >= 3s, when it becomes Stale.
+
+| Physical boundary | Celsius | Fahrenheit | Kelvin |
+|---|---|---|---|
+| Lower heater threshold | 18°C | 64.4°F | 291.15K |
+| Upper heater threshold | 22°C | 71.6°F | 295.15K |
+| Heater valid range | −40–50°C | −40–122°F | 233.15–323.15K |
+
+Literal conversion is exact before binary64 rounding. Do not feed a value such as 64.4 directly to a canonical runtime sample: 64.4°F means 291.15K. Driver bindings identify the supplied unit and quantity. See [physical types](reference/02-types-expressions-state.md) and [hysteresis](#ch13).
+
+### E16 — Celsius heater
+
+```ghost
+// E16
+control CelsiusHeater {
+  sensor air: Temperature {
+    sample = 1s;
+    valid = -40°C .. 50°C;
+    filter = median(1);
+    stale_after = 3s;
+    recover_after = 1 samples;
+  }
+  signal cold = hysteresis(air,
+    on_below: 18°C, off_above: 22°C, initial: false);
+  output heater: Bool;
+  heater <- cold |> recover(false);
+}
+```
+
+### E17 — Fahrenheit heater
+
+```ghost
+// E17
+control FahrenheitHeater {
+  sensor air: Temperature {
+    sample = 1s;
+    valid = -40°F .. 122°F;
+    filter = median(1);
+    stale_after = 3s;
+    recover_after = 1 samples;
+  }
+  signal cold = hysteresis(air,
+    on_below: 64.4°F, off_above: 71.6°F, initial: false);
+  output heater: Bool;
+  heater <- cold |> recover(false);
+}
+```
+
+### E18 — Kelvin heater
+
+```ghost
+// E18
+control KelvinHeater {
+  sensor air: Temperature {
+    sample = 1s;
+    valid = 233.15K .. 323.15K;
+    filter = median(1);
+    stale_after = 3s;
+    recover_after = 1 samples;
+  }
+  signal cold = hysteresis(air,
+    on_below: 291.15K, off_above: 295.15K, initial: false);
+  output heater: Bool;
+  heater <- cold |> recover(false);
+}
+```
+
+### Air VPD from temperature and relative humidity
+
+Air VPD is saturation vapour pressure minus actual air vapour pressure. For simultaneous air temperature T in °C and air relative humidity RH, use `0.6108 * exp(17.27*T/(T+237.3)) * (1-RH/100)` kPa. The saturation relation and relative-humidity definition come from [FAO-56, Chapter 3, equations 10–11](https://www.fao.org/4/x0490e/x0490e07.htm). This is an instantaneous air calculation, not FAO's daily evapotranspiration estimate. Leaf VPD additionally depends on leaf temperature; it is not calculated here.
+
+GhostFlow has no exp builtin. Each complete example authors `exp_0_3_1` as an ordinary pure fn: a fixed 14th-order Taylor polynomial, evaluated in Horner form. The declared air sensor domain is **0–50°C**, so the exponent is **0–3.006**, inside the function's stated 0–3.1 domain. Outside that temperature range the sensor returns Invalid and the formula is not evaluated. Do not extrapolate the approximation. The [independent numerical check](../tests/programming-climate.test.mjs) compares real runtime values with host Math.exp on a 0.1°C grid and humidity boundaries, requiring absolute error <= **0.001 kPa**. It checks all three originals, rather than copying their polynomial into an expected-value implementation.
+
+`(t - 0°C) / 1Δ°C` explicitly obtains a Number in Celsius. `rh / 100%RH` explicitly normalizes typed humidity, using [the RH ratio contract](reference/02-types-expressions-state.md). The final multiplication by `0.6108kPaVPD` preserves VaporPressureDeficit. RelativeHumidity is air humidity, not E10's soil-moisture Percent.
+
+Light is typed **PPFD**, using `umol/m2/s` (µmol·m⁻²·s⁻¹). It counts photosynthetically relevant photons. Lux is illuminance weighted for human vision; there is no universal lux-to-PPFD conversion. Use a verified PPFD sensor/binding. Light **gates output eligibility** and never modifies calculated VPD at fixed T/RH.
+
+### Three independent teaching policies
+
+Thresholds are illustrative source intent, not universal crop recommendations. A humidifier demand is not proof that humidity rises; ventilation depends on outdoor conditions; irrigation demand is not a soil-water estimate or a pump sequence. These examples have no greenhouse physical model. The installation owns actuator binding, suitability and physical effect verification.
+
+| Example | ON | OFF | Light gate |
+|---|---|---|---|
+| E19 humidification demand | VPD > 1.2 kPa | VPD < 1.0 kPa | PPFD >= 200 µmol·m⁻²·s⁻¹ |
+| E20 ventilation demand | VPD < 0.4 kPa | VPD > 0.6 kPa | PPFD >= 200 µmol·m⁻²·s⁻¹ |
+| E21 irrigation demand | VPD > 1.0 kPa | VPD < 0.8 kPa | PPFD >= 300 µmol·m⁻²·s⁻¹ |
+
+A calculated Result is not a declared sensor, so the sensor-only hysteresis constructor cannot consume it. The explicit Bool state below expresses the same strict ON/OFF/dead-band intent. Temperature/RH faults clear demand. Night or light fault inhibits the output while climate demand may remain remembered. Recovery uses current good evidence; no timer or extra automatic mode is introduced. `air_vpd_value = 0` on climate fault is an explicit display placeholder. **Read vpd_valid with it**: false does not mean measured zero VPD. A light fault inhibits the output without invalidating a still-good T/RH calculation.
+
+### E19 — High-VPD humidification demand
+
+```ghost
+// E19
+fn exp_0_3_1(x: Number) -> Number {
+  1 + x / 1 * (1 + x / 2 * (1 + x / 3 * (1 + x / 4 * (1 + x / 5 * (1 + x / 6 * (1 + x / 7 * (1 + x / 8 * (1 + x / 9 * (1 + x / 10 * (1 + x / 11 * (1 + x / 12 * (1 + x / 13 * (1 + x / 14 * (1))))))))))))))
+}
+fn air_vpd(t: Temperature, rh: RelativeHumidity) -> VaporPressureDeficit {
+  0.6108kPaVPD * exp_0_3_1(
+    17.27 * ((t - 0°C) / 1Δ°C) / (((t - 0°C) / 1Δ°C) + 237.3)
+  ) * (1 - rh / 100%RH)
+}
+control HumidificationDemand {
+  sensor air: Temperature {
+    sample = 1s; valid = 0°C .. 50°C;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor humidity: RelativeHumidity {
+    sample = 1s; valid = 0%RH .. 100%RH;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor light: PPFD {
+    sample = 1s; valid = 0umol/m2/s .. 3000umol/m2/s;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  let climate: Result<VaporPressureDeficit, SensorFault> = case air {
+    ok(t) => case humidity {
+      ok(rh) => ok(air_vpd(t, rh));
+      fault(reason) => fault(reason);
+    };
+    fault(reason) => fault(reason);
+  };
+  let daylight = case light {
+    ok(ppfd) => ppfd >= 200umol/m2/s;
+    fault(_) => false;
+  };
+  state demand: Bool = false;
+  demand' = case climate {
+    ok(value) => if value > 1.2kPaVPD then true
+      else if value < 1.0kPaVPD then false else demand;
+    fault(_) => false;
+  };
+  output air_vpd_value: VaporPressureDeficit;
+  output vpd_valid, humidify_demand: Bool;
+  air_vpd_value <- climate |> recover(0kPaVPD);
+  vpd_valid <- case climate { ok(_) => true; fault(_) => false; };
+  humidify_demand <- daylight && demand';
+}
+```
+
+### E20 — Low-VPD ventilation demand
+
+```ghost
+// E20
+fn exp_0_3_1(x: Number) -> Number {
+  1 + x / 1 * (1 + x / 2 * (1 + x / 3 * (1 + x / 4 * (1 + x / 5 * (1 + x / 6 * (1 + x / 7 * (1 + x / 8 * (1 + x / 9 * (1 + x / 10 * (1 + x / 11 * (1 + x / 12 * (1 + x / 13 * (1 + x / 14 * (1))))))))))))))
+}
+fn air_vpd(t: Temperature, rh: RelativeHumidity) -> VaporPressureDeficit {
+  0.6108kPaVPD * exp_0_3_1(
+    17.27 * ((t - 0°C) / 1Δ°C) / (((t - 0°C) / 1Δ°C) + 237.3)
+  ) * (1 - rh / 100%RH)
+}
+control VentilationDemand {
+  sensor air: Temperature {
+    sample = 1s; valid = 0°C .. 50°C;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor humidity: RelativeHumidity {
+    sample = 1s; valid = 0%RH .. 100%RH;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor light: PPFD {
+    sample = 1s; valid = 0umol/m2/s .. 3000umol/m2/s;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  let climate: Result<VaporPressureDeficit, SensorFault> = case air {
+    ok(t) => case humidity {
+      ok(rh) => ok(air_vpd(t, rh));
+      fault(reason) => fault(reason);
+    };
+    fault(reason) => fault(reason);
+  };
+  let daylight = case light {
+    ok(ppfd) => ppfd >= 200umol/m2/s;
+    fault(_) => false;
+  };
+  state demand: Bool = false;
+  demand' = case climate {
+    ok(value) => if value < 0.4kPaVPD then true
+      else if value > 0.6kPaVPD then false else demand;
+    fault(_) => false;
+  };
+  output air_vpd_value: VaporPressureDeficit;
+  output vpd_valid, ventilate_demand: Bool;
+  air_vpd_value <- climate |> recover(0kPaVPD);
+  vpd_valid <- case climate { ok(_) => true; fault(_) => false; };
+  ventilate_demand <- daylight && demand';
+}
+```
+
+### E21 — VPD and light irrigation demand
+
+```ghost
+// E21
+fn exp_0_3_1(x: Number) -> Number {
+  1 + x / 1 * (1 + x / 2 * (1 + x / 3 * (1 + x / 4 * (1 + x / 5 * (1 + x / 6 * (1 + x / 7 * (1 + x / 8 * (1 + x / 9 * (1 + x / 10 * (1 + x / 11 * (1 + x / 12 * (1 + x / 13 * (1 + x / 14 * (1))))))))))))))
+}
+fn air_vpd(t: Temperature, rh: RelativeHumidity) -> VaporPressureDeficit {
+  0.6108kPaVPD * exp_0_3_1(
+    17.27 * ((t - 0°C) / 1Δ°C) / (((t - 0°C) / 1Δ°C) + 237.3)
+  ) * (1 - rh / 100%RH)
+}
+control IrrigationDemand {
+  sensor air: Temperature {
+    sample = 1s; valid = 0°C .. 50°C;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor humidity: RelativeHumidity {
+    sample = 1s; valid = 0%RH .. 100%RH;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor light: PPFD {
+    sample = 1s; valid = 0umol/m2/s .. 3000umol/m2/s;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  let climate: Result<VaporPressureDeficit, SensorFault> = case air {
+    ok(t) => case humidity {
+      ok(rh) => ok(air_vpd(t, rh));
+      fault(reason) => fault(reason);
+    };
+    fault(reason) => fault(reason);
+  };
+  let daylight = case light {
+    ok(ppfd) => ppfd >= 300umol/m2/s;
+    fault(_) => false;
+  };
+  state demand: Bool = false;
+  demand' = case climate {
+    ok(value) => if value > 1.0kPaVPD then true
+      else if value < 0.8kPaVPD then false else demand;
+    fault(_) => false;
+  };
+  output air_vpd_value: VaporPressureDeficit;
+  output vpd_valid, irrigation_demand: Bool;
+  air_vpd_value <- climate |> recover(0kPaVPD);
+  vpd_valid <- case climate { ok(_) => true; fault(_) => false; };
+  irrigation_demand <- daylight && demand';
+}
+```
+
+### E22 — Run two existing VPD controls together through imports
+
+E22 does not copy the E19 or E20 source. It imports complete `.ghost.md`
+documents generated from those two original sections, pinned by exact revision
+and SHA-256. One raw sample packet for `air`, `humidity`, and `light` fans out
+to both instances, while each instance retains its own sensor conditioner and
+`demand` state. The root exposes both demands. Its common VPD observation uses
+the `high` instance's `air_vpd_value` and `vpd_valid`, calculated from the same
+inputs.
+
+```ghost
+// E22
+import HighVpd from "./E19.ghost.md"
+  revision "7e135b93ea4c4988d305f992db277a6d8581a271"
+  sha256 "ef80061222c5c671b8b78d8fae733b543e51149c7e5d2c7d5e2bb2cc41fbdb30";
+import LowVpd from "./E20.ghost.md"
+  revision "7e135b93ea4c4988d305f992db277a6d8581a271"
+  sha256 "bbf57007c5973684660747c515bb2534124d50341647b2282bd2ca32852a724b";
+control CombinedVpdDemands {
+  sensor air: Temperature {
+    sample = 1s; valid = 0°C .. 50°C;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor humidity: RelativeHumidity {
+    sample = 1s; valid = 0%RH .. 100%RH;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor light: PPFD {
+    sample = 1s; valid = 0umol/m2/s .. 3000umol/m2/s;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  output air_vpd_value: VaporPressureDeficit;
+  output vpd_valid, humidify_demand, ventilate_demand: Bool;
+  instance high: HighVpd;
+  instance low: LowVpd;
+  connect high.air <- air;
+  connect high.humidity <- humidity;
+  connect high.light <- light;
+  connect low.air <- air;
+  connect low.humidity <- humidity;
+  connect low.light <- light;
+  connect air_vpd_value <- high.air_vpd_value;
+  connect vpd_valid <- high.vpd_valid;
+  connect humidify_demand <- high.humidify_demand;
+  connect ventilate_demand <- low.ventilate_demand;
+}
+```
+
+### Run, observe and change one input
+
+Compile each E16–E21 fence separately as a complete .ghost.md document, as in E15. Compile E22 with the generated `examples/programming-book-imports` source closure. Run `node --test tests/programming-climate.test.mjs tests/programming-book-simulation.test.mjs tests/programming-book-import-package.test.mjs` for compiler and actual ghostsim/WASM scans; native/WASM artifacts must have matching build provenance. [Verification](VERIFICATION.md) describes the build prerequisites. The test writes disposable scenario artifacts and never drives hardware.
+
+The online reader defaults to a coordinated **24-hour synthetic daily profile**, using the time-dependent sensor source introduced with E10. Temperature, RH and PPFD vary linearly between the following knots and repeat continuously. Temperature never decreases during 06–18; light is exactly zero during 18–06. This is an illustrative input trajectory, not a greenhouse model or actuator feedback. Each declared sample interval supplies new typed sensor evidence; the actual WASM program computes VPD and control demand.
+
+| Simulated hour | Air °C | RH % | PPFD µmol·m⁻²·s⁻¹ | Observe |
+|---|---|---|---|---|
+| 00 | 18 | 90 | 0 | Initial heater OFF; light-gated demands OFF |
+| 03 | 17 | 92 | 0 | Heater ON |
+| 06 | 16 | 94 | 0 | Sunrise; heater ON |
+| 09 | 22 | 85 | 500 | Low-VPD ventilation ON; heater retains ON at exact 22°C |
+| 12 | 28 | 60 | 1000 | Humidification and irrigation demand ON; heater/ventilation OFF |
+| 15 | 31 | 45 | 650 | High-VPD demands remain ON |
+| 18 | 31 | 60 | 0 | Sunset; light-gated demands OFF |
+| 21 | 23 | 80 | 0 | Night cooling; heater still OFF |
+| 24 | 18 | 90 | 0 | Continuous loop boundary; heater turns ON only below 18°C |
+
+Run each example from simulated 00:00. E16–E21 default to 1000× speed and a 24-hour timing chart; compare 09, 12, 15 and 18. Actual wall-clock throughput depends on the computer. Speed changes simulated time per wall-clock time; it does not change thresholds or the daily profile. Pause freezes simulation time. Heater ON at 09 disappears as temperature rises strictly above 22°C. These are independent programs, so no interlock between heater and ventilation is implied. Unit selection changes entry/display units without changing physical values: 17°C = 62.6°F = 290.15K. E16–E18 must make identical decisions across the day.
+
+Constant-value and manual single-packet modes remain useful for individual boundary experiments. They are optional debugging sources, rather than substitutes for observing changing daily decisions.
+
+For Stale, use single-packet mode or stop sample delivery, then advance simulation time to the declared 3s boundary. Repeated constant-source samples are fresh evidence and should not become stale. To demonstrate Disconnected, choose that sample quality; a newly delivered failure remains a failure. Do not simulate disconnection by repeatedly reusing an old Good packet as if it were fresh.
+
+For the heater, observe 18 → 17 → 18 → 22 → 23°C, then a sensor fault and recovery. For each VPD controller, hold temperature at 25°C, change RH to cross its thresholds, and then change only PPFD. Compare requested/safe demand, air_vpd_value and vpd_valid. Try absent, Invalid, Disconnected and stale samples; each relevant fault must inhibit output immediately. Change T/RH together when checking the numerical relation. Do not interpret logical demand, a successful scan or a virtual actuator as a physically confirmed effect.
+
 <a id="appendix-a"></a>
 ## Appendix A. Specification guide
 
@@ -1132,5 +1670,7 @@ Do not directly compare a sensor as if it were its payload. Use `case` or an exp
 
 <a id="appendix-c"></a>
 ## Appendix C. Document maintenance rules
+
+When a learning scenario requests a time-varying environment, its default source must exercise the relevant ON/OFF decisions over time. Keep independent transition checkpoints in the existing book simulation test; constant valid inputs alone cannot verify that intent. Daily-profile checks complement the existing fault and strict-boundary scans.
 
 The Language Reference is normative. For conflicts or missing examples found in this guide, check the relevant Reference section before correcting them. Syntax/semantic changes update Reference syntax, rules, reasons, and examples, then synchronize this guide's learning path and code. Link implementation boundaries needed for learning to evidence documents; maintain changing progress, test counts, artifact hashes, and supported-board lists there. Reuse `tests/docs-runnable-examples.test.mjs` for compiler checks. After book changes, run `npm run generate:pc01` to refresh derived provenance; preserve historical replay and benchmark evidence.
