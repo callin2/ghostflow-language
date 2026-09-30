@@ -214,6 +214,20 @@ where
     }
 }
 
+/// Publisher authentication is strict unless a development host explicitly opts out.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum SignaturePolicy {
+    #[default]
+    Enforce,
+    DevelopmentBypass,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SignatureAuthentication {
+    Authenticated,
+    DevelopmentBypass,
+}
+
 pub struct VerificationProfile<'a> {
     pub trusted_keys: &'a [TrustedKey],
     pub revoked_key_ids: &'a [String],
@@ -239,6 +253,7 @@ pub struct VerifiedPackage {
     pub package_format: &'static str,
     pub payload_sha256: String,
     pub accepted_key_ids: Vec<String>,
+    pub signature_authentication: SignatureAuthentication,
     pub source: VerifiedSource,
     pub manifest: Value,
     pub source_map: Value,
@@ -2178,6 +2193,16 @@ pub fn verify_portable_package(
     transport: &[u8],
     profile: &VerificationProfile<'_>,
 ) -> Result<VerifiedPackage> {
+    verify_portable_package_with_signature_policy(transport, profile, SignaturePolicy::Enforce)
+}
+
+/// Development opt-out affects publisher authentication only. All package,
+/// compatibility and target-loader checks use the same verifier as strict mode.
+pub fn verify_portable_package_with_signature_policy(
+    transport: &[u8],
+    profile: &VerificationProfile<'_>,
+    signature_policy: SignaturePolicy,
+) -> Result<VerifiedPackage> {
     let root = parse_canonical_transport(transport, profile.limits)?;
     let envelope: Envelope = parse_wire(root, "package")?;
     if envelope.format != PACKAGE_FORMAT {
@@ -2187,7 +2212,9 @@ pub fn verify_portable_package(
         );
     }
     require_digest(&envelope.payload_sha256, "package.payloadSha256")?;
-    if envelope.signatures.is_empty() || envelope.signatures.len() > profile.limits.max_signatures {
+    if (signature_policy == SignaturePolicy::Enforce && envelope.signatures.is_empty())
+        || envelope.signatures.len() > profile.limits.max_signatures
+    {
         return fail(
             ErrorCode::SignatureCount,
             "package signatures must contain 1 to the configured maximum",
@@ -2231,7 +2258,23 @@ pub fn verify_portable_package(
     require_profile_identifier(&identity.runtime_abi, "identity.runtimeAbi")?;
     require_profile_identifier(&identity.binding_revision, "identity.bindingRevision")?;
 
-    let accepted_key_ids = verify_signatures(&envelope.signatures, &payload_bytes, profile)?;
+    let accepted_key_ids = match signature_policy {
+        SignaturePolicy::Enforce => {
+            verify_signatures(&envelope.signatures, &payload_bytes, profile)?
+        }
+        SignaturePolicy::DevelopmentBypass => {
+            let mut seen = HashSet::new();
+            for signature in &envelope.signatures {
+                if signature_bytes(signature, &mut seen)?.len() != 64 {
+                    return fail(
+                        ErrorCode::InvalidSchema,
+                        "Ed25519 signature must be 64 bytes",
+                    );
+                }
+            }
+            Vec::new()
+        }
+    };
     require_identifier(
         profile.expected_compiler_revision,
         "expectedCompilerRevision",
@@ -2481,6 +2524,10 @@ pub fn verify_portable_package(
         package_format: PACKAGE_FORMAT,
         payload_sha256: envelope.payload_sha256,
         accepted_key_ids,
+        signature_authentication: match signature_policy {
+            SignaturePolicy::Enforce => SignatureAuthentication::Authenticated,
+            SignaturePolicy::DevelopmentBypass => SignatureAuthentication::DevelopmentBypass,
+        },
         source: VerifiedSource {
             filename: payload.source.filename,
             text: source_text,
@@ -2524,6 +2571,27 @@ fn parse_embedded_canonical_json(
     Ok(value)
 }
 
+fn signature_bytes<'a>(
+    signature: &'a SignatureWire,
+    seen: &mut HashSet<&'a str>,
+) -> Result<Vec<u8>> {
+    if signature.algorithm != "Ed25519" {
+        return fail(
+            ErrorCode::UnsupportedSignatureAlgorithm,
+            "only Ed25519 signatures are supported",
+        );
+    }
+    require_identifier(&signature.key_id, "signatures.keyId")?;
+    if !seen.insert(signature.key_id.as_str()) {
+        return fail(ErrorCode::DuplicateSignature, "duplicate signature key ID");
+    }
+    decode_base64(
+        &signature.signature_base64,
+        "signatures.signatureBase64",
+        256,
+    )
+}
+
 fn verify_signatures(
     signatures: &[SignatureWire],
     payload_bytes: &[u8],
@@ -2559,21 +2627,7 @@ fn verify_signatures(
     let mut accepted = Vec::new();
     let mut saw_revoked = false;
     for signature in signatures {
-        if signature.algorithm != "Ed25519" {
-            return fail(
-                ErrorCode::UnsupportedSignatureAlgorithm,
-                "only Ed25519 signatures are supported",
-            );
-        }
-        require_identifier(&signature.key_id, "signatures.keyId")?;
-        if !seen.insert(signature.key_id.as_str()) {
-            return fail(ErrorCode::DuplicateSignature, "duplicate signature key ID");
-        }
-        let signature_bytes = decode_base64(
-            &signature.signature_base64,
-            "signatures.signatureBase64",
-            256,
-        )?;
+        let signature_bytes = signature_bytes(signature, &mut seen)?;
         if revoked.contains(signature.key_id.as_str()) {
             saw_revoked = true;
             continue;
@@ -2921,6 +2975,201 @@ mod tests {
         assert_eq!(verified.source.filename, "01-latch.ghost.md");
         assert_eq!(verified.accepted_key_ids, vec!["test-current-2026"]);
         assert_eq!(&verified.bytecode_copy()[..4], b"GFB1");
+    }
+
+    #[test]
+    fn development_signature_policy_is_explicit_and_unauthenticated() {
+        let loader = |_bytes: &[u8],
+                      _context: &TargetLoaderContext<'_>|
+         -> std::result::Result<bool, String> { Ok(true) };
+        let mut envelope: Value = serde_json::from_slice(&fixture()).unwrap();
+        envelope["signatures"] = serde_json::json!([]);
+        let bytes = development_test_transport(&envelope);
+        let mut current = profile(&loader);
+        current.trusted_keys = &[];
+        assert_eq!(
+            verify_portable_package(&bytes, &current).unwrap_err().code,
+            ErrorCode::SignatureCount
+        );
+        let admitted = verify_portable_package_with_signature_policy(
+            &bytes,
+            &current,
+            SignaturePolicy::DevelopmentBypass,
+        )
+        .unwrap();
+        assert_eq!(
+            admitted.signature_authentication,
+            SignatureAuthentication::DevelopmentBypass
+        );
+        assert!(admitted.accepted_key_ids.is_empty());
+        let strict = verify_portable_package(&fixture(), &profile(&loader)).unwrap();
+        assert_eq!(
+            strict.signature_authentication,
+            SignatureAuthentication::Authenticated
+        );
+        let untrusted = verify_portable_package_with_signature_policy(
+            &fixture(),
+            &current,
+            SignaturePolicy::DevelopmentBypass,
+        )
+        .unwrap();
+        assert!(untrusted.accepted_key_ids.is_empty());
+        assert_eq!(untrusted.source.sha256, strict.source.sha256);
+        assert_eq!(untrusted.bytecode_copy(), strict.bytecode_copy());
+        envelope["signatures"] = serde_json::json!([{
+            "algorithm": "Ed25519", "keyId": "test-current-2026",
+            "signatureBase64": BASE64.encode([0u8; 64])
+        }]);
+        let bytes = development_test_transport(&envelope);
+        assert_eq!(
+            verify_portable_package(&bytes, &profile(&loader))
+                .unwrap_err()
+                .code,
+            ErrorCode::UntrustedSignature
+        );
+        assert!(verify_portable_package_with_signature_policy(
+            &bytes,
+            &current,
+            SignaturePolicy::DevelopmentBypass
+        )
+        .unwrap()
+        .accepted_key_ids
+        .is_empty());
+    }
+
+    #[test]
+    fn development_bypass_retains_integrity_and_compatibility_checks() {
+        let loader =
+            |_bytes: &[u8],
+             _context: &TargetLoaderContext<'_>|
+             -> std::result::Result<bool, String> { panic!("loader must not run") };
+        let mut envelope: Value = serde_json::from_slice(&fixture()).unwrap();
+        envelope["signatures"] = serde_json::json!([]);
+        envelope["payloadSha256"] = serde_json::json!("0".repeat(64));
+        let bytes = development_test_transport(&envelope);
+        assert_eq!(
+            verify_portable_package_with_signature_policy(
+                &bytes,
+                &profile(&loader),
+                SignaturePolicy::DevelopmentBypass
+            )
+            .unwrap_err()
+            .code,
+            ErrorCode::DigestMismatch
+        );
+        let mut current = profile(&loader);
+        current.expected_binding_revision = "different-binding";
+        assert_eq!(
+            verify_portable_package_with_signature_policy(
+                &fixture(),
+                &current,
+                SignaturePolicy::DevelopmentBypass
+            )
+            .unwrap_err()
+            .code,
+            ErrorCode::BindingRevisionMismatch
+        );
+        current = profile(&loader);
+        current.supported_runtime_abis = &[];
+        assert_eq!(
+            verify_portable_package_with_signature_policy(
+                &fixture(),
+                &current,
+                SignaturePolicy::DevelopmentBypass
+            )
+            .unwrap_err()
+            .code,
+            ErrorCode::InvalidVerifierOptions
+        );
+        for (artifact, expected) in [
+            ("source", ErrorCode::SourceDigestMismatch),
+            ("bytecode", ErrorCode::BytecodeDigestMismatch),
+        ] {
+            let mut envelope: Value = serde_json::from_slice(&fixture()).unwrap();
+            envelope["payload"][artifact]["sha256"] = serde_json::json!("0".repeat(64));
+            envelope["payloadSha256"] = serde_json::json!(sha256_hex(
+                &canonical_json(&envelope["payload"], VerifierLimits::default()).unwrap()
+            ));
+            let bytes = development_test_transport(&envelope);
+            assert_eq!(
+                verify_portable_package_with_signature_policy(
+                    &bytes,
+                    &profile(&loader),
+                    SignaturePolicy::DevelopmentBypass
+                )
+                .unwrap_err()
+                .code,
+                expected
+            );
+        }
+    }
+
+    #[test]
+    fn development_bypass_rejects_malformed_signature_metadata() {
+        let loader =
+            |_bytes: &[u8],
+             _context: &TargetLoaderContext<'_>|
+             -> std::result::Result<bool, String> { panic!("loader must not run") };
+        let base: Value = serde_json::from_slice(&fixture()).unwrap();
+        for (field, value, expected) in [
+            (
+                "algorithm",
+                "other",
+                ErrorCode::UnsupportedSignatureAlgorithm,
+            ),
+            ("signatureBase64", "not base64", ErrorCode::InvalidBase64),
+            ("signatureBase64", "AA==", ErrorCode::InvalidSchema),
+            ("keyId", "", ErrorCode::InvalidIdentity),
+        ] {
+            let mut envelope = base.clone();
+            envelope["signatures"][0][field] = serde_json::json!(value);
+            let bytes = development_test_transport(&envelope);
+            assert_eq!(
+                verify_portable_package_with_signature_policy(
+                    &bytes,
+                    &profile(&loader),
+                    SignaturePolicy::DevelopmentBypass
+                )
+                .unwrap_err()
+                .code,
+                expected
+            );
+        }
+        let mut envelope = base;
+        let signature = envelope["signatures"][0].clone();
+        envelope["signatures"]
+            .as_array_mut()
+            .unwrap()
+            .push(signature);
+        let bytes = development_test_transport(&envelope);
+        assert_eq!(
+            verify_portable_package_with_signature_policy(
+                &bytes,
+                &profile(&loader),
+                SignaturePolicy::DevelopmentBypass
+            )
+            .unwrap_err()
+            .code,
+            ErrorCode::DuplicateSignature
+        );
+        let mut current = profile(&loader);
+        current.limits.max_signatures = 1;
+        assert_eq!(
+            verify_portable_package_with_signature_policy(
+                &bytes,
+                &current,
+                SignaturePolicy::DevelopmentBypass
+            )
+            .unwrap_err()
+            .code,
+            ErrorCode::SignatureCount
+        );
+    }
+
+    fn development_test_transport(envelope: &Value) -> Vec<u8> {
+        let mut bytes = canonical_json(envelope, VerifierLimits::default()).unwrap();
+        bytes.push(b'\n');
+        bytes
     }
 
     #[test]

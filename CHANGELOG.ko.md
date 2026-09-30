@@ -5,6 +5,16 @@
 
 ## 미출시
 
+### 2026-10-01 — 명시적 native 개발 서명 정책
+
+Native portable-package verifier는 발행자 인증에 대한 명시적 개발 우회를 제공한다.
+기존 API는 강제 검증을 유지한다. 서명이 없거나 신뢰하지 않는 package도 동일한
+integrity, compatibility, loader 검사를 통과해야 한다. 우회 결과는
+`DevelopmentBypass`와 빈 accepted key 배열을 명시한다. Device profile을 활성화하거나
+DSL/VM semantics를 바꾸지 않는다. Native package regression은 strict rejection,
+개발 admission, 잘못된 signature metadata, 유지된 payload/source/bytecode/binding
+rejection을 검증한다.
+
 ### 2026-10-01 — bounded 자연 사건 fallback ([#29](https://github.com/callin2/ghostflow-language/issues/29))
 
 Reference §3.4는 Solar/Tide의 `clock = hold_trusted(5min, terminal: skip)`와 Solar의 `fallback = fixed_time(time`06:00`, terminal: skip)`을 허용한다. 이전에는 trusted-only clock과 skip fallback만 받았다. hold는 엄격한 duration 경계에서 만료되며 anchor/uncertainty 부재는 fail closed한다. fallback은 회복과 checkpoint에서도 같은 source-date Solar identity를 소비한다. facts provider가 IANA civil time을 변환하며 모호하거나 존재하지 않는 시간은 skip한다. 확장 정책은 GFB13/control-v12와 Solar GFSF6을 선택한다. 기존 bytes는 그대로이며 이전 pinned runtime은 GFB13을 거부한다. 서명 portable-package GFB11 profile은 좁게 유지한다. 회귀 검증: `natural-fallback-compiler.test.mjs`, `natural-fallback-runtime.test.mjs`, core `solar_tape`. 실행 결과는 별도로 보고하며 물리 Device 검증을 주장하지 않는다.

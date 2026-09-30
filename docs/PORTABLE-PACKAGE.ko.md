@@ -47,6 +47,30 @@ package
 
 ## 검증 순서
 
+### Native 개발 인증 정책
+
+Rust `ghostflow-package`의 `verify_portable_package` API는 항상 발행자 인증을
+강제한다. `SignaturePolicy::default()`는 `Enforce`다. 명시적인 개발 host는
+`verify_portable_package_with_signature_policy`에 `DevelopmentBypass`를 전달할
+수 있다. 동일한 canonical verifier와 target loader를 사용한다. 이 owner
+interface는 Device build profile을 선택하거나 Browser/JavaScript 검증의 우회를
+활성화하지 않는다.
+
+개발 우회는 빈 `signatures` 배열 또는 신뢰하지 않거나 폐기된 발행자의 서명을
+받으며 암호학적 인증을 검사하지 않는다. 배열은 필수이고 `max_signatures` 한도를
+유지한다. 존재하는 항목은 정확한 schema, Ed25519 algorithm, 서로 다른 bounded
+key ID, 64바이트의 canonical base64 encoding을 가져야 한다. 이 모드에서는
+trust roots와 revocation 입력을 사용하지 않으며 가짜 trusted key로 대체하지
+않는다. Canonical transport, payload/artifact hash, size bound, compatibility
+identity, capability, binding, source/bytecode cross-link, target loading은 계속
+필수다. Hash는 byte 일관성을 나타내며 발행자 인증이나 의도를 보증하지 않는다.
+
+결과의 `signature_authentication`은 `Authenticated` 또는 `DevelopmentBypass`다.
+우회 결과의 `accepted_key_ids`는 제공한 서명이 검증될 수 있어도 항상 빈 배열이다.
+Host는 이 비인증 상태를 공개하고 upload, 저장 program의 boot, rollback에 동일한
+정책을 적용해야 한다. Production과 trusted acceptance host는 강제 검증을 유지해야
+한다. 개발 우회는 output authority나 실행 권한을 부여하지 않는다.
+
 `verifyPortablePackage`는 안정적인 `code`가 있는 `PortablePackageError`를 반환하고 다음 검사가 통과할 때까지 바이트코드를 공개하지 않습니다.
 
 1. 정확한 패키지/페이로드 스키마와 지원 버전

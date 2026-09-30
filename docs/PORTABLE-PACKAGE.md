@@ -72,6 +72,32 @@ and must never be configured as a product trust root.
 
 ## Verification order
 
+### Native development authentication policy
+
+The Rust `ghostflow-package` API `verify_portable_package` always enforces
+publisher authentication. `SignaturePolicy::default()` is `Enforce`. An explicit
+development host may call `verify_portable_package_with_signature_policy` with
+`DevelopmentBypass`; it runs the same canonical verifier and target loader.
+This owner interface does not select a Device build profile or enable a bypass
+in Browser/JavaScript verification.
+
+Development bypass accepts an empty `signatures` array or signatures from an
+untrusted/revoked publisher without checking cryptographic authentication.
+The array remains required and bounded by `max_signatures`. Present entries
+must have the exact schema, Ed25519 algorithm, distinct bounded key IDs and
+canonical base64 encoding of 64 bytes. Trust roots and revocation inputs are
+unused in this mode; no fake trusted key is substituted. Canonical transport,
+payload and artifact hashes, size bounds, compatibility identity, capabilities,
+binding, source/bytecode cross-links and target loading remain mandatory.
+Hashes establish byte consistency, not an authenticated publisher or intent.
+
+The result exposes `signature_authentication` as `Authenticated` or
+`DevelopmentBypass`. A bypassed result always has empty `accepted_key_ids`,
+even if a supplied signature would otherwise verify. Hosts must expose that
+unauthenticated status and apply one policy to upload, stored-program boot and
+rollback. Production and trusted acceptance hosts must keep enforcement;
+development opt-out does not grant output authority or authorize execution.
+
 `verifyPortablePackage` returns `PortablePackageError` with a stable `code` and
 does not expose bytecode until these checks pass:
 
