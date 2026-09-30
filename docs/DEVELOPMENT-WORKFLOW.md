@@ -81,6 +81,13 @@ tests or gates to obtain a pass. Reuse previous evidence only when source,
 dependencies, toolchain, configuration and relevant environment inputs match.
 Report each command, exit status, useful counts and any remaining limit.
 
+Before reusing a Node dependency directory, run
+`~/.codex/bin/test-compact -- npm ls --depth=0` from the verified package root.
+A matching lockfile or one successful import does not establish that all pinned
+dependencies are installed. If validation fails, use a worktree-local
+`~/.codex/bin/test-compact -- npm ci --ignore-scripts` before testing. Do not
+repair another worktree's dependency directory implicitly.
+
 For documentation batches, regenerate the index once after the batch, then
 check translations and index freshness:
 
