@@ -2,6 +2,13 @@
   "format": "GhostFlow/document-translations-v1",
   "documents": [
     {
+      "source": "docs/ESTIMATE-EVIDENCE.md",
+      "sourceLanguage": "en",
+      "translation": "docs/ESTIMATE-EVIDENCE.ko.md",
+      "sourceSha256": "b95906697154dfb070cee95e1179ef141cbc4e91a5186eaed1e122b3f0fff65b",
+      "translationSha256": "0530ef684366a737ed89cb3722ab7f6d887e6f902c3dd36fba75dc7392402494"
+    },
+    {
       "source": "AGENTS.md",
       "sourceLanguage": "en",
       "translation": "AGENTS.ko.md",
@@ -117,8 +124,8 @@
       "source": "docs/DEVELOPMENT-WORKFLOW.md",
       "sourceLanguage": "en",
       "translation": "docs/DEVELOPMENT-WORKFLOW.ko.md",
-      "sourceSha256": "39d1a1556b16f51ea0bdd376f1bc3b6b75ad1b1a69bb0f2c3bc53ee4dd31ba6a",
-      "translationSha256": "37848f2b9244f313d13da0ac6cb3273953c9f4534415dc56d868c928df186ce1"
+      "sourceSha256": "b07de952bca53cf6245890f4abffbbb1bcb4610cc8221d6788562d40f5add10a",
+      "translationSha256": "7ecaee9969e683f455eb649926c8ecb805c44f544469dd5be563486c7a5534a2"
     },
     {
       "source": "docs/DOCUMENTATION-LANGUAGES.md",
@@ -306,8 +313,8 @@
       "source": "docs/reference/04-sensors-constraints-control.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/04-sensors-constraints-control.en.md",
-      "sourceSha256": "1cc3be7455c281fc59a5eb4c4c2845622b05d1ee676a53a9cf52363f2fb3d29e",
-      "translationSha256": "c87c7f12827bf86284335e2562d6a571102baab93c37192e59339b7a1719832a"
+      "sourceSha256": "561a01a4bd2a9c39bdeee01657385f283c6025a01bb144d0d447106a5c14b842",
+      "translationSha256": "c0fc5789d648db42cad5673e8ca6f98242ef60947f55467c46b1f59bcba9bc99"
     },
     {
       "source": "docs/reference/05-settings-and-observation.md",
@@ -516,8 +523,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "dd0fbfcda043b619d495461c6b25ad1baa4941efc74a5f8f96a08a35d97c88df",
-      "translationSha256": "d89ac90ea6250cb7bb2e5a8804dab8e0e1787a1384b1e608e1751bce8355fe5e"
+      "sourceSha256": "24d05b48e7f09db28e9ae492a8ac30089fb99b58e663246c9746326b0d1152cf",
+      "translationSha256": "4d7a673052bdd7a4d3e54d489a9b18867c6a54e0625e07b72f23986c8b5bc6d6"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",

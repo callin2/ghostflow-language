@@ -428,6 +428,10 @@ head `b85ef02fb546cd5f957c12ab66f091b90f9484f0`의
 Estimate를 소비하는 실행 지원은 #385에서 별도 compatibility를 정하기 전까지 이 계약의
 범위가 아니다.
 
+[유한한 estimate-basis admission API](../ESTIMATE-EVIDENCE.ko.md)는 유효성,
+출처, 선언된 완전한 history를 구분한다. 승인된 basis는 측정이나 temporal 권한을
+부여하지 않는다. source 선언과 모델 선택은 별도의 compatibility 결정이다.
+
 ## 4.5 선택 sensor와 capability
 
 ```ghost

@@ -322,6 +322,11 @@ Current `sensorSample` lowering marks measured provenance with code `1`; runtime
 This contract does not enable runtime consumption; that requires the separate
 compatibility work in #385.
 
+The [bounded estimate-basis admission API](../ESTIMATE-EVIDENCE.md) keeps validity,
+origin and declared complete history separate. Its admitted basis grants no
+measurement or temporal permission; source declaration and model selection remain
+separate compatibility decisions.
+
 ## 4.5 Optional sensors and capabilities
 
 ```ghost

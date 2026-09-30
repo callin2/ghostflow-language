@@ -5,6 +5,16 @@
 
 ## 미출시
 
+### 2026-10-01 — 유한한 estimate-basis 근거 API ([#398](https://github.com/callin2/ghostflow-language/issues/398))
+
+portable core는 불변 reference와 유한 capacity 아래 명시적인 requested 또는
+acknowledged-write history를 승인한다. native/WASM은 정확한 실행 출처, 원본 receipt
+시간, 선언된 coverage, 알려진/알 수 없는 uncertainty를 보존한다. 잘못된 입력은 원자적으로
+거부한다. gap, context 변경, 실패/불확실 write는 원인과 함께 연속성을 무효화한다.
+근거 API만 추가하며 source syntax, Result/Quality 상태, 수치 모델, temporal 권한은 없다.
+기존 sensor 산술과 measured-only admission은 그대로다. 실행 가능한 추정 선언과 보정 기간
+예제는 parent #385에 남는다.
+
 ### 2026-09-30 — 불변 UTC Range 실행 ([#152](https://github.com/callin2/ghostflow-language/issues/152))
 
 UTC Daily와 비어 있지 않은 정적 DailySlots `range(duration)` control이 GFB12로 실행된다. admission은 반열린 계획 interval의 남은 시간만 사용하며 cancellation은 occurrence를 소비한다. 활성 종료는 wall 보정과 clock trust 상실 중에도 monotonic time을 사용한다. checkpoint 복원은 중복 방지를 유지하지만 활성 timer는 재개하지 않는다. 다른 허용된 Range 변형은 descriptor로 유지한다. compiler, native/WASM/ghostsim parity와 실패 경계 test가 이 제한된 범위를 검증하며 물리 장치 검증을 주장하지 않는다. 이전 bytecode consumer는 새 형식을 명시적으로 거부한다.

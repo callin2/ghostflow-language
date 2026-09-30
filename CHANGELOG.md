@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### 2026-10-01 — bounded estimate-basis evidence API ([#398](https://github.com/callin2/ghostflow-language/issues/398))
+
+The portable core admits explicit requested or acknowledged-write histories under
+an immutable reference and finite capacity. Native/WASM retain exact execution
+origin, original receipt time, declared coverage and known/unknown uncertainty.
+Malformed inputs reject atomically; gaps, changed context and failed/uncertain
+writes invalidate continuity with their cause. This adds an evidence API only:
+no source syntax, Result/Quality status, numerical model or temporal permission.
+Existing sensor arithmetic and measured-only admission remain unchanged. Parent
+#385 still owns executable estimate declarations and calibrated-duration examples.
+
 ### 2026-09-30 — execute immutable UTC Range ([#152](https://github.com/callin2/ghostflow-language/issues/152))
 
 UTC Daily and static nonempty DailySlots `range(duration)` controls now execute as GFB12. Admission uses the remaining half-open planned interval; cancellation consumes the occurrence, and ongoing completion uses monotonic time through wall corrections or clock-trust loss. Checkpoint recovery retains deduplication without resuming an active timer. Other accepted Range variants remain descriptors. Compiler, native/WASM/ghostsim parity and failure-boundary tests cover the bounded slice; no physical device verification is claimed. Older bytecode consumers reject the new format explicitly.

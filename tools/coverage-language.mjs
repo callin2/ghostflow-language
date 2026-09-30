@@ -88,12 +88,14 @@ const TESTS = Object.freeze([
   'tests/natural-schedule-contract.test.mjs', 'tests/solar-schedule.test.mjs',
   'tests/time-literals.test.mjs',
   'tests/true-for-lowering.test.mjs', 'tests/true-for-wasm.test.mjs',
+  'tests/estimate-evidence.test.mjs',
   'tests/verified-wasm-artifact.test.mjs', 'tests/window-wasm.test.mjs',
 ]);
 const TARGETS = Object.freeze([
   'tools/int-settings.mjs',
   'tools/control.mjs', 'tools/gfb1.mjs', 'tools/core-ir.mjs', 'tools/literate.mjs', 'tools/toolchain.mjs',
   'runtimes/wasm/control-runtime.mjs', 'runtimes/wasm/ghostflow-runtime.mjs',
+  'runtimes/wasm/estimate-evidence.mjs',
 ]);
 const EXCLUDED = Object.freeze([{ test: 'tests/requirement-catalog.test.mjs', reason: 'catalog status is a separate requirement-governance gate, not language execution coverage' }]);
 const MINIMUM = Object.freeze({ functions: 100, lines: 88, v8BlockRanges: 77 });

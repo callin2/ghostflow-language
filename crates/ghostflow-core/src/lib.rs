@@ -11,6 +11,7 @@ pub mod context_vm;
 pub mod controller;
 pub mod cron_schedule;
 pub mod daily_slots;
+pub mod estimate_evidence;
 pub mod keyboard;
 pub mod natural_context;
 pub mod objective_vm;
