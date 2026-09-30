@@ -3,11 +3,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { after, test } from 'node:test';
 import { externalOracleCaseIds, frozenCompilerCaseIds, frozenSpecifiedCaseIds, referenceCaseTitle } from '../tools/reference-evidence.mjs';
 import { catalogPath, validateCatalog } from '../contracts/feature-status/validate.mjs';
+import { cliConcurrency, runNodeCli } from './helpers/cli-process.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const referenceDir = path.join(root, 'docs/reference');
@@ -176,29 +176,20 @@ test('Reference catalog: unique cases, valid citations, concrete oracles, every 
 });
 
 function invoke(args) {
-  const result = spawnSync(process.execPath, [path.join(root, 'tools/ghostc.mjs'), ...args], {
-    cwd: root,
-    encoding: 'utf8',
-    timeout: 15_000,
-    maxBuffer: 2 * 1024 * 1024,
+  return runNodeCli([path.join(root, 'tools/ghostc.mjs'), ...args], {
+    cwd: root, timeout: 15_000, maxBuffer: 2 * 1024 * 1024,
   });
-  return {
-    status: result.status,
-    signal: result.signal,
-    stdout: result.stdout ?? '',
-    stderr: result.stderr ?? '',
-    error: result.error?.message ?? null,
-  };
 }
 
 for (const entry of cases) {
-  const title = referenceCaseTitle(entry);
-  if (entry.status !== 'executable') {
-    // The CLI does not execute external oracles. The explicit language gate does.
-    if (!externalOracleIds.has(entry.id)) test(title, { todo: `${entry.status}: ${entry.reason}` });
-    continue;
+  // The CLI does not execute external oracles. The explicit language gate does.
+  if (entry.status !== 'executable' && !externalOracleIds.has(entry.id)) {
+    test(referenceCaseTitle(entry), { todo: `${entry.status}: ${entry.reason}` });
   }
-  test(title, () => {
+}
+
+test('Reference CLI executable cases', { concurrency: cliConcurrency }, async t => {
+  await Promise.all(cases.filter(entry => entry.status === 'executable').map(entry => t.test(referenceCaseTitle(entry), async () => {
     const record = { ...entry, outcome: 'failed', invocations: [] };
     results.push(record);
     const dir = fs.mkdtempSync(path.join(temporaryRoot, 'case-'));
@@ -209,7 +200,7 @@ for (const entry of cases) {
     const sourceFiles = fs.readdirSync(dir).sort();
     try {
       const failures = [];
-      const checked = invoke(['--check', input]);
+      const checked = await invoke(['--check', input]);
       record.invocations.push({ mode: 'check', ...checked });
       try {
         assert.equal(checked.error, null, `${entry.id}: CLI infrastructure error: ${checked.error}`);
@@ -225,7 +216,7 @@ for (const entry of cases) {
         failures.push(`check: ${error.message}`);
       }
       // Check-mode failure must not hide a distinct artifact-publication defect.
-      const built = invoke([input, output]);
+      const built = await invoke([input, output]);
       record.invocations.push({ mode: 'build', ...built });
       try {
         assert.equal(built.error, null, `${entry.id}: CLI infrastructure error: ${built.error}`);
@@ -260,8 +251,8 @@ for (const entry of cases) {
       record.failure = error.message;
       throw error;
     }
-  });
-}
+  })));
+});
 
 after(() => {
   const summary = Object.fromEntries(['passed', 'failed'].map(outcome =>

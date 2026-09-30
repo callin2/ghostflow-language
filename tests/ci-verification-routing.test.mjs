@@ -123,6 +123,19 @@ test('workflow always triggers, routes both lanes, and preserves full verificati
   assert.match(result, /VERIFICATION_NEEDS: \$\{\{ toJSON\(needs\) \}\}/);
   assert.match(result, /node tools\/ci-verification-routing.mjs result/);
   for (const action of workflow.matchAll(/uses: actions\/\S+@(\S+)/g)) assert.match(action[1], /^[0-9a-f]{40}$/);
+  for (const action of workflow.matchAll(/uses: Swatinem\/\S+@(\S+)/g)) assert.match(action[1], /^[0-9a-f]{40}$/);
+  assert.match(verify, /workspaces: source -> target/);
+  assert.match(verify, /key: \$\{\{ matrix.label \}\}/);
+  assert.doesNotMatch(verify, /cache-all-crates: true|cache-workspace-crates: true|cache-directories:|lookup-only: true/);
   const verifier = fs.readFileSync(new URL('../tools/verify-language.mjs', import.meta.url), 'utf8');
   assert.ok(verifier.includes("'tests/ci-verification-routing.test.mjs'"));
+});
+
+test('workflow cancels obsolete heads only within the same PR', () => {
+  const workflow = fs.readFileSync(new URL('../.github/workflows/verified-wasm.yml', import.meta.url), 'utf8');
+  const concurrency = workflow.split('\nconcurrency:\n')[1]?.split('\njobs:\n')[0];
+  assert.ok(concurrency.includes('github.workflow'));
+  assert.ok(concurrency.includes('github.event_name'));
+  assert.ok(concurrency.includes('github.event.pull_request.number || github.run_id'));
+  assert.match(concurrency, /cancel-in-progress: \$\{\{ github.event_name == 'pull_request' \}\}/);
 });
