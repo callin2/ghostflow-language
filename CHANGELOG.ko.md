@@ -5,6 +5,16 @@
 
 ## 미출시
 
+### 2026-10-01 — pause 중 Solar 관측 ([#402](https://github.com/callin2/ghostflow-language/issues/402))
+
+명시적 paused observation은 작성된 program 실행이나 scan 생성 없이 Solar terminal
+identity를 유지한다. 예를 들어 pause 중 관측한 occurrence는 resume/reboot 뒤에도
+소비된 상태다. 이전에는 native observation을 생략하면 resume 때 해당 occurrence가
+실행될 수 있었다. Program-logical time은 멈출 수 있으며 실제 wall/trust는 그대로
+공급한다. 잘못된 관측은 원자적으로 거부한다. `schedule_module`과 pin을 고정한 Device
+adapter regression이 경계를 검증한다. Syntax, GFB/WASM ABI, 일반 lifecycle interface는
+추가하지 않는다.
+
 ### 2026-10-01 — 영속적인 framed Solar admission ([#400](https://github.com/callin2/ghostflow-language/issues/400))
 
 Rust owner API는 이제 GFB5 Solar scan을 frame으로 실행하고 정확한 program의

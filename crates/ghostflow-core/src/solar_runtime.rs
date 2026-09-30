@@ -203,15 +203,7 @@ impl SolarRuntime {
             boot_epoch: activation.boot_epoch,
         })
     }
-    pub(crate) fn stage(
-        &self,
-        descriptors: &[PulseDescriptor],
-        clock: ClockSnapshot<'_>,
-        facts: &[SolarInput<'_>],
-        inputs: &[Value],
-        state: &[Value],
-        trace: &mut ResultTraceBuffer,
-    ) -> Result<StagedSolar> {
+    fn validate_inputs(descriptors: &[PulseDescriptor], facts: &[SolarInput<'_>]) -> Result<()> {
         if facts.len() != descriptors.len()
             || facts
                 .iter()
@@ -228,6 +220,46 @@ impl SolarRuntime {
         {
             return Err(Error::new("solar provider revision exceeds limit"));
         }
+        Ok(())
+    }
+
+    pub(crate) fn observe_paused(
+        &self,
+        descriptors: &[PulseDescriptor],
+        clock: ClockSnapshot<'_>,
+        facts: &[SolarInput<'_>],
+    ) -> Result<Self> {
+        Self::validate_inputs(descriptors, facts)?;
+        if descriptors
+            .iter()
+            .any(|d| !matches!(d, PulseDescriptor::Solar(_)))
+            || facts
+                .iter()
+                .flat_map(|f| f.facts.rows)
+                .any(|r| r.fold != 0 || r.slot_key != 0 || r.minute_of_day != 0)
+        {
+            return Err(Error::new("paused observation requires pure Solar facts"));
+        }
+        let mut staged = self.clone();
+        for (input, engine) in facts.iter().zip(&mut staged.engines) {
+            let stage = engine.begin(clock, input.facts)?.evaluate(false)?;
+            // This suppresses host execution. It does not evaluate the authored
+            // predicate or publish ConditionsFalseAtPulse as program trace.
+            engine.commit(stage)?;
+        }
+        Ok(staged)
+    }
+
+    pub(crate) fn stage(
+        &self,
+        descriptors: &[PulseDescriptor],
+        clock: ClockSnapshot<'_>,
+        facts: &[SolarInput<'_>],
+        inputs: &[Value],
+        state: &[Value],
+        trace: &mut ResultTraceBuffer,
+    ) -> Result<StagedSolar> {
+        Self::validate_inputs(descriptors, facts)?;
         let mut staged = StagedSolar {
             engines: self.engines.clone(),
             projections: Vec::with_capacity(descriptors.len()),

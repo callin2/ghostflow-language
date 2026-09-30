@@ -84,6 +84,16 @@ impl ScanDriver {
         self.runtime.restore_solar_checkpoint(bytes)
     }
 
+    /// Advance only Solar admission while host execution is explicitly paused.
+    /// This does not create a scan or change framed scalar input/clock evidence.
+    pub fn observe_solar_paused(
+        &mut self,
+        clock: ClockSnapshot<'_>,
+        facts: &[crate::solar_runtime::SolarInput<'_>],
+    ) -> Result<()> {
+        self.runtime.observe_solar_paused(clock, facts)
+    }
+
     /// Validates a complete host frame without changing runtime state, inputs,
     /// sequence, clock, journal, or output intents.
     pub fn validate_scan_frame(&self, frame: &ScanFrameV1) -> Result<()> {

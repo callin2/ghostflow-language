@@ -87,6 +87,11 @@ never refresh a historical evidence hash to hide drift. Await successful static
 and focused results before starting full verification. Freeze input files during
 each run; a run started before a correction does not validate the final tree.
 
+For a prerequisite of a named current consumer, pin that consumer to the immutable
+owner candidate and pass its full affected regression suite before owner merge.
+Owner-only tests do not establish consumer lifecycle compatibility. Preserve
+existing consumer oracles and historical evidence.
+
 Before reusing a Node dependency directory, run
 `~/.codex/bin/test-compact -- npm ls --depth=0` from the verified package root.
 A matching lockfile or one successful import does not establish that all pinned
