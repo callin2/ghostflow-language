@@ -9,6 +9,7 @@ import { validateSolarActivation } from './solar-abi.mjs';
 import { encodeContextActivation, encodeContextFacts } from './context-abi.mjs';
 import { QUANTITY_TYPES, canonicalUnitFor, isQuantityType } from '../../tools/quantities.mjs';
 import { TIME_TYPES, isTimeType, validateTimeValue } from '../../tools/time-literals.mjs';
+import { isInt32, intSettingsIssue } from '../../tools/int-settings.mjs';
 
 const FORMAT = 'GhostFlow/control-v1';
 const SETTINGS_FORMAT = 'GhostFlow/control-v2';
@@ -99,7 +100,7 @@ function typedValue(value, valueType, label) {
   if (valueType === 'Bool') {
     if (typeof value !== 'boolean') throw new TypeError(`${label} must be boolean`);
   } else if (valueType === 'Int') {
-    safeInteger(value, label, -2147483648, 2147483647);
+    if (!isInt32(value)) throw new TypeError(`${label} must be a safe integer in [-2147483648, 2147483647]`);
   } else if (valueType === 'Duration') {
     safeInteger(value, label);
   } else if (isTimeType(valueType)) {
@@ -169,18 +170,27 @@ function validateSettings(config, label, { stream = false } = {}) {
     if (config.type === 'Date') typedValue(settings.step, 'Int', `${label}.settings.step`);
     else if (config.type === 'TimeOfDay' || config.type === 'DateTime') typedValue(settings.step, 'Duration', `${label}.settings.step`);
     else typedValue(settings.step, config.type === 'Temperature' ? 'TemperatureDelta' : config.type, `${label}.settings.step`);
-    if (settings.min > settings.max) throw new Error(`${label}.settings range is inverted`);
-    if (settings.step <= 0) throw new Error(`${label}.settings.step must be positive`);
-    const misaligned = config.type === 'Int' || isTimeType(config.type)
-      ? (config.value - settings.min) % settings.step !== 0
-      : Math.abs((config.value - settings.min) / settings.step - Math.round((config.value - settings.min) / settings.step)) > 1e-9;
-    if (misaligned) {
-      throw new Error(`${label}.value is not aligned to settings.step from settings.min`);
+    if (config.type === 'Int') {
+      const issue = intSettingsIssue(config.value, settings);
+      if (issue === 'inverted-range') throw new Error(`${label}.settings range is inverted`);
+      if (issue === 'nonpositive-step') throw new Error(`${label}.settings.step must be positive`);
+      if (issue === 'value-grid') throw new Error(`${label}.value is not aligned to settings.step from settings.min`);
+      if (issue === 'max-grid') throw new Error(`${label}.settings.max is not aligned to settings.step from settings.min`);
+      if (issue === 'value-range') throw new Error(`${label}.value is outside settings range`);
+    } else {
+      if (settings.min > settings.max) throw new Error(`${label}.settings range is inverted`);
+      if (settings.step <= 0) throw new Error(`${label}.settings.step must be positive`);
+      const misaligned = isTimeType(config.type)
+        ? (config.value - settings.min) % settings.step !== 0
+        : Math.abs((config.value - settings.min) / settings.step - Math.round((config.value - settings.min) / settings.step)) > 1e-9;
+      if (misaligned) {
+        throw new Error(`${label}.value is not aligned to settings.step from settings.min`);
+      }
+      if (isTimeType(config.type) && (settings.max - settings.min) % settings.step !== 0) {
+        throw new Error(`${label}.settings.max is not aligned to settings.step from settings.min`);
+      }
+      if (config.value < settings.min || config.value > settings.max) throw new Error(`${label}.value is outside settings range`);
     }
-    if ((config.type === 'Int' || isTimeType(config.type)) && (settings.max - settings.min) % settings.step !== 0) {
-      throw new Error(`${label}.settings.max is not aligned to settings.step from settings.min`);
-    }
-    if (config.value < settings.min || config.value > settings.max) throw new Error(`${label}.value is outside settings range`);
   }
 
   // Compiler-emitted source-literal spans are metadata for candidate generation.

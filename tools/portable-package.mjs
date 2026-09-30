@@ -1,6 +1,7 @@
 import { canonicalJson } from './canonical-json.mjs';
 import { canonicalUnitFor, isQuantityType } from './quantities.mjs';
 import { isTimeType, validateTimeValue } from './time-literals.mjs';
+import { isInt32, intSettingsIssue } from './int-settings.mjs';
 import { compileControl } from './control.mjs';
 import { extractLiterate } from './literate.mjs';
 import { equalBytes } from './sha256.mjs';
@@ -187,7 +188,7 @@ function manifestCapabilityType(type, path) {
 function manifestIntConfig(config, path, stream = false) {
   if (config.type !== 'Int') return;
   const requireInt = (value, field) => {
-    if (!Number.isInteger(value) || value < -2147483648 || value > 2147483647) {
+    if (!isInt32(value)) {
       fail('manifest-mismatch', `${path}.${field} must be a signed i32 Int`);
     }
   };
@@ -203,8 +204,7 @@ function manifestIntConfig(config, path, stream = false) {
   if (settings.label !== undefined && (typeof settings.label !== 'string' || settings.label.length < 1 || settings.label.length > 128)) {
     fail('manifest-mismatch', `${path}.settings.label must be a string of 1 to 128 characters`);
   }
-  if (settings.step <= 0 || settings.min > settings.max || config.value < settings.min || config.value > settings.max
-      || (config.value - settings.min) % settings.step !== 0 || (settings.max - settings.min) % settings.step !== 0) {
+  if (intSettingsIssue(config.value, settings) !== null) {
     fail('manifest-mismatch', `${path}.settings range or grid is invalid for Int`);
   }
 }
