@@ -247,6 +247,79 @@ All windows use only past and present. Simulation does not look ahead at future 
 
 A missed scan creates no observation. The compiler must calculate maximum retained sample count from duration, max_age, sample contract and runtime profile; if it cannot, reject activation. Checkpoint restoration is allowed only after source/time continuity validation; otherwise the result is NotReady.
 
+### Estimated-value provenance and continuity
+
+An estimate is a value produced by an identified model; it is not a sensor
+observation or an applied/confirmed output fact. `Result<T, SensorFault>` expresses
+validity or fault for a declared sensor value. `ok(value)` means the source value
+met its declared validity contract; it does not make a calculation measured or
+physically confirmed. `Estimated` is a conceptual evidence origin. It adds no
+`Result` status, `Quality` variant, or executable syntax.
+
+Interpretation requires the model and calibration-parameter revisions, runtime
+reference identity and how/by whom it was established, source/program and
+installation-binding revisions, run and monotonic time epoch, the source or
+application receipt history used, and the declared basis. Retained references and
+history must fit a finite bound declared by the deployment profile. If that bound
+cannot be supported, reject the use; do not retain unbounded history on an MCU.
+
+The first actuator-progress basis is the Device's acknowledged output-register or
+write history. Its acknowledgement means only that the Driver accepted that
+register/write; it does not prove motor movement or position. Request time may be
+used as a basis only when explicitly declared as requested history. Never
+substitute it for applied history. This follows the requested/safe/applied/
+confirmed distinction in §4.7.
+
+An estimate interval starts from an admissible declared runtime reference and
+qualifying receipt/history. Re-reading or exposing a cached receipt in another
+scan creates neither a new write nor new evidence; it does not reset the
+origin/start, freshness, or uncertainty. An estimate may advance under normal
+monotonic-time evaluation only while verified continuity holds. The complete
+qualifying history is required. Do not interpolate across an unobserved gap, a
+failure, or an uncertain write. If a new write fails, an earlier cached ACK keeps
+its original identity as historical evidence and the current applied-target
+history is uncertain. Do not infer continuing application from that old ACK.
+
+A reboot or change to run/time epoch, source epoch, installation binding,
+model/calibration revision, or runtime reference breaks live-estimate continuity
+unless the owner explicitly validates and re-establishes it. Calibration
+parameters may remain after reboot; a runtime position reference or estimate
+must not be silently restored or set to zero. A missing or unverified basis makes
+the current estimate unavailable/NotReady. Preserve an explicit existing
+source/time fault as that fault; convert neither case to zero or automatic
+fallback. A timer-only policy remains valid when no estimate is available and
+does not need to consume one.
+
+Unknown uncertainty remains unknown. Define no universal formula, confidence,
+numeric uncertainty, duration, or expiry. The selected model/source type must
+declare which estimates it permits and its uncertainty bound. Existing
+`quality: measured`, `hold_last`, and `true_for` measured admission remain
+unchanged; any future estimate-capable consumer must explicitly admit estimated
+evidence and declare a source/type uncertainty bound.
+
+Continuous example: with an explicit runtime reference, matching model,
+calibration and binding, the same run/time epoch, and a gap-free qualifying write
+history within the profile bound, the selected model may produce an estimate. It
+remains an estimate; a Driver ACK alone does not assert movement. Discontinuous
+example: for an applied-history basis, an unacknowledged request, failed or
+uncertain new write, reboot, or identity/revision change makes the live estimate
+unavailable until a reference is validated again. A separately declared
+requested-history basis may use a request as an assumption, but must not label it
+applied history. Keep calibration parameters and prior estimates as history with
+their own identities.
+
+The estimate semantics are tracked in GhostFlow [#383](https://github.com/callin2/ghostflow-language/issues/383);
+follow-on compatibility work is [#385](https://github.com/callin2/ghostflow-language/issues/385).
+Calibration/reference semantics are in [System #132](https://github.com/callin2/farm_studio_system/issues/132)
+and its [architecture contract](https://github.com/callin2/farm_studio_system/blob/241643c125439c1ec141c8596feec3f4ad143ade/docs/architecture/INPUT-DRIVER-ARCHITECTURE.md#calibration-parameters-and-position-reference--system-132).
+The concrete Device output-receipt boundary is in draft [PR #107](https://github.com/callin2/farm-device/pull/107),
+head `b85ef02fb546cd5f957c12ab66f091b90f9484f0`, at
+[host observation](https://github.com/callin2/farm-device/blob/b85ef02fb546cd5f957c12ab66f091b90f9484f0/rust/firmware/src/host_observation.rs).
+The current lowering of `quality: measured` (code `1`) and runtime
+`Measured`/`Held`/`Constructed` classifications do not represent `Estimated`.
+This contract does not enable runtime consumption; that requires the separate
+compatibility work in #385.
+
 ## 4.5 Optional sensors and capabilities
 
 ```ghost
