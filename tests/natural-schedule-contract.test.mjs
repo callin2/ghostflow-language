@@ -85,7 +85,7 @@ for (const id of ['REF-03-042', 'REF-03-060']) {
     ['Bool fallback', 'fallback = false;', /fallback must be skip/],
     ['Duration fallback', 'fallback = 5min;', /fallback must be skip/],
     ['self-dependent fallback', id === 'REF-03-042' ? 'fallback = dawn.due;' : 'fallback = high.active;', /fallback must be skip/],
-    ['unsupported nested fallback', 'fallback = fixed_time(time`06:00`);', /fallback must be skip/],
+    ['fallback without required terminal', 'fallback = fixed_time(time`06:00`);', id === 'REF-03-042' ? /terminal.*skip/ : /fallback must be skip/],
   ]) {
     test(`${id}: public compilation rejects ${label} at its authored location`, async () => {
       const entry = fixture(id);

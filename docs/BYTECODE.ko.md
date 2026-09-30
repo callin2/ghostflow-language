@@ -3,6 +3,12 @@
 
 # GFB 바이트코드
 
+## Bounded 자연 정책 (GFB13)
+
+확장 Solar/Tide 정책만 GFB13과 `GhostFlow/control-v12`를 선택하며 기존 profile bytes는 그대로다. Solar tag 1은 기존 layout을 유지하고 `when` expression 뒤에 `holdMs:u64` (0은 없음), `fallbackAtMs:u64` (86400000은 skip)을 추가한다. Context record는 cancellation expression 뒤에 `holdMs:u64`를 추가한다. Manifest 정책은 clock `{kind: 'hold_trusted', durationMs, terminal: 'skip'}`, fallback `{kind: 'fixed_time', atMs, terminal: 'skip'}` 객체다.
+
+확장 Solar facts는 GFSF6을 사용한다. Solar v1 row layout을 유지하고 provider/context string 뒤에 optional `fallbackWallMs`, `unavailableReason:u8` (255는 없음, 0–5는 natural-context reason code)을 추가한다. 기존 v1 packet과 WASM 함수 이름은 그대로다. 이전 pinned runtime은 activation 전에 GFB13을 거부한다. 서명 portable-package의 config-only GFB11 profile은 좁은 범위를 유지한다. 이 형식은 물리 Device 증거가 아니다.
+
 모든 정수는 리틀엔디안이다. 문자열은 `u16 length` 뒤에 UTF-8 바이트가 온다.
 값은 제한된 후위 스택을 사용하고 조건식은 정방향 분기를 사용한다. 공개 컴파일은
 정확한 표준 `.ghost.md` 문서 전체를 입력으로 받는다. `tools/gfb1.mjs`의 S-expression

@@ -221,6 +221,8 @@ fn corrected_occurrence_before_trusted_high_water_is_missed_once() {
 fn incomplete_or_malformed_provider_facts_fail_closed_before_staging() {
     let mut engine = SolarPulseEngine::new(41, 100, 7, 4).unwrap();
     let malformed = [SolarFact {
+        fallback_wall_ms: None,
+        unavailable_reason: None,
         source_day: 3,
         slot_key: 0,
         minute_of_day: 0,

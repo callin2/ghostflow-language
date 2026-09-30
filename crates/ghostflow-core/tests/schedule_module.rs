@@ -1231,6 +1231,8 @@ fn slot_fact(
     scheduled_wall_ms: u64,
 ) -> ghostflow_core::solar_admission::SolarFact {
     ghostflow_core::solar_admission::SolarFact {
+        fallback_wall_ms: None,
+        unavailable_reason: None,
         source_day,
         slot_key,
         minute_of_day,

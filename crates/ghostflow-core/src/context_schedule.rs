@@ -438,7 +438,8 @@ impl Engine {
                 None
             },
         )?;
-        let observed = staged.clock.poll(clock)?;
+        let policy = staged.clock.poll_with_hold(clock, desc.clock_hold_ms)?;
+        let observed = policy.observation;
         let mut decision = Decision::default();
         match &desc.definition {
             ScheduleDefinition::UtcRange { .. } => unreachable!("Range staged before pulse clock"),
@@ -570,6 +571,38 @@ impl Engine {
                     cancel,
                     &mut decision,
                 )?;
+            }
+        }
+        if matches!(desc.definition, ScheduleDefinition::TideRun { .. }) {
+            let held = match &policy.provenance {
+                crate::schedule_clock::ClockProvenance::HeldClock { source_revision } => {
+                    Some(source_revision.clone())
+                }
+                _ => None,
+            };
+            if held.is_some() || observed.current_effective_wall_ms.is_none() {
+                let mut evidence = Observation {
+                    clock_provenance: None,
+                    clock_source_revision: None,
+                    clock_uncertainty_ms: observed.uncertainty_ms,
+                    unknown_reason: observed.unknown_reason.map(str::to_owned),
+                    site: desc.site,
+                    occurrence_id: String::new(),
+                    planned_ms: observed.current_effective_wall_ms,
+                    decision: if held.is_some() {
+                        "HeldClock"
+                    } else {
+                        "Unknown(ClockUnknown)"
+                    }
+                    .into(),
+                    provider_revision: String::new(),
+                    context_revision: String::new(),
+                };
+                if let Some(revision) = held {
+                    evidence.clock_provenance = Some("HeldClock".into());
+                    evidence.clock_source_revision = revision;
+                }
+                decision.observations.push(evidence);
             }
         }
         Ok((staged, decision))
@@ -717,6 +750,10 @@ impl Engine {
                 "Cancelled"
             };
             out.observations.push(Observation {
+                clock_provenance: None,
+                clock_source_revision: None,
+                clock_uncertainty_ms: None,
+                unknown_reason: None,
                 site,
                 occurrence_id: key.clone(),
                 planned_ms: Some(fact.planned_wall_ms),
@@ -737,6 +774,10 @@ impl Engine {
                     .or(previous_active.as_ref())
                     .ok_or_else(|| invalid("missing active Range plan"))?;
                 out.observations.push(Observation {
+                    clock_provenance: None,
+                    clock_source_revision: None,
+                    clock_uncertainty_ms: None,
+                    unknown_reason: None,
                     site,
                     occurrence_id: key.clone(),
                     planned_ms: Some(fact.planned_wall_ms),
@@ -765,6 +806,10 @@ impl Engine {
                     })
                 });
             out.observations.push(Observation {
+                clock_provenance: None,
+                clock_source_revision: None,
+                clock_uncertainty_ms: None,
+                unknown_reason: None,
                 site,
                 occurrence_id: fact.map_or_else(String::new, |fact| fact.occurrence_key.clone()),
                 planned_ms: fact.map(|fact| fact.planned_wall_ms),
@@ -774,6 +819,10 @@ impl Engine {
             });
         } else if result.decision == RangeDecision::ClockUnknown && out.observations.is_empty() {
             out.observations.push(Observation {
+                clock_provenance: None,
+                clock_source_revision: None,
+                clock_uncertainty_ms: None,
+                unknown_reason: None,
                 site,
                 occurrence_id: String::new(),
                 planned_ms: None,
@@ -789,6 +838,10 @@ impl Engine {
                 })
             });
             out.observations.push(Observation {
+                clock_provenance: None,
+                clock_source_revision: None,
+                clock_uncertainty_ms: None,
+                unknown_reason: None,
                 site,
                 occurrence_id: fact.map_or_else(String::new, |fact| fact.occurrence_key.clone()),
                 planned_ms: fact.map(|fact| fact.planned_wall_ms),
@@ -810,11 +863,15 @@ impl Engine {
     ) -> Result<(Self, Decision)> {
         Self::validate_rows(desc, facts)?;
         let mut staged = self.clone();
-        staged.clock.poll(clock)?;
+        staged.clock.poll_with_hold(clock, desc.clock_hold_ms)?;
         Ok((
             staged,
             Decision {
                 observations: vec![crate::context_vm::Observation {
+                    clock_provenance: None,
+                    clock_source_revision: None,
+                    clock_uncertainty_ms: None,
+                    unknown_reason: None,
                     site: desc.site,
                     occurrence_id: String::new(),
                     planned_ms: None,
@@ -950,6 +1007,10 @@ impl Engine {
             self.terminalize(&id)?;
             out.missed = true;
             out.observations.push(Observation {
+                clock_provenance: None,
+                clock_source_revision: None,
+                clock_uncertainty_ms: None,
+                unknown_reason: None,
                 site,
                 occurrence_id: id,
                 planned_ms: Some(planned),
@@ -1032,6 +1093,10 @@ impl Engine {
             out.due |= outcome == "Due";
             out.missed |= outcome != "Due";
             out.observations.push(Observation {
+                clock_provenance: None,
+                clock_source_revision: None,
+                clock_uncertainty_ms: None,
+                unknown_reason: None,
                 site,
                 occurrence_id: id,
                 planned_ms: Some(planned),
@@ -1085,6 +1150,10 @@ impl Engine {
                 if let Some(fault) = id.strip_prefix('?') {
                     let reason = fault.split(':').next().unwrap_or("CalendarMissing");
                     out.observations.push(Observation {
+                        clock_provenance: None,
+                        clock_source_revision: None,
+                        clock_uncertainty_ms: None,
+                        unknown_reason: None,
                         site,
                         occurrence_id: format!("{site}:calendar"),
                         planned_ms: Some(planned),
@@ -1101,6 +1170,10 @@ impl Engine {
                     if !self.terminal.contains(ineligible) {
                         self.terminalize(ineligible)?;
                         out.observations.push(Observation {
+                            clock_provenance: None,
+                            clock_source_revision: None,
+                            clock_uncertainty_ms: None,
+                            unknown_reason: None,
                             site,
                             occurrence_id: ineligible.into(),
                             planned_ms: Some(planned),
@@ -1137,6 +1210,10 @@ impl Engine {
             out.due |= outcome == "Due";
             out.missed |= outcome != "Due";
             out.observations.push(Observation {
+                clock_provenance: None,
+                clock_source_revision: None,
+                clock_uncertainty_ms: None,
+                unknown_reason: None,
                 site,
                 occurrence_id: id,
                 planned_ms: Some(planned),
@@ -1179,6 +1256,10 @@ impl Engine {
             if cancel || monotonic >= active.end_monotonic_ms {
                 self.active_run = None;
                 out.observations.push(Observation {
+                    clock_provenance: None,
+                    clock_source_revision: None,
+                    clock_uncertainty_ms: None,
+                    unknown_reason: None,
                     site,
                     occurrence_id: active.id,
                     planned_ms: Some(active.planned_ms),
@@ -1193,6 +1274,10 @@ impl Engine {
             } else {
                 out.active = true;
                 out.observations.push(Observation {
+                    clock_provenance: None,
+                    clock_source_revision: None,
+                    clock_uncertainty_ms: None,
+                    unknown_reason: None,
                     site,
                     occurrence_id: active.id,
                     planned_ms: Some(active.planned_ms),
@@ -1209,6 +1294,10 @@ impl Engine {
         if previous < facts.coverage_start_ms || now >= facts.coverage_end_ms {
             self.end_pending(site, "IncompleteCoverage", out)?;
             out.observations.push(Observation {
+                clock_provenance: None,
+                clock_source_revision: None,
+                clock_uncertainty_ms: None,
+                unknown_reason: None,
                 site,
                 occurrence_id: format!("{site}:coverage"),
                 planned_ms: None,
@@ -1221,6 +1310,10 @@ impl Engine {
         let Some(observation) = facts.provider.as_ref() else {
             self.end_pending(site, "PredictionMissing", out)?;
             out.observations.push(Observation {
+                clock_provenance: None,
+                clock_source_revision: None,
+                clock_uncertainty_ms: None,
+                unknown_reason: None,
                 site,
                 occurrence_id: format!("{site}:provider"),
                 planned_ms: None,
@@ -1240,6 +1333,10 @@ impl Engine {
         {
             self.end_pending(site, "PredictionStale", out)?;
             out.observations.push(Observation {
+                clock_provenance: None,
+                clock_source_revision: None,
+                clock_uncertainty_ms: None,
+                unknown_reason: None,
                 site,
                 occurrence_id: format!("{site}:provider"),
                 planned_ms: None,
@@ -1264,6 +1361,10 @@ impl Engine {
                     self.terminalize(&id)?;
                     out.missed = true;
                     out.observations.push(Observation {
+                        clock_provenance: None,
+                        clock_source_revision: None,
+                        clock_uncertainty_ms: None,
+                        unknown_reason: None,
                         site,
                         occurrence_id: id,
                         planned_ms: None,
@@ -1302,6 +1403,10 @@ impl Engine {
                     self.terminalize(&id)?;
                     out.missed = true;
                     out.observations.push(Observation {
+                        clock_provenance: None,
+                        clock_source_revision: None,
+                        clock_uncertainty_ms: None,
+                        unknown_reason: None,
                         site,
                         occurrence_id: id,
                         planned_ms: Some(planned),
@@ -1316,6 +1421,10 @@ impl Engine {
                 self.terminalize(&id)?;
                 out.missed = true;
                 out.observations.push(Observation {
+                    clock_provenance: None,
+                    clock_source_revision: None,
+                    clock_uncertainty_ms: None,
+                    unknown_reason: None,
                     site,
                     occurrence_id: id,
                     planned_ms: Some(planned),
@@ -1333,6 +1442,10 @@ impl Engine {
                 self.terminalize(&id)?;
                 out.missed = true;
                 out.observations.push(Observation {
+                    clock_provenance: None,
+                    clock_source_revision: None,
+                    clock_uncertainty_ms: None,
+                    unknown_reason: None,
                     site,
                     occurrence_id: id,
                     planned_ms: Some(planned),
@@ -1346,6 +1459,10 @@ impl Engine {
                 self.terminalize(&id)?;
                 out.missed = true;
                 out.observations.push(Observation {
+                    clock_provenance: None,
+                    clock_source_revision: None,
+                    clock_uncertainty_ms: None,
+                    unknown_reason: None,
                     site,
                     occurrence_id: id,
                     planned_ms: Some(planned),
@@ -1369,6 +1486,10 @@ impl Engine {
                 self.terminalize(&id)?;
                 out.missed = true;
                 out.observations.push(Observation {
+                    clock_provenance: None,
+                    clock_source_revision: None,
+                    clock_uncertainty_ms: None,
+                    unknown_reason: None,
                     site,
                     occurrence_id: id,
                     planned_ms: Some(planned),
@@ -1382,6 +1503,10 @@ impl Engine {
                 self.pending_grace.remove(&id);
                 self.terminalize(&id)?;
                 out.observations.push(Observation {
+                    clock_provenance: None,
+                    clock_source_revision: None,
+                    clock_uncertainty_ms: None,
+                    unknown_reason: None,
                     site,
                     occurrence_id: id,
                     planned_ms: Some(planned),
@@ -1405,6 +1530,10 @@ impl Engine {
                     context_revision: row.context_revision.clone(),
                 });
                 out.observations.push(Observation {
+                    clock_provenance: None,
+                    clock_source_revision: None,
+                    clock_uncertainty_ms: None,
+                    unknown_reason: None,
                     site,
                     occurrence_id: id,
                     planned_ms: Some(planned),
@@ -1452,6 +1581,7 @@ mod tests {
 
     fn range_desc(starts: Vec<u64>, duration: u64) -> ScheduleDescriptor {
         ScheduleDescriptor {
+            clock_hold_ms: None,
             site: 7,
             name: "planned".into(),
             gap_ms: 100,
@@ -1756,6 +1886,7 @@ mod tests {
     }
     fn periodic(editable: bool) -> ScheduleDescriptor {
         ScheduleDescriptor {
+            clock_hold_ms: None,
             site: 1,
             name: "cycle".into(),
             gap_ms: 10_000,
@@ -1921,6 +2052,7 @@ mod tests {
     #[test]
     fn tide_cancel_wins_first_admissible_tick_and_never_rearms() {
         let desc = ScheduleDescriptor {
+            clock_hold_ms: None,
             site: 2,
             name: "tide".into(),
             gap_ms: 10_000,
@@ -2064,6 +2196,69 @@ mod tests {
         assert!(!completed.active);
         assert_eq!(completed.observations[0].decision, "RunEnded");
         assert_eq!(completed.observations[0].planned_ms, Some(1_000));
+        let held_desc = ScheduleDescriptor {
+            clock_hold_ms: Some(200),
+            ..desc.clone()
+        };
+        let held_engine = Engine::new(&held_desc, 1, 8).unwrap();
+        let (held_baseline, _) = held_engine
+            .stage(&held_desc, clock(900), &evidence, true, false, None, 0)
+            .unwrap();
+        let unknown_clock = |at| ClockSnapshot {
+            trust: ClockTrust::Unknown("TrustExpired"),
+            wall_ms: None,
+            ..clock(at)
+        };
+        let (held_run, held_due) = held_baseline
+            .stage(
+                &held_desc,
+                unknown_clock(1_000),
+                &evidence,
+                true,
+                false,
+                None,
+                0,
+            )
+            .unwrap();
+        assert!(held_due.due && held_due.active);
+        let held_trace = held_due
+            .observations
+            .iter()
+            .find(|row| row.decision == "HeldClock")
+            .unwrap();
+        assert_eq!(held_trace.clock_source_revision.as_deref(), Some("clock-1"));
+        assert_eq!(held_trace.unknown_reason.as_deref(), Some("TrustExpired"));
+        let (expired_run, expired_decision) = held_run
+            .stage(
+                &held_desc,
+                unknown_clock(1_100),
+                &evidence,
+                true,
+                false,
+                None,
+                0,
+            )
+            .unwrap();
+        assert!(expired_decision.active && !expired_decision.due);
+        let (_, ended) = expired_run
+            .stage(
+                &held_desc,
+                unknown_clock(1_600),
+                &evidence,
+                true,
+                false,
+                None,
+                0,
+            )
+            .unwrap();
+        assert!(!ended.active && !ended.due);
+        assert!(ended
+            .observations
+            .iter()
+            .any(|row| row.decision == "RunEnded"));
+        let saved = held_run.snapshot().unwrap();
+        let restarted = Engine::restore(&held_desc, 2, 8, &saved).unwrap();
+        assert!(restarted.active_run.is_none());
         let (_, cancelled_run) = admitted
             .stage(&desc, clock(1_100), &withdrawn, true, true, None, 0)
             .unwrap();
@@ -2089,6 +2284,7 @@ mod tests {
     #[test]
     fn cron_wrong_source_and_duplicate_rows_reject_at_boot_baseline() {
         let desc = ScheduleDescriptor {
+            clock_hold_ms: None,
             site: 3,
             name: "morning".into(),
             gap_ms: 10_000,
@@ -2135,6 +2331,7 @@ mod tests {
     #[test]
     fn timeslots_live_edit_uses_opaque_keys_and_restores_effective_setting() {
         let desc = ScheduleDescriptor {
+            clock_hold_ms: None,
             site: 4,
             name: "starts".into(),
             gap_ms: 10_000,
