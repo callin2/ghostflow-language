@@ -5,6 +5,19 @@
 
 ## 미출시
 
+### 2026-09-30 ? 검증된 중복 제약 대체 ([#31](https://github.com/callin2/ghostflow-language/issues/31))
+
+컴파일은 독립적인 bounded effect 검증 후 인접한 동일 순서의 Bool 출력 제약을
+병합할 수 있다. 예를 들어 연속된 두 `require pump => valve;` 선언은 하나의
+실행 검사와 두 원본 출처를 유지한다. 변환된 source map과 결합된 관찰은 host v2
+형식을 사용한다. 제거된 검사는 검증된 파생 대체 근거를 가지며 실행된 것으로
+보고하지 않는다. 기존 lowering은 미증명 상태를 유지한다. 이 한정된 조각 밖의
+프로그램은 원래 경로를 유지한다. GFB 명령, native/WASM ABI와 원본 문법은
+바뀌지 않는다. 이전 host metadata consumer는 v2를 거부하며, 해당 package는
+replay를 우회하지 않고 canonical source에서 다시 빌드해야 한다.
+[대체 계약](docs/CHECKED-CONSTRAINT-REPLACEMENTS.md)과 compiler, proof 변조,
+source recovery, native/WASM parity 회귀를 참조한다.
+
 ### 2026-10-01 — 명시적 native 개발 서명 정책
 
 Native portable-package verifier는 발행자 인증에 대한 명시적 개발 우회를 제공한다.

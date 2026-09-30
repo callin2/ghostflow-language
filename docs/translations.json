@@ -2,6 +2,13 @@
   "format": "GhostFlow/document-translations-v1",
   "documents": [
     {
+      "source": "docs/CHECKED-CONSTRAINT-REPLACEMENTS.md",
+      "sourceLanguage": "en",
+      "translation": "docs/CHECKED-CONSTRAINT-REPLACEMENTS.ko.md",
+      "sourceSha256": "adb86455ffcf58d9d72526a1ff378f6286a187e8321c4caf2fd317dfe5c3d23d",
+      "translationSha256": "bb0b2aa02f17ef8a72335f8ecc4fc30532ffdf51caabc1d415434243518a368a"
+    },
+    {
       "source": "docs/OPTIMIZER-PASS-CONTRACT.md",
       "sourceLanguage": "en",
       "translation": "docs/OPTIMIZER-PASS-CONTRACT.ko.md",
@@ -544,8 +551,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "460e19113139380e86a2f4b24d5cecc75908542278ae238422ed4e911932e863",
-      "translationSha256": "8f22ffd05ed5b542dc790b62cf63a2941f27a6cd1ce145baa4850a377c177325"
+      "sourceSha256": "89b47012070f4504ea457a59f41062fc1829d34dce6f45b685074f3aea7e6f3f",
+      "translationSha256": "f8e45b19d375de518ede480ded0bdd5d1c1355158f09027d64e6a98003659a91"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",

@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### 2026-09-30 ? checked duplicate constraint replacement ([#31](https://github.com/callin2/ghostflow-language/issues/31))
+
+Compilation can merge adjacent identical ordered Bool output constraints after
+independent bounded effect verification. For example, two consecutive
+`require pump => valve;` declarations retain one executable check and both source
+origins. The transformed source map and joined observations use host v2 formats;
+the removed check has certified derived replacement evidence and is never reported
+as executed. Existing lowering remains unproven. Programs outside this bounded
+slice keep their original path. GFB instructions, native/WASM ABI and source
+grammar remain unchanged; older host metadata consumers reject v2, and affected
+packages must be rebuilt from canonical source rather than bypassing replay.
+See [the replacement contract](docs/CHECKED-CONSTRAINT-REPLACEMENTS.md) and its
+compiler, proof-tampering, source recovery and native/WASM parity regressions.
+
 ### 2026-10-01 — explicit native development signature policy
 
 The native portable-package verifier offers an explicit development opt-out for

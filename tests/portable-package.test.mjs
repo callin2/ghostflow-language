@@ -200,6 +200,32 @@ test('GF-TEST-portable-package-derivations: signed records cannot lose origins o
   }
 });
 
+test('GF-TEST-portable-package-constraint-proof: checked eliminated origins survive signing and re-signed tampering fails', async () => {
+  const source = '```ghost\ncontrol ProofPackage { input start, stop: Bool; output pump, valve: Bool; pump <- start; valve <- stop; require pump => valve; require pump => valve; }\n```';
+  const compilation = await compileSource(source, { filename: 'proof-package.ghost.md' });
+  const current = await currentKeyPromise;
+  const packageValue = await buildPortablePackage(compilation, identity, buildOptions([{ keyId: current.keyId, privateKey: current.privateKey }]));
+  const verified = await verifyPortablePackage(packageValue, verifierOptions(current));
+  assert.equal(compilation.traceMetadata.format, 'GhostFlow/source-trace-v2');
+  assert.ok(verified);
+  for (const mutate of [m => delete m.constraintProof,
+    m => m.constraintProof.sourceToCompiled[1] = 1,
+    m => m.constraintProof.status = 'unverified',
+    m => m.constraintProof.certificateSha256 = '0'.repeat(64),
+    m => m.constraints.pop(),
+    m => m.derivations[1].originNodeIds.pop(),
+    m => m.format = 'GhostFlow/source-trace-v1']) {
+    const candidate = clone(packageValue);
+    const map = JSON.parse(Buffer.from(candidate.payload.sourceMap.contentBase64, 'base64').toString('utf8'));
+    mutate(map.traceMetadata);
+    const bytes = encoder.encode(canonicalJson(map));
+    candidate.payload.sourceMap.contentBase64 = base64(bytes);
+    candidate.payload.sourceMap.sha256 = await digestHex(bytes);
+    await resign(candidate, current);
+    await expectsCode(() => verifyPortablePackage(candidate, verifierOptions(current)), 'source-map-mismatch');
+  }
+});
+
 test('GF-TEST-portable-package-trust: key rotation accepts a new active signer and rejects a solely revoked signer', async () => {
   const { compilation, current } = await fixture();
   const next = await nextKeyPromise;

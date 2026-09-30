@@ -7,6 +7,7 @@
  */
 import { compile as compileGfb, CompileError } from './gfb1.mjs';
 import { buildSourceTrace } from './source-trace.mjs';
+import { checkedAdjacentConstraints } from './constraint-proof.mjs';
 import { QUANTITY_TYPES, canonicalUnitFor, isQuantityType, quantityLiteral, quantitySuffixAt } from './quantities.mjs';
 import { TIME_TYPES, isTimeType, parseTimeLiteral, validateTimeValue } from './time-literals.mjs';
 
@@ -1548,8 +1549,9 @@ class Lowerer {
           ...solarForms, ...contextForms, ...strategy.intents.map(([name, expression]) => ['intent', name, expression]),
       ])
       : [['strategy', 'control', '0', ['device', deviceQuery], ...windows, ...solarForms, ...contextForms, ...this.trueForForms(), ...transitions, ...intents]];
+    const constraintProof = checkedAdjacentConstraints(this.constraints);
     const module = ['module', this.ast.name, ['version', '1'], ...this.gfbInputs, ...this.gfbStates, ...temporalForms,
-      ...strategyForms, ...this.constraints,
+      ...strategyForms, ...(constraintProof?.compiled ?? this.constraints),
       ...[...this.objectives.values()].filter(objective => objective.binding === 'native-temperature-percent-v1').map(objective => [
         'pid-objective', objective.name, objective.bindings.output, objective.bindings.measure,
         objective.bindings.measureOk, objective.bindings.target, objective.bindings.safeMax,
@@ -1598,7 +1600,7 @@ class Lowerer {
             origin: window.source.originTag, quality: window.sample.quality, sourceTag: window.sample.sourceTag,
           },
           origins: window.source.origins ?? [],
-        }))),
+        })), constraintProof),
     };
   }
   unique(name, loc, category) {

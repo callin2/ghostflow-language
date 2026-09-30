@@ -21,6 +21,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/BEHAVIOR-COMPOSITION-RESEARCH.md](BEHAVIOR-COMPOSITION-RESEARCH.md) | Behavior composition: research and architecture review | md |
 | [docs/BYTECODE.ko.md](BYTECODE.ko.md) | GFB 바이트코드 | md |
 | [docs/BYTECODE.md](BYTECODE.md) | GFB bytecode | md |
+| [docs/CHECKED-CONSTRAINT-REPLACEMENTS.ko.md](CHECKED-CONSTRAINT-REPLACEMENTS.ko.md) | 검증된 제약 대체 | md |
+| [docs/CHECKED-CONSTRAINT-REPLACEMENTS.md](CHECKED-CONSTRAINT-REPLACEMENTS.md) | Checked constraint replacements | md |
 | [docs/COMPILER-DIAGNOSTICS.ko.md](COMPILER-DIAGNOSTICS.ko.md) | 공개 컴파일러 진단 | md |
 | [docs/COMPILER-DIAGNOSTICS.md](COMPILER-DIAGNOSTICS.md) | Public compiler diagnostics | md |
 | [docs/CONSTRAINTS.en.md](CONSTRAINTS.en.md) | GhostFlow common constraints and sensor signal contract | md |
@@ -202,4 +204,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.ko.md](research/GF-COMPOSE-R9-ACCEPTANCE.ko.md) | GF-COMPOSE R9: acceptance와 구현 인계 | md |
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.md](research/GF-COMPOSE-R9-ACCEPTANCE.md) | GF-COMPOSE R9: acceptance and implementation handoff | md |
 
-168 documents.
+170 documents.

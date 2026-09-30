@@ -69,6 +69,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/BEHAVIOR-COMPOSITION-RESEARCH.md](docs/BEHAVIOR-COMPOSITION-RESEARCH.md) | Behavior composition: research and architecture review | md |
 | [docs/BYTECODE.ko.md](docs/BYTECODE.ko.md) | GFB 바이트코드 | md |
 | [docs/BYTECODE.md](docs/BYTECODE.md) | GFB bytecode | md |
+| [docs/CHECKED-CONSTRAINT-REPLACEMENTS.ko.md](docs/CHECKED-CONSTRAINT-REPLACEMENTS.ko.md) | 검증된 제약 대체 | md |
+| [docs/CHECKED-CONSTRAINT-REPLACEMENTS.md](docs/CHECKED-CONSTRAINT-REPLACEMENTS.md) | Checked constraint replacements | md |
 | [docs/COMPILER-DIAGNOSTICS.ko.md](docs/COMPILER-DIAGNOSTICS.ko.md) | 공개 컴파일러 진단 | md |
 | [docs/COMPILER-DIAGNOSTICS.md](docs/COMPILER-DIAGNOSTICS.md) | Public compiler diagnostics | md |
 | [docs/CONSTRAINTS.en.md](docs/CONSTRAINTS.en.md) | GhostFlow common constraints and sensor signal contract | md |
@@ -428,4 +430,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-318 documents.
+320 documents.

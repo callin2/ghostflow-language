@@ -1,5 +1,6 @@
 import { extractLiterate, mapSourcePosition } from './literate.mjs';
 import { canonicalJson } from './canonical-json.mjs';
+import { verifyConstraintProof } from './constraint-proof.mjs';
 
 // Reference §2.5 fixes these enum identities and ordinal order.
 export const RESULT_FAULT_MEMBERS = Object.freeze({
@@ -280,7 +281,7 @@ function requireSignalRoles(entries, mode) {
 }
 
 /** Consumes the authoritative parsed AST, lowered constraints, forms, and generated timer state names. */
-export function buildSourceTrace(ast, constraints, bytes, transitions = [], intents = [], generatedTimers = [], resultSites = [], generatedSignals = [], generatedWindows = []) {
+export function buildSourceTrace(ast, constraints, bytes, transitions = [], intents = [], generatedTimers = [], resultSites = [], generatedSignals = [], generatedWindows = [], constraintProof = null) {
   const bindings = [];
   const add = (node, name, fields, extra = {}) => bindings.push({
     nodeId: node.id, kind: node.kind, name, fields, source: { ...node.loc }, ...extra,
@@ -371,7 +372,7 @@ export function buildSourceTrace(ast, constraints, bytes, transitions = [], inte
     return [{
       id: `require:${node.id}`, nodeId: node.id,
       originNodeIds: [...origins].sort((a, b) => a - b),
-      target: { index, kind, names },
+      target: { index: constraintProof?.sourceToCompiled[index] ?? index, kind, names },
       rule: kind === 'mutex' ? 'require-negated-conjunction-to-mutex-v1'
         : kind === 'requires-any' ? 'require-disjunction-to-requires-any-v1' : 'require-implication-to-requires-v1',
       scope: 'same-module-bool-output-constraint', relation: 'lowered-as',
@@ -379,7 +380,8 @@ export function buildSourceTrace(ast, constraints, bytes, transitions = [], inte
     }];
   });
   return {
-    format: 'GhostFlow/source-trace-v1', moduleFingerprint: moduleFingerprint(bytes), bindings,
+    format: constraintProof ? 'GhostFlow/source-trace-v2' : 'GhostFlow/source-trace-v1', moduleFingerprint: moduleFingerprint(bytes), bindings,
+    ...(constraintProof ? { constraintProof } : {}),
     dependencies: [...windowDependencies(generatedWindows), ...dependenciesForForms(transitions, intents, generatedTimers, windowSites)],
     constraints: constraints.map(([kind, ...names], index) => ({
       index, kind, names, nodeId: sourceConstraints[index].id, source: { ...sourceConstraints[index].loc },
@@ -478,14 +480,22 @@ export function verifySourceTraceMetadata(metadata, bytes, nodes, {
   timerDescriptors, expectedTimerDependencies, expectedResultSites, expectedSignalBindings, expectedSignalDependencies,
   expectedWindowSites, expectedWindowDependencies,
   expectedDerivations = [],
+  expectedConstraintProof = null,
 } = {}) {
-  if (!object(metadata) || metadata.format !== 'GhostFlow/source-trace-v1') {
+  if (!object(metadata) || metadata.format !== (expectedConstraintProof ? 'GhostFlow/source-trace-v2' : 'GhostFlow/source-trace-v1')) {
     throw new Error('source trace metadata format mismatch');
   }
   const allowedMetadataFields = new Set([
     'format', 'moduleFingerprint', 'bindings', 'dependencies', 'constraints', 'resultSites',
     'windowSites', 'sourceDocumentSha256', 'bytecodeSha256', 'intentAnchors', 'intentLinks', 'derivations',
   ]);
+  if (expectedConstraintProof) {
+    allowedMetadataFields.add('constraintProof');
+    verifyConstraintProof(metadata.constraintProof);
+    if (canonicalJson(metadata.constraintProof) !== canonicalJson(expectedConstraintProof)) {
+      throw new Error('constraint proof does not match canonical source');
+    }
+  }
   if (Object.keys(metadata).some(field => !allowedMetadataFields.has(field))) {
     throw new Error('source trace metadata fields mismatch');
   }
@@ -936,6 +946,8 @@ export function verifySourceTraceMetadata(metadata, bytes, nodes, {
     requireNodePosition(entry, node, `source trace constraint ${entry.index}`);
   }
   if (usedConstraintNodes.size !== constraintNodes.length) throw new Error('source trace constraint coverage mismatch');
+  if (expectedConstraintProof && canonicalJson(metadata.constraints.map(entry => [entry.kind, ...entry.names]))
+      !== canonicalJson(expectedConstraintProof.original)) throw new Error('constraint proof source coverage mismatch');
   return metadata;
 }
 
@@ -974,18 +986,32 @@ export function remapSourceTrace(metadata, extractionMap) {
 
 /** Joins observed fields only. It does not evaluate expressions or infer causes. */
 export function observeSourceTrace(metadata, trace) {
-  if (metadata?.format !== 'GhostFlow/source-trace-v1' || trace?.module !== metadata.moduleFingerprint) {
+  const proof = metadata?.format === 'GhostFlow/source-trace-v2' ? metadata.constraintProof : null;
+  if (!['GhostFlow/source-trace-v1', 'GhostFlow/source-trace-v2'].includes(metadata?.format) || trace?.module !== metadata.moduleFingerprint) {
     throw new Error('source/trace module identity mismatch');
   }
   const observations = trace.safetyTrace;
+  if (metadata.format === 'GhostFlow/source-trace-v2') {
+    verifyConstraintProof(proof);
+    if (!Array.isArray(metadata.constraints) || canonicalJson(metadata.constraints.map(entry => [entry.kind, ...entry.names]))
+        !== canonicalJson(proof.original) || metadata.constraints.some((entry, index) => entry.index !== index)
+        || new Set(metadata.constraints.map(entry => entry.nodeId)).size !== metadata.constraints.length) {
+      throw new Error('constraint proof source coverage mismatch');
+    }
+  } else if (Object.hasOwn(metadata, 'constraintProof')) throw new Error('constraint proof requires source-trace-v2');
   if (observations?.format !== 'GhostFlow/safety-trace-v1' || !Array.isArray(observations.constraints)
-      || observations.constraints.length !== metadata.constraints.length) throw new Error('safety trace unavailable or incompatible');
+      || observations.constraints.length !== (proof?.compiled.length ?? metadata.constraints.length)) throw new Error('safety trace unavailable or incompatible');
   const constraints = metadata.constraints.map((entry, index) => {
-    const observed = observations.constraints[index];
-    if (observed.index !== entry.index || observed.kind !== entry.kind || JSON.stringify(observed.names) !== JSON.stringify(entry.names)) {
+    const compiledIndex = proof?.sourceToCompiled[index] ?? index;
+    const observed = observations.constraints[compiledIndex];
+    if (observed.index !== compiledIndex || observed.kind !== entry.kind || JSON.stringify(observed.names) !== JSON.stringify(entry.names)) {
       throw new Error('constraint source/trace mapping mismatch');
     }
-    return { ...entry, observed };
+    if (proof && index > 0 && proof.sourceToCompiled[index - 1] === compiledIndex) {
+      return { ...entry, evidence: 'derived', relation: 'checked-adjacent-duplicate', replacementCompiledIndex: compiledIndex,
+        checker: proof.checker, certificateSha256: proof.certificateSha256 };
+    }
+    return { ...entry, ...(proof ? { evidence: 'executed', compiledIndex } : {}), observed };
   });
   if (!Array.isArray(metadata.resultSites) || !Array.isArray(trace.resultTrace)) {
     throw new Error('result trace metadata or events are unavailable');
@@ -1020,7 +1046,7 @@ export function observeSourceTrace(metadata, trace) {
   }) }));
   const windowEvents = observeWindowEvents(metadata.windowSites, trace.windowTrace);
   return {
-    format: 'GhostFlow/source-observation-v1',
+    format: proof ? 'GhostFlow/source-observation-v2' : 'GhostFlow/source-observation-v1',
     ...(Object.hasOwn(metadata, 'sourceDocumentSha256')
       ? { sourceDocumentSha256: metadata.sourceDocumentSha256 } : {}),
     ...(Object.hasOwn(metadata, 'bytecodeSha256') ? { bytecodeSha256: metadata.bytecodeSha256 } : {}),
@@ -1253,9 +1279,11 @@ function observedScalar(values, name) {
  * replaced with plausible zero/false values.
  */
 export function observeRuntimeValues(metadata, trace) {
-  if (metadata?.format !== 'GhostFlow/source-trace-v1' || trace?.module !== metadata.moduleFingerprint) {
+  if (!['GhostFlow/source-trace-v1', 'GhostFlow/source-trace-v2'].includes(metadata?.format) || trace?.module !== metadata.moduleFingerprint) {
     throw new Error('source/trace module identity mismatch');
   }
+  if (metadata.format === 'GhostFlow/source-trace-v2') verifyConstraintProof(metadata.constraintProof);
+  else if (Object.hasOwn(metadata, 'constraintProof')) throw new Error('constraint proof requires source-trace-v2');
   if (!Array.isArray(metadata.bindings)) throw new Error('source trace bindings are unavailable');
 
   const values = [];
