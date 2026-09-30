@@ -399,11 +399,13 @@ runtime reference의 변경은 live estimate의 continuity를 끊는다. 소유�
 바꾸지 않는다. timer-only 정책은 estimate가 unavailable이어도 유효하며 estimate를 요구하지
 않는다.
 
-불확실성이 알려지지 않았다면 unknown으로 남긴다. 보편적인 formula, confidence, uncertainty
-숫자, duration 또는 expiry를 정하지 않는다. 허용 가능한 estimate와 uncertainty bound는 선택된
-model/source type이 선언해야 한다. 기존 `quality: measured`, `hold_last`, `true_for`의 measured
-admission은 바뀌지 않는다. 향후 estimate-capable consumer는 estimated evidence를 명시적으로
-허용하고 source/type의 uncertainty bound를 선언해야 한다.
+불확실성이 알려지지 않았다면 unknown으로 남긴다. model/source는 known uncertainty bound 또는
+불확실성이 unknown이라는 점을 명시해야 한다. 따라서 불확실성을 모르는 estimate도 보존하거나
+표시할 수 있지만, bounded temporal operator에 자동으로 들어갈 수는 없다. 보편적인 formula,
+confidence, uncertainty 숫자, duration 또는 expiry를 정하지 않는다. 기존 `quality: measured`,
+`hold_last`, `true_for`의 measured admission은 바뀌지 않는다. 향후 estimated evidence를 받는
+temporal consumer는 해당 source/type을 명시적으로 허용하고 선언된 uncertainty bound를 요구해야
+한다. unknown uncertainty를 조용히 허용해서는 안 된다.
 
 연속 예: 명시적으로 설정한 runtime reference, 같은 model/calibration/binding, 같은 run/time
 epoch와 profile bound 내 gap 없는 qualifying write history가 있으면 선택된 model이 estimate를
@@ -421,7 +423,7 @@ calibration/reference는 [System #132](https://github.com/callin2/farm_studio_sy
 연결된다. Device output receipt의 구체 경계는 draft [PR #107](https://github.com/callin2/farm-device/pull/107)
 head `b85ef02fb546cd5f957c12ab66f091b90f9484f0`의
 [host observation source](https://github.com/callin2/farm-device/blob/b85ef02fb546cd5f957c12ab66f091b90f9484f0/rust/firmware/src/host_observation.rs)를
-참조한다. 현재 `quality: measured`를 code `1`로 lower하는 방식과 runtime
+참조한다. 현재 `sensorSample` lowering은 measured provenance를 code `1`로 표시한다. runtime
 `Measured`/`Held`/`Constructed` 분류는 바뀌지 않으며 `Estimated`를 표현하지 않는다.
 Estimate를 소비하는 실행 지원은 #385에서 별도 compatibility를 정하기 전까지 이 계약의
 범위가 아니다.

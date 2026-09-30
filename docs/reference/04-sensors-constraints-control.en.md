@@ -290,12 +290,14 @@ source/time fault as that fault; convert neither case to zero or automatic
 fallback. A timer-only policy remains valid when no estimate is available and
 does not need to consume one.
 
-Unknown uncertainty remains unknown. Define no universal formula, confidence,
-numeric uncertainty, duration, or expiry. The selected model/source type must
-declare which estimates it permits and its uncertainty bound. Existing
-`quality: measured`, `hold_last`, and `true_for` measured admission remain
-unchanged; any future estimate-capable consumer must explicitly admit estimated
-evidence and declare a source/type uncertainty bound.
+Unknown uncertainty remains unknown. The model/source must declare either a known
+uncertainty bound or that uncertainty is unknown. This permits retaining or
+presenting an estimate with unknown uncertainty; it does not admit that estimate
+to bounded temporal operators. Define no universal formula, confidence, numeric
+uncertainty, duration, or expiry. Existing `quality: measured`, `hold_last`, and
+`true_for` measured admission remain unchanged. Any future estimate-admitting
+temporal consumer must explicitly admit the source/type and require its declared
+uncertainty bound; it cannot silently accept unknown uncertainty.
 
 Continuous example: with an explicit runtime reference, matching model,
 calibration and binding, the same run/time epoch, and a gap-free qualifying write
@@ -315,7 +317,7 @@ and its [architecture contract](https://github.com/callin2/farm_studio_system/bl
 The concrete Device output-receipt boundary is in draft [PR #107](https://github.com/callin2/farm-device/pull/107),
 head `b85ef02fb546cd5f957c12ab66f091b90f9484f0`, at
 [host observation](https://github.com/callin2/farm-device/blob/b85ef02fb546cd5f957c12ab66f091b90f9484f0/rust/firmware/src/host_observation.rs).
-The current lowering of `quality: measured` (code `1`) and runtime
+Current `sensorSample` lowering marks measured provenance with code `1`; runtime
 `Measured`/`Held`/`Constructed` classifications do not represent `Estimated`.
 This contract does not enable runtime consumption; that requires the separate
 compatibility work in #385.
