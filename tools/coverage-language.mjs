@@ -37,6 +37,7 @@ const TESTS = Object.freeze([
   'tests/debounce-runtime.test.mjs', 'tests/duration-runtime.test.mjs',
   'tests/datetime-runtime.test.mjs', 'tests/int-settings-artifacts.test.mjs',
   'tests/int-settings-package.test.mjs', 'tests/operating-settings.test.mjs',
+  'tests/continuous-timer-compatibility.test.mjs',
   'tests/composition-execution.test.mjs', 'tests/result-trace-runtime.test.mjs',
   'tests/long-tick-state.test.mjs', 'tests/resource-policy-artifact.test.mjs',
   'tests/compiler-cli-diagnostics.test.mjs', 'tests/compiler-interaction-diagnostics.test.mjs',
