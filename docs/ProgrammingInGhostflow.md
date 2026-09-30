@@ -1164,8 +1164,8 @@ provider는 관측·예측을 공급한다. 프로그램은 무엇을 허용할�
 | `range` | `range(Duration)`: 계획된 구간 | schedule basis; 비중첩 증명과 명시적 cancel_when 필요. 고정 UTC 구간은 제한된 실행 경로를 지원하며 일반 민간시 구간은 descriptor 범위다. [Range 계약](../tests/schedule-descriptor-artifact.test.mjs). |
 | `run` | `run(Duration, within(Duration))`: 승인부터 Tide 운전 | Tide basis; 첫 Duration은 운전 길이. 유예 구간 안에서 첫 승인 필요. [Tide](../tests/natural-schedule-contract.test.mjs). |
 | `within` | `within(Duration)`: Tide 승인 유예 | Tide run의 둘째 인자 전용; [planned,planned+grace), 정확한 끝 제외. 운전 길이를 늘리지 않는다. [Tide](../tests/natural-schedule-contract.test.mjs). |
-| `hold_trusted` | `hold_trusted(Duration, terminal: skip)`: 제한된 신뢰 시각 보류 | Solar/Tide clock 필드; 양수 상수, 이전 신뢰 근거와 run/time 연속성 필요. 정확한 만료 경계는 skip. E36. |
-| `fixed_time` | `fixed_time(TimeOfDay literal, terminal: skip)`: 고정 시각 fallback | Solar fallback 전용; 상수 TimeOfDay literal과 명시적 terminal skip. Tide로 옮기지 않는다. E36/E101. |
+| `hold_trusted` | `hold_trusted(Duration, terminal: skip)`: 제한된 신뢰 시각 보류 | Solar/Tide clock 필드; 양수 상수, 이전 신뢰 근거와 run/time 연속성 필요. 정확한 만료 경계는 skip. E36. [Execution](../tests/programming-natural-examples.test.mjs). |
+| `fixed_time` | `fixed_time(TimeOfDay literal, terminal: skip)`: 고정 시각 fallback | Solar fallback 전용; 상수 TimeOfDay literal과 명시적 terminal skip. Tide로 옮기지 않는다. E36/E101. [Execution](../tests/programming-natural-examples.test.mjs). |
 
 현재 실행 예약은 baseline 복구를 사용한다. Solar와 Tide는 `trusted_only` 또는 양수 상수 Duration과 `terminal: skip`을 지정한 `hold_trusted`를 지원한다. Solar는 `fixed_time(TimeOfDay, terminal: skip)` fallback도 지원하며 Tide fallback은 `skip`이다. Daily/slots/Cron은 pulse, Periodic은 instant+preserve_anchor, Tide는 run+within이다. `range`의 고정 UTC 구간은 별도 제한 실행 경로가 있으며 일반 민간시 descriptor 전체가 실행 가능하다는 뜻은 아니다. 아래 E36–E37과 [fallback 검사](../tests/natural-fallback-compiler.test.mjs)를 참고한다.
 근거: [예약 lowering과 경로 선택](../tools/control.mjs), [시간 Reference](reference/03-time-and-schedules.md).

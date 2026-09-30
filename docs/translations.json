@@ -306,8 +306,8 @@
       "source": "docs/ProgrammingInGhostflow.md",
       "sourceLanguage": "ko",
       "translation": "docs/ProgrammingInGhostflow.en.md",
-      "sourceSha256": "dfad883e448aa617a930c02ec7542500263ae899bff2c60f9fe0d17741ef3c0b",
-      "translationSha256": "ded16e1372a1d21ed1880aab84a2ee22cb6f01f994b338598aa0086f9f7ae3a1"
+      "sourceSha256": "6f5fe186206ab3a6ccf471287987aec5fefcdfe33a63b39f616cf52d519d48cc",
+      "translationSha256": "210cd167a0400297277983f91e58b5c94e82cb3ac7706f4c564b53ed93a80b6f"
     },
     {
       "source": "docs/REFERENCE-QUERY.md",

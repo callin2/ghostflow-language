@@ -50,8 +50,12 @@ function entries(book) {
 }
 
 const primary = compilerCallables(compiler);
+// Schedule policy calls have their own contextual dispatcher, rather than the
+// ordinary expression dispatcher. Keep their coverage derived from that code.
+const policyCalls = [...new Set([...compiler.matchAll(/options\.(?:clock|fallback)\.name === '([a-z_]+)'/g)]
+  .map(match => match[1]))].sort();
 const hostOnly = ['day', 'pump_capacity', 'stopped'];
-const expected = [...primary, ...hostOnly].sort();
+const expected = [...primary, ...policyCalls, ...hostOnly].sort();
 
 function checkCoverage(book) {
   assert.deepEqual(entries(book), expected, 'book entries cover compiler callables and host-policy forms');

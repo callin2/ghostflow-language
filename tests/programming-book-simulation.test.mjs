@@ -489,6 +489,9 @@ const errorExamples = [
   ['E92', /next state references are allowed only in output expressions/], ['E93', /unexpected trailing token control/],
   ['E94', /Int literal is outside/], ['E95', /case for Mode must be exhaustive/],
   ['E96', /duplicate output connection lamp/], ['E97', /cannot use Result directly/],
+  ['E98', /does not implicitly mix Int and Number/], ['E99', /invalid datetime literal/],
+  ['E100', /Solar schedule requires fallback/], ['E101', /fallback must be skip/],
+  ['E102', /requires one argument and terminal: skip/],
 ];
 for (const [id, diagnostic] of errorExamples) {
   test(`Programming ${id} is rejected by public compiler diagnostics before simulation`, () => {
@@ -535,11 +538,18 @@ test('Programming E10 equal-threshold experiment produces the real compiler diag
 
 test('Programming inventory assigns every fence and numbered example to executable, diagnostic or explanatory coverage', () => {
   const compileOnlyExamples = ['E22', 'E31', 'E33'];
+  // These examples execute in the separately listed native/WASM test suite.
+  // Derive its registrations instead of declaring runtime coverage by hand.
+  const naturalTests = fs.readFileSync(path.join(root, 'tests/programming-natural-examples.test.mjs'), 'utf8');
+  const naturalRuntimeIds = [...naturalTests.matchAll(/test\('Programming (E\d+) /g)].map(match => match[1]);
+  assert.ok(naturalRuntimeIds.length > 0, 'natural-time examples have runtime test registrations');
+  const runtimeIds = [...bookRuntimeIds, ...naturalRuntimeIds];
+  assert.equal(new Set(runtimeIds).size, runtimeIds.length, 'runtime example registrations are unique');
   const numbered = [...book.matchAll(/^### (E\d+) —/gm)].map(match => match[1]).sort();
-  assert.deepEqual(numbered, [...bookRuntimeIds, ...compileOnlyExamples, ...errorExamples.map(([id]) => id), 'E11'].sort());
+  assert.deepEqual(numbered, [...runtimeIds, ...compileOnlyExamples, ...errorExamples.map(([id]) => id), 'E11'].sort());
   const fences = [...book.matchAll(/^`{3,4}([^`\n]+)$/gm)].map(match => match[1]);
   const counts = Object.fromEntries([...new Set(fences)].map(kind => [kind, fences.filter(item => item === kind).length]));
-  assert.deepEqual(counts, { ghost: bookRuntimeIds.size + compileOnlyExamples.length + 1, text: 3, markdown: 1, sh: 1, 'ghost-error': errorExamples.length });
+  assert.deepEqual(counts, { ghost: runtimeIds.length + compileOnlyExamples.length + 1, text: 3, markdown: 1, sh: 1, 'ghost-error': errorExamples.length });
   const catalog = JSON.parse(fs.readFileSync(path.join(root, 'examples/curriculum/catalog.json'), 'utf8'));
   assert.deepEqual(catalog.lessons.map(lesson => lesson.id).sort(), [...replay.scenarios.map(lesson => lesson.id), ...additionalLessons.map(([id]) => id)].sort());
   const links = [...book.matchAll(/\]\(\.\.\/(examples\/[^)#]+\.ghost\.md)(?:#[^)]*)?\)/g)].map(match => match[1]);
