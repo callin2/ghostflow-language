@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### 2026-09-30 — execute immutable UTC Range ([#152](https://github.com/callin2/ghostflow-language/issues/152))
+
+UTC Daily and static nonempty DailySlots `range(duration)` controls now execute as GFB12. Admission uses the remaining half-open planned interval; cancellation consumes the occurrence, and ongoing completion uses monotonic time through wall corrections or clock-trust loss. Checkpoint recovery retains deduplication without resuming an active timer. Other accepted Range variants remain descriptors. Compiler, native/WASM/ghostsim parity and failure-boundary tests cover the bounded slice; no physical device verification is claimed. Older bytecode consumers reject the new format explicitly.
+
 ### 2026-09-30 — reject ignored input initializers ([#151](https://github.com/callin2/ghostflow-language/issues/151))
 
 Bug fix, Reference §1.6: `input x: Bool = false;` previously parsed but silently

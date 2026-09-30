@@ -5,6 +5,10 @@
 
 ## 미출시
 
+### 2026-09-30 — 불변 UTC Range 실행 ([#152](https://github.com/callin2/ghostflow-language/issues/152))
+
+UTC Daily와 비어 있지 않은 정적 DailySlots `range(duration)` control이 GFB12로 실행된다. admission은 반열린 계획 interval의 남은 시간만 사용하며 cancellation은 occurrence를 소비한다. 활성 종료는 wall 보정과 clock trust 상실 중에도 monotonic time을 사용한다. checkpoint 복원은 중복 방지를 유지하지만 활성 timer는 재개하지 않는다. 다른 허용된 Range 변형은 descriptor로 유지한다. compiler, native/WASM/ghostsim parity와 실패 경계 test가 이 제한된 범위를 검증하며 물리 장치 검증을 주장하지 않는다. 이전 bytecode consumer는 새 형식을 명시적으로 거부한다.
+
 ### 2026-09-30 — 무시되던 input 초기값 거부 ([#151](https://github.com/callin2/ghostflow-language/issues/151))
 
 버그 수정, Reference §1.6: 기존에는 `input x: Bool = false;`를 파싱한 뒤 초기값을

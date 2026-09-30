@@ -33,7 +33,7 @@ frame을 native framed VM과 비교하며 native 원본 sensor scenario 호스�
 | 항목 | 현재 표현 | 역할 |
 |---|---|---|
 | 정본 프로그램 | `.ghost.md` | 의도, 코드, 주석, 설명을 포함한 리터레이트 소스 |
-| 생성 실행 파일 | `GFB1` 매직과 기능 선택 `u16` 형식 1–9 또는 11을 가진 `.gfb` | VM이 소비하는 바이너리 IR. [BYTECODE.md](BYTECODE.md) 참조 |
+| 생성 실행 파일 | `GFB1` 매직과 기능 선택 `u16` 형식 1–9, 11 또는 12을 가진 `.gfb` | VM이 소비하는 바이너리 IR. [BYTECODE.md](BYTECODE.md) 참조 |
 | 생성 제어 매니페스트 | 기능 선택 `GhostFlow/control-v1`, `v2`, `v3`, `v4`, `v7`, `v8` 또는 `v10` | 형식이 지정된 호스트 포트, 타이머/센서/일정 요구 및 바이트코드 해시 |
 | 생성 제약 정책 | `GhostFlow/constraints-v1` | 호스트에 바인딩되는 독립 제약 소스의 하향 변환 결과 |
 | 생성 소스 맵 | `.gfb.map.json` | 진단 노드/행 매핑. SOURCE-MAP.md에 정의된 compileSource의 소스 보존 엔벌로프 |

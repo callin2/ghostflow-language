@@ -1502,6 +1502,9 @@ class Lowerer {
       : ['all', ...this.manifest.outputs.map(output => ['has', 'actuator', output.name, gfbType(semanticType(output.type))])];
     const solarForms = this.solarForms();
     const contextForms = emitBytecode ? this.contextForms() : [];
+    if (contextForms.some(form => form[0] === 'utc-range') && solarForms.length) {
+      error(this.ast.loc, 'UTC Range cannot mix with legacy Solar or civil pulse execution');
+    }
     if (emitBytecode && this.configStreams.length && solarForms.length) {
       error(this.ast.loc, 'config streams cannot mix with legacy Solar/DailySlots context execution; use fixed let values or a config-aware schedule');
     }
@@ -1546,7 +1549,7 @@ class Lowerer {
         String(objective.controller.bias), String(objective.output.max), String(objective.controller.restart.output),
       ])];
     if (!emitBytecode) return { manifest: this.manifest, sourceMap: this.ast.sourceNodes };
-    const policySchedule = this.ast.body.find(item => item.kind === 'schedule' && !isExecutablePulseSchedule(item)
+    const policySchedule = this.ast.body.find(item => item.kind === 'schedule' && !isExecutablePulseSchedule(item) && !isExecutableRangeSchedule(item)
       && Object.keys(item.policy ?? {}).some(key => key !== 'fallback'));
     if (policySchedule) error(policySchedule.loc,
       `${policySchedule.scheduleType} policy execution requires verified occurrence provider and native admission bindings`);
@@ -2304,10 +2307,10 @@ class Lowerer {
       });
       this.schedules.set(item.name, { slot, loc: item.loc });
       this.symbols.get(item.name).type = { kind: 'Schedule' };
-      if (isExecutablePulseSchedule(item)) {
+      if (isExecutablePulseSchedule(item) || isExecutableRangeSchedule(item)) {
         if (!this.hasClock) { this.addInput(`${RESERVED_PREFIX}now_ms`, NUMBER, item.loc); this.hasClock = true; }
         if (!this.gfbInputs.some(input => input[1] === `${RESERVED_PREFIX}time_epoch`)) this.addInput(`${RESERVED_PREFIX}time_epoch`, NUMBER, item.loc);
-        this.schedules.set(item.name, { slot, loc: item.loc, projections: new Set(['due', 'missed']) });
+        this.schedules.set(item.name, { slot, loc: item.loc, projections: new Set(isExecutableRangeSchedule(item) ? ['due', 'active'] : ['due', 'missed']) });
       }
   }
   addSolarSchedule(item) {
@@ -3546,11 +3549,18 @@ class Lowerer {
         config.settings?.access === 'operator' ? 'true' : 'false', payload,
         inputs?.ok ?? 'none', inputs?.value ?? 'none', inputs?.fault ?? 'none'];
     });
-    const scheduleForms = this.manifest.schedules.filter(schedule => ['periodic', 'cron', 'tide'].includes(schedule.kind)
+    const scheduleForms = this.manifest.schedules.filter(schedule => schedule.policy?.basis?.kind === 'range'
+      || ['periodic', 'cron', 'tide'].includes(schedule.kind)
       || schedule.kind === 'daily' && schedule.day?.calendar
       || schedule.kind === 'daily-slots' && schedule.selectedConfig).map(schedule => {
       const base = [String(schedule.site), schedule.name, String(schedule.policy.gapMs)];
       const when = schedule.policy.when, cancel = schedule.policy.cancelWhen ?? 'false';
+      if (schedule.policy.basis?.kind === 'range') {
+        if (schedule.timezone !== 'UTC' || schedule.day || schedule.selectedConfig
+          || !['daily', 'daily-slots'].includes(schedule.kind)) error(this.ast.loc, 'executable Range requires immutable UTC Daily or DailySlots');
+        const starts = schedule.kind === 'daily' ? [schedule.atMs] : schedule.slots.map(minute => minute * 60_000);
+        return ['utc-range', ...base, 'UTC', String(schedule.policy.basis.durationMs), ['starts', ...starts.map(String)], when, cancel];
+      }
       if (schedule.kind === 'periodic') {
         const config = this.manifest.configs.find(item => item.id === schedule.every.configId);
         if (config && config.type !== 'Duration' || schedule.anchor.kind !== 'instant'
@@ -3856,6 +3866,15 @@ export function isExecutablePulseSchedule(item) {
     && item.policy?.clock?.name === 'trusted_only')
     || (item.scheduleType === 'Tide' && item.policy?.basis?.name === 'run'
     && item.policy?.clock?.name === 'trusted_only');
+}
+
+/** Immutable UTC recurrence only; other accepted Range variants stay descriptors. */
+export function isExecutableRangeSchedule(item) {
+  return item.timezone === 'UTC' && item.policy?.basis?.kind === 'call'
+    && item.policy.basis.name === 'range' && item.policy?.clock?.name === 'trusted_only'
+    && (item.scheduleType === 'Daily' && !item.on && !item.calendar
+      && item.at?.kind === 'literal' && item.at.raw.startsWith('time`')
+      || item.scheduleType === 'DailySlots' && Array.isArray(item.selected) && item.selected.length > 0);
 }
 
 /** Internal composition adapter. The public API accepts canonical documents. */

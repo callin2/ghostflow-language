@@ -295,8 +295,9 @@ cancel_when := Bool                                   // 현재 civil range에 �
 
 현재 compiler는 `clock = trusted_only`, `fallback = skip`만 받는다.
 `window`, `run(_, on_time)`, `At`, `hold_trusted`, `fixed_time`은 선택된 설계 표기이며
-아직 compiler 지원 범위 밖이다. civil `range`는 현재 UTC timezone의 정적 non-overlap을
-증명할 수 있는 recurrence에서 type-check되지만 실행 bytecode로 내려가지 않는다.
+아직 compiler 지원 범위 밖이다. civil `range`는 UTC timezone의 정적 non-overlap을
+증명해야 한다. 불변 UTC Daily와 비어 있지 않은 정적 DailySlots Range는 GFB12로
+실행되며 다른 허용된 Range recurrence는 비실행 descriptor로 유지된다.
 Tide의 `run(_, within(_))`은 지원한다.
 
 `fixed_time`은 Solar에서만 쓸 수 있다. 해당 source local date의 fallback occurrence가
@@ -363,8 +364,8 @@ revision이 포함된다. 대표 disposition은 `Before`, `PredicateFalse`, `Alr
 ### 놓친 occurrence에 대한 소스 반응
 
 `schedule_name.missed`는 `Bool` 투영이다. 현재 compiler는 Solar와 실행 가능한
-`pulse` civil schedule에 이 투영을 제공한다. `range` descriptor에서는 아직
-실행 투영으로 쓸 수 없다. 해당 schedule에서 하나 이상의 occurrence가
+`pulse` civil schedule에 이 투영을 제공한다. 실행 가능한 UTC Range를 포함한
+Range에서는 아직 실행 투영으로 제공하지 않는다. 해당 schedule에서 하나 이상의 occurrence가
 이번 accepted scan에 **terminal missed**로 확정될 때만 true다. 한 scan에서 둘 이상을
 놓쳐도 값은 한 번 true이고, 다음 accepted scan에 새 terminal miss가 없으면 false다.
 control action은 이 값을 해당 accepted scan의 immutable snapshot에서 정확히 한 번 평가한다.
@@ -402,7 +403,7 @@ record를 합치거나 이유 하나로 요약하지 않는다. 재부팅 뒤 �
 | `window(5min)` (설계) | `[planned, planned+5min)`에서 조건이 처음 true인 시점에 한 번 admit. 같은 occurrence에서 false→true가 반복돼도 재arm하지 않는다. |
 | `run(5min, on_time)` (설계) | observed crossing에서만 admit하고 admission부터 5분 운전한다. |
 | `run(5min, within(10min))` (Tide) | `[planned, planned+10min)`에서 첫 admission을 허용한다. 10분은 grace이고 run length는 5분이다. |
-| `range(10min)` (civil contract) | 신뢰할 수 있는 현재 시각이 `[planned, planned+10min)` 안에 있고 `when`이 true이면 첫 관측·부팅·회복이 늦어도 한 번 admit한다. 끝은 계획 시작점 + 10분이다. 현재 bytecode 실행은 미지원이다. |
+| `range(10min)` (civil contract) | 신뢰할 수 있는 현재 시각이 `[planned, planned+10min)` 안에 있고 `when`이 true이면 첫 관측·부팅·회복이 늦어도 한 번 admit한다. 끝은 계획 시작점 + 10분이다. 불변 UTC Daily/DailySlots는 GFB12로 실행된다. |
 
 ```ghost
 schedule morning_watering: Daily {
@@ -420,8 +421,17 @@ schedule morning_watering: Daily {
 }
 ```
 
-이 `range` 예시는 현재 compiler에서 검증되는 계약이며 실행 가능한 control bytecode는
-아니다. 현재 civil `range`는 `UTC`와 recurrence non-overlap 조건이 필요하다.
+이 불변 UTC `range` 예시는 실행 가능한 GFB12 control bytecode이다. 제한된 실행
+범위는 work calendar 없는 Daily와 비어 있지 않은 정적 DailySlots이며 `trusted_only`,
+`baseline`, `skip`을 사용한다. live 시작/duration 설정, Periodic Range와 다른 허용된
+변형은 descriptor로 유지한다. 비 UTC와 증명할 수 없는 overlap은 계속 거부하며
+timezone이나 DST 정책을 추측하지 않는다.
+
+Range context checkpoint는 소비한 occurrence identity를 보존하며 활성 monotonic
+timer는 보존하지 않는다. 새 boot로 복원해도 이미 소비한 occurrence를 재개하거나
+다시 admit하지 않는다. 아직 소비하지 않은 열린 interval은 남은 시간만 admit할 수
+있다. terminal capacity가 소진되면 scan 전체를 원자적으로 거부하며 identity를
+조용히 제거하지 않는다.
 
 late interval은 half-open이다. 종료 경계에서 새로 admit하지 않는다. 예정 시간 08:00,
 `run(5min, within(10min))`이 08:02에 admit되면 08:07까지의 단조 run이다.

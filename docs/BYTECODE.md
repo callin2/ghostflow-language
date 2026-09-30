@@ -29,6 +29,7 @@ The S-expression representation in `tools/gfb1.mjs` is internal compiler IR.
 | 7 | PID objective | Bool, Number and Int plus objective record |
 | 8 | Daily schedule prelude | Temporal types plus Daily descriptors |
 | 9 | DailySlots schedule prelude | Temporal types plus DailySlots descriptors |
+| 12 | Immutable UTC Range | GFB11 context layout plus UTC Range tag 13 |
 | 11 | Typed configuration streams and context execution | Context preludes and optional PID objective; replaces the prior format 10 context profile |
 
 These are compiler output profiles, not a promise that every host supports every
@@ -281,3 +282,9 @@ extension descriptors for temporal, config, quality, and objective behavior.
 The S-expression form named above is the internal lowering input to this stage.
 Only the GFB emitter maps the Core IR to numeric opcodes, selects a format, and
 writes bytes. This separation changes no GFB wire version or runtime contract.
+
+## Immutable UTC Range (format 12)
+
+GFB12 requires at least one UTC Range prelude and otherwise uses the GFB11 context layout and optional objective trailer. Tagged prelude `13` encodes `site:u32`, name string, `gapMs:u64`, timezone string (`UTC` only), `durationMs:u64`, `startCount:u16`, then sorted unique `startMs:u64` values and the `when` and `cancel_when` expression blobs. There are 1–96 starts in `[0,86400000)`; duration is in `[1,86400000]`. Circular daily spacing must be at least the duration. The native decoder independently validates these bounds and non-overlap. Old format bytes remain unchanged; older consumers reject format 12 before activation. Downgrading the header cannot make tag 13 a GFB11 prelude.
+
+The manifest remains `GhostFlow/control-v10` and uses the existing context facts ABI. Each Range site requires empty occurrence rows and no calendar/provider; the runtime derives UTC plans from trusted wall time. Occurrence identity uses site, UTC source day and stable sorted slot key. Range engine checkpoints use GFES2 with GFRG1 consumed-key ledgers; prior engines retain GFES1. A new boot retains deduplication but never resumes an active timer. Capacity exhaustion and malformed checkpoints fail explicitly and atomically. Signed portable-package configuration profiles remain GFB11 and do not accept GFB12.
