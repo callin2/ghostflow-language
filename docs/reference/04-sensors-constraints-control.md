@@ -363,6 +363,71 @@ missed scan은 관측을 만들지 않는다. compiler는 duration, max_age, sam
 profile에서 최대 보존 sample 수를 계산해야 하며 계산할 수 없으면 활성화를 거부한다.
 checkpoint 복원은 source/time continuity를 검증한 경우만 허용하고 그렇지 않으면 NotReady다.
 
+### 추정값 근거와 연속성
+
+추정값은 명시된 model이 산출한 값이며 sensor 관측이나 적용·확인된 출력 사실이 아니다.
+`Result<T, SensorFault>`는 선언된 sensor 값의 유효성 또는 고장을 표현한다. `ok(value)`는
+source 값이 계약상 유효하다는 뜻이지 계산 결과가 측정되었거나 물리적으로 확인되었다는
+뜻이 아니다. `Estimated`는 개념적인 근거 출처이며 새 `Result` 상태, `Quality` 변형 또는
+실행 syntax를 추가하지 않는다.
+
+추정값을 해석하려면 model과 calibration parameter revision, runtime reference의 정체성과
+설정 방법·operator/source, source/program과 설치 binding revision, run과 monotonic time epoch,
+근거가 된 source/application receipt history, 명시한 산출 basis를 함께 보존한다. actuator
+진행 추정의 첫 basis는 Device가 실제로 수락한 output register/write history다. Device의 ACK는
+driver가 그 register/write를 수락했다는 뜻일 뿐 motor가 움직였거나 position이 확인되었다는
+뜻이 아니다. 요청 시각을 basis로 선택할 수는 있지만 requested history로 명시해야 하며
+applied history와 바꾸어 쓰지 않는다. 이 구분은 §4.7의 요청·safe·applied·confirmed 경계를
+따른다. 보존할 참조와 history는 선언된 deployment profile의 유한한 bound 안에 있어야 한다.
+필요한 bound를 지원할 수 없으면 무제한 MCU history를 만들지 말고 해당 사용을 거부한다.
+
+추정 interval은 admissible하다고 선언된 runtime reference와 qualifying receipt/history에서만
+시작한다. cached receipt를 다시 읽거나 다른 scan에서 노출해도 새 write나 새 evidence가
+만들어지지 않으며 origin/start, freshness 또는 uncertainty를 reset하지 않는다. 검증된 연속
+history가 있을 때만 정상적인 monotonic time 평가에 따라 estimate가 진행될 수 있다. 연속
+산출에는 필요한 history 전체가 있어야 한다. 관측되지 않은 gap, 실패 또는 불확실한 write를
+가로질러 interpolate하지 않는다. 특히 새 write가 실패하면 이전 cached ACK는 원래 identity를
+지닌 과거 receipt로 남고 현재 applied-target history는 불확실하다. 과거 ACK만으로 적용 상태가
+계속 유지되었다고 추정하지 않는다.
+
+reboot/run·time epoch, source epoch, installation binding, model/calibration revision 또는
+runtime reference의 변경은 live estimate의 continuity를 끊는다. 소유자가 명시한 검증으로
+연속성을 재수립한 경우에만 계속 사용할 수 있다. calibration parameter는 reboot 뒤에도
+남을 수 있지만 runtime position reference와 estimate는 자동 복원되거나 0으로 초기화되지
+않는다. 필요한 basis가 없거나 검증할 수 없으면 현재 estimate는 unavailable/NotReady다.
+명시적으로 발생한 기존 source/time fault는 원래 fault로 보존한다. 둘 다 0이나 자동 fallback으로
+바꾸지 않는다. timer-only 정책은 estimate가 unavailable이어도 유효하며 estimate를 요구하지
+않는다.
+
+불확실성이 알려지지 않았다면 unknown으로 남긴다. model/source는 known uncertainty bound 또는
+불확실성이 unknown이라는 점을 명시해야 한다. 따라서 불확실성을 모르는 estimate도 보존하거나
+표시할 수 있지만, bounded temporal operator에 자동으로 들어갈 수는 없다. 보편적인 formula,
+confidence, uncertainty 숫자, duration 또는 expiry를 정하지 않는다. 기존 `quality: measured`,
+`hold_last`, `true_for`의 measured admission은 바뀌지 않는다. 향후 estimated evidence를 받는
+temporal consumer는 해당 source/type을 명시적으로 허용하고 선언된 uncertainty bound를 요구해야
+한다. unknown uncertainty를 조용히 허용해서는 안 된다.
+
+연속 예: 명시적으로 설정한 runtime reference, 같은 model/calibration/binding, 같은 run/time
+epoch와 profile bound 내 gap 없는 qualifying write history가 있으면 선택된 model이 estimate를
+산출할 수 있다. 그 결과는 계속 estimate이며 Driver ACK만으로 실제 움직임을 주장하지 않는다.
+단절 예: applied-history basis에서는 ACK 없는 요청, 실패하거나 불확실한 새 write, reboot 또는
+identity/revision 변경 뒤 새로 검증된 reference가 생기기 전까지 live estimate가 unavailable이다.
+별도로 선언된 requested-history basis는 그 요청을 추정 가정으로 쓸 수 있지만 applied history로
+표시하지 않는다. calibration parameter와 이전 estimate는 각각의 정체성을 유지한 이력으로
+남는다.
+
+이 계약의 추정 의미는 GhostFlow [#383](https://github.com/callin2/ghostflow-language/issues/383),
+후속 compatibility 작업은 [#385](https://github.com/callin2/ghostflow-language/issues/385),
+calibration/reference는 [System #132](https://github.com/callin2/farm_studio_system/issues/132)와
+[해당 architecture contract](https://github.com/callin2/farm_studio_system/blob/241643c125439c1ec141c8596feec3f4ad143ade/docs/architecture/INPUT-DRIVER-ARCHITECTURE.md#calibration-parameters-and-position-reference--system-132)에
+연결된다. Device output receipt의 구체 경계는 draft [PR #107](https://github.com/callin2/farm-device/pull/107)
+head `b85ef02fb546cd5f957c12ab66f091b90f9484f0`의
+[host observation source](https://github.com/callin2/farm-device/blob/b85ef02fb546cd5f957c12ab66f091b90f9484f0/rust/firmware/src/host_observation.rs)를
+참조한다. 현재 `sensorSample` lowering은 measured provenance를 code `1`로 표시한다. runtime
+`Measured`/`Held`/`Constructed` 분류는 바뀌지 않으며 `Estimated`를 표현하지 않는다.
+Estimate를 소비하는 실행 지원은 #385에서 별도 compatibility를 정하기 전까지 이 계약의
+범위가 아니다.
+
 ## 4.5 선택 sensor와 capability
 
 ```ghost
