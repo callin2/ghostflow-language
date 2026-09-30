@@ -233,6 +233,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | --- | --- | --- |
 | [examples/irrigation.ghost.ko.md](examples/irrigation.ghost.ko.md) | 관개 런타임 픽스처 | md |
 | [examples/irrigation.ghost.md](examples/irrigation.ghost.md) | Irrigation runtime fixture | md |
+| [examples/optional-feedback-timer.ghost.ko.md](examples/optional-feedback-timer.ghost.ko.md) | 선택 관찰을 포함한 타이머 제어 | md |
+| [examples/optional-feedback-timer.ghost.md](examples/optional-feedback-timer.ghost.md) | Timer control with optional observation | md |
 | [examples/scheduled-watering.ghost.en.md](examples/scheduled-watering.ghost.en.md) | Sequential watering by daily schedule | md |
 | [examples/scheduled-watering.ghost.md](examples/scheduled-watering.ghost.md) | 하루 시간표에 따른 순차 관수 | md |
 | [examples/solar-watering.ghost.en.md](examples/solar-watering.ghost.en.md) | Watering timed to sunrise and sunset | md |
@@ -416,4 +418,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-306 documents.
+308 documents.

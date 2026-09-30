@@ -861,6 +861,13 @@
       "translation": "tests/reference/README.en.md",
       "sourceSha256": "fea55ecafa747d86445dd2f35176146d9bf10c4c852d3f6655847910ab351245",
       "translationSha256": "69680266a80bad7bf72ff3a7b11ebbbbaa6086b4562e04bc33c398c6918b5896"
+    },
+    {
+      "source": "examples/optional-feedback-timer.ghost.md",
+      "sourceLanguage": "en",
+      "translation": "examples/optional-feedback-timer.ghost.ko.md",
+      "sourceSha256": "8baa2cf99de7a98a4b0234d06acb3248b53639fc7b3981cfccc710eab61dfd60",
+      "translationSha256": "0840b7d2cfebfdc83dc05e989bd37d5decff193b3fb90d8e57e5b6cc8e2ae040"
     }
   ],
   "exclusions": [

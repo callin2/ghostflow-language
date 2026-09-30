@@ -28,6 +28,8 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/feature-status.test.mjs',
   'tests/reference-simulator.test.mjs',
   'tests/adapt-control-host.test.mjs',
+  'tests/optional-feedback-timer-compiler.test.mjs',
+  'tests/optional-feedback-timer.test.mjs',
   'tests/reference-query.test.mjs',
   'tests/reference-index-links.test.mjs',
   'tests/reference-terms-boundaries.test.mjs',
