@@ -2,6 +2,13 @@
   "format": "GhostFlow/document-translations-v1",
   "documents": [
     {
+      "source": "docs/OPTIMIZER-PASS-CONTRACT.md",
+      "sourceLanguage": "en",
+      "translation": "docs/OPTIMIZER-PASS-CONTRACT.ko.md",
+      "sourceSha256": "b3266658b0fec8e2d01236e1718b5d55e846ebf7fc16ca925bf042666f9cdeb2",
+      "translationSha256": "565ec4512eae5ecdd4751ec4bd2d944b612d07f1848da6c900ff73db7c927ad9"
+    },
+    {
       "source": "docs/INTERACTION-STREAM-CONTRACT.md",
       "sourceLanguage": "en",
       "translation": "docs/INTERACTION-STREAM-CONTRACT.ko.md",

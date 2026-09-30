@@ -129,6 +129,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/LLM-TOOLCHAIN-ARCHITECTURE.md](docs/LLM-TOOLCHAIN-ARCHITECTURE.md) | Authoring and virtual simulation architecture | md |
 | [docs/OPERATOR-SETTINGS-STREAM.ko.md](docs/OPERATOR-SETTINGS-STREAM.ko.md) | Typed configuration stream | md |
 | [docs/OPERATOR-SETTINGS-STREAM.md](docs/OPERATOR-SETTINGS-STREAM.md) | Typed configuration streams | md |
+| [docs/OPTIMIZER-PASS-CONTRACT.ko.md](docs/OPTIMIZER-PASS-CONTRACT.ko.md) | 최적화 패스 계약 | md |
+| [docs/OPTIMIZER-PASS-CONTRACT.md](docs/OPTIMIZER-PASS-CONTRACT.md) | Optimizer pass contract | md |
 | [docs/PORTABLE-PACKAGE.ko.md](docs/PORTABLE-PACKAGE.ko.md) | 이식 가능한 GFB 패키지 v1 | md |
 | [docs/PORTABLE-PACKAGE.md](docs/PORTABLE-PACKAGE.md) | Portable GFB package v1 | md |
 | [docs/ProgrammingInGhostflow.en.md](docs/ProgrammingInGhostflow.en.md) | Programming in GhostFlow | md |
@@ -426,4 +428,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-316 documents.
+318 documents.
