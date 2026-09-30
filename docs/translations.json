@@ -868,6 +868,13 @@
       "translation": "examples/optional-feedback-timer.ghost.ko.md",
       "sourceSha256": "8baa2cf99de7a98a4b0234d06acb3248b53639fc7b3981cfccc710eab61dfd60",
       "translationSha256": "0840b7d2cfebfdc83dc05e989bd37d5decff193b3fb90d8e57e5b6cc8e2ae040"
+    },
+    {
+      "source": "examples/explicit-feedback-adoption.ghost.md",
+      "sourceLanguage": "en",
+      "translation": "examples/explicit-feedback-adoption.ghost.ko.md",
+      "sourceSha256": "8f753ccce7d27bc4b6f7f2847e49915257c63c593925120c01272f6657de8b3d",
+      "translationSha256": "901db50ecb74fb55b6e9377d69302a46eb38cffe40132c331ce3ade46951447f"
     }
   ],
   "exclusions": [

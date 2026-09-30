@@ -231,6 +231,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 
 | Path | Title | Type |
 | --- | --- | --- |
+| [examples/explicit-feedback-adoption.ghost.ko.md](examples/explicit-feedback-adoption.ghost.ko.md) | 명시적으로 채택한 피드백 억제 | md |
+| [examples/explicit-feedback-adoption.ghost.md](examples/explicit-feedback-adoption.ghost.md) | Explicitly adopted feedback inhibition | md |
 | [examples/irrigation.ghost.ko.md](examples/irrigation.ghost.ko.md) | 관개 런타임 픽스처 | md |
 | [examples/irrigation.ghost.md](examples/irrigation.ghost.md) | Irrigation runtime fixture | md |
 | [examples/optional-feedback-timer.ghost.ko.md](examples/optional-feedback-timer.ghost.ko.md) | 선택 관찰을 포함한 타이머 제어 | md |
@@ -418,4 +420,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-308 documents.
+310 documents.
