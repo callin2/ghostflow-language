@@ -1031,6 +1031,59 @@ impl Runtime {
         self.context_runtime = Some(restored);
         Ok(())
     }
+    /// Export bounded durable Solar terminal identities for the exact Program.
+    /// This is not a scalar-state or clock-continuity checkpoint.
+    pub fn solar_checkpoint(&self) -> Result<Vec<u8>> {
+        let module = self
+            .module
+            .as_ref()
+            .ok_or_else(|| Error::new("no module installed"))?;
+        let selected = self
+            .active_strategy
+            .ok_or_else(|| Error::new("Solar is not active"))?;
+        let requirements = module
+            .schedules
+            .as_ref()
+            .ok_or_else(|| Error::new("no Solar requirements"))?;
+        self.solar_runtime
+            .as_ref()
+            .ok_or_else(|| Error::new("no Solar runtime"))?
+            .snapshot(
+                &requirements.strategies[selected].schedules,
+                module.fingerprint,
+            )
+    }
+
+    /// Restore before the first tick; malformed data leaves the runtime unchanged.
+    /// The new run retains its fresh boot epoch and baseline clock semantics.
+    pub fn restore_solar_checkpoint(&mut self, bytes: &[u8]) -> Result<()> {
+        if self.next_tick != 1 {
+            return Err(Error::new("restore Solar before the first scan"));
+        }
+        let module = self
+            .module
+            .as_ref()
+            .ok_or_else(|| Error::new("no module installed"))?;
+        let selected = self
+            .active_strategy
+            .ok_or_else(|| Error::new("Solar is not active"))?;
+        let requirements = module
+            .schedules
+            .as_ref()
+            .ok_or_else(|| Error::new("no Solar requirements"))?;
+        let restored = self
+            .solar_runtime
+            .as_ref()
+            .ok_or_else(|| Error::new("no Solar runtime"))?
+            .restored(
+                &requirements.strategies[selected].schedules,
+                module.fingerprint,
+                bytes,
+            )?;
+        self.solar_runtime = Some(restored);
+        Ok(())
+    }
+
     /// Bind provider occurrence facts to a schedule-only GFB5 module.
     /// Provider code must derive facts from the installed descriptor, including
     /// timezone/location/offset and complete coverage. No host due bit is accepted.

@@ -80,6 +80,10 @@ impl ScanDriver {
         self.runtime.restore_context_checkpoint(bytes)
     }
 
+    pub fn restore_solar_checkpoint(&mut self, bytes: &[u8]) -> Result<()> {
+        self.runtime.restore_solar_checkpoint(bytes)
+    }
+
     /// Validates a complete host frame without changing runtime state, inputs,
     /// sequence, clock, journal, or output intents.
     pub fn validate_scan_frame(&self, frame: &ScanFrameV1) -> Result<()> {
@@ -181,6 +185,33 @@ impl ScanDriver {
         self.scan_inner(frame, Some((clock, facts)), None)
     }
 
+    /// Dispatches Solar provider facts through the same framed transaction.
+    /// Clocks, admission, scalar state and scan sequence commit only on success.
+    pub fn scan_with_solar(
+        &mut self,
+        frame: ScanFrameV1,
+        clock: ClockSnapshot<'_>,
+        facts: &[crate::solar_runtime::SolarInput<'_>],
+    ) -> Result<ScanOutcomeV1> {
+        if clock.monotonic_ms != frame.logical_time_ms {
+            return Err(Error::new(
+                "schedule clock does not match frame logical time",
+            ));
+        }
+        if self.runtime.solar_runtime.is_none() {
+            return Err(Error::new("solar scan requires an activated solar runtime"));
+        }
+        let facts: Vec<_> = facts
+            .iter()
+            .map(|input| ScheduleInput {
+                site: input.site,
+                kind: crate::solar_runtime::ScheduleKind::Solar,
+                facts: input.facts,
+            })
+            .collect();
+        self.scan_inner(frame, None, Some((clock, &facts, 1)))
+    }
+
     /// Dispatches civil occurrence facts through the same framed transaction.
     /// The core derives admission and retains its ledger only on success.
     pub fn scan_with_schedules(
@@ -214,7 +245,7 @@ impl ScanDriver {
                     .runtime
                     .module
                     .as_ref()
-                    .is_some_and(|m| matches!(m.format_version, 8 | 9)))
+                    .is_some_and(|m| matches!(m.format_version, 5 | 6 | 8 | 9)))
             || (self.runtime.context_runtime.is_some()
                 && ((name == "__gf_time_epoch"
                     && self
@@ -275,7 +306,16 @@ impl ScanDriver {
                         .set_input("__gf_time_epoch", Value::Number(clock.boot_epoch as f64))
                 })
                 .and_then(|()| {
-                    if version == 3 {
+                    if version == 1 {
+                        let facts: Vec<_> = facts
+                            .iter()
+                            .map(|input| crate::solar_runtime::SolarInput {
+                                site: input.site,
+                                facts: input.facts,
+                            })
+                            .collect();
+                        self.runtime.tick_with_solar(clock, &facts)
+                    } else if version == 3 {
                         self.runtime.tick_with_daily_slots(clock, facts)
                     } else {
                         self.runtime.tick_with_schedules(clock, facts)

@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### 2026-10-01 — durable framed Solar admission ([#400](https://github.com/callin2/ghostflow-language/issues/400))
+
+The Rust owner API now frames GFB5 Solar scans and exports/restores bounded
+terminal occurrence identities for the exact program. Previously a Device
+consumer could not preserve native Solar duplicate suppression across restart.
+For example, restoring `solar_checkpoint()` before the first scan retains a
+consumed occurrence while the new boot establishes a fresh clock baseline.
+Malformed, mismatched or over-capacity checkpoints reject atomically. Hosts must
+persist admission before publishing ON. `schedule_module` tests cover restore,
+framed rollback and retry. Source syntax, GFB and WASM ABI are unchanged; this
+does not claim physical actuation or supply the remaining civil checkpoint API.
+
 ### 2026-10-01 — bounded estimate-basis evidence API ([#398](https://github.com/callin2/ghostflow-language/issues/398))
 
 The portable core admits explicit requested or acknowledged-write histories under

@@ -821,6 +821,243 @@ fn solar_activation() -> ghostflow_core::solar_runtime::SolarActivation {
     }
 }
 
+#[test]
+fn framed_solar_checkpoint_restores_terminal_identity_in_a_new_clock_run() {
+    use ghostflow_core::{
+        scan::ScanFrameV1,
+        schedule_clock::{ClockSnapshot, ClockTrust},
+        solar_admission::{SolarFact, SolarFacts},
+        solar_runtime::SolarInput,
+    };
+    let fixture = Fixture::default();
+    let fresh = || {
+        let mut runtime = Runtime::new(4);
+        runtime.install(Module::load(&fixture.bytes()).unwrap(), false);
+        runtime.activate_with_solar(&solar_activation()).unwrap();
+        runtime.into_scan_driver()
+    };
+    let frame = |scan_id, logical_time_ms| ScanFrameV1 {
+        scan_id,
+        logical_time_ms,
+        inputs: vec![],
+    };
+    let clock = |monotonic_ms, wall_ms| ClockSnapshot {
+        monotonic_ms,
+        boot_epoch: 3,
+        wall_ms: Some(wall_ms),
+        trust: ClockTrust::Trusted,
+        uncertainty_ms: None,
+        source_revision: Some("clock-v1"),
+    };
+    let rows = [SolarFact::available(0, 1000, "solar-v1", "zone-v1")];
+    let facts = [SolarInput {
+        site: 7,
+        facts: SolarFacts {
+            coverage_from_wall_ms: 0,
+            coverage_to_wall_ms: 2000,
+            rows: &rows,
+        },
+    }];
+    let mut driver = fresh();
+    driver
+        .scan_with_solar(frame(0, 0), clock(0, 999), &facts)
+        .unwrap();
+    let before = driver.runtime().solar_checkpoint().unwrap();
+    assert!(driver
+        .scan_with_solar(frame(1, 1), clock(2, 1000), &facts)
+        .is_err());
+    assert_eq!(driver.runtime().solar_checkpoint().unwrap(), before);
+    assert!(
+        driver
+            .scan_with_solar(frame(1, 1), clock(1, 1000), &facts)
+            .unwrap()
+            .trace
+            .schedule_trace[0]
+            .due
+    );
+    let checkpoint = driver.runtime().solar_checkpoint().unwrap();
+    assert_ne!(checkpoint, before);
+    assert!(driver.restore_solar_checkpoint(&checkpoint).is_err());
+    let mut reboot_runtime = Runtime::new(4);
+    reboot_runtime.install(Module::load(&fixture.bytes()).unwrap(), false);
+    reboot_runtime
+        .activate_with_solar(&ghostflow_core::solar_runtime::SolarActivation {
+            boot_epoch: 7,
+            ..solar_activation()
+        })
+        .unwrap();
+    let mut reboot = reboot_runtime.into_scan_driver();
+    let reboot_clock = |now, wall| ClockSnapshot {
+        boot_epoch: 7,
+        ..clock(now, wall)
+    };
+    reboot.restore_solar_checkpoint(&checkpoint).unwrap();
+    // Invalid payloads with a valid checksum still reject atomically.
+    let seal = |bytes: &mut Vec<u8>| {
+        let mut crc = !0u32;
+        for byte in &bytes[..bytes.len() - 4] {
+            crc ^= u32::from(*byte);
+            for _ in 0..8 {
+                crc = (crc >> 1) ^ (0xedb8_8320u32 & 0u32.wrapping_sub(crc & 1));
+            }
+        }
+        let end = bytes.len();
+        bytes[end - 4..].copy_from_slice(&(!crc).to_le_bytes());
+    };
+    for (offset, value) in [(16, 8), (25, 255)] {
+        let mut malformed = checkpoint.clone();
+        malformed[offset] = value;
+        seal(&mut malformed);
+        assert!(reboot.restore_solar_checkpoint(&malformed).is_err());
+        assert_eq!(reboot.runtime().solar_checkpoint().unwrap(), checkpoint);
+    }
+    // A correctly sealed envelope must still respect the selected capacity and
+    // must not restore duplicate terminal identities.
+    let mut two_days = checkpoint.clone();
+    two_days[20..22].copy_from_slice(&2u16.to_le_bytes());
+    two_days.splice(26..26, 1u32.to_le_bytes());
+    seal(&mut two_days);
+    let mut bounded = Runtime::new(4);
+    bounded.install(Module::load(&fixture.bytes()).unwrap(), false);
+    bounded
+        .activate_with_solar(&ghostflow_core::solar_runtime::SolarActivation {
+            terminal_capacity: 1,
+            ..solar_activation()
+        })
+        .unwrap();
+    let bounded_before = bounded.solar_checkpoint().unwrap();
+    assert!(bounded.restore_solar_checkpoint(&two_days).is_err());
+    assert_eq!(bounded.solar_checkpoint().unwrap(), bounded_before);
+    let mut duplicates = two_days;
+    duplicates[26..30].copy_from_slice(&0u32.to_le_bytes());
+    seal(&mut duplicates);
+    assert!(reboot.restore_solar_checkpoint(&duplicates).is_err());
+    assert_eq!(reboot.runtime().solar_checkpoint().unwrap(), checkpoint);
+    assert!(reboot
+        .restore_solar_checkpoint(&vec![0; 20 + 128 * (6 + 4096 * 4) + 1])
+        .is_err());
+    assert!(
+        !reboot
+            .scan_with_solar(frame(0, 0), reboot_clock(0, 999), &facts)
+            .unwrap()
+            .trace
+            .schedule_trace[0]
+            .due
+    );
+    assert!(
+        !reboot
+            .scan_with_solar(frame(1, 1), reboot_clock(1, 1000), &facts)
+            .unwrap()
+            .trace
+            .schedule_trace[0]
+            .due
+    );
+    for end in 0..checkpoint.len() {
+        assert!(
+            fresh()
+                .restore_solar_checkpoint(&checkpoint[..end])
+                .is_err(),
+            "truncation {end}"
+        );
+    }
+    for index in 0..checkpoint.len() {
+        let mut corrupt = checkpoint.clone();
+        corrupt[index] ^= 1;
+        assert!(
+            fresh().restore_solar_checkpoint(&corrupt).is_err(),
+            "corruption {index}"
+        );
+    }
+    let mut different = Runtime::new(2);
+    different.install(
+        Module::load(
+            &Fixture {
+                output: vec![1, 0],
+                ..fixture
+            }
+            .bytes(),
+        )
+        .unwrap(),
+        false,
+    );
+    different.activate_with_solar(&solar_activation()).unwrap();
+    assert!(different.restore_solar_checkpoint(&checkpoint).is_err());
+}
+
+#[test]
+fn framed_solar_downstream_failure_keeps_checkpoint_clock_and_sequence_retryable() {
+    use ghostflow_core::{
+        scan::{ScanFrameV1, ScanInput},
+        schedule_clock::{ClockSnapshot, ClockTrust},
+        solar_admission::{SolarFact, SolarFacts},
+        solar_runtime::SolarInput,
+    };
+    let mut fixture = Fixture::default();
+    fixture.states = 1;
+    fixture.transition = Some(vec![58, 0, 0, 0]);
+    fixture.output_type = 2;
+    fixture.output = vec![33, 3, 0, 0, 2];
+    fixture.output.extend(11f64.to_le_bytes());
+    fixture.output.extend([20, 22]);
+    let mut runtime = Runtime::new(4);
+    runtime.install(Module::load(&fixture.bytes()).unwrap(), false);
+    runtime.activate_with_solar(&solar_activation()).unwrap();
+    let mut driver = runtime.into_scan_driver();
+    let frame = |scan_id, logical_time_ms| ScanFrameV1 {
+        scan_id,
+        logical_time_ms,
+        inputs: vec![],
+    };
+    let clock = |monotonic_ms, wall_ms| ClockSnapshot {
+        monotonic_ms,
+        boot_epoch: 3,
+        wall_ms: Some(wall_ms),
+        trust: ClockTrust::Trusted,
+        uncertainty_ms: None,
+        source_revision: None,
+    };
+    let rows = [SolarFact::available(0, 1000, "solar", "zone")];
+    let facts = [SolarInput {
+        site: 7,
+        facts: SolarFacts {
+            coverage_from_wall_ms: 0,
+            coverage_to_wall_ms: 2000,
+            rows: &rows,
+        },
+    }];
+    driver
+        .scan_with_solar(frame(0, 10), clock(10, 999), &facts)
+        .unwrap();
+    let before = driver.runtime().solar_checkpoint().unwrap();
+    assert_eq!(
+        driver
+            .scan_with_solar(frame(1, 11), clock(11, 1000), &facts)
+            .unwrap_err()
+            .message(),
+        "division by zero"
+    );
+    assert_eq!(driver.next_scan_id(), Some(1));
+    assert_eq!(driver.scan_last_time_ms(), Some(10));
+    assert_eq!(driver.runtime().journal().len(), 1);
+    assert_eq!(driver.runtime().solar_checkpoint().unwrap(), before);
+    let mut forged = frame(1, 12);
+    forged.inputs.push(ScanInput {
+        name: "__gf_time_epoch".into(),
+        value: Value::Number(3.0),
+    });
+    assert!(driver
+        .scan_with_solar(forged, clock(12, 1000), &facts)
+        .is_err());
+    assert!(
+        driver
+            .scan_with_solar(frame(1, 12), clock(12, 1000), &facts)
+            .unwrap()
+            .trace
+            .schedule_trace[0]
+            .due
+    );
+}
+
 fn daily_entry(repeated: u8, when: &[u8]) -> Vec<u8> {
     let mut b = vec![3];
     b.extend(7u32.to_le_bytes());
