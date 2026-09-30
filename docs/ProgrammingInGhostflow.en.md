@@ -1830,7 +1830,7 @@ These ten articles show how people with different jobs can approach the same con
 
 When a conveyor stops unexpectedly, the useful question is “Which condition stopped it?” This program drops the running state and remembers the jam as soon as the input clears in a scan. Even after the cause is gone, resetting the fault does not restart the conveyor until the operator releases and presses Start again.
 
-Run one scan with `start=true`, `jam_clear=false`, and `reset=false`. `fault_latched` and `fault_lamp` turn on while `running` and `conveyor` turn off. Clear the jam, then reset: the fault memory clears by itself, but the drive remains stopped. You can follow the inputs and state used for each output directly in the source. The electrical meaning of a jam detector and the emergency-stop circuit still need separate design.
+Run one scan with `start=true`, `jam_clear=false`, and `reset=false`. `fault_latched` and `fault_lamp` turn on while `running` and `conveyor` turn off. Clear the jam, then reset: only the fault memory clears, while the drive remains stopped. You can follow the inputs and state used for each output directly in the source. The electrical meaning of a jam detector and the emergency-stop circuit still need separate design.
 
 ```ghost
 // E23
