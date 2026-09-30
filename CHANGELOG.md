@@ -2,6 +2,31 @@
 
 ## Unreleased
 
+### 2026-09-30 — reject ignored input initializers ([#151](https://github.com/callin2/ghostflow-language/issues/151))
+
+Bug fix, Reference §1.6: `input x: Bool = false;` previously parsed but silently
+discarded its initializer. It now fails at `=` in the original source, including
+canonical literate documents. Migrate to `input x: Bool;` and supply the value from
+the host; no implicit default or fallback is introduced. State initialization and
+type-only output declarations are unchanged. `tests/compiler.test.mjs` covers
+rejected initializers, source locations, and valid host inputs with state/output
+declarations. `tests/control-host.test.mjs` verifies missing-input rejection and
+explicit true/false values through real WASM. No GFB/ABI change is required.
+
+### 2026-09-30 — native scenario Percent input bug fix
+
+The native scenario runner now accepts finite `Percent` inputs in the inclusive
+0..100 range, preserving their numeric values for both initial inputs and input
+actions. Previously the public simulator validated these inputs but its native
+transport rejected them as an invalid type, including programming example E32.
+For example, `input level: Percent;` with a host value of `33.5` retains `33.5`.
+Invalid values and nominal type mismatches remain rejected. This restores the
+existing Percent contract (Reference §2.1); no source migration or GFB/ABI change
+is needed. Coverage: native `scenario_scan` unit tests, `tests/ghostsim.test.mjs`,
+`tests/ghostsim-input-validation.test.mjs`, and E32 in
+`tests/programming-book-simulation.test.mjs`. Prerequisite for
+[#151](https://github.com/callin2/ghostflow-language/issues/151).
+
 ### 2026-09-29 — pinned sensor and function composition ([#377](https://github.com/callin2/ghostflow-language/issues/377))
 
 Reference §6.4 sensor connections and imported pure functions now execute, instead

@@ -202,7 +202,7 @@
       "sourceLanguage": "ko",
       "translation": "docs/LANGUAGE-REFERENCE.en.md",
       "sourceSha256": "5e173bca6dcd2366a735c5e21c91695f8658055211dffe66d567341fce8719e3",
-      "translationSha256": "2332d16dd02d7e339d8c9797061ccdff8d47fdf35afced8f16125626f9409785"
+      "translationSha256": "1b6ea6554f1190b9461f175788e553ee1fe921a2aa3a270ba37171b61b92c09d"
     },
     {
       "source": "docs/LANGUAGE-SURFACE.md",
@@ -285,8 +285,8 @@
       "source": "docs/reference/01-source-and-syntax.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/01-source-and-syntax.en.md",
-      "sourceSha256": "0ce85a809713cf57f62928cc1dfca222109e3cd8ed04bb2247e51bdea14c4dfe",
-      "translationSha256": "32a713f82c3603e9d25534b46e8cb4c3eb94fad47857f3693887fcb4e020080f"
+      "sourceSha256": "41dc41d8a4cf38b5ee56118c0c563226a87981e0d761ee0244dc4bd2852dc0de",
+      "translationSha256": "e2b3366085e862113bf100a00836496e4c5036f54877e1f132ecdc60ebe138ec"
     },
     {
       "source": "docs/reference/02-types-expressions-state.md",
@@ -516,8 +516,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "778d8121584695210fc233e665ed08254c402a04078d267beeb4b1f9f337ecea",
-      "translationSha256": "d3625b86d6f440bbd621fd3bf54ab56adf43e9f47d5901cad1c63f2a26632ac7"
+      "sourceSha256": "6c046f68c2f2343cb1c26b1e7e0add1aa6fb84cd5d4dc1039a6038dec792aa19",
+      "translationSha256": "79ba0893fee9f5e3aee8743c958deade81f1f8d36ff4b9a42bf59b2e30a3a0ce"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",
@@ -852,8 +852,8 @@
       "source": "tests/reference/DECISIONS.md",
       "sourceLanguage": "ko",
       "translation": "tests/reference/DECISIONS.en.md",
-      "sourceSha256": "cb019fb29a9c3492530dcd28030dcdba6db66ae8b14434971bd30c65c7b2fdf0",
-      "translationSha256": "bc88eee6e4eb1d8f608df6aab0e0462f0fa1ed9a3a19a65bcbde5fd27a23c616"
+      "sourceSha256": "c39cde92a9e6eb6e5a3f6202166afcc1233add33e474b7513a7758145dab478e",
+      "translationSha256": "18de5b49c7b4acae063d5726867b12745ba41de34d7d888fe5ca90862eec17f9"
     },
     {
       "source": "tests/reference/README.md",

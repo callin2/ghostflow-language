@@ -9,7 +9,7 @@ Site-specific values such as operating time, admissible quality, device selectio
 
 | ID | Settled decision summary | Reference | Verification form |
 |---|---|---|---|
-| `REF-00-010` | Memory and provenance of two reused instances are isolated. | [docs/LANGUAGE-REFERENCE.md §10](<../../docs/LANGUAGE-REFERENCE.md#10-조합해도-책임과-비용을-추적할-수-있게-한다>) | `specified` |
+| `REF-00-010` | Memory and provenance of two reused instances are isolated. | [docs/LANGUAGE-REFERENCE.md §10](<../../docs/LANGUAGE-REFERENCE.md#10-잘-만든-예제-두-개를-가져왔으면-함께-쓸-수-있어야죠>) | `specified` |
 | `REF-01-044` | The removed purefn alias is rejected with a migration diagnostic, not automatically interpreted as fn. | [01-source-and-syntax.md](<../../docs/reference/01-source-and-syntax.md#16-대표-표기-참고-별칭과-역사적-대안>) | `executable` |
 | `REF-01-045` | Control value declarations share one namespace even across different kinds; a name cannot be declared again. | [01-source-and-syntax.md](<../../docs/reference/01-source-and-syntax.md#17-소스-규칙의-장별-경계>)<br>[01-source-and-syntax.md](<../../docs/reference/01-source-and-syntax.md#이름-범위와-해석>) | `executable` |
 | `REF-01-056` | Without an expected numeric type, integer-shaped literals are Int; decimal-point or exponent literals are Number. | [02-types-expressions-state.md](<../../docs/reference/02-types-expressions-state.md#22-리터럴과-기대-타입>) | `executable` |

@@ -5,6 +5,28 @@
 
 ## 미출시
 
+### 2026-09-30 — 무시되던 input 초기값 거부 ([#151](https://github.com/callin2/ghostflow-language/issues/151))
+
+버그 수정, Reference §1.6: 기존에는 `input x: Bool = false;`를 파싱한 뒤 초기값을
+조용히 버렸다. 이제 canonical literate 문서를 포함한 원본 소스의 `=` 위치에서
+오류가 발생한다. `input x: Bool;`로 바꾸고 host에서 값을 공급한다. 암묵적인
+기본값이나 fallback은 도입하지 않는다. State 초기화와 타입만 선언하는 output은
+바뀌지 않는다. `tests/compiler.test.mjs`에서 초기값 거부, 소스 위치, state·output을
+포함한 유효한 host 입력 선언을 검증한다. `tests/control-host.test.mjs`는 실제 WASM으로
+입력 누락 거부와 명시적인 true·false 값을 검증한다. GFB/ABI 변경은 없다.
+
+### 2026-09-30 — 네이티브 시나리오 Percent 입력 버그 수정
+
+네이티브 시나리오 실행기는 이제 0..100 범위(양 끝 포함)의 유한한 `Percent` 입력을
+받으며 초기 입력과 입력 변경 action 모두 숫자 값을 그대로 보존한다. 기존에는 공개
+시뮬레이터가 입력을 검증해도 네이티브 전달 경로에서 잘못된 타입으로 거부했으며,
+프로그래밍 예제 E32도 실패했다. 예를 들어 `input level: Percent;`에 host 값 `33.5`를
+공급하면 `33.5`를 유지한다. 잘못된 값과 nominal 타입 불일치는 계속 거부한다.
+기존 Percent 계약(Reference §2.1)을 복구하며 소스 이행이나 GFB/ABI 변경은 없다.
+네이티브 `scenario_scan` 단위 테스트, `tests/ghostsim.test.mjs`,
+`tests/ghostsim-input-validation.test.mjs`, `tests/programming-book-simulation.test.mjs`의
+E32로 검증한다. [#151](https://github.com/callin2/ghostflow-language/issues/151)의 선행 수정이다.
+
 ### 2026-09-29 — 고정 sensor·함수 합성 ([#377](https://github.com/callin2/ghostflow-language/issues/377))
 
 Reference §6.4의 sensor 연결과 import 순수 함수가 미지원 거부 대신 실행된다.

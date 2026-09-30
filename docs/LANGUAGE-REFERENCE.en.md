@@ -37,123 +37,123 @@ When documents from different periods conflict, follow the subsequent decision t
 
 ## Design philosophy
 
-Imagine that a pump stops at four in the morning. The person who wrote the program cannot be reached, and someone at the site has to find the cause.
+Imagine a pump has stopped at four in the morning. The person who wrote the program can't be reached, and someone on site has to find the cause.
 
-That person needs a program that helps them understand why the equipment stopped, what to check, and what they may change. If someone has to remember circumstances that cannot be found in the code, the only option may be to call that person again.
+That person needs a program that helps them understand why the equipment stopped, where to look, and what they can change. If someone has to remember details that the code alone can't tell you, you end up having to call that person again.
 
-As I designed GhostFlow, I often returned to one principle:
+There's a standard I kept coming back to while designing GhostFlow.
 
-**It should be possible to read and change it on site, even at four in the morning.**
+**Even at four in the morning, you should be able to read and fix it on site.**
 
-At first, I wanted to make the control usually done with a PLC easier to build on an inexpensive MCU. But turning on a relay when someone presses a switch was not enough. The reasons for behavior should remain understandable over time; existing work should remain useful when equipment changes; and someone else should be able to take over when the original author is gone.
+At first, I wanted to make the control work I'd been doing with PLCs a little easier on inexpensive MCUs. But making a relay turn on when you press a switch wasn't enough. You still needed to understand the reasons behind the behavior over time, keep using existing work when the equipment changed, and let someone else take over even when the original author wasn't there.
 
-The principles below grew out of those choices.
+The principles below are choices that came out of that process.
 
-### 1. Keep the reason for the code with the code
+### 1. Keep the reason for the code alongside the code
 
-“Open the valve, then start the pump three seconds later.”
+“Open the valve, then turn on the pump three seconds later.”
 
-The code might say that. But why wait three seconds? Is that how long the valve takes to open, extra time allowed for the pipes, or a number added for a trial? Without knowing, it is hard to tell whether reducing three seconds to one is safe.
+That might be what the code says. But why wait three seconds? Is that how long the valve takes to open, a margin for the piping, or just a number someone put in to try things out? Without knowing that, it's hard to judge whether you can shorten those three seconds to one.
 
-That is why GhostFlow puts explanations and code in one `.ghost.md` document. The document records not only what the program does, but why it was chosen and which equipment and conditions it assumes, linked to the relevant code. Later, someone should be able to trace which explanation supports the code and what changed in each revision.
+That's why GhostFlow puts explanation and code in a single `.ghost.md` document. Alongside what the code does, you leave a record of why you chose that behavior and what equipment and conditions it assumes, connected to the relevant code. When making changes later, you should also be able to trace which explanation the code was based on and what changed in which revision.
 
-This distinction matters even more when AI writes code. What the user actually asked for and what AI guessed to fill a gap are different things. Unconfirmed assumptions must remain labeled as assumptions. A plausible explanation does not become the user's intent just because it sounds convincing.
+The more code AI writes, the more important this distinction becomes. What a user actually asked for is different from a guess AI made to fill in a gap. An unconfirmed assumption should remain an assumption. Adding a plausible explanation doesn't turn it into the user's intent.
 
-### 2. A decision to turn on the pump is not proof that it turned on
+### 2. Deciding to turn on a pump is different from knowing it turned on
 
-Even if a program asks for the pump to turn on, the pump may not run if power is lost or the equipment has a fault. A screen that says ON must also distinguish a request to turn on from confirmation that it actually did.
+Even if a program says to turn on a pump, the pump might not run if the power is disconnected or the device has a problem. When a screen says ON, we need to distinguish a request to turn it on from confirmation that it is actually running.
 
-GhostFlow takes inputs and computes what action to request. A binding records which port and device should receive that request, while a Driver handles the actual hardware. The rule “stop the pump when water is low” should not also contain a pin number for a particular board.
+GhostFlow takes inputs and computes which actions to request. Which ports and devices those requests connect to is written in the connection configuration, called binding, and the Driver handles the actual hardware. A rule like “stop the pump if there isn't enough water” doesn't need a particular board's pin numbers mixed into it.
 
-This separation lets the same rules be tested with virtual switches and lamps before connecting them to real equipment. It also makes it possible to compare behavior without sending real outputs. But a request produced in a virtual run and equipment moving correctly on site remain separate facts that must be checked separately.
+With these responsibilities separated, you can test the same rules with virtual switches and lamps, then connect them to real devices later. You can also design runs that compare behavior without sending any real outputs. But a request produced in a virtual run and equipment operating correctly in the field remain separate things to verify throughout.
 
-### 3. Make memory and the next change in state visible
+### 3. You should be able to see what is remembered and how it changes next
 
-For a motor to keep running after someone releases the start button, the program has to remember that the button was pressed. A program that opens valves in sequence also needs to know which valve it is on.
+For a motor to keep running after you release the start button, something has to remember that the button was pressed. A program that opens valves in sequence also needs to know which valve it is currently using.
 
-That memory belongs in `state`. Functions calculate from the values they receive; state carries memory from one decision to the next. I do not want a function call to quietly change some value elsewhere.
+That memory belongs in `state`. Functions compute from the values they receive, while state carries the memory needed from one operation to the next. I don't want calling a function to secretly change a value somewhere else.
 
-What matters to me is a structure where **the next state can be read directly from the current state and inputs**. If a reader has to replay the execution order in their head several times to understand it, changing the program on site will be even harder. When a calculation result feeds another decision, the state connecting those calculations should also be clear.
+What matters to me is **a structure where you can read the next state directly from the current state and inputs**. If the reader has to run through the execution order several times in their head just to understand it, fixing it on site will be even harder. When a computed result is fed back into a decision, the state it passes through before the next computation should also be clear.
 
-### 4. Be able to check yesterday's decision today
+### 4. You should be able to check yesterday's decision again today
 
-“Why did it ask the pump to turn on at three yesterday afternoon?”
+“Why did it ask to turn on the pump at three yesterday afternoon?”
 
-If the inputs, previous state, effective settings, and time conditions from then were recorded, the same conditions should produce the same decision. That makes it possible to investigate the cause instead of relying on memory or guesswork. After changing the program, the same conditions can also show what changed.
+If you've recorded the inputs, previous state, effective settings, and time conditions from that moment, you should be able to get the same decision under the same conditions. That lets you investigate the cause without relying only on memory or guesswork. After changing the program, you can also supply the same conditions and compare what changes.
 
-For this, one control calculation, or tick, uses the same input snapshot and previous state. The next states are committed together after calculation. Results should not depend on which source line happened to run first or on a function secretly reading the clock. It should also be clear which calculation first uses a settings change.
+To make this possible, a tick, which is one control computation, uses the same set of inputs and previous state throughout. The next states are committed together after computation finishes. The result shouldn't depend on which line of code ran first or whether a function secretly read the clock. You should also be able to tell which computation a settings change took effect from.
 
-AI can help write programs, but I do not want each operating decision to depend on a fresh AI answer. At the site, confirmed rules should run under defined conditions, and the decision should be traceable later. The basic control assigned to the device should continue on site without waiting for the internet or an AI response.
+AI can help write a program, but I don't want each operating decision to depend on a new answer from AI. On site, the equipment should follow verified rules under defined execution conditions, and we should be able to retrace those decisions later. The device should also be able to keep carrying out its basic control locally without waiting for the internet or an AI response.
 
-### 5. Do not make readers guess what a number means
+### 5. Don't make people guess the units every time they read a number
 
-If a setting just says `10`, someone has to search nearby code to learn whether it means ten repetitions, ten seconds, or ten percent. A meaning that seemed obvious to the author may be forgotten a few months later.
+If a setting just says `10`, you have to dig through the surrounding code to find out whether it means ten times, ten seconds, or ten percent. A meaning that seemed obvious when you wrote it might be hard to remember a few months later.
 
-GhostFlow distinguishes counts, time, percentages, and physical quantities. It also distinguishes counts that need exact integers from numbers such as measurements that may be approximate. The language should check what a value means instead of relying only on its variable name.
+GhostFlow treats counts, time, percentages, and physical quantities as distinct. It also distinguishes counts that need exact integers from numbers that handle approximate values, such as measurements. The idea is to let the language check what values mean instead of relying only on variable names.
 
-When converting units or a decimal to an integer, the conversion should show what was changed, where rounding happened, and what was discarded. I want the language to catch some mistakes before they depend on a person noticing them during careful review.
+When converting units or converting a decimal value to an integer, the conversion, the point at which rounding happened, and what was discarded should all be visible. I'd like the language to catch some of the mistakes that otherwise only careful reading can prevent.
 
-### 6. Keep making decisions during ten minutes of watering
+### 6. Decisions need to continue during those ten minutes of watering
 
-“Water at 6 a.m.,” “water for ten minutes,” and “do not exceed 30 minutes of watering in total today” are different requirements. Treating them all as one kind of timer because they involve time makes the meaning ambiguous when operation stops and starts again.
+“Water at 6 a.m.,” “water for ten minutes,” and “keep today's total watering time within thirty minutes” are different requirements. If you lump them into one timer just because they all concern time, interpretations can start to diverge as soon as you stop partway through and start again.
 
-GhostFlow distinguishes the time a schedule starts, continuous elapsed time, accumulated usage, and recurring periods. It should also retain which schedule occurrence happened so that a repeated delivery can be distinguished from a new occurrence. Clock time and the basis for measuring elapsed time are separate as well.
+GhostFlow distinguishes the time to start, continuously elapsed time, accumulated usage time, and recurring periods. It also needs to record which schedule occurrence happened, so that receiving the same occurrence again can be distinguished from a new one. The time shown by a clock and the basis for measuring elapsed time are separate too.
 
-Above all, the program must keep making other decisions while it waits for ten minutes. It still needs to notice a stop button or a low-water condition. It can express a condition such as “one hour after sunrise,” but what to do when sunrise cannot be determined must be decided separately.
+Above all, waiting ten minutes mustn't mean the program stops making other decisions. It needs to keep checking whether the stop button has been pressed or the water has run low. Conditions like “one hour after sunrise” should also be expressible, but what to do when the sunrise time can't be obtained needs to be specified separately.
 
-### 7. Preserve the fact that a value is unknown
+### 7. If a value is unknown, keep that fact visible
 
-A temperature of zero degrees is different from being unable to read the temperature sensor. Having a last reading is also different from being able to trust that reading now.
+A temperature of zero degrees is different from being unable to read the temperature sensor. Having a last-read value is also different from being able to trust and use that value now.
 
-Distinguish a value that has not arrived, one that is too old, and one that failed to read from a normal value. Failure to determine sunrise must not be treated as “the scheduled time has not arrived.” If an unknown situation is simply changed to zero or false, later decisions lose the information needed to find what went wrong.
+We distinguish a value that isn't available yet, a value that is too old, or a failed read from a normal value. Being unable to obtain the sunrise time mustn't be treated as “the scheduled time hasn't arrived yet,” either. If an unknown situation is simply turned into zero or false, later decisions have no way to tell what went wrong.
 
-Any alternative rule must be stated for the equipment's conditions. Even when a substitute value is used to continue calculation, keep the original missing information, why that choice was made, and when normal operation returned.
+The fallback rule for such a situation needs to be explicit and suited to the installation's conditions. Even if computation continues with a substitute value, we need to keep a record of what information was originally missing, why this approach was chosen, and when things returned to normal.
 
-### 8. Separate the action a program wants from the action the installation allows
+### 8. Distinguish what you want to do from what you are allowed to do
 
-A watering program may want to start the pump when the tank is empty. Two programs may want the same pump, or equipment may forbid forward and reverse outputs at the same time.
+An irrigation program might want to turn on a pump while the water tank is empty. Two programs might want to use the same pump, or a device might have forward and reverse outputs that mustn't be turned on together.
 
-Copying these conditions into many programs makes omissions and inconsistent edits likely. Keep each program's request separate from the installation-wide conditions that permit it. Make mutually exclusive outputs, shared-resource rules, mode permissions, and operating-time limits visible. When a request is blocked, it should be possible to see which condition blocked it.
+Copying these conditions into different places in each program makes it easy to leave one out or later change only one copy. That's why we treat each program's requests separately from the conditions that govern what the installation as a whole allows. Outputs that can't be on together, rules for shared resources, what each mode permits, and operating time limits should be visible. When a request is blocked, we should be able to tell which condition blocked it.
 
-Showing a user only “pump OFF” is not enough. They should be able to trace “watering was scheduled, but the low-water input prevented the pump from turning on.” This lets non-specialists ask in their own words and understand why an action happened. Explanations should follow the evidence from execution, not be plausible stories added afterward.
+Showing the user only “pump OFF” isn't enough. They should be able to follow the explanation all the way to “it was time to water, but the pump wasn't turned on because of the low-water input.” That's why I want even non-specialists to be able to ask about the reasons behind behavior in their own words and check the answers. Explanations should follow the evidence from execution, rather than adding a plausible story afterward.
 
-Program constraints do not replace physical safety devices. Responsibilities such as emergency stops and electrical protection still belong in hardware.
+Of course, constraints in a program don't replace physical safety devices. Responsibilities that belong in hardware, such as emergency stops and electrical protection, remain separate.
 
-### 9. Do not rewrite the program just to change the watering time
+### 9. You shouldn't have to rewrite a program just to change the watering time
 
-In a program that waters for ten minutes every hour, someone may want to reduce today's duration to seven minutes. Having to edit the control code for that would make ordinary adjustment difficult.
+With a program that “waters for ten minutes every hour,” you might want to reduce it to seven minutes today. If that means changing the control code too, it won't be convenient for everyday use.
 
-Declare values that operators can adjust as settings. Give each setting a name, type, default, allowed range, and access permission, and make clear when a changed value takes effect. Changing a setting is different from changing the control rule or forcibly overwriting internal state.
+Values that can be adjusted during operation are declared separately as settings. We record their names, types, defaults, allowed ranges, and permissions together, and make it clear when changed values take effect. Changing settings, changing the control rules themselves, and forcibly overwriting internal state are different things.
 
-Screens should be able to use this information too. A time setting can create a time input and guide the user to stay within its range. I like screens that feel like the switches and dials on an existing control cabinet, but they do not have to look that way. A phone can show the same setting differently. **The appearance of the screen may change, but the meaning of the operation should stay the same.**
+Screens should be able to use this information too. For a time setting, that might mean creating a time input tool and helping people stay within the allowed range. I like screens that feel as if the switches and dials from an existing control cabinet have been moved onto them, but they don't have to look that way. The same settings could be presented differently on a phone. **Even when the screen looks different, the controls should keep the same meaning.**
 
-### 10. If two good examples are available, they should work together
+### 10. If you've found two good examples, you should be able to use them together
 
-There may be one example for watering and another for ventilation. Each works on its own. But if using them on one board requires taking both programs apart and rewriting them, someone who is not comfortable coding may hit a dead end.
+There's an irrigation control example and a ventilation fan control example. Each works well on its own. But if using them together on one board means taking both programs apart and rewriting them, someone who's not comfortable coding can get stuck right there.
 
-This has especially bothered me. If watering needs two inputs and three outputs, and ventilation needs four outputs, I want people to be able to bring in each program and connect its inputs and outputs to the equipment they need.
+I found this particularly frustrating. If irrigation needs two inputs and three outputs, and ventilation needs four outputs, I wanted to be able to take each program and use it by connecting devices to the inputs and outputs it needs.
 
-That does not mean matching only the number of inputs and outputs is enough. We must check whether programs share resources, whether their constraints conflict, and whether their states stay separate. The origin and revision of imported code and the devices currently connected to it should also remain traceable.
+That doesn't mean matching the number of inputs and outputs is enough. We need to check whether the programs share resources, whether their constraints conflict, and whether their states stay separate. We should also be able to trace the original code and its revision, along with the devices currently connected to it.
 
-We must also remember that these programs run on small MCUs. A composition that looks simple must not lead to a calculation that never ends or memory that grows without limit. Its memory use and computation cost should remain assessable. The goal is to combine the convenience of reusing someone else's work with the conditions needed to operate it responsibly on one's own equipment.
+I also try to keep in mind that these programs will run on small MCUs. A combination might look simple, but it would be a problem if its computation never finished or the values it needed to remember kept growing. Even after composition, we should be able to assess how much memory and computation it needs. I want both the convenience of reusing someone else's work and the conditions that let you take responsibility for running it on your own equipment.
 
 ## Perspectives that influenced the design
 
-GhostFlow was influenced by tools I liked using. Rather than copying their syntax, I tried to bring over what made them convenient and understandable.
+GhostFlow carries influences from tools I've enjoyed using. Rather than copying their syntax, I tried to bring over what made them convenient and easy to understand.
 
-From **Literate CoffeeScript**, I liked reading explanations and code in one document. You can explain how equipment should behave and place code where it is needed. Rather than requiring a separate manual to be written well, I wanted explanation and code to live together from the start.
+What I liked about **Literate CoffeeScript** was reading explanation and code in one document. You can describe how the equipment should behave and put the code where it's needed. Rather than requiring a separate, well-written manual, I wanted explanation and code to be together from the start.
 
-**ObservableHQ** influenced not only the way connected calculations and screens respond when values change, but also the idea of bringing someone else's notebook into your own work. A good result can become material for the next piece of work, instead of something to look at and leave behind. What mattered to me in **marimo and D3.js** was also keeping code and results together so their values and changes can be seen.
+**ObservableHQ** influenced me not only through the way connected computations and displays update when a value changes, but also through the way you can take someone else's notebook and use it as part of your own work. What mattered was being able to use a well-made result as material for the next piece of work, rather than just looking at it. Looking at **marimo and D3.js**, I also valued keeping code and results together and seeing the relationships between values and changes.
 
-From **functional programming**, I took the idea of composing small calculations without hiding memory or side effects. From **Cycle.js**, I took the separation between receiving inputs, producing output requests, and letting a Driver create real effects. These ideas connect to keeping state, calculation, and hardware distinct.
+From **functional programming**, I took the idea of composing small computations without hiding memory or side effects. From **Cycle.js**, I took the perspective of separating receiving inputs, producing output requests, and the Driver that creates actual effects. These connect to the choices to keep state, computation, and hardware distinct.
 
-**Elm and Rust** influenced my preference for checking problems with types and branch analysis before execution. I saw a similar value in **Railway-oriented programming**: both normal results and failure paths should be readable in the code.
+**Elm and Rust** influenced the approach of using type and branch checks to catch problems before they appear at runtime. What I valued in **railway-oriented programming** was similar: you should be able to read the failure paths in the code, as well as the normal results.
 
-From **YAML**, I took declarations that reveal the structure of names and settings. From **Cypher**, I took selecting by an object's characteristics and capabilities rather than its location. **Meta Lua** interested me as a way to treat code as data and extend it. But even when expressions are extended, their meaning and reach should remain checkable.
+From **YAML**, I drew on declarations that expose the structure of names and settings. From **Cypher**, I drew on selecting things by their properties and capabilities rather than their location. What interested me in **Meta Lua** was the possibility of treating code as data and extending it. Even when extending the forms of expression, though, it should still be possible to check what the code means and how far its effects reach.
 
-All these preferences point in the same direction. **I want what we understood while building something to remain available when someone changes it or takes it over.** Whether a person writes the program or AI helps, the person left on site should be able to read it and make a decision.
+In the end, these preferences all point in the same direction. **I don't want what we understood while building something to be lost when we fix it or hand it over.** Whether a person writes it or AI helps, the person left on site needs to be able to read the program and make a judgment.
 
-This section describes the design direction of GhostFlow. Check implementation status and what has been verified on real devices separately.
+This section describes the design criteria GhostFlow aims for. How much of each feature has been implemented, and what has been verified on actual devices, need to be checked separately.
 
 ## Rules for maintaining this reference
 
