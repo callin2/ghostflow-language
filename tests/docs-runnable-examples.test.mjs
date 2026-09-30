@@ -52,6 +52,10 @@ for (const [id, section, marker, nextMarker] of [
     const next = index >= 9 ? null : `### E${String(index + 24).padStart(2, '0')} —`;
     return [`Programming ${id}`, programming, `### ${id} —`, next];
   }).filter(Boolean),
+  ['Programming E34', programming, '### E34 —', '### E35 —'],
+  ['Programming E35', programming, '### E35 —', '### E36 —'],
+  ['Programming E36', programming, '### E36 —', '### E37 —'],
+  ['Programming E37', programming, '### E37 —', '### E98 —'],
 ]) {
   test(`${id} remains executable GhostFlow`, () => {
     const compiled = compileSourceSync(example(section, marker, nextMarker), { filename: `${id}.ghost.md` });
@@ -124,6 +128,11 @@ for (const [id, diagnostic] of [
   ['E95', /case for Mode must be exhaustive/],
   ['E96', /duplicate output connection lamp/],
   ['E97', /cannot use Result directly/],
+  ['E98', /does not implicitly mix Int and Number/],
+  ['E99', /invalid datetime literal/],
+  ['E100', /Solar schedule requires fallback/],
+  ['E101', /fallback must be skip/],
+  ['E102', /requires one argument and terminal: skip/],
 ]) {
   test(`Programming ${id} retains its intended compiler diagnostic`, () => {
     const code = document => {

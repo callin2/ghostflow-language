@@ -1150,11 +1150,13 @@ For example, `gap = skip_after(10min);` declares a gap policy. Tide's `basis = r
 | `instant` | `instant(DateTime)`: absolute Periodic anchor | Constant DateTime; current executable slice uses preserve_anchor and pulse. [Periodic](../tests/periodic-cron-policy.test.mjs). |
 | `civil` | `civil(Date, TimeOfDay)`: civil Periodic anchor | Constant date/time; checked descriptor contract, outside current Periodic bytecode slice. [Periodic](../tests/periodic-cron-policy.test.mjs). |
 | `skip_after` | `skip_after(Duration)`: bound acceptable observation gap | Schedule gap field; larger gaps use explicit skip/baseline policy. [Policies](../tests/periodic-cron-policy.test.mjs). |
-| `range` | `range(Duration)`: planned civil interval | Schedule basis; nonoverlap must be provable and cancel_when explicit. Descriptor-only; no control bytecode. [Range contract](../tests/schedule-descriptor-artifact.test.mjs). |
+| `range` | `range(Duration)`: planned interval | Schedule basis; nonoverlap must be provable and cancel_when explicit. Fixed UTC ranges have a bounded execution slice; general civil ranges remain descriptor scope. [Range contract](../tests/schedule-descriptor-artifact.test.mjs). |
 | `run` | `run(Duration, within(Duration))`: Tide run from admission | Tide basis; first Duration is run length. Admission must occur inside the grace interval. [Tide](../tests/natural-schedule-contract.test.mjs). |
 | `within` | `within(Duration)`: Tide admission grace | Only second argument of Tide run; [planned,planned+grace), exact end excluded. It does not extend run length. [Tide](../tests/natural-schedule-contract.test.mjs). |
+| `hold_trusted` | `hold_trusted(Duration, terminal: skip)`: bounded trusted-time hold | Solar/Tide clock field; positive constant, prior trusted evidence and run/time continuity required. Exact expiry skips. E36. |
+| `fixed_time` | `fixed_time(TimeOfDay literal, terminal: skip)`: fixed-time fallback | Solar fallback only; constant TimeOfDay literal and explicit terminal skip. Do not transfer it to Tide. E36/E101. |
 
-Current executable schedule slices use trusted clock, baseline recovery and skip fallback. Daily/slots/Cron use pulse; Periodic requires instant+preserve_anchor; Tide uses run+within. A civil contract accepted into a descriptor is not an executable schedule.
+Current executable schedules use baseline recovery. Solar and Tide support `trusted_only` or `hold_trusted` with a positive constant Duration and `terminal: skip`. Solar also supports `fixed_time(TimeOfDay, terminal: skip)` fallback; Tide fallback is `skip`. Daily/slots/Cron use pulse; Periodic requires instant+preserve_anchor; Tide uses run+within. Fixed UTC `range` has a separate bounded execution slice; this does not make every civil descriptor executable. See E36–E37 below and the [fallback checks](../tests/natural-fallback-compiler.test.mjs).
 Source: [schedule lowering and slice selection](../tools/control.mjs), [time Reference](reference/03-time-and-schedules.md).
 
 ### 13.6 Account for use before granting more
@@ -2060,3 +2062,176 @@ control OwnedWateringRule {
 ```
 
 The shared GhostFlow promise is larger than moving a device. It keeps the reasoning from input and rule through output intent in the source so another person can review and continue the work.
+
+## Exact counts and natural time: executable R14–R17 examples
+
+This section explains R14–R17 from [#30](https://github.com/callin2/ghostflow-language/issues/30) through independent programs supported today. [Reference 02](reference/02-types-expressions-state.en.md) and [Reference 03](reference/03-time-and-schedules.en.md) define the rules. Provisional wording in historical review plans does not replace adopted rules. The following tracks decisions and work already adopted; it does not ask readers to select those policies again.
+
+| Item | Adopted decision and work | Execution evidence |
+|---|---|---|
+| R14 exact counts | #22/#24/#25: checked i32 Int, explicit conversion, reject overflowing ticks | E34/E98, [integer checks](../tests/int-compiler.test.mjs), [division and boundaries](../tests/int-division-identity.test.mjs) |
+| R15 absolute time | #27: DateTime with an offset, exact UTC instant, Duration shifts | E35/E99, [DateTime execution](../tests/date-time-control.test.mjs) |
+| R16 calendar/natural schedules | #28 and #401/#403: Solar pulse, Tide run/within, provider and occurrence identity | E36/E37, [natural schedules](../tests/natural-schedule-contract.test.mjs), [Solar scan parity](../tests/solar-scanframe-native-wasm.test.mjs) |
+| R17 uncertain-time policy | #29: bounded hold_trusted, Solar fixed_time, explicit terminal skip | E36/E100–E102, [fallback compilation](../tests/natural-fallback-compiler.test.mjs), [fallback execution](../tests/natural-fallback-runtime.test.mjs) |
+
+The current compiler emits executable bytecode for E34–E37. The error examples below are complete programs intentionally rejected by that compiler. Run each fence separately. [Document compilation checks](../tests/docs-runnable-examples.test.mjs) verify identical source in both languages and intended diagnostics; [book execution checks](../tests/programming-natural-examples.test.mjs) exercise E34–E37 host behavior. Compilation and host runtime checks do not establish Device deployment or physical output confirmation.
+
+### E34 — Count true scans exactly
+
+Add one on every successful scan with `add=true`. This counts scans, rather than rising edges, so holding true increments on every scan. The output reads `count'` after parallel update. Adding at the Int maximum rejects the tick with `integer-overflow` and commits neither new state nor output intent. It does not hide overflow by wrapping or saturation.
+
+```ghost
+// E34
+control ExactScanCount {
+  input add: Bool;
+  state count: Int = 0;
+  output total: Int;
+  count' = if add then count + 1 else count;
+  total <- count';
+}
+```
+
+### E35 — Compare an absolute window with explicit offsets
+
+The local spelling 06:30+09:00 and the previous day's 21:30Z identify the same UTC instant. `now` is a typed DateTime supplied by the environment; this expression does not guess a number's meaning or clock trust. The window includes its start and excludes its end. `5min` is a fixed Duration, not a calendar month or timezone change. Out-of-domain DateTime input or a shift result is rejected without partial state updates.
+
+```ghost
+// E35
+control AbsoluteWindow {
+  input now: DateTime;
+  output in_window, same_instant: Bool;
+  let start = datetime`2026-09-30T06:30:00+09:00`;
+  let end = start + 5min;
+  in_window <- now >= start && now < end;
+  same_instant <- start == datetime`2026-09-29T21:30:00Z`;
+}
+```
+
+### E36 — Sunrise pulses with bounded clock and fixed-time fallback
+
+Request a start pulse at the occurrence thirty minutes after sunrise when `enabled`. `start` is not an all-day state and adds no duration run. The environment supplies trusted clock and location/Solar calculation evidence. Within the same run/time continuity, `hold_trusted` extends a previously received trusted snapshot using monotonic time for less than two minutes. Without that prior evidence, or at the exact two-minute boundary, it skips. Held time is not recorded as trusted wall time.
+
+When the Solar event is unavailable, use the explicit alternative at UTC 06:30. This fallback still needs a valid trusted or bounded held clock. Unavailable time becomes neither zero nor now; its terminal policy is skip. First observation and baseline recovery after a large gap do not retroactively start past occurrences. Schedule evidence distinguishes admission, unknown and fallback reasons.
+
+```ghost
+// E36
+control SolarFallbackStart {
+  input enabled: Bool;
+  schedule dawn: Solar {
+    timezone = "UTC";
+    latitude = 37;
+    longitude = 127;
+    at = sun`rise + 30min`;
+    basis = pulse;
+    when = enabled;
+    clock = hold_trusted(2min, terminal: skip);
+    gap = skip_after(60s);
+    recovery = baseline;
+    fallback = fixed_time(time`06:30`, terminal: skip);
+  }
+  output start: Bool;
+  start <- dawn.due;
+}
+```
+
+### E37 — Admit before high tide, then run on monotonic time
+
+Planned time is thirty minutes before high tide from provider `harbor_tides`. With valid fresh predictions, trusted clock and `allowed=true`, admit once inside [planned, planned+10min). The exact end is excluded. Run for five minutes from admission; late admission does not extend run length. `stop=true` cancels through `cancel_when`. Even if new admission becomes unavailable, an already admitted run proceeds on monotonic time subject to cancellation and run/time continuity rules.
+
+Missing/stale predictions or an Unknown clock do not admit new runs. `fallback=skip` neither proves physical fail-safe behavior nor invents predictions. `pump` is output intent, separate from safe/applied/confirmed physical facts. Provider station/revision/occurrence and clock snapshots are environmental inputs; the code contains no addresses or installation credentials.
+
+```ghost
+// E37
+control TideRun {
+  input allowed, stop: Bool;
+  provider harbor_tides: TidePredictions;
+  schedule high: Tide {
+    source = harbor_tides;
+    timezone = "UTC";
+    at = tide`high - 30min`;
+    basis = run(5min, within(10min));
+    when = allowed;
+    cancel_when = stop;
+    clock = trusted_only;
+    gap = skip_after(60s);
+    recovery = baseline;
+    fallback = skip;
+  }
+  output pump: Bool;
+  pump <- high.active;
+}
+```
+
+### E98 — Reject implicit Int and Number mixing
+
+Here count is Int and measurement is Number. The compiler rejects this code. If approximate calculation is intended, write `number(count)` explicitly. To convert to an exact count, choose `int_exact` or an explicit rounding conversion and its error policy.
+
+```ghost-error
+control MixedCount {
+  input count: Int;
+  input measurement: Number;
+  output total: Number;
+  total <- count + measurement;
+}
+```
+
+### E99 — Reject DateTime without an offset
+
+Local time alone does not identify a UTC instant. Supply Z or a numeric offset; do not guess an IANA zone.
+
+```ghost-error
+control MissingOffset {
+  output ready: Bool;
+  ready <- datetime`2026-09-30T06:30:00` < datetime`2026-09-30T07:00:00Z`;
+}
+```
+
+### E100 — Keep Solar fallback explicit
+
+Behavior when data is missing is part of the source contract. A schedule missing mandatory fallback emits no bytecode. If skip is selected, write `fallback = skip;`.
+
+```ghost-error
+control MissingSolarFallback {
+  schedule dawn: Solar {
+    timezone = "UTC"; latitude = 37; longitude = 127; at = sun`rise`;
+    basis = pulse; when = true; clock = trusted_only;
+    gap = skip_after(60s); recovery = baseline;
+  }
+  output start: Bool;
+  start <- dawn.due;
+}
+```
+
+### E101 — Keep Solar fixed-time fallback out of Tide
+
+The current fixed_time execution slice is Solar only. Tide fallback is skip; fixed time is not treated as an occurrence from a high-tide prediction.
+
+```ghost-error
+control UnsupportedTideFallback {
+  provider predictions: TidePredictions;
+  schedule high: Tide {
+    source = predictions; timezone = "UTC"; at = tide`high`;
+    basis = run(5min, within(10min)); when = true; cancel_when = false;
+    clock = trusted_only; gap = skip_after(60s); recovery = baseline;
+    fallback = fixed_time(time`06:30`, terminal: skip);
+  }
+  output pump: Bool;
+  pump <- high.active;
+}
+```
+
+### E102 — Specify the end of clock hold
+
+`hold_trusted(2min)` alone hides what happens after the hold expires. The currently supported explicit terminal policy is `terminal: skip`.
+
+```ghost-error
+control MissingHoldTerminal {
+  schedule dawn: Solar {
+    timezone = "UTC"; latitude = 37; longitude = 127; at = sun`rise`;
+    basis = pulse; when = true; clock = hold_trusted(2min);
+    gap = skip_after(60s); recovery = baseline; fallback = skip;
+  }
+  output start: Bool;
+  start <- dawn.due;
+}
+```
