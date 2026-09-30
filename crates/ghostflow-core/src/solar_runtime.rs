@@ -195,7 +195,23 @@ impl SolarRuntime {
                     d.gap_ms(),
                     activation.boot_epoch,
                     activation.terminal_capacity,
+                )?
+                .with_policy(
+                    match d {
+                        PulseDescriptor::Solar(s) => s.clock_hold_ms,
+                        _ => None,
+                    },
+                    match d {
+                        PulseDescriptor::Solar(s) => s.fallback_time_ms,
+                        _ => None,
+                    },
                 )
+                .map(|engine| {
+                    engine.with_fallback_timezone(match d {
+                        PulseDescriptor::Solar(s) => &s.timezone,
+                        _ => "",
+                    })
+                })
             })
             .collect::<Result<_>>()?;
         Ok(Self {
@@ -318,6 +334,8 @@ impl SolarRuntime {
                     .observations
                     .extend(input.facts.rows.iter().map(|row| {
                         crate::solar_admission::SolarObservation {
+                            fallback: false,
+                            unavailable_reason: None,
                             source_day: row.source_day,
                             slot_key: row.slot_key,
                             minute_of_day: row.minute_of_day,

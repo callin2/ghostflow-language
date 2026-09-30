@@ -909,10 +909,8 @@ class ControlParser {
       } else if (key.value === 'at') {
         options.at = this.solarAt();
       } else if (key.value === 'fallback') {
-        const value = this.identifier('Solar fallback must be skip');
-        if (value.value !== 'skip') error(value, 'Solar fallback must be skip');
-        options.fallback = value.value;
-        policy.fallback = this.node('reference', value, { name: value.value });
+        policy.fallback = this.expression();
+        options.fallback = policy.fallback;
       } else if (['basis', 'when', 'clock', 'gap', 'recovery'].includes(key.value)) {
         policy[key.value] = this.expression();
       } else error(key, `unsupported Solar schedule option ${key.value}`);
@@ -1502,6 +1500,12 @@ class Lowerer {
       : ['all', ...this.manifest.outputs.map(output => ['has', 'actuator', output.name, gfbType(semanticType(output.type))])];
     const solarForms = this.solarForms();
     const contextForms = emitBytecode ? this.contextForms() : [];
+    const extendedSolar = this.manifest.schedules.some(schedule => schedule.kind === 'solar'
+      && (typeof schedule.policy.clock === 'object' || typeof schedule.policy.fallback === 'object'));
+    if (emitBytecode && extendedSolar && (this.manifest.schedules.some(schedule => schedule.kind !== 'solar')
+      || this.providers.size || this.configStreams.length)) {
+      error(this.ast.loc, 'extended Solar policy execution requires Solar-only schedules without providers or config streams');
+    }
     if (contextForms.some(form => form[0] === 'utc-range') && solarForms.length) {
       error(this.ast.loc, 'UTC Range cannot mix with legacy Solar or civil pulse execution');
     }
@@ -1524,6 +1528,8 @@ class Lowerer {
     if (contextForms.length) this.manifest.format = 'GhostFlow/control-v10';
     else if (solarForms.some(form => form[0] === 'daily-slots-pulse')) this.manifest.format = 'GhostFlow/control-v8';
     else if (solarForms.some(form => form[0] === 'daily-pulse')) this.manifest.format = 'GhostFlow/control-v7';
+    if (this.manifest.schedules.some(schedule => typeof schedule.policy?.clock === 'object'
+      || typeof schedule.policy?.fallback === 'object')) this.manifest.format = 'GhostFlow/control-v12';
     const temporalForms = this.windows.length || this.trueFors.length || solarForms.length || contextForms.length ? [
       ['temporal-context', `${RESERVED_PREFIX}now_ms`, `${RESERVED_PREFIX}time_epoch`],
       ...[...this.temporalRoots.values()].sort((left, right) => left.tag - right.tag).map(root =>
@@ -2394,8 +2400,32 @@ class Lowerer {
       if (!sameType(cancel.type, BOOL)) error(options.cancel_when.loc, `${label} cancel_when must be Bool`);
       result.cancelWhen = cancel.sexpr;
     }
-    return { ...result, clock: choice('clock', ['trusted_only']), gapMs: gapDuration.constant,
-      recovery: choice('recovery', ['baseline']), fallback: choice('fallback', ['skip']) };
+    const terminalCall = (node, name) => {
+      if (node.kind !== 'call' || node.name !== name || node.args.length !== 1
+        || node.named.length !== 1 || node.named[0].name !== 'terminal'
+        || node.named[0].value.kind !== 'reference' || node.named[0].value.name !== 'skip') {
+        error(node.loc, `${label} ${name} requires one argument and terminal: skip`);
+      }
+    };
+    let clock, fallback;
+    if (options.clock.kind === 'call' && options.clock.name === 'hold_trusted') {
+      terminalCall(options.clock, 'hold_trusted');
+      const duration = this.expression(options.clock.args[0], new Map(), { allowNext: false }, [], DURATION);
+      if (!sameType(duration.type, DURATION) || !Number.isSafeInteger(duration.constant) || duration.constant <= 0)
+        error(options.clock.loc, `${label} hold_trusted requires a positive constant Duration`);
+      clock = { kind: 'hold_trusted', durationMs: duration.constant, terminal: 'skip' };
+    } else clock = choice('clock', ['trusted_only']);
+    if (label === 'Solar' && options.fallback.kind === 'call' && options.fallback.name === 'fixed_time') {
+      terminalCall(options.fallback, 'fixed_time');
+      const node = options.fallback.args[0];
+      if (node.kind !== 'literal' || !node.raw?.startsWith('time`'))
+        error(node.loc, 'Solar fixed_time requires a TimeOfDay literal');
+      const at = this.expression(node, new Map(), { allowNext: false });
+      if (at.type.kind !== 'TimeOfDay') error(node.loc, 'Solar fixed_time requires a TimeOfDay literal');
+      fallback = { kind: 'fixed_time', atMs: at.constant, terminal: 'skip' };
+    } else fallback = choice('fallback', ['skip']);
+    return { ...result, clock, gapMs: gapDuration.constant,
+      recovery: choice('recovery', ['baseline']), fallback };
   }
   resolveSignal(name) {
     if (this.signals.has(name)) return this.signals.get(name);
@@ -3530,9 +3560,11 @@ class Lowerer {
     ] : [
       'solar-pulse', String(schedule.site), schedule.name, schedule.timezone,
       String(schedule.latitude), String(schedule.longitude), schedule.event,
-      String(schedule.offsetMs), schedule.policy.basis, schedule.policy.clock,
-      String(schedule.policy.gapMs), schedule.policy.recovery, schedule.policy.fallback,
+      String(schedule.offsetMs), schedule.policy.basis, 'trusted_only',
+      String(schedule.policy.gapMs), schedule.policy.recovery, 'skip',
       schedule.policy.when,
+      ...(typeof schedule.policy.clock === 'object' || typeof schedule.policy.fallback === 'object'
+        ? [String(schedule.policy.clock.durationMs ?? 0), String(schedule.policy.fallback.atMs ?? 86400000)] : []),
     ]);
   }
   contextForms() {
@@ -3583,7 +3615,8 @@ class Lowerer {
       if (schedule.kind === 'tide') {
         if (schedule.policy.basis?.kind !== 'run') error(this.ast.loc, 'Tide executable slice requires Run basis');
         return ['tide-run', ...base, schedule.timezone, schedule.source, schedule.event, String(schedule.offsetMs),
-          String(schedule.policy.basis.durationMs), String(schedule.policy.basis.admission.durationMs), when, cancel];
+          String(schedule.policy.basis.durationMs), String(schedule.policy.basis.admission.durationMs), when, cancel,
+          ...(typeof schedule.policy.clock === 'object' ? [String(schedule.policy.clock.durationMs)] : [])];
       }
       const config = this.manifest.configs.find(item => item.name === schedule.selectedConfig);
       if (!config || schedule.policy.basis !== 'pulse') error(this.ast.loc, 'TimeSlots executable slice requires config and pulse');
@@ -3865,7 +3898,7 @@ export function isExecutablePulseSchedule(item) {
     || (item.scheduleType === 'Cron' && item.policy?.basis?.name === 'pulse'
     && item.policy?.clock?.name === 'trusted_only')
     || (item.scheduleType === 'Tide' && item.policy?.basis?.name === 'run'
-    && item.policy?.clock?.name === 'trusted_only');
+    && ['trusted_only', 'hold_trusted'].includes(item.policy?.clock?.name));
 }
 
 /** Immutable UTC recurrence only; other accepted Range variants stay descriptors. */

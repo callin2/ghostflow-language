@@ -55,6 +55,22 @@ fn context_traces(out: &mut impl Write, r: &TickRecord) -> fmt::Result {
             text(out, &observation.provider_revision)?;
             out.write_str(",\"contextRevision\":")?;
             text(out, &observation.context_revision)?;
+            if let Some(provenance) = &observation.clock_provenance {
+                out.write_str(",\"clockProvenance\":")?;
+                text(out, provenance)?;
+                out.write_str(",\"clockSourceRevision\":")?;
+                if let Some(revision) = &observation.clock_source_revision {
+                    text(out, revision)?;
+                } else {
+                    out.write_str("null")?;
+                }
+                out.write_str(",\"clockUncertaintyMs\":")?;
+                optional_u64(out, observation.clock_uncertainty_ms)?;
+            }
+            if let Some(reason) = &observation.unknown_reason {
+                out.write_str(",\"unknownReason\":")?;
+                text(out, reason)?;
+            }
             out.write_char('}')?;
         }
         out.write_char(']')?;
@@ -302,6 +318,18 @@ pub(crate) fn record(out: &mut impl Write, r: &TickRecord) -> fmt::Result {
                 trace.site, trace.due
             )?;
             text(out, &format!("{:?}", trace.decision))?;
+            if let crate::schedule_clock::ClockProvenance::HeldClock { source_revision } =
+                &trace.clock_provenance
+            {
+                out.write_str(",\"clockProvenance\":\"HeldClock\",\"clockSourceRevision\":")?;
+                if let Some(revision) = source_revision {
+                    text(out, revision)?;
+                } else {
+                    out.write_str("null")?;
+                }
+                out.write_str(",\"clockUncertaintyMs\":")?;
+                optional_u64(out, trace.clock_uncertainty_ms)?;
+            }
             if let Some(reason) = &trace.unknown_reason {
                 out.write_str(",\"unknownReason\":")?;
                 text(out, reason)?;
@@ -335,6 +363,12 @@ pub(crate) fn record(out: &mut impl Write, r: &TickRecord) -> fmt::Result {
                 )?;
                 out.write_str(",\"scheduledWallMs\":")?;
                 optional_u64(out, row.scheduled_wall_ms)?;
+                if row.fallback {
+                    out.write_str(",\"fallback\":true")?;
+                }
+                if let Some(reason) = row.unavailable_reason {
+                    write!(out, ",\"unavailableReason\":{}", reason)?;
+                }
                 out.write_str(",\"decision\":")?;
                 text(out, &format!("{:?}", row.decision))?;
                 out.write_str(",\"providerRevision\":")?;

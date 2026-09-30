@@ -63,6 +63,7 @@ pub enum ScheduleDefinition {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ScheduleDescriptor {
+    pub clock_hold_ms: Option<u64>,
     pub site: u32,
     pub name: String,
     pub gap_ms: u64,
@@ -181,6 +182,10 @@ pub struct SettingsEvent {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Observation {
+    pub clock_provenance: Option<String>,
+    pub clock_source_revision: Option<String>,
+    pub clock_uncertainty_ms: Option<u64>,
+    pub unknown_reason: Option<String>,
     pub site: u32,
     pub occurrence_id: String,
     pub planned_ms: Option<u64>,
@@ -476,7 +481,7 @@ pub(crate) fn load_schedule(
                 dst_repeated,
             }
         }
-        13 if format == 12 => {
+        13 if matches!(format, 12 | 13) => {
             if text(reader)? != "UTC" {
                 return Err(Error::new("Range requires UTC timezone"));
             }
@@ -497,13 +502,25 @@ pub(crate) fn load_schedule(
         }
         _ => return Err(Error::new("invalid context schedule kind")),
     };
+    let when = reader.blob()?;
+    let cancel = reader.blob()?;
+    let clock_hold_ms = if format == 13 {
+        let hold = exact(reader)?;
+        if hold != 0 && !matches!(definition, ScheduleDefinition::TideRun { .. }) {
+            return Err(Error::new("clock hold requires natural schedule"));
+        }
+        (hold != 0).then_some(hold)
+    } else {
+        None
+    };
     Ok(ScheduleDescriptor {
+        clock_hold_ms,
         site,
         name,
         gap_ms,
         definition,
-        when: reader.blob()?,
-        cancel: reader.blob()?,
+        when,
+        cancel,
     })
 }
 

@@ -300,6 +300,10 @@ impl ContextRuntime {
             inputs[usize::from(d.value_input)] = Value::Int(value);
             inputs[usize::from(d.fault_input)] = Value::Number(f64::from(fault));
             staged.trace.push(Observation {
+                clock_provenance: None,
+                clock_source_revision: None,
+                clock_uncertainty_ms: None,
+                unknown_reason: None,
                 site: d.site,
                 occurrence_id: String::new(),
                 planned_ms: None,
@@ -485,6 +489,10 @@ impl ContextRuntime {
                         } else {
                             group_fault = Some(SETTINGS_INVALID);
                             staged.trace.push(Observation {
+                                clock_provenance: None,
+                                clock_source_revision: None,
+                                clock_uncertainty_ms: None,
+                                unknown_reason: None,
                                 site: change.id,
                                 occurrence_id: event.event_id.clone(),
                                 planned_ms: None,
@@ -525,6 +533,10 @@ impl ContextRuntime {
         for config in &staged.runtime.configs {
             config.project(inputs);
             staged.trace.push(Observation {
+                clock_provenance: None,
+                clock_source_revision: None,
+                clock_uncertainty_ms: None,
+                unknown_reason: None,
                 site: config.descriptor.id,
                 occurrence_id: String::new(),
                 planned_ms: None,
@@ -591,6 +603,10 @@ impl ContextRuntime {
             inputs[usize::from(d.value_input)] = Value::Bool(value);
             inputs[usize::from(d.fault_input)] = Value::Number(f64::from(fault));
             staged.trace.push(Observation {
+                clock_provenance: None,
+                clock_source_revision: None,
+                clock_uncertainty_ms: None,
+                unknown_reason: None,
                 site: d.site,
                 occurrence_id: String::new(),
                 planned_ms: None,

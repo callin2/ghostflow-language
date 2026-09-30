@@ -1,5 +1,11 @@
 # GFB bytecode
 
+## Bounded natural policies (GFB13)
+
+Only extended Solar/Tide policies select GFB13 and `GhostFlow/control-v12`; legacy profile bytes remain unchanged. Solar tag 1 retains its layout and appends after the `when` expression `holdMs:u64` (0 means none) and `fallbackAtMs:u64` (86400000 means skip). Context records append `holdMs:u64` after the cancellation expression. Manifest policies are objects: clock `{kind: 'hold_trusted', durationMs, terminal: 'skip'}`, fallback `{kind: 'fixed_time', atMs, terminal: 'skip'}`.
+
+Extended Solar facts use GFSF6: retain the Solar v1 row layout and append after provider/context strings optional `fallbackWallMs` and `unavailableReason:u8` (255 means none; 0–5 are natural-context reason codes). Legacy v1 packets and WASM function names remain unchanged. Pinned older runtimes reject GFB13 before activation. The signed portable-package config-only GFB11 profile remains narrow. This format is not physical Device evidence.
+
 All integers are little-endian. Strings are `u16 length` followed by UTF-8
 bytes. Values use a bounded postfix stack; conditional expressions use forward
 branches. Public compilation accepts a complete canonical `.ghost.md` document.

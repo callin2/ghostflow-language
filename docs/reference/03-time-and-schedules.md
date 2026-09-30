@@ -293,12 +293,25 @@ cancel_when := Bool                                   // 현재 civil range에 �
 경계에서는 `ClockUnknown` 뒤 새 admission 판단에 terminal skip을 적용한다.
 이미 admit한 Range의 단조 종료 시점은 유지한다. high-water는 바꾸지 않는다.
 
-현재 compiler는 `clock = trusted_only`, `fallback = skip`만 받는다.
-`window`, `run(_, on_time)`, `At`, `hold_trusted`, `fixed_time`은 선택된 설계 표기이며
+현재 compiler는 Solar와 Tide에 `clock = hold_trusted(positive constant Duration, terminal: skip)`을,
+Solar에 `fallback = fixed_time(TimeOfDay literal, terminal: skip)`을 받는다.
+Tide는 `fallback = skip`만 허용하며 다른 trigger는 trusted-only clock과 skip fallback을 유지한다.
+`window`, `run(_, on_time)`, `At`은 선택된 설계 표기이며
 아직 compiler 지원 범위 밖이다. civil `range`는 UTC timezone의 정적 non-overlap을
 증명해야 한다. 불변 UTC Daily와 비어 있지 않은 정적 DailySlots Range는 GFB12로
 실행되며 다른 허용된 Range recurrence는 비실행 descriptor로 유지된다.
 Tide의 `run(_, within(_))`은 지원한다.
+
+bounded 자연 정책 admission은 단조 경과가 duration보다 엄격히 작은 동안만 held time을 사용한다.
+trusted anchor나 uncertainty가 없거나 checked 덧셈이 overflow하면 fail closed한다.
+held wall time과 uncertainty는 마지막 trusted 값에 경과 시간을 더하며 `HeldClock` provenance를 남긴다.
+만료는 새 admission을 terminal skip하고 high-water를 유지하며 active Run의 종료를 늘리지 않는다.
+회복은 baseline을 설정하고 재시작은 새 clock으로 시작한다. facts provider는 IANA 변환을 소유하며
+알려진 source local date와 그 날짜의 작성한 시간·timezone에 맞는 fallback instant를 제공한다.
+모호하거나 존재하지 않는 civil time은 fold를 만들지 않고 terminal skip한다.
+core는 admission과 생성 due input을 소유한다. 같은 source local date의 fallback과 회복된 Solar 사건은
+consumed identity와 terminal checkpoint를 공유한다. 이 제한은 예측 부재나 불확실한 clock이 occurrence를
+암묵적으로 만드는 것을 막는다.
 
 `fixed_time`은 Solar에서만 쓸 수 있다. 해당 source local date의 fallback occurrence가
 admit되면 같은 occurrence ledger가 그 날짜의 Solar 사건을 소비하므로 provider가
@@ -536,6 +549,8 @@ occurrence를 남은 시간 동안 admit한다. 같은 schedule에 동시에 열
 정확히 하나만 교차한 경우에는 각 basis의 ordinary admission 규칙을 적용한다.
 
 ## 3.6 선택된 DailySlots
+
+확장 Solar 정책은 bounded Solar profile에서만 실행한다. non-Solar schedule, provider/config 실행이나 지원하지 않는 기능과의 조합은 거부한다. 기존 Solar 조합은 기존 profile을 유지한다.
 
 `DailySlots<15min>`은 지역 날짜의 15분 격자 시각을 선택하는 일정이다.
 

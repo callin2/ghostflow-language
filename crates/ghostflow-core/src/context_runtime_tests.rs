@@ -92,6 +92,7 @@ fn module(descriptor: PulseDescriptor, natural: bool) -> Module {
 fn periodic() -> Module {
     let mut program = module(
         PulseDescriptor::Context(ScheduleDescriptor {
+            clock_hold_ms: None,
             site: 7,
             name: "periodic".into(),
             gap_ms: 60,
@@ -172,6 +173,7 @@ fn periodic_facts() -> context_runtime::Facts {
 fn utc_range_program() -> Module {
     let mut program = module(
         PulseDescriptor::Context(ScheduleDescriptor {
+            clock_hold_ms: None,
             site: 7,
             name: "planned".into(),
             gap_ms: 60,
@@ -533,6 +535,7 @@ fn one_scan_rejects_mixed_provider_revisions_before_committing_any_state() {
     strategy
         .schedules
         .push(PulseDescriptor::Context(ScheduleDescriptor {
+            clock_hold_ms: None,
             site: 8,
             name: "run".into(),
             gap_ms: 60,

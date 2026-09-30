@@ -28,6 +28,8 @@ frame을 native framed VM과 비교하며 native 원본 sensor scenario 호스�
 
 `output name: Type;` 선언은 형식만 지정하며 정확히 하나의 `name <- expression;` 연결을 가져야 합니다. 이 연결은 해당 틱의 논리적 요청 의도를 만듭니다. 안전성 해결은 이와 다른 안전 의도를 만들 수 있습니다. VM은 시작 기본값을 할당하지 않으며 의도가 하드웨어에 도달했다고 보장하지 않습니다. 시작 및 실패 안전 OFF 동작, 출력 적용 시점, 드라이버 연결 해제 처리는 호스트/드라이버 정책이며 별도 증거가 필요합니다.
 
+확장 Solar/Tide 자연 정책은 GFB13과 `GhostFlow/control-v12`를 선택하며 Solar facts는 GFSF6을 사용한다. 기존 profile과 packet bytes는 그대로다. WASM 함수 이름은 바뀌지 않으며 이전 pinned runtime은 GFB13을 거부한다. 서명 portable-package의 config-only GFB11 profile은 넓히지 않는다. compiler/runtime 회귀 검증은 `natural-fallback-compiler.test.mjs`, `natural-fallback-runtime.test.mjs`, core `solar_tape` 테스트가 담당한다. 문서는 해당 실행 결과나 물리 Device 동작의 증거가 아니다.
+
 ## 아티팩트와 버전
 
 | 항목 | 현재 표현 | 역할 |

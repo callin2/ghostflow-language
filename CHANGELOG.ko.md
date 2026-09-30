@@ -5,6 +5,10 @@
 
 ## 미출시
 
+### 2026-10-01 — bounded 자연 사건 fallback ([#29](https://github.com/callin2/ghostflow-language/issues/29))
+
+Reference §3.4는 Solar/Tide의 `clock = hold_trusted(5min, terminal: skip)`와 Solar의 `fallback = fixed_time(time`06:00`, terminal: skip)`을 허용한다. 이전에는 trusted-only clock과 skip fallback만 받았다. hold는 엄격한 duration 경계에서 만료되며 anchor/uncertainty 부재는 fail closed한다. fallback은 회복과 checkpoint에서도 같은 source-date Solar identity를 소비한다. facts provider가 IANA civil time을 변환하며 모호하거나 존재하지 않는 시간은 skip한다. 확장 정책은 GFB13/control-v12와 Solar GFSF6을 선택한다. 기존 bytes는 그대로이며 이전 pinned runtime은 GFB13을 거부한다. 서명 portable-package GFB11 profile은 좁게 유지한다. 회귀 검증: `natural-fallback-compiler.test.mjs`, `natural-fallback-runtime.test.mjs`, core `solar_tape`. 실행 결과는 별도로 보고하며 물리 Device 검증을 주장하지 않는다.
+
 ### 2026-10-01 — pause 중 Solar 관측 ([#402](https://github.com/callin2/ghostflow-language/issues/402))
 
 명시적 paused observation은 작성된 program 실행이나 scan 생성 없이 Solar terminal
