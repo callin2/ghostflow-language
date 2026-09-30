@@ -2,6 +2,13 @@
   "format": "GhostFlow/document-translations-v1",
   "documents": [
     {
+      "source": "docs/INTERACTION-STREAM-CONTRACT.md",
+      "sourceLanguage": "en",
+      "translation": "docs/INTERACTION-STREAM-CONTRACT.ko.md",
+      "sourceSha256": "f2e179afa29cc1d6eef9be9cd4df17f17f906686fa7eb74b5254d52a86d10662",
+      "translationSha256": "a5a9493fd5cb51411d81b59c24b78b686822539870d8db5b5e2fdf94f8c131b7"
+    },
+    {
       "source": "docs/DRIVER-ABI-V1-DRAFT.md",
       "sourceLanguage": "en",
       "translation": "docs/DRIVER-ABI-V1-DRAFT.ko.md",
