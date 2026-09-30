@@ -31,6 +31,8 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/adapt-control-host.test.mjs',
   'tests/optional-feedback-timer-compiler.test.mjs',
   'tests/optional-feedback-timer.test.mjs',
+  'tests/explicit-feedback-adoption-compiler.test.mjs',
+  'tests/explicit-feedback-adoption.test.mjs',
   'tests/reference-query.test.mjs',
   'tests/reference-index-links.test.mjs',
   'tests/reference-terms-boundaries.test.mjs',
