@@ -5,6 +5,16 @@
 
 ## 미출시
 
+### 2026-09-30 — 무시되던 input 초기값 거부 ([#151](https://github.com/callin2/ghostflow-language/issues/151))
+
+버그 수정, Reference §1.6: 기존에는 `input x: Bool = false;`를 파싱한 뒤 초기값을
+조용히 버렸다. 이제 canonical literate 문서를 포함한 원본 소스의 `=` 위치에서
+오류가 발생한다. `input x: Bool;`로 바꾸고 host에서 값을 공급한다. 암묵적인
+기본값이나 fallback은 도입하지 않는다. State 초기화와 타입만 선언하는 output은
+바뀌지 않는다. `tests/compiler.test.mjs`에서 초기값 거부, 소스 위치, state·output을
+포함한 유효한 host 입력 선언을 검증한다. `tests/control-host.test.mjs`는 실제 WASM으로
+입력 누락 거부와 명시적인 true·false 값을 검증한다. GFB/ABI 변경은 없다.
+
 ### 2026-09-30 — 네이티브 시나리오 Percent 입력 버그 수정
 
 네이티브 시나리오 실행기는 이제 0..100 범위(양 끝 포함)의 유한한 `Percent` 입력을

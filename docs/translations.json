@@ -285,8 +285,8 @@
       "source": "docs/reference/01-source-and-syntax.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/01-source-and-syntax.en.md",
-      "sourceSha256": "0ce85a809713cf57f62928cc1dfca222109e3cd8ed04bb2247e51bdea14c4dfe",
-      "translationSha256": "32a713f82c3603e9d25534b46e8cb4c3eb94fad47857f3693887fcb4e020080f"
+      "sourceSha256": "41dc41d8a4cf38b5ee56118c0c563226a87981e0d761ee0244dc4bd2852dc0de",
+      "translationSha256": "e2b3366085e862113bf100a00836496e4c5036f54877e1f132ecdc60ebe138ec"
     },
     {
       "source": "docs/reference/02-types-expressions-state.md",
@@ -516,8 +516,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "fdd25a3f5409b0bfa0375da85ffb9ccd73e52f8a70c76edbf6b748933439d995",
-      "translationSha256": "cf5afab9f96d71f3cd7b651141e2c278e2bcb2b53d522563fe6002118bb4414a"
+      "sourceSha256": "6c046f68c2f2343cb1c26b1e7e0add1aa6fb84cd5d4dc1039a6038dec792aa19",
+      "translationSha256": "79ba0893fee9f5e3aee8743c958deade81f1f8d36ff4b9a42bf59b2e30a3a0ce"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",
