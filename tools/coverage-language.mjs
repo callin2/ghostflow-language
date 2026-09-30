@@ -89,6 +89,7 @@ const TESTS = Object.freeze([
   'tests/verified-wasm-artifact.test.mjs', 'tests/window-wasm.test.mjs',
 ]);
 const TARGETS = Object.freeze([
+  'tools/int-settings.mjs',
   'tools/control.mjs', 'tools/gfb1.mjs', 'tools/core-ir.mjs', 'tools/literate.mjs', 'tools/toolchain.mjs',
   'runtimes/wasm/control-runtime.mjs', 'runtimes/wasm/ghostflow-runtime.mjs',
 ]);

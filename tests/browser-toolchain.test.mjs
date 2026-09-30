@@ -56,6 +56,9 @@ test('browser public compiler graph contains no Node builtin or Buffer dependenc
   const runtimeSnapshotModules = browserModuleGraph(fileURLToPath(runtimeSnapshotEntry));
   assert.ok(runtimeSnapshotModules.has(path.join(root, 'tools/interaction-runtime-snapshot.mjs')));
   assert.ok(runtimeSnapshotModules.has(path.join(root, 'tools/interaction-schema.mjs')));
+  for (const entry of ['runtimes/wasm/control-runtime.mjs', 'tools/portable-package.mjs']) {
+    assert.ok(browserModuleGraph(path.join(root, entry)).has(path.join(root, 'tools/int-settings.mjs')));
+  }
 });
 
 test('shared SHA-256 matches Node across padding, UTF-8, binary, and source-limit inputs', () => {
