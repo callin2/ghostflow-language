@@ -82,6 +82,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/LLM-TOOLCHAIN-ARCHITECTURE.md](LLM-TOOLCHAIN-ARCHITECTURE.md) | Authoring and virtual simulation architecture | md |
 | [docs/OPERATOR-SETTINGS-STREAM.ko.md](OPERATOR-SETTINGS-STREAM.ko.md) | Typed configuration stream | md |
 | [docs/OPERATOR-SETTINGS-STREAM.md](OPERATOR-SETTINGS-STREAM.md) | Typed configuration streams | md |
+| [docs/OPTIMIZER-PASS-CONTRACT.ko.md](OPTIMIZER-PASS-CONTRACT.ko.md) | 최적화 패스 계약 | md |
+| [docs/OPTIMIZER-PASS-CONTRACT.md](OPTIMIZER-PASS-CONTRACT.md) | Optimizer pass contract | md |
 | [docs/PORTABLE-PACKAGE.ko.md](PORTABLE-PACKAGE.ko.md) | 이식 가능한 GFB 패키지 v1 | md |
 | [docs/PORTABLE-PACKAGE.md](PORTABLE-PACKAGE.md) | Portable GFB package v1 | md |
 | [docs/ProgrammingInGhostflow.en.md](ProgrammingInGhostflow.en.md) | Programming in GhostFlow | md |
@@ -200,4 +202,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.ko.md](research/GF-COMPOSE-R9-ACCEPTANCE.ko.md) | GF-COMPOSE R9: acceptance와 구현 인계 | md |
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.md](research/GF-COMPOSE-R9-ACCEPTANCE.md) | GF-COMPOSE R9: acceptance and implementation handoff | md |
 
-166 documents.
+168 documents.
