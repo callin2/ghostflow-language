@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import test from 'node:test';
 import { compileControl, typeCheckControl } from '../tools/control.mjs';
 import { extractLiterate } from '../tools/literate.mjs';
+import { compileSource } from '../tools/toolchain.mjs';
 
 const cases = JSON.parse(fs.readFileSync(new URL('./reference/cases/02-time-control.json', import.meta.url))).cases;
 const fixture = cases.find(entry => entry.id === 'REF-03-062');
@@ -112,3 +113,24 @@ test('all Reference tide classes and moon phases are accepted', () => {
     assert.equal(manifest.naturalConditions[0].classification, classification);
   }
 });
+
+for (const classification of ['spring', 'neap']) {
+  test(`${classification}: canonical condition has a source-bound descriptor and explicit fault branch`, async () => {
+    const source = fixture.source.replace('tide`neap`', `tide\`${classification}\``);
+    const compiled = await compileSource(source, { filename: fixture.filename });
+    const condition = compiled.manifest.naturalConditions.find(item => item.operation === 'tide_is');
+    assert.equal(condition.classification, classification);
+    assert.equal(condition.provider, 'harbor_tides');
+    assert.deepEqual(condition.result, { value: 'Bool', error: 'TemporalContextFault' });
+    const mapped = compiled.sourceMap.find(node => node.id === condition.site);
+    assert.equal(mapped.kind, 'call');
+    assert.equal(mapped.line, source.split('\n').findIndex(line => line.includes('tide_is(')) + 1);
+    const extracted = extractLiterate(source, { filename: fixture.filename }).code;
+    assert.equal(extracted.slice(mapped.offset, mapped.endOffset), 'tide_is');
+
+    const wrongFaultBranch = source.replace('fault(_) => false', 'fault(_) => 5min');
+    await assert.rejects(() => compileSource(wrongFaultBranch, { filename: fixture.filename }), /case branches/);
+    const missingFaultBranch = source.replace('fault(_) => false;', '');
+    await assert.rejects(() => compileSource(missingFaultBranch, { filename: fixture.filename }), /exhaustive|fault/);
+  });
+}
