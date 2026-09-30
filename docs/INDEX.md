@@ -38,6 +38,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/DOCUMENTATION-LANGUAGES.md](DOCUMENTATION-LANGUAGES.md) | Documentation languages | md |
 | [docs/DOCUMENTATION.ko.md](DOCUMENTATION.ko.md) | 문서 목록 | md |
 | [docs/DOCUMENTATION.md](DOCUMENTATION.md) | Documentation catalog | md |
+| [docs/DRIVER-ABI-V1-DRAFT.ko.md](DRIVER-ABI-V1-DRAFT.ko.md) | Host–Driver C ABI v1 초안 | md |
+| [docs/DRIVER-ABI-V1-DRAFT.md](DRIVER-ABI-V1-DRAFT.md) | Host–Driver C ABI v1 draft | md |
 | [docs/ESTIMATE-EVIDENCE.ko.md](ESTIMATE-EVIDENCE.ko.md) | 유한한 추정 근거 admission | md |
 | [docs/ESTIMATE-EVIDENCE.md](ESTIMATE-EVIDENCE.md) | Bounded estimate evidence admission | md |
 | [docs/EXACT-INTEGER-CONTRACT.ko.md](EXACT-INTEGER-CONTRACT.ko.md) | 정확한 정수 계약 제안 | md |
@@ -196,4 +198,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.ko.md](research/GF-COMPOSE-R9-ACCEPTANCE.ko.md) | GF-COMPOSE R9: acceptance와 구현 인계 | md |
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.md](research/GF-COMPOSE-R9-ACCEPTANCE.md) | GF-COMPOSE R9: acceptance and implementation handoff | md |
 
-162 documents.
+164 documents.

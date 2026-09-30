@@ -86,6 +86,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/DOCUMENTATION-LANGUAGES.md](docs/DOCUMENTATION-LANGUAGES.md) | Documentation languages | md |
 | [docs/DOCUMENTATION.ko.md](docs/DOCUMENTATION.ko.md) | 문서 목록 | md |
 | [docs/DOCUMENTATION.md](docs/DOCUMENTATION.md) | Documentation catalog | md |
+| [docs/DRIVER-ABI-V1-DRAFT.ko.md](docs/DRIVER-ABI-V1-DRAFT.ko.md) | Host–Driver C ABI v1 초안 | md |
+| [docs/DRIVER-ABI-V1-DRAFT.md](docs/DRIVER-ABI-V1-DRAFT.md) | Host–Driver C ABI v1 draft | md |
 | [docs/ESTIMATE-EVIDENCE.ko.md](docs/ESTIMATE-EVIDENCE.ko.md) | 유한한 추정 근거 admission | md |
 | [docs/ESTIMATE-EVIDENCE.md](docs/ESTIMATE-EVIDENCE.md) | Bounded estimate evidence admission | md |
 | [docs/EXACT-INTEGER-CONTRACT.ko.md](docs/EXACT-INTEGER-CONTRACT.ko.md) | 정확한 정수 계약 제안 | md |
@@ -422,4 +424,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-312 documents.
+314 documents.
