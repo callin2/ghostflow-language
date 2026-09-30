@@ -5,6 +5,18 @@
 
 ## 미출시
 
+### 2026-09-30 — 네이티브 시나리오 Percent 입력 버그 수정
+
+네이티브 시나리오 실행기는 이제 0..100 범위(양 끝 포함)의 유한한 `Percent` 입력을
+받으며 초기 입력과 입력 변경 action 모두 숫자 값을 그대로 보존한다. 기존에는 공개
+시뮬레이터가 입력을 검증해도 네이티브 전달 경로에서 잘못된 타입으로 거부했으며,
+프로그래밍 예제 E32도 실패했다. 예를 들어 `input level: Percent;`에 host 값 `33.5`를
+공급하면 `33.5`를 유지한다. 잘못된 값과 nominal 타입 불일치는 계속 거부한다.
+기존 Percent 계약(Reference §2.1)을 복구하며 소스 이행이나 GFB/ABI 변경은 없다.
+네이티브 `scenario_scan` 단위 테스트, `tests/ghostsim.test.mjs`,
+`tests/ghostsim-input-validation.test.mjs`, `tests/programming-book-simulation.test.mjs`의
+E32로 검증한다. [#151](https://github.com/callin2/ghostflow-language/issues/151)의 선행 수정이다.
+
 ### 2026-09-29 — 고정 sensor·함수 합성 ([#377](https://github.com/callin2/ghostflow-language/issues/377))
 
 Reference §6.4의 sensor 연결과 import 순수 함수가 미지원 거부 대신 실행된다.
