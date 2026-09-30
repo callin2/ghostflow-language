@@ -176,7 +176,7 @@ A program has exactly one `control` execution root. Document-scope imports pin a
 The declaration forms established by the selected syntax are below. Detailed rules for `expr`, `type`, and `pattern` are covered in the [next chapter](02-types-expressions-state.md).
 
 ```text
-input_decl       ::= 'input' name_list ':' type [ '=' expr ] ';'
+input_decl       ::= 'input' name_list ':' type ';'
 sensor_decl      ::= 'sensor' Identifier [ '?' ] ':' type
                      ( ';' | '{' { sensor_setting ';' } '}' )
 output_decl      ::= 'output' name_list ':' type ';'
@@ -199,7 +199,13 @@ name_list        ::= Identifier { ',' Identifier }
 parameter_list   ::= Identifier ':' type { ',' Identifier ':' type }
 ```
 
-The current parser reads an `input` initializer but does not use it as an initial executable input value. The host supplies inputs. Do not use initializers in source expecting executable semantics.
+`input` declares names and types only. An initializer such as `input x: Bool = false;`
+is a compile error at the source location of `=`. The host supplies input values;
+the declaration introduces no implicit default or fallback. Declare `input x: Bool;`
+and supply its value from the host. Use `state` for internal program memory that
+needs an initial value.
+
+**Why**: An unused initializer must not appear to provide an executable fallback.
 
 Unlike the general declaration structure, `schedule` has settings blocks specific to each type. The settled daily-slot form is below.
 

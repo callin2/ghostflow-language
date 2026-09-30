@@ -25,6 +25,13 @@ fn typed(input: &Json) -> Result<Value, Box<dyn Error>> {
         "Number" => Ok(Value::Number(
             value.as_f64().ok_or("Number value required")?,
         )),
+        "Percent" => {
+            let value = value.as_f64().ok_or("Percent value required")?;
+            if !value.is_finite() || !(0.0..=100.0).contains(&value) {
+                return Err("Percent value must be finite and within 0..100".into());
+            }
+            Ok(Value::Number(value))
+        }
         "Int" => Ok(Value::Int(i32::try_from(
             value.as_i64().ok_or("Int value required")?,
         )?)),
@@ -55,6 +62,46 @@ fn output_capabilities(
 mod tests {
     use super::*;
     use ghostflow_core::Type;
+
+    #[test]
+    fn percent_inputs_preserve_finite_values_and_inclusive_boundaries() {
+        for value in [0.0, 100.0, 0.25, 33.5] {
+            assert_eq!(
+                typed(&json!({ "type": "Percent", "value": value })).unwrap(),
+                Value::Number(value)
+            );
+        }
+    }
+
+    #[test]
+    fn percent_inputs_reject_out_of_range_and_non_numeric_values() {
+        for value in [
+            json!(-0.01),
+            json!(100.01),
+            json!("50"),
+            json!(true),
+            Json::Null,
+        ] {
+            assert!(typed(&json!({ "type": "Percent", "value": value })).is_err());
+        }
+    }
+
+    #[test]
+    fn typed_inputs_preserve_existing_types_and_reject_unknown_types() {
+        for (input, expected) in [
+            (json!({ "type": "Bool", "value": true }), Value::Bool(true)),
+            (json!({ "type": "Int", "value": -4 }), Value::Int(-4)),
+            (
+                json!({ "type": "Number", "value": -1.5 }),
+                Value::Number(-1.5),
+            ),
+        ] {
+            assert_eq!(typed(&input).unwrap(), expected);
+        }
+        assert!(typed(&json!({ "type": "Unknown", "value": 50 })).is_err());
+        assert!(typed(&json!({ "type": "Int", "value": 1.5 })).is_err());
+        assert!(typed(&json!({ "type": "Bool", "value": 1 })).is_err());
+    }
 
     #[test]
     fn output_capabilities_deduplicate_identical_fields() {

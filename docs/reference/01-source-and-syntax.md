@@ -240,7 +240,7 @@ parameter, instance, connect와 typed expression macro 문법은
 규칙은 [다음 장](02-types-expressions-state.md)에서 다룬다.
 
 ```text
-input_decl       ::= 'input' name_list ':' type [ '=' expr ] ';'
+input_decl       ::= 'input' name_list ':' type ';'
 sensor_decl      ::= 'sensor' Identifier [ '?' ] ':' type
                      ( ';' | '{' { sensor_setting ';' } '}' )
 output_decl      ::= 'output' name_list ':' type ';'
@@ -263,8 +263,12 @@ name_list        ::= Identifier { ',' Identifier }
 parameter_list   ::= Identifier ':' type { ',' Identifier ':' type }
 ```
 
-현재 parser는 `input` initializer를 읽지만 실행 입력의 초기값으로 사용하지 않는다.
-입력값은 host가 공급한다. 실행 의미를 기대하는 소스에는 initializer를 쓰지 않는다.
+`input`은 이름과 타입만 선언한다. `input x: Bool = false;`처럼 초기값을 쓰면
+`=`의 소스 위치에서 컴파일 오류가 발생한다. 입력값은 host가 공급하며, 선언에
+암묵적인 기본값이나 fallback은 없다. `input x: Bool;`처럼 선언하고 host에서
+값을 공급한다. 초기값이 필요한 프로그램 내부 기억은 `state`로 선언한다.
+
+**Why**: 사용되지 않는 초기값이 실행 시 대체값처럼 보이는 일을 막는다.
 
 `schedule`은 일반 선언 골격과 달리 타입별 설정 block을 갖는다. 확정된 일일 슬롯
 형태는 다음과 같다.

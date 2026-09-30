@@ -616,13 +616,14 @@ class ControlParser {
     const names = this.names(`expected ${kind} name`);
     this.expect(':', `expected : after ${kind} name`);
     const type = this.typeName();
+    if (kind === 'input' && this.matches('=')) {
+      error(this.current(), 'input declarations are type-only; the host supplies input values');
+    }
     if (kind === 'output' && this.matches('=')) {
       error(this.current(), 'output declarations are type-only; connect each output with `name <- expression;`');
     }
-    let initial = null;
-    if (this.maybe('=')) initial = this.expression();
     this.expect(';', `expected ; after ${kind} declaration`);
-    return this.node(kind, start, { names: names.map(x => x.value), type, initial });
+    return this.node(kind, start, { names: names.map(x => x.value), type, initial: null });
   }
   state() {
     const start = this.take(), name = this.identifier('expected state name');

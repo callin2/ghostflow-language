@@ -26,6 +26,28 @@ control MoistureHost {
 
 async function artifact() { return compileSource(source, { filename: 'control-host.ghost' }); }
 async function host() { return ControlRuntime.instantiate(wasmBytes, await artifact()); }
+
+test('type-only inputs require host values and preserve initialized state and connected outputs', async () => {
+  const compiled = await compileSource(`control HostInputs {
+    input request: Bool;
+    state active: Bool = false;
+    active' = request;
+    output previous, current: Bool;
+    previous <- active;
+    current <- active';
+  }`, { filename: 'host-inputs.ghost' });
+  const runtime = await ControlRuntime.instantiate(wasmBytes, compiled);
+  try {
+    assert.throws(() => runtime.step({ nowMs: 0, inputs: {} }), /missing input/);
+    const on = runtime.step({ nowMs: 0, inputs: { request: true } });
+    assert.equal(on.vm.safe?.previous ?? on.vm.safeIntents?.previous, false);
+    assert.equal(on.vm.safe?.current ?? on.vm.safeIntents?.current, true);
+    assert.throws(() => runtime.step({ nowMs: 1, inputs: {} }), /missing input/);
+    const off = runtime.step({ nowMs: 1, inputs: { request: false } });
+    assert.equal(off.vm.safe?.previous ?? off.vm.safeIntents?.previous, true);
+    assert.equal(off.vm.safe?.current ?? off.vm.safeIntents?.current, false);
+  } finally { runtime.dispose(); }
+});
 function sample(id, value, quality = 'Good') { return { epoch: 1, id, timestampMs: id * 1000, value, quality }; }
 
 const scheduledSource = extractLiterate(
