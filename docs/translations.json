@@ -201,8 +201,8 @@
       "source": "docs/LANGUAGE-REFERENCE.md",
       "sourceLanguage": "ko",
       "translation": "docs/LANGUAGE-REFERENCE.en.md",
-      "sourceSha256": "7ad71823428dc65f3d41e150ef253431696be4daaeb1e8c1db86a23a338c0309",
-      "translationSha256": "c76ad9196743b3568d698790b0f50cd9533cd691c2882609b7f148e065320be4"
+      "sourceSha256": "5e173bca6dcd2366a735c5e21c91695f8658055211dffe66d567341fce8719e3",
+      "translationSha256": "2332d16dd02d7e339d8c9797061ccdff8d47fdf35afced8f16125626f9409785"
     },
     {
       "source": "docs/LANGUAGE-SURFACE.md",
@@ -271,8 +271,8 @@
       "source": "docs/ProgrammingInGhostflow.md",
       "sourceLanguage": "ko",
       "translation": "docs/ProgrammingInGhostflow.en.md",
-      "sourceSha256": "14f4ed3e7b755adee1778d1c6d06a754a202afa80f48d99ed22c53f9afbfddee",
-      "translationSha256": "e1bfd15a68aece08032f4b4efc66e22896581f49522e2d70242f69b5ea86a502"
+      "sourceSha256": "986edb6956fcada52f46573da2fa4853556d390456c47e7c865c7a1224650494",
+      "translationSha256": "98b1b706b60c318dfc88e234dd3a5106b6b6624a7d78cc7e484054aed6174bc7"
     },
     {
       "source": "docs/REFERENCE-QUERY.md",
@@ -997,7 +997,15 @@
       "reason": "Generated exact canonical section from the bilingual programming book; translate the authored book instead."
     },
     {
+      "path": "examples/programming-book-imports/E21.ghost.md",
+      "reason": "Generated exact canonical section from the bilingual programming book; translate the authored book instead."
+    },
+    {
       "path": "examples/programming-book-imports/E22.ghost.md",
+      "reason": "Generated exact canonical section from the bilingual programming book; translate the authored book instead."
+    },
+    {
+      "path": "examples/programming-book-imports/E31.ghost.md",
       "reason": "Generated exact canonical section from the bilingual programming book; translate the authored book instead."
     },
     {

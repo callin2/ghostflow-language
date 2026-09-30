@@ -301,7 +301,9 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | --- | --- | --- |
 | [examples/programming-book-imports/E19.ghost.md](examples/programming-book-imports/E19.ghost.md) | E19.ghost.md | md |
 | [examples/programming-book-imports/E20.ghost.md](examples/programming-book-imports/E20.ghost.md) | E20.ghost.md | md |
+| [examples/programming-book-imports/E21.ghost.md](examples/programming-book-imports/E21.ghost.md) | E21.ghost.md | md |
 | [examples/programming-book-imports/E22.ghost.md](examples/programming-book-imports/E22.ghost.md) | E22.ghost.md | md |
+| [examples/programming-book-imports/E31.ghost.md](examples/programming-book-imports/E31.ghost.md) | E31.ghost.md | md |
 
 ## examples/tutorial/
 
@@ -414,4 +416,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-304 documents.
+306 documents.

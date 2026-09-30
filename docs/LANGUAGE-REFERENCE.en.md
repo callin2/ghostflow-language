@@ -37,81 +37,123 @@ When documents from different periods conflict, follow the subsequent decision t
 
 ## Design philosophy
 
-### 1. Read intent and rules together
+Imagine that a pump stops at four in the morning. The person who wrote the program cannot be reached, and someone at the site has to find the cause.
 
-A control program should contain both “what happens under which conditions” and “why it happens.” Even when a condition is readable, losing the reason for choosing it makes the validity of a change difficult to assess. GhostFlow puts explanation and code in the same document and connects intent, premises, and assumptions to declarations and expressions. Unconfirmed assumptions do not become user intent.
+That person needs a program that helps them understand why the equipment stopped, what to check, and what they may change. If someone has to remember circumstances that cannot be found in the code, the only option may be to call that person again.
 
-**Related features:** literate `.ghost.md`, intent anchor/link, original revisions and provenance, the meaning of explanation graphs and change history.
+As I designed GhostFlow, I often returned to one principle:
 
-### 2. Expose the boundaries of inputs, decisions, and effects
+**It should be possible to read and change it on site, even at four in the morning.**
 
-The language computes output intentions from inputs. The Driver applies those intentions to the actual environment. Physical device locations and wiring must not be hidden in decision expressions. This boundary allows the same rules to be used for actual operation, explanation, and virtual execution. A true output intention is not confirmation that a physical device moved.
+At first, I wanted to make the control usually done with a PLC easier to build on an inexpensive MCU. But turning on a relay when someone presses a switch was not enough. The reasons for behavior should remain understandable over time; existing work should remain useful when equipment changes; and someone else should be able to take over when the original author is gone.
 
-**Related features:** typed input/output, `<-`, requested/safe intent, logical ports and binding, ghost execution without effects.
+The principles below grew out of those choices.
 
-### 3. Put memory in state and computation in pure functions
+### 1. Keep the reason for the code with the code
 
-Self-holding, accumulated counts, and operating stages require memory. Do not entrust that memory to hidden function-call side effects or statement execution order. Pure functions transform values; `state` holds memory between the previous and next decisions. Feedback must pass through an explicit state boundary.
+“Open the valve, then start the pump three seconds later.”
 
-**Related features:** `state`, next-state expressions, `let`, pure functions, combinational cycle restrictions, explicit delays and state isolation in composition.
+The code might say that. But why wait three seconds? Is that how long the valve takes to open, extra time allowed for the pipes, or a number added for a trial? Without knowing, it is hard to tell whether reducing three seconds to one is safe.
 
-### 4. Obtain the same decision under the same execution conditions
+That is why GhostFlow puts explanations and code in one `.ghost.md` document. The document records not only what the program does, but why it was chosen and which equipment and conditions it assumes, linked to the relevant code. Later, someone should be able to trace which explanation supports the code and what changed in each revision.
 
-Identical inputs, previous state, effective settings, and time conditions must produce identical results. Within one tick, state expressions read the same previous state and commit their results together. Arbitrary statement order or hidden clock reads must not change control results.
+This distinction matters even more when AI writes code. What the user actually asked for and what AI guessed to fill a gap are different things. Unconfirmed assumptions must remain labeled as assumptions. A plausible explanation does not become the user's intent just because it sounds convincing.
 
-**Related features:** input snapshot, atomic state transitions, explicit time, the application point of settings events, replay and branch comparison.
+### 2. A decision to turn on the pump is not proof that it turned on
 
-### 5. Preserve the meaning of values through types
+Even if a program asks for the pump to turn on, the pump may not run if power is lost or the equipment has a fault. A screen that says ON must also distinguish a request to turn on from confirmation that it actually did.
 
-Counts, time, moisture percentage, pressure, and true/false are different kinds of values. Do not erase their distinctions merely because they can all be displayed as numbers. Expose the conversions and rounding selected during computation; do not hide precision loss.
+GhostFlow takes inputs and computes what action to request. A binding records which port and device should receive that request, while a Driver handles the actual hardware. The rule “stop the pump when water is low” should not also contain a pin number for a particular board.
 
-**Related features:** `Int`, `Number`, `Duration`, `Percent`, finite enum, explicit integer conversions, physical quantities, units and dimensions, typed settings.
+This separation lets the same rules be tested with virtual switches and lamps before connecting them to real equipment. It also makes it possible to compare behavior without sending real outputs. But a request produced in a virtual run and equipment moving correctly on site remain separate facts that must be checked separately.
 
-### 6. Time is a relationship between control inputs and state
+### 3. Make memory and the next change in state visible
 
-“Start at 6 a.m.” and “run for 5 minutes” have different meanings. Stop and sensor inputs must still be evaluated while waiting. Distinguish schedule occurrences, continuous elapsed time, accumulated usage, recurring periods, and calendar conditions.
+For a motor to keep running after someone releases the start button, the program has to remember that the button was pressed. A program that opens valves in sequence also needs to know which valve it is on.
 
-**Related features:** DateTime and monotonic time, elapsed and continuous Bool timers, Pulse, Window, Run, occurrence identity, time budgets and natural-event fallback.
+That memory belongs in `state`. Functions calculate from the values they receive; state carries memory from one decision to the next. I do not want a function call to quietly change some value elsewhere.
 
-### 7. Do not hide errors or missing information
+What matters to me is a structure where **the next state can be read directly from the current state and inputs**. If a reader has to replay the execution order in their head several times to understand it, changing the program on site will be even harder. When a calculation result feeds another decision, the state connecting those calculations should also be clear.
 
-A missing or failed sensor is not a normal value of 0. Unknown predictions for natural events also do not mean an operating condition is false. Make alternative decisions explicit and preserve the original error, uncertainty, and reason for the choice.
+### 4. Be able to check yesterday's decision today
 
-**Related features:** distinguishing Option and Result, `ok`/`fault`, quality preservation, NotReady, Stale, Unknown, explicit fallback, recovery, and decision evidence.
+“Why did it ask the pump to turn on at three yesterday afternoon?”
 
-### 8. Make constraints and decision evidence readable
+If the inputs, previous state, effective settings, and time conditions from then were recorded, the same conditions should produce the same decision. That makes it possible to investigate the cause instead of relying on memory or guesswork. After changing the program, the same conditions can also show what changed.
 
-The behavior an individual control wants can differ from what the installation as a whole permits. Copying constraints into multiple expressions makes omissions and inconsistent changes likely. Expose permission conditions and arbitration rules so that blocked requests can be explained.
+For this, one control calculation, or tick, uses the same input snapshot and previous state. The next states are committed together after calculation. Results should not depend on which source line happened to run first or on a function secretly reading the clock. It should also be clear which calculation first uses a settings change.
 
-**Related features:** `require`, `mutex`, common constraints, shared resources and modes, operating time limits, requested/safe distinction and explanation.
+AI can help write programs, but I do not want each operating decision to depend on a fresh AI answer. At the site, confirmed rules should run under defined conditions, and the decision should be traceable later. The basic control assigned to the device should continue on site without waiting for the internet or an AI response.
 
-### 9. Connect operating adjustment points and screens through the same meaning
+### 5. Do not make readers guess what a number means
 
-An operator-adjustable “5 minutes” is a setting with a name, type, default, range, and access permissions. A screen should receive this meaning and create a time input field. Changing a setting must not become rewriting control rules or arbitrarily changing internal state.
+If a setting just says `10`, someone has to search nearby code to learn whether it means ten repetitions, ten seconds, or ten percent. A meaning that seemed obvious to the author may be forgotten a few months later.
 
-**Related features:** typed config metadata, defaults and effective values, atomic live changes, screen-independent descriptors, settings revision.
+GhostFlow distinguishes counts, time, percentages, and physical quantities. It also distinguishes counts that need exact integers from numbers such as measurements that may be approximate. The language should check what a value means instead of relying only on its variable name.
 
-### 10. Keep responsibilities and costs traceable through composition
+When converting units or a decimal to an integer, the conversion should show what was changed, where rounding happened, and what was discarded. I want the language to catch some mistakes before they depend on a person noticing them during careful review.
 
-When reusing behavior, it must be possible to identify its origin, its connections, and who uses the same physical resources. Complex compositions must not create nonterminating computation or unlimited hidden work.
+### 6. Keep making decisions during ten minutes of watering
 
-**Related features:** import identity, behavior instance, typed logical port, explicit binding, finite contracts, bounded state, time and resources, semantic DAG and intent tracing.
+“Water at 6 a.m.,” “water for ten minutes,” and “do not exceed 30 minutes of watering in total today” are different requirements. Treating them all as one kind of timer because they involve time makes the meaning ambiguous when operation stops and starts again.
+
+GhostFlow distinguishes the time a schedule starts, continuous elapsed time, accumulated usage, and recurring periods. It should also retain which schedule occurrence happened so that a repeated delivery can be distinguished from a new occurrence. Clock time and the basis for measuring elapsed time are separate as well.
+
+Above all, the program must keep making other decisions while it waits for ten minutes. It still needs to notice a stop button or a low-water condition. It can express a condition such as “one hour after sunrise,” but what to do when sunrise cannot be determined must be decided separately.
+
+### 7. Preserve the fact that a value is unknown
+
+A temperature of zero degrees is different from being unable to read the temperature sensor. Having a last reading is also different from being able to trust that reading now.
+
+Distinguish a value that has not arrived, one that is too old, and one that failed to read from a normal value. Failure to determine sunrise must not be treated as “the scheduled time has not arrived.” If an unknown situation is simply changed to zero or false, later decisions lose the information needed to find what went wrong.
+
+Any alternative rule must be stated for the equipment's conditions. Even when a substitute value is used to continue calculation, keep the original missing information, why that choice was made, and when normal operation returned.
+
+### 8. Separate the action a program wants from the action the installation allows
+
+A watering program may want to start the pump when the tank is empty. Two programs may want the same pump, or equipment may forbid forward and reverse outputs at the same time.
+
+Copying these conditions into many programs makes omissions and inconsistent edits likely. Keep each program's request separate from the installation-wide conditions that permit it. Make mutually exclusive outputs, shared-resource rules, mode permissions, and operating-time limits visible. When a request is blocked, it should be possible to see which condition blocked it.
+
+Showing a user only “pump OFF” is not enough. They should be able to trace “watering was scheduled, but the low-water input prevented the pump from turning on.” This lets non-specialists ask in their own words and understand why an action happened. Explanations should follow the evidence from execution, not be plausible stories added afterward.
+
+Program constraints do not replace physical safety devices. Responsibilities such as emergency stops and electrical protection still belong in hardware.
+
+### 9. Do not rewrite the program just to change the watering time
+
+In a program that waters for ten minutes every hour, someone may want to reduce today's duration to seven minutes. Having to edit the control code for that would make ordinary adjustment difficult.
+
+Declare values that operators can adjust as settings. Give each setting a name, type, default, allowed range, and access permission, and make clear when a changed value takes effect. Changing a setting is different from changing the control rule or forcibly overwriting internal state.
+
+Screens should be able to use this information too. A time setting can create a time input and guide the user to stay within its range. I like screens that feel like the switches and dials on an existing control cabinet, but they do not have to look that way. A phone can show the same setting differently. **The appearance of the screen may change, but the meaning of the operation should stay the same.**
+
+### 10. If two good examples are available, they should work together
+
+There may be one example for watering and another for ventilation. Each works on its own. But if using them on one board requires taking both programs apart and rewriting them, someone who is not comfortable coding may hit a dead end.
+
+This has especially bothered me. If watering needs two inputs and three outputs, and ventilation needs four outputs, I want people to be able to bring in each program and connect its inputs and outputs to the equipment they need.
+
+That does not mean matching only the number of inputs and outputs is enough. We must check whether programs share resources, whether their constraints conflict, and whether their states stay separate. The origin and revision of imported code and the devices currently connected to it should also remain traceable.
+
+We must also remember that these programs run on small MCUs. A composition that looks simple must not lead to a calculation that never ends or memory that grows without limit. Its memory use and computation cost should remain assessable. The goal is to combine the convenience of reusing someone else's work with the conditions needed to operate it responsibly on one's own equipment.
 
 ## Perspectives that influenced the design
 
-The [original language design](LANGUAGE.md#1-언어의-방향) connects the following preferences with language choices. This table explains what each perspective contributed; it is not a list of syntax aliases.
+GhostFlow was influenced by tools I liked using. Rather than copying their syntax, I tried to bring over what made them convenient and understandable.
 
-| Perspective | What GhostFlow considered important |
-|---|---|
-| YAML | Declaration hierarchy and readable names, types, and settings |
-| Literate CoffeeScript | Reading explanation and executable rules in the same document |
-| Functional and function-level composition | Composing pure value transformations and making memory explicit |
-| Railway-oriented programming | Handling normal values and errors within the same explicit flow |
-| Cycle.js | Input Source, output Intent, and the Driver boundary for actual effects |
-| Cypher query | Explicitly selecting meaningful device capabilities |
-| Meta Lua | Treating code as data while validating the meaning and boundaries of syntax extensions |
-| Observable, marimo, D3.js | Observing values, state, changes, and decisions in connection with code |
-| Elm, Rust | Clear error boundaries and predictable execution through type and branch checking |
+From **Literate CoffeeScript**, I liked reading explanations and code in one document. You can explain how equipment should behave and place code where it is needed. Rather than requiring a separate manual to be written well, I wanted explanation and code to live together from the start.
+
+**ObservableHQ** influenced not only the way connected calculations and screens respond when values change, but also the idea of bringing someone else's notebook into your own work. A good result can become material for the next piece of work, instead of something to look at and leave behind. What mattered to me in **marimo and D3.js** was also keeping code and results together so their values and changes can be seen.
+
+From **functional programming**, I took the idea of composing small calculations without hiding memory or side effects. From **Cycle.js**, I took the separation between receiving inputs, producing output requests, and letting a Driver create real effects. These ideas connect to keeping state, calculation, and hardware distinct.
+
+**Elm and Rust** influenced my preference for checking problems with types and branch analysis before execution. I saw a similar value in **Railway-oriented programming**: both normal results and failure paths should be readable in the code.
+
+From **YAML**, I took declarations that reveal the structure of names and settings. From **Cypher**, I took selecting by an object's characteristics and capabilities rather than its location. **Meta Lua** interested me as a way to treat code as data and extend it. But even when expressions are extended, their meaning and reach should remain checkable.
+
+All these preferences point in the same direction. **I want what we understood while building something to remain available when someone changes it or takes it over.** Whether a person writes the program or AI helps, the person left on site should be able to read it and make a decision.
+
+This section describes the design direction of GhostFlow. Check implementation status and what has been verified on real devices separately.
 
 ## Rules for maintaining this reference
 
