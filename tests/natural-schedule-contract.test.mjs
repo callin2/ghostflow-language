@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
-import { compileControl, typeCheckControl } from '../tools/control.mjs';
+import { compileControl, typeCheckControl, parseControl, ControlCompileError } from '../tools/control.mjs';
 import { extractLiterate } from '../tools/literate.mjs';
 import { compileSource } from '../tools/toolchain.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
@@ -49,6 +49,64 @@ test('Tide reference policy retains stable logical provider and event offset', (
 
 test('Tide rejects a classification tag as an occurrence event', () => {
   assert.throws(() => typeCheckControl(code('REF-03-061')), /Tide event must be high or low/);
+});
+
+for (const [id, tag, event, offsetMs] of [
+  ['REF-03-042', 'sun', 'rise', 1_800_000],
+  ['REF-03-042', 'sun', 'set', -1_800_000],
+  ['REF-03-060', 'tide', 'high', -1_800_000],
+  ['REF-03-060', 'tide', 'low', 1_800_000],
+]) {
+  test(`${tag} ${event}: canonical source retains event, offset and declaration identity`, async () => {
+    const entry = fixture(id);
+    const literal = `${tag}\`${event} ${offsetMs < 0 ? '-' : '+'} 30min\``;
+    const source = entry.source.replace(new RegExp(`${tag}\`[^\`]+\``), literal);
+    const extracted = extractLiterate(source, { filename: entry.filename }).code;
+    const ast = parseControl(extracted, { filename: entry.filename });
+    const schedule = ast.body.find(node => node.kind === 'schedule');
+    assert.equal(schedule.at.event, event);
+    assert.equal(schedule.at.offsetMs, offsetMs);
+    if (tag === 'tide') assert.equal(extracted.slice(schedule.at.loc.offset, schedule.at.loc.endOffset), literal);
+    const compiled = await compileSource(source, { filename: entry.filename });
+    const descriptor = compiled.manifest.schedules.find(item => item.site === schedule.id);
+    assert.equal(descriptor.event, event);
+    assert.equal(descriptor.offsetMs, offsetMs);
+    assert.equal(descriptor.policy.fallback, 'skip');
+    const mapped = compiled.sourceMap.find(node => node.id === descriptor.site);
+    assert.equal(mapped.kind, 'schedule');
+    assert.equal(mapped.line, source.split('\n').findIndex(line => line.includes(`schedule ${schedule.name}:`)) + 1);
+    assert.equal(mapped.extracted.line, schedule.loc.line);
+  });
+}
+
+for (const id of ['REF-03-042', 'REF-03-060']) {
+  for (const [label, replacement, message] of [
+    ['missing fallback', '', /schedule requires fallback/],
+    ['Bool fallback', 'fallback = false;', /fallback must be skip/],
+    ['Duration fallback', 'fallback = 5min;', /fallback must be skip/],
+    ['self-dependent fallback', id === 'REF-03-042' ? 'fallback = dawn.due;' : 'fallback = high.active;', /fallback must be skip/],
+    ['unsupported nested fallback', 'fallback = fixed_time(time`06:00`);', /fallback must be skip/],
+  ]) {
+    test(`${id}: public compilation rejects ${label} at its authored location`, async () => {
+      const entry = fixture(id);
+      const source = entry.source.replace('fallback = skip;', replacement);
+      await assert.rejects(() => compileSource(source, { filename: entry.filename }), error => {
+        assert.ok(error instanceof ControlCompileError);
+        assert.match(error.message, message);
+        const lineText = replacement || `schedule ${id === 'REF-03-042' ? 'dawn' : 'high'}:`;
+        assert.equal(error.line, source.split('\n').findIndex(line => line.includes(lineText)) + 1);
+        return true;
+      });
+    });
+  }
+}
+
+test('Tide compilation rejects unavailable or incompatible logical provider prerequisites', async () => {
+  const entry = fixture('REF-03-060');
+  for (const declaration of ['', 'provider harbor_tides: LunarEphemeris;']) {
+    const source = entry.source.replace('provider harbor_tides: TidePredictions;', declaration);
+    await assert.rejects(() => compileSource(source, { filename: entry.filename }), /Tide source must name a TidePredictions provider/);
+  }
 });
 
 test('Solar policy remains executable through the native solar runtime path', () => {
