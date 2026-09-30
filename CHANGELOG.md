@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### 2026-10-01 — paused Solar observation ([#402](https://github.com/callin2/ghostflow-language/issues/402))
+
+Explicit paused observations now retain Solar terminal identities without running
+the authored program or creating a scan. For example, an occurrence observed
+while paused remains consumed after resume/reboot. Previously skipping the native
+observation could fire that occurrence on resume. Program-logical time may freeze;
+actual wall/trust remain supplied. Malformed observations reject atomically.
+`schedule_module` and the pinned Device adapter regression cover the boundary.
+No syntax, GFB/WASM ABI or generic lifecycle interface is added.
+
 ### 2026-10-01 — durable framed Solar admission ([#400](https://github.com/callin2/ghostflow-language/issues/400))
 
 The Rust owner API now frames GFB5 Solar scans and exports/restores bounded

@@ -45,6 +45,19 @@ Host는 완전한 provider fact를 공급한다. Admission과 원자적 상태 c
 한다. 저장 실패 시 실행을 중단하고 출력을 clear해야 한다. 이것만으로 실제
 하드웨어가 동작했다는 뜻은 아니다.
 
+명시적 pause에는 `Runtime::observe_solar_paused(clock, facts)`와 ScanDriver
+wrapper가 pure-Solar clock과 terminal identity만 진행한다
+([#402](https://github.com/callin2/ghostflow-language/issues/402)). 작성된 predicate/scalar
+평가, scalar input 소비, intent, tick journal, scan identity 변경은 없다.
+Suppression은 작성된 `ConditionsFalseAtPulse` trace가 아니다. 거부된 관측은 아무것도
+commit하지 않는다. OFF 상태에서 변경된 terminal identity를 저장한다. 저장 실패는
+durability 인정이나 resume 허용 없이 실행을 중단해야 한다.
+
+Solar는 `scan_with_solar`가 요구하는 비감소 program-logical clock을 사용하며 pause
+중 멈출 수 있다. 실제 wall time과 trust는 그대로 공급한다. Wall gap, rollback,
+recovery는 shared-core 규칙을 유지하며 소비한 occurrence는 resume 때 뒤늦게 실행하지
+않는다. 이것은 이동이나 application의 실측 기간이 아니다.
+
 호출자는 schedule마다 terminal identity를 1–4096개 선택한다.
 Batch는 그 용량으로 제한된다. Revision 텍스트는 근거 준비/보존 전에
 필드마다 UTF-8 128바이트로 제한한다. 용량 소진은 식별자 이력을 제거하지 않고

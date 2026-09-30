@@ -1084,6 +1084,36 @@ impl Runtime {
         Ok(())
     }
 
+    /// Observe Solar admission while the host explicitly pauses execution.
+    /// Only schedule clocks and terminal identities commit. No authored predicate,
+    /// scalar state, inputs, intents, tick journal or scan sequence is evaluated.
+    /// The clock uses the same program-logical domain as framed Solar scans; it
+    /// may freeze during pause while actual wall time and trust remain supplied.
+    pub fn observe_solar_paused(
+        &mut self,
+        clock: schedule_clock::ClockSnapshot<'_>,
+        facts: &[solar_runtime::SolarInput<'_>],
+    ) -> Result<()> {
+        let module = self
+            .module
+            .as_ref()
+            .ok_or_else(|| Error::new("no module installed"))?;
+        let selected = self
+            .active_strategy
+            .ok_or_else(|| Error::new("Solar is not active"))?;
+        let requirements = module
+            .schedules
+            .as_ref()
+            .ok_or_else(|| Error::new("no Solar requirements"))?;
+        let staged = self
+            .solar_runtime
+            .as_ref()
+            .ok_or_else(|| Error::new("no Solar runtime"))?
+            .observe_paused(&requirements.strategies[selected].schedules, clock, facts)?;
+        self.solar_runtime = Some(staged);
+        Ok(())
+    }
+
     /// Bind provider occurrence facts to a schedule-only GFB5 module.
     /// Provider code must derive facts from the installed descriptor, including
     /// timezone/location/offset and complete coverage. No host due bit is accepted.

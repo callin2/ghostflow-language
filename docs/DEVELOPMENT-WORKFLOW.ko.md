@@ -85,6 +85,11 @@ drift를 숨기려고 과거 증거 해시를 갱신하지 않습니다. 정적 
 기다린 뒤 전체 검증을 시작합니다. 실행 중 입력 파일은 고정합니다. 수정 전에 시작한
 실행은 최종 트리를 검증하지 않습니다.
 
+명시된 현재 consumer의 선행 작업은 consumer를 불변 owner candidate에 고정하고
+영향받는 전체 regression suite를 통과한 뒤 owner merge합니다. Owner만의 test는
+consumer lifecycle 호환성을 입증하지 않습니다. 기존 consumer oracle과 과거 근거를
+보존합니다.
+
 Node 의존성 디렉터리를 재사용하기 전에 확인한 패키지 루트에서
 `~/.codex/bin/test-compact -- npm ls --depth=0`을 실행합니다. 잠금 파일이
 같거나 한 번의 import가 성공해도 고정한 모든 의존성이 설치되었다는 증거는

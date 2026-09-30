@@ -1058,6 +1058,127 @@ fn framed_solar_downstream_failure_keeps_checkpoint_clock_and_sequence_retryable
     );
 }
 
+#[test]
+fn paused_solar_observations_consume_without_executing_a_frame_and_restore_on_reboot() {
+    use ghostflow_core::{
+        scan::ScanFrameV1,
+        schedule_clock::{ClockSnapshot, ClockTrust},
+        solar_admission::{SolarFact, SolarFacts},
+        solar_runtime::SolarInput,
+    };
+    let fixture = Fixture {
+        states: 1,
+        transition: Some(vec![1, 1]),
+        ..Fixture::default()
+    };
+    let fresh = |boot_epoch| {
+        let mut runtime = Runtime::new(4);
+        runtime.install(Module::load(&fixture.bytes()).unwrap(), false);
+        runtime
+            .activate_with_solar(&ghostflow_core::solar_runtime::SolarActivation {
+                boot_epoch,
+                ..solar_activation()
+            })
+            .unwrap();
+        runtime.into_scan_driver()
+    };
+    let clock = |boot_epoch, monotonic_ms, wall_ms, trust| ClockSnapshot {
+        boot_epoch,
+        monotonic_ms,
+        wall_ms: Some(wall_ms),
+        trust,
+        uncertainty_ms: None,
+        source_revision: Some("actual-wall-provider"),
+    };
+    let rows = [SolarFact::available(0, 1000, "solar-v1", "zone-v1")];
+    let facts = [SolarInput {
+        site: 7,
+        facts: SolarFacts {
+            coverage_from_wall_ms: 0,
+            coverage_to_wall_ms: 200_000,
+            rows: &rows,
+        },
+    }];
+    for observations in [vec![999, 1000, 900], vec![999, 100_000]] {
+        let mut driver = fresh(3);
+        let before = driver.runtime().solar_checkpoint().unwrap();
+        for wall in observations {
+            // The program clock freezes while real trusted wall observations advance.
+            driver
+                .observe_solar_paused(clock(3, 0, wall, ClockTrust::Trusted), &facts)
+                .unwrap();
+            assert_eq!(driver.runtime().state("s0"), Some(Value::Bool(false)));
+            assert_eq!(driver.runtime().intent("due"), None);
+            assert!(driver.runtime().journal().is_empty());
+            assert_eq!(driver.next_scan_id(), Some(0));
+            assert_eq!(driver.scan_last_time_ms(), None);
+        }
+        let checkpoint = driver.runtime().solar_checkpoint().unwrap();
+        assert_ne!(checkpoint, before);
+        let bad = [SolarInput {
+            site: 8,
+            facts: facts[0].facts,
+        }];
+        assert!(driver
+            .observe_solar_paused(clock(3, 0, 1001, ClockTrust::Trusted), &bad)
+            .is_err());
+        assert!(driver
+            .observe_solar_paused(clock(4, 0, 1001, ClockTrust::Trusted), &facts)
+            .is_err());
+        assert_eq!(driver.runtime().solar_checkpoint().unwrap(), checkpoint);
+        // Clock trust is supplied faithfully. Recovery cannot revive the consumed day.
+        driver
+            .observe_solar_paused(
+                clock(3, 0, 1001, ClockTrust::Unknown("RTC unavailable")),
+                &facts,
+            )
+            .unwrap();
+        driver
+            .observe_solar_paused(clock(3, 0, 1002, ClockTrust::Trusted), &facts)
+            .unwrap();
+        let outcome = driver
+            .scan_with_solar(
+                ScanFrameV1 {
+                    scan_id: 0,
+                    logical_time_ms: 1,
+                    inputs: vec![],
+                },
+                clock(3, 1, 1003, ClockTrust::Trusted),
+                &facts,
+            )
+            .unwrap();
+        assert!(!outcome.trace.schedule_trace[0].due);
+        assert_eq!(driver.runtime().journal().len(), 1);
+        assert_eq!(driver.runtime().state("s0"), Some(Value::Bool(true)));
+        let mut reboot = fresh(7);
+        reboot.restore_solar_checkpoint(&checkpoint).unwrap();
+        let first = reboot
+            .scan_with_solar(
+                ScanFrameV1 {
+                    scan_id: 0,
+                    logical_time_ms: 0,
+                    inputs: vec![],
+                },
+                clock(7, 0, 999, ClockTrust::Trusted),
+                &facts,
+            )
+            .unwrap();
+        assert!(!first.trace.schedule_trace[0].due);
+        let crossed = reboot
+            .scan_with_solar(
+                ScanFrameV1 {
+                    scan_id: 1,
+                    logical_time_ms: 1,
+                    inputs: vec![],
+                },
+                clock(7, 1, 1000, ClockTrust::Trusted),
+                &facts,
+            )
+            .unwrap();
+        assert!(!crossed.trace.schedule_trace[0].due);
+    }
+}
+
 fn daily_entry(repeated: u8, when: &[u8]) -> Vec<u8> {
     let mut b = vec![3];
     b.extend(7u32.to_le_bytes());

@@ -124,8 +124,8 @@
       "source": "docs/DEVELOPMENT-WORKFLOW.md",
       "sourceLanguage": "en",
       "translation": "docs/DEVELOPMENT-WORKFLOW.ko.md",
-      "sourceSha256": "b07de952bca53cf6245890f4abffbbb1bcb4610cc8221d6788562d40f5add10a",
-      "translationSha256": "7ecaee9969e683f455eb649926c8ecb805c44f544469dd5be563486c7a5534a2"
+      "sourceSha256": "ab5735c48ac67f567f2c7ce79cfec92080796feb04847236120bab1446c169fe",
+      "translationSha256": "ce22af6b34360cf704678c1e3f18bd9e247333fb022aadecd456f0dd09af6073"
     },
     {
       "source": "docs/DOCUMENTATION-LANGUAGES.md",
@@ -523,8 +523,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "787d2167138b90591f6ffee15523ae6205548270cfb5582f4042714dabde5f02",
-      "translationSha256": "6580a4156afca7e5a0ce3e33ad68281295d1075ab8095b6015462927125e5b84"
+      "sourceSha256": "c9ec7157c80a93ff3600b46719a0b965ef65a5c84d440cc9330a6b0e8d676302",
+      "translationSha256": "1c109894cdbb1de753fac3a965462256522d80924d1a2a2d9ee8e55c952fc56c"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",
@@ -796,8 +796,8 @@
       "source": "tasks/solar-native-admission-integration.md",
       "sourceLanguage": "en",
       "translation": "tasks/solar-native-admission-integration.ko.md",
-      "sourceSha256": "2e6b49f4711742a04cc850fc3dc1b0f5b562fcb307de549ad4d3a0cdb76059be",
-      "translationSha256": "b38663535be167f7e812fa8c0c35694df4a0260c3db0870c73fc759de4fc1d25"
+      "sourceSha256": "6103acbb7f9bb6b6e2b2898129531c274d9e48e27bd539a4984dbe114e5577e9",
+      "translationSha256": "0dabff2bb9f7009ee497b44e839c9253c9f6ea33c0693dc2cf11cf7e281d4cff"
     },
     {
       "source": "tasks/temporal-adapter-replay-design.md",

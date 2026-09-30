@@ -41,6 +41,19 @@ state commit. The host must persist a successful checkpoint before publishing
 or applying ON. A save failure must halt and clear outputs; it does not establish
 that hardware acted.
 
+For explicit pause, `Runtime::observe_solar_paused(clock, facts)` and its
+ScanDriver wrapper advance only pure-Solar clocks and terminal identities
+([#402](https://github.com/callin2/ghostflow-language/issues/402)). No authored
+predicate/scalar evaluation, scalar input consumption, intent, tick journal or
+scan identity changes. Suppression is not an authored `ConditionsFalseAtPulse`
+trace. Rejected observations commit nothing. Persist changed terminal identities
+while OFF; save failure must halt, never acknowledge durability or permit resume.
+
+Solar uses the nondecreasing program-logical clock required by `scan_with_solar`,
+which may freeze during pause. Actual wall time and trust remain unchanged inputs.
+Wall gaps, rollback and recovery keep shared-core rules; consumed occurrences do
+not catch up on resume. This is not measured movement or application duration.
+
 A caller selects 1–4096 terminal identities per schedule. The batch is bounded
 by that capacity. Revision text is limited to 128 UTF-8 bytes per field before
 staging/retaining evidence. Exhaustion rejects the tick rather than evicting
