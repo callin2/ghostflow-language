@@ -9,3 +9,7 @@ description = "Deterministic verified runtime for GhostFlow control modules"
 
 [dev-dependencies]
 serde_json = "1.0"
+
+[[example]]
+name = "scenario_scan"
+test = true
