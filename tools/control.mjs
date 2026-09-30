@@ -910,6 +910,10 @@ class ControlParser {
         options.at = this.solarAt();
       } else if (key.value === 'fallback') {
         policy.fallback = this.expression();
+        if (!(policy.fallback.kind === 'reference' && policy.fallback.name === 'skip')
+          && !(policy.fallback.kind === 'call' && policy.fallback.name === 'fixed_time')) {
+          error(policy.fallback.loc, 'Solar fallback must be skip');
+        }
         options.fallback = policy.fallback;
       } else if (['basis', 'when', 'clock', 'gap', 'recovery'].includes(key.value)) {
         policy[key.value] = this.expression();
