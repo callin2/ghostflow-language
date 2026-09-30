@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### 2026-10-01 — explicit native development signature policy
+
+The native portable-package verifier offers an explicit development opt-out for
+publisher authentication. The existing API remains enforcing. Unsigned or
+untrusted packages still pass the same integrity, compatibility and loader
+checks; bypass results explicitly report `DevelopmentBypass` and no accepted
+keys. This does not enable a Device profile or change DSL/VM semantics. Native
+package regressions cover strict rejection, development admission, malformed
+signature metadata and retained payload/source/bytecode/binding rejection.
+
 ### 2026-10-01 — bounded natural-event fallback ([#29](https://github.com/callin2/ghostflow-language/issues/29))
 
 Reference §3.4 now permits Solar/Tide `clock = hold_trusted(5min, terminal: skip)` and Solar `fallback = fixed_time(time`06:00`, terminal: skip)`; previously only trusted-only clock and skip fallback were accepted. Hold expires at the strict duration boundary; absent anchors/uncertainty fail closed. A fallback consumes the same source-date Solar identity through recovery and checkpoints. Facts providers resolve IANA civil time; ambiguous/nonexistent times skip. Extended policies select GFB13/control-v12 and Solar GFSF6; legacy bytes remain unchanged and older pinned runtimes reject GFB13. The signed portable-package GFB11 profile remains narrow. Regression coverage: `natural-fallback-compiler.test.mjs`, `natural-fallback-runtime.test.mjs`, core `solar_tape`; execution results are reported separately, with no physical Device claim.

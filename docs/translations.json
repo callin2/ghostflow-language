@@ -278,8 +278,8 @@
       "source": "docs/PORTABLE-PACKAGE.md",
       "sourceLanguage": "en",
       "translation": "docs/PORTABLE-PACKAGE.ko.md",
-      "sourceSha256": "79f4db479c1dfecdd9cf3c24f5ed4ad21854311c9e5f4481a5a8932d14e3e34c",
-      "translationSha256": "995ba07feef5a14a3e4dc299ff09bd8c5e913ecbfd03ec7e70fed1dbfbf1d2ec"
+      "sourceSha256": "826a728fbe97196225800a7a5a8872b5a364b44f0a0065b2125045ec5c99e60e",
+      "translationSha256": "fc9bf0b0fd136cf309c3a04f2b5f3ba9c79316b205bdc4e86d93a8a730574334"
     },
     {
       "source": "docs/ProgrammingInGhostflow.md",
@@ -530,8 +530,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "1f896dc25c945aa86b84cf33ae5fc99f7d3999852045d8e5256f5006578f6fbc",
-      "translationSha256": "33c64c57ce4510500c3557c38c6092e77ff73d536690a22d49d982cf8919fab6"
+      "sourceSha256": "460e19113139380e86a2f4b24d5cecc75908542278ae238422ed4e911932e863",
+      "translationSha256": "8f22ffd05ed5b542dc790b62cf63a2941f27a6cd1ce145baa4850a377c177325"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",
