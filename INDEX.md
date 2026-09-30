@@ -101,6 +101,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/INDEX.md](docs/INDEX.md) | Documentation index | md |
 | [docs/INTENT-ANCHOR-MAP.ko.md](docs/INTENT-ANCHOR-MAP.ko.md) | Literate intent anchor map | md |
 | [docs/INTENT-ANCHOR-MAP.md](docs/INTENT-ANCHOR-MAP.md) | Literate intent anchor map | md |
+| [docs/INTERACTION-STREAM-CONTRACT.ko.md](docs/INTERACTION-STREAM-CONTRACT.ko.md) | Interaction 스트림 계약 설계 | md |
+| [docs/INTERACTION-STREAM-CONTRACT.md](docs/INTERACTION-STREAM-CONTRACT.md) | Interaction stream contract design | md |
 | [docs/KEYBOARD-HOST.ko.md](docs/KEYBOARD-HOST.ko.md) | 실시간 키보드 호스트 | md |
 | [docs/KEYBOARD-HOST.md](docs/KEYBOARD-HOST.md) | Real-time keyboard host | md |
 | [docs/language_faq.en.md](docs/language_faq.en.md) | GhostFlow Coding FAQ | md |
@@ -424,4 +426,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-314 documents.
+316 documents.

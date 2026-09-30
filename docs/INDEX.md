@@ -52,6 +52,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/IMPLEMENTATION.md](IMPLEMENTATION.md) | Implementation and artifact boundaries | md |
 | [docs/INTENT-ANCHOR-MAP.ko.md](INTENT-ANCHOR-MAP.ko.md) | Literate intent anchor map | md |
 | [docs/INTENT-ANCHOR-MAP.md](INTENT-ANCHOR-MAP.md) | Literate intent anchor map | md |
+| [docs/INTERACTION-STREAM-CONTRACT.ko.md](INTERACTION-STREAM-CONTRACT.ko.md) | Interaction 스트림 계약 설계 | md |
+| [docs/INTERACTION-STREAM-CONTRACT.md](INTERACTION-STREAM-CONTRACT.md) | Interaction stream contract design | md |
 | [docs/KEYBOARD-HOST.ko.md](KEYBOARD-HOST.ko.md) | 실시간 키보드 호스트 | md |
 | [docs/KEYBOARD-HOST.md](KEYBOARD-HOST.md) | Real-time keyboard host | md |
 | [docs/language_faq.en.md](language_faq.en.md) | GhostFlow Coding FAQ | md |
@@ -198,4 +200,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.ko.md](research/GF-COMPOSE-R9-ACCEPTANCE.ko.md) | GF-COMPOSE R9: acceptance와 구현 인계 | md |
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.md](research/GF-COMPOSE-R9-ACCEPTANCE.md) | GF-COMPOSE R9: acceptance and implementation handoff | md |
 
-164 documents.
+166 documents.
