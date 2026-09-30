@@ -16,6 +16,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/doc-index.test.mjs',
   'tests/verified-wasm-artifact.test.mjs',
   'tests/ci-verification-routing.test.mjs',
+  'tests/cli-process.test.mjs',
   'tests/boundary-conformance.test.mjs',
   'tests/compiler.test.mjs',
   'tests/docs-runnable-examples.test.mjs',
@@ -396,11 +397,9 @@ async function verify(nodeOnly, curriculumOnly) {
       await gate(process.execPath, ['tools/ghostc.mjs', 'examples/irrigation.ghost.md', 'build/irrigation.gfb']);
       await gate('cargo', ['test', '--locked', '--offline', '--workspace']);
       await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-core', '--example', 'run']);
-      await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-core', '--example', 'run', '--release']);
-      await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-core', '--example', 'scan_adapter', '--release']);
-      await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-core', '--example', 'scan_tape', '--release']);
-      await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-core', '--example', 'context_tape', '--release']);
-      await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-core', '--example', 'scenario_scan', '--release']);
+      await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-core', '--release',
+        '--example', 'run', '--example', 'scan_adapter', '--example', 'scan_tape',
+        '--example', 'context_tape', '--example', 'scenario_scan']);
       await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-wasm', '--target', 'wasm32-unknown-unknown', '--release']);
       wasmVerified = true;
     }
