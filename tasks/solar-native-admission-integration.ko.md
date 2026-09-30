@@ -7,6 +7,11 @@
 기준: Reference §3.4–3.8과 기존 GFB5 Solar pulse 계약.
 이 문서는 구현 기록이며 언어 계약을 변경하지 않는다.
 
+영속 framed API는 Farm Device [#102](https://github.com/callin2/farm-device/issues/102)의
+제한된 선행 작업 [#400](https://github.com/callin2/ghostflow-language/issues/400)이다.
+현재 개발 base에 원래 `4815b54` owner 구현을 재사용한다. Device pin 이전과
+하드웨어 acceptance는 별도 gate다.
+
 ## 구현된 내용
 
 `Runtime::activate_with_solar`는 schedule-only GFB5 module,
@@ -47,9 +52,9 @@ tick을 거부한다. 이는 명시적 저장 상한이며 인증된 byte 예산
 
 ## 근거
 
-`cargo check -p ghostflow-core --tests`: 통과. `cargo test -p ghostflow-core
---test schedule_module`: 30건 통과. `cargo test -p ghostflow-core --lib
-scan::tests`: 6건 통과.
+`4815b54`의 원래 focused 근거는 `cargo check -p ghostflow-core --tests`: 통과,
+`schedule_module`: 30건 통과, `scan::tests`: 6건 통과다. 이 수치는 과거 기록이며
+현재 consumer나 firmware의 acceptance가 아니다.
 
 Schedule 테스트는 다음 실행 동작을 다룬다.
 
@@ -100,7 +105,11 @@ Native admission은 occurrence coverage와 clock/site binding을 검증한다.
 중복 억제, provider trace 근거, unknown-clock 복구, 모든 packet 잘림을 검증한다.
 GFB5 encoding 테스트와 함께 테스트 12건이 통과한다.
 
-## 여전히 필요한 내용
+## 과거 기록의 남은 통합 작업
+
+다음은 public GFB5 compiler 통합 이전의 최초 native slice 기록이다.
+#400은 영속 Rust owner 경계를 추가한다. 현재 Device 통합, deployment 예산,
+하드웨어 acceptance를 입증하지 않는다.
 
 이 native slice로 새로 GREEN이 된 Reference 수용 ID는 없다.
 컴파일러가 GFB5 prelude를 생성하고 공개 ControlRuntime이 정책 manifest를

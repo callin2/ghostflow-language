@@ -911,6 +911,28 @@ fn framed_solar_checkpoint_restores_terminal_identity_in_a_new_clock_run() {
         assert!(reboot.restore_solar_checkpoint(&malformed).is_err());
         assert_eq!(reboot.runtime().solar_checkpoint().unwrap(), checkpoint);
     }
+    // A correctly sealed envelope must still respect the selected capacity and
+    // must not restore duplicate terminal identities.
+    let mut two_days = checkpoint.clone();
+    two_days[20..22].copy_from_slice(&2u16.to_le_bytes());
+    two_days.splice(26..26, 1u32.to_le_bytes());
+    seal(&mut two_days);
+    let mut bounded = Runtime::new(4);
+    bounded.install(Module::load(&fixture.bytes()).unwrap(), false);
+    bounded
+        .activate_with_solar(&ghostflow_core::solar_runtime::SolarActivation {
+            terminal_capacity: 1,
+            ..solar_activation()
+        })
+        .unwrap();
+    let bounded_before = bounded.solar_checkpoint().unwrap();
+    assert!(bounded.restore_solar_checkpoint(&two_days).is_err());
+    assert_eq!(bounded.solar_checkpoint().unwrap(), bounded_before);
+    let mut duplicates = two_days;
+    duplicates[26..30].copy_from_slice(&0u32.to_le_bytes());
+    seal(&mut duplicates);
+    assert!(reboot.restore_solar_checkpoint(&duplicates).is_err());
+    assert_eq!(reboot.runtime().solar_checkpoint().unwrap(), checkpoint);
     assert!(reboot
         .restore_solar_checkpoint(&vec![0; 20 + 128 * (6 + 4096 * 4) + 1])
         .is_err());

@@ -5,6 +5,18 @@
 
 ## 미출시
 
+### 2026-10-01 — 영속적인 framed Solar admission ([#400](https://github.com/callin2/ghostflow-language/issues/400))
+
+Rust owner API는 이제 GFB5 Solar scan을 frame으로 실행하고 정확한 program의
+유한 terminal occurrence identity를 내보내고 복원한다. 이전에는 Device consumer가
+재시작 후 native Solar 중복 억제를 보존할 수 없었다. 예를 들어 첫 scan 전에
+`solar_checkpoint()`를 복원하면 소비한 occurrence를 유지하고 새 boot에서는 clock
+baseline을 새로 설정한다. 잘못되거나 일치하지 않거나 capacity를 넘는 checkpoint는
+원자적으로 거부한다. Host는 ON을 게시하기 전에 admission을 저장해야 한다.
+`schedule_module` test가 복원, framed rollback, retry를 검증한다. Source syntax,
+GFB, WASM ABI는 그대로다. 물리 구동을 주장하지 않으며 남은 civil checkpoint API를
+제공하지 않는다.
+
 ### 2026-10-01 — 유한한 estimate-basis 근거 API ([#398](https://github.com/callin2/ghostflow-language/issues/398))
 
 portable core는 불변 reference와 유한 capacity 아래 명시적인 requested 또는

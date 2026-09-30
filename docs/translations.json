@@ -523,8 +523,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "24d05b48e7f09db28e9ae492a8ac30089fb99b58e663246c9746326b0d1152cf",
-      "translationSha256": "4d7a673052bdd7a4d3e54d489a9b18867c6a54e0625e07b72f23986c8b5bc6d6"
+      "sourceSha256": "787d2167138b90591f6ffee15523ae6205548270cfb5582f4042714dabde5f02",
+      "translationSha256": "6580a4156afca7e5a0ce3e33ad68281295d1075ab8095b6015462927125e5b84"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",
@@ -796,8 +796,8 @@
       "source": "tasks/solar-native-admission-integration.md",
       "sourceLanguage": "en",
       "translation": "tasks/solar-native-admission-integration.ko.md",
-      "sourceSha256": "1a244c765d864716cf68eae9a4ff0124014d11992ab26721b0bcc8a1654ef456",
-      "translationSha256": "da844cb50e4185f6c700cb2fabac6d3250aacc3860ab6d155a7e71b4fe32ce54"
+      "sourceSha256": "2e6b49f4711742a04cc850fc3dc1b0f5b562fcb307de549ad4d3a0cdb76059be",
+      "translationSha256": "b38663535be167f7e812fa8c0c35694df4a0260c3db0870c73fc759de4fc1d25"
     },
     {
       "source": "tasks/temporal-adapter-replay-design.md",
