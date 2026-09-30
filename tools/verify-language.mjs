@@ -9,6 +9,7 @@ import { compileSource } from './toolchain.mjs';
 import { CURRICULUM_REPLAY_MANIFEST, prepareCurriculumReplays, verifyCurriculumReplayWasm } from './curriculum-replay.mjs';
 import { PC01_PROJECTION, verifyPc01Projection } from './generate-pc-01-projection.mjs';
 import { verificationSourceHashes } from './verification-sources.mjs';
+import { readCatalog, validateCatalog } from '../contracts/requirements/validate.mjs';
 
 // Deliberately explicit. Product/LLM/device tests belong to other repositories.
 export const LANGUAGE_TESTS = Object.freeze([
@@ -375,6 +376,8 @@ async function verify(nodeOnly, curriculumOnly) {
     if (Number(process.versions.node.split('.')[0]) < 22) throw new Error('Node.js 22 or newer is required');
     if (process.platform === 'win32') throw new Error('retained native tutorial paths require a POSIX host (macOS/Linux)');
     report.sourceSha256 = verificationSourceHashes(root);
+    // Fail stale/tampered requirement locators before native compilation or replay.
+    validateCatalog(readCatalog({ root }), { root });
     await gate('npm', ['run', 'docs:check']);
     for (const test of LANGUAGE_TESTS) {
       if (!fs.statSync(path.join(root, test)).isFile()) throw new Error(`missing language test: ${test}`);

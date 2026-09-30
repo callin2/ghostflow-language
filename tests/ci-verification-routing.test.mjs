@@ -139,3 +139,12 @@ test('workflow cancels obsolete heads only within the same PR', () => {
   assert.ok(concurrency.includes('github.event.pull_request.number || github.run_id'));
   assert.match(concurrency, /cancel-in-progress: \$\{\{ github.event_name == 'pull_request' \}\}/);
 });
+
+test('requirement-catalog corruption fails static preflight before native work', () => {
+  const verifier = fs.readFileSync(new URL('../tools/verify-language.mjs', import.meta.url), 'utf8');
+  assert.match(verifier, /import \{ readCatalog, validateCatalog \} from '\.\.\/contracts\/requirements\/validate\.mjs'/);
+  const preflight = verifier.indexOf('validateCatalog(readCatalog({ root }), { root });');
+  assert.ok(preflight > verifier.indexOf('  try {'));
+  assert.ok(preflight < verifier.indexOf('await verifyPlcCurriculum();'));
+  assert.ok(preflight < verifier.indexOf("await gate('cargo'"));
+});
