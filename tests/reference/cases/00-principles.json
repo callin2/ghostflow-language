@@ -6,7 +6,7 @@
     {
       "id": "REF-00-001",
       "references": [
-        "../LANGUAGE-REFERENCE.md#1-의도와-규칙을-함께-읽는다"
+        "../LANGUAGE-REFERENCE.md#1-코드와-함께-그-코드를-쓴-이유도-남겨요"
       ],
       "rule": "컴파일과 설명 연결은 원문 의도와 판본을 보존한다",
       "scope": "tooling",
@@ -20,7 +20,7 @@
       "id": "REF-00-002",
       "issue": "https://github.com/callin2/ghostflow-language/issues/191",
       "references": [
-        "../LANGUAGE-REFERENCE.md#2-입력-판단-효과의-경계를-드러낸다"
+        "../LANGUAGE-REFERENCE.md#2-펌프를-켜라는-판단과-펌프가-켜졌다는-사실은-달라요"
       ],
       "rule": "출력 요청은 실제 장치 동작 확인으로 승격되지 않는다",
       "scope": "driver",
@@ -33,7 +33,7 @@
     {
       "id": "REF-00-003",
       "references": [
-        "../LANGUAGE-REFERENCE.md#3-기억은-상태에-계산은-순수-함수에-둔다"
+        "../LANGUAGE-REFERENCE.md#3-무엇을-기억하고-다음에-어떻게-바뀌는지가-보여야-해요"
       ],
       "rule": "state 경계 없는 조합 피드백은 거부한다",
       "scope": "compiler",
@@ -44,7 +44,7 @@
     {
       "id": "REF-00-004",
       "references": [
-        "../LANGUAGE-REFERENCE.md#4-같은-실행-조건이면-같은-판단을-얻는다"
+        "../LANGUAGE-REFERENCE.md#4-어제의-판단을-오늘-다시-확인할-수-있어야-해요"
       ],
       "rule": "동일한 실행 조건을 재생하면 동일한 판단을 얻는다",
       "scope": "runtime",
@@ -57,7 +57,7 @@
     {
       "id": "REF-00-005",
       "references": [
-        "../LANGUAGE-REFERENCE.md#5-값의-의미를-타입으로-보존한다"
+        "../LANGUAGE-REFERENCE.md#5-숫자를-읽을-때마다-단위를-추측하게-두지-않아요"
       ],
       "rule": "시간을 Bool로 암묵 변환하지 않는다",
       "scope": "compiler",
@@ -69,7 +69,7 @@
       "id": "REF-00-006",
       "issue": "https://github.com/callin2/ghostflow-language/issues/192",
       "references": [
-        "../LANGUAGE-REFERENCE.md#6-시간은-제어의-입력과-상태-관계다"
+        "../LANGUAGE-REFERENCE.md#6-물을-주는-10분-동안에도-판단은-계속돼야-해요"
       ],
       "rule": "운전 타이머를 기다리는 동안에도 정지 입력을 판단한다",
       "scope": "runtime",
@@ -83,7 +83,7 @@
       "id": "REF-00-007",
       "issue": "https://github.com/callin2/ghostflow-language/issues/193",
       "references": [
-        "../LANGUAGE-REFERENCE.md#7-오류와-정보-부족을-숨기지-않는다"
+        "../LANGUAGE-REFERENCE.md#7-값을-모르면-모른다는-사실을-남겨요"
       ],
       "rule": "센서 정상 0과 fault에서 선택한 대체값 0은 품질에서 구분된다",
       "scope": "runtime",
@@ -96,7 +96,7 @@
     {
       "id": "REF-00-008",
       "references": [
-        "../LANGUAGE-REFERENCE.md#8-제약과-판단의-근거를-읽을-수-있게-한다"
+        "../LANGUAGE-REFERENCE.md#8-하고-싶은-동작과-해도-되는-동작을-구분해요"
       ],
       "rule": "제약으로 차단된 출력에 요청과 차단 근거를 함께 보존한다",
       "scope": "runtime",
@@ -110,7 +110,7 @@
       "id": "REF-00-009",
       "issue": "https://github.com/callin2/ghostflow-language/issues/194",
       "references": [
-        "../LANGUAGE-REFERENCE.md#9-운영-조절점과-화면을-같은-의미로-연결한다"
+        "../LANGUAGE-REFERENCE.md#9-물-주는-시간을-바꾸려고-프로그램을-다시-짤-필요는-없잖아요"
       ],
       "rule": "동일 설정을 편집하는 서로 다른 UI가 검증 의미를 바꾸지 않는다",
       "scope": "renderer",
@@ -124,7 +124,7 @@
       "id": "REF-00-010",
       "issue": "https://github.com/callin2/ghostflow-language/issues/195",
       "references": [
-        "../LANGUAGE-REFERENCE.md#10-조합해도-책임과-비용을-추적할-수-있게-한다"
+        "../LANGUAGE-REFERENCE.md#10-잘-만든-예제-두-개를-가져왔으면-함께-쓸-수-있어야죠"
       ],
       "rule": "재사용한 두 instance의 기억과 provenance는 격리된다",
       "scope": "runtime",
