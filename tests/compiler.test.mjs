@@ -19,7 +19,7 @@ console.log(`compiler tests passed (${compilation.bytes.length} byte module)`);
 
 for (const declaration of ['input x: Bool = false;', 'input x, y: Bool = true;', 'input count: Int = 1 + 2;']) {
   test(`rejects input initializer at its equals token: ${declaration}`, () => {
-    assert.throws(() => compileControl(`control Invalid {\n  ${declaration}\n  output ready: Bool; ready <- true;\n}`, { filename: 'input.ghost' }), error => {
+    assert.throws(() => compileControl(`control InputInitializer {\n  ${declaration}\n  output ready: Bool; ready <- true;\n}`, { filename: 'input.ghost' }), error => {
       assert.ok(error instanceof ControlCompileError);
       assert.equal(error.filename, 'input.ghost');
       assert.equal(error.line, 2);
@@ -33,7 +33,7 @@ for (const declaration of ['input x: Bool = false;', 'input x, y: Bool = true;',
 for (const eol of ['\n', '\r\n']) {
   test(`input initializer diagnostic maps to canonical Markdown (${JSON.stringify(eol)})`, async () => {
     const source = [
-      '# Host inputs', '', '```ghost', 'control Invalid {', '```', '',
+      '# Host inputs', '', '```ghost', 'control InputInitializer {', '```', '',
       'Inputs come from the host.', '', '```ghost', '  input x: Bool = false;',
       '  output ready: Bool; ready <- x;', '}', '```', '',
     ].join(eol);
@@ -57,6 +57,6 @@ test('canonical host inputs remain type-only alongside initialized state and con
   assert.deepEqual(result.manifest.inputs, [{ name: 'x', type: 'Bool' }, { name: 'y', type: 'Bool' }]);
   assert.deepEqual(result.manifest.outputs, [{ name: 'ready', type: 'Bool' }]);
   assert.equal(result.bytes.subarray(0, 4).toString(), 'GFB1');
-  assert.throws(() => compileControl('control Invalid { output ready: Bool = false; }'),
+  assert.throws(() => compileControl('control OutputInitializer { output ready: Bool = false; }'),
     /output declarations are type-only; connect each output/);
 });
