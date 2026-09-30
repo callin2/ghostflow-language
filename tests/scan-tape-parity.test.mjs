@@ -7,6 +7,8 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { compileSource } from './helpers/literate-compile.mjs';
 import { FramedGhostFlowRuntime } from '../runtimes/wasm/framed-runtime.mjs';
+import { observeRuntimeValues } from '../tools/source-trace.mjs';
+import { sensorFaultTimerSource, sensorFaultTimerScans } from './helpers/continuous-timer-vectors.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const wasmBytes = fs.readFileSync(path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm'));
@@ -15,6 +17,24 @@ const nativePath = path.join(root, 'target/release/examples/scan_tape' + (proces
 function row(scanId, logicalTimeMs, inputs) {
   return { scanId, logicalTimeMs, inputs };
 }
+
+test('T01-FAULT: native and framed WASM reset and restart the authored sensor-fault timer identically', async () => {
+  // The public sensor conditioner is tested in control-host; this tape supplies
+  // its Good/Disconnected Result rails to both executions of the same bytecode.
+  const artifact = await compileSource(sensorFaultTimerSource, { filename: 'continuous-sensor-fault.ghost' });
+  const sensor = artifact.manifest.sensors.find(item => item.name === 'high');
+  const tape = sensorFaultTimerScans.map(({ nowMs, quality }, scanId) => row(scanId, nowMs, [
+    { name: sensor.valueInput, value: quality === 'Good' ? 40 : 0 },
+    { name: sensor.okInput, value: quality === 'Good' },
+    { name: sensor.faultInput, value: 0 }, // SensorFault.Disconnected
+  ]));
+  const { artifact: compared, native } = await compare(sensorFaultTimerSource, tape, 'continuous-sensor-fault.ghost');
+  assert.deepEqual(compared.bytes, artifact.bytes);
+  assert.deepEqual(native.map(item => item.accepted), sensorFaultTimerScans.map(() => true));
+  assert.deepEqual(native.map(item => item.outcome.trace.safe.ready), sensorFaultTimerScans.map(item => item.ready));
+  assert.deepEqual(native.map(item => observeRuntimeValues(artifact.traceMetadata, item.outcome.trace).values
+    .find(value => value.kind === 'timer' && value.name === 'hot_for').value), sensorFaultTimerScans.map(item => item.elapsed));
+});
 
 function tsv(tape) {
   return `${tape.map(({ scanId, logicalTimeMs, inputs }) => [scanId, logicalTimeMs, ...inputs.flatMap(({ name, value }) => [name, typeof value === 'boolean' ? 'b' : 'n', String(value)])].join('\t')).join('\n')}\n`;

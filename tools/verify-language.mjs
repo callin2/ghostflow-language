@@ -70,6 +70,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/portable-package.test.mjs',
   'tests/gfb10-package.test.mjs',
   'tests/control-host.test.mjs',
+  'tests/continuous-timer-compatibility.test.mjs',
   'tests/control-runtime-atomicity.test.mjs',
   'tests/native-dispatch-status.test.mjs',
   'tests/framed-control-host.test.mjs',

@@ -4,6 +4,8 @@ import test from 'node:test';
 import { compileSource } from './helpers/literate-compile.mjs';
 import { extractLiterate } from '../tools/literate.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
+import { observeRuntimeValues } from '../tools/source-trace.mjs';
+import { sensorFaultTimerSource, sensorFaultTimerScans } from './helpers/continuous-timer-vectors.mjs';
 
 const wasmPath = new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url);
 const wasmBytes = fs.readFileSync(wasmPath);
@@ -23,6 +25,26 @@ control MoistureHost {
   pump <- start && dry_ok;
 }
 `;
+
+test('T01-FAULT: an explicit sensor fault branch resets continuous_true and recovery starts at zero', async t => {
+  const compiled = await compileSource(sensorFaultTimerSource, { filename: 'continuous-sensor-fault.ghost' });
+  const runtime = await ControlRuntime.instantiate(wasmBytes, compiled);
+  t.after(() => runtime.dispose());
+  for (const [index, { nowMs, quality, elapsed, ready }] of sensorFaultTimerScans.entries()) {
+    const result = runtime.step({ nowMs, samples: { high: {
+      epoch: 1, id: index + 1, timestampMs: nowMs, value: 40, quality,
+    } } });
+    assert.equal(result.sensors.high.quality, quality);
+    assert.equal(result.sensors.high.ok, quality === 'Good');
+    assert.equal(result.vm.safe.ready, ready);
+    assert.equal(observeRuntimeValues(compiled.traceMetadata, result.vm).values
+      .find(value => value.kind === 'timer' && value.name === 'hot_for').value, elapsed);
+    assert.equal(result.vm.stateAfter.__gf_timer_was_true_hot_for, quality === 'Good');
+    if (quality !== 'Good' || elapsed === 0) {
+      assert.equal(result.vm.stateAfter.__gf_timer_since_hot_for, nowMs);
+    }
+  }
+});
 
 async function artifact() { return compileSource(source, { filename: 'control-host.ghost' }); }
 async function host() { return ControlRuntime.instantiate(wasmBytes, await artifact()); }
