@@ -160,6 +160,9 @@ impl Fixture {
             blob(&mut b, if empty { &[1, 0] } else { &self.output });
         }
         b.extend([0, 0]);
+        if matches!(self.version, 7 | 11 | 12) {
+            b.extend([0, 0]); // objective count
+        }
         b
     }
 }
@@ -168,6 +171,67 @@ fn rejected(f: &Fixture, message: &str) {
         Err(error) => assert_eq!(error.message(), message),
         Ok(_) => panic!("accepted invalid module: {message}"),
     }
+}
+
+fn utc_range(starts: &[u64], duration: u64, zone: &str) -> Vec<u8> {
+    let mut bytes = vec![13];
+    bytes.extend(7u32.to_le_bytes());
+    string(&mut bytes, "planned");
+    bytes.extend(60_000u64.to_le_bytes());
+    string(&mut bytes, zone);
+    bytes.extend(duration.to_le_bytes());
+    bytes.extend((starts.len() as u16).to_le_bytes());
+    for start in starts {
+        bytes.extend(start.to_le_bytes());
+    }
+    blob(&mut bytes, &[1, 1]);
+    blob(&mut bytes, &[1, 0]);
+    bytes
+}
+
+#[test]
+fn gfb12_range_loads_active_and_rejects_old_profiles_and_malformed_recurrences() {
+    let mut fixture = Fixture {
+        version: 12,
+        entries: vec![utc_range(&[0, 900_000], 900_000, "UTC")],
+        output: vec![58, 0, 0, 2],
+        ..Default::default()
+    };
+    let module = Module::load(&fixture.bytes()).unwrap();
+    assert!(matches!(
+        &module.schedule_requirements().unwrap().strategies[0].schedules[0],
+        PulseDescriptor::Context(ghostflow_core::context_vm::ScheduleDescriptor {
+            definition: ghostflow_core::context_vm::ScheduleDefinition::UtcRange { .. },
+            ..
+        })
+    ));
+    for version in [5, 8, 9, 10, 11] {
+        fixture.version = version;
+        rejected(&fixture, "invalid prelude kind");
+    }
+    fixture.version = 12;
+    for (starts, duration) in [
+        (vec![], 1),
+        (vec![0], 0),
+        (vec![0, 0], 1),
+        (vec![900_000, 0], 1),
+        (vec![86_400_000], 1),
+        (vec![0, 900_000], 900_001),
+        (vec![0, 86_399_999], 2),
+        (vec![0], 86_400_001),
+        (vec![0; 97], 1),
+    ] {
+        fixture.entries = vec![utc_range(&starts, duration, "UTC")];
+        assert!(
+            Module::load(&fixture.bytes()).is_err(),
+            "accepted {starts:?}/{duration}"
+        );
+    }
+    fixture.entries = vec![utc_range(&[0], 1, "Etc/UTC")];
+    rejected(&fixture, "Range requires UTC timezone");
+    fixture.entries = vec![Solar::default().bytes()];
+    fixture.output = vec![58, 0, 0, 0];
+    rejected(&fixture, "GFB format 12 requires UTC Range");
 }
 
 #[test]

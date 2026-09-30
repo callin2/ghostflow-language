@@ -231,7 +231,7 @@ cancel_when := Bool                                   // Required for current ci
 
 All common fields are required. Unconditional admission can specify `when = true`; a Run or Range without language-level cancellation can specify `cancel_when = false`. In the current compiler, `cancel_when` is allowed for `Tide` Run and civil `range`, and is required for `range`. It is forbidden for `pulse`. `hold_trusted(d, terminal: skip)` adds monotonic elapsed time to the last trusted wall instant and uses it for at most d. Uncertainty adds the same monotonic elapsed time to the last uncertainty, recording `HeldClock` provenance. At the boundary, after `ClockUnknown`, terminal skip applies to new admission decisions. An already admitted Range keeps its monotonic end time. High-water does not change.
 
-The current compiler accepts only `clock = trusted_only` and `fallback = skip`. `window`, `run(_, on_time)`, `At`, `hold_trusted` and `fixed_time` are selected design notations outside current compiler support. Civil `range` is currently type-checked for recurrences whose static non-overlap can be proved in the UTC timezone, but is not lowered to executable bytecode. Tide `run(_, within(_))` is supported.
+The current compiler accepts only `clock = trusted_only` and `fallback = skip`. `window`, `run(_, on_time)`, `At`, `hold_trusted` and `fixed_time` are selected design notations outside current compiler support. Civil `range` is currently type-checked for recurrences whose static non-overlap can be proved in the UTC timezone, and lowers immutable UTC Daily and nonempty DailySlots ranges to GFB12 execution. Other accepted Range recurrences remain non-executable descriptors. Tide `run(_, within(_))` is supported.
 
 `fixed_time` is available only for Solar. When a fallback occurrence for that source local date is admitted, the same occurrence ledger consumes that date's Solar event, avoiding duplication even if the provider recovers. Tide allows only `fallback = skip` because without predictions the number and identity of events are unknown.
 
@@ -277,7 +277,7 @@ Because `.due = false` alone cannot distinguish ordinary false, Unknown fallback
 
 ### Source response to missed occurrences
 
-`schedule_name.missed` is a `Bool` projection. The current compiler provides it for Solar and executable `pulse` civil schedules. It is not yet an execution projection for `range` descriptors. It is true only when one or more occurrences of that schedule become **terminal missed** in this accepted scan. Even if two or more are missed in one scan, the value is true once; it is false in the next accepted scan if there is no new terminal miss. A control action evaluates this value exactly once in that accepted scan's immutable snapshot. Simply reobserving an occurrence already recorded as terminal missed or restoring a checkpoint does not make it true again. Rejected scans commit neither this pulse nor state transitions.
+`schedule_name.missed` is a `Bool` projection. The current compiler provides it for Solar and executable `pulse` civil schedules. It is not yet an execution projection for Range, including executable UTC Range controls. It is true only when one or more occurrences of that schedule become **terminal missed** in this accepted scan. Even if two or more are missed in one scan, the value is true once; it is false in the next accepted scan if there is no new terminal miss. A control action evaluates this value exactly once in that accepted scan's immutable snapshot. Simply reobserving an occurrence already recorded as terminal missed or restoring a checkpoint does not make it true again. Rejected scans commit neither this pulse nor state transitions.
 
 ```ghost
 state missed_scans: Int = 0;
@@ -298,7 +298,7 @@ A Bool pulse contains neither count nor reason. The same accepted scan's **order
 | `window(5min)` (design) | Admit once at the first true condition within `[planned, planned+5min)`. Repeated false→true changes in the same occurrence do not rearm it. |
 | `run(5min, on_time)` (design) | Admit only at observed crossing and run for five minutes from admission. |
 | `run(5min, within(10min))` (Tide) | Allow first admission within `[planned, planned+10min)`. Ten minutes are grace; run length is five minutes. |
-| `range(10min)` (civil contract) | If trusted current time is within `[planned, planned+10min)` and `when` is true, admit once even after late first observation, boot or recovery. End is planned start + ten minutes. Bytecode execution is currently unsupported. |
+| `range(10min)` (civil contract) | If trusted current time is within `[planned, planned+10min)` and `when` is true, admit once even after late first observation, boot or recovery. End is planned start + ten minutes. Immutable UTC Daily/DailySlots execution uses GFB12. |
 
 ```ghost
 schedule morning_watering: Daily {
@@ -316,7 +316,9 @@ schedule morning_watering: Daily {
 }
 ```
 
-This `range` example is a contract validated by the current compiler, not executable control bytecode. Current civil `range` requires `UTC` and recurrence non-overlap.
+This immutable UTC `range` example is executable GFB12 control bytecode. The bounded execution slice supports Daily without a work calendar and nonempty static DailySlots, with `trusted_only`, `baseline` and `skip`. Live start/duration settings, Periodic Range and other accepted variants remain descriptors. Non-UTC and unprovable overlap remain rejected; no timezone or DST policy is inferred.
+
+Range context checkpoints retain consumed occurrence identities, not an active monotonic timer. Restoring into a fresh boot does not resume or readmit an already consumed occurrence. An unconsumed still-open interval may admit only its remaining time. Terminal-capacity exhaustion rejects the scan atomically; identities are never silently pruned.
 
 The late interval is half-open. No new admission occurs at its end boundary. For a planned time of 08:00, `run(5min, within(10min))` admitted at 08:02 is a monotonic run through 08:07.
 

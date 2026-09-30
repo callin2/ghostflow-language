@@ -331,7 +331,7 @@ impl ContextRuntime {
                 })
                 .ok_or_else(|| invalid("unknown context schedule site"))?;
             match definition {
-                ScheduleDefinition::Periodic { .. } => {
+                ScheduleDefinition::Periodic { .. } | ScheduleDefinition::UtcRange { .. } => {
                     if evidence.provider.is_some()
                         || evidence.calendar.is_some()
                         || !evidence.rows.is_empty()

@@ -60,7 +60,7 @@ driver disconnect handling are host/Driver policy and require separate evidence.
 | Item | Current representation | Role |
 |---|---|---|
 | Authoritative program | `.ghost.md` | Literate source with intent, code, comments and explanation |
-| Generated executable | `.gfb`, `GFB1` magic with feature-selected `u16` format 1–9 or 11 | Binary IR consumed by the VM; see [BYTECODE.md](BYTECODE.md) |
+| Generated executable | `.gfb`, `GFB1` magic with feature-selected `u16` format 1–9, 11 or 12 | Binary IR consumed by the VM; see [BYTECODE.md](BYTECODE.md) |
 | Generated control manifest | Feature-selected `GhostFlow/control-v1`, `v2`, `v3`, `v4`, `v7`, `v8` or `v10` | Typed host ports, timer/sensor/schedule requirements and bytecode hash |
 | Generated constraint policy | `GhostFlow/constraints-v1` | Lowered standalone constraint source, bound by the host |
 | Generated source map | `.gfb.map.json` | Diagnostic nodes/line mapping; source-preserving envelope from compileSource as specified in SOURCE-MAP.md |

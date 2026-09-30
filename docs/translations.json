@@ -75,8 +75,8 @@
       "source": "docs/BYTECODE.md",
       "sourceLanguage": "en",
       "translation": "docs/BYTECODE.ko.md",
-      "sourceSha256": "1ff79e043d5cf57bcd9c81e0b4cb1422e56db76ca4f1bef02ab1198c76575483",
-      "translationSha256": "7c021c623754136b6861fa1cc2098283160732d3d3c873ec88879d79c936f75d"
+      "sourceSha256": "110d0dc3d9e4869bf16d8933cfa78900e482a5ff4e27b58d9ad10e9623f82b47",
+      "translationSha256": "7ed795283f59df78a4fcff4baff1487ccf1cd760b9413fffdc4cd920fdc52734"
     },
     {
       "source": "docs/COMPILER-DIAGNOSTICS.md",
@@ -159,8 +159,8 @@
       "source": "docs/IMPLEMENTATION.md",
       "sourceLanguage": "en",
       "translation": "docs/IMPLEMENTATION.ko.md",
-      "sourceSha256": "e9f89dde19c8e4029eee0844de483dee019c64acd5c8cd3e15e2f9abd64ea7f5",
-      "translationSha256": "06e76601727ebad397047b36d822d3a458b7c28b160d689a83b74bd390376d39"
+      "sourceSha256": "0004a9349e37b5e866c2242fafd2e57f6c511e4c6e0441257121438780106e74",
+      "translationSha256": "6a7e71315659b56509cbf486ec0805a69a7e7d790ea456003713e66aec921fb7"
     },
     {
       "source": "docs/INTENT-ANCHOR-MAP.md",
@@ -299,8 +299,8 @@
       "source": "docs/reference/03-time-and-schedules.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/03-time-and-schedules.en.md",
-      "sourceSha256": "16bc8c99babdec6464fe4b140b9232714541e4056aa777cc50b9eea8262ad315",
-      "translationSha256": "d3318ef7c4645bf6df9ddb6830a4dc29103f83fbfe13bb95a82f512bde2b1dae"
+      "sourceSha256": "f1003b2b13ff353267387de71e5f254aed22b9e6e48d070ed5c01ad31f1570ad",
+      "translationSha256": "efce202c70dcb8606b5f672bb2f04dc8eb8e489889d34501329bfaa736c7f647"
     },
     {
       "source": "docs/reference/04-sensors-constraints-control.md",
@@ -516,8 +516,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "6c046f68c2f2343cb1c26b1e7e0add1aa6fb84cd5d4dc1039a6038dec792aa19",
-      "translationSha256": "79ba0893fee9f5e3aee8743c958deade81f1f8d36ff4b9a42bf59b2e30a3a0ce"
+      "sourceSha256": "dd0fbfcda043b619d495461c6b25ad1baa4941efc74a5f8f96a08a35d97c88df",
+      "translationSha256": "d89ac90ea6250cb7bb2e5a8804dab8e0e1787a1384b1e608e1751bce8355fe5e"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",

@@ -222,7 +222,7 @@ function validateContextManifest(input, bytecodeFormat) {
   const manifest = record(input, 'manifest');
   keys(manifest, ['format','name','inputs','outputs','sensors','schedules','timers','signals','configs','bytecodeSha256'],
     ['providers','calendars','naturalConditions','accounting','resources','objectives','adaptSettings'], 'manifest');
-  if (bytecodeFormat !== 11) throw new Error('control-v10 requires GFB11');
+  if (bytecodeFormat !== 11 && bytecodeFormat !== 12) throw new Error('control-v10 requires GFB11 or GFB12');
   name(manifest.name, 'manifest.name');
   if (!/^[0-9a-f]{64}$/.test(manifest.bytecodeSha256)) throw new Error('invalid bytecode SHA-256');
   const inputs = validateList(manifest.inputs, 'manifest.inputs', ['name','type'], ['canonicalUnit']);
@@ -256,8 +256,25 @@ function validateContextManifest(input, bytecodeFormat) {
   for (const item of schedules) {
     name(item.name, 'schedule.name'); safeInteger(item.site, 'schedule.site', 1, 0xffff_ffff);
     if (!['periodic','cron','daily','daily-slots','tide'].includes(item.kind)) throw new Error('unsupported context schedule kind');
-    if (item.kind === 'daily' && !['workday','offday'].includes(item.day?.kind)) throw new Error('context Daily requires WorkCalendar day');
-    if (item.kind === 'daily-slots' && !item.selectedConfig) throw new Error('context DailySlots requires TimeSlots config');
+    const range = item.policy?.basis?.kind === 'range';
+    if (range) {
+      if (bytecodeFormat !== 12 || item.timezone !== 'UTC' || item.day || item.selectedConfig
+        || !['daily','daily-slots'].includes(item.kind)) throw new Error('executable Range requires GFB12 and immutable UTC Daily or DailySlots');
+      const policy = record(item.policy, `schedule ${item.name}.policy`);
+      keys(policy, ['basis','when','cancelWhen','clock','gapMs','recovery','fallback'], [], `schedule ${item.name}.policy`);
+      keys(record(policy.basis, 'Range basis'), ['kind','durationMs'], [], 'Range basis');
+      if (policy.clock !== 'trusted_only' || policy.recovery !== 'baseline' || policy.fallback !== 'skip') throw new Error('unsupported Range policy');
+      safeInteger(policy.gapMs, 'Range gapMs', 1);
+      safeInteger(policy.basis.durationMs, 'Range durationMs', 1, 86_400_000);
+      const starts = item.kind === 'daily' ? [safeInteger(item.atMs, 'Range atMs', 0, 86_399_999)]
+        : (Array.isArray(item.slots) ? item.slots.map(minute => safeInteger(minute, 'Range slot', 0, 1439) * 60_000) : []);
+      if (!starts.length || starts.length > 96 || starts.some((start, index) => index > 0 && start <= starts[index - 1])
+        || starts.some((start, index) => starts[(index + 1) % starts.length] + (index + 1 === starts.length ? 86_400_000 : 0) - start < policy.basis.durationMs)) {
+        throw new Error('Range occurrences must not overlap');
+      }
+    }
+    if (!range && item.kind === 'daily' && !['workday','offday'].includes(item.day?.kind)) throw new Error('context Daily requires WorkCalendar day');
+    if (!range && item.kind === 'daily-slots' && !item.selectedConfig) throw new Error('context DailySlots requires TimeSlots config');
     if (item.kind === 'tide' && !providers.some(p => p.name === item.source && p.type === 'TidePredictions')) throw new Error('unbound Tide provider');
   }
   for (const item of naturals) {

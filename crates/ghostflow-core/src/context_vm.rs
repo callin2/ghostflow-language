@@ -16,6 +16,11 @@ pub struct DurationSetting {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ScheduleDefinition {
+    /// GFB12 immutable civil Range; UTC recurrence is computed in Rust.
+    UtcRange {
+        starts_ms: Vec<u64>,
+        duration_ms: u64,
+    },
     Periodic {
         epoch_id: String,
         anchor_ms: u64,
@@ -198,6 +203,22 @@ pub(crate) fn text(reader: &mut Reader<'_>) -> Result<String> {
         return Err(Error::new("context identifier must contain 1..128 bytes"));
     }
     Ok(value)
+}
+
+pub(crate) fn validate_utc_range(starts: &[u64], duration: u64) -> Result<()> {
+    const DAY: u64 = 86_400_000;
+    if !(1..=96).contains(&starts.len())
+        || duration == 0
+        || duration > DAY
+        || starts.iter().any(|start| *start >= DAY)
+        || starts
+            .windows(2)
+            .any(|pair| pair[0] >= pair[1] || duration > pair[1] - pair[0])
+        || duration > DAY - starts[starts.len() - 1] + starts[0]
+    {
+        return Err(Error::new("invalid or overlapping UTC Range recurrence"));
+    }
+    Ok(())
 }
 
 fn exact(reader: &mut Reader<'_>) -> Result<u64> {
@@ -453,6 +474,25 @@ pub(crate) fn load_schedule(
                 initial_minutes,
                 dst_missing,
                 dst_repeated,
+            }
+        }
+        13 if format == 12 => {
+            if text(reader)? != "UTC" {
+                return Err(Error::new("Range requires UTC timezone"));
+            }
+            let duration_ms = exact(reader)?;
+            let count = usize::from(reader.u16()?);
+            if !(1..=96).contains(&count) {
+                return Err(Error::new("invalid UTC Range start count"));
+            }
+            let mut starts_ms = Vec::with_capacity(count);
+            for _ in 0..count {
+                starts_ms.push(exact(reader)?);
+            }
+            validate_utc_range(&starts_ms, duration_ms)?;
+            ScheduleDefinition::UtcRange {
+                starts_ms,
+                duration_ms,
             }
         }
         _ => return Err(Error::new("invalid context schedule kind")),

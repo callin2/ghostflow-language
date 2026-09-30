@@ -169,6 +169,69 @@ fn periodic_facts() -> context_runtime::Facts {
     }
 }
 
+fn utc_range_program() -> Module {
+    let mut program = module(
+        PulseDescriptor::Context(ScheduleDescriptor {
+            site: 7,
+            name: "planned".into(),
+            gap_ms: 60,
+            definition: ScheduleDefinition::UtcRange {
+                starts_ms: vec![100],
+                duration_ms: 100,
+            },
+            when: vec![1, 1],
+            cancel: vec![1, 0],
+        }),
+        false,
+    );
+    program.format_version = 12;
+    program.strategies[0].intents[0].expression = vec![58, 0, 0, 2];
+    program
+}
+
+#[test]
+fn utc_range_context_failure_rolls_back_and_checkpoint_never_resumes() {
+    let mut runtime = Runtime::new(8);
+    runtime.install(utc_range_program(), false);
+    runtime
+        .activate_with_context(&context_runtime::Activation {
+            boot_epoch: 1,
+            terminal_capacity: 8,
+            bindings: vec![],
+        })
+        .unwrap();
+    let pristine = runtime.context_checkpoint().unwrap();
+    inputs(&mut runtime, 1, 0, Some(0));
+    assert!(runtime
+        .tick_with_context(clock(1, 0, 140), &periodic_facts())
+        .is_err());
+    assert_eq!(runtime.context_checkpoint().unwrap(), pristine);
+    inputs(&mut runtime, 1, 0, Some(1));
+    let admitted = runtime
+        .tick_with_context(clock(1, 0, 140), &periodic_facts())
+        .unwrap();
+    assert_eq!(admitted.requested_intents["allowed"], Value::Bool(true));
+    assert!(admitted.context_trace.iter().any(|o| o.decision == "Due"));
+    let checkpoint = runtime.context_checkpoint().unwrap();
+    let mut reboot = Runtime::new(8);
+    reboot.install(utc_range_program(), false);
+    reboot
+        .activate_with_context(&context_runtime::Activation {
+            boot_epoch: 2,
+            terminal_capacity: 8,
+            bindings: vec![],
+        })
+        .unwrap();
+    reboot.restore_context_checkpoint(&checkpoint).unwrap();
+    inputs(&mut reboot, 2, 0, Some(1));
+    let restored = reboot
+        .tick_with_context(clock(2, 0, 150), &periodic_facts())
+        .unwrap();
+    assert_eq!(restored.requested_intents["allowed"], Value::Bool(false));
+    assert!(restored.context_trace.iter().all(|o| o.decision != "Due"));
+    assert_eq!(reboot.context_checkpoint().unwrap(), checkpoint);
+}
+
 fn framed_periodic() -> scan::ScanDriver {
     let mut runtime = Runtime::new(8);
     runtime.install(periodic(), false);

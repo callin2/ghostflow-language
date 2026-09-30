@@ -5,6 +5,7 @@ use crate::context_vm::{
     Decision, Observation, ScheduleDefinition, ScheduleDescriptor, ScheduleEvidence, SettingValue,
 };
 use crate::cron_schedule::{CivilSlot, CronFields, RepeatedPolicy};
+use crate::range_schedule::{RangeDecision, RangeEngine, RangeFact};
 use crate::schedule_clock::{ClockDisposition, ClockSnapshot, ClockTrust, ScheduleClockGate};
 use crate::work_calendar::{self, DayQuery, DaySelector};
 use crate::{Error, Result};
@@ -23,6 +24,8 @@ pub struct Engine {
     active_run: Option<ActiveRun>,
     last_plan: BTreeMap<String, u64>,
     pending_grace: BTreeMap<String, (u64, String, String)>,
+    range: Option<RangeEngine>,
+    range_clock_revision: Option<String>,
 }
 
 #[derive(Clone)]
@@ -103,6 +106,16 @@ impl Engine {
     }
 
     pub fn snapshot(&self) -> Result<Vec<u8>> {
+        if let Some(range) = &self.range {
+            // Only consumed identities are durable. Active monotonic references
+            // cannot be transferred to a new boot and are never resumed.
+            let mut bytes = b"GFES\x02GFRG\x01".to_vec();
+            write_len(&mut bytes, range.terminal_keys().len())?;
+            for key in range.terminal_keys() {
+                write_string(&mut bytes, key)?;
+            }
+            return Ok(bytes);
+        }
         let mut bytes = Vec::new();
         bytes.extend_from_slice(b"GFES");
         bytes.push(1);
@@ -145,6 +158,44 @@ impl Engine {
             return Err(invalid("context checkpoint exceeds bound"));
         }
         let mut reader = SnapshotReader { bytes, at: 0 };
+        if let ScheduleDefinition::UtcRange { starts_ms, .. } = &desc.definition {
+            if reader.take(5)? != b"GFES\x02" || reader.take(5)? != b"GFRG\x01" {
+                return Err(invalid("invalid Range checkpoint version"));
+            }
+            let mut restored = Self::new(desc, boot_epoch, capacity)?;
+            let count = usize::from(reader.u16()?);
+            if count > capacity {
+                return Err(invalid("Range checkpoint terminal capacity"));
+            }
+            let mut keys = Vec::with_capacity(count);
+            for _ in 0..count {
+                let key = reader.string()?;
+                let parts: Vec<_> = key.split(':').collect();
+                if parts.len() != 3 {
+                    return Err(invalid("invalid Range checkpoint occurrence identity"));
+                }
+                let site = parts[0].parse::<u32>().ok();
+                let day = parts[1].parse::<u64>().ok();
+                let slot = parts[2].parse::<usize>().ok();
+                if site != Some(desc.site)
+                    || day.is_none_or(|day| day > 2_932_896)
+                    || slot.is_none_or(|slot| !(1..=starts_ms.len()).contains(&slot))
+                    || key != format!("{}:{}:{}", desc.site, day.unwrap(), slot.unwrap())
+                {
+                    return Err(invalid("invalid Range checkpoint occurrence identity"));
+                }
+                keys.push(key);
+            }
+            if reader.at != bytes.len() {
+                return Err(invalid("trailing Range checkpoint bytes"));
+            }
+            restored
+                .range
+                .as_mut()
+                .unwrap()
+                .restore_terminal_keys(keys)?;
+            return Ok(restored);
+        }
         if reader.take(4)? != b"GFES" || reader.u8()? != 1 {
             return Err(invalid("invalid context checkpoint version"));
         }
@@ -279,6 +330,13 @@ impl Engine {
             return Err(invalid("invalid context terminal capacity"));
         }
         let (interval_ms, slots, next_slot_key) = match &desc.definition {
+            ScheduleDefinition::UtcRange {
+                starts_ms,
+                duration_ms,
+            } => {
+                crate::context_vm::validate_utc_range(starts_ms, *duration_ms)?;
+                (None, Vec::new(), 1)
+            }
             ScheduleDefinition::Periodic { every, .. } => {
                 if every.initial_ms == 0
                     || every.initial_ms < every.min_ms
@@ -331,6 +389,12 @@ impl Engine {
             active_run: None,
             last_plan: BTreeMap::new(),
             pending_grace: BTreeMap::new(),
+            range: if matches!(desc.definition, ScheduleDefinition::UtcRange { .. }) {
+                Some(RangeEngine::new(desc.gap_ms, boot_epoch, capacity)?)
+            } else {
+                None
+            },
+            range_clock_revision: None,
         })
     }
 
@@ -351,6 +415,18 @@ impl Engine {
             return Err(invalid("invalid context schedule evidence"));
         }
         Self::validate_rows(desc, facts)?;
+        if let ScheduleDefinition::UtcRange {
+            starts_ms,
+            duration_ms,
+        } = &desc.definition
+        {
+            if change.is_some() {
+                return Err(invalid(
+                    "immutable UTC Range cannot accept settings changes",
+                ));
+            }
+            return self.utc_range(desc.site, starts_ms, *duration_ms, clock, when, cancel);
+        }
         let mut staged = self.clone();
         staged.apply_setting(
             desc,
@@ -365,6 +441,7 @@ impl Engine {
         let observed = staged.clock.poll(clock)?;
         let mut decision = Decision::default();
         match &desc.definition {
+            ScheduleDefinition::UtcRange { .. } => unreachable!("Range staged before pulse clock"),
             ScheduleDefinition::Periodic {
                 epoch_id,
                 anchor_ms,
@@ -499,8 +576,16 @@ impl Engine {
     }
 
     fn validate_rows(desc: &ScheduleDescriptor, facts: &ScheduleEvidence) -> Result<()> {
+        if matches!(desc.definition, ScheduleDefinition::UtcRange { .. })
+            && (facts.provider.is_some() || facts.calendar.is_some() || !facts.rows.is_empty())
+        {
+            return Err(invalid("unexpected UTC Range evidence payload"));
+        }
         let tide = matches!(desc.definition, ScheduleDefinition::TideRun { .. });
-        if matches!(desc.definition, ScheduleDefinition::Periodic { .. }) && !facts.rows.is_empty()
+        if matches!(
+            desc.definition,
+            ScheduleDefinition::Periodic { .. } | ScheduleDefinition::UtcRange { .. }
+        ) && !facts.rows.is_empty()
         {
             return Err(invalid("Periodic evidence cannot contain occurrence rows"));
         }
@@ -547,6 +632,173 @@ impl Engine {
             }
         }
         Ok(())
+    }
+
+    fn utc_range(
+        &self,
+        site: u32,
+        starts: &[u64],
+        duration: u64,
+        clock: ClockSnapshot<'_>,
+        when: bool,
+        cancel: bool,
+    ) -> Result<(Self, Decision)> {
+        const DAY: u64 = 86_400_000;
+        const MAX_WALL: u64 = 253_402_300_799_999;
+        let mut plans = Vec::new();
+        if let (ClockTrust::Trusted, Some(wall)) = (clock.trust, clock.wall_ms) {
+            if wall > MAX_WALL {
+                return Err(invalid("UTC Range wall time is out of range"));
+            }
+            let current_day = wall / DAY;
+            for day in current_day.saturating_sub(1)..=current_day {
+                for (slot, start) in starts.iter().enumerate() {
+                    let planned = day * DAY + start;
+                    let _end = planned
+                        .checked_add(duration)
+                        .filter(|end| *end <= MAX_WALL)
+                        .ok_or_else(|| invalid("UTC Range planned end is out of range"))?;
+                    // Only intervals crossing midnight need a preceding-day
+                    // plan. Keep them after their end too, so the exact end
+                    // consumes the identity before a wall correction backward.
+                    if day < current_day && start + duration <= DAY {
+                        continue;
+                    }
+                    plans.push(RangeFact {
+                        occurrence_key: format!("{site}:{day}:{}", slot + 1),
+                        planned_wall_ms: planned,
+                        duration_ms: duration,
+                    });
+                }
+            }
+        }
+        let original = self
+            .range
+            .as_ref()
+            .ok_or_else(|| invalid("missing Range engine"))?;
+        let stage = original.begin(clock, &plans, when, cancel)?;
+        let result = stage.result.clone();
+        let disposition = stage.clock_disposition;
+        let previous_active = original.active_fact().cloned();
+        let previous_keys = original.terminal_keys();
+        let mut staged = self.clone();
+        let range = staged.range.as_mut().unwrap();
+        range.commit(stage);
+        if result.due {
+            staged.range_clock_revision =
+                Some(clock.source_revision.unwrap_or("clock-unversioned").into());
+        }
+        let revision = staged
+            .range_clock_revision
+            .as_deref()
+            .unwrap_or(clock.source_revision.unwrap_or("clock-unversioned"));
+        let mut out = Decision {
+            due: result.due,
+            active: result.active,
+            ..Decision::default()
+        };
+        for key in range
+            .terminal_keys()
+            .iter()
+            .filter(|key| !previous_keys.contains(key))
+        {
+            let fact = plans
+                .iter()
+                .find(|fact| &fact.occurrence_key == key)
+                .ok_or_else(|| invalid("missing terminal Range plan"))?;
+            let decision = if result.occurrence_key.as_ref() == Some(key) && result.due {
+                "Due"
+            } else if clock
+                .wall_ms
+                .is_some_and(|wall| wall >= fact.planned_wall_ms + duration)
+            {
+                "LateStartExpired"
+            } else {
+                "Cancelled"
+            };
+            out.observations.push(Observation {
+                site,
+                occurrence_id: key.clone(),
+                planned_ms: Some(fact.planned_wall_ms),
+                decision: decision.into(),
+                provider_revision: "utc-static-v1".into(),
+                context_revision: if decision == "Due" {
+                    revision
+                } else {
+                    clock.source_revision.unwrap_or("clock-unversioned")
+                }
+                .into(),
+            });
+        }
+        if let Some(key) = &result.occurrence_key {
+            if !out.observations.iter().any(|o| &o.occurrence_id == key) {
+                let fact = range
+                    .active_fact()
+                    .or(previous_active.as_ref())
+                    .ok_or_else(|| invalid("missing active Range plan"))?;
+                out.observations.push(Observation {
+                    site,
+                    occurrence_id: key.clone(),
+                    planned_ms: Some(fact.planned_wall_ms),
+                    decision: format!("{:?}", result.decision),
+                    provider_revision: "utc-static-v1".into(),
+                    context_revision: revision.into(),
+                });
+            }
+        }
+        if disposition == ClockDisposition::ObservationGap {
+            let fact = result
+                .occurrence_key
+                .as_ref()
+                .and_then(|key| {
+                    plans
+                        .iter()
+                        .find(|fact| &fact.occurrence_key == key)
+                        .or(range.active_fact())
+                        .or(previous_active.as_ref())
+                })
+                .or_else(|| {
+                    clock.wall_ms.and_then(|wall| {
+                        plans.iter().find(|fact| {
+                            wall >= fact.planned_wall_ms && wall < fact.planned_wall_ms + duration
+                        })
+                    })
+                });
+            out.observations.push(Observation {
+                site,
+                occurrence_id: fact.map_or_else(String::new, |fact| fact.occurrence_key.clone()),
+                planned_ms: fact.map(|fact| fact.planned_wall_ms),
+                decision: "ObservationGap".into(),
+                provider_revision: "utc-static-v1".into(),
+                context_revision: clock.source_revision.unwrap_or("clock-unversioned").into(),
+            });
+        } else if result.decision == RangeDecision::ClockUnknown && out.observations.is_empty() {
+            out.observations.push(Observation {
+                site,
+                occurrence_id: String::new(),
+                planned_ms: None,
+                decision: "Unknown(ClockUnknown)".into(),
+                provider_revision: "utc-static-v1".into(),
+                context_revision: clock.source_revision.unwrap_or("clock-unversioned").into(),
+            });
+        }
+        if out.observations.is_empty() {
+            let fact = clock.wall_ms.and_then(|wall| {
+                plans.iter().find(|fact| {
+                    wall >= fact.planned_wall_ms && wall < fact.planned_wall_ms + duration
+                })
+            });
+            out.observations.push(Observation {
+                site,
+                occurrence_id: fact.map_or_else(String::new, |fact| fact.occurrence_key.clone()),
+                planned_ms: fact.map(|fact| fact.planned_wall_ms),
+                decision: format!("{:?}", result.decision),
+                provider_revision: "utc-static-v1".into(),
+                context_revision: clock.source_revision.unwrap_or("clock-unversioned").into(),
+            });
+        }
+        // Range .missed remains outside the current executable projection contract.
+        Ok((staged, out))
     }
 
     pub fn stage_settings_fault(
@@ -1197,6 +1449,290 @@ mod tests {
     use super::*;
     use crate::context_vm::{DurationSetting, Occurrence, ProviderBinding, ProviderObservation};
     use crate::schedule_clock::ClockTrust;
+
+    fn range_desc(starts: Vec<u64>, duration: u64) -> ScheduleDescriptor {
+        ScheduleDescriptor {
+            site: 7,
+            name: "planned".into(),
+            gap_ms: 100,
+            definition: ScheduleDefinition::UtcRange {
+                starts_ms: starts,
+                duration_ms: duration,
+            },
+            when: vec![],
+            cancel: vec![],
+        }
+    }
+
+    #[test]
+    fn utc_range_late_recovery_gap_cancel_and_monotonic_end() {
+        let desc = range_desc(vec![1_000, 2_000], 600);
+        let evidence = facts(7);
+        let engine = Engine::new(&desc, 1, 8).unwrap();
+        let unknown = ClockSnapshot {
+            trust: ClockTrust::Unknown("lost"),
+            ..clock(1_240)
+        };
+        let (engine, unknown_result) = engine
+            .stage(&desc, unknown, &evidence, true, false, None, 0)
+            .unwrap();
+        assert!(!unknown_result.due && !unknown_result.active);
+        let admitted_clock = ClockSnapshot {
+            monotonic_ms: 1_250,
+            wall_ms: Some(1_240),
+            ..clock(1_250)
+        };
+        let (engine, admitted) = engine
+            .stage(&desc, admitted_clock, &evidence, true, false, None, 0)
+            .unwrap();
+        assert!(admitted.due && admitted.active && !admitted.missed);
+        assert_eq!(admitted.observations[0].occurrence_id, "7:0:1");
+        assert_eq!(admitted.observations[0].planned_ms, Some(1_000));
+        let (engine, continuing) = engine
+            .stage(
+                &desc,
+                ClockSnapshot {
+                    monotonic_ms: 1_609,
+                    wall_ms: Some(9_000),
+                    ..clock(1_609)
+                },
+                &evidence,
+                false,
+                false,
+                None,
+                0,
+            )
+            .unwrap();
+        assert!(continuing.active && !continuing.due);
+        assert!(continuing
+            .observations
+            .iter()
+            .any(|o| o.decision == "ObservationGap"));
+        let (engine, completed) = engine
+            .stage(
+                &desc,
+                ClockSnapshot {
+                    trust: ClockTrust::Unknown("lost"),
+                    ..clock(1_610)
+                },
+                &evidence,
+                true,
+                false,
+                None,
+                0,
+            )
+            .unwrap();
+        assert!(!completed.active);
+        let (engine, next) = engine
+            .stage(
+                &desc,
+                ClockSnapshot {
+                    monotonic_ms: 1_611,
+                    wall_ms: Some(2_400),
+                    ..clock(1_611)
+                },
+                &evidence,
+                true,
+                false,
+                None,
+                0,
+            )
+            .unwrap();
+        assert!(next.due && next.active);
+        let (engine, cancelled) = engine
+            .stage(
+                &desc,
+                ClockSnapshot {
+                    monotonic_ms: 1_612,
+                    wall_ms: Some(2_401),
+                    ..clock(1_612)
+                },
+                &evidence,
+                true,
+                true,
+                None,
+                0,
+            )
+            .unwrap();
+        assert!(!cancelled.active);
+        assert!(cancelled
+            .observations
+            .iter()
+            .any(|o| o.decision == "Cancelled"));
+        let (_, no_rearm) = engine
+            .stage(
+                &desc,
+                ClockSnapshot {
+                    monotonic_ms: 1_613,
+                    wall_ms: Some(2_402),
+                    ..clock(1_613)
+                },
+                &evidence,
+                true,
+                false,
+                None,
+                0,
+            )
+            .unwrap();
+        assert!(!no_rearm.due && !no_rearm.active);
+    }
+
+    #[test]
+    fn utc_range_previous_day_open_exact_end_and_terminal_checkpoint() {
+        const DAY: u64 = 86_400_000;
+        let desc = range_desc(vec![DAY - 300], 600);
+        let evidence = facts(7);
+        let engine = Engine::new(&desc, 1, 8).unwrap();
+        let (engine, admitted) = engine
+            .stage(
+                &desc,
+                ClockSnapshot {
+                    monotonic_ms: 0,
+                    wall_ms: Some(DAY + 100),
+                    ..clock(0)
+                },
+                &evidence,
+                true,
+                false,
+                None,
+                0,
+            )
+            .unwrap();
+        assert!(admitted.due && admitted.active);
+        assert_eq!(admitted.observations[0].occurrence_id, "7:0:1");
+        let checkpoint = engine.snapshot().unwrap();
+        assert!(checkpoint.starts_with(b"GFES\x02GFRG\x01"));
+        let restored = Engine::restore(&desc, 2, 8, &checkpoint).unwrap();
+        let (_, no_resume) = restored
+            .stage(
+                &desc,
+                ClockSnapshot {
+                    boot_epoch: 2,
+                    monotonic_ms: 0,
+                    wall_ms: Some(DAY + 101),
+                    ..clock(0)
+                },
+                &evidence,
+                true,
+                false,
+                None,
+                0,
+            )
+            .unwrap();
+        assert!(!no_resume.due && !no_resume.active);
+        assert_eq!(restored.snapshot().unwrap(), checkpoint);
+        assert!(Engine::restore(&desc, 2, 8, &checkpoint[..checkpoint.len() - 1]).is_err());
+        let mut trailing = checkpoint.clone();
+        trailing.push(0);
+        assert!(Engine::restore(&desc, 2, 8, &trailing).is_err());
+        let mut wrong_version = checkpoint.clone();
+        wrong_version[4] = 1;
+        assert!(Engine::restore(&desc, 2, 8, &wrong_version).is_err());
+        let mut wrong_site = checkpoint.clone();
+        wrong_site[14] = b'8';
+        assert!(Engine::restore(&desc, 2, 8, &wrong_site).is_err());
+        let mut duplicate = checkpoint.clone();
+        duplicate[10..12].copy_from_slice(&2u16.to_le_bytes());
+        duplicate.extend_from_slice(&checkpoint[12..]);
+        assert!(Engine::restore(&desc, 2, 8, &duplicate).is_err());
+        let fresh = Engine::new(&desc, 1, 8).unwrap();
+        let (closed, exact_end) = fresh
+            .stage(
+                &desc,
+                ClockSnapshot {
+                    monotonic_ms: 0,
+                    wall_ms: Some(DAY - 300 + 600),
+                    ..clock(0)
+                },
+                &evidence,
+                true,
+                false,
+                None,
+                0,
+            )
+            .unwrap();
+        assert!(!exact_end.due && !exact_end.active);
+        assert_eq!(exact_end.observations[0].decision, "LateStartExpired");
+        let (_, corrected_back) = closed
+            .stage(
+                &desc,
+                ClockSnapshot {
+                    monotonic_ms: 1,
+                    wall_ms: Some(DAY + 100),
+                    ..clock(1)
+                },
+                &evidence,
+                true,
+                false,
+                None,
+                0,
+            )
+            .unwrap();
+        assert!(!corrected_back.due && !corrected_back.active);
+        let same_day_desc = range_desc(vec![1_000], 600);
+        let fresh = Engine::new(&same_day_desc, 1, 8).unwrap();
+        let (_, expired) = fresh
+            .stage(
+                &same_day_desc,
+                clock(1_600),
+                &evidence,
+                true,
+                false,
+                None,
+                0,
+            )
+            .unwrap();
+        assert_eq!(expired.observations[0].decision, "LateStartExpired");
+        assert_eq!(expired.observations[0].occurrence_id, "7:0:1");
+        assert!(!expired.missed);
+    }
+
+    #[test]
+    fn utc_range_capacity_and_malformed_inputs_reject_atomically() {
+        let desc = range_desc(vec![1_000, 2_000], 600);
+        let evidence = facts(7);
+        let engine = Engine::new(&desc, 1, 1).unwrap();
+        assert!(engine
+            .stage(&desc, clock(1_240), &evidence, true, false, None, 0)
+            .is_err());
+        assert_eq!(engine.snapshot().unwrap(), b"GFES\x02GFRG\x01\0\0");
+        let engine = Engine::new(&desc, 1, 8).unwrap();
+        assert!(engine
+            .stage(&desc, clock(u64::MAX), &evidence, true, false, None, 0)
+            .is_err());
+        assert!(engine
+            .stage(
+                &desc,
+                clock(1_240),
+                &evidence,
+                true,
+                false,
+                Some(&SettingValue::Duration(1)),
+                1
+            )
+            .is_err());
+        assert!(Engine::new(&range_desc(vec![0, 86_399_999], 2), 1, 8).is_err());
+        assert!(Engine::restore(
+            &desc,
+            2,
+            8,
+            &Engine::new(&periodic(false), 1, 8)
+                .unwrap()
+                .snapshot()
+                .unwrap()
+        )
+        .is_err());
+        let single = range_desc(vec![1_000], 600);
+        let engine = Engine::new(&single, 1, 1).unwrap();
+        let (engine, _) = engine
+            .stage(&single, clock(1_240), &evidence, true, false, None, 0)
+            .unwrap();
+        let checkpoint = engine.snapshot().unwrap();
+        assert!(engine
+            .stage(&single, clock(86_401_240), &evidence, true, false, None, 0)
+            .is_err());
+        assert_eq!(engine.snapshot().unwrap(), checkpoint);
+    }
 
     fn clock(at: u64) -> ClockSnapshot<'static> {
         ClockSnapshot {
