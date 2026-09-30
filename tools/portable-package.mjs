@@ -790,12 +790,14 @@ export async function verifyPortablePackage(packageValue, options = {}) {
       let expectedWindowSites;
       let expectedWindowDependencies;
       let expectedDerivations;
+      let expectedConstraintProof;
       {
         if (continuousTimerNames.size) expectedTimerDependencies = replay.traceMetadata.dependencies.filter(entry => (
           entry.target.field === 'timerValue' && continuousTimerNames.has(entry.target.name)
         ));
         const mappedTrace = remapSourceTrace(replay.traceMetadata, extraction.sourceMap);
         expectedDerivations = mappedTrace.derivations ?? [];
+        expectedConstraintProof = mappedTrace.constraintProof ?? null;
         expectedResultSites = mappedTrace.resultSites;
         expectedSignalBindings = mappedTrace.bindings.filter(entry => entry.kind === 'signal');
         const signalStates = new Set(expectedSignalBindings.map(entry => entry.name));
@@ -818,6 +820,7 @@ export async function verifyPortablePackage(packageValue, options = {}) {
         expectedWindowSites,
         expectedWindowDependencies,
         expectedDerivations,
+        expectedConstraintProof,
       });
     }
   } catch (error) {

@@ -2978,6 +2978,41 @@ mod tests {
     }
 
     #[test]
+    fn trusted_builder_constraint_proof_is_signed_transport_not_native_semantic_proof() {
+        // The builder owns semantic replay/checking. Native verification checks
+        // signed transport and loader compatibility, not the host proof theorem.
+        let bytes = fixture_for("constraint-proof-valid");
+        let loader = |bytes: &[u8],
+                      _context: &TargetLoaderContext<'_>|
+         -> std::result::Result<bool, String> {
+            assert_eq!(&bytes[..4], b"GFB1");
+            Ok(true)
+        };
+        let verified = verify_portable_package(&bytes, &profile(&loader)).unwrap();
+        assert_eq!(verified.accepted_key_ids, vec!["test-current-2026"]);
+        let trace = &verified.source_map["traceMetadata"];
+        assert_eq!(trace["format"], "GhostFlow/source-trace-v2");
+        assert_eq!(
+            trace["constraintProof"]["original"]
+                .as_array()
+                .unwrap()
+                .len(),
+            2
+        );
+        assert_eq!(
+            trace["constraintProof"]["compiled"]
+                .as_array()
+                .unwrap()
+                .len(),
+            1
+        );
+        assert_eq!(
+            trace["constraintProof"]["sourceToCompiled"],
+            serde_json::json!([0, 0])
+        );
+    }
+
+    #[test]
     fn development_signature_policy_is_explicit_and_unauthenticated() {
         let loader = |_bytes: &[u8],
                       _context: &TargetLoaderContext<'_>|

@@ -45,6 +45,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/quantities.test.mjs',
   'tests/relative-humidity-ratio.test.mjs',
   'tests/constraints.test.mjs',
+  'tests/constraint-proof.test.mjs',
   'tests/coverage-edges.test.mjs',
   'tests/gfb1-browser.test.mjs',
   'tests/coverage-source-identity.test.mjs',

@@ -165,11 +165,18 @@ const profileSource = {
   'profile-2': 'control Integer { input start, stop: Bool; state count: Int = 7; output pump: Int; output valve: Bool; pump <- count; valve <- start; }',
   'profile-3': 'control IntegerBranch { input start, stop: Bool; state count: Int = 7; output pump: Int; output valve: Bool; pump <- if start then count else 0; valve <- start; }',
 }[scenario];
-const source = configTimerScenario
+let source = configTimerScenario
   ? fs.readFileSync(path.join(root, 'examples/authoring/corpus/setting-corrected.ghost.md'), 'utf8')
   : (profileSource || quantitySource || timeSource || resultSource || debounceSource || holdSource || intSettingsSource || windowScenario) ? `# Package profile\n\n\`\`\`ghost\n${profileSource || quantitySource || timeSource || resultSource || debounceSource || holdSource || intSettingsSource || windowSource}\n\`\`\`\n`
   : fs.readFileSync(path.join(root, 'examples/tutorial/01-latch.ghost.md'), 'utf8');
+if (scenario === 'constraint-proof-valid') {
+  if (!source.includes('  require pump => valve;')) throw new Error('missing fixture constraint');
+  source = source.replace('  require pump => valve;', '  require pump => valve;\n  require pump => valve;');
+}
 const compilation = await compileSource(source, { filename: '01-latch.ghost.md' });
+if (scenario === 'constraint-proof-valid' && compilation.traceMetadata.format !== 'GhostFlow/source-trace-v2') {
+  throw new Error('fixture must contain a checked executable replacement');
+}
 if (scenario === 'profile-2' || scenario === 'profile-3') identity.requiredCapabilities[0].type = 'int';
 if (quantityScenario) identity.requiredCapabilities = [
   ...QUANTITY_TYPES.flatMap((_, index) => [{ kind: 'input', name: `input_${index}`, type: 'number' }, { kind: 'actuator', name: `output_${index}`, type: 'number' }]),
@@ -203,7 +210,7 @@ const packageValue = await buildPortablePackage(compilation, identity, {
   signers: [{ keyId: 'test-current-2026', privateKey }],
   verifyCompilation: (text, { filename }) => compileSource(text, { filename }),
 });
-if (scenario === 'valid' || profileSource || configTimerScenario || scenario === 'quantity-valid' || scenario === 'time-valid' || scenario === 'result-valid' || scenario === 'debounce-valid' || scenario === 'hold-valid' || scenario === 'hold-basic-valid' || scenario === 'int-settings-valid' || scenario === 'window-valid') {
+if (scenario === 'valid' || scenario === 'constraint-proof-valid' || profileSource || configTimerScenario || scenario === 'quantity-valid' || scenario === 'time-valid' || scenario === 'result-valid' || scenario === 'debounce-valid' || scenario === 'hold-valid' || scenario === 'hold-basic-valid' || scenario === 'int-settings-valid' || scenario === 'window-valid') {
   process.stdout.write(serializePortablePackage(packageValue));
 } else if (quantityScenario || timeScenario || resultScenario || debounceScenario || holdScenario || intSettingsScenario || windowScenario || ['unsupported-bytecode-version', 'version-mismatch-1', 'version-mismatch-2', 'unsupported-header'].includes(scenario)) {
   const candidate = JSON.parse(JSON.stringify(packageValue));
