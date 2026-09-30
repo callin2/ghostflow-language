@@ -24,6 +24,22 @@ Clock, terminal ledger, scalar 상태, 출력, journal은 함께 commit된다.
 `TickRecord.schedule_trace`와 JSON encoding은 판단과 occurrence별
 provider/context revision 근거를 보존한다.
 
+공개 Rust API는 `ScanDriver::scan_with_solar(frame, clock, &[SolarInput]) ->
+ScanOutcome`도 제공한다. `Runtime::solar_checkpoint()`는 불투명한 `GFSO` v1
+snapshot을 `Result<Vec<u8>>`로 반환한다. `Runtime::restore_solar_checkpoint(&[u8])`와
+`ScanDriver::restore_solar_checkpoint(&[u8])`는 첫 scan 전에만 이를 복원한다.
+Snapshot에는 정확한 기존 program fingerprint와 순서가 있는 Solar site,
+우발적 손상 검사인 CRC32(인증 기능 아님), terminal source-day identity만
+포함된다. 복원은 새로 활성화한 runtime의 fresh boot epoch와 clock baseline을
+보존한다. Checkpoint에는 scalar 상태가 포함되지 않으며 run replay를 지원하지
+않는다. 새 civil checkpoint 형식은 추가하지 않는다. Schedule별 terminal
+identity 상한은 계속 1–4096개다.
+
+Host는 완전한 provider fact를 공급한다. Admission과 원자적 상태 commit은 VM이
+담당한다. Host는 성공한 checkpoint를 저장한 뒤에만 ON을 게시하거나 적용해야
+한다. 저장 실패 시 실행을 중단하고 출력을 clear해야 한다. 이것만으로 실제
+하드웨어가 동작했다는 뜻은 아니다.
+
 호출자는 schedule마다 terminal identity를 1–4096개 선택한다.
 Batch는 그 용량으로 제한된다. Revision 텍스트는 근거 준비/보존 전에
 필드마다 UTF-8 128바이트로 제한한다. 용량 소진은 식별자 이력을 제거하지 않고
@@ -31,8 +47,11 @@ tick을 거부한다. 이는 명시적 저장 상한이며 인증된 byte 예산
 
 ## 근거
 
-`cargo test -p ghostflow-core --test schedule_module`: 테스트 21건 통과.
-다음을 다루는 실행 테스트 9건을 포함한다.
+`cargo check -p ghostflow-core --tests`: 통과. `cargo test -p ghostflow-core
+--test schedule_module`: 30건 통과. `cargo test -p ghostflow-core --lib
+scan::tests`: 6건 통과.
+
+Schedule 테스트는 다음 실행 동작을 다룬다.
 
 - baseline, 정확한 crossing, 중복 억제, JSON trace;
 - 지연 실행 대신 거짓 술어 종결 처리;
@@ -90,8 +109,8 @@ GFB5 encoding 테스트와 함께 테스트 12건이 통과한다.
 Solar descriptor에서 `dueInput`을 기대하며 이 GFB5 경로에 아직 연결되지 않았다.
 기존 host `due` 입력은 native admission 계약의 근거가 아니다.
 
-혼합 window/true_for prelude, 영속 checkpoint/restore/replay,
-보정된 byte 예산, descriptor로 검증된 자연 사건 provider 통합,
+혼합 window/true_for prelude, 보정된 byte 예산,
+descriptor로 검증된 자연 사건 provider 통합,
 civil/Tide occurrence format은 미완료다. Native 일반 activation,
 미지원 혼합 activation, rewind는 계속 fail-closed다.
 어떤 누락 계약도 host가 계산한 pulse나 약화한 Reference fixture로 대체하지 않는다.

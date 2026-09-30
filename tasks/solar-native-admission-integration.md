@@ -20,6 +20,22 @@ together. Any failure discards staged schedule changes. Rejected ticks remain
 retryable. `TickRecord.schedule_trace` and its JSON encoding retain decisions
 and per-occurrence provider/context revision evidence.
 
+The public Rust API also exposes `ScanDriver::scan_with_solar(frame, clock,
+&[SolarInput]) -> ScanOutcome`. `Runtime::solar_checkpoint()` returns an opaque
+`GFSO` v1 snapshot as `Result<Vec<u8>>`; `Runtime::restore_solar_checkpoint(&[u8])`
+and `ScanDriver::restore_solar_checkpoint(&[u8])` restore it only before the
+first scan. The snapshot carries the exact existing program fingerprint and
+ordered Solar sites, a CRC32 accidental-corruption check (not authentication),
+and terminal source-day identities only. Restore preserves the newly activated
+runtime's fresh boot epoch and clock baseline. The checkpoint does not include
+scalar state or support run replay. No civil checkpoint format is added. Each
+schedule remains bounded at 1–4096 terminal identities.
+
+The host supplies complete provider facts. The VM owns admission and atomic
+state commit. The host must persist a successful checkpoint before publishing
+or applying ON. A save failure must halt and clear outputs; it does not establish
+that hardware acted.
+
 A caller selects 1–4096 terminal identities per schedule. The batch is bounded
 by that capacity. Revision text is limited to 128 UTF-8 bytes per field before
 staging/retaining evidence. Exhaustion rejects the tick rather than evicting
@@ -27,6 +43,10 @@ identity history. These are explicit storage bounds, not a certified byte budget
 or ESP32 deployment result.
 
 ## Evidence
+
+`cargo check -p ghostflow-core --tests`: pass. `cargo test -p ghostflow-core
+--test schedule_module`: 30 pass. `cargo test -p ghostflow-core --lib
+scan::tests`: 6 pass.
 
 `cargo test -p ghostflow-core --test schedule_module`: 21 tests pass, including
 9 execution tests covering:
@@ -86,8 +106,8 @@ descriptor-bound provider facts through the new WASM API. ControlRuntime current
 expects `dueInput` on Solar descriptors; it does not yet bind this GFB5 path.
 Existing host `due` inputs are not evidence of the native admission contract.
 
-Mixed window/true_for preludes, durable checkpoint/restore/replay, calibrated
-byte budgets, a descriptor-verified natural-event provider integration, and the
-civil/Tide occurrence formats remain incomplete. Native plain activation,
+Mixed window/true_for preludes, calibrated byte budgets, a descriptor-verified
+natural-event provider integration, and the civil/Tide occurrence formats remain
+incomplete. Native plain activation,
 unsupported mixed activation and rewind stay fail-closed. None of those missing
 contracts is replaced by a host-computed pulse or a weakened Reference fixture.

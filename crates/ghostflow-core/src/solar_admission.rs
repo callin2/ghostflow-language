@@ -125,6 +125,23 @@ pub struct SolarStage {
 }
 
 impl SolarPulseEngine {
+    pub(crate) fn terminal_identities(&self) -> &[(i32, u16, u8)] {
+        &self.terminal_days
+    }
+
+    pub(crate) fn restore_solar_identities(&mut self, days: Vec<(i32, u16, u8)>) -> Result<()> {
+        if days.len() > self.terminal_capacity
+            || days.iter().any(|(day, slot, fold)| {
+                !(0..=MAX_SOURCE_DAY).contains(day) || *slot != 0 || *fold != 0
+            })
+            || days.iter().collect::<std::collections::BTreeSet<_>>().len() != days.len()
+        {
+            return Err(Error::new("invalid solar checkpoint terminal identities"));
+        }
+        self.terminal_days = days;
+        Ok(())
+    }
+
     pub fn new(site: u32, gap_ms: u64, boot_epoch: u64, terminal_capacity: usize) -> Result<Self> {
         if site == 0 || terminal_capacity == 0 || terminal_capacity > MAX_TERMINAL_CAPACITY {
             return Err(Error::new("invalid solar admission configuration"));
