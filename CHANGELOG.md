@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### 2026-10-02 — signed current Periodic package admission
+
+The package verifier previously rejected the current compiler's
+`config interval: Duration = 15min` plus `schedule cycle: Periodic` result
+because GFB11 was limited to config-only preludes. Signed GFB11/control-v10
+packages now admit that bounded Periodic form when its scalar config, instant
+anchor, generated ports and schedule descriptor match the bytecode. Other
+schedule kinds and unsupported preludes remain rejected. Existing source and
+signature verification, config bounds and Device admission stay required.
+Regression: signed REF-03-036 reaches the native target loader; re-signed
+descriptor substitutions fail before it. This restores the intended package
+path for [Device issue #74](https://github.com/callin2/farm-device/issues/74).
+
 ### 2026-10-01 — bound finite resource enforcement ([#158](https://github.com/callin2/ghostflow-language/issues/158))
 
 Reference §4.8 now distinguishes source checking from executable resource binding.
