@@ -1152,6 +1152,10 @@
       "reason": "Executable test or benchmark input fixture, not authored reader documentation; canonical source identity is retained."
     },
     {
+      "path": "tests/fixtures/issue-93-quantities.ghost.md",
+      "reason": "Executable native/WASM quantity conformance input fixture, not authored reader documentation; canonical source identity is retained."
+    },
+    {
       "path": "tests/fixtures/true-for-certified.ghost.md",
       "reason": "Executable test or benchmark input fixture, not authored reader documentation; canonical source identity is retained."
     },
