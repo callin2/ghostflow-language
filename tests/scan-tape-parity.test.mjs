@@ -263,6 +263,40 @@ control FaultingProduct {
     && entry.target.name === 'result' && entry.reads.some(read => read.field === 'inputs' && read.name === 'divisor')));
 });
 
+test('REF-03-013: elapsed restarts at both Bool changes in completed native and WASM scans', async () => {
+  const tape = [
+    row(0, 0, [{ name: 'request', value: false }]),
+    row(1, 100, [{ name: 'request', value: true }]),
+    row(2, 250, [{ name: 'request', value: true }]),
+    row(3, 300, [{ name: 'request', value: false }]),
+  ];
+  const { artifact, native, wasm } = await compare(`
+control ElapsedReference {
+  input request: Bool;
+  state running: Bool = false;
+  timer age = elapsed(running);
+  running' = request;
+  output pump: Bool;
+  pump <- running';
+}
+`, tape, 'reference-elapsed-bool.ghost');
+  assert.deepEqual(artifact.manifest.timers, [{ name: 'age', state: 'running', clockInput: '__gf_now_ms' }]);
+  for (const outcomes of [native, wasm]) {
+    assert.deepEqual(outcomes.map(item => item.accepted), [true, true, true, true]);
+    assert.deepEqual(outcomes.map(item => item.outcome.trace.stateAfter.running), [false, true, true, false]);
+    // This is the authored timer observation after the state change commits,
+    // rather than a control expression evaluated against the previous state.
+    const timers = outcomes.map(item => observeRuntimeValues(artifact.traceMetadata, item.outcome.trace).values
+      .find(value => value.kind === 'timer' && value.name === 'age'));
+    assert.deepEqual(timers.map(timer => ({ valueType: timer.valueType, unit: timer.unit, value: timer.value })), [
+      { valueType: 'Duration', unit: 'ms', value: 0 },
+      { valueType: 'Duration', unit: 'ms', value: 0 },
+      { valueType: 'Duration', unit: 'ms', value: 150 },
+      { valueType: 'Duration', unit: 'ms', value: 0 },
+    ]);
+  }
+});
+
 test('GF-TEST-scan-tape-parity: timer boundaries and 32-bit logical time remain exact', async () => {
   const tape = [
     row(0, 0, [{ name: 'enabled', value: true }]),
