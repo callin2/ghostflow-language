@@ -222,7 +222,7 @@
       "given": "같은 Bool에서 생성한 timer A는 100에, B는 120에 활성화되고 입력은 150에 SensorFault가 된다.",
       "when": "timer state와 fault를 처리한다.",
       "then": "A와 B의 since는 독립적이며 fault는 작성자의 명시 case 없이 true로 계수되지 않는다.",
-      "reason": "공개 continuous timer 문법이 아직 없다."
+      "reason": "시작 시각이 다른 두 continuous-true timer의 상태 격리와 명시적 fault 분기는 runtime trace로 검증한다."
     },
     {
       "id": "REF-03-018",

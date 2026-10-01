@@ -2329,6 +2329,21 @@
       ],
       "evidence": [
         {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/scan-tape-parity.test.mjs",
+              "testId": "REF-03-017: continuous true rejects an implicit Result Bool input",
+              "caseId": "REF-03-017",
+              "assertionClass": "type-boundary",
+              "polarities": [
+                "negative"
+              ]
+            }
+          ]
+        },
+        {
           "stage": "native_wasm",
           "status": "verified",
           "refs": [
@@ -2345,16 +2360,32 @@
                 "positive",
                 "boundary"
               ]
+            },
+            {
+              "path": "tests/scan-tape-parity.test.mjs",
+              "testId": "REF-03-017: independently enabled timers preserve separate starts and explicit sensor fault handling on native and WASM",
+              "caseId": "REF-03-017",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
             }
           ]
         }
       ],
       "gaps": [],
       "issues": [
-        206
+        206,
+        207
       ],
       "referenceCaseIds": [
-        "REF-03-016"
+        "REF-03-016",
+        "REF-03-017"
       ]
     },
     {
