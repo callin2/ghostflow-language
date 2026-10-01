@@ -19,6 +19,78 @@ function row(scanId, logicalTimeMs, inputs) {
   return { scanId, logicalTimeMs, inputs };
 }
 
+test('REF-04-016 median five rejects partial windows, returns the spike-resistant middle and rebuilds after fault on native and plain/framed WASM', async () => {
+  const artifact = await compileSource(`control MedianWindow {
+  sensor moisture: Percent {
+    valid = 0% .. 100%; filter = median(5); stale_after = 3s; recover_after = 3 samples;
+  }
+  state active: Bool = true;
+  timer age = elapsed(active);
+  output value: Percent;
+  output decision_at: Duration;
+  value <- moisture |> recover(0%);
+  decision_at <- age;
+}`, { filename: 'reference-median-window.ghost' });
+  const sample = (id, timestampMs, value, quality = 'Good') =>
+    ({ epoch: 1, id, timestampMs, value, quality });
+  const firstRecovery = sample(7, 60, 70);
+  const steps = [
+    ...[28, 29, 90, 28, 29].map((value, index) =>
+      ({ nowMs: index * 10, samples: { moisture: sample(index + 1, index * 10, value) } })),
+    { nowMs: 50, samples: { moisture: sample(6, 50, 0, 'Invalid') } },
+    { nowMs: 60, samples: { moisture: firstRecovery } },
+    { nowMs: 61, samples: { moisture: firstRecovery } }, { nowMs: 62 },
+    ...[75, 80, 85, 90].map((value, index) => ({ nowMs: 70 + index * 10,
+      samples: { moisture: sample(index + 8, 70 + index * 10, value) } })),
+  ];
+  const origin = artifact.sourceMap.find(node => node.kind === 'sensor').id;
+  const executions = [];
+  for (const instantiate of [ControlRuntime.instantiate, ControlRuntime.instantiateFramed]) {
+    const runtime = await instantiate.call(ControlRuntime, wasmBytes, artifact);
+    try {
+      executions.push(steps.map(input => {
+        const outcome = runtime.step(input);
+        return { ...outcome, identity: runtime.sensors.get('moisture').conditioner.sampleIdentity() };
+      }));
+    } finally { runtime.dispose(); }
+  }
+  const [plain, framed] = executions;
+  const projection = rows => rows.map(({ vm, sensors, identity }) => ({ vm, sensors, identity }));
+  assert.deepEqual(projection(plain), projection(framed));
+  for (const rows of executions) {
+    for (const [index, { vm, sensors }] of rows.entries()) {
+      const good = index === 4 || index === 12;
+      // Reference 4.2 preserves the immediate Invalid fault. "After fault,
+      // NotReady" is the subsequent valid-sample refill phase, not fault relabeling.
+      const fault = index === 5;
+      assert.equal(sensors.moisture.quality, good ? 'Good' : fault ? 'Invalid' : 'NotReady');
+      assert.equal(sensors.moisture.ok, good);
+      assert.deepEqual(vm.requested, { value: good ? (index === 4 ? 29 : 80) : 0,
+        decision_at: steps[index].nowMs });
+      assert.deepEqual(vm.safe, vm.requested);
+      assert.equal(vm.inputs.__gf_now_ms, steps[index].nowMs);
+      assert.equal(vm.resultTrace[0].choice, good ? 0 : fault ? 3 : 4);
+      assert.equal(vm.resultTrace[0].origin, good ? 0 : origin);
+      assert.equal(vm.stateBefore.active, true);
+      assert.equal(vm.stateAfter.active, true);
+    }
+    for (const index of [6, 7, 8])
+      assert.deepEqual(rows[index].identity, { epoch: 1, id: 7, timestampMs: 60 });
+    assert.equal(rows[11].sensors.moisture.quality, 'NotReady', 'four unique samples do not refill median(5)');
+    assert.equal(rows[12].sensors.moisture.value, 80, 'the rebuilt window contains only 70,75,80,85,90');
+  }
+  // Native VM consumes the actual conditioner Result rails; independent existing
+  // Rust Sensor tests prove native median and fault/refill conditioning.
+  const tape = framed.map(({ vm }, scanId) => row(scanId, steps[scanId].nowMs,
+    Object.entries(vm.inputs).filter(([name]) => name !== '__gf_now_ms')
+      .map(([name, value]) => ({ name, value }))));
+  const native = nativeRun(artifact.bytes, tape);
+  assertParity(native, await wasmRun(artifact, tape));
+  assert.ok(native.every(item => item.accepted), JSON.stringify(native));
+  assert.deepEqual(native.map(item => item.outcome.trace), framed.map(item => item.vm));
+  assert.deepEqual(native.map(item => item.outcome.logicalTimeMs), steps.map(input => input.nowMs));
+});
+
 test('REF-04-012 sample timestamp zero holds permission at 2999 and expires at 3000 while default reset removes old permission on native and plain/framed WASM', async () => {
   const artifact = await compileSource(`control FreshnessPermission {
   sensor moisture: Percent {
