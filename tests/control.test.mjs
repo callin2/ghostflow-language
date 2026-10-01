@@ -437,7 +437,7 @@ control Constraints {
   constraints Shared { }
   output pump: Bool;
 }
-`, 'named-constraints parser');
+`, 'local constraints block requires at least one rule');
 
 expectError(`
 control BadSlots {
