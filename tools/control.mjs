@@ -1505,6 +1505,9 @@ class Lowerer {
       : ['all', ...this.manifest.outputs.map(output => ['has', 'actuator', output.name, gfbType(semanticType(output.type))])];
     const solarForms = this.solarForms();
     const contextForms = emitBytecode ? this.contextForms() : [];
+    if (contextForms.some(form => form[0] === 'holiday-daily-pulse') && solarForms.length) {
+      error(this.ast.loc, 'Holiday Daily cannot mix with legacy Solar or non-calendar Daily/DailySlots execution');
+    }
     const extendedSolar = this.manifest.schedules.some(schedule => schedule.kind === 'solar'
       && (typeof schedule.policy.clock === 'object' || typeof schedule.policy.fallback === 'object'));
     if (emitBytecode && extendedSolar && (this.manifest.schedules.some(schedule => schedule.kind !== 'solar')
@@ -1543,6 +1546,7 @@ class Lowerer {
       }
       this.manifest.format = 'GhostFlow/control-v13';
     }
+    if (contextForms.some(form => form[0] === 'holiday-daily-pulse')) this.manifest.format = 'GhostFlow/control-v14';
     const temporalForms = this.windows.length || this.trueFors.length || solarForms.length || contextForms.length ? [
       ['temporal-context', `${RESERVED_PREFIX}now_ms`, `${RESERVED_PREFIX}time_epoch`],
       ...[...this.temporalRoots.values()].sort((left, right) => left.tag - right.tag).map(root =>
@@ -3631,7 +3635,9 @@ class Lowerer {
           ...schedule.fields.map((field, index) => ['field', ...(field ?? Array.from({ length: [60, 24, 31, 12, 7][index] }, (_, at) => at + (index === 2 || index === 3 ? 1 : 0)))]), when, cancel];
       }
       if (schedule.kind === 'daily') {
-        if (!['workday', 'offday'].includes(schedule.day.kind) || schedule.policy.basis !== 'pulse') error(this.ast.loc, 'WorkCalendar executable slice requires workday/offday pulse');
+        if (schedule.policy.basis !== 'pulse') error(this.ast.loc, 'calendar Daily executable slice requires pulse');
+        if (schedule.day.kind === 'holiday') return ['holiday-daily-pulse', ...base, schedule.timezone,
+          String(schedule.atMs), schedule.day.calendar, schedule.dstMissing, schedule.dstRepeated, when, cancel];
         return ['calendar-daily-pulse', ...base, schedule.timezone, String(schedule.atMs), schedule.day.calendar,
           schedule.day.kind, schedule.dstMissing, schedule.dstRepeated, when, cancel];
       }
@@ -3910,7 +3916,7 @@ export function compileAccountingControl(source, { filename = '<control>' } = {}
 /** Only this bounded civil pulse slice has a VM/provider transport. */
 export function isExecutablePulseSchedule(item) {
   return item.scheduleType === 'Solar' || item.scheduleType === 'At' || (item.scheduleType === 'Daily'
-    && (!item.on && !item.calendar || item.on && item.calendar && ['day`workday`', 'day`offday`'].includes(item.on.value))
+    && (!item.on && !item.calendar || item.on && item.calendar && ['day`workday`', 'day`offday`', 'day`holiday`'].includes(item.on.value))
     && item.at?.kind === 'literal' && item.at.raw.startsWith('time`')
     && item.policy?.basis?.name === 'pulse' && item.policy?.clock?.name === 'trusted_only')
     || (item.scheduleType === 'DailySlots' && item.selected

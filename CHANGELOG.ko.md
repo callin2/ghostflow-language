@@ -5,6 +5,22 @@
 
 ## 미출시
 
+### 2026-10-01 — 공휴일 실행과 불변 달력 합성
+
+Daily의 `on = day\`holiday\`; calendar = public_days;`는 typed HolidayCalendar의
+membership을 shared Rust core에서 실행하며 근무/휴무 일정과 함께 사용할 수 있다.
+공휴일 membership은 작업 예외와 독립적이다. Node reference adapter는
+검토된 한국 2026–2027 사실과 명시 base/override 합성을 제공하고 새 ID, 내용 revision,
+출처를 유지한다. 현장 주간/공휴일 작업 정책은 명시한다. 부재·만료·coverage 밖은
+Unknown을 유지한다. 공유 binding은 같은 snapshot을 요구하며 revision 내용은
+tick과 durable restore를 가로질러 불변이다. [Reference §3.8](docs/reference/03-time-and-schedules.md#38-dst-자정과-work-calendar)과
+[provider 안내](docs/CALENDAR-PROVIDERS.ko.md)를 참조한다.
+공휴일 실행은 GFB15/control-v14를 사용하고 GFSF5는 유지한다. GFCXv3은 제한된
+달력 history를 저장하고 v1/v2 checkpoint를 거부한다. 이전 loader는 새 header를
+거부한다. 요일 문법 [#155](https://github.com/callin2/ghostflow-language/issues/155)는
+별도 작업이다. provider, compiler, native/WASM/ghostsim과 checkpoint 회귀는
+host 실행을 검증하며 Device나 물리 운전을 증명하지 않는다.
+
 ### 2026-10-01 — one-shot At pulse ([#154](https://github.com/callin2/ghostflow-language/issues/154))
 
 `schedule appointment: At { at = datetime\`2026-01-01T08:00:00Z\`; ... }`이

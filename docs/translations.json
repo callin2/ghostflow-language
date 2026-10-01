@@ -145,8 +145,8 @@
       "source": "docs/CONTEXT-EXECUTION-ABI.md",
       "sourceLanguage": "en",
       "translation": "docs/CONTEXT-EXECUTION-ABI.ko.md",
-      "sourceSha256": "c347bba55bd5b61e9540cf552009b0af07d0017ac7ea5c8679988de27523ff39",
-      "translationSha256": "0b5d44da9325f0045a1cad6759009127881ea2e1bd4b3daa01c99dcdb9567918"
+      "sourceSha256": "379f800d0aaeac37b6e6ba2d1ffc6afd8a0114e08f936a5890ac02a76552380a",
+      "translationSha256": "68aa1bcdbe9df65028c6c34c8f692fef307c38911a9445f584baaa624dbe8262"
     },
     {
       "source": "docs/CONTINUOUS-BOOL-TIMER-CONTRACT.md",
@@ -180,8 +180,8 @@
       "source": "docs/DOCUMENTATION.md",
       "sourceLanguage": "en",
       "translation": "docs/DOCUMENTATION.ko.md",
-      "sourceSha256": "cc67fbc0f5f1d349eada884889dd0fe811eb2ff7c50eaeb57dd033c0bec36cf5",
-      "translationSha256": "5ef9946a143b7915a3a44f8fbbe4b572b6817ce4944424a5db7c0fb8e0c91d09"
+      "sourceSha256": "aa419d37db26daf4359f83b7e46f42fa8c2ef6c6cb5e63ecd43a9328565bb5c9",
+      "translationSha256": "f5e45627875b16d60d542e3cdc881b5208e2c3f1d5e99458531cac93bac8b2f4"
     },
     {
       "source": "docs/EXACT-INTEGER-CONTRACT.md",
@@ -299,8 +299,8 @@
       "source": "docs/OPERATOR-SETTINGS-STREAM.md",
       "sourceLanguage": "en",
       "translation": "docs/OPERATOR-SETTINGS-STREAM.ko.md",
-      "sourceSha256": "4e0cf058ea1e0481b34e4dc9600b0f46de621fed9c08f8625717f35db5cf3bda",
-      "translationSha256": "8150d7237994c84949a9943be0d276ee4966d37c748a6b6f3ea9f9fc37859fcf"
+      "sourceSha256": "a0a586a2e3e358aae868ce2c177bcc2ddb0d1e4df6a9d90a110987a7e9b97aad",
+      "translationSha256": "588cb8bbe56ae1c45bb55fde6179d66648d1b1c93b6db5e5bfd526790b723fbc"
     },
     {
       "source": "docs/plans/2026-09-28-semantic-kernel.md",
@@ -348,8 +348,8 @@
       "source": "docs/reference/03-time-and-schedules.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/03-time-and-schedules.en.md",
-      "sourceSha256": "07bd731ef65ede6d2c71a1c27acdfbc731fea31228fa640d5a80be0fee2b8765",
-      "translationSha256": "e36778439b267b2115c45e1bec5112aa490d674fdb174c0266b600a95c504800"
+      "sourceSha256": "48b511114f5c850b99d92c610945759cc9dbcd06ac85d375626c392c6b76449d",
+      "translationSha256": "c95310820f307f0e534bdeff74fb24decf02ff9c9464dd2412952d16202d93c3"
     },
     {
       "source": "docs/reference/04-sensors-constraints-control.md",
@@ -565,8 +565,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "06daa9c04462ec97b64b21c2f0abe8612f0ee52eeaac50078303e8f72ce01f53",
-      "translationSha256": "e348adb20490e332db15428c440ed7ecdd96198415f751b6ea8d8deb882a3da4"
+      "sourceSha256": "260e58610cabefb61c86c8fa1b4d3a72e3c6010a857af5afffb527c3b8e1574c",
+      "translationSha256": "4f2e3d320648e0f8f84cf988327b967fed2ab5ef20a77a9d669fae3782c8695b"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",
@@ -938,6 +938,20 @@
       "translation": ".github/pull_request_template.ko.md",
       "sourceSha256": "32569c4c5c201d620790fb343102c9870770991995c4bc18119a799c31dd961d",
       "translationSha256": "77bd12e823d9afcd03d06ae69bf0c72725ec8e9b626ec105f5bfb92e049cb8cc"
+    },
+    {
+      "source": "docs/CALENDAR-PROVIDERS.md",
+      "sourceLanguage": "en",
+      "translation": "docs/CALENDAR-PROVIDERS.ko.md",
+      "sourceSha256": "87d3ff05ddaff990063796646a13990474f5ea47980457a70fe616adab573bcd",
+      "translationSha256": "56efe812219d556e0eabb169101634e4a6daec7b8d81ad22da505b6193a91020"
+    },
+    {
+      "source": "examples/korean-calendar.ghost.md",
+      "sourceLanguage": "ko",
+      "translation": "examples/korean-calendar.ghost.en.md",
+      "sourceSha256": "bca00944a6684b09aac6ef4e5b955c6beaade02b0d4bc8d1efc6bfadf921ed49",
+      "translationSha256": "12a365ebbd6717735f44148df1aed7d670076fd6ff5e4f47e243abfe06d6b30a"
     }
   ],
   "exclusions": [

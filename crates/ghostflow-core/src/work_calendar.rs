@@ -16,6 +16,7 @@ pub enum DayClass {
 pub enum DaySelector {
     Workday,
     Offday,
+    Holiday,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -107,6 +108,12 @@ pub fn evaluate<'a>(
             revision,
         });
     }
+    if query.selector == DaySelector::Holiday {
+        return Ok(DayResult {
+            value: Ok(snapshot.holidays.binary_search(&query.date).is_ok()),
+            revision,
+        });
+    }
     let class = if let Ok(index) = snapshot
         .exceptions
         .binary_search_by_key(&query.date, |entry| entry.date)
@@ -183,6 +190,87 @@ mod tests {
                 .unwrap()
                 .value,
             Ok(true)
+        );
+    }
+
+    #[test]
+    fn public_holiday_membership_is_independent_of_farm_work_and_off_dates() {
+        let mut calendar = snapshot();
+        // Farm work on a public holiday preserves public holiday membership.
+        assert_eq!(
+            evaluate(query(1, DaySelector::Holiday), Some(&calendar))
+                .unwrap()
+                .value,
+            Ok(true)
+        );
+        assert_eq!(
+            evaluate(query(1, DaySelector::Workday), Some(&calendar))
+                .unwrap()
+                .value,
+            Ok(true)
+        );
+        // Closing a farm on an ordinary date does not invent a public holiday.
+        calendar.exceptions.push(DayException {
+            date: 4,
+            class: DayClass::Off,
+        });
+        assert_eq!(
+            evaluate(query(4, DaySelector::Holiday), Some(&calendar))
+                .unwrap()
+                .value,
+            Ok(false)
+        );
+        assert_eq!(
+            evaluate(query(4, DaySelector::Offday), Some(&calendar))
+                .unwrap()
+                .value,
+            Ok(true)
+        );
+        // Treating holidays as farm work also leaves the public calendar unchanged.
+        calendar.exceptions.clear();
+        calendar.holiday_policy = DayClass::Work;
+        assert_eq!(
+            evaluate(query(1, DaySelector::Holiday), Some(&calendar))
+                .unwrap()
+                .value,
+            Ok(true)
+        );
+        assert_eq!(
+            evaluate(query(1, DaySelector::Workday), Some(&calendar))
+                .unwrap()
+                .value,
+            Ok(true)
+        );
+        assert_eq!(
+            evaluate(query(2, DaySelector::Holiday), Some(&calendar))
+                .unwrap()
+                .value,
+            Ok(false)
+        );
+    }
+
+    #[test]
+    fn holiday_selector_preserves_missing_stale_coverage_and_binding_failures() {
+        let calendar = snapshot();
+        let missing = evaluate(query(1, DaySelector::Holiday), None).unwrap();
+        assert_eq!(missing.value, Err(CalendarFault::CalendarMissing));
+        assert_eq!(missing.revision, None);
+        for mut q in [
+            query(7, DaySelector::Holiday),
+            query(1, DaySelector::Holiday),
+        ] {
+            if q.date == 1 {
+                q.now_ms = calendar.expires_at_ms;
+            }
+            let result = evaluate(q, Some(&calendar)).unwrap();
+            assert_eq!(result.value, Err(CalendarFault::CalendarOutOfRange));
+            assert_eq!(result.revision, Some("r2"));
+        }
+        let mut q = query(1, DaySelector::Holiday);
+        q.timezone = "UTC";
+        assert_eq!(
+            evaluate(q, Some(&calendar)),
+            Err(CalendarInputError::BindingMismatch)
         );
     }
 

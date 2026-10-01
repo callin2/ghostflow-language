@@ -9,7 +9,7 @@ use crate::{
     schedule_vm::PulseDescriptor,
     Error, Result, ResultTraceBuffer, Value,
 };
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 #[path = "context_checkpoint.rs"]
 mod checkpoint;
@@ -86,6 +86,7 @@ pub(crate) struct ContextRuntime {
     settings_revision: u64,
     last_event_position: Option<u64>,
     event_ids: BTreeSet<String>,
+    calendar_revisions: BTreeMap<(String, String), crate::work_calendar::WorkCalendarSnapshot>,
     capacity: usize,
     clock: ScheduleClockGate,
 }
@@ -100,6 +101,8 @@ fn invalid(message: &str) -> Error {
     Error::new(message)
 }
 const MAX_EXACT: u64 = 9_007_199_254_740_991;
+const MAX_CALENDAR_REVISIONS: usize = 128;
+const MAX_CALENDAR_CELLS: usize = 8192;
 
 fn bounded(value: &str) -> bool {
     !value.is_empty() && value.len() <= 128
@@ -149,6 +152,9 @@ impl ContextRuntime {
                     } => Some((provider.as_str(), 0, Some(timezone.as_str()))),
                     ScheduleDefinition::CalendarDaily {
                         calendar, timezone, ..
+                    }
+                    | ScheduleDefinition::HolidayDaily {
+                        calendar, timezone, ..
                     } => Some((calendar.as_str(), 2, Some(timezone.as_str()))),
                     _ => None,
                 },
@@ -195,6 +201,7 @@ impl ContextRuntime {
             settings_revision: 0,
             last_event_position: None,
             event_ids: BTreeSet::new(),
+            calendar_revisions: BTreeMap::new(),
             capacity: activation.terminal_capacity,
             clock: ScheduleClockGate::new(9_007_199_254_740_991, activation.boot_epoch)?,
         })
@@ -358,6 +365,9 @@ impl ContextRuntime {
                 }
                 ScheduleDefinition::CalendarDaily {
                     calendar, timezone, ..
+                }
+                | ScheduleDefinition::HolidayDaily {
+                    calendar, timezone, ..
                 } => {
                     if evidence.provider.is_some() {
                         return Err(invalid("unexpected Calendar provider payload"));
@@ -423,6 +433,30 @@ impl ContextRuntime {
                                 != observation.classifications.iter().collect::<BTreeSet<_>>())
                 {
                     return Err(invalid("inconsistent shared provider snapshot"));
+                }
+            }
+        }
+        // A calendar binding is one immutable envelope for the entire scan,
+        // including absence. Do not allow two sites to observe different days,
+        // revisions, policies, or availability from the same binding.
+        let mut calendars = BTreeMap::new();
+        for evidence in &facts.schedules {
+            let calendar = descriptors.iter().find_map(|d| match d {
+                PulseDescriptor::Context(d) if d.site == evidence.site => match &d.definition {
+                    ScheduleDefinition::CalendarDaily { calendar, .. }
+                    | ScheduleDefinition::HolidayDaily { calendar, .. } => Some(calendar),
+                    _ => None,
+                },
+                _ => None,
+            });
+            if let Some(calendar) = calendar {
+                if let Some(prior) = calendars.insert(calendar, &evidence.calendar) {
+                    if prior != &evidence.calendar {
+                        return Err(invalid("inconsistent shared calendar snapshot"));
+                    }
+                }
+                if let Some(snapshot) = &evidence.calendar {
+                    staged.runtime.remember_calendar(snapshot)?;
                 }
             }
         }
@@ -709,6 +743,33 @@ impl ContextRuntime {
             }
         }
         Ok(staged)
+    }
+}
+
+impl ContextRuntime {
+    fn remember_calendar(
+        &mut self,
+        snapshot: &crate::work_calendar::WorkCalendarSnapshot,
+    ) -> Result<()> {
+        let key = (snapshot.calendar_id.clone(), snapshot.revision.clone());
+        if let Some(prior) = self.calendar_revisions.get(&key) {
+            if prior != snapshot {
+                return Err(invalid("calendar revision contents changed"));
+            }
+        } else {
+            let cells: usize = self
+                .calendar_revisions
+                .values()
+                .map(|s| s.holidays.len() + s.exceptions.len())
+                .sum();
+            if self.calendar_revisions.len() >= self.capacity.min(MAX_CALENDAR_REVISIONS)
+                || cells + snapshot.holidays.len() + snapshot.exceptions.len() > MAX_CALENDAR_CELLS
+            {
+                return Err(invalid("calendar revision capacity exceeded"));
+            }
+            self.calendar_revisions.insert(key, snapshot.clone());
+        }
+        Ok(())
     }
 }
 

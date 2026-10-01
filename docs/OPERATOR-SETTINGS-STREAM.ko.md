@@ -84,13 +84,14 @@ public framed 경로는 같은 GFCA1/GFSF5 packet과 native ScanDriver로 `gf_fr
 `gf_frame_scan_context`를 사용한다. 완전한 input frame은 runtime 보호 Result projection/
 파생 monotonic clock을 생략한다. logical time은 context clock과 일치해야 한다. 성공 평가만
 native scan ID/time을 전진시키고 승인 결과를 게시한다. 거부 frame은 같은 scan ID에서
-재시도할 수 있다. framed checkpoint/state 접근과 첫 scan 이전 restore는 GFCX2를 재사용한다.
+재시도할 수 있다. framed checkpoint/state 접근과 첫 scan 이전 restore는 GFCX3를 재사용한다.
 두 번째 settings state를 만들거나 JavaScript에서 승인 결과를 합성하지 않는다.
 
-GFCX2는 정확한 Program/binding identity 아래 현재 Result, revision, 승인 event identity,
+GFCX3는 정확한 Program/binding identity 아래 현재 Result, revision, 승인 event identity,
 key 할당 history를 저장한다. 복원 fault는 fault로 남는다. 과거 성공 payload는 stable-key/
 phase 검증에만 존재하며 consumer fallback이 아니다. 복원 engine cache는 공유 config
-history와 일치해야 한다. 이전 GFCX1 image는 명시 거부한다.
+history와 일치해야 한다. 제한된 달력 ID/revision의 전체 내용 history도 유지한다.
+이전 GFCX1/GFCX2 image는 명시 거부한다.
 
 context state는 각 config의 ID, name, type, 현재 Result를 노출한다. error 결과는 이전
 `value` 대신 fault를 담는다. emission은 source hash/run identity를 바꾸지 않는다.

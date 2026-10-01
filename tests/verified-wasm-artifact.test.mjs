@@ -137,12 +137,12 @@ test('handoff rejects omitted, extra and changed source evidence', t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-source-evidence-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   for (const name of ['tools', 'crates/ghostflow-core', 'crates/ghostflow-package',
-    'runtimes/wasm', 'tests', 'examples', 'docs', 'contracts/integration-v1',
+    'runtimes/wasm', 'data/calendars', 'tests', 'examples', 'docs', 'contracts/integration-v1',
     'contracts/interaction-v0', 'contracts/requirements']) {
     fs.mkdirSync(path.join(root, name), { recursive: true });
     fs.writeFileSync(path.join(root, name, 'fixture.txt'), `fixture ${name}`);
   }
-  for (const name of ['runtimes/node/ledger.mjs', 'README.md', 'AGENTS.md', '.gitignore',
+  for (const name of ['runtimes/node/ledger.mjs', 'runtimes/node/calendar.mjs', 'README.md', 'AGENTS.md', '.gitignore',
     'Cargo.toml', 'Cargo.lock', 'package.json', 'package-lock.json', 'Makefile']) {
     fs.mkdirSync(path.dirname(path.join(root, name)), { recursive: true });
     fs.writeFileSync(path.join(root, name), `fixture ${name}`);
@@ -152,9 +152,27 @@ test('handoff rejects omitted, extra and changed source evidence', t => {
   const omitted = { ...hashes };
   delete omitted['crates/ghostflow-package/fixture.txt'];
   assert.throws(() => assertVerificationSources(root, omitted), /hash set/);
+  for (const calendarSource of ['runtimes/node/calendar.mjs', 'data/calendars/fixture.txt']) {
+    const missingCalendar = { ...hashes };
+    delete missingCalendar[calendarSource];
+    assert.throws(() => assertVerificationSources(root, missingCalendar), /hash set/);
+  }
   assert.throws(() => assertVerificationSources(root, { ...hashes, 'unknown.txt': 'a'.repeat(64) }), /hash set/);
   fs.writeFileSync(path.join(root, 'runtimes/wasm/fixture.txt'), 'changed fixture');
   assert.throws(() => assertVerificationSources(root, hashes), /source changed/);
+  fs.writeFileSync(path.join(root, 'runtimes/wasm/fixture.txt'), 'fixture runtimes/wasm');
+  fs.writeFileSync(path.join(root, 'data/calendars/fixture.txt'), 'changed calendar facts');
+  assert.throws(() => assertVerificationSources(root, hashes), /source changed/);
+  fs.writeFileSync(path.join(root, 'data/calendars/fixture.txt'), 'fixture data/calendars');
+  fs.rmSync(path.join(root, 'runtimes/node/calendar.mjs'));
+  const historical = verificationSourceHashes(root);
+  const historicalExpected = { ...hashes };
+  delete historicalExpected['runtimes/node/calendar.mjs'];
+  delete historicalExpected['data/calendars/fixture.txt'];
+  assert.deepEqual(historical, historicalExpected, 'pre-calendar source graph keeps its original evidence keys');
+  fs.rmSync(path.join(root, 'data/calendars'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'runtimes/node/calendar.mjs'), 'fixture runtimes/node/calendar.mjs');
+  assert.throws(() => verificationSourceHashes(root), /ENOENT/, 'current adapter requires its reviewed dataset');
 });
 
 test('verified WASM workflow binds full verification to the exact pushed source', () => {

@@ -798,11 +798,24 @@ weekday tag에는 calendar가 필요 없다. `holiday`는 HolidayCalendar, `work
 `offday`는 WorkCalendar를 요구한다. 종류가 맞지 않거나 binding이 없으면 activation
 error다. calendar snapshot의 timezone은 schedule timezone과 같아야 한다.
 
+`holiday`는 공휴일 날짜 목록의 membership이다. 같은 날짜의 작업 예외가 `work`여도
+공휴일 사실은 유지되며 weekly pattern이나 holiday work policy를 읽지 않는다.
+Daily pulse의 `holiday`, `workday`, `offday`는 typed calendar와 명시적인 공통/DST
+policy를 사용한다. weekday tag와 일반 `calendar_is` 식은 이 실행 범위에 포함되지 않는다.
+
+달력 base와 override는 명시적으로 합성하여 새 ID/revision을 만든다. 원본은 불변이며
+timezone 불일치와 한 overlay 층의 중복 날짜를 거부한다. 같은 binding의 일정들은
+한 tick에서 같은 snapshot 또는 모두 부재인 자료를 사용해야 한다. calendar ID/revision을
+다른 내용으로 재사용하지 않는다. accepted 내용 기록은 새 revision과 checkpoint 뒤에도
+유지되며 저장 한계를 넘으면 fail closed한다. 이 기록을 담는 GFCXv3은 이전 v1/v2
+checkpoint를 거부한다. 자료 조립과 설치 절차는 [달력 provider 안내](../CALENDAR-PROVIDERS.ko.md)를 따른다.
+
 work calendar snapshot은 calendar ID, revision, timezone, coverage range를 가진다.
 판정 우선순위는 같은 날짜의 명시 예외, 선언된 holiday policy, weekly pattern이다.
 같은 날짜의 충돌하는 예외는 invalid다. workday는 계획된 근무일이지 사람의 실제
 재실 확인이 아니다. snapshot이 없거나 coverage 밖이면 workday와 offday 모두
-Unknown이다. `!workday`로 Unknown을 offday 허가로 바꾸지 않는다.
+Unknown이다. expiry 경계부터도 Unknown이며 공휴일 판정에 같은 규칙을 적용한다.
+`!workday`로 Unknown을 offday 허가로 바꾸지 않는다. `fallback = skip`은 새 admission을 만들지 않는다.
 
 overnight shift의 business date 귀속은 이 day tag가 결정하지 않는다. 별도 shift
 계약 전에는 자정을 가로지르는 work interval을 거부하고 명시 구간으로 나눈다.

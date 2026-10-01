@@ -96,14 +96,15 @@ The complete input frame omits runtime-protected Result projections and the
 derived monotonic clock. Its logical time must match the context clock. Only a
 successful evaluation advances the native scan ID/time and publishes the
 accepted outcome. Rejected frames remain retryable at the same scan ID. Framed
-checkpoint/state access and pre-first-scan restore reuse GFCX2; they do not
+checkpoint/state access and pre-first-scan restore reuse GFCX3; they do not
 create a second settings state or synthesize an accepted outcome in JavaScript.
 
-GFCX2 persists the current Result, revision, accepted event identities and key
+GFCX3 persists the current Result, revision, accepted event identities and key
 allocation history under the exact Program/binding identity. A restored fault
 remains a fault. Historical successful payloads exist only for stable-key and
 phase validation, never as a consumer fallback. Restored engine caches must
-agree with the shared config history. Old GFCX1 images are rejected explicitly.
+agree with the shared config history. It also retains bounded full calendar
+ID/revision content history. Old GFCX1/GFCX2 images are rejected explicitly.
 
 Context state exposes each config's ID, name, type and current Result. Error
 results contain a fault rather than an old `value`. Source hashes and run

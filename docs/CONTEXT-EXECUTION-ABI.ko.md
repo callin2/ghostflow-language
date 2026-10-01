@@ -122,8 +122,11 @@ fault enum의 0–5에 대응한다. 설정 kind 0은 Duration, 1은 TimeSlots�
 `gf_restore_context_checkpoint(handle, ptr, len)`은 활성화된 실행의 첫 스캔 전에만
 허용된다. 영구 저장과 확인 책임은 호스트에 있다.
 
-GFCX1에는 magic/version, 정확한 Program 지문, 표준 바인딩 바이트, 설정 개정,
-승인 이벤트 식별자, site 키 기반 엔진 스냅샷과 CRC32가 들어간다. 봉투는 4 MiB,
+GFCX3에는 magic/version, 정확한 Program 지문, 표준 바인딩 바이트, 설정 개정,
+승인 이벤트 식별자, site 키 기반 엔진 스냅샷과 CRC32가 들어간다. ID/revision별
+accepted 달력 전체 내용도 저장하며 `min(terminalCapacity, 128)`개 snapshot과
+8192개 holiday/exception 날짜 cell로 제한한다. revision 내용 변경이나 한계 초과는
+restore를 거부한다. GFCX1과 GFCX2는 명시 거부한다. 봉투는 4 MiB,
 각 엔진 스냅샷은 1 MiB로 제한된다. 식별 불일치, 손상, 복원 설정 오류 또는 용량
 초과가 있으면 전체 복원을 거부한다. CRC32는 우발적 손상을 감지하지만 인증 수단은 아니다.
 
