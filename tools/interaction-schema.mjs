@@ -48,10 +48,12 @@ function canonicalDocument(document) {
   return document;
 }
 
-function sourceType(name) {
+function sourceType(name, enums) {
   if (name === 'Bool' || name === 'Int' || name === 'Number' || name === 'Date' || name === 'TimeOfDay' || name === 'DateTime') return { kind: 'builtin', name, unit: null };
   if (name === 'Duration') return { kind: 'builtin', name, unit: 'ms' };
-  return { kind: 'nominal', name, unit: name === 'Percent' ? 'percent' : isQuantityType(name) ? canonicalUnitFor(name) : null };
+  const members = enums.get(name);
+  return { kind: 'nominal', name, unit: name === 'Percent' ? 'percent' : isQuantityType(name) ? canonicalUnitFor(name) : null,
+    ...(members ? { enumMembers: members.map((member, value) => ({ name: member.name, value })) } : {}) };
 }
 
 function validationSnapshot(schema) {
@@ -98,6 +100,7 @@ function expectedSchema(compilation, identityValue) {
   }
   const extraction = extractLiterate(source.text, { filename: source.filename });
   const ast = parseControl(extraction.code, { filename: source.filename });
+  const enums = new Map(ast.body.filter(item => item.kind === 'enum').map(item => [item.name, item.members]));
   const nodeById = new Map((compilation.sourceMap ?? []).map(node => [node?.id, node]));
   const linksByNode = new Map();
   for (const link of trace.intentLinks ?? []) {
@@ -123,7 +126,7 @@ function expectedSchema(compilation, identityValue) {
     if (item.kind === 'config') {
       const settings = config.settings;
       descriptors.push({
-        id: `setting.${item.name}`, name: item.name, kind: 'setting', sourceType: sourceType(config.type), access: ['read'],
+        id: `setting.${item.name}`, name: item.name, kind: 'setting', sourceType: sourceType(config.type, enums), access: ['read'],
         authority: settings.access, applyPolicy: 'live', label: settings.label ?? item.name,
         constraint: config.type === 'Bool'
           ? { kind: 'choices', values: [false, true] }
@@ -136,7 +139,7 @@ function expectedSchema(compilation, identityValue) {
       const counter = links.some(link => link.meaning === 'counter');
       if (counter && item.type.name !== 'Int') fail(`state.${item.name} counter meaning requires Int`);
       descriptors.push({
-        id: `${counter ? 'counter' : 'state'}.${item.name}`, name: item.name, kind: counter ? 'counter' : 'state', sourceType: sourceType(item.type.name), access: ['read'],
+        id: `${counter ? 'counter' : 'state'}.${item.name}`, name: item.name, kind: counter ? 'counter' : 'state', sourceType: sourceType(item.type.name, enums), access: ['read'],
         provenance: { sourceNode: { id: item.id, kind: 'state' }, intentAnchorIds: anchors },
       });
       continue;
@@ -150,7 +153,7 @@ function expectedSchema(compilation, identityValue) {
       }
     } else if (!declaredStates.has(subject?.name)) fail(`timer.${item.name} must target an authored state`);
     descriptors.push({
-      id: `timer.${item.name}`, name: item.name, kind: 'timer', sourceType: sourceType('Duration'), access: ['read'],
+      id: `timer.${item.name}`, name: item.name, kind: 'timer', sourceType: sourceType('Duration', enums), access: ['read'],
       operation: continuous
         ? { kind: 'continuous_true', subjectNodeId: subject.id }
         : { kind: 'elapsed_since_change', subjectId: `state.${subject.name}` },

@@ -3,7 +3,7 @@ import { sha256Hex } from '../../tools/sha256.mjs';
 
 export const INTERACTION_SCHEMA_FORMAT = 'GhostFlow/interaction-schema-v0';
 export const RUNTIME_SNAPSHOT_FORMAT = 'GhostFlow/runtime-snapshot-v0';
-export const INTERACTION_SCHEMA_VERSION = '0.1';
+export const INTERACTION_SCHEMA_VERSION = '0.2';
 export const RUNTIME_SNAPSHOT_VERSION = '0.1';
 
 const PUBLIC_ID = /^[A-Za-z][A-Za-z0-9._:-]{0,127}$/;
@@ -75,7 +75,9 @@ function sourceIdentity(value, path, errors) {
 }
 
 function sourceType(value, path, errors) {
-  if (!exactObject(value, ['kind', 'name', 'unit'], path, errors)) return;
+  const fields = value?.kind === 'nominal' && Object.hasOwn(value, 'enumMembers')
+    ? ['kind', 'name', 'unit', 'enumMembers'] : ['kind', 'name', 'unit'];
+  if (!exactObject(value, fields, path, errors)) return;
   if (value.kind !== 'builtin' && value.kind !== 'nominal') issue(errors, `${path}.kind`, 'source_type', 'must be builtin or nominal');
   if (value.kind === 'builtin') {
     if (!BUILTIN_TYPES.has(value.name)) issue(errors, `${path}.name`, 'source_type', 'must be a supported builtin source type');
@@ -83,6 +85,21 @@ function sourceType(value, path, errors) {
   } else {
     publicId(value.name, `${path}.name`, errors);
     if (value.unit !== null && (typeof value.unit !== 'string' || !value.unit)) issue(errors, `${path}.unit`, 'unit', 'must be null or a non-empty semantic unit');
+    if (Object.hasOwn(value, 'enumMembers')) {
+      if (value.unit !== null || !Array.isArray(value.enumMembers) || value.enumMembers.length === 0) {
+        issue(errors, `${path}.enumMembers`, 'enum_members', 'must be a non-empty authored enum with no unit');
+      } else {
+        const names = new Set();
+        value.enumMembers.forEach((member, index) => {
+          const memberPath = `${path}.enumMembers[${index}]`;
+          if (!exactObject(member, ['name', 'value'], memberPath, errors)) return;
+          publicId(member.name, `${memberPath}.name`, errors);
+          if (names.has(member.name)) issue(errors, `${memberPath}.name`, 'duplicate_identity', 'enum member names must be unique');
+          names.add(member.name);
+          if (member.value !== index) issue(errors, `${memberPath}.value`, 'enum_members', 'enum member value must equal its declaration ordinal');
+        });
+      }
+    }
   }
 }
 
@@ -211,6 +228,12 @@ function sameIdentity(actual, expected, path, errors) {
 }
 
 function readyValue(type, value, path, errors) {
+  if (type?.kind === 'nominal' && Array.isArray(type.enumMembers)) {
+    if (!Number.isSafeInteger(value) || !type.enumMembers.some(member => member?.value === value)) {
+      issue(errors, path, 'value_type', 'must be a declared enum member ordinal');
+    }
+    return;
+  }
   if (type?.kind === 'builtin' && type.name === 'Bool' && typeof value !== 'boolean') issue(errors, path, 'value_type', 'must be Bool from source semantics');
   if (type?.kind === 'builtin' && type.name === 'Int' && (!Number.isInteger(value) || value < -2147483648 || value > 2147483647)) issue(errors, path, 'value_type', 'must be a signed i32 Int from source semantics');
   if (type?.kind === 'builtin' && type.name === 'Number' && (typeof value !== 'number' || !Number.isFinite(value))) issue(errors, path, 'value_type', 'must be finite Number from source semantics');

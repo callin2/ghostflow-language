@@ -68,8 +68,8 @@
       "source": "contracts/interaction-v0/README.md",
       "sourceLanguage": "en",
       "translation": "contracts/interaction-v0/README.ko.md",
-      "sourceSha256": "6c15aa4740eb129ab4ba8bc28a3ae59fb6745a79e836e5f0d9014ee2bbf73240",
-      "translationSha256": "7266be204c0e43a14dc641f8a2d3c4b4616b9fc1a74fa5ef051f7c154719faf8"
+      "sourceSha256": "84a22c69584a014c5330d8f5937d14235a0d89b9e17183c1cb734cf906889de6",
+      "translationSha256": "10c5920618e342c9edb09cf4ed8df682abe5c89105ff435508a5b89fdbce0ffd"
     },
     {
       "source": "contracts/requirements/README.md",
