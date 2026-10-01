@@ -593,6 +593,38 @@ control SharedPumpPolicy {
 binding과 enforcement가 없는 shared descriptor를 실행 control이나 enforced policy로
 표시하지 않는다. 이전 최상위 resource-policy 파일도 checked non-control artifact다.
 
+공유 실행을 선택할 때는 정확한 정본 source/descriptor, binding revision,
+안정 resource ID와 typed mapping을 하나의 bound 프로그램 identity로 고정한다.
+활성화와 각 평가의 binding은 그 identity와 같아야 한다. missing/mismatch는
+부분 실행이 아니라 평가 거부다. bound 실행의 요청·admission·safe_output은
+동일한 Rust commit 경계에서 검사하며 host의 후처리 출력 filter로 대신하지 않는다.
+논리 enforcement가 physical applied/confirmed나 Driver 안전 순서를 보장하지는 않는다.
+
+exclusive의 원시 activity 입력은 admission 결과가 아니다. 이미 admit된 activity와
+충돌하는 새 claim은 거부하고 기존 admission과 이전 safe 출력을 보존한다.
+거부한 newcomer는 false 관측 뒤 새 true claim으로 admission을 다시 요청한다.
+시작 전 예측한 출력 관계 위반은 새 admission과 보호 출력을 만들지 않는다.
+이전에 commit한 safe 값이 없으면 거부 출력 집합은 비어 있다. 이미 실행 중인
+요청의 관계 위반에는 작성한 safe vector를 적용하며, trip은 입력 정상화만으로
+풀리지 않는다. exclusive group은 모든 claim=false 관측 뒤 새 claim의 admission을
+다시 검사한다. require-only group은 requested map=authored safe map 관측으로 복구
+기준선을 세운 뒤 새 departure를 검사한다.
+숨은 재시도·대기열·우선순위 상승으로 이 복구 경계를 우회하지 않는다.
+
+여러 group의 필수 조건은 AND이며 안전 의미가 충돌하는 중첩은 거부한다.
+bound Bool profile은 모든 출력의 finite resource mapping과 전체 safe vector를
+요구한다. 설치 authority가 공유하는 registry는 같은 안정 ID의 두 번째 활성
+논리 writer를 거부한다. 별도 설치의 registry가 물리 배타성을 증명하지는 않는다.
+보호 resource를 공유하는 group의 trip은 전이적으로 연결된 component에 적용하고,
+공유 resource의 작성 safe 값은 일치해야 한다. 무관한 group의 admission은 유지한다.
+최종 safe 후보를 모든 공유·지역 필수 조건의 AND로 다시 검증한다. 이 제한은
+여러 VM 협력 중재, session lease나 임의 PID 정책을 구현하는 의미가 아니다.
+VM 오류나 binding 오류는 state·guard·trace를 함께 rollback한다. trace는 원시
+요청, admitted activity, requested/safe 값, 원인·group·binding identity를 구분한다.
+정상 평가한 denial은 ordinary VM state를 commit하며 job/session 취소를 뜻하지 않는다.
+
+실행 그룹은 하나의 exclusive 활동 집합까지 지원한다. 여러 exclusive 문장은 소스 검사 대상으로 유지하지만 별도의 실행 연결이 필요하므로 서로 다른 집합을 합쳐 해석하지 않고 거부한다. 작성된 전역 안전 벡터는 로컬 필수 제약도 만족해야 한다.
+
 accounting의 `constraints Name { limit used(account, basis) <= bound { ... } }`는
 별도 사용량 scope다(§3.10). 선언한 `resource`·`account`, semantic stage, basis,
 persistence가 ledger의 뜻을 정한다. 지역 Bool 규칙이나 shared admission으로 대체하지 않는다.

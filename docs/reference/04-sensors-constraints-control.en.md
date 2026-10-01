@@ -459,6 +459,43 @@ binding contract. This introduces no new `station`, `use`, `bind` or session syn
 Do not label an unbound, unenforced shared descriptor as an executable control or enforced
 policy. Former top-level resource-policy files also remain checked non-control artifacts.
 
+Selecting shared execution pins the exact canonical source/descriptor, binding
+revision, stable resource IDs and typed mappings into one bound program identity.
+Activation and each evaluation must provide the same binding identity. Missing
+or mismatched binding rejects evaluation rather than partially executing it.
+Bound requests, admission and safe_output are checked within one Rust commit
+boundary, not by a host filter after output publication. Logical enforcement
+does not guarantee physical applied/confirmed evidence or Driver safe sequencing.
+
+Raw exclusive activity inputs are not admission results. Deny new claims that
+conflict with an admitted activity, preserving incumbent admission and previous
+safe outputs. A predicted prestart output-relation violation creates neither new
+admission nor protected output. A denied newcomer must be observed false before
+requesting admission with a fresh true claim. With no previously committed safe
+values, denial
+has an empty output set. A relation violation during admitted execution uses the
+authored safe vector; normal inputs alone do not clear the trip. An exclusive group
+requires an all-claims-false observation, then checks admission for a fresh claim.
+A require-only group establishes its recovery baseline when requested map equals
+authored safe map, then checks a fresh departure. Hidden retries,
+queues or priority escalation cannot bypass this recovery boundary.
+
+Mandatory conditions across groups combine as AND; reject overlapping groups
+with conflicting safety meaning. The bound Bool profile requires finite resource
+mappings for every output and a complete safe vector. The registry shared by an
+installation authority refuses a second active logical writer for the same stable
+ID. Registries of separate installations do not prove physical exclusion. Trips
+propagate across the transitively connected component of groups sharing protected
+resources; authored safe values must agree on shared resources. Unrelated groups
+retain their admission. Revalidate the final safe candidate against the AND of all
+mandatory shared and local conditions. This does not implement cooperative multi-VM
+arbitration, session leases or arbitrary PID policies. VM or binding errors roll
+back state, guard and trace together. Traces distinguish raw requests, admitted
+activity, requested/safe values, cause, group and binding identity.
+A successfully evaluated denial commits ordinary VM state; it does not cancel jobs/sessions.
+
+Executable groups support at most one exclusive activity set. Multiple exclusive statements remain checked source but require separate execution integration; reject them rather than flattening their distinct sets. The authored global safe vector must also satisfy mandatory local constraints.
+
 Accounting's `constraints Name { limit used(account, basis) <= bound { ... } }` has a separate
 usage scope (§3.10). Declared `resource` and `account`, semantic stage, basis and persistence
 define the ledger. Local Bool rules and shared admission do not replace it.

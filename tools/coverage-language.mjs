@@ -53,6 +53,7 @@ const TESTS = Object.freeze([
   'tests/macro-composition-contract.test.mjs', 'tests/objective-adapt-structural.test.mjs',
   'tests/import-header.test.mjs', 'tests/import-cli-digest.test.mjs',
   'tests/named-constraints.test.mjs', 'tests/resource-policy.test.mjs',
+  'tests/bound-resource-control.test.mjs',
   'tests/schedule-descriptor-artifact.test.mjs', 'tests/gfb2-int.test.mjs',
   'tests/int-compiler.test.mjs', 'tests/lesson.test.mjs', 'tests/interaction-corpus.test.mjs',
   'tests/temporal-resource-plan-wasm.test.mjs', 'tests/temporal-replay-wasm.test.mjs',
@@ -101,6 +102,8 @@ const TARGETS = Object.freeze([
   'runtimes/wasm/control-runtime.mjs', 'runtimes/wasm/ghostflow-runtime.mjs',
   'runtimes/wasm/estimate-evidence.mjs',
   'runtimes/node/resource-constraints-binding.mjs',
+  'tools/bound-resource-control.mjs',
+  'runtimes/node/bound-resource-control.mjs',
 ]);
 const EXCLUDED = Object.freeze([{ test: 'tests/requirement-catalog.test.mjs', reason: 'catalog status is a separate requirement-governance gate, not language execution coverage' }]);
 const MINIMUM = Object.freeze({ functions: 100, lines: 88, v8BlockRanges: 77 });

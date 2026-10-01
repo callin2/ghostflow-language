@@ -2,6 +2,38 @@
 
 ## Unreleased
 
+### 2026-10-01 — bound finite resource enforcement ([#158](https://github.com/callin2/ghostflow-language/issues/158))
+
+Reference §4.8 now distinguishes source checking from executable resource binding.
+Previously, `constraints Shared for station { ... }` produced only a checked
+nonexecutable descriptor. `compileBoundResourceControl(checked, binding)` now
+builds a guarded GFB17 profile for a Bool GFB1 v1/v3 request control. The binding
+pins the canonical source/descriptor, installation revision, stable resource IDs,
+and complete finite mode/output mappings. Each group supports one exclusive activity
+set or requirement-only execution; multiple exclusive statements are rejected rather
+than flattened. Every output needs explicit protection;
+missing bindings and unsupported profiles fail closed. No implicit output or
+physical safety sequence is supplied.
+
+The portable Rust guard owns admission and the final logical output projection.
+Conflicting new activity cannot displace an incumbent or enter a hidden queue.
+Predicted prestart violations deny admission without new output actuation. Ongoing
+violations use the authored safe vector, including true values, and require neutral
+then fresh requests before recovery. Overlapping mandatory groups combine as AND;
+inconsistent safe values reject. Existing local requirements remain mandatory.
+One host-owned registry covers every supported writer; duplicate ownership rejects.
+Explicit activation and matching binding identity on every scan prevent ordinary
+tick/scan bypass. Failed evaluations roll back guard, VM and decision evidence.
+
+Unbound compilation stays nonexecutable; clients opt in with the exact binding
+and guarded APIs. Accounting, imports, Station advisory checks and fixed Station
+leases retain their existing contracts. This finite logical profile does not
+implement contextual/continuous/PID execution, cooperative multi-control arbitration,
+physical Driver adoption or hardware confirmation. Complete bilingual example:
+`examples/bound-resource-execution.ghost.md`. Regression evidence covers actual
+native/plain/framed WASM and reference simulation, binding forgery, admission,
+non-OFF violation response, recovery and writer/bypass rejection.
+
 ### 2026-10-01 — canonical control-owned constraint groups ([#157](https://github.com/callin2/ghostflow-language/issues/157))
 
 Reference §4.8 distinguishes local output, shared-resource and accounting scope.

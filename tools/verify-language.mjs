@@ -51,6 +51,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/named-constraints.test.mjs',
   'tests/resource-policy-artifact.test.mjs',
   'tests/constraint-proof.test.mjs',
+  'tests/bound-resource-control.test.mjs',
   'tests/coverage-edges.test.mjs',
   'tests/gfb1-browser.test.mjs',
   'tests/coverage-source-identity.test.mjs',
@@ -424,7 +425,7 @@ async function verify(nodeOnly, curriculumOnly) {
       await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-core', '--example', 'run']);
       await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-core', '--release',
         '--example', 'run', '--example', 'scan_adapter', '--example', 'scan_tape',
-        '--example', 'context_tape', '--example', 'scenario_scan', '--example', 'estimate_evidence', '--example', 'solar_tape']);
+        '--example', 'context_tape', '--example', 'scenario_scan', '--example', 'estimate_evidence', '--example', 'solar_tape', '--example', 'resource_tape']);
       await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-wasm', '--target', 'wasm32-unknown-unknown', '--release']);
       wasmVerified = true;
     }

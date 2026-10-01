@@ -312,6 +312,40 @@ pub(crate) fn record(out: &mut impl Write, r: &TickRecord) -> fmt::Result {
     }
     certified_traces(out, r)?;
     context_traces(out, r)?;
+    if !r.resource_trace.is_empty() {
+        out.write_str(",\"resourceTrace\":[")?;
+        for (index, trace) in r.resource_trace.iter().enumerate() {
+            if index > 0 {
+                out.write_char(',')?;
+            }
+            out.write_str("{\"group\":")?;
+            text(out, &trace.group)?;
+            out.write_str(",\"decision\":")?;
+            text(out, &trace.decision)?;
+            out.write_str(",\"failedRule\":")?;
+            match trace.failed_rule {
+                Some(rule) => write!(out, "{rule}")?,
+                None => out.write_str("null")?,
+            }
+            out.write_str(",\"admittedMode\":")?;
+            match &trace.admitted_mode {
+                Some(mode) => text(out, mode)?,
+                None => out.write_str("null")?,
+            }
+            write!(out, ",\"tripped\":{},\"bindingHash\":", trace.tripped)?;
+            text(out, &trace.binding_hash)?;
+            out.write_str(",\"sourceHash\":")?;
+            text(out, &trace.source_hash)?;
+            out.write_str(",\"descriptorHash\":")?;
+            text(out, &trace.descriptor_hash)?;
+            out.write_str(",\"localCandidate\":")?;
+            values(out, &trace.local_candidate)?;
+            out.write_str(",\"finalProtected\":")?;
+            values(out, &trace.final_protected)?;
+            out.write_char('}')?;
+        }
+        out.write_char(']')?;
+    }
     if !r.schedule_trace.is_empty() {
         out.write_str(",\"scheduleTrace\":[")?;
         for (index, trace) in r.schedule_trace.iter().enumerate() {
@@ -396,6 +430,7 @@ mod tests {
     #[test]
     fn shared_writer_preserves_escaped_schema_and_propagates_sink_failure() {
         let r = TickRecord {
+            resource_trace: vec![],
             module_fingerprint: 1,
             tick: 2,
             strategy: "λ\"\\\n\u{1}".into(),

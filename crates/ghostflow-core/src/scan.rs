@@ -170,7 +170,14 @@ impl ScanDriver {
     /// Evaluates one complete, validated host frame. Only a successful core
     /// evaluation advances the scan sequence and logical clock.
     pub fn scan(&mut self, frame: ScanFrameV1) -> Result<ScanOutcomeV1> {
-        self.scan_inner(frame, None, None)
+        self.scan_inner(frame, None, None, None)
+    }
+    pub fn scan_with_resource_binding(
+        &mut self,
+        frame: ScanFrameV1,
+        binding: &[u8],
+    ) -> Result<ScanOutcomeV1> {
+        self.scan_inner(frame, None, None, Some(binding))
     }
 
     /// Evaluates a complete context frame with explicit clock and context facts.
@@ -192,7 +199,7 @@ impl ScanDriver {
                 "context scan requires an activated context runtime",
             ));
         }
-        self.scan_inner(frame, Some((clock, facts)), None)
+        self.scan_inner(frame, Some((clock, facts)), None, None)
     }
 
     /// Dispatches Solar provider facts through the same framed transaction.
@@ -219,7 +226,7 @@ impl ScanDriver {
                 facts: input.facts,
             })
             .collect();
-        self.scan_inner(frame, None, Some((clock, &facts, 1)))
+        self.scan_inner(frame, None, Some((clock, &facts, 1)), None)
     }
 
     /// Dispatches civil occurrence facts through the same framed transaction.
@@ -244,7 +251,7 @@ impl ScanDriver {
         if !matches!(version, 2 | 3) {
             return Err(Error::new("unsupported framed schedule packet version"));
         }
-        self.scan_inner(frame, None, Some((clock, facts, version)))
+        self.scan_inner(frame, None, Some((clock, facts, version)), None)
     }
 
     fn derived_input(&self, name: &str) -> bool {
@@ -271,6 +278,7 @@ impl ScanDriver {
         frame: ScanFrameV1,
         context: Option<(ClockSnapshot<'_>, &Facts)>,
         schedules: Option<(ClockSnapshot<'_>, &[ScheduleInput<'_>], u16)>,
+        resource_binding: Option<&[u8]>,
     ) -> Result<ScanOutcomeV1> {
         self.validate_scan_frame(&frame)?;
 
@@ -329,6 +337,8 @@ impl ScanDriver {
                         self.runtime.tick_with_schedules(clock, facts)
                     }
                 })
+        } else if let Some(binding) = resource_binding {
+            self.runtime.tick_with_resource_binding(binding)
         } else {
             self.runtime.tick_at(frame.logical_time_ms)
         };

@@ -980,8 +980,8 @@
         "path": "crates/ghostflow-core/src/lib.rs",
         "heading": "fn monotonic_input_failure_is_atomic()",
         "lines": [
-          3961,
-          3983
+          4071,
+          4093
         ],
         "sha256": "a9a83443a83a4ad006cf9ee304d0f38b8bb14332b54bda1fa0c9ffecc2a583fc"
       },

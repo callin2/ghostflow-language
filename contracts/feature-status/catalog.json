@@ -3746,6 +3746,12 @@
               "testId": "GF-TEST-resource-constraint-binding: exact source-bound finite logical mapping validates without granting execution",
               "assertionClass": "type-boundary",
               "polarities": ["positive", "negative", "boundary"]
+            },
+            {
+              "path": "tests/bound-resource-control.test.mjs",
+              "testId": "GF-TEST-bound-resource-compile: source-bound finite executable policy rejects incomplete or mismatched contracts",
+              "assertionClass": "compile-policy",
+              "polarities": ["positive", "negative", "boundary"]
             }
           ]
         },
@@ -3766,12 +3772,19 @@
               "assertionClass": "target-parity",
               "targets": ["native", "wasm"],
               "polarities": ["negative", "boundary"]
+            },
+            {
+              "path": "tests/bound-resource-control.test.mjs",
+              "testId": "GF-TEST-bound-resource-parity: automatic manual fallback admission violation recovery and trace match native plain framed and simulation",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "negative", "boundary"]
             }
           ]
         }
       ],
       "gaps": [
-        "Shared descriptor and logical binding validation grant no execution authority. Generic shared admission and ongoing resource-specific safe behavior remain #158; physical output ABI, Driver application and hardware confirmation are not claimed. The bounded standalone Station adapter is retained for its concrete consumers."
+        "Unbound descriptors grant no execution authority. Explicitly bound GFB17 supports finite Bool GFB1 v1/v3 controls only, with one registry for all supported writers and duplicate writers refused. Contextual/accounting/continuous/PID profiles, shared import composition, cooperative multi-control arbitration and session leases are outside this profile. Physical output ABI, Driver application and hardware confirmation are not claimed. The bounded standalone Station adapter is retained for its concrete consumers."
       ],
       "issues": [157, 158],
       "referenceCaseIds": []
