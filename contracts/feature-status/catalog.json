@@ -2221,6 +2221,14 @@
               "targets": [
                 "wasm"
               ]
+            },
+            {
+              "path": "tests/scan-tape-parity.test.mjs",
+              "testId": "REF-01-074: explicit false fallback preserves sensor fault and authored case provenance on native and WASM",
+              "caseId": "REF-01-074",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "negative", "boundary"]
             }
           ]
         }
@@ -2228,8 +2236,8 @@
       "gaps": [
         "Outside the frozen source type set."
       ],
-      "issues": [],
-      "referenceCaseIds": []
+      "issues": [198],
+      "referenceCaseIds": ["REF-01-074"]
     },
     {
       "id": "temporal-duration",

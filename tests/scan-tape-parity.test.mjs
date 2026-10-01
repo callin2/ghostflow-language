@@ -263,6 +263,60 @@ control FaultingProduct {
     && entry.target.name === 'result' && entry.reads.some(read => read.field === 'inputs' && read.name === 'divisor')));
 });
 
+test('REF-01-074: explicit false fallback preserves sensor fault and authored case provenance on native and WASM', async () => {
+  const source = '# Moisture fallback\n\n```ghost\n' + `control MoistureFallback {
+  sensor moisture: Percent;
+  let dry = case moisture { ok(value) => value < 30%; fault(_) => false; };
+  output pump: Bool;
+  pump <- dry;
+}` + '\n```\n';
+  const filename = 'moisture-fallback.ghost.md';
+  const compiled = await compileSource(source, { filename });
+  const sensor = compiled.manifest.sensors.find(item => item.name === 'moisture');
+  const tape = [
+    { value: 40, good: true },
+    { value: 0, good: false }, // unavailable value would be dry if fault were silently normalized
+    { value: 0, good: true },
+    { value: 0, good: false },
+  ].map(({ value, good }, scanId) => row(scanId, scanId * 100, [
+    { name: sensor.valueInput, value }, { name: sensor.okInput, value: good },
+    { name: sensor.faultInput, value: 0 }, // SensorFault.Disconnected
+  ]));
+  const { artifact, native, wasm } = await compare(source, tape, filename);
+  assert.deepEqual(artifact.bytes, compiled.bytes);
+  const sensorNode = artifact.sourceMap.find(node => node.kind === 'sensor');
+  const site = artifact.traceMetadata.resultSites.find(item => item.kind === 'case' && item.errorType === 'SensorFault');
+  assert.ok(sensorNode && site);
+  const origin = site.origins.find(item => item.tag === sensorNode.id);
+  assert.ok(origin, 'fallback site retains its authored sensor origin');
+  assert.deepEqual(origin, { tag: sensorNode.id, nodeId: sensorNode.id, kind: 'sensor', name: 'moisture' });
+  const caseNode = artifact.sourceMap.find(node => node.id === site.nodeId);
+  assert.equal(caseNode.kind, 'case');
+  assert.deepEqual({ filename: site.source.filename, line: site.source.line, column: site.source.column },
+    { filename: caseNode.filename, line: caseNode.line, column: caseNode.column });
+  for (const outcomes of [native, wasm]) {
+    assert.deepEqual(outcomes.map(item => item.accepted), [true, true, true, true]);
+    assert.deepEqual(outcomes.map(item => item.outcome.trace.requested.pump), [false, false, true, false]);
+    assert.deepEqual(outcomes.map(item => item.outcome.trace.safe.pump), [false, false, true, false]);
+    const events = outcomes.map(item => observeSourceTrace(artifact.traceMetadata, item.outcome.trace).resultEvents
+      .find(event => event.site === site.site));
+    assert.deepEqual(events.map(event => ({ kind: event.kind, errorType: event.errorType, choice: event.choice,
+      fault: event.fault, origin: event.origin })), [
+      { kind: 'case', errorType: 'SensorFault', choice: 0, fault: null, origin: 0 },
+      { kind: 'case', errorType: 'SensorFault', choice: 1, fault: 'Disconnected', origin: sensorNode.id },
+      { kind: 'case', errorType: 'SensorFault', choice: 0, fault: null, origin: 0 },
+      { kind: 'case', errorType: 'SensorFault', choice: 1, fault: 'Disconnected', origin: sensorNode.id },
+    ]);
+    for (const index of [1, 3]) {
+      assert.deepEqual(events[index].source, site.source);
+      assert.deepEqual(events[index].originDescriptor, origin);
+      assert.equal(events[index].source.filename, filename);
+    }
+    assert.equal(events[0].originDescriptor, null);
+    assert.equal(events[2].originDescriptor, null);
+  }
+});
+
 test('REF-03-014: one phase transition, rejected stop rollback, and waiting safety agree on native and WASM', async () => {
   const source = `control AtomicPhase {
   input stop, advance, permit: Bool;
