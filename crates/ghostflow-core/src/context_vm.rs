@@ -33,6 +33,13 @@ pub enum ScheduleDefinition {
         starts_ms: Vec<u64>,
         duration_ms: u64,
     },
+    CalendarRange {
+        timezone: String,
+        starts_ms: Vec<u64>,
+        duration_ms: u64,
+        calendar: String,
+        offday: bool,
+    },
     Periodic {
         epoch_id: String,
         anchor_ms: u64,
@@ -110,6 +117,18 @@ pub struct AccountingDescriptor {
     pub name: String,
     pub account: String,
     pub event: String,
+    pub timezone: String,
+    pub ok_input: u16,
+    pub value_input: u16,
+    pub fault_input: u16,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct CalendarDescriptor {
+    pub site: u32,
+    pub name: String,
+    pub calendar: String,
+    pub selector: crate::work_calendar::DaySelector,
     pub timezone: String,
     pub ok_input: u16,
     pub value_input: u16,
@@ -298,6 +317,32 @@ pub(crate) fn load_schedule(
         return Err(Error::new("invalid context schedule gap"));
     }
     let definition = match kind {
+        17 if format == 18 => {
+            let timezone = text(reader)?;
+            let duration_ms = exact(reader)?;
+            let count = usize::from(reader.u16()?);
+            if timezone != "UTC" || count != 1 {
+                return Err(Error::new(
+                    "calendar Range requires one static UTC Daily start",
+                ));
+            }
+            let starts_ms = vec![exact(reader)?];
+            validate_utc_range(&starts_ms, duration_ms)?;
+            if starts_ms[0] + duration_ms > 86_400_000 {
+                return Err(Error::new(
+                    "calendar Range crosses midnight; split explicit intervals",
+                ));
+            }
+            let calendar = text(reader)?;
+            let offday = flag(reader)?;
+            ScheduleDefinition::CalendarRange {
+                timezone,
+                starts_ms,
+                duration_ms,
+                calendar,
+                offday,
+            }
+        }
         16 if format == 16 => {
             let timezone = text(reader)?;
             let latitude = reader.f64()?;
@@ -553,7 +598,7 @@ pub(crate) fn load_schedule(
                 dst_repeated,
             }
         }
-        15 if matches!(format, 15 | 16) => {
+        15 if matches!(format, 15 | 16 | 18) => {
             let timezone = text(reader)?;
             let at_ms = exact(reader)?;
             let calendar = text(reader)?;
@@ -569,7 +614,7 @@ pub(crate) fn load_schedule(
                 dst_repeated,
             }
         }
-        13 if matches!(format, 12 | 13 | 15) => {
+        13 if matches!(format, 12 | 13 | 15 | 18) => {
             if text(reader)? != "UTC" {
                 return Err(Error::new("Range requires UTC timezone"));
             }
@@ -681,6 +726,135 @@ fn config_dependencies(
         .collect();
     ids.sort_unstable();
     Ok(ids)
+}
+
+#[cfg(test)]
+mod calendar18_loader_tests {
+    use super::*;
+
+    fn string(out: &mut Vec<u8>, value: &str) {
+        out.extend_from_slice(&(value.len() as u16).to_le_bytes());
+        out.extend_from_slice(value.as_bytes());
+    }
+
+    fn range(timezone: &str, start: u64, duration: u64, selector: u8) -> Vec<u8> {
+        let mut out = 7u32.to_le_bytes().to_vec();
+        string(&mut out, "work-range");
+        out.extend_from_slice(&1_000u64.to_le_bytes());
+        string(&mut out, timezone);
+        out.extend_from_slice(&duration.to_le_bytes());
+        out.extend_from_slice(&1u16.to_le_bytes());
+        out.extend_from_slice(&start.to_le_bytes());
+        string(&mut out, "workers");
+        out.push(selector);
+        for value in [true, false] {
+            out.extend_from_slice(&2u32.to_le_bytes());
+            out.extend_from_slice(&[1, u8::from(value)]);
+        }
+        out
+    }
+
+    #[test]
+    fn calendar18_loader_rejects_overnight_timezone_bad_selector_and_old_profile() {
+        let endpoint = range("UTC", 23 * 3_600_000, 3_600_000, 0);
+        assert!(load_schedule(&mut Reader::new(&endpoint), 17, 18, &[]).is_ok());
+        for bytes in [
+            range("UTC", 23 * 3_600_000, 3_600_001, 0),
+            range("Asia/Seoul", 0, 100, 0),
+            range("UTC", 0, 100, 2),
+            range("UTC", 0, 0, 0),
+        ] {
+            assert!(load_schedule(&mut Reader::new(&bytes), 17, 18, &[]).is_err());
+        }
+        for format in [10, 11, 12, 13, 14, 15, 16, 17] {
+            assert!(load_schedule(&mut Reader::new(&endpoint), 17, format, &[]).is_err());
+        }
+        // The original static Range contract still permits an interval across midnight.
+        assert!(validate_utc_range(&[23 * 3_600_000], 2 * 3_600_000).is_ok());
+    }
+
+    #[test]
+    fn calendar18_result_loader_verifies_typed_protected_projection_rails() {
+        let mut bytes = 7u32.to_le_bytes().to_vec();
+        string(&mut bytes, "working");
+        string(&mut bytes, "workers");
+        bytes.push(0);
+        string(&mut bytes, "UTC");
+        for index in [0u16, 1, 2] {
+            bytes.extend_from_slice(&index.to_le_bytes());
+        }
+        let mut fields = [
+            Field {
+                name: "__gf_calendar_7_ok".into(),
+                value_type: Type::Bool,
+                default: crate::Value::Bool(false),
+            },
+            Field {
+                name: "__gf_calendar_7_value".into(),
+                value_type: Type::Bool,
+                default: crate::Value::Bool(false),
+            },
+            Field {
+                name: "__gf_calendar_7_fault".into(),
+                value_type: Type::Number,
+                default: crate::Value::Number(0.0),
+            },
+        ];
+        assert!(load_calendar(&mut Reader::new(&bytes), &fields).is_ok());
+        fields[0].name = "host_permission".into();
+        assert!(load_calendar(&mut Reader::new(&bytes), &fields).is_err());
+        fields[0].name = "__gf_calendar_7_ok".into();
+        fields[1].value_type = Type::Number;
+        assert!(load_calendar(&mut Reader::new(&bytes), &fields).is_err());
+        fields[1].value_type = Type::Bool;
+        let len = bytes.len();
+        bytes[len - 2..].copy_from_slice(&0u16.to_le_bytes());
+        assert!(load_calendar(&mut Reader::new(&bytes), &fields).is_err());
+    }
+}
+
+pub(crate) fn load_calendar(
+    reader: &mut Reader<'_>,
+    inputs: &[Field],
+) -> Result<CalendarDescriptor> {
+    let site = reader.u32()?;
+    let name = text(reader)?;
+    let calendar = text(reader)?;
+    let selector = match reader.u8()? {
+        0 => crate::work_calendar::DaySelector::Workday,
+        1 => crate::work_calendar::DaySelector::Offday,
+        2 => crate::work_calendar::DaySelector::Holiday,
+        _ => return Err(Error::new("invalid calendar selector")),
+    };
+    let timezone = text(reader)?;
+    if timezone != "UTC" {
+        return Err(Error::new("calendar Result requires explicit UTC binding"));
+    }
+    let ok_input = reader.u16()?;
+    let value_input = reader.u16()?;
+    let fault_input = reader.u16()?;
+    for (index, suffix, ty) in [
+        (ok_input, "ok", Type::Bool),
+        (value_input, "value", Type::Bool),
+        (fault_input, "fault", Type::Number),
+    ] {
+        let field = inputs
+            .get(usize::from(index))
+            .ok_or_else(|| Error::new("calendar projection index"))?;
+        if field.name != format!("__gf_calendar_{site}_{suffix}") || field.value_type != ty {
+            return Err(Error::new("calendar projection binding mismatch"));
+        }
+    }
+    Ok(CalendarDescriptor {
+        site,
+        name,
+        calendar,
+        selector,
+        timezone,
+        ok_input,
+        value_input,
+        fault_input,
+    })
 }
 
 pub(crate) fn load_natural(reader: &mut Reader<'_>, inputs: &[Field]) -> Result<NaturalDescriptor> {

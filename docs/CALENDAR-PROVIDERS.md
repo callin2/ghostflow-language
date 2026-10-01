@@ -137,8 +137,24 @@ Holiday Daily pulse is identified by `holiday-daily-pulse`, GFB15 and
 `GhostFlow/control-v14`. Existing work/off-day tag/byte layout and GFSF5 facts
 wire stay unchanged. Older loaders reject the new GFB header. These identifiers
 are separate from package and Device firmware versions. This adapter does not
-expand weekday-literal or general `calendar_is` expression implementation.
-Issue #155's weekday grammar remains separate.
+expand weekday-literal implementation. Issue #155's weekday grammar remains
+separate.
+
+The adopted `calendar_is` Result and immutable UTC Daily work/off-day Range
+slice use GFB18/`GhostFlow/control-v18`. Their activation requires an explicit
+UTC calendar binding; the Korean `Asia/Seoul` example above remains a Daily-pulse
+example. Supply identified snapshots in GFSF5 schedule facts for each query or
+range site. Rust derives the date and returns typed calendar faults; do not
+supply caller-computed work/off-day Bool values. Shared bindings use identical
+snapshots within one scan and retain the same bounded revision history.
+
+A work Range must end at or before midnight. For `23:45` through `00:15`, author
+separate `range(15min)` Daily declarations starting at `23:45` and `00:00`.
+The latter declaration evaluates the next date independently; no shift business
+date is inferred. Handle `calendar_is` faults explicitly before negating its
+successful Bool. Missing data, outside coverage and expiry do not permit either
+workday or offday admission. These are logical reference-host semantics, not
+evidence of human attendance, physical outputs or storage-medium durability.
 
 ## Consistency, absence and storage bounds
 

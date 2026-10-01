@@ -5,6 +5,20 @@
 
 ## 미출시
 
+### 2026-10-01 — 근무 달력 경계의 실행 ([#225](https://github.com/callin2/ghostflow-language/issues/225))
+
+Reference §3.8의 `calendar_is` Result 식과 불변 UTC Daily work/off-day range를
+GFB18 및 `GhostFlow/control-v18`의 공유 Rust context engine으로 실행한다.
+이전에는 채택된 이 표면의 실행 lowering이 없었다. host는 식별된 calendar snapshot을
+공급하고 Rust는 missing, coverage 밖, expiry fault를 보존한다. Result를 명시적인
+fault 처리 없이 부정하여 허가로 만들 수 없다. 자정을 넘는 work range는 거부한다.
+`23:45`와 `range(15min)`, `00:00`와 `range(15min)`을 각각 별도 선언으로 나눈다.
+정확히 자정에 끝나는 range는 유효하며 일반 UTC range의 기존 동작은 유지한다.
+제한된 profile은 명시적인 UTC binding을 요구한다. shift 귀속, 비 UTC Range 정책,
+Run overlap 규칙을 추가하지 않는다. 이전 loader는 GFB18을 거부한다.
+정확한 REF-03-041 oracle은 `tests/reference-calendar-boundary.test.mjs`와
+공유 core/native/WASM 검증으로 확인한다.
+
 ### 2026-10-02 — 현재 Periodic 패키지의 서명된 승인
 
 기존 패키지 검증기는 GFB11에서 config 전용 서두만 허용하여 현재 컴파일러의

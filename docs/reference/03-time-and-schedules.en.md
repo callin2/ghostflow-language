@@ -353,7 +353,7 @@ schedule morning_watering: Daily {
 }
 ```
 
-This immutable UTC `range` example is executable GFB12 control bytecode. The bounded execution slice supports Daily without a work calendar and nonempty static DailySlots, with `trusted_only`, `baseline` and `skip`. Live start/duration settings, Periodic Range and other accepted variants remain descriptors. Non-UTC and unprovable overlap remain rejected; no timezone or DST policy is inferred.
+This immutable UTC `range` example is executable GFB12 control bytecode. The bounded execution slice supports Daily without a work calendar and nonempty static DailySlots, with `trusted_only`, `baseline` and `skip`. Immutable UTC Daily with a `workday` or `offday` selector and a typed WorkCalendar uses GFB18. Its start plus duration must not exceed local midnight; divide an overnight work interval into separate explicit Daily ranges. A range ending exactly at midnight is valid because its end is exclusive. Ordinary ranges without a work calendar retain their existing midnight behavior. Live start/duration settings, Periodic Range and other accepted variants remain descriptors. Non-UTC and unprovable overlap remain rejected; no timezone or DST policy is inferred.
 
 Range context checkpoints retain consumed occurrence identities, not an active monotonic timer. Restoring into a fresh boot does not resume or readmit an already consumed occurrence. An unconsumed still-open interval may admit only its remaining time. Terminal-capacity exhaustion rejects the scan atomically; identities are never silently pruned.
 
@@ -536,8 +536,11 @@ A weekday tag needs no calendar. `holiday` requires HolidayCalendar; `workday` a
 `holiday` is membership in the public holiday date list. A `work` exception for
 the same date preserves the holiday fact; weekly pattern and holiday work policy
 do not affect it. Daily pulses for `holiday`, `workday` and `offday` use typed
-calendars and explicit common/DST policies. Weekday tags and ordinary
-`calendar_is` expressions are outside this execution scope.
+calendars and explicit common/DST policies. Weekday tags remain outside this
+execution scope. Ordinary `calendar_is` with a `workday`, `offday` or `holiday`
+selector returns the typed Result below; its bounded executable profile requires
+an explicit UTC calendar binding. Other timezone profiles are rejected at
+activation, and the host does not supply a precomputed eligibility value.
 
 Explicit composition of calendar base and overrides creates a new ID/revision.
 The original is immutable; timezone mismatch and duplicate dates in one overlay

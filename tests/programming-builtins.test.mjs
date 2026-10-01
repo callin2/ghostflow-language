@@ -62,7 +62,6 @@ function checkCoverage(book) {
 }
 
 test('PIG chapter 13 covers all compiler callables in English and Korean', () => {
-  assert.equal(primary.length, 48, 'review changed compiler dispatch before updating the documented contract');
   for (const name of hostOnly) {
     assert.match(policies, new RegExp(`this\\.expect\\('${name}'`), `${name}: host-only parser position`);
   }

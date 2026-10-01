@@ -145,8 +145,8 @@
       "source": "docs/BYTECODE.md",
       "sourceLanguage": "en",
       "translation": "docs/BYTECODE.ko.md",
-      "sourceSha256": "619bef702417ccb3e8c170a43f815e832f9584413fa3109fdfa2c966a3fb34ff",
-      "translationSha256": "0f4c75d3ab53e1db5931c0714e18d3e52cd944cec34ba7529818b00e1d11af4f"
+      "sourceSha256": "46e672972b01bacb947fba96c566ae25640e9a04734c30c5a230cb7900981098",
+      "translationSha256": "62ecf64ea5b85a17c5d24fe0c422130ea509202087d19c99505484a8c4490451"
     },
     {
       "source": "docs/COMPILER-DIAGNOSTICS.md",
@@ -166,8 +166,8 @@
       "source": "docs/CONTEXT-EXECUTION-ABI.md",
       "sourceLanguage": "en",
       "translation": "docs/CONTEXT-EXECUTION-ABI.ko.md",
-      "sourceSha256": "b2171d3c5911f056af8892bce262ba51f3682f17cc4963ab937cf941d5c70c2c",
-      "translationSha256": "a8749d3c1a52b16bd767d3afe686b071ed3d9aaa9866a76a5a052a1aa08060ae"
+      "sourceSha256": "01df0bd3a50050979c9b31a29726ec4e53a0f637a8c32526105ddb99b1454e58",
+      "translationSha256": "8568656caab83cc6237ef892e4395df2246f765257d66324c92f0f346a6fc2e3"
     },
     {
       "source": "docs/CONTINUOUS-BOOL-TIMER-CONTRACT.md",
@@ -229,8 +229,8 @@
       "source": "docs/IMPLEMENTATION.md",
       "sourceLanguage": "en",
       "translation": "docs/IMPLEMENTATION.ko.md",
-      "sourceSha256": "bcce042c5bd93d8987aafbefe79e044fac1d5586c7668637268795b3c64c8794",
-      "translationSha256": "992549faefc3f723b703eb86fa0d97ff0842e2b0ce400ec8d7c78a588bd94c85"
+      "sourceSha256": "416333727680d6b6da4205eba5b7206d1d5bdb3f4c5e0be25ad3f32a4db25cee",
+      "translationSha256": "cae1429fb982b24516ae4d5d22aeece5fb0409c8258be884c33a72f189b2a746"
     },
     {
       "source": "docs/INTENT-ANCHOR-MAP.md",
@@ -341,8 +341,8 @@
       "source": "docs/ProgrammingInGhostflow.md",
       "sourceLanguage": "ko",
       "translation": "docs/ProgrammingInGhostflow.en.md",
-      "sourceSha256": "204ea39659d032acf211557c2ccd972506dc539b37cec96ff96fbd5bd57cea43",
-      "translationSha256": "28e820dd1fb200e9c268335579d07a53dac0eb2339bdecadbdd3281b8651b7cd"
+      "sourceSha256": "6d4722de4eb78d27e1ff85b187791e12e5647d3355857d1c55c0cd23accbb661",
+      "translationSha256": "16ecee4e01404f70b1a8278241f65cc39d68c01dd3e0fb015315106aeaec08d0"
     },
     {
       "source": "docs/REFERENCE-QUERY.md",
@@ -369,8 +369,8 @@
       "source": "docs/reference/03-time-and-schedules.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/03-time-and-schedules.en.md",
-      "sourceSha256": "7a014414cbc8b6a012dea6d0d908451835ac030d81b952700e586d29f9abeb12",
-      "translationSha256": "83c7c0476bc0324f3ed02c7e1e828a41501f4bae4ea7a79a909685767d4ece42"
+      "sourceSha256": "9a73399f42f7cc76aa446f3035353a368db12d8b23c2241499ce92fef65c8cff",
+      "translationSha256": "38cddb21455d819bd153b8344e6da30399e0301a39bfac821d8147a3664b1ada"
     },
     {
       "source": "docs/reference/04-sensors-constraints-control.md",
@@ -586,8 +586,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "cf6bec2c2b4384fb62778df33155dfd22fd3dbe0d9b4fa3493e3f187ea039592",
-      "translationSha256": "a2730dbf8720a94c406f4c6949eb4908df4a8cb9cd9690f1d12bf92e1b77095c"
+      "sourceSha256": "d98e78dffe2e2ac42e66c1c1a52425918df6032164adfe0cf671d9c59450a196",
+      "translationSha256": "ea7cb22f0c1ead4972312964dc50b8dca77a07aed13c58b55dfc097238d8f706"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",
@@ -964,8 +964,8 @@
       "source": "docs/CALENDAR-PROVIDERS.md",
       "sourceLanguage": "en",
       "translation": "docs/CALENDAR-PROVIDERS.ko.md",
-      "sourceSha256": "87d3ff05ddaff990063796646a13990474f5ea47980457a70fe616adab573bcd",
-      "translationSha256": "56efe812219d556e0eabb169101634e4a6daec7b8d81ad22da505b6193a91020"
+      "sourceSha256": "4dafa09bda1184eb79ccb4c63e0ae6ab3eb2a14e5eea7ce33abd886f3c3b9857",
+      "translationSha256": "dfeaa15af5fd844f283e7b512ce136b2b4e8bdae07ea2a4d9b9c55f394be49ed"
     },
     {
       "source": "examples/korean-calendar.ghost.md",

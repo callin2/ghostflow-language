@@ -128,8 +128,23 @@ calendar = public_days;
 Holiday Daily pulse는 `holiday-daily-pulse`, GFB15와 `GhostFlow/control-v14`로
 식별한다. 기존 work/off day의 tag/byte layout과 GFSF5 facts wire는 유지한다.
 이전 loader는 새 GFB header를 거부한다. package version이나 Device firmware
-version과 같은 번호가 아니다. weekday literal와 일반 `calendar_is` 표현식의
-구현 범위는 이 adapter 추가로 확장되지 않는다. #155의 요일 문법은 별도 작업이다.
+version과 같은 번호가 아니다. weekday literal의 구현 범위는 이 adapter 추가로
+확장되지 않는다. #155의 요일 문법은 별도 작업이다.
+
+채택된 `calendar_is` Result와 불변 UTC Daily work/off-day Range 실행 범위는
+GFB18/`GhostFlow/control-v18`을 사용한다. activation에는 명시적인 UTC calendar
+binding이 필요하다. 위의 한국 `Asia/Seoul` 예시는 Daily pulse 예시로 유지한다.
+각 query 또는 range site의 GFSF5 schedule fact로 식별된 snapshot을 공급한다.
+Rust가 date를 계산하고 typed calendar fault를 반환한다. 호출자가 계산한 work/off-day
+Bool을 공급하지 않는다. scan 안에서 binding을 공유하면 동일한 snapshot을 사용하며
+같은 유한 revision history를 유지한다.
+
+work Range의 끝은 자정 이하이어야 한다. `23:45`부터 `00:15`까지라면 `23:45`와
+`00:00`에 각각 시작하는 별도의 `range(15min)` Daily 선언을 작성한다. 뒤의 선언은
+다음 date를 독립적으로 판정하며 shift의 business date를 추측하지 않는다.
+`calendar_is`의 성공 Bool을 부정하기 전에 fault를 명시적으로 처리한다. missing,
+coverage 밖, expiry는 workday나 offday admission을 허용하지 않는다. 이는 논리적인
+reference host 의미이며 실제 재실, 물리 output, 저장 매체 durability의 증거가 아니다.
 
 ## 일관성, 부재와 저장 한계
 

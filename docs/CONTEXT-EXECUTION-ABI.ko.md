@@ -37,6 +37,32 @@ GFSF4에는 accounting 투영을 담을 수 없다.
 
 ## 실행 설명자
 
+### GFB18 달력 경계
+
+`GhostFlow/control-v18`은 일반 calendar Result와 불변 UTC Daily work/off-day
+range에 GFB18을 사용한다. 새 prelude tag의 본문은 다음과 같다.
+
+| Tag | 본문 |
+| --- | --- |
+| 17 Calendar Range | u32 site, string name, u64 gapMs, string timezone (`UTC`), u64 durationMs, u16 startCount와 u64 startsMs 목록, string calendar, u8 selector, Bool expression blob when/cancel |
+| 18 Calendar Result | u32 site, string name/calendar, u8 selector, string timezone (`UTC`), u16 ok/value/fault protected input index |
+
+Range selector는 workday 0 또는 offday 1이며 Result는 holiday 2도 허용한다.
+source Range 실행 범위는 불변 UTC Daily다. 반열린 interval의 끝은 자정 이하이어야
+한다. 자정을 넘는 work interval은 거부하며 명시적인 별도 선언으로 나누어야 한다.
+일반 UTC Range의 기존 의미는 유지한다. 새 admission 전에 calendar eligibility를
+판정하며 이미 admit한 Range는 monotonic deadline을 유지한다.
+
+두 descriptor는 site를 key로 하는 기존 GFSF5 `schedule` fact에서 optional calendar
+snapshot을 받는다. Result와 Range에는 provider observation이나 civil occurrence row가
+필요 없다. Rust가 trusted clock에서 UTC date를 계산하고 calendar를 판정하며 missing,
+coverage 밖, expiry fault를 보존한다. Result projection은 Bool/Bool/Number이며
+CalendarFault의 유한한 code를 사용한다. 이 입력들은 protected이므로 host는 eligibility
+projection을 공급할 수 없다. activation에는 일치하는 명시적 UTC calendar binding이
+필요하다. binding을 공유하는 Result, Range, Daily pulse 전체에 snapshot 동일성,
+revision history, 유한 보관 상한, rejected scan의 atomicity를 적용한다. 기존 facts와
+checkpoint format은 유지하며 이전 loader는 새 GFB header를 거부한다.
+
 GFB10은 GFB 시간 헤더와 태그가 붙은 전략 서두를 유지한다. 기존 태그 0–4는 기존
 레이아웃을 유지한다. 태그 5–9는 `u32 site, string name, u64 gapMs`로 시작하고
 Bool 표현식 blob `when, cancel`로 끝난다.

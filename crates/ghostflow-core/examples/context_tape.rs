@@ -1,15 +1,16 @@
-//! Bounded HIL transport for explicit Periodic, settings, civil or Solar context frames. All decisions
+//! Bounded HIL transport for explicit Periodic, settings, civil, calendar or Solar context frames. All decisions
 //! and frame commits belong to the shared Rust ScanDriver.
 use ghostflow_core::{
     context_runtime::{Activation, Facts},
     context_vm::{
-        Occurrence, ScheduleEvidence, SettingChange, SettingsEvent, SettingsOrigin,
-        SolarContextEvidence,
+        Occurrence, ProviderBinding, ScheduleEvidence, SettingChange, SettingsEvent,
+        SettingsOrigin, SolarContextEvidence,
     },
     scan::{ScanFrameV1, ScanInput},
     schedule_clock::{ClockSnapshot, ClockTrust},
     settings_stream::ConfigValue,
     solar_admission::{SolarFact, SolarFactAvailability},
+    work_calendar::{DayClass, DayException, WorkCalendarSnapshot},
     Capability, Module, Runtime, Value,
 };
 use serde_json::{json, Value as Json};
@@ -203,6 +204,92 @@ fn solar_evidence(value: &Json) -> Result<SolarContextEvidence> {
     })
 }
 
+fn calendar_binding(value: &Json) -> Result<ProviderBinding> {
+    fields(
+        value,
+        &[
+            "kind",
+            "provider",
+            "namespace",
+            "station",
+            "bindingRevision",
+            "location",
+            "timezone",
+            "criteria",
+            "maxUncertaintyMs",
+        ],
+    )?;
+    if value["kind"] != "calendar" {
+        return Err("calendar tape requires calendar bindings".into());
+    }
+    Ok(ProviderBinding {
+        provider: text(&value["provider"])?.into(),
+        kind: 2,
+        namespace: text(&value["namespace"])?.into(),
+        station: text(&value["station"])?.into(),
+        binding_revision: text(&value["bindingRevision"])?.into(),
+        location: text(&value["location"])?.into(),
+        timezone: text(&value["timezone"])?.into(),
+        criteria: text(&value["criteria"])?.into(),
+        max_uncertainty_ms: integer(&value["maxUncertaintyMs"])?,
+    })
+}
+
+fn day_class(value: &Json) -> Result<DayClass> {
+    match text(value)? {
+        "work" => Ok(DayClass::Work),
+        "off" => Ok(DayClass::Off),
+        _ => Err("invalid calendar day class".into()),
+    }
+}
+
+fn calendar_snapshot(value: &Json) -> Result<Option<WorkCalendarSnapshot>> {
+    if value.is_null() {
+        return Ok(None);
+    }
+    fields(
+        value,
+        &[
+            "calendarId",
+            "revision",
+            "timezone",
+            "coveredFromDate",
+            "coveredToDateExclusive",
+            "expiresAtMs",
+            "weeklyWorkMask",
+            "holidayPolicy",
+            "holidays",
+            "exceptions",
+        ],
+    )?;
+    let holidays = array(&value["holidays"], 4096)?
+        .iter()
+        .map(|day| Ok(i32::try_from(integer(day)?)?))
+        .collect::<Result<Vec<_>>>()?;
+    let exceptions = array(&value["exceptions"], 4096)?
+        .iter()
+        .map(|entry| {
+            fields(entry, &["date", "class"])?;
+            Ok(DayException {
+                date: i32::try_from(integer(&entry["date"])?)?,
+                class: day_class(&entry["class"])?,
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    Ok(Some(WorkCalendarSnapshot {
+        calendar_id: text(&value["calendarId"])?.into(),
+        revision: text(&value["revision"])?.into(),
+        timezone: text(&value["timezone"])?.into(),
+        covered_from_date: i32::try_from(integer(&value["coveredFromDate"])?)?,
+        covered_to_date_exclusive: i32::try_from(integer(&value["coveredToDateExclusive"])?)?,
+        expires_at_ms: integer(&value["expiresAtMs"])?,
+        weekly_work_mask: u8::try_from(integer(&value["weeklyWorkMask"])?)?,
+        holiday_policy: day_class(&value["holidayPolicy"])?,
+        holidays,
+        exceptions,
+    }))
+}
+
 fn main() -> Result<()> {
     let args: Vec<_> = env::args().skip(1).collect();
     if args.len() != 2 {
@@ -220,7 +307,8 @@ fn main() -> Result<()> {
     let tape: Json = serde_json::from_slice(&read(&args[1])?)?;
     let solar_profile = tape["profile"] == "context-solar-v1";
     let civil_profile = tape["profile"] == "context-civil-v1";
-    if civil_profile {
+    let calendar_profile = tape["profile"] == "context-calendar-v1";
+    if civil_profile || calendar_profile {
         fields(&tape, &["profile", "activation", "steps", "checkpoint"])?;
         fields(
             &tape["activation"],
@@ -228,13 +316,25 @@ fn main() -> Result<()> {
         )?;
     }
     let settings_profile = tape["profile"] == "context-settings-v1" || solar_profile;
-    if !settings_profile && !civil_profile && tape["profile"] != "context-periodic-v1" {
+    if !settings_profile
+        && !civil_profile
+        && !calendar_profile
+        && tape["profile"] != "context-periodic-v1"
+    {
         return Err("unsupported context tape profile".into());
     }
     let activation = &tape["activation"];
-    if !array(&activation["bindings"], 0)?.is_empty() {
-        return Err("Periodic providers must be empty".into());
-    }
+    let bindings = if calendar_profile {
+        array(&activation["bindings"], 128)?
+            .iter()
+            .map(calendar_binding)
+            .collect::<Result<Vec<_>>>()?
+    } else {
+        if !array(&activation["bindings"], 0)?.is_empty() {
+            return Err("Periodic providers must be empty".into());
+        }
+        vec![]
+    };
     let mut runtime = Runtime::new(1024);
     runtime.install(module, false);
     for capability in capabilities {
@@ -243,9 +343,9 @@ fn main() -> Result<()> {
     runtime.activate_with_context(&Activation {
         boot_epoch: integer(&activation["bootEpoch"])?,
         terminal_capacity: usize::try_from(integer(&activation["terminalCapacity"])?)?,
-        bindings: vec![],
+        bindings,
     })?;
-    if civil_profile && !tape["checkpoint"].is_null() {
+    if (civil_profile || calendar_profile) && !tape["checkpoint"].is_null() {
         let encoded = tape["checkpoint"]
             .as_str()
             .ok_or("invalid checkpoint hex")?;
@@ -277,7 +377,7 @@ fn main() -> Result<()> {
             if !array(&step["natural"], 0)?.is_empty() {
                 return Err("Solar tape cannot supply natural providers".into());
             }
-        } else if civil_profile {
+        } else if civil_profile || calendar_profile {
             fields(
                 step,
                 &[
@@ -322,8 +422,9 @@ fn main() -> Result<()> {
         let mut schedules = Vec::new();
         for schedule in array(&step["schedules"], 128)? {
             if !schedule["provider"].is_null()
-                || !schedule["calendar"].is_null()
-                || (!civil_profile && !array(&schedule["rows"], 0)?.is_empty())
+                || (!calendar_profile && !schedule["calendar"].is_null())
+                || (!(civil_profile || calendar_profile)
+                    && !array(&schedule["rows"], 0)?.is_empty())
             {
                 return Err(
                     "Periodic tape cannot supply providers, calendars or occurrence rows".into(),
@@ -333,7 +434,7 @@ fn main() -> Result<()> {
                 return Err("settings tape cannot supply schedules".into());
             }
             let mut rows = Vec::new();
-            if civil_profile {
+            if civil_profile || calendar_profile {
                 fields(
                     schedule,
                     &[
@@ -383,12 +484,16 @@ fn main() -> Result<()> {
                 coverage_start_ms: integer(&schedule["coverageStartMs"])?,
                 coverage_end_ms: integer(&schedule["coverageEndMs"])?,
                 provider: None,
-                calendar: None,
+                calendar: if calendar_profile {
+                    calendar_snapshot(&schedule["calendar"])?
+                } else {
+                    None
+                },
                 rows,
             });
         }
         let clock = &step["clock"];
-        if civil_profile {
+        if civil_profile || calendar_profile {
             fields(
                 clock,
                 &[
@@ -466,7 +571,7 @@ fn main() -> Result<()> {
                 if settings_profile {
                     record["settings"] = state.unwrap_or(Json::Null);
                 }
-                if civil_profile {
+                if civil_profile || calendar_profile {
                     record["checkpoint"] = Json::String(
                         driver
                             .runtime()
@@ -478,6 +583,13 @@ fn main() -> Result<()> {
                 }
                 println!("{record}");
             }
+            Err(error) if calendar_profile => println!(
+                "{}",
+                json!({
+                    "accepted": false, "error": error.to_string(), "checkpoint": driver.runtime().context_checkpoint()?.iter()
+                        .map(|byte| format!("{byte:02x}")).collect::<String>(),
+                })
+            ),
             Err(error) if settings_profile => println!(
                 "{}",
                 json!({

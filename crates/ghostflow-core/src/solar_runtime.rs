@@ -182,6 +182,7 @@ impl SolarRuntime {
                 d,
                 PulseDescriptor::Context(_)
                     | PulseDescriptor::Natural(_)
+                    | PulseDescriptor::Calendar(_)
                     | PulseDescriptor::Accounting(_)
             )
         }) {

@@ -57,6 +57,16 @@ driver disconnect handling are host/Driver policy and require separate evidence.
 
 Extended Solar/Tide natural policies select GFB13 and `GhostFlow/control-v12`; Solar facts use GFSF6. Legacy profiles and packet bytes remain unchanged. WASM function names do not change; pinned older runtimes reject GFB13. The signed portable-package config-only GFB11 profile is not broadened. Compiler/runtime regression coverage belongs to `natural-fallback-compiler.test.mjs`, `natural-fallback-runtime.test.mjs` and core `solar_tape` tests; documentation does not establish their execution result or physical Device behavior.
 
+The adopted calendar-boundary slice uses GFB18 and `GhostFlow/control-v18`:
+`calendar_is` lowers a typed Result query, and immutable UTC Daily work/off-day
+Range lowers calendar-filtered admission. Both execute in the shared Rust core
+from identified snapshots through unchanged GFSF5 facts. Matching explicit UTC
+bindings are required. Cross-midnight work ranges reject and must be split into
+separate declarations; ordinary UTC ranges keep their existing behavior. This
+does not implement non-UTC Range, shift ownership or deferred Window/Run bases.
+Native and framed WASM acceptance evidence belongs to
+`tests/reference-calendar-boundary.test.mjs`, not to documentation or a model.
+
 ## Artifacts and versions
 
 | Item | Current representation | Role |

@@ -3,6 +3,16 @@
 
 # GFB 바이트코드
 
+GFB18은 채택된 달력 경계 profile `GhostFlow/control-v18`을 추가한다.
+prelude tag 17은 calendar로 판정하는 불변 UTC Daily Range이며 tag 18은
+protected Bool/Bool/fault-code 입력을 쓰는 typed calendar Result다.
+정확한 layout과 그대로 유지되는 GFSF5 fact는
+[컨텍스트 실행 ABI](CONTEXT-EXECUTION-ABI.ko.md#gfb18-달력-경계)에 설명한다.
+Range는 자정을 넘는 work interval을 거부하며 자정에 끝나고 다음 날짜에 시작하는
+명시적인 별도 range를 허용한다. 일반 Range 및 이전 binary layout의 기존 의미는
+유지한다. 새 tag에는 GFB18 header가 필요하며 이전 loader는 이를 거부한다.
+이 식별자는 Device release나 물리 실행의 인증이 아니다.
+
 ## Bounded 자연 정책 (GFB13)
 
 확장 Solar/Tide 정책만 GFB13과 `GhostFlow/control-v12`를 선택하며 기존 profile bytes는 그대로다. Solar tag 1은 기존 layout을 유지하고 `when` expression 뒤에 `holdMs:u64` (0은 없음), `fallbackAtMs:u64` (86400000은 skip)을 추가한다. Context record는 cancellation expression 뒤에 `holdMs:u64`를 추가한다. Manifest 정책은 clock `{kind: 'hold_trusted', durationMs, terminal: 'skip'}`, fallback `{kind: 'fixed_time', atMs, terminal: 'skip'}` 객체다.

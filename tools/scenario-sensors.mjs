@@ -114,7 +114,7 @@ try {
         }));
         if (plantState !== null) plantState.appliedPercent = virtualActuators[scenario.plant.actuator].applied;
         console.log(JSON.stringify({ scanId: outcome.frame?.scanId ?? scanId, logicalTimeMs: action.atMs, trace: outcome.vm,
-          ...(['GhostFlow/control-v10', 'GhostFlow/control-v15'].includes(manifest.format) ? { settingsState: runtime.contextSnapshot().state } : {}),
+          ...(['GhostFlow/control-v10', 'GhostFlow/control-v15', 'GhostFlow/control-v18'].includes(manifest.format) ? { settingsState: runtime.contextSnapshot().state } : {}),
           ...(scenario.actuatorBindings === undefined ? {} : { virtualActuators }), ...(plant === undefined ? {} : { plant }) }));
         scanId += 1;
         samples = {};

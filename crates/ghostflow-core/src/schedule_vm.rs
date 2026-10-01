@@ -65,6 +65,7 @@ pub enum PulseDescriptor {
     DailySlots(DailySlotsPulseDescriptor),
     Context(crate::context_vm::ScheduleDescriptor),
     Natural(crate::context_vm::NaturalDescriptor),
+    Calendar(crate::context_vm::CalendarDescriptor),
     Accounting(crate::context_vm::AccountingDescriptor),
     Config(crate::settings_stream::ConfigDescriptor),
 }
@@ -76,6 +77,7 @@ impl PulseDescriptor {
             Self::DailySlots(d) => d.site,
             Self::Context(d) => d.site,
             Self::Natural(d) => d.site,
+            Self::Calendar(d) => d.site,
             Self::Accounting(d) => d.site,
             Self::Config(d) => d.id,
         }
@@ -87,6 +89,7 @@ impl PulseDescriptor {
             Self::DailySlots(d) => d.gap_ms,
             Self::Context(d) => d.gap_ms,
             Self::Natural(_) => 1,
+            Self::Calendar(_) => 1,
             Self::Accounting(_) => 1,
             Self::Config(_) => 1,
         }
@@ -98,6 +101,7 @@ impl PulseDescriptor {
             Self::DailySlots(d) => &d.when,
             Self::Context(d) => &d.when,
             Self::Natural(_) => &[],
+            Self::Calendar(_) => &[],
             Self::Accounting(_) => &[],
             Self::Config(_) => &[],
         }
@@ -377,9 +381,10 @@ pub(crate) fn load_prelude(
                 (site, name)
             }
             kind if (matches!(kind, 5..=9)
-                && matches!(format, 10 | 11 | 12 | 13 | 14 | 15 | 16))
-                || (kind == 13 && matches!(format, 12 | 13 | 14 | 15 | 16))
-                || (kind == 15 && matches!(format, 15 | 16))
+                && matches!(format, 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18))
+                || (kind == 13 && matches!(format, 12 | 13 | 14 | 15 | 16 | 18))
+                || (kind == 15 && matches!(format, 15 | 16 | 18))
+                || (kind == 17 && format == 18)
                 || (kind == 16 && format == 16)
                 || (kind == 14 && format == 14) =>
             {
@@ -406,6 +411,15 @@ pub(crate) fn load_prelude(
                     .order
                     .push(PreludeEntry::Schedule(result.schedules.len() as u16));
                 result.schedules.push(PulseDescriptor::Context(descriptor));
+                identity
+            }
+            18 if format == 18 => {
+                let descriptor = crate::context_vm::load_calendar(reader, inputs)?;
+                let identity = (descriptor.site, descriptor.name.clone());
+                result
+                    .order
+                    .push(PreludeEntry::Schedule(result.schedules.len() as u16));
+                result.schedules.push(PulseDescriptor::Calendar(descriptor));
                 identity
             }
             10 if matches!(format, 10 | 11 | 12 | 13 | 14 | 15 | 16) => {
@@ -468,7 +482,7 @@ pub(crate) fn projection_type(
         return Err(Error::new("schedule projection index"));
     }
     if field
-        > if matches!(format, 10 | 11 | 12 | 13 | 14 | 15 | 16) {
+        > if matches!(format, 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18) {
             2
         } else {
             1
