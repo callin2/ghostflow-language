@@ -43,6 +43,13 @@ pub enum ScheduleDefinition {
         dst_missing: u8,
         dst_repeated: u8,
     },
+    HolidayDaily {
+        timezone: String,
+        at_ms: u64,
+        calendar: String,
+        dst_missing: u8,
+        dst_repeated: u8,
+    },
     TideRun {
         timezone: String,
         provider: String,
@@ -484,7 +491,23 @@ pub(crate) fn load_schedule(
                 dst_repeated,
             }
         }
-        13 if matches!(format, 12 | 13) => {
+        15 if format == 15 => {
+            let timezone = text(reader)?;
+            let at_ms = exact(reader)?;
+            let calendar = text(reader)?;
+            let (dst_missing, dst_repeated) = dst(reader)?;
+            if at_ms >= 86_400_000 {
+                return Err(Error::new("invalid holiday Daily time"));
+            }
+            ScheduleDefinition::HolidayDaily {
+                timezone,
+                at_ms,
+                calendar,
+                dst_missing,
+                dst_repeated,
+            }
+        }
+        13 if matches!(format, 12 | 13 | 15) => {
             if text(reader)? != "UTC" {
                 return Err(Error::new("Range requires UTC timezone"));
             }
@@ -516,7 +539,7 @@ pub(crate) fn load_schedule(
     };
     let when = reader.blob()?;
     let cancel = reader.blob()?;
-    let clock_hold_ms = if format == 13 {
+    let clock_hold_ms = if matches!(format, 13 | 15) {
         let hold = exact(reader)?;
         if hold != 0 && !matches!(definition, ScheduleDefinition::TideRun { .. }) {
             return Err(Error::new("clock hold requires natural schedule"));

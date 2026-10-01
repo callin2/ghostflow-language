@@ -3,6 +3,360 @@ use context_vm::*;
 use schedule_clock::{ClockSnapshot, ClockTrust};
 use schedule_vm::{PulseDescriptor, ScheduleRequirements, ScheduleStrategy};
 
+fn calendar_program() -> Module {
+    let descriptor = |site| {
+        PulseDescriptor::Context(ScheduleDescriptor {
+            clock_hold_ms: None,
+            site,
+            name: format!("calendar-{site}"),
+            gap_ms: 60,
+            definition: ScheduleDefinition::CalendarDaily {
+                timezone: "Asia/Seoul".into(),
+                at_ms: 0,
+                calendar: "workers".into(),
+                offday: false,
+                dst_missing: 0,
+                dst_repeated: 0,
+            },
+            when: vec![1, 1],
+            cancel: vec![1, 0],
+        })
+    };
+    let mut program = module(descriptor(7), false);
+    let schedules = &mut program.schedules.as_mut().unwrap().strategies[0];
+    schedules.schedules.push(descriptor(8));
+    schedules
+        .prelude
+        .push(schedule_vm::PreludeEntry::Schedule(1));
+    program
+}
+fn calendar_activation(epoch: u64, capacity: usize) -> context_runtime::Activation {
+    context_runtime::Activation {
+        boot_epoch: epoch,
+        terminal_capacity: capacity,
+        bindings: vec![ProviderBinding {
+            provider: "workers".into(),
+            kind: 2,
+            namespace: "calendar".into(),
+            station: "farm".into(),
+            binding_revision: "installation-1".into(),
+            location: "farm".into(),
+            timezone: "Asia/Seoul".into(),
+            criteria: "reviewed".into(),
+            max_uncertainty_ms: 0,
+        }],
+    }
+}
+fn calendar_snapshot(revision: &str) -> work_calendar::WorkCalendarSnapshot {
+    work_calendar::WorkCalendarSnapshot {
+        calendar_id: "workers".into(),
+        revision: revision.into(),
+        timezone: "Asia/Seoul".into(),
+        covered_from_date: 0,
+        covered_to_date_exclusive: 20_000,
+        expires_at_ms: 100_000,
+        weekly_work_mask: 0b0111110,
+        holiday_policy: work_calendar::DayClass::Off,
+        holidays: vec![1],
+        exceptions: vec![],
+    }
+}
+fn calendar_facts(snapshot: Option<work_calendar::WorkCalendarSnapshot>) -> context_runtime::Facts {
+    context_runtime::Facts {
+        schedules: [7, 8]
+            .into_iter()
+            .map(|site| ScheduleEvidence {
+                site,
+                coverage_start_ms: 0,
+                coverage_end_ms: 100_000,
+                provider: None,
+                calendar: snapshot.clone(),
+                rows: vec![],
+            })
+            .collect(),
+        ..Default::default()
+    }
+}
+fn calendar_runtime(epoch: u64, capacity: usize) -> Runtime {
+    let mut runtime = Runtime::new(8);
+    runtime.install(calendar_program(), false);
+    runtime
+        .activate_with_context(&calendar_activation(epoch, capacity))
+        .unwrap();
+    runtime
+}
+
+#[test]
+fn calendar_same_scan_rejects_presence_revision_and_content_disagreement_atomically() {
+    let mut runtime = calendar_runtime(1, 8);
+    let pristine = runtime.context_checkpoint().unwrap();
+    for other in [
+        None,
+        Some(calendar_snapshot("r2")),
+        Some({
+            let mut changed = calendar_snapshot("r1");
+            changed.holidays = vec![2];
+            changed
+        }),
+    ] {
+        let mut facts = calendar_facts(Some(calendar_snapshot("r1")));
+        facts.schedules[1].calendar = other;
+        inputs(&mut runtime, 1, 10, Some(1));
+        assert!(runtime
+            .tick_with_context(clock(1, 10, 10), &facts)
+            .unwrap_err()
+            .to_string()
+            .contains("inconsistent shared calendar snapshot"));
+        assert_eq!(runtime.context_checkpoint().unwrap(), pristine);
+        assert_eq!(runtime.state("counter"), Some(Value::Int(10)));
+        assert!(runtime.safe_intents.is_empty());
+        assert!(runtime.journal.is_empty());
+    }
+    // A rejected future clock was not committed: an earlier valid scan succeeds.
+    inputs(&mut runtime, 1, 0, Some(2));
+    runtime
+        .tick_with_context(clock(1, 0, 0), &calendar_facts(None))
+        .unwrap();
+    assert_eq!(runtime.state("counter"), Some(Value::Int(5)));
+}
+
+#[test]
+fn holiday_and_workday_sites_share_one_calendar_envelope() {
+    let mut program = calendar_program();
+    let PulseDescriptor::Context(descriptor) =
+        &mut program.schedules.as_mut().unwrap().strategies[0].schedules[1]
+    else {
+        unreachable!()
+    };
+    descriptor.definition = ScheduleDefinition::HolidayDaily {
+        timezone: "Asia/Seoul".into(),
+        at_ms: 0,
+        calendar: "workers".into(),
+        dst_missing: 0,
+        dst_repeated: 0,
+    };
+    program.format_version = 15;
+    let mut runtime = Runtime::new(8);
+    runtime.install(program, false);
+    runtime
+        .activate_with_context(&calendar_activation(1, 8))
+        .unwrap();
+    let before = runtime.context_checkpoint().unwrap();
+    let mut facts = calendar_facts(Some(calendar_snapshot("r1")));
+    facts.schedules[1].calendar = None;
+    inputs(&mut runtime, 1, 0, Some(1));
+    assert!(runtime
+        .tick_with_context(clock(1, 0, 0), &facts)
+        .unwrap_err()
+        .to_string()
+        .contains("inconsistent shared calendar snapshot"));
+    assert_eq!(runtime.context_checkpoint().unwrap(), before);
+    inputs(&mut runtime, 1, 0, Some(1));
+    runtime
+        .tick_with_context(
+            clock(1, 0, 0),
+            &calendar_facts(Some(calendar_snapshot("r1"))),
+        )
+        .unwrap();
+}
+
+#[test]
+fn calendar_revisions_are_immutable_across_ticks_and_checkpoint_restore() {
+    let mut runtime = calendar_runtime(1, 8);
+    for (mono, revision) in [(0, "r1"), (1, "r2")] {
+        inputs(&mut runtime, 1, mono, Some(1));
+        runtime
+            .tick_with_context(
+                clock(1, mono, mono),
+                &calendar_facts(Some(calendar_snapshot(revision))),
+            )
+            .unwrap();
+    }
+    let checkpoint = runtime.context_checkpoint().unwrap();
+    assert_eq!(&checkpoint[..6], b"GFCX\x03\x00");
+    let mut reboot = calendar_runtime(2, 8);
+    reboot.restore_context_checkpoint(&checkpoint).unwrap();
+    assert_eq!(reboot.context_checkpoint().unwrap(), checkpoint);
+    for (runtime, epoch) in [(&mut runtime, 1), (&mut reboot, 2)] {
+        let mut changed = calendar_snapshot("r1");
+        changed.weekly_work_mask = 0;
+        inputs(runtime, epoch, 5, Some(1));
+        assert!(runtime
+            .tick_with_context(clock(epoch, 5, 5), &calendar_facts(Some(changed)))
+            .unwrap_err()
+            .to_string()
+            .contains("calendar revision contents changed"));
+        assert_eq!(runtime.context_checkpoint().unwrap(), checkpoint);
+        inputs(runtime, epoch, 5, Some(1));
+        runtime
+            .tick_with_context(
+                clock(epoch, 5, 5),
+                &calendar_facts(Some(calendar_snapshot("r1"))),
+            )
+            .unwrap();
+    }
+}
+
+#[test]
+fn calendar_rejected_tick_does_not_poison_revision_and_capacity_fails_closed() {
+    let mut runtime = calendar_runtime(1, 1);
+    let before = runtime.context_checkpoint().unwrap();
+    inputs(&mut runtime, 1, 0, Some(0));
+    assert!(runtime
+        .tick_with_context(
+            clock(1, 0, 0),
+            &calendar_facts(Some(calendar_snapshot("r1")))
+        )
+        .is_err());
+    assert_eq!(runtime.context_checkpoint().unwrap(), before);
+    let mut changed = calendar_snapshot("r1");
+    changed.holidays = vec![2];
+    inputs(&mut runtime, 1, 0, Some(1));
+    runtime
+        .tick_with_context(clock(1, 0, 0), &calendar_facts(Some(changed)))
+        .unwrap();
+    let committed = runtime.context_checkpoint().unwrap();
+    inputs(&mut runtime, 1, 1, Some(1));
+    assert!(runtime
+        .tick_with_context(
+            clock(1, 1, 1),
+            &calendar_facts(Some(calendar_snapshot("r2")))
+        )
+        .unwrap_err()
+        .to_string()
+        .contains("calendar revision capacity exceeded"));
+    assert_eq!(runtime.context_checkpoint().unwrap(), committed);
+}
+
+#[test]
+fn calendar_history_entry_and_aggregate_cell_limits_are_bounded() {
+    let mut runtime = calendar_runtime(1, 256);
+    for mono in 0..128 {
+        inputs(&mut runtime, 1, mono, Some(1));
+        runtime
+            .tick_with_context(
+                clock(1, mono, mono),
+                &calendar_facts(Some(calendar_snapshot(&format!("r{mono:03}")))),
+            )
+            .unwrap();
+    }
+    let before = runtime.context_checkpoint().unwrap();
+    inputs(&mut runtime, 1, 128, Some(1));
+    assert!(runtime
+        .tick_with_context(
+            clock(1, 128, 128),
+            &calendar_facts(Some(calendar_snapshot("overflow")))
+        )
+        .unwrap_err()
+        .to_string()
+        .contains("calendar revision capacity exceeded"));
+    assert_eq!(runtime.context_checkpoint().unwrap(), before);
+
+    let mut runtime = calendar_runtime(1, 8);
+    let mut full = calendar_snapshot("full");
+    full.holidays = (0..4096).collect();
+    full.exceptions = (0..4096)
+        .map(|date| work_calendar::DayException {
+            date,
+            class: work_calendar::DayClass::Work,
+        })
+        .collect();
+    inputs(&mut runtime, 1, 0, Some(1));
+    runtime
+        .tick_with_context(clock(1, 0, 0), &calendar_facts(Some(full.clone())))
+        .unwrap();
+    let checkpoint = runtime.context_checkpoint().unwrap();
+    let mut reboot = calendar_runtime(2, 8);
+    reboot.restore_context_checkpoint(&checkpoint).unwrap();
+    inputs(&mut reboot, 2, 0, Some(1));
+    // Reusing a retained snapshot costs no additional cells.
+    reboot
+        .tick_with_context(clock(2, 0, 0), &calendar_facts(Some(full)))
+        .unwrap();
+    inputs(&mut reboot, 2, 1, Some(1));
+    assert!(reboot
+        .tick_with_context(
+            clock(2, 1, 1),
+            &calendar_facts(Some(calendar_snapshot("extra")))
+        )
+        .unwrap_err()
+        .to_string()
+        .contains("calendar revision capacity exceeded"));
+    assert_eq!(reboot.context_checkpoint().unwrap(), checkpoint);
+}
+
+fn checkpoint_checksum(bytes: &mut [u8]) {
+    let length = bytes.len() - 4;
+    let mut crc = !0u32;
+    for byte in &bytes[..length] {
+        crc ^= u32::from(*byte);
+        for _ in 0..8 {
+            crc = (crc >> 1) ^ (0xedb8_8320u32 & 0u32.wrapping_sub(crc & 1));
+        }
+    }
+    bytes[length..].copy_from_slice(&(!crc).to_le_bytes());
+}
+
+#[test]
+fn calendar_checkpoint_rejects_old_version_invalid_bounds_and_duplicate_history() {
+    let mut runtime = calendar_runtime(1, 8);
+    inputs(&mut runtime, 1, 0, Some(1));
+    runtime
+        .tick_with_context(
+            clock(1, 0, 0),
+            &calendar_facts(Some(calendar_snapshot("r1"))),
+        )
+        .unwrap();
+    let checkpoint = runtime.context_checkpoint().unwrap();
+    let binding_length = u32::from_le_bytes(checkpoint[14..18].try_into().unwrap()) as usize;
+    let count_offset = 18 + binding_length;
+    let record_start = count_offset + 2;
+    let mut fields = record_start;
+    for _ in 0..3 {
+        fields += 2 + usize::from(u16::from_le_bytes(
+            checkpoint[fields..fields + 2].try_into().unwrap(),
+        ));
+    }
+    // Three strings, date bounds, expiry, weekly mask, holiday class, holiday count/data, exceptions count.
+    let record_end = fields + 8 + 8 + 2 + 2 + 4 + 2;
+    let mut old = checkpoint.clone();
+    old[4] = 2;
+    let mut capacity = checkpoint.clone();
+    capacity[count_offset..count_offset + 2].copy_from_slice(&129u16.to_le_bytes());
+    let mut bad_class = checkpoint.clone();
+    bad_class[fields + 17] = 2;
+    let mut bad_date = checkpoint.clone();
+    bad_date[fields..fields + 4].copy_from_slice(&(-1i32).to_le_bytes());
+    let mut bad_holidays = checkpoint.clone();
+    bad_holidays[fields + 18..fields + 20].copy_from_slice(&4097u16.to_le_bytes());
+    let mut unbound = checkpoint.clone();
+    unbound[record_start + 2] = b'X';
+    let mut bad_text = checkpoint.clone();
+    bad_text[record_start..record_start + 2].copy_from_slice(&129u16.to_le_bytes());
+    let mut duplicate = checkpoint.clone();
+    duplicate.splice(
+        record_end..record_end,
+        checkpoint[record_start..record_end].iter().copied(),
+    );
+    duplicate[count_offset..count_offset + 2].copy_from_slice(&2u16.to_le_bytes());
+    for mut invalid in [
+        old,
+        capacity,
+        bad_class,
+        bad_date,
+        bad_holidays,
+        unbound,
+        bad_text,
+        duplicate,
+    ] {
+        checkpoint_checksum(&mut invalid);
+        let mut reboot = calendar_runtime(2, 8);
+        let pristine = reboot.context_checkpoint().unwrap();
+        assert!(reboot.restore_context_checkpoint(&invalid).is_err());
+        assert_eq!(reboot.context_checkpoint().unwrap(), pristine);
+    }
+}
+
 fn field(name: &str, value: Value) -> Field {
     Field {
         name: name.into(),

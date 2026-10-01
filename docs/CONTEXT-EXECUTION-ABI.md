@@ -124,9 +124,12 @@ Native entry points also validate payload bounds and descriptor compatibility.
 `gf_restore_context_checkpoint(handle, ptr, len)` is permitted only before the
 first scan of an activated run. The host owns durable storage and acknowledgement.
 
-GFCX1 contains magic/version, the exact Program fingerprint, canonical binding
+GFCX3 contains magic/version, the exact Program fingerprint, canonical binding
 bytes, settings revision, accepted event identities, site-keyed engine snapshots,
-and CRC32. The wrapper is bounded by 4 MiB, each engine snapshot by 1 MiB.
+and CRC32. It also persists full accepted calendar contents keyed by ID/revision,
+bounded to `min(terminalCapacity, 128)` snapshots and 8192 holiday/exception date
+cells; restore rejects changed revision contents or bound violations. GFCX1 and
+GFCX2 are rejected explicitly. The wrapper is bounded by 4 MiB, each engine snapshot by 1 MiB.
 Identity mismatch, corruption, invalid restored settings or capacity overflow
 reject the whole restore. CRC32 detects accidental corruption; it is not an
 authentication mechanism.

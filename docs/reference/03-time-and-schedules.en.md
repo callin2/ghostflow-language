@@ -518,7 +518,22 @@ calendar = workers;
 
 A weekday tag needs no calendar. `holiday` requires HolidayCalendar; `workday` and `offday` require WorkCalendar. An incompatible kind or missing binding is an activation error. Calendar snapshot timezone must equal schedule timezone.
 
-A work-calendar snapshot has calendar ID, revision, timezone and coverage range. Decision precedence is explicit exceptions for that date, declared holiday policy, then weekly pattern. Conflicting exceptions for one date are invalid. A workday is a planned working day, not confirmation of actual human presence. Without a snapshot or outside coverage, both workday and offday are Unknown. `!workday` must not turn Unknown into offday permission.
+`holiday` is membership in the public holiday date list. A `work` exception for
+the same date preserves the holiday fact; weekly pattern and holiday work policy
+do not affect it. Daily pulses for `holiday`, `workday` and `offday` use typed
+calendars and explicit common/DST policies. Weekday tags and ordinary
+`calendar_is` expressions are outside this execution scope.
+
+Explicit composition of calendar base and overrides creates a new ID/revision.
+The original is immutable; timezone mismatch and duplicate dates in one overlay
+layer are rejected. Schedules sharing a binding use equal snapshots or all
+absent data in one tick. A calendar ID/revision must not be reused with changed
+contents. Accepted contents remain recorded after new revisions and checkpoints;
+exceeding storage bounds fails closed. GFCXv3 preserves this history and rejects
+v1/v2 checkpoints. See the [calendar provider guide](../CALENDAR-PROVIDERS.md)
+for fact assembly and installation.
+
+A work-calendar snapshot has calendar ID, revision, timezone and coverage range. Decision precedence is explicit exceptions for that date, declared holiday policy, then weekly pattern. Conflicting exceptions for one date are invalid. A workday is a planned working day, not confirmation of actual human presence. Without a snapshot, outside coverage or at expiry, both workday and offday are Unknown; the same rules apply to holiday decisions. `!workday` must not turn Unknown into offday permission. `fallback = skip` creates no new admission.
 
 This day tag does not decide which business date owns an overnight shift. Until there is a separate shift contract, reject work intervals crossing midnight and divide them into explicit intervals.
 

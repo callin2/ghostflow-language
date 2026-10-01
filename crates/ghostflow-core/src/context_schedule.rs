@@ -499,7 +499,13 @@ impl Engine {
             ScheduleDefinition::CalendarDaily {
                 calendar,
                 timezone,
-                offday,
+                at_ms,
+                dst_repeated,
+                ..
+            }
+            | ScheduleDefinition::HolidayDaily {
+                calendar,
+                timezone,
                 at_ms,
                 dst_repeated,
                 ..
@@ -515,10 +521,12 @@ impl Engine {
                         calendar_id: calendar,
                         timezone,
                         date: row.source_day,
-                        selector: if *offday {
-                            DaySelector::Offday
-                        } else {
-                            DaySelector::Workday
+                        selector: match desc.definition {
+                            ScheduleDefinition::HolidayDaily { .. } => DaySelector::Holiday,
+                            ScheduleDefinition::CalendarDaily { offday: true, .. } => {
+                                DaySelector::Offday
+                            }
+                            _ => DaySelector::Workday,
                         },
                         now_ms: observed.current_effective_wall_ms.unwrap_or(0),
                     };

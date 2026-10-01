@@ -104,15 +104,135 @@ fn read_value(reader: &mut Reader<'_>) -> Result<ConfigValue> {
     Ok(ConfigValue::Slots(slots))
 }
 
+fn write_calendar(
+    out: &mut Vec<u8>,
+    snapshot: &crate::work_calendar::WorkCalendarSnapshot,
+) -> Result<()> {
+    for value in [
+        &snapshot.calendar_id,
+        &snapshot.revision,
+        &snapshot.timezone,
+    ] {
+        text(out, value)?;
+    }
+    append(out, &snapshot.covered_from_date.to_le_bytes())?;
+    append(out, &snapshot.covered_to_date_exclusive.to_le_bytes())?;
+    append(out, &snapshot.expires_at_ms.to_le_bytes())?;
+    append(
+        out,
+        &[
+            snapshot.weekly_work_mask,
+            u8::from(snapshot.holiday_policy == crate::work_calendar::DayClass::Off),
+        ],
+    )?;
+    append(out, &(snapshot.holidays.len() as u16).to_le_bytes())?;
+    for date in &snapshot.holidays {
+        append(out, &date.to_le_bytes())?;
+    }
+    append(out, &(snapshot.exceptions.len() as u16).to_le_bytes())?;
+    for entry in &snapshot.exceptions {
+        append(out, &entry.date.to_le_bytes())?;
+        append(
+            out,
+            &[u8::from(entry.class == crate::work_calendar::DayClass::Off)],
+        )?;
+    }
+    Ok(())
+}
+
+fn read_class(reader: &mut Reader<'_>) -> Result<crate::work_calendar::DayClass> {
+    match reader.u8()? {
+        0 => Ok(crate::work_calendar::DayClass::Work),
+        1 => Ok(crate::work_calendar::DayClass::Off),
+        _ => Err(invalid("invalid checkpoint calendar class")),
+    }
+}
+fn calendar_text(reader: &mut Reader<'_>) -> Result<String> {
+    let count = usize::from(reader.u16()?);
+    if !(1..=128).contains(&count) {
+        return Err(invalid("invalid checkpoint calendar text bound"));
+    }
+    std::str::from_utf8(reader.take(count)?)
+        .map(str::to_owned)
+        .map_err(|_| invalid("invalid checkpoint calendar text"))
+}
+
+fn read_calendar(
+    reader: &mut Reader<'_>,
+    remaining_cells: usize,
+) -> Result<crate::work_calendar::WorkCalendarSnapshot> {
+    let mut snapshot = crate::work_calendar::WorkCalendarSnapshot {
+        calendar_id: calendar_text(reader)?,
+        revision: calendar_text(reader)?,
+        timezone: calendar_text(reader)?,
+        covered_from_date: reader.i32()?,
+        covered_to_date_exclusive: reader.i32()?,
+        expires_at_ms: reader.u64()?,
+        weekly_work_mask: reader.u8()?,
+        holiday_policy: read_class(reader)?,
+        holidays: Vec::new(),
+        exceptions: Vec::new(),
+    };
+    let count = usize::from(reader.u16()?);
+    if count > 4096 || count > remaining_cells {
+        return Err(invalid("checkpoint calendar holiday capacity"));
+    }
+    for _ in 0..count {
+        snapshot.holidays.push(reader.i32()?);
+    }
+    let count = usize::from(reader.u16()?);
+    if count > 4096 || count > remaining_cells - snapshot.holidays.len() {
+        return Err(invalid("checkpoint calendar exception capacity"));
+    }
+    for _ in 0..count {
+        snapshot
+            .exceptions
+            .push(crate::work_calendar::DayException {
+                date: reader.i32()?,
+                class: read_class(reader)?,
+            });
+    }
+    if [
+        &snapshot.calendar_id,
+        &snapshot.revision,
+        &snapshot.timezone,
+    ]
+    .iter()
+    .any(|s| !bounded(s))
+        || snapshot.expires_at_ms > MAX_EXACT
+    {
+        return Err(invalid("invalid checkpoint calendar bounds"));
+    }
+    crate::work_calendar::evaluate(
+        crate::work_calendar::DayQuery {
+            calendar_id: &snapshot.calendar_id,
+            timezone: &snapshot.timezone,
+            date: snapshot.covered_from_date,
+            selector: crate::work_calendar::DaySelector::Workday,
+            now_ms: 0,
+        },
+        Some(&snapshot),
+    )
+    .map_err(|_| invalid("invalid checkpoint calendar snapshot"))?;
+    Ok(snapshot)
+}
+
 impl ContextRuntime {
     pub(crate) fn snapshot(
         &self,
         descriptors: &[PulseDescriptor],
         fingerprint: u64,
     ) -> Result<Vec<u8>> {
-        let mut out = b"GFCX\x02\x00".to_vec();
+        let mut out = b"GFCX\x03\x00".to_vec();
         append(&mut out, &fingerprint.to_le_bytes())?;
         blob(&mut out, &bindings(&self.bindings)?)?;
+        append(
+            &mut out,
+            &(self.calendar_revisions.len() as u16).to_le_bytes(),
+        )?;
+        for snapshot in self.calendar_revisions.values() {
+            write_calendar(&mut out, snapshot)?;
+        }
         append(&mut out, &self.settings_revision.to_le_bytes())?;
         append(&mut out, &(self.event_ids.len() as u16).to_le_bytes())?;
         for event in &self.event_ids {
@@ -163,13 +283,37 @@ impl ContextRuntime {
             return Err(invalid("corrupt context checkpoint"));
         }
         let mut reader = Reader::new(payload);
-        if reader.take(4)? != b"GFCX" || reader.u16()? != 2 || reader.u64()? != fingerprint {
+        if reader.take(4)? != b"GFCX" || reader.u16()? != 3 || reader.u64()? != fingerprint {
             return Err(invalid("context checkpoint Program identity mismatch"));
         }
         if read_blob(&mut reader)? != bindings(&self.bindings)? {
             return Err(invalid("context checkpoint provider identity mismatch"));
         }
         let mut restored = self.clone();
+        let count = usize::from(reader.u16()?);
+        if count > self.capacity.min(MAX_CALENDAR_REVISIONS) {
+            return Err(invalid("checkpoint calendar revision capacity"));
+        }
+        restored.calendar_revisions.clear();
+        let mut previous = None;
+        let mut remaining_cells = MAX_CALENDAR_CELLS;
+        for _ in 0..count {
+            let snapshot = read_calendar(&mut reader, remaining_cells)?;
+            remaining_cells -= snapshot.holidays.len() + snapshot.exceptions.len();
+            if !self.bindings.iter().any(|b| {
+                b.kind == 2 && b.provider == snapshot.calendar_id && b.timezone == snapshot.timezone
+            }) {
+                return Err(invalid("checkpoint calendar binding mismatch"));
+            }
+            let key = (snapshot.calendar_id.clone(), snapshot.revision.clone());
+            if previous.as_ref().is_some_and(|prior| prior >= &key) {
+                return Err(invalid(
+                    "duplicate or unordered checkpoint calendar revision",
+                ));
+            }
+            previous = Some(key);
+            restored.remember_calendar(&snapshot)?;
+        }
         restored.settings_revision = reader.u64()?;
         let count = usize::from(reader.u16()?);
         if count > self.capacity || restored.settings_revision > 9_007_199_254_740_991 {

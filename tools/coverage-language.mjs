@@ -46,6 +46,8 @@ const TESTS = Object.freeze([
   'tests/output-conformance.test.mjs',
   'tests/after-event-contract.test.mjs', 'tests/natural-condition-contract.test.mjs',
   'tests/after-event-control.test.mjs', 'tests/context-wasm-boundaries.test.mjs',
+  'tests/calendar-provider.test.mjs', 'tests/calendar-execution.test.mjs',
+  'tests/calendar-runtime.test.mjs',
   'tests/config-native-wasm-parity.test.mjs',
   'tests/macro-composition-contract.test.mjs', 'tests/objective-adapt-structural.test.mjs',
   'tests/import-header.test.mjs', 'tests/import-cli-digest.test.mjs',

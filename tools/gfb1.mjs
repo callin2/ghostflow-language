@@ -235,7 +235,7 @@ function lowerCoreModule(ast) {
   for(const c of constraints){if(c.names.length>32||new Set(c.names).size!==c.names.length)throw new CompileError('invalid constraint names or arity');for(const n of c.names)assertName(n,'constraint');}
   const env={inputs:new Map(inputs.map((x,i)=>[x.name,{...x,index:i}])),states:new Map(states.map((x,i)=>[x.name,{...x,index:i}]))};
   const rawWindowCount=strategies.reduce((total,{raw})=>total+raw.slice(3).filter(form=>Array.isArray(form)&&form[0]==='window').length,0);
-  const contextHeads=['at-pulse','periodic-pulse','cron-pulse','calendar-daily-pulse','tide-run','config-daily-slots-pulse','utc-range'];
+  const contextHeads=['at-pulse','periodic-pulse','cron-pulse','calendar-daily-pulse','holiday-daily-pulse','tide-run','config-daily-slots-pulse','utc-range'];
   const rawScheduleCount=strategies.reduce((total,{raw})=>total+raw.slice(3).filter(form=>Array.isArray(form)&&['solar-pulse','daily-pulse','daily-slots-pulse','config-stream',...contextHeads].includes(form[0])).length,0);
   const hasContext=strategies.some(({raw})=>raw.slice(3).some(form=>Array.isArray(form)&&['config-stream',...contextHeads,'natural-result','accounting-result'].includes(form[0])));
   const rawNaturalCount=strategies.reduce((total,{raw})=>total+raw.slice(3).filter(form=>Array.isArray(form)&&['natural-result','accounting-result'].includes(form[0])).length,0);
@@ -475,7 +475,7 @@ function lowerCoreModule(ast) {
         if(preludeNames.has(scheduleName))throw new CompileError('duplicate prelude name');preludeNames.add(scheduleName);
         const gapMs=unsignedAtom(gapAtom,9007199254740991n,'invalid schedule gap');
         if(!gapMs)throw new CompileError('invalid schedule gap');
-        const expected={ 'at-pulse':3,'cron-pulse':10,'calendar-daily-pulse':8,'tide-run':8,'config-daily-slots-pulse':6,'utc-range':5 }[h];
+        const expected={ 'at-pulse':3,'cron-pulse':10,'calendar-daily-pulse':8,'holiday-daily-pulse':7,'tide-run':8,'config-daily-slots-pulse':6,'utc-range':5 }[h];
         if(h==='periodic-pulse'?![5,6].includes(payload.length):payload.length!==expected)throw new CompileError(`${h} has invalid arity`);
         const [whenForm,cancelForm]=payload.slice(-2);
         const when=checkedExpression(whenForm,contextEnv(),false),cancel=checkedExpression(cancelForm,contextEnv(),false);
@@ -516,6 +516,9 @@ function lowerCoreModule(ast) {
           const [timezone,at,calendar,offday,missing,fold]=data;
           if(!['workday','offday'].includes(offday))throw new CompileError('invalid WorkCalendar selector');
           detail={timezone:text(timezone),at:unsignedAtom(at,86399999n,'invalid Daily at'),calendar:text(calendar),offday:offday==='offday'?1:0,missing:dst(missing),repeated:repeated(fold)};
+        }else if(h==='holiday-daily-pulse'){
+          const [timezone,at,calendar,missing,fold]=data;
+          detail={timezone:text(timezone),at:unsignedAtom(at,86399999n,'invalid Daily at'),calendar:text(calendar),missing:dst(missing),repeated:repeated(fold)};
         }else if(h==='tide-run'){
           const [timezone,provider,event,offset,run,within]=data;
           if(!['high','low'].includes(event))throw new CompileError('invalid Tide event');
@@ -635,7 +638,7 @@ function lowerCoreModule(ast) {
 function emitGfb(moduleIr) {
   const {name,version,inputs,states,strategies,constraints,temporal,objectives:compiledObjectives}=moduleIr;
   const preludeKinds=new Set(strategies.flatMap(strategy=>strategy.extensions.preludes.map(prelude=>prelude.kind)));
-  const hasContext=['config-stream','periodic-pulse','cron-pulse','calendar-daily-pulse','tide-run',
+  const hasContext=['config-stream','periodic-pulse','cron-pulse','calendar-daily-pulse','holiday-daily-pulse','tide-run',
     'config-daily-slots-pulse','natural-result','accounting-result','utc-range','at-pulse'].some(kind=>preludeKinds.has(kind));
   const hasDailySlots=preludeKinds.has('daily-slots'),hasDaily=preludeKinds.has('daily');
   const hasTrueFors=preludeKinds.has('true-for');
@@ -662,7 +665,9 @@ function emitGfb(moduleIr) {
   const extendedNatural=strategies.some(strategy=>strategy.extensions.preludes.some(prelude=>
     prelude.kind==='schedule'&&(prelude.value.holdMs>0n||prelude.value.fallbackAtMs<86400000n)
     ||prelude.kind==='tide-run'&&prelude.value.holdMs>0n));
-  const format=preludeKinds.has('at-pulse')?14:extendedNatural?13:preludeKinds.has('utc-range')?12:hasContext?11:hasDailySlots?9:hasDaily?8:hasPid?7:hasTrueFors?6:hasSchedules?5:temporal?4:format3?3:intDeclarations||intExpressions?2:1;
+  if(preludeKinds.has('holiday-daily-pulse')&&preludeKinds.has('at-pulse'))throw new CompileError('Holiday Daily cannot mix with At execution');
+  if(preludeKinds.has('holiday-daily-pulse')&&['schedule','daily','daily-slots'].some(kind=>preludeKinds.has(kind)))throw new CompileError('Holiday Daily cannot mix with legacy Solar or non-calendar Daily/DailySlots execution');
+  const format=preludeKinds.has('holiday-daily-pulse')?15:preludeKinds.has('at-pulse')?14:extendedNatural?13:preludeKinds.has('utc-range')?12:hasContext?11:hasDailySlots?9:hasDaily?8:hasPid?7:hasTrueFors?6:hasSchedules?5:temporal?4:format3?3:intDeclarations||intExpressions?2:1;
   const w=new Writer();w.bytes(UTF8.encode('GFB1'));w.u16(format);w.str(name);w.u32(version);
   const typeCode=type=>TYPE[type.toLowerCase()];
   w.u16(inputs.length);for(const x of inputs){w.str(x.name);w.u8(typeCode(x.type));}
@@ -670,7 +675,7 @@ function emitGfb(moduleIr) {
   if(temporal){w.u16(temporal.nowInput);w.u16(temporal.timeEpochInput);w.u16(temporal.roots.length);for(const root of temporal.roots){w.u32(root.tag);w.str(root.name);for(const index of root.indices)w.u16(index);}}
   const missingCode=value=>['skip','next_valid'].indexOf(value),repeatedCode=value=>['first','second','both','skip'].indexOf(value);
   const writeWindow=window=>{w.u32(window.site);w.str(window.name);w.u8(['average','min','max','rate'].indexOf(window.operation));w.u8(typeCode(window.payloadType));w.u64(window.overMs);w.u64(window.maxAgeMs);w.u16(window.rootRefs.length);for(const root of window.rootRefs)w.u16(root);for(const expression of window.source){const bytes=encode(expression).bytes;w.u32(bytes.length);w.bytes(bytes);}};
-  const writeSchedule=schedule=>{w.u32(schedule.site);w.str(schedule.name);w.str(schedule.timezone);w.f64(schedule.latitude);w.f64(schedule.longitude);w.u8(schedule.event==='rise'?0:1);w.i64(schedule.offsetMs);w.u8(0);w.u8(0);w.u8(0);w.u8(0);w.u64(schedule.gapMs);const bytes=encode(schedule.when).bytes;w.u32(bytes.length);w.bytes(bytes);if(format===13){w.u64(schedule.holdMs??0n);w.u64(schedule.fallbackAtMs??86400000n);}};
+  const writeSchedule=schedule=>{w.u32(schedule.site);w.str(schedule.name);w.str(schedule.timezone);w.f64(schedule.latitude);w.f64(schedule.longitude);w.u8(schedule.event==='rise'?0:1);w.i64(schedule.offsetMs);w.u8(0);w.u8(0);w.u8(0);w.u8(0);w.u64(schedule.gapMs);const bytes=encode(schedule.when).bytes;w.u32(bytes.length);w.bytes(bytes);if(format===13||format===15){w.u64(schedule.holdMs??0n);w.u64(schedule.fallbackAtMs??86400000n);}};
   const writeDaily=schedule=>{w.u32(schedule.site);w.str(schedule.name);w.str(schedule.timezone);w.u64(schedule.atMs);w.u8(missingCode(schedule.dstMissing));w.u8(repeatedCode(schedule.dstRepeated));w.u8(0);w.u8(0);w.u8(0);w.u8(0);w.u64(schedule.gapMs);const bytes=encode(schedule.when,'invalid Daily predicate').bytes;w.u32(bytes.length);w.bytes(bytes);};
   const writeDailySlots=schedule=>{w.u32(schedule.site);w.str(schedule.name);w.str(schedule.timezone);w.u64(schedule.gridMs);w.u8(missingCode(schedule.dstMissing));w.u8(repeatedCode(schedule.dstRepeated));w.u8(0);w.u8(0);w.u8(0);w.u8(0);w.u64(schedule.gapMs);w.u16(schedule.slots.length);for(const slot of schedule.slots){w.u16(slot.key);w.u16(slot.minute);}const bytes=encode(schedule.when,'invalid DailySlots predicate').bytes;w.u32(bytes.length);w.bytes(bytes);};
   const writeTrueFor=signal=>{w.u32(signal.site);w.str(signal.name);w.u32(signal.sourceTag);w.str(signal.sourceName);w.u64(signal.durationMs);for(const index of signal.indices)w.u16(index);};
@@ -689,12 +694,13 @@ function emitGfb(moduleIr) {
     else if(prelude.kind==='periodic-pulse'){w.str(d.epoch);w.u64(d.anchor);w.u32(d.configId);if(d.configId===0)w.u64(d.literal);}
     else if(prelude.kind==='cron-pulse'){w.str(d.timezone);w.u8(missingCode(d.missing));w.u8(repeatedCode(d.repeated));for(const field of d.fields){w.u8(field.length);for(const value of field)w.u8(value);}}
     else if(prelude.kind==='calendar-daily-pulse'){w.str(d.timezone);w.u64(d.at);w.str(d.calendar);w.u8(d.offday==='offday'?1:0);w.u8(missingCode(d.missing));w.u8(repeatedCode(d.repeated));}
+    else if(prelude.kind==='holiday-daily-pulse'){w.str(d.timezone);w.u64(d.at);w.str(d.calendar);w.u8(missingCode(d.missing));w.u8(repeatedCode(d.repeated));}
     else if(prelude.kind==='tide-run'){w.str(d.timezone);w.str(d.provider);w.u8(d.high==='high'?1:0);w.i64(d.offset);w.u64(d.run);w.u64(d.within);}
     else {w.str(d.timezone);w.u32(d.configId);w.u8(missingCode(d.missing));w.u8(repeatedCode(d.repeated));}
     for(const expression of [x.when,x.cancel]){const bytes=encode(expression,'invalid context schedule predicate').bytes;w.u32(bytes.length);w.bytes(bytes);}
-    if(format===13)w.u64(x.holdMs??0n);
+    if(format===13||format===15)w.u64(x.holdMs??0n);
   };
-  w.u16(compiledStrategies.length);for(const s of compiledStrategies){w.str(s.name);w.i32(s.priority);w.u32(s.query.length);w.bytes(s.query);if(temporal){if(taggedPreludes){w.u16(s.preludes.length);for(const prelude of s.preludes){const tag={'window':0,'schedule':1,'true-for':2,'daily':3,'daily-slots':4,'periodic-pulse':5,'cron-pulse':6,'calendar-daily-pulse':7,'tide-run':8,'config-daily-slots-pulse':9,'natural-result':10,'accounting-result':11,'config-stream':12,'utc-range':13,'at-pulse':14}[prelude.kind];w.u8(tag);if(tag>=5)writeContext(prelude);else if(prelude.kind==='window')writeWindow(prelude.value);else if(prelude.kind==='schedule')writeSchedule(prelude.value);else if(prelude.kind==='daily')writeDaily(prelude.value);else if(prelude.kind==='daily-slots')writeDailySlots(prelude.value);else writeTrueFor(prelude.value);}}else{w.u16(s.windows.length);for(const window of s.windows)writeWindow(window);}}w.u16(s.transitions.length);for(const t of s.transitions){w.u16(t.index);w.u32(t.expr.length);w.bytes(t.expr);}w.u16(s.intents.length);for(const i of s.intents){w.str(i.name);w.u8(typeCode(i.type));w.u32(i.expr.length);w.bytes(i.expr);}}
+  w.u16(compiledStrategies.length);for(const s of compiledStrategies){w.str(s.name);w.i32(s.priority);w.u32(s.query.length);w.bytes(s.query);if(temporal){if(taggedPreludes){w.u16(s.preludes.length);for(const prelude of s.preludes){const tag={'window':0,'schedule':1,'true-for':2,'daily':3,'daily-slots':4,'periodic-pulse':5,'cron-pulse':6,'calendar-daily-pulse':7,'tide-run':8,'config-daily-slots-pulse':9,'natural-result':10,'accounting-result':11,'config-stream':12,'utc-range':13,'at-pulse':14,'holiday-daily-pulse':15}[prelude.kind];w.u8(tag);if(tag>=5)writeContext(prelude);else if(prelude.kind==='window')writeWindow(prelude.value);else if(prelude.kind==='schedule')writeSchedule(prelude.value);else if(prelude.kind==='daily')writeDaily(prelude.value);else if(prelude.kind==='daily-slots')writeDailySlots(prelude.value);else writeTrueFor(prelude.value);}}else{w.u16(s.windows.length);for(const window of s.windows)writeWindow(window);}}w.u16(s.transitions.length);for(const t of s.transitions){w.u16(t.index);w.u32(t.expr.length);w.bytes(t.expr);}w.u16(s.intents.length);for(const i of s.intents){w.str(i.name);w.u8(typeCode(i.type));w.u32(i.expr.length);w.bytes(i.expr);}}
   w.u16(constraints.length);for(const c of constraints){w.u8(({requires:1,mutex:2,requires_any:3})[c.kind]);w.u16(c.names.length);for(const n of c.names)w.str(n);}
   if(format===7||format>=11){w.u16(compiledObjectives.length);for(const objective of compiledObjectives){w.str(objective.name);w.str(objective.outputPort);for(const index of objective.indices)w.u16(index);if(format>=11)w.u16(objective.targetOkIndex);w.u64(objective.period);w.u64(objective.late);w.u8(objective.direction==='direct'?0:1);for(const value of objective.numbers)w.f64(value);}}
   return w.finish();

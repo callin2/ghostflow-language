@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+### 2026-10-01 — explicit public-holiday execution and immutable calendar composition
+
+Daily `on = day\`holiday\`; calendar = public_days;` now executes membership in
+a typed HolidayCalendar using the shared Rust core, alongside work/off-day
+schedules. Holiday membership remains independent of work exceptions. The Node
+reference adapter supplies pinned Korean 2026–2027 facts
+and explicit base/overrides with new IDs, content revisions and provenance;
+farm weekly/holiday policy remains explicit. Missing, expired or uncovered data
+preserves Unknown. Shared bindings require identical snapshots; revision contents
+remain immutable across ticks and durable restore. See [Reference §3.8](docs/reference/03-time-and-schedules.en.md#38-dst-midnight-and-work-calendars)
+and the [provider guide](docs/CALENDAR-PROVIDERS.md).
+Holiday execution selects GFB15/control-v14; GFSF5 stays unchanged. GFCXv3
+persists bounded calendar history and rejects v1/v2 checkpoints. Older loaders
+reject the new header. Weekday grammar [#155](https://github.com/callin2/ghostflow-language/issues/155)
+remains separate. Provider, compiler, native/WASM/ghostsim and checkpoint
+regressions validate host execution; no Device or physical operation is claimed.
+
 ### 2026-10-01 — one-shot At pulse ([#154](https://github.com/callin2/ghostflow-language/issues/154))
 
 `schedule appointment: At { at = datetime\`2026-01-01T08:00:00Z\`; ... }`

@@ -78,6 +78,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/BEHAVIOR-COMPOSITION-RESEARCH.md](docs/BEHAVIOR-COMPOSITION-RESEARCH.md) | Behavior composition: research and architecture review | md |
 | [docs/BYTECODE.ko.md](docs/BYTECODE.ko.md) | GFB 바이트코드 | md |
 | [docs/BYTECODE.md](docs/BYTECODE.md) | GFB bytecode | md |
+| [docs/CALENDAR-PROVIDERS.ko.md](docs/CALENDAR-PROVIDERS.ko.md) | 한국 공휴일과 현장 근무 달력 | md |
+| [docs/CALENDAR-PROVIDERS.md](docs/CALENDAR-PROVIDERS.md) | Korean public holidays and farm work calendars | md |
 | [docs/CHECKED-CONSTRAINT-REPLACEMENTS.ko.md](docs/CHECKED-CONSTRAINT-REPLACEMENTS.ko.md) | 검증된 제약 대체 | md |
 | [docs/CHECKED-CONSTRAINT-REPLACEMENTS.md](docs/CHECKED-CONSTRAINT-REPLACEMENTS.md) | Checked constraint replacements | md |
 | [docs/COMPILER-DIAGNOSTICS.ko.md](docs/COMPILER-DIAGNOSTICS.ko.md) | 공개 컴파일러 진단 | md |
@@ -258,6 +260,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [examples/explicit-feedback-adoption.ghost.md](examples/explicit-feedback-adoption.ghost.md) | Explicitly adopted feedback inhibition | md |
 | [examples/irrigation.ghost.ko.md](examples/irrigation.ghost.ko.md) | 관개 런타임 픽스처 | md |
 | [examples/irrigation.ghost.md](examples/irrigation.ghost.md) | Irrigation runtime fixture | md |
+| [examples/korean-calendar.ghost.en.md](examples/korean-calendar.ghost.en.md) | Korean public holidays and farm workdays | md |
+| [examples/korean-calendar.ghost.md](examples/korean-calendar.ghost.md) | 한국 공휴일과 농장 작업일 | md |
 | [examples/optional-feedback-timer.ghost.ko.md](examples/optional-feedback-timer.ghost.ko.md) | 선택 관찰을 포함한 타이머 제어 | md |
 | [examples/optional-feedback-timer.ghost.md](examples/optional-feedback-timer.ghost.md) | Timer control with optional observation | md |
 | [examples/scheduled-watering.ghost.en.md](examples/scheduled-watering.ghost.en.md) | Sequential watering by daily schedule | md |
@@ -450,4 +454,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-330 documents.
+334 documents.

@@ -20,7 +20,9 @@ const SCHEDULE_SLOTS_FORMAT = 'GhostFlow/control-v8';
 const STREAM_CONTEXT_FORMAT = 'GhostFlow/control-v10';
 const AVAILABILITY_FORMAT = 'GhostFlow/control-v12';
 const AT_FORMAT = 'GhostFlow/control-v13';
+const HOLIDAY_FORMAT = 'GhostFlow/control-v14';
 const contextManifest = manifest => manifest?.format === STREAM_CONTEXT_FORMAT
+  || manifest?.format === HOLIDAY_FORMAT
   || manifest?.format === AT_FORMAT
   || manifest?.format === AVAILABILITY_FORMAT && !manifest.schedules?.some(item => item.kind === 'solar');
 const RESERVED = '__gf_';
@@ -227,7 +229,7 @@ function validateContextManifest(input, bytecodeFormat) {
   const manifest = record(input, 'manifest');
   keys(manifest, ['format','name','inputs','outputs','sensors','schedules','timers','signals','configs','bytecodeSha256'],
     ['providers','calendars','naturalConditions','accounting','resources','objectives','adaptSettings'], 'manifest');
-  if (manifest.format === AT_FORMAT ? bytecodeFormat !== 14 : manifest.format === AVAILABILITY_FORMAT ? bytecodeFormat !== 13 : ![11, 12].includes(bytecodeFormat)) throw new Error('context manifest requires its matching GFB format');
+  if (manifest.format === HOLIDAY_FORMAT ? bytecodeFormat !== 15 : manifest.format === AT_FORMAT ? bytecodeFormat !== 14 : manifest.format === AVAILABILITY_FORMAT ? bytecodeFormat !== 13 : ![11, 12].includes(bytecodeFormat)) throw new Error('context manifest requires its matching GFB format');
   name(manifest.name, 'manifest.name');
   if (!/^[0-9a-f]{64}$/.test(manifest.bytecodeSha256)) throw new Error('invalid bytecode SHA-256');
   const inputs = validateList(manifest.inputs, 'manifest.inputs', ['name','type'], ['canonicalUnit']);
@@ -249,6 +251,8 @@ function validateContextManifest(input, bytecodeFormat) {
   const naturals = validateList(manifest.naturalConditions ?? [], 'manifest.naturalConditions',
     ['site','operation','provider','classification','result','projectionInputs']);
   const accounting = manifest.accounting === undefined ? null : copy(record(manifest.accounting, 'manifest.accounting'));
+  if (manifest.format === HOLIDAY_FORMAT && (!schedules.some(item => item.kind === 'daily' && item.day?.kind === 'holiday')
+    || schedules.some(item => item.kind === 'at'))) throw new Error('Holiday profile requires Holiday Daily and excludes At');
   if (manifest.format === AT_FORMAT && (!schedules.length || schedules.some(item => item.kind !== 'at')
     || [configs,sensors,objectives,resources,adaptSettings,providers,calendars,naturals].some(list => list.length) || accounting)) {
     throw new Error('At profile requires At-only execution');
@@ -277,7 +281,7 @@ function validateContextManifest(input, bytecodeFormat) {
     if (!['periodic','cron','daily','daily-slots','tide'].includes(item.kind)) throw new Error('unsupported context schedule kind');
     const range = item.policy?.basis?.kind === 'range';
     if (range) {
-      if (![12, 13].includes(bytecodeFormat) || item.timezone !== 'UTC' || item.day || item.selectedConfig
+      if (![12, 13, 15].includes(bytecodeFormat) || item.timezone !== 'UTC' || item.day || item.selectedConfig
         || !['daily','daily-slots'].includes(item.kind)) throw new Error('executable Range requires GFB12 and immutable UTC Daily or DailySlots');
       const policy = record(item.policy, `schedule ${item.name}.policy`);
       keys(policy, ['basis','when','cancelWhen','clock','gapMs','recovery','fallback'], [], `schedule ${item.name}.policy`);
@@ -292,11 +296,17 @@ function validateContextManifest(input, bytecodeFormat) {
         throw new Error('Range occurrences must not overlap');
       }
     }
-    if (!range && item.kind === 'daily' && !['workday','offday'].includes(item.day?.kind)) throw new Error('context Daily requires WorkCalendar day');
+    if (!range && item.kind === 'daily') {
+      if (!['workday','offday','holiday'].includes(item.day?.kind)) throw new Error('context Daily requires calendar day');
+      const holiday = item.day.kind === 'holiday';
+      if (holiday && manifest.format !== HOLIDAY_FORMAT) throw new Error('Holiday Daily requires control-v14 and GFB15');
+      if (!calendars.some(calendar => calendar.name === item.day.calendar
+        && calendar.type === (holiday ? 'HolidayCalendar' : 'WorkCalendar'))) throw new Error('unbound or wrong-type Daily calendar');
+    }
     if (!range && item.kind === 'daily-slots' && !item.selectedConfig) throw new Error('context DailySlots requires TimeSlots config');
     if (item.kind === 'tide' && !providers.some(p => p.name === item.source && p.type === 'TidePredictions')) throw new Error('unbound Tide provider');
     if (!range) {
-      validateClockPolicy(item.policy?.clock, { allowHold: manifest.format === AVAILABILITY_FORMAT && item.kind === 'tide' });
+      validateClockPolicy(item.policy?.clock, { allowHold: [AVAILABILITY_FORMAT, HOLIDAY_FORMAT].includes(manifest.format) && item.kind === 'tide' });
       if (item.policy?.fallback !== 'skip' || item.policy?.recovery !== 'baseline') throw new Error('unsupported context schedule fallback or recovery');
     }
   }

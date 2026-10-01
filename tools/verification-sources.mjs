@@ -6,7 +6,7 @@ import { createHash } from 'node:crypto';
 // source files. The current frontend pin contains only ghostflow-core under
 // crates/, so it produces the same key set as its original verifier.
 const SOURCE_ROOTS = [
-  'tools', 'crates', 'runtimes/wasm', 'runtimes/node/ledger.mjs',
+  'tools', 'crates', 'runtimes/wasm', 'runtimes/node',
   'tests', 'examples', 'docs', 'contracts/integration-v1',
   'contracts/interaction-v0', 'contracts/requirements', 'README.md',
   'AGENTS.md', '.gitignore', 'Cargo.toml', 'Cargo.lock', 'package.json',
@@ -30,6 +30,9 @@ export function verificationSourceHashes(root) {
     }
   }
   for (const relative of SOURCE_ROOTS) visit(relative);
+  // Historical consumer pins predate the calendar adapter. Its presence makes
+  // the reviewed offline dataset mandatory in the current source graph.
+  if (fs.existsSync(path.join(root, 'runtimes/node/calendar.mjs'))) visit('data/calendars');
   return hashes;
 }
 
