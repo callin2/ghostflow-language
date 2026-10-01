@@ -10,20 +10,24 @@ The [Language Reference](LANGUAGE-REFERENCE.md) defines the language rules.
 The language, runtime, Driver, installation, and UI responsibilities for each requirement are listed in
 [Reference Chapter 8](reference/08-language-runtime-and-device-boundaries.md#83-faq-전체-책임표).
 
+Reviewed against dev on 2026-10-01: [`a7333e56bc25c73fd6167b1182269b96cb671d05`](https://github.com/callin2/ghostflow-language/tree/a7333e56bc25c73fd6167b1182269b96cb671d05).
+`[Undecided]` marks an unresolved language/contract decision; `[Partially unsupported]` marks the stated scope unavailable in this dev; `[Changed]` marks advice superseded by this dev. Each status note identifies the affected scope.
+An untagged question does not establish physical Device, API, or UI integration verification.
+
 ## Questions
 
 1. [How do I write a program file?](#q01)
 2. [How do I turn an output on only while a button is held?](#q02)
 3. [How do I keep running after releasing Start and stop with the Stop button?](#q03)
-4. [How do I run for five minutes after starting and stop automatically?](#q04)
-5. [How do I turn on after a request persists for two seconds?](#q05)
-6. [How do I turn off three seconds after the request disappears?](#q06)
+4. [How do I run for five minutes after starting and stop automatically? [Changed]](#q04)
+5. [How do I turn on after a request persists for two seconds? [Changed]](#q05)
+6. [How do I turn off three seconds after the request disappears? [Changed]](#q06)
 7. [How do I irrigate every day at 6:00 AM and 6:45 PM?](#q07)
-8. [How do I irrigate zone 1 and then zone 2?](#q08)
+8. [How do I irrigate zone 1 and then zone 2? [Changed]](#q08)
 9. [How do I turn on at low moisture without switching repeatedly at the boundary?](#q09)
 10. [How do I fill a tank below the lower limit and stop at the upper limit?](#q10)
 11. [How do I emit a completion signal after three sensor detections?](#q11)
-12. [How do I make “five minutes” an editable field on the screen?](#q12)
+12. [How do I make “five minutes” an editable field on the screen? [Changed]](#q12)
 13. [How do I retain an alarm after the fault clears and release it with Reset?](#q13)
 14. [How do I prevent two outputs from turning on together?](#q14)
 15. [How do I start 30 minutes after sunrise?](#q15)
@@ -32,19 +36,19 @@ The language, runtime, Driver, installation, and UI responsibilities for each re
 18. [Is self-holding supported?](#q18)
 19. [Can I move a particular device when the user cancels partway through?](#q19)
 20. [How do I schedule an operation at sunrise?](#q20)
-21. [Can I schedule operations by day of the week?](#q21)
-22. [Can I control a device based on its accumulated operating time?](#q22)
+21. [Can I schedule operations by day of the week? [Partially unsupported]](#q21)
+22. [Can I control a device based on its accumulated operating time? [Partially unsupported]](#q22)
 23. [Can I run cleaning based on the daily operation count regardless of automatic or manual mode?](#q23)
-24. [Can I change just the operating time later without a firmware update?](#q24)
+24. [Can I change just the operating time later without a firmware update? [Changed]](#q24)
 25. [Can I change a setting field's label and UI component?](#q25)
 26. [Can I limit the range of editable setting values?](#q26)
-27. [Can I use different settings for each day of the week?](#q27)
+27. [Can I use different settings for each day of the week? [Changed]](#q27)
 28. [Can I use different control logic only on public holidays?](#q28)
 29. [Can I account for daylight saving time in control?](#q29)
-30. [Can I control operations based on high and low tide?](#q30)
-31. [Can I control operations based on spring/neap tides or the moon phase?](#q31)
+30. [Can I control operations based on high and low tide? [Partially unsupported]](#q30)
+31. [Can I control operations based on spring/neap tides or the moon phase? [Changed]](#q31)
 32. [Can I code the behavior after power returns following an outage?](#q32)
-33. [Can I replace a temperature sensor without changing the control code?](#q33)
+33. [Can I replace a temperature sensor without changing the control code? [Changed]](#q33)
 34. [Are sensor settings separate from GhostFlow source? Do they change at different intervals?](#q34)
 35. [Can I replace a sensor without recompiling the control program, like changing only a printer Driver?](#q35)
 36. [Should the separation of device replacement and recompilation also be in the language spec?](#q36)
@@ -160,7 +164,9 @@ control StartStop {
 Related example: [START/STOP](../examples/curriculum/pc-02-start-stop.ghost.md).
 
 <a id="q04"></a>
-## 4. How do I run for five minutes after starting and stop automatically?
+## 4. How do I run for five minutes after starting and stop automatically? [Changed]
+
+> **Current dev status:** The duration setting now yields a Result. The age < duration comparison below does not compile without case handling of ok/fault. [Current contract](reference/05-settings-and-observation.md#기본값과-유효값).
 
 Use the running state together with the time elapsed in that state.
 End operation when `stop` or `low_water` is true. Ignore new start requests while running.
@@ -202,7 +208,9 @@ A new press is required to restart after expiry. After a stop or low-water condi
 - `require pump => valve`: [Reference §4.7 Output intent and constraints](reference/04-sensors-constraints-control.md#47-requested-safe-applied-confirmed)
 
 <a id="q05"></a>
-## 5. How do I turn on after a request persists for two seconds?
+## 5. How do I turn on after a request persists for two seconds? [Changed]
+
+> **Current dev status:** The delay setting now yields a Result. Handle ok/fault with case before the age >= delay comparison below. [Current contract](reference/05-settings-and-observation.md#기본값과-유효값).
 
 Distinguish the state of having received a request from the state of actually being on.
 
@@ -240,7 +248,9 @@ The exact transition occurs at the tick that observes the condition. One long ti
 Related example: [Independent timer patterns](../examples/curriculum/pc-06-timer-patterns.ghost.md).
 
 <a id="q06"></a>
-## 6. How do I turn off three seconds after the request disappears?
+## 6. How do I turn off three seconds after the request disappears? [Changed]
+
+> **Current dev status:** The delay setting now yields a Result. Handle ok/fault with case before the age >= delay comparison below. [Current contract](reference/05-settings-and-observation.md#기본값과-유효값).
 
 Add a holding stage after the request is released. If the request returns while holding, stay on.
 
@@ -319,7 +329,9 @@ This example does not store schedules arriving while running. It also does not e
 - `elapsed(running)`: [Reference §3.2 Elapsed time after state changes](reference/03-time-and-schedules.md#32-상태-변경-뒤의-경과-시간)
 
 <a id="q08"></a>
-## 8. How do I irrigate zone 1 and then zone 2?
+## 8. How do I irrigate zone 1 and then zone 2? [Changed]
+
+> **Current dev status:** The watering_time and settle_time settings now yield Results. Handle ok/fault with case before the time comparisons below. [Current contract](reference/05-settings-and-observation.md#기본값과-유효값).
 
 Write the sequence as an enum and connect the outputs permitted in each stage.
 This is an example of the normal operating sequence. Each zone proceeds through a two-second wait after requesting valve opening, five minutes of water supply,
@@ -485,7 +497,9 @@ When exposing the counter on screen, explicitly specify its counter meaning in t
 - Public meaning of counters: [Reference §5.3 — Descriptors and snapshots](reference/05-settings-and-observation.md#descriptor와-snapshot)
 
 <a id="q12"></a>
-## 12. How do I make “five minutes” an editable field on the screen?
+## 12. How do I make “five minutes” an editable field on the screen? [Changed]
+
+> **Current dev status:** Setting declarations and live updates are supported. The age < duration advice below uses the earlier scalar-reading model; handle the current setting Result with case. [Current contract](reference/05-settings-and-observation.md#기본값과-유효값).
 
 Declare an operational setting with its type, range, increment, permission, and display name.
 Replace the `duration` declaration in [example 4](#q04) with this **fragment**.
@@ -825,7 +839,9 @@ preserving the boundary between schedule evaluation and device control.
 - `fallback = skip` and recovery: [Reference §3.9 Fallback and recovery for natural references](reference/03-time-and-schedules.md#자연-기준의-fallback과-회복)
 
 <a id="q21"></a>
-## 21. Can I schedule operations by day of the week?
+## 21. Can I schedule operations by day of the week? [Partially unsupported]
+
+> **Current dev status:** The day weekday-range filter mon..fri is unsupported. The workday/offday and installation-calendar alternative below is supported. [Current contract](reference/03-time-and-schedules.md#38-dst-자정과-work-calendar).
 
 Express weekday conditions in the schedule's `on` field. For example, to start at 6:00 AM Monday through Friday,
 combine the time condition with this weekday condition.
@@ -850,7 +866,9 @@ DST and midnight boundary policies also follow the schedule contract.
 
 
 <a id="q22"></a>
-## 22. Can I control a device based on its accumulated operating time?
+## 22. Can I control a device based on its accumulated operating time? [Partially unsupported]
+
+> **Current dev status:** The example consuming externally confirmed accumulated Duration is supported. Executable on_time accounts currently support durable applied evidence only; native account execution for requested/safe/confirmed stages is unsupported. [Current contract](../tools/control.mjs#L1521).
 
 Receive accumulated operating time as a `Duration` value and use it in conditions.
 First decide **over which period, and what qualifies as operation for accumulation**.
@@ -959,7 +977,9 @@ Write the cleaning stages and outputs with enum state, as in [sequential control
 - Related principles of daily equipment aggregation — time aggregation rules, not count syntax: [Reference §3.10 Time-based usage constraints](reference/03-time-and-schedules.md#310-시간-기반-사용량-제약)
 
 <a id="q24"></a>
-## 24. Can I change just the operating time later without a firmware update?
+## 24. Can I change just the operating time later without a firmware update? [Changed]
+
+> **Current dev status:** Live updates and TimeSlots connections are supported. The age < duration advice below uses the earlier scalar-reading model; handle the current setting Result with case. [Current contract](reference/05-settings-and-observation.md#기본값과-유효값).
 
 Yes. Declare **how long to operate** as an operator-editable `Duration` setting.
 This **fragment** replaces the `duration` declaration in [timed operation in question 4](#q04).
@@ -1089,7 +1109,9 @@ Declare `access = designer` to disallow operator changes entirely.
 - Accepting or rejecting multiple settings together: [Reference §5.2 atomic live event](reference/05-settings-and-observation.md#atomic-live-event)
 
 <a id="q27"></a>
-## 27. Can I use different settings for each day of the week?
+## 27. Can I use different settings for each day of the week? [Changed]
+
+> **Current dev status:** The duration selected by the conditional is also a Result. Handle ok/fault with case before comparing operating time. [Current contract](reference/05-settings-and-observation.md#기본값과-유효값).
 
 Yes. Declare weekday-specific values individually as `config`, then select a value with a conditional expression.
 For example, configure five minutes on weekdays and ten on weekends.
@@ -1252,7 +1274,9 @@ whereas “turn the pump on for five minutes” means actual duration.
 - `elapsed(running)`: [Reference §3.2 Elapsed time after state changes](reference/03-time-and-schedules.md#32-상태-변경-뒤의-경과-시간)
 
 <a id="q30"></a>
-## 30. Can I control operations based on high and low tide?
+## 30. Can I control operations based on high and low tide? [Partially unsupported]
+
+> **Current dev status:** High/low tide and offsets are supported. The run(10min, on_time) notation below is design notation; the compiler supports run(_, within(_)). [Current contract](reference/03-time-and-schedules.md#pulse-window-run-range).
 
 Yes. Use predicted high/low tide times as the basis for schedule occurrences,
 and specify offsets before or after them separately from operating length.
@@ -1295,7 +1319,9 @@ and the tide event that caused its start remains distinguishable.
 - Calendar time and monotonic elapsed time: [Reference §3.1 Time values and clock domains](reference/03-time-and-schedules.md#31-시간값과-시계-영역)
 
 <a id="q31"></a>
-## 31. Can I control operations based on spring/neap tides or the moon phase?
+## 31. Can I control operations based on spring/neap tides or the moon phase? [Changed]
+
+> **Current dev status:** tide_is and moon_is return `Result<Bool, TemporalContextFault>`. Handle ok/fault with case for when = tide_is(...) below. The separate Bool-input fragment remains valid. [Current contract](reference/03-time-and-schedules.md#달과-조석).
 
 Yes. Treat spring/neap tides as **a tidal-range classification state or period**,
 and moon phase as a separate condition. When a condition is met, permit a schedule or select
@@ -1404,7 +1430,9 @@ are different facts. Resuming previous operation merely because power returned d
 - Boundaries of setting retention, new executions, and boot outputs: [Reference §5.2 Lifecycles and temporary settings](reference/05-settings-and-observation.md#생명주기와-임시-설정)
 
 <a id="q33"></a>
-## 33. Can I replace a temperature sensor without changing the control code?
+## 33. Can I replace a temperature sensor without changing the control code? [Changed]
+
+> **Current dev status:** The Number example below remains valid. The statement that dedicated quantity notation is only design scope is outdated. Temperature, TemperatureDelta, and unit literals are now supported. [Current contract](reference/02-types-expressions-state.md#29-물리량과-단위).
 
 **If the same logical input contract is maintained, the control code can stay unchanged.**
 The program reads logical roles such as “greenhouse temperature” instead of sensor model names or pin numbers.
