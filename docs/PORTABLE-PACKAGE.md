@@ -130,7 +130,21 @@ channel map before invoking the package verifier.
 
 ## Compatibility and migration
 
-- Package v1 contains one current GFB profile: 1, 2, 3 or 4. The signed bytecode
+### Signed GFB11 Periodic with scalar settings
+
+GFB11 with `GhostFlow/control-v10` and `GhostFlow/context-scan-abi-v5` may now
+package scalar configs together with an executable Periodic schedule. The
+current signed subset requires an instant anchor, `preserve_anchor`, a config
+backed `Duration` interval, a constant `true` predicate, and the
+`pulse`/`trusted_only`/`baseline`/`skip` policy. The manifest schedule site,
+name, interval config ID and value, anchor, gap and policy must match the
+decoded GFB11 descriptor. Generated config projections and the clock/epoch
+inputs must match the bytecode. Other schedule kinds, objective/window/signal
+preludes and unsigned or mismatched packages remain rejected. Scalar config
+initial values and bounds retain their existing checks. This extends package
+admission only; it does not change the language or Device deployment policy.
+
+- Package v1 contains one supported GFB profile. The signed bytecode
   descriptor version is the decimal string of the actual little-endian header
   version. Both JavaScript and Rust verifiers require an exact match before
   invoking the target loader. Supported-but-mismatched versions report

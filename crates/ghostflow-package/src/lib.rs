@@ -1446,7 +1446,8 @@ fn verify_debounce_descriptors(
 
 fn verify_config_bindings(manifest: &Value, module: &ghostflow_core::Module) -> Result<()> {
     use ghostflow_core::{
-        schedule_vm::PulseDescriptor, settings_stream::ConfigValue, Value as MachineValue,
+        context_vm::ScheduleDefinition, schedule_vm::PulseDescriptor, settings_stream::ConfigValue,
+        Type, Value as MachineValue,
     };
     let mismatch = |message: &str| PortablePackageError {
         code: ErrorCode::ManifestMismatch,
@@ -1463,14 +1464,14 @@ fn verify_config_bindings(manifest: &Value, module: &ghostflow_core::Module) -> 
         || module
             .true_for_requirements()
             .is_some_and(|r| r.strategies.iter().any(|s| !s.signals.is_empty()))
-        || !manifest["schedules"].as_array().unwrap().is_empty()
         || !manifest["signals"].as_array().unwrap().is_empty()
     {
         return Err(mismatch(
-            "portable GFB11 profile supports config streams without schedule/objective preludes",
+            "portable GFB11 profile supports scalar configs and Periodic schedules only",
         ));
     }
     let configs = manifest["configs"].as_array().unwrap();
+    let manifest_schedules = manifest["schedules"].as_array().unwrap();
     if configs.is_empty() {
         return Err(mismatch("portable GFB11 profile requires config streams"));
     }
@@ -1479,16 +1480,125 @@ fn verify_config_bindings(manifest: &Value, module: &ghostflow_core::Module) -> 
         MachineValue::Int(value) => expected.as_i64() == Some(i64::from(value)),
         MachineValue::Number(value) => expected.as_f64() == Some(value),
     };
+    let inputs: HashMap<_, _> = module.input_fields().collect();
+    let mut generated = HashMap::new();
+    if !manifest_schedules.is_empty() {
+        generated.insert("__gf_now_ms".to_owned(), Type::Number);
+        generated.insert("__gf_time_epoch".to_owned(), Type::Number);
+    }
     for strategy in &schedules.strategies {
-        if strategy.schedules.len() != configs.len() {
-            return Err(mismatch("manifest config count differs from bytecode"));
+        if strategy.schedules.len() != configs.len() + manifest_schedules.len() {
+            return Err(mismatch(
+                "manifest config/schedule count differs from bytecode",
+            ));
         }
         let mut ids = HashSet::new();
+        let mut sites = HashSet::new();
         for descriptor in &strategy.schedules {
             let PulseDescriptor::Config(config) = descriptor else {
-                return Err(mismatch(
-                    "portable context profile requires config-only preludes",
-                ));
+                let PulseDescriptor::Context(periodic) = descriptor else {
+                    return Err(mismatch(
+                        "portable GFB11 profile requires Periodic schedule preludes",
+                    ));
+                };
+                let ScheduleDefinition::Periodic {
+                    epoch_id,
+                    anchor_ms,
+                    every,
+                } = &periodic.definition
+                else {
+                    return Err(mismatch(
+                        "portable GFB11 profile requires Periodic schedule preludes",
+                    ));
+                };
+                let expected = manifest_schedules
+                    .iter()
+                    .find(|entry| entry["site"].as_u64() == Some(u64::from(periodic.site)))
+                    .ok_or_else(|| mismatch("Periodic site differs from bytecode"))?;
+                let object = value_object(expected, "GFB11 Periodic schedule")?;
+                exact_keys(
+                    object,
+                    &[
+                        "kind",
+                        "every",
+                        "anchor",
+                        "intervalChange",
+                        "site",
+                        "name",
+                        "policy",
+                    ],
+                    "GFB11 Periodic schedule",
+                    ErrorCode::ManifestMismatch,
+                )?;
+                let anchor = value_object(&expected["anchor"], "GFB11 Periodic anchor")?;
+                exact_keys(
+                    anchor,
+                    &["kind", "instantMs"],
+                    "GFB11 Periodic anchor",
+                    ErrorCode::ManifestMismatch,
+                )?;
+                let interval = value_object(&expected["every"], "GFB11 Periodic interval")?;
+                exact_keys(
+                    interval,
+                    &["expression", "initialMs", "config", "configId"],
+                    "GFB11 Periodic interval",
+                    ErrorCode::ManifestMismatch,
+                )?;
+                let policy = value_object(&expected["policy"], "GFB11 Periodic policy")?;
+                exact_keys(
+                    policy,
+                    &["basis", "when", "clock", "gapMs", "recovery", "fallback"],
+                    "GFB11 Periodic policy",
+                    ErrorCode::ManifestMismatch,
+                )?;
+                let config = configs
+                    .iter()
+                    .find(|entry| entry["id"].as_u64() == Some(u64::from(every.id)))
+                    .ok_or_else(|| mismatch("Periodic config identity differs from bytecode"))?;
+                if !sites.insert(periodic.site)
+                    || expected["kind"].as_str() != Some("periodic")
+                    || expected["name"].as_str() != Some(periodic.name.as_str())
+                    || expected["intervalChange"].as_str() != Some("preserve_anchor")
+                    || anchor["kind"].as_str() != Some("instant")
+                    || anchor["instantMs"].as_u64() != Some(*anchor_ms)
+                    || epoch_id != &format!("instant:{anchor_ms}")
+                    || interval["configId"].as_u64() != Some(u64::from(every.id))
+                    || interval["config"].as_str() != Some(every.name.as_str())
+                    || interval["expression"].as_str() != Some(every.name.as_str())
+                    || interval["initialMs"].as_u64() != Some(every.initial_ms)
+                    || config["name"].as_str() != Some(every.name.as_str())
+                    || config["type"].as_str() != Some("Duration")
+                    || config["value"].as_u64() != Some(every.initial_ms)
+                    || (config["settings"]["access"].as_str() == Some("operator"))
+                        != every.operator_editable
+                    || policy["basis"].as_str() != Some("pulse")
+                    || policy["when"].as_str() != Some("true")
+                    || periodic.when != [1, 1]
+                    || periodic.cancel != [1, 0]
+                    || policy["clock"].as_str() != Some("trusted_only")
+                    || policy["gapMs"].as_u64() != Some(periodic.gap_ms)
+                    || policy["recovery"].as_str() != Some("baseline")
+                    || policy["fallback"].as_str() != Some("skip")
+                {
+                    return Err(mismatch("GFB11 Periodic descriptor differs from bytecode"));
+                }
+                let (min, max, step) = match config["settings"].get("min") {
+                    Some(_) => (
+                        config["settings"]["min"].as_u64(),
+                        config["settings"]["max"].as_u64(),
+                        config["settings"]["step"].as_u64(),
+                    ),
+                    None => (Some(1), Some(9_007_199_254_740_991), Some(1)),
+                };
+                if min != Some(every.min_ms)
+                    || max != Some(every.max_ms)
+                    || step != Some(every.step_ms)
+                {
+                    return Err(mismatch(
+                        "GFB11 Periodic bounds differ from config bytecode",
+                    ));
+                }
+                continue;
             };
             if config.kind == 3 {
                 return Err(mismatch("portable config profile requires scalar payloads"));
@@ -1505,6 +1615,13 @@ fn verify_config_bindings(manifest: &Value, module: &ghostflow_core::Module) -> 
                 || expected["settings"].get("apply").is_some()
             {
                 return Err(mismatch("manifest config descriptor differs from bytecode"));
+            }
+            for (suffix, ty) in [
+                ("ok", Type::Bool),
+                ("value", initial_type(config)),
+                ("fault", Type::Number),
+            ] {
+                generated.insert(format!("__gf_config_{}_{}", config.id, suffix), ty);
             }
             let ConfigValue::Scalar(initial) = config.initial else {
                 return Err(mismatch("portable config profile requires scalar payloads"));
@@ -1524,8 +1641,32 @@ fn verify_config_bindings(manifest: &Value, module: &ghostflow_core::Module) -> 
                 ));
             }
         }
+        if ids.len() != configs.len() || sites.len() != manifest_schedules.len() {
+            return Err(mismatch(
+                "GFB11 config or Periodic identity count differs from bytecode",
+            ));
+        }
+    }
+    if generated
+        .iter()
+        .any(|(name, ty)| inputs.get(name.as_str()) != Some(ty))
+        || inputs
+            .iter()
+            .any(|(name, ty)| name.starts_with("__gf_config_") && generated.get(*name) != Some(ty))
+    {
+        return Err(mismatch("GFB11 generated input ports differ from bytecode"));
     }
     Ok(())
+}
+
+fn initial_type(
+    config: &ghostflow_core::settings_stream::ConfigDescriptor,
+) -> ghostflow_core::Type {
+    match config.kind {
+        0 => ghostflow_core::Type::Bool,
+        1 => ghostflow_core::Type::Int,
+        _ => ghostflow_core::Type::Number,
+    }
 }
 
 fn verify_debounce_bindings(manifest: &Value, bytecode: &[u8]) -> Result<()> {
@@ -2846,9 +2987,14 @@ mod tests {
 
     fn fixture_for(scenario: &str) -> Vec<u8> {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let periodic = scenario.strip_prefix("gfb11-periodic-");
         let output = Command::new("node")
-            .arg(root.join("tests/native-portable-package-fixture.mjs"))
-            .arg(scenario)
+            .arg(root.join(if periodic.is_some() {
+                "tests/native-gfb11-periodic-package-fixture.mjs"
+            } else {
+                "tests/native-portable-package-fixture.mjs"
+            }))
+            .arg(periodic.unwrap_or(scenario))
             .current_dir(&root)
             .output()
             .expect("Node must generate the portable-package fixture");
@@ -3705,6 +3851,59 @@ mod tests {
                 verify_portable_package(&bytes, &current).unwrap_err().code,
                 ErrorCode::ManifestMismatch,
                 "{scenario}"
+            );
+        }
+    }
+
+    #[test]
+    fn signed_gfb11_scalar_config_periodic_reaches_loader_and_rejects_substitution() {
+        let accept = |bytes: &[u8],
+                      context: &TargetLoaderContext<'_>|
+         -> std::result::Result<bool, String> {
+            assert_eq!(u16::from_le_bytes([bytes[4], bytes[5]]), 11);
+            assert_eq!(context.manifest["format"], "GhostFlow/control-v10");
+            assert_eq!(context.manifest["schedules"][0]["kind"], "periodic");
+            Ok(true)
+        };
+        let mut current = profile(&accept);
+        let capabilities = vec![Capability {
+            kind: "actuator".into(),
+            name: "due".into(),
+            value_type: "bool".into(),
+        }];
+        current.available_capabilities = &capabilities;
+        verify_portable_package(&fixture_for("gfb11-periodic-valid"), &current).unwrap();
+
+        let reject_loader =
+            |_: &[u8], _: &TargetLoaderContext<'_>| -> std::result::Result<bool, String> {
+                panic!("mismatched Periodic package must reject before target loader")
+            };
+        current.target_loader = &reject_loader;
+        for scenario in [
+            "missing-schedule",
+            "duplicate-schedule",
+            "wrong-site",
+            "wrong-name",
+            "wrong-config-id",
+            "wrong-config-name",
+            "wrong-initial",
+            "wrong-anchor",
+            "wrong-gap",
+            "wrong-clock",
+            "wrong-when",
+            "extra-policy",
+            "wrong-kind",
+            "extra-signal",
+        ] {
+            let error = verify_portable_package(
+                &fixture_for(&format!("gfb11-periodic-{scenario}")),
+                &current,
+            )
+            .unwrap_err();
+            assert_eq!(
+                error.code,
+                ErrorCode::ManifestMismatch,
+                "{scenario}: {error:?}"
             );
         }
     }
