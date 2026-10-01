@@ -229,8 +229,8 @@
       "source": "docs/language_faq.md",
       "sourceLanguage": "ko",
       "translation": "docs/language_faq.en.md",
-      "sourceSha256": "967f77ae9492ab3e2b0773287a506373dc709c0ea151b55742449d1dae9ec997",
-      "translationSha256": "ebe898ae24a53d8b53f417eac45f5a2ca78bb3ac0288a6ba114113294e4dd9a2"
+      "sourceSha256": "a033ba9e53e216b71eda8a988f969b9de7b86ed00cc9801e893500cb06d35ec9",
+      "translationSha256": "590e7607179bbd38dca4ab4929b8c80f244f5a44b3b09bc12d0671dae6ae5c10"
     },
     {
       "source": "docs/LANGUAGE-EXAMPLES.md",
