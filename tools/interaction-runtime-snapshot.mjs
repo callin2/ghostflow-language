@@ -51,6 +51,8 @@ function runtimeSchema(compilation, suppliedSchema) {
 }
 
 function typeMatches(type, value) {
+  if (type?.kind === 'nominal' && Array.isArray(type.enumMembers)) return Number.isSafeInteger(value)
+    && type.enumMembers.some(member => member.value === value);
   if (type?.kind === 'builtin' && type.name === 'Bool') return typeof value === 'boolean';
   if (type?.kind === 'builtin' && type.name === 'Int') return Number.isInteger(value) && value >= -2147483648 && value <= 2147483647;
   if (type?.kind === 'builtin' && type.name === 'Number') return typeof value === 'number' && Number.isFinite(value);

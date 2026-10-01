@@ -89,6 +89,35 @@ test('GF-TEST-interaction-v0-empty: an identified stateless module has an exact 
   assert.ok(result.errors.some(entry => entry.code === 'unknown_descriptor'));
 });
 
+test('GF-TEST-interaction-enum-members: accepts declared ordinals and rejects malformed maps and values', () => {
+  const enumSchema = clone(schema);
+  enumSchema.descriptors[0].sourceType = { kind: 'nominal', name: 'Phase', unit: null,
+    enumMembers: [{ name: 'Idle', value: 0 }, { name: 'Running', value: 1 }] };
+  const enumSnapshot = clone(snapshot);
+  enumSnapshot.schema.sha256 = interactionSchemaSha256(enumSchema);
+  enumSnapshot.observations[0].value = 1;
+  assert.equal(validate(enumSchema, enumSnapshot).valid, true);
+  const underscored = clone(enumSchema);
+  underscored.descriptors[0].sourceType.enumMembers[0].name = '_Idle';
+  const underscoredSnapshot = clone(enumSnapshot);
+  underscoredSnapshot.schema.sha256 = interactionSchemaSha256(underscored);
+  assert.equal(validate(underscored, underscoredSnapshot).valid, true);
+  for (const members of [[], [{ name: 'Idle', value: 1 }],
+    [{ name: 'Idle', value: 0 }, { name: 'Idle', value: 1 }],
+    [{ name: 'Idle', value: 0, extra: true }]]) {
+    const candidate = clone(enumSchema);
+    candidate.descriptors[0].sourceType.enumMembers = members;
+    const candidateSnapshot = clone(enumSnapshot);
+    candidateSnapshot.schema.sha256 = interactionSchemaSha256(candidate);
+    assert.equal(validate(candidate, candidateSnapshot).valid, false);
+  }
+  for (const value of [-1, 2, 1.5, 'Running', false]) {
+    const candidate = clone(enumSnapshot);
+    candidate.observations[0].value = value;
+    assert.ok(validate(enumSchema, candidate).errors.some(entry => entry.code === 'value_type'));
+  }
+});
+
 test('GF-TEST-interaction-v0-fixture: static source and module identities match the checked-in literate fixture', async () => {
   const source = fs.readFileSync(path.join(root, fixtureSourcePath), 'utf8');
   assert.equal(createHash('sha256').update(source).digest('hex'), schema.source.sha256);

@@ -139,7 +139,8 @@ test('GF-TEST-interaction-emission-enum-phase-age: enum state remains nominal an
   });
   const [phase, age] = compilation.interactionSchema.descriptors;
   assert.deepEqual([phase.id, phase.kind, phase.sourceType], [
-    'state.phase', 'state', { kind: 'nominal', name: 'Phase', unit: null },
+    'state.phase', 'state', { kind: 'nominal', name: 'Phase', unit: null,
+      enumMembers: [{ name: 'Idle', value: 0 }, { name: 'Running', value: 1 }] },
   ]);
   assert.deepEqual([age.id, age.kind, age.sourceType, age.operation], [
     'timer.age', 'timer', { kind: 'builtin', name: 'Duration', unit: 'ms' },
@@ -147,6 +148,10 @@ test('GF-TEST-interaction-emission-enum-phase-age: enum state remains nominal an
   ]);
   assert.deepEqual(phase.provenance.intentAnchorIds, ['GF-INT-FIXTURE-ENUM-PHASE-AGE-V0']);
   assert.deepEqual(age.provenance.intentAnchorIds, ['GF-INT-FIXTURE-ENUM-PHASE-AGE-V0']);
+  const underscoredSource = read(enumPhaseAgePath).replaceAll('Idle', '_Idle');
+  const underscored = await compileSource(underscoredSource, { filename: enumPhaseAgePath,
+    interactionSourceIdentity: { documentId: 'source.fixture-enum-underscored', revisionId: 'revision.fixture-enum-underscored-v0' } });
+  assert.deepEqual(underscored.interactionSchema.descriptors[0].sourceType.enumMembers[0], { name: '_Idle', value: 0 });
 });
 
 test('GF-TEST-interaction-emission-continuous-true: descriptor and private roles retain the authored Bool subject provenance', async () => {

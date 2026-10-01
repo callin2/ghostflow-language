@@ -379,6 +379,12 @@ test('GF-TEST-interaction-runtime-snapshot-enum-phase-age: completed WASM scan o
     { descriptorId: 'state.phase', status: 'ready', value: 1 },
     { descriptorId: 'timer.age', status: 'ready', value: 55 },
   ]);
+  const invalidTrace = structuredClone(execution.outcomes[1].trace);
+  invalidTrace.stateAfter.phase = 2;
+  const invalid = emitCompletedScanSnapshot({ compilation: artifact, runId: run.runId,
+    completion: run.scans[1].completion, trace: invalidTrace });
+  assert.deepEqual(invalid.observations.find(entry => entry.descriptorId === 'state.phase'),
+    { descriptorId: 'state.phase', status: 'error', error: 'runtime-value-type-mismatch' });
 });
 
 test('GF-TEST-interaction-runtime-snapshot-watering: eight outputs follow edge latch, priority stops, and exact five-minute cutoff', async () => {
