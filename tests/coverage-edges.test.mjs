@@ -49,7 +49,7 @@ const invalidControls = [
   ['unsupported check', 'control X { check nope; }', 'unsupported construct check'],
   ['unexpected declaration', 'control X { nonsense; }', 'unexpected declaration nonsense'],
   ['unknown sensor option', 'control X { sensor s: Number { nope = 1; } }', 'unsupported sensor option nope'],
-  ['unsupported schedule kind', 'control X { schedule s: Weekly<15min> { timezone = "UTC"; selected = []; } }', 'only Daily, DailySlots<15min>, Periodic, Cron, Solar and Tide schedules are supported'],
+  ['unsupported schedule kind', 'control X { schedule s: Weekly<15min> { timezone = "UTC"; selected = []; } }', 'only At, Daily, DailySlots<15min>, Periodic, Cron, Solar and Tide schedules are supported'],
   ['schedule timezone type', 'control X { schedule s: DailySlots<15min> { timezone = 1; selected = []; } }', 'timezone must be a string'],
   ['schedule selected item', 'control X { schedule s: DailySlots<15min> { timezone = "UTC"; selected = [true]; } }', 'selected entries must be HH:MM'],
   ['unknown schedule option', 'control X { schedule s: DailySlots<15min> { timezone = "UTC"; other = []; selected = []; } }', 'unsupported schedule option other'],

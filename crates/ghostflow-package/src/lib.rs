@@ -2823,6 +2823,27 @@ mod tests {
     use super::*;
     use std::process::Command;
 
+    #[test]
+    fn executable_at_remains_outside_signed_package_profile() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let output = Command::new("node")
+            .arg(root.join("tests/native-at-bytecode-fixture.mjs"))
+            .current_dir(&root)
+            .output()
+            .expect("Node must compile the At artifact");
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let bytes = BASE64.decode(&output.stdout).unwrap();
+        ghostflow_core::Module::load(&bytes).expect("At must be executable in the core");
+        assert_eq!(
+            validate_gfb1(&bytes).unwrap_err().code,
+            ErrorCode::UnsupportedBytecodeVersion
+        );
+    }
+
     fn fixture_for(scenario: &str) -> Vec<u8> {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let output = Command::new("node")

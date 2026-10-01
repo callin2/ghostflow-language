@@ -89,6 +89,7 @@ export function validateScenario(scenario, manifest) {
   const hasDailySlots = manifest.schedules?.some(schedule => schedule.kind === 'daily-slots') ?? false;
   const hasCivilSchedule = hasDaily || hasDailySlots;
   const hasContext = manifest.format === 'GhostFlow/control-v10'
+    || manifest.format === 'GhostFlow/control-v13'
     || manifest.format === 'GhostFlow/control-v12' && !hasSolar;
   if (hasContext) {
     if (scenario.context === undefined) throw new Error('context control requires explicit context activation');
@@ -332,7 +333,7 @@ export function loadVerifiedArtifact(artifactPath) {
   const manifest = JSON.parse(fs.readFileSync(`${artifactPath}.manifest.json`, 'utf8'));
   const map = JSON.parse(fs.readFileSync(`${artifactPath}.map.json`, 'utf8'));
   const document = verifyArtifactSourceMap(map, artifactBytes, { manifest });
-  if (!/^GhostFlow\/control-v(?:[1-9]|10|12)$/u.test(manifest.format)) throw new Error('artifact must be an executable control artifact');
+  if (!/^GhostFlow\/control-v(?:[1-9]|10|12|13)$/u.test(manifest.format)) throw new Error('artifact must be an executable control artifact');
   if (manifest.bytecodeSha256 !== sha256(artifactBytes)) throw new Error('artifact SHA-256 mismatch');
   return { artifactBytes, manifest, map, document };
 }
@@ -379,7 +380,7 @@ export function runScenario(artifactPath, scenarioPath, { format = 'toon' } = {}
       || manifest.schedules?.some(schedule => schedule.kind === 'daily')
       || manifest.schedules?.some(schedule => schedule.kind === 'daily-slots')
       || (manifest.naturalConditions?.length ?? 0) > 0
-      || ['GhostFlow/control-v10', 'GhostFlow/control-v12'].includes(manifest.format)
+      || ['GhostFlow/control-v10', 'GhostFlow/control-v12', 'GhostFlow/control-v13'].includes(manifest.format)
       || manifest.schedules?.some(schedule => ['periodic','cron','tide'].includes(schedule.kind))
       || manifest.signals?.some(signal => signal.kind === 'after-event');
     const executable = conditioned ? process.execPath : path.join(root, 'target/release/examples/scenario_scan');
@@ -418,6 +419,7 @@ export function runScenario(artifactPath, scenarioPath, { format = 'toon' } = {}
         ...(row.trace.windowTrace ? { windowTrace: row.trace.windowTrace } : {}),
         ...(row.trace.trueForTrace ? { trueForTrace: row.trace.trueForTrace } : {}),
         ...(row.trace.scheduleTrace ? { scheduleTrace: row.trace.scheduleTrace } : {}),
+        ...(row.trace.contextTrace ? { contextTrace: row.trace.contextTrace } : {}),
         ...(row.settingsState ? { settingsState: row.settingsState } : {}),
       }));
     } catch (error) {

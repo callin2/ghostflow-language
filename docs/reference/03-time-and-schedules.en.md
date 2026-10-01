@@ -199,7 +199,7 @@ Even if `manual_request` is true, a low-water constraint making safe output fals
 
 A Schedule is a continuously evaluated typed reactive value, not a delayed call or background thread. It evaluates trigger, day rule, predicate and context at the current time to decide whether to admit an occurrence. An unsatisfied pulse is not automatically queued.
 
-The selected trigger types are `At`, `Daily`, `DailySlots<G>`, `Periodic`, `Cron`, `Solar` and `Tide`. The current compiler does not accept `At` and accepts only `DailySlots<15min>`. Each type has its own trigger fields and these common policy fields.
+The selected trigger types are `At`, `Daily`, `DailySlots<G>`, `Periodic`, `Cron`, `Solar` and `Tide`. The current compiler accepts one-shot `At` pulse and only `DailySlots<15min>`. Each type has its own trigger fields and these common policy fields.
 
 ```ghost
 schedule name: TriggerType {
@@ -231,13 +231,33 @@ cancel_when := Bool                                   // Required for current ci
 
 All common fields are required. Unconditional admission can specify `when = true`; a Run or Range without language-level cancellation can specify `cancel_when = false`. In the current compiler, `cancel_when` is allowed for `Tide` Run and civil `range`, and is required for `range`. It is forbidden for `pulse`. `hold_trusted(d, terminal: skip)` adds monotonic elapsed time to the last trusted wall instant and uses it for at most d. Uncertainty adds the same monotonic elapsed time to the last uncertainty, recording `HeldClock` provenance. At the boundary, after `ClockUnknown`, terminal skip applies to new admission decisions. An already admitted Range keeps its monotonic end time. High-water does not change.
 
-The current compiler accepts `clock = hold_trusted(positive constant Duration, terminal: skip)` for Solar and Tide and `fallback = fixed_time(TimeOfDay literal, terminal: skip)` for Solar. Tide permits only `fallback = skip`; other triggers retain trusted-only clock and skip fallback. `window`, `run(_, on_time)` and `At` remain outside current support. Civil `range` requires provable static non-overlap in UTC; immutable UTC Daily and nonempty static DailySlots ranges execute as GFB12, while other accepted Range recurrences remain descriptors. Tide `run(_, within(_))` is supported.
+The current compiler accepts `clock = hold_trusted(positive constant Duration, terminal: skip)` for Solar and Tide and `fallback = fixed_time(TimeOfDay literal, terminal: skip)` for Solar. Tide permits only `fallback = skip`; other triggers retain trusted-only clock and skip fallback. `window` and `run(_, on_time)` remain outside current support. Civil `range` requires provable static non-overlap in UTC; immutable UTC Daily and nonempty static DailySlots ranges execute as GFB12, while other accepted Range recurrences remain descriptors. Tide `run(_, within(_))` is supported.
 
 Bounded natural-policy admission uses held time only while monotonic elapsed time is strictly less than the duration. Missing trusted anchors or uncertainty and checked-addition overflow fail closed. Held wall time and uncertainty are the last trusted values plus elapsed time, with `HeldClock` provenance. Expiry terminal-skips new admission, preserves high-water and does not extend an active Run. Recovery establishes a baseline; restart begins with a new clock. The facts provider owns IANA conversion and supplies a known source local date and fallback instant matching the authored time and timezone on that date. Ambiguous or nonexistent civil times terminal-skip without inventing a fold. The core owns admission and generated due inputs. A fallback and recovered Solar event on the same source local date share a consumed identity and terminal checkpoint. These bounds prevent unavailable predictions or uncertain clocks from silently creating occurrences.
 
 `fixed_time` is available only for Solar. When a fallback occurrence for that source local date is admitted, the same occurrence ledger consumes that date's Solar event, avoiding duplication even if the provider recovers. Tide allows only `fallback = skip` because without predictions the number and identity of events are unknown.
 
-The designed one-shot `At` uses ``at = datetime`...`;`` and has no DST fields. The current compiler has no `At` implementation. `Daily`, one time each day, requires `timezone`, ``at = time`...`;``, `dst_missing` and `dst_repeated`. For example:
+One-shot `At` uses a constant typed DateTime and has no timezone or DST fields:
+
+```ghost
+schedule appointment: At {
+  at = datetime`2026-01-01T08:00:00Z`;
+  basis = pulse;
+  when = true;
+  clock = trusted_only;
+  gap = skip_after(60s);
+  recovery = baseline;
+  fallback = skip;
+}
+```
+
+The absolute instant is normalized from its explicit offset. Equivalent offset spellings plan the same instant. This bounded profile accepts only `pulse`, trusted-only clock, baseline recovery and skip fallback, with a positive constant gap. Missing fields, non-DateTime/nonconstant `at`, timezone/DST/cancellation fields and other bases are diagnostics. It exposes `.due` and `.missed`; it cannot mix with provider, config, sensor, resource, objective or other schedule profiles. GFB14 and control-v13 identify this execution profile; the framed clock/scan transport is unchanged. Older loaders reject GFB14. Signed portable packages do not yet accept this profile.
+
+The Rust core computes one occurrence from the compiled schedule site and instant, without host-supplied occurrence rows. Admission requires `previous < planned <= current` on an accepted trusted scan with no observation gap and `when = true`. False at crossing and an overlapping gap consume a terminal miss. A boot/recovery baseline at or after the instant consumes a `BaselinePastMissed` occurrence without catch-up. Reobserving, wall rollback and recrossing do not create another pulse. Clock source/boot revision does not create a new identity. Rejected scans commit neither the clock baseline, terminal identity nor projections.
+
+Cross-restart deduplication requires restoring the matching program's terminal checkpoint. A consumed or missed identity stays consumed even if the new boot's wall clock is before the instant; a pre-occurrence checkpoint may admit a future crossing. Fresh activation has no durable history. A crash after admission but before durable checkpoint publication is outside the VM's once-only guarantee; host persistence and dispatch must handle that boundary. Admission is logical evidence and does not prove physical execution or acknowledgement.
+
+`Daily`, one time each day, requires `timezone`, ``at = time`...`;``, `dst_missing` and `dst_repeated`. For example:
 
 ```ghost
 schedule morning: Daily {
@@ -279,7 +299,7 @@ Because `.due = false` alone cannot distinguish ordinary false, Unknown fallback
 
 ### Source response to missed occurrences
 
-`schedule_name.missed` is a `Bool` projection. The current compiler provides it for Solar and executable `pulse` civil schedules. It is not yet an execution projection for Range, including executable UTC Range controls. It is true only when one or more occurrences of that schedule become **terminal missed** in this accepted scan. Even if two or more are missed in one scan, the value is true once; it is false in the next accepted scan if there is no new terminal miss. A control action evaluates this value exactly once in that accepted scan's immutable snapshot. Simply reobserving an occurrence already recorded as terminal missed or restoring a checkpoint does not make it true again. Rejected scans commit neither this pulse nor state transitions.
+`schedule_name.missed` is a `Bool` projection. The current compiler provides it for At pulse, Solar and executable `pulse` civil schedules. It is not yet an execution projection for Range, including executable UTC Range controls. It is true only when one or more occurrences of that schedule become **terminal missed** in this accepted scan. Even if two or more are missed in one scan, the value is true once; it is false in the next accepted scan if there is no new terminal miss. A control action evaluates this value exactly once in that accepted scan's immutable snapshot. Simply reobserving an occurrence already recorded as terminal missed or restoring a checkpoint does not make it true again. Rejected scans commit neither this pulse nor state transitions.
 
 ```ghost
 state missed_scans: Int = 0;

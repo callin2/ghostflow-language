@@ -276,6 +276,19 @@ impl Engine {
             return Err(invalid("trailing context checkpoint bytes"));
         }
         match &desc.definition {
+            ScheduleDefinition::AtPulse { .. } => {
+                let identity = format!("{}:at", desc.site);
+                if restored.terminal.iter().any(|id| id != &identity)
+                    || restored.interval_ms.is_some()
+                    || !restored.slots.is_empty()
+                    || !restored.added_at_wall.is_empty()
+                    || !restored.last_plan.is_empty()
+                    || restored.phase_revision != 0
+                    || restored.next_slot_key != 1
+                {
+                    return Err(invalid("At checkpoint identity mismatch"));
+                }
+            }
             ScheduleDefinition::Periodic { every, .. } => {
                 let value = restored
                     .interval_ms
@@ -442,6 +455,9 @@ impl Engine {
         let observed = policy.observation;
         let mut decision = Decision::default();
         match &desc.definition {
+            ScheduleDefinition::AtPulse { at_ms } => {
+                staged.at_pulse(desc.site, *at_ms, &observed, when, &mut decision)?
+            }
             ScheduleDefinition::UtcRange { .. } => unreachable!("Range staged before pulse clock"),
             ScheduleDefinition::Periodic {
                 epoch_id,
@@ -609,8 +625,10 @@ impl Engine {
     }
 
     fn validate_rows(desc: &ScheduleDescriptor, facts: &ScheduleEvidence) -> Result<()> {
-        if matches!(desc.definition, ScheduleDefinition::UtcRange { .. })
-            && (facts.provider.is_some() || facts.calendar.is_some() || !facts.rows.is_empty())
+        if matches!(
+            desc.definition,
+            ScheduleDefinition::UtcRange { .. } | ScheduleDefinition::AtPulse { .. }
+        ) && (facts.provider.is_some() || facts.calendar.is_some() || !facts.rows.is_empty())
         {
             return Err(invalid("unexpected UTC Range evidence payload"));
         }
@@ -995,6 +1013,59 @@ impl Engine {
             return Err(invalid("context terminal ledger capacity exceeded"));
         }
         self.terminal.insert(id.to_owned());
+        Ok(())
+    }
+
+    fn at_pulse(
+        &mut self,
+        site: u32,
+        planned: u64,
+        clock: &crate::schedule_clock::ClockObservation<'_>,
+        when: bool,
+        out: &mut Decision,
+    ) -> Result<()> {
+        let id = format!("{site}:at");
+        let Some(now) = clock.current_effective_wall_ms else {
+            return Ok(());
+        };
+        if self.terminal.contains(&id) {
+            return Ok(());
+        }
+        let baseline = matches!(
+            clock.disposition,
+            ClockDisposition::BootBaseline | ClockDisposition::RecoveryBaseline
+        );
+        let crossed = clock
+            .previous_effective_wall_ms
+            .is_some_and(|previous| previous < planned && planned <= now)
+            && planned > clock.previous_trusted_high_water_ms.unwrap_or(0);
+        if !(baseline && planned <= now || crossed) {
+            return Ok(());
+        }
+        let outcome = if baseline {
+            "BaselinePastMissed"
+        } else if clock.disposition == ClockDisposition::ObservationGap {
+            "ObservationGap"
+        } else if !when {
+            "ConditionsFalseAtPulse"
+        } else {
+            "Due"
+        };
+        self.terminalize(&id)?;
+        out.due = outcome == "Due";
+        out.missed = !out.due;
+        out.observations.push(Observation {
+            clock_provenance: None,
+            clock_source_revision: None,
+            clock_uncertainty_ms: None,
+            unknown_reason: None,
+            site,
+            occurrence_id: id,
+            planned_ms: Some(planned),
+            decision: outcome.into(),
+            provider_revision: String::new(),
+            context_revision: String::new(),
+        });
         Ok(())
     }
 

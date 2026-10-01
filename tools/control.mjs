@@ -853,7 +853,7 @@ class ControlParser {
     const kind = this.identifier('expected schedule type');
     if (kind.value === 'Solar') return this.solarSchedule(start, name);
     if (kind.value === 'Tide') return this.tideSchedule(start, name);
-    if (!['Daily', 'DailySlots', 'Periodic', 'Cron'].includes(kind.value)) error(kind, 'only Daily, DailySlots<15min>, Periodic, Cron, Solar and Tide schedules are supported');
+    if (!['At', 'Daily', 'DailySlots', 'Periodic', 'Cron'].includes(kind.value)) error(kind, 'only At, Daily, DailySlots<15min>, Periodic, Cron, Solar and Tide schedules are supported');
     let interval = null;
     if (kind.value === 'DailySlots') {
       this.expect('<'); interval = this.expression(5); this.expect('>', 'expected > after DailySlots interval');
@@ -870,7 +870,7 @@ class ControlParser {
         if (this.current().kind !== 'cron-literal') error(this.current(), 'Cron at requires a cron5 tagged literal');
         at = this.take();
       }
-      else if (key.value === 'at' && kind.value === 'Daily') at = this.expression();
+      else if (key.value === 'at' && ['Daily', 'At'].includes(kind.value)) at = this.expression();
       else if (key.value === 'on' && kind.value === 'Daily') {
         const value = this.current();
         if (value.kind !== 'context-literal' || !value.value.startsWith('day`')) error(value, 'Daily on requires a day tagged literal');
@@ -1535,6 +1535,14 @@ class Lowerer {
     else if (solarForms.some(form => form[0] === 'daily-pulse')) this.manifest.format = 'GhostFlow/control-v7';
     if (this.manifest.schedules.some(schedule => typeof schedule.policy?.clock === 'object'
       || typeof schedule.policy?.fallback === 'object')) this.manifest.format = 'GhostFlow/control-v12';
+    if (contextForms.some(form => form[0] === 'at-pulse')) {
+      if (solarForms.length || contextForms.some(form => form[0] !== 'at-pulse')
+        || ['configs','sensors','providers','calendars','naturalConditions','objectives','resources','adaptSettings','signals']
+          .some(key => this.manifest[key]?.length) || this.manifest.accounting) {
+        error(this.ast.loc, 'At pulse execution cannot mix with other schedule/provider/config profiles');
+      }
+      this.manifest.format = 'GhostFlow/control-v13';
+    }
     const temporalForms = this.windows.length || this.trueFors.length || solarForms.length || contextForms.length ? [
       ['temporal-context', `${RESERVED_PREFIX}now_ms`, `${RESERVED_PREFIX}time_epoch`],
       ...[...this.temporalRoots.values()].sort((left, right) => left.tag - right.tag).map(root =>
@@ -2143,6 +2151,14 @@ class Lowerer {
     }); this.symbols.get(item.name).type = resultType(type, semanticType('SensorFault'));
   }
   addSchedule(item) {
+    if (item.scheduleType === 'At') {
+      if (!item.at) error(item.loc, 'At schedule requires at');
+      if (item.timezone !== null || item.policy.dst_missing || item.policy.dst_repeated) error(item.loc, 'At has no timezone or DST fields');
+      const at = this.expression(item.at, new Map(), { allowNext: false });
+      if (at.type.kind !== 'DateTime' || !Number.isSafeInteger(at.constant)) error(item.at.loc, 'At at must be a constant DateTime');
+      if (item.policy.basis?.kind !== 'reference' || item.policy.basis.name !== 'pulse') error(item.loc, 'At executable basis requires pulse');
+      return this.addCivilSchedulePolicy(item, { kind: 'at', atMs: at.constant }, false);
+    }
     if (item.scheduleType === 'Solar') return this.addSolarSchedule(item);
     if (item.scheduleType === 'Tide') return this.addTideSchedule(item);
     if (item.scheduleType === 'Periodic') return this.addPeriodicSchedule(item);
@@ -2311,7 +2327,7 @@ class Lowerer {
         if (!sameType(cancel.type, BOOL)) error(options.cancel_when.loc, `${label} cancel_when must be Bool`);
         cancelWhen = cancel.sexpr;
       }
-      const slot = this.configStreams.length + this.manifest.schedules.filter(schedule => ['solar', 'daily', 'daily-slots', 'periodic', 'cron'].includes(schedule.kind)).length;
+      const slot = this.configStreams.length + this.manifest.schedules.filter(schedule => ['at', 'solar', 'daily', 'daily-slots', 'periodic', 'cron'].includes(schedule.kind)).length;
       this.manifest.schedules.push({
         ...trigger, site: item.id, name: item.name, ...civilPolicy,
         policy: { basis, when: predicate.sexpr, ...(cancelWhen === undefined ? {} : { cancelWhen }),
@@ -3587,12 +3603,13 @@ class Lowerer {
         config.settings?.access === 'operator' ? 'true' : 'false', payload,
         inputs?.ok ?? 'none', inputs?.value ?? 'none', inputs?.fault ?? 'none'];
     });
-    const scheduleForms = this.manifest.schedules.filter(schedule => schedule.policy?.basis?.kind === 'range'
+    const scheduleForms = this.manifest.schedules.filter(schedule => schedule.kind === 'at' || schedule.policy?.basis?.kind === 'range'
       || ['periodic', 'cron', 'tide'].includes(schedule.kind)
       || schedule.kind === 'daily' && schedule.day?.calendar
       || schedule.kind === 'daily-slots' && schedule.selectedConfig).map(schedule => {
       const base = [String(schedule.site), schedule.name, String(schedule.policy.gapMs)];
       const when = schedule.policy.when, cancel = schedule.policy.cancelWhen ?? 'false';
+      if (schedule.kind === 'at') return ['at-pulse', ...base, String(schedule.atMs), when, cancel];
       if (schedule.policy.basis?.kind === 'range') {
         if (schedule.timezone !== 'UTC' || schedule.day || schedule.selectedConfig
           || !['daily', 'daily-slots'].includes(schedule.kind)) error(this.ast.loc, 'executable Range requires immutable UTC Daily or DailySlots');
@@ -3892,7 +3909,7 @@ export function compileAccountingControl(source, { filename = '<control>' } = {}
 
 /** Only this bounded civil pulse slice has a VM/provider transport. */
 export function isExecutablePulseSchedule(item) {
-  return item.scheduleType === 'Solar' || (item.scheduleType === 'Daily'
+  return item.scheduleType === 'Solar' || item.scheduleType === 'At' || (item.scheduleType === 'Daily'
     && (!item.on && !item.calendar || item.on && item.calendar && ['day`workday`', 'day`offday`'].includes(item.on.value))
     && item.at?.kind === 'literal' && item.at.raw.startsWith('time`')
     && item.policy?.basis?.name === 'pulse' && item.policy?.clock?.name === 'trusted_only')

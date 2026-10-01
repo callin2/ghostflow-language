@@ -19,7 +19,9 @@ const SCHEDULE_FORMAT = 'GhostFlow/control-v7';
 const SCHEDULE_SLOTS_FORMAT = 'GhostFlow/control-v8';
 const STREAM_CONTEXT_FORMAT = 'GhostFlow/control-v10';
 const AVAILABILITY_FORMAT = 'GhostFlow/control-v12';
+const AT_FORMAT = 'GhostFlow/control-v13';
 const contextManifest = manifest => manifest?.format === STREAM_CONTEXT_FORMAT
+  || manifest?.format === AT_FORMAT
   || manifest?.format === AVAILABILITY_FORMAT && !manifest.schedules?.some(item => item.kind === 'solar');
 const RESERVED = '__gf_';
 const TYPES = new Set(['Bool', 'Int', 'Number', 'Percent', 'Duration', ...TIME_TYPES, ...QUANTITY_TYPES]);
@@ -225,7 +227,7 @@ function validateContextManifest(input, bytecodeFormat) {
   const manifest = record(input, 'manifest');
   keys(manifest, ['format','name','inputs','outputs','sensors','schedules','timers','signals','configs','bytecodeSha256'],
     ['providers','calendars','naturalConditions','accounting','resources','objectives','adaptSettings'], 'manifest');
-  if (manifest.format === AVAILABILITY_FORMAT ? bytecodeFormat !== 13 : ![11, 12].includes(bytecodeFormat)) throw new Error('context manifest requires its matching GFB format');
+  if (manifest.format === AT_FORMAT ? bytecodeFormat !== 14 : manifest.format === AVAILABILITY_FORMAT ? bytecodeFormat !== 13 : ![11, 12].includes(bytecodeFormat)) throw new Error('context manifest requires its matching GFB format');
   name(manifest.name, 'manifest.name');
   if (!/^[0-9a-f]{64}$/.test(manifest.bytecodeSha256)) throw new Error('invalid bytecode SHA-256');
   const inputs = validateList(manifest.inputs, 'manifest.inputs', ['name','type'], ['canonicalUnit']);
@@ -247,6 +249,10 @@ function validateContextManifest(input, bytecodeFormat) {
   const naturals = validateList(manifest.naturalConditions ?? [], 'manifest.naturalConditions',
     ['site','operation','provider','classification','result','projectionInputs']);
   const accounting = manifest.accounting === undefined ? null : copy(record(manifest.accounting, 'manifest.accounting'));
+  if (manifest.format === AT_FORMAT && (!schedules.length || schedules.some(item => item.kind !== 'at')
+    || [configs,sensors,objectives,resources,adaptSettings,providers,calendars,naturals].some(list => list.length) || accounting)) {
+    throw new Error('At profile requires At-only execution');
+  }
   if (manifest.signals.length) throw new Error('context signal mixing is not supported');
   if (sensors.length && (!objectives.length || sensors.length !== 1)) throw new Error('context sensors require one PID objective');
   const timers = validateList(manifest.timers, 'manifest.timers', ['name','state','clockInput']);
@@ -258,6 +264,16 @@ function validateContextManifest(input, bytecodeFormat) {
   for (const item of outputs) { portName(item.name, 'output.name'); type(item.type, `output ${item.name}.type`); validateCanonicalUnit(item, `output ${item.name}`); }
   for (const item of schedules) {
     name(item.name, 'schedule.name'); safeInteger(item.site, 'schedule.site', 1, 0xffff_ffff);
+    if (item.kind === 'at') {
+      if (manifest.format !== AT_FORMAT) throw new Error('At requires control-v13 and GFB14');
+      keys(item, ['kind','site','name','policy','atMs'], [], 'At schedule');
+      safeInteger(item.atMs, 'At atMs', 0, 253_402_300_799_999);
+      keys(record(item.policy, 'At policy'), ['basis','when','clock','gapMs','recovery','fallback'], [], 'At policy');
+      if (item.policy.basis !== 'pulse' || item.policy.clock !== 'trusted_only' || item.policy.recovery !== 'baseline'
+        || item.policy.fallback !== 'skip') throw new Error('unsupported At policy');
+      safeInteger(item.policy.gapMs, 'At gapMs', 1);
+      continue;
+    }
     if (!['periodic','cron','daily','daily-slots','tide'].includes(item.kind)) throw new Error('unsupported context schedule kind');
     const range = item.policy?.basis?.kind === 'range';
     if (range) {
