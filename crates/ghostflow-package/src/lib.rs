@@ -4088,6 +4088,7 @@ mod tests {
                             source_revision: None,
                         },
                         &ghostflow_core::context_runtime::Facts {
+                            solars: vec![],
                             natural: vec![],
                             schedules: vec![],
                             settings: None,
