@@ -2,6 +2,13 @@
   "format": "GhostFlow/document-translations-v1",
   "documents": [
     {
+      "source": "docs/HOST-EVENT-ORDERING-CONTRACT.md",
+      "sourceLanguage": "en",
+      "translation": "docs/HOST-EVENT-ORDERING-CONTRACT.ko.md",
+      "sourceSha256": "0ab3bd709d744ac916002733605f5992cf5e07af516598f952b8a3e56fe43d01",
+      "translationSha256": "cf6c40766cddf4464658a9d24e49c13b834c68edf34f7ae66b96be20defcc0bf"
+    },
+    {
       "source": "docs/CHECKED-CONSTRAINT-REPLACEMENTS.md",
       "sourceLanguage": "en",
       "translation": "docs/CHECKED-CONSTRAINT-REPLACEMENTS.ko.md",
