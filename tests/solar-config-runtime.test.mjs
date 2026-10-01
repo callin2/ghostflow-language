@@ -6,7 +6,8 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { encode } from '@toon-format/toon';
-import { compileSource, writeArtifact } from '../tools/toolchain.mjs';
+import { compileSource, writeArtifact, restoreArtifactSourceMap } from '../tools/toolchain.mjs';
+import { observeSourceTrace } from '../tools/source-trace.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 import { encodeContextFacts, solarContextEvidence } from '../runtimes/wasm/context-abi.mjs';
 import { runScenario } from '../tools/ghostsim.mjs';
@@ -52,6 +53,76 @@ function native(t, compiled, steps) {
   return execFileSync(path.join(root, 'target/release/examples/context_tape' + (process.platform === 'win32' ? '.exe' : '')),
     [modulePath, tapePath], { encoding: 'utf8' }).trim().split('\n').map(line => JSON.parse(line));
 }
+
+test('REF-03-025: Solar PredictionStale skip preserves Unknown cause and loaded definition/provider/context revisions at host activation', async t => {
+  const compiled = await artifact();
+  const sourceMap = { format: 'GhostFlow/source-map-v1', bytecodeSha256: compiled.manifest.bytecodeSha256,
+    sourceDocument: compiled.sourceDocument, nodes: compiled.sourceMap, lines: compiled.extractionMap,
+    traceMetadata: compiled.traceMetadata, interactionSchema: null, interactionSourceIdentity: null };
+  const verified = restoreArtifactSourceMap(sourceMap, compiled.bytes, { manifest: compiled.manifest });
+  const providerRevision = 'solar-prediction-expired-r17';
+  const contextRevision = 'seoul-location-r4';
+  const stale = compiled.manifest.schedules.map(descriptor => {
+    assert.equal(descriptor.policy.fallback, 'skip');
+    return solarContextEvidence(descriptor, {
+      site: descriptor.site, coverageFromWallMs: 0, coverageToWallMs: 86_400_000,
+      rows: [{ sourceDay: 0, scheduledWallMs: null, available: false,
+        unavailableReason: 4, providerRevision, contextRevision }], // ABI reason 4 is PredictionStale.
+    });
+  });
+  const steps = [0, 100, 200].map(nowMs => ({ nowMs, contextFacts: {
+    clock: clock(nowMs, 900 + nowMs), natural: [], schedules: [], settings: null, solars: stale,
+  } }));
+  const execute = async (observationSteps = steps) => {
+    const runtime = await ControlRuntime.instantiateFramed(wasmBytes(), compiled, { context: activation });
+    try {
+      return observationSteps.map(step => runtime.step({ ...step, inputs: { divisor: 1 } }).vm);
+    } finally { runtime.dispose(); }
+  };
+  const traces = await execute();
+  for (const trace of traces) {
+    // The existing verified host source observation joins this accepted scan to
+    // its canonical definition revision, rather than treating bytecode as source.
+    const sourceObservation = observeSourceTrace(verified.traceMetadata, trace);
+    assert.equal(sourceObservation.sourceDocumentSha256, compiled.sourceDocument.sha256);
+    assert.equal(sourceObservation.bytecodeSha256, compiled.manifest.bytecodeSha256);
+    assert.equal(trace.module, compiled.traceMetadata.moduleFingerprint);
+    assert.equal(trace.safe.due, false);
+    assert.equal(trace.safe.mirrored, false);
+    for (const descriptor of compiled.manifest.schedules) {
+      const observation = trace.contextTrace.find(row => row.site === descriptor.site && row.unavailableReason === 4);
+      assert.ok(observation, 'the stale provider result survives Bool projection');
+      assert.equal(observation.decision, 'Unknown(OccurrenceUnavailable)');
+      assert.equal(observation.unavailableReason, 4, 'the typed ABI cause is PredictionStale, not ordinary False');
+      assert.equal(observation.fallback, false);
+      assert.equal(observation.providerRevision, providerRevision);
+      assert.equal(observation.contextRevision, contextRevision);
+      assert.equal(observation.plannedWallMs, null);
+    }
+  }
+  const records = native(t, compiled, steps);
+  assert.ok(records.every(record => record.accepted));
+  assert.deepEqual(records.map(record => record.outcome.trace), traces);
+  assert.deepEqual(native(t, compiled, steps), records, 'fresh native activation preserves stale observation provenance');
+  assert.deepEqual(await execute(), traces, 'fresh host/WASM activation preserves stale observation provenance');
+  const available = await execute(steps.map(step => ({ ...step,
+    contextFacts: facts(compiled, step.nowMs, 900 + step.nowMs) })));
+  assert.equal(available[1].safe.due, true, 'available evidence crosses; stale evidence is not a constant-false Schedule');
+  assert.equal(available[1].contextTrace.some(row => row.decision === 'Due'), true);
+  const descriptor = compiled.manifest.schedules[0];
+  const revised = await compileSource(document + '\nRevision-only prose.\n', { filename: 'issue-145-solar-config.ghost.md' });
+  assert.deepEqual(revised.bytes, compiled.bytes, 'equal bytecode alone cannot identify a canonical definition revision');
+  assert.notEqual(revised.sourceDocument.sha256, compiled.sourceDocument.sha256);
+  assert.throws(() => restoreArtifactSourceMap(sourceMap, compiled.bytes, {
+    manifest: compiled.manifest, expectedSourceSha256: revised.sourceDocument.sha256,
+  }), /source.*identity|source.*SHA-256/i);
+  assert.throws(() => observeSourceTrace(verified.traceMetadata, { ...traces[0], module: '0'.repeat(16) }), /module identity mismatch/);
+  assert.throws(() => solarContextEvidence(descriptor, {
+    site: descriptor.site + 1, coverageFromWallMs: 0, coverageToWallMs: 86_400_000, rows: [],
+  }), /site mismatch/);
+  const forged = structuredClone(steps[0].contextFacts); forged.solars[0].due = true;
+  assert.throws(() => encodeContextFacts(forged), /unexpected/);
+});
 
 test('Solar/settings GFSF6 retains GFSF5 for non-Solar facts and rejects host due, binding omissions and unordered rows', async () => {
   const compiled = await artifact();
