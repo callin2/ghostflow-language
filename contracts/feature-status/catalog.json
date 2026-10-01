@@ -3654,6 +3654,39 @@
       "referenceCaseIds": ["REF-03-025"]
     },
     {
+      "id": "schedule-boot-rollback",
+      "family": "Schedule boot/recovery baseline and rollback suppression",
+      "clause": {
+        "path": "docs/reference/03-time-and-schedules.md",
+        "heading": "3.5 Schedule의 공통 의미"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/context-wasm-boundaries.test.mjs",
+              "testId": "REF-03-031: 06:10 boot and clock recovery do not catch up the 06:00 slot after 05:55 rollback in native and WASM",
+              "caseId": "REF-03-031",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "negative", "boundary"]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Boot/recovery high-water is verified within an activation; cross-restart restoration covers already-admitted terminal identities. A baseline-only checkpoint restored into a second boot before the skipped slot does not preserve that suppression. Broader restart policy, storage-medium durability and physical execution are not claimed."
+      ],
+      "issues": [220],
+      "referenceCaseIds": ["REF-03-031"]
+    },
+    {
       "id": "product-boundary",
       "family": "Farmer UI, installation and deployment",
       "clause": {
