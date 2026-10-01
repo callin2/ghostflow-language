@@ -1,0 +1,17 @@
+{
+  "id": "GF-FIELD-numeric-threshold-virtual-ro1",
+  "provenance": {
+    "issue": "https://github.com/callin2/farm-device/issues/43",
+    "revision": "618e45046f1c8be748eeec6767d5ffe0ea997a11",
+    "source": "tools/hil/cases/numeric-threshold-virtual-ro1/numeric-threshold-virtual-ro1.ghost.md",
+    "oracle": "tools/hil/cases/numeric-threshold-virtual-ro1/case.json",
+    "boardProfile": "waveshare-esp32-s3-eth-8di-8ro-r8n16",
+    "mode": "software numeric injection and virtual output; physical contact not measured"
+  },
+  "rows": [
+    { "moisture": 42.4, "pump": true },
+    { "moisture": 42.5, "pump": false },
+    { "moisture": 42.6, "pump": false },
+    { "moisture": 42.4, "pump": true }
+  ]
+}

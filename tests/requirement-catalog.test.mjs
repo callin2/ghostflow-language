@@ -9,7 +9,7 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const catalog = readCatalog({ root });
 
 test('requirement catalog has content-derived IDs and complete relation', () => {
-  assert.deepEqual(validateCatalog(catalog, { root }), { requirements: 42, tests: 18, linkedTests: 18 });
+  assert.deepEqual(validateCatalog(catalog, { root }), { requirements: 42, tests: 19, linkedTests: 19 });
   for (const requirement of catalog.requirements) assert.equal(requirement.id, requirementId(requirement.statement));
 });
 

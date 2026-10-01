@@ -28,6 +28,10 @@ refresh it after the edit batch.
 
 ## Define one bounded task
 
+For a concrete task with a field-derived oracle and bounded mutation evidence,
+use the [AI contribution package](docs/AI-CONTRIBUTION-PACKAGE.md). The issue and
+PR templates capture its minimum identities, scope and independent evidence.
+
 Write down the intended outcome, owned files or boundaries, acceptance criteria,
 prerequisites and focused verification command. Keep completed, blocked and
 independent work distinct. Do not add feature scope or cleanup that the request

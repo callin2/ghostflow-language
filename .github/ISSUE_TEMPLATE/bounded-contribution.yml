@@ -1,0 +1,36 @@
+name: Bounded contribution / 범위를 제한한 기여
+description: One reproducible contract task with independent evidence / 독립 근거가 있는 재현 가능한 계약 작업 하나
+title: "[contribution] "
+labels: ["module:ghostflow-toolchain"]
+body:
+  - type: markdown
+    attributes:
+      value: "Use docs/AI-CONTRIBUTION-PACKAGE.md (한국어: .ko.md). Preserve unrelated work and existing oracles. Native/WASM agreement proves portability, not physical correctness. / 무관한 작업과 기존 oracle을 보존하세요. native/WASM 일치는 이식 근거이며 물리적 정확성 증명이 아닙니다."
+  - type: textarea
+    id: contract
+    attributes:
+      label: Contract, identities and scope / 계약, identity와 범위
+      description: "Issue/contract IDs, required docs, exact base SHA, source/fixture paths, allowed files, prerequisites. / Issue·계약 ID, 필요 문서, 정확한 base SHA, source·fixture 경로, 허용 파일, 선행조건."
+    validations:
+      required: true
+  - type: textarea
+    id: oracle
+    attributes:
+      label: Independent expected outcomes / 독립 기대 결과
+      description: "Cite authoritative provenance, boundary/failure expectations and limits. Do not derive the oracle from the proposed implementation. / 권위 있는 출처, 경계·실패 기대값과 한계를 인용하세요. 제안 구현에서 oracle을 생성하지 마세요."
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction and regression evidence / 재현과 회귀 근거
+      description: "Exact commands/exit codes, before/after results, artifact identity, protection-weakening sensitivity, unrun/infrastructure/physical gaps. / 정확한 명령·exit code, before·after 결과, artifact identity, 보호 조건 약화 검출, 미실행·인프라·물리 공백."
+    validations:
+      required: true
+  - type: textarea
+    id: review
+    attributes:
+      label: Evidence changes requiring separate review / 별도 검토할 근거 변경
+      description: "Protection rules; expected values; assertions/test skip/deletion/runner list; status/testIds/locator/pendingReason. Specification changes need cited evidence and independent meaning review; implementation and tests can share an error. / 보호 규칙; 기대값; assertion·test skip·삭제·runner list; status·testIds·locator·pendingReason. 명세 변경에는 인용 근거와 독립 의미 검토가 필요하며 구현과 test가 같은 오류를 공유할 수 있습니다."
+    validations:
+      required: true
