@@ -2,6 +2,20 @@
   "format": "GhostFlow/document-translations-v1",
   "documents": [
     {
+      "source": "examples/shared-constraint-contract.ghost.md",
+      "sourceLanguage": "en",
+      "translation": "examples/shared-constraint-contract.ghost.ko.md",
+      "sourceSha256": "06d6b113591505a8d13874d249594672b7f819b2b201e834698edf8321c10fe8",
+      "translationSha256": "0cc3cc95a61e70762452be7d09b106d29406de3a2b329dcc3379fb87e13b8717"
+    },
+    {
+      "source": "examples/constraint-envelope.ghost.md",
+      "sourceLanguage": "en",
+      "translation": "examples/constraint-envelope.ghost.ko.md",
+      "sourceSha256": "bd32b4a8c3951bcfe4d44a848f29d4260de1c743b25f03c73e3f69478c9e0c92",
+      "translationSha256": "3ab4a6d9a9875f2f55d67c012f79aa1c35b73a8b730b7344c88fec2b3496d219"
+    },
+    {
       "source": "docs/EFFECT-PROCESS-CONTRACT.md",
       "sourceLanguage": "en",
       "translation": "docs/EFFECT-PROCESS-CONTRACT.ko.md",
@@ -138,8 +152,8 @@
       "source": "docs/CONSTRAINTS.md",
       "sourceLanguage": "ko",
       "translation": "docs/CONSTRAINTS.en.md",
-      "sourceSha256": "47b065d6db2c9d7c0c27873ec19a37b78587c041678b86662100e231c0f932d3",
-      "translationSha256": "04bf9cfc6c5decf38cdd266d41b9e49a7879bfc19c778b7065b31a44029816d8"
+      "sourceSha256": "5e8aaffe86ccb3cc18df3e8e4215f3117b5ad1e0a2e5e236ae3e109ca69b98d1",
+      "translationSha256": "97562ee35a073c200e0ab4259b1597610e80ff9cf54e02070098a0fb93aaaf6c"
     },
     {
       "source": "docs/CONTEXT-EXECUTION-ABI.md",
@@ -355,8 +369,8 @@
       "source": "docs/reference/04-sensors-constraints-control.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/04-sensors-constraints-control.en.md",
-      "sourceSha256": "561a01a4bd2a9c39bdeee01657385f283c6025a01bb144d0d447106a5c14b842",
-      "translationSha256": "c0fc5789d648db42cad5673e8ca6f98242ef60947f55467c46b1f59bcba9bc99"
+      "sourceSha256": "ab49301e706c8e7c7c7d4f460192b2a675c900368b2c5105d580d11d478210f3",
+      "translationSha256": "eb193b8e83c79b5d0c2164f29c08bc1a10dead90b310b009df9e3f4bc1dc4dde"
     },
     {
       "source": "docs/reference/05-settings-and-observation.md",
@@ -565,8 +579,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "a7c88a67e47a28e418d6b6fa3791f14f51442d19ddc87e955a142f098c72d824",
-      "translationSha256": "9ceda3b0b9768f7302137b9b46726895ad378f8d6ab3fe96b2c746f1160eda08"
+      "sourceSha256": "d4b28ef447abcf007d62d58be0ae65c5a1b623da3880766964f0c96256833eca",
+      "translationSha256": "d1e6a65843e2175043ca4dd88bcd0211b03a94da022c8aa0cb29d14273ae0e63"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",
@@ -670,8 +684,8 @@
       "source": "examples/station-rules.ghost.md",
       "sourceLanguage": "en",
       "translation": "examples/station-rules.ghost.ko.md",
-      "sourceSha256": "a2be97a7d654e3143144e58e378318297bc6afa9ef9cc4804e1cf67870ab93f5",
-      "translationSha256": "30b99475ce13bc0b0e711d9167bc7fc0bde441c8a5676672afdac41662e530ca"
+      "sourceSha256": "cbb466e0e90b34b9ee6d7847846719e1fdd85f10d40cfecb081fdd7e2ce1f46e",
+      "translationSha256": "e5a2aaccec9df9df9e8922649a102b607eb74f4321cac9c15266a8570c07ce79"
     },
     {
       "source": "examples/tutorial/01-latch.ghost.md",

@@ -100,6 +100,7 @@ const TARGETS = Object.freeze([
   'tools/control.mjs', 'tools/gfb1.mjs', 'tools/core-ir.mjs', 'tools/literate.mjs', 'tools/toolchain.mjs',
   'runtimes/wasm/control-runtime.mjs', 'runtimes/wasm/ghostflow-runtime.mjs',
   'runtimes/wasm/estimate-evidence.mjs',
+  'runtimes/node/resource-constraints-binding.mjs',
 ]);
 const EXCLUDED = Object.freeze([{ test: 'tests/requirement-catalog.test.mjs', reason: 'catalog status is a separate requirement-governance gate, not language execution coverage' }]);
 const MINIMUM = Object.freeze({ functions: 100, lines: 88, v8BlockRanges: 77 });

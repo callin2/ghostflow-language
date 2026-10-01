@@ -5,6 +5,32 @@
 
 ## 미출시
 
+### 2026-10-01 — control-owned 제약 그룹 정리 ([#157](https://github.com/callin2/ghostflow-language/issues/157))
+
+Reference §4.8에서 local 출력, 공유 자원, accounting 적용 범위를 구분합니다.
+이제 control 하나에서 기존 Bool 출력 규칙을
+`constraints Local { require at safe_output pump => valve; }`로 묶습니다.
+이전에는 그룹 밖에서만 수용했습니다. 그룹은 기존 native/WASM 출력 projection,
+fixed-point 차단과 회복 의미를 유지하며 소스에 연결된 규칙 관찰도 보존합니다.
+
+기존 targeted 문법 `constraints Shared for resource { ... }`를 같은 control
+안에서 검사합니다. 명시적인 `safe { alias = false; ... }` 값은 유한한 Bool
+자원을 모두 포함하고 필수 predicate를 만족해야 합니다. false를 모든 자원에
+안전한 값으로 추론하지 않습니다. 공유 계약은 #158의 binding·enforcement
+전까지 명시적으로 실행 불가능한 descriptor만 만들며, 제약을 조용히 제거해
+실행 bytecode를 만들 수 없습니다. import·instance·connect와 accounting limit의
+기존 의미는 보존합니다. 독립 `ghostrules` profile은 실제 Station demo와 Station
+WASM 소비자를 위해서만 유지하고 제한된 계약을 별도로 문서화합니다.
+물리 output ABI나 안전 시퀀스는 추가하지 않습니다. 그룹 소스는 새 컴파일러로
+재컴파일하며, 기존 그룹 밖 규칙은 계속 유효합니다.
+참조 논리 mapping 검사는 정본 source/artifact 해시, 안정 resource identity와
+유한한 Bool 입력·출력 port를 고정하고 누락·불일치·위장 binding을 거부한다.
+실행 권한을 주지 않으며, 완전한 소프트웨어 전용 예제는
+`examples/shared-constraint-contract.ghost.md`다.
+검증은 완전한 `examples/constraint-envelope.ghost.md`, 문법 및 잘못된 safe 값,
+실제 native/plain/framed-WASM 동등성, 누락 참조, 미지원 권고 단계와 binding
+없는 실행 거부를 포함합니다.
+
 ### 2026-10-01 — accounting 전용 artifact profile ([#210](https://github.com/callin2/ghostflow-language/issues/210))
 
 실행 가능한 accounting source는 `on_time` account만 있고 context를 생성하는

@@ -8,15 +8,103 @@ Current syntax and semantics for operating settings follow [Reference §5.1–5.
 See [implementation scope](IMPLEMENTATION.md) and [traceability](TRACEABILITY.md) for execution coverage.
 This is a subsequent contract for the [selected control syntax](LANGUAGE-SURFACE.md).
 
-Executable portions and future **design examples** coexist below.
-Control is compiled by `ghostc`; the standalone `constraints Name { ... }` form in this document is compiled separately from canonical `.ghost.md` documents by `ghostrules`.
-That standalone form is not `ghostc` input.
-The `constraints Name for resource { ... }` notation in [Reference §4.8](reference/04-sensors-constraints-control.md#48-공통-constraints-표기와-연산) is `ghostc` syntax.
-The two compilers support different rule subsets.
-The CLI extracts only top-level `ghost` fenced code precisely and rejects plain `.ghost` input.
-`compileConstraints` in `tools/constraints.mjs` is an internal lowerer accepting only this extracted code, not a general-purpose solver supporting the whole DSL.
-Facility/port names in `constraints` examples must be bound to the installation configuration.
-Each example distinguishes complete controls from fragments placed inside a control.
+The canonical authored surface is named `constraints` inside one `.ghost.md`
+control. Local Bool output constraints, shared resource policies and accounting
+use named groups but have distinct targets and execution contracts. Follow
+[Reference §4.8](reference/04-sensors-constraints-control.en.md#48-common-constraints-notation-and-operations).
+The existing standalone `constraints Name { ... }` examples below are **Station
+adapter examples**. Retain that bounded `ghostrules` path only for the actual
+programming-book WASM simulation, `tools/station-demo.mjs` and the fixed Station
+artifact consumed by `bindStationPolicy`. It is neither generic canonical syntax
+nor arbitrary PID safety enforcement. Historical notation alone does not justify
+another compatibility path. The CLI extracts top-level `ghost` fences and rejects
+plain `.ghost` input. `compileConstraints` is the Station adapter's internal
+lowerer, not a generic solver. Do not confuse shared descriptor validation with
+actual binding and enforcement.
+
+## Canonical local, shared and accounting boundaries
+
+Complete canonical files are [the executable local envelope](../examples/constraint-envelope.ghost.md)
+and [the checked shared contract with its complete logical mapping](../examples/shared-constraint-contract.ghost.md).
+`validateResourceConstraintBinding` validates revision, exact canonical source/artifact
+digests, every required stable resource identity and typed port, and every finite
+exclusive-mode input. It rejects missing/extra mappings, disguised duplicate
+resource identities or ports, and host-supplied policy fields. Validation returns
+`executable: false`; it grants neither admission nor output authority. This is a
+reference logical binding contract, not a physical output ABI.
+
+This is a complete local-constraint control. Local constraints apply only to
+this control's outputs and execute through ordinary Bool lowering. Existing
+ungrouped `require` and `mutex` retain the same meaning.
+
+```ghost
+control LocalPump {
+  input request, valve_ready: Bool;
+  output pump, valve: Bool;
+  pump <- request;
+  valve <- valve_ready;
+  constraints LocalRules {
+    require at safe_output pump => valve;
+  }
+}
+```
+
+A shared resource policy states its scope with `constraints Name for resource`.
+This is **complete checked source producing a non-executable descriptor**.
+`ghostc` source checking validates declarations, types, finite sets and safe-value
+relations. `compileControl` and composition reject this policy while its executable
+binding and enforcement are unavailable.
+
+```ghost
+control SharedPumpPolicy {
+  resource station: Station;
+  resource pump1: BoolActuator;
+  resource valve1: BoolActuator;
+  input automatic, manual, pump_request, valve_request: Bool;
+  output pump, valve: Bool;
+  pump <- pump_request;
+  valve <- valve_request;
+  constraints SharedRules for station {
+    exclusive at admission { automatic, manual };
+    require at safe_output pump1.on => any_on({ valve1 });
+    safe { pump1 = false; valve1 = true; }
+  }
+}
+```
+
+`safe` explicitly assigns every Bool resource in the finite referenced set and
+must satisfy all mandatory output relations. These values are pump OFF and valve
+ON, not a hidden all-OFF default. Do not assume the source `pump`/`valve` requests
+have been connected to physical resources. Stable resource identity, all automatic/
+manual paths, staged enforcement, trace and recovery belong to the separate
+execution contract in [#158](https://github.com/callin2/ghostflow-language/issues/158).
+Former top-level resource-policy files also remain checked non-control artifacts,
+never enforced controls. Do not invent `station`, `use`, `bind` or session syntax.
+
+Accounting declares the existing `resource` and `account`, then uses
+`constraints Budget { limit used(account, basis) <= bound { ... } }`.
+Do not replace local Bool conditions or shared admission with a usage ledger.
+[Reference §3.10](reference/03-time-and-schedules.en.md#310-time-based-usage-constraints)
+defines the usage stage, basis and persistence.
+
+Constraints form the **permitted region** for requests, including goals/PID.
+Local constraints affect only their own control; shared constraints apply to all
+automatic, manual and fallback paths using the same resource. A predicted violation
+before starting denies new admission. During execution, follow the authored
+resource-specific safe behavior rather than unconditionally turning everything
+OFF. This distinction does not implement a general output ABI or physical safe
+sequence. Do not generalize the existing narrower PID engine contract into
+arbitrary resource-policy enforcement.
+
+All mandatory conditions combine as AND. Decide admission first, check safe_output
+relations on the requested candidate, then let the Driver apply it. Arbitration
+priority chooses within the permitted region; it cannot bypass mandatory
+constraints, binding, provenance or recovery requirements. Retain violation causes
+separately from denials and safe transitions. Normal observations do not create new
+start authority; retries and recovery follow the same rules. `check pump_capacity`
+is a nonblocking advisory in the Station adapter below, not a mandatory require.
+`warn` and `monitor` are unsupported; do not silently promote warnings to safety
+requires or commands.
 
 ## Direction established in this conversation
 
@@ -38,10 +126,12 @@ A policy immediately executing manual requests during automatic operation solely
 Attach local constraints inside a control and shared constraints to a facility scope defined by the device profile.
 When multiple controls reference the same pump, they share constraints and usage for one physical pump ID.
 
-The following is a facility-configuration example in the standalone form compiled by `ghostrules`.
+This and the subsequent standalone groups are facility examples for the fixed Station adapter.
 `station`, `pump1`, `settings`, and `starts` connect to stable IDs of facilities/settings/schedules.
 `pump1.valves` is a finite valve set with preregistered supply relationships.
 Do not connect by discovery order or display name.
+
+Station adapter example — bounded standalone rules for the fixed facility adapter.
 
 ```text
 constraints StationRules {
@@ -76,7 +166,7 @@ The mode manager owns one `Stopped | Auto | Manual | Configure` value; those nam
 | check | Non-blocking analysis using optional information | Pass / Violation / Unknown diagnostic; does not block execution |
 | warn ... when | Future design notation; currently rejected by both parsers | Record a warning event with cause and target |
 
-Existing one-line `require` also lowers into the same constraint model.
+Local-control one-line Bool `require` and this Station adapter have different execution paths.
 A warning is not an exception allowing a constraint violation; clearing it does not release mandatory constraints.
 The host owns notification delivery and does not repeatedly send the same violation to users every tick.
 
@@ -113,6 +203,8 @@ Shared concurrent operation or preemption is a separate opt-in policy and does n
 This case binds the existing and new controls' pumps to physical `pump1`, and their valve ports to `valve1`–`valve4` respectively in installation configuration.
 These connections are device bindings required for control, not pressure/flow metadata.
 The following rules attach to that facility.
+
+Station adapter example — bounded standalone rules for the fixed facility adapter.
 
 ```ghost
 constraints SharedPump {
@@ -231,6 +323,8 @@ The precise boundary is recorded in `docs/OPERATOR-SETTINGS-STREAM.md`.
 This is not an example attaching a stop condition to operator changes of `water1_time` above.
 `mode` and `station` are names supplied by the facility manager.
 
+Station adapter example — bounded standalone rules for the fixed facility adapter.
+
 ```ghost
 constraints EditInterlock {
   exclusive(automatic, manual, configuring);
@@ -279,6 +373,8 @@ Invalid directly entered values/units can be diagnosed during editing and reject
 
 The following basic rules can be used even when no pressure/flow information is entered.
 
+Station adapter example — bounded standalone rules for the fixed facility adapter.
+
 ```ghost
 constraints BasicWatering {
   require count_on(pump1.valves) <= 2;
@@ -288,6 +384,8 @@ constraints BasicWatering {
 
 Add the following rules only when capacity analysis is desired.
 Both groups can apply together.
+
+Station adapter example — bounded standalone rules for the fixed facility adapter.
 
 ```ghost
 constraints CapacityAdvice {
@@ -322,6 +420,8 @@ The actual pump operating point is determined by pump and system curves.
 
 Conservative flow limits or permitted valve combinations per operating condition verified at installation can be added to the profile only when desired.
 The following is a syntax sketch for optional analysis.
+
+Station adapter example — bounded standalone rules for the fixed facility adapter.
 
 ```text
 constraints PumpCapacity {
@@ -604,6 +704,8 @@ schedule starts: DailySlots<15min> {
   selected = [06:00, 06:15, 12:30, 18:45];
 }
 ```
+
+Station adapter example — bounded standalone rules for the fixed facility adapter.
 
 ```ghost
 constraints DailyWatering {

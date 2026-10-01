@@ -8,6 +8,21 @@ const faq = fs.readFileSync(new URL('../docs/language_faq.md', import.meta.url),
 const programming = fs.readFileSync(new URL('../docs/ProgrammingInGhostflow.md', import.meta.url), 'utf8');
 const programmingEnglish = fs.readFileSync(new URL('../docs/ProgrammingInGhostflow.en.md', import.meta.url), 'utf8');
 
+test('canonical constraint examples distinguish executable local control from checked shared descriptor', () => {
+  for (const name of ['CONSTRAINTS.md', 'CONSTRAINTS.en.md']) {
+    const document = fs.readFileSync(new URL(`../docs/${name}`, import.meta.url), 'utf8');
+    const fences = [...document.matchAll(/```ghost\n(control (?:LocalPump|SharedPumpPolicy) \{[\s\S]*?)\n```/g)];
+    const local = fences.find(match => match[1].startsWith('control LocalPump'));
+    const shared = fences.find(match => match[1].startsWith('control SharedPumpPolicy'));
+    assert.ok(local && shared, 'complete named examples and all dependencies must be shown');
+    const compile = code => compileSourceSync(`# Example\n\n\`\`\`ghost\n${code}\n\`\`\`\n`, { filename: 'constraints-example.ghost.md' });
+    assert.match(compile(local[1]).manifest.format, /^GhostFlow\/control-v\d+$/);
+    const descriptor = compile(shared[1]);
+    assert.equal(descriptor.manifest.format, 'GhostFlow/control-policy-descriptor-v1');
+    assert.equal(JSON.parse(Buffer.from(descriptor.bytes).toString('utf8')).executable, false);
+  }
+});
+
 function example(section, marker, nextMarker) {
   const start = section.indexOf(marker);
   assert.notEqual(start, -1, `missing example ${marker}`);

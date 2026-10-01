@@ -1,7 +1,7 @@
 import { attachIntentMetadata, remapSourceTrace } from './source-trace.mjs';
 import { emitInteractionSchema } from './interaction-schema.mjs';
 import { extractLiterate, mapSourcePosition } from './literate.mjs';
-import { compileAccountingControl, compileControl, compileResourcePolicyArtifact, compileScheduleDescriptorArtifact, compileTemporalDescriptorArtifact, hasTemporalDescriptorCalls, isExecutablePulseSchedule, isExecutableRangeSchedule, parseControl } from './control.mjs';
+import { compileAccountingControl, compileControl, compileControlPolicyDescriptorArtifact, compileResourcePolicyArtifact, compileScheduleDescriptorArtifact, compileTemporalDescriptorArtifact, hasTemporalDescriptorCalls, isExecutablePulseSchedule, isExecutableRangeSchedule, parseControl } from './control.mjs';
 import { isWellFormedUnicode, sha256Hex, utf8ByteLength } from './sha256.mjs';
 import { compileComposition, resolveDocument } from './composition.mjs';
 
@@ -98,6 +98,8 @@ export function compileSourceSync(source, options = {}) {
       result = composition.result;
     } else result = ast.kind === 'resource-policy'
       ? compileResourcePolicyArtifact(extraction.code, { filename })
+      : ast.body.some(item => item.kind === 'shared-constraints')
+        ? compileControlPolicyDescriptorArtifact(extraction.code, { filename })
       : ast.body.some(item => item.kind === 'account' || item.kind === 'account-constraints')
         ? compileAccountingControl(extraction.code, { filename })
       : ast.body.some(item => item.kind === 'schedule' && !isExecutablePulseSchedule(item) && !isExecutableRangeSchedule(item)
@@ -166,6 +168,35 @@ export function compileSourceSync(source, options = {}) {
       }),
     };
   }
+  const mapFor = name => composition?.units.get(resolveDocument('', name))?.extraction.sourceMap ?? extraction.sourceMap;
+  const remapConstraintSource = identity => {
+    if (!identity) return identity;
+    const original = mapSourcePosition(mapFor(identity.filename), identity.line, identity.column);
+    if (!original) return identity;
+    const end = mapSourcePosition(mapFor(identity.filename), identity.endLine ?? identity.line, identity.endColumn ?? identity.column);
+    const { nodeId, ...extracted } = identity;
+    return { nodeId, filename: original.file, line: original.line, column: original.column,
+      ...(end ? { endLine: end.line, endColumn: end.column } : {}), extracted };
+  };
+  const controlManifest = result.manifest?.format === 'GhostFlow/control-policy-descriptor-v1'
+    ? result.manifest.control : result.manifest;
+  if (controlManifest?.sharedResourceConstraints || controlManifest?.localConstraints) {
+    const mappedControl = { ...controlManifest };
+    for (const key of ['sharedResourceConstraints', 'localConstraints']) if (controlManifest[key]) {
+      mappedControl[key] = controlManifest[key].map(group => ({ ...group, source: remapConstraintSource(group.source),
+        rules: group.rules.map(rule => ({ ...rule, source: remapConstraintSource(rule.source) })),
+        ...(group.safe ? { safe: group.safe.map(entry => ({ ...entry, source: remapConstraintSource(entry.source) })) } : {}),
+      }));
+    }
+    result = { ...result, manifest: result.manifest.format === 'GhostFlow/control-policy-descriptor-v1'
+      ? { ...result.manifest, control: mappedControl } : mappedControl };
+  }
+  if (result.manifest?.format === 'GhostFlow/control-policy-descriptor-v1') {
+    const artifact = JSON.parse(new TextDecoder().decode(result.bytes));
+    result = { ...result, bytes: new TextEncoder().encode(JSON.stringify({ ...artifact, manifest: result.manifest,
+      sourceDocument: { format: SOURCE_DOCUMENT_FORMAT, kind: 'literate', filename, text: source, sha256: sha256Hex(source) },
+    })) };
+  }
   const bytes = Uint8Array.from(result.bytes);
   if (bytes.byteLength > SOURCE_LIMIT) throw new Error('compiled module byte limit exceeded');
   const digest = sha256Hex(bytes);
@@ -176,7 +207,6 @@ export function compileSourceSync(source, options = {}) {
     text: source,
     sha256: sha256Hex(source),
   };
-  const mapFor = name => composition?.units.get(resolveDocument('', name))?.extraction.sourceMap ?? extraction.sourceMap;
   const mappedTrace = composition ? (() => {
     const trace = { ...result.traceMetadata };
     for (const key of ['bindings', 'constraints', 'resultSites', 'windowSites', 'intentLinks']) if (Array.isArray(trace[key])) {
@@ -201,7 +231,7 @@ export function compileSourceSync(source, options = {}) {
     traceMetadata,
     manifest: result.manifest ? {
       ...result.manifest, bytecodeSha256: digest,
-      ...(['GhostFlow/schedule-descriptor-v1', 'GhostFlow/temporal-descriptor-v1'].includes(result.manifest.format)
+      ...(['GhostFlow/schedule-descriptor-v1', 'GhostFlow/temporal-descriptor-v1', 'GhostFlow/control-policy-descriptor-v1'].includes(result.manifest.format)
         ? { sourceDocumentSha256: sourceDocument.sha256 } : {}),
     } : null,
     extractionMap: extraction.sourceMap,
