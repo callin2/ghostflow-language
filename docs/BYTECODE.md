@@ -1,5 +1,16 @@
 # GFB bytecode
 
+GFB18 adds the adopted calendar boundary profile `GhostFlow/control-v18`.
+Prelude tag 17 is a calendar-filtered immutable UTC Daily Range; tag 18 is a
+typed calendar Result with protected Bool/Bool/fault-code inputs. Their exact
+layouts and unchanged GFSF5 facts are in
+[Context execution ABI](CONTEXT-EXECUTION-ABI.md#gfb18-calendar-boundaries).
+Range rejects work intervals crossing midnight while permitting explicit
+separate ranges ending at midnight and starting on the next date. Existing
+ordinary Range and older binary layouts retain their semantics. A GFB18 header
+is required for these tags; older loaders reject it. These identifiers do not
+certify a Device release or physical execution.
+
 ## Bounded natural policies (GFB13)
 
 Only extended Solar/Tide policies select GFB13 and `GhostFlow/control-v12`; legacy profile bytes remain unchanged. Solar tag 1 retains its layout and appends after the `when` expression `holdMs:u64` (0 means none) and `fallbackAtMs:u64` (86400000 means skip). Context records append `holdMs:u64` after the cancellation expression. Manifest policies are objects: clock `{kind: 'hold_trusted', durationMs, terminal: 'skip'}`, fallback `{kind: 'fixed_time', atMs, terminal: 'skip'}`.

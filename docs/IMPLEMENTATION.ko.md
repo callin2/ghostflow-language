@@ -30,6 +30,15 @@ frame을 native framed VM과 비교하며 native 원본 sensor scenario 호스�
 
 확장 Solar/Tide 자연 정책은 GFB13과 `GhostFlow/control-v12`를 선택하며 Solar facts는 GFSF6을 사용한다. 기존 profile과 packet bytes는 그대로다. WASM 함수 이름은 바뀌지 않으며 이전 pinned runtime은 GFB13을 거부한다. 서명 portable-package의 config-only GFB11 profile은 넓히지 않는다. compiler/runtime 회귀 검증은 `natural-fallback-compiler.test.mjs`, `natural-fallback-runtime.test.mjs`, core `solar_tape` 테스트가 담당한다. 문서는 해당 실행 결과나 물리 Device 동작의 증거가 아니다.
 
+채택된 달력 경계 실행 범위는 GFB18과 `GhostFlow/control-v18`을 사용한다.
+`calendar_is`는 typed Result query로, 불변 UTC Daily work/off-day Range는
+calendar를 판정하는 admission으로 lowering한다. 두 형태 모두 식별된 snapshot과
+그대로 유지되는 GFSF5 fact를 받아 공유 Rust core에서 실행한다. 일치하는 명시적 UTC
+binding이 필요하다. 자정을 넘는 work range는 거부하여 별도 선언으로 나누어야 하며
+일반 UTC range는 기존 동작을 유지한다. 비 UTC Range, shift 귀속, 보류된 Window/Run
+basis를 구현하지 않는다. native와 framed WASM의 acceptance 증거는 문서나 model이
+아니라 `tests/reference-calendar-boundary.test.mjs`에 둔다.
+
 ## 아티팩트와 버전
 
 | 항목 | 현재 표현 | 역할 |

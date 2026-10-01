@@ -37,6 +37,34 @@ A missing observation produces typed Unknown rather than fabricated evidence.
 
 ## Executable descriptors
 
+### GFB18 calendar boundaries
+
+`GhostFlow/control-v18` uses GFB18 for ordinary calendar Results and immutable
+UTC Daily work/off-day ranges. Its new prelude tags are:
+
+| Tag | Body |
+| --- | --- |
+| 17 Calendar Range | u32 site, string name, u64 gapMs, string timezone (`UTC`), u64 durationMs, u16 startCount followed by u64 startsMs, string calendar, u8 selector, Bool expression blobs when/cancel |
+| 18 Calendar Result | u32 site, string name/calendar, u8 selector, string timezone (`UTC`), u16 ok/value/fault protected input indices |
+
+Range selectors are workday 0 or offday 1; Result additionally permits holiday 2.
+The source Range slice is immutable UTC Daily. Its half-open interval must end
+at or before midnight; a work interval crossing midnight is rejected and must
+be represented by separate explicit declarations. Ordinary UTC Range keeps its
+existing semantics. Calendar eligibility is checked before new admission;
+an admitted Range retains its monotonic deadline.
+
+Both descriptors consume existing GFSF5 `schedule` facts keyed by site, carrying
+the optional calendar snapshot. Result and Range require no provider observation
+or civil occurrence rows. Rust derives the UTC date from trusted clock evidence
+and evaluates the calendar, preserving missing, out-of-coverage and expired
+faults. The Result projection is Bool/Bool/Number, with a finite CalendarFault
+code. These inputs are protected; the host cannot supply eligibility projections.
+Activation requires an explicit matching UTC calendar binding. Snapshot equality,
+revision history, bounded retention and rejected-scan atomicity apply across
+Result, Range and Daily pulse consumers sharing a binding. Existing facts and
+checkpoint formats stay unchanged; older loaders reject the new GFB header.
+
 GFB10 retains the GFB temporal header and tagged strategy preludes. Existing
 tags 0–4 retain their layouts. Tags 5–9 begin with `u32 site, string name,
 u64 gapMs`, and end with the Bool expression blobs `when, cancel`.

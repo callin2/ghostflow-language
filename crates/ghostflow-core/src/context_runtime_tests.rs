@@ -3,6 +3,394 @@ use context_vm::*;
 use schedule_clock::{ClockSnapshot, ClockTrust};
 use schedule_vm::{PulseDescriptor, ScheduleRequirements, ScheduleStrategy};
 
+fn calendar18_program(with_range: bool) -> Module {
+    let descriptor = PulseDescriptor::Calendar(CalendarDescriptor {
+        site: 7,
+        name: "working".into(),
+        calendar: "workers".into(),
+        selector: work_calendar::DaySelector::Workday,
+        timezone: "UTC".into(),
+        ok_input: 2,
+        value_input: 3,
+        fault_input: 4,
+    });
+    let mut program = module(descriptor, true);
+    program.format_version = 18;
+    for (index, suffix) in [(2, "ok"), (3, "value"), (4, "fault")] {
+        program.inputs[index].name = format!("__gf_calendar_7_{suffix}");
+    }
+    program.strategies[0].intents = vec![
+        Intent {
+            name: "ok".into(),
+            value_type: Type::Bool,
+            expression: vec![3, 2, 0],
+        },
+        Intent {
+            name: "value".into(),
+            value_type: Type::Bool,
+            expression: vec![3, 3, 0],
+        },
+        Intent {
+            name: "fault".into(),
+            value_type: Type::Number,
+            expression: vec![3, 4, 0],
+        },
+    ];
+    if with_range {
+        let schedules = &mut program.schedules.as_mut().unwrap().strategies[0];
+        schedules
+            .schedules
+            .push(PulseDescriptor::Context(ScheduleDescriptor {
+                clock_hold_ms: None,
+                site: 8,
+                name: "work-range".into(),
+                gap_ms: 1_000,
+                definition: ScheduleDefinition::CalendarRange {
+                    timezone: "UTC".into(),
+                    starts_ms: vec![100],
+                    duration_ms: 200,
+                    calendar: "workers".into(),
+                    offday: false,
+                },
+                when: vec![1, 1],
+                cancel: vec![1, 0],
+            }));
+        schedules
+            .prelude
+            .push(schedule_vm::PreludeEntry::Schedule(1));
+        program.strategies[0].intents.push(Intent {
+            name: "active".into(),
+            value_type: Type::Bool,
+            expression: vec![58, 1, 0, 2],
+        });
+    }
+    program
+}
+
+fn calendar18_activation(epoch: u64) -> context_runtime::Activation {
+    let mut activation = calendar_activation(epoch, 8);
+    activation.bindings[0].timezone = "UTC".into();
+    activation
+}
+
+fn calendar18_snapshot() -> work_calendar::WorkCalendarSnapshot {
+    let mut snapshot = calendar_snapshot("r1");
+    snapshot.timezone = "UTC".into();
+    snapshot.expires_at_ms = 86_400_000 * 7;
+    snapshot.covered_to_date_exclusive = 7;
+    snapshot
+}
+
+fn calendar18_facts(
+    with_range: bool,
+    snapshot: Option<work_calendar::WorkCalendarSnapshot>,
+) -> context_runtime::Facts {
+    let mut facts = calendar_facts(snapshot);
+    if !with_range {
+        facts.schedules.pop();
+    }
+    for evidence in &mut facts.schedules {
+        evidence.coverage_end_ms = 86_400_000 * 7;
+    }
+    facts
+}
+
+fn calendar18_runtime(with_range: bool, epoch: u64) -> Runtime {
+    let mut runtime = Runtime::new(8);
+    runtime.install(calendar18_program(with_range), false);
+    runtime
+        .activate_with_context(&calendar18_activation(epoch))
+        .unwrap();
+    runtime
+}
+
+#[test]
+fn calendar18_result_uses_current_trusted_day_and_preserves_fault_codes() {
+    let mut runtime = calendar18_runtime(false, 1);
+    let snapshot = calendar18_snapshot();
+    // Thursday is work, explicit Friday holiday is off, Sunday is off,
+    // Monday is work. Date is derived in Rust, not supplied as a host Boolean.
+    for (mono, day, expected) in [(0, 0, true), (1, 1, false), (2, 3, false), (3, 4, true)] {
+        inputs(&mut runtime, 1, mono, None);
+        let row = runtime
+            .tick_with_context(
+                clock(1, mono, day * 86_400_000),
+                &calendar18_facts(false, Some(snapshot.clone())),
+            )
+            .unwrap();
+        assert_eq!(row.requested_intents["ok"], Value::Bool(true));
+        assert_eq!(row.requested_intents["value"], Value::Bool(expected));
+        assert_eq!(row.requested_intents["fault"], Value::Number(0.0));
+    }
+    for (mono, wall, data, trust, expected) in [
+        (4, 0, None, ClockTrust::Trusted, 1),
+        (
+            5,
+            7 * 86_400_000,
+            Some(snapshot.clone()),
+            ClockTrust::Trusted,
+            2,
+        ),
+        (
+            6,
+            0,
+            Some({
+                let mut expired = snapshot.clone();
+                expired.expires_at_ms = 0;
+                expired
+            }),
+            ClockTrust::Trusted,
+            2,
+        ),
+        (7, 0, Some(snapshot), ClockTrust::Unknown("lost"), 0),
+    ] {
+        // A distinct expired envelope needs its own revision.
+        let data = data.map(|mut s| {
+            if s.expires_at_ms == 0 {
+                s.revision = "expired".into();
+            }
+            s
+        });
+        inputs(&mut runtime, 1, mono, None);
+        let row = runtime
+            .tick_with_context(
+                ClockSnapshot {
+                    trust,
+                    ..clock(1, mono, wall)
+                },
+                &calendar18_facts(false, data),
+            )
+            .unwrap();
+        assert_eq!(row.requested_intents["ok"], Value::Bool(false));
+        assert_eq!(row.requested_intents["value"], Value::Bool(false));
+        assert_eq!(
+            row.requested_intents["fault"],
+            Value::Number(expected as f64)
+        );
+    }
+    for suffix in ["ok", "value", "fault"] {
+        assert!(runtime
+            .set_input(
+                &format!("__gf_calendar_7_{suffix}"),
+                if suffix == "fault" {
+                    Value::Number(0.0)
+                } else {
+                    Value::Bool(true)
+                }
+            )
+            .is_err());
+    }
+}
+
+#[test]
+fn calendar18_query_and_range_share_atomic_immutable_snapshot_and_checkpoint_history() {
+    let mut runtime = calendar18_runtime(true, 1);
+    let snapshot = calendar18_snapshot();
+    let before = runtime.context_checkpoint().unwrap();
+    for data in [
+        None,
+        Some({
+            let mut s = snapshot.clone();
+            s.revision = "r2".into();
+            s
+        }),
+    ] {
+        let mut facts = calendar18_facts(true, Some(snapshot.clone()));
+        facts.schedules[1].calendar = data;
+        inputs(&mut runtime, 1, 100, None);
+        assert!(runtime
+            .tick_with_context(clock(1, 100, 100), &facts)
+            .is_err());
+        assert_eq!(runtime.context_checkpoint().unwrap(), before);
+        assert!(runtime.journal.is_empty());
+    }
+    let mut missing = calendar18_facts(true, Some(snapshot.clone()));
+    missing.schedules.remove(0);
+    inputs(&mut runtime, 1, 100, None);
+    assert!(runtime
+        .tick_with_context(clock(1, 100, 100), &missing)
+        .is_err());
+    assert_eq!(runtime.context_checkpoint().unwrap(), before);
+    inputs(&mut runtime, 1, 0, None);
+    runtime
+        .tick_with_context(
+            clock(1, 0, 100),
+            &calendar18_facts(true, Some(snapshot.clone())),
+        )
+        .unwrap();
+    let checkpoint = runtime.context_checkpoint().unwrap();
+    let mut reboot = calendar18_runtime(true, 2);
+    reboot.restore_context_checkpoint(&checkpoint).unwrap();
+    let mut changed = snapshot;
+    changed.weekly_work_mask = 0;
+    inputs(&mut reboot, 2, 0, None);
+    assert!(reboot
+        .tick_with_context(clock(2, 0, 100), &calendar18_facts(true, Some(changed)))
+        .is_err());
+    assert_eq!(reboot.context_checkpoint().unwrap(), checkpoint);
+}
+
+#[test]
+fn calendar18_range_missing_or_offday_denies_admission_but_active_deadline_is_monotonic() {
+    let mut runtime = calendar18_runtime(true, 1);
+    inputs(&mut runtime, 1, 0, None);
+    let row = runtime
+        .tick_with_context(clock(1, 0, 100), &calendar18_facts(true, None))
+        .unwrap();
+    assert_eq!(row.requested_intents["active"], Value::Bool(false));
+    assert!(row
+        .context_trace
+        .iter()
+        .any(|o| o.site == 8 && o.decision == "Unknown(CalendarMissing)"));
+    inputs(&mut runtime, 1, 1, None);
+    let row = runtime
+        .tick_with_context(
+            clock(1, 1, 101),
+            &calendar18_facts(true, Some(calendar18_snapshot())),
+        )
+        .unwrap();
+    assert_eq!(row.requested_intents["active"], Value::Bool(true));
+    assert!(row
+        .context_trace
+        .iter()
+        .any(|o| o.site == 8 && o.decision == "Due" && o.provider_revision == "r1"));
+    // A new off-day revision does not reclassify the admitted occurrence.
+    let mut off_revision = calendar18_snapshot();
+    off_revision.revision = "off-revision".into();
+    off_revision.weekly_work_mask = 0;
+    inputs(&mut runtime, 1, 2, None);
+    let row = runtime
+        .tick_with_context(
+            clock(1, 2, 102),
+            &calendar18_facts(true, Some(off_revision)),
+        )
+        .unwrap();
+    assert_eq!(row.requested_intents["value"], Value::Bool(false));
+    assert_eq!(row.requested_intents["active"], Value::Bool(true));
+    assert!(row
+        .context_trace
+        .iter()
+        .any(|o| o.site == 8 && o.provider_revision == "r1"));
+    // Loss of calendar and a wall correction do not retime or cancel admission.
+    inputs(&mut runtime, 1, 199, None);
+    let row = runtime
+        .tick_with_context(clock(1, 199, 86_400_100), &calendar18_facts(true, None))
+        .unwrap();
+    assert_eq!(row.requested_intents["active"], Value::Bool(true));
+    assert!(row
+        .context_trace
+        .iter()
+        .any(|o| o.site == 8 && o.provider_revision == "r1"));
+    inputs(&mut runtime, 1, 200, None);
+    let row = runtime
+        .tick_with_context(clock(1, 200, 86_400_100), &calendar18_facts(true, None))
+        .unwrap();
+    assert_eq!(row.requested_intents["active"], Value::Bool(false));
+    let mut off_runtime = calendar18_runtime(true, 1);
+    inputs(&mut off_runtime, 1, 0, None);
+    let row = off_runtime
+        .tick_with_context(
+            clock(1, 0, 86_400_100),
+            &calendar18_facts(true, Some(calendar18_snapshot())),
+        )
+        .unwrap();
+    assert_eq!(row.requested_intents["active"], Value::Bool(false));
+    assert!(row
+        .context_trace
+        .iter()
+        .any(|o| o.site == 8 && o.decision == "ExcludedDay"));
+}
+
+#[test]
+fn calendar18_query_revision_capacity_rejects_without_committing_clock_or_history() {
+    let mut runtime = calendar18_runtime(false, 1);
+    // Activation's capacity of eight bounds retained calendar revisions too.
+    for mono in 0..8 {
+        let mut snapshot = calendar18_snapshot();
+        snapshot.revision = format!("revision-{mono}");
+        inputs(&mut runtime, 1, mono, None);
+        runtime
+            .tick_with_context(clock(1, mono, 0), &calendar18_facts(false, Some(snapshot)))
+            .unwrap();
+    }
+    let checkpoint = runtime.context_checkpoint().unwrap();
+    let mut excess = calendar18_snapshot();
+    excess.revision = "revision-over-capacity".into();
+    inputs(&mut runtime, 1, 10, None);
+    assert!(runtime
+        .tick_with_context(clock(1, 10, 0), &calendar18_facts(false, Some(excess)))
+        .is_err());
+    assert_eq!(runtime.context_checkpoint().unwrap(), checkpoint);
+    // Reuse the same immutable envelope at an earlier accepted monotonic tick.
+    let mut known = calendar18_snapshot();
+    known.revision = "revision-0".into();
+    inputs(&mut runtime, 1, 8, None);
+    runtime
+        .tick_with_context(clock(1, 8, 0), &calendar18_facts(false, Some(known)))
+        .unwrap();
+}
+
+#[test]
+fn calendar18_framed_scan_derives_clock_and_results_rejecting_caller_projections_atomically() {
+    let mut program = calendar18_program(true);
+    program.inputs.push(field("permit", Value::Bool(true)));
+    let mut runtime = Runtime::new(8);
+    runtime.install(program, false);
+    runtime
+        .activate_with_context(&calendar18_activation(1))
+        .unwrap();
+    let mut driver = runtime.into_scan_driver();
+    let pristine = driver.runtime().context_checkpoint().unwrap();
+    let frame = scan::ScanFrameV1 {
+        scan_id: 0,
+        logical_time_ms: 0,
+        inputs: vec![scan::ScanInput {
+            name: "permit".into(),
+            value: Value::Bool(true),
+        }],
+    };
+    let facts = calendar18_facts(true, Some(calendar18_snapshot()));
+    for (name, value) in [
+        ("__gf_time_epoch", Value::Number(1.0)),
+        ("__gf_calendar_7_ok", Value::Bool(true)),
+        ("__gf_calendar_7_value", Value::Bool(true)),
+        ("__gf_calendar_7_fault", Value::Number(0.0)),
+    ] {
+        let mut forged = frame.clone();
+        forged.inputs[0] = scan::ScanInput {
+            name: name.into(),
+            value,
+        };
+        assert_eq!(
+            driver
+                .scan_with_context(forged, clock(1, 0, 100), &facts)
+                .unwrap_err()
+                .to_string(),
+            "reserved input is runtime-derived"
+        );
+        assert_eq!(driver.runtime().context_checkpoint().unwrap(), pristine);
+        assert_eq!(driver.next_scan_id(), Some(0));
+    }
+    assert!(driver
+        .scan_with_context(frame.clone(), clock(1, 0, 100), &Default::default())
+        .is_err());
+    assert_eq!(driver.runtime().context_checkpoint().unwrap(), pristine);
+    let outcome = driver
+        .scan_with_context(frame, clock(1, 0, 100), &facts)
+        .unwrap();
+    assert_eq!(outcome.trace.inputs["__gf_time_epoch"], Value::Number(1.0));
+    assert_eq!(
+        outcome.trace.inputs["__gf_calendar_7_ok"],
+        Value::Bool(true)
+    );
+    assert_eq!(
+        outcome.trace.inputs["__gf_calendar_7_value"],
+        Value::Bool(true)
+    );
+    assert_eq!(outcome.trace.safe_intents["active"], Value::Bool(true));
+    assert_eq!(driver.next_scan_id(), Some(1));
+}
+
 fn calendar_program() -> Module {
     let descriptor = |site| {
         PulseDescriptor::Context(ScheduleDescriptor {

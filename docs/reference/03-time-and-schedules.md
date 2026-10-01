@@ -484,7 +484,11 @@ schedule morning_watering: Daily {
 
 이 불변 UTC `range` 예시는 실행 가능한 GFB12 control bytecode이다. 제한된 실행
 범위는 work calendar 없는 Daily와 비어 있지 않은 정적 DailySlots이며 `trusted_only`,
-`baseline`, `skip`을 사용한다. live 시작/duration 설정, Periodic Range와 다른 허용된
+`baseline`, `skip`을 사용한다. typed WorkCalendar와 `workday` 또는 `offday` selector를
+쓰는 불변 UTC Daily는 GFB18로 실행한다. 시작 시각과 duration의 합은 local midnight을
+넘을 수 없다. overnight work interval은 명시적인 별도 Daily range로 나눈다. 끝은
+제외되므로 정확히 자정에 끝나는 range는 유효하다. work calendar 없는 일반 range의
+기존 자정 동작은 유지한다. live 시작/duration 설정, Periodic Range와 다른 허용된
 변형은 descriptor로 유지한다. 비 UTC와 증명할 수 없는 overlap은 계속 거부하며
 timezone이나 DST 정책을 추측하지 않는다.
 
@@ -814,7 +818,10 @@ error다. calendar snapshot의 timezone은 schedule timezone과 같아야 한다
 `holiday`는 공휴일 날짜 목록의 membership이다. 같은 날짜의 작업 예외가 `work`여도
 공휴일 사실은 유지되며 weekly pattern이나 holiday work policy를 읽지 않는다.
 Daily pulse의 `holiday`, `workday`, `offday`는 typed calendar와 명시적인 공통/DST
-policy를 사용한다. weekday tag와 일반 `calendar_is` 식은 이 실행 범위에 포함되지 않는다.
+policy를 사용한다. weekday tag는 이 실행 범위에 포함되지 않는다.
+일반 `calendar_is`와 `workday`, `offday`, `holiday` selector는 아래의 typed Result를
+반환한다. 제한된 실행 profile은 명시적인 UTC calendar binding을 요구한다. 다른
+timezone profile은 activation에서 거부하며 host가 계산한 eligibility 값을 받지 않는다.
 
 달력 base와 override는 명시적으로 합성하여 새 ID/revision을 만든다. 원본은 불변이며
 timezone 불일치와 한 overlay 층의 중복 날짜를 거부한다. 같은 binding의 일정들은

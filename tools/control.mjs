@@ -1610,6 +1610,7 @@ class Lowerer {
     }
     if (contextForms.some(form => form[0] === 'holiday-daily-pulse')) this.manifest.format = 'GhostFlow/control-v14';
     if (contextForms.some(form => form[0] === 'solar-context-pulse')) this.manifest.format = 'GhostFlow/control-v15';
+    if (contextForms.some(form => ['calendar-range', 'calendar-result'].includes(form[0]))) this.manifest.format = 'GhostFlow/control-v18';
     const temporalForms = this.windows.length || this.trueFors.length || solarForms.length || contextForms.length ? [
       ['temporal-context', `${RESERVED_PREFIX}now_ms`, `${RESERVED_PREFIX}time_epoch`],
       ...[...this.temporalRoots.values()].sort((left, right) => left.tag - right.tag).map(root =>
@@ -2391,6 +2392,9 @@ class Lowerer {
         else if (trigger.kind === 'periodic') minimumSpacing = trigger.every.initialMs;
         else error(options.basis.loc, `${label} range requires a statically bounded recurrence`);
         if (range.constant > minimumSpacing) error(options.basis.loc, `${label} range occurrences must not overlap`);
+        if (trigger.day && (trigger.day.kind === 'holiday' || trigger.atMs + range.constant > 86_400_000)) {
+          error(options.basis.loc, 'work calendar Range must stay within one civil date; split overnight intervals into explicit Daily ranges');
+        }
         basis = { kind: 'range', durationMs: range.constant };
       } else error(options.basis.loc, `${label} basis must be pulse or range(positive Duration)`);
       const clock = choice('clock', ['trusted_only']);
@@ -3477,6 +3481,26 @@ class Lowerer {
       error(node.loc, 'removed alias ifthenelse; use if condition then value else value');
     }
     if (node.name === 'elapsed' || node.name === 'hysteresis' || node.name === 'median') error(node.loc, `${node.name} is only valid in its declaration`);
+    if (node.name === 'calendar_is') {
+      if (node.args.length !== 2 || node.named.length) error(node.loc, 'calendar_is expects a calendar and one day classification');
+      const calendarRef = node.args[0];
+      const calendar = calendarRef.kind === 'reference' ? this.calendars.get(calendarRef.name) : null;
+      if (!calendar) error(calendarRef.loc, 'calendar_is first argument must name a typed calendar');
+      if (options.pureFunction) error(calendarRef.loc, `fn ${options.pureFunction} cannot capture global ${calendarRef.name}`);
+      const selector = node.args[1];
+      const match = selector.kind === 'literal' ? /^day`(workday|offday|holiday)`$/.exec(selector.raw) : null;
+      if (!match) error(selector.loc, 'calendar_is requires day`workday`, day`offday` or day`holiday`');
+      if (calendar.type !== (match[1] === 'holiday' ? 'HolidayCalendar' : 'WorkCalendar')) error(calendarRef.loc, 'calendar_is calendar type does not match day selector');
+      const projectionInputs = Object.fromEntries(['ok', 'value', 'fault'].map(role => [role, this.generatedName(`calendar_${node.id}`, role)]));
+      for (const role of ['ok', 'value', 'fault']) this.addInput(projectionInputs[role], role === 'fault' ? NUMBER : BOOL, node.loc);
+      if (!this.hasClock) { this.addInput(`${RESERVED_PREFIX}now_ms`, NUMBER, node.loc); this.hasClock = true; }
+      if (!this.gfbInputs.some(input => input[1] === `${RESERVED_PREFIX}time_epoch`)) this.addInput(`${RESERVED_PREFIX}time_epoch`, NUMBER, node.loc);
+      (this.manifest.calendarConditions ??= []).push({ site: node.id, calendar: calendar.name, classification: match[1], timezone: 'UTC',
+        result: { value: 'Bool', error: 'CalendarFault' }, projectionInputs });
+      return { type: resultType(BOOL, semanticType('CalendarFault')), ok: `input.${projectionInputs.ok}`, value: `input.${projectionInputs.value}`,
+        faultCode: `input.${projectionInputs.fault}`, originTag: numberAtom(node.id),
+        origins: [{ tag: node.id, nodeId: node.id, kind: 'calendar-condition', name: 'calendar_is' }], sample: scanSample() };
+    }
     if (node.name === 'tide_is' || node.name === 'moon_is') {
       if (node.args.length !== 2 || node.named.length) error(node.loc, `${node.name} expects a provider and one classification`);
       const providerRef = node.args[0];
@@ -3713,9 +3737,11 @@ class Lowerer {
       }
       if (schedule.kind === 'at') return ['at-pulse', ...base, String(schedule.atMs), when, cancel];
       if (schedule.policy.basis?.kind === 'range') {
-        if (schedule.timezone !== 'UTC' || schedule.day || schedule.selectedConfig
+        if (schedule.timezone !== 'UTC' || schedule.selectedConfig
           || !['daily', 'daily-slots'].includes(schedule.kind)) error(this.ast.loc, 'executable Range requires immutable UTC Daily or DailySlots');
         const starts = schedule.kind === 'daily' ? [schedule.atMs] : schedule.slots.map(minute => minute * 60_000);
+        if (schedule.day) return ['calendar-range', ...base, 'UTC', String(schedule.policy.basis.durationMs), ['starts', ...starts.map(String)],
+          schedule.day.calendar, schedule.day.kind, when, cancel];
         return ['utc-range', ...base, 'UTC', String(schedule.policy.basis.durationMs), ['starts', ...starts.map(String)], when, cancel];
       }
       if (schedule.kind === 'periodic') {
@@ -3760,7 +3786,10 @@ class Lowerer {
       account.evidenceBinding.target, account.basis.zone,
       account.resultInputs.ok, account.resultInputs.value, account.resultInputs.fault,
     ]);
-    return [...configForms, ...scheduleForms, ...naturalForms, ...accountingForms];
+    const calendarForms = (this.manifest.calendarConditions ?? []).map(condition => ['calendar-result', String(condition.site), `calendar_${condition.site}`,
+      condition.calendar, condition.classification, condition.timezone,
+      ...['ok','value','fault'].map(role => condition.projectionInputs[role])]);
+    return [...configForms, ...scheduleForms, ...naturalForms, ...accountingForms, ...calendarForms];
   }
   windowForms() {
     return this.windows.map(({ descriptor, source, sample, outputType }) => [
@@ -4089,7 +4118,7 @@ export function isExecutablePulseSchedule(item) {
 export function isExecutableRangeSchedule(item) {
   return item.timezone === 'UTC' && item.policy?.basis?.kind === 'call'
     && item.policy.basis.name === 'range' && item.policy?.clock?.name === 'trusted_only'
-    && (item.scheduleType === 'Daily' && !item.on && !item.calendar
+    && (item.scheduleType === 'Daily' && (!item.on && !item.calendar || item.on && item.calendar && ['day`workday`','day`offday`'].includes(item.on.value))
       && item.at?.kind === 'literal' && item.at.raw.startsWith('time`')
       || item.scheduleType === 'DailySlots' && Array.isArray(item.selected) && item.selected.length > 0);
 }

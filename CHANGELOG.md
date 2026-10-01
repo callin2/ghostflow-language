@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### 2026-10-01 — executable work-calendar boundaries ([#225](https://github.com/callin2/ghostflow-language/issues/225))
+
+Reference §3.8's `calendar_is` Result expression and immutable UTC Daily
+work/off-day ranges now use the shared Rust context engine through GFB18 and
+`GhostFlow/control-v18`. Previously these adopted forms lacked executable
+lowering. The host supplies identified calendar snapshots; Rust preserves
+missing, out-of-coverage and expired faults. A Result cannot be negated into
+permission without explicit fault handling. Work ranges crossing midnight are
+rejected; split `23:45` plus `range(15min)` and `00:00` plus `range(15min)` into
+separate declarations. Ranges ending at midnight are valid. Ordinary UTC ranges
+retain their existing behavior. The bounded profile requires explicit UTC
+bindings; it adds no shift ownership, non-UTC Range policy or Run overlap rule.
+Older loaders reject GFB18. Regression evidence is the exact REF-03-041 oracle
+in `tests/reference-calendar-boundary.test.mjs` and shared-core/native/WASM checks.
+
 ### 2026-10-02 — signed current Periodic package admission
 
 The package verifier previously rejected the current compiler's

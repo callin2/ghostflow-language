@@ -22,7 +22,9 @@ const AVAILABILITY_FORMAT = 'GhostFlow/control-v12';
 const AT_FORMAT = 'GhostFlow/control-v13';
 const HOLIDAY_FORMAT = 'GhostFlow/control-v14';
 const SOLAR_CONTEXT_FORMAT = 'GhostFlow/control-v15';
+const CALENDAR_EXECUTION_FORMAT = 'GhostFlow/control-v18';
 const contextManifest = manifest => manifest?.format === STREAM_CONTEXT_FORMAT
+  || manifest?.format === CALENDAR_EXECUTION_FORMAT
   || manifest?.format === SOLAR_CONTEXT_FORMAT
   || manifest?.format === HOLIDAY_FORMAT
   || manifest?.format === AT_FORMAT
@@ -230,8 +232,8 @@ function validateCanonicalUnit(item, label) {
 function validateContextManifest(input, bytecodeFormat) {
   const manifest = record(input, 'manifest');
   keys(manifest, ['format','name','inputs','outputs','sensors','schedules','timers','signals','configs','bytecodeSha256'],
-    ['providers','calendars','naturalConditions','accounting','resources','objectives','adaptSettings'], 'manifest');
-  if (manifest.format === SOLAR_CONTEXT_FORMAT ? bytecodeFormat !== 16 : manifest.format === HOLIDAY_FORMAT ? bytecodeFormat !== 15 : manifest.format === AT_FORMAT ? bytecodeFormat !== 14 : manifest.format === AVAILABILITY_FORMAT ? bytecodeFormat !== 13 : ![11, 12].includes(bytecodeFormat)) throw new Error('context manifest requires its matching GFB format');
+    ['providers','calendars','naturalConditions','calendarConditions','accounting','resources','objectives','adaptSettings'], 'manifest');
+  if (manifest.format === CALENDAR_EXECUTION_FORMAT ? bytecodeFormat !== 18 : manifest.format === SOLAR_CONTEXT_FORMAT ? bytecodeFormat !== 16 : manifest.format === HOLIDAY_FORMAT ? bytecodeFormat !== 15 : manifest.format === AT_FORMAT ? bytecodeFormat !== 14 : manifest.format === AVAILABILITY_FORMAT ? bytecodeFormat !== 13 : ![11, 12].includes(bytecodeFormat)) throw new Error('context manifest requires its matching GFB format');
   name(manifest.name, 'manifest.name');
   if (!/^[0-9a-f]{64}$/.test(manifest.bytecodeSha256)) throw new Error('invalid bytecode SHA-256');
   const inputs = validateList(manifest.inputs, 'manifest.inputs', ['name','type'], ['canonicalUnit']);
@@ -252,6 +254,10 @@ function validateContextManifest(input, bytecodeFormat) {
   const calendars = validateList(manifest.calendars ?? [], 'manifest.calendars', ['name','type']);
   const naturals = validateList(manifest.naturalConditions ?? [], 'manifest.naturalConditions',
     ['site','operation','provider','classification','result','projectionInputs']);
+  const calendarConditions = validateList(manifest.calendarConditions ?? [], 'manifest.calendarConditions',
+    ['site','calendar','classification','timezone','result','projectionInputs']);
+  if (manifest.format === CALENDAR_EXECUTION_FORMAT && !calendarConditions.length && !schedules.some(item => item.day && item.policy?.basis?.kind === 'range')) throw new Error('calendar execution profile requires a calendar Result or Range');
+  if (manifest.format !== CALENDAR_EXECUTION_FORMAT && calendarConditions.length) throw new Error('calendar Result requires control-v18');
   const accounting = manifest.accounting === undefined ? null : copy(record(manifest.accounting, 'manifest.accounting'));
   if (manifest.format === SOLAR_CONTEXT_FORMAT && !schedules.some(item => item.kind === 'solar')) throw new Error('Solar context profile requires Solar');
   if (manifest.format === HOLIDAY_FORMAT && (!schedules.some(item => item.kind === 'daily' && item.day?.kind === 'holiday')
@@ -298,7 +304,7 @@ function validateContextManifest(input, bytecodeFormat) {
     if (!['periodic','cron','daily','daily-slots','tide'].includes(item.kind)) throw new Error('unsupported context schedule kind');
     const range = item.policy?.basis?.kind === 'range';
     if (range) {
-      if (![12, 13, 15, 16].includes(bytecodeFormat) || item.timezone !== 'UTC' || item.day || item.selectedConfig
+      if (![12, 13, 15, 16, 18].includes(bytecodeFormat) || item.timezone !== 'UTC' || item.day && bytecodeFormat !== 18 || item.selectedConfig
         || !['daily','daily-slots'].includes(item.kind)) throw new Error('executable Range requires GFB12 and immutable UTC Daily or DailySlots');
       const policy = record(item.policy, `schedule ${item.name}.policy`);
       keys(policy, ['basis','when','cancelWhen','clock','gapMs','recovery','fallback'], [], `schedule ${item.name}.policy`);
@@ -312,11 +318,14 @@ function validateContextManifest(input, bytecodeFormat) {
         || starts.some((start, index) => starts[(index + 1) % starts.length] + (index + 1 === starts.length ? 86_400_000 : 0) - start < policy.basis.durationMs)) {
         throw new Error('Range occurrences must not overlap');
       }
+      if (item.day && (item.kind !== 'daily' || !['workday','offday'].includes(item.day.kind)
+        || !calendars.some(calendar => calendar.name === item.day.calendar && calendar.type === 'WorkCalendar')
+        || starts[0] + policy.basis.durationMs > 86_400_000)) throw new Error('work calendar Range must be typed and stay within one civil date');
     }
     if (!range && item.kind === 'daily') {
       if (!['workday','offday','holiday'].includes(item.day?.kind)) throw new Error('context Daily requires calendar day');
       const holiday = item.day.kind === 'holiday';
-      if (holiday && ![HOLIDAY_FORMAT, SOLAR_CONTEXT_FORMAT].includes(manifest.format)) throw new Error('Holiday Daily requires control-v14/v15 and GFB15/16');
+      if (holiday && ![HOLIDAY_FORMAT, SOLAR_CONTEXT_FORMAT, CALENDAR_EXECUTION_FORMAT].includes(manifest.format)) throw new Error('Holiday Daily requires its calendar profile');
       if (!calendars.some(calendar => calendar.name === item.day.calendar
         && calendar.type === (holiday ? 'HolidayCalendar' : 'WorkCalendar'))) throw new Error('unbound or wrong-type Daily calendar');
     }
@@ -332,6 +341,14 @@ function validateContextManifest(input, bytecodeFormat) {
     const expected = item.operation === 'tide_is' ? 'TidePredictions' : item.operation === 'moon_is' ? 'LunarEphemeris' : null;
     if (!expected || !providers.some(p => p.name === item.provider && p.type === expected)) throw new Error('natural provider mismatch');
     for (const role of ['ok','value','fault']) generated(item.projectionInputs[role], `${RESERVED}natural_${item.site}_${role}`, 'natural projection');
+  }
+  for (const item of calendarConditions) {
+    safeInteger(item.site, 'calendar Result site', 1, 0xffff_ffff);
+    if (item.timezone !== 'UTC' || !['workday','offday','holiday'].includes(item.classification)
+      || !calendars.some(calendar => calendar.name === item.calendar && calendar.type === (item.classification === 'holiday' ? 'HolidayCalendar' : 'WorkCalendar'))
+      || item.result?.value !== 'Bool' || item.result?.error !== 'CalendarFault') throw new Error('calendar Result definition mismatch');
+    keys(record(item.projectionInputs, 'calendar Result projections'), ['ok','value','fault'], [], 'calendar Result projections');
+    for (const role of ['ok','value','fault']) generated(item.projectionInputs[role], `${RESERVED}calendar_${item.site}_${role}`, 'calendar Result projection');
   }
   for (const item of configs) {
     name(item.name, 'config.name');
@@ -351,7 +368,7 @@ function validateContextManifest(input, bytecodeFormat) {
   }
   unique(configs.map(item => item.id), 'config id');
   unique([...inputs,...outputs,...schedules,...configs,...providers,...calendars,...timers,...sensors,...objectives,...adaptSettings].map(item => item.name), 'context name');
-  unique([...schedules,...naturals].map(item => item.site), 'context site');
+  unique([...schedules,...naturals,...calendarConditions].map(item => item.site), 'context site');
   for (const sensor of sensors) {
     name(sensor.name, 'sensor.name');
     if (sensor.type !== 'Temperature' || sensor.canonicalUnit !== 'K') throw new Error('context PID sensor must be canonical Temperature');
@@ -387,7 +404,7 @@ function validateContextManifest(input, bytecodeFormat) {
       throw new Error('adaptation proposal target identity mismatch');
   }
   const normalized = freeze(copy({ ...manifest, inputs, outputs, schedules, configs, providers, calendars, timers,
-    sensors, objectives, resources, adaptSettings, naturalConditions: naturals, ...(accounting === null ? {} : { accounting }) }));
+    sensors, objectives, resources, adaptSettings, naturalConditions: naturals, ...(calendarConditions.length ? { calendarConditions } : {}), ...(accounting === null ? {} : { accounting }) }));
   return { manifest: normalized, inputNames: new Set(inputs.map(item => item.name)),
     sensorByName: new Map(sensors.map(item => [item.name,item])), scheduleNames: new Set(schedules.map(item => item.name)), signalNames: new Set() };
 }

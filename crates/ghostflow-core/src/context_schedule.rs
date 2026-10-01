@@ -28,6 +28,7 @@ pub struct Engine {
     pending_grace: BTreeMap<String, (u64, String, String)>,
     range: Option<RangeEngine>,
     range_clock_revision: Option<String>,
+    range_calendar_revision: Option<String>,
 }
 
 #[derive(Clone)]
@@ -195,7 +196,9 @@ impl Engine {
                 .restore_solar_identities(identities)?;
             return Ok(restored);
         }
-        if let ScheduleDefinition::UtcRange { starts_ms, .. } = &desc.definition {
+        if let ScheduleDefinition::UtcRange { starts_ms, .. }
+        | ScheduleDefinition::CalendarRange { starts_ms, .. } = &desc.definition
+        {
             if reader.take(5)? != b"GFES\x02" || reader.take(5)? != b"GFRG\x01" {
                 return Err(invalid("invalid Range checkpoint version"));
             }
@@ -387,6 +390,26 @@ impl Engine {
                 crate::context_vm::validate_utc_range(starts_ms, *duration_ms)?;
                 (None, Vec::new(), 1)
             }
+            ScheduleDefinition::CalendarRange {
+                timezone,
+                starts_ms,
+                duration_ms,
+                calendar,
+                ..
+            } => {
+                crate::context_vm::validate_utc_range(starts_ms, *duration_ms)?;
+                if timezone != "UTC"
+                    || calendar.is_empty()
+                    || calendar.len() > 128
+                    || starts_ms.len() != 1
+                    || starts_ms[0] + duration_ms > 86_400_000
+                {
+                    return Err(invalid(
+                        "calendar Range crosses midnight or has invalid binding",
+                    ));
+                }
+                (None, Vec::new(), 1)
+            }
             ScheduleDefinition::Periodic { every, .. } => {
                 if every.initial_ms == 0
                     || every.initial_ms < every.min_ms
@@ -457,12 +480,16 @@ impl Engine {
             active_run: None,
             last_plan: BTreeMap::new(),
             pending_grace: BTreeMap::new(),
-            range: if matches!(desc.definition, ScheduleDefinition::UtcRange { .. }) {
+            range: if matches!(
+                desc.definition,
+                ScheduleDefinition::UtcRange { .. } | ScheduleDefinition::CalendarRange { .. }
+            ) {
                 Some(RangeEngine::new(desc.gap_ms, boot_epoch, capacity)?)
             } else {
                 None
             },
             range_clock_revision: None,
+            range_calendar_revision: None,
         })
     }
 
@@ -483,6 +510,78 @@ impl Engine {
             return Err(invalid("invalid context schedule evidence"));
         }
         Self::validate_rows(desc, facts)?;
+        if let ScheduleDefinition::CalendarRange {
+            starts_ms,
+            duration_ms,
+            calendar,
+            timezone,
+            offday,
+        } = &desc.definition
+        {
+            if change.is_some() {
+                return Err(invalid(
+                    "immutable calendar Range cannot accept settings changes",
+                ));
+            }
+            let mut eligibility = None;
+            if let (ClockTrust::Trusted, Some(wall)) = (clock.trust, clock.wall_ms) {
+                if wall > 253_402_300_799_999 {
+                    return Err(invalid("calendar Range wall time is out of range"));
+                }
+                eligibility = Some(
+                    work_calendar::evaluate(
+                        DayQuery {
+                            calendar_id: calendar,
+                            timezone,
+                            date: (wall / 86_400_000) as i32,
+                            selector: if *offday {
+                                DaySelector::Offday
+                            } else {
+                                DaySelector::Workday
+                            },
+                            now_ms: wall,
+                        },
+                        facts.calendar.as_ref(),
+                    )
+                    .map_err(|_| invalid("invalid calendar Range snapshot"))?
+                    .value,
+                );
+            }
+            let allowed = eligibility == Some(Ok(true));
+            let (mut staged, mut decision) = self.utc_range(
+                desc.site,
+                starts_ms,
+                *duration_ms,
+                clock,
+                when && allowed,
+                cancel,
+            )?;
+            if decision.due {
+                staged.range_calendar_revision =
+                    facts.calendar.as_ref().map(|c| c.revision.clone());
+            }
+            for observation in &mut decision.observations {
+                observation.provider_revision = if decision.active
+                    || observation.decision == "Completed"
+                    || observation.decision == "Cancelled"
+                {
+                    staged.range_calendar_revision.clone().unwrap_or_default()
+                } else {
+                    facts
+                        .calendar
+                        .as_ref()
+                        .map_or(String::new(), |c| c.revision.clone())
+                };
+                if observation.decision == "Waiting" && !allowed {
+                    observation.decision = match eligibility {
+                        Some(Ok(false)) => "ExcludedDay".into(),
+                        Some(Err(fault)) => format!("Unknown({fault:?})"),
+                        _ => "Unknown(ClockUnknown)".into(),
+                    };
+                }
+            }
+            return Ok((staged, decision));
+        }
         if let ScheduleDefinition::UtcRange {
             starts_ms,
             duration_ms,
@@ -516,7 +615,9 @@ impl Engine {
             ScheduleDefinition::AtPulse { at_ms } => {
                 staged.at_pulse(desc.site, *at_ms, &observed, when, &mut decision)?
             }
-            ScheduleDefinition::UtcRange { .. } => unreachable!("Range staged before pulse clock"),
+            ScheduleDefinition::UtcRange { .. } | ScheduleDefinition::CalendarRange { .. } => {
+                unreachable!("Range staged before pulse clock")
+            }
             ScheduleDefinition::Periodic {
                 epoch_id,
                 anchor_ms,
@@ -693,6 +794,11 @@ impl Engine {
     }
 
     fn validate_rows(desc: &ScheduleDescriptor, facts: &ScheduleEvidence) -> Result<()> {
+        if matches!(desc.definition, ScheduleDefinition::CalendarRange { .. })
+            && (facts.provider.is_some() || !facts.rows.is_empty())
+        {
+            return Err(invalid("unexpected calendar Range occurrence payload"));
+        }
         if matches!(
             desc.definition,
             ScheduleDefinition::UtcRange { .. } | ScheduleDefinition::AtPulse { .. }

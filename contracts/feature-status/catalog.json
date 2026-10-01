@@ -3790,6 +3790,72 @@
       "referenceCaseIds": []
     },
     {
+      "id": "work-calendar-boundaries",
+      "family": "UTC work calendar Result and same-date Range",
+      "clause": {
+        "path": "docs/reference/03-time-and-schedules.en.md",
+        "heading": "3.8 DST, midnight and work calendars"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": ["compile", "native_wasm"],
+      "evidence": [
+        {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [{
+            "path": "tests/reference-calendar-boundary.test.mjs",
+            "testId": "REF-03-041: adopted calendar Result and same-day Range compile as executable GFB18",
+            "caseId": "REF-03-041",
+            "assertionClass": "compile-policy",
+            "polarities": ["positive"]
+          }]
+        },
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/reference-calendar-boundary.test.mjs",
+              "testId": "REF-03-041: work calendar intervals reject crossing midnight and accept an explicit split",
+              "caseId": "REF-03-041",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "negative", "boundary"]
+            },
+            {
+              "path": "tests/reference-calendar-boundary.test.mjs",
+              "testId": "REF-03-041: actual coverage boundaries preserve Unknown and explicit Result fallback forbids rest permission",
+              "caseId": "REF-03-041",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "negative", "boundary"]
+            },
+            {
+              "path": "tests/reference-calendar-boundary.test.mjs",
+              "testId": "REF-03-041: conflicting exceptions, mixed snapshots and changed revision contents reject atomically",
+              "caseId": "REF-03-041",
+              "assertionClass": "rollback",
+              "targets": ["wasm"],
+              "polarities": ["negative", "boundary"]
+            },
+            {
+              "path": "tests/reference-calendar-boundary.test.mjs",
+              "testId": "REF-03-041: strict UTC activation, missing facts and protected projections cannot bypass the owner",
+              "caseId": "REF-03-041",
+              "assertionClass": "type-boundary",
+              "targets": ["wasm"],
+              "polarities": ["negative", "boundary"]
+            }
+          ]
+        }
+      ],
+      "gaps": ["Executable calendar_is and work/offday Daily Range require exact UTC binding and immutable positive literal durations. Non-UTC expression/Range execution, shifts, automatic overnight splitting, calendar-filtered DailySlots and physical operation are not claimed."],
+      "issues": [225],
+      "referenceCaseIds": ["REF-03-041"]
+    },
+    {
       "id": "product-boundary",
       "family": "Farmer UI, installation and deployment",
       "clause": {
