@@ -19,6 +19,85 @@ function row(scanId, logicalTimeMs, inputs) {
   return { scanId, logicalTimeMs, inputs };
 }
 
+test('REF-04-011 fault recovery keeps source epochs separate and a default fresh owner resets median readiness on native and plain/framed WASM', async () => {
+  const artifact = await compileSource(`control EpochRecovery {
+  sensor moisture: Percent {
+    valid = 0% .. 100%; filter = median(5); stale_after = 300ms; recover_after = 3 samples;
+  }
+  state active: Bool = true;
+  timer age = elapsed(active);
+  output value: Percent;
+  output decision_age: Duration;
+  value <- moisture |> recover(0%);
+  decision_age <- age;
+}`, { filename: 'reference-epoch-recovery.ghost' });
+  const step = (epoch, id, nowMs, value, quality = 'Good') => ({ nowMs,
+    samples: { moisture: { epoch, id, timestampMs: nowMs, value, quality } } });
+  const epochTwo = step(2, 2, 110, 75);
+  const recovery = [
+    ...[10, 20, 30, 40, 50].map((value, index) => step(1, index + 1, index * 10, value)),
+    step(1, 6, 50, 0, 'Disconnected'),
+    ...[10, 11, 12].map((value, index) => step(1, index + 7, 60 + index * 10, value)),
+    step(2, 1, 100, 70), epochTwo,
+    { ...epochTwo, nowMs: 111 }, { nowMs: 112 },
+    step(2, 3, 120, 80), step(2, 4, 130, 85), step(2, 5, 140, 90),
+  ];
+  const fresh = [{ nowMs: 141 },
+    ...[20, 25, 30, 35, 40].map((value, index) => step(2, index + 1, 150 + index * 10, value))];
+  const origin = artifact.sourceMap.find(node => node.kind === 'sensor').id;
+  for (const [steps, freshOwner] of [[recovery, false], [fresh, true]]) {
+    const executions = [];
+    for (const instantiate of [ControlRuntime.instantiate, ControlRuntime.instantiateFramed]) {
+      // Only the same executable is passed: no restored conditioner/checkpoint.
+      const runtime = await instantiate.call(ControlRuntime, wasmBytes, artifact);
+      try {
+        executions.push(steps.map(input => {
+          const outcome = runtime.step(input);
+          return { ...outcome, identity: runtime.sensors.get('moisture').conditioner.sampleIdentity() };
+        }));
+      } finally { runtime.dispose(); }
+    }
+    const [plain, framed] = executions;
+    const projection = rows => rows.map(({ vm, sensors, identity }) => ({ vm, sensors, identity }));
+    assert.deepEqual(projection(plain), projection(framed));
+    for (const rows of executions) {
+      for (const [index, { vm, sensors }] of rows.entries()) {
+        const good = freshOwner ? index === 5 : [4, 15].includes(index);
+        const fault = !freshOwner && index === 5;
+        assert.equal(sensors.moisture.quality, good ? 'Good' : fault ? 'Disconnected' : 'NotReady');
+        assert.deepEqual(vm.requested, { value: good ? (freshOwner || index === 4 ? 30 : 80) : 0,
+          decision_age: steps[index].nowMs - steps[0].nowMs });
+        assert.deepEqual(vm.safe, vm.requested);
+        assert.equal(vm.inputs.__gf_now_ms, steps[index].nowMs);
+        assert.equal(vm.resultTrace[0].choice, good ? 0 : fault ? 1 : 4);
+        assert.equal(vm.resultTrace[0].origin, good ? 0 : origin);
+        assert.equal(vm.stateBefore.active, true);
+        assert.equal(vm.stateAfter.active, true);
+      }
+      if (freshOwner) {
+        assert.equal(rows[0].identity, null, 'default logical owner startup has no previous sample/freshness');
+        assert.equal(rows[4].sensors.moisture.quality, 'NotReady', 'four fresh samples cannot inherit a warm median');
+      } else {
+        for (const index of [6, 7, 8, 9, 10, 11, 12, 13, 14])
+          assert.equal(rows[index].sensors.moisture.quality, 'NotReady');
+        for (const index of [10, 11, 12])
+          assert.deepEqual(rows[index].identity, { epoch: 2, id: 2, timestampMs: 110 });
+        assert.equal(rows[15].sensors.moisture.value, 80, 'the median contains only 70,75,80,85,90 from epoch two');
+      }
+    }
+    // Actual native VM evidence consumes the same conditioner Result rails;
+    // the independently tested native Rust Sensor owns native conditioning.
+    const tape = framed.map(({ vm }, scanId) => row(scanId, steps[scanId].nowMs,
+      Object.entries(vm.inputs).filter(([name]) => name !== '__gf_now_ms')
+        .map(([name, value]) => ({ name, value }))));
+    const native = nativeRun(artifact.bytes, tape);
+    assertParity(native, await wasmRun(artifact, tape));
+    assert.ok(native.every(item => item.accepted), JSON.stringify(native));
+    assert.deepEqual(native.map(item => item.outcome.trace), framed.map(item => item.vm));
+    assert.deepEqual(native.map(item => item.outcome.logicalTimeMs), steps.map(input => input.nowMs));
+  }
+});
+
 test('REF-04-010 Driver sample ID seven is Invalid before filtering and ID eight enters once with sample-timestamp freshness on native and plain/framed WASM', async () => {
   const artifact = await compileSource(`control DriverSample {
   sensor moisture: Percent {

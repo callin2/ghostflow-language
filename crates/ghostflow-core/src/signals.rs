@@ -1045,4 +1045,62 @@ mod tests {
         recovery.update(good(12, 120, 29.0), 120).unwrap();
         assert_eq!(recovery.reading(120), Ok(29.0));
     }
+
+    #[test]
+    fn ref_04_011_recovery_does_not_cross_epochs_and_fresh_sensor_starts_empty() {
+        let config = SensorConfig::new(Filter::Median(5), 0.0, 100.0, 300, 3);
+        let mut s = Sensor::new(config).unwrap();
+        for (index, value) in [10.0, 20.0, 30.0, 40.0, 50.0].into_iter().enumerate() {
+            let id = index as u64 + 1;
+            let now = index as u64 * 10;
+            let _ = s.update(Sample::good(1, id, now, value), now);
+        }
+        assert_eq!(s.reading(40), Ok(30.0));
+        assert_eq!(
+            s.update(Sample::new(1, 6, 50, 0.0, Quality::Disconnected), 50),
+            Err(SensorFault::Disconnected)
+        );
+        for (index, value) in [10.0, 11.0, 12.0].into_iter().enumerate() {
+            let id = index as u64 + 7;
+            let now = 60 + index as u64 * 10;
+            assert_eq!(
+                s.update(Sample::good(1, id, now, value), now),
+                Err(SensorFault::NotReady)
+            );
+        }
+        for (index, value) in [70.0, 75.0, 80.0, 85.0, 90.0].into_iter().enumerate() {
+            let id = index as u64 + 1;
+            let now = 100 + index as u64 * 10;
+            let result = s.update(Sample::good(2, id, now, value), now);
+            if id < 5 {
+                assert_eq!(result, Err(SensorFault::NotReady));
+            } else {
+                assert_eq!(result, Ok(UpdateResult::Accepted));
+            }
+            assert_eq!(s.accepted_sample_identity(), Some((2, id, now)));
+            if id == 2 {
+                assert_eq!(
+                    s.update(Sample::good(2, id, now, value), 111),
+                    Ok(UpdateResult::Duplicate)
+                );
+                assert_eq!(s.reading(112), Err(SensorFault::NotReady));
+                assert_eq!(s.accepted_sample_identity(), Some((2, id, now)));
+            }
+        }
+        assert_eq!(s.reading(140), Ok(80.0));
+        let mut fresh = Sensor::new(config).unwrap();
+        assert_eq!(fresh.reading(141), Err(SensorFault::NotReady));
+        assert_eq!(fresh.accepted_sample_identity(), None);
+        for (index, value) in [20.0, 25.0, 30.0, 35.0, 40.0].into_iter().enumerate() {
+            let id = index as u64 + 1;
+            let now = 150 + index as u64 * 10;
+            let result = fresh.update(Sample::good(2, id, now, value), now);
+            if id < 5 {
+                assert_eq!(result, Err(SensorFault::NotReady));
+            } else {
+                assert_eq!(result, Ok(UpdateResult::Accepted));
+            }
+        }
+        assert_eq!(fresh.reading(190), Ok(30.0));
+    }
 }
