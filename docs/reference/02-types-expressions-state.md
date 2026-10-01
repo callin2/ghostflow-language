@@ -385,6 +385,17 @@ intent를 부분 확정하지 않는다. 이 논리적 원자성이 여러 물�
 다른 상태를 읽어 초기값을 계산하지 않는다. 이 명시적 시작값이 재현 가능한 첫
 tick의 이전 상태를 만든다.
 
+**설계 이유와 출처:** [#149](https://github.com/callin2/ghostflow-language/issues/149)에서
+사용자는 React/ObservableHQ에서 차용한 점을 event stream 안에서 제어를 평가하고
+그 결과를 next state로 명시적으로 반환하는 방식이라고 설명했다. 전기 기술자가
+recursive 또는 loop 형태의 제어를 추적하기 어려울 수 있다는 것은 사용자의 교육적
+전제다. 이전 상태와 candidate next state를 분리해 쓰면 시간 경계가 보인다.
+`left' = right; right' = left;`는 이전 값 쌍을 읽고 다음 값 쌍을 기술한다.
+이 전제는 가독성의 기준이며 모든 전기 기술자에 대한 일반적 사실을 주장하지 않는다.
+실행 가능한 표기는 ASCII apostrophe (`'`)다. 대화 원문의 backtick 표기와 뒤이은
+assistant의 일반 cycle 규칙, time travel, 인과 설명 논의가 추가 문법이나 기능을
+확정하지는 않는다. 실행 의미는 위의 snapshot, 상태 전이, 출력 규칙을 따른다.
+
 ### 타이머도 상태다
 
 `timer age = elapsed(phase);`는 `phase`가 마지막으로 확정 변경된 뒤의 단조 경과

@@ -499,6 +499,16 @@ with `let` when multiple transitions need them.
 **Design reason:** Explicit previous and next states preserve the “basis for this evaluation”
 while updating state simultaneously. This distinction grounds timing comparisons and values displayed beside source.
 
+The user explained this choice in [#149](https://github.com/callin2/ghostflow-language/issues/149):
+the React/ObservableHQ influence is control evaluated within an event stream with
+an explicit next-state result. The educational premise was that recursive or
+loop-shaped control may be hard for electricians to trace. E04 makes the boundary
+concrete: read the previous `a` and `b`, describe `a'` and `b'`, then commit both.
+This is a readability goal, not a general judgment about electricians. Use the
+ASCII apostrophe (`'`) shown in E04. The issue's conversational backtick and later
+assistant proposals do not add syntax, time-travel or causal-explanation features.
+The execution rules are in [Reference §2.8](reference/02-types-expressions-state.en.md#28-tick-and-state-snapshot).
+
 A successful tick calculates candidate next from this tick's input snapshot and previous state, then requested and safe intents,
 and atomically commits state and intent records. A runtime fault in a selected expression rejects the tick without partial updates.
 Output-constraint blocking differs from this evaluation failure and does not cancel the successful tick's state commit.

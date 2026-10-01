@@ -320,8 +320,8 @@
       "source": "docs/ProgrammingInGhostflow.md",
       "sourceLanguage": "ko",
       "translation": "docs/ProgrammingInGhostflow.en.md",
-      "sourceSha256": "6f5fe186206ab3a6ccf471287987aec5fefcdfe33a63b39f616cf52d519d48cc",
-      "translationSha256": "210cd167a0400297277983f91e58b5c94e82cb3ac7706f4c564b53ed93a80b6f"
+      "sourceSha256": "a5043156d56c9813fb55a623bdefabfc518465de8ab26712a89ee927df9d6551",
+      "translationSha256": "3eb6ace937f1b427838e1c018f131347bacafd257f28f64ddc510666646f59f2"
     },
     {
       "source": "docs/REFERENCE-QUERY.md",
@@ -341,8 +341,8 @@
       "source": "docs/reference/02-types-expressions-state.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/02-types-expressions-state.en.md",
-      "sourceSha256": "a748546d34ff5d3c612393463edfb65c919ba80134f527444a6568860274fc35",
-      "translationSha256": "568e5c6eba69f05992addc0a9e682bf3a2da795eefd6679801c17a60715f1277"
+      "sourceSha256": "c56f9f2a4131ba3c7bbda6db4fa89ec62d303b60e3e1db845110e6092c81a8f6",
+      "translationSha256": "746e460f42264b9596eec825b1c5ef0a31fe20849fb1e584f3b001b32e1d0b9c"
     },
     {
       "source": "docs/reference/03-time-and-schedules.md",

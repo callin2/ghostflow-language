@@ -500,6 +500,16 @@ control TwoStates {
 **설계 이유:** 이전 상태와 다음 상태를 명시하면 “이번 판단의 근거”를 보존하면서
 상태를 동시에 갱신할 수 있다. 이 구분이 타이밍 비교와 소스 옆 값 표시의 기준이 된다.
 
+사용자는 [#149](https://github.com/callin2/ghostflow-language/issues/149)에서 이 선택을
+설명했어요. React/ObservableHQ에서 차용한 점은 event stream 안에서 제어를 평가하고
+next state를 명시적으로 반환하는 방식이에요. recursive 또는 loop 형태의 제어가
+전기 기술자에게 추적하기 어려울 수 있다는 것은 사용자의 교육적 전제예요.
+E04에서는 이전 `a`, `b`를 읽고 `a'`, `b'`를 기술한 뒤 둘을 함께 확정하므로 시간
+경계가 보여요. 이는 가독성의 목표이며 전기 기술자 전체에 대한 일반적 판단이 아니에요.
+실행 코드에서는 E04처럼 ASCII apostrophe (`'`)를 써요. 대화의 backtick과 뒤이은
+assistant 제안이 추가 문법, time-travel, 인과 설명 기능을 만들지는 않아요.
+실행 규칙은 [Reference §2.8](reference/02-types-expressions-state.md#28-tick과-상태-snapshot)을 따라요.
+
 성공한 tick은 이번 입력 snapshot과 이전 state에서 candidate next를 계산하고, requested intent와
 safe intent를 계산한 뒤 상태와 intent 기록을 원자적으로 확정한다. 선택된 식의 runtime
 fault는 부분 갱신 없이 tick을 거부한다. 출력 제약의 차단은 이 평가 실패와 다르며,
