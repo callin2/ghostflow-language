@@ -89,7 +89,20 @@ Host는 이 비인증 상태를 공개하고 upload, 저장 program의 boot, rol
 
 ## 호환성 및 마이그레이션
 
-- 패키지 v1에는 현재 GFB 프로파일 1, 2, 3, 4 중 하나가 들어갑니다. 서명된 바이트코드 설명자 버전은 실제 리틀엔디안 헤더 버전의 십진 문자열입니다. JavaScript 및 Rust 검증기는 대상 로더를 호출하기 전에 정확히 일치하는지 확인합니다. 지원되지만 서로 다른 버전은 `bytecode-version-mismatch`, 알 수 없는 버전은 `unsupported-bytecode-version`으로 보고합니다. Int 포트는 프로파일 3에서도 별도 `int` 기능 형식으로 매핑합니다. 17개 물리량 형식은 기계 기능 `number`에 매핑하며, 해당 입력/출력/센서/설정 설명자는 카탈로그의 정확한 `canonicalUnit`을 요구합니다. 입력/출력 물리량 레코드에는 `name`, `type`, `canonicalUnit`만 포함됩니다. 물리량이 아닌 레코드에는 그 필드가 허용되지 않습니다. JavaScript와 Rust는 대상 로더를 호출하기 전에 누락되었거나 잘못되었거나 예상 밖인 단위 메타데이터를 거부합니다. 컴파일 재생, 서명, 아티팩트 다이제스트, 대상 검증도 계속 필요합니다. 현재 프로파일 의미는 [BYTECODE.md](BYTECODE.md)를 참조하세요.
+### 스칼라 설정을 사용하는 서명된 GFB11 Periodic
+
+GFB11, `GhostFlow/control-v10`, `GhostFlow/context-scan-abi-v5` 조합은 이제
+스칼라 config와 실행 가능한 Periodic schedule을 함께 패키지로 만들 수 있습니다.
+현재 서명 프로필은 instant anchor, `preserve_anchor`, config 기반 `Duration`
+간격, 상수 `true` 조건, `pulse`/`trusted_only`/`baseline`/`skip` 정책만
+지원합니다. manifest의 schedule site, 이름, 간격 config ID와 값, anchor,
+gap, 정책은 GFB11 설명자와 일치해야 합니다. 생성된 config 투영 입력과
+clock/epoch 입력도 바이트코드와 일치해야 합니다. 다른 schedule 종류,
+objective/window/signal 서두, 서명되지 않았거나 불일치하는 패키지는
+계속 거부합니다. 스칼라 config의 초기값과 범위 검사는 유지합니다.
+이 변경은 패키지 승인 범위만 넓히며 언어나 Device 배포 정책은 변경하지 않습니다.
+
+- 패키지 v1에는 지원되는 GFB 프로파일 하나가 들어갑니다. 서명된 바이트코드 설명자 버전은 실제 리틀엔디안 헤더 버전의 십진 문자열입니다. JavaScript 및 Rust 검증기는 대상 로더를 호출하기 전에 정확히 일치하는지 확인합니다. 지원되지만 서로 다른 버전은 `bytecode-version-mismatch`, 알 수 없는 버전은 `unsupported-bytecode-version`으로 보고합니다. Int 포트는 프로파일 3에서도 별도 `int` 기능 형식으로 매핑합니다. 17개 물리량 형식은 기계 기능 `number`에 매핑하며, 해당 입력/출력/센서/설정 설명자는 카탈로그의 정확한 `canonicalUnit`을 요구합니다. 입력/출력 물리량 레코드에는 `name`, `type`, `canonicalUnit`만 포함됩니다. 물리량이 아닌 레코드에는 그 필드가 허용되지 않습니다. JavaScript와 Rust는 대상 로더를 호출하기 전에 누락되었거나 잘못되었거나 예상 밖인 단위 메타데이터를 거부합니다. 컴파일 재생, 서명, 아티팩트 다이제스트, 대상 검증도 계속 필요합니다. 현재 프로파일 의미는 [BYTECODE.md](BYTECODE.md)를 참조하세요.
 - 서명된 배포가 필요한 호스트는 유효하지 않은 패키지를 원시 `.gfb` 경로로 강등해서는 안 됩니다.
 - 알 수 없는 패키지, 페이로드, 바이트코드, 매니페스트, 런타임 의미, ABI 버전은 거부됩니다. 새 버전을 지원하려면 새 적합성 코퍼스와 명시적인 소비자 호환성 업데이트가 필요합니다.
 - API 저장소, Device 원자적 준비/활성화/복구, 프로덕션 키 보관은 각 모듈의 책임이며 이 패키지 계약을 소비합니다.

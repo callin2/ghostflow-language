@@ -76,6 +76,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/long-tick-state.test.mjs',
   'tests/duration-runtime.test.mjs',
   'tests/portable-package.test.mjs',
+  'tests/gfb11-periodic-package.test.mjs',
   'tests/gfb10-package.test.mjs',
   'tests/control-host.test.mjs',
   'tests/continuous-timer-compatibility.test.mjs',

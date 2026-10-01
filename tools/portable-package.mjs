@@ -313,10 +313,12 @@ function validateConfigStreamPackageProfile(manifest, version, runtimeAbi) {
   }
   if (!stream) return;
   if (!Array.isArray(manifest.configs) || !manifest.configs.length
-    || ['schedules','signals','naturalConditions','providers','calendars','objectives','adaptSettings']
+    || !Array.isArray(manifest.schedules)
+    || manifest.schedules.some(schedule => schedule?.kind !== 'periodic')
+    || ['signals','naturalConditions','providers','calendars','objectives','adaptSettings']
       .some(field => manifest[field] !== undefined && (!Array.isArray(manifest[field]) || manifest[field].length))
     || manifest.accounting !== undefined) {
-    fail('unsupported-bytecode-version', 'signed GFB11 profile currently requires config-only context execution');
+    fail('unsupported-bytecode-version', 'signed GFB11 profile supports scalar configs and Periodic schedules only');
   }
 }
 
@@ -686,7 +688,11 @@ export async function verifyPortablePackage(packageValue, options = {}) {
   for (const [index, schedule] of manifest.schedules.entries()) {
     if (!isPlainObject(schedule)) fail('manifest-mismatch', `manifest.schedules[${index}] must be an object`);
     const name = ghostName(schedule.name, `manifest.schedules[${index}].name`);
-    if (!contextManifest) addGenerated(schedule.dueInput, `__gf_schedule_due_${name}`, `manifest.schedules[${index}].dueInput`);
+    if (!contextManifest && packageValue.payload.bytecode.version !== '11') {
+      addGenerated(schedule.dueInput, `__gf_schedule_due_${name}`, `manifest.schedules[${index}].dueInput`);
+    } else if (packageValue.payload.bytecode.version === '11' && Object.hasOwn(schedule, 'dueInput')) {
+      fail('manifest-mismatch', `manifest.schedules[${index}].dueInput is not a GFB11 Periodic port`);
+    }
   }
   for (const [index, timer] of manifest.timers.entries()) {
     if (!isPlainObject(timer)) fail('manifest-mismatch', `manifest.timers[${index}] must be an object`);
@@ -755,6 +761,10 @@ export async function verifyPortablePackage(packageValue, options = {}) {
     if (packageValue.payload.bytecode.version === '11'
         && canonicalJson(manifest.configs) !== canonicalJson(replay.manifest.configs)) {
       throw new Error('config streams do not match canonical source lowering');
+    }
+    if (packageValue.payload.bytecode.version === '11'
+        && canonicalJson(manifest.schedules) !== canonicalJson(replay.manifest.schedules)) {
+      throw new Error('Periodic schedules do not match canonical source lowering');
     }
     const intConfigs = entries => entries.filter(entry => entry.type === 'Int');
     if (canonicalJson(intConfigs(manifest.configs)) !== canonicalJson(intConfigs(replay.manifest.configs))) {

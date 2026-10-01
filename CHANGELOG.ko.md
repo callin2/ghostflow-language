@@ -5,6 +5,19 @@
 
 ## 미출시
 
+### 2026-10-02 — 현재 Periodic 패키지의 서명된 승인
+
+기존 패키지 검증기는 GFB11에서 config 전용 서두만 허용하여 현재 컴파일러의
+`config interval: Duration = 15min` 및 `schedule cycle: Periodic` 결과를
+거부했습니다. 이제 서명된 GFB11/control-v10 패키지는 스칼라 config,
+instant anchor, 생성 입력 및 schedule 설명자가 바이트코드와 일치하는
+범위에서 이 Periodic 형식을 승인합니다. 다른 schedule 종류와 미지원
+서두는 계속 거부합니다. 기존 소스·서명 검증과 config 범위 검사,
+Device 승인은 그대로 필요합니다. 회귀 검사에서는 서명된 REF-03-036이
+native target loader에 도달하며, 재서명한 설명자 바꿔치기는 그 전에
+거부됩니다. [Device 이슈 #74](https://github.com/callin2/farm-device/issues/74)의
+의도된 패키지 경로를 복구합니다.
+
 ### 2026-10-01 — 바인딩된 작성 상태 출처 버그 수정 ([#158](https://github.com/callin2/ghostflow-language/issues/158))
 
 유한 바인딩 자원 프로필에서 의도 anchor와 연결한 작성 Bool 상태도 브라우저 API로
