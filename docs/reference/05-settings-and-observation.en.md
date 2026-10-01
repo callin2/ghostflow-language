@@ -48,6 +48,13 @@ control OperatorSettings {
 | `access = designer` | Value chosen by the source author | Cannot be changed through operating settings events. |
 | `label` | Human-readable display name | Not an identifier; changes neither meaning nor permissions. |
 
+Enum members can also declare a display label: `type Phase = Idle { label = "대기"; } | Running;`.
+This optional plain-text metadata does not change the member name, ordinal or control
+execution. Unlabeled members display their source name. Empty or whitespace-only labels,
+duplicate labels and unsupported member options are errors. The compiler emits the
+label as `enumMembers[].displayLabel` in Interaction Schema `0.3`; web, HMI and mobile
+consumers share that metadata. See the [Interaction contract](../../contracts/interaction-v0/README.md).
+
 There is no `apply` field. Both `apply = stopped` and `apply = live` are syntax errors. `operator` settings always follow the atomic live event semantics in §5.2. This rule is fixed in the declaration itself to avoid a second settings system for selecting application timing.
 
 Numeric setting defaults must also lie within `min..max` and fit the step grid based on `min`. `Bool` already defines its two selectable values in the type and has no numeric range or increment. `false`, `0`, and `0%` are valid explicit values rather than absence. Unknown targets, duplicate targets, and unauthorized changes are rejected before stream admission. If the payload of an identified, authorized change fails type, range, or increment validation, it produces the error emission in §5.2. Failed payloads are not applied as successful values.

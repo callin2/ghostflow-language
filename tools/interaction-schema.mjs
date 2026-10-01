@@ -53,7 +53,8 @@ function sourceType(name, enums) {
   if (name === 'Duration') return { kind: 'builtin', name, unit: 'ms' };
   const members = enums.get(name);
   return { kind: 'nominal', name, unit: name === 'Percent' ? 'percent' : isQuantityType(name) ? canonicalUnitFor(name) : null,
-    ...(members ? { enumMembers: members.map((member, value) => ({ name: member.name, value })) } : {}) };
+    ...(members ? { enumMembers: members.map((member, value) => ({ name: member.name, value,
+      ...(member.label !== undefined ? { displayLabel: member.label } : {}) })) } : {}) };
 }
 
 function validationSnapshot(schema) {

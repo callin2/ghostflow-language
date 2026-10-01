@@ -52,6 +52,13 @@ control OperatorSettings {
 | `access = designer` | 소스 작성자가 정하는 값 | 운영 설정 event로 바꿀 수 없다. |
 | `label` | 사람이 읽을 표시 이름 | 식별자가 아니며 의미나 권한을 바꾸지 않는다. |
 
+enum 멤버도 표시 레이블을 선언할 수 있다: `type Phase = Idle { label = "대기"; } | Running;`.
+이 선택적 일반 텍스트 메타데이터는 멤버 이름, 순번과 제어 실행을 바꾸지 않는다.
+레이블이 없는 멤버는 소스 이름을 표시한다. 빈 문자열, 공백만 있는 문자열,
+중복 레이블과 지원하지 않는 멤버 옵션은 오류다. 컴파일러는 Interaction 스키마
+`0.3`의 `enumMembers[].displayLabel`로 레이블을 생성한다. 웹, HMI, 모바일 소비자가
+같은 메타데이터를 사용한다. [Interaction 계약](../../contracts/interaction-v0/README.ko.md)을 참고한다.
+
 `apply` 필드는 두지 않는다. `apply = stopped`와 `apply = live`는 모두 구문 오류다.
 `operator` 설정의 적용 의미는 항상 5.2절의 atomic live event다. 적용 시점을 고르는
 두 번째 설정 체계를 만들지 않기 위해 이 규칙을 선언 자체에 고정한다.

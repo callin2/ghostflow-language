@@ -68,8 +68,8 @@
       "source": "contracts/interaction-v0/README.md",
       "sourceLanguage": "en",
       "translation": "contracts/interaction-v0/README.ko.md",
-      "sourceSha256": "84a22c69584a014c5330d8f5937d14235a0d89b9e17183c1cb734cf906889de6",
-      "translationSha256": "10c5920618e342c9edb09cf4ed8df682abe5c89105ff435508a5b89fdbce0ffd"
+      "sourceSha256": "90eafb48488bb25bd509217210d49e94c9acccc4d93707011e2007524f310ada",
+      "translationSha256": "9e52606f8308ba1155abb85539386b03478641c94840e27d979f5630714fb187"
     },
     {
       "source": "contracts/requirements/README.md",
@@ -362,8 +362,8 @@
       "source": "docs/reference/05-settings-and-observation.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/05-settings-and-observation.en.md",
-      "sourceSha256": "cf1ba40154722315c43a79168d60a9bfb537a71aced24c40fe1d6862d0a54fd3",
-      "translationSha256": "a76274c49719a028f9307364f20015056baa905aa1fdbb9c18542d0fc46518c0"
+      "sourceSha256": "05ee69ff19b041cdf033ebd0f08d50066056d1da075e25381b4b9cab079ead76",
+      "translationSha256": "446a1963ab84d8edd1c9c43994ed7e7b208b6a6ac39a277890b7a9cd32845257"
     },
     {
       "source": "docs/reference/06-composition-and-replay.md",
