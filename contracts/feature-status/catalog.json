@@ -2229,6 +2229,14 @@
               "assertionClass": "target-parity",
               "targets": ["native", "wasm"],
               "polarities": ["positive", "negative", "boundary"]
+            },
+            {
+              "path": "tests/result-control.test.mjs",
+              "testId": "REF-00-007 normal zero and fault fallback zero retain distinct result trace evidence",
+              "caseId": "REF-00-007",
+              "assertionClass": "runtime-value",
+              "targets": ["wasm"],
+              "polarities": ["positive", "negative", "boundary"]
             }
           ]
         }
@@ -2236,8 +2244,8 @@
       "gaps": [
         "Outside the frozen source type set."
       ],
-      "issues": [198],
-      "referenceCaseIds": ["REF-01-074"]
+      "issues": [198, 193],
+      "referenceCaseIds": ["REF-01-074", "REF-00-007"]
     },
     {
       "id": "temporal-duration",
