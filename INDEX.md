@@ -20,6 +20,13 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [README.ko.md](README.ko.md) | 의도를 잃지 않는 제어. | md |
 | [README.md](README.md) | Control that stays true to intent. | md |
 
+## .github/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [.github/pull_request_template.ko.md](.github/pull_request_template.ko.md) | pull_request_template.ko.md | md |
+| [.github/pull_request_template.md](.github/pull_request_template.md) | pull_request_template.md | md |
+
 ## contracts/integration-v1/
 
 | Path | Title | Type |
@@ -65,6 +72,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/ACCOUNTING-LEDGER-ABI.md](docs/ACCOUNTING-LEDGER-ABI.md) | Accounting ledger primitive ABI | md |
 | [docs/AFTER-EVENT-WASM-ABI.ko.md](docs/AFTER-EVENT-WASM-ABI.ko.md) | after_event 실행 ABI 식별 정보 | md |
 | [docs/AFTER-EVENT-WASM-ABI.md](docs/AFTER-EVENT-WASM-ABI.md) | Identified after_event execution ABI | md |
+| [docs/AI-CONTRIBUTION-PACKAGE.ko.md](docs/AI-CONTRIBUTION-PACKAGE.ko.md) | 범위를 제한한 AI 기여 작업 패키지 | md |
+| [docs/AI-CONTRIBUTION-PACKAGE.md](docs/AI-CONTRIBUTION-PACKAGE.md) | Bounded AI contribution package | md |
 | [docs/BEHAVIOR-COMPOSITION-RESEARCH.ko.md](docs/BEHAVIOR-COMPOSITION-RESEARCH.ko.md) | 동작 조합: 연구와 아키텍처 검토 | md |
 | [docs/BEHAVIOR-COMPOSITION-RESEARCH.md](docs/BEHAVIOR-COMPOSITION-RESEARCH.md) | Behavior composition: research and architecture review | md |
 | [docs/BYTECODE.ko.md](docs/BYTECODE.ko.md) | GFB 바이트코드 | md |
@@ -424,6 +433,12 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/fixtures/issue-93-quantities.ghost.md](tests/fixtures/issue-93-quantities.ghost.md) | Quantity execution parity fixture | md |
 | [tests/fixtures/true-for-certified.ghost.md](tests/fixtures/true-for-certified.ghost.md) | Certified hot interval | md |
 
+## tests/fixtures/contribution-134/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [tests/fixtures/contribution-134/numeric-threshold.ghost.md](tests/fixtures/contribution-134/numeric-threshold.ghost.md) | Numeric moisture threshold to virtual relay 1 | md |
+
 ## tests/reference/
 
 | Path | Title | Type |
@@ -435,4 +450,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-325 documents.
+330 documents.

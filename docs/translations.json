@@ -82,8 +82,8 @@
       "source": "CONTRIBUTING.md",
       "sourceLanguage": "en",
       "translation": "CONTRIBUTING.ko.md",
-      "sourceSha256": "bd5a0c755be7b9d0a06e40cfdda5d62969b7b2f83678edd39415fbd237f10ac3",
-      "translationSha256": "0139eccc92ee298df85ca713eab06a95725ac8575f602fa42f2ccb2ab1de81cd"
+      "sourceSha256": "715196eaaf40e61baec1853235634b2d9ca3c16b1323d576b8ecb87f37050560",
+      "translationSha256": "2f7f2d37c9af6a97e446271bb759cbac236f315f1b10e2611bb4ec552f47325e"
     },
     {
       "source": "docs/2026-09-24-authoring-baseline-provenance.md",
@@ -924,6 +924,20 @@
       "translation": "examples/explicit-feedback-adoption.ghost.ko.md",
       "sourceSha256": "8f753ccce7d27bc4b6f7f2847e49915257c63c593925120c01272f6657de8b3d",
       "translationSha256": "901db50ecb74fb55b6e9377d69302a46eb38cffe40132c331ce3ade46951447f"
+    },
+    {
+      "source": "docs/AI-CONTRIBUTION-PACKAGE.md",
+      "sourceLanguage": "en",
+      "translation": "docs/AI-CONTRIBUTION-PACKAGE.ko.md",
+      "sourceSha256": "283089fc5d57a3a89207e803954d76081b0d240a6c736e701d8f21be459750db",
+      "translationSha256": "6a8d1527e8cabedbc0d6d8dcf7b90e46711dade4752860d370628fca4eadbd00"
+    },
+    {
+      "source": ".github/pull_request_template.md",
+      "sourceLanguage": "en",
+      "translation": ".github/pull_request_template.ko.md",
+      "sourceSha256": "32569c4c5c201d620790fb343102c9870770991995c4bc18119a799c31dd961d",
+      "translationSha256": "77bd12e823d9afcd03d06ae69bf0c72725ec8e9b626ec105f5bfb92e049cb8cc"
     }
   ],
   "exclusions": [
@@ -1170,6 +1184,10 @@
     {
       "path": "INDEX.md",
       "reason": "Generated repository-wide Markdown/HTML path and title index; regenerated from Git working files, not authored reader prose."
+    },
+    {
+      "path": "tests/fixtures/contribution-134/numeric-threshold.ghost.md",
+      "reason": "Canonical executable test input mirrored from an immutable virtual field fixture; provenance and reader guidance are in the bilingual contribution package."
     }
   ]
 }

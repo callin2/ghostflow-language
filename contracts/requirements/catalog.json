@@ -45,7 +45,8 @@
         "GF-TEST-output-intent-lowering",
         "GF-TEST-host-virtual-output",
         "GF-TEST-output-native-wasm-differential",
-        "GF-TEST-safety-fixed-point"
+        "GF-TEST-safety-fixed-point",
+        "GF-TEST-contribution-field-boundary"
       ],
       "status": "implemented"
     },
@@ -1123,6 +1124,20 @@
         "sha256": "ef318f93e8fb982b21ade82cdac612409ae5353d57230803d8f8844fe28fc0ee"
       },
       "selector": "GF-TEST-strategy-priority: only ties at the winning priority prevent activation"
+    },
+    {
+      "id": "GF-TEST-contribution-field-boundary",
+      "file": "tests/runtime-conformance.test.mjs",
+      "locator": {
+        "path": "tests/runtime-conformance.test.mjs",
+        "heading": "test('GF-TEST-contribution-field-boundary: independent field oracle kills weakened threshold rules', async t => {",
+        "lines": [
+          292,
+          333
+        ],
+        "sha256": "ee54081183c269388d393e5e301c6a1b94228690c2b6d02639709090a89f56db"
+      },
+      "selector": "GF-TEST-contribution-field-boundary: independent field oracle kills weakened threshold rules"
     }
   ]
 }

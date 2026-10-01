@@ -28,6 +28,10 @@ npm run docs:find -- --limit 8 QUERY
 
 ## 작업 범위와 완료 기준 정하기
 
+현장 사례에서 파생한 oracle과 범위를 제한한 mutation 근거가 있는 구체적인
+작업에는 [AI 기여 패키지](docs/AI-CONTRIBUTION-PACKAGE.ko.md)를 사용하세요.
+issue/PR template은 최소 identity, 범위와 독립 근거를 기록합니다.
+
 의도한 결과, 담당 파일 또는 경계, 완료 기준, 선행 조건, 집중 검증 명령을
 기록하세요. 완료된 작업, 막힌 작업, 독립적으로 할 수 있는 작업을 구분하세요.
 요청에 필요하지 않은 기능이나 정리를 추가하지 마세요.
