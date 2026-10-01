@@ -3621,6 +3621,39 @@
       "referenceCaseIds": ["REF-03-023"]
     },
     {
+      "id": "solar-stale-observation",
+      "family": "Solar stale prediction and verified source observation provenance",
+      "clause": {
+        "path": "docs/reference/03-time-and-schedules.md",
+        "heading": "3.5 Schedule의 공통 의미"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/solar-config-runtime.test.mjs",
+              "testId": "REF-03-025: Solar PredictionStale skip preserves Unknown cause and loaded definition/provider/context revisions at host activation",
+              "caseId": "REF-03-025",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "negative", "boundary"]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Evidence covers caller-supplied PredictionStale facts, host source-observation verification and native/WASM skip projection; external provider freshness, physical Driver behavior and complete schedule observation fields are not claimed."
+      ],
+      "issues": [214],
+      "referenceCaseIds": ["REF-03-025"]
+    },
+    {
       "id": "product-boundary",
       "family": "Farmer UI, installation and deployment",
       "clause": {
