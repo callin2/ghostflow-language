@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { compileSource } from './helpers/literate-compile.mjs';
 import { FramedGhostFlowRuntime } from '../runtimes/wasm/framed-runtime.mjs';
+import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 import { observeRuntimeValues, observeSourceTrace } from '../tools/source-trace.mjs';
 import { sensorFaultTimerSource, sensorFaultTimerScans } from './helpers/continuous-timer-vectors.mjs';
 
@@ -17,6 +18,102 @@ const nativePath = path.join(root, 'target/release/examples/scan_tape' + (proces
 function row(scanId, logicalTimeMs, inputs) {
   return { scanId, logicalTimeMs, inputs };
 }
+
+test('REF-04-005 pure map projects a held sample over three ticks without changing state, sample freshness or recovery on native and plain/framed WASM', async () => {
+  const artifact = await compileSource(`fn invert(value: Number) -> Number { 10.0 / value }
+control PureMap {
+  sensor reading: Number { filter = median(1); stale_after = 300ms; recover_after = 3 samples; }
+  state retained: Number = 17.0;
+  output projected, original: Number;
+  let mapped = reading |> map(invert);
+  projected <- mapped |> recover(-1.0);
+  original <- reading |> recover(-2.0);
+}`, { filename: 'reference-pure-map.ghost' });
+  assert.deepEqual(artifact.manifest.sensors.map(item => item.name), ['reading']);
+  for (const field of ['schedules', 'timers', 'signals', 'configs'])
+    assert.deepEqual(artifact.manifest[field], [], `map creates no ${field} owner`);
+  const sample = (id, timestampMs, quality = 'Good') =>
+    ({ epoch: 1, id, timestampMs, quality, value: quality === 'Good' ? 2 : 0 });
+  const held = sample(3, 2);
+  const recovering = sample(5, 50);
+  const steps = [
+    { nowMs: 0, samples: { reading: sample(1, 0) } },
+    { nowMs: 1, samples: { reading: sample(2, 1) } },
+    { nowMs: 2, samples: { reading: held } },
+    ...[10, 20, 30].map(nowMs => ({ nowMs, samples: { reading: held } })),
+    { nowMs: 40, samples: { reading: sample(4, 40, 'Disconnected') } },
+    { nowMs: 50, samples: { reading: recovering } },
+    ...[60, 70].map(nowMs => ({ nowMs, samples: { reading: recovering } })),
+    { nowMs: 80, samples: { reading: sample(6, 80) } },
+    { nowMs: 90, samples: { reading: sample(7, 90) } },
+    { nowMs: 389 }, { nowMs: 390 },
+  ];
+  const executions = [];
+  for (const instantiate of [ControlRuntime.instantiate, ControlRuntime.instantiateFramed]) {
+    const runtime = await instantiate.call(ControlRuntime, wasmBytes, artifact);
+    try {
+      executions.push(steps.map(step => {
+        const outcome = runtime.step(step);
+        return { ...outcome, identity: runtime.sensors.get('reading').conditioner.sampleIdentity() };
+      }));
+    } finally { runtime.dispose(); }
+  }
+  const [plain, framed] = executions;
+  const projection = rows => rows.map(({ vm, sensors, identity }) => ({ vm, sensors, identity }));
+  assert.deepEqual(projection(framed), projection(plain));
+  for (const rows of executions) {
+    for (const index of [3, 4, 5]) {
+      assert.deepEqual(rows[index].vm.safe, { projected: 5, original: 2 });
+      assert.deepEqual(rows[index].sensors.reading, rows[2].sensors.reading);
+      assert.deepEqual(rows[index].identity, { epoch: 1, id: 3, timestampMs: 2 });
+    }
+    for (const index of [7, 8, 9, 10]) {
+      assert.equal(rows[index].sensors.reading.quality, 'NotReady');
+      assert.deepEqual(rows[index].vm.safe, { projected: -1, original: -2 });
+    }
+    for (const index of [7, 8, 9])
+      assert.deepEqual(rows[index].identity, { epoch: 1, id: 5, timestampMs: 50 });
+    assert.equal(rows[6].sensors.reading.quality, 'Disconnected');
+    assert.equal(rows[11].sensors.reading.quality, 'Good');
+    assert.equal(rows[12].sensors.reading.quality, 'Good');
+    assert.equal(rows[13].sensors.reading.quality, 'Stale');
+    const faultOrigin = artifact.sourceMap.find(node => node.kind === 'sensor').id;
+    const choices = { Good: 0, Disconnected: 1, Stale: 2, NotReady: 4 };
+    for (const { vm, sensors } of rows) {
+      assert.deepEqual(vm.stateBefore, { retained: 17 });
+      assert.deepEqual(vm.stateAfter, { retained: 17 });
+      assert.deepEqual(vm.requested, vm.safe);
+      // map and recover retain the original sensor fault, rather than promoting it to ok.
+      assert.ok(vm.resultTrace.length > 0, 'the authored Result transformations emit provenance');
+      for (const event of vm.resultTrace) {
+        assert.equal(event.choice, choices[sensors.reading.quality]);
+        assert.equal(event.origin, sensors.reading.ok ? 0 : faultOrigin);
+      }
+    }
+  }
+  // Native executes the same bytecode with the exact conditioned Result rails.
+  // Physical sample admission above belongs to the actual WASM reference host.
+  const tape = framed.map(({ vm }, scanId) => row(scanId, steps[scanId].nowMs,
+    Object.entries(vm.inputs).map(([name, value]) => ({ name, value }))));
+  const native = nativeRun(artifact.bytes, tape);
+  const direct = await wasmRun(artifact, tape);
+  assertParity(native, direct);
+  assert.ok(native.every(item => item.accepted));
+  assert.deepEqual(native.map(item => item.outcome.trace), framed.map(item => item.vm));
+  assert.deepEqual(native.map(item => item.outcome.logicalTimeMs), steps.map(step => step.nowMs));
+  // A zero normal payload really traps in invert; fault rows' zero rails succeed
+  // only because map bypasses the callback, preserving the original fault.
+  const sensor = artifact.manifest.sensors[0];
+  const zero = [row(0, 0, [
+    { name: sensor.valueInput, value: 0 }, { name: sensor.okInput, value: true },
+    { name: sensor.faultInput, value: 0 },
+  ])];
+  const zeroNative = nativeRun(artifact.bytes, zero);
+  const zeroWasm = await wasmRun(artifact, zero);
+  assertParity(zeroNative, zeroWasm);
+  assert.equal(zeroNative[0].accepted, false);
+  assert.match(zeroNative[0].error, /zero|finite|division/i);
+});
 
 test('T01-FAULT: native and framed WASM reset and restart the authored sensor-fault timer identically', async () => {
   // The public sensor conditioner is tested in control-host; this tape supplies
