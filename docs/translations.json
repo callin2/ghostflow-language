@@ -2,6 +2,13 @@
   "format": "GhostFlow/document-translations-v1",
   "documents": [
     {
+      "source": "docs/EFFECT-PROCESS-CONTRACT.md",
+      "sourceLanguage": "en",
+      "translation": "docs/EFFECT-PROCESS-CONTRACT.ko.md",
+      "sourceSha256": "8e2db15c3eb85a520a584a51e6ba189b39067aac1dee2fdf5be24cefb1b21f60",
+      "translationSha256": "25fd4f29379e369eeb16d5f5e96373d08b88eaebcf0cf36d46a33f69eead49ce"
+    },
+    {
       "source": "docs/HOST-EVENT-ORDERING-CONTRACT.md",
       "sourceLanguage": "en",
       "translation": "docs/HOST-EVENT-ORDERING-CONTRACT.ko.md",
