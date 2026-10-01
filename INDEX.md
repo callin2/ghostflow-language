@@ -98,6 +98,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/FRAMED-CONTROL-HOST.md](docs/FRAMED-CONTROL-HOST.md) | Framed ControlRuntime adoption (D6) | md |
 | [docs/GFB5-SCHEDULE-PRELUDE.ko.md](docs/GFB5-SCHEDULE-PRELUDE.ko.md) | GFB5 일정 서두 | md |
 | [docs/GFB5-SCHEDULE-PRELUDE.md](docs/GFB5-SCHEDULE-PRELUDE.md) | GFB5 schedule prelude | md |
+| [docs/HOST-EVENT-ORDERING-CONTRACT.ko.md](docs/HOST-EVENT-ORDERING-CONTRACT.ko.md) | Host 이벤트 순서 계약 | md |
+| [docs/HOST-EVENT-ORDERING-CONTRACT.md](docs/HOST-EVENT-ORDERING-CONTRACT.md) | Host event ordering contract | md |
 | [docs/IMPLEMENTATION.ko.md](docs/IMPLEMENTATION.ko.md) | 구현 및 아티팩트 경계 | md |
 | [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) | Implementation and artifact boundaries | md |
 | [docs/INDEX.md](docs/INDEX.md) | Documentation index | md |
@@ -430,4 +432,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-320 documents.
+322 documents.
