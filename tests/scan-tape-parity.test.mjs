@@ -19,6 +19,79 @@ function row(scanId, logicalTimeMs, inputs) {
   return { scanId, logicalTimeMs, inputs };
 }
 
+test('REF-04-012 sample timestamp zero holds permission at 2999 and expires at 3000 while default reset removes old permission on native and plain/framed WASM', async () => {
+  const artifact = await compileSource(`control FreshnessPermission {
+  sensor moisture: Percent {
+    valid = 0% .. 100%; filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  state active: Bool = true;
+  timer age = elapsed(active);
+  output permit: Bool;
+  output decision_age: Duration;
+  permit <- moisture |> map(below(50%)) |> recover(false);
+  decision_age <- age;
+}`, { filename: 'reference-freshness-permission.ghost' });
+  const sample = (id, timestampMs, value) => ({ epoch: 1, id, timestampMs, value, quality: 'Good' });
+  const held = sample(1, 0, 20);
+  const warm = [{ nowMs: 0, samples: { moisture: held } },
+    { nowMs: 2999, samples: { moisture: held } }, { nowMs: 3000 }, { nowMs: 3001 }];
+  const fresh = [{ nowMs: 3001 },
+    { nowMs: 3002, samples: { moisture: sample(1, 3002, 80) } },
+    { nowMs: 3003, samples: { moisture: sample(2, 3003, 20) } }];
+  const origin = artifact.sourceMap.find(node => node.kind === 'sensor').id;
+  for (const [steps, freshOwner] of [[warm, false], [fresh, true]]) {
+    const executions = [];
+    for (const instantiate of [ControlRuntime.instantiate, ControlRuntime.instantiateFramed]) {
+      // Default factory receives the same executable and no restored checkpoint.
+      const runtime = await instantiate.call(ControlRuntime, wasmBytes, artifact);
+      try {
+        executions.push(steps.map((input, index) => {
+          const conditioner = runtime.sensors.get('moisture').conditioner;
+          if (!freshOwner && index === 3) conditioner.reset();
+          const outcome = runtime.step(input);
+          return { ...outcome, identity: conditioner.sampleIdentity() };
+        }));
+      } finally { runtime.dispose(); }
+    }
+    const [plain, framed] = executions;
+    const projection = rows => rows.map(({ vm, sensors, identity }) => ({ vm, sensors, identity }));
+    assert.deepEqual(projection(plain), projection(framed));
+    for (const rows of executions) {
+      for (const [index, { vm, sensors, identity }] of rows.entries()) {
+        const quality = freshOwner ? (index === 0 ? 'NotReady' : 'Good')
+          : ['Good', 'Good', 'Stale', 'NotReady'][index];
+        const permit = freshOwner ? index === 2 : index < 2;
+        assert.equal(sensors.moisture.quality, quality);
+        assert.equal(sensors.moisture.ok, quality === 'Good');
+        assert.deepEqual(vm.requested, { permit, decision_age: steps[index].nowMs - steps[0].nowMs });
+        assert.deepEqual(vm.safe, vm.requested);
+        assert.equal(vm.inputs.__gf_now_ms, steps[index].nowMs);
+        assert.equal(vm.resultTrace[0].choice, quality === 'Good' ? 0 : quality === 'Stale' ? 2 : 4);
+        assert.equal(vm.resultTrace[0].origin, quality === 'Good' ? 0 : origin);
+        assert.equal(vm.stateBefore.active, true);
+        assert.equal(vm.stateAfter.active, true);
+        if (freshOwner) {
+          assert.deepEqual(identity, index === 0 ? null : {
+            epoch: 1, id: index, timestampMs: steps[index].nowMs,
+          });
+        } else {
+          assert.deepEqual(identity, index === 3 ? null : { epoch: 1, id: 1, timestampMs: 0 });
+        }
+      }
+    }
+    // Native executes the exact conditioned Result rails with the driver's
+    // protected logical clock; actual native conditioning is tested separately.
+    const tape = framed.map(({ vm }, scanId) => row(scanId, steps[scanId].nowMs,
+      Object.entries(vm.inputs).filter(([name]) => name !== '__gf_now_ms')
+        .map(([name, value]) => ({ name, value }))));
+    const native = nativeRun(artifact.bytes, tape);
+    assertParity(native, await wasmRun(artifact, tape));
+    assert.ok(native.every(item => item.accepted), JSON.stringify(native));
+    assert.deepEqual(native.map(item => item.outcome.trace), framed.map(item => item.vm));
+    assert.deepEqual(native.map(item => item.outcome.logicalTimeMs), steps.map(input => input.nowMs));
+  }
+});
+
 test('REF-04-011 fault recovery keeps source epochs separate and a default fresh owner resets median readiness on native and plain/framed WASM', async () => {
   const artifact = await compileSource(`control EpochRecovery {
   sensor moisture: Percent {

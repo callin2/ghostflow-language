@@ -1103,4 +1103,41 @@ mod tests {
         }
         assert_eq!(fresh.reading(190), Ok(30.0));
     }
+
+    #[test]
+    fn ref_04_012_exact_stale_boundary_and_default_reset_clear_old_sample() {
+        let config = SensorConfig::new(Filter::Median(1), 0.0, 100.0, 3_000, 1);
+        let mut s = Sensor::new(config).unwrap();
+        s.update(Sample::good(1, 1, 0, 20.0), 0).unwrap();
+        assert_eq!(
+            s.update(Sample::good(1, 1, 0, 20.0), 2_999),
+            Ok(UpdateResult::Duplicate)
+        );
+        assert_eq!(s.reading(2_999), Ok(20.0));
+        assert_eq!(s.reading(3_000), Err(SensorFault::Stale));
+        assert_eq!(s.accepted_sample_identity(), Some((1, 1, 0)));
+        assert_eq!(s.last_physical_sample_time(), Some(0));
+        s.reset();
+        assert_eq!(s.accepted_sample_identity(), None);
+        assert_eq!(s.last_physical_sample_time(), None);
+        assert_eq!(s.value(3_001), None);
+        assert_eq!(s.reading(0), Err(SensorFault::NotReady));
+        assert_eq!(s.reading(3_001), Err(SensorFault::NotReady));
+        let mut fresh = Sensor::new(config).unwrap();
+        assert_eq!(fresh.accepted_sample_identity(), None);
+        assert_eq!(fresh.reading(0), Err(SensorFault::NotReady));
+        fresh.update(Sample::good(1, 1, 1, 20.0), 1).unwrap();
+        assert_eq!(fresh.reading(1), Ok(20.0));
+        assert_eq!(
+            fresh.update(Sample::new(1, 2, 2, 0.0, Quality::Disconnected), 2),
+            Err(SensorFault::Disconnected)
+        );
+        assert_eq!(fresh.reading(2), Err(SensorFault::Disconnected));
+        fresh.update(Sample::good(1, 3, 3, 20.0), 3).unwrap();
+        assert_eq!(
+            fresh.update(Sample::good(1, 4, 4, 101.0), 4),
+            Err(SensorFault::Invalid)
+        );
+        assert_eq!(fresh.reading(4), Err(SensorFault::Invalid));
+    }
 }
