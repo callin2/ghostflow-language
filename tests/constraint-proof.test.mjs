@@ -37,6 +37,67 @@ control Proof {
 `;
 const filename = 'proof.ghost.md';
 const clone = value => JSON.parse(JSON.stringify(value));
+
+test('GF-TEST-local-constraint-envelope: grouped mandatory outputs enforce and recover identically in native and both WASM ABIs', async t => {
+  const root = fileURLToPath(new URL('../', import.meta.url));
+  const document = fs.readFileSync(path.join(root, 'examples/constraint-envelope.ghost.md'), 'utf8');
+  const translated = fs.readFileSync(path.join(root, 'examples/constraint-envelope.ghost.ko.md'), 'utf8');
+  assert.equal(document.match(/```ghost\n([\s\S]*?)\n```/)[1], translated.match(/```ghost\n([\s\S]*?)\n```/)[1]);
+  const compiled = await compileSource(document, { filename: 'examples/constraint-envelope.ghost.md' });
+  const flat = await compileSource(document.replace('  constraints LocalEnvelope {\n', '')
+    .replace('    require at safe_output', '    require').replace('    mutex(forward, reverse);\n  }', '    mutex(forward, reverse);'),
+    { filename: 'flat-envelope.ghost.md' });
+  assert.deepEqual(compiled.bytes, flat.bytes, 'grouping preserves existing local semantics');
+  const inputs = [
+    { start: true, valve_ready: false, forward_request: true, reverse_request: false },
+    { start: true, valve_ready: true, forward_request: true, reverse_request: true },
+    { start: true, valve_ready: true, forward_request: false, reverse_request: true },
+    { start: false, valve_ready: false, forward_request: false, reverse_request: false },
+  ];
+  const expected = [
+    { pump: false, valve: false, forward: true, reverse: false },
+    { pump: true, valve: true, forward: false, reverse: false },
+    { pump: true, valve: true, forward: false, reverse: true },
+    { pump: false, valve: false, forward: false, reverse: false },
+  ];
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'gf-local-envelope-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const modulePath = path.join(directory, 'control.gfb'), inputPath = path.join(directory, 'inputs.csv');
+  fs.writeFileSync(modulePath, compiled.bytes);
+  fs.writeFileSync(inputPath, `${Object.keys(inputs[0]).join(',')}\n${inputs.map(row => Object.values(row).join(',')).join('\n')}\n`);
+  const native = () => execFileSync(path.join(root, 'target/release/examples/run' + (process.platform === 'win32' ? '.exe' : '')),
+    [modulePath, inputPath], { encoding: 'utf8' }).trim().split('\n').map(JSON.parse);
+  const traces = native();
+  assert.deepEqual(native(), traces);
+  assert.deepEqual(traces.map(trace => trace.safe), expected);
+  assert.deepEqual(traces.map(trace => trace.requested.pump), [true, true, true, false]);
+  assert.ok(traces[0].faults.length > 0, 'missing valve blocks requested pump');
+  assert.ok(traces[1].faults.length > 0, 'simultaneous directions are blocked');
+  assert.deepEqual(traces[2].faults, [], 'valid recovery permits the request');
+  const wasm = fs.readFileSync(path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm'));
+  for (const Runtime of [GhostFlowRuntime, FramedGhostFlowRuntime]) {
+    const execute = async () => {
+      const runtime = await Runtime.instantiate(wasm);
+      try {
+        runtime.load(compiled.bytes);
+        for (const output of compiled.manifest.outputs) runtime.addCapability('actuator', output.name, 'bool');
+        runtime.activate();
+        return inputs.map((row, index) => {
+          if (Runtime === FramedGhostFlowRuntime) return runtime.scan({ scanId: index, logicalTimeMs: index,
+            inputs: Object.entries(row).map(([name, value]) => ({ name, value })) }).trace;
+          for (const [name, value] of Object.entries(row)) runtime.setBool(name, value);
+          runtime.tick(); return clone(runtime.trace);
+        });
+      } finally { runtime.dispose(); }
+    };
+    assert.deepEqual(await execute(), traces);
+    assert.deepEqual(await execute(), traces);
+  }
+  const observation = observeSourceTrace(compiled.traceMetadata, traces[0]);
+  assert.deepEqual(observation.constraints.map(rule => rule.observed), traces[0].safetyTrace.constraints);
+  assert.deepEqual(observation.constraints.map(rule => rule.nodeId), compiled.manifest.localConstraints[0].rules.map(rule => rule.source.nodeId));
+  await assert.rejects(compileSource(document.replace('pump => valve', 'pump => missing'), { filename: 'missing.ghost.md' }), /unknown|missing/);
+});
 function refreshProof(proof) {
   proof.originalSha256 = sha256Hex(canonicalJson(proof.original));
   proof.compiledSha256 = sha256Hex(canonicalJson(proof.compiled));
@@ -44,6 +105,33 @@ function refreshProof(proof) {
   proof.certificateSha256 = sha256Hex(canonicalJson(content));
   return proof;
 }
+
+test('GF-TEST-shared-constraint-descriptor: actual native and both WASM loaders reject checked policy bytes without enforcement', async t => {
+  const root = fileURLToPath(new URL('../', import.meta.url));
+  const contract = fs.readFileSync(path.join(root, 'docs/CONSTRAINTS.en.md'), 'utf8');
+  const code = contract.match(/```ghost\n(control SharedPumpPolicy \{[\s\S]*?)\n```/)[1];
+  const compiled = await compileSource(`# Checked shared contract\n\n\`\`\`ghost\n${code}\n\`\`\`\n`, { filename: 'shared-envelope.ghost.md' });
+  assert.equal(compiled.manifest.format, 'GhostFlow/control-policy-descriptor-v1');
+  const descriptor = JSON.parse(Buffer.from(compiled.bytes).toString('utf8'));
+  assert.equal(descriptor.executable, false);
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'gf-unbound-envelope-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const modulePath = path.join(directory, 'policy.json'), inputPath = path.join(directory, 'inputs.csv');
+  fs.writeFileSync(inputPath, 'unused\n');
+  const wasm = fs.readFileSync(path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm'));
+  for (const bytes of [compiled.bytes, Buffer.from(JSON.stringify({ ...descriptor, executable: true }))]) {
+    fs.writeFileSync(modulePath, bytes);
+    const outcome = JSON.parse(execFileSync(path.join(root, 'target/release/examples/run' + (process.platform === 'win32' ? '.exe' : '')),
+      [modulePath, inputPath, '--outcomes'], { encoding: 'utf8' }).trim());
+    assert.equal(outcome.status, 'ERROR');
+    assert.equal(outcome.phase, 'load');
+    for (const Runtime of [GhostFlowRuntime, FramedGhostFlowRuntime]) {
+      const runtime = await Runtime.instantiate(wasm);
+      try { assert.throws(() => runtime.load(bytes), /magic|GFB|module|format|version/i); }
+      finally { runtime.dispose(); }
+    }
+  }
+});
 function mapOf(a) {
   return { format: 'GhostFlow/source-map-v1', bytecodeSha256: a.manifest.bytecodeSha256,
     sourceDocument: a.sourceDocument, nodes: a.sourceMap, lines: a.extractionMap, traceMetadata: a.traceMetadata };

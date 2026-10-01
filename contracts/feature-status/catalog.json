@@ -3720,6 +3720,63 @@
       "referenceCaseIds": ["REF-03-035"]
     },
     {
+      "id": "control-owned-constraint-groups",
+      "family": "Control-owned local groups and checked shared resource contracts",
+      "clause": {
+        "path": "docs/reference/04-sensors-constraints-control.md",
+        "heading": "4.8 공통 constraints 표기와 연산"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/named-constraints.test.mjs",
+              "testId": "local named output groups lower existing safety rules and retain group and rule provenance",
+              "assertionClass": "compile-policy",
+              "polarities": ["positive", "negative", "boundary"]
+            },
+            {
+              "path": "tests/resource-policy-artifact.test.mjs",
+              "testId": "GF-TEST-resource-constraint-binding: exact source-bound finite logical mapping validates without granting execution",
+              "assertionClass": "type-boundary",
+              "polarities": ["positive", "negative", "boundary"]
+            }
+          ]
+        },
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/constraint-proof.test.mjs",
+              "testId": "GF-TEST-local-constraint-envelope: grouped mandatory outputs enforce and recover identically in native and both WASM ABIs",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "negative", "boundary"]
+            },
+            {
+              "path": "tests/constraint-proof.test.mjs",
+              "testId": "GF-TEST-shared-constraint-descriptor: actual native and both WASM loaders reject checked policy bytes without enforcement",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["negative", "boundary"]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Shared descriptor and logical binding validation grant no execution authority. Generic shared admission and ongoing resource-specific safe behavior remain #158; physical output ABI, Driver application and hardware confirmation are not claimed. The bounded standalone Station adapter is retained for its concrete consumers."
+      ],
+      "issues": [157, 158],
+      "referenceCaseIds": []
+    },
+    {
       "id": "product-boundary",
       "family": "Farmer UI, installation and deployment",
       "clause": {

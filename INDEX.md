@@ -258,6 +258,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 
 | Path | Title | Type |
 | --- | --- | --- |
+| [examples/constraint-envelope.ghost.ko.md](examples/constraint-envelope.ghost.ko.md) | 완전한 local 출력 허용 범위 | md |
+| [examples/constraint-envelope.ghost.md](examples/constraint-envelope.ghost.md) | A complete local output envelope | md |
 | [examples/explicit-feedback-adoption.ghost.ko.md](examples/explicit-feedback-adoption.ghost.ko.md) | 명시적으로 채택한 피드백 억제 | md |
 | [examples/explicit-feedback-adoption.ghost.md](examples/explicit-feedback-adoption.ghost.md) | Explicitly adopted feedback inhibition | md |
 | [examples/irrigation.ghost.ko.md](examples/irrigation.ghost.ko.md) | 관개 런타임 픽스처 | md |
@@ -268,6 +270,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [examples/optional-feedback-timer.ghost.md](examples/optional-feedback-timer.ghost.md) | Timer control with optional observation | md |
 | [examples/scheduled-watering.ghost.en.md](examples/scheduled-watering.ghost.en.md) | Sequential watering by daily schedule | md |
 | [examples/scheduled-watering.ghost.md](examples/scheduled-watering.ghost.md) | 하루 시간표에 따른 순차 관수 | md |
+| [examples/shared-constraint-contract.ghost.ko.md](examples/shared-constraint-contract.ghost.ko.md) | 완전한 공유 자원 검사 계약 | md |
+| [examples/shared-constraint-contract.ghost.md](examples/shared-constraint-contract.ghost.md) | A complete checked shared resource contract | md |
 | [examples/solar-live-config.ghost.en.md](examples/solar-live-config.ghost.en.md) | Allowing sunrise schedules through shared settings observations | md |
 | [examples/solar-live-config.ghost.md](examples/solar-live-config.ghost.md) | 공유 설정 관측으로 일출 스케줄 허용하기 | md |
 | [examples/solar-watering.ghost.en.md](examples/solar-watering.ghost.en.md) | Watering timed to sunrise and sunset | md |
@@ -459,4 +463,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-339 documents.
+343 documents.

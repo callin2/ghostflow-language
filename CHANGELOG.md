@@ -2,6 +2,34 @@
 
 ## Unreleased
 
+### 2026-10-01 — canonical control-owned constraint groups ([#157](https://github.com/callin2/ghostflow-language/issues/157))
+
+Reference §4.8 distinguishes local output, shared-resource and accounting scope.
+One control can now group existing Bool output rules as
+`constraints Local { require at safe_output pump => valve; }`;
+the previous compiler accepted those rules only ungrouped. Grouping preserves
+the existing native/WASM output projection, including fixed-point denial and
+recovery, and keeps source-linked rule observations.
+
+The existing targeted syntax `constraints Shared for resource { ... }` can
+be checked inside the same control. Its explicit `safe { alias = false; ... }`
+vector must cover its finite Bool resources and satisfy its mandatory predicates;
+false is not inferred as a universal safe state. Shared contracts produce only
+an explicitly nonexecutable descriptor pending #158 binding and enforcement;
+they cannot be silently stripped into runnable bytecode. Existing import,
+instance and connect semantics and accounting limit syntax are preserved.
+The standalone `ghostrules` profile remains solely for concrete Station demo
+and Station WASM consumers, with its restricted contract documented separately.
+No physical output ABI or safe sequence is introduced. Recompile grouped
+sources with the new compiler; existing ungrouped sources remain valid.
+The reference logical mapping validator pins canonical source and artifact hashes,
+stable resource identities and finite Bool input/output ports, rejecting missing,
+mismatched or disguised bindings without granting execution. Its complete
+software-only example is `examples/shared-constraint-contract.ghost.md`.
+Regression evidence: complete `examples/constraint-envelope.ghost.md`, grammar
+and invalid safe-vector checks, actual native/plain/framed-WASM parity, missing
+references, unsupported advisory stages and execution-without-binding rejection.
+
 ### 2026-10-01 — accounting-only artifact profile ([#210](https://github.com/callin2/ghostflow-language/issues/210))
 
 An executable accounting source now selects `GhostFlow/control-v10` even when

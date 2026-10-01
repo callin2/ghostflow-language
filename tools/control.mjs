@@ -449,12 +449,12 @@ class ControlParser {
     for (const field of ['cleanup', 'resume']) if (!fields[field]) error(kind, `missing preemption field ${field}`);
     return { kind: kind.value, fields, loc: copyLoc(kind) };
   }
-  namedConstraints() {
+  namedConstraints(inline = false) {
     const start = this.take(), name = this.identifier('expected constraints name');
     this.expect('for', 'constraints requires for resource');
     const target = this.identifier('expected constraints target resource');
     this.expect('{', 'expected { after constraints target');
-    const rules = [];
+    const rules = []; let safe;
     while (!this.matches('}')) {
       if (this.current().kind === 'eof') error(start, 'unclosed constraints block');
       const kind = this.take();
@@ -464,19 +464,54 @@ class ControlParser {
         if (stage.value !== 'admission') error(stage, 'exclusive stage must be admission');
         const members = this.finiteNames('exclusive modes');
         this.expect(';', 'expected ; after exclusive rule');
-        rules.push({ kind: 'exclusive', stage: stage.value, members, loc: copyLoc(kind) });
+        rules.push(inline ? this.node('exclusive', kind, { stage: stage.value, members })
+          : { kind: 'exclusive', stage: stage.value, members, loc: copyLoc(kind) });
       } else if (kind.value === 'require') {
         this.expect('at', 'require requires a stage');
         const stage = this.identifier('expected require stage');
         if (stage.value !== 'safe_output') error(stage, 'finite-set require stage must be safe_output');
         const predicate = this.constraintPredicate();
         this.expect(';', 'expected ; after require rule');
-        rules.push({ kind: 'require', stage: stage.value, predicate, loc: copyLoc(kind) });
-      } else error(kind, `unsupported named constraint ${kind.value}`);
+        rules.push(inline ? this.node('require', kind, { stage: stage.value, predicate })
+          : { kind: 'require', stage: stage.value, predicate, loc: copyLoc(kind) });
+      } else if (kind.value === 'safe') {
+        if (safe !== undefined) error(kind, 'duplicate authored safe vector');
+        this.expect('{', 'safe requires { resource = Bool; }');
+        safe = [];
+        while (!this.matches('}')) {
+          if (this.current().kind === 'eof') error(kind, 'unclosed safe vector');
+          const resource = this.identifier('expected safe resource alias');
+          this.expect('=', 'safe resource requires =');
+          const value = this.take();
+          if (!['true', 'false'].includes(value.value)) error(value, 'safe value must be a literal Bool');
+          this.expect(';', 'expected ; after safe resource value');
+          safe.push(inline ? this.node('resource-safe-value', resource, { resource: resource.value, value: value.value === 'true' })
+            : { resource: resource.value, value: value.value === 'true', loc: copyLoc(resource) });
+        }
+        this.take(); this.maybe(';');
+      } else error(kind, `unsupported named constraint ${kind.value}; use exclusive at admission or require at safe_output`);
     }
     this.take();
     if (!rules.length) error(start, 'constraints block requires at least one rule');
-    return { name: name.value, target: target.value, rules, loc: copyLoc(start) };
+    if (inline && safe === undefined) error(start, 'shared resource constraints require an authored safe vector');
+    if (inline) return this.node('shared-constraints', start, { name: name.value, target: target.value, rules, safe });
+    return { name: name.value, target: target.value, rules, ...(safe !== undefined ? { safe } : {}), loc: copyLoc(start) };
+  }
+  controlConstraints() {
+    if (this.tokens[this.at + 2]?.value === 'for') return this.namedConstraints(true);
+    if (this.tokens[this.at + 3]?.value === 'limit') return this.accountConstraints();
+    const start = this.take(), name = this.identifier('expected constraints name');
+    this.expect('{', 'expected { after constraints name');
+    const rules = [];
+    while (!this.matches('}')) {
+      if (this.current().kind === 'eof') error(start, 'unclosed local constraints block');
+      if (this.matches('require')) rules.push(this.requirement(true));
+      else if (this.matches('mutex')) rules.push(this.mutex());
+      else error(this.current(), `unsupported local constraint ${this.current().value}; use require or mutex, and keep accounting limit rules in a separate group`);
+    }
+    this.take();
+    if (!rules.length) error(start, 'local constraints block requires at least one rule');
+    return this.node('local-constraints', start, { name: name.value, rules });
   }
   finiteNames(label) {
     this.expect('{', `expected { for ${label}`);
@@ -578,7 +613,7 @@ class ControlParser {
       case 'objective': return this.objective();
       case 'degraded': return this.degraded();
       case 'adapt_setting': return this.adaptSetting();
-      case 'constraints': return this.accountConstraints();
+      case 'constraints': return this.controlConstraints();
       case 'check': case 'limit': error(token, `unsupported construct ${token.value}`);
       default:
         if (token.kind === 'identifier' && this.tokens[this.at + 1]?.value === "'") return this.nextStatement(false);
@@ -801,7 +836,7 @@ class ControlParser {
     this.expect('{', 'expected { after constraints name');
     const limits = [];
     while (!this.matches('}')) {
-      const token = this.expect('limit', 'constraints only support limit rules');
+      const token = this.expect('limit', 'accounting constraints only support limit rules; keep local output and shared resource rules in separate groups');
       const used = this.call(this.expect('used', 'limit requires used(account, basis)'));
       if (!used.args.length || used.args.length > 2) error(token, 'used requires an account and one time basis');
       const op = this.current();
@@ -1005,8 +1040,12 @@ class ControlParser {
     this.expect('<-', 'output connection requires <-'); const value = this.expression(); this.expect(';', 'expected ; after output connection');
     return this.node('connection', start, { name: name.value, value });
   }
-  requirement() {
+  requirement(grouped = false) {
     const start = this.take();
+    if (grouped && this.maybe('at')) {
+      const stage = this.identifier('expected local require stage');
+      if (stage.value !== 'safe_output') error(stage, 'local require stage must be safe_output');
+    }
     let value;
     if (this.matches('!')) value = this.expression();
     else {
@@ -1014,7 +1053,7 @@ class ControlParser {
       value = this.node('binary', start, { op: '=>', left, right });
     }
     this.expect(';', 'expected ; after require');
-    return this.node('require', start, { value });
+    return this.node('require', start, { value, ...(grouped ? { stage: 'safe_output' } : {}) });
   }
   mutex() {
     const start = this.take(); this.expect('('); const names = this.names('expected mutex output'); this.expect(')'); this.expect(';');
@@ -1474,6 +1513,10 @@ class Lowerer {
     this.hasSolarSchedule = ast.body.some(item => item.kind === 'schedule' && item.scheduleType === 'Solar');
   }
   lower({ emitBytecode = true, accountingExecution = false } = {}) {
+    if (emitBytecode && this.ast.body.some(item => item.kind === 'shared-constraints')) {
+      error(this.ast.body.find(item => item.kind === 'shared-constraints').loc,
+        'shared resource constraints require resource binding and runtime enforcement; compile a checked nonexecutable descriptor');
+    }
     this.syntaxOnly = !emitBytecode;
     this.accountingExecution = accountingExecution;
     validateCompositionStructure(this.ast);
@@ -1605,7 +1648,7 @@ class Lowerer {
       bytes,
       manifest: this.manifest,
       sourceMap: this.ast.sourceNodes,
-      traceMetadata: buildSourceTrace(this.ast, this.constraints, bytes, transitions, intents, generatedTimers, this.resultSites, this.generatedSignals,
+      traceMetadata: buildSourceTrace({ ...this.ast, body: this.ast.body.flatMap(item => item.kind === 'local-constraints' ? item.rules : [item]) }, this.constraints, bytes, transitions, intents, generatedTimers, this.resultSites, this.generatedSignals,
         this.windows.map(window => ({
           node: window.item, descriptor: window.descriptor,
           source: {
@@ -1662,7 +1705,7 @@ class Lowerer {
     for (const item of this.ast.body) {
       if (item.kind === 'enum') continue;
       if (item.kind === 'input' || item.kind === 'output') for (const name of item.names) this.unique(name, item.loc, item.kind);
-      else if (['state', 'config', 'parameter', 'let', 'function', 'syntax', 'sensor', 'event', 'calendar', 'provider', 'signal', 'schedule', 'timer', 'resource', 'account', 'account-constraints'].includes(item.kind)) this.unique(item.name, item.loc, item.kind);
+      else if (['state', 'config', 'parameter', 'let', 'function', 'syntax', 'sensor', 'event', 'calendar', 'provider', 'signal', 'schedule', 'timer', 'resource', 'account', 'account-constraints', 'shared-constraints', 'local-constraints'].includes(item.kind)) this.unique(item.name, item.loc, item.kind);
       else if (item.kind === 'adapt') this.unique(item.name, item.loc, 'adapt policy');
       else if (['objective', 'degraded', 'adapt-setting'].includes(item.kind)) this.unique(item.name, item.loc, item.kind);
     }
@@ -1749,6 +1792,12 @@ class Lowerer {
   }
   generatedName(kind, name) { return `${RESERVED_PREFIX}${kind}_${name}`; }
   validateAndPopulate() {
+    if (this.ast.body.some(item => item.kind === 'shared-constraints')) {
+      this.manifest.sharedResourceConstraints = checkResourcePolicy({
+        inline: true, resources: this.ast.body.filter(item => item.kind === 'resource'),
+        constraints: this.ast.body.filter(item => item.kind === 'shared-constraints'),
+      }).constraints;
+    }
     for (const item of this.ast.body) if (item.kind === 'syntax') this.addMacro(item);
     // Functions are declarations, so calls may precede their definitions both
     // inside the control and in the top-level pure-function prelude.
@@ -1899,7 +1948,19 @@ class Lowerer {
         if (!output.expression) error(output.loc, `output ${output.name} requires exactly one connection (${output.name} <- expression;)`);
       }
     }
-    for (const item of this.ast.body) if (item.kind === 'require' || item.kind === 'mutex') this.addConstraint(item);
+    for (const item of this.ast.body) {
+      if (item.kind === 'require' || item.kind === 'mutex') this.addConstraint(item);
+      if (item.kind === 'local-constraints') {
+        const rules = item.rules.map(rule => {
+          if (rule.kind === 'mutex' && new Set(rule.names).size !== rule.names.length) error(rule.loc, 'duplicate local mutex output');
+          const before = this.constraints.length;
+          this.addConstraint(rule);
+          return { kind: rule.kind, stage: 'safe_output', lowered: this.constraints.slice(before), source: { nodeId: rule.id, ...rule.loc } };
+        });
+        (this.manifest.localConstraints ??= []).push({ name: item.name, scope: 'local_output', rules,
+          source: { nodeId: item.id, ...item.loc } });
+      }
+    }
   }
   addAdapt(item) {
     const strategyNames = new Set();
@@ -3796,7 +3857,8 @@ function checkResourcePolicy(ast) {
   for (const resource of ast.resources) {
     rejectName(resource.name, resource.loc, 'resource');
     if (resources.has(resource.name)) error(resource.loc, `duplicate resource ${resource.name}`);
-    if (!['Station', 'BoolActuator'].includes(resource.type)) error(resource.loc, `unsupported resource type ${resource.type}`);
+    if (!(ast.inline ? ['Station', 'BoolActuator', 'ContinuousActuator'] : ['Station', 'BoolActuator']).includes(resource.type)) error(resource.loc, `unsupported resource type ${resource.type}`);
+    if (ast.inline && resource.typeArgs) error(resource.loc, 'shared resource declarations require a finite concrete resource type');
     resources.set(resource.name, resource.type);
   }
   const finiteSet = (members, loc, type) => {
@@ -3837,22 +3899,74 @@ function checkResourcePolicy(ast) {
     if (constraints.has(group.name)) error(group.loc, `duplicate constraints ${group.name}`);
     constraints.add(group.name);
     if (!resources.has(group.target)) error(group.loc, `unknown resource ${group.target}`);
-    if (resources.get(group.target) !== 'Station') error(group.loc, `constraints target ${group.target} must be a Station resource`);
+    if (!(ast.inline ? ['Station', 'BoolActuator'] : ['Station']).includes(resources.get(group.target))) {
+      error(group.loc, `constraints target ${group.target} must be a ${ast.inline ? 'Station or BoolActuator' : 'Station'} resource`);
+    }
     const rules = group.rules.map(rule => {
       if (rule.kind === 'exclusive') {
         if (rule.members.length < 2) error(rule.loc, 'exclusive requires at least two modes');
+        if (rule.members.length > 128) error(rule.loc, 'exclusive finite mode set exceeds 128 members');
         const seen = new Set();
         const members = rule.members.map(member => {
           rejectName(member.name, member.loc, 'mode');
           if (seen.has(member.name)) error(member.loc, `duplicate exclusive mode ${member.name}`);
           seen.add(member.name); return member.name;
         });
-        return { kind: rule.kind, stage: rule.stage, members };
+        return { kind: rule.kind, stage: rule.stage, members,
+          ...(ast.inline ? { source: { nodeId: rule.id, ...rule.loc } } : {}) };
       }
       const predicate = term(rule.predicate);
       if (predicate.type !== 'Bool') error(rule.loc, 'require predicate must be Bool');
-      return { kind: rule.kind, stage: rule.stage, predicate: predicate.value };
+      return { kind: rule.kind, stage: rule.stage, predicate: predicate.value,
+        ...(ast.inline ? { source: { nodeId: rule.id, ...rule.loc } } : {}) };
     });
+    if (ast.inline || group.safe !== undefined) {
+      if (!Array.isArray(group.safe)) error(group.loc, 'shared resource constraints require an authored safe vector');
+      const outputs = new Set(resources.get(group.target) === 'BoolActuator' ? [group.target] : []);
+      const refs = node => {
+        if (node.resources) for (const name of node.resources) outputs.add(name);
+        if (node.kind === 'resource-on') outputs.add(node.resource);
+        if (node.left) refs(node.left);
+        if (node.right) refs(node.right);
+      };
+      for (const rule of rules) if (rule.kind === 'require') refs(rule.predicate);
+      const safeValues = new Map();
+      if (group.safe.length > 128 || outputs.size > 128) error(group.loc, 'authored safe vector exceeds 128 resources');
+      const safe = group.safe.map(entry => {
+        if (safeValues.has(entry.resource)) error(entry.loc, `duplicate safe resource ${entry.resource}`);
+        if (!resources.has(entry.resource)) error(entry.loc, `unknown safe resource ${entry.resource}`);
+        if (resources.get(entry.resource) !== 'BoolActuator') error(entry.loc, `safe resource ${entry.resource} must be a BoolActuator`);
+        if (!outputs.has(entry.resource)) error(entry.loc, `safe resource ${entry.resource} is outside the protected finite output set`);
+        if (typeof entry.value !== 'boolean') error(entry.loc, 'safe value must be a literal Bool');
+        safeValues.set(entry.resource, entry.value);
+        return { resource: entry.resource, value: entry.value,
+          ...(ast.inline ? { source: { nodeId: entry.id, ...entry.loc } } : {}) };
+      });
+      for (const output of outputs) if (!safeValues.has(output)) error(group.loc, `authored safe vector is missing protected resource ${output}`);
+      const evaluate = node => {
+        if (node.kind === 'Bool' || node.kind === 'Int') return node.value;
+        if (node.kind === 'resource-on') return safeValues.get(node.resource);
+        if (node.kind === 'count_on') return node.resources.filter(name => safeValues.get(name)).length;
+        if (node.kind === 'any_on') return node.resources.some(name => safeValues.get(name));
+        const left = evaluate(node.left), right = evaluate(node.right);
+        switch (node.op) {
+          case '=>': return !left || right;
+          case '==': return left === right;
+          case '!=': return left !== right;
+          case '<': return left < right;
+          case '<=': return left <= right;
+          case '>': return left > right;
+          case '>=': return left >= right;
+          default: error(group.loc, 'unsupported finite safe predicate');
+        }
+      };
+      for (const rule of rules) if (rule.kind === 'require' && !evaluate(rule.predicate)) {
+        error(group.loc, 'authored safe vector does not satisfy every mandatory require at safe_output');
+      }
+      return { name: group.name, target: group.target, scope: 'shared_resource', rules, safe,
+        modes: [...new Set(rules.filter(rule => rule.kind === 'exclusive').flatMap(rule => rule.members))],
+        outputs: [...outputs], ...(ast.inline ? { source: { nodeId: group.id, ...group.loc } } : {}) };
+    }
     return { name: group.name, target: group.target, rules };
   });
   const policies = (ast.resourcePolicies ?? []).map(policy => {
@@ -3907,6 +4021,10 @@ function checkResourcePolicy(ast) {
 export function compileControl(source, { filename = '<control>', emitBytecode = true } = {}) {
   if (typeof filename !== 'string' || !filename) internal('filename must be a non-empty string');
   const ast = new ControlParser(source, filename).parse();
+  if (ast.kind === 'control' && ast.body.some(item => item.kind === 'shared-constraints')) {
+    error(ast.body.find(item => item.kind === 'shared-constraints').loc,
+      'shared resource constraints require resource binding and runtime enforcement; compile a checked nonexecutable descriptor');
+  }
   if (ast.kind === 'resource-policy') {
     checkResourcePolicy(ast);
     error(ast.loc, ast.resourcePolicies?.length
@@ -3973,6 +4091,23 @@ export function compileResourcePolicyArtifact(source, { filename = '<policy>' } 
     policy: manifest,
   }));
   return { bytes, manifest, sourceMap: ast.sourceNodes };
+}
+
+/** Checked in-control shared resource contract; it cannot be installed as GFB. */
+export function compileControlPolicyDescriptorArtifact(source, { filename = '<control>' } = {}) {
+  const ast = new ControlParser(source, filename).parse();
+  if (ast.kind !== 'control' || !ast.body.some(item => item.kind === 'shared-constraints')) {
+    error(ast.loc, 'expected a control with shared resource constraints');
+  }
+  const checked = new Lowerer(ast, filename).lower({ emitBytecode: false });
+  const manifest = { format: 'GhostFlow/control-policy-descriptor-v1', executable: false,
+    requiredRuntimeContracts: ['bound-shared-resources', 'admission-exclusivity', 'safe-output-resource-requirements'],
+    control: checked.manifest };
+  const bytes = new TextEncoder().encode(JSON.stringify({
+    format: 'GhostFlow/control-policy-descriptor-artifact-v1', executable: false,
+    controlSource: source, manifest,
+  }));
+  return { bytes, manifest, sourceMap: checked.sourceMap };
 }
 
 /** Type-checked schedule contract. These bytes cannot be loaded as control bytecode. */
