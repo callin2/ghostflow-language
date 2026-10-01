@@ -19,6 +19,129 @@ function row(scanId, logicalTimeMs, inputs) {
   return { scanId, logicalTimeMs, inputs };
 }
 
+test('REF-04-010 Driver sample ID seven is Invalid before filtering and ID eight enters once with sample-timestamp freshness on native and plain/framed WASM', async () => {
+  const artifact = await compileSource(`control DriverSample {
+  sensor moisture: Percent {
+    valid = 0% .. 100%; filter = median(3); stale_after = 300ms; recover_after = 1 samples;
+  }
+  state active: Bool = true;
+  timer age = elapsed(active);
+  output value: Percent;
+  output decision_at: Duration;
+  value <- moisture |> recover(0%);
+  decision_at <- age;
+}`, { filename: 'reference-driver-sample.ghost' });
+  const sample = (id, timestampMs, value) => ({ epoch: 1, id, timestampMs, value, quality: 'Good' });
+  const invalid = sample(7, 100, 101);
+  const next = sample(8, 140, 29);
+  const steps = [
+    { nowMs: 0, samples: { moisture: sample(1, 0, 20) } },
+    { nowMs: 10, samples: { moisture: sample(2, 10, 20) } },
+    { nowMs: 20, samples: { moisture: sample(3, 20, 20) } },
+    ...[110, 120, 130].map(nowMs => ({ nowMs, samples: { moisture: invalid } })),
+    { nowMs: 150, samples: { moisture: next } },
+    { nowMs: 160, samples: { moisture: next } }, { nowMs: 170 },
+    { nowMs: 190, samples: { moisture: sample(9, 180, 31) } },
+    { nowMs: 210, samples: { moisture: sample(10, 200, 33) } },
+    { nowMs: 499 }, { nowMs: 500 },
+  ];
+  const qualities = ['NotReady', 'NotReady', 'Good', 'Invalid', 'Invalid', 'Invalid',
+    'NotReady', 'NotReady', 'NotReady', 'NotReady', 'Good', 'Good', 'Stale'];
+  const executions = [];
+  for (const instantiate of [ControlRuntime.instantiate, ControlRuntime.instantiateFramed]) {
+    const runtime = await instantiate.call(ControlRuntime, wasmBytes, artifact);
+    try {
+      executions.push(steps.map((step, index) => {
+        const outcome = runtime.step(step);
+        const conditioner = runtime.sensors.get('moisture').conditioner;
+        const identity = conditioner.sampleIdentity();
+        if (index === 6) {
+          // This is the implemented logical reference-host sample ingress;
+          // the proposed native C Driver ABI and physical commands are not exercised.
+          const before = structuredClone(runtime.runtime.trace);
+          const { timestampMs: omittedTime, ...missingTimestamp } = next;
+          const { quality: omittedQuality, ...missingQuality } = next;
+          for (const samples of [
+            { unknown: next }, { moisture: { ...next, quality: 'Noise' } },
+            { moisture: { ...next, timestampMs: 152 } },
+            { moisture: { ...next, epoch: -1 } }, { moisture: { ...next, id: -1 } },
+            { moisture: { ...next, sourceId: 'forged-driver' } },
+            { moisture: missingTimestamp }, { moisture: missingQuality },
+          ]) {
+            assert.throws(() => runtime.step({ nowMs: 151, samples }));
+            assert.deepEqual(conditioner.sampleIdentity(), identity);
+            assert.deepEqual(runtime.runtime.trace, before, 'rejected metadata commits no decision');
+          }
+        }
+        return { ...outcome, identity };
+      }));
+    } finally { runtime.dispose(); }
+  }
+  const projection = rows => rows.map(({ vm, sensors, identity }) => ({ vm, sensors, identity }));
+  const [plain, framed] = executions;
+  assert.deepEqual(projection(plain), projection(framed));
+  const choice = { Good: 0, Invalid: 3, NotReady: 4, Stale: 2 };
+  const origin = artifact.sourceMap.find(node => node.kind === 'sensor').id;
+  for (const rows of executions) {
+    assert.equal(rows[2].sensors.moisture.value, 20, 'a full healthy window precedes the invalid candidate');
+    for (const [index, { vm, sensors }] of rows.entries()) {
+      assert.equal(sensors.moisture.quality, qualities[index]);
+      assert.equal(vm.inputs.__gf_now_ms, steps[index].nowMs);
+      assert.deepEqual(vm.requested, { value: index === 2 ? 20 : qualities[index] === 'Good' ? 31 : 0,
+        decision_at: steps[index].nowMs });
+      assert.deepEqual(vm.safe, vm.requested);
+      assert.equal(vm.resultTrace[0].choice, choice[qualities[index]]);
+      assert.equal(vm.resultTrace[0].origin, sensors.moisture.ok ? 0 : origin);
+    }
+    for (const index of [3, 4, 5])
+      assert.deepEqual(rows[index].identity, { epoch: 1, id: 7, timestampMs: 100 });
+    for (const index of [6, 7, 8])
+      assert.deepEqual(rows[index].identity, { epoch: 1, id: 8, timestampMs: 140 });
+    assert.equal(rows[9].sensors.moisture.quality, 'NotReady', 'two unique samples do not fill median(3)');
+    assert.equal(rows[10].sensors.moisture.value, 31, 'only 29,31,33 enter the rebuilt filter');
+    assert.deepEqual(rows[11].identity, { epoch: 1, id: 10, timestampMs: 200 });
+    assert.deepEqual(rows[12].identity, rows[11].identity);
+    assert.equal(rows[12].sensors.moisture.quality, 'Stale', 'deadline is sample timestamp 200+300, not delivery 210+300');
+  }
+  const tape = framed.map(({ vm }, scanId) => row(scanId, steps[scanId].nowMs,
+    Object.entries(vm.inputs).filter(([name]) => name !== '__gf_now_ms')
+      .map(([name, value]) => ({ name, value }))));
+  const native = nativeRun(artifact.bytes, tape);
+  assertParity(native, await wasmRun(artifact, tape));
+  assert.ok(native.every(item => item.accepted), JSON.stringify(native));
+  assert.deepEqual(native.map(item => item.outcome.trace), framed.map(item => item.vm));
+  assert.deepEqual(native.map(item => item.outcome.logicalTimeMs), steps.map(step => step.nowMs));
+});
+
+test('REF-04-010 repeated Driver sample identity does not advance recovery after the filter is ready on plain/framed WASM', async () => {
+  const artifact = await compileSource(`control DriverRecovery {
+  sensor moisture: Percent {
+    valid = 0% .. 100%; filter = median(1); stale_after = 300ms; recover_after = 5 samples;
+  }
+  output value: Percent;
+  value <- moisture |> recover(0%);
+}`, { filename: 'reference-driver-recovery.ghost' });
+  const sample = (id, value) => ({ epoch: 1, id, timestampMs: id * 10, value, quality: 'Good' });
+  for (const instantiate of [ControlRuntime.instantiate, ControlRuntime.instantiateFramed]) {
+    const runtime = await instantiate.call(ControlRuntime, wasmBytes, artifact);
+    try {
+      for (const nowMs of [70, 71, 72])
+        assert.equal(runtime.step({ nowMs, samples: { moisture: sample(7, 101) } }).sensors.moisture.quality, 'Invalid');
+      for (const nowMs of [80, 81, 82]) {
+        const row = runtime.step({ nowMs, samples: { moisture: sample(8, 29) } });
+        assert.equal(row.sensors.moisture.quality, 'NotReady');
+        assert.equal(row.vm.safe.value, 0);
+      }
+      assert.equal(runtime.step({ nowMs: 83 }).sensors.moisture.quality, 'NotReady');
+      for (const id of [9, 10, 11])
+        assert.equal(runtime.step({ nowMs: id * 10, samples: { moisture: sample(id, 29) } }).sensors.moisture.quality, 'NotReady');
+      const recovered = runtime.step({ nowMs: 120, samples: { moisture: sample(12, 29) } });
+      assert.equal(recovered.sensors.moisture.quality, 'Good');
+      assert.equal(recovered.vm.safe.value, 29);
+    } finally { runtime.dispose(); }
+  }
+});
+
 test('REF-04-003 one sensor retains four fault reasons and decision times through false recovery on native and plain/framed WASM', async () => {
   const artifact = await compileSource(`control FaultJournal {
   sensor moisture: Percent {
