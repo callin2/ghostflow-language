@@ -67,6 +67,7 @@ const TESTS = Object.freeze([
   'tests/window-control.test.mjs', 'tests/hold-last-control.test.mjs',
   'tests/debounce-control.test.mjs',
   'tests/reference-coverage-gaps.test.mjs',
+  'tests/reference-index-links.test.mjs',
   'tests/control-source-validation.test.mjs', 'tests/debounce-diagnostics.test.mjs',
   'tests/hold-last-diagnostics.test.mjs',
   'tests/expression-order.test.mjs', 'tests/dynamic-int-conversions.test.mjs',
