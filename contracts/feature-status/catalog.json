@@ -2315,6 +2315,49 @@
       ]
     },
     {
+      "id": "continuous-true-timer",
+      "family": "Continuous-true Bool timer evidence",
+      "clause": {
+        "path": "docs/reference/03-time-and-schedules.en.md",
+        "heading": "3.3 Time for which a Bool is continuously true"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [
+        "native_wasm"
+      ],
+      "evidence": [
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/scan-tape-parity.test.mjs",
+              "testId": "REF-03-016: continuous true preserves equal timestamps and resets before a new interval on native and WASM",
+              "caseId": "REF-03-016",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [],
+      "issues": [
+        206
+      ],
+      "referenceCaseIds": [
+        "REF-03-016"
+      ]
+    },
+    {
       "id": "temporal-window",
       "family": "Temporal windows and hold-last provenance",
       "clause": {

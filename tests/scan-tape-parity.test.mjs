@@ -263,6 +263,29 @@ control FaultingProduct {
     && entry.target.name === 'result' && entry.reads.some(read => read.field === 'inputs' && read.name === 'divisor')));
 });
 
+test('REF-03-016: continuous true preserves equal timestamps and resets before a new interval on native and WASM', async () => {
+  const trace = [[100, true], [100, true], [140, true], [160, false], [200, true], [230, true]];
+  const { artifact, native, wasm } = await compare(`
+control ContinuousReference {
+  input c: Bool;
+  timer active_for = continuous_true(c);
+  output age_ms: Duration;
+  age_ms <- active_for;
+}
+`, trace.map(([logicalTimeMs, c], scanId) => row(scanId, logicalTimeMs, [{ name: 'c', value: c }])),
+  'reference-continuous-true.ghost');
+  assert.deepEqual(artifact.manifest.timers, [{ name: 'active_for', mode: 'continuous-true', clockInput: '__gf_now_ms' }]);
+  const expected = [0, 0, 40, 0, 0, 30];
+  for (const outcomes of [native, wasm]) {
+    assert.deepEqual(outcomes.map(item => item.accepted), trace.map(() => true));
+    assert.deepEqual(outcomes.map(item => item.outcome.trace.safe.age_ms), expected);
+    const timers = outcomes.map(item => observeRuntimeValues(artifact.traceMetadata, item.outcome.trace).values
+      .find(value => value.kind === 'timer' && value.name === 'active_for'));
+    assert.deepEqual(timers.map(timer => ({ valueType: timer.valueType, unit: timer.unit, value: timer.value })),
+      expected.map(value => ({ valueType: 'Duration', unit: 'ms', value })));
+  }
+});
+
 test('REF-01-103: phase age starts at zero on a nonzero clock and restarts on committed change', async () => {
   const filename = 'contracts/interaction-v0/examples/enum-phase-age.ghost.md';
   const source = fs.readFileSync(path.join(root, filename), 'utf8');
