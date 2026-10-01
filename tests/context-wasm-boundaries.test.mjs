@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { dirname, resolve, join } from 'node:path';
+import { tmpdir } from 'node:os';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { GhostFlowRuntime } from '../runtimes/wasm/ghostflow-runtime.mjs';
@@ -81,6 +82,94 @@ function restore(runtime, bytes) {
     runtime.wasm.gf_dealloc(ptr, bytes.length);
   }
 }
+
+test('REF-03-031: 06:10 boot and clock recovery do not catch up the 06:00 slot after 05:55 rollback in native and WASM', async t => {
+  const fixture = cases.find(entry => entry.id === 'REF-03-057');
+  // The authored 20-minute gap makes the exact five-minute recross eligible for
+  // ordinary observation; a gap skip cannot mask broken baseline/high-water.
+  const compiled = await compileSource(fixture.source.replace('skip_after(60s)', 'skip_after(20min)'),
+    { filename: 'boot-rollback.ghost.md' });
+  const planned = Date.UTC(2026, 8, 24, 21); // 2026-09-25 06:00 Asia/Seoul.
+  const site = compiled.manifest.schedules[0].site;
+  const activation = { bootEpoch: 7, terminalCapacity: 8, bindings: [] };
+  const packet = (nowMs, wallMs, { trusted = true, bootEpoch = 7 } = {}) => ({ nowMs, contextFacts: {
+    clock: { monotonicMs: nowMs, bootEpoch, wallMs: trusted ? wallMs : null, trusted,
+      uncertaintyMs: 0, unknownReason: trusted ? null : 'TrustExpired', sourceRevision: 'rtc-revision-r7' },
+    natural: [], settings: null,
+    schedules: [{ site, coverageStartMs: planned - 600_000, coverageEndMs: planned + 1_200_001,
+      provider: null, calendar: null, rows: [{ sourceDay: Date.UTC(2026, 8, 25) / 86_400_000,
+        slotKey: 1, minuteOfDay: 360, fold: 0, eventId: '', eventKind: 'civil', instantMs: planned,
+        withdrawn: false, providerRevision: 'iana-2026-r4', contextRevision: 'seoul-context-r9' }] }],
+  } });
+  const steps = [packet(0, planned + 600_000), packet(1, planned - 300_000), packet(2, planned)];
+  const execute = async (observations, { bootEpoch = 7, saved } = {}) => {
+    const runtime = await ControlRuntime.instantiateFramed(wasmBytes, compiled,
+      { context: { ...activation, bootEpoch } });
+    try {
+      if (saved) runtime.restoreContextCheckpoint(saved);
+      return observations.map(step => {
+        const trace = runtime.step(step).vm;
+        return { trace, checkpoint: Buffer.from(runtime.contextSnapshot().bytes).toString('hex') };
+      });
+    } finally { runtime.dispose(); }
+  };
+  execFileSync('cargo', ['build', '--locked', '--offline', '--release', '-p', 'ghostflow-core', '--example', 'context_tape'],
+    { cwd: root, stdio: 'inherit' });
+  const directory = mkdtempSync(join(tmpdir(), 'reference-boot-rollback-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const modulePath = join(directory, 'slots.gfb'), tapePath = join(directory, 'tape.json');
+  writeFileSync(modulePath, compiled.bytes);
+  const native = (observations, { bootEpoch = 7, saved, profile = 'context-civil-v1' } = {}) => {
+    writeFileSync(tapePath, JSON.stringify({ profile, activation: { ...activation, bootEpoch },
+      ...(saved ? { checkpoint: Buffer.from(saved).toString('hex') } : {}),
+      steps: observations.map((step, scanId) => ({ scanId, logicalTimeMs: step.nowMs, inputs: [], ...step.contextFacts })) }));
+    return execFileSync(resolve(root, 'target/release/examples/context_tape' + (process.platform === 'win32' ? '.exe' : '')),
+      [modulePath, tapePath], { encoding: 'utf8', timeout: 10_000 }).trim().split('\n').map(JSON.parse);
+  };
+  const compare = (records, rows) => {
+    assert.ok(records.every(record => record.accepted));
+    assert.deepEqual(records.map(record => ({ trace: record.outcome.trace, checkpoint: record.checkpoint })), rows);
+  };
+  const rows = await execute(steps), records = native(steps);
+  compare(records, rows);
+  for (const { trace } of rows) {
+    assert.equal(trace.requested.due, false);
+    assert.equal(trace.safe.due, false);
+    assert.deepEqual((trace.contextTrace ?? []).filter(row => row.site === site), [],
+      'baseline and rollback create no schedule occurrence');
+  }
+  assert.deepEqual(await execute(steps), rows);
+  assert.deepEqual(native(steps), records);
+  const normal = [packet(0, planned - 1), packet(1, planned), packet(2, planned - 300_000), packet(3, planned)];
+  const normalRows = await execute(normal), normalRecords = native(normal);
+  compare(normalRecords, normalRows);
+  assert.deepEqual(normalRows.map(row => row.trace.safe.due), [false,true,false,false]);
+  const admitted = normalRows[1].trace.contextTrace.find(row => row.decision === 'Due');
+  assert.equal(admitted.plannedWallMs, planned);
+  assert.equal(admitted.providerRevision, 'iana-2026-r4');
+  assert.equal(admitted.contextRevision, 'seoul-context-r9');
+  const recovery = [packet(0, planned - 1), packet(1, planned, { trusted: false }),
+    packet(2, planned + 600_000), packet(3, planned - 300_000), packet(4, planned)];
+  const recoveryRows = await execute(recovery);
+  compare(native(recovery), recoveryRows);
+  assert.deepEqual(recoveryRows.map(row => row.trace.safe.due), [false,false,false,false,false]);
+  // Cross-restart guarantee here is the existing admitted terminal ledger.
+  // Persistence of a skipped preboot baseline across a second restart is a
+  // distinct clock-history contract, outside the original single-boot case.
+  const saved = Buffer.from(normalRecords[1].checkpoint, 'hex');
+  const afterReboot = [packet(0, planned - 300_000, { bootEpoch: 8 }), packet(1, planned, { bootEpoch: 8 })];
+  const restoredRows = await execute(afterReboot, { bootEpoch: 8, saved });
+  compare(native(afterReboot, { bootEpoch: 8, saved }), restoredRows);
+  assert.deepEqual(restoredRows.map(row => row.trace.safe.due), [false,false]);
+  const corrupt = Buffer.from(records[0].checkpoint, 'hex'); corrupt[corrupt.length - 1] ^= 1;
+  await assert.rejects(execute(steps, { saved: corrupt }), /checkpoint|restore|invalid|checksum/i);
+  assert.throws(() => native(steps, { saved: corrupt }), /checkpoint|restore|invalid|checksum/i);
+  const forged = structuredClone(steps); forged[0].contextFacts.schedules[0].rows[0].eventKind = 'high';
+  assert.throws(() => native(forged), /civil tape cannot supply natural occurrence/);
+  const spoofed = structuredClone(steps); spoofed[0].contextFacts.schedules[0].due = true;
+  assert.throws(() => native(spoofed), /unexpected context evidence field/);
+  assert.throws(() => native(steps, { profile: 'context-periodic-v1' }), /invalid or oversized context array|occurrence rows/);
+});
 
 test('ControlRuntime context checkpoint restores occurrence dedupe and rejects corrupt bytes', async t => {
   const compiled = await artifact('REF-03-036');

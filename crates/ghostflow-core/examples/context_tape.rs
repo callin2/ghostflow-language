@@ -1,9 +1,10 @@
-//! Bounded HIL transport for explicit Periodic, settings or Solar context frames. All decisions
+//! Bounded HIL transport for explicit Periodic, settings, civil or Solar context frames. All decisions
 //! and frame commits belong to the shared Rust ScanDriver.
 use ghostflow_core::{
     context_runtime::{Activation, Facts},
     context_vm::{
-        ScheduleEvidence, SettingChange, SettingsEvent, SettingsOrigin, SolarContextEvidence,
+        Occurrence, ScheduleEvidence, SettingChange, SettingsEvent, SettingsOrigin,
+        SolarContextEvidence,
     },
     scan::{ScanFrameV1, ScanInput},
     schedule_clock::{ClockSnapshot, ClockTrust},
@@ -218,8 +219,16 @@ fn main() -> Result<()> {
         .collect();
     let tape: Json = serde_json::from_slice(&read(&args[1])?)?;
     let solar_profile = tape["profile"] == "context-solar-v1";
+    let civil_profile = tape["profile"] == "context-civil-v1";
+    if civil_profile {
+        fields(&tape, &["profile", "activation", "steps", "checkpoint"])?;
+        fields(
+            &tape["activation"],
+            &["bootEpoch", "terminalCapacity", "bindings"],
+        )?;
+    }
     let settings_profile = tape["profile"] == "context-settings-v1" || solar_profile;
-    if !settings_profile && tape["profile"] != "context-periodic-v1" {
+    if !settings_profile && !civil_profile && tape["profile"] != "context-periodic-v1" {
         return Err("unsupported context tape profile".into());
     }
     let activation = &tape["activation"];
@@ -236,6 +245,19 @@ fn main() -> Result<()> {
         terminal_capacity: usize::try_from(integer(&activation["terminalCapacity"])?)?,
         bindings: vec![],
     })?;
+    if civil_profile && !tape["checkpoint"].is_null() {
+        let encoded = tape["checkpoint"]
+            .as_str()
+            .ok_or("invalid checkpoint hex")?;
+        if encoded.len() > 2_097_152 || encoded.len() % 2 != 0 || !encoded.is_ascii() {
+            return Err("invalid or oversized checkpoint hex".into());
+        }
+        let bytes = (0..encoded.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&encoded[i..i + 2], 16))
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        runtime.restore_context_checkpoint(&bytes)?;
+    }
     let mut driver = runtime.into_scan_driver();
     for step in array(&tape["steps"], 4096)? {
         if solar_profile {
@@ -254,6 +276,22 @@ fn main() -> Result<()> {
             )?;
             if !array(&step["natural"], 0)?.is_empty() {
                 return Err("Solar tape cannot supply natural providers".into());
+            }
+        } else if civil_profile {
+            fields(
+                step,
+                &[
+                    "scanId",
+                    "logicalTimeMs",
+                    "inputs",
+                    "clock",
+                    "natural",
+                    "schedules",
+                    "settings",
+                ],
+            )?;
+            if !array(&step["natural"], 0)?.is_empty() {
+                return Err("civil tape cannot supply natural providers".into());
             }
         } else if !step["solars"].is_null() {
             return Err("Solar facts require context-solar-v1".into());
@@ -285,7 +323,7 @@ fn main() -> Result<()> {
         for schedule in array(&step["schedules"], 128)? {
             if !schedule["provider"].is_null()
                 || !schedule["calendar"].is_null()
-                || !array(&schedule["rows"], 0)?.is_empty()
+                || (!civil_profile && !array(&schedule["rows"], 0)?.is_empty())
             {
                 return Err(
                     "Periodic tape cannot supply providers, calendars or occurrence rows".into(),
@@ -294,16 +332,76 @@ fn main() -> Result<()> {
             if settings_profile {
                 return Err("settings tape cannot supply schedules".into());
             }
+            let mut rows = Vec::new();
+            if civil_profile {
+                fields(
+                    schedule,
+                    &[
+                        "site",
+                        "coverageStartMs",
+                        "coverageEndMs",
+                        "provider",
+                        "calendar",
+                        "rows",
+                    ],
+                )?;
+                for row in array(&schedule["rows"], 4096)? {
+                    fields(
+                        row,
+                        &[
+                            "sourceDay",
+                            "slotKey",
+                            "minuteOfDay",
+                            "fold",
+                            "eventId",
+                            "eventKind",
+                            "instantMs",
+                            "withdrawn",
+                            "providerRevision",
+                            "contextRevision",
+                        ],
+                    )?;
+                    if row["eventKind"] != "civil" || row["eventId"] != "" {
+                        return Err("civil tape cannot supply natural occurrence identities".into());
+                    }
+                    rows.push(Occurrence {
+                        source_day: i32::try_from(integer(&row["sourceDay"])?)?,
+                        slot_key: integer(&row["slotKey"])?,
+                        minute_of_day: u16::try_from(integer(&row["minuteOfDay"])?)?,
+                        fold: u8::try_from(integer(&row["fold"])?)?,
+                        event_id: String::new(),
+                        event_kind: 0,
+                        instant_ms: optional(&row["instantMs"])?,
+                        withdrawn: row["withdrawn"].as_bool().ok_or("invalid withdrawn flag")?,
+                        provider_revision: text(&row["providerRevision"])?.into(),
+                        context_revision: text(&row["contextRevision"])?.into(),
+                    });
+                }
+            }
             schedules.push(ScheduleEvidence {
                 site: u32::try_from(integer(&schedule["site"])?)?,
                 coverage_start_ms: integer(&schedule["coverageStartMs"])?,
                 coverage_end_ms: integer(&schedule["coverageEndMs"])?,
                 provider: None,
                 calendar: None,
-                rows: vec![],
+                rows,
             });
         }
         let clock = &step["clock"];
+        if civil_profile {
+            fields(
+                clock,
+                &[
+                    "monotonicMs",
+                    "bootEpoch",
+                    "wallMs",
+                    "uncertaintyMs",
+                    "trusted",
+                    "unknownReason",
+                    "sourceRevision",
+                ],
+            )?;
+        }
         let trusted = clock["trusted"].as_bool().ok_or("invalid clock trust")?;
         let snapshot = ClockSnapshot {
             monotonic_ms: integer(&clock["monotonicMs"])?,
@@ -367,6 +465,16 @@ fn main() -> Result<()> {
                 }});
                 if settings_profile {
                     record["settings"] = state.unwrap_or(Json::Null);
+                }
+                if civil_profile {
+                    record["checkpoint"] = Json::String(
+                        driver
+                            .runtime()
+                            .context_checkpoint()?
+                            .iter()
+                            .map(|byte| format!("{byte:02x}"))
+                            .collect(),
+                    );
                 }
                 println!("{record}");
             }
