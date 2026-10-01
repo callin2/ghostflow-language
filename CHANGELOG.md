@@ -15,6 +15,35 @@ Regression: signed REF-03-036 reaches the native target loader; re-signed
 descriptor substitutions fail before it. This restores the intended package
 path for [Device issue #74](https://github.com/callin2/farm-device/issues/74).
 
+### 2026-10-01 — bound authored-state provenance bug fix ([#158](https://github.com/callin2/ghostflow-language/issues/158))
+
+An intent-linked authored Bool state in the finite bound-resource profile now
+compiles through the browser API and produces its completed-scan observation.
+Previously, attaching an intent anchor to the nonexecutable descriptor crashed
+literate source remapping because executable trace arrays were absent. The
+descriptor now supplies an explicit empty provenance shell; binding retains the
+actual lowered program's runtime bindings and adds only the descriptor's intent
+anchors and links. No executable metadata is inferred from missing fields.
+`tests/bound-resource-control.test.mjs` verifies canonical state/anchor positions
+and actual WASM `remembered` observations changing from `true` to `false`.
+
+### 2026-10-01 — browser bound-resource modules ([#158](https://github.com/callin2/ghostflow-language/issues/158))
+
+The public browser compiler now exports bound-resource compilation, verification,
+and trace observation. The runtime is portable at
+`runtimes/wasm/bound-resource-control.mjs`; the current Node import reexports the
+same implementation and writer registry. The finite GFB17 policy and Rust
+execution semantics are unchanged. Writer reservations include asynchronous
+creation within one realm. Cross-Worker installations require a shared host
+registry and this API provides no physical guarantee.
+
+Checked resource descriptors can now emit an interaction schema with an explicit
+document/revision identity. Binding regenerates its module identity against the
+executable bytes; verification rejects forged schema metadata. The existing
+canonical mapping, runtime parity and mismatch checks remain, with browser graph,
+pending-writer and disposal/reinstantiation tests in
+`tests/browser-toolchain.test.mjs` and `tests/bound-resource-control.test.mjs`.
+
 ### 2026-10-01 — bound finite resource enforcement ([#158](https://github.com/callin2/ghostflow-language/issues/158))
 
 Reference §4.8 now distinguishes source checking from executable resource binding.

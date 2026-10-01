@@ -18,6 +18,33 @@ native target loader에 도달하며, 재서명한 설명자 바꿔치기는 그
 거부됩니다. [Device 이슈 #74](https://github.com/callin2/farm-device/issues/74)의
 의도된 패키지 경로를 복구합니다.
 
+### 2026-10-01 — 바인딩된 작성 상태 출처 버그 수정 ([#158](https://github.com/callin2/ghostflow-language/issues/158))
+
+유한 바인딩 자원 프로필에서 의도 anchor와 연결한 작성 Bool 상태도 브라우저 API로
+컴파일하고 완료된 scan의 관찰값을 생성합니다. 이전에는 실행 불가능한 descriptor에
+의도 anchor를 붙이면 실행 trace 배열이 없어 literate 소스 위치 변환이 실패했습니다.
+이제 descriptor는 명시적인 빈 출처 구조를 제공하고, 바인딩은 실제로 낮춘 프로그램의
+실행 바인딩을 유지하며 descriptor의 의도 anchor와 링크만 추가합니다. 없는 필드에서
+실행 메타데이터를 추정하지 않습니다. `tests/bound-resource-control.test.mjs`에서
+정규 상태·anchor 위치와 실제 WASM의 `remembered` 관찰값이 `true`에서 `false`로
+바뀌는 것을 검증합니다.
+
+### 2026-10-01 — 브라우저 바인딩 자원 모듈 ([#158](https://github.com/callin2/ghostflow-language/issues/158))
+
+공개 브라우저 컴파일러가 바인딩 자원 컴파일·검증·trace 관찰을 재수출합니다.
+이식 가능한 런타임 경로는 `runtimes/wasm/bound-resource-control.mjs`이며,
+현재 Node 경로는 동일한 구현과 writer 레지스트리를 재수출합니다. 유한 GFB17
+정책과 Rust 실행 의미는 바뀌지 않습니다. 하나의 realm 안에서는 비동기 생성
+대기부터 writer 자원을 예약합니다. Worker를 나누는 설치는 공유 호스트
+레지스트리가 필요하며 이 API는 물리적 보장을 제공하지 않습니다.
+
+검증된 자원 descriptor도 명시적인 문서·리비전 식별자로 상호작용 스키마를
+생성할 수 있습니다. 바인딩 시 실행 바이트에 맞는 모듈 식별자를 다시 생성하고,
+검증은 위조된 스키마 메타데이터를 거부합니다. 기존 정규 매핑·실행 동등성·불일치
+검사를 유지하며 `tests/browser-toolchain.test.mjs`와
+`tests/bound-resource-control.test.mjs`에서 브라우저 그래프·생성 대기 writer·폐기
+후 재생성을 검증합니다.
+
 ### 2026-10-01 — 바인딩된 유한 자원 제약 실행 ([#158](https://github.com/callin2/ghostflow-language/issues/158))
 
 Reference §4.8에서 소스 검사와 실행 가능한 자원 바인딩을 구분합니다.

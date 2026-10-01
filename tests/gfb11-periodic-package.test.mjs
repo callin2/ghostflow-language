@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { verifyPortablePackage, PortablePackageError } from '../tools/portable-package.mjs';
 
@@ -18,7 +19,7 @@ const options = {
 };
 function signed(scenario) {
   return JSON.parse(execFileSync(process.execPath,
-    [new URL('./native-gfb11-periodic-package-fixture.mjs', import.meta.url).pathname, scenario],
+    [fileURLToPath(new URL('./native-gfb11-periodic-package-fixture.mjs', import.meta.url)), scenario],
     { encoding: 'utf8' }));
 }
 

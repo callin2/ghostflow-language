@@ -6,11 +6,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { compileSourceSync } from '../tools/compile-source.mjs';
-import { compileBoundResourceControl, observeBoundResourceTrace } from '../tools/bound-resource-control.mjs';
+import { compileSource, compileBoundResourceControl, verifyBoundResourceCompilation, observeBoundResourceTrace } from '../tools/browser-toolchain.mjs';
 import { GhostFlowRuntime } from '../runtimes/wasm/ghostflow-runtime.mjs';
 import { FramedGhostFlowRuntime } from '../runtimes/wasm/framed-runtime.mjs';
-import { BoundResourceControlRuntime, simulateBoundResourceControl } from '../runtimes/node/bound-resource-control.mjs';
+import { BoundResourceControlRuntime, simulateBoundResourceControl } from '../runtimes/wasm/bound-resource-control.mjs';
+import { BoundResourceControlRuntime as NodeBoundRuntime } from '../runtimes/node/bound-resource-control.mjs';
 import { sha256Hex } from '../tools/sha256.mjs';
+import { prepareCompletedScanSnapshot } from '../tools/interaction-runtime-snapshot.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const filename = 'examples/bound-resource-execution.ghost.md';
@@ -82,6 +84,75 @@ test('GF-TEST-bound-resource-compile: source-bound finite executable policy reje
   assert.throws(() => compile(document.replace('  constraints SharedRules for station {', '  constraints Opposite for pump1 { require at safe_output valve1.on == true; safe { pump1 = true; valve1 = true; } }\n  constraints SharedRules for station {')), /incompatible authored safe/);
   assert.throws(() => compile(document.replace('    exclusive at admission { automatic, manual };',
     '    exclusive at admission { automatic, manual };\n    exclusive at admission { automatic, manual };')), /multiple exclusive sets/);
+});
+
+test('bound browser compiler retains and verifies exact interaction identity after executable binding', async () => {
+  const { binding, checked: original } = compile();
+  const identity = { documentId: 'browser-bound-document', revisionId: 'browser-bound-revision' };
+  const checked = await compileSource(document, { filename, interactionSourceIdentity: identity });
+  assert.deepEqual(checked.bytes, original.bytes, 'interaction identity does not alter checked source bytes');
+  const bound = compileBoundResourceControl(checked, binding);
+  const verified = verifyBoundResourceCompilation(bound);
+  assert.deepEqual(verified.interactionSchema, bound.interactionSchema);
+  assert.deepEqual(bound.interactionSourceIdentity, identity);
+  assert.equal(bound.interactionSchema.source.sha256, checked.sourceDocument.sha256);
+  assert.equal(bound.interactionSchema.module.bytecodeSha256, bound.manifest.bytecodeSha256);
+  assert.notEqual(bound.interactionSchema.module.bytecodeSha256, checked.interactionSchema.module.bytecodeSha256);
+  assert.deepEqual(bound.manifest.inputs, checked.manifest.control.inputs);
+  assert.deepEqual(bound.manifest.outputs, checked.manifest.control.outputs);
+  const runtime = await BoundResourceControlRuntime.instantiate(wasm(), bound);
+  try {
+    const outcome = runtime.scan(frame(bound, rows[3], 0));
+    const observer = prepareCompletedScanSnapshot({ compilation: bound, runId: 'browser-bound-run' });
+    const snapshot = observer.emit({ completion: { kind: 'completed-scan', scanId: outcome.scanId,
+      logicalTimeMs: outcome.logicalTimeMs }, trace: outcome.trace });
+    assert.equal(snapshot.source.documentId, identity.documentId);
+    assert.equal(snapshot.source.revisionId, identity.revisionId);
+    assert.equal(snapshot.module.bytecodeSha256, bound.manifest.bytecodeSha256);
+  } finally { runtime.dispose(); }
+  const forged = { ...bound, interactionSchema: clone(bound.interactionSchema) };
+  forged.interactionSchema.module.bytecodeSha256 = checked.manifest.bytecodeSha256;
+  assert.throws(() => verifyBoundResourceCompilation(forged), /metadata differs/);
+});
+
+test('portable bound runtime reserves pending writers and shares the concrete Node import registry', async () => {
+  const { bound } = compile(document, 'virtual/browser-pending');
+  assert.equal(NodeBoundRuntime, BoundResourceControlRuntime);
+  const pending = BoundResourceControlRuntime.instantiate(wasm(), bound);
+  await assert.rejects(NodeBoundRuntime.instantiate(wasm(), bound), /active writer/);
+  const runtime = await pending;
+  assert.deepEqual(runtime.scan(frame(bound, rows[3], 0)).trace.safe, { pump: true, valve: true });
+  runtime.dispose(); runtime.dispose();
+  assert.throws(() => runtime.scan(frame(bound, rows[3], 1)), /disposed/);
+  const replacement = await NodeBoundRuntime.instantiate(wasm(), bound);
+  try { assert.equal(replacement.scan(frame(bound, rows[3], 0)).scanId, 0); }
+  finally { replacement.dispose(); }
+});
+
+test('bound browser authored Bool state retains canonical intent provenance in actual completed snapshots', async () => {
+  const source = document.replace('```ghost', '<!-- ghostflow:anchor id=GF-INT-REVIEW-BOUND-STATE kind=intent status=confirmed origin=user -->\nRemember whether automatic was requested in a completed scan.\n\n```ghost')
+    .replace('  output pump, valve: Bool;', '  // ghostflow:link id=GF-INT-REVIEW-BOUND-STATE relation=implements\n  state remembered: Bool = false;\n  remembered\' = automatic;\n  output pump, valve: Bool;');
+  const identity = { documentId: 'review-bound-state', revisionId: 'r1' };
+  const checked = await compileSource(source, { filename: 'review-bound-state.ghost.md', interactionSourceIdentity: identity });
+  const { binding } = compile();
+  const updatedBinding = { ...binding, sourceDocumentSha256: checked.sourceDocument.sha256, artifactSha256: checked.manifest.bytecodeSha256 };
+  const bound = compileBoundResourceControl(checked, updatedBinding);
+  assert.deepEqual(checked.interactionSchema.descriptors.map(descriptor => descriptor.id), ['state.remembered']);
+  assert.deepEqual(bound.interactionSchema.descriptors, checked.interactionSchema.descriptors);
+  assert.ok(bound.traceMetadata.bindings.some(entry => entry.kind === 'state' && entry.name === 'remembered'));
+  const stateDescriptor = bound.interactionSchema.descriptors[0];
+  assert.deepEqual(stateDescriptor.provenance.intentAnchorIds, ['GF-INT-REVIEW-BOUND-STATE']);
+  const sourceNode = bound.sourceMap.find(node => node.id === stateDescriptor.provenance.sourceNode.id);
+  assert.equal(source.split('\n')[sourceNode.line - 1].trim(), 'state remembered: Bool = false;');
+  const runtime = await BoundResourceControlRuntime.instantiate(wasm(), bound);
+  try {
+    const observer = prepareCompletedScanSnapshot({ compilation: bound, runId: 'bound-state-run' });
+    const snapshots = [rows[3], rows[2]].map((values, scanId) => {
+      const outcome = runtime.scan(frame(bound, values, scanId));
+      return observer.emit({ completion: { kind: 'completed-scan', scanId: outcome.scanId, logicalTimeMs: outcome.logicalTimeMs }, trace: outcome.trace });
+    });
+    assert.deepEqual(snapshots.map(snapshot => snapshot.observations.find(value => value.descriptorId === 'state.remembered').value), [true, false]);
+  } finally { runtime.dispose(); }
 });
 
 test('GF-TEST-bound-resource-parity: automatic manual fallback admission violation recovery and trace match native plain framed and simulation', async t => {

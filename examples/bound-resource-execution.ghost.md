@@ -65,3 +65,36 @@ try {
 The second request violates the running requirement and uses the authored non-OFF safe vector. Restoring the valve request alone does not restart the pump. A neutral frame releases the trip; the later fresh manual claim must pass the same envelope. Binding is immutable for this activation and required on every evaluation. The native host must share one `ResourceBindingRegistry` among every writer in its installation; the reference Node host also rejects duplicate writers across WASM instances. Independent registries are separate installation authorities, not a way to arbitrate one shared resource.
 
 This executable profile supports one Bool GFB1 v1/v3 request control with every output explicitly protected. Unsupported contextual/accounting/continuous profiles and shared-policy import composition fail closed. The specialized Station lease/cleanup contract remains separate. No hardware application, confirmed stop, physical sequence, PID integration or cooperative multi-control arbitration is demonstrated here.
+
+## Browser and Worker public modules
+
+Browsers and Workers import `compileSource`, `compileBoundResourceControl`,
+`verifyBoundResourceCompilation`, and `observeBoundResourceTrace` from
+`tools/browser-toolchain.mjs`. Import `BoundResourceControlRuntime` from
+`runtimes/wasm/bound-resource-control.mjs`. Supply the exact canonical document,
+installation binding, and fetched WASM bytes. `instantiate(wasmBytes, bound)`
+creates the checked writer; `scan(frame)` returns the framed Rust outcome, and
+`dispose()` releases its claim. Runtime construction failure also releases the
+pending claim. The compiler and runtime module graphs use no Node builtins or
+`Buffer`. The Node path above reexports this same runtime for the current example.
+
+Pass `interactionSourceIdentity` to `compileSource` when presenting an
+interaction schema. Binding preserves that document/revision identity and
+regenerates the schema's module identity for the executable GFB17 bytes. Schema
+verification reconstructs both identities; checked descriptors remain
+nonexecutable. Inputs and outputs come from the checked control manifest and
+retain their exact names and types in the bound manifest.
+
+The finite profile may include authored Bool state. Link each observed state to
+its confirmed literate intent anchor as required by the interaction contract.
+The checked descriptor carries source provenance without executable storage
+bindings; binding obtains those from the actual lowered program. Completed
+WASM scan snapshots expose the observed state value through the same public
+interaction producer, including nonempty schemas.
+
+The JavaScript writer registry covers one module instance in one realm, including
+pending asynchronous creation. Separate Workers, windows, or independently
+loaded module instances have separate registries. An installation host must
+reserve stable resource IDs in one shared authority before starting any of those
+writers, and release them on failure, disposal, or Worker termination. The
+realm-local guard supplies no cross-Worker arbitration or physical guarantee.

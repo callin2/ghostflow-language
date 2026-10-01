@@ -10,6 +10,7 @@ import {
 import { extractLiterate } from './literate.mjs';
 import { compileControl, parseControl } from './control.mjs';
 import { canonicalUnitFor, isQuantityType } from './quantities.mjs';
+import { moduleFingerprint } from './source-trace.mjs';
 
 const PUBLIC_ID = /^[A-Za-z][A-Za-z0-9._:-]{0,127}$/;
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -91,12 +92,16 @@ function assertContractSchema(schema) {
 function expectedSchema(compilation, identityValue) {
   const source = canonicalDocument(compilation?.sourceDocument);
   const identity = sourceIdentity(identityValue);
-  const manifest = compilation?.manifest;
-  const trace = compilation?.traceMetadata;
+  const artifactManifest = compilation?.manifest;
+  const manifest = artifactManifest?.format === 'GhostFlow/control-policy-descriptor-v1'
+    ? artifactManifest.control : artifactManifest;
+  const trace = artifactManifest?.format === 'GhostFlow/control-policy-descriptor-v1'
+    ? { ...compilation.traceMetadata, moduleFingerprint: moduleFingerprint(compilation.bytes) }
+    : compilation?.traceMetadata;
   if (!manifest || typeof manifest.name !== 'string' || !trace || typeof trace.moduleFingerprint !== 'string') {
     fail('compiler result lacks product control manifest or source trace metadata');
   }
-  if (!SHA256.test(manifest.bytecodeSha256) || manifest.bytecodeSha256 !== sha256Hex(compilation.bytes)) {
+  if (!SHA256.test(artifactManifest.bytecodeSha256) || artifactManifest.bytecodeSha256 !== sha256Hex(compilation.bytes)) {
     fail('compiler result bytecode identity is invalid');
   }
   const extraction = extractLiterate(source.text, { filename: source.filename });
@@ -164,7 +169,7 @@ function expectedSchema(compilation, identityValue) {
   const schema = {
     format: INTERACTION_SCHEMA_FORMAT,
     version: INTERACTION_SCHEMA_VERSION,
-    module: { id: manifest.name, moduleFingerprint: trace.moduleFingerprint, bytecodeSha256: manifest.bytecodeSha256 },
+    module: { id: manifest.name, moduleFingerprint: trace.moduleFingerprint, bytecodeSha256: artifactManifest.bytecodeSha256 },
     source: { ...identity, format: SOURCE_FORMAT, kind: 'literate', sha256: source.sha256 },
     descriptors,
   };
