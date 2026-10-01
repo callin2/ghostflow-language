@@ -209,6 +209,30 @@ test('REF-07-005: Unknown calendar negation preserves its reason and cannot admi
   }
 });
 
+test('REF-07-004: serialized calendar Unknown retains reason revision and query identity separately from normal false', async () => {
+  const artifact = await compileSource(source('00:00', '15min'));
+  const snapshot = calendar().snapshot;
+  const querySite = artifact.manifest.calendarConditions[0].site;
+  for (const [trusted, supplied, decision] of [
+    [true, snapshot, 'Ok(false)'],
+    [true, null, 'Fault(CalendarMissing)'],
+    [false, snapshot, 'Fault(ClockUnknown)'],
+  ]) {
+    const [trace] = await parity(artifact, [{ mono: 0, wall: date('2026-10-02T00:00:00Z'), snapshot: supplied, trusted }],
+      [{ active: false, permitted_rest: decision === 'Ok(false)' }]);
+    const serialized = JSON.parse(JSON.stringify(trace));
+    assert.equal(serialized.module, trace.module);
+    assert.deepEqual(serialized.contextTrace, trace.contextTrace);
+    const query = serialized.contextTrace.find(row => row.site === querySite);
+    assert.equal(query.decision, decision);
+    assert.equal(query.providerRevision, supplied ? snapshot.revision : '');
+    assert.equal(query.contextRevision, activation.bindings[0].bindingRevision);
+    assert.equal(query.occurrenceId, `${querySite}:calendar`);
+    assert.equal(query.unknownReason, decision.startsWith('Fault(') ? decision : undefined);
+    assert.equal(typeof serialized.safe.active, 'boolean');
+  }
+});
+
 test('REF-03-041: conflicting exceptions, mixed snapshots and changed revision contents reject atomically', async t => {
   const artifact = await compileSource(source());
   const snapshot = calendar().snapshot;

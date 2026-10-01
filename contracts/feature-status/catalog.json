@@ -3894,6 +3894,54 @@
       "referenceCaseIds": ["REF-03-041", "REF-07-005"]
     },
     {
+      "id": "distinct-boundary-states",
+      "family": "Typed false/zero, capability absence, sensor fault, calendar Unknown and identified empty observation",
+      "clause": {
+        "path": "docs/reference/07-semantic-rules-and-index.en.md",
+        "heading": "7.3 False, absent, and uncertain are different"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": ["native_wasm"],
+      "evidence": [{
+        "stage": "native_wasm",
+        "status": "verified",
+        "refs": [{
+          "path": "tests/reference-distinct-states.test.mjs",
+          "testId": "REF-07-004: serialized completed observations retain ready false and numeric zero with source and run identity",
+          "caseId": "REF-07-004",
+          "assertionClass": "observation",
+          "targets": ["wasm"],
+          "polarities": ["positive", "negative", "boundary"]
+        }, {
+          "path": "tests/reference-distinct-states.test.mjs",
+          "testId": "REF-07-004: serialized optional absence and installed sensor fault retain strategy quality and Result origin",
+          "caseId": "REF-07-004",
+          "assertionClass": "runtime-value",
+          "targets": ["wasm"],
+          "polarities": ["positive", "negative", "boundary"]
+        }, {
+          "path": "tests/reference-calendar-boundary.test.mjs",
+          "testId": "REF-07-004: serialized calendar Unknown retains reason revision and query identity separately from normal false",
+          "caseId": "REF-07-004",
+          "assertionClass": "target-parity",
+          "targets": ["native", "wasm"],
+          "polarities": ["positive", "negative", "boundary"]
+        }, {
+          "path": "tests/interaction-runtime-snapshot.test.mjs",
+          "testId": "GF-TEST-interaction-runtime-snapshot-empty: direct control preserves native/WASM output parity with an identified empty observation",
+          "caseId": "REF-07-004",
+          "assertionClass": "observation",
+          "targets": ["native", "wasm"],
+          "polarities": ["positive", "boundary"]
+        }]
+      }],
+      "gaps": ["This bounded oracle serializes actual logical control traces and completed public observations. It does not unify their schemas or establish Device/physical observation production. Calendar query coverage remains the adopted UTC profile; capability binding and Run overlap decisions remain outside this evidence."],
+      "issues": [312],
+      "referenceCaseIds": ["REF-07-004"]
+    },
+    {
       "id": "product-boundary",
       "family": "Farmer UI, installation and deployment",
       "clause": {

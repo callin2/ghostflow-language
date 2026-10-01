@@ -49,6 +49,7 @@ const TESTS = Object.freeze([
   'tests/calendar-provider.test.mjs', 'tests/calendar-execution.test.mjs',
   'tests/calendar-runtime.test.mjs',
   'tests/reference-calendar-boundary.test.mjs',
+  'tests/reference-distinct-states.test.mjs',
   'tests/solar-config-compiler.test.mjs', 'tests/solar-config-runtime.test.mjs',
   'tests/config-native-wasm-parity.test.mjs',
   'tests/macro-composition-contract.test.mjs', 'tests/objective-adapt-structural.test.mjs',
