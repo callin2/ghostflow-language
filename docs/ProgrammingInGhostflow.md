@@ -1161,11 +1161,13 @@ provider는 관측·예측을 공급한다. 프로그램은 무엇을 허용할�
 | `instant` | `instant(DateTime)`: Periodic의 절대 anchor | 상수 DateTime; 현재 실행 경로는 preserve_anchor와 pulse 사용. [Periodic](../tests/periodic-cron-policy.test.mjs). |
 | `civil` | `civil(Date, TimeOfDay)`: Periodic의 민간시 anchor | 상수 날짜·시각; 검증 descriptor 계약, 현재 Periodic bytecode 경로 밖. [Periodic](../tests/periodic-cron-policy.test.mjs). |
 | `skip_after` | `skip_after(Duration)`: 허용 관측 공백 제한 | schedule gap 필드; 더 큰 공백에는 명시적 skip/baseline 정책 사용. [정책](../tests/periodic-cron-policy.test.mjs). |
-| `range` | `range(Duration)`: 계획된 민간시 구간 | schedule basis; 비중첩 증명과 명시적 cancel_when 필요. descriptor 전용, 제어 bytecode 없음. [Range 계약](../tests/schedule-descriptor-artifact.test.mjs). |
+| `range` | `range(Duration)`: 계획된 구간 | schedule basis; 비중첩 증명과 명시적 cancel_when 필요. 고정 UTC 구간은 제한된 실행 경로를 지원하며 일반 민간시 구간은 descriptor 범위다. [Range 계약](../tests/schedule-descriptor-artifact.test.mjs). |
 | `run` | `run(Duration, within(Duration))`: 승인부터 Tide 운전 | Tide basis; 첫 Duration은 운전 길이. 유예 구간 안에서 첫 승인 필요. [Tide](../tests/natural-schedule-contract.test.mjs). |
 | `within` | `within(Duration)`: Tide 승인 유예 | Tide run의 둘째 인자 전용; [planned,planned+grace), 정확한 끝 제외. 운전 길이를 늘리지 않는다. [Tide](../tests/natural-schedule-contract.test.mjs). |
+| `hold_trusted` | `hold_trusted(Duration, terminal: skip)`: 제한된 신뢰 시각 보류 | Solar/Tide clock 필드; 양수 상수, 이전 신뢰 근거와 run/time 연속성 필요. 정확한 만료 경계는 skip. E36. [Execution](../tests/programming-natural-examples.test.mjs). |
+| `fixed_time` | `fixed_time(TimeOfDay literal, terminal: skip)`: 고정 시각 fallback | Solar fallback 전용; 상수 TimeOfDay literal과 명시적 terminal skip. Tide로 옮기지 않는다. E36/E101. [Execution](../tests/programming-natural-examples.test.mjs). |
 
-현재 실행 예약은 신뢰 시계, baseline 복구, skip fallback을 사용한다. Daily/slots/Cron은 pulse, Periodic은 instant+preserve_anchor, Tide는 run+within이다. descriptor로 허용된 민간시 계약을 실행 예약으로 취급하지 않는다.
+현재 실행 예약은 baseline 복구를 사용한다. Solar와 Tide는 `trusted_only` 또는 양수 상수 Duration과 `terminal: skip`을 지정한 `hold_trusted`를 지원한다. Solar는 `fixed_time(TimeOfDay, terminal: skip)` fallback도 지원하며 Tide fallback은 `skip`이다. Daily/slots/Cron은 pulse, Periodic은 instant+preserve_anchor, Tide는 run+within이다. `range`의 고정 UTC 구간은 별도 제한 실행 경로가 있으며 일반 민간시 descriptor 전체가 실행 가능하다는 뜻은 아니다. 아래 E36–E37과 [fallback 검사](../tests/natural-fallback-compiler.test.mjs)를 참고한다.
 근거: [예약 lowering과 경로 선택](../tools/control.mjs), [시간 Reference](reference/03-time-and-schedules.md).
 
 ### 13.6 더 허용하기 전에 사용량 계상하기
@@ -2068,3 +2070,176 @@ control OwnedWateringRule {
 ```
 
 이 열 편을 관통하는 GhostFlow의 약속은 장치를 움직이는 데서 끝나지 않는다. 입력과 규칙에서 출력 의도까지의 이유를 소스에 남겨 다음 사람이 검토하고 이어갈 수 있게 한다.
+
+## 정확한 수와 자연 시각: R14–R17 실행 예제
+
+이 절은 [#30](https://github.com/callin2/ghostflow-language/issues/30)의 R14–R17을 현재 지원되는 독립 프로그램으로 설명한다. 규칙의 권위는 [Reference 02](reference/02-types-expressions-state.md)와 [Reference 03](reference/03-time-and-schedules.md)다. 과거 검토 계획의 잠정 표기는 현재 채택된 규칙을 대체하지 않는다. 다음은 이미 채택된 결정과 작업의 추적 근거이며 정책 재선택 요청이 아니다.
+
+| 항목 | 채택된 결정과 작업 | 실행 증거 |
+|---|---|---|
+| R14 정확한 수 | #22/#24/#25: checked i32 Int, 명시적 변환, overflow 시 tick 거절 | E34/E98, [정수 검사](../tests/int-compiler.test.mjs), [나눗셈·경계](../tests/int-division-identity.test.mjs) |
+| R15 절대 시각 | #27: offset 있는 DateTime, 정확한 UTC instant, Duration 이동 | E35/E99, [DateTime 실행](../tests/date-time-control.test.mjs) |
+| R16 달력·자연 예약 | #28 및 #401/#403: Solar pulse, Tide run/within, provider·occurrence 식별 | E36/E37, [자연 예약](../tests/natural-schedule-contract.test.mjs), [Solar scan parity](../tests/solar-scanframe-native-wasm.test.mjs) |
+| R17 불확실 시각 정책 | #29: 제한된 hold_trusted, Solar fixed_time, 명시적 terminal skip | E36/E100–E102, [fallback 컴파일](../tests/natural-fallback-compiler.test.mjs), [fallback 실행](../tests/natural-fallback-runtime.test.mjs) |
+
+E34–E37은 현재 컴파일러가 실행 bytecode를 만드는 예제다. 아래 오류 예제는 의도적으로 거절되는 완전한 프로그램이다. 각 fence는 따로 실행한다. [문서 컴파일 검사](../tests/docs-runnable-examples.test.mjs)는 두 언어의 같은 소스와 의도한 오류를 검증하며 [책 실행 검사](../tests/programming-natural-examples.test.mjs)는 E34–E37의 host 동작을 검사한다. 컴파일과 host runtime 검사는 Device 배포나 물리 출력 확인이 아니다.
+
+### E34 — 참인 scan의 수를 정확히 세기
+
+`add=true`인 성공한 scan마다 1을 더한다. 상승 edge의 수가 아니므로 true를 유지하면 scan마다 증가한다. 출력은 병렬 갱신 후의 `count'`다. Int 최대값에서 더하면 `integer-overflow`로 tick을 거절하고 새 상태·출력 의도를 commit하지 않는다. wrap이나 포화로 숨기지 않는다.
+
+```ghost
+// E34
+control ExactScanCount {
+  input add: Bool;
+  state count: Int = 0;
+  output total: Int;
+  count' = if add then count + 1 else count;
+  total <- count';
+}
+```
+
+### E35 — offset 있는 절대 시각 구간 비교하기
+
+현지 표기 06:30+09:00과 전날 21:30Z는 같은 UTC instant다. `now`는 환경에서 전달하는 typed DateTime이며 숫자나 시계의 신뢰 여부를 추측하는 표현식이 아니다. 구간은 시작 포함·끝 제외다. `5min`은 고정 Duration이며 달력의 한 달이나 타임존 변경을 뜻하지 않는다. 도메인 밖 DateTime 입력이나 이동 결과는 거절되며 부분 상태 갱신을 만들지 않는다.
+
+```ghost
+// E35
+control AbsoluteWindow {
+  input now: DateTime;
+  output in_window, same_instant: Bool;
+  let start = datetime`2026-09-30T06:30:00+09:00`;
+  let end = start + 5min;
+  in_window <- now >= start && now < end;
+  same_instant <- start == datetime`2026-09-29T21:30:00Z`;
+}
+```
+
+### E36 — 일출 pulse와 제한된 시계·고정 시각 fallback
+
+일출 30분 뒤의 occurrence에서 `enabled`일 때 시작 pulse를 요청한다. `start`는 하루 종일 켜지는 상태가 아니며 duration 운전을 추가하지 않는다. 환경은 신뢰 시계와 위치·Solar 계산 근거를 제공한다. `hold_trusted`는 같은 run/time 연속성에서 이미 받은 신뢰 snapshot을 단조 시계로 최대 2분만 연장한다. 이전 신뢰 근거가 없거나 정확한 2분 경계에 도달하면 skip한다. 보류 시각을 신뢰 wall clock으로 기록하지 않는다.
+
+Solar 사건을 사용할 수 없을 때 명시한 고정 UTC 06:30 대안을 사용한다. 이 fallback도 유효한 신뢰/제한 보류 시계가 필요하다. 사용할 수 없는 시각을 0이나 지금으로 바꾸지 않으며 terminal은 skip이다. 최초 관측과 큰 공백의 baseline 복구는 지난 occurrence를 소급해서 시작하지 않는다. admission·unknown·fallback 이유는 schedule 증거에서 구별한다.
+
+```ghost
+// E36
+control SolarFallbackStart {
+  input enabled: Bool;
+  schedule dawn: Solar {
+    timezone = "UTC";
+    latitude = 37;
+    longitude = 127;
+    at = sun`rise + 30min`;
+    basis = pulse;
+    when = enabled;
+    clock = hold_trusted(2min, terminal: skip);
+    gap = skip_after(60s);
+    recovery = baseline;
+    fallback = fixed_time(time`06:30`, terminal: skip);
+  }
+  output start: Bool;
+  start <- dawn.due;
+}
+```
+
+### E37 — 만조 전의 승인 유예와 단조 시계 운전
+
+provider `harbor_tides`의 만조 30분 전이 계획 시각이다. 유효하고 신선한 예측·신뢰 시계가 있고 `allowed=true`이면 [계획, 계획+10분)에서 한 번 승인한다. 정확한 끝은 제외한다. 승인부터 5분 운전하며 지연 승인으로 운전 길이가 늘어나지 않는다. `stop=true`이면 `cancel_when`으로 취소한다. 새 admission이 허용되지 않아도 이미 승인한 운전은 단조 시간으로 진행하며 취소 조건과 run/time 연속성 규칙을 따른다.
+
+없는·오래된 예측이나 Unknown 시계는 새 운전을 승인하지 않는다. `fallback=skip`은 물리 fail-safe를 증명하거나 예측을 만들어내지 않는다. `pump`는 safe/applied/confirmed 물리 사실과 구별되는 출력 의도다. provider의 station/revision/occurrence와 clock snapshot은 환경 입력이며 코드에 주소나 설치 credential을 넣지 않는다.
+
+```ghost
+// E37
+control TideRun {
+  input allowed, stop: Bool;
+  provider harbor_tides: TidePredictions;
+  schedule high: Tide {
+    source = harbor_tides;
+    timezone = "UTC";
+    at = tide`high - 30min`;
+    basis = run(5min, within(10min));
+    when = allowed;
+    cancel_when = stop;
+    clock = trusted_only;
+    gap = skip_after(60s);
+    recovery = baseline;
+    fallback = skip;
+  }
+  output pump: Bool;
+  pump <- high.active;
+}
+```
+
+### E98 — Int와 Number를 암묵적으로 섞지 않기
+
+아래 count는 Int이며 measurement는 Number다. 이 코드는 거절된다. 의도가 근사 계산이면 `number(count)`를 명시하고, 정확한 수로 바꾸려면 `int_exact`나 명시한 반올림 변환의 오류 정책을 선택한다.
+
+```ghost-error
+control MixedCount {
+  input count: Int;
+  input measurement: Number;
+  output total: Number;
+  total <- count + measurement;
+}
+```
+
+### E99 — offset 없는 DateTime을 거절하기
+
+현지 시각만으로 UTC instant를 만들지 않는다. Z 또는 숫자 offset을 명시해야 하며 IANA zone을 임의로 추측하지 않는다.
+
+```ghost-error
+control MissingOffset {
+  output ready: Bool;
+  ready <- datetime`2026-09-30T06:30:00` < datetime`2026-09-30T07:00:00Z`;
+}
+```
+
+### E100 — Solar의 fallback을 생략하지 않기
+
+자료가 없을 때의 행동도 소스 계약이다. 필수 fallback이 빠진 예약은 bytecode를 만들지 않는다. 선택한 정책이 skip이면 `fallback = skip;`을 쓴다.
+
+```ghost-error
+control MissingSolarFallback {
+  schedule dawn: Solar {
+    timezone = "UTC"; latitude = 37; longitude = 127; at = sun`rise`;
+    basis = pulse; when = true; clock = trusted_only;
+    gap = skip_after(60s); recovery = baseline;
+  }
+  output start: Bool;
+  start <- dawn.due;
+}
+```
+
+### E101 — Solar 고정 시각 fallback을 Tide로 옮기지 않기
+
+현재 fixed_time 실행 경로는 Solar 전용이다. Tide의 fallback은 skip이며 고정 시각을 만조 예측과 같은 occurrence로 취급하지 않는다.
+
+```ghost-error
+control UnsupportedTideFallback {
+  provider predictions: TidePredictions;
+  schedule high: Tide {
+    source = predictions; timezone = "UTC"; at = tide`high`;
+    basis = run(5min, within(10min)); when = true; cancel_when = false;
+    clock = trusted_only; gap = skip_after(60s); recovery = baseline;
+    fallback = fixed_time(time`06:30`, terminal: skip);
+  }
+  output pump: Bool;
+  pump <- high.active;
+}
+```
+
+### E102 — 보류 종료 정책을 반드시 쓰기
+
+`hold_trusted(2min)`만으로 보류가 끝난 뒤의 행동을 숨기지 않는다. 현재 지원되는 명시적 끝 정책은 `terminal: skip`이다.
+
+```ghost-error
+control MissingHoldTerminal {
+  schedule dawn: Solar {
+    timezone = "UTC"; latitude = 37; longitude = 127; at = sun`rise`;
+    basis = pulse; when = true; clock = hold_trusted(2min);
+    gap = skip_after(60s); recovery = baseline; fallback = skip;
+  }
+  output start: Bool;
+  start <- dawn.due;
+}
+```
