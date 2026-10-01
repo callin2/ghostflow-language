@@ -25,7 +25,8 @@
     "build:wasm": "cargo build --locked --offline -p ghostflow-wasm --target wasm32-unknown-unknown --release",
     "docs:index": "node tools/check-doc-index-provenance.mjs && node tools/doc-index/docs-index.mjs --docs-dir docs && node tools/doc-index/docs-index.mjs --docs-dir .",
     "docs:index:check": "node tools/check-doc-index-provenance.mjs && node tools/doc-index/docs-index.mjs --check --docs-dir docs && node tools/doc-index/docs-index.mjs --check --docs-dir .",
-    "docs:find": "node tools/check-doc-index-provenance.mjs && node tools/doc-index/docs-find.mjs"
+    "docs:find": "node tools/check-doc-index-provenance.mjs && node tools/doc-index/docs-find.mjs",
+    "test:portable-package": "node --test tests/requirement-catalog.test.mjs && node --test tests/portable-package.test.mjs"
   },
   "dependencies": {
     "@toon-format/toon": "4.1.1",

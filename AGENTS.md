@@ -62,9 +62,11 @@ are installed. It compiles the fixture required by Rust tests before invoking
 Cargo, builds the WASM/native runners, and executes the language tests/tutorial.
 Keep runnable FAQ and programming samples in the focused
 `tests/docs-runnable-examples.test.mjs` compiler check when changing them.
-After editing a document referenced by `contracts/requirements/catalog.json`,
+After editing any file referenced by `contracts/requirements/catalog.json`,
 run `node --test tests/requirement-catalog.test.mjs`; relocate unchanged excerpt
-ranges when lines move, and preserve their expected hashes.
+ranges when lines move, and preserve their expected hashes. Use `npm run
+test:portable-package` for focused package checks; it runs the fast catalog
+preflight before package regressions.
 Keep source and artifact hashes in release records. Generated verification and
 tutorial traces are execution evidence under ignored `build/`, separate from
 source releases. Report host validation separately from Device, API and farmer-UX
