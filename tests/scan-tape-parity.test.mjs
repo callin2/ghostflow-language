@@ -263,6 +263,30 @@ control FaultingProduct {
     && entry.target.name === 'result' && entry.reads.some(read => read.field === 'inputs' && read.name === 'divisor')));
 });
 
+test('REF-01-103: phase age starts at zero on a nonzero clock and restarts on committed change', async () => {
+  const filename = 'contracts/interaction-v0/examples/enum-phase-age.ghost.md';
+  const source = fs.readFileSync(path.join(root, filename), 'utf8');
+  const { artifact, native, wasm } = await compare(source, [
+    row(0, 100, [{ name: 'advance', value: false }]),
+    row(1, 175, [{ name: 'advance', value: true }]),
+    row(2, 230, [{ name: 'advance', value: true }]),
+    row(3, 300, [{ name: 'advance', value: false }]),
+  ], filename);
+  assert.deepEqual(artifact.manifest.timers, [{ name: 'age', state: 'phase', clockInput: '__gf_now_ms' }]);
+  for (const outcomes of [native, wasm]) {
+    assert.deepEqual(outcomes.map(item => item.accepted), [true, true, true, true]);
+    assert.deepEqual(outcomes.map(item => item.outcome.trace.stateAfter.phase), [0, 1, 1, 0]);
+    const timers = outcomes.map(item => observeRuntimeValues(artifact.traceMetadata, item.outcome.trace).values
+      .find(value => value.kind === 'timer' && value.name === 'age'));
+    assert.deepEqual(timers.map(timer => ({ valueType: timer.valueType, unit: timer.unit, value: timer.value })), [
+      { valueType: 'Duration', unit: 'ms', value: 0 },
+      { valueType: 'Duration', unit: 'ms', value: 0 },
+      { valueType: 'Duration', unit: 'ms', value: 55 },
+      { valueType: 'Duration', unit: 'ms', value: 0 },
+    ]);
+  }
+});
+
 test('REF-03-013: elapsed restarts at both Bool changes in completed native and WASM scans', async () => {
   const tape = [
     row(0, 0, [{ name: 'request', value: false }]),
