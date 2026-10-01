@@ -2268,18 +2268,34 @@
                 "positive",
                 "boundary"
               ]
+            },
+            {
+              "path": "tests/scan-tape-parity.test.mjs",
+              "testId": "REF-03-013: elapsed restarts at both Bool changes in completed native and WASM scans",
+              "caseId": "REF-01-104",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
             }
           ]
         }
       ],
       "gaps": [
-        "Linked oracles cover true_for and the exact REF-03-013 completed-scan elapsed trace; other timer cases remain separate, and rolling budget is a separate contract."
+        "Linked oracles cover true_for and the exact completed-scan elapsed trace for REF-03-013 and REF-01-104; other timer cases remain separate, and rolling budget is a separate contract."
       ],
       "issues": [
-        204
+        204,
+        202
       ],
       "referenceCaseIds": [
-        "REF-03-013"
+        "REF-03-013",
+        "REF-01-104"
       ]
     },
     {
