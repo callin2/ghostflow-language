@@ -2211,6 +2211,19 @@
       "requiredEvidence": [],
       "evidence": [
         {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/result-control.test.mjs",
+              "testId": "REF-01-075 optional syntax does not implicitly unwrap or default a sensor Result",
+              "caseId": "REF-01-075",
+              "assertionClass": "type-boundary",
+              "polarities": ["negative"]
+            }
+          ]
+        },
+        {
           "stage": "native_wasm",
           "status": "verified",
           "refs": [
@@ -2237,6 +2250,14 @@
               "assertionClass": "runtime-value",
               "targets": ["wasm"],
               "polarities": ["positive", "negative", "boundary"]
+            },
+            {
+              "path": "tests/result-control.test.mjs",
+              "testId": "REF-01-075 optional sensor absence and installed fault identities remain distinct on framed WASM",
+              "caseId": "REF-01-075",
+              "assertionClass": "runtime-value",
+              "targets": ["wasm"],
+              "polarities": ["positive", "negative", "boundary"]
             }
           ]
         }
@@ -2244,8 +2265,8 @@
       "gaps": [
         "Outside the frozen source type set."
       ],
-      "issues": [198, 193],
-      "referenceCaseIds": ["REF-01-074", "REF-00-007"]
+      "issues": [198, 193, 199],
+      "referenceCaseIds": ["REF-01-074", "REF-00-007", "REF-01-075"]
     },
     {
       "id": "temporal-duration",

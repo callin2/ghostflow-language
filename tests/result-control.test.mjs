@@ -168,6 +168,69 @@ test('legacy and framed Result hosts reject missing or forged sensor fault bindi
   await assert.rejects(() => ControlRuntime.instantiateFramed(wasm, forgedSignal), /faultInput/);
 });
 
+test('REF-01-075 optional sensor absence and installed fault identities remain distinct on framed WASM', async () => {
+  const compiled = await compileSource(`control OptionalMoisture {
+    sensor moisture?: Percent;
+    output installed, healthy: Bool;
+    output reason: Int;
+    adapt moisture_policy {
+      strategy Installed priority 10 match (moisture: sensor<Percent>) {
+        installed <- true;
+        healthy <- case moisture { ok(_) => true; fault(_) => false; };
+        reason <- case moisture {
+          ok(_) => 0;
+          fault(f) => case f { Disconnected => 1; Stale => 2; Invalid => 3; NotReady => 4; };
+        };
+      }
+      strategy Absent priority 0 match always {
+        installed <- false;
+        healthy <- false;
+        reason <- -1;
+      }
+    }
+  }`, { filename: 'optional-moisture.ghost' });
+  assert.equal(compiled.manifest.sensors[0].optional, true);
+  const capability = { kind: 'sensor', name: 'moisture', type: 'Percent' };
+  const absent = await ControlRuntime.instantiateFramed(wasm, compiled, { capabilities: [] });
+  try {
+    const outcome = absent.step({ nowMs: 0 });
+    assert.equal(outcome.vm.strategy, 'Absent');
+    assert.deepEqual(outcome.vm.safe, { healthy: false, installed: false, reason: -1 });
+    assert.deepEqual(outcome.vm.resultTrace, [], 'absent strategy does not invent a Result fallback');
+    assert.equal(outcome.sensors.moisture.quality, 'NotReady'); // unpopulated placeholder, not presence evidence
+    assert.throws(() => absent.step({ nowMs: 1, samples: { moisture: sample(1, 'Good') } }),
+      /absent sensor capability moisture/);
+    assert.deepEqual(absent.runtime.outcome.trace, outcome.vm);
+  } finally { absent.dispose(); }
+  for (const [quality, reason] of [['Good', 0], ['Disconnected', 1], ['Stale', 2], ['Invalid', 3], ['NotReady', 4]]) {
+    const runtime = await ControlRuntime.instantiateFramed(wasm, compiled, { capabilities: [capability] });
+    try {
+      const outcome = runtime.step({ nowMs: 0, samples: { moisture: sample(0, quality) } });
+      assert.equal(outcome.vm.strategy, 'Installed', 'installed fault cannot select the absence strategy');
+      assert.equal(outcome.sensors.moisture.quality, quality);
+      assert.deepEqual(outcome.vm.safe, { healthy: quality === 'Good', installed: true, reason });
+      assert.ok(outcome.vm.resultTrace.some(event => event.choice === reason
+        && event.origin === (quality === 'Good' ? 0 : compiled.sourceMap.find(node => node.kind === 'sensor').id)));
+    } finally { runtime.dispose(); }
+  }
+});
+
+test('REF-01-075 optional syntax does not implicitly unwrap or default a sensor Result', async () => {
+  await assert.rejects(() => compileSource(`control ImplicitOptional {
+    sensor moisture?: Percent;
+    output pump: Bool;
+    pump <- moisture < 30%;
+  }`, { filename: 'implicit-optional.ghost' }), /optional sensor moisture may only be read inside a strategy that matches it/);
+  await assert.rejects(() => compileSource(`control ImplicitOptionalResult {
+    sensor moisture?: Percent;
+    output pump: Bool;
+    adapt moisture_policy {
+      strategy Installed priority 10 match (moisture: sensor<Percent>) { pump <- moisture < 30%; }
+      strategy Absent priority 0 match always { pump <- false; }
+    }
+  }`, { filename: 'implicit-optional-result.ghost' }), /Result|ordered|compare|Percent/);
+});
+
 test('REF-04-003 all SensorFault reasons survive explicit fallback', async () => {
   const compiled = await compileSource(`control FaultReasons {
     sensor reading: Number { stale_after = 3s; }
