@@ -3,7 +3,7 @@ import { sha256Hex } from '../../tools/sha256.mjs';
 
 export const INTERACTION_SCHEMA_FORMAT = 'GhostFlow/interaction-schema-v0';
 export const RUNTIME_SNAPSHOT_FORMAT = 'GhostFlow/runtime-snapshot-v0';
-export const INTERACTION_SCHEMA_VERSION = '0.2';
+export const INTERACTION_SCHEMA_VERSION = '0.3';
 export const RUNTIME_SNAPSHOT_VERSION = '0.1';
 
 const PUBLIC_ID = /^[A-Za-z][A-Za-z0-9._:-]{0,127}$/;
@@ -99,7 +99,11 @@ function sourceType(value, path, errors) {
         const names = new Set();
         value.enumMembers.forEach((member, index) => {
           const memberPath = `${path}.enumMembers[${index}]`;
-          if (!exactObject(member, ['name', 'value'], memberPath, errors)) return;
+          if (!exactObject(member, Object.hasOwn(member ?? {}, 'displayLabel')
+            ? ['name', 'value', 'displayLabel'] : ['name', 'value'], memberPath, errors)) return;
+          if (Object.hasOwn(member, 'displayLabel') && (typeof member.displayLabel !== 'string' || !member.displayLabel.trim())) {
+            issue(errors, `${memberPath}.displayLabel`, 'enum_member_label', 'must be a non-empty plain-text string');
+          }
           enumMemberName(member.name, `${memberPath}.name`, errors);
           if (names.has(member.name)) issue(errors, `${memberPath}.name`, 'duplicate_identity', 'enum member names must be unique');
           names.add(member.name);

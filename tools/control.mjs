@@ -746,10 +746,29 @@ class ControlParser {
   }
   typeDecl() {
     const start = this.take(), name = this.identifier('expected type name');
-    this.expect('=', 'type requires ='); const members = [this.identifier('expected enum member')];
-    while (this.maybe('|')) members.push(this.identifier('expected enum member'));
+    this.expect('=', 'type requires ='); const members = [this.enumMember()];
+    while (this.maybe('|')) members.push(this.enumMember());
     this.expect(';', 'expected ; after type declaration');
-    return this.node('enum', start, { name: name.value, members: members.map(x => ({ name: x.value, loc: copyLoc(x) })) });
+    return this.node('enum', start, { name: name.value, members });
+  }
+  enumMember() {
+    const name = this.identifier('expected enum member');
+    const member = { name: name.value, loc: copyLoc(name) };
+    if (this.maybe('{')) {
+      while (!this.matches('}')) {
+        const key = this.identifier('expected enum member option');
+        if (key.value !== 'label') error(key, `unsupported enum member option ${key.value}`);
+        if (member.label !== undefined) error(key, 'duplicate enum member option label');
+        this.expect('=', 'expected = after enum member option label');
+        const label = this.current();
+        if (label.kind !== 'string') error(label, 'enum member label must be a string');
+        if (!label.value.trim()) error(label, 'enum member label must be a non-empty string');
+        member.label = this.take().value;
+        this.expect(';', 'expected ; after enum member option');
+      }
+      this.take();
+    }
+    return member;
   }
   functionDecl() {
     const start = this.take(), name = this.identifier('expected function name');
