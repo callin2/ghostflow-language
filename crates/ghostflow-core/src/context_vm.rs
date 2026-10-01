@@ -16,6 +16,9 @@ pub struct DurationSetting {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ScheduleDefinition {
+    AtPulse {
+        at_ms: u64,
+    },
     /// GFB12 immutable civil Range; UTC recurrence is computed in Rust.
     UtcRange {
         starts_ms: Vec<u64>,
@@ -500,6 +503,15 @@ pub(crate) fn load_schedule(
                 duration_ms,
             }
         }
+        14 if format == 14 => ScheduleDefinition::AtPulse {
+            at_ms: {
+                let at = exact(reader)?;
+                if at > 253_402_300_799_999 {
+                    return Err(Error::new("At DateTime out of range"));
+                }
+                at
+            },
+        },
         _ => return Err(Error::new("invalid context schedule kind")),
     };
     let when = reader.blob()?;

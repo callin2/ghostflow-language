@@ -254,7 +254,7 @@ impl ContextRuntime {
         staged.runtime.clock.poll(clock)?;
         let expected = descriptors
             .iter()
-            .filter(|d| matches!(d, PulseDescriptor::Context(_)))
+            .filter(|d| matches!(d, PulseDescriptor::Context(c) if !matches!(c.definition, ScheduleDefinition::AtPulse { .. })))
             .count();
         if facts.schedules.len() != expected || facts.natural.len() > self.bindings.len() {
             return Err(invalid("context facts do not match installed requirements"));
@@ -335,6 +335,9 @@ impl ContextRuntime {
                 })
                 .ok_or_else(|| invalid("unknown context schedule site"))?;
             match definition {
+                ScheduleDefinition::AtPulse { .. } => {
+                    return Err(invalid("At occurrences are computed by the core"))
+                }
                 ScheduleDefinition::Periodic { .. } | ScheduleDefinition::UtcRange { .. } => {
                     if evidence.provider.is_some()
                         || evidence.calendar.is_some()
@@ -617,11 +620,23 @@ impl ContextRuntime {
         }
         for (index, descriptor) in descriptors.iter().enumerate() {
             if let PulseDescriptor::Context(d) = descriptor {
-                let evidence = facts
-                    .schedules
-                    .iter()
-                    .find(|e| e.site == d.site)
-                    .ok_or_else(|| invalid("missing schedule evidence"))?;
+                let at_evidence = ScheduleEvidence {
+                    site: d.site,
+                    coverage_start_ms: 0,
+                    coverage_end_ms: 253_402_300_800_000,
+                    provider: None,
+                    calendar: None,
+                    rows: Vec::new(),
+                };
+                let evidence = if matches!(d.definition, ScheduleDefinition::AtPulse { .. }) {
+                    &at_evidence
+                } else {
+                    facts
+                        .schedules
+                        .iter()
+                        .find(|e| e.site == d.site)
+                        .ok_or_else(|| invalid("missing schedule evidence"))?
+                };
                 let evaluate = |code: &[u8], trace: &mut ResultTraceBuffer| -> Result<bool> {
                     match eval_expression_with_preludes(
                         code,

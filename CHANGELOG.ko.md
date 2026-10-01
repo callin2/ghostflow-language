@@ -5,6 +5,20 @@
 
 ## 미출시
 
+### 2026-10-01 — one-shot At pulse ([#154](https://github.com/callin2/ghostflow-language/issues/154))
+
+`schedule appointment: At { at = datetime\`2026-01-01T08:00:00Z\`; ... }`이
+이제 shared Rust core, WASM host와 ghostsim에서 절대 시점의 단일 pulse로
+컴파일되고 실행된다. 공통 policy 여섯 개는 필수다. 이 제한된 profile은
+pulse/trusted-only/baseline/skip을 받고 다른 basis와 timezone/DST/cancellation
+field는 거부한다. trusted crossing은 한 번 admit하며 false, gap과 지난
+boot/recovery baseline은 terminal miss로 소비한다. 거부된 scan은 소비하지
+않으며 같은 program의 checkpoint 복원은 reboot 뒤 dedup을 유지한다.
+GFB14/control-v13으로 이전 loader는 fail closed한다. scan transport는 그대로다.
+서명된 portable packaging은 아직 지원하지 않는다. [Reference §3.5](docs/reference/03-time-and-schedules.md#35-schedule의-공통-의미)를 참조한다.
+compiler와 native/WASM/ghostsim 경계, 회복, rollback과 checkpoint 회귀 검사를
+추가했다. 논리 admission은 물리 실행을 주장하지 않는다.
+
 ### 2026-10-01 — portable 적응 전략 메타데이터
 
 Portable package는 컴파일러가 생성한 쌍으로 된 adaptation descriptor를 받습니다.

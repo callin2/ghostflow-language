@@ -262,7 +262,7 @@ impl ScanDriver {
                         .runtime
                         .module
                         .as_ref()
-                        .is_some_and(|m| matches!(m.format_version, 10 | 11 | 12 | 13)))
+                        .is_some_and(|m| matches!(m.format_version, 10 | 11 | 12 | 13 | 14)))
                     || ["__gf_config_", "__gf_natural_", "__gf_accounting_"]
                         .iter()
                         .any(|prefix| name.starts_with(prefix))))
@@ -290,7 +290,7 @@ impl ScanDriver {
             .runtime
             .module
             .as_ref()
-            .is_some_and(|m| matches!(m.format_version, 10 | 11 | 12 | 13));
+            .is_some_and(|m| matches!(m.format_version, 10 | 11 | 12 | 13 | 14));
         let result = if let Some((clock, facts)) = context {
             let clock_input = self.runtime.set_input(
                 RESERVED_CLOCK_INPUT,

@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### 2026-10-01 — one-shot At pulse ([#154](https://github.com/callin2/ghostflow-language/issues/154))
+
+`schedule appointment: At { at = datetime\`2026-01-01T08:00:00Z\`; ... }`
+now compiles and executes an absolute singleton pulse in the shared Rust core,
+WASM host and ghostsim. The six common policies remain required; this bounded
+profile accepts pulse/trusted-only/baseline/skip and rejects other bases and
+timezone/DST/cancellation fields. Trusted crossing admits once; false, gap and
+past boot/recovery baseline consume a terminal miss. Rejected scans do not
+consume, and matching restored checkpoints preserve deduplication after reboot.
+GFB14/control-v13 make older loaders fail closed; scan transport is unchanged.
+Signed portable packaging remains unsupported. See [Reference §3.5](docs/reference/03-time-and-schedules.en.md#35-common-schedule-semantics).
+Compiler and native/WASM/ghostsim boundary, recovery, rollback and checkpoint
+regressions cover this addition; logical admission makes no physical claim.
+
 ### 2026-10-01 — portable adaptive strategy metadata
 
 Portable packages now accept compiler-produced paired adaptation descriptors.

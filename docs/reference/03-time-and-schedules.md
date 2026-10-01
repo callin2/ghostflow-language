@@ -253,7 +253,7 @@ value다. 현재 시점에서 trigger, day rule, predicate와 context를 평가�
 admit할지 판단한다. 충족하지 않은 pulse는 자동 대기열에 들어가지 않는다.
 
 선택된 trigger 타입은 `At`, `Daily`, `DailySlots<G>`, `Periodic`, `Cron`, `Solar`,
-`Tide`다. 현재 compiler는 `At`을 받지 않고 `DailySlots<15min>`만 받는다.
+`Tide`다. 현재 compiler는 one-shot `At` pulse와 `DailySlots<15min>`을 받는다.
 각 타입은 고유 trigger field와 다음 공통 policy field를 가진다.
 
 ```ghost
@@ -296,7 +296,7 @@ cancel_when := Bool                                   // 현재 civil range에 �
 현재 compiler는 Solar와 Tide에 `clock = hold_trusted(positive constant Duration, terminal: skip)`을,
 Solar에 `fallback = fixed_time(TimeOfDay literal, terminal: skip)`을 받는다.
 Tide는 `fallback = skip`만 허용하며 다른 trigger는 trusted-only clock과 skip fallback을 유지한다.
-`window`, `run(_, on_time)`, `At`은 선택된 설계 표기이며
+`window`, `run(_, on_time)`은 선택된 설계 표기이며
 아직 compiler 지원 범위 밖이다. civil `range`는 UTC timezone의 정적 non-overlap을
 증명해야 한다. 불변 UTC Daily와 비어 있지 않은 정적 DailySlots Range는 GFB12로
 실행되며 다른 허용된 Range recurrence는 비실행 descriptor로 유지된다.
@@ -318,8 +318,43 @@ admit되면 같은 occurrence ledger가 그 날짜의 Solar 사건을 소비하�
 회복되어도 중복하지 않는다. Tide는 예측 부재 시 사건 수와 identity를 알 수 없으므로
 `fallback = skip`만 허용한다.
 
-설계된 one-shot `At`은 ``at = datetime`...`;``을 쓰며 DST field가 없다.
-현재 compiler에는 `At` 구현이 없다. 매일 한 시각인 `Daily`는
+one-shot `At`은 상수 typed DateTime을 쓰며 timezone과 DST field가 없다.
+
+```ghost
+schedule appointment: At {
+  at = datetime`2026-01-01T08:00:00Z`;
+  basis = pulse;
+  when = true;
+  clock = trusted_only;
+  gap = skip_after(60s);
+  recovery = baseline;
+  fallback = skip;
+}
+```
+
+절대 instant는 명시한 offset으로 정규화한다. 같은 instant를 나타내는 offset 표기는
+같은 시점을 계획한다. 이 제한된 profile은 `pulse`, trusted-only clock, baseline recovery,
+skip fallback과 양의 상수 gap만 받는다. 누락 field, DateTime이 아닌 값이나 비상수 `at`,
+timezone/DST/cancellation field, 다른 basis는 진단한다. `.due`와 `.missed`를 노출하며
+provider, config, sensor, resource, objective 또는 다른 schedule profile과 혼합하지 않는다.
+GFB14와 control-v13이 이 실행 profile을 식별한다. framed clock/scan transport는 그대로다.
+이전 loader는 GFB14를 거부한다. 서명된 portable package는 아직 이 profile을 받지 않는다.
+
+Rust core는 host가 제공한 occurrence row 없이 컴파일된 schedule site와 instant에서
+단일 occurrence를 계산한다. admission은 observation gap이 없는 accepted trusted scan에서
+`previous < planned <= current`이고 `when = true`일 때만 가능하다. crossing에서 false이거나
+gap이 겹치면 terminal miss로 소비한다. instant 이후 또는 같은 시점의 boot/recovery
+baseline은 catch-up 없이 `BaselinePastMissed`로 소비한다. 재관찰, wall rollback과 recrossing은
+다른 pulse를 만들지 않는다. clock source/boot revision은 새 identity를 만들지 않는다.
+거부된 scan은 clock baseline, terminal identity와 projection 어느 것도 commit하지 않는다.
+
+재시작을 가로지르는 dedup에는 같은 program의 terminal checkpoint 복원이 필요하다.
+새 boot의 wall clock이 instant 이전이어도 이미 admit되거나 missed된 identity는 소비 상태를
+유지한다. occurrence 이전 checkpoint는 미래 crossing을 admit할 수 있다. 새 activation에는
+durable history가 없다. admission 후 durable checkpoint를 발행하기 전 crash는 VM의
+once-only 보장 밖이며 host persistence와 dispatch가 그 경계를 처리해야 한다.
+admission은 논리 증거이며 물리 실행이나 acknowledgement를 증명하지 않는다.
+매일 한 시각인 `Daily`는
 `timezone`, ``at = time`...`;``, `dst_missing`, `dst_repeated`를 요구한다. 예를 들면 다음과 같다.
 
 ```ghost
@@ -376,7 +411,7 @@ revision이 포함된다. 대표 disposition은 `Before`, `PredicateFalse`, `Alr
 
 ### 놓친 occurrence에 대한 소스 반응
 
-`schedule_name.missed`는 `Bool` 투영이다. 현재 compiler는 Solar와 실행 가능한
+`schedule_name.missed`는 `Bool` 투영이다. 현재 compiler는 At pulse, Solar와 실행 가능한
 `pulse` civil schedule에 이 투영을 제공한다. 실행 가능한 UTC Range를 포함한
 Range에서는 아직 실행 투영으로 제공하지 않는다. 해당 schedule에서 하나 이상의 occurrence가
 이번 accepted scan에 **terminal missed**로 확정될 때만 true다. 한 scan에서 둘 이상을
