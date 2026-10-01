@@ -223,7 +223,7 @@
       "code": "control Bad { schedule starts: Weekly<15min> { timezone = \"UTC\"; selected = []; } }",
       "valid": "control Good { schedule starts: DailySlots<15min> { timezone = \"UTC\"; selected = []; } }",
       "at": "Weekly",
-      "message": "only Daily, DailySlots<15min>, Periodic, Cron, Solar and Tide schedules are supported"
+      "message": "only At, Daily, DailySlots<15min>, Periodic, Cron, Solar and Tide schedules are supported"
     },
     {
       "id": "parser-schedule-timezone-string",
