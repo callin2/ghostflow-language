@@ -6,7 +6,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { writeArtifact, restoreArtifactSourceMap } from '../tools/toolchain.mjs';
+import { observeSourceTrace } from '../tools/source-trace.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 import { FramedGhostFlowRuntime } from '../runtimes/wasm/framed-runtime.mjs';
 
@@ -15,6 +17,108 @@ const relay = doc('control Relay { input start: Bool; output pump: Bool; pump <-
 const pin = (text = relay) => `import Relay from "./relay.ghost.md" revision "r1" sha256 "${sha256Hex(text)}";`;
 const root = body => doc(`${pin()} control Farm { input start: Bool; output pump: Bool; ${body} }`);
 const closure = [{ filename: 'relay.ghost.md', revision: 'r1', text: relay }];
+const nativePath = fileURLToPath(new URL('../target/release/examples/scan_tape' + (process.platform === 'win32' ? '.exe' : ''), import.meta.url));
+
+test('REF-00-010: one sensor edge changes only instance A and retains definition and binding provenance on native and WASM', async t => {
+  const counter = doc(`control Counter {
+  sensor detected: Number { sample = 1s; filter = median(1); stale_after = 3s; recover_after = 1 samples; }
+  let high = case detected { ok(value) => value > 0; fault(_) => false; };
+  state was_high: Bool = false;
+  state count: Int = 0;
+  was_high' = high;
+  count' = if high && !was_high then count + 1 else count;
+  output total: Int;
+  total <- count';
+}`);
+  const definitionSha = sha256Hex(counter);
+  const source = doc(`import Counter from "./counter.ghost.md" revision "counter-r1" sha256 "${definitionSha}";
+control CounterPair {
+  sensor sensor_a: Number { sample = 1s; }
+  sensor sensor_b: Number { sample = 1s; }
+  output a, b: Int;
+  instance A: Counter;
+  instance B: Counter;
+  connect A.detected <- sensor_a;
+  connect B.detected <- sensor_b;
+  connect a <- A.total;
+  connect b <- B.total;
+}`);
+  const artifact = await compileSource(source, { filename: 'counter-pair.ghost.md',
+    sourceClosure: [{ filename: 'counter.ghost.md', revision: 'counter-r1', text: counter }] });
+  assert.deepEqual(artifact.sourceClosure.instances, [
+    { instance: 'A', filename: 'counter.ghost.md', definition: 'Counter' },
+    { instance: 'B', filename: 'counter.ghost.md', definition: 'Counter' },
+  ]);
+  assert.deepEqual(artifact.sourceClosure.documents, [{ filename: 'counter.ghost.md', revision: 'counter-r1', text: counter, sha256: definitionSha }]);
+  assert.deepEqual(artifact.manifest.sensorInstances.map(({ instance, port, sourceSensor }) => ({ instance, port, sourceSensor })), [
+    { instance: 'A', port: 'detected', sourceSensor: 'sensor_a' },
+    { instance: 'B', port: 'detected', sourceSensor: 'sensor_b' },
+  ]);
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'reference-instance-isolation-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const modulePath = path.join(directory, 'counter.gfb'), tapePath = path.join(directory, 'frames.tsv');
+  writeArtifact(artifact, modulePath);
+  const map = JSON.parse(fs.readFileSync(`${modulePath}.map.json`, 'utf8'));
+  const restored = restoreArtifactSourceMap(map, artifact.bytes, { manifest: artifact.manifest });
+  assert.deepEqual(restored.sourceClosure, artifact.sourceClosure);
+  const wasm = fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
+  const runtime = await ControlRuntime.instantiateFramed(wasm, artifact);
+  t.after(() => runtime.dispose());
+  const frames = [], outcomes = [], dispatch = runtime.runtime.dispatch.bind(runtime.runtime);
+  runtime.runtime.dispatch = frame => {
+    frames.push(structuredClone(frame)); dispatch(frame); outcomes.push(structuredClone(runtime.runtime.outcome));
+  };
+  // Exactly one rising edge on A; holding and falling must not count again.
+  for (const [index, value] of [0, 1, 1, 0].entries()) {
+    const nowMs = index * 1000;
+    const sample = value => ({ epoch: 1, id: index + 1, timestampMs: nowMs, quality: 'Good', value });
+    runtime.step({ nowMs, samples: { sensor_a: sample(value), sensor_b: sample(0) } });
+  }
+  fs.writeFileSync(tapePath, frames.map(frame => [frame.scanId, frame.logicalTimeMs,
+    ...frame.inputs.flatMap(input => [input.name, input.type === 'Bool' ? 'b' : 'n', input.value])].join('\t')).join('\n') + '\n');
+  const runNative = () => {
+    const result = spawnSync(nativePath, [modulePath, tapePath], { encoding: 'utf8', timeout: 10_000 });
+    assert.equal(result.status, 0, result.error?.message ?? result.stderr);
+    const rows = result.stdout.trim().split('\n').map(JSON.parse);
+    assert.ok(rows.every(row => row.accepted));
+    return rows.map(row => row.outcome);
+  };
+  const native = runNative();
+  assert.deepEqual(native, outcomes);
+  assert.deepEqual(runNative(), native);
+  const replay = await FramedGhostFlowRuntime.instantiate(wasm);
+  t.after(() => replay.dispose());
+  replay.load(artifact.bytes);
+  for (const output of artifact.manifest.outputs) replay.addCapability('actuator', output.name, 'int');
+  for (const sensor of [...artifact.manifest.sensors, ...artifact.manifest.sensorInstances]) replay.addCapability('sensor', sensor.name, 'number');
+  replay.activate();
+  assert.deepEqual(frames.map(frame => structuredClone(replay.scan(frame))), outcomes);
+  for (const traces of [native, outcomes]) {
+    assert.deepEqual(traces.map(outcome => outcome.trace.safe), [{ a: 0, b: 0 }, { a: 1, b: 0 }, { a: 1, b: 0 }, { a: 1, b: 0 }]);
+    const countBindings = ['A', 'B'].map(instance => {
+      const binding = restored.traceMetadata.bindings.find(binding => binding.kind === 'state' && binding.name.endsWith('_count')
+        && restored.sourceMap.find(node => node.id === binding.nodeId)?.instance === instance);
+      assert.ok(binding, `${instance} has an observable private counter`);
+      return binding;
+    });
+    const nodes = countBindings.map(binding => restored.sourceMap.find(node => node.id === binding.nodeId));
+    assert.notEqual(nodes[0].id, nodes[1].id);
+    assert.equal(nodes[0].definitionNodeId, nodes[1].definitionNodeId);
+    assert.deepEqual(nodes.map(node => node.filename), ['counter.ghost.md', 'counter.ghost.md']);
+    assert.deepEqual(nodes.map(node => node.instance), ['A', 'B']);
+    assert.deepEqual(traces.map(outcome => countBindings.map(binding => {
+      const observed = observeSourceTrace(restored.traceMetadata, outcome.trace).bindings.find(item => item.nodeId === binding.nodeId);
+      assert.equal(observed.source.filename, 'counter.ghost.md');
+      return observed.observations.find(item => item.field === 'stateAfter').value;
+    })), [[0, 0], [1, 0], [1, 0], [1, 0]]);
+  }
+  const wrongInstance = structuredClone(map);
+  wrongInstance.nodes.find(node => node.kind === 'state' && node.instance === 'A').instance = 'B';
+  assert.throws(() => restoreArtifactSourceMap(wrongInstance, artifact.bytes), /sourceMap.*canonical source/);
+  const wrongBinding = structuredClone(artifact.manifest);
+  wrongBinding.sensorInstances.find(sensor => sensor.instance === 'B').sourceSensor = 'sensor_a';
+  assert.throws(() => restoreArtifactSourceMap(map, artifact.bytes, { manifest: wrongBinding }), /manifest.*canonical source/);
+});
 
 test('public compiler executes pinned Relay connections with exact source closure', async () => {
   const source = root('instance east: Relay; connect east.start <- start; connect pump <- east.pump;');
@@ -186,7 +290,7 @@ test('composed conditioned frames have identical native and WASM VM outcomes', a
  fs.writeFileSync(modulePath, artifact.bytes);
  fs.writeFileSync(inputPath, frames.map(f => [f.scanId, f.logicalTimeMs,
   ...f.inputs.flatMap(i => [i.name, i.type === 'Bool' ? 'b' : 'n', i.value])].join('\t')).join('\n') + '\n');
- const result = spawnSync(new URL('../target/release/examples/scan_tape', import.meta.url).pathname, [modulePath, inputPath], { encoding: 'utf8', timeout: 10_000 });
+ const result = spawnSync(nativePath, [modulePath, inputPath], { encoding: 'utf8', timeout: 10_000 });
  assert.equal(result.status, 0, result.error?.message ?? result.stderr);
  const nativeRows = result.stdout.trim().split('\n').map(JSON.parse);
  assert.ok(nativeRows.every(row => row.accepted));
