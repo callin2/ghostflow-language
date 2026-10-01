@@ -610,6 +610,7 @@ export async function verifyPortablePackage(packageValue, options = {}) {
       if (Object.hasOwn(manifest, key)) manifestKeys.push(key);
     }
   }
+  if (Object.hasOwn(manifest,'adaptPolicy') || Object.hasOwn(manifest,'strategies')) manifestKeys.push('adaptPolicy','strategies');
   exactObject(manifest, manifestKeys, 'manifest');
   if (manifest.format !== packageValue.payload.manifest.format) fail('manifest-mismatch', 'manifest format does not match descriptor');
   if (packageValue.payload.bytecode.version === '4' && manifest.format !== 'GhostFlow/control-v4') fail('manifest-mismatch', 'GFB format 4 requires a control-v4 manifest');
@@ -745,6 +746,11 @@ export async function verifyPortablePackage(packageValue, options = {}) {
   } else try {
     const extraction = extractLiterate(sourceText, { filename: mappedDocument.filename });
     const replay = compileControl(extraction.code, { filename: mappedDocument.filename });
+    if (Object.hasOwn(manifest,'adaptPolicy') || Object.hasOwn(replay.manifest,'adaptPolicy')) {
+      if (canonicalJson(manifest.adaptPolicy ?? null) !== canonicalJson(replay.manifest.adaptPolicy ?? null)
+        || canonicalJson(manifest.strategies ?? null) !== canonicalJson(replay.manifest.strategies ?? null)
+        || !equalBytes(artifacts.bytecode,replay.bytes)) throw new Error('adaptive strategy projection does not match canonical source and bytecode');
+    }
     if (!equalBytes(replay.bytes, artifacts.bytecode)) throw new Error('canonical source does not reproduce package bytecode');
     if (packageValue.payload.bytecode.version === '11'
         && canonicalJson(manifest.configs) !== canonicalJson(replay.manifest.configs)) {

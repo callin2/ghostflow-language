@@ -654,6 +654,22 @@ impl Module {
             )
     }
 
+    /// Immutable strategy projection used by package metadata binding checks.
+    pub fn strategy_bindings(&self) -> impl Iterator<Item = (&str, i32, &[u8], Vec<&str>)> {
+        self.strategies.iter().map(|strategy| {
+            (
+                strategy.name.as_str(),
+                strategy.priority,
+                strategy.query.as_slice(),
+                strategy
+                    .intents
+                    .iter()
+                    .map(|intent| intent.name.as_str())
+                    .collect(),
+            )
+        })
+    }
+
     pub fn objective_requirements(&self) -> Option<&objective_vm::ObjectiveDescriptor> {
         self.objective.as_ref()
     }

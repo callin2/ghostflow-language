@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### 2026-10-01 — portable adaptive strategy metadata
+
+Portable packages now accept compiler-produced paired adaptation descriptors.
+Canonical source replay and native decoded strategy/query bindings reject
+re-signed descriptor or bytecode changes. Optional Bool feedback preserves the
+absent baseline and explicit present strategy in native/WASM execution. GFB,
+wire formats, ABI and signature policy are unchanged. See
+[Portable package](docs/PORTABLE-PACKAGE.md#adaptive-strategy-descriptors).
+
+
 ### 2026-09-30 ? checked duplicate constraint replacement ([#31](https://github.com/callin2/ghostflow-language/issues/31))
 
 Compilation can merge adjacent identical ordered Bool output constraints after

@@ -1778,6 +1778,166 @@ fn verify_gfb10_periodic_bindings(manifest: &Value, bytecode: &[u8]) -> Result<(
     Ok(())
 }
 
+fn verify_adapt_bindings(manifest: &Value, bytecode: &[u8]) -> Result<()> {
+    let Some(policy) = manifest.get("adaptPolicy") else {
+        let module =
+            ghostflow_core::Module::load(bytecode).map_err(|error| PortablePackageError {
+                code: ErrorCode::ManifestMismatch,
+                message: error.to_string(),
+            })?;
+        if module
+            .strategy_bindings()
+            .any(|(name, _, _, _)| name != "control")
+            || module.strategy_bindings().count() != 1
+        {
+            return fail(
+                ErrorCode::ManifestMismatch,
+                "adaptive bytecode requires paired strategy descriptors",
+            );
+        }
+        return Ok(());
+    };
+    let policy = value_object(policy, "manifest.adaptPolicy")?;
+    exact_keys(
+        policy,
+        &["name", "selection"],
+        "manifest.adaptPolicy",
+        ErrorCode::ManifestMismatch,
+    )?;
+    require_ghost_name(
+        policy["name"].as_str().unwrap_or(""),
+        "manifest.adaptPolicy.name",
+    )?;
+    if policy["selection"].as_str() != Some("highest-priority-unique") {
+        return fail(
+            ErrorCode::ManifestMismatch,
+            "unsupported adaptive selection",
+        );
+    }
+    let descriptors = manifest["strategies"]
+        .as_array()
+        .ok_or_else(|| PortablePackageError {
+            code: ErrorCode::ManifestMismatch,
+            message: "adaptive strategies must be an array".into(),
+        })?;
+    let module = ghostflow_core::Module::load(bytecode).map_err(|error| PortablePackageError {
+        code: ErrorCode::ManifestMismatch,
+        message: error.to_string(),
+    })?;
+    let bindings: Vec<_> = module.strategy_bindings().collect();
+    if descriptors.is_empty() || descriptors.len() != bindings.len() {
+        return fail(
+            ErrorCode::ManifestMismatch,
+            "adaptive strategy count does not match bytecode",
+        );
+    }
+    fn capability(query: &mut Vec<u8>, kind: &str, name: &str, ty: &str) -> Result<()> {
+        require_ghost_name(name, "adaptive capability name")?;
+        query.push(1);
+        for text in [kind, name] {
+            query.extend((text.len() as u16).to_le_bytes());
+            query.extend(text.as_bytes());
+        }
+        query.push(
+            match manifest_capability_type(ty, "adaptive capability type")? {
+                "bool" => 1,
+                "int" => 3,
+                _ => 2,
+            },
+        );
+        Ok(())
+    }
+    for (descriptor, (name, priority, actual_query, outputs)) in descriptors.iter().zip(bindings) {
+        let descriptor = value_object(descriptor, "adaptive strategy")?;
+        exact_keys(
+            descriptor,
+            &["name", "priority", "match", "outputNames"],
+            "adaptive strategy",
+            ErrorCode::ManifestMismatch,
+        )?;
+        let expected_outputs: Vec<Value> = outputs
+            .iter()
+            .map(|name| Value::String((*name).into()))
+            .collect();
+        if descriptor["name"].as_str() != Some(name)
+            || descriptor["priority"].as_i64() != Some(i64::from(priority))
+            || descriptor["outputNames"].as_array() != Some(&expected_outputs)
+        {
+            return fail(
+                ErrorCode::ManifestMismatch,
+                "adaptive strategy descriptor does not match bytecode",
+            );
+        }
+        let mut query = Vec::new();
+        let mut count = 0u16;
+        for output in manifest["outputs"].as_array().unwrap() {
+            capability(
+                &mut query,
+                "actuator",
+                output["name"].as_str().unwrap_or(""),
+                output["type"].as_str().unwrap_or(""),
+            )?;
+            count += 1;
+        }
+        if descriptor["match"].as_str() != Some("always") {
+            let matches = descriptor["match"]
+                .as_array()
+                .ok_or_else(|| PortablePackageError {
+                    code: ErrorCode::ManifestMismatch,
+                    message: "adaptive match must be always or capabilities".into(),
+                })?;
+            if matches.is_empty() || matches.len() > 128 {
+                return fail(ErrorCode::ManifestMismatch, "adaptive match count invalid");
+            }
+            let mut seen = HashSet::new();
+            for matched in matches {
+                let matched = value_object(matched, "adaptive match")?;
+                exact_keys(
+                    matched,
+                    &["role", "kind", "type"],
+                    "adaptive match",
+                    ErrorCode::ManifestMismatch,
+                )?;
+                let kind = matched["kind"].as_str().unwrap_or("");
+                let role = matched["role"].as_str().unwrap_or("");
+                let ty = matched["type"].as_str().unwrap_or("");
+                let field = match kind {
+                    "sensor" => "sensors",
+                    "actuator" => "outputs",
+                    _ => {
+                        return fail(
+                            ErrorCode::ManifestMismatch,
+                            "unsupported adaptive match kind",
+                        )
+                    }
+                };
+                if !seen.insert((kind, role))
+                    || !manifest[field].as_array().unwrap().iter().any(|declared| {
+                        declared["name"].as_str() == Some(role)
+                            && declared["type"].as_str() == Some(ty)
+                    })
+                {
+                    return fail(
+                        ErrorCode::ManifestMismatch,
+                        "adaptive match is not a declared typed capability",
+                    );
+                }
+                capability(&mut query, kind, role, ty)?;
+                count += 1;
+            }
+        }
+        query.push(2);
+        query.extend(count.to_le_bytes());
+        if query != actual_query {
+            return fail(
+                ErrorCode::ManifestMismatch,
+                "adaptive capability query does not match bytecode",
+            );
+        }
+    }
+    Ok(())
+}
+
 fn verify_manifest(
     manifest: &Value,
     descriptor_format: &str,
@@ -1785,23 +1945,22 @@ fn verify_manifest(
     identity: &[Capability],
 ) -> Result<()> {
     let object = value_object(manifest, "manifest")?;
-    exact_keys(
-        object,
-        &[
-            "format",
-            "name",
-            "inputs",
-            "outputs",
-            "sensors",
-            "schedules",
-            "timers",
-            "signals",
-            "configs",
-            "bytecodeSha256",
-        ],
-        "manifest",
-        ErrorCode::ManifestMismatch,
-    )?;
+    let mut keys = vec![
+        "format",
+        "name",
+        "inputs",
+        "outputs",
+        "sensors",
+        "schedules",
+        "timers",
+        "signals",
+        "configs",
+        "bytecodeSha256",
+    ];
+    if object.contains_key("adaptPolicy") || object.contains_key("strategies") {
+        keys.extend(["adaptPolicy", "strategies"]);
+    }
+    exact_keys(object, &keys, "manifest", ErrorCode::ManifestMismatch)?;
     let format = object["format"]
         .as_str()
         .ok_or_else(|| PortablePackageError {
@@ -2480,6 +2639,7 @@ pub fn verify_portable_package_with_signature_policy(
         &bytecode_sha256,
         &identity.required_capabilities,
     )?;
+    verify_adapt_bindings(&manifest, &bytecode)?;
     verify_debounce_bindings(&manifest, &bytecode)?;
     if bytecode_version == 10 {
         verify_gfb10_periodic_bindings(&manifest, &bytecode)?;
@@ -2746,6 +2906,98 @@ mod tests {
             expected_binding_revision: "virtual-two-output-v1",
             target_loader: loader,
             limits: VerifierLimits::default(),
+        }
+    }
+
+    #[test]
+    fn signed_adaptive_bool_package_binds_strategy_queries_and_rejects_resigned_tampering() {
+        let accept =
+            |bytes: &[u8], _: &TargetLoaderContext<'_>| -> std::result::Result<bool, String> {
+                ghostflow_core::Module::load(bytes)
+                    .map(|_| true)
+                    .map_err(|error| error.to_string())
+            };
+        let mut current = profile(&accept);
+        let capabilities = vec![Capability {
+            kind: "actuator".into(),
+            name: "pump".into(),
+            value_type: "bool".into(),
+        }];
+        current.available_capabilities = &capabilities;
+        let verified = verify_portable_package(&fixture_for("adapt-valid"), &current).unwrap();
+        assert_eq!(
+            verified.manifest["sensors"][0]["optional"],
+            Value::Bool(true)
+        );
+        assert_eq!(verified.manifest["strategies"].as_array().unwrap().len(), 2);
+        for present in [false, true] {
+            let mut runtime = ghostflow_core::Runtime::new(4);
+            runtime.install(
+                ghostflow_core::Module::load(&verified.bytecode_copy()).unwrap(),
+                false,
+            );
+            runtime
+                .add_capability(ghostflow_core::Capability::new(
+                    "actuator",
+                    "pump",
+                    ghostflow_core::Type::Bool,
+                ))
+                .unwrap();
+            if present {
+                runtime
+                    .add_capability(ghostflow_core::Capability::new(
+                        "sensor",
+                        "door",
+                        ghostflow_core::Type::Bool,
+                    ))
+                    .unwrap();
+            }
+            runtime.activate().unwrap();
+            let sensor = &verified.manifest["sensors"][0];
+            runtime
+                .set_input(
+                    sensor["valueInput"].as_str().unwrap(),
+                    ghostflow_core::Value::Bool(true),
+                )
+                .unwrap();
+            runtime
+                .set_input(
+                    sensor["okInput"].as_str().unwrap(),
+                    ghostflow_core::Value::Bool(true),
+                )
+                .unwrap();
+            runtime
+                .set_input(
+                    sensor["faultInput"].as_str().unwrap(),
+                    ghostflow_core::Value::Number(0.0),
+                )
+                .unwrap();
+            assert_eq!(
+                runtime.tick().unwrap().safe_intents["pump"],
+                ghostflow_core::Value::Bool(present)
+            );
+        }
+        let reject = |_: &[u8], _: &TargetLoaderContext<'_>| -> std::result::Result<bool, String> {
+            panic!("forged metadata must reject before loader")
+        };
+        current.target_loader = &reject;
+        for scenario in [
+            "adapt-priority",
+            "adapt-name",
+            "adapt-match",
+            "adapt-output",
+            "adapt-policy",
+            "adapt-unpaired",
+            "adapt-missing",
+            "adapt-bytecode",
+        ] {
+            assert_eq!(
+                verify_portable_package(&fixture_for(scenario), &current)
+                    .unwrap_err()
+                    .code,
+                ErrorCode::ManifestMismatch,
+                "{scenario}"
+            );
         }
     }
 
