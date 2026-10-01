@@ -1182,10 +1182,11 @@ A provider supplies observations or predictions; the program decides what they p
 
 | Builtin | Signature and purpose | Context, boundaries and example |
 |---|---|---|
+| `calendar_is` | ``calendar_is(calendar, day`workday` or day`offday` or day`holiday`) -> Result<Bool,CalendarFault>`` | Typed WorkCalendar or HolidayCalendar with an explicit UTC binding in GFB18. Missing, outside-coverage, expired or untrusted-clock facts preserve a fault; handle it explicitly before negating the successful Bool. [Executed calendar boundaries](../tests/reference-calendar-boundary.test.mjs). |
 | `tide_is` | ``tide_is(provider, tide`spring` or tide`neap`) -> Result<Bool,TemporalContextFault>`` | Declared TidePredictions provider. Missing/stale prediction or clock context is a fault. [Natural conditions](../tests/natural-condition-contract.test.mjs). |
 | `moon_is` | ``moon_is(provider, moon`phase`) -> Result<Bool,TemporalContextFault>`` | LunarEphemeris provider; phases: new, waxing_crescent, first_quarter, waxing_gibbous, full, waning_gibbous, last_quarter, waning_crescent. [Natural conditions](../tests/natural-condition-contract.test.mjs). |
 
-The tagged literals in these signatures are notation fragments. Both calls require runtime/provider facts and cannot capture a global provider inside a pure fn.
+The tagged literals in these signatures are notation fragments. These calls require runtime/provider facts and cannot capture a global calendar or provider inside a pure fn.
 
 The following constructors are valid only in schedule fields. They do not return freely stored expression values. Durations here are positive constants.
 For example, `gap = skip_after(10min);` declares a gap policy. Tide's `basis = run(5min, within(10min));` allows admission within ten minutes, then runs for five minutes from admission.

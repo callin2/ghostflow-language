@@ -1187,10 +1187,11 @@ provider는 관측·예측을 공급한다. 프로그램은 무엇을 허용할�
 
 | 내장 이름 | 시그니처와 목적 | 문맥, 경계와 예제 |
 |---|---|---|
+| `calendar_is` | ``calendar_is(calendar, day`workday` or day`offday` or day`holiday`) -> Result<Bool,CalendarFault>`` | GFB18의 명시적 UTC binding을 쓰는 typed WorkCalendar 또는 HolidayCalendar. missing, coverage 밖, expiry, untrusted clock은 fault를 보존한다. 성공 Bool을 부정하기 전에 fault를 명시적으로 처리한다. [실행된 달력 경계](../tests/reference-calendar-boundary.test.mjs). |
 | `tide_is` | ``tide_is(provider, tide`spring` or tide`neap`) -> Result<Bool,TemporalContextFault>`` | 선언된 TidePredictions provider. 예측 누락·노후 또는 시계 문맥 실패는 fault. [자연 조건](../tests/natural-condition-contract.test.mjs). |
 | `moon_is` | ``moon_is(provider, moon`phase`) -> Result<Bool,TemporalContextFault>`` | LunarEphemeris provider; 위상: new, waxing_crescent, first_quarter, waxing_gibbous, full, waning_gibbous, last_quarter, waning_crescent. [자연 조건](../tests/natural-condition-contract.test.mjs). |
 
-시그니처 안의 tagged literal은 표기 단편이다. 두 호출 모두 런타임·provider 사실이 필요하다. pure fn에서 전역 provider를 캡처할 수 없다.
+시그니처 안의 tagged literal은 표기 단편이다. 이 호출들은 런타임·provider 사실이 필요하다. pure fn에서 전역 calendar나 provider를 캡처할 수 없다.
 
 다음 생성자는 schedule 필드에서만 쓴다. 일반 표현식 저장값을 반환하지 않는다. 여기의 Duration은 양수 상수다.
 예를 들어 `gap = skip_after(10min);`은 공백 정책이다. Tide의 `basis = run(5min, within(10min));`은 10분 안의 승인을 허용하고 승인부터 5분 운전한다.
