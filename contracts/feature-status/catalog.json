@@ -3687,6 +3687,39 @@
       "referenceCaseIds": ["REF-03-031"]
     },
     {
+      "id": "dailyslots-selected-crossing",
+      "family": "Selected DailySlots first-crossing pulse",
+      "clause": {
+        "path": "docs/reference/03-time-and-schedules.md",
+        "heading": "3.6 선택된 DailySlots"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/context-wasm-boundaries.test.mjs",
+              "testId": "REF-03-035: selected 06:00 and 18:45 slots pulse on the first crossing tick, not the next tick or other quarter-hours, in native and WASM",
+              "caseId": "REF-03-035",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "negative", "boundary"]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Civil occurrence rows and clock evidence are supplied at the host boundary; this verifies shared native/WASM execution, not a timezone database, physical clock, storage-medium durability or Window/Run policy. Baseline-only checkpoint suppression across a new boot is not claimed."
+      ],
+      "issues": [221],
+      "referenceCaseIds": ["REF-03-035"]
+    },
+    {
       "id": "product-boundary",
       "family": "Farmer UI, installation and deployment",
       "clause": {

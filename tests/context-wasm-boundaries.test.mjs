@@ -171,6 +171,86 @@ test('REF-03-031: 06:10 boot and clock recovery do not catch up the 06:00 slot a
   assert.throws(() => native(steps, { profile: 'context-periodic-v1' }), /invalid or oversized context array|occurrence rows/);
 });
 
+test('REF-03-035: selected 06:00 and 18:45 slots pulse on the first crossing tick, not the next tick or other quarter-hours, in native and WASM', async t => {
+  const compiled = await artifact('REF-03-057');
+  const morning = Date.UTC(2026, 8, 24, 21); // 2026-09-25 06:00 Asia/Seoul
+  const evening = morning + (12 * 60 + 45) * 60_000;
+  const site = compiled.manifest.schedules[0].site;
+  const activation = { bootEpoch: 7, terminalCapacity: 8, bindings: [] };
+  const occurrences = [
+    { slotKey: 1, minuteOfDay: 360, instantMs: morning },
+    { slotKey: 2, minuteOfDay: 1125, instantMs: evening },
+  ].map(row => ({ ...row, sourceDay: Date.UTC(2026, 8, 25) / 86_400_000,
+    fold: 0, eventId: '', eventKind: 'civil', withdrawn: false,
+    providerRevision: 'iana-2026-r4', contextRevision: 'seoul-context-r9' }));
+  const packets = walls => walls.map((wallMs, index) => ({ nowMs: index * 1_000, contextFacts: {
+    clock: clock(index * 1_000, wallMs), natural: [], settings: null,
+    schedules: [{ site, coverageStartMs: morning - 120_000, coverageEndMs: evening + 60_000,
+      provider: null, calendar: null, rows: occurrences }],
+  } }));
+  execFileSync('cargo', ['build', '--locked', '--offline', '--release', '-p', 'ghostflow-core', '--example', 'context_tape'],
+    { cwd: root, stdio: 'inherit' });
+  const directory = mkdtempSync(join(tmpdir(), 'reference-selected-slots-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const modulePath = join(directory, 'slots.gfb'), tapePath = join(directory, 'tape.json');
+  writeFileSync(modulePath, compiled.bytes);
+  const execute = async steps => {
+    const runtime = await ControlRuntime.instantiateFramed(wasmBytes, compiled, { context: activation });
+    try {
+      return steps.map(step => ({ trace: runtime.step(step).vm,
+        checkpoint: Buffer.from(runtime.contextSnapshot().bytes).toString('hex') }));
+    } finally { runtime.dispose(); }
+  };
+  const native = steps => {
+    writeFileSync(tapePath, JSON.stringify({ profile: 'context-civil-v1', activation,
+      steps: steps.map((step, scanId) => ({ scanId, logicalTimeMs: step.nowMs, inputs: [], ...step.contextFacts })) }));
+    return execFileSync(resolve(root, 'target/release/examples/context_tape' + (process.platform === 'win32' ? '.exe' : '')),
+      [modulePath, tapePath], { encoding: 'utf8', timeout: 10_000 }).trim().split('\n').map(JSON.parse);
+  };
+  const compare = async steps => {
+    const rows = await execute(steps), records = native(steps);
+    assert.ok(records.every(record => record.accepted));
+    assert.deepEqual(records.map(record => ({ trace: record.outcome.trace, checkpoint: record.checkpoint })), rows);
+    assert.deepEqual(await execute(steps), rows);
+    assert.deepEqual(native(steps), records);
+    return rows;
+  };
+  // Observe every intervening minute so a gap skip cannot conceal a spurious
+  // 06:15 or 06:30 grid pulse. The unchanged source's maximum gap is 60 seconds.
+  const walls = [morning - 10_000, morning + 5_000, morning + 10_000];
+  for (let minute = 1; minute <= 30; minute++) walls.push(morning + minute * 60_000);
+  const rows = await compare(packets(walls));
+  assert.deepEqual(rows.map(row => row.trace.requested.due), walls.map((_, index) => index === 1));
+  assert.deepEqual(rows.map(row => row.trace.safe.due), walls.map((_, index) => index === 1));
+  const due = rows[1].trace.contextTrace.find(row => row.site === site && row.decision === 'Due');
+  assert.ok(due);
+  assert.equal(due.plannedWallMs, morning);
+  assert.equal(due.providerRevision, 'iana-2026-r4');
+  assert.equal(due.contextRevision, 'seoul-context-r9');
+  for (const [index, row] of rows.entries()) {
+    if (index !== 1) assert.deepEqual((row.trace.contextTrace ?? []).filter(entry => entry.site === site), []);
+  }
+  const eveningRows = await compare(packets([evening - 10_000, evening + 5_000, evening + 10_000]));
+  assert.deepEqual(eveningRows.map(row => row.trace.safe.due), [false, true, false]);
+  assert.equal(eveningRows[1].trace.contextTrace.find(row => row.decision === 'Due').plannedWallMs, evening);
+  const rollback = await compare(packets([morning - 10_000, morning + 5_000, morning - 10_000, morning + 5_000]));
+  assert.deepEqual(rollback.map(row => row.trace.safe.due), [false, true, false, false]);
+  const boot = await compare(packets([morning + 5_000, morning + 10_000]));
+  assert.deepEqual(boot.map(row => row.trace.safe.due), [false, false]);
+  const gap = await compare(packets([morning - 61_000, morning + 5_000, morning + 10_000]));
+  assert.deepEqual(gap.map(row => row.trace.safe.due), [false, false, false]);
+  const recoveryPackets = packets([morning - 10_000, morning, morning + 5_000, morning + 10_000]);
+  Object.assign(recoveryPackets[1].contextFacts.clock,
+    { trusted: false, wallMs: null, unknownReason: 'TrustExpired' });
+  const recovery = await compare(recoveryPackets);
+  assert.deepEqual(recovery.map(row => row.trace.safe.due), [false, false, false, false]);
+  assert.deepEqual((recovery[1].trace.contextTrace ?? []).filter(row => row.site === site), [],
+    'an untrusted clock admits no occurrence');
+  const spoofed = packets(walls); spoofed[1].contextFacts.schedules[0].due = true;
+  await assert.rejects(execute(spoofed), /unknown field|unexpected|due/i);
+  assert.throws(() => native(spoofed), /unexpected context evidence field/);
+});
+
 test('ControlRuntime context checkpoint restores occurrence dedupe and rejects corrupt bytes', async t => {
   const compiled = await artifact('REF-03-036');
   const profile = { context: { bootEpoch: 7, terminalCapacity: 8, bindings: [] } };
