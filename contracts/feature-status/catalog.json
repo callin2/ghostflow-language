@@ -2923,13 +2923,27 @@
               "assertionClass": "compile-policy"
             }
           ]
+        },
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/composition-execution.test.mjs",
+              "testId": "REF-00-010: one sensor edge changes only instance A and retains definition and binding provenance on native and WASM",
+              "caseId": "REF-00-010",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "negative", "boundary"]
+            }
+          ]
         }
       ],
       "gaps": [
-        "Verified imported port contracts are not yet activated for composition runtime."
+        "Executable evidence covers pinned counter instances with distinct sensor suppliers, isolated state and verified definition/instance/binding provenance; imported intent metadata and broader composition cases remain separate contracts."
       ],
-      "issues": [],
-      "referenceCaseIds": []
+      "issues": [195],
+      "referenceCaseIds": ["REF-00-010"]
     },
     {
       "id": "macro-composition",
