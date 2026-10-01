@@ -3485,6 +3485,52 @@
       ]
     },
     {
+      "id": "typed-value-consumer-boundaries",
+      "family": "Typed value identity across language-owned consumer boundaries",
+      "clause": {
+        "path": "docs/reference/02-types-expressions-state.md",
+        "heading": "2.1 값 종류"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/interaction-runtime-snapshot.test.mjs",
+              "testId": "REF-01-055 rejects implicit interchange of Percent, Number, Duration and TimeOfDay",
+              "caseId": "REF-01-055",
+              "assertionClass": "type-boundary",
+              "polarities": ["negative", "boundary"]
+            }
+          ]
+        },
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/interaction-runtime-snapshot.test.mjs",
+              "testId": "REF-01-055 typed values retain identity through verified portable handoff, Interaction Schema and native/WASM execution",
+              "caseId": "REF-01-055",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "boundary"]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Evidence covers compiler types, read-only Interaction Schema, signed portable artifact handoff and virtual binding-revision admission; downstream device execution and physical effects are not claimed."
+      ],
+      "issues": [197],
+      "referenceCaseIds": ["REF-01-055"]
+    },
+    {
       "id": "product-boundary",
       "family": "Farmer UI, installation and deployment",
       "clause": {
