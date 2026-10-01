@@ -5,8 +5,8 @@
       "source": "examples/bound-resource-execution.ghost.md",
       "sourceLanguage": "en",
       "translation": "examples/bound-resource-execution.ghost.ko.md",
-      "sourceSha256": "8fe1a1949917ca510bf2ec4c833add88698f20bc7037530bdda54d7cf229125e",
-      "translationSha256": "741f4ee67b30a75bbe4d2f9178f5d30b220007c34a2f50fe62509a7aaf3cf50a"
+      "sourceSha256": "d2b2f20b0e00cb60ba40c434de9d54ef57d33310cd8967dfcb0dca7be2664ef0",
+      "translationSha256": "93854bf155a93bd353b6768378b27e374c1176cc10b8c19f94645f921ede2299"
     },
     {
       "source": "examples/shared-constraint-contract.ghost.md",
@@ -586,8 +586,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "8ea332fac28b0d7b279f57f8a6698c3ee97e48394a552361a301a78eeecc45c9",
-      "translationSha256": "dfd0271acd64a32f445279afb3ccc0a43b3bce5630ce42a363314b31d6de7f5d"
+      "sourceSha256": "f47e38c8b648604186f91e0ce99bc3c800309f9c527328cd755d2562a6c38dc7",
+      "translationSha256": "48c38d232f6df225e4f14fc8d4f3cd2a2c5e65b74a91a13a12d2f5837ac66466"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",

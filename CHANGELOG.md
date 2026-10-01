@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+### 2026-10-01 — browser bound-resource modules ([#158](https://github.com/callin2/ghostflow-language/issues/158))
+
+The public browser compiler now exports bound-resource compilation, verification,
+and trace observation. The runtime is portable at
+`runtimes/wasm/bound-resource-control.mjs`; the current Node import reexports the
+same implementation and writer registry. The finite GFB17 policy and Rust
+execution semantics are unchanged. Writer reservations include asynchronous
+creation within one realm. Cross-Worker installations require a shared host
+registry and this API provides no physical guarantee.
+
+Checked resource descriptors can now emit an interaction schema with an explicit
+document/revision identity. Binding regenerates its module identity against the
+executable bytes; verification rejects forged schema metadata. The existing
+canonical mapping, runtime parity and mismatch checks remain, with browser graph,
+pending-writer and disposal/reinstantiation tests in
+`tests/browser-toolchain.test.mjs` and `tests/bound-resource-control.test.mjs`.
+
 ### 2026-10-01 — bound finite resource enforcement ([#158](https://github.com/callin2/ghostflow-language/issues/158))
 
 Reference §4.8 now distinguishes source checking from executable resource binding.

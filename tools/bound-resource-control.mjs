@@ -1,9 +1,10 @@
 import { compileSourceSync } from './compile-source.mjs';
 import { compileBoundControlPolicyArtifact } from './control.mjs';
 import { extractLiterate } from './literate.mjs';
-import { moduleFingerprint } from './source-trace.mjs';
+import { moduleFingerprint, remapSourceTrace } from './source-trace.mjs';
 import { sha256Hex } from './sha256.mjs';
 import { canonicalJson } from './canonical-json.mjs';
+import { emitInteractionSchema } from './interaction-schema.mjs';
 import { validateResourceConstraintBinding } from '../runtimes/node/resource-constraints-binding.mjs';
 
 const fail = message => { throw new Error(`bound resource control: ${message}`); };
@@ -60,7 +61,8 @@ export function compileBoundResourceControl(compilation, installationBinding) {
     modes: [...verified.modes].sort((a, b) => compare(`${a.group}/${a.name}`, `${b.group}/${b.name}`)) };
   const bindingSha256 = sha256Hex(canonicalJson(binding));
   const source = compilation.sourceDocument;
-  const descriptor = compileSourceSync(source.text, { filename: source.filename });
+  const descriptor = compileSourceSync(source.text, { filename: source.filename,
+    ...(compilation.interactionSourceIdentity ? { interactionSourceIdentity: compilation.interactionSourceIdentity } : {}) });
   const control = descriptor.manifest.control;
   const resources = new Map(binding.resources.map(resource => [resource.name, resource]));
   const declarations = new Map(control.resources.map(resource => [resource.name, resource.type]));
@@ -129,12 +131,15 @@ export function compileBoundResourceControl(compilation, installationBinding) {
   const bytecodeSha256 = sha256Hex(compiled.bytes);
   const evidence = { sourceDocumentSha256: source.sha256, descriptorSha256: sha256Hex(descriptor.bytes),
     bindingSha256, bindingRevision: binding.revision };
-  return { ...descriptor, bytes: compiled.bytes,
+  const result = { ...descriptor, bytes: compiled.bytes,
     manifest: { ...control, format: 'GhostFlow/control-v17', executable: true, bytecodeSha256,
       requiredRuntimeContracts: ['bound-resource-activation', 'bound-resource-every-scan', 'one-registry-for-all-writers'],
       resourceBinding: binding, ...evidence },
-    traceMetadata: { ...descriptor.traceMetadata, moduleFingerprint: moduleFingerprint(compiled.bytes), bytecodeSha256, ...evidence },
+    traceMetadata: { ...remapSourceTrace(compiled.traceMetadata, extraction.sourceMap), ...descriptor.traceMetadata,
+      moduleFingerprint: moduleFingerprint(compiled.bytes), bytecodeSha256, ...evidence },
     resourceBindingActivation: activationBytes, resourceBindingScan: scan.finish() };
+  return { ...result, interactionSchema: descriptor.interactionSourceIdentity
+    ? emitInteractionSchema(result, descriptor.interactionSourceIdentity) : null };
 }
 
 /** Reconstruct both executable bytes and source metadata before accepting a saved artifact. */
@@ -142,9 +147,11 @@ export function verifyBoundResourceCompilation(compilation) {
   if (compilation?.manifest?.format !== 'GhostFlow/control-v17') fail('expected an executable bound resource control');
   const source = compilation.sourceDocument;
   const { executable: _flag, ...binding } = compilation.manifest.resourceBinding;
-  const checked = compileBoundResourceControl(compileSourceSync(source.text, { filename: source.filename }), binding);
+  const checked = compileBoundResourceControl(compileSourceSync(source.text, { filename: source.filename,
+    ...(compilation.interactionSourceIdentity ? { interactionSourceIdentity: compilation.interactionSourceIdentity } : {}) }), binding);
   if (sha256Hex(compilation.bytes) !== checked.manifest.bytecodeSha256
-    || canonicalJson(compilation.manifest) !== canonicalJson(checked.manifest)) {
+    || canonicalJson(compilation.manifest) !== canonicalJson(checked.manifest)
+    || canonicalJson(compilation.interactionSchema ?? null) !== canonicalJson(checked.interactionSchema)) {
     fail('artifact or source metadata differs from its canonical source and binding');
   }
   return checked;
