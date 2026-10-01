@@ -35,6 +35,11 @@ API를 명시적으로 선택합니다. 회계·import·Station 권고 검사·�
 회귀 증거는 실제 native/plain/framed WASM 및 참조 시뮬레이션, 바인딩 위조,
 입장, 모든 출력을 OFF로 만들지 않는 위반 응답, 복구, 작성자·우회 거부를 포함합니다.
 
+결정 trace로 현재 wasm32 framed replay 헤더가 프레임당 192바이트에서
+200바이트로 증가합니다(세 프레임은 24바이트 추가). planner는 실제 컴파일러
+레이아웃을 계산합니다. 기존 temporal 예산과 과거 보고서는 유지하므로,
+호출자는 최대 replay 예산에 이 헤더 비용을 포함해야 합니다.
+
 ### 2026-10-01 — control-owned 제약 그룹 정리 ([#157](https://github.com/callin2/ghostflow-language/issues/157))
 
 Reference §4.8에서 local 출력, 공유 자원, accounting 적용 범위를 구분합니다.

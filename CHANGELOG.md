@@ -34,6 +34,11 @@ physical Driver adoption or hardware confirmation. Complete bilingual example:
 native/plain/framed WASM and reference simulation, binding forgery, admission,
 non-OFF violation response, recovery and writer/bypass rejection.
 
+The decision trace increases the current wasm32 framed replay header from 192
+to 200 bytes per frame (24 additional bytes for three frames). The planner counts
+the actual compiler layout; existing temporal budgets and historical reports stay
+unchanged, so callers must allow this header overhead in their peak replay budget.
+
 ### 2026-10-01 — canonical control-owned constraint groups ([#157](https://github.com/callin2/ghostflow-language/issues/157))
 
 Reference §4.8 distinguishes local output, shared-resource and accounting scope.
