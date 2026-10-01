@@ -263,6 +263,69 @@ control FaultingProduct {
     && entry.target.name === 'result' && entry.reads.some(read => read.field === 'inputs' && read.name === 'divisor')));
 });
 
+test('REF-03-014: one phase transition, rejected stop rollback, and waiting safety agree on native and WASM', async () => {
+  const source = `control AtomicPhase {
+  input stop, advance, permit: Bool;
+  input divisor: Number;
+  sensor healthy: Bool;
+  let safe_healthy = case healthy { ok(value) => value; fault(_) => false; };
+  type Phase = Open | Middle | Final | Idle;
+  state phase: Phase = Open;
+  timer age = elapsed(phase);
+  phase' = case phase {
+    Open => if stop || !safe_healthy then Idle else if age >= 2s then Middle else Open;
+    Middle => if stop || !safe_healthy then Idle else if advance then Final else Middle;
+    Final => if stop || !safe_healthy then Idle else Final;
+    Idle => Idle;
+  };
+  output pump, allowed: Bool;
+  output quotient: Number;
+  pump <- phase' != Idle;
+  allowed <- permit;
+  quotient <- 1.0 / divisor;
+  require pump => allowed;
+}`;
+  const compiled = await compileSource(source, { filename: 'atomic-phase.ghost' });
+  const sensor = compiled.manifest.sensors.find(item => item.name === 'healthy');
+  const inputs = (stop, permit, good = true, divisor = 1) => [
+    { name: 'stop', value: stop }, { name: 'advance', value: true }, { name: 'permit', value: permit },
+    { name: sensor.valueInput, value: true }, { name: sensor.okInput, value: good },
+    { name: sensor.faultInput, value: 0 }, // SensorFault.Disconnected
+    { name: 'divisor', value: divisor },
+  ];
+  for (const interruptedBy of ['stop', 'fault']) {
+    const { artifact, native, wasm } = await compare(source, [
+      row(0, 100, inputs(false, true)),
+      row(1, 1100, inputs(false, false)),
+      row(2, 2100, inputs(false, true)),
+      row(3, 2200, inputs(true, false, false, 0)), // core arithmetic fault rolls back the attempted transition
+      row(3, 2150, inputs(interruptedBy === 'stop', false, interruptedBy !== 'fault')),
+    ], 'atomic-phase.ghost');
+    assert.deepEqual(artifact.bytes, compiled.bytes);
+    for (const outcomes of [native, wasm]) {
+      assert.deepEqual(outcomes.map(item => item.accepted), [true, true, true, false, true]);
+      assert.deepEqual(outcomes.map(item => item.outcome.trace.stateAfter.phase), [0, 0, 1, 1, 3]);
+      assert.deepEqual(outcomes[3].outcome, outcomes[2].outcome, 'rejected stop/fault cannot change phase, timer or outcome');
+      assert.match(outcomes[3].error, /division by zero/);
+      assert.deepEqual(outcomes[4].outcome.trace.stateBefore, outcomes[2].outcome.trace.stateAfter,
+        'accepted retry must observe every committed phase and internal timer state before the failed attempt');
+      assert.equal(outcomes[4].outcome.logicalTimeMs, 2150, 'rejected future timestamp must not advance the clock');
+      const ages = outcomes.map(item => observeRuntimeValues(artifact.traceMetadata, item.outcome.trace).values
+        .find(value => value.kind === 'timer' && value.name === 'age').value);
+      assert.deepEqual(ages, [0, 1000, 0, 0, 0]);
+      const waiting = outcomes[1].outcome.trace;
+      assert.deepEqual([waiting.requested.pump, waiting.safe.pump], [true, false]);
+      assert.deepEqual(waiting.safetyTrace.constraints[0].firstViolation.blocked, ['pump']);
+      assert.deepEqual([outcomes[4].outcome.trace.requested.pump, outcomes[4].outcome.trace.safe.pump,
+        outcomes[4].outcome.trace.requested.allowed], [false, false, false]);
+      if (interruptedBy === 'fault') {
+        assert.ok(observeSourceTrace(artifact.traceMetadata, outcomes[4].outcome.trace).resultEvents
+          .some(event => event.kind === 'case' && event.errorType === 'SensorFault' && event.fault === 'Disconnected'));
+      }
+    }
+  }
+});
+
 test('REF-03-017: independently enabled timers preserve separate starts and explicit sensor fault handling on native and WASM', async () => {
   const source = `control IndependentFaultTimers {
   input enabled_a, enabled_b: Bool;
