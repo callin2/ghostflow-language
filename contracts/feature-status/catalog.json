@@ -2252,6 +2252,14 @@
               "polarities": ["positive", "negative", "boundary"]
             },
             {
+              "path": "tests/scan-tape-parity.test.mjs",
+              "testId": "REF-04-003 one sensor retains four fault reasons and decision times through false recovery on native and plain/framed WASM",
+              "caseId": "REF-04-003",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "negative", "boundary"]
+            },
+            {
               "path": "tests/result-control.test.mjs",
               "testId": "REF-00-007 normal zero and fault fallback zero retain distinct result trace evidence",
               "caseId": "REF-00-007",
@@ -2273,8 +2281,8 @@
       "gaps": [
         "Outside the frozen source type set."
       ],
-      "issues": [198, 193, 199, 230],
-      "referenceCaseIds": ["REF-01-074", "REF-00-007", "REF-01-075", "REF-04-005"]
+      "issues": [198, 193, 199, 230, 229],
+      "referenceCaseIds": ["REF-01-074", "REF-00-007", "REF-01-075", "REF-04-005", "REF-04-003"]
     },
     {
       "id": "temporal-duration",
