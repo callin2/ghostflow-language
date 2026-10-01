@@ -710,6 +710,35 @@ control DirectionInterlock {
 첫 예제처럼 상태 전이와 재시작 조건까지 명시한다.
 비상정지는 이 소프트웨어 논리로 대체하지 않는다.
 
+### 지역 제약과 공유 자원 제약 묶기
+
+한 control의 Bool 출력 제약은 `constraints LocalRules { require pump => valve; }`처럼
+이름 있는 지역 묶음으로 적을 수 있다. `mutex`도 그 안에 둘 수 있다. 이름은 설명을
+찾기 쉽게 만들며, 제약의 범위를 다른 control이나 물리 장치 전체로 넓히지는 않는다.
+모든 필수 조건은 AND다. 우선순위로 조건을 건너뛸 수 없고 선택적 `check` 분석은
+별도의 비차단 advisory다.
+
+여러 요청 경로가 같은 논리 자원을 쓰면 `constraints SharedRules for station`으로
+공유 규칙을 선언한다. [완전한 공유 실행 예제](../examples/bound-resource-execution.ghost.ko.md)는
+자동·수동·fallback 요청을 같은 Rust guard로 검사한다. `compileSourceSync`의 결과는
+검사된 비실행 descriptor다. 정확한 source/artifact와 안정 resource ID, mode/input,
+output mapping을 `compileBoundResourceControl`에 명시 전달한 뒤 참조 host의
+실제 Rust/WASM scan 경로로 실행한다. 예제에는 전체 binding과 기록 입력이 있다.
+
+시작 전 위반은 새 admission을 거부한다. 기존 사용권과 충돌하는 새 claim은 기존
+admission과 이전 safe 출력을 유지하며 대기열에 숨겨 재시도하지 않는다. 실행 중
+위반의 예제 대응은 작성한 `pump1 = false; valve1 = true;`다. 안전을 항상 모든 출력
+OFF로 바꾸지 않는다. trip 뒤에는 영향을 받은 exclusive group의 모든 claim이
+neutral인 관측과 새 claim이 필요하다. require-only group은 requested 값이 작성 safe
+값과 같아진 관측 뒤 새 요청을 검사한다. 연결된 group은 같은 scan에서 함께 복구해야 한다.
+
+이 실행 범위는 모든 출력이 명시 보호된 Bool GFB1 v1/v3 control 하나다. 같은 설치의
+writer는 공유 registry를 사용하며 같은 안정 ID의 추가 활성 writer를 거부한다.
+context/PID, shared-policy import composition, 여러 VM의 협력 중재는 포함하지 않는다.
+결과는 논리 requested/safe 의도다. 실제 Driver 적용, 밸브 열림 확인이나 현장 설치를
+증명하지 않는다. 자세한 규칙과 단계는 [Reference §4.8](reference/04-sensors-constraints-control.md#48-공통-constraints-표기와-연산)과
+[제약 계약](CONSTRAINTS.md#공유-bool-실행)을 참조한다.
+
 **왜 두 방식으로 나누나요?** 운전 상태를 어떻게 바꿀지와 어떤 출력 조합을 허용할지는
 각각 명시해야 하는 제어 규칙이기 때문이다.
 

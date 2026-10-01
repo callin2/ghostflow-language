@@ -714,6 +714,42 @@ Output constraints also do not automatically reset state. If a new start is requ
 explicitly specify state transitions and restart conditions as in the first example.
 This software logic does not replace an emergency stop.
 
+### Grouping local and shared resource constraints
+
+A control's Bool output constraints can form a named local group such as
+`constraints LocalRules { require pump => valve; }`. `mutex` can appear in the
+group too. Its name helps readers find the explanation; it does not expand the
+scope to other controls or an entire physical installation. All mandatory
+conditions combine as AND. Priority cannot bypass them; optional `check`
+analysis remains a separate nonblocking advisory.
+
+When request paths share one logical resource, declare shared rules with
+`constraints SharedRules for station`. The [complete execution example](../examples/bound-resource-execution.ghost.md)
+checks automatic, manual and fallback requests through the same Rust guard.
+`compileSourceSync` produces a checked non-executable descriptor. Pass exact
+source/artifact identities, stable resource IDs, mode/input and output mappings
+explicitly to `compileBoundResourceControl`, then execute through the reference
+host's actual Rust/WASM scan path. The example supplies the complete binding and
+recorded inputs.
+
+A prestart violation denies new admission. A new claim conflicting with the
+incumbent preserves incumbent admission and previous safe outputs; it is not
+hidden in a retry queue. During execution, the example's authored response is
+`pump1 = false; valve1 = true;`, rather than a universal all-OFF rule. After a
+trip, affected exclusive groups need an all-claims-neutral observation and a
+fresh claim. Require-only groups observe requested values equal to authored
+safe values before checking a fresh request. Connected groups must recover
+together in the same scan.
+
+The executable subset is one Bool GFB1 v1/v3 control with every output explicitly
+protected. Writers in one installation share a registry that refuses additional
+active writers for the same stable ID. Context/PID, shared-policy import
+composition and cooperative multi-VM arbitration are outside this subset.
+Results are logical requested/safe intents, not evidence of Driver application,
+valve-open confirmation or field installation. See [Reference §4.8](reference/04-sensors-constraints-control.en.md#48-common-constraints-notation-and-operations)
+and [the constraint contract](CONSTRAINTS.en.md#shared-bool-execution) for rules
+and stages.
+
 **Why separate these two approaches?** How to change operating state and which output combinations to permit
 are control rules that must each be explicit.
 
