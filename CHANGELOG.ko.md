@@ -5,6 +5,18 @@
 
 ## 미출시
 
+### 2026-10-01 — accounting 전용 artifact profile ([#210](https://github.com/callin2/ghostflow-language/issues/210))
+
+실행 가능한 accounting source는 `on_time` account만 있고 context를 생성하는
+표현식이 없어도 `GhostFlow/control-v10`을 선택한다. 이전에는
+`account used = on_time(pump, stage: applied, persistence: durable);`가
+control-v1을 유지할 수 있어 기존 accounting metadata가 있어도 표준 source에
+바인딩하는 WASM ledger가 거부했다. 문서화된 binding 계약을 복구하며 syntax,
+GFB bytes, ledger ABI는 바꾸지 않는다. 다시 컴파일하면 profile이 수정된다.
+Reference §3.4는 그대로다. REF-03-020은 일정·불규칙 partition의 실제 native/WASM
+역사적 rolling 계산을 partial overlap과 snapshot replay까지 비교한다.
+제어 admission, 실시간 cutoff, 물리 receipt 검증은 이 수정의 범위 밖이다.
+
 ### 2026-10-01 — 공유 Solar/config 실행 ([#145](https://github.com/callin2/ghostflow-language/issues/145))
 
 이전에 compiler가 거부했던 Solar와 live typed configuration 합성을 이제 하나의

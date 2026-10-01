@@ -19,6 +19,15 @@ GhostFlow 제어에서 accounting 선언을 실행 가능하게 만드는 것은
 해당 바인딩에 속하는지도 검증해야 한다. 이 API는 제어 admission을 수행하거나
 예약을 정산하지 않는다.
 
+Accounting 전용 source는 context를 생성하는 표현식이 없어도 accounting
+control-v10 profile을 선택한다. REF-03-020은 같은 검증된 source binding을
+native Rust와 WASM ledger에서 실행한다. 동일한 ON/OFF 경계를 1초 및 반복되는
+7/13/9초 관측으로 나누고, 공통 logical time의 정확한 60초 rolling overlap이
+snapshot 복원 및 새 replay 이후에도 일치하는지 확인한다. Native 테스트 실행기는
+컴파일된 module과 host가 검증한 manifest를 읽으며 source를 독립적으로 컴파일하지
+않는다. 이는 호출자가 검증한 applied interval의 역사적 계산이며, 제어 admission,
+실시간 최대 ON cutoff 또는 물리 receipt 인증을 검증하지 않는다.
+
 ## 호출자가 제공하는 증거
 
 - 적용된 ON 기록은 이미 호출자가 안정적인 물리 리소스별로 검증하고 병합한 것이다. 각 구간에는 0이 아닌 receipt ID와 양수 단조 구간이 있다. receipt ID는 리소스 내에서 유일하다.

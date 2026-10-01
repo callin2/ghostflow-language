@@ -1533,7 +1533,7 @@ class Lowerer {
       delete this.manifest.accounts;
       delete this.manifest.accountingConstraints;
     }
-    if (contextForms.length) this.manifest.format = 'GhostFlow/control-v10';
+    if (contextForms.length || accountingExecution) this.manifest.format = 'GhostFlow/control-v10';
     else if (solarForms.some(form => form[0] === 'daily-slots-pulse')) this.manifest.format = 'GhostFlow/control-v8';
     else if (solarForms.some(form => form[0] === 'daily-pulse')) this.manifest.format = 'GhostFlow/control-v7';
     if (this.manifest.schedules.some(schedule => typeof schedule.policy?.clock === 'object'
