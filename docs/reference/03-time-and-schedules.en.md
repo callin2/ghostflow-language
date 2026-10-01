@@ -237,6 +237,21 @@ Bounded natural-policy admission uses held time only while monotonic elapsed tim
 
 `fixed_time` is available only for Solar. When a fallback occurrence for that source local date is admitted, the same occurrence ledger consumes that date's Solar event, avoiding duplication even if the provider recovers. Tide allows only `fallback = skip` because without predictions the number and identity of events are unknown.
 
+When Solar `when` reads a config Result, that config is an admission dependency.
+A dependent current fault preserves `Unknown(SettingsFault)` and admits no new
+occurrence even if the authored fault branch returns true. An unrelated config
+fault does not suppress Solar. Solar and ordinary control read the current
+Results at the same evaluation position. A successful recovery observation
+establishes a baseline without catching up past events. Settings observations,
+Solar decisions and VM transitions commit together, so failed evaluations
+consume neither events nor occurrences. Coordinates, timezone, event and offset
+are immutable program definitions, never implicitly replaced by live settings.
+
+**Why:** a schedule starting work from an old successful value while ordinary
+control sees a settings error creates contradictory decisions within one
+program. Preserve the cause and decide admission from the observation that
+actually took effect.
+
 One-shot `At` uses a constant typed DateTime and has no timezone or DST fields:
 
 ```ghost

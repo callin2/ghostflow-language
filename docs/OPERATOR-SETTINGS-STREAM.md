@@ -118,12 +118,19 @@ The Periodic profile in this change executes an explicit `instant` anchor with
 `preserve_anchor`, pulse/trusted-clock/baseline/skip policies. The Reference's
 other anchors and phase policies retain their own implementation requirements;
 this change does not claim to execute them. Config-backed TimeSlots uses the
-shared stream consumer. Mixing streams with the older Solar or literal
-DailySlots execution profile is rejected at source compilation. The native
+shared stream consumer. Solar now consumes the same current Results through
+the [shared Solar context profile](SOLAR-CONFIG-EXECUTION.md). Its compiled
+`when` dependencies preserve a current fault as `Unknown(SettingsFault)`,
+including when an authored fault branch returns true. Recovery establishes a
+baseline without catch-up; unrelated config faults do not suppress Solar.
+Mixing streams with literal DailySlots remains rejected at source compilation. The native
 Temperature PID objective reads its target from the same protected config
 Result vector; a fault follows its authored disable policy. These rejections
 must not be bypassed by converting a real operator setting to a constant.
-Solar unification is tracked in [#145](https://github.com/callin2/ghostflow-language/issues/145).
+The shared Solar path uses GFB16/control-v15 and GFSF6, stages the existing Rust
+Solar engine with settings and VM state, and retains Solar terminal identities
+inside GFCX3. Existing standalone Solar and non-Solar GFSF5 consumers retain
+their explicit profiles; they are not executable fallbacks for rejected source.
 Accounting reserve and limit values in the executable profile are static
 designer bounds. The Reference's 5-minute ON and 10-second stop-delay example
 uses `let` for those fixed bounds; a live config Result is rejected rather than

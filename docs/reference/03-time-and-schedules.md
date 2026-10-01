@@ -318,6 +318,19 @@ admit되면 같은 occurrence ledger가 그 날짜의 Solar 사건을 소비하�
 회복되어도 중복하지 않는다. Tide는 예측 부재 시 사건 수와 identity를 알 수 없으므로
 `fallback = skip`만 허용한다.
 
+Solar의 `when`이 config Result를 읽으면 해당 config는 admission 의존성이다.
+의존 config의 현재 fault는 작성한 fault 분기가 true를 반환해도
+`Unknown(SettingsFault)`를 보존하며 새 occurrence를 admit하지 않는다.
+무관한 config fault는 Solar를 억제하지 않는다. Solar와 일반 제어는 같은 평가
+position의 현재 Result를 읽는다. 복구 성공 관측은 기준선을 세우며 과거 사건을
+catch-up하지 않는다. 설정 관측·Solar 판단·VM 전이는 함께 commit하므로 실패
+평가는 event나 occurrence를 소비하지 않는다. 좌표·시간대·사건·offset은 불변
+프로그램 정의이며 live 설정으로 암묵 교체하지 않는다.
+
+**왜:** 일반 제어가 오류로 보는 설정을 schedule이 과거 성공 값으로 읽어 작업을
+시작하면 같은 프로그램 안의 판단이 어긋난다. 오류의 원인을 보존하고 실제 적용된
+관측으로 admission을 정해야 한다.
+
 one-shot `At`은 상수 typed DateTime을 쓰며 timezone과 DST field가 없다.
 
 ```ghost

@@ -241,6 +241,70 @@ fn schedule(r: &mut Reader<'_>) -> Result<ScheduleEvidence, String> {
     })
 }
 
+fn solar(r: &mut Reader<'_>) -> Result<SolarContextEvidence, String> {
+    use ghostflow_core::solar_admission::{SolarFact, SolarFactAvailability};
+    let site = r.u32()?;
+    let timezone = r.text(false)?;
+    let latitude = f64::from_le_bytes(r.take(8)?.try_into().unwrap());
+    let longitude = f64::from_le_bytes(r.take(8)?.try_into().unwrap());
+    let event = r.u8()?;
+    let offset_ms = r.raw64()? as i64;
+    if !latitude.is_finite()
+        || !longitude.is_finite()
+        || !(-90.0..=90.0).contains(&latitude)
+        || !(-180.0..=180.0).contains(&longitude)
+        || event > 1
+        || offset_ms.unsigned_abs() > 86_400_000
+    {
+        return Err("invalid Solar context immutable binding".into());
+    }
+    let coverage_start_ms = r.exact()?;
+    let coverage_end_ms = r.exact()?;
+    let count = r.count(4096)?;
+    let mut rows = Vec::with_capacity(count);
+    for _ in 0..count {
+        let source_day = r.day(false)?;
+        let availability = match r.u8()? {
+            0 => SolarFactAvailability::Available,
+            1 => SolarFactAvailability::Unavailable,
+            _ => return Err("invalid Solar fact availability".into()),
+        };
+        let scheduled_wall_ms = r.optional()?;
+        let fallback_wall_ms = r.optional()?;
+        let unavailable_reason = match r.u8()? {
+            255 => None,
+            reason @ 0..=5 => Some(reason),
+            _ => return Err("invalid Solar unavailable reason".into()),
+        };
+        if fallback_wall_ms.is_some() && unavailable_reason.is_none() {
+            return Err("Solar fallback requires unavailable reason".into());
+        }
+        rows.push(SolarFact {
+            source_day,
+            availability,
+            scheduled_wall_ms,
+            fallback_wall_ms,
+            unavailable_reason,
+            provider_revision: r.text(false)?,
+            context_revision: r.text(false)?,
+            slot_key: 0,
+            minute_of_day: 0,
+            fold: 0,
+        });
+    }
+    Ok(SolarContextEvidence {
+        site,
+        timezone,
+        latitude,
+        longitude,
+        event,
+        offset_ms,
+        coverage_start_ms,
+        coverage_end_ms,
+        rows,
+    })
+}
+
 fn settings(r: &mut Reader<'_>) -> Result<SettingsEvent, String> {
     let program_fingerprint = r.raw64()?;
     let event_id = r.text(false)?;
@@ -371,7 +435,11 @@ fn decode_activation(bytes: &[u8]) -> Result<Activation, String> {
 
 fn decode_facts(bytes: &[u8]) -> Result<Packet, String> {
     let mut r = Reader { bytes, at: 0 };
-    if bytes.len() > MAX_PACKET || r.take(4)? != b"GFSF" || r.u16()? != 5 {
+    if bytes.len() > MAX_PACKET || r.take(4)? != b"GFSF" {
+        return Err("invalid context facts header".into());
+    }
+    let version = r.u16()?;
+    if !matches!(version, 5 | 6) {
         return Err("invalid context facts header".into());
     }
     let monotonic_ms = r.exact()?;
@@ -395,6 +463,12 @@ fn decode_facts(bytes: &[u8]) -> Result<Packet, String> {
     }
     if r.flag()? {
         facts.settings = Some(settings(&mut r)?);
+    }
+    if version == 6 {
+        let count = r.count(128)?;
+        for _ in 0..count {
+            facts.solars.push(solar(&mut r)?);
+        }
     }
     r.finish()?;
     Ok(Packet {
@@ -529,6 +603,71 @@ pub unsafe extern "C" fn gf_restore_context_checkpoint(
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn text(bytes: &mut Vec<u8>, value: &str) {
+        bytes.extend_from_slice(&(value.len() as u16).to_le_bytes());
+        bytes.extend_from_slice(value.as_bytes());
+    }
+    fn solar_packet(reason: u8) -> Vec<u8> {
+        let mut bytes = b"GFSF\x06\x00".to_vec();
+        bytes.extend_from_slice(&0u64.to_le_bytes());
+        bytes.extend_from_slice(&1u64.to_le_bytes());
+        bytes.push(1);
+        bytes.extend_from_slice(&90u64.to_le_bytes());
+        bytes.push(1);
+        bytes.extend_from_slice(&0u64.to_le_bytes());
+        bytes.push(1);
+        text(&mut bytes, "");
+        text(&mut bytes, "clock-1");
+        bytes.extend_from_slice(&[0, 0, 0, 0, 0]); // no natural/civil/settings
+        bytes.extend_from_slice(&1u16.to_le_bytes());
+        bytes.extend_from_slice(&7u32.to_le_bytes());
+        text(&mut bytes, "UTC");
+        bytes.extend_from_slice(&37f64.to_le_bytes());
+        bytes.extend_from_slice(&127f64.to_le_bytes());
+        bytes.push(0);
+        bytes.extend_from_slice(&(-1i64).to_le_bytes());
+        bytes.extend_from_slice(&0u64.to_le_bytes());
+        bytes.extend_from_slice(&1_000u64.to_le_bytes());
+        bytes.extend_from_slice(&1u16.to_le_bytes());
+        bytes.extend_from_slice(&0u32.to_le_bytes());
+        bytes.push(1); // unavailable
+        bytes.push(0);
+        bytes.extend_from_slice(&0u64.to_le_bytes()); // absent scheduled
+        bytes.push(1);
+        bytes.extend_from_slice(&100u64.to_le_bytes()); // fallback
+        bytes.push(reason);
+        text(&mut bytes, "provider-1");
+        text(&mut bytes, "context-1");
+        bytes
+    }
+    #[test]
+    fn solar_context_packet_keeps_complete_facts_and_rejects_reason_omission_and_truncation() {
+        let bytes = solar_packet(2);
+        let packet = decode_facts(&bytes).unwrap();
+        let solar = &packet.facts.solars[0];
+        assert_eq!(
+            (
+                solar.site,
+                solar.latitude,
+                solar.longitude,
+                solar.event,
+                solar.offset_ms
+            ),
+            (7, 37.0, 127.0, 0, -1)
+        );
+        assert_eq!(solar.timezone, "UTC");
+        assert_eq!(solar.rows[0].fallback_wall_ms, Some(100));
+        assert_eq!(solar.rows[0].unavailable_reason, Some(2));
+        assert_eq!(solar.rows[0].provider_revision, "provider-1");
+        assert_eq!(solar.rows[0].context_revision, "context-1");
+        assert!(decode_facts(&solar_packet(255)).is_err());
+        for end in 0..bytes.len() {
+            assert!(decode_facts(&bytes[..end]).is_err());
+        }
+        let mut trailing = bytes;
+        trailing.push(0);
+        assert!(decode_facts(&trailing).is_err());
+    }
     #[test]
     fn context_activation_rejects_trailing_and_oversized_packets() {
         let mut bytes = b"GFCA\x01\x00".to_vec();

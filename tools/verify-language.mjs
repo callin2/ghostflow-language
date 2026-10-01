@@ -110,6 +110,8 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/calendar-provider.test.mjs',
   'tests/calendar-execution.test.mjs',
   'tests/calendar-runtime.test.mjs',
+  'tests/solar-config-compiler.test.mjs',
+  'tests/solar-config-runtime.test.mjs',
   'tests/after-event-contract.test.mjs',
   'tests/after-event-wasm.test.mjs',
   'tests/after-event-control.test.mjs',

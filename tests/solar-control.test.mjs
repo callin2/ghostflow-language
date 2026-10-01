@@ -99,7 +99,7 @@ test('Solar rejects missing, duplicate, unknown, nonliteral, and out-of-range fi
   expectError(solarControl(dawn.replace('Asia/Seoul', 'Not/AZone')), /Solar timezone must be a supported IANA timezone/);
 });
 
-test('Solar restricts sun tags, exact offsets, fallback, and operating metadata', () => {
+test('Solar restricts sun tags, exact offsets and fallback while accepting shared config metadata', () => {
   expectError(solarControl(dawn.replace('sun`rise + 30min`', 'sun`noon + 30min`')), /Solar event must be rise or set/, { line: 6, column: 14 });
   expectError(solarControl(dawn.replace('30min', '30.5min')), /Solar offset must be an integer duration literal/, { line: 6, column: 21 });
   expectError(solarControl(dawn.replace('30min', '25h')), /Solar offset magnitude must not exceed 24h/, { line: 6, column: 21 });
@@ -111,7 +111,10 @@ test('Solar restricts sun tags, exact offsets, fallback, and operating metadata'
     '  enabled <- false;',
     '}',
   ].join('\n'), /expected ; after let declaration/, { line: 2, column: 18 });
-  expectError(solarControl(dawn.replace('  schedule dawn', '  config duration: Duration = 5min { min = 1min; max = 10min; step = 1min; access = operator; }\n  schedule dawn')), /config streams cannot mix with legacy Solar\/DailySlots context execution/, { line: 1, column: 1 });
+  const configured = compileControl(solarControl(dawn.replace('  schedule dawn', '  config duration: Duration = 5min { min = 1min; max = 10min; step = 1min; access = operator; }\n  schedule dawn')));
+  assert.equal(configured.manifest.format, 'GhostFlow/control-v15');
+  assert.equal(Buffer.from(configured.bytes).readUInt16LE(4), 16);
+  assert.deepEqual(configured.manifest.schedules[0].configIds, [], 'an unrelated config is not a predicate dependency');
 });
 
 test('the existing DailySlots snapshot remains v1-compatible', () => {

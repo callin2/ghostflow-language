@@ -1,11 +1,14 @@
-//! Bounded HIL transport for explicit Periodic or settings context frames. All decisions
+//! Bounded HIL transport for explicit Periodic, settings or Solar context frames. All decisions
 //! and frame commits belong to the shared Rust ScanDriver.
 use ghostflow_core::{
     context_runtime::{Activation, Facts},
-    context_vm::{ScheduleEvidence, SettingChange, SettingsEvent, SettingsOrigin},
+    context_vm::{
+        ScheduleEvidence, SettingChange, SettingsEvent, SettingsOrigin, SolarContextEvidence,
+    },
     scan::{ScanFrameV1, ScanInput},
     schedule_clock::{ClockSnapshot, ClockTrust},
     settings_stream::ConfigValue,
+    solar_admission::{SolarFact, SolarFactAvailability},
     Capability, Module, Runtime, Value,
 };
 use serde_json::{json, Value as Json};
@@ -112,6 +115,93 @@ fn settings_event(value: &Json) -> Result<Option<SettingsEvent>> {
     }))
 }
 
+fn fields(value: &Json, allowed: &[&str]) -> Result<()> {
+    let map = value.as_object().ok_or("context evidence must be object")?;
+    if map.keys().any(|key| !allowed.contains(&key.as_str())) {
+        return Err("unexpected context evidence field".into());
+    }
+    Ok(())
+}
+
+fn solar_evidence(value: &Json) -> Result<SolarContextEvidence> {
+    fields(
+        value,
+        &[
+            "site",
+            "timezone",
+            "latitude",
+            "longitude",
+            "event",
+            "offsetMs",
+            "coverageStartMs",
+            "coverageEndMs",
+            "rows",
+        ],
+    )?;
+    let coordinate = |key: &str, bound: f64| -> Result<f64> {
+        value[key]
+            .as_f64()
+            .filter(|n| n.is_finite() && n.abs() <= bound)
+            .ok_or_else(|| "invalid Solar coordinate".into())
+    };
+    let mut rows = Vec::new();
+    let mut previous = None;
+    for row in array(&value["rows"], 4096)? {
+        fields(
+            row,
+            &[
+                "sourceDay",
+                "scheduledWallMs",
+                "availability",
+                "fallbackWallMs",
+                "unavailableReason",
+                "providerRevision",
+                "contextRevision",
+            ],
+        )?;
+        let day = u32::try_from(integer(&row["sourceDay"])?)?;
+        if day > 2_932_896 || previous.is_some_and(|old| day <= old) {
+            return Err("invalid Solar source order".into());
+        }
+        previous = Some(day);
+        let availability = match integer(&row["availability"])? {
+            0 => SolarFactAvailability::Available,
+            1 => SolarFactAvailability::Unavailable,
+            _ => return Err("invalid Solar availability".into()),
+        };
+        rows.push(SolarFact {
+            source_day: i32::try_from(day)?,
+            scheduled_wall_ms: optional(&row["scheduledWallMs"])?,
+            availability,
+            fallback_wall_ms: optional(&row["fallbackWallMs"])?,
+            unavailable_reason: if row["unavailableReason"].is_null() {
+                None
+            } else {
+                Some(u8::try_from(integer(&row["unavailableReason"])?)?)
+            },
+            provider_revision: text(&row["providerRevision"])?.into(),
+            context_revision: text(&row["contextRevision"])?.into(),
+            slot_key: 0,
+            minute_of_day: 0,
+            fold: 0,
+        });
+    }
+    Ok(SolarContextEvidence {
+        site: u32::try_from(integer(&value["site"])?)?,
+        timezone: text(&value["timezone"])?.into(),
+        latitude: coordinate("latitude", 90.0)?,
+        longitude: coordinate("longitude", 180.0)?,
+        event: u8::try_from(integer(&value["event"])?)?,
+        offset_ms: value["offsetMs"]
+            .as_i64()
+            .filter(|n| n.unsigned_abs() <= MAX_EXACT)
+            .ok_or("invalid Solar offset")?,
+        coverage_start_ms: integer(&value["coverageStartMs"])?,
+        coverage_end_ms: integer(&value["coverageEndMs"])?,
+        rows,
+    })
+}
+
 fn main() -> Result<()> {
     let args: Vec<_> = env::args().skip(1).collect();
     if args.len() != 2 {
@@ -127,7 +217,8 @@ fn main() -> Result<()> {
         .map(|(name, kind)| Capability::new("actuator", name, kind))
         .collect();
     let tape: Json = serde_json::from_slice(&read(&args[1])?)?;
-    let settings_profile = tape["profile"] == "context-settings-v1";
+    let solar_profile = tape["profile"] == "context-solar-v1";
+    let settings_profile = tape["profile"] == "context-settings-v1" || solar_profile;
     if !settings_profile && tape["profile"] != "context-periodic-v1" {
         return Err("unsupported context tape profile".into());
     }
@@ -147,6 +238,26 @@ fn main() -> Result<()> {
     })?;
     let mut driver = runtime.into_scan_driver();
     for step in array(&tape["steps"], 4096)? {
+        if solar_profile {
+            fields(
+                step,
+                &[
+                    "scanId",
+                    "logicalTimeMs",
+                    "inputs",
+                    "clock",
+                    "natural",
+                    "schedules",
+                    "settings",
+                    "solars",
+                ],
+            )?;
+            if !array(&step["natural"], 0)?.is_empty() {
+                return Err("Solar tape cannot supply natural providers".into());
+            }
+        } else if !step["solars"].is_null() {
+            return Err("Solar facts require context-solar-v1".into());
+        }
         let mut inputs = Vec::new();
         for input in array(&step["inputs"], 128)? {
             let name = text(&input["name"])?;
@@ -218,6 +329,14 @@ fn main() -> Result<()> {
             }
             None
         };
+        let solars = if solar_profile {
+            array(&step["solars"], 128)?
+                .iter()
+                .map(solar_evidence)
+                .collect::<Result<Vec<_>>>()?
+        } else {
+            vec![]
+        };
         let result = driver.scan_with_context(
             ScanFrameV1 {
                 scan_id: integer(&step["scanId"])?,
@@ -228,6 +347,7 @@ fn main() -> Result<()> {
             &Facts {
                 schedules,
                 settings,
+                solars,
                 ..Default::default()
             },
         );

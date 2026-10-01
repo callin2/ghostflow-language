@@ -55,6 +55,12 @@ fn context_traces(out: &mut impl Write, r: &TickRecord) -> fmt::Result {
             text(out, &observation.provider_revision)?;
             out.write_str(",\"contextRevision\":")?;
             text(out, &observation.context_revision)?;
+            if let Some(fallback) = observation.solar_fallback {
+                write!(out, ",\"fallback\":{fallback}")?;
+            }
+            if let Some(reason) = observation.solar_unavailable_reason {
+                write!(out, ",\"unavailableReason\":{reason}")?;
+            }
             if let Some(provenance) = &observation.clock_provenance {
                 out.write_str(",\"clockProvenance\":")?;
                 text(out, provenance)?;

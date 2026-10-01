@@ -252,7 +252,7 @@ pub(crate) fn load_prelude(
                     }));
                 (site, name)
             }
-            3 if matches!(format, 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15) => {
+            3 if matches!(format, 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16) => {
                 let site = reader.u32()?;
                 let name = reader.string()?;
                 let timezone = reader.string()?;
@@ -304,7 +304,7 @@ pub(crate) fn load_prelude(
                     }));
                 (site, name)
             }
-            4 if matches!(format, 9 | 10 | 11 | 12 | 13 | 14 | 15) => {
+            4 if matches!(format, 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16) => {
                 let site = reader.u32()?;
                 let name = reader.string()?;
                 let timezone = reader.string()?;
@@ -376,9 +376,11 @@ pub(crate) fn load_prelude(
                     }));
                 (site, name)
             }
-            kind if (matches!(kind, 5..=9) && matches!(format, 10 | 11 | 12 | 13 | 14 | 15))
-                || (kind == 13 && matches!(format, 12 | 13 | 14 | 15))
-                || (kind == 15 && format == 15)
+            kind if (matches!(kind, 5..=9)
+                && matches!(format, 10 | 11 | 12 | 13 | 14 | 15 | 16))
+                || (kind == 13 && matches!(format, 12 | 13 | 14 | 15 | 16))
+                || (kind == 15 && matches!(format, 15 | 16))
+                || (kind == 16 && format == 16)
                 || (kind == 14 && format == 14) =>
             {
                 let descriptor =
@@ -406,7 +408,7 @@ pub(crate) fn load_prelude(
                 result.schedules.push(PulseDescriptor::Context(descriptor));
                 identity
             }
-            10 if matches!(format, 10 | 11 | 12 | 13 | 14 | 15) => {
+            10 if matches!(format, 10 | 11 | 12 | 13 | 14 | 15 | 16) => {
                 let descriptor = crate::context_vm::load_natural(reader, inputs)?;
                 let identity = (descriptor.site, descriptor.name.clone());
                 result
@@ -415,7 +417,7 @@ pub(crate) fn load_prelude(
                 result.schedules.push(PulseDescriptor::Natural(descriptor));
                 identity
             }
-            11 if matches!(format, 10 | 11 | 12 | 13 | 14 | 15) => {
+            11 if matches!(format, 10 | 11 | 12 | 13 | 14 | 15 | 16) => {
                 let descriptor = crate::context_vm::load_accounting(reader, inputs)?;
                 let identity = (descriptor.site, descriptor.name.clone());
                 result
@@ -426,7 +428,7 @@ pub(crate) fn load_prelude(
                     .push(PulseDescriptor::Accounting(descriptor));
                 identity
             }
-            12 if matches!(format, 11 | 12 | 13 | 14 | 15) => {
+            12 if matches!(format, 11 | 12 | 13 | 14 | 15 | 16) => {
                 let descriptor = crate::settings_stream::load(reader, inputs)?;
                 let identity = (descriptor.id, descriptor.name.clone());
                 result
@@ -466,7 +468,7 @@ pub(crate) fn projection_type(
         return Err(Error::new("schedule projection index"));
     }
     if field
-        > if matches!(format, 10 | 11 | 12 | 13 | 14 | 15) {
+        > if matches!(format, 10 | 11 | 12 | 13 | 14 | 15 | 16) {
             2
         } else {
             1

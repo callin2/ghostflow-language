@@ -1405,6 +1405,7 @@ fn pid_reads_staged_config_result_and_rolls_back_with_failed_vm() {
         runtime.set_input("safe_max", Value::Number(80.0)).unwrap();
     };
     let mut facts = context_runtime::Facts {
+        solars: vec![],
         natural: vec![],
         schedules: vec![],
         settings: None,
@@ -1488,6 +1489,194 @@ fn pid_reads_staged_config_result_and_rolls_back_with_failed_vm() {
             .safe_intents["vent"],
         Value::Number(2.0)
     );
+}
+
+fn solar_config_program() -> Module {
+    let mut program = periodic();
+    program.format_version = 16;
+    let PulseDescriptor::Context(d) =
+        &mut program.schedules.as_mut().unwrap().strategies[0].schedules[0]
+    else {
+        unreachable!()
+    };
+    d.gap_ms = 172_800_000;
+    d.definition = ScheduleDefinition::SolarContext {
+        timezone: "UTC".into(),
+        latitude: 37.0,
+        longitude: 127.0,
+        event: 0,
+        offset_ms: 0,
+        fallback_time_ms: None,
+        config_ids: vec![6],
+    };
+    // Explicit fault fallback true cannot override a referenced settings fault.
+    d.when = vec![1, 1];
+    program
+}
+fn solar_config_runtime(epoch: u64) -> Runtime {
+    let mut runtime = Runtime::new(8);
+    runtime.install(solar_config_program(), false);
+    runtime
+        .activate_with_context(&context_runtime::Activation {
+            boot_epoch: epoch,
+            terminal_capacity: 8,
+            bindings: vec![],
+        })
+        .unwrap();
+    runtime
+}
+fn solar_config_facts() -> context_runtime::Facts {
+    context_runtime::Facts {
+        solars: vec![SolarContextEvidence {
+            site: 7,
+            timezone: "UTC".into(),
+            latitude: 37.0,
+            longitude: 127.0,
+            event: 0,
+            offset_ms: 0,
+            coverage_start_ms: 0,
+            coverage_end_ms: 172_800_000,
+            rows: vec![
+                solar_admission::SolarFact::available(0, 100, "provider-1", "position-1"),
+                solar_admission::SolarFact::available(1, 86_400_100, "provider-1", "position-1"),
+            ],
+        }],
+        ..Default::default()
+    }
+}
+fn solar_settings(
+    id: &str,
+    revision: u64,
+    position: u64,
+    result: std::result::Result<settings_stream::ConfigValue, u8>,
+) -> SettingsEvent {
+    SettingsEvent {
+        program_fingerprint: 85,
+        event_id: id.into(),
+        base_revision: revision,
+        position: position + 1,
+        origin: SettingsOrigin::OperatorEdit,
+        changes: vec![SettingChange {
+            id: 6,
+            semantic_type: "Duration".into(),
+            result,
+        }],
+    }
+}
+
+#[test]
+fn solar_config_fault_forces_recovery_baseline_without_catchup() {
+    let mut runtime = solar_config_runtime(1);
+    let mut facts = solar_config_facts();
+    inputs(&mut runtime, 1, 0, Some(1));
+    runtime.tick_with_context(clock(1, 0, 90), &facts).unwrap();
+    for (position, wall, revision, id, fault) in
+        [(1, 100, 0, "unavailable", 1), (2, 110, 1, "invalid", 0)]
+    {
+        facts.settings = Some(solar_settings(id, revision, position, Err(fault)));
+        inputs(&mut runtime, 1, position, Some(1));
+        let record = runtime
+            .tick_with_context(clock(1, position, wall), &facts)
+            .unwrap();
+        assert_eq!(record.requested_intents["allowed"], Value::Bool(false));
+        assert!(record.context_trace.iter().any(|o| o.decision
+            == if fault == 0 {
+                "Unknown(SettingsInvalid)"
+            } else {
+                "Unknown(SettingsUnavailable)"
+            }));
+    }
+    facts.settings = Some(solar_settings(
+        "recovered",
+        2,
+        3,
+        Ok(settings_stream::ConfigValue::Scalar(Value::Number(20.0))),
+    ));
+    inputs(&mut runtime, 1, 3, Some(1));
+    let recovered = runtime.tick_with_context(clock(1, 3, 120), &facts).unwrap();
+    assert_eq!(recovered.requested_intents["allowed"], Value::Bool(false));
+    assert!(recovered
+        .context_trace
+        .iter()
+        .any(|o| o.decision == "RecoveryBaseline"));
+    facts.settings = None;
+    inputs(&mut runtime, 1, 4, Some(1));
+    let next_day = runtime
+        .tick_with_context(clock(1, 4, 86_400_100), &facts)
+        .unwrap();
+    assert_eq!(next_day.requested_intents["allowed"], Value::Bool(true));
+    let checkpoint = runtime.context_checkpoint().unwrap();
+    let mut reboot = solar_config_runtime(2);
+    reboot.restore_context_checkpoint(&checkpoint).unwrap();
+    for (mono, wall) in [(0, 86_400_090), (1, 86_400_100)] {
+        inputs(&mut reboot, 2, mono, Some(1));
+        let record = reboot
+            .tick_with_context(clock(2, mono, wall), &facts)
+            .unwrap();
+        assert_eq!(record.requested_intents["allowed"], Value::Bool(false));
+    }
+}
+
+#[test]
+fn solar_config_due_and_settings_and_clock_rollback_as_one_transaction() {
+    let mut runtime = solar_config_runtime(1);
+    let mut facts = solar_config_facts();
+    inputs(&mut runtime, 1, 0, Some(1));
+    runtime.tick_with_context(clock(1, 0, 90), &facts).unwrap();
+    let checkpoint = runtime.context_checkpoint().unwrap();
+    facts.settings = Some(solar_settings(
+        "new-value",
+        0,
+        1,
+        Ok(settings_stream::ConfigValue::Scalar(Value::Number(20.0))),
+    ));
+    inputs(&mut runtime, 1, 1, Some(0));
+    assert!(runtime.tick_with_context(clock(1, 1, 100), &facts).is_err());
+    assert_eq!(runtime.context_checkpoint().unwrap(), checkpoint);
+    assert_eq!(runtime.journal.len(), 1);
+    inputs(&mut runtime, 1, 1, Some(1));
+    let retry = runtime.tick_with_context(clock(1, 1, 100), &facts).unwrap();
+    assert_eq!(retry.requested_intents["allowed"], Value::Bool(true));
+    assert!(runtime.context_state_json().unwrap().contains("20"));
+    facts.settings = None;
+    inputs(&mut runtime, 1, 2, Some(1));
+    assert_eq!(
+        runtime
+            .tick_with_context(clock(1, 2, 100), &facts)
+            .unwrap()
+            .requested_intents["allowed"],
+        Value::Bool(false)
+    );
+}
+
+#[test]
+fn solar_config_immutable_binding_and_missing_or_civil_facts_reject_atomically() {
+    let mut runtime = solar_config_runtime(1);
+    let pristine = runtime.context_checkpoint().unwrap();
+    for mutation in 0..9 {
+        let mut facts = solar_config_facts();
+        match mutation {
+            0 => facts.solars.clear(),
+            1 => facts.solars[0].latitude = 38.0,
+            2 => facts.solars[0].longitude = 126.0,
+            3 => facts.solars[0].timezone = "Asia/Seoul".into(),
+            4 => facts.solars[0].event = 1,
+            5 => facts.solars[0].offset_ms = 1,
+            6 => facts.solars.push(facts.solars[0].clone()),
+            7 => facts.schedules = periodic_facts().schedules,
+            _ => {
+                facts.solars[0].rows[0].availability =
+                    solar_admission::SolarFactAvailability::Unavailable;
+                facts.solars[0].rows[0].scheduled_wall_ms = None;
+                facts.solars[0].rows[0].fallback_wall_ms = Some(100);
+                facts.solars[0].rows[0].unavailable_reason = None;
+            }
+        }
+        inputs(&mut runtime, 1, 0, Some(1));
+        assert!(runtime.tick_with_context(clock(1, 0, 90), &facts).is_err());
+        assert_eq!(runtime.context_checkpoint().unwrap(), pristine);
+        assert!(runtime.journal.is_empty());
+    }
 }
 
 #[test]
