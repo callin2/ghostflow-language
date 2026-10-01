@@ -2600,15 +2600,24 @@
               "targets": [
                 "wasm"
               ]
+            },
+            {
+              "path": "tests/result-control.test.mjs",
+              "testId": "REF-08-012 default new control run clears warm sensor filter and freshness on plain and framed WASM",
+              "caseId": "REF-08-012",
+              "assertionClass": "runtime-value",
+              "targets": ["wasm"],
+              "polarities": ["positive", "negative", "boundary"]
             }
           ]
         }
       ],
       "gaps": [
-        "Driver sampling and physical sensing are not claimed."
+        "Driver sampling and physical sensing are not claimed.",
+        "REF-08-012 covers default logical owner startup on plain/framed WASM, not physical reboot or persistent resumption."
       ],
-      "issues": [],
-      "referenceCaseIds": []
+      "issues": [329],
+      "referenceCaseIds": ["REF-08-012"]
     },
     {
       "id": "filter-hysteresis",

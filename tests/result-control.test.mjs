@@ -7,6 +7,68 @@ import { compileSource } from './helpers/literate-compile.mjs';
 const wasm = fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
 const sample = (id, quality, value = 0, timestampMs = id) => ({ epoch: 1, id, timestampMs, quality, value });
 
+test('REF-08-012 default new control run clears warm sensor filter and freshness on plain and framed WASM', async () => {
+  const compiled = await compileSource(`control FreshSensorRun {
+    sensor moisture: Percent {
+      valid = 0% .. 100%; filter = median(5); stale_after = 3s; recover_after = 3 samples;
+    }
+    output value: Percent;
+    value <- moisture |> recover(0%);
+  }`, { filename: 'fresh-sensor-run.ghost' });
+  for (const instantiate of [ControlRuntime.instantiate, ControlRuntime.instantiateFramed]) {
+    const warm = await instantiate.call(ControlRuntime, wasm, compiled);
+    try {
+      for (const [id, value] of [[1, 10], [2, 20], [3, 30], [4, 40], [5, 50]]) {
+        const nowMs = id * 1000;
+        warm.step({ nowMs, samples: { moisture: sample(id, 'Good', value, nowMs) } });
+      }
+      const retained = warm.step({ nowMs: 5001 });
+      assert.equal(retained.sensors.moisture.quality, 'Good');
+      assert.equal(retained.vm.safe.value, 30);
+      assert.deepEqual(warm.sensors.get('moisture').conditioner.sampleIdentity(),
+        { epoch: 1, id: 5, timestampMs: 5000 });
+    } finally { warm.dispose(); }
+
+    // The default factory receives only the same executable, with no restored sensor state.
+    const fresh = await instantiate.call(ControlRuntime, wasm, compiled);
+    try {
+      const conditioner = fresh.sensors.get('moisture').conditioner;
+      for (const nowMs of [5001, 7999, 8000]) {
+        const startup = fresh.step({ nowMs });
+        assert.equal(startup.sensors.moisture.quality, 'NotReady');
+        assert.equal(startup.sensors.moisture.ok, false);
+        assert.equal(conditioner.read(nowMs).value, null);
+        assert.equal(startup.vm.safe.value, 0);
+        assert.equal(startup.vm.resultTrace.at(-1).choice, 4);
+        assert.equal(conditioner.sampleIdentity(), null);
+      }
+      // Reused source epoch/IDs cannot inherit a previous owner's sample cache or window.
+      for (const [id, value] of [[1, 70], [2, 75], [3, 80], [4, 85], [5, 90]]) {
+        const nowMs = 9000 + id;
+        const reading = fresh.step({ nowMs, samples: { moisture: sample(id, 'Good', value, nowMs) } });
+        assert.deepEqual(conditioner.sampleIdentity(), { epoch: 1, id, timestampMs: nowMs });
+        if (id < 5) {
+          assert.equal(reading.sensors.moisture.quality, 'NotReady');
+          assert.equal(reading.sensors.moisture.ok, false);
+          assert.equal(conditioner.read(nowMs).value, null);
+          assert.equal(reading.vm.safe.value, 0);
+          assert.equal(reading.vm.resultTrace.at(-1).choice, 4);
+        } else {
+          assert.equal(reading.sensors.moisture.quality, 'Good');
+          assert.equal(reading.vm.safe.value, 80);
+          assert.equal(reading.vm.resultTrace.at(-1).choice, 0);
+        }
+      }
+      assert.equal(fresh.step({ nowMs: 12004 }).sensors.moisture.quality, 'Good');
+      const stale = fresh.step({ nowMs: 12005 });
+      assert.equal(stale.sensors.moisture.quality, 'Stale');
+      assert.equal(stale.sensors.moisture.ok, false);
+      assert.equal(conditioner.read(12005).value, null);
+      assert.equal(stale.vm.resultTrace.at(-1).choice, 2);
+    } finally { fresh.dispose(); }
+  }
+});
+
 test('Result function parameters, constructors, and exhaustive nested fault cases lower to scalar control flow', async () => {
   const compiled = await compileSource(`fn ready(value: Bool) -> Result<Bool, SensorFault> {
     if value then ok(true) else fault(NotReady)
