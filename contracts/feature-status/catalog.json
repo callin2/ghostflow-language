@@ -2745,6 +2745,14 @@
               ]
             },
             {
+              "path": "tests/config-native-wasm-parity.test.mjs",
+              "testId": "REF-05-016 designer Percent rejects operator edits without changing value or settings revision in native and plain/framed WASM",
+              "caseId": "REF-05-016",
+              "assertionClass": "runtime-value",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "negative", "boundary"]
+            },
+            {
               "path": "tests/issue-90-settings-stream.test.mjs",
               "testId": "REF-05-106 [host] 복귀 실패를 정상 설정값으로 숨기지 않는다.",
               "caseId": "REF-05-106",
@@ -2815,6 +2823,7 @@
       ],
       "issues": [
         74,
+        277,
         338,
         337,
         336,
@@ -2822,6 +2831,7 @@
         332
       ],
       "referenceCaseIds": [
+        "REF-05-016",
         "REF-05-106",
         "REF-05-105",
         "REF-05-104",
