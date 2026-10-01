@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### 2026-10-01 — accounting-only artifact profile ([#210](https://github.com/callin2/ghostflow-language/issues/210))
+
+An executable accounting source now selects `GhostFlow/control-v10` even when
+it contains only `on_time` accounts and no context-producing expressions.
+Previously, `account used = on_time(pump, stage: applied, persistence: durable);`
+could retain control-v1, so the canonical source-bound WASM ledger rejected its
+existing accounting metadata. This fixes the documented binding contract without
+changing syntax, GFB bytes or the ledger ABI; recompilation corrects the profile.
+Reference §3.4 is unchanged. REF-03-020 compares actual native/WASM historical
+rolling calculation for regular and irregular partitions, including partial
+overlap and snapshot replay. Control admission, live cutoff and physical receipt
+validation remain outside this fix.
+
 ### 2026-10-01 — shared Solar/config execution ([#145](https://github.com/callin2/ghostflow-language/issues/145))
 
 Solar and live typed configuration now execute in one staged Rust context;

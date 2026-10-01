@@ -3555,6 +3555,39 @@
       "referenceCaseIds": ["REF-01-055"]
     },
     {
+      "id": "rolling-ledger-calculation",
+      "family": "Historical rolling ledger calculation across scan partitions",
+      "clause": {
+        "path": "docs/reference/03-time-and-schedules.md",
+        "heading": "3.4 누적 시간과 rolling budget"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/accounting-wasm.test.mjs",
+              "testId": "REF-03-020: source-bound native and WASM rolling ledgers integrate regular and 7/13/9-second partitions exactly",
+              "caseId": "REF-03-020",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "negative", "boundary"]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Historical calculation consumes caller-validated applied intervals and trusted host resource bindings; complete control on_time admission, live cutoff, storage-medium certification and physical receipt validation are not claimed."
+      ],
+      "issues": [210],
+      "referenceCaseIds": ["REF-03-020"]
+    },
+    {
       "id": "product-boundary",
       "family": "Farmer UI, installation and deployment",
       "clause": {

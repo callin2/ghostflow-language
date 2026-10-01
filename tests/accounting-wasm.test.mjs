@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { dirname, resolve, join } from 'node:path';
+import { tmpdir } from 'node:os';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { AccountingRuntime } from '../runtimes/wasm/accounting-runtime.mjs';
 import { GhostFlowRuntime } from '../runtimes/wasm/ghostflow-runtime.mjs';
 import { compileSource } from '../tools/compile-source.mjs';
+import { verifyArtifactSourceMap } from '../tools/toolchain.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const wasmPath = resolve(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm');
@@ -19,6 +21,121 @@ const config = { maxIntervals: 8, maxEvents: 8, maxReservations: 8, maxRollingWi
 const id = value => new Uint8Array(16).fill(value);
 const reference = JSON.parse(readFileSync(resolve(root, 'tests/reference/cases/02-time-control.json'), 'utf8'))
   .cases.find(entry => entry.id === 'REF-03-050');
+
+test('REF-03-020: source-bound native and WASM rolling ledgers integrate regular and 7/13/9-second partitions exactly', async t => {
+  const source = '# Historical applied intervals\n\n```ghost\ncontrol RollingHistory {\n'
+    + 'resource pump: BoolActuator;\naccount pump_applied = on_time(pump, stage: applied, persistence: durable);\n'
+    + 'constraints Budget { limit used(pump_applied, rolling(60s)) <= 30s { reserve = 1s; on_unknown = block; } }\n'
+    + 'output ready: Bool; ready <- false;\n}\n```\n';
+  const filename = 'rolling-history.ghost.md';
+  const artifact = await compileSource(source, { filename });
+  assert.equal(artifact.manifest.format, 'GhostFlow/control-v10');
+  const map = { format: 'GhostFlow/source-map-v1', bytecodeSha256: artifact.manifest.bytecodeSha256,
+    sourceDocument: artifact.sourceDocument, nodes: artifact.sourceMap, lines: artifact.extractionMap,
+    traceMetadata: artifact.traceMetadata, interactionSchema: null, interactionSourceIdentity: null };
+  verifyArtifactSourceMap(map, artifact.bytes, { manifest: artifact.manifest });
+  const binding = artifact.manifest.accounting.bindings.find(binding => binding.name === 'pump_applied');
+  assert.deepEqual(binding.evidenceBinding, { kind: 'applied_interval', target: 'pump', stage: 'applied', identity: 'receipt_id' });
+  const windowMs = artifact.manifest.accounting.constraints[0].limits[0].basis.durationMs;
+  assert.equal(windowMs, 60_000);
+  const intervals = [[0, 20_000], [30_000, 40_000], [80_000, 100_000]];
+  const queries = [40_000, 65_000, 85_000, 110_000];
+  const expected = [{ nowMs: 40_000, usedMs: 30_000 }, { nowMs: 65_000, usedMs: 25_000 },
+    { nowMs: 85_000, usedMs: 15_000 }, { nowMs: 110_000, usedMs: 20_000 }];
+  const cadence = deltas => {
+    const times = [0];
+    for (let index = 0; times.at(-1) < 110_000; index++) times.push(Math.min(110_000, times.at(-1) + deltas[index % deltas.length]));
+    return times;
+  };
+  const regular = cadence([1000]), irregular = cadence([7000, 13_000, 9000]);
+  assert.deepEqual(irregular.slice(0, 4), [0, 7000, 20_000, 29_000]);
+  const partition = scanTimes => {
+    // Independent event timestamps are mandatory boundaries, not values rounded
+    // to the next scan. The host only partitions caller-validated intervals.
+    const times = [...new Set([...scanTimes, ...queries, ...intervals.flat()])].sort((a, b) => a - b);
+    let previous = 0, receiptId = 0;
+    return times.map(nowMs => {
+      const segments = intervals.flatMap(([start, end]) => {
+        const startMs = Math.max(start, previous), endMs = Math.min(end, nowMs);
+        return startMs < endMs ? [{ receiptId: ++receiptId, resourceId: 7, startMs, endMs }] : [];
+      });
+      previous = nowMs;
+      return { nowMs, segments, query: queries.includes(nowMs) };
+    });
+  };
+  const tapes = [partition(regular), partition(irregular)];
+  assert.notDeepEqual(tapes[0].flatMap(frame => frame.segments), tapes[1].flatMap(frame => frame.segments));
+  const ledgerConfig = { maxIntervals: 256, maxEvents: 8, maxReservations: 8, maxRollingWindowMs: 60_000n };
+  const executeWasm = async frames => {
+    const runtime = await AccountingRuntime.instantiateSource(wasmBytes, source, {
+      filename, account: binding.name, resourceId: 7, config: ledgerConfig,
+    });
+    try {
+      assert.equal(runtime.source.text, source);
+      assert.equal(runtime.source.sha256, artifact.sourceDocument.sha256);
+      assert.equal(runtime.source.artifactSha256, artifact.manifest.bytecodeSha256);
+      assert.equal(runtime.source.target, 'pump'); assert.equal(runtime.source.stage, 'applied');
+      let now = 0n, snapshot;
+      const persist = async bytes => {
+        assert.equal(runtime.usedRolling(7, now, BigInt(windowMs)), null, 'unacknowledged ledger is Unknown');
+        snapshot = bytes.slice(); return true; // Test-owned acknowledgement, no storage-medium certification.
+      };
+      await runtime.initializeEmpty(persist);
+      const observations = [];
+      for (const frame of frames) {
+        now = BigInt(frame.nowMs);
+        for (const segment of frame.segments) {
+          const receiptId = new Uint8Array(16);
+          new DataView(receiptId.buffer).setBigUint64(0, BigInt(segment.receiptId), true);
+          await runtime.recordAppliedSegment({ ...segment, receiptId, startMs: BigInt(segment.startMs), endMs: BigInt(segment.endMs), localDay: 100 }, persist);
+        }
+        if (frame.query) {
+          const used = runtime.usedRolling(7, now, BigInt(windowMs));
+          assert.equal(typeof used, 'bigint', 'acknowledged rolling result is Known');
+          observations.push({ nowMs: frame.nowMs, usedMs: Number(used) });
+        }
+      }
+      assert.throws(() => runtime.usedRolling(8, now, BigInt(windowMs)), /wrong bound resource ID/);
+      runtime.restore(snapshot);
+      assert.equal(runtime.usedRolling(7, 110_000n, BigInt(windowMs)), 20_000n);
+      return observations;
+    } finally { runtime.dispose(); }
+  };
+  execFileSync('cargo', ['build', '--locked', '--offline', '--release', '-p', 'ghostflow-core', '--example', 'accounting_tape'], { cwd: root, stdio: 'inherit' });
+  const directory = mkdtempSync(join(tmpdir(), 'reference-rolling-accounting-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const modulePath = join(directory, 'module.gfb'), tapePath = join(directory, 'tape.json');
+  writeFileSync(modulePath, artifact.bytes);
+  const runner = resolve(root, 'target/release/examples/accounting_tape' + (process.platform === 'win32' ? '.exe' : ''));
+  const nativeRequest = frames => ({ moduleFingerprint: artifact.traceMetadata.moduleFingerprint,
+    manifest: artifact.manifest, account: binding.name, target: 'pump', resourceId: 7, windowMs, frames });
+  const runNative = request => {
+    writeFileSync(tapePath, JSON.stringify(request));
+    return JSON.parse(execFileSync(runner, [modulePath, tapePath], { encoding: 'utf8', timeout: 10_000 }));
+  };
+  for (const frames of tapes) {
+    const request = nativeRequest(frames);
+    const native = runNative(request);
+    assert.deepEqual(native, { moduleFingerprint: artifact.traceMetadata.moduleFingerprint,
+      account: binding.name, target: 'pump', stage: 'applied', resourceId: 7, observations: expected });
+    assert.deepEqual(runNative(request), native);
+    assert.deepEqual(await executeWasm(frames), native.observations);
+    assert.deepEqual(await executeWasm(frames), native.observations);
+  }
+  await assert.rejects(AccountingRuntime.instantiateSource(wasmBytes, source, { filename, account: 'missing', resourceId: 7, config: ledgerConfig }), /no accounting account/);
+  await assert.rejects(AccountingRuntime.instantiateSource(wasmBytes, source.replace('stage: applied', 'stage: safe'), {
+    filename, account: binding.name, resourceId: 7, config: ledgerConfig,
+  }), /applied|unsupported accounting stage/);
+  for (const [mutate, reason] of [
+    [request => { request.account = 'missing'; }, /unknown source account/],
+    [request => { request.target = 'other'; }, /source target mismatch/],
+    [request => { request.moduleFingerprint = '0'.repeat(16); }, /compiled module identity mismatch/],
+    [request => { request.frames.find(frame => frame.segments.length).segments[0].resourceId = 8; }, /wrong bound resource ID/],
+  ]) {
+    const request = structuredClone(nativeRequest(tapes[1])); mutate(request);
+    assert.throws(() => runNative(request), reason);
+  }
+});
 
 test('WASM accounting stays Unknown until exact snapshot revision is persisted', async () => {
   const runtime = await AccountingRuntime.instantiate(wasmBytes, config);

@@ -103,8 +103,8 @@
       "source": "docs/ACCOUNTING-LEDGER-ABI.md",
       "sourceLanguage": "en",
       "translation": "docs/ACCOUNTING-LEDGER-ABI.ko.md",
-      "sourceSha256": "04deadb4cde208d55eacc3e356bc35f45f8f3651466ad5dd672945eb3b27ce26",
-      "translationSha256": "6e6ffdadb040e5e82fd7c7bb324068eab7d1e4c7fe6197e27fbede47c6eab77e"
+      "sourceSha256": "7342889ac5e48991d786837250e8578146dcc69c29fae0f0ec6cb3cf39946177",
+      "translationSha256": "d572df3cce30ff42f32f8331eef6e6101ef7a98f9aa013479f93e10837d85b9a"
     },
     {
       "source": "docs/AFTER-EVENT-WASM-ABI.md",
@@ -565,8 +565,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "120aa3ee37667c19c5d070e716b011c624fa298a4b12dcdada31ed63c61dda12",
-      "translationSha256": "77189da3da8f24020a7696dd3b796e12052fa60016acd88a8e53247be4263be1"
+      "sourceSha256": "a7c88a67e47a28e418d6b6fa3791f14f51442d19ddc87e955a142f098c72d824",
+      "translationSha256": "9ceda3b0b9768f7302137b9b46726895ad378f8d6ab3fe96b2c746f1160eda08"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",
