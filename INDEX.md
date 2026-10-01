@@ -421,6 +421,7 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/fixtures/gfb2-int-golden-v1.ghost.md](tests/fixtures/gfb2-int-golden-v1.ghost.md) | Exact integer GFB vector | md |
 | [tests/fixtures/issue-90-readonly-settings.ghost.md](tests/fixtures/issue-90-readonly-settings.ghost.md) | Read-only settings producer | md |
 | [tests/fixtures/issue-90-settings-periodic.ghost.md](tests/fixtures/issue-90-settings-periodic.ghost.md) | Live settings stream | md |
+| [tests/fixtures/issue-93-quantities.ghost.md](tests/fixtures/issue-93-quantities.ghost.md) | Quantity execution parity fixture | md |
 | [tests/fixtures/true-for-certified.ghost.md](tests/fixtures/true-for-certified.ghost.md) | Certified hot interval | md |
 
 ## tests/reference/
@@ -434,4 +435,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-324 documents.
+325 documents.
