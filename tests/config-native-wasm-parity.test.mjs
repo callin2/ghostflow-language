@@ -62,6 +62,74 @@ async function wasmRun(artifact, attempts, framed) {
   }
 }
 
+test('REF-05-015 live Duration compares the existing six-minute timer with the new five-minute value in native and plain/framed WASM', async () => {
+  const artifact = await compileSource(literateDocument(`control LiveDuration {
+    config duration: Duration = 10min { min = 1min; max = 20min; step = 1min; access = operator; }
+    state running: Bool = true;
+    state remembered: Bool = false;
+    remembered' = true;
+    timer age = elapsed(running);
+    let within_duration = case duration { ok(value) => age < value; fault(_) => false; };
+    running' = running && within_duration;
+    output drive: Bool;
+    output elapsed_ms, duration_ms: Duration;
+    drive <- running';
+    elapsed_ms <- age;
+    duration_ms <- case duration { ok(value) => value; fault(_) => 0ms; };
+  }`), { filename: 'reference-live-duration.ghost.md' });
+  const [duration] = artifact.manifest.configs;
+  assert.equal(duration.value, 600_000);
+  const probe = await ControlRuntime.instantiateFramed(wasmBytes, artifact,
+    { context: { bootEpoch: 1, terminalCapacity: 8, bindings: [] } });
+  const fingerprint = probe.contextSnapshot().state.programFingerprint;
+  probe.dispose();
+  const attempts = [
+    { scanId: 0, nowMs: 0, settings: null },
+    { scanId: 1, nowMs: 360_000, settings: null },
+    { scanId: 2, nowMs: 360_000, settings: {
+      programFingerprint: fingerprint, eventId: 'shorten-live-duration',
+      baseRevision: 0, position: 3, origin: 'operatorEdit',
+      changes: [{ configId: duration.id, result: { ok: true, type: 'Duration', value: 300_000 } }],
+    } },
+    { scanId: 3, nowMs: 360_001, settings: null },
+  ];
+  const executions = [nativeRun(artifact, attempts),
+    await wasmRun(artifact, attempts, false), await wasmRun(artifact, attempts, true)];
+  const expected = [
+    { drive: true, elapsed_ms: 0, duration_ms: 600_000 },
+    { drive: true, elapsed_ms: 360_000, duration_ms: 600_000 },
+    { drive: false, elapsed_ms: 360_000, duration_ms: 300_000 },
+    // This new timer baseline follows the authored running true-to-false transition,
+    // rather than initialization by the setting event at the preceding decision.
+    { drive: false, elapsed_ms: 1, duration_ms: 300_000 },
+  ];
+  for (const rows of executions) {
+    assert.ok(rows.every(row => row.accepted), JSON.stringify(rows));
+    assert.deepEqual(rows.map(row => row.settings.settingsRevision), [0, 0, 1, 1]);
+    assert.deepEqual(rows[2].settings.settings[0].result, { ok: true, value: 300_000 });
+    const traces = rows.map(row => row.outcome.trace ?? row.outcome.vm);
+    assert.deepEqual(traces.map(trace => trace.requested), expected);
+    assert.deepEqual(traces.map(trace => trace.safe), expected);
+    assert.equal(traces[0].stateBefore.remembered, false);
+    assert.equal(traces[1].stateAfter.running, true);
+    assert.deepEqual(traces[2].stateBefore, traces[1].stateAfter,
+      'the live event preserves the existing state before authored transition evaluation');
+    assert.equal(traces[2].stateBefore.running, true);
+    assert.equal(traces[2].stateAfter.running, false);
+    assert.equal(traces[2].stateAfter.remembered, true);
+    assert.equal(traces[3].stateBefore.running, false);
+  }
+  const [native, plain, framed] = executions;
+  for (let i = 0; i < attempts.length; i++) {
+    assert.deepEqual(plain[i].settings, native[i].settings);
+    assert.deepEqual(framed[i].settings, native[i].settings);
+    assert.deepEqual(plain[i].outcome.vm, native[i].outcome.trace);
+    assert.deepEqual(framed[i].outcome.vm, native[i].outcome.trace);
+    assert.deepEqual(framed[i].outcome.frame,
+      { scanId: native[i].outcome.scanId, logicalTimeMs: native[i].outcome.logicalTimeMs });
+  }
+});
+
 test('REF-05-016 designer Percent rejects operator edits without changing value or settings revision in native and plain/framed WASM', async () => {
   const artifact = await compileSource(literateDocument(`control DesignerDuty {
     config duty: Percent = 50% { min = 0%; max = 100%; step = 10%; access = designer; }
