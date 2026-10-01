@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
 import { SignalConditioner } from '../runtimes/wasm/signals.mjs';
+import { compileSource } from './helpers/literate-compile.mjs';
 
 function fakeExports() {
   const memory = new WebAssembly.Memory({ initial: 1 });
@@ -220,6 +221,44 @@ test('real WASM sample identity preserves accepted, duplicate, and fault samples
   assert.deepEqual(sensor.sampleIdentity(), { epoch: 8, id: 2, timestampMs: 200 });
   sensor.reset();
   assert.equal(sensor.sampleIdentity(), null);
+});
+
+test('REF-01-077 hysteresis retains the original three-value trace across an in-memory WASM checkpoint and replay', async t => {
+  const artifact = await compileSource(`control HysteresisCheckpoint {
+    sensor moisture: Percent { valid = 0% .. 100%; filter = median(1); stale_after = 3s; recover_after = 1 samples; }
+    signal dry = hysteresis(moisture, on_below: 30%, off_above: 35%, initial: false);
+    output pump: Bool;
+    pump <- case dry { ok(value) => value; fault(_) => false; };
+  }`, { filename: 'hysteresis-checkpoint.ghost' });
+  const sourceSensor = artifact.manifest.sensors.find(item => item.name === 'moisture');
+  const sourceSignal = artifact.manifest.signals.find(item => item.name === 'dry');
+  const config = {
+    filter: sourceSensor.filter, window: sourceSensor.window,
+    validMin: sourceSensor.validMin, validMax: sourceSensor.validMax,
+    staleMs: sourceSensor.staleMs, recoverSamples: sourceSensor.recoverSamples,
+    hysteresis: { onBelow: sourceSignal.onBelow, offAbove: sourceSignal.offAbove, initial: sourceSignal.initial },
+  };
+  assert.deepEqual(config.hysteresis, { onBelow: 30, offAbove: 35, initial: false });
+  const sensor = await realConditioner(t, config);
+  assert.equal(sensor.read(0).dry, false);
+  const values = [29, 32, 36];
+  const advance = (conditioner, index) => {
+    const nowMs = (index + 1) * 1000;
+    conditioner.update(goodSample(index + 1, values[index], nowMs), nowMs);
+    return { reading: conditioner.read(nowMs), identity: conditioner.sampleIdentity() };
+  };
+  const first = advance(sensor, 0);
+  sensor.begin(); // existing ABI takes a bounded clone of complete Rust Sensor state
+  const original = [first, advance(sensor, 1), advance(sensor, 2)];
+  assert.deepEqual(original.map(item => item.reading.dry), [true, true, false]);
+  assert.deepEqual(original.map(item => item.reading.value), values);
+  sensor.rollback();
+  assert.deepEqual({ reading: sensor.read(1000), identity: sensor.sampleIdentity() }, first);
+  const resumed = [first, advance(sensor, 1), advance(sensor, 2)];
+  assert.deepEqual(resumed, original, 'resumed deadband must retain the checkpoint hysteresis memory');
+  const fresh = await realConditioner(t, config);
+  assert.deepEqual(values.map((_, index) => advance(fresh, index)), original,
+    'independent full replay must reproduce readings, quality, hysteresis and sample identities');
 });
 
 test('real WASM signal transaction rollback restores reading and identity', async t => {

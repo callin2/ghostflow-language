@@ -2631,13 +2631,21 @@
               "targets": [
                 "wasm"
               ]
+            },
+            {
+              "path": "tests/signals-wasm.test.mjs",
+              "testId": "REF-01-077 hysteresis retains the original three-value trace across an in-memory WASM checkpoint and replay",
+              "caseId": "REF-01-077",
+              "assertionClass": "replay",
+              "targets": ["wasm"],
+              "polarities": ["positive", "boundary"]
             }
           ]
         }
       ],
       "gaps": [],
-      "issues": [],
-      "referenceCaseIds": []
+      "issues": [200],
+      "referenceCaseIds": ["REF-01-077"]
     },
     {
       "id": "resource-arbitration",
