@@ -519,3 +519,21 @@ test('GF-TEST-portable-package-browser: signed package verification does not req
     else delete globalThis.Buffer;
   }
 });
+
+test('GF-TEST-portable-package-adapt: canonical Bool strategy package retains optional presence and rejects resigned descriptor changes',async()=>{
+ const current=await currentKeyPromise;
+ const source='# Explicit feedback\n```ghost\ncontrol Feedback { sensor door?: Bool; output pump: Bool; adapt policy { strategy WithDoor priority 100 match (door: sensor<Bool>) { pump <- case door { ok(value) => value; fault(_) => false; }; } strategy Baseline priority 0 match always { pump <- false; } } }\n```';
+ await assert.rejects(compileSource(source.replace('strategy WithDoor','strategy control'),{filename:'feedback.ghost.md'}),/strategy name control is reserved/);
+ const compilation=await compileSource(source,{filename:'feedback.ghost.md'});const required=[{kind:'actuator',name:'pump',type:'bool'}];
+ const packaged=await buildPortablePackage(compilation,{...identity,requiredCapabilities:required},buildOptions([{keyId:current.keyId,privateKey:current.privateKey}]));
+ const options={...verifierOptions(current),supportedManifestFormats:[compilation.manifest.format],availableCapabilities:required};
+ const verified=await verifyPortablePackage(packaged,options);assert.equal(verified.manifest.sensors[0].optional,true);assert.equal(verified.manifest.strategies.length,2);
+ for(const mutate of [m=>m.strategies[0].priority++,m=>m.strategies[0].name='Forged',m=>m.strategies[0].match[0].role='other',m=>m.strategies[0].outputNames[0]='other',m=>m.adaptPolicy.selection='first',m=>{delete m.strategies;}]){
+  const changed=clone(packaged);const manifest=JSON.parse(Buffer.from(changed.payload.manifest.contentBase64,'base64'));mutate(manifest);const bytes=encoder.encode(canonicalJson(manifest));changed.payload.manifest.contentBase64=base64(bytes);changed.payload.manifest.sha256=await digestHex(bytes);await resign(changed,current);
+  await assert.rejects(verifyPortablePackage(changed,{...options,verifyBytecode:()=>assert.fail('tamper must reject before loader')}),PortablePackageError);
+ }
+ const wasm=fs.readFileSync(wasmPath);
+ for(const present of [false,true]){
+  const runtime=await GhostFlowRuntime.instantiate(wasm);try{runtime.load(verified.bytecode.copy());runtime.addCapability('actuator','pump','bool');if(present)runtime.addCapability('sensor','door','bool');runtime.activate();const sensor=verified.manifest.sensors[0];runtime.setBool(sensor.valueInput,true);runtime.setBool(sensor.okInput,true);runtime.setNumber(sensor.faultInput,0);runtime.tick();assert.equal(runtime.trace.requested.pump,present);}finally{runtime.dispose();}
+ }
+});

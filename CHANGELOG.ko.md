@@ -5,6 +5,15 @@
 
 ## 미출시
 
+### 2026-10-01 — portable 적응 전략 메타데이터
+
+Portable package는 컴파일러가 생성한 쌍으로 된 adaptation descriptor를 받습니다.
+정본 소스 replay와 native decoded strategy/query binding은 재서명된 descriptor나
+bytecode 변경을 거부합니다. 선택 Bool feedback은 native/WASM 실행에서 부재 시
+baseline과 명시적인 존재 시 전략을 유지합니다. GFB, wire 형식, ABI와 서명 정책은
+변하지 않습니다. [Portable package](docs/PORTABLE-PACKAGE.ko.md#적응-전략-descriptor)를 참조합니다.
+
+
 ### 2026-09-30 ? 검증된 중복 제약 대체 ([#31](https://github.com/callin2/ghostflow-language/issues/31))
 
 컴파일은 독립적인 bounded effect 검증 후 인접한 동일 순서의 Bool 출력 제약을

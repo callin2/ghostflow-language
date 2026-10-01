@@ -41,7 +41,7 @@ official builder from pairing readable source with another compiled program.
 Required capabilities are sorted by `kind`, `name`, then `type`. Every manifest
 input (`input`), non-optional sensor (`sensor`) and output (`actuator`) must match
 the signed required-capability set in both directions. Optional sensors remain
-outside that required set until a later strategy/adaptation contract names them.
+outside that required set; explicit host bindings determine their presence.
 
 ## Signature bytes and trust
 
@@ -197,3 +197,21 @@ signatures, capabilities and JSON depth. The Device consumer must select a
 device-sized profile, stage transport bytes outside the active program slot and
 invoke this verifier before atomic activation. Host verification alone is not
 evidence of MCU activation, relay operation or physical load movement.
+
+
+## Adaptive strategy descriptors
+
+Compiler-produced `adaptPolicy` and `strategies` are paired signed manifest
+metadata. JS verification compares them with canonical source recompilation and
+exact bytecode. Native verification matches ordered strategy names, priorities,
+output names and capability-query bytes against the decoded core module. Typed
+matches must reference declared sensor/actuator capabilities. Selection remains
+`highest-priority-unique`; unsupported or unpaired metadata rejects before loading.
+The policy name is signed, bounded source metadata, not a new runtime selector.
+
+Optional Bool observation does not automatically select or activate a new policy.
+An explicit host capability snapshot determines whether its authored strategy is
+eligible. Native and WASM tests preserve the absent baseline and present feedback
+outputs and reject re-signed strategy/query/bytecode tampering. GFB and wire formats,
+ABI and signature policy remain unchanged. Physical wiring and Device admission
+remain consumer responsibilities.
