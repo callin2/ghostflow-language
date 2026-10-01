@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { compileSource } from './helpers/literate-compile.mjs';
 import { FramedGhostFlowRuntime } from '../runtimes/wasm/framed-runtime.mjs';
-import { observeRuntimeValues } from '../tools/source-trace.mjs';
+import { observeRuntimeValues, observeSourceTrace } from '../tools/source-trace.mjs';
 import { sensorFaultTimerSource, sensorFaultTimerScans } from './helpers/continuous-timer-vectors.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -261,6 +261,59 @@ control FaultingProduct {
   assert.equal(native[1].outcome.trace.safe.result, 0);
   assert.ok(artifact.traceMetadata.dependencies.some(entry => entry.target.field === 'requested'
     && entry.target.name === 'result' && entry.reads.some(read => read.field === 'inputs' && read.name === 'divisor')));
+});
+
+test('REF-03-017: independently enabled timers preserve separate starts and explicit sensor fault handling on native and WASM', async () => {
+  const source = `control IndependentFaultTimers {
+  input enabled_a, enabled_b: Bool;
+  sensor high: Bool;
+  let safe_high = case high { ok(value) => value; fault(_) => false; };
+  timer a_for = continuous_true(enabled_a && safe_high);
+  timer b_for = continuous_true(enabled_b && safe_high);
+  output a_age_ms, b_age_ms: Duration;
+  a_age_ms <- a_for;
+  b_age_ms <- b_for;
+}`;
+  const filename = 'reference-independent-fault-timers.ghost';
+  const artifact = await compileSource(source, { filename });
+  const sensor = artifact.manifest.sensors.find(item => item.name === 'high');
+  // Both timers use the same sensor Bool. Their distinct starts come from
+  // explicit authored enable predicates, not an implicit activation API.
+  const tape = [[100, true, false, true], [120, true, true, true], [140, true, true, true],
+    [150, true, true, false], [200, true, true, true], [220, true, true, true]]
+    .map(([logicalTimeMs, enabledA, enabledB, good], scanId) => row(scanId, logicalTimeMs, [
+      { name: 'enabled_a', value: enabledA }, { name: 'enabled_b', value: enabledB },
+      { name: sensor.valueInput, value: true }, { name: sensor.okInput, value: good },
+      { name: sensor.faultInput, value: 0 }, // SensorFault.Disconnected, including a true raw payload.
+    ]));
+  const { artifact: compared, native, wasm } = await compare(source, tape, filename);
+  assert.deepEqual(compared.bytes, artifact.bytes);
+  const expected = [{ a_for: 0, b_for: 0 }, { a_for: 20, b_for: 0 }, { a_for: 40, b_for: 20 },
+    { a_for: 0, b_for: 0 }, { a_for: 0, b_for: 0 }, { a_for: 20, b_for: 20 }];
+  for (const outcomes of [native, wasm]) {
+    assert.deepEqual(outcomes.map(item => item.accepted), tape.map(() => true));
+    assert.deepEqual(outcomes.map(item => ({ a_for: item.outcome.trace.safe.a_age_ms,
+      b_for: item.outcome.trace.safe.b_age_ms })), expected);
+    assert.deepEqual(outcomes.map(item => Object.fromEntries(observeRuntimeValues(artifact.traceMetadata,
+      item.outcome.trace).values.filter(value => value.kind === 'timer').map(value => [value.name, value.value]))), expected);
+    const since = name => artifact.traceMetadata.bindings.find(binding => binding.kind === 'timer'
+      && binding.generated.declaration === name && binding.generated.role === 'since').name;
+    assert.notEqual(since('a_for'), since('b_for'));
+    assert.equal(outcomes[2].outcome.trace.stateAfter[since('a_for')], 100);
+    assert.equal(outcomes[2].outcome.trace.stateAfter[since('b_for')], 120);
+    const fault = observeSourceTrace(artifact.traceMetadata, outcomes[3].outcome.trace).resultEvents;
+    assert.ok(fault.some(event => event.kind === 'case' && event.errorType === 'SensorFault'
+      && event.fault === 'Disconnected'), 'the authored false branch retains the sensor fault');
+  }
+});
+
+test('REF-03-017: continuous true rejects an implicit Result Bool input', async () => {
+  await assert.rejects(compileSource(`control ImplicitFaultTimer {
+  sensor high: Bool;
+  timer active_for = continuous_true(high);
+  output age_ms: Duration;
+  age_ms <- active_for;
+}`, { filename: 'reference-implicit-fault-timer.ghost' }), /continuous_true argument must be Bool/);
 });
 
 test('REF-03-016: continuous true preserves equal timestamps and resets before a new interval on native and WASM', async () => {
