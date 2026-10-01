@@ -3,6 +3,14 @@
 
 # Solar schedule: compiler와 simulation host
 
+이 안내는 이전 standalone Solar profile을 설명한다. live typed config Result를
+공유하고 Rust가 context admission을 소유하는 Solar는
+[Solar/config 실행](SOLAR-CONFIG-EXECUTION.ko.md)을 참조한다. 현재 Reference의
+명시 공통 정책과 제한된 hold/fixed-time fallback 규칙은 아래 원래 v3 범위를
+대체한다. [Reference §3.5](reference/03-time-and-schedules.md#35-schedule의-공통-의미)를 참조한다.
+standalone profile은 구체적인 기존 consumer를 위해 유지하며 공유 context
+profile의 fallback이 아니다.
+
 `Solar`는 host가 공급하는 occurrence descriptor다. compiler는 typed `.due` Boolean input만
 내보낸다. 천문 event를 계산하거나 output을 운전하지 않는다.
 
@@ -31,7 +39,8 @@ timer는 독립적으로 계속된다.
 Solar를 포함한 control의 manifest format은 `GhostFlow/control-v3`다. descriptor는
 `{ kind: "solar", name, timezone, latitude, longitude, event, offsetMs, fallback: "skip",
 dueInput }`이다. mixed v3 manifest에서도 기존 `DailySlots` descriptor는 불변이다.
-이 compiler 작업은 Solar/operating-setting metadata를 의도적으로 함께 거부한다.
+원래 compiler 범위는 Solar/operating-setting metadata를 함께 거부했다. 새 GFB16
+공유 context profile은 설정을 상수로 접지 않고 이 합성을 지원한다.
 Solar가 없는 control은 v1/v2 manifest 동작을 유지한다.
 
 ## Simulation host

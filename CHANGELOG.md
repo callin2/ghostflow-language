@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+### 2026-10-01 — shared Solar/config execution ([#145](https://github.com/callin2/ghostflow-language/issues/145))
+
+Solar and live typed configuration now execute in one staged Rust context;
+the compiler previously rejected their composition. For example,
+`when = case enabled { ok(v) => v; fault(_) => false; };` reads the same
+current Result as ordinary control. Any config fault referenced by `when`
+preserves `Unknown(SettingsFault)` even if its fault branch returns true;
+unrelated faults do not suppress Solar. Recovery establishes a baseline without
+catch-up. Failed evaluations consume neither events nor occurrences. This
+prevents stale success from authorizing an occurrence. See
+[Reference §3.5](docs/reference/03-time-and-schedules.en.md#35-common-schedule-semantics)
+and the [execution guide](docs/SOLAR-CONFIG-EXECUTION.md).
+GFB16/tag16 selects control-v15 and GFSF6 Solar facts with immutable compiled
+binding checks. GFCX3 retains its wrapper and adds GFES subtype3 Solar state.
+The explicit compatibility decision retains concrete standalone Solar #28/#29
+consumers and GFSF5 non-Solar profiles, including calendars; neither is a fallback
+for rejected shared source. Older loaders reject GFB16. Compiler and native/
+WASM/ghostsim regressions cover dependency tampering, current fault/recovery,
+rollback and durable deduplication. Literal DailySlots mixing and #153 Window/
+Run overlap remain outside this change; no Device adoption or physical operation
+is claimed.
+
 ### 2026-10-01 — explicit public-holiday execution and immutable calendar composition
 
 Daily `on = day\`holiday\`; calendar = public_days;` now executes membership in

@@ -145,8 +145,8 @@
       "source": "docs/CONTEXT-EXECUTION-ABI.md",
       "sourceLanguage": "en",
       "translation": "docs/CONTEXT-EXECUTION-ABI.ko.md",
-      "sourceSha256": "379f800d0aaeac37b6e6ba2d1ffc6afd8a0114e08f936a5890ac02a76552380a",
-      "translationSha256": "68aa1bcdbe9df65028c6c34c8f692fef307c38911a9445f584baaa624dbe8262"
+      "sourceSha256": "b2171d3c5911f056af8892bce262ba51f3682f17cc4963ab937cf941d5c70c2c",
+      "translationSha256": "a8749d3c1a52b16bd767d3afe686b071ed3d9aaa9866a76a5a052a1aa08060ae"
     },
     {
       "source": "docs/CONTINUOUS-BOOL-TIMER-CONTRACT.md",
@@ -180,8 +180,8 @@
       "source": "docs/DOCUMENTATION.md",
       "sourceLanguage": "en",
       "translation": "docs/DOCUMENTATION.ko.md",
-      "sourceSha256": "aa419d37db26daf4359f83b7e46f42fa8c2ef6c6cb5e63ecd43a9328565bb5c9",
-      "translationSha256": "f5e45627875b16d60d542e3cdc881b5208e2c3f1d5e99458531cac93bac8b2f4"
+      "sourceSha256": "01e3114db01e4a7483c77ae859194759ee96e435cbbca0498e8510d075bef3ca",
+      "translationSha256": "5d40b15e4c9de00526d76d1247b353c06dccb4349f0223bfa86ebbb28b6ed698"
     },
     {
       "source": "docs/EXACT-INTEGER-CONTRACT.md",
@@ -299,8 +299,8 @@
       "source": "docs/OPERATOR-SETTINGS-STREAM.md",
       "sourceLanguage": "en",
       "translation": "docs/OPERATOR-SETTINGS-STREAM.ko.md",
-      "sourceSha256": "a0a586a2e3e358aae868ce2c177bcc2ddb0d1e4df6a9d90a110987a7e9b97aad",
-      "translationSha256": "588cb8bbe56ae1c45bb55fde6179d66648d1b1c93b6db5e5bfd526790b723fbc"
+      "sourceSha256": "702e3b64283ff0c8a3da17b819f4b54b06c197b28636010b849c20baaf553245",
+      "translationSha256": "a14da60802c76187995ec80de7e91be34dd4969ae826c2021db72dfce30088c4"
     },
     {
       "source": "docs/plans/2026-09-28-semantic-kernel.md",
@@ -348,8 +348,8 @@
       "source": "docs/reference/03-time-and-schedules.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/03-time-and-schedules.en.md",
-      "sourceSha256": "48b511114f5c850b99d92c610945759cc9dbcd06ac85d375626c392c6b76449d",
-      "translationSha256": "c95310820f307f0e534bdeff74fb24decf02ff9c9464dd2412952d16202d93c3"
+      "sourceSha256": "7a014414cbc8b6a012dea6d0d908451835ac030d81b952700e586d29f9abeb12",
+      "translationSha256": "83c7c0476bc0324f3ed02c7e1e828a41501f4bae4ea7a79a909685767d4ece42"
     },
     {
       "source": "docs/reference/04-sensors-constraints-control.md",
@@ -474,8 +474,8 @@
       "source": "docs/SOLAR-SCHEDULE.md",
       "sourceLanguage": "en",
       "translation": "docs/SOLAR-SCHEDULE.ko.md",
-      "sourceSha256": "2ba439a2dd02804b1097524cf0aca243cd1b2f4c8f7ea8e918919c546f1897d1",
-      "translationSha256": "ad5b334f6c20320c4022cb438bbfd7e2292640c0610da0451f600e6021e4c74e"
+      "sourceSha256": "09a4fcaad550519bd007a42ce96ebd6377b300a65a166b198b76e8122097385c",
+      "translationSha256": "4e8000ca06d90fa4fe5ba0746ec25df1716262d5b04045291ee163ca9d7d9510"
     },
     {
       "source": "docs/SOURCE-MAP.md",
@@ -565,8 +565,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "260e58610cabefb61c86c8fa1b4d3a72e3c6010a857af5afffb527c3b8e1574c",
-      "translationSha256": "4f2e3d320648e0f8f84cf988327b967fed2ab5ef20a77a9d669fae3782c8695b"
+      "sourceSha256": "120aa3ee37667c19c5d070e716b011c624fa298a4b12dcdada31ed63c61dda12",
+      "translationSha256": "77189da3da8f24020a7696dd3b796e12052fa60016acd88a8e53247be4263be1"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",
@@ -952,6 +952,20 @@
       "translation": "examples/korean-calendar.ghost.en.md",
       "sourceSha256": "bca00944a6684b09aac6ef4e5b955c6beaade02b0d4bc8d1efc6bfadf921ed49",
       "translationSha256": "12a365ebbd6717735f44148df1aed7d670076fd6ff5e4f47e243abfe06d6b30a"
+    },
+    {
+      "source": "docs/SOLAR-CONFIG-EXECUTION.md",
+      "sourceLanguage": "en",
+      "translation": "docs/SOLAR-CONFIG-EXECUTION.ko.md",
+      "sourceSha256": "ce073af1790e7dfc6b716859828a381f932291189d5571f437524aec6bac8de6",
+      "translationSha256": "e2217913594b477469ca9204b2300e5dd5dff6b23137b0dff5da187a4b135d6c"
+    },
+    {
+      "source": "examples/solar-live-config.ghost.md",
+      "sourceLanguage": "ko",
+      "translation": "examples/solar-live-config.ghost.en.md",
+      "sourceSha256": "0ec0eb39fbc5895916ebc83f971ae59a479715f86ce0264423f1d7515bd0fad3",
+      "translationSha256": "c949d5b1afcfe3610e772128d62eff15227f9d742a475efbb131c3edae4b2b5e"
     }
   ],
   "exclusions": [
@@ -1202,6 +1216,10 @@
     {
       "path": "tests/fixtures/contribution-134/numeric-threshold.ghost.md",
       "reason": "Canonical executable test input mirrored from an immutable virtual field fixture; provenance and reader guidance are in the bilingual contribution package."
+    },
+    {
+      "path": "tests/fixtures/issue-145-solar-config.ghost.md",
+      "reason": "Canonical executable Solar/shared-config conformance fixture with deterministic recorded facts and event sequence; reader guidance and example are translated separately."
     }
   ]
 }

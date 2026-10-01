@@ -16,6 +16,15 @@ pub struct DurationSetting {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ScheduleDefinition {
+    SolarContext {
+        timezone: String,
+        latitude: f64,
+        longitude: f64,
+        event: u8,
+        offset_ms: i64,
+        fallback_time_ms: Option<u64>,
+        config_ids: Vec<u32>,
+    },
     AtPulse {
         at_ms: u64,
     },
@@ -161,6 +170,20 @@ pub struct ScheduleEvidence {
     pub rows: Vec<Occurrence>,
 }
 
+/// Complete provider facts, never a caller-computed due projection.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SolarContextEvidence {
+    pub site: u32,
+    pub timezone: String,
+    pub latitude: f64,
+    pub longitude: f64,
+    pub event: u8,
+    pub offset_ms: i64,
+    pub coverage_start_ms: u64,
+    pub coverage_end_ms: u64,
+    pub rows: Vec<crate::solar_admission::SolarFact>,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SettingValue {
     Duration(u64),
@@ -192,6 +215,8 @@ pub struct SettingsEvent {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Observation {
+    pub solar_fallback: Option<bool>,
+    pub solar_unavailable_reason: Option<u8>,
     pub clock_provenance: Option<String>,
     pub clock_source_revision: Option<String>,
     pub clock_uncertainty_ms: Option<u64>,
@@ -273,6 +298,43 @@ pub(crate) fn load_schedule(
         return Err(Error::new("invalid context schedule gap"));
     }
     let definition = match kind {
+        16 if format == 16 => {
+            let timezone = text(reader)?;
+            let latitude = reader.f64()?;
+            let longitude = reader.f64()?;
+            let event = reader.u8()?;
+            let offset_ms = reader.u64()? as i64;
+            let fallback = exact(reader)?;
+            let count = usize::from(reader.u16()?);
+            if !latitude.is_finite()
+                || !longitude.is_finite()
+                || !(-90.0..=90.0).contains(&latitude)
+                || !(-180.0..=180.0).contains(&longitude)
+                || event > 1
+                || offset_ms.unsigned_abs() > 86_400_000
+                || fallback > 86_400_000
+                || count > 128
+            {
+                return Err(Error::new("invalid context Solar descriptor"));
+            }
+            let mut config_ids = Vec::with_capacity(count);
+            for _ in 0..count {
+                let id = reader.u32()?;
+                if id == 0 || config_ids.last().is_some_and(|old| *old >= id)
+                    || !prior.iter().any(|d| matches!(d, crate::schedule_vm::PulseDescriptor::Config(c) if c.id == id))
+                { return Err(Error::new("invalid Solar config dependency")); }
+                config_ids.push(id);
+            }
+            ScheduleDefinition::SolarContext {
+                timezone,
+                latitude,
+                longitude,
+                event,
+                offset_ms,
+                fallback_time_ms: (fallback != 86_400_000).then_some(fallback),
+                config_ids,
+            }
+        }
         5 => {
             let epoch_id = text(reader)?;
             let anchor_ms = exact(reader)?;
@@ -491,7 +553,7 @@ pub(crate) fn load_schedule(
                 dst_repeated,
             }
         }
-        15 if format == 15 => {
+        15 if matches!(format, 15 | 16) => {
             let timezone = text(reader)?;
             let at_ms = exact(reader)?;
             let calendar = text(reader)?;
@@ -539,9 +601,21 @@ pub(crate) fn load_schedule(
     };
     let when = reader.blob()?;
     let cancel = reader.blob()?;
-    let clock_hold_ms = if matches!(format, 13 | 15) {
+    if let ScheduleDefinition::SolarContext { config_ids, .. } = &definition {
+        if *config_ids != config_dependencies(&when, prior)? {
+            return Err(Error::new(
+                "Solar config dependencies differ from protected input reads",
+            ));
+        }
+    }
+    let clock_hold_ms = if matches!(format, 13 | 15 | 16) {
         let hold = exact(reader)?;
-        if hold != 0 && !matches!(definition, ScheduleDefinition::TideRun { .. }) {
+        if hold != 0
+            && !matches!(
+                definition,
+                ScheduleDefinition::TideRun { .. } | ScheduleDefinition::SolarContext { .. }
+            )
+        {
             return Err(Error::new("clock hold requires natural schedule"));
         }
         (hold != 0).then_some(hold)
@@ -557,6 +631,56 @@ pub(crate) fn load_schedule(
         when,
         cancel,
     })
+}
+
+/// Decode instructions rather than trusting compiler dependency metadata or
+/// searching byte values inside immediates. Result branches read all three
+/// protected rails; every referenced rail binds the owning current Result.
+fn config_dependencies(
+    code: &[u8],
+    prior: &[crate::schedule_vm::PulseDescriptor],
+) -> Result<Vec<u32>> {
+    let mut r = Reader::new(code);
+    let mut reads = std::collections::BTreeSet::new();
+    while !r.finished() {
+        match r.u8()? {
+            1 => {
+                r.take(1)?;
+            }
+            2 => {
+                r.take(8)?;
+            }
+            3 => {
+                reads.insert(r.u16()?);
+            }
+            4 | 5 | 30 | 31 => {
+                r.take(2)?;
+            }
+            23 | 56 => {
+                r.take(4)?;
+            }
+            57..=59 => {
+                r.take(3)?;
+            }
+            10 | 13..=22 | 24..=29 | 32..=55 => {}
+            _ => return Err(Error::new("unknown expression opcode")),
+        }
+    }
+    let mut ids: Vec<_> = prior
+        .iter()
+        .filter_map(|d| match d {
+            crate::schedule_vm::PulseDescriptor::Config(c)
+                if [c.ok_input, c.value_input, c.fault_input]
+                    .iter()
+                    .any(|i| reads.contains(i)) =>
+            {
+                Some(c.id)
+            }
+            _ => None,
+        })
+        .collect();
+    ids.sort_unstable();
+    Ok(ids)
 }
 
 pub(crate) fn load_natural(reader: &mut Reader<'_>, inputs: &[Field]) -> Result<NaturalDescriptor> {
@@ -647,4 +771,128 @@ pub(crate) fn load_accounting(
         value_input,
         fault_input,
     })
+}
+
+#[cfg(test)]
+mod solar_dependency_tests {
+    use super::*;
+    use crate::schedule_vm::PulseDescriptor;
+    fn config() -> PulseDescriptor {
+        PulseDescriptor::Config(crate::settings_stream::ConfigDescriptor {
+            id: 7,
+            name: "enabled".into(),
+            semantic_type: "Bool".into(),
+            kind: 0,
+            operator_editable: true,
+            initial: crate::settings_stream::ConfigValue::Scalar(crate::Value::Bool(true)),
+            bounds: None,
+            grid_ms: 0,
+            capacity: 0,
+            ok_input: 2,
+            value_input: 3,
+            fault_input: 4,
+        })
+    }
+    fn text(bytes: &mut Vec<u8>, value: &str) {
+        bytes.extend_from_slice(&(value.len() as u16).to_le_bytes());
+        bytes.extend_from_slice(value.as_bytes());
+    }
+    fn encoded(ids: &[u32], when: &[u8]) -> Vec<u8> {
+        let mut bytes = 8u32.to_le_bytes().to_vec();
+        text(&mut bytes, "rise");
+        bytes.extend_from_slice(&1_000u64.to_le_bytes());
+        text(&mut bytes, "UTC");
+        bytes.extend_from_slice(&37f64.to_le_bytes());
+        bytes.extend_from_slice(&127f64.to_le_bytes());
+        bytes.push(0);
+        bytes.extend_from_slice(&0i64.to_le_bytes());
+        bytes.extend_from_slice(&86_400_000u64.to_le_bytes());
+        bytes.extend_from_slice(&(ids.len() as u16).to_le_bytes());
+        for id in ids {
+            bytes.extend_from_slice(&id.to_le_bytes());
+        }
+        for code in [when, &[1, 0][..]] {
+            bytes.extend_from_slice(&(code.len() as u32).to_le_bytes());
+            bytes.extend_from_slice(code);
+        }
+        bytes.extend_from_slice(&0u64.to_le_bytes());
+        bytes
+    }
+    fn module_bytes(ids: &[u32], when: &[u8]) -> Vec<u8> {
+        let mut bytes = b"GFB1\x10\x00".to_vec();
+        text(&mut bytes, "dependency-contract");
+        bytes.extend_from_slice(&1u32.to_le_bytes());
+        bytes.extend_from_slice(&5u16.to_le_bytes());
+        for (name, ty) in [
+            ("__gf_now_ms", 2),
+            ("__gf_time_epoch", 2),
+            ("__gf_config_7_ok", 1),
+            ("__gf_config_7_value", 1),
+            ("__gf_config_7_fault", 2),
+        ] {
+            text(&mut bytes, name);
+            bytes.push(ty);
+        }
+        bytes.extend_from_slice(&0u16.to_le_bytes()); // states
+        for n in [0u16, 1, 0, 1] {
+            bytes.extend_from_slice(&n.to_le_bytes());
+        } // clock indices, roots, strategies
+        text(&mut bytes, "control");
+        bytes.extend_from_slice(&0i32.to_le_bytes());
+        bytes.extend_from_slice(&2u32.to_le_bytes());
+        bytes.extend_from_slice(&[5, 1]);
+        bytes.extend_from_slice(&2u16.to_le_bytes()); // two descriptors
+        bytes.push(12);
+        bytes.extend_from_slice(&7u32.to_le_bytes());
+        text(&mut bytes, "enabled");
+        text(&mut bytes, "Bool");
+        bytes.extend_from_slice(&[0, 1, 1, 0]); // Bool/operator/true/no bounds
+        for n in [2u16, 3, 4] {
+            bytes.extend_from_slice(&n.to_le_bytes());
+        }
+        bytes.push(16);
+        bytes.extend_from_slice(&encoded(ids, when));
+        for _ in 0..4 {
+            bytes.extend_from_slice(&0u16.to_le_bytes());
+        } // transitions, intents, constraints, objective
+        bytes
+    }
+    #[test]
+    fn module_loader_rejects_forged_solar_config_dependency_omission() {
+        let valid = module_bytes(&[7], &[3, 3, 0]);
+        assert!(crate::Module::load(&valid).is_ok());
+        let forged = module_bytes(&[], &[3, 3, 0]);
+        assert!(crate::Module::load(&forged)
+            .err()
+            .unwrap()
+            .to_string()
+            .contains("dependencies differ from protected input reads"));
+        assert!(crate::Module::load(&module_bytes(&[7], &[1, 1])).is_err());
+    }
+    #[test]
+    fn solar_dependency_metadata_must_match_decoded_protected_rails() {
+        let prior = [config()];
+        for input in [2, 3, 4] {
+            let code = [3, input, 0];
+            assert_eq!(config_dependencies(&code, &prior).unwrap(), vec![7]);
+            assert!(load_schedule(&mut Reader::new(&encoded(&[], &code)), 16, 16, &prior).is_err());
+            assert!(load_schedule(&mut Reader::new(&encoded(&[7], &code)), 16, 16, &prior).is_ok());
+        }
+        // The read-looking bytes are inside a floating-point immediate.
+        let mut immediate = vec![2];
+        immediate.extend_from_slice(&[3, 2, 0, 0, 0, 0, 0, 0]);
+        assert!(config_dependencies(&immediate, &prior).unwrap().is_empty());
+        assert!(load_schedule(&mut Reader::new(&encoded(&[7], &[1, 1])), 16, 16, &prior).is_err());
+        assert!(load_schedule(&mut Reader::new(&encoded(&[8], &[1, 1])), 16, 16, &prior).is_err());
+        assert!(load_schedule(
+            &mut Reader::new(&encoded(&[7, 7], &[3, 2, 0])),
+            16,
+            16,
+            &prior
+        )
+        .is_err());
+        assert!(
+            load_schedule(&mut Reader::new(&encoded(&[7], &[3, 2, 0])), 16, 15, &prior).is_err()
+        );
+    }
 }

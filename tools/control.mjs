@@ -1510,15 +1510,15 @@ class Lowerer {
     }
     const extendedSolar = this.manifest.schedules.some(schedule => schedule.kind === 'solar'
       && (typeof schedule.policy.clock === 'object' || typeof schedule.policy.fallback === 'object'));
-    if (emitBytecode && extendedSolar && (this.manifest.schedules.some(schedule => schedule.kind !== 'solar')
-      || this.providers.size || this.configStreams.length)) {
+    if (emitBytecode && extendedSolar && !this.configStreams.length && (this.manifest.schedules.some(schedule => schedule.kind !== 'solar')
+      || this.providers.size)) {
       error(this.ast.loc, 'extended Solar policy execution requires Solar-only schedules without providers or config streams');
     }
     if (contextForms.some(form => form[0] === 'utc-range') && solarForms.length) {
       error(this.ast.loc, 'UTC Range cannot mix with legacy Solar or civil pulse execution');
     }
     if (emitBytecode && this.configStreams.length && solarForms.length) {
-      error(this.ast.loc, 'config streams cannot mix with legacy Solar/DailySlots context execution; use fixed let values or a config-aware schedule');
+      error(this.ast.loc, 'config streams cannot mix with legacy Daily/DailySlots context execution; use fixed let values or a config-aware schedule');
     }
     if (accountingExecution) {
       const bindings = this.manifest.accounts ?? [];
@@ -1547,6 +1547,7 @@ class Lowerer {
       this.manifest.format = 'GhostFlow/control-v13';
     }
     if (contextForms.some(form => form[0] === 'holiday-daily-pulse')) this.manifest.format = 'GhostFlow/control-v14';
+    if (contextForms.some(form => form[0] === 'solar-context-pulse')) this.manifest.format = 'GhostFlow/control-v15';
     const temporalForms = this.windows.length || this.trueFors.length || solarForms.length || contextForms.length ? [
       ['temporal-context', `${RESERVED_PREFIX}now_ms`, `${RESERVED_PREFIX}time_epoch`],
       ...[...this.temporalRoots.values()].sort((left, right) => left.tag - right.tag).map(root =>
@@ -2331,7 +2332,9 @@ class Lowerer {
         if (!sameType(cancel.type, BOOL)) error(options.cancel_when.loc, `${label} cancel_when must be Bool`);
         cancelWhen = cancel.sexpr;
       }
-      const slot = this.configStreams.length + this.manifest.schedules.filter(schedule => ['at', 'solar', 'daily', 'daily-slots', 'periodic', 'cron'].includes(schedule.kind)).length;
+      const slot = this.configStreams.length + (this.configStreams.length && this.hasSolarSchedule
+        ? this.manifest.schedules.length
+        : this.manifest.schedules.filter(schedule => ['at', 'solar', 'daily', 'daily-slots', 'periodic', 'cron'].includes(schedule.kind)).length);
       this.manifest.schedules.push({
         ...trigger, site: item.id, name: item.name, ...civilPolicy,
         policy: { basis, when: predicate.sexpr, ...(cancelWhen === undefined ? {} : { cancelWhen }),
@@ -2355,7 +2358,8 @@ class Lowerer {
     const policy = this.naturalSchedulePolicy(item, false);
     if (!this.hasClock) { this.addInput(`${RESERVED_PREFIX}now_ms`, NUMBER, item.loc); this.hasClock = true; }
     if (!this.gfbInputs.some(input => input[1] === `${RESERVED_PREFIX}time_epoch`)) this.addInput(`${RESERVED_PREFIX}time_epoch`, NUMBER, item.loc);
-    const slot = this.manifest.schedules.filter(schedule => ['solar', 'daily'].includes(schedule.kind)).length;
+    const slot = this.configStreams.length ? this.configStreams.length + this.manifest.schedules.length
+      : this.manifest.schedules.filter(schedule => ['solar', 'daily'].includes(schedule.kind)).length;
     this.manifest.format = 'GhostFlow/control-v3';
     this.manifest.schedules.push({
       kind: 'solar', site: item.id, name: item.name, timezone: item.timezone,
@@ -3572,7 +3576,7 @@ class Lowerer {
     ]);
   }
   solarForms() {
-    return this.manifest.schedules.filter(schedule => schedule.kind === 'solar'
+    return this.manifest.schedules.filter(schedule => schedule.kind === 'solar' && !this.configStreams.length
       || ['daily', 'daily-slots'].includes(schedule.kind) && schedule.policy.basis === 'pulse'
         && schedule.policy.clock === 'trusted_only' && !schedule.day && !schedule.selectedConfig).map(schedule => schedule.kind === 'daily' ? [
       'daily-pulse', String(schedule.site), schedule.name, schedule.timezone, String(schedule.atMs),
@@ -3607,12 +3611,26 @@ class Lowerer {
         config.settings?.access === 'operator' ? 'true' : 'false', payload,
         inputs?.ok ?? 'none', inputs?.value ?? 'none', inputs?.fault ?? 'none'];
     });
-    const scheduleForms = this.manifest.schedules.filter(schedule => schedule.kind === 'at' || schedule.policy?.basis?.kind === 'range'
+    const scheduleForms = this.manifest.schedules.filter(schedule => schedule.kind === 'solar' && this.configStreams.length
+      || schedule.kind === 'at' || schedule.policy?.basis?.kind === 'range'
       || ['periodic', 'cron', 'tide'].includes(schedule.kind)
       || schedule.kind === 'daily' && schedule.day?.calendar
       || schedule.kind === 'daily-slots' && schedule.selectedConfig).map(schedule => {
       const base = [String(schedule.site), schedule.name, String(schedule.policy.gapMs)];
       const when = schedule.policy.when, cancel = schedule.policy.cancelWhen ?? 'false';
+      if (schedule.kind === 'solar') {
+        const atoms = new Set();
+        const collect = value => { if (Array.isArray(value)) value.forEach(collect);
+          else for (const atom of String(value).match(/[^\s()]+/g) ?? []) atoms.add(atom); };
+        collect(when);
+        const deps = this.configStreams.filter(stream => stream.resultInputs
+          && Object.values(stream.resultInputs).some(input => atoms.has(`input.${input}`)))
+          .map(stream => stream.id).sort((a, b) => a - b);
+        schedule.configIds = deps;
+        return ['solar-context-pulse', ...base, schedule.timezone, String(schedule.latitude), String(schedule.longitude),
+          schedule.event, String(schedule.offsetMs), String(schedule.policy.fallback.atMs ?? 86400000),
+          ['config-deps', ...deps.map(String)], when, cancel, String(schedule.policy.clock.durationMs ?? 0)];
+      }
       if (schedule.kind === 'at') return ['at-pulse', ...base, String(schedule.atMs), when, cancel];
       if (schedule.policy.basis?.kind === 'range') {
         if (schedule.timezone !== 'UTC' || schedule.day || schedule.selectedConfig

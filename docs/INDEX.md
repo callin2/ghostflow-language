@@ -109,6 +109,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/SCENARIO-RUNNER.ko.md](SCENARIO-RUNNER.ko.md) | 가상 시나리오 러너 | md |
 | [docs/SCENARIO-RUNNER.md](SCENARIO-RUNNER.md) | Virtual scenario runner | md |
 | [docs/SEPARATION-VALIDATION.md](SEPARATION-VALIDATION.md) | Language project separation verification | md |
+| [docs/SOLAR-CONFIG-EXECUTION.ko.md](SOLAR-CONFIG-EXECUTION.ko.md) | 공유 live 설정을 사용하는 Solar 실행 | md |
+| [docs/SOLAR-CONFIG-EXECUTION.md](SOLAR-CONFIG-EXECUTION.md) | Solar execution with shared live configuration | md |
 | [docs/SOLAR-SCHEDULE.ko.md](SOLAR-SCHEDULE.ko.md) | Solar schedule: compiler와 simulation host | md |
 | [docs/SOLAR-SCHEDULE.md](SOLAR-SCHEDULE.md) | Solar schedules: compiler and simulation host | md |
 | [docs/SOURCE-MAP.ko.md](SOURCE-MAP.ko.md) | 소스를 보존하는 산출물 맵 — 첫 단계 | md |
@@ -212,4 +214,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.ko.md](research/GF-COMPOSE-R9-ACCEPTANCE.ko.md) | GF-COMPOSE R9: acceptance와 구현 인계 | md |
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.md](research/GF-COMPOSE-R9-ACCEPTANCE.md) | GF-COMPOSE R9: acceptance and implementation handoff | md |
 
-178 documents.
+180 documents.

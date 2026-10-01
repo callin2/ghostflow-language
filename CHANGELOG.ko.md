@@ -5,6 +5,25 @@
 
 ## 미출시
 
+### 2026-10-01 — 공유 Solar/config 실행 ([#145](https://github.com/callin2/ghostflow-language/issues/145))
+
+이전에 compiler가 거부했던 Solar와 live typed configuration 합성을 이제 하나의
+staged Rust context에서 실행한다. 예를 들어
+`when = case enabled { ok(v) => v; fault(_) => false; };`는 일반 제어와 같은
+현재 Result를 읽는다. `when`이 참조한 config fault는 작성한 fault 분기가 true를
+반환해도 `Unknown(SettingsFault)`를 보존한다. 무관한 fault는 Solar를 억제하지
+않는다. 복구는 catch-up 없이 기준선을 세우고 실패한 평가는 event/occurrence를
+소비하지 않는다. 과거 성공 값이 occurrence를 허용하는 것을 막기 위한 변경이다.
+[Reference §3.5](docs/reference/03-time-and-schedules.md#35-schedule의-공통-의미)와
+[실행 안내](docs/SOLAR-CONFIG-EXECUTION.ko.md)를 참조한다.
+GFB16/tag16은 control-v15와 불변 컴파일 binding을 검증하는 GFSF6 Solar 사실을
+선택한다. GFCX3 wrapper는 유지하고 GFES subtype3 Solar state를 추가한다.
+명시 호환 결정으로 구체적인 standalone Solar #28/#29 consumer와 calendar를
+포함한 비Solar GFSF5 profile을 유지한다. 거부된 공유 source의 fallback은 아니다.
+이전 loader는 GFB16을 거부한다. compiler와 native/WASM/ghostsim 회귀는 의존성
+변조, 현재 fault/복구, rollback, durable 중복 억제를 다룬다. literal DailySlots
+혼합과 #153 Window/Run 중첩은 범위 밖이다. Device 채택이나 물리 운전을 주장하지 않는다.
+
 ### 2026-10-01 — 공휴일 실행과 불변 달력 합성
 
 Daily의 `on = day\`holiday\`; calendar = public_days;`는 typed HolidayCalendar의

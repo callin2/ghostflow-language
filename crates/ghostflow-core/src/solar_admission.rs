@@ -136,6 +136,10 @@ pub struct SolarStage {
 }
 
 impl SolarPulseEngine {
+    pub(crate) fn reset_observation_baseline(&mut self, boot_epoch: u64) -> Result<()> {
+        self.clock = ScheduleClockGate::new(self.gap_ms, boot_epoch)?;
+        Ok(())
+    }
     pub(crate) fn terminal_identities(&self) -> &[(i32, u16, u8)] {
         &self.terminal_days
     }

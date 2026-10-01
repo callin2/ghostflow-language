@@ -10,7 +10,7 @@ import { verifyArtifactSourceMap } from './toolchain.mjs';
 import { encodeTemporalProfile } from '../runtimes/wasm/temporal-profile.mjs';
 import { encodeScheduleFacts, encodeSolarFacts, validateSolarActivation } from '../runtimes/wasm/solar-abi.mjs';
 import { validateSolarFallbackFacts } from '../runtimes/wasm/solar-schedule.mjs';
-import { encodeContextActivation, encodeContextFacts } from '../runtimes/wasm/context-abi.mjs';
+import { encodeContextActivation, encodeContextFacts, validateContextSolarFacts } from '../runtimes/wasm/context-abi.mjs';
 import { AFTER_EVENT_CAPACITY } from '../runtimes/wasm/after-event-runtime.mjs';
 
 const root = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
@@ -84,13 +84,14 @@ export function validateScenario(scenario, manifest) {
     if (!Array.isArray(scenario.capabilities)) throw new Error('capabilities: expected array');
     if (!manifest.adaptPolicy && !manifest.strategies) throw new Error('capabilities require an adapt control');
   }
-  const hasSolar = manifest.schedules?.some(schedule => schedule.kind === 'solar') ?? false;
+  const hasSolar = manifest.format !== 'GhostFlow/control-v15' && (manifest.schedules?.some(schedule => schedule.kind === 'solar') ?? false);
   const hasDaily = manifest.schedules?.some(schedule => schedule.kind === 'daily') ?? false;
   const hasDailySlots = manifest.schedules?.some(schedule => schedule.kind === 'daily-slots') ?? false;
   const hasCivilSchedule = hasDaily || hasDailySlots;
   const hasContext = manifest.format === 'GhostFlow/control-v10'
     || manifest.format === 'GhostFlow/control-v13'
     || manifest.format === 'GhostFlow/control-v14'
+    || manifest.format === 'GhostFlow/control-v15'
     || manifest.format === 'GhostFlow/control-v12' && !hasSolar;
   if (hasContext) {
     if (scenario.context === undefined) throw new Error('context control requires explicit context activation');
@@ -306,6 +307,7 @@ export function validateScenario(scenario, manifest) {
         } else if (action.scheduleFacts !== undefined) throw new Error(`${location}: schedule facts require a Daily or DailySlots schedule`);
         if (hasContext) {
           if (action.contextFacts === undefined) throw new Error(`${location}: context scan requires typed facts`);
+          validateContextSolarFacts(action.contextFacts, manifest.schedules);
           encodeContextFacts(action.contextFacts);
           if (action.contextFacts.clock.monotonicMs !== action.atMs) throw new Error(`${location}: context clock monotonicMs must match atMs`);
           if (action.contextFacts.clock.bootEpoch !== scenario.context.bootEpoch) throw new Error(`${location}: context bootEpoch must match activation`);
@@ -334,7 +336,7 @@ export function loadVerifiedArtifact(artifactPath) {
   const manifest = JSON.parse(fs.readFileSync(`${artifactPath}.manifest.json`, 'utf8'));
   const map = JSON.parse(fs.readFileSync(`${artifactPath}.map.json`, 'utf8'));
   const document = verifyArtifactSourceMap(map, artifactBytes, { manifest });
-  if (!/^GhostFlow\/control-v(?:[1-9]|10|12|13|14)$/u.test(manifest.format)) throw new Error('artifact must be an executable control artifact');
+  if (!/^GhostFlow\/control-v(?:[1-9]|10|12|13|14|15)$/u.test(manifest.format)) throw new Error('artifact must be an executable control artifact');
   if (manifest.bytecodeSha256 !== sha256(artifactBytes)) throw new Error('artifact SHA-256 mismatch');
   return { artifactBytes, manifest, map, document };
 }
@@ -381,7 +383,7 @@ export function runScenario(artifactPath, scenarioPath, { format = 'toon' } = {}
       || manifest.schedules?.some(schedule => schedule.kind === 'daily')
       || manifest.schedules?.some(schedule => schedule.kind === 'daily-slots')
       || (manifest.naturalConditions?.length ?? 0) > 0
-      || ['GhostFlow/control-v10', 'GhostFlow/control-v12', 'GhostFlow/control-v13', 'GhostFlow/control-v14'].includes(manifest.format)
+      || ['GhostFlow/control-v10', 'GhostFlow/control-v12', 'GhostFlow/control-v13', 'GhostFlow/control-v14', 'GhostFlow/control-v15'].includes(manifest.format)
       || manifest.schedules?.some(schedule => ['periodic','cron','tide'].includes(schedule.kind))
       || manifest.signals?.some(signal => signal.kind === 'after-event');
     const executable = conditioned ? process.execPath : path.join(root, 'target/release/examples/scenario_scan');

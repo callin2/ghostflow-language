@@ -6,7 +6,7 @@ import { NativeDispatchError } from './native-dispatch.mjs';
 import { encodeTemporalProfile } from './temporal-profile.mjs';
 import { validateSolarDescriptor, validateClockPolicy, validateSolarFallback, validateSolarFallbackFacts } from './solar-schedule.mjs';
 import { validateSolarActivation } from './solar-abi.mjs';
-import { encodeContextActivation, encodeContextFacts } from './context-abi.mjs';
+import { encodeContextActivation, encodeContextFacts, validateContextSolarFacts } from './context-abi.mjs';
 import { QUANTITY_TYPES, canonicalUnitFor, isQuantityType } from '../../tools/quantities.mjs';
 import { TIME_TYPES, isTimeType, validateTimeValue } from '../../tools/time-literals.mjs';
 import { isInt32, intSettingsIssue } from '../../tools/int-settings.mjs';
@@ -21,7 +21,9 @@ const STREAM_CONTEXT_FORMAT = 'GhostFlow/control-v10';
 const AVAILABILITY_FORMAT = 'GhostFlow/control-v12';
 const AT_FORMAT = 'GhostFlow/control-v13';
 const HOLIDAY_FORMAT = 'GhostFlow/control-v14';
+const SOLAR_CONTEXT_FORMAT = 'GhostFlow/control-v15';
 const contextManifest = manifest => manifest?.format === STREAM_CONTEXT_FORMAT
+  || manifest?.format === SOLAR_CONTEXT_FORMAT
   || manifest?.format === HOLIDAY_FORMAT
   || manifest?.format === AT_FORMAT
   || manifest?.format === AVAILABILITY_FORMAT && !manifest.schedules?.some(item => item.kind === 'solar');
@@ -229,13 +231,13 @@ function validateContextManifest(input, bytecodeFormat) {
   const manifest = record(input, 'manifest');
   keys(manifest, ['format','name','inputs','outputs','sensors','schedules','timers','signals','configs','bytecodeSha256'],
     ['providers','calendars','naturalConditions','accounting','resources','objectives','adaptSettings'], 'manifest');
-  if (manifest.format === HOLIDAY_FORMAT ? bytecodeFormat !== 15 : manifest.format === AT_FORMAT ? bytecodeFormat !== 14 : manifest.format === AVAILABILITY_FORMAT ? bytecodeFormat !== 13 : ![11, 12].includes(bytecodeFormat)) throw new Error('context manifest requires its matching GFB format');
+  if (manifest.format === SOLAR_CONTEXT_FORMAT ? bytecodeFormat !== 16 : manifest.format === HOLIDAY_FORMAT ? bytecodeFormat !== 15 : manifest.format === AT_FORMAT ? bytecodeFormat !== 14 : manifest.format === AVAILABILITY_FORMAT ? bytecodeFormat !== 13 : ![11, 12].includes(bytecodeFormat)) throw new Error('context manifest requires its matching GFB format');
   name(manifest.name, 'manifest.name');
   if (!/^[0-9a-f]{64}$/.test(manifest.bytecodeSha256)) throw new Error('invalid bytecode SHA-256');
   const inputs = validateList(manifest.inputs, 'manifest.inputs', ['name','type'], ['canonicalUnit']);
   const outputs = validateList(manifest.outputs, 'manifest.outputs', ['name','type'], ['canonicalUnit']);
   const schedules = validateList(manifest.schedules, 'manifest.schedules', ['kind','site','name','policy'],
-    ['timezone','source','event','offsetMs','anchor','every','intervalChange','cron5','fields','dstMissing','dstRepeated','atMs','day','gridMs','slots','selectedConfig']);
+    ['timezone','latitude','longitude','configIds','source','event','offsetMs','anchor','every','intervalChange','cron5','fields','dstMissing','dstRepeated','atMs','day','gridMs','slots','selectedConfig']);
   const configs = validateList(manifest.configs, 'manifest.configs', ['name','type','value'],
     ['id','settings','gridMs','capacity','initialOffset','initialEndOffset','canonicalUnit','displayUnit']);
   const sensors = validateList(manifest.sensors, 'manifest.sensors',
@@ -251,6 +253,7 @@ function validateContextManifest(input, bytecodeFormat) {
   const naturals = validateList(manifest.naturalConditions ?? [], 'manifest.naturalConditions',
     ['site','operation','provider','classification','result','projectionInputs']);
   const accounting = manifest.accounting === undefined ? null : copy(record(manifest.accounting, 'manifest.accounting'));
+  if (manifest.format === SOLAR_CONTEXT_FORMAT && !schedules.some(item => item.kind === 'solar')) throw new Error('Solar context profile requires Solar');
   if (manifest.format === HOLIDAY_FORMAT && (!schedules.some(item => item.kind === 'daily' && item.day?.kind === 'holiday')
     || schedules.some(item => item.kind === 'at'))) throw new Error('Holiday profile requires Holiday Daily and excludes At');
   if (manifest.format === AT_FORMAT && (!schedules.length || schedules.some(item => item.kind !== 'at')
@@ -278,10 +281,24 @@ function validateContextManifest(input, bytecodeFormat) {
       safeInteger(item.policy.gapMs, 'At gapMs', 1);
       continue;
     }
+    if (item.kind === 'solar') {
+      if (manifest.format !== SOLAR_CONTEXT_FORMAT) throw new Error('context Solar requires control-v15 and GFB16');
+      keys(item, ['kind','site','name','timezone','latitude','longitude','event','offsetMs','policy','configIds'], [], 'context Solar schedule');
+      if (!Array.isArray(item.configIds) || item.configIds.length > 128
+        || item.configIds.some((id, index) => !Number.isSafeInteger(id) || id <= 0 || id > 0xffff_ffff
+          || index > 0 && id <= item.configIds[index - 1] || !configs.some(config => config.id === id))) throw new Error('invalid context Solar config dependencies');
+      validateSolarDescriptor(item);
+      keys(record(item.policy, 'Solar policy'), ['basis','when','clock','gapMs','recovery','fallback'], [], 'Solar policy');
+      safeInteger(item.policy.gapMs, 'Solar gapMs', 1);
+      validateClockPolicy(item.policy?.clock, { allowHold: true });
+      validateSolarFallback(item.policy?.fallback, { allowFixed: true });
+      if (item.policy?.basis !== 'pulse' || item.policy?.recovery !== 'baseline') throw new Error('unsupported context Solar policy');
+      continue;
+    }
     if (!['periodic','cron','daily','daily-slots','tide'].includes(item.kind)) throw new Error('unsupported context schedule kind');
     const range = item.policy?.basis?.kind === 'range';
     if (range) {
-      if (![12, 13, 15].includes(bytecodeFormat) || item.timezone !== 'UTC' || item.day || item.selectedConfig
+      if (![12, 13, 15, 16].includes(bytecodeFormat) || item.timezone !== 'UTC' || item.day || item.selectedConfig
         || !['daily','daily-slots'].includes(item.kind)) throw new Error('executable Range requires GFB12 and immutable UTC Daily or DailySlots');
       const policy = record(item.policy, `schedule ${item.name}.policy`);
       keys(policy, ['basis','when','cancelWhen','clock','gapMs','recovery','fallback'], [], `schedule ${item.name}.policy`);
@@ -299,14 +316,14 @@ function validateContextManifest(input, bytecodeFormat) {
     if (!range && item.kind === 'daily') {
       if (!['workday','offday','holiday'].includes(item.day?.kind)) throw new Error('context Daily requires calendar day');
       const holiday = item.day.kind === 'holiday';
-      if (holiday && manifest.format !== HOLIDAY_FORMAT) throw new Error('Holiday Daily requires control-v14 and GFB15');
+      if (holiday && ![HOLIDAY_FORMAT, SOLAR_CONTEXT_FORMAT].includes(manifest.format)) throw new Error('Holiday Daily requires control-v14/v15 and GFB15/16');
       if (!calendars.some(calendar => calendar.name === item.day.calendar
         && calendar.type === (holiday ? 'HolidayCalendar' : 'WorkCalendar'))) throw new Error('unbound or wrong-type Daily calendar');
     }
     if (!range && item.kind === 'daily-slots' && !item.selectedConfig) throw new Error('context DailySlots requires TimeSlots config');
     if (item.kind === 'tide' && !providers.some(p => p.name === item.source && p.type === 'TidePredictions')) throw new Error('unbound Tide provider');
     if (!range) {
-      validateClockPolicy(item.policy?.clock, { allowHold: [AVAILABILITY_FORMAT, HOLIDAY_FORMAT].includes(manifest.format) && item.kind === 'tide' });
+      validateClockPolicy(item.policy?.clock, { allowHold: [AVAILABILITY_FORMAT, HOLIDAY_FORMAT, SOLAR_CONTEXT_FORMAT].includes(manifest.format) && item.kind === 'tide' });
       if (item.policy?.fallback !== 'skip' || item.policy?.recovery !== 'baseline') throw new Error('unsupported context schedule fallback or recovery');
     }
   }
@@ -896,7 +913,7 @@ async function instantiateControlRuntime(wasmBytes, { bytes: bytecode, manifest 
   const hasTrueFor = checkedManifest.manifest.signals.some(item => item.kind === 'true-for');
   const hasAfterEvent = checkedManifest.manifest.signals.some(isAfterEvent);
   const hasContext = contextManifest(checkedManifest.manifest);
-  const hasSolar = checkedManifest.manifest.schedules.some(item => item.kind === 'solar');
+  const hasSolar = !hasContext && checkedManifest.manifest.schedules.some(item => item.kind === 'solar');
   const hasSchedules = !hasContext && checkedManifest.manifest.schedules.some(item => ['daily', 'daily-slots'].includes(item.kind));
   let temporal = null;
   if (hasContext) {
@@ -1181,6 +1198,7 @@ export class ControlRuntime {
     if (this.#hasContext && contextFacts === undefined) throw new Error('context facts are required');
     if (!this.#hasContext && contextFacts !== undefined) throw new Error('context facts require a GFB10 control');
     if (this.#hasContext) {
+      validateContextSolarFacts(contextFacts, this.manifest.schedules);
       encodeContextFacts(contextFacts);
       if (contextFacts.clock.monotonicMs !== nowMs) throw new Error('context clock.monotonicMs must equal nowMs');
       if (contextFacts.clock.bootEpoch !== this.#temporalEpoch) throw new Error('context bootEpoch must match activation');

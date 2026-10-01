@@ -135,6 +135,54 @@ restore를 거부한다. GFCX1과 GFCX2는 명시 거부한다. 봉투는 4 MiB,
 과거 발생을 재생할 수 없다. 이는 컨텍스트 체크포인트이지 accounting ledger나 일반
 VM 상태 이미지가 아니다.
 
+## 공유 Solar context 확장
+
+위 layout은 원래 context profile을 설명한다. typed 설정은
+[configuration stream](OPERATOR-SETTINGS-STREAM.ko.md)의 GFSF5 envelope를 쓰고,
+calendar Holiday Daily는 GFB15 tag15를 추가한다. 공유 config의 Solar는 기존
+GFCA1 activation과 GFB11 공유 config descriptor를 유지하며 GFB16/control-v15를
+사용한다. tag16은 공통 `u32 site, string name, u64 gapMs` prefix 뒤 다음을 담는다.
+
+```text
+string timezone, f64 latitude, f64 longitude, u8 event,
+i64 offsetMs, u64 fallbackAtMs,
+u16 configDependencyCount, u32 configIds[],
+expression when, expression cancel, u64 holdMs
+```
+
+event는 rise0/set1이다. fallbackAtMs 86400000과 holdMs 0은 부재다. config ID는
+정렬되고 고유하다. Rust는 보호된 `when` 읽기로 정확한 의존성을 검증하며 참조한
+현재 fault가 하나라도 있으면 admission을 막는다. binding field는 불변이며 사실과
+정확히 일치해야 한다.
+
+GFSF6은 optional settings section까지 GFSF5를 유지한 뒤 다음을 덧붙인다.
+
+```text
+u16 solarCount, solar[]
+solar := u32 site, string timezone, f64 latitude, f64 longitude,
+         u8 event, i64 offsetMs, u64 coverageStartMs/coverageEndMs,
+         u16 rowCount, solarRow[]
+solarRow := u32 sourceDay, u8 availability,
+            optional scheduledWallMs, optional fallbackWallMs,
+            u8 unavailableReason, string providerRevision/contextRevision
+```
+
+availability는 available0/unavailable1이고 reason255는 부재, 0–5는 typed natural
+fault code다. optional time은 `u8 present, u64 value`를 유지하며 부재 값은 0이다.
+Solar row는 civil slot/fold field를 받지 않는다. Rust가 해당 identity 요소를 0으로
+고정한다. `runtimes/wasm/context-abi.mjs`의
+`solarContextEvidence(descriptor, providerSchedule)`은 provider 사실을 이 packet으로
+투영하며 admission을 계산하지 않는다. Solar context에는 GFSF6이 필요하다.
+기존 비Solar profile은 명시 호환 결정에 따라 GFSF5를 유지한다.
+
+Solar, 공유 config vector와 VM은 함께 commit한다. 실패 평가는 event/occurrence
+어느 것도 소비하지 않는다. 성공 복구는 과거 catch-up 없이 기준선을 세운다.
+GFCX3는 GFES subtype3 Solar engine state를 담는다. 정확한 Program/binding 아래
+source-day terminal identity와 현재 config Result를 유지하고 새 기준선을 위해 clock
+관측은 버린다. 이전 GFB loader는 format16을 거부한다. standalone Solar consumer는
+암묵 fallback이 아니라 기존 profile을 유지한다. 범위와 재현 절차는
+[실행 안내](SOLAR-CONFIG-EXECUTION.ko.md)를 참조한다.
+
 ## 증거
 
 `context_runtime_tests`는 보호 입력, 공급자 일관성, VM 실패 롤백, 설정 재시도 및

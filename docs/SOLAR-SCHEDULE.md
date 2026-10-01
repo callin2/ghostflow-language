@@ -1,5 +1,13 @@
 # Solar schedules: compiler and simulation host
 
+This guide describes the older standalone Solar profile. For Solar sharing live
+typed config Results and Rust-owned context admission, use
+[Solar/config execution](SOLAR-CONFIG-EXECUTION.md). The current Reference's
+explicit common policies and bounded hold/fixed-time fallback rules supersede
+the original v3 slice described below; see [Reference §3.5](reference/03-time-and-schedules.en.md#35-common-schedule-semantics).
+The standalone profile remains for concrete existing consumers; it is not a
+fallback for the shared-context profile.
+
 `Solar` is a host-supplied occurrence descriptor.  The compiler only emits its
 typed `.due` Boolean input; it does not calculate an astronomical event or
 operate an output.
@@ -31,8 +39,9 @@ no new `.due` occurrence. Existing relative timers continue independently.
 Any control containing Solar has manifest format `GhostFlow/control-v3`. Its
 descriptor is `{ kind: "solar", name, timezone, latitude, longitude, event,
 offsetMs, fallback: "skip", dueInput }`. Existing `DailySlots` descriptors
-remain unchanged, including in a mixed v3 manifest. Solar and operating-setting
-metadata are intentionally rejected together for this compiler slice; controls
+remain unchanged, including in a mixed v3 manifest. This original compiler slice
+rejected Solar and operating-setting metadata together; the newer GFB16 shared
+context profile supports that composition without folding settings to constants. Controls
 without Solar retain their v1/v2 manifest behavior.
 
 ## Simulation host

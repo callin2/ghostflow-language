@@ -139,6 +139,55 @@ identities survive restart. Clock observations and active Runs do not. Restored
 runs establish a fresh baseline and cannot replay past occurrences. This is a
 context checkpoint; it is not an accounting ledger or a general VM-state image.
 
+## Shared Solar context extension
+
+The layouts above describe the original context profile. Typed settings use the
+GFSF5 envelope in [configuration streams](OPERATOR-SETTINGS-STREAM.md); calendar
+Holiday Daily adds GFB15 tag15. Solar with shared config uses GFB16/control-v15
+and the existing GFCA1 activation, retaining the GFB11 shared config descriptors.
+Tag16 has the common `u32 site, string name, u64 gapMs` prefix, followed by:
+
+```text
+string timezone, f64 latitude, f64 longitude, u8 event,
+i64 offsetMs, u64 fallbackAtMs,
+u16 configDependencyCount, u32 configIds[],
+expression when, expression cancel, u64 holdMs
+```
+
+Event is rise0/set1; fallbackAtMs 86400000 means absent, holdMs 0 means absent.
+Config IDs are sorted and unique. Rust verifies exact dependencies from protected
+`when` reads; any referenced current fault prevents admission. Binding fields
+are immutable and must match the facts exactly.
+
+GFSF6 retains GFSF5 through its optional settings section, then appends:
+
+```text
+u16 solarCount, solar[]
+solar := u32 site, string timezone, f64 latitude, f64 longitude,
+         u8 event, i64 offsetMs, u64 coverageStartMs/coverageEndMs,
+         u16 rowCount, solarRow[]
+solarRow := u32 sourceDay, u8 availability,
+            optional scheduledWallMs, optional fallbackWallMs,
+            u8 unavailableReason, string providerRevision/contextRevision
+```
+
+Availability is available0/unavailable1; reason255 means absent, 0–5 are typed
+natural fault codes. Optional times retain `u8 present, u64 value` with absent
+zero. Solar rows do not accept civil slot/fold fields; Rust fixes their identity
+components to zero. `solarContextEvidence(descriptor, providerSchedule)` in
+`runtimes/wasm/context-abi.mjs` projects provider facts into this packet; it
+does not compute admission. A Solar context requires GFSF6; existing non-Solar
+profiles retain GFSF5 by explicit compatibility decision.
+
+Solar, the shared config vector and VM commit together. Failed evaluations
+consume neither events nor occurrences. Successful recovery establishes a
+baseline, with no past catch-up. GFCX3 embeds GFES subtype3 Solar engine state,
+preserving source-day terminal identities and current config Results under the
+exact Program/bindings while discarding clock observations for a fresh baseline.
+Older GFB loaders reject format16. The standalone Solar consumers keep their
+existing profile, not an implicit fallback. See the
+[execution guide](SOLAR-CONFIG-EXECUTION.md) for scope and reproduction.
+
 ## Evidence
 
 `context_runtime_tests` exercises protected inputs, shared-provider consistency,

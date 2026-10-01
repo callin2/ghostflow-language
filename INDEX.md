@@ -163,6 +163,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/SCENARIO-RUNNER.ko.md](docs/SCENARIO-RUNNER.ko.md) | 가상 시나리오 러너 | md |
 | [docs/SCENARIO-RUNNER.md](docs/SCENARIO-RUNNER.md) | Virtual scenario runner | md |
 | [docs/SEPARATION-VALIDATION.md](docs/SEPARATION-VALIDATION.md) | Language project separation verification | md |
+| [docs/SOLAR-CONFIG-EXECUTION.ko.md](docs/SOLAR-CONFIG-EXECUTION.ko.md) | 공유 live 설정을 사용하는 Solar 실행 | md |
+| [docs/SOLAR-CONFIG-EXECUTION.md](docs/SOLAR-CONFIG-EXECUTION.md) | Solar execution with shared live configuration | md |
 | [docs/SOLAR-SCHEDULE.ko.md](docs/SOLAR-SCHEDULE.ko.md) | Solar schedule: compiler와 simulation host | md |
 | [docs/SOLAR-SCHEDULE.md](docs/SOLAR-SCHEDULE.md) | Solar schedules: compiler and simulation host | md |
 | [docs/SOURCE-MAP.ko.md](docs/SOURCE-MAP.ko.md) | 소스를 보존하는 산출물 맵 — 첫 단계 | md |
@@ -266,6 +268,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [examples/optional-feedback-timer.ghost.md](examples/optional-feedback-timer.ghost.md) | Timer control with optional observation | md |
 | [examples/scheduled-watering.ghost.en.md](examples/scheduled-watering.ghost.en.md) | Sequential watering by daily schedule | md |
 | [examples/scheduled-watering.ghost.md](examples/scheduled-watering.ghost.md) | 하루 시간표에 따른 순차 관수 | md |
+| [examples/solar-live-config.ghost.en.md](examples/solar-live-config.ghost.en.md) | Allowing sunrise schedules through shared settings observations | md |
+| [examples/solar-live-config.ghost.md](examples/solar-live-config.ghost.md) | 공유 설정 관측으로 일출 스케줄 허용하기 | md |
 | [examples/solar-watering.ghost.en.md](examples/solar-watering.ghost.en.md) | Watering timed to sunrise and sunset | md |
 | [examples/solar-watering.ghost.md](examples/solar-watering.ghost.md) | 일출·일몰에 맞춘 관수 | md |
 | [examples/station-rules.ghost.ko.md](examples/station-rules.ghost.ko.md) | 공용 관측소 정책 | md |
@@ -432,6 +436,7 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/fixtures/after-event-evidence.ghost.md](tests/fixtures/after-event-evidence.ghost.md) | Evidence after event | md |
 | [tests/fixtures/gfb1-golden-v1.ghost.md](tests/fixtures/gfb1-golden-v1.ghost.md) | GFB1 version 1 golden vector | md |
 | [tests/fixtures/gfb2-int-golden-v1.ghost.md](tests/fixtures/gfb2-int-golden-v1.ghost.md) | Exact integer GFB vector | md |
+| [tests/fixtures/issue-145-solar-config.ghost.md](tests/fixtures/issue-145-solar-config.ghost.md) | Solar settings transaction fixture | md |
 | [tests/fixtures/issue-90-readonly-settings.ghost.md](tests/fixtures/issue-90-readonly-settings.ghost.md) | Read-only settings producer | md |
 | [tests/fixtures/issue-90-settings-periodic.ghost.md](tests/fixtures/issue-90-settings-periodic.ghost.md) | Live settings stream | md |
 | [tests/fixtures/issue-93-quantities.ghost.md](tests/fixtures/issue-93-quantities.ghost.md) | Quantity execution parity fixture | md |
@@ -454,4 +459,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-334 documents.
+339 documents.

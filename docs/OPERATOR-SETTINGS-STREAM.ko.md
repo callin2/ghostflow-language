@@ -103,11 +103,17 @@ context state는 각 config의 ID, name, type, 현재 Result를 노출한다. er
 이 변경의 Periodic profile은 `preserve_anchor`, pulse/trusted-clock/baseline/skip 정책으로
 명시적 `instant` anchor를 실행한다. Reference의 다른 anchor/phase 정책은 자체 구현
 요구사항을 유지한다. 이 변경은 그 실행을 주장하지 않는다. config 기반 TimeSlots는 공유
-stream consumer를 사용한다. stream과 이전 Solar/literal DailySlots 실행 profile 혼합은
-source 컴파일에서 거부한다. native Temperature PID objective는 같은 보호 config Result
+stream consumer를 사용한다. Solar는 이제 [공유 Solar context profile](SOLAR-CONFIG-EXECUTION.ko.md)로
+같은 현재 Result를 소비한다. 컴파일한 `when` 의존성은 작성한 fault 분기가 true를
+반환해도 현재 fault를 `Unknown(SettingsFault)`로 보존한다. 복구는 catch-up 없이
+기준선을 세우고 무관한 config fault는 Solar를 억제하지 않는다.
+stream과 literal DailySlots 혼합은 여전히 source 컴파일에서 거부한다.
+native Temperature PID objective는 같은 보호 config Result
 vector에서 target을 읽는다. fault는 작성 disable 정책을 따른다. 실제 operator setting을
-상수로 바꿔 이 거부를 우회해서는 안 된다. Solar 통합은
-[#145](https://github.com/callin2/ghostflow-language/issues/145)에서 추적한다.
+상수로 바꿔 이 거부를 우회해서는 안 된다. 공유 Solar 경로는 GFB16/control-v15와
+GFSF6를 사용하고 기존 Rust Solar engine을 설정·VM state와 함께 stage한다.
+Solar terminal identity는 GFCX3 안에 유지한다. 기존 standalone Solar와 비Solar
+GFSF5 consumer는 명시 profile을 유지하며 거부된 source의 실행 fallback이 아니다.
 실행 profile의 accounting reserve/limit 값은 정적 designer bound다. Reference의 ON 5분/
 stop-delay 10초 예는 고정 bound에 `let`을 쓴다. live config Result는 initial 값으로 조용히
 접지 않고 거부한다.

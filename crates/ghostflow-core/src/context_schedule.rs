@@ -13,6 +13,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Clone)]
 pub struct Engine {
+    solar: Option<crate::solar_admission::SolarPulseEngine>,
+    solar_settings_baseline: bool,
     clock: ScheduleClockGate,
     terminal: BTreeSet<String>,
     capacity: usize,
@@ -106,6 +108,14 @@ impl Engine {
     }
 
     pub fn snapshot(&self) -> Result<Vec<u8>> {
+        if let Some(solar) = &self.solar {
+            let mut bytes = b"GFES\x03".to_vec();
+            write_len(&mut bytes, solar.terminal_identities().len())?;
+            for (day, _, _) in solar.terminal_identities() {
+                bytes.extend_from_slice(&day.to_le_bytes());
+            }
+            return Ok(bytes);
+        }
         if let Some(range) = &self.range {
             // Only consumed identities are durable. Active monotonic references
             // cannot be transferred to a new boot and are never resumed.
@@ -158,6 +168,33 @@ impl Engine {
             return Err(invalid("context checkpoint exceeds bound"));
         }
         let mut reader = SnapshotReader { bytes, at: 0 };
+        if matches!(desc.definition, ScheduleDefinition::SolarContext { .. }) {
+            if reader.take(5)? != b"GFES\x03" {
+                return Err(invalid("invalid Solar context checkpoint version"));
+            }
+            let mut restored = Self::new(desc, boot_epoch, capacity)?;
+            let count = usize::from(reader.u16()?);
+            if count > capacity {
+                return Err(invalid("Solar context checkpoint capacity exceeded"));
+            }
+            let mut identities = Vec::with_capacity(count);
+            for _ in 0..count {
+                identities.push((
+                    u32::from_le_bytes(reader.take(4)?.try_into().unwrap()) as i32,
+                    0,
+                    0,
+                ));
+            }
+            if reader.at != bytes.len() {
+                return Err(invalid("trailing Solar context checkpoint bytes"));
+            }
+            restored
+                .solar
+                .as_mut()
+                .unwrap()
+                .restore_solar_identities(identities)?;
+            return Ok(restored);
+        }
         if let ScheduleDefinition::UtcRange { starts_ms, .. } = &desc.definition {
             if reader.take(5)? != b"GFES\x02" || reader.take(5)? != b"GFRG\x01" {
                 return Err(invalid("invalid Range checkpoint version"));
@@ -391,6 +428,24 @@ impl Engine {
             _ => (None, Vec::new(), 1),
         };
         Ok(Self {
+            solar: match &desc.definition {
+                ScheduleDefinition::SolarContext {
+                    timezone,
+                    fallback_time_ms,
+                    ..
+                } => Some(
+                    crate::solar_admission::SolarPulseEngine::new(
+                        desc.site,
+                        desc.gap_ms,
+                        boot_epoch,
+                        capacity,
+                    )?
+                    .with_policy(desc.clock_hold_ms, *fallback_time_ms)?
+                    .with_fallback_timezone(timezone),
+                ),
+                _ => None,
+            },
+            solar_settings_baseline: false,
             clock: ScheduleClockGate::new(desc.gap_ms, boot_epoch)?,
             terminal: BTreeSet::new(),
             capacity,
@@ -455,6 +510,9 @@ impl Engine {
         let observed = policy.observation;
         let mut decision = Decision::default();
         match &desc.definition {
+            ScheduleDefinition::SolarContext { .. } => {
+                return Err(invalid("Solar requires complete Solar facts"))
+            }
             ScheduleDefinition::AtPulse { at_ms } => {
                 staged.at_pulse(desc.site, *at_ms, &observed, when, &mut decision)?
             }
@@ -606,6 +664,8 @@ impl Engine {
             };
             if held.is_some() || observed.current_effective_wall_ms.is_none() {
                 let mut evidence = Observation {
+                    solar_fallback: None,
+                    solar_unavailable_reason: None,
                     clock_provenance: None,
                     clock_source_revision: None,
                     clock_uncertainty_ms: observed.uncertainty_ms,
@@ -776,6 +836,8 @@ impl Engine {
                 "Cancelled"
             };
             out.observations.push(Observation {
+                solar_fallback: None,
+                solar_unavailable_reason: None,
                 clock_provenance: None,
                 clock_source_revision: None,
                 clock_uncertainty_ms: None,
@@ -800,6 +862,8 @@ impl Engine {
                     .or(previous_active.as_ref())
                     .ok_or_else(|| invalid("missing active Range plan"))?;
                 out.observations.push(Observation {
+                    solar_fallback: None,
+                    solar_unavailable_reason: None,
                     clock_provenance: None,
                     clock_source_revision: None,
                     clock_uncertainty_ms: None,
@@ -832,6 +896,8 @@ impl Engine {
                     })
                 });
             out.observations.push(Observation {
+                solar_fallback: None,
+                solar_unavailable_reason: None,
                 clock_provenance: None,
                 clock_source_revision: None,
                 clock_uncertainty_ms: None,
@@ -845,6 +911,8 @@ impl Engine {
             });
         } else if result.decision == RangeDecision::ClockUnknown && out.observations.is_empty() {
             out.observations.push(Observation {
+                solar_fallback: None,
+                solar_unavailable_reason: None,
                 clock_provenance: None,
                 clock_source_revision: None,
                 clock_uncertainty_ms: None,
@@ -864,6 +932,8 @@ impl Engine {
                 })
             });
             out.observations.push(Observation {
+                solar_fallback: None,
+                solar_unavailable_reason: None,
                 clock_provenance: None,
                 clock_source_revision: None,
                 clock_uncertainty_ms: None,
@@ -894,6 +964,8 @@ impl Engine {
             staged,
             Decision {
                 observations: vec![crate::context_vm::Observation {
+                    solar_fallback: None,
+                    solar_unavailable_reason: None,
                     clock_provenance: None,
                     clock_source_revision: None,
                     clock_uncertainty_ms: None,
@@ -915,6 +987,144 @@ impl Engine {
                 ..Default::default()
             },
         ))
+    }
+
+    pub fn stage_solar(
+        &self,
+        desc: &ScheduleDescriptor,
+        clock: ClockSnapshot<'_>,
+        evidence: &crate::context_vm::SolarContextEvidence,
+        when: bool,
+        settings_fault: Option<u8>,
+    ) -> Result<(Self, Decision)> {
+        use crate::solar_admission::{SolarDecision as SD, SolarFacts};
+        let ScheduleDefinition::SolarContext {
+            timezone,
+            latitude,
+            longitude,
+            event,
+            offset_ms,
+            ..
+        } = &desc.definition
+        else {
+            return Err(invalid("Solar context descriptor required"));
+        };
+        if evidence.site != desc.site
+            || evidence.timezone != *timezone
+            || evidence.latitude.to_bits() != latitude.to_bits()
+            || evidence.longitude.to_bits() != longitude.to_bits()
+            || evidence.event != *event
+            || evidence.offset_ms != *offset_ms
+            || evidence.rows.len() > 4096
+            || evidence.coverage_start_ms >= evidence.coverage_end_ms
+            || evidence.rows.iter().any(|r| {
+                r.fold != 0
+                    || r.slot_key != 0
+                    || r.minute_of_day != 0
+                    || r.fallback_wall_ms.is_some() && r.unavailable_reason.is_none()
+                    || r.provider_revision.is_empty()
+                    || r.context_revision.is_empty()
+                    || r.provider_revision.len() > 128
+                    || r.context_revision.len() > 128
+            })
+        {
+            return Err(invalid("Solar context facts violate immutable descriptor"));
+        }
+        let facts = SolarFacts {
+            coverage_from_wall_ms: evidence.coverage_start_ms,
+            coverage_to_wall_ms: evidence.coverage_end_ms,
+            rows: &evidence.rows,
+        };
+        let mut staged = self.clone();
+        let engine = staged
+            .solar
+            .as_mut()
+            .ok_or_else(|| invalid("Solar context engine absent"))?;
+        let recovery = settings_fault.is_none() && staged.solar_settings_baseline;
+        if recovery {
+            engine.reset_observation_baseline(clock.boot_epoch)?;
+        }
+        let reason = settings_fault.map(|f| {
+            if f == 0 {
+                "SettingsInvalid"
+            } else {
+                "SettingsUnavailable"
+            }
+        });
+        let stage = engine
+            .begin_with_unknown(clock, facts, reason)?
+            .evaluate(when)?;
+        let result = engine.commit(stage)?;
+        staged.solar_settings_baseline = settings_fault.is_some();
+        let (clock_provenance, clock_source_revision) = match &result.clock_provenance {
+            crate::schedule_clock::ClockProvenance::Snapshot => {
+                ("Snapshot", clock.source_revision.map(str::to_owned))
+            }
+            crate::schedule_clock::ClockProvenance::HeldClock { source_revision } => {
+                ("HeldClock", source_revision.clone())
+            }
+        };
+        let decision_text = |decision| {
+            if let Some(reason) = reason {
+                format!("Unknown({reason})")
+            } else if recovery && decision == SD::BootBaseline {
+                "RecoveryBaseline".into()
+            } else if decision == SD::Unknown {
+                format!(
+                    "Unknown({})",
+                    result
+                        .unknown_reason
+                        .as_deref()
+                        .unwrap_or("OccurrenceUnavailable")
+                )
+            } else {
+                format!("{decision:?}")
+            }
+        };
+        let mut out = Decision {
+            due: result.due,
+            ..Default::default()
+        };
+        for row in &result.observations {
+            out.missed |= matches!(
+                row.decision,
+                SD::ConditionsFalseAtPulse
+                    | SD::Missed
+                    | SD::ObservationGap
+                    | SD::CorrectionPastHighWater
+            );
+            out.observations.push(Observation {
+                solar_fallback: Some(row.fallback),
+                solar_unavailable_reason: row.unavailable_reason,
+                clock_provenance: Some(clock_provenance.into()),
+                clock_source_revision: clock_source_revision.clone(),
+                clock_uncertainty_ms: result.clock_uncertainty_ms,
+                unknown_reason: result.unknown_reason.clone(),
+                site: desc.site,
+                occurrence_id: format!("{}:{}:0:0", desc.site, row.source_day),
+                planned_ms: row.scheduled_wall_ms,
+                decision: decision_text(row.decision),
+                provider_revision: row.provider_revision.clone(),
+                context_revision: row.context_revision.clone(),
+            });
+        }
+        if out.observations.is_empty() || reason.is_some() || recovery {
+            out.observations.push(Observation {
+                solar_fallback: None,
+                solar_unavailable_reason: None,
+                clock_provenance: Some(clock_provenance.into()),
+                clock_source_revision: clock_source_revision.clone(),
+                clock_uncertainty_ms: result.clock_uncertainty_ms,
+                unknown_reason: result.unknown_reason.clone(),
+                site: desc.site,
+                occurrence_id: String::new(),
+                planned_ms: None,
+                decision: decision_text(result.decision),
+                provider_revision: String::new(),
+                context_revision: String::new(),
+            });
+        }
+        Ok((staged, out))
     }
 
     fn apply_setting(
@@ -1063,6 +1273,8 @@ impl Engine {
         out.due = outcome == "Due";
         out.missed = !out.due;
         out.observations.push(Observation {
+            solar_fallback: None,
+            solar_unavailable_reason: None,
             clock_provenance: None,
             clock_source_revision: None,
             clock_uncertainty_ms: None,
@@ -1086,6 +1298,8 @@ impl Engine {
             self.terminalize(&id)?;
             out.missed = true;
             out.observations.push(Observation {
+                solar_fallback: None,
+                solar_unavailable_reason: None,
                 clock_provenance: None,
                 clock_source_revision: None,
                 clock_uncertainty_ms: None,
@@ -1172,6 +1386,8 @@ impl Engine {
             out.due |= outcome == "Due";
             out.missed |= outcome != "Due";
             out.observations.push(Observation {
+                solar_fallback: None,
+                solar_unavailable_reason: None,
                 clock_provenance: None,
                 clock_source_revision: None,
                 clock_uncertainty_ms: None,
@@ -1229,6 +1445,8 @@ impl Engine {
                 if let Some(fault) = id.strip_prefix('?') {
                     let reason = fault.split(':').next().unwrap_or("CalendarMissing");
                     out.observations.push(Observation {
+                        solar_fallback: None,
+                        solar_unavailable_reason: None,
                         clock_provenance: None,
                         clock_source_revision: None,
                         clock_uncertainty_ms: None,
@@ -1249,6 +1467,8 @@ impl Engine {
                     if !self.terminal.contains(ineligible) {
                         self.terminalize(ineligible)?;
                         out.observations.push(Observation {
+                            solar_fallback: None,
+                            solar_unavailable_reason: None,
                             clock_provenance: None,
                             clock_source_revision: None,
                             clock_uncertainty_ms: None,
@@ -1289,6 +1509,8 @@ impl Engine {
             out.due |= outcome == "Due";
             out.missed |= outcome != "Due";
             out.observations.push(Observation {
+                solar_fallback: None,
+                solar_unavailable_reason: None,
                 clock_provenance: None,
                 clock_source_revision: None,
                 clock_uncertainty_ms: None,
@@ -1335,6 +1557,8 @@ impl Engine {
             if cancel || monotonic >= active.end_monotonic_ms {
                 self.active_run = None;
                 out.observations.push(Observation {
+                    solar_fallback: None,
+                    solar_unavailable_reason: None,
                     clock_provenance: None,
                     clock_source_revision: None,
                     clock_uncertainty_ms: None,
@@ -1353,6 +1577,8 @@ impl Engine {
             } else {
                 out.active = true;
                 out.observations.push(Observation {
+                    solar_fallback: None,
+                    solar_unavailable_reason: None,
                     clock_provenance: None,
                     clock_source_revision: None,
                     clock_uncertainty_ms: None,
@@ -1373,6 +1599,8 @@ impl Engine {
         if previous < facts.coverage_start_ms || now >= facts.coverage_end_ms {
             self.end_pending(site, "IncompleteCoverage", out)?;
             out.observations.push(Observation {
+                solar_fallback: None,
+                solar_unavailable_reason: None,
                 clock_provenance: None,
                 clock_source_revision: None,
                 clock_uncertainty_ms: None,
@@ -1389,6 +1617,8 @@ impl Engine {
         let Some(observation) = facts.provider.as_ref() else {
             self.end_pending(site, "PredictionMissing", out)?;
             out.observations.push(Observation {
+                solar_fallback: None,
+                solar_unavailable_reason: None,
                 clock_provenance: None,
                 clock_source_revision: None,
                 clock_uncertainty_ms: None,
@@ -1412,6 +1642,8 @@ impl Engine {
         {
             self.end_pending(site, "PredictionStale", out)?;
             out.observations.push(Observation {
+                solar_fallback: None,
+                solar_unavailable_reason: None,
                 clock_provenance: None,
                 clock_source_revision: None,
                 clock_uncertainty_ms: None,
@@ -1440,6 +1672,8 @@ impl Engine {
                     self.terminalize(&id)?;
                     out.missed = true;
                     out.observations.push(Observation {
+                        solar_fallback: None,
+                        solar_unavailable_reason: None,
                         clock_provenance: None,
                         clock_source_revision: None,
                         clock_uncertainty_ms: None,
@@ -1482,6 +1716,8 @@ impl Engine {
                     self.terminalize(&id)?;
                     out.missed = true;
                     out.observations.push(Observation {
+                        solar_fallback: None,
+                        solar_unavailable_reason: None,
                         clock_provenance: None,
                         clock_source_revision: None,
                         clock_uncertainty_ms: None,
@@ -1500,6 +1736,8 @@ impl Engine {
                 self.terminalize(&id)?;
                 out.missed = true;
                 out.observations.push(Observation {
+                    solar_fallback: None,
+                    solar_unavailable_reason: None,
                     clock_provenance: None,
                     clock_source_revision: None,
                     clock_uncertainty_ms: None,
@@ -1521,6 +1759,8 @@ impl Engine {
                 self.terminalize(&id)?;
                 out.missed = true;
                 out.observations.push(Observation {
+                    solar_fallback: None,
+                    solar_unavailable_reason: None,
                     clock_provenance: None,
                     clock_source_revision: None,
                     clock_uncertainty_ms: None,
@@ -1538,6 +1778,8 @@ impl Engine {
                 self.terminalize(&id)?;
                 out.missed = true;
                 out.observations.push(Observation {
+                    solar_fallback: None,
+                    solar_unavailable_reason: None,
                     clock_provenance: None,
                     clock_source_revision: None,
                     clock_uncertainty_ms: None,
@@ -1565,6 +1807,8 @@ impl Engine {
                 self.terminalize(&id)?;
                 out.missed = true;
                 out.observations.push(Observation {
+                    solar_fallback: None,
+                    solar_unavailable_reason: None,
                     clock_provenance: None,
                     clock_source_revision: None,
                     clock_uncertainty_ms: None,
@@ -1582,6 +1826,8 @@ impl Engine {
                 self.pending_grace.remove(&id);
                 self.terminalize(&id)?;
                 out.observations.push(Observation {
+                    solar_fallback: None,
+                    solar_unavailable_reason: None,
                     clock_provenance: None,
                     clock_source_revision: None,
                     clock_uncertainty_ms: None,
@@ -1609,6 +1855,8 @@ impl Engine {
                     context_revision: row.context_revision.clone(),
                 });
                 out.observations.push(Observation {
+                    solar_fallback: None,
+                    solar_unavailable_reason: None,
                     clock_provenance: None,
                     clock_source_revision: None,
                     clock_uncertainty_ms: None,
@@ -1941,6 +2189,187 @@ mod tests {
             .stage(&single, clock(86_401_240), &evidence, true, false, None, 0)
             .is_err());
         assert_eq!(engine.snapshot().unwrap(), checkpoint);
+    }
+
+    fn solar_desc(fallback_time_ms: Option<u64>) -> ScheduleDescriptor {
+        ScheduleDescriptor {
+            clock_hold_ms: Some(1_000),
+            site: 7,
+            name: "solar".into(),
+            gap_ms: 10_000,
+            definition: ScheduleDefinition::SolarContext {
+                timezone: "UTC".into(),
+                latitude: 37.0,
+                longitude: 127.0,
+                event: 0,
+                offset_ms: 0,
+                fallback_time_ms,
+                config_ids: vec![],
+            },
+            when: vec![1, 1],
+            cancel: vec![1, 0],
+        }
+    }
+    fn solar_facts() -> crate::context_vm::SolarContextEvidence {
+        crate::context_vm::SolarContextEvidence {
+            site: 7,
+            timezone: "UTC".into(),
+            latitude: 37.0,
+            longitude: 127.0,
+            event: 0,
+            offset_ms: 0,
+            coverage_start_ms: 0,
+            coverage_end_ms: 1_000,
+            rows: vec![crate::solar_admission::SolarFact::available(
+                0, 100, "p1", "c1",
+            )],
+        }
+    }
+
+    #[test]
+    fn solar_context_reuses_fallback_and_bounded_clock_hold_with_complete_trace() {
+        use crate::solar_admission::SolarFactAvailability;
+        let desc = solar_desc(Some(100));
+        let mut evidence = solar_facts();
+        evidence.rows[0].availability = SolarFactAvailability::Unavailable;
+        evidence.rows[0].scheduled_wall_ms = None;
+        evidence.rows[0].fallback_wall_ms = Some(100);
+        evidence.rows[0].unavailable_reason = Some(2);
+        let engine = Engine::new(&desc, 1, 8).unwrap();
+        let (baseline, _) = engine
+            .stage_solar(
+                &desc,
+                ClockSnapshot {
+                    monotonic_ms: 0,
+                    wall_ms: Some(90),
+                    ..clock(0)
+                },
+                &evidence,
+                true,
+                None,
+            )
+            .unwrap();
+        let (due, result) = baseline
+            .stage_solar(
+                &desc,
+                ClockSnapshot {
+                    monotonic_ms: 10,
+                    wall_ms: None,
+                    trust: ClockTrust::Unknown("TrustExpired"),
+                    source_revision: None,
+                    ..clock(0)
+                },
+                &evidence,
+                true,
+                None,
+            )
+            .unwrap();
+        assert!(result.due);
+        assert!(result.observations.iter().any(|o| o.decision == "Due"
+            && o.solar_fallback == Some(true)
+            && o.solar_unavailable_reason == Some(2)
+            && o.clock_provenance.as_deref() == Some("HeldClock")
+            && o.clock_source_revision.as_deref() == Some("clock-1")));
+        let (_, expired) = due
+            .stage_solar(
+                &desc,
+                ClockSnapshot {
+                    monotonic_ms: 1_001,
+                    wall_ms: None,
+                    trust: ClockTrust::Unknown("TrustExpired"),
+                    source_revision: None,
+                    ..clock(0)
+                },
+                &evidence,
+                true,
+                None,
+            )
+            .unwrap();
+        assert!(!expired.due);
+        assert!(expired
+            .observations
+            .iter()
+            .any(|o| o.decision.starts_with("Unknown(")));
+        let forbidden = solar_desc(None);
+        assert!(Engine::new(&forbidden, 1, 8)
+            .unwrap()
+            .stage_solar(&forbidden, clock(90), &evidence, true, None)
+            .is_err());
+        let mismatched = solar_desc(Some(101));
+        assert!(Engine::new(&mismatched, 1, 8)
+            .unwrap()
+            .stage_solar(&mismatched, clock(90), &evidence, true, None)
+            .is_err());
+    }
+
+    #[test]
+    fn solar_context_false_condition_and_checkpoint_capacity_fail_closed() {
+        let desc = solar_desc(None);
+        let evidence = solar_facts();
+        let initial = Engine::new(&desc, 1, 1).unwrap();
+        let (baseline, _) = initial
+            .stage_solar(&desc, clock(90), &evidence, true, None)
+            .unwrap();
+        let (consumed, result) = baseline
+            .stage_solar(&desc, clock(100), &evidence, false, None)
+            .unwrap();
+        assert!(!result.due && result.missed);
+        assert_eq!(result.observations[0].decision, "ConditionsFalseAtPulse");
+        let (_, repeat) = consumed
+            .stage_solar(&desc, clock(101), &evidence, true, None)
+            .unwrap();
+        assert!(!repeat.due);
+        let checkpoint = consumed.snapshot().unwrap();
+        let restored = Engine::restore(&desc, 2, 1, &checkpoint).unwrap();
+        let (baseline, _) = restored
+            .stage_solar(
+                &desc,
+                ClockSnapshot {
+                    boot_epoch: 2,
+                    ..clock(90)
+                },
+                &evidence,
+                true,
+                None,
+            )
+            .unwrap();
+        assert!(
+            !baseline
+                .stage_solar(
+                    &desc,
+                    ClockSnapshot {
+                        boot_epoch: 2,
+                        ..clock(100)
+                    },
+                    &evidence,
+                    true,
+                    None
+                )
+                .unwrap()
+                .1
+                .due
+        );
+        for mutation in 0..4 {
+            let mut malformed = checkpoint.clone();
+            match mutation {
+                0 => malformed[4] = 1,
+                1 => malformed[5..7].copy_from_slice(&2u16.to_le_bytes()),
+                2 => malformed[7..11].copy_from_slice(&u32::MAX.to_le_bytes()),
+                _ => malformed.push(0),
+            }
+            assert!(Engine::restore(&desc, 2, 1, &malformed).is_err());
+        }
+        let mut too_many = evidence.clone();
+        too_many
+            .rows
+            .push(crate::solar_admission::SolarFact::available(
+                1, 200, "p1", "c1",
+            ));
+        let before = initial.snapshot().unwrap();
+        assert!(initial
+            .stage_solar(&desc, clock(90), &too_many, true, None)
+            .is_err());
+        assert_eq!(initial.snapshot().unwrap(), before);
     }
 
     fn clock(at: u64) -> ClockSnapshot<'static> {

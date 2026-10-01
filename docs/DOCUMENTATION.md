@@ -53,6 +53,7 @@ evidence and test inputs have explicit exclusions in [the manifest](translations
 | `docs/SCAN-TAPE-PARITY.md` | [English](SCAN-TAPE-PARITY.md) | [한국어](SCAN-TAPE-PARITY.ko.md) |
 | `docs/SCENARIO-RUNNER.md` | [English](SCENARIO-RUNNER.md) | [한국어](SCENARIO-RUNNER.ko.md) |
 | `docs/SOLAR-SCHEDULE.md` | [English](SOLAR-SCHEDULE.md) | [한국어](SOLAR-SCHEDULE.ko.md) |
+| `docs/SOLAR-CONFIG-EXECUTION.md` | [English](SOLAR-CONFIG-EXECUTION.md) | [한국어](SOLAR-CONFIG-EXECUTION.ko.md) |
 | `docs/SOURCE-MAP.md` | [English](SOURCE-MAP.md) | [한국어](SOURCE-MAP.ko.md) |
 | `docs/SOURCE-SAFETY-TRACE.md` | [English](SOURCE-SAFETY-TRACE.md) | [한국어](SOURCE-SAFETY-TRACE.ko.md) |
 | `docs/SUNCALC-ATTRIBUTION.md` | [English](SUNCALC-ATTRIBUTION.md) | [한국어](SUNCALC-ATTRIBUTION.ko.md) |
@@ -98,6 +99,7 @@ evidence and test inputs have explicit exclusions in [the manifest](translations
 | `examples/irrigation.ghost.md` | [English](../examples/irrigation.ghost.md) | [한국어](../examples/irrigation.ghost.ko.md) |
 | `examples/scheduled-watering.ghost.md` | [English](../examples/scheduled-watering.ghost.en.md) | [한국어](../examples/scheduled-watering.ghost.md) |
 | `examples/solar-watering.ghost.md` | [English](../examples/solar-watering.ghost.en.md) | [한국어](../examples/solar-watering.ghost.md) |
+| `examples/solar-live-config.ghost.md` | [English](../examples/solar-live-config.ghost.en.md) | [한국어](../examples/solar-live-config.ghost.md) |
 | `examples/station-rules.ghost.md` | [English](../examples/station-rules.ghost.md) | [한국어](../examples/station-rules.ghost.ko.md) |
 | `examples/tutorial/01-latch.ghost.md` | [English](../examples/tutorial/01-latch.ghost.md) | [한국어](../examples/tutorial/01-latch.ghost.ko.md) |
 | `examples/tutorial/02-watering.ghost.md` | [English](../examples/tutorial/02-watering.ghost.md) | [한국어](../examples/tutorial/02-watering.ghost.ko.md) |

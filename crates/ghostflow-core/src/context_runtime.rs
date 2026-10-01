@@ -23,6 +23,7 @@ pub struct Activation {
 
 #[derive(Clone, Debug, Default)]
 pub struct Facts {
+    pub solars: Vec<SolarContextEvidence>,
     pub schedules: Vec<ScheduleEvidence>,
     pub natural: Vec<ProviderObservation>,
     pub settings: Option<SettingsEvent>,
@@ -261,7 +262,7 @@ impl ContextRuntime {
         staged.runtime.clock.poll(clock)?;
         let expected = descriptors
             .iter()
-            .filter(|d| matches!(d, PulseDescriptor::Context(c) if !matches!(c.definition, ScheduleDefinition::AtPulse { .. })))
+            .filter(|d| matches!(d, PulseDescriptor::Context(c) if !matches!(c.definition, ScheduleDefinition::AtPulse { .. } | ScheduleDefinition::SolarContext { .. })))
             .count();
         if facts.schedules.len() != expected || facts.natural.len() > self.bindings.len() {
             return Err(invalid("context facts do not match installed requirements"));
@@ -307,6 +308,8 @@ impl ContextRuntime {
             inputs[usize::from(d.value_input)] = Value::Int(value);
             inputs[usize::from(d.fault_input)] = Value::Number(f64::from(fault));
             staged.trace.push(Observation {
+                solar_fallback: None,
+                solar_unavailable_reason: None,
                 clock_provenance: None,
                 clock_source_revision: None,
                 clock_uncertainty_ms: None,
@@ -320,6 +323,27 @@ impl ContextRuntime {
             });
         }
         let mut sites = BTreeSet::new();
+        let solar_count = descriptors
+            .iter()
+            .filter(|d| {
+                matches!(
+                    d,
+                    PulseDescriptor::Context(ScheduleDescriptor {
+                        definition: ScheduleDefinition::SolarContext { .. },
+                        ..
+                    })
+                )
+            })
+            .count();
+        if facts.solars.len() != solar_count {
+            return Err(invalid("missing Solar context facts binding"));
+        }
+        let mut solar_sites = BTreeSet::new();
+        for solar in &facts.solars {
+            if !solar_sites.insert(solar.site) || !descriptors.iter().any(|d| matches!(d,
+                PulseDescriptor::Context(ScheduleDescriptor { site, definition: ScheduleDefinition::SolarContext { .. }, .. }) if *site == solar.site))
+            { return Err(invalid("unknown or duplicate Solar context site")); }
+        }
         for evidence in &facts.schedules {
             if !sites.insert(evidence.site)
                 || !descriptors
@@ -342,6 +366,9 @@ impl ContextRuntime {
                 })
                 .ok_or_else(|| invalid("unknown context schedule site"))?;
             match definition {
+                ScheduleDefinition::SolarContext { .. } => {
+                    return Err(invalid("Solar requires Solar facts, not civil evidence"))
+                }
                 ScheduleDefinition::AtPulse { .. } => {
                     return Err(invalid("At occurrences are computed by the core"))
                 }
@@ -526,6 +553,8 @@ impl ContextRuntime {
                         } else {
                             group_fault = Some(SETTINGS_INVALID);
                             staged.trace.push(Observation {
+                                solar_fallback: None,
+                                solar_unavailable_reason: None,
                                 clock_provenance: None,
                                 clock_source_revision: None,
                                 clock_uncertainty_ms: None,
@@ -570,6 +599,8 @@ impl ContextRuntime {
         for config in &staged.runtime.configs {
             config.project(inputs);
             staged.trace.push(Observation {
+                solar_fallback: None,
+                solar_unavailable_reason: None,
                 clock_provenance: None,
                 clock_source_revision: None,
                 clock_uncertainty_ms: None,
@@ -640,6 +671,8 @@ impl ContextRuntime {
             inputs[usize::from(d.value_input)] = Value::Bool(value);
             inputs[usize::from(d.fault_input)] = Value::Number(f64::from(fault));
             staged.trace.push(Observation {
+                solar_fallback: None,
+                solar_unavailable_reason: None,
                 clock_provenance: None,
                 clock_source_revision: None,
                 clock_uncertainty_ms: None,
@@ -662,7 +695,10 @@ impl ContextRuntime {
                     calendar: None,
                     rows: Vec::new(),
                 };
-                let evidence = if matches!(d.definition, ScheduleDefinition::AtPulse { .. }) {
+                let evidence = if matches!(
+                    d.definition,
+                    ScheduleDefinition::AtPulse { .. } | ScheduleDefinition::SolarContext { .. }
+                ) {
                     &at_evidence
                 } else {
                     facts
@@ -718,19 +754,34 @@ impl ContextRuntime {
                 let engine = self.engines[index]
                     .as_ref()
                     .ok_or_else(|| invalid("context engine binding mismatch"))?;
-                let (next, decision) = if let Some(Err(fault)) = config.map(|c| &c.current) {
-                    engine.stage_settings_fault(d, clock, evidence, *fault)?
-                } else {
-                    engine.stage(
-                        d,
-                        clock,
-                        evidence,
-                        when,
-                        cancel,
-                        change.as_ref(),
-                        staged.runtime.settings_revision,
-                    )?
-                };
+                let (next, decision) =
+                    if let ScheduleDefinition::SolarContext { config_ids, .. } = &d.definition {
+                        let fault = staged
+                            .runtime
+                            .configs
+                            .iter()
+                            .filter(|c| config_ids.contains(&c.descriptor.id))
+                            .filter_map(|c| c.current.as_ref().err().copied())
+                            .min();
+                        let solar = facts
+                            .solars
+                            .iter()
+                            .find(|s| s.site == d.site)
+                            .ok_or_else(|| invalid("missing Solar context facts"))?;
+                        engine.stage_solar(d, clock, solar, when, fault)?
+                    } else if let Some(Err(fault)) = config.map(|c| &c.current) {
+                        engine.stage_settings_fault(d, clock, evidence, *fault)?
+                    } else {
+                        engine.stage(
+                            d,
+                            clock,
+                            evidence,
+                            when,
+                            cancel,
+                            change.as_ref(),
+                            staged.runtime.settings_revision,
+                        )?
+                    };
                 staged.runtime.engines[index] = Some(next);
                 staged.projections.push([
                     Value::Bool(decision.due),
