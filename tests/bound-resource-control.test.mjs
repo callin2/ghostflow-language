@@ -129,6 +129,32 @@ test('portable bound runtime reserves pending writers and shares the concrete No
   finally { replacement.dispose(); }
 });
 
+test('bound browser authored Bool state retains canonical intent provenance in actual completed snapshots', async () => {
+  const source = document.replace('```ghost', '<!-- ghostflow:anchor id=GF-INT-REVIEW-BOUND-STATE kind=intent status=confirmed origin=user -->\nRemember whether automatic was requested in a completed scan.\n\n```ghost')
+    .replace('  output pump, valve: Bool;', '  // ghostflow:link id=GF-INT-REVIEW-BOUND-STATE relation=implements\n  state remembered: Bool = false;\n  remembered\' = automatic;\n  output pump, valve: Bool;');
+  const identity = { documentId: 'review-bound-state', revisionId: 'r1' };
+  const checked = await compileSource(source, { filename: 'review-bound-state.ghost.md', interactionSourceIdentity: identity });
+  const { binding } = compile();
+  const updatedBinding = { ...binding, sourceDocumentSha256: checked.sourceDocument.sha256, artifactSha256: checked.manifest.bytecodeSha256 };
+  const bound = compileBoundResourceControl(checked, updatedBinding);
+  assert.deepEqual(checked.interactionSchema.descriptors.map(descriptor => descriptor.id), ['state.remembered']);
+  assert.deepEqual(bound.interactionSchema.descriptors, checked.interactionSchema.descriptors);
+  assert.ok(bound.traceMetadata.bindings.some(entry => entry.kind === 'state' && entry.name === 'remembered'));
+  const stateDescriptor = bound.interactionSchema.descriptors[0];
+  assert.deepEqual(stateDescriptor.provenance.intentAnchorIds, ['GF-INT-REVIEW-BOUND-STATE']);
+  const sourceNode = bound.sourceMap.find(node => node.id === stateDescriptor.provenance.sourceNode.id);
+  assert.equal(source.split('\n')[sourceNode.line - 1].trim(), 'state remembered: Bool = false;');
+  const runtime = await BoundResourceControlRuntime.instantiate(wasm(), bound);
+  try {
+    const observer = prepareCompletedScanSnapshot({ compilation: bound, runId: 'bound-state-run' });
+    const snapshots = [rows[3], rows[2]].map((values, scanId) => {
+      const outcome = runtime.scan(frame(bound, values, scanId));
+      return observer.emit({ completion: { kind: 'completed-scan', scanId: outcome.scanId, logicalTimeMs: outcome.logicalTimeMs }, trace: outcome.trace });
+    });
+    assert.deepEqual(snapshots.map(snapshot => snapshot.observations.find(value => value.descriptorId === 'state.remembered').value), [true, false]);
+  } finally { runtime.dispose(); }
+});
+
 test('GF-TEST-bound-resource-parity: automatic manual fallback admission violation recovery and trace match native plain framed and simulation', async t => {
   const { bound } = compile();
   const files = temporary(t, bound);

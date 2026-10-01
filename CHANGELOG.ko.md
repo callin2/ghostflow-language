@@ -5,6 +5,17 @@
 
 ## 미출시
 
+### 2026-10-01 — 바인딩된 작성 상태 출처 버그 수정 ([#158](https://github.com/callin2/ghostflow-language/issues/158))
+
+유한 바인딩 자원 프로필에서 의도 anchor와 연결한 작성 Bool 상태도 브라우저 API로
+컴파일하고 완료된 scan의 관찰값을 생성합니다. 이전에는 실행 불가능한 descriptor에
+의도 anchor를 붙이면 실행 trace 배열이 없어 literate 소스 위치 변환이 실패했습니다.
+이제 descriptor는 명시적인 빈 출처 구조를 제공하고, 바인딩은 실제로 낮춘 프로그램의
+실행 바인딩을 유지하며 descriptor의 의도 anchor와 링크만 추가합니다. 없는 필드에서
+실행 메타데이터를 추정하지 않습니다. `tests/bound-resource-control.test.mjs`에서
+정규 상태·anchor 위치와 실제 WASM의 `remembered` 관찰값이 `true`에서 `false`로
+바뀌는 것을 검증합니다.
+
 ### 2026-10-01 — 브라우저 바인딩 자원 모듈 ([#158](https://github.com/callin2/ghostflow-language/issues/158))
 
 공개 브라우저 컴파일러가 바인딩 자원 컴파일·검증·trace 관찰을 재수출합니다.

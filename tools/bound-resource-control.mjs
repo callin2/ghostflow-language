@@ -135,7 +135,9 @@ export function compileBoundResourceControl(compilation, installationBinding) {
     manifest: { ...control, format: 'GhostFlow/control-v17', executable: true, bytecodeSha256,
       requiredRuntimeContracts: ['bound-resource-activation', 'bound-resource-every-scan', 'one-registry-for-all-writers'],
       resourceBinding: binding, ...evidence },
-    traceMetadata: { ...remapSourceTrace(compiled.traceMetadata, extraction.sourceMap), ...descriptor.traceMetadata,
+    traceMetadata: { ...remapSourceTrace(compiled.traceMetadata, extraction.sourceMap),
+      ...(descriptor.traceMetadata?.intentAnchors ? { intentAnchors: descriptor.traceMetadata.intentAnchors,
+        intentLinks: descriptor.traceMetadata.intentLinks } : {}),
       moduleFingerprint: moduleFingerprint(compiled.bytes), bytecodeSha256, ...evidence },
     resourceBindingActivation: activationBytes, resourceBindingScan: scan.finish() };
   return { ...result, interactionSchema: descriptor.interactionSourceIdentity

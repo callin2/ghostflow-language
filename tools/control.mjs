@@ -4126,7 +4126,11 @@ export function compileControlPolicyDescriptorArtifact(source, { filename = '<co
     format: 'GhostFlow/control-policy-descriptor-artifact-v1', executable: false,
     controlSource: source, manifest,
   }));
-  return { bytes, manifest, sourceMap: checked.sourceMap };
+  // A checked descriptor carries canonical intent provenance, but owns no
+  // executable storage bindings or runtime constraint observations. The bound
+  // compiler supplies those from the actual guarded request program.
+  return { bytes, manifest, sourceMap: checked.sourceMap,
+    traceMetadata: { bindings: [], constraints: [], resultSites: [] } };
 }
 
 /** Internal bound-profile lowering. Never returns an unguarded shared-policy program. */

@@ -85,6 +85,13 @@ verification reconstructs both identities; checked descriptors remain
 nonexecutable. Inputs and outputs come from the checked control manifest and
 retain their exact names and types in the bound manifest.
 
+The finite profile may include authored Bool state. Link each observed state to
+its confirmed literate intent anchor as required by the interaction contract.
+The checked descriptor carries source provenance without executable storage
+bindings; binding obtains those from the actual lowered program. Completed
+WASM scan snapshots expose the observed state value through the same public
+interaction producer, including nonempty schemas.
+
 The JavaScript writer registry covers one module instance in one realm, including
 pending asynchronous creation. Separate Workers, windows, or independently
 loaded module instances have separate registries. An installation host must
