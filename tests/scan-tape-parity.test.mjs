@@ -94,6 +94,39 @@ async function compare(source, tape, filename) {
   return { artifact, native, wasm };
 }
 
+test('REF-00-006: stop at 1000ms ends the five-minute request immediately on native and WASM', async () => {
+  // The Given is an already-started run at zero, not an extra start event or a
+  // new stop-priority rule. Only the case's two times and stop input are supplied.
+  const tape = [row(0, 0, [{ name: 'stop', value: false }]), row(1, 1000, [{ name: 'stop', value: true }])];
+  const { artifact, native, wasm } = await compare(`
+control NonblockingStop {
+  input stop: Bool;
+  state running: Bool = true;
+  timer age = elapsed(running);
+  running' = running && !stop && age < 5min;
+  output pump: Bool;
+  output age_before_transition: Duration;
+  output timer_expired: Bool;
+  pump <- running';
+  age_before_transition <- age;
+  timer_expired <- age >= 5min;
+}
+`, tape, 'reference-nonblocking-stop.ghost');
+  assert.deepEqual(artifact.manifest.timers, [{ name: 'age', state: 'running', clockInput: '__gf_now_ms' }]);
+  for (const outcomes of [native, wasm]) {
+    assert.deepEqual(outcomes.map(item => item.accepted), [true, true]);
+    assert.deepEqual(outcomes.map(item => item.outcome.logicalTimeMs), [0, 1000]);
+    assert.deepEqual(outcomes.map(item => item.outcome.trace.inputs.stop), [false, true]);
+    assert.deepEqual(outcomes.map(item => item.outcome.trace.inputs.__gf_now_ms), [0, 1000]);
+    assert.deepEqual(outcomes.map(item => item.outcome.trace.stateBefore.running), [true, true]);
+    assert.deepEqual(outcomes.map(item => item.outcome.trace.stateAfter.running), [true, false]);
+    assert.deepEqual(outcomes.map(item => item.outcome.trace.requested.pump), [true, false]);
+    assert.deepEqual(outcomes.map(item => item.outcome.trace.safe.pump), [true, false]);
+    assert.deepEqual(outcomes.map(item => item.outcome.trace.requested.age_before_transition), [0, 1000]);
+    assert.deepEqual(outcomes.map(item => item.outcome.trace.requested.timer_expired), [false, false]);
+  }
+});
+
 test('REF core Percent and Duration source units retain exact native and WASM values', async () => {
   const { artifact, native } = await compare(`
 control TypedUnits {
