@@ -970,4 +970,79 @@ mod tests {
         assert_eq!(s.diagnostics().count(), MAX_DIAGNOSTICS);
         assert!(s.diagnostic(MAX_DIAGNOSTICS).is_none());
     }
+
+    #[test]
+    fn ref_04_010_invalid_seven_duplicate_eight_and_sample_time_freshness() {
+        let mut s = Sensor::new(SensorConfig::new(Filter::Median(3), 0.0, 100.0, 300, 1)).unwrap();
+        for (id, timestamp) in [(1, 0), (2, 10)] {
+            assert_eq!(
+                s.update(good(id, timestamp, 20.0), timestamp),
+                Err(SensorFault::NotReady)
+            );
+        }
+        s.update(good(3, 20, 20.0), 20).unwrap();
+        assert_eq!(s.reading(20), Ok(20.0));
+        for now in [110, 120, 130] {
+            let updated = s.update(good(7, 100, 101.0), now);
+            if now == 110 {
+                assert_eq!(updated, Err(SensorFault::Invalid));
+            } else {
+                assert_eq!(updated, Ok(UpdateResult::Duplicate));
+            }
+            assert_eq!(s.reading(now), Err(SensorFault::Invalid));
+            assert_eq!(s.accepted_sample_identity(), Some((1, 7, 100)));
+        }
+        assert_eq!(
+            s.update(good(8, 140, 29.0), 150),
+            Err(SensorFault::NotReady)
+        );
+        assert_eq!(
+            s.update(good(8, 140, 29.0), 160),
+            Ok(UpdateResult::Duplicate)
+        );
+        assert_eq!(s.reading(170), Err(SensorFault::NotReady));
+        assert_eq!(s.accepted_sample_identity(), Some((1, 8, 140)));
+        assert_eq!(
+            s.update(good(9, 180, 31.0), 190),
+            Err(SensorFault::NotReady)
+        );
+        s.update(good(10, 200, 33.0), 210).unwrap();
+        assert_eq!(s.reading(210), Ok(31.0));
+        assert_eq!(s.reading(499), Ok(31.0));
+        assert_eq!(s.reading(500), Err(SensorFault::Stale));
+        assert_eq!(s.accepted_sample_identity(), Some((1, 10, 200)));
+
+        // Separate recovery from filter readiness, so duplicate/read increments
+        // cannot be hidden by an incomplete filter window.
+        let mut recovery =
+            Sensor::new(SensorConfig::new(Filter::Median(1), 0.0, 100.0, 300, 5)).unwrap();
+        assert_eq!(
+            recovery.update(good(7, 70, 101.0), 70),
+            Err(SensorFault::Invalid)
+        );
+        assert_eq!(
+            recovery.update(good(8, 80, 29.0), 80),
+            Err(SensorFault::NotReady)
+        );
+        assert_eq!(recovery.recover_count, 1);
+        for now in [81, 82] {
+            assert_eq!(
+                recovery.update(good(8, 80, 29.0), now),
+                Ok(UpdateResult::Duplicate)
+            );
+            assert_eq!(recovery.reading(now), Err(SensorFault::NotReady));
+            assert_eq!(recovery.recover_count, 1);
+        }
+        assert_eq!(recovery.reading(83), Err(SensorFault::NotReady));
+        assert_eq!(recovery.recover_count, 1);
+        for id in [9, 10, 11] {
+            assert_eq!(
+                recovery.update(good(id, id * 10, 29.0), id * 10),
+                Err(SensorFault::NotReady)
+            );
+            assert_eq!(recovery.recover_count, (id - 7) as usize);
+        }
+        recovery.update(good(12, 120, 29.0), 120).unwrap();
+        assert_eq!(recovery.reading(120), Ok(29.0));
+    }
 }
