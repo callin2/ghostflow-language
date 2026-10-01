@@ -3588,6 +3588,39 @@
       "referenceCaseIds": ["REF-03-020"]
     },
     {
+      "id": "pulse-no-queue",
+      "family": "Pulse predicate failure and read-only Schedule evaluation",
+      "clause": {
+        "path": "docs/reference/03-time-and-schedules.md",
+        "heading": "3.5 Schedule의 공통 의미"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/at-runtime.test.mjs",
+              "testId": "REF-03-023: false 08:00 pulse stays missed at 08:01 and reading Schedule leaves Idle output off in native and WASM",
+              "caseId": "REF-03-023",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "negative", "boundary"]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "The exact oracle covers accepted At pulse scans and logical requested/safe intent; Window/Run admission and physical Driver application are not claimed."
+      ],
+      "issues": [213],
+      "referenceCaseIds": ["REF-03-023"]
+    },
+    {
       "id": "product-boundary",
       "family": "Farmer UI, installation and deployment",
       "clause": {

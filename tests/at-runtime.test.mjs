@@ -22,8 +22,8 @@ function facts(mono, delta, { trusted = true, boot = 1 } = {}) {
     natural: [], schedules: [], settings: null };
 }
 async function parity(steps, due, missed, source = atSource()) {
-  source = source.replace('output alarm: Bool;', 'output alarm: Bool; output missed_alarm: Bool;')
-    .replace('alarm <- appointment.due;', 'alarm <- appointment.due; missed_alarm <- appointment.missed;');
+  source = source.replace('output alarm: Bool;',
+    'output alarm: Bool; output missed_alarm: Bool; missed_alarm <- appointment.missed;');
   const artifact = await compileSource(source, { filename: 'at-runtime.ghost.md' });
   const runtime = await ControlRuntime.instantiateFramed(wasm, artifact, { context: activation });
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-at-'));
@@ -58,6 +58,37 @@ async function parity(steps, due, missed, source = atSource()) {
     return traces;
   } finally { runtime.dispose(); fs.rmSync(dir, { recursive: true, force: true }); }
 }
+
+test('REF-03-023: false 08:00 pulse stays missed at 08:01 and reading Schedule leaves Idle output off in native and WASM', async () => {
+  const idleSource = atSource({ declarations: 'input allow: Bool; state idle: Bool = true; state observed: Bool = false;',
+    output: "idle' = idle; observed' = appointment.due; alarm <- !idle;" });
+  const steps = [{ mono: 0, delta: -1, allow: false },
+    { mono: 1, delta: 0, allow: false }, { mono: 60_001, delta: 60_000, allow: true }];
+  const missed = await parity(steps, [false,false,false], [false,true,false], idleSource);
+  const record = missed[1].contextTrace.find(record => record.decision === 'ConditionsFalseAtPulse');
+  assert.ok(record, 'the 08:00 predicate failure is an explicit terminal observation');
+  assert.equal(record.plannedWallMs, planned);
+  assert.match(record.occurrenceId, /:at$/);
+  assert.deepEqual(missed[2].contextTrace ?? [], [], '08:01 creates no new occurrence or delayed admission');
+  for (const trace of missed) {
+    assert.equal(trace.stateAfter.idle, true);
+    assert.equal(trace.stateAfter.observed, false);
+    assert.equal(trace.requested.alarm, false);
+    assert.equal(trace.safe.alarm, false);
+  }
+  assert.deepEqual(await parity(steps, [false,false,false], [false,true,false], idleSource), missed,
+    'fresh native/WASM/ghostsim execution preserves the complete observation trace');
+  // A true crossing proves the Schedule was actually evaluated, but reading its
+  // due value into state cannot authorize an unconnected Idle output.
+  const admitted = await parity(steps.map(step => ({ ...step, allow: true })),
+    [false,false,false], [false,false,false], idleSource);
+  assert.equal(admitted[1].stateAfter.observed, true);
+  assert.equal(admitted[1].stateAfter.idle, true);
+  assert.equal(admitted[1].contextTrace.some(record => record.decision === 'Due'), true);
+  assert.equal(admitted[1].requested.alarm, false);
+  assert.equal(admitted[1].safe.alarm, false);
+  assert.equal(admitted[2].stateAfter.observed, false);
+});
 
 test('GF-TEST-at-runtime: exact crossing and rollback emit the singleton once in native WASM and ghostsim', async () => {
   const traces = await parity([{ mono: 0, delta: -1 }, { mono: 1, delta: 0 }, { mono: 2, delta: 0 },
