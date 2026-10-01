@@ -250,8 +250,8 @@
       "source": "docs/language_faq.md",
       "sourceLanguage": "ko",
       "translation": "docs/language_faq.en.md",
-      "sourceSha256": "a033ba9e53e216b71eda8a988f969b9de7b86ed00cc9801e893500cb06d35ec9",
-      "translationSha256": "590e7607179bbd38dca4ab4929b8c80f244f5a44b3b09bc12d0671dae6ae5c10"
+      "sourceSha256": "e1dc7072aa0718c341acba7288ab50a4d4352a3ff687a2a1cd18e9c863123f94",
+      "translationSha256": "e537025a6953253cd8e181ea0b27e75d325775806acd41809751930e1fa8b70d"
     },
     {
       "source": "docs/LANGUAGE-EXAMPLES.md",
@@ -341,8 +341,8 @@
       "source": "docs/ProgrammingInGhostflow.md",
       "sourceLanguage": "ko",
       "translation": "docs/ProgrammingInGhostflow.en.md",
-      "sourceSha256": "a5043156d56c9813fb55a623bdefabfc518465de8ab26712a89ee927df9d6551",
-      "translationSha256": "3eb6ace937f1b427838e1c018f131347bacafd257f28f64ddc510666646f59f2"
+      "sourceSha256": "204ea39659d032acf211557c2ccd972506dc539b37cec96ff96fbd5bd57cea43",
+      "translationSha256": "28e820dd1fb200e9c268335579d07a53dac0eb2339bdecadbdd3281b8651b7cd"
     },
     {
       "source": "docs/REFERENCE-QUERY.md",

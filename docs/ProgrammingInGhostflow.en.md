@@ -588,6 +588,41 @@ To move to a stopped state, express that transition in the program too.
 **Small experiment:** Change E03 to `pump <- start;` and release Start.
 Can you separately explain `running` remaining true and `pump` turning off?
 
+### Named local groups and the shared resource envelope
+
+E05/E06 constrain outputs of their own control. Putting the same rule in a named
+local group such as `constraints LocalRules { require pump => valve; }` preserves
+its scope and Bool constraint meaning. Constraints form the permitted region for
+goals; all mandatory conditions combine as AND. Priority or optional nonblocking
+analysis does not release mandatory conditions.
+
+Continue with the [complete bound execution example](../examples/bound-resource-execution.ghost.md).
+Checking `constraints SharedRules for station` alone does not execute protected
+outputs. The checked descriptor from `compileSourceSync` needs explicit
+`compileBoundResourceControl` binding to exact source/artifact identities, stable
+IDs and mode/output mappings. Its artifact checks every supported automatic,
+manual and fallback path through the same guard during actual Rust/WASM scans.
+This is not a JavaScript filter added after output publication.
+
+The example's authored safe vector turns the pump OFF and leaves the valve ON
+when a relation is violated during execution. A prestart violation denies new
+admission; a conflicting newcomer neither takes incumbent admission nor enters
+a hidden queue. Normal conditions alone do not clear a trip. Exclusive groups
+need a neutral observation followed by a fresh claim; require-only groups need
+requested=authored safe followed by a fresh request. Connected groups recover
+together in one scan. Successfully evaluated denial commits ordinary state;
+binding/VM errors roll back state, guard and trace.
+
+This is logical execution of one Bool GFB1 v1/v3 control with every output
+explicitly mapped. The installation authority shares the writers' registry,
+refusing a second active writer for the same stable ID. Separate installation
+registries do not certify physical exclusion. Arbitrary PID, context,
+shared-policy import composition, cooperative multi-VM arbitration and physical
+safe sequencing have separate boundaries. Do not replace E05/E06's existing
+results or replay records with those of this new example. [Reference §4.8](reference/04-sensors-constraints-control.en.md#48-common-constraints-notation-and-operations)
+and [the constraint contract](CONSTRAINTS.en.md#shared-bool-execution) distinguish
+source, binding, admission and safe-output evidence.
+
 <a id="ch05"></a>
 ## 5. Separating calculations with functions
 

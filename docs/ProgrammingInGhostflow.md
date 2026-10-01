@@ -592,6 +592,35 @@ control DirectionInterlock {
 `running`이 참으로 남는 것과 `pump`가 꺼지는 것을 별도로 설명할 수 있을까?
 
 
+### 이름 있는 지역 묶음과 공유 자원의 허용 범위
+
+E05·E06은 자기 control의 출력 제약이다. 같은 규칙을
+`constraints LocalRules { require pump => valve; }`처럼 이름 있는 지역 묶음에 넣어도
+그 범위와 Bool 제약 의미는 같다. 제약은 목표가 움직일 수 있는 허용 영역이며 필수
+조건은 모두 AND다. 우선순위나 선택적인 비차단 분석이 필수 조건을 해제하지 않는다.
+
+공유 자원은 [완전한 bound 실행 예제](../examples/bound-resource-execution.ghost.ko.md)로
+이어 읽는다. `constraints SharedRules for station`의 검사 결과만으로 보호 출력이
+실행되지는 않는다. `compileSourceSync`의 checked descriptor에 정확한 source/artifact,
+안정 ID와 mode/output mapping을 명시 결속하는 `compileBoundResourceControl` 단계가
+필요하다. 그 artifact는 실제 Rust/WASM scan에서 자동·수동·fallback의 모든 지원
+경로를 같은 guard로 검사한다. host가 출력 후 JavaScript filter를 붙이는 방식이 아니다.
+
+예제에서는 실행 중 관계 위반에 pump OFF·valve ON이라는 작성 safe vector를 사용한다.
+시작 전 위반은 새 admission을 거부하며, 충돌한 newcomer가 기존 admission을 빼앗거나
+숨은 대기열로 들어가지 않는다. trip은 조건 정상화만으로 풀리지 않는다. exclusive
+group은 neutral 관측 뒤 새 claim, require-only group은 requested=authored safe 관측
+뒤 새 요청이 필요하다. 연결된 group은 같은 scan에서 함께 복구한다. 정상 평가한
+denial은 ordinary state를 commit하고, binding/VM 오류는 state·guard·trace를 rollback한다.
+
+이것은 모든 출력을 명시 mapping한 Bool GFB1 v1/v3 control 하나의 논리 실행이다.
+설치 authority는 writer의 registry를 공유하며 같은 안정 ID의 두 번째 활성 writer를
+허용하지 않는다. 별도 설치 registry가 물리 배타성을 인증하지는 않는다. 임의 PID,
+context, shared-policy import composition, 여러 VM의 협력 중재와 물리 안전 순서는
+별도 경계다. E05·E06의 기존 결과와 재현 기록을 이 새 예제의 결과로 바꾸지 않는다.
+[Reference §4.8](reference/04-sensors-constraints-control.md#48-공통-constraints-표기와-연산)과
+[제약 계약](CONSTRAINTS.md#공유-bool-실행)은 source·binding·admission·safe 근거를 구분한다.
+
 <a id="ch05"></a>
 ## 5. 함수로 계산을 나누기
 
