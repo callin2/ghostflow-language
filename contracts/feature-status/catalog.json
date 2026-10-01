@@ -3113,18 +3113,42 @@
                 "positive",
                 "negative"
               ]
+            },
+            {
+              "path": "tests/reference-index-links.test.mjs",
+              "testId": "REF-07-001: index concepts stay usable as names while body-defined syntax keeps its allowed positions",
+              "caseId": "REF-07-001",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/reference-index-links.test.mjs",
+              "testId": "REF-07-001: indexed design and installation concepts do not become executable source declarations",
+              "caseId": "REF-07-001",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
             }
           ]
         }
       ],
       "gaps": [
-        "The oracle verifies Reference index structure and status-marker consistency; it does not prove every linked target's full prose semantics."
+        "The oracles verify index links, status markers, and body-linked compiler contrasts for reserved words, contextual keys, design notation, and external installation concepts; they do not classify every indexed term or prove every linked target's full semantics."
       ],
       "issues": [
+        310,
         315,
         317
       ],
       "referenceCaseIds": [
+        "REF-07-001",
         "REF-07-008",
         "REF-07-010"
       ]
