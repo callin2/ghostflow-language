@@ -2640,6 +2640,22 @@
               "assertionClass": "runtime-value",
               "targets": ["wasm"],
               "polarities": ["positive", "negative", "boundary"]
+            },
+            {
+              "path": "tests/scan-tape-parity.test.mjs",
+              "testId": "REF-04-011 fault recovery keeps source epochs separate and a default fresh owner resets median readiness on native and plain/framed WASM",
+              "caseId": "REF-04-011",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "negative", "boundary"]
+            },
+            {
+              "path": "tests/signals-wasm.test.mjs",
+              "testId": "real WASM recovery does not combine samples across source epochs",
+              "caseId": "REF-04-011",
+              "assertionClass": "runtime-value",
+              "targets": ["wasm"],
+              "polarities": ["positive", "negative", "boundary"]
             }
           ]
         }
@@ -2648,8 +2664,8 @@
         "Driver sampling and physical sensing are not claimed.",
         "REF-08-012 covers default logical owner startup on plain/framed WASM, not physical reboot or persistent resumption."
       ],
-      "issues": [329, 231],
-      "referenceCaseIds": ["REF-08-012", "REF-04-010"]
+      "issues": [329, 231, 232],
+      "referenceCaseIds": ["REF-08-012", "REF-04-010", "REF-04-011"]
     },
     {
       "id": "filter-hysteresis",
