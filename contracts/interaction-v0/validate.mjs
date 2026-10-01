@@ -7,6 +7,7 @@ export const INTERACTION_SCHEMA_VERSION = '0.2';
 export const RUNTIME_SNAPSHOT_VERSION = '0.1';
 
 const PUBLIC_ID = /^[A-Za-z][A-Za-z0-9._:-]{0,127}$/;
+const ENUM_MEMBER_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const SHA256 = /^[a-f0-9]{64}$/;
 const MODULE_FINGERPRINT = /^[a-f0-9]{16}$/;
 const BUILTIN_TYPES = new Map([
@@ -46,6 +47,12 @@ function publicId(value, path, errors) {
     return false;
   }
   return true;
+}
+
+function enumMemberName(value, path, errors) {
+  if (typeof value !== 'string' || !ENUM_MEMBER_NAME.test(value) || value.startsWith('__gf_')) {
+    issue(errors, path, 'enum_members', 'must be an authored enum identifier without the reserved __gf_ prefix');
+  }
 }
 
 function sha256(value, path, errors) {
@@ -93,7 +100,7 @@ function sourceType(value, path, errors) {
         value.enumMembers.forEach((member, index) => {
           const memberPath = `${path}.enumMembers[${index}]`;
           if (!exactObject(member, ['name', 'value'], memberPath, errors)) return;
-          publicId(member.name, `${memberPath}.name`, errors);
+          enumMemberName(member.name, `${memberPath}.name`, errors);
           if (names.has(member.name)) issue(errors, `${memberPath}.name`, 'duplicate_identity', 'enum member names must be unique');
           names.add(member.name);
           if (member.value !== index) issue(errors, `${memberPath}.value`, 'enum_members', 'enum member value must equal its declaration ordinal');

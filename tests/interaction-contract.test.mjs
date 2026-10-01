@@ -97,6 +97,11 @@ test('GF-TEST-interaction-enum-members: accepts declared ordinals and rejects ma
   enumSnapshot.schema.sha256 = interactionSchemaSha256(enumSchema);
   enumSnapshot.observations[0].value = 1;
   assert.equal(validate(enumSchema, enumSnapshot).valid, true);
+  const underscored = clone(enumSchema);
+  underscored.descriptors[0].sourceType.enumMembers[0].name = '_Idle';
+  const underscoredSnapshot = clone(enumSnapshot);
+  underscoredSnapshot.schema.sha256 = interactionSchemaSha256(underscored);
+  assert.equal(validate(underscored, underscoredSnapshot).valid, true);
   for (const members of [[], [{ name: 'Idle', value: 1 }],
     [{ name: 'Idle', value: 0 }, { name: 'Idle', value: 1 }],
     [{ name: 'Idle', value: 0, extra: true }]]) {
