@@ -3810,6 +3810,12 @@
             "caseId": "REF-03-041",
             "assertionClass": "compile-policy",
             "polarities": ["positive"]
+          }, {
+            "path": "tests/reference-calendar-boundary.test.mjs",
+            "testId": "REF-07-005: direct calendar Result negation cannot type-check as admission permission",
+            "caseId": "REF-07-005",
+            "assertionClass": "type-boundary",
+            "polarities": ["positive", "negative"]
           }]
         },
         {
@@ -3847,13 +3853,21 @@
               "assertionClass": "type-boundary",
               "targets": ["wasm"],
               "polarities": ["negative", "boundary"]
+            },
+            {
+              "path": "tests/reference-calendar-boundary.test.mjs",
+              "testId": "REF-07-005: Unknown calendar negation preserves its reason and cannot admit a Range across native WASM and simulation",
+              "caseId": "REF-07-005",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "negative", "boundary"]
             }
           ]
         }
       ],
       "gaps": ["Executable calendar_is and work/offday Daily Range require exact UTC binding and immutable positive literal durations. Non-UTC expression/Range execution, shifts, automatic overnight splitting, calendar-filtered DailySlots and physical operation are not claimed."],
-      "issues": [225],
-      "referenceCaseIds": ["REF-03-041"]
+      "issues": [225, 313],
+      "referenceCaseIds": ["REF-03-041", "REF-07-005"]
     },
     {
       "id": "product-boundary",

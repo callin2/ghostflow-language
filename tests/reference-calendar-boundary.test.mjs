@@ -67,7 +67,7 @@ function facts(artifact, mono, wall, snapshot, trusted = true) {
   return { clock: { monotonicMs: mono, bootEpoch: 1, wallMs: wall, uncertaintyMs: 0, trusted,
     unknownReason: trusted ? null : 'ClockUnknown', sourceRevision: 'reference-225-clock' }, natural: [], settings: null,
   schedules: sites.map(item => ({ site: item.site, coverageStartMs: 0, coverageEndMs: 253402300799999,
-    provider: null, calendar: snapshot, rows: [] })) };
+    provider: null, calendar: item.calendar || item.day?.calendar ? snapshot : null, rows: [] })) };
 }
 const wasm = () => readFileSync(resolve(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm'));
 
@@ -160,6 +160,53 @@ test('REF-03-041: actual coverage boundaries preserve Unknown and explicit Resul
   }
   await assert.rejects(() => compileSource(source().replace('case working { ok(value) => !value; fault(_) => false; }', '!working')),
     error => !/unknown function/.test(error.message) && /Bool|Result/.test(error.message));
+});
+
+// The range itself has no calendar filter: only the authored negation guard
+// decides admission. This separates Unknown handling from day-rule filtering.
+const negatedAdmissionSource = () => source('00:00', '1min')
+  .replace('    on = day`workday`;\n    calendar = workers;\n', '')
+  .replace('when = true;', 'when = permitted;')
+  .replace('  let working =', '  let permitted = case working { ok(value) => !value; fault(_) => false; };\n  let working =');
+
+test('REF-07-005: direct calendar Result negation cannot type-check as admission permission', async () => {
+  const guarded = negatedAdmissionSource();
+  const artifact = await compileSource(guarded, { filename: 'unknown-negation-admission.ghost.md' });
+  assert.equal(artifact.manifest.calendarConditions[0].calendar, 'workers');
+  for (const [condition, diagnostic] of [['!working', /! requires Bool/], ['working', /Daily when must be Bool/]]) {
+    await assert.rejects(() => compileSource(guarded.replace('when = permitted;', `when = ${condition};`)),
+      error => !/unknown function/.test(error.message) && diagnostic.test(error.message));
+  }
+});
+
+test('REF-07-005: Unknown calendar negation preserves its reason and cannot admit a Range across native WASM and simulation', async () => {
+  const artifact = await compileSource(negatedAdmissionSource(), { filename: 'unknown-negation-admission.ghost.md' });
+  const snapshot = calendar().snapshot;
+  const querySite = artifact.manifest.calendarConditions[0].site;
+  const scheduleSite = artifact.manifest.schedules[0].site;
+  for (const [label, day, supplied, trusted, fault, allowed] of [
+    ['known working day', '2026-10-01', snapshot, true, null, false],
+    ['known rest day', '2026-10-02', snapshot, true, null, true],
+    ['missing calendar', '2026-10-01', null, true, 'CalendarMissing', false],
+    ['before coverage', '2026-09-30', snapshot, true, 'CalendarOutOfRange', false],
+    ['after coverage', '2026-10-03', { ...snapshot, expiresAtMs: date('2026-10-04T00:00:00Z') }, true, 'CalendarOutOfRange', false],
+    ['expired calendar', '2026-10-01', { ...snapshot, expiresAtMs: date('2026-10-01T00:00:00Z') }, true, 'CalendarOutOfRange', false],
+    ['untrusted clock', '2026-10-01', snapshot, false, 'ClockUnknown', false],
+  ]) {
+    const start = date(`${day}T00:00:00Z`);
+    const traces = await parity(artifact, [
+      { mono: 0, wall: start - 1000, snapshot: supplied, trusted },
+      { mono: 1000, wall: start, snapshot: supplied, trusted },
+    ], [{ active: false, permitted_rest: label === 'after coverage' }, { active: allowed, permitted_rest: allowed }]);
+    const query = traces[1].contextTrace.find(row => row.site === querySite);
+    const admission = traces[1].contextTrace.find(row => row.site === scheduleSite);
+    assert.equal(query.decision, fault ? `Fault(${fault})` : `Ok(${!allowed})`, label);
+    assert.equal(admission.decision, allowed ? 'Due' : trusted ? 'Waiting' : 'Unknown(ClockUnknown)', JSON.stringify({ label, query, admission }));
+    if (allowed) {
+      assert.equal(admission.occurrenceId, `${scheduleSite}:${calendarEpochDay(day)}:1`);
+      assert.equal(admission.plannedWallMs, start);
+    }
+  }
 });
 
 test('REF-03-041: conflicting exceptions, mixed snapshots and changed revision contents reject atomically', async t => {
