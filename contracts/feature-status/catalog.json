@@ -2696,10 +2696,20 @@
             {
               "path": "tests/signals-wasm.test.mjs",
               "testId": "real WASM REF-04-016 median five clears its window after Invalid fault",
+              "caseId": "REF-04-016",
               "assertionClass": "runtime-value",
               "targets": [
                 "wasm"
-              ]
+              ],
+              "polarities": ["positive", "negative", "boundary"]
+            },
+            {
+              "path": "tests/scan-tape-parity.test.mjs",
+              "testId": "REF-04-016 median five rejects partial windows, returns the spike-resistant middle and rebuilds after fault on native and plain/framed WASM",
+              "caseId": "REF-04-016",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "negative", "boundary"]
             },
             {
               "path": "tests/signals-wasm.test.mjs",
@@ -2721,8 +2731,8 @@
         }
       ],
       "gaps": [],
-      "issues": [200],
-      "referenceCaseIds": ["REF-01-077"]
+      "issues": [200, 234],
+      "referenceCaseIds": ["REF-01-077", "REF-04-016"]
     },
     {
       "id": "resource-arbitration",
