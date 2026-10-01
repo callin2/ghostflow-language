@@ -584,6 +584,15 @@ test('GF-TEST-interaction-runtime-snapshot-empty: direct control preserves nativ
     trace: wasm[0].trace,
   });
   assert.deepEqual(snapshot.observations, []);
+  const serialized = JSON.parse(JSON.stringify(snapshot));
+  assert.deepEqual(serialized, snapshot);
+  assert.equal(serialized.source.revisionId, 'revision.direct-output.1');
+  assert.equal(serialized.source.sha256, artifact.sourceDocument.sha256);
+  assert.equal(serialized.module.moduleFingerprint, wasm[0].trace.module);
+  assert.equal(serialized.runId, 'run.direct-output.1');
+  assert.deepEqual(serialized.completion, scans[0].completion);
+  assert.deepEqual(joinRuntimeSnapshot(artifact.interactionSchema, serialized,
+    expectedRuntimeIdentity(artifact.interactionSchema, 'run.direct-output.1')), { status: 'ready', staleReasons: [] });
   assert.deepEqual(joinRuntimeSnapshot(artifact.interactionSchema, snapshot,
     expectedRuntimeIdentity(artifact.interactionSchema, 'run.direct-output.1')), {
     status: 'ready', staleReasons: [],
