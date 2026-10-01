@@ -1518,7 +1518,7 @@ class Lowerer {
       error(this.ast.loc, 'UTC Range cannot mix with legacy Solar or civil pulse execution');
     }
     if (emitBytecode && this.configStreams.length && solarForms.length) {
-      error(this.ast.loc, 'config streams cannot mix with legacy Solar/DailySlots context execution; use fixed let values or a config-aware schedule');
+      error(this.ast.loc, 'config streams cannot mix with legacy Daily/DailySlots context execution; use fixed let values or a config-aware schedule');
     }
     if (accountingExecution) {
       const bindings = this.manifest.accounts ?? [];
