@@ -19,6 +19,107 @@ function row(scanId, logicalTimeMs, inputs) {
   return { scanId, logicalTimeMs, inputs };
 }
 
+test('REF-04-003 one sensor retains four fault reasons and decision times through false recovery on native and plain/framed WASM', async () => {
+  const artifact = await compileSource(`control FaultJournal {
+  sensor moisture: Percent {
+    valid = 0% .. 100%; filter = median(3); stale_after = 300ms; recover_after = 5 samples;
+  }
+  state running: Bool = true;
+  timer age = elapsed(running);
+  output pump: Bool;
+  output decision_at: Duration;
+  pump <- moisture |> map(below(30%)) |> recover(false);
+  decision_at <- age;
+}`, { filename: 'reference-fault-journal.ghost' });
+  const sample = (id, timestampMs, value = 20, quality = 'Good') =>
+    ({ epoch: 1, id, timestampMs, quality, value });
+  const recovering = sample(8, 410);
+  const steps = [
+    { nowMs: 0, samples: { moisture: sample(1, 0, 0, 'Disconnected') } },
+    { nowMs: 10, samples: { moisture: sample(2, 10) } },
+    { nowMs: 20, samples: { moisture: sample(3, 20) } },
+    { nowMs: 30, samples: { moisture: sample(4, 30) } },
+    { nowMs: 40, samples: { moisture: sample(5, 40) } },
+    { nowMs: 50, samples: { moisture: sample(6, 50) } },
+    { nowMs: 349 }, { nowMs: 350 },
+    // Good transport quality with an out-of-range payload must become Invalid.
+    { nowMs: 400, samples: { moisture: sample(7, 400, 101) } },
+    { nowMs: 410, samples: { moisture: recovering } },
+    { nowMs: 420, samples: { moisture: recovering } },
+    { nowMs: 430 },
+    { nowMs: 440, samples: { moisture: sample(9, 440) } },
+    { nowMs: 450, samples: { moisture: sample(10, 450) } },
+    { nowMs: 451, samples: { moisture: sample(10, 450) } },
+    { nowMs: 452 },
+    { nowMs: 460, samples: { moisture: sample(11, 460) } },
+    { nowMs: 470, samples: { moisture: sample(12, 470) } },
+  ];
+  const quality = ['Disconnected', 'NotReady', 'NotReady', 'NotReady', 'NotReady', 'Good', 'Good',
+    'Stale', 'Invalid', 'NotReady', 'NotReady', 'NotReady', 'NotReady', 'NotReady',
+    'NotReady', 'NotReady', 'NotReady', 'Good'];
+  const choice = { Good: 0, Disconnected: 1, Stale: 2, Invalid: 3, NotReady: 4 };
+  const origin = artifact.sourceMap.find(node => node.kind === 'sensor').id;
+  const executions = [];
+  for (const instantiate of [ControlRuntime.instantiate, ControlRuntime.instantiateFramed]) {
+    const runtime = await instantiate.call(ControlRuntime, wasmBytes, artifact);
+    try {
+      executions.push(steps.map(step => {
+        const outcome = runtime.step(step);
+        return { ...outcome, identity: runtime.sensors.get('moisture').conditioner.sampleIdentity() };
+      }));
+    } finally { runtime.dispose(); }
+  }
+  const [plain, framed] = executions;
+  const projection = rows => rows.map(({ vm, sensors, identity }) => ({ vm, sensors, identity }));
+  assert.deepEqual(projection(plain), projection(framed));
+  for (const rows of executions) {
+    for (const [index, { vm, sensors }] of rows.entries()) {
+      assert.equal(sensors.moisture.quality, quality[index]);
+      assert.equal(sensors.moisture.ok, quality[index] === 'Good');
+      assert.deepEqual(vm.requested, { pump: quality[index] === 'Good', decision_at: steps[index].nowMs });
+      assert.deepEqual(vm.safe, vm.requested);
+      assert.deepEqual(vm.stateBefore, {
+        running: true, __gf_timer_initialized_age: index > 0, __gf_timer_since_age: 0,
+      });
+      assert.deepEqual(vm.stateAfter, {
+        running: true, __gf_timer_initialized_age: true, __gf_timer_since_age: 0,
+      });
+      // These are observation/decision times in the committed journal, not
+      // fabricated physical fault-onset timestamps. The authored timer starts at zero.
+      assert.equal(vm.inputs.__gf_now_ms, steps[index].nowMs);
+      assert.ok(vm.resultTrace.length > 0, 'false fallback must retain Result provenance');
+      for (const event of vm.resultTrace) {
+        assert.equal(event.choice, choice[quality[index]]);
+        assert.equal(event.origin, sensors.moisture.ok ? 0 : origin);
+      }
+    }
+    assert.deepEqual(rows[6].identity, { epoch: 1, id: 6, timestampMs: 50 });
+    assert.deepEqual(rows[7].identity, rows[6].identity,
+      'repeated reads and explicit fallback do not refresh the last physical sample');
+    for (const index of [9, 10, 11])
+      assert.deepEqual(rows[index].identity, { epoch: 1, id: 8, timestampMs: 410 });
+    // Three samples fill median(3), independently of the five-sample recovery rule.
+    assert.equal(rows[13].sensors.moisture.quality, 'NotReady', 'a full filter does not erase pending recovery');
+    for (const index of [13, 14, 15]) {
+      assert.equal(rows[index].sensors.moisture.quality, 'NotReady');
+      assert.deepEqual(rows[index].identity, { epoch: 1, id: 10, timestampMs: 450 });
+    }
+    assert.equal(rows[16].sensors.moisture.quality, 'NotReady', 'four new recovery samples remain insufficient');
+    assert.equal(rows[17].sensors.moisture.quality, 'Good', 'the fifth new sample completes recovery');
+  }
+  // Native evaluates the same executable using the exact actual conditioner
+  // Result rails; physical admission above is the WASM reference-host boundary.
+  // ScanDriver supplies its protected clock from logicalTimeMs, not a caller input.
+  const tape = framed.map(({ vm }, scanId) => row(scanId, steps[scanId].nowMs,
+    Object.entries(vm.inputs).filter(([name]) => name !== '__gf_now_ms')
+      .map(([name, value]) => ({ name, value }))));
+  const native = nativeRun(artifact.bytes, tape);
+  assertParity(native, await wasmRun(artifact, tape));
+  assert.ok(native.every(item => item.accepted), JSON.stringify(native));
+  assert.deepEqual(native.map(item => item.outcome.trace), framed.map(item => item.vm));
+  assert.deepEqual(native.map(item => item.outcome.logicalTimeMs), steps.map(step => step.nowMs));
+});
+
 test('REF-04-005 pure map projects a held sample over three ticks without changing state, sample freshness or recovery on native and plain/framed WASM', async () => {
   const artifact = await compileSource(`fn invert(value: Number) -> Number { 10.0 / value }
 control PureMap {
