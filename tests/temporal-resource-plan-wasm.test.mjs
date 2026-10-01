@@ -27,7 +27,7 @@ const WIDTH = Object.freeze({
   Window: 416, WindowCheckpoint: 232, RootDensity: 16, RootState: 56, Observation: 40,
   EvidenceWindow: 936, EvidenceCheckpoint: 512, EvidencePoint: 64, ProofNode: 72,
   TemporalRuntime: 120, TemporalPlan: 64, WindowPlan: 32, Slot: 952, Snapshot: 48,
-  WindowTrace: 224, Value: 16, ResultTraceEvent: 12, RootInput: 40, Vec: 12,
+  WindowTrace: 224, Value: 16, ResultTraceEvent: 12, RootInput: 40, Vec: 12, ScanOutcome: 200,
 });
 
 function windowGeometry(overMs, upstream = [], prior = []) {
@@ -74,8 +74,9 @@ function temporalBytes(journalCapacity) {
 const LIVE_ORACLE = temporalBytes(1024);
 const REPLAY_ORACLE = temporalBytes(3);
 const LEGACY_REPLAY_PEAK = LIVE_ORACLE.bytes + REPLAY_ORACLE.bytes + 3 * 24;
-// TickRecord now retains a context trace Vec; ScanOutcomeV1 is 192 bytes on wasm32.
-const FRAMED_REPLAY_PEAK = LEGACY_REPLAY_PEAK + 3 * 192;
+// Independent wasm32 compiler probing measures ScanOutcomeV1 at 200 bytes:
+// the resource trace Vec adds 12 bytes and absorbs 4 bytes of prior padding.
+const FRAMED_REPLAY_PEAK = LEGACY_REPLAY_PEAK + 3 * WIDTH.ScanOutcome;
 
 function profile(sourceTag, changes = {}) {
   return {
@@ -215,7 +216,7 @@ for (const framed of [false, true]) test(`${framed ? 'framed' : 'legacy'} replay
   assert.equal(replayPlan.liveBytes, activationPlan.accountedTemporalBytes);
   assert.equal(replayPlan.ghostBytes, REPLAY_ORACLE.bytes);
   assert.equal(replayPlan.returnHeaderBytes, 3 * 24);
-  assert.equal(replayPlan.frameHeaderBytes, framed ? 3 * 192 : 0);
+  assert.equal(replayPlan.frameHeaderBytes, framed ? 3 * WIDTH.ScanOutcome : 0);
   const replayPeak = framed ? FRAMED_REPLAY_PEAK : LEGACY_REPLAY_PEAK;
   assert.equal(replayPlan.requiredPeakTemporalBytes, replayPeak);
   assert.equal(replayPlan.ghostFitsBudget, true);

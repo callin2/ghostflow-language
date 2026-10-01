@@ -213,6 +213,28 @@ export class FramedGhostFlowRuntime {
     }
   }
 
+  activateResourceBinding(bytes) {
+    this.#bytes(bytes, (p, n) => this.#check(this.wasm.gf_frame_activate_resource_binding(this.handle, p, n)));
+  }
+
+  scanResourceBinding(frame, bindingBytes) {
+    let committed = false;
+    try {
+      const encoded = encodeFrame(frame);
+      this.#bytes(encoded.bytes, (p, n) => this.#bytes(bindingBytes, (bp, bn) => {
+        committed = null;
+        const ok = this.wasm.gf_frame_scan_resource_binding(this.handle, BigInt(encoded.scanId),
+          BigInt(encoded.logicalTimeMs), p, n, bp, bn);
+        committed = Boolean(ok);
+        if (!ok) throw new Error(this.#lastError() || 'Bound resource scan failed');
+      }));
+    } catch (cause) {
+      throw new NativeDispatchError(cause.message, { cause, committed });
+    }
+    try { return this.outcome; }
+    catch (cause) { throw new NativeDispatchError(cause.message, { cause, committed: true }); }
+  }
+
   dispatch(frame) {
     let committed = false;
     try {

@@ -4129,6 +4129,32 @@ export function compileControlPolicyDescriptorArtifact(source, { filename = '<co
   return { bytes, manifest, sourceMap: checked.sourceMap };
 }
 
+/** Internal bound-profile lowering. Never returns an unguarded shared-policy program. */
+export function compileBoundControlPolicyArtifact(source, { filename, envelope } = {}) {
+  const ast = new ControlParser(source, filename).parse();
+  if (ast.kind !== 'control' || !ast.body.some(item => item.kind === 'shared-constraints')) {
+    error(ast.loc, 'bound resource execution requires an in-control shared policy');
+  }
+  const checked = new Lowerer(ast, filename).lower({ emitBytecode: false });
+  const requestAst = { ...ast, body: ast.body.filter(item => !['shared-constraints', 'resource'].includes(item.kind)) };
+  const candidate = new Lowerer(requestAst, filename).lower();
+  if (![1, 3].includes(new DataView(candidate.bytes.buffer, candidate.bytes.byteOffset).getUint16(4, true))
+    || checked.manifest.outputs.some(port => port.type !== 'Bool')
+    || checked.manifest.inputs.some(port => port.type !== 'Bool')) {
+    error(ast.loc, 'bound resource execution supports only a Bool GFB1 v1/v3 control; contextual, accounting, continuous and other profiles require separate integration');
+  }
+  if (typeof envelope !== 'function') error(ast.loc, 'bound resource execution requires a compiled policy envelope');
+  const bytes = envelope(candidate.bytes, checked.manifest, candidate.traceMetadata.constraints);
+  if (!(bytes instanceof Uint8Array) || bytes.length < candidate.bytes.length + 10
+    || new TextDecoder().decode(bytes.subarray(0, 4)) !== 'GFB1'
+    || new DataView(bytes.buffer, bytes.byteOffset).getUint16(4, true) !== 17
+    || new DataView(bytes.buffer, bytes.byteOffset).getUint32(6, true) !== candidate.bytes.length
+    || candidate.bytes.some((byte, index) => bytes[index + 10] !== byte)) {
+    error(ast.loc, 'bound resource execution requires the guarded GFB17 envelope');
+  }
+  return { ...candidate, bytes, manifest: { ...checked.manifest, format: 'GhostFlow/control-v17' } };
+}
+
 /** Type-checked schedule contract. These bytes cannot be loaded as control bytecode. */
 export function compileScheduleDescriptorArtifact(source, { filename = '<control>' } = {}) {
   const ast = new ControlParser(source, filename).parse();

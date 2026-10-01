@@ -278,6 +278,68 @@ pub unsafe extern "C" fn gf_frame_activate(handle: *mut FramedHandle) -> i32 {
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn gf_frame_activate_resource_binding(
+    handle: *mut FramedHandle,
+    ptr: *const u8,
+    len: usize,
+) -> i32 {
+    let Some(h) = handle.as_mut() else { return 0 };
+    let bytes = match crate::resource_constraints_abi::packet(ptr, len) {
+        Ok(v) => v,
+        Err(e) => return h.failure(e),
+    };
+    let state = std::mem::replace(&mut h.state, FramedState::Configuring(Runtime::new(1)));
+    match state {
+        FramedState::Configuring(mut runtime) => match runtime
+            .activate_with_resource_binding(bytes, crate::resource_constraints_abi::registry())
+        {
+            Ok(()) => {
+                h.state = FramedState::Active(runtime.into_scan_driver());
+                h.success()
+            }
+            Err(e) => {
+                h.state = FramedState::Configuring(runtime);
+                h.failure(e.to_string())
+            }
+        },
+        FramedState::Active(driver) => {
+            h.state = FramedState::Active(driver);
+            h.failure("framed runtime is already active")
+        }
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn gf_frame_scan_resource_binding(
+    handle: *mut FramedHandle,
+    scan_id: u64,
+    logical_time_ms: u64,
+    ptr: *const u8,
+    len: usize,
+    binding_ptr: *const u8,
+    binding_len: usize,
+) -> i32 {
+    let Some(h) = handle.as_mut() else { return 0 };
+    let frame = match decode_frame(ptr, len, scan_id, logical_time_ms) {
+        Ok(v) => v,
+        Err(e) => return h.failure(e),
+    };
+    let binding = match crate::resource_constraints_abi::packet(binding_ptr, binding_len) {
+        Ok(v) => v,
+        Err(e) => return h.failure(e),
+    };
+    let outcome = match &mut h.state {
+        FramedState::Configuring(_) => return h.failure("framed runtime is not active"),
+        FramedState::Active(driver) => match driver.scan_with_resource_binding(frame, binding) {
+            Ok(v) => v,
+            Err(e) => return h.failure(e.to_string()),
+        },
+    };
+    h.outcome=format!("{{\"format\":\"GhostFlow/scan-outcome-v1\",\"scanId\":{},\"logicalTimeMs\":{},\"trace\":{}}}",outcome.scan_id,outcome.logical_time_ms,outcome.trace.to_json());
+    h.success()
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn gf_frame_activate_temporal(
     handle: *mut FramedHandle,
     ptr: *const u8,

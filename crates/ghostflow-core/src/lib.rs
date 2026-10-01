@@ -16,6 +16,7 @@ pub mod keyboard;
 pub mod natural_context;
 pub mod objective_vm;
 pub mod range_schedule;
+pub mod resource_constraints;
 pub mod resource_policy;
 pub mod scan;
 pub mod schedule_clock;
@@ -172,6 +173,7 @@ pub struct Module {
     schedules: Option<schedule_vm::ScheduleRequirements>,
     true_fors: Option<true_for_vm::TrueForRequirements>,
     objective: Option<objective_vm::ObjectiveDescriptor>,
+    resource_policy: Option<resource_constraints::Plan>,
 }
 
 impl Module {
@@ -187,6 +189,27 @@ impl Module {
             return Err(Error::new("invalid GFB1 magic"));
         }
         let format_version = reader.u16()?;
+        if format_version == 17 {
+            let inner_length = reader.u32()? as usize;
+            if inner_length > MAX_MODULE_BYTES {
+                return Err(Error::new("resource base byte limit exceeded"));
+            }
+            let inner = reader.take(inner_length)?.to_vec();
+            if inner.get(..4) != Some(&b"GFB1"[..])
+                || !matches!(inner.get(4..6), Some([1, 0]) | Some([3, 0]))
+            {
+                return Err(Error::new("resource wrapper requires GFB1 Bool base"));
+            }
+            let mut module = Self::load(&inner)?;
+            let plan = resource_constraints::Plan::read(&mut reader, &module)?;
+            if !reader.finished() {
+                return Err(Error::new("trailing resource wrapper bytes"));
+            }
+            module.resource_policy = Some(plan);
+            module.format_version = 17;
+            module.fingerprint = fingerprint;
+            return Ok(module);
+        }
         if !matches!(
             format_version,
             1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16
@@ -648,6 +671,7 @@ impl Module {
             schedules,
             true_fors,
             objective,
+            resource_policy: None,
         })
     }
 
@@ -772,6 +796,7 @@ pub struct ResultTraceEvent {
 #[derive(Clone, Debug)]
 pub struct TickRecord {
     pub module_fingerprint: u64,
+    pub resource_trace: Vec<resource_constraints::Observation>,
     pub tick: u64,
     pub strategy: String,
     pub inputs: NamedValues,
@@ -817,6 +842,8 @@ pub struct Runtime {
     solar_runtime: Option<solar_runtime::SolarRuntime>,
     context_runtime: Option<context_runtime::ContextRuntime>,
     objective_runtime: Option<controller::Pid>,
+    resource_guard: Option<resource_constraints::Guard>,
+    resource_lease: Option<resource_constraints::Lease>,
 }
 
 impl Runtime {
@@ -837,9 +864,17 @@ impl Runtime {
             solar_runtime: None,
             context_runtime: None,
             objective_runtime: None,
+            resource_guard: None,
+            resource_lease: None,
         }
     }
     pub fn install(&mut self, module: Module, preserve_state: bool) {
+        if module.resource_policy.is_some() || self.resource_guard.is_some() {
+            self.journal.clear();
+            self.next_tick = 1;
+        }
+        self.resource_guard = None;
+        self.resource_lease = None;
         // Installation is an explicit new temporal execution session.
         if module.temporal.is_some()
             || self.temporal.is_some()
@@ -876,6 +911,11 @@ impl Runtime {
         self.last_time_ms = None;
     }
     pub fn hot_swap(&mut self, module: Module) -> Result<()> {
+        if module.resource_policy.is_some() || self.resource_guard.is_some() {
+            return Err(Error::new(
+                "resource hot swap requires explicit binding activation",
+            ));
+        }
         if module.objective.is_some() || self.objective_runtime.is_some() {
             return Err(Error::new(
                 "objective hot swap requires explicit controller migration",
@@ -952,6 +992,35 @@ impl Runtime {
         Ok(())
     }
     pub fn activate(&mut self) -> Result<()> {
+        if self
+            .module
+            .as_ref()
+            .is_some_and(|m| m.resource_policy.is_some())
+        {
+            return Err(Error::new("resource activation requires immutable binding"));
+        }
+        self.activate_inner()
+    }
+    pub fn activate_with_resource_binding(
+        &mut self,
+        bytes: &[u8],
+        registry: &resource_constraints::ResourceBindingRegistry,
+    ) -> Result<()> {
+        if self.resource_guard.is_some() {
+            return Err(Error::new("resource runtime already activated"));
+        }
+        let plan = self
+            .module
+            .as_ref()
+            .and_then(|m| m.resource_policy.as_ref())
+            .ok_or_else(|| Error::new("not a bound resource module"))?;
+        let (guard, lease) = plan.activate(bytes, registry)?;
+        self.activate_inner()?;
+        self.resource_guard = Some(guard);
+        self.resource_lease = Some(lease);
+        Ok(())
+    }
+    fn activate_inner(&mut self) -> Result<()> {
         let m = self
             .module
             .as_ref()
@@ -1052,7 +1121,7 @@ impl Runtime {
         {
             return Err(Error::new("context facts require GFB10, GFB11 or GFB12"));
         }
-        self.tick_inner(None, Some((clock, facts)))
+        self.tick_inner(None, Some((clock, facts)), None)
     }
     pub fn context_checkpoint(&self) -> Result<Vec<u8>> {
         let module = self
@@ -1292,7 +1361,7 @@ impl Runtime {
         {
             return Err(Error::new("Solar facts cannot contain a civil fold"));
         }
-        self.tick_inner(Some((clock, facts)), None)
+        self.tick_inner(Some((clock, facts)), None, None)
     }
     pub fn tick_with_schedules(
         &mut self,
@@ -1342,7 +1411,7 @@ impl Runtime {
                 facts: f.facts,
             })
             .collect();
-        self.tick_inner(Some((clock, &shared)), None)
+        self.tick_inner(Some((clock, &shared)), None, None)
     }
     /// Native direct-source certified interval execution. Mixed preludes and replay
     /// require separate integration and remain rejected.
@@ -1518,7 +1587,10 @@ impl Runtime {
         Ok(())
     }
     pub fn tick(&mut self) -> Result<&TickRecord> {
-        self.tick_inner(None, None)
+        self.tick_inner(None, None, None)
+    }
+    pub fn tick_with_resource_binding(&mut self, bytes: &[u8]) -> Result<&TickRecord> {
+        self.tick_inner(None, None, Some(bytes))
     }
     fn tick_inner(
         &mut self,
@@ -1527,6 +1599,7 @@ impl Runtime {
             &[solar_runtime::SolarInput<'_>],
         )>,
         context: Option<(schedule_clock::ClockSnapshot<'_>, &context_runtime::Facts)>,
+        resource_binding: Option<&[u8]>,
     ) -> Result<&TickRecord> {
         if self.context_runtime.is_some() != context.is_some() {
             return Err(Error::new("context tick requires activated typed evidence"));
@@ -1540,6 +1613,17 @@ impl Runtime {
             .module
             .as_ref()
             .ok_or_else(|| Error::new("no module installed"))?;
+        if m.resource_policy.is_some() {
+            self.resource_guard
+                .as_ref()
+                .ok_or_else(|| Error::new("resource runtime is not activated"))?
+                .validate_scan(
+                    resource_binding
+                        .ok_or_else(|| Error::new("resource tick requires immutable binding"))?,
+                )?;
+        } else if resource_binding.is_some() {
+            return Err(Error::new("not a bound resource module"));
+        }
         let si = self
             .active_strategy
             .ok_or_else(|| Error::new("runtime is not active"))?;
@@ -1752,6 +1836,21 @@ impl Runtime {
             );
         }
         let (mut safe, faults, safety_trace) = apply_safety(requested.clone(), &m.constraints);
+        let mut resource_trace = vec![];
+        let resource_stage = if let Some(guard) = &self.resource_guard {
+            let (stage, projected, trace) =
+                guard.stage(&named(&m.inputs, &iv), &requested, &safe)?;
+            if apply_safety(projected.clone(), &m.constraints).0 != projected {
+                return Err(Error::new(
+                    "resource projection conflicts with local constraints",
+                ));
+            }
+            safe = projected;
+            resource_trace = trace;
+            Some(stage)
+        } else {
+            None
+        };
         if let (Some(descriptor), Some(stage)) = (&m.objective, &objective_stage) {
             safe.insert(
                 descriptor.output.clone(),
@@ -1759,6 +1858,7 @@ impl Runtime {
             );
         }
         let rec = TickRecord {
+            resource_trace,
             module_fingerprint: m.fingerprint,
             tick: self.next_tick,
             strategy: strategy.name.clone(),
@@ -1804,6 +1904,9 @@ impl Runtime {
             self.context_runtime = Some(stage.runtime);
         }
         self.next_tick = next_tick;
+        if let Some(stage) = resource_stage {
+            self.resource_guard = Some(stage);
+        }
         self.last_time_ms = clock.or(self.last_time_ms);
         self.state = next;
         self.safe_intents = safe;
@@ -1845,6 +1948,11 @@ impl Runtime {
         &self.journal
     }
     pub fn rewind(&mut self, tick: u64) -> Result<()> {
+        if self.resource_guard.is_some() {
+            return Err(Error::new(
+                "resource rewind requires admission checkpoint support",
+            ));
+        }
         if self.objective_runtime.is_some() {
             return Err(Error::new(
                 "objective rewind requires controller checkpoint support",
@@ -3378,6 +3486,7 @@ mod tests {
             true_fors: None,
             format_version: 2,
             objective: None,
+            resource_policy: None,
             name: "int-atomicity".into(),
             version: 1,
             inputs: vec![Field {
@@ -3753,6 +3862,7 @@ mod tests {
         assert_eq!(rule.final_evaluation.values["pump"], Value::Bool(false));
         assert!(rule.final_evaluation.satisfied);
         let encoded = TickRecord {
+            resource_trace: vec![],
             module_fingerprint: 0,
             tick: 1,
             strategy: "test".into(),

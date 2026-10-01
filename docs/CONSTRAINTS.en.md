@@ -30,8 +30,14 @@ and [the checked shared contract with its complete logical mapping](../examples/
 digests, every required stable resource identity and typed port, and every finite
 exclusive-mode input. It rejects missing/extra mappings, disguised duplicate
 resource identities or ports, and host-supplied policy fields. Validation returns
-`executable: false`; it grants neither admission nor output authority. This is a
-reference logical binding contract, not a physical output ABI.
+`executable: false`; it grants neither admission nor output authority.
+To select execution, pass the validated compilation and binding together to
+`compileBoundResourceControl(compilation, binding)`. This explicit path emits a
+bounded Bool GFB17 module with a shared Rust guard. Compiling canonical source
+alone does not silently turn the checked descriptor into an executable artifact.
+This is a reference logical binding contract, not a physical output ABI.
+
+Executable groups support at most one exclusive activity set. Multiple exclusive statements remain checked source but require separate execution integration; reject them rather than flattening their distinct sets. The authored global safe vector must also satisfy mandatory local constraints.
 
 This is a complete local-constraint control. Local constraints apply only to
 this control's outputs and execute through ordinary Bool lowering. Existing
@@ -53,7 +59,7 @@ A shared resource policy states its scope with `constraints Name for resource`.
 This is **complete checked source producing a non-executable descriptor**.
 `ghostc` source checking validates declarations, types, finite sets and safe-value
 relations. `compileControl` and composition reject this policy while its executable
-binding and enforcement are unavailable.
+binding is absent. Separate explicit bound compilation selects execution.
 
 ```ghost
 control SharedPumpPolicy {
@@ -75,11 +81,82 @@ control SharedPumpPolicy {
 `safe` explicitly assigns every Bool resource in the finite referenced set and
 must satisfy all mandatory output relations. These values are pump OFF and valve
 ON, not a hidden all-OFF default. Do not assume the source `pump`/`valve` requests
-have been connected to physical resources. Stable resource identity, all automatic/
-manual paths, staged enforcement, trace and recovery belong to the separate
-execution contract in [#158](https://github.com/callin2/ghostflow-language/issues/158).
+have been connected to physical resources. Validated stable resource identities
+and typed port mappings plus explicit bound activation enable the logical
+enforcement described below.
 Former top-level resource-policy files also remain checked non-control artifacts,
 never enforced controls. Do not invent `station`, `use`, `bind` or session syntax.
+
+## Shared Bool execution
+
+See [bound-resource-execution](../examples/bound-resource-execution.ghost.md)
+for the complete executable example, explicit binding and recorded inputs/results.
+The #157 shared checking example above retains its existing non-executable
+descriptor contract.
+
+The bound profile in [#158](https://github.com/callin2/ghostflow-language/issues/158)
+executes one Bool control and a finite resource set through a shared Rust tick
+guard. Every output must be resource-bound with an authored complete safe vector.
+The binding pins #157's exact canonical source/descriptor digests, revision,
+stable IDs and Bool mode-input/output mappings. Supply it explicitly on module
+activation as GFRB1 and supply the same binding identity as a GFRS1 packet on every
+scan. Rust APIs are `activate_with_resource_binding(bytes, &ResourceBindingRegistry)`,
+`tick_with_resource_binding(bytes)` and `ScanDriver::scan_with_resource_binding(frame, bytes)`.
+Missing or mismatched
+binding fails closed. An ordinary loader may parse the module, but ordinary
+activate/tick/scan cannot bypass the guard. Execution is not a JavaScript filter
+added after publishing outputs.
+
+GFB17 wraps only existing GFB1 v1 or v3 programs with every input/output port Bool,
+including the guard in their commit boundary. Automatic, manual and fallback
+source using short-circuit evaluation lowers to v3. Other inner profiles are
+unsupported. Outputs from every supported branch pass
+through the same Rust guard. Context schedules, objectives/PID, import composition
+and group overlaps with ambiguous safety meaning are rejected outside this bounded
+profile. The installation authority must make every logical writer use the same
+`ResourceBindingRegistry`. Native activation receives a shared Arc registry; the
+WASM ABI shares one registry across all handles within an instance. Both refuse
+a second active writer for the same stable resource ID. The Node reference wrapper
+also checks different WASM instances through one module registry. Station and Bool
+resource IDs are both covered. Separate installation registries do not certify
+physical exclusion across installations. This does not provide cooperative
+multi-VM arbitration, session leases or a general
+physical output ABI. Existing Station adapter, accounting execution paths and
+nonblocking `check` remain unchanged.
+
+Mandatory group conditions combine as AND. A new activity claim conflicting with
+the current admission is denied while incumbent admission and previous safe
+outputs remain. A requested candidate violating a mandatory output relation
+before starting creates neither new admission nor protected output. A denied
+newcomer must be observed false before requesting admission with a fresh true claim.
+The first
+denial has an empty output set because no previous output exists; otherwise retain
+the previously committed safe values. Do not invent prestart replacement outputs
+from the descriptor's safe vector.
+
+If an already admitted execution's requested candidate violates a mandatory
+relation, transition to its authored resource-specific safe vector. Preserve
+safe behavior with some outputs ON, such as pump=false and valve=true. Normal
+inputs after a trip do not automatically restart execution. An exclusive group
+requires an observation with all claims false, followed by a fresh claim satisfying
+every admission condition. A require-only group establishes a recovery baseline
+when its requested map equals the authored safe map, then checks a fresh departure.
+Trips propagate across the transitively connected component of groups sharing
+protected resources. Authored safe values must agree on shared resources;
+unrelated groups retain their admission. Revalidate the final safe candidate
+against the AND of every mandatory shared and local constraint.
+Do not hide the old claim in a retry queue. Distinguish raw claims from
+admitted activity and requested from final safe values, retaining the cause,
+group, binding and scan evidence.
+
+A successfully evaluated denial commits ordinary VM state. Denial does not mean
+cancelling the program's job/session or restoring every state to its previous value.
+
+A binding error or VM failure rolls back VM state, guard admission and trace
+together. Do not partially change protected state or commit rejected-scan evidence.
+Logical safe outputs differ from Driver applied and physical feedback confirmed.
+Actual Driver sequencing, physical safety devices and field installation are
+outside this profile's validation scope.
 
 Accounting declares the existing `resource` and `account`, then uses
 `constraints Budget { limit used(account, basis) <= bound { ... } }`.
@@ -175,6 +252,10 @@ The checking stage is determined by a constraint's target.
 Do not implicitly mix these stages. General expressions lacking a defined target stage receive compilation diagnostics.
 
 ## Shared pumps across multiple controls
+
+The session/arbitration explanation in this section is the facility contract of
+the fixed Station adapter below. The bound Bool profile above permits one active
+writer; it does not claim multi-VM session arbitration or physical usage rights.
 
 The shared-resource manager is the sole output writer for a physical pump.
 Individual controls' outputs are requests, not last-writer-wins GPIO writes.

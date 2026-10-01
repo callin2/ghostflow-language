@@ -258,6 +258,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 
 | Path | Title | Type |
 | --- | --- | --- |
+| [examples/bound-resource-execution.ghost.ko.md](examples/bound-resource-execution.ghost.ko.md) | 바인딩된 공유 Bool 정책 실행 | md |
+| [examples/bound-resource-execution.ghost.md](examples/bound-resource-execution.ghost.md) | Executing a bound shared Bool policy | md |
 | [examples/constraint-envelope.ghost.ko.md](examples/constraint-envelope.ghost.ko.md) | 완전한 local 출력 허용 범위 | md |
 | [examples/constraint-envelope.ghost.md](examples/constraint-envelope.ghost.md) | A complete local output envelope | md |
 | [examples/explicit-feedback-adoption.ghost.ko.md](examples/explicit-feedback-adoption.ghost.ko.md) | 명시적으로 채택한 피드백 억제 | md |
@@ -463,4 +465,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-343 documents.
+345 documents.

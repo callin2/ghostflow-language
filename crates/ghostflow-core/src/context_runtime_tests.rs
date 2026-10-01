@@ -389,6 +389,7 @@ fn module(descriptor: PulseDescriptor, natural: bool) -> Module {
         inputs.push(field("rhs", Value::Int(1)));
     }
     Module {
+        resource_policy: None,
         fingerprint: 85,
         format_version: 11,
         name: "context-transaction".into(),
