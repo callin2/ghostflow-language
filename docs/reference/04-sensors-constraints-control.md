@@ -602,7 +602,7 @@ persistence가 ledger의 뜻을 정한다. 지역 Bool 규칙이나 shared admis
 | 표기 | 적용 단계와 의미 |
 |---|---|
 | 지역 `require [at safe_output] p` | 자기 control의 Bool 출력 후보 불변조건. 대상 생략은 safe_output이다. |
-| 지역 `mutex(a, b)` | 자기 control의 Bool 출력 둘을 동시에 true로 요청하지 않는다. |
+| 지역 `mutex(a, b)` | 자기 control의 두 requested Bool 출력이 true이면 그 요청 증거를 보존하고 두 safe 출력을 false로 만든다. |
 | 공유 `exclusive at admission { a, b, ... }` | 같은 scope의 유한 Bool activity 집합 2개 이상. 충돌하는 새 admission을 거부한다. |
 | 공유 `require at safe_output p` | 유한 resource 출력 관계를 검사한다. 안전 값도 이 필수 관계를 만족해야 한다. |
 | 공유 `safe { resource = Bool; ... }` | 실행 중 위반에 사용할 resource별 명시 안전 vector. 보편적인 전체 OFF 기본값은 없다. |

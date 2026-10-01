@@ -468,7 +468,7 @@ define the ledger. Local Bool rules and shared admission do not replace it.
 | Notation | Application stage and meaning |
 |---|---|
 | Local `require [at safe_output] p` | Bool candidate-output invariant of its own control. Omitted target means safe_output. |
-| Local `mutex(a, b)` | Do not request both Bool outputs of its own control true simultaneously. |
+| Local `mutex(a, b)` | When both requested Bool outputs of its own control are true, preserve that requested evidence and set both safe outputs false. |
 | Shared `exclusive at admission { a, b, ... }` | At least two finite Bool activities in one scope. Reject conflicting new admission. |
 | Shared `require at safe_output p` | Check finite resource-output relations. Safe values must also satisfy these mandatory relations. |
 | Shared `safe { resource = Bool; ... }` | Authored resource-specific safe vector for violations during execution. No universal all-OFF default. |
