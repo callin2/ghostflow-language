@@ -4505,6 +4505,20 @@
       "issues": [263], "referenceCaseIds": ["REF-03-074"]
     },
     {
+      "id": "range-safety-deadline",
+      "family": "Range planned deadline during global safety blocking",
+      "clause": { "path": "docs/reference/03-time-and-schedules.en.md", "heading": "3.5 Common Schedule semantics" },
+      "owner": "CORE", "maturity": "EXPERIMENTAL", "coreScope": false, "requiredEvidence": [],
+      "evidence": [{ "stage": "native_wasm", "status": "verified", "refs": [{
+        "path": "tests/range-safety-deadline.test.mjs",
+        "testId": "REF-03-075: fixed Range deadline survives safety blocking in native context tape and framed WASM",
+        "caseId": "REF-03-075", "assertionClass": "target-parity",
+        "targets": ["native", "wasm"], "polarities": ["positive", "negative", "boundary"]
+      }] }],
+      "gaps": ["The same checked canonical GFB12 immutable UTC DailySlots Range and global Bool safety requirement execute in actual native and framed WASM with identical complete VM/context traces and every durable checkpoint. Requested output remains active while safe output is blocked at08:06/08:07, resumes safely at08:08 without a new admission, remains active at08:09:59.999 and finishes at08:10. The consumed occurrence checkpoint remains unchanged. No Driver applied/confirmed output, physical safety certification, non-UTC/DST, live Range setting binding, generic Run overlap or external publishing-host lifecycle implementation is claimed."],
+      "issues": [264], "referenceCaseIds": ["REF-03-075"]
+    },
+    {
       "id": "product-boundary",
       "family": "Farmer UI, installation and deployment",
       "clause": {
