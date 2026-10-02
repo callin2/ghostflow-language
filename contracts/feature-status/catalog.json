@@ -5365,6 +5365,63 @@
       "gaps": ["Source-supplied canonical closure validation and actual portable execution are verified. Registry resolution, package signing, deployment and physical binding are separate contracts."],
       "issues": [298],
       "referenceCaseIds": ["REF-06-011"]
+    },
+    {
+      "id": "keyed-retime-occurrence-identity",
+      "family": "Keyed TimeSlots retime preserves admitted Range occurrence and ledger",
+      "clause": {
+        "path": "docs/reference/03-time-and-schedules.en.md",
+        "heading": "3.6 Selected DailySlots"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/range-keyed-retime.test.mjs",
+              "testId": "REF-03-081 retained key retime at 08:05 pauses then resumes same 08:07-08:17 Range without second due",
+              "caseId": "REF-03-081",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/range-keyed-retime.test.mjs",
+              "testId": "REF-03-081 immediate 08:07 effective retime evaluates same occurrence active in that accepted frame",
+              "caseId": "REF-03-081",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Conformance-only evidence for actual canonical keyed UTC Range: 08:04 admission, retained-key retime to08:07, pause/resume, half-open08:17 end, fixed occurrence and no second due. Full framed native/WASM outcomes, settings and checkpoints agree. Restore retains consumed identity/settings without resuming active timer. Other civil zones, Device restart/run identity issuance and physical effect adoption are separate contracts."
+      ],
+      "issues": [
+        270
+      ],
+      "referenceCaseIds": [
+        "REF-03-081"
+      ]
     }
   ]
 }
