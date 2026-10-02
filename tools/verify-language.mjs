@@ -155,6 +155,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/temporal-resource-plan-wasm.test.mjs',
     'tests/range-contract.test.mjs',
     'tests/range-runtime.test.mjs',
+    'tests/range-clock-corrections.test.mjs',
   'tests/at-contract.test.mjs',
   'tests/at-runtime.test.mjs',
   'tests/at-package.test.mjs',
