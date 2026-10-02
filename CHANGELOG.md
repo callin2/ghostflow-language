@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### 2026-10-02 — block unacknowledged accounting admission ([#269](https://github.com/callin2/ghostflow-language/issues/269))
+
+Bug fix restoring Reference §3.10 `on_unknown = block`: rolling reservation
+admission now rejects a ledger whose current revision lacks durable
+acknowledgement before any reservation, revision or persistence mutation.
+Previously `initializeEmpty` with a failed write produced Unknown reads but a
+5s reservation could still be inserted. Missing/corrupt ledgers remain blocked;
+pending exact retries also block until explicit `persistPending` recovery, then
+known duplicates remain idempotent. REF-03-080 compares the same canonical
+count-fault-to-false program and source-derived protective policy over actual
+native/WASM ABI traces, complete ledgers and admission outcomes. This is
+source-bound reference-host admission, not automatic VM/resource or physical
+binding. No source grammar or serialized ABI format changes.
+
 ### 2026-10-02 — live Range Duration setting retimes active occurrence ([#265](https://github.com/callin2/ghostflow-language/issues/265))
 
 Reference §3.5 `range(duration)` now accepts a `Duration` config for executable UTC Daily/DailySlots GFB12 Range without a work calendar. A successful atomic live settings event recomputes the active occurrence from the frozen planned start: 08:00 admitted at 08:04 with 10min, then edited at 08:07 to 12min, remains the same occurrence and ends at 08:12; editing to 5min ends it at the event position. No new due pulse or occurrence ID is emitted, and the accepted duration is persisted in the GFRGv2 checkpoint so the next occurrence uses the live value after restore. Invalid typed values become the existing settings-fault decision without changing the accepted duration. REF-03-076 covers native/WASM trace and checkpoint parity. The GFB12 encoding uses a zero duration sentinel followed by the existing config id; older GFB12 consumers reject this new encoded form.

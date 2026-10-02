@@ -112,6 +112,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/accounting-syntax.test.mjs',
   'tests/accounting-wasm.test.mjs',
   'tests/event-count-accounting-faults.test.mjs',
+  'tests/accounting-admission-faults.test.mjs',
   'tests/context-wasm-boundaries.test.mjs',
   'tests/calendar-provider.test.mjs',
   'tests/calendar-execution.test.mjs',
