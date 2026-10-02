@@ -4223,6 +4223,33 @@
       "referenceCaseIds": ["REF-04-038"]
     },
     {
+      "id": "station-session-accounting",
+      "family": "Station cleanup completion and merged applied resource accounting",
+      "clause": {
+        "path": "docs/reference/04-sensors-constraints-control.en.md",
+        "heading": "4.8 Common constraints notation and operations"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [{
+        "stage": "native_wasm",
+        "status": "verified",
+        "refs": [{
+          "path": "tests/accounting-wasm.test.mjs",
+          "testId": "REF-04-046: checked source native/WASM ledgers merge applied overlap while Station cleanup retains its lease",
+          "caseId": "REF-04-046",
+          "assertionClass": "target-parity",
+          "targets": ["native", "wasm"],
+          "polarities": ["positive", "negative", "boundary"]
+        }]
+      }],
+      "gaps": ["The checked canonical account binds caller-validated applied intervals to one stable host resource ID. Native/WASM ledger union and the fixed Station owner use identical explicit test-host lifecycle inputs: pump OFF with open valves retains ownership, safe cleanup alone retains the reservation, and acknowledged durable finish releases it. This is portable owner evidence, not production compiler lowering of stopped/on_time, physical receipt certification or a Device release."],
+      "issues": [245],
+      "referenceCaseIds": ["REF-04-046"]
+    },
+    {
       "id": "product-boundary",
       "family": "Farmer UI, installation and deployment",
       "clause": {
