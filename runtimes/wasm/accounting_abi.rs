@@ -330,7 +330,13 @@ pub unsafe extern "C" fn gf_tick_accounting(
         event_type,
         (local_day_present != 0).then_some(local_day),
         accounting.persisted_revision == accounting.revision,
-        accounting.unavailable_fault,
+        // A known, unacknowledged revision is incomplete. Preserve the
+        // missing/corrupt distinction for genuinely unknown ledgers.
+        if accounting.ledger.is_known() && accounting.persisted_revision != accounting.revision {
+            3
+        } else {
+            accounting.unavailable_fault
+        },
     ) {
         Ok(input) => input,
         Err(error) => return control.complete(Err(error)),

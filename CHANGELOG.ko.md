@@ -15,6 +15,15 @@ Live Range config는 runtime loader와 동일하게 컴파일 시 양수인 최�
 변경하지 않는다. clock trust가 unknown이거나 wall 보정으로 날짜가 바뀌어도
 이미 admit한 frozen origin으로 재시간화를 수행한다.
 
+### 2026-10-02 — 영속 이벤트 count의 불완전 상태 ([#268](https://github.com/callin2/ghostflow-language/issues/268))
+
+WASM accounting adapter는 알려진 ledger의 최신 revision에 영속 저장 승인이
+없으면 `LedgerIncomplete`을 반환한다. 이전에는 이벤트 저장이 실패한 뒤에도
+초기화 당시의 `LedgerMissing`을 유지했다. 누락·손상 ledger는 각각의 fault를
+유지하며, 저장 승인에 성공하면 정확한 count로 복구된다. REF-03-079는 실제
+native/WASM control trace와 직렬화된 ledger를 비교한다. 내부 production 변환
+경계 테스트는 수십억 이벤트를 할당하지 않고 `CountOverflow`를 검증한다.
+
 ### 2026-10-02 — 영속 rolling 예산 설명 ([#260](https://github.com/callin2/ghostflow-language/issues/260))
 
 Reference §4.15에 실제 Rust ledger를 읽는 소스 바인딩 reference host 조회를
