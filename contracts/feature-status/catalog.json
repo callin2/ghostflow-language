@@ -5587,6 +5587,76 @@
       "referenceCaseIds": [
         "REF-03-082"
       ]
+    },
+    {
+      "id": "composition-declaration-order-independence",
+      "family": "Composition declarations and source-closure traversal preserve identity-keyed state and output results",
+      "clause": {
+        "path": "docs/reference/06-composition-and-replay.en.md",
+        "heading": "6.5 Invariants of composed execution"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/composition-order-independence.test.mjs",
+              "testId": "REF-06-013 reversing instance and connection declarations preserves private state and requested safe outputs on native and WASM",
+              "caseId": "REF-06-013",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive"
+              ]
+            },
+            {
+              "path": "tests/composition-order-independence.test.mjs",
+              "testId": "REF-06-013 reversed import closure and dependency traversal preserve previous-snapshot cross-instance reads on native and WASM",
+              "caseId": "REF-06-013",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive"
+              ]
+            }
+          ]
+        },
+        {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/composition-order-independence.test.mjs",
+              "testId": "REF-06-013 declaration order cannot authorize combinational cycles or transitive same-tick next-state reads",
+              "caseId": "REF-06-013",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Conformance-only evidence for actual canonical pinned composition: reversed instance/connect/import declarations and supplied closure traversal preserve identity-keyed state-before/state-after and requested/safe output sequences. Every artifact executes in actual native and framed-WASM cores with complete outcome parity. Cross-instance reads observe previous committed state; declaration order cannot authorize cycles or next-state reads. This does not implement a scheduler, asynchronous ingress policy, resource arbitration, persistent instance identity issuance or physical binding."
+      ],
+      "issues": [
+        299
+      ],
+      "referenceCaseIds": [
+        "REF-06-013"
+      ]
     }
   ]
 }

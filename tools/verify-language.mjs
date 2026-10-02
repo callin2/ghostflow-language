@@ -192,6 +192,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/import-header.test.mjs',
   'tests/import-composition.test.mjs',
   'tests/composition-execution.test.mjs',
+  'tests/composition-order-independence.test.mjs',
   'tests/competing-output-writers.test.mjs',
   'tests/pinned-import-closure.test.mjs',
   'tests/import-cli-digest.test.mjs',
