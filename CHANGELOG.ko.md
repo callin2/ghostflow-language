@@ -5,6 +5,16 @@
 
 ## 미출시
 
+### 2026-10-02 — what-if 재생 입력 누락 보고 ([#304](https://github.com/callin2/ghostflow-language/issues/304))
+
+제한된 reference host가 event-sourced 기록 prefix checkpoint에서 plain control의 실제
+source-bound ghost branch를 실행한다. 각 미래 프레임은 완전한 기록 입력과 센서 sample을
+요구하며 누락되면 branch 실행 전에 보고한다. fault sample을 포함한 명시적 가상 입력은
+synthetic provenance를 표시해야 한다. 새 일회용 runtime이 원본 기록과 이후 live 실행을
+보존한다. canonical native/WASM 테스트는 전체 VM trace·상태·requested/safe 출력을 비교한다.
+이 프로파일은 같은 Program과 가상 binding을 사용한다. 외부 메모리 checkpoint,
+settings/schedule, Device 실행과 환경 모델은 범위 밖이다.
+
 ### 2026-10-02 — keyed TimeSlots Range의 atomic 중첩 검증 ([#267](https://github.com/callin2/ghostflow-language/issues/267))
 
 Reference §§3.5–3.6은 하루를 나누는 정수 분 grid에서 `TimeSlots<G,N>`로 선택한

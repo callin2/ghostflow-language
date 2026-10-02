@@ -154,6 +154,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/window-derived-provenance.test.mjs',
   'tests/temporal-replay-wasm.test.mjs',
   'tests/core-replay-wasm.test.mjs',
+  'tests/what-if-replay.test.mjs',
   'tests/temporal-resource-plan-wasm.test.mjs',
     'tests/range-contract.test.mjs',
     'tests/range-runtime.test.mjs',

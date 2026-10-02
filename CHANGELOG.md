@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### 2026-10-02 — report missing what-if replay inputs ([#304](https://github.com/callin2/ghostflow-language/issues/304))
+
+The bounded reference host now executes actual source-bound ghost branches for
+plain controls from an event-sourced recorded-prefix checkpoint. Each future
+frame requires complete recorded inputs and sensor samples; missing records
+produce a report before branch execution. Explicit virtual inputs must carry
+synthetic provenance, including fault samples. Fresh disposable runtimes preserve
+the original recording and live continuation. Canonical native/WASM tests compare
+full VM traces, state and requested/safe outputs. This profile compares the same
+Program and uses virtual bindings; foreign memory checkpoints, settings/schedules,
+Device execution and environmental models remain outside its scope.
+
 ### 2026-10-02 — atomic keyed TimeSlots Range overlap validation ([#267](https://github.com/callin2/ghostflow-language/issues/267))
 
 Reference §§3.5–3.6 now execute UTC `DailySlots<G>` selected by `TimeSlots<G,N>`

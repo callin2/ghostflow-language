@@ -5125,6 +5125,95 @@
       "referenceCaseIds": [
         "REF-03-078"
       ]
+    },
+    {
+      "id": "missing-input-what-if-replay",
+      "family": "Source-bound ghost branches report missing records and retain synthetic provenance",
+      "clause": {
+        "path": "docs/reference/06-composition-and-replay.en.md",
+        "heading": "6.8 Replay, ghost, and branches"
+      },
+      "owner": "HOST",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/what-if-replay.test.mjs",
+              "testId": "REF-06-019 what-if reports missing recorded sensors instead of inventing or holding an old value",
+              "caseId": "REF-06-019",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/what-if-replay.test.mjs",
+              "testId": "REF-06-019 recorded and synthetic ghost branches compare actual state, faults and safe outputs at logical ticks",
+              "caseId": "REF-06-019",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            }
+          ]
+        },
+        {
+          "stage": "host_simulation",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/what-if-replay.test.mjs",
+              "testId": "REF-06-019 source tampering, malformed virtual inputs and incomplete checkpoints fail without changing replay history",
+              "caseId": "REF-06-019",
+              "assertionClass": "replay",
+              "targets": [
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/what-if-replay.test.mjs",
+              "testId": "REF-06-019 preparation captures recordings before async compilation and never promotes later caller samples to recorded evidence",
+              "caseId": "REF-06-019",
+              "assertionClass": "replay",
+              "targets": [
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Actual same-Program plain-control what-if execution from a bounded event-sourced recorded-prefix checkpoint; missing required future sensor/input records report before execution, explicit virtual values retain synthetic provenance, original/live continuation is unchanged. Reference-host sensor conditioning and complete portable VM native/WASM traces are checked. Foreign memory checkpoints, candidate source replacement, production binding/run identity issuance, settings/schedules, Device lifecycle, durable branch storage and environment models are outside this profile."
+      ],
+      "issues": [
+        304
+      ],
+      "referenceCaseIds": [
+        "REF-06-019"
+      ]
     }
   ]
 }

@@ -600,8 +600,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "e4e20a7280b00596476205897e32aea136d867ca1ea99406041547731b12e091",
-      "translationSha256": "c34dc51cfa6dfe2bf4167ff0459cc39cfcbfdd4eaac75df6022465fc5d89ab44"
+      "sourceSha256": "24df04f1e913c5e4172b9bf82e39991825c7bf59a856a45f997683935d82f97d",
+      "translationSha256": "fee5d98726b4ae843f3a3d730d8a31f032c345d31a6445e309ee00e339bb651b"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",
@@ -1001,6 +1001,13 @@
       "translation": "examples/solar-live-config.ghost.en.md",
       "sourceSha256": "0ec0eb39fbc5895916ebc83f971ae59a479715f86ce0264423f1d7515bd0fad3",
       "translationSha256": "c949d5b1afcfe3610e772128d62eff15227f9d742a475efbb131c3edae4b2b5e"
+    },
+    {
+      "source": "docs/WHAT-IF-REPLAY.md",
+      "sourceLanguage": "en",
+      "translation": "docs/WHAT-IF-REPLAY.ko.md",
+      "sourceSha256": "cfef25216d9528d9f5cdd74f206b045de812e89e1192b09d9cfd6605d5f56333",
+      "translationSha256": "66361f89e2fa85a84f1e32fe4891fb50e0311836a9c97bf6d54e22b963ed6c66"
     }
   ],
   "exclusions": [
