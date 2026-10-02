@@ -4397,6 +4397,21 @@
       "issues": [256], "referenceCaseIds": ["REF-04-060"]
     },
     {
+      "id": "sensor-recovery-require-start",
+      "family": "Recovered sensor evidence and fault-stopped session authorization",
+      "clause": { "path": "docs/reference/04-sensors-constraints-control.en.md", "heading": "4.13 Explicit fallback and degraded control" },
+      "owner": "CORE", "maturity": "EXPERIMENTAL", "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [{ "stage": "native_wasm", "status": "verified", "refs": [{
+        "path": "tests/scan-tape-parity.test.mjs",
+        "testId": "REF-04-062 canonical native/WASM sensor recovery cannot restart a fault-stopped session or restore its timer",
+        "caseId": "REF-04-062", "assertionClass": "target-parity",
+        "targets": ["native", "wasm"], "polarities": ["positive", "negative", "boundary"]
+      }] }],
+      "gaps": ["Canonical authored Result/state/continuous timer policy requires a fresh start edge. Actual Rust/WASM sensor recover_after accepts three fresh samples, rejects duplicate progress, and restores evidence without restarting the fault-stopped session. Both portable VMs execute the same compiled lifecycle transaction over common conditioned rails; a new explicit start creates a fresh timer origin. No generic Run/degraded-objective compiler lowering, independent native sensor producer, physical Driver behavior or publishing-host session authority is claimed."],
+      "issues": [257], "referenceCaseIds": ["REF-04-062"]
+    },
+    {
       "id": "product-boundary",
       "family": "Farmer UI, installation and deployment",
       "clause": {

@@ -19,6 +19,81 @@ function row(scanId, logicalTimeMs, inputs) {
   return { scanId, logicalTimeMs, inputs };
 }
 
+test('REF-04-062 canonical native/WASM sensor recovery cannot restart a fault-stopped session or restore its timer', async () => {
+  // Explicit require-start policy expressed using existing Result/state/timer
+  // primitives. This is not generic Run or degraded-objective lowering.
+  const source = `control RequireFreshStart {
+    input start: Bool;
+    sensor temperature: Number {
+      filter = median(1); recover_after = 3 samples; stale_after = 10s;
+    }
+    state running: Bool = false;
+    state previous_start: Bool = false;
+    let evidence_ready = case temperature { ok(_) => true; fault(_) => false; };
+    let fresh_start = start && !previous_start;
+    previous_start' = start;
+    let admitted = evidence_ready && (running || fresh_start);
+    running' = admitted;
+    timer session_age = continuous_true(admitted);
+    output enabled, start_requested: Bool;
+    output age_ms: Duration;
+    enabled <- running';
+    start_requested <- fresh_start && evidence_ready;
+    age_ms <- session_age;
+  }`;
+  const artifact = await compileSource(source, { filename: 'reference-require-fresh-start.ghost' });
+  await assert.rejects(() => compileSource(source.replace('case temperature', 'case missing_sensor'),
+    { filename: 'reference-missing-recovery-sensor.ghost' }), /unknown.*missing_sensor|undefined.*missing_sensor/);
+  const at = (nowMs, id, start, quality = 'Good') => ({ nowMs, inputs: { start },
+    samples: { temperature: { epoch: 1, id, timestampMs: nowMs, value: 25, quality } } });
+  const recovering = at(1500, 7, true);
+  const steps = [at(0, 1, false), at(100, 2, false), at(200, 3, false),
+    at(300, 4, true), at(1300, 5, true), at(1400, 6, true, 'Invalid'),
+    recovering, { ...recovering, nowMs: 1600 }, at(1700, 8, true), at(1800, 9, true),
+    at(5000, 10, true), at(5100, 11, false), at(5200, 12, true), at(5700, 13, true)];
+  const qualities = ['Good', 'Good', 'Good', 'Good', 'Good', 'Invalid',
+    'NotReady', 'NotReady', 'NotReady', 'Good', 'Good', 'Good', 'Good', 'Good'];
+  const enabled = [false, false, false, true, true, false, false, false, false, false, false, false, true, true];
+  const starts = steps.map((_, i) => i === 3 || i === 12);
+  const ages = [0, 0, 0, 0, 1000, 0, 0, 0, 0, 0, 0, 0, 0, 500];
+  const executions = [];
+  for (const instantiate of [ControlRuntime.instantiate, ControlRuntime.instantiateFramed]) {
+    const runtime = await instantiate.call(ControlRuntime, wasmBytes, artifact);
+    try {
+      assert.throws(() => runtime.step({ nowMs: 0, inputs: {} }), /missing input/);
+      executions.push(steps.map(step => runtime.step(step)));
+    } finally { runtime.dispose(); }
+  }
+  const [plain, framed] = executions;
+  assert.deepEqual(plain, framed.map(({ frame, ...result }) => result));
+  for (const [i, result] of framed.entries()) {
+    assert.equal(result.sensors.temperature.quality, qualities[i]);
+    assert.equal(result.sensors.temperature.ok, qualities[i] === 'Good');
+    assert.equal(result.vm.stateAfter.running, enabled[i]);
+    assert.equal(result.vm.stateAfter.previous_start, steps[i].inputs.start);
+    assert.deepEqual(result.vm.requested, { enabled: enabled[i], start_requested: starts[i], age_ms: ages[i] });
+    assert.deepEqual(result.vm.safe, result.vm.requested);
+    assert.equal(result.vm.stateAfter.__gf_timer_was_true_session_age, enabled[i]);
+    assert.ok(result.vm.resultTrace.length > 0, 'the explicit fault branch retains Result diagnostics');
+    const choice = { Good: 0, Invalid: 3, NotReady: 4 };
+    assert.ok(result.vm.resultTrace.every(site => site.choice === choice[qualities[i]]));
+  }
+  assert.equal(framed[4].vm.safe.age_ms, 1000, 'the previous session really accumulated time');
+  assert.equal(framed[8].sensors.temperature.ok, false, 'two fresh samples plus a duplicate are insufficient');
+  assert.equal(framed[9].sensors.temperature.ok, true, 'the third fresh recovery sample restores evidence only');
+  assert.equal(framed[10].vm.safe.enabled, false, 'later healthy evidence and held old request cannot restart');
+  assert.equal(framed[12].vm.stateAfter.__gf_timer_since_session_age, 5200, 'a fresh explicit event establishes a new timer origin');
+  // Same compiled source executes the lifecycle transaction in both portable
+  // VMs over genuine Rust/WASM-conditioned rails. Native sensor admission is
+  // not independently reproduced, and no physical output is claimed.
+  const tape = framed.map(({ vm }, scanId) => row(scanId, steps[scanId].nowMs,
+    Object.entries(vm.inputs).filter(([name]) => name !== '__gf_now_ms').map(([name, value]) => ({ name, value }))));
+  const native = nativeRun(artifact.bytes, tape);
+  assertParity(native, await wasmRun(artifact, tape));
+  assert.ok(native.every(item => item.accepted), JSON.stringify(native));
+  assert.deepEqual(native.map(item => item.outcome.trace), framed.map(item => item.vm));
+});
+
 test('REF-04-030 authored direction compares accepted values across fault on native VM rails and plain/framed WASM conditioning', async () => {
   // This is an authored Result/state idiom, not a builtin rising/falling operator.
   // The author explicitly chooses no direction until a previous success exists
