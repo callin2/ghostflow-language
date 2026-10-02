@@ -5788,6 +5788,105 @@
       "referenceCaseIds": [
         "REF-05-019"
       ]
+    },
+    {
+      "id": "macro-purity-resource-boundary",
+      "family": "Typed expression macros preserve compile-time purity and expansion bounds",
+      "clause": {
+        "path": "docs/reference/06-composition-and-replay.en.md",
+        "heading": "6.10 `syntax`, `quote`, and splice syntax"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/macro-purity-resource-boundary.test.mjs",
+              "testId": "macro splice accepts runtime expressions as AST without reading them during expansion",
+              "caseId": "REF-06-024",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/macro-purity-resource-boundary.test.mjs",
+              "testId": "macro body cannot read runtime values directly while expanding",
+              "caseId": "REF-06-024",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/macro-purity-resource-boundary.test.mjs",
+              "testId": "macro grammar exposes no file, network or clock capability primitives",
+              "caseId": "REF-06-024",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/macro-purity-resource-boundary.test.mjs",
+              "testId": "direct and indirect recursive macro expansion are rejected",
+              "caseId": "REF-06-024",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/macro-purity-resource-boundary.test.mjs",
+              "testId": "macro expansion has a bounded AST node budget",
+              "caseId": "REF-06-024",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/macro-purity-resource-boundary.test.mjs",
+              "testId": "canonical compileSource rejects macro impurity without calling host network hook",
+              "caseId": "REF-06-024",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/macro-purity-resource-boundary.test.mjs",
+              "testId": "ghostc rejection emits no runtime artifact",
+              "caseId": "REF-06-024",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Compiler-only conformance for existing typed expression macros: runtime expressions may be spliced as ASTs but direct runtime capture, unrecognized file/network/clock functions, direct/indirect recursion and expansion beyond the existing 4096-node budget reject. Canonical compile and CLI do not invoke the host fetch hook or emit a rejected artifact. No new primitive, capability sandbox, runtime effect or native/WASM execution claim."
+      ],
+      "issues": [
+        308
+      ],
+      "referenceCaseIds": [
+        "REF-06-024"
+      ]
     }
   ]
 }
