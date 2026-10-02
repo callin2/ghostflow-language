@@ -249,7 +249,7 @@ function validateContextManifest(input, bytecodeFormat) {
     ['name','measure','target','manipulate','output','controller','binding','executable','bindings']);
   const resources = validateList(manifest.resources ?? [], 'manifest.resources', ['name','type']);
   const adaptSettings = validateList(manifest.adaptSettings ?? [], 'manifest.adaptSettings',
-    ['name','target','authority','runtime'], ['targetId','targetType']);
+    ['name','target','authority','runtime','allowed','maxStep','maxChange','windowMs','targetId','targetType']);
   const providers = validateList(manifest.providers ?? [], 'manifest.providers', ['name','type']);
   const calendars = validateList(manifest.calendars ?? [], 'manifest.calendars', ['name','type']);
   const naturals = validateList(manifest.naturalConditions ?? [], 'manifest.naturalConditions',
@@ -400,9 +400,20 @@ function validateContextManifest(input, bytecodeFormat) {
     name(adapt.name, 'adapt_setting.name');
     const target = configs.find(item => item.name === adapt.target);
     if (!target || adapt.runtime !== 'requires-host-settings-event-validation') throw new Error('invalid adaptation proposal descriptor');
-    if (adapt.targetId !== undefined && adapt.targetId !== target.id || adapt.targetType !== undefined && adapt.targetType !== target.type)
+    if (adapt.targetId !== target.id || adapt.targetType !== target.type || typeof target.value !== 'number')
       throw new Error('adaptation proposal target identity mismatch');
+    const bounds = record(adapt.allowed, 'adaptation.allowed');
+    keys(bounds, ['min','max'], [], 'adaptation.allowed');
+    for (const value of [bounds.min, bounds.max, adapt.maxStep, adapt.maxChange]) {
+      if (typeof value !== 'number' || !Number.isFinite(value)) throw new Error('invalid adaptation numeric bound');
+      if (target.type === 'Int' && !isInt32(value)
+        || target.type === 'Duration' && (!Number.isSafeInteger(value) || value < 0)) throw new Error('invalid adaptation typed bound');
+    }
+    if (bounds.min > bounds.max || adapt.maxStep <= 0 || adapt.maxChange <= 0
+      || !Number.isSafeInteger(adapt.windowMs) || adapt.windowMs <= 0
+      || typeof adapt.authority !== 'string' || !adapt.authority.length) throw new Error('invalid adaptation policy bounds');
   }
+  unique(adaptSettings.map(item => item.target), 'adaptation target');
   const normalized = freeze(copy({ ...manifest, inputs, outputs, schedules, configs, providers, calendars, timers,
     sensors, objectives, resources, adaptSettings, naturalConditions: naturals, ...(calendarConditions.length ? { calendarConditions } : {}), ...(accounting === null ? {} : { accounting }) }));
   return { manifest: normalized, inputNames: new Set(inputs.map(item => item.name)),

@@ -2,6 +2,13 @@
   "format": "GhostFlow/document-translations-v1",
   "documents": [
     {
+      "source": "docs/ADAPTATION-SETTINGS-HOST.md",
+      "sourceLanguage": "en",
+      "translation": "docs/ADAPTATION-SETTINGS-HOST.ko.md",
+      "sourceSha256": "b3069bc5a797c05c1fc6093a41e510713e5291f6a7795977ef655a6cb4435777",
+      "translationSha256": "6cdefe55260d8c00ca4b967d16522878b6358de64ea2c71ba4df8f6b17970304"
+    },
+    {
       "source": "examples/bound-resource-execution.ghost.md",
       "sourceLanguage": "en",
       "translation": "examples/bound-resource-execution.ghost.ko.md",
@@ -586,8 +593,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "0a82db1a9bba3a7942683aca391f591e38848805ece83178d02548594e747ac8",
-      "translationSha256": "2adda7507d1c3c500497a07e95a18e4982fc3d295eebd7912f7eae227e026483"
+      "sourceSha256": "442678f4cdc7b998df798ab5ca0ddd5d6503f9524c88136ea7af690e41643ca4",
+      "translationSha256": "8e3b5f6b4876d1a743d273a1ff0c493eac7f6828f3a0457471026ef5c41493d0"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",

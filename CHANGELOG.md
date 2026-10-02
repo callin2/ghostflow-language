@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### 2026-10-02 — bounded adaptation admission bug fix ([#258](https://github.com/callin2/ghostflow-language/issues/258))
+
+Reference §4.14 policy bounds were omitted from compiled descriptors and no
+reference host enforced proposal rates. Compilation now checks and carries
+typed bounds; the fresh `AdaptationSettingsHost` validates trusted actor authority
+and all proposed properties before one existing atomic Rust settings event.
+After 20%→30% consumes a 10% hourly budget, a two-property proposal including
+30%→25% rejects both without changing values or revision. REF-04-064 checks actual
+WASM activation and snapshots, absolute rolling budgets, exact Int/Duration grids
+and bounded identity/history admission. GFB/WASM ABI is unchanged; regenerate old
+adaptation manifests because bounds are now required. This reference profile
+does not provide settings checkpoint recovery or API/Device integration.
+
 ### 2026-10-02 — Station atomic mode-entry binding bug fix ([#250](https://github.com/callin2/ghostflow-language/issues/250))
 
 Reference §4.10 rejects every conflicting same-tick mode entry. The WASM adapter

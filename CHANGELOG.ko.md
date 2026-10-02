@@ -5,6 +5,18 @@
 
 ## 미출시
 
+### 2026-10-02 — 제한된 적응 제안 검증 버그 수정 ([#258](https://github.com/callin2/ghostflow-language/issues/258))
+
+Reference §4.14 정책 경계가 컴파일 descriptor에서 빠졌고 reference host가 제안의
+변화량 한도를 검증하지 않았다. 이제 컴파일 시 typed 경계를 검사하고 전달하며 새
+`AdaptationSettingsHost`가 신뢰된 actor 권한과 모든 property를 검증한 후 기존
+Rust atomic 설정 event 하나를 제출한다. 20%→30%로 시간당 10% 한도를 소비한 뒤
+30%→25%를 포함하는 두 property 제안은 값과 revision을 바꾸지 않고 모두 거부한다.
+REF-04-064가 실제 WASM 활성화와 snapshot, rolling 절대 변화량, 정확한 Int/Duration
+격자, 제한된 식별자·이력 검증을 확인한다. GFB/WASM ABI는 그대로지만 경계가 필수이므로
+기존 adaptation manifest를 다시 생성해야 한다. 이 reference profile은 설정
+checkpoint 복구나 API/Device 통합을 제공하지 않는다.
+
 ### 2026-10-02 — Station 원자적 mode 진입 binding 버그 수정 ([#250](https://github.com/callin2/ghostflow-language/issues/250))
 
 Reference §4.10은 같은 tick의 충돌 mode 진입을 모두 거부한다. 기존 WASM

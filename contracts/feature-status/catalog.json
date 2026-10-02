@@ -2877,12 +2877,23 @@
       "maturity": "EXPERIMENTAL",
       "coreScope": false,
       "requiredEvidence": [],
-      "evidence": [],
+      "evidence": [{
+        "stage": "host_simulation",
+        "status": "verified",
+        "refs": [{
+          "path": "tests/adaptation-settings-host.test.mjs",
+          "testId": "REF-04-064: actual activated host rejects the whole two-property proposal when one hourly rate is exceeded",
+          "targets": ["wasm"],
+          "caseId": "REF-04-064",
+          "assertionClass": "rollback",
+          "polarities": ["positive", "negative"]
+        }]
+      }],
       "gaps": [
-        "No exact oracle linked for bounded adaptation; fallback has its own §4.13 contract."
+        "Fresh reference host admission is verified; checkpoint recovery, API publishing and Device integration are not claimed."
       ],
-      "issues": [],
-      "referenceCaseIds": []
+      "issues": [258],
+      "referenceCaseIds": ["REF-04-064"]
     },
     {
       "id": "settings-live",
