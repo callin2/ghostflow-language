@@ -12,6 +12,16 @@ proposals reject explicitly; rejected envelopes leave the settings revision and
 complete context checkpoint unchanged. Retime also works while clock trust is
 unknown or wall correction crosses a date, using the admitted frozen origin.
 
+### 2026-10-02 — incomplete durable event counts ([#268](https://github.com/callin2/ghostflow-language/issues/268))
+
+The WASM accounting adapter now returns `LedgerIncomplete` when a known ledger's
+latest revision lacks durable acknowledgement. Previously it retained
+`LedgerMissing` from initialization after an event's persistence failed. Missing
+and corrupt ledgers retain their distinct faults; successful acknowledgement
+recovers the exact count. REF-03-079 compares actual native/WASM control traces
+and serialized ledgers. A private production conversion boundary test checks
+`CountOverflow` without allocating billions of event records.
+
 ### 2026-10-02 — durable rolling budget explanation ([#260](https://github.com/callin2/ghostflow-language/issues/260))
 
 Reference §4.15 now has a source-bound reference host query over the real Rust

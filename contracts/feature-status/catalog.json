@@ -4543,6 +4543,20 @@
       "issues": [265], "referenceCaseIds": ["REF-03-076"]
     },
     {
+      "id": "event-count-accounting-faults",
+      "family": "Exact event count and typed accounting faults",
+      "clause": { "path": "docs/reference/03-time-and-schedules.en.md", "heading": "3.10 Time-based usage constraints" },
+      "owner": "CORE", "maturity": "EXPERIMENTAL", "coreScope": false, "requiredEvidence": [],
+      "evidence": [{ "stage": "native_wasm", "status": "verified", "refs": [{
+        "path": "tests/event-count-accounting-faults.test.mjs",
+        "testId": "REF-03-079: actual durable typed-event ledgers return exact Int and accounting faults in native/WASM control traces",
+        "caseId": "REF-03-079", "assertionClass": "target-parity",
+        "targets": ["native", "wasm"], "polarities": ["positive", "negative", "boundary"]
+      }] }],
+      "gaps": ["Same canonical typed-event account executes through actual Rust ledgers and native/WASM control VMs with complete trace and serialized-ledger parity for exact zero/two counts, deduplication, other-day exclusion, restored evidence, missing/corrupt/incomplete ledger, absent local-day boundary, and durable acknowledgement recovery. CountOverflow is separately proved at the private production i32 conversion boundary (zero/MAX/MAX+1/u64MAX), not by an end-to-end ledger with billions of records. Binding, local-day boundaries and durable acknowledgement come from an explicit test host; no physical event authentication, automatic civil-time resolution, production storage integration or storage-medium certification is claimed."],
+      "issues": [268], "referenceCaseIds": ["REF-03-079"]
+    },
+    {
       "id": "product-boundary",
       "family": "Farmer UI, installation and deployment",
       "clause": {
