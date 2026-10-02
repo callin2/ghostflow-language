@@ -853,6 +853,43 @@ mod tests {
     }
 
     #[test]
+    fn ref_04_019_hysteresis_strict_boundaries_and_fault_result() {
+        let mut sensor = sensor(Filter::Median(1), 1);
+        let cases = [
+            (30.0, false),
+            (29.0, true),
+            (33.0, true),
+            (35.0, true),
+            (36.0, false),
+        ];
+        for (index, (value, expected)) in cases.into_iter().enumerate() {
+            let id = index as u64 + 1;
+            assert_eq!(
+                sensor.update(good(id, id, value), id),
+                Ok(UpdateResult::Accepted)
+            );
+            assert_eq!(
+                sensor.read_hysteresis(id),
+                HysteresisReading {
+                    value: expected,
+                    quality: Quality::Good
+                }
+            );
+        }
+        assert_eq!(
+            sensor.update(Sample::new(1, 6, 6, 36.0, Quality::Invalid), 6),
+            Err(SensorFault::Invalid)
+        );
+        assert_eq!(
+            sensor.read_hysteresis(6),
+            HysteresisReading {
+                value: false,
+                quality: Quality::Invalid
+            }
+        );
+    }
+
+    #[test]
     fn repeated_reads_at_same_time_are_observationally_pure() {
         let mut s = sensor(Filter::Median(1), 1);
         assert!(s.update(good(1, 100, 20.0), 100).is_ok());

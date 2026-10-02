@@ -19,6 +19,55 @@ function row(scanId, logicalTimeMs, inputs) {
   return { scanId, logicalTimeMs, inputs };
 }
 
+test('REF-04-019 hysteresis keeps strict boundaries and preserves the fault Result on native VM rails and plain/framed WASM conditioning', async () => {
+  const artifact = await compileSource(`control HysteresisBoundaries {
+  sensor moisture: Percent {
+    valid = 0% .. 100%; filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  signal dry = hysteresis(moisture, on_below: 30%, off_above: 35%, initial: false);
+  output pump: Bool;
+  pump <- case dry { ok(value) => value; fault(_) => false; };
+}`, { filename: 'reference-hysteresis-boundaries.ghost' });
+  const sample = (id, value, quality = 'Good') =>
+    ({ epoch: 1, id, timestampMs: id, value, quality });
+  const steps = [30, 29, 33, 35, 36].map((value, index) => ({
+    nowMs: index + 1, samples: { moisture: sample(index + 1, value) },
+  }));
+  steps.push({ nowMs: 6, samples: { moisture: sample(6, 36, 'Invalid') } });
+  const expected = [false, true, true, true, false, false];
+  const signalOrigin = artifact.sourceMap.find(node => node.kind === 'signal').id;
+  const executions = [];
+  for (const instantiate of [ControlRuntime.instantiate, ControlRuntime.instantiateFramed]) {
+    const runtime = await instantiate.call(ControlRuntime, wasmBytes, artifact);
+    try { executions.push(steps.map(input => runtime.step(input))); }
+    finally { runtime.dispose(); }
+  }
+  const [plain, framed] = executions;
+  const projection = rows => rows.map(({ vm, sensors, signals }) => ({ vm, sensors, signals }));
+  assert.deepEqual(projection(plain), projection(framed));
+  for (const rows of executions) {
+    assert.deepEqual(rows.map(({ signals }) => signals.dry.value), expected);
+    assert.deepEqual(rows.map(({ signals }) => signals.dry.ok), [true, true, true, true, true, false]);
+    assert.deepEqual(rows.map(({ signals }) => signals.dry.quality),
+      ['Good', 'Good', 'Good', 'Good', 'Good', 'Invalid']);
+    for (const [index, { vm }] of rows.entries()) {
+      assert.deepEqual(vm.requested, { pump: expected[index] });
+      assert.deepEqual(vm.safe, vm.requested);
+      assert.equal(vm.resultTrace[0].choice, index === 5 ? 3 : 0);
+      assert.equal(vm.resultTrace[0].origin, index === 5 ? signalOrigin : 0);
+    }
+  }
+  // The native VM consumes the exact conditioned Result rails captured above;
+  // the Rust Sensor test with this case ID proves native sensor conditioning.
+  const tape = framed.map(({ vm }, scanId) => row(scanId, steps[scanId].nowMs,
+    Object.entries(vm.inputs).filter(([name]) => name !== '__gf_now_ms')
+      .map(([name, value]) => ({ name, value }))));
+  const native = nativeRun(artifact.bytes, tape);
+  assertParity(native, await wasmRun(artifact, tape));
+  assert.ok(native.every(item => item.accepted), JSON.stringify(native));
+  assert.deepEqual(native.map(item => item.outcome.trace), framed.map(item => item.vm));
+});
+
 test('REF-04-016 median five rejects partial windows, returns the spike-resistant middle and rebuilds after fault on native and plain/framed WASM', async () => {
   const artifact = await compileSource(`control MedianWindow {
   sensor moisture: Percent {

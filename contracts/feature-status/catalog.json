@@ -2714,10 +2714,20 @@
             {
               "path": "tests/signals-wasm.test.mjs",
               "testId": "real WASM REF-04-019 hysteresis preserves thresholds and exposes fault",
+              "caseId": "REF-04-019",
               "assertionClass": "runtime-value",
               "targets": [
                 "wasm"
-              ]
+              ],
+              "polarities": ["positive", "negative", "boundary"]
+            },
+            {
+              "path": "tests/scan-tape-parity.test.mjs",
+              "testId": "REF-04-019 hysteresis keeps strict boundaries and preserves the fault Result on native VM rails and plain/framed WASM conditioning",
+              "caseId": "REF-04-019",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "negative", "boundary"]
             },
             {
               "path": "tests/signals-wasm.test.mjs",
@@ -2731,8 +2741,8 @@
         }
       ],
       "gaps": [],
-      "issues": [200, 234],
-      "referenceCaseIds": ["REF-01-077", "REF-04-016"]
+      "issues": [200, 234, 235],
+      "referenceCaseIds": ["REF-01-077", "REF-04-016", "REF-04-019"]
     },
     {
       "id": "resource-arbitration",
