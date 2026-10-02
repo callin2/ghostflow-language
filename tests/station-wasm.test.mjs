@@ -1,10 +1,15 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { existsSync, readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { dirname, resolve, join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { createHash } from 'node:crypto';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { GhostFlowStation } from '../runtimes/wasm/station.mjs';
+import { bindStationPolicy } from '../runtimes/wasm/policy.mjs';
+import { compileConstraints } from '../tools/constraints.mjs';
+import { extractLiterate } from '../tools/literate.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const wasmPath = resolve(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm');
@@ -71,6 +76,121 @@ test('uses the built WASM and keeps optional capacity advisory', async () => {
   assert.equal(instance.dailyUsedMs, 100n);
   assert.equal(instance.reservedMs, 0n);
   instance.dispose();
+});
+
+test('REF-04-047: checked Station source native/WASM capacity is advisory Unknown unless Pass is required', async t => {
+  const reference = JSON.parse(readFileSync(resolve(root, 'tests/reference/cases/02-time-control.json'), 'utf8'))
+    .cases.find(entry => entry.id === 'REF-04-047');
+  assert.equal(reference.scope, 'runtime');
+  assert.match(reference.given, /Unknown/);
+  assert.match(reference.when, /check.*require Pass/);
+  assert(reference.issue.endsWith('/246'));
+  const filename = 'examples/station-rules.ghost.md';
+  const advisory = readFileSync(resolve(root, filename), 'utf8');
+  const strict = advisory.replace('check pump_capacity(pump1);', 'require pump_capacity(pump1) == Pass;');
+  assert.notEqual(strict, advisory);
+  const bindings = {
+    station: { id: 'station', config: { valveCount: 4, maxOpenValves: 2, dailyQuotaMs: 1000, maxStartBudgetMs: 800 } },
+    pump: { id: 'pump1' }, settings: { id: 'settings' },
+    schedules: { starts: { id: 'starts', timezone: 'Asia/Seoul' } },
+    modeAliases: { Auto: 'Auto', Manual: 'Manual', Configure: 'Configure' },
+    activityAliases: { automatic: 'Auto', manual: 'Manual', configuring: 'Configure' },
+  };
+  const compile = source => compileConstraints(extractLiterate(source, { filename }).code, { filename });
+  const sha = value => createHash('sha256').update(value).digest('hex');
+  const fingerprint = bytes => {
+    let hash = 0xcbf29ce484222325n;
+    for (const byte of bytes) hash = BigInt.asUintN(64, (hash ^ BigInt(byte)) * 0x100000001b3n);
+    return hash.toString(16).padStart(16, '0');
+  };
+  // Trusted host inputs: these paired flows are already expressed in L/min
+  // under one validated operating condition. No pressure quantity is passed
+  // to or summed by either owner; missing curve context supplies absent flow.
+  const cases = [
+    { label: 'missing curve context', capacity: {}, expected: 'Unknown' },
+    { label: 'missing available flow', capacity: { requestedFlow: 10 }, expected: 'Unknown' },
+    { label: 'missing requested flow', capacity: { availableFlow: 10 }, expected: 'Unknown' },
+    { label: 'below available flow', capacity: { availableFlow: 10, requestedFlow: 9 }, expected: 'Pass' },
+    { label: 'equal available flow', capacity: { availableFlow: 10, requestedFlow: 10 }, expected: 'Pass' },
+    { label: 'above available flow', capacity: { availableFlow: 10, requestedFlow: 11 }, expected: 'Violation' },
+  ];
+  execFileSync('cargo', ['build', '--locked', '--offline', '--release', '-p', 'ghostflow-core', '--example', 'station_capacity_tape'], {
+    cwd: root, stdio: 'inherit',
+  });
+  const runner = resolve(root, 'target/release/examples/station_capacity_tape' + (process.platform === 'win32' ? '.exe' : ''));
+  const directory = mkdtempSync(join(tmpdir(), 'reference-station-capacity-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const artifactPath = join(directory, 'constraints.json'), tapePath = join(directory, 'tape.json');
+  const identities = [];
+  for (const [source, required] of [[advisory, false], [strict, true]]) {
+    const artifact = compile(source), policy = bindStationPolicy(artifact, bindings);
+    assert.equal(policy.stationConfig.requireCapacityPass, required);
+    assert.deepEqual(policy.checks, [{ kind: 'capacityCheck', pump: 'pump1', required, missing: 'Unknown', blocking: required }]);
+    const bytes = Buffer.from(JSON.stringify(artifact));
+    const identity = { sourceSha256: sha(source), artifactSha256: sha(bytes), bindingSha256: sha(JSON.stringify(bindings)),
+      policySha256: sha(JSON.stringify(policy)), artifactFingerprint: fingerprint(bytes) };
+    identities.push(identity);
+    // Validate the exact source -> checked artifact -> bound configuration
+    // immediately before crossing the test-only native transport boundary.
+    assert.deepEqual(compile(source), artifact);
+    assert.deepEqual(bindStationPolicy(artifact, bindings), policy);
+    writeFileSync(artifactPath, bytes);
+    const tape = { artifactFingerprint: identity.artifactFingerprint, stationConfig: policy.stationConfig, cases };
+    writeFileSync(tapePath, JSON.stringify(tape));
+    const native = JSON.parse(execFileSync(runner, [artifactPath, tapePath], { encoding: 'utf8', timeout: 10_000 }));
+    assert.equal(native.artifactFingerprint, identity.artifactFingerprint);
+    const observations = [];
+    for (const row of cases) {
+      const instance = await GhostFlowStation.instantiate(wasmBytes, policy.stationConfig);
+      try {
+        synchronize(instance);
+        enterAuto(instance);
+        const before = instance.claim;
+        let writes = 0;
+        const persist = async bytes => { assert(bytes.length > 16); writes++; return true; };
+        const grantObservation = (grant, nowMs) => {
+          const output = instance.authorizeOutput({ sessionId: 77n, pumpOn: true, valves: 1n, nowMs });
+          return { capacity: grant.capacity, leaseDeadlineMs: Number(grant.leaseDeadlineMs),
+            reservedMs: Number(instance.reservedMs), pumpOn: output.pumpOn, valves: Number(output.valves), durableWrites: writes };
+        };
+        const request = { ...startRequest(instance, 2n, 501n), capacity: row.capacity };
+        let initial, retry = null;
+        if (required && row.expected !== 'Pass') {
+          await assert.rejects(instance.start(request, persist), { message: 'required pump capacity check was not Pass' });
+          assert.deepEqual(instance.claim, before);
+          assert.equal(instance.reservedMs, 0n);
+          assert.equal(writes, 0);
+          assert.throws(() => instance.authorizeOutput({ sessionId: 77n, pumpOn: true, valves: 1n, nowMs: 10n }), /session does not own/);
+          assert.throws(() => instance.commitStart(1n), /no matching prepared transition/);
+          initial = { rejected: true, error: 'required pump capacity check was not Pass', unchanged: true,
+            reservedMs: 0, durableWrites: 0, noGrant: true, noPending: true };
+          // Same request/session/occurrence can retry: rejection consumed none
+          // of their identities and left no partial durable reservation.
+          retry = grantObservation(await instance.start({ ...request, nowMs: 11n,
+            capacity: { availableFlow: 10, requestedFlow: 10 } }, persist), 11n);
+          assert.deepEqual(retry, { capacity: 'Pass', leaseDeadlineMs: 111, reservedMs: 100,
+            pumpOn: true, valves: 1, durableWrites: 1 });
+        } else {
+          const grant = grantObservation(await instance.start(request, persist), 10n);
+          assert.deepEqual(grant, { capacity: row.expected, leaseDeadlineMs: 110, reservedMs: 100,
+            pumpOn: true, valves: 1, durableWrites: 1 });
+          initial = { rejected: false, grant };
+        }
+        observations.push({ label: row.label, initial, retry });
+      } finally { instance.dispose(); }
+    }
+    assert.deepEqual(native.observations, observations);
+    writeFileSync(tapePath, JSON.stringify({ ...tape, artifactFingerprint: '0000000000000000' }));
+    assert.throws(() => execFileSync(runner, [artifactPath, tapePath], { encoding: 'utf8', stdio: 'pipe' }), /checked constraint artifact identity mismatch/);
+    t.diagnostic(JSON.stringify({ required, identity, observations }));
+  }
+  assert.notEqual(identities[0].sourceSha256, identities[1].sourceSha256);
+  assert.notEqual(identities[0].artifactSha256, identities[1].artifactSha256);
+  assert.notEqual(identities[0].policySha256, identities[1].policySha256);
+  assert.equal(identities[0].bindingSha256, identities[1].bindingSha256);
+  assert.throws(() => bindStationPolicy(compile(advisory), { ...bindings, pump: { id: 'valve1' } }), /unbound pump identifier pump1/);
+  assert.throws(() => bindStationPolicy(compile(advisory.replace('pump_capacity(pump1)', 'pump_capacity(missing)')), bindings), /unbound pump identifier missing/);
+  assert.throws(() => compile(advisory.replace('pump_capacity(pump1)', 'pump_capacity(flow + pressure)')), /unexpected character "\+"/);
 });
 
 test('immediate Stop cancels a hanging Start persistence before it can grant output', async () => {

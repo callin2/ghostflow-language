@@ -4250,6 +4250,33 @@
       "referenceCaseIds": ["REF-04-046"]
     },
     {
+      "id": "station-capacity-admission",
+      "family": "Station advisory and mandatory capacity admission",
+      "clause": {
+        "path": "docs/reference/04-sensors-constraints-control.en.md",
+        "heading": "4.8 Common constraints notation and operations"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [{
+        "stage": "native_wasm",
+        "status": "verified",
+        "refs": [{
+          "path": "tests/station-wasm.test.mjs",
+          "testId": "REF-04-047: checked Station source native/WASM capacity is advisory Unknown unless Pass is required",
+          "caseId": "REF-04-047",
+          "assertionClass": "target-parity",
+          "targets": ["native", "wasm"],
+          "polarities": ["positive", "negative", "boundary"]
+        }]
+      }],
+      "gaps": ["The existing bounded Station adapter consumes checked canonical constraints and explicit bindings. Native/WASM owners receive the same generated Station config and host-validated same-unit flows under compatible conditions. Missing information remains advisory Unknown; require Pass rejects Unknown/Violation before persistence, reservation or output grant and permits a valid same-request retry. This is portable owner conformance, not a native compiler, hydraulic curve model, unit registry, physical certification or generic resource-policy grammar."],
+      "issues": [246],
+      "referenceCaseIds": ["REF-04-047"]
+    },
+    {
       "id": "product-boundary",
       "family": "Farmer UI, installation and deployment",
       "clause": {
