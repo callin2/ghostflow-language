@@ -1611,6 +1611,7 @@ class Lowerer {
     if (contextForms.some(form => form[0] === 'holiday-daily-pulse')) this.manifest.format = 'GhostFlow/control-v14';
     if (contextForms.some(form => form[0] === 'solar-context-pulse')) this.manifest.format = 'GhostFlow/control-v15';
     if (contextForms.some(form => ['calendar-range', 'calendar-result'].includes(form[0]))) this.manifest.format = 'GhostFlow/control-v18';
+    if (contextForms.some(form => form[0] === 'utc-range' && form[6] !== '0')) this.manifest.format = 'GhostFlow/control-v19';
     const temporalForms = this.windows.length || this.trueFors.length || solarForms.length || contextForms.length ? [
       ['temporal-context', `${RESERVED_PREFIX}now_ms`, `${RESERVED_PREFIX}time_epoch`],
       ...[...this.temporalRoots.values()].sort((left, right) => left.tag - right.tag).map(root =>
@@ -2274,9 +2275,20 @@ class Lowerer {
     }
     if (item.scheduleType === 'Daily') {
       if (!item.at) error(item.loc, 'Daily schedule requires at');
-      const at = this.expression(item.at, new Map(), { allowNext: false });
+      const startConfig = item.at.kind === 'reference' && this.symbols.get(item.at.name)?.category === 'config'
+        ? this.symbols.get(item.at.name) : null;
+      const at = startConfig ? startConfig.value : this.expression(item.at, new Map(), { allowNext: false });
       if (at.type.kind !== 'TimeOfDay' || at.constant === undefined) error(item.at.loc, 'Daily at must be a constant TimeOfDay');
       const day = this.resolveScheduleDay(item);
+      if (startConfig) {
+        const rangeBasis = item.policy?.basis?.kind === 'call' && item.policy.basis.name === 'range'
+          && item.policy.basis.args.length === 1 && !item.policy.basis.named.length;
+        const rangeArg = rangeBasis ? item.policy.basis.args[0] : null;
+        const durationConfig = rangeArg?.kind === 'reference' && this.symbols.get(rangeArg.name)?.category === 'config';
+        if (!rangeBasis || durationConfig || item.timezone !== 'UTC' || day) {
+          error(item.at.loc, 'config-backed Daily at is only executable as a single bounded UTC Daily Range start with fixed duration');
+        }
+      }
       return this.addCivilSchedulePolicy(item, { kind: 'daily', atMs: at.constant, ...(day ? { day } : {}) });
     }
     const interval = this.expression(item.interval, new Map(), { allowNext: false });
@@ -2394,11 +2406,16 @@ class Lowerer {
         const rangeArg = options.basis.args[0];
         const rangeConfig = rangeArg.kind === 'reference' && this.symbols.get(rangeArg.name)?.category === 'config'
           ? this.symbols.get(rangeArg.name) : null;
+        const startConfig = trigger.kind === 'daily' && item.at?.kind === 'reference'
+          && this.symbols.get(item.at.name)?.category === 'config'
+          ? this.symbols.get(item.at.name) : null;
         const range = rangeConfig ? rangeConfig.value : this.expression(rangeArg, new Map(), { allowNext: false }, [], DURATION);
         if (!sameType(range.type, DURATION) || !Number.isSafeInteger(range.constant) || range.constant <= 0) {
           error(options.basis.loc, `${label} range requires a positive Duration`);
         }
         if (rangeConfig && rangeConfig.payloadType?.kind !== 'Duration') error(rangeArg.loc, `${label} range config must be Duration`);
+        if (startConfig && startConfig.payloadType?.kind !== 'TimeOfDay') error(item.at.loc, `${label} start config must be TimeOfDay`);
+        if (startConfig && (trigger.kind !== 'daily' || rangeConfig || item.timezone !== 'UTC' || trigger.day)) error(item.at.loc, 'live Range start settings require a single bounded UTC Daily scalar start and fixed duration');
         if (rangeConfig) {
           const descriptor = this.manifest.configs.find(config => config.id === rangeConfig.id);
           if (!descriptor?.settings || descriptor.settings.min <= 0) error(rangeArg.loc, 'live Range duration config requires a positive minimum Duration');
@@ -2418,13 +2435,17 @@ class Lowerer {
         else if (trigger.kind === 'periodic') minimumSpacing = trigger.every.initialMs;
         else error(options.basis.loc, `${label} range requires a statically bounded recurrence`);
         if (range.constant > minimumSpacing) error(options.basis.loc, `${label} range occurrences must not overlap`);
-        if (trigger.day && rangeConfig) {
-          error(options.basis.loc, 'live Range duration settings are only executable for immutable UTC Daily or DailySlots without a work calendar');
+        if (trigger.day && (rangeConfig || startConfig)) {
+          error(options.basis.loc, rangeConfig
+            ? 'live Range duration settings are only executable for immutable UTC Daily or DailySlots without a work calendar'
+            : 'live Range start settings are only executable for immutable UTC Daily without a work calendar');
         }
         if (trigger.day && (trigger.day.kind === 'holiday' || trigger.atMs + range.constant > 86_400_000)) {
           error(options.basis.loc, 'work calendar Range must stay within one civil date; split overnight intervals into explicit Daily ranges');
         }
-        basis = { kind: 'range', durationMs: range.constant, ...(rangeConfig ? { durationConfig: rangeArg.name, durationConfigId: rangeConfig.id } : {}) };
+        basis = { kind: 'range', durationMs: range.constant,
+          ...(rangeConfig ? { durationConfig: rangeArg.name, durationConfigId: rangeConfig.id } : {}),
+          ...(startConfig ? { startConfig: item.at.name, startConfigId: startConfig.id } : {}) };
       } else error(options.basis.loc, `${label} basis must be pulse or range(positive Duration)`);
       const clock = choice('clock', ['trusted_only']);
       const recovery = choice('recovery', ['baseline']);
@@ -3836,9 +3857,10 @@ class Lowerer {
         if (schedule.timezone !== 'UTC' || schedule.selectedConfig
           || !['daily', 'daily-slots'].includes(schedule.kind)) error(this.ast.loc, 'executable Range requires immutable UTC Daily or DailySlots');
         const starts = schedule.kind === 'daily' ? [schedule.atMs] : schedule.slots.map(minute => minute * 60_000);
-        if (schedule.day) return ['calendar-range', ...base, 'UTC', String(schedule.policy.basis.durationMs), ['starts', ...starts.map(String)],
+        if (schedule.day) return ['calendar-range', ...base, 'UTC', String(schedule.policy.basis.durationMs), '0', ['starts', ...starts.map(String)],
           schedule.day.calendar, schedule.day.kind, when, cancel];
-        return ['utc-range', ...base, 'UTC', schedule.policy.basis.durationConfigId ? ['duration-config', String(schedule.policy.basis.durationConfigId)] : String(schedule.policy.basis.durationMs), ['starts', ...starts.map(String)], when, cancel];
+        return ['utc-range', ...base, 'UTC', schedule.policy.basis.durationConfigId ? ['duration-config', String(schedule.policy.basis.durationConfigId)] : String(schedule.policy.basis.durationMs),
+          String(schedule.policy.basis.startConfigId ?? 0), ['starts', ...starts.map(String)], when, cancel];
       }
       if (schedule.kind === 'periodic') {
         const config = this.manifest.configs.find(item => item.id === schedule.every.configId);
@@ -4215,7 +4237,7 @@ export function isExecutableRangeSchedule(item) {
   return item.timezone === 'UTC' && item.policy?.basis?.kind === 'call'
     && item.policy.basis.name === 'range' && item.policy?.clock?.name === 'trusted_only'
     && (item.scheduleType === 'Daily' && (!item.on && !item.calendar || item.on && item.calendar && ['day`workday`','day`offday`'].includes(item.on.value))
-      && item.at?.kind === 'literal' && item.at.raw.startsWith('time`')
+      && (item.at?.kind === 'literal' && item.at.raw.startsWith('time`') || item.at?.kind === 'reference')
       || item.scheduleType === 'DailySlots' && Array.isArray(item.selected) && item.selected.length > 0);
 }
 

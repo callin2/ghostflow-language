@@ -491,18 +491,18 @@ schedule morning_watering: Daily {
 넘을 수 없다. overnight work interval은 명시적인 별도 Daily range로 나눈다. 끝은
 제외되므로 정확히 자정에 끝나는 range는 유효하다. work calendar 없는 일반 range의
 기존 자정 동작은 유지한다. 이 slice에서 live duration 설정은 work calendar가 없는
-UTC Daily/DailySlots에만 실행 lowering을 제공한다. work calendar Range와 live
-Range duration config의 조합은 정적으로 거부하여 static calendar Range로 조용히
-fallback하지 않는다. live 시작 설정, Periodic Range와 다른 허용된 변형은 descriptor로
-유지한다. 비 UTC와 증명할 수 없는 overlap은 계속 거부하며 timezone이나 DST 정책을
-추측하지 않는다.
+UTC Daily/DailySlots에만 실행 lowering을 제공한다. live scalar start 설정은 고정
+Duration을 가진 단일 UTC Daily Range에만 실행 lowering을 제공한다. work calendar Range와
+live Range duration/start config의 조합, live start와 live duration을 함께 쓰는 조합,
+Periodic Range와 비 UTC Range는 정적으로 거부하여 static Range로 조용히 fallback하지
+않는다. 지원되지 않는 변형은 timezone이나 DST 정책을 추측하지 않는다.
 
-Range context checkpoint는 소비한 occurrence identity와 live duration 설정이 있으면
-그 effective duration을 보존하며 활성 monotonic
-timer는 보존하지 않는다. 새 boot로 복원해도 이미 소비한 occurrence를 재개하거나
-다시 admit하지 않지만 다음 occurrence는 복원된 duration을 쓴다. 아직 소비하지 않은 열린 interval은 남은 시간만 admit할 수
-있다. terminal capacity가 소진되면 scan 전체를 원자적으로 거부하며 identity를
-조용히 제거하지 않는다.
+Range context checkpoint는 소비한 occurrence identity와 live duration 또는 live scalar
+start 설정이 있으면 그 effective 값을 보존하며 활성 monotonic timer는 보존하지 않는다.
+새 boot로 복원해도 이미 소비한 occurrence를 재개하거나 다시 admit하지 않지만 다음
+occurrence는 복원된 duration 또는 start를 쓴다. 아직 소비하지 않은 열린 interval은 남은
+시간만 admit할 수 있다. terminal capacity가 소진되면 scan 전체를 원자적으로 거부하며
+identity를 조용히 제거하지 않는다.
 
 late interval은 half-open이다. 종료 경계에서 새로 admit하지 않는다. 예정 시간 08:00,
 `run(5min, within(10min))`이 08:02에 admit되면 08:07까지의 단조 run이다.
@@ -548,9 +548,12 @@ settings revision 변경에도 유지한다. admission 이후에는 보정 전�
 기준을 단조 경과로 전진시켜 현재 위치와 남은 시간을 정한다. 예를 들어 08:00
 계획 `range(10min)`이 08:04에 admit된 뒤 08:07에 Duration을 12분으로 바꾸면
 08:12에 끝난다. 5분으로 줄이면 새 종료점 08:05가 이미 지났으므로 그 event가
-적용되는 판단에서 끝난다. 시작 시각을 08:02로 바꾸고 Duration을 10분으로
-유지하면 종료점은 08:12다. late admission 시각을 새 계획 시작점으로 사용하지
-않는다. 같은 위치에서 설정 event와 scan이 겹치면 §5.2의 event 적용 순서를
+적용되는 판단에서 끝난다. 시작 시각을 08:08로 바꾸면 같은 occurrence는 즉시
+비활성화되고 신뢰 가능한 08:08 scan에서 다시 active가 되어 08:18에 끝난다. 시작
+시각을 08:02로 바꾸고 Duration을 10분으로 유지하면 종료점은 08:12다. late admission
+시각을 새 계획 시작점으로 사용하지 않으며, wall 보정이나 ClockUnknown으로 현재
+날짜 key를 만들 수 없어도 admit 당시 original local date와 변경된 TimeOfDay에서
+재계산한다. 같은 위치에서 설정 event와 scan이 겹치면 §5.2의 event 적용 순서를
 먼저 확정하고 그 위치의 유효 설정으로 판단한다.
 
 전역 안전 제약이 출력을 막으면 safe output은 즉시 false지만 Range occurrence와

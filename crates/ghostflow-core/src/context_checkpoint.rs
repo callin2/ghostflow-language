@@ -400,11 +400,24 @@ impl ContextRuntime {
             let (PulseDescriptor::Context(d), Some(engine)) = (descriptor, engine) else {
                 continue;
             };
-            let id = match &d.definition {
-                ScheduleDefinition::Periodic { every, .. } => every.id,
-                ScheduleDefinition::UtcRange { duration, .. } => duration.id,
-                ScheduleDefinition::ConfigDailySlots { config_id, .. } => *config_id,
-                _ => 0,
+            let (id, semantic_type) = match &d.definition {
+                ScheduleDefinition::Periodic { every, .. } => (every.id, "Duration".to_owned()),
+                ScheduleDefinition::UtcRange {
+                    duration, start, ..
+                } => {
+                    if start.id != 0 {
+                        (start.id, "TimeOfDay".to_owned())
+                    } else {
+                        (duration.id, "Duration".to_owned())
+                    }
+                }
+                ScheduleDefinition::ConfigDailySlots {
+                    config_id,
+                    grid_ms,
+                    capacity,
+                    ..
+                } => (*config_id, format!("TimeSlots<{grid_ms}ms,{capacity}>")),
+                _ => (0, String::new()),
             };
             if id == 0 {
                 continue;
@@ -414,9 +427,19 @@ impl ContextRuntime {
                 .iter()
                 .find(|c| c.descriptor.id == id)
                 .ok_or_else(|| invalid("checkpoint config consumer identity"))?;
-            let expected = match &config.last_success {
-                ConfigValue::Scalar(Value::Number(n)) => SettingValue::Duration(*n as u64),
-                ConfigValue::Slots(slots) => SettingValue::Slots(slots.clone()),
+            if config.descriptor.semantic_type != semantic_type {
+                return Err(invalid("checkpoint config consumer descriptor mismatch"));
+            }
+            let expected = match (&config.last_success, semantic_type.as_str()) {
+                (ConfigValue::Scalar(Value::Number(n)), "TimeOfDay") => {
+                    SettingValue::TimeOfDay(*n as u64)
+                }
+                (ConfigValue::Scalar(Value::Number(n)), "Duration") => {
+                    SettingValue::Duration(*n as u64)
+                }
+                (ConfigValue::Slots(slots), ty) if ty.starts_with("TimeSlots<") => {
+                    SettingValue::Slots(slots.clone())
+                }
                 _ => return Err(invalid("checkpoint config consumer type")),
             };
             if engine.effective_setting(d) != Some(expected) {
