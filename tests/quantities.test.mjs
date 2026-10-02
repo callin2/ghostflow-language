@@ -340,7 +340,8 @@ control QuantitySetting {
     trace: { module: interaction.traceMetadata.moduleFingerprint, inputs: {}, stateAfter: {} },
     settingsState,
   });
-  assert.deepEqual(snapshot.observations, [{ descriptorId: 'setting.target', status: 'ready', value: 298.15 }]);
+  assert.deepEqual(snapshot.observations, [{ descriptorId: 'setting.target', status: 'ready', value: 298.15,
+    defaultValue: 298.15, emissionRevision: 0, applicationPosition: null, override: false }]);
   assert.equal(validateInteraction(interaction.interactionSchema, snapshot).valid, true);
   const invalid = structuredClone(snapshot);
   invalid.observations[0].value = '298.15';

@@ -1,4 +1,5 @@
 <!-- translation-source: contracts/interaction-v0/README.md -->
+
 [English 원문](README.md)
 
 # Interaction 스키마 및 런타임 스냅샷 v0
@@ -83,6 +84,22 @@ Interaction 계약 및 생성 이름 배제를 계속 검사합니다. 재컴파
 | `error` | 신뢰된 생성자 | `error` | 이 설명자를 관찰할 수 없었습니다. |
 | `stale` | 검증 소비자의 조인 | 파생 사유 | 구조적으로 유효한 스냅샷이 소비자가 기대하는 스키마, 모듈, 소스 또는 실행 식별자와 다릅니다. 자체 선언 관찰 상태로는 허용되지 않습니다. |
 
+설정은 명시적으로 업그레이드된 profile을 씁니다. `setting` 설명자를 하나라도 포함한
+정적 스키마는 스키마 버전 `0.4`를, 런타임 스냅샷은 스냅샷 버전 `0.2`를 씁니다.
+설정이 없는 스키마는 기존 스키마 `0.3`과 스냅샷 `0.1` 그대로이며, 예전 설정
+스냅샷을 새 profile로 조용히 재해석하지 않습니다.
+
+`setting` 관찰이 있는 스냅샷은 전역 `settingsRevision`도 가집니다. 각 설정 관찰에는
+`defaultValue`, `emissionRevision`, `applicationPosition`이 필요하고, `ready` 관찰에는
+추가로 `override`가 필요합니다. `defaultValue`는 정적 소스 리터럴이며 fallback이 아닙니다.
+`emissionRevision`과 `applicationPosition`은 해당 설정에 실제로 수락된 emission의 revision과
+이벤트 위치입니다. 초기 소스 관찰은 revision `0`, `applicationPosition: null`,
+`override: false`를 쓰며 현재 값은 `defaultValue`와 정확히 같아야 합니다. 이후 수락된
+성공 emission은 값이 default와 같아도 나중 revision/위치와 `override: true`를 씁니다.
+수락된 설정 fault는 현재 Result의 fault와 같은 provenance 필드를 유지하되 ready 전용
+`override`는 노출하지 않으며, 이전 성공 `value`나 합성 default를 effective 값으로 노출하지
+않습니다. 설정이 아닌 설명자는 기존의 최소 상태 필드를 유지합니다.
+
 선택적 예상 식별자가 제공된 경우에만 검증기가 정확한 stale 사유와 함께 `join.status: "stale"`을 보고합니다. 예상 조인은 스키마 형식/버전/다이제스트, 모듈 ID/지문/바이트코드 SHA, 소스 문서 ID/리비전 ID/SHA 및 실행 ID를 비교할 수 있습니다. `scanId`는 한 실행 내부의 순서 좌표일 뿐이므로 제외됩니다. 문서 내부의 스키마/스냅샷 불일치는 stale 데이터가 아니라 검증 `error`입니다. 이 구분은 신뢰할 수 없는 페이로드가 식별 실패를 숨기려고 스스로 stale이라고 표시하는 일을 막습니다.
 
 ## 픽스처와 검증
@@ -102,3 +119,23 @@ Interaction 계약 및 생성 이름 배제를 계속 검사합니다. 재컴파
 `tests/interaction-runtime-snapshot.test.mjs`는 각 정확한 코퍼스 소스와 테이프를 릴리스 네이티브 프레임 실행기 및 실제 프레임 WASM ABI에 재생합니다. 완료 추적을 투영하고 타이머 논리 클록 값을 포함해 네이티브와 WASM의 공개 스냅샷이 바이트 단위로 같은지 요구합니다. 또한 비활성화, 매 스캔 읽기 및 지연 소비자 실행을 비교합니다. 관찰은 커밋 상태, 요청 출력 또는 안전 출력을 바꾸면 안 됩니다. 이는 호스트 네이티브/WASM 증거일 뿐 브라우저 승인, 펌웨어 실행 또는 물리 장치 동작을 주장하지 않습니다.
 
 여기서 거부한 v0 대안은 신뢰할 수 없는 관찰에 `ready`와 함께 `stale`을 넣는 것입니다. 그러면 생성자의 주장이 소비자의 식별자 조인을 대신하게 됩니다. 검증 중 파생하면 문서를 작게 유지하면서 재시작 및 리비전 불일치를 명시할 수 있습니다.
+
+## 설정 provenance 검증
+
+새 `0.4` setting descriptor에는 canonical source의 `defaultValue`가 포함된다.
+producer는 runtime 기본값을 컴파일된 config literal과 비교하고 validator는 각 동적
+기본값을 그 정적 descriptor에 연결한다. 행의 `emissionRevision`은 전역
+`settingsRevision` 이하이며 최신 수락 전역 revision이 적어도 한 행에 있어야 한다.
+한 atomic revision의 행들은 같은 `applicationPosition`을 갖는다. revision 0은
+초기 source 성공값이며 fault나 변경 이력을 뜻하지 않는다. position은 실행별 좌표라
+checkpoint 복원 전후에 증가할 필요가 없다. context checkpoint 버전 4가 이 필드를
+저장하고 새 owner 변경 전에 값·이력·allocator 및 revision 상관관계를 검증한다.
+
+명시적 legacy schema `0.3` / snapshot `0.1` 설정 문서는 원래 필드와 digest로
+계속 검증한다. 새 provenance 주장을 포함하지 않고 `0.4` / `0.2`로 재해석하지
+않으며 새 설정 producer는 새 profile을 사용한다. 설정이 없는 문서와 과거 고정
+digest는 유지한다. REF-05-012 테스트는 실제 native와 framed WASM의 전체
+outcome·설정·checkpoint 동등성, 권한 및 VM transaction 거부, source 기본값
+변조와 checksum을 복구한 의미적 restore 변조를 검증한다. 설정 관측 계약이며
+실행 descriptor binding·변경 권한 부여·publishing 식별자 발급·Device 채택을
+주장하지 않는다.

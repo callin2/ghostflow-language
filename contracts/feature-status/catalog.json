@@ -5214,6 +5214,117 @@
       "referenceCaseIds": [
         "REF-06-019"
       ]
+    },
+    {
+      "id": "settings-default-emission-provenance",
+      "family": "Source defaults and per-setting accepted emission provenance",
+      "clause": {
+        "path": "docs/reference/05-settings-and-observation.en.md",
+        "heading": "5.1 `config` declarations"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/settings-default-provenance.test.mjs",
+              "testId": "REF-05-012 settings default provenance distinguishes defaults, equal updates, faults and unrelated edits",
+              "caseId": "REF-05-012",
+              "assertionClass": "observation",
+              "targets": [
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/settings-default-provenance.test.mjs",
+              "testId": "REF-05-012 native context_tape and framed WASM settings/checkpoint parity with negative restore",
+              "caseId": "REF-05-012",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/settings-default-provenance.test.mjs",
+              "testId": "REF-05-012 initial Duration remains source-bound through an unrelated Bool edit and repeated equal emissions on native and framed WASM",
+              "caseId": "REF-05-012",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/settings-default-provenance.test.mjs",
+              "testId": "REF-05-012 versioned public settings reject forged defaults and revision correlations while legacy snapshots retain their contract",
+              "caseId": "REF-05-012",
+              "assertionClass": "type-boundary",
+              "targets": [
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/settings-default-provenance.test.mjs",
+              "testId": "REF-05-012 checksum-repaired semantic provenance corruption rejects atomically in native and framed WASM owners",
+              "caseId": "REF-05-012",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/settings-default-provenance.test.mjs",
+              "testId": "REF-05-012 permission and VM transaction failures preserve provenance, complete outcomes and event reuse on native and framed WASM",
+              "caseId": "REF-05-012",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Genuine Rust settings-emission metadata and versioned Interaction settings profile0.4/snapshot0.2: source defaults remain separate from current successful values or faults, global revision and row emission/application position are correlated, equal successful emissions are distinguishable from initial defaults, and corrupt durable provenance rejects atomically. Actual native/framed-WASM full outcome/settings/checkpoint and rollback proof. Legacy0.3/0.1 settings validation and nonsettings/historical digests are preserved. Executable descriptor binding, mutation authority issuance, publishing identities and Device adoption remain external separate work."
+      ],
+      "issues": [
+        273
+      ],
+      "referenceCaseIds": [
+        "REF-05-012"
+      ]
     }
   ]
 }

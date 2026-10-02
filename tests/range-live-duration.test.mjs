@@ -247,10 +247,11 @@ test('REF-03-076 GFRG2 checkpoint malformed payloads reject in WASM and native r
   ]);
   const artifact = rows.artifact;
   const good = Buffer.from(rows.native.at(-1).checkpoint, 'hex');
-  assert.equal(good.subarray(0, 6).toString('latin1'), 'GFCX\x03\x00');
+  assert.equal(good.subarray(0, 6).toString('latin1'), 'GFCX\x04\x00');
   const marker = good.indexOf(Buffer.from('GFES\x02GFRG\x02', 'latin1'));
   assert.ok(marker > 0, 'wrapped checkpoint contains GFRG2 engine payload');
   const corruptions = [
+    ['older context version lacks provenance', buffer => { buffer[4] = 3; return fixCheckpointChecksum(buffer); }],
     ['invalid engine header', buffer => { buffer[marker + 7] = 255; return fixCheckpointChecksum(buffer); }],
     ['missing effective duration payload', buffer => fixCheckpointChecksum(Buffer.concat([buffer.subarray(0, marker + 10), buffer.subarray(marker + 18)]))],
     ['effective duration outside config bounds', buffer => { buffer.writeBigUInt64LE(12_000_000n, marker + 10); return fixCheckpointChecksum(buffer); }],

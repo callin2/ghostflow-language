@@ -88,6 +88,30 @@ fn write_value(out: &mut Vec<u8>, value: &ConfigValue) -> Result<()> {
         }
     }
 }
+fn write_public_value(out: &mut String, value: &ConfigValue) -> Result<()> {
+    match value {
+        ConfigValue::Scalar(Value::Bool(v)) => out.push_str(if *v { "true" } else { "false" }),
+        ConfigValue::Scalar(Value::Int(v)) => {
+            write!(out, "{v}").map_err(|_| invalid("context state formatting"))?
+        }
+        ConfigValue::Scalar(Value::Number(v)) => {
+            write!(out, "{v}").map_err(|_| invalid("context state formatting"))?
+        }
+        ConfigValue::Slots(slots) => {
+            out.push_str("{\"kind\":\"slots\",\"entries\":[");
+            for (index, (key, minute)) in slots.iter().enumerate() {
+                if index > 0 {
+                    out.push(',');
+                }
+                write!(out, "{{\"key\":{key},\"minuteOfDay\":{minute}}}")
+                    .map_err(|_| invalid("context state formatting"))?;
+            }
+            out.push_str("]}");
+        }
+    }
+    Ok(())
+}
+
 fn read_value(reader: &mut Reader<'_>) -> Result<ConfigValue> {
     let kind = reader.u8()?;
     if kind != 3 {
@@ -223,7 +247,7 @@ impl ContextRuntime {
         descriptors: &[PulseDescriptor],
         fingerprint: u64,
     ) -> Result<Vec<u8>> {
-        let mut out = b"GFCX\x03\x00".to_vec();
+        let mut out = b"GFCX\x04\x00".to_vec();
         append(&mut out, &fingerprint.to_le_bytes())?;
         blob(&mut out, &bindings(&self.bindings)?)?;
         append(
@@ -242,6 +266,14 @@ impl ContextRuntime {
         for config in &self.configs {
             append(&mut out, &config.descriptor.id.to_le_bytes())?;
             append(&mut out, &config.next_key.to_le_bytes())?;
+            append(&mut out, &config.emission_revision.to_le_bytes())?;
+            append(
+                &mut out,
+                &config
+                    .application_position
+                    .unwrap_or(u64::MAX)
+                    .to_le_bytes(),
+            )?;
             write_value(&mut out, &config.last_success)?;
             match &config.current {
                 Ok(value) => {
@@ -283,7 +315,7 @@ impl ContextRuntime {
             return Err(invalid("corrupt context checkpoint"));
         }
         let mut reader = Reader::new(payload);
-        if reader.take(4)? != b"GFCX" || reader.u16()? != 3 || reader.u64()? != fingerprint {
+        if reader.take(4)? != b"GFCX" || reader.u16()? != 4 || reader.u64()? != fingerprint {
             return Err(invalid("context checkpoint Program identity mismatch"));
         }
         if read_blob(&mut reader)? != bindings(&self.bindings)? {
@@ -336,12 +368,24 @@ impl ContextRuntime {
                 return Err(invalid("checkpoint config identity mismatch"));
             }
             config.next_key = reader.u64()?;
+            config.emission_revision = reader.u64()?;
+            let position = reader.u64()?;
+            config.application_position = if position == u64::MAX {
+                None
+            } else {
+                Some(position)
+            };
             config.last_success = read_value(&mut reader)?;
             if config.next_key == 0
                 || config.next_key > MAX_EXACT
+                || config.emission_revision > restored.settings_revision
+                || (config.emission_revision == 0) != config.application_position.is_none()
+                || config
+                    .application_position
+                    .is_some_and(|position| position > MAX_EXACT)
                 || matches!(&config.last_success, ConfigValue::Slots(slots) if slots.iter().any(|(key,_)| *key == 0 || *key >= config.next_key))
             {
-                return Err(invalid("invalid checkpoint config allocator"));
+                return Err(invalid("invalid checkpoint config allocator/provenance"));
             }
             if config
                 .validate(&config.descriptor.semantic_type, &config.last_success)
@@ -368,10 +412,42 @@ impl ContextRuntime {
                 }
                 _ => return Err(invalid("invalid checkpoint config Result tag")),
             };
+            if config.emission_revision == 0 {
+                let expected_next_key = match &config.descriptor.initial {
+                    ConfigValue::Slots(slots) => slots.len() as u64 + 1,
+                    _ => 1,
+                };
+                if config.current != Ok(config.descriptor.initial.clone())
+                    || config.last_success != config.descriptor.initial
+                    || config.next_key != expected_next_key
+                {
+                    return Err(invalid("checkpoint initial config provenance mismatch"));
+                }
+            }
             if !config.descriptor.operator_editable
                 && config.last_success != config.descriptor.initial
             {
                 return Err(invalid("checkpoint changes immutable config"));
+            }
+        }
+        if restored.settings_revision > 0
+            && !restored
+                .configs
+                .iter()
+                .any(|config| config.emission_revision == restored.settings_revision)
+        {
+            return Err(invalid("checkpoint latest settings revision absent"));
+        }
+        let mut revision_positions = std::collections::BTreeMap::new();
+        for config in &restored.configs {
+            if config.emission_revision == 0 {
+                continue;
+            }
+            match revision_positions.insert(config.emission_revision, config.application_position) {
+                Some(prior) if prior != config.application_position => {
+                    return Err(invalid("checkpoint atomic settings position mismatch"));
+                }
+                _ => {}
             }
         }
         if usize::from(reader.u16()?) != descriptors.len() {
@@ -481,6 +557,19 @@ impl ContextRuntime {
             out.push_str(",\"type\":");
             crate::trace_json::text(&mut out, &config.descriptor.semantic_type)
                 .map_err(|_| invalid("context state formatting"))?;
+            out.push_str(",\"defaultValue\":");
+            write_public_value(&mut out, &config.descriptor.initial)?;
+            write!(
+                out,
+                ",\"emissionRevision\":{},\"applicationPosition\":",
+                config.emission_revision
+            )
+            .map_err(|_| invalid("context state formatting"))?;
+            if let Some(position) = config.application_position {
+                write!(out, "{position}").map_err(|_| invalid("context state formatting"))?;
+            } else {
+                out.push_str("null");
+            }
             let value = match &config.current {
                 Err(fault) => {
                     out.push_str(if *fault == 0 {
@@ -491,6 +580,8 @@ impl ContextRuntime {
                     continue;
                 }
                 Ok(value) => {
+                    write!(out, ",\"override\":{}", config.emission_revision != 0)
+                        .map_err(|_| invalid("context state formatting"))?;
                     out.push_str(",\"result\":{\"ok\":true,\"value\":");
                     value
                 }

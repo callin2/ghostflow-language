@@ -5,6 +5,8 @@ export const INTERACTION_SCHEMA_FORMAT = 'GhostFlow/interaction-schema-v0';
 export const RUNTIME_SNAPSHOT_FORMAT = 'GhostFlow/runtime-snapshot-v0';
 export const INTERACTION_SCHEMA_VERSION = '0.3';
 export const RUNTIME_SNAPSHOT_VERSION = '0.1';
+export const SETTINGS_INTERACTION_SCHEMA_VERSION = '0.4';
+export const SETTINGS_RUNTIME_SNAPSHOT_VERSION = '0.2';
 
 const PUBLIC_ID = /^[A-Za-z][A-Za-z0-9._:-]{0,127}$/;
 const ENUM_MEMBER_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -134,7 +136,7 @@ function provenance(value, kind, path, errors) {
   }
 }
 
-function descriptor(value, index, errors) {
+function descriptor(value, index, errors, settingsProfile) {
   const path = `schema.descriptors[${index}]`;
   if (!object(value)) {
     issue(errors, path, 'shape', 'must be an object');
@@ -143,7 +145,7 @@ function descriptor(value, index, errors) {
   const fields = value.kind === 'timer'
     ? ['id', 'name', 'kind', 'sourceType', 'access', 'operation', 'provenance']
     : value.kind === 'setting'
-      ? ['id', 'name', 'kind', 'sourceType', 'access', 'authority', 'applyPolicy', 'label', 'constraint', 'provenance']
+      ? ['id', 'name', 'kind', 'sourceType', 'access', 'authority', 'applyPolicy', 'label', ...(settingsProfile ? ['defaultValue'] : []), 'constraint', 'provenance']
     : ['id', 'name', 'kind', 'sourceType', 'access', 'provenance'];
   if (!exactObject(value, fields, path, errors)) return;
   publicId(value.id, `${path}.id`, errors);
@@ -174,6 +176,7 @@ function descriptor(value, index, errors) {
     issue(errors, `${path}.sourceType`, 'counter_type', 'must be builtin Int with no unit');
   }
   if (value.kind === 'setting') {
+    if (settingsProfile) readyValue(value.sourceType, value.defaultValue, `${path}.defaultValue`, errors);
     if (!['operator', 'designer'].includes(value.authority)) issue(errors, `${path}.authority`, 'setting_authority', 'must be operator or designer');
     if (value.applyPolicy !== 'live') issue(errors, `${path}.applyPolicy`, 'setting_apply', 'must be live');
     if (typeof value.label !== 'string' || value.label.length < 1 || value.label.length > 128) issue(errors, `${path}.label`, 'setting_label', 'must be 1 to 128 characters');
@@ -206,7 +209,6 @@ function descriptor(value, index, errors) {
 function validateSchema(schema, errors) {
   if (!exactObject(schema, ['format', 'version', 'module', 'source', 'descriptors'], 'schema', errors)) return;
   if (schema.format !== INTERACTION_SCHEMA_FORMAT) issue(errors, 'schema.format', 'format', `must be ${INTERACTION_SCHEMA_FORMAT}`);
-  if (schema.version !== INTERACTION_SCHEMA_VERSION) issue(errors, 'schema.version', 'version', `must be ${INTERACTION_SCHEMA_VERSION}`);
   moduleIdentity(schema.module, 'schema.module', errors);
   sourceIdentity(schema.source, 'schema.source', errors);
   if (!Array.isArray(schema.descriptors)) {
@@ -216,11 +218,15 @@ function validateSchema(schema, errors) {
   const ids = new Set();
   const names = new Set();
   schema.descriptors.forEach((entry, index) => {
-    descriptor(entry, index, errors);
+    descriptor(entry, index, errors, schema.version === SETTINGS_INTERACTION_SCHEMA_VERSION);
     if (ids.has(entry?.id)) issue(errors, `schema.descriptors[${index}].id`, 'duplicate_identity', 'must be unique');
     if (names.has(entry?.name)) issue(errors, `schema.descriptors[${index}].name`, 'duplicate_identity', 'must be unique');
     ids.add(entry?.id); names.add(entry?.name);
   });
+  const hasSettings = schema.descriptors.some(entry => entry?.kind === 'setting');
+  if (schema.version !== INTERACTION_SCHEMA_VERSION && !(hasSettings && schema.version === SETTINGS_INTERACTION_SCHEMA_VERSION)) {
+    issue(errors, 'schema.version', 'version', 'must be 0.3 or the explicit settings profile 0.4');
+  }
   const descriptorsById = new Map(schema.descriptors.map(entry => [entry?.id, entry]));
   for (const entry of schema.descriptors) {
     if (entry?.kind !== 'timer') continue;
@@ -256,21 +262,34 @@ function readyValue(type, value, path, errors) {
   }
 }
 
-function observation(value, descriptorValue, index, errors) {
+function observation(value, descriptorValue, index, errors, globalSettingsRevision, settingsProfile) {
   const path = `snapshot.observations[${index}]`;
   if (!object(value)) {
     issue(errors, path, 'shape', 'must be an object');
     return;
   }
   if (!OBSERVATION_STATUS.has(value.status)) issue(errors, `${path}.status`, 'observation_status', 'must be ready, unavailable, or error; stale is a validated join result');
-  const fields = value.status === 'ready' ? ['descriptorId', 'status', 'value']
+  const settingReadyFields = settingsProfile && descriptorValue?.kind === 'setting'
+    ? ['defaultValue', 'emissionRevision', 'applicationPosition', 'override'] : [];
+  const settingErrorFields = settingsProfile && descriptorValue?.kind === 'setting'
+    ? ['defaultValue', 'emissionRevision', 'applicationPosition'] : [];
+  const fields = value.status === 'ready' ? ['descriptorId', ...settingReadyFields, 'status', 'value']
     : value.status === 'unavailable' ? ['descriptorId', 'status', 'reason']
-      : value.status === 'error' ? ['descriptorId', 'status', 'error']
+      : value.status === 'error' ? ['descriptorId', ...settingErrorFields, 'status', 'error']
         : ['descriptorId', 'status'];
   if (!exactObject(value, fields, path, errors)) return;
   publicId(value.descriptorId, `${path}.descriptorId`, errors);
   if (value.status === 'ready') {
     readyValue(descriptorValue?.sourceType, value.value, `${path}.value`, errors);
+    if (settingsProfile && descriptorValue?.kind === 'setting') {
+      readyValue(descriptorValue.sourceType, value.defaultValue, `${path}.defaultValue`, errors);
+      if (!Number.isSafeInteger(value.emissionRevision) || value.emissionRevision < 0 || value.emissionRevision > globalSettingsRevision) issue(errors, `${path}.emissionRevision`, 'settings_provenance', 'must be a non-negative safe integer not greater than the global settingsRevision');
+      if (!(value.applicationPosition === null || Number.isSafeInteger(value.applicationPosition) && value.applicationPosition >= 0)) issue(errors, `${path}.applicationPosition`, 'settings_provenance', 'must be null or a non-negative safe integer');
+      if (typeof value.override !== 'boolean' || value.override !== (value.emissionRevision !== 0)
+          || (value.emissionRevision === 0) !== (value.applicationPosition === null)) issue(errors, `${path}.override`, 'settings_provenance', 'must match emission revision and application position');
+      if (value.emissionRevision === 0 && value.value !== value.defaultValue) issue(errors, `${path}.value`, 'settings_provenance', 'initial setting value must equal defaultValue');
+      if (value.defaultValue !== descriptorValue.defaultValue) issue(errors, `${path}.defaultValue`, 'settings_provenance', 'must equal the static source default');
+    }
     if (descriptorValue?.kind === 'setting') {
       const constraint = descriptorValue.constraint;
       const misaligned = constraint?.kind === 'range' && (descriptorValue.sourceType?.name === 'Int'
@@ -283,14 +302,31 @@ function observation(value, descriptorValue, index, errors) {
       if (constraint?.kind === 'choices' && !constraint.values?.includes(value.value)) issue(errors, `${path}.value`, 'setting_value', 'must be an authored choice');
     }
   }
+  if (settingsProfile && value.status === 'error' && descriptorValue?.kind === 'setting') {
+    if (!['SettingsInvalid', 'SettingsUnavailable'].includes(value.error)) issue(errors, `${path}.error`, 'settings_provenance', 'must be a current SettingsFault');
+    readyValue(descriptorValue.sourceType, value.defaultValue, `${path}.defaultValue`, errors);
+    if (!Number.isSafeInteger(value.emissionRevision) || value.emissionRevision < 0 || value.emissionRevision > globalSettingsRevision) issue(errors, `${path}.emissionRevision`, 'settings_provenance', 'must be a non-negative safe integer not greater than the global settingsRevision');
+    if (!(value.applicationPosition === null || Number.isSafeInteger(value.applicationPosition) && value.applicationPosition >= 0)) issue(errors, `${path}.applicationPosition`, 'settings_provenance', 'must be null or a non-negative safe integer');
+    if ((value.emissionRevision === 0) !== (value.applicationPosition === null)) issue(errors, `${path}.applicationPosition`, 'settings_provenance', 'must match emission revision');
+    if (value.emissionRevision === 0) issue(errors, `${path}.emissionRevision`, 'settings_provenance', 'a fault requires an accepted emission');
+    if (value.defaultValue !== descriptorValue.defaultValue) issue(errors, `${path}.defaultValue`, 'settings_provenance', 'must equal the static source default');
+  }
+  if (settingsProfile && value.status === 'unavailable' && descriptorValue?.kind === 'setting') issue(errors, `${path}.status`, 'settings_provenance', 'settings expose the current success or fault Result');
   if (value.status === 'unavailable' && (typeof value.reason !== 'string' || !value.reason)) issue(errors, `${path}.reason`, 'observation_reason', 'must be non-empty');
   if (value.status === 'error' && (typeof value.error !== 'string' || !value.error)) issue(errors, `${path}.error`, 'observation_error', 'must be non-empty');
 }
 
 function validateSnapshot(schema, snapshot, errors) {
-  if (!exactObject(snapshot, ['format', 'version', 'schema', 'module', 'source', 'runId', 'completion', 'observations'], 'snapshot', errors)) return;
+  const hasSettings = schema.version === SETTINGS_INTERACTION_SCHEMA_VERSION;
+  const snapshotFields = hasSettings
+    ? ['format', 'version', 'schema', 'module', 'source', 'runId', 'completion', 'settingsRevision', 'observations']
+    : ['format', 'version', 'schema', 'module', 'source', 'runId', 'completion', 'observations'];
+  if (!exactObject(snapshot, snapshotFields, 'snapshot', errors)) return;
   if (snapshot.format !== RUNTIME_SNAPSHOT_FORMAT) issue(errors, 'snapshot.format', 'format', `must be ${RUNTIME_SNAPSHOT_FORMAT}`);
-  if (snapshot.version !== RUNTIME_SNAPSHOT_VERSION) issue(errors, 'snapshot.version', 'version', `must be ${RUNTIME_SNAPSHOT_VERSION}`);
+  const expectedSnapshotVersion = hasSettings ? SETTINGS_RUNTIME_SNAPSHOT_VERSION : RUNTIME_SNAPSHOT_VERSION;
+  if (snapshot.version !== expectedSnapshotVersion) issue(errors, 'snapshot.version', 'version', `must be ${expectedSnapshotVersion} for ${hasSettings ? 'settings' : 'non-settings'} profile`);
+  const globalSettingsRevision = hasSettings ? snapshot.settingsRevision : 0;
+  if (hasSettings && (!Number.isSafeInteger(globalSettingsRevision) || globalSettingsRevision < 0)) issue(errors, 'snapshot.settingsRevision', 'settings_provenance', 'must be a non-negative safe integer');
   if (exactObject(snapshot.schema, ['format', 'version', 'sha256'], 'snapshot.schema', errors)) {
     if (snapshot.schema.format !== schema.format) issue(errors, 'snapshot.schema.format', 'identity_mismatch', 'does not match the static schema');
     if (snapshot.schema.version !== schema.version) issue(errors, 'snapshot.schema.version', 'identity_mismatch', 'does not match the static schema');
@@ -313,12 +349,25 @@ function validateSnapshot(schema, snapshot, errors) {
   const descriptors = new Map(schema.descriptors.map(entry => [entry.id, entry]));
   const ids = new Set();
   snapshot.observations.forEach((entry, index) => {
-    observation(entry, descriptors.get(entry?.descriptorId), index, errors);
+    observation(entry, descriptors.get(entry?.descriptorId), index, errors, globalSettingsRevision, hasSettings);
     if (!descriptors.has(entry?.descriptorId)) issue(errors, `snapshot.observations[${index}].descriptorId`, 'unknown_descriptor', 'is absent from the static schema');
     if (ids.has(entry?.descriptorId)) issue(errors, `snapshot.observations[${index}].descriptorId`, 'duplicate_descriptor', 'must occur once');
     ids.add(entry?.descriptorId);
   });
   for (const descriptorId of descriptors.keys()) if (!ids.has(descriptorId)) issue(errors, 'snapshot.observations', 'missing_observation', `must explicitly cover ${descriptorId}`);
+  if (hasSettings) {
+    const settings = snapshot.observations.filter(entry => descriptors.get(entry?.descriptorId)?.kind === 'setting');
+    const positions = new Map();
+    for (const entry of settings) {
+      if (positions.has(entry.emissionRevision) && positions.get(entry.emissionRevision) !== entry.applicationPosition) {
+        issue(errors, 'snapshot.observations', 'settings_provenance', 'one atomic emission must have one application position');
+      }
+      positions.set(entry.emissionRevision, entry.applicationPosition);
+    }
+    if (globalSettingsRevision > 0 && !settings.some(entry => entry.emissionRevision === globalSettingsRevision)) {
+      issue(errors, 'snapshot.settingsRevision', 'settings_provenance', 'latest accepted revision must be represented by a setting');
+    }
+  }
 }
 
 function expectedJoin(schema, snapshot, expected) {

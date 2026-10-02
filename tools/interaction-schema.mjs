@@ -2,8 +2,10 @@ import { equalBytes, sha256Hex } from './sha256.mjs';
 import {
   INTERACTION_SCHEMA_FORMAT,
   INTERACTION_SCHEMA_VERSION,
+  SETTINGS_INTERACTION_SCHEMA_VERSION,
   RUNTIME_SNAPSHOT_FORMAT,
   RUNTIME_SNAPSHOT_VERSION,
+  SETTINGS_RUNTIME_SNAPSHOT_VERSION,
   interactionSchemaSha256,
   validateInteraction,
 } from '../contracts/interaction-v0/validate.mjs';
@@ -60,6 +62,7 @@ function sourceType(name, enums) {
 
 function validationSnapshot(schema) {
   const valueFor = descriptor => {
+    if (descriptor.kind === 'setting' && schema.version === SETTINGS_INTERACTION_SCHEMA_VERSION) return descriptor.defaultValue;
     if (descriptor.kind === 'setting' && descriptor.constraint.kind === 'range') return descriptor.constraint.min;
     if (descriptor.kind === 'setting' && descriptor.constraint.kind === 'choices') return descriptor.constraint.values[0];
     const type = descriptor.sourceType;
@@ -68,15 +71,19 @@ function validationSnapshot(schema) {
   };
   return {
     format: RUNTIME_SNAPSHOT_FORMAT,
-    version: RUNTIME_SNAPSHOT_VERSION,
+    version: schema.version === SETTINGS_INTERACTION_SCHEMA_VERSION ? SETTINGS_RUNTIME_SNAPSHOT_VERSION : RUNTIME_SNAPSHOT_VERSION,
     schema: { format: schema.format, version: schema.version, sha256: '0'.repeat(64) },
     module: { ...schema.module },
     source: { ...schema.source },
     runId: 'schema-validation',
     completion: { kind: 'completed-scan', scanId: 0, logicalTimeMs: 0 },
-    observations: schema.descriptors.map(descriptor => ({
+    ...(schema.version === SETTINGS_INTERACTION_SCHEMA_VERSION ? { settingsRevision: 0 } : {}),
+    observations: schema.descriptors.map(descriptor => descriptor.kind === 'setting' && schema.version === SETTINGS_INTERACTION_SCHEMA_VERSION ? {
+      descriptorId: descriptor.id, defaultValue: valueFor(descriptor), emissionRevision: 0,
+      applicationPosition: null, override: false, status: 'ready', value: valueFor(descriptor),
+    } : {
       descriptorId: descriptor.id, status: 'ready', value: valueFor(descriptor),
-    })),
+    }),
   };
 }
 
@@ -134,6 +141,7 @@ function expectedSchema(compilation, identityValue) {
       descriptors.push({
         id: `setting.${item.name}`, name: item.name, kind: 'setting', sourceType: sourceType(config.type, enums), access: ['read'],
         authority: settings.access, applyPolicy: 'live', label: settings.label ?? item.name,
+        defaultValue: config.value,
         constraint: config.type === 'Bool'
           ? { kind: 'choices', values: [false, true] }
           : { kind: 'range', min: settings.min, max: settings.max, step: settings.step },
@@ -168,7 +176,7 @@ function expectedSchema(compilation, identityValue) {
   }
   const schema = {
     format: INTERACTION_SCHEMA_FORMAT,
-    version: INTERACTION_SCHEMA_VERSION,
+    version: descriptors.some(descriptor => descriptor.kind === 'setting') ? SETTINGS_INTERACTION_SCHEMA_VERSION : INTERACTION_SCHEMA_VERSION,
     module: { id: manifest.name, moduleFingerprint: trace.moduleFingerprint, bytecodeSha256: artifactManifest.bytecodeSha256 },
     source: { ...identity, format: SOURCE_FORMAT, kind: 'literate', sha256: source.sha256 },
     descriptors,
@@ -189,6 +197,16 @@ export function verifyInteractionSchema(compilation, schema) {
     documentId: schema.source?.documentId,
     revisionId: schema.source?.revisionId,
   });
+  // A persisted legacy settings document retains its original contract and
+  // digest. It is never silently promoted to the provenance profile.
+  if (schema.version === INTERACTION_SCHEMA_VERSION) {
+    expected.version = INTERACTION_SCHEMA_VERSION;
+    expected.descriptors = expected.descriptors.map(descriptor => {
+      if (descriptor.kind !== 'setting') return descriptor;
+      const { defaultValue: _default, ...legacy } = descriptor;
+      return legacy;
+    });
+  }
   if (JSON.stringify(schema) !== JSON.stringify(expected)) fail('schema does not match compiler provenance, source identity, or canonical source');
   return expected;
 }
