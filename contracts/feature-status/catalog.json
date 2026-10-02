@@ -4277,6 +4277,33 @@
       "referenceCaseIds": ["REF-04-047"]
     },
     {
+      "id": "station-owner-isolation",
+      "family": "Station session owner isolates inactive pump requests",
+      "clause": {
+        "path": "docs/reference/04-sensors-constraints-control.en.md",
+        "heading": "4.9 Shared resources and arbitration"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [{
+        "stage": "native_wasm",
+        "status": "verified",
+        "refs": [{
+          "path": "tests/station-wasm.test.mjs",
+          "testId": "REF-04-048: checked Station source native/WASM owner grant survives inactive false in either same-tick order",
+          "caseId": "REF-04-048",
+          "assertionClass": "target-parity",
+          "targets": ["native", "wasm"],
+          "polarities": ["positive", "negative", "boundary"]
+        }]
+      }],
+      "gaps": ["The existing fixed Station owner consumes the same checked canonical constraints and generated configuration on native/WASM. Same-tick owner ON and inactive OFF requests in both orders preserve the owner's authorization, proven by a subsequent real owner report-applied check without reauthorization and an explicit time ledger. Owner OFF between phases retains the lease and reservation; inactive output and acquisition remain rejected. Applied reports are host fixtures, not physical receipts. This is bounded portable owner conformance, not generic cooperative VM resource-policy execution, batch admission, compiler lowering or a Device release."],
+      "issues": [247],
+      "referenceCaseIds": ["REF-04-048"]
+    },
+    {
       "id": "product-boundary",
       "family": "Farmer UI, installation and deployment",
       "clause": {

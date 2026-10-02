@@ -193,6 +193,116 @@ test('REF-04-047: checked Station source native/WASM capacity is advisory Unknow
   assert.throws(() => compile(advisory.replace('pump_capacity(pump1)', 'pump_capacity(flow + pressure)')), /unexpected character "\+"/);
 });
 
+test('REF-04-048: checked Station source native/WASM owner grant survives inactive false in either same-tick order', async t => {
+  const reference = JSON.parse(readFileSync(resolve(root, 'tests/reference/cases/02-time-control.json'), 'utf8'))
+    .cases.find(entry => entry.id === 'REF-04-048');
+  assert(reference, 'retain the original shared pump reference');
+  assert.equal(reference.scope, 'runtime');
+  assert.match(reference.given, /control A.*lease.*true.*B.*false/);
+  assert.match(reference.when, /tick intents.*arbitrate/);
+  assert.match(reference.then, /A.*session.*final intent.*B.*false/);
+  assert(reference.issue.endsWith('/247'));
+  const filename = 'examples/station-rules.ghost.md';
+  const source = readFileSync(resolve(root, filename), 'utf8');
+  const bindings = {
+    station: { id: 'station', config: { valveCount: 4, maxOpenValves: 2, dailyQuotaMs: 1000, maxStartBudgetMs: 800 } },
+    pump: { id: 'pump1' }, settings: { id: 'settings' },
+    schedules: { starts: { id: 'starts', timezone: 'Asia/Seoul' } },
+    modeAliases: { Auto: 'Auto', Manual: 'Manual', Configure: 'Configure' },
+    activityAliases: { automatic: 'Auto', manual: 'Manual', configuring: 'Configure' },
+  };
+  const compile = value => compileConstraints(extractLiterate(value, { filename }).code, { filename });
+  const artifact = compile(source), policy = bindStationPolicy(artifact, bindings);
+  const bytes = Buffer.from(JSON.stringify(artifact));
+  const sha = value => createHash('sha256').update(value).digest('hex');
+  let hash = 0xcbf29ce484222325n;
+  for (const byte of bytes) hash = BigInt.asUintN(64, (hash ^ BigInt(byte)) * 0x100000001b3n);
+  const identity = { sourceSha256: sha(source), artifactSha256: sha(bytes),
+    bindingSha256: sha(JSON.stringify(bindings)), policySha256: sha(JSON.stringify(policy)),
+    artifactFingerprint: hash.toString(16).padStart(16, '0') };
+  execFileSync('cargo', ['build', '--locked', '--offline', '--release', '-p', 'ghostflow-core', '--example', 'station_ownership_tape'], {
+    cwd: root, stdio: 'inherit',
+  });
+  const runner = resolve(root, 'target/release/examples/station_ownership_tape' + (process.platform === 'win32' ? '.exe' : ''));
+  const directory = mkdtempSync(join(tmpdir(), 'reference-station-ownership-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const artifactPath = join(directory, 'constraints.json'), tapePath = join(directory, 'tape.json');
+  assert.deepEqual(compile(source), artifact);
+  assert.deepEqual(bindStationPolicy(artifact, bindings), policy);
+  writeFileSync(artifactPath, bytes);
+  for (const order of ['AB', 'BA']) {
+    const tape = { artifactFingerprint: identity.artifactFingerprint, stationConfig: policy.stationConfig, order };
+    writeFileSync(tapePath, JSON.stringify(tape));
+    const native = JSON.parse(execFileSync(runner, [artifactPath, tapePath], { encoding: 'utf8', timeout: 10_000 }));
+    const instance = await GhostFlowStation.instantiate(wasmBytes, policy.stationConfig);
+    try {
+      synchronize(instance);
+      enterAuto(instance);
+      let writes = 0;
+      const persist = async snapshot => { assert(snapshot.length > 16); writes++; return true; };
+      const grant = await instance.start(startRequest(instance, 2n, undefined), persist);
+      const ownerClaim = instance.claim;
+      const trace = [{ event: 'lease', nowMs: 10, sessionId: 77,
+        leaseDeadlineMs: Number(grant.leaseDeadlineMs), reservedMs: Number(instance.reservedMs) }];
+      const on = { sessionId: 77n, pumpOn: true, valves: 1n };
+      const off = { sessionId: 77n, pumpOn: false, valves: 1n };
+      const inactive = { sessionId: 78n, pumpOn: false, valves: 0n };
+      for (const actor of order) {
+        if (actor === 'A') {
+          const output = instance.authorizeOutput({ ...on, nowMs: 10n });
+          trace.push({ event: 'request', actor, nowMs: 10, pumpOn: true,
+            accepted: true, sessionId: Number(output.sessionId), valves: Number(output.valves) });
+        } else {
+          assert.throws(() => instance.authorizeOutput({ ...inactive, nowMs: 10n }), /session does not own/);
+          trace.push({ event: 'request', actor, nowMs: 10, pumpOn: false,
+            accepted: false, error: 'SessionMismatch' });
+        }
+      }
+      // This is a host-supplied applied fixture, not a physical driver receipt.
+      // Do not reauthorize: reportApplied checks the ON grant retained by Rust
+      // after B's rejected OFF request, exposing a last-writer regression.
+      instance.reportApplied({ ...on, nowMs: 10n });
+      assert.throws(() => instance.reportApplied({ ...inactive, nowMs: 10n }), /session does not own/);
+      trace.push({ event: 'appliedFixture', nowMs: 10, sessionId: 77, pumpOn: true,
+        valves: 1, nonownerReportRejected: true });
+      instance.advance(20n);
+      trace.push({ event: 'ledger', nowMs: 20, dailyUsedMs: Number(instance.dailyUsedMs),
+        reservedMs: Number(instance.reservedMs) });
+      // The active session accrues ON time internally; dailyUsedMs settles
+      // only at durable finish, while its full budget remains reserved.
+      assert.equal(instance.dailyUsedMs, 0n);
+      instance.authorizeOutput({ ...off, nowMs: 20n });
+      assert.throws(() => instance.authorizeOutput({ ...inactive, nowMs: 20n }), /session does not own/);
+      instance.reportApplied({ ...off, nowMs: 20n });
+      assert.throws(() => instance.prepareStart({ ...startRequest(instance, 3n, undefined, 20n),
+        sessionId: 78n, ownerId: 89n }), /already.*owner|owned/i);
+      assert.equal(instance.reservedMs, 100n);
+      assert.deepEqual(instance.claim, ownerClaim);
+      assert.equal(writes, 1);
+      trace.push({ event: 'betweenPhases', nowMs: 20, sessionId: 77, pumpOn: false, valves: 1,
+        nonownerRejected: true, acquisitionRejected: 'AlreadyOwned', reservedMs: Number(instance.reservedMs) });
+      instance.authorizeOutput({ ...on, nowMs: 30n });
+      instance.reportApplied({ ...on, nowMs: 30n });
+      trace.push({ event: 'appliedFixture', nowMs: 30, sessionId: 77, pumpOn: true, valves: 1 });
+      instance.authorizeOutput({ sessionId: 77n, pumpOn: false, valves: 0n, nowMs: 40n });
+      instance.reportApplied({ sessionId: 77n, pumpOn: false, valves: 0n, nowMs: 40n });
+      await instance.finish({ sessionId: 77n, outcome: 'Completed', nowMs: 40n }, persist);
+      trace.push({ event: 'finish', nowMs: 40, dailyUsedMs: Number(instance.dailyUsedMs),
+        reservedMs: Number(instance.reservedMs) });
+      assert.equal(instance.dailyUsedMs, 20n);
+      assert.equal(instance.reservedMs, 0n);
+      assert.equal(writes, 2);
+      assert.throws(() => instance.authorizeOutput({ ...on, nowMs: 40n }), /session does not own/);
+      assert.deepEqual(native, { artifactFingerprint: identity.artifactFingerprint, order, trace });
+      t.diagnostic(JSON.stringify({ identity, order, trace }));
+    } finally { instance.dispose(); }
+    writeFileSync(tapePath, JSON.stringify({ ...tape, artifactFingerprint: '0000000000000000' }));
+    assert.throws(() => execFileSync(runner, [artifactPath, tapePath], { encoding: 'utf8', stdio: 'pipe' }), /checked constraint artifact identity mismatch/);
+  }
+  assert.throws(() => bindStationPolicy(artifact, { ...bindings, pump: { id: 'valve1' } }), /unbound pump identifier pump1/);
+  assert.throws(() => bindStationPolicy(compile(source.replace('pump_capacity(pump1)', 'pump_capacity(missing)')), bindings), /unbound pump identifier missing/);
+});
+
 test('immediate Stop cancels a hanging Start persistence before it can grant output', async () => {
   const instance = await station();
   synchronize(instance);
