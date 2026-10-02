@@ -5657,6 +5657,80 @@
       "referenceCaseIds": [
         "REF-06-013"
       ]
+    },
+    {
+      "id": "keyed-retime-overlap-atomic-rejection",
+      "family": "Retained-key TimeSlots retime rejects overlapping Range intervals without partial state or ledger mutation",
+      "clause": {
+        "path": "docs/reference/03-time-and-schedules.en.md",
+        "heading": "3.6 Selected DailySlots"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/range-retime-atomic-rejection.test.mjs",
+              "testId": "REF-03-083 retained K2 retime to 08:07 is atomically rejected and same-base retry can accept 08:10 touching",
+              "caseId": "REF-03-083",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/range-retime-atomic-rejection.test.mjs",
+              "testId": "REF-03-083 mixed Bool plus retained-key overlap rolls back every change and permits later nonoverlap control",
+              "caseId": "REF-03-083",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/range-retime-atomic-rejection.test.mjs",
+              "testId": "REF-03-083 rejection preserves durable GFRG4 checkpoint and restored ledger does not replay history",
+              "caseId": "REF-03-083",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Conformance-only evidence for canonical keyed UTC range(10min): K1 at08:00/K2 at08:20, retained K2 retime to08:07 rejects the entire event while exact settings/opaque keys/revision/allocator and durable checkpoint remain unchanged. Mixed Bool rollback, unchanged accepted scan position, same-base retry, touching08:10/nonoverlap08:11 controls and GFRG4 consumed-history restore are verified with every complete native/WASM outcome/settings/checkpoint receipt. Other civil zones, live Duration, Run overlap, publishing run identity and physical adoption remain separate contracts."
+      ],
+      "issues": [
+        272
+      ],
+      "referenceCaseIds": [
+        "REF-03-083"
+      ]
     }
   ]
 }

@@ -165,6 +165,7 @@ export const LANGUAGE_TESTS = Object.freeze([
     'tests/range-timeslots-overlap.test.mjs',
     'tests/range-keyed-retime.test.mjs',
     'tests/range-slot-edit-identity.test.mjs',
+    'tests/range-retime-atomic-rejection.test.mjs',
   'tests/at-contract.test.mjs',
   'tests/at-runtime.test.mjs',
   'tests/at-package.test.mjs',
