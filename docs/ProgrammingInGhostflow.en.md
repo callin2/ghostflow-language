@@ -6,7 +6,7 @@
 
 Write device behavior as code, then understand it by running it
 
-**User guide · Language Reference basis · dev reviewed 2026-09-28**
+**Revised edition · English translation · based on the Language Reference**
 
 ## Before you begin
 
@@ -16,7 +16,17 @@ Each task is simple on its own. But as conditions grow and devices work together
 
 GhostFlow is a language for writing these conditions and actions as code. It describes how states change in response to sensors or user input, and what actions to request from devices.
 
-This guide starts with simple examples and works through reading and changing them. We begin by turning one output on and off with a switch, then expand to programs that remember state, wait for time, and change their behavior based on sensor values.
+This book does not ask you to memorize the grammar before writing a program. First
+predict the result, change one thing, and find the tick where the result changes.
+We begin with one switch, but quickly reach questions that occur in real
+installations. Which input wins when start and stop arrive together? What can you
+trust when a sensor chatters or becomes stale? Does ON on a screen mean that the
+device physically turned on?
+
+Getting the answer right matters less than keeping the evidence. For each example,
+write down the inputs and previous state, predict the next state and the
+requested/safe intent, then compare them with the run. When your prediction differs,
+that difference is the concept worth learning.
 
 For exact syntax and behavior rules, see the [Language Reference](LANGUAGE-REFERENCE.md). This guide teaches through examples; the Reference defines the language. If their explanations differ, follow the Reference. When syntax changes, update the Reference first, then align this guide's examples.
 
@@ -28,13 +38,21 @@ An example in this guide does not mean that its feature is ready to use on a phy
 
 Compilation, support in the execution environment, and the behavior of a real device each need separate verification. This guide explains how to write and read code according to the current specification. It does not claim that every feature is implemented or ready for board deployment.
 
-This document review is based on dev revision `3982e6bf71cf5880286fcea017cb355ab222428d`. See [Implementation](IMPLEMENTATION.md) and [feature maturity and executable evidence](REFERENCE-FEATURE-STATUS.md) for later implementation and verification status.
+The exact claims of this edition cover whether source follows the current Language
+Reference, what the current compiler and logical execution paths check, and which
+exercises the public reader can open. They do not claim physical verification on
+a particular board, wiring harness, sensor, or actuator. The current checkout's
+[Implementation](IMPLEMENTATION.md), [feature maturity and executable evidence](REFERENCE-FEATURE-STATUS.md),
+and tests define the implementation evidence.
 
-The [Semantic Kernel 0.1 review plan](plans/2026-09-28-semantic-kernel.md) explains the background and core scope whose behavior was prioritized for definition. Not every feature in the Reference or this guide is part of that scope.
-
-The compiler tests cover independent control programs E01–E10 and E12–E14, and the literate document E15. E11 explains notation; it is not an executable example.
-
-E08's `enum` and `elapsed`, E09's schedules, and E10/E14's sensor and adaptation features include behavior outside that core scope. Do not read the program composition and replacement explanations in Chapters 11–12 as instructions for features that are fully implemented.
+In the public reader catalog, the controls from E01–E33 except E11, PC-01–PC-10,
+and tutorial/03–04 run when their required browser capabilities are admitted. E11
+is a canonical-notation explanation, not an executable control. E34–E37 compile,
+but the current browser cabinet cannot admit `Int`, `DateTime`, and the new
+natural-event host facts, so they are checked in a separate host profile.
+`station-rules` is also a separate-host policy grammar. E90–E102 check expected
+diagnostics rather than successful execution. These categories tell you where
+evidence is available; they are not a ranking of the features.
 
 ### How to read the examples
 
@@ -52,19 +70,34 @@ The [example execution check](../tests/programming-book-simulation.test.mjs) com
 
 Examples need different inputs and execution environments, so their checks vary.
 
-E01–E10, E12–E15, and PC-01–PC-10 are checked through the public `ghostsim` path. E02/E08 receive configuration Results and context facts; E09 receives civil schedule facts. E10/E14 and tutorial/03 receive sensor samples and the execution capabilities they need.
+Controls from E01–E33 except E11 are checked in the execution profile selected by
+the public reader. E02/E08 receive configuration Results and context facts; E09
+receives civil schedule facts. E10/E14 and tutorial/03 receive sensor samples and
+the capabilities they need. PC-01–PC-10 and tutorial/03–04 also run in the browser
+when those capabilities are admitted. E34–E37 and `station-rules` use the separate
+host profiles described above.
 
-Ordinary input and state examples run in native Rust. Examples that need the corresponding conditioner use a WASM build of the same core.
+General input and state examples check logical results from the shared Rust core.
+The browser reader presents the same meaning through a WASM path. Both paths
+observe inputs, state, requested/safe intent, and diagnostics; neither establishes
+a physical device effect.
 
 tutorial/04 checks schedule events and sequential outputs in the existing `ControlRuntime`/`DailySlots` WASM host. station-rules compiles a policy with `ghostrules`, binds it, then checks output authorization and `Stop` in WASM `GhostFlowStation`. These advanced examples are checked separately from the `ghostsim` CLI path.
 
-E11 explains notation. E90–E97 check whether the compiler reports expected errors for intentionally invalid code. Diagrams and explanations of program composition are not executed. Source-mutation experiments are checked separately from the originals.
+E11 explains notation. E90–E102 check whether the compiler reports expected errors
+for intentionally invalid code. Diagrams and explanations of program composition
+are not executed. Source-mutation experiments are checked separately from the originals.
 
 To run the example check directly, you need Node dependencies and native/WASM artifacts built from the same revision. Then run `node --test tests/programming-book-simulation.test.mjs`. See [Verification](VERIFICATION.md) for the full build and verification sequence.
 
 The compiler check in `tests/docs-runnable-examples.test.mjs` can run without building the runtime.
 
-Chapter 14 introduces E16–E22 examples using temperature and climate sensors. Checks for `ghostsim` control calculations and independent WASM numerical calculations are in `tests/programming-book-simulation.test.mjs`, `tests/programming-climate.test.mjs`, and `tests/programming-book-import-package.test.mjs`.
+Chapter 14 contains E16–E22, which cover temperature and climate sensors. Chapter
+15 and advanced examples E23–E37 go deeper into physical quantities, observation,
+exact counts, and natural time. Evidence for control calculations and import
+packages is split across `tests/programming-book-simulation.test.mjs`,
+`tests/programming-climate.test.mjs`, and
+`tests/programming-book-import-package.test.mjs`.
 
 These steps check program logic and calculations. Whether real sensors and devices behave as intended must be verified separately.
 
@@ -100,6 +133,13 @@ Appendices: [A. Specification guide](#appendix-a) · [B. Learning through errors
 <a id="ch01"></a>
 ## 1. One switch and one output
 
+When control programming starts with an input wired straight to an output, it is
+reasonable to wonder why a language is needed at all. The simplicity is the point.
+Before running E01, write the lamp value for three ticks: `false → true → false`.
+Once the result matches, ask where each value came from. Separating the contact,
+normalized input, logical output, and real relay gives you the same reading method
+for every more complicated program in the book.
+
 ### E01 — Connecting an input to an output
 
 The first program turns the LED on when the switch is on and off when the switch is off.
@@ -114,20 +154,21 @@ control FollowSwitch {
 }
 ```
 
-`control FollowSwitch` declares the program's name and scope.
-`input` is a value coming from outside; `output` is a value sent outside.
-`Bool` has two values: `true` and `false`.
-
-`lamp <- switch_on` means “in this output calculation, lamp follows switch_on.”
-Reading `<-` from right to left reveals where the value comes from.
+`control FollowSwitch` gives this decision a name and a boundary. Values crossing
+in are `input`; calculated values crossing out are `output`. No hidden wiring or
+device choice sits between them. Read `lamp <- switch_on` with the arrow: “this
+tick's lamp request came from switch_on.” Even two `Bool` values can explain the
+origin of an output, which is the first useful result.
 
 | Input `switch_on` | Output `lamp` |
 |---|---|
 | `false` | `false` |
 | `true` | `true` |
 
-The table shows the two possible Bool values. Release→press→release is not a third value,
-but a **transition scenario** passing through these two rows over time.
+The table shows two possible moments. Release→press→release is not a third value;
+it is a **transition scenario** that visits the rows over time. Keeping the table
+and scenario distinct prevents “what is true now?” from being confused with “how
+did we arrive here?”
 
 ### Distinguishing contacts, PLC inputs, and GhostFlow inputs
 
@@ -152,11 +193,14 @@ or device outputs falls within binding and Driver contracts.
 
 ### The unit for reading execution: tick
 
-Here, one control calculation is called a **tick**. Within a tick,
-read one captured input set. The next tick reads a new set.
+One control evaluation is a **tick**. Every expression in that tick sees one
+captured input set. Do not imagine separate expressions reading a switch at
+different physical moments; a new input set arrives with the next tick.
 
-This program needs no memory. The same inputs therefore produce the same outputs.
-Chapter 3 adds `state` to remember values from previous ticks.
+E01 has no memory, so the same input always produces the same output. If a trace
+first shows `switch_on` and `lamp` disagreeing, inspect normalization, binding,
+or the Driver before blaming this expression. Chapter 3 adds `state`, after which
+the same current input can produce different results because the past differs.
 
 The information connecting `switch_on` to DI1 and `lamp` to RO1 is mapping outside the program.
 Names do not automatically determine hardware ports. This lets the same calculation connect
@@ -164,18 +208,28 @@ to virtual switches/LEDs and device I/O.
 
 ### Try changing it
 
-Change the connection to `lamp <- !switch_on;`. `!` inverts true and false.
-Before running the code, predict the two output cells in the table above.
+Before changing the connection to `lamp <- !switch_on;`, draw the new table on
+paper. Because `!` flips true and false, both output cells should change. Restore
+the original after checking it, then change only the input name. Behavior stays the
+same while a reader's interpretation changes: a first exercise in separating a
+calculation edit from an explanation edit.
 
 <a id="ch02"></a>
 ## 2. Names, values, types, and expressions
 
+Many field mistakes begin because two people read `30` as 30 percent and 30
+seconds, not because the arithmetic is difficult. Here names and types catch that
+misunderstanding early. Before running E02, predict the rows for 29%, 30%, and 31%,
+then change only `<` to `<=`. If exactly one boundary changes, you can see how a
+type and a small expression narrow the decision.
+
 ### Notation separating statements
 
-In the current syntax, declarations and expression definitions end with `;`. `{ }` defines scope; indentation
-aligns text for human readers. Neither two-space nor four-space indentation is mandatory.
-A newline cannot replace a semicolon. Semicolons are optional in some positions,
-such as the final expression in a function body or the end of a block. Appendix A covers these separately.
+In the current syntax, declarations and expression definitions end with `;`.
+A newline does not have to guess whether a statement ended, so a long expression
+can span lines without changing meaning. `{ }` creates scope, while indentation
+helps people see the structure. Appendix A identifies the few positions, such as a
+function's final expression, where the semicolon is optional.
 
 Names start with an English letter or underscore and can have subsequent digits. They are case-sensitive,
 so `start` and `Start` differ. Do not use reserved words or the internal `__gf_` prefix as names.
@@ -191,9 +245,11 @@ Write Korean explanations in `//` comments or literate prose. Identifiers themse
 | `Percent` | `30%` | Percentage values. Literal/input range is 0–100 |
 | `Duration` | `250ms`, `2s`, `5min`, `1h` | Nonnegative time length with millisecond resolution |
 
-`Int`, `Number`, `Percent`, and `Duration` are types with different meanings. For example,
-`Percent` and `Number` cannot be compared directly. `Int` is an exact integer for quantities and counts;
-`Number` is approximate numeric data for measurements and similar uses. Exact ranges and conversions follow
+`Int`, `Number`, `Percent`, and `Duration` ask different questions even
+when their text looks similar. A `Percent` cannot be compared directly with a
+`Number`, because 30% must not quietly pretend to be a measurement whose value
+happens to be 30. Use `Int` for exact counts and repetitions and `Number` for
+approximate measurements. Exact ranges and conversions follow
 [Reference §2.1–2.3](reference/02-types-expressions-state.md#21-값-종류).
 
 Without an expected numeric type, whole-number literals are `Int`; decimal or exponent literals are `Number`.
@@ -245,8 +301,11 @@ control ThresholdControl {
 }
 ```
 
-`level` is an input supplied every tick. `threshold` is an adjustable value exposed as `config`,
-and `low` is the calculation comparing them. Changing a default in source creates a new document revision.
+`level` is an observation supplied every tick. `threshold` is exposed as
+`config` for adjustment, while `low` is this tick's calculation rather than
+stored state. Because the three have distinct names, a trace can ask whether the
+water fell, the setting changed, or the comparison changed. Changing the default
+in source creates a new document revision.
 Operational changes can be applied as typed atomic live events only for settings exposed with `access = operator`.
 The metadata contract follows [Reference §5](reference/05-settings-and-observation.md#51-config-선언).
 Reading `config threshold: Percent` yields `Result<Percent, SettingsFault>`.
@@ -260,13 +319,22 @@ This example chooses `low=false` on fault. This is not a language-wide fallback 
 | `30%` | `30%` | `false` |
 | `31%` | `30%` | `false` |
 
-Placing `low`'s definition after the output connection yields the same calculation. The compiler follows
-dependencies rather than declaration order. Cyclic `let` definitions requiring one another's results are disallowed.
+Moving `low` below the output connection produces the same calculation. The
+compiler follows dependencies instead of overwriting values from top to bottom, so
+a layout edit can remain distinct from a decision edit. A cyclic pair of `let`
+definitions is rejected because neither result provides a starting point.
 
 **Small experiment:** If `<` becomes `<=`, which single table row changes?
 
 <a id="ch03"></a>
 ## 3. What it means to remember state
+
+Current input is not enough when a pump must keep running after START is released.
+In PC-02, a held START must not restart immediately after STOP clears. These
+exercises ask both what to remember and what an event must make you forget. Hide
+the next-state column in each table and predict it first. The PC path extends that
+small memory into motors, reversal, levels, mode transfer, sequences, and fault
+recovery.
 
 ### E03 — Stop-priority self-holding
 
@@ -287,11 +355,16 @@ control LatchingPump {
 }
 ```
 
-`running` is the value remembered at tick start. `running'` is the next value calculated
-in this tick. Read the trailing apostrophe as **prime**.
+`running` is the remembered value at the start of a tick; `running'` is the next
+value calculated from the current inputs. Read the apostrophe as **prime**. The two
+names keep “running before STOP was observed” separate from “state to commit after
+STOP has been handled.”
 
-In words, the expression says “if Stop is not pressed, and Start is pressed or operation was already running,
-continue running.” If both buttons are pressed, `!stop` is false, so Stop wins.
+Read the expression aloud: “Keep running if stop is not pressed and either start
+is pressed or the system was already running.” If that sentence is not the field
+requirement, fix the requirement before rearranging parentheses. When both buttons
+are pressed, `!stop` is false, so stop wins. That simultaneous-input row turns
+the phrase “stop priority” into observable behavior.
 
 | tick | start | stop | Previous `running` | Next `running'` | pump |
 |---|---|---|---|---|---|
@@ -301,11 +374,17 @@ continue running.” If both buttons are pressed, `!stop` is false, so Stop wins
 | 4 | true | true | true | false | false |
 | 5 | false | false | false | false | false |
 
-The output reads `running'`, so it turns on in the starting tick.
-Changing to `pump <- running;` outputs the previous value, delaying by one tick in this example.
-The difference is **which point in time the referenced value belongs to**, rather than statement position.
+The output reads `running'`, so it turns on in the tick that observes START.
+Change only one line to `pump <- running;` and the old state delays it by a tick.
+Run both versions with the same inputs and find their first difference: behavior
+changed because of **which point in time the value belongs to**, not statement position.
 
 ### PC-02 — START / STOP waiting for a fresh start
+
+PC-02 through PC-10 are an optional field-problem route, not a mandatory grammar
+sequence. PC-02–03 cover restart and motor permission, PC-04–05 direction and
+position, PC-06–08 time, levels, and mode, and PC-09–10 the whole sequence and
+recovery. Each preserves the earlier example and adds one burden.
 
 Keep E03's basic self-holding unchanged. PC-02 adds `stop_ok`, `armed`, `running`, and `start_event`
 in a [separate literate original](../examples/curriculum/pc-02-start-stop.ghost.md) to express stop priority and restart inhibition.
@@ -516,6 +595,12 @@ Output-constraint blocking differs from this evaluation failure and does not can
 <a id="ch04"></a>
 ## 4. Output intent and final outputs
 
+When a screen says the pump is ON but no water moves, one Boolean cannot explain
+the situation. The code may have requested ON, a constraint may have blocked it,
+the Driver may not have applied it, or feedback may not have confirmed it. In E05,
+set `request=true` and `valve_ready=false`, then predict where requested and safe
+intent diverge. This turns “why did it not turn on?” into a question about evidence.
+
 “Final outputs” in this chapter means the runtime's **safe intent**. `<-` creates **requested intent**, which constraints restrict.
 **Applied** is evidence of a command applied by a Driver; **confirmed** is separate feedback evidence such as a limit or encoder.
 A true safe intent does not establish relay or pump operation. Read
@@ -545,9 +630,10 @@ control PumpPermission {
 | true | true | true / true | true / true |
 | true | false | true / false | false / false |
 
-In the last row, pump intent from `<-` is true, but `require` blocks it.
-`pump => valve` requires the valve to be requested too when the pump is requested.
-It turns the pump off instead of forcing the valve on to satisfy the condition.
+The last row is the reason for the example. The pump request from `<-` is true,
+but `require` makes safe intent false. `pump => valve` says the valve must
+already be requested when the pump is requested. The runtime does not secretly
+turn the valve on to satisfy the rule. The trace shows which request was abandoned.
 
 ```text
 request ─────────────→ pump intent ──┐
@@ -626,6 +712,12 @@ source, binding, admission and safe-output evidence.
 <a id="ch05"></a>
 ## 5. Separating calculations with functions
 
+Copy a latch expression into several places and eventually one copy will acquire a
+different stop priority. A function is less about saving lines than naming one
+decision so it can be reviewed once. In E07, calculate `hold` and `permitted`
+separately before composing them. Predict whether toggling `enabled` restarts the
+control without START; the answer makes the absence of hidden function state clear.
+
 ### E07 — Extracting the self-holding calculation into a function
 
 ```ghost
@@ -648,11 +740,13 @@ control FunctionLatch {
 }
 ```
 
-`fn` defines a function; `-> Bool` is its result type. The final body expression is its result,
-so no separate `return` statement is used. Write calls as `hold(start, stop, running)`.
+Parameters after `fn` gather the evidence the decision needs; `-> Bool` states
+the result promise. The final expression is the result, so there is no separate
+`return`. Reading `hold(start, stop, running)` exposes all dependencies at the call site.
 
-Both functions receive values and return calculated values. If `enabled=false`, `permitted`
-returns false, so next state is also off. While `enabled=true`, this is E03's self-holding.
+When `enabled=false`, `permitted` returns false and next state turns off.
+Turning it true again does not restart operation because remembered state is
+already false. The function calculates from arguments and hides no separate memory.
 
 Current functions receive external inputs, state, and settings as parameters instead of reading them directly.
 Needed values appear at the call site, making dependencies readable. For example, attempting to read
@@ -667,6 +761,12 @@ and then true again, will operation resume without Start? Extend E03's state tab
 
 <a id="ch06"></a>
 ## 6. Control that waits for time
+
+“Turn on after two seconds” cannot mean pausing execution for two seconds. The
+controller must still read STOP and evaluate other controls. E08 makes waiting
+visible as a `Waiting` state plus elapsed time. Predict the next state at 1999ms,
+2000ms, and 2001ms, then release START halfway through. Time flows continuously,
+but observation and transition happen at ticks.
 
 ### E08 — Turning on after an input persists for two seconds
 
@@ -695,17 +795,20 @@ control DelayedStart {
 }
 ```
 
-`type Phase = ...` defines a type of named finite states.
-`case phase` selects the expression for the current stage to calculate the next stage.
-All cases must be covered, and both `if` results must have the same type.
+`type Phase = ...` names the three situations that waiting must distinguish. A
+single Bool would hide “not started” and “waiting” inside the same off value.
+`case phase` selects one expression for the current stage. Every case must be
+covered, so adding a stage later reveals any missing decision.
 
 `delay` is `Result<Duration, SettingsFault>`. Compare time with its payload only in `ok(value)`.
 On a config fault, this example cancels the pending wait and transitions to `Idle`, keeping output intent off.
 A later valid config and `start=true` begin a new wait. `2s` is the initial `ok` payload, not an error fallback.
 This is this example's policy, not a language/Driver default or a physical fail-safe guarantee.
 
-`elapsed(phase)` is **elapsed time since phase's last committed change**.
-The timer resets to zero at the commit point of the tick changing `Idle` to `Waiting`.
+`elapsed(phase)` is **elapsed time since phase's last committed change**. Zero is
+the commit point of the tick changing `Idle` to `Waiting`. Idle time before
+START is not part of the wait, and releasing then pressing START does not splice
+the old wait onto the new one.
 Transition at the first tick where the condition is true; do not skip several stages in one tick.
 
 | Logical time | start | Stage read | age read | Next stage | motor |
@@ -743,6 +846,12 @@ The timer condition is two seconds, but observation and transition occur at tick
 <a id="ch07"></a>
 ## 7. Starting at scheduled times
 
+Watering at 06:00 and watering for five minutes both concern time, but they use
+different clocks. The first needs civil time and a time zone; the second needs
+monotonic elapsed time after an event. In E09, imagine the 06:00 event arrives and
+the wall clock then moves backward. The five-minute run should remain stable. That
+prediction explains why DST, clock gaps, provider failure, and fallback are explicit.
+
 ### E09 — Running five minutes at two times each day
 
 ```ghost
@@ -777,7 +886,11 @@ control ScheduledPulse {
 }
 ```
 
-`DailySlots<15min>` selects times on a 15-minute grid within local dates. Duplicate slots and off-grid times are rejected. `starts.due` is a schedule projection; occurrence admission and missed/unknown reasons are retained as separate observations. This schedule specifies pulse basis, a trusted clock, a 60-second observation gap, baseline recovery, and skip fallback. See [Reference §3.5–3.6](reference/03-time-and-schedules.md#36-선택된-dailyslots).
+`DailySlots<15min>` selects from a 15-minute grid in each local date, rejecting an
+off-grid value such as 06:07 instead of rounding it. `starts.due` projects whether
+an occurrence arrived on this tick; admission and missed/unknown evidence stay
+separate. Pulse basis, trusted clock, 60-second gap, recovery, and fallback are
+explicit so a later review cannot invent a perfect-clock assumption.
 
 | Event | Previous stage | Next stage | pump |
 |---|---|---|---|
@@ -803,6 +916,20 @@ Sunrise/sunset, tide predictions, calendar, and clock data depend on external pr
 
 <a id="ch08"></a>
 ## 8. Sensor values and quality
+
+Suppose moisture alternates between `29%, 31%, 29%`. A single threshold makes the
+water request alternate too. Then one `90%` appears: did the soil suddenly become
+wet, or did one reading spike? If the sensor disconnects after its last reading,
+how long should that number still be trusted?
+
+These are different questions. E10 checks measurement quality, chooses a recent
+median, separates the ON and OFF thresholds, then checks whether the user permits
+watering. Follow raw value, filtered value, decision and requested output in turn.
+The program has several parts because the questions deserve separate answers.
+
+The moisture percentages and 30%/35% thresholds are illustrative logical values,
+not universal agricultural recommendations for soils, crops or sensor calibration.
+This chapter verifies a water request; actual flow needs separate device and feedback evidence.
 
 ### Input values and measured values
 
@@ -835,19 +962,56 @@ control MoistureControl {
 }
 ```
 
-`sample` describes the desired measurement interval. This declaration does not create
-a thread directly reading a sensor; the host supplies timestamped measurements.
-`valid` is the valid range; `median(3)` filters the median of three valid measurements.
-`stale_after` defines staleness; `recover_after` defines recovery conditions.
-Consider both filter-window readiness and satisfaction of recovery conditions.
+`sample = 1s` describes the desired measurement interval. It creates neither a
+sensor-reading thread nor a fresh observation each second. The host supplies
+samples with their original timestamps and identities. `valid` defines the valid
+range. The filter accepts fresh valid samples within that range. Reading one
+sample in several ticks neither fills the window nor refreshes its timestamp.
+
+`median(3)` picks the middle of the last three valid values. Sorting
+`29%, 90%, 28%` gives `28%, 29%, 90%`, so the result is `29%`. One large value
+does not immediately mean wet soil. With only two samples, the middle is not ready:
+the initial two samples yield `NotReady`, and this example's fault branch keeps
+the water request off.
 
 `hysteresis` separates on and off thresholds. For healthy measurements, a filtered value below
 30% turns the dry state on, and above 35% turns it off. Between the thresholds,
 retain the previous decision. Exactly 30% or 35% also retains it.
 Thus, fluctuation near 30% does not invert the output each time.
 
-For example, if three values entering a ready filter are `29%, 90%, 28%`, their median is `29%`.
-With healthy quality and `enabled=true`, that value leads to a dry decision and water-supply request.
+Between `30%` and `35%`, a number does not establish a new conclusion: it keeps
+the previous one. The same `33%` can therefore keep watering after a dry reading,
+but does not start watering from the initial state. This small difference adds
+memory to a threshold comparison.
+
+Now set `enabled=true` and supply these raw samples in order, one fresh healthy
+observation each second. Cover the table and first predict which row turns the request off.
+
+| New raw sample | Median of the latest three | `dry` result | Requested `pump` |
+|---|---|---|---|
+| `31%` | Window incomplete | `fault(NotReady)` | `false` |
+| `29%` | Window incomplete | `fault(NotReady)` | `false` |
+| `90%` | `31%` | `ok(false)` | `false` |
+| `28%` | `29%` | `ok(true)` | `true` |
+| `30%` | `30%` | `ok(true)` | `true` |
+| `34%` | `30%` | `ok(true)` | `true` |
+| `36%` | `34%` | `ok(true)` | `true` |
+| `38%` | `36%` | `ok(false)` | `false` |
+
+The request is still on when the raw value reaches `36%`: the filtered value is
+`34%`. After `38%` arrives, the window `34%, 36%, 38%` has median `36%`, above
+35%, and turns the decision off. Comparing only raw value and output can look
+surprising; following the intermediate values explains it.
+
+Next stop supplying new samples. When age from the last sample's original timestamp
+reaches exactly 3 seconds, the result is `Stale`. Compare 2999ms and 3000ms.
+Reevaluation or retransmitting the same sample does not extend that deadline.
+
+A fault is not a normal moisture value. It clears the filter window and resets
+hysteresis to `initial: false`. When healthy samples resume, `recover_after = 1 samples`
+does not by itself allow immediate recovery: this filter also needs **three fresh
+valid samples**. If the recovered median is `33%`, the old `true` decision does
+not return; the initial `false` decision remains.
 
 `ok(value)` names a healthy result. `_` in `fault(_)` means the specific error value
 is unused in this calculation. Even if `false` is chosen as the fallback value, original quality information
@@ -882,11 +1046,30 @@ Compare the installed sensor's healthy value in `WithMoisture`; request false on
 When uninstalled, `Baseline` requests false. `?` alone does not generate a fallback strategy.
 Detailed rules follow [Reference §4.5–4.6](reference/04-sensors-constraints-control.md#45-선택-sensor와-capability).
 
-**Small experiment:** What happens if E10's on/off thresholds are identical?
-For evaluation, should the chart show raw measurements or filtered results?
+E14 distinguishes an absent sensor from a fault in an installed sensor. With no
+sensor installed it selects `Baseline`; with an installed sensor whose value is
+unavailable it follows the fault branch inside `WithMoisture`. Both requests are
+false, but their evidence differs. Equal output does not mean equal reasoning.
+
+**Change one thing:** While E10 produces `ok(true)`, turn only `enabled` off.
+The decision remains; the pump request stops. Enabling it again restores the
+request only while quality remains healthy. Separating decision and permission
+avoids inventing a new sensor state for a user operation.
+
+Also predict what happens when both thresholds are made equal. Current
+`hysteresis` requires `on_below < off_above`, so this edit should produce a
+diagnostic rather than a healthy execution. Show raw and filtered values together,
+and inspect quality and request separately. E10 has no `require` or `mutex`, so
+safe equals requested here; that equality does not confirm physical pumping.
 
 <a id="ch09"></a>
 ## 9. Reading expressions precisely
+
+The shorter an expression looks, the more readily we import rules from another
+language. This chapter uses small counterexamples instead of a grammar recital.
+Choose one normal value and one fault for division, conditionals, and `case`, then
+predict the result. E11's canonical notation makes the same shape carry the same
+meaning in reviews and searches.
 
 ### E12 — Numbers and operators
 
@@ -951,9 +1134,10 @@ control SafeDivision {
 }
 ```
 
-With `a=6, b=2`, select `3`; with `a=6, b=0`, select `0`.
-For zero, `0` is the fallback result chosen by this program. In domains that do not need
-such a choice, exposing the error may be more appropriate.
+With `a=6, b=2`, the result is `3`; with `a=6, b=0`, it is `0`. The useful
+discovery is that division is never evaluated on the zero branch. Still, `0` is
+this program's policy, not the language's universal answer. A domain that must
+distinguish zero from fault should preserve the error instead.
 
 ### E11 — Using only canonical notation
 
@@ -962,8 +1146,14 @@ New programs use `fn`, `type Mode = Off | On;`, `running' = ...;`, and `if c the
 <a id="ch10"></a>
 ## 10. Stopping, changing, and comparing
 
-An important experiment for understanding GhostFlow is running two code versions with identical inputs.
-Use E03's stop-priority self-holding as the baseline.
+The anxious question after changing control code is whether only the intended
+behavior changed. Answer it by feeding two revisions the same inputs and logical
+times. The first differing tick shows how one expression propagates into state,
+intent, and constraints. This comparison habit becomes the basis for understanding
+import replacement and replay.
+
+The two expressions below look similar enough to pass as a parenthesis cleanup.
+Place both against the same recording, using E03's stop-priority latch as the baseline.
 
 ```text
 Original A: running' = !stop && (start || running);
@@ -993,9 +1183,11 @@ Starting the book's first experiment with replay from initial state makes compar
 
 ### Which values should appear beside source?
 
-In the editing experience we are building together, place `start`, previous `running`, and next `running'`
-for the selected tick beside source. Selecting `pump` traces the conditions from which its value flowed.
-If a constraint changed an output, show both candidate and final values.
+When reviewing a trace or designing an observation view, compare the selected
+tick's `start`, previous `running`, and next `running'` with source. Follow the
+conditions that contribute to `pump`, and compare candidate and final values when
+a constraint changes an output. This is observation and UI design guidance, not
+a claim that the current reader provides source-selection or dependency-tracing UI.
 
 The observation screen needs to answer four questions.
 
@@ -1009,18 +1201,30 @@ Observable values and evidence kinds follow [Reference §5](reference/05-setting
 <a id="ch11"></a>
 ## 11. Files and literate programs
 
+Months after a fault, the reason for a condition matters as much as the condition
+itself. E15 keeps that reasoning beside executable source instead of squeezing it
+into leftover comments. Changing prose changes the document revision, while only
+the `ghost` blocks carry execution meaning. Save and check the `.ghost.md`
+document itself rather than copying its blocks into a second source.
+
 ### One file and one control
 
-The execution root is one `control`. Declare reuse across files with document-scope `import`
-pinning complete `.ghost.md` definition revisions and digests.
-Compose imported controls with `instance` and `connect`. Wildcard imports and a second
-root control are disallowed. Detailed syntax follows [Reference §6](reference/06-composition-and-replay.md#64-import와-연결의-문법).
+An executable document has one root `control`, so no filename or deployment
+convention must guess which control starts. Reuse pins the revision and digest of
+a complete `.ghost.md` definition with document-scope `import`, then composes
+it with `instance` and `connect`. Rejecting wildcard imports and a second root
+keeps reviewed identity aligned with executable structure.
 
 The single-root rule provides the skeleton of an executable definition. It prevents an ambiguous root when composing several imported definitions as instances.
 
 ### E15 — Writing explanation and code in the same document
 
 Consider saving the following entire content as `follow-switch.ghost.md`.
+The quoted canonical document retains its Korean prose and exact source identity.
+Its heading means “Output following input”; the first paragraph says “Declare the
+switch and LED values,” and the paragraph between code blocks says “The output
+follows the switch value on every tick.” This English reading projection translates
+the explanation without creating a second independently editable canonical source.
 
 ````markdown
 # 입력을 따라가는 출력
@@ -1051,10 +1255,16 @@ Exact extraction rules are in [Reference §1.1](reference/01-source-and-syntax.m
 
 ### Files and program composition
 
-File placement does not replace import relationships. `import` specifies immutable source identity; `instance` and `connect` connect typed logical ports. Review changed originals as new revisions. Imports, instances, bindings, and provenance follow [Reference §6.2–6.7](reference/06-composition-and-replay.md).
+Files do not become related merely by sharing a directory. `import` names immutable
+source identity; `instance` and `connect` expose typed logical ports. When the
+original changes, review a new revision instead of silently picking it up. That is
+the minimum needed to reproduce the claim that today's composition uses yesterday's
+reviewed component.
 
 Distinguish compiler contract checking of pinned imports, instances, and ports from runtime execution.
-Composition runtime activation is not a completed feature. For a single-control exercise, save the entire document as in E15,
+The fixed source closures of E22 and E31 are also verified through browser Worker/WASM
+execution. That evidence does not cover arbitrary compositions or installation profiles.
+For a single-control exercise, save the entire document as in E15,
 then check and compile it from the language repository root:
 
 ```sh
@@ -1068,7 +1278,17 @@ Do not compile this whole book as one executable document.
 <a id="ch12"></a>
 ## 12. One device, multiple controls
 
-Each definition has one control root. Program reuse is expressed by creating instances of imported controls and connecting logical ports. Sharing a physical resource requires explicit identity and resource contracts. Distinguish control output intent from physical confirmation of final device effects.
+Watering and ventilation may each work alone yet conflict over one pump or power
+budget. This chapter pins imported revisions and exposes relationships through
+instances and typed ports instead of copying files together. Before replacement,
+write down which ports and resource contracts must remain stable. Composition pays
+off when it lets you prove what changed and what stayed the same.
+
+Each definition has one root. A composition creates instances of imported controls
+and connects logical ports, leaving a type and origin to inspect at every arrow.
+If two instances want one physical resource, connections alone cannot resolve it:
+resource identity and contracts must be explicit, while output intent remains
+distinct from physical confirmation.
 
 ```text
 definition revision → import → instance + typed connect
@@ -1080,10 +1300,20 @@ Use `adapt`, capability checks, common constraints, shared resources, replay, an
 <a id="ch13"></a>
 ## 13. Built-in functions and operations
 
+This is the chapter where a familiar function name is most dangerous. First mark
+whether the return type is a `Result`, whether the operation remembers samples,
+and whether it needs an external clock or natural-event provider. A call may be a
+value calculation, stateful signal, schedule descriptor, or host policy; each has
+different observable evidence. Treat the catalog below as a map for repeating
+those questions, not as a list of names to memorize.
+
 A builtin is an operation the compiler already knows. A `fn` is a calculation you declare, such as E07's function. A familiar name does not make a function builtin: there are no general `abs`, `min`, `max`, `clamp`, `sqrt`, `pow` or `round` expression functions. Declare a suitable `fn` when the language permits its calculation.
 
-This chapter audits dev revision `c1bbbe35cbe5acf16118707f8afc14619153d918` for [#369](https://github.com/callin2/ghostflow-language/issues/369).
-It covers all **48 primary callable spellings** and **3 additional host-policy spellings**. The tables distinguish ordinary calls, declaration constructors and restricted transforms. Signatures below are fragments; the linked tests contain complete examples. They are not extra independent source documents.
+Read the call names and signatures in this chapter against the current Language
+Reference and compiler registry. It covers all **48 primary callable spellings**
+and **3 additional host-policy spellings**. The tables distinguish ordinary calls,
+declaration constructors and restricted transforms. Signatures below are fragments;
+the linked tests contain complete examples. They are not extra independent source documents.
 
 First ask where the operation is permitted. Then inspect its input and result types. Finally ask whether it remembers samples or state, requires a clock/provider, or returns a fault. A successful compile can produce a checked descriptor rather than executable control. Even executable control needs the stated runtime inputs and bindings. None of these operations proves physical output effect.
 
@@ -1277,14 +1507,34 @@ The following are useful alongside builtins, but are **not callable functions**.
 | PID checkpoint; degraded Name | Selected design alternatives unsupported by current native PID fault/restart policies. |
 | ifthenelse, purefn, enum, next | Removed aliases. Use canonical if ... then ... else, fn, type and primed state. |
 
-Do not infer support from a name appearing in a diagnostic or design example. Check the compiler path and artifact kind. [Chapter coverage check](../tests/programming-builtins.test.mjs) keeps both languages aligned with the compiler's callable dispatch and verifies documented entries have signatures, context and example links.
+A name in a diagnostic is not evidence of support. That is why the table separates
+design alternatives from current calls. Check the compiler path and artifact kind.
+The [chapter coverage check](../tests/programming-builtins.test.mjs) aligns both
+languages with callable dispatch; it does not establish physical usefulness.
 
 <a id="ch14"></a>
 ## 14. Temperature units and air-VPD control
 
+25°C and 77°F describe the same air with different numbers. The same number 25
+with a different unit can describe a completely different condition. Feed the
+same physical temperature to E16–E18 and predict equal heater decisions. In the
+VPD examples, change only temperature or humidity and observe which demand changes
+first. Separating conversion from policy lets you resolve calculation errors and
+policy disagreements in different places.
+
 ### One physical temperature, three source units
 
-A Temperature sensor retains its physical type. Celsius, Fahrenheit and Kelvin are source/display units; the runtime uses canonical kelvin. These three independent heater examples express the same rule: below 18°C turn demand ON; above 22°C turn it OFF. Equality at either threshold and the closed band preserve the previous good decision. Faults inhibit the heater and reset retained hysteresis to initial false; one new good sample is required for these median(1) examples. Before the first sample, the sensor is NotReady. The last good sample can remain usable between deliveries until its age >= 3s, when it becomes Stale.
+A Temperature sensor retains its physical type across Celsius, Fahrenheit, and
+Kelvin source/display units; runtime representation is canonical kelvin. The three
+heater examples express one physical rule: below 18°C request ON, above 22°C
+request OFF, and at either boundary or inside the band retain the previous good
+decision. Reading the table across checks that conversion preserves the boundary.
+
+Quality travels with the calculation. Before the first sample the sensor is
+NotReady. The last good sample remains usable between deliveries until age >= 3s,
+when it becomes Stale. A fault inhibits demand and resets hysteresis to initial
+false; these median(1) examples recover after one new good sample. “A number was
+seen before” and “the number is trustworthy now” are different claims.
 
 | Physical boundary | Celsius | Fahrenheit | Kelvin |
 |---|---|---|---|
@@ -1600,6 +1850,12 @@ For the heater, observe 18 → 17 → 18 → 22 → 23°C, then a sensor fault a
 <a id="ch15"></a>
 ## 15. Named physical quantities and units
 
+A numeric result is not necessarily a meaningful result. Flow multiplied by time
+can produce volume; adding voltage to flow is a broken question even though both
+operands contain numbers. In E33, predict that conversions within one quantity
+succeed while mixed quantities are diagnosed. A compiler rejection here is a
+field misunderstanding found before execution.
+
 Chapter 6 covers `Duration`; Chapter 7 covers dates and times. This chapter focuses on the
 17 named physical quantities whose units change how a measurement is understood. Keeping
 their types instead of converting them to untyped `Number` lets the compiler catch
@@ -1733,14 +1989,19 @@ control PhysicalQuantityUnits {
 ```
 
 `pressure > vpd`, `irradiance > ppfd`, `humidity > 70%`, `air + air`, and
-`flow + tank_volume` are rejected because their types differ or the operation is undefined.
-When a sensor unit changes, check that it remains an accepted unit of the same quantity.
-When it changes to another quantity, such as a light conversion, verify the conversion's
-source and accuracy separately. These examples explain type rules; they do not replace
-sensor calibration or equipment operating limits.
+`flow + tank_volume` are rejected because their types differ or the operation is
+undefined. Before silencing the diagnostic with a conversion, ask whether the
+physical question makes sense. Display units of one quantity can use an allowed
+conversion; a different quantity, such as a light conversion, needs separately
+verified provenance and accuracy. Type checks do not replace calibration or
+equipment limits, but they make the questions for those checks precise.
 
 <a id="appendix-a"></a>
 ## Appendix A. Specification guide
+
+Use this appendix after the main text gives you a concept and you need its exact
+boundary. There is no need to memorize it front to back. Let it route a declaration
+to its Reference rule, rationale, and diagnostics.
 
 This table guides you from learning chapters to normative syntax. It does not replace the full grammar or an implementation support list.
 
@@ -1758,6 +2019,11 @@ This table guides you from learning chapters to normative syntax. It does not re
 
 <a id="appendix-b"></a>
 ## Appendix B. Learning through errors
+
+A useful diagnostic says which promise was broken, not merely that something is
+wrong. E90–E102 are experiments whose expected outcome is failure. Predict the
+diagnostic location and reason, and leave only one error at a time so the language
+boundary remains visible.
 
 These short error examples exercise Reference rules. Read each independently.
 `ghost-error` is a presentation tag marking error examples in this guide. Actual `.ghost.md`
@@ -1863,14 +2129,33 @@ Do not directly compare a sensor as if it were its payload. Use `case` or an exp
 <a id="appendix-c"></a>
 ## Appendix C. Document maintenance rules
 
-When a learning scenario requests a time-varying environment, its default source must exercise the relevant ON/OFF decisions over time. Keep independent transition checkpoints in the existing book simulation test; constant valid inputs alone cannot verify that intent. Daily-profile checks complement the existing fault and strict-boundary scans.
+The examples are teaching fragments and checked contracts at the same time.
+Preserving anchors, example IDs, canonical fences, and translation correspondence
+keeps the reader and regression tests pointed at the same source. Keep source
+distinct from projections so new prose does not create a second executable origin.
+
+A time-varying teaching example cannot prove its intent with one constant valid
+input. Keep independent checkpoints before ON, at the ON boundary, through the
+retained band, and at OFF. A daily trace complements fault and strict-boundary
+scans rather than replacing them.
 
 The Language Reference is normative. For conflicts or missing examples found in this guide, check the relevant Reference section before correcting them. Syntax/semantic changes update Reference syntax, rules, reasons, and examples, then synchronize this guide's learning path and code. Link implementation boundaries needed for learning to evidence documents; maintain changing progress, test counts, artifact hashes, and supported-board lists there. Reuse `tests/docs-runnable-examples.test.mjs` for compiler checks. After book changes, run `npm run generate:pc01` to refresh derived provenance; preserve historical replay and benchmark evidence.
 
 <a id="appendix-d"></a>
 ## Appendix D. Examples by audience
 
-These ten articles show how people with different jobs can approach the same control language. Each example is a standalone, executable `ghost` fence that you can run in PIG and explore with different input sequences. The results show logical control only. Boards, drivers, wiring, and field checks remain responsible for actual contacts, valves, and motors.
+A PLC developer may enter through interlocks, a web developer through observation,
+and a firmware developer through the binding boundary. E23–E32 offer those
+different entrances and return to the same requested/safe/applied/confirmed model.
+Start with the role nearest yours, then reread the same trace using another role's
+question.
+
+These ten programs show the questions different jobs bring to one trace. Pick one
+and change its input order: a PLC developer may seek the first blocking condition,
+a web developer the evidence to display, and a firmware developer the boundary
+between a logical value and a pin. Each is independent and executable. Its result
+is logical evidence; boards, Drivers, wiring, and field checks remain responsible
+for contacts, valves, and motors.
 
 ### E23 — PLC developers: trace a fault from its cause to the output
 
@@ -2107,11 +2392,25 @@ control OwnedWateringRule {
 }
 ```
 
-The shared GhostFlow promise is larger than moving a device. It keeps the reasoning from input and rule through output intent in the source so another person can review and continue the work.
+You do not need to read all ten examples. Follow one from input to output intent,
+then find the same evidence distinction in another role's example. GhostFlow's
+promise is less the declaration that a device moved than the reason another person
+can review and continue the decision.
 
 ## Exact counts and natural time: executable R14–R17 examples
 
-This section explains R14–R17 from [#30](https://github.com/callin2/ghostflow-language/issues/30) through independent programs supported today. [Reference 02](reference/02-types-expressions-state.en.md) and [Reference 03](reference/03-time-and-schedules.en.md) define the rules. Provisional wording in historical review plans does not replace adopted rules. The following tracks decisions and work already adopted; it does not ask readers to select those policies again.
+The final advanced group covers boundaries that cannot be rounded into “close
+enough.” Scan counts need exact `Int`, absolute time needs offset-bearing
+`DateTime`, and sunrise or tide needs provider evidence plus fallback. E34–E37
+currently run in a separate host profile, so their absence from the browser cabinet
+does not mean the language lacks them. Fix the input evidence and compare just
+before, exactly at, and just after each boundary.
+
+The four examples ask one question in different forms: what exact evidence lets us
+say a boundary was crossed? E34 uses scan count, E35 a UTC instant, E36 a sunrise
+occurrence, and E37 a tide occurrence. [Reference 02](reference/02-types-expressions-state.en.md)
+and [Reference 03](reference/03-time-and-schedules.en.md) define the rules; the
+table routes each decision to reproducible execution evidence.
 
 | Item | Adopted decision and work | Execution evidence |
 |---|---|---|
