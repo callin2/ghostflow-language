@@ -5,7 +5,9 @@
 //! explicit test-host Station tape exercises its admission/lifecycle owner.
 //! This is neither production control admission nor physical receipt validation.
 use ghostflow_core::{
-    accounting::{AccountingConfig, AccountingLedger, LedgerRead},
+    accounting::{
+        AccountingConfig, AccountingError, AccountingLedger, AdmissionResult, LedgerRead,
+    },
     station::{
         CapacityObservation, DurableAck, EnterRequest, FinishOutcome, Mode, OutputState,
         StartRequest, Station, StationConfig, StationError, StopProof, StopRequest,
@@ -118,6 +120,114 @@ fn station_observations(tape: &Value) -> Result<Value, Box<dyn Error>> {
     observations.push(observe(&station, "durable-finish", false));
     Ok(json!(observations))
 }
+// One fixed test-host joins the existing owners; no production admission or
+// boot-clock bridge is claimed. Timestamps share a caller-trusted timeline.
+fn restart_observations(
+    ledger: &mut AccountingLedger,
+    config: AccountingConfig,
+    resource: u32,
+    window: u64,
+    tape: &Value,
+) -> Result<Value, Box<dyn Error>> {
+    let bound = &tape["stationConfig"];
+    let station_config = StationConfig {
+        valve_count: u8::try_from(number(&bound["valveCount"])?)?,
+        max_open_valves: u8::try_from(number(&bound["maxOpenValves"])?)?,
+        daily_quota_ms: number(&bound["dailyQuotaMs"])?,
+        max_start_budget_ms: number(&bound["maxStartBudgetMs"])?,
+        ..StationConfig::default()
+    };
+    let limit = number(&tape["limitMs"])?;
+    let reserve = number(&tape["reserveMs"])?;
+    let mut station = Station::new(station_config.clone())?;
+    station.synchronize_day(100, 0, 100_000, true)?;
+    station.enter(EnterRequest {
+        request_id: 1,
+        claim: station.claim(),
+        mode: Mode::Auto,
+    })?;
+    let request = |station: &Station, request_id, occurrence, now_ms| StartRequest {
+        request_id,
+        claim: station.claim(),
+        session_id: 77,
+        owner_id: 88,
+        mode: Mode::Auto,
+        valves: 1,
+        budget_ms: 100,
+        occurrence_id: Some(occurrence),
+        capacity: CapacityObservation::default(),
+        now_ms,
+    };
+    let start = station.prepare_start(request(&station, 2, 501, 10))?;
+    station.commit_start(DurableAck::new(start.token()))?;
+    let on = OutputState {
+        pump_on: true,
+        valves: 1,
+    };
+    station.authorize_output(77, on, 10)?;
+    station.report_applied(77, on, 10)?;
+    station.authorize_output(77, OutputState::SAFE, 40)?;
+    station.report_applied(77, OutputState::SAFE, 40)?;
+    let finish = station.prepare_finish(77, FinishOutcome::Completed, 40)?;
+    station.commit_finish(DurableAck::new(finish.token()))?;
+    let mut observations = Vec::new();
+    for phase in ["beforeRestart", "afterRestart", "afterWindowExpiry"] {
+        let now = if phase == "afterWindowExpiry" {
+            60_040
+        } else {
+            50
+        };
+        if phase == "afterRestart" {
+            station.request_stop(StopRequest {
+                request_id: 3,
+                claim: station.claim(),
+            })?;
+            station.confirm_stopped(StopProof::Commanded, 50)?;
+            let station_bytes = station.snapshot_bytes()?;
+            let ledger_bytes = ledger.snapshot_bytes()?;
+            station = Station::restore(station_config.clone(), &station_bytes)?;
+            *ledger = AccountingLedger::restore(config, &ledger_bytes)?;
+            station.synchronize_day(100, 50, 100_000, true)?;
+            station.enter(EnterRequest {
+                request_id: 4,
+                claim: station.claim(),
+                mode: Mode::Auto,
+            })?;
+        }
+        if station.prepare_start(request(&station, 5, 501, now)).err()
+            != Some(StationError::DuplicateOccurrence)
+        {
+            return Err("once ledger reset or duplicate occurrence admitted".into());
+        }
+        // Independent positive day/once admission, aborted before any grant:
+        // rolling rejection cannot be explained by a duplicate or exhausted day.
+        let prepared = station.prepare_start(request(&station, 6, 502, now))?;
+        station.abort_prepared(prepared.token())?;
+        let mut reservation = [0u8; 16];
+        reservation[0] = if now == 50 { 20 } else { 21 };
+        let rolling: String =
+            match ledger.reserve_rolling(reservation, resource, now, window, limit, reserve) {
+                Ok(AdmissionResult::Reserved) => "Inserted".into(),
+                Ok(AdmissionResult::Duplicate) => "Duplicate".into(),
+                Err(AccountingError::LimitExceeded) => "Rejected".into(),
+                Err(error) => return Err(error.into()),
+            };
+        let used = match ledger.used_rolling(resource, now, window) {
+            LedgerRead::Known(v) => v,
+            _ => return Err("unknown rolling history".into()),
+        };
+        let day = match ledger.used_local_day(resource, 100) {
+            LedgerRead::Known(v) => v,
+            _ => return Err("unknown day history".into()),
+        };
+        observations.push(
+            json!({"phase":phase,"nowMs":now,"duplicate":"DuplicateOccurrence",
+            "freshDayAdmission":true,"stationDayUsedMs":station.daily_used_ms(),"dayUsedMs":day,
+            "rollingUsedMs":used,"rollingAdmission":rolling}),
+        );
+    }
+    Ok(json!(observations))
+}
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<_> = env::args().skip(1).collect();
     if args.len() != 2 {
@@ -216,6 +326,27 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut result = json!({"moduleFingerprint":fingerprint,"account":account,"target":target,"stage":"applied","resourceId":resource,"observations":observations});
     if !tape["station"].is_null() {
         result["stationObservations"] = station_observations(&tape["station"])?;
+    }
+    if !tape["restart"].is_null() {
+        let limits = tape["manifest"]["accounting"]["constraints"]
+            .as_array()
+            .ok_or("missing source constraint")?;
+        let selected = limits
+            .iter()
+            .filter_map(|group| group["limits"].as_array())
+            .flatten()
+            .find(|limit| {
+                limit["account"].as_str() == Some(account) && limit["basis"]["kind"] == "rolling"
+            })
+            .ok_or("missing source rolling constraint")?;
+        if selected["basis"]["durationMs"] != tape["windowMs"]
+            || selected["boundMs"] != tape["restart"]["limitMs"]
+            || selected["reserveMs"] != tape["restart"]["reserveMs"]
+        {
+            return Err("source rolling constraint mismatch".into());
+        }
+        result["restartObservations"] =
+            restart_observations(&mut ledger, config, resource, window, &tape["restart"])?;
     }
     println!("{result}");
     Ok(())

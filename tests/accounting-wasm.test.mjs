@@ -249,6 +249,110 @@ test('REF-04-046: checked source native/WASM ledgers merge applied overlap while
   }), /applied|unsupported accounting stage/);
 });
 
+test('REF-04-056: checked source native/WASM once, day and rolling histories survive fresh-owner restart independently', async t => {
+  const original = JSON.parse(readFileSync(resolve(root, 'tests/reference/cases/02-time-control.json'), 'utf8'))
+    .cases.find(entry => entry.id === 'REF-04-056');
+  assert.equal(original.issue, 'https://github.com/callin2/ghostflow-language/issues/254');
+  assert.equal(original.status, 'specified'); assert.equal(original.scope, 'runtime');
+  const source = '# Durable independent histories\n\n```ghost\ncontrol RestartHistory {\n'
+    + 'resource pump: BoolActuator;\naccount applied = on_time(pump, stage: applied, persistence: durable);\n'
+    + 'constraints Duty { limit used(applied, rolling(60s)) <= 30ms { reserve = 1ms; on_unknown = block; } }\n'
+    + 'output ready: Bool; ready <- false;\n}\n```\n';
+  const filename = 'restart-history.ghost.md';
+  const artifact = await compileSource(source, { filename });
+  verifyArtifactSourceMap({ format: 'GhostFlow/source-map-v1', bytecodeSha256: artifact.manifest.bytecodeSha256,
+    sourceDocument: artifact.sourceDocument, nodes: artifact.sourceMap, lines: artifact.extractionMap,
+    traceMetadata: artifact.traceMetadata, interactionSchema: null, interactionSourceIdentity: null }, artifact.bytes,
+  { manifest: artifact.manifest });
+  const binding = artifact.manifest.accounting.bindings[0];
+  const limit = artifact.manifest.accounting.constraints[0].limits[0];
+  assert.deepEqual(binding.evidenceBinding, { kind: 'applied_interval', target: 'pump', stage: 'applied', identity: 'receipt_id' });
+  const ledgerConfig = { maxIntervals: 256, maxEvents: 8, maxReservations: 8, maxRollingWindowMs: 60_000n };
+  const stationConfig = { valveCount: 4, maxOpenValves: 2, dailyQuotaMs: 1000, maxStartBudgetMs: 800 };
+  const persist = async bytes => { assert(bytes.length > 0); return true; }; // Test-owned durable ACK.
+  let ledger = await AccountingRuntime.instantiateSource(wasmBytes, source, { filename, account: 'applied', resourceId: 7, config: ledgerConfig });
+  let station = await GhostFlowStation.instantiate(wasmBytes, stationConfig);
+  t.after(() => { ledger.dispose(); station.dispose(); });
+  assert.equal(ledger.source.sha256, artifact.sourceDocument.sha256);
+  assert.equal(ledger.source.artifactSha256, artifact.manifest.bytecodeSha256);
+  let durableLedger;
+  const persistLedger = async bytes => { durableLedger = bytes.slice(); return persist(bytes); };
+  await ledger.initializeEmpty(persistLedger); // First boot only; never used during recovery.
+  const receiptId = new Uint8Array(16); receiptId[0] = 1;
+  await ledger.recordAppliedSegment({ receiptId, resourceId: 7, startMs: 10n, endMs: 40n, localDay: 100 }, persistLedger);
+  station.synchronizeDay({ day: 100, nowMs: 0n, nextDayDeadlineMs: 100_000n, trusted: true });
+  station.enter({ requestId: 1n, ...station.claim, mode: 'Auto' });
+  const request = (requestId, occurrenceId, nowMs) => ({ requestId, ...station.claim, sessionId: 77n, ownerId: 88n,
+    mode: 'Auto', valves: 1n, budgetMs: 100n, occurrenceId, nowMs });
+  await station.start(request(2n, 501n, 10n), persist);
+  for (const [pumpOn, valves, nowMs] of [[true, 1n, 10n], [false, 0n, 40n]]) {
+    station.authorizeOutput({ sessionId: 77n, pumpOn, valves, nowMs });
+    station.reportApplied({ sessionId: 77n, pumpOn, valves, nowMs }); // Applied fixture, no physical proof.
+  }
+  const finish = station.prepareFinish({ sessionId: 77n, outcome: 'Completed', nowMs: 40n });
+  await persist(finish.bytes); station.commitFinish(finish.token);
+  const observations = [];
+  for (const phase of ['beforeRestart', 'afterRestart', 'afterWindowExpiry']) {
+    const nowMs = phase === 'afterWindowExpiry' ? 60_040n : 50n;
+    if (phase === 'afterRestart') {
+      station.requestStop({ requestId: 3n, ...station.claim }); station.confirmStopped({ nowMs: 50n });
+      const stationBytes = station.snapshot(), ledgerBytes = durableLedger.slice();
+      await persist(stationBytes); await persist(ledgerBytes);
+      const previousStation = station, previousLedger = ledger;
+      station = await GhostFlowStation.instantiate(wasmBytes, stationConfig);
+      ledger = await AccountingRuntime.instantiateSource(wasmBytes, source, { filename, account: 'applied', resourceId: 7, config: ledgerConfig });
+      assert.notEqual(station.wasm, previousStation.wasm); assert.notEqual(ledger.wasm, previousLedger.wasm);
+      // Empty recovery owners are not accepted as historical truth.
+      assert.equal(ledger.usedRolling(7, 50n, BigInt(limit.basis.durationMs)), null);
+      station.restore(stationBytes); ledger.restore(ledgerBytes);
+      previousStation.dispose(); previousLedger.dispose();
+      // The test host supplies comparable trusted timestamps across boots. It
+      // does not implement Device boot-clock mapping or certify real storage.
+      station.synchronizeDay({ day: 100, nowMs: 50n, nextDayDeadlineMs: 100_000n, trusted: true });
+      station.enter({ requestId: 4n, ...station.claim, mode: 'Auto' });
+    }
+    assert.throws(() => station.prepareStart(request(5n, 501n, nowMs)), /occurrence id was already accepted/);
+    assert.equal(station.dailyUsedMs, 30n);
+    assert(station.dailyUsedMs + 100n < BigInt(stationConfig.dailyQuotaMs), 'day budget admits the new finite job');
+    const prepared = station.prepareStart(request(6n, 502n, nowMs)); station.abortPrepared(prepared.token);
+    const reservationId = new Uint8Array(16); reservationId[0] = nowMs === 50n ? 20 : 21;
+    const admission = await ledger.reserveRolling({ reservationId, resourceId: 7, admittedAtMs: nowMs,
+      windowMs: BigInt(limit.basis.durationMs), limitMs: BigInt(limit.boundMs), reserveMs: BigInt(limit.reserveMs) }, persistLedger);
+    observations.push({ phase, nowMs: Number(nowMs), duplicate: 'DuplicateOccurrence', freshDayAdmission: true,
+      stationDayUsedMs: Number(station.dailyUsedMs), dayUsedMs: Number(ledger.usedLocalDay(7, 100)),
+      rollingUsedMs: Number(ledger.usedRolling(7, nowMs, BigInt(limit.basis.durationMs))), rollingAdmission: admission });
+  }
+  assert.deepEqual(observations, [
+    { phase: 'beforeRestart', nowMs: 50, duplicate: 'DuplicateOccurrence', freshDayAdmission: true, stationDayUsedMs: 30, dayUsedMs: 30, rollingUsedMs: 30, rollingAdmission: 'Rejected' },
+    { phase: 'afterRestart', nowMs: 50, duplicate: 'DuplicateOccurrence', freshDayAdmission: true, stationDayUsedMs: 30, dayUsedMs: 30, rollingUsedMs: 30, rollingAdmission: 'Rejected' },
+    { phase: 'afterWindowExpiry', nowMs: 60040, duplicate: 'DuplicateOccurrence', freshDayAdmission: true, stationDayUsedMs: 30, dayUsedMs: 30, rollingUsedMs: 0, rollingAdmission: 'Inserted' },
+  ]);
+  execFileSync('cargo', ['build', '--locked', '--offline', '--release', '-p', 'ghostflow-core', '--example', 'accounting_tape'], { cwd: root, stdio: 'inherit' });
+  const directory = mkdtempSync(join(tmpdir(), 'reference-ledger-restart-')); t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const modulePath = join(directory, 'module.gfb'), tapePath = join(directory, 'tape.json'); writeFileSync(modulePath, artifact.bytes);
+  const tape = { moduleFingerprint: artifact.traceMetadata.moduleFingerprint, manifest: artifact.manifest,
+    account: 'applied', target: 'pump', resourceId: 7, windowMs: limit.basis.durationMs,
+    frames: [{ nowMs: 40, segments: [{ receiptId: 1, resourceId: 7, startMs: 10, endMs: 40 }], query: true }],
+    restart: { limitMs: limit.boundMs, reserveMs: limit.reserveMs, stationConfig } };
+  const runNative = request => {
+    writeFileSync(tapePath, JSON.stringify(request));
+    return JSON.parse(execFileSync(resolve(root, 'target/release/examples/accounting_tape' + (process.platform === 'win32' ? '.exe' : '')),
+      [modulePath, tapePath], { encoding: 'utf8', stdio: 'pipe', timeout: 10_000 }));
+  };
+  assert.deepEqual(runNative(tape).restartObservations, observations);
+  for (const [mutate, reason] of [
+    [request => { request.account = 'missing'; }, /unknown source account/],
+    [request => { request.target = 'wrong'; }, /source target mismatch/],
+    [request => { request.moduleFingerprint = '0'.repeat(16); }, /compiled module identity mismatch/],
+    [request => { request.frames[0].segments[0].resourceId = 8; }, /wrong bound resource ID/],
+    [request => { request.restart.limitMs = 31; }, /source rolling constraint mismatch/],
+    [request => { request.windowMs = 59_000; }, /source rolling constraint mismatch/],
+    [request => { request.restart.stationConfig.dailyQuotaMs = 20; }, /QuotaExceeded/],
+  ]) { const invalid = structuredClone(tape); mutate(invalid); assert.throws(() => runNative(invalid), reason); }
+  await assert.rejects(AccountingRuntime.instantiateSource(wasmBytes, source, { filename, account: 'missing', resourceId: 7, config: ledgerConfig }), /source has no accounting account missing/);
+  t.diagnostic(JSON.stringify({ sourceSha256: artifact.sourceDocument.sha256, artifactSha256: artifact.manifest.bytecodeSha256, observations }));
+});
+
 test('WASM accounting stays Unknown until exact snapshot revision is persisted', async () => {
   const runtime = await AccountingRuntime.instantiate(wasmBytes, config);
   let durableSnapshot;
