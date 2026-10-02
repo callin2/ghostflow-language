@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### 2026-10-02 — diagnose transitive import cycles at the closing edge ([#298](https://github.com/callin2/ghostflow-language/issues/298))
+
+The compiler now reports an executable import cycle at its authored back edge
+before checking that edge's revision/digest. Previously a circular digest
+mismatch masked the structural cycle. For example, pinned `root -> A -> B -> A`
+rejects as a cycle at B's import of A. Non-cyclic imports still require every
+exact immutable revision and UTF-8 source digest; no resolver, fallback or
+artifact format changes. Canonical two-dependency tests verify full persisted
+closure replay, tamper rejection, authored missing/floating/mismatched pins and
+complete native/framed-WASM execution outcomes. This restores Reference §6.4's
+specific cycle rejection; it does not adopt package or deployment policies.
+
 ### 2026-10-02 — bind settings observations to source defaults and accepted emissions ([#273](https://github.com/callin2/ghostflow-language/issues/273))
 
 Settings streams now retain each row's accepted emission revision and application

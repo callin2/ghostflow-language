@@ -600,8 +600,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "fadc91dd725c6020013d1fdf8c9cb4ecf4b8cca475c0606179f68cac4113443d",
-      "translationSha256": "d60ce66c53b8f32b54e7a006a1a25fe8a3ce704301159169594a67a98198e22b"
+      "sourceSha256": "e4f1e90526638001f62a540533fc7009cfe27a8b847794274d2b2d38b3056941",
+      "translationSha256": "bffefcbe7f50571a5e4784af2bca2a2cebcec12b141e9d8b759b69b6b07f302a"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",
