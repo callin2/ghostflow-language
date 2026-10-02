@@ -303,6 +303,126 @@ test('REF-04-048: checked Station source native/WASM owner grant survives inacti
   assert.throws(() => bindStationPolicy(compile(source.replace('pump_capacity(pump1)', 'pump_capacity(missing)')), bindings), /unbound pump identifier missing/);
 });
 
+test('REF-04-049: checked Station source native/WASM retains the session lease through OFF cleanup and durable stop completion', async t => {
+  const reference = JSON.parse(readFileSync(resolve(root, 'tests/reference/cases/02-time-control.json'), 'utf8'))
+    .cases.find(entry => entry.id === 'REF-04-049');
+  assert(reference, 'retain the original whole-session lease reference');
+  assert.equal(reference.scope, 'runtime');
+  assert.match(reference.given, /A session.*pump OFF.*cleanup.*B/);
+  assert.match(reference.when, /lease admission/);
+  assert.match(reference.then, /A.*ownership.*B.*queue\/admission/);
+  assert(reference.issue.endsWith('/248'));
+  const filename = 'examples/station-rules.ghost.md';
+  const source = readFileSync(resolve(root, filename), 'utf8');
+  const bindings = {
+    station: { id: 'station', config: { valveCount: 4, maxOpenValves: 2, dailyQuotaMs: 1000, maxStartBudgetMs: 800 } },
+    pump: { id: 'pump1' }, settings: { id: 'settings' },
+    schedules: { starts: { id: 'starts', timezone: 'Asia/Seoul' } },
+    modeAliases: { Auto: 'Auto', Manual: 'Manual', Configure: 'Configure' },
+    activityAliases: { automatic: 'Auto', manual: 'Manual', configuring: 'Configure' },
+  };
+  const compile = value => compileConstraints(extractLiterate(value, { filename }).code, { filename });
+  const artifact = compile(source), policy = bindStationPolicy(artifact, bindings);
+  const bytes = Buffer.from(JSON.stringify(artifact));
+  const sha = value => createHash('sha256').update(value).digest('hex');
+  let hash = 0xcbf29ce484222325n;
+  for (const byte of bytes) hash = BigInt.asUintN(64, (hash ^ BigInt(byte)) * 0x100000001b3n);
+  const identity = { sourceSha256: sha(source), artifactSha256: sha(bytes),
+    bindingSha256: sha(JSON.stringify(bindings)), policySha256: sha(JSON.stringify(policy)),
+    artifactFingerprint: hash.toString(16).padStart(16, '0') };
+  execFileSync('cargo', ['build', '--locked', '--offline', '--release', '-p', 'ghostflow-core', '--example', 'station_ownership_tape'], {
+    cwd: root, stdio: 'inherit',
+  });
+  const runner = resolve(root, 'target/release/examples/station_ownership_tape' + (process.platform === 'win32' ? '.exe' : ''));
+  const directory = mkdtempSync(join(tmpdir(), 'reference-station-lifecycle-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const artifactPath = join(directory, 'constraints.json'), tapePath = join(directory, 'tape.json');
+  // This approved fixed Station adapter uses reject admission, not a hidden
+  // queue or generic resource-policy VM. Both real owners receive this config.
+  assert.deepEqual(compile(source), artifact);
+  assert.deepEqual(bindStationPolicy(artifact, bindings), policy);
+  writeFileSync(artifactPath, bytes);
+  const tape = { artifactFingerprint: identity.artifactFingerprint, stationConfig: policy.stationConfig, scenario: 'lifecycle' };
+  writeFileSync(tapePath, JSON.stringify(tape));
+  const native = JSON.parse(execFileSync(runner, [artifactPath, tapePath], { encoding: 'utf8', timeout: 10_000 }));
+  const instance = await GhostFlowStation.instantiate(wasmBytes, policy.stationConfig);
+  try {
+    synchronize(instance);
+    enterAuto(instance);
+    let writes = 0;
+    const persist = async snapshot => { assert(snapshot.length > 16); writes++; return true; };
+    const grant = await instance.start(startRequest(instance, 2n, undefined), persist);
+    const trace = [{ event: 'lease', nowMs: 10, sessionId: 77,
+      leaseDeadlineMs: Number(grant.leaseDeadlineMs), reservedMs: Number(instance.reservedMs) }];
+    const bRequest = nowMs => ({ ...startRequest(instance, 3n, undefined, nowMs), sessionId: 78n, ownerId: 89n });
+    const ledger = () => ({ reservedMs: Number(instance.reservedMs), dailyUsedMs: Number(instance.dailyUsedMs) });
+    for (const [event, nowMs, pumpOn, valves] of [
+      ['preopen', 10n, false, 1n], ['on', 20n, true, 1n],
+      ['betweenStages', 30n, false, 1n], ['cleanup', 40n, false, 2n],
+    ]) {
+      const output = { sessionId: 77n, pumpOn, valves, nowMs };
+      instance.authorizeOutput(output);
+      instance.reportApplied(output); // host fixture, not a physical driver receipt
+      const before = instance.claim;
+      await assert.rejects(instance.start(bRequest(nowMs), persist), /already owned/);
+      assert.deepEqual(instance.claim, before);
+      assert.equal(instance.reservedMs, 100n);
+      assert.equal(instance.dailyUsedMs, 0n);
+      assert.equal(writes, 1);
+      assert.throws(() => instance.commitStart(999n), /no matching prepared transition/);
+      trace.push({ event, nowMs: Number(nowMs), sessionId: 77, pumpOn, valves: Number(valves),
+        admission: 'AlreadyOwned', ...ledger() });
+    }
+    assert.throws(() => instance.prepareFinish({ sessionId: 77n, outcome: 'Cancelled', nowMs: 40n }), /pump and valves safely off/);
+    const directive = instance.requestStop({ requestId: 4n, ...instance.claim });
+    assert.equal(directive.forceSafeOutputs, true);
+    await assert.rejects(instance.start(bRequest(40n), persist), /stop is in progress/);
+    assert.throws(() => instance.confirmStopped({ nowMs: 40n }), /active session needs durable/);
+    assert.equal(instance.mode, 'Auto');
+    trace.push({ event: 'stopBarrier', nowMs: 40, mode: instance.mode, stopping: instance.stopping,
+      admission: 'Stopping', sessionId: 77, ...ledger() });
+    instance.reportApplied({ sessionId: 77n, pumpOn: false, valves: 0n, nowMs: 50n });
+    await assert.rejects(instance.start(bRequest(50n), persist), /stop is in progress/);
+    assert.throws(() => instance.confirmStopped({ nowMs: 50n }), /active session needs durable/);
+    const finish = instance.prepareFinish({ sessionId: 77n, outcome: 'Cancelled', nowMs: 50n });
+    assert(finish.bytes.length > 16);
+    await assert.rejects(instance.start(bRequest(50n), persist), /awaiting commit or abort/);
+    assert.throws(() => instance.commitFinish(finish.token + 1n), /token does not match/);
+    assert.equal(instance.mode, 'Auto');
+    assert.equal(instance.stopping, true);
+    assert.equal(instance.reservedMs, 100n);
+    assert.equal(instance.dailyUsedMs, 0n);
+    assert.equal(writes, 1);
+    trace.push({ event: 'finishPending', nowMs: 50, mode: instance.mode, stopping: instance.stopping,
+      admission: 'PendingPersistence', sessionId: 77, pumpOn: false, valves: 0, ...ledger() });
+    // Explicit simulated durable ACK boundary: a wrong ACK above retained A.
+    assert(await persist(finish.bytes));
+    instance.commitFinish(finish.token);
+    assert.equal(instance.mode, 'Stopped');
+    assert.equal(instance.stopping, false);
+    assert.equal(instance.dailyUsedMs, 10n);
+    assert.equal(instance.reservedMs, 0n);
+    await assert.rejects(instance.start(bRequest(50n), persist), /active station mode/);
+    trace.push({ event: 'finishAck', nowMs: 50, mode: instance.mode, stopping: instance.stopping,
+      admission: 'ModeMismatch', ...ledger() });
+    enterAuto(instance, 5n);
+    const bGrant = await instance.start(bRequest(50n), persist);
+    const output = instance.authorizeOutput({ sessionId: 78n, pumpOn: false, valves: 1n, nowMs: 50n });
+    assert.throws(() => instance.authorizeOutput({ sessionId: 77n, pumpOn: false, valves: 0n, nowMs: 50n }), /session does not own/);
+    assert.equal(writes, 3);
+    assert.equal(instance.reservedMs, 100n);
+    assert.equal(bGrant.leaseDeadlineMs, 150n);
+    trace.push({ event: 'BAdmitted', nowMs: 50, sessionId: Number(output.sessionId),
+      leaseDeadlineMs: Number(bGrant.leaseDeadlineMs), pumpOn: false, valves: 1, ...ledger() });
+    assert.deepEqual(native, { artifactFingerprint: identity.artifactFingerprint, scenario: 'lifecycle', trace });
+    t.diagnostic(JSON.stringify({ admissionPolicy: 'fixed Station rejection; explicit retry', identity, trace }));
+  } finally { instance.dispose(); }
+  writeFileSync(tapePath, JSON.stringify({ ...tape, artifactFingerprint: '0000000000000000' }));
+  assert.throws(() => execFileSync(runner, [artifactPath, tapePath], { encoding: 'utf8', stdio: 'pipe' }), /checked constraint artifact identity mismatch/);
+  assert.throws(() => bindStationPolicy(artifact, { ...bindings, pump: { id: 'valve1' } }), /unbound pump identifier pump1/);
+  assert.throws(() => bindStationPolicy(compile(source.replace('pump_capacity(pump1)', 'pump_capacity(missing)')), bindings), /unbound pump identifier missing/);
+});
+
 test('immediate Stop cancels a hanging Start persistence before it can grant output', async () => {
   const instance = await station();
   synchronize(instance);

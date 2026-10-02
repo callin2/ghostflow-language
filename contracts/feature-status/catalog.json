@@ -4304,6 +4304,33 @@
       "referenceCaseIds": ["REF-04-048"]
     },
     {
+      "id": "station-whole-session-lease",
+      "family": "Station lease retained through cleanup and durable stop",
+      "clause": {
+        "path": "docs/reference/04-sensors-constraints-control.en.md",
+        "heading": "4.9 Shared resources and arbitration"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [{
+        "stage": "native_wasm",
+        "status": "verified",
+        "refs": [{
+          "path": "tests/station-wasm.test.mjs",
+          "testId": "REF-04-049: checked Station source native/WASM retains the session lease through OFF cleanup and durable stop completion",
+          "caseId": "REF-04-049",
+          "assertionClass": "target-parity",
+          "targets": ["native", "wasm"],
+          "polarities": ["positive", "negative", "boundary"]
+        }]
+      }],
+      "gaps": ["The approved fixed Station adapter uses explicit rejection and retry, not a hidden queue. Same checked canonical source and binding-generated config drive native/WASM owners through preopen, ON, between-stage OFF, cleanup, stop barrier, safe applied fixture and durable finish ACK. B remains rejected while A owns the lease and reservation, including a wrong finish ACK; release requires safe cleanup and the correct ACK, followed by explicit new mode entry before B admission. Applied states and durable ACKs are host fixtures. This proves bounded portable owner conformance, not generic resource-policy queue/VM integration, compiler lowering, physical feedback or a Device release."],
+      "issues": [248],
+      "referenceCaseIds": ["REF-04-049"]
+    },
+    {
       "id": "product-boundary",
       "family": "Farmer UI, installation and deployment",
       "clause": {
