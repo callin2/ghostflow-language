@@ -14,6 +14,7 @@ import {
 } from '../tools/portable-package.mjs';
 import { compileSource } from '../tools/toolchain.mjs';
 import { GhostFlowRuntime } from '../runtimes/wasm/ghostflow-runtime.mjs';
+import { moduleFingerprint } from '../tools/source-trace.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const nativePath = path.join(root, 'target/release/examples/run' + (process.platform === 'win32' ? '.exe' : ''));
@@ -467,6 +468,39 @@ test('GF-TEST-portable-package-profiles: signed packages preserve profiles 1, 2 
       await expectsCode(() => verifyPortablePackage(candidate, { ...options, verifyBytecode: () => assert.fail('mismatch must reject before loader') }), 'bytecode-version-mismatch');
     }
   }
+});
+
+test('GF-TEST-portable-package-restart-lifecycle: real source trace remains bound to the GFB19 wrapper', async () => {
+  const current = await currentKeyPromise;
+  const source = `# Restart lifecycle package
+
+\`\`\`ghost
+control RestartPackage {
+  type RestartReason = PowerOn | Brownout | Watchdog | Software | Unknown;
+  input start, stop: Bool;
+  input restart_reason: RestartReason;
+  input restart_event: Bool;
+  output pump, valve: Bool;
+  pump <- if restart_event then start else false;
+  valve <- stop;
+}
+\`\`\`
+`;
+  const compilation = await compileSource(source, { filename: 'restart-package.ghost.md' });
+  const capabilities = [
+    { kind: 'actuator', name: 'pump', type: 'bool' },
+    { kind: 'actuator', name: 'valve', type: 'bool' },
+    { kind: 'input', name: 'start', type: 'bool' },
+    { kind: 'input', name: 'stop', type: 'bool' },
+  ];
+  assert.equal(compilation.traceMetadata.moduleFingerprint, moduleFingerprint(compilation.bytes));
+  const packageValue = await buildPortablePackage(compilation, { ...identity, requiredCapabilities: capabilities },
+    buildOptions([{ keyId: current.keyId, privateKey: current.privateKey }]));
+  const verified = await verifyPortablePackage(packageValue, {
+    ...verifierOptions(current), supportedManifestFormats: [compilation.manifest.format],
+    availableCapabilities: capabilities,
+  });
+  assert.equal(verified.sourceMap.traceMetadata.moduleFingerprint, moduleFingerprint(verified.bytecode.copy()));
 });
 
 test('GF-TEST-portable-package-quantities: signed quantity ports map to number and preserve canonical units', async () => {

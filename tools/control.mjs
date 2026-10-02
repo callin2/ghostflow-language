@@ -6,7 +6,7 @@
  * load modules, or execute user supplied code.
  */
 import { compile as compileGfb, CompileError } from './gfb1.mjs';
-import { buildSourceTrace } from './source-trace.mjs';
+import { buildSourceTrace, moduleFingerprint } from './source-trace.mjs';
 import { checkedAdjacentConstraints } from './constraint-proof.mjs';
 import { QUANTITY_TYPES, canonicalUnitFor, isQuantityType, quantityLiteral, quantitySuffixAt } from './quantities.mjs';
 import { TIME_TYPES, isTimeType, parseTimeLiteral, validateTimeValue } from './time-literals.mjs';
@@ -4200,7 +4200,12 @@ export function compileControl(source, { filename = '<control>', emitBytecode = 
       : 'named constraints require resource binding and runtime enforcement');
   }
   const lowered = new Lowerer(ast, filename).lower({ emitBytecode });
-  if (emitBytecode && lowered.manifest.lifecycle) lowered.bytes = wrapLifecycleGfb(lowered.bytes, lowered.manifest.lifecycle);
+  if (emitBytecode && lowered.manifest.lifecycle) {
+    lowered.bytes = wrapLifecycleGfb(lowered.bytes, lowered.manifest.lifecycle);
+    if (lowered.traceMetadata) {
+      lowered.traceMetadata = { ...lowered.traceMetadata, moduleFingerprint: moduleFingerprint(lowered.bytes) };
+    }
+  }
   if (lowered.manifest.signals.some(signal => signal.kind === 'after-event'
     && !signal.projections?.length)) {
     error(ast.loc, 'after_event requires an explicit after_event_any or after_event_all projection');
