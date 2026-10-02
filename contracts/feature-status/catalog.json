@@ -2777,6 +2777,41 @@
       "referenceCaseIds": ["REF-01-077", "REF-04-016", "REF-04-019", "REF-04-024"]
     },
     {
+      "id": "accepted-direction-idiom",
+      "family": "Authored accepted-value direction",
+      "clause": {
+        "path": "docs/reference/04-sensors-constraints-control.md",
+        "heading": "4.4 temporal evidence"
+      },
+      "owner": "LIBRARY",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/scan-tape-parity.test.mjs",
+              "testId": "REF-04-030 authored direction compares accepted values across fault on native VM rails and plain/framed WASM conditioning",
+              "caseId": "REF-04-030",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "negative", "boundary"]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "This source-authored Result/state comparison proves REF-04-030; no builtin rising/falling operator is implemented or specified.",
+        "The source explicitly chooses first-success initialization and false fault output intents while preserving fault diagnostics; this is not a universal temporal admission, duplicate or epoch policy.",
+        "Native VM parity uses genuine WASM-conditioned Result rails, not native physical sensor admission."
+      ],
+      "issues": [238],
+      "referenceCaseIds": ["REF-04-030"]
+    },
+    {
       "id": "resource-arbitration",
       "family": "Shared resource arbitration",
       "clause": {

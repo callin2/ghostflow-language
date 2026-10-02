@@ -19,6 +19,74 @@ function row(scanId, logicalTimeMs, inputs) {
   return { scanId, logicalTimeMs, inputs };
 }
 
+test('REF-04-030 authored direction compares accepted values across fault on native VM rails and plain/framed WASM conditioning', async () => {
+  // This is an authored Result/state idiom, not a builtin rising/falling operator.
+  // The author explicitly chooses no direction until a previous success exists
+  // and false output intents on fault; the sensor Result remains faulted.
+  const artifact = await compileSource(`control AcceptedDirection {
+  sensor reading: Number {
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  state previousAccepted: Number = 0.0;
+  state hasPrevious: Bool = false;
+  output rising, falling: Bool;
+  previousAccepted' = case reading { ok(value) => value; fault(_) => previousAccepted; };
+  hasPrevious' = case reading { ok(_) => true; fault(_) => hasPrevious; };
+  rising <- case reading { ok(value) => hasPrevious && value > previousAccepted; fault(_) => false; };
+  falling <- case reading { ok(value) => hasPrevious && value < previousAccepted; fault(_) => false; };
+}`, { filename: 'reference-accepted-direction.ghost' });
+  const sample = (id, value, quality = 'Good') =>
+    ({ epoch: 1, id, timestampMs: id, value, quality });
+  const steps = [
+    { nowMs: 1, samples: { reading: sample(1, 10) } },
+    { nowMs: 2, samples: { reading: sample(2, 0, 'Invalid') } },
+    { nowMs: 3, samples: { reading: sample(3, 12) } },
+    { nowMs: 4, samples: { reading: sample(4, 11) } },
+    // Equality is neither direction; it is still an accepted value.
+    { nowMs: 5, samples: { reading: sample(5, 11) } },
+  ];
+  const expected = [
+    { rising: false, falling: false }, { rising: false, falling: false },
+    { rising: true, falling: false }, { rising: false, falling: true },
+    { rising: false, falling: false },
+  ];
+  const executions = [];
+  for (const instantiate of [ControlRuntime.instantiate, ControlRuntime.instantiateFramed]) {
+    const runtime = await instantiate.call(ControlRuntime, wasmBytes, artifact);
+    try { executions.push(steps.map(step => runtime.step(step))); }
+    finally { runtime.dispose(); }
+  }
+  const [plain, framed] = executions;
+  assert.deepEqual(plain, framed.map(({ frame, ...result }) => result));
+  const origin = artifact.sourceMap.find(node => node.kind === 'sensor').id;
+  for (const rows of executions) {
+    assert.deepEqual(rows.map(({ sensors }) => sensors.reading.ok), [true, false, true, true, true]);
+    assert.deepEqual(rows.map(({ sensors }) => sensors.reading.quality), ['Good', 'Invalid', 'Good', 'Good', 'Good']);
+    assert.deepEqual(rows.map(({ vm }) => vm.stateAfter), [10, 10, 12, 11, 11]
+      .map(previousAccepted => ({ previousAccepted, hasPrevious: true })));
+    assert.deepEqual(rows[0].vm.stateBefore, { previousAccepted: 0, hasPrevious: false });
+    assert.deepEqual(rows[1].vm.stateAfter, rows[1].vm.stateBefore, 'fault cannot replace the previous accepted value');
+    assert.deepEqual(rows[2].vm.stateBefore, rows[0].vm.stateAfter, '12 compares against accepted 10 across the fault');
+    for (const [index, { vm }] of rows.entries()) {
+      assert.deepEqual(vm.requested, expected[index]);
+      assert.deepEqual(vm.safe, expected[index]);
+      assert.ok(vm.resultTrace.length > 0, 'authored fallback retains the original sensor Result diagnostics');
+      for (const site of vm.resultTrace) {
+        assert.equal(site.choice, index === 1 ? 3 : 0);
+        assert.equal(site.origin, index === 1 ? origin : 0);
+      }
+    }
+  }
+  // Native executes the actual compiled comparisons and state transaction over
+  // genuine WASM-conditioned rails. This does not claim native sensor admission.
+  const tape = framed.map(({ vm }, scanId) => row(scanId, steps[scanId].nowMs,
+    Object.entries(vm.inputs).map(([name, value]) => ({ name, value }))));
+  const native = nativeRun(artifact.bytes, tape);
+  assertParity(native, await wasmRun(artifact, tape));
+  assert.ok(native.every(item => item.accepted), JSON.stringify(native));
+  assert.deepEqual(native.map(item => item.outcome.trace), framed.map(item => item.vm));
+});
+
 test('REF-04-024 median to EMA composition preserves repeated fault, sample identity and bounded state on native VM and plain/framed WASM', async () => {
   const artifact = await compileSource(`control ComposedFilter {
   sensor moisture: Percent { valid = 0% .. 100%; filter = median(3); stale_after = 3s; recover_after = 3 samples; }
