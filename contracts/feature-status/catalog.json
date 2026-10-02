@@ -4349,6 +4349,24 @@
       "referenceCaseIds": ["REF-04-052"]
     },
     {
+      "id": "independent-ledger-restart",
+      "family": "Independent occurrence, day and rolling histories across restart",
+      "clause": { "path": "docs/reference/04-sensors-constraints-control.en.md", "heading": "4.11 Accounting and budgets" },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [{ "stage": "native_wasm", "status": "verified", "refs": [{
+        "path": "tests/accounting-wasm.test.mjs",
+        "testId": "REF-04-056: checked source native/WASM once, day and rolling histories survive fresh-owner restart independently",
+        "caseId": "REF-04-056", "assertionClass": "target-parity",
+        "targets": ["native", "wasm"], "polarities": ["positive", "negative", "boundary"]
+      }] }],
+      "gaps": ["Same checked canonical applied account and source-derived rolling constraint drive actual native/WASM ledgers; a fixed test host joins the Station once/day owner using identical explicit configuration. Fresh owners restore persisted histories, duplicate occurrence remains rejected despite remaining day quota, and rolling admission rejects a distinct eligible occurrence at the limit until historical intervals expire. Durable ACKs, applied evidence and comparable timestamps across boots are test-host fixtures. No production admission lowering, Device boot-clock bridge, physical receipt verification or storage-medium certification is claimed."],
+      "issues": [254],
+      "referenceCaseIds": ["REF-04-056"]
+    },
+    {
       "id": "product-boundary",
       "family": "Farmer UI, installation and deployment",
       "clause": {
