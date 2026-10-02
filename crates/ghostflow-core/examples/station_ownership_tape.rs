@@ -146,6 +146,95 @@ fn lifecycle(station: &mut Station, fingerprint: &str) -> Result<(), Box<dyn Err
     );
     Ok(())
 }
+fn mode_batch(station: &mut Station, fingerprint: &str, order: &str) -> Result<(), Box<dyn Error>> {
+    let prepared = station.prepare_start(request(station, 77, 10))?;
+    station.commit_start(DurableAck::new(prepared.token()))?;
+    let on = OutputState {
+        pump_on: true,
+        valves: 1,
+    };
+    station.authorize_output(77, on, 20)?;
+    station.report_applied(77, on, 20)?;
+    station.advance(40)?;
+    let old = station.claim();
+    station.request_stop(StopRequest {
+        request_id: 4,
+        claim: old,
+    })?;
+    let mut trace = vec![
+        json!({"event":"Stop","nowMs":40,"mode":format!("{:?}", station.mode()),"stopping":station.stopping(),"reservedMs":station.reserved_ms()}),
+    ];
+    let modes = match order {
+        "MC" => [Mode::Manual, Mode::Configure],
+        "CM" => [Mode::Configure, Mode::Manual],
+        _ => return Err("invalid mode batch order".into()),
+    };
+    let entries = |claim| {
+        [
+            EnterRequest {
+                request_id: 5,
+                claim,
+                mode: modes[0],
+            },
+            EnterRequest {
+                request_id: 6,
+                claim,
+                mode: modes[1],
+            },
+        ]
+    };
+    for claim in [old, station.claim()] {
+        let before = station.snapshot_bytes()?;
+        if station.enter_batch(&entries(claim)).is_ok() || station.snapshot_bytes()? != before {
+            return Err("Stop-time entries mutated the owner".into());
+        }
+    }
+    if station.prepare_start(request(station, 78, 40)).err() != Some(StationError::Stopping) {
+        return Err("new start escaped Stop barrier".into());
+    }
+    trace.push(json!({"event":"entriesRejected","nowMs":40,"order":order,"mode":format!("{:?}", station.mode()),"stopping":station.stopping(),"reservedMs":station.reserved_ms()}));
+    station.report_applied(77, OutputState::SAFE, 50)?;
+    let finish = station.prepare_finish(77, FinishOutcome::Cancelled, 50)?;
+    if station.enter_batch(&entries(station.claim())).err()
+        != Some(StationError::PendingPersistence)
+    {
+        return Err("pending finish allowed entry".into());
+    }
+    station.commit_finish(DurableAck::new(finish.token()))?;
+    station.advance(60)?;
+    if station.mode() != Mode::Stopped || station.reserved_ms() != 0 {
+        return Err("hidden entry after Stop completion".into());
+    }
+    trace.push(json!({"event":"finishAck","nowMs":60,"mode":format!("{:?}", station.mode()),"stopping":station.stopping(),"reservedMs":station.reserved_ms(),"dailyUsedMs":station.daily_used_ms()}));
+    let before = station.snapshot_bytes()?;
+    if station.enter_batch(&entries(station.claim())).err()
+        != Some(StationError::ConflictingModeRequests)
+        || station.snapshot_bytes()? != before
+    {
+        return Err("conflicting stopped entries selected a winner".into());
+    }
+    if station
+        .enter(EnterRequest {
+            request_id: 5,
+            claim: old,
+            mode: modes[0],
+        })
+        .is_ok()
+    {
+        return Err("stale entry claim survived Stop".into());
+    }
+    station.enter(EnterRequest {
+        request_id: 5,
+        claim: station.claim(),
+        mode: modes[0],
+    })?;
+    trace.push(json!({"event":"explicitEntry","nowMs":60,"mode":format!("{:?}", station.mode())}));
+    println!(
+        "{}",
+        json!({"artifactFingerprint":fingerprint,"scenario":"stopModeBatch","trace":trace})
+    );
+    Ok(())
+}
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<_> = env::args().skip(1).collect();
     if args.len() != 2 {
@@ -183,6 +272,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     })?;
     if tape["scenario"].as_str() == Some("lifecycle") {
         return lifecycle(&mut station, &fingerprint);
+    }
+    if tape["scenario"].as_str() == Some("stopModeBatch") {
+        return mode_batch(
+            &mut station,
+            &fingerprint,
+            tape["order"].as_str().ok_or("missing order")?,
+        );
     }
     let order = tape["order"].as_str().ok_or("missing order")?;
     if order != "AB" && order != "BA" {

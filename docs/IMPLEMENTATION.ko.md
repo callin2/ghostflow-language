@@ -5,6 +5,19 @@
 
 이 내보내기는 기존 컴파일러와 이식 가능한 런타임을 변경하지 않습니다. 언어 문서에는 구현된 문법과 향후 설계가 함께 포함됩니다. 수용 여부는 컴파일러와 [VERIFICATION.md](VERIFICATION.md)에 설명된 호스트 테스트로 판단합니다.
 
+고정 Station WASM 어댑터의 `enterBatch(requests)`는 기존 Rust
+`Station::enter_batch` 계약(Reference §4.10)을 노출한다. 호스트는 관측한
+Stop을 먼저 처리한 뒤 같은 tick의 모든 mode 진입을 하나의 batch로 전달한다.
+충돌 진입은 Stopped에서도 원자적으로 거부하며 cleanup 완료까지 저장하지 않는다.
+순차 `enter()` 호출은 각각 단일 요청이므로 충돌 batch를 나타낼 수 없다.
+추가된 `gf_station_enter_batch` export는 최대 256개의 32바이트 record를 받는다.
+각 record는 little-endian u64 요청 ID, revision, stop generation,
+mode(1 Auto, 2 Manual, 3 Configure)로 구성한다. 어댑터는 core 호출 전에
+전체 record를 검증한다. GFB/GFS와 기존 export는 변경하지 않으며 batch 호출자는
+새 export가 필요하다. Native/WASM 테스트는 같은 검증된 canonical Station
+source와 binding 생성 설정을 사용한다. Applied 출력과 durable ACK는 호스트
+fixture이며 물리 장치 검증을 뜻하지 않는다.
+
 ## 실행 경로
 
 고정 import 합성은 변경하지 않은 sensor와 순수 함수 정의를 받는다. 함수와 호출은

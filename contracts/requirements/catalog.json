@@ -31,8 +31,8 @@
         "path": "docs/IMPLEMENTATION.md",
         "heading": "Executable path",
         "lines": [
-          8,
-          13
+          21,
+          26
         ],
         "sha256": "861309e84773754aeeccabb77016a1eb1c33c587cefebde697e9d1e91996c110"
       },
@@ -57,8 +57,8 @@
         "path": "docs/IMPLEMENTATION.md",
         "heading": "Executable path",
         "lines": [
-          8,
-          10
+          21,
+          23
         ],
         "sha256": "f7a5af48cd0a6ad18fbce35a5f015912a5b8df91fc3092da9e7a4f1cfb05bcea"
       },
@@ -427,8 +427,8 @@
         "path": "docs/IMPLEMENTATION.md",
         "heading": "Executable path",
         "lines": [
-          8,
-          14
+          21,
+          27
         ],
         "sha256": "92c67941b2a3aa2a025b01718a8fa76b93a21baf82c4269295843ca3f00696b8"
       },
@@ -448,8 +448,8 @@
         "path": "docs/IMPLEMENTATION.md",
         "heading": "Executable path",
         "lines": [
-          8,
-          13
+          21,
+          26
         ],
         "sha256": "861309e84773754aeeccabb77016a1eb1c33c587cefebde697e9d1e91996c110"
       },
@@ -469,8 +469,8 @@
         "path": "docs/IMPLEMENTATION.md",
         "heading": "Limits and consumer responsibilities",
         "lines": [
-          104,
-          104
+          117,
+          117
         ],
         "sha256": "988f17dcdb9eb934346aeab946e9ae1490363aabdc611b09b8604ed9e65e0583"
       },
@@ -867,8 +867,8 @@
         "path": "docs/IMPLEMENTATION.md",
         "heading": "Executable path",
         "lines": [
-          8,
-          13
+          21,
+          26
         ],
         "sha256": "861309e84773754aeeccabb77016a1eb1c33c587cefebde697e9d1e91996c110"
       },
@@ -887,8 +887,8 @@
         "path": "docs/IMPLEMENTATION.md",
         "heading": "Artifacts and versions",
         "lines": [
-          70,
-          73
+          83,
+          86
         ],
         "sha256": "3ec6524fc323397e8db764d16caff93481662ad2987d87521bf43c13744a0161"
       },

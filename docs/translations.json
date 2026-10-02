@@ -229,8 +229,8 @@
       "source": "docs/IMPLEMENTATION.md",
       "sourceLanguage": "en",
       "translation": "docs/IMPLEMENTATION.ko.md",
-      "sourceSha256": "416333727680d6b6da4205eba5b7206d1d5bdb3f4c5e0be25ad3f32a4db25cee",
-      "translationSha256": "cae1429fb982b24516ae4d5d22aeece5fb0409c8258be884c33a72f189b2a746"
+      "sourceSha256": "e2fc080b6617296464ed66ccede9a3f7a04d870050ecd5cfca68c09aac375fef",
+      "translationSha256": "6f16a829574cc632337ce9fc64764c9f5b903ac552051f8b928c4047f138e17b"
     },
     {
       "source": "docs/INTENT-ANCHOR-MAP.md",
@@ -586,8 +586,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "e6e9dbb04d63dac5eaa0449381eca0f8ff2ce9a8353b3a04fdb84ad9578bbc7e",
-      "translationSha256": "8e7641aa0b14d86840e0ec8f1ec39da7fa0832581331d6f7b40f60df44227db9"
+      "sourceSha256": "0a82db1a9bba3a7942683aca391f591e38848805ece83178d02548594e747ac8",
+      "translationSha256": "2adda7507d1c3c500497a07e95a18e4982fc3d295eebd7912f7eae227e026483"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",

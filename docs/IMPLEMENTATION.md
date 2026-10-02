@@ -5,6 +5,19 @@ language documents include both implemented syntax and future design; acceptance
 is determined by the compiler and the host tests described in
 [VERIFICATION.md](VERIFICATION.md).
 
+The fixed Station WASM adapter exposes `enterBatch(requests)` for the existing
+Rust `Station::enter_batch` contract (Reference §4.10). Hosts dispatch an observed
+Stop first, then submit every same-tick mode entry in one batch. Conflicting
+entries reject atomically, including from Stopped; they are never queued for
+cleanup completion. Sequential `enter()` calls remain single requests and cannot
+represent a conflicting batch. The additive `gf_station_enter_batch` export takes
+at most 256 packed 32-byte records, each containing little-endian u64 request ID,
+revision, stop generation and mode (1 Auto, 2 Manual, 3 Configure). The adapter
+validates all records before calling the core. This changes neither GFB/GFS nor
+existing exports; batch callers require this new export. Native/WASM tests use
+the same checked canonical Station source and binding-generated configuration,
+with host applied-output and durable-ACK fixtures, without physical verification.
+
 ## Executable path
 
 `tools/browser-toolchain.mjs` exposes `compileSource(source, {filename,

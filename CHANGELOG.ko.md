@@ -5,6 +5,18 @@
 
 ## 미출시
 
+### 2026-10-02 — Station 원자적 mode 진입 binding 버그 수정 ([#250](https://github.com/callin2/ghostflow-language/issues/250))
+
+Reference §4.10은 같은 tick의 충돌 mode 진입을 모두 거부한다. 기존 WASM
+어댑터는 `enter()`만 노출하여 Stopped에서 Manual 다음 Configure를 순차 호출하면
+Manual이 선택될 수 있었다. 이제 `enterBatch([{requestId: 5n, ...claim,
+mode: 'Manual'}, {requestId: 6n, ...claim, mode: 'Configure'}])`가 기존 Rust의
+원자적 계약을 호출하여 변경이나 지연 진입 없이 둘 다 거부한다. 호스트는 여전히
+관측한 Stop을 진입 및 새 작업보다 먼저 처리한다. 기존 단일 진입 export,
+source profile 및 GFB/GFS 형식은 그대로이며 batch 호출자는 추가된
+`gf_station_enter_batch` export가 필요하다. REF-04-052는 native/WASM 동등성,
+Stop cleanup과 명시적 재시도, 잘못된 batch와 오래된 claim 검사를 포함한다.
+
 ### 2026-10-02 — 합성 EMA signal 실행 ([#237](https://github.com/callin2/ghostflow-language/issues/237))
 
 Reference §4.3의 이름 있는 numeric EMA 단계를 공유 Rust VM의 유한 상태로
