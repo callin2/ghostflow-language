@@ -6022,6 +6022,49 @@
       "referenceCaseIds": [
         "REF-06-001"
       ]
+    },
+    {
+      "id": "applied-ledger-evidence-boundary",
+      "family": "Stable equipment usage aggregates selected applied evidence independently of request and UI time",
+      "clause": {
+        "path": "docs/reference/08-language-runtime-and-device-boundaries.en.md",
+        "heading": "8.4 Boundaries each feature must preserve"
+      },
+      "owner": "HOST",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/applied-ledger-evidence-boundary.test.mjs",
+              "testId": "REF-08-008: durable applied ledger uses stable resource evidence and ignores requested and UI display time",
+              "caseId": "REF-08-008",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Conformance-only existing caller-validated applied/durable source binding and explicit stable resourceId. Actual native/WASM request producer and ledger observations execute; requests/UI times never manufacture applied receipts. Native transport internally snapshot/restores, while raw durable byte/pending/corrupt controls use actual WASM ABI. No Driver authenticity, confirmed stage, identity issuer or production Device integration."
+      ],
+      "issues": [
+        325
+      ],
+      "referenceCaseIds": [
+        "REF-08-008"
+      ]
     }
   ]
 }
