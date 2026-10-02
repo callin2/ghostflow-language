@@ -5,6 +5,17 @@
 
 ## 미출시
 
+### 2026-10-02 — 경쟁하는 두 output writer 식별 ([#300](https://github.com/callin2/ghostflow-language/issues/300))
+
+조합 duplicate-supplier 진단은 두 원본 writer endpoint를 모두 명명하거나 root
+output expression과 instance connection을 구분한다. 예를 들어
+`connect pump <- east.pump`와 `connect pump <- west.pump`는 여전히 activation
+전에 거부되며 이제 `east.pump`와 `west.pump`를 함께 식별한다. 이전에는 공유 sink만
+명명했다. 기존 진단 종류, 정본 두 번째 writer 위치와 거부 동작을 유지한다.
+last-writer 정책, arbitration이나 artifact/ABI 변경을 도입하지 않는다. Reference
+§6.5의 정확한 테스트는 writer·선언 순서 양쪽, expression과의 혼합 충돌 및 별도
+channel의 native/framed-WASM 전체 결과 일치를 검증한다.
+
 ### 2026-10-02 — transitive import cycle의 닫는 edge에서 진단 ([#298](https://github.com/callin2/ghostflow-language/issues/298))
 
 컴파일러는 닫는 import edge의 revision/digest를 검사하기 전에 원본 위치에서

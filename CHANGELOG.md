@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### 2026-10-02 — identify both competing output writers ([#300](https://github.com/callin2/ghostflow-language/issues/300))
+
+Composition duplicate-supplier diagnostics now name both authored writer
+endpoints, or distinguish a root output expression from an instance connection.
+For example, `connect pump <- east.pump` plus `connect pump <- west.pump`
+still rejects before activation and now identifies `east.pump` and `west.pump`.
+Previously only the shared sink was named. The existing diagnostic category,
+canonical second-writer location and rejection behavior are preserved; no
+last-writer policy, arbitration or artifact/ABI change is introduced. Exact
+Reference §6.5 tests cover either writer/declaration order, mixed expression
+conflicts and distinct-channel native/framed-WASM complete outcome parity.
+
 ### 2026-10-02 — diagnose transitive import cycles at the closing edge ([#298](https://github.com/callin2/ghostflow-language/issues/298))
 
 The compiler now reports an executable import cycle at its authored back edge

@@ -5422,6 +5422,72 @@
       "referenceCaseIds": [
         "REF-03-081"
       ]
+    },
+    {
+      "id": "competing-direct-output-writers",
+      "family": "Competing direct output writers reject with both authored identities",
+      "clause": {
+        "path": "docs/reference/06-composition-and-replay.en.md",
+        "heading": "6.5 Invariants of composed execution"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/competing-output-writers.test.mjs",
+              "testId": "REF-06-014 competing instance direct writers reject before activation and identify both endpoints in either order",
+              "caseId": "REF-06-014",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/competing-output-writers.test.mjs",
+              "testId": "REF-06-014 root expression and instance connection writer conflicts retain both authored origins",
+              "caseId": "REF-06-014",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            }
+          ]
+        },
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/competing-output-writers.test.mjs",
+              "testId": "REF-06-014 distinct authoritative channels preserve each writer value with complete native framed WASM parity",
+              "caseId": "REF-06-014",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Executable canonical composition rejects competing direct writers before activation and names both endpoints, preserving authored conflict location in either order. Distinct-channel complete native/WASM outcome parity is verified. Shared resource arbitration, installation/physical endpoint compatibility, binding authority and Device effects are separate contracts."
+      ],
+      "issues": [
+        300
+      ],
+      "referenceCaseIds": [
+        "REF-06-014"
+      ]
     }
   ]
 }

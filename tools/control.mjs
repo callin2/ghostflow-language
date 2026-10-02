@@ -1493,9 +1493,13 @@ export function validateCompositionStructure(ast) {
     }
   }
   const suppliers = new Map();
+  const writerIdentity = item => item.kind === 'connect'
+    ? item.source.path
+    : `output expression ${item.name}`;
+  const conflict = (target, item) => `writers ${writerIdentity(suppliers.get(target))} and ${writerIdentity(item)}`;
   for (const item of ast.body) {
     if (item.kind === 'connection') {
-      if (suppliers.has(item.name)) error(item.loc, `duplicate supplier for output ${item.name}`);
+      if (suppliers.has(item.name)) error(item.loc, `duplicate supplier for output ${item.name}: ${conflict(item.name, item)}`);
       suppliers.set(item.name, item);
     } else if (item.kind === 'connect') {
       for (const endpoint of [item.sink, item.source]) if (endpoint.instance && !instanceNames.has(endpoint.instance)) {
@@ -1504,7 +1508,7 @@ export function validateCompositionStructure(ast) {
       if (!item.sink.instance && definitions.get(item.sink.port) !== 'output') error(item.sink.loc, 'connect sink must be an instance input or root output');
       if (!item.source.instance && !['input', 'sensor'].includes(definitions.get(item.source.port))) error(item.source.loc, 'connect source must be a root input, root sensor or instance output');
       if (!item.sink.instance && !item.source.instance) error(item.source.loc, 'root output connect source must be an instance output');
-      if (suppliers.has(item.sink.path)) error(item.sink.loc, `duplicate supplier for port ${item.sink.path}`);
+      if (suppliers.has(item.sink.path)) error(item.sink.loc, `duplicate supplier for port ${item.sink.path}: ${conflict(item.sink.path, item)}`);
       suppliers.set(item.sink.path, item);
     }
   }
