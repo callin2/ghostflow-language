@@ -144,6 +144,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/VERIFICATION.md](VERIFICATION.md) | Standalone language verification | md |
 | [docs/WASM-CI-ARTIFACTS.ko.md](WASM-CI-ARTIFACTS.ko.md) | 리비전 지정 GhostFlow WASM CI 아티팩트 | md |
 | [docs/WASM-CI-ARTIFACTS.md](WASM-CI-ARTIFACTS.md) | Revision-addressed GhostFlow WASM CI artifacts | md |
+| [docs/WHAT-IF-REPLAY.ko.md](WHAT-IF-REPLAY.ko.md) | 제한된 what-if 재생 | md |
+| [docs/WHAT-IF-REPLAY.md](WHAT-IF-REPLAY.md) | Bounded what-if replay | md |
 
 ## docs/assets/
 
@@ -218,4 +220,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.ko.md](research/GF-COMPOSE-R9-ACCEPTANCE.ko.md) | GF-COMPOSE R9: acceptance와 구현 인계 | md |
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.md](research/GF-COMPOSE-R9-ACCEPTANCE.md) | GF-COMPOSE R9: acceptance and implementation handoff | md |
 
-184 documents.
+186 documents.

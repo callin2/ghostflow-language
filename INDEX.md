@@ -197,6 +197,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/VERIFICATION.md](docs/VERIFICATION.md) | Standalone language verification | md |
 | [docs/WASM-CI-ARTIFACTS.ko.md](docs/WASM-CI-ARTIFACTS.ko.md) | 리비전 지정 GhostFlow WASM CI 아티팩트 | md |
 | [docs/WASM-CI-ARTIFACTS.md](docs/WASM-CI-ARTIFACTS.md) | Revision-addressed GhostFlow WASM CI artifacts | md |
+| [docs/WHAT-IF-REPLAY.ko.md](docs/WHAT-IF-REPLAY.ko.md) | 제한된 what-if 재생 | md |
+| [docs/WHAT-IF-REPLAY.md](docs/WHAT-IF-REPLAY.md) | Bounded what-if replay | md |
 
 ## docs/plans/
 
@@ -469,4 +471,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-349 documents.
+351 documents.
