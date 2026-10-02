@@ -668,9 +668,13 @@ impl ContextRuntime {
                     candidates
                         .iter()
                         .find(|(index, _, _)| self.configs[*index].descriptor.id == id)
-                        .and_then(|(_, value, _)| match value {
+                        .and_then(|(index, value, _)| match value {
                             ConfigValue::Scalar(Value::Number(n)) => {
-                                Some(SettingValue::SharedDuration(*n as u64))
+                                if self.configs[*index].descriptor.semantic_type == "TimeOfDay" {
+                                    Some(SettingValue::SharedTimeOfDay(*n as u64))
+                                } else {
+                                    Some(SettingValue::SharedDuration(*n as u64))
+                                }
                             }
                             ConfigValue::Slots(slots) => {
                                 Some(SettingValue::SharedSlots(slots.clone()))
@@ -684,7 +688,15 @@ impl ContextRuntime {
                     };
                     let config_id = match &d.definition {
                         ScheduleDefinition::Periodic { every, .. } => every.id,
-                        ScheduleDefinition::UtcRange { duration, .. } => duration.id,
+                        ScheduleDefinition::UtcRange {
+                            duration, start, ..
+                        } => {
+                            if start.id != 0 {
+                                start.id
+                            } else {
+                                duration.id
+                            }
+                        }
                         ScheduleDefinition::ConfigDailySlots { config_id, .. } => *config_id,
                         _ => 0,
                     };
@@ -914,7 +926,15 @@ impl ContextRuntime {
                 let cancel = evaluate(&d.cancel, trace)?;
                 let config_id = match &d.definition {
                     ScheduleDefinition::Periodic { every, .. } => every.id,
-                    ScheduleDefinition::UtcRange { duration, .. } => duration.id,
+                    ScheduleDefinition::UtcRange {
+                        duration, start, ..
+                    } => {
+                        if start.id != 0 {
+                            start.id
+                        } else {
+                            duration.id
+                        }
+                    }
                     ScheduleDefinition::ConfigDailySlots { config_id, .. } => *config_id,
                     _ => 0,
                 };
@@ -930,7 +950,11 @@ impl ContextRuntime {
                 let change = if changed {
                     config.and_then(|c| match &c.current {
                         Ok(ConfigValue::Scalar(Value::Number(n))) => {
-                            Some(SettingValue::SharedDuration(*n as u64))
+                            if c.descriptor.semantic_type == "TimeOfDay" {
+                                Some(SettingValue::SharedTimeOfDay(*n as u64))
+                            } else {
+                                Some(SettingValue::SharedDuration(*n as u64))
+                            }
                         }
                         Ok(ConfigValue::Slots(slots)) => {
                             Some(SettingValue::SharedSlots(slots.clone()))

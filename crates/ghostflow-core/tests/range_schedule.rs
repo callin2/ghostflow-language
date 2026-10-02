@@ -175,6 +175,38 @@ fn discarded_stage_does_not_consume_admission() {
 }
 
 #[test]
+fn generic_retime_uses_absolute_non_civil_planned_wall_fact() {
+    let mut engine = RangeEngine::new(100, 1, 8).unwrap();
+    let stage = engine
+        .begin(
+            clock(0, 86_399_900),
+            &[fact("absolute", 86_399_800)],
+            true,
+            false,
+        )
+        .unwrap();
+    assert!(stage.result.due && stage.result.active);
+    engine.commit(stage);
+    let changed = [RangeFact {
+        occurrence_key: "absolute".into(),
+        planned_wall_ms: 86_400_200,
+        duration_ms: 600,
+    }];
+    let stage = engine
+        .begin_retime(clock(100, 86_400_000), &changed, true, false)
+        .unwrap();
+    assert!(!stage.result.due);
+    assert!(!stage.result.active);
+    assert_eq!(stage.result.deadline_monotonic_ms, Some(900));
+    engine.commit(stage);
+    let stage = engine
+        .begin(clock(300, 86_400_200), &changed, true, false)
+        .unwrap();
+    assert!(stage.result.active);
+    assert_eq!(stage.result.deadline_monotonic_ms, Some(900));
+}
+
+#[test]
 fn live_start_edit_pauses_same_identity_and_resumes_without_second_due() {
     let mut engine = RangeEngine::new(100, 1, 8).unwrap();
     let stage = engine

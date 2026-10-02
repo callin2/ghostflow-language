@@ -23,7 +23,9 @@ const AT_FORMAT = 'GhostFlow/control-v13';
 const HOLIDAY_FORMAT = 'GhostFlow/control-v14';
 const SOLAR_CONTEXT_FORMAT = 'GhostFlow/control-v15';
 const CALENDAR_EXECUTION_FORMAT = 'GhostFlow/control-v18';
+const RANGE_LIVE_START_FORMAT = 'GhostFlow/control-v19';
 const contextManifest = manifest => manifest?.format === STREAM_CONTEXT_FORMAT
+  || manifest?.format === RANGE_LIVE_START_FORMAT
   || manifest?.format === CALENDAR_EXECUTION_FORMAT
   || manifest?.format === SOLAR_CONTEXT_FORMAT
   || manifest?.format === HOLIDAY_FORMAT
@@ -233,7 +235,7 @@ function validateContextManifest(input, bytecodeFormat) {
   const manifest = record(input, 'manifest');
   keys(manifest, ['format','name','inputs','outputs','sensors','schedules','timers','signals','configs','bytecodeSha256'],
     ['providers','calendars','naturalConditions','calendarConditions','accounting','resources','objectives','adaptSettings'], 'manifest');
-  if (manifest.format === CALENDAR_EXECUTION_FORMAT ? bytecodeFormat !== 18 : manifest.format === SOLAR_CONTEXT_FORMAT ? bytecodeFormat !== 16 : manifest.format === HOLIDAY_FORMAT ? bytecodeFormat !== 15 : manifest.format === AT_FORMAT ? bytecodeFormat !== 14 : manifest.format === AVAILABILITY_FORMAT ? bytecodeFormat !== 13 : ![11, 12].includes(bytecodeFormat)) throw new Error('context manifest requires its matching GFB format');
+  if (manifest.format === RANGE_LIVE_START_FORMAT ? bytecodeFormat !== 19 : manifest.format === CALENDAR_EXECUTION_FORMAT ? bytecodeFormat !== 18 : manifest.format === SOLAR_CONTEXT_FORMAT ? bytecodeFormat !== 16 : manifest.format === HOLIDAY_FORMAT ? bytecodeFormat !== 15 : manifest.format === AT_FORMAT ? bytecodeFormat !== 14 : manifest.format === AVAILABILITY_FORMAT ? bytecodeFormat !== 13 : ![11, 12].includes(bytecodeFormat)) throw new Error('context manifest requires its matching GFB format');
   name(manifest.name, 'manifest.name');
   if (!/^[0-9a-f]{64}$/.test(manifest.bytecodeSha256)) throw new Error('invalid bytecode SHA-256');
   const inputs = validateList(manifest.inputs, 'manifest.inputs', ['name','type'], ['canonicalUnit']);
@@ -304,17 +306,20 @@ function validateContextManifest(input, bytecodeFormat) {
     if (!['periodic','cron','daily','daily-slots','tide'].includes(item.kind)) throw new Error('unsupported context schedule kind');
     const range = item.policy?.basis?.kind === 'range';
     if (range) {
-      if (![12, 13, 15, 16, 18].includes(bytecodeFormat) || item.timezone !== 'UTC' || item.day && bytecodeFormat !== 18 || item.selectedConfig
+      if (![12, 13, 15, 16, 18, 19].includes(bytecodeFormat) || item.timezone !== 'UTC' || item.day && bytecodeFormat !== 18 || item.selectedConfig
         || !['daily','daily-slots'].includes(item.kind)) throw new Error('executable Range requires GFB12 and immutable UTC Daily or DailySlots');
       const policy = record(item.policy, `schedule ${item.name}.policy`);
       keys(policy, ['basis','when','cancelWhen','clock','gapMs','recovery','fallback'], [], `schedule ${item.name}.policy`);
-      keys(record(policy.basis, 'Range basis'), ['kind','durationMs'], ['durationConfig','durationConfigId'], 'Range basis');
+      keys(record(policy.basis, 'Range basis'), ['kind','durationMs'], ['durationConfig','durationConfigId','startConfig','startConfigId'], 'Range basis');
       if (policy.clock !== 'trusted_only' || policy.recovery !== 'baseline' || policy.fallback !== 'skip') throw new Error('unsupported Range policy');
       safeInteger(policy.gapMs, 'Range gapMs', 1);
       safeInteger(policy.basis.durationMs, 'Range durationMs', 1, 86_400_000);
       const hasDurationConfig = Object.prototype.hasOwnProperty.call(policy.basis, 'durationConfig');
       const hasDurationConfigId = Object.prototype.hasOwnProperty.call(policy.basis, 'durationConfigId');
       if (hasDurationConfig !== hasDurationConfigId) throw new Error('Range duration config metadata must include name and id together');
+      const hasStartConfig = Object.prototype.hasOwnProperty.call(policy.basis, 'startConfig');
+      const hasStartConfigId = Object.prototype.hasOwnProperty.call(policy.basis, 'startConfigId');
+      if (hasDurationConfig && (hasStartConfig || hasStartConfigId)) throw new Error('Range cannot bind both live duration and live start configs');
       if (hasDurationConfig) {
         name(policy.basis.durationConfig, 'Range durationConfig');
         const configId = safeInteger(policy.basis.durationConfigId, 'Range durationConfigId', 1, 0xffff_ffff);
@@ -324,6 +329,15 @@ function validateContextManifest(input, bytecodeFormat) {
       }
       const starts = item.kind === 'daily' ? [safeInteger(item.atMs, 'Range atMs', 0, 86_399_999)]
         : (Array.isArray(item.slots) ? item.slots.map(minute => safeInteger(minute, 'Range slot', 0, 1439) * 60_000) : []);
+      if (hasStartConfig !== hasStartConfigId) throw new Error('Range start config metadata must include name and id together');
+      if (hasStartConfig) {
+        if (manifest.format !== RANGE_LIVE_START_FORMAT || item.kind !== 'daily' || starts.length !== 1 || item.day) throw new Error('Range live start requires GFB19 immutable UTC Daily');
+        name(policy.basis.startConfig, 'Range startConfig');
+        const configId = safeInteger(policy.basis.startConfigId, 'Range startConfigId', 1, 0xffff_ffff);
+        const config = configs.find(c => c.id === configId);
+        if (!config || config.name !== policy.basis.startConfig || config.type !== 'TimeOfDay') throw new Error('Range start config metadata mismatch');
+        if (config.value !== starts[0]) throw new Error('Range start config initial value mismatch');
+      }
       if (!starts.length || starts.length > 96 || starts.some((start, index) => index > 0 && start <= starts[index - 1])
         || starts.some((start, index) => starts[(index + 1) % starts.length] + (index + 1 === starts.length ? 86_400_000 : 0) - start < policy.basis.durationMs)) {
         throw new Error('Range occurrences must not overlap');
@@ -437,7 +451,7 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
     throw new Error('adapt strategy activation requires a capability-aware host; ControlRuntime cannot activate this manifest');
   }
   keys(manifest, ['format', 'name', 'inputs', 'outputs', 'sensors', 'schedules', 'timers', 'signals', 'configs', 'bytecodeSha256'], ['adaptPolicy', 'strategies', 'objectives', 'resources', 'sensorInstances'], 'manifest');
-  if (manifest.format !== FORMAT && manifest.format !== INTEGER_FORMAT && !(manifest.format === SETTINGS_FORMAT && acceptSettings) && manifest.format !== SOLAR_FORMAT && manifest.format !== SCHEDULE_FORMAT && manifest.format !== SCHEDULE_SLOTS_FORMAT && manifest.format !== AVAILABILITY_FORMAT) throw new Error(`unsupported manifest format ${String(manifest.format)}`);
+  if (manifest.format !== FORMAT && manifest.format !== INTEGER_FORMAT && !(manifest.format === SETTINGS_FORMAT && acceptSettings) && manifest.format !== SOLAR_FORMAT && manifest.format !== SCHEDULE_FORMAT && manifest.format !== SCHEDULE_SLOTS_FORMAT && manifest.format !== AVAILABILITY_FORMAT && manifest.format !== RANGE_LIVE_START_FORMAT) throw new Error(`unsupported manifest format ${String(manifest.format)}`);
   const settingsManifest = manifest.format === SETTINGS_FORMAT || manifest.format === INTEGER_FORMAT || manifest.format === AVAILABILITY_FORMAT;
   const solarManifest = manifest.format === SOLAR_FORMAT || manifest.format === INTEGER_FORMAT || manifest.format === AVAILABILITY_FORMAT;
   name(manifest.name, 'manifest.name');

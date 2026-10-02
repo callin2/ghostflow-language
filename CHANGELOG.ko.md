@@ -17,6 +17,10 @@ source에서 유도한 보호 policy의 실제 native/WASM ABI trace, 전체 led
 결과를 비교한다. source-bound 참조 host admission이며 자동 VM/resource 또는 물리
 binding은 아니다. source grammar와 직렬화 ABI format은 바뀌지 않는다.
 
+### 2026-10-02 — live scalar Range 시작 설정이 활성 occurrence를 재시각화 ([#266](https://github.com/callin2/ghostflow-language/issues/266))
+
+Reference §3.5는 이제 고정 Duration을 가진 제한된 실행 가능 UTC Daily Range profile에서 scalar `Daily.at` source로 `TimeOfDay` config를 받을 수 있다. 성공한 원자적 live settings event는 이미 admit한 occurrence를 original local date와 새 유효 시작 시각으로 다시 계산하며 같은 occurrence ID와 due ledger를 유지한다. 08:00 `range(10min)`이 08:04에 admit된 뒤 08:07에 08:08로 편집되면 즉시 일시 비활성화되고 08:08에 다시 active가 되어 08:18에 끝난다. 08:02로 편집하면 08:12에 끝난다. GFB19 encoding은 start config id를 담는다. calendar, 비 UTC, multi-slot, Periodic, live start+Duration 조합은 static metadata로 fallback하지 않고 거부한다. Checkpoint는 승인된 scalar start 설정과 소비한 history를 저장·검증하지만 active timer를 재개하지 않는다. REF-03-077은 native/WASM framed parity test로 검증한다.
+
 ### 2026-10-02 — live Range Duration 설정이 활성 occurrence를 재시각화 ([#265](https://github.com/callin2/ghostflow-language/issues/265))
 
 Reference §3.5의 `range(duration)`은 이제 work calendar가 없는 실행 가능한 UTC Daily/DailySlots GFB12 Range에서 `Duration` config를 받을 수 있다. 성공한 원자적 live settings event는 frozen planned start에서 활성 occurrence를 다시 계산한다. 08:00 계획을 08:04에 10분으로 admit한 뒤 08:07에 12분으로 편집하면 같은 occurrence가 유지되고 08:12에 끝난다. 5분으로 편집하면 event 위치에서 종료한다. 새 due pulse나 occurrence ID를 만들지 않는다. 승인된 duration은 GFRGv2 checkpoint에 보존되어 복구 뒤 다음 occurrence도 live 값을 쓴다. 잘못된 typed 값은 기존 settings-fault 결정이 되며 승인된 duration을 바꾸지 않는다. REF-03-076은 native/WASM trace와 checkpoint parity를 검증한다. GFB12 encoding은 duration 0 sentinel 다음 기존 config id를 쓰며, 이전 GFB12 consumer는 이 새 encoding form을 거부한다.

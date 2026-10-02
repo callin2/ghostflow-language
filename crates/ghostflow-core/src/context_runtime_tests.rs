@@ -932,6 +932,15 @@ fn utc_range_program() -> Module {
                     max_ms: 100,
                     step_ms: 1,
                 },
+                start: DurationSetting {
+                    id: 0,
+                    name: String::new(),
+                    operator_editable: false,
+                    initial_ms: 100,
+                    min_ms: 100,
+                    max_ms: 100,
+                    step_ms: 1,
+                },
             },
             when: vec![1, 1],
             cancel: vec![1, 0],
@@ -1640,6 +1649,65 @@ fn timeslots_consumers_share_keys_and_fault_without_historical_fallback() {
         .unwrap();
     reboot.restore_context_checkpoint(&snapshot).unwrap();
     assert_eq!(reboot.context_state_json().unwrap(), state);
+}
+
+#[test]
+fn timeslots_checkpoint_restore_uses_authored_grid_and_capacity() {
+    use settings_stream::ConfigValue;
+    for (grid_ms, capacity, minute) in [(60_000, 3, 1), (900_000, 8, 15)] {
+        let mut program = periodic();
+        let strategy = &mut program.schedules.as_mut().unwrap().strategies[0];
+        let PulseDescriptor::Config(config) = &mut strategy.schedules[1] else {
+            panic!()
+        };
+        config.kind = 3;
+        config.semantic_type = format!("TimeSlots<{grid_ms}ms,{capacity}>");
+        config.initial = ConfigValue::Slots(vec![(1, minute)]);
+        config.bounds = None;
+        config.grid_ms = grid_ms;
+        config.capacity = capacity;
+        config.ok_input = u16::MAX;
+        config.value_input = u16::MAX;
+        config.fault_input = u16::MAX;
+        let PulseDescriptor::Context(schedule) = &mut strategy.schedules[0] else {
+            panic!()
+        };
+        schedule.definition = ScheduleDefinition::ConfigDailySlots {
+            config_id: 6,
+            timezone: "UTC".into(),
+            setting: "interval".into(),
+            operator_editable: true,
+            grid_ms,
+            capacity,
+            initial_minutes: vec![minute],
+            dst_missing: 0,
+            dst_repeated: 0,
+        };
+        let mut runtime = Runtime::new(8);
+        runtime.install(program.clone(), false);
+        runtime
+            .activate_with_context(&context_runtime::Activation {
+                boot_epoch: 1,
+                terminal_capacity: 8,
+                bindings: vec![],
+            })
+            .unwrap();
+        let checkpoint = runtime.context_checkpoint().unwrap();
+        let mut reboot = Runtime::new(8);
+        reboot.install(program, false);
+        reboot
+            .activate_with_context(&context_runtime::Activation {
+                boot_epoch: 2,
+                terminal_capacity: 8,
+                bindings: vec![],
+            })
+            .unwrap();
+        reboot.restore_context_checkpoint(&checkpoint).unwrap();
+        assert_eq!(
+            reboot.context_state_json().unwrap(),
+            runtime.context_state_json().unwrap()
+        );
+    }
 }
 
 #[test]
