@@ -653,7 +653,9 @@ impl ContextRuntime {
                             ConfigValue::Scalar(Value::Number(n)) => {
                                 Some(SettingValue::SharedDuration(*n as u64))
                             }
-                            ConfigValue::Slots(slots) => Some(SettingValue::SharedSlots(slots.clone())),
+                            ConfigValue::Slots(slots) => {
+                                Some(SettingValue::SharedSlots(slots.clone()))
+                            }
                             _ => None,
                         })
                 };

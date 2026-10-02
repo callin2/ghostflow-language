@@ -221,7 +221,11 @@ impl Engine {
                 b"GFRG\x02" => {
                     let value = reader.u64()?;
                     match &desc.definition {
-                        ScheduleDefinition::UtcRange { duration, starts_ms, .. } => {
+                        ScheduleDefinition::UtcRange {
+                            duration,
+                            starts_ms,
+                            ..
+                        } => {
                             if duration.id == 0
                                 || value < duration.min_ms
                                 || value > duration.max_ms
@@ -626,7 +630,15 @@ impl Engine {
         {
             let (staged_setting, live_duration) =
                 self.effective_range_duration(desc, change, *duration_ms)?;
-            return staged_setting.utc_range(desc.site, starts_ms, live_duration, clock, when, cancel, duration.id != 0 && change.is_some());
+            return staged_setting.utc_range(
+                desc.site,
+                starts_ms,
+                live_duration,
+                clock,
+                when,
+                cancel,
+                duration.id != 0 && change.is_some(),
+            );
         }
         let mut staged = self.clone();
         staged.apply_setting(
@@ -937,7 +949,10 @@ impl Engine {
             .as_ref()
             .ok_or_else(|| invalid("missing Range engine"))?;
         if let Some(active) = original.active_fact() {
-            if !plans.iter().any(|fact| fact.occurrence_key == active.occurrence_key) {
+            if !plans
+                .iter()
+                .any(|fact| fact.occurrence_key == active.occurrence_key)
+            {
                 plans.push(RangeFact {
                     occurrence_key: active.occurrence_key.clone(),
                     planned_wall_ms: active.planned_wall_ms,
@@ -945,7 +960,11 @@ impl Engine {
                 });
             }
         }
-        let stage = if retime { original.begin_retime(clock, &plans, when, cancel)? } else { original.begin(clock, &plans, when, cancel)? };
+        let stage = if retime {
+            original.begin_retime(clock, &plans, when, cancel)?
+        } else {
+            original.begin(clock, &plans, when, cancel)?
+        };
         let result = stage.result.clone();
         let disposition = stage.clock_disposition;
         let previous_active = original.active_fact().cloned();
@@ -1325,7 +1344,9 @@ impl Engine {
                 SettingValue::Duration(interval) | SettingValue::SharedDuration(interval),
             )
             | (
-                ScheduleDefinition::UtcRange { duration: every, .. },
+                ScheduleDefinition::UtcRange {
+                    duration: every, ..
+                },
                 SettingValue::Duration(interval) | SettingValue::SharedDuration(interval),
             ) => {
                 if !every.operator_editable && !matches!(change, SettingValue::SharedDuration(_))
