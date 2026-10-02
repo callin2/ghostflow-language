@@ -4519,6 +4519,30 @@
       "issues": [264], "referenceCaseIds": ["REF-03-075"]
     },
     {
+      "id": "range-live-duration",
+      "family": "Live Duration retimes the admitted planned Range",
+      "clause": { "path": "docs/reference/03-time-and-schedules.en.md", "heading": "3.5 Common Schedule semantics" },
+      "owner": "CORE", "maturity": "EXPERIMENTAL", "coreScope": false, "requiredEvidence": [],
+      "evidence": [{ "stage": "native_wasm", "status": "verified", "refs": [{
+        "path": "tests/range-live-duration.test.mjs",
+        "testId": "REF-03-076 live Range duration extension and reduction retime same occurrence without new due",
+        "caseId": "REF-03-076", "assertionClass": "target-parity",
+        "targets": ["native", "wasm"], "polarities": ["positive", "negative", "boundary"]
+      }, {
+        "path": "tests/range-live-duration.test.mjs",
+        "testId": "REF-03-076 accepted duration persists to checkpoint and next occurrence",
+        "caseId": "REF-03-076", "assertionClass": "target-parity",
+        "targets": ["native", "wasm"], "polarities": ["positive", "boundary"]
+      }, {
+        "path": "tests/range-live-duration.test.mjs",
+        "testId": "REF-03-076 overlapping live duration event is transport-rejected atomically",
+        "caseId": "REF-03-076", "assertionClass": "target-parity",
+        "targets": ["native", "wasm"], "polarities": ["negative", "boundary"]
+      }] }],
+      "gaps": ["Canonical GFB12 UTC Daily/DailySlots without a work calendar binds a positive bounded live Duration config and executes accepted settings in actual native/framed WASM VMs. Extension10-to12 and reduction10-to5 retime the same occurrence from its frozen planned origin, retain consumed identity, and emit no new Due. Accepted duration persists for future occurrences and in versioned GFRG2 checkpoints; immutable GFRG1 remains unchanged. Unsupported live calendar/recurrence profiles reject rather than silently becoming static; overlap-changing proposals reject atomically. This is portable core and reference-host execution, not a publishing-host settings lifecycle, non-UTC/DST resolver, live start retime, generic Run overlap, Device integration or physical output proof."],
+      "issues": [265], "referenceCaseIds": ["REF-03-076"]
+    },
+    {
       "id": "product-boundary",
       "family": "Farmer UI, installation and deployment",
       "clause": {

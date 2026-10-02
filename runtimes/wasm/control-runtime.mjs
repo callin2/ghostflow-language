@@ -308,10 +308,20 @@ function validateContextManifest(input, bytecodeFormat) {
         || !['daily','daily-slots'].includes(item.kind)) throw new Error('executable Range requires GFB12 and immutable UTC Daily or DailySlots');
       const policy = record(item.policy, `schedule ${item.name}.policy`);
       keys(policy, ['basis','when','cancelWhen','clock','gapMs','recovery','fallback'], [], `schedule ${item.name}.policy`);
-      keys(record(policy.basis, 'Range basis'), ['kind','durationMs'], [], 'Range basis');
+      keys(record(policy.basis, 'Range basis'), ['kind','durationMs'], ['durationConfig','durationConfigId'], 'Range basis');
       if (policy.clock !== 'trusted_only' || policy.recovery !== 'baseline' || policy.fallback !== 'skip') throw new Error('unsupported Range policy');
       safeInteger(policy.gapMs, 'Range gapMs', 1);
       safeInteger(policy.basis.durationMs, 'Range durationMs', 1, 86_400_000);
+      const hasDurationConfig = Object.prototype.hasOwnProperty.call(policy.basis, 'durationConfig');
+      const hasDurationConfigId = Object.prototype.hasOwnProperty.call(policy.basis, 'durationConfigId');
+      if (hasDurationConfig !== hasDurationConfigId) throw new Error('Range duration config metadata must include name and id together');
+      if (hasDurationConfig) {
+        name(policy.basis.durationConfig, 'Range durationConfig');
+        const configId = safeInteger(policy.basis.durationConfigId, 'Range durationConfigId', 1, 0xffff_ffff);
+        const config = configs.find(item => item.id === configId);
+        if (!config || config.name !== policy.basis.durationConfig || config.type !== 'Duration') throw new Error('Range duration config metadata mismatch');
+        if (config.value !== policy.basis.durationMs) throw new Error('Range duration config initial value mismatch');
+      }
       const starts = item.kind === 'daily' ? [safeInteger(item.atMs, 'Range atMs', 0, 86_399_999)]
         : (Array.isArray(item.slots) ? item.slots.map(minute => safeInteger(minute, 'Range slot', 0, 1439) * 60_000) : []);
       if (!starts.length || starts.length > 96 || starts.some((start, index) => index > 0 && start <= starts[index - 1])

@@ -299,8 +299,10 @@ Tide는 `fallback = skip`만 허용하며 다른 trigger는 trusted-only clock�
 `window`, `run(_, on_time)`은 선택된 설계 표기이며
 아직 compiler 지원 범위 밖이다. civil `range`는 UTC timezone의 정적 non-overlap을
 증명해야 한다. 불변 UTC Daily와 비어 있지 않은 정적 DailySlots Range는 GFB12로
-실행되며 다른 허용된 Range recurrence는 비실행 descriptor로 유지된다.
-Tide의 `run(_, within(_))`은 지원한다.
+실행되며 다른 허용된 Range recurrence는 비실행 descriptor로 유지된다. Range duration은
+초기값으로 non-overlap을 증명할 수 있는 operator `Duration` config일 수 있다. 승인된 live
+setting event는 frozen planned start에서 현재 occurrence를 다시 계산하며 새 due pulse나
+occurrence identity를 만들지 않는다. Tide의 `run(_, within(_))`은 지원한다.
 
 bounded 자연 정책 admission은 단조 경과가 duration보다 엄격히 작은 동안만 held time을 사용한다.
 trusted anchor나 uncertainty가 없거나 checked 덧셈이 overflow하면 fail closed한다.
@@ -488,13 +490,17 @@ schedule morning_watering: Daily {
 쓰는 불변 UTC Daily는 GFB18로 실행한다. 시작 시각과 duration의 합은 local midnight을
 넘을 수 없다. overnight work interval은 명시적인 별도 Daily range로 나눈다. 끝은
 제외되므로 정확히 자정에 끝나는 range는 유효하다. work calendar 없는 일반 range의
-기존 자정 동작은 유지한다. live 시작/duration 설정, Periodic Range와 다른 허용된
-변형은 descriptor로 유지한다. 비 UTC와 증명할 수 없는 overlap은 계속 거부하며
-timezone이나 DST 정책을 추측하지 않는다.
+기존 자정 동작은 유지한다. 이 slice에서 live duration 설정은 work calendar가 없는
+UTC Daily/DailySlots에만 실행 lowering을 제공한다. work calendar Range와 live
+Range duration config의 조합은 정적으로 거부하여 static calendar Range로 조용히
+fallback하지 않는다. live 시작 설정, Periodic Range와 다른 허용된 변형은 descriptor로
+유지한다. 비 UTC와 증명할 수 없는 overlap은 계속 거부하며 timezone이나 DST 정책을
+추측하지 않는다.
 
-Range context checkpoint는 소비한 occurrence identity를 보존하며 활성 monotonic
+Range context checkpoint는 소비한 occurrence identity와 live duration 설정이 있으면
+그 effective duration을 보존하며 활성 monotonic
 timer는 보존하지 않는다. 새 boot로 복원해도 이미 소비한 occurrence를 재개하거나
-다시 admit하지 않는다. 아직 소비하지 않은 열린 interval은 남은 시간만 admit할 수
+다시 admit하지 않지만 다음 occurrence는 복원된 duration을 쓴다. 아직 소비하지 않은 열린 interval은 남은 시간만 admit할 수
 있다. terminal capacity가 소진되면 scan 전체를 원자적으로 거부하며 identity를
 조용히 제거하지 않는다.
 

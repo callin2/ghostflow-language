@@ -402,6 +402,7 @@ impl ContextRuntime {
             };
             let id = match &d.definition {
                 ScheduleDefinition::Periodic { every, .. } => every.id,
+                ScheduleDefinition::UtcRange { duration, .. } => duration.id,
                 ScheduleDefinition::ConfigDailySlots { config_id, .. } => *config_id,
                 _ => 0,
             };

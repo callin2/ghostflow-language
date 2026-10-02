@@ -507,10 +507,18 @@ function lowerCoreModule(ast) {
           const [timezone,duration,starts]=data;
           if(timezone!=='UTC'||!Array.isArray(starts)||starts[0]!=='starts'||starts.length<2||starts.length>97)throw new CompileError('invalid UTC Range definition');
           const values=starts.slice(1).map(atom=>unsignedAtom(atom,86399999n,'invalid UTC Range start'));
-          const length=unsignedAtom(duration,86400000n,'invalid UTC Range duration');
-          if(!length||values.some((value,index)=>index>0&&value<=values[index-1])
-            ||values.some((value,index)=>(values[(index+1)%values.length]+(index+1===values.length?86400000n:0n))-value<length))throw new CompileError('UTC Range occurrences must not overlap');
-          detail={timezone,duration:length,starts:values};
+          const durationConfig=Array.isArray(duration)&&duration[0]==='duration-config';
+          const length=durationConfig?0n:unsignedAtom(duration,86400000n,'invalid UTC Range duration');
+          if(durationConfig){
+            if(duration.length!==2)throw new CompileError('invalid UTC Range duration config');
+            const configId=Number(unsignedAtom(duration[1],4294967295n,'invalid UTC Range duration config id'));
+            const config=preludes.find(prelude=>prelude.kind==='config-stream'&&prelude.value.site===configId);
+            if(!config||config.value.semanticType!=='Duration')throw new CompileError('invalid UTC Range duration config');
+            if(h==='calendar-range')throw new CompileError('live Range duration config is unsupported for calendar Range');
+          }
+          if(!durationConfig&&!length||values.some((value,index)=>index>0&&value<=values[index-1])
+            ||!durationConfig&&values.some((value,index)=>(values[(index+1)%values.length]+(index+1===values.length?86400000n:0n))-value<length))throw new CompileError('UTC Range occurrences must not overlap');
+          detail={timezone,duration:durationConfig?duration:length,starts:values};
           if(h==='calendar-range'){
             const [calendar,selector]=data.slice(3);
             if(!['workday','offday'].includes(selector)||values.length!==1||values[0]+length>86400000n)throw new CompileError('work calendar Range must stay within one civil date; split overnight intervals');
@@ -731,7 +739,7 @@ function emitGfb(moduleIr) {
   }w.u64(x.gapMs);
     if(prelude.kind==='solar-context-pulse'){w.str(d.timezone);w.f64(d.latitude);w.f64(d.longitude);w.u8(d.event==='rise'?0:1);w.i64(d.offset);w.u64(d.fallbackAt);w.u16(d.configIds.length);for(const id of d.configIds)w.u32(id);}
     else if(prelude.kind==='at-pulse'){w.u64(d.at);}
-    else if(prelude.kind==='utc-range'||prelude.kind==='calendar-range'){w.str(d.timezone);w.u64(d.duration);w.u16(d.starts.length);for(const start of d.starts)w.u64(start);if(prelude.kind==='calendar-range'){w.str(d.calendar);w.u8(d.selector==='offday'?1:0);}}
+    else if(prelude.kind==='utc-range'||prelude.kind==='calendar-range'){w.str(d.timezone);if(Array.isArray(d.duration)&&d.duration[0]==='duration-config'){w.u64(0n);w.u32(Number(d.duration[1]));}else w.u64(d.duration);w.u16(d.starts.length);for(const start of d.starts)w.u64(start);if(prelude.kind==='calendar-range'){w.str(d.calendar);w.u8(d.selector==='offday'?1:0);}}
     else if(prelude.kind==='periodic-pulse'){w.str(d.epoch);w.u64(d.anchor);w.u32(d.configId);if(d.configId===0)w.u64(d.literal);}
     else if(prelude.kind==='cron-pulse'){w.str(d.timezone);w.u8(missingCode(d.missing));w.u8(repeatedCode(d.repeated));for(const field of d.fields){w.u8(field.length);for(const value of field)w.u8(value);}}
     else if(prelude.kind==='calendar-daily-pulse'){w.str(d.timezone);w.u64(d.at);w.str(d.calendar);w.u8(d.offday==='offday'?1:0);w.u8(missingCode(d.missing));w.u8(repeatedCode(d.repeated));}

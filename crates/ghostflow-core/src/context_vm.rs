@@ -32,6 +32,7 @@ pub enum ScheduleDefinition {
     UtcRange {
         starts_ms: Vec<u64>,
         duration_ms: u64,
+        duration: DurationSetting,
     },
     CalendarRange {
         timezone: String,
@@ -619,6 +620,11 @@ pub(crate) fn load_schedule(
                 return Err(Error::new("Range requires UTC timezone"));
             }
             let duration_ms = exact(reader)?;
+            let duration_config_id = if duration_ms == 0 {
+                Some(reader.u32()?)
+            } else {
+                None
+            };
             let count = usize::from(reader.u16()?);
             if !(1..=96).contains(&count) {
                 return Err(Error::new("invalid UTC Range start count"));
@@ -627,10 +633,68 @@ pub(crate) fn load_schedule(
             for _ in 0..count {
                 starts_ms.push(exact(reader)?);
             }
-            validate_utc_range(&starts_ms, duration_ms)?;
+            let duration =
+                if let Some(id) = duration_config_id {
+                    let config = prior
+                        .iter()
+                        .find_map(|p| match p {
+                            crate::schedule_vm::PulseDescriptor::Config(c) if c.id == id => Some(c),
+                            _ => None,
+                        })
+                        .ok_or_else(|| Error::new("Range duration config must precede consumer"))?;
+                    if config.semantic_type != "Duration" {
+                        return Err(Error::new("Range duration config must be Duration"));
+                    }
+                    let crate::settings_stream::ConfigValue::Scalar(crate::Value::Number(initial)) =
+                        config.initial
+                    else {
+                        return Err(Error::new("invalid Range Duration config"));
+                    };
+                    let (min, max, step) = config.bounds.map_or(
+                        (1.0, 9_007_199_254_740_991.0, 1.0),
+                        |(a, b, c)| match (a, b, c) {
+                            (
+                                crate::Value::Number(a),
+                                crate::Value::Number(b),
+                                crate::Value::Number(c),
+                            ) => (a, b, c),
+                            _ => (0.0, 0.0, 0.0),
+                        },
+                    );
+                    DurationSetting {
+                        id,
+                        name: config.name.clone(),
+                        operator_editable: config.operator_editable,
+                        initial_ms: initial as u64,
+                        min_ms: min as u64,
+                        max_ms: max as u64,
+                        step_ms: step as u64,
+                    }
+                } else {
+                    DurationSetting {
+                        id: 0,
+                        name: String::new(),
+                        operator_editable: false,
+                        initial_ms: duration_ms,
+                        min_ms: duration_ms,
+                        max_ms: duration_ms,
+                        step_ms: 1,
+                    }
+                };
+            if duration.min_ms == 0
+                || duration.step_ms == 0
+                || duration.max_ms < duration.min_ms
+                || duration.initial_ms < duration.min_ms
+                || duration.initial_ms > duration.max_ms
+                || (duration.initial_ms - duration.min_ms) % duration.step_ms != 0
+            {
+                return Err(Error::new("invalid Range duration setting"));
+            }
+            validate_utc_range(&starts_ms, duration.initial_ms)?;
             ScheduleDefinition::UtcRange {
                 starts_ms,
-                duration_ms,
+                duration_ms: duration.initial_ms,
+                duration,
             }
         }
         14 if format == 14 => ScheduleDefinition::AtPulse {

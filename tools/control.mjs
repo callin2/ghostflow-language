@@ -2391,9 +2391,17 @@ class Lowerer {
         basis = 'pulse';
       } else if (options.basis.kind === 'call' && options.basis.name === 'range'
         && options.basis.args.length === 1 && !options.basis.named.length) {
-        const range = this.expression(options.basis.args[0], new Map(), { allowNext: false }, [], DURATION);
+        const rangeArg = options.basis.args[0];
+        const rangeConfig = rangeArg.kind === 'reference' && this.symbols.get(rangeArg.name)?.category === 'config'
+          ? this.symbols.get(rangeArg.name) : null;
+        const range = rangeConfig ? rangeConfig.value : this.expression(rangeArg, new Map(), { allowNext: false }, [], DURATION);
         if (!sameType(range.type, DURATION) || !Number.isSafeInteger(range.constant) || range.constant <= 0) {
           error(options.basis.loc, `${label} range requires a positive Duration`);
+        }
+        if (rangeConfig && rangeConfig.payloadType?.kind !== 'Duration') error(rangeArg.loc, `${label} range config must be Duration`);
+        if (rangeConfig) {
+          const descriptor = this.manifest.configs.find(config => config.id === rangeConfig.id);
+          if (!descriptor?.settings || descriptor.settings.min <= 0) error(rangeArg.loc, 'live Range duration config requires a positive minimum Duration');
         }
         if (!options.cancel_when) error(item.loc, `${label} range basis requires cancel_when`);
         if (civil && (trigger.kind === 'periodic' || item.timezone !== 'UTC')) {
@@ -2410,10 +2418,13 @@ class Lowerer {
         else if (trigger.kind === 'periodic') minimumSpacing = trigger.every.initialMs;
         else error(options.basis.loc, `${label} range requires a statically bounded recurrence`);
         if (range.constant > minimumSpacing) error(options.basis.loc, `${label} range occurrences must not overlap`);
+        if (trigger.day && rangeConfig) {
+          error(options.basis.loc, 'live Range duration settings are only executable for immutable UTC Daily or DailySlots without a work calendar');
+        }
         if (trigger.day && (trigger.day.kind === 'holiday' || trigger.atMs + range.constant > 86_400_000)) {
           error(options.basis.loc, 'work calendar Range must stay within one civil date; split overnight intervals into explicit Daily ranges');
         }
-        basis = { kind: 'range', durationMs: range.constant };
+        basis = { kind: 'range', durationMs: range.constant, ...(rangeConfig ? { durationConfig: rangeArg.name, durationConfigId: rangeConfig.id } : {}) };
       } else error(options.basis.loc, `${label} basis must be pulse or range(positive Duration)`);
       const clock = choice('clock', ['trusted_only']);
       const recovery = choice('recovery', ['baseline']);
@@ -3827,7 +3838,7 @@ class Lowerer {
         const starts = schedule.kind === 'daily' ? [schedule.atMs] : schedule.slots.map(minute => minute * 60_000);
         if (schedule.day) return ['calendar-range', ...base, 'UTC', String(schedule.policy.basis.durationMs), ['starts', ...starts.map(String)],
           schedule.day.calendar, schedule.day.kind, when, cancel];
-        return ['utc-range', ...base, 'UTC', String(schedule.policy.basis.durationMs), ['starts', ...starts.map(String)], when, cancel];
+        return ['utc-range', ...base, 'UTC', schedule.policy.basis.durationConfigId ? ['duration-config', String(schedule.policy.basis.durationConfigId)] : String(schedule.policy.basis.durationMs), ['starts', ...starts.map(String)], when, cancel];
       }
       if (schedule.kind === 'periodic') {
         const config = this.manifest.configs.find(item => item.id === schedule.every.configId);

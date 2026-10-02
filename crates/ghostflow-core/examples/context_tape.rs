@@ -306,7 +306,8 @@ fn main() -> Result<()> {
         .collect();
     let tape: Json = serde_json::from_slice(&read(&args[1])?)?;
     let solar_profile = tape["profile"] == "context-solar-v1";
-    let civil_profile = tape["profile"] == "context-civil-v1";
+    let civil_profile =
+        tape["profile"] == "context-civil-v1" || tape["profile"] == "context-settings-civil-v1";
     let calendar_profile = tape["profile"] == "context-calendar-v1";
     if civil_profile || calendar_profile {
         fields(&tape, &["profile", "activation", "steps", "checkpoint"])?;
@@ -315,7 +316,9 @@ fn main() -> Result<()> {
             &["bootEpoch", "terminalCapacity", "bindings"],
         )?;
     }
-    let settings_profile = tape["profile"] == "context-settings-v1" || solar_profile;
+    let settings_profile = tape["profile"] == "context-settings-v1"
+        || tape["profile"] == "context-settings-civil-v1"
+        || solar_profile;
     if !settings_profile
         && !civil_profile
         && !calendar_profile
@@ -430,7 +433,7 @@ fn main() -> Result<()> {
                     "Periodic tape cannot supply providers, calendars or occurrence rows".into(),
                 );
             }
-            if settings_profile {
+            if settings_profile && !civil_profile {
                 return Err("settings tape cannot supply schedules".into());
             }
             let mut rows = Vec::new();
@@ -594,6 +597,8 @@ fn main() -> Result<()> {
                 "{}",
                 json!({
                     "accepted": false, "error": error.to_string(), "settings": state,
+                    "checkpoint": driver.runtime().context_checkpoint()?.iter()
+                        .map(|byte| format!("{byte:02x}")).collect::<String>(),
                 })
             ),
             Err(error) => return Err(error.into()),
