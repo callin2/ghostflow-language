@@ -2295,7 +2295,7 @@ class Lowerer {
     const interval = this.expression(item.interval, new Map(), { allowNext: false });
     const configuredRange = item.selected && !Array.isArray(item.selected)
       && item.policy?.basis?.kind === 'call' && item.policy.basis.name === 'range';
-    if (!sameType(interval.type, DURATION) || interval.constant !== 900_000 && !configuredRange) error(item.interval.loc, 'only DailySlots<15min> is supported outside typed TimeSlots Range');
+    if (!sameType(interval.type, DURATION) || interval.constant !== 900_000 && !configuredRange) error(item.interval.loc, 'only DailySlots<15min> is supported');
     if (configuredRange && (!Number.isSafeInteger(interval.constant) || interval.constant <= 0
       || interval.constant % 60_000 !== 0 || 86_400_000 % interval.constant !== 0)) error(item.interval.loc, 'TimeSlots Range requires a positive whole-minute grid dividing one day');
     if (!item.timezone || !item.timezone.trim()) error(item.loc, 'schedule requires timezone');
