@@ -173,6 +173,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/interaction-emission.test.mjs',
   'tests/enum-member-label.test.mjs',
   'tests/interaction-runtime-snapshot.test.mjs',
+  'tests/observation-no-write.test.mjs',
   'tests/intent-anchor-map.test.mjs',
   'tests/ledger.test.mjs',
   'tests/literate.test.mjs',

@@ -4772,6 +4772,62 @@
       "referenceCaseIds": [
         "REF-03-077"
       ]
+    },
+    {
+      "id": "observation-no-write",
+      "family": "Read-only observation cannot create write capabilities",
+      "clause": {
+        "path": "docs/reference/05-settings-and-observation.en.md",
+        "heading": "5.3 Renderer-independent observation model"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/observation-no-write.test.mjs",
+              "testId": "REF-05-020 canonical observation metadata rejects forged write capabilities without mutating completed runtime",
+              "caseId": "REF-05-020",
+              "assertionClass": "rollback",
+              "targets": [
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/observation-no-write.test.mjs",
+              "testId": "REF-05-020 actual native and WASM settings requests cannot address observed state timer or output",
+              "caseId": "REF-05-020",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Canonical Interaction v0 metadata remains read-only; public verification and completed-scan preparation reject forged write/execute permissions and invented output or reclassified setting descriptors. Actual native/framed-WASM settings envelopes cannot address authored state, timer or output node identities, with complete checkpoint/revision rollback and a valid operator-config positive control. This is conformance evidence for existing metadata and portable reference-runtime validation, not new output descriptors, frontend executable binding, Device authority or publishing-host implementation."
+      ],
+      "issues": [
+        281
+      ],
+      "referenceCaseIds": [
+        "REF-05-020"
+      ]
     }
   ]
 }
