@@ -5731,6 +5731,63 @@
       "referenceCaseIds": [
         "REF-03-083"
       ]
+    },
+    {
+      "id": "renderer-setting-validation",
+      "family": "Renderer-neutral settings preserve typed validation and permission",
+      "clause": {
+        "path": "docs/reference/05-settings-and-observation.en.md",
+        "heading": "5.3 Renderer-independent observation model"
+      },
+      "owner": "HOST",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/renderer-setting-validation.test.mjs",
+              "testId": "REF-05-019 time-entry and slider preserve Duration off-grid fault and recovery in native WASM",
+              "caseId": "REF-05-019",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/renderer-setting-validation.test.mjs",
+              "testId": "REF-05-019 presentation cannot grant setting permission or change type and source provenance",
+              "caseId": "REF-05-019",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Two renderer-neutral presentation fixtures preserve the compiled Duration descriptor and submit identical unrounded canonical values. Actual native and framed-WASM outcomes/settings/checkpoints agree: authorized off-grid and type-invalid payloads emit SettingsInvalid; designer edits reject before admission; recovery restores a valid Result. Source-bound schema forgery cannot alter type, step, authority, access or provenance. This is conformance-only fixture and reference host evidence, not production frontend UI, authentication, command binding or Device adoption."
+      ],
+      "issues": [
+        280
+      ],
+      "referenceCaseIds": [
+        "REF-05-019"
+      ]
     }
   ]
 }
