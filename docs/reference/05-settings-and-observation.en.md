@@ -171,9 +171,10 @@ When a restart reason is required, supply it through an ordinary typed input con
 ```ghost
 type RestartReason = PowerOn | Brownout | Watchdog | Software | Unknown;
 input restart_reason: RestartReason;
+input restart_event: Bool;
 ```
 
-This declaration is a control-body fragment. The producer supplies only hardware-confirmed causes; without evidence, supply `Unknown`. `PowerOn` alone does not establish recovery from a power outage. This input remains fixed for one run. The author defines automatic resumption, waiting, or cancellation followed by returning to the original position through state transitions. The Driver's installation contract owns physical outputs before the first decision.
+These exact reserved declarations are a control-body fragment. The host explicitly supplies the hardware-confirmed reason, or `Unknown` when evidence is unavailable, and whether the boot event remains pending. `PowerOn` alone does not establish recovery from a power outage. Both inputs are immutable for the run and are injected by the framed runtime; callers cannot supply them in scan frames or through ordinary input setters. When the event is pending, `restart_event` is true in the first successfully committed scan and false afterward. A rejected scan leaves it pending. The host sets it false when replacing a program after the boot event was already consumed. The author defines automatic resumption, waiting, or cancellation followed by returning to the original position through state transitions. This contract supplies an event and cause; it does not restore VM or timer memory. The Driver's installation contract owns physical outputs before the first decision.
 
 ## 5.3 Renderer-independent observation model
 

@@ -23,6 +23,8 @@ pub struct FramedHandle {
     resource_plan: String,
     context_checkpoint: Vec<u8>,
     context_state: String,
+    lifecycle_required: bool,
+    restart_init: Option<(u8, bool)>,
 }
 
 impl FramedHandle {
@@ -35,6 +37,8 @@ impl FramedHandle {
             resource_plan: String::new(),
             context_checkpoint: Vec::new(),
             context_state: String::new(),
+            lifecycle_required: false,
+            restart_init: None,
         }
     }
 
@@ -209,10 +213,39 @@ pub unsafe extern "C" fn gf_frame_load(
     };
     match &mut handle.state {
         FramedState::Configuring(runtime) => {
+            handle.lifecycle_required = module.lifecycle().is_some();
+            handle.restart_init = None;
             runtime.install(module, false);
             handle.success()
         }
         FramedState::Active(_) => handle.failure("framed runtime is already active"),
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn gf_frame_initialize_restart(
+    handle: *mut FramedHandle,
+    reason_ordinal: u8,
+    event_pending: u8,
+) -> i32 {
+    let Some(handle) = handle.as_mut() else {
+        return 0;
+    };
+    if event_pending > 1 {
+        return handle.failure("restart event pending must be 0 or 1");
+    }
+    if !handle.lifecycle_required {
+        return handle.failure("module has no restart lifecycle");
+    }
+    match &handle.state {
+        FramedState::Configuring(_) if handle.restart_init.is_none() => {
+            handle.restart_init = Some((reason_ordinal, event_pending == 1));
+            handle.success()
+        }
+        FramedState::Configuring(_) => handle.failure("restart lifecycle is already initialized"),
+        FramedState::Active(_) => {
+            handle.failure("restart lifecycle initialization must precede activation")
+        }
     }
 }
 
@@ -258,11 +291,21 @@ pub unsafe extern "C" fn gf_frame_activate(handle: *mut FramedHandle) -> i32 {
     let Some(handle) = handle.as_mut() else {
         return 0;
     };
+    if handle.lifecycle_required && handle.restart_init.is_none() {
+        return handle.failure("restart lifecycle initialization is required before activation");
+    }
     let state = std::mem::replace(&mut handle.state, FramedState::Configuring(Runtime::new(1)));
     match state {
         FramedState::Configuring(mut runtime) => match runtime.activate() {
             Ok(()) => {
-                handle.state = FramedState::Active(runtime.into_scan_driver());
+                let mut driver = runtime.into_scan_driver();
+                if let Some((reason, pending)) = handle.restart_init {
+                    if let Err(error) = driver.initialize_restart(reason, pending) {
+                        handle.state = FramedState::Configuring(driver.into_runtime());
+                        return handle.failure(error.to_string());
+                    }
+                }
+                handle.state = FramedState::Active(driver);
                 handle.success()
             }
             Err(error) => {
@@ -848,4 +891,35 @@ pub unsafe extern "C" fn gf_frame_error_len(handle: *const FramedHandle) -> usiz
         .as_ref()
         .map(|handle| handle.error.len())
         .unwrap_or(0)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn gf_frame_restart_event_pending(handle: *mut FramedHandle) -> i32 {
+    let Some(handle) = handle.as_mut() else {
+        return -1;
+    };
+    if !handle.lifecycle_required {
+        handle.failure("module has no restart lifecycle");
+        return -1;
+    }
+    match &handle.state {
+        FramedState::Active(driver) => {
+            if driver.restart_event_pending() {
+                1
+            } else {
+                0
+            }
+        }
+        FramedState::Configuring(_) if handle.restart_init.is_some() => {
+            if handle.restart_init.is_some_and(|(_, pending)| pending) {
+                1
+            } else {
+                0
+            }
+        }
+        FramedState::Configuring(_) => {
+            handle.failure("restart lifecycle is not active");
+            -1
+        }
+    }
 }

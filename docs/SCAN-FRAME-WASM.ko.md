@@ -72,6 +72,26 @@ dispose는 여러 번 호출해도 안전하다. 필수 export를 확인하고 �
 명확한 오류와 함께 실패한다. ControlRuntime/프런트엔드는 아직 변경하지 않는다.
 D6가 해당 통합과 핀을 담당한다.
 
+## 재시작 수명 주기 확장
+
+정확한 reserved 재시작 선언이 있는 control은 compiler가 GFB1 형식 19로 감싼다.
+wrapper는 원인 input, 순서가 있는 enum 멤버와 이벤트 input을 식별하며 loader는 이를
+기본 module과 대조한다. Manifest도 호스트 binding 검사에 사용할 같은 값을 담는다.
+기본 control profile과 그 버전은 바뀌지 않는다.
+
+활성화 전에 `gf_frame_initialize_restart(handle, reason_ordinal:u8,
+event_pending:u8)` 또는 `FramedGhostFlowRuntime.initializeRestart(reasonOrdinal,
+eventPending)`를 호출한다. 원인 ordinal은 선언 순서를 따른다. 원인을 확인할 수 없으면
+호출자는 ordinal 4인 `Unknown`을 공급한다. lifecycle module은 정확히 한 번 초기화해야
+한다. 호스트는 프로그램 교체 사이에도 부팅 pending bit를 보존하고, 이벤트를 이미
+성공적으로 소비한 뒤에는 false를 전달한다.
+
+Lifecycle input은 완전한 scan frame에서 제외하며 호출자가 넣으면 거부한다. Runtime이
+고정 원인과 이벤트 값을 주입한다. 성공한 scan은 pending을 지우고 거부된 scan은 유지한다.
+Native와 WASM 호스트는 `ScanDriver::restart_event_pending()` 또는 WASM의
+`gf_frame_restart_event_pending` / JavaScript `restartEventPending`으로 결과를 읽어 저장할
+수 있다. 이 확장은 VM이나 timer 기억을 복원하지 않는다.
+
 ## 승인 기준
 
 실제 빌드된 WASM 테스트는 구성/활성화, 동일 스캔의 요청/안전 출력, 타이머 시간

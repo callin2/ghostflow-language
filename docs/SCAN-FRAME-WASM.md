@@ -68,6 +68,29 @@ Outcome JSON contains only plain data. Methods after dispose throw; disposal is
 idempotent. Check required exports and fail clearly on an old WASM artifact.
 No change to ControlRuntime/frontend yet: D6 owns that integration and pins.
 
+## Restart lifecycle extension
+
+The compiler wraps a control with the exact reserved restart declarations in
+GFB1 format 19. The wrapper identifies the reason input, ordered enum members,
+and event input, and the loader validates them against the base module. The
+manifest mirrors these values for host binding checks. The base control profile
+and its version remain unchanged.
+
+Before activation, call
+`gf_frame_initialize_restart(handle, reason_ordinal:u8, event_pending:u8)` or
+`FramedGhostFlowRuntime.initializeRestart(reasonOrdinal, eventPending)`. The
+reason ordinal follows the declared member order. The caller supplies `Unknown`
+as ordinal 4 when it cannot confirm a cause. Initialization is required exactly
+once for lifecycle modules. The host must preserve its boot-pending bit across
+program replacement and pass false after a successful lifecycle event.
+
+Lifecycle inputs are omitted from the complete scan frame and rejected if a
+caller attempts to supply them. The runtime injects the fixed reason and event
+value. A successful scan clears pending; a rejected scan retains it. Native and
+WASM hosts can read `ScanDriver::restart_event_pending()` or the WASM
+`gf_frame_restart_event_pending` / JavaScript `restartEventPending` property to
+persist the resulting state. This extension does not restore VM or timer state.
+
 ## Acceptance
 
 Actual built WASM tests cover configure/activate, same-scan requested/safe,

@@ -1459,6 +1459,32 @@ function sexpr(value) {
   return String(value);
 }
 
+function wrapLifecycleGfb(bytes, lifecycle) {
+  const encoder = new TextEncoder();
+  const fields = [encoder.encode(lifecycle.restartReasonInput), Uint8Array.of(lifecycle.restartReasonMembers.length),
+    ...lifecycle.restartReasonMembers.map(member => encoder.encode(member.name)), encoder.encode(lifecycle.restartEventInput)];
+  const sized = fields.map((field, index) => {
+    if (index === 1) return field;
+    const prefix = new Uint8Array(2);
+    new DataView(prefix.buffer).setUint16(0, field.length, true);
+    return concatBytes(prefix, field);
+  });
+  const descriptor = concatBytes(...sized);
+  const prefix = new Uint8Array(10);
+  prefix.set([0x47, 0x46, 0x42, 0x31]);
+  const view = new DataView(prefix.buffer);
+  view.setUint16(4, 19, true);
+  view.setUint32(6, bytes.length, true);
+  return concatBytes(prefix, bytes, descriptor);
+}
+
+function concatBytes(...parts) {
+  const result = new Uint8Array(parts.reduce((size, part) => size + part.length, 0));
+  let offset = 0;
+  for (const part of parts) { result.set(part, offset); offset += part.length; }
+  return result;
+}
+
 function canonicalModuleForm(value, depth = 0) {
   if (depth > 128) throw new CompileError('syntax nesting limit exceeded');
   return Array.isArray(value)
@@ -1526,6 +1552,7 @@ class Lowerer {
     this.configStreams = [];
     this.usesInt = false;
     this.failedLets = new Map();
+    this.restartLifecycle = null;
     this.syntaxOnly = false;
     this.accountingExecution = false;
     this.standalone = !!ast.standalone;
@@ -1542,7 +1569,7 @@ class Lowerer {
     if (this.ast.imports.length) error(this.ast.imports[0].loc,
       'import execution requires a verified source closure and composition lowering, which are not yet supported');
     rejectName(this.ast.name, this.ast.loc, 'control');
-    this.declare(); this.validateAndPopulate();
+    this.declare(); this.configureRestartLifecycle(); this.validateAndPopulate();
     for (const check of this.ast.compositionChecks ?? []) {
       const expected = this.resolveType(check.type);
       const actual = this.expression(check.value, new Map(), { allowNext: true }, [], expected);
@@ -1733,6 +1760,30 @@ class Lowerer {
     if (adaptations.length > 1) error(adaptations[1].loc, 'a control may declare only one adapt policy');
     this.adaptPolicy = adaptations[0] ?? null;
   }
+  configureRestartLifecycle() {
+    const memberNames = ['PowerOn', 'Brownout', 'Watchdog', 'Software', 'Unknown'];
+    const declarations = this.ast.body.filter(item => item.kind === 'input');
+    const hasReservedEnum = this.ast.body.some(item => item.kind === 'enum' && item.name === 'RestartReason');
+    const hasReservedInput = declarations.some(item => item.names.includes('restart_reason') || item.names.includes('restart_event'));
+    if (!hasReservedEnum && !hasReservedInput) return;
+    const enumDecl = this.ast.body.find(item => item.kind === 'enum' && item.name === 'RestartReason');
+    if (!enumDecl || enumDecl.members.length !== memberNames.length
+      || enumDecl.members.some((member, index) => member.name !== memberNames[index])) {
+      error(enumDecl?.loc ?? this.ast.loc, 'RestartReason must declare PowerOn | Brownout | Watchdog | Software | Unknown in that order');
+    }
+    const reasonDecls = declarations.filter(item => item.names.includes('restart_reason'));
+    const eventDecls = declarations.filter(item => item.names.includes('restart_event'));
+    if (reasonDecls.length !== 1 || reasonDecls[0].names.length !== 1 || reasonDecls[0].type.name !== 'RestartReason'
+      || eventDecls.length !== 1 || eventDecls[0].names.length !== 1 || eventDecls[0].type.name !== 'Bool') {
+      error(this.ast.loc, 'restart lifecycle requires input restart_reason: RestartReason and input restart_event: Bool');
+    }
+    this.restartLifecycle = {
+      format: 'GhostFlow/lifecycle-v1', restartReasonInput: 'restart_reason',
+      restartReasonMembers: memberNames.map((name, value) => ({ name, value })),
+      restartEventInput: 'restart_event',
+    };
+    this.manifest.lifecycle = this.restartLifecycle;
+  }
   addInput(name, type, loc, user = false) {
     if (this.gfbInputs.some(x => x[1] === name)) error(loc, `duplicate generated input ${name}`);
     this.gfbInputs.push(['input', name, gfbType(type)]);
@@ -1837,7 +1888,9 @@ class Lowerer {
         this.validateAccountConstraints(item);
       }
       if (item.kind === 'input') {
-        const type = this.resolveType(item.type); if (!SCALAR_TYPES.has(type.kind)) error(item.type.loc, 'input must use a scalar type');
+        const type = this.resolveType(item.type);
+        const isLifecycleReason = this.restartLifecycle && item.names.length === 1 && item.names[0] === 'restart_reason' && type.kind === 'RestartReason';
+        if (!SCALAR_TYPES.has(type.kind) && !isLifecycleReason) error(item.type.loc, 'input must use a scalar type');
         for (const name of item.names) { this.addInput(name, type, item.loc, true); this.symbols.get(name).type = type; }
       }
       if (item.kind === 'output') {
@@ -4147,6 +4200,7 @@ export function compileControl(source, { filename = '<control>', emitBytecode = 
       : 'named constraints require resource binding and runtime enforcement');
   }
   const lowered = new Lowerer(ast, filename).lower({ emitBytecode });
+  if (emitBytecode && lowered.manifest.lifecycle) lowered.bytes = wrapLifecycleGfb(lowered.bytes, lowered.manifest.lifecycle);
   if (lowered.manifest.signals.some(signal => signal.kind === 'after-event'
     && !signal.projections?.length)) {
     error(ast.loc, 'after_event requires an explicit after_event_any or after_event_all projection');

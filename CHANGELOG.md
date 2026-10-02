@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### 2026-10-02 — restart lifecycle inputs
+
+Controls can opt into the exact reserved `RestartReason` and `restart_event`
+inputs. The compiler records and validates their ordered enum metadata in an
+additive GFB19 envelope while preserving the base control profile. Framed native
+and WASM hosts must initialize the hardware-confirmed cause and boot-pending bit
+before activation. The core injects both values and rejects caller overrides.
+The event remains true across rejected scans and clears after the first
+successful commit. This supports event-driven recovery only; VM and timer state
+are not restored. Generic enum inputs and `on_restart` syntax remain unsupported.
+
 ### 2026-10-02 — Station atomic mode-entry binding bug fix ([#250](https://github.com/callin2/ghostflow-language/issues/250))
 
 Reference §4.10 rejects every conflicting same-tick mode entry. The WASM adapter

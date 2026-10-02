@@ -174,6 +174,14 @@ pub struct Module {
     true_fors: Option<true_for_vm::TrueForRequirements>,
     objective: Option<objective_vm::ObjectiveDescriptor>,
     resource_policy: Option<resource_constraints::Plan>,
+    lifecycle: Option<LifecycleDescriptor>,
+}
+
+#[derive(Clone)]
+pub struct LifecycleDescriptor {
+    pub restart_reason_input: String,
+    pub restart_reason_members: Vec<String>,
+    pub restart_event_input: String,
 }
 
 impl Module {
@@ -189,6 +197,61 @@ impl Module {
             return Err(Error::new("invalid GFB1 magic"));
         }
         let format_version = reader.u16()?;
+        if format_version == 19 {
+            let inner_length = reader.u32()? as usize;
+            if inner_length > MAX_MODULE_BYTES {
+                return Err(Error::new("lifecycle base byte limit exceeded"));
+            }
+            let inner = reader.take(inner_length)?.to_vec();
+            if matches!(inner.get(4..6), Some([17, 0]) | Some([19, 0])) {
+                return Err(Error::new("nested GFB wrapper is unsupported"));
+            }
+            let reason_name = reader.string()?;
+            let reason_count = reader.u8()?;
+            if reason_count != 5 {
+                return Err(Error::new("invalid lifecycle reason count"));
+            }
+            let mut reason_members = Vec::with_capacity(reason_count as usize);
+            for _ in 0..reason_count {
+                reason_members.push(reader.string()?);
+            }
+            let event_name = reader.string()?;
+            if !reader.finished() {
+                return Err(Error::new("trailing lifecycle descriptor bytes"));
+            }
+            if reason_name != "restart_reason"
+                || event_name != "restart_event"
+                || reason_members != ["PowerOn", "Brownout", "Watchdog", "Software", "Unknown"]
+            {
+                return Err(Error::new("invalid lifecycle descriptor"));
+            }
+            let mut module = Self::load(&inner)?;
+            if module.lifecycle.is_some() {
+                return Err(Error::new("nested lifecycle descriptor"));
+            }
+            let reason_input = module
+                .inputs
+                .iter()
+                .position(|field| field.name == reason_name)
+                .ok_or_else(|| Error::new("lifecycle reason input missing"))?;
+            let event_input = module
+                .inputs
+                .iter()
+                .position(|field| field.name == event_name)
+                .ok_or_else(|| Error::new("lifecycle event input missing"))?;
+            if module.inputs[reason_input].value_type != Type::Number
+                || module.inputs[event_input].value_type != Type::Bool
+            {
+                return Err(Error::new("lifecycle input type mismatch"));
+            }
+            module.lifecycle = Some(LifecycleDescriptor {
+                restart_reason_input: reason_name,
+                restart_reason_members: reason_members,
+                restart_event_input: event_name,
+            });
+            module.fingerprint = fingerprint;
+            return Ok(module);
+        }
         if format_version == 17 {
             let inner_length = reader.u32()? as usize;
             if inner_length > MAX_MODULE_BYTES {
@@ -679,11 +742,21 @@ impl Module {
             true_fors,
             objective,
             resource_policy: None,
+            lifecycle: None,
         })
     }
 
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    pub fn lifecycle(&self) -> Option<&LifecycleDescriptor> {
+        self.lifecycle.as_ref()
+    }
+
+    /// Base module GFB format, excluding an outer compiler metadata envelope.
+    pub fn bytecode_format_version(&self) -> u16 {
+        self.format_version
     }
     pub fn version(&self) -> u32 {
         self.version
@@ -835,6 +908,7 @@ impl TickRecord {
 
 pub struct Runtime {
     module: Option<Module>,
+    scan_driver_authorized: bool,
     capabilities: Vec<Capability>,
     active_strategy: Option<usize>,
     inputs: Vec<Option<Value>>,
@@ -857,6 +931,7 @@ impl Runtime {
     pub fn new(journal_capacity: usize) -> Self {
         Self {
             module: None,
+            scan_driver_authorized: false,
             capabilities: vec![],
             active_strategy: None,
             inputs: vec![],
@@ -1565,6 +1640,34 @@ impl Runtime {
         .report)
     }
     pub fn set_input(&mut self, name: &str, value: Value) -> Result<()> {
+        if self
+            .module
+            .as_ref()
+            .and_then(|module| module.lifecycle.as_ref())
+            .is_some_and(|lifecycle| {
+                lifecycle.restart_reason_input == name || lifecycle.restart_event_input == name
+            })
+        {
+            return Err(Error::new("restart lifecycle inputs are runtime-derived"));
+        }
+        self.assign_input(name, value)
+    }
+
+    pub(crate) fn set_lifecycle_input(&mut self, name: &str, value: Value) -> Result<()> {
+        if !self
+            .module
+            .as_ref()
+            .and_then(|module| module.lifecycle.as_ref())
+            .is_some_and(|lifecycle| {
+                lifecycle.restart_reason_input == name || lifecycle.restart_event_input == name
+            })
+        {
+            return Err(Error::new("input is not part of the restart lifecycle"));
+        }
+        self.assign_input(name, value)
+    }
+
+    fn assign_input(&mut self, name: &str, value: Value) -> Result<()> {
         let m = self
             .module
             .as_ref()
@@ -1609,6 +1712,16 @@ impl Runtime {
         context: Option<(schedule_clock::ClockSnapshot<'_>, &context_runtime::Facts)>,
         resource_binding: Option<&[u8]>,
     ) -> Result<&TickRecord> {
+        if !self.scan_driver_authorized
+            && self
+                .module
+                .as_ref()
+                .is_some_and(|module| module.lifecycle.is_some())
+        {
+            return Err(Error::new(
+                "restart lifecycle controls require the framed scan driver",
+            ));
+        }
         if self.context_runtime.is_some() != context.is_some() {
             return Err(Error::new("context tick requires activated typed evidence"));
         }
@@ -1925,6 +2038,16 @@ impl Runtime {
             self.journal.pop_front();
         }
         Ok(self.journal.back().expect("inserted"))
+    }
+
+    pub(crate) fn with_scan_driver_authority<T>(
+        &mut self,
+        run: impl FnOnce(&mut Self) -> Result<T>,
+    ) -> Result<T> {
+        self.scan_driver_authorized = true;
+        let result = run(self);
+        self.scan_driver_authorized = false;
+        result
     }
     /// Supplies explicit monotonic time; no wall clock is read inside the VM.
     pub fn tick_at(&mut self, milliseconds: u64) -> Result<&TickRecord> {
@@ -3496,6 +3619,7 @@ mod tests {
             format_version: 2,
             objective: None,
             resource_policy: None,
+            lifecycle: None,
             name: "int-atomicity".into(),
             version: 1,
             inputs: vec![Field {

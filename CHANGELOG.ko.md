@@ -5,6 +5,16 @@
 
 ## 미출시
 
+### 2026-10-02 — 재시작 수명 주기 입력
+
+Control은 정확한 reserved `RestartReason`과 `restart_event` 입력을 선택할 수 있다.
+Compiler는 기본 control profile을 보존하면서 순서가 있는 enum metadata를 추가 GFB19
+envelope에 기록하고 검증한다. Framed native/WASM 호스트는 활성화 전에 하드웨어가
+확인한 원인과 부팅 pending bit를 초기화해야 한다. Core가 두 값을 주입하고 호출자의
+덮어쓰기를 거부한다. 이벤트는 거부된 scan 뒤에도 true를 유지하고 처음 성공적으로
+commit된 뒤 지운다. 이는 이벤트 기반 복구만 지원하며 VM과 timer 상태는 복원하지 않는다.
+일반 enum input과 `on_restart` 문법은 계속 지원하지 않는다.
+
 ### 2026-10-02 — Station 원자적 mode 진입 binding 버그 수정 ([#250](https://github.com/callin2/ghostflow-language/issues/250))
 
 Reference §4.10은 같은 tick의 충돌 mode 진입을 모두 거부한다. 기존 WASM

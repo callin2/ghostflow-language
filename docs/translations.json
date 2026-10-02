@@ -383,8 +383,8 @@
       "source": "docs/reference/05-settings-and-observation.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/05-settings-and-observation.en.md",
-      "sourceSha256": "05ee69ff19b041cdf033ebd0f08d50066056d1da075e25381b4b9cab079ead76",
-      "translationSha256": "446a1963ab84d8edd1c9c43994ed7e7b208b6a6ac39a277890b7a9cd32845257"
+      "sourceSha256": "59e2ed6277d9f49fec3d4cdf1278155a9b3d50830da42a42b9188f52535fc3a0",
+      "translationSha256": "b3a4922edd2240130cc72ffa4f30019c7d6581e0c091022ff071eb0a7bfc2187"
     },
     {
       "source": "docs/reference/06-composition-and-replay.md",
@@ -474,8 +474,8 @@
       "source": "docs/SCAN-FRAME-WASM.md",
       "sourceLanguage": "en",
       "translation": "docs/SCAN-FRAME-WASM.ko.md",
-      "sourceSha256": "415d9248546fead35e4cf8a099a496d9783170045d219a09c2ca2a8acfccf1e3",
-      "translationSha256": "76e07552e03b1f545d6069f9cae4f021bce5b1ed6ca4cdfdd6f6bb003132f77c"
+      "sourceSha256": "87a95eb7204617bbf11483d7481b183841d5ab588ef9c17344c6768e468f9701",
+      "translationSha256": "04772277e085d12b42a70ad73e5722da7b72d73cd30c175009c9e51fdf001538"
     },
     {
       "source": "docs/SCAN-TAPE-PARITY.md",
@@ -586,8 +586,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "0a82db1a9bba3a7942683aca391f591e38848805ece83178d02548594e747ac8",
-      "translationSha256": "2adda7507d1c3c500497a07e95a18e4982fc3d295eebd7912f7eae227e026483"
+      "sourceSha256": "bf08a7bf0de82c5c585fa67b515ed49721bbfaace824f789917e8809536a8c8b",
+      "translationSha256": "0d77e4e23792e09d504d5529e7713fe2a86701dbb80775ce9282ff53de5a3924"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",

@@ -49,6 +49,7 @@ const debounceScenario = scenario.startsWith('debounce-');
 const holdScenario = scenario.startsWith('hold-');
 const intSettingsScenario = scenario.startsWith('int-settings-');
 const windowScenario = scenario.startsWith('window-');
+const restartLifecycleScenario = scenario.startsWith('restart-lifecycle-');
 const gfb10Scenario = scenario.startsWith('gfb10-');
 if (gfb10Scenario) {
   const pinned = JSON.parse(fs.readFileSync(path.join(root, 'tests/fixtures/gfb10-periodic-package-payload.json'), 'utf8'));
@@ -161,11 +162,20 @@ const quantitySource = quantityScenario ? `control Quantities {
   config threshold: Temperature = 25°C;
   config plain: Number = 1.0;
 }` : null;
+const restartLifecycleSource = `control RestartPackage {
+  type RestartReason = PowerOn | Brownout | Watchdog | Software | Unknown;
+  input start, stop: Bool;
+  input restart_reason: RestartReason;
+  input restart_event: Bool;
+  output pump, valve: Bool;
+  pump <- if restart_event then start else false;
+  valve <- stop;
+}`;
 const profileSource = {
   'profile-1': 'control Compact { input start, stop: Bool; output pump, valve: Bool; pump <- start; valve <- start; }',
   'profile-2': 'control Integer { input start, stop: Bool; state count: Int = 7; output pump: Int; output valve: Bool; pump <- count; valve <- start; }',
   'profile-3': 'control IntegerBranch { input start, stop: Bool; state count: Int = 7; output pump: Int; output valve: Bool; pump <- if start then count else 0; valve <- start; }',
-}[scenario];
+}[scenario] || (restartLifecycleScenario ? restartLifecycleSource : null);
 let source = configTimerScenario
   ? fs.readFileSync(path.join(root, 'examples/authoring/corpus/setting-corrected.ghost.md'), 'utf8')
   : (profileSource || quantitySource || timeSource || resultSource || debounceSource || holdSource || intSettingsSource || windowScenario) ? `# Package profile\n\n\`\`\`ghost\n${profileSource || quantitySource || timeSource || resultSource || debounceSource || holdSource || intSettingsSource || windowSource}\n\`\`\`\n`
@@ -213,13 +223,16 @@ const packageValue = await buildPortablePackage(compilation, identity, {
   signers: [{ keyId: 'test-current-2026', privateKey }],
   verifyCompilation: (text, { filename }) => compileSource(text, { filename }),
 });
-if (scenario === 'adapt-valid' || scenario === 'valid' || scenario === 'constraint-proof-valid' || profileSource || configTimerScenario || scenario === 'quantity-valid' || scenario === 'time-valid' || scenario === 'result-valid' || scenario === 'debounce-valid' || scenario === 'hold-valid' || scenario === 'hold-basic-valid' || scenario === 'int-settings-valid' || scenario === 'window-valid') {
+if (scenario === 'adapt-valid' || scenario === 'valid' || scenario === 'constraint-proof-valid' || (profileSource && scenario !== 'restart-lifecycle-manifest-tamper') || configTimerScenario || scenario === 'quantity-valid' || scenario === 'time-valid' || scenario === 'result-valid' || scenario === 'debounce-valid' || scenario === 'hold-valid' || scenario === 'hold-basic-valid' || scenario === 'int-settings-valid' || scenario === 'window-valid') {
   process.stdout.write(serializePortablePackage(packageValue));
-} else if (adaptScenario || quantityScenario || timeScenario || resultScenario || debounceScenario || holdScenario || intSettingsScenario || windowScenario || ['unsupported-bytecode-version', 'version-mismatch-1', 'version-mismatch-2', 'unsupported-header'].includes(scenario)) {
+} else if (adaptScenario || quantityScenario || timeScenario || resultScenario || debounceScenario || holdScenario || intSettingsScenario || windowScenario || restartLifecycleScenario || ['unsupported-bytecode-version', 'version-mismatch-1', 'version-mismatch-2', 'unsupported-header'].includes(scenario)) {
   const candidate = JSON.parse(JSON.stringify(packageValue));
-  if (adaptScenario || quantityScenario || timeScenario || resultScenario || debounceScenario || holdScenario || intSettingsScenario || windowScenario) {
+  if (adaptScenario || quantityScenario || timeScenario || resultScenario || debounceScenario || holdScenario || intSettingsScenario || windowScenario || restartLifecycleScenario) {
     const manifest = JSON.parse(Buffer.from(candidate.payload.manifest.contentBase64, 'base64').toString('utf8'));
-    if(adaptScenario){
+    if (restartLifecycleScenario) {
+      if (scenario !== 'restart-lifecycle-manifest-tamper') throw new Error(`unknown restart lifecycle scenario: ${scenario}`);
+      manifest.lifecycle.restartReasonMembers[0].name = 'Forged';
+    } else if(adaptScenario){
       if(scenario==='adapt-priority') manifest.strategies[0].priority++;
       else if(scenario==='adapt-name') manifest.strategies[0].name='Forged';
       else if(scenario==='adapt-match') manifest.strategies[0].match[0].role='other';
@@ -466,7 +479,7 @@ if (scenario === 'adapt-valid' || scenario === 'valid' || scenario === 'constrai
     bytes.writeUInt16LE(5, 4);
     candidate.payload.bytecode.contentBase64 = bytes.toString('base64');
     candidate.payload.bytecode.sha256 = Buffer.from(await crypto.subtle.digest('SHA-256', bytes)).toString('hex');
-  } else candidate.payload.bytecode.version = scenario === 'unsupported-bytecode-version' ? '5' : scenario.slice(-1);
+  } else if (!restartLifecycleScenario) candidate.payload.bytecode.version = scenario === 'unsupported-bytecode-version' ? '5' : scenario.slice(-1);
   const payloadBytes = encoder.encode(canonicalJson(candidate.payload));
   const payloadDigest = new Uint8Array(await crypto.subtle.digest('SHA-256', payloadBytes));
   candidate.payloadSha256 = Array.from(payloadDigest, byte => byte.toString(16).padStart(2, '0')).join('');

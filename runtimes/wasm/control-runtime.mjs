@@ -10,6 +10,7 @@ import { encodeContextActivation, encodeContextFacts, validateContextSolarFacts 
 import { QUANTITY_TYPES, canonicalUnitFor, isQuantityType } from '../../tools/quantities.mjs';
 import { TIME_TYPES, isTimeType, validateTimeValue } from '../../tools/time-literals.mjs';
 import { isInt32, intSettingsIssue } from '../../tools/int-settings.mjs';
+import { physicalManifestInputs, validateLifecycleManifest } from '../../tools/lifecycle-contract.mjs';
 
 const FORMAT = 'GhostFlow/control-v1';
 const SETTINGS_FORMAT = 'GhostFlow/control-v2';
@@ -232,7 +233,8 @@ function validateCanonicalUnit(item, label) {
 function validateContextManifest(input, bytecodeFormat) {
   const manifest = record(input, 'manifest');
   keys(manifest, ['format','name','inputs','outputs','sensors','schedules','timers','signals','configs','bytecodeSha256'],
-    ['providers','calendars','naturalConditions','calendarConditions','accounting','resources','objectives','adaptSettings'], 'manifest');
+    ['providers','calendars','naturalConditions','calendarConditions','accounting','resources','objectives','adaptSettings','lifecycle'], 'manifest');
+  const lifecycle = validateLifecycleManifest(manifest);
   if (manifest.format === CALENDAR_EXECUTION_FORMAT ? bytecodeFormat !== 18 : manifest.format === SOLAR_CONTEXT_FORMAT ? bytecodeFormat !== 16 : manifest.format === HOLIDAY_FORMAT ? bytecodeFormat !== 15 : manifest.format === AT_FORMAT ? bytecodeFormat !== 14 : manifest.format === AVAILABILITY_FORMAT ? bytecodeFormat !== 13 : ![11, 12].includes(bytecodeFormat)) throw new Error('context manifest requires its matching GFB format');
   name(manifest.name, 'manifest.name');
   if (!/^[0-9a-f]{64}$/.test(manifest.bytecodeSha256)) throw new Error('invalid bytecode SHA-256');
@@ -273,7 +275,7 @@ function validateContextManifest(input, bytecodeFormat) {
     name(item.name, 'timer.name'); name(item.state, `timer ${item.name}.state`);
     if (item.clockInput !== `${RESERVED}now_ms`) throw new Error(`timer ${item.name}.clockInput must be ${RESERVED}now_ms`);
   }
-  for (const item of inputs) { name(item.name, 'input.name'); if (item.name.startsWith(RESERVED)) throw new Error('reserved user input'); type(item.type, `input ${item.name}.type`); validateCanonicalUnit(item, `input ${item.name}`); }
+  for (const item of inputs) { name(item.name, 'input.name'); if (item.name.startsWith(RESERVED)) throw new Error('reserved user input'); if (!(lifecycle && item.name === lifecycle.restartReasonInput)) type(item.type, `input ${item.name}.type`); validateCanonicalUnit(item, `input ${item.name}`); }
   for (const item of outputs) { portName(item.name, 'output.name'); type(item.type, `output ${item.name}.type`); validateCanonicalUnit(item, `output ${item.name}`); }
   for (const item of schedules) {
     name(item.name, 'schedule.name'); safeInteger(item.site, 'schedule.site', 1, 0xffff_ffff);
@@ -405,7 +407,7 @@ function validateContextManifest(input, bytecodeFormat) {
   }
   const normalized = freeze(copy({ ...manifest, inputs, outputs, schedules, configs, providers, calendars, timers,
     sensors, objectives, resources, adaptSettings, naturalConditions: naturals, ...(calendarConditions.length ? { calendarConditions } : {}), ...(accounting === null ? {} : { accounting }) }));
-  return { manifest: normalized, inputNames: new Set(inputs.map(item => item.name)),
+  return { manifest: normalized, lifecycle, inputNames: new Set(physicalManifestInputs(normalized).map(item => item.name)),
     sensorByName: new Map(sensors.map(item => [item.name,item])), scheduleNames: new Set(schedules.map(item => item.name)), signalNames: new Set() };
 }
 
@@ -415,7 +417,8 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
   if ((Object.hasOwn(manifest, 'adaptPolicy') || Object.hasOwn(manifest, 'strategies')) && capabilities === undefined) {
     throw new Error('adapt strategy activation requires a capability-aware host; ControlRuntime cannot activate this manifest');
   }
-  keys(manifest, ['format', 'name', 'inputs', 'outputs', 'sensors', 'schedules', 'timers', 'signals', 'configs', 'bytecodeSha256'], ['adaptPolicy', 'strategies', 'objectives', 'resources', 'sensorInstances'], 'manifest');
+  keys(manifest, ['format', 'name', 'inputs', 'outputs', 'sensors', 'schedules', 'timers', 'signals', 'configs', 'bytecodeSha256'], ['adaptPolicy', 'strategies', 'objectives', 'resources', 'sensorInstances', 'lifecycle'], 'manifest');
+  const lifecycle = validateLifecycleManifest(manifest);
   if (manifest.format !== FORMAT && manifest.format !== INTEGER_FORMAT && !(manifest.format === SETTINGS_FORMAT && acceptSettings) && manifest.format !== SOLAR_FORMAT && manifest.format !== SCHEDULE_FORMAT && manifest.format !== SCHEDULE_SLOTS_FORMAT && manifest.format !== AVAILABILITY_FORMAT) throw new Error(`unsupported manifest format ${String(manifest.format)}`);
   const settingsManifest = manifest.format === SETTINGS_FORMAT || manifest.format === INTEGER_FORMAT || manifest.format === AVAILABILITY_FORMAT;
   const solarManifest = manifest.format === SOLAR_FORMAT || manifest.format === INTEGER_FORMAT || manifest.format === AVAILABILITY_FORMAT;
@@ -507,7 +510,7 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
   const configs = validateList(manifest.configs, 'manifest.configs', ['name', 'type', 'value'], settingsManifest ? ['settings', 'initialOffset', 'initialEndOffset', 'canonicalUnit', 'displayUnit'] : ['canonicalUnit']);
   const resources = manifest.resources === undefined ? [] : validateList(manifest.resources, 'manifest.resources', ['name', 'type'], []);
 
-  for (const item of inputs) { name(item.name, 'input.name'); type(item.type, `input ${item.name}.type`); validateCanonicalUnit(item, `input ${item.name}`); }
+  for (const item of inputs) { name(item.name, 'input.name'); if (!(lifecycle && item.name === lifecycle.restartReasonInput)) type(item.type, `input ${item.name}.type`); validateCanonicalUnit(item, `input ${item.name}`); }
   for (const item of outputs) { portName(item.name, 'output.name'); type(item.type, `output ${item.name}.type`); validateCanonicalUnit(item, `output ${item.name}`); }
   const windows = signals.filter(item => item.kind === 'window');
   if (manifest.format === INTEGER_FORMAT && ![2, 3, 4, 5, 6].includes(bytecodeFormat)) throw new Error('v4 manifest requires GFB format 2, 3, 4, 5 or 6');
@@ -525,7 +528,7 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
       : isAfterEvent(item) ? item.projections.length * 3 : 3), 0)
     + schedules.filter(item => item.kind !== 'solar').length + timers.length * 2 + (timers.length > 0 || signals.some(isVmSignal) ? 1 : 0) + (windows.length ? 1 : 0);
   if (generatedTotal > MAX_NAMES) throw new RangeError(`generated manifest names exceed ${MAX_NAMES}`);
-  const inputNames = new Set(inputs.map(item => item.name));
+  const inputNames = new Set(physicalManifestInputs(manifest).map(item => item.name));
 
   for (const item of configs) {
     name(item.name, 'config.name');
@@ -868,7 +871,7 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
   const publicManifest = freeze({ ...copy(manifest), inputs, outputs, sensors, schedules, timers, signals, configs,
     ...(manifest.sensorInstances === undefined ? {} : { sensorInstances }),
     ...(manifest.resources === undefined ? {} : { resources }), ...(manifest.objectives === undefined ? {} : { objectives }) });
-  return { manifest: publicManifest, inputNames, sensorByName, scheduleNames, signalNames };
+  return { manifest: publicManifest, lifecycle, inputNames, sensorByName, scheduleNames, signalNames };
 }
 
 function bytes(value, label) {
@@ -912,10 +915,29 @@ async function instantiateControlRuntime(wasmBytes, { bytes: bytecode, manifest 
   const wasm = new Uint8Array(bytes(wasmBytes, 'wasmBytes'));
   // Copy caller-owned bytecode before awaiting digest verification (TOCTOU-safe).
   const compiledBytes = new Uint8Array(bytes(bytecode, 'bytes'));
-  const bytecodeFormat = compiledBytes.byteLength >= 6
+  let bytecodeFormat = compiledBytes.byteLength >= 6
     ? new DataView(compiledBytes.buffer, compiledBytes.byteOffset, compiledBytes.byteLength).getUint16(4, true)
     : null;
+  if (bytecodeFormat === 19) {
+    if (compiledBytes.byteLength < 10) throw new Error('truncated GFB19 lifecycle header');
+    const view = new DataView(compiledBytes.buffer, compiledBytes.byteOffset, compiledBytes.byteLength);
+    const innerLength = view.getUint32(6, true);
+    if (innerLength < 6 || 10 + innerLength > compiledBytes.length) throw new Error('invalid GFB19 base payload length');
+    bytecodeFormat = view.getUint16(14, true);
+  }
   const checkedManifest = validateManifest(manifest, { ...options, bytecodeFormat });
+  if ((checkedManifest.lifecycle !== null) !== (compiledBytes.byteLength >= 6 && new DataView(compiledBytes.buffer, compiledBytes.byteOffset, compiledBytes.byteLength).getUint16(4, true) === 19)) {
+    throw new Error('manifest lifecycle metadata must match GFB19 bytecode');
+  }
+  if (checkedManifest.lifecycle && !options.restart) throw new Error('restart initialization is required for a lifecycle control');
+  if (!checkedManifest.lifecycle && options.restart !== undefined) throw new Error('restart initialization requires lifecycle metadata');
+  if (options.restart !== undefined) {
+    const restart = record(options.restart, 'restart');
+    keys(restart, ['reasonOrdinal', 'eventPending'], [], 'restart');
+    safeInteger(restart.reasonOrdinal, 'restart.reasonOrdinal', 0, 4);
+    if (typeof restart.eventPending !== 'boolean') throw new TypeError('restart.eventPending must be boolean');
+  }
+  if (checkedManifest.lifecycle && instantiateRuntime === GhostFlowRuntime.instantiate) throw new Error('restart lifecycle requires framed ControlRuntime');
   const suppliedCapabilities = options.capabilities;
   const presentSensors = new Set(checkedManifest.manifest.sensors.filter(sensor => !sensor.optional).map(sensor => sensor.name));
   if (suppliedCapabilities !== undefined) {
@@ -985,6 +1007,7 @@ async function instantiateControlRuntime(wasmBytes, { bytes: bytecode, manifest 
   const afterEvents = new Map();
   try {
     runtime.load(compiledBytes);
+    if (checkedManifest.lifecycle) runtime.initializeRestart(options.restart.reasonOrdinal, options.restart.eventPending);
     for (const item of [...checkedManifest.manifest.sensors, ...(checkedManifest.manifest.sensorInstances ?? [])]) sensors.set(item.name, { item, conditioner: new SignalConditioner(runtime.wasm, sensorConfig(item)) });
     for (const item of checkedManifest.manifest.signals) {
       if (isVmSignal(item) || item.kind === 'true-for' || isAfterEvent(item)) continue;
@@ -1044,12 +1067,14 @@ export class ControlRuntime {
   #hasContext;
   #afterEventEpoch;
   #presentSensors;
+  #lifecycle;
 
   constructor(runtime, manifest, sensors, signals, afterEvents, framed = false, temporalEpoch = null, hasSolar = false, afterEventEpoch = null, hasSchedules = false, hasContext = false) {
     this.runtime = runtime;
     this.exports = runtime.wasm;
     this.manifest = manifest.manifest;
     this.inputNames = manifest.inputNames;
+    this.physicalInputs = physicalManifestInputs(manifest.manifest);
     this.sensorByName = manifest.sensorByName;
     this.scheduleNames = manifest.scheduleNames;
     this.solarScheduleNames = new Set(manifest.manifest.schedules.filter(item => item.kind === 'solar').map(item => item.name));
@@ -1069,6 +1094,7 @@ export class ControlRuntime {
     this.#hasContext = hasContext;
     this.#afterEventEpoch = afterEventEpoch;
     this.#presentSensors = manifest.presentSensors;
+    this.#lifecycle = manifest.lifecycle ?? null;
   }
 
   /** Latest committed framed outcome; legacy entries deliberately expose none. */
@@ -1076,6 +1102,12 @@ export class ControlRuntime {
     this.#live();
     if (!this.#framed) return null;
     return this.runtime.outcome;
+  }
+  get restartEventPending() {
+    this.#live();
+    if (!this.#lifecycle) return null;
+    if (!this.#framed) throw new Error('restart lifecycle requires framed ControlRuntime');
+    return this.runtime.restartEventPending;
   }
   contextSnapshot() {
     this.#live();
@@ -1109,7 +1141,7 @@ export class ControlRuntime {
       const staged = this.#stageAfterEvents(captured, sensorReadings, observedSensors);
       afterEventTransaction = staged.trackers;
 
-      for (const item of this.manifest.inputs) {
+      for (const item of this.physicalInputs) {
         const value = captured.inputValues.get(item.name);
         if (item.type === 'Bool') this.runtime.setBool(item.name, value);
         else if (item.type === 'Int') this.runtime.setInt(item.name, value);
@@ -1194,7 +1226,7 @@ export class ControlRuntime {
     if (this.lastNowMs !== null && nowMs < this.lastNowMs) throw new Error('nowMs must be monotonic');
     record(inputs, 'inputs'); record(samples, 'samples'); record(due, 'due'); record(intervals, 'intervals'); record(events, 'events'); record(objectiveSafeMax, 'objectiveSafeMax');
     for (const key of Object.keys(inputs)) if (!this.inputNames.has(key)) throw new Error(`unknown input ${key}`);
-    for (const item of this.manifest.inputs) if (!Object.prototype.hasOwnProperty.call(inputs, item.name)) throw new Error(`missing input ${item.name}`);
+    for (const item of this.physicalInputs) if (!Object.prototype.hasOwnProperty.call(inputs, item.name)) throw new Error(`missing input ${item.name}`);
     for (const key of Object.keys(samples)) {
       if (!this.sensorByName.has(key)) throw new Error(`unknown sensor ${key}`);
       if (this.#presentSensors !== null && !this.#presentSensors.has(key)) throw new Error(`absent sensor capability ${key}`);
@@ -1242,7 +1274,7 @@ export class ControlRuntime {
     }
 
     const inputValues = new Map();
-    for (const item of this.manifest.inputs) {
+    for (const item of this.physicalInputs) {
       const value = inputs[item.name];
       inputValue(value, item.type, `inputs.${item.name}`);
       inputValues.set(item.name, value);
@@ -1517,7 +1549,7 @@ export class ControlRuntime {
       const staged = this.#stageAfterEvents(captured, sensorReadings, observedSensors);
       afterEventTransaction = staged.trackers;
       const frameInputs = [];
-      for (const item of this.manifest.inputs) frameInputs.push({ name: item.name, type: item.type, value: captured.inputValues.get(item.name) });
+      for (const item of this.physicalInputs) frameInputs.push({ name: item.name, type: item.type, value: captured.inputValues.get(item.name) });
       for (const [, entry] of this.sensors) {
         const reading = sensorReadings.get(entry.item.name);
         frameInputs.push({ name: entry.item.valueInput, type: entry.item.type, value: reading.value });

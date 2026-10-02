@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { compile, parse, tokenize } from '../tools/gfb1.mjs';
+import { compileControl } from '../tools/control.mjs';
 import { compileSource } from './helpers/literate-compile.mjs';
 import { FramedGhostFlowRuntime } from '../runtimes/wasm/framed-runtime.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
@@ -89,6 +90,37 @@ test('GF-TEST-scan-frame-wasm: configure, activate, and preserve requested/safe 
   assert.throws(() => runtime.load(moduleBytes), /already active/);
   assert.throws(() => runtime.addCapability('actuator', 'pump', 'bool'), /already active/);
   assert.throws(() => runtime.activate(), /already active/);
+});
+
+test('GF-TEST-restart-lifecycle-wasm: initialize before activation and consume event on committed scan', async t => {
+  const module = compileControl(`control RestartFrame {
+    type RestartReason = PowerOn | Brownout | Watchdog | Software | Unknown;
+    input restart_reason: RestartReason;
+    input restart_event: Bool;
+    state seen: Bool = false;
+    seen' = restart_event;
+  }`);
+  const runtime = await FramedGhostFlowRuntime.instantiate(wasmBytes);
+  t.after(() => runtime.dispose());
+  const malformed = new Uint8Array(module.bytes);
+  const malformedView = new DataView(malformed.buffer, malformed.byteOffset, malformed.byteLength);
+  let descriptorAt = 10 + malformedView.getUint32(6, true);
+  descriptorAt += 2 + malformedView.getUint16(descriptorAt, true) + 1;
+  descriptorAt += 2;
+  malformed[descriptorAt] = 'X'.charCodeAt(0);
+  assert.throws(() => runtime.load(malformed), /invalid lifecycle descriptor/);
+  runtime.load(module.bytes);
+  assert.throws(() => runtime.activate(), /restart lifecycle initialization is required/);
+  runtime.initializeRestart(2, true);
+  assert.equal(runtime.restartEventPending, true);
+  runtime.activate();
+  const first = runtime.scan({ scanId: 0, logicalTimeMs: 0, inputs: [] });
+  assert.equal(first.trace.inputs.restart_reason, 2);
+  assert.equal(first.trace.inputs.restart_event, true);
+  assert.equal(runtime.restartEventPending, false);
+  const second = runtime.scan({ scanId: 1, logicalTimeMs: 1, inputs: [] });
+  assert.equal(second.trace.inputs.restart_reason, 2);
+  assert.equal(second.trace.inputs.restart_event, false);
 });
 
 test('GF-TEST-scan-frame-wasm: generated timer lowering receives logical frame time', async t => {
@@ -471,7 +503,7 @@ test('GF-TEST-scan-frame-wasm: wrapper rejects non-buffer and oversized module i
   let scans = 0;
   const memory = new WebAssembly.Memory({ initial: 1 });
   const functions = Object.fromEntries([
-    'gf_dealloc', 'gf_frame_destroy', 'gf_frame_load', 'gf_frame_add_capability', 'gf_frame_activate', 'gf_frame_activate_temporal',
+    'gf_dealloc', 'gf_frame_destroy', 'gf_frame_load', 'gf_frame_add_capability', 'gf_frame_initialize_restart', 'gf_frame_restart_event_pending', 'gf_frame_activate', 'gf_frame_activate_temporal',
     'gf_frame_outcome_ptr', 'gf_frame_outcome_len', 'gf_frame_error_ptr', 'gf_frame_error_len',
     'gf_frame_replay_temporal', 'gf_frame_replay_ptr', 'gf_frame_replay_len',
     'gf_frame_plan_temporal', 'gf_frame_plan_temporal_replay', 'gf_frame_resource_plan_ptr', 'gf_frame_resource_plan_len',

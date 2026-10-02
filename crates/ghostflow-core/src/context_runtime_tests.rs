@@ -778,6 +778,7 @@ fn module(descriptor: PulseDescriptor, natural: bool) -> Module {
     }
     Module {
         resource_policy: None,
+        lifecycle: None,
         fingerprint: 85,
         format_version: 11,
         name: "context-transaction".into(),
