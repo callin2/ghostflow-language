@@ -706,7 +706,15 @@ impl ContextRuntime {
                     let engine = self.engines[index]
                         .as_ref()
                         .ok_or_else(|| invalid("context engine binding mismatch"))?;
-                    engine.preflight_setting(d, proposal(config_id).as_ref())?;
+                    engine.preflight_setting(
+                        d,
+                        proposal(config_id).as_ref(),
+                        if matches!(clock.trust, ClockTrust::Trusted) {
+                            clock.wall_ms
+                        } else {
+                            None
+                        },
+                    )?;
                 }
             }
             if let Some(fault) = group_fault.or(explicit_fault) {

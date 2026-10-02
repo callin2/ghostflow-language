@@ -5,6 +5,23 @@
 
 ## 미출시
 
+### 2026-10-02 — keyed TimeSlots Range의 atomic 중첩 검증 ([#267](https://github.com/callin2/ghostflow-language/issues/267))
+
+Reference §§3.5–3.6은 하루를 나누는 정수 분 grid에서 `TimeSlots<G,N>`로 선택한
+UTC `DailySlots<G>`와 양의 고정 Duration을 GFB20/control-v20으로 실행한다.
+이전에는 이 keyed Range 형식을 거부했다. 08:00 `range(20min)`을
+`[08:00, 08:15]`로 바꾸는 live 제안은 설정/scan transaction 전체를 거부하고,
+맞닿는 `[08:00, 08:20]`은 성공한다. preflight는 이미 admit한 제거된 key도
+보호한다. retime은 occurrence identity를 유지하고, key 제거는 admit한 작업을
+유지하며, 추가/재추가는 새 key와 신뢰할 수 있는 추가 baseline을 사용한다.
+변경된 key는 신뢰할 수 있는 wall time 없이는 atomic하게 거부한다. 빈 목록은
+유효하고 승인된 fault는 새 plan을 만들지 않으며 과거 key를 보존한다. GFRG4는
+keyed 설정, allocator, baseline과 consumed history를 저장하고 restore에서 검증하되
+timer를 재개하지 않는다. 이전 consumer는 새 format을 거부하며 GFRG1/2/3은 별도로
+유지한다. REF-03-078은 원래의 정적 slots/live Duration 중첩 사례를 포함하여 실제
+native/WASM trace, 전체 checkpoint와 rollback을 비교한다. 비 UTC/DST, calendar,
+live TimeSlots와 Duration의 조합, Run cancellation 정책은 이 profile 밖에 있다.
+
 ### 2026-10-02 — 영속 확인 없는 accounting admission 차단 ([#269](https://github.com/callin2/ghostflow-language/issues/269))
 
 Reference §3.10 `on_unknown = block`을 복원하는 버그 수정이다. 현재 revision에 영속

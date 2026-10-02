@@ -445,6 +445,16 @@ impl ContextRuntime {
             if engine.effective_setting(d) != Some(expected) {
                 return Err(invalid("checkpoint config consumer value mismatch"));
             }
+            if matches!(
+                d.definition,
+                ScheduleDefinition::ConfigDailySlots {
+                    range_duration_ms: Some(_),
+                    ..
+                }
+            ) && engine.settings_key_allocator() != config.next_key
+            {
+                return Err(invalid("checkpoint config consumer key allocator mismatch"));
+            }
         }
         // Event positions and clocks are run-local; durable identities are not.
         restored.last_event_position = None;

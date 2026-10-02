@@ -381,8 +381,8 @@ pub(crate) fn load_prelude(
                 (site, name)
             }
             kind if (matches!(kind, 5..=9)
-                && matches!(format, 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19))
-                || (kind == 13 && matches!(format, 12 | 13 | 14 | 15 | 16 | 18 | 19))
+                && matches!(format, 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20))
+                || (kind == 13 && matches!(format, 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20))
                 || (kind == 15 && matches!(format, 15 | 16 | 18))
                 || (kind == 17 && format == 18)
                 || (kind == 16 && format == 16)
@@ -442,7 +442,7 @@ pub(crate) fn load_prelude(
                     .push(PulseDescriptor::Accounting(descriptor));
                 identity
             }
-            12 if matches!(format, 11 | 12 | 13 | 14 | 15 | 16 | 19) => {
+            12 if matches!(format, 11 | 12 | 13 | 14 | 15 | 16 | 19 | 20) => {
                 let descriptor = crate::settings_stream::load(reader, inputs)?;
                 let identity = (descriptor.id, descriptor.name.clone());
                 result
@@ -482,7 +482,7 @@ pub(crate) fn projection_type(
         return Err(Error::new("schedule projection index"));
     }
     if field
-        > if matches!(format, 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19) {
+        > if matches!(format, 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20) {
             2
         } else {
             1

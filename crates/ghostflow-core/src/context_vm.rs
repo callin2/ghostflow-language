@@ -86,6 +86,7 @@ pub enum ScheduleDefinition {
         grid_ms: u64,
         capacity: u16,
         initial_minutes: Vec<u16>,
+        range_duration_ms: Option<u64>,
         dst_missing: u8,
         dst_repeated: u8,
     },
@@ -271,15 +272,24 @@ pub(crate) fn text(reader: &mut Reader<'_>) -> Result<String> {
 }
 
 pub(crate) fn validate_utc_range(starts: &[u64], duration: u64) -> Result<()> {
+    validate_utc_range_inner(starts, duration, false)
+}
+
+pub(crate) fn validate_utc_range_allow_empty(starts: &[u64], duration: u64) -> Result<()> {
+    validate_utc_range_inner(starts, duration, true)
+}
+
+fn validate_utc_range_inner(starts: &[u64], duration: u64, allow_empty: bool) -> Result<()> {
     const DAY: u64 = 86_400_000;
-    if !(1..=96).contains(&starts.len())
-        || duration == 0
+    if duration == 0
         || duration > DAY
+        || starts.len() > 96
+        || (!allow_empty && starts.is_empty())
         || starts.iter().any(|start| *start >= DAY)
         || starts
             .windows(2)
             .any(|pair| pair[0] >= pair[1] || duration > pair[1] - pair[0])
-        || duration > DAY - starts[starts.len() - 1] + starts[0]
+        || (!starts.is_empty() && duration > DAY - starts[starts.len() - 1] + starts[0])
     {
         return Err(Error::new("invalid or overlapping UTC Range recurrence"));
     }
@@ -636,6 +646,26 @@ pub(crate) fn load_schedule(
                         slots.iter().map(|(_, minute)| *minute).collect(),
                     )
                 };
+            let range_duration_ms = if format >= 20 {
+                let value = exact(reader)?;
+                if value == 0 {
+                    None
+                } else {
+                    Some(value)
+                }
+            } else {
+                None
+            };
+            if let Some(duration) = range_duration_ms {
+                if timezone != "UTC" {
+                    return Err(Error::new("TimeSlots Range requires UTC"));
+                }
+                let starts: Vec<u64> = initial_minutes
+                    .iter()
+                    .map(|minute| u64::from(*minute) * 60_000)
+                    .collect();
+                validate_utc_range_allow_empty(&starts, duration)?;
+            }
             let (dst_missing, dst_repeated) = dst(reader)?;
             ScheduleDefinition::ConfigDailySlots {
                 config_id,
@@ -645,6 +675,7 @@ pub(crate) fn load_schedule(
                 grid_ms,
                 capacity,
                 initial_minutes,
+                range_duration_ms,
                 dst_missing,
                 dst_repeated,
             }

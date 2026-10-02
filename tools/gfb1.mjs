@@ -476,7 +476,7 @@ function lowerCoreModule(ast) {
         const gapMs=unsignedAtom(gapAtom,9007199254740991n,'invalid schedule gap');
         if(!gapMs)throw new CompileError('invalid schedule gap');
         const expected={ 'at-pulse':3,'solar-context-pulse':9,'cron-pulse':10,'calendar-daily-pulse':8,'holiday-daily-pulse':7,'tide-run':8,'config-daily-slots-pulse':6,'utc-range':6,'calendar-range':8 }[h];
-        if(h==='periodic-pulse'?![5,6].includes(payload.length):payload.length!==expected)throw new CompileError(`${h} has invalid arity`);
+        if(h==='periodic-pulse'?![5,6].includes(payload.length):h==='config-daily-slots-pulse'?![6,7].includes(payload.length):payload.length!==expected)throw new CompileError(`${h} has invalid arity`);
         const [whenForm,cancelForm]=payload.slice(-2);
         const when=checkedExpression(whenForm,contextEnv(),false),cancel=checkedExpression(cancelForm,contextEnv(),false);
         if(when.type!==TYPE.bool||cancel.type!==TYPE.bool)throw new CompileError('invalid context schedule predicate');
@@ -563,10 +563,14 @@ function lowerCoreModule(ast) {
             within:unsignedAtom(within,9007199254740991n,'invalid Tide within')};
           if(!detail.run||!detail.within)throw new CompileError('invalid Tide duration');
         }else{
-          const [timezone,configIdAtom,missing,fold]=data;
+          const [timezone,configIdAtom,...rest]=data;
+          const withRange=rest.length===3;
+          const [rangeDurationAtom,missing,fold]=withRange?rest:[undefined,...rest];
           detail={timezone:text(timezone),configId:Number(unsignedAtom(configIdAtom,4294967295n,'invalid TimeSlots config id')),
+            ...(withRange?{rangeDuration:unsignedAtom(rangeDurationAtom,86400000n,'invalid TimeSlots Range duration')}:{}),
             missing:dst(missing),repeated:repeated(fold)};
           if(!detail.configId)throw new CompileError('invalid TimeSlots config id');
+          if(withRange&&!detail.rangeDuration)throw new CompileError('invalid TimeSlots Range duration');
         }
         const schedule={site,name:scheduleName,gapMs,when,cancel,detail,...(holdMs!==null?{holdMs}: {})};
         schedules.push(schedule);preludes.push({kind:h,value:schedule});
@@ -720,8 +724,9 @@ function emitGfb(moduleIr) {
   const calendarExecution=preludeKinds.has('calendar-range')||preludeKinds.has('calendar-result');
   if(calendarExecution&&(extendedNatural||hasPid||['at-pulse','solar-context-pulse','schedule','daily','daily-slots','config-stream','natural-result','accounting-result'].some(kind=>preludeKinds.has(kind))))throw new CompileError('calendar execution cannot mix with legacy civil/Solar/At, settings, natural/accounting Results, PID or hold_trusted execution');
   const liveRangeStart=compiledStrategies.some(strategy=>strategy.extensions.preludes.some(prelude=>prelude.kind==='utc-range'&&prelude.value.detail.startConfigId));
+  const timeSlotsRange=compiledStrategies.some(strategy=>strategy.extensions.preludes.some(prelude=>prelude.kind==='config-daily-slots-pulse'&&prelude.value.detail.rangeDuration));
   if(liveRangeStart&&calendarExecution)throw new CompileError('live Range start cannot mix with calendar execution');
-  const format=liveRangeStart?19:calendarExecution?18:preludeKinds.has('solar-context-pulse')?16:preludeKinds.has('holiday-daily-pulse')?15:preludeKinds.has('at-pulse')?14:extendedNatural?13:preludeKinds.has('utc-range')?12:hasContext?11:hasDailySlots?9:hasDaily?8:hasPid?7:hasTrueFors?6:hasSchedules?5:temporal?4:format3?3:intDeclarations||intExpressions?2:1;
+  const format=timeSlotsRange?20:liveRangeStart?19:calendarExecution?18:preludeKinds.has('solar-context-pulse')?16:preludeKinds.has('holiday-daily-pulse')?15:preludeKinds.has('at-pulse')?14:extendedNatural?13:preludeKinds.has('utc-range')?12:hasContext?11:hasDailySlots?9:hasDaily?8:hasPid?7:hasTrueFors?6:hasSchedules?5:temporal?4:format3?3:intDeclarations||intExpressions?2:1;
   const w=new Writer();w.bytes(UTF8.encode('GFB1'));w.u16(format);w.str(name);w.u32(version);
   const typeCode=type=>TYPE[type.toLowerCase()];
   w.u16(inputs.length);for(const x of inputs){w.str(x.name);w.u8(typeCode(x.type));}
@@ -753,7 +758,7 @@ function emitGfb(moduleIr) {
     else if(prelude.kind==='calendar-daily-pulse'){w.str(d.timezone);w.u64(d.at);w.str(d.calendar);w.u8(d.offday==='offday'?1:0);w.u8(missingCode(d.missing));w.u8(repeatedCode(d.repeated));}
     else if(prelude.kind==='holiday-daily-pulse'){w.str(d.timezone);w.u64(d.at);w.str(d.calendar);w.u8(missingCode(d.missing));w.u8(repeatedCode(d.repeated));}
     else if(prelude.kind==='tide-run'){w.str(d.timezone);w.str(d.provider);w.u8(d.high==='high'?1:0);w.i64(d.offset);w.u64(d.run);w.u64(d.within);}
-    else {w.str(d.timezone);w.u32(d.configId);w.u8(missingCode(d.missing));w.u8(repeatedCode(d.repeated));}
+    else {w.str(d.timezone);w.u32(d.configId);if(format>=20)w.u64(d.rangeDuration??0n);w.u8(missingCode(d.missing));w.u8(repeatedCode(d.repeated));}
     for(const expression of [x.when,x.cancel]){const bytes=encode(expression,'invalid context schedule predicate').bytes;w.u32(bytes.length);w.bytes(bytes);}
     if(format===13||format===15||format===16)w.u64(x.holdMs??0n);
   };

@@ -4885,6 +4885,246 @@
       "referenceCaseIds": [
         "REF-05-024"
       ]
+    },
+    {
+      "id": "keyed-timeslots-range-overlap",
+      "family": "Atomic keyed TimeSlots Range settings and overlap preflight",
+      "clause": {
+        "path": "docs/reference/03-time-and-schedules.en.md",
+        "heading": "3.6 Selected DailySlots"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/range-timeslots-overlap.test.mjs",
+              "testId": "REF-03-078 TimeSlots Range rejects overlap before commit and accepts touching replacement",
+              "caseId": "REF-03-078",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/range-timeslots-overlap.test.mjs",
+              "testId": "REF-03-078 mixed Bool plus overlapping TimeSlots event rolls back whole event",
+              "caseId": "REF-03-078",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/range-timeslots-overlap.test.mjs",
+              "testId": "REF-03-078 empty TimeSlots Range is valid and produces no fallback plan",
+              "caseId": "REF-03-078",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/range-timeslots-overlap.test.mjs",
+              "testId": "REF-03-078 retained-key retime preserves occurrence and removed key active retention",
+              "caseId": "REF-03-078",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/range-timeslots-overlap.test.mjs",
+              "testId": "REF-03-078 added baseline and re-add fresh key prevent same-window admission",
+              "caseId": "REF-03-078",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/range-timeslots-overlap.test.mjs",
+              "testId": "REF-03-078 accepted fault advances revision without deriving Range plan and recovery restores exact checkpoint parity",
+              "caseId": "REF-03-078",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/range-timeslots-overlap.test.mjs",
+              "testId": "REF-03-078 malformed TimeSlots Range manifests are rejected by framed runtime",
+              "caseId": "REF-03-078",
+              "assertionClass": "type-boundary",
+              "targets": [
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/range-timeslots-overlap.test.mjs",
+              "testId": "REF-03-078 original live Duration proposal rejects 20 minute overlap atomically and accepts 15 minute touching intervals",
+              "caseId": "REF-03-078",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/range-timeslots-overlap.test.mjs",
+              "testId": "REF-03-078 admitted removed-key interval participates in whole-event overlap preflight",
+              "caseId": "REF-03-078",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/range-timeslots-overlap.test.mjs",
+              "testId": "REF-03-078 initially empty keyed Range uses GFRG4 and restores without inventing an occurrence",
+              "caseId": "REF-03-078",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/range-timeslots-overlap.test.mjs",
+              "testId": "REF-03-078 checkpoint preserves key order after valid retime reverses displayed time order",
+              "caseId": "REF-03-078",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/range-timeslots-overlap.test.mjs",
+              "testId": "REF-03-078 actual native and WASM loaders reject valid-layout non-UTC GFB20 Range metadata",
+              "caseId": "REF-03-078",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/range-timeslots-overlap.test.mjs",
+              "testId": "REF-03-078 repaired malformed GFRG4 checkpoints reject without mutating native or WASM owners",
+              "caseId": "REF-03-078",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/range-timeslots-overlap.test.mjs",
+              "testId": "REF-03-078 unknown-clock insertion rejects without inventing a wall baseline and trusted retry cannot replay an elapsed start",
+              "caseId": "REF-03-078",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            }
+          ]
+        },
+        {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/range-timeslots-overlap.test.mjs",
+              "testId": "REF-03-078 canonical compilation rejects unsupported zones combined live Duration overlapping initial lists and invalid grids",
+              "caseId": "REF-03-078",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Genuine bounded UTC DailySlots keyed TimeSlots Range implementation with fixed positive Duration, whole-minute day-dividing grid, atomic overlap rejection including removed admitted keys, fault/history and GFRG4 checkpoint parity. Changed-key edits require a trusted wall baseline. Original REF-03-078 static-slots live Duration overlap case is retained. Non-UTC/DST, calendar, combined live TimeSlots/Duration, Run cancellation, Device and hardware remain outside this profile; this does not close separate identity/retime issues."
+      ],
+      "issues": [
+        267
+      ],
+      "referenceCaseIds": [
+        "REF-03-078"
+      ]
     }
   ]
 }

@@ -1612,6 +1612,7 @@ class Lowerer {
     if (contextForms.some(form => form[0] === 'solar-context-pulse')) this.manifest.format = 'GhostFlow/control-v15';
     if (contextForms.some(form => ['calendar-range', 'calendar-result'].includes(form[0]))) this.manifest.format = 'GhostFlow/control-v18';
     if (contextForms.some(form => form[0] === 'utc-range' && form[6] !== '0')) this.manifest.format = 'GhostFlow/control-v19';
+    if (contextForms.some(form => form[0] === 'config-daily-slots-pulse' && form.length === 11)) this.manifest.format = 'GhostFlow/control-v20';
     const temporalForms = this.windows.length || this.trueFors.length || solarForms.length || contextForms.length ? [
       ['temporal-context', `${RESERVED_PREFIX}now_ms`, `${RESERVED_PREFIX}time_epoch`],
       ...[...this.temporalRoots.values()].sort((left, right) => left.tag - right.tag).map(root =>
@@ -2292,7 +2293,11 @@ class Lowerer {
       return this.addCivilSchedulePolicy(item, { kind: 'daily', atMs: at.constant, ...(day ? { day } : {}) });
     }
     const interval = this.expression(item.interval, new Map(), { allowNext: false });
-    if (!sameType(interval.type, DURATION) || interval.constant !== 900_000) error(item.interval.loc, 'only DailySlots<15min> is supported');
+    const configuredRange = item.selected && !Array.isArray(item.selected)
+      && item.policy?.basis?.kind === 'call' && item.policy.basis.name === 'range';
+    if (!sameType(interval.type, DURATION) || interval.constant !== 900_000 && !configuredRange) error(item.interval.loc, 'only DailySlots<15min> is supported outside typed TimeSlots Range');
+    if (configuredRange && (!Number.isSafeInteger(interval.constant) || interval.constant <= 0
+      || interval.constant % 60_000 !== 0 || 86_400_000 % interval.constant !== 0)) error(item.interval.loc, 'TimeSlots Range requires a positive whole-minute grid dividing one day');
     if (!item.timezone || !item.timezone.trim()) error(item.loc, 'schedule requires timezone');
     if (!item.selected) error(item.loc, 'schedule requires selected slots');
     let slots = [], selectedConfig = null;
@@ -2414,6 +2419,7 @@ class Lowerer {
           error(options.basis.loc, `${label} range requires a positive Duration`);
         }
         if (rangeConfig && rangeConfig.payloadType?.kind !== 'Duration') error(rangeArg.loc, `${label} range config must be Duration`);
+        if (trigger.selectedConfig && rangeConfig) error(rangeArg.loc, 'live Range duration settings cannot be combined with TimeSlots selected config');
         if (startConfig && startConfig.payloadType?.kind !== 'TimeOfDay') error(item.at.loc, `${label} start config must be TimeOfDay`);
         if (startConfig && (trigger.kind !== 'daily' || rangeConfig || item.timezone !== 'UTC' || trigger.day)) error(item.at.loc, 'live Range start settings require a single bounded UTC Daily scalar start and fixed duration');
         if (rangeConfig) {
@@ -2427,7 +2433,7 @@ class Lowerer {
         let minimumSpacing;
         if (trigger.kind === 'daily-slots') {
           const starts = trigger.slots.map(minutes => minutes * 60_000);
-          minimumSpacing = starts.length === 1 ? 86_400_000 : Math.min(...starts.map((start, index) => {
+          minimumSpacing = starts.length <= 1 ? 86_400_000 : Math.min(...starts.map((start, index) => {
             const next = starts[(index + 1) % starts.length] + (index + 1 === starts.length ? 86_400_000 : 0);
             return next - start;
           }));
@@ -3854,8 +3860,14 @@ class Lowerer {
       }
       if (schedule.kind === 'at') return ['at-pulse', ...base, String(schedule.atMs), when, cancel];
       if (schedule.policy.basis?.kind === 'range') {
-        if (schedule.timezone !== 'UTC' || schedule.selectedConfig
+        if (schedule.timezone !== 'UTC'
           || !['daily', 'daily-slots'].includes(schedule.kind)) error(this.ast.loc, 'executable Range requires immutable UTC Daily or DailySlots');
+        if (schedule.selectedConfig) {
+          const config = this.manifest.configs.find(item => item.name === schedule.selectedConfig);
+          if (!config || schedule.kind !== 'daily-slots' || schedule.policy.basis.durationConfigId || schedule.policy.basis.startConfigId || schedule.policy.basis.durationMs > 86_400_000) error(this.ast.loc, 'TimeSlots Range requires fixed duration selected config');
+          return ['config-daily-slots-pulse', ...base, schedule.timezone, String(config.id),
+            String(schedule.policy.basis.durationMs), schedule.dstMissing, schedule.dstRepeated, when, cancel];
+        }
         const starts = schedule.kind === 'daily' ? [schedule.atMs] : schedule.slots.map(minute => minute * 60_000);
         if (schedule.day) return ['calendar-range', ...base, 'UTC', String(schedule.policy.basis.durationMs), '0', ['starts', ...starts.map(String)],
           schedule.day.calendar, schedule.day.kind, when, cancel];
@@ -4238,7 +4250,7 @@ export function isExecutableRangeSchedule(item) {
     && item.policy.basis.name === 'range' && item.policy?.clock?.name === 'trusted_only'
     && (item.scheduleType === 'Daily' && (!item.on && !item.calendar || item.on && item.calendar && ['day`workday`','day`offday`'].includes(item.on.value))
       && (item.at?.kind === 'literal' && item.at.raw.startsWith('time`') || item.at?.kind === 'reference')
-      || item.scheduleType === 'DailySlots' && Array.isArray(item.selected) && item.selected.length > 0);
+      || item.scheduleType === 'DailySlots' && (Array.isArray(item.selected) ? item.selected.length > 0 : item.selected?.kind === 'identifier'));
 }
 
 /** Internal composition adapter. The public API accepts canonical documents. */
