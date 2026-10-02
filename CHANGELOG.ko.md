@@ -5,6 +5,18 @@
 
 ## 미출시
 
+### 2026-10-02 — 영속 확인 없는 accounting admission 차단 ([#269](https://github.com/callin2/ghostflow-language/issues/269))
+
+Reference §3.10 `on_unknown = block`을 복원하는 버그 수정이다. 현재 revision에 영속
+확인이 없는 ledger는 reservation, revision 또는 persistence를 바꾸기 전에 rolling
+reservation admission을 거부한다. 이전에는 `initializeEmpty`의 저장이 실패해 읽기가
+Unknown이어도 5초 reservation을 생성할 수 있었다. 누락·손상 ledger는 계속 차단하며
+pending 정확한 재시도도 명시적 `persistPending` 복구 전에는 차단한다. 복구 후 알려진
+중복은 멱등성을 유지한다. REF-03-080은 같은 canonical count-fault-to-false program과
+source에서 유도한 보호 policy의 실제 native/WASM ABI trace, 전체 ledger와 admission
+결과를 비교한다. source-bound 참조 host admission이며 자동 VM/resource 또는 물리
+binding은 아니다. source grammar와 직렬화 ABI format은 바뀌지 않는다.
+
 ### 2026-10-02 — live Range Duration 설정이 활성 occurrence를 재시각화 ([#265](https://github.com/callin2/ghostflow-language/issues/265))
 
 Reference §3.5의 `range(duration)`은 이제 work calendar가 없는 실행 가능한 UTC Daily/DailySlots GFB12 Range에서 `Duration` config를 받을 수 있다. 성공한 원자적 live settings event는 frozen planned start에서 활성 occurrence를 다시 계산한다. 08:00 계획을 08:04에 10분으로 admit한 뒤 08:07에 12분으로 편집하면 같은 occurrence가 유지되고 08:12에 끝난다. 5분으로 편집하면 event 위치에서 종료한다. 새 due pulse나 occurrence ID를 만들지 않는다. 승인된 duration은 GFRGv2 checkpoint에 보존되어 복구 뒤 다음 occurrence도 live 값을 쓴다. 잘못된 typed 값은 기존 settings-fault 결정이 되며 승인된 duration을 바꾸지 않는다. REF-03-076은 native/WASM trace와 checkpoint parity를 검증한다. GFB12 encoding은 duration 0 sentinel 다음 기존 config id를 쓰며, 이전 GFB12 consumer는 이 새 encoding form을 거부한다.

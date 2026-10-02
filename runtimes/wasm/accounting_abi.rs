@@ -133,6 +133,11 @@ pub unsafe extern "C" fn gf_accounting_reserve_rolling(
     let Some(reservation_id) = identity(reservation_id) else {
         return handle.fail("invalid reservation identity");
     };
+    // Admission must use the same durably acknowledged view as accounting
+    // reads. An exact retry is not permission to persist a pending mutation.
+    if handle.persisted_revision != handle.revision {
+        return handle.fail("accounting ledger is not durably acknowledged");
+    }
     let result = handle.ledger.reserve_rolling(
         reservation_id,
         resource_id,
@@ -669,6 +674,62 @@ pub unsafe extern "C" fn gf_accounting_last_error_len(handle: *const AccountingH
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn durable_admission_blocks_pending_without_ledger_or_revision_mutation() {
+        unsafe {
+            let handle = gf_accounting_create(8, 8, 8, 60_000);
+            let reserve = |id: u8| {
+                gf_accounting_reserve_rolling(
+                    handle,
+                    [id; 16].as_ptr(),
+                    7,
+                    0,
+                    60_000,
+                    30_000,
+                    5_000,
+                )
+            };
+            assert_eq!(reserve(1), 0); // Missing remains unknown.
+            assert_eq!(gf_accounting_revision(handle), 0);
+            assert_eq!(gf_accounting_initialize_empty(handle), 1);
+            assert_eq!(gf_accounting_snapshot(handle), 1);
+            let before = (*handle).ledger.snapshot_bytes().unwrap();
+            let revision = gf_accounting_revision(handle);
+            assert_eq!(reserve(1), 0);
+            assert_eq!((*handle).ledger.snapshot_bytes().unwrap(), before);
+            assert_eq!(gf_accounting_revision(handle), revision);
+            assert_eq!((*handle).persisted_revision, 0);
+            assert_eq!((*handle).snapshot_revision, Some(revision));
+            assert_eq!(gf_accounting_ack_persisted(handle, revision), 1);
+            assert_eq!(reserve(1), 1);
+            assert_eq!(gf_accounting_snapshot(handle), 1);
+            let pending = (*handle).ledger.snapshot_bytes().unwrap();
+            let pending_revision = gf_accounting_revision(handle);
+            for id in [1, 2] {
+                // Pending exact duplicate and new identity block.
+                assert_eq!(reserve(id), 0);
+                assert_eq!((*handle).ledger.snapshot_bytes().unwrap(), pending);
+                assert_eq!(gf_accounting_revision(handle), pending_revision);
+                assert_eq!((*handle).persisted_revision, revision);
+            }
+            assert_eq!(gf_accounting_ack_persisted(handle, revision), 0);
+            assert_eq!(gf_accounting_ack_persisted(handle, pending_revision), 1);
+            assert_eq!(reserve(1), 2); // Known exact retry remains idempotent.
+            assert_eq!(gf_accounting_revision(handle), pending_revision);
+            let mut corrupt = pending.clone();
+            corrupt[7] ^= 255;
+            assert_eq!(
+                gf_accounting_restore(handle, corrupt.as_ptr(), corrupt.len()),
+                0
+            );
+            let unknown_revision = gf_accounting_revision(handle);
+            assert_eq!(reserve(2), 0);
+            assert_eq!(gf_accounting_revision(handle), unknown_revision);
+            assert_eq!((*handle).unavailable_fault, 2);
+            gf_accounting_destroy(handle);
+        }
+    }
 
     #[test]
     fn wasm_abi_records_queries_snapshots_and_restores() {

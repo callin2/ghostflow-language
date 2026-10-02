@@ -4557,6 +4557,25 @@
       "issues": [268], "referenceCaseIds": ["REF-03-079"]
     },
     {
+      "id": "durable-accounting-admission",
+      "family": "Unknown accounting blocks protective admission without mutation",
+      "clause": { "path": "docs/reference/03-time-and-schedules.en.md", "heading": "3.10 Time-based usage constraints" },
+      "owner": "CORE", "maturity": "EXPERIMENTAL", "coreScope": false, "requiredEvidence": [],
+      "evidence": [{ "stage": "native_wasm", "status": "verified", "refs": [{
+        "path": "tests/accounting-admission-faults.test.mjs",
+        "testId": "REF-03-080: actual count faults map false in native/WASM and source-bound unknown protective admission preserves complete ledgers",
+        "caseId": "REF-03-080", "assertionClass": "target-parity",
+        "targets": ["native", "wasm"], "polarities": ["positive", "negative", "boundary"]
+      }, {
+        "path": "tests/accounting-admission-faults.test.mjs",
+        "testId": "REF-03-080: pending reservation retries block without persistence and explicit acknowledgement recovers exact admission identity",
+        "caseId": "REF-03-080", "assertionClass": "rollback",
+        "targets": ["wasm"], "polarities": ["positive", "negative", "boundary"]
+      }] }],
+      "gaps": ["The same checked canonical typed-event and applied-time accounting program executes through the production native/WASM accounting ABI, comparing complete count-control traces, both serialized ledgers, revisions, protective admission and persistence calls across missing, corrupt, unacknowledged initialization/records and explicit recovery. Pending duplicate/new reservations reject before ledger mutation or persistence; acknowledged recovery preserves exact identity and known exhausted budgets reject atomically. Binding, manifest policy and acknowledgements are supplied by an explicit trusted reference test host. This is not automatic VM/output/resource binding, authenticated physical evidence, production storage integration, Device operation or deployment."],
+      "issues": [269], "referenceCaseIds": ["REF-03-080"]
+    },
+    {
       "id": "product-boundary",
       "family": "Farmer UI, installation and deployment",
       "clause": {
