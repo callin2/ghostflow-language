@@ -12,6 +12,101 @@ fn config() -> AccountingConfig {
 }
 
 #[test]
+fn rolling_explanation_exact_union_threshold_and_restore() {
+    let mut ledger = AccountingLedger::new(config()).unwrap();
+    ledger
+        .record_applied_segment(id(1), 7, 0, 20_000, 1)
+        .unwrap();
+    ledger
+        .record_applied_segment(id(2), 7, 10_000, 30_000, 1)
+        .unwrap();
+    let LedgerRead::Known(explanation) = ledger.explain_rolling(7, 40_000, 60_000, 30_000, 5_000)
+    else {
+        panic!("known ledger");
+    };
+    assert_eq!(
+        (
+            explanation.used_ms,
+            explanation.blocked,
+            explanation.next_release_ms
+        ),
+        (30_000, true, Some(65_000))
+    );
+    let snapshot = ledger.snapshot_bytes().unwrap();
+    assert_eq!(
+        ledger.reserve_rolling(id(3), 7, 64_999, 60_000, 30_000, 5_000),
+        Err(AccountingError::LimitExceeded)
+    );
+    assert_eq!(ledger.snapshot_bytes().unwrap(), snapshot);
+    let restored = AccountingLedger::restore(config(), &snapshot).unwrap();
+    assert_eq!(
+        restored.explain_rolling(7, 40_000, 60_000, 30_000, 5_000),
+        LedgerRead::Known(explanation)
+    );
+    assert_eq!(
+        ledger.reserve_rolling(id(3), 7, 65_000, 60_000, 30_000, 5_000),
+        Ok(AdmissionResult::Reserved)
+    );
+    assert_eq!(
+        ledger.explain_rolling(7, 20_000, 60_000, 30_000, 5_000),
+        LedgerRead::Unknown
+    );
+}
+
+#[test]
+fn rolling_explanation_never_expires_outstanding_reservations() {
+    let mut ledger = AccountingLedger::new(config()).unwrap();
+    ledger
+        .reserve_rolling(id(1), 7, 0, 60_000, 30_000, 30_000)
+        .unwrap();
+    for now in [0, 1_000_000, u64::MAX] {
+        let LedgerRead::Known(explanation) = ledger.explain_rolling(7, now, 60_000, 30_000, 1)
+        else {
+            panic!("known ledger");
+        };
+        assert_eq!(
+            (
+                explanation.reserved_ms,
+                explanation.blocked,
+                explanation.next_release_ms
+            ),
+            (30_000, true, None)
+        );
+    }
+    ledger.cancel_rolling(id(1), id(2)).unwrap();
+    let LedgerRead::Known(explanation) = ledger.explain_rolling(7, u64::MAX, 60_000, 30_000, 1)
+    else {
+        panic!("known ledger");
+    };
+    assert!(!explanation.blocked);
+}
+
+#[test]
+fn rolling_explanation_u64_boundary_does_not_wrap_or_invent_release() {
+    let mut ledger = AccountingLedger::new(config()).unwrap();
+    ledger
+        .record_applied_segment(id(1), 7, u64::MAX - 10, u64::MAX, 1)
+        .unwrap();
+    let LedgerRead::Known(explanation) = ledger.explain_rolling(7, u64::MAX, 60_000, 10, 1) else {
+        panic!("known ledger");
+    };
+    assert_eq!(
+        (
+            explanation.used_ms,
+            explanation.blocked,
+            explanation.next_release_ms
+        ),
+        (10, true, None)
+    );
+    assert_eq!(
+        AccountingLedger::unknown(config())
+            .unwrap()
+            .explain_rolling(7, 0, 60_000, 10, 1),
+        LedgerRead::Unknown
+    );
+}
+
+#[test]
 fn rolling_admission_rejects_reference_reservation_without_mutation() {
     let mut ledger = AccountingLedger::new(config()).unwrap();
     let before = ledger.snapshot_bytes().unwrap();

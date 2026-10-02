@@ -23,6 +23,75 @@ const id = value => new Uint8Array(16).fill(value);
 const reference = JSON.parse(readFileSync(resolve(root, 'tests/reference/cases/02-time-control.json'), 'utf8'))
   .cases.find(entry => entry.id === 'REF-03-050');
 
+test('REF-04-066: durable source-bound budget explanation ignores OFF animation and reproduces after activation', async t => {
+  const original = JSON.parse(readFileSync(resolve(root, 'tests/reference/cases/02-time-control.json'), 'utf8'))
+    .cases.find(entry => entry.id === 'REF-04-066');
+  assert.equal(original.issue, 'https://github.com/callin2/ghostflow-language/issues/260');
+  assert.equal(original.scope, 'host'); assert.equal(original.status, 'specified');
+  assert.match(original.given, /budget/); assert.match(original.when, /next release/);
+  const source = '# Budget explanation\n\n```ghost\ncontrol Explanation {\n'
+    + 'resource pump: BoolActuator; account applied = on_time(pump, stage: applied, persistence: durable);\n'
+    + 'event started: Event; account starts = count_events(started, over: local_day("UTC"), persistence: durable);\n'
+    + 'constraints Budget { limit used(applied, rolling(60s)) <= 30s { reserve = 5s; on_unknown = block; } }\n'
+    + 'output pump_off: Bool; pump_off <- case starts.count { ok(count) => count < 0; fault(_) => false; };\n}\n```\n';
+  const options = { filename: 'budget-explanation.ghost.md', account: 'applied', resourceId: 7, config };
+  const artifact = await compileSource(source, { filename: options.filename });
+  const query = { nowMs: 40_000n, windowMs: 60_000n, limitMs: 30_000n, reserveMs: 5_000n };
+  const ledger = await AccountingRuntime.instantiateSource(wasmBytes, source, options);
+  t.after(() => ledger.dispose());
+  let snapshot;
+  const persist = async bytes => { snapshot = bytes.slice(); return true; };
+  assert.equal(ledger.explainRolling(query), null, 'uninitialized is Unknown');
+  await ledger.initializeEmpty(persist);
+  await ledger.recordAppliedSegment({ receiptId: id(90), resourceId: 7, startMs: 0n, endMs: 20_000n, localDay: 1 }, persist);
+  await ledger.recordAppliedSegment({ receiptId: id(91), resourceId: 7, startMs: 10_000n, endMs: 30_000n, localDay: 1 }, persist);
+  const explanation = ledger.explainRolling(query);
+  assert.deepEqual([explanation.usedMs, explanation.limitMs, explanation.reserveMs, explanation.reservedMs,
+    explanation.blocked, explanation.nextReleaseMs, explanation.ledgerRevision], [30_000n, 30_000n, 5_000n, 0n, true, 65_000n, 3n]);
+  assert.equal(explanation.source.sha256, artifact.sourceDocument.sha256);
+  assert.equal(explanation.source.artifactSha256, artifact.manifest.bytecodeSha256);
+  assert.deepEqual([explanation.source.account, explanation.source.target, explanation.source.stage,
+    explanation.resourceId, explanation.blockReason], ['applied', 'pump', 'applied', 7, 'rolling-budget']);
+  const rejected = { reservationId: id(92), resourceId: 7, admittedAtMs: query.nowMs, ...query };
+  assert.equal(await ledger.reserveRolling(rejected, persist), 'Rejected');
+  assert.deepEqual(ledger.explainRolling(query), explanation, 'rejected start does not mutate ledger revision or evidence');
+  for (const animation of [{ output: false, timeMs: 0 }, { output: false, timeMs: 999_999 }]) {
+    assert.equal(animation.output, false);
+    assert.deepEqual(ledger.explainRolling(query), explanation);
+  }
+  assert.equal(await ledger.reserveRolling({ ...rejected, admittedAtMs: 64_999n }, persist), 'Rejected');
+  const restored = await AccountingRuntime.instantiateSource(wasmBytes, source, options);
+  t.after(() => restored.dispose()); restored.restore(snapshot);
+  const replay = restored.explainRolling(query);
+  assert.deepEqual({ ...replay, ledgerRevision: explanation.ledgerRevision }, explanation);
+  assert.equal(replay.ledgerRevision, 0n, 'restore revision is local to the new owner');
+  const control = new GhostFlowRuntime(restored.wasm); t.after(() => control.dispose()); control.load(artifact.bytes);
+  control.addCapability('actuator', 'pump_off', 'bool');
+  restored.activateControl(control, { bootEpoch: 2n, terminalCapacity: 8 });
+  const countBinding = artifact.manifest.accounting.bindings.find(binding => binding.name === 'starts');
+  // A separate context ledger restores the same bytes; the rolling query stays
+  // on its source-bound owner. OFF observation does not cause the budget denial.
+  const sharedLedger = new AccountingRuntime(restored.wasm, config); t.after(() => sharedLedger.dispose());
+  sharedLedger.restore(snapshot);
+  const trace = sharedLedger.tickControl(control, { site: countBinding.site, account: countBinding.name,
+    event: countBinding.evidenceBinding.target, timezone: countBinding.basis.zone, eventType: 9,
+    localDay: 1, monotonicMs: 40_000n, bootEpoch: 2n, wallMs: 1_700_000_000_000n, clockTrusted: true });
+  assert.equal(trace.safe.pump_off, false, 'actual completed control output is OFF');
+  assert.deepEqual(restored.explainRolling(query), replay, 'control activation cannot reset accounted usage');
+  assert.equal(await restored.reserveRolling({ ...rejected, admittedAtMs: 65_000n }, async () => false).catch(e => e.message),
+    'accounting snapshot was not durably acknowledged');
+  assert.equal(restored.explainRolling(query), null, 'pending persistence is Unknown');
+  await restored.persistPending(persist);
+  assert.deepEqual([restored.explainRolling(query).reservedMs, restored.explainRolling(query).nextReleaseMs], [5_000n, 70_000n]);
+  assert.throws(() => { ledger.binding.limits[0].boundMs = 99_000; }, TypeError);
+  assert.throws(() => { ledger.binding.limits[0].basis.durationMs = 99_000; }, TypeError);
+  assert.throws(() => { ledger.binding.limits.push({}); }, TypeError);
+  assert.throws(() => ledger.explainRolling({ ...query, limitMs: 99_000n }), /bound source constraint/);
+  assert.equal(ledger.explainRolling({ ...query, nowMs: 20_000n }), null, 'future recorded evidence is not a release forecast');
+  assert.equal(await restored.reserveRolling({ ...rejected, reservationId: id(93), admittedAtMs: 100_000n }, persist), 'Inserted');
+  t.diagnostic(JSON.stringify({ sourceSha256: explanation.source.sha256, nextReleaseMs: String(explanation.nextReleaseMs) }));
+});
+
 test('REF-03-020: source-bound native and WASM rolling ledgers integrate regular and 7/13/9-second partitions exactly', async t => {
   const source = '# Historical applied intervals\n\n```ghost\ncontrol RollingHistory {\n'
     + 'resource pump: BoolActuator;\naccount pump_applied = on_time(pump, stage: applied, persistence: durable);\n'

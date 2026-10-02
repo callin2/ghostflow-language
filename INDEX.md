@@ -158,6 +158,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/REFERENCE-QUERY.ko.md](docs/REFERENCE-QUERY.ko.md) | 언어 참조 선택 조회 | md |
 | [docs/REFERENCE-QUERY.md](docs/REFERENCE-QUERY.md) | Selective Language Reference query | md |
 | [docs/REFERENCE-SIMULATOR-BASELINE-2026-09-23.md](docs/REFERENCE-SIMULATOR-BASELINE-2026-09-23.md) | Reference simulator baseline — 2026-09-23 | md |
+| [docs/ROLLING-BUDGET-EXPLANATION.ko.md](docs/ROLLING-BUDGET-EXPLANATION.ko.md) | 영속 rolling 예산 설명 | md |
+| [docs/ROLLING-BUDGET-EXPLANATION.md](docs/ROLLING-BUDGET-EXPLANATION.md) | Durable rolling budget explanation | md |
 | [docs/SCAN-FRAME-WASM.ko.md](docs/SCAN-FRAME-WASM.ko.md) | Scan frame WASM ABI v1 | md |
 | [docs/SCAN-FRAME-WASM.md](docs/SCAN-FRAME-WASM.md) | Scan frame WASM ABI v1 | md |
 | [docs/SCAN-TAPE-PARITY.ko.md](docs/SCAN-TAPE-PARITY.ko.md) | Native/WASM scan tape parity (D9) | md |
@@ -467,4 +469,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-347 documents.
+349 documents.

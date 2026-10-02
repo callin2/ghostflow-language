@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### 2026-10-02 — durable rolling budget explanation ([#260](https://github.com/callin2/ghostflow-language/issues/260))
+
+Reference §4.15 now has a source-bound reference host query over the real Rust
+ledger, including durable revision, budget denial and earliest conditional
+release. Overlapping [0,20s]/[10s,30s] intervals with a 60s window, 30s limit and
+5s proposal reject at 64.999s and admit at 65s, independently of OFF animation.
+REF-04-066 checks restore/activation and unacknowledged persistence. Bindings
+copy and freeze source limits, fixing a bug that violated checked-source policy:
+previously changing the public limit to 99s admitted an unauthorized reservation;
+now that mutation throws and a mismatched reservation rejects. The before/after
+probe and immutable-binding regressions verify the restored contract.
+Rebuild WASM for the additive query export; GFB/snapshot formats are unchanged.
+See [the host contract](docs/ROLLING-BUDGET-EXPLANATION.md) for trusted evidence,
+local revision and integration limits.
+
 ### 2026-10-02 — bounded adaptation admission bug fix ([#258](https://github.com/callin2/ghostflow-language/issues/258))
 
 Reference §4.14 policy bounds were omitted from compiled descriptors and no

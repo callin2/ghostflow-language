@@ -2,6 +2,13 @@
   "format": "GhostFlow/document-translations-v1",
   "documents": [
     {
+      "source": "docs/ROLLING-BUDGET-EXPLANATION.md",
+      "sourceLanguage": "en",
+      "translation": "docs/ROLLING-BUDGET-EXPLANATION.ko.md",
+      "sourceSha256": "8b6a6105ea1a54970fcc0f2cb9d779582d1bbc5138dae5d52363ad667477e78c",
+      "translationSha256": "ea25fbdf36c904cdd66e7f7514e2407cb0dfc3a352332be94b6cebcc98efc3c9"
+    },
+    {
       "source": "docs/ADAPTATION-SETTINGS-HOST.md",
       "sourceLanguage": "en",
       "translation": "docs/ADAPTATION-SETTINGS-HOST.ko.md",
@@ -593,8 +600,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "442678f4cdc7b998df798ab5ca0ddd5d6503f9524c88136ea7af690e41643ca4",
-      "translationSha256": "8e3b5f6b4876d1a743d273a1ff0c493eac7f6828f3a0457471026ef5c41493d0"
+      "sourceSha256": "229ebc605f9391e1dbd529d659be13937b6f0a97742d3be8bc289da74f3d3d44",
+      "translationSha256": "d502cbcbbe6acaa827666965912f02dd351f2f1125cfbb2429a6845ff3615c23"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",

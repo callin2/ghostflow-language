@@ -5,6 +5,20 @@
 
 ## 미출시
 
+### 2026-10-02 — 영속 rolling 예산 설명 ([#260](https://github.com/callin2/ghostflow-language/issues/260))
+
+Reference §4.15에 실제 Rust ledger를 읽는 소스 바인딩 reference host 조회를
+추가했다. 영속 revision, 예산 거부와 조건부 가장 빠른 해제 시각을 제공한다.
+겹친 [0,20s]/[10s,30s] interval, 60s window, 30s 한도, 5s 제안은 OFF animation과
+무관하게 64.999s에 거부하고 65s에 허용한다. REF-04-066은 복구/activation과
+영속 승인 전 Unknown을 검증한다. 소스 한도를 복사하고 동결하여 caller의
+메타데이터 변경이 검증된 소스 정책을 위반하던 버그를 수정했다. 이전에는 공개
+한도를 99s로 바꾸면 허가되지 않은 예약을 허용했지만 이제 변경 시 예외를 던지고
+불일치 예약을 거부한다. 수정 전후 probe와 불변 바인딩 회귀 검증이 복구된 계약을
+확인한다. 추가 query export를 위해 WASM을
+재빌드해야 하지만 GFB/snapshot 형식은 유지된다. 신뢰 증거, owner 내부 revision,
+통합 한계는 [host 계약](docs/ROLLING-BUDGET-EXPLANATION.ko.md)을 참고한다.
+
 ### 2026-10-02 — 제한된 적응 제안 검증 버그 수정 ([#258](https://github.com/callin2/ghostflow-language/issues/258))
 
 Reference §4.14 정책 경계가 컴파일 descriptor에서 빠졌고 reference host가 제안의
