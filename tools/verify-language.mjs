@@ -171,6 +171,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/pc-01-projection-sync.test.mjs',
   'tests/integration-contract.test.mjs',
   'tests/interaction-contract.test.mjs',
+  'tests/interaction-counter.test.mjs',
   'tests/interaction-corpus.test.mjs',
   'tests/interaction-emission.test.mjs',
   'tests/enum-member-label.test.mjs',

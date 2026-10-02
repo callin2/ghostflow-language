@@ -2,13 +2,14 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { validateInteraction } from '../contracts/interaction-v0/validate.mjs';
 import { FramedGhostFlowRuntime } from '../runtimes/wasm/framed-runtime.mjs';
 import { compileSource, restoreArtifactSourceMap, writeArtifact } from '../tools/toolchain.mjs';
 import { emitCompletedScanSnapshot, prepareCompletedScanSnapshot } from '../tools/interaction-runtime-snapshot.mjs';
 
-const root = path.resolve(new URL('..', import.meta.url).pathname);
+const root = fileURLToPath(new URL('..', import.meta.url));
 const sourcePath = 'contracts/interaction-v0/examples/exact-counter.ghost.md';
 const identity = { documentId: 'source.fixture-exact-counter', revisionId: 'revision.fixture-exact-counter-v0' };
 const read = relative => fs.readFileSync(path.join(root, relative), 'utf8');
