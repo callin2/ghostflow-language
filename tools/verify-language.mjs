@@ -92,6 +92,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/compiler-newline-diagnostics.test.mjs',
   'tests/compiler-syntax-boundaries.test.mjs',
   'tests/compiler-syntax-structure.test.mjs',
+  'tests/macro-purity-resource-boundary.test.mjs',
   'tests/compiler-parser-callsites.test.mjs',
   'tests/compiler-token-limit-diagnostics.test.mjs',
   'tests/compiler-cli-diagnostics.test.mjs',
