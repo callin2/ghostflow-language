@@ -5,6 +5,19 @@
 
 이 내보내기는 기존 컴파일러와 이식 가능한 런타임을 변경하지 않습니다. 언어 문서에는 구현된 문법과 향후 설계가 함께 포함됩니다. 수용 여부는 컴파일러와 [VERIFICATION.md](VERIFICATION.md)에 설명된 호스트 테스트로 판단합니다.
 
+고정 Station WASM 어댑터의 `enterBatch(requests)`는 기존 Rust
+`Station::enter_batch` 계약(Reference §4.10)을 노출한다. 호스트는 관측한
+Stop을 먼저 처리한 뒤 같은 tick의 모든 mode 진입을 하나의 batch로 전달한다.
+충돌 진입은 Stopped에서도 원자적으로 거부하며 cleanup 완료까지 저장하지 않는다.
+순차 `enter()` 호출은 각각 단일 요청이므로 충돌 batch를 나타낼 수 없다.
+추가된 `gf_station_enter_batch` export는 최대 256개의 32바이트 record를 받는다.
+각 record는 little-endian u64 요청 ID, revision, stop generation,
+mode(1 Auto, 2 Manual, 3 Configure)로 구성한다. 어댑터는 core 호출 전에
+전체 record를 검증한다. GFB/GFS와 기존 export는 변경하지 않으며 batch 호출자는
+새 export가 필요하다. Native/WASM 테스트는 같은 검증된 canonical Station
+source와 binding 생성 설정을 사용한다. Applied 출력과 durable ACK는 호스트
+fixture이며 물리 장치 검증을 뜻하지 않는다.
+
 ## 실행 경로
 
 고정 import 합성은 변경하지 않은 sensor와 순수 함수 정의를 받는다. 함수와 호출은
@@ -28,12 +41,23 @@ frame을 native framed VM과 비교하며 native 원본 sensor scenario 호스�
 
 `output name: Type;` 선언은 형식만 지정하며 정확히 하나의 `name <- expression;` 연결을 가져야 합니다. 이 연결은 해당 틱의 논리적 요청 의도를 만듭니다. 안전성 해결은 이와 다른 안전 의도를 만들 수 있습니다. VM은 시작 기본값을 할당하지 않으며 의도가 하드웨어에 도달했다고 보장하지 않습니다. 시작 및 실패 안전 OFF 동작, 출력 적용 시점, 드라이버 연결 해제 처리는 호스트/드라이버 정책이며 별도 증거가 필요합니다.
 
+확장 Solar/Tide 자연 정책은 GFB13과 `GhostFlow/control-v12`를 선택하며 Solar facts는 GFSF6을 사용한다. 기존 profile과 packet bytes는 그대로다. WASM 함수 이름은 바뀌지 않으며 이전 pinned runtime은 GFB13을 거부한다. 서명 portable-package의 config-only GFB11 profile은 넓히지 않는다. compiler/runtime 회귀 검증은 `natural-fallback-compiler.test.mjs`, `natural-fallback-runtime.test.mjs`, core `solar_tape` 테스트가 담당한다. 문서는 해당 실행 결과나 물리 Device 동작의 증거가 아니다.
+
+채택된 달력 경계 실행 범위는 GFB18과 `GhostFlow/control-v18`을 사용한다.
+`calendar_is`는 typed Result query로, 불변 UTC Daily work/off-day Range는
+calendar를 판정하는 admission으로 lowering한다. 두 형태 모두 식별된 snapshot과
+그대로 유지되는 GFSF5 fact를 받아 공유 Rust core에서 실행한다. 일치하는 명시적 UTC
+binding이 필요하다. 자정을 넘는 work range는 거부하여 별도 선언으로 나누어야 하며
+일반 UTC range는 기존 동작을 유지한다. 비 UTC Range, shift 귀속, 보류된 Window/Run
+basis를 구현하지 않는다. native와 framed WASM의 acceptance 증거는 문서나 model이
+아니라 `tests/reference-calendar-boundary.test.mjs`에 둔다.
+
 ## 아티팩트와 버전
 
 | 항목 | 현재 표현 | 역할 |
 |---|---|---|
 | 정본 프로그램 | `.ghost.md` | 의도, 코드, 주석, 설명을 포함한 리터레이트 소스 |
-| 생성 실행 파일 | `GFB1` 매직과 기능 선택 `u16` 형식 1–9 또는 11을 가진 `.gfb` | VM이 소비하는 바이너리 IR. [BYTECODE.md](BYTECODE.md) 참조 |
+| 생성 실행 파일 | `GFB1` 매직과 기능 선택 `u16` 형식 1–9, 11 또는 12을 가진 `.gfb` | VM이 소비하는 바이너리 IR. [BYTECODE.md](BYTECODE.md) 참조 |
 | 생성 제어 매니페스트 | 기능 선택 `GhostFlow/control-v1`, `v2`, `v3`, `v4`, `v7`, `v8` 또는 `v10` | 형식이 지정된 호스트 포트, 타이머/센서/일정 요구 및 바이트코드 해시 |
 | 생성 제약 정책 | `GhostFlow/constraints-v1` | 호스트에 바인딩되는 독립 제약 소스의 하향 변환 결과 |
 | 생성 소스 맵 | `.gfb.map.json` | 진단 노드/행 매핑. SOURCE-MAP.md에 정의된 compileSource의 소스 보존 엔벌로프 |

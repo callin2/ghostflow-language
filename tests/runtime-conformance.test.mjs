@@ -248,3 +248,86 @@ test('GF-TEST-strategy-priority: only ties at the winning priority prevent activ
   assert.equal(outcomes[0].trace.strategy, 'winner');
   assert.deepEqual(outcomes[0].trace.safe, { result: true });
 });
+
+test('GF-TEST-quantity-native-parity: canonical units, affine boundaries and dimensional arithmetic', async t => {
+  const filename = 'tests/fixtures/issue-93-quantities.ghost.md';
+  const compiled = await compileSource(fs.readFileSync(path.join(root, filename), 'utf8'), { filename });
+  const fields = ['ambient', 'co2', 'pressure', 'humidity', 'flow', 'interval', 'requested'];
+  const baseline = { ambient: 298.15, co2: 0.0008, pressure: 1200, humidity: 0.7,
+    flow: 0.000125, interval: 8000, requested: 50 };
+  const rows = [baseline,
+    { ...baseline, ambient: 303.15, co2: 0.001, pressure: 1199, humidity: 0.6, requested: 100 },
+    { ...baseline, ambient: 293.15, co2: 0, pressure: 1201, humidity: 1, flow: 0, interval: 0, requested: 0 },
+  ];
+  const outputs = ['cooling', 'ventilation', 'pressure_ok', 'dry'].map(name => [name, 'bool'])
+    .concat(['delta', 'delivered', 'target', 'concentration', 'pressure_limit', 'duty', 'duration', 'count']
+      .map(name => [name, 'number']));
+  const { outcomes, runtime } = await differential(t, compiled.bytes, fields, rows, outputs);
+  const expected = [
+    { cooling: false, ventilation: false, pressure_ok: true, dry: false, delta: 0, delivered: 0.001,
+      target: 298.15, concentration: 0.0008, pressure_limit: 1200, duty: 50, duration: 8000, count: 1 },
+    { cooling: true, ventilation: true, pressure_ok: false, dry: true, delta: 5, delivered: 0.001,
+      target: 298.15, concentration: 0.0008, pressure_limit: 1200, duty: 100, duration: 8000, count: 2 },
+    { cooling: false, ventilation: false, pressure_ok: true, dry: false, delta: -5, delivered: 0,
+      target: 298.15, concentration: 0.0008, pressure_limit: 1200, duty: 0, duration: 0, count: 3 },
+  ];
+  assert.deepEqual(outcomes.map(row => row.status), ['OK', 'OK', 'OK']);
+  assert.deepEqual(outcomes.map(row => row.trace.requested), expected);
+  assert.deepEqual(outcomes.map(row => row.trace.safe), expected);
+  assert.equal(runtime.stateNumber('accepted'), 3);
+
+  // Reuse exactly the same compiled bytes for rejection and recovery. A missing
+  // quantity and a finite input whose product overflows must not commit state.
+  const { ambient: omitted, ...missing } = baseline;
+  const rejected = await differential(t, compiled.bytes, fields,
+    [baseline, missing, { ...baseline, flow: Number.MAX_VALUE }, baseline], outputs);
+  assert.deepEqual(rejected.outcomes.filter(row => row.status === 'ERROR'), [
+    { status: 'ERROR', phase: 'tick', error: 'missing input ambient', journalLength: 1 },
+    { status: 'ERROR', phase: 'tick', error: 'non-finite arithmetic result', journalLength: 1 },
+  ]);
+  assert.deepEqual(rejected.outcomes.filter(row => row.status === 'OK').map(row => row.trace.stateAfter.accepted), [1, 2]);
+  assert.equal(rejected.runtime.stateNumber('accepted'), 2);
+});
+
+test('GF-TEST-contribution-field-boundary: independent field oracle kills weakened threshold rules', async t => {
+  const filename = 'tests/fixtures/contribution-134/numeric-threshold.ghost.md';
+  const source = fs.readFileSync(path.join(root, filename), 'utf8');
+  const fixture = JSON.parse(fs.readFileSync(path.join(root, 'tests/fixtures/contribution-134/oracle.json'), 'utf8'));
+  // Independent expected values from Device #43's pinned virtual case, not from
+  // compiler output or agreement between two executions of the same Rust core.
+  const expected = [true, false, false, true];
+  assert.deepEqual(fixture.rows, [
+    { moisture: 42.4, pump: true }, { moisture: 42.5, pump: false },
+    { moisture: 42.6, pump: false }, { moisture: 42.4, pump: true },
+  ], 'field oracle edits need separate requirement review');
+  const rows = fixture.rows.map(({ moisture }) => ({ moisture }));
+  const checkOracle = outcomes => assert.deepEqual(outcomes.map(row => row.trace.safe.pump), expected);
+  const compiled = await compileSource(source, { filename });
+  const baseline = await differential(t, compiled.bytes, ['moisture'], rows, [['pump', 'bool']]);
+  assert.deepEqual(baseline.outcomes.map(row => row.status), rows.map(() => 'OK'));
+  checkOracle(baseline.outcomes);
+  assert.deepEqual(baseline.outcomes.map(row => row.trace.requested.pump), expected);
+  // The CSV runner skips wholly blank lines and cannot encode sole-input
+  // omission. Use the explicit WASM seam without claiming native coverage.
+  const failure = baseline.runtime;
+  const committed = failure.trace;
+  failure.clearInputs();
+  assert.throws(() => failure.tick(), /missing input moisture/);
+  assert.deepEqual(failure.trace, committed);
+  assert.equal(failure.intentBool('pump'), true);
+  failure.setNumber('moisture', 42.6);
+  failure.tick();
+  assert.equal(failure.intentBool('pump'), false);
+
+  const rule = 'pump <- moisture < 42.5;';
+  assert.equal(source.split(rule).length, 2, 'mutation site must be unique');
+  for (const weakened of ['pump <- moisture <= 42.5;', 'pump <- true;']) {
+    const mutant = await compileSource(source.replace(rule, weakened), { filename });
+    const result = await differential(t, mutant.bytes, ['moisture'], rows, [['pump', 'bool']]);
+    // Infrastructure errors cannot count as a killed mutant: both targets must
+    // complete every scan before the independent boundary assertion goes RED.
+    assert.deepEqual(result.outcomes.map(row => row.status), rows.map(() => 'OK'));
+    assert.throws(() => checkOracle(result.outcomes), assert.AssertionError,
+      'the unchanged field oracle must reject a weakened/removed inhibition rule');
+  }
+});

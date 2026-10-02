@@ -3,9 +3,14 @@ use std::{slice, str};
 
 #[path = "../framed_abi.rs"]
 mod framed_abi;
+#[path = "../resource_constraints_abi.rs"]
+mod resource_constraints_abi;
 
 #[path = "../after_event_abi.rs"]
 mod after_event_abi;
+
+#[path = "../estimate_abi.rs"]
+mod estimate_abi;
 
 #[path = "../controller_abi.rs"]
 mod controller_abi;

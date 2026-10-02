@@ -41,7 +41,7 @@ official builder from pairing readable source with another compiled program.
 Required capabilities are sorted by `kind`, `name`, then `type`. Every manifest
 input (`input`), non-optional sensor (`sensor`) and output (`actuator`) must match
 the signed required-capability set in both directions. Optional sensors remain
-outside that required set until a later strategy/adaptation contract names them.
+outside that required set; explicit host bindings determine their presence.
 
 ## Signature bytes and trust
 
@@ -71,6 +71,32 @@ The RFC 8032 key material in `tests/portable-package.test.mjs` is public test da
 and must never be configured as a product trust root.
 
 ## Verification order
+
+### Native development authentication policy
+
+The Rust `ghostflow-package` API `verify_portable_package` always enforces
+publisher authentication. `SignaturePolicy::default()` is `Enforce`. An explicit
+development host may call `verify_portable_package_with_signature_policy` with
+`DevelopmentBypass`; it runs the same canonical verifier and target loader.
+This owner interface does not select a Device build profile or enable a bypass
+in Browser/JavaScript verification.
+
+Development bypass accepts an empty `signatures` array or signatures from an
+untrusted/revoked publisher without checking cryptographic authentication.
+The array remains required and bounded by `max_signatures`. Present entries
+must have the exact schema, Ed25519 algorithm, distinct bounded key IDs and
+canonical base64 encoding of 64 bytes. Trust roots and revocation inputs are
+unused in this mode; no fake trusted key is substituted. Canonical transport,
+payload and artifact hashes, size bounds, compatibility identity, capabilities,
+binding, source/bytecode cross-links and target loading remain mandatory.
+Hashes establish byte consistency, not an authenticated publisher or intent.
+
+The result exposes `signature_authentication` as `Authenticated` or
+`DevelopmentBypass`. A bypassed result always has empty `accepted_key_ids`,
+even if a supplied signature would otherwise verify. Hosts must expose that
+unauthenticated status and apply one policy to upload, stored-program boot and
+rollback. Production and trusted acceptance hosts must keep enforcement;
+development opt-out does not grant output authority or authorize execution.
 
 `verifyPortablePackage` returns `PortablePackageError` with a stable `code` and
 does not expose bytecode until these checks pass:
@@ -104,7 +130,21 @@ channel map before invoking the package verifier.
 
 ## Compatibility and migration
 
-- Package v1 contains one current GFB profile: 1, 2, 3 or 4. The signed bytecode
+### Signed GFB11 Periodic with scalar settings
+
+GFB11 with `GhostFlow/control-v10` and `GhostFlow/context-scan-abi-v5` may now
+package scalar configs together with an executable Periodic schedule. The
+current signed subset requires an instant anchor, `preserve_anchor`, a config
+backed `Duration` interval, a constant `true` predicate, and the
+`pulse`/`trusted_only`/`baseline`/`skip` policy. The manifest schedule site,
+name, interval config ID and value, anchor, gap and policy must match the
+decoded GFB11 descriptor. Generated config projections and the clock/epoch
+inputs must match the bytecode. Other schedule kinds, objective/window/signal
+preludes and unsigned or mismatched packages remain rejected. Scalar config
+initial values and bounds retain their existing checks. This extends package
+admission only; it does not change the language or Device deployment policy.
+
+- Package v1 contains one supported GFB profile. The signed bytecode
   descriptor version is the decimal string of the actual little-endian header
   version. Both JavaScript and Rust verifiers require an exact match before
   invoking the target loader. Supported-but-mismatched versions report
@@ -171,3 +211,21 @@ signatures, capabilities and JSON depth. The Device consumer must select a
 device-sized profile, stage transport bytes outside the active program slot and
 invoke this verifier before atomic activation. Host verification alone is not
 evidence of MCU activation, relay operation or physical load movement.
+
+
+## Adaptive strategy descriptors
+
+Compiler-produced `adaptPolicy` and `strategies` are paired signed manifest
+metadata. JS verification compares them with canonical source recompilation and
+exact bytecode. Native verification matches ordered strategy names, priorities,
+output names and capability-query bytes against the decoded core module. Typed
+matches must reference declared sensor/actuator capabilities. Selection remains
+`highest-priority-unique`; unsupported or unpaired metadata rejects before loading.
+The policy name is signed, bounded source metadata, not a new runtime selector.
+
+Optional Bool observation does not automatically select or activate a new policy.
+An explicit host capability snapshot determines whether its authored strategy is
+eligible. Native and WASM tests preserve the absent baseline and present feedback
+outputs and reject re-signed strategy/query/bytecode tampering. GFB and wire formats,
+ABI and signature policy remain unchanged. Physical wiring and Device admission
+remain consumer responsibilities.

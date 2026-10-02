@@ -291,6 +291,18 @@ An undefined next state retains its previous value. A state cannot have more tha
 
 The initial value in `state name: Type = value;` must be a constant of the declared type. It is not computed by reading inputs or other state. This explicit starting value creates reproducible previous state for the first tick.
 
+**Design rationale and origin:** In [#149](https://github.com/callin2/ghostflow-language/issues/149),
+the user described the React/ObservableHQ influence as evaluating control within an
+event stream and explicitly returning the next state. The user's educational premise
+was that electricians may find recursive or loop-shaped control difficult to trace.
+Writing previous state and candidate next state separately makes the time boundary
+visible: `left' = right; right' = left;` reads the previous pair and describes the next
+pair. That premise guides readability; it is not a claim about every electrician.
+The executable notation is the ASCII apostrophe (`'`). The user's conversational
+backtick spelling and the later assistant discussion of general cycle rules,
+time travel and causal explanations do not establish additional syntax or features.
+The snapshot, transition and output rules above define execution.
+
 ### Timers are state too
 
 `timer age = elapsed(phase);` is monotonic elapsed time since the last committed change to `phase`. It resets to 0 when the change commits and is read in subsequent ticks. Its initial value is also 0. For Bool targets, transitions in both true and false directions begin new intervals. A timer is neither `sleep` nor a separate execution thread and does not block processing other inputs.

@@ -1,5 +1,22 @@
 # GFB bytecode
 
+GFB18 adds the adopted calendar boundary profile `GhostFlow/control-v18`.
+Prelude tag 17 is a calendar-filtered immutable UTC Daily Range; tag 18 is a
+typed calendar Result with protected Bool/Bool/fault-code inputs. Their exact
+layouts and unchanged GFSF5 facts are in
+[Context execution ABI](CONTEXT-EXECUTION-ABI.md#gfb18-calendar-boundaries).
+Range rejects work intervals crossing midnight while permitting explicit
+separate ranges ending at midnight and starting on the next date. Existing
+ordinary Range and older binary layouts retain their semantics. A GFB18 header
+is required for these tags; older loaders reject it. These identifiers do not
+certify a Device release or physical execution.
+
+## Bounded natural policies (GFB13)
+
+Only extended Solar/Tide policies select GFB13 and `GhostFlow/control-v12`; legacy profile bytes remain unchanged. Solar tag 1 retains its layout and appends after the `when` expression `holdMs:u64` (0 means none) and `fallbackAtMs:u64` (86400000 means skip). Context records append `holdMs:u64` after the cancellation expression. Manifest policies are objects: clock `{kind: 'hold_trusted', durationMs, terminal: 'skip'}`, fallback `{kind: 'fixed_time', atMs, terminal: 'skip'}`.
+
+Extended Solar facts use GFSF6: retain the Solar v1 row layout and append after provider/context strings optional `fallbackWallMs` and `unavailableReason:u8` (255 means none; 0–5 are natural-context reason codes). Legacy v1 packets and WASM function names remain unchanged. Pinned older runtimes reject GFB13 before activation. The signed portable-package config-only GFB11 profile remains narrow. This format is not physical Device evidence.
+
 All integers are little-endian. Strings are `u16 length` followed by UTF-8
 bytes. Values use a bounded postfix stack; conditional expressions use forward
 branches. Public compilation accepts a complete canonical `.ghost.md` document.
@@ -29,6 +46,7 @@ The S-expression representation in `tools/gfb1.mjs` is internal compiler IR.
 | 7 | PID objective | Bool, Number and Int plus objective record |
 | 8 | Daily schedule prelude | Temporal types plus Daily descriptors |
 | 9 | DailySlots schedule prelude | Temporal types plus DailySlots descriptors |
+| 12 | Immutable UTC Range | GFB11 context layout plus UTC Range tag 13 |
 | 11 | Typed configuration streams and context execution | Context preludes and optional PID objective; replaces the prior format 10 context profile |
 
 These are compiler output profiles, not a promise that every host supports every
@@ -281,3 +299,9 @@ extension descriptors for temporal, config, quality, and objective behavior.
 The S-expression form named above is the internal lowering input to this stage.
 Only the GFB emitter maps the Core IR to numeric opcodes, selects a format, and
 writes bytes. This separation changes no GFB wire version or runtime contract.
+
+## Immutable UTC Range (format 12)
+
+GFB12 requires at least one UTC Range prelude and otherwise uses the GFB11 context layout and optional objective trailer. Tagged prelude `13` encodes `site:u32`, name string, `gapMs:u64`, timezone string (`UTC` only), `durationMs:u64`, `startCount:u16`, then sorted unique `startMs:u64` values and the `when` and `cancel_when` expression blobs. There are 1–96 starts in `[0,86400000)`; duration is in `[1,86400000]`. Circular daily spacing must be at least the duration. The native decoder independently validates these bounds and non-overlap. Old format bytes remain unchanged; older consumers reject format 12 before activation. Downgrading the header cannot make tag 13 a GFB11 prelude.
+
+The manifest remains `GhostFlow/control-v10` and uses the existing context facts ABI. Each Range site requires empty occurrence rows and no calendar/provider; the runtime derives UTC plans from trusted wall time. Occurrence identity uses site, UTC source day and stable sorted slot key. Range engine checkpoints use GFES2 with GFRG1 consumed-key ledgers; prior engines retain GFES1. A new boot retains deduplication but never resumes an active timer. Capacity exhaustion and malformed checkpoints fail explicitly and atomically. Signed portable-package configuration profiles remain GFB11 and do not accept GFB12.

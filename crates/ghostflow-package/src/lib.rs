@@ -214,6 +214,20 @@ where
     }
 }
 
+/// Publisher authentication is strict unless a development host explicitly opts out.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum SignaturePolicy {
+    #[default]
+    Enforce,
+    DevelopmentBypass,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SignatureAuthentication {
+    Authenticated,
+    DevelopmentBypass,
+}
+
 pub struct VerificationProfile<'a> {
     pub trusted_keys: &'a [TrustedKey],
     pub revoked_key_ids: &'a [String],
@@ -239,6 +253,7 @@ pub struct VerifiedPackage {
     pub package_format: &'static str,
     pub payload_sha256: String,
     pub accepted_key_ids: Vec<String>,
+    pub signature_authentication: SignatureAuthentication,
     pub source: VerifiedSource,
     pub manifest: Value,
     pub source_map: Value,
@@ -1431,7 +1446,8 @@ fn verify_debounce_descriptors(
 
 fn verify_config_bindings(manifest: &Value, module: &ghostflow_core::Module) -> Result<()> {
     use ghostflow_core::{
-        schedule_vm::PulseDescriptor, settings_stream::ConfigValue, Value as MachineValue,
+        context_vm::ScheduleDefinition, schedule_vm::PulseDescriptor, settings_stream::ConfigValue,
+        Type, Value as MachineValue,
     };
     let mismatch = |message: &str| PortablePackageError {
         code: ErrorCode::ManifestMismatch,
@@ -1448,14 +1464,14 @@ fn verify_config_bindings(manifest: &Value, module: &ghostflow_core::Module) -> 
         || module
             .true_for_requirements()
             .is_some_and(|r| r.strategies.iter().any(|s| !s.signals.is_empty()))
-        || !manifest["schedules"].as_array().unwrap().is_empty()
         || !manifest["signals"].as_array().unwrap().is_empty()
     {
         return Err(mismatch(
-            "portable GFB11 profile supports config streams without schedule/objective preludes",
+            "portable GFB11 profile supports scalar configs and Periodic schedules only",
         ));
     }
     let configs = manifest["configs"].as_array().unwrap();
+    let manifest_schedules = manifest["schedules"].as_array().unwrap();
     if configs.is_empty() {
         return Err(mismatch("portable GFB11 profile requires config streams"));
     }
@@ -1464,16 +1480,125 @@ fn verify_config_bindings(manifest: &Value, module: &ghostflow_core::Module) -> 
         MachineValue::Int(value) => expected.as_i64() == Some(i64::from(value)),
         MachineValue::Number(value) => expected.as_f64() == Some(value),
     };
+    let inputs: HashMap<_, _> = module.input_fields().collect();
+    let mut generated = HashMap::new();
+    if !manifest_schedules.is_empty() {
+        generated.insert("__gf_now_ms".to_owned(), Type::Number);
+        generated.insert("__gf_time_epoch".to_owned(), Type::Number);
+    }
     for strategy in &schedules.strategies {
-        if strategy.schedules.len() != configs.len() {
-            return Err(mismatch("manifest config count differs from bytecode"));
+        if strategy.schedules.len() != configs.len() + manifest_schedules.len() {
+            return Err(mismatch(
+                "manifest config/schedule count differs from bytecode",
+            ));
         }
         let mut ids = HashSet::new();
+        let mut sites = HashSet::new();
         for descriptor in &strategy.schedules {
             let PulseDescriptor::Config(config) = descriptor else {
-                return Err(mismatch(
-                    "portable context profile requires config-only preludes",
-                ));
+                let PulseDescriptor::Context(periodic) = descriptor else {
+                    return Err(mismatch(
+                        "portable GFB11 profile requires Periodic schedule preludes",
+                    ));
+                };
+                let ScheduleDefinition::Periodic {
+                    epoch_id,
+                    anchor_ms,
+                    every,
+                } = &periodic.definition
+                else {
+                    return Err(mismatch(
+                        "portable GFB11 profile requires Periodic schedule preludes",
+                    ));
+                };
+                let expected = manifest_schedules
+                    .iter()
+                    .find(|entry| entry["site"].as_u64() == Some(u64::from(periodic.site)))
+                    .ok_or_else(|| mismatch("Periodic site differs from bytecode"))?;
+                let object = value_object(expected, "GFB11 Periodic schedule")?;
+                exact_keys(
+                    object,
+                    &[
+                        "kind",
+                        "every",
+                        "anchor",
+                        "intervalChange",
+                        "site",
+                        "name",
+                        "policy",
+                    ],
+                    "GFB11 Periodic schedule",
+                    ErrorCode::ManifestMismatch,
+                )?;
+                let anchor = value_object(&expected["anchor"], "GFB11 Periodic anchor")?;
+                exact_keys(
+                    anchor,
+                    &["kind", "instantMs"],
+                    "GFB11 Periodic anchor",
+                    ErrorCode::ManifestMismatch,
+                )?;
+                let interval = value_object(&expected["every"], "GFB11 Periodic interval")?;
+                exact_keys(
+                    interval,
+                    &["expression", "initialMs", "config", "configId"],
+                    "GFB11 Periodic interval",
+                    ErrorCode::ManifestMismatch,
+                )?;
+                let policy = value_object(&expected["policy"], "GFB11 Periodic policy")?;
+                exact_keys(
+                    policy,
+                    &["basis", "when", "clock", "gapMs", "recovery", "fallback"],
+                    "GFB11 Periodic policy",
+                    ErrorCode::ManifestMismatch,
+                )?;
+                let config = configs
+                    .iter()
+                    .find(|entry| entry["id"].as_u64() == Some(u64::from(every.id)))
+                    .ok_or_else(|| mismatch("Periodic config identity differs from bytecode"))?;
+                if !sites.insert(periodic.site)
+                    || expected["kind"].as_str() != Some("periodic")
+                    || expected["name"].as_str() != Some(periodic.name.as_str())
+                    || expected["intervalChange"].as_str() != Some("preserve_anchor")
+                    || anchor["kind"].as_str() != Some("instant")
+                    || anchor["instantMs"].as_u64() != Some(*anchor_ms)
+                    || epoch_id != &format!("instant:{anchor_ms}")
+                    || interval["configId"].as_u64() != Some(u64::from(every.id))
+                    || interval["config"].as_str() != Some(every.name.as_str())
+                    || interval["expression"].as_str() != Some(every.name.as_str())
+                    || interval["initialMs"].as_u64() != Some(every.initial_ms)
+                    || config["name"].as_str() != Some(every.name.as_str())
+                    || config["type"].as_str() != Some("Duration")
+                    || config["value"].as_u64() != Some(every.initial_ms)
+                    || (config["settings"]["access"].as_str() == Some("operator"))
+                        != every.operator_editable
+                    || policy["basis"].as_str() != Some("pulse")
+                    || policy["when"].as_str() != Some("true")
+                    || periodic.when != [1, 1]
+                    || periodic.cancel != [1, 0]
+                    || policy["clock"].as_str() != Some("trusted_only")
+                    || policy["gapMs"].as_u64() != Some(periodic.gap_ms)
+                    || policy["recovery"].as_str() != Some("baseline")
+                    || policy["fallback"].as_str() != Some("skip")
+                {
+                    return Err(mismatch("GFB11 Periodic descriptor differs from bytecode"));
+                }
+                let (min, max, step) = match config["settings"].get("min") {
+                    Some(_) => (
+                        config["settings"]["min"].as_u64(),
+                        config["settings"]["max"].as_u64(),
+                        config["settings"]["step"].as_u64(),
+                    ),
+                    None => (Some(1), Some(9_007_199_254_740_991), Some(1)),
+                };
+                if min != Some(every.min_ms)
+                    || max != Some(every.max_ms)
+                    || step != Some(every.step_ms)
+                {
+                    return Err(mismatch(
+                        "GFB11 Periodic bounds differ from config bytecode",
+                    ));
+                }
+                continue;
             };
             if config.kind == 3 {
                 return Err(mismatch("portable config profile requires scalar payloads"));
@@ -1490,6 +1615,13 @@ fn verify_config_bindings(manifest: &Value, module: &ghostflow_core::Module) -> 
                 || expected["settings"].get("apply").is_some()
             {
                 return Err(mismatch("manifest config descriptor differs from bytecode"));
+            }
+            for (suffix, ty) in [
+                ("ok", Type::Bool),
+                ("value", initial_type(config)),
+                ("fault", Type::Number),
+            ] {
+                generated.insert(format!("__gf_config_{}_{}", config.id, suffix), ty);
             }
             let ConfigValue::Scalar(initial) = config.initial else {
                 return Err(mismatch("portable config profile requires scalar payloads"));
@@ -1509,8 +1641,32 @@ fn verify_config_bindings(manifest: &Value, module: &ghostflow_core::Module) -> 
                 ));
             }
         }
+        if ids.len() != configs.len() || sites.len() != manifest_schedules.len() {
+            return Err(mismatch(
+                "GFB11 config or Periodic identity count differs from bytecode",
+            ));
+        }
+    }
+    if generated
+        .iter()
+        .any(|(name, ty)| inputs.get(name.as_str()) != Some(ty))
+        || inputs
+            .iter()
+            .any(|(name, ty)| name.starts_with("__gf_config_") && generated.get(*name) != Some(ty))
+    {
+        return Err(mismatch("GFB11 generated input ports differ from bytecode"));
     }
     Ok(())
+}
+
+fn initial_type(
+    config: &ghostflow_core::settings_stream::ConfigDescriptor,
+) -> ghostflow_core::Type {
+    match config.kind {
+        0 => ghostflow_core::Type::Bool,
+        1 => ghostflow_core::Type::Int,
+        _ => ghostflow_core::Type::Number,
+    }
 }
 
 fn verify_debounce_bindings(manifest: &Value, bytecode: &[u8]) -> Result<()> {
@@ -1763,6 +1919,166 @@ fn verify_gfb10_periodic_bindings(manifest: &Value, bytecode: &[u8]) -> Result<(
     Ok(())
 }
 
+fn verify_adapt_bindings(manifest: &Value, bytecode: &[u8]) -> Result<()> {
+    let Some(policy) = manifest.get("adaptPolicy") else {
+        let module =
+            ghostflow_core::Module::load(bytecode).map_err(|error| PortablePackageError {
+                code: ErrorCode::ManifestMismatch,
+                message: error.to_string(),
+            })?;
+        if module
+            .strategy_bindings()
+            .any(|(name, _, _, _)| name != "control")
+            || module.strategy_bindings().count() != 1
+        {
+            return fail(
+                ErrorCode::ManifestMismatch,
+                "adaptive bytecode requires paired strategy descriptors",
+            );
+        }
+        return Ok(());
+    };
+    let policy = value_object(policy, "manifest.adaptPolicy")?;
+    exact_keys(
+        policy,
+        &["name", "selection"],
+        "manifest.adaptPolicy",
+        ErrorCode::ManifestMismatch,
+    )?;
+    require_ghost_name(
+        policy["name"].as_str().unwrap_or(""),
+        "manifest.adaptPolicy.name",
+    )?;
+    if policy["selection"].as_str() != Some("highest-priority-unique") {
+        return fail(
+            ErrorCode::ManifestMismatch,
+            "unsupported adaptive selection",
+        );
+    }
+    let descriptors = manifest["strategies"]
+        .as_array()
+        .ok_or_else(|| PortablePackageError {
+            code: ErrorCode::ManifestMismatch,
+            message: "adaptive strategies must be an array".into(),
+        })?;
+    let module = ghostflow_core::Module::load(bytecode).map_err(|error| PortablePackageError {
+        code: ErrorCode::ManifestMismatch,
+        message: error.to_string(),
+    })?;
+    let bindings: Vec<_> = module.strategy_bindings().collect();
+    if descriptors.is_empty() || descriptors.len() != bindings.len() {
+        return fail(
+            ErrorCode::ManifestMismatch,
+            "adaptive strategy count does not match bytecode",
+        );
+    }
+    fn capability(query: &mut Vec<u8>, kind: &str, name: &str, ty: &str) -> Result<()> {
+        require_ghost_name(name, "adaptive capability name")?;
+        query.push(1);
+        for text in [kind, name] {
+            query.extend((text.len() as u16).to_le_bytes());
+            query.extend(text.as_bytes());
+        }
+        query.push(
+            match manifest_capability_type(ty, "adaptive capability type")? {
+                "bool" => 1,
+                "int" => 3,
+                _ => 2,
+            },
+        );
+        Ok(())
+    }
+    for (descriptor, (name, priority, actual_query, outputs)) in descriptors.iter().zip(bindings) {
+        let descriptor = value_object(descriptor, "adaptive strategy")?;
+        exact_keys(
+            descriptor,
+            &["name", "priority", "match", "outputNames"],
+            "adaptive strategy",
+            ErrorCode::ManifestMismatch,
+        )?;
+        let expected_outputs: Vec<Value> = outputs
+            .iter()
+            .map(|name| Value::String((*name).into()))
+            .collect();
+        if descriptor["name"].as_str() != Some(name)
+            || descriptor["priority"].as_i64() != Some(i64::from(priority))
+            || descriptor["outputNames"].as_array() != Some(&expected_outputs)
+        {
+            return fail(
+                ErrorCode::ManifestMismatch,
+                "adaptive strategy descriptor does not match bytecode",
+            );
+        }
+        let mut query = Vec::new();
+        let mut count = 0u16;
+        for output in manifest["outputs"].as_array().unwrap() {
+            capability(
+                &mut query,
+                "actuator",
+                output["name"].as_str().unwrap_or(""),
+                output["type"].as_str().unwrap_or(""),
+            )?;
+            count += 1;
+        }
+        if descriptor["match"].as_str() != Some("always") {
+            let matches = descriptor["match"]
+                .as_array()
+                .ok_or_else(|| PortablePackageError {
+                    code: ErrorCode::ManifestMismatch,
+                    message: "adaptive match must be always or capabilities".into(),
+                })?;
+            if matches.is_empty() || matches.len() > 128 {
+                return fail(ErrorCode::ManifestMismatch, "adaptive match count invalid");
+            }
+            let mut seen = HashSet::new();
+            for matched in matches {
+                let matched = value_object(matched, "adaptive match")?;
+                exact_keys(
+                    matched,
+                    &["role", "kind", "type"],
+                    "adaptive match",
+                    ErrorCode::ManifestMismatch,
+                )?;
+                let kind = matched["kind"].as_str().unwrap_or("");
+                let role = matched["role"].as_str().unwrap_or("");
+                let ty = matched["type"].as_str().unwrap_or("");
+                let field = match kind {
+                    "sensor" => "sensors",
+                    "actuator" => "outputs",
+                    _ => {
+                        return fail(
+                            ErrorCode::ManifestMismatch,
+                            "unsupported adaptive match kind",
+                        )
+                    }
+                };
+                if !seen.insert((kind, role))
+                    || !manifest[field].as_array().unwrap().iter().any(|declared| {
+                        declared["name"].as_str() == Some(role)
+                            && declared["type"].as_str() == Some(ty)
+                    })
+                {
+                    return fail(
+                        ErrorCode::ManifestMismatch,
+                        "adaptive match is not a declared typed capability",
+                    );
+                }
+                capability(&mut query, kind, role, ty)?;
+                count += 1;
+            }
+        }
+        query.push(2);
+        query.extend(count.to_le_bytes());
+        if query != actual_query {
+            return fail(
+                ErrorCode::ManifestMismatch,
+                "adaptive capability query does not match bytecode",
+            );
+        }
+    }
+    Ok(())
+}
+
 fn verify_manifest(
     manifest: &Value,
     descriptor_format: &str,
@@ -1770,23 +2086,22 @@ fn verify_manifest(
     identity: &[Capability],
 ) -> Result<()> {
     let object = value_object(manifest, "manifest")?;
-    exact_keys(
-        object,
-        &[
-            "format",
-            "name",
-            "inputs",
-            "outputs",
-            "sensors",
-            "schedules",
-            "timers",
-            "signals",
-            "configs",
-            "bytecodeSha256",
-        ],
-        "manifest",
-        ErrorCode::ManifestMismatch,
-    )?;
+    let mut keys = vec![
+        "format",
+        "name",
+        "inputs",
+        "outputs",
+        "sensors",
+        "schedules",
+        "timers",
+        "signals",
+        "configs",
+        "bytecodeSha256",
+    ];
+    if object.contains_key("adaptPolicy") || object.contains_key("strategies") {
+        keys.extend(["adaptPolicy", "strategies"]);
+    }
+    exact_keys(object, &keys, "manifest", ErrorCode::ManifestMismatch)?;
     let format = object["format"]
         .as_str()
         .ok_or_else(|| PortablePackageError {
@@ -2178,6 +2493,16 @@ pub fn verify_portable_package(
     transport: &[u8],
     profile: &VerificationProfile<'_>,
 ) -> Result<VerifiedPackage> {
+    verify_portable_package_with_signature_policy(transport, profile, SignaturePolicy::Enforce)
+}
+
+/// Development opt-out affects publisher authentication only. All package,
+/// compatibility and target-loader checks use the same verifier as strict mode.
+pub fn verify_portable_package_with_signature_policy(
+    transport: &[u8],
+    profile: &VerificationProfile<'_>,
+    signature_policy: SignaturePolicy,
+) -> Result<VerifiedPackage> {
     let root = parse_canonical_transport(transport, profile.limits)?;
     let envelope: Envelope = parse_wire(root, "package")?;
     if envelope.format != PACKAGE_FORMAT {
@@ -2187,7 +2512,9 @@ pub fn verify_portable_package(
         );
     }
     require_digest(&envelope.payload_sha256, "package.payloadSha256")?;
-    if envelope.signatures.is_empty() || envelope.signatures.len() > profile.limits.max_signatures {
+    if (signature_policy == SignaturePolicy::Enforce && envelope.signatures.is_empty())
+        || envelope.signatures.len() > profile.limits.max_signatures
+    {
         return fail(
             ErrorCode::SignatureCount,
             "package signatures must contain 1 to the configured maximum",
@@ -2231,7 +2558,23 @@ pub fn verify_portable_package(
     require_profile_identifier(&identity.runtime_abi, "identity.runtimeAbi")?;
     require_profile_identifier(&identity.binding_revision, "identity.bindingRevision")?;
 
-    let accepted_key_ids = verify_signatures(&envelope.signatures, &payload_bytes, profile)?;
+    let accepted_key_ids = match signature_policy {
+        SignaturePolicy::Enforce => {
+            verify_signatures(&envelope.signatures, &payload_bytes, profile)?
+        }
+        SignaturePolicy::DevelopmentBypass => {
+            let mut seen = HashSet::new();
+            for signature in &envelope.signatures {
+                if signature_bytes(signature, &mut seen)?.len() != 64 {
+                    return fail(
+                        ErrorCode::InvalidSchema,
+                        "Ed25519 signature must be 64 bytes",
+                    );
+                }
+            }
+            Vec::new()
+        }
+    };
     require_identifier(
         profile.expected_compiler_revision,
         "expectedCompilerRevision",
@@ -2437,6 +2780,7 @@ pub fn verify_portable_package(
         &bytecode_sha256,
         &identity.required_capabilities,
     )?;
+    verify_adapt_bindings(&manifest, &bytecode)?;
     verify_debounce_bindings(&manifest, &bytecode)?;
     if bytecode_version == 10 {
         verify_gfb10_periodic_bindings(&manifest, &bytecode)?;
@@ -2481,6 +2825,10 @@ pub fn verify_portable_package(
         package_format: PACKAGE_FORMAT,
         payload_sha256: envelope.payload_sha256,
         accepted_key_ids,
+        signature_authentication: match signature_policy {
+            SignaturePolicy::Enforce => SignatureAuthentication::Authenticated,
+            SignaturePolicy::DevelopmentBypass => SignatureAuthentication::DevelopmentBypass,
+        },
         source: VerifiedSource {
             filename: payload.source.filename,
             text: source_text,
@@ -2524,6 +2872,27 @@ fn parse_embedded_canonical_json(
     Ok(value)
 }
 
+fn signature_bytes<'a>(
+    signature: &'a SignatureWire,
+    seen: &mut HashSet<&'a str>,
+) -> Result<Vec<u8>> {
+    if signature.algorithm != "Ed25519" {
+        return fail(
+            ErrorCode::UnsupportedSignatureAlgorithm,
+            "only Ed25519 signatures are supported",
+        );
+    }
+    require_identifier(&signature.key_id, "signatures.keyId")?;
+    if !seen.insert(signature.key_id.as_str()) {
+        return fail(ErrorCode::DuplicateSignature, "duplicate signature key ID");
+    }
+    decode_base64(
+        &signature.signature_base64,
+        "signatures.signatureBase64",
+        256,
+    )
+}
+
 fn verify_signatures(
     signatures: &[SignatureWire],
     payload_bytes: &[u8],
@@ -2559,21 +2928,7 @@ fn verify_signatures(
     let mut accepted = Vec::new();
     let mut saw_revoked = false;
     for signature in signatures {
-        if signature.algorithm != "Ed25519" {
-            return fail(
-                ErrorCode::UnsupportedSignatureAlgorithm,
-                "only Ed25519 signatures are supported",
-            );
-        }
-        require_identifier(&signature.key_id, "signatures.keyId")?;
-        if !seen.insert(signature.key_id.as_str()) {
-            return fail(ErrorCode::DuplicateSignature, "duplicate signature key ID");
-        }
-        let signature_bytes = decode_base64(
-            &signature.signature_base64,
-            "signatures.signatureBase64",
-            256,
-        )?;
+        let signature_bytes = signature_bytes(signature, &mut seen)?;
         if revoked.contains(signature.key_id.as_str()) {
             saw_revoked = true;
             continue;
@@ -2609,11 +2964,37 @@ mod tests {
     use super::*;
     use std::process::Command;
 
-    fn fixture_for(scenario: &str) -> Vec<u8> {
+    #[test]
+    fn executable_at_remains_outside_signed_package_profile() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let output = Command::new("node")
-            .arg(root.join("tests/native-portable-package-fixture.mjs"))
-            .arg(scenario)
+            .arg(root.join("tests/native-at-bytecode-fixture.mjs"))
+            .current_dir(&root)
+            .output()
+            .expect("Node must compile the At artifact");
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let bytes = BASE64.decode(&output.stdout).unwrap();
+        ghostflow_core::Module::load(&bytes).expect("At must be executable in the core");
+        assert_eq!(
+            validate_gfb1(&bytes).unwrap_err().code,
+            ErrorCode::UnsupportedBytecodeVersion
+        );
+    }
+
+    fn fixture_for(scenario: &str) -> Vec<u8> {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let periodic = scenario.strip_prefix("gfb11-periodic-");
+        let output = Command::new("node")
+            .arg(root.join(if periodic.is_some() {
+                "tests/native-gfb11-periodic-package-fixture.mjs"
+            } else {
+                "tests/native-portable-package-fixture.mjs"
+            }))
+            .arg(periodic.unwrap_or(scenario))
             .current_dir(&root)
             .output()
             .expect("Node must generate the portable-package fixture");
@@ -2692,6 +3073,98 @@ mod tests {
             expected_binding_revision: "virtual-two-output-v1",
             target_loader: loader,
             limits: VerifierLimits::default(),
+        }
+    }
+
+    #[test]
+    fn signed_adaptive_bool_package_binds_strategy_queries_and_rejects_resigned_tampering() {
+        let accept =
+            |bytes: &[u8], _: &TargetLoaderContext<'_>| -> std::result::Result<bool, String> {
+                ghostflow_core::Module::load(bytes)
+                    .map(|_| true)
+                    .map_err(|error| error.to_string())
+            };
+        let mut current = profile(&accept);
+        let capabilities = vec![Capability {
+            kind: "actuator".into(),
+            name: "pump".into(),
+            value_type: "bool".into(),
+        }];
+        current.available_capabilities = &capabilities;
+        let verified = verify_portable_package(&fixture_for("adapt-valid"), &current).unwrap();
+        assert_eq!(
+            verified.manifest["sensors"][0]["optional"],
+            Value::Bool(true)
+        );
+        assert_eq!(verified.manifest["strategies"].as_array().unwrap().len(), 2);
+        for present in [false, true] {
+            let mut runtime = ghostflow_core::Runtime::new(4);
+            runtime.install(
+                ghostflow_core::Module::load(&verified.bytecode_copy()).unwrap(),
+                false,
+            );
+            runtime
+                .add_capability(ghostflow_core::Capability::new(
+                    "actuator",
+                    "pump",
+                    ghostflow_core::Type::Bool,
+                ))
+                .unwrap();
+            if present {
+                runtime
+                    .add_capability(ghostflow_core::Capability::new(
+                        "sensor",
+                        "door",
+                        ghostflow_core::Type::Bool,
+                    ))
+                    .unwrap();
+            }
+            runtime.activate().unwrap();
+            let sensor = &verified.manifest["sensors"][0];
+            runtime
+                .set_input(
+                    sensor["valueInput"].as_str().unwrap(),
+                    ghostflow_core::Value::Bool(true),
+                )
+                .unwrap();
+            runtime
+                .set_input(
+                    sensor["okInput"].as_str().unwrap(),
+                    ghostflow_core::Value::Bool(true),
+                )
+                .unwrap();
+            runtime
+                .set_input(
+                    sensor["faultInput"].as_str().unwrap(),
+                    ghostflow_core::Value::Number(0.0),
+                )
+                .unwrap();
+            assert_eq!(
+                runtime.tick().unwrap().safe_intents["pump"],
+                ghostflow_core::Value::Bool(present)
+            );
+        }
+        let reject = |_: &[u8], _: &TargetLoaderContext<'_>| -> std::result::Result<bool, String> {
+            panic!("forged metadata must reject before loader")
+        };
+        current.target_loader = &reject;
+        for scenario in [
+            "adapt-priority",
+            "adapt-name",
+            "adapt-match",
+            "adapt-output",
+            "adapt-policy",
+            "adapt-unpaired",
+            "adapt-missing",
+            "adapt-bytecode",
+        ] {
+            assert_eq!(
+                verify_portable_package(&fixture_for(scenario), &current)
+                    .unwrap_err()
+                    .code,
+                ErrorCode::ManifestMismatch,
+                "{scenario}"
+            );
         }
     }
 
@@ -2924,6 +3397,236 @@ mod tests {
     }
 
     #[test]
+    fn trusted_builder_constraint_proof_is_signed_transport_not_native_semantic_proof() {
+        // The builder owns semantic replay/checking. Native verification checks
+        // signed transport and loader compatibility, not the host proof theorem.
+        let bytes = fixture_for("constraint-proof-valid");
+        let loader = |bytes: &[u8],
+                      _context: &TargetLoaderContext<'_>|
+         -> std::result::Result<bool, String> {
+            assert_eq!(&bytes[..4], b"GFB1");
+            Ok(true)
+        };
+        let verified = verify_portable_package(&bytes, &profile(&loader)).unwrap();
+        assert_eq!(verified.accepted_key_ids, vec!["test-current-2026"]);
+        let trace = &verified.source_map["traceMetadata"];
+        assert_eq!(trace["format"], "GhostFlow/source-trace-v2");
+        assert_eq!(
+            trace["constraintProof"]["original"]
+                .as_array()
+                .unwrap()
+                .len(),
+            2
+        );
+        assert_eq!(
+            trace["constraintProof"]["compiled"]
+                .as_array()
+                .unwrap()
+                .len(),
+            1
+        );
+        assert_eq!(
+            trace["constraintProof"]["sourceToCompiled"],
+            serde_json::json!([0, 0])
+        );
+    }
+
+    #[test]
+    fn development_signature_policy_is_explicit_and_unauthenticated() {
+        let loader = |_bytes: &[u8],
+                      _context: &TargetLoaderContext<'_>|
+         -> std::result::Result<bool, String> { Ok(true) };
+        let mut envelope: Value = serde_json::from_slice(&fixture()).unwrap();
+        envelope["signatures"] = serde_json::json!([]);
+        let bytes = development_test_transport(&envelope);
+        let mut current = profile(&loader);
+        current.trusted_keys = &[];
+        assert_eq!(
+            verify_portable_package(&bytes, &current).unwrap_err().code,
+            ErrorCode::SignatureCount
+        );
+        let admitted = verify_portable_package_with_signature_policy(
+            &bytes,
+            &current,
+            SignaturePolicy::DevelopmentBypass,
+        )
+        .unwrap();
+        assert_eq!(
+            admitted.signature_authentication,
+            SignatureAuthentication::DevelopmentBypass
+        );
+        assert!(admitted.accepted_key_ids.is_empty());
+        let strict = verify_portable_package(&fixture(), &profile(&loader)).unwrap();
+        assert_eq!(
+            strict.signature_authentication,
+            SignatureAuthentication::Authenticated
+        );
+        let untrusted = verify_portable_package_with_signature_policy(
+            &fixture(),
+            &current,
+            SignaturePolicy::DevelopmentBypass,
+        )
+        .unwrap();
+        assert!(untrusted.accepted_key_ids.is_empty());
+        assert_eq!(untrusted.source.sha256, strict.source.sha256);
+        assert_eq!(untrusted.bytecode_copy(), strict.bytecode_copy());
+        envelope["signatures"] = serde_json::json!([{
+            "algorithm": "Ed25519", "keyId": "test-current-2026",
+            "signatureBase64": BASE64.encode([0u8; 64])
+        }]);
+        let bytes = development_test_transport(&envelope);
+        assert_eq!(
+            verify_portable_package(&bytes, &profile(&loader))
+                .unwrap_err()
+                .code,
+            ErrorCode::UntrustedSignature
+        );
+        assert!(verify_portable_package_with_signature_policy(
+            &bytes,
+            &current,
+            SignaturePolicy::DevelopmentBypass
+        )
+        .unwrap()
+        .accepted_key_ids
+        .is_empty());
+    }
+
+    #[test]
+    fn development_bypass_retains_integrity_and_compatibility_checks() {
+        let loader =
+            |_bytes: &[u8],
+             _context: &TargetLoaderContext<'_>|
+             -> std::result::Result<bool, String> { panic!("loader must not run") };
+        let mut envelope: Value = serde_json::from_slice(&fixture()).unwrap();
+        envelope["signatures"] = serde_json::json!([]);
+        envelope["payloadSha256"] = serde_json::json!("0".repeat(64));
+        let bytes = development_test_transport(&envelope);
+        assert_eq!(
+            verify_portable_package_with_signature_policy(
+                &bytes,
+                &profile(&loader),
+                SignaturePolicy::DevelopmentBypass
+            )
+            .unwrap_err()
+            .code,
+            ErrorCode::DigestMismatch
+        );
+        let mut current = profile(&loader);
+        current.expected_binding_revision = "different-binding";
+        assert_eq!(
+            verify_portable_package_with_signature_policy(
+                &fixture(),
+                &current,
+                SignaturePolicy::DevelopmentBypass
+            )
+            .unwrap_err()
+            .code,
+            ErrorCode::BindingRevisionMismatch
+        );
+        current = profile(&loader);
+        current.supported_runtime_abis = &[];
+        assert_eq!(
+            verify_portable_package_with_signature_policy(
+                &fixture(),
+                &current,
+                SignaturePolicy::DevelopmentBypass
+            )
+            .unwrap_err()
+            .code,
+            ErrorCode::InvalidVerifierOptions
+        );
+        for (artifact, expected) in [
+            ("source", ErrorCode::SourceDigestMismatch),
+            ("bytecode", ErrorCode::BytecodeDigestMismatch),
+        ] {
+            let mut envelope: Value = serde_json::from_slice(&fixture()).unwrap();
+            envelope["payload"][artifact]["sha256"] = serde_json::json!("0".repeat(64));
+            envelope["payloadSha256"] = serde_json::json!(sha256_hex(
+                &canonical_json(&envelope["payload"], VerifierLimits::default()).unwrap()
+            ));
+            let bytes = development_test_transport(&envelope);
+            assert_eq!(
+                verify_portable_package_with_signature_policy(
+                    &bytes,
+                    &profile(&loader),
+                    SignaturePolicy::DevelopmentBypass
+                )
+                .unwrap_err()
+                .code,
+                expected
+            );
+        }
+    }
+
+    #[test]
+    fn development_bypass_rejects_malformed_signature_metadata() {
+        let loader =
+            |_bytes: &[u8],
+             _context: &TargetLoaderContext<'_>|
+             -> std::result::Result<bool, String> { panic!("loader must not run") };
+        let base: Value = serde_json::from_slice(&fixture()).unwrap();
+        for (field, value, expected) in [
+            (
+                "algorithm",
+                "other",
+                ErrorCode::UnsupportedSignatureAlgorithm,
+            ),
+            ("signatureBase64", "not base64", ErrorCode::InvalidBase64),
+            ("signatureBase64", "AA==", ErrorCode::InvalidSchema),
+            ("keyId", "", ErrorCode::InvalidIdentity),
+        ] {
+            let mut envelope = base.clone();
+            envelope["signatures"][0][field] = serde_json::json!(value);
+            let bytes = development_test_transport(&envelope);
+            assert_eq!(
+                verify_portable_package_with_signature_policy(
+                    &bytes,
+                    &profile(&loader),
+                    SignaturePolicy::DevelopmentBypass
+                )
+                .unwrap_err()
+                .code,
+                expected
+            );
+        }
+        let mut envelope = base;
+        let signature = envelope["signatures"][0].clone();
+        envelope["signatures"]
+            .as_array_mut()
+            .unwrap()
+            .push(signature);
+        let bytes = development_test_transport(&envelope);
+        assert_eq!(
+            verify_portable_package_with_signature_policy(
+                &bytes,
+                &profile(&loader),
+                SignaturePolicy::DevelopmentBypass
+            )
+            .unwrap_err()
+            .code,
+            ErrorCode::DuplicateSignature
+        );
+        let mut current = profile(&loader);
+        current.limits.max_signatures = 1;
+        assert_eq!(
+            verify_portable_package_with_signature_policy(
+                &bytes,
+                &current,
+                SignaturePolicy::DevelopmentBypass
+            )
+            .unwrap_err()
+            .code,
+            ErrorCode::SignatureCount
+        );
+    }
+
+    fn development_test_transport(envelope: &Value) -> Vec<u8> {
+        let mut bytes = canonical_json(envelope, VerifierLimits::default()).unwrap();
+        bytes.push(b'\n');
+        bytes
+    }
+
+    #[test]
     fn tampered_transport_never_reaches_loader() {
         let mut bytes = fixture();
         let marker = b"\"payloadSha256\":\"";
@@ -3148,6 +3851,59 @@ mod tests {
                 verify_portable_package(&bytes, &current).unwrap_err().code,
                 ErrorCode::ManifestMismatch,
                 "{scenario}"
+            );
+        }
+    }
+
+    #[test]
+    fn signed_gfb11_scalar_config_periodic_reaches_loader_and_rejects_substitution() {
+        let accept = |bytes: &[u8],
+                      context: &TargetLoaderContext<'_>|
+         -> std::result::Result<bool, String> {
+            assert_eq!(u16::from_le_bytes([bytes[4], bytes[5]]), 11);
+            assert_eq!(context.manifest["format"], "GhostFlow/control-v10");
+            assert_eq!(context.manifest["schedules"][0]["kind"], "periodic");
+            Ok(true)
+        };
+        let mut current = profile(&accept);
+        let capabilities = vec![Capability {
+            kind: "actuator".into(),
+            name: "due".into(),
+            value_type: "bool".into(),
+        }];
+        current.available_capabilities = &capabilities;
+        verify_portable_package(&fixture_for("gfb11-periodic-valid"), &current).unwrap();
+
+        let reject_loader =
+            |_: &[u8], _: &TargetLoaderContext<'_>| -> std::result::Result<bool, String> {
+                panic!("mismatched Periodic package must reject before target loader")
+            };
+        current.target_loader = &reject_loader;
+        for scenario in [
+            "missing-schedule",
+            "duplicate-schedule",
+            "wrong-site",
+            "wrong-name",
+            "wrong-config-id",
+            "wrong-config-name",
+            "wrong-initial",
+            "wrong-anchor",
+            "wrong-gap",
+            "wrong-clock",
+            "wrong-when",
+            "extra-policy",
+            "wrong-kind",
+            "extra-signal",
+        ] {
+            let error = verify_portable_package(
+                &fixture_for(&format!("gfb11-periodic-{scenario}")),
+                &current,
+            )
+            .unwrap_err();
+            assert_eq!(
+                error.code,
+                ErrorCode::ManifestMismatch,
+                "{scenario}: {error:?}"
             );
         }
     }
@@ -3531,6 +4287,7 @@ mod tests {
                             source_revision: None,
                         },
                         &ghostflow_core::context_runtime::Facts {
+                            solars: vec![],
                             natural: vec![],
                             schedules: vec![],
                             settings: None,

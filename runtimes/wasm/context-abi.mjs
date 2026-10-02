@@ -1,4 +1,5 @@
-// GFB11 context activation and GFSF5 provider/settings evidence.
+// Context activation and GFSF5/6 provider/settings evidence.
+import { validateSolarDescriptor, validateSolarFallbackFacts } from './solar-schedule.mjs';
 const utf8 = new TextEncoder();
 const LIMIT = 65_536;
 const MAX_EXACT = Number.MAX_SAFE_INTEGER;
@@ -24,6 +25,7 @@ class Writer {
   u16(n) { this.room(2); this.view.setUint16(this.at, n, true); this.at += 2; }
   u32(n) { this.room(4); this.view.setUint32(this.at, n, true); this.at += 4; }
   i32(n) { this.room(4); this.view.setInt32(this.at, n, true); this.at += 4; }
+  i64(n, label) { if (!Number.isSafeInteger(n)) throw new RangeError(`invalid ${label}`); this.room(8); this.view.setBigInt64(this.at, BigInt(n), true); this.at += 8; }
   f64(n) { this.room(8); this.view.setFloat64(this.at, n, true); this.at += 8; }
   u64(n, label) { integer(n, label); this.room(8); this.view.setBigUint64(this.at, BigInt(n), true); this.at += 8; }
   raw64(n, label) {
@@ -112,8 +114,9 @@ export function encodeContextActivation(profile) {
 }
 
 export function encodeContextFacts(packet) {
-  const p = object(packet, ['clock','natural','schedules','settings'], 'context facts');
-  const writer = new Writer(); writer.raw([71,70,83,70]); writer.u16(5);
+  const p = object(packet, ['clock','natural','schedules','settings','solars'], 'context facts');
+  const solars = p.solars === undefined ? [] : bounded(p.solars, 'solars');
+  const writer = new Writer(); writer.raw([71,70,83,70]); writer.u16(solars.length ? 6 : 5);
   const c = object(p.clock, ['monotonicMs','bootEpoch','wallMs','uncertaintyMs','trusted','unknownReason','sourceRevision'], 'clock');
   writer.u64(c.monotonicMs, 'clock.monotonicMs'); writer.u64(c.bootEpoch, 'clock.bootEpoch');
   writer.optional(c.wallMs, 'clock.wallMs'); writer.optional(c.uncertaintyMs, 'clock.uncertaintyMs');
@@ -202,5 +205,78 @@ export function encodeContextFacts(packet) {
       } else throw new TypeError('settings result.ok must be Bool');
     }
   }
+  if (solars.length) {
+    writer.u16(solars.length);
+    const solarSites = new Set();
+    for (const [index, value] of solars.entries()) {
+      const label = `solars[${index}]`;
+      const s = object(value, ['site','timezone','latitude','longitude','event','offsetMs','coverageStartMs','coverageEndMs','rows'], label);
+      const site = integer(s.site, `${label}.site`, 0xffff_ffff);
+      if (!site || sites.has(site) || solarSites.has(site)) throw new RangeError('invalid or duplicate Solar site');
+      solarSites.add(site); writer.u32(site); writer.str(s.timezone, `${label}.timezone`);
+      if (!Number.isFinite(s.latitude) || Math.abs(s.latitude) > 90 || !Number.isFinite(s.longitude) || Math.abs(s.longitude) > 180) throw new RangeError('invalid Solar coordinates');
+      writer.f64(s.latitude); writer.f64(s.longitude);
+      if (![0, 1].includes(s.event)) throw new RangeError('invalid Solar event');
+      writer.u8(s.event); writer.i64(s.offsetMs, `${label}.offsetMs`);
+      const start = integer(s.coverageStartMs, `${label}.coverageStartMs`), end = integer(s.coverageEndMs, `${label}.coverageEndMs`);
+      if (start >= end) throw new RangeError('invalid Solar coverage');
+      writer.u64(start, 'Solar coverageStartMs'); writer.u64(end, 'Solar coverageEndMs');
+      const rows = bounded(s.rows, `${label}.rows`, 4096); writer.u16(rows.length); let previous = -1;
+      for (const [rowIndex, value] of rows.entries()) {
+        const row = object(value, ['sourceDay','scheduledWallMs','availability','fallbackWallMs','unavailableReason','providerRevision','contextRevision'], `${label}.rows[${rowIndex}]`);
+        const day = integer(row.sourceDay, 'Solar sourceDay', 2_932_896);
+        if (day <= previous) throw new RangeError('Solar rows must be ordered by source identity');
+        previous = day; writer.u32(day);
+        if (![0, 1].includes(row.availability) || (row.availability === 0) !== (row.scheduledWallMs != null)) throw new TypeError('invalid Solar availability');
+        if (row.availability === 0 && (row.fallbackWallMs != null || row.unavailableReason != null)) throw new TypeError('available Solar event cannot have fallback facts');
+        if (row.fallbackWallMs != null && row.unavailableReason == null) throw new TypeError('Solar fallback requires unavailableReason');
+        writer.u8(row.availability); writer.optional(row.scheduledWallMs, 'Solar scheduledWallMs'); writer.optional(row.fallbackWallMs, 'Solar fallbackWallMs');
+        writer.u8(row.unavailableReason == null ? 255 : integer(row.unavailableReason, 'Solar unavailableReason', 5));
+        writer.str(row.providerRevision, 'Solar providerRevision'); writer.str(row.contextRevision, 'Solar contextRevision');
+      }
+    }
+  }
   return writer.finish();
+}
+
+// Bind provider observations to the compiled descriptor; admission stays in Rust.
+export function solarContextEvidence(descriptor, providerSchedule) {
+  validateSolarDescriptor(descriptor);
+  const s = object(providerSchedule, ['site','coverageFromWallMs','coverageToWallMs','rows'], 'Solar provider schedule');
+  if (s.site !== descriptor.site) throw new RangeError('Solar provider site mismatch');
+  validateSolarFallbackFacts({ schedules: [s] }, [descriptor]);
+  const evidence = {
+    site: descriptor.site, timezone: descriptor.timezone, latitude: descriptor.latitude,
+    longitude: descriptor.longitude, event: descriptor.event === 'rise' ? 0 : 1, offsetMs: descriptor.offsetMs,
+    coverageStartMs: s.coverageFromWallMs, coverageEndMs: s.coverageToWallMs,
+    rows: bounded(s.rows, 'Solar provider rows', 4096).map(value => {
+      const row = object(value, ['sourceDay','scheduledWallMs','available','fallbackWallMs','unavailableReason','providerRevision','contextRevision'], 'Solar provider row');
+      if (typeof row.available !== 'boolean') throw new TypeError('Solar provider available must be Bool');
+      return { sourceDay: row.sourceDay, scheduledWallMs: row.scheduledWallMs,
+        availability: row.available ? 0 : 1, fallbackWallMs: row.fallbackWallMs ?? null,
+        unavailableReason: row.unavailableReason ?? null, providerRevision: row.providerRevision, contextRevision: row.contextRevision };
+    }),
+  };
+  // Reuse the bounded encoder's checks without inventing another admission path.
+  encodeContextFacts({ clock: { monotonicMs: 0, bootEpoch: 0, wallMs: 0, uncertaintyMs: 0,
+    trusted: true, unknownReason: null, sourceRevision: '' }, natural: [], schedules: [], settings: null, solars: [evidence] });
+  return evidence;
+}
+
+export function validateContextSolarFacts(packet, descriptors) {
+  const expected = new Map(descriptors.filter(item => item.kind === 'solar').map(item => [item.site, item]));
+  const seen = new Set();
+  const schedules = [];
+  for (const evidence of packet.solars ?? []) {
+    const descriptor = expected.get(evidence.site);
+    if (!descriptor || seen.has(evidence.site)) throw new TypeError('unexpected or duplicate context Solar binding');
+    seen.add(evidence.site);
+    if (evidence.timezone !== descriptor.timezone || evidence.latitude !== descriptor.latitude
+      || evidence.longitude !== descriptor.longitude || evidence.offsetMs !== descriptor.offsetMs
+      || evidence.event !== (descriptor.event === 'rise' ? 0 : 1)) throw new TypeError('context Solar binding mismatch');
+    schedules.push({ site: evidence.site, rows: evidence.rows.map(row => ({ ...row, available: row.availability === 0 })) });
+  }
+  if (seen.size !== expected.size) throw new TypeError('missing context Solar evidence');
+  validateSolarFallbackFacts({ schedules }, [...expected.values()]);
+  return packet;
 }

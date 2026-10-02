@@ -41,6 +41,7 @@ const identity = {
   bindingRevision: 'virtual-two-output-v1',
 };
 const scenario = process.argv[2] ?? 'valid';
+const adaptScenario=scenario.startsWith('adapt-');
 const quantityScenario = scenario.startsWith('quantity-');
 const timeScenario = scenario.startsWith('time-');
 const resultScenario = scenario.startsWith('result-');
@@ -165,11 +166,19 @@ const profileSource = {
   'profile-2': 'control Integer { input start, stop: Bool; state count: Int = 7; output pump: Int; output valve: Bool; pump <- count; valve <- start; }',
   'profile-3': 'control IntegerBranch { input start, stop: Bool; state count: Int = 7; output pump: Int; output valve: Bool; pump <- if start then count else 0; valve <- start; }',
 }[scenario];
-const source = configTimerScenario
+let source = configTimerScenario
   ? fs.readFileSync(path.join(root, 'examples/authoring/corpus/setting-corrected.ghost.md'), 'utf8')
   : (profileSource || quantitySource || timeSource || resultSource || debounceSource || holdSource || intSettingsSource || windowScenario) ? `# Package profile\n\n\`\`\`ghost\n${profileSource || quantitySource || timeSource || resultSource || debounceSource || holdSource || intSettingsSource || windowSource}\n\`\`\`\n`
   : fs.readFileSync(path.join(root, 'examples/tutorial/01-latch.ghost.md'), 'utf8');
+if (scenario === 'constraint-proof-valid') {
+  if (!source.includes('  require pump => valve;')) throw new Error('missing fixture constraint');
+  source = source.replace('  require pump => valve;', '  require pump => valve;\n  require pump => valve;');
+}
+if(adaptScenario) source='# Authored feedback\n```ghost\ncontrol Feedback { sensor door?: Bool; output pump: Bool; adapt policy { strategy WithDoor priority 100 match (door: sensor<Bool>) { pump <- case door { ok(value) => value; fault(_) => false; }; } strategy Baseline priority 0 match always { pump <- false; } } }\n```';
 const compilation = await compileSource(source, { filename: '01-latch.ghost.md' });
+if (scenario === 'constraint-proof-valid' && compilation.traceMetadata.format !== 'GhostFlow/source-trace-v2') {
+  throw new Error('fixture must contain a checked executable replacement');
+}
 if (scenario === 'profile-2' || scenario === 'profile-3') identity.requiredCapabilities[0].type = 'int';
 if (quantityScenario) identity.requiredCapabilities = [
   ...QUANTITY_TYPES.flatMap((_, index) => [{ kind: 'input', name: `input_${index}`, type: 'number' }, { kind: 'actuator', name: `output_${index}`, type: 'number' }]),
@@ -199,17 +208,30 @@ if (windowScenario) identity.requiredCapabilities = [
   { kind: 'sensor', name: 'probe', type: 'number' },
   { kind: 'actuator', name: 'pump', type: 'bool' },
 ];
+if(adaptScenario) identity.requiredCapabilities=[{kind:'actuator',name:'pump',type:'bool'}];
 const packageValue = await buildPortablePackage(compilation, identity, {
   signers: [{ keyId: 'test-current-2026', privateKey }],
   verifyCompilation: (text, { filename }) => compileSource(text, { filename }),
 });
-if (scenario === 'valid' || profileSource || configTimerScenario || scenario === 'quantity-valid' || scenario === 'time-valid' || scenario === 'result-valid' || scenario === 'debounce-valid' || scenario === 'hold-valid' || scenario === 'hold-basic-valid' || scenario === 'int-settings-valid' || scenario === 'window-valid') {
+if (scenario === 'adapt-valid' || scenario === 'valid' || scenario === 'constraint-proof-valid' || profileSource || configTimerScenario || scenario === 'quantity-valid' || scenario === 'time-valid' || scenario === 'result-valid' || scenario === 'debounce-valid' || scenario === 'hold-valid' || scenario === 'hold-basic-valid' || scenario === 'int-settings-valid' || scenario === 'window-valid') {
   process.stdout.write(serializePortablePackage(packageValue));
-} else if (quantityScenario || timeScenario || resultScenario || debounceScenario || holdScenario || intSettingsScenario || windowScenario || ['unsupported-bytecode-version', 'version-mismatch-1', 'version-mismatch-2', 'unsupported-header'].includes(scenario)) {
+} else if (adaptScenario || quantityScenario || timeScenario || resultScenario || debounceScenario || holdScenario || intSettingsScenario || windowScenario || ['unsupported-bytecode-version', 'version-mismatch-1', 'version-mismatch-2', 'unsupported-header'].includes(scenario)) {
   const candidate = JSON.parse(JSON.stringify(packageValue));
-  if (quantityScenario || timeScenario || resultScenario || debounceScenario || holdScenario || intSettingsScenario || windowScenario) {
+  if (adaptScenario || quantityScenario || timeScenario || resultScenario || debounceScenario || holdScenario || intSettingsScenario || windowScenario) {
     const manifest = JSON.parse(Buffer.from(candidate.payload.manifest.contentBase64, 'base64').toString('utf8'));
-    if (intSettingsScenario) {
+    if(adaptScenario){
+      if(scenario==='adapt-priority') manifest.strategies[0].priority++;
+      else if(scenario==='adapt-name') manifest.strategies[0].name='Forged';
+      else if(scenario==='adapt-match') manifest.strategies[0].match[0].role='other';
+      else if(scenario==='adapt-output') manifest.strategies[0].outputNames[0]='other';
+      else if(scenario==='adapt-policy') manifest.adaptPolicy.selection='first';
+      else if(scenario==='adapt-unpaired') delete manifest.strategies;
+      else if(scenario==='adapt-missing'){delete manifest.strategies;delete manifest.adaptPolicy;}
+      else if(scenario==='adapt-bytecode'){
+        const bytes=Buffer.from(candidate.payload.bytecode.contentBase64,'base64');const at=bytes.indexOf(Buffer.from('WithDoor'))+8;
+        bytes.writeInt32LE(101,at);candidate.payload.bytecode.contentBase64=bytes.toString('base64');candidate.payload.bytecode.sha256=Buffer.from(await crypto.subtle.digest('SHA-256',bytes)).toString('hex');manifest.bytecodeSha256=candidate.payload.bytecode.sha256;
+      }else throw new Error('unknown adapt fixture');
+    } else if (intSettingsScenario) {
       const config = manifest.configs[0];
       const match = /^int-settings-(value|min|max|step)-(fraction|underflow|overflow|string|null|missing)$/.exec(scenario);
       if (match) {

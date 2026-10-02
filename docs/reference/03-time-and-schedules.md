@@ -253,7 +253,7 @@ value다. 현재 시점에서 trigger, day rule, predicate와 context를 평가�
 admit할지 판단한다. 충족하지 않은 pulse는 자동 대기열에 들어가지 않는다.
 
 선택된 trigger 타입은 `At`, `Daily`, `DailySlots<G>`, `Periodic`, `Cron`, `Solar`,
-`Tide`다. 현재 compiler는 `At`을 받지 않고 `DailySlots<15min>`만 받는다.
+`Tide`다. 현재 compiler는 one-shot `At` pulse와 `DailySlots<15min>`을 받는다.
 각 타입은 고유 trigger field와 다음 공통 policy field를 가진다.
 
 ```ghost
@@ -293,19 +293,81 @@ cancel_when := Bool                                   // 현재 civil range에 �
 경계에서는 `ClockUnknown` 뒤 새 admission 판단에 terminal skip을 적용한다.
 이미 admit한 Range의 단조 종료 시점은 유지한다. high-water는 바꾸지 않는다.
 
-현재 compiler는 `clock = trusted_only`, `fallback = skip`만 받는다.
-`window`, `run(_, on_time)`, `At`, `hold_trusted`, `fixed_time`은 선택된 설계 표기이며
-아직 compiler 지원 범위 밖이다. civil `range`는 현재 UTC timezone의 정적 non-overlap을
-증명할 수 있는 recurrence에서 type-check되지만 실행 bytecode로 내려가지 않는다.
+현재 compiler는 Solar와 Tide에 `clock = hold_trusted(positive constant Duration, terminal: skip)`을,
+Solar에 `fallback = fixed_time(TimeOfDay literal, terminal: skip)`을 받는다.
+Tide는 `fallback = skip`만 허용하며 다른 trigger는 trusted-only clock과 skip fallback을 유지한다.
+`window`, `run(_, on_time)`은 선택된 설계 표기이며
+아직 compiler 지원 범위 밖이다. civil `range`는 UTC timezone의 정적 non-overlap을
+증명해야 한다. 불변 UTC Daily와 비어 있지 않은 정적 DailySlots Range는 GFB12로
+실행되며 다른 허용된 Range recurrence는 비실행 descriptor로 유지된다.
 Tide의 `run(_, within(_))`은 지원한다.
+
+bounded 자연 정책 admission은 단조 경과가 duration보다 엄격히 작은 동안만 held time을 사용한다.
+trusted anchor나 uncertainty가 없거나 checked 덧셈이 overflow하면 fail closed한다.
+held wall time과 uncertainty는 마지막 trusted 값에 경과 시간을 더하며 `HeldClock` provenance를 남긴다.
+만료는 새 admission을 terminal skip하고 high-water를 유지하며 active Run의 종료를 늘리지 않는다.
+회복은 baseline을 설정하고 재시작은 새 clock으로 시작한다. facts provider는 IANA 변환을 소유하며
+알려진 source local date와 그 날짜의 작성한 시간·timezone에 맞는 fallback instant를 제공한다.
+모호하거나 존재하지 않는 civil time은 fold를 만들지 않고 terminal skip한다.
+core는 admission과 생성 due input을 소유한다. 같은 source local date의 fallback과 회복된 Solar 사건은
+consumed identity와 terminal checkpoint를 공유한다. 이 제한은 예측 부재나 불확실한 clock이 occurrence를
+암묵적으로 만드는 것을 막는다.
 
 `fixed_time`은 Solar에서만 쓸 수 있다. 해당 source local date의 fallback occurrence가
 admit되면 같은 occurrence ledger가 그 날짜의 Solar 사건을 소비하므로 provider가
 회복되어도 중복하지 않는다. Tide는 예측 부재 시 사건 수와 identity를 알 수 없으므로
 `fallback = skip`만 허용한다.
 
-설계된 one-shot `At`은 ``at = datetime`...`;``을 쓰며 DST field가 없다.
-현재 compiler에는 `At` 구현이 없다. 매일 한 시각인 `Daily`는
+Solar의 `when`이 config Result를 읽으면 해당 config는 admission 의존성이다.
+의존 config의 현재 fault는 작성한 fault 분기가 true를 반환해도
+`Unknown(SettingsFault)`를 보존하며 새 occurrence를 admit하지 않는다.
+무관한 config fault는 Solar를 억제하지 않는다. Solar와 일반 제어는 같은 평가
+position의 현재 Result를 읽는다. 복구 성공 관측은 기준선을 세우며 과거 사건을
+catch-up하지 않는다. 설정 관측·Solar 판단·VM 전이는 함께 commit하므로 실패
+평가는 event나 occurrence를 소비하지 않는다. 좌표·시간대·사건·offset은 불변
+프로그램 정의이며 live 설정으로 암묵 교체하지 않는다.
+
+**왜:** 일반 제어가 오류로 보는 설정을 schedule이 과거 성공 값으로 읽어 작업을
+시작하면 같은 프로그램 안의 판단이 어긋난다. 오류의 원인을 보존하고 실제 적용된
+관측으로 admission을 정해야 한다.
+
+one-shot `At`은 상수 typed DateTime을 쓰며 timezone과 DST field가 없다.
+
+```ghost
+schedule appointment: At {
+  at = datetime`2026-01-01T08:00:00Z`;
+  basis = pulse;
+  when = true;
+  clock = trusted_only;
+  gap = skip_after(60s);
+  recovery = baseline;
+  fallback = skip;
+}
+```
+
+절대 instant는 명시한 offset으로 정규화한다. 같은 instant를 나타내는 offset 표기는
+같은 시점을 계획한다. 이 제한된 profile은 `pulse`, trusted-only clock, baseline recovery,
+skip fallback과 양의 상수 gap만 받는다. 누락 field, DateTime이 아닌 값이나 비상수 `at`,
+timezone/DST/cancellation field, 다른 basis는 진단한다. `.due`와 `.missed`를 노출하며
+provider, config, sensor, resource, objective 또는 다른 schedule profile과 혼합하지 않는다.
+GFB14와 control-v13이 이 실행 profile을 식별한다. framed clock/scan transport는 그대로다.
+이전 loader는 GFB14를 거부한다. 서명된 portable package는 아직 이 profile을 받지 않는다.
+
+Rust core는 host가 제공한 occurrence row 없이 컴파일된 schedule site와 instant에서
+단일 occurrence를 계산한다. admission은 observation gap이 없는 accepted trusted scan에서
+`previous < planned <= current`이고 `when = true`일 때만 가능하다. crossing에서 false이거나
+gap이 겹치면 terminal miss로 소비한다. instant 이후 또는 같은 시점의 boot/recovery
+baseline은 catch-up 없이 `BaselinePastMissed`로 소비한다. 재관찰, wall rollback과 recrossing은
+다른 pulse를 만들지 않는다. clock source/boot revision은 새 identity를 만들지 않는다.
+거부된 scan은 clock baseline, terminal identity와 projection 어느 것도 commit하지 않는다.
+
+재시작을 가로지르는 dedup에는 같은 program의 terminal checkpoint 복원이 필요하다.
+새 boot의 wall clock이 instant 이전이어도 이미 admit되거나 missed된 identity는 소비 상태를
+유지한다. occurrence 이전 checkpoint는 미래 crossing을 admit할 수 있다. 새 activation에는
+durable history가 없다. admission 후 durable checkpoint를 발행하기 전 crash는 VM의
+once-only 보장 밖이며 host persistence와 dispatch가 그 경계를 처리해야 한다.
+admission은 논리 증거이며 물리 실행이나 acknowledgement를 증명하지 않는다.
+매일 한 시각인 `Daily`는
 `timezone`, ``at = time`...`;``, `dst_missing`, `dst_repeated`를 요구한다. 예를 들면 다음과 같다.
 
 ```ghost
@@ -362,9 +424,9 @@ revision이 포함된다. 대표 disposition은 `Before`, `PredicateFalse`, `Alr
 
 ### 놓친 occurrence에 대한 소스 반응
 
-`schedule_name.missed`는 `Bool` 투영이다. 현재 compiler는 Solar와 실행 가능한
-`pulse` civil schedule에 이 투영을 제공한다. `range` descriptor에서는 아직
-실행 투영으로 쓸 수 없다. 해당 schedule에서 하나 이상의 occurrence가
+`schedule_name.missed`는 `Bool` 투영이다. 현재 compiler는 At pulse, Solar와 실행 가능한
+`pulse` civil schedule에 이 투영을 제공한다. 실행 가능한 UTC Range를 포함한
+Range에서는 아직 실행 투영으로 제공하지 않는다. 해당 schedule에서 하나 이상의 occurrence가
 이번 accepted scan에 **terminal missed**로 확정될 때만 true다. 한 scan에서 둘 이상을
 놓쳐도 값은 한 번 true이고, 다음 accepted scan에 새 terminal miss가 없으면 false다.
 control action은 이 값을 해당 accepted scan의 immutable snapshot에서 정확히 한 번 평가한다.
@@ -402,7 +464,7 @@ record를 합치거나 이유 하나로 요약하지 않는다. 재부팅 뒤 �
 | `window(5min)` (설계) | `[planned, planned+5min)`에서 조건이 처음 true인 시점에 한 번 admit. 같은 occurrence에서 false→true가 반복돼도 재arm하지 않는다. |
 | `run(5min, on_time)` (설계) | observed crossing에서만 admit하고 admission부터 5분 운전한다. |
 | `run(5min, within(10min))` (Tide) | `[planned, planned+10min)`에서 첫 admission을 허용한다. 10분은 grace이고 run length는 5분이다. |
-| `range(10min)` (civil contract) | 신뢰할 수 있는 현재 시각이 `[planned, planned+10min)` 안에 있고 `when`이 true이면 첫 관측·부팅·회복이 늦어도 한 번 admit한다. 끝은 계획 시작점 + 10분이다. 현재 bytecode 실행은 미지원이다. |
+| `range(10min)` (civil contract) | 신뢰할 수 있는 현재 시각이 `[planned, planned+10min)` 안에 있고 `when`이 true이면 첫 관측·부팅·회복이 늦어도 한 번 admit한다. 끝은 계획 시작점 + 10분이다. 불변 UTC Daily/DailySlots는 GFB12로 실행된다. |
 
 ```ghost
 schedule morning_watering: Daily {
@@ -420,8 +482,21 @@ schedule morning_watering: Daily {
 }
 ```
 
-이 `range` 예시는 현재 compiler에서 검증되는 계약이며 실행 가능한 control bytecode는
-아니다. 현재 civil `range`는 `UTC`와 recurrence non-overlap 조건이 필요하다.
+이 불변 UTC `range` 예시는 실행 가능한 GFB12 control bytecode이다. 제한된 실행
+범위는 work calendar 없는 Daily와 비어 있지 않은 정적 DailySlots이며 `trusted_only`,
+`baseline`, `skip`을 사용한다. typed WorkCalendar와 `workday` 또는 `offday` selector를
+쓰는 불변 UTC Daily는 GFB18로 실행한다. 시작 시각과 duration의 합은 local midnight을
+넘을 수 없다. overnight work interval은 명시적인 별도 Daily range로 나눈다. 끝은
+제외되므로 정확히 자정에 끝나는 range는 유효하다. work calendar 없는 일반 range의
+기존 자정 동작은 유지한다. live 시작/duration 설정, Periodic Range와 다른 허용된
+변형은 descriptor로 유지한다. 비 UTC와 증명할 수 없는 overlap은 계속 거부하며
+timezone이나 DST 정책을 추측하지 않는다.
+
+Range context checkpoint는 소비한 occurrence identity를 보존하며 활성 monotonic
+timer는 보존하지 않는다. 새 boot로 복원해도 이미 소비한 occurrence를 재개하거나
+다시 admit하지 않는다. 아직 소비하지 않은 열린 interval은 남은 시간만 admit할 수
+있다. terminal capacity가 소진되면 scan 전체를 원자적으로 거부하며 identity를
+조용히 제거하지 않는다.
 
 late interval은 half-open이다. 종료 경계에서 새로 admit하지 않는다. 예정 시간 08:00,
 `run(5min, within(10min))`이 08:02에 admit되면 08:07까지의 단조 run이다.
@@ -526,6 +601,8 @@ occurrence를 남은 시간 동안 admit한다. 같은 schedule에 동시에 열
 정확히 하나만 교차한 경우에는 각 basis의 ordinary admission 규칙을 적용한다.
 
 ## 3.6 선택된 DailySlots
+
+확장 Solar 정책은 bounded Solar profile에서만 실행한다. non-Solar schedule, provider/config 실행이나 지원하지 않는 기능과의 조합은 거부한다. 기존 Solar 조합은 기존 profile을 유지한다.
 
 `DailySlots<15min>`은 지역 날짜의 15분 격자 시각을 선택하는 일정이다.
 
@@ -738,11 +815,27 @@ weekday tag에는 calendar가 필요 없다. `holiday`는 HolidayCalendar, `work
 `offday`는 WorkCalendar를 요구한다. 종류가 맞지 않거나 binding이 없으면 activation
 error다. calendar snapshot의 timezone은 schedule timezone과 같아야 한다.
 
+`holiday`는 공휴일 날짜 목록의 membership이다. 같은 날짜의 작업 예외가 `work`여도
+공휴일 사실은 유지되며 weekly pattern이나 holiday work policy를 읽지 않는다.
+Daily pulse의 `holiday`, `workday`, `offday`는 typed calendar와 명시적인 공통/DST
+policy를 사용한다. weekday tag는 이 실행 범위에 포함되지 않는다.
+일반 `calendar_is`와 `workday`, `offday`, `holiday` selector는 아래의 typed Result를
+반환한다. 제한된 실행 profile은 명시적인 UTC calendar binding을 요구한다. 다른
+timezone profile은 activation에서 거부하며 host가 계산한 eligibility 값을 받지 않는다.
+
+달력 base와 override는 명시적으로 합성하여 새 ID/revision을 만든다. 원본은 불변이며
+timezone 불일치와 한 overlay 층의 중복 날짜를 거부한다. 같은 binding의 일정들은
+한 tick에서 같은 snapshot 또는 모두 부재인 자료를 사용해야 한다. calendar ID/revision을
+다른 내용으로 재사용하지 않는다. accepted 내용 기록은 새 revision과 checkpoint 뒤에도
+유지되며 저장 한계를 넘으면 fail closed한다. 이 기록을 담는 GFCXv3은 이전 v1/v2
+checkpoint를 거부한다. 자료 조립과 설치 절차는 [달력 provider 안내](../CALENDAR-PROVIDERS.ko.md)를 따른다.
+
 work calendar snapshot은 calendar ID, revision, timezone, coverage range를 가진다.
 판정 우선순위는 같은 날짜의 명시 예외, 선언된 holiday policy, weekly pattern이다.
 같은 날짜의 충돌하는 예외는 invalid다. workday는 계획된 근무일이지 사람의 실제
 재실 확인이 아니다. snapshot이 없거나 coverage 밖이면 workday와 offday 모두
-Unknown이다. `!workday`로 Unknown을 offday 허가로 바꾸지 않는다.
+Unknown이다. expiry 경계부터도 Unknown이며 공휴일 판정에 같은 규칙을 적용한다.
+`!workday`로 Unknown을 offday 허가로 바꾸지 않는다. `fallback = skip`은 새 admission을 만들지 않는다.
 
 overnight shift의 business date 귀속은 이 day tag가 결정하지 않는다. 별도 shift
 계약 전에는 자정을 가로지르는 work interval을 거부하고 명시 구간으로 나눈다.

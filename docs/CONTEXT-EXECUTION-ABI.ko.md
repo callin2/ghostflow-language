@@ -37,6 +37,32 @@ GFSF4에는 accounting 투영을 담을 수 없다.
 
 ## 실행 설명자
 
+### GFB18 달력 경계
+
+`GhostFlow/control-v18`은 일반 calendar Result와 불변 UTC Daily work/off-day
+range에 GFB18을 사용한다. 새 prelude tag의 본문은 다음과 같다.
+
+| Tag | 본문 |
+| --- | --- |
+| 17 Calendar Range | u32 site, string name, u64 gapMs, string timezone (`UTC`), u64 durationMs, u16 startCount와 u64 startsMs 목록, string calendar, u8 selector, Bool expression blob when/cancel |
+| 18 Calendar Result | u32 site, string name/calendar, u8 selector, string timezone (`UTC`), u16 ok/value/fault protected input index |
+
+Range selector는 workday 0 또는 offday 1이며 Result는 holiday 2도 허용한다.
+source Range 실행 범위는 불변 UTC Daily다. 반열린 interval의 끝은 자정 이하이어야
+한다. 자정을 넘는 work interval은 거부하며 명시적인 별도 선언으로 나누어야 한다.
+일반 UTC Range의 기존 의미는 유지한다. 새 admission 전에 calendar eligibility를
+판정하며 이미 admit한 Range는 monotonic deadline을 유지한다.
+
+두 descriptor는 site를 key로 하는 기존 GFSF5 `schedule` fact에서 optional calendar
+snapshot을 받는다. Result와 Range에는 provider observation이나 civil occurrence row가
+필요 없다. Rust가 trusted clock에서 UTC date를 계산하고 calendar를 판정하며 missing,
+coverage 밖, expiry fault를 보존한다. Result projection은 Bool/Bool/Number이며
+CalendarFault의 유한한 code를 사용한다. 이 입력들은 protected이므로 host는 eligibility
+projection을 공급할 수 없다. activation에는 일치하는 명시적 UTC calendar binding이
+필요하다. binding을 공유하는 Result, Range, Daily pulse 전체에 snapshot 동일성,
+revision history, 유한 보관 상한, rejected scan의 atomicity를 적용한다. 기존 facts와
+checkpoint format은 유지하며 이전 loader는 새 GFB header를 거부한다.
+
 GFB10은 GFB 시간 헤더와 태그가 붙은 전략 서두를 유지한다. 기존 태그 0–4는 기존
 레이아웃을 유지한다. 태그 5–9는 `u32 site, string name, u64 gapMs`로 시작하고
 Bool 표현식 blob `when, cancel`로 끝난다.
@@ -122,8 +148,11 @@ fault enum의 0–5에 대응한다. 설정 kind 0은 Duration, 1은 TimeSlots�
 `gf_restore_context_checkpoint(handle, ptr, len)`은 활성화된 실행의 첫 스캔 전에만
 허용된다. 영구 저장과 확인 책임은 호스트에 있다.
 
-GFCX1에는 magic/version, 정확한 Program 지문, 표준 바인딩 바이트, 설정 개정,
-승인 이벤트 식별자, site 키 기반 엔진 스냅샷과 CRC32가 들어간다. 봉투는 4 MiB,
+GFCX3에는 magic/version, 정확한 Program 지문, 표준 바인딩 바이트, 설정 개정,
+승인 이벤트 식별자, site 키 기반 엔진 스냅샷과 CRC32가 들어간다. ID/revision별
+accepted 달력 전체 내용도 저장하며 `min(terminalCapacity, 128)`개 snapshot과
+8192개 holiday/exception 날짜 cell로 제한한다. revision 내용 변경이나 한계 초과는
+restore를 거부한다. GFCX1과 GFCX2는 명시 거부한다. 봉투는 4 MiB,
 각 엔진 스냅샷은 1 MiB로 제한된다. 식별 불일치, 손상, 복원 설정 오류 또는 용량
 초과가 있으면 전체 복원을 거부한다. CRC32는 우발적 손상을 감지하지만 인증 수단은 아니다.
 
@@ -131,6 +160,54 @@ GFCX1에는 magic/version, 정확한 Program 지문, 표준 바인딩 바이트,
 유지된다. 시계 관측과 활성 Run은 유지되지 않는다. 복원한 실행은 새 기준점을 만들며
 과거 발생을 재생할 수 없다. 이는 컨텍스트 체크포인트이지 accounting ledger나 일반
 VM 상태 이미지가 아니다.
+
+## 공유 Solar context 확장
+
+위 layout은 원래 context profile을 설명한다. typed 설정은
+[configuration stream](OPERATOR-SETTINGS-STREAM.ko.md)의 GFSF5 envelope를 쓰고,
+calendar Holiday Daily는 GFB15 tag15를 추가한다. 공유 config의 Solar는 기존
+GFCA1 activation과 GFB11 공유 config descriptor를 유지하며 GFB16/control-v15를
+사용한다. tag16은 공통 `u32 site, string name, u64 gapMs` prefix 뒤 다음을 담는다.
+
+```text
+string timezone, f64 latitude, f64 longitude, u8 event,
+i64 offsetMs, u64 fallbackAtMs,
+u16 configDependencyCount, u32 configIds[],
+expression when, expression cancel, u64 holdMs
+```
+
+event는 rise0/set1이다. fallbackAtMs 86400000과 holdMs 0은 부재다. config ID는
+정렬되고 고유하다. Rust는 보호된 `when` 읽기로 정확한 의존성을 검증하며 참조한
+현재 fault가 하나라도 있으면 admission을 막는다. binding field는 불변이며 사실과
+정확히 일치해야 한다.
+
+GFSF6은 optional settings section까지 GFSF5를 유지한 뒤 다음을 덧붙인다.
+
+```text
+u16 solarCount, solar[]
+solar := u32 site, string timezone, f64 latitude, f64 longitude,
+         u8 event, i64 offsetMs, u64 coverageStartMs/coverageEndMs,
+         u16 rowCount, solarRow[]
+solarRow := u32 sourceDay, u8 availability,
+            optional scheduledWallMs, optional fallbackWallMs,
+            u8 unavailableReason, string providerRevision/contextRevision
+```
+
+availability는 available0/unavailable1이고 reason255는 부재, 0–5는 typed natural
+fault code다. optional time은 `u8 present, u64 value`를 유지하며 부재 값은 0이다.
+Solar row는 civil slot/fold field를 받지 않는다. Rust가 해당 identity 요소를 0으로
+고정한다. `runtimes/wasm/context-abi.mjs`의
+`solarContextEvidence(descriptor, providerSchedule)`은 provider 사실을 이 packet으로
+투영하며 admission을 계산하지 않는다. Solar context에는 GFSF6이 필요하다.
+기존 비Solar profile은 명시 호환 결정에 따라 GFSF5를 유지한다.
+
+Solar, 공유 config vector와 VM은 함께 commit한다. 실패 평가는 event/occurrence
+어느 것도 소비하지 않는다. 성공 복구는 과거 catch-up 없이 기준선을 세운다.
+GFCX3는 GFES subtype3 Solar engine state를 담는다. 정확한 Program/binding 아래
+source-day terminal identity와 현재 config Result를 유지하고 새 기준선을 위해 clock
+관측은 버린다. 이전 GFB loader는 format16을 거부한다. standalone Solar consumer는
+암묵 fallback이 아니라 기존 profile을 유지한다. 범위와 재현 절차는
+[실행 안내](SOLAR-CONFIG-EXECUTION.ko.md)를 참조한다.
 
 ## 증거
 

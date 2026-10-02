@@ -9,7 +9,7 @@ import { compileSource, literateDocument } from './helpers/literate-compile.mjs'
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
-const nativePath = path.join(root, 'target/release/examples/context_tape');
+const nativePath = path.join(root, `target/release/examples/context_tape${process.platform === 'win32' ? '.exe' : ''}`);
 const wasmBytes = fs.readFileSync(path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm'));
 const source = literateDocument(`control TypedDefaults {
   config duration: Duration = 5min { min = 1min; max = 20min; step = 1min; access = operator; }
@@ -61,6 +61,136 @@ async function wasmRun(artifact, attempts, framed) {
     runtime.dispose();
   }
 }
+
+test('REF-05-015 live Duration compares the existing six-minute timer with the new five-minute value in native and plain/framed WASM', async () => {
+  const artifact = await compileSource(literateDocument(`control LiveDuration {
+    config duration: Duration = 10min { min = 1min; max = 20min; step = 1min; access = operator; }
+    state running: Bool = true;
+    state remembered: Bool = false;
+    remembered' = true;
+    timer age = elapsed(running);
+    let within_duration = case duration { ok(value) => age < value; fault(_) => false; };
+    running' = running && within_duration;
+    output drive: Bool;
+    output elapsed_ms, duration_ms: Duration;
+    drive <- running';
+    elapsed_ms <- age;
+    duration_ms <- case duration { ok(value) => value; fault(_) => 0ms; };
+  }`), { filename: 'reference-live-duration.ghost.md' });
+  const [duration] = artifact.manifest.configs;
+  assert.equal(duration.value, 600_000);
+  const probe = await ControlRuntime.instantiateFramed(wasmBytes, artifact,
+    { context: { bootEpoch: 1, terminalCapacity: 8, bindings: [] } });
+  const fingerprint = probe.contextSnapshot().state.programFingerprint;
+  probe.dispose();
+  const attempts = [
+    { scanId: 0, nowMs: 0, settings: null },
+    { scanId: 1, nowMs: 360_000, settings: null },
+    { scanId: 2, nowMs: 360_000, settings: {
+      programFingerprint: fingerprint, eventId: 'shorten-live-duration',
+      baseRevision: 0, position: 3, origin: 'operatorEdit',
+      changes: [{ configId: duration.id, result: { ok: true, type: 'Duration', value: 300_000 } }],
+    } },
+    { scanId: 3, nowMs: 360_001, settings: null },
+  ];
+  const executions = [nativeRun(artifact, attempts),
+    await wasmRun(artifact, attempts, false), await wasmRun(artifact, attempts, true)];
+  const expected = [
+    { drive: true, elapsed_ms: 0, duration_ms: 600_000 },
+    { drive: true, elapsed_ms: 360_000, duration_ms: 600_000 },
+    { drive: false, elapsed_ms: 360_000, duration_ms: 300_000 },
+    // This new timer baseline follows the authored running true-to-false transition,
+    // rather than initialization by the setting event at the preceding decision.
+    { drive: false, elapsed_ms: 1, duration_ms: 300_000 },
+  ];
+  for (const rows of executions) {
+    assert.ok(rows.every(row => row.accepted), JSON.stringify(rows));
+    assert.deepEqual(rows.map(row => row.settings.settingsRevision), [0, 0, 1, 1]);
+    assert.deepEqual(rows[2].settings.settings[0].result, { ok: true, value: 300_000 });
+    const traces = rows.map(row => row.outcome.trace ?? row.outcome.vm);
+    assert.deepEqual(traces.map(trace => trace.requested), expected);
+    assert.deepEqual(traces.map(trace => trace.safe), expected);
+    assert.equal(traces[0].stateBefore.remembered, false);
+    assert.equal(traces[1].stateAfter.running, true);
+    assert.deepEqual(traces[2].stateBefore, traces[1].stateAfter,
+      'the live event preserves the existing state before authored transition evaluation');
+    assert.equal(traces[2].stateBefore.running, true);
+    assert.equal(traces[2].stateAfter.running, false);
+    assert.equal(traces[2].stateAfter.remembered, true);
+    assert.equal(traces[3].stateBefore.running, false);
+  }
+  const [native, plain, framed] = executions;
+  for (let i = 0; i < attempts.length; i++) {
+    assert.deepEqual(plain[i].settings, native[i].settings);
+    assert.deepEqual(framed[i].settings, native[i].settings);
+    assert.deepEqual(plain[i].outcome.vm, native[i].outcome.trace);
+    assert.deepEqual(framed[i].outcome.vm, native[i].outcome.trace);
+    assert.deepEqual(framed[i].outcome.frame,
+      { scanId: native[i].outcome.scanId, logicalTimeMs: native[i].outcome.logicalTimeMs });
+  }
+});
+
+test('REF-05-016 designer Percent rejects operator edits without changing value or settings revision in native and plain/framed WASM', async () => {
+  const artifact = await compileSource(literateDocument(`control DesignerDuty {
+    config duty: Percent = 50% { min = 0%; max = 100%; step = 10%; access = designer; }
+    output duty_pct: Percent;
+    duty_pct <- case duty { ok(v) => v; fault(_) => 0%; };
+  }`), { filename: 'reference-designer-duty.ghost.md' });
+  const [duty] = artifact.manifest.configs;
+  assert.equal(duty.settings.access, 'designer');
+  assert.equal(duty.value, 50);
+  const probe = await ControlRuntime.instantiateFramed(wasmBytes, artifact,
+    { context: { bootEpoch: 1, terminalCapacity: 8, bindings: [] } });
+  const fingerprint = probe.contextSnapshot().state.programFingerprint;
+  probe.dispose();
+  const event = (eventId, baseRevision, position, origin, result) => ({
+    programFingerprint: fingerprint, eventId, baseRevision, position, origin,
+    changes: [{ configId: duty.id, result }],
+  });
+  const ok = value => ({ ok: true, type: 'Percent', value });
+  const attempts = [
+    { scanId: 0, nowMs: 0, settings: null },
+    { scanId: 1, nowMs: 1, settings: event('duty-request', 0, 2, 'operatorEdit', ok(60)) },
+    // Rejected authority consumes neither the frame nor event identity. The trusted-host
+    // producer classification permits a fault, then recovery only to the author's payload;
+    // this owner harness does not authenticate the sender of the classification.
+    { scanId: 1, nowMs: 1, settings: event('duty-request', 0, 2, 'producerObservation',
+      { ok: false, fault: 'SettingsUnavailable' }) },
+    { scanId: 2, nowMs: 2, settings: event('duty-recovery', 1, 3, 'producerObservation', ok(50)) },
+    { scanId: 3, nowMs: 3, settings: event('duty-second-request', 2, 4, 'operatorEdit', ok(60)) },
+    { scanId: 3, nowMs: 3, settings: event('duty-second-request', 2, 4, 'producerObservation', ok(60)) },
+    { scanId: 3, nowMs: 3, settings: null },
+  ];
+  const executions = [nativeRun(artifact, attempts),
+    await wasmRun(artifact, attempts, false), await wasmRun(artifact, attempts, true)];
+  for (const rows of executions) {
+    assert.deepEqual(rows.map(row => row.accepted), [true, false, true, true, false, false, true]);
+    for (const [rejected, prior] of [[1, 0], [4, 3], [5, 3]]) {
+      assert.match(rows[rejected].error, rejected === 5
+        ? /producer cannot change readonly config payload/ : /unauthorized|settings target/);
+      assert.deepEqual(rows[rejected].settings, rows[prior].settings,
+        'denied edits preserve the entire owner settings state, including revision and event history');
+      assert.equal(rows[rejected].settings.settings[0].result.value, 50);
+    }
+    assert.deepEqual(rows.map(row => row.settings.settingsRevision), [0, 0, 1, 2, 2, 2, 2]);
+    assert.deepEqual(rows[2].settings.settings[0].result, { ok: false, fault: 'SettingsUnavailable' });
+    assert.deepEqual(rows[3].settings.settings[0].result, { ok: true, value: 50 });
+  }
+  const [native, plain, framed] = executions;
+  for (let i = 0; i < attempts.length; i++) {
+    assert.deepEqual(plain[i].settings, native[i].settings);
+    assert.deepEqual(framed[i].settings, native[i].settings);
+    if (native[i].accepted) {
+      assert.deepEqual(plain[i].outcome.vm.safe, native[i].outcome.trace.safe);
+      assert.deepEqual(framed[i].outcome.vm.safe, native[i].outcome.trace.safe);
+      assert.deepEqual(framed[i].outcome.frame,
+        { scanId: native[i].outcome.scanId, logicalTimeMs: native[i].outcome.logicalTimeMs });
+    }
+  }
+  assert.deepEqual(native.filter(row => row.accepted).map(row => row.outcome.scanId), [0, 1, 2, 3]);
+  assert.deepEqual(native.filter(row => row.accepted).map(row => row.outcome.trace.safe),
+    [{ duty_pct: 50 }, { duty_pct: 0 }, { duty_pct: 50 }, { duty_pct: 50 }]);
+});
 
 test('GF-TEST-config-native-wasm-parity: bounded Duration and Percent defaults, updates, faults, and rollback match native and WASM', async () => {
   const artifact = await compileSource(source, { filename: 'config-native-wasm-parity.ghost.md' });

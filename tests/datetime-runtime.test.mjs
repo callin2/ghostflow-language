@@ -7,6 +7,8 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { compile, parse, tokenize } from '../tools/gfb1.mjs';
 import { GhostFlowRuntime } from '../runtimes/wasm/ghostflow-runtime.mjs';
+import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
+import { compileSource } from './helpers/literate-compile.mjs';
 
 const nativePath = fileURLToPath(new URL('../target/release/examples/run', import.meta.url));
 const wasmPath = new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url);
@@ -87,4 +89,60 @@ test('GF-TEST-datetime-guard-loader: unsupported profile, operand and stack shap
     assert.throws(() => runtime.load(invalid), expected);
   }
   assert.throws(() => gfb('(module Invalid (strategy run 0 (device true) (intent result (check-datetime true))))'), /check-datetime expects one Number operand/);
+});
+
+test('GF-TEST-datetime-calendar-monotonic: public DateTime shifts and wall corrections preserve elapsed time and atomic native/WASM state', async t => {
+  const artifact = await compileSource(`control CalendarAndElapsed {
+    input wall: DateTime;
+    input offset: Duration;
+    state running: Bool = false;
+    state accepted: Int = 0;
+    timer age = elapsed(running);
+    running' = true;
+    accepted' = accepted + 1;
+    output after, before: DateTime;
+    output elapsed_ms: Duration;
+    output same_instant: Bool;
+    after <- wall + offset;
+    before <- wall - offset;
+    elapsed_ms <- age;
+    same_instant <- wall == datetime\`2026-01-02T00:00:00Z\`
+      && wall == datetime\`2026-01-02T09:00:00+09:00\`;
+  }`, { filename: 'calendar-and-elapsed.ghost' });
+  const midnight = Date.UTC(2026, 0, 2);
+  const attempts = [
+    { mono: 0, wall: midnight - 1, offset: 1, elapsed: 0 },
+    { mono: 10, wall: midnight, offset: 1, elapsed: 10 },
+    { mono: 20, wall: midnight - 3_600_000, offset: 1, elapsed: 20 },
+    { mono: 30, wall: midnight + 3_600_000, offset: 1, elapsed: 30 },
+    { mono: 40, wall: MAX, offset: 1, error: 'datetime-out-of-range' },
+    { mono: 40, wall: 0, offset: 1, error: 'datetime-out-of-range' },
+    { mono: 40, wall: 0, offset: 0, elapsed: 40 },
+    { mono: 50, wall: MAX, offset: 0, elapsed: 50 },
+  ];
+  const outcomes = native(t, artifact.bytes, 'wall,offset,__gf_now_ms',
+    attempts.map(({ mono, wall, offset }) => `${wall},${offset},${mono}`));
+  const runtime = await ControlRuntime.instantiateFramed(fs.readFileSync(wasmPath), artifact);
+  t.after(() => runtime.dispose());
+  let committed, accepted = 0;
+  attempts.forEach(({ mono, wall, offset, elapsed, error }, index) => {
+    if (error) {
+      assert.equal(outcomes[index].error, error);
+      assert.equal(outcomes[index].journalLength, accepted);
+      assert.throws(() => runtime.step({ nowMs: mono, inputs: { wall, offset } }), new RegExp(error));
+      assert.deepEqual(runtime.lastFrameOutcome, committed,
+        'failed shift preserves frame, state, outputs and elapsed reference');
+      return;
+    }
+    const result = runtime.step({ nowMs: mono, inputs: { wall, offset } });
+    accepted++;
+    assert.deepEqual(result.vm.safe, {
+      after: wall + offset, before: wall - offset, elapsed_ms: elapsed,
+      same_instant: wall === midnight,
+    });
+    assert.deepEqual(outcomes[index].trace.safe, result.vm.safe, `native/WASM attempt ${index}`);
+    assert.deepEqual(outcomes[index].trace.stateAfter, result.vm.stateAfter);
+    assert.equal(result.vm.stateAfter.accepted, accepted);
+    committed = structuredClone(runtime.lastFrameOutcome);
+  });
 });

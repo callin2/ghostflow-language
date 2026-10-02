@@ -16,11 +16,107 @@ import {
 import { verifyInteractionCorpus } from '../contracts/interaction-v0/verify-corpus.mjs';
 import { FramedGhostFlowRuntime } from '../runtimes/wasm/framed-runtime.mjs';
 import { canonicalJson } from '../tools/canonical-json.mjs';
+import { buildPortablePackage, verifyPortablePackage } from '../tools/portable-package.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const corpus = JSON.parse(fs.readFileSync(path.join(root, 'contracts/interaction-v0/examples/corpus.json'), 'utf8'));
 const wasmBytes = fs.readFileSync(path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm'));
 const nativePath = path.join(root, 'target/release/examples/scan_tape' + (process.platform === 'win32' ? '.exe' : ''));
+
+test('REF-01-055 typed values retain identity through verified portable handoff, Interaction Schema and native/WASM execution', async () => {
+  const link = '// ghostflow:link id=GF-INT-REF-01-055 relation=implements\n';
+  const source = '# Typed value boundaries\n\n<!-- ghostflow:anchor id=GF-INT-REF-01-055 kind=intent status=confirmed origin=user -->\n'
+    + 'Retain the authored type of each state through execution and read-only observation.\n\n```ghost\ncontrol TypeBoundaries {\n'
+    + link + 'state percent: Percent = 30%;\n' + link + 'state number: Number = 30.0;\n'
+    + link + 'state duration: Duration = 30ms;\n' + link + 'state clock: TimeOfDay = time`06:00`;\n'
+    + 'output percent_out: Percent; output number_out: Number;\n'
+    + 'output duration_out: Duration; output clock_out: TimeOfDay;\n'
+    + 'percent_out <- percent; number_out <- number; duration_out <- duration; clock_out <- clock;\n}\n```\n';
+  const interactionSourceIdentity = { documentId: 'source.ref-01-055', revisionId: 'revision.ref-01-055.1' };
+  const artifact = await compileSource(source, { filename: 'ref-01-055.ghost.md', interactionSourceIdentity });
+  const expectedPorts = [
+    { name: 'percent_out', type: 'Percent' }, { name: 'number_out', type: 'Number' },
+    { name: 'duration_out', type: 'Duration' }, { name: 'clock_out', type: 'TimeOfDay' },
+  ];
+  assert.deepEqual(artifact.manifest.outputs, expectedPorts);
+  const identity = {
+    compilerRevision: 'ref-01-055-test-compiler', runtimeSemantics: 'GhostFlow/runtime-semantics-v1',
+    runtimeAbi: 'GhostFlow/framed-scan-abi-v1', bindingRevision: 'virtual-ref-01-055-v1',
+    // Numeric transport categories coexist with the retained language types.
+    requiredCapabilities: expectedPorts.map(port => ({ kind: 'actuator', name: port.name, type: 'number' })),
+  };
+  const key = await crypto.subtle.generateKey('Ed25519', false, ['sign', 'verify']);
+  const buildOptions = {
+    signers: [{ keyId: 'ref-01-055-test-key', privateKey: key.privateKey }],
+    verifyCompilation: (text, { filename }) => compileSource(text, { filename }),
+  };
+  const packageValue = await buildPortablePackage(artifact, identity, buildOptions);
+  const verified = await verifyPortablePackage(packageValue, {
+    trustedKeys: [{ keyId: 'ref-01-055-test-key', publicKey: key.publicKey }], revokedKeyIds: [],
+    expectedCompilerRevision: identity.compilerRevision,
+    supportedRuntimeSemantics: [identity.runtimeSemantics], supportedRuntimeAbis: [identity.runtimeAbi],
+    supportedManifestFormats: [artifact.manifest.format], availableCapabilities: identity.requiredCapabilities,
+    expectedBindingRevision: identity.bindingRevision,
+    verifyBytecode: async (bytes, received) => {
+      assert.deepEqual(received.manifest.outputs, expectedPorts);
+      const runtime = await FramedGhostFlowRuntime.instantiate(wasmBytes);
+      try {
+        runtime.load(bytes);
+        for (const capability of received.identity.requiredCapabilities) runtime.addCapability(capability.kind, capability.name, capability.type);
+        runtime.activate();
+        return true;
+      } finally { runtime.dispose(); }
+    },
+  });
+  assert.deepEqual(verified.manifest.outputs, expectedPorts);
+  assert.equal(verified.identity.bindingRevision, identity.bindingRevision);
+  const received = await compileSource(verified.source.text, { filename: verified.source.filename, interactionSourceIdentity });
+  assert.deepEqual(new Uint8Array(received.bytes), verified.bytecode.copy());
+  assert.deepEqual(received.manifest, verified.manifest);
+  assert.deepEqual(received.traceMetadata, verified.sourceMap.traceMetadata);
+  // Execute the bytes and metadata returned by verification, then reconstruct
+  // the read-only UI schema from that exact received source.
+  received.bytes = verified.bytecode.copy();
+  received.manifest = verified.manifest;
+  received.traceMetadata = verified.sourceMap.traceMetadata;
+  const expectedTypes = [
+    ['state.percent', { kind: 'nominal', name: 'Percent', unit: 'percent' }],
+    ['state.number', { kind: 'builtin', name: 'Number', unit: null }],
+    ['state.duration', { kind: 'builtin', name: 'Duration', unit: 'ms' }],
+    ['state.clock', { kind: 'builtin', name: 'TimeOfDay', unit: null }],
+  ];
+  assert.deepEqual(received.interactionSchema.descriptors.map(descriptor => [descriptor.id, descriptor.sourceType]), expectedTypes);
+  const scans = [{ completion: { kind: 'completed-scan', scanId: 0, logicalTimeMs: 100 }, inputs: [] }];
+  const native = nativeRun(received, scans);
+  const wasm = await wasmRun(received, scans);
+  assert.deepEqual(wasm, native);
+  assert.deepEqual(await wasmRun(received, scans), wasm);
+  assert.deepEqual(wasm[0].trace.safe, { percent_out: 30, number_out: 30, duration_out: 30, clock_out: 21_600_000 });
+  const snapshot = emitCompletedScanSnapshot({ compilation: received, runId: 'run.ref-01-055', completion: scans[0].completion, trace: wasm[0].trace });
+  assert.deepEqual(snapshot.observations, [
+    { descriptorId: 'state.percent', status: 'ready', value: 30 },
+    { descriptorId: 'state.number', status: 'ready', value: 30 },
+    { descriptorId: 'state.duration', status: 'ready', value: 30 },
+    { descriptorId: 'state.clock', status: 'ready', value: 21_600_000 },
+  ]);
+  assert.deepEqual(joinRuntimeSnapshot(received.interactionSchema, snapshot,
+    expectedRuntimeIdentity(received.interactionSchema, 'run.ref-01-055')), { status: 'ready', staleReasons: [] });
+  const schedule = await compileSource('```ghost\ncontrol Slots { schedule starts: DailySlots<15min> { timezone = "UTC"; selected = [06:00]; } output due: Bool; due <- starts.due; }\n```\n');
+  assert.deepEqual(schedule.manifest.schedules, [{ name: 'starts', timezone: 'UTC', slots: [360], dueInput: '__gf_schedule_due_starts' }]);
+  assert.equal(schedule.manifest.schedules[0].slots[0] * 60_000, snapshot.observations[3].value);
+  const forged = structuredClone(artifact);
+  forged.manifest.outputs[0].type = 'Number';
+  await assert.rejects(buildPortablePackage(forged, identity, buildOptions), error => error.code === 'compilation-mismatch');
+  const forgedSchema = structuredClone(received.interactionSchema);
+  forgedSchema.descriptors[0].sourceType = { kind: 'builtin', name: 'Number', unit: null };
+  assert.throws(() => prepareCompletedScanSnapshot({ compilation: received, schema: forgedSchema, runId: 'run.ref-01-055' }), /interaction schema:/);
+});
+
+test('REF-01-055 rejects implicit interchange of Percent, Number, Duration and TimeOfDay', async () => {
+  for (const [type, expression] of [['Number', '30%'], ['Percent', '30.0'], ['Duration', 'time`06:00`'], ['TimeOfDay', '30ms']]) {
+    await assert.rejects(compileSource('```ghost\ncontrol TypeMismatch { output value: ' + type + '; value <- ' + expression + '; }\n```\n'), new RegExp('output value must be ' + type));
+  }
+});
 
 const directSource = `# Direct input to output
 
@@ -283,6 +379,12 @@ test('GF-TEST-interaction-runtime-snapshot-enum-phase-age: completed WASM scan o
     { descriptorId: 'state.phase', status: 'ready', value: 1 },
     { descriptorId: 'timer.age', status: 'ready', value: 55 },
   ]);
+  const invalidTrace = structuredClone(execution.outcomes[1].trace);
+  invalidTrace.stateAfter.phase = 2;
+  const invalid = emitCompletedScanSnapshot({ compilation: artifact, runId: run.runId,
+    completion: run.scans[1].completion, trace: invalidTrace });
+  assert.deepEqual(invalid.observations.find(entry => entry.descriptorId === 'state.phase'),
+    { descriptorId: 'state.phase', status: 'error', error: 'runtime-value-type-mismatch' });
 });
 
 test('GF-TEST-interaction-runtime-snapshot-watering: eight outputs follow edge latch, priority stops, and exact five-minute cutoff', async () => {
@@ -482,6 +584,15 @@ test('GF-TEST-interaction-runtime-snapshot-empty: direct control preserves nativ
     trace: wasm[0].trace,
   });
   assert.deepEqual(snapshot.observations, []);
+  const serialized = JSON.parse(JSON.stringify(snapshot));
+  assert.deepEqual(serialized, snapshot);
+  assert.equal(serialized.source.revisionId, 'revision.direct-output.1');
+  assert.equal(serialized.source.sha256, artifact.sourceDocument.sha256);
+  assert.equal(serialized.module.moduleFingerprint, wasm[0].trace.module);
+  assert.equal(serialized.runId, 'run.direct-output.1');
+  assert.deepEqual(serialized.completion, scans[0].completion);
+  assert.deepEqual(joinRuntimeSnapshot(artifact.interactionSchema, serialized,
+    expectedRuntimeIdentity(artifact.interactionSchema, 'run.direct-output.1')), { status: 'ready', staleReasons: [] });
   assert.deepEqual(joinRuntimeSnapshot(artifact.interactionSchema, snapshot,
     expectedRuntimeIdentity(artifact.interactionSchema, 'run.direct-output.1')), {
     status: 'ready', staleReasons: [],

@@ -20,6 +20,13 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [README.ko.md](README.ko.md) | 의도를 잃지 않는 제어. | md |
 | [README.md](README.md) | Control that stays true to intent. | md |
 
+## .github/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [.github/pull_request_template.ko.md](.github/pull_request_template.ko.md) | pull_request_template.ko.md | md |
+| [.github/pull_request_template.md](.github/pull_request_template.md) | pull_request_template.md | md |
+
 ## contracts/integration-v1/
 
 | Path | Title | Type |
@@ -65,10 +72,16 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/ACCOUNTING-LEDGER-ABI.md](docs/ACCOUNTING-LEDGER-ABI.md) | Accounting ledger primitive ABI | md |
 | [docs/AFTER-EVENT-WASM-ABI.ko.md](docs/AFTER-EVENT-WASM-ABI.ko.md) | after_event 실행 ABI 식별 정보 | md |
 | [docs/AFTER-EVENT-WASM-ABI.md](docs/AFTER-EVENT-WASM-ABI.md) | Identified after_event execution ABI | md |
+| [docs/AI-CONTRIBUTION-PACKAGE.ko.md](docs/AI-CONTRIBUTION-PACKAGE.ko.md) | 범위를 제한한 AI 기여 작업 패키지 | md |
+| [docs/AI-CONTRIBUTION-PACKAGE.md](docs/AI-CONTRIBUTION-PACKAGE.md) | Bounded AI contribution package | md |
 | [docs/BEHAVIOR-COMPOSITION-RESEARCH.ko.md](docs/BEHAVIOR-COMPOSITION-RESEARCH.ko.md) | 동작 조합: 연구와 아키텍처 검토 | md |
 | [docs/BEHAVIOR-COMPOSITION-RESEARCH.md](docs/BEHAVIOR-COMPOSITION-RESEARCH.md) | Behavior composition: research and architecture review | md |
 | [docs/BYTECODE.ko.md](docs/BYTECODE.ko.md) | GFB 바이트코드 | md |
 | [docs/BYTECODE.md](docs/BYTECODE.md) | GFB bytecode | md |
+| [docs/CALENDAR-PROVIDERS.ko.md](docs/CALENDAR-PROVIDERS.ko.md) | 한국 공휴일과 현장 근무 달력 | md |
+| [docs/CALENDAR-PROVIDERS.md](docs/CALENDAR-PROVIDERS.md) | Korean public holidays and farm work calendars | md |
+| [docs/CHECKED-CONSTRAINT-REPLACEMENTS.ko.md](docs/CHECKED-CONSTRAINT-REPLACEMENTS.ko.md) | 검증된 제약 대체 | md |
+| [docs/CHECKED-CONSTRAINT-REPLACEMENTS.md](docs/CHECKED-CONSTRAINT-REPLACEMENTS.md) | Checked constraint replacements | md |
 | [docs/COMPILER-DIAGNOSTICS.ko.md](docs/COMPILER-DIAGNOSTICS.ko.md) | 공개 컴파일러 진단 | md |
 | [docs/COMPILER-DIAGNOSTICS.md](docs/COMPILER-DIAGNOSTICS.md) | Public compiler diagnostics | md |
 | [docs/CONSTRAINTS.en.md](docs/CONSTRAINTS.en.md) | GhostFlow common constraints and sensor signal contract | md |
@@ -86,17 +99,27 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/DOCUMENTATION-LANGUAGES.md](docs/DOCUMENTATION-LANGUAGES.md) | Documentation languages | md |
 | [docs/DOCUMENTATION.ko.md](docs/DOCUMENTATION.ko.md) | 문서 목록 | md |
 | [docs/DOCUMENTATION.md](docs/DOCUMENTATION.md) | Documentation catalog | md |
+| [docs/DRIVER-ABI-V1-DRAFT.ko.md](docs/DRIVER-ABI-V1-DRAFT.ko.md) | Host–Driver C ABI v1 초안 | md |
+| [docs/DRIVER-ABI-V1-DRAFT.md](docs/DRIVER-ABI-V1-DRAFT.md) | Host–Driver C ABI v1 draft | md |
+| [docs/EFFECT-PROCESS-CONTRACT.ko.md](docs/EFFECT-PROCESS-CONTRACT.ko.md) | Effect와 Process 계약 | md |
+| [docs/EFFECT-PROCESS-CONTRACT.md](docs/EFFECT-PROCESS-CONTRACT.md) | Effect and Process contract | md |
+| [docs/ESTIMATE-EVIDENCE.ko.md](docs/ESTIMATE-EVIDENCE.ko.md) | 유한한 추정 근거 admission | md |
+| [docs/ESTIMATE-EVIDENCE.md](docs/ESTIMATE-EVIDENCE.md) | Bounded estimate evidence admission | md |
 | [docs/EXACT-INTEGER-CONTRACT.ko.md](docs/EXACT-INTEGER-CONTRACT.ko.md) | 정확한 정수 계약 제안 | md |
 | [docs/EXACT-INTEGER-CONTRACT.md](docs/EXACT-INTEGER-CONTRACT.md) | Exact integer contract proposal | md |
 | [docs/FRAMED-CONTROL-HOST.ko.md](docs/FRAMED-CONTROL-HOST.ko.md) | Framed ControlRuntime 도입 (D6) | md |
 | [docs/FRAMED-CONTROL-HOST.md](docs/FRAMED-CONTROL-HOST.md) | Framed ControlRuntime adoption (D6) | md |
 | [docs/GFB5-SCHEDULE-PRELUDE.ko.md](docs/GFB5-SCHEDULE-PRELUDE.ko.md) | GFB5 일정 서두 | md |
 | [docs/GFB5-SCHEDULE-PRELUDE.md](docs/GFB5-SCHEDULE-PRELUDE.md) | GFB5 schedule prelude | md |
+| [docs/HOST-EVENT-ORDERING-CONTRACT.ko.md](docs/HOST-EVENT-ORDERING-CONTRACT.ko.md) | Host 이벤트 순서 계약 | md |
+| [docs/HOST-EVENT-ORDERING-CONTRACT.md](docs/HOST-EVENT-ORDERING-CONTRACT.md) | Host event ordering contract | md |
 | [docs/IMPLEMENTATION.ko.md](docs/IMPLEMENTATION.ko.md) | 구현 및 아티팩트 경계 | md |
 | [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) | Implementation and artifact boundaries | md |
 | [docs/INDEX.md](docs/INDEX.md) | Documentation index | md |
 | [docs/INTENT-ANCHOR-MAP.ko.md](docs/INTENT-ANCHOR-MAP.ko.md) | Literate intent anchor map | md |
 | [docs/INTENT-ANCHOR-MAP.md](docs/INTENT-ANCHOR-MAP.md) | Literate intent anchor map | md |
+| [docs/INTERACTION-STREAM-CONTRACT.ko.md](docs/INTERACTION-STREAM-CONTRACT.ko.md) | Interaction 스트림 계약 설계 | md |
+| [docs/INTERACTION-STREAM-CONTRACT.md](docs/INTERACTION-STREAM-CONTRACT.md) | Interaction stream contract design | md |
 | [docs/KEYBOARD-HOST.ko.md](docs/KEYBOARD-HOST.ko.md) | 실시간 키보드 호스트 | md |
 | [docs/KEYBOARD-HOST.md](docs/KEYBOARD-HOST.md) | Real-time keyboard host | md |
 | [docs/language_faq.en.md](docs/language_faq.en.md) | GhostFlow Coding FAQ | md |
@@ -123,6 +146,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/LLM-TOOLCHAIN-ARCHITECTURE.md](docs/LLM-TOOLCHAIN-ARCHITECTURE.md) | Authoring and virtual simulation architecture | md |
 | [docs/OPERATOR-SETTINGS-STREAM.ko.md](docs/OPERATOR-SETTINGS-STREAM.ko.md) | Typed configuration stream | md |
 | [docs/OPERATOR-SETTINGS-STREAM.md](docs/OPERATOR-SETTINGS-STREAM.md) | Typed configuration streams | md |
+| [docs/OPTIMIZER-PASS-CONTRACT.ko.md](docs/OPTIMIZER-PASS-CONTRACT.ko.md) | 최적화 패스 계약 | md |
+| [docs/OPTIMIZER-PASS-CONTRACT.md](docs/OPTIMIZER-PASS-CONTRACT.md) | Optimizer pass contract | md |
 | [docs/PORTABLE-PACKAGE.ko.md](docs/PORTABLE-PACKAGE.ko.md) | 이식 가능한 GFB 패키지 v1 | md |
 | [docs/PORTABLE-PACKAGE.md](docs/PORTABLE-PACKAGE.md) | Portable GFB package v1 | md |
 | [docs/ProgrammingInGhostflow.en.md](docs/ProgrammingInGhostflow.en.md) | Programming in GhostFlow | md |
@@ -138,6 +163,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/SCENARIO-RUNNER.ko.md](docs/SCENARIO-RUNNER.ko.md) | 가상 시나리오 러너 | md |
 | [docs/SCENARIO-RUNNER.md](docs/SCENARIO-RUNNER.md) | Virtual scenario runner | md |
 | [docs/SEPARATION-VALIDATION.md](docs/SEPARATION-VALIDATION.md) | Language project separation verification | md |
+| [docs/SOLAR-CONFIG-EXECUTION.ko.md](docs/SOLAR-CONFIG-EXECUTION.ko.md) | 공유 live 설정을 사용하는 Solar 실행 | md |
+| [docs/SOLAR-CONFIG-EXECUTION.md](docs/SOLAR-CONFIG-EXECUTION.md) | Solar execution with shared live configuration | md |
 | [docs/SOLAR-SCHEDULE.ko.md](docs/SOLAR-SCHEDULE.ko.md) | Solar schedule: compiler와 simulation host | md |
 | [docs/SOLAR-SCHEDULE.md](docs/SOLAR-SCHEDULE.md) | Solar schedules: compiler and simulation host | md |
 | [docs/SOURCE-MAP.ko.md](docs/SOURCE-MAP.ko.md) | 소스를 보존하는 산출물 맵 — 첫 단계 | md |
@@ -231,10 +258,24 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 
 | Path | Title | Type |
 | --- | --- | --- |
+| [examples/bound-resource-execution.ghost.ko.md](examples/bound-resource-execution.ghost.ko.md) | 바인딩된 공유 Bool 정책 실행 | md |
+| [examples/bound-resource-execution.ghost.md](examples/bound-resource-execution.ghost.md) | Executing a bound shared Bool policy | md |
+| [examples/constraint-envelope.ghost.ko.md](examples/constraint-envelope.ghost.ko.md) | 완전한 local 출력 허용 범위 | md |
+| [examples/constraint-envelope.ghost.md](examples/constraint-envelope.ghost.md) | A complete local output envelope | md |
+| [examples/explicit-feedback-adoption.ghost.ko.md](examples/explicit-feedback-adoption.ghost.ko.md) | 명시적으로 채택한 피드백 억제 | md |
+| [examples/explicit-feedback-adoption.ghost.md](examples/explicit-feedback-adoption.ghost.md) | Explicitly adopted feedback inhibition | md |
 | [examples/irrigation.ghost.ko.md](examples/irrigation.ghost.ko.md) | 관개 런타임 픽스처 | md |
 | [examples/irrigation.ghost.md](examples/irrigation.ghost.md) | Irrigation runtime fixture | md |
+| [examples/korean-calendar.ghost.en.md](examples/korean-calendar.ghost.en.md) | Korean public holidays and farm workdays | md |
+| [examples/korean-calendar.ghost.md](examples/korean-calendar.ghost.md) | 한국 공휴일과 농장 작업일 | md |
+| [examples/optional-feedback-timer.ghost.ko.md](examples/optional-feedback-timer.ghost.ko.md) | 선택 관찰을 포함한 타이머 제어 | md |
+| [examples/optional-feedback-timer.ghost.md](examples/optional-feedback-timer.ghost.md) | Timer control with optional observation | md |
 | [examples/scheduled-watering.ghost.en.md](examples/scheduled-watering.ghost.en.md) | Sequential watering by daily schedule | md |
 | [examples/scheduled-watering.ghost.md](examples/scheduled-watering.ghost.md) | 하루 시간표에 따른 순차 관수 | md |
+| [examples/shared-constraint-contract.ghost.ko.md](examples/shared-constraint-contract.ghost.ko.md) | 완전한 공유 자원 검사 계약 | md |
+| [examples/shared-constraint-contract.ghost.md](examples/shared-constraint-contract.ghost.md) | A complete checked shared resource contract | md |
+| [examples/solar-live-config.ghost.en.md](examples/solar-live-config.ghost.en.md) | Allowing sunrise schedules through shared settings observations | md |
+| [examples/solar-live-config.ghost.md](examples/solar-live-config.ghost.md) | 공유 설정 관측으로 일출 스케줄 허용하기 | md |
 | [examples/solar-watering.ghost.en.md](examples/solar-watering.ghost.en.md) | Watering timed to sunrise and sunset | md |
 | [examples/solar-watering.ghost.md](examples/solar-watering.ghost.md) | 일출·일몰에 맞춘 관수 | md |
 | [examples/station-rules.ghost.ko.md](examples/station-rules.ghost.ko.md) | 공용 관측소 정책 | md |
@@ -301,7 +342,9 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | --- | --- | --- |
 | [examples/programming-book-imports/E19.ghost.md](examples/programming-book-imports/E19.ghost.md) | E19.ghost.md | md |
 | [examples/programming-book-imports/E20.ghost.md](examples/programming-book-imports/E20.ghost.md) | E20.ghost.md | md |
+| [examples/programming-book-imports/E21.ghost.md](examples/programming-book-imports/E21.ghost.md) | E21.ghost.md | md |
 | [examples/programming-book-imports/E22.ghost.md](examples/programming-book-imports/E22.ghost.md) | E22.ghost.md | md |
+| [examples/programming-book-imports/E31.ghost.md](examples/programming-book-imports/E31.ghost.md) | E31.ghost.md | md |
 
 ## examples/tutorial/
 
@@ -399,9 +442,17 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/fixtures/after-event-evidence.ghost.md](tests/fixtures/after-event-evidence.ghost.md) | Evidence after event | md |
 | [tests/fixtures/gfb1-golden-v1.ghost.md](tests/fixtures/gfb1-golden-v1.ghost.md) | GFB1 version 1 golden vector | md |
 | [tests/fixtures/gfb2-int-golden-v1.ghost.md](tests/fixtures/gfb2-int-golden-v1.ghost.md) | Exact integer GFB vector | md |
+| [tests/fixtures/issue-145-solar-config.ghost.md](tests/fixtures/issue-145-solar-config.ghost.md) | Solar settings transaction fixture | md |
 | [tests/fixtures/issue-90-readonly-settings.ghost.md](tests/fixtures/issue-90-readonly-settings.ghost.md) | Read-only settings producer | md |
 | [tests/fixtures/issue-90-settings-periodic.ghost.md](tests/fixtures/issue-90-settings-periodic.ghost.md) | Live settings stream | md |
+| [tests/fixtures/issue-93-quantities.ghost.md](tests/fixtures/issue-93-quantities.ghost.md) | Quantity execution parity fixture | md |
 | [tests/fixtures/true-for-certified.ghost.md](tests/fixtures/true-for-certified.ghost.md) | Certified hot interval | md |
+
+## tests/fixtures/contribution-134/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [tests/fixtures/contribution-134/numeric-threshold.ghost.md](tests/fixtures/contribution-134/numeric-threshold.ghost.md) | Numeric moisture threshold to virtual relay 1 | md |
 
 ## tests/reference/
 
@@ -414,4 +465,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-304 documents.
+345 documents.

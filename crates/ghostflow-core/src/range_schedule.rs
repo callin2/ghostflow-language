@@ -5,7 +5,7 @@
 //! against the shared trusted-clock gate for an outer accepted transaction.
 //! Safety arbitration consumes `active` downstream and never pauses this clock.
 
-use crate::schedule_clock::{ClockSnapshot, ScheduleClockGate, MAX_EXACT_TIME};
+use crate::schedule_clock::{ClockDisposition, ClockSnapshot, ScheduleClockGate, MAX_EXACT_TIME};
 use crate::{Error, Result};
 
 const MAX_WALL_MS: u64 = 253_402_300_799_999;
@@ -60,9 +60,35 @@ pub struct RangeEngine {
 pub struct RangeStage {
     engine: RangeEngine,
     pub result: RangeStageResult,
+    pub clock_disposition: ClockDisposition,
 }
 
 impl RangeEngine {
+    pub(crate) fn terminal_keys(&self) -> &[String] {
+        &self.terminal_keys
+    }
+
+    pub(crate) fn active_fact(&self) -> Option<&RangeFact> {
+        self.active.as_ref().map(|active| &active.fact)
+    }
+
+    /// Durable keys consume admitted, cancelled and expired occurrences. A new
+    /// boot gets a fresh gate and no active timer; restoration never resumes a
+    /// previously admitted interval or emits a second admission pulse.
+    pub(crate) fn restore_terminal_keys(&mut self, keys: Vec<String>) -> Result<()> {
+        if keys.len() > self.terminal_capacity
+            || keys.iter().any(|key| key.is_empty() || key.len() > 128)
+            || keys
+                .iter()
+                .enumerate()
+                .any(|(i, key)| keys[..i].contains(key))
+        {
+            return Err(Error::new("invalid Range terminal checkpoint keys"));
+        }
+        self.terminal_keys = keys;
+        self.active = None;
+        Ok(())
+    }
     pub fn new(gap_ms: u64, boot_epoch: u64, terminal_capacity: usize) -> Result<Self> {
         if !(1..=4096).contains(&terminal_capacity) {
             return Err(Error::new("invalid Range ledger capacity"));
@@ -162,7 +188,11 @@ impl RangeEngine {
                 } else {
                     RangeDecision::Waiting
                 };
-                return Ok(RangeStage { engine, result });
+                return Ok(RangeStage {
+                    engine,
+                    result,
+                    clock_disposition: clock.disposition,
+                });
             }
             engine.active = None;
         }
@@ -170,7 +200,11 @@ impl RangeEngine {
             if result.occurrence_key.is_none() {
                 result.decision = RangeDecision::ClockUnknown;
             }
-            return Ok(RangeStage { engine, result });
+            return Ok(RangeStage {
+                engine,
+                result,
+                clock_disposition: clock.disposition,
+            });
         };
         for fact in facts {
             if engine.terminal_keys.contains(&fact.occurrence_key) {
@@ -218,7 +252,11 @@ impl RangeEngine {
             };
             break;
         }
-        Ok(RangeStage { engine, result })
+        Ok(RangeStage {
+            engine,
+            result,
+            clock_disposition: clock.disposition,
+        })
     }
 
     pub fn commit(&mut self, stage: RangeStage) {

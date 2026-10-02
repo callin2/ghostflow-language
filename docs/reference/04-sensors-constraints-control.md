@@ -189,6 +189,13 @@ signal stable_start = debounce(start, stable_for: 2s, initial: false);
 | `stale_after(d)` | timestamped Result, 양의 Duration | 마지막 실제 유효 sample age가 d에 도달하면 Stale. 재평가나 filter output 시각으로 연장하지 않는다. |
 
 `filter`는 한 연산만 받는다. 여러 단계를 합성하려면 각 단계를 이름 있는 `signal`로 선언한다.
+numeric Result의 다음 EMA 단계는 `signal smooth = ema(moisture, alpha: 0.25);`로 선언한다.
+`signal slower = ema(smooth, alpha: 0.25);`처럼 EMA 결과를 다시 연결할 수 있다.
+각 EMA는 단일 물리 source의 epoch·sample ID·timestamp를 이어받아 새 정상 sample에서만
+갱신한다. 입력 fault를 그대로 전달하고 EMA 기억을 비우며, upstream filter 준비와
+`recover_after`를 만족한 첫 정상 sample로 다시 seed한다. 별도 recovery counter나
+새 freshness 시각을 만들지 않는다. sample lineage가 없는 값이나 여러 물리 source를
+선택하는 식은 EMA 단계의 입력으로 받지 않는다.
 Temperature filter는 payload를 canonical kelvin domain의 affine weighted mean으로 내부 계산한다.
 이는 source 식에 Temperature+Temperature 또는 absolute temperature scalar 곱셈을 허용하지 않는다.
 보호 신호와 완만한 환경 sensor에 같은 filter delay를 일괄 적용하지 않는다. 각 연산은
@@ -363,6 +370,75 @@ missed scan은 관측을 만들지 않는다. compiler는 duration, max_age, sam
 profile에서 최대 보존 sample 수를 계산해야 하며 계산할 수 없으면 활성화를 거부한다.
 checkpoint 복원은 source/time continuity를 검증한 경우만 허용하고 그렇지 않으면 NotReady다.
 
+### 추정값 근거와 연속성
+
+추정값은 명시된 model이 산출한 값이며 sensor 관측이나 적용·확인된 출력 사실이 아니다.
+`Result<T, SensorFault>`는 선언된 sensor 값의 유효성 또는 고장을 표현한다. `ok(value)`는
+source 값이 계약상 유효하다는 뜻이지 계산 결과가 측정되었거나 물리적으로 확인되었다는
+뜻이 아니다. `Estimated`는 개념적인 근거 출처이며 새 `Result` 상태, `Quality` 변형 또는
+실행 syntax를 추가하지 않는다.
+
+추정값을 해석하려면 model과 calibration parameter revision, runtime reference의 정체성과
+설정 방법·operator/source, source/program과 설치 binding revision, run과 monotonic time epoch,
+근거가 된 source/application receipt history, 명시한 산출 basis를 함께 보존한다. actuator
+진행 추정의 첫 basis는 Device가 실제로 수락한 output register/write history다. Device의 ACK는
+driver가 그 register/write를 수락했다는 뜻일 뿐 motor가 움직였거나 position이 확인되었다는
+뜻이 아니다. 요청 시각을 basis로 선택할 수는 있지만 requested history로 명시해야 하며
+applied history와 바꾸어 쓰지 않는다. 이 구분은 §4.7의 요청·safe·applied·confirmed 경계를
+따른다. 보존할 참조와 history는 선언된 deployment profile의 유한한 bound 안에 있어야 한다.
+필요한 bound를 지원할 수 없으면 무제한 MCU history를 만들지 말고 해당 사용을 거부한다.
+
+추정 interval은 admissible하다고 선언된 runtime reference와 qualifying receipt/history에서만
+시작한다. cached receipt를 다시 읽거나 다른 scan에서 노출해도 새 write나 새 evidence가
+만들어지지 않으며 origin/start, freshness 또는 uncertainty를 reset하지 않는다. 검증된 연속
+history가 있을 때만 정상적인 monotonic time 평가에 따라 estimate가 진행될 수 있다. 연속
+산출에는 필요한 history 전체가 있어야 한다. 관측되지 않은 gap, 실패 또는 불확실한 write를
+가로질러 interpolate하지 않는다. 특히 새 write가 실패하면 이전 cached ACK는 원래 identity를
+지닌 과거 receipt로 남고 현재 applied-target history는 불확실하다. 과거 ACK만으로 적용 상태가
+계속 유지되었다고 추정하지 않는다.
+
+reboot/run·time epoch, source epoch, installation binding, model/calibration revision 또는
+runtime reference의 변경은 live estimate의 continuity를 끊는다. 소유자가 명시한 검증으로
+연속성을 재수립한 경우에만 계속 사용할 수 있다. calibration parameter는 reboot 뒤에도
+남을 수 있지만 runtime position reference와 estimate는 자동 복원되거나 0으로 초기화되지
+않는다. 필요한 basis가 없거나 검증할 수 없으면 현재 estimate는 unavailable/NotReady다.
+명시적으로 발생한 기존 source/time fault는 원래 fault로 보존한다. 둘 다 0이나 자동 fallback으로
+바꾸지 않는다. timer-only 정책은 estimate가 unavailable이어도 유효하며 estimate를 요구하지
+않는다.
+
+불확실성이 알려지지 않았다면 unknown으로 남긴다. model/source는 known uncertainty bound 또는
+불확실성이 unknown이라는 점을 명시해야 한다. 따라서 불확실성을 모르는 estimate도 보존하거나
+표시할 수 있지만, bounded temporal operator에 자동으로 들어갈 수는 없다. 보편적인 formula,
+confidence, uncertainty 숫자, duration 또는 expiry를 정하지 않는다. 기존 `quality: measured`,
+`hold_last`, `true_for`의 measured admission은 바뀌지 않는다. 향후 estimated evidence를 받는
+temporal consumer는 해당 source/type을 명시적으로 허용하고 선언된 uncertainty bound를 요구해야
+한다. unknown uncertainty를 조용히 허용해서는 안 된다.
+
+연속 예: 명시적으로 설정한 runtime reference, 같은 model/calibration/binding, 같은 run/time
+epoch와 profile bound 내 gap 없는 qualifying write history가 있으면 선택된 model이 estimate를
+산출할 수 있다. 그 결과는 계속 estimate이며 Driver ACK만으로 실제 움직임을 주장하지 않는다.
+단절 예: applied-history basis에서는 ACK 없는 요청, 실패하거나 불확실한 새 write, reboot 또는
+identity/revision 변경 뒤 새로 검증된 reference가 생기기 전까지 live estimate가 unavailable이다.
+별도로 선언된 requested-history basis는 그 요청을 추정 가정으로 쓸 수 있지만 applied history로
+표시하지 않는다. calibration parameter와 이전 estimate는 각각의 정체성을 유지한 이력으로
+남는다.
+
+이 계약의 추정 의미는 GhostFlow [#383](https://github.com/callin2/ghostflow-language/issues/383),
+후속 compatibility 작업은 [#385](https://github.com/callin2/ghostflow-language/issues/385),
+calibration/reference는 [System #132](https://github.com/callin2/farm_studio_system/issues/132)와
+[해당 architecture contract](https://github.com/callin2/farm_studio_system/blob/241643c125439c1ec141c8596feec3f4ad143ade/docs/architecture/INPUT-DRIVER-ARCHITECTURE.md#calibration-parameters-and-position-reference--system-132)에
+연결된다. Device output receipt의 구체 경계는 draft [PR #107](https://github.com/callin2/farm-device/pull/107)
+head `b85ef02fb546cd5f957c12ab66f091b90f9484f0`의
+[host observation source](https://github.com/callin2/farm-device/blob/b85ef02fb546cd5f957c12ab66f091b90f9484f0/rust/firmware/src/host_observation.rs)를
+참조한다. 현재 `sensorSample` lowering은 measured provenance를 code `1`로 표시한다. runtime
+`Measured`/`Held`/`Constructed` 분류는 바뀌지 않으며 `Estimated`를 표현하지 않는다.
+Estimate를 소비하는 실행 지원은 #385에서 별도 compatibility를 정하기 전까지 이 계약의
+범위가 아니다.
+
+[유한한 estimate-basis admission API](../ESTIMATE-EVIDENCE.ko.md)는 유효성,
+출처, 선언된 완전한 history를 구분한다. 승인된 basis는 측정이나 temporal 권한을
+부여하지 않는다. source 선언과 모델 선택은 별도의 compatibility 결정이다.
+
 ## 4.5 선택 sensor와 capability
 
 ```ghost
@@ -477,73 +553,137 @@ confirmed feedback은 출처와 품질을 따로 가진다.
 
 ## 4.8 공통 constraints 표기와 연산
 
-다음 `constraints` 블록은 선택된 설계 표기다. 규칙은 안정적인 설비 ID와
-유한한 port/resource 집합에 bind한다. 현재 resource-policy named parser는
-`constraints Name for resource { exclusive at admission { ... }; require at safe_output ...; }`
-만 받는다. 이 문법은 resource binding과 runtime enforcement가 없으면 실행 control로
-내려가지 않는다. `ghostrules`의 standalone parser는 별도
-`constraints Name { ... }` 문법으로 `exclusive(...)`, `allow`, `limit`, `once`,
-`check`를 검증한다. control 안의 accounting 제약은 또 다른
-`constraints Name { limit used(account, basis) <= bound { ... } }` 형태다(§3.10).
-세 형태의 결과를 같은 실행 계약으로 간주하지 않는다.
+정본 작성 단위는 control 내부의 이름 있는 `constraints` 블록이다.
+지역 Bool 출력 규칙은 `constraints Name { require [at safe_output] p; mutex(a, b); }`다.
+대상을 생략한 Bool `require`는 `safe_output`이고 지역 묶음은 자기 control에만 적용된다.
+다음은 완전한 지역 control이다.
 
 ```ghost
-constraints StationRules for station {
-  exclusive at admission { automatic, manual, configuring };
-  allow enter(Auto, Manual, Configure)
-    only when mode == Stopped && stopped(station);
-  require at safe_output count_on({ valve1, valve2, valve3 }) <= 2;
-  require at safe_output pump1.on => any_on({ valve1, valve2, valve3 });
-  limit on_time(pump1) <= 1h per day("Asia/Seoul");
-  once starts per occurrence;
-  check pump_capacity(pump1);
-  warn low_margin when remaining_budget < 5min;
+control LocalPump {
+  input request, valve_ready: Bool;
+  output pump, valve: Bool;
+  pump <- request;
+  valve <- valve_ready;
+  constraints LocalRules {
+    require at safe_output pump => valve;
+  }
 }
 ```
 
+공유 규칙은 `constraints Name for resource`로 명시한 안정적인 resource scope에 적용된다.
+같은 자원을 사용하는 자동·수동·fallback 등 모든 요청 경로가 같은 규칙을 따른다.
+다음은 완전한 source이며 공유 policy의 checked descriptor를 정의한다.
+descriptor 검증은 실행 binding/enforcement를 대신하지 않는다.
+
+```ghost
+control SharedPumpPolicy {
+  resource station: Station;
+  resource pump1: BoolActuator;
+  resource valve1: BoolActuator;
+  input automatic, manual, pump_request, valve_request: Bool;
+  output pump, valve: Bool;
+  pump <- pump_request;
+  valve <- valve_request;
+  constraints SharedRules for station {
+    exclusive at admission { automatic, manual };
+    require at safe_output pump1.on => any_on({ valve1 });
+    safe { pump1 = false; valve1 = true; }
+  }
+}
+```
+
+`safe`는 참조한 유한 Bool resource 집합 전체에 작성한 안전 값을 지정한다.
+누락·중복·타입 불일치와 필수 관계를 위반하는 safe vector는 잘못된 정의다.
+위 예제는 pump=false, valve=true를 선택한다. 안전이 항상 전체 OFF라는 뜻은 아니다.
+요청 output과 resource endpoint의 연결은 별도 명시 binding 계약이며 여기서
+`station`, `use`, `bind`, session 문법을 새로 도입하지 않는다.
+binding과 enforcement가 없는 shared descriptor를 실행 control이나 enforced policy로
+표시하지 않는다. 이전 최상위 resource-policy 파일도 checked non-control artifact다.
+
+공유 실행을 선택할 때는 정확한 정본 source/descriptor, binding revision,
+안정 resource ID와 typed mapping을 하나의 bound 프로그램 identity로 고정한다.
+활성화와 각 평가의 binding은 그 identity와 같아야 한다. missing/mismatch는
+부분 실행이 아니라 평가 거부다. bound 실행의 요청·admission·safe_output은
+동일한 Rust commit 경계에서 검사하며 host의 후처리 출력 filter로 대신하지 않는다.
+논리 enforcement가 physical applied/confirmed나 Driver 안전 순서를 보장하지는 않는다.
+
+exclusive의 원시 activity 입력은 admission 결과가 아니다. 이미 admit된 activity와
+충돌하는 새 claim은 거부하고 기존 admission과 이전 safe 출력을 보존한다.
+거부한 newcomer는 false 관측 뒤 새 true claim으로 admission을 다시 요청한다.
+시작 전 예측한 출력 관계 위반은 새 admission과 보호 출력을 만들지 않는다.
+이전에 commit한 safe 값이 없으면 거부 출력 집합은 비어 있다. 이미 실행 중인
+요청의 관계 위반에는 작성한 safe vector를 적용하며, trip은 입력 정상화만으로
+풀리지 않는다. exclusive group은 모든 claim=false 관측 뒤 새 claim의 admission을
+다시 검사한다. require-only group은 requested map=authored safe map 관측으로 복구
+기준선을 세운 뒤 새 departure를 검사한다.
+숨은 재시도·대기열·우선순위 상승으로 이 복구 경계를 우회하지 않는다.
+
+여러 group의 필수 조건은 AND이며 안전 의미가 충돌하는 중첩은 거부한다.
+bound Bool profile은 모든 출력의 finite resource mapping과 전체 safe vector를
+요구한다. 설치 authority가 공유하는 registry는 같은 안정 ID의 두 번째 활성
+논리 writer를 거부한다. 별도 설치의 registry가 물리 배타성을 증명하지는 않는다.
+보호 resource를 공유하는 group의 trip은 전이적으로 연결된 component에 적용하고,
+공유 resource의 작성 safe 값은 일치해야 한다. 무관한 group의 admission은 유지한다.
+최종 safe 후보를 모든 공유·지역 필수 조건의 AND로 다시 검증한다. 이 제한은
+여러 VM 협력 중재, session lease나 임의 PID 정책을 구현하는 의미가 아니다.
+VM 오류나 binding 오류는 state·guard·trace를 함께 rollback한다. trace는 원시
+요청, admitted activity, requested/safe 값, 원인·group·binding identity를 구분한다.
+정상 평가한 denial은 ordinary VM state를 commit하며 job/session 취소를 뜻하지 않는다.
+
+실행 그룹은 하나의 exclusive 활동 집합까지 지원한다. 여러 exclusive 문장은 소스 검사 대상으로 유지하지만 별도의 실행 연결이 필요하므로 서로 다른 집합을 합쳐 해석하지 않고 거부한다. 작성된 전역 안전 벡터는 로컬 필수 제약도 만족해야 한다.
+
+accounting의 `constraints Name { limit used(account, basis) <= bound { ... } }`는
+별도 사용량 scope다(§3.10). 선언한 `resource`·`account`, semantic stage, basis,
+persistence가 ledger의 뜻을 정한다. 지역 Bool 규칙이나 shared admission으로 대체하지 않는다.
+
 ### 제약문의 의미
 
-| 표기 | 인수 | 적용 단계와 의미 |
-|---|---|---|
-| `exclusive at admission { a, b, ... }` (resource-policy); `exclusive(a, b, ...)` (`ghostrules`) | 같은 scope의 mode/activity 2개 이상 | 동시에 활성화하지 않는다. 충돌하는 새 진입을 거부하고 기존 상태를 유지한다. |
-| `allow enter(M...) only when p` (`ghostrules`) | 유한 mode 집합과 Bool 전제 | mode 진입 요청 시 p를 검사한다. stop 요청 자체를 막지 않는다. 현재 parser의 `p`는 정확히 `mode == Stopped && stopped(station)` 형태다. |
-| `require p` | 출력/허가 단계가 정해진 Bool 불변조건 | 시작 전 허가와 실행 중 감시에 모두 쓰며 Unknown을 통과로 보지 않는다. |
-| `limit q <= bound per basis` | typed quantity, 같은 타입 bound, day/window basis | 남은 예산을 검사하고 한도 경계에서 추가 동작을 차단한다. |
-| `once schedule per occurrence` | schedule ID와 occurrence identity | 같은 occurrence의 재접수를 막는다. 시간 budget과 별도 ledger다. |
-| `check analysis(args)` | optional 정보에 의존하는 analysis | `Pass/Violation/Unknown`을 내는 비차단 분석이다. |
-| `warn id when p` (설계) | 안정적인 경고 ID와 Bool | 결과를 바꾸지 않고 원인·대상과 함께 진단 event를 낸다. 현재 두 parser 모두 받지 않는다. |
+| 표기 | 적용 단계와 의미 |
+|---|---|
+| 지역 `require [at safe_output] p` | 자기 control의 Bool 출력 후보 불변조건. 대상 생략은 safe_output이다. |
+| 지역 `mutex(a, b)` | 자기 control의 두 requested Bool 출력이 true이면 그 요청 증거를 보존하고 두 safe 출력을 false로 만든다. |
+| 공유 `exclusive at admission { a, b, ... }` | 같은 scope의 유한 Bool activity 집합 2개 이상. 충돌하는 새 admission을 거부한다. |
+| 공유 `require at safe_output p` | 유한 resource 출력 관계를 검사한다. 안전 값도 이 필수 관계를 만족해야 한다. |
+| 공유 `safe { resource = Bool; ... }` | 실행 중 위반에 사용할 resource별 명시 안전 vector. 보편적인 전체 OFF 기본값은 없다. |
+| accounting `limit used(...) <= bound` | 명시 stage/basis의 남은 예산과 한도. 세부 규칙은 §3.10이다. |
+| Station adapter `check pump_capacity(pump)` | optional 정보의 비차단 `Pass/Violation/Unknown` advisory. 필수 require로 승격하지 않는다. |
 
-현재 named parser의 target은 `exclusive`의 `admission`과 finite-set `require`의
-`safe_output`이다. `monitor`는 선택된 설계 target이며 현재 parser가 받지 않는다.
-기존 control 내부의 target 없는
-Bool `require`는 `safe_output`을 뜻한다. 각 규칙은 적용 단계를 가진다. 출력 관계를 mode 진입 규칙처럼 처리하거나, 비차단
-check를 safety require로 암묵 승격하지 않는다. 필수 제약은 모두 AND로 만족해야 한다.
-arbitration은 허용 영역 안에서 어떤 요청을 채택할지 정하는 별도 정책이다. priority
-점수로 필수 제약을 완화하지 않는다.
+모든 필수 조건은 AND로 만족해야 한다. 제약은 goal/PID 등 의도가 움직일 수 있는
+허용 영역이다. priority는 그 안에서 요청을 고르는 arbitration 정책이며 필수 조건을
+완화하거나 resource binding·provenance·복구 조건을 우회하지 않는다.
+예측 가능한 시작 전 위반은 admission을 거부한다. 실행 중에는 작성한 resource별
+safe 동작을 적용하고 원인과 전이를 남긴다. admission, requested 후보,
+safe_output, Driver applied, feedback confirmed를 결정적인 순서로 구분하며 한 단계의
+증거를 다른 단계의 보장으로 바꾸지 않는다(§4.7).
+정상 evidence의 회복은 새 시작 권한이 아니다. 재시도·복구·수동 경로도 같은 필수 조건을 따른다.
 
-### 공통 함수
+`warn`과 `monitor`는 지원 문법이 아니다. Station adapter의 `allow`, `once`,
+`on_time`, `check`를 generic named resource-policy 안에 섞지 않는다.
+`ghostrules` 독립 표면은 programming-book WASM simulation, station-demo,
+고정 Station artifact의 `bindStationPolicy`라는 구체적인 현재 consumer에만 유지한다.
+[Station adapter 예제](../CONSTRAINTS.md)는 이 제한을 명시한다.
+독립 artifact는 범용 control 제약이나 임의 PID enforcement의 fallback이 아니다.
 
-| 함수 | 입력 | 결과와 규칙 |
-|---|---|---|
-| `count_on(xs)` | 유한 Bool output/resource 집합 | final candidate에서 true인 서로 다른 항목 수 `Int`. 같은 물리 항목을 중복 세지 않으며 빈 집합은 0이다. |
-| `any_on(xs)` | 명시된 유한 Bool 집합 | 하나 이상 true이면 Bool true. 빈 집합은 false다. |
-| `on_time(resource)` | 안정적인 물리 resource ID와 명시 accounting stage | 해당 resource의 합쳐진 ON Duration. 여러 control의 겹친 요청을 이중 계수하지 않는다. |
-| `stopped(station)` | station ID | 진행 session과 정리 절차가 끝나고 사용권이 반환됐으며 요구된 stop evidence를 충족했는지 나타낸다. 단순 pump=false가 아니다. |
-| `pump_capacity(pump)` | pump ID, 해당 profile의 optional capacity context | `Pass/Violation/Unknown(reason)`. 요청 전체를 같은 조건의 pump/system model과 비교한다. |
+### 공통 함수와 유한 자원
 
-`pump_capacity`의 flow와 pressure를 단순히 합하거나 서로 비교하지 않는다. 같은 검증
-조건의 `flow_budget`과 zone `demand_flow`처럼 단위가 맞는 모델만 사용한다. 정보가
-부족하면 Unknown이다. `check pump_capacity`는 운전을 차단하지 않는다. 작성자가
-`require pump_capacity(pump1) == Pass`를 명시한 경우에만 Violation과 Unknown이 새
-시작을 막는다.
+공유 `count_on({ items })`은 서로 다른 Bool resource의 true 수인 `Int`이고
+`any_on({ items })`은 하나 이상 true이면 Bool true다. 집합 literal은 compile-time
+유한 목록이다. `resource.on`은 Bool actuator resource 관계에 쓰며 typed endpoint를
+임의 source Bool 변수와 혼동하지 않는다. 빈 집합의 count는 0, any는 false이며
+빈 집합으로 운영 허용을 의도하면 별도 필수 조건으로 명시한다.
+physical binding 뒤 같은 endpoint alias는 중복 계수하지 않는다. binding 전후
+distinct identity가 달라지면 activation 진단에 두 목록을 제시한다.
 
-**왜:** 불변조건, 진입 허가, 사용량 한도와 비차단 분석은 위반 때 해야 할 일이 다르다.
-한 종류의 Bool 필터로 합치면 Unknown을 통과시키거나 분석 경고를 운전 정지로 바꾸게 된다.
+Station adapter의 `stopped(station)`는 단순 pump=false가 아니라 session·정리·사용권
+반환과 명시 stop evidence를 뜻한다. `pump_capacity`의 flow와 pressure를 임의 합산하지
+않고 같은 검증 조건의 unit-compatible 모델을 쓴다. 정보가 없으면 Unknown이며
+advisory `check`는 운전을 차단하지 않는다. 이 제한된 Station 의미를 범용 물리
+safe sequence나 output ABI 구현으로 일반화하지 않는다.
 
-집합 literal은 `{ item, ... }`이며 compile-time 유한 목록이다. physical binding 뒤 같은
-endpoint의 alias는 한 번만 센다. binding 전후 distinct identity가 달라지면 activation
-diagnostic에 두 목록을 모두 제시한다. 빈 집합 결과가 허가를 뜻해야 한다면 작성자가 별도
-`require`로 그 정책을 명시한다.
+**왜:** 지역 출력 불변조건, 공유 admission, 사용량 ledger와 비차단 분석을 같은
+실행 경로로 보이면 검증된 descriptor를 실제 안전 집행으로 오해하거나 수동 경로로
+규칙을 우회할 수 있다. scope·stage·안전 값과 실행 근거를 명시해야 같은 자원의
+모든 경로가 같은 허용 영역을 지킨다.
 
 ## 4.9 공유 자원과 arbitration
 

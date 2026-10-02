@@ -5,6 +5,19 @@ language documents include both implemented syntax and future design; acceptance
 is determined by the compiler and the host tests described in
 [VERIFICATION.md](VERIFICATION.md).
 
+The fixed Station WASM adapter exposes `enterBatch(requests)` for the existing
+Rust `Station::enter_batch` contract (Reference §4.10). Hosts dispatch an observed
+Stop first, then submit every same-tick mode entry in one batch. Conflicting
+entries reject atomically, including from Stopped; they are never queued for
+cleanup completion. Sequential `enter()` calls remain single requests and cannot
+represent a conflicting batch. The additive `gf_station_enter_batch` export takes
+at most 256 packed 32-byte records, each containing little-endian u64 request ID,
+revision, stop generation and mode (1 Auto, 2 Manual, 3 Configure). The adapter
+validates all records before calling the core. This changes neither GFB/GFS nor
+existing exports; batch callers require this new export. Native/WASM tests use
+the same checked canonical Station source and binding-generated configuration,
+with host applied-output and durable-ACK fixtures, without physical verification.
+
 ## Executable path
 
 `tools/browser-toolchain.mjs` exposes `compileSource(source, {filename,
@@ -55,12 +68,24 @@ does not assign startup defaults and does not promise that an intent reached
 hardware. Startup and failure-safe OFF behavior, output application timing, and
 driver disconnect handling are host/Driver policy and require separate evidence.
 
+Extended Solar/Tide natural policies select GFB13 and `GhostFlow/control-v12`; Solar facts use GFSF6. Legacy profiles and packet bytes remain unchanged. WASM function names do not change; pinned older runtimes reject GFB13. The signed portable-package config-only GFB11 profile is not broadened. Compiler/runtime regression coverage belongs to `natural-fallback-compiler.test.mjs`, `natural-fallback-runtime.test.mjs` and core `solar_tape` tests; documentation does not establish their execution result or physical Device behavior.
+
+The adopted calendar-boundary slice uses GFB18 and `GhostFlow/control-v18`:
+`calendar_is` lowers a typed Result query, and immutable UTC Daily work/off-day
+Range lowers calendar-filtered admission. Both execute in the shared Rust core
+from identified snapshots through unchanged GFSF5 facts. Matching explicit UTC
+bindings are required. Cross-midnight work ranges reject and must be split into
+separate declarations; ordinary UTC ranges keep their existing behavior. This
+does not implement non-UTC Range, shift ownership or deferred Window/Run bases.
+Native and framed WASM acceptance evidence belongs to
+`tests/reference-calendar-boundary.test.mjs`, not to documentation or a model.
+
 ## Artifacts and versions
 
 | Item | Current representation | Role |
 |---|---|---|
 | Authoritative program | `.ghost.md` | Literate source with intent, code, comments and explanation |
-| Generated executable | `.gfb`, `GFB1` magic with feature-selected `u16` format 1–9 or 11 | Binary IR consumed by the VM; see [BYTECODE.md](BYTECODE.md) |
+| Generated executable | `.gfb`, `GFB1` magic with feature-selected `u16` format 1–9, 11 or 12 | Binary IR consumed by the VM; see [BYTECODE.md](BYTECODE.md) |
 | Generated control manifest | Feature-selected `GhostFlow/control-v1`, `v2`, `v3`, `v4`, `v7`, `v8` or `v10` | Typed host ports, timer/sensor/schedule requirements and bytecode hash |
 | Generated constraint policy | `GhostFlow/constraints-v1` | Lowered standalone constraint source, bound by the host |
 | Generated source map | `.gfb.map.json` | Diagnostic nodes/line mapping; source-preserving envelope from compileSource as specified in SOURCE-MAP.md |

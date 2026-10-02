@@ -1,4 +1,4 @@
-//! Bounded GFSF v1 clock/provider-fact transport. No caller-computed due bit.
+//! Bounded GFSF clock/provider-fact transport. No caller-computed due bit.
 use ghostflow_core::{
     schedule_clock::{ClockSnapshot, ClockTrust},
     solar_admission::{SolarFact, SolarFactAvailability, SolarFacts},
@@ -163,7 +163,7 @@ fn decode(bytes: &[u8], version: u16) -> Result<Packet, String> {
         if site == 0 || packet.schedules.iter().any(|item| item.site == site) {
             return Err("invalid or duplicate solar site".into());
         }
-        let kind = if version >= 2 {
+        let kind = if matches!(version, 2 | 3) {
             match reader.u8()? {
                 0 => ScheduleKind::Solar,
                 1 => ScheduleKind::Daily,
@@ -190,7 +190,11 @@ fn decode(bytes: &[u8], version: u16) -> Result<Packet, String> {
             } else {
                 (0, 0)
             };
-            let fold = if version >= 2 { reader.u8()? } else { 0 };
+            let fold = if matches!(version, 2 | 3) {
+                reader.u8()?
+            } else {
+                0
+            };
             if fold > 2 {
                 return Err("invalid occurrence fold".into());
             }
@@ -204,12 +208,30 @@ fn decode(bytes: &[u8], version: u16) -> Result<Packet, String> {
             if provider_revision.is_empty() || context_revision.is_empty() {
                 return Err("empty solar revision".into());
             }
+            let (fallback_wall_ms, unavailable_reason) = if version == 6 {
+                let fallback = reader.optional()?;
+                let reason = match reader.u8()? {
+                    255 => None,
+                    value @ 0..=5 => Some(value),
+                    _ => return Err("invalid Solar unavailable reason".into()),
+                };
+                if available && (fallback.is_some() || reason.is_some())
+                    || fallback.is_some() && reason.is_none()
+                {
+                    return Err("invalid Solar fallback facts".into());
+                }
+                (fallback, reason)
+            } else {
+                (None, None)
+            };
             rows.push(SolarFact {
                 source_day: source_day as i32,
                 slot_key,
                 minute_of_day,
                 fold,
                 scheduled_wall_ms,
+                fallback_wall_ms,
+                unavailable_reason,
                 provider_revision,
                 context_revision,
                 availability: if available {
@@ -253,7 +275,18 @@ pub unsafe extern "C" fn gf_tick_solar(
     ptr: *const u8,
     len: usize,
 ) -> i32 {
-    tick_facts(handle, ptr, len, 1)
+    let Some(h) = handle.as_mut() else { return 0 };
+    if ptr.is_null() || !(6..=MAX_PACKET).contains(&len) {
+        h.error = "invalid solar packet pointer or length".into();
+        return 0;
+    }
+    let bytes = std::slice::from_raw_parts(ptr, len);
+    let version = u16::from_le_bytes([bytes[4], bytes[5]]);
+    if !matches!(version, 1 | 6) {
+        h.error = "invalid solar packet version".into();
+        return 0;
+    }
+    tick_facts(handle, ptr, len, version)
 }
 
 #[no_mangle]
@@ -328,7 +361,7 @@ unsafe fn tick_facts(handle: *mut super::Handle, ptr: *const u8, len: usize, ver
             ClockTrust::Unknown(&packet.reason)
         },
     };
-    let result = if version == 1 {
+    let result = if matches!(version, 1 | 6) {
         h.runtime.tick_with_solar(clock, &facts)
     } else {
         let inputs: Vec<_> = facts

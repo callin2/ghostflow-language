@@ -17,10 +17,16 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/ACCOUNTING-LEDGER-ABI.md](ACCOUNTING-LEDGER-ABI.md) | Accounting ledger primitive ABI | md |
 | [docs/AFTER-EVENT-WASM-ABI.ko.md](AFTER-EVENT-WASM-ABI.ko.md) | after_event 실행 ABI 식별 정보 | md |
 | [docs/AFTER-EVENT-WASM-ABI.md](AFTER-EVENT-WASM-ABI.md) | Identified after_event execution ABI | md |
+| [docs/AI-CONTRIBUTION-PACKAGE.ko.md](AI-CONTRIBUTION-PACKAGE.ko.md) | 범위를 제한한 AI 기여 작업 패키지 | md |
+| [docs/AI-CONTRIBUTION-PACKAGE.md](AI-CONTRIBUTION-PACKAGE.md) | Bounded AI contribution package | md |
 | [docs/BEHAVIOR-COMPOSITION-RESEARCH.ko.md](BEHAVIOR-COMPOSITION-RESEARCH.ko.md) | 동작 조합: 연구와 아키텍처 검토 | md |
 | [docs/BEHAVIOR-COMPOSITION-RESEARCH.md](BEHAVIOR-COMPOSITION-RESEARCH.md) | Behavior composition: research and architecture review | md |
 | [docs/BYTECODE.ko.md](BYTECODE.ko.md) | GFB 바이트코드 | md |
 | [docs/BYTECODE.md](BYTECODE.md) | GFB bytecode | md |
+| [docs/CALENDAR-PROVIDERS.ko.md](CALENDAR-PROVIDERS.ko.md) | 한국 공휴일과 현장 근무 달력 | md |
+| [docs/CALENDAR-PROVIDERS.md](CALENDAR-PROVIDERS.md) | Korean public holidays and farm work calendars | md |
+| [docs/CHECKED-CONSTRAINT-REPLACEMENTS.ko.md](CHECKED-CONSTRAINT-REPLACEMENTS.ko.md) | 검증된 제약 대체 | md |
+| [docs/CHECKED-CONSTRAINT-REPLACEMENTS.md](CHECKED-CONSTRAINT-REPLACEMENTS.md) | Checked constraint replacements | md |
 | [docs/COMPILER-DIAGNOSTICS.ko.md](COMPILER-DIAGNOSTICS.ko.md) | 공개 컴파일러 진단 | md |
 | [docs/COMPILER-DIAGNOSTICS.md](COMPILER-DIAGNOSTICS.md) | Public compiler diagnostics | md |
 | [docs/CONSTRAINTS.en.md](CONSTRAINTS.en.md) | GhostFlow common constraints and sensor signal contract | md |
@@ -38,16 +44,26 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/DOCUMENTATION-LANGUAGES.md](DOCUMENTATION-LANGUAGES.md) | Documentation languages | md |
 | [docs/DOCUMENTATION.ko.md](DOCUMENTATION.ko.md) | 문서 목록 | md |
 | [docs/DOCUMENTATION.md](DOCUMENTATION.md) | Documentation catalog | md |
+| [docs/DRIVER-ABI-V1-DRAFT.ko.md](DRIVER-ABI-V1-DRAFT.ko.md) | Host–Driver C ABI v1 초안 | md |
+| [docs/DRIVER-ABI-V1-DRAFT.md](DRIVER-ABI-V1-DRAFT.md) | Host–Driver C ABI v1 draft | md |
+| [docs/EFFECT-PROCESS-CONTRACT.ko.md](EFFECT-PROCESS-CONTRACT.ko.md) | Effect와 Process 계약 | md |
+| [docs/EFFECT-PROCESS-CONTRACT.md](EFFECT-PROCESS-CONTRACT.md) | Effect and Process contract | md |
+| [docs/ESTIMATE-EVIDENCE.ko.md](ESTIMATE-EVIDENCE.ko.md) | 유한한 추정 근거 admission | md |
+| [docs/ESTIMATE-EVIDENCE.md](ESTIMATE-EVIDENCE.md) | Bounded estimate evidence admission | md |
 | [docs/EXACT-INTEGER-CONTRACT.ko.md](EXACT-INTEGER-CONTRACT.ko.md) | 정확한 정수 계약 제안 | md |
 | [docs/EXACT-INTEGER-CONTRACT.md](EXACT-INTEGER-CONTRACT.md) | Exact integer contract proposal | md |
 | [docs/FRAMED-CONTROL-HOST.ko.md](FRAMED-CONTROL-HOST.ko.md) | Framed ControlRuntime 도입 (D6) | md |
 | [docs/FRAMED-CONTROL-HOST.md](FRAMED-CONTROL-HOST.md) | Framed ControlRuntime adoption (D6) | md |
 | [docs/GFB5-SCHEDULE-PRELUDE.ko.md](GFB5-SCHEDULE-PRELUDE.ko.md) | GFB5 일정 서두 | md |
 | [docs/GFB5-SCHEDULE-PRELUDE.md](GFB5-SCHEDULE-PRELUDE.md) | GFB5 schedule prelude | md |
+| [docs/HOST-EVENT-ORDERING-CONTRACT.ko.md](HOST-EVENT-ORDERING-CONTRACT.ko.md) | Host 이벤트 순서 계약 | md |
+| [docs/HOST-EVENT-ORDERING-CONTRACT.md](HOST-EVENT-ORDERING-CONTRACT.md) | Host event ordering contract | md |
 | [docs/IMPLEMENTATION.ko.md](IMPLEMENTATION.ko.md) | 구현 및 아티팩트 경계 | md |
 | [docs/IMPLEMENTATION.md](IMPLEMENTATION.md) | Implementation and artifact boundaries | md |
 | [docs/INTENT-ANCHOR-MAP.ko.md](INTENT-ANCHOR-MAP.ko.md) | Literate intent anchor map | md |
 | [docs/INTENT-ANCHOR-MAP.md](INTENT-ANCHOR-MAP.md) | Literate intent anchor map | md |
+| [docs/INTERACTION-STREAM-CONTRACT.ko.md](INTERACTION-STREAM-CONTRACT.ko.md) | Interaction 스트림 계약 설계 | md |
+| [docs/INTERACTION-STREAM-CONTRACT.md](INTERACTION-STREAM-CONTRACT.md) | Interaction stream contract design | md |
 | [docs/KEYBOARD-HOST.ko.md](KEYBOARD-HOST.ko.md) | 실시간 키보드 호스트 | md |
 | [docs/KEYBOARD-HOST.md](KEYBOARD-HOST.md) | Real-time keyboard host | md |
 | [docs/language_faq.en.md](language_faq.en.md) | GhostFlow Coding FAQ | md |
@@ -76,6 +92,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/LLM-TOOLCHAIN-ARCHITECTURE.md](LLM-TOOLCHAIN-ARCHITECTURE.md) | Authoring and virtual simulation architecture | md |
 | [docs/OPERATOR-SETTINGS-STREAM.ko.md](OPERATOR-SETTINGS-STREAM.ko.md) | Typed configuration stream | md |
 | [docs/OPERATOR-SETTINGS-STREAM.md](OPERATOR-SETTINGS-STREAM.md) | Typed configuration streams | md |
+| [docs/OPTIMIZER-PASS-CONTRACT.ko.md](OPTIMIZER-PASS-CONTRACT.ko.md) | 최적화 패스 계약 | md |
+| [docs/OPTIMIZER-PASS-CONTRACT.md](OPTIMIZER-PASS-CONTRACT.md) | Optimizer pass contract | md |
 | [docs/PORTABLE-PACKAGE.ko.md](PORTABLE-PACKAGE.ko.md) | 이식 가능한 GFB 패키지 v1 | md |
 | [docs/PORTABLE-PACKAGE.md](PORTABLE-PACKAGE.md) | Portable GFB package v1 | md |
 | [docs/ProgrammingInGhostflow.en.md](ProgrammingInGhostflow.en.md) | Programming in GhostFlow | md |
@@ -91,6 +109,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/SCENARIO-RUNNER.ko.md](SCENARIO-RUNNER.ko.md) | 가상 시나리오 러너 | md |
 | [docs/SCENARIO-RUNNER.md](SCENARIO-RUNNER.md) | Virtual scenario runner | md |
 | [docs/SEPARATION-VALIDATION.md](SEPARATION-VALIDATION.md) | Language project separation verification | md |
+| [docs/SOLAR-CONFIG-EXECUTION.ko.md](SOLAR-CONFIG-EXECUTION.ko.md) | 공유 live 설정을 사용하는 Solar 실행 | md |
+| [docs/SOLAR-CONFIG-EXECUTION.md](SOLAR-CONFIG-EXECUTION.md) | Solar execution with shared live configuration | md |
 | [docs/SOLAR-SCHEDULE.ko.md](SOLAR-SCHEDULE.ko.md) | Solar schedule: compiler와 simulation host | md |
 | [docs/SOLAR-SCHEDULE.md](SOLAR-SCHEDULE.md) | Solar schedules: compiler and simulation host | md |
 | [docs/SOURCE-MAP.ko.md](SOURCE-MAP.ko.md) | 소스를 보존하는 산출물 맵 — 첫 단계 | md |
@@ -194,4 +214,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.ko.md](research/GF-COMPOSE-R9-ACCEPTANCE.ko.md) | GF-COMPOSE R9: acceptance와 구현 인계 | md |
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.md](research/GF-COMPOSE-R9-ACCEPTANCE.md) | GF-COMPOSE R9: acceptance and implementation handoff | md |
 
-160 documents.
+180 documents.

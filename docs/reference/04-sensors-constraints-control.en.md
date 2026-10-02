@@ -160,7 +160,16 @@ signal stable_start = debounce(start, stable_for: 2s, initial: false);
 | `ema(alpha)` | Numeric Result, finite `0 < alpha <= 1` | Seed with the first valid sample and calculate `alpha*x + (1-alpha)*previous`. No normal result before recovery conditions are met. |
 | `stale_after(d)` | Timestamped Result, positive Duration | Stale when the last actual valid sample's age reaches d. Reevaluation or filter-output time does not extend it. |
 
-`filter` accepts one operation only. To compose multiple steps, declare each as a named `signal`. A Temperature filter internally computes an affine weighted mean in the canonical kelvin domain. This does not permit Temperature+Temperature or absolute-temperature scalar multiplication in source expressions. Do not uniformly apply the same filter delay to protective signals and gradual environmental sensors. Each operation must have a fixed state size and computation bound. Update only on new samples; composition preserves quality until `case` or `recover`.
+`filter` accepts one operation only. To compose multiple steps, declare each as a named `signal`.
+Declare the next EMA stage of a numeric Result as `signal smooth = ema(moisture, alpha: 0.25);`.
+An EMA result can feed another stage: `signal slower = ema(smooth, alpha: 0.25);`.
+Each EMA inherits a single physical source's epoch, sample ID and timestamp and updates only
+on a new healthy sample. It propagates input faults and clears its EMA memory, then seeds
+again from the first healthy sample satisfying the upstream filter readiness and
+`recover_after`. It creates neither another recovery counter nor a new freshness time.
+Values without sample lineage and expressions selecting multiple physical sources are
+not accepted as EMA-stage inputs.
+A Temperature filter internally computes an affine weighted mean in the canonical kelvin domain. This does not permit Temperature+Temperature or absolute-temperature scalar multiplication in source expressions. Do not uniformly apply the same filter delay to protective signals and gradual environmental sensors. Each operation must have a fixed state size and computation bound. Update only on new samples; composition preserves quality until `case` or `recover`.
 
 **Why:** Erasing sensor quality in a filter or reusing one sample once per tick lets smoothing hide faults and changes replay results. Named finite state makes delay and resource cost reviewable.
 
@@ -247,6 +256,86 @@ All windows use only past and present. Simulation does not look ahead at future 
 
 A missed scan creates no observation. The compiler must calculate maximum retained sample count from duration, max_age, sample contract and runtime profile; if it cannot, reject activation. Checkpoint restoration is allowed only after source/time continuity validation; otherwise the result is NotReady.
 
+### Estimated-value provenance and continuity
+
+An estimate is a value produced by an identified model; it is not a sensor
+observation or an applied/confirmed output fact. `Result<T, SensorFault>` expresses
+validity or fault for a declared sensor value. `ok(value)` means the source value
+met its declared validity contract; it does not make a calculation measured or
+physically confirmed. `Estimated` is a conceptual evidence origin. It adds no
+`Result` status, `Quality` variant, or executable syntax.
+
+Interpretation requires the model and calibration-parameter revisions, runtime
+reference identity and how/by whom it was established, source/program and
+installation-binding revisions, run and monotonic time epoch, the source or
+application receipt history used, and the declared basis. Retained references and
+history must fit a finite bound declared by the deployment profile. If that bound
+cannot be supported, reject the use; do not retain unbounded history on an MCU.
+
+The first actuator-progress basis is the Device's acknowledged output-register or
+write history. Its acknowledgement means only that the Driver accepted that
+register/write; it does not prove motor movement or position. Request time may be
+used as a basis only when explicitly declared as requested history. Never
+substitute it for applied history. This follows the requested/safe/applied/
+confirmed distinction in §4.7.
+
+An estimate interval starts from an admissible declared runtime reference and
+qualifying receipt/history. Re-reading or exposing a cached receipt in another
+scan creates neither a new write nor new evidence; it does not reset the
+origin/start, freshness, or uncertainty. An estimate may advance under normal
+monotonic-time evaluation only while verified continuity holds. The complete
+qualifying history is required. Do not interpolate across an unobserved gap, a
+failure, or an uncertain write. If a new write fails, an earlier cached ACK keeps
+its original identity as historical evidence and the current applied-target
+history is uncertain. Do not infer continuing application from that old ACK.
+
+A reboot or change to run/time epoch, source epoch, installation binding,
+model/calibration revision, or runtime reference breaks live-estimate continuity
+unless the owner explicitly validates and re-establishes it. Calibration
+parameters may remain after reboot; a runtime position reference or estimate
+must not be silently restored or set to zero. A missing or unverified basis makes
+the current estimate unavailable/NotReady. Preserve an explicit existing
+source/time fault as that fault; convert neither case to zero or automatic
+fallback. A timer-only policy remains valid when no estimate is available and
+does not need to consume one.
+
+Unknown uncertainty remains unknown. The model/source must declare either a known
+uncertainty bound or that uncertainty is unknown. This permits retaining or
+presenting an estimate with unknown uncertainty; it does not admit that estimate
+to bounded temporal operators. Define no universal formula, confidence, numeric
+uncertainty, duration, or expiry. Existing `quality: measured`, `hold_last`, and
+`true_for` measured admission remain unchanged. Any future estimate-admitting
+temporal consumer must explicitly admit the source/type and require its declared
+uncertainty bound; it cannot silently accept unknown uncertainty.
+
+Continuous example: with an explicit runtime reference, matching model,
+calibration and binding, the same run/time epoch, and a gap-free qualifying write
+history within the profile bound, the selected model may produce an estimate. It
+remains an estimate; a Driver ACK alone does not assert movement. Discontinuous
+example: for an applied-history basis, an unacknowledged request, failed or
+uncertain new write, reboot, or identity/revision change makes the live estimate
+unavailable until a reference is validated again. A separately declared
+requested-history basis may use a request as an assumption, but must not label it
+applied history. Keep calibration parameters and prior estimates as history with
+their own identities.
+
+The estimate semantics are tracked in GhostFlow [#383](https://github.com/callin2/ghostflow-language/issues/383);
+follow-on compatibility work is [#385](https://github.com/callin2/ghostflow-language/issues/385).
+Calibration/reference semantics are in [System #132](https://github.com/callin2/farm_studio_system/issues/132)
+and its [architecture contract](https://github.com/callin2/farm_studio_system/blob/241643c125439c1ec141c8596feec3f4ad143ade/docs/architecture/INPUT-DRIVER-ARCHITECTURE.md#calibration-parameters-and-position-reference--system-132).
+The concrete Device output-receipt boundary is in draft [PR #107](https://github.com/callin2/farm-device/pull/107),
+head `b85ef02fb546cd5f957c12ab66f091b90f9484f0`, at
+[host observation](https://github.com/callin2/farm-device/blob/b85ef02fb546cd5f957c12ab66f091b90f9484f0/rust/firmware/src/host_observation.rs).
+Current `sensorSample` lowering marks measured provenance with code `1`; runtime
+`Measured`/`Held`/`Constructed` classifications do not represent `Estimated`.
+This contract does not enable runtime consumption; that requires the separate
+compatibility work in #385.
+
+The [bounded estimate-basis admission API](../ESTIMATE-EVIDENCE.md) keeps validity,
+origin and declared complete history separate. Its admitted basis grants no
+measurement or temporal permission; source declaration and model selection remain
+separate compatibility decisions.
+
 ## 4.5 Optional sensors and capabilities
 
 ```ghost
@@ -332,51 +421,142 @@ The result is safe intent. It is neither evidence of actual GPIO/relay applicati
 
 ## 4.8 Common constraints notation and operations
 
-The following `constraints` block is selected design notation. Rules bind to stable equipment IDs and finite port/resource sets. The current resource-policy named parser accepts only `constraints Name for resource { exclusive at admission { ... }; require at safe_output ...; }`. This syntax does not lower to executable control without resource binding and runtime enforcement. The `ghostrules` standalone parser uses separate `constraints Name { ... }` syntax to validate `exclusive(...)`, `allow`, `limit`, `once` and `check`. Accounting constraints within a control use yet another form, `constraints Name { limit used(account, basis) <= bound { ... } }` (§3.10). Do not regard the three forms' results as the same execution contract.
+The canonical authored unit is a named `constraints` block inside a control.
+Local Bool output rules use `constraints Name { require [at safe_output] p; mutex(a, b); }`.
+An untargeted Bool `require` means `safe_output`; a local group applies only to its own control.
+This is a complete local control.
 
 ```ghost
-constraints StationRules for station {
-  exclusive at admission { automatic, manual, configuring };
-  allow enter(Auto, Manual, Configure)
-    only when mode == Stopped && stopped(station);
-  require at safe_output count_on({ valve1, valve2, valve3 }) <= 2;
-  require at safe_output pump1.on => any_on({ valve1, valve2, valve3 });
-  limit on_time(pump1) <= 1h per day("Asia/Seoul");
-  once starts per occurrence;
-  check pump_capacity(pump1);
-  warn low_margin when remaining_budget < 5min;
+control LocalPump {
+  input request, valve_ready: Bool;
+  output pump, valve: Bool;
+  pump <- request;
+  valve <- valve_ready;
+  constraints LocalRules {
+    require at safe_output pump => valve;
+  }
 }
 ```
 
+Shared rules apply to the stable resource scope stated by `constraints Name for resource`.
+All automatic, manual and fallback request paths using that resource follow the same rules.
+This complete source defines a checked shared-policy descriptor. Checking a descriptor does
+not replace executable binding and enforcement.
+
+```ghost
+control SharedPumpPolicy {
+  resource station: Station;
+  resource pump1: BoolActuator;
+  resource valve1: BoolActuator;
+  input automatic, manual, pump_request, valve_request: Bool;
+  output pump, valve: Bool;
+  pump <- pump_request;
+  valve <- valve_request;
+  constraints SharedRules for station {
+    exclusive at admission { automatic, manual };
+    require at safe_output pump1.on => any_on({ valve1 });
+    safe { pump1 = false; valve1 = true; }
+  }
+}
+```
+
+`safe` assigns authored safe values to the entire finite set of referenced Bool resources.
+Missing, duplicate or mistyped values and a safe vector violating mandatory relations are
+invalid definitions. This example chooses pump=false and valve=true; safety does not always
+mean all OFF. Connecting request outputs to resource endpoints requires a separate explicit
+binding contract. This introduces no new `station`, `use`, `bind` or session syntax.
+Do not label an unbound, unenforced shared descriptor as an executable control or enforced
+policy. Former top-level resource-policy files also remain checked non-control artifacts.
+
+Selecting shared execution pins the exact canonical source/descriptor, binding
+revision, stable resource IDs and typed mappings into one bound program identity.
+Activation and each evaluation must provide the same binding identity. Missing
+or mismatched binding rejects evaluation rather than partially executing it.
+Bound requests, admission and safe_output are checked within one Rust commit
+boundary, not by a host filter after output publication. Logical enforcement
+does not guarantee physical applied/confirmed evidence or Driver safe sequencing.
+
+Raw exclusive activity inputs are not admission results. Deny new claims that
+conflict with an admitted activity, preserving incumbent admission and previous
+safe outputs. A predicted prestart output-relation violation creates neither new
+admission nor protected output. A denied newcomer must be observed false before
+requesting admission with a fresh true claim. With no previously committed safe
+values, denial
+has an empty output set. A relation violation during admitted execution uses the
+authored safe vector; normal inputs alone do not clear the trip. An exclusive group
+requires an all-claims-false observation, then checks admission for a fresh claim.
+A require-only group establishes its recovery baseline when requested map equals
+authored safe map, then checks a fresh departure. Hidden retries,
+queues or priority escalation cannot bypass this recovery boundary.
+
+Mandatory conditions across groups combine as AND; reject overlapping groups
+with conflicting safety meaning. The bound Bool profile requires finite resource
+mappings for every output and a complete safe vector. The registry shared by an
+installation authority refuses a second active logical writer for the same stable
+ID. Registries of separate installations do not prove physical exclusion. Trips
+propagate across the transitively connected component of groups sharing protected
+resources; authored safe values must agree on shared resources. Unrelated groups
+retain their admission. Revalidate the final safe candidate against the AND of all
+mandatory shared and local conditions. This does not implement cooperative multi-VM
+arbitration, session leases or arbitrary PID policies. VM or binding errors roll
+back state, guard and trace together. Traces distinguish raw requests, admitted
+activity, requested/safe values, cause, group and binding identity.
+A successfully evaluated denial commits ordinary VM state; it does not cancel jobs/sessions.
+
+Executable groups support at most one exclusive activity set. Multiple exclusive statements remain checked source but require separate execution integration; reject them rather than flattening their distinct sets. The authored global safe vector must also satisfy mandatory local constraints.
+
+Accounting's `constraints Name { limit used(account, basis) <= bound { ... } }` has a separate
+usage scope (§3.10). Declared `resource` and `account`, semantic stage, basis and persistence
+define the ledger. Local Bool rules and shared admission do not replace it.
+
 ### Constraint statement semantics
 
-| Notation | Arguments | Application stage and meaning |
-|---|---|---|
-| `exclusive at admission { a, b, ... }` (resource-policy); `exclusive(a, b, ...)` (`ghostrules`) | At least two modes/activities in the same scope | Do not activate concurrently. Reject conflicting new entry and retain existing state. |
-| `allow enter(M...) only when p` (`ghostrules`) | Finite mode set and Bool premise | Check p on mode-entry request. Do not block stop requests themselves. Current parser p is exactly `mode == Stopped && stopped(station)`. |
-| `require p` | Bool invariant with a defined output/permission stage | Used for both prestart permission and runtime monitoring; Unknown is not pass. |
-| `limit q <= bound per basis` | Typed quantity, same-type bound, day/window basis | Check remaining budget and block further operation at the limit boundary. |
-| `once schedule per occurrence` | Schedule ID and occurrence identity | Prevent readmission of the same occurrence. A ledger separate from time budget. |
-| `check analysis(args)` | Analysis depending on optional information | Nonblocking analysis yielding `Pass/Violation/Unknown`. |
-| `warn id when p` (design) | Stable warning ID and Bool | Emit a diagnostic event with cause and target without changing results. Neither current parser accepts it. |
+| Notation | Application stage and meaning |
+|---|---|
+| Local `require [at safe_output] p` | Bool candidate-output invariant of its own control. Omitted target means safe_output. |
+| Local `mutex(a, b)` | When both requested Bool outputs of its own control are true, preserve that requested evidence and set both safe outputs false. |
+| Shared `exclusive at admission { a, b, ... }` | At least two finite Bool activities in one scope. Reject conflicting new admission. |
+| Shared `require at safe_output p` | Check finite resource-output relations. Safe values must also satisfy these mandatory relations. |
+| Shared `safe { resource = Bool; ... }` | Authored resource-specific safe vector for violations during execution. No universal all-OFF default. |
+| Accounting `limit used(...) <= bound` | Remaining budget and limit at the explicit stage/basis; details in §3.10. |
+| Station adapter `check pump_capacity(pump)` | Nonblocking `Pass/Violation/Unknown` advisory using optional information. Never promoted to mandatory require. |
 
-Current named-parser targets are `admission` for `exclusive` and `safe_output` for finite-set `require`. `monitor` is a selected design target unsupported by the current parser. Existing untargeted Bool `require` within a control means `safe_output`. Each rule has an application stage. Do not treat output relations as mode-entry rules or implicitly promote nonblocking checks to safety requires. All mandatory constraints must hold together as AND. Arbitration is a separate policy choosing which requests to accept within the permitted region. Priority scores do not relax mandatory constraints.
+All mandatory conditions combine as AND. Constraints form the permitted region for intents,
+including goals/PID. Priority is an arbitration policy choosing requests within that region;
+it does not relax mandatory conditions or bypass resource binding, provenance or recovery.
+Predictable prestart violations deny admission. During execution, apply authored resource-
+specific safe behavior and retain the cause and transition. Distinguish admission, requested
+candidate, safe_output, Driver applied and feedback confirmed in deterministic order; evidence
+at one stage does not guarantee another (§4.7). Recovery of normal evidence creates no new
+start authority. Retries, recovery and manual paths follow the same mandatory conditions.
 
-### Common functions
+`warn` and `monitor` are unsupported syntax. Do not mix the Station adapter's `allow`, `once`,
+`on_time` or `check` into generic named resource policies. The standalone `ghostrules` surface
+is retained only for concrete current consumers: programming-book WASM simulation, station-demo
+and `bindStationPolicy` of the fixed Station artifact. The
+[Station adapter examples](../CONSTRAINTS.en.md) state this boundary. A standalone artifact is
+not a fallback for generic control constraints or arbitrary PID enforcement.
 
-| Function | Input | Result and rules |
-|---|---|---|
-| `count_on(xs)` | Finite Bool output/resource set | `Int` count of distinct true items in the final candidate. Do not double-count the same physical item; an empty set gives zero. |
-| `any_on(xs)` | Explicit finite Bool set | Bool true if at least one is true. An empty set gives false. |
-| `on_time(resource)` | Stable physical resource ID and explicit accounting stage | Merged ON Duration of that resource. Do not double-count overlapping requests from multiple controls. |
-| `stopped(station)` | Station ID | Whether active sessions and cleanup are finished, usage rights returned and required stop evidence met. Not merely pump=false. |
-| `pump_capacity(pump)` | Pump ID, optional capacity context in its profile | `Pass/Violation/Unknown(reason)`. Compare all requests against a pump/system model under the same conditions. |
+### Common functions and finite resources
 
-Do not simply add or compare flow and pressure in `pump_capacity`. Use only unit-compatible models, such as `flow_budget` and zone `demand_flow` under the same validated conditions. Insufficient information means Unknown. `check pump_capacity` does not block operation. Violation and Unknown block new starts only if the author explicitly specifies `require pump_capacity(pump1) == Pass`.
+Shared `count_on({ items })` returns the `Int` count of distinct true Bool resources;
+`any_on({ items })` is Bool true when at least one is true. Set literals are finite compile-time
+lists. `resource.on` expresses a Bool actuator resource relation; do not confuse a typed
+endpoint with an arbitrary source Bool variable. Empty count is zero and empty any is false.
+An author intending an empty set to allow operation states that policy through a separate
+mandatory condition. After physical binding, aliases of one endpoint count once. If distinct
+identity changes before/after binding, activation diagnostics show both lists.
 
-**Why:** Invariants, entry permission, usage limits and nonblocking analysis need different actions on violation. Combining them into one Bool filter can pass Unknown or turn an analysis warning into an operation stop.
+The Station adapter's `stopped(station)` means session and cleanup completion, returned usage
+rights and explicit stop evidence, not merely pump=false. Do not arbitrarily add flow and
+pressure in `pump_capacity`; use unit-compatible models under the same validated conditions.
+Missing information gives Unknown; advisory `check` does not block operation. Do not generalize
+this bounded Station meaning into implemented generic physical safe sequences or output ABIs.
 
-Set literals are `{ item, ... }`, finite compile-time lists. After physical binding, aliases of one endpoint count once. If distinct identities change before/after binding, activation diagnostics show both lists. If an empty-set result should mean permission, the author specifies that policy with a separate `require`.
+**Why:** treating local output invariants, shared admission, usage ledgers and nonblocking
+analysis as one execution path can mistake a checked descriptor for actual safety enforcement
+or allow manual paths to bypass rules. Explicit scope, stage, safe values and execution
+evidence keep every path using one resource inside the same permitted region.
 
 ## 4.9 Shared resources and arbitration
 

@@ -3,6 +3,11 @@
 Ground truth: Reference §3.4–3.8 and the existing GFB5 Solar pulse contract.
 This is an implementation record; it does not change the language contract.
 
+The durable framed API is the bounded prerequisite [#400](https://github.com/callin2/ghostflow-language/issues/400)
+for Farm Device [#102](https://github.com/callin2/farm-device/issues/102).
+It reuses the original `4815b54` owner implementation on the current development
+base. Device pin migration and hardware acceptance remain separate gates.
+
 ## Implemented
 
 `Runtime::activate_with_solar` accepts a schedule-only GFB5 module and an
@@ -20,6 +25,35 @@ together. Any failure discards staged schedule changes. Rejected ticks remain
 retryable. `TickRecord.schedule_trace` and its JSON encoding retain decisions
 and per-occurrence provider/context revision evidence.
 
+The public Rust API also exposes `ScanDriver::scan_with_solar(frame, clock,
+&[SolarInput]) -> ScanOutcome`. `Runtime::solar_checkpoint()` returns an opaque
+`GFSO` v1 snapshot as `Result<Vec<u8>>`; `Runtime::restore_solar_checkpoint(&[u8])`
+and `ScanDriver::restore_solar_checkpoint(&[u8])` restore it only before the
+first scan. The snapshot carries the exact existing program fingerprint and
+ordered Solar sites, a CRC32 accidental-corruption check (not authentication),
+and terminal source-day identities only. Restore preserves the newly activated
+runtime's fresh boot epoch and clock baseline. The checkpoint does not include
+scalar state or support run replay. No civil checkpoint format is added. Each
+schedule remains bounded at 1–4096 terminal identities.
+
+The host supplies complete provider facts. The VM owns admission and atomic
+state commit. The host must persist a successful checkpoint before publishing
+or applying ON. A save failure must halt and clear outputs; it does not establish
+that hardware acted.
+
+For explicit pause, `Runtime::observe_solar_paused(clock, facts)` and its
+ScanDriver wrapper advance only pure-Solar clocks and terminal identities
+([#402](https://github.com/callin2/ghostflow-language/issues/402)). No authored
+predicate/scalar evaluation, scalar input consumption, intent, tick journal or
+scan identity changes. Suppression is not an authored `ConditionsFalseAtPulse`
+trace. Rejected observations commit nothing. Persist changed terminal identities
+while OFF; save failure must halt, never acknowledge durability or permit resume.
+
+Solar uses the nondecreasing program-logical clock required by `scan_with_solar`,
+which may freeze during pause. Actual wall time and trust remain unchanged inputs.
+Wall gaps, rollback and recovery keep shared-core rules; consumed occurrences do
+not catch up on resume. This is not measured movement or application duration.
+
 A caller selects 1–4096 terminal identities per schedule. The batch is bounded
 by that capacity. Revision text is limited to 128 UTF-8 bytes per field before
 staging/retaining evidence. Exhaustion rejects the tick rather than evicting
@@ -27,6 +61,10 @@ identity history. These are explicit storage bounds, not a certified byte budget
 or ESP32 deployment result.
 
 ## Evidence
+
+The original focused evidence at `4815b54` was `cargo check -p ghostflow-core
+--tests`: pass; `schedule_module`: 30 pass; `scan::tests`: 6 pass. These are
+historical counts, not acceptance of the current consumer or firmware.
 
 `cargo test -p ghostflow-core --test schedule_module`: 21 tests pass, including
 9 execution tests covering:
@@ -77,7 +115,11 @@ clock/site binding. Failed execution leaves admission and scalar state retryable
 duplicate suppression, provider trace evidence, unknown-clock recovery and all
 packet truncations. Together with GFB5 encoding tests, 12 tests pass.
 
-## Still required
+## Historical remaining integration work
+
+The following records the initial native slice before public GFB5 compiler
+integration. #400 adds the durable Rust owner boundary; it does not establish
+current Device integration, deployment budgets or hardware acceptance.
 
 No Reference acceptance ID is newly green from this native slice. Public Solar
 compilation still rejects the canonical policy until the compiler emits its
@@ -86,8 +128,8 @@ descriptor-bound provider facts through the new WASM API. ControlRuntime current
 expects `dueInput` on Solar descriptors; it does not yet bind this GFB5 path.
 Existing host `due` inputs are not evidence of the native admission contract.
 
-Mixed window/true_for preludes, durable checkpoint/restore/replay, calibrated
-byte budgets, a descriptor-verified natural-event provider integration, and the
-civil/Tide occurrence formats remain incomplete. Native plain activation,
+Mixed window/true_for preludes, calibrated byte budgets, a descriptor-verified
+natural-event provider integration, and the civil/Tide occurrence formats remain
+incomplete. Native plain activation,
 unsupported mixed activation and rewind stay fail-closed. None of those missing
 contracts is replaced by a host-computed pulse or a weakened Reference fixture.

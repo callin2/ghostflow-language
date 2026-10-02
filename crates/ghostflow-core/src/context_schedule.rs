@@ -5,6 +5,7 @@ use crate::context_vm::{
     Decision, Observation, ScheduleDefinition, ScheduleDescriptor, ScheduleEvidence, SettingValue,
 };
 use crate::cron_schedule::{CivilSlot, CronFields, RepeatedPolicy};
+use crate::range_schedule::{RangeDecision, RangeEngine, RangeFact};
 use crate::schedule_clock::{ClockDisposition, ClockSnapshot, ClockTrust, ScheduleClockGate};
 use crate::work_calendar::{self, DayQuery, DaySelector};
 use crate::{Error, Result};
@@ -12,6 +13,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Clone)]
 pub struct Engine {
+    solar: Option<crate::solar_admission::SolarPulseEngine>,
+    solar_settings_baseline: bool,
     clock: ScheduleClockGate,
     terminal: BTreeSet<String>,
     capacity: usize,
@@ -23,6 +26,9 @@ pub struct Engine {
     active_run: Option<ActiveRun>,
     last_plan: BTreeMap<String, u64>,
     pending_grace: BTreeMap<String, (u64, String, String)>,
+    range: Option<RangeEngine>,
+    range_clock_revision: Option<String>,
+    range_calendar_revision: Option<String>,
 }
 
 #[derive(Clone)]
@@ -103,6 +109,24 @@ impl Engine {
     }
 
     pub fn snapshot(&self) -> Result<Vec<u8>> {
+        if let Some(solar) = &self.solar {
+            let mut bytes = b"GFES\x03".to_vec();
+            write_len(&mut bytes, solar.terminal_identities().len())?;
+            for (day, _, _) in solar.terminal_identities() {
+                bytes.extend_from_slice(&day.to_le_bytes());
+            }
+            return Ok(bytes);
+        }
+        if let Some(range) = &self.range {
+            // Only consumed identities are durable. Active monotonic references
+            // cannot be transferred to a new boot and are never resumed.
+            let mut bytes = b"GFES\x02GFRG\x01".to_vec();
+            write_len(&mut bytes, range.terminal_keys().len())?;
+            for key in range.terminal_keys() {
+                write_string(&mut bytes, key)?;
+            }
+            return Ok(bytes);
+        }
         let mut bytes = Vec::new();
         bytes.extend_from_slice(b"GFES");
         bytes.push(1);
@@ -145,6 +169,73 @@ impl Engine {
             return Err(invalid("context checkpoint exceeds bound"));
         }
         let mut reader = SnapshotReader { bytes, at: 0 };
+        if matches!(desc.definition, ScheduleDefinition::SolarContext { .. }) {
+            if reader.take(5)? != b"GFES\x03" {
+                return Err(invalid("invalid Solar context checkpoint version"));
+            }
+            let mut restored = Self::new(desc, boot_epoch, capacity)?;
+            let count = usize::from(reader.u16()?);
+            if count > capacity {
+                return Err(invalid("Solar context checkpoint capacity exceeded"));
+            }
+            let mut identities = Vec::with_capacity(count);
+            for _ in 0..count {
+                identities.push((
+                    u32::from_le_bytes(reader.take(4)?.try_into().unwrap()) as i32,
+                    0,
+                    0,
+                ));
+            }
+            if reader.at != bytes.len() {
+                return Err(invalid("trailing Solar context checkpoint bytes"));
+            }
+            restored
+                .solar
+                .as_mut()
+                .unwrap()
+                .restore_solar_identities(identities)?;
+            return Ok(restored);
+        }
+        if let ScheduleDefinition::UtcRange { starts_ms, .. }
+        | ScheduleDefinition::CalendarRange { starts_ms, .. } = &desc.definition
+        {
+            if reader.take(5)? != b"GFES\x02" || reader.take(5)? != b"GFRG\x01" {
+                return Err(invalid("invalid Range checkpoint version"));
+            }
+            let mut restored = Self::new(desc, boot_epoch, capacity)?;
+            let count = usize::from(reader.u16()?);
+            if count > capacity {
+                return Err(invalid("Range checkpoint terminal capacity"));
+            }
+            let mut keys = Vec::with_capacity(count);
+            for _ in 0..count {
+                let key = reader.string()?;
+                let parts: Vec<_> = key.split(':').collect();
+                if parts.len() != 3 {
+                    return Err(invalid("invalid Range checkpoint occurrence identity"));
+                }
+                let site = parts[0].parse::<u32>().ok();
+                let day = parts[1].parse::<u64>().ok();
+                let slot = parts[2].parse::<usize>().ok();
+                if site != Some(desc.site)
+                    || day.is_none_or(|day| day > 2_932_896)
+                    || slot.is_none_or(|slot| !(1..=starts_ms.len()).contains(&slot))
+                    || key != format!("{}:{}:{}", desc.site, day.unwrap(), slot.unwrap())
+                {
+                    return Err(invalid("invalid Range checkpoint occurrence identity"));
+                }
+                keys.push(key);
+            }
+            if reader.at != bytes.len() {
+                return Err(invalid("trailing Range checkpoint bytes"));
+            }
+            restored
+                .range
+                .as_mut()
+                .unwrap()
+                .restore_terminal_keys(keys)?;
+            return Ok(restored);
+        }
         if reader.take(4)? != b"GFES" || reader.u8()? != 1 {
             return Err(invalid("invalid context checkpoint version"));
         }
@@ -225,6 +316,19 @@ impl Engine {
             return Err(invalid("trailing context checkpoint bytes"));
         }
         match &desc.definition {
+            ScheduleDefinition::AtPulse { .. } => {
+                let identity = format!("{}:at", desc.site);
+                if restored.terminal.iter().any(|id| id != &identity)
+                    || restored.interval_ms.is_some()
+                    || !restored.slots.is_empty()
+                    || !restored.added_at_wall.is_empty()
+                    || !restored.last_plan.is_empty()
+                    || restored.phase_revision != 0
+                    || restored.next_slot_key != 1
+                {
+                    return Err(invalid("At checkpoint identity mismatch"));
+                }
+            }
             ScheduleDefinition::Periodic { every, .. } => {
                 let value = restored
                     .interval_ms
@@ -279,6 +383,33 @@ impl Engine {
             return Err(invalid("invalid context terminal capacity"));
         }
         let (interval_ms, slots, next_slot_key) = match &desc.definition {
+            ScheduleDefinition::UtcRange {
+                starts_ms,
+                duration_ms,
+            } => {
+                crate::context_vm::validate_utc_range(starts_ms, *duration_ms)?;
+                (None, Vec::new(), 1)
+            }
+            ScheduleDefinition::CalendarRange {
+                timezone,
+                starts_ms,
+                duration_ms,
+                calendar,
+                ..
+            } => {
+                crate::context_vm::validate_utc_range(starts_ms, *duration_ms)?;
+                if timezone != "UTC"
+                    || calendar.is_empty()
+                    || calendar.len() > 128
+                    || starts_ms.len() != 1
+                    || starts_ms[0] + duration_ms > 86_400_000
+                {
+                    return Err(invalid(
+                        "calendar Range crosses midnight or has invalid binding",
+                    ));
+                }
+                (None, Vec::new(), 1)
+            }
             ScheduleDefinition::Periodic { every, .. } => {
                 if every.initial_ms == 0
                     || every.initial_ms < every.min_ms
@@ -320,6 +451,24 @@ impl Engine {
             _ => (None, Vec::new(), 1),
         };
         Ok(Self {
+            solar: match &desc.definition {
+                ScheduleDefinition::SolarContext {
+                    timezone,
+                    fallback_time_ms,
+                    ..
+                } => Some(
+                    crate::solar_admission::SolarPulseEngine::new(
+                        desc.site,
+                        desc.gap_ms,
+                        boot_epoch,
+                        capacity,
+                    )?
+                    .with_policy(desc.clock_hold_ms, *fallback_time_ms)?
+                    .with_fallback_timezone(timezone),
+                ),
+                _ => None,
+            },
+            solar_settings_baseline: false,
             clock: ScheduleClockGate::new(desc.gap_ms, boot_epoch)?,
             terminal: BTreeSet::new(),
             capacity,
@@ -331,6 +480,16 @@ impl Engine {
             active_run: None,
             last_plan: BTreeMap::new(),
             pending_grace: BTreeMap::new(),
+            range: if matches!(
+                desc.definition,
+                ScheduleDefinition::UtcRange { .. } | ScheduleDefinition::CalendarRange { .. }
+            ) {
+                Some(RangeEngine::new(desc.gap_ms, boot_epoch, capacity)?)
+            } else {
+                None
+            },
+            range_clock_revision: None,
+            range_calendar_revision: None,
         })
     }
 
@@ -351,6 +510,90 @@ impl Engine {
             return Err(invalid("invalid context schedule evidence"));
         }
         Self::validate_rows(desc, facts)?;
+        if let ScheduleDefinition::CalendarRange {
+            starts_ms,
+            duration_ms,
+            calendar,
+            timezone,
+            offday,
+        } = &desc.definition
+        {
+            if change.is_some() {
+                return Err(invalid(
+                    "immutable calendar Range cannot accept settings changes",
+                ));
+            }
+            let mut eligibility = None;
+            if let (ClockTrust::Trusted, Some(wall)) = (clock.trust, clock.wall_ms) {
+                if wall > 253_402_300_799_999 {
+                    return Err(invalid("calendar Range wall time is out of range"));
+                }
+                eligibility = Some(
+                    work_calendar::evaluate(
+                        DayQuery {
+                            calendar_id: calendar,
+                            timezone,
+                            date: (wall / 86_400_000) as i32,
+                            selector: if *offday {
+                                DaySelector::Offday
+                            } else {
+                                DaySelector::Workday
+                            },
+                            now_ms: wall,
+                        },
+                        facts.calendar.as_ref(),
+                    )
+                    .map_err(|_| invalid("invalid calendar Range snapshot"))?
+                    .value,
+                );
+            }
+            let allowed = eligibility == Some(Ok(true));
+            let (mut staged, mut decision) = self.utc_range(
+                desc.site,
+                starts_ms,
+                *duration_ms,
+                clock,
+                when && allowed,
+                cancel,
+            )?;
+            if decision.due {
+                staged.range_calendar_revision =
+                    facts.calendar.as_ref().map(|c| c.revision.clone());
+            }
+            for observation in &mut decision.observations {
+                observation.provider_revision = if decision.active
+                    || observation.decision == "Completed"
+                    || observation.decision == "Cancelled"
+                {
+                    staged.range_calendar_revision.clone().unwrap_or_default()
+                } else {
+                    facts
+                        .calendar
+                        .as_ref()
+                        .map_or(String::new(), |c| c.revision.clone())
+                };
+                if observation.decision == "Waiting" && !allowed {
+                    observation.decision = match eligibility {
+                        Some(Ok(false)) => "ExcludedDay".into(),
+                        Some(Err(fault)) => format!("Unknown({fault:?})"),
+                        _ => "Unknown(ClockUnknown)".into(),
+                    };
+                }
+            }
+            return Ok((staged, decision));
+        }
+        if let ScheduleDefinition::UtcRange {
+            starts_ms,
+            duration_ms,
+        } = &desc.definition
+        {
+            if change.is_some() {
+                return Err(invalid(
+                    "immutable UTC Range cannot accept settings changes",
+                ));
+            }
+            return self.utc_range(desc.site, starts_ms, *duration_ms, clock, when, cancel);
+        }
         let mut staged = self.clone();
         staged.apply_setting(
             desc,
@@ -362,9 +605,19 @@ impl Engine {
                 None
             },
         )?;
-        let observed = staged.clock.poll(clock)?;
+        let policy = staged.clock.poll_with_hold(clock, desc.clock_hold_ms)?;
+        let observed = policy.observation;
         let mut decision = Decision::default();
         match &desc.definition {
+            ScheduleDefinition::SolarContext { .. } => {
+                return Err(invalid("Solar requires complete Solar facts"))
+            }
+            ScheduleDefinition::AtPulse { at_ms } => {
+                staged.at_pulse(desc.site, *at_ms, &observed, when, &mut decision)?
+            }
+            ScheduleDefinition::UtcRange { .. } | ScheduleDefinition::CalendarRange { .. } => {
+                unreachable!("Range staged before pulse clock")
+            }
             ScheduleDefinition::Periodic {
                 epoch_id,
                 anchor_ms,
@@ -405,7 +658,13 @@ impl Engine {
             ScheduleDefinition::CalendarDaily {
                 calendar,
                 timezone,
-                offday,
+                at_ms,
+                dst_repeated,
+                ..
+            }
+            | ScheduleDefinition::HolidayDaily {
+                calendar,
+                timezone,
                 at_ms,
                 dst_repeated,
                 ..
@@ -421,10 +680,12 @@ impl Engine {
                         calendar_id: calendar,
                         timezone,
                         date: row.source_day,
-                        selector: if *offday {
-                            DaySelector::Offday
-                        } else {
-                            DaySelector::Workday
+                        selector: match desc.definition {
+                            ScheduleDefinition::HolidayDaily { .. } => DaySelector::Holiday,
+                            ScheduleDefinition::CalendarDaily { offday: true, .. } => {
+                                DaySelector::Offday
+                            }
+                            _ => DaySelector::Workday,
                         },
                         now_ms: observed.current_effective_wall_ms.unwrap_or(0),
                     };
@@ -495,12 +756,61 @@ impl Engine {
                 )?;
             }
         }
+        if matches!(desc.definition, ScheduleDefinition::TideRun { .. }) {
+            let held = match &policy.provenance {
+                crate::schedule_clock::ClockProvenance::HeldClock { source_revision } => {
+                    Some(source_revision.clone())
+                }
+                _ => None,
+            };
+            if held.is_some() || observed.current_effective_wall_ms.is_none() {
+                let mut evidence = Observation {
+                    solar_fallback: None,
+                    solar_unavailable_reason: None,
+                    clock_provenance: None,
+                    clock_source_revision: None,
+                    clock_uncertainty_ms: observed.uncertainty_ms,
+                    unknown_reason: observed.unknown_reason.map(str::to_owned),
+                    site: desc.site,
+                    occurrence_id: String::new(),
+                    planned_ms: observed.current_effective_wall_ms,
+                    decision: if held.is_some() {
+                        "HeldClock"
+                    } else {
+                        "Unknown(ClockUnknown)"
+                    }
+                    .into(),
+                    provider_revision: String::new(),
+                    context_revision: String::new(),
+                };
+                if let Some(revision) = held {
+                    evidence.clock_provenance = Some("HeldClock".into());
+                    evidence.clock_source_revision = revision;
+                }
+                decision.observations.push(evidence);
+            }
+        }
         Ok((staged, decision))
     }
 
     fn validate_rows(desc: &ScheduleDescriptor, facts: &ScheduleEvidence) -> Result<()> {
+        if matches!(desc.definition, ScheduleDefinition::CalendarRange { .. })
+            && (facts.provider.is_some() || !facts.rows.is_empty())
+        {
+            return Err(invalid("unexpected calendar Range occurrence payload"));
+        }
+        if matches!(
+            desc.definition,
+            ScheduleDefinition::UtcRange { .. } | ScheduleDefinition::AtPulse { .. }
+        ) && (facts.provider.is_some() || facts.calendar.is_some() || !facts.rows.is_empty())
+        {
+            return Err(invalid("unexpected UTC Range evidence payload"));
+        }
         let tide = matches!(desc.definition, ScheduleDefinition::TideRun { .. });
-        if matches!(desc.definition, ScheduleDefinition::Periodic { .. }) && !facts.rows.is_empty()
+        if matches!(
+            desc.definition,
+            ScheduleDefinition::Periodic { .. } | ScheduleDefinition::UtcRange { .. }
+        ) && !facts.rows.is_empty()
         {
             return Err(invalid("Periodic evidence cannot contain occurrence rows"));
         }
@@ -549,6 +859,203 @@ impl Engine {
         Ok(())
     }
 
+    fn utc_range(
+        &self,
+        site: u32,
+        starts: &[u64],
+        duration: u64,
+        clock: ClockSnapshot<'_>,
+        when: bool,
+        cancel: bool,
+    ) -> Result<(Self, Decision)> {
+        const DAY: u64 = 86_400_000;
+        const MAX_WALL: u64 = 253_402_300_799_999;
+        let mut plans = Vec::new();
+        if let (ClockTrust::Trusted, Some(wall)) = (clock.trust, clock.wall_ms) {
+            if wall > MAX_WALL {
+                return Err(invalid("UTC Range wall time is out of range"));
+            }
+            let current_day = wall / DAY;
+            for day in current_day.saturating_sub(1)..=current_day {
+                for (slot, start) in starts.iter().enumerate() {
+                    let planned = day * DAY + start;
+                    let _end = planned
+                        .checked_add(duration)
+                        .filter(|end| *end <= MAX_WALL)
+                        .ok_or_else(|| invalid("UTC Range planned end is out of range"))?;
+                    // Only intervals crossing midnight need a preceding-day
+                    // plan. Keep them after their end too, so the exact end
+                    // consumes the identity before a wall correction backward.
+                    if day < current_day && start + duration <= DAY {
+                        continue;
+                    }
+                    plans.push(RangeFact {
+                        occurrence_key: format!("{site}:{day}:{}", slot + 1),
+                        planned_wall_ms: planned,
+                        duration_ms: duration,
+                    });
+                }
+            }
+        }
+        let original = self
+            .range
+            .as_ref()
+            .ok_or_else(|| invalid("missing Range engine"))?;
+        let stage = original.begin(clock, &plans, when, cancel)?;
+        let result = stage.result.clone();
+        let disposition = stage.clock_disposition;
+        let previous_active = original.active_fact().cloned();
+        let previous_keys = original.terminal_keys();
+        let mut staged = self.clone();
+        let range = staged.range.as_mut().unwrap();
+        range.commit(stage);
+        if result.due {
+            staged.range_clock_revision =
+                Some(clock.source_revision.unwrap_or("clock-unversioned").into());
+        }
+        let revision = staged
+            .range_clock_revision
+            .as_deref()
+            .unwrap_or(clock.source_revision.unwrap_or("clock-unversioned"));
+        let mut out = Decision {
+            due: result.due,
+            active: result.active,
+            ..Decision::default()
+        };
+        for key in range
+            .terminal_keys()
+            .iter()
+            .filter(|key| !previous_keys.contains(key))
+        {
+            let fact = plans
+                .iter()
+                .find(|fact| &fact.occurrence_key == key)
+                .ok_or_else(|| invalid("missing terminal Range plan"))?;
+            let decision = if result.occurrence_key.as_ref() == Some(key) && result.due {
+                "Due"
+            } else if clock
+                .wall_ms
+                .is_some_and(|wall| wall >= fact.planned_wall_ms + duration)
+            {
+                "LateStartExpired"
+            } else {
+                "Cancelled"
+            };
+            out.observations.push(Observation {
+                solar_fallback: None,
+                solar_unavailable_reason: None,
+                clock_provenance: None,
+                clock_source_revision: None,
+                clock_uncertainty_ms: None,
+                unknown_reason: None,
+                site,
+                occurrence_id: key.clone(),
+                planned_ms: Some(fact.planned_wall_ms),
+                decision: decision.into(),
+                provider_revision: "utc-static-v1".into(),
+                context_revision: if decision == "Due" {
+                    revision
+                } else {
+                    clock.source_revision.unwrap_or("clock-unversioned")
+                }
+                .into(),
+            });
+        }
+        if let Some(key) = &result.occurrence_key {
+            if !out.observations.iter().any(|o| &o.occurrence_id == key) {
+                let fact = range
+                    .active_fact()
+                    .or(previous_active.as_ref())
+                    .ok_or_else(|| invalid("missing active Range plan"))?;
+                out.observations.push(Observation {
+                    solar_fallback: None,
+                    solar_unavailable_reason: None,
+                    clock_provenance: None,
+                    clock_source_revision: None,
+                    clock_uncertainty_ms: None,
+                    unknown_reason: None,
+                    site,
+                    occurrence_id: key.clone(),
+                    planned_ms: Some(fact.planned_wall_ms),
+                    decision: format!("{:?}", result.decision),
+                    provider_revision: "utc-static-v1".into(),
+                    context_revision: revision.into(),
+                });
+            }
+        }
+        if disposition == ClockDisposition::ObservationGap {
+            let fact = result
+                .occurrence_key
+                .as_ref()
+                .and_then(|key| {
+                    plans
+                        .iter()
+                        .find(|fact| &fact.occurrence_key == key)
+                        .or(range.active_fact())
+                        .or(previous_active.as_ref())
+                })
+                .or_else(|| {
+                    clock.wall_ms.and_then(|wall| {
+                        plans.iter().find(|fact| {
+                            wall >= fact.planned_wall_ms && wall < fact.planned_wall_ms + duration
+                        })
+                    })
+                });
+            out.observations.push(Observation {
+                solar_fallback: None,
+                solar_unavailable_reason: None,
+                clock_provenance: None,
+                clock_source_revision: None,
+                clock_uncertainty_ms: None,
+                unknown_reason: None,
+                site,
+                occurrence_id: fact.map_or_else(String::new, |fact| fact.occurrence_key.clone()),
+                planned_ms: fact.map(|fact| fact.planned_wall_ms),
+                decision: "ObservationGap".into(),
+                provider_revision: "utc-static-v1".into(),
+                context_revision: clock.source_revision.unwrap_or("clock-unversioned").into(),
+            });
+        } else if result.decision == RangeDecision::ClockUnknown && out.observations.is_empty() {
+            out.observations.push(Observation {
+                solar_fallback: None,
+                solar_unavailable_reason: None,
+                clock_provenance: None,
+                clock_source_revision: None,
+                clock_uncertainty_ms: None,
+                unknown_reason: None,
+                site,
+                occurrence_id: String::new(),
+                planned_ms: None,
+                decision: "Unknown(ClockUnknown)".into(),
+                provider_revision: "utc-static-v1".into(),
+                context_revision: clock.source_revision.unwrap_or("clock-unversioned").into(),
+            });
+        }
+        if out.observations.is_empty() {
+            let fact = clock.wall_ms.and_then(|wall| {
+                plans.iter().find(|fact| {
+                    wall >= fact.planned_wall_ms && wall < fact.planned_wall_ms + duration
+                })
+            });
+            out.observations.push(Observation {
+                solar_fallback: None,
+                solar_unavailable_reason: None,
+                clock_provenance: None,
+                clock_source_revision: None,
+                clock_uncertainty_ms: None,
+                unknown_reason: None,
+                site,
+                occurrence_id: fact.map_or_else(String::new, |fact| fact.occurrence_key.clone()),
+                planned_ms: fact.map(|fact| fact.planned_wall_ms),
+                decision: format!("{:?}", result.decision),
+                provider_revision: "utc-static-v1".into(),
+                context_revision: clock.source_revision.unwrap_or("clock-unversioned").into(),
+            });
+        }
+        // Range .missed remains outside the current executable projection contract.
+        Ok((staged, out))
+    }
+
     pub fn stage_settings_fault(
         &self,
         desc: &ScheduleDescriptor,
@@ -558,11 +1065,17 @@ impl Engine {
     ) -> Result<(Self, Decision)> {
         Self::validate_rows(desc, facts)?;
         let mut staged = self.clone();
-        staged.clock.poll(clock)?;
+        staged.clock.poll_with_hold(clock, desc.clock_hold_ms)?;
         Ok((
             staged,
             Decision {
                 observations: vec![crate::context_vm::Observation {
+                    solar_fallback: None,
+                    solar_unavailable_reason: None,
+                    clock_provenance: None,
+                    clock_source_revision: None,
+                    clock_uncertainty_ms: None,
+                    unknown_reason: None,
                     site: desc.site,
                     occurrence_id: String::new(),
                     planned_ms: None,
@@ -580,6 +1093,144 @@ impl Engine {
                 ..Default::default()
             },
         ))
+    }
+
+    pub fn stage_solar(
+        &self,
+        desc: &ScheduleDescriptor,
+        clock: ClockSnapshot<'_>,
+        evidence: &crate::context_vm::SolarContextEvidence,
+        when: bool,
+        settings_fault: Option<u8>,
+    ) -> Result<(Self, Decision)> {
+        use crate::solar_admission::{SolarDecision as SD, SolarFacts};
+        let ScheduleDefinition::SolarContext {
+            timezone,
+            latitude,
+            longitude,
+            event,
+            offset_ms,
+            ..
+        } = &desc.definition
+        else {
+            return Err(invalid("Solar context descriptor required"));
+        };
+        if evidence.site != desc.site
+            || evidence.timezone != *timezone
+            || evidence.latitude.to_bits() != latitude.to_bits()
+            || evidence.longitude.to_bits() != longitude.to_bits()
+            || evidence.event != *event
+            || evidence.offset_ms != *offset_ms
+            || evidence.rows.len() > 4096
+            || evidence.coverage_start_ms >= evidence.coverage_end_ms
+            || evidence.rows.iter().any(|r| {
+                r.fold != 0
+                    || r.slot_key != 0
+                    || r.minute_of_day != 0
+                    || r.fallback_wall_ms.is_some() && r.unavailable_reason.is_none()
+                    || r.provider_revision.is_empty()
+                    || r.context_revision.is_empty()
+                    || r.provider_revision.len() > 128
+                    || r.context_revision.len() > 128
+            })
+        {
+            return Err(invalid("Solar context facts violate immutable descriptor"));
+        }
+        let facts = SolarFacts {
+            coverage_from_wall_ms: evidence.coverage_start_ms,
+            coverage_to_wall_ms: evidence.coverage_end_ms,
+            rows: &evidence.rows,
+        };
+        let mut staged = self.clone();
+        let engine = staged
+            .solar
+            .as_mut()
+            .ok_or_else(|| invalid("Solar context engine absent"))?;
+        let recovery = settings_fault.is_none() && staged.solar_settings_baseline;
+        if recovery {
+            engine.reset_observation_baseline(clock.boot_epoch)?;
+        }
+        let reason = settings_fault.map(|f| {
+            if f == 0 {
+                "SettingsInvalid"
+            } else {
+                "SettingsUnavailable"
+            }
+        });
+        let stage = engine
+            .begin_with_unknown(clock, facts, reason)?
+            .evaluate(when)?;
+        let result = engine.commit(stage)?;
+        staged.solar_settings_baseline = settings_fault.is_some();
+        let (clock_provenance, clock_source_revision) = match &result.clock_provenance {
+            crate::schedule_clock::ClockProvenance::Snapshot => {
+                ("Snapshot", clock.source_revision.map(str::to_owned))
+            }
+            crate::schedule_clock::ClockProvenance::HeldClock { source_revision } => {
+                ("HeldClock", source_revision.clone())
+            }
+        };
+        let decision_text = |decision| {
+            if let Some(reason) = reason {
+                format!("Unknown({reason})")
+            } else if recovery && decision == SD::BootBaseline {
+                "RecoveryBaseline".into()
+            } else if decision == SD::Unknown {
+                format!(
+                    "Unknown({})",
+                    result
+                        .unknown_reason
+                        .as_deref()
+                        .unwrap_or("OccurrenceUnavailable")
+                )
+            } else {
+                format!("{decision:?}")
+            }
+        };
+        let mut out = Decision {
+            due: result.due,
+            ..Default::default()
+        };
+        for row in &result.observations {
+            out.missed |= matches!(
+                row.decision,
+                SD::ConditionsFalseAtPulse
+                    | SD::Missed
+                    | SD::ObservationGap
+                    | SD::CorrectionPastHighWater
+            );
+            out.observations.push(Observation {
+                solar_fallback: Some(row.fallback),
+                solar_unavailable_reason: row.unavailable_reason,
+                clock_provenance: Some(clock_provenance.into()),
+                clock_source_revision: clock_source_revision.clone(),
+                clock_uncertainty_ms: result.clock_uncertainty_ms,
+                unknown_reason: result.unknown_reason.clone(),
+                site: desc.site,
+                occurrence_id: format!("{}:{}:0:0", desc.site, row.source_day),
+                planned_ms: row.scheduled_wall_ms,
+                decision: decision_text(row.decision),
+                provider_revision: row.provider_revision.clone(),
+                context_revision: row.context_revision.clone(),
+            });
+        }
+        if out.observations.is_empty() || reason.is_some() || recovery {
+            out.observations.push(Observation {
+                solar_fallback: None,
+                solar_unavailable_reason: None,
+                clock_provenance: Some(clock_provenance.into()),
+                clock_source_revision: clock_source_revision.clone(),
+                clock_uncertainty_ms: result.clock_uncertainty_ms,
+                unknown_reason: result.unknown_reason.clone(),
+                site: desc.site,
+                occurrence_id: String::new(),
+                planned_ms: None,
+                decision: decision_text(result.decision),
+                provider_revision: String::new(),
+                context_revision: String::new(),
+            });
+        }
+        Ok((staged, out))
     }
 
     fn apply_setting(
@@ -689,6 +1340,61 @@ impl Engine {
         Ok(())
     }
 
+    fn at_pulse(
+        &mut self,
+        site: u32,
+        planned: u64,
+        clock: &crate::schedule_clock::ClockObservation<'_>,
+        when: bool,
+        out: &mut Decision,
+    ) -> Result<()> {
+        let id = format!("{site}:at");
+        let Some(now) = clock.current_effective_wall_ms else {
+            return Ok(());
+        };
+        if self.terminal.contains(&id) {
+            return Ok(());
+        }
+        let baseline = matches!(
+            clock.disposition,
+            ClockDisposition::BootBaseline | ClockDisposition::RecoveryBaseline
+        );
+        let crossed = clock
+            .previous_effective_wall_ms
+            .is_some_and(|previous| previous < planned && planned <= now)
+            && planned > clock.previous_trusted_high_water_ms.unwrap_or(0);
+        if !(baseline && planned <= now || crossed) {
+            return Ok(());
+        }
+        let outcome = if baseline {
+            "BaselinePastMissed"
+        } else if clock.disposition == ClockDisposition::ObservationGap {
+            "ObservationGap"
+        } else if !when {
+            "ConditionsFalseAtPulse"
+        } else {
+            "Due"
+        };
+        self.terminalize(&id)?;
+        out.due = outcome == "Due";
+        out.missed = !out.due;
+        out.observations.push(Observation {
+            solar_fallback: None,
+            solar_unavailable_reason: None,
+            clock_provenance: None,
+            clock_source_revision: None,
+            clock_uncertainty_ms: None,
+            unknown_reason: None,
+            site,
+            occurrence_id: id,
+            planned_ms: Some(planned),
+            decision: outcome.into(),
+            provider_revision: String::new(),
+            context_revision: String::new(),
+        });
+        Ok(())
+    }
+
     fn end_pending(&mut self, site: u32, reason: &str, out: &mut Decision) -> Result<()> {
         let pending = std::mem::take(&mut self.pending_grace);
         for (id, (planned, provider_revision, context_revision)) in pending {
@@ -698,6 +1404,12 @@ impl Engine {
             self.terminalize(&id)?;
             out.missed = true;
             out.observations.push(Observation {
+                solar_fallback: None,
+                solar_unavailable_reason: None,
+                clock_provenance: None,
+                clock_source_revision: None,
+                clock_uncertainty_ms: None,
+                unknown_reason: None,
                 site,
                 occurrence_id: id,
                 planned_ms: Some(planned),
@@ -780,6 +1492,12 @@ impl Engine {
             out.due |= outcome == "Due";
             out.missed |= outcome != "Due";
             out.observations.push(Observation {
+                solar_fallback: None,
+                solar_unavailable_reason: None,
+                clock_provenance: None,
+                clock_source_revision: None,
+                clock_uncertainty_ms: None,
+                unknown_reason: None,
                 site,
                 occurrence_id: id,
                 planned_ms: Some(planned),
@@ -833,6 +1551,12 @@ impl Engine {
                 if let Some(fault) = id.strip_prefix('?') {
                     let reason = fault.split(':').next().unwrap_or("CalendarMissing");
                     out.observations.push(Observation {
+                        solar_fallback: None,
+                        solar_unavailable_reason: None,
+                        clock_provenance: None,
+                        clock_source_revision: None,
+                        clock_uncertainty_ms: None,
+                        unknown_reason: None,
                         site,
                         occurrence_id: format!("{site}:calendar"),
                         planned_ms: Some(planned),
@@ -849,6 +1573,12 @@ impl Engine {
                     if !self.terminal.contains(ineligible) {
                         self.terminalize(ineligible)?;
                         out.observations.push(Observation {
+                            solar_fallback: None,
+                            solar_unavailable_reason: None,
+                            clock_provenance: None,
+                            clock_source_revision: None,
+                            clock_uncertainty_ms: None,
+                            unknown_reason: None,
                             site,
                             occurrence_id: ineligible.into(),
                             planned_ms: Some(planned),
@@ -885,6 +1615,12 @@ impl Engine {
             out.due |= outcome == "Due";
             out.missed |= outcome != "Due";
             out.observations.push(Observation {
+                solar_fallback: None,
+                solar_unavailable_reason: None,
+                clock_provenance: None,
+                clock_source_revision: None,
+                clock_uncertainty_ms: None,
+                unknown_reason: None,
                 site,
                 occurrence_id: id,
                 planned_ms: Some(planned),
@@ -927,6 +1663,12 @@ impl Engine {
             if cancel || monotonic >= active.end_monotonic_ms {
                 self.active_run = None;
                 out.observations.push(Observation {
+                    solar_fallback: None,
+                    solar_unavailable_reason: None,
+                    clock_provenance: None,
+                    clock_source_revision: None,
+                    clock_uncertainty_ms: None,
+                    unknown_reason: None,
                     site,
                     occurrence_id: active.id,
                     planned_ms: Some(active.planned_ms),
@@ -941,6 +1683,12 @@ impl Engine {
             } else {
                 out.active = true;
                 out.observations.push(Observation {
+                    solar_fallback: None,
+                    solar_unavailable_reason: None,
+                    clock_provenance: None,
+                    clock_source_revision: None,
+                    clock_uncertainty_ms: None,
+                    unknown_reason: None,
                     site,
                     occurrence_id: active.id,
                     planned_ms: Some(active.planned_ms),
@@ -957,6 +1705,12 @@ impl Engine {
         if previous < facts.coverage_start_ms || now >= facts.coverage_end_ms {
             self.end_pending(site, "IncompleteCoverage", out)?;
             out.observations.push(Observation {
+                solar_fallback: None,
+                solar_unavailable_reason: None,
+                clock_provenance: None,
+                clock_source_revision: None,
+                clock_uncertainty_ms: None,
+                unknown_reason: None,
                 site,
                 occurrence_id: format!("{site}:coverage"),
                 planned_ms: None,
@@ -969,6 +1723,12 @@ impl Engine {
         let Some(observation) = facts.provider.as_ref() else {
             self.end_pending(site, "PredictionMissing", out)?;
             out.observations.push(Observation {
+                solar_fallback: None,
+                solar_unavailable_reason: None,
+                clock_provenance: None,
+                clock_source_revision: None,
+                clock_uncertainty_ms: None,
+                unknown_reason: None,
                 site,
                 occurrence_id: format!("{site}:provider"),
                 planned_ms: None,
@@ -988,6 +1748,12 @@ impl Engine {
         {
             self.end_pending(site, "PredictionStale", out)?;
             out.observations.push(Observation {
+                solar_fallback: None,
+                solar_unavailable_reason: None,
+                clock_provenance: None,
+                clock_source_revision: None,
+                clock_uncertainty_ms: None,
+                unknown_reason: None,
                 site,
                 occurrence_id: format!("{site}:provider"),
                 planned_ms: None,
@@ -1012,6 +1778,12 @@ impl Engine {
                     self.terminalize(&id)?;
                     out.missed = true;
                     out.observations.push(Observation {
+                        solar_fallback: None,
+                        solar_unavailable_reason: None,
+                        clock_provenance: None,
+                        clock_source_revision: None,
+                        clock_uncertainty_ms: None,
+                        unknown_reason: None,
                         site,
                         occurrence_id: id,
                         planned_ms: None,
@@ -1050,6 +1822,12 @@ impl Engine {
                     self.terminalize(&id)?;
                     out.missed = true;
                     out.observations.push(Observation {
+                        solar_fallback: None,
+                        solar_unavailable_reason: None,
+                        clock_provenance: None,
+                        clock_source_revision: None,
+                        clock_uncertainty_ms: None,
+                        unknown_reason: None,
                         site,
                         occurrence_id: id,
                         planned_ms: Some(planned),
@@ -1064,6 +1842,12 @@ impl Engine {
                 self.terminalize(&id)?;
                 out.missed = true;
                 out.observations.push(Observation {
+                    solar_fallback: None,
+                    solar_unavailable_reason: None,
+                    clock_provenance: None,
+                    clock_source_revision: None,
+                    clock_uncertainty_ms: None,
+                    unknown_reason: None,
                     site,
                     occurrence_id: id,
                     planned_ms: Some(planned),
@@ -1081,6 +1865,12 @@ impl Engine {
                 self.terminalize(&id)?;
                 out.missed = true;
                 out.observations.push(Observation {
+                    solar_fallback: None,
+                    solar_unavailable_reason: None,
+                    clock_provenance: None,
+                    clock_source_revision: None,
+                    clock_uncertainty_ms: None,
+                    unknown_reason: None,
                     site,
                     occurrence_id: id,
                     planned_ms: Some(planned),
@@ -1094,6 +1884,12 @@ impl Engine {
                 self.terminalize(&id)?;
                 out.missed = true;
                 out.observations.push(Observation {
+                    solar_fallback: None,
+                    solar_unavailable_reason: None,
+                    clock_provenance: None,
+                    clock_source_revision: None,
+                    clock_uncertainty_ms: None,
+                    unknown_reason: None,
                     site,
                     occurrence_id: id,
                     planned_ms: Some(planned),
@@ -1117,6 +1913,12 @@ impl Engine {
                 self.terminalize(&id)?;
                 out.missed = true;
                 out.observations.push(Observation {
+                    solar_fallback: None,
+                    solar_unavailable_reason: None,
+                    clock_provenance: None,
+                    clock_source_revision: None,
+                    clock_uncertainty_ms: None,
+                    unknown_reason: None,
                     site,
                     occurrence_id: id,
                     planned_ms: Some(planned),
@@ -1130,6 +1932,12 @@ impl Engine {
                 self.pending_grace.remove(&id);
                 self.terminalize(&id)?;
                 out.observations.push(Observation {
+                    solar_fallback: None,
+                    solar_unavailable_reason: None,
+                    clock_provenance: None,
+                    clock_source_revision: None,
+                    clock_uncertainty_ms: None,
+                    unknown_reason: None,
                     site,
                     occurrence_id: id,
                     planned_ms: Some(planned),
@@ -1153,6 +1961,12 @@ impl Engine {
                     context_revision: row.context_revision.clone(),
                 });
                 out.observations.push(Observation {
+                    solar_fallback: None,
+                    solar_unavailable_reason: None,
+                    clock_provenance: None,
+                    clock_source_revision: None,
+                    clock_uncertainty_ms: None,
+                    unknown_reason: None,
                     site,
                     occurrence_id: id,
                     planned_ms: Some(planned),
@@ -1198,6 +2012,472 @@ mod tests {
     use crate::context_vm::{DurationSetting, Occurrence, ProviderBinding, ProviderObservation};
     use crate::schedule_clock::ClockTrust;
 
+    fn range_desc(starts: Vec<u64>, duration: u64) -> ScheduleDescriptor {
+        ScheduleDescriptor {
+            clock_hold_ms: None,
+            site: 7,
+            name: "planned".into(),
+            gap_ms: 100,
+            definition: ScheduleDefinition::UtcRange {
+                starts_ms: starts,
+                duration_ms: duration,
+            },
+            when: vec![],
+            cancel: vec![],
+        }
+    }
+
+    #[test]
+    fn utc_range_late_recovery_gap_cancel_and_monotonic_end() {
+        let desc = range_desc(vec![1_000, 2_000], 600);
+        let evidence = facts(7);
+        let engine = Engine::new(&desc, 1, 8).unwrap();
+        let unknown = ClockSnapshot {
+            trust: ClockTrust::Unknown("lost"),
+            ..clock(1_240)
+        };
+        let (engine, unknown_result) = engine
+            .stage(&desc, unknown, &evidence, true, false, None, 0)
+            .unwrap();
+        assert!(!unknown_result.due && !unknown_result.active);
+        let admitted_clock = ClockSnapshot {
+            monotonic_ms: 1_250,
+            wall_ms: Some(1_240),
+            ..clock(1_250)
+        };
+        let (engine, admitted) = engine
+            .stage(&desc, admitted_clock, &evidence, true, false, None, 0)
+            .unwrap();
+        assert!(admitted.due && admitted.active && !admitted.missed);
+        assert_eq!(admitted.observations[0].occurrence_id, "7:0:1");
+        assert_eq!(admitted.observations[0].planned_ms, Some(1_000));
+        let (engine, continuing) = engine
+            .stage(
+                &desc,
+                ClockSnapshot {
+                    monotonic_ms: 1_609,
+                    wall_ms: Some(9_000),
+                    ..clock(1_609)
+                },
+                &evidence,
+                false,
+                false,
+                None,
+                0,
+            )
+            .unwrap();
+        assert!(continuing.active && !continuing.due);
+        assert!(continuing
+            .observations
+            .iter()
+            .any(|o| o.decision == "ObservationGap"));
+        let (engine, completed) = engine
+            .stage(
+                &desc,
+                ClockSnapshot {
+                    trust: ClockTrust::Unknown("lost"),
+                    ..clock(1_610)
+                },
+                &evidence,
+                true,
+                false,
+                None,
+                0,
+            )
+            .unwrap();
+        assert!(!completed.active);
+        let (engine, next) = engine
+            .stage(
+                &desc,
+                ClockSnapshot {
+                    monotonic_ms: 1_611,
+                    wall_ms: Some(2_400),
+                    ..clock(1_611)
+                },
+                &evidence,
+                true,
+                false,
+                None,
+                0,
+            )
+            .unwrap();
+        assert!(next.due && next.active);
+        let (engine, cancelled) = engine
+            .stage(
+                &desc,
+                ClockSnapshot {
+                    monotonic_ms: 1_612,
+                    wall_ms: Some(2_401),
+                    ..clock(1_612)
+                },
+                &evidence,
+                true,
+                true,
+                None,
+                0,
+            )
+            .unwrap();
+        assert!(!cancelled.active);
+        assert!(cancelled
+            .observations
+            .iter()
+            .any(|o| o.decision == "Cancelled"));
+        let (_, no_rearm) = engine
+            .stage(
+                &desc,
+                ClockSnapshot {
+                    monotonic_ms: 1_613,
+                    wall_ms: Some(2_402),
+                    ..clock(1_613)
+                },
+                &evidence,
+                true,
+                false,
+                None,
+                0,
+            )
+            .unwrap();
+        assert!(!no_rearm.due && !no_rearm.active);
+    }
+
+    #[test]
+    fn utc_range_previous_day_open_exact_end_and_terminal_checkpoint() {
+        const DAY: u64 = 86_400_000;
+        let desc = range_desc(vec![DAY - 300], 600);
+        let evidence = facts(7);
+        let engine = Engine::new(&desc, 1, 8).unwrap();
+        let (engine, admitted) = engine
+            .stage(
+                &desc,
+                ClockSnapshot {
+                    monotonic_ms: 0,
+                    wall_ms: Some(DAY + 100),
+                    ..clock(0)
+                },
+                &evidence,
+                true,
+                false,
+                None,
+                0,
+            )
+            .unwrap();
+        assert!(admitted.due && admitted.active);
+        assert_eq!(admitted.observations[0].occurrence_id, "7:0:1");
+        let checkpoint = engine.snapshot().unwrap();
+        assert!(checkpoint.starts_with(b"GFES\x02GFRG\x01"));
+        let restored = Engine::restore(&desc, 2, 8, &checkpoint).unwrap();
+        let (_, no_resume) = restored
+            .stage(
+                &desc,
+                ClockSnapshot {
+                    boot_epoch: 2,
+                    monotonic_ms: 0,
+                    wall_ms: Some(DAY + 101),
+                    ..clock(0)
+                },
+                &evidence,
+                true,
+                false,
+                None,
+                0,
+            )
+            .unwrap();
+        assert!(!no_resume.due && !no_resume.active);
+        assert_eq!(restored.snapshot().unwrap(), checkpoint);
+        assert!(Engine::restore(&desc, 2, 8, &checkpoint[..checkpoint.len() - 1]).is_err());
+        let mut trailing = checkpoint.clone();
+        trailing.push(0);
+        assert!(Engine::restore(&desc, 2, 8, &trailing).is_err());
+        let mut wrong_version = checkpoint.clone();
+        wrong_version[4] = 1;
+        assert!(Engine::restore(&desc, 2, 8, &wrong_version).is_err());
+        let mut wrong_site = checkpoint.clone();
+        wrong_site[14] = b'8';
+        assert!(Engine::restore(&desc, 2, 8, &wrong_site).is_err());
+        let mut duplicate = checkpoint.clone();
+        duplicate[10..12].copy_from_slice(&2u16.to_le_bytes());
+        duplicate.extend_from_slice(&checkpoint[12..]);
+        assert!(Engine::restore(&desc, 2, 8, &duplicate).is_err());
+        let fresh = Engine::new(&desc, 1, 8).unwrap();
+        let (closed, exact_end) = fresh
+            .stage(
+                &desc,
+                ClockSnapshot {
+                    monotonic_ms: 0,
+                    wall_ms: Some(DAY - 300 + 600),
+                    ..clock(0)
+                },
+                &evidence,
+                true,
+                false,
+                None,
+                0,
+            )
+            .unwrap();
+        assert!(!exact_end.due && !exact_end.active);
+        assert_eq!(exact_end.observations[0].decision, "LateStartExpired");
+        let (_, corrected_back) = closed
+            .stage(
+                &desc,
+                ClockSnapshot {
+                    monotonic_ms: 1,
+                    wall_ms: Some(DAY + 100),
+                    ..clock(1)
+                },
+                &evidence,
+                true,
+                false,
+                None,
+                0,
+            )
+            .unwrap();
+        assert!(!corrected_back.due && !corrected_back.active);
+        let same_day_desc = range_desc(vec![1_000], 600);
+        let fresh = Engine::new(&same_day_desc, 1, 8).unwrap();
+        let (_, expired) = fresh
+            .stage(
+                &same_day_desc,
+                clock(1_600),
+                &evidence,
+                true,
+                false,
+                None,
+                0,
+            )
+            .unwrap();
+        assert_eq!(expired.observations[0].decision, "LateStartExpired");
+        assert_eq!(expired.observations[0].occurrence_id, "7:0:1");
+        assert!(!expired.missed);
+    }
+
+    #[test]
+    fn utc_range_capacity_and_malformed_inputs_reject_atomically() {
+        let desc = range_desc(vec![1_000, 2_000], 600);
+        let evidence = facts(7);
+        let engine = Engine::new(&desc, 1, 1).unwrap();
+        assert!(engine
+            .stage(&desc, clock(1_240), &evidence, true, false, None, 0)
+            .is_err());
+        assert_eq!(engine.snapshot().unwrap(), b"GFES\x02GFRG\x01\0\0");
+        let engine = Engine::new(&desc, 1, 8).unwrap();
+        assert!(engine
+            .stage(&desc, clock(u64::MAX), &evidence, true, false, None, 0)
+            .is_err());
+        assert!(engine
+            .stage(
+                &desc,
+                clock(1_240),
+                &evidence,
+                true,
+                false,
+                Some(&SettingValue::Duration(1)),
+                1
+            )
+            .is_err());
+        assert!(Engine::new(&range_desc(vec![0, 86_399_999], 2), 1, 8).is_err());
+        assert!(Engine::restore(
+            &desc,
+            2,
+            8,
+            &Engine::new(&periodic(false), 1, 8)
+                .unwrap()
+                .snapshot()
+                .unwrap()
+        )
+        .is_err());
+        let single = range_desc(vec![1_000], 600);
+        let engine = Engine::new(&single, 1, 1).unwrap();
+        let (engine, _) = engine
+            .stage(&single, clock(1_240), &evidence, true, false, None, 0)
+            .unwrap();
+        let checkpoint = engine.snapshot().unwrap();
+        assert!(engine
+            .stage(&single, clock(86_401_240), &evidence, true, false, None, 0)
+            .is_err());
+        assert_eq!(engine.snapshot().unwrap(), checkpoint);
+    }
+
+    fn solar_desc(fallback_time_ms: Option<u64>) -> ScheduleDescriptor {
+        ScheduleDescriptor {
+            clock_hold_ms: Some(1_000),
+            site: 7,
+            name: "solar".into(),
+            gap_ms: 10_000,
+            definition: ScheduleDefinition::SolarContext {
+                timezone: "UTC".into(),
+                latitude: 37.0,
+                longitude: 127.0,
+                event: 0,
+                offset_ms: 0,
+                fallback_time_ms,
+                config_ids: vec![],
+            },
+            when: vec![1, 1],
+            cancel: vec![1, 0],
+        }
+    }
+    fn solar_facts() -> crate::context_vm::SolarContextEvidence {
+        crate::context_vm::SolarContextEvidence {
+            site: 7,
+            timezone: "UTC".into(),
+            latitude: 37.0,
+            longitude: 127.0,
+            event: 0,
+            offset_ms: 0,
+            coverage_start_ms: 0,
+            coverage_end_ms: 1_000,
+            rows: vec![crate::solar_admission::SolarFact::available(
+                0, 100, "p1", "c1",
+            )],
+        }
+    }
+
+    #[test]
+    fn solar_context_reuses_fallback_and_bounded_clock_hold_with_complete_trace() {
+        use crate::solar_admission::SolarFactAvailability;
+        let desc = solar_desc(Some(100));
+        let mut evidence = solar_facts();
+        evidence.rows[0].availability = SolarFactAvailability::Unavailable;
+        evidence.rows[0].scheduled_wall_ms = None;
+        evidence.rows[0].fallback_wall_ms = Some(100);
+        evidence.rows[0].unavailable_reason = Some(2);
+        let engine = Engine::new(&desc, 1, 8).unwrap();
+        let (baseline, _) = engine
+            .stage_solar(
+                &desc,
+                ClockSnapshot {
+                    monotonic_ms: 0,
+                    wall_ms: Some(90),
+                    ..clock(0)
+                },
+                &evidence,
+                true,
+                None,
+            )
+            .unwrap();
+        let (due, result) = baseline
+            .stage_solar(
+                &desc,
+                ClockSnapshot {
+                    monotonic_ms: 10,
+                    wall_ms: None,
+                    trust: ClockTrust::Unknown("TrustExpired"),
+                    source_revision: None,
+                    ..clock(0)
+                },
+                &evidence,
+                true,
+                None,
+            )
+            .unwrap();
+        assert!(result.due);
+        assert!(result.observations.iter().any(|o| o.decision == "Due"
+            && o.solar_fallback == Some(true)
+            && o.solar_unavailable_reason == Some(2)
+            && o.clock_provenance.as_deref() == Some("HeldClock")
+            && o.clock_source_revision.as_deref() == Some("clock-1")));
+        let (_, expired) = due
+            .stage_solar(
+                &desc,
+                ClockSnapshot {
+                    monotonic_ms: 1_001,
+                    wall_ms: None,
+                    trust: ClockTrust::Unknown("TrustExpired"),
+                    source_revision: None,
+                    ..clock(0)
+                },
+                &evidence,
+                true,
+                None,
+            )
+            .unwrap();
+        assert!(!expired.due);
+        assert!(expired
+            .observations
+            .iter()
+            .any(|o| o.decision.starts_with("Unknown(")));
+        let forbidden = solar_desc(None);
+        assert!(Engine::new(&forbidden, 1, 8)
+            .unwrap()
+            .stage_solar(&forbidden, clock(90), &evidence, true, None)
+            .is_err());
+        let mismatched = solar_desc(Some(101));
+        assert!(Engine::new(&mismatched, 1, 8)
+            .unwrap()
+            .stage_solar(&mismatched, clock(90), &evidence, true, None)
+            .is_err());
+    }
+
+    #[test]
+    fn solar_context_false_condition_and_checkpoint_capacity_fail_closed() {
+        let desc = solar_desc(None);
+        let evidence = solar_facts();
+        let initial = Engine::new(&desc, 1, 1).unwrap();
+        let (baseline, _) = initial
+            .stage_solar(&desc, clock(90), &evidence, true, None)
+            .unwrap();
+        let (consumed, result) = baseline
+            .stage_solar(&desc, clock(100), &evidence, false, None)
+            .unwrap();
+        assert!(!result.due && result.missed);
+        assert_eq!(result.observations[0].decision, "ConditionsFalseAtPulse");
+        let (_, repeat) = consumed
+            .stage_solar(&desc, clock(101), &evidence, true, None)
+            .unwrap();
+        assert!(!repeat.due);
+        let checkpoint = consumed.snapshot().unwrap();
+        let restored = Engine::restore(&desc, 2, 1, &checkpoint).unwrap();
+        let (baseline, _) = restored
+            .stage_solar(
+                &desc,
+                ClockSnapshot {
+                    boot_epoch: 2,
+                    ..clock(90)
+                },
+                &evidence,
+                true,
+                None,
+            )
+            .unwrap();
+        assert!(
+            !baseline
+                .stage_solar(
+                    &desc,
+                    ClockSnapshot {
+                        boot_epoch: 2,
+                        ..clock(100)
+                    },
+                    &evidence,
+                    true,
+                    None
+                )
+                .unwrap()
+                .1
+                .due
+        );
+        for mutation in 0..4 {
+            let mut malformed = checkpoint.clone();
+            match mutation {
+                0 => malformed[4] = 1,
+                1 => malformed[5..7].copy_from_slice(&2u16.to_le_bytes()),
+                2 => malformed[7..11].copy_from_slice(&u32::MAX.to_le_bytes()),
+                _ => malformed.push(0),
+            }
+            assert!(Engine::restore(&desc, 2, 1, &malformed).is_err());
+        }
+        let mut too_many = evidence.clone();
+        too_many
+            .rows
+            .push(crate::solar_admission::SolarFact::available(
+                1, 200, "p1", "c1",
+            ));
+        let before = initial.snapshot().unwrap();
+        assert!(initial
+            .stage_solar(&desc, clock(90), &too_many, true, None)
+            .is_err());
+        assert_eq!(initial.snapshot().unwrap(), before);
+    }
+
     fn clock(at: u64) -> ClockSnapshot<'static> {
         ClockSnapshot {
             monotonic_ms: at,
@@ -1220,6 +2500,7 @@ mod tests {
     }
     fn periodic(editable: bool) -> ScheduleDescriptor {
         ScheduleDescriptor {
+            clock_hold_ms: None,
             site: 1,
             name: "cycle".into(),
             gap_ms: 10_000,
@@ -1385,6 +2666,7 @@ mod tests {
     #[test]
     fn tide_cancel_wins_first_admissible_tick_and_never_rearms() {
         let desc = ScheduleDescriptor {
+            clock_hold_ms: None,
             site: 2,
             name: "tide".into(),
             gap_ms: 10_000,
@@ -1528,6 +2810,69 @@ mod tests {
         assert!(!completed.active);
         assert_eq!(completed.observations[0].decision, "RunEnded");
         assert_eq!(completed.observations[0].planned_ms, Some(1_000));
+        let held_desc = ScheduleDescriptor {
+            clock_hold_ms: Some(200),
+            ..desc.clone()
+        };
+        let held_engine = Engine::new(&held_desc, 1, 8).unwrap();
+        let (held_baseline, _) = held_engine
+            .stage(&held_desc, clock(900), &evidence, true, false, None, 0)
+            .unwrap();
+        let unknown_clock = |at| ClockSnapshot {
+            trust: ClockTrust::Unknown("TrustExpired"),
+            wall_ms: None,
+            ..clock(at)
+        };
+        let (held_run, held_due) = held_baseline
+            .stage(
+                &held_desc,
+                unknown_clock(1_000),
+                &evidence,
+                true,
+                false,
+                None,
+                0,
+            )
+            .unwrap();
+        assert!(held_due.due && held_due.active);
+        let held_trace = held_due
+            .observations
+            .iter()
+            .find(|row| row.decision == "HeldClock")
+            .unwrap();
+        assert_eq!(held_trace.clock_source_revision.as_deref(), Some("clock-1"));
+        assert_eq!(held_trace.unknown_reason.as_deref(), Some("TrustExpired"));
+        let (expired_run, expired_decision) = held_run
+            .stage(
+                &held_desc,
+                unknown_clock(1_100),
+                &evidence,
+                true,
+                false,
+                None,
+                0,
+            )
+            .unwrap();
+        assert!(expired_decision.active && !expired_decision.due);
+        let (_, ended) = expired_run
+            .stage(
+                &held_desc,
+                unknown_clock(1_600),
+                &evidence,
+                true,
+                false,
+                None,
+                0,
+            )
+            .unwrap();
+        assert!(!ended.active && !ended.due);
+        assert!(ended
+            .observations
+            .iter()
+            .any(|row| row.decision == "RunEnded"));
+        let saved = held_run.snapshot().unwrap();
+        let restarted = Engine::restore(&held_desc, 2, 8, &saved).unwrap();
+        assert!(restarted.active_run.is_none());
         let (_, cancelled_run) = admitted
             .stage(&desc, clock(1_100), &withdrawn, true, true, None, 0)
             .unwrap();
@@ -1553,6 +2898,7 @@ mod tests {
     #[test]
     fn cron_wrong_source_and_duplicate_rows_reject_at_boot_baseline() {
         let desc = ScheduleDescriptor {
+            clock_hold_ms: None,
             site: 3,
             name: "morning".into(),
             gap_ms: 10_000,
@@ -1599,6 +2945,7 @@ mod tests {
     #[test]
     fn timeslots_live_edit_uses_opaque_keys_and_restores_effective_setting() {
         let desc = ScheduleDescriptor {
+            clock_hold_ms: None,
             site: 4,
             name: "starts".into(),
             gap_ms: 10_000,

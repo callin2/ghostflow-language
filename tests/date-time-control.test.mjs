@@ -90,6 +90,7 @@ test('compiler rejects invalid tagged forms and undefined time arithmetic or ord
     ['bad time', 'let bad = time\`24:00\`;', /time|range|invalid/],
     ['Date order', 'let bad = date\`2026-01-01\` < date\`2026-01-02\`;', /Date|ordered|operator|numeric/],
     ['DateTime difference', 'let bad = datetime\`2026-01-02T00:00:00Z\` - datetime\`2026-01-01T00:00:00Z\`;', /DateTime|not defined/],
+    ['negative DateTime difference', 'let bad = datetime\`2026-01-01T00:00:00Z\` - datetime\`2026-01-02T00:00:00Z\`;', /DateTime|not defined/],
     ['TimeOfDay addition', 'let bad = time\`23:00\` + 2h;', /TimeOfDay|not defined/],
     ['reverse addition', 'let bad = 1h + datetime\`2026-01-01T00:00:00Z\`;', /Duration|DateTime|not defined/],
     ['cross compare', 'let bad = time\`06:00\` == datetime\`2026-01-01T06:00:00Z\`;', /same type/],

@@ -5,16 +5,161 @@
 실행 범위는 [구현 범위](IMPLEMENTATION.md), [추적성](TRACEABILITY.md)을 참조한다.
 [선택한 control 문법](LANGUAGE-SURFACE.md)에 대한 후속 계약이다.
 
-아래에는 실행 가능한 부분과 미래 **설계 예제**가 함께 있다. control은 `ghostc`,
-이 문서의 `constraints Name { ... }` 독립 형식은 canonical `.ghost.md` 문서를
-`ghostrules`로 따로 컴파일한다. 이 독립 형식은 `ghostc` 입력이 아니다.
-[Reference §4.8](reference/04-sensors-constraints-control.md#48-공통-constraints-표기와-연산)의
-`constraints Name for resource { ... }` 표기는 `ghostc` 문법이다. 두 compiler의
-지원 규칙 범위는 다르다. CLI는 최상위 `ghost` fenced code만 정확히 추출하며 plain
-`.ghost` 입력을 거절한다. `tools/constraints.mjs`의 `compileConstraints`는 이 추출
-코드만 받는 내부 lowerer다. 전체 DSL을 지원하는 범용 solver는 아니다.
-`constraints` 예제의 설비·포트 이름은 설치 구성에 바인딩해야 한다.
-완결된 control과 control 내부에 넣는 단편을 각 예제에서 구분한다.
+정본 작성 표면은 하나의 `.ghost.md` control 안의 이름 있는 `constraints`다.
+지역 Bool 출력 제약, 공유 resource policy, accounting은 이름 있는 묶음을 쓰지만
+대상과 실행 계약은 구분한다. [Reference §4.8](reference/04-sensors-constraints-control.md#48-공통-constraints-표기와-연산)를 따른다.
+아래의 기존 독립 `constraints Name { ... }` 예제는 **Station adapter 예제**다.
+`ghostrules`를 사용하는 실제 programming-book WASM simulation,
+`tools/station-demo.mjs`, `bindStationPolicy`의 고정 Station artifact를 위해서만
+그 제한된 경로를 유지한다. 범용 정본 문법이나 임의 PID safety enforcement가 아니다.
+역사적 표기라는 이유만으로 다른 호환 경로를 유지하지 않는다.
+CLI는 최상위 `ghost` fence를 추출하고 plain `.ghost` 입력을 거절한다.
+`compileConstraints`는 Station adapter의 내부 lowerer이며 범용 solver가 아니다.
+공유 policy의 descriptor 검증과 실제 binding/enforcement를 혼동하지 않는다.
+
+## 정본 지역·공유·accounting 경계
+
+완전한 정본 파일은 [실행 가능한 local 허용 범위](../examples/constraint-envelope.ghost.md)와
+[논리 mapping 전체를 보이는 공유 검사 계약](../examples/shared-constraint-contract.ghost.md)이다.
+`validateResourceConstraintBinding`은 revision, 정확한 정본 source/artifact 해시,
+모든 필수 안정 resource identity와 typed port, 유한한 exclusive-mode 입력을
+검사한다. 누락·추가 mapping, 위장된 같은 resource identity나 port, 호스트가
+넣은 정책 필드는 거부한다. 검사 결과는 `executable: false`이며 admission이나
+출력 권한을 주지 않는다. 실행을 선택할 때는 검증한 compilation과 binding을
+`compileBoundResourceControl(compilation, binding)`에 함께 전달한다. 이 명시 경로는
+제한된 Bool 프로그램을 공유 Rust guard가 있는 GFB17 module로 만든다. 정본
+source만 컴파일한 checked descriptor가 자동으로 실행 artifact로 바뀌지는 않는다.
+이는 참조 논리 binding 계약이지 물리 output ABI가 아니다.
+
+실행 그룹은 하나의 exclusive 활동 집합까지 지원한다. 여러 exclusive 문장은 소스 검사 대상으로 유지하지만 별도의 실행 연결이 필요하므로 서로 다른 집합을 합쳐 해석하지 않고 거부한다. 작성된 전역 안전 벡터는 로컬 필수 제약도 만족해야 한다.
+
+다음은 완전한 지역 제약 control이다. 지역 제약은 이 control의 출력에만 적용되며
+일반 Bool lowering으로 실행된다. 이름 없는 기존 `require`와 `mutex`의 의미도 같다.
+
+```ghost
+control LocalPump {
+  input request, valve_ready: Bool;
+  output pump, valve: Bool;
+  pump <- request;
+  valve <- valve_ready;
+  constraints LocalRules {
+    require at safe_output pump => valve;
+  }
+}
+```
+
+공유 resource policy는 `constraints Name for resource`로 scope를 명시한다.
+다음은 **완전한 checked source, 비실행 descriptor**다. `ghostc`의 source 검증은
+선언·타입·유한 집합·안전 값 관계를 검사한다. `compileControl`이나 composition은
+binding 없는 이 policy를 거부한다. 별도의 명시 bound compilation이 실행 경로다.
+
+```ghost
+control SharedPumpPolicy {
+  resource station: Station;
+  resource pump1: BoolActuator;
+  resource valve1: BoolActuator;
+  input automatic, manual, pump_request, valve_request: Bool;
+  output pump, valve: Bool;
+  pump <- pump_request;
+  valve <- valve_request;
+  constraints SharedRules for station {
+    exclusive at admission { automatic, manual };
+    require at safe_output pump1.on => any_on({ valve1 });
+    safe { pump1 = false; valve1 = true; }
+  }
+}
+```
+
+`safe`는 규칙이 참조하는 유한 Bool resource 전체에 값을 명시하고 모든 필수
+출력 관계를 만족해야 한다. 위 값은 pump OFF와 valve ON이다. 모든 자원을 OFF로
+바꾸는 숨은 기본값이 아니다. source의 `pump`/`valve` 요청을 physical resource와
+연결했다고 가정하지 않는다. 안정적인 resource identity와 typed port mapping을
+검증하고 bound module을 명시 활성화해야 아래의 논리 enforcement가 가능하다.
+종전 최상위 resource policy 파일 역시 checked non-control artifact이며 enforced
+control로 표시하지 않는다. 새 `station`, `use`, `bind`, session 문법을 만들지 않는다.
+
+## 공유 Bool 실행
+
+완전한 실행 예제와 명시 binding, 기록 입력·결과는
+[bound-resource-execution](../examples/bound-resource-execution.ghost.ko.md)을 참조한다.
+앞의 #157 공유 검사 예제는 기존 비실행 descriptor 계약을 그대로 유지한다.
+
+[#158](https://github.com/callin2/ghostflow-language/issues/158)의 bound profile은
+하나의 Bool control과 유한 resource 집합을 공유 Rust tick guard로 실행한다.
+모든 출력은 resource에 결속되고 작성한 전체 safe vector가 있어야 한다.
+binding은 #157의 정확한 정본 source/descriptor digest, revision, 안정 ID,
+Bool mode-input/output mapping을 고정한다. module 활성화 시 binding을 명시
+GFRB1 packet으로 제공하고 매 scan에는 같은 binding identity의 GFRS1 packet을
+제공한다. Rust API는 `activate_with_resource_binding(bytes, &ResourceBindingRegistry)`,
+`tick_with_resource_binding(bytes)`, `ScanDriver::scan_with_resource_binding(frame, bytes)`다.
+누락·불일치는 fail closed다.
+일반 loader가 module을 읽더라도 일반 activate/tick/scan으로 guard를 건너뛰지 못한다.
+host가 출력 뒤에 JavaScript filter를 덧붙여 실행하는 방식이 아니다.
+
+GFB17은 모든 input/output port가 Bool인 기존 GFB1 v1 또는 v3 프로그램만 감싸고
+guard를 프로그램 commit 경계에 포함한다. 단락 평가를 사용하는 자동·수동·fallback
+source는 v3으로 내려간다. 다른 내부 profile은 지원하지 않는다. 모든 지원 분기의
+출력이 같은 Rust guard를 지난다.
+context schedule, objective/PID, import composition, 안전 의미가 모호한 group
+중첩은 이 bounded profile 밖이며 거부한다. 설치 authority는 모든 논리 writer가
+같은 `ResourceBindingRegistry`를 사용하도록 해야 한다. native는 activation에
+전달한 공유 Arc registry, WASM ABI는 한 instance의 모든 handle이 공유하는
+registry로 같은 안정 resource ID의 두 번째 활성 writer를 거부한다. Node 참조
+wrapper는 여러 WASM instance도 같은 module registry로 검사한다. Station과 Bool
+resource ID 모두 대상이다. 별도 설치 registry 간 물리 배타성의 인증이 아니다.
+여러 VM의 협력 중재, session lease나 범용
+physical output ABI를 제공한다고 해석하지 않는다. 기존 Station adapter와
+accounting 실행 경로, 비차단 `check`는 바꾸지 않는다.
+
+group의 필수 조건은 모두 AND로 검사한다. 새로운 activity claim이 현재 admission과
+충돌하면 새 claim을 거부하고 incumbent admission과 이전 safe 출력을 유지한다.
+거부된 newcomer는 false 관측 뒤 새 true claim으로 다시 admission을 요청해야 한다.
+시작 전 requested 후보가 필수 출력 관계를 위반해도 새 admission과 보호 출력을
+만들지 않는다. 첫 거부에는 이전 출력이 없으므로 출력 집합이 비어 있고, 이미
+commit한 safe 출력이 있으면 그 값을 보존한다. descriptor의 safe vector를 시작 전
+거부의 대체 출력으로 임의 적용하지 않는다.
+
+이미 admit된 실행의 requested 후보가 필수 관계를 위반하면 작성한 resource별
+safe vector로 전이한다. pump=false, valve=true처럼 일부 ON인 안전 동작도 그대로
+존중한다. trip 뒤 입력이 정상으로 바뀌었다고 자동 재시작하지 않는다. exclusive
+group은 모든 claim이 false인 관측 뒤 새 claim이 admission 조건을 다시 만족해야 한다.
+require-only group은 requested map이 authored safe map과 같아진 관측으로 복구
+기준선을 세운 뒤 새 departure를 검사한다.
+보호 resource를 공유하는 group의 trip은 전이적으로 연결된 component 전체에
+적용한다. 작성 safe 값은 공유 resource에 대해 일치해야 하며 무관한 group의
+admission은 유지한다. 최종 safe 후보는 모든 필수 공유·지역 제약의 AND를 다시
+검증해야 한다.
+이전 claim을 숨은 대기열에 넣어 재시도하지 않는다. 원시 claim과 admitted activity,
+requested와 final safe 값을 구분해 원인·group·binding·scan 근거를 남긴다.
+
+정상적으로 평가한 denial은 ordinary VM state를 commit한다. 거부가 프로그램의
+job/session을 취소하거나 모든 state를 이전 값으로 되돌린다는 뜻은 아니다.
+
+binding 오류나 VM 실패는 VM state, guard admission과 trace를 함께 rollback한다.
+부분적으로 보호 상태만 바뀌거나 거부된 scan의 증거가 commit되어서는 안 된다.
+논리 safe output은 Driver applied나 physical feedback confirmed와 다르다.
+실제 Driver 순서·물리 안전 장치·현장 설치는 이 profile의 검증 범위가 아니다.
+
+accounting은 기존 `resource`·`account`를 선언하고
+`constraints Budget { limit used(account, basis) <= bound { ... } }`를 쓴다.
+지역 Bool 조건이나 공유 admission을 사용량 ledger로 대체하지 않는다.
+[Reference §3.10](reference/03-time-and-schedules.md#310-시간-기반-사용량-제약)의 stage,
+basis와 persistence가 사용량의 뜻을 정한다.
+
+제약은 goal/PID를 포함한 요청이 움직일 수 있는 **허용 영역**이다. 지역 제약은
+자기 control에만, 공유 제약은 같은 resource의 자동·수동·fallback 등 모든 경로에
+적용한다. 시작 전 예측한 위반은 새 admission을 거부한다. 실행 중에는 작성한
+resource별 안전 동작을 따르며 무조건 전체 OFF로 바꾸지 않는다. 이 구분은 범용
+output ABI나 물리 안전 순서를 구현했다는 뜻이 아니다. 기존 PID engine의 더 좁은
+실행 계약도 임의 resource policy enforcement로 일반화하지 않는다.
+
+모든 필수 조건은 AND다. admission 검사를 먼저 확정하고 요청 후보에 대해
+safe_output 관계를 검사한 뒤 Driver가 적용한다. arbitration priority는 허용 영역
+안에서 요청을 고를 뿐, 필수 제약·binding·provenance·복구 조건을 우회하지 못한다.
+위반 원인과 거부/안전 전이를 구분해 남겨야 한다. 관측 정상화는 새 start 권한이
+아니며, 재시도나 복구도 같은 규칙을 따른다. `check pump_capacity`는 아래 Station
+adapter의 비차단 advisory이고 필수 require가 아니다. `warn`과 `monitor`는 지원하지
+않으며 경고를 safety require나 명령으로 몰래 승격하지 않는다.
 
 ## 이번 대화에서 정한 방향
 
@@ -41,9 +186,11 @@
 장치 프로파일이 정의한 설비 범위에는 공유 제약을 붙인다. 여러 control이 같은
 펌프를 참조하면 물리 펌프 ID 하나의 제약과 사용량을 공유한다.
 
-아래는 `ghostrules`로 컴파일하는 독립 형식의 설비 구성 예제다. `station`, `pump1`, `settings`,
+아래와 이후의 독립 묶음은 고정 Station adapter의 설비 구성 예제다. `station`, `pump1`, `settings`,
 `starts`는 설비/설정/시간표의 안정적인 ID에 연결되고, `pump1.valves`는 미리
 등록된 공급 관계의 유한한 밸브 집합이다. 발견한 순서나 표시 이름으로 연결하지 않는다.
+
+Station adapter 예제 — 고정 설비 adapter의 제한된 독립 규칙이다.
 
 ```text
 constraints StationRules {
@@ -79,7 +226,7 @@ constraints StationRules {
 | check | 선택 정보를 활용하는 비차단 분석 | Pass / Violation / Unknown 진단; 실행을 차단하지 않음 |
 | warn ... when | 미래 설계 표기; 현재 두 parser 모두 거절 | 원인과 대상을 가진 경고 이벤트 기록 |
 
-기존 한 줄 `require`도 같은 제약 모델로 내려간다. 경고는 제약 위반을 허용하는
+지역 control의 한 줄 Bool `require`와 이 Station adapter는 실행 경로가 다르다. 경고는 제약 위반을 허용하는
 예외가 아니며, 경고를 지워도 필수 제약이 해제되지 않는다. 알림 전송은 호스트가
 담당하고 같은 위반을 매 tick마다 사용자에게 반복 전송하지 않는다.
 
@@ -88,6 +235,10 @@ constraints StationRules {
 암묵적으로 섞지 않으며 대상 단계가 정해지지 않는 일반식은 컴파일 진단 대상이다.
 
 ## 여러 control의 공유 펌프
+
+이 절의 세션·중재 설명은 아래 고정 Station adapter의 설비 계약이다.
+위 bound Bool profile은 하나의 활성 writer만 허용하며 여러 VM의 세션 중재나
+물리 사용권을 구현했다고 주장하지 않는다.
 
 공유 자원 관리자가 물리 펌프의 유일한 출력 작성자다. 개별 control의 출력은 요청이며
 마지막 작성자가 이기는 GPIO 쓰기가 아니다. 활동하지 않는 control의 `false` 요청은
@@ -115,6 +266,8 @@ ID로 결정하고, 대기열 길이·만료를 제한한다. 공유 동시 운�
 설치 구성에서 기존 control의 pump와 새 control의 pump가 모두 물리 `pump1`을,
 각 밸브 포트가 각각 `valve1`~`valve4`를 가리키게 연결한 경우다. 이 연결은 압력·유량
 메타데이터가 아니라 제어에 필요한 장치 바인딩이다. 아래는 그 설비에 붙이는 규칙이다.
+
+Station adapter 예제 — 고정 설비 adapter의 제한된 독립 규칙이다.
 
 ```ghost
 constraints SharedPump {
@@ -236,6 +389,8 @@ emission이다. 소비자는 `case water1_time { ok(value) => ...; fault(reason)
 운영자 변경에 정지 조건을 붙이는 예제가 아니다. `mode`와 `station`은 설비 관리자가
 제공하는 이름이다.
 
+Station adapter 예제 — 고정 설비 adapter의 제한된 독립 규칙이다.
+
 ```ghost
 constraints EditInterlock {
   exclusive(automatic, manual, configuring);
@@ -288,6 +443,8 @@ operator 설정 문법과 atomic live 의미는 위 Reference §5.1–5.2를 따
 
 압력·유량을 하나도 입력하지 않은 설비에서도 다음 기본 규칙을 사용할 수 있다.
 
+Station adapter 예제 — 고정 설비 adapter의 제한된 독립 규칙이다.
+
 ```ghost
 constraints BasicWatering {
   require count_on(pump1.valves) <= 2;
@@ -296,6 +453,8 @@ constraints BasicWatering {
 ```
 
 용량 분석을 보고 싶을 때만 다음 규칙을 추가한다. 이 두 묶음은 함께 적용할 수 있다.
+
+Station adapter 예제 — 고정 설비 adapter의 제한된 독립 규칙이다.
 
 ```ghost
 constraints CapacityAdvice {
@@ -332,6 +491,8 @@ Configure 절차에서 변경·검증·적용해야 하며 runtime-adjustable �
 
 설치 때 검증한 운전 조건별 보수적인 유량 한도나 허용 밸브 조합을 원할 때만
 프로파일에 추가할 수 있다. 다음은 선택적 분석의 구문 스케치다.
+
+Station adapter 예제 — 고정 설비 adapter의 제한된 독립 규칙이다.
 
 ```text
 constraints PumpCapacity {
@@ -630,6 +791,8 @@ schedule starts: DailySlots<15min> {
   selected = [06:00, 06:15, 12:30, 18:45];
 }
 ```
+
+Station adapter 예제 — 고정 설비 adapter의 제한된 독립 규칙이다.
 
 ```ghost
 constraints DailyWatering {

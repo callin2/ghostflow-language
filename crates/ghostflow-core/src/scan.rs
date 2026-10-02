@@ -80,6 +80,20 @@ impl ScanDriver {
         self.runtime.restore_context_checkpoint(bytes)
     }
 
+    pub fn restore_solar_checkpoint(&mut self, bytes: &[u8]) -> Result<()> {
+        self.runtime.restore_solar_checkpoint(bytes)
+    }
+
+    /// Advance only Solar admission while host execution is explicitly paused.
+    /// This does not create a scan or change framed scalar input/clock evidence.
+    pub fn observe_solar_paused(
+        &mut self,
+        clock: ClockSnapshot<'_>,
+        facts: &[crate::solar_runtime::SolarInput<'_>],
+    ) -> Result<()> {
+        self.runtime.observe_solar_paused(clock, facts)
+    }
+
     /// Validates a complete host frame without changing runtime state, inputs,
     /// sequence, clock, journal, or output intents.
     pub fn validate_scan_frame(&self, frame: &ScanFrameV1) -> Result<()> {
@@ -156,7 +170,14 @@ impl ScanDriver {
     /// Evaluates one complete, validated host frame. Only a successful core
     /// evaluation advances the scan sequence and logical clock.
     pub fn scan(&mut self, frame: ScanFrameV1) -> Result<ScanOutcomeV1> {
-        self.scan_inner(frame, None, None)
+        self.scan_inner(frame, None, None, None)
+    }
+    pub fn scan_with_resource_binding(
+        &mut self,
+        frame: ScanFrameV1,
+        binding: &[u8],
+    ) -> Result<ScanOutcomeV1> {
+        self.scan_inner(frame, None, None, Some(binding))
     }
 
     /// Evaluates a complete context frame with explicit clock and context facts.
@@ -178,7 +199,34 @@ impl ScanDriver {
                 "context scan requires an activated context runtime",
             ));
         }
-        self.scan_inner(frame, Some((clock, facts)), None)
+        self.scan_inner(frame, Some((clock, facts)), None, None)
+    }
+
+    /// Dispatches Solar provider facts through the same framed transaction.
+    /// Clocks, admission, scalar state and scan sequence commit only on success.
+    pub fn scan_with_solar(
+        &mut self,
+        frame: ScanFrameV1,
+        clock: ClockSnapshot<'_>,
+        facts: &[crate::solar_runtime::SolarInput<'_>],
+    ) -> Result<ScanOutcomeV1> {
+        if clock.monotonic_ms != frame.logical_time_ms {
+            return Err(Error::new(
+                "schedule clock does not match frame logical time",
+            ));
+        }
+        if self.runtime.solar_runtime.is_none() {
+            return Err(Error::new("solar scan requires an activated solar runtime"));
+        }
+        let facts: Vec<_> = facts
+            .iter()
+            .map(|input| ScheduleInput {
+                site: input.site,
+                kind: crate::solar_runtime::ScheduleKind::Solar,
+                facts: input.facts,
+            })
+            .collect();
+        self.scan_inner(frame, None, Some((clock, &facts, 1)), None)
     }
 
     /// Dispatches civil occurrence facts through the same framed transaction.
@@ -203,7 +251,7 @@ impl ScanDriver {
         if !matches!(version, 2 | 3) {
             return Err(Error::new("unsupported framed schedule packet version"));
         }
-        self.scan_inner(frame, None, Some((clock, facts, version)))
+        self.scan_inner(frame, None, Some((clock, facts, version)), None)
     }
 
     fn derived_input(&self, name: &str) -> bool {
@@ -214,17 +262,20 @@ impl ScanDriver {
                     .runtime
                     .module
                     .as_ref()
-                    .is_some_and(|m| matches!(m.format_version, 8 | 9)))
+                    .is_some_and(|m| matches!(m.format_version, 5 | 6 | 8 | 9)))
             || (self.runtime.context_runtime.is_some()
                 && ((name == "__gf_time_epoch"
-                    && self
-                        .runtime
-                        .module
-                        .as_ref()
-                        .is_some_and(|m| matches!(m.format_version, 10 | 11)))
-                    || ["__gf_config_", "__gf_natural_", "__gf_accounting_"]
-                        .iter()
-                        .any(|prefix| name.starts_with(prefix))))
+                    && self.runtime.module.as_ref().is_some_and(|m| {
+                        matches!(m.format_version, 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18)
+                    }))
+                    || [
+                        "__gf_config_",
+                        "__gf_natural_",
+                        "__gf_accounting_",
+                        "__gf_calendar_",
+                    ]
+                    .iter()
+                    .any(|prefix| name.starts_with(prefix))))
     }
 
     fn scan_inner(
@@ -232,6 +283,7 @@ impl ScanDriver {
         frame: ScanFrameV1,
         context: Option<(ClockSnapshot<'_>, &Facts)>,
         schedules: Option<(ClockSnapshot<'_>, &[ScheduleInput<'_>], u16)>,
+        resource_binding: Option<&[u8]>,
     ) -> Result<ScanOutcomeV1> {
         self.validate_scan_frame(&frame)?;
 
@@ -249,7 +301,7 @@ impl ScanDriver {
             .runtime
             .module
             .as_ref()
-            .is_some_and(|m| matches!(m.format_version, 10 | 11));
+            .is_some_and(|m| matches!(m.format_version, 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18));
         let result = if let Some((clock, facts)) = context {
             let clock_input = self.runtime.set_input(
                 RESERVED_CLOCK_INPUT,
@@ -275,12 +327,23 @@ impl ScanDriver {
                         .set_input("__gf_time_epoch", Value::Number(clock.boot_epoch as f64))
                 })
                 .and_then(|()| {
-                    if version == 3 {
+                    if version == 1 {
+                        let facts: Vec<_> = facts
+                            .iter()
+                            .map(|input| crate::solar_runtime::SolarInput {
+                                site: input.site,
+                                facts: input.facts,
+                            })
+                            .collect();
+                        self.runtime.tick_with_solar(clock, &facts)
+                    } else if version == 3 {
                         self.runtime.tick_with_daily_slots(clock, facts)
                     } else {
                         self.runtime.tick_with_schedules(clock, facts)
                     }
                 })
+        } else if let Some(binding) = resource_binding {
+            self.runtime.tick_with_resource_binding(binding)
         } else {
             self.runtime.tick_at(frame.logical_time_ms)
         };

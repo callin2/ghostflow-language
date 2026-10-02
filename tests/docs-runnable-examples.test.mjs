@@ -8,10 +8,25 @@ const faq = fs.readFileSync(new URL('../docs/language_faq.md', import.meta.url),
 const programming = fs.readFileSync(new URL('../docs/ProgrammingInGhostflow.md', import.meta.url), 'utf8');
 const programmingEnglish = fs.readFileSync(new URL('../docs/ProgrammingInGhostflow.en.md', import.meta.url), 'utf8');
 
+test('canonical constraint examples distinguish executable local control from checked shared descriptor', () => {
+  for (const name of ['CONSTRAINTS.md', 'CONSTRAINTS.en.md']) {
+    const document = fs.readFileSync(new URL(`../docs/${name}`, import.meta.url), 'utf8');
+    const fences = [...document.matchAll(/```ghost\n(control (?:LocalPump|SharedPumpPolicy) \{[\s\S]*?)\n```/g)];
+    const local = fences.find(match => match[1].startsWith('control LocalPump'));
+    const shared = fences.find(match => match[1].startsWith('control SharedPumpPolicy'));
+    assert.ok(local && shared, 'complete named examples and all dependencies must be shown');
+    const compile = code => compileSourceSync(`# Example\n\n\`\`\`ghost\n${code}\n\`\`\`\n`, { filename: 'constraints-example.ghost.md' });
+    assert.match(compile(local[1]).manifest.format, /^GhostFlow\/control-v\d+$/);
+    const descriptor = compile(shared[1]);
+    assert.equal(descriptor.manifest.format, 'GhostFlow/control-policy-descriptor-v1');
+    assert.equal(JSON.parse(Buffer.from(descriptor.bytes).toString('utf8')).executable, false);
+  }
+});
+
 function example(section, marker, nextMarker) {
   const start = section.indexOf(marker);
   assert.notEqual(start, -1, `missing example ${marker}`);
-  const sectionEnd = section.indexOf(nextMarker, start + marker.length);
+  const sectionEnd = nextMarker ? section.indexOf(nextMarker, start + marker.length) : section.length;
   assert.notEqual(sectionEnd, -1, `missing following section after ${marker}`);
   const next = section.indexOf('```ghost\n', start);
   assert.notEqual(next, -1, `missing GhostFlow fence in ${marker}`);
@@ -46,6 +61,16 @@ for (const [id, section, marker, nextMarker] of [
   ['Programming E19', programming, '### E19 —', '### E20 —'],
   ['Programming E20', programming, '### E20 —', '### E21 —'],
   ['Programming E21', programming, '### E21 —', '<a id="appendix-a"></a>'],
+  ...Array.from({ length: 11 }, (_, index) => {
+    const id = `E${String(index + 23).padStart(2, '0')}`;
+    if (id === 'E31') return null;
+    const next = index >= 9 ? null : `### E${String(index + 24).padStart(2, '0')} —`;
+    return [`Programming ${id}`, programming, `### ${id} —`, next];
+  }).filter(Boolean),
+  ['Programming E34', programming, '### E34 —', '### E35 —'],
+  ['Programming E35', programming, '### E35 —', '### E36 —'],
+  ['Programming E36', programming, '### E36 —', '### E37 —'],
+  ['Programming E37', programming, '### E37 —', '### E98 —'],
 ]) {
   test(`${id} remains executable GhostFlow`, () => {
     const compiled = compileSourceSync(example(section, marker, nextMarker), { filename: `${id}.ghost.md` });
@@ -81,6 +106,21 @@ test('Programming E22 compiles only with its pinned generated source closure', (
   assert.match(compileSourceSync(canonical, { filename: generated.manifest.root.filename, sourceClosure }).manifest.format, /^GhostFlow\/control-v\d+$/);
 });
 
+test('Programming E31 imports the canonical irrigation and ventilation controls', () => {
+  const generated = deriveProgrammingBookImportPackage(programming);
+  const composition = generated.manifest.compositions[0];
+  const sourceClosure = composition.imports.map(item => ({
+    filename: item.filename, revision: item.revision, text: generated.files.get(item.filename),
+  }));
+  const canonical = generated.files.get(composition.root.filename);
+  assert.equal(example(programmingEnglish, '### E31 —', '### E32 —'), example(programming, '### E31 —', '### E32 —'),
+    'Programming E31 translation must preserve executable code');
+  assert.deepEqual(composition.imports.map(item => item.filename), ['E21.ghost.md', 'E20.ghost.md']);
+  assert.throws(() => compileSourceSync(canonical, { filename: composition.root.filename }), /verified source closure/);
+  const compiled = compileSourceSync(canonical, { filename: composition.root.filename, sourceClosure });
+  assert.deepEqual(compiled.manifest.outputs.map(item => item.name), ['irrigation_demand', 'ventilate_demand']);
+});
+
 for (const [id, marker, nextMarker, mutation] of [
   ['E02', '### E02 —', '<a id="ch03"></a>', source => source.replace(
     /let low = case threshold \{[\s\S]*?\n  \};/, 'let low = level < threshold;')],
@@ -103,6 +143,11 @@ for (const [id, diagnostic] of [
   ['E95', /case for Mode must be exhaustive/],
   ['E96', /duplicate output connection lamp/],
   ['E97', /cannot use Result directly/],
+  ['E98', /does not implicitly mix Int and Number/],
+  ['E99', /invalid datetime literal/],
+  ['E100', /Solar schedule requires fallback/],
+  ['E101', /fallback must be skip/],
+  ['E102', /requires one argument and terminal: skip/],
 ]) {
   test(`Programming ${id} retains its intended compiler diagnostic`, () => {
     const code = document => {

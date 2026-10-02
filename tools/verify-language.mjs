@@ -9,6 +9,7 @@ import { compileSource } from './toolchain.mjs';
 import { CURRICULUM_REPLAY_MANIFEST, prepareCurriculumReplays, verifyCurriculumReplayWasm } from './curriculum-replay.mjs';
 import { PC01_PROJECTION, verifyPc01Projection } from './generate-pc-01-projection.mjs';
 import { verificationSourceHashes } from './verification-sources.mjs';
+import { readCatalog, validateCatalog } from '../contracts/requirements/validate.mjs';
 
 // Deliberately explicit. Product/LLM/device tests belong to other repositories.
 export const LANGUAGE_TESTS = Object.freeze([
@@ -16,9 +17,13 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/doc-index.test.mjs',
   'tests/verified-wasm-artifact.test.mjs',
   'tests/ci-verification-routing.test.mjs',
+  'tests/cli-process.test.mjs',
   'tests/boundary-conformance.test.mjs',
+  'tests/host-event-ordering-contract.test.mjs',
+  'tests/effect-process-contract.test.mjs',
   'tests/compiler.test.mjs',
   'tests/docs-runnable-examples.test.mjs',
+  'tests/programming-natural-examples.test.mjs',
   'tests/programming-builtins.test.mjs',
   'tests/programming-book-simulation.test.mjs',
   'tests/programming-climate.test.mjs',
@@ -28,6 +33,10 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/feature-status.test.mjs',
   'tests/reference-simulator.test.mjs',
   'tests/adapt-control-host.test.mjs',
+  'tests/optional-feedback-timer-compiler.test.mjs',
+  'tests/optional-feedback-timer.test.mjs',
+  'tests/explicit-feedback-adoption-compiler.test.mjs',
+  'tests/explicit-feedback-adoption.test.mjs',
   'tests/reference-query.test.mjs',
   'tests/reference-index-links.test.mjs',
   'tests/reference-terms-boundaries.test.mjs',
@@ -39,6 +48,10 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/quantities.test.mjs',
   'tests/relative-humidity-ratio.test.mjs',
   'tests/constraints.test.mjs',
+  'tests/named-constraints.test.mjs',
+  'tests/resource-policy-artifact.test.mjs',
+  'tests/constraint-proof.test.mjs',
+  'tests/bound-resource-control.test.mjs',
   'tests/coverage-edges.test.mjs',
   'tests/gfb1-browser.test.mjs',
   'tests/coverage-source-identity.test.mjs',
@@ -63,8 +76,10 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/long-tick-state.test.mjs',
   'tests/duration-runtime.test.mjs',
   'tests/portable-package.test.mjs',
+  'tests/gfb11-periodic-package.test.mjs',
   'tests/gfb10-package.test.mjs',
   'tests/control-host.test.mjs',
+  'tests/continuous-timer-compatibility.test.mjs',
   'tests/control-runtime-atomicity.test.mjs',
   'tests/native-dispatch-status.test.mjs',
   'tests/framed-control-host.test.mjs',
@@ -91,9 +106,18 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/periodic-cron-policy.test.mjs',
   'tests/natural-condition-contract.test.mjs',
   'tests/natural-schedule-contract.test.mjs',
+  'tests/natural-fallback-compiler.test.mjs',
+  'tests/natural-fallback-runtime.test.mjs',
   'tests/accounting-syntax.test.mjs',
   'tests/accounting-wasm.test.mjs',
   'tests/context-wasm-boundaries.test.mjs',
+  'tests/calendar-provider.test.mjs',
+  'tests/calendar-execution.test.mjs',
+  'tests/calendar-runtime.test.mjs',
+  'tests/reference-calendar-boundary.test.mjs',
+  'tests/reference-distinct-states.test.mjs',
+  'tests/solar-config-compiler.test.mjs',
+  'tests/solar-config-runtime.test.mjs',
   'tests/after-event-contract.test.mjs',
   'tests/after-event-wasm.test.mjs',
   'tests/after-event-control.test.mjs',
@@ -128,7 +152,11 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/temporal-replay-wasm.test.mjs',
   'tests/core-replay-wasm.test.mjs',
   'tests/temporal-resource-plan-wasm.test.mjs',
-  'tests/range-contract.test.mjs',
+    'tests/range-contract.test.mjs',
+    'tests/range-runtime.test.mjs',
+  'tests/at-contract.test.mjs',
+  'tests/at-runtime.test.mjs',
+  'tests/at-package.test.mjs',
   'tests/curriculum-replay.test.mjs',
   'tests/core-irrigation-proof.test.mjs',
   'tests/pc-01-projection-sync.test.mjs',
@@ -136,6 +164,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/interaction-contract.test.mjs',
   'tests/interaction-corpus.test.mjs',
   'tests/interaction-emission.test.mjs',
+  'tests/enum-member-label.test.mjs',
   'tests/interaction-runtime-snapshot.test.mjs',
   'tests/intent-anchor-map.test.mjs',
   'tests/ledger.test.mjs',
@@ -183,6 +212,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/operating-settings.test.mjs',
   'tests/restart-reason-boundary.test.mjs',
   'tests/config-native-wasm-parity.test.mjs',
+  'tests/estimate-evidence.test.mjs',
   'tests/issue-90-settings-stream.test.mjs',
 ]);
 
@@ -367,6 +397,8 @@ async function verify(nodeOnly, curriculumOnly) {
     if (Number(process.versions.node.split('.')[0]) < 22) throw new Error('Node.js 22 or newer is required');
     if (process.platform === 'win32') throw new Error('retained native tutorial paths require a POSIX host (macOS/Linux)');
     report.sourceSha256 = verificationSourceHashes(root);
+    // Fail stale/tampered requirement locators before native compilation or replay.
+    validateCatalog(readCatalog({ root }), { root });
     await gate('npm', ['run', 'docs:check']);
     for (const test of LANGUAGE_TESTS) {
       if (!fs.statSync(path.join(root, test)).isFile()) throw new Error(`missing language test: ${test}`);
@@ -394,11 +426,9 @@ async function verify(nodeOnly, curriculumOnly) {
       await gate(process.execPath, ['tools/ghostc.mjs', 'examples/irrigation.ghost.md', 'build/irrigation.gfb']);
       await gate('cargo', ['test', '--locked', '--offline', '--workspace']);
       await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-core', '--example', 'run']);
-      await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-core', '--example', 'run', '--release']);
-      await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-core', '--example', 'scan_adapter', '--release']);
-      await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-core', '--example', 'scan_tape', '--release']);
-      await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-core', '--example', 'context_tape', '--release']);
-      await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-core', '--example', 'scenario_scan', '--release']);
+      await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-core', '--release',
+        '--example', 'run', '--example', 'scan_adapter', '--example', 'scan_tape',
+        '--example', 'context_tape', '--example', 'scenario_scan', '--example', 'estimate_evidence', '--example', 'solar_tape', '--example', 'resource_tape']);
       await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-wasm', '--target', 'wasm32-unknown-unknown', '--release']);
       wasmVerified = true;
     }

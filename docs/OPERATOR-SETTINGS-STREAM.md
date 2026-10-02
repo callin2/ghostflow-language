@@ -96,14 +96,15 @@ The complete input frame omits runtime-protected Result projections and the
 derived monotonic clock. Its logical time must match the context clock. Only a
 successful evaluation advances the native scan ID/time and publishes the
 accepted outcome. Rejected frames remain retryable at the same scan ID. Framed
-checkpoint/state access and pre-first-scan restore reuse GFCX2; they do not
+checkpoint/state access and pre-first-scan restore reuse GFCX3; they do not
 create a second settings state or synthesize an accepted outcome in JavaScript.
 
-GFCX2 persists the current Result, revision, accepted event identities and key
+GFCX3 persists the current Result, revision, accepted event identities and key
 allocation history under the exact Program/binding identity. A restored fault
 remains a fault. Historical successful payloads exist only for stable-key and
 phase validation, never as a consumer fallback. Restored engine caches must
-agree with the shared config history. Old GFCX1 images are rejected explicitly.
+agree with the shared config history. It also retains bounded full calendar
+ID/revision content history. Old GFCX1/GFCX2 images are rejected explicitly.
 
 Context state exposes each config's ID, name, type and current Result. Error
 results contain a fault rather than an old `value`. Source hashes and run
@@ -117,12 +118,19 @@ The Periodic profile in this change executes an explicit `instant` anchor with
 `preserve_anchor`, pulse/trusted-clock/baseline/skip policies. The Reference's
 other anchors and phase policies retain their own implementation requirements;
 this change does not claim to execute them. Config-backed TimeSlots uses the
-shared stream consumer. Mixing streams with the older Solar or literal
-DailySlots execution profile is rejected at source compilation. The native
+shared stream consumer. Solar now consumes the same current Results through
+the [shared Solar context profile](SOLAR-CONFIG-EXECUTION.md). Its compiled
+`when` dependencies preserve a current fault as `Unknown(SettingsFault)`,
+including when an authored fault branch returns true. Recovery establishes a
+baseline without catch-up; unrelated config faults do not suppress Solar.
+Mixing streams with literal DailySlots remains rejected at source compilation. The native
 Temperature PID objective reads its target from the same protected config
 Result vector; a fault follows its authored disable policy. These rejections
 must not be bypassed by converting a real operator setting to a constant.
-Solar unification is tracked in [#145](https://github.com/callin2/ghostflow-language/issues/145).
+The shared Solar path uses GFB16/control-v15 and GFSF6, stages the existing Rust
+Solar engine with settings and VM state, and retains Solar terminal identities
+inside GFCX3. Existing standalone Solar and non-Solar GFSF5 consumers retain
+their explicit profiles; they are not executable fallbacks for rejected source.
 Accounting reserve and limit values in the executable profile are static
 designer bounds. The Reference's 5-minute ON and 10-second stop-delay example
 uses `let` for those fixed bounds; a live config Result is rejected rather than

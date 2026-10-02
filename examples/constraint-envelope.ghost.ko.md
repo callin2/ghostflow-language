@@ -1,0 +1,37 @@
+<!-- translation-source: examples/constraint-envelope.ghost.md -->
+[English canonical source](constraint-envelope.ghost.md)
+
+# 완전한 local 출력 허용 범위
+
+이 소프트웨어 전용 예제에는 control 하나만 있으며 import나 숨은 binding이
+없습니다. 네 입력은 테스트 호스트가 제공하는 Bool 관찰값이고, 네 출력은 가상
+Bool intent endpoint입니다. 이 가상 endpoint에 대해서는 false를 명시적으로
+선택한 비활성 값으로 사용합니다. 이것이 임의의 물리 자원에 안전한 동작이라는
+뜻은 아닙니다.
+
+요청은 목표를 표현합니다. local 필수 규칙은 허용되는 출력을 제한합니다.
+펌프에는 준비된 밸브가 필요하고 두 방향 출력은 동시에 활성화할 수 없습니다.
+이 규칙은 자동·수동 중재 정책을 선택하거나 하드웨어에 출력이 적용되었다고
+인증하지 않습니다.
+
+```ghost
+control OutputEnvelope {
+  input start, valve_ready, forward_request, reverse_request: Bool;
+  output pump, valve, forward, reverse: Bool;
+  pump <- start;
+  valve <- valve_ready;
+  forward <- forward_request;
+  reverse <- reverse_request;
+
+  constraints LocalEnvelope {
+    require at safe_output pump => valve;
+    mutex(forward, reverse);
+  }
+}
+```
+
+start=true이고 valve_ready=false이면 requested pump=true가 safe pump=false로
+바뀝니다. valve_ready가 true로 회복하면 같은 요청이 허용됩니다. 양쪽 방향을
+동시에 요청하면 두 방향 출력은 모두 false가 됩니다. 이것은 local 출력
+projection이며 admission이나 일반 공유 자원 enforcement가 아닙니다. 별도
+평가 단계와 명시적 binding 경계는 [제약 계약](../docs/CONSTRAINTS.md)을 보세요.

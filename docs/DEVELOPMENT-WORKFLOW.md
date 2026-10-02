@@ -81,6 +81,24 @@ tests or gates to obtain a pass. Reuse previous evidence only when source,
 dependencies, toolchain, configuration and relevant environment inputs match.
 Report each command, exit status, useful counts and any remaining limit.
 
+The verifier validates requirement-catalog excerpts before native compilation or
+replay. If source lines move, relocate the unchanged excerpt and retain its hash;
+never refresh a historical evidence hash to hide drift. Await successful static
+and focused results before starting full verification. Freeze input files during
+each run; a run started before a correction does not validate the final tree.
+
+For a prerequisite of a named current consumer, pin that consumer to the immutable
+owner candidate and pass its full affected regression suite before owner merge.
+Owner-only tests do not establish consumer lifecycle compatibility. Preserve
+existing consumer oracles and historical evidence.
+
+Before reusing a Node dependency directory, run
+`~/.codex/bin/test-compact -- npm ls --depth=0` from the verified package root.
+A matching lockfile or one successful import does not establish that all pinned
+dependencies are installed. If validation fails, use a worktree-local
+`~/.codex/bin/test-compact -- npm ci --ignore-scripts` before testing. Do not
+repair another worktree's dependency directory implicitly.
+
 For documentation batches, regenerate the index once after the batch, then
 check translations and index freshness:
 

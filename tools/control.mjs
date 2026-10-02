@@ -7,6 +7,7 @@
  */
 import { compile as compileGfb, CompileError } from './gfb1.mjs';
 import { buildSourceTrace } from './source-trace.mjs';
+import { checkedAdjacentConstraints } from './constraint-proof.mjs';
 import { QUANTITY_TYPES, canonicalUnitFor, isQuantityType, quantityLiteral, quantitySuffixAt } from './quantities.mjs';
 import { TIME_TYPES, isTimeType, parseTimeLiteral, validateTimeValue } from './time-literals.mjs';
 
@@ -448,12 +449,12 @@ class ControlParser {
     for (const field of ['cleanup', 'resume']) if (!fields[field]) error(kind, `missing preemption field ${field}`);
     return { kind: kind.value, fields, loc: copyLoc(kind) };
   }
-  namedConstraints() {
+  namedConstraints(inline = false) {
     const start = this.take(), name = this.identifier('expected constraints name');
     this.expect('for', 'constraints requires for resource');
     const target = this.identifier('expected constraints target resource');
     this.expect('{', 'expected { after constraints target');
-    const rules = [];
+    const rules = []; let safe;
     while (!this.matches('}')) {
       if (this.current().kind === 'eof') error(start, 'unclosed constraints block');
       const kind = this.take();
@@ -463,19 +464,54 @@ class ControlParser {
         if (stage.value !== 'admission') error(stage, 'exclusive stage must be admission');
         const members = this.finiteNames('exclusive modes');
         this.expect(';', 'expected ; after exclusive rule');
-        rules.push({ kind: 'exclusive', stage: stage.value, members, loc: copyLoc(kind) });
+        rules.push(inline ? this.node('exclusive', kind, { stage: stage.value, members })
+          : { kind: 'exclusive', stage: stage.value, members, loc: copyLoc(kind) });
       } else if (kind.value === 'require') {
         this.expect('at', 'require requires a stage');
         const stage = this.identifier('expected require stage');
         if (stage.value !== 'safe_output') error(stage, 'finite-set require stage must be safe_output');
         const predicate = this.constraintPredicate();
         this.expect(';', 'expected ; after require rule');
-        rules.push({ kind: 'require', stage: stage.value, predicate, loc: copyLoc(kind) });
-      } else error(kind, `unsupported named constraint ${kind.value}`);
+        rules.push(inline ? this.node('require', kind, { stage: stage.value, predicate })
+          : { kind: 'require', stage: stage.value, predicate, loc: copyLoc(kind) });
+      } else if (kind.value === 'safe') {
+        if (safe !== undefined) error(kind, 'duplicate authored safe vector');
+        this.expect('{', 'safe requires { resource = Bool; }');
+        safe = [];
+        while (!this.matches('}')) {
+          if (this.current().kind === 'eof') error(kind, 'unclosed safe vector');
+          const resource = this.identifier('expected safe resource alias');
+          this.expect('=', 'safe resource requires =');
+          const value = this.take();
+          if (!['true', 'false'].includes(value.value)) error(value, 'safe value must be a literal Bool');
+          this.expect(';', 'expected ; after safe resource value');
+          safe.push(inline ? this.node('resource-safe-value', resource, { resource: resource.value, value: value.value === 'true' })
+            : { resource: resource.value, value: value.value === 'true', loc: copyLoc(resource) });
+        }
+        this.take(); this.maybe(';');
+      } else error(kind, `unsupported named constraint ${kind.value}; use exclusive at admission or require at safe_output`);
     }
     this.take();
     if (!rules.length) error(start, 'constraints block requires at least one rule');
-    return { name: name.value, target: target.value, rules, loc: copyLoc(start) };
+    if (inline && safe === undefined) error(start, 'shared resource constraints require an authored safe vector');
+    if (inline) return this.node('shared-constraints', start, { name: name.value, target: target.value, rules, safe });
+    return { name: name.value, target: target.value, rules, ...(safe !== undefined ? { safe } : {}), loc: copyLoc(start) };
+  }
+  controlConstraints() {
+    if (this.tokens[this.at + 2]?.value === 'for') return this.namedConstraints(true);
+    if (this.tokens[this.at + 3]?.value === 'limit') return this.accountConstraints();
+    const start = this.take(), name = this.identifier('expected constraints name');
+    this.expect('{', 'expected { after constraints name');
+    const rules = [];
+    while (!this.matches('}')) {
+      if (this.current().kind === 'eof') error(start, 'unclosed local constraints block');
+      if (this.matches('require')) rules.push(this.requirement(true));
+      else if (this.matches('mutex')) rules.push(this.mutex());
+      else error(this.current(), `unsupported local constraint ${this.current().value}; use require or mutex, and keep accounting limit rules in a separate group`);
+    }
+    this.take();
+    if (!rules.length) error(start, 'local constraints block requires at least one rule');
+    return this.node('local-constraints', start, { name: name.value, rules });
   }
   finiteNames(label) {
     this.expect('{', `expected { for ${label}`);
@@ -577,7 +613,7 @@ class ControlParser {
       case 'objective': return this.objective();
       case 'degraded': return this.degraded();
       case 'adapt_setting': return this.adaptSetting();
-      case 'constraints': return this.accountConstraints();
+      case 'constraints': return this.controlConstraints();
       case 'check': case 'limit': error(token, `unsupported construct ${token.value}`);
       default:
         if (token.kind === 'identifier' && this.tokens[this.at + 1]?.value === "'") return this.nextStatement(false);
@@ -616,13 +652,14 @@ class ControlParser {
     const names = this.names(`expected ${kind} name`);
     this.expect(':', `expected : after ${kind} name`);
     const type = this.typeName();
+    if (kind === 'input' && this.matches('=')) {
+      error(this.current(), 'input declarations are type-only; the host supplies input values');
+    }
     if (kind === 'output' && this.matches('=')) {
       error(this.current(), 'output declarations are type-only; connect each output with `name <- expression;`');
     }
-    let initial = null;
-    if (this.maybe('=')) initial = this.expression();
     this.expect(';', `expected ; after ${kind} declaration`);
-    return this.node(kind, start, { names: names.map(x => x.value), type, initial });
+    return this.node(kind, start, { names: names.map(x => x.value), type, initial: null });
   }
   state() {
     const start = this.take(), name = this.identifier('expected state name');
@@ -709,10 +746,29 @@ class ControlParser {
   }
   typeDecl() {
     const start = this.take(), name = this.identifier('expected type name');
-    this.expect('=', 'type requires ='); const members = [this.identifier('expected enum member')];
-    while (this.maybe('|')) members.push(this.identifier('expected enum member'));
+    this.expect('=', 'type requires ='); const members = [this.enumMember()];
+    while (this.maybe('|')) members.push(this.enumMember());
     this.expect(';', 'expected ; after type declaration');
-    return this.node('enum', start, { name: name.value, members: members.map(x => ({ name: x.value, loc: copyLoc(x) })) });
+    return this.node('enum', start, { name: name.value, members });
+  }
+  enumMember() {
+    const name = this.identifier('expected enum member');
+    const member = { name: name.value, loc: copyLoc(name) };
+    if (this.maybe('{')) {
+      while (!this.matches('}')) {
+        const key = this.identifier('expected enum member option');
+        if (key.value !== 'label') error(key, `unsupported enum member option ${key.value}`);
+        if (member.label !== undefined) error(key, 'duplicate enum member option label');
+        this.expect('=', 'expected = after enum member option label');
+        const label = this.current();
+        if (label.kind !== 'string') error(label, 'enum member label must be a string');
+        if (!label.value.trim()) error(label, 'enum member label must be a non-empty string');
+        member.label = this.take().value;
+        this.expect(';', 'expected ; after enum member option');
+      }
+      this.take();
+    }
+    return member;
   }
   functionDecl() {
     const start = this.take(), name = this.identifier('expected function name');
@@ -799,7 +855,7 @@ class ControlParser {
     this.expect('{', 'expected { after constraints name');
     const limits = [];
     while (!this.matches('}')) {
-      const token = this.expect('limit', 'constraints only support limit rules');
+      const token = this.expect('limit', 'accounting constraints only support limit rules; keep local output and shared resource rules in separate groups');
       const used = this.call(this.expect('used', 'limit requires used(account, basis)'));
       if (!used.args.length || used.args.length > 2) error(token, 'used requires an account and one time basis');
       const op = this.current();
@@ -851,7 +907,7 @@ class ControlParser {
     const kind = this.identifier('expected schedule type');
     if (kind.value === 'Solar') return this.solarSchedule(start, name);
     if (kind.value === 'Tide') return this.tideSchedule(start, name);
-    if (!['Daily', 'DailySlots', 'Periodic', 'Cron'].includes(kind.value)) error(kind, 'only Daily, DailySlots<15min>, Periodic, Cron, Solar and Tide schedules are supported');
+    if (!['At', 'Daily', 'DailySlots', 'Periodic', 'Cron'].includes(kind.value)) error(kind, 'only At, Daily, DailySlots<15min>, Periodic, Cron, Solar and Tide schedules are supported');
     let interval = null;
     if (kind.value === 'DailySlots') {
       this.expect('<'); interval = this.expression(5); this.expect('>', 'expected > after DailySlots interval');
@@ -868,7 +924,7 @@ class ControlParser {
         if (this.current().kind !== 'cron-literal') error(this.current(), 'Cron at requires a cron5 tagged literal');
         at = this.take();
       }
-      else if (key.value === 'at' && kind.value === 'Daily') at = this.expression();
+      else if (key.value === 'at' && ['Daily', 'At'].includes(kind.value)) at = this.expression();
       else if (key.value === 'on' && kind.value === 'Daily') {
         const value = this.current();
         if (value.kind !== 'context-literal' || !value.value.startsWith('day`')) error(value, 'Daily on requires a day tagged literal');
@@ -908,10 +964,12 @@ class ControlParser {
       } else if (key.value === 'at') {
         options.at = this.solarAt();
       } else if (key.value === 'fallback') {
-        const value = this.identifier('Solar fallback must be skip');
-        if (value.value !== 'skip') error(value, 'Solar fallback must be skip');
-        options.fallback = value.value;
-        policy.fallback = this.node('reference', value, { name: value.value });
+        policy.fallback = this.expression();
+        if (!(policy.fallback.kind === 'reference' && policy.fallback.name === 'skip')
+          && !(policy.fallback.kind === 'call' && policy.fallback.name === 'fixed_time')) {
+          error(policy.fallback.loc, 'Solar fallback must be skip');
+        }
+        options.fallback = policy.fallback;
       } else if (['basis', 'when', 'clock', 'gap', 'recovery'].includes(key.value)) {
         policy[key.value] = this.expression();
       } else error(key, `unsupported Solar schedule option ${key.value}`);
@@ -1001,8 +1059,12 @@ class ControlParser {
     this.expect('<-', 'output connection requires <-'); const value = this.expression(); this.expect(';', 'expected ; after output connection');
     return this.node('connection', start, { name: name.value, value });
   }
-  requirement() {
+  requirement(grouped = false) {
     const start = this.take();
+    if (grouped && this.maybe('at')) {
+      const stage = this.identifier('expected local require stage');
+      if (stage.value !== 'safe_output') error(stage, 'local require stage must be safe_output');
+    }
     let value;
     if (this.matches('!')) value = this.expression();
     else {
@@ -1010,7 +1072,7 @@ class ControlParser {
       value = this.node('binary', start, { op: '=>', left, right });
     }
     this.expect(';', 'expected ; after require');
-    return this.node('require', start, { value });
+    return this.node('require', start, { value, ...(grouped ? { stage: 'safe_output' } : {}) });
   }
   mutex() {
     const start = this.take(); this.expect('('); const names = this.names('expected mutex output'); this.expect(')'); this.expect(';');
@@ -1470,6 +1532,10 @@ class Lowerer {
     this.hasSolarSchedule = ast.body.some(item => item.kind === 'schedule' && item.scheduleType === 'Solar');
   }
   lower({ emitBytecode = true, accountingExecution = false } = {}) {
+    if (emitBytecode && this.ast.body.some(item => item.kind === 'shared-constraints')) {
+      error(this.ast.body.find(item => item.kind === 'shared-constraints').loc,
+        'shared resource constraints require resource binding and runtime enforcement; compile a checked nonexecutable descriptor');
+    }
     this.syntaxOnly = !emitBytecode;
     this.accountingExecution = accountingExecution;
     validateCompositionStructure(this.ast);
@@ -1501,8 +1567,20 @@ class Lowerer {
       : ['all', ...this.manifest.outputs.map(output => ['has', 'actuator', output.name, gfbType(semanticType(output.type))])];
     const solarForms = this.solarForms();
     const contextForms = emitBytecode ? this.contextForms() : [];
+    if (contextForms.some(form => form[0] === 'holiday-daily-pulse') && solarForms.length) {
+      error(this.ast.loc, 'Holiday Daily cannot mix with legacy Solar or non-calendar Daily/DailySlots execution');
+    }
+    const extendedSolar = this.manifest.schedules.some(schedule => schedule.kind === 'solar'
+      && (typeof schedule.policy.clock === 'object' || typeof schedule.policy.fallback === 'object'));
+    if (emitBytecode && extendedSolar && !this.configStreams.length && (this.manifest.schedules.some(schedule => schedule.kind !== 'solar')
+      || this.providers.size)) {
+      error(this.ast.loc, 'extended Solar policy execution requires Solar-only schedules without providers or config streams');
+    }
+    if (contextForms.some(form => form[0] === 'utc-range') && solarForms.length) {
+      error(this.ast.loc, 'UTC Range cannot mix with legacy Solar or civil pulse execution');
+    }
     if (emitBytecode && this.configStreams.length && solarForms.length) {
-      error(this.ast.loc, 'config streams cannot mix with legacy Solar/DailySlots context execution; use fixed let values or a config-aware schedule');
+      error(this.ast.loc, 'config streams cannot mix with legacy Daily/DailySlots context execution; use fixed let values or a config-aware schedule');
     }
     if (accountingExecution) {
       const bindings = this.manifest.accounts ?? [];
@@ -1517,9 +1595,22 @@ class Lowerer {
       delete this.manifest.accounts;
       delete this.manifest.accountingConstraints;
     }
-    if (contextForms.length) this.manifest.format = 'GhostFlow/control-v10';
+    if (contextForms.length || accountingExecution) this.manifest.format = 'GhostFlow/control-v10';
     else if (solarForms.some(form => form[0] === 'daily-slots-pulse')) this.manifest.format = 'GhostFlow/control-v8';
     else if (solarForms.some(form => form[0] === 'daily-pulse')) this.manifest.format = 'GhostFlow/control-v7';
+    if (this.manifest.schedules.some(schedule => typeof schedule.policy?.clock === 'object'
+      || typeof schedule.policy?.fallback === 'object')) this.manifest.format = 'GhostFlow/control-v12';
+    if (contextForms.some(form => form[0] === 'at-pulse')) {
+      if (solarForms.length || contextForms.some(form => form[0] !== 'at-pulse')
+        || ['configs','sensors','providers','calendars','naturalConditions','objectives','resources','adaptSettings','signals']
+          .some(key => this.manifest[key]?.length) || this.manifest.accounting) {
+        error(this.ast.loc, 'At pulse execution cannot mix with other schedule/provider/config profiles');
+      }
+      this.manifest.format = 'GhostFlow/control-v13';
+    }
+    if (contextForms.some(form => form[0] === 'holiday-daily-pulse')) this.manifest.format = 'GhostFlow/control-v14';
+    if (contextForms.some(form => form[0] === 'solar-context-pulse')) this.manifest.format = 'GhostFlow/control-v15';
+    if (contextForms.some(form => ['calendar-range', 'calendar-result'].includes(form[0]))) this.manifest.format = 'GhostFlow/control-v18';
     const temporalForms = this.windows.length || this.trueFors.length || solarForms.length || contextForms.length ? [
       ['temporal-context', `${RESERVED_PREFIX}now_ms`, `${RESERVED_PREFIX}time_epoch`],
       ...[...this.temporalRoots.values()].sort((left, right) => left.tag - right.tag).map(root =>
@@ -1534,8 +1625,9 @@ class Lowerer {
           ...solarForms, ...contextForms, ...strategy.intents.map(([name, expression]) => ['intent', name, expression]),
       ])
       : [['strategy', 'control', '0', ['device', deviceQuery], ...windows, ...solarForms, ...contextForms, ...this.trueForForms(), ...transitions, ...intents]];
+    const constraintProof = checkedAdjacentConstraints(this.constraints);
     const module = ['module', this.ast.name, ['version', '1'], ...this.gfbInputs, ...this.gfbStates, ...temporalForms,
-      ...strategyForms, ...this.constraints,
+      ...strategyForms, ...(constraintProof?.compiled ?? this.constraints),
       ...[...this.objectives.values()].filter(objective => objective.binding === 'native-temperature-percent-v1').map(objective => [
         'pid-objective', objective.name, objective.bindings.output, objective.bindings.measure,
         objective.bindings.measureOk, objective.bindings.target, objective.bindings.safeMax,
@@ -1545,7 +1637,7 @@ class Lowerer {
         String(objective.controller.bias), String(objective.output.max), String(objective.controller.restart.output),
       ])];
     if (!emitBytecode) return { manifest: this.manifest, sourceMap: this.ast.sourceNodes };
-    const policySchedule = this.ast.body.find(item => item.kind === 'schedule' && !isExecutablePulseSchedule(item)
+    const policySchedule = this.ast.body.find(item => item.kind === 'schedule' && !isExecutablePulseSchedule(item) && !isExecutableRangeSchedule(item)
       && Object.keys(item.policy ?? {}).some(key => key !== 'fallback'));
     if (policySchedule) error(policySchedule.loc,
       `${policySchedule.scheduleType} policy execution requires verified occurrence provider and native admission bindings`);
@@ -1576,7 +1668,7 @@ class Lowerer {
       bytes,
       manifest: this.manifest,
       sourceMap: this.ast.sourceNodes,
-      traceMetadata: buildSourceTrace(this.ast, this.constraints, bytes, transitions, intents, generatedTimers, this.resultSites, this.generatedSignals,
+      traceMetadata: buildSourceTrace({ ...this.ast, body: this.ast.body.flatMap(item => item.kind === 'local-constraints' ? item.rules : [item]) }, this.constraints, bytes, transitions, intents, generatedTimers, this.resultSites, this.generatedSignals,
         this.windows.map(window => ({
           node: window.item, descriptor: window.descriptor,
           source: {
@@ -1584,7 +1676,7 @@ class Lowerer {
             origin: window.source.originTag, quality: window.sample.quality, sourceTag: window.sample.sourceTag,
           },
           origins: window.source.origins ?? [],
-        }))),
+        })), constraintProof),
     };
   }
   unique(name, loc, category) {
@@ -1633,7 +1725,7 @@ class Lowerer {
     for (const item of this.ast.body) {
       if (item.kind === 'enum') continue;
       if (item.kind === 'input' || item.kind === 'output') for (const name of item.names) this.unique(name, item.loc, item.kind);
-      else if (['state', 'config', 'parameter', 'let', 'function', 'syntax', 'sensor', 'event', 'calendar', 'provider', 'signal', 'schedule', 'timer', 'resource', 'account', 'account-constraints'].includes(item.kind)) this.unique(item.name, item.loc, item.kind);
+      else if (['state', 'config', 'parameter', 'let', 'function', 'syntax', 'sensor', 'event', 'calendar', 'provider', 'signal', 'schedule', 'timer', 'resource', 'account', 'account-constraints', 'shared-constraints', 'local-constraints'].includes(item.kind)) this.unique(item.name, item.loc, item.kind);
       else if (item.kind === 'adapt') this.unique(item.name, item.loc, 'adapt policy');
       else if (['objective', 'degraded', 'adapt-setting'].includes(item.kind)) this.unique(item.name, item.loc, item.kind);
     }
@@ -1720,6 +1812,12 @@ class Lowerer {
   }
   generatedName(kind, name) { return `${RESERVED_PREFIX}${kind}_${name}`; }
   validateAndPopulate() {
+    if (this.ast.body.some(item => item.kind === 'shared-constraints')) {
+      this.manifest.sharedResourceConstraints = checkResourcePolicy({
+        inline: true, resources: this.ast.body.filter(item => item.kind === 'resource'),
+        constraints: this.ast.body.filter(item => item.kind === 'shared-constraints'),
+      }).constraints;
+    }
     for (const item of this.ast.body) if (item.kind === 'syntax') this.addMacro(item);
     // Functions are declarations, so calls may precede their definitions both
     // inside the control and in the top-level pure-function prelude.
@@ -1870,7 +1968,19 @@ class Lowerer {
         if (!output.expression) error(output.loc, `output ${output.name} requires exactly one connection (${output.name} <- expression;)`);
       }
     }
-    for (const item of this.ast.body) if (item.kind === 'require' || item.kind === 'mutex') this.addConstraint(item);
+    for (const item of this.ast.body) {
+      if (item.kind === 'require' || item.kind === 'mutex') this.addConstraint(item);
+      if (item.kind === 'local-constraints') {
+        const rules = item.rules.map(rule => {
+          if (rule.kind === 'mutex' && new Set(rule.names).size !== rule.names.length) error(rule.loc, 'duplicate local mutex output');
+          const before = this.constraints.length;
+          this.addConstraint(rule);
+          return { kind: rule.kind, stage: 'safe_output', lowered: this.constraints.slice(before), source: { nodeId: rule.id, ...rule.loc } };
+        });
+        (this.manifest.localConstraints ??= []).push({ name: item.name, scope: 'local_output', rules,
+          source: { nodeId: item.id, ...item.loc } });
+      }
+    }
   }
   addAdapt(item) {
     const strategyNames = new Set();
@@ -2127,6 +2237,14 @@ class Lowerer {
     }); this.symbols.get(item.name).type = resultType(type, semanticType('SensorFault'));
   }
   addSchedule(item) {
+    if (item.scheduleType === 'At') {
+      if (!item.at) error(item.loc, 'At schedule requires at');
+      if (item.timezone !== null || item.policy.dst_missing || item.policy.dst_repeated) error(item.loc, 'At has no timezone or DST fields');
+      const at = this.expression(item.at, new Map(), { allowNext: false });
+      if (at.type.kind !== 'DateTime' || !Number.isSafeInteger(at.constant)) error(item.at.loc, 'At at must be a constant DateTime');
+      if (item.policy.basis?.kind !== 'reference' || item.policy.basis.name !== 'pulse') error(item.loc, 'At executable basis requires pulse');
+      return this.addCivilSchedulePolicy(item, { kind: 'at', atMs: at.constant }, false);
+    }
     if (item.scheduleType === 'Solar') return this.addSolarSchedule(item);
     if (item.scheduleType === 'Tide') return this.addTideSchedule(item);
     if (item.scheduleType === 'Periodic') return this.addPeriodicSchedule(item);
@@ -2274,6 +2392,9 @@ class Lowerer {
         else if (trigger.kind === 'periodic') minimumSpacing = trigger.every.initialMs;
         else error(options.basis.loc, `${label} range requires a statically bounded recurrence`);
         if (range.constant > minimumSpacing) error(options.basis.loc, `${label} range occurrences must not overlap`);
+        if (trigger.day && (trigger.day.kind === 'holiday' || trigger.atMs + range.constant > 86_400_000)) {
+          error(options.basis.loc, 'work calendar Range must stay within one civil date; split overnight intervals into explicit Daily ranges');
+        }
         basis = { kind: 'range', durationMs: range.constant };
       } else error(options.basis.loc, `${label} basis must be pulse or range(positive Duration)`);
       const clock = choice('clock', ['trusted_only']);
@@ -2295,7 +2416,9 @@ class Lowerer {
         if (!sameType(cancel.type, BOOL)) error(options.cancel_when.loc, `${label} cancel_when must be Bool`);
         cancelWhen = cancel.sexpr;
       }
-      const slot = this.configStreams.length + this.manifest.schedules.filter(schedule => ['solar', 'daily', 'daily-slots', 'periodic', 'cron'].includes(schedule.kind)).length;
+      const slot = this.configStreams.length + (this.configStreams.length && this.hasSolarSchedule
+        ? this.manifest.schedules.length
+        : this.manifest.schedules.filter(schedule => ['at', 'solar', 'daily', 'daily-slots', 'periodic', 'cron'].includes(schedule.kind)).length);
       this.manifest.schedules.push({
         ...trigger, site: item.id, name: item.name, ...civilPolicy,
         policy: { basis, when: predicate.sexpr, ...(cancelWhen === undefined ? {} : { cancelWhen }),
@@ -2303,10 +2426,10 @@ class Lowerer {
       });
       this.schedules.set(item.name, { slot, loc: item.loc });
       this.symbols.get(item.name).type = { kind: 'Schedule' };
-      if (isExecutablePulseSchedule(item)) {
+      if (isExecutablePulseSchedule(item) || isExecutableRangeSchedule(item)) {
         if (!this.hasClock) { this.addInput(`${RESERVED_PREFIX}now_ms`, NUMBER, item.loc); this.hasClock = true; }
         if (!this.gfbInputs.some(input => input[1] === `${RESERVED_PREFIX}time_epoch`)) this.addInput(`${RESERVED_PREFIX}time_epoch`, NUMBER, item.loc);
-        this.schedules.set(item.name, { slot, loc: item.loc, projections: new Set(['due', 'missed']) });
+        this.schedules.set(item.name, { slot, loc: item.loc, projections: new Set(isExecutableRangeSchedule(item) ? ['due', 'active'] : ['due', 'missed']) });
       }
   }
   addSolarSchedule(item) {
@@ -2319,7 +2442,8 @@ class Lowerer {
     const policy = this.naturalSchedulePolicy(item, false);
     if (!this.hasClock) { this.addInput(`${RESERVED_PREFIX}now_ms`, NUMBER, item.loc); this.hasClock = true; }
     if (!this.gfbInputs.some(input => input[1] === `${RESERVED_PREFIX}time_epoch`)) this.addInput(`${RESERVED_PREFIX}time_epoch`, NUMBER, item.loc);
-    const slot = this.manifest.schedules.filter(schedule => ['solar', 'daily'].includes(schedule.kind)).length;
+    const slot = this.configStreams.length ? this.configStreams.length + this.manifest.schedules.length
+      : this.manifest.schedules.filter(schedule => ['solar', 'daily'].includes(schedule.kind)).length;
     this.manifest.format = 'GhostFlow/control-v3';
     this.manifest.schedules.push({
       kind: 'solar', site: item.id, name: item.name, timezone: item.timezone,
@@ -2390,8 +2514,32 @@ class Lowerer {
       if (!sameType(cancel.type, BOOL)) error(options.cancel_when.loc, `${label} cancel_when must be Bool`);
       result.cancelWhen = cancel.sexpr;
     }
-    return { ...result, clock: choice('clock', ['trusted_only']), gapMs: gapDuration.constant,
-      recovery: choice('recovery', ['baseline']), fallback: choice('fallback', ['skip']) };
+    const terminalCall = (node, name) => {
+      if (node.kind !== 'call' || node.name !== name || node.args.length !== 1
+        || node.named.length !== 1 || node.named[0].name !== 'terminal'
+        || node.named[0].value.kind !== 'reference' || node.named[0].value.name !== 'skip') {
+        error(node.loc, `${label} ${name} requires one argument and terminal: skip`);
+      }
+    };
+    let clock, fallback;
+    if (options.clock.kind === 'call' && options.clock.name === 'hold_trusted') {
+      terminalCall(options.clock, 'hold_trusted');
+      const duration = this.expression(options.clock.args[0], new Map(), { allowNext: false }, [], DURATION);
+      if (!sameType(duration.type, DURATION) || !Number.isSafeInteger(duration.constant) || duration.constant <= 0)
+        error(options.clock.loc, `${label} hold_trusted requires a positive constant Duration`);
+      clock = { kind: 'hold_trusted', durationMs: duration.constant, terminal: 'skip' };
+    } else clock = choice('clock', ['trusted_only']);
+    if (label === 'Solar' && options.fallback.kind === 'call' && options.fallback.name === 'fixed_time') {
+      terminalCall(options.fallback, 'fixed_time');
+      const node = options.fallback.args[0];
+      if (node.kind !== 'literal' || !node.raw?.startsWith('time`'))
+        error(node.loc, 'Solar fixed_time requires a TimeOfDay literal');
+      const at = this.expression(node, new Map(), { allowNext: false });
+      if (at.type.kind !== 'TimeOfDay') error(node.loc, 'Solar fixed_time requires a TimeOfDay literal');
+      fallback = { kind: 'fixed_time', atMs: at.constant, terminal: 'skip' };
+    } else fallback = choice('fallback', ['skip']);
+    return { ...result, clock, gapMs: gapDuration.constant,
+      recovery: choice('recovery', ['baseline']), fallback };
   }
   resolveSignal(name) {
     if (this.signals.has(name)) return this.signals.get(name);
@@ -2405,6 +2553,7 @@ class Lowerer {
   }
   addSignal(item) {
     const call = item.call;
+    if (call.kind === 'call' && call.name === 'ema') return this.addEmaSignal(item, call);
     if (call.kind === 'call' && ['window_average', 'window_min', 'window_max', 'window_rate'].includes(call.name)) return this.addWindowSignal(item, call);
     if (call.kind === 'call' && call.name === 'debounce') return this.addDebounceSignal(item, call);
     if (call.kind === 'call' && call.name === 'hold_last') return this.addHoldLastSignal(item, call);
@@ -2426,6 +2575,72 @@ class Lowerer {
     this.manifest.signals.push({ name: item.name, sensor: sensorRef.name, onBelow: below.constant, offAbove: above.constant, initial: initial.constant, valueInput, okInput, faultInput });
     const sample = this.sensorSample(sensorRef.name);
     this.signals.set(item.name, { type: BOOL, valueInput, okInput, faultInput, originTag: item.id, loc: item.loc, sample }); this.symbols.get(item.name).type = resultType(BOOL, semanticType('SensorFault'));
+  }
+  addEmaSignal(item, call) {
+    if (call.args.length !== 1 || call.named.length !== 1 || call.named[0].name !== 'alpha') {
+      error(call.loc, 'ema signal requires ema(source, alpha: Number)');
+    }
+    const source = this.expression(call.args[0], new Map(), { allowNext: false });
+    if (source.type.kind !== 'Result' || source.type.error.kind !== 'SensorFault'
+        || (!['Number', 'Percent'].includes(source.type.value.kind) && !isQuantityType(source.type.value.kind))) {
+      error(call.args[0].loc, 'ema source must be numeric Result<T, SensorFault>');
+    }
+    const alpha = this.expression(call.named[0].value, new Map(), { allowNext: false }, [], NUMBER);
+    if (!sameType(alpha.type, NUMBER) || alpha.constant === undefined || !Number.isFinite(alpha.constant)
+        || !(alpha.constant > 0 && alpha.constant <= 1)) error(call.loc, 'ema alpha must be finite and in (0, 1]');
+    const sample = source.sample ?? scanSample();
+    if (sample.sources.length !== 1) error(call.loc, 'ema signal requires exactly one physical sample lineage');
+    if (!this.hasClock) { this.addInput(`${RESERVED_PREFIX}now_ms`, NUMBER, item.loc); this.hasClock = true; }
+    for (const root of sample.sources) this.allocateSampleRoot(root);
+    const payloadType = source.type.value;
+    const states = Object.fromEntries(['ready', 'value', 'lastSourceTag'].map(role => [role,
+      this.generatedName(`ema_${role.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)}`, item.name)]));
+    this.addState(states.ready, BOOL, false, item.loc);
+    this.addState(states.value, payloadType, defaultLowered(payloadType).constant ?? 0, item.loc);
+    this.addState(states.lastSourceTag, NUMBER, 0, item.loc);
+    const sources = sample.sources.map(root => {
+      const rootStates = { lastEpoch: `${RESERVED_PREFIX}ema_source_epoch_${item.name}_${root.tag}`,
+        lastId: `${RESERVED_PREFIX}ema_source_id_${item.name}_${root.tag}` };
+      this.addState(rootStates.lastEpoch, NUMBER, 0, item.loc); this.addState(rootStates.lastId, NUMBER, -1, item.loc);
+      return { ...root, states: rootStates };
+    });
+    const observations = sources.map(root => {
+      const inputs = this.sensors.get(root.name).sampleInputs;
+      const epoch = `input.${inputs.epoch}`, id = `input.${inputs.id}`, present = `input.${inputs.present}`;
+      const epochChanged = ['not', ['eq', epoch, `state.${root.states.lastEpoch}`]];
+      const newer = ['and', present, ['or', epochChanged, ['gt', id, `state.${root.states.lastId}`]]];
+      const selected = ['eq', sample.sourceTag, numberAtom(root.tag)];
+      return { root, epoch, id, newer, fresh: ['and', selected, newer],
+        changed: ['and', selected, ['and', present, epochChanged]] };
+    });
+    const any = values => values.reduce((left, right) => ['or', left, right], 'false');
+    const fresh = any(observations.map(observation => observation.fresh));
+    const changed = ['or', ['not', ['eq', sample.sourceTag, `state.${states.lastSourceTag}`]],
+      any(observations.map(observation => observation.changed))];
+    const readyBefore = ['and', `state.${states.ready}`, ['not', changed]];
+    const weighted = ['add', ['mul', numberAtom(alpha.constant), source.value],
+      ['mul', numberAtom(1 - alpha.constant), `state.${states.value}`]];
+    const value = ['if', source.ok, ['if', fresh,
+      ['if', readyBefore, weighted, source.value], ['if', readyBefore, `state.${states.value}`, '0']], '0'];
+    const ready = ['and', source.ok, ['or', fresh, readyBefore]];
+    const next = { ready, value, lastSourceTag: sample.sourceTag };
+    const sourceNext = observations.flatMap(({ root, epoch, id, newer }) => [
+      [root.states.lastEpoch, ['if', newer, epoch, `state.${root.states.lastEpoch}`]],
+      [root.states.lastId, ['if', newer, id, `state.${root.states.lastId}`]],
+    ]);
+    const descriptor = { kind: 'ema', name: item.name, payloadType: payloadType.kind, errorType: 'SensorFault',
+      alpha: alpha.constant, sourceMode: 'sample', clockInput: `${RESERVED_PREFIX}now_ms`, sources, states };
+    const lowered = { ...source, value, ok: ready,
+      faultCode: ['if', source.ok, '3', source.faultCode],
+      originTag: ['if', source.ok, numberAtom(item.id), source.originTag],
+      origins: [...(source.origins ?? []), { tag: item.id, nodeId: item.id, kind: 'signal', name: item.name }], sample };
+    this.manifest.signals.push(descriptor);
+    this.signals.set(item.name, { type: payloadType, lowered, descriptor, states, next, sourceNext, originTag: item.id, loc: item.loc });
+    this.symbols.get(item.name).type = lowered.type;
+    for (const [role, name] of Object.entries(states)) this.generatedSignals.push({ node: item, role, name });
+    for (const root of sources) this.generatedSignals.push(
+      { node: item, role: 'sourceEpoch', name: root.states.lastEpoch, sourceTag: root.tag },
+      { node: item, role: 'sourceId', name: root.states.lastId, sourceTag: root.tag });
   }
   addAfterEventSignal(item, call) {
     const named = new Map();
@@ -3333,6 +3548,26 @@ class Lowerer {
       error(node.loc, 'removed alias ifthenelse; use if condition then value else value');
     }
     if (node.name === 'elapsed' || node.name === 'hysteresis' || node.name === 'median') error(node.loc, `${node.name} is only valid in its declaration`);
+    if (node.name === 'calendar_is') {
+      if (node.args.length !== 2 || node.named.length) error(node.loc, 'calendar_is expects a calendar and one day classification');
+      const calendarRef = node.args[0];
+      const calendar = calendarRef.kind === 'reference' ? this.calendars.get(calendarRef.name) : null;
+      if (!calendar) error(calendarRef.loc, 'calendar_is first argument must name a typed calendar');
+      if (options.pureFunction) error(calendarRef.loc, `fn ${options.pureFunction} cannot capture global ${calendarRef.name}`);
+      const selector = node.args[1];
+      const match = selector.kind === 'literal' ? /^day`(workday|offday|holiday)`$/.exec(selector.raw) : null;
+      if (!match) error(selector.loc, 'calendar_is requires day`workday`, day`offday` or day`holiday`');
+      if (calendar.type !== (match[1] === 'holiday' ? 'HolidayCalendar' : 'WorkCalendar')) error(calendarRef.loc, 'calendar_is calendar type does not match day selector');
+      const projectionInputs = Object.fromEntries(['ok', 'value', 'fault'].map(role => [role, this.generatedName(`calendar_${node.id}`, role)]));
+      for (const role of ['ok', 'value', 'fault']) this.addInput(projectionInputs[role], role === 'fault' ? NUMBER : BOOL, node.loc);
+      if (!this.hasClock) { this.addInput(`${RESERVED_PREFIX}now_ms`, NUMBER, node.loc); this.hasClock = true; }
+      if (!this.gfbInputs.some(input => input[1] === `${RESERVED_PREFIX}time_epoch`)) this.addInput(`${RESERVED_PREFIX}time_epoch`, NUMBER, node.loc);
+      (this.manifest.calendarConditions ??= []).push({ site: node.id, calendar: calendar.name, classification: match[1], timezone: 'UTC',
+        result: { value: 'Bool', error: 'CalendarFault' }, projectionInputs });
+      return { type: resultType(BOOL, semanticType('CalendarFault')), ok: `input.${projectionInputs.ok}`, value: `input.${projectionInputs.value}`,
+        faultCode: `input.${projectionInputs.fault}`, originTag: numberAtom(node.id),
+        origins: [{ tag: node.id, nodeId: node.id, kind: 'calendar-condition', name: 'calendar_is' }], sample: scanSample() };
+    }
     if (node.name === 'tide_is' || node.name === 'moon_is') {
       if (node.args.length !== 2 || node.named.length) error(node.loc, `${node.name} expects a provider and one classification`);
       const providerRef = node.args[0];
@@ -3512,7 +3747,7 @@ class Lowerer {
     ]);
   }
   solarForms() {
-    return this.manifest.schedules.filter(schedule => schedule.kind === 'solar'
+    return this.manifest.schedules.filter(schedule => schedule.kind === 'solar' && !this.configStreams.length
       || ['daily', 'daily-slots'].includes(schedule.kind) && schedule.policy.basis === 'pulse'
         && schedule.policy.clock === 'trusted_only' && !schedule.day && !schedule.selectedConfig).map(schedule => schedule.kind === 'daily' ? [
       'daily-pulse', String(schedule.site), schedule.name, schedule.timezone, String(schedule.atMs),
@@ -3526,9 +3761,11 @@ class Lowerer {
     ] : [
       'solar-pulse', String(schedule.site), schedule.name, schedule.timezone,
       String(schedule.latitude), String(schedule.longitude), schedule.event,
-      String(schedule.offsetMs), schedule.policy.basis, schedule.policy.clock,
-      String(schedule.policy.gapMs), schedule.policy.recovery, schedule.policy.fallback,
+      String(schedule.offsetMs), schedule.policy.basis, 'trusted_only',
+      String(schedule.policy.gapMs), schedule.policy.recovery, 'skip',
       schedule.policy.when,
+      ...(typeof schedule.policy.clock === 'object' || typeof schedule.policy.fallback === 'object'
+        ? [String(schedule.policy.clock.durationMs ?? 0), String(schedule.policy.fallback.atMs ?? 86400000)] : []),
     ]);
   }
   contextForms() {
@@ -3545,11 +3782,35 @@ class Lowerer {
         config.settings?.access === 'operator' ? 'true' : 'false', payload,
         inputs?.ok ?? 'none', inputs?.value ?? 'none', inputs?.fault ?? 'none'];
     });
-    const scheduleForms = this.manifest.schedules.filter(schedule => ['periodic', 'cron', 'tide'].includes(schedule.kind)
+    const scheduleForms = this.manifest.schedules.filter(schedule => schedule.kind === 'solar' && this.configStreams.length
+      || schedule.kind === 'at' || schedule.policy?.basis?.kind === 'range'
+      || ['periodic', 'cron', 'tide'].includes(schedule.kind)
       || schedule.kind === 'daily' && schedule.day?.calendar
       || schedule.kind === 'daily-slots' && schedule.selectedConfig).map(schedule => {
       const base = [String(schedule.site), schedule.name, String(schedule.policy.gapMs)];
       const when = schedule.policy.when, cancel = schedule.policy.cancelWhen ?? 'false';
+      if (schedule.kind === 'solar') {
+        const atoms = new Set();
+        const collect = value => { if (Array.isArray(value)) value.forEach(collect);
+          else for (const atom of String(value).match(/[^\s()]+/g) ?? []) atoms.add(atom); };
+        collect(when);
+        const deps = this.configStreams.filter(stream => stream.resultInputs
+          && Object.values(stream.resultInputs).some(input => atoms.has(`input.${input}`)))
+          .map(stream => stream.id).sort((a, b) => a - b);
+        schedule.configIds = deps;
+        return ['solar-context-pulse', ...base, schedule.timezone, String(schedule.latitude), String(schedule.longitude),
+          schedule.event, String(schedule.offsetMs), String(schedule.policy.fallback.atMs ?? 86400000),
+          ['config-deps', ...deps.map(String)], when, cancel, String(schedule.policy.clock.durationMs ?? 0)];
+      }
+      if (schedule.kind === 'at') return ['at-pulse', ...base, String(schedule.atMs), when, cancel];
+      if (schedule.policy.basis?.kind === 'range') {
+        if (schedule.timezone !== 'UTC' || schedule.selectedConfig
+          || !['daily', 'daily-slots'].includes(schedule.kind)) error(this.ast.loc, 'executable Range requires immutable UTC Daily or DailySlots');
+        const starts = schedule.kind === 'daily' ? [schedule.atMs] : schedule.slots.map(minute => minute * 60_000);
+        if (schedule.day) return ['calendar-range', ...base, 'UTC', String(schedule.policy.basis.durationMs), ['starts', ...starts.map(String)],
+          schedule.day.calendar, schedule.day.kind, when, cancel];
+        return ['utc-range', ...base, 'UTC', String(schedule.policy.basis.durationMs), ['starts', ...starts.map(String)], when, cancel];
+      }
       if (schedule.kind === 'periodic') {
         const config = this.manifest.configs.find(item => item.id === schedule.every.configId);
         if (config && config.type !== 'Duration' || schedule.anchor.kind !== 'instant'
@@ -3565,14 +3826,17 @@ class Lowerer {
           ...schedule.fields.map((field, index) => ['field', ...(field ?? Array.from({ length: [60, 24, 31, 12, 7][index] }, (_, at) => at + (index === 2 || index === 3 ? 1 : 0)))]), when, cancel];
       }
       if (schedule.kind === 'daily') {
-        if (!['workday', 'offday'].includes(schedule.day.kind) || schedule.policy.basis !== 'pulse') error(this.ast.loc, 'WorkCalendar executable slice requires workday/offday pulse');
+        if (schedule.policy.basis !== 'pulse') error(this.ast.loc, 'calendar Daily executable slice requires pulse');
+        if (schedule.day.kind === 'holiday') return ['holiday-daily-pulse', ...base, schedule.timezone,
+          String(schedule.atMs), schedule.day.calendar, schedule.dstMissing, schedule.dstRepeated, when, cancel];
         return ['calendar-daily-pulse', ...base, schedule.timezone, String(schedule.atMs), schedule.day.calendar,
           schedule.day.kind, schedule.dstMissing, schedule.dstRepeated, when, cancel];
       }
       if (schedule.kind === 'tide') {
         if (schedule.policy.basis?.kind !== 'run') error(this.ast.loc, 'Tide executable slice requires Run basis');
         return ['tide-run', ...base, schedule.timezone, schedule.source, schedule.event, String(schedule.offsetMs),
-          String(schedule.policy.basis.durationMs), String(schedule.policy.basis.admission.durationMs), when, cancel];
+          String(schedule.policy.basis.durationMs), String(schedule.policy.basis.admission.durationMs), when, cancel,
+          ...(typeof schedule.policy.clock === 'object' ? [String(schedule.policy.clock.durationMs)] : [])];
       }
       const config = this.manifest.configs.find(item => item.name === schedule.selectedConfig);
       if (!config || schedule.policy.basis !== 'pulse') error(this.ast.loc, 'TimeSlots executable slice requires config and pulse');
@@ -3589,7 +3853,10 @@ class Lowerer {
       account.evidenceBinding.target, account.basis.zone,
       account.resultInputs.ok, account.resultInputs.value, account.resultInputs.fault,
     ]);
-    return [...configForms, ...scheduleForms, ...naturalForms, ...accountingForms];
+    const calendarForms = (this.manifest.calendarConditions ?? []).map(condition => ['calendar-result', String(condition.site), `calendar_${condition.site}`,
+      condition.calendar, condition.classification, condition.timezone,
+      ...['ok','value','fault'].map(role => condition.projectionInputs[role])]);
+    return [...configForms, ...scheduleForms, ...naturalForms, ...accountingForms, ...calendarForms];
   }
   windowForms() {
     return this.windows.map(({ descriptor, source, sample, outputType }) => [
@@ -3705,7 +3972,8 @@ function checkResourcePolicy(ast) {
   for (const resource of ast.resources) {
     rejectName(resource.name, resource.loc, 'resource');
     if (resources.has(resource.name)) error(resource.loc, `duplicate resource ${resource.name}`);
-    if (!['Station', 'BoolActuator'].includes(resource.type)) error(resource.loc, `unsupported resource type ${resource.type}`);
+    if (!(ast.inline ? ['Station', 'BoolActuator', 'ContinuousActuator'] : ['Station', 'BoolActuator']).includes(resource.type)) error(resource.loc, `unsupported resource type ${resource.type}`);
+    if (ast.inline && resource.typeArgs) error(resource.loc, 'shared resource declarations require a finite concrete resource type');
     resources.set(resource.name, resource.type);
   }
   const finiteSet = (members, loc, type) => {
@@ -3746,22 +4014,74 @@ function checkResourcePolicy(ast) {
     if (constraints.has(group.name)) error(group.loc, `duplicate constraints ${group.name}`);
     constraints.add(group.name);
     if (!resources.has(group.target)) error(group.loc, `unknown resource ${group.target}`);
-    if (resources.get(group.target) !== 'Station') error(group.loc, `constraints target ${group.target} must be a Station resource`);
+    if (!(ast.inline ? ['Station', 'BoolActuator'] : ['Station']).includes(resources.get(group.target))) {
+      error(group.loc, `constraints target ${group.target} must be a ${ast.inline ? 'Station or BoolActuator' : 'Station'} resource`);
+    }
     const rules = group.rules.map(rule => {
       if (rule.kind === 'exclusive') {
         if (rule.members.length < 2) error(rule.loc, 'exclusive requires at least two modes');
+        if (rule.members.length > 128) error(rule.loc, 'exclusive finite mode set exceeds 128 members');
         const seen = new Set();
         const members = rule.members.map(member => {
           rejectName(member.name, member.loc, 'mode');
           if (seen.has(member.name)) error(member.loc, `duplicate exclusive mode ${member.name}`);
           seen.add(member.name); return member.name;
         });
-        return { kind: rule.kind, stage: rule.stage, members };
+        return { kind: rule.kind, stage: rule.stage, members,
+          ...(ast.inline ? { source: { nodeId: rule.id, ...rule.loc } } : {}) };
       }
       const predicate = term(rule.predicate);
       if (predicate.type !== 'Bool') error(rule.loc, 'require predicate must be Bool');
-      return { kind: rule.kind, stage: rule.stage, predicate: predicate.value };
+      return { kind: rule.kind, stage: rule.stage, predicate: predicate.value,
+        ...(ast.inline ? { source: { nodeId: rule.id, ...rule.loc } } : {}) };
     });
+    if (ast.inline || group.safe !== undefined) {
+      if (!Array.isArray(group.safe)) error(group.loc, 'shared resource constraints require an authored safe vector');
+      const outputs = new Set(resources.get(group.target) === 'BoolActuator' ? [group.target] : []);
+      const refs = node => {
+        if (node.resources) for (const name of node.resources) outputs.add(name);
+        if (node.kind === 'resource-on') outputs.add(node.resource);
+        if (node.left) refs(node.left);
+        if (node.right) refs(node.right);
+      };
+      for (const rule of rules) if (rule.kind === 'require') refs(rule.predicate);
+      const safeValues = new Map();
+      if (group.safe.length > 128 || outputs.size > 128) error(group.loc, 'authored safe vector exceeds 128 resources');
+      const safe = group.safe.map(entry => {
+        if (safeValues.has(entry.resource)) error(entry.loc, `duplicate safe resource ${entry.resource}`);
+        if (!resources.has(entry.resource)) error(entry.loc, `unknown safe resource ${entry.resource}`);
+        if (resources.get(entry.resource) !== 'BoolActuator') error(entry.loc, `safe resource ${entry.resource} must be a BoolActuator`);
+        if (!outputs.has(entry.resource)) error(entry.loc, `safe resource ${entry.resource} is outside the protected finite output set`);
+        if (typeof entry.value !== 'boolean') error(entry.loc, 'safe value must be a literal Bool');
+        safeValues.set(entry.resource, entry.value);
+        return { resource: entry.resource, value: entry.value,
+          ...(ast.inline ? { source: { nodeId: entry.id, ...entry.loc } } : {}) };
+      });
+      for (const output of outputs) if (!safeValues.has(output)) error(group.loc, `authored safe vector is missing protected resource ${output}`);
+      const evaluate = node => {
+        if (node.kind === 'Bool' || node.kind === 'Int') return node.value;
+        if (node.kind === 'resource-on') return safeValues.get(node.resource);
+        if (node.kind === 'count_on') return node.resources.filter(name => safeValues.get(name)).length;
+        if (node.kind === 'any_on') return node.resources.some(name => safeValues.get(name));
+        const left = evaluate(node.left), right = evaluate(node.right);
+        switch (node.op) {
+          case '=>': return !left || right;
+          case '==': return left === right;
+          case '!=': return left !== right;
+          case '<': return left < right;
+          case '<=': return left <= right;
+          case '>': return left > right;
+          case '>=': return left >= right;
+          default: error(group.loc, 'unsupported finite safe predicate');
+        }
+      };
+      for (const rule of rules) if (rule.kind === 'require' && !evaluate(rule.predicate)) {
+        error(group.loc, 'authored safe vector does not satisfy every mandatory require at safe_output');
+      }
+      return { name: group.name, target: group.target, scope: 'shared_resource', rules, safe,
+        modes: [...new Set(rules.filter(rule => rule.kind === 'exclusive').flatMap(rule => rule.members))],
+        outputs: [...outputs], ...(ast.inline ? { source: { nodeId: group.id, ...group.loc } } : {}) };
+    }
     return { name: group.name, target: group.target, rules };
   });
   const policies = (ast.resourcePolicies ?? []).map(policy => {
@@ -3816,6 +4136,10 @@ function checkResourcePolicy(ast) {
 export function compileControl(source, { filename = '<control>', emitBytecode = true } = {}) {
   if (typeof filename !== 'string' || !filename) internal('filename must be a non-empty string');
   const ast = new ControlParser(source, filename).parse();
+  if (ast.kind === 'control' && ast.body.some(item => item.kind === 'shared-constraints')) {
+    error(ast.body.find(item => item.kind === 'shared-constraints').loc,
+      'shared resource constraints require resource binding and runtime enforcement; compile a checked nonexecutable descriptor');
+  }
   if (ast.kind === 'resource-policy') {
     checkResourcePolicy(ast);
     error(ast.loc, ast.resourcePolicies?.length
@@ -3842,8 +4166,8 @@ export function compileAccountingControl(source, { filename = '<control>' } = {}
 
 /** Only this bounded civil pulse slice has a VM/provider transport. */
 export function isExecutablePulseSchedule(item) {
-  return item.scheduleType === 'Solar' || (item.scheduleType === 'Daily'
-    && (!item.on && !item.calendar || item.on && item.calendar && ['day`workday`', 'day`offday`'].includes(item.on.value))
+  return item.scheduleType === 'Solar' || item.scheduleType === 'At' || (item.scheduleType === 'Daily'
+    && (!item.on && !item.calendar || item.on && item.calendar && ['day`workday`', 'day`offday`', 'day`holiday`'].includes(item.on.value))
     && item.at?.kind === 'literal' && item.at.raw.startsWith('time`')
     && item.policy?.basis?.name === 'pulse' && item.policy?.clock?.name === 'trusted_only')
     || (item.scheduleType === 'DailySlots' && item.selected
@@ -3854,7 +4178,16 @@ export function isExecutablePulseSchedule(item) {
     || (item.scheduleType === 'Cron' && item.policy?.basis?.name === 'pulse'
     && item.policy?.clock?.name === 'trusted_only')
     || (item.scheduleType === 'Tide' && item.policy?.basis?.name === 'run'
-    && item.policy?.clock?.name === 'trusted_only');
+    && ['trusted_only', 'hold_trusted'].includes(item.policy?.clock?.name));
+}
+
+/** Immutable UTC recurrence only; other accepted Range variants stay descriptors. */
+export function isExecutableRangeSchedule(item) {
+  return item.timezone === 'UTC' && item.policy?.basis?.kind === 'call'
+    && item.policy.basis.name === 'range' && item.policy?.clock?.name === 'trusted_only'
+    && (item.scheduleType === 'Daily' && (!item.on && !item.calendar || item.on && item.calendar && ['day`workday`','day`offday`'].includes(item.on.value))
+      && item.at?.kind === 'literal' && item.at.raw.startsWith('time`')
+      || item.scheduleType === 'DailySlots' && Array.isArray(item.selected) && item.selected.length > 0);
 }
 
 /** Internal composition adapter. The public API accepts canonical documents. */
@@ -3873,6 +4206,53 @@ export function compileResourcePolicyArtifact(source, { filename = '<policy>' } 
     policy: manifest,
   }));
   return { bytes, manifest, sourceMap: ast.sourceNodes };
+}
+
+/** Checked in-control shared resource contract; it cannot be installed as GFB. */
+export function compileControlPolicyDescriptorArtifact(source, { filename = '<control>' } = {}) {
+  const ast = new ControlParser(source, filename).parse();
+  if (ast.kind !== 'control' || !ast.body.some(item => item.kind === 'shared-constraints')) {
+    error(ast.loc, 'expected a control with shared resource constraints');
+  }
+  const checked = new Lowerer(ast, filename).lower({ emitBytecode: false });
+  const manifest = { format: 'GhostFlow/control-policy-descriptor-v1', executable: false,
+    requiredRuntimeContracts: ['bound-shared-resources', 'admission-exclusivity', 'safe-output-resource-requirements'],
+    control: checked.manifest };
+  const bytes = new TextEncoder().encode(JSON.stringify({
+    format: 'GhostFlow/control-policy-descriptor-artifact-v1', executable: false,
+    controlSource: source, manifest,
+  }));
+  // A checked descriptor carries canonical intent provenance, but owns no
+  // executable storage bindings or runtime constraint observations. The bound
+  // compiler supplies those from the actual guarded request program.
+  return { bytes, manifest, sourceMap: checked.sourceMap,
+    traceMetadata: { bindings: [], constraints: [], resultSites: [] } };
+}
+
+/** Internal bound-profile lowering. Never returns an unguarded shared-policy program. */
+export function compileBoundControlPolicyArtifact(source, { filename, envelope } = {}) {
+  const ast = new ControlParser(source, filename).parse();
+  if (ast.kind !== 'control' || !ast.body.some(item => item.kind === 'shared-constraints')) {
+    error(ast.loc, 'bound resource execution requires an in-control shared policy');
+  }
+  const checked = new Lowerer(ast, filename).lower({ emitBytecode: false });
+  const requestAst = { ...ast, body: ast.body.filter(item => !['shared-constraints', 'resource'].includes(item.kind)) };
+  const candidate = new Lowerer(requestAst, filename).lower();
+  if (![1, 3].includes(new DataView(candidate.bytes.buffer, candidate.bytes.byteOffset).getUint16(4, true))
+    || checked.manifest.outputs.some(port => port.type !== 'Bool')
+    || checked.manifest.inputs.some(port => port.type !== 'Bool')) {
+    error(ast.loc, 'bound resource execution supports only a Bool GFB1 v1/v3 control; contextual, accounting, continuous and other profiles require separate integration');
+  }
+  if (typeof envelope !== 'function') error(ast.loc, 'bound resource execution requires a compiled policy envelope');
+  const bytes = envelope(candidate.bytes, checked.manifest, candidate.traceMetadata.constraints);
+  if (!(bytes instanceof Uint8Array) || bytes.length < candidate.bytes.length + 10
+    || new TextDecoder().decode(bytes.subarray(0, 4)) !== 'GFB1'
+    || new DataView(bytes.buffer, bytes.byteOffset).getUint16(4, true) !== 17
+    || new DataView(bytes.buffer, bytes.byteOffset).getUint32(6, true) !== candidate.bytes.length
+    || candidate.bytes.some((byte, index) => bytes[index + 10] !== byte)) {
+    error(ast.loc, 'bound resource execution requires the guarded GFB17 envelope');
+  }
+  return { ...candidate, bytes, manifest: { ...checked.manifest, format: 'GhostFlow/control-v17' } };
 }
 
 /** Type-checked schedule contract. These bytes cannot be loaded as control bytecode. */

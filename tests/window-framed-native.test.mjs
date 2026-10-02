@@ -69,6 +69,78 @@ function tapeRow(scanId, logicalTimeMs, inputs) {
   return [scanId, logicalTimeMs, ...inputs.flatMap(input => [input.name, typeof input.value === 'boolean' ? 'b' : 'n', input.value])].join('\t');
 }
 
+test('REF-04-032 preloaded future samples stay excluded and no-checkpoint restart is NotReady on native and WASM bounded windows', async t => {
+  const { artifact, directory, modulePath, tag, inputs } = await fixture(t);
+  // The whole tape, including t=20, is loaded before either portable owner runs.
+  // Deliberately present that observation at t=10: admission must reject it,
+  // retaining the committed window and allowing the same scan ID to retry.
+  const at = (present, id, timestamp, value = 284) => inputs({ threshold: 1000, present, id, timestamp, value });
+  const frames = [
+    { scanId: 0, logicalTimeMs: 0, inputs: at(true, 1, 0, 280) },
+    { scanId: 1, logicalTimeMs: 10, inputs: at(true, 2, 20) },
+    { scanId: 1, logicalTimeMs: 10, inputs: at(false, 2, 20) },
+    { scanId: 2, logicalTimeMs: 20, inputs: at(true, 2, 20) },
+    { scanId: 3, logicalTimeMs: 19, inputs: at(false, 2, 20) },
+    { scanId: 3, logicalTimeMs: 2000, inputs: at(false, 2, 20) },
+  ];
+  const executeNative = tape => {
+    const inputPath = path.join(directory, 'reference-window-bounds.tsv');
+    fs.writeFileSync(inputPath, `${tape.map(frame => tapeRow(frame.scanId, frame.logicalTimeMs, frame.inputs)).join('\n')}\n`);
+    const result = native(tapePath, [modulePath, inputPath, ...profileArgs(tag)]);
+    assert.equal(result.status, 0, result.stderr);
+    return result.stdout.trim().split('\n').map(JSON.parse);
+  };
+  const runtime = await FramedGhostFlowRuntime.instantiate(wasm);
+  t.after(() => runtime.dispose());
+  runtime.load(artifact.bytes);
+  for (const output of artifact.manifest.outputs) runtime.addCapability('actuator', output.name, output.type === 'Bool' ? 'bool' : 'number');
+  const boundedProfile = profile(tag);
+  const planned = runtime.planTemporal({ profile: boundedProfile, maxJsonBytes: 65536 });
+  assert.equal(planned.retainedSamples, 12, 'four statically planned windows each retain at most three observations');
+  assert.equal(planned.fitsBudget, true);
+  runtime.activateTemporal(boundedProfile);
+  const wasmRows = frames.map(frame => {
+    try { return { accepted: true, outcome: runtime.scan(frame) }; }
+    catch (error) { return { accepted: false, outcome: runtime.outcome, error: error.message }; }
+  });
+  const nativeRows = executeNative(frames);
+  assert.deepEqual(nativeRows.map(({ accepted, outcome }) => ({ accepted, outcome })),
+    wasmRows.map(({ accepted, outcome }) => ({ accepted, outcome })), 'same canonical bytecode exposes the entire same trace on both targets');
+  assert.deepEqual(nativeRows.map(row => row.accepted), [true, false, true, true, false, true]);
+  assert.match(nativeRows[1].error, /future/);
+  assert.deepEqual(nativeRows[1].outcome, nativeRows[0].outcome);
+  assert.deepEqual(nativeRows[2].outcome.trace.windowTrace.map(row => row.contributors.map(point => point.id)), [[1], [1], [1], [1]]);
+  assert.deepEqual(nativeRows[2].outcome.trace.safe, { average: 280, minimum: 280, maximum: 280, fast: false });
+  assert.deepEqual(nativeRows[3].outcome.trace.windowTrace.map(row => row.count), [2, 2, 2, 2]);
+  assert.deepEqual(nativeRows[3].outcome.trace.safe, { average: 282, minimum: 280, maximum: 284, fast: false });
+  assert.match(nativeRows[4].error, /backward|monotonic/);
+  assert.deepEqual(nativeRows[4].outcome, nativeRows[3].outcome);
+  assert.ok(nativeRows[5].outcome.trace.windowTrace.every(row => row.value === null && row.count === 0), 'missed scans cannot invent observations or retain expired evidence');
+  const live = structuredClone(runtime.outcome);
+  const replayRequest = { profile: boundedProfile, count: 4, maxPeakTemporalBytes: 268435456, maxJsonBytes: 67108864 };
+  const replay = runtime.replayTemporal(replayRequest);
+  assert.deepEqual(replay.records, wasmRows.filter(row => row.accepted).map(row => row.outcome));
+  for (const count of [Infinity, 5]) {
+    assert.throws(() => runtime.replayTemporal({ ...replayRequest, count }), /positive u32|count|retained|checkpoint/i);
+    assert.deepEqual(runtime.replay, replay);
+    assert.deepEqual(runtime.outcome, live, 'unbounded or unavailable history never clamps or mutates execution');
+  }
+  assert.deepEqual(runtime.planTemporal({ profile: boundedProfile, maxJsonBytes: 65536 }), planned, 'elapsed sparse time does not expand statically bounded storage');
+  // No checkpoint is supplied. A genuinely fresh owner follows the established
+  // default startup policy; this is not foreign checkpoint restoration.
+  const fresh = [{ scanId: 0, logicalTimeMs: 10, inputs: at(false, 2, 20) }];
+  const freshNative = executeNative(fresh);
+  const restarted = await FramedGhostFlowRuntime.instantiate(wasm);
+  t.after(() => restarted.dispose());
+  restarted.load(artifact.bytes);
+  for (const output of artifact.manifest.outputs) restarted.addCapability('actuator', output.name, output.type === 'Bool' ? 'bool' : 'number');
+  restarted.activateTemporal(boundedProfile);
+  assert.deepEqual(freshNative[0].outcome, restarted.scan(fresh[0]));
+  assert.ok(freshNative[0].outcome.trace.windowTrace.every(row => row.value === null && row.quality === 0 && row.count === 0));
+  assert.equal(freshNative[0].outcome.trace.resultTrace.length, 4);
+  assert.ok(freshNative[0].outcome.trace.resultTrace.every(row => row.choice === 4 && row.origin !== 0), 'explicit recovery keeps the original unavailable-window Result origin');
+});
+
 test('framed native adapters require one complete explicit temporal profile', async t => {
   const { directory, modulePath, tag, inputs } = await fixture(t);
   const csvPath = path.join(directory, 'frames.csv');

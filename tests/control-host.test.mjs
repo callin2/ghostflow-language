@@ -4,6 +4,8 @@ import test from 'node:test';
 import { compileSource } from './helpers/literate-compile.mjs';
 import { extractLiterate } from '../tools/literate.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
+import { observeRuntimeValues } from '../tools/source-trace.mjs';
+import { sensorFaultTimerSource, sensorFaultTimerScans } from './helpers/continuous-timer-vectors.mjs';
 
 const wasmPath = new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url);
 const wasmBytes = fs.readFileSync(wasmPath);
@@ -24,8 +26,50 @@ control MoistureHost {
 }
 `;
 
+test('T01-FAULT: an explicit sensor fault branch resets continuous_true and recovery starts at zero', async t => {
+  const compiled = await compileSource(sensorFaultTimerSource, { filename: 'continuous-sensor-fault.ghost' });
+  const runtime = await ControlRuntime.instantiate(wasmBytes, compiled);
+  t.after(() => runtime.dispose());
+  for (const [index, { nowMs, quality, elapsed, ready }] of sensorFaultTimerScans.entries()) {
+    const result = runtime.step({ nowMs, samples: { high: {
+      epoch: 1, id: index + 1, timestampMs: nowMs, value: 40, quality,
+    } } });
+    assert.equal(result.sensors.high.quality, quality);
+    assert.equal(result.sensors.high.ok, quality === 'Good');
+    assert.equal(result.vm.safe.ready, ready);
+    assert.equal(observeRuntimeValues(compiled.traceMetadata, result.vm).values
+      .find(value => value.kind === 'timer' && value.name === 'hot_for').value, elapsed);
+    assert.equal(result.vm.stateAfter.__gf_timer_was_true_hot_for, quality === 'Good');
+    if (quality !== 'Good' || elapsed === 0) {
+      assert.equal(result.vm.stateAfter.__gf_timer_since_hot_for, nowMs);
+    }
+  }
+});
+
 async function artifact() { return compileSource(source, { filename: 'control-host.ghost' }); }
 async function host() { return ControlRuntime.instantiate(wasmBytes, await artifact()); }
+
+test('type-only inputs require host values and preserve initialized state and connected outputs', async () => {
+  const compiled = await compileSource(`control HostInputs {
+    input request: Bool;
+    state active: Bool = false;
+    active' = request;
+    output previous, current: Bool;
+    previous <- active;
+    current <- active';
+  }`, { filename: 'host-inputs.ghost' });
+  const runtime = await ControlRuntime.instantiate(wasmBytes, compiled);
+  try {
+    assert.throws(() => runtime.step({ nowMs: 0, inputs: {} }), /missing input/);
+    const on = runtime.step({ nowMs: 0, inputs: { request: true } });
+    assert.equal(on.vm.safe?.previous ?? on.vm.safeIntents?.previous, false);
+    assert.equal(on.vm.safe?.current ?? on.vm.safeIntents?.current, true);
+    assert.throws(() => runtime.step({ nowMs: 1, inputs: {} }), /missing input/);
+    const off = runtime.step({ nowMs: 1, inputs: { request: false } });
+    assert.equal(off.vm.safe?.previous ?? off.vm.safeIntents?.previous, true);
+    assert.equal(off.vm.safe?.current ?? off.vm.safeIntents?.current, false);
+  } finally { runtime.dispose(); }
+});
 function sample(id, value, quality = 'Good') { return { epoch: 1, id, timestampMs: id * 1000, value, quality }; }
 
 const scheduledSource = extractLiterate(

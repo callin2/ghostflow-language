@@ -9,7 +9,7 @@ use crate::{
     schedule_vm::PulseDescriptor,
     Error, Result, ResultTraceBuffer, Value,
 };
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 #[path = "context_checkpoint.rs"]
 mod checkpoint;
@@ -23,6 +23,7 @@ pub struct Activation {
 
 #[derive(Clone, Debug, Default)]
 pub struct Facts {
+    pub solars: Vec<SolarContextEvidence>,
     pub schedules: Vec<ScheduleEvidence>,
     pub natural: Vec<ProviderObservation>,
     pub settings: Option<SettingsEvent>,
@@ -86,6 +87,7 @@ pub(crate) struct ContextRuntime {
     settings_revision: u64,
     last_event_position: Option<u64>,
     event_ids: BTreeSet<String>,
+    calendar_revisions: BTreeMap<(String, String), crate::work_calendar::WorkCalendarSnapshot>,
     capacity: usize,
     clock: ScheduleClockGate,
 }
@@ -100,9 +102,30 @@ fn invalid(message: &str) -> Error {
     Error::new(message)
 }
 const MAX_EXACT: u64 = 9_007_199_254_740_991;
+const MAX_CALENDAR_REVISIONS: usize = 128;
+const MAX_CALENDAR_CELLS: usize = 8192;
 
 fn bounded(value: &str) -> bool {
     !value.is_empty() && value.len() <= 128
+}
+
+fn calendar_binding(descriptor: &PulseDescriptor) -> Option<(&str, &str)> {
+    match descriptor {
+        PulseDescriptor::Calendar(d) => Some((&d.calendar, &d.timezone)),
+        PulseDescriptor::Context(d) => match &d.definition {
+            ScheduleDefinition::CalendarDaily {
+                calendar, timezone, ..
+            }
+            | ScheduleDefinition::HolidayDaily {
+                calendar, timezone, ..
+            }
+            | ScheduleDefinition::CalendarRange {
+                calendar, timezone, ..
+            } => Some((calendar, timezone)),
+            _ => None,
+        },
+        _ => None,
+    }
 }
 
 impl ContextRuntime {
@@ -143,11 +166,20 @@ impl ContextRuntime {
                     None,
                 )),
                 PulseDescriptor::Accounting(_) | PulseDescriptor::Config(_) => None,
+                PulseDescriptor::Calendar(d) => {
+                    Some((d.calendar.as_str(), 2, Some(d.timezone.as_str())))
+                }
                 PulseDescriptor::Context(d) => match &d.definition {
                     ScheduleDefinition::TideRun {
                         provider, timezone, ..
                     } => Some((provider.as_str(), 0, Some(timezone.as_str()))),
                     ScheduleDefinition::CalendarDaily {
+                        calendar, timezone, ..
+                    }
+                    | ScheduleDefinition::HolidayDaily {
+                        calendar, timezone, ..
+                    }
+                    | ScheduleDefinition::CalendarRange {
                         calendar, timezone, ..
                     } => Some((calendar.as_str(), 2, Some(timezone.as_str()))),
                     _ => None,
@@ -195,6 +227,7 @@ impl ContextRuntime {
             settings_revision: 0,
             last_event_position: None,
             event_ids: BTreeSet::new(),
+            calendar_revisions: BTreeMap::new(),
             capacity: activation.terminal_capacity,
             clock: ScheduleClockGate::new(9_007_199_254_740_991, activation.boot_epoch)?,
         })
@@ -254,7 +287,7 @@ impl ContextRuntime {
         staged.runtime.clock.poll(clock)?;
         let expected = descriptors
             .iter()
-            .filter(|d| matches!(d, PulseDescriptor::Context(_)))
+            .filter(|d| matches!(d, PulseDescriptor::Calendar(_)) || matches!(d, PulseDescriptor::Context(c) if !matches!(c.definition, ScheduleDefinition::AtPulse { .. } | ScheduleDefinition::SolarContext { .. })))
             .count();
         if facts.schedules.len() != expected || facts.natural.len() > self.bindings.len() {
             return Err(invalid("context facts do not match installed requirements"));
@@ -300,6 +333,12 @@ impl ContextRuntime {
             inputs[usize::from(d.value_input)] = Value::Int(value);
             inputs[usize::from(d.fault_input)] = Value::Number(f64::from(fault));
             staged.trace.push(Observation {
+                solar_fallback: None,
+                solar_unavailable_reason: None,
+                clock_provenance: None,
+                clock_source_revision: None,
+                clock_uncertainty_ms: None,
+                unknown_reason: None,
                 site: d.site,
                 occurrence_id: String::new(),
                 planned_ms: None,
@@ -309,11 +348,35 @@ impl ContextRuntime {
             });
         }
         let mut sites = BTreeSet::new();
+        let solar_count = descriptors
+            .iter()
+            .filter(|d| {
+                matches!(
+                    d,
+                    PulseDescriptor::Context(ScheduleDescriptor {
+                        definition: ScheduleDefinition::SolarContext { .. },
+                        ..
+                    })
+                )
+            })
+            .count();
+        if facts.solars.len() != solar_count {
+            return Err(invalid("missing Solar context facts binding"));
+        }
+        let mut solar_sites = BTreeSet::new();
+        for solar in &facts.solars {
+            if !solar_sites.insert(solar.site) || !descriptors.iter().any(|d| matches!(d,
+                PulseDescriptor::Context(ScheduleDescriptor { site, definition: ScheduleDefinition::SolarContext { .. }, .. }) if *site == solar.site))
+            { return Err(invalid("unknown or duplicate Solar context site")); }
+        }
         for evidence in &facts.schedules {
             if !sites.insert(evidence.site)
-                || !descriptors
-                    .iter()
-                    .any(|d| matches!(d, PulseDescriptor::Context(c) if c.site == evidence.site))
+                || !descriptors.iter().any(|d| {
+                    matches!(
+                        d,
+                        PulseDescriptor::Context(_) | PulseDescriptor::Calendar(_)
+                    ) && d.site() == evidence.site
+                })
             {
                 return Err(invalid("unknown or duplicate context schedule site"));
             }
@@ -323,6 +386,47 @@ impl ContextRuntime {
             {
                 return Err(invalid("invalid context occurrence bounds"));
             }
+            let descriptor = descriptors
+                .iter()
+                .find(|d| d.site() == evidence.site)
+                .ok_or_else(|| invalid("unknown context schedule site"))?;
+            if let Some((calendar, timezone)) = calendar_binding(descriptor) {
+                if evidence.provider.is_some()
+                    || matches!(descriptor, PulseDescriptor::Calendar(_))
+                        && !evidence.rows.is_empty()
+                {
+                    return Err(invalid(
+                        "unexpected calendar Result provider or occurrence payload",
+                    ));
+                }
+                if let Some(snapshot) = &evidence.calendar {
+                    if ![
+                        &snapshot.calendar_id,
+                        &snapshot.revision,
+                        &snapshot.timezone,
+                    ]
+                    .iter()
+                    .all(|s| bounded(s))
+                        || snapshot.expires_at_ms > MAX_EXACT
+                    {
+                        return Err(invalid("invalid calendar snapshot bounds"));
+                    }
+                    crate::work_calendar::evaluate(
+                        crate::work_calendar::DayQuery {
+                            calendar_id: calendar,
+                            timezone,
+                            date: snapshot.covered_from_date,
+                            selector: crate::work_calendar::DaySelector::Workday,
+                            now_ms: 0,
+                        },
+                        Some(snapshot),
+                    )
+                    .map_err(|_| invalid("invalid calendar snapshot"))?;
+                }
+            }
+            if matches!(descriptor, PulseDescriptor::Calendar(_)) {
+                continue;
+            }
             let definition = descriptors
                 .iter()
                 .find_map(|d| match d {
@@ -331,7 +435,13 @@ impl ContextRuntime {
                 })
                 .ok_or_else(|| invalid("unknown context schedule site"))?;
             match definition {
-                ScheduleDefinition::Periodic { .. } => {
+                ScheduleDefinition::SolarContext { .. } => {
+                    return Err(invalid("Solar requires Solar facts, not civil evidence"))
+                }
+                ScheduleDefinition::AtPulse { .. } => {
+                    return Err(invalid("At occurrences are computed by the core"))
+                }
+                ScheduleDefinition::Periodic { .. } | ScheduleDefinition::UtcRange { .. } => {
                     if evidence.provider.is_some()
                         || evidence.calendar.is_some()
                         || !evidence.rows.is_empty()
@@ -350,6 +460,12 @@ impl ContextRuntime {
                     }
                 }
                 ScheduleDefinition::CalendarDaily {
+                    calendar, timezone, ..
+                }
+                | ScheduleDefinition::HolidayDaily {
+                    calendar, timezone, ..
+                }
+                | ScheduleDefinition::CalendarRange {
                     calendar, timezone, ..
                 } => {
                     if evidence.provider.is_some() {
@@ -419,6 +535,27 @@ impl ContextRuntime {
                 }
             }
         }
+        // A calendar binding is one immutable envelope for the entire scan,
+        // including absence. Do not allow two sites to observe different days,
+        // revisions, policies, or availability from the same binding.
+        let mut calendars = BTreeMap::new();
+        for evidence in &facts.schedules {
+            let calendar = descriptors
+                .iter()
+                .find(|d| d.site() == evidence.site)
+                .and_then(calendar_binding)
+                .map(|(calendar, _)| calendar);
+            if let Some(calendar) = calendar {
+                if let Some(prior) = calendars.insert(calendar, &evidence.calendar) {
+                    if prior != &evidence.calendar {
+                        return Err(invalid("inconsistent shared calendar snapshot"));
+                    }
+                }
+                if let Some(snapshot) = &evidence.calendar {
+                    staged.runtime.remember_calendar(snapshot)?;
+                }
+            }
+        }
         if let Some(event) = &facts.settings {
             if event.program_fingerprint != program_fingerprint
                 || !bounded(&event.event_id)
@@ -485,6 +622,12 @@ impl ContextRuntime {
                         } else {
                             group_fault = Some(SETTINGS_INVALID);
                             staged.trace.push(Observation {
+                                solar_fallback: None,
+                                solar_unavailable_reason: None,
+                                clock_provenance: None,
+                                clock_source_revision: None,
+                                clock_uncertainty_ms: None,
+                                unknown_reason: None,
                                 site: change.id,
                                 occurrence_id: event.event_id.clone(),
                                 planned_ms: None,
@@ -525,6 +668,12 @@ impl ContextRuntime {
         for config in &staged.runtime.configs {
             config.project(inputs);
             staged.trace.push(Observation {
+                solar_fallback: None,
+                solar_unavailable_reason: None,
+                clock_provenance: None,
+                clock_source_revision: None,
+                clock_uncertainty_ms: None,
+                unknown_reason: None,
                 site: config.descriptor.id,
                 occurrence_id: String::new(),
                 planned_ms: None,
@@ -535,6 +684,72 @@ impl ContextRuntime {
                 },
                 provider_revision: staged.runtime.settings_revision.to_string(),
                 context_revision: config.descriptor.name.clone(),
+            });
+        }
+        // Calendar Results are derived from the immutable trusted clock and
+        // complete calendar facts before any schedule predicate runs.
+        for descriptor in descriptors {
+            let PulseDescriptor::Calendar(d) = descriptor else {
+                continue;
+            };
+            let evidence = facts
+                .schedules
+                .iter()
+                .find(|e| e.site == d.site)
+                .ok_or_else(|| invalid("missing calendar Result evidence"))?;
+            let (ok, value, fault, decision) =
+                if let (ClockTrust::Trusted, Some(wall)) = (clock.trust, clock.wall_ms) {
+                    if wall > 253_402_300_799_999 {
+                        return Err(invalid("calendar Result wall time is out of range"));
+                    }
+                    let result = crate::work_calendar::evaluate(
+                        crate::work_calendar::DayQuery {
+                            calendar_id: &d.calendar,
+                            timezone: &d.timezone,
+                            date: (wall / 86_400_000) as i32,
+                            selector: d.selector,
+                            now_ms: wall,
+                        },
+                        evidence.calendar.as_ref(),
+                    )
+                    .map_err(|_| invalid("invalid calendar Result snapshot"))?;
+                    match result.value {
+                        Ok(value) => (true, value, 0, format!("Ok({value})")),
+                        Err(crate::work_calendar::CalendarFault::CalendarMissing) => {
+                            (false, false, 1, "Fault(CalendarMissing)".into())
+                        }
+                        Err(crate::work_calendar::CalendarFault::CalendarOutOfRange) => {
+                            (false, false, 2, "Fault(CalendarOutOfRange)".into())
+                        }
+                    }
+                } else {
+                    (false, false, 0, "Fault(ClockUnknown)".into())
+                };
+            inputs[usize::from(d.ok_input)] = Value::Bool(ok);
+            inputs[usize::from(d.value_input)] = Value::Bool(value);
+            inputs[usize::from(d.fault_input)] = Value::Number(f64::from(fault));
+            staged.trace.push(Observation {
+                solar_fallback: None,
+                solar_unavailable_reason: None,
+                clock_provenance: None,
+                clock_source_revision: clock.source_revision.map(str::to_owned),
+                clock_uncertainty_ms: clock.uncertainty_ms,
+                unknown_reason: (!ok).then_some(decision.clone()),
+                site: d.site,
+                occurrence_id: format!("{}:calendar", d.site),
+                planned_ms: clock.wall_ms,
+                decision,
+                provider_revision: evidence
+                    .calendar
+                    .as_ref()
+                    .map_or("", |c| c.revision.as_str())
+                    .into(),
+                context_revision: self
+                    .bindings
+                    .iter()
+                    .find(|b| b.provider == d.calendar)
+                    .map_or("", |b| b.binding_revision.as_str())
+                    .into(),
             });
         }
         // Natural projections are complete before any schedule predicate runs.
@@ -591,6 +806,12 @@ impl ContextRuntime {
             inputs[usize::from(d.value_input)] = Value::Bool(value);
             inputs[usize::from(d.fault_input)] = Value::Number(f64::from(fault));
             staged.trace.push(Observation {
+                solar_fallback: None,
+                solar_unavailable_reason: None,
+                clock_provenance: None,
+                clock_source_revision: None,
+                clock_uncertainty_ms: None,
+                unknown_reason: None,
                 site: d.site,
                 occurrence_id: String::new(),
                 planned_ms: None,
@@ -601,11 +822,26 @@ impl ContextRuntime {
         }
         for (index, descriptor) in descriptors.iter().enumerate() {
             if let PulseDescriptor::Context(d) = descriptor {
-                let evidence = facts
-                    .schedules
-                    .iter()
-                    .find(|e| e.site == d.site)
-                    .ok_or_else(|| invalid("missing schedule evidence"))?;
+                let at_evidence = ScheduleEvidence {
+                    site: d.site,
+                    coverage_start_ms: 0,
+                    coverage_end_ms: 253_402_300_800_000,
+                    provider: None,
+                    calendar: None,
+                    rows: Vec::new(),
+                };
+                let evidence = if matches!(
+                    d.definition,
+                    ScheduleDefinition::AtPulse { .. } | ScheduleDefinition::SolarContext { .. }
+                ) {
+                    &at_evidence
+                } else {
+                    facts
+                        .schedules
+                        .iter()
+                        .find(|e| e.site == d.site)
+                        .ok_or_else(|| invalid("missing schedule evidence"))?
+                };
                 let evaluate = |code: &[u8], trace: &mut ResultTraceBuffer| -> Result<bool> {
                     match eval_expression_with_preludes(
                         code,
@@ -653,19 +889,34 @@ impl ContextRuntime {
                 let engine = self.engines[index]
                     .as_ref()
                     .ok_or_else(|| invalid("context engine binding mismatch"))?;
-                let (next, decision) = if let Some(Err(fault)) = config.map(|c| &c.current) {
-                    engine.stage_settings_fault(d, clock, evidence, *fault)?
-                } else {
-                    engine.stage(
-                        d,
-                        clock,
-                        evidence,
-                        when,
-                        cancel,
-                        change.as_ref(),
-                        staged.runtime.settings_revision,
-                    )?
-                };
+                let (next, decision) =
+                    if let ScheduleDefinition::SolarContext { config_ids, .. } = &d.definition {
+                        let fault = staged
+                            .runtime
+                            .configs
+                            .iter()
+                            .filter(|c| config_ids.contains(&c.descriptor.id))
+                            .filter_map(|c| c.current.as_ref().err().copied())
+                            .min();
+                        let solar = facts
+                            .solars
+                            .iter()
+                            .find(|s| s.site == d.site)
+                            .ok_or_else(|| invalid("missing Solar context facts"))?;
+                        engine.stage_solar(d, clock, solar, when, fault)?
+                    } else if let Some(Err(fault)) = config.map(|c| &c.current) {
+                        engine.stage_settings_fault(d, clock, evidence, *fault)?
+                    } else {
+                        engine.stage(
+                            d,
+                            clock,
+                            evidence,
+                            when,
+                            cancel,
+                            change.as_ref(),
+                            staged.runtime.settings_revision,
+                        )?
+                    };
                 staged.runtime.engines[index] = Some(next);
                 staged.projections.push([
                     Value::Bool(decision.due),
@@ -678,6 +929,33 @@ impl ContextRuntime {
             }
         }
         Ok(staged)
+    }
+}
+
+impl ContextRuntime {
+    fn remember_calendar(
+        &mut self,
+        snapshot: &crate::work_calendar::WorkCalendarSnapshot,
+    ) -> Result<()> {
+        let key = (snapshot.calendar_id.clone(), snapshot.revision.clone());
+        if let Some(prior) = self.calendar_revisions.get(&key) {
+            if prior != snapshot {
+                return Err(invalid("calendar revision contents changed"));
+            }
+        } else {
+            let cells: usize = self
+                .calendar_revisions
+                .values()
+                .map(|s| s.holidays.len() + s.exceptions.len())
+                .sum();
+            if self.calendar_revisions.len() >= self.capacity.min(MAX_CALENDAR_REVISIONS)
+                || cells + snapshot.holidays.len() + snapshot.exceptions.len() > MAX_CALENDAR_CELLS
+            {
+                return Err(invalid("calendar revision capacity exceeded"));
+            }
+            self.calendar_revisions.insert(key, snapshot.clone());
+        }
+        Ok(())
     }
 }
 

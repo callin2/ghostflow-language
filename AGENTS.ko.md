@@ -28,7 +28,7 @@ GhostFlow 제어/출력 수명 주기, 시뮬레이터 동작, Device 출력 실
 
 소스 편집에는 `apply_patch`를 사용하고 무관한 변경을 보존하세요. 제품 서버, POC UI, 자격 증명, 모델 연결기, 보드 펌웨어, 장치 호출, 가져온 대화 기록을 이 저장소에 추가하지 마세요. 테스트는 `tools/verify-language.mjs`에 명시적으로 나열하세요. 와일드카드로 형제 제품 테스트를 자동 발견하지 마세요.
 
-의존성과 WASM Rust 대상이 설치되면 호스트 검증에 `npm test`를 실행합니다. Rust 테스트에 필요한 픽스처를 컴파일한 뒤 Cargo를 호출하고 WASM/네이티브 러너를 빌드하며 언어 테스트와 튜토리얼을 실행합니다. 실행 가능한 FAQ 및 프로그래밍 샘플을 변경하면 `tests/docs-runnable-examples.test.mjs`의 집중 컴파일러 검사에 유지하세요. `contracts/requirements/catalog.json`이 참조하는 문서를 편집한 뒤에는 `node --test tests/requirement-catalog.test.mjs`를 실행하세요. 행이 이동하면 발췌 범위를 조정하고 기대 해시는 보존하세요.
+의존성과 WASM Rust 대상이 설치되면 호스트 검증에 `npm test`를 실행합니다. Rust 테스트에 필요한 픽스처를 컴파일한 뒤 Cargo를 호출하고 WASM/네이티브 러너를 빌드하며 언어 테스트와 튜토리얼을 실행합니다. 실행 가능한 FAQ 및 프로그래밍 샘플을 변경하면 `tests/docs-runnable-examples.test.mjs`의 집중 컴파일러 검사에 유지하세요. `contracts/requirements/catalog.json`이 참조하는 모든 파일을 편집한 뒤에는 `node --test tests/requirement-catalog.test.mjs`를 실행하세요. 행이 이동하면 발췌 범위를 조정하고 기대 해시는 보존하세요. 집중 package 검사는 `npm run test:portable-package`를 사용하세요. package 회귀 전에 빠른 catalog preflight를 실행합니다.
 
 릴리스 기록에는 소스 및 아티팩트 해시를 보존하세요. 생성된 검증 및 튜토리얼 추적은 무시되는 `build/` 아래 실행 증거이며 소스 릴리스와 구분됩니다. 호스트 검증은 Device, API, 농가 UX 검증과 구분해 보고하세요.
 

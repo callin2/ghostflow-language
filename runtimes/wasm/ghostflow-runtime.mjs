@@ -26,6 +26,12 @@ export class GhostFlowRuntime {
   load(moduleBytes) { this.#bytes(moduleBytes, (p, n) => this.#check(this.wasm.gf_load(this.handle, p, n))); }
   hotSwap(moduleBytes) { this.#bytes(moduleBytes, (p, n) => this.#check(this.wasm.gf_hot_swap(this.handle, p, n))); }
   activate() { this.#check(this.wasm.gf_activate(this.handle)); }
+  activateResourceBinding(bytes) {
+    this.#bytes(bytes, (p, n) => this.#check(this.wasm.gf_activate_resource_binding(this.handle, p, n)));
+  }
+  tickResourceBinding(bytes) {
+    this.#bytes(bytes, (p, n) => this.#dispatch(() => this.wasm.gf_tick_resource_binding(this.handle, p, n)));
+  }
   activateTemporal(profile) {
     this.#bytes(encodeTemporalProfile(profile), (p, n) => this.#check(this.wasm.gf_activate_temporal(this.handle, p, n)));
   }

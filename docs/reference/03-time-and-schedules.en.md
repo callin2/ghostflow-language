@@ -199,7 +199,7 @@ Even if `manual_request` is true, a low-water constraint making safe output fals
 
 A Schedule is a continuously evaluated typed reactive value, not a delayed call or background thread. It evaluates trigger, day rule, predicate and context at the current time to decide whether to admit an occurrence. An unsatisfied pulse is not automatically queued.
 
-The selected trigger types are `At`, `Daily`, `DailySlots<G>`, `Periodic`, `Cron`, `Solar` and `Tide`. The current compiler does not accept `At` and accepts only `DailySlots<15min>`. Each type has its own trigger fields and these common policy fields.
+The selected trigger types are `At`, `Daily`, `DailySlots<G>`, `Periodic`, `Cron`, `Solar` and `Tide`. The current compiler accepts one-shot `At` pulse and only `DailySlots<15min>`. Each type has its own trigger fields and these common policy fields.
 
 ```ghost
 schedule name: TriggerType {
@@ -231,11 +231,48 @@ cancel_when := Bool                                   // Required for current ci
 
 All common fields are required. Unconditional admission can specify `when = true`; a Run or Range without language-level cancellation can specify `cancel_when = false`. In the current compiler, `cancel_when` is allowed for `Tide` Run and civil `range`, and is required for `range`. It is forbidden for `pulse`. `hold_trusted(d, terminal: skip)` adds monotonic elapsed time to the last trusted wall instant and uses it for at most d. Uncertainty adds the same monotonic elapsed time to the last uncertainty, recording `HeldClock` provenance. At the boundary, after `ClockUnknown`, terminal skip applies to new admission decisions. An already admitted Range keeps its monotonic end time. High-water does not change.
 
-The current compiler accepts only `clock = trusted_only` and `fallback = skip`. `window`, `run(_, on_time)`, `At`, `hold_trusted` and `fixed_time` are selected design notations outside current compiler support. Civil `range` is currently type-checked for recurrences whose static non-overlap can be proved in the UTC timezone, but is not lowered to executable bytecode. Tide `run(_, within(_))` is supported.
+The current compiler accepts `clock = hold_trusted(positive constant Duration, terminal: skip)` for Solar and Tide and `fallback = fixed_time(TimeOfDay literal, terminal: skip)` for Solar. Tide permits only `fallback = skip`; other triggers retain trusted-only clock and skip fallback. `window` and `run(_, on_time)` remain outside current support. Civil `range` requires provable static non-overlap in UTC; immutable UTC Daily and nonempty static DailySlots ranges execute as GFB12, while other accepted Range recurrences remain descriptors. Tide `run(_, within(_))` is supported.
+
+Bounded natural-policy admission uses held time only while monotonic elapsed time is strictly less than the duration. Missing trusted anchors or uncertainty and checked-addition overflow fail closed. Held wall time and uncertainty are the last trusted values plus elapsed time, with `HeldClock` provenance. Expiry terminal-skips new admission, preserves high-water and does not extend an active Run. Recovery establishes a baseline; restart begins with a new clock. The facts provider owns IANA conversion and supplies a known source local date and fallback instant matching the authored time and timezone on that date. Ambiguous or nonexistent civil times terminal-skip without inventing a fold. The core owns admission and generated due inputs. A fallback and recovered Solar event on the same source local date share a consumed identity and terminal checkpoint. These bounds prevent unavailable predictions or uncertain clocks from silently creating occurrences.
 
 `fixed_time` is available only for Solar. When a fallback occurrence for that source local date is admitted, the same occurrence ledger consumes that date's Solar event, avoiding duplication even if the provider recovers. Tide allows only `fallback = skip` because without predictions the number and identity of events are unknown.
 
-The designed one-shot `At` uses ``at = datetime`...`;`` and has no DST fields. The current compiler has no `At` implementation. `Daily`, one time each day, requires `timezone`, ``at = time`...`;``, `dst_missing` and `dst_repeated`. For example:
+When Solar `when` reads a config Result, that config is an admission dependency.
+A dependent current fault preserves `Unknown(SettingsFault)` and admits no new
+occurrence even if the authored fault branch returns true. An unrelated config
+fault does not suppress Solar. Solar and ordinary control read the current
+Results at the same evaluation position. A successful recovery observation
+establishes a baseline without catching up past events. Settings observations,
+Solar decisions and VM transitions commit together, so failed evaluations
+consume neither events nor occurrences. Coordinates, timezone, event and offset
+are immutable program definitions, never implicitly replaced by live settings.
+
+**Why:** a schedule starting work from an old successful value while ordinary
+control sees a settings error creates contradictory decisions within one
+program. Preserve the cause and decide admission from the observation that
+actually took effect.
+
+One-shot `At` uses a constant typed DateTime and has no timezone or DST fields:
+
+```ghost
+schedule appointment: At {
+  at = datetime`2026-01-01T08:00:00Z`;
+  basis = pulse;
+  when = true;
+  clock = trusted_only;
+  gap = skip_after(60s);
+  recovery = baseline;
+  fallback = skip;
+}
+```
+
+The absolute instant is normalized from its explicit offset. Equivalent offset spellings plan the same instant. This bounded profile accepts only `pulse`, trusted-only clock, baseline recovery and skip fallback, with a positive constant gap. Missing fields, non-DateTime/nonconstant `at`, timezone/DST/cancellation fields and other bases are diagnostics. It exposes `.due` and `.missed`; it cannot mix with provider, config, sensor, resource, objective or other schedule profiles. GFB14 and control-v13 identify this execution profile; the framed clock/scan transport is unchanged. Older loaders reject GFB14. Signed portable packages do not yet accept this profile.
+
+The Rust core computes one occurrence from the compiled schedule site and instant, without host-supplied occurrence rows. Admission requires `previous < planned <= current` on an accepted trusted scan with no observation gap and `when = true`. False at crossing and an overlapping gap consume a terminal miss. A boot/recovery baseline at or after the instant consumes a `BaselinePastMissed` occurrence without catch-up. Reobserving, wall rollback and recrossing do not create another pulse. Clock source/boot revision does not create a new identity. Rejected scans commit neither the clock baseline, terminal identity nor projections.
+
+Cross-restart deduplication requires restoring the matching program's terminal checkpoint. A consumed or missed identity stays consumed even if the new boot's wall clock is before the instant; a pre-occurrence checkpoint may admit a future crossing. Fresh activation has no durable history. A crash after admission but before durable checkpoint publication is outside the VM's once-only guarantee; host persistence and dispatch must handle that boundary. Admission is logical evidence and does not prove physical execution or acknowledgement.
+
+`Daily`, one time each day, requires `timezone`, ``at = time`...`;``, `dst_missing` and `dst_repeated`. For example:
 
 ```ghost
 schedule morning: Daily {
@@ -277,7 +314,7 @@ Because `.due = false` alone cannot distinguish ordinary false, Unknown fallback
 
 ### Source response to missed occurrences
 
-`schedule_name.missed` is a `Bool` projection. The current compiler provides it for Solar and executable `pulse` civil schedules. It is not yet an execution projection for `range` descriptors. It is true only when one or more occurrences of that schedule become **terminal missed** in this accepted scan. Even if two or more are missed in one scan, the value is true once; it is false in the next accepted scan if there is no new terminal miss. A control action evaluates this value exactly once in that accepted scan's immutable snapshot. Simply reobserving an occurrence already recorded as terminal missed or restoring a checkpoint does not make it true again. Rejected scans commit neither this pulse nor state transitions.
+`schedule_name.missed` is a `Bool` projection. The current compiler provides it for At pulse, Solar and executable `pulse` civil schedules. It is not yet an execution projection for Range, including executable UTC Range controls. It is true only when one or more occurrences of that schedule become **terminal missed** in this accepted scan. Even if two or more are missed in one scan, the value is true once; it is false in the next accepted scan if there is no new terminal miss. A control action evaluates this value exactly once in that accepted scan's immutable snapshot. Simply reobserving an occurrence already recorded as terminal missed or restoring a checkpoint does not make it true again. Rejected scans commit neither this pulse nor state transitions.
 
 ```ghost
 state missed_scans: Int = 0;
@@ -298,7 +335,7 @@ A Bool pulse contains neither count nor reason. The same accepted scan's **order
 | `window(5min)` (design) | Admit once at the first true condition within `[planned, planned+5min)`. Repeated false→true changes in the same occurrence do not rearm it. |
 | `run(5min, on_time)` (design) | Admit only at observed crossing and run for five minutes from admission. |
 | `run(5min, within(10min))` (Tide) | Allow first admission within `[planned, planned+10min)`. Ten minutes are grace; run length is five minutes. |
-| `range(10min)` (civil contract) | If trusted current time is within `[planned, planned+10min)` and `when` is true, admit once even after late first observation, boot or recovery. End is planned start + ten minutes. Bytecode execution is currently unsupported. |
+| `range(10min)` (civil contract) | If trusted current time is within `[planned, planned+10min)` and `when` is true, admit once even after late first observation, boot or recovery. End is planned start + ten minutes. Immutable UTC Daily/DailySlots execution uses GFB12. |
 
 ```ghost
 schedule morning_watering: Daily {
@@ -316,7 +353,9 @@ schedule morning_watering: Daily {
 }
 ```
 
-This `range` example is a contract validated by the current compiler, not executable control bytecode. Current civil `range` requires `UTC` and recurrence non-overlap.
+This immutable UTC `range` example is executable GFB12 control bytecode. The bounded execution slice supports Daily without a work calendar and nonempty static DailySlots, with `trusted_only`, `baseline` and `skip`. Immutable UTC Daily with a `workday` or `offday` selector and a typed WorkCalendar uses GFB18. Its start plus duration must not exceed local midnight; divide an overnight work interval into separate explicit Daily ranges. A range ending exactly at midnight is valid because its end is exclusive. Ordinary ranges without a work calendar retain their existing midnight behavior. Live start/duration settings, Periodic Range and other accepted variants remain descriptors. Non-UTC and unprovable overlap remain rejected; no timezone or DST policy is inferred.
+
+Range context checkpoints retain consumed occurrence identities, not an active monotonic timer. Restoring into a fresh boot does not resume or readmit an already consumed occurrence. An unconsumed still-open interval may admit only its remaining time. Terminal-capacity exhaustion rejects the scan atomically; identities are never silently pruned.
 
 The late interval is half-open. No new admission occurs at its end boundary. For a planned time of 08:00, `run(5min, within(10min))` admitted at 08:02 is a monotonic run through 08:07.
 
@@ -347,6 +386,8 @@ Schedules check monotonic delta and positive wall delta between consecutive acce
 If two or more occurrences of the same schedule are crossed between consecutive accepted scans, record all new Pulse, Window and Run occurrences as missed and admit or execute none. Range does not execute occurrences already ended or recorded terminal missed/withdrawn; it admits the current occurrence whose interval is open at trusted current time for its remaining duration. Two simultaneously open Range intervals of the same schedule are forbidden and rejected in compile/live settings validation. If exactly one occurrence is crossed, apply ordinary admission rules for each basis.
 
 ## 3.6 Selected DailySlots
+
+Extended Solar policies execute only in the bounded Solar profile; combining them with non-Solar schedules, provider/config execution or unsupported features is rejected. Legacy Solar combinations retain their existing profile.
 
 `DailySlots<15min>` selects times on a 15-minute grid of the local date.
 
@@ -492,7 +533,25 @@ calendar = workers;
 
 A weekday tag needs no calendar. `holiday` requires HolidayCalendar; `workday` and `offday` require WorkCalendar. An incompatible kind or missing binding is an activation error. Calendar snapshot timezone must equal schedule timezone.
 
-A work-calendar snapshot has calendar ID, revision, timezone and coverage range. Decision precedence is explicit exceptions for that date, declared holiday policy, then weekly pattern. Conflicting exceptions for one date are invalid. A workday is a planned working day, not confirmation of actual human presence. Without a snapshot or outside coverage, both workday and offday are Unknown. `!workday` must not turn Unknown into offday permission.
+`holiday` is membership in the public holiday date list. A `work` exception for
+the same date preserves the holiday fact; weekly pattern and holiday work policy
+do not affect it. Daily pulses for `holiday`, `workday` and `offday` use typed
+calendars and explicit common/DST policies. Weekday tags remain outside this
+execution scope. Ordinary `calendar_is` with a `workday`, `offday` or `holiday`
+selector returns the typed Result below; its bounded executable profile requires
+an explicit UTC calendar binding. Other timezone profiles are rejected at
+activation, and the host does not supply a precomputed eligibility value.
+
+Explicit composition of calendar base and overrides creates a new ID/revision.
+The original is immutable; timezone mismatch and duplicate dates in one overlay
+layer are rejected. Schedules sharing a binding use equal snapshots or all
+absent data in one tick. A calendar ID/revision must not be reused with changed
+contents. Accepted contents remain recorded after new revisions and checkpoints;
+exceeding storage bounds fails closed. GFCXv3 preserves this history and rejects
+v1/v2 checkpoints. See the [calendar provider guide](../CALENDAR-PROVIDERS.md)
+for fact assembly and installation.
+
+A work-calendar snapshot has calendar ID, revision, timezone and coverage range. Decision precedence is explicit exceptions for that date, declared holiday policy, then weekly pattern. Conflicting exceptions for one date are invalid. A workday is a planned working day, not confirmation of actual human presence. Without a snapshot, outside coverage or at expiry, both workday and offday are Unknown; the same rules apply to holiday decisions. `!workday` must not turn Unknown into offday permission. `fallback = skip` creates no new admission.
 
 This day tag does not decide which business date owns an overnight shift. Until there is a separate shift contract, reject work intervals crossing midnight and divide them into explicit intervals.
 

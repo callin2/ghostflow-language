@@ -2,11 +2,81 @@
   "format": "GhostFlow/document-translations-v1",
   "documents": [
     {
+      "source": "examples/bound-resource-execution.ghost.md",
+      "sourceLanguage": "en",
+      "translation": "examples/bound-resource-execution.ghost.ko.md",
+      "sourceSha256": "90f15fdb460acc15115755cc2cfba5d5ba9ec0295242e617cea2079087613663",
+      "translationSha256": "1ce4f5e02e4bac5f0240f2867f52d15c66d1cfc9a77e7d0e25b850fbd2d42a4a"
+    },
+    {
+      "source": "examples/shared-constraint-contract.ghost.md",
+      "sourceLanguage": "en",
+      "translation": "examples/shared-constraint-contract.ghost.ko.md",
+      "sourceSha256": "06d6b113591505a8d13874d249594672b7f819b2b201e834698edf8321c10fe8",
+      "translationSha256": "0cc3cc95a61e70762452be7d09b106d29406de3a2b329dcc3379fb87e13b8717"
+    },
+    {
+      "source": "examples/constraint-envelope.ghost.md",
+      "sourceLanguage": "en",
+      "translation": "examples/constraint-envelope.ghost.ko.md",
+      "sourceSha256": "bd32b4a8c3951bcfe4d44a848f29d4260de1c743b25f03c73e3f69478c9e0c92",
+      "translationSha256": "3ab4a6d9a9875f2f55d67c012f79aa1c35b73a8b730b7344c88fec2b3496d219"
+    },
+    {
+      "source": "docs/EFFECT-PROCESS-CONTRACT.md",
+      "sourceLanguage": "en",
+      "translation": "docs/EFFECT-PROCESS-CONTRACT.ko.md",
+      "sourceSha256": "8e2db15c3eb85a520a584a51e6ba189b39067aac1dee2fdf5be24cefb1b21f60",
+      "translationSha256": "25fd4f29379e369eeb16d5f5e96373d08b88eaebcf0cf36d46a33f69eead49ce"
+    },
+    {
+      "source": "docs/HOST-EVENT-ORDERING-CONTRACT.md",
+      "sourceLanguage": "en",
+      "translation": "docs/HOST-EVENT-ORDERING-CONTRACT.ko.md",
+      "sourceSha256": "0ab3bd709d744ac916002733605f5992cf5e07af516598f952b8a3e56fe43d01",
+      "translationSha256": "cf6c40766cddf4464658a9d24e49c13b834c68edf34f7ae66b96be20defcc0bf"
+    },
+    {
+      "source": "docs/CHECKED-CONSTRAINT-REPLACEMENTS.md",
+      "sourceLanguage": "en",
+      "translation": "docs/CHECKED-CONSTRAINT-REPLACEMENTS.ko.md",
+      "sourceSha256": "adb86455ffcf58d9d72526a1ff378f6286a187e8321c4caf2fd317dfe5c3d23d",
+      "translationSha256": "bb0b2aa02f17ef8a72335f8ecc4fc30532ffdf51caabc1d415434243518a368a"
+    },
+    {
+      "source": "docs/OPTIMIZER-PASS-CONTRACT.md",
+      "sourceLanguage": "en",
+      "translation": "docs/OPTIMIZER-PASS-CONTRACT.ko.md",
+      "sourceSha256": "b3266658b0fec8e2d01236e1718b5d55e846ebf7fc16ca925bf042666f9cdeb2",
+      "translationSha256": "565ec4512eae5ecdd4751ec4bd2d944b612d07f1848da6c900ff73db7c927ad9"
+    },
+    {
+      "source": "docs/INTERACTION-STREAM-CONTRACT.md",
+      "sourceLanguage": "en",
+      "translation": "docs/INTERACTION-STREAM-CONTRACT.ko.md",
+      "sourceSha256": "f2e179afa29cc1d6eef9be9cd4df17f17f906686fa7eb74b5254d52a86d10662",
+      "translationSha256": "a5a9493fd5cb51411d81b59c24b78b686822539870d8db5b5e2fdf94f8c131b7"
+    },
+    {
+      "source": "docs/DRIVER-ABI-V1-DRAFT.md",
+      "sourceLanguage": "en",
+      "translation": "docs/DRIVER-ABI-V1-DRAFT.ko.md",
+      "sourceSha256": "54d333b22b97478a38aa04a39ccbc4dafdac16569e21c017ef2b2d4ebaf7255c",
+      "translationSha256": "0a8b9692ba0dcb859a037aaf4fd3ea53f6b474342d8484de0e521ea9461580b7"
+    },
+    {
+      "source": "docs/ESTIMATE-EVIDENCE.md",
+      "sourceLanguage": "en",
+      "translation": "docs/ESTIMATE-EVIDENCE.ko.md",
+      "sourceSha256": "b95906697154dfb070cee95e1179ef141cbc4e91a5186eaed1e122b3f0fff65b",
+      "translationSha256": "0530ef684366a737ed89cb3722ab7f6d887e6f902c3dd36fba75dc7392402494"
+    },
+    {
       "source": "AGENTS.md",
       "sourceLanguage": "en",
       "translation": "AGENTS.ko.md",
-      "sourceSha256": "cc5a72eb4c34e5dbbf63d957a22abbc5136d5ad52dc7d8dfeae707525569441e",
-      "translationSha256": "55db5317e396f8b6cab186f722b28ce97b032d708ed92771f4243bbd87ec60b8"
+      "sourceSha256": "8baae1b95a802b97a223de1f8fc2723f7a175a08ecc82f6478a0106408e6674c",
+      "translationSha256": "7fa460b29c05a6680e669918e935e6ac5093099e502af9b4a512171167b3ac8b"
     },
     {
       "source": "contracts/integration-v1/README.md",
@@ -19,8 +89,8 @@
       "source": "contracts/interaction-v0/README.md",
       "sourceLanguage": "en",
       "translation": "contracts/interaction-v0/README.ko.md",
-      "sourceSha256": "6c15aa4740eb129ab4ba8bc28a3ae59fb6745a79e836e5f0d9014ee2bbf73240",
-      "translationSha256": "7266be204c0e43a14dc641f8a2d3c4b4616b9fc1a74fa5ef051f7c154719faf8"
+      "sourceSha256": "90eafb48488bb25bd509217210d49e94c9acccc4d93707011e2007524f310ada",
+      "translationSha256": "9e52606f8308ba1155abb85539386b03478641c94840e27d979f5630714fb187"
     },
     {
       "source": "contracts/requirements/README.md",
@@ -33,8 +103,8 @@
       "source": "CONTRIBUTING.md",
       "sourceLanguage": "en",
       "translation": "CONTRIBUTING.ko.md",
-      "sourceSha256": "bd5a0c755be7b9d0a06e40cfdda5d62969b7b2f83678edd39415fbd237f10ac3",
-      "translationSha256": "0139eccc92ee298df85ca713eab06a95725ac8575f602fa42f2ccb2ab1de81cd"
+      "sourceSha256": "715196eaaf40e61baec1853235634b2d9ca3c16b1323d576b8ecb87f37050560",
+      "translationSha256": "2f7f2d37c9af6a97e446271bb759cbac236f315f1b10e2611bb4ec552f47325e"
     },
     {
       "source": "docs/2026-09-24-authoring-baseline-provenance.md",
@@ -54,8 +124,8 @@
       "source": "docs/ACCOUNTING-LEDGER-ABI.md",
       "sourceLanguage": "en",
       "translation": "docs/ACCOUNTING-LEDGER-ABI.ko.md",
-      "sourceSha256": "04deadb4cde208d55eacc3e356bc35f45f8f3651466ad5dd672945eb3b27ce26",
-      "translationSha256": "6e6ffdadb040e5e82fd7c7bb324068eab7d1e4c7fe6197e27fbede47c6eab77e"
+      "sourceSha256": "7342889ac5e48991d786837250e8578146dcc69c29fae0f0ec6cb3cf39946177",
+      "translationSha256": "d572df3cce30ff42f32f8331eef6e6101ef7a98f9aa013479f93e10837d85b9a"
     },
     {
       "source": "docs/AFTER-EVENT-WASM-ABI.md",
@@ -75,8 +145,8 @@
       "source": "docs/BYTECODE.md",
       "sourceLanguage": "en",
       "translation": "docs/BYTECODE.ko.md",
-      "sourceSha256": "1ff79e043d5cf57bcd9c81e0b4cb1422e56db76ca4f1bef02ab1198c76575483",
-      "translationSha256": "7c021c623754136b6861fa1cc2098283160732d3d3c873ec88879d79c936f75d"
+      "sourceSha256": "46e672972b01bacb947fba96c566ae25640e9a04734c30c5a230cb7900981098",
+      "translationSha256": "62ecf64ea5b85a17c5d24fe0c422130ea509202087d19c99505484a8c4490451"
     },
     {
       "source": "docs/COMPILER-DIAGNOSTICS.md",
@@ -89,15 +159,15 @@
       "source": "docs/CONSTRAINTS.md",
       "sourceLanguage": "ko",
       "translation": "docs/CONSTRAINTS.en.md",
-      "sourceSha256": "47b065d6db2c9d7c0c27873ec19a37b78587c041678b86662100e231c0f932d3",
-      "translationSha256": "04bf9cfc6c5decf38cdd266d41b9e49a7879bfc19c778b7065b31a44029816d8"
+      "sourceSha256": "9199b3a405d17e907612af29755647afde80a00a3ffef3e00e88f3151649d7fd",
+      "translationSha256": "7c4881bc9586781ac7db12dc7e8cf073607e2c8799b36c6d3877d1ffcabc5a18"
     },
     {
       "source": "docs/CONTEXT-EXECUTION-ABI.md",
       "sourceLanguage": "en",
       "translation": "docs/CONTEXT-EXECUTION-ABI.ko.md",
-      "sourceSha256": "c347bba55bd5b61e9540cf552009b0af07d0017ac7ea5c8679988de27523ff39",
-      "translationSha256": "0b5d44da9325f0045a1cad6759009127881ea2e1bd4b3daa01c99dcdb9567918"
+      "sourceSha256": "01df0bd3a50050979c9b31a29726ec4e53a0f637a8c32526105ddb99b1454e58",
+      "translationSha256": "8568656caab83cc6237ef892e4395df2246f765257d66324c92f0f346a6fc2e3"
     },
     {
       "source": "docs/CONTINUOUS-BOOL-TIMER-CONTRACT.md",
@@ -117,8 +187,8 @@
       "source": "docs/DEVELOPMENT-WORKFLOW.md",
       "sourceLanguage": "en",
       "translation": "docs/DEVELOPMENT-WORKFLOW.ko.md",
-      "sourceSha256": "68ef396fc4650a6c267328e68d75546da76eaa76163e36465ca1e0639dc47309",
-      "translationSha256": "be9485bf667a7cc501e5a34c0f484cdd68b91ebe418b66a00c65734863099ca1"
+      "sourceSha256": "ab5735c48ac67f567f2c7ce79cfec92080796feb04847236120bab1446c169fe",
+      "translationSha256": "ce22af6b34360cf704678c1e3f18bd9e247333fb022aadecd456f0dd09af6073"
     },
     {
       "source": "docs/DOCUMENTATION-LANGUAGES.md",
@@ -131,8 +201,8 @@
       "source": "docs/DOCUMENTATION.md",
       "sourceLanguage": "en",
       "translation": "docs/DOCUMENTATION.ko.md",
-      "sourceSha256": "cc67fbc0f5f1d349eada884889dd0fe811eb2ff7c50eaeb57dd033c0bec36cf5",
-      "translationSha256": "5ef9946a143b7915a3a44f8fbbe4b572b6817ce4944424a5db7c0fb8e0c91d09"
+      "sourceSha256": "01e3114db01e4a7483c77ae859194759ee96e435cbbca0498e8510d075bef3ca",
+      "translationSha256": "5d40b15e4c9de00526d76d1247b353c06dccb4349f0223bfa86ebbb28b6ed698"
     },
     {
       "source": "docs/EXACT-INTEGER-CONTRACT.md",
@@ -159,8 +229,8 @@
       "source": "docs/IMPLEMENTATION.md",
       "sourceLanguage": "en",
       "translation": "docs/IMPLEMENTATION.ko.md",
-      "sourceSha256": "e9f89dde19c8e4029eee0844de483dee019c64acd5c8cd3e15e2f9abd64ea7f5",
-      "translationSha256": "06e76601727ebad397047b36d822d3a458b7c28b160d689a83b74bd390376d39"
+      "sourceSha256": "e2fc080b6617296464ed66ccede9a3f7a04d870050ecd5cfca68c09aac375fef",
+      "translationSha256": "6f16a829574cc632337ce9fc64764c9f5b903ac552051f8b928c4047f138e17b"
     },
     {
       "source": "docs/INTENT-ANCHOR-MAP.md",
@@ -180,8 +250,8 @@
       "source": "docs/language_faq.md",
       "sourceLanguage": "ko",
       "translation": "docs/language_faq.en.md",
-      "sourceSha256": "967f77ae9492ab3e2b0773287a506373dc709c0ea151b55742449d1dae9ec997",
-      "translationSha256": "ebe898ae24a53d8b53f417eac45f5a2ca78bb3ac0288a6ba114113294e4dd9a2"
+      "sourceSha256": "e1dc7072aa0718c341acba7288ab50a4d4352a3ff687a2a1cd18e9c863123f94",
+      "translationSha256": "e537025a6953253cd8e181ea0b27e75d325775806acd41809751930e1fa8b70d"
     },
     {
       "source": "docs/LANGUAGE-EXAMPLES.md",
@@ -201,8 +271,8 @@
       "source": "docs/LANGUAGE-REFERENCE.md",
       "sourceLanguage": "ko",
       "translation": "docs/LANGUAGE-REFERENCE.en.md",
-      "sourceSha256": "7ad71823428dc65f3d41e150ef253431696be4daaeb1e8c1db86a23a338c0309",
-      "translationSha256": "c76ad9196743b3568d698790b0f50cd9533cd691c2882609b7f148e065320be4"
+      "sourceSha256": "5e173bca6dcd2366a735c5e21c91695f8658055211dffe66d567341fce8719e3",
+      "translationSha256": "1b6ea6554f1190b9461f175788e553ee1fe921a2aa3a270ba37171b61b92c09d"
     },
     {
       "source": "docs/LANGUAGE-SURFACE.md",
@@ -250,8 +320,8 @@
       "source": "docs/OPERATOR-SETTINGS-STREAM.md",
       "sourceLanguage": "en",
       "translation": "docs/OPERATOR-SETTINGS-STREAM.ko.md",
-      "sourceSha256": "4e0cf058ea1e0481b34e4dc9600b0f46de621fed9c08f8625717f35db5cf3bda",
-      "translationSha256": "8150d7237994c84949a9943be0d276ee4966d37c748a6b6f3ea9f9fc37859fcf"
+      "sourceSha256": "702e3b64283ff0c8a3da17b819f4b54b06c197b28636010b849c20baaf553245",
+      "translationSha256": "a14da60802c76187995ec80de7e91be34dd4969ae826c2021db72dfce30088c4"
     },
     {
       "source": "docs/plans/2026-09-28-semantic-kernel.md",
@@ -264,15 +334,15 @@
       "source": "docs/PORTABLE-PACKAGE.md",
       "sourceLanguage": "en",
       "translation": "docs/PORTABLE-PACKAGE.ko.md",
-      "sourceSha256": "79f4db479c1dfecdd9cf3c24f5ed4ad21854311c9e5f4481a5a8932d14e3e34c",
-      "translationSha256": "995ba07feef5a14a3e4dc299ff09bd8c5e913ecbfd03ec7e70fed1dbfbf1d2ec"
+      "sourceSha256": "b94fca14e4ae81fb225cd6913971e9ed07143210fa1a4c0a18c031667e55c308",
+      "translationSha256": "684391e33802143faffc270fa4008f995f3325dfdf7cda1add7293fdc5076f9e"
     },
     {
       "source": "docs/ProgrammingInGhostflow.md",
       "sourceLanguage": "ko",
       "translation": "docs/ProgrammingInGhostflow.en.md",
-      "sourceSha256": "14f4ed3e7b755adee1778d1c6d06a754a202afa80f48d99ed22c53f9afbfddee",
-      "translationSha256": "e1bfd15a68aece08032f4b4efc66e22896581f49522e2d70242f69b5ea86a502"
+      "sourceSha256": "57f32d88e185541daafc5aec21f0dc71449fc8eb87d6450e2a29e85b379c0a21",
+      "translationSha256": "8d7a33a13ca2a94b278cf8e06ba525e1eb00b6b5a4aaab304061ede351d0b073"
     },
     {
       "source": "docs/REFERENCE-QUERY.md",
@@ -285,36 +355,36 @@
       "source": "docs/reference/01-source-and-syntax.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/01-source-and-syntax.en.md",
-      "sourceSha256": "0ce85a809713cf57f62928cc1dfca222109e3cd8ed04bb2247e51bdea14c4dfe",
-      "translationSha256": "32a713f82c3603e9d25534b46e8cb4c3eb94fad47857f3693887fcb4e020080f"
+      "sourceSha256": "41dc41d8a4cf38b5ee56118c0c563226a87981e0d761ee0244dc4bd2852dc0de",
+      "translationSha256": "e2b3366085e862113bf100a00836496e4c5036f54877e1f132ecdc60ebe138ec"
     },
     {
       "source": "docs/reference/02-types-expressions-state.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/02-types-expressions-state.en.md",
-      "sourceSha256": "a748546d34ff5d3c612393463edfb65c919ba80134f527444a6568860274fc35",
-      "translationSha256": "568e5c6eba69f05992addc0a9e682bf3a2da795eefd6679801c17a60715f1277"
+      "sourceSha256": "c56f9f2a4131ba3c7bbda6db4fa89ec62d303b60e3e1db845110e6092c81a8f6",
+      "translationSha256": "746e460f42264b9596eec825b1c5ef0a31fe20849fb1e584f3b001b32e1d0b9c"
     },
     {
       "source": "docs/reference/03-time-and-schedules.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/03-time-and-schedules.en.md",
-      "sourceSha256": "16bc8c99babdec6464fe4b140b9232714541e4056aa777cc50b9eea8262ad315",
-      "translationSha256": "d3318ef7c4645bf6df9ddb6830a4dc29103f83fbfe13bb95a82f512bde2b1dae"
+      "sourceSha256": "9a73399f42f7cc76aa446f3035353a368db12d8b23c2241499ce92fef65c8cff",
+      "translationSha256": "38cddb21455d819bd153b8344e6da30399e0301a39bfac821d8147a3664b1ada"
     },
     {
       "source": "docs/reference/04-sensors-constraints-control.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/04-sensors-constraints-control.en.md",
-      "sourceSha256": "33e6a6bbbc04195548481e37eaa696e839ebce41f69da75991852dda2e606af8",
-      "translationSha256": "a524d5e38b69b99f22665a710e4aab73e536280812236c7aa79ded8d957348eb"
+      "sourceSha256": "5606e95d24283e7cea441b27421d0e64cb91a064d0abc3df0fae8aaace2ea013",
+      "translationSha256": "5e2e2c00955ba5c45950bcb2c2ccdbbdbf6daeecb19ec1aa9745432e766d5a26"
     },
     {
       "source": "docs/reference/05-settings-and-observation.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/05-settings-and-observation.en.md",
-      "sourceSha256": "cf1ba40154722315c43a79168d60a9bfb537a71aced24c40fe1d6862d0a54fd3",
-      "translationSha256": "a76274c49719a028f9307364f20015056baa905aa1fdbb9c18542d0fc46518c0"
+      "sourceSha256": "05ee69ff19b041cdf033ebd0f08d50066056d1da075e25381b4b9cab079ead76",
+      "translationSha256": "446a1963ab84d8edd1c9c43994ed7e7b208b6a6ac39a277890b7a9cd32845257"
     },
     {
       "source": "docs/reference/06-composition-and-replay.md",
@@ -425,8 +495,8 @@
       "source": "docs/SOLAR-SCHEDULE.md",
       "sourceLanguage": "en",
       "translation": "docs/SOLAR-SCHEDULE.ko.md",
-      "sourceSha256": "2ba439a2dd02804b1097524cf0aca243cd1b2f4c8f7ea8e918919c546f1897d1",
-      "translationSha256": "ad5b334f6c20320c4022cb438bbfd7e2292640c0610da0451f600e6021e4c74e"
+      "sourceSha256": "09a4fcaad550519bd007a42ce96ebd6377b300a65a166b198b76e8122097385c",
+      "translationSha256": "4e8000ca06d90fa4fe5ba0746ec25df1716262d5b04045291ee163ca9d7d9510"
     },
     {
       "source": "docs/SOURCE-MAP.md",
@@ -516,8 +586,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "778d8121584695210fc233e665ed08254c402a04078d267beeb4b1f9f337ecea",
-      "translationSha256": "d3625b86d6f440bbd621fd3bf54ab56adf43e9f47d5901cad1c63f2a26632ac7"
+      "sourceSha256": "0a82db1a9bba3a7942683aca391f591e38848805ece83178d02548594e747ac8",
+      "translationSha256": "2adda7507d1c3c500497a07e95a18e4982fc3d295eebd7912f7eae227e026483"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",
@@ -621,8 +691,8 @@
       "source": "examples/station-rules.ghost.md",
       "sourceLanguage": "en",
       "translation": "examples/station-rules.ghost.ko.md",
-      "sourceSha256": "a2be97a7d654e3143144e58e378318297bc6afa9ef9cc4804e1cf67870ab93f5",
-      "translationSha256": "30b99475ce13bc0b0e711d9167bc7fc0bde441c8a5676672afdac41662e530ca"
+      "sourceSha256": "cbb466e0e90b34b9ee6d7847846719e1fdd85f10d40cfecb081fdd7e2ce1f46e",
+      "translationSha256": "e5a2aaccec9df9df9e8922649a102b607eb74f4321cac9c15266a8570c07ce79"
     },
     {
       "source": "examples/tutorial/01-latch.ghost.md",
@@ -789,8 +859,8 @@
       "source": "tasks/solar-native-admission-integration.md",
       "sourceLanguage": "en",
       "translation": "tasks/solar-native-admission-integration.ko.md",
-      "sourceSha256": "465ee3dbd8a054de71a0354a5c69400a4073a9a87d618a7022c0a30ded43bec3",
-      "translationSha256": "8c8ae649244741101a59ab24c1c0aa9277fce8364bdb87263b5be53b19763955"
+      "sourceSha256": "6103acbb7f9bb6b6e2b2898129531c274d9e48e27bd539a4984dbe114e5577e9",
+      "translationSha256": "0dabff2bb9f7009ee497b44e839c9253c9f6ea33c0693dc2cf11cf7e281d4cff"
     },
     {
       "source": "tasks/temporal-adapter-replay-design.md",
@@ -852,8 +922,8 @@
       "source": "tests/reference/DECISIONS.md",
       "sourceLanguage": "ko",
       "translation": "tests/reference/DECISIONS.en.md",
-      "sourceSha256": "cb019fb29a9c3492530dcd28030dcdba6db66ae8b14434971bd30c65c7b2fdf0",
-      "translationSha256": "bc88eee6e4eb1d8f608df6aab0e0462f0fa1ed9a3a19a65bcbde5fd27a23c616"
+      "sourceSha256": "c39cde92a9e6eb6e5a3f6202166afcc1233add33e474b7513a7758145dab478e",
+      "translationSha256": "18de5b49c7b4acae063d5726867b12745ba41de34d7d888fe5ca90862eec17f9"
     },
     {
       "source": "tests/reference/README.md",
@@ -861,6 +931,62 @@
       "translation": "tests/reference/README.en.md",
       "sourceSha256": "fea55ecafa747d86445dd2f35176146d9bf10c4c852d3f6655847910ab351245",
       "translationSha256": "69680266a80bad7bf72ff3a7b11ebbbbaa6086b4562e04bc33c398c6918b5896"
+    },
+    {
+      "source": "examples/optional-feedback-timer.ghost.md",
+      "sourceLanguage": "en",
+      "translation": "examples/optional-feedback-timer.ghost.ko.md",
+      "sourceSha256": "8baa2cf99de7a98a4b0234d06acb3248b53639fc7b3981cfccc710eab61dfd60",
+      "translationSha256": "0840b7d2cfebfdc83dc05e989bd37d5decff193b3fb90d8e57e5b6cc8e2ae040"
+    },
+    {
+      "source": "examples/explicit-feedback-adoption.ghost.md",
+      "sourceLanguage": "en",
+      "translation": "examples/explicit-feedback-adoption.ghost.ko.md",
+      "sourceSha256": "8f753ccce7d27bc4b6f7f2847e49915257c63c593925120c01272f6657de8b3d",
+      "translationSha256": "901db50ecb74fb55b6e9377d69302a46eb38cffe40132c331ce3ade46951447f"
+    },
+    {
+      "source": "docs/AI-CONTRIBUTION-PACKAGE.md",
+      "sourceLanguage": "en",
+      "translation": "docs/AI-CONTRIBUTION-PACKAGE.ko.md",
+      "sourceSha256": "283089fc5d57a3a89207e803954d76081b0d240a6c736e701d8f21be459750db",
+      "translationSha256": "6a8d1527e8cabedbc0d6d8dcf7b90e46711dade4752860d370628fca4eadbd00"
+    },
+    {
+      "source": ".github/pull_request_template.md",
+      "sourceLanguage": "en",
+      "translation": ".github/pull_request_template.ko.md",
+      "sourceSha256": "32569c4c5c201d620790fb343102c9870770991995c4bc18119a799c31dd961d",
+      "translationSha256": "77bd12e823d9afcd03d06ae69bf0c72725ec8e9b626ec105f5bfb92e049cb8cc"
+    },
+    {
+      "source": "docs/CALENDAR-PROVIDERS.md",
+      "sourceLanguage": "en",
+      "translation": "docs/CALENDAR-PROVIDERS.ko.md",
+      "sourceSha256": "4dafa09bda1184eb79ccb4c63e0ae6ab3eb2a14e5eea7ce33abd886f3c3b9857",
+      "translationSha256": "dfeaa15af5fd844f283e7b512ce136b2b4e8bdae07ea2a4d9b9c55f394be49ed"
+    },
+    {
+      "source": "examples/korean-calendar.ghost.md",
+      "sourceLanguage": "ko",
+      "translation": "examples/korean-calendar.ghost.en.md",
+      "sourceSha256": "bca00944a6684b09aac6ef4e5b955c6beaade02b0d4bc8d1efc6bfadf921ed49",
+      "translationSha256": "12a365ebbd6717735f44148df1aed7d670076fd6ff5e4f47e243abfe06d6b30a"
+    },
+    {
+      "source": "docs/SOLAR-CONFIG-EXECUTION.md",
+      "sourceLanguage": "en",
+      "translation": "docs/SOLAR-CONFIG-EXECUTION.ko.md",
+      "sourceSha256": "ce073af1790e7dfc6b716859828a381f932291189d5571f437524aec6bac8de6",
+      "translationSha256": "e2217913594b477469ca9204b2300e5dd5dff6b23137b0dff5da187a4b135d6c"
+    },
+    {
+      "source": "examples/solar-live-config.ghost.md",
+      "sourceLanguage": "ko",
+      "translation": "examples/solar-live-config.ghost.en.md",
+      "sourceSha256": "0ec0eb39fbc5895916ebc83f971ae59a479715f86ce0264423f1d7515bd0fad3",
+      "translationSha256": "c949d5b1afcfe3610e772128d62eff15227f9d742a475efbb131c3edae4b2b5e"
     }
   ],
   "exclusions": [
@@ -997,7 +1123,15 @@
       "reason": "Generated exact canonical section from the bilingual programming book; translate the authored book instead."
     },
     {
+      "path": "examples/programming-book-imports/E21.ghost.md",
+      "reason": "Generated exact canonical section from the bilingual programming book; translate the authored book instead."
+    },
+    {
       "path": "examples/programming-book-imports/E22.ghost.md",
+      "reason": "Generated exact canonical section from the bilingual programming book; translate the authored book instead."
+    },
+    {
+      "path": "examples/programming-book-imports/E31.ghost.md",
       "reason": "Generated exact canonical section from the bilingual programming book; translate the authored book instead."
     },
     {
@@ -1081,6 +1215,10 @@
       "reason": "Executable test or benchmark input fixture, not authored reader documentation; canonical source identity is retained."
     },
     {
+      "path": "tests/fixtures/issue-93-quantities.ghost.md",
+      "reason": "Executable native/WASM quantity conformance input fixture, not authored reader documentation; canonical source identity is retained."
+    },
+    {
       "path": "tests/fixtures/true-for-certified.ghost.md",
       "reason": "Executable test or benchmark input fixture, not authored reader documentation; canonical source identity is retained."
     },
@@ -1095,6 +1233,14 @@
     {
       "path": "INDEX.md",
       "reason": "Generated repository-wide Markdown/HTML path and title index; regenerated from Git working files, not authored reader prose."
+    },
+    {
+      "path": "tests/fixtures/contribution-134/numeric-threshold.ghost.md",
+      "reason": "Canonical executable test input mirrored from an immutable virtual field fixture; provenance and reader guidance are in the bilingual contribution package."
+    },
+    {
+      "path": "tests/fixtures/issue-145-solar-config.ghost.md",
+      "reason": "Canonical executable Solar/shared-config conformance fixture with deterministic recorded facts and event sequence; reader guidance and example are translated separately."
     }
   ]
 }

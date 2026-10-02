@@ -17,6 +17,16 @@ resource or Event. A restored ledger snapshot has no embedded source identity,
 so the host must also verify that its durable storage belongs to that binding.
 This API does not perform control admission or settle reservations.
 
+Accounting-only sources select the accounting control-v10 profile even without
+context-producing expressions. REF-03-020 executes the same checked source
+binding against native Rust and WASM ledgers: identical ON/OFF boundaries are
+partitioned by 1-second and repeating 7/13/9-second observations, and exact
+60-second rolling overlaps agree at common logical times, including after
+snapshot restoration and fresh replay. The native test runner loads the compiled
+module and a host-verified manifest; it does not independently compile source.
+These are historical calculations over caller-validated applied intervals, not
+control admission, live maximum-ON cutoff or physical receipt certification.
+
 ## Evidence supplied by the caller
 
 - Applied ON records are already validated and merged by the caller per stable

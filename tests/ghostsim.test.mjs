@@ -60,6 +60,35 @@ function run(artifact, scenario, format = 'json') {
   });
 }
 
+test('ghostsim preserves Percent initial values and updates through the native scenario runner', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostsim-percent-'));
+  try {
+    const artifact = path.join(directory, 'percent.gfb');
+    const source = '# Percent inputs\n\n```ghost\ncontrol PercentInput {\n'
+      + '  input level: Percent;\n  output high: Bool;\n  high <- level >= 50%;\n}\n```\n';
+    writeArtifact(await compileSource(source, { filename: 'percent.ghost.md' }), artifact);
+    const values = [0, 100, 0.25, 50, 33.5];
+    const result = run(artifact, {
+      format: 'GhostFlow/scenario-v1', id: 'percent-native',
+      initialInputs: [{ name: 'level', type: 'Percent', value: values[0] }],
+      keyBindings: [],
+      actions: [{ kind: 'scan', atMs: 0 }, ...values.slice(1).flatMap((value, index) => [
+        { kind: 'input', name: 'level', type: 'Percent', value },
+        { kind: 'scan', atMs: index + 1 },
+      ])],
+    });
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    const report = JSON.parse(result.stdout);
+    assert.equal(report.format, 'GhostFlow/scenario-result-v1');
+    assert.equal(report.outcome, 'completed');
+    assert.deepEqual(report.scans.map(scan => scan.inputs.level), values);
+    assert.deepEqual(report.scans.map(scan => scan.requestedVirtualIntent.high), values.map(value => value >= 50));
+    assert.deepEqual(report.scans.map(scan => scan.safeVirtualIntent.high), values.map(value => value >= 50));
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test('ghostsim executes only explicit scans and advances elapsed on a clock-only scan', async () => {
   const { directory, artifact } = await fixture();
   try {

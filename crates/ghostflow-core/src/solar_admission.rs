@@ -4,7 +4,7 @@
 //! never accepts a caller-computed `due` bit. Provider truth, IANA conversion,
 //! and durable package identity remain outside this component.
 
-use crate::schedule_clock::{ClockDisposition, ClockSnapshot, ScheduleClockGate};
+use crate::schedule_clock::{ClockDisposition, ClockProvenance, ClockSnapshot, ScheduleClockGate};
 use crate::{Error, Result};
 use std::sync::atomic::{AtomicU32, Ordering};
 
@@ -21,6 +21,8 @@ pub enum SolarFactAvailability {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SolarFact {
+    pub fallback_wall_ms: Option<u64>,
+    pub unavailable_reason: Option<u8>,
     pub source_day: i32,
     /// Stable slot key within a DailySlots definition; zero for other schedules.
     pub slot_key: u16,
@@ -42,6 +44,8 @@ impl SolarFact {
         context: &str,
     ) -> Self {
         Self {
+            fallback_wall_ms: None,
+            unavailable_reason: None,
             source_day,
             slot_key: 0,
             minute_of_day: 0,
@@ -78,6 +82,8 @@ pub enum SolarDecision {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SolarObservation {
+    pub fallback: bool,
+    pub unavailable_reason: Option<u8>,
     pub source_day: i32,
     pub slot_key: u16,
     pub minute_of_day: u16,
@@ -90,6 +96,8 @@ pub struct SolarObservation {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SolarStageResult {
+    pub clock_provenance: ClockProvenance,
+    pub clock_uncertainty_ms: Option<u64>,
     pub site: u32,
     pub due: bool,
     pub decision: SolarDecision,
@@ -99,6 +107,9 @@ pub struct SolarStageResult {
 
 #[derive(Debug)]
 pub struct SolarPulseEngine {
+    clock_hold_ms: Option<u64>,
+    fallback_time_ms: Option<u64>,
+    fallback_utc: bool,
     site: u32,
     gap_ms: u64,
     clock: ScheduleClockGate,
@@ -125,11 +136,35 @@ pub struct SolarStage {
 }
 
 impl SolarPulseEngine {
+    pub(crate) fn reset_observation_baseline(&mut self, boot_epoch: u64) -> Result<()> {
+        self.clock = ScheduleClockGate::new(self.gap_ms, boot_epoch)?;
+        Ok(())
+    }
+    pub(crate) fn terminal_identities(&self) -> &[(i32, u16, u8)] {
+        &self.terminal_days
+    }
+
+    pub(crate) fn restore_solar_identities(&mut self, days: Vec<(i32, u16, u8)>) -> Result<()> {
+        if days.len() > self.terminal_capacity
+            || days.iter().any(|(day, slot, fold)| {
+                !(0..=MAX_SOURCE_DAY).contains(day) || *slot != 0 || *fold != 0
+            })
+            || days.iter().collect::<std::collections::BTreeSet<_>>().len() != days.len()
+        {
+            return Err(Error::new("invalid solar checkpoint terminal identities"));
+        }
+        self.terminal_days = days;
+        Ok(())
+    }
+
     pub fn new(site: u32, gap_ms: u64, boot_epoch: u64, terminal_capacity: usize) -> Result<Self> {
         if site == 0 || terminal_capacity == 0 || terminal_capacity > MAX_TERMINAL_CAPACITY {
             return Err(Error::new("invalid solar admission configuration"));
         }
         Ok(Self {
+            clock_hold_ms: None,
+            fallback_time_ms: None,
+            fallback_utc: false,
             site,
             gap_ms,
             clock: ScheduleClockGate::new(gap_ms, boot_epoch)?,
@@ -140,12 +175,32 @@ impl SolarPulseEngine {
         })
     }
 
+    pub fn with_policy(
+        mut self,
+        clock_hold_ms: Option<u64>,
+        fallback_time_ms: Option<u64>,
+    ) -> Result<Self> {
+        if clock_hold_ms.is_some_and(|v| v == 0 || v > 9_007_199_254_740_991)
+            || fallback_time_ms.is_some_and(|v| v >= 86_400_000)
+        {
+            return Err(Error::new("invalid natural availability policy"));
+        }
+        self.clock_hold_ms = clock_hold_ms;
+        self.fallback_time_ms = fallback_time_ms;
+        Ok(self)
+    }
+
     pub fn begin<'a>(
         &self,
         snapshot: ClockSnapshot<'a>,
         facts: SolarFacts<'a>,
     ) -> Result<SolarStage> {
         self.begin_with_unknown(snapshot, facts, None)
+    }
+
+    pub fn with_fallback_timezone(mut self, timezone: &str) -> Self {
+        self.fallback_utc = matches!(timezone, "UTC" | "Etc/UTC");
+        self
     }
 
     pub(crate) fn begin_with_unknown<'a>(
@@ -155,21 +210,73 @@ impl SolarPulseEngine {
         unknown_reason: Option<&str>,
     ) -> Result<SolarStage> {
         validate_facts(facts)?;
+        if self.fallback_utc
+            && facts.rows.iter().any(|row| {
+                row.fallback_wall_ms.is_some_and(|at| {
+                    at / 86_400_000 != row.source_day as u64
+                        || Some(at % 86_400_000) != self.fallback_time_ms
+                })
+            })
+        {
+            return Err(Error::new("fallback fact violates civil descriptor"));
+        }
+        if facts
+            .rows
+            .iter()
+            .any(|row| row.fallback_wall_ms.is_some() && self.fallback_time_ms.is_none())
+        {
+            return Err(Error::new("fallback fact requires explicit policy"));
+        }
+        let normalized_rows: Vec<_> = facts
+            .rows
+            .iter()
+            .cloned()
+            .map(|mut row| {
+                if row.availability == SolarFactAvailability::Unavailable
+                    && self.fallback_time_ms.is_some()
+                {
+                    row.scheduled_wall_ms = row.fallback_wall_ms;
+                    if row.scheduled_wall_ms.is_some() {
+                        row.availability = SolarFactAvailability::Available;
+                    }
+                }
+                row
+            })
+            .collect();
+        let facts = SolarFacts {
+            rows: &normalized_rows,
+            ..facts
+        };
         if facts.rows.len() > self.terminal_capacity {
             return Err(Error::new(
                 "solar fact batch exceeds terminal ledger capacity",
             ));
         }
         let mut engine = self.clone_for_stage();
-        let clock = engine.clock.poll(snapshot)?;
+        let policy_clock = engine
+            .clock
+            .poll_with_hold(snapshot, engine.clock_hold_ms)?;
+        let clock = policy_clock.observation;
         let base_generation = engine.generation;
         let mut result = SolarStageResult {
+            clock_provenance: policy_clock.provenance,
+            clock_uncertainty_ms: clock.uncertainty_ms,
             site: engine.site,
             due: false,
             decision: SolarDecision::Before,
             observations: Vec::new(),
             unknown_reason: clock.unknown_reason.map(str::to_owned),
         };
+        if clock.current_effective_wall_ms.is_some() {
+            for row in facts.rows.iter().filter(|row| {
+                row.availability == SolarFactAvailability::Unavailable
+                    && row.unavailable_reason.is_some()
+            }) {
+                result
+                    .observations
+                    .push(observation(row, SolarDecision::Unknown));
+            }
+        }
         if let Some(reason) = unknown_reason {
             result.decision = SolarDecision::Unknown;
             result.unknown_reason = Some(clock.unknown_reason.unwrap_or(reason).to_owned());
@@ -351,6 +458,9 @@ impl SolarPulseEngine {
 
     fn clone_for_stage(&self) -> Self {
         Self {
+            clock_hold_ms: self.clock_hold_ms,
+            fallback_time_ms: self.fallback_time_ms,
+            fallback_utc: self.fallback_utc,
             site: self.site,
             gap_ms: self.gap_ms,
             clock: self.clock.clone(),
@@ -429,6 +539,8 @@ impl SolarStage {
 
 fn observation(fact: &SolarFact, decision: SolarDecision) -> SolarObservation {
     SolarObservation {
+        fallback: fact.fallback_wall_ms.is_some(),
+        unavailable_reason: fact.unavailable_reason,
         source_day: fact.source_day,
         slot_key: fact.slot_key,
         minute_of_day: fact.minute_of_day,
@@ -477,10 +589,29 @@ fn validate_facts(facts: SolarFacts<'_>) -> Result<()> {
     if facts.coverage_from_wall_ms > facts.coverage_to_wall_ms {
         return Err(Error::new("solar fact coverage is reversed"));
     }
+    if facts.coverage_to_wall_ms > MAX_WALL_MS {
+        return Err(Error::new("solar coverage out of range"));
+    }
     let mut previous = None;
     for fact in facts.rows {
         if !(0..=MAX_SOURCE_DAY).contains(&fact.source_day) {
             return Err(Error::new("solar fact source day is out of range"));
+        }
+        if fact.unavailable_reason.is_some_and(|reason| reason > 5)
+            || (fact.availability == SolarFactAvailability::Available
+                && (fact.fallback_wall_ms.is_some() || fact.unavailable_reason.is_some()))
+            || (fact.availability == SolarFactAvailability::Unavailable
+                && fact.scheduled_wall_ms.is_some())
+        {
+            return Err(Error::new("invalid solar availability fact"));
+        }
+        if let Some(at) = fact.fallback_wall_ms {
+            if at > MAX_WALL_MS
+                || at < facts.coverage_from_wall_ms
+                || at > facts.coverage_to_wall_ms
+            {
+                return Err(Error::new("fallback fact outside coverage"));
+            }
         }
         if fact.fold > 2 {
             return Err(Error::new("invalid occurrence fold"));
@@ -510,4 +641,189 @@ fn validate_facts(facts: SolarFacts<'_>) -> Result<()> {
 
 fn identity(fact: &SolarFact) -> (i32, u16, u8) {
     (fact.source_day, fact.slot_key, fact.fold)
+}
+
+#[cfg(test)]
+mod natural_policy_tests {
+    use super::*;
+    use crate::schedule_clock::ClockTrust;
+    fn clock(now: u64, wall: u64, trusted: bool) -> ClockSnapshot<'static> {
+        ClockSnapshot {
+            monotonic_ms: now,
+            boot_epoch: 7,
+            wall_ms: Some(wall),
+            trust: if trusted {
+                ClockTrust::Trusted
+            } else {
+                ClockTrust::Unknown("TrustExpired")
+            },
+            uncertainty_ms: Some(2),
+            source_revision: Some("rtc-v1"),
+        }
+    }
+    fn fallback() -> SolarFact {
+        SolarFact {
+            source_day: 0,
+            slot_key: 0,
+            minute_of_day: 0,
+            fold: 0,
+            scheduled_wall_ms: None,
+            fallback_wall_ms: Some(21_600_000),
+            unavailable_reason: Some(2),
+            provider_revision: "solar-v1".into(),
+            context_revision: "site-v1".into(),
+            availability: SolarFactAvailability::Unavailable,
+        }
+    }
+    fn facts(rows: &[SolarFact]) -> SolarFacts<'_> {
+        SolarFacts {
+            coverage_from_wall_ms: 0,
+            coverage_to_wall_ms: 86_400_000,
+            rows,
+        }
+    }
+    fn commit(
+        engine: &mut SolarPulseEngine,
+        snapshot: ClockSnapshot<'_>,
+        rows: &[SolarFact],
+        predicate: bool,
+    ) -> SolarStageResult {
+        let stage = engine
+            .begin(snapshot, facts(rows))
+            .unwrap()
+            .evaluate(predicate)
+            .unwrap();
+        engine.commit(stage).unwrap()
+    }
+    #[test]
+    fn held_fallback_consumes_event_identity_and_restart_keeps_it() {
+        let mut engine = SolarPulseEngine::new(1, 60_000, 7, 16)
+            .unwrap()
+            .with_policy(Some(2_000), Some(21_600_000))
+            .unwrap()
+            .with_fallback_timezone("UTC");
+        let rows = [fallback()];
+        assert_eq!(
+            commit(&mut engine, clock(0, 21_599_000, true), &rows, true).decision,
+            SolarDecision::BootBaseline
+        );
+        let held = commit(&mut engine, clock(1_000, 0, false), &rows, true);
+        assert!(held.due);
+        assert!(held.observations[0].fallback);
+        assert_eq!(held.observations[0].unavailable_reason, Some(2));
+        assert!(matches!(
+            held.clock_provenance,
+            ClockProvenance::HeldClock { .. }
+        ));
+        let expired = commit(&mut engine, clock(2_000, 0, false), &rows, true);
+        assert!(!expired.due);
+        assert_eq!(expired.unknown_reason.as_deref(), Some("TrustExpired"));
+        let recovered = [SolarFact::available(0, 21_602_000, "solar-v2", "site-v1")];
+        assert!(
+            !commit(
+                &mut engine,
+                clock(3_000, 21_602_000, true),
+                &recovered,
+                true
+            )
+            .due
+        );
+        assert!(
+            !commit(
+                &mut engine,
+                clock(4_000, 21_603_000, true),
+                &recovered,
+                true
+            )
+            .due
+        );
+        let mut restart = SolarPulseEngine::new(1, 60_000, 7, 16)
+            .unwrap()
+            .with_policy(Some(2_000), Some(21_600_000))
+            .unwrap();
+        restart
+            .restore_solar_identities(engine.terminal_days.clone())
+            .unwrap();
+        assert!(!commit(&mut restart, clock(0, 21_599_000, true), &rows, true).due);
+        assert_eq!(
+            commit(&mut restart, clock(1_000, 21_600_000, true), &rows, true).decision,
+            SolarDecision::AlreadyTerminal
+        );
+    }
+    #[test]
+    fn fallback_needs_clock_and_rejects_retiming_atomically() {
+        let mut engine = SolarPulseEngine::new(1, 60_000, 7, 16)
+            .unwrap()
+            .with_policy(None, Some(21_600_000))
+            .unwrap()
+            .with_fallback_timezone("UTC");
+        let rows = [fallback()];
+        assert!(!commit(&mut engine, clock(0, 0, false), &rows, true).due);
+        commit(&mut engine, clock(1_000, 21_599_000, true), &rows, true);
+        let mut invalid = rows.clone();
+        invalid[0].fallback_wall_ms = Some(21_600_001);
+        assert!(engine
+            .begin(clock(2_000, 21_600_000, true), facts(&invalid))
+            .is_err());
+        assert!(engine.terminal_days.is_empty());
+        assert!(commit(&mut engine, clock(2_000, 21_600_000, true), &rows, true).due);
+        let legacy = SolarPulseEngine::new(1, 60_000, 7, 16).unwrap();
+        assert!(legacy.begin(clock(0, 0, true), facts(&rows)).is_err());
+    }
+    #[test]
+    fn false_predicate_and_correction_are_terminal() {
+        let mut engine = SolarPulseEngine::new(1, 60_000, 7, 16)
+            .unwrap()
+            .with_policy(None, Some(21_600_000))
+            .unwrap();
+        let rows = [fallback()];
+        commit(&mut engine, clock(0, 21_599_000, true), &rows, true);
+        assert_eq!(
+            commit(&mut engine, clock(1_000, 21_600_000, true), &rows, false).decision,
+            SolarDecision::ConditionsFalseAtPulse
+        );
+        assert!(!commit(&mut engine, clock(2_000, 21_600_001, true), &rows, true).due);
+        let mut fresh = SolarPulseEngine::new(1, 60_000, 7, 16)
+            .unwrap()
+            .with_policy(None, Some(21_600_000))
+            .unwrap();
+        commit(&mut fresh, clock(0, 21_601_000, true), &[], true);
+        assert_eq!(
+            commit(&mut fresh, clock(1_000, 21_602_000, true), &rows, true).decision,
+            SolarDecision::CorrectionPastHighWater
+        );
+    }
+
+    #[test]
+    fn unavailable_future_without_instant_does_not_consume_recovered_event() {
+        let mut engine = SolarPulseEngine::new(1, 60_000, 7, 16)
+            .unwrap()
+            .with_policy(None, Some(21_600_000))
+            .unwrap();
+        let mut missing = fallback();
+        missing.fallback_wall_ms = None;
+        let rows = [missing];
+        let unknown = commit(&mut engine, clock(0, 21_598_000, true), &rows, true);
+        assert_eq!(unknown.observations[0].decision, SolarDecision::Unknown);
+        assert!(engine.terminal_days.is_empty());
+        let recovered = [SolarFact::available(0, 21_600_000, "solar-v2", "site-v1")];
+        assert!(
+            !commit(
+                &mut engine,
+                clock(1_000, 21_599_000, true),
+                &recovered,
+                true
+            )
+            .due
+        );
+        assert!(
+            commit(
+                &mut engine,
+                clock(2_000, 21_600_000, true),
+                &recovered,
+                true
+            )
+            .due
+        );
+    }
 }

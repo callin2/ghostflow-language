@@ -1,30 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { compileSource } from '../tools/toolchain.mjs';
+import { dailySlotsRange as dailySlots } from './helpers/range-source.mjs';
 
 const document = body => `# Planned watering range\n\n\`\`\`ghost\n${body}\n\`\`\`\n`;
 const diagnostics = error => (error.diagnosticEnvelope?.diagnostics ?? []).map(item => item.message).join('\n');
 
-function dailySlots({ selected = '[08:00, 08:15]', duration = '15min', config = '', timezone = 'UTC', dstMissing = 'skip', dstRepeated = 'first' } = {}) {
-  return document(`control PlannedWatering {
-  ${config}
-  schedule watering: DailySlots<15min> {
-    timezone = "${timezone}";
-    selected = ${selected};
-    dst_missing = ${dstMissing};
-    dst_repeated = ${dstRepeated};
-    basis = range(${duration});
-    when = true;
-    cancel_when = false;
-    clock = trusted_only;
-    gap = skip_after(60s);
-    recovery = baseline;
-    fallback = skip;
-  }
-  output pump: Bool;
-  pump <- watering.active;
-}`);
-}
 
 function periodic({ duration }) {
   return document(`control PlannedPeriodicWatering {
@@ -67,15 +48,17 @@ function daily({ duration = '24h', timezone = 'America/New_York', dstMissing = '
 
 test('range accepts adjacent DailySlots intervals and keeps the planned duration', async () => {
   const artifact = await compileSource(dailySlots(), { filename: 'range-adjacent.ghost.md' });
-  const schedule = artifact.manifest.control.schedules[0];
+  const schedule = artifact.manifest.schedules[0];
+  assert.equal(artifact.manifest.format, 'GhostFlow/control-v10');
+  assert.equal(artifact.bytes.readUInt16LE(4), 12);
   assert.deepEqual(schedule.slots, [480, 495]);
   assert.deepEqual(schedule.policy.basis, { kind: 'range', durationMs: 900_000 });
   assert.equal(schedule.policy.cancelWhen, 'false');
   const midnight = await compileSource(dailySlots({ selected: '[23:45, 00:00]' }), { filename: 'range-midnight-adjacent.ghost.md' });
-  assert.deepEqual(midnight.manifest.control.schedules[0].slots, [0, 1425]);
+  assert.deepEqual(midnight.manifest.schedules[0].slots, [0, 1425]);
   const conditional = await compileSource(dailySlots().replace('control PlannedWatering {', 'control PlannedWatering { input stop: Bool;')
     .replace('cancel_when = false', 'cancel_when = stop'), { filename: 'range-cancel-condition.ghost.md' });
-  assert.equal(conditional.manifest.control.schedules[0].policy.cancelWhen, 'input.stop');
+  assert.equal(conditional.manifest.schedules[0].policy.cancelWhen, 'input.stop');
 });
 
 test('range rejects overlapping static DailySlots intervals at compile time', async () => {
@@ -147,8 +130,8 @@ test('overlapping fixed Duration is rejected', async () => {
 test('fixed Duration accepts a boundary-touching interval', async () => {
   const source = dailySlots({ duration: 'watering_duration', config: 'let watering_duration = 15min;' });
   const candidate = await compileSource(source, { filename: 'range-fixed-adjacent.ghost.md' });
-  assert.equal(candidate.manifest.format, 'GhostFlow/schedule-descriptor-v1');
-  assert.deepEqual(candidate.manifest.control.schedules[0].slots, [480, 495]);
+  assert.equal(candidate.manifest.format, 'GhostFlow/control-v10');
+  assert.deepEqual(candidate.manifest.schedules[0].slots, [480, 495]);
 });
 
 test('Result-backed range duration fails closed instead of folding an initial config value', async () => {

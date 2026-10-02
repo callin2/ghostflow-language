@@ -11,10 +11,12 @@ pub mod context_vm;
 pub mod controller;
 pub mod cron_schedule;
 pub mod daily_slots;
+pub mod estimate_evidence;
 pub mod keyboard;
 pub mod natural_context;
 pub mod objective_vm;
 pub mod range_schedule;
+pub mod resource_constraints;
 pub mod resource_policy;
 pub mod scan;
 pub mod schedule_clock;
@@ -55,7 +57,13 @@ impl Type {
         match value {
             1 => Ok(Self::Bool),
             2 => Ok(Self::Number),
-            3 if matches!(format_version, 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11) => Ok(Self::Int),
+            3 if matches!(
+                format_version,
+                2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18
+            ) =>
+            {
+                Ok(Self::Int)
+            }
             _ => Err(Error::new("invalid type")),
         }
     }
@@ -165,6 +173,7 @@ pub struct Module {
     schedules: Option<schedule_vm::ScheduleRequirements>,
     true_fors: Option<true_for_vm::TrueForRequirements>,
     objective: Option<objective_vm::ObjectiveDescriptor>,
+    resource_policy: Option<resource_constraints::Plan>,
 }
 
 impl Module {
@@ -180,7 +189,31 @@ impl Module {
             return Err(Error::new("invalid GFB1 magic"));
         }
         let format_version = reader.u16()?;
-        if !matches!(format_version, 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11) {
+        if format_version == 17 {
+            let inner_length = reader.u32()? as usize;
+            if inner_length > MAX_MODULE_BYTES {
+                return Err(Error::new("resource base byte limit exceeded"));
+            }
+            let inner = reader.take(inner_length)?.to_vec();
+            if inner.get(..4) != Some(&b"GFB1"[..])
+                || !matches!(inner.get(4..6), Some([1, 0]) | Some([3, 0]))
+            {
+                return Err(Error::new("resource wrapper requires GFB1 Bool base"));
+            }
+            let mut module = Self::load(&inner)?;
+            let plan = resource_constraints::Plan::read(&mut reader, &module)?;
+            if !reader.finished() {
+                return Err(Error::new("trailing resource wrapper bytes"));
+            }
+            module.resource_policy = Some(plan);
+            module.format_version = 17;
+            module.fingerprint = fingerprint;
+            return Ok(module);
+        }
+        if !matches!(
+            format_version,
+            1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18
+        ) {
             return Err(Error::new("unsupported GFB format"));
         }
         let name = reader.string()?;
@@ -238,7 +271,10 @@ impl Module {
             });
         }
 
-        let mut temporal = if matches!(format_version, 4 | 5 | 6 | 8 | 9 | 10 | 11) {
+        let mut temporal = if matches!(
+            format_version,
+            4 | 5 | 6 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18
+        ) {
             Some(temporal_vm::TemporalRequirements::load_header(
                 &mut reader,
                 &inputs,
@@ -247,10 +283,12 @@ impl Module {
         } else {
             None
         };
-        let mut schedules = matches!(format_version, 5 | 6 | 8 | 9 | 10 | 11).then(|| {
-            schedule_vm::ScheduleRequirements {
-                strategies: Vec::new(),
-            }
+        let mut schedules = matches!(
+            format_version,
+            5 | 6 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18
+        )
+        .then(|| schedule_vm::ScheduleRequirements {
+            strategies: Vec::new(),
         });
         let mut true_fors = (format_version == 6).then(|| true_for_vm::TrueForRequirements {
             strategies: Vec::new(),
@@ -271,45 +309,47 @@ impl Module {
             let query = reader.blob()?;
             verify_query(&query, format_version)?;
 
-            let (windows, schedule_count, true_for_count, mut result_trace_bound) =
-                if matches!(format_version, 5 | 6 | 8 | 9 | 10 | 11) {
-                    let loaded = schedule_vm::load_prelude(
-                        &mut reader,
-                        &inputs,
-                        &states,
-                        &temporal.as_ref().expect("format 5 header").roots,
-                        format_version,
-                    )?;
-                    let schedule_count = loaded.schedules.len();
-                    let true_for_count = loaded.true_fors.len();
-                    if let Some(requirements) = &mut true_fors {
-                        requirements.strategies.push(true_for_vm::TrueForStrategy {
-                            name: strategy_name.clone(),
-                            signals: loaded.true_fors,
-                        });
-                    }
-                    schedules
-                        .as_mut()
-                        .expect("format 5 schedules")
-                        .strategies
-                        .push(schedule_vm::ScheduleStrategy {
-                            name: strategy_name.clone(),
-                            schedules: loaded.schedules,
-                            prelude: loaded.order,
-                        });
-                    (
-                        loaded.windows,
-                        schedule_count,
-                        true_for_count,
-                        loaded.marker_count,
-                    )
-                } else if let Some(temporal) = &temporal {
-                    let (windows, markers) =
-                        temporal_vm::load_windows(&mut reader, &inputs, &states, &temporal.roots)?;
-                    (windows, 0, 0, markers)
-                } else {
-                    (Vec::new(), 0, 0, 0)
-                };
+            let (windows, schedule_count, true_for_count, mut result_trace_bound) = if matches!(
+                format_version,
+                5 | 6 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18
+            ) {
+                let loaded = schedule_vm::load_prelude(
+                    &mut reader,
+                    &inputs,
+                    &states,
+                    &temporal.as_ref().expect("format 5 header").roots,
+                    format_version,
+                )?;
+                let schedule_count = loaded.schedules.len();
+                let true_for_count = loaded.true_fors.len();
+                if let Some(requirements) = &mut true_fors {
+                    requirements.strategies.push(true_for_vm::TrueForStrategy {
+                        name: strategy_name.clone(),
+                        signals: loaded.true_fors,
+                    });
+                }
+                schedules
+                    .as_mut()
+                    .expect("format 5 schedules")
+                    .strategies
+                    .push(schedule_vm::ScheduleStrategy {
+                        name: strategy_name.clone(),
+                        schedules: loaded.schedules,
+                        prelude: loaded.order,
+                    });
+                (
+                    loaded.windows,
+                    schedule_count,
+                    true_for_count,
+                    loaded.marker_count,
+                )
+            } else if let Some(temporal) = &temporal {
+                let (windows, markers) =
+                    temporal_vm::load_windows(&mut reader, &inputs, &states, &temporal.roots)?;
+                (windows, 0, 0, markers)
+            } else {
+                (Vec::new(), 0, 0, 0)
+            };
 
             let transition_count = reader.u16()? as usize;
             if transition_count > state_count {
@@ -448,6 +488,23 @@ impl Module {
             }
             requirements.validate_bindings(temporal.as_ref().expect("format 6 header"))?;
         }
+        if format_version == 12
+            && !schedules.as_ref().is_some_and(|requirements| {
+                requirements.strategies.iter().any(|strategy| {
+                    strategy.schedules.iter().any(|entry| {
+                        matches!(
+                            entry,
+                            schedule_vm::PulseDescriptor::Context(context_vm::ScheduleDescriptor {
+                                definition: context_vm::ScheduleDefinition::UtcRange { .. },
+                                ..
+                            })
+                        )
+                    })
+                })
+            })
+        {
+            return Err(Error::new("GFB format 12 requires UTC Range"));
+        }
         let constraint_count = reader.u16()? as usize;
         if constraint_count > 128 {
             return Err(Error::new("constraint limit exceeded"));
@@ -496,7 +553,78 @@ impl Module {
         if format_version == 2 && !has_int_type && !has_int_expression {
             return Err(Error::new("unsupported GFB format 2 without Int"));
         }
-        let objective_count = if matches!(format_version, 7 | 11) {
+        if format_version == 13
+            && !schedules.as_ref().is_some_and(|requirements| {
+                requirements
+                    .strategies
+                    .iter()
+                    .flat_map(|strategy| &strategy.schedules)
+                    .any(|descriptor| match descriptor {
+                        schedule_vm::PulseDescriptor::Solar(d) => {
+                            d.clock_hold_ms.is_some() || d.fallback_time_ms.is_some()
+                        }
+                        schedule_vm::PulseDescriptor::Context(d) => d.clock_hold_ms.is_some(),
+                        _ => false,
+                    })
+            })
+        {
+            return Err(Error::new("GFB format 13 requires extended natural policy"));
+        }
+        if format_version == 14 && !schedules.as_ref().is_some_and(|requirements| {
+            let descriptors: Vec<_> = requirements.strategies.iter().flat_map(|s| &s.schedules).collect();
+            !descriptors.is_empty() && descriptors.iter().all(|d| matches!(d,
+                schedule_vm::PulseDescriptor::Context(c) if matches!(c.definition, context_vm::ScheduleDefinition::AtPulse { .. })))
+        }) { return Err(Error::new("GFB format 14 requires At-only schedule definitions")); }
+        if format_version == 15 && !schedules.as_ref().is_some_and(|requirements| {
+            let descriptors: Vec<_> = requirements.strategies.iter().flat_map(|s| &s.schedules).collect();
+            descriptors.iter().any(|d| matches!(d,
+                schedule_vm::PulseDescriptor::Context(c) if matches!(c.definition, context_vm::ScheduleDefinition::HolidayDaily { .. })))
+                && !descriptors.iter().any(|d| matches!(d,
+                    schedule_vm::PulseDescriptor::Context(c) if matches!(c.definition, context_vm::ScheduleDefinition::AtPulse { .. })))
+        }) { return Err(Error::new("GFB format 15 requires holiday schedule without At")); }
+        if format_version == 16
+            && !schedules.as_ref().is_some_and(|requirements| {
+                let descriptors: Vec<_> = requirements
+                    .strategies
+                    .iter()
+                    .flat_map(|s| &s.schedules)
+                    .collect();
+                descriptors.iter().any(|d| {
+                    matches!(
+                        d,
+                        schedule_vm::PulseDescriptor::Context(context_vm::ScheduleDescriptor {
+                            definition: context_vm::ScheduleDefinition::SolarContext { .. },
+                            ..
+                        })
+                    )
+                }) && descriptors.iter().all(|d| {
+                    !matches!(
+                        d,
+                        schedule_vm::PulseDescriptor::Solar(_)
+                            | schedule_vm::PulseDescriptor::Daily(_)
+                            | schedule_vm::PulseDescriptor::DailySlots(_)
+                            | schedule_vm::PulseDescriptor::Context(
+                                context_vm::ScheduleDescriptor {
+                                    definition: context_vm::ScheduleDefinition::AtPulse { .. },
+                                    ..
+                                }
+                            )
+                    )
+                })
+            })
+        {
+            return Err(Error::new(
+                "GFB format 16 requires unified Solar without legacy schedules or At",
+            ));
+        }
+        if format_version == 18 && !schedules.as_ref().is_some_and(|requirements| {
+            let descriptors: Vec<_> = requirements.strategies.iter().flat_map(|s| &s.schedules).collect();
+            descriptors.iter().any(|d| matches!(d, schedule_vm::PulseDescriptor::Calendar(_))
+                || matches!(d, schedule_vm::PulseDescriptor::Context(c) if matches!(c.definition, context_vm::ScheduleDefinition::CalendarRange { .. })))
+                && descriptors.iter().all(|d| matches!(d, schedule_vm::PulseDescriptor::Calendar(_))
+                    || matches!(d, schedule_vm::PulseDescriptor::Context(c) if !matches!(c.definition, context_vm::ScheduleDefinition::SolarContext { .. } | context_vm::ScheduleDefinition::AtPulse { .. })))
+        }) { return Err(Error::new("GFB format 18 requires calendar execution without unsupported profiles")); }
+        let objective_count = if matches!(format_version, 7 | 11 | 12 | 13 | 14 | 15 | 16 | 18) {
             reader.u16()?
         } else {
             0
@@ -512,9 +640,9 @@ impl Module {
                 &mut reader,
                 &inputs,
                 &strategies,
-                format_version == 11,
+                matches!(format_version, 11 | 12 | 13 | 14 | 15 | 16 | 18),
             )?;
-            if format_version == 11
+            if matches!(format_version, 11 | 12 | 13 | 14 | 15 | 16 | 18)
                 && !schedules.as_ref().is_some_and(|requirements| {
                     requirements.strategies.iter().all(|strategy| {
                         strategy.schedules.iter().any(|entry| {
@@ -550,6 +678,7 @@ impl Module {
             schedules,
             true_fors,
             objective,
+            resource_policy: None,
         })
     }
 
@@ -609,6 +738,22 @@ impl Module {
             )
     }
 
+    /// Immutable strategy projection used by package metadata binding checks.
+    pub fn strategy_bindings(&self) -> impl Iterator<Item = (&str, i32, &[u8], Vec<&str>)> {
+        self.strategies.iter().map(|strategy| {
+            (
+                strategy.name.as_str(),
+                strategy.priority,
+                strategy.query.as_slice(),
+                strategy
+                    .intents
+                    .iter()
+                    .map(|intent| intent.name.as_str())
+                    .collect(),
+            )
+        })
+    }
+
     pub fn objective_requirements(&self) -> Option<&objective_vm::ObjectiveDescriptor> {
         self.objective.as_ref()
     }
@@ -658,6 +803,7 @@ pub struct ResultTraceEvent {
 #[derive(Clone, Debug)]
 pub struct TickRecord {
     pub module_fingerprint: u64,
+    pub resource_trace: Vec<resource_constraints::Observation>,
     pub tick: u64,
     pub strategy: String,
     pub inputs: NamedValues,
@@ -703,6 +849,8 @@ pub struct Runtime {
     solar_runtime: Option<solar_runtime::SolarRuntime>,
     context_runtime: Option<context_runtime::ContextRuntime>,
     objective_runtime: Option<controller::Pid>,
+    resource_guard: Option<resource_constraints::Guard>,
+    resource_lease: Option<resource_constraints::Lease>,
 }
 
 impl Runtime {
@@ -723,9 +871,17 @@ impl Runtime {
             solar_runtime: None,
             context_runtime: None,
             objective_runtime: None,
+            resource_guard: None,
+            resource_lease: None,
         }
     }
     pub fn install(&mut self, module: Module, preserve_state: bool) {
+        if module.resource_policy.is_some() || self.resource_guard.is_some() {
+            self.journal.clear();
+            self.next_tick = 1;
+        }
+        self.resource_guard = None;
+        self.resource_lease = None;
         // Installation is an explicit new temporal execution session.
         if module.temporal.is_some()
             || self.temporal.is_some()
@@ -762,6 +918,11 @@ impl Runtime {
         self.last_time_ms = None;
     }
     pub fn hot_swap(&mut self, module: Module) -> Result<()> {
+        if module.resource_policy.is_some() || self.resource_guard.is_some() {
+            return Err(Error::new(
+                "resource hot swap requires explicit binding activation",
+            ));
+        }
         if module.objective.is_some() || self.objective_runtime.is_some() {
             return Err(Error::new(
                 "objective hot swap requires explicit controller migration",
@@ -838,6 +999,35 @@ impl Runtime {
         Ok(())
     }
     pub fn activate(&mut self) -> Result<()> {
+        if self
+            .module
+            .as_ref()
+            .is_some_and(|m| m.resource_policy.is_some())
+        {
+            return Err(Error::new("resource activation requires immutable binding"));
+        }
+        self.activate_inner()
+    }
+    pub fn activate_with_resource_binding(
+        &mut self,
+        bytes: &[u8],
+        registry: &resource_constraints::ResourceBindingRegistry,
+    ) -> Result<()> {
+        if self.resource_guard.is_some() {
+            return Err(Error::new("resource runtime already activated"));
+        }
+        let plan = self
+            .module
+            .as_ref()
+            .and_then(|m| m.resource_policy.as_ref())
+            .ok_or_else(|| Error::new("not a bound resource module"))?;
+        let (guard, lease) = plan.activate(bytes, registry)?;
+        self.activate_inner()?;
+        self.resource_guard = Some(guard);
+        self.resource_lease = Some(lease);
+        Ok(())
+    }
+    fn activate_inner(&mut self) -> Result<()> {
         let m = self
             .module
             .as_ref()
@@ -884,8 +1074,10 @@ impl Runtime {
             .module
             .as_ref()
             .ok_or_else(|| Error::new("no module installed"))?;
-        if !matches!(module.format_version, 10 | 11) {
-            return Err(Error::new("context activation requires GFB10 or GFB11"));
+        if !matches!(module.format_version, 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18) {
+            return Err(Error::new(
+                "context activation requires GFB10, GFB11 or GFB12",
+            ));
         }
         if module
             .temporal
@@ -932,11 +1124,11 @@ impl Runtime {
         if !self
             .module
             .as_ref()
-            .is_some_and(|m| matches!(m.format_version, 10 | 11))
+            .is_some_and(|m| matches!(m.format_version, 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18))
         {
-            return Err(Error::new("context facts require GFB10 or GFB11"));
+            return Err(Error::new("context facts require GFB10, GFB11 or GFB12"));
         }
-        self.tick_inner(None, Some((clock, facts)))
+        self.tick_inner(None, Some((clock, facts)), None)
     }
     pub fn context_checkpoint(&self) -> Result<Vec<u8>> {
         let module = self
@@ -1006,6 +1198,89 @@ impl Runtime {
         self.context_runtime = Some(restored);
         Ok(())
     }
+    /// Export bounded durable Solar terminal identities for the exact Program.
+    /// This is not a scalar-state or clock-continuity checkpoint.
+    pub fn solar_checkpoint(&self) -> Result<Vec<u8>> {
+        let module = self
+            .module
+            .as_ref()
+            .ok_or_else(|| Error::new("no module installed"))?;
+        let selected = self
+            .active_strategy
+            .ok_or_else(|| Error::new("Solar is not active"))?;
+        let requirements = module
+            .schedules
+            .as_ref()
+            .ok_or_else(|| Error::new("no Solar requirements"))?;
+        self.solar_runtime
+            .as_ref()
+            .ok_or_else(|| Error::new("no Solar runtime"))?
+            .snapshot(
+                &requirements.strategies[selected].schedules,
+                module.fingerprint,
+            )
+    }
+
+    /// Restore before the first tick; malformed data leaves the runtime unchanged.
+    /// The new run retains its fresh boot epoch and baseline clock semantics.
+    pub fn restore_solar_checkpoint(&mut self, bytes: &[u8]) -> Result<()> {
+        if self.next_tick != 1 {
+            return Err(Error::new("restore Solar before the first scan"));
+        }
+        let module = self
+            .module
+            .as_ref()
+            .ok_or_else(|| Error::new("no module installed"))?;
+        let selected = self
+            .active_strategy
+            .ok_or_else(|| Error::new("Solar is not active"))?;
+        let requirements = module
+            .schedules
+            .as_ref()
+            .ok_or_else(|| Error::new("no Solar requirements"))?;
+        let restored = self
+            .solar_runtime
+            .as_ref()
+            .ok_or_else(|| Error::new("no Solar runtime"))?
+            .restored(
+                &requirements.strategies[selected].schedules,
+                module.fingerprint,
+                bytes,
+            )?;
+        self.solar_runtime = Some(restored);
+        Ok(())
+    }
+
+    /// Observe Solar admission while the host explicitly pauses execution.
+    /// Only schedule clocks and terminal identities commit. No authored predicate,
+    /// scalar state, inputs, intents, tick journal or scan sequence is evaluated.
+    /// The clock uses the same program-logical domain as framed Solar scans; it
+    /// may freeze during pause while actual wall time and trust remain supplied.
+    pub fn observe_solar_paused(
+        &mut self,
+        clock: schedule_clock::ClockSnapshot<'_>,
+        facts: &[solar_runtime::SolarInput<'_>],
+    ) -> Result<()> {
+        let module = self
+            .module
+            .as_ref()
+            .ok_or_else(|| Error::new("no module installed"))?;
+        let selected = self
+            .active_strategy
+            .ok_or_else(|| Error::new("Solar is not active"))?;
+        let requirements = module
+            .schedules
+            .as_ref()
+            .ok_or_else(|| Error::new("no Solar requirements"))?;
+        let staged = self
+            .solar_runtime
+            .as_ref()
+            .ok_or_else(|| Error::new("no Solar runtime"))?
+            .observe_paused(&requirements.strategies[selected].schedules, clock, facts)?;
+        self.solar_runtime = Some(staged);
+        Ok(())
+    }
+
     /// Bind provider occurrence facts to a schedule-only GFB5 module.
     /// Provider code must derive facts from the installed descriptor, including
     /// timezone/location/offset and complete coverage. No host due bit is accepted.
@@ -1093,7 +1368,7 @@ impl Runtime {
         {
             return Err(Error::new("Solar facts cannot contain a civil fold"));
         }
-        self.tick_inner(Some((clock, facts)), None)
+        self.tick_inner(Some((clock, facts)), None, None)
     }
     pub fn tick_with_schedules(
         &mut self,
@@ -1143,7 +1418,7 @@ impl Runtime {
                 facts: f.facts,
             })
             .collect();
-        self.tick_inner(Some((clock, &shared)), None)
+        self.tick_inner(Some((clock, &shared)), None, None)
     }
     /// Native direct-source certified interval execution. Mixed preludes and replay
     /// require separate integration and remain rejected.
@@ -1299,10 +1574,12 @@ impl Runtime {
             .iter()
             .position(|f| f.name == name)
             .ok_or_else(|| Error::new(format!("unknown input {name}")))?;
-        if matches!(m.format_version, 10 | 11)
+        if matches!(m.format_version, 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18)
             && (name.starts_with("__gf_natural_")
+                || name.starts_with("__gf_calendar_")
                 || name.starts_with("__gf_accounting_")
-                || (m.format_version == 11 && name.starts_with("__gf_config_")))
+                || (matches!(m.format_version, 11 | 12 | 13 | 14 | 15 | 16 | 18)
+                    && name.starts_with("__gf_config_")))
         {
             return Err(Error::new(
                 "Rust provider projections are not caller inputs",
@@ -1318,7 +1595,10 @@ impl Runtime {
         Ok(())
     }
     pub fn tick(&mut self) -> Result<&TickRecord> {
-        self.tick_inner(None, None)
+        self.tick_inner(None, None, None)
+    }
+    pub fn tick_with_resource_binding(&mut self, bytes: &[u8]) -> Result<&TickRecord> {
+        self.tick_inner(None, None, Some(bytes))
     }
     fn tick_inner(
         &mut self,
@@ -1327,6 +1607,7 @@ impl Runtime {
             &[solar_runtime::SolarInput<'_>],
         )>,
         context: Option<(schedule_clock::ClockSnapshot<'_>, &context_runtime::Facts)>,
+        resource_binding: Option<&[u8]>,
     ) -> Result<&TickRecord> {
         if self.context_runtime.is_some() != context.is_some() {
             return Err(Error::new("context tick requires activated typed evidence"));
@@ -1340,6 +1621,17 @@ impl Runtime {
             .module
             .as_ref()
             .ok_or_else(|| Error::new("no module installed"))?;
+        if m.resource_policy.is_some() {
+            self.resource_guard
+                .as_ref()
+                .ok_or_else(|| Error::new("resource runtime is not activated"))?
+                .validate_scan(
+                    resource_binding
+                        .ok_or_else(|| Error::new("resource tick requires immutable binding"))?,
+                )?;
+        } else if resource_binding.is_some() {
+            return Err(Error::new("not a bound resource module"));
+        }
         let si = self
             .active_strategy
             .ok_or_else(|| Error::new("runtime is not active"))?;
@@ -1349,10 +1641,12 @@ impl Runtime {
             .iter()
             .enumerate()
             .map(|(i, v)| {
-                if matches!(m.format_version, 10 | 11)
+                if matches!(m.format_version, 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18)
                     && (m.inputs[i].name.starts_with("__gf_natural_")
+                        || m.inputs[i].name.starts_with("__gf_calendar_")
                         || m.inputs[i].name.starts_with("__gf_accounting_")
-                        || (m.format_version == 11 && m.inputs[i].name.starts_with("__gf_config_")))
+                        || (matches!(m.format_version, 11 | 12 | 13 | 14 | 15 | 16 | 18)
+                            && m.inputs[i].name.starts_with("__gf_config_")))
                 {
                     return Ok(m.inputs[i].default);
                 }
@@ -1551,6 +1845,21 @@ impl Runtime {
             );
         }
         let (mut safe, faults, safety_trace) = apply_safety(requested.clone(), &m.constraints);
+        let mut resource_trace = vec![];
+        let resource_stage = if let Some(guard) = &self.resource_guard {
+            let (stage, projected, trace) =
+                guard.stage(&named(&m.inputs, &iv), &requested, &safe)?;
+            if apply_safety(projected.clone(), &m.constraints).0 != projected {
+                return Err(Error::new(
+                    "resource projection conflicts with local constraints",
+                ));
+            }
+            safe = projected;
+            resource_trace = trace;
+            Some(stage)
+        } else {
+            None
+        };
         if let (Some(descriptor), Some(stage)) = (&m.objective, &objective_stage) {
             safe.insert(
                 descriptor.output.clone(),
@@ -1558,6 +1867,7 @@ impl Runtime {
             );
         }
         let rec = TickRecord {
+            resource_trace,
             module_fingerprint: m.fingerprint,
             tick: self.next_tick,
             strategy: strategy.name.clone(),
@@ -1603,6 +1913,9 @@ impl Runtime {
             self.context_runtime = Some(stage.runtime);
         }
         self.next_tick = next_tick;
+        if let Some(stage) = resource_stage {
+            self.resource_guard = Some(stage);
+        }
         self.last_time_ms = clock.or(self.last_time_ms);
         self.state = next;
         self.safe_intents = safe;
@@ -1644,6 +1957,11 @@ impl Runtime {
         &self.journal
     }
     pub fn rewind(&mut self, tick: u64) -> Result<()> {
+        if self.resource_guard.is_some() {
+            return Err(Error::new(
+                "resource rewind requires admission checkpoint support",
+            ));
+        }
         if self.objective_runtime.is_some() {
             return Err(Error::new(
                 "objective rewind requires controller checkpoint support",
@@ -2275,7 +2593,10 @@ fn verify_expression_with_prelude(
                 type_push(&mut stack, &mut len, Type::Int)?;
             }
             op @ 30..=31 => {
-                if !matches!(format_version, 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11) {
+                if !matches!(
+                    format_version,
+                    3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18
+                ) {
                     return Err(Error::new("branch opcode requires GFB format 3"));
                 }
                 let target = r.jump_target()?;
@@ -2292,13 +2613,19 @@ fn verify_expression_with_prelude(
                 reachable = op == 30;
             }
             32..=47 => {
-                if !matches!(format_version, 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11) {
+                if !matches!(
+                    format_version,
+                    3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18
+                ) {
                     return Err(Error::new("compact Number opcode requires GFB format 3"));
                 }
                 type_push(&mut stack, &mut len, Type::Number)?;
             }
             op @ 48..=53 => {
-                if !matches!(format_version, 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11) {
+                if !matches!(
+                    format_version,
+                    3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18
+                ) {
                     return Err(Error::new("conversion opcode requires GFB format 3"));
                 }
                 let (source, target) = if op == 48 {
@@ -2312,7 +2639,10 @@ fn verify_expression_with_prelude(
                 type_push(&mut stack, &mut len, target)?;
             }
             54 => {
-                if !matches!(format_version, 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11) {
+                if !matches!(
+                    format_version,
+                    3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18
+                ) {
                     return Err(Error::new("Duration guard requires GFB format 3"));
                 }
                 if type_pop(&mut stack, &mut len)? != Type::Number {
@@ -2321,7 +2651,10 @@ fn verify_expression_with_prelude(
                 type_push(&mut stack, &mut len, Type::Number)?;
             }
             55 => {
-                if !matches!(format_version, 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11) {
+                if !matches!(
+                    format_version,
+                    3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18
+                ) {
                     return Err(Error::new("DateTime guard requires GFB format 3"));
                 }
                 if type_pop(&mut stack, &mut len)? != Type::Number {
@@ -2330,7 +2663,10 @@ fn verify_expression_with_prelude(
                 type_push(&mut stack, &mut len, Type::Number)?;
             }
             56 => {
-                if !matches!(format_version, 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11) {
+                if !matches!(
+                    format_version,
+                    3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18
+                ) {
                     return Err(Error::new("Result trace requires GFB format 3"));
                 }
                 if r.u32()? == 0 {
@@ -2345,7 +2681,10 @@ fn verify_expression_with_prelude(
                 type_push(&mut stack, &mut len, payload)?;
             }
             57 => {
-                if !matches!(format_version, 4 | 5 | 6 | 8 | 9 | 10 | 11) {
+                if !matches!(
+                    format_version,
+                    4 | 5 | 6 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18
+                ) {
                     return Err(Error::new("temporal projection requires GFB format 4"));
                 }
                 let slot = r.u16()?;
@@ -2357,7 +2696,10 @@ fn verify_expression_with_prelude(
                 )?;
             }
             58 => {
-                if !matches!(format_version, 5 | 6 | 8 | 9 | 10 | 11) {
+                if !matches!(
+                    format_version,
+                    5 | 6 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18
+                ) {
                     return Err(Error::new("schedule projection requires GFB format 5"));
                 }
                 let slot = r.u16()?;
@@ -3153,6 +3495,7 @@ mod tests {
             true_fors: None,
             format_version: 2,
             objective: None,
+            resource_policy: None,
             name: "int-atomicity".into(),
             version: 1,
             inputs: vec![Field {
@@ -3528,6 +3871,7 @@ mod tests {
         assert_eq!(rule.final_evaluation.values["pump"], Value::Bool(false));
         assert!(rule.final_evaluation.satisfied);
         let encoded = TickRecord {
+            resource_trace: vec![],
             module_fingerprint: 0,
             tick: 1,
             strategy: "test".into(),

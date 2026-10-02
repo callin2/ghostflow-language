@@ -2211,6 +2211,19 @@
       "requiredEvidence": [],
       "evidence": [
         {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/result-control.test.mjs",
+              "testId": "REF-01-075 optional syntax does not implicitly unwrap or default a sensor Result",
+              "caseId": "REF-01-075",
+              "assertionClass": "type-boundary",
+              "polarities": ["negative"]
+            }
+          ]
+        },
+        {
           "stage": "native_wasm",
           "status": "verified",
           "refs": [
@@ -2221,6 +2234,46 @@
               "targets": [
                 "wasm"
               ]
+            },
+            {
+              "path": "tests/scan-tape-parity.test.mjs",
+              "testId": "REF-01-074: explicit false fallback preserves sensor fault and authored case provenance on native and WASM",
+              "caseId": "REF-01-074",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "negative", "boundary"]
+            },
+            {
+              "path": "tests/scan-tape-parity.test.mjs",
+              "testId": "REF-04-005 pure map projects a held sample over three ticks without changing state, sample freshness or recovery on native and plain/framed WASM",
+              "caseId": "REF-04-005",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "negative", "boundary"]
+            },
+            {
+              "path": "tests/scan-tape-parity.test.mjs",
+              "testId": "REF-04-003 one sensor retains four fault reasons and decision times through false recovery on native and plain/framed WASM",
+              "caseId": "REF-04-003",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "negative", "boundary"]
+            },
+            {
+              "path": "tests/result-control.test.mjs",
+              "testId": "REF-00-007 normal zero and fault fallback zero retain distinct result trace evidence",
+              "caseId": "REF-00-007",
+              "assertionClass": "runtime-value",
+              "targets": ["wasm"],
+              "polarities": ["positive", "negative", "boundary"]
+            },
+            {
+              "path": "tests/result-control.test.mjs",
+              "testId": "REF-01-075 optional sensor absence and installed fault identities remain distinct on framed WASM",
+              "caseId": "REF-01-075",
+              "assertionClass": "runtime-value",
+              "targets": ["wasm"],
+              "polarities": ["positive", "negative", "boundary"]
             }
           ]
         }
@@ -2228,8 +2281,8 @@
       "gaps": [
         "Outside the frozen source type set."
       ],
-      "issues": [],
-      "referenceCaseIds": []
+      "issues": [198, 193, 199, 230, 229],
+      "referenceCaseIds": ["REF-01-074", "REF-00-007", "REF-01-075", "REF-04-005", "REF-04-003"]
     },
     {
       "id": "temporal-duration",
@@ -2254,15 +2307,159 @@
               "targets": [
                 "wasm"
               ]
+            },
+            {
+              "path": "tests/scan-tape-parity.test.mjs",
+              "testId": "REF-03-013: elapsed restarts at both Bool changes in completed native and WASM scans",
+              "caseId": "REF-03-013",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/scan-tape-parity.test.mjs",
+              "testId": "REF-03-013: elapsed restarts at both Bool changes in completed native and WASM scans",
+              "caseId": "REF-01-104",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/scan-tape-parity.test.mjs",
+              "testId": "REF-01-103: phase age starts at zero on a nonzero clock and restarts on committed change",
+              "caseId": "REF-01-103",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/scan-tape-parity.test.mjs",
+              "testId": "REF-03-014: one phase transition, rejected stop rollback, and waiting safety agree on native and WASM",
+              "caseId": "REF-03-014",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "negative", "boundary"]
+            },
+            {
+              "path": "tests/scan-tape-parity.test.mjs",
+              "testId": "REF-00-006: stop at 1000ms ends the five-minute request immediately on native and WASM",
+              "caseId": "REF-00-006",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "boundary"]
             }
           ]
         }
       ],
       "gaps": [
-        "Linked oracle covers true_for; rolling budget is a separate contract."
+        "Linked oracles cover true_for, the exact completed-scan Bool elapsed trace for REF-03-013 and REF-01-104, nonzero-clock phase initialization/change for REF-01-103, single-transition/rejected-scan/waiting safety for REF-03-014, and immediate stop at 1000ms before the five-minute timer expires for REF-00-006; other timer cases remain separate, and rolling budget is a separate contract."
       ],
-      "issues": [],
-      "referenceCaseIds": []
+      "issues": [
+        204,
+        202,
+        201,
+        205,
+        192
+      ],
+      "referenceCaseIds": [
+        "REF-03-013",
+        "REF-01-104",
+        "REF-01-103",
+        "REF-03-014",
+        "REF-00-006"
+      ]
+    },
+    {
+      "id": "continuous-true-timer",
+      "family": "Continuous-true Bool timer evidence",
+      "clause": {
+        "path": "docs/reference/03-time-and-schedules.en.md",
+        "heading": "3.3 Time for which a Bool is continuously true"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [
+        "native_wasm"
+      ],
+      "evidence": [
+        {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/scan-tape-parity.test.mjs",
+              "testId": "REF-03-017: continuous true rejects an implicit Result Bool input",
+              "caseId": "REF-03-017",
+              "assertionClass": "type-boundary",
+              "polarities": [
+                "negative"
+              ]
+            }
+          ]
+        },
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/scan-tape-parity.test.mjs",
+              "testId": "REF-03-016: continuous true preserves equal timestamps and resets before a new interval on native and WASM",
+              "caseId": "REF-03-016",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/scan-tape-parity.test.mjs",
+              "testId": "REF-03-017: independently enabled timers preserve separate starts and explicit sensor fault handling on native and WASM",
+              "caseId": "REF-03-017",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [],
+      "issues": [
+        206,
+        207
+      ],
+      "referenceCaseIds": [
+        "REF-03-016",
+        "REF-03-017"
+      ]
     },
     {
       "id": "temporal-window",
@@ -2287,6 +2484,21 @@
               "targets": [
                 "native"
               ]
+            },
+            {
+              "path": "tests/window-framed-native.test.mjs",
+              "testId": "REF-04-032 preloaded future samples stay excluded and no-checkpoint restart is NotReady on native and WASM bounded windows",
+              "caseId": "REF-04-032",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
             }
           ]
         }
@@ -2294,8 +2506,12 @@
       "gaps": [
         "Native window evidence does not establish every hold_last or WASM path."
       ],
-      "issues": [],
-      "referenceCaseIds": []
+      "issues": [
+        239
+      ],
+      "referenceCaseIds": [
+        "REF-04-032"
+      ]
     },
     {
       "id": "daily-schedule",
@@ -2415,19 +2631,86 @@
             {
               "path": "tests/signals-wasm.test.mjs",
               "testId": "real WASM stale boundary and fresh conditioner reboot start at NotReady",
+              "caseId": "REF-04-012",
               "assertionClass": "runtime-value",
               "targets": [
                 "wasm"
-              ]
+              ],
+              "polarities": ["positive", "negative", "boundary"]
+            },
+            {
+              "path": "tests/signals-wasm.test.mjs",
+              "testId": "real WASM REF-04-023 delayed evaluation and duplicate samples keep the 3999 Good and 4000 Stale boundary",
+              "caseId": "REF-04-023",
+              "assertionClass": "runtime-value",
+              "targets": ["wasm"],
+              "polarities": ["positive", "negative", "boundary"]
+            },
+            {
+              "path": "tests/scan-tape-parity.test.mjs",
+              "testId": "REF-04-023 sample timestamp 1000 expires at 4000 despite later filter evaluations on native VM rails and plain/framed WASM conditioning",
+              "caseId": "REF-04-023",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "negative", "boundary"]
+            },
+            {
+              "path": "tests/result-control.test.mjs",
+              "testId": "REF-08-012 default new control run clears warm sensor filter and freshness on plain and framed WASM",
+              "caseId": "REF-08-012",
+              "assertionClass": "runtime-value",
+              "targets": ["wasm"],
+              "polarities": ["positive", "negative", "boundary"]
+            },
+            {
+              "path": "tests/scan-tape-parity.test.mjs",
+              "testId": "REF-04-010 Driver sample ID seven is Invalid before filtering and ID eight enters once with sample-timestamp freshness on native and plain/framed WASM",
+              "caseId": "REF-04-010",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "negative", "boundary"]
+            },
+            {
+              "path": "tests/scan-tape-parity.test.mjs",
+              "testId": "REF-04-010 repeated Driver sample identity does not advance recovery after the filter is ready on plain/framed WASM",
+              "caseId": "REF-04-010",
+              "assertionClass": "runtime-value",
+              "targets": ["wasm"],
+              "polarities": ["positive", "negative", "boundary"]
+            },
+            {
+              "path": "tests/scan-tape-parity.test.mjs",
+              "testId": "REF-04-011 fault recovery keeps source epochs separate and a default fresh owner resets median readiness on native and plain/framed WASM",
+              "caseId": "REF-04-011",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "negative", "boundary"]
+            },
+            {
+              "path": "tests/signals-wasm.test.mjs",
+              "testId": "real WASM recovery does not combine samples across source epochs",
+              "caseId": "REF-04-011",
+              "assertionClass": "runtime-value",
+              "targets": ["wasm"],
+              "polarities": ["positive", "negative", "boundary"]
+            },
+            {
+              "path": "tests/scan-tape-parity.test.mjs",
+              "testId": "REF-04-012 sample timestamp zero holds permission at 2999 and expires at 3000 while default reset removes old permission on native and plain/framed WASM",
+              "caseId": "REF-04-012",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "negative", "boundary"]
             }
           ]
         }
       ],
       "gaps": [
-        "Driver sampling and physical sensing are not claimed."
+        "Driver sampling and physical sensing are not claimed.",
+        "REF-08-012 covers default logical owner startup on plain/framed WASM, not physical reboot or persistent resumption."
       ],
-      "issues": [],
-      "referenceCaseIds": []
+      "issues": [329, 231, 232, 233, 236],
+      "referenceCaseIds": ["REF-08-012", "REF-04-010", "REF-04-011", "REF-04-012", "REF-04-023"]
     },
     {
       "id": "filter-hysteresis",
@@ -2448,25 +2731,104 @@
             {
               "path": "tests/signals-wasm.test.mjs",
               "testId": "real WASM REF-04-016 median five clears its window after Invalid fault",
+              "caseId": "REF-04-016",
               "assertionClass": "runtime-value",
               "targets": [
                 "wasm"
-              ]
+              ],
+              "polarities": ["positive", "negative", "boundary"]
+            },
+            {
+              "path": "tests/scan-tape-parity.test.mjs",
+              "testId": "REF-04-016 median five rejects partial windows, returns the spike-resistant middle and rebuilds after fault on native and plain/framed WASM",
+              "caseId": "REF-04-016",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "negative", "boundary"]
             },
             {
               "path": "tests/signals-wasm.test.mjs",
               "testId": "real WASM REF-04-019 hysteresis preserves thresholds and exposes fault",
+              "caseId": "REF-04-019",
               "assertionClass": "runtime-value",
               "targets": [
                 "wasm"
-              ]
+              ],
+              "polarities": ["positive", "negative", "boundary"]
+            },
+            {
+              "path": "tests/scan-tape-parity.test.mjs",
+              "testId": "REF-04-019 hysteresis keeps strict boundaries and preserves the fault Result on native VM rails and plain/framed WASM conditioning",
+              "caseId": "REF-04-019",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "negative", "boundary"]
+            },
+            {
+              "path": "tests/scan-tape-parity.test.mjs",
+              "testId": "REF-04-024 median to EMA composition preserves repeated fault, sample identity and bounded state on native VM and plain/framed WASM",
+              "caseId": "REF-04-024",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "negative", "boundary"]
+            },
+            {
+              "path": "tests/scan-tape-parity.test.mjs",
+              "testId": "REF-04-024 EMA composition rejects invalid contracts and atomically rolls back a failed scan",
+              "caseId": "REF-04-024",
+              "assertionClass": "runtime-value",
+              "targets": ["wasm"],
+              "polarities": ["negative", "boundary"]
+            },
+            {
+              "path": "tests/signals-wasm.test.mjs",
+              "testId": "REF-01-077 hysteresis retains the original three-value trace across an in-memory WASM checkpoint and replay",
+              "caseId": "REF-01-077",
+              "assertionClass": "replay",
+              "targets": ["wasm"],
+              "polarities": ["positive", "boundary"]
             }
           ]
         }
       ],
       "gaps": [],
-      "issues": [],
-      "referenceCaseIds": []
+      "issues": [200, 234, 235, 237],
+      "referenceCaseIds": ["REF-01-077", "REF-04-016", "REF-04-019", "REF-04-024"]
+    },
+    {
+      "id": "accepted-direction-idiom",
+      "family": "Authored accepted-value direction",
+      "clause": {
+        "path": "docs/reference/04-sensors-constraints-control.md",
+        "heading": "4.4 temporal evidence"
+      },
+      "owner": "LIBRARY",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/scan-tape-parity.test.mjs",
+              "testId": "REF-04-030 authored direction compares accepted values across fault on native VM rails and plain/framed WASM conditioning",
+              "caseId": "REF-04-030",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "negative", "boundary"]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "This source-authored Result/state comparison proves REF-04-030; no builtin rising/falling operator is implemented or specified.",
+        "The source explicitly chooses first-success initialization and false fault output intents while preserving fault diagnostics; this is not a universal temporal admission, duplicate or epoch policy.",
+        "Native VM parity uses genuine WASM-conditioned Result rails, not native physical sensor admission."
+      ],
+      "issues": [238],
+      "referenceCaseIds": ["REF-04-030"]
     },
     {
       "id": "resource-arbitration",
@@ -2547,6 +2909,29 @@
               ]
             },
             {
+              "path": "tests/config-native-wasm-parity.test.mjs",
+              "testId": "REF-05-015 live Duration compares the existing six-minute timer with the new five-minute value in native and plain/framed WASM",
+              "caseId": "REF-05-015",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/config-native-wasm-parity.test.mjs",
+              "testId": "REF-05-016 designer Percent rejects operator edits without changing value or settings revision in native and plain/framed WASM",
+              "caseId": "REF-05-016",
+              "assertionClass": "runtime-value",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "negative", "boundary"]
+            },
+            {
               "path": "tests/issue-90-settings-stream.test.mjs",
               "testId": "REF-05-106 [host] 복귀 실패를 정상 설정값으로 숨기지 않는다.",
               "caseId": "REF-05-106",
@@ -2617,6 +3002,8 @@
       ],
       "issues": [
         74,
+        276,
+        277,
         338,
         337,
         336,
@@ -2624,6 +3011,8 @@
         332
       ],
       "referenceCaseIds": [
+        "REF-05-015",
+        "REF-05-016",
         "REF-05-106",
         "REF-05-105",
         "REF-05-104",
@@ -2734,13 +3123,27 @@
               "assertionClass": "compile-policy"
             }
           ]
+        },
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/composition-execution.test.mjs",
+              "testId": "REF-00-010: one sensor edge changes only instance A and retains definition and binding provenance on native and WASM",
+              "caseId": "REF-00-010",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "negative", "boundary"]
+            }
+          ]
         }
       ],
       "gaps": [
-        "Verified imported port contracts are not yet activated for composition runtime."
+        "Executable evidence covers pinned counter instances with distinct sensor suppliers, isolated state and verified definition/instance/binding provenance; imported intent metadata and broader composition cases remain separate contracts."
       ],
-      "issues": [],
-      "referenceCaseIds": []
+      "issues": [195],
+      "referenceCaseIds": ["REF-00-010"]
     },
     {
       "id": "macro-composition",
@@ -2910,18 +3313,42 @@
                 "positive",
                 "negative"
               ]
+            },
+            {
+              "path": "tests/reference-index-links.test.mjs",
+              "testId": "REF-07-001: index concepts stay usable as names while body-defined syntax keeps its allowed positions",
+              "caseId": "REF-07-001",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/reference-index-links.test.mjs",
+              "testId": "REF-07-001: indexed design and installation concepts do not become executable source declarations",
+              "caseId": "REF-07-001",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
             }
           ]
         }
       ],
       "gaps": [
-        "The oracle verifies Reference index structure and status-marker consistency; it does not prove every linked target's full prose semantics."
+        "The oracles verify index links, status markers, and body-linked compiler contrasts for reserved words, contextual keys, design notation, and external installation concepts; they do not classify every indexed term or prove every linked target's full semantics."
       ],
       "issues": [
+        310,
         315,
         317
       ],
       "referenceCaseIds": [
+        "REF-07-001",
         "REF-07-008",
         "REF-07-010"
       ]
@@ -3304,6 +3731,655 @@
       "referenceCaseIds": [
         "REF-08-016"
       ]
+    },
+    {
+      "id": "typed-value-consumer-boundaries",
+      "family": "Typed value identity across language-owned consumer boundaries",
+      "clause": {
+        "path": "docs/reference/02-types-expressions-state.md",
+        "heading": "2.1 값 종류"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/interaction-runtime-snapshot.test.mjs",
+              "testId": "REF-01-055 rejects implicit interchange of Percent, Number, Duration and TimeOfDay",
+              "caseId": "REF-01-055",
+              "assertionClass": "type-boundary",
+              "polarities": ["negative", "boundary"]
+            }
+          ]
+        },
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/interaction-runtime-snapshot.test.mjs",
+              "testId": "REF-01-055 typed values retain identity through verified portable handoff, Interaction Schema and native/WASM execution",
+              "caseId": "REF-01-055",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "boundary"]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Evidence covers compiler types, read-only Interaction Schema, signed portable artifact handoff and virtual binding-revision admission; downstream device execution and physical effects are not claimed."
+      ],
+      "issues": [197],
+      "referenceCaseIds": ["REF-01-055"]
+    },
+    {
+      "id": "rolling-ledger-calculation",
+      "family": "Historical rolling ledger calculation across scan partitions",
+      "clause": {
+        "path": "docs/reference/03-time-and-schedules.md",
+        "heading": "3.4 누적 시간과 rolling budget"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/accounting-wasm.test.mjs",
+              "testId": "REF-03-020: source-bound native and WASM rolling ledgers integrate regular and 7/13/9-second partitions exactly",
+              "caseId": "REF-03-020",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "negative", "boundary"]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Historical calculation consumes caller-validated applied intervals and trusted host resource bindings; complete control on_time admission, live cutoff, storage-medium certification and physical receipt validation are not claimed."
+      ],
+      "issues": [210],
+      "referenceCaseIds": ["REF-03-020"]
+    },
+    {
+      "id": "pulse-no-queue",
+      "family": "Pulse predicate failure and read-only Schedule evaluation",
+      "clause": {
+        "path": "docs/reference/03-time-and-schedules.md",
+        "heading": "3.5 Schedule의 공통 의미"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/at-runtime.test.mjs",
+              "testId": "REF-03-023: false 08:00 pulse stays missed at 08:01 and reading Schedule leaves Idle output off in native and WASM",
+              "caseId": "REF-03-023",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "negative", "boundary"]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "The exact oracle covers accepted At pulse scans and logical requested/safe intent; Window/Run admission and physical Driver application are not claimed."
+      ],
+      "issues": [213],
+      "referenceCaseIds": ["REF-03-023"]
+    },
+    {
+      "id": "solar-stale-observation",
+      "family": "Solar stale prediction and verified source observation provenance",
+      "clause": {
+        "path": "docs/reference/03-time-and-schedules.md",
+        "heading": "3.5 Schedule의 공통 의미"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/solar-config-runtime.test.mjs",
+              "testId": "REF-03-025: Solar PredictionStale skip preserves Unknown cause and loaded definition/provider/context revisions at host activation",
+              "caseId": "REF-03-025",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "negative", "boundary"]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Evidence covers caller-supplied PredictionStale facts, host source-observation verification and native/WASM skip projection; external provider freshness, physical Driver behavior and complete schedule observation fields are not claimed."
+      ],
+      "issues": [214],
+      "referenceCaseIds": ["REF-03-025"]
+    },
+    {
+      "id": "schedule-boot-rollback",
+      "family": "Schedule boot/recovery baseline and rollback suppression",
+      "clause": {
+        "path": "docs/reference/03-time-and-schedules.md",
+        "heading": "3.5 Schedule의 공통 의미"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/context-wasm-boundaries.test.mjs",
+              "testId": "REF-03-031: 06:10 boot and clock recovery do not catch up the 06:00 slot after 05:55 rollback in native and WASM",
+              "caseId": "REF-03-031",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "negative", "boundary"]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Boot/recovery high-water is verified within an activation; cross-restart restoration covers already-admitted terminal identities. A baseline-only checkpoint restored into a second boot before the skipped slot does not preserve that suppression. Broader restart policy, storage-medium durability and physical execution are not claimed."
+      ],
+      "issues": [220],
+      "referenceCaseIds": ["REF-03-031"]
+    },
+    {
+      "id": "dailyslots-selected-crossing",
+      "family": "Selected DailySlots first-crossing pulse",
+      "clause": {
+        "path": "docs/reference/03-time-and-schedules.md",
+        "heading": "3.6 선택된 DailySlots"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/context-wasm-boundaries.test.mjs",
+              "testId": "REF-03-035: selected 06:00 and 18:45 slots pulse on the first crossing tick, not the next tick or other quarter-hours, in native and WASM",
+              "caseId": "REF-03-035",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "negative", "boundary"]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Civil occurrence rows and clock evidence are supplied at the host boundary; this verifies shared native/WASM execution, not a timezone database, physical clock, storage-medium durability or Window/Run policy. Baseline-only checkpoint suppression across a new boot is not claimed."
+      ],
+      "issues": [221],
+      "referenceCaseIds": ["REF-03-035"]
+    },
+    {
+      "id": "control-owned-constraint-groups",
+      "family": "Control-owned local groups and checked shared resource contracts",
+      "clause": {
+        "path": "docs/reference/04-sensors-constraints-control.md",
+        "heading": "4.8 공통 constraints 표기와 연산"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/named-constraints.test.mjs",
+              "testId": "local named output groups lower existing safety rules and retain group and rule provenance",
+              "assertionClass": "compile-policy",
+              "polarities": ["positive", "negative", "boundary"]
+            },
+            {
+              "path": "tests/resource-policy-artifact.test.mjs",
+              "testId": "GF-TEST-resource-constraint-binding: exact source-bound finite logical mapping validates without granting execution",
+              "assertionClass": "type-boundary",
+              "polarities": ["positive", "negative", "boundary"]
+            },
+            {
+              "path": "tests/bound-resource-control.test.mjs",
+              "testId": "GF-TEST-bound-resource-compile: source-bound finite executable policy rejects incomplete or mismatched contracts",
+              "assertionClass": "compile-policy",
+              "polarities": ["positive", "negative", "boundary"]
+            }
+          ]
+        },
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/constraint-proof.test.mjs",
+              "testId": "GF-TEST-local-constraint-envelope: grouped mandatory outputs enforce and recover identically in native and both WASM ABIs",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "negative", "boundary"]
+            },
+            {
+              "path": "tests/constraint-proof.test.mjs",
+              "testId": "GF-TEST-shared-constraint-descriptor: actual native and both WASM loaders reject checked policy bytes without enforcement",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["negative", "boundary"]
+            },
+            {
+              "path": "tests/bound-resource-control.test.mjs",
+              "testId": "GF-TEST-bound-resource-parity: automatic manual fallback admission violation recovery and trace match native plain framed and simulation",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "negative", "boundary"]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Unbound descriptors grant no execution authority. Explicitly bound GFB17 supports finite Bool GFB1 v1/v3 controls only, with one registry for all supported writers and duplicate writers refused. Contextual/accounting/continuous/PID profiles, shared import composition, cooperative multi-control arbitration and session leases are outside this profile. Physical output ABI, Driver application and hardware confirmation are not claimed. The bounded standalone Station adapter is retained for its concrete consumers."
+      ],
+      "issues": [157, 158],
+      "referenceCaseIds": []
+    },
+    {
+      "id": "work-calendar-boundaries",
+      "family": "UTC work calendar Result and same-date Range",
+      "clause": {
+        "path": "docs/reference/03-time-and-schedules.en.md",
+        "heading": "3.8 DST, midnight and work calendars"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": ["compile", "native_wasm"],
+      "evidence": [
+        {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [{
+            "path": "tests/reference-calendar-boundary.test.mjs",
+            "testId": "REF-03-041: adopted calendar Result and same-day Range compile as executable GFB18",
+            "caseId": "REF-03-041",
+            "assertionClass": "compile-policy",
+            "polarities": ["positive"]
+          }, {
+            "path": "tests/reference-calendar-boundary.test.mjs",
+            "testId": "REF-07-005: direct calendar Result negation cannot type-check as admission permission",
+            "caseId": "REF-07-005",
+            "assertionClass": "type-boundary",
+            "polarities": ["positive", "negative"]
+          }]
+        },
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/reference-calendar-boundary.test.mjs",
+              "testId": "REF-03-041: work calendar intervals reject crossing midnight and accept an explicit split",
+              "caseId": "REF-03-041",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "negative", "boundary"]
+            },
+            {
+              "path": "tests/reference-calendar-boundary.test.mjs",
+              "testId": "REF-03-041: actual coverage boundaries preserve Unknown and explicit Result fallback forbids rest permission",
+              "caseId": "REF-03-041",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "negative", "boundary"]
+            },
+            {
+              "path": "tests/reference-calendar-boundary.test.mjs",
+              "testId": "REF-03-041: conflicting exceptions, mixed snapshots and changed revision contents reject atomically",
+              "caseId": "REF-03-041",
+              "assertionClass": "rollback",
+              "targets": ["wasm"],
+              "polarities": ["negative", "boundary"]
+            },
+            {
+              "path": "tests/reference-calendar-boundary.test.mjs",
+              "testId": "REF-03-041: strict UTC activation, missing facts and protected projections cannot bypass the owner",
+              "caseId": "REF-03-041",
+              "assertionClass": "type-boundary",
+              "targets": ["wasm"],
+              "polarities": ["negative", "boundary"]
+            },
+            {
+              "path": "tests/reference-calendar-boundary.test.mjs",
+              "testId": "REF-07-005: Unknown calendar negation preserves its reason and cannot admit a Range across native WASM and simulation",
+              "caseId": "REF-07-005",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "negative", "boundary"]
+            }
+          ]
+        }
+      ],
+      "gaps": ["Executable calendar_is and work/offday Daily Range require exact UTC binding and immutable positive literal durations. Non-UTC expression/Range execution, shifts, automatic overnight splitting, calendar-filtered DailySlots and physical operation are not claimed."],
+      "issues": [225, 313],
+      "referenceCaseIds": ["REF-03-041", "REF-07-005"]
+    },
+    {
+      "id": "distinct-boundary-states",
+      "family": "Typed false/zero, capability absence, sensor fault, calendar Unknown and identified empty observation",
+      "clause": {
+        "path": "docs/reference/07-semantic-rules-and-index.en.md",
+        "heading": "7.3 False, absent, and uncertain are different"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": ["native_wasm"],
+      "evidence": [{
+        "stage": "native_wasm",
+        "status": "verified",
+        "refs": [{
+          "path": "tests/reference-distinct-states.test.mjs",
+          "testId": "REF-07-004: serialized completed observations retain ready false and numeric zero with source and run identity",
+          "caseId": "REF-07-004",
+          "assertionClass": "observation",
+          "targets": ["wasm"],
+          "polarities": ["positive", "negative", "boundary"]
+        }, {
+          "path": "tests/reference-distinct-states.test.mjs",
+          "testId": "REF-07-004: serialized optional absence and installed sensor fault retain strategy quality and Result origin",
+          "caseId": "REF-07-004",
+          "assertionClass": "runtime-value",
+          "targets": ["wasm"],
+          "polarities": ["positive", "negative", "boundary"]
+        }, {
+          "path": "tests/reference-calendar-boundary.test.mjs",
+          "testId": "REF-07-004: serialized calendar Unknown retains reason revision and query identity separately from normal false",
+          "caseId": "REF-07-004",
+          "assertionClass": "target-parity",
+          "targets": ["native", "wasm"],
+          "polarities": ["positive", "negative", "boundary"]
+        }, {
+          "path": "tests/interaction-runtime-snapshot.test.mjs",
+          "testId": "GF-TEST-interaction-runtime-snapshot-empty: direct control preserves native/WASM output parity with an identified empty observation",
+          "caseId": "REF-07-004",
+          "assertionClass": "observation",
+          "targets": ["native", "wasm"],
+          "polarities": ["positive", "boundary"]
+        }]
+      }],
+      "gaps": ["This bounded oracle serializes actual logical control traces and completed public observations. It does not unify their schemas or establish Device/physical observation production. Calendar query coverage remains the adopted UTC profile; capability binding and Run overlap decisions remain outside this evidence."],
+      "issues": [312],
+      "referenceCaseIds": ["REF-07-004"]
+    },
+    {
+      "id": "optional-capability-strategy",
+      "family": "Optional capability absence and installed sensor faults",
+      "clause": {
+        "path": "docs/reference/04-sensors-constraints-control.en.md",
+        "heading": "4.5 Optional sensors and capabilities"
+      },
+      "owner": "HOST",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": ["host_simulation"],
+      "evidence": [{
+        "stage": "host_simulation",
+        "status": "verified",
+        "refs": [{
+          "path": "tests/adapt-control-host.test.mjs",
+          "testId": "REF-04-034: activated absence and installed Disconnected retain profile identity and selected strategy in actual host snapshots",
+          "caseId": "REF-04-034",
+          "assertionClass": "simulation",
+          "targets": ["wasm"],
+          "polarities": ["positive", "negative", "boundary"]
+        }]
+      }],
+      "gaps": ["The reference plain/framed WASM hosts execute fixed finite virtual profiles and caller-supplied snapshots. Source, bytecode, manifest and activation-profile digests identify this evidence; no live profile-revision API, physical binding or Device operation is claimed."],
+      "issues": [240],
+      "referenceCaseIds": ["REF-04-034"]
+    },
+    {
+      "id": "capability-profile-and",
+      "family": "Finite actuator profiles and capability AND activation",
+      "clause": {
+        "path": "docs/reference/04-sensors-constraints-control.en.md",
+        "heading": "4.6 Device queries and strategy selection"
+      },
+      "owner": "HOST",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": ["host_simulation"],
+      "evidence": [{
+        "stage": "host_simulation",
+        "status": "verified",
+        "refs": [{
+          "path": "tests/adapt-control-host.test.mjs",
+          "testId": "REF-04-036: duplicate actuator keys reject and comma-AND requires both pump and valve in actual host activation",
+          "caseId": "REF-04-036",
+          "assertionClass": "simulation",
+          "targets": ["wasm"],
+          "polarities": ["positive", "negative", "boundary"]
+        }]
+      }],
+      "gaps": ["Actual plain/framed WASM owners validate finite caller-supplied actuator profiles and execute the accepted canonical candidate. Source, bytecode, manifest and profile digests identify this bounded evidence; no live profile-revision API, physical binding, Device operation or native-host parity is claimed."],
+      "issues": [241],
+      "referenceCaseIds": ["REF-04-036"]
+    },
+    {
+      "id": "strategy-winning-priority",
+      "family": "Unique winning priority in host strategy activation",
+      "clause": {
+        "path": "docs/reference/04-sensors-constraints-control.en.md",
+        "heading": "4.6 Device queries and strategy selection"
+      },
+      "owner": "HOST",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": ["host_simulation"],
+      "evidence": [{
+        "stage": "host_simulation",
+        "status": "verified",
+        "refs": [{
+          "path": "tests/adapt-control-host.test.mjs",
+          "testId": "REF-04-038: equal winning priorities reject both declaration orders in actual host activation",
+          "caseId": "REF-04-038",
+          "assertionClass": "simulation",
+          "targets": ["wasm"],
+          "polarities": ["positive", "negative", "boundary"]
+        }]
+      }],
+      "gaps": ["Actual plain/framed WASM owners reject equal winning priorities in both declaration orders, prevent execution after rejection, and select a unique higher priority despite lower ties. Source, bytecode, manifest and profile digests identify bounded caller-supplied activation evidence; no live profile-revision API, physical binding, Device operation or native-host parity is claimed."],
+      "issues": [242],
+      "referenceCaseIds": ["REF-04-038"]
+    },
+    {
+      "id": "station-session-accounting",
+      "family": "Station cleanup completion and merged applied resource accounting",
+      "clause": {
+        "path": "docs/reference/04-sensors-constraints-control.en.md",
+        "heading": "4.8 Common constraints notation and operations"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [{
+        "stage": "native_wasm",
+        "status": "verified",
+        "refs": [{
+          "path": "tests/accounting-wasm.test.mjs",
+          "testId": "REF-04-046: checked source native/WASM ledgers merge applied overlap while Station cleanup retains its lease",
+          "caseId": "REF-04-046",
+          "assertionClass": "target-parity",
+          "targets": ["native", "wasm"],
+          "polarities": ["positive", "negative", "boundary"]
+        }]
+      }],
+      "gaps": ["The checked canonical account binds caller-validated applied intervals to one stable host resource ID. Native/WASM ledger union and the fixed Station owner use identical explicit test-host lifecycle inputs: pump OFF with open valves retains ownership, safe cleanup alone retains the reservation, and acknowledged durable finish releases it. This is portable owner evidence, not production compiler lowering of stopped/on_time, physical receipt certification or a Device release."],
+      "issues": [245],
+      "referenceCaseIds": ["REF-04-046"]
+    },
+    {
+      "id": "station-capacity-admission",
+      "family": "Station advisory and mandatory capacity admission",
+      "clause": {
+        "path": "docs/reference/04-sensors-constraints-control.en.md",
+        "heading": "4.8 Common constraints notation and operations"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [{
+        "stage": "native_wasm",
+        "status": "verified",
+        "refs": [{
+          "path": "tests/station-wasm.test.mjs",
+          "testId": "REF-04-047: checked Station source native/WASM capacity is advisory Unknown unless Pass is required",
+          "caseId": "REF-04-047",
+          "assertionClass": "target-parity",
+          "targets": ["native", "wasm"],
+          "polarities": ["positive", "negative", "boundary"]
+        }]
+      }],
+      "gaps": ["The existing bounded Station adapter consumes checked canonical constraints and explicit bindings. Native/WASM owners receive the same generated Station config and host-validated same-unit flows under compatible conditions. Missing information remains advisory Unknown; require Pass rejects Unknown/Violation before persistence, reservation or output grant and permits a valid same-request retry. This is portable owner conformance, not a native compiler, hydraulic curve model, unit registry, physical certification or generic resource-policy grammar."],
+      "issues": [246],
+      "referenceCaseIds": ["REF-04-047"]
+    },
+    {
+      "id": "station-owner-isolation",
+      "family": "Station session owner isolates inactive pump requests",
+      "clause": {
+        "path": "docs/reference/04-sensors-constraints-control.en.md",
+        "heading": "4.9 Shared resources and arbitration"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [{
+        "stage": "native_wasm",
+        "status": "verified",
+        "refs": [{
+          "path": "tests/station-wasm.test.mjs",
+          "testId": "REF-04-048: checked Station source native/WASM owner grant survives inactive false in either same-tick order",
+          "caseId": "REF-04-048",
+          "assertionClass": "target-parity",
+          "targets": ["native", "wasm"],
+          "polarities": ["positive", "negative", "boundary"]
+        }]
+      }],
+      "gaps": ["The existing fixed Station owner consumes the same checked canonical constraints and generated configuration on native/WASM. Same-tick owner ON and inactive OFF requests in both orders preserve the owner's authorization, proven by a subsequent real owner report-applied check without reauthorization and an explicit time ledger. Owner OFF between phases retains the lease and reservation; inactive output and acquisition remain rejected. Applied reports are host fixtures, not physical receipts. This is bounded portable owner conformance, not generic cooperative VM resource-policy execution, batch admission, compiler lowering or a Device release."],
+      "issues": [247],
+      "referenceCaseIds": ["REF-04-048"]
+    },
+    {
+      "id": "station-whole-session-lease",
+      "family": "Station lease retained through cleanup and durable stop",
+      "clause": {
+        "path": "docs/reference/04-sensors-constraints-control.en.md",
+        "heading": "4.9 Shared resources and arbitration"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [{
+        "stage": "native_wasm",
+        "status": "verified",
+        "refs": [{
+          "path": "tests/station-wasm.test.mjs",
+          "testId": "REF-04-049: checked Station source native/WASM retains the session lease through OFF cleanup and durable stop completion",
+          "caseId": "REF-04-049",
+          "assertionClass": "target-parity",
+          "targets": ["native", "wasm"],
+          "polarities": ["positive", "negative", "boundary"]
+        }]
+      }],
+      "gaps": ["The approved fixed Station adapter uses explicit rejection and retry, not a hidden queue. Same checked canonical source and binding-generated config drive native/WASM owners through preopen, ON, between-stage OFF, cleanup, stop barrier, safe applied fixture and durable finish ACK. B remains rejected while A owns the lease and reservation, including a wrong finish ACK; release requires safe cleanup and the correct ACK, followed by explicit new mode entry before B admission. Applied states and durable ACKs are host fixtures. This proves bounded portable owner conformance, not generic resource-policy queue/VM integration, compiler lowering, physical feedback or a Device release."],
+      "issues": [248],
+      "referenceCaseIds": ["REF-04-049"]
+    },
+    {
+      "id": "station-stop-mode-entry-batch",
+      "family": "Station Stop barrier and atomic mode-entry batch",
+      "clause": { "path": "docs/reference/04-sensors-constraints-control.en.md", "heading": "4.10 Modes and live settings" },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [{ "stage": "native_wasm", "status": "verified", "refs": [{
+        "path": "tests/station-wasm.test.mjs",
+        "testId": "REF-04-052: checked Station source native/WASM rejects same-tick Stop Manual Configure entries without deferred transition",
+        "caseId": "REF-04-052", "assertionClass": "target-parity",
+        "targets": ["native", "wasm"], "polarities": ["positive", "negative", "boundary"]
+      }] }],
+      "gaps": ["Bounded fixed Station owner with explicit host Stop-first dispatch, same checked canonical source and binding-generated config on native/WASM. Applied safe output and durable ACK are host fixtures, not physical evidence. No generic ingress scheduler, mode-expression compiler lowering or structural apply contract is introduced."],
+      "issues": [250],
+      "referenceCaseIds": ["REF-04-052"]
+    },
+    {
+      "id": "independent-ledger-restart",
+      "family": "Independent occurrence, day and rolling histories across restart",
+      "clause": { "path": "docs/reference/04-sensors-constraints-control.en.md", "heading": "4.11 Accounting and budgets" },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [{ "stage": "native_wasm", "status": "verified", "refs": [{
+        "path": "tests/accounting-wasm.test.mjs",
+        "testId": "REF-04-056: checked source native/WASM once, day and rolling histories survive fresh-owner restart independently",
+        "caseId": "REF-04-056", "assertionClass": "target-parity",
+        "targets": ["native", "wasm"], "polarities": ["positive", "negative", "boundary"]
+      }] }],
+      "gaps": ["Same checked canonical applied account and source-derived rolling constraint drive actual native/WASM ledgers; a fixed test host joins the Station once/day owner using identical explicit configuration. Fresh owners restore persisted histories, duplicate occurrence remains rejected despite remaining day quota, and rolling admission rejects a distinct eligible occurrence at the limit until historical intervals expire. Durable ACKs, applied evidence and comparable timestamps across boots are test-host fixtures. No production admission lowering, Device boot-clock bridge, physical receipt verification or storage-medium certification is claimed."],
+      "issues": [254],
+      "referenceCaseIds": ["REF-04-056"]
+    },
+    {
+      "id": "finite-reservation-cutoff",
+      "family": "Worst-case reservation and finite manual cutoff",
+      "clause": { "path": "docs/reference/04-sensors-constraints-control.en.md", "heading": "4.11 Accounting and budgets" },
+      "owner": "CORE", "maturity": "EXPERIMENTAL", "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [{ "stage": "native_wasm", "status": "verified", "refs": [{
+        "path": "tests/station-wasm.test.mjs",
+        "testId": "REF-04-057: checked Station source native/WASM reserves worst ON plus stop delay and enforces finite manual cutoff",
+        "caseId": "REF-04-057", "assertionClass": "target-parity",
+        "targets": ["native", "wasm"], "polarities": ["positive", "negative", "boundary"]
+      }] }],
+      "gaps": ["Same checked canonical fixed Station source binds the 8-minute day quota for both native/WASM owners. Explicit host planning inputs compute 7-minute worst ON plus 2-minute stop delay; the resulting 9-minute reservation is rejected. Missing, zero and unbounded manual cutoff fail closed. A finite 6-minute manual cutoff plus 2-minute delayed applied SAFE fixture reserves and settles 8 minutes, with safe directives and ownership retained through durable finish. Recovery conservatively retains an uncertain reservation. Planning, applied states, trusted clock and durable ACKs are bounded test-host fixtures, not production planner lowering, general rolling admission, verified physical stop or a Device release."],
+      "issues": [255], "referenceCaseIds": ["REF-04-057"]
     },
     {
       "id": "product-boundary",

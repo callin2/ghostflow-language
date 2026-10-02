@@ -37,6 +37,34 @@ A missing observation produces typed Unknown rather than fabricated evidence.
 
 ## Executable descriptors
 
+### GFB18 calendar boundaries
+
+`GhostFlow/control-v18` uses GFB18 for ordinary calendar Results and immutable
+UTC Daily work/off-day ranges. Its new prelude tags are:
+
+| Tag | Body |
+| --- | --- |
+| 17 Calendar Range | u32 site, string name, u64 gapMs, string timezone (`UTC`), u64 durationMs, u16 startCount followed by u64 startsMs, string calendar, u8 selector, Bool expression blobs when/cancel |
+| 18 Calendar Result | u32 site, string name/calendar, u8 selector, string timezone (`UTC`), u16 ok/value/fault protected input indices |
+
+Range selectors are workday 0 or offday 1; Result additionally permits holiday 2.
+The source Range slice is immutable UTC Daily. Its half-open interval must end
+at or before midnight; a work interval crossing midnight is rejected and must
+be represented by separate explicit declarations. Ordinary UTC Range keeps its
+existing semantics. Calendar eligibility is checked before new admission;
+an admitted Range retains its monotonic deadline.
+
+Both descriptors consume existing GFSF5 `schedule` facts keyed by site, carrying
+the optional calendar snapshot. Result and Range require no provider observation
+or civil occurrence rows. Rust derives the UTC date from trusted clock evidence
+and evaluates the calendar, preserving missing, out-of-coverage and expired
+faults. The Result projection is Bool/Bool/Number, with a finite CalendarFault
+code. These inputs are protected; the host cannot supply eligibility projections.
+Activation requires an explicit matching UTC calendar binding. Snapshot equality,
+revision history, bounded retention and rejected-scan atomicity apply across
+Result, Range and Daily pulse consumers sharing a binding. Existing facts and
+checkpoint formats stay unchanged; older loaders reject the new GFB header.
+
 GFB10 retains the GFB temporal header and tagged strategy preludes. Existing
 tags 0–4 retain their layouts. Tags 5–9 begin with `u32 site, string name,
 u64 gapMs`, and end with the Bool expression blobs `when, cancel`.
@@ -124,9 +152,12 @@ Native entry points also validate payload bounds and descriptor compatibility.
 `gf_restore_context_checkpoint(handle, ptr, len)` is permitted only before the
 first scan of an activated run. The host owns durable storage and acknowledgement.
 
-GFCX1 contains magic/version, the exact Program fingerprint, canonical binding
+GFCX3 contains magic/version, the exact Program fingerprint, canonical binding
 bytes, settings revision, accepted event identities, site-keyed engine snapshots,
-and CRC32. The wrapper is bounded by 4 MiB, each engine snapshot by 1 MiB.
+and CRC32. It also persists full accepted calendar contents keyed by ID/revision,
+bounded to `min(terminalCapacity, 128)` snapshots and 8192 holiday/exception date
+cells; restore rejects changed revision contents or bound violations. GFCX1 and
+GFCX2 are rejected explicitly. The wrapper is bounded by 4 MiB, each engine snapshot by 1 MiB.
 Identity mismatch, corruption, invalid restored settings or capacity overflow
 reject the whole restore. CRC32 detects accidental corruption; it is not an
 authentication mechanism.
@@ -135,6 +166,55 @@ Effective Periodic phase/interval, keyed slots/allocator and terminal occurrence
 identities survive restart. Clock observations and active Runs do not. Restored
 runs establish a fresh baseline and cannot replay past occurrences. This is a
 context checkpoint; it is not an accounting ledger or a general VM-state image.
+
+## Shared Solar context extension
+
+The layouts above describe the original context profile. Typed settings use the
+GFSF5 envelope in [configuration streams](OPERATOR-SETTINGS-STREAM.md); calendar
+Holiday Daily adds GFB15 tag15. Solar with shared config uses GFB16/control-v15
+and the existing GFCA1 activation, retaining the GFB11 shared config descriptors.
+Tag16 has the common `u32 site, string name, u64 gapMs` prefix, followed by:
+
+```text
+string timezone, f64 latitude, f64 longitude, u8 event,
+i64 offsetMs, u64 fallbackAtMs,
+u16 configDependencyCount, u32 configIds[],
+expression when, expression cancel, u64 holdMs
+```
+
+Event is rise0/set1; fallbackAtMs 86400000 means absent, holdMs 0 means absent.
+Config IDs are sorted and unique. Rust verifies exact dependencies from protected
+`when` reads; any referenced current fault prevents admission. Binding fields
+are immutable and must match the facts exactly.
+
+GFSF6 retains GFSF5 through its optional settings section, then appends:
+
+```text
+u16 solarCount, solar[]
+solar := u32 site, string timezone, f64 latitude, f64 longitude,
+         u8 event, i64 offsetMs, u64 coverageStartMs/coverageEndMs,
+         u16 rowCount, solarRow[]
+solarRow := u32 sourceDay, u8 availability,
+            optional scheduledWallMs, optional fallbackWallMs,
+            u8 unavailableReason, string providerRevision/contextRevision
+```
+
+Availability is available0/unavailable1; reason255 means absent, 0–5 are typed
+natural fault codes. Optional times retain `u8 present, u64 value` with absent
+zero. Solar rows do not accept civil slot/fold fields; Rust fixes their identity
+components to zero. `solarContextEvidence(descriptor, providerSchedule)` in
+`runtimes/wasm/context-abi.mjs` projects provider facts into this packet; it
+does not compute admission. A Solar context requires GFSF6; existing non-Solar
+profiles retain GFSF5 by explicit compatibility decision.
+
+Solar, the shared config vector and VM commit together. Failed evaluations
+consume neither events nor occurrences. Successful recovery establishes a
+baseline, with no past catch-up. GFCX3 embeds GFES subtype3 Solar engine state,
+preserving source-day terminal identities and current config Results under the
+exact Program/bindings while discarding clock observations for a fresh baseline.
+Older GFB loaders reject format16. The standalone Solar consumers keep their
+existing profile, not an implicit fallback. See the
+[execution guide](SOLAR-CONFIG-EXECUTION.md) for scope and reproduction.
 
 ## Evidence
 

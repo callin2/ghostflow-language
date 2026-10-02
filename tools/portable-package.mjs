@@ -1,6 +1,7 @@
 import { canonicalJson } from './canonical-json.mjs';
 import { canonicalUnitFor, isQuantityType } from './quantities.mjs';
 import { isTimeType, validateTimeValue } from './time-literals.mjs';
+import { isInt32, intSettingsIssue } from './int-settings.mjs';
 import { compileControl } from './control.mjs';
 import { extractLiterate } from './literate.mjs';
 import { equalBytes } from './sha256.mjs';
@@ -187,7 +188,7 @@ function manifestCapabilityType(type, path) {
 function manifestIntConfig(config, path, stream = false) {
   if (config.type !== 'Int') return;
   const requireInt = (value, field) => {
-    if (!Number.isInteger(value) || value < -2147483648 || value > 2147483647) {
+    if (!isInt32(value)) {
       fail('manifest-mismatch', `${path}.${field} must be a signed i32 Int`);
     }
   };
@@ -203,8 +204,7 @@ function manifestIntConfig(config, path, stream = false) {
   if (settings.label !== undefined && (typeof settings.label !== 'string' || settings.label.length < 1 || settings.label.length > 128)) {
     fail('manifest-mismatch', `${path}.settings.label must be a string of 1 to 128 characters`);
   }
-  if (settings.step <= 0 || settings.min > settings.max || config.value < settings.min || config.value > settings.max
-      || (config.value - settings.min) % settings.step !== 0 || (settings.max - settings.min) % settings.step !== 0) {
+  if (intSettingsIssue(config.value, settings) !== null) {
     fail('manifest-mismatch', `${path}.settings range or grid is invalid for Int`);
   }
 }
@@ -313,10 +313,12 @@ function validateConfigStreamPackageProfile(manifest, version, runtimeAbi) {
   }
   if (!stream) return;
   if (!Array.isArray(manifest.configs) || !manifest.configs.length
-    || ['schedules','signals','naturalConditions','providers','calendars','objectives','adaptSettings']
+    || !Array.isArray(manifest.schedules)
+    || manifest.schedules.some(schedule => schedule?.kind !== 'periodic')
+    || ['signals','naturalConditions','providers','calendars','objectives','adaptSettings']
       .some(field => manifest[field] !== undefined && (!Array.isArray(manifest[field]) || manifest[field].length))
     || manifest.accounting !== undefined) {
-    fail('unsupported-bytecode-version', 'signed GFB11 profile currently requires config-only context execution');
+    fail('unsupported-bytecode-version', 'signed GFB11 profile supports scalar configs and Periodic schedules only');
   }
 }
 
@@ -610,6 +612,7 @@ export async function verifyPortablePackage(packageValue, options = {}) {
       if (Object.hasOwn(manifest, key)) manifestKeys.push(key);
     }
   }
+  if (Object.hasOwn(manifest,'adaptPolicy') || Object.hasOwn(manifest,'strategies')) manifestKeys.push('adaptPolicy','strategies');
   exactObject(manifest, manifestKeys, 'manifest');
   if (manifest.format !== packageValue.payload.manifest.format) fail('manifest-mismatch', 'manifest format does not match descriptor');
   if (packageValue.payload.bytecode.version === '4' && manifest.format !== 'GhostFlow/control-v4') fail('manifest-mismatch', 'GFB format 4 requires a control-v4 manifest');
@@ -685,7 +688,11 @@ export async function verifyPortablePackage(packageValue, options = {}) {
   for (const [index, schedule] of manifest.schedules.entries()) {
     if (!isPlainObject(schedule)) fail('manifest-mismatch', `manifest.schedules[${index}] must be an object`);
     const name = ghostName(schedule.name, `manifest.schedules[${index}].name`);
-    if (!contextManifest) addGenerated(schedule.dueInput, `__gf_schedule_due_${name}`, `manifest.schedules[${index}].dueInput`);
+    if (!contextManifest && packageValue.payload.bytecode.version !== '11') {
+      addGenerated(schedule.dueInput, `__gf_schedule_due_${name}`, `manifest.schedules[${index}].dueInput`);
+    } else if (packageValue.payload.bytecode.version === '11' && Object.hasOwn(schedule, 'dueInput')) {
+      fail('manifest-mismatch', `manifest.schedules[${index}].dueInput is not a GFB11 Periodic port`);
+    }
   }
   for (const [index, timer] of manifest.timers.entries()) {
     if (!isPlainObject(timer)) fail('manifest-mismatch', `manifest.timers[${index}] must be an object`);
@@ -745,10 +752,19 @@ export async function verifyPortablePackage(packageValue, options = {}) {
   } else try {
     const extraction = extractLiterate(sourceText, { filename: mappedDocument.filename });
     const replay = compileControl(extraction.code, { filename: mappedDocument.filename });
+    if (Object.hasOwn(manifest,'adaptPolicy') || Object.hasOwn(replay.manifest,'adaptPolicy')) {
+      if (canonicalJson(manifest.adaptPolicy ?? null) !== canonicalJson(replay.manifest.adaptPolicy ?? null)
+        || canonicalJson(manifest.strategies ?? null) !== canonicalJson(replay.manifest.strategies ?? null)
+        || !equalBytes(artifacts.bytecode,replay.bytes)) throw new Error('adaptive strategy projection does not match canonical source and bytecode');
+    }
     if (!equalBytes(replay.bytes, artifacts.bytecode)) throw new Error('canonical source does not reproduce package bytecode');
     if (packageValue.payload.bytecode.version === '11'
         && canonicalJson(manifest.configs) !== canonicalJson(replay.manifest.configs)) {
       throw new Error('config streams do not match canonical source lowering');
+    }
+    if (packageValue.payload.bytecode.version === '11'
+        && canonicalJson(manifest.schedules) !== canonicalJson(replay.manifest.schedules)) {
+      throw new Error('Periodic schedules do not match canonical source lowering');
     }
     const intConfigs = entries => entries.filter(entry => entry.type === 'Int');
     if (canonicalJson(intConfigs(manifest.configs)) !== canonicalJson(intConfigs(replay.manifest.configs))) {
@@ -790,12 +806,14 @@ export async function verifyPortablePackage(packageValue, options = {}) {
       let expectedWindowSites;
       let expectedWindowDependencies;
       let expectedDerivations;
+      let expectedConstraintProof;
       {
         if (continuousTimerNames.size) expectedTimerDependencies = replay.traceMetadata.dependencies.filter(entry => (
           entry.target.field === 'timerValue' && continuousTimerNames.has(entry.target.name)
         ));
         const mappedTrace = remapSourceTrace(replay.traceMetadata, extraction.sourceMap);
         expectedDerivations = mappedTrace.derivations ?? [];
+        expectedConstraintProof = mappedTrace.constraintProof ?? null;
         expectedResultSites = mappedTrace.resultSites;
         expectedSignalBindings = mappedTrace.bindings.filter(entry => entry.kind === 'signal');
         const signalStates = new Set(expectedSignalBindings.map(entry => entry.name));
@@ -818,6 +836,7 @@ export async function verifyPortablePackage(packageValue, options = {}) {
         expectedWindowSites,
         expectedWindowDependencies,
         expectedDerivations,
+        expectedConstraintProof,
       });
     }
   } catch (error) {

@@ -6,20 +6,24 @@
 각 요구에 필요한 언어·런타임·Driver·설치·UI의 책임은
 [Reference 8장](reference/08-language-runtime-and-device-boundaries.md#83-faq-전체-책임표)에 정리한다.
 
+검토 기준: 2026-10-01, dev [`a7333e56bc25c73fd6167b1182269b96cb671d05`](https://github.com/callin2/ghostflow-language/tree/a7333e56bc25c73fd6167b1182269b96cb671d05).
+`[미결정]`은 미확정 언어·계약 결정, `[부분 미지원]`은 현재 dev에서 지원하지 않는 해당 범위, `[변경됨]`은 현재 dev가 대체한 설명을 뜻한다. 각 상태 주석에 해당 범위를 적는다.
+태그가 없다는 사실은 실제 장치·API·UI 통합 검증을 뜻하지 않는다.
+
 ## 질문 목록
 
 1. [프로그램 파일은 어떻게 작성하나요?](#q01)
 2. [버튼을 누르는 동안만 출력을 켜려면?](#q02)
 3. [시작 버튼을 놓아도 운전을 유지하고, 정지 버튼으로 끄려면?](#q03)
-4. [한 번 시작하면 5분 운전하고 자동으로 멈추려면?](#q04)
-5. [요청이 2초 동안 유지된 뒤 켜려면?](#q05)
-6. [요청이 사라져도 3초 뒤에 끄려면?](#q06)
+4. [한 번 시작하면 5분 운전하고 자동으로 멈추려면? [변경됨]](#q04)
+5. [요청이 2초 동안 유지된 뒤 켜려면? [변경됨]](#q05)
+6. [요청이 사라져도 3초 뒤에 끄려면? [변경됨]](#q06)
 7. [매일 오전 6시와 오후 6시 45분에 관수하려면?](#q07)
-8. [1번 구역 다음에 2번 구역을 순서대로 관수하려면?](#q08)
+8. [1번 구역 다음에 2번 구역을 순서대로 관수하려면? [변경됨]](#q08)
 9. [수분이 낮을 때 켜고, 경계에서 켜졌다 꺼졌다 하지 않게 하려면?](#q09)
 10. [탱크가 하한보다 낮아지면 채우고 상한에서 멈추려면?](#q10)
 11. [센서가 세 번 감지하면 완료 신호를 내보내려면?](#q11)
-12. [‘5분’을 화면에서 변경할 수 있는 입력창으로 만들려면?](#q12)
+12. [‘5분’을 화면에서 변경할 수 있는 입력창으로 만들려면? [변경됨]](#q12)
 13. [고장이 사라져도 알람을 유지하고 리셋으로 해제하려면?](#q13)
 14. [두 출력을 동시에 켜지 못하게 하려면?](#q14)
 15. [일출 30분 뒤에 시작하려면?](#q15)
@@ -28,19 +32,19 @@
 18. [자기유지 기능이 있나요?](#q18)
 19. [사용자가 중간에 취소한 경우 특정 장치를 움직이게 할 수 있나요?](#q19)
 20. [일출 시각에 맞춰 예약하려면?](#q20)
-21. [요일을 기준으로 동작을 예약할 수 있나요?](#q21)
-22. [특정 장치의 누적 동작 시간을 기준으로 제어할 수 있나요?](#q22)
+21. [요일을 기준으로 동작을 예약할 수 있나요? [부분 미지원]](#q21)
+22. [특정 장치의 누적 동작 시간을 기준으로 제어할 수 있나요? [부분 미지원]](#q22)
 23. [자동·수동 운전과 상관없이 하루 동작 횟수에 따라 세척 운전을 할 수 있나요?](#q23)
-24. [펌웨어 업데이트 없이 나중에 작동 시간만 바꿀 수 있나요?](#q24)
+24. [펌웨어 업데이트 없이 나중에 작동 시간만 바꿀 수 있나요? [변경됨]](#q24)
 25. [설정 입력창의 라벨과 UI 컴포넌트를 바꿀 수 있나요?](#q25)
 26. [설정값의 변경 가능 범위를 제한할 수 있나요?](#q26)
-27. [요일별로 다른 설정을 할 수 있나요?](#q27)
+27. [요일별로 다른 설정을 할 수 있나요? [변경됨]](#q27)
 28. [공휴일에만 제어 로직을 다르게 할 수 있나요?](#q28)
 29. [서머타임도 제어에 적용할 수 있나요?](#q29)
-30. [만조·간조를 기준으로 제어할 수 있나요?](#q30)
-31. [사리·조금이나 달의 위상을 기준으로 제어할 수 있나요?](#q31)
+30. [만조·간조를 기준으로 제어할 수 있나요? [부분 미지원]](#q30)
+31. [사리·조금이나 달의 위상을 기준으로 제어할 수 있나요? [변경됨]](#q31)
 32. [정전 후 다시 켜졌을 때의 동작을 코딩할 수 있나요?](#q32)
-33. [온도 센서를 바꿔도 제어 코드를 수정하지 않아도 되나요?](#q33)
+33. [온도 센서를 바꿔도 제어 코드를 수정하지 않아도 되나요? [변경됨]](#q33)
 34. [센서 설정과 GhostFlow 소스는 분리되나요? 변경 주기도 다른가요?](#q34)
 35. [프린터 Driver만 바꾸듯 센서를 교체해도 제어 프로그램을 재컴파일하지 않아도 되나요?](#q35)
 36. [장치 교체와 재컴파일 분리 원칙은 language spec에도 있어야 하나요?](#q36)
@@ -156,7 +160,9 @@ control StartStop {
 관련 예제: [START/STOP](../examples/curriculum/pc-02-start-stop.ghost.md).
 
 <a id="q04"></a>
-## 4. 한 번 시작하면 5분 운전하고 자동으로 멈추려면?
+## 4. 한 번 시작하면 5분 운전하고 자동으로 멈추려면? [변경됨]
+
+> **현재 dev 상태:** 현재 duration 설정은 Result다. 아래 age < duration 비교는 case의 ok/fault 처리 없이 컴파일되지 않는다. [현재 계약](reference/05-settings-and-observation.md#기본값과-유효값).
 
 운전 상태와 그 상태의 경과 시간을 함께 사용한다.
 `stop` 또는 `low_water`가 참이면 종료한다. 운전 중 새 시작 요청은 무시한다.
@@ -198,7 +204,9 @@ control FiveMinuteRun {
 - `require pump => valve`: [Reference §4.7 출력 의도와 제약](reference/04-sensors-constraints-control.md#47-requested-safe-applied-confirmed)
 
 <a id="q05"></a>
-## 5. 요청이 2초 동안 유지된 뒤 켜려면?
+## 5. 요청이 2초 동안 유지된 뒤 켜려면? [변경됨]
+
+> **현재 dev 상태:** 현재 delay 설정은 Result다. 아래 age >= delay 비교 전에 case로 ok/fault를 처리해야 한다. [현재 계약](reference/05-settings-and-observation.md#기본값과-유효값).
 
 요청을 받은 상태와 실제로 켜진 상태를 구분한다.
 
@@ -236,7 +244,9 @@ control OnDelay {
 관련 예제: [독립적인 타이머 패턴](../examples/curriculum/pc-06-timer-patterns.ghost.md).
 
 <a id="q06"></a>
-## 6. 요청이 사라져도 3초 뒤에 끄려면?
+## 6. 요청이 사라져도 3초 뒤에 끄려면? [변경됨]
+
+> **현재 dev 상태:** 현재 delay 설정은 Result다. 아래 age >= delay 비교 전에 case로 ok/fault를 처리해야 한다. [현재 계약](reference/05-settings-and-observation.md#기본값과-유효값).
 
 요청 해제 뒤의 유지 단계를 둔다. 유지 중 요청이 돌아오면 계속 켠다.
 
@@ -315,7 +325,9 @@ control DailyWatering {
 - `elapsed(running)`: [Reference §3.2 상태 변경 뒤의 경과 시간](reference/03-time-and-schedules.md#32-상태-변경-뒤의-경과-시간)
 
 <a id="q08"></a>
-## 8. 1번 구역 다음에 2번 구역을 순서대로 관수하려면?
+## 8. 1번 구역 다음에 2번 구역을 순서대로 관수하려면? [변경됨]
+
+> **현재 dev 상태:** 현재 watering_time과 settle_time 설정은 Result다. 아래 시간 비교 전에 case로 ok/fault를 처리해야 한다. [현재 계약](reference/05-settings-and-observation.md#기본값과-유효값).
 
 순서를 enum으로 적고 각 단계에서 허용할 출력을 연결한다.
 아래는 정상 운전 순서의 예다. 각 구역은 밸브 개방 요청 후 2초 대기, 5분 급수,
@@ -481,7 +493,9 @@ reset과 감지가 같은 tick이면 reset이 우선한다. 초기 입력이 참
 - 카운터의 공개 의미: [Reference §5.3 — descriptor와 snapshot](reference/05-settings-and-observation.md#descriptor와-snapshot)
 
 <a id="q12"></a>
-## 12. ‘5분’을 화면에서 변경할 수 있는 입력창으로 만들려면?
+## 12. ‘5분’을 화면에서 변경할 수 있는 입력창으로 만들려면? [변경됨]
+
+> **현재 dev 상태:** 설정 선언과 live 변경은 지원한다. 아래 age < duration은 이전 scalar 읽기 방식이며 현재 설정의 Result를 case로 처리해야 한다. [현재 계약](reference/05-settings-and-observation.md#기본값과-유효값).
 
 운영 설정으로 선언하고 타입·범위·증분·권한·표시 이름을 적는다.
 다음 **단편**으로 [4번 예제](#q04)의 `duration` 선언을 바꾼다.
@@ -696,6 +710,35 @@ control DirectionInterlock {
 첫 예제처럼 상태 전이와 재시작 조건까지 명시한다.
 비상정지는 이 소프트웨어 논리로 대체하지 않는다.
 
+### 지역 제약과 공유 자원 제약 묶기
+
+한 control의 Bool 출력 제약은 `constraints LocalRules { require pump => valve; }`처럼
+이름 있는 지역 묶음으로 적을 수 있다. `mutex`도 그 안에 둘 수 있다. 이름은 설명을
+찾기 쉽게 만들며, 제약의 범위를 다른 control이나 물리 장치 전체로 넓히지는 않는다.
+모든 필수 조건은 AND다. 우선순위로 조건을 건너뛸 수 없고 선택적 `check` 분석은
+별도의 비차단 advisory다.
+
+여러 요청 경로가 같은 논리 자원을 쓰면 `constraints SharedRules for station`으로
+공유 규칙을 선언한다. [완전한 공유 실행 예제](../examples/bound-resource-execution.ghost.ko.md)는
+자동·수동·fallback 요청을 같은 Rust guard로 검사한다. `compileSourceSync`의 결과는
+검사된 비실행 descriptor다. 정확한 source/artifact와 안정 resource ID, mode/input,
+output mapping을 `compileBoundResourceControl`에 명시 전달한 뒤 참조 host의
+실제 Rust/WASM scan 경로로 실행한다. 예제에는 전체 binding과 기록 입력이 있다.
+
+시작 전 위반은 새 admission을 거부한다. 기존 사용권과 충돌하는 새 claim은 기존
+admission과 이전 safe 출력을 유지하며 대기열에 숨겨 재시도하지 않는다. 실행 중
+위반의 예제 대응은 작성한 `pump1 = false; valve1 = true;`다. 안전을 항상 모든 출력
+OFF로 바꾸지 않는다. trip 뒤에는 영향을 받은 exclusive group의 모든 claim이
+neutral인 관측과 새 claim이 필요하다. require-only group은 requested 값이 작성 safe
+값과 같아진 관측 뒤 새 요청을 검사한다. 연결된 group은 같은 scan에서 함께 복구해야 한다.
+
+이 실행 범위는 모든 출력이 명시 보호된 Bool GFB1 v1/v3 control 하나다. 같은 설치의
+writer는 공유 registry를 사용하며 같은 안정 ID의 추가 활성 writer를 거부한다.
+context/PID, shared-policy import composition, 여러 VM의 협력 중재는 포함하지 않는다.
+결과는 논리 requested/safe 의도다. 실제 Driver 적용, 밸브 열림 확인이나 현장 설치를
+증명하지 않는다. 자세한 규칙과 단계는 [Reference §4.8](reference/04-sensors-constraints-control.md#48-공통-constraints-표기와-연산)과
+[제약 계약](CONSTRAINTS.md#공유-bool-실행)을 참조한다.
+
 **왜 두 방식으로 나누나요?** 운전 상태를 어떻게 바꿀지와 어떤 출력 조합을 허용할지는
 각각 명시해야 하는 제어 규칙이기 때문이다.
 
@@ -821,7 +864,9 @@ admit하고, 운전 시간은 기존 `duration`과 control state가 정한다. �
 - `fallback = skip`과 회복: [Reference §3.9 자연 기준의 fallback과 회복](reference/03-time-and-schedules.md#자연-기준의-fallback과-회복)
 
 <a id="q21"></a>
-## 21. 요일을 기준으로 동작을 예약할 수 있나요?
+## 21. 요일을 기준으로 동작을 예약할 수 있나요? [부분 미지원]
+
+> **현재 dev 상태:** day의 mon..fri 범위 필터는 지원하지 않는다. 아래 workday/offday와 설치 calendar 대안은 지원한다. [현재 계약](reference/03-time-and-schedules.md#38-dst-자정과-work-calendar).
 
 요일 조건은 일정의 `on` 필드로 표현한다. 예를 들어 월요일부터 금요일까지
 오전 6시에 시작하려면 시각 조건과 다음 요일 조건을 조합한다.
@@ -847,7 +892,9 @@ DST와 자정 경계 정책도 일정 계약에 따라 적용한다.
 
 
 <a id="q22"></a>
-## 22. 특정 장치의 누적 동작 시간을 기준으로 제어할 수 있나요?
+## 22. 특정 장치의 누적 동작 시간을 기준으로 제어할 수 있나요? [부분 미지원]
+
+> **현재 dev 상태:** 외부의 확인된 누적 Duration 입력을 쓰는 예제는 지원한다. 현재 실행 가능한 on_time account는 durable·applied 증거만 지원하며 requested/safe/confirmed 단계의 native account 실행은 미지원이다. [현재 계약](../tools/control.mjs#L1521).
 
 누적 동작 시간을 `Duration` 값으로 받아 조건에 사용할 수 있다.
 먼저 **어느 기간에, 무엇을 동작으로 인정하여 합산하는지** 정한다.
@@ -956,7 +1003,9 @@ let wash_due = count_valid && today_starts >= 10;
 - 일일 설비 집계의 관련 원칙 — 시간 집계 규칙이며 횟수 문법은 아님: [Reference §3.10 시간 기반 사용량 제약](reference/03-time-and-schedules.md#310-시간-기반-사용량-제약)
 
 <a id="q24"></a>
-## 24. 펌웨어 업데이트 없이 나중에 작동 시간만 바꿀 수 있나요?
+## 24. 펌웨어 업데이트 없이 나중에 작동 시간만 바꿀 수 있나요? [변경됨]
+
+> **현재 dev 상태:** live 변경과 TimeSlots 연결은 지원한다. 아래 age < duration은 이전 scalar 읽기 방식이며 현재 설정의 Result를 case로 처리해야 한다. [현재 계약](reference/05-settings-and-observation.md#기본값과-유효값).
 
 가능하다. **얼마 동안 작동할지**를 운영자가 바꿀 수 있는 `Duration` 설정으로 선언한다.
 다음 **단편**은 [4번 시간제 운전](#q04)의 `duration` 선언을 대체한다.
@@ -1088,7 +1137,9 @@ config duration: Duration = 5min {
 - 여러 설정의 전체 승인 또는 전체 거부: [Reference §5.2 atomic live event](reference/05-settings-and-observation.md#atomic-live-event)
 
 <a id="q27"></a>
-## 27. 요일별로 다른 설정을 할 수 있나요?
+## 27. 요일별로 다른 설정을 할 수 있나요? [변경됨]
+
+> **현재 dev 상태:** 조건식이 선택한 duration도 Result다. 운전 시간 비교 전에 case로 ok/fault를 처리해야 한다. [현재 계약](reference/05-settings-and-observation.md#기본값과-유효값).
 
 가능하다. 요일별 값을 각각 `config`로 선언하고 조건식으로 사용할 값을 선택한다.
 예를 들어 평일에는 5분, 주말에는 10분 운전하도록 설정할 수 있다.
@@ -1252,7 +1303,9 @@ Reference §3.8에 정의된 전환 정책은 다음과 같다.
 - `elapsed(running)`: [Reference §3.2 상태 변경 뒤의 경과 시간](reference/03-time-and-schedules.md#32-상태-변경-뒤의-경과-시간)
 
 <a id="q30"></a>
-## 30. 만조·간조를 기준으로 제어할 수 있나요?
+## 30. 만조·간조를 기준으로 제어할 수 있나요? [부분 미지원]
+
+> **현재 dev 상태:** 만조·간조와 offset은 지원한다. 아래 run(10min, on_time)은 설계 표기이며 compiler는 run(_, within(_))을 지원한다. [현재 계약](reference/03-time-and-schedules.md#pulse-window-run-range).
 
 가능하다. 예측된 만조·간조 시각을 예약 발생 기준으로 삼고,
 그 전후의 시간 차이와 운전 길이를 따로 정한다.
@@ -1295,7 +1348,9 @@ basis = run(10min, on_time);
 - 달력 시각과 단조 경과 시간: [Reference §3.1 시간값과 시계 영역](reference/03-time-and-schedules.md#31-시간값과-시계-영역)
 
 <a id="q31"></a>
-## 31. 사리·조금이나 달의 위상을 기준으로 제어할 수 있나요?
+## 31. 사리·조금이나 달의 위상을 기준으로 제어할 수 있나요? [변경됨]
+
+> **현재 dev 상태:** tide_is와 moon_is는 `Result<Bool, TemporalContextFault>`를 반환한다. 아래 when = tide_is(...)는 case로 ok/fault를 처리해야 한다. 별도 Bool 입력 단편은 유효하다. [현재 계약](reference/03-time-and-schedules.md#달과-조석).
 
 가능하다. 사리·조금은 **조차의 분류 상태 또는 기간**으로,
 달의 위상은 그와 별개의 조건으로 다룬다. 조건을 만족할 때 예약을 허용하거나
@@ -1404,7 +1459,9 @@ control RestartAndWait {
 - 설정 보존, 새 실행과 부팅 출력의 경계: [Reference §5.2 생명주기와 임시 설정](reference/05-settings-and-observation.md#생명주기와-임시-설정)
 
 <a id="q33"></a>
-## 33. 온도 센서를 바꿔도 제어 코드를 수정하지 않아도 되나요?
+## 33. 온도 센서를 바꿔도 제어 코드를 수정하지 않아도 되나요? [변경됨]
+
+> **현재 dev 상태:** 아래 Number 예제는 유효하다. 전용 물리량 표기가 설계 범위에만 있다는 설명은 변경됐다. 현재 Temperature·TemperatureDelta와 단위 literal을 지원한다. [현재 계약](reference/02-types-expressions-state.md#29-물리량과-단위).
 
 **같은 논리 입력 계약을 유지한다면 제어 코드를 그대로 사용할 수 있다.**
 프로그램은 센서 모델명이나 핀 번호 대신 “온실 온도” 같은 논리 역할을 읽는다.

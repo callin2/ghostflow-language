@@ -59,6 +59,32 @@ contract does not grant `write` or `execute` access before those designs exist.
 carries `builtin` `Bool`, `Int`, `Number`, or `Duration`, or a named `nominal` type and
 semantic unit. Runtime JSON spelling never selects the type: `0` remains a
 `Number` or a `Duration` only because the static descriptor says which it is.
+For a compiler-declared enum, nominal `sourceType` also carries the exact
+`enumMembers: [{"name":"Idle","value":0}, ...]` table in declaration order.
+The ordinal is explicit, unique, and starts at zero. Other nominal types have
+no `enumMembers`. A ready enum observation must match one declared ordinal;
+an unknown value is an error, never a guessed name. The table participates in
+the schema digest and the source/revision identity join. Schema version `0.2`
+adds this field; the runtime snapshot remains version `0.1`.
+
+Schema version `0.3` adds an optional plain-text `displayLabel` to each enum
+member. Author it in the canonical `.ghost.md` control block:
+
+```ghost
+type Phase = Idle { label = "대기"; } | Running;
+```
+
+The emitted first member is `{"name":"Idle","value":0,"displayLabel":"대기"}`.
+Unannotated members omit `displayLabel`; consumers display `displayLabel ?? name`.
+The label is presentation metadata for web, HMI and mobile consumers. It changes
+neither enum identity nor ordinal, control meaning, GFB bytes or the VM ABI.
+Labels use the existing JSON string escaping rules and support Unicode. Empty or
+whitespace-only labels, duplicate `label` entries and other member options are
+compiler errors. Consumers render labels as text, never as markup. Labels
+participate in the exact schema digest; label edits require a matching source
+revision and snapshot identity. Runtime snapshot version stays `0.1`; runtime
+observation values remain numeric ordinals. Imported enum composition remains
+unsupported and retains its existing diagnostic.
 
 A valid stateless control has an identified schema with `descriptors: []`.
 This means the exact literate revision and compiled module have no public

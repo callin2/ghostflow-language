@@ -1,6 +1,6 @@
 {
   "format": "GhostFlow/interaction-schema-v0",
-  "version": "0.1",
+  "version": "0.3",
   "module": {
     "id": "FiveMinuteWatering",
     "moduleFingerprint": "18052752a622baf5",

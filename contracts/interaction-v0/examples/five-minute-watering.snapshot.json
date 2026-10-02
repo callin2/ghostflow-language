@@ -3,8 +3,8 @@
   "version": "0.1",
   "schema": {
     "format": "GhostFlow/interaction-schema-v0",
-    "version": "0.1",
-    "sha256": "49bb7521ec3416c057fb0cbf4bc91c0c1ec674b304ee8f233ed2a9fa2b21a1da"
+    "version": "0.3",
+    "sha256": "47b54afdb3c67020ae98d7464bde17d558ac96e7e13c058bdf324afda67caf55"
   },
   "module": {
     "id": "FiveMinuteWatering",

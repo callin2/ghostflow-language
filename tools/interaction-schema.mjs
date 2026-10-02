@@ -10,6 +10,7 @@ import {
 import { extractLiterate } from './literate.mjs';
 import { compileControl, parseControl } from './control.mjs';
 import { canonicalUnitFor, isQuantityType } from './quantities.mjs';
+import { moduleFingerprint } from './source-trace.mjs';
 
 const PUBLIC_ID = /^[A-Za-z][A-Za-z0-9._:-]{0,127}$/;
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -48,10 +49,13 @@ function canonicalDocument(document) {
   return document;
 }
 
-function sourceType(name) {
+function sourceType(name, enums) {
   if (name === 'Bool' || name === 'Int' || name === 'Number' || name === 'Date' || name === 'TimeOfDay' || name === 'DateTime') return { kind: 'builtin', name, unit: null };
   if (name === 'Duration') return { kind: 'builtin', name, unit: 'ms' };
-  return { kind: 'nominal', name, unit: name === 'Percent' ? 'percent' : isQuantityType(name) ? canonicalUnitFor(name) : null };
+  const members = enums.get(name);
+  return { kind: 'nominal', name, unit: name === 'Percent' ? 'percent' : isQuantityType(name) ? canonicalUnitFor(name) : null,
+    ...(members ? { enumMembers: members.map((member, value) => ({ name: member.name, value,
+      ...(member.label !== undefined ? { displayLabel: member.label } : {}) })) } : {}) };
 }
 
 function validationSnapshot(schema) {
@@ -88,16 +92,21 @@ function assertContractSchema(schema) {
 function expectedSchema(compilation, identityValue) {
   const source = canonicalDocument(compilation?.sourceDocument);
   const identity = sourceIdentity(identityValue);
-  const manifest = compilation?.manifest;
-  const trace = compilation?.traceMetadata;
+  const artifactManifest = compilation?.manifest;
+  const manifest = artifactManifest?.format === 'GhostFlow/control-policy-descriptor-v1'
+    ? artifactManifest.control : artifactManifest;
+  const trace = artifactManifest?.format === 'GhostFlow/control-policy-descriptor-v1'
+    ? { ...compilation.traceMetadata, moduleFingerprint: moduleFingerprint(compilation.bytes) }
+    : compilation?.traceMetadata;
   if (!manifest || typeof manifest.name !== 'string' || !trace || typeof trace.moduleFingerprint !== 'string') {
     fail('compiler result lacks product control manifest or source trace metadata');
   }
-  if (!SHA256.test(manifest.bytecodeSha256) || manifest.bytecodeSha256 !== sha256Hex(compilation.bytes)) {
+  if (!SHA256.test(artifactManifest.bytecodeSha256) || artifactManifest.bytecodeSha256 !== sha256Hex(compilation.bytes)) {
     fail('compiler result bytecode identity is invalid');
   }
   const extraction = extractLiterate(source.text, { filename: source.filename });
   const ast = parseControl(extraction.code, { filename: source.filename });
+  const enums = new Map(ast.body.filter(item => item.kind === 'enum').map(item => [item.name, item.members]));
   const nodeById = new Map((compilation.sourceMap ?? []).map(node => [node?.id, node]));
   const linksByNode = new Map();
   for (const link of trace.intentLinks ?? []) {
@@ -123,7 +132,7 @@ function expectedSchema(compilation, identityValue) {
     if (item.kind === 'config') {
       const settings = config.settings;
       descriptors.push({
-        id: `setting.${item.name}`, name: item.name, kind: 'setting', sourceType: sourceType(config.type), access: ['read'],
+        id: `setting.${item.name}`, name: item.name, kind: 'setting', sourceType: sourceType(config.type, enums), access: ['read'],
         authority: settings.access, applyPolicy: 'live', label: settings.label ?? item.name,
         constraint: config.type === 'Bool'
           ? { kind: 'choices', values: [false, true] }
@@ -136,7 +145,7 @@ function expectedSchema(compilation, identityValue) {
       const counter = links.some(link => link.meaning === 'counter');
       if (counter && item.type.name !== 'Int') fail(`state.${item.name} counter meaning requires Int`);
       descriptors.push({
-        id: `${counter ? 'counter' : 'state'}.${item.name}`, name: item.name, kind: counter ? 'counter' : 'state', sourceType: sourceType(item.type.name), access: ['read'],
+        id: `${counter ? 'counter' : 'state'}.${item.name}`, name: item.name, kind: counter ? 'counter' : 'state', sourceType: sourceType(item.type.name, enums), access: ['read'],
         provenance: { sourceNode: { id: item.id, kind: 'state' }, intentAnchorIds: anchors },
       });
       continue;
@@ -150,7 +159,7 @@ function expectedSchema(compilation, identityValue) {
       }
     } else if (!declaredStates.has(subject?.name)) fail(`timer.${item.name} must target an authored state`);
     descriptors.push({
-      id: `timer.${item.name}`, name: item.name, kind: 'timer', sourceType: sourceType('Duration'), access: ['read'],
+      id: `timer.${item.name}`, name: item.name, kind: 'timer', sourceType: sourceType('Duration', enums), access: ['read'],
       operation: continuous
         ? { kind: 'continuous_true', subjectNodeId: subject.id }
         : { kind: 'elapsed_since_change', subjectId: `state.${subject.name}` },
@@ -160,7 +169,7 @@ function expectedSchema(compilation, identityValue) {
   const schema = {
     format: INTERACTION_SCHEMA_FORMAT,
     version: INTERACTION_SCHEMA_VERSION,
-    module: { id: manifest.name, moduleFingerprint: trace.moduleFingerprint, bytecodeSha256: manifest.bytecodeSha256 },
+    module: { id: manifest.name, moduleFingerprint: trace.moduleFingerprint, bytecodeSha256: artifactManifest.bytecodeSha256 },
     source: { ...identity, format: SOURCE_FORMAT, kind: 'literate', sha256: source.sha256 },
     descriptors,
   };

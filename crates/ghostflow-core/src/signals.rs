@@ -798,6 +798,26 @@ mod tests {
     }
 
     #[test]
+    fn ref_04_023_stale_boundary_uses_sample_time_not_filter_evaluation() {
+        let mut s = sensor(Filter::Median(1), 1);
+        let sample = good(1, 1_000, 42.0);
+        assert_eq!(s.update(sample, 1_500), Ok(UpdateResult::Accepted));
+        for now in [1_500, 2_500] {
+            assert_eq!(s.reading(now), Ok(42.0));
+            assert_eq!(s.quality(now), Quality::Good);
+            assert_eq!(s.accepted_sample_identity(), Some((1, 1, 1_000)));
+        }
+        assert_eq!(s.update(sample, 3_999), Ok(UpdateResult::Duplicate));
+        assert_eq!(s.reading(3_999), Ok(42.0));
+        assert_eq!(s.quality(3_999), Quality::Good);
+        assert_eq!(s.reading(4_000), Err(SensorFault::Stale));
+        assert_eq!(s.quality(4_000), Quality::Stale);
+        assert_eq!(s.update(sample, 4_001), Ok(UpdateResult::Duplicate));
+        assert_eq!(s.reading(4_001), Err(SensorFault::Stale));
+        assert_eq!(s.accepted_sample_identity(), Some((1, 1, 1_000)));
+    }
+
+    #[test]
     fn recovery_requires_both_filter_and_recover_count() {
         let mut s = sensor(Filter::Median(5), 3);
         for id in 1..=4 {
@@ -848,6 +868,43 @@ mod tests {
             HysteresisReading {
                 value: false,
                 quality: Quality::Disconnected
+            }
+        );
+    }
+
+    #[test]
+    fn ref_04_019_hysteresis_strict_boundaries_and_fault_result() {
+        let mut sensor = sensor(Filter::Median(1), 1);
+        let cases = [
+            (30.0, false),
+            (29.0, true),
+            (33.0, true),
+            (35.0, true),
+            (36.0, false),
+        ];
+        for (index, (value, expected)) in cases.into_iter().enumerate() {
+            let id = index as u64 + 1;
+            assert_eq!(
+                sensor.update(good(id, id, value), id),
+                Ok(UpdateResult::Accepted)
+            );
+            assert_eq!(
+                sensor.read_hysteresis(id),
+                HysteresisReading {
+                    value: expected,
+                    quality: Quality::Good
+                }
+            );
+        }
+        assert_eq!(
+            sensor.update(Sample::new(1, 6, 6, 36.0, Quality::Invalid), 6),
+            Err(SensorFault::Invalid)
+        );
+        assert_eq!(
+            sensor.read_hysteresis(6),
+            HysteresisReading {
+                value: false,
+                quality: Quality::Invalid
             }
         );
     }
@@ -969,5 +1026,175 @@ mod tests {
         assert_eq!(s.diagnostic_count(), MAX_DIAGNOSTICS + 2);
         assert_eq!(s.diagnostics().count(), MAX_DIAGNOSTICS);
         assert!(s.diagnostic(MAX_DIAGNOSTICS).is_none());
+    }
+
+    #[test]
+    fn ref_04_010_invalid_seven_duplicate_eight_and_sample_time_freshness() {
+        let mut s = Sensor::new(SensorConfig::new(Filter::Median(3), 0.0, 100.0, 300, 1)).unwrap();
+        for (id, timestamp) in [(1, 0), (2, 10)] {
+            assert_eq!(
+                s.update(good(id, timestamp, 20.0), timestamp),
+                Err(SensorFault::NotReady)
+            );
+        }
+        s.update(good(3, 20, 20.0), 20).unwrap();
+        assert_eq!(s.reading(20), Ok(20.0));
+        for now in [110, 120, 130] {
+            let updated = s.update(good(7, 100, 101.0), now);
+            if now == 110 {
+                assert_eq!(updated, Err(SensorFault::Invalid));
+            } else {
+                assert_eq!(updated, Ok(UpdateResult::Duplicate));
+            }
+            assert_eq!(s.reading(now), Err(SensorFault::Invalid));
+            assert_eq!(s.accepted_sample_identity(), Some((1, 7, 100)));
+        }
+        assert_eq!(
+            s.update(good(8, 140, 29.0), 150),
+            Err(SensorFault::NotReady)
+        );
+        assert_eq!(
+            s.update(good(8, 140, 29.0), 160),
+            Ok(UpdateResult::Duplicate)
+        );
+        assert_eq!(s.reading(170), Err(SensorFault::NotReady));
+        assert_eq!(s.accepted_sample_identity(), Some((1, 8, 140)));
+        assert_eq!(
+            s.update(good(9, 180, 31.0), 190),
+            Err(SensorFault::NotReady)
+        );
+        s.update(good(10, 200, 33.0), 210).unwrap();
+        assert_eq!(s.reading(210), Ok(31.0));
+        assert_eq!(s.reading(499), Ok(31.0));
+        assert_eq!(s.reading(500), Err(SensorFault::Stale));
+        assert_eq!(s.accepted_sample_identity(), Some((1, 10, 200)));
+
+        // Separate recovery from filter readiness, so duplicate/read increments
+        // cannot be hidden by an incomplete filter window.
+        let mut recovery =
+            Sensor::new(SensorConfig::new(Filter::Median(1), 0.0, 100.0, 300, 5)).unwrap();
+        assert_eq!(
+            recovery.update(good(7, 70, 101.0), 70),
+            Err(SensorFault::Invalid)
+        );
+        assert_eq!(
+            recovery.update(good(8, 80, 29.0), 80),
+            Err(SensorFault::NotReady)
+        );
+        assert_eq!(recovery.recover_count, 1);
+        for now in [81, 82] {
+            assert_eq!(
+                recovery.update(good(8, 80, 29.0), now),
+                Ok(UpdateResult::Duplicate)
+            );
+            assert_eq!(recovery.reading(now), Err(SensorFault::NotReady));
+            assert_eq!(recovery.recover_count, 1);
+        }
+        assert_eq!(recovery.reading(83), Err(SensorFault::NotReady));
+        assert_eq!(recovery.recover_count, 1);
+        for id in [9, 10, 11] {
+            assert_eq!(
+                recovery.update(good(id, id * 10, 29.0), id * 10),
+                Err(SensorFault::NotReady)
+            );
+            assert_eq!(recovery.recover_count, (id - 7) as usize);
+        }
+        recovery.update(good(12, 120, 29.0), 120).unwrap();
+        assert_eq!(recovery.reading(120), Ok(29.0));
+    }
+
+    #[test]
+    fn ref_04_011_recovery_does_not_cross_epochs_and_fresh_sensor_starts_empty() {
+        let config = SensorConfig::new(Filter::Median(5), 0.0, 100.0, 300, 3);
+        let mut s = Sensor::new(config).unwrap();
+        for (index, value) in [10.0, 20.0, 30.0, 40.0, 50.0].into_iter().enumerate() {
+            let id = index as u64 + 1;
+            let now = index as u64 * 10;
+            let _ = s.update(Sample::good(1, id, now, value), now);
+        }
+        assert_eq!(s.reading(40), Ok(30.0));
+        assert_eq!(
+            s.update(Sample::new(1, 6, 50, 0.0, Quality::Disconnected), 50),
+            Err(SensorFault::Disconnected)
+        );
+        for (index, value) in [10.0, 11.0, 12.0].into_iter().enumerate() {
+            let id = index as u64 + 7;
+            let now = 60 + index as u64 * 10;
+            assert_eq!(
+                s.update(Sample::good(1, id, now, value), now),
+                Err(SensorFault::NotReady)
+            );
+        }
+        for (index, value) in [70.0, 75.0, 80.0, 85.0, 90.0].into_iter().enumerate() {
+            let id = index as u64 + 1;
+            let now = 100 + index as u64 * 10;
+            let result = s.update(Sample::good(2, id, now, value), now);
+            if id < 5 {
+                assert_eq!(result, Err(SensorFault::NotReady));
+            } else {
+                assert_eq!(result, Ok(UpdateResult::Accepted));
+            }
+            assert_eq!(s.accepted_sample_identity(), Some((2, id, now)));
+            if id == 2 {
+                assert_eq!(
+                    s.update(Sample::good(2, id, now, value), 111),
+                    Ok(UpdateResult::Duplicate)
+                );
+                assert_eq!(s.reading(112), Err(SensorFault::NotReady));
+                assert_eq!(s.accepted_sample_identity(), Some((2, id, now)));
+            }
+        }
+        assert_eq!(s.reading(140), Ok(80.0));
+        let mut fresh = Sensor::new(config).unwrap();
+        assert_eq!(fresh.reading(141), Err(SensorFault::NotReady));
+        assert_eq!(fresh.accepted_sample_identity(), None);
+        for (index, value) in [20.0, 25.0, 30.0, 35.0, 40.0].into_iter().enumerate() {
+            let id = index as u64 + 1;
+            let now = 150 + index as u64 * 10;
+            let result = fresh.update(Sample::good(2, id, now, value), now);
+            if id < 5 {
+                assert_eq!(result, Err(SensorFault::NotReady));
+            } else {
+                assert_eq!(result, Ok(UpdateResult::Accepted));
+            }
+        }
+        assert_eq!(fresh.reading(190), Ok(30.0));
+    }
+
+    #[test]
+    fn ref_04_012_exact_stale_boundary_and_default_reset_clear_old_sample() {
+        let config = SensorConfig::new(Filter::Median(1), 0.0, 100.0, 3_000, 1);
+        let mut s = Sensor::new(config).unwrap();
+        s.update(Sample::good(1, 1, 0, 20.0), 0).unwrap();
+        assert_eq!(
+            s.update(Sample::good(1, 1, 0, 20.0), 2_999),
+            Ok(UpdateResult::Duplicate)
+        );
+        assert_eq!(s.reading(2_999), Ok(20.0));
+        assert_eq!(s.reading(3_000), Err(SensorFault::Stale));
+        assert_eq!(s.accepted_sample_identity(), Some((1, 1, 0)));
+        assert_eq!(s.last_physical_sample_time(), Some(0));
+        s.reset();
+        assert_eq!(s.accepted_sample_identity(), None);
+        assert_eq!(s.last_physical_sample_time(), None);
+        assert_eq!(s.value(3_001), None);
+        assert_eq!(s.reading(0), Err(SensorFault::NotReady));
+        assert_eq!(s.reading(3_001), Err(SensorFault::NotReady));
+        let mut fresh = Sensor::new(config).unwrap();
+        assert_eq!(fresh.accepted_sample_identity(), None);
+        assert_eq!(fresh.reading(0), Err(SensorFault::NotReady));
+        fresh.update(Sample::good(1, 1, 1, 20.0), 1).unwrap();
+        assert_eq!(fresh.reading(1), Ok(20.0));
+        assert_eq!(
+            fresh.update(Sample::new(1, 2, 2, 0.0, Quality::Disconnected), 2),
+            Err(SensorFault::Disconnected)
+        );
+        assert_eq!(fresh.reading(2), Err(SensorFault::Disconnected));
+        fresh.update(Sample::good(1, 3, 3, 20.0), 3).unwrap();
+        assert_eq!(
+            fresh.update(Sample::good(1, 4, 4, 101.0), 4),
+            Err(SensorFault::Invalid)
+        );
+        assert_eq!(fresh.reading(4), Err(SensorFault::Invalid));
     }
 }

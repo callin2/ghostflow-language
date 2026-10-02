@@ -3,6 +3,22 @@
 
 # GFB 바이트코드
 
+GFB18은 채택된 달력 경계 profile `GhostFlow/control-v18`을 추가한다.
+prelude tag 17은 calendar로 판정하는 불변 UTC Daily Range이며 tag 18은
+protected Bool/Bool/fault-code 입력을 쓰는 typed calendar Result다.
+정확한 layout과 그대로 유지되는 GFSF5 fact는
+[컨텍스트 실행 ABI](CONTEXT-EXECUTION-ABI.ko.md#gfb18-달력-경계)에 설명한다.
+Range는 자정을 넘는 work interval을 거부하며 자정에 끝나고 다음 날짜에 시작하는
+명시적인 별도 range를 허용한다. 일반 Range 및 이전 binary layout의 기존 의미는
+유지한다. 새 tag에는 GFB18 header가 필요하며 이전 loader는 이를 거부한다.
+이 식별자는 Device release나 물리 실행의 인증이 아니다.
+
+## Bounded 자연 정책 (GFB13)
+
+확장 Solar/Tide 정책만 GFB13과 `GhostFlow/control-v12`를 선택하며 기존 profile bytes는 그대로다. Solar tag 1은 기존 layout을 유지하고 `when` expression 뒤에 `holdMs:u64` (0은 없음), `fallbackAtMs:u64` (86400000은 skip)을 추가한다. Context record는 cancellation expression 뒤에 `holdMs:u64`를 추가한다. Manifest 정책은 clock `{kind: 'hold_trusted', durationMs, terminal: 'skip'}`, fallback `{kind: 'fixed_time', atMs, terminal: 'skip'}` 객체다.
+
+확장 Solar facts는 GFSF6을 사용한다. Solar v1 row layout을 유지하고 provider/context string 뒤에 optional `fallbackWallMs`, `unavailableReason:u8` (255는 없음, 0–5는 natural-context reason code)을 추가한다. 기존 v1 packet과 WASM 함수 이름은 그대로다. 이전 pinned runtime은 activation 전에 GFB13을 거부한다. 서명 portable-package의 config-only GFB11 profile은 좁은 범위를 유지한다. 이 형식은 물리 Device 증거가 아니다.
+
 모든 정수는 리틀엔디안이다. 문자열은 `u16 length` 뒤에 UTF-8 바이트가 온다.
 값은 제한된 후위 스택을 사용하고 조건식은 정방향 분기를 사용한다. 공개 컴파일은
 정확한 표준 `.ghost.md` 문서 전체를 입력으로 받는다. `tools/gfb1.mjs`의 S-expression
@@ -32,6 +48,7 @@
 | 7 | PID objective | Bool, Number, Int 및 objective 레코드 |
 | 8 | Daily 일정 서두 | 시간 형식 및 Daily 설명자 |
 | 9 | DailySlots 일정 서두 | 시간 형식 및 DailySlots 설명자 |
+| 12 | 불변 UTC Range | GFB11 context 배치와 UTC Range 태그 13 |
 | 11 | 형식 설정 스트림 및 컨텍스트 실행 | 컨텍스트 서두와 선택 PID objective; 기존 형식 10 컨텍스트 프로필을 대체 |
 
 이는 컴파일러 출력 프로필이지 모든 호스트가 모든 프로필을 지원한다는 약속은 아니다.
@@ -261,3 +278,9 @@ origin 식별자를 정확한 소스 개정 및 오류 enum에 바인딩한다. 
 S-expression 형식은 이 단계의 내부 lowering 입력이다. GFB emitter만 Core IR을 숫자
 opcode로 매핑하고 형식을 선택해 바이트를 기록한다. 이 분리는 GFB wire 버전이나
 런타임 계약을 바꾸지 않는다.
+
+## 불변 UTC Range (형식 12)
+
+GFB12는 UTC Range prelude를 하나 이상 요구하며 그 밖에는 GFB11 context 배치와 선택적 objective trailer를 사용한다. 태그 `13`은 `site:u32`, 이름 string, `gapMs:u64`, timezone string (`UTC`만), `durationMs:u64`, `startCount:u16`, 정렬된 고유 `startMs:u64` 값, `when`과 `cancel_when` expression blob을 인코딩한다. 시작은 `[0,86400000)` 안에 1–96개이며 duration은 `[1,86400000]`이다. 하루 순환 간격은 duration 이상이어야 한다. native decoder가 경계와 non-overlap을 독립적으로 검증한다. 기존 형식의 bytes는 바뀌지 않으며 이전 consumer는 activation 전에 형식 12를 거부한다. header를 낮춰도 태그 13은 GFB11 prelude가 되지 않는다.
+
+manifest는 `GhostFlow/control-v10`과 기존 context facts ABI를 사용한다. 각 Range site는 빈 occurrence rows와 calendar/provider 없음이 필요하며 runtime은 신뢰된 wall time으로 UTC 계획을 생성한다. occurrence identity는 site, UTC source day, 정렬된 안정 slot key를 사용한다. Range engine checkpoint는 GFES2와 GFRG1 consumed-key ledger를 사용하며 기존 engine은 GFES1을 유지한다. 새 boot는 중복 방지 정보를 유지하지만 활성 timer를 재개하지 않는다. capacity 소진과 잘못된 checkpoint는 명시적이고 원자적으로 실패한다. 서명된 portable-package 설정 profile은 GFB11을 유지하며 GFB12를 허용하지 않는다.

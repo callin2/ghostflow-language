@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
+import { compileSource } from '../tools/toolchain.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const referenceDir = path.join(root, 'docs/reference');
@@ -77,6 +78,85 @@ function assertResolvableLocalLinks(markdown, baseDir) {
 
   assert.deepEqual(errors, []);
 }
+
+function compileIndexSource(code) {
+  return compileSource(`# Index classification\n\n\`\`\`ghost\n${code}\n\`\`\`\n`, { filename: 'index-classification.ghost.md' });
+}
+
+function indexedBody(index, term, file, heading) {
+  const row = tableRows(index).find(row => cells(row)[0].includes(term));
+  assert.ok(row, `missing index entry for ${term}`);
+  assert.ok(links(row).includes(file), `${term} must link to its governing body`);
+  return section(readReference(file.replace('.md', '.en.md')), heading);
+}
+
+test('REF-07-001: index concepts stay usable as names while body-defined syntax keeps its allowed positions', async () => {
+  const chapter = readReference('07-semantic-rules-and-index.en.md');
+  const purpose = section(chapter, '7.1 Purpose of this chapter');
+  assert.match(purpose, /entire list is not a set of reserved words/);
+  const index = section(chapter, '7.5 Declaration and notation index');
+  assertResolvableLocalLinks(index, referenceDir);
+  assert.ok(tableRows(index).some(row => cells(row)[0].includes('checkpoint')));
+  assert.ok(tableRows(section(chapter, '7.7 Terms')).some(row => cells(row)[0] === 'Driver'));
+  const vocabulary = indexedBody(index, '`control`', '01-source-and-syntax.md', '1.3 Vocabulary');
+  assert.match(vocabulary, /language words cannot be user-defined names/);
+  assert.match(vocabulary, /`timezone`.*contextual words/s);
+
+  // These spellings share the index with source keywords, but are concepts,
+  // unsupported design notation, or contextual keys rather than global reservations.
+  const compiled = await compileIndexSource(`control IndexNames {
+    input Driver: Bool;
+    input checkpoint: Bool;
+    input warn: Bool;
+    input timezone: Bool;
+    output binding: Bool;
+    binding <- Driver && checkpoint && warn && timezone;
+  }`);
+  assert.deepEqual(compiled.manifest.inputs.map(input => input.name), ['Driver', 'checkpoint', 'warn', 'timezone']);
+  assert.deepEqual(compiled.manifest.outputs, [{ name: 'binding', type: 'Bool' }]);
+  await assert.rejects(compileIndexSource('control Bad { output control: Bool; control <- true; }'),
+    /output name control is reserved/);
+  await assert.rejects(compileIndexSource('input start: Bool; control Bad { output pump: Bool; pump <- true; }'),
+    /expected control declaration/);
+
+  const scheduleBody = indexedBody(index, '`timezone`', '03-time-and-schedules.md', '3.6 Selected DailySlots');
+  assert.match(scheduleBody, /timezone/);
+  const contextual = await compileIndexSource(`control ContextualKey {
+    schedule starts: DailySlots<15min> { timezone = "UTC"; selected = [06:00]; }
+    output pump: Bool;
+    pump <- starts.due;
+  }`);
+  assert.deepEqual(contextual.manifest.schedules.map(({ name, timezone, slots }) => ({ name, timezone, slots })),
+    [{ name: 'starts', timezone: 'UTC', slots: [360] }]);
+});
+
+test('REF-07-001: indexed design and installation concepts do not become executable source declarations', async () => {
+  const cases = JSON.parse(fs.readFileSync(path.join(root, 'tests/reference/cases/03-settings-boundaries.json'), 'utf8')).cases;
+  const original = cases.find(entry => entry.id === 'REF-07-001');
+  assert.equal(original.issue, 'https://github.com/callin2/ghostflow-language/issues/310');
+  assert.equal(original.scope, 'tooling');
+  assert.equal(original.status, 'specified');
+  const index = section(readReference('07-semantic-rules-and-index.en.md'), '7.5 Declaration and notation index');
+  const constraintBody = indexedBody(index, '`warn`', '04-sensors-constraints-control.md', '4.8 Common constraints notation and operations');
+  assert.match(constraintBody, /`warn` and `monitor` are unsupported syntax/);
+  await assert.rejects(compileIndexSource(`control DesignNotation {
+    output pump: Bool; pump <- true;
+    constraints Safety { warn true; }
+  }`), /unsupported local constraint warn/);
+
+  const compositionBody = indexedBody(index, 'binding', '06-composition-and-replay.md', '6.3 Parameters, settings, dependencies, and bindings');
+  const connectionBody = indexedBody(index, 'binding', '06-composition-and-replay.md', '6.4 Import and connection syntax');
+  assert.match(connectionBody, /`bind` is not control source syntax/);
+  assert.ok(compositionBody.includes("execution environment manages the Driver's own deployment revision"));
+  await assert.rejects(compileIndexSource('control InstallationSketch { output pump: Bool; pump <- true; bind pump = gpio(17); }'),
+    /unexpected declaration bind/);
+  await assert.rejects(compileIndexSource('Driver gpio; control InstallationSketch { output pump: Bool; pump <- true; }'),
+    /expected control declaration/);
+  const logical = await compileIndexSource('control LogicalPort { input start: Bool; output pump: Bool; pump <- start; }');
+  assert.deepEqual(logical.manifest.inputs, [{ name: 'start', type: 'Bool' }]);
+  assert.deepEqual(logical.manifest.outputs, [{ name: 'pump', type: 'Bool' }]);
+  assert.equal('bindings' in logical.manifest, false, 'logical compilation must not invent physical installation bindings');
+});
 
 test('REF-07-008: syntax and symbol index links resolve to exact Reference sections', () => {
   const chapter = readReference('07-semantic-rules-and-index.md');
