@@ -2484,6 +2484,21 @@
               "targets": [
                 "native"
               ]
+            },
+            {
+              "path": "tests/window-framed-native.test.mjs",
+              "testId": "REF-04-032 preloaded future samples stay excluded and no-checkpoint restart is NotReady on native and WASM bounded windows",
+              "caseId": "REF-04-032",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
             }
           ]
         }
@@ -2491,8 +2506,12 @@
       "gaps": [
         "Native window evidence does not establish every hold_last or WASM path."
       ],
-      "issues": [],
-      "referenceCaseIds": []
+      "issues": [
+        239
+      ],
+      "referenceCaseIds": [
+        "REF-04-032"
+      ]
     },
     {
       "id": "daily-schedule",
