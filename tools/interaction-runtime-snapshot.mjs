@@ -214,11 +214,13 @@ function emitVerifiedSnapshot({ verifiedSchema, traceMetadata, configs, expected
       throw new Error('interaction runtime snapshot: current Rust settings state is required');
     }
     const declared = new Map(configs.map(config => [config.id, config]));
+    const settingTypes = new Map(verifiedSchema.descriptors.filter(descriptor => descriptor.kind === 'setting')
+      .map(descriptor => [descriptor.name, descriptor.sourceType]));
     for (const item of settingsState.settings) {
       const config = declared.get(item?.id), result = item?.result;
       if (!config || item.name !== config.name || item.type !== config.type || settings.has(item.name)
           || !object(result) || typeof result.ok !== 'boolean'
-          || !Object.hasOwn(item, 'defaultValue') || !typeMatches({ kind: config.type === 'Percent' ? 'nominal' : 'builtin', name: config.type, unit: null }, item.defaultValue)
+          || !Object.hasOwn(item, 'defaultValue') || !typeMatches(settingTypes.get(config.name), item.defaultValue)
           || item.defaultValue !== config.value
           || !Number.isSafeInteger(item.emissionRevision) || item.emissionRevision < 0 || item.emissionRevision > settingsState.settingsRevision
           || !(item.applicationPosition === null || Number.isSafeInteger(item.applicationPosition) && item.applicationPosition >= 0)
