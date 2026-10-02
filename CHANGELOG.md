@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+### 2026-10-02 — bind settings observations to source defaults and accepted emissions ([#273](https://github.com/callin2/ghostflow-language/issues/273))
+
+Settings streams now retain each row's accepted emission revision and application
+position separately from immutable source identity and global settings revision.
+An initial 5-minute Duration remains a non-override after an unrelated Bool edit;
+successful equal-valued emissions are later overrides. Current faults expose the
+fault without a historical/default effective-value fallback or ready-only override.
+New settings Interaction schemas use explicit version 0.4 with source-bound static
+defaults, and snapshots use 0.2 with correlated global/row provenance. Legacy 0.3/0.1
+settings documents retain their original validation and digest; non-settings are
+unchanged. Context checkpoint version 4 persists metadata and rejects inconsistent
+initial values, allocator/history, latest revision and atomic positions before
+owner mutation. Actual canonical native/framed-WASM tests compare full outcomes,
+settings and checkpoints, including permission/VM rollback and checksum-repaired
+semantic corruption. No executable descriptor binding, publishing identities,
+Device adoption or hardware verification is claimed.
+
 ### 2026-10-02 — report missing what-if replay inputs ([#304](https://github.com/callin2/ghostflow-language/issues/304))
 
 The bounded reference host now executes actual source-bound ghost branches for

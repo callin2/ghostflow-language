@@ -2,12 +2,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { validateInteraction } from '../contracts/interaction-v0/validate.mjs';
 import { emitCompletedScanSnapshot, prepareCompletedScanSnapshot } from '../tools/interaction-runtime-snapshot.mjs';
 import { compileSource } from '../tools/toolchain.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 
-const root = path.resolve(new URL('..', import.meta.url).pathname);
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const sourcePath = 'contracts/interaction-v0/examples/operator-settings.ghost.md';
 const source = fs.readFileSync(path.join(root, sourcePath), 'utf8');
 const identity = { documentId: 'source.fixture-operator-settings', revisionId: 'revision.fixture-operator-settings-v0' };
@@ -37,6 +38,7 @@ test('GF-TEST-interaction-setting-schema: existing authored config policy emits 
       id: 'setting.duration', name: 'duration', kind: 'setting',
       sourceType: { kind: 'builtin', name: 'Duration', unit: 'ms' },
       access: ['read'], authority: 'operator', applyPolicy: 'live', label: 'Watering duration',
+      defaultValue: 300000,
       constraint: { kind: 'range', min: 60000, max: 1200000, step: 60000 },
       provenance: { sourceNode: { id: 2, kind: 'config' }, intentAnchorIds: ['GF-INT-FIXTURE-OPERATOR-SETTINGS-V0'] },
     },
@@ -44,6 +46,7 @@ test('GF-TEST-interaction-setting-schema: existing authored config policy emits 
       id: 'setting.duty', name: 'duty', kind: 'setting',
       sourceType: { kind: 'nominal', name: 'Percent', unit: 'percent' },
       access: ['read'], authority: 'designer', applyPolicy: 'live', label: 'Duty',
+      defaultValue: 50,
       constraint: { kind: 'range', min: 0, max: 100, step: 10 },
       provenance: { sourceNode: { id: 4, kind: 'config' }, intentAnchorIds: ['GF-INT-FIXTURE-OPERATOR-SETTINGS-V0'] },
     },
@@ -51,6 +54,7 @@ test('GF-TEST-interaction-setting-schema: existing authored config policy emits 
       id: 'setting.enabled', name: 'enabled', kind: 'setting',
       sourceType: { kind: 'builtin', name: 'Bool', unit: null },
       access: ['read'], authority: 'operator', applyPolicy: 'live', label: 'Enabled',
+      defaultValue: false,
       constraint: { kind: 'choices', values: [false, true] },
       provenance: { sourceNode: { id: 6, kind: 'config' }, intentAnchorIds: ['GF-INT-FIXTURE-OPERATOR-SETTINGS-V0'] },
     },
@@ -85,13 +89,11 @@ test('GF-TEST-interaction-setting-snapshot: completed projection uses current Ru
   }
   const wrongType = structuredClone(completed.settingsState);
   wrongType.settings[0].result.value = 0.5;
-  assert.deepEqual(producer.emit({ ...request, settingsState: wrongType }).observations[0], {
-    descriptorId: 'setting.duration', status: 'error', error: 'runtime-value-type-mismatch',
-  });
+  assert.throws(() => producer.emit({ ...request, settingsState: wrongType }), /contract validation|type-mismatch|Result mismatch/);
   assert.deepEqual(snapshot.observations, [
-    { descriptorId: 'setting.duration', status: 'ready', value: 300000 },
-    { descriptorId: 'setting.duty', status: 'ready', value: 50 },
-    { descriptorId: 'setting.enabled', status: 'ready', value: false },
+    { descriptorId: 'setting.duration', defaultValue: 300000, emissionRevision: 0, applicationPosition: null, override: false, status: 'ready', value: 300000 },
+    { descriptorId: 'setting.duty', defaultValue: 50, emissionRevision: 0, applicationPosition: null, override: false, status: 'ready', value: 50 },
+    { descriptorId: 'setting.enabled', defaultValue: false, emissionRevision: 0, applicationPosition: null, override: false, status: 'ready', value: false },
   ]);
   assert.equal(validateInteraction(artifact.interactionSchema, snapshot).valid, true);
   assert.throws(() => emitCompletedScanSnapshot({
@@ -124,7 +126,8 @@ test('GF-TEST-interaction-setting-error: current fault rail is visible without m
     const producer = prepareCompletedScanSnapshot({ compilation: artifact, runId: 'run.operator-settings-fault' });
     assert.deepEqual(producer.emit({ completion: { kind: 'completed-scan', scanId: 0, logicalTimeMs: 1 }, trace: outcome.vm, settingsState: runtime.contextSnapshot().state }), snapshot);
     assert.deepEqual(snapshot.observations[0], {
-      descriptorId: 'setting.duration', status: 'error', error: 'SettingsUnavailable',
+      descriptorId: 'setting.duration', defaultValue: 300000, emissionRevision: 1, applicationPosition: 1,
+      status: 'error', error: 'SettingsUnavailable',
     });
     assert.equal(validateInteraction(artifact.interactionSchema, snapshot).valid, true);
   } finally { runtime.dispose(); }

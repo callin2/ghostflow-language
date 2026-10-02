@@ -362,7 +362,7 @@ test('REF-03-077 GFRG3 live start checkpoint rejects repaired malformed payloads
   ]);
   const compiled = await artifact();
   const good = Buffer.from(rows.at(-1).checkpoint, 'hex');
-  assert.equal(good.subarray(0, 6).toString('latin1'), 'GFCX\x03\x00');
+  assert.equal(good.subarray(0, 6).toString('latin1'), 'GFCX\x04\x00');
   const marker = good.indexOf(Buffer.from('GFES\x02GFRG\x03', 'latin1'));
   assert.ok(marker > 0, 'wrapped checkpoint contains GFRG3 engine payload');
   const corruptions = [

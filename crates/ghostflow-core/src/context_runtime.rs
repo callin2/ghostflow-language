@@ -718,23 +718,33 @@ impl ContextRuntime {
                 }
             }
             if let Some(fault) = group_fault.or(explicit_fault) {
+                let next_revision = self
+                    .settings_revision
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("settings revision exhausted"))?;
                 for config in &mut staged.runtime.configs {
                     if changes.contains(&config.descriptor.id) {
                         config.current = Err(fault);
+                        config.emission_revision = next_revision;
+                        config.application_position = Some(event.position);
                     }
                 }
+                staged.runtime.settings_revision = next_revision;
             } else {
+                let next_revision = self
+                    .settings_revision
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("settings revision exhausted"))?;
                 for (index, value, next_key) in candidates {
                     let config = &mut staged.runtime.configs[index];
                     config.current = Ok(value.clone());
+                    config.emission_revision = next_revision;
+                    config.application_position = Some(event.position);
                     config.last_success = value;
                     config.next_key = next_key;
                 }
+                staged.runtime.settings_revision = next_revision;
             }
-            staged.runtime.settings_revision = self
-                .settings_revision
-                .checked_add(1)
-                .ok_or_else(|| invalid("settings revision exhausted"))?;
             staged.runtime.last_event_position = Some(event.position);
             staged.runtime.event_ids.insert(event.event_id.clone());
         }

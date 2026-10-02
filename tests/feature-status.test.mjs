@@ -111,6 +111,12 @@ test('finite frozen Reference scope has exact active compiler and external oracl
   const fakeSpecified = structuredClone(catalog);
   fakeSpecified.entries.find(entry => entry.id === 'settings-observation').referenceCaseIds.push('REF-07-007');
   assert.equal(externalOracleCaseIds(fakeSpecified, cases).has('REF-07-007'), false);
+  assert.equal(externalOracleCaseIds(fakeSpecified, cases).has('REF-05-012'), true);
+  // A named case alone must still fail coverage if its actual verified oracle
+  // links disappear. REF-05-012 now has independent executable evidence.
+  for (const entry of fakeSpecified.entries) for (const evidence of entry.evidence) {
+    evidence.refs = evidence.refs.filter(ref => ref.caseId !== 'REF-05-012');
+  }
   assert.equal(externalOracleCaseIds(fakeSpecified, cases).has('REF-05-012'), false);
 });
 

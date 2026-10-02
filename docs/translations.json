@@ -103,8 +103,8 @@
       "source": "contracts/interaction-v0/README.md",
       "sourceLanguage": "en",
       "translation": "contracts/interaction-v0/README.ko.md",
-      "sourceSha256": "90eafb48488bb25bd509217210d49e94c9acccc4d93707011e2007524f310ada",
-      "translationSha256": "9e52606f8308ba1155abb85539386b03478641c94840e27d979f5630714fb187"
+      "sourceSha256": "543d522b6be8194d72e8b7e2ad0dc0075f1cb971f01c605cbae29c2ce5ba737f",
+      "translationSha256": "56e5afdd060e30dfc5af6185890b61292a0ec0c9cfe8e61c68f2671282b2e896"
     },
     {
       "source": "contracts/requirements/README.md",
@@ -600,8 +600,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "24df04f1e913c5e4172b9bf82e39991825c7bf59a856a45f997683935d82f97d",
-      "translationSha256": "fee5d98726b4ae843f3a3d730d8a31f032c345d31a6445e309ee00e339bb651b"
+      "sourceSha256": "fadc91dd725c6020013d1fdf8c9cb4ecf4b8cca475c0606179f68cac4113443d",
+      "translationSha256": "d60ce66c53b8f32b54e7a006a1a25fe8a3ce704301159169594a67a98198e22b"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",

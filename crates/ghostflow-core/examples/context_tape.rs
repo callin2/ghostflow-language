@@ -364,7 +364,7 @@ fn main() -> Result<()> {
         terminal_capacity: usize::try_from(integer(&activation["terminalCapacity"])?)?,
         bindings,
     })?;
-    if (civil_profile || calendar_profile) && !tape["checkpoint"].is_null() {
+    if (civil_profile || calendar_profile || settings_profile) && !tape["checkpoint"].is_null() {
         let encoded = tape["checkpoint"]
             .as_str()
             .ok_or("invalid checkpoint hex")?;
@@ -378,6 +378,7 @@ fn main() -> Result<()> {
         runtime.restore_context_checkpoint(&bytes)?;
     }
     let mut driver = runtime.into_scan_driver();
+    let mut last_outcome: Option<Json> = None;
     for step in array(&tape["steps"], 4096)? {
         if solar_profile {
             fields(
@@ -587,10 +588,11 @@ fn main() -> Result<()> {
                     "format": "GhostFlow/scan-outcome-v1", "scanId": outcome.scan_id,
                     "logicalTimeMs": outcome.logical_time_ms, "trace": trace,
                 }});
+                last_outcome = Some(record["outcome"].clone());
                 if settings_profile {
                     record["settings"] = state.unwrap_or(Json::Null);
                 }
-                if civil_profile || calendar_profile {
+                if civil_profile || calendar_profile || settings_profile {
                     record["checkpoint"] = Json::String(
                         driver
                             .runtime()
@@ -609,14 +611,24 @@ fn main() -> Result<()> {
                         .map(|byte| format!("{byte:02x}")).collect::<String>(),
                 })
             ),
-            Err(error) if settings_profile => println!(
-                "{}",
-                json!({
-                    "accepted": false, "error": error.to_string(), "settings": state,
-                    "checkpoint": driver.runtime().context_checkpoint()?.iter()
-                        .map(|byte| format!("{byte:02x}")).collect::<String>(),
-                })
-            ),
+            Err(error) if settings_profile => {
+                let committed = driver.runtime().journal().back().map(|trace| {
+                    serde_json::from_str::<Json>(&trace.to_json()).expect("valid committed trace")
+                });
+                assert_eq!(
+                    committed.as_ref(),
+                    last_outcome.as_ref().map(|row| &row["trace"])
+                );
+                println!(
+                    "{}",
+                    json!({
+                        "accepted": false, "error": error.to_string(), "settings": state,
+                    "lastOutcome": last_outcome,
+                        "checkpoint": driver.runtime().context_checkpoint()?.iter()
+                            .map(|byte| format!("{byte:02x}")).collect::<String>(),
+                    })
+                );
+            }
             Err(error) => return Err(error.into()),
         }
     }

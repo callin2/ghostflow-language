@@ -561,7 +561,7 @@ fn calendar_revisions_are_immutable_across_ticks_and_checkpoint_restore() {
             .unwrap();
     }
     let checkpoint = runtime.context_checkpoint().unwrap();
-    assert_eq!(&checkpoint[..6], b"GFCX\x03\x00");
+    assert_eq!(&checkpoint[..6], b"GFCX\x04\x00");
     let mut reboot = calendar_runtime(2, 8);
     reboot.restore_context_checkpoint(&checkpoint).unwrap();
     assert_eq!(reboot.context_checkpoint().unwrap(), checkpoint);
@@ -1151,6 +1151,8 @@ fn rejected_vm_scan_rolls_back_live_event_then_durable_restore_keeps_accepted_ph
     assert_eq!(accepted.requested_intents["allowed"], Value::Bool(false));
     let state = runtime.context_state_json().unwrap();
     assert!(state.contains("\"settingsRevision\":1"));
+    assert!(state.contains("\"emissionRevision\":1"));
+    assert!(!state.contains("\"sourceRevision\":1"));
     assert!(state.contains("\"value\":20"));
     let checkpoint = runtime.context_checkpoint().unwrap();
     assert!(runtime.restore_context_checkpoint(&checkpoint).is_err());
@@ -1187,6 +1189,75 @@ fn rejected_vm_scan_rolls_back_live_event_then_durable_restore_keeps_accepted_ph
             .requested_intents["allowed"],
         Value::Bool(true)
     );
+}
+
+#[test]
+fn settings_provenance_zero_cannot_restore_changed_value_or_fault_and_rejection_keeps_owner() {
+    for result in [
+        Ok(settings_stream::ConfigValue::Scalar(Value::Number(20.0))),
+        Err(settings_stream::SETTINGS_UNAVAILABLE),
+    ] {
+        let mut driver = framed_periodic();
+        let mut facts = periodic_facts();
+        facts.settings = Some(SettingsEvent {
+            program_fingerprint: 85,
+            event_id: "provenance-guard".into(),
+            base_revision: 0,
+            position: 1,
+            origin: SettingsOrigin::ProducerObservation,
+            changes: vec![SettingChange {
+                id: 6,
+                semantic_type: if result.is_ok() {
+                    "Duration".into()
+                } else {
+                    String::new()
+                },
+                result,
+            }],
+        });
+        driver
+            .scan_with_context(context_frame(0, 0, 1), clock(1, 0, 99), &facts)
+            .unwrap();
+        let saved = driver.runtime().context_checkpoint().unwrap();
+        let mut offset = 14;
+        offset += 4 + u32::from_le_bytes(saved[offset..offset + 4].try_into().unwrap()) as usize;
+        assert_eq!(&saved[offset..offset + 2], &[0, 0]);
+        offset += 2 + 8;
+        let events = u16::from_le_bytes(saved[offset..offset + 2].try_into().unwrap());
+        offset += 2;
+        for _ in 0..events {
+            offset +=
+                2 + u16::from_le_bytes(saved[offset..offset + 2].try_into().unwrap()) as usize;
+        }
+        assert_eq!(
+            u16::from_le_bytes(saved[offset..offset + 2].try_into().unwrap()),
+            1
+        );
+        offset += 2;
+        assert_eq!(
+            u32::from_le_bytes(saved[offset..offset + 4].try_into().unwrap()),
+            6
+        );
+        let mut bad = saved.clone();
+        bad[offset + 12..offset + 20].copy_from_slice(&0u64.to_le_bytes());
+        bad[offset + 20..offset + 28].copy_from_slice(&u64::MAX.to_le_bytes());
+        checkpoint_checksum(&mut bad);
+        let mut owner = framed_periodic();
+        let before = owner.runtime().context_checkpoint().unwrap();
+        assert!(owner
+            .restore_context_checkpoint(&bad)
+            .unwrap_err()
+            .to_string()
+            .contains("initial config provenance"));
+        assert_eq!(owner.runtime().context_checkpoint().unwrap(), before);
+        assert!(owner.runtime().journal().is_empty());
+        assert_eq!(owner.next_scan_id(), Some(0));
+        owner.restore_context_checkpoint(&saved).unwrap();
+        assert_eq!(
+            owner.runtime().context_state_json().unwrap(),
+            driver.runtime().context_state_json().unwrap()
+        );
+    }
 }
 
 #[test]
@@ -1638,7 +1709,7 @@ fn timeslots_consumers_share_keys_and_fault_without_historical_fallback() {
     );
     let snapshot = runtime.context_checkpoint().unwrap();
     let state = runtime.context_state_json().unwrap();
-    assert!(!state.contains("entries"));
+    assert!(!state.contains("\"result\":{\"ok\":true,\"value\":{\"kind\":\"slots\",\"entries\""));
     let mut reboot = Runtime::new(8);
     reboot.install(program, false);
     reboot

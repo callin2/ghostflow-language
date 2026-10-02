@@ -5,6 +5,19 @@
 
 ## 미출시
 
+### 2026-10-02 — 설정 관측을 source 기본값과 수락 emission에 연결 ([#273](https://github.com/callin2/ghostflow-language/issues/273))
+
+설정 stream이 행별 수락 emission revision과 적용 position을 불변 source 식별자 및 전역
+settings revision과 구분해 유지한다. 초기 5분 Duration은 다른 Bool 수정 후에도 override가
+아니며 같은 값의 성공 emission도 이후 override다. 현재 fault는 과거 성공값·기본값의
+유효값 fallback이나 성공 전용 override 없이 fault를 표시한다. 새 설정 Interaction schema는
+source 기본값을 포함한 명시적 버전 0.4이고 snapshot은 전역·행 provenance를 연결한 0.2다.
+legacy 0.3/0.1 설정 문서는 원래 검증과 digest를 유지하며 설정이 없는 문서는 변경하지 않는다.
+context checkpoint 버전 4가 metadata를 저장하고 초기값·allocator·이력·최신 revision·atomic
+position 불일치를 owner 변경 전에 거부한다. 실제 canonical native/framed-WASM 테스트가
+전체 outcome·설정·checkpoint, 권한/VM rollback과 checksum을 복구한 의미적 변조를 검증한다.
+실행 descriptor binding·publishing 식별자·Device 채택·하드웨어 검증은 주장하지 않는다.
+
 ### 2026-10-02 — what-if 재생 입력 누락 보고 ([#304](https://github.com/callin2/ghostflow-language/issues/304))
 
 제한된 reference host가 event-sourced 기록 prefix checkpoint에서 plain control의 실제
