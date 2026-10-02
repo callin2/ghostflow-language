@@ -167,7 +167,7 @@ function requireNodePosition(entry, node, label) {
 
 export function sourceMapRequiresTraceMetadata(nodes) {
   return Array.isArray(nodes) && nodes.some(node => object(node) && TRACEABLE_NODE_KINDS.has(node.kind)
-    && (node.kind !== 'signal' || ['debounce', 'hold_last'].includes(node.signalMode) || node.signalMode?.startsWith('window_')));
+    && (node.kind !== 'signal' || ['debounce', 'hold_last', 'ema'].includes(node.signalMode) || node.signalMode?.startsWith('window_')));
 }
 
 function dependencyField(value) {
@@ -258,7 +258,7 @@ function generatedTimerState(role, declaration) {
 const DEBOUNCE_ROLES = Object.freeze(['stable', 'candidate', 'candidateActive', 'candidateSince', 'lastSourceTag']);
 const HOLD_ROLES = Object.freeze(['available', 'value', 'heldSourceTag', 'heldEpoch', 'heldId', 'heldTimestamp', 'held', 'age', 'maskedFaultPresent', 'maskedFaultCode', 'maskedFaultOrigin']);
 const DEBOUNCE_SOURCE_ROLES = Object.freeze(['sourceEpoch', 'sourceId']);
-const signalRoles = mode => mode === 'hold_last' ? HOLD_ROLES : DEBOUNCE_ROLES;
+const signalRoles = mode => mode === 'ema' ? ['ready', 'value', 'lastSourceTag'] : mode === 'hold_last' ? HOLD_ROLES : DEBOUNCE_ROLES;
 function validSignalRole({ role, sourceTag }, mode) {
   return signalRoles(mode).includes(role) ? sourceTag === undefined
     : DEBOUNCE_SOURCE_ROLES.includes(role) && Number.isSafeInteger(sourceTag) && sourceTag > 0;
@@ -290,7 +290,7 @@ export function buildSourceTrace(ast, constraints, bytes, transitions = [], inte
   const signals = new Map();
   for (const generated of generatedSignals) {
     if (!object(generated) || generated.node?.kind !== 'signal'
-        || !['debounce', 'hold_last'].includes(generated.node.call?.name) || !validSignalRole(generated, generated.node.call.name)
+        || !['debounce', 'hold_last', 'ema'].includes(generated.node.call?.name) || !validSignalRole(generated, generated.node.call.name)
         || generated.name !== generatedSignalState(generated.role, generated.node.name, generated.sourceTag, generated.node.call.name)) {
       throw new Error('invalid generated debounce source binding');
     }
@@ -318,7 +318,7 @@ export function buildSourceTrace(ast, constraints, bytes, transitions = [], inte
         add(statement, statement.name, ['requested', 'safe'], { strategy: strategy.name });
       }
     }
-    if (node.kind === 'signal' && ['debounce', 'hold_last'].includes(node.call?.name)) {
+    if (node.kind === 'signal' && ['debounce', 'hold_last', 'ema'].includes(node.call?.name)) {
       const entries = [...signals.entries()].filter(([, entry]) => entry.node.id === node.id);
       requireSignalRoles(entries.map(([, entry]) => entry), node.call.name);
       for (const [key, generated] of entries) {
@@ -790,7 +790,7 @@ export function verifySourceTraceMetadata(metadata, bytes, nodes, {
     bindingsByNode.set(entry.nodeId, grouped);
 
     if (entry.kind === 'signal') {
-      if (!['debounce', 'hold_last'].includes(node.signalMode) || !object(entry.generated)
+      if (!['debounce', 'hold_last', 'ema'].includes(node.signalMode) || !object(entry.generated)
           || !validSignalRole(entry.generated, node.signalMode)) throw new Error('generated signal binding shape mismatch');
       requireExactFields(entry.generated, DEBOUNCE_SOURCE_ROLES.includes(entry.generated.role)
         ? ['declaration', 'role', 'sourceTag'] : ['declaration', 'role'], 'generated debounce binding');
@@ -814,7 +814,7 @@ export function verifySourceTraceMetadata(metadata, bytes, nodes, {
 
   for (const node of nodes) {
     if (!BINDING_FIELDS.has(node.kind)) continue;
-    if (node.kind === 'signal' && !['debounce', 'hold_last'].includes(node.signalMode)) continue;
+    if (node.kind === 'signal' && !['debounce', 'hold_last', 'ema'].includes(node.signalMode)) continue;
     const grouped = bindingsByNode.get(node.id) ?? [];
     if (node.kind === 'signal') {
       requireSignalRoles(grouped.map(entry => entry.generated), node.signalMode);
@@ -856,7 +856,7 @@ export function verifySourceTraceMetadata(metadata, bytes, nodes, {
     throw new Error('manifest timer descriptor has no source binding');
   }
   const signalBindings = metadata.bindings.filter(entry => entry.kind === 'signal');
-  if ((signalBindings.length || nodes.some(node => node.kind === 'signal' && ['debounce', 'hold_last'].includes(node.signalMode)))
+  if ((signalBindings.length || nodes.some(node => node.kind === 'signal' && ['debounce', 'hold_last', 'ema'].includes(node.signalMode)))
       && !Array.isArray(expectedSignalBindings)) throw new Error('canonical debounce bindings are required');
   if (Array.isArray(expectedSignalBindings) && canonicalJson(signalBindings) !== canonicalJson(expectedSignalBindings)) {
     throw new Error('debounce bindings do not match canonical source lowering');

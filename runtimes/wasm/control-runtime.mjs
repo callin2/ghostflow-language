@@ -40,7 +40,7 @@ const MAX_NAME_LENGTH = 128;
 const MAX_SCHEDULE_SLOTS = 96;
 const SENSOR_FAULT_CODE = Object.freeze({ Disconnected: 0, Stale: 1, Invalid: 2, NotReady: 3 });
 const HOLD_STATE_ROLES = ['available', 'value', 'heldSourceTag', 'heldEpoch', 'heldId', 'heldTimestamp', 'held', 'age', 'maskedFaultPresent', 'maskedFaultCode', 'maskedFaultOrigin'];
-const isVmSignal = item => item.kind === 'debounce' || item.kind === 'hold-last' || item.kind === 'window';
+const isVmSignal = item => item.kind === 'debounce' || item.kind === 'hold-last' || item.kind === 'window' || item.kind === 'ema';
 const isAfterEvent = item => item.kind === 'after-event';
 const RATE_TYPES = new Set(['Temperature', 'TemperatureDelta', 'Pressure', 'VaporPressureDeficit', 'FlowRate', 'Volume', 'Length', 'Irradiance', 'PPFD', 'Energy', 'Power', 'ElectricalCurrent', 'Voltage', 'Conductivity']);
 
@@ -484,7 +484,9 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
   if (!Array.isArray(manifest.signals) || manifest.signals.length > MAX_LIST) throw new TypeError('manifest.signals must be a bounded array');
   const signals = manifest.signals.map((signal, index) => {
     const item = record(signal, `manifest.signals[${index}]`);
-    if (item.kind === 'debounce') keys(item,
+    if (item.kind === 'ema') keys(item,
+      ['kind', 'name', 'payloadType', 'errorType', 'alpha', 'sourceMode', 'clockInput', 'sources', 'states'], [], `manifest.signals[${index}]`);
+    else if (item.kind === 'debounce') keys(item,
       ['kind', 'name', 'payloadType', 'errorType', 'sourceMode', 'stableForMs', 'initial', 'clockInput', 'sources', 'states'],
       ['members'], `manifest.signals[${index}]`);
     else if (item.kind === 'hold-last') keys(item,
@@ -782,8 +784,14 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
     }
     if (isVmSignal(item)) {
       const hold = item.kind === 'hold-last';
-      const prefix = hold ? 'hold_last' : 'debounce';
-      if (hold && TYPES.has(item.payloadType)) {
+      const ema = item.kind === 'ema';
+      const prefix = ema ? 'ema' : hold ? 'hold_last' : 'debounce';
+      if (ema) {
+        if (!['Number', 'Percent'].includes(item.payloadType) && !isQuantityType(item.payloadType)) throw new Error(`signal ${item.name} EMA requires numeric payload`);
+        if (item.errorType !== 'SensorFault' || item.sourceMode !== 'sample' || !Array.isArray(item.sources) || item.sources.length !== 1) throw new Error(`signal ${item.name} EMA requires single-source SensorFault sample evidence`);
+        finite(item.alpha, `signal ${item.name}.alpha`);
+        if (!(item.alpha > 0 && item.alpha <= 1)) throw new Error(`signal ${item.name}.alpha must be in (0, 1]`);
+      } else if (hold && TYPES.has(item.payloadType)) {
         if (item.members !== undefined) throw new Error(`signal ${item.name}.members is forbidden for scalar hold_last`);
       } else if (item.payloadType === 'Bool') {
         if (item.members !== undefined) throw new Error(`signal ${item.name}.members is forbidden for Bool debounce`);
@@ -798,7 +806,7 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
       if (hold && (item.errorType !== 'SensorFault' || item.quality !== 'measured' || item.sourceMode !== 'sample')) throw new Error(`signal ${item.name} hold_last requires measured SensorFault sample evidence`);
       if (item.errorType !== null && !['SensorFault', 'ClockFault', 'CalendarFault', 'TemporalContextFault'].includes(item.errorType)) throw new Error(`signal ${item.name}.errorType is unsupported`);
       if (!['scan', 'sample'].includes(item.sourceMode)) throw new Error(`signal ${item.name}.sourceMode is unsupported`);
-      safeInteger(hold ? item.forAtMostMs : item.stableForMs, `signal ${item.name}.${hold ? 'forAtMostMs' : 'stableForMs'}`, 1);
+      if (!ema) safeInteger(hold ? item.forAtMostMs : item.stableForMs, `signal ${item.name}.${hold ? 'forAtMostMs' : 'stableForMs'}`, 1);
       if (item.clockInput !== `${RESERVED}now_ms`) throw new Error(`signal ${item.name}.clockInput must be ${RESERVED}now_ms`);
       if (!Array.isArray(item.sources) || item.sources.length > MAX_LIST) throw new Error(`signal ${item.name}.sources must be a bounded array`);
       let priorTag = 0;
@@ -817,7 +825,7 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
       }
       unique(item.sources.map(source => source.name), `signal ${item.name} sample source`);
       if ((item.sourceMode === 'sample') !== (item.sources.length > 0)) throw new Error(`signal ${item.name}.sourceMode does not match sources`);
-      const stateFields = hold ? HOLD_STATE_ROLES : ['stable', 'candidate', 'candidateActive', 'candidateSince', 'lastSourceTag'];
+      const stateFields = ema ? ['ready', 'value', 'lastSourceTag'] : hold ? HOLD_STATE_ROLES : ['stable', 'candidate', 'candidateActive', 'candidateSince', 'lastSourceTag'];
       keys(record(item.states, `signal ${item.name}.states`), stateFields, [], `signal ${item.name}.states`);
       for (const role of stateFields) {
         name(item.states[role], `signal ${item.name}.states.${role}`, true);

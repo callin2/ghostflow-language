@@ -19,6 +19,140 @@ function row(scanId, logicalTimeMs, inputs) {
   return { scanId, logicalTimeMs, inputs };
 }
 
+test('REF-04-024 median to EMA composition preserves repeated fault, sample identity and bounded state on native VM and plain/framed WASM', async () => {
+  const artifact = await compileSource(`control ComposedFilter {
+  sensor moisture: Percent { valid = 0% .. 100%; filter = median(3); stale_after = 3s; recover_after = 3 samples; }
+  signal smooth = ema(moisture, alpha: 0.5);
+  signal slower = ema(smooth, alpha: 0.5);
+  output value, lagged: Percent;
+  value <- smooth |> recover(0%);
+  lagged <- slower |> recover(0%);
+}`, { filename: 'reference-composed-filter.ghost' });
+  const at = (id, value, quality = 'Good', epoch = 1) => ({
+    nowMs: id * 100, samples: { moisture: { epoch, id, timestampMs: id * 100, value, quality } },
+  });
+  const fault = at(4, 0, 'Invalid');
+  const repeated = at(9, 100);
+  const steps = [at(1, 20), at(2, 40), at(3, 60), fault,
+    { ...fault, nowMs: 450 }, { nowMs: 500 },
+    at(5, 60), at(6, 80), at(7, 100), at(8, 100), repeated,
+    { ...repeated, nowMs: 950 }, { nowMs: 1000 }, { nowMs: 3900 },
+    { nowMs: 4000, samples: { moisture: { epoch: 2, id: 1, timestampMs: 4000, value: 10, quality: 'Good' } } },
+    { nowMs: 4100, samples: { moisture: { epoch: 2, id: 2, timestampMs: 4100, value: 20, quality: 'Good' } } },
+    { nowMs: 4200, samples: { moisture: { epoch: 2, id: 3, timestampMs: 4200, value: 30, quality: 'Good' } } },
+  ];
+  const expected = [0, 0, 40, 0, 0, 0, 0, 0, 80, 90, 95, 95, 95, 0, 0, 0, 20];
+  const lagged = [0, 0, 40, 0, 0, 0, 0, 0, 80, 85, 90, 90, 90, 0, 0, 0, 20];
+  const executions = [];
+  for (const instantiate of [ControlRuntime.instantiate, ControlRuntime.instantiateFramed]) {
+    const runtime = await instantiate.call(ControlRuntime, wasmBytes, artifact);
+    try { executions.push(steps.map(step => runtime.step(step))); }
+    finally { runtime.dispose(); }
+  }
+  const [plain, framed] = executions;
+  assert.deepEqual(plain, framed.map(({ frame, ...result }) => result));
+  const states = artifact.manifest.signals.flatMap(signal => [
+    ...Object.values(signal.states), ...signal.sources.flatMap(root => Object.values(root.states)),
+  ]);
+  assert.equal(states.length, 10, 'each EMA has three scalar states and two identity slots for its single root');
+  assert.equal(new Set(states).size, 10);
+  for (const [index, result] of framed.entries()) {
+    assert.deepEqual(result.vm.requested, { value: expected[index], lagged: lagged[index] });
+    assert.deepEqual(result.vm.safe, result.vm.requested);
+    assert.equal(Object.keys(result.vm.stateAfter).length, 10, 'tick count does not grow retained state');
+    const observation = observeSourceTrace(artifact.traceMetadata, result.vm);
+    const emaBindings = observation.bindings.filter(binding => binding.kind === 'signal');
+    assert.equal(emaBindings.length, 10);
+    assert.ok(emaBindings.every(binding => binding.observations.every(value => value.observed)));
+    const qualities = ['NotReady', 'NotReady', 'Good', 'Invalid', 'Invalid', 'Invalid',
+      'NotReady', 'NotReady', 'Good', 'Good', 'Good', 'Good', 'Good', 'Stale', 'NotReady', 'NotReady', 'Good'];
+    const choices = { Good: 0, Invalid: 3, NotReady: 4, Stale: 2 };
+    assert.equal(result.sensors.moisture.quality, qualities[index]);
+    assert.ok(result.vm.resultTrace.every(site => site.choice === choices[qualities[index]]));
+    assert.ok(result.vm.resultTrace.every(site => site.origin === (qualities[index] === 'Good' ? 0
+      : artifact.sourceMap.find(node => node.kind === 'sensor').id)));
+    const faulted = [3, 4, 5].includes(index);
+    if (faulted) {
+      assert.equal(result.sensors.moisture.quality, 'Invalid');
+      assert.ok(result.vm.resultTrace.every(site => site.choice === 3));
+      assert.ok(result.vm.resultTrace.every(site => site.origin === artifact.sourceMap.find(node => node.kind === 'sensor').id));
+    }
+  }
+  assert.deepEqual(framed[4].vm.stateAfter, framed[3].vm.stateAfter);
+  assert.deepEqual(framed[5].vm.stateAfter, framed[3].vm.stateAfter);
+  assert.deepEqual(framed[11].vm.stateAfter, framed[10].vm.stateAfter);
+  assert.deepEqual(framed[12].vm.stateAfter, framed[10].vm.stateAfter);
+  // Native VM runs the actual compiled EMA recurrence. Its input rails here
+  // come from genuine WASM median conditioning, rather than fabricated values.
+  const tape = framed.map(({ vm }, scanId) => row(scanId, steps[scanId].nowMs,
+    Object.entries(vm.inputs).filter(([name]) => name !== '__gf_now_ms').map(([name, value]) => ({ name, value }))));
+  const native = nativeRun(artifact.bytes, tape);
+  assertParity(native, await wasmRun(artifact, tape));
+  assert.ok(native.every(item => item.accepted), JSON.stringify(native));
+  assert.deepEqual(native.map(item => item.outcome.trace), framed.map(item => item.vm));
+});
+
+test('REF-04-024 EMA composition rejects invalid contracts and atomically rolls back a failed scan', async () => {
+  const source = alpha => `control AtomicEma {
+    input divisor: Number;
+    sensor x: Number { filter = median(1); stale_after = 10s; }
+    signal smooth = ema(x, alpha: ${alpha});
+    output value, quotient: Number;
+    value <- smooth |> recover(-1.0);
+    quotient <- 1.0 / divisor;
+  }`;
+  for (const alpha of ['0.0', '1.1', '-0.5']) await assert.rejects(compileSource(source(alpha)), /ema alpha/);
+  await assert.rejects(compileSource(source('0.5').replace('ema(x,', 'ema(divisor,')), /numeric Result/);
+  const artifact = await compileSource(source('0.5'));
+  const tampered = structuredClone(artifact.manifest);
+  tampered.signals[0].alpha = 0;
+  await assert.rejects(ControlRuntime.instantiate(wasmBytes, { ...artifact, manifest: tampered }), /alpha/);
+  const tamperedRoot = structuredClone(artifact.manifest);
+  tamperedRoot.signals[0].sources[0].name = 'missing';
+  await assert.rejects(ControlRuntime.instantiate(wasmBytes, { ...artifact, manifest: tamperedRoot }), /unknown sample source/);
+  const sample = (id, value) => ({ epoch: 1, id, timestampMs: id, value, quality: 'Good' });
+  for (const instantiate of [ControlRuntime.instantiate, ControlRuntime.instantiateFramed]) {
+    const runtime = await instantiate.call(ControlRuntime, wasmBytes, artifact);
+    try {
+      const first = runtime.step({ nowMs: 1, inputs: { divisor: 1 }, samples: { x: sample(1, 10) } });
+      assert.equal(first.vm.safe.value, 10);
+      assert.throws(() => runtime.step({ nowMs: 2, inputs: { divisor: 0 }, samples: { x: sample(2, 30) } }), /division by zero/);
+      assert.deepEqual(runtime.sensors.get('x').conditioner.sampleIdentity(), { epoch: 1, id: 1, timestampMs: 1 });
+      const retry = runtime.step({ nowMs: 2, inputs: { divisor: 1 }, samples: { x: sample(2, 30) } });
+      assert.deepEqual(retry.vm.stateBefore, first.vm.stateAfter);
+      assert.equal(retry.vm.safe.value, 20, 'the rejected scan did not apply an extra EMA recurrence');
+    } finally { runtime.dispose(); }
+  }
+});
+
+test('named EMA supports affine Temperature and alpha one while rejecting multiple physical roots', async () => {
+  const artifact = await compileSource(`control TemperatureEma {
+    sensor temperature: Temperature { filter = median(1); stale_after = 3s; }
+    signal smooth = ema(temperature, alpha: 0.5);
+    signal immediate = ema(temperature, alpha: 1.0);
+    output value, direct: Temperature;
+    value <- smooth |> recover(0°C);
+    direct <- immediate |> recover(0°C);
+  }`);
+  const runtime = await ControlRuntime.instantiateFramed(wasmBytes, artifact);
+  try {
+    const first = runtime.step({ nowMs: 1, samples: { temperature: { epoch: 1, id: 1, timestampMs: 1, value: 273.15, quality: 'Good' } } });
+    const next = runtime.step({ nowMs: 2, samples: { temperature: { epoch: 1, id: 2, timestampMs: 2, value: 293.15, quality: 'Good' } } });
+    assert.equal(first.vm.safe.value, 273.15);
+    assert.equal(next.vm.safe.value, 283.15);
+    assert.equal(next.vm.safe.direct, 293.15);
+  } finally { runtime.dispose(); }
+  await assert.rejects(compileSource(`control MultipleRoots {
+    input select: Bool;
+    sensor a: Number;
+    sensor b: Number;
+    let selected = if select then a else b;
+    signal smooth = ema(selected, alpha: 0.5);
+    output value: Number;
+    value <- smooth |> recover(0.0);
+  }`), /exactly one physical sample lineage/);
+});
+
 test('REF-04-023 sample timestamp 1000 expires at 4000 despite later filter evaluations on native VM rails and plain/framed WASM conditioning', async () => {
   const artifact = await compileSource(`control StaleBoundary {
   sensor moisture: Percent {

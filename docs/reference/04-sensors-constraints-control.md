@@ -189,6 +189,13 @@ signal stable_start = debounce(start, stable_for: 2s, initial: false);
 | `stale_after(d)` | timestamped Result, 양의 Duration | 마지막 실제 유효 sample age가 d에 도달하면 Stale. 재평가나 filter output 시각으로 연장하지 않는다. |
 
 `filter`는 한 연산만 받는다. 여러 단계를 합성하려면 각 단계를 이름 있는 `signal`로 선언한다.
+numeric Result의 다음 EMA 단계는 `signal smooth = ema(moisture, alpha: 0.25);`로 선언한다.
+`signal slower = ema(smooth, alpha: 0.25);`처럼 EMA 결과를 다시 연결할 수 있다.
+각 EMA는 단일 물리 source의 epoch·sample ID·timestamp를 이어받아 새 정상 sample에서만
+갱신한다. 입력 fault를 그대로 전달하고 EMA 기억을 비우며, upstream filter 준비와
+`recover_after`를 만족한 첫 정상 sample로 다시 seed한다. 별도 recovery counter나
+새 freshness 시각을 만들지 않는다. sample lineage가 없는 값이나 여러 물리 source를
+선택하는 식은 EMA 단계의 입력으로 받지 않는다.
 Temperature filter는 payload를 canonical kelvin domain의 affine weighted mean으로 내부 계산한다.
 이는 source 식에 Temperature+Temperature 또는 absolute temperature scalar 곱셈을 허용하지 않는다.
 보호 신호와 완만한 환경 sensor에 같은 filter delay를 일괄 적용하지 않는다. 각 연산은

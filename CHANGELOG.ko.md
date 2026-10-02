@@ -5,6 +5,19 @@
 
 ## 미출시
 
+### 2026-10-02 — 합성 EMA signal 실행 ([#237](https://github.com/callin2/ghostflow-language/issues/237))
+
+Reference §4.3의 이름 있는 numeric EMA 단계를 공유 Rust VM의 유한 상태로
+컴파일한다. 이전에는 `signal smooth = ema(moisture, alpha: 0.5);`를 거부하여
+문서의 sensor median → EMA 합성을 실행할 수 없었다. EMA는 upstream Result와
+원래 물리 sample identity를 소비한다. 중복 sample과 clock-only tick은 recurrence를
+바꾸지 않으며 fault는 기억을 비우고 provenance를 보존한다. upstream의 준비·복구
+조건과 freshness를 그대로 따른다. 단일 source EMA마다 scalar 슬롯 세 개와 source
+identity 슬롯 두 개를 사용하며 source epoch 변경은 reseed한다. bytecode/ABI 형식
+변경이나 암묵적인 recovery 정책을 추가하지 않는다. 지원되는 단계는 단일 물리
+source를 가진 numeric SensorFault Result를 요구한다. REF-04-024 native VM/plain/framed
+WASM trace와 atomic rollback·invalid contract 회귀 검증으로 복원된 동작을 확인한다.
+
 ### 2026-10-01 — 근무 달력 경계의 실행 ([#225](https://github.com/callin2/ghostflow-language/issues/225))
 
 Reference §3.8의 `calendar_is` Result 식과 불변 UTC Daily work/off-day range를
