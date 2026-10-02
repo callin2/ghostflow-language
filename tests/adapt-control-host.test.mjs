@@ -4,12 +4,123 @@ import { createHash } from 'node:crypto';
 import test from 'node:test';
 import { compileSource } from '../tools/toolchain.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
+import { GhostFlowRuntime } from '../runtimes/wasm/ghostflow-runtime.mjs';
+import { FramedGhostFlowRuntime } from '../runtimes/wasm/framed-runtime.mjs';
 
 const wasm = fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
 const cases = JSON.parse(fs.readFileSync(new URL('./reference/cases/02-time-control.json', import.meta.url)));
 const reference = (Array.isArray(cases) ? cases : cases.cases).find(item => item.id === 'REF-04-035');
 assert.ok(reference, 'canonical capability-strategies source must remain available');
 const artifact = await compileSource(reference.source, { filename: reference.filename });
+
+test('REF-04-036: duplicate actuator keys reject and comma-AND requires both pump and valve in actual host activation', async t => {
+  const original = (Array.isArray(cases) ? cases : cases.cases).find(item => item.id === 'REF-04-036');
+  assert.ok(original, 'original host Reference case must remain available');
+  assert.equal(original.status, 'specified');
+  assert.equal(original.scope, 'host');
+  assert.equal(original.issue, 'https://github.com/callin2/ghostflow-language/issues/241');
+  const source = `# Actuator profile AND
+
+\`\`\`ghost
+control ProfileAND {
+  input scheduled: Bool;
+  output pump, valve: Bool;
+  adapt policy {
+    strategy Both priority 10 match (pump: actuator<Bool>, valve: actuator<Bool>) {
+      pump <- scheduled;
+      valve <- scheduled;
+    }
+  }
+}
+\`\`\`
+`;
+  const compiled = await compileSource(source, { filename: 'actuator-profile-and.ghost.md' });
+  // Inspect the accepted candidate's small GFB1 query, because both output
+  // bindings also require presence and must not mask an OR in comma lowering.
+  const bytes = Buffer.from(compiled.bytes);
+  let at = 6;
+  const text = () => { const size = bytes.readUInt16LE(at); at += 2; const value = bytes.toString('utf8', at, at + size); at += size; return value; };
+  assert.equal(bytes.readUInt16LE(4), 1);
+  assert.equal(text(), 'ProfileAND'); at += 4; // Module flags.
+  assert.equal(bytes.readUInt16LE(at), 1); at += 2;
+  assert.equal(text(), 'scheduled'); assert.equal(bytes[at++], 1);
+  assert.equal(bytes.readUInt16LE(at), 0); at += 2; // No state.
+  assert.equal(bytes.readUInt16LE(at), 1); at += 2;
+  assert.equal(text(), 'Both'); at += 4; // Priority.
+  const queryEnd = at + 4 + bytes.readUInt32LE(at); at += 4;
+  const query = [];
+  while (at < queryEnd) {
+    const opcode = bytes[at++];
+    if (opcode === 1) query.push({ kind: text(), name: text(), type: bytes[at++] });
+    else {
+      assert.equal(opcode, 2, 'the capability query combines requirements with AND, never OR');
+      const arity = bytes.readUInt16LE(at); at += 2;
+      assert.ok(arity > 0 && arity <= query.length);
+      query.push({ all: query.splice(query.length - arity, arity) });
+    }
+  }
+  assert.equal(at, queryEnd);
+  assert.equal(query.length, 1);
+  assert.ok(Array.isArray(query[0].all));
+  // Repeated output/match predicates are equivalent; the semantic requirement
+  // is the conjunction of these actuator keys, not their encoding count.
+  assert.deepEqual([...new Set(query[0].all.map(cap => `${cap.kind}:${cap.name}:${cap.type}`))].sort(),
+    ['actuator:pump:1', 'actuator:valve:1']);
+  const hash = value => createHash('sha256').update(value).digest('hex');
+  const wire = value => JSON.parse(JSON.stringify(value));
+  const identity = { sourceSha256: hash(source), bytecodeSha256: hash(compiled.bytes),
+    manifestSha256: hash(JSON.stringify(compiled.manifest)), module: compiled.traceMetadata.moduleFingerprint };
+  assert.equal(identity.bytecodeSha256, compiled.manifest.bytecodeSha256);
+  const pump = { kind: 'actuator', name: 'pump', type: 'bool' };
+  const valve = { kind: 'actuator', name: 'valve', type: 'bool' };
+  const profiles = [
+    { capabilities: [pump, pump], error: /duplicate capability/ },
+    { capabilities: [pump, { ...pump, type: 'number' }], error: /duplicate capability/ },
+    { capabilities: [pump], error: /no device strategy matches capabilities/ },
+    { capabilities: [valve], error: /no device strategy matches capabilities/ },
+    { capabilities: [pump, { ...valve, type: 'number' }], error: /no device strategy matches capabilities/ },
+    { capabilities: [pump, valve] },
+  ];
+  const captures = [];
+  for (const Owner of [GhostFlowRuntime, FramedGhostFlowRuntime]) {
+    const records = [];
+    for (const { capabilities, error } of profiles) {
+      const runtime = await Owner.instantiate(wasm);
+      t.after(() => runtime.dispose());
+      runtime.load(compiled.bytes);
+      const activation = wire({ capabilities, sha256: hash(JSON.stringify(capabilities)) });
+      const activate = () => {
+        for (const cap of activation.capabilities) runtime.addCapability(cap.kind, cap.name, cap.type);
+        runtime.activate();
+      };
+      if (error) {
+        let rejected;
+        assert.throws(activate, cause => { rejected = cause.message; return error.test(rejected); });
+        if (Owner === FramedGhostFlowRuntime) assert.equal(runtime.outcome, null, 'rejected profile publishes no scan');
+        else assert.equal(runtime.journalLength, 0, 'rejected profile commits no tick');
+        records.push({ identity, activation, rejected });
+        continue;
+      }
+      activate();
+      const traces = [];
+      for (const [scanId, scheduled] of [true, false].entries()) {
+        const snapshot = { scanId, logicalTimeMs: scanId, inputs: [{ name: 'scheduled', value: scheduled }] };
+        let trace;
+        if (Owner === FramedGhostFlowRuntime) trace = runtime.scan(snapshot).trace;
+        else { runtime.setBool('scheduled', scheduled); runtime.tickAt(scanId); trace = runtime.trace; }
+        assert.equal(trace.module, identity.module);
+        assert.equal(trace.strategy, 'Both');
+        assert.equal(trace.inputs.scheduled, scheduled);
+        assert.deepEqual(trace.requested, { pump: scheduled, valve: scheduled });
+        assert.deepEqual(trace.safe, trace.requested);
+        traces.push(wire({ snapshot, trace }));
+      }
+      records.push({ identity, activation, traces });
+    }
+    captures.push(records);
+  }
+  assert.deepEqual(captures[0], captures[1], 'plain and framed Rust owners agree on captured profile admission and execution');
+});
 
 test('REF-04-035 explicit absent sensor selects Baseline', async () => {
   const host = await ControlRuntime.instantiateFramed(wasm, artifact, { capabilities: [] });
