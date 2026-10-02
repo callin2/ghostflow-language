@@ -5488,6 +5488,105 @@
       "referenceCaseIds": [
         "REF-06-014"
       ]
+    },
+    {
+      "id": "slot-retime-remove-add-identity",
+      "family": "Keyed TimeSlots retime and remove/add preserve distinct occurrence identities and add baselines",
+      "clause": {
+        "path": "docs/reference/03-time-and-schedules.en.md",
+        "heading": "3.6 Selected DailySlots"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/range-slot-edit-identity.test.mjs",
+              "testId": "REF-03-082 retained-key retime pauses the admitted K occurrence while terminal remove/add allocates a new baseline key",
+              "caseId": "REF-03-082",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/range-slot-edit-identity.test.mjs",
+              "testId": "REF-03-082 removing admitted K retains its already admitted Range until the original deadline",
+              "caseId": "REF-03-082",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/range-slot-edit-identity.test.mjs",
+              "testId": "REF-03-082 terminal current-date K cannot be rearmed by retime or remove/add to an elapsed 08:07 slot",
+              "caseId": "REF-03-082",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/range-slot-edit-identity.test.mjs",
+              "testId": "REF-03-082 added entries use ordinary baseline: future additions can admit, current or past insertions do not",
+              "caseId": "REF-03-082",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/range-slot-edit-identity.test.mjs",
+              "testId": "REF-03-082 terminal GFRG4 checkpoint preserves consumed history and new key after remove/add without replaying the add baseline",
+              "caseId": "REF-03-082",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Conformance-only evidence for actual canonical keyed UTC Range: retained-key retime keeps the occurrence ledger; terminal remove/add allocates a fresh key and ordinary add baseline without rearming or relabeling the old occurrence. Removing an admitted entry retains its existing Range until its original deadline. Future/current/past additions and GFRG4 restore are checked with complete native/WASM outcomes, settings and checkpoint parity. Other civil zones, Run overlap, publishing run identity, Device restart and physical adoption are separate contracts."
+      ],
+      "issues": [
+        271
+      ],
+      "referenceCaseIds": [
+        "REF-03-082"
+      ]
     }
   ]
 }
