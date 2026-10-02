@@ -55,6 +55,110 @@ function startRequest(instance, requestId, occurrenceId, nowMs = 10n, budgetMs =
   };
 }
 
+test('REF-04-057: checked Station source native/WASM reserves worst ON plus stop delay and enforces finite manual cutoff', async t => {
+  const reference = JSON.parse(readFileSync(resolve(root, 'tests/reference/cases/02-time-control.json'), 'utf8')).cases.find(entry => entry.id === 'REF-04-057');
+  assert.equal(reference.scope, 'runtime');
+  assert.equal(reference.status, 'specified');
+  assert(reference.issue.endsWith('/255'));
+  assert.match(reference.given, /remaining=8min, worst ON=7min, stop delay=2min/);
+  const filename = 'examples/station-rules.ghost.md';
+  const source = readFileSync(resolve(root, filename), 'utf8').replace('<= 1h per day', '<= 8min per day');
+  const bindings = {
+    station: { id: 'station', config: { valveCount: 4, maxOpenValves: 2, dailyQuotaMs: 3_600_000, maxStartBudgetMs: 600_000 } },
+    pump: { id: 'pump1' }, settings: { id: 'settings' }, schedules: { starts: { id: 'starts', timezone: 'Asia/Seoul' } },
+    modeAliases: { Auto: 'Auto', Manual: 'Manual', Configure: 'Configure' },
+    activityAliases: { automatic: 'Auto', manual: 'Manual', configuring: 'Configure' },
+  };
+  const compile = value => compileConstraints(extractLiterate(value, { filename }).code, { filename });
+  const artifact = compile(source), policy = bindStationPolicy(artifact, bindings);
+  assert.equal(policy.stationConfig.dailyQuotaMs, 480_000);
+  assert(policy.stationConfig.maxStartBudgetMs >= 540_000);
+  // These explicit host planner inputs are not new language syntax. Both real
+  // owners receive their total finite bound, derived independently from 7+2.
+  const planningInputs = { worstOnMs: 420_000, stopDelayMs: 120_000, manualCutoffMs: 360_000 };
+  const sum = (a, b) => {
+    assert(Number.isSafeInteger(a) && a > 0 && Number.isSafeInteger(b) && b >= 0, 'finite cutoff required');
+    const total = a + b;
+    assert(Number.isSafeInteger(total), 'reservation overflow');
+    return total;
+  };
+  const automatic = sum(planningInputs.worstOnMs, planningInputs.stopDelayMs);
+  const manual = sum(planningInputs.manualCutoffMs, planningInputs.stopDelayMs);
+  assert.equal(automatic, 540_000); assert.equal(manual, 480_000);
+  assert.throws(() => sum(undefined, planningInputs.stopDelayMs), /finite cutoff required/);
+  assert.throws(() => sum(Infinity, planningInputs.stopDelayMs), /finite cutoff required/);
+  assert.throws(() => sum(Number.MAX_SAFE_INTEGER, 1), /reservation overflow/);
+  const bytes = Buffer.from(JSON.stringify(artifact)), sha = value => createHash('sha256').update(value).digest('hex');
+  let hash = 0xcbf29ce484222325n;
+  for (const byte of bytes) hash = BigInt.asUintN(64, (hash ^ BigInt(byte)) * 0x100000001b3n);
+  const identity = { sourceSha256: sha(source), artifactSha256: sha(bytes), bindingSha256: sha(JSON.stringify(bindings)), policySha256: sha(JSON.stringify(policy)), artifactFingerprint: hash.toString(16).padStart(16, '0') };
+  execFileSync('cargo', ['build', '--locked', '--offline', '--release', '-p', 'ghostflow-core', '--example', 'station_ownership_tape'], { cwd: root, stdio: 'inherit' });
+  const runner = resolve(root, 'target/release/examples/station_ownership_tape' + (process.platform === 'win32' ? '.exe' : ''));
+  const directory = mkdtempSync(join(tmpdir(), 'reference-reservation-cutoff-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const artifactPath = join(directory, 'constraints.json'), tapePath = join(directory, 'tape.json');
+  assert.deepEqual(compile(source), artifact); assert.deepEqual(bindStationPolicy(artifact, bindings), policy);
+  writeFileSync(artifactPath, bytes);
+  const tape = { artifactFingerprint: identity.artifactFingerprint, stationConfig: policy.stationConfig, scenario: 'reservationCutoff', ...planningInputs };
+  writeFileSync(tapePath, JSON.stringify(tape));
+  const native = JSON.parse(execFileSync(runner, [artifactPath, tapePath], { encoding: 'utf8', timeout: 10_000 }));
+  const instance = await GhostFlowStation.instantiate(wasmBytes, policy.stationConfig);
+  const recovered = await GhostFlowStation.instantiate(wasmBytes, policy.stationConfig);
+  try {
+    instance.synchronizeDay({ day: 20_000, nowMs: 0n, nextDayDeadlineMs: 86_400_000n, trusted: true }); enterAuto(instance);
+    const request = budgetMs => ({ ...startRequest(instance, 2n, undefined, 0n, BigInt(budgetMs)), mode: instance.mode });
+    let writes = 0;
+    const persist = async image => { assert(image.length > 16); writes++; return true; };
+    const ledger = () => ({ reservedMs: Number(instance.reservedMs), dailyUsedMs: Number(instance.dailyUsedMs) });
+    await assert.rejects(instance.start(request(automatic), persist), /quota/);
+    assert.equal(writes, 0); assert.equal(instance.reservedMs, 0n);
+    const trace = [{ event: 'automaticRejected', budgetMs: automatic, error: 'QuotaExceeded', ...ledger() }];
+    instance.requestStop({ requestId: 4n, ...instance.claim }); instance.confirmStopped({ nowMs: 0n });
+    instance.enter({ requestId: 5n, ...instance.claim, mode: 'Manual' });
+    for (const budget of [0n, 0xffff_ffff_ffff_ffffn]) await assert.rejects(instance.start(request(budget), persist), /finite.*maximum/);
+    const missing = request(1); delete missing.budgetMs;
+    await assert.rejects(instance.start(missing, persist), /budgetMs/);
+    assert.equal(writes, 0);
+    trace.push({ event: 'manualUnboundedRejected', ...ledger() });
+    const grant = await instance.start(request(manual), persist);
+    assert.equal(grant.leaseDeadlineMs, BigInt(manual));
+    const on = { sessionId: 77n, pumpOn: true, valves: 1n, nowMs: 0n };
+    instance.authorizeOutput(on); instance.reportApplied(on);
+    trace.push({ event: 'finiteManualGranted', cutoffMs: planningInputs.manualCutoffMs, budgetMs: manual, leaseDeadlineMs: Number(grant.leaseDeadlineMs), reservedMs: Number(instance.reservedMs) });
+    const acknowledgedSnapshot = instance.snapshot();
+    assert(await persist(acknowledgedSnapshot));
+    recovered.restore(acknowledgedSnapshot);
+    recovered.synchronizeDay({ day: 20_000, nowMs: 0n, nextDayDeadlineMs: 86_400_000n, trusted: true });
+    await assert.rejects(recovered.start({ ...request(manual), ...recovered.claim, requestId: 3n }, persist), /recovered uncertain reservation requires safe-output acknowledgement/);
+    assert.equal(recovered.reservedMs, BigInt(manual));
+    assert.equal(recovered.dailyUsedMs, 0n);
+    trace.push({ event: 'recoveryHold', reservedMs: Number(recovered.reservedMs), dailyUsedMs: Number(recovered.dailyUsedMs) });
+    const cutoff = BigInt(planningInputs.manualCutoffMs);
+    instance.advance(cutoff);
+    const directive = instance.requestStop({ requestId: 6n, ...instance.claim }); assert.equal(directive.forceSafeOutputs, true);
+    trace.push({ event: 'manualCutoff', nowMs: Number(cutoff), forceSafeOutput: directive.forceSafeOutputs, reservedMs: Number(instance.reservedMs) });
+    const deadline = instance.advance(BigInt(manual)); assert.equal(deadline.forceSafeOutputs, true);
+    assert.throws(() => instance.authorizeOutput({ ...on, nowMs: BigInt(manual) }), /stop is in progress/);
+    trace.push({ event: 'leaseDeadline', nowMs: manual, forceSafeOutput: deadline.forceSafeOutputs, reservedMs: Number(instance.reservedMs) });
+    // Delayed applied SAFE fixture at cutoff+stop delay: total applied ON=8min.
+    instance.reportApplied({ sessionId: 77n, pumpOn: false, valves: 0n, nowMs: BigInt(manual) });
+    const finish = instance.prepareFinish({ sessionId: 77n, outcome: 'Cancelled', nowMs: BigInt(manual) });
+    assert.throws(() => instance.commitFinish(finish.token + 1n), /token does not match/);
+    await assert.rejects(instance.start(request(manual), persist), /awaiting commit or abort/);
+    trace.push({ event: 'finishPending', ...ledger(), mode: instance.mode });
+    assert(await persist(finish.bytes));
+    instance.commitFinish(finish.token);
+    trace.push({ event: 'settledApplied', ...ledger(), mode: instance.mode });
+    assert.equal(instance.dailyUsedMs, 480_000n); assert.equal(instance.reservedMs, 0n); assert.equal(writes, 3);
+    assert.deepEqual(native, { artifactFingerprint: identity.artifactFingerprint, scenario: 'reservationCutoff', trace });
+    t.diagnostic(JSON.stringify({ identity, planningInputs, automaticRequiredMs: automatic, manualReserveMs: manual, trace }));
+  } finally { instance.dispose(); recovered.dispose(); }
+  writeFileSync(tapePath, JSON.stringify({ ...tape, artifactFingerprint: '0000000000000000' }));
+  assert.throws(() => execFileSync(runner, [artifactPath, tapePath], { encoding: 'utf8', stdio: 'pipe' }), /checked constraint artifact identity mismatch/);
+  assert.throws(() => bindStationPolicy(artifact, { ...bindings, pump: { id: 'missing' } }), /unbound pump identifier pump1/);
+  assert.throws(() => bindStationPolicy(compile(source.replace('pump_capacity(pump1)', 'pump_capacity(missing)')), bindings), /unbound pump identifier missing/);
+});
+
 test('uses the built WASM and keeps optional capacity advisory', async () => {
   const instance = await station();
   synchronize(instance);

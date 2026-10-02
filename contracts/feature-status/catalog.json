@@ -4367,6 +4367,21 @@
       "referenceCaseIds": ["REF-04-056"]
     },
     {
+      "id": "finite-reservation-cutoff",
+      "family": "Worst-case reservation and finite manual cutoff",
+      "clause": { "path": "docs/reference/04-sensors-constraints-control.en.md", "heading": "4.11 Accounting and budgets" },
+      "owner": "CORE", "maturity": "EXPERIMENTAL", "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [{ "stage": "native_wasm", "status": "verified", "refs": [{
+        "path": "tests/station-wasm.test.mjs",
+        "testId": "REF-04-057: checked Station source native/WASM reserves worst ON plus stop delay and enforces finite manual cutoff",
+        "caseId": "REF-04-057", "assertionClass": "target-parity",
+        "targets": ["native", "wasm"], "polarities": ["positive", "negative", "boundary"]
+      }] }],
+      "gaps": ["Same checked canonical fixed Station source binds the 8-minute day quota for both native/WASM owners. Explicit host planning inputs compute 7-minute worst ON plus 2-minute stop delay; the resulting 9-minute reservation is rejected. Missing, zero and unbounded manual cutoff fail closed. A finite 6-minute manual cutoff plus 2-minute delayed applied SAFE fixture reserves and settles 8 minutes, with safe directives and ownership retained through durable finish. Recovery conservatively retains an uncertain reservation. Planning, applied states, trusted clock and durable ACKs are bounded test-host fixtures, not production planner lowering, general rolling admission, verified physical stop or a Device release."],
+      "issues": [255], "referenceCaseIds": ["REF-04-057"]
+    },
+    {
       "id": "product-boundary",
       "family": "Farmer UI, installation and deployment",
       "clause": {
