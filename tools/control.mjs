@@ -2553,6 +2553,7 @@ class Lowerer {
   }
   addSignal(item) {
     const call = item.call;
+    if (call.kind === 'call' && call.name === 'ema') return this.addEmaSignal(item, call);
     if (call.kind === 'call' && ['window_average', 'window_min', 'window_max', 'window_rate'].includes(call.name)) return this.addWindowSignal(item, call);
     if (call.kind === 'call' && call.name === 'debounce') return this.addDebounceSignal(item, call);
     if (call.kind === 'call' && call.name === 'hold_last') return this.addHoldLastSignal(item, call);
@@ -2574,6 +2575,72 @@ class Lowerer {
     this.manifest.signals.push({ name: item.name, sensor: sensorRef.name, onBelow: below.constant, offAbove: above.constant, initial: initial.constant, valueInput, okInput, faultInput });
     const sample = this.sensorSample(sensorRef.name);
     this.signals.set(item.name, { type: BOOL, valueInput, okInput, faultInput, originTag: item.id, loc: item.loc, sample }); this.symbols.get(item.name).type = resultType(BOOL, semanticType('SensorFault'));
+  }
+  addEmaSignal(item, call) {
+    if (call.args.length !== 1 || call.named.length !== 1 || call.named[0].name !== 'alpha') {
+      error(call.loc, 'ema signal requires ema(source, alpha: Number)');
+    }
+    const source = this.expression(call.args[0], new Map(), { allowNext: false });
+    if (source.type.kind !== 'Result' || source.type.error.kind !== 'SensorFault'
+        || (!['Number', 'Percent'].includes(source.type.value.kind) && !isQuantityType(source.type.value.kind))) {
+      error(call.args[0].loc, 'ema source must be numeric Result<T, SensorFault>');
+    }
+    const alpha = this.expression(call.named[0].value, new Map(), { allowNext: false }, [], NUMBER);
+    if (!sameType(alpha.type, NUMBER) || alpha.constant === undefined || !Number.isFinite(alpha.constant)
+        || !(alpha.constant > 0 && alpha.constant <= 1)) error(call.loc, 'ema alpha must be finite and in (0, 1]');
+    const sample = source.sample ?? scanSample();
+    if (sample.sources.length !== 1) error(call.loc, 'ema signal requires exactly one physical sample lineage');
+    if (!this.hasClock) { this.addInput(`${RESERVED_PREFIX}now_ms`, NUMBER, item.loc); this.hasClock = true; }
+    for (const root of sample.sources) this.allocateSampleRoot(root);
+    const payloadType = source.type.value;
+    const states = Object.fromEntries(['ready', 'value', 'lastSourceTag'].map(role => [role,
+      this.generatedName(`ema_${role.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)}`, item.name)]));
+    this.addState(states.ready, BOOL, false, item.loc);
+    this.addState(states.value, payloadType, defaultLowered(payloadType).constant ?? 0, item.loc);
+    this.addState(states.lastSourceTag, NUMBER, 0, item.loc);
+    const sources = sample.sources.map(root => {
+      const rootStates = { lastEpoch: `${RESERVED_PREFIX}ema_source_epoch_${item.name}_${root.tag}`,
+        lastId: `${RESERVED_PREFIX}ema_source_id_${item.name}_${root.tag}` };
+      this.addState(rootStates.lastEpoch, NUMBER, 0, item.loc); this.addState(rootStates.lastId, NUMBER, -1, item.loc);
+      return { ...root, states: rootStates };
+    });
+    const observations = sources.map(root => {
+      const inputs = this.sensors.get(root.name).sampleInputs;
+      const epoch = `input.${inputs.epoch}`, id = `input.${inputs.id}`, present = `input.${inputs.present}`;
+      const epochChanged = ['not', ['eq', epoch, `state.${root.states.lastEpoch}`]];
+      const newer = ['and', present, ['or', epochChanged, ['gt', id, `state.${root.states.lastId}`]]];
+      const selected = ['eq', sample.sourceTag, numberAtom(root.tag)];
+      return { root, epoch, id, newer, fresh: ['and', selected, newer],
+        changed: ['and', selected, ['and', present, epochChanged]] };
+    });
+    const any = values => values.reduce((left, right) => ['or', left, right], 'false');
+    const fresh = any(observations.map(observation => observation.fresh));
+    const changed = ['or', ['not', ['eq', sample.sourceTag, `state.${states.lastSourceTag}`]],
+      any(observations.map(observation => observation.changed))];
+    const readyBefore = ['and', `state.${states.ready}`, ['not', changed]];
+    const weighted = ['add', ['mul', numberAtom(alpha.constant), source.value],
+      ['mul', numberAtom(1 - alpha.constant), `state.${states.value}`]];
+    const value = ['if', source.ok, ['if', fresh,
+      ['if', readyBefore, weighted, source.value], ['if', readyBefore, `state.${states.value}`, '0']], '0'];
+    const ready = ['and', source.ok, ['or', fresh, readyBefore]];
+    const next = { ready, value, lastSourceTag: sample.sourceTag };
+    const sourceNext = observations.flatMap(({ root, epoch, id, newer }) => [
+      [root.states.lastEpoch, ['if', newer, epoch, `state.${root.states.lastEpoch}`]],
+      [root.states.lastId, ['if', newer, id, `state.${root.states.lastId}`]],
+    ]);
+    const descriptor = { kind: 'ema', name: item.name, payloadType: payloadType.kind, errorType: 'SensorFault',
+      alpha: alpha.constant, sourceMode: 'sample', clockInput: `${RESERVED_PREFIX}now_ms`, sources, states };
+    const lowered = { ...source, value, ok: ready,
+      faultCode: ['if', source.ok, '3', source.faultCode],
+      originTag: ['if', source.ok, numberAtom(item.id), source.originTag],
+      origins: [...(source.origins ?? []), { tag: item.id, nodeId: item.id, kind: 'signal', name: item.name }], sample };
+    this.manifest.signals.push(descriptor);
+    this.signals.set(item.name, { type: payloadType, lowered, descriptor, states, next, sourceNext, originTag: item.id, loc: item.loc });
+    this.symbols.get(item.name).type = lowered.type;
+    for (const [role, name] of Object.entries(states)) this.generatedSignals.push({ node: item, role, name });
+    for (const root of sources) this.generatedSignals.push(
+      { node: item, role: 'sourceEpoch', name: root.states.lastEpoch, sourceTag: root.tag },
+      { node: item, role: 'sourceId', name: root.states.lastId, sourceTag: root.tag });
   }
   addAfterEventSignal(item, call) {
     const named = new Map();

@@ -160,7 +160,16 @@ signal stable_start = debounce(start, stable_for: 2s, initial: false);
 | `ema(alpha)` | Numeric Result, finite `0 < alpha <= 1` | Seed with the first valid sample and calculate `alpha*x + (1-alpha)*previous`. No normal result before recovery conditions are met. |
 | `stale_after(d)` | Timestamped Result, positive Duration | Stale when the last actual valid sample's age reaches d. Reevaluation or filter-output time does not extend it. |
 
-`filter` accepts one operation only. To compose multiple steps, declare each as a named `signal`. A Temperature filter internally computes an affine weighted mean in the canonical kelvin domain. This does not permit Temperature+Temperature or absolute-temperature scalar multiplication in source expressions. Do not uniformly apply the same filter delay to protective signals and gradual environmental sensors. Each operation must have a fixed state size and computation bound. Update only on new samples; composition preserves quality until `case` or `recover`.
+`filter` accepts one operation only. To compose multiple steps, declare each as a named `signal`.
+Declare the next EMA stage of a numeric Result as `signal smooth = ema(moisture, alpha: 0.25);`.
+An EMA result can feed another stage: `signal slower = ema(smooth, alpha: 0.25);`.
+Each EMA inherits a single physical source's epoch, sample ID and timestamp and updates only
+on a new healthy sample. It propagates input faults and clears its EMA memory, then seeds
+again from the first healthy sample satisfying the upstream filter readiness and
+`recover_after`. It creates neither another recovery counter nor a new freshness time.
+Values without sample lineage and expressions selecting multiple physical sources are
+not accepted as EMA-stage inputs.
+A Temperature filter internally computes an affine weighted mean in the canonical kelvin domain. This does not permit Temperature+Temperature or absolute-temperature scalar multiplication in source expressions. Do not uniformly apply the same filter delay to protective signals and gradual environmental sensors. Each operation must have a fixed state size and computation bound. Update only on new samples; composition preserves quality until `case` or `recover`.
 
 **Why:** Erasing sensor quality in a filter or reusing one sample once per tick lets smoothing hide faults and changes replay results. Named finite state makes delay and resource cost reviewable.
 

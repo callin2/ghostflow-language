@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### 2026-10-02 — composed EMA signal execution ([#237](https://github.com/callin2/ghostflow-language/issues/237))
+
+Reference §4.3's named numeric EMA stage now compiles to bounded shared Rust VM
+state. Previously `signal smooth = ema(moisture, alpha: 0.5);` was rejected,
+preventing the documented sensor median → EMA composition. The EMA consumes the
+upstream Result and original physical sample identity: duplicates and clock-only
+ticks leave its recurrence unchanged; faults clear memory and retain their
+provenance. Upstream readiness/recovery and freshness remain authoritative.
+Each single-source EMA uses three scalar slots plus two source-identity slots;
+source epoch changes reseed. No bytecode/ABI format changes or implicit recovery
+policy are introduced. The supported stage requires numeric SensorFault Result
+with one physical source. REF-04-024 native VM/plain/framed WASM traces and
+atomic rollback/invalid-contract regressions cover this restored behavior.
+
 ### 2026-10-01 — executable work-calendar boundaries ([#225](https://github.com/callin2/ghostflow-language/issues/225))
 
 Reference §3.8's `calendar_is` Result expression and immutable UTC Daily

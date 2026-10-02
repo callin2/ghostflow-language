@@ -2746,6 +2746,22 @@
               "polarities": ["positive", "negative", "boundary"]
             },
             {
+              "path": "tests/scan-tape-parity.test.mjs",
+              "testId": "REF-04-024 median to EMA composition preserves repeated fault, sample identity and bounded state on native VM and plain/framed WASM",
+              "caseId": "REF-04-024",
+              "assertionClass": "target-parity",
+              "targets": ["native", "wasm"],
+              "polarities": ["positive", "negative", "boundary"]
+            },
+            {
+              "path": "tests/scan-tape-parity.test.mjs",
+              "testId": "REF-04-024 EMA composition rejects invalid contracts and atomically rolls back a failed scan",
+              "caseId": "REF-04-024",
+              "assertionClass": "runtime-value",
+              "targets": ["wasm"],
+              "polarities": ["negative", "boundary"]
+            },
+            {
               "path": "tests/signals-wasm.test.mjs",
               "testId": "REF-01-077 hysteresis retains the original three-value trace across an in-memory WASM checkpoint and replay",
               "caseId": "REF-01-077",
@@ -2757,8 +2773,8 @@
         }
       ],
       "gaps": [],
-      "issues": [200, 234, 235],
-      "referenceCaseIds": ["REF-01-077", "REF-04-016", "REF-04-019"]
+      "issues": [200, 234, 235, 237],
+      "referenceCaseIds": ["REF-01-077", "REF-04-016", "REF-04-019", "REF-04-024"]
     },
     {
       "id": "resource-arbitration",
