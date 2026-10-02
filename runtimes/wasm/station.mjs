@@ -114,6 +114,23 @@ export class GhostFlowStation {
     this.#check(this.wasm.gf_station_enter(this.handle, modeCode(mode), u64(requestId, 'requestId'), u64(revision, 'revision'), u64(stopGeneration, 'stopGeneration')));
   }
 
+  // Dispatch an observed Stop first; pass all same-tick mode entries together.
+  // Rust rejects conflicts atomically, without selecting or queuing an entry.
+  enterBatch(requests) {
+    this.#alive();
+    if (!Array.isArray(requests)) throw new TypeError('entry requests must be an array');
+    if (requests.length > 256) throw new RangeError('entry batch exceeds the station request ledger bound');
+    const records = requests.map(request => {
+      if (!request || typeof request !== 'object') throw new TypeError('entry request must be an object');
+      return [u64(request.requestId, 'requestId'), u64(request.revision, 'revision'),
+        u64(request.stopGeneration, 'stopGeneration'), BigInt(modeCode(request.mode))];
+    });
+    const bytes = new Uint8Array(records.length * 32);
+    const view = new DataView(bytes.buffer);
+    records.forEach((record, index) => record.forEach((value, field) => view.setBigUint64(index * 32 + field * 8, value, true)));
+    this.#bytes(bytes, (ptr) => this.#check(this.wasm.gf_station_enter_batch(this.handle, ptr, records.length)));
+  }
+
   // request.valves is the session's permitted set across all sequential steps.
   // It is not an output command: authorizeOutput still enforces maxOpenValves
   // on every simultaneously applied mask and rejects valves outside this set.

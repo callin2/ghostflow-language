@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### 2026-10-02 — Station atomic mode-entry binding bug fix ([#250](https://github.com/callin2/ghostflow-language/issues/250))
+
+Reference §4.10 rejects every conflicting same-tick mode entry. The WASM adapter
+previously exposed only `enter()`: sequential Manual then Configure could select
+Manual from Stopped. `enterBatch([{requestId: 5n, ...claim, mode: 'Manual'},
+{requestId: 6n, ...claim, mode: 'Configure'}])` now reaches the existing atomic
+Rust contract and rejects both without mutation or deferred entry. Hosts still
+dispatch an observed Stop before entry/new work. Existing single-entry exports,
+source profiles and GFB/GFS formats are unchanged; batch callers require the
+additive `gf_station_enter_batch` export. REF-04-052 covers native/WASM parity,
+Stop cleanup and explicit retry, with malformed batch and stale-claim guards.
+
 ### 2026-10-02 — composed EMA signal execution ([#237](https://github.com/callin2/ghostflow-language/issues/237))
 
 Reference §4.3's named numeric EMA stage now compiles to bounded shared Rust VM

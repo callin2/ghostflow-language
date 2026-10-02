@@ -423,6 +423,120 @@ test('REF-04-049: checked Station source native/WASM retains the session lease t
   assert.throws(() => bindStationPolicy(compile(source.replace('pump_capacity(pump1)', 'pump_capacity(missing)')), bindings), /unbound pump identifier missing/);
 });
 
+test('REF-04-052: checked Station source native/WASM rejects same-tick Stop Manual Configure entries without deferred transition', async t => {
+  const reference = JSON.parse(readFileSync(resolve(root, 'tests/reference/cases/02-time-control.json'), 'utf8'))
+    .cases.find(entry => entry.id === 'REF-04-052');
+  assert(reference && reference.issue.endsWith('/250'));
+  assert.equal(reference.scope, 'runtime');
+  assert.match(reference.given, /Stop, Manual.*Configure/);
+  assert.match(reference.then, /두 진입.*거부.*Stop\/cleanup.*몰래/);
+  const filename = 'examples/station-rules.ghost.md';
+  const source = readFileSync(resolve(root, filename), 'utf8');
+  const bindings = {
+    station: { id: 'station', config: { valveCount: 4, maxOpenValves: 2, dailyQuotaMs: 1000, maxStartBudgetMs: 800 } },
+    pump: { id: 'pump1' }, settings: { id: 'settings' },
+    schedules: { starts: { id: 'starts', timezone: 'Asia/Seoul' } },
+    modeAliases: { Auto: 'Auto', Manual: 'Manual', Configure: 'Configure' },
+    activityAliases: { automatic: 'Auto', manual: 'Manual', configuring: 'Configure' },
+  };
+  const compile = value => compileConstraints(extractLiterate(value, { filename }).code, { filename });
+  const artifact = compile(source), policy = bindStationPolicy(artifact, bindings);
+  const bytes = Buffer.from(JSON.stringify(artifact));
+  let hash = 0xcbf29ce484222325n;
+  for (const byte of bytes) hash = BigInt.asUintN(64, (hash ^ BigInt(byte)) * 0x100000001b3n);
+  const sha = value => createHash('sha256').update(value).digest('hex');
+  const identity = { sourceSha256: sha(source), artifactSha256: sha(bytes), bindingSha256: sha(JSON.stringify(bindings)),
+    policySha256: sha(JSON.stringify(policy)), artifactFingerprint: hash.toString(16).padStart(16, '0') };
+  execFileSync('cargo', ['build', '--locked', '--offline', '--release', '-p', 'ghostflow-core', '--example', 'station_ownership_tape'], { cwd: root, stdio: 'inherit' });
+  const runner = resolve(root, 'target/release/examples/station_ownership_tape' + (process.platform === 'win32' ? '.exe' : ''));
+  const directory = mkdtempSync(join(tmpdir(), 'reference-station-mode-batch-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const artifactPath = join(directory, 'constraints.json'), tapePath = join(directory, 'tape.json');
+  writeFileSync(artifactPath, bytes);
+  for (const order of ['MC', 'CM']) {
+    const tape = { artifactFingerprint: identity.artifactFingerprint, stationConfig: policy.stationConfig, scenario: 'stopModeBatch', order };
+    writeFileSync(tapePath, JSON.stringify(tape));
+    const native = JSON.parse(execFileSync(runner, [artifactPath, tapePath], { encoding: 'utf8', timeout: 10_000 }));
+    const instance = await GhostFlowStation.instantiate(wasmBytes, policy.stationConfig);
+    try {
+      synchronize(instance); enterAuto(instance);
+      await instance.start(startRequest(instance, 2n, undefined), async () => true);
+      const on = { sessionId: 77n, pumpOn: true, valves: 1n, nowMs: 20n };
+      instance.authorizeOutput(on); instance.reportApplied(on); // host applied fixture
+      instance.advance(40n);
+      const old = instance.claim;
+      assert.equal(instance.requestStop({ requestId: 4n, ...old }).forceSafeOutputs, true);
+      const trace = [{ event: 'Stop', nowMs: 40, mode: instance.mode, stopping: instance.stopping, reservedMs: Number(instance.reservedMs) }];
+      const modes = order === 'MC' ? ['Manual', 'Configure'] : ['Configure', 'Manual'];
+      const entries = claim => modes.map((mode, index) => ({ requestId: BigInt(5 + index), ...claim, mode }));
+      for (const claim of [old, instance.claim]) {
+        const before = instance.snapshot();
+        assert.throws(() => instance.enterBatch(entries(claim)), /generation|conflicting/i);
+        assert.deepEqual(instance.snapshot(), before);
+      }
+      assert.throws(() => instance.prepareStart({ ...startRequest(instance, 3n, undefined, 40n), sessionId: 78n }), /stop is in progress/);
+      assert.throws(() => instance.enter({ requestId: 7n, ...instance.claim, mode: 'Manual' }), /not stopped/);
+      trace.push({ event: 'entriesRejected', nowMs: 40, order, mode: instance.mode, stopping: instance.stopping, reservedMs: Number(instance.reservedMs) });
+      instance.reportApplied({ sessionId: 77n, pumpOn: false, valves: 0n, nowMs: 50n });
+      const finish = instance.prepareFinish({ sessionId: 77n, outcome: 'Cancelled', nowMs: 50n });
+      assert.throws(() => instance.enterBatch(entries(instance.claim)), /awaiting commit or abort/);
+      instance.commitFinish(finish.token); // explicit simulated durable ACK
+      instance.advance(60n);
+      assert.equal(instance.mode, 'Stopped');
+      trace.push({ event: 'finishAck', nowMs: 60, mode: instance.mode, stopping: instance.stopping,
+        reservedMs: Number(instance.reservedMs), dailyUsedMs: Number(instance.dailyUsedMs) });
+      const before = instance.snapshot();
+      assert.throws(() => instance.enterBatch(entries(instance.claim)), /conflicting/i);
+      assert.deepEqual(instance.snapshot(), before); // both rejected; no first winner
+      assert.throws(() => instance.enter({ requestId: 5n, ...old, mode: modes[0] }), /generation/);
+      instance.enterBatch([{ requestId: 5n, ...instance.claim, mode: modes[0] }]);
+      trace.push({ event: 'explicitEntry', nowMs: 60, mode: instance.mode });
+      assert.deepEqual(native, { artifactFingerprint: identity.artifactFingerprint, scenario: 'stopModeBatch', trace });
+      t.diagnostic(JSON.stringify({ identity, order, trace }));
+    } finally { instance.dispose(); }
+    writeFileSync(tapePath, JSON.stringify({ ...tape, artifactFingerprint: '0000000000000000' }));
+    assert.throws(() => execFileSync(runner, [artifactPath, tapePath], { encoding: 'utf8', stdio: 'pipe' }), /checked constraint artifact identity mismatch/);
+  }
+  assert.throws(() => bindStationPolicy(artifact, { ...bindings, pump: { id: 'valve1' } }), /unbound pump identifier pump1/);
+  assert.throws(() => bindStationPolicy(compile(source.replace('pump_capacity(pump1)', 'pump_capacity(missing)')), bindings), /unbound pump identifier missing/);
+});
+
+test('station entry batch validates JS and packed ABI input before atomic owner mutation', async () => {
+  const instance = await station();
+  try {
+    synchronize(instance);
+    const request = { requestId: 1n, ...instance.claim, mode: 'Manual' };
+    const before = instance.snapshot();
+    for (const input of [null, [], Array(257).fill(request), [request, { ...request, requestId: 2n, mode: 'Stopped' }],
+      [request, { ...request, requestId: -1n }], [request, request]]) {
+      assert.throws(() => instance.enterBatch(input));
+      assert.deepEqual(instance.snapshot(), before);
+    }
+    const wasm = instance.wasm;
+    for (const [ptr, count] of [[0, 0], [0, 1], [0, 257], [wasm.memory.buffer.byteLength - 16, 1]]) {
+      assert.equal(wasm.gf_station_enter_batch(instance.handle, ptr, count), 0);
+      assert.deepEqual(instance.snapshot(), before);
+    }
+    const ptr = wasm.gf_alloc(64);
+    try {
+      const view = new DataView(wasm.memory.buffer);
+      for (let index = 0; index < 2; index++) {
+        [BigInt(index + 1), request.revision, request.stopGeneration, index === 0 ? 2n : 258n]
+          .forEach((value, field) => view.setBigUint64(ptr + index * 32 + field * 8, value, true));
+      }
+      assert.equal(wasm.gf_station_enter_batch(instance.handle, ptr, 2), 0);
+      assert.deepEqual(instance.snapshot(), before);
+    } finally { wasm.gf_dealloc(ptr, 64); }
+    instance.enterBatch([request, { ...request, requestId: 2n }]);
+    assert.equal(instance.mode, 'Manual');
+    instance.requestStop({ requestId: 3n, ...instance.claim });
+    instance.confirmStopped({ nowMs: 0n });
+    assert.throws(() => instance.enterBatch([{ ...request, ...instance.claim }]), /already accepted/);
+    assert.equal(instance.mode, 'Stopped');
+  } finally { instance.dispose(); }
+  assert.throws(() => instance.enterBatch([]), /disposed/);
+});
+
 test('immediate Stop cancels a hanging Start persistence before it can grant output', async () => {
   const instance = await station();
   synchronize(instance);

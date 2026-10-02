@@ -4331,6 +4331,24 @@
       "referenceCaseIds": ["REF-04-049"]
     },
     {
+      "id": "station-stop-mode-entry-batch",
+      "family": "Station Stop barrier and atomic mode-entry batch",
+      "clause": { "path": "docs/reference/04-sensors-constraints-control.en.md", "heading": "4.10 Modes and live settings" },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [{ "stage": "native_wasm", "status": "verified", "refs": [{
+        "path": "tests/station-wasm.test.mjs",
+        "testId": "REF-04-052: checked Station source native/WASM rejects same-tick Stop Manual Configure entries without deferred transition",
+        "caseId": "REF-04-052", "assertionClass": "target-parity",
+        "targets": ["native", "wasm"], "polarities": ["positive", "negative", "boundary"]
+      }] }],
+      "gaps": ["Bounded fixed Station owner with explicit host Stop-first dispatch, same checked canonical source and binding-generated config on native/WASM. Applied safe output and durable ACK are host fixtures, not physical evidence. No generic ingress scheduler, mode-expression compiler lowering or structural apply contract is introduced."],
+      "issues": [250],
+      "referenceCaseIds": ["REF-04-052"]
+    },
+    {
       "id": "product-boundary",
       "family": "Farmer UI, installation and deployment",
       "clause": {

@@ -223,6 +223,49 @@ pub unsafe extern "C" fn gf_station_enter(
 }
 
 #[no_mangle]
+/// Packed little-endian u64 records: request ID, revision, stop generation, mode.
+/// Validate the entire bounded transport before calling the atomic core owner.
+pub unsafe extern "C" fn gf_station_enter_batch(
+    handle: *mut StationHandle,
+    requests_ptr: *const u8,
+    requests_len: usize,
+) -> i32 {
+    let Some(handle) = handle.as_mut() else {
+        return 0;
+    };
+    if requests_len > 256 {
+        return handle.fail("entry batch exceeds the station request ledger bound");
+    }
+    #[cfg(target_arch = "wasm32")]
+    if (requests_ptr as usize)
+        .checked_add(requests_len * 32)
+        .is_none_or(|end| end > core::arch::wasm32::memory_size::<0>() * 65_536)
+    {
+        return handle.fail("entry batch lies outside WASM memory");
+    }
+    let result = (|| {
+        let data = bytes(requests_ptr, requests_len * 32)?;
+        let mut requests = Vec::with_capacity(requests_len);
+        for record in data.chunks_exact(32) {
+            let field = |offset| u64::from_le_bytes(record[offset..offset + 8].try_into().unwrap());
+            let mode_code = u8::try_from(field(24)).map_err(|_| {
+                ghostflow_core::station::StationError::InvalidRequest("invalid entry mode")
+            })?;
+            requests.push(EnterRequest {
+                request_id: field(0),
+                claim: Claim {
+                    revision: field(8),
+                    stop_generation: field(16),
+                },
+                mode: mode(mode_code)?,
+            });
+        }
+        handle.station.enter_batch(&requests).map(|_| ())
+    })();
+    handle.complete(result)
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn gf_station_prepare_start(
     handle: *mut StationHandle,
     request_id: u64,
