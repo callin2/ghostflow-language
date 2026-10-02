@@ -5944,6 +5944,84 @@
       "referenceCaseIds": [
         "REF-08-009"
       ]
+    },
+    {
+      "id": "composition-state-feedback-boundary",
+      "family": "Graph-specific cycles distinguish committed state feedback from computation",
+      "clause": {
+        "path": "docs/reference/06-composition-and-replay.en.md",
+        "heading": "6.1 One semantic model and multiple graphs"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/composition-state-feedback-boundary.test.mjs",
+              "testId": "REF-06-001 accepts two-way cross-instance feedback only through previous committed state with deterministic tick lag",
+              "caseId": "REF-06-001",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive"
+              ]
+            }
+          ]
+        },
+        {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/composition-state-feedback-boundary.test.mjs",
+              "testId": "REF-06-001 rejects identical endpoints linked by same-tick combinational expressions",
+              "caseId": "REF-06-001",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/composition-state-feedback-boundary.test.mjs",
+              "testId": "REF-06-001 rejects next-state cross feedback across instances",
+              "caseId": "REF-06-001",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/composition-state-feedback-boundary.test.mjs",
+              "testId": "REF-06-001 import back-edge rejects before its invalid pin and preserves syntax type revision failures",
+              "caseId": "REF-06-001",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Conformance-only: explicit previous-committed-state edges permit two-instance feedback with expected tick lag and isolated Bool/Int state. Native scan_tape, framed WASM and direct replay agree on complete receipts; reordered declarations retain identity-keyed results. Same-tick combinational and next-state feedback reject; correctly pinned forward imports cannot hide a cyclic back edge behind its invalid closing pin. No new graph primitive, installation/explanation/timeline policy or persistent identity issuance."
+      ],
+      "issues": [
+        289
+      ],
+      "referenceCaseIds": [
+        "REF-06-001"
+      ]
     }
   ]
 }
