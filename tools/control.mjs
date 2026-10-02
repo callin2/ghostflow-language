@@ -1144,7 +1144,7 @@ class ControlParser {
   adaptSetting() {
     const start = this.take(), name = this.identifier('expected adaptation name'); this.expect('for', 'adapt_setting requires for setting');
     const target = this.identifier('expected adaptation setting'); this.expect('{', 'expected { after adaptation setting'); const fields = {};
-    while (!this.matches('}')) { const key = this.identifier('expected adaptation field'); this.expect('=', `expected = after adaptation field ${key.value}`); if (fields[key.value]) error(key, `duplicate adaptation field ${key.value}`); fields[key.value] = this.expression(); if (key.value === 'allowed') { this.expect('..', 'adapt_setting allowed requires ..'); fields.allowedMax = this.expression(); } if (key.value === 'max_change') { this.expect('per', 'max_change requires per duration'); fields.maxChangeWindow = this.expression(); } this.expect(';'); }
+    while (!this.matches('}')) { const key = this.identifier('expected adaptation field'); if (!['allowed','max_step','max_change','authority','controller_transition'].includes(key.value)) error(key, `unsupported adaptation field ${key.value}`); this.expect('=', `expected = after adaptation field ${key.value}`); if (fields[key.value]) error(key, `duplicate adaptation field ${key.value}`); fields[key.value] = this.expression(); if (key.value === 'allowed') { this.expect('..', 'adapt_setting allowed requires ..'); fields.allowedMax = this.expression(); } if (key.value === 'max_change') { this.expect('per', 'max_change requires per duration'); fields.maxChangeWindow = this.expression(); } this.expect(';'); }
     this.take(); this.maybe(';'); return this.node('adapt-setting', start, { name: name.value, target: target.value, fields });
   }
   strategy() {
@@ -2174,13 +2174,31 @@ class Lowerer {
     (this.manifest.degraded ??= []).push(this.degradedPolicies.get(item.name));
   }
   addAdaptSetting(item) {
+    for (const key of Object.keys(item.fields)) if (!['allowed','allowedMax','max_step','max_change','maxChangeWindow','authority'].includes(key)) error(item.fields[key].loc, `unsupported adaptation field ${key}`);
     const target = this.symbols.get(item.target); if (!target || target.category !== 'config') error(item.loc, `adapt_setting target must reference a config ${item.target}`);
     for (const key of ['allowed','max_step','max_change','authority']) if (!item.fields[key]) error(item.loc, `adapt_setting requires ${key}`);
     if (item.fields.controller_transition) error(item.fields.controller_transition.loc, 'adapt_setting cannot reset controller state');
     const allowed = item.fields.allowed; if (!item.fields.allowedMax) error(allowed.loc, 'adapt_setting allowed requires a range');
-    const maxChange = item.fields.max_change;
+    const payload = target.payloadType;
+    if (!['Int', 'Number', 'Duration', 'Percent'].includes(payload.kind) && !isQuantityType(payload.kind)) error(item.loc, 'adapt_setting requires a numeric config');
+    const constant = (expr, type) => {
+      const checked = this.expression(expr, new Map(), { allowNext: false }, [], type);
+      if (!sameType(checked.type, type)) error(expr.loc, 'adapt_setting bound type mismatch');
+      const value = checked.constant;
+      if (typeof value !== 'number' || !Number.isFinite(value)) error(expr.loc, 'adapt_setting bounds must be finite typed constants');
+      return value;
+    };
+    const delta = payload.kind === 'Temperature' ? semanticType('TemperatureDelta') : payload;
+    const bounds = { min: constant(allowed, payload), max: constant(item.fields.allowedMax, payload) };
+    const maxStep = constant(item.fields.max_step, delta);
+    const maxChange = constant(item.fields.max_change, delta);
+    const windowMs = constant(item.fields.maxChangeWindow, semanticType('Duration'));
+    if (bounds.min > bounds.max || maxStep <= 0 || maxChange <= 0 || !Number.isSafeInteger(windowMs) || windowMs <= 0) error(item.loc, 'adapt_setting requires ordered bounds and positive step, change and window');
+    if ([...this.adaptSettings.values()].some(policy => policy.target === item.target)) error(item.loc, 'duplicate adaptation target');
+    if (!item.fields.authority.name) error(item.loc, 'adapt_setting authority must be a name');
     this.adaptSettings.set(item.name, { name: item.name, target: item.target, targetId: target.id,
       targetType: typeNameOf(target.payloadType), authority: item.fields.authority.name ?? null,
+      allowed: bounds, maxStep, maxChange, windowMs,
       runtime: 'requires-host-settings-event-validation' });
     (this.manifest.adaptSettings ??= []).push(this.adaptSettings.get(item.name));
   }
