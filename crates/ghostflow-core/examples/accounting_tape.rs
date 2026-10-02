@@ -1,10 +1,15 @@
 //! Test-only transport for source-bound historical accounting observations.
 //! The test host verifies canonical source/manifest identity before this call.
 //! This runner loads the exact module and declared account, then delegates all
-//! interval union and rolling calculation to AccountingLedger. No I/O admission
-//! or physical receipt validation is performed here.
+//! interval union and rolling calculation to AccountingLedger. An optional
+//! explicit test-host Station tape exercises its admission/lifecycle owner.
+//! This is neither production control admission nor physical receipt validation.
 use ghostflow_core::{
     accounting::{AccountingConfig, AccountingLedger, LedgerRead},
+    station::{
+        CapacityObservation, DurableAck, EnterRequest, FinishOutcome, Mode, OutputState,
+        StartRequest, Station, StationConfig, StationError, StopProof, StopRequest,
+    },
     Module,
 };
 use serde_json::{json, Value};
@@ -23,6 +28,95 @@ fn number(value: &Value) -> Result<u64, Box<dyn Error>> {
         .as_u64()
         .filter(|n| *n <= 9_007_199_254_740_991)
         .ok_or_else(|| "invalid exact integer".into())
+}
+// Test-host lifecycle transport. The same explicit config/timestamps are used by
+// the WASM host; this is not compiler lowering of stopped(station).
+fn station_observations(tape: &Value) -> Result<Value, Box<dyn Error>> {
+    let config = &tape["config"];
+    let mut station = Station::new(StationConfig {
+        valve_count: u8::try_from(number(&config["valveCount"])?)?,
+        max_open_valves: u8::try_from(number(&config["maxOpenValves"])?)?,
+        daily_quota_ms: number(&config["dailyQuotaMs"])?,
+        max_start_budget_ms: number(&config["maxStartBudgetMs"])?,
+        ..StationConfig::default()
+    })?;
+    let at = |name: &str| number(&tape[name]);
+    let observe = |station: &Station, phase: &str, rejected: bool| {
+        json!({
+            "phase":phase,"mode":format!("{:?}",station.mode()),"stopping":station.stopping(),
+            "reservedMs":station.reserved_ms(),"usedMs":station.daily_used_ms(),"rejected":rejected
+        })
+    };
+    station.synchronize_day(100, 0, 10_000, true)?;
+    station.enter(EnterRequest {
+        request_id: 1,
+        claim: station.claim(),
+        mode: Mode::Auto,
+    })?;
+    let prepared = station.prepare_start(StartRequest {
+        request_id: 2,
+        claim: station.claim(),
+        session_id: 77,
+        owner_id: 88,
+        mode: Mode::Auto,
+        valves: 3,
+        budget_ms: 100,
+        occurrence_id: Some(501),
+        capacity: CapacityObservation::default(),
+        now_ms: at("onMs")?,
+    })?;
+    station.commit_start(DurableAck::new(prepared.token()))?;
+    let on = OutputState {
+        pump_on: true,
+        valves: 1,
+    };
+    station.authorize_output(77, on, at("onMs")?)?;
+    station.report_applied(77, on, at("onMs")?)?;
+    let cleanup = OutputState {
+        pump_on: false,
+        valves: 1,
+    };
+    station.authorize_output(77, cleanup, at("offMs")?)?;
+    station.report_applied(77, cleanup, at("offMs")?)?;
+    station.request_stop(StopRequest {
+        request_id: 3,
+        claim: station.claim(),
+    })?;
+    let rejected = station
+        .prepare_finish(77, FinishOutcome::Cancelled, at("offMs")?)
+        .err()
+        == Some(StationError::OutputStillApplied);
+    if !rejected {
+        return Err("pump OFF with open valves must reject finish for unsafe outputs".into());
+    }
+    if station
+        .confirm_stopped(StopProof::Commanded, at("offMs")?)
+        .err()
+        != Some(StationError::InvalidRequest(
+            "active session needs durable prepare_finish",
+        ))
+    {
+        return Err("active session allowed stop confirmation".into());
+    }
+    let mut observations = vec![observe(&station, "pump-off-cleanup-open", rejected)];
+    // The owner still prevents re-entry and stop confirmation while its session
+    // and reservation remain, even after all outputs have become safe.
+    if station
+        .enter(EnterRequest {
+            request_id: 4,
+            claim: station.claim(),
+            mode: Mode::Manual,
+        })
+        .is_ok()
+    {
+        return Err("unfinished owner allowed mode entry".into());
+    }
+    station.report_applied(77, OutputState::SAFE, at("safeMs")?)?;
+    let prepared = station.prepare_finish(77, FinishOutcome::Cancelled, at("safeMs")?)?;
+    observations.push(observe(&station, "safe-awaiting-durable-finish", false));
+    station.commit_finish(DurableAck::new(prepared.token()))?;
+    observations.push(observe(&station, "durable-finish", false));
+    Ok(json!(observations))
 }
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<_> = env::args().skip(1).collect();
@@ -119,9 +213,10 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
         }
     }
-    println!(
-        "{}",
-        json!({"moduleFingerprint":fingerprint,"account":account,"target":target,"stage":"applied","resourceId":resource,"observations":observations})
-    );
+    let mut result = json!({"moduleFingerprint":fingerprint,"account":account,"target":target,"stage":"applied","resourceId":resource,"observations":observations});
+    if !tape["station"].is_null() {
+        result["stationObservations"] = station_observations(&tape["station"])?;
+    }
+    println!("{result}");
     Ok(())
 }

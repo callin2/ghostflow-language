@@ -7,6 +7,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { AccountingRuntime } from '../runtimes/wasm/accounting-runtime.mjs';
 import { GhostFlowRuntime } from '../runtimes/wasm/ghostflow-runtime.mjs';
+import { GhostFlowStation } from '../runtimes/wasm/station.mjs';
 import { compileSource } from '../tools/compile-source.mjs';
 import { verifyArtifactSourceMap } from '../tools/toolchain.mjs';
 
@@ -135,6 +136,117 @@ test('REF-03-020: source-bound native and WASM rolling ledgers integrate regular
     const request = structuredClone(nativeRequest(tapes[1])); mutate(request);
     assert.throws(() => runNative(request), reason);
   }
+});
+
+test('REF-04-046: checked source native/WASM ledgers merge applied overlap while Station cleanup retains its lease', async t => {
+  const original = JSON.parse(readFileSync(resolve(root, 'tests/reference/cases/02-time-control.json'), 'utf8'))
+    .cases.find(entry => entry.id === 'REF-04-046');
+  assert.equal(original.issue, 'https://github.com/callin2/ghostflow-language/issues/245');
+  assert.equal(original.status, 'specified'); assert.equal(original.scope, 'runtime');
+  const source = '# Shared pump applied accounting\n\n```ghost\ncontrol SharedPumpHistory {\n'
+    + 'resource pump: BoolActuator;\naccount applied = on_time(pump, stage: applied, persistence: durable);\n'
+    + 'output ready: Bool; ready <- false;\n}\n```\n';
+  const filename = 'shared-pump-history.ghost.md';
+  const artifact = await compileSource(source, { filename });
+  const map = { format: 'GhostFlow/source-map-v1', bytecodeSha256: artifact.manifest.bytecodeSha256,
+    sourceDocument: artifact.sourceDocument, nodes: artifact.sourceMap, lines: artifact.extractionMap,
+    traceMetadata: artifact.traceMetadata, interactionSchema: null, interactionSourceIdentity: null };
+  verifyArtifactSourceMap(map, artifact.bytes, { manifest: artifact.manifest });
+  const stationTape = { config: { valveCount: 4, maxOpenValves: 2, dailyQuotaMs: 1000, maxStartBudgetMs: 800 },
+    onMs: 10, offMs: 30, safeMs: 40 };
+  // Two logical controls supplied these already validated applied intervals for
+  // one stable physical ID. The Rust ledger owns the union calculation; this
+  // test does not validate Driver receipts or implement a merge in JavaScript.
+  const frames = [{ nowMs: 30, segments: [
+    { receiptId: 1, resourceId: 7, startMs: 10, endMs: 25 },
+    { receiptId: 2, resourceId: 7, startMs: 20, endMs: 30 },
+  ], query: true }, { nowMs: 40, segments: [], query: true }];
+  const expected = [{ nowMs: 30, usedMs: 20 }, { nowMs: 40, usedMs: 20 }];
+  assert.notEqual(expected[0].usedMs, (25 - 10) + (30 - 20), 'overlap must not be summed per control');
+  const persist = async () => true;
+  const ledger = await AccountingRuntime.instantiateSource(wasmBytes, source, {
+    filename, account: 'applied', resourceId: 7, config,
+  });
+  const station = await GhostFlowStation.instantiate(wasmBytes, stationTape.config);
+  t.after(() => { ledger.dispose(); station.dispose(); });
+  assert.equal(ledger.source.text, source);
+  assert.equal(ledger.source.sha256, artifact.sourceDocument.sha256);
+  assert.equal(ledger.source.artifactSha256, artifact.manifest.bytecodeSha256);
+  assert.equal(ledger.source.target, 'pump'); assert.equal(ledger.source.stage, 'applied');
+  await ledger.initializeEmpty(persist);
+  const used = [];
+  for (const frame of frames) {
+    for (const segment of frame.segments) {
+      const receiptId = new Uint8Array(16);
+      new DataView(receiptId.buffer).setBigUint64(0, BigInt(segment.receiptId), true);
+      await ledger.recordAppliedSegment({ ...segment, receiptId,
+        startMs: BigInt(segment.startMs), endMs: BigInt(segment.endMs), localDay: 100 }, persist);
+    }
+    used.push({ nowMs: frame.nowMs, usedMs: Number(ledger.usedRolling(7, BigInt(frame.nowMs), 60_000n)) });
+  }
+  assert.deepEqual(used, expected);
+  assert.equal(ledger.usedLocalDay(7, 100), 20n);
+  assert.throws(() => ledger.usedRolling(8, 40n, 60_000n), /wrong bound resource ID/);
+  station.synchronizeDay({ day: 100, nowMs: 0n, nextDayDeadlineMs: 10_000n, trusted: true });
+  station.enter({ requestId: 1n, ...station.claim, mode: 'Auto' });
+  const grant = await station.start({ requestId: 2n, ...station.claim, sessionId: 77n, ownerId: 88n,
+    mode: 'Auto', valves: 3n, budgetMs: 100n, occurrenceId: 501n, nowMs: 10n }, persist);
+  assert.equal(grant.leaseDeadlineMs, 110n);
+  const apply = (pumpOn, valves, nowMs) => {
+    station.authorizeOutput({ sessionId: 77n, pumpOn, valves, nowMs });
+    station.reportApplied({ sessionId: 77n, pumpOn, valves, nowMs });
+  };
+  apply(true, 1n, 10n); apply(false, 1n, 30n);
+  station.requestStop({ requestId: 3n, ...station.claim });
+  assert.throws(() => station.prepareFinish({ sessionId: 77n, outcome: 'Cancelled', nowMs: 30n }), /driver has not reported pump and valves safely off/);
+  const observe = (phase, rejected = false) => ({ phase, mode: station.mode, stopping: station.stopping,
+    reservedMs: Number(station.reservedMs), usedMs: Number(station.dailyUsedMs), rejected });
+  const lifecycle = [observe('pump-off-cleanup-open', true)];
+  // This is the original joint observation: overlap is counted once while pump
+  // OFF has not released the owner, cleanup or its finite reservation.
+  assert.equal(used[0].usedMs, 20);
+  assert.equal(station.mode, 'Auto'); assert.equal(station.stopping, true); assert.equal(station.reservedMs, 100n);
+  assert.throws(() => station.enter({ requestId: 4n, ...station.claim, mode: 'Manual' }), /not stopped/);
+  assert.throws(() => station.confirmStopped({ nowMs: 30n }), /active session needs durable prepare_finish/);
+  station.reportApplied({ sessionId: 77n, pumpOn: false, valves: 0n, nowMs: 40n });
+  const prepared = station.prepareFinish({ sessionId: 77n, outcome: 'Cancelled', nowMs: 40n });
+  lifecycle.push(observe('safe-awaiting-durable-finish'));
+  assert.equal(station.mode, 'Auto'); assert.equal(station.reservedMs, 100n);
+  // The test-owned persistence acknowledgement precedes commit. It certifies
+  // neither a storage medium nor physical feedback.
+  assert.equal(await persist(prepared.bytes, prepared.token), true);
+  station.commitFinish(prepared.token);
+  lifecycle.push(observe('durable-finish'));
+  assert.deepEqual(lifecycle, [
+    { phase: 'pump-off-cleanup-open', mode: 'Auto', stopping: true, reservedMs: 100, usedMs: 0, rejected: true },
+    { phase: 'safe-awaiting-durable-finish', mode: 'Auto', stopping: true, reservedMs: 100, usedMs: 0, rejected: false },
+    { phase: 'durable-finish', mode: 'Stopped', stopping: false, reservedMs: 0, usedMs: 20, rejected: false },
+  ]);
+  execFileSync('cargo', ['build', '--locked', '--offline', '--release', '-p', 'ghostflow-core', '--example', 'accounting_tape'], { cwd: root, stdio: 'inherit' });
+  const directory = mkdtempSync(join(tmpdir(), 'reference-session-accounting-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const modulePath = join(directory, 'module.gfb'), tapePath = join(directory, 'tape.json');
+  writeFileSync(modulePath, artifact.bytes);
+  const request = { moduleFingerprint: artifact.traceMetadata.moduleFingerprint, manifest: artifact.manifest,
+    account: 'applied', target: 'pump', resourceId: 7, windowMs: 60_000, frames, station: stationTape };
+  const runNative = request => {
+    writeFileSync(tapePath, JSON.stringify(request));
+    const runner = resolve(root, 'target/release/examples/accounting_tape' + (process.platform === 'win32' ? '.exe' : ''));
+    return JSON.parse(execFileSync(runner, [modulePath, tapePath], { encoding: 'utf8', timeout: 10_000 }));
+  };
+  const native = runNative(request);
+  assert.deepEqual(native, { moduleFingerprint: artifact.traceMetadata.moduleFingerprint, account: 'applied',
+    target: 'pump', stage: 'applied', resourceId: 7, observations: used, stationObservations: lifecycle });
+  assert.deepEqual(runNative(request), native, 'fresh replay retains identical owner and ledger observations');
+  for (const [mutate, reason] of [
+    [request => { request.frames[0].segments[0].resourceId = 8; }, /wrong bound resource ID/],
+    [request => { request.manifest.accounting.bindings[0].evidenceBinding.stage = 'safe'; }, /unsupported source accounting binding/],
+  ]) {
+    const invalid = structuredClone(request); mutate(invalid); assert.throws(() => runNative(invalid), reason);
+  }
+  await assert.rejects(AccountingRuntime.instantiateSource(wasmBytes, source.replace('stage: applied', 'stage: safe'), {
+    filename, account: 'applied', resourceId: 7, config,
+  }), /applied|unsupported accounting stage/);
 });
 
 test('WASM accounting stays Unknown until exact snapshot revision is persisted', async () => {
