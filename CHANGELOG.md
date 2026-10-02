@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+### 2026-10-02 — atomic keyed TimeSlots Range overlap validation ([#267](https://github.com/callin2/ghostflow-language/issues/267))
+
+Reference §§3.5–3.6 now execute UTC `DailySlots<G>` selected by `TimeSlots<G,N>`
+with fixed positive Duration on a whole-minute grid dividing the day, using
+GFB20/control-v20. Previously this keyed Range form was rejected. A live proposal
+from 08:00 `range(20min)` to `[08:00, 08:15]` rejects the entire settings/scan
+transaction; `[08:00, 08:20]` touches and succeeds. Preflight also protects an
+admitted removed key. Retimes retain occurrence identity, removed keys retain
+admitted work, and additions/re-additions use fresh keys and trusted addition
+baselines. Changed keys reject atomically without trusted wall time. Empty lists
+are valid; accepted faults preserve historical keys without deriving a new plan.
+GFRG4 persists keyed settings, allocator, baselines and consumed history and
+validates them on restore without resuming timers. Older consumers reject the
+new format; GFRG1/2/3 remain separate. REF-03-078 tests compare actual native/WASM
+traces, complete checkpoints and rollback, including the original static-slots
+live Duration overlap case. Non-UTC/DST, calendar, combined live TimeSlots plus
+Duration and Run cancellation policy remain outside this profile.
+
 ### 2026-10-02 — block unacknowledged accounting admission ([#269](https://github.com/callin2/ghostflow-language/issues/269))
 
 Bug fix restoring Reference §3.10 `on_unknown = block`: rolling reservation

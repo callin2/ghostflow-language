@@ -289,6 +289,10 @@ impl RangeEngine {
         Ok(())
     }
 
+    pub(crate) fn validate_retime_facts(&self, facts: &[RangeFact]) -> Result<()> {
+        self.validate_facts(facts, true)
+    }
+
     fn validate_facts(&self, facts: &[RangeFact], retime: bool) -> Result<()> {
         if facts.len() > self.terminal_capacity {
             return Err(Error::new("Range fact batch exceeds ledger capacity"));

@@ -161,6 +161,7 @@ export const LANGUAGE_TESTS = Object.freeze([
     'tests/range-safety-deadline.test.mjs',
     'tests/range-live-duration.test.mjs',
     'tests/range-live-start.test.mjs',
+    'tests/range-timeslots-overlap.test.mjs',
   'tests/at-contract.test.mjs',
   'tests/at-runtime.test.mjs',
   'tests/at-package.test.mjs',

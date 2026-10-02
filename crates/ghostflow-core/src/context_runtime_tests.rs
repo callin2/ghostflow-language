@@ -1577,6 +1577,7 @@ fn timeslots_consumers_share_keys_and_fault_without_historical_fallback() {
         grid_ms: 60_000,
         capacity: 3,
         initial_minutes: vec![1],
+        range_duration_ms: None,
         dst_missing: 0,
         dst_repeated: 0,
     };
@@ -1680,6 +1681,7 @@ fn timeslots_checkpoint_restore_uses_authored_grid_and_capacity() {
             grid_ms,
             capacity,
             initial_minutes: vec![minute],
+            range_duration_ms: None,
             dst_missing: 0,
             dst_repeated: 0,
         };

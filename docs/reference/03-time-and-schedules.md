@@ -701,6 +701,27 @@ retime 결과도 전체 `TimeSlots<G,N>` 값으로서 grid, 중복, N과 같은 
 이 타입은 “15분마다”가 아니다. `[06:00, 18:45]`라는 특정 local clock slots를
 나타낸다. 주기를 설정값으로 바꾸는 Periodic과 의미가 다르다.
 
+제한된 실행 가능한 keyed Range profile은 `TimeSlots<G,N>`로 선택한 UTC
+`DailySlots<G>`, 양의 고정 Duration, work calendar 없음, 24시간을 나누는 정수 분
+grid를 사용한다. GFB20/control-v20으로 식별하며 live TimeSlots와 live Duration의
+조합이나 비 UTC zone은 거부한다. 예를 들어 승인된 08:00 `range(20min)`을
+`[08:00, 08:15]`로 바꿀 수 없지만 반열린 구간이 맞닿는 `[08:00, 08:20]`은
+유효하다. preflight는 제안된 미래 목록에서 key가 제거된 이미 admit한 구간도
+포함한다. 거부하면 event의 다른 설정과 clock, allocator, revision, occurrence
+history를 모두 commit하지 않는다. **Why:** 설정 revision이 겹치는 작업을 만들거나
+control snapshot의 일부만 바꾸어서는 안 된다.
+
+이 실행 profile에서 key를 추가하거나 retime하는 edit는 신뢰할 수 있는 wall
+baseline이 필요하며 wall trust가 Unknown이면 atomic하게 거부한다. 변경되지 않은
+key와 승인된 settings-fault emission은 기존 동작을 유지한다. 이 제한은 별도의
+live scalar start/Duration Range profile을 바꾸지 않는다. fault emission은 과거
+key identity를 보존하지만 새 effective plan 없이 Unknown을 낸다. GFRG4 checkpoint는
+승인된 keyed 목록, allocator, 추가 baseline과 consumed history를 저장하며 빈 목록과
+표시 시각 순서가 바뀐 retained key도 포함한다. restore는 이 metadata를 검증하며
+활성 timer를 재개하지 않는다. 기존 GFRG1/2/3 profile은 각자의 format을 유지한다.
+이전 loader는 static fallback으로 실행하지 않고 GFB20을 거부한다. 이 profile은
+timezone/DST나 Run cancellation 정책을 선택하지 않는다.
+
 ## 3.7 Periodic과 Cron
 
 ### Periodic

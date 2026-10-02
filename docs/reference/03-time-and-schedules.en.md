@@ -443,6 +443,30 @@ Validate a retime result as a complete `TimeSlots<G,N>` value for grid, duplicat
 
 This type does not mean “every 15 minutes.” It represents specific local clock slots such as `[06:00, 18:45]`. It differs from Periodic, whose period changes through a setting.
 
+The bounded executable keyed Range profile uses UTC `DailySlots<G>` selected by
+`TimeSlots<G,N>`, a positive fixed Duration, no work calendar, and a whole-minute
+grid dividing 24 hours. It uses GFB20/control-v20; combining live TimeSlots with
+live Duration or a non-UTC zone is rejected. For example, an accepted 08:00
+`range(20min)` cannot be changed to `[08:00, 08:15]`; `[08:00, 08:20]` is valid
+because the half-open intervals touch. Preflight includes an admitted interval
+whose key is removed from the proposed future list. Rejection commits neither
+the other settings in the event nor clock, allocator, revision or occurrence
+history. **Why:** a settings revision must not introduce overlapping work or
+partially change the control snapshot.
+
+In this execution profile, an edit that adds or retimes a key requires a trusted
+wall baseline; it rejects atomically while wall trust is unknown. Unchanged
+keys and accepted settings-fault emissions retain their existing behavior.
+This restriction does not change the separate live scalar start/Duration Range
+profiles. Fault emissions preserve historical key identity but produce Unknown
+without a new effective plan. The GFRG4 checkpoint persists the accepted keyed
+list, allocator, addition baselines and consumed history, including an empty
+list and retained keys whose displayed time order changed. Restore validates
+that metadata and never resumes an active timer. Existing GFRG1/2/3 profiles
+retain their own formats; older loaders reject GFB20 rather than executing a
+static fallback. This profile does not select timezone/DST or Run cancellation
+policy.
+
 ## 3.7 Periodic and Cron
 
 ### Periodic

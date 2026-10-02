@@ -86,18 +86,34 @@ fn settings_event(value: &Json) -> Result<Option<SettingsEvent>> {
             Some(true) => {
                 let semantic_type = text(&result["type"])?.to_owned();
                 let value = match semantic_type.as_str() {
-                    "Bool" => Value::Bool(result["value"].as_bool().ok_or("invalid Bool setting")?),
-                    "Int" => Value::Int(i32::try_from(
+                    "Bool" => ConfigValue::Scalar(Value::Bool(
+                        result["value"].as_bool().ok_or("invalid Bool setting")?,
+                    )),
+                    "Int" => ConfigValue::Scalar(Value::Int(i32::try_from(
                         result["value"].as_i64().ok_or("invalid Int setting")?,
-                    )?),
-                    _ => Value::Number(
+                    )?)),
+                    ty if ty.starts_with("TimeSlots<") => {
+                        let slot_value = &result["value"];
+                        if text(&slot_value["kind"])? != "slots" {
+                            return Err("invalid TimeSlots setting".into());
+                        }
+                        let mut slots = Vec::new();
+                        for item in array(&slot_value["entries"], 4096)? {
+                            slots.push((
+                                integer(&item["key"])?,
+                                u16::try_from(integer(&item["minuteOfDay"])?)?,
+                            ));
+                        }
+                        ConfigValue::Slots(slots)
+                    }
+                    _ => ConfigValue::Scalar(Value::Number(
                         result["value"]
                             .as_f64()
                             .filter(|n| n.is_finite())
                             .ok_or("invalid numeric setting")?,
-                    ),
+                    )),
                 };
-                (semantic_type, Ok(ConfigValue::Scalar(value)))
+                (semantic_type, Ok(value))
             }
             None => return Err("invalid settings Result".into()),
         };
