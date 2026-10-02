@@ -499,6 +499,45 @@ pub unsafe extern "C" fn gf_accounting_used_rolling(
     }
 }
 
+/// Output words: used, outstanding reserve, blocked, release-present, release,
+/// exact durable revision. Status 2 is Unknown and writes no evidence.
+#[no_mangle]
+pub unsafe extern "C" fn gf_accounting_explain_rolling(
+    handle: *const AccountingHandle,
+    resource_id: u32,
+    now_ms: u64,
+    window_ms: u64,
+    limit_ms: u64,
+    reserve_ms: u64,
+    output: *mut u64,
+) -> i32 {
+    let Some(handle) = handle.as_ref() else {
+        return 0;
+    };
+    if output.is_null() {
+        return 0;
+    }
+    if handle.persisted_revision != handle.revision {
+        return 2;
+    }
+    let LedgerRead::Known(explanation) =
+        handle
+            .ledger
+            .explain_rolling(resource_id, now_ms, window_ms, limit_ms, reserve_ms)
+    else {
+        return 2;
+    };
+    slice::from_raw_parts_mut(output, 6).copy_from_slice(&[
+        explanation.used_ms,
+        explanation.reserved_ms,
+        u64::from(explanation.blocked),
+        u64::from(explanation.next_release_ms.is_some()),
+        explanation.next_release_ms.unwrap_or(0),
+        handle.revision,
+    ]);
+    1
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn gf_accounting_used_local_day(
     handle: *mut AccountingHandle,

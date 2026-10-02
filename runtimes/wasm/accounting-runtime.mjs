@@ -37,7 +37,8 @@ export class AccountingRuntime {
       if (resourceId === undefined || eventType !== undefined) throw new TypeError('resourceId is required for an on_time account');
       const limits = (artifact.manifest.accounting.constraints ?? [])
         .flatMap(group => group.limits).filter(limit => limit.account === account);
-      binding = { operation: 'on_time', id: uint32(resourceId, 'resourceId'), limits };
+      binding = { operation: 'on_time', id: uint32(resourceId, 'resourceId'),
+        limits: Object.freeze(limits.map(limit => Object.freeze({ ...limit, basis: Object.freeze({ ...limit.basis }) }))) };
     } else if (descriptor.operation === 'count_events' && descriptor.basis?.kind === 'local_day') {
       if (evidence?.kind !== 'typed_event') throw new Error('unsupported accounting evidence binding');
       if (eventType === undefined || resourceId !== undefined) throw new TypeError('eventType is required for a count_events account');
@@ -66,6 +67,7 @@ export class AccountingRuntime {
       'gf_accounting_reserve_rolling', 'gf_accounting_settle_rolling', 'gf_accounting_cancel_rolling',
       'gf_accounting_used_rolling', 'gf_accounting_used_local_day', 'gf_accounting_event_count',
       'gf_accounting_snapshot', 'gf_accounting_snapshot_ptr', 'gf_accounting_snapshot_len',
+      'gf_accounting_explain_rolling',
       'gf_accounting_ack_persisted', 'gf_accounting_revision', 'gf_accounting_last_error_ptr',
       'gf_accounting_last_error_len', 'gf_activate_accounting', 'gf_tick_accounting',
       'gf_alloc', 'gf_dealloc', 'memory',
@@ -174,6 +176,28 @@ export class AccountingRuntime {
   usedRolling(resourceId, nowMs, windowMs) {
     this.#bound('on_time', resourceId);
     return this.#query('gf_accounting_used_rolling', [uint32(resourceId, 'resourceId'), unsigned64(nowMs, 'nowMs'), unsigned64(windowMs, 'windowMs')]);
+  }
+
+  /** Source-bound, read-only admission explanation. nowMs is the trusted ledger
+   * clock; UI animation is deliberately absent. null means Unknown, not zero. */
+  explainRolling({ nowMs, windowMs, limitMs, reserveMs } = {}) {
+    this.#live();
+    if (this.binding?.operation !== 'on_time') throw new TypeError('a source-bound on_time account is required');
+    this.#boundAdmission(windowMs, limitMs, reserveMs);
+    const args = [nowMs, windowMs, limitMs, reserveMs].map((value, index) =>
+      unsigned64(value, ['nowMs', 'windowMs', 'limitMs', 'reserveMs'][index]));
+    const output = this.wasm.gf_alloc(48);
+    try {
+      const status = this.wasm.gf_accounting_explain_rolling(this.handle, this.binding.id, ...args, output);
+      if (status === 2) return null;
+      if (status !== 1) throw new Error('accounting explanation failed');
+      const view = new DataView(this.wasm.memory.buffer);
+      const word = index => view.getBigUint64(output + index * 8, true);
+      return Object.freeze({ source: this.source, resourceId: this.binding.id, nowMs: args[0],
+        windowMs: args[1], limitMs: args[2], reserveMs: args[3], usedMs: word(0), reservedMs: word(1),
+        blocked: word(2) === 1n, blockReason: word(2) === 1n ? 'rolling-budget' : null,
+        nextReleaseMs: word(3) === 1n ? word(4) : null, ledgerRevision: word(5) });
+    } finally { this.wasm.gf_dealloc(output, 48); }
   }
 
   usedLocalDay(resourceId, localDay) {

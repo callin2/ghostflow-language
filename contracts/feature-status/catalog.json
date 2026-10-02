@@ -4423,6 +4423,20 @@
       "issues": [257], "referenceCaseIds": ["REF-04-062"]
     },
     {
+      "id": "rolling-budget-explanation",
+      "family": "Durable rolling budget explanation",
+      "clause": { "path": "docs/reference/04-sensors-constraints-control.md", "heading": "4.15 타입, 자원과 설명 규칙" },
+      "owner": "HOST", "maturity": "EXPERIMENTAL", "coreScope": false, "requiredEvidence": [],
+      "evidence": [{ "stage": "host_simulation", "status": "verified", "refs": [{
+        "path": "tests/accounting-wasm.test.mjs",
+        "testId": "REF-04-066: durable source-bound budget explanation ignores OFF animation and reproduces after activation",
+        "caseId": "REF-04-066", "targets": ["wasm"], "assertionClass": "observation",
+        "polarities": ["positive", "negative", "boundary"]
+      }] }],
+      "gaps": ["Source-bound reference accounting explanation consumes caller-validated intervals and trusted host bindings/time. Revisions are local to each ledger owner; recovery uses the durable snapshot. No frontend renderer, physical evidence, automatic on_time VM start/cutoff, API integration or storage-medium certification is claimed."],
+      "issues": [260], "referenceCaseIds": ["REF-04-066"]
+    },
+    {
       "id": "product-boundary",
       "family": "Farmer UI, installation and deployment",
       "clause": {

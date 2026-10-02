@@ -104,6 +104,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/REFERENCE-QUERY.ko.md](REFERENCE-QUERY.ko.md) | 언어 참조 선택 조회 | md |
 | [docs/REFERENCE-QUERY.md](REFERENCE-QUERY.md) | Selective Language Reference query | md |
 | [docs/REFERENCE-SIMULATOR-BASELINE-2026-09-23.md](REFERENCE-SIMULATOR-BASELINE-2026-09-23.md) | Reference simulator baseline — 2026-09-23 | md |
+| [docs/ROLLING-BUDGET-EXPLANATION.ko.md](ROLLING-BUDGET-EXPLANATION.ko.md) | 영속 rolling 예산 설명 | md |
+| [docs/ROLLING-BUDGET-EXPLANATION.md](ROLLING-BUDGET-EXPLANATION.md) | Durable rolling budget explanation | md |
 | [docs/SCAN-FRAME-WASM.ko.md](SCAN-FRAME-WASM.ko.md) | Scan frame WASM ABI v1 | md |
 | [docs/SCAN-FRAME-WASM.md](SCAN-FRAME-WASM.md) | Scan frame WASM ABI v1 | md |
 | [docs/SCAN-TAPE-PARITY.ko.md](SCAN-TAPE-PARITY.ko.md) | Native/WASM scan tape parity (D9) | md |
@@ -216,4 +218,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.ko.md](research/GF-COMPOSE-R9-ACCEPTANCE.ko.md) | GF-COMPOSE R9: acceptance와 구현 인계 | md |
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.md](research/GF-COMPOSE-R9-ACCEPTANCE.md) | GF-COMPOSE R9: acceptance and implementation handoff | md |
 
-182 documents.
+184 documents.

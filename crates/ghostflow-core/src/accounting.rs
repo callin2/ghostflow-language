@@ -79,6 +79,15 @@ pub enum AdmissionResult {
     Duplicate,
 }
 
+/// Read-only admission evidence from one recorded ledger snapshot.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RollingExplanation {
+    pub used_ms: u64,
+    pub reserved_ms: u64,
+    pub blocked: bool,
+    pub next_release_ms: Option<u64>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct AppliedSegment {
     receipt_id: [u8; 16],
@@ -333,6 +342,75 @@ impl AccountingLedger {
             Some(used) => LedgerRead::Known(used),
             None => LedgerRead::Unknown,
         }
+    }
+
+    /// Earliest admission time assuming no new evidence. Outstanding reservations
+    /// never expire by animation or elapsed time: only settlement/cancellation
+    /// releases them. Future-dated intervals cannot establish a release forecast.
+    pub fn explain_rolling(
+        &self,
+        resource_id: u32,
+        now_ms: u64,
+        window_ms: u64,
+        limit_ms: u64,
+        reserve_ms: u64,
+    ) -> LedgerRead<RollingExplanation> {
+        let LedgerRead::Known(used_ms) = self.used_rolling(resource_id, now_ms, window_ms) else {
+            return LedgerRead::Unknown;
+        };
+        if limit_ms == 0
+            || reserve_ms == 0
+            || self
+                .intervals
+                .iter()
+                .any(|i| i.resource_id == resource_id && i.end_ms > now_ms)
+        {
+            return LedgerRead::Unknown;
+        }
+        let Some(reserved_ms) = self
+            .reservations
+            .iter()
+            .filter(|r| {
+                r.resource_id == resource_id && matches!(r.state, ReservationState::Outstanding)
+            })
+            .try_fold(0u64, |sum, r| sum.checked_add(r.reserve_ms))
+        else {
+            return LedgerRead::Unknown;
+        };
+        let allowance = limit_ms
+            .checked_sub(reserved_ms)
+            .and_then(|v| v.checked_sub(reserve_ms));
+        let blocked = allowance.is_none_or(|v| used_ms > v);
+        let next_release_ms = if !blocked {
+            None
+        } else if let Some(allowance) = allowance {
+            let mut low = now_ms;
+            let mut high = now_ms.saturating_add(window_ms);
+            if !matches!(self.used_rolling(resource_id, high, window_ms), LedgerRead::Known(v) if v <= allowance)
+            {
+                None
+            } else {
+                // At most 64 queries over a bounded interval inventory.
+                while low < high {
+                    let middle = low + (high - low) / 2;
+                    if matches!(self.used_rolling(resource_id, middle, window_ms), LedgerRead::Known(v) if v <= allowance)
+                    {
+                        high = middle;
+                    } else {
+                        low = middle + 1;
+                    }
+                }
+                Some(low)
+            }
+        } else {
+            None
+        };
+        LedgerRead::Known(RollingExplanation {
+            used_ms,
+            reserved_ms,
+            blocked,
+            next_release_ms,
+        })
     }
 
     pub fn used_local_day(&self, resource_id: u32, local_day: i32) -> LedgerRead<u64> {
