@@ -4169,6 +4169,33 @@
       "referenceCaseIds": ["REF-04-034"]
     },
     {
+      "id": "capability-profile-and",
+      "family": "Finite actuator profiles and capability AND activation",
+      "clause": {
+        "path": "docs/reference/04-sensors-constraints-control.en.md",
+        "heading": "4.6 Device queries and strategy selection"
+      },
+      "owner": "HOST",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": ["host_simulation"],
+      "evidence": [{
+        "stage": "host_simulation",
+        "status": "verified",
+        "refs": [{
+          "path": "tests/adapt-control-host.test.mjs",
+          "testId": "REF-04-036: duplicate actuator keys reject and comma-AND requires both pump and valve in actual host activation",
+          "caseId": "REF-04-036",
+          "assertionClass": "simulation",
+          "targets": ["wasm"],
+          "polarities": ["positive", "negative", "boundary"]
+        }]
+      }],
+      "gaps": ["Actual plain/framed WASM owners validate finite caller-supplied actuator profiles and execute the accepted canonical candidate. Source, bytecode, manifest and profile digests identify this bounded evidence; no live profile-revision API, physical binding, Device operation or native-host parity is claimed."],
+      "issues": [241],
+      "referenceCaseIds": ["REF-04-036"]
+    },
+    {
       "id": "product-boundary",
       "family": "Farmer UI, installation and deployment",
       "clause": {
