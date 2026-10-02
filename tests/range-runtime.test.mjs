@@ -24,7 +24,7 @@ function facts(site, monotonicMs, wallMs, trusted = true) {
     provider: null, calendar: null, rows: [] }], settings: null };
 }
 
-async function parity(source, steps, expected) {
+async function parity(source, steps, expected, { checkpoints = false } = {}) {
   const artifact = await compileSource(source, { filename: 'range-runtime.ghost.md' });
   assert.equal(artifact.bytes.readUInt16LE(4), 12);
   const site = artifact.manifest.schedules[0].site;
@@ -39,17 +39,23 @@ async function parity(source, steps, expected) {
     const artifactPath = path.join(directory, 'range.gfb');
     writeArtifact(artifact, artifactPath);
     const tapePath = path.join(directory, 'tape.json');
-    fs.writeFileSync(tapePath, JSON.stringify({ profile: 'context-periodic-v1', activation, steps: frames }));
+    fs.writeFileSync(tapePath, JSON.stringify({ profile: checkpoints ? 'context-civil-v1' : 'context-periodic-v1', activation, steps: frames }));
     const native = spawnSync(path.join(root, 'target/release/examples/context_tape'), [artifactPath, tapePath],
       { encoding: 'utf8', timeout: 10_000, maxBuffer: 4 * 1024 * 1024 });
     assert.equal(native.status, 0, native.stderr || native.stdout);
     const rows = native.stdout.trim().split('\n').map(row => JSON.parse(row));
-    const traces = steps.map(({ mono, inputs = {} }, i) => runtime.step({ nowMs: mono, inputs,
-      contextFacts: facts(site, mono, steps[i].wall, steps[i].trusted ?? true) }).vm);
+    const snapshots = [];
+    const traces = steps.map(({ mono, inputs = {} }, i) => {
+      const trace = runtime.step({ nowMs: mono, inputs,
+        contextFacts: facts(site, mono, steps[i].wall, steps[i].trusted ?? true) }).vm;
+      if (checkpoints) snapshots.push(Buffer.from(runtime.contextSnapshot().bytes).toString('hex'));
+      return trace;
+    });
     assert.deepEqual(traces.map(trace => trace.safe.pump), expected);
     rows.forEach((row, i) => {
       assert.equal(row.accepted, true, JSON.stringify(row));
       assert.deepEqual(row.outcome.trace, traces[i], `native/WASM frame ${i}`);
+      if (checkpoints) assert.equal(row.checkpoint, snapshots[i], `native/WASM ledger checkpoint ${i}`);
     });
     const actions = steps.flatMap(({ mono, inputs = {} }, i) => [
       ...Object.entries(inputs).map(([name, value]) => ({ kind: 'input', name, type: 'Bool', value })),
@@ -70,6 +76,52 @@ async function parity(source, steps, expected) {
     fs.rmSync(directory, { recursive: true, force: true });
   }
 }
+
+test('REF-03-073 canonical native/WASM Range admits only remaining time after boot gap and trust recovery', async () => {
+  const source = dailySlotsRange({ selected: '[07:45, 08:00]', duration: '10min' });
+  const start = day + 8 * hour;
+  const before = { mono: 0, wall: day + 7 * hour + 40 * 60_000 };
+  const paths = [
+    { name: 'boot', prefix: [], origin: 0 },
+    { name: 'gap', prefix: [before], origin: 24 * 60_000 },
+    { name: 'trust recovery', prefix: [before,
+      { mono: 1, wall: null, trusted: false }], origin: 24 * 60_000 },
+  ];
+  const decisions = trace => trace.contextTrace.map(row => row.decision);
+  for (const { name, prefix, origin } of paths) {
+    const { traces } = await parity(source, [...prefix,
+      { mono: origin, wall: start + 4 * 60_000 },
+      { mono: origin + 1, wall: start + 4 * 60_000 },
+      { mono: origin + 359_999, wall: start + 10 * 60_000 - 1 },
+      { mono: origin + 360_000, wall: start + 10 * 60_000 },
+      { mono: origin + 360_001, wall: start + 4 * 60_000 },
+    ], [...prefix.map(() => false), true, true, true, false, false], { checkpoints: true });
+    const rows = traces.slice(prefix.length);
+    if (name === 'trust recovery') assert.deepEqual(decisions(traces[1]), ['Unknown(ClockUnknown)']);
+    const admission = rows[0].contextTrace;
+    assert.deepEqual(admission.filter(row => row.decision !== 'ObservationGap').map(row =>
+      [row.plannedWallMs, row.decision]), [[start - 15 * 60_000, 'LateStartExpired'], [start, 'Due']], name);
+    if (name === 'gap') assert.ok(decisions(rows[0]).includes('ObservationGap'));
+    assert.equal(rows.flatMap(decisions).filter(decision => decision === 'Due').length, 1, name);
+    assert.ok(decisions(rows[1]).includes('Active'), name);
+    assert.ok(decisions(rows[2]).includes('Active'), name);
+    assert.ok(decisions(rows[3]).includes('Completed'), name);
+    assert.ok(decisions(rows[4]).includes('AlreadyTerminal'), `${name}: wall rollback cannot replay`);
+
+    const expired = await parity(source, [...prefix,
+      { mono: origin, wall: start + 10 * 60_000 },
+      { mono: origin + 1, wall: start + 10 * 60_000 },
+      { mono: origin + 2, wall: start + 4 * 60_000 },
+    ], [...prefix.map(() => false), false, false, false], { checkpoints: true });
+    const expiryRows = expired.traces.slice(prefix.length);
+    if (name === 'trust recovery') assert.deepEqual(decisions(expired.traces[1]), ['Unknown(ClockUnknown)']);
+    assert.deepEqual(expiryRows[0].contextTrace.filter(row => row.decision !== 'ObservationGap')
+      .map(row => [row.plannedWallMs, row.decision]),
+    [[start - 15 * 60_000, 'LateStartExpired'], [start, 'LateStartExpired']], name);
+    assert.equal(expiryRows.flatMap(decisions).filter(decision => decision === 'Due').length, 0, name);
+    for (const row of expiryRows.slice(1)) assert.ok(decisions(row).includes('AlreadyTerminal'), name);
+  }
+});
 
 test('GF-TEST-range-runtime: unchanged accepted Range source executes late admission and touching slots in all hosts', async () => {
   await parity(dailySlotsRange(), [

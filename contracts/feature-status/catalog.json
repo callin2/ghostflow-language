@@ -4477,6 +4477,20 @@
       "issues": [260], "referenceCaseIds": ["REF-04-066"]
     },
     {
+      "id": "range-remaining-admission",
+      "family": "Planned Range remaining admission after clock baselines",
+      "clause": { "path": "docs/reference/03-time-and-schedules.en.md", "heading": "3.5 Common Schedule semantics" },
+      "owner": "CORE", "maturity": "EXPERIMENTAL", "coreScope": false, "requiredEvidence": [],
+      "evidence": [{ "stage": "native_wasm", "status": "verified", "refs": [{
+        "path": "tests/range-runtime.test.mjs",
+        "testId": "REF-03-073 canonical native/WASM Range admits only remaining time after boot gap and trust recovery",
+        "caseId": "REF-03-073", "assertionClass": "target-parity",
+        "targets": ["native", "wasm"], "polarities": ["positive", "negative", "boundary"]
+      }] }],
+      "gaps": ["The same checked canonical GFB12 immutable UTC DailySlots Range executes in native and WASM with identical complete tick/context traces and durable context checkpoint bytes. Boot, observation gap and trust recovery admit once at 08:04 and end at 08:10; exact endpoint expiry records LateStartExpired, consumes earlier expired slots and cannot replay on duplicate observations or wall rollback. Reference ghostsim outputs also agree. No non-UTC/DST, live Range setting binding, generic Run overlap, physical output or external publishing-host lifecycle implementation is claimed."],
+      "issues": [262], "referenceCaseIds": ["REF-03-073"]
+    },
+    {
       "id": "product-boundary",
       "family": "Farmer UI, installation and deployment",
       "clause": {
