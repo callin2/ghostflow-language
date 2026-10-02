@@ -4142,6 +4142,33 @@
       "referenceCaseIds": ["REF-07-004"]
     },
     {
+      "id": "optional-capability-strategy",
+      "family": "Optional capability absence and installed sensor faults",
+      "clause": {
+        "path": "docs/reference/04-sensors-constraints-control.en.md",
+        "heading": "4.5 Optional sensors and capabilities"
+      },
+      "owner": "HOST",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": ["host_simulation"],
+      "evidence": [{
+        "stage": "host_simulation",
+        "status": "verified",
+        "refs": [{
+          "path": "tests/adapt-control-host.test.mjs",
+          "testId": "REF-04-034: activated absence and installed Disconnected retain profile identity and selected strategy in actual host snapshots",
+          "caseId": "REF-04-034",
+          "assertionClass": "simulation",
+          "targets": ["wasm"],
+          "polarities": ["positive", "negative", "boundary"]
+        }]
+      }],
+      "gaps": ["The reference plain/framed WASM hosts execute fixed finite virtual profiles and caller-supplied snapshots. Source, bytecode, manifest and activation-profile digests identify this evidence; no live profile-revision API, physical binding or Device operation is claimed."],
+      "issues": [240],
+      "referenceCaseIds": ["REF-04-034"]
+    },
+    {
       "id": "product-boundary",
       "family": "Farmer UI, installation and deployment",
       "clause": {
