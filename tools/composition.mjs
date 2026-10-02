@@ -48,10 +48,13 @@ export function compileComposition(source, filename, supplied) {
     for (const entry of ast.imports) {
       const target = resolveDocument(name, entry.locator), document = documents.get(target);
       if (!document) fail(entry.locatorLoc, `missing imported document ${entry.locator} in sourceClosure`, 'GF_IMPORT');
+      // A closing edge to an active definition is a structural cycle even
+      // when its circular content pin cannot match. Reject before identity
+      // checks so the authored back edge retains the specific cycle reason.
+      if (active.has(target)) fail(entry.loc, `executable import cycle at ${entry.locator}`, 'GF_IMPORT');
       if (document.revision !== entry.revision) fail(entry.loc, `import revision mismatch for ${entry.locator}`, 'GF_IMPORT');
       if (document.sha256 !== entry.sha256) fail(entry.digestLoc,
         `import sha256 digest mismatch for ${entry.locator}: expected ${entry.sha256}, actual ${document.sha256}`, 'GF_IMPORT');
-      if (active.has(target)) fail(entry.loc, `executable import cycle at ${entry.locator}`, 'GF_IMPORT');
       used.add(target); unit.imports.set(entry.name, visit(document.text, target));
     }
     active.delete(key); return unit;

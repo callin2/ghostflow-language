@@ -5325,6 +5325,46 @@
       "referenceCaseIds": [
         "REF-05-012"
       ]
+    },
+    {
+      "id": "exact-transitive-import-closure",
+      "family": "Exact immutable transitive import revision and digest closure",
+      "clause": { "path": "docs/reference/06-composition-and-replay.en.md", "heading": "6.4 Import and connection syntax" },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "native_wasm", "status": "verified",
+          "refs": [
+            {
+              "path": "tests/pinned-import-closure.test.mjs",
+              "testId": "REF-06-011 exact transitive revision and digest closure survives artifact replay and native framed WASM execution",
+              "caseId": "REF-06-011", "assertionClass": "target-parity",
+              "targets": ["native", "wasm"], "polarities": ["positive", "negative"]
+            }
+          ]
+        },
+        {
+          "stage": "compile", "status": "verified",
+          "refs": [
+            {
+              "path": "tests/pinned-import-closure.test.mjs",
+              "testId": "REF-06-011 missing or floating transitive pins and revision or digest mismatches reject at their authored dependency",
+              "caseId": "REF-06-011", "assertionClass": "compile-policy", "polarities": ["negative"]
+            },
+            {
+              "path": "tests/pinned-import-closure.test.mjs",
+              "testId": "REF-06-011 executable transitive import back edges reject as cycles before their circular digest mismatch",
+              "caseId": "REF-06-011", "assertionClass": "compile-policy", "polarities": ["negative"]
+            }
+          ]
+        }
+      ],
+      "gaps": ["Source-supplied canonical closure validation and actual portable execution are verified. Registry resolution, package signing, deployment and physical binding are separate contracts."],
+      "issues": [298],
+      "referenceCaseIds": ["REF-06-011"]
     }
   ]
 }

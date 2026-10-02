@@ -5,6 +5,18 @@
 
 ## 미출시
 
+### 2026-10-02 — transitive import cycle의 닫는 edge에서 진단 ([#298](https://github.com/callin2/ghostflow-language/issues/298))
+
+컴파일러는 닫는 import edge의 revision/digest를 검사하기 전에 원본 위치에서
+executable import cycle을 보고한다. 이전에는 순환 digest 불일치가 구조적 cycle을
+가렸다. 예를 들어 pinned `root -> A -> B -> A`는 B가 A를 import하는 위치에서
+cycle로 거부된다. 순환이 없는 import는 여전히 모든 정확한 immutable revision과
+UTF-8 source digest를 요구한다. resolver, fallback이나 artifact format은 바뀌지
+않는다. 두 dependency의 canonical 테스트는 저장된 전체 closure 재검증, 변조 거부,
+원본 위치의 누락·floating·불일치 pin과 native/framed-WASM 전체 실행 결과를 확인한다.
+이는 Reference §6.4의 구체적 cycle 거부를 복구하는 수정이며 package나 배포 정책을
+채택하지 않는다.
+
 ### 2026-10-02 — 설정 관측을 source 기본값과 수락 emission에 연결 ([#273](https://github.com/callin2/ghostflow-language/issues/273))
 
 설정 stream이 행별 수락 emission revision과 적용 position을 불변 source 식별자 및 전역
