@@ -644,6 +644,38 @@ impl ContextRuntime {
                     }
                 }
             }
+            if group_fault.is_none() && explicit_fault.is_none() {
+                let proposal = |id| {
+                    candidates
+                        .iter()
+                        .find(|(index, _, _)| self.configs[*index].descriptor.id == id)
+                        .and_then(|(_, value, _)| match value {
+                            ConfigValue::Scalar(Value::Number(n)) => {
+                                Some(SettingValue::SharedDuration(*n as u64))
+                            }
+                            ConfigValue::Slots(slots) => Some(SettingValue::SharedSlots(slots.clone())),
+                            _ => None,
+                        })
+                };
+                for (index, descriptor) in descriptors.iter().enumerate() {
+                    let PulseDescriptor::Context(d) = descriptor else {
+                        continue;
+                    };
+                    let config_id = match &d.definition {
+                        ScheduleDefinition::Periodic { every, .. } => every.id,
+                        ScheduleDefinition::UtcRange { duration, .. } => duration.id,
+                        ScheduleDefinition::ConfigDailySlots { config_id, .. } => *config_id,
+                        _ => 0,
+                    };
+                    if config_id == 0 || !changes.contains(&config_id) {
+                        continue;
+                    }
+                    let engine = self.engines[index]
+                        .as_ref()
+                        .ok_or_else(|| invalid("context engine binding mismatch"))?;
+                    engine.preflight_setting(d, proposal(config_id).as_ref())?;
+                }
+            }
             if let Some(fault) = group_fault.or(explicit_fault) {
                 for config in &mut staged.runtime.configs {
                     if changes.contains(&config.descriptor.id) {
@@ -861,6 +893,7 @@ impl ContextRuntime {
                 let cancel = evaluate(&d.cancel, trace)?;
                 let config_id = match &d.definition {
                     ScheduleDefinition::Periodic { every, .. } => every.id,
+                    ScheduleDefinition::UtcRange { duration, .. } => duration.id,
                     ScheduleDefinition::ConfigDailySlots { config_id, .. } => *config_id,
                     _ => 0,
                 };

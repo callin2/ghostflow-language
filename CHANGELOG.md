@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### 2026-10-02 — live Range Duration setting retimes active occurrence ([#265](https://github.com/callin2/ghostflow-language/issues/265))
+
+Reference §3.5 `range(duration)` now accepts a `Duration` config for executable UTC Daily/DailySlots GFB12 Range without a work calendar. A successful atomic live settings event recomputes the active occurrence from the frozen planned start: 08:00 admitted at 08:04 with 10min, then edited at 08:07 to 12min, remains the same occurrence and ends at 08:12; editing to 5min ends it at the event position. No new due pulse or occurrence ID is emitted, and the accepted duration is persisted in the GFRGv2 checkpoint so the next occurrence uses the live value after restore. Invalid typed values become the existing settings-fault decision without changing the accepted duration. REF-03-076 covers native/WASM trace and checkpoint parity. The GFB12 encoding uses a zero duration sentinel followed by the existing config id; older GFB12 consumers reject this new encoded form.
+
+Live Range configs require a positive minimum Duration at compilation, matching
+the runtime loader. Unsupported calendar binding and overlap-changing live
+proposals reject explicitly; rejected envelopes leave the settings revision and
+complete context checkpoint unchanged. Retime also works while clock trust is
+unknown or wall correction crosses a date, using the admitted frozen origin.
+
 ### 2026-10-02 — durable rolling budget explanation ([#260](https://github.com/callin2/ghostflow-language/issues/260))
 
 Reference §4.15 now has a source-bound reference host query over the real Rust

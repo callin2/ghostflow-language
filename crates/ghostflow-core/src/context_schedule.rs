@@ -100,7 +100,9 @@ impl<'a> SnapshotReader<'a> {
 impl Engine {
     pub fn effective_setting(&self, desc: &ScheduleDescriptor) -> Option<SettingValue> {
         match desc.definition {
-            ScheduleDefinition::Periodic { .. } => self.interval_ms.map(SettingValue::Duration),
+            ScheduleDefinition::Periodic { .. } | ScheduleDefinition::UtcRange { .. } => {
+                self.interval_ms.map(SettingValue::Duration)
+            }
             ScheduleDefinition::ConfigDailySlots { .. } => {
                 Some(SettingValue::Slots(self.slots.clone()))
             }
@@ -120,7 +122,14 @@ impl Engine {
         if let Some(range) = &self.range {
             // Only consumed identities are durable. Active monotonic references
             // cannot be transferred to a new boot and are never resumed.
-            let mut bytes = b"GFES\x02GFRG\x01".to_vec();
+            let live_interval = self.interval_ms;
+            let mut bytes = if live_interval.is_some() {
+                let mut bytes = b"GFES\x02GFRG\x02".to_vec();
+                bytes.extend_from_slice(&live_interval.unwrap().to_le_bytes());
+                bytes
+            } else {
+                b"GFES\x02GFRG\x01".to_vec()
+            };
             write_len(&mut bytes, range.terminal_keys().len())?;
             for key in range.terminal_keys() {
                 write_string(&mut bytes, key)?;
@@ -199,10 +208,35 @@ impl Engine {
         if let ScheduleDefinition::UtcRange { starts_ms, .. }
         | ScheduleDefinition::CalendarRange { starts_ms, .. } = &desc.definition
         {
-            if reader.take(5)? != b"GFES\x02" || reader.take(5)? != b"GFRG\x01" {
+            if reader.take(5)? != b"GFES\x02" {
                 return Err(invalid("invalid Range checkpoint version"));
             }
             let mut restored = Self::new(desc, boot_epoch, capacity)?;
+            match reader.take(5)? {
+                b"GFRG\x01" => {
+                    if restored.interval_ms.is_some() {
+                        return Err(invalid("Range checkpoint missing live interval"));
+                    }
+                }
+                b"GFRG\x02" => {
+                    let value = reader.u64()?;
+                    match &desc.definition {
+                        ScheduleDefinition::UtcRange { duration, starts_ms, .. } => {
+                            if duration.id == 0
+                                || value < duration.min_ms
+                                || value > duration.max_ms
+                                || (value - duration.min_ms) % duration.step_ms != 0
+                            {
+                                return Err(invalid("Range checkpoint setting mismatch"));
+                            }
+                            crate::context_vm::validate_utc_range(starts_ms, value)?;
+                            restored.interval_ms = Some(value);
+                        }
+                        _ => return Err(invalid("unexpected Range live interval checkpoint")),
+                    }
+                }
+                _ => return Err(invalid("invalid Range checkpoint version")),
+            }
             let count = usize::from(reader.u16()?);
             if count > capacity {
                 return Err(invalid("Range checkpoint terminal capacity"));
@@ -386,9 +420,10 @@ impl Engine {
             ScheduleDefinition::UtcRange {
                 starts_ms,
                 duration_ms,
+                duration,
             } => {
                 crate::context_vm::validate_utc_range(starts_ms, *duration_ms)?;
-                (None, Vec::new(), 1)
+                (duration.id.ne(&0).then_some(*duration_ms), Vec::new(), 1)
             }
             ScheduleDefinition::CalendarRange {
                 timezone,
@@ -555,6 +590,7 @@ impl Engine {
                 clock,
                 when && allowed,
                 cancel,
+                false,
             )?;
             if decision.due {
                 staged.range_calendar_revision =
@@ -585,14 +621,12 @@ impl Engine {
         if let ScheduleDefinition::UtcRange {
             starts_ms,
             duration_ms,
+            duration,
         } = &desc.definition
         {
-            if change.is_some() {
-                return Err(invalid(
-                    "immutable UTC Range cannot accept settings changes",
-                ));
-            }
-            return self.utc_range(desc.site, starts_ms, *duration_ms, clock, when, cancel);
+            let (staged_setting, live_duration) =
+                self.effective_range_duration(desc, change, *duration_ms)?;
+            return staged_setting.utc_range(desc.site, starts_ms, live_duration, clock, when, cancel, duration.id != 0 && change.is_some());
         }
         let mut staged = self.clone();
         staged.apply_setting(
@@ -867,6 +901,7 @@ impl Engine {
         clock: ClockSnapshot<'_>,
         when: bool,
         cancel: bool,
+        retime: bool,
     ) -> Result<(Self, Decision)> {
         const DAY: u64 = 86_400_000;
         const MAX_WALL: u64 = 253_402_300_799_999;
@@ -901,7 +936,16 @@ impl Engine {
             .range
             .as_ref()
             .ok_or_else(|| invalid("missing Range engine"))?;
-        let stage = original.begin(clock, &plans, when, cancel)?;
+        if let Some(active) = original.active_fact() {
+            if !plans.iter().any(|fact| fact.occurrence_key == active.occurrence_key) {
+                plans.push(RangeFact {
+                    occurrence_key: active.occurrence_key.clone(),
+                    planned_wall_ms: active.planned_wall_ms,
+                    duration_ms: duration,
+                });
+            }
+        }
+        let stage = if retime { original.begin_retime(clock, &plans, when, cancel)? } else { original.begin(clock, &plans, when, cancel)? };
         let result = stage.result.clone();
         let disposition = stage.clock_disposition;
         let previous_active = original.active_fact().cloned();
@@ -1233,6 +1277,38 @@ impl Engine {
         Ok((staged, out))
     }
 
+    pub(crate) fn preflight_setting(
+        &self,
+        desc: &ScheduleDescriptor,
+        change: Option<&SettingValue>,
+    ) -> Result<()> {
+        let Some(change) = change else {
+            return Err(invalid("missing setting payload for schedule"));
+        };
+        if let ScheduleDefinition::UtcRange { duration_ms, .. } = &desc.definition {
+            self.effective_range_duration(desc, Some(change), *duration_ms)?;
+        } else {
+            let mut staged = self.clone();
+            staged.apply_setting(desc, Some(change), 0, None)?;
+        }
+        Ok(())
+    }
+
+    fn effective_range_duration(
+        &self,
+        desc: &ScheduleDescriptor,
+        change: Option<&SettingValue>,
+        fallback: u64,
+    ) -> Result<(Self, u64)> {
+        let mut staged = self.clone();
+        staged.apply_setting(desc, change, 0, None)?;
+        let duration = staged.interval_ms.unwrap_or(fallback);
+        if let ScheduleDefinition::UtcRange { starts_ms, .. } = &desc.definition {
+            crate::context_vm::validate_utc_range(starts_ms, duration)?;
+        }
+        Ok((staged, duration))
+    }
+
     fn apply_setting(
         &mut self,
         desc: &ScheduleDescriptor,
@@ -1246,6 +1322,10 @@ impl Engine {
         match (&desc.definition, change) {
             (
                 ScheduleDefinition::Periodic { every, .. },
+                SettingValue::Duration(interval) | SettingValue::SharedDuration(interval),
+            )
+            | (
+                ScheduleDefinition::UtcRange { duration: every, .. },
                 SettingValue::Duration(interval) | SettingValue::SharedDuration(interval),
             ) => {
                 if !every.operator_editable && !matches!(change, SettingValue::SharedDuration(_))
@@ -2021,6 +2101,15 @@ mod tests {
             definition: ScheduleDefinition::UtcRange {
                 starts_ms: starts,
                 duration_ms: duration,
+                duration: DurationSetting {
+                    id: 0,
+                    name: String::new(),
+                    operator_editable: false,
+                    initial_ms: duration,
+                    min_ms: duration,
+                    max_ms: duration,
+                    step_ms: 1,
+                },
             },
             when: vec![],
             cancel: vec![],

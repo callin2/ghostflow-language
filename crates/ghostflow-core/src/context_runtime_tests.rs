@@ -923,6 +923,15 @@ fn utc_range_program() -> Module {
             definition: ScheduleDefinition::UtcRange {
                 starts_ms: vec![100],
                 duration_ms: 100,
+                duration: DurationSetting {
+                    id: 0,
+                    name: String::new(),
+                    operator_editable: false,
+                    initial_ms: 100,
+                    min_ms: 100,
+                    max_ms: 100,
+                    step_ms: 1,
+                },
             },
             when: vec![1, 1],
             cancel: vec![1, 0],
