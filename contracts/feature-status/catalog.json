@@ -4828,6 +4828,63 @@
       "referenceCaseIds": [
         "REF-05-020"
       ]
+    },
+    {
+      "id": "completed-snapshot-identity-join",
+      "family": "Completed observations retain Program and host-owned run identity",
+      "clause": {
+        "path": "docs/reference/05-settings-and-observation.en.md",
+        "heading": "5.4 Identity and physical-fact boundaries"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/snapshot-identity-join.test.mjs",
+              "testId": "REF-05-024 canonical native and WASM snapshots reject crossed Program documents and mark a valid foreign Program stale",
+              "caseId": "REF-05-024",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/snapshot-identity-join.test.mjs",
+              "testId": "REF-05-024 separate native and WASM execution instances with reused scan zero remain stale across host-owned run epochs",
+              "caseId": "REF-05-024",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Conformance evidence for the original REF-05-024 mismatched Program digest or runId case: actual canonical native/WASM completed outcomes produce identical snapshots; crossed schema/Program documents fail strict validation, valid foreign Program observations derive stale joins, and fresh execution instances with reused scan IDs remain stale across host-owned run epochs. No runtime or contract behavior changes; automatic run identity issuance, settings/binding revision joins, publishing-host lifecycle and Device/physical evidence remain outside this existing Interaction v0 profile."
+      ],
+      "issues": [
+        284
+      ],
+      "referenceCaseIds": [
+        "REF-05-024"
+      ]
     }
   ]
 }
