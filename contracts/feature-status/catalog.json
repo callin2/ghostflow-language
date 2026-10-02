@@ -5887,6 +5887,63 @@
       "referenceCaseIds": [
         "REF-06-024"
       ]
+    },
+    {
+      "id": "settings-execution-revalidation",
+      "family": "Execution boundary revalidates UI-valid settings identity and revision",
+      "clause": {
+        "path": "docs/reference/08-language-runtime-and-device-boundaries.en.md",
+        "heading": "8.4 Boundaries each feature must preserve"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/settings-execution-revalidation.test.mjs",
+              "testId": "REF-08-009 UI-valid stale mixed settings reject atomically and fresh-baseline retry commits on native WASM",
+              "caseId": "REF-08-009",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/settings-execution-revalidation.test.mjs",
+              "testId": "REF-08-009 UI-valid foreign Program settings reject despite matching names types and baseline",
+              "caseId": "REF-08-009",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Conformance-only: fixture UI range/type checks do not bypass current Program or settings baseline validation. Actual native and framed-WASM core reject stale mixed events and foreign compiled Program events atomically, preserving complete outcomes/settings/checkpoint and permitting same-identity/position/scan retry after correction. No product UI/authentication/run issuance or settings fault-policy change."
+      ],
+      "issues": [
+        326
+      ],
+      "referenceCaseIds": [
+        "REF-08-009"
+      ]
     }
   ]
 }

@@ -183,6 +183,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/observation-no-write.test.mjs',
   'tests/interaction-settings.test.mjs',
   'tests/renderer-setting-validation.test.mjs',
+  'tests/settings-execution-revalidation.test.mjs',
   'tests/settings-default-provenance.test.mjs',
   'tests/snapshot-identity-join.test.mjs',
   'tests/intent-anchor-map.test.mjs',
