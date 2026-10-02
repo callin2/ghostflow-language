@@ -919,10 +919,10 @@ capability/safety 계약이 없으면 relay에는 hysteresis/on-off가 적합하
 
 첫 accepted sample은 previous error와 previous measurement를 현재값으로 초기화하고 D=0이며
 가상의 이전 interval을 적분하지 않는다. 현재 PID `fault`는 `disable`만 받는다.
-`degraded Name`은 선택된 설계 대안이며 현재 compiler가 받지 않는다.
+`degraded Name`은 선택된 설계 대안이며 현재 native Temperature PID profile이 받지 않는다.
 `bias`, `anti_windup`, `disabled`, `transfer`, `fault`, `restart`는 생략할 수 없다. restart는 typed
 output을 쓰는 `reset(output: value)`다. continuity가 검증된 `checkpoint`는
-선택된 설계 대안이며 현재 compiler가 받지 않는다.
+선택된 설계 대안이며 현재 native Temperature PID profile이 받지 않는다.
 `reset(output:v)`는 첫 accepted sample에서 integral tracking state를 정해 첫 unclamped
 requested가 명시한 `v`가 되게 한다. disable과
 manual→auto transfer는 현재 safe target을 추적한다. setpoint와 gain은 typed operator settings가
@@ -971,10 +971,13 @@ degraded TemperatureFallback for greenhouse_temperature {
 
 성립한 branch 중 최대 i32 priority 하나를 선택하며 동률은 ambiguity error다. 선언 순서는
 선택 기준이 아니다. `otherwise`는 필수이고 현재 compiler는 `disable`만 받는다.
-완전한 branch는 선택된 설계 대안이며 아직 지원하지 않는다. resume은
+`otherwise`의 완전한 fallback branch는 선택된 설계 대안이며 아직 지원하지 않는다. resume은
 `require_start`, `automatic`, `stay_degraded` 중 하나를 반드시 쓴다. `automatic`도 새 start
 권한을 만들지 않고 기존 session이 유효할 때만 primary로 복귀한다. fallback authority는
 primary보다 높아질 수 없고 safety authority를 가질 수 없다.
+compiler는 구조 검증된 degraded descriptor를 `requires-native-fallback-binding`으로 받지만,
+이는 실행 가능한 fallback 지원이 아니다. 실행 가능한 fallback binding이 마련되기 전에는
+native Temperature PID profile이 degraded control을 거부한다.
 
 ## 4.14 bounded adaptation
 
@@ -1043,9 +1046,9 @@ budget, PID, fallback, arbitration에 대한 독립적인 제어 의미를 만�
 shared resource, objective·PI/PID, degraded control과 bounded adaptation의 표면을 확정했다.
 다음 세부만 해당 소유 장의 계약을 참조한다.
 
-- rolling budget의 history, scan boundary와 reboot policy: 3장 시간·accounting 계약.
-- quantity, delta, Result와 quality predicate의 일반 타입 규칙: 2장 타입 계약.
-- installation binding과 live settings event record: 5–6장 설정·조합 계약.
+- rolling budget의 history, scan boundary와 reboot policy: [3장 시간·accounting 계약](03-time-and-schedules.md#310-시간-기반-사용량-제약).
+- quantity, delta, Result와 quality predicate의 일반 타입 규칙: [2장 Result 계약](02-types-expressions-state.md#25-sensor-결과와-명시적-오류-흐름)과 [물리량·단위 계약](02-types-expressions-state.md#29-물리량과-단위).
+- installation binding과 live settings event record: [5장 설정 계약](05-settings-and-observation.md#52-소스-변경과-운영-설정-변경), [정체성 기록](05-settings-and-observation.md#54-정체성과-물리적-사실의-경계), [6장 조합 계약](06-composition-and-replay.md#63-parameters-settings-dependencies와-bindings).
 
 이 참조는 Result/Option 구분, requested→safe→applied→confirmed 순서, 필수 constraint의
 우선성, bounded state, atomic live settings와 명시 fallback 의미를 바꾸지 않는다.

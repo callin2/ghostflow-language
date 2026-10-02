@@ -724,7 +724,7 @@ position feedback 17% with provenance
 
 Integral anti-windup follows the safe-tracking rules above, rather than continuously accumulating based only on requested 92%. Do not automatically convert continuous PID output to high-frequency time proportioning for relay-only actuators. Without a separate capability/safety contract, hysteresis/on-off is appropriate for relays.
 
-The first accepted sample initializes previous error and previous measurement to current values, with D=0 and no integration of an imaginary previous interval. Current PID `fault` accepts only `disable`. `degraded Name` is a selected design alternative unsupported by the current compiler. `bias`, `anti_windup`, `disabled`, `transfer`, `fault` and `restart` cannot be omitted. Restart is `reset(output: value)` with typed output. A continuity-validated `checkpoint` is a selected design alternative unsupported by the current compiler. `reset(output:v)` sets integral tracking state at the first accepted sample so its first unclamped requested equals explicit `v`. Disable and manual→auto transfer track the current safe target. Setpoint and gains may be typed operator settings. Live events apply atomically within the same program/run without resetting controller/timer/filter state. At the next normal evaluation, `track_safe` continues bumplessly. Showing a setpoint in the farmer UI does not mean exposing every expert gain with the same permissions.
+The first accepted sample initializes previous error and previous measurement to current values, with D=0 and no integration of an imaginary previous interval. Current PID `fault` accepts only `disable`. `degraded Name` is a selected design alternative unsupported by the current native Temperature PID profile. `bias`, `anti_windup`, `disabled`, `transfer`, `fault` and `restart` cannot be omitted. Restart is `reset(output: value)` with typed output. A continuity-validated `checkpoint` is a selected design alternative unsupported by the current native Temperature PID profile. `reset(output:v)` sets integral tracking state at the first accepted sample so its first unclamped requested equals explicit `v`. Disable and manual→auto transfer track the current safe target. Setpoint and gains may be typed operator settings. Live events apply atomically within the same program/run without resetting controller/timer/filter state. At the next normal evaluation, `track_safe` continues bumplessly. Showing a setpoint in the farmer UI does not mean exposing every expert gain with the same permissions.
 
 **Why:** A farmer's goal is maintaining a condition such as temperature or humidity. Making an algorithm name the higher-level intent prevents explaining relay, PI and PID replacement and safety clamps under one objective.
 
@@ -758,7 +758,7 @@ degraded TemperatureFallback for greenhouse_temperature {
 }
 ```
 
-Select the one satisfied branch with greatest i32 priority; a tie is an ambiguity error. Declaration order is not a selection criterion. `otherwise` is required; the current compiler accepts only `disable`. A complete branch is a selected design alternative not yet supported. Resume must be one of `require_start`, `automatic`, `stay_degraded`. Even `automatic` creates no new start authority and returns to primary only while the existing session remains valid. Fallback authority cannot exceed primary or possess safety authority.
+Select the one satisfied branch with greatest i32 priority; a tie is an ambiguity error. Declaration order is not a selection criterion. `otherwise` is required; the current compiler accepts only `disable`. A full fallback branch in `otherwise` is a selected design alternative not yet supported. Resume must be one of `require_start`, `automatic`, `stay_degraded`. Even `automatic` creates no new start authority and returns to primary only while the existing session remains valid. Fallback authority cannot exceed primary or possess safety authority. The compiler accepts structurally validated degraded descriptors marked `requires-native-fallback-binding`; this is not executable fallback support. The native Temperature PID profile rejects degraded control until an executable fallback binding exists.
 
 ## 4.14 Bounded adaptation
 
@@ -809,9 +809,9 @@ Observation/display layers consume decided values and evidence. Do not create in
 
 This chapter establishes the surfaces for Result transforms, bounded signals/windows, capability strategies, named constraints, shared resources, objectives/PI/PID, degraded control and bounded adaptation. Only these details refer to their owning chapters' contracts:
 
-- Rolling-budget history, scan boundaries and reboot policy: chapter 3 time/accounting contract.
-- General typing rules for quantity, delta, Result and quality predicates: chapter 2 type contract.
-- Installation binding and live-settings event records: chapters 5–6 settings/composition contracts.
+- Rolling-budget history, scan boundaries and reboot policy: [chapter 3 time/accounting contract](03-time-and-schedules.en.md#310-time-based-usage-constraints).
+- General typing rules for quantity, delta, Result and quality predicates: [chapter 2 Result contract](02-types-expressions-state.en.md#25-sensor-results-and-explicit-error-flow) and [quantity/unit contract](02-types-expressions-state.en.md#29-physical-quantities-and-units).
+- Installation binding and live-settings event records: [chapter 5 settings contract](05-settings-and-observation.en.md#52-source-changes-and-operating-settings-changes), [identity records](05-settings-and-observation.en.md#54-identity-and-physical-fact-boundaries), and [chapter 6 composition contract](06-composition-and-replay.en.md#63-parameters-settings-dependencies-and-bindings).
 
 These references do not change the Result/Option distinction, requested→safe→applied→confirmed sequence, mandatory constraint precedence, bounded state, atomic live settings or explicit fallback semantics.
 

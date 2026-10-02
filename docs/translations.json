@@ -390,8 +390,8 @@
       "source": "docs/reference/04-sensors-constraints-control.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/04-sensors-constraints-control.en.md",
-      "sourceSha256": "5606e95d24283e7cea441b27421d0e64cb91a064d0abc3df0fae8aaace2ea013",
-      "translationSha256": "5e2e2c00955ba5c45950bcb2c2ccdbbdbf6daeecb19ec1aa9745432e766d5a26"
+      "sourceSha256": "e9f6c0b874fa534c06cfa49e39e5321b65246152f7ce6e4d5f58c749553cf4bf",
+      "translationSha256": "500fdbcfcf7c513bf9ae020537a6752aa03e67d87720c984c1255c2751bc8851"
     },
     {
       "source": "docs/reference/05-settings-and-observation.md",

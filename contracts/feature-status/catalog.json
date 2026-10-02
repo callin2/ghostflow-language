@@ -3365,6 +3365,46 @@
       ]
     },
     {
+      "id": "reference-control-chapter-boundaries",
+      "family": "Selected control surfaces and owning chapter documentation contracts",
+      "clause": {
+        "path": "docs/reference/04-sensors-constraints-control.md",
+        "heading": "4.16 확정된 control 문법과 장별 경계"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": ["compile"],
+      "evidence": [{
+        "stage": "compile",
+        "status": "verified",
+        "refs": [{
+          "path": "tests/reference-terms-boundaries.test.mjs",
+          "testId": "REF-04-067: selected control surfaces delegate only accounting types and settings binding records to exact bilingual owner sections",
+          "caseId": "REF-04-067",
+          "assertionClass": "compile-policy",
+          "polarities": ["positive", "boundary"]
+        }, {
+          "path": "tests/reference-terms-boundaries.test.mjs",
+          "testId": "REF-04-067: boundary oracle rejects wrong missing and malformed owner links and selected contract downgrades",
+          "caseId": "REF-04-067",
+          "assertionClass": "compile-policy",
+          "polarities": ["negative", "boundary"]
+        }, {
+          "path": "tests/reference-terms-boundaries.test.mjs",
+          "testId": "REF-04-067: explicit implementation qualifiers do not turn selected surfaces into production completion",
+          "caseId": "REF-04-067",
+          "assertionClass": "compile-policy",
+          "polarities": ["positive", "negative", "boundary"]
+        }]
+      }],
+      "gaps": [
+        "Tooling checks selected bilingual documentation contracts, exact owner links and explicit implementation qualifiers only. They do not prove parser, compiler, runtime, same-tick controller/resource binding, Run overlap, publishing host, Driver or physical implementation. Deferred decisions and unsupported notation retain their existing owners; no grammar or architecture decision is made here."
+      ],
+      "issues": [261],
+      "referenceCaseIds": ["REF-04-067"]
+    },
+    {
       "id": "reference-terms-boundaries",
       "family": "Reference identity and effect boundary terms",
       "clause": {
