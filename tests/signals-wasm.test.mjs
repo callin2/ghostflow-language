@@ -202,6 +202,17 @@ test('real WASM stale boundary and fresh conditioner reboot start at NotReady', 
   assert.equal(fresh.read(0).value, null);
 });
 
+test('real WASM REF-04-023 delayed evaluation and duplicate samples keep the 3999 Good and 4000 Stale boundary', async t => {
+  const sensor = await realConditioner(t, { staleMs: 3_000 });
+  const sample = goodSample(1, 42, 1000);
+  assert.equal(sensor.update(sample, 1500).quality, 'Good');
+  assert.equal(sensor.read(2500).value, 42);
+  assert.deepEqual(sensor.update(sample, 3999), { ok: true, value: 42, quality: 'Good', dry: false });
+  assert.deepEqual(sensor.read(4000), { ok: false, value: null, quality: 'Stale', dry: false });
+  assert.deepEqual(sensor.update(sample, 4001), { ok: false, value: null, quality: 'Stale', dry: false });
+  assert.deepEqual(sensor.sampleIdentity(), { epoch: 1, id: 1, timestampMs: 1000 });
+});
+
 test('real WASM sample identity preserves accepted, duplicate, and fault samples and reset clears it', async t => {
   const sensor = await realConditioner(t, { window: 1, recoverSamples: 1 });
   assert.equal(sensor.sampleIdentity(), null);

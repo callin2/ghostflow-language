@@ -798,6 +798,26 @@ mod tests {
     }
 
     #[test]
+    fn ref_04_023_stale_boundary_uses_sample_time_not_filter_evaluation() {
+        let mut s = sensor(Filter::Median(1), 1);
+        let sample = good(1, 1_000, 42.0);
+        assert_eq!(s.update(sample, 1_500), Ok(UpdateResult::Accepted));
+        for now in [1_500, 2_500] {
+            assert_eq!(s.reading(now), Ok(42.0));
+            assert_eq!(s.quality(now), Quality::Good);
+            assert_eq!(s.accepted_sample_identity(), Some((1, 1, 1_000)));
+        }
+        assert_eq!(s.update(sample, 3_999), Ok(UpdateResult::Duplicate));
+        assert_eq!(s.reading(3_999), Ok(42.0));
+        assert_eq!(s.quality(3_999), Quality::Good);
+        assert_eq!(s.reading(4_000), Err(SensorFault::Stale));
+        assert_eq!(s.quality(4_000), Quality::Stale);
+        assert_eq!(s.update(sample, 4_001), Ok(UpdateResult::Duplicate));
+        assert_eq!(s.reading(4_001), Err(SensorFault::Stale));
+        assert_eq!(s.accepted_sample_identity(), Some((1, 1, 1_000)));
+    }
+
+    #[test]
     fn recovery_requires_both_filter_and_recover_count() {
         let mut s = sensor(Filter::Median(5), 3);
         for id in 1..=4 {
