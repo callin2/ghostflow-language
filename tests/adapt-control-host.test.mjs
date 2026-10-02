@@ -233,3 +233,83 @@ test('REF-04-034: activated absence and installed Disconnected retain profile id
   }
   assert.deepEqual(captures[0], captures[1], 'plain and framed hosts execute identical captured inputs and traces');
 });
+
+test('REF-04-038: equal winning priorities reject both declaration orders in actual host activation', async t => {
+  const original = (Array.isArray(cases) ? cases : cases.cases).find(item => item.id === 'REF-04-038');
+  assert.ok(original, 'original strategy ambiguity Reference case must remain available');
+  assert.equal(original.status, 'specified');
+  assert.equal(original.scope, 'host');
+  assert.equal(original.issue, 'https://github.com/callin2/ghostflow-language/issues/242');
+  const hash = value => createHash('sha256').update(value).digest('hex');
+  const wire = value => JSON.parse(JSON.stringify(value));
+  const strategies = {
+    A: 'strategy A priority 10 match (pump: actuator<Bool>) { pump <- false; }',
+    B: 'strategy B priority 10 match (pump: actuator<Bool>) { pump <- true; }',
+    C: 'strategy C priority 11 match (pump: actuator<Bool>) { pump <- enabled; }',
+  };
+  const candidates = [];
+  for (const order of ['AB', 'BA', 'ABC', 'CAB', 'BCA']) {
+    const source = `# Unique winning strategy\n\n\`\`\`ghost\ncontrol PrioritySelection {\n  input enabled: Bool;\n  output pump: Bool;\n  adapt policy {\n    ${[...order].map(name => strategies[name]).join('\n    ')}\n  }\n}\n\`\`\`\n`;
+    const compiled = await compileSource(source, { filename: `strategy-priority-${order}.ghost.md` });
+    const identity = { sourceSha256: hash(source), bytecodeSha256: hash(compiled.bytes),
+      manifestSha256: hash(JSON.stringify(compiled.manifest)), module: compiled.traceMetadata.moduleFingerprint };
+    assert.equal(identity.bytecodeSha256, compiled.manifest.bytecodeSha256);
+    candidates.push({ order, compiled, identity });
+  }
+  assert.notEqual(candidates[0].identity.sourceSha256, candidates[1].identity.sourceSha256);
+  const captures = [];
+  for (const Owner of [GhostFlowRuntime, FramedGhostFlowRuntime]) {
+    const records = [];
+    for (const { order, compiled, identity } of candidates) {
+      for (const capabilities of [[], [{ kind: 'actuator', name: 'pump', type: 'bool' }]]) {
+        const runtime = await Owner.instantiate(wasm);
+        t.after(() => runtime.dispose());
+        runtime.load(compiled.bytes);
+        const activation = wire({ capabilities, sha256: hash(JSON.stringify(capabilities)) });
+        for (const cap of activation.capabilities) runtime.addCapability(cap.kind, cap.name, cap.type);
+        const snapshot = { scanId: 0, logicalTimeMs: 0, inputs: [{ name: 'enabled', value: true }] };
+        const scan = () => {
+          if (Owner === FramedGhostFlowRuntime) return runtime.scan(snapshot).trace;
+          runtime.setBool('enabled', true); runtime.tickAt(0); return runtime.trace;
+        };
+        const expectedError = capabilities.length === 0 ? 'no device strategy matches capabilities'
+          : order.includes('C') ? null : 'ambiguous winning device strategies';
+        if (expectedError) {
+          let rejected;
+          assert.throws(() => runtime.activate(), cause => {
+            rejected = cause.message; return rejected === expectedError;
+          });
+          // Loading or failed selection never grants an executable strategy.
+          let scanRejected;
+          assert.throws(scan, cause => {
+            scanRejected = cause.message;
+            return scanRejected === (Owner === FramedGhostFlowRuntime ? 'framed runtime is not active' : 'runtime is not active');
+          });
+          if (Owner === FramedGhostFlowRuntime) assert.equal(runtime.outcome, null);
+          else assert.equal(runtime.journalLength, 0);
+          records.push({ order, identity, activation, rejected, snapshot, scanRejected });
+          continue;
+        }
+        runtime.activate();
+        const traces = [];
+        for (const [scanId, enabled] of [true, false].entries()) {
+          let trace;
+          const input = { scanId, logicalTimeMs: scanId, inputs: [{ name: 'enabled', value: enabled }] };
+          if (Owner === FramedGhostFlowRuntime) trace = runtime.scan(input).trace;
+          else { runtime.setBool('enabled', enabled); runtime.tickAt(scanId); trace = runtime.trace; }
+          assert.equal(trace.module, identity.module);
+          assert.equal(trace.strategy, 'C', 'a unique higher priority wins despite lower ties and declaration order');
+          assert.equal(trace.inputs.enabled, enabled);
+          assert.deepEqual(trace.requested, { pump: enabled });
+          assert.deepEqual(trace.safe, trace.requested);
+          traces.push(wire({ snapshot: input, trace }));
+        }
+        records.push({ order, identity, activation, traces });
+      }
+    }
+    captures.push(records);
+  }
+  const comparable = records => records.map(({ scanRejected, ...record }) => record);
+  assert.deepEqual(comparable(captures[0]), comparable(captures[1]),
+    'plain and framed owners agree on captured activation errors and selected execution');
+});
