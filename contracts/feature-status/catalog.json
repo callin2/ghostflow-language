@@ -4196,6 +4196,33 @@
       "referenceCaseIds": ["REF-04-036"]
     },
     {
+      "id": "strategy-winning-priority",
+      "family": "Unique winning priority in host strategy activation",
+      "clause": {
+        "path": "docs/reference/04-sensors-constraints-control.en.md",
+        "heading": "4.6 Device queries and strategy selection"
+      },
+      "owner": "HOST",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": ["host_simulation"],
+      "evidence": [{
+        "stage": "host_simulation",
+        "status": "verified",
+        "refs": [{
+          "path": "tests/adapt-control-host.test.mjs",
+          "testId": "REF-04-038: equal winning priorities reject both declaration orders in actual host activation",
+          "caseId": "REF-04-038",
+          "assertionClass": "simulation",
+          "targets": ["wasm"],
+          "polarities": ["positive", "negative", "boundary"]
+        }]
+      }],
+      "gaps": ["Actual plain/framed WASM owners reject equal winning priorities in both declaration orders, prevent execution after rejection, and select a unique higher priority despite lower ties. Source, bytecode, manifest and profile digests identify bounded caller-supplied activation evidence; no live profile-revision API, physical binding, Device operation or native-host parity is claimed."],
+      "issues": [242],
+      "referenceCaseIds": ["REF-04-038"]
+    },
+    {
       "id": "product-boundary",
       "family": "Farmer UI, installation and deployment",
       "clause": {
