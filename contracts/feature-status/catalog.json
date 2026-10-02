@@ -4382,6 +4382,21 @@
       "issues": [255], "referenceCaseIds": ["REF-04-057"]
     },
     {
+      "id": "pid-effective-saturation",
+      "family": "PID effective saturation and distinct output observations",
+      "clause": { "path": "docs/reference/04-sensors-constraints-control.en.md", "heading": "4.12 Continuous control objectives" },
+      "owner": "CORE", "maturity": "EXPERIMENTAL", "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [{ "stage": "native_wasm", "status": "verified", "refs": [{
+        "path": "tests/objective-adapt-structural.test.mjs",
+        "testId": "REF-04-060 canonical native/WASM PID records distinct observation stages and conditional_safe rejects saturation growth",
+        "caseId": "REF-04-060", "assertionClass": "target-parity",
+        "targets": ["native", "wasm"], "polarities": ["positive", "negative", "boundary"]
+      }] }],
+      "gaps": ["Same checked canonical GFB11 Temperature/Percent PID source executes on native/WASM over identical accepted sensor-conditioned rails. Actual requested92/safe20 and separately declared applied20/feedback17 fixture inputs retain their distinct identities and quality flag. Perturbed applied/feedback observations cannot replace safe saturation. Repeated constrained deadlines followed by release97 prove conditional_safe rejects integral growth. Public applied/feedback/provenance inputs are explicit host fixtures, not a production Driver receipt or feedback-admission ABI, physical verification, continuous resource arbitration binding, or an independent native sensor producer. The selected policy is read from the compiled descriptor; production trace schema is unchanged."],
+      "issues": [256], "referenceCaseIds": ["REF-04-060"]
+    },
+    {
       "id": "product-boundary",
       "family": "Farmer UI, installation and deployment",
       "clause": {
