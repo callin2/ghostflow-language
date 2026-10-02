@@ -16,7 +16,7 @@ const typedArrayByteLength = Object.getOwnPropertyDescriptor(Object.getPrototype
 const arrayBufferByteLength = Object.getOwnPropertyDescriptor(ArrayBuffer.prototype, 'byteLength').get;
 const requiredFunctions = Object.freeze([
   'gf_alloc', 'gf_dealloc',
-  'gf_frame_create', 'gf_frame_destroy', 'gf_frame_load', 'gf_frame_add_capability', 'gf_frame_initialize_restart', 'gf_frame_restart_event_pending', 'gf_frame_activate', 'gf_frame_activate_temporal', 'gf_frame_scan',
+  'gf_frame_create', 'gf_frame_destroy', 'gf_frame_load', 'gf_frame_add_capability', 'gf_frame_initialize_restart', 'gf_frame_restart_event_pending', 'gf_frame_validate', 'gf_frame_activate', 'gf_frame_activate_temporal', 'gf_frame_scan',
   'gf_frame_outcome_ptr', 'gf_frame_outcome_len', 'gf_frame_error_ptr', 'gf_frame_error_len',
   'gf_frame_replay_temporal', 'gf_frame_replay_ptr', 'gf_frame_replay_len',
   'gf_frame_plan_temporal', 'gf_frame_plan_temporal_replay', 'gf_frame_resource_plan_ptr', 'gf_frame_resource_plan_len',
@@ -165,6 +165,8 @@ export class FramedGhostFlowRuntime {
   }
 
   activate() { this.#live(); this.#check(this.wasm.gf_frame_activate(this.handle)); }
+  /** Validate capabilities without starting a scan run or initializing lifecycle inputs. */
+  validate() { this.#live(); this.#check(this.wasm.gf_frame_validate(this.handle)); }
   activateTemporal(profile) {
     this.#live();
     this.#bytes(encodeTemporalProfile(profile), (p, n) => this.#check(this.wasm.gf_frame_activate_temporal(this.handle, p, n)));

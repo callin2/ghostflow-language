@@ -76,6 +76,11 @@ and event input, and the loader validates them against the base module. The
 manifest mirrors these values for host binding checks. The base control profile
 and its version remain unchanged.
 
+A validation-only host may call `gf_frame_validate(handle)` or
+`FramedGhostFlowRuntime.validate()` after loading the module and registering its
+capabilities. This checks capability compatibility and leaves the handle in its
+configuring state. It does not initialize lifecycle inputs or permit scans.
+
 Before activation, call
 `gf_frame_initialize_restart(handle, reason_ordinal:u8, event_pending:u8)` or
 `FramedGhostFlowRuntime.initializeRestart(reasonOrdinal, eventPending)`. The

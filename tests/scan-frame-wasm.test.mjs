@@ -97,8 +97,8 @@ test('GF-TEST-restart-lifecycle-wasm: initialize before activation and consume e
     type RestartReason = PowerOn | Brownout | Watchdog | Software | Unknown;
     input restart_reason: RestartReason;
     input restart_event: Bool;
-    state seen: Bool = false;
-    seen' = restart_event;
+    output recover: Bool;
+    recover <- restart_event;
   }`);
   const runtime = await FramedGhostFlowRuntime.instantiate(wasmBytes);
   t.after(() => runtime.dispose());
@@ -110,6 +110,10 @@ test('GF-TEST-restart-lifecycle-wasm: initialize before activation and consume e
   malformed[descriptorAt] = 'X'.charCodeAt(0);
   assert.throws(() => runtime.load(malformed), /invalid lifecycle descriptor/);
   runtime.load(module.bytes);
+  runtime.addCapability('actuator', 'recover', 'bool');
+  runtime.validate();
+  runtime.validate();
+  assert.throws(() => runtime.scan({ scanId: 0, logicalTimeMs: 0, inputs: [] }), /not active/);
   assert.throws(() => runtime.activate(), /restart lifecycle initialization is required/);
   runtime.initializeRestart(2, true);
   assert.equal(runtime.restartEventPending, true);
@@ -503,7 +507,7 @@ test('GF-TEST-scan-frame-wasm: wrapper rejects non-buffer and oversized module i
   let scans = 0;
   const memory = new WebAssembly.Memory({ initial: 1 });
   const functions = Object.fromEntries([
-    'gf_dealloc', 'gf_frame_destroy', 'gf_frame_load', 'gf_frame_add_capability', 'gf_frame_initialize_restart', 'gf_frame_restart_event_pending', 'gf_frame_activate', 'gf_frame_activate_temporal',
+    'gf_dealloc', 'gf_frame_destroy', 'gf_frame_load', 'gf_frame_add_capability', 'gf_frame_initialize_restart', 'gf_frame_restart_event_pending', 'gf_frame_validate', 'gf_frame_activate', 'gf_frame_activate_temporal',
     'gf_frame_outcome_ptr', 'gf_frame_outcome_len', 'gf_frame_error_ptr', 'gf_frame_error_len',
     'gf_frame_replay_temporal', 'gf_frame_replay_ptr', 'gf_frame_replay_len',
     'gf_frame_plan_temporal', 'gf_frame_plan_temporal_replay', 'gf_frame_resource_plan_ptr', 'gf_frame_resource_plan_len',

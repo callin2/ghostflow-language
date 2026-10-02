@@ -474,8 +474,8 @@
       "source": "docs/SCAN-FRAME-WASM.md",
       "sourceLanguage": "en",
       "translation": "docs/SCAN-FRAME-WASM.ko.md",
-      "sourceSha256": "87a95eb7204617bbf11483d7481b183841d5ab588ef9c17344c6768e468f9701",
-      "translationSha256": "04772277e085d12b42a70ad73e5722da7b72d73cd30c175009c9e51fdf001538"
+      "sourceSha256": "39fa85f338507bf93efa70a7bc2ecebec128ba7220f351622124d6807f0d8dea",
+      "translationSha256": "a621eba8f4be548710f4f2429aaf53b7aaf4fa207edb18605d912930203012f8"
     },
     {
       "source": "docs/SCAN-TAPE-PARITY.md",

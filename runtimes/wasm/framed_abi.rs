@@ -320,6 +320,22 @@ pub unsafe extern "C" fn gf_frame_activate(handle: *mut FramedHandle) -> i32 {
     }
 }
 
+/// Validates loaded bytecode and host capabilities without starting a scan run.
+/// This is for validation-only adapters; lifecycle initialization is not implied.
+#[no_mangle]
+pub unsafe extern "C" fn gf_frame_validate(handle: *mut FramedHandle) -> i32 {
+    let Some(handle) = handle.as_mut() else {
+        return 0;
+    };
+    match &mut handle.state {
+        FramedState::Configuring(runtime) => match runtime.activate() {
+            Ok(()) => handle.success(),
+            Err(error) => handle.failure(error.to_string()),
+        },
+        FramedState::Active(_) => handle.failure("validation requires a configuring runtime"),
+    }
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn gf_frame_activate_resource_binding(
     handle: *mut FramedHandle,

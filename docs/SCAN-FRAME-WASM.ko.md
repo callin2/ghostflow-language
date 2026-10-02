@@ -79,6 +79,11 @@ wrapper는 원인 input, 순서가 있는 enum 멤버와 이벤트 input을 식�
 기본 module과 대조한다. Manifest도 호스트 binding 검사에 사용할 같은 값을 담는다.
 기본 control profile과 그 버전은 바뀌지 않는다.
 
+검증 전용 호스트는 module을 불러오고 capability를 등록한 뒤
+`gf_frame_validate(handle)` 또는 `FramedGhostFlowRuntime.validate()`를 호출할 수 있다.
+이 호출은 capability 호환성을 검사하고 handle을 구성 상태에 둔다. Lifecycle input을
+초기화하지 않으며 scan도 허용하지 않는다.
+
 활성화 전에 `gf_frame_initialize_restart(handle, reason_ordinal:u8,
 event_pending:u8)` 또는 `FramedGhostFlowRuntime.initializeRestart(reasonOrdinal,
 eventPending)`를 호출한다. 원인 ordinal은 선언 순서를 따른다. 원인을 확인할 수 없으면
