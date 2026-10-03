@@ -7121,6 +7121,119 @@
       "referenceCaseIds": [
         "REF-03-049"
       ]
+    },
+    {
+      "id": "software-input-installation-reference",
+      "family": "Explicit software Bool input installation compatibility",
+      "clause": {
+        "path": "docs/reference/06-composition-and-replay.en.md",
+        "heading": "6.2 Definitions, instances, and logical ports"
+      },
+      "owner": "HOST",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "host_simulation",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/software-input-reference.test.mjs",
+              "testId": "REF-06-004 accepts an explicit software Bool input with the same logical direction and semantic type",
+              "caseId": "REF-06-004",
+              "assertionClass": "identity",
+              "targets": [
+                "host"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/software-input-reference.test.mjs",
+              "testId": "REF-06-004 rejects software input direction and semantic type mismatches with complete errors",
+              "caseId": "REF-06-004",
+              "assertionClass": "identity",
+              "targets": [
+                "host"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/software-input-reference.test.mjs",
+              "testId": "REF-06-004 rejects missing or incorrect explicit software input bindings",
+              "caseId": "REF-06-004",
+              "assertionClass": "identity",
+              "targets": [
+                "host"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/software-input-reference.test.mjs",
+              "testId": "REF-06-004 rejects hash and identity mismatches instead of relabeling software input source",
+              "caseId": "REF-06-004",
+              "assertionClass": "identity",
+              "targets": [
+                "host"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/software-input-reference.test.mjs",
+              "testId": "REF-06-004 fixture source, artifact manifest and identities are hash-consistent exact bytes",
+              "caseId": "REF-06-004",
+              "assertionClass": "identity",
+              "targets": [
+                "host"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/software-input-reference.test.mjs",
+              "testId": "REF-06-004 software compatibility does not become hardware or physical proof",
+              "caseId": "REF-06-004",
+              "assertionClass": "identity",
+              "targets": [
+                "host"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Production Node installation/release/run validator executes complete deterministic positive/negative binding and semantic-type oracles on exact hash-consistent fictional artifacts, preserving inputs and unknown physical gates. Host-only admission evidence is explicit; no native Rust/WASM execution, actual Device binding, hardware or physical verification is claimed."
+      ],
+      "issues": [
+        292
+      ],
+      "referenceCaseIds": [
+        "REF-06-004"
+      ]
     }
   ]
 }
