@@ -144,3 +144,7 @@ marks its history Unknown and advances its revision. Retry requires explicit
 restoration of the saved trusted checkpoint; it does not silently reset usage.
 These transports supply no production clock/binding provider, receipt
 authentication or physical storage/application certification.
+
+## Stop-delay reservation acceptance
+
+REF-03-049 uses the authored finite expression `reserve = worst_case_on + stop_delay`, with 5min maximum ON and 2min stop delay. A 7min reservation cannot fit in 6min remaining. The native `stop_delay_reservation_tape` test transport links this production C ABI and matches source-bound WASM statuses, revisions, complete checkpoint bytes and rolling explanations through fresh replay. A restored outstanding reservation remains charged even after old applied intervals leave the window. Missing or corrupt durable evidence is Unknown; no elapsed-time refund or evidence-free settlement occurs. Only a separately supplied correlated applied receipt and explicit durable acknowledgement can settle the reservation. Resource identity, monotonic-time comparability, storage acknowledgement and receipt validation are trusted test-host inputs; this fixture does not establish physical cutoff, storage durability or automatic output admission.

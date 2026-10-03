@@ -7032,6 +7032,95 @@
       "referenceCaseIds": [
         "REF-08-013"
       ]
+    },
+    {
+      "id": "stop-delay-reservation-reference",
+      "family": "Finite reserve includes stop delay and retains uncertainty",
+      "clause": {
+        "path": "docs/reference/03-time-and-schedules.en.md",
+        "heading": "3.10 Time-based usage constraints"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/stop-delay-reservation-reference.test.mjs",
+              "testId": "REF-03-049 five-minute maximum ON plus two-minute stop delay rejects six-minute remaining budget without mutation and admits exact seven-minute recovery",
+              "caseId": "REF-03-049",
+              "assertionClass": "rollback",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/stop-delay-reservation-reference.test.mjs",
+              "testId": "REF-03-049 power-loss restore retains uncertain outstanding reservation after window expiry and rejects evidence-free release or duplicate collision",
+              "caseId": "REF-03-049",
+              "assertionClass": "rollback",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/stop-delay-reservation-reference.test.mjs",
+              "testId": "REF-03-049 missing or corrupt durable state stays Unknown and fails closed until explicit restore with the outstanding reservation intact",
+              "caseId": "REF-03-049",
+              "assertionClass": "rollback",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/stop-delay-reservation-reference.test.mjs",
+              "testId": "REF-03-049 only correlated applied receipt evidence settles the reservation and source-bound guards reject omitting stop delay",
+              "caseId": "REF-03-049",
+              "assertionClass": "rollback",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Authored reserve=5min+2min lowers to7min; remaining6min rejects before persistence/mutation and exact7min recovery admits after explicit acknowledgement. Source-bound WASM and production native accounting C ABI compare all statuses/revisions/checkpoint bytes/explanations and fresh replay. Outstanding reservations persist through restored power-loss state and do not expire by elapsed time; missing/corrupt state is Unknown. Missing settlement evidence, zero cancellation identity and reservation collision preserve reservation; only correlated applied receipt settlement releases it. Trusted test host supplies storage acknowledgement, resource binding and comparable monotonic time. No automatic output admission, physical cutoff, receipt authenticity or general manual-operation/rolling-budget #96 completion is claimed."
+      ],
+      "issues": [
+        228
+      ],
+      "referenceCaseIds": [
+        "REF-03-049"
+      ]
     }
   ]
 }

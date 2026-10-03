@@ -127,3 +127,7 @@ checkpoint bytes, revision과 known/Unknown query를 WASM과 비교한다.
 신뢰할 수 있는 checkpoint를 명시적으로 복원해야 하며, 사용량을 자동으로
 초기화하지 않는다. 이 transport는 production clock/binding provider,
 receipt 인증 또는 물리 저장·적용의 검증을 제공하지 않는다.
+
+## Stop-delay reservation 수용 검증
+
+REF-03-049는 작성된 유한 표현식 `reserve = worst_case_on + stop_delay`를 사용하며 최대 ON5min과 stop delay2min을 포함한다. 남은6min에는7min 예약을 할 수 없다. native `stop_delay_reservation_tape` 테스트 transport는 이 production C ABI를 연결하며 source-bound WASM의 status, revision, 전체 checkpoint byte와 rolling explanation을 fresh replay까지 비교한다. 복원된 outstanding reservation은 과거 applied interval이 창을 벗어나도 계속 차감된다. durable 근거가 없거나 손상되면 Unknown이며 경과시간만으로 환불하거나 근거 없이 settlement하지 않는다. 별도로 제공된 correlated applied receipt와 명시적 durable acknowledgement가 있어야 예약을 settlement할 수 있다. resource identity, monotonic-time 비교 가능성, storage acknowledgement와 receipt 검증은 신뢰된 test-host 입력이며 이 fixture는 물리 cutoff, storage durability 또는 자동 output admission을 입증하지 않는다.
