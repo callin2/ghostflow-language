@@ -113,6 +113,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/natural-fallback-runtime.test.mjs',
   'tests/accounting-syntax.test.mjs',
   'tests/accounting-wasm.test.mjs',
+  'tests/reference-03-048-local-day-accounting.test.mjs',
   'tests/rolling-overlap-admission-boundary.test.mjs',
   'tests/applied-ledger-evidence-boundary.test.mjs',
   'tests/ghost-timeline-noninterference.test.mjs',
