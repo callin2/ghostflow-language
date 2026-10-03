@@ -45,14 +45,20 @@ export function compileComposition(source, filename, supplied) {
     validateCompositionStructure(ast);
     const unit = { ast, extraction, imports: new Map(), filename: name };
     units.set(key, unit); active.add(key);
+    const dependencyContext = (entry, actual) => {
+      const instances = ast.body.filter(node => node.kind === 'instance' && node.alias === entry.name).map(node => node.name);
+      const ports = ast.body.filter(node => node.kind === 'connect').flatMap(node => [node.sink, node.source])
+        .filter(endpoint => instances.includes(endpoint.instance)).map(endpoint => endpoint.path);
+      return `; composition contract: definition ${entry.name} (import alias); instances [${instances.join(', ')}]; ports [${[...new Set(ports)].join(', ')}]; expected revision ${entry.revision} sha256 ${entry.sha256}; actual ${actual}; supply the exact pinned dependency before activation`;
+    };
     for (const entry of ast.imports) {
       const target = resolveDocument(name, entry.locator), document = documents.get(target);
-      if (!document) fail(entry.locatorLoc, `missing imported document ${entry.locator} in sourceClosure`, 'GF_IMPORT');
+      if (!document) fail(entry.locatorLoc, `missing imported document ${entry.locator} in sourceClosure${dependencyContext(entry, 'missing')}`, 'GF_IMPORT');
       // A closing edge to an active definition is a structural cycle even
       // when its circular content pin cannot match. Reject before identity
       // checks so the authored back edge retains the specific cycle reason.
       if (active.has(target)) fail(entry.loc, `executable import cycle at ${entry.locator}`, 'GF_IMPORT');
-      if (document.revision !== entry.revision) fail(entry.loc, `import revision mismatch for ${entry.locator}`, 'GF_IMPORT');
+      if (document.revision !== entry.revision) fail(entry.loc, `import revision mismatch for ${entry.locator}${dependencyContext(entry, `revision ${document.revision} sha256 ${document.sha256}`)}`, 'GF_IMPORT');
       if (document.sha256 !== entry.sha256) fail(entry.digestLoc,
         `import sha256 digest mismatch for ${entry.locator}: expected ${entry.sha256}, actual ${document.sha256}`, 'GF_IMPORT');
       used.add(target); unit.imports.set(entry.name, visit(document.text, target));

@@ -1496,7 +1496,17 @@ export function validateCompositionStructure(ast) {
   const writerIdentity = item => item.kind === 'connect'
     ? item.source.path
     : `output expression ${item.name}`;
-  const conflict = (target, item) => `writers ${writerIdentity(suppliers.get(target))} and ${writerIdentity(item)}`;
+  const conflict = (target, item) => {
+    const writers = [suppliers.get(target), item];
+    const affected = writers.map(writer => {
+      const endpoint = writer.kind === 'connect' ? writer.source : null;
+      const instance = endpoint?.instance ? instances.find(node => node.name === endpoint.instance) : null;
+      const imported = instance ? ast.imports.find(entry => entry.name === instance.alias) : null;
+      return { identity: `${instance ? 'import alias' : 'definition'} ${instance?.alias ?? ast.name}/${instance?.name ?? 'root'}/${endpoint?.port ?? writer.name}`,
+        evidence: imported ? `${imported.locator}@${imported.revision} sha256 ${imported.sha256}` : 'root canonical source' };
+    });
+    return `writers ${writers.map(writerIdentity).join(' and ')}; composition contract: definition ${ast.name}; affected [${affected.map(writer => writer.identity).join(', ')}]; expected one supplier; actual 2; evidence revisions [${[...new Set(affected.map(writer => writer.evidence))].join(', ')}]; choose one supplier before activation`;
+  };
   for (const item of ast.body) {
     if (item.kind === 'connection') {
       if (suppliers.has(item.name)) error(item.loc, `duplicate supplier for output ${item.name}: ${conflict(item.name, item)}`);

@@ -64,6 +64,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/HOST-EVENT-ORDERING-CONTRACT.md](HOST-EVENT-ORDERING-CONTRACT.md) | Host event ordering contract | md |
 | [docs/IMPLEMENTATION.ko.md](IMPLEMENTATION.ko.md) | 구현 및 아티팩트 경계 | md |
 | [docs/IMPLEMENTATION.md](IMPLEMENTATION.md) | Implementation and artifact boundaries | md |
+| [docs/INSTANCE-TRACE-PROJECTION.ko.md](INSTANCE-TRACE-PROJECTION.ko.md) | Instance trace projection 참조 어댑터 | md |
+| [docs/INSTANCE-TRACE-PROJECTION.md](INSTANCE-TRACE-PROJECTION.md) | Instance trace projection reference adapter | md |
 | [docs/INTENT-ANCHOR-MAP.ko.md](INTENT-ANCHOR-MAP.ko.md) | Literate intent anchor map | md |
 | [docs/INTENT-ANCHOR-MAP.md](INTENT-ANCHOR-MAP.md) | Literate intent anchor map | md |
 | [docs/INTERACTION-STREAM-CONTRACT.ko.md](INTERACTION-STREAM-CONTRACT.ko.md) | Interaction 스트림 계약 설계 | md |
@@ -94,6 +96,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/LLM-AUTHORING-WORKFLOW.md](LLM-AUTHORING-WORKFLOW.md) | Model independent authoring workflow | md |
 | [docs/LLM-TOOLCHAIN-ARCHITECTURE.ko.md](LLM-TOOLCHAIN-ARCHITECTURE.ko.md) | 작성 및 가상 시뮬레이션 아키텍처 | md |
 | [docs/LLM-TOOLCHAIN-ARCHITECTURE.md](LLM-TOOLCHAIN-ARCHITECTURE.md) | Authoring and virtual simulation architecture | md |
+| [docs/OBSERVATION-EVENT-HISTORY.ko.md](OBSERVATION-EVENT-HISTORY.ko.md) | 보존 범위가 있는 관찰 event 이력 | md |
+| [docs/OBSERVATION-EVENT-HISTORY.md](OBSERVATION-EVENT-HISTORY.md) | Bounded observation event history | md |
 | [docs/OPERATOR-SETTINGS-STREAM.ko.md](OPERATOR-SETTINGS-STREAM.ko.md) | Typed configuration stream | md |
 | [docs/OPERATOR-SETTINGS-STREAM.md](OPERATOR-SETTINGS-STREAM.md) | Typed configuration streams | md |
 | [docs/OPTIMIZER-PASS-CONTRACT.ko.md](OPTIMIZER-PASS-CONTRACT.ko.md) | 최적화 패스 계약 | md |
@@ -135,6 +139,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/TEMPORAL-REPLAY.md](TEMPORAL-REPLAY.md) | Temporal replay through the WASM adapters | md |
 | [docs/TEMPORAL-RESOURCES.ko.md](TEMPORAL-RESOURCES.ko.md) | Temporal resource 계획 | md |
 | [docs/TEMPORAL-RESOURCES.md](TEMPORAL-RESOURCES.md) | Temporal resource planning | md |
+| [docs/TEMPORARY-SETTINGS-HOST.ko.md](TEMPORARY-SETTINGS-HOST.ko.md) | 임시 설정 reference host | md |
+| [docs/TEMPORARY-SETTINGS-HOST.md](TEMPORARY-SETTINGS-HOST.md) | Temporary settings reference host | md |
 | [docs/TESTING.ko.md](TESTING.ko.md) | GhostFlow 적합성 및 신뢰성 테스트 | md |
 | [docs/TESTING.md](TESTING.md) | GhostFlow conformance and reliability testing | md |
 | [docs/TIME-AND-SCHEDULE-CONTRACT.ko.md](TIME-AND-SCHEDULE-CONTRACT.ko.md) | 시간과 Schedule 계약 제안 | md |
@@ -200,6 +206,7 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/reports/2026-09-24-range-cancel-acceptance.md](reports/2026-09-24-range-cancel-acceptance.md) | Range `cancel_when` compiler acceptance — 2026-09-24 | md |
 | [docs/reports/2026-09-24-reference-execution-support-audit.md](reports/2026-09-24-reference-execution-support-audit.md) | Reference execution and support audit — 2026-09-24 | md |
 | [docs/reports/2026-09-24-reference-simulator-evidence.json](reports/2026-09-24-reference-simulator-evidence.json) | 2026-09-24-reference-simulator-evidence.json | json |
+| [docs/reports/2026-10-03-stale-branch-reconciliation.md](reports/2026-10-03-stale-branch-reconciliation.md) | Stale branch reconciliation — 2026-10-03 | md |
 
 ## docs/research/
 
@@ -224,4 +231,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.ko.md](research/GF-COMPOSE-R9-ACCEPTANCE.ko.md) | GF-COMPOSE R9: acceptance와 구현 인계 | md |
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.md](research/GF-COMPOSE-R9-ACCEPTANCE.md) | GF-COMPOSE R9: acceptance and implementation handoff | md |
 
-190 documents.
+197 documents.

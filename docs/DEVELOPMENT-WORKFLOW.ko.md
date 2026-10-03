@@ -139,6 +139,13 @@ node --test tests/doc-translations.test.mjs tests/doc-index.test.mjs
 
 ## 5. 작업 종료 및 반복 개선
 
+같은 저장소의 기능 PR이 `dev`에 병합되면 CI는 현재 원격 tip이 병합 이벤트의
+head SHA와 같을 때만 원격 브랜치를 삭제합니다. 정확한 Git force-with-lease가
+동시 변경을 보호합니다. 포크 head, 없는 tip, 진행된 tip, `main`, `dev`, 기본
+브랜치와 release 브랜치는 보존합니다. 이 자동화는 로컬 브랜치와 작업 트리를
+삭제하지 않습니다. 과거 브랜치의 조상을 보존해야 하는 통합에는 merge commit을
+사용합니다. squash는 원래 tip을 `dev`의 조상으로 만들지 않습니다.
+
 정확한 변경, 증거와 명령, 종료 상태, 관련 건수, 한계 및 연결된 이슈나 풀 리퀘스트를
 보고합니다. 자동 검사 결과가 통과하고 의미, 설계 또는 안전 문제가 남지 않았다면
 전체 검토를 반복하지 않습니다. CI 주기 변경을 제안하기 전에 병목을 측정합니다.

@@ -70,3 +70,64 @@ ledger 스냅샷은 CRC-32 손상 검사가 있는 버전 지정 바이너리 �
 키도 제공하고 자정을 기준으로 세그먼트를 분할해야 한다. 이벤트 ID 보존 기한이나
 정리 정책은 정의되지 않았다. 구성된 이벤트 용량을 초과하면 fail-closed 처리한다.
 이 때문에 이 기본 요소만으로 완전한 `durable` 컴파일러 런타임 바인딩을 제공하지는 않는다.
+
+## Native rolling overlap conformance
+
+테스트 전용 core `accounting_tape` transport는 과거 frame의 선택적 `admission`을
+받는다. 필드는 0이 아닌 정수 `reservationId`, `limitMs`, `reserveMs`, Bool
+`retry`다. 선택한 account의 검증된 source manifest와 window, bound, reserve,
+`on_unknown = block`을 비교한 뒤 실제 `AccountingLedger::reserve_rolling`을
+호출한다. 결과는 native 판단, snapshot 불변 여부, 선택적 동일 요청의 중복 재시도,
+applied 사용량과 미정산 예약량을 보존한다. 관찰만 하는 기존 tape의 출력 모양은
+유지된다.
+
+REF-03-019는 applied interval `(0,20]`, `(30,40]`, window 60초, limit 30초,
+reserve 5초를 사용한다. 40초에는 사용량이 30초이므로 변경 없이 admission을
+거부한다. 65초의 window는 `(5,65]`이며 첫 interval의 15초와 둘째 interval의
+10초가 남아 합계 **25초**, admission을 위한 잔여 예산은 정확히 5초다. 원본
+사례가 같은 시점에 합계 15초라고 한 것은 산술 오류였다. 현재 case의 수치를
+정정하되 ID, backlink와 고정된 역사적 원본은 유지한다.
+
+동일하게 컴파일한 source와 유한 record로 native/WASM 계산 및 known admission의
+일치를 검증한다. Native core transport는 ledger를 명시적으로 직렬화하고 복원한다.
+WASM reference adapter는 추가로 승인되지 않은 예약이 Unknown을 유지하고 명시적
+쓰기 승인 전까지 재시도를 차단함을 검증한다. Native core 직렬화는 그 adapter의
+쓰기 승인이나 물리 저장장치 인증이 아니다. 어느 테스트 transport도 VM 출력을
+물리 resource에 자동 연결하거나 applied receipt의 진위를 인증하지 않는다.
+
+## 선택한 재부팅 예산 프로필 (REF-03-022)
+
+REF-03-022는 기존 durable applied 프로필과 `on_unknown = block`을 선택한다.
+실제 적용 사용량 28초 이후 durable checkpoint 없이 재부팅하면 새 owner는
+Unknown이다. host는 최초 설치용 `initializeEmpty`로 이 이력을 지우면 안 된다.
+누락되거나 손상된 이력은 revision, snapshot 또는 persistence 호출을 변경하지
+않고 5초 reservation을 차단한다. 유효한 checkpoint는 28초를 복구하며 30초
+한도에서 여전히 해당 reservation을 차단한다. 비교 가능한 monotonic 시각
+63초에는 60초 window가 `(0,28]`에서 25초를 유지하므로 5초 reserve가 정확히
+허용된다. native `accounting_reboot_tape`의 production C ABI transport와
+source-bound WASM adapter는 전체 snapshot 및 admission 결과가 일치한다.
+재부팅을 가로지르는 비교 가능한 monotonic timeline은 caller의 책임이다.
+이 선택된 프로필은 window 만료 후 자동 reset이나 non-durable 프로필을 채택하지 않는다.
+
+## Local-day 적합성 test transport (REF-03-048)
+
+범위가 제한된 test host는 설치된 Intl timezone 자료로 서울 자정을 해석하고
+최종 applied 구간을 분할한다. 독립적인 Automatic/Manual 논리 pump 요청은
+공급된 하나의 resource identity에 연결한다. 요청은 물리 적용의 증거가 아니다.
+ledger는 겹치는 applied 구간을 한 번만 합산한다. 23:50–00:10은 각 local day에
+10분씩, 별도의 rolling 24시간 query에는 20분을 기록한다.
+
+test 전용 `accounting_tape`는 명시적인 segment day tag, 제한된 day query,
+선택적인 전체 record checkpoint를 지원한다. test 전용
+`accounting_local_day_tape`는 production C ABI를 연결해 전체 status,
+checkpoint bytes, revision과 known/Unknown query를 WASM과 비교한다.
+동일 receipt 재전달은 사용량과 checkpoint를 바꾸지 않는다. 잘못된 applied
+구간은 primitive ledger를 변경하지 않지만, production C ABI는 보수적으로
+이력을 Unknown으로 표시하고 revision을 증가시킨다. retry하려면 저장된
+신뢰할 수 있는 checkpoint를 명시적으로 복원해야 하며, 사용량을 자동으로
+초기화하지 않는다. 이 transport는 production clock/binding provider,
+receipt 인증 또는 물리 저장·적용의 검증을 제공하지 않는다.
+
+## Stop-delay reservation 수용 검증
+
+REF-03-049는 작성된 유한 표현식 `reserve = worst_case_on + stop_delay`를 사용하며 최대 ON5min과 stop delay2min을 포함한다. 남은6min에는7min 예약을 할 수 없다. native `stop_delay_reservation_tape` 테스트 transport는 이 production C ABI를 연결하며 source-bound WASM의 status, revision, 전체 checkpoint byte와 rolling explanation을 fresh replay까지 비교한다. 복원된 outstanding reservation은 과거 applied interval이 창을 벗어나도 계속 차감된다. durable 근거가 없거나 손상되면 Unknown이며 경과시간만으로 환불하거나 근거 없이 settlement하지 않는다. 별도로 제공된 correlated applied receipt와 명시적 durable acknowledgement가 있어야 예약을 settlement할 수 있다. resource identity, monotonic-time 비교 가능성, storage acknowledgement와 receipt 검증은 신뢰된 test-host 입력이며 이 fixture는 물리 cutoff, storage durability 또는 자동 output admission을 입증하지 않는다.

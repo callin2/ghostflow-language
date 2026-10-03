@@ -234,6 +234,26 @@ impl ConfigStream {
     /// Normalize one candidate on a clone; semantic invalidity is an error rail,
     /// not an engine exception. Callers commit only a complete aggregate.
     pub fn validate(&self, semantic_type: &str, value: &ConfigValue) -> Option<(ConfigValue, u64)> {
+        self.validate_candidate(semantic_type, value, false)
+    }
+
+    /// Restore allocated ordinary row identities after a host-validated overlay.
+    /// Ordinary edits still cannot resurrect a retired key, and this path never
+    /// accepts unallocated keys or bypasses type, grid, capacity or uniqueness.
+    pub fn validate_temporary_return(
+        &self,
+        semantic_type: &str,
+        value: &ConfigValue,
+    ) -> Option<(ConfigValue, u64)> {
+        self.validate_candidate(semantic_type, value, true)
+    }
+
+    fn validate_candidate(
+        &self,
+        semantic_type: &str,
+        value: &ConfigValue,
+        temporary_return: bool,
+    ) -> Option<(ConfigValue, u64)> {
         let d = &self.descriptor;
         if semantic_type != d.semantic_type {
             return None;
@@ -292,7 +312,9 @@ impl ConfigStream {
                             return None;
                         }
                         key
-                    } else if prior.iter().any(|(old, _)| *old == key) {
+                    } else if prior.iter().any(|(old, _)| *old == key)
+                        || temporary_return && key < self.next_key
+                    {
                         key
                     } else {
                         return None;
@@ -369,6 +391,50 @@ fn numeric_domain(kind: &str, value: f64) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn temporary_return_preserves_allocated_row_without_weakening_ordinary_edit() {
+        let descriptor = ConfigDescriptor {
+            id: 1,
+            name: "slots".into(),
+            semantic_type: "TimeSlots<900000ms,3>".into(),
+            kind: 3,
+            operator_editable: true,
+            initial: ConfigValue::Slots(vec![(1, 360)]),
+            bounds: None,
+            grid_ms: 900000,
+            capacity: 3,
+            ok_input: 0,
+            value_input: 1,
+            fault_input: 2,
+        };
+        let mut stream = ConfigStream::new(descriptor).unwrap();
+        let original = stream.last_success.clone();
+        let (temporary, next) = stream
+            .validate("TimeSlots<900000ms,3>", &ConfigValue::Slots(vec![(0, 480)]))
+            .unwrap();
+        stream.last_success = temporary;
+        stream.next_key = next;
+        assert_eq!(next, 3);
+        assert!(stream
+            .validate("TimeSlots<900000ms,3>", &original)
+            .is_none());
+        assert_eq!(
+            stream.validate_temporary_return("TimeSlots<900000ms,3>", &original),
+            Some((original, 3))
+        );
+        for invalid in [
+            ConfigValue::Slots(vec![(3, 360)]),
+            ConfigValue::Slots(vec![(1, 361)]),
+            ConfigValue::Slots(vec![(1, 360), (1, 480)]),
+        ] {
+            assert!(stream
+                .validate_temporary_return("TimeSlots<900000ms,3>", &invalid)
+                .is_none());
+        }
+        assert!(stream
+            .validate_temporary_return("TimeSlots<900000ms,4>", &ConfigValue::Slots(vec![(1, 360)]))
+            .is_none());
+    }
     #[test]
     fn native_descriptor_enforces_integer_and_calendar_max_grid() {
         let mut descriptor = ConfigDescriptor {

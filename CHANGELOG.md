@@ -2,6 +2,37 @@
 
 ## Unreleased
 
+### 2026-10-03 — report retained observation event gaps ([#282](https://github.com/callin2/ghostflow-language/issues/282))
+
+Adds a source-bound reference Host journal that retains explicit events separately from completed snapshots. A consumer at sequence10 receives an explicit missed range11–13 if retention begins at14, with the original event14 and no snapshot-derived synthetic events. Complete publication validates atomically, rejected batches permit same-scan retry, and cursors bind exact source/Program/schema/run identity. REF-05-022 verifies actual native/framed-WASM traces, complete host delivery and fresh replay. This reference API does not change source syntax, Interaction snapshot v0, physical evidence or final execution-environment event transport.
+
+### 2026-10-03 — source-bound instance trace projection ([#291](https://github.com/callin2/ghostflow-language/issues/291))
+
+Adds a production reference adapter for REF-06-003 instance display and trace projection. The adapter verifies exact root source, imported closure text/revisions/digests, bytecode, manifest, source map and trace metadata by recompiling the supplied artifact before activation. Presentation labels must target the actual compiled instance IDs and remain separate metadata; they do not rename instances or author source revisions. Projection now consumes `observeSourceTrace()` results and returns identity-keyed entries from emitted source-map owners and authored symbols without making private VM slot suffixes public meaning. Malformed labels, caller mutation attempts, wrong source/manifest/closure provenance and wrong trace module identities reject before projection. No source grammar, evaluator or Reference semantics change is introduced.
+
+### 2026-10-03 — Program-bound temporary settings ([#279](https://github.com/callin2/ghostflow-language/issues/279))
+
+Adds a reference host for grouped Run/Until operating settings. Temporary values capture the preceding ordinary value, expire or cancel before evaluation, block decisions when lifetime or return validity is unavailable, and restore only with explicit same-Program approval into a fresh run. Invalid ordinary replacement follows aggregate SettingsInvalid. A typed context settings origin (tag 2, temporaryReturn) preserves previously allocated TimeSlots row identities on validated return while ordinary edits retain their deletion and allocation guards. Actor grants and checkpoint approval are trusted host inputs. REF-05-018 compares complete native/WASM outcomes and checkpoint bytes.
+
+### 2026-10-03 — retain signed reusable source closure ([#309](https://github.com/callin2/ghostflow-language/issues/309))
+
+Portable composition packages now retain their exact transitive pinned source closure. Previously signing omitted this provenance and verification tried to lower imports without their documents. Verification now recompiles the signed closure and compares complete bytecode, manifest and source-map identity before target admission; re-signed instance tampering rejects. REF-06-025 covers native/WASM instance isolation and effect-free replay from the verified package. Existing package format and plain-control replay policy remain unchanged.
+
+### 2026-10-03 — complete dependency and ownership rejection context ([#301](https://github.com/callin2/ghostflow-language/issues/301))
+
+Restores Reference §6.6 diagnostic detail. Missing or wrong-revision imports now
+name their import alias, affected instances/ports, expected revision/digest and
+actual missing or supplied identity. Duplicate suppliers retain both writers
+and add affected definition/instance/port, one-supplier expectation, actual count,
+pinned evidence and corrective choice. For example, two writers to `pump` are
+rejected before activation with both `Relay/east/pump` and `Relay/west/pump`.
+Previously the reason and writer names omitted this contract context. Existing
+error classes/categories, authored locations, first-failure order and candidate
+rejection remain; diagnostic text is more detailed, with no source syntax,
+artifact or ABI change. REF-06-015 negative tests and repaired-source complete
+native/framed-WASM execution/replay cover the change.
+
+
 ### 2026-10-03 — restore mixed UTC Ranges and private-config snapshots ([#503](https://github.com/callin2/ghostflow-language/pull/503))
 
 Bug fixes restoring Reference §§3.5–3.6 and §5 settings observation behavior.

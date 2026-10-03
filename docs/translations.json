@@ -2,6 +2,13 @@
   "format": "GhostFlow/document-translations-v1",
   "documents": [
     {
+      "source": "docs/INSTANCE-TRACE-PROJECTION.md",
+      "sourceLanguage": "en",
+      "translation": "docs/INSTANCE-TRACE-PROJECTION.ko.md",
+      "sourceSha256": "12f66540601fb6cdc5084f7d9c5ef6ea06bd4895cb3c99845799c86941f8570b",
+      "translationSha256": "733a67a3f452f200919231ddb7c6fed1f3488b98621f9b36e7e3307fb3d89e7c"
+    },
+    {
       "source": "docs/SOLAR-EVIDENCE-RECORDER.md",
       "sourceLanguage": "en",
       "translation": "docs/SOLAR-EVIDENCE-RECORDER.ko.md",
@@ -152,8 +159,8 @@
       "source": "docs/ACCOUNTING-LEDGER-ABI.md",
       "sourceLanguage": "en",
       "translation": "docs/ACCOUNTING-LEDGER-ABI.ko.md",
-      "sourceSha256": "6744cf9461cb6df8a187fb5d6ec25b60505fd4b14db977483bb34d4f966d7a65",
-      "translationSha256": "cda59342b75a30d756a117e5c7bfe29e76fa550fc51fcfc4683cb2bdecf9388b"
+      "sourceSha256": "1a3addcdc95704ec96eb3a4cf89720fc27f9aceba99583802bbc07f8009d64e8",
+      "translationSha256": "b00d367469a6ba4b3cf6a7002d5b8d78682e9323d92689d01543e1c2692556ae"
     },
     {
       "source": "docs/AFTER-EVENT-WASM-ABI.md",
@@ -194,8 +201,8 @@
       "source": "docs/CONTEXT-EXECUTION-ABI.md",
       "sourceLanguage": "en",
       "translation": "docs/CONTEXT-EXECUTION-ABI.ko.md",
-      "sourceSha256": "01df0bd3a50050979c9b31a29726ec4e53a0f637a8c32526105ddb99b1454e58",
-      "translationSha256": "8568656caab83cc6237ef892e4395df2246f765257d66324c92f0f346a6fc2e3"
+      "sourceSha256": "f57b51be5dd579304e09d3c63ae077ed723b6759802fc911eaaeef0359826e12",
+      "translationSha256": "379b193749ee32afe085497025d7eaeb53e17d95e8f890f9d775c61229f082bd"
     },
     {
       "source": "docs/CONTINUOUS-BOOL-TIMER-CONTRACT.md",
@@ -215,8 +222,8 @@
       "source": "docs/DEVELOPMENT-WORKFLOW.md",
       "sourceLanguage": "en",
       "translation": "docs/DEVELOPMENT-WORKFLOW.ko.md",
-      "sourceSha256": "ab5735c48ac67f567f2c7ce79cfec92080796feb04847236120bab1446c169fe",
-      "translationSha256": "ce22af6b34360cf704678c1e3f18bd9e247333fb022aadecd456f0dd09af6073"
+      "sourceSha256": "089980fe023cd3ecd452f0820a0c7dc382a640faf074ad9ec395623918798344",
+      "translationSha256": "10dc46bab9dab2e68ec2ddc6f15e98a1018e96808f4a598907eb8721fb0d3a7f"
     },
     {
       "source": "docs/DOCUMENTATION-LANGUAGES.md",
@@ -362,8 +369,8 @@
       "source": "docs/PORTABLE-PACKAGE.md",
       "sourceLanguage": "en",
       "translation": "docs/PORTABLE-PACKAGE.ko.md",
-      "sourceSha256": "b94fca14e4ae81fb225cd6913971e9ed07143210fa1a4c0a18c031667e55c308",
-      "translationSha256": "684391e33802143faffc270fa4008f995f3325dfdf7cda1add7293fdc5076f9e"
+      "sourceSha256": "f864216237f6b90342971d48d2195604cf1ae38c98c6f5ac52280eb264258cab",
+      "translationSha256": "de6e21bdb7d8e56aeade7cfe99ba61e83000dd133b1ef91342bc77a80b14cb71"
     },
     {
       "source": "docs/ProgrammingInGhostflow.md",
@@ -537,7 +544,7 @@
       "source": "docs/SOURCE-SAFETY-TRACE.md",
       "sourceLanguage": "en",
       "translation": "docs/SOURCE-SAFETY-TRACE.ko.md",
-      "sourceSha256": "1659bddb02eef09f77bb918d16b3ac4b9fa22e9d15b48bc2bd78889fa409b7b1",
+      "sourceSha256": "0451d71f07c6d17985995861771650dd0b595a1161a6a402e9c5fa480d30c386",
       "translationSha256": "d2c1f8b06c4613ea81e5fd0c9c563524ba5b3c85834379f650476ccc6e950c8e"
     },
     {
@@ -614,8 +621,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "4636b96b2f7169978dc26417f8347340f9e66f1ce0a6986357e125cfc9352453",
-      "translationSha256": "b543774b247116599839caf7274f6eb49bb013601714f71f2d3933d0f77b1d35"
+      "sourceSha256": "d109ee3d9932f3187c4426d79950c939d460857a5b75766e5e7d5bd31b036079",
+      "translationSha256": "9c6d3bdc4ee2ca52c6bc5ee63714c010e67e9cc2f0d3bf1456e244cf5dfbadab"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",
@@ -1022,6 +1029,20 @@
       "translation": "docs/WHAT-IF-REPLAY.ko.md",
       "sourceSha256": "cfef25216d9528d9f5cdd74f206b045de812e89e1192b09d9cfd6605d5f56333",
       "translationSha256": "66361f89e2fa85a84f1e32fe4891fb50e0311836a9c97bf6d54e22b963ed6c66"
+    },
+    {
+      "source": "docs/TEMPORARY-SETTINGS-HOST.md",
+      "sourceLanguage": "en",
+      "translation": "docs/TEMPORARY-SETTINGS-HOST.ko.md",
+      "sourceSha256": "99bf4ab2c1053ed43f2c7ae24ecd0254cb685b13b62b00b81aded4d870a65477",
+      "translationSha256": "3c7f9790dd7e1e6ccb1ec6ad0760feade6bdec4acd512827f9b078564657ee11"
+    },
+    {
+      "source": "docs/OBSERVATION-EVENT-HISTORY.md",
+      "sourceLanguage": "en",
+      "translation": "docs/OBSERVATION-EVENT-HISTORY.ko.md",
+      "sourceSha256": "c265f6904258eee5e24dd7228222d40317806cffc5f143978f023d32b4bbf952",
+      "translationSha256": "a4f85f8836f1d8cba9b4cc78c70f632b60e47a7c5bda108354c23821a16da9be"
     }
   ],
   "exclusions": [
@@ -1276,6 +1297,10 @@
     {
       "path": "tests/fixtures/issue-145-solar-config.ghost.md",
       "reason": "Canonical executable Solar/shared-config conformance fixture with deterministic recorded facts and event sequence; reader guidance and example are translated separately."
+    },
+    {
+      "path": "docs/reports/2026-10-03-stale-branch-reconciliation.md",
+      "reason": "Historical branch reconciliation report and execution evidence; reports may remain in their original language."
     }
   ]
 }

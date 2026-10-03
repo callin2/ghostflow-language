@@ -604,7 +604,7 @@ impl ContextRuntime {
                     return Err(invalid("unknown settings stream target"));
                 };
                 if !changes.insert(change.id)
-                    || event.origin == SettingsOrigin::OperatorEdit
+                    || event.origin != SettingsOrigin::ProducerObservation
                         && !config.descriptor.operator_editable
                 {
                     return Err(invalid("invalid settings target"));
@@ -627,9 +627,12 @@ impl ContextRuntime {
                         {
                             return Err(invalid("settings payload exceeds transport bounds"));
                         }
-                        if let Some((value, next_key)) =
+                        let candidate = if event.origin == SettingsOrigin::TemporaryReturn {
+                            config.validate_temporary_return(&change.semantic_type, value)
+                        } else {
                             config.validate(&change.semantic_type, value)
-                        {
+                        };
+                        if let Some((value, next_key)) = candidate {
                             if !config.descriptor.operator_editable
                                 && value != config.descriptor.initial
                             {

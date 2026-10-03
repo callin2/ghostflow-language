@@ -142,6 +142,14 @@ Agent maintenance and CI checks are not a filesystem watcher.
 
 ## 5. Close the task and improve repeatability
 
+After a same-repository feature PR merges into `dev`, CI deletes its remote head
+only when the current remote tip still equals the merged event's head SHA. An
+exact Git force-with-lease protects concurrent updates. Fork heads, absent or
+advanced tips, `main`, `dev`, the default branch and release branches are
+preserved. Local branches and worktrees are never removed by this automation.
+Use a merge commit when integrating historical branches whose ancestry must be
+preserved; a squash does not make their original tips ancestors of `dev`.
+
 Report the exact change, evidence and commands, exit status, relevant counts,
 limits, and linked issue or pull request. Do not repeat a full review when
 automated results pass and no semantic, design or safety question remains.

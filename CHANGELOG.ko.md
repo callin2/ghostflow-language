@@ -5,6 +5,36 @@
 
 ## 미출시
 
+### 2026-10-03 — 보존 범위의 관찰 event gap 보고 ([#282](https://github.com/callin2/ghostflow-language/issues/282))
+
+명시적 event와 completed snapshot을 분리해서 보존하는 소스에 결합된 참조 Host journal을 추가한다. sequence10의 소비자는 보존 범위가14부터 시작하면 누락 범위11–13과 원래 event14를 받으며 snapshot에서 만든 가상 event는 받지 않는다. 전체 발행을 원자적으로 검증하고 거부된 batch는 같은 scan에서 재시도할 수 있으며 cursor는 정확한 source/Program/schema/run identity에 결합한다. REF-05-022는 실제 native/framed-WASM trace, 전체 Host 전달 및 새 replay를 검증한다. 이 참조 API는 source 문법, Interaction snapshot v0, 물리 증거 또는 실행 환경의 최종 event 전송을 바꾸지 않는다.
+
+### 2026-10-03 — source에 결합된 instance trace projection ([#291](https://github.com/callin2/ghostflow-language/issues/291))
+
+REF-06-003 instance 표시와 trace projection을 위한 production 참조 어댑터를 추가한다. 이 어댑터는 activation 전에 supplied artifact를 다시 컴파일하여 정확한 root source, imported closure의 text/revision/digest, bytecode, manifest, source map 및 trace metadata를 검증한다. Presentation label은 실제 컴파일된 instance ID를 정확히 대상으로 해야 하며 별도 metadata로 남는다. 이 label은 instance를 rename하거나 source revision을 작성하지 않는다. Projection은 이제 `observeSourceTrace()` 결과를 사용하고, 방출된 source-map owner와 authored symbol에서 identity-keyed entry를 반환하며 private VM slot suffix를 public meaning으로 만들지 않는다. 잘못된 label, caller mutation 시도, 잘못된 source/manifest/closure provenance 및 다른 trace module identity는 projection 전에 거부된다. Source grammar, evaluator 또는 Reference semantics 변경은 없다.
+
+### 2026-10-03 — Program에 결합된 임시 설정 ([#279](https://github.com/callin2/ghostflow-language/issues/279))
+
+그룹 단위 Run/Until 운영 설정을 위한 참조 Host를 추가합니다. 임시 값은 직전 일반 값을 기록하고, 평가 전에 만료 또는 취소하며, 수명이나 복귀 유효성을 확인할 수 없으면 결정을 막습니다. 같은 Program에 대한 명시적 승인으로만 새 Run에 복원합니다. 잘못된 일반 값 대체는 전체 SettingsInvalid 경로를 따릅니다. 형식 있는 context 설정 origin(tag 2, temporaryReturn)은 검증된 복귀에서 이미 할당한 TimeSlots 행 식별자를 보존하며 일반 편집의 삭제 및 할당 검사는 유지합니다. 행위자 권한과 체크포인트 승인은 신뢰하는 Host 입력입니다. REF-05-018은 native/WASM의 전체 결과와 체크포인트 바이트를 비교합니다.
+
+### 2026-10-03 — 서명된 재사용 source closure 보존 ([#309](https://github.com/callin2/ghostflow-language/issues/309))
+
+Portable composition package는 이제 정확히 pin된 transitive source closure를 보존한다. 이전에는 서명 과정에서 provenance가 빠지고 검증이 문서 없이 import를 lowering하려 했다. 검증은 서명된 closure를 다시 컴파일하여 전체 bytecode, manifest 및 source-map identity를 비교한 뒤 target admission을 허용한다. 다시 서명한 instance 변조도 거부한다. REF-06-025는 native/WASM instance 격리와 검증된 package의 effect-free replay를 확인한다. 기존 package format과 plain-control replay 정책은 바뀌지 않는다.
+
+### 2026-10-03 — dependency 및 ownership 거부 맥락 보완 ([#301](https://github.com/callin2/ghostflow-language/issues/301))
+
+Reference §6.6의 진단 상세를 복원한다. 누락되거나 revision이 다른 import는
+import alias, 영향받는 instance/port, 기대 revision/digest 및 실제 누락 또는
+제공된 identity를 명시한다. 중복 supplier는 두 writer를 유지하고 영향받는
+definition/instance/port, supplier 하나라는 기대, 실제 개수, pinned 근거와
+교정 선택을 추가한다. 예를 들어 `pump`의 두 writer는 activation 전에
+`Relay/east/pump`와 `Relay/west/pump`를 모두 명시하여 거부한다. 이전에는
+이유와 writer 이름만 있었고 해당 contract 맥락이 빠져 있었다. 기존 error
+class/category, 작성 위치, 첫 실패 순서 및 후보 거부는 유지한다. 진단 문구가
+더 상세해지지만 source 문법, artifact 또는 ABI는 바뀌지 않는다. REF-06-015
+거부 테스트와 수정된 source의 전체 native/framed-WASM 실행/replay로 검증한다.
+
+
 ### 2026-10-03 — 혼합 UTC Range와 비공개 config snapshot 복구 ([#503](https://github.com/callin2/ghostflow-language/pull/503))
 
 Reference §§3.5–3.6과 §5의 설정 관측 동작을 복구하는 버그 수정이다.
