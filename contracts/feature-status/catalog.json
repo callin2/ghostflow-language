@@ -6511,6 +6511,50 @@
       "referenceCaseIds": [
         "REF-03-029"
       ]
+    },
+    {
+      "id": "accounting-reboot-budget",
+      "family": "Durable applied rolling budget stays Unknown without reboot history",
+      "clause": {
+        "path": "docs/ACCOUNTING-LEDGER-ABI.md",
+        "heading": "Persistence sequence"
+      },
+      "owner": "HOST",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/accounting-reboot-budget.test.mjs",
+              "testId": "REF-03-022: durable applied reboot budget blocks Unknown after reboot and preserves restored 28s history",
+              "caseId": "REF-03-022",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Selected adopted durable applied accounting profile: fresh or corrupt checkpoint remains Unknown and blocks reservation without mutation; valid restoration preserves 28s and admits 5s only at 63s when overlap is 25s. Native production C ABI and source-bound WASM snapshots agree. Caller-supplied comparable monotonic time and trusted manifest binding remain host obligations; no clock bridge, physical receipt, automatic VM/resource admission or alternative non-durable/reset policy is adopted."
+      ],
+      "issues": [
+        212
+      ],
+      "referenceCaseIds": [
+        "REF-03-022"
+      ]
     }
   ]
 }

@@ -94,3 +94,17 @@ WASM reference adapter는 추가로 승인되지 않은 예약이 Unknown을 유
 쓰기 승인 전까지 재시도를 차단함을 검증한다. Native core 직렬화는 그 adapter의
 쓰기 승인이나 물리 저장장치 인증이 아니다. 어느 테스트 transport도 VM 출력을
 물리 resource에 자동 연결하거나 applied receipt의 진위를 인증하지 않는다.
+
+## 선택한 재부팅 예산 프로필 (REF-03-022)
+
+REF-03-022는 기존 durable applied 프로필과 `on_unknown = block`을 선택한다.
+실제 적용 사용량 28초 이후 durable checkpoint 없이 재부팅하면 새 owner는
+Unknown이다. host는 최초 설치용 `initializeEmpty`로 이 이력을 지우면 안 된다.
+누락되거나 손상된 이력은 revision, snapshot 또는 persistence 호출을 변경하지
+않고 5초 reservation을 차단한다. 유효한 checkpoint는 28초를 복구하며 30초
+한도에서 여전히 해당 reservation을 차단한다. 비교 가능한 monotonic 시각
+63초에는 60초 window가 `(0,28]`에서 25초를 유지하므로 5초 reserve가 정확히
+허용된다. native `accounting_reboot_tape`의 production C ABI transport와
+source-bound WASM adapter는 전체 snapshot 및 admission 결과가 일치한다.
+재부팅을 가로지르는 비교 가능한 monotonic timeline은 caller의 책임이다.
+이 선택된 프로필은 window 만료 후 자동 reset이나 non-durable 프로필을 채택하지 않는다.
