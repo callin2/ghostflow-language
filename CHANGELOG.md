@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### 2026-10-03 — complete dependency and ownership rejection context ([#301](https://github.com/callin2/ghostflow-language/issues/301))
+
+Restores Reference §6.6 diagnostic detail. Missing or wrong-revision imports now
+name their import alias, affected instances/ports, expected revision/digest and
+actual missing or supplied identity. Duplicate suppliers retain both writers
+and add affected definition/instance/port, one-supplier expectation, actual count,
+pinned evidence and corrective choice. For example, two writers to `pump` are
+rejected before activation with both `Relay/east/pump` and `Relay/west/pump`.
+Previously the reason and writer names omitted this contract context. Existing
+error classes/categories, authored locations, first-failure order and candidate
+rejection remain; diagnostic text is more detailed, with no source syntax,
+artifact or ABI change. REF-06-015 negative tests and repaired-source complete
+native/framed-WASM execution/replay cover the change.
+
+
 ### 2026-10-03 — restore mixed UTC Ranges and private-config snapshots ([#503](https://github.com/callin2/ghostflow-language/pull/503))
 
 Bug fixes restoring Reference §§3.5–3.6 and §5 settings observation behavior.
