@@ -20,6 +20,7 @@ pub struct Engine {
     capacity: usize,
     phase_revision: u64,
     interval_ms: Option<u64>,
+    range_start_ms: Option<u64>,
     slots: Vec<(u64, u16)>,
     next_slot_key: u64,
     added_at_wall: BTreeMap<u64, u64>,
@@ -27,6 +28,7 @@ pub struct Engine {
     last_plan: BTreeMap<String, u64>,
     pending_grace: BTreeMap<String, (u64, String, String)>,
     range: Option<RangeEngine>,
+    keyed_range: bool,
     range_clock_revision: Option<String>,
     range_calendar_revision: Option<String>,
 }
@@ -98,9 +100,26 @@ impl<'a> SnapshotReader<'a> {
 }
 
 impl Engine {
+    pub(crate) fn settings_key_allocator(&self) -> u64 {
+        self.next_slot_key
+    }
+
     pub fn effective_setting(&self, desc: &ScheduleDescriptor) -> Option<SettingValue> {
         match desc.definition {
             ScheduleDefinition::Periodic { .. } => self.interval_ms.map(SettingValue::Duration),
+            ScheduleDefinition::UtcRange {
+                ref duration,
+                ref start,
+                ..
+            } => {
+                if start.id != 0 {
+                    self.range_start_ms.map(SettingValue::TimeOfDay)
+                } else if duration.id != 0 {
+                    self.interval_ms.map(SettingValue::Duration)
+                } else {
+                    None
+                }
+            }
             ScheduleDefinition::ConfigDailySlots { .. } => {
                 Some(SettingValue::Slots(self.slots.clone()))
             }
@@ -120,7 +139,36 @@ impl Engine {
         if let Some(range) = &self.range {
             // Only consumed identities are durable. Active monotonic references
             // cannot be transferred to a new boot and are never resumed.
-            let mut bytes = b"GFES\x02GFRG\x01".to_vec();
+            let live_interval = self.interval_ms;
+            let live_start = self.range_start_ms;
+            let mut bytes = if self.keyed_range {
+                let mut bytes = b"GFES\x02GFRG\x04".to_vec();
+                write_len(&mut bytes, self.slots.len())?;
+                for &(key, minute) in &self.slots {
+                    bytes.extend_from_slice(&key.to_le_bytes());
+                    bytes.extend_from_slice(&minute.to_le_bytes());
+                }
+                bytes.extend_from_slice(&self.next_slot_key.to_le_bytes());
+                write_len(&mut bytes, self.added_at_wall.len())?;
+                for (&key, &at) in &self.added_at_wall {
+                    bytes.extend_from_slice(&key.to_le_bytes());
+                    bytes.extend_from_slice(&at.to_le_bytes());
+                }
+                bytes
+            } else if live_start.is_some() {
+                let mut bytes = b"GFES\x02GFRG\x03".to_vec();
+                bytes.push(u8::from(live_interval.is_some()));
+                bytes.extend_from_slice(&live_interval.unwrap_or(0).to_le_bytes());
+                bytes.push(1);
+                bytes.extend_from_slice(&live_start.unwrap().to_le_bytes());
+                bytes
+            } else if let Some(live_interval) = live_interval {
+                let mut bytes = b"GFES\x02GFRG\x02".to_vec();
+                bytes.extend_from_slice(&live_interval.to_le_bytes());
+                bytes
+            } else {
+                b"GFES\x02GFRG\x01".to_vec()
+            };
             write_len(&mut bytes, range.terminal_keys().len())?;
             for key in range.terminal_keys() {
                 write_string(&mut bytes, key)?;
@@ -196,13 +244,168 @@ impl Engine {
                 .restore_solar_identities(identities)?;
             return Ok(restored);
         }
-        if let ScheduleDefinition::UtcRange { starts_ms, .. }
-        | ScheduleDefinition::CalendarRange { starts_ms, .. } = &desc.definition
-        {
-            if reader.take(5)? != b"GFES\x02" || reader.take(5)? != b"GFRG\x01" {
+        let range_starts_ms = match &desc.definition {
+            ScheduleDefinition::UtcRange { starts_ms, .. }
+            | ScheduleDefinition::CalendarRange { starts_ms, .. } => Some(starts_ms.clone()),
+            ScheduleDefinition::ConfigDailySlots {
+                initial_minutes,
+                range_duration_ms: Some(_),
+                ..
+            } => Some(
+                initial_minutes
+                    .iter()
+                    .map(|minute| u64::from(*minute) * 60_000)
+                    .collect(),
+            ),
+            _ => None,
+        };
+        if let Some(starts_ms) = range_starts_ms {
+            if reader.take(5)? != b"GFES\x02" {
                 return Err(invalid("invalid Range checkpoint version"));
             }
             let mut restored = Self::new(desc, boot_epoch, capacity)?;
+            match reader.take(5)? {
+                b"GFRG\x01" => {
+                    if restored.interval_ms.is_some()
+                        || restored.range_start_ms.is_some()
+                        || restored.keyed_range
+                    {
+                        return Err(invalid("Range checkpoint missing live setting"));
+                    }
+                }
+                b"GFRG\x02" => {
+                    let value = reader.u64()?;
+                    match &desc.definition {
+                        ScheduleDefinition::UtcRange {
+                            duration,
+                            starts_ms,
+                            ..
+                        } => {
+                            if duration.id == 0
+                                || value < duration.min_ms
+                                || value > duration.max_ms
+                                || (value - duration.min_ms) % duration.step_ms != 0
+                            {
+                                return Err(invalid("Range checkpoint setting mismatch"));
+                            }
+                            crate::context_vm::validate_utc_range(starts_ms, value)?;
+                            restored.interval_ms = Some(value);
+                        }
+                        _ => return Err(invalid("unexpected Range live interval checkpoint")),
+                    }
+                }
+                b"GFRG\x03" => match &desc.definition {
+                    ScheduleDefinition::UtcRange {
+                        duration,
+                        start,
+                        starts_ms,
+                        ..
+                    } => {
+                        let has_duration = reader.u8()?;
+                        if has_duration > 1 {
+                            return Err(invalid("invalid Range checkpoint duration tag"));
+                        }
+                        let duration_value = reader.u64()?;
+                        let has_start = reader.u8()?;
+                        if has_start > 1 {
+                            return Err(invalid("invalid Range checkpoint start tag"));
+                        }
+                        let start_value = reader.u64()?;
+                        let duration_value = if has_duration == 1 {
+                            if duration.id == 0
+                                || duration_value < duration.min_ms
+                                || duration_value > duration.max_ms
+                                || (duration_value - duration.min_ms) % duration.step_ms != 0
+                            {
+                                return Err(invalid("Range checkpoint setting mismatch"));
+                            }
+                            restored.interval_ms = Some(duration_value);
+                            duration_value
+                        } else if duration.id == 0 {
+                            duration.initial_ms
+                        } else {
+                            return Err(invalid("Range checkpoint missing live duration"));
+                        };
+                        let starts = if has_start == 1 {
+                            if start.id == 0
+                                || start_value < start.min_ms
+                                || start_value > start.max_ms
+                                || (start_value - start.min_ms) % start.step_ms != 0
+                                || start_value >= 86_400_000
+                            {
+                                return Err(invalid("Range checkpoint start mismatch"));
+                            }
+                            restored.range_start_ms = Some(start_value);
+                            vec![start_value]
+                        } else if start.id == 0 {
+                            starts_ms.clone()
+                        } else {
+                            return Err(invalid("Range checkpoint missing live start"));
+                        };
+                        crate::context_vm::validate_utc_range(&starts, duration_value)?;
+                    }
+                    _ => return Err(invalid("unexpected Range live setting checkpoint")),
+                },
+                b"GFRG\x04" => match &desc.definition {
+                    ScheduleDefinition::ConfigDailySlots {
+                        grid_ms,
+                        capacity: max,
+                        range_duration_ms: Some(duration),
+                        ..
+                    } => {
+                        let slot_count = reader.u16()? as usize;
+                        if slot_count > usize::from(*max) {
+                            return Err(invalid("context checkpoint slot capacity"));
+                        }
+                        restored.slots.clear();
+                        let mut seen_times = BTreeSet::new();
+                        let mut previous_key = 0;
+                        for _ in 0..slot_count {
+                            let key = reader.u64()?;
+                            let minute = reader.u16()?;
+                            if key <= previous_key
+                                || minute >= 1440
+                                || (u64::from(minute) * 60_000) % grid_ms != 0
+                                || !seen_times.insert(minute)
+                            {
+                                return Err(invalid("invalid context checkpoint slot"));
+                            }
+                            previous_key = key;
+                            restored.slots.push((key, minute));
+                        }
+                        restored.next_slot_key = reader.u64()?;
+                        if restored.next_slot_key <= previous_key {
+                            return Err(invalid("invalid context checkpoint key allocator"));
+                        }
+                        let added_count = reader.u16()? as usize;
+                        if added_count > usize::from(*max) {
+                            return Err(invalid("context checkpoint added-key capacity"));
+                        }
+                        restored.added_at_wall.clear();
+                        for _ in 0..added_count {
+                            let key = reader.u64()?;
+                            let at = reader.u64()?;
+                            if key == 0
+                                || key >= restored.next_slot_key
+                                || !restored.slots.iter().any(|(existing, _)| *existing == key)
+                                || at > 253_402_300_799_999
+                                || restored.added_at_wall.insert(key, at).is_some()
+                            {
+                                return Err(invalid("invalid context checkpoint added key"));
+                            }
+                        }
+                        let mut starts: Vec<u64> = restored
+                            .slots
+                            .iter()
+                            .map(|(_, minute)| u64::from(*minute) * 60_000)
+                            .collect();
+                        starts.sort_unstable();
+                        crate::context_vm::validate_utc_range_allow_empty(&starts, *duration)?;
+                    }
+                    _ => return Err(invalid("unexpected TimeSlots Range checkpoint")),
+                },
+                _ => return Err(invalid("invalid Range checkpoint version")),
+            }
             let count = usize::from(reader.u16()?);
             if count > capacity {
                 return Err(invalid("Range checkpoint terminal capacity"));
@@ -216,10 +419,17 @@ impl Engine {
                 }
                 let site = parts[0].parse::<u32>().ok();
                 let day = parts[1].parse::<u64>().ok();
-                let slot = parts[2].parse::<usize>().ok();
+                let slot = parts[2].parse::<u64>().ok();
+                let valid_slot = match &desc.definition {
+                    ScheduleDefinition::ConfigDailySlots {
+                        range_duration_ms: Some(_),
+                        ..
+                    } => slot.is_some_and(|slot| slot > 0 && slot < restored.next_slot_key),
+                    _ => slot.is_some_and(|slot| (1..=starts_ms.len() as u64).contains(&slot)),
+                };
                 if site != Some(desc.site)
                     || day.is_none_or(|day| day > 2_932_896)
-                    || slot.is_none_or(|slot| !(1..=starts_ms.len()).contains(&slot))
+                    || !valid_slot
                     || key != format!("{}:{}:{}", desc.site, day.unwrap(), slot.unwrap())
                 {
                     return Err(invalid("invalid Range checkpoint occurrence identity"));
@@ -348,6 +558,7 @@ impl Engine {
                 capacity: max,
                 operator_editable,
                 initial_minutes,
+                range_duration_ms,
                 ..
             } => {
                 if restored.interval_ms.is_some()
@@ -366,6 +577,14 @@ impl Engine {
                 {
                     return Err(invalid("TimeSlots checkpoint setting mismatch"));
                 }
+                if let Some(duration) = range_duration_ms {
+                    let starts: Vec<u64> = restored
+                        .slots
+                        .iter()
+                        .map(|(_, minute)| u64::from(*minute) * 60_000)
+                        .collect();
+                    crate::context_vm::validate_utc_range_allow_empty(&starts, *duration)?;
+                }
             }
             _ if restored.interval_ms.is_some() || !restored.slots.is_empty() => {
                 return Err(invalid("unexpected context checkpoint setting"))
@@ -382,13 +601,20 @@ impl Engine {
         if capacity == 0 || capacity > 4096 {
             return Err(invalid("invalid context terminal capacity"));
         }
-        let (interval_ms, slots, next_slot_key) = match &desc.definition {
+        let (interval_ms, range_start_ms, slots, next_slot_key) = match &desc.definition {
             ScheduleDefinition::UtcRange {
                 starts_ms,
                 duration_ms,
+                duration,
+                start,
             } => {
                 crate::context_vm::validate_utc_range(starts_ms, *duration_ms)?;
-                (None, Vec::new(), 1)
+                (
+                    duration.id.ne(&0).then_some(*duration_ms),
+                    start.id.ne(&0).then_some(starts_ms[0]),
+                    Vec::new(),
+                    1,
+                )
             }
             ScheduleDefinition::CalendarRange {
                 timezone,
@@ -408,7 +634,7 @@ impl Engine {
                         "calendar Range crosses midnight or has invalid binding",
                     ));
                 }
-                (None, Vec::new(), 1)
+                (None, None, Vec::new(), 1)
             }
             ScheduleDefinition::Periodic { every, .. } => {
                 if every.initial_ms == 0
@@ -419,12 +645,14 @@ impl Engine {
                 {
                     return Err(invalid("invalid Periodic setting"));
                 }
-                (Some(every.initial_ms), Vec::new(), 1)
+                (Some(every.initial_ms), None, Vec::new(), 1)
             }
             ScheduleDefinition::ConfigDailySlots {
                 initial_minutes,
                 grid_ms,
                 capacity: max,
+                range_duration_ms,
+                timezone,
                 ..
             } => {
                 if *max == 0
@@ -438,7 +666,18 @@ impl Engine {
                 {
                     return Err(invalid("invalid TimeSlots initial value"));
                 }
+                if let Some(duration) = range_duration_ms {
+                    if timezone != "UTC" {
+                        return Err(invalid("TimeSlots Range requires UTC"));
+                    }
+                    let starts: Vec<u64> = initial_minutes
+                        .iter()
+                        .map(|minute| u64::from(*minute) * 60_000)
+                        .collect();
+                    crate::context_vm::validate_utc_range_allow_empty(&starts, *duration)?;
+                }
                 (
+                    None,
                     None,
                     initial_minutes
                         .iter()
@@ -448,7 +687,7 @@ impl Engine {
                     initial_minutes.len() as u64 + 1,
                 )
             }
-            _ => (None, Vec::new(), 1),
+            _ => (None, None, Vec::new(), 1),
         };
         Ok(Self {
             solar: match &desc.definition {
@@ -474,6 +713,7 @@ impl Engine {
             capacity,
             phase_revision: 0,
             interval_ms,
+            range_start_ms,
             slots,
             next_slot_key,
             added_at_wall: BTreeMap::new(),
@@ -482,7 +722,12 @@ impl Engine {
             pending_grace: BTreeMap::new(),
             range: if matches!(
                 desc.definition,
-                ScheduleDefinition::UtcRange { .. } | ScheduleDefinition::CalendarRange { .. }
+                ScheduleDefinition::UtcRange { .. }
+                    | ScheduleDefinition::CalendarRange { .. }
+                    | ScheduleDefinition::ConfigDailySlots {
+                        range_duration_ms: Some(_),
+                        ..
+                    }
             ) {
                 Some(RangeEngine::new(desc.gap_ms, boot_epoch, capacity)?)
             } else {
@@ -490,6 +735,13 @@ impl Engine {
             },
             range_clock_revision: None,
             range_calendar_revision: None,
+            keyed_range: matches!(
+                desc.definition,
+                ScheduleDefinition::ConfigDailySlots {
+                    range_duration_ms: Some(_),
+                    ..
+                }
+            ),
         })
     }
 
@@ -548,13 +800,19 @@ impl Engine {
                 );
             }
             let allowed = eligibility == Some(Ok(true));
+            let keyed: Vec<(u64, u64)> = starts_ms
+                .iter()
+                .enumerate()
+                .map(|(index, start)| ((index + 1) as u64, *start))
+                .collect();
             let (mut staged, mut decision) = self.utc_range(
                 desc.site,
-                starts_ms,
+                &keyed,
                 *duration_ms,
                 clock,
                 when && allowed,
                 cancel,
+                false,
             )?;
             if decision.due {
                 staged.range_calendar_revision =
@@ -585,14 +843,64 @@ impl Engine {
         if let ScheduleDefinition::UtcRange {
             starts_ms,
             duration_ms,
+            duration,
+            start,
         } = &desc.definition
         {
-            if change.is_some() {
-                return Err(invalid(
-                    "immutable UTC Range cannot accept settings changes",
-                ));
-            }
-            return self.utc_range(desc.site, starts_ms, *duration_ms, clock, when, cancel);
+            let (staged_setting, live_duration, live_starts) =
+                self.effective_utc_range(desc, change, starts_ms, *duration_ms)?;
+            let keyed: Vec<(u64, u64)> = live_starts
+                .iter()
+                .enumerate()
+                .map(|(index, start)| ((index + 1) as u64, *start))
+                .collect();
+            return staged_setting.utc_range(
+                desc.site,
+                &keyed,
+                live_duration,
+                clock,
+                when,
+                cancel,
+                (duration.id != 0 || start.id != 0) && change.is_some(),
+            );
+        }
+        if let ScheduleDefinition::ConfigDailySlots {
+            range_duration_ms: Some(duration),
+            ..
+        } = &desc.definition
+        {
+            let mut staged_setting = self.clone();
+            staged_setting.apply_setting(
+                desc,
+                change,
+                next_settings_revision,
+                if matches!(clock.trust, ClockTrust::Trusted) {
+                    clock.wall_ms
+                } else {
+                    None
+                },
+            )?;
+            let mut starts: Vec<u64> = staged_setting
+                .slots
+                .iter()
+                .map(|(_, minute)| u64::from(*minute) * 60_000)
+                .collect();
+            starts.sort_unstable();
+            crate::context_vm::validate_utc_range_allow_empty(&starts, *duration)?;
+            let keyed: Vec<(u64, u64)> = staged_setting
+                .slots
+                .iter()
+                .map(|(key, minute)| (*key, u64::from(*minute) * 60_000))
+                .collect();
+            return staged_setting.utc_range(
+                desc.site,
+                &keyed,
+                *duration,
+                clock,
+                when,
+                cancel,
+                change.is_some(),
+            );
         }
         let mut staged = self.clone();
         staged.apply_setting(
@@ -615,9 +923,12 @@ impl Engine {
             ScheduleDefinition::AtPulse { at_ms } => {
                 staged.at_pulse(desc.site, *at_ms, &observed, when, &mut decision)?
             }
-            ScheduleDefinition::UtcRange { .. } | ScheduleDefinition::CalendarRange { .. } => {
-                unreachable!("Range staged before pulse clock")
-            }
+            ScheduleDefinition::UtcRange { .. }
+            | ScheduleDefinition::CalendarRange { .. }
+            | ScheduleDefinition::ConfigDailySlots {
+                range_duration_ms: Some(_),
+                ..
+            } => unreachable!("Range staged before pulse clock"),
             ScheduleDefinition::Periodic {
                 epoch_id,
                 anchor_ms,
@@ -706,6 +1017,7 @@ impl Engine {
                 grid_ms,
                 capacity,
                 dst_repeated,
+                range_duration_ms: None,
                 ..
             } => {
                 let selected_slots = staged.slots.clone();
@@ -862,14 +1174,19 @@ impl Engine {
     fn utc_range(
         &self,
         site: u32,
-        starts: &[u64],
+        starts: &[(u64, u64)],
         duration: u64,
         clock: ClockSnapshot<'_>,
         when: bool,
         cancel: bool,
+        retime: bool,
     ) -> Result<(Self, Decision)> {
         const DAY: u64 = 86_400_000;
         const MAX_WALL: u64 = 253_402_300_799_999;
+        let original = self
+            .range
+            .as_ref()
+            .ok_or_else(|| invalid("missing Range engine"))?;
         let mut plans = Vec::new();
         if let (ClockTrust::Trusted, Some(wall)) = (clock.trust, clock.wall_ms) {
             if wall > MAX_WALL {
@@ -877,8 +1194,20 @@ impl Engine {
             }
             let current_day = wall / DAY;
             for day in current_day.saturating_sub(1)..=current_day {
-                for (slot, start) in starts.iter().enumerate() {
+                for (slot_key, start) in starts {
                     let planned = day * DAY + start;
+                    let occurrence_key = format!("{site}:{day}:{slot_key}");
+                    if self.keyed_range
+                        && self
+                            .added_at_wall
+                            .get(slot_key)
+                            .is_some_and(|at| planned <= *at)
+                        && !original
+                            .active_fact()
+                            .is_some_and(|active| active.occurrence_key == occurrence_key)
+                    {
+                        continue;
+                    }
                     let _end = planned
                         .checked_add(duration)
                         .filter(|end| *end <= MAX_WALL)
@@ -890,18 +1219,55 @@ impl Engine {
                         continue;
                     }
                     plans.push(RangeFact {
-                        occurrence_key: format!("{site}:{day}:{}", slot + 1),
+                        occurrence_key,
                         planned_wall_ms: planned,
                         duration_ms: duration,
                     });
                 }
             }
         }
-        let original = self
-            .range
-            .as_ref()
-            .ok_or_else(|| invalid("missing Range engine"))?;
-        let stage = original.begin(clock, &plans, when, cancel)?;
+        if let Some(active) = original.active_fact() {
+            if !plans
+                .iter()
+                .any(|fact| fact.occurrence_key == active.occurrence_key)
+            {
+                let mut parts = active.occurrence_key.split(':');
+                let key_site = parts.next().and_then(|part| part.parse::<u32>().ok());
+                let key_day = parts.next().and_then(|part| part.parse::<u64>().ok());
+                let key_slot = parts.next().and_then(|part| part.parse::<u64>().ok());
+                if parts.next().is_some() || key_site != Some(site) || key_slot.is_none() {
+                    return Err(invalid("invalid active Range occurrence identity"));
+                }
+                let slot = key_slot.unwrap();
+                let day =
+                    key_day.ok_or_else(|| invalid("invalid active Range occurrence identity"))?;
+                let planned_wall_ms =
+                    if let Some((_, start)) = starts.iter().find(|(key, _)| *key == slot) {
+                        day.checked_mul(DAY)
+                            .and_then(|base| base.checked_add(*start))
+                            .filter(|planned| {
+                                planned
+                                    .checked_add(duration)
+                                    .is_some_and(|end| end <= MAX_WALL)
+                            })
+                            .ok_or_else(|| invalid("UTC Range planned end is out of range"))?
+                    } else if self.slots.iter().any(|(key, _)| *key == slot) {
+                        return Err(invalid("invalid active Range occurrence identity"));
+                    } else {
+                        active.planned_wall_ms
+                    };
+                plans.push(RangeFact {
+                    occurrence_key: active.occurrence_key.clone(),
+                    planned_wall_ms,
+                    duration_ms: duration,
+                });
+            }
+        }
+        let stage = if retime {
+            original.begin_retime(clock, &plans, when, cancel)?
+        } else {
+            original.begin(clock, &plans, when, cancel)?
+        };
         let result = stage.result.clone();
         let disposition = stage.clock_disposition;
         let previous_active = original.active_fact().cloned();
@@ -1233,6 +1599,75 @@ impl Engine {
         Ok((staged, out))
     }
 
+    pub(crate) fn preflight_setting(
+        &self,
+        desc: &ScheduleDescriptor,
+        change: Option<&SettingValue>,
+        wall_ms: Option<u64>,
+    ) -> Result<()> {
+        let Some(change) = change else {
+            return Err(invalid("missing setting payload for schedule"));
+        };
+        if let ScheduleDefinition::UtcRange {
+            starts_ms,
+            duration_ms,
+            ..
+        } = &desc.definition
+        {
+            self.effective_utc_range(desc, Some(change), starts_ms, *duration_ms)?;
+        } else {
+            let mut staged = self.clone();
+            staged.apply_setting(desc, Some(change), 0, wall_ms)?;
+            if let ScheduleDefinition::ConfigDailySlots {
+                range_duration_ms: Some(duration),
+                ..
+            } = &desc.definition
+            {
+                if let Some(active) = self.range.as_ref().and_then(RangeEngine::active_fact) {
+                    let day = active
+                        .occurrence_key
+                        .split(':')
+                        .nth(1)
+                        .and_then(|value| value.parse::<u64>().ok())
+                        .ok_or_else(|| invalid("invalid active Range occurrence identity"))?;
+                    let facts: Vec<_> = staged
+                        .slots
+                        .iter()
+                        .map(|(key, minute)| RangeFact {
+                            occurrence_key: format!("{}:{day}:{key}", desc.site),
+                            planned_wall_ms: day * 86_400_000 + u64::from(*minute) * 60_000,
+                            duration_ms: *duration,
+                        })
+                        .collect();
+                    self.range.as_ref().unwrap().validate_retime_facts(&facts)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn effective_utc_range(
+        &self,
+        desc: &ScheduleDescriptor,
+        change: Option<&SettingValue>,
+        static_starts: &[u64],
+        fallback_duration: u64,
+    ) -> Result<(Self, u64, Vec<u64>)> {
+        let mut staged = self.clone();
+        let prior_start = staged.range_start_ms;
+        staged.apply_setting(desc, change, 0, None)?;
+        let duration = staged.interval_ms.unwrap_or(fallback_duration);
+        let starts = staged
+            .range_start_ms
+            .map(|start| vec![start])
+            .unwrap_or_else(|| static_starts.to_vec());
+        if let Err(error) = crate::context_vm::validate_utc_range(&starts, duration) {
+            staged.range_start_ms = prior_start;
+            return Err(error);
+        }
+        Ok((staged, duration, starts))
+    }
+
     fn apply_setting(
         &mut self,
         desc: &ScheduleDescriptor,
@@ -1246,6 +1681,12 @@ impl Engine {
         match (&desc.definition, change) {
             (
                 ScheduleDefinition::Periodic { every, .. },
+                SettingValue::Duration(interval) | SettingValue::SharedDuration(interval),
+            )
+            | (
+                ScheduleDefinition::UtcRange {
+                    duration: every, ..
+                },
                 SettingValue::Duration(interval) | SettingValue::SharedDuration(interval),
             ) => {
                 if !every.operator_editable && !matches!(change, SettingValue::SharedDuration(_))
@@ -1261,10 +1702,28 @@ impl Engine {
                 self.phase_revision = revision;
             }
             (
+                ScheduleDefinition::UtcRange { start, .. },
+                SettingValue::TimeOfDay(value) | SettingValue::SharedTimeOfDay(value),
+            ) => {
+                if start.id == 0
+                    || !start.operator_editable
+                        && !matches!(change, SettingValue::SharedTimeOfDay(_))
+                    || *value < start.min_ms
+                    || *value > start.max_ms
+                    || (value - start.min_ms) % start.step_ms != 0
+                    || *value >= 86_400_000
+                {
+                    return Err(invalid("Range start edit is unauthorized or out of range"));
+                }
+                self.range_start_ms = Some(*value);
+                self.phase_revision = revision;
+            }
+            (
                 ScheduleDefinition::ConfigDailySlots {
                     operator_editable,
                     grid_ms,
                     capacity,
+                    range_duration_ms,
                     ..
                 },
                 SettingValue::Slots(entries) | SettingValue::SharedSlots(entries),
@@ -1297,7 +1756,14 @@ impl Engine {
                         fresh
                     } else if matches!(change, SettingValue::SharedSlots(_)) {
                         if !self.slots.contains(&(key, minute)) {
-                            self.added_at_wall.insert(key, wall_ms.unwrap_or(0));
+                            let at = if self.keyed_range {
+                                wall_ms.ok_or_else(|| {
+                                    invalid("TimeSlots edit requires trusted wall baseline")
+                                })?
+                            } else {
+                                wall_ms.unwrap_or(0)
+                            };
+                            self.added_at_wall.insert(key, at);
                         }
                         self.next_slot_key = self.next_slot_key.max(
                             key.checked_add(1)
@@ -1322,6 +1788,14 @@ impl Engine {
                         return Err(invalid("duplicate TimeSlots key"));
                     }
                     updated.push((resolved, minute));
+                }
+                let mut starts: Vec<u64> = updated
+                    .iter()
+                    .map(|(_, minute)| u64::from(*minute) * 60_000)
+                    .collect();
+                starts.sort_unstable();
+                if let Some(duration) = range_duration_ms {
+                    crate::context_vm::validate_utc_range_allow_empty(&starts, *duration)?;
                 }
                 updated.sort_by_key(|(key, _)| *key);
                 self.slots = updated;
@@ -2021,6 +2495,24 @@ mod tests {
             definition: ScheduleDefinition::UtcRange {
                 starts_ms: starts,
                 duration_ms: duration,
+                duration: DurationSetting {
+                    id: 0,
+                    name: String::new(),
+                    operator_editable: false,
+                    initial_ms: duration,
+                    min_ms: duration,
+                    max_ms: duration,
+                    step_ms: 1,
+                },
+                start: DurationSetting {
+                    id: 0,
+                    name: String::new(),
+                    operator_editable: false,
+                    initial_ms: 0,
+                    min_ms: 0,
+                    max_ms: 0,
+                    step_ms: 1,
+                },
             },
             when: vec![],
             cancel: vec![],
@@ -2957,6 +3449,7 @@ mod tests {
                 grid_ms: 900_000,
                 capacity: 3,
                 initial_minutes: vec![360],
+                range_duration_ms: None,
                 dst_missing: 0,
                 dst_repeated: 0,
             },

@@ -14,6 +14,8 @@ pub struct DurationSetting {
     pub step_ms: u64,
 }
 
+pub type TimeOfDaySetting = DurationSetting;
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum ScheduleDefinition {
     SolarContext {
@@ -32,6 +34,8 @@ pub enum ScheduleDefinition {
     UtcRange {
         starts_ms: Vec<u64>,
         duration_ms: u64,
+        duration: DurationSetting,
+        start: TimeOfDaySetting,
     },
     CalendarRange {
         timezone: String,
@@ -82,6 +86,7 @@ pub enum ScheduleDefinition {
         grid_ms: u64,
         capacity: u16,
         initial_minutes: Vec<u16>,
+        range_duration_ms: Option<u64>,
         dst_missing: u8,
         dst_repeated: u8,
     },
@@ -207,6 +212,8 @@ pub struct SolarContextEvidence {
 pub enum SettingValue {
     Duration(u64),
     SharedDuration(u64),
+    TimeOfDay(u64),
+    SharedTimeOfDay(u64),
     /// Full keyed value: existing key retimes; absent key removes; key 0 adds.
     Slots(Vec<(u64, u16)>),
     /// Already validated/allocated by the shared config stream, not host input.
@@ -265,15 +272,24 @@ pub(crate) fn text(reader: &mut Reader<'_>) -> Result<String> {
 }
 
 pub(crate) fn validate_utc_range(starts: &[u64], duration: u64) -> Result<()> {
+    validate_utc_range_inner(starts, duration, false)
+}
+
+pub(crate) fn validate_utc_range_allow_empty(starts: &[u64], duration: u64) -> Result<()> {
+    validate_utc_range_inner(starts, duration, true)
+}
+
+fn validate_utc_range_inner(starts: &[u64], duration: u64, allow_empty: bool) -> Result<()> {
     const DAY: u64 = 86_400_000;
-    if !(1..=96).contains(&starts.len())
-        || duration == 0
+    if duration == 0
         || duration > DAY
+        || starts.len() > 96
+        || (!allow_empty && starts.is_empty())
         || starts.iter().any(|start| *start >= DAY)
         || starts
             .windows(2)
             .any(|pair| pair[0] >= pair[1] || duration > pair[1] - pair[0])
-        || duration > DAY - starts[starts.len() - 1] + starts[0]
+        || (!starts.is_empty() && duration > DAY - starts[starts.len() - 1] + starts[0])
     {
         return Err(Error::new("invalid or overlapping UTC Range recurrence"));
     }
@@ -302,6 +318,51 @@ fn dst(reader: &mut Reader<'_>) -> Result<(u8, u8)> {
         return Err(Error::new("invalid context DST policy"));
     }
     Ok(pair)
+}
+
+fn duration_setting(
+    prior: &[crate::schedule_vm::PulseDescriptor],
+    id: u32,
+    semantic_type: &str,
+    label: &str,
+) -> Result<DurationSetting> {
+    if id == 0 {
+        return Err(Error::new("invalid Range config identity"));
+    }
+    let config = prior
+        .iter()
+        .find_map(|p| match p {
+            crate::schedule_vm::PulseDescriptor::Config(c) if c.id == id => Some(c),
+            _ => None,
+        })
+        .ok_or_else(|| Error::new(format!("{label} must precede consumer")))?;
+    if config.semantic_type != semantic_type {
+        return Err(Error::new(format!("{label} must be {semantic_type}")));
+    }
+    let crate::settings_stream::ConfigValue::Scalar(crate::Value::Number(initial)) = config.initial
+    else {
+        return Err(Error::new(format!("invalid {label}")));
+    };
+    let (min, max, step) =
+        config
+            .bounds
+            .map_or((1.0, 9_007_199_254_740_991.0, 1.0), |(a, b, c)| {
+                match (a, b, c) {
+                    (crate::Value::Number(a), crate::Value::Number(b), crate::Value::Number(c)) => {
+                        (a, b, c)
+                    }
+                    _ => (0.0, 0.0, 0.0),
+                }
+            });
+    Ok(DurationSetting {
+        id,
+        name: config.name.clone(),
+        operator_editable: config.operator_editable,
+        initial_ms: initial as u64,
+        min_ms: min as u64,
+        max_ms: max as u64,
+        step_ms: step as u64,
+    })
 }
 
 pub(crate) fn load_schedule(
@@ -585,6 +646,26 @@ pub(crate) fn load_schedule(
                         slots.iter().map(|(_, minute)| *minute).collect(),
                     )
                 };
+            let range_duration_ms = if format >= 20 {
+                let value = exact(reader)?;
+                if value == 0 {
+                    None
+                } else {
+                    Some(value)
+                }
+            } else {
+                None
+            };
+            if let Some(duration) = range_duration_ms {
+                if timezone != "UTC" {
+                    return Err(Error::new("TimeSlots Range requires UTC"));
+                }
+                let starts: Vec<u64> = initial_minutes
+                    .iter()
+                    .map(|minute| u64::from(*minute) * 60_000)
+                    .collect();
+                validate_utc_range_allow_empty(&starts, duration)?;
+            }
             let (dst_missing, dst_repeated) = dst(reader)?;
             ScheduleDefinition::ConfigDailySlots {
                 config_id,
@@ -594,6 +675,7 @@ pub(crate) fn load_schedule(
                 grid_ms,
                 capacity,
                 initial_minutes,
+                range_duration_ms,
                 dst_missing,
                 dst_repeated,
             }
@@ -614,11 +696,22 @@ pub(crate) fn load_schedule(
                 dst_repeated,
             }
         }
-        13 if matches!(format, 12 | 13 | 15 | 18) => {
+        13 if matches!(format, 12 | 13 | 15 | 18 | 19 | 20) => {
             if text(reader)? != "UTC" {
                 return Err(Error::new("Range requires UTC timezone"));
             }
             let duration_ms = exact(reader)?;
+            let duration_config_id = if duration_ms == 0 {
+                Some(reader.u32()?)
+            } else {
+                None
+            };
+            let start_config_id = if format >= 19 { reader.u32()? } else { 0 };
+            if duration_config_id.is_some() && start_config_id != 0 {
+                return Err(Error::new(
+                    "Range cannot bind both live duration and live start configs",
+                ));
+            }
             let count = usize::from(reader.u16()?);
             if !(1..=96).contains(&count) {
                 return Err(Error::new("invalid UTC Range start count"));
@@ -627,10 +720,52 @@ pub(crate) fn load_schedule(
             for _ in 0..count {
                 starts_ms.push(exact(reader)?);
             }
-            validate_utc_range(&starts_ms, duration_ms)?;
+            let duration = if let Some(id) = duration_config_id {
+                duration_setting(prior, id, "Duration", "Range duration config")?
+            } else {
+                DurationSetting {
+                    id: 0,
+                    name: String::new(),
+                    operator_editable: false,
+                    initial_ms: duration_ms,
+                    min_ms: duration_ms,
+                    max_ms: duration_ms,
+                    step_ms: 1,
+                }
+            };
+            let start = if start_config_id == 0 {
+                DurationSetting {
+                    id: 0,
+                    name: String::new(),
+                    operator_editable: false,
+                    initial_ms: starts_ms[0],
+                    min_ms: starts_ms[0],
+                    max_ms: starts_ms[0],
+                    step_ms: 1,
+                }
+            } else {
+                duration_setting(prior, start_config_id, "TimeOfDay", "Range start config")?
+            };
+            if duration.min_ms == 0
+                || duration.step_ms == 0
+                || duration.max_ms < duration.min_ms
+                || duration.initial_ms < duration.min_ms
+                || duration.initial_ms > duration.max_ms
+                || (duration.initial_ms - duration.min_ms) % duration.step_ms != 0
+            {
+                return Err(Error::new("invalid Range duration setting"));
+            }
+            validate_utc_range(&starts_ms, duration.initial_ms)?;
+            if start.id != 0 && (starts_ms.len() != 1 || start.initial_ms != starts_ms[0]) {
+                return Err(Error::new(
+                    "Range start config must match one UTC Daily start",
+                ));
+            }
             ScheduleDefinition::UtcRange {
                 starts_ms,
-                duration_ms,
+                duration_ms: duration.initial_ms,
+                duration,
+                start,
             }
         }
         14 if format == 14 => ScheduleDefinition::AtPulse {

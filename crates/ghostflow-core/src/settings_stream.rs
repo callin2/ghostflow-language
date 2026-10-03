@@ -39,6 +39,8 @@ pub struct ConfigEmission {
 pub(crate) struct ConfigStream {
     pub descriptor: ConfigDescriptor,
     pub current: std::result::Result<ConfigValue, u8>,
+    pub emission_revision: u64,
+    pub application_position: Option<u64>,
     // Identity/allocator history, never an implicit read fallback.
     pub last_success: ConfigValue,
     pub next_key: u64,
@@ -221,6 +223,8 @@ impl ConfigStream {
         };
         Ok(Self {
             current: Ok(descriptor.initial.clone()),
+            emission_revision: 0,
+            application_position: None,
             last_success: descriptor.initial.clone(),
             descriptor,
             next_key,

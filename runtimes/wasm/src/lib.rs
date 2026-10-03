@@ -34,7 +34,7 @@ mod signals_abi;
 mod station_abi;
 
 #[path = "../accounting_abi.rs"]
-mod accounting_abi;
+pub mod accounting_abi;
 
 pub struct Handle {
     runtime: Runtime,

@@ -1,9 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { compileControl, typeCheckControl } from '../tools/control.mjs';
 import { compileSource } from './helpers/literate-compile.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
+import { pidSaturationSource, pidActivation, pidSaturationSteps, pidStages } from './helpers/pid-saturation-vectors.mjs';
 const wasm = fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
 const objective = `control ObjectiveTest {
 sensor inside_temperature: Temperature;
@@ -108,3 +113,66 @@ test('native PID descriptor rejects unsupported quantity, manual and degraded pa
 });
 test('degraded control requires exhaustive otherwise', () => { assert.throws(() => typeCheckControl('control X { sensor s: Temperature; degraded D for missing { branch B priority 1 when s quality in { measured } use objective O authority automatic_degraded output 0% .. 30%; otherwise disable; resume = require_start; } }'), /unknown degraded objective|requires at least one branch/); });
 test('bounded adaptation produces host binding manifest', () => { const r = typeCheckControl('control X { config target: Pressure = 1.0kPa { min = 0.7kPa; max = 1.2kPa; step = 0.05kPa; access = operator; label = "VPD"; } adapt_setting policy for target { allowed = 0.7kPa .. 1.2kPa; max_step = 0.05kPa; max_change = 0.05kPa per 1h; authority = optimizer; } }'); assert.equal(r.manifest.adaptSettings[0].target, 'target'); });
+
+test('REF-04-060 canonical native/WASM PID records distinct observation stages and conditional_safe rejects saturation growth', async t => {
+  const compiled = await compileSource(pidSaturationSource, { filename: 'reference-pid-saturation.ghost' });
+  assert.equal(new DataView(compiled.bytes.buffer, compiled.bytes.byteOffset).getUint16(4, true), 11);
+  const descriptor = compiled.manifest.objectives[0];
+  assert.equal(descriptor.binding, 'native-temperature-percent-v1');
+  assert.equal(descriptor.controller.antiWindup, 'conditional_safe');
+  const root = fileURLToPath(new URL('..', import.meta.url));
+  execFileSync('cargo', ['build', '--locked', '--offline', '--release', '-p', 'ghostflow-core', '--example', 'context_tape'], { cwd: root, stdio: 'pipe' });
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'reference-pid-saturation-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const modulePath = path.join(directory, 'module.gfb'), tapePath = path.join(directory, 'tape.json');
+  fs.writeFileSync(modulePath, compiled.bytes);
+  const execute = async steps => {
+    const runtime = await ControlRuntime.instantiate(wasm, compiled, { context: pidActivation });
+    let rows;
+    try { rows = steps.map(step => runtime.step(step)); }
+    finally { runtime.dispose(); }
+    // Native consumes the same accepted sensor-conditioned rails. Context
+    // settings/clock projections remain core-owned and cannot be supplied here.
+    const projected = new Set(compiled.manifest.configs.flatMap(config =>
+      ['ok', 'value', 'fault'].map(role => `__gf_config_${config.id}_${role}`)));
+    for (const objective of compiled.manifest.objectives) {
+      projected.add(objective.bindings.target); projected.add(objective.bindings.targetOk);
+    }
+    projected.add('__gf_now_ms');
+    projected.add('__gf_time_epoch');
+    fs.writeFileSync(tapePath, JSON.stringify({ profile: 'context-settings-v1', activation: pidActivation,
+      steps: rows.map(({ vm }, scanId) => ({ scanId, logicalTimeMs: steps[scanId].nowMs,
+        inputs: Object.entries(vm.inputs).filter(([name]) => !projected.has(name))
+          .map(([name, value]) => ({ name, value })), ...steps[scanId].contextFacts })) }));
+    const records = execFileSync(path.join(root, 'target/release/examples/context_tape' + (process.platform === 'win32' ? '.exe' : '')),
+      [modulePath, tapePath], { encoding: 'utf8', timeout: 10_000 }).trim().split('\n').map(JSON.parse);
+    assert.ok(records.every(record => record.accepted), JSON.stringify(records));
+    assert.deepEqual(records.map(record => record.outcome.trace), rows.map(row => row.vm));
+    return records.map(record => pidStages(record.outcome.trace, descriptor.controller.antiWindup));
+  };
+  const stages = await execute(pidSaturationSteps());
+  assert.deepEqual(stages.map(row => [row.requested, row.safe]),
+    [[92,20], [92,20], [92,20], [92,20], [92,20], [97,97]]);
+  assert.deepEqual(stages[0], { antiWindup: 'conditional_safe', requested: 92, safe: 20,
+    appliedObservation: { percent: 20, driverRevision: 3 },
+    feedbackObservation: { percent: 17, good: true, epoch: 9, id: 1, atMs: 0 } });
+  // Initial error=5, P=10 and I=82 track restart92. The release tick adds only
+  // its own 5 points, yielding97; hidden accumulation over the clamp horizon
+  // would produce100. This tests controller memory without inventing a getter.
+  const changed = await execute(pidSaturationSteps({ applied: 12, feedback: 8, good: false }));
+  assert.deepEqual(changed.map(row => [row.requested, row.safe]), stages.map(row => [row.requested, row.safe]));
+  assert.ok(changed.every(row => row.appliedObservation.percent === 12
+    && row.feedbackObservation.percent === 8 && !row.feedbackObservation.good));
+  // The fixtures are public observations, not Driver receipts or the sensor
+  // admission engine. Unknown/missing source references must still fail closed.
+  await assert.rejects(() => compileSource(pidSaturationSource.replace('measure = inside_temperature', 'measure = missing_temperature')), /objective measure must reference a declared sensor/);
+  await assert.rejects(() => compileSource(pidSaturationSource.replace('target = target_temperature', 'target = missing_target')), /objective target must reference a declared config or setting/);
+  const runtime = await ControlRuntime.instantiate(wasm, compiled, { context: pidActivation });
+  try {
+    const step = pidSaturationSteps()[0];
+    assert.throws(() => runtime.step({ ...step, inputs: { ...step.inputs, unknown_feedback: 17 } }), /unknown input/);
+    const { driver_applied, ...missing } = step.inputs;
+    assert.throws(() => runtime.step({ ...step, inputs: missing }), /missing.*driver_applied/);
+    assert.equal(runtime.step(step).vm.requested['roof_vent.position'], 92);
+  } finally { runtime.dispose(); }
+});

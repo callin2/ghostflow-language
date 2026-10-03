@@ -5,6 +5,142 @@
 
 ## 미출시
 
+### 2026-10-03 — 혼합 UTC Range와 비공개 config snapshot 복구 ([#503](https://github.com/callin2/ghostflow-language/pull/503))
+
+Reference §§3.5–3.6과 §5의 설정 관측 동작을 복구하는 버그 수정이다.
+GFB20에서 config로 선택한 `DailySlots` Range와 일반 UTC `Daily` Range를
+함께 로드한다. 이전에는 일반 schedule 때문에 activation이 실패했다.
+완료 scan snapshot은 공개 설정과 함께 선언한 비공개
+`config internal: Bool = true;`를 수락한다. 모든 compiled config의 정확한
+runtime 식별자, source 기본값과 emission provenance 검사는 유지하며 공개
+descriptor만 투영한다. 기존 native/framed-WASM 동등성 및 설정 provenance
+테스트가 혼합 activation·실행과 비공개 행 변조를 검증한다. format/ABI 변경이나
+Device·하드웨어 검증을 주장하지 않는다.
+
+### 2026-10-02 — 경쟁하는 두 output writer 식별 ([#300](https://github.com/callin2/ghostflow-language/issues/300))
+
+조합 duplicate-supplier 진단은 두 원본 writer endpoint를 모두 명명하거나 root
+output expression과 instance connection을 구분한다. 예를 들어
+`connect pump <- east.pump`와 `connect pump <- west.pump`는 여전히 activation
+전에 거부되며 이제 `east.pump`와 `west.pump`를 함께 식별한다. 이전에는 공유 sink만
+명명했다. 기존 진단 종류, 정본 두 번째 writer 위치와 거부 동작을 유지한다.
+last-writer 정책, arbitration이나 artifact/ABI 변경을 도입하지 않는다. Reference
+§6.5의 정확한 테스트는 writer·선언 순서 양쪽, expression과의 혼합 충돌 및 별도
+channel의 native/framed-WASM 전체 결과 일치를 검증한다.
+
+### 2026-10-02 — transitive import cycle의 닫는 edge에서 진단 ([#298](https://github.com/callin2/ghostflow-language/issues/298))
+
+컴파일러는 닫는 import edge의 revision/digest를 검사하기 전에 원본 위치에서
+executable import cycle을 보고한다. 이전에는 순환 digest 불일치가 구조적 cycle을
+가렸다. 예를 들어 pinned `root -> A -> B -> A`는 B가 A를 import하는 위치에서
+cycle로 거부된다. 순환이 없는 import는 여전히 모든 정확한 immutable revision과
+UTF-8 source digest를 요구한다. resolver, fallback이나 artifact format은 바뀌지
+않는다. 두 dependency의 canonical 테스트는 저장된 전체 closure 재검증, 변조 거부,
+원본 위치의 누락·floating·불일치 pin과 native/framed-WASM 전체 실행 결과를 확인한다.
+이는 Reference §6.4의 구체적 cycle 거부를 복구하는 수정이며 package나 배포 정책을
+채택하지 않는다.
+
+### 2026-10-02 — 설정 관측을 source 기본값과 수락 emission에 연결 ([#273](https://github.com/callin2/ghostflow-language/issues/273))
+
+설정 stream이 행별 수락 emission revision과 적용 position을 불변 source 식별자 및 전역
+settings revision과 구분해 유지한다. 초기 5분 Duration은 다른 Bool 수정 후에도 override가
+아니며 같은 값의 성공 emission도 이후 override다. 현재 fault는 과거 성공값·기본값의
+유효값 fallback이나 성공 전용 override 없이 fault를 표시한다. 새 설정 Interaction schema는
+source 기본값을 포함한 명시적 버전 0.4이고 snapshot은 전역·행 provenance를 연결한 0.2다.
+legacy 0.3/0.1 설정 문서는 원래 검증과 digest를 유지하며 설정이 없는 문서는 변경하지 않는다.
+context checkpoint 버전 4가 metadata를 저장하고 초기값·allocator·이력·최신 revision·atomic
+position 불일치를 owner 변경 전에 거부한다. 실제 canonical native/framed-WASM 테스트가
+전체 outcome·설정·checkpoint, 권한/VM rollback과 checksum을 복구한 의미적 변조를 검증한다.
+실행 descriptor binding·publishing 식별자·Device 채택·하드웨어 검증은 주장하지 않는다.
+
+### 2026-10-02 — what-if 재생 입력 누락 보고 ([#304](https://github.com/callin2/ghostflow-language/issues/304))
+
+제한된 reference host가 event-sourced 기록 prefix checkpoint에서 plain control의 실제
+source-bound ghost branch를 실행한다. 각 미래 프레임은 완전한 기록 입력과 센서 sample을
+요구하며 누락되면 branch 실행 전에 보고한다. fault sample을 포함한 명시적 가상 입력은
+synthetic provenance를 표시해야 한다. 새 일회용 runtime이 원본 기록과 이후 live 실행을
+보존한다. canonical native/WASM 테스트는 전체 VM trace·상태·requested/safe 출력을 비교한다.
+이 프로파일은 같은 Program과 가상 binding을 사용한다. 외부 메모리 checkpoint,
+settings/schedule, Device 실행과 환경 모델은 범위 밖이다.
+
+### 2026-10-02 — keyed TimeSlots Range의 atomic 중첩 검증 ([#267](https://github.com/callin2/ghostflow-language/issues/267))
+
+Reference §§3.5–3.6은 하루를 나누는 정수 분 grid에서 `TimeSlots<G,N>`로 선택한
+UTC `DailySlots<G>`와 양의 고정 Duration을 GFB20/control-v20으로 실행한다.
+이전에는 이 keyed Range 형식을 거부했다. 08:00 `range(20min)`을
+`[08:00, 08:15]`로 바꾸는 live 제안은 설정/scan transaction 전체를 거부하고,
+맞닿는 `[08:00, 08:20]`은 성공한다. preflight는 이미 admit한 제거된 key도
+보호한다. retime은 occurrence identity를 유지하고, key 제거는 admit한 작업을
+유지하며, 추가/재추가는 새 key와 신뢰할 수 있는 추가 baseline을 사용한다.
+변경된 key는 신뢰할 수 있는 wall time 없이는 atomic하게 거부한다. 빈 목록은
+유효하고 승인된 fault는 새 plan을 만들지 않으며 과거 key를 보존한다. GFRG4는
+keyed 설정, allocator, baseline과 consumed history를 저장하고 restore에서 검증하되
+timer를 재개하지 않는다. 이전 consumer는 새 format을 거부하며 GFRG1/2/3은 별도로
+유지한다. REF-03-078은 원래의 정적 slots/live Duration 중첩 사례를 포함하여 실제
+native/WASM trace, 전체 checkpoint와 rollback을 비교한다. 비 UTC/DST, calendar,
+live TimeSlots와 Duration의 조합, Run cancellation 정책은 이 profile 밖에 있다.
+
+### 2026-10-02 — 영속 확인 없는 accounting admission 차단 ([#269](https://github.com/callin2/ghostflow-language/issues/269))
+
+Reference §3.10 `on_unknown = block`을 복원하는 버그 수정이다. 현재 revision에 영속
+확인이 없는 ledger는 reservation, revision 또는 persistence를 바꾸기 전에 rolling
+reservation admission을 거부한다. 이전에는 `initializeEmpty`의 저장이 실패해 읽기가
+Unknown이어도 5초 reservation을 생성할 수 있었다. 누락·손상 ledger는 계속 차단하며
+pending 정확한 재시도도 명시적 `persistPending` 복구 전에는 차단한다. 복구 후 알려진
+중복은 멱등성을 유지한다. REF-03-080은 같은 canonical count-fault-to-false program과
+source에서 유도한 보호 policy의 실제 native/WASM ABI trace, 전체 ledger와 admission
+결과를 비교한다. source-bound 참조 host admission이며 자동 VM/resource 또는 물리
+binding은 아니다. source grammar와 직렬화 ABI format은 바뀌지 않는다.
+
+### 2026-10-02 — live scalar Range 시작 설정이 활성 occurrence를 재시각화 ([#266](https://github.com/callin2/ghostflow-language/issues/266))
+
+Reference §3.5는 이제 고정 Duration을 가진 제한된 실행 가능 UTC Daily Range profile에서 scalar `Daily.at` source로 `TimeOfDay` config를 받을 수 있다. 성공한 원자적 live settings event는 이미 admit한 occurrence를 original local date와 새 유효 시작 시각으로 다시 계산하며 같은 occurrence ID와 due ledger를 유지한다. 08:00 `range(10min)`이 08:04에 admit된 뒤 08:07에 08:08로 편집되면 즉시 일시 비활성화되고 08:08에 다시 active가 되어 08:18에 끝난다. 08:02로 편집하면 08:12에 끝난다. GFB19 encoding은 start config id를 담는다. calendar, 비 UTC, multi-slot, Periodic, live start+Duration 조합은 static metadata로 fallback하지 않고 거부한다. Checkpoint는 승인된 scalar start 설정과 소비한 history를 저장·검증하지만 active timer를 재개하지 않는다. REF-03-077은 native/WASM framed parity test로 검증한다.
+
+### 2026-10-02 — live Range Duration 설정이 활성 occurrence를 재시각화 ([#265](https://github.com/callin2/ghostflow-language/issues/265))
+
+Reference §3.5의 `range(duration)`은 이제 work calendar가 없는 실행 가능한 UTC Daily/DailySlots GFB12 Range에서 `Duration` config를 받을 수 있다. 성공한 원자적 live settings event는 frozen planned start에서 활성 occurrence를 다시 계산한다. 08:00 계획을 08:04에 10분으로 admit한 뒤 08:07에 12분으로 편집하면 같은 occurrence가 유지되고 08:12에 끝난다. 5분으로 편집하면 event 위치에서 종료한다. 새 due pulse나 occurrence ID를 만들지 않는다. 승인된 duration은 GFRGv2 checkpoint에 보존되어 복구 뒤 다음 occurrence도 live 값을 쓴다. 잘못된 typed 값은 기존 settings-fault 결정이 되며 승인된 duration을 바꾸지 않는다. REF-03-076은 native/WASM trace와 checkpoint parity를 검증한다. GFB12 encoding은 duration 0 sentinel 다음 기존 config id를 쓰며, 이전 GFB12 consumer는 이 새 encoding form을 거부한다.
+
+Live Range config는 runtime loader와 동일하게 컴파일 시 양수인 최소 Duration을
+요구한다. 지원하지 않는 calendar binding과 중첩을 만드는 live 제안은 명시적으로
+거부하며, 거부한 envelope는 settings revision과 전체 context checkpoint를
+변경하지 않는다. clock trust가 unknown이거나 wall 보정으로 날짜가 바뀌어도
+이미 admit한 frozen origin으로 재시간화를 수행한다.
+
+### 2026-10-02 — 영속 이벤트 count의 불완전 상태 ([#268](https://github.com/callin2/ghostflow-language/issues/268))
+
+WASM accounting adapter는 알려진 ledger의 최신 revision에 영속 저장 승인이
+없으면 `LedgerIncomplete`을 반환한다. 이전에는 이벤트 저장이 실패한 뒤에도
+초기화 당시의 `LedgerMissing`을 유지했다. 누락·손상 ledger는 각각의 fault를
+유지하며, 저장 승인에 성공하면 정확한 count로 복구된다. REF-03-079는 실제
+native/WASM control trace와 직렬화된 ledger를 비교한다. 내부 production 변환
+경계 테스트는 수십억 이벤트를 할당하지 않고 `CountOverflow`를 검증한다.
+
+### 2026-10-02 — 영속 rolling 예산 설명 ([#260](https://github.com/callin2/ghostflow-language/issues/260))
+
+Reference §4.15에 실제 Rust ledger를 읽는 소스 바인딩 reference host 조회를
+추가했다. 영속 revision, 예산 거부와 조건부 가장 빠른 해제 시각을 제공한다.
+겹친 [0,20s]/[10s,30s] interval, 60s window, 30s 한도, 5s 제안은 OFF animation과
+무관하게 64.999s에 거부하고 65s에 허용한다. REF-04-066은 복구/activation과
+영속 승인 전 Unknown을 검증한다. 소스 한도를 복사하고 동결하여 caller의
+메타데이터 변경이 검증된 소스 정책을 위반하던 버그를 수정했다. 이전에는 공개
+한도를 99s로 바꾸면 허가되지 않은 예약을 허용했지만 이제 변경 시 예외를 던지고
+불일치 예약을 거부한다. 수정 전후 probe와 불변 바인딩 회귀 검증이 복구된 계약을
+확인한다. 추가 query export를 위해 WASM을
+재빌드해야 하지만 GFB/snapshot 형식은 유지된다. 신뢰 증거, owner 내부 revision,
+통합 한계는 [host 계약](docs/ROLLING-BUDGET-EXPLANATION.ko.md)을 참고한다.
+
+### 2026-10-02 — 제한된 적응 제안 검증 버그 수정 ([#258](https://github.com/callin2/ghostflow-language/issues/258))
+
+Reference §4.14 정책 경계가 컴파일 descriptor에서 빠졌고 reference host가 제안의
+변화량 한도를 검증하지 않았다. 이제 컴파일 시 typed 경계를 검사하고 전달하며 새
+`AdaptationSettingsHost`가 신뢰된 actor 권한과 모든 property를 검증한 후 기존
+Rust atomic 설정 event 하나를 제출한다. 20%→30%로 시간당 10% 한도를 소비한 뒤
+30%→25%를 포함하는 두 property 제안은 값과 revision을 바꾸지 않고 모두 거부한다.
+REF-04-064가 실제 WASM 활성화와 snapshot, rolling 절대 변화량, 정확한 Int/Duration
+격자, 제한된 식별자·이력 검증을 확인한다. GFB/WASM ABI는 그대로지만 경계가 필수이므로
+기존 adaptation manifest를 다시 생성해야 한다. 이 reference profile은 설정
+checkpoint 복구나 API/Device 통합을 제공하지 않는다.
+
 ### 2026-10-02 — Station 원자적 mode 진입 binding 버그 수정 ([#250](https://github.com/callin2/ghostflow-language/issues/250))
 
 Reference §4.10은 같은 tick의 충돌 mode 진입을 모두 거부한다. 기존 WASM

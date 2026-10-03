@@ -15,6 +15,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/2026-09-24-machinery-safety-principles-audit.html](2026-09-24-machinery-safety-principles-audit.html) | GhostFlow 기계 안전 원칙 대조 보고서 — 2026-09-24 | html |
 | [docs/ACCOUNTING-LEDGER-ABI.ko.md](ACCOUNTING-LEDGER-ABI.ko.md) | Accounting ledger 기본 ABI | md |
 | [docs/ACCOUNTING-LEDGER-ABI.md](ACCOUNTING-LEDGER-ABI.md) | Accounting ledger primitive ABI | md |
+| [docs/ADAPTATION-SETTINGS-HOST.ko.md](ADAPTATION-SETTINGS-HOST.ko.md) | 제한된 적응 설정 호스트 | md |
+| [docs/ADAPTATION-SETTINGS-HOST.md](ADAPTATION-SETTINGS-HOST.md) | Bounded adaptation settings host | md |
 | [docs/AFTER-EVENT-WASM-ABI.ko.md](AFTER-EVENT-WASM-ABI.ko.md) | after_event 실행 ABI 식별 정보 | md |
 | [docs/AFTER-EVENT-WASM-ABI.md](AFTER-EVENT-WASM-ABI.md) | Identified after_event execution ABI | md |
 | [docs/AI-CONTRIBUTION-PACKAGE.ko.md](AI-CONTRIBUTION-PACKAGE.ko.md) | 범위를 제한한 AI 기여 작업 패키지 | md |
@@ -56,6 +58,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/FRAMED-CONTROL-HOST.md](FRAMED-CONTROL-HOST.md) | Framed ControlRuntime adoption (D6) | md |
 | [docs/GFB5-SCHEDULE-PRELUDE.ko.md](GFB5-SCHEDULE-PRELUDE.ko.md) | GFB5 일정 서두 | md |
 | [docs/GFB5-SCHEDULE-PRELUDE.md](GFB5-SCHEDULE-PRELUDE.md) | GFB5 schedule prelude | md |
+| [docs/GHOST-TIMELINE.ko.md](GHOST-TIMELINE.ko.md) | 제한된 live timeline과 ghost rewind | md |
+| [docs/GHOST-TIMELINE.md](GHOST-TIMELINE.md) | Bounded live timeline and ghost rewind | md |
 | [docs/HOST-EVENT-ORDERING-CONTRACT.ko.md](HOST-EVENT-ORDERING-CONTRACT.ko.md) | Host 이벤트 순서 계약 | md |
 | [docs/HOST-EVENT-ORDERING-CONTRACT.md](HOST-EVENT-ORDERING-CONTRACT.md) | Host event ordering contract | md |
 | [docs/IMPLEMENTATION.ko.md](IMPLEMENTATION.ko.md) | 구현 및 아티팩트 경계 | md |
@@ -102,6 +106,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/REFERENCE-QUERY.ko.md](REFERENCE-QUERY.ko.md) | 언어 참조 선택 조회 | md |
 | [docs/REFERENCE-QUERY.md](REFERENCE-QUERY.md) | Selective Language Reference query | md |
 | [docs/REFERENCE-SIMULATOR-BASELINE-2026-09-23.md](REFERENCE-SIMULATOR-BASELINE-2026-09-23.md) | Reference simulator baseline — 2026-09-23 | md |
+| [docs/ROLLING-BUDGET-EXPLANATION.ko.md](ROLLING-BUDGET-EXPLANATION.ko.md) | 영속 rolling 예산 설명 | md |
+| [docs/ROLLING-BUDGET-EXPLANATION.md](ROLLING-BUDGET-EXPLANATION.md) | Durable rolling budget explanation | md |
 | [docs/SCAN-FRAME-WASM.ko.md](SCAN-FRAME-WASM.ko.md) | Scan frame WASM ABI v1 | md |
 | [docs/SCAN-FRAME-WASM.md](SCAN-FRAME-WASM.md) | Scan frame WASM ABI v1 | md |
 | [docs/SCAN-TAPE-PARITY.ko.md](SCAN-TAPE-PARITY.ko.md) | Native/WASM scan tape parity (D9) | md |
@@ -111,6 +117,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/SEPARATION-VALIDATION.md](SEPARATION-VALIDATION.md) | Language project separation verification | md |
 | [docs/SOLAR-CONFIG-EXECUTION.ko.md](SOLAR-CONFIG-EXECUTION.ko.md) | 공유 live 설정을 사용하는 Solar 실행 | md |
 | [docs/SOLAR-CONFIG-EXECUTION.md](SOLAR-CONFIG-EXECUTION.md) | Solar execution with shared live configuration | md |
+| [docs/SOLAR-EVIDENCE-RECORDER.ko.md](SOLAR-EVIDENCE-RECORDER.ko.md) | 수용된 Solar scan의 실행 증거 | md |
+| [docs/SOLAR-EVIDENCE-RECORDER.md](SOLAR-EVIDENCE-RECORDER.md) | Accepted Solar scan evidence | md |
 | [docs/SOLAR-SCHEDULE.ko.md](SOLAR-SCHEDULE.ko.md) | Solar schedule: compiler와 simulation host | md |
 | [docs/SOLAR-SCHEDULE.md](SOLAR-SCHEDULE.md) | Solar schedules: compiler and simulation host | md |
 | [docs/SOURCE-MAP.ko.md](SOURCE-MAP.ko.md) | 소스를 보존하는 산출물 맵 — 첫 단계 | md |
@@ -140,6 +148,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/VERIFICATION.md](VERIFICATION.md) | Standalone language verification | md |
 | [docs/WASM-CI-ARTIFACTS.ko.md](WASM-CI-ARTIFACTS.ko.md) | 리비전 지정 GhostFlow WASM CI 아티팩트 | md |
 | [docs/WASM-CI-ARTIFACTS.md](WASM-CI-ARTIFACTS.md) | Revision-addressed GhostFlow WASM CI artifacts | md |
+| [docs/WHAT-IF-REPLAY.ko.md](WHAT-IF-REPLAY.ko.md) | 제한된 what-if 재생 | md |
+| [docs/WHAT-IF-REPLAY.md](WHAT-IF-REPLAY.md) | Bounded what-if replay | md |
 
 ## docs/assets/
 
@@ -214,4 +224,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.ko.md](research/GF-COMPOSE-R9-ACCEPTANCE.ko.md) | GF-COMPOSE R9: acceptance와 구현 인계 | md |
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.md](research/GF-COMPOSE-R9-ACCEPTANCE.md) | GF-COMPOSE R9: acceptance and implementation handoff | md |
 
-180 documents.
+190 documents.

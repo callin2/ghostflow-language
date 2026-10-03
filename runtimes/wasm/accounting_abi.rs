@@ -133,6 +133,11 @@ pub unsafe extern "C" fn gf_accounting_reserve_rolling(
     let Some(reservation_id) = identity(reservation_id) else {
         return handle.fail("invalid reservation identity");
     };
+    // Admission must use the same durably acknowledged view as accounting
+    // reads. An exact retry is not permission to persist a pending mutation.
+    if handle.persisted_revision != handle.revision {
+        return handle.fail("accounting ledger is not durably acknowledged");
+    }
     let result = handle.ledger.reserve_rolling(
         reservation_id,
         resource_id,
@@ -330,7 +335,13 @@ pub unsafe extern "C" fn gf_tick_accounting(
         event_type,
         (local_day_present != 0).then_some(local_day),
         accounting.persisted_revision == accounting.revision,
-        accounting.unavailable_fault,
+        // A known, unacknowledged revision is incomplete. Preserve the
+        // missing/corrupt distinction for genuinely unknown ledgers.
+        if accounting.ledger.is_known() && accounting.persisted_revision != accounting.revision {
+            3
+        } else {
+            accounting.unavailable_fault
+        },
     ) {
         Ok(input) => input,
         Err(error) => return control.complete(Err(error)),
@@ -499,6 +510,45 @@ pub unsafe extern "C" fn gf_accounting_used_rolling(
     }
 }
 
+/// Output words: used, outstanding reserve, blocked, release-present, release,
+/// exact durable revision. Status 2 is Unknown and writes no evidence.
+#[no_mangle]
+pub unsafe extern "C" fn gf_accounting_explain_rolling(
+    handle: *const AccountingHandle,
+    resource_id: u32,
+    now_ms: u64,
+    window_ms: u64,
+    limit_ms: u64,
+    reserve_ms: u64,
+    output: *mut u64,
+) -> i32 {
+    let Some(handle) = handle.as_ref() else {
+        return 0;
+    };
+    if output.is_null() {
+        return 0;
+    }
+    if handle.persisted_revision != handle.revision {
+        return 2;
+    }
+    let LedgerRead::Known(explanation) =
+        handle
+            .ledger
+            .explain_rolling(resource_id, now_ms, window_ms, limit_ms, reserve_ms)
+    else {
+        return 2;
+    };
+    slice::from_raw_parts_mut(output, 6).copy_from_slice(&[
+        explanation.used_ms,
+        explanation.reserved_ms,
+        u64::from(explanation.blocked),
+        u64::from(explanation.next_release_ms.is_some()),
+        explanation.next_release_ms.unwrap_or(0),
+        handle.revision,
+    ]);
+    1
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn gf_accounting_used_local_day(
     handle: *mut AccountingHandle,
@@ -624,6 +674,62 @@ pub unsafe extern "C" fn gf_accounting_last_error_len(handle: *const AccountingH
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn durable_admission_blocks_pending_without_ledger_or_revision_mutation() {
+        unsafe {
+            let handle = gf_accounting_create(8, 8, 8, 60_000);
+            let reserve = |id: u8| {
+                gf_accounting_reserve_rolling(
+                    handle,
+                    [id; 16].as_ptr(),
+                    7,
+                    0,
+                    60_000,
+                    30_000,
+                    5_000,
+                )
+            };
+            assert_eq!(reserve(1), 0); // Missing remains unknown.
+            assert_eq!(gf_accounting_revision(handle), 0);
+            assert_eq!(gf_accounting_initialize_empty(handle), 1);
+            assert_eq!(gf_accounting_snapshot(handle), 1);
+            let before = (*handle).ledger.snapshot_bytes().unwrap();
+            let revision = gf_accounting_revision(handle);
+            assert_eq!(reserve(1), 0);
+            assert_eq!((*handle).ledger.snapshot_bytes().unwrap(), before);
+            assert_eq!(gf_accounting_revision(handle), revision);
+            assert_eq!((*handle).persisted_revision, 0);
+            assert_eq!((*handle).snapshot_revision, Some(revision));
+            assert_eq!(gf_accounting_ack_persisted(handle, revision), 1);
+            assert_eq!(reserve(1), 1);
+            assert_eq!(gf_accounting_snapshot(handle), 1);
+            let pending = (*handle).ledger.snapshot_bytes().unwrap();
+            let pending_revision = gf_accounting_revision(handle);
+            for id in [1, 2] {
+                // Pending exact duplicate and new identity block.
+                assert_eq!(reserve(id), 0);
+                assert_eq!((*handle).ledger.snapshot_bytes().unwrap(), pending);
+                assert_eq!(gf_accounting_revision(handle), pending_revision);
+                assert_eq!((*handle).persisted_revision, revision);
+            }
+            assert_eq!(gf_accounting_ack_persisted(handle, revision), 0);
+            assert_eq!(gf_accounting_ack_persisted(handle, pending_revision), 1);
+            assert_eq!(reserve(1), 2); // Known exact retry remains idempotent.
+            assert_eq!(gf_accounting_revision(handle), pending_revision);
+            let mut corrupt = pending.clone();
+            corrupt[7] ^= 255;
+            assert_eq!(
+                gf_accounting_restore(handle, corrupt.as_ptr(), corrupt.len()),
+                0
+            );
+            let unknown_revision = gf_accounting_revision(handle);
+            assert_eq!(reserve(2), 0);
+            assert_eq!(gf_accounting_revision(handle), unknown_revision);
+            assert_eq!((*handle).unavailable_fault, 2);
+            gf_accounting_destroy(handle);
+        }
+    }
 
     #[test]
     fn wasm_abi_records_queries_snapshots_and_restores() {

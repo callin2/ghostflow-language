@@ -82,7 +82,8 @@ test('actual compiled Int extrema execute in Rust WASM and produce valid setting
     const completion = await run(artifact);
     assert.equal(completion.vm.safe.result, value);
     const observed = await snapshot(artifact, `int-extreme-${value}`);
-    assert.deepEqual(observed.observations, [{ descriptorId: 'setting.count', status: 'ready', value }]);
+    assert.deepEqual(observed.observations, [{ descriptorId: 'setting.count', status: 'ready', value,
+      defaultValue: value, emissionRevision: 0, applicationPosition: null, override: false }]);
     assert.equal(validateInteraction(artifact.interactionSchema, observed).valid, true);
   }
 });

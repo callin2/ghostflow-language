@@ -1,9 +1,9 @@
 # Accounting ledger primitive ABI
 
-This ABI exposes the Rust accounting ledger to a host through WebAssembly. It
-does not make accounting declarations executable in a GhostFlow control.
-`compileControl` remains fail-closed until compiler lowering binds account
-expressions and constraint admission to this ledger.
+This ABI exposes the Rust accounting ledger to a host through WebAssembly.
+GFB10 count Results execute inside the portable control VM using the paired
+ledger. Source-bound rolling reservation admission is an explicit reference-host
+operation; the ABI does not automatically bind control outputs to resources.
 
 `AccountingRuntime.instantiateSource(wasmBytes, document, options)` compiles an
 exact canonical `.ghost.md` document and selects one declared account by name.
@@ -15,7 +15,9 @@ SHA-256, selected account and target names, stage, and artifact SHA-256.
 The supplied numeric ID still requires a trusted host binding to the physical
 resource or Event. A restored ledger snapshot has no embedded source identity,
 so the host must also verify that its durable storage belongs to that binding.
-This API does not perform control admission or settle reservations.
+The source-bound reference host can explicitly prepare, settle and cancel rolling
+reservations through this primitive. It does not automatically connect VM output
+decisions to resource admission or certify physical application evidence.
 
 Accounting-only sources select the accounting control-v10 profile even without
 context-producing expressions. REF-03-020 executes the same checked source
@@ -50,6 +52,23 @@ that exact revision. After each inserted record, reads return Unknown until the
 host snapshots the new revision, persists it, and acknowledges it. A write
 acknowledgement for a stale revision is rejected. Restored valid snapshots are
 already acknowledged; missing or invalid snapshots remain Unknown.
+
+Rolling reservation admission uses that same durable view. A known in-memory
+ledger with an unacknowledged revision rejects admission before creating a
+reservation, advancing the revision or invoking host persistence. This includes
+an empty initialization whose write failed and an exact retry of a pending
+reservation. Missing/corrupt ledgers also fail closed. Recover explicitly with
+`persistPending` after a successful durable write; only then may an exact retry
+return `Duplicate`. A failed reservation write retains its pending reservation
+and Unknown reads rather than fabricating a grant or rolling it back. This
+restores protective `on_unknown = block`; evaluating a count fault through
+`case ... fault(_) => false` records no event and grants no start authority.
+
+The native `accounting_admission_tape` example links the same production C ABI
+through its Rust module/rlib for bounded conformance transport. A trusted test
+host supplies the checked source manifest and explicit write acknowledgements;
+counts/faults/admission decisions still originate inside the Rust ABI. It is not
+a new caller-projected decision ABI or an automatic VM/resource binding.
 
 The ledger snapshot is a versioned binary format with a CRC-32 corruption check.
 The host owns storage and must preserve the bytes exactly. The primitive does

@@ -266,7 +266,10 @@ impl ScanDriver {
             || (self.runtime.context_runtime.is_some()
                 && ((name == "__gf_time_epoch"
                     && self.runtime.module.as_ref().is_some_and(|m| {
-                        matches!(m.format_version, 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18)
+                        matches!(
+                            m.format_version,
+                            10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20
+                        )
                     }))
                     || [
                         "__gf_config_",
@@ -297,11 +300,12 @@ impl ScanDriver {
                 return Err(error);
             }
         }
-        let derive_epoch = self
-            .runtime
-            .module
-            .as_ref()
-            .is_some_and(|m| matches!(m.format_version, 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18));
+        let derive_epoch = self.runtime.module.as_ref().is_some_and(|m| {
+            matches!(
+                m.format_version,
+                10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20
+            )
+        });
         let result = if let Some((clock, facts)) = context {
             let clock_input = self.runtime.set_input(
                 RESERVED_CLOCK_INPUT,

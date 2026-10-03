@@ -1144,7 +1144,7 @@ class ControlParser {
   adaptSetting() {
     const start = this.take(), name = this.identifier('expected adaptation name'); this.expect('for', 'adapt_setting requires for setting');
     const target = this.identifier('expected adaptation setting'); this.expect('{', 'expected { after adaptation setting'); const fields = {};
-    while (!this.matches('}')) { const key = this.identifier('expected adaptation field'); this.expect('=', `expected = after adaptation field ${key.value}`); if (fields[key.value]) error(key, `duplicate adaptation field ${key.value}`); fields[key.value] = this.expression(); if (key.value === 'allowed') { this.expect('..', 'adapt_setting allowed requires ..'); fields.allowedMax = this.expression(); } if (key.value === 'max_change') { this.expect('per', 'max_change requires per duration'); fields.maxChangeWindow = this.expression(); } this.expect(';'); }
+    while (!this.matches('}')) { const key = this.identifier('expected adaptation field'); if (!['allowed','max_step','max_change','authority','controller_transition'].includes(key.value)) error(key, `unsupported adaptation field ${key.value}`); this.expect('=', `expected = after adaptation field ${key.value}`); if (fields[key.value]) error(key, `duplicate adaptation field ${key.value}`); fields[key.value] = this.expression(); if (key.value === 'allowed') { this.expect('..', 'adapt_setting allowed requires ..'); fields.allowedMax = this.expression(); } if (key.value === 'max_change') { this.expect('per', 'max_change requires per duration'); fields.maxChangeWindow = this.expression(); } this.expect(';'); }
     this.take(); this.maybe(';'); return this.node('adapt-setting', start, { name: name.value, target: target.value, fields });
   }
   strategy() {
@@ -1493,9 +1493,13 @@ export function validateCompositionStructure(ast) {
     }
   }
   const suppliers = new Map();
+  const writerIdentity = item => item.kind === 'connect'
+    ? item.source.path
+    : `output expression ${item.name}`;
+  const conflict = (target, item) => `writers ${writerIdentity(suppliers.get(target))} and ${writerIdentity(item)}`;
   for (const item of ast.body) {
     if (item.kind === 'connection') {
-      if (suppliers.has(item.name)) error(item.loc, `duplicate supplier for output ${item.name}`);
+      if (suppliers.has(item.name)) error(item.loc, `duplicate supplier for output ${item.name}: ${conflict(item.name, item)}`);
       suppliers.set(item.name, item);
     } else if (item.kind === 'connect') {
       for (const endpoint of [item.sink, item.source]) if (endpoint.instance && !instanceNames.has(endpoint.instance)) {
@@ -1504,7 +1508,7 @@ export function validateCompositionStructure(ast) {
       if (!item.sink.instance && definitions.get(item.sink.port) !== 'output') error(item.sink.loc, 'connect sink must be an instance input or root output');
       if (!item.source.instance && !['input', 'sensor'].includes(definitions.get(item.source.port))) error(item.source.loc, 'connect source must be a root input, root sensor or instance output');
       if (!item.sink.instance && !item.source.instance) error(item.source.loc, 'root output connect source must be an instance output');
-      if (suppliers.has(item.sink.path)) error(item.sink.loc, `duplicate supplier for port ${item.sink.path}`);
+      if (suppliers.has(item.sink.path)) error(item.sink.loc, `duplicate supplier for port ${item.sink.path}: ${conflict(item.sink.path, item)}`);
       suppliers.set(item.sink.path, item);
     }
   }
@@ -1611,6 +1615,8 @@ class Lowerer {
     if (contextForms.some(form => form[0] === 'holiday-daily-pulse')) this.manifest.format = 'GhostFlow/control-v14';
     if (contextForms.some(form => form[0] === 'solar-context-pulse')) this.manifest.format = 'GhostFlow/control-v15';
     if (contextForms.some(form => ['calendar-range', 'calendar-result'].includes(form[0]))) this.manifest.format = 'GhostFlow/control-v18';
+    if (contextForms.some(form => form[0] === 'utc-range' && form[6] !== '0')) this.manifest.format = 'GhostFlow/control-v19';
+    if (contextForms.some(form => form[0] === 'config-daily-slots-pulse' && form.length === 11)) this.manifest.format = 'GhostFlow/control-v20';
     const temporalForms = this.windows.length || this.trueFors.length || solarForms.length || contextForms.length ? [
       ['temporal-context', `${RESERVED_PREFIX}now_ms`, `${RESERVED_PREFIX}time_epoch`],
       ...[...this.temporalRoots.values()].sort((left, right) => left.tag - right.tag).map(root =>
@@ -2174,13 +2180,31 @@ class Lowerer {
     (this.manifest.degraded ??= []).push(this.degradedPolicies.get(item.name));
   }
   addAdaptSetting(item) {
+    for (const key of Object.keys(item.fields)) if (!['allowed','allowedMax','max_step','max_change','maxChangeWindow','authority'].includes(key)) error(item.fields[key].loc, `unsupported adaptation field ${key}`);
     const target = this.symbols.get(item.target); if (!target || target.category !== 'config') error(item.loc, `adapt_setting target must reference a config ${item.target}`);
     for (const key of ['allowed','max_step','max_change','authority']) if (!item.fields[key]) error(item.loc, `adapt_setting requires ${key}`);
     if (item.fields.controller_transition) error(item.fields.controller_transition.loc, 'adapt_setting cannot reset controller state');
     const allowed = item.fields.allowed; if (!item.fields.allowedMax) error(allowed.loc, 'adapt_setting allowed requires a range');
-    const maxChange = item.fields.max_change;
+    const payload = target.payloadType;
+    if (!['Int', 'Number', 'Duration', 'Percent'].includes(payload.kind) && !isQuantityType(payload.kind)) error(item.loc, 'adapt_setting requires a numeric config');
+    const constant = (expr, type) => {
+      const checked = this.expression(expr, new Map(), { allowNext: false }, [], type);
+      if (!sameType(checked.type, type)) error(expr.loc, 'adapt_setting bound type mismatch');
+      const value = checked.constant;
+      if (typeof value !== 'number' || !Number.isFinite(value)) error(expr.loc, 'adapt_setting bounds must be finite typed constants');
+      return value;
+    };
+    const delta = payload.kind === 'Temperature' ? semanticType('TemperatureDelta') : payload;
+    const bounds = { min: constant(allowed, payload), max: constant(item.fields.allowedMax, payload) };
+    const maxStep = constant(item.fields.max_step, delta);
+    const maxChange = constant(item.fields.max_change, delta);
+    const windowMs = constant(item.fields.maxChangeWindow, semanticType('Duration'));
+    if (bounds.min > bounds.max || maxStep <= 0 || maxChange <= 0 || !Number.isSafeInteger(windowMs) || windowMs <= 0) error(item.loc, 'adapt_setting requires ordered bounds and positive step, change and window');
+    if ([...this.adaptSettings.values()].some(policy => policy.target === item.target)) error(item.loc, 'duplicate adaptation target');
+    if (!item.fields.authority.name) error(item.loc, 'adapt_setting authority must be a name');
     this.adaptSettings.set(item.name, { name: item.name, target: item.target, targetId: target.id,
       targetType: typeNameOf(target.payloadType), authority: item.fields.authority.name ?? null,
+      allowed: bounds, maxStep, maxChange, windowMs,
       runtime: 'requires-host-settings-event-validation' });
     (this.manifest.adaptSettings ??= []).push(this.adaptSettings.get(item.name));
   }
@@ -2256,13 +2280,28 @@ class Lowerer {
     }
     if (item.scheduleType === 'Daily') {
       if (!item.at) error(item.loc, 'Daily schedule requires at');
-      const at = this.expression(item.at, new Map(), { allowNext: false });
+      const startConfig = item.at.kind === 'reference' && this.symbols.get(item.at.name)?.category === 'config'
+        ? this.symbols.get(item.at.name) : null;
+      const at = startConfig ? startConfig.value : this.expression(item.at, new Map(), { allowNext: false });
       if (at.type.kind !== 'TimeOfDay' || at.constant === undefined) error(item.at.loc, 'Daily at must be a constant TimeOfDay');
       const day = this.resolveScheduleDay(item);
+      if (startConfig) {
+        const rangeBasis = item.policy?.basis?.kind === 'call' && item.policy.basis.name === 'range'
+          && item.policy.basis.args.length === 1 && !item.policy.basis.named.length;
+        const rangeArg = rangeBasis ? item.policy.basis.args[0] : null;
+        const durationConfig = rangeArg?.kind === 'reference' && this.symbols.get(rangeArg.name)?.category === 'config';
+        if (!rangeBasis || durationConfig || item.timezone !== 'UTC' || day) {
+          error(item.at.loc, 'config-backed Daily at is only executable as a single bounded UTC Daily Range start with fixed duration');
+        }
+      }
       return this.addCivilSchedulePolicy(item, { kind: 'daily', atMs: at.constant, ...(day ? { day } : {}) });
     }
     const interval = this.expression(item.interval, new Map(), { allowNext: false });
-    if (!sameType(interval.type, DURATION) || interval.constant !== 900_000) error(item.interval.loc, 'only DailySlots<15min> is supported');
+    const configuredRange = item.selected && !Array.isArray(item.selected)
+      && item.policy?.basis?.kind === 'call' && item.policy.basis.name === 'range';
+    if (!sameType(interval.type, DURATION) || interval.constant !== 900_000 && !configuredRange) error(item.interval.loc, 'only DailySlots<15min> is supported');
+    if (configuredRange && (!Number.isSafeInteger(interval.constant) || interval.constant <= 0
+      || interval.constant % 60_000 !== 0 || 86_400_000 % interval.constant !== 0)) error(item.interval.loc, 'TimeSlots Range requires a positive whole-minute grid dividing one day');
     if (!item.timezone || !item.timezone.trim()) error(item.loc, 'schedule requires timezone');
     if (!item.selected) error(item.loc, 'schedule requires selected slots');
     let slots = [], selectedConfig = null;
@@ -2373,9 +2412,23 @@ class Lowerer {
         basis = 'pulse';
       } else if (options.basis.kind === 'call' && options.basis.name === 'range'
         && options.basis.args.length === 1 && !options.basis.named.length) {
-        const range = this.expression(options.basis.args[0], new Map(), { allowNext: false }, [], DURATION);
+        const rangeArg = options.basis.args[0];
+        const rangeConfig = rangeArg.kind === 'reference' && this.symbols.get(rangeArg.name)?.category === 'config'
+          ? this.symbols.get(rangeArg.name) : null;
+        const startConfig = trigger.kind === 'daily' && item.at?.kind === 'reference'
+          && this.symbols.get(item.at.name)?.category === 'config'
+          ? this.symbols.get(item.at.name) : null;
+        const range = rangeConfig ? rangeConfig.value : this.expression(rangeArg, new Map(), { allowNext: false }, [], DURATION);
         if (!sameType(range.type, DURATION) || !Number.isSafeInteger(range.constant) || range.constant <= 0) {
           error(options.basis.loc, `${label} range requires a positive Duration`);
+        }
+        if (rangeConfig && rangeConfig.payloadType?.kind !== 'Duration') error(rangeArg.loc, `${label} range config must be Duration`);
+        if (trigger.selectedConfig && rangeConfig) error(rangeArg.loc, 'live Range duration settings cannot be combined with TimeSlots selected config');
+        if (startConfig && startConfig.payloadType?.kind !== 'TimeOfDay') error(item.at.loc, `${label} start config must be TimeOfDay`);
+        if (startConfig && (trigger.kind !== 'daily' || rangeConfig || item.timezone !== 'UTC' || trigger.day)) error(item.at.loc, 'live Range start settings require a single bounded UTC Daily scalar start and fixed duration');
+        if (rangeConfig) {
+          const descriptor = this.manifest.configs.find(config => config.id === rangeConfig.id);
+          if (!descriptor?.settings || descriptor.settings.min <= 0) error(rangeArg.loc, 'live Range duration config requires a positive minimum Duration');
         }
         if (!options.cancel_when) error(item.loc, `${label} range basis requires cancel_when`);
         if (civil && (trigger.kind === 'periodic' || item.timezone !== 'UTC')) {
@@ -2384,7 +2437,7 @@ class Lowerer {
         let minimumSpacing;
         if (trigger.kind === 'daily-slots') {
           const starts = trigger.slots.map(minutes => minutes * 60_000);
-          minimumSpacing = starts.length === 1 ? 86_400_000 : Math.min(...starts.map((start, index) => {
+          minimumSpacing = starts.length <= 1 ? 86_400_000 : Math.min(...starts.map((start, index) => {
             const next = starts[(index + 1) % starts.length] + (index + 1 === starts.length ? 86_400_000 : 0);
             return next - start;
           }));
@@ -2392,10 +2445,17 @@ class Lowerer {
         else if (trigger.kind === 'periodic') minimumSpacing = trigger.every.initialMs;
         else error(options.basis.loc, `${label} range requires a statically bounded recurrence`);
         if (range.constant > minimumSpacing) error(options.basis.loc, `${label} range occurrences must not overlap`);
+        if (trigger.day && (rangeConfig || startConfig)) {
+          error(options.basis.loc, rangeConfig
+            ? 'live Range duration settings are only executable for immutable UTC Daily or DailySlots without a work calendar'
+            : 'live Range start settings are only executable for immutable UTC Daily without a work calendar');
+        }
         if (trigger.day && (trigger.day.kind === 'holiday' || trigger.atMs + range.constant > 86_400_000)) {
           error(options.basis.loc, 'work calendar Range must stay within one civil date; split overnight intervals into explicit Daily ranges');
         }
-        basis = { kind: 'range', durationMs: range.constant };
+        basis = { kind: 'range', durationMs: range.constant,
+          ...(rangeConfig ? { durationConfig: rangeArg.name, durationConfigId: rangeConfig.id } : {}),
+          ...(startConfig ? { startConfig: item.at.name, startConfigId: startConfig.id } : {}) };
       } else error(options.basis.loc, `${label} basis must be pulse or range(positive Duration)`);
       const clock = choice('clock', ['trusted_only']);
       const recovery = choice('recovery', ['baseline']);
@@ -3804,12 +3864,19 @@ class Lowerer {
       }
       if (schedule.kind === 'at') return ['at-pulse', ...base, String(schedule.atMs), when, cancel];
       if (schedule.policy.basis?.kind === 'range') {
-        if (schedule.timezone !== 'UTC' || schedule.selectedConfig
+        if (schedule.timezone !== 'UTC'
           || !['daily', 'daily-slots'].includes(schedule.kind)) error(this.ast.loc, 'executable Range requires immutable UTC Daily or DailySlots');
+        if (schedule.selectedConfig) {
+          const config = this.manifest.configs.find(item => item.name === schedule.selectedConfig);
+          if (!config || schedule.kind !== 'daily-slots' || schedule.policy.basis.durationConfigId || schedule.policy.basis.startConfigId || schedule.policy.basis.durationMs > 86_400_000) error(this.ast.loc, 'TimeSlots Range requires fixed duration selected config');
+          return ['config-daily-slots-pulse', ...base, schedule.timezone, String(config.id),
+            String(schedule.policy.basis.durationMs), schedule.dstMissing, schedule.dstRepeated, when, cancel];
+        }
         const starts = schedule.kind === 'daily' ? [schedule.atMs] : schedule.slots.map(minute => minute * 60_000);
-        if (schedule.day) return ['calendar-range', ...base, 'UTC', String(schedule.policy.basis.durationMs), ['starts', ...starts.map(String)],
+        if (schedule.day) return ['calendar-range', ...base, 'UTC', String(schedule.policy.basis.durationMs), '0', ['starts', ...starts.map(String)],
           schedule.day.calendar, schedule.day.kind, when, cancel];
-        return ['utc-range', ...base, 'UTC', String(schedule.policy.basis.durationMs), ['starts', ...starts.map(String)], when, cancel];
+        return ['utc-range', ...base, 'UTC', schedule.policy.basis.durationConfigId ? ['duration-config', String(schedule.policy.basis.durationConfigId)] : String(schedule.policy.basis.durationMs),
+          String(schedule.policy.basis.startConfigId ?? 0), ['starts', ...starts.map(String)], when, cancel];
       }
       if (schedule.kind === 'periodic') {
         const config = this.manifest.configs.find(item => item.id === schedule.every.configId);
@@ -4186,8 +4253,8 @@ export function isExecutableRangeSchedule(item) {
   return item.timezone === 'UTC' && item.policy?.basis?.kind === 'call'
     && item.policy.basis.name === 'range' && item.policy?.clock?.name === 'trusted_only'
     && (item.scheduleType === 'Daily' && (!item.on && !item.calendar || item.on && item.calendar && ['day`workday`','day`offday`'].includes(item.on.value))
-      && item.at?.kind === 'literal' && item.at.raw.startsWith('time`')
-      || item.scheduleType === 'DailySlots' && Array.isArray(item.selected) && item.selected.length > 0);
+      && (item.at?.kind === 'literal' && item.at.raw.startsWith('time`') || item.at?.kind === 'reference')
+      || item.scheduleType === 'DailySlots' && (Array.isArray(item.selected) ? item.selected.length > 0 : item.selected?.kind === 'identifier'));
 }
 
 /** Internal composition adapter. The public API accepts canonical documents. */

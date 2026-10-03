@@ -2,6 +2,155 @@
 
 ## Unreleased
 
+### 2026-10-03 — restore mixed UTC Ranges and private-config snapshots ([#503](https://github.com/callin2/ghostflow-language/pull/503))
+
+Bug fixes restoring Reference §§3.5–3.6 and §5 settings observation behavior.
+GFB20 now loads an ordinary UTC `Daily` Range alongside a config-selected
+`DailySlots` Range; previously the ordinary schedule prevented activation.
+Completed-scan snapshots now accept unexposed `config internal: Bool = true;`
+alongside public settings. Every compiled config still requires its exact runtime
+identity, source default and emission provenance; only public descriptors are
+projected. Existing native/framed-WASM parity and settings-provenance suites
+cover mixed activation/execution and private-row tampering. No format/ABI change
+or Device/hardware verification is claimed.
+
+### 2026-10-02 — identify both competing output writers ([#300](https://github.com/callin2/ghostflow-language/issues/300))
+
+Composition duplicate-supplier diagnostics now name both authored writer
+endpoints, or distinguish a root output expression from an instance connection.
+For example, `connect pump <- east.pump` plus `connect pump <- west.pump`
+still rejects before activation and now identifies `east.pump` and `west.pump`.
+Previously only the shared sink was named. The existing diagnostic category,
+canonical second-writer location and rejection behavior are preserved; no
+last-writer policy, arbitration or artifact/ABI change is introduced. Exact
+Reference §6.5 tests cover either writer/declaration order, mixed expression
+conflicts and distinct-channel native/framed-WASM complete outcome parity.
+
+### 2026-10-02 — diagnose transitive import cycles at the closing edge ([#298](https://github.com/callin2/ghostflow-language/issues/298))
+
+The compiler now reports an executable import cycle at its authored back edge
+before checking that edge's revision/digest. Previously a circular digest
+mismatch masked the structural cycle. For example, pinned `root -> A -> B -> A`
+rejects as a cycle at B's import of A. Non-cyclic imports still require every
+exact immutable revision and UTF-8 source digest; no resolver, fallback or
+artifact format changes. Canonical two-dependency tests verify full persisted
+closure replay, tamper rejection, authored missing/floating/mismatched pins and
+complete native/framed-WASM execution outcomes. This restores Reference §6.4's
+specific cycle rejection; it does not adopt package or deployment policies.
+
+### 2026-10-02 — bind settings observations to source defaults and accepted emissions ([#273](https://github.com/callin2/ghostflow-language/issues/273))
+
+Settings streams now retain each row's accepted emission revision and application
+position separately from immutable source identity and global settings revision.
+An initial 5-minute Duration remains a non-override after an unrelated Bool edit;
+successful equal-valued emissions are later overrides. Current faults expose the
+fault without a historical/default effective-value fallback or ready-only override.
+New settings Interaction schemas use explicit version 0.4 with source-bound static
+defaults, and snapshots use 0.2 with correlated global/row provenance. Legacy 0.3/0.1
+settings documents retain their original validation and digest; non-settings are
+unchanged. Context checkpoint version 4 persists metadata and rejects inconsistent
+initial values, allocator/history, latest revision and atomic positions before
+owner mutation. Actual canonical native/framed-WASM tests compare full outcomes,
+settings and checkpoints, including permission/VM rollback and checksum-repaired
+semantic corruption. No executable descriptor binding, publishing identities,
+Device adoption or hardware verification is claimed.
+
+### 2026-10-02 — report missing what-if replay inputs ([#304](https://github.com/callin2/ghostflow-language/issues/304))
+
+The bounded reference host now executes actual source-bound ghost branches for
+plain controls from an event-sourced recorded-prefix checkpoint. Each future
+frame requires complete recorded inputs and sensor samples; missing records
+produce a report before branch execution. Explicit virtual inputs must carry
+synthetic provenance, including fault samples. Fresh disposable runtimes preserve
+the original recording and live continuation. Canonical native/WASM tests compare
+full VM traces, state and requested/safe outputs. This profile compares the same
+Program and uses virtual bindings; foreign memory checkpoints, settings/schedules,
+Device execution and environmental models remain outside its scope.
+
+### 2026-10-02 — atomic keyed TimeSlots Range overlap validation ([#267](https://github.com/callin2/ghostflow-language/issues/267))
+
+Reference §§3.5–3.6 now execute UTC `DailySlots<G>` selected by `TimeSlots<G,N>`
+with fixed positive Duration on a whole-minute grid dividing the day, using
+GFB20/control-v20. Previously this keyed Range form was rejected. A live proposal
+from 08:00 `range(20min)` to `[08:00, 08:15]` rejects the entire settings/scan
+transaction; `[08:00, 08:20]` touches and succeeds. Preflight also protects an
+admitted removed key. Retimes retain occurrence identity, removed keys retain
+admitted work, and additions/re-additions use fresh keys and trusted addition
+baselines. Changed keys reject atomically without trusted wall time. Empty lists
+are valid; accepted faults preserve historical keys without deriving a new plan.
+GFRG4 persists keyed settings, allocator, baselines and consumed history and
+validates them on restore without resuming timers. Older consumers reject the
+new format; GFRG1/2/3 remain separate. REF-03-078 tests compare actual native/WASM
+traces, complete checkpoints and rollback, including the original static-slots
+live Duration overlap case. Non-UTC/DST, calendar, combined live TimeSlots plus
+Duration and Run cancellation policy remain outside this profile.
+
+### 2026-10-02 — block unacknowledged accounting admission ([#269](https://github.com/callin2/ghostflow-language/issues/269))
+
+Bug fix restoring Reference §3.10 `on_unknown = block`: rolling reservation
+admission now rejects a ledger whose current revision lacks durable
+acknowledgement before any reservation, revision or persistence mutation.
+Previously `initializeEmpty` with a failed write produced Unknown reads but a
+5s reservation could still be inserted. Missing/corrupt ledgers remain blocked;
+pending exact retries also block until explicit `persistPending` recovery, then
+known duplicates remain idempotent. REF-03-080 compares the same canonical
+count-fault-to-false program and source-derived protective policy over actual
+native/WASM ABI traces, complete ledgers and admission outcomes. This is
+source-bound reference-host admission, not automatic VM/resource or physical
+binding. No source grammar or serialized ABI format changes.
+
+### 2026-10-02 — live scalar Range start retimes active occurrence ([#266](https://github.com/callin2/ghostflow-language/issues/266))
+
+Reference §3.5 now accepts a `TimeOfDay` config as the scalar `Daily.at` source for the bounded executable UTC Daily Range profile with fixed Duration. A successful atomic live settings event recomputes the already admitted occurrence from the original local date and the new effective start while retaining the same occurrence ID and due ledger: 08:00 `range(10min)` admitted at 08:04, edited at 08:07 to 08:08, pauses immediately, resumes at 08:08 and ends at 08:18; editing to 08:02 ends at 08:12. The GFB19 encoding carries the start config id; unsupported calendar, non-UTC, multi-slot, Periodic and combined live start+Duration profiles reject instead of falling back to static metadata. Checkpoints persist and verify the accepted scalar start setting and consumed history but never resume an active timer. REF-03-077 is covered by native/WASM framed parity tests.
+
+### 2026-10-02 — live Range Duration setting retimes active occurrence ([#265](https://github.com/callin2/ghostflow-language/issues/265))
+
+Reference §3.5 `range(duration)` now accepts a `Duration` config for executable UTC Daily/DailySlots GFB12 Range without a work calendar. A successful atomic live settings event recomputes the active occurrence from the frozen planned start: 08:00 admitted at 08:04 with 10min, then edited at 08:07 to 12min, remains the same occurrence and ends at 08:12; editing to 5min ends it at the event position. No new due pulse or occurrence ID is emitted, and the accepted duration is persisted in the GFRGv2 checkpoint so the next occurrence uses the live value after restore. Invalid typed values become the existing settings-fault decision without changing the accepted duration. REF-03-076 covers native/WASM trace and checkpoint parity. The GFB12 encoding uses a zero duration sentinel followed by the existing config id; older GFB12 consumers reject this new encoded form.
+
+Live Range configs require a positive minimum Duration at compilation, matching
+the runtime loader. Unsupported calendar binding and overlap-changing live
+proposals reject explicitly; rejected envelopes leave the settings revision and
+complete context checkpoint unchanged. Retime also works while clock trust is
+unknown or wall correction crosses a date, using the admitted frozen origin.
+
+### 2026-10-02 — incomplete durable event counts ([#268](https://github.com/callin2/ghostflow-language/issues/268))
+
+The WASM accounting adapter now returns `LedgerIncomplete` when a known ledger's
+latest revision lacks durable acknowledgement. Previously it retained
+`LedgerMissing` from initialization after an event's persistence failed. Missing
+and corrupt ledgers retain their distinct faults; successful acknowledgement
+recovers the exact count. REF-03-079 compares actual native/WASM control traces
+and serialized ledgers. A private production conversion boundary test checks
+`CountOverflow` without allocating billions of event records.
+
+### 2026-10-02 — durable rolling budget explanation ([#260](https://github.com/callin2/ghostflow-language/issues/260))
+
+Reference §4.15 now has a source-bound reference host query over the real Rust
+ledger, including durable revision, budget denial and earliest conditional
+release. Overlapping [0,20s]/[10s,30s] intervals with a 60s window, 30s limit and
+5s proposal reject at 64.999s and admit at 65s, independently of OFF animation.
+REF-04-066 checks restore/activation and unacknowledged persistence. Bindings
+copy and freeze source limits, fixing a bug that violated checked-source policy:
+previously changing the public limit to 99s admitted an unauthorized reservation;
+now that mutation throws and a mismatched reservation rejects. The before/after
+probe and immutable-binding regressions verify the restored contract.
+Rebuild WASM for the additive query export; GFB/snapshot formats are unchanged.
+See [the host contract](docs/ROLLING-BUDGET-EXPLANATION.md) for trusted evidence,
+local revision and integration limits.
+
+### 2026-10-02 — bounded adaptation admission bug fix ([#258](https://github.com/callin2/ghostflow-language/issues/258))
+
+Reference §4.14 policy bounds were omitted from compiled descriptors and no
+reference host enforced proposal rates. Compilation now checks and carries
+typed bounds; the fresh `AdaptationSettingsHost` validates trusted actor authority
+and all proposed properties before one existing atomic Rust settings event.
+After 20%→30% consumes a 10% hourly budget, a two-property proposal including
+30%→25% rejects both without changing values or revision. REF-04-064 checks actual
+WASM activation and snapshots, absolute rolling budgets, exact Int/Duration grids
+and bounded identity/history admission. GFB/WASM ABI is unchanged; regenerate old
+adaptation manifests because bounds are now required. This reference profile
+does not provide settings checkpoint recovery or API/Device integration.
+
 ### 2026-10-02 — Station atomic mode-entry binding bug fix ([#250](https://github.com/callin2/ghostflow-language/issues/250))
 
 Reference §4.10 rejects every conflicting same-tick mode entry. The WASM adapter

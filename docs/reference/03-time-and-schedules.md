@@ -299,8 +299,10 @@ Tide는 `fallback = skip`만 허용하며 다른 trigger는 trusted-only clock�
 `window`, `run(_, on_time)`은 선택된 설계 표기이며
 아직 compiler 지원 범위 밖이다. civil `range`는 UTC timezone의 정적 non-overlap을
 증명해야 한다. 불변 UTC Daily와 비어 있지 않은 정적 DailySlots Range는 GFB12로
-실행되며 다른 허용된 Range recurrence는 비실행 descriptor로 유지된다.
-Tide의 `run(_, within(_))`은 지원한다.
+실행되며 다른 허용된 Range recurrence는 비실행 descriptor로 유지된다. Range duration은
+초기값으로 non-overlap을 증명할 수 있는 operator `Duration` config일 수 있다. 승인된 live
+setting event는 frozen planned start에서 현재 occurrence를 다시 계산하며 새 due pulse나
+occurrence identity를 만들지 않는다. Tide의 `run(_, within(_))`은 지원한다.
 
 bounded 자연 정책 admission은 단조 경과가 duration보다 엄격히 작은 동안만 held time을 사용한다.
 trusted anchor나 uncertainty가 없거나 checked 덧셈이 overflow하면 fail closed한다.
@@ -488,15 +490,19 @@ schedule morning_watering: Daily {
 쓰는 불변 UTC Daily는 GFB18로 실행한다. 시작 시각과 duration의 합은 local midnight을
 넘을 수 없다. overnight work interval은 명시적인 별도 Daily range로 나눈다. 끝은
 제외되므로 정확히 자정에 끝나는 range는 유효하다. work calendar 없는 일반 range의
-기존 자정 동작은 유지한다. live 시작/duration 설정, Periodic Range와 다른 허용된
-변형은 descriptor로 유지한다. 비 UTC와 증명할 수 없는 overlap은 계속 거부하며
-timezone이나 DST 정책을 추측하지 않는다.
+기존 자정 동작은 유지한다. 이 slice에서 live duration 설정은 work calendar가 없는
+UTC Daily/DailySlots에만 실행 lowering을 제공한다. live scalar start 설정은 고정
+Duration을 가진 단일 UTC Daily Range에만 실행 lowering을 제공한다. work calendar Range와
+live Range duration/start config의 조합, live start와 live duration을 함께 쓰는 조합,
+Periodic Range와 비 UTC Range는 정적으로 거부하여 static Range로 조용히 fallback하지
+않는다. 지원되지 않는 변형은 timezone이나 DST 정책을 추측하지 않는다.
 
-Range context checkpoint는 소비한 occurrence identity를 보존하며 활성 monotonic
-timer는 보존하지 않는다. 새 boot로 복원해도 이미 소비한 occurrence를 재개하거나
-다시 admit하지 않는다. 아직 소비하지 않은 열린 interval은 남은 시간만 admit할 수
-있다. terminal capacity가 소진되면 scan 전체를 원자적으로 거부하며 identity를
-조용히 제거하지 않는다.
+Range context checkpoint는 소비한 occurrence identity와 live duration 또는 live scalar
+start 설정이 있으면 그 effective 값을 보존하며 활성 monotonic timer는 보존하지 않는다.
+새 boot로 복원해도 이미 소비한 occurrence를 재개하거나 다시 admit하지 않지만 다음
+occurrence는 복원된 duration 또는 start를 쓴다. 아직 소비하지 않은 열린 interval은 남은
+시간만 admit할 수 있다. terminal capacity가 소진되면 scan 전체를 원자적으로 거부하며
+identity를 조용히 제거하지 않는다.
 
 late interval은 half-open이다. 종료 경계에서 새로 admit하지 않는다. 예정 시간 08:00,
 `run(5min, within(10min))`이 08:02에 admit되면 08:07까지의 단조 run이다.
@@ -542,9 +548,12 @@ settings revision 변경에도 유지한다. admission 이후에는 보정 전�
 기준을 단조 경과로 전진시켜 현재 위치와 남은 시간을 정한다. 예를 들어 08:00
 계획 `range(10min)`이 08:04에 admit된 뒤 08:07에 Duration을 12분으로 바꾸면
 08:12에 끝난다. 5분으로 줄이면 새 종료점 08:05가 이미 지났으므로 그 event가
-적용되는 판단에서 끝난다. 시작 시각을 08:02로 바꾸고 Duration을 10분으로
-유지하면 종료점은 08:12다. late admission 시각을 새 계획 시작점으로 사용하지
-않는다. 같은 위치에서 설정 event와 scan이 겹치면 §5.2의 event 적용 순서를
+적용되는 판단에서 끝난다. 시작 시각을 08:08로 바꾸면 같은 occurrence는 즉시
+비활성화되고 신뢰 가능한 08:08 scan에서 다시 active가 되어 08:18에 끝난다. 시작
+시각을 08:02로 바꾸고 Duration을 10분으로 유지하면 종료점은 08:12다. late admission
+시각을 새 계획 시작점으로 사용하지 않으며, wall 보정이나 ClockUnknown으로 현재
+날짜 key를 만들 수 없어도 admit 당시 original local date와 변경된 TimeOfDay에서
+재계산한다. 같은 위치에서 설정 event와 scan이 겹치면 §5.2의 event 적용 순서를
 먼저 확정하고 그 위치의 유효 설정으로 판단한다.
 
 전역 안전 제약이 출력을 막으면 safe output은 즉시 false지만 Range occurrence와
@@ -691,6 +700,27 @@ retime 결과도 전체 `TimeSlots<G,N>` 값으로서 grid, 중복, N과 같은 
 
 이 타입은 “15분마다”가 아니다. `[06:00, 18:45]`라는 특정 local clock slots를
 나타낸다. 주기를 설정값으로 바꾸는 Periodic과 의미가 다르다.
+
+제한된 실행 가능한 keyed Range profile은 `TimeSlots<G,N>`로 선택한 UTC
+`DailySlots<G>`, 양의 고정 Duration, work calendar 없음, 24시간을 나누는 정수 분
+grid를 사용한다. GFB20/control-v20으로 식별하며 live TimeSlots와 live Duration의
+조합이나 비 UTC zone은 거부한다. 예를 들어 승인된 08:00 `range(20min)`을
+`[08:00, 08:15]`로 바꿀 수 없지만 반열린 구간이 맞닿는 `[08:00, 08:20]`은
+유효하다. preflight는 제안된 미래 목록에서 key가 제거된 이미 admit한 구간도
+포함한다. 거부하면 event의 다른 설정과 clock, allocator, revision, occurrence
+history를 모두 commit하지 않는다. **Why:** 설정 revision이 겹치는 작업을 만들거나
+control snapshot의 일부만 바꾸어서는 안 된다.
+
+이 실행 profile에서 key를 추가하거나 retime하는 edit는 신뢰할 수 있는 wall
+baseline이 필요하며 wall trust가 Unknown이면 atomic하게 거부한다. 변경되지 않은
+key와 승인된 settings-fault emission은 기존 동작을 유지한다. 이 제한은 별도의
+live scalar start/Duration Range profile을 바꾸지 않는다. fault emission은 과거
+key identity를 보존하지만 새 effective plan 없이 Unknown을 낸다. GFRG4 checkpoint는
+승인된 keyed 목록, allocator, 추가 baseline과 consumed history를 저장하며 빈 목록과
+표시 시각 순서가 바뀐 retained key도 포함한다. restore는 이 metadata를 검증하며
+활성 timer를 재개하지 않는다. 기존 GFRG1/2/3 profile은 각자의 format을 유지한다.
+이전 loader는 static fallback으로 실행하지 않고 GFB20을 거부한다. 이 profile은
+timezone/DST나 Run cancellation 정책을 선택하지 않는다.
 
 ## 3.7 Periodic과 Cron
 

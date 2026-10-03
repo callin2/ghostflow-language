@@ -86,18 +86,34 @@ fn settings_event(value: &Json) -> Result<Option<SettingsEvent>> {
             Some(true) => {
                 let semantic_type = text(&result["type"])?.to_owned();
                 let value = match semantic_type.as_str() {
-                    "Bool" => Value::Bool(result["value"].as_bool().ok_or("invalid Bool setting")?),
-                    "Int" => Value::Int(i32::try_from(
+                    "Bool" => ConfigValue::Scalar(Value::Bool(
+                        result["value"].as_bool().ok_or("invalid Bool setting")?,
+                    )),
+                    "Int" => ConfigValue::Scalar(Value::Int(i32::try_from(
                         result["value"].as_i64().ok_or("invalid Int setting")?,
-                    )?),
-                    _ => Value::Number(
+                    )?)),
+                    ty if ty.starts_with("TimeSlots<") => {
+                        let slot_value = &result["value"];
+                        if text(&slot_value["kind"])? != "slots" {
+                            return Err("invalid TimeSlots setting".into());
+                        }
+                        let mut slots = Vec::new();
+                        for item in array(&slot_value["entries"], 4096)? {
+                            slots.push((
+                                integer(&item["key"])?,
+                                u16::try_from(integer(&item["minuteOfDay"])?)?,
+                            ));
+                        }
+                        ConfigValue::Slots(slots)
+                    }
+                    _ => ConfigValue::Scalar(Value::Number(
                         result["value"]
                             .as_f64()
                             .filter(|n| n.is_finite())
                             .ok_or("invalid numeric setting")?,
-                    ),
+                    )),
                 };
-                (semantic_type, Ok(ConfigValue::Scalar(value)))
+                (semantic_type, Ok(value))
             }
             None => return Err("invalid settings Result".into()),
         };
@@ -306,16 +322,21 @@ fn main() -> Result<()> {
         .collect();
     let tape: Json = serde_json::from_slice(&read(&args[1])?)?;
     let solar_profile = tape["profile"] == "context-solar-v1";
-    let civil_profile = tape["profile"] == "context-civil-v1";
+    let settings_periodic_profile = tape["profile"] == "context-settings-periodic-v1";
+    let civil_profile =
+        tape["profile"] == "context-civil-v1" || tape["profile"] == "context-settings-civil-v1";
     let calendar_profile = tape["profile"] == "context-calendar-v1";
-    if civil_profile || calendar_profile {
+    if civil_profile || calendar_profile || settings_periodic_profile {
         fields(&tape, &["profile", "activation", "steps", "checkpoint"])?;
         fields(
             &tape["activation"],
             &["bootEpoch", "terminalCapacity", "bindings"],
         )?;
     }
-    let settings_profile = tape["profile"] == "context-settings-v1" || solar_profile;
+    let settings_profile = tape["profile"] == "context-settings-v1"
+        || settings_periodic_profile
+        || tape["profile"] == "context-settings-civil-v1"
+        || solar_profile;
     if !settings_profile
         && !civil_profile
         && !calendar_profile
@@ -345,7 +366,7 @@ fn main() -> Result<()> {
         terminal_capacity: usize::try_from(integer(&activation["terminalCapacity"])?)?,
         bindings,
     })?;
-    if (civil_profile || calendar_profile) && !tape["checkpoint"].is_null() {
+    if (civil_profile || calendar_profile || settings_profile) && !tape["checkpoint"].is_null() {
         let encoded = tape["checkpoint"]
             .as_str()
             .ok_or("invalid checkpoint hex")?;
@@ -359,6 +380,7 @@ fn main() -> Result<()> {
         runtime.restore_context_checkpoint(&bytes)?;
     }
     let mut driver = runtime.into_scan_driver();
+    let mut last_outcome: Option<Json> = None;
     for step in array(&tape["steps"], 4096)? {
         if solar_profile {
             fields(
@@ -377,7 +399,7 @@ fn main() -> Result<()> {
             if !array(&step["natural"], 0)?.is_empty() {
                 return Err("Solar tape cannot supply natural providers".into());
             }
-        } else if civil_profile || calendar_profile {
+        } else if civil_profile || calendar_profile || settings_periodic_profile {
             fields(
                 step,
                 &[
@@ -430,11 +452,11 @@ fn main() -> Result<()> {
                     "Periodic tape cannot supply providers, calendars or occurrence rows".into(),
                 );
             }
-            if settings_profile {
+            if settings_profile && !civil_profile && !settings_periodic_profile {
                 return Err("settings tape cannot supply schedules".into());
             }
             let mut rows = Vec::new();
-            if civil_profile || calendar_profile {
+            if civil_profile || calendar_profile || settings_periodic_profile {
                 fields(
                     schedule,
                     &[
@@ -568,10 +590,11 @@ fn main() -> Result<()> {
                     "format": "GhostFlow/scan-outcome-v1", "scanId": outcome.scan_id,
                     "logicalTimeMs": outcome.logical_time_ms, "trace": trace,
                 }});
+                last_outcome = Some(record["outcome"].clone());
                 if settings_profile {
                     record["settings"] = state.unwrap_or(Json::Null);
                 }
-                if civil_profile || calendar_profile {
+                if civil_profile || calendar_profile || settings_profile {
                     record["checkpoint"] = Json::String(
                         driver
                             .runtime()
@@ -590,12 +613,24 @@ fn main() -> Result<()> {
                         .map(|byte| format!("{byte:02x}")).collect::<String>(),
                 })
             ),
-            Err(error) if settings_profile => println!(
-                "{}",
-                json!({
-                    "accepted": false, "error": error.to_string(), "settings": state,
-                })
-            ),
+            Err(error) if settings_profile => {
+                let committed = driver.runtime().journal().back().map(|trace| {
+                    serde_json::from_str::<Json>(&trace.to_json()).expect("valid committed trace")
+                });
+                assert_eq!(
+                    committed.as_ref(),
+                    last_outcome.as_ref().map(|row| &row["trace"])
+                );
+                println!(
+                    "{}",
+                    json!({
+                        "accepted": false, "error": error.to_string(), "settings": state,
+                    "lastOutcome": last_outcome,
+                        "checkpoint": driver.runtime().context_checkpoint()?.iter()
+                            .map(|byte| format!("{byte:02x}")).collect::<String>(),
+                    })
+                );
+            }
             Err(error) => return Err(error.into()),
         }
     }

@@ -86,7 +86,7 @@ test('calendar checkpoint restores dedupe and rejects rewritten snapshot content
   assert.deepEqual(outputs(original.step(calendarPacket(compiled, calendars, '2026-10-09', 1)).vm.safe),
     { public_holiday: true, farm_work: true, farm_rest: false });
   const saved = original.contextSnapshot().bytes;
-  assert.equal(saved[4], 3, 'GFCX v3 persists calendar revision history');
+  assert.equal(saved[4], 4, 'GFCX v4 persists calendar revision history and settings provenance');
   restored.restoreContextCheckpoint(saved);
   restored.step(calendarPacket(compiled, calendars, '2026-10-09', 0, -1));
   assert.deepEqual(outputs(restored.step(calendarPacket(compiled, calendars, '2026-10-09', 1)).vm.safe), none);

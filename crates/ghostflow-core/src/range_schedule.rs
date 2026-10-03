@@ -45,6 +45,7 @@ struct ActiveRange {
     deadline_monotonic_ms: u64,
     admitted_wall_ms: u64,
     admitted_monotonic_ms: u64,
+    planned_offset_ms: u64,
     paused: bool,
 }
 
@@ -146,9 +147,17 @@ impl RangeEngine {
             decision: RangeDecision::Waiting,
         };
         if let Some(active) = &mut engine.active {
-            let stable_wall_ms =
-                active.admitted_wall_ms + (snapshot.monotonic_ms - active.admitted_monotonic_ms);
+            let monotonic_elapsed = snapshot
+                .monotonic_ms
+                .checked_sub(active.admitted_monotonic_ms)
+                .ok_or_else(|| Error::new("Range monotonic clock moved before admission"))?;
+            let stable_wall_ms = active
+                .admitted_wall_ms
+                .checked_add(monotonic_elapsed)
+                .ok_or_else(|| Error::new("Range stable wall is out of range"))?;
             // Provider refreshes and wall corrections cannot retime admission.
+            // The generic engine consumes absolute planned-wall facts; civil-day
+            // binding belongs in the UTC Daily adapter that constructs them.
             // At the exact endpoint an event ordered before the scan can still
             // extend the interval. A later event cannot revive elapsed time.
             if retime && snapshot.monotonic_ms <= active.deadline_monotonic_ms {
@@ -156,14 +165,22 @@ impl RangeEngine {
                     .iter()
                     .find(|fact| fact.occurrence_key == active.fact.occurrence_key)
                 {
-                    let end = changed.planned_wall_ms + changed.duration_ms;
+                    let changed = changed.clone();
+                    let end = changed
+                        .planned_wall_ms
+                        .checked_add(changed.duration_ms)
+                        .ok_or_else(|| Error::new("Range planned end is out of range"))?;
                     active.deadline_monotonic_ms = snapshot
                         .monotonic_ms
                         .checked_add(end.saturating_sub(stable_wall_ms))
                         .filter(|deadline| *deadline <= MAX_EXACT_TIME)
                         .ok_or_else(|| Error::new("Range monotonic deadline is out of range"))?;
-                    active.fact = changed.clone();
-                    active.paused |= stable_wall_ms < changed.planned_wall_ms;
+                    active.planned_offset_ms = active
+                        .admitted_wall_ms
+                        .checked_sub(changed.planned_wall_ms)
+                        .unwrap_or(0);
+                    active.fact = changed;
+                    active.paused |= stable_wall_ms < active.fact.planned_wall_ms;
                 }
             }
             result.occurrence_key = Some(active.fact.occurrence_key.clone());
@@ -241,6 +258,7 @@ impl RangeEngine {
                 deadline_monotonic_ms: deadline,
                 admitted_wall_ms: wall_ms,
                 admitted_monotonic_ms: snapshot.monotonic_ms,
+                planned_offset_ms: wall_ms - fact.planned_wall_ms,
                 paused: false,
             });
             result = RangeStageResult {
@@ -269,6 +287,10 @@ impl RangeEngine {
         }
         self.terminal_keys.push(key.to_owned());
         Ok(())
+    }
+
+    pub(crate) fn validate_retime_facts(&self, facts: &[RangeFact]) -> Result<()> {
+        self.validate_facts(facts, true)
     }
 
     fn validate_facts(&self, facts: &[RangeFact], retime: bool) -> Result<()> {

@@ -162,6 +162,26 @@ Per-observation payload statuses are intentionally minimal:
 | `error` | trusted producer | `error` | This descriptor could not be observed. |
 | `stale` | validating consumer join | derived reasons | The structurally valid snapshot differs from the consumer's expected schema, module, source, or run identity. It is never accepted as a self-declared observation status. |
 
+Settings use an explicit upgraded profile: static schemas that contain any
+`setting` descriptor use schema version `0.4`, and their runtime snapshots use
+snapshot version `0.2`. Non-settings schemas remain exactly schema `0.3` and
+snapshot `0.1`; older settings snapshots are not silently reinterpreted as the
+new profile.
+
+For `setting` observations, the snapshot also carries a global
+`settingsRevision`. Each setting observation requires `defaultValue`,
+`emissionRevision`, and `applicationPosition`; `ready` observations additionally
+carry `override`. `defaultValue` is the static source literal, not a fallback.
+`emissionRevision` and `applicationPosition` are the actual per-setting accepted
+emission revision and event position; initial source observations use revision
+`0`, `applicationPosition: null`, and `override: false`, and their current value
+must equal `defaultValue`. Any later accepted successful emission, even one equal
+to the default, uses its later revision/position and `override: true`. An
+accepted settings fault keeps the fault as the current Result and carries the
+same provenance fields except ready-only `override`; it does not expose an old
+successful `value` or synthesize a default as effective. Non-settings
+descriptors keep the original minimal status fields.
+
 The validator reports `join.status: "stale"` with exact stale reasons only when
 an optional expected identity is supplied. The expected join can compare schema
 format, version, and digest; module ID, fingerprint, and bytecode SHA; source
@@ -228,3 +248,26 @@ The v0 alternative rejected here is putting `stale` beside `ready` in an
 untrusted observation. That would make a producer's assertion substitute for a
 consumer's identity join. Deriving it in validation keeps the document small
 while making restart and revision mismatches explicit.
+
+## Settings provenance validation
+
+The new `0.4` setting descriptor includes its canonical source `defaultValue`.
+The producer compares runtime defaults with the compiled config literal, and
+the validator binds each dynamic default to that static descriptor. A row's
+`emissionRevision` cannot exceed global `settingsRevision`; the latest accepted
+global revision must occur in at least one row. Rows from one atomic revision
+share an `applicationPosition`. Revision zero means the initial successful
+source value, never a fault or changed history. Positions remain run-local and
+need not increase across a checkpoint restore. Context checkpoint version 4
+persists these fields and rejects inconsistent values/history/allocator and
+revision correlations before changing the new owner.
+
+Explicit legacy schema `0.3` / snapshot `0.1` settings documents still validate
+with their original fields and digest. They have no new provenance claims and
+are never reinterpreted as `0.4` / `0.2`; fresh settings producers use the new
+profile. Non-settings documents and historical pinned digests remain intact.
+REF-05-012 tests use actual native and framed WASM execution with complete
+outcome/settings/checkpoint parity, rejected permission and VM transactions,
+source-default forgeries, and checksum-repaired semantic restore corruption.
+This is a settings observation contract, not executable descriptor binding,
+mutation authorization, publishing identity issuance or Device adoption.

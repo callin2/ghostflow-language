@@ -231,7 +231,7 @@ cancel_when := Bool                                   // Required for current ci
 
 All common fields are required. Unconditional admission can specify `when = true`; a Run or Range without language-level cancellation can specify `cancel_when = false`. In the current compiler, `cancel_when` is allowed for `Tide` Run and civil `range`, and is required for `range`. It is forbidden for `pulse`. `hold_trusted(d, terminal: skip)` adds monotonic elapsed time to the last trusted wall instant and uses it for at most d. Uncertainty adds the same monotonic elapsed time to the last uncertainty, recording `HeldClock` provenance. At the boundary, after `ClockUnknown`, terminal skip applies to new admission decisions. An already admitted Range keeps its monotonic end time. High-water does not change.
 
-The current compiler accepts `clock = hold_trusted(positive constant Duration, terminal: skip)` for Solar and Tide and `fallback = fixed_time(TimeOfDay literal, terminal: skip)` for Solar. Tide permits only `fallback = skip`; other triggers retain trusted-only clock and skip fallback. `window` and `run(_, on_time)` remain outside current support. Civil `range` requires provable static non-overlap in UTC; immutable UTC Daily and nonempty static DailySlots ranges execute as GFB12, while other accepted Range recurrences remain descriptors. Tide `run(_, within(_))` is supported.
+The current compiler accepts `clock = hold_trusted(positive constant Duration, terminal: skip)` for Solar and Tide and `fallback = fixed_time(TimeOfDay literal, terminal: skip)` for Solar. Tide permits only `fallback = skip`; other triggers retain trusted-only clock and skip fallback. `window` and `run(_, on_time)` remain outside current support. Civil `range` requires provable static non-overlap in UTC; immutable UTC Daily and nonempty static DailySlots ranges execute as GFB12, while other accepted Range recurrences remain descriptors. A Range duration may be an operator `Duration` config when the initial value proves non-overlap; accepted live setting events recompute the current occurrence from its frozen planned start, without a new due pulse or occurrence identity. Tide `run(_, within(_))` is supported.
 
 Bounded natural-policy admission uses held time only while monotonic elapsed time is strictly less than the duration. Missing trusted anchors or uncertainty and checked-addition overflow fail closed. Held wall time and uncertainty are the last trusted values plus elapsed time, with `HeldClock` provenance. Expiry terminal-skips new admission, preserves high-water and does not extend an active Run. Recovery establishes a baseline; restart begins with a new clock. The facts provider owns IANA conversion and supplies a known source local date and fallback instant matching the authored time and timezone on that date. Ambiguous or nonexistent civil times terminal-skip without inventing a fold. The core owns admission and generated due inputs. A fallback and recovered Solar event on the same source local date share a consumed identity and terminal checkpoint. These bounds prevent unavailable predictions or uncertain clocks from silently creating occurrences.
 
@@ -353,9 +353,9 @@ schedule morning_watering: Daily {
 }
 ```
 
-This immutable UTC `range` example is executable GFB12 control bytecode. The bounded execution slice supports Daily without a work calendar and nonempty static DailySlots, with `trusted_only`, `baseline` and `skip`. Immutable UTC Daily with a `workday` or `offday` selector and a typed WorkCalendar uses GFB18. Its start plus duration must not exceed local midnight; divide an overnight work interval into separate explicit Daily ranges. A range ending exactly at midnight is valid because its end is exclusive. Ordinary ranges without a work calendar retain their existing midnight behavior. Live start/duration settings, Periodic Range and other accepted variants remain descriptors. Non-UTC and unprovable overlap remain rejected; no timezone or DST policy is inferred.
+This immutable UTC `range` example is executable GFB12 control bytecode. The bounded execution slice supports Daily without a work calendar and nonempty static DailySlots, with `trusted_only`, `baseline` and `skip`. Immutable UTC Daily with a `workday` or `offday` selector and a typed WorkCalendar uses GFB18. Its start plus duration must not exceed local midnight; divide an overnight work interval into separate explicit Daily ranges. A range ending exactly at midnight is valid because its end is exclusive. Ordinary ranges without a work calendar retain their existing midnight behavior. In this slice, live duration settings lower only for UTC Daily/DailySlots without a work calendar. Live scalar start settings lower only for a single UTC Daily Range with fixed Duration. Work-calendar Range with live duration/start config, combined live start+Duration, Periodic Range and non-UTC Range are rejected statically instead of silently falling back to static Range metadata. Unsupported variants do not infer timezone or DST policy.
 
-Range context checkpoints retain consumed occurrence identities, not an active monotonic timer. Restoring into a fresh boot does not resume or readmit an already consumed occurrence. An unconsumed still-open interval may admit only its remaining time. Terminal-capacity exhaustion rejects the scan atomically; identities are never silently pruned.
+Range context checkpoints retain consumed occurrence identities and, when present, the effective live duration or live scalar start setting, not an active monotonic timer. Restoring into a fresh boot does not resume or readmit an already consumed occurrence, but the next occurrence uses the restored duration or start. An unconsumed still-open interval may admit only its remaining time. Terminal-capacity exhaustion rejects the scan atomically; identities are never silently pruned.
 
 The late interval is half-open. No new admission occurs at its end boundary. For a planned time of 08:00, `run(5min, within(10min))` admitted at 08:02 is a monotonic run through 08:07.
 
@@ -365,7 +365,7 @@ Different Range occurrences of the same schedule must not overlap. A nonempty in
 
 At Range admission, fix the planned end using the occurrence's planned start and the effective Duration at that point. Convert the already elapsed portion into remaining time on the monotonic clock. RTC/NTP wall-clock correction after admission neither advances nor delays the ongoing end. Apply the corrected wall clock to subsequent occurrence decisions after the current occurrence ends. Preserve trusted time, planned start and monotonic elapsed reference together for the same occurrence, avoiding recalculation of the end during correction.
 
-If the scalar start-time setting of a trigger with a single planned start, or its Duration, is an operational setting, apply an accepted atomic live event to the current occurrence too, from its application position. Recalculate the current interval and end with the changed start and Duration. Keep occurrence ID and already admitted ledger across settings revision changes. After admission, advance the stable pre-correction time reference by monotonic elapsed time to determine current position and remaining time. For example, an 08:00-planned `range(10min)` admitted at 08:04 ends at 08:12 if Duration changes to 12 minutes at 08:07. Shortening it to five minutes ends it at the decision applying that event because the new 08:05 end has passed. Changing start to 08:02 while keeping ten minutes sets end to 08:12. Do not use late admission time as the new planned start. If a settings event and scan coincide at one position, first establish §5.2 event application order, then decide using effective settings at that position.
+If the scalar start-time setting of a trigger with a single planned start, or its Duration, is an operational setting, apply an accepted atomic live event to the current occurrence too, from its application position. Recalculate the current interval and end with the changed start and Duration. Keep occurrence ID and already admitted ledger across settings revision changes. After admission, advance the stable pre-correction time reference by monotonic elapsed time to determine current position and remaining time. For example, an 08:00-planned `range(10min)` admitted at 08:04 ends at 08:12 if Duration changes to 12 minutes at 08:07. Shortening it to five minutes ends it at the decision applying that event because the new 08:05 end has passed. Changing start to 08:08 immediately makes the same occurrence inactive, lets it become active again at trusted 08:08, and ends it at 08:18. Changing start to 08:02 while keeping ten minutes sets end to 08:12. Do not use late admission time as the new planned start; even when wall correction or ClockUnknown prevents using the current-date key, retime from the original local date and effective TimeOfDay. If a settings event and scan coincide at one position, first establish §5.2 event application order, then decide using effective settings at that position.
 
 When global safety constraints block output, safe output immediately becomes false, but the Range occurrence and monotonic end remain. If the constraint clears before the end, only the then-remaining interval may be requested. Blocked time is not appended at the end. `cancel_when = true` terminates the occurrence; renewed permission does not restart it. `.active` and requested/safe/applied/confirmed output are different observations.
 
@@ -442,6 +442,30 @@ An accepted live edit has these semantics:
 Validate a retime result as a complete `TimeSlots<G,N>` value for grid, duplicates, N and Range non-overlap in the same schedule. If the new time overlaps another item's Range, reject the whole event and retain existing values, slot keys, settings revision, active occurrence and ledger.
 
 This type does not mean “every 15 minutes.” It represents specific local clock slots such as `[06:00, 18:45]`. It differs from Periodic, whose period changes through a setting.
+
+The bounded executable keyed Range profile uses UTC `DailySlots<G>` selected by
+`TimeSlots<G,N>`, a positive fixed Duration, no work calendar, and a whole-minute
+grid dividing 24 hours. It uses GFB20/control-v20; combining live TimeSlots with
+live Duration or a non-UTC zone is rejected. For example, an accepted 08:00
+`range(20min)` cannot be changed to `[08:00, 08:15]`; `[08:00, 08:20]` is valid
+because the half-open intervals touch. Preflight includes an admitted interval
+whose key is removed from the proposed future list. Rejection commits neither
+the other settings in the event nor clock, allocator, revision or occurrence
+history. **Why:** a settings revision must not introduce overlapping work or
+partially change the control snapshot.
+
+In this execution profile, an edit that adds or retimes a key requires a trusted
+wall baseline; it rejects atomically while wall trust is unknown. Unchanged
+keys and accepted settings-fault emissions retain their existing behavior.
+This restriction does not change the separate live scalar start/Duration Range
+profiles. Fault emissions preserve historical key identity but produce Unknown
+without a new effective plan. The GFRG4 checkpoint persists the accepted keyed
+list, allocator, addition baselines and consumed history, including an empty
+list and retained keys whose displayed time order changed. Restore validates
+that metadata and never resumes an active timer. Existing GFRG1/2/3 profiles
+retain their own formats; older loaders reject GFB20 rather than executing a
+static fallback. This profile does not select timezone/DST or Run cancellation
+policy.
 
 ## 3.7 Periodic and Cron
 

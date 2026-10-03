@@ -40,6 +40,25 @@ pub struct AccountingInput {
     value: std::result::Result<i32, u8>,
 }
 
+// Keep the exact-count boundary on the production ledger-to-Result path. A
+// boundary test must not manufacture billions of records or inject a Result.
+fn exact_event_count(value: u64) -> std::result::Result<i32, u8> {
+    i32::try_from(value).map_err(|_| 4)
+}
+
+#[cfg(test)]
+mod event_count_boundary_tests {
+    use super::exact_event_count;
+
+    #[test]
+    fn exact_int_boundary_returns_count_overflow_without_wrapping() {
+        assert_eq!(exact_event_count(0), Ok(0));
+        assert_eq!(exact_event_count(i32::MAX as u64), Ok(i32::MAX));
+        assert_eq!(exact_event_count(i32::MAX as u64 + 1), Err(4));
+        assert_eq!(exact_event_count(u64::MAX), Err(4));
+    }
+}
+
 impl AccountingInput {
     pub fn from_ledger(
         site: u32,
@@ -64,7 +83,7 @@ impl AccountingInput {
             None => Err(0),
             Some(_) if !durable_ack => Err(unavailable_fault),
             Some(day) => match ledger.event_count(event_type, day) {
-                crate::accounting::LedgerRead::Known(value) => i32::try_from(value).map_err(|_| 4),
+                crate::accounting::LedgerRead::Known(value) => exact_event_count(value),
                 crate::accounting::LedgerRead::Unknown => Err(unavailable_fault),
             },
         };
@@ -644,24 +663,88 @@ impl ContextRuntime {
                     }
                 }
             }
+            if group_fault.is_none() && explicit_fault.is_none() {
+                let proposal = |id| {
+                    candidates
+                        .iter()
+                        .find(|(index, _, _)| self.configs[*index].descriptor.id == id)
+                        .and_then(|(index, value, _)| match value {
+                            ConfigValue::Scalar(Value::Number(n)) => {
+                                if self.configs[*index].descriptor.semantic_type == "TimeOfDay" {
+                                    Some(SettingValue::SharedTimeOfDay(*n as u64))
+                                } else {
+                                    Some(SettingValue::SharedDuration(*n as u64))
+                                }
+                            }
+                            ConfigValue::Slots(slots) => {
+                                Some(SettingValue::SharedSlots(slots.clone()))
+                            }
+                            _ => None,
+                        })
+                };
+                for (index, descriptor) in descriptors.iter().enumerate() {
+                    let PulseDescriptor::Context(d) = descriptor else {
+                        continue;
+                    };
+                    let config_id = match &d.definition {
+                        ScheduleDefinition::Periodic { every, .. } => every.id,
+                        ScheduleDefinition::UtcRange {
+                            duration, start, ..
+                        } => {
+                            if start.id != 0 {
+                                start.id
+                            } else {
+                                duration.id
+                            }
+                        }
+                        ScheduleDefinition::ConfigDailySlots { config_id, .. } => *config_id,
+                        _ => 0,
+                    };
+                    if config_id == 0 || !changes.contains(&config_id) {
+                        continue;
+                    }
+                    let engine = self.engines[index]
+                        .as_ref()
+                        .ok_or_else(|| invalid("context engine binding mismatch"))?;
+                    engine.preflight_setting(
+                        d,
+                        proposal(config_id).as_ref(),
+                        if matches!(clock.trust, ClockTrust::Trusted) {
+                            clock.wall_ms
+                        } else {
+                            None
+                        },
+                    )?;
+                }
+            }
             if let Some(fault) = group_fault.or(explicit_fault) {
+                let next_revision = self
+                    .settings_revision
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("settings revision exhausted"))?;
                 for config in &mut staged.runtime.configs {
                     if changes.contains(&config.descriptor.id) {
                         config.current = Err(fault);
+                        config.emission_revision = next_revision;
+                        config.application_position = Some(event.position);
                     }
                 }
+                staged.runtime.settings_revision = next_revision;
             } else {
+                let next_revision = self
+                    .settings_revision
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("settings revision exhausted"))?;
                 for (index, value, next_key) in candidates {
                     let config = &mut staged.runtime.configs[index];
                     config.current = Ok(value.clone());
+                    config.emission_revision = next_revision;
+                    config.application_position = Some(event.position);
                     config.last_success = value;
                     config.next_key = next_key;
                 }
+                staged.runtime.settings_revision = next_revision;
             }
-            staged.runtime.settings_revision = self
-                .settings_revision
-                .checked_add(1)
-                .ok_or_else(|| invalid("settings revision exhausted"))?;
             staged.runtime.last_event_position = Some(event.position);
             staged.runtime.event_ids.insert(event.event_id.clone());
         }
@@ -861,6 +944,15 @@ impl ContextRuntime {
                 let cancel = evaluate(&d.cancel, trace)?;
                 let config_id = match &d.definition {
                     ScheduleDefinition::Periodic { every, .. } => every.id,
+                    ScheduleDefinition::UtcRange {
+                        duration, start, ..
+                    } => {
+                        if start.id != 0 {
+                            start.id
+                        } else {
+                            duration.id
+                        }
+                    }
                     ScheduleDefinition::ConfigDailySlots { config_id, .. } => *config_id,
                     _ => 0,
                 };
@@ -876,7 +968,11 @@ impl ContextRuntime {
                 let change = if changed {
                     config.and_then(|c| match &c.current {
                         Ok(ConfigValue::Scalar(Value::Number(n))) => {
-                            Some(SettingValue::SharedDuration(*n as u64))
+                            if c.descriptor.semantic_type == "TimeOfDay" {
+                                Some(SettingValue::SharedTimeOfDay(*n as u64))
+                            } else {
+                                Some(SettingValue::SharedDuration(*n as u64))
+                            }
                         }
                         Ok(ConfigValue::Slots(slots)) => {
                             Some(SettingValue::SharedSlots(slots.clone()))

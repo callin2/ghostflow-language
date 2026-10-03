@@ -59,7 +59,7 @@ impl Type {
             2 => Ok(Self::Number),
             3 if matches!(
                 format_version,
-                2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18
+                2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20
             ) =>
             {
                 Ok(Self::Int)
@@ -212,7 +212,7 @@ impl Module {
         }
         if !matches!(
             format_version,
-            1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18
+            1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20
         ) {
             return Err(Error::new("unsupported GFB format"));
         }
@@ -273,7 +273,7 @@ impl Module {
 
         let mut temporal = if matches!(
             format_version,
-            4 | 5 | 6 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18
+            4 | 5 | 6 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20
         ) {
             Some(temporal_vm::TemporalRequirements::load_header(
                 &mut reader,
@@ -285,7 +285,7 @@ impl Module {
         };
         let mut schedules = matches!(
             format_version,
-            5 | 6 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18
+            5 | 6 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20
         )
         .then(|| schedule_vm::ScheduleRequirements {
             strategies: Vec::new(),
@@ -311,7 +311,7 @@ impl Module {
 
             let (windows, schedule_count, true_for_count, mut result_trace_bound) = if matches!(
                 format_version,
-                5 | 6 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18
+                5 | 6 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20
             ) {
                 let loaded = schedule_vm::load_prelude(
                     &mut reader,
@@ -624,7 +624,16 @@ impl Module {
                 && descriptors.iter().all(|d| matches!(d, schedule_vm::PulseDescriptor::Calendar(_))
                     || matches!(d, schedule_vm::PulseDescriptor::Context(c) if !matches!(c.definition, context_vm::ScheduleDefinition::SolarContext { .. } | context_vm::ScheduleDefinition::AtPulse { .. })))
         }) { return Err(Error::new("GFB format 18 requires calendar execution without unsupported profiles")); }
-        let objective_count = if matches!(format_version, 7 | 11 | 12 | 13 | 14 | 15 | 16 | 18) {
+        if format_version == 20 && !schedules.as_ref().is_some_and(|requirements| {
+            requirements.strategies.iter().flat_map(|s| &s.schedules).any(|d| {
+                matches!(d, schedule_vm::PulseDescriptor::Context(c)
+                    if matches!(c.definition, context_vm::ScheduleDefinition::ConfigDailySlots { range_duration_ms: Some(_), .. }))
+            })
+        }) { return Err(Error::new("GFB format 20 requires TimeSlots Range binding")); }
+        let objective_count = if matches!(
+            format_version,
+            7 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20
+        ) {
             reader.u16()?
         } else {
             0
@@ -640,9 +649,9 @@ impl Module {
                 &mut reader,
                 &inputs,
                 &strategies,
-                matches!(format_version, 11 | 12 | 13 | 14 | 15 | 16 | 18),
+                matches!(format_version, 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20),
             )?;
-            if matches!(format_version, 11 | 12 | 13 | 14 | 15 | 16 | 18)
+            if matches!(format_version, 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20)
                 && !schedules.as_ref().is_some_and(|requirements| {
                     requirements.strategies.iter().all(|strategy| {
                         strategy.schedules.iter().any(|entry| {
@@ -1074,7 +1083,10 @@ impl Runtime {
             .module
             .as_ref()
             .ok_or_else(|| Error::new("no module installed"))?;
-        if !matches!(module.format_version, 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18) {
+        if !matches!(
+            module.format_version,
+            10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20
+        ) {
             return Err(Error::new(
                 "context activation requires GFB10, GFB11 or GFB12",
             ));
@@ -1121,11 +1133,12 @@ impl Runtime {
         clock: schedule_clock::ClockSnapshot<'_>,
         facts: &context_runtime::Facts,
     ) -> Result<&TickRecord> {
-        if !self
-            .module
-            .as_ref()
-            .is_some_and(|m| matches!(m.format_version, 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18))
-        {
+        if !self.module.as_ref().is_some_and(|m| {
+            matches!(
+                m.format_version,
+                10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20
+            )
+        }) {
             return Err(Error::new("context facts require GFB10, GFB11 or GFB12"));
         }
         self.tick_inner(None, Some((clock, facts)), None)
@@ -1574,12 +1587,14 @@ impl Runtime {
             .iter()
             .position(|f| f.name == name)
             .ok_or_else(|| Error::new(format!("unknown input {name}")))?;
-        if matches!(m.format_version, 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18)
-            && (name.starts_with("__gf_natural_")
-                || name.starts_with("__gf_calendar_")
-                || name.starts_with("__gf_accounting_")
-                || (matches!(m.format_version, 11 | 12 | 13 | 14 | 15 | 16 | 18)
-                    && name.starts_with("__gf_config_")))
+        if matches!(
+            m.format_version,
+            10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20
+        ) && (name.starts_with("__gf_natural_")
+            || name.starts_with("__gf_calendar_")
+            || name.starts_with("__gf_accounting_")
+            || (matches!(m.format_version, 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20)
+                && name.starts_with("__gf_config_")))
         {
             return Err(Error::new(
                 "Rust provider projections are not caller inputs",
@@ -1641,12 +1656,14 @@ impl Runtime {
             .iter()
             .enumerate()
             .map(|(i, v)| {
-                if matches!(m.format_version, 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18)
-                    && (m.inputs[i].name.starts_with("__gf_natural_")
-                        || m.inputs[i].name.starts_with("__gf_calendar_")
-                        || m.inputs[i].name.starts_with("__gf_accounting_")
-                        || (matches!(m.format_version, 11 | 12 | 13 | 14 | 15 | 16 | 18)
-                            && m.inputs[i].name.starts_with("__gf_config_")))
+                if matches!(
+                    m.format_version,
+                    10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20
+                ) && (m.inputs[i].name.starts_with("__gf_natural_")
+                    || m.inputs[i].name.starts_with("__gf_calendar_")
+                    || m.inputs[i].name.starts_with("__gf_accounting_")
+                    || (matches!(m.format_version, 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20)
+                        && m.inputs[i].name.starts_with("__gf_config_")))
                 {
                     return Ok(m.inputs[i].default);
                 }
@@ -2595,7 +2612,7 @@ fn verify_expression_with_prelude(
             op @ 30..=31 => {
                 if !matches!(
                     format_version,
-                    3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18
+                    3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20
                 ) {
                     return Err(Error::new("branch opcode requires GFB format 3"));
                 }
@@ -2615,7 +2632,7 @@ fn verify_expression_with_prelude(
             32..=47 => {
                 if !matches!(
                     format_version,
-                    3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18
+                    3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20
                 ) {
                     return Err(Error::new("compact Number opcode requires GFB format 3"));
                 }
@@ -2624,7 +2641,7 @@ fn verify_expression_with_prelude(
             op @ 48..=53 => {
                 if !matches!(
                     format_version,
-                    3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18
+                    3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20
                 ) {
                     return Err(Error::new("conversion opcode requires GFB format 3"));
                 }
@@ -2641,7 +2658,7 @@ fn verify_expression_with_prelude(
             54 => {
                 if !matches!(
                     format_version,
-                    3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18
+                    3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20
                 ) {
                     return Err(Error::new("Duration guard requires GFB format 3"));
                 }
@@ -2653,7 +2670,7 @@ fn verify_expression_with_prelude(
             55 => {
                 if !matches!(
                     format_version,
-                    3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18
+                    3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20
                 ) {
                     return Err(Error::new("DateTime guard requires GFB format 3"));
                 }
@@ -2665,7 +2682,7 @@ fn verify_expression_with_prelude(
             56 => {
                 if !matches!(
                     format_version,
-                    3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18
+                    3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20
                 ) {
                     return Err(Error::new("Result trace requires GFB format 3"));
                 }
@@ -2683,7 +2700,7 @@ fn verify_expression_with_prelude(
             57 => {
                 if !matches!(
                     format_version,
-                    4 | 5 | 6 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18
+                    4 | 5 | 6 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20
                 ) {
                     return Err(Error::new("temporal projection requires GFB format 4"));
                 }
@@ -2698,7 +2715,7 @@ fn verify_expression_with_prelude(
             58 => {
                 if !matches!(
                     format_version,
-                    5 | 6 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18
+                    5 | 6 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20
                 ) {
                     return Err(Error::new("schedule projection requires GFB format 5"));
                 }

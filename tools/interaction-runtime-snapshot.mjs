@@ -84,11 +84,19 @@ function timerClockMalformed(descriptor, trace) {
 function publicObservation(descriptor, values, trace, settings) {
   if (descriptor.kind === 'setting') {
     if (!settings.has(descriptor.name)) return { descriptorId: descriptor.id, status: 'unavailable', reason: 'runtime-value-unavailable' };
-    const result = settings.get(descriptor.name);
-    if (!result.ok) return { descriptorId: descriptor.id, status: 'error', error: result.fault };
+    const item = settings.get(descriptor.name);
+    const result = item.result;
+    const base = {
+      descriptorId: descriptor.id,
+      defaultValue: item.defaultValue,
+      emissionRevision: item.emissionRevision,
+      applicationPosition: item.applicationPosition,
+    };
+    if (!result.ok) return { ...base, status: 'error', error: result.fault };
+    base.override = item.override;
     const value = result.value;
     return typeMatches(descriptor.sourceType, value)
-      ? { descriptorId: descriptor.id, status: 'ready', value }
+      ? { ...base, status: 'ready', value }
       : { descriptorId: descriptor.id, status: 'error', error: 'runtime-value-type-mismatch' };
   }
   const runtimeKind = descriptor.kind === 'counter' ? 'state' : descriptor.kind;
@@ -206,22 +214,30 @@ function emitVerifiedSnapshot({ verifiedSchema, traceMetadata, configs, expected
       throw new Error('interaction runtime snapshot: current Rust settings state is required');
     }
     const declared = new Map(configs.map(config => [config.id, config]));
+    const settingTypes = new Map(verifiedSchema.descriptors.filter(descriptor => descriptor.kind === 'setting')
+      .map(descriptor => [descriptor.name, descriptor.sourceType]));
     for (const item of settingsState.settings) {
       const config = declared.get(item?.id), result = item?.result;
       if (!config || item.name !== config.name || item.type !== config.type || settings.has(item.name)
           || !object(result) || typeof result.ok !== 'boolean'
-          || result.ok && !Object.hasOwn(result, 'value')
-          || !result.ok && !['SettingsInvalid','SettingsUnavailable'].includes(result.fault)) {
+          || !Object.hasOwn(item, 'defaultValue')
+          || settingTypes.has(config.name) && !typeMatches(settingTypes.get(config.name), item.defaultValue)
+          || item.defaultValue !== config.value
+          || !Number.isSafeInteger(item.emissionRevision) || item.emissionRevision < 0 || item.emissionRevision > settingsState.settingsRevision
+          || !(item.applicationPosition === null || Number.isSafeInteger(item.applicationPosition) && item.applicationPosition >= 0)
+          || (item.emissionRevision === 0) !== (item.applicationPosition === null)
+          || result.ok && (typeof item.override !== 'boolean' || item.override !== (item.emissionRevision !== 0) || !Object.hasOwn(result, 'value') || item.emissionRevision === 0 && result.value !== item.defaultValue)
+          || !result.ok && (item.emissionRevision === 0 || Object.hasOwn(item, 'override') || !['SettingsInvalid','SettingsUnavailable'].includes(result.fault))) {
         throw new Error('interaction runtime snapshot: settings state identity or Result mismatch');
       }
-      settings.set(item.name, result);
+      settings.set(item.name, item);
     }
   } else if (settingsState !== undefined) {
     throw new Error('interaction runtime snapshot: unexpected settings state');
   }
   const snapshot = {
     format: 'GhostFlow/runtime-snapshot-v0',
-    version: '0.1',
+    version: configs.length ? '0.2' : '0.1',
     schema: {
       format: verifiedSchema.format,
       version: verifiedSchema.version,
@@ -231,6 +247,7 @@ function emitVerifiedSnapshot({ verifiedSchema, traceMetadata, configs, expected
     source: { ...verifiedSchema.source },
     runId: expected.runId,
     completion: { ...completion },
+    ...(configs.length ? { settingsRevision: settingsState.settingsRevision } : {}),
     observations: verifiedSchema.descriptors.map(descriptor => publicObservation(descriptor, values, trace, settings)),
   };
   const validated = validateInteraction(verifiedSchema, snapshot);
