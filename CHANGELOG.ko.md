@@ -5,6 +5,10 @@
 
 ## 미출시
 
+### 2026-10-03 — 보존 범위의 관찰 event gap 보고 ([#282](https://github.com/callin2/ghostflow-language/issues/282))
+
+명시적 event와 completed snapshot을 분리해서 보존하는 소스에 결합된 참조 Host journal을 추가한다. sequence10의 소비자는 보존 범위가14부터 시작하면 누락 범위11–13과 원래 event14를 받으며 snapshot에서 만든 가상 event는 받지 않는다. 전체 발행을 원자적으로 검증하고 거부된 batch는 같은 scan에서 재시도할 수 있으며 cursor는 정확한 source/Program/schema/run identity에 결합한다. REF-05-022는 실제 native/framed-WASM trace, 전체 Host 전달 및 새 replay를 검증한다. 이 참조 API는 source 문법, Interaction snapshot v0, 물리 증거 또는 실행 환경의 최종 event 전송을 바꾸지 않는다.
+
 ### 2026-10-03 — Program에 결합된 임시 설정 ([#279](https://github.com/callin2/ghostflow-language/issues/279))
 
 그룹 단위 Run/Until 운영 설정을 위한 참조 Host를 추가합니다. 임시 값은 직전 일반 값을 기록하고, 평가 전에 만료 또는 취소하며, 수명이나 복귀 유효성을 확인할 수 없으면 결정을 막습니다. 같은 Program에 대한 명시적 승인으로만 새 Run에 복원합니다. 잘못된 일반 값 대체는 전체 SettingsInvalid 경로를 따릅니다. 형식 있는 context 설정 origin(tag 2, temporaryReturn)은 검증된 복귀에서 이미 할당한 TimeSlots 행 식별자를 보존하며 일반 편집의 삭제 및 할당 검사는 유지합니다. 행위자 권한과 체크포인트 승인은 신뢰하는 Host 입력입니다. REF-05-018은 native/WASM의 전체 결과와 체크포인트 바이트를 비교합니다.
