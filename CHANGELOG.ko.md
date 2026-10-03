@@ -5,6 +5,20 @@
 
 ## 미출시
 
+### 2026-10-03 — dependency 및 ownership 거부 맥락 보완 ([#301](https://github.com/callin2/ghostflow-language/issues/301))
+
+Reference §6.6의 진단 상세를 복원한다. 누락되거나 revision이 다른 import는
+import alias, 영향받는 instance/port, 기대 revision/digest 및 실제 누락 또는
+제공된 identity를 명시한다. 중복 supplier는 두 writer를 유지하고 영향받는
+definition/instance/port, supplier 하나라는 기대, 실제 개수, pinned 근거와
+교정 선택을 추가한다. 예를 들어 `pump`의 두 writer는 activation 전에
+`Relay/east/pump`와 `Relay/west/pump`를 모두 명시하여 거부한다. 이전에는
+이유와 writer 이름만 있었고 해당 contract 맥락이 빠져 있었다. 기존 error
+class/category, 작성 위치, 첫 실패 순서 및 후보 거부는 유지한다. 진단 문구가
+더 상세해지지만 source 문법, artifact 또는 ABI는 바뀌지 않는다. REF-06-015
+거부 테스트와 수정된 source의 전체 native/framed-WASM 실행/replay로 검증한다.
+
+
 ### 2026-10-03 — 혼합 UTC Range와 비공개 config snapshot 복구 ([#503](https://github.com/callin2/ghostflow-language/pull/503))
 
 Reference §§3.5–3.6과 §5의 설정 관측 동작을 복구하는 버그 수정이다.

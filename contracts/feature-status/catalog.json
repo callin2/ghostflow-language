@@ -6688,6 +6688,72 @@
       "referenceCaseIds": [
         "REF-03-039"
       ]
+    },
+    {
+      "id": "composition-contract-reference",
+      "family": "Pre-activation pinned dependency and exclusive output ownership diagnostics",
+      "clause": {
+        "path": "docs/reference/06-composition-and-replay.en.md",
+        "heading": "6.6 Resources and contracts"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/composition-contract-reference.test.mjs",
+              "testId": "REF-06-015 missing pinned dependency reports definition instances ports expected actual and evidence revision before activation",
+              "caseId": "REF-06-015",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/composition-contract-reference.test.mjs",
+              "testId": "REF-06-015 conflicting output ownership names both definitions instances ports and pinned evidence without choosing a writer",
+              "caseId": "REF-06-015",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            }
+          ]
+        },
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/composition-contract-reference.test.mjs",
+              "testId": "REF-06-015 repaired pinned composition activates unchanged native and WASM with independent output channels and complete replay",
+              "caseId": "REF-06-015",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "The exact missing-dependency/competing-output case rejects before producing an artifact. Existing diagnostic messages now retain import alias, authored instance/port, expected/actual dependency or supplier count, pinned revision/digest and corrective choice. Repaired pinned source executes complete native/framed-WASM parity and replay with independent channels. First-failure validation is preserved; these are static source contracts, not installation suitability, physical verification, continuous-resource arbitration or a Program hot-replacement lifecycle."
+      ],
+      "issues": [
+        301
+      ],
+      "referenceCaseIds": [
+        "REF-06-015"
+      ]
     }
   ]
 }

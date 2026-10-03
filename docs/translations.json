@@ -614,8 +614,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "4636b96b2f7169978dc26417f8347340f9e66f1ce0a6986357e125cfc9352453",
-      "translationSha256": "b543774b247116599839caf7274f6eb49bb013601714f71f2d3933d0f77b1d35"
+      "sourceSha256": "df99010d91b53126ab58f2c8cf063a801a51833212d96742ae32b9f8ccea0c6c",
+      "translationSha256": "ecb2a0a2d5dd10521d5c4b3bc22fbd349092ae24e6214bb13ba54b1659165a90"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",
