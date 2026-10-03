@@ -6869,50 +6869,6 @@
       "referenceCaseIds": [
         "REF-08-001"
       ]
-    },
-    {
-      "id": "program-settings-reference",
-      "family": "Program-bound ordinary settings and typed fresh defaults",
-      "clause": {
-        "path": "docs/reference/05-settings-and-observation.en.md",
-        "heading": "5.1 `config` declarations"
-      },
-      "owner": "CORE",
-      "maturity": "EXPERIMENTAL",
-      "coreScope": false,
-      "requiredEvidence": [],
-      "evidence": [
-        {
-          "stage": "native_wasm",
-          "status": "verified",
-          "refs": [
-            {
-              "path": "tests/config-native-wasm-parity.test.mjs",
-              "testId": "REF-05-018 ordinary settings are Program-bound and a fresh Program validates its own typed stream in native and framed WASM",
-              "caseId": "REF-05-018",
-              "assertionClass": "target-parity",
-              "targets": [
-                "native",
-                "wasm"
-              ],
-              "polarities": [
-                "positive",
-                "negative",
-                "boundary"
-              ]
-            }
-          ]
-        }
-      ],
-      "gaps": [
-        "Ordinary operator override remains bound to Program P. A fresh Program Q with the same config name uses its own fingerprint, default, type and range; cross-Program checkpoint restore and malformed/wrong-Program/unknown-target events reject before admission. Current authorized wrong-type/range results remain SettingsInvalid and explicit producer unavailability remains visible. Complete native/framed-WASM traces, frame identities, settings and checkpoint bytes plus fresh replay agree. Trusted host classifies operatorEdit; this does not authenticate actors or adopt temporary lifetime, expiry, migration, hot replacement or runId policy."
-      ],
-      "issues": [
-        279
-      ],
-      "referenceCaseIds": [
-        "REF-05-018"
-      ]
     }
   ]
 }

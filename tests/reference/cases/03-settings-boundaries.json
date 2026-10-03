@@ -239,12 +239,10 @@
       "rule": "임시 설정은 Program에 결속하며 다른 Program에 자동 이관하지 않는다.",
       "scope": "host",
       "status": "specified",
-      "given": "Program P의 승인된 일반 설정값과 같은 config 이름을 쓰지만 Program fingerprint, 기본값, 타입, 범위가 다른 새 Program Q가 있다.",
-      "when": "Q를 활성화하고 P의 checkpoint·event를 복원 또는 적용하려 한 뒤 Q의 새 설정 요청들을 보낸다.",
-      "then": "P의 override를 Q에 자동 적용하지 않는다. P checkpoint와 wrong-Program·malformed·unknown-target event는 admission 전에 거부되고, Q의 인식·승인된 wrong type/range payload는 SettingsInvalid가 되며 valid retry와 SettingsUnavailable 후 recovery는 Q의 현재 타입·범위·권한으로 처리된다.",
-      "reason": "설정 event와 Program 교체를 실행하는 host 수용 사례이며 focused owner harness가 native context_tape와 framed WASM으로 관찰한다.",
-      "test": "tests/config-native-wasm-parity.test.mjs",
-      "selector": "REF-05-018 ordinary settings are Program-bound and a fresh Program validates its own typed stream in native and framed WASM"
+      "given": "Program P의 임시값과 새 Program Q가 있다.",
+      "when": "Q를 활성화한다.",
+      "then": "P의 override를 Q에 자동 적용하지 않는다. Q의 새 요청은 Q의 타입·범위·권한·수명으로 검증한다.",
+      "reason": "설정 event와 Program 교체를 실행하는 host 수용 사례다."
     },
     {
       "id": "REF-05-019",
