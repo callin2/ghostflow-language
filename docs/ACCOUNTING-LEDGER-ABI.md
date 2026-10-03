@@ -109,3 +109,18 @@ unacknowledged reservation stays Unknown and blocks retries until explicit
 acknowledgement. Native core serialization is not that adapter's persistence
 acknowledgement or physical storage certification. Neither test transport binds
 VM outputs to physical resources or authenticates applied receipts.
+
+## Selected reboot budget profile (REF-03-022)
+
+REF-03-022 selects the existing durable applied profile with `on_unknown = block`.
+After 28 seconds of applied usage, reboot without its durable checkpoint creates
+an Unknown owner; the host must not use first-install `initializeEmpty` to erase
+that history. Missing or corrupt history blocks a 5-second reservation without
+revision, snapshot or persistence-call mutation. A valid checkpoint restores
+28 seconds and still blocks that reservation under a 30-second limit. At
+comparable monotonic time 63 seconds, the 60-second window retains 25 seconds
+from `(0,28]`, so the 5-second reserve fits exactly. The native
+`accounting_reboot_tape` production C ABI transport and source-bound WASM adapter
+agree on these complete snapshots and admission outcomes. The caller owns the
+comparable monotonic timeline across reboot. This selected profile does not
+adopt automatic reset after window expiry or a non-durable profile.
