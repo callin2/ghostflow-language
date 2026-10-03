@@ -6389,6 +6389,70 @@
       "referenceCaseIds": [
         "REF-08-014"
       ]
+    },
+    {
+      "id": "rolling-partial-overlap-admission",
+      "family": "Rolling partial overlap and exact reserve admission",
+      "clause": {
+        "path": "docs/reference/03-time-and-schedules.en.md",
+        "heading": "3.4 Cumulative time and rolling budget"
+      },
+      "owner": "HOST",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/rolling-overlap-admission-boundary.test.mjs",
+              "testId": "REF-03-019: native accounting_tape and WASM observe the same clipped partial overlap oracle",
+              "caseId": "REF-03-019",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            }
+          ]
+        },
+        {
+          "stage": "host_simulation",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/rolling-overlap-admission-boundary.test.mjs",
+              "testId": "REF-03-019: source-bound rolling overlap blocks exact limit and admits exact recovered reserve",
+              "caseId": "REF-03-019",
+              "assertionClass": "rollback",
+              "targets": [
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Caller-validated applied intervals and source-bound reference ledger admission: (5,65] retains 15s plus 10s, so used=25s and a 5s reserve fits. Native/WASM known decisions, rejected snapshot preservation and duplicate retry agree; only the WASM reference adapter exercises durable acknowledgement and pending Unknown. Native serialization is not persistence certification. No automatic VM output/resource admission, authenticated Driver receipts or physical verification."
+      ],
+      "issues": [
+        209
+      ],
+      "referenceCaseIds": [
+        "REF-03-019"
+      ]
     }
   ]
 }

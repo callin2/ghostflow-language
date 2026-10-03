@@ -82,3 +82,30 @@ also supply trusted local-day keys and split segments at midnight. No bounded
 event-ID retention or pruning policy is defined; exhausting configured event
 capacity fails closed. These choices prevent this primitive from serving as a
 complete `durable` compiler runtime binding yet.
+
+## Native rolling overlap conformance
+
+The test-only core `accounting_tape` transport accepts an optional `admission`
+on a historical frame: a nonzero integer `reservationId`, `limitMs`, `reserveMs`
+and Boolean `retry`. It validates the window, bound, reserve and `on_unknown =
+block` against the selected account's checked source manifest before calling
+the actual `AccountingLedger::reserve_rolling`. Results retain the native
+decision, unchanged-snapshot evidence, optional exact duplicate retry, applied
+usage and outstanding reservation usage. Existing observation-only tapes retain
+their previous output shape.
+
+REF-03-019 uses applied intervals `(0,20]` and `(30,40]`, a 60-second window,
+30-second limit and 5-second reserve. At 40 seconds, usage is 30 seconds and
+admission rejects without mutation. At 65 seconds, the window is `(5,65]`:
+15 seconds from the first interval plus 10 seconds from the second give **25
+seconds**, leaving exactly 5 seconds for admission. The original case's
+15-second total at that time was an arithmetic error, corrected in the current
+case while retaining its ID, backlink and pinned historical original.
+
+The same compiled source and finite records produce native/WASM calculation
+and known-admission parity. The native core transport explicitly serializes and
+restores the ledger; the WASM reference adapter additionally proves that an
+unacknowledged reservation stays Unknown and blocks retries until explicit
+acknowledgement. Native core serialization is not that adapter's persistence
+acknowledgement or physical storage certification. Neither test transport binds
+VM outputs to physical resources or authenticates applied receipts.

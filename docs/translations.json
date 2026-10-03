@@ -152,8 +152,8 @@
       "source": "docs/ACCOUNTING-LEDGER-ABI.md",
       "sourceLanguage": "en",
       "translation": "docs/ACCOUNTING-LEDGER-ABI.ko.md",
-      "sourceSha256": "6744cf9461cb6df8a187fb5d6ec25b60505fd4b14db977483bb34d4f966d7a65",
-      "translationSha256": "cda59342b75a30d756a117e5c7bfe29e76fa550fc51fcfc4683cb2bdecf9388b"
+      "sourceSha256": "de8a4529728841c9fd51354fcee67609d18336ebe5772e94c044c6bc12a32e15",
+      "translationSha256": "5fb2e4affa211b27d71447db5bc6fb5fd90326102e34d41d66fa539ac541cd42"
     },
     {
       "source": "docs/AFTER-EVENT-WASM-ABI.md",

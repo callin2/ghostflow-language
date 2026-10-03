@@ -70,3 +70,27 @@ ledger 스냅샷은 CRC-32 손상 검사가 있는 버전 지정 바이너리 �
 키도 제공하고 자정을 기준으로 세그먼트를 분할해야 한다. 이벤트 ID 보존 기한이나
 정리 정책은 정의되지 않았다. 구성된 이벤트 용량을 초과하면 fail-closed 처리한다.
 이 때문에 이 기본 요소만으로 완전한 `durable` 컴파일러 런타임 바인딩을 제공하지는 않는다.
+
+## Native rolling overlap conformance
+
+테스트 전용 core `accounting_tape` transport는 과거 frame의 선택적 `admission`을
+받는다. 필드는 0이 아닌 정수 `reservationId`, `limitMs`, `reserveMs`, Bool
+`retry`다. 선택한 account의 검증된 source manifest와 window, bound, reserve,
+`on_unknown = block`을 비교한 뒤 실제 `AccountingLedger::reserve_rolling`을
+호출한다. 결과는 native 판단, snapshot 불변 여부, 선택적 동일 요청의 중복 재시도,
+applied 사용량과 미정산 예약량을 보존한다. 관찰만 하는 기존 tape의 출력 모양은
+유지된다.
+
+REF-03-019는 applied interval `(0,20]`, `(30,40]`, window 60초, limit 30초,
+reserve 5초를 사용한다. 40초에는 사용량이 30초이므로 변경 없이 admission을
+거부한다. 65초의 window는 `(5,65]`이며 첫 interval의 15초와 둘째 interval의
+10초가 남아 합계 **25초**, admission을 위한 잔여 예산은 정확히 5초다. 원본
+사례가 같은 시점에 합계 15초라고 한 것은 산술 오류였다. 현재 case의 수치를
+정정하되 ID, backlink와 고정된 역사적 원본은 유지한다.
+
+동일하게 컴파일한 source와 유한 record로 native/WASM 계산 및 known admission의
+일치를 검증한다. Native core transport는 ledger를 명시적으로 직렬화하고 복원한다.
+WASM reference adapter는 추가로 승인되지 않은 예약이 Unknown을 유지하고 명시적
+쓰기 승인 전까지 재시도를 차단함을 검증한다. Native core 직렬화는 그 adapter의
+쓰기 승인이나 물리 저장장치 인증이 아니다. 어느 테스트 transport도 VM 출력을
+물리 resource에 자동 연결하거나 applied receipt의 진위를 인증하지 않는다.
