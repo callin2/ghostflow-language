@@ -6958,6 +6958,80 @@
       "referenceCaseIds": [
         "REF-06-025"
       ]
+    },
+    {
+      "id": "calendar-host-parity-reference",
+      "family": "Pinned calendar and DST host execution parity",
+      "clause": {
+        "path": "docs/reference/08-language-runtime-and-device-boundaries.en.md",
+        "heading": "8.6 Language decisions and author-selected policies"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/calendar-host-parity-reference.test.mjs",
+              "testId": "REF-08-013 compares native Rust context owner and framed WASM with identical manifest-derived DST and calendar facts",
+              "caseId": "REF-08-013",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/calendar-host-parity-reference.test.mjs",
+              "testId": "REF-08-013 supplied pinned evidence yields identical complete host receipts with fetch unavailable and unknown clock recovery",
+              "caseId": "REF-08-013",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/calendar-host-parity-reference.test.mjs",
+              "testId": "REF-08-013 rejects malformed context atomically and a valid retry matches clean replay",
+              "caseId": "REF-08-013",
+              "assertionClass": "rollback",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "One exact GFB18 source combines explicit New York gap/fold policies, a calendar-filtered Range and calendar Result. Installed Intl/Node/ICU/tz metadata and bounded calendar fixture content revision supply identical manifest-derived facts to native Rust and framed WASM hosts. Full outcomes, mandatory context settings, checkpoint bytes, occurrence identity/provider revisions, CalendarMissing/ClockUnknown, terminal restored deduplication, fresh replay and malformed rejection/valid retry agree. A disabled fetch path is never invoked and preserves complete supplied-fact receipts. This is pinned-data reference host execution, not official holiday data, remote provider acquisition, production network topology, Device run issuance or physical verification."
+      ],
+      "issues": [
+        330
+      ],
+      "referenceCaseIds": [
+        "REF-08-013"
+      ]
     }
   ]
 }

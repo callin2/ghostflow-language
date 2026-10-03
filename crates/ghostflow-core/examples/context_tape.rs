@@ -369,7 +369,8 @@ fn main() -> Result<()> {
     let settings_periodic_profile = tape["profile"] == "context-settings-periodic-v1";
     let civil_profile =
         tape["profile"] == "context-civil-v1" || tape["profile"] == "context-settings-civil-v1";
-    let calendar_profile = tape["profile"] == "context-calendar-v1";
+    let calendar_profile = tape["profile"] == "context-calendar-v1"
+        || tape["profile"] == "context-settings-calendar-v1";
     let tide_profile = tape["profile"] == "context-tide-v1";
     if civil_profile || calendar_profile || settings_periodic_profile || tide_profile {
         fields(&tape, &["profile", "activation", "steps", "checkpoint"])?;
@@ -381,6 +382,7 @@ fn main() -> Result<()> {
     let settings_profile = tape["profile"] == "context-settings-v1"
         || settings_periodic_profile
         || tape["profile"] == "context-settings-civil-v1"
+        || tape["profile"] == "context-settings-calendar-v1"
         || solar_profile;
     if !settings_profile
         && !civil_profile
@@ -511,7 +513,8 @@ fn main() -> Result<()> {
                     "Periodic tape cannot supply providers, calendars or occurrence rows".into(),
                 );
             }
-            if settings_profile && !civil_profile && !settings_periodic_profile {
+            if settings_profile && !civil_profile && !settings_periodic_profile && !calendar_profile
+            {
                 return Err("settings tape cannot supply schedules".into());
             }
             let mut rows = Vec::new();
@@ -689,7 +692,7 @@ fn main() -> Result<()> {
                 }
                 println!("{record}");
             }
-            Err(error) if calendar_profile => println!(
+            Err(error) if calendar_profile && !settings_profile => println!(
                 "{}",
                 json!({
                     "accepted": false, "error": error.to_string(), "checkpoint": driver.runtime().context_checkpoint()?.iter()
