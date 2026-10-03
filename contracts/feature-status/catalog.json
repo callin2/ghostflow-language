@@ -6219,6 +6219,62 @@
       "referenceCaseIds": [
         "REF-08-007"
       ]
+    },
+    {
+      "id": "solar-admitted-scan-recorder",
+      "family": "Accepted Solar scans retain admitted occurrence and revision context",
+      "clause": {
+        "path": "docs/reference/03-time-and-schedules.en.md",
+        "heading": "3.5 Common Schedule semantics"
+      },
+      "owner": "HOST",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/solar-admitted-observation.test.mjs",
+              "testId": "REF-03-028 accepted due false scans bind AlreadyAdmitted occurrence and current revisions to actual native WASM evidence",
+              "caseId": "REF-03-028",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/solar-admitted-observation.test.mjs",
+              "testId": "REF-03-028 rejected evidence and missed boot occurrences never manufacture admitted provenance",
+              "caseId": "REF-03-028",
+              "assertionClass": "rollback",
+              "targets": [
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Bounded reference host recorder validates canonical source/trace before activation, retains actual accepted Due admissions and joins current provider facts with AlreadyAdmitted disposition while preserving raw core decisions. Full native/WASM outcomes/checkpoints, revised predictions, multi-occurrence Bool projection and rejected facts prove recording. No core admission or checkpoint format change, physical sink, durable writer, identity issuer or checkpoint-only history restoration."
+      ],
+      "issues": [
+        217
+      ],
+      "referenceCaseIds": [
+        "REF-03-028"
+      ]
     }
   ]
 }

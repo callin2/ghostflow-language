@@ -124,6 +124,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/reference-distinct-states.test.mjs',
   'tests/solar-config-compiler.test.mjs',
   'tests/solar-config-runtime.test.mjs',
+  'tests/solar-admitted-observation.test.mjs',
   'tests/solar-provider-evidence-boundary.test.mjs',
   'tests/after-event-contract.test.mjs',
   'tests/after-event-wasm.test.mjs',

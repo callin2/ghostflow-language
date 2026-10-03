@@ -2,6 +2,13 @@
   "format": "GhostFlow/document-translations-v1",
   "documents": [
     {
+      "source": "docs/SOLAR-EVIDENCE-RECORDER.md",
+      "sourceLanguage": "en",
+      "translation": "docs/SOLAR-EVIDENCE-RECORDER.ko.md",
+      "sourceSha256": "b34007c3c426690b5d3a036b496244f47031f56a50f2c2a2ec9a6644fd56dbae",
+      "translationSha256": "fa51af58121c645f2ef29a520af7307358bb759c0e4311125c65b28bd5d9eced"
+    },
+    {
       "source": "docs/GHOST-TIMELINE.md",
       "sourceLanguage": "en",
       "translation": "docs/GHOST-TIMELINE.ko.md",
