@@ -7485,6 +7485,154 @@
       "referenceCaseIds": [
         "REF-05-018"
       ]
+    },
+    {
+      "id": "retained-observation-event-history-reference",
+      "family": "Explicit retained event sequence gaps and separate completed snapshots",
+      "clause": {
+        "path": "docs/reference/05-settings-and-observation.en.md",
+        "heading": "5.3 Renderer-independent observation model"
+      },
+      "owner": "HOST",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "host_simulation",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/observation-event-history-reference.test.mjs",
+              "testId": "REF-05-022 production native and WASM events report exactly missing sequence 11 to 13 after cursor 10 without snapshot reconstruction",
+              "caseId": "REF-05-022",
+              "assertionClass": "identity",
+              "targets": [
+                "host"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/observation-event-history-reference.test.mjs",
+              "testId": "REF-05-022 exact retention boundary and resumed delivery preserve every retained event in sequence",
+              "caseId": "REF-05-022",
+              "assertionClass": "identity",
+              "targets": [
+                "host"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/observation-event-history-reference.test.mjs",
+              "testId": "REF-05-022 scans with no explicit events update snapshots without inventing intermediate events or gaps",
+              "caseId": "REF-05-022",
+              "assertionClass": "identity",
+              "targets": [
+                "host"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/observation-event-history-reference.test.mjs",
+              "testId": "REF-05-022 malformed batch duplicate scan and clock regression reject atomically and same-scan valid retry preserves history",
+              "caseId": "REF-05-022",
+              "assertionClass": "identity",
+              "targets": [
+                "host"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/observation-event-history-reference.test.mjs",
+              "testId": "REF-05-022 cursors bind exact source Program schema and run identity and never convert cross-run loss into an ordinary sequence gap",
+              "caseId": "REF-05-022",
+              "assertionClass": "identity",
+              "targets": [
+                "host"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/observation-event-history-reference.test.mjs",
+              "testId": "REF-05-022 owned event payloads snapshots and activation metadata resist caller mutation without changing current or replayed receipts",
+              "caseId": "REF-05-022",
+              "assertionClass": "identity",
+              "targets": [
+                "host"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/observation-event-history-reference.test.mjs",
+              "testId": "REF-05-022 multi-event scan retention reports loss by event sequence while preserving the completed scan and bounded capacity",
+              "caseId": "REF-05-022",
+              "assertionClass": "identity",
+              "targets": [
+                "host"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            }
+          ]
+        },
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/observation-event-history-reference.test.mjs",
+              "testId": "REF-05-022 production native and WASM events report exactly missing sequence 11 to 13 after cursor 10 without snapshot reconstruction",
+              "caseId": "REF-05-022",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Actual source-bound JavaScript reference journal assigns per-run event sequences to explicit producer facts, bounds retention, reports exact missed ranges, preserves current snapshots separately, rejects atomically and binds cursors to exact execution identity. Complete native Rust/framed-WASM core outcomes feed the same host journal and full receipts agree on fresh replay. This is not a native Rust journal, final environment event/command/alarm serialization, authenticated event service, durable network storage, Device deployment or physical confirmation."
+      ],
+      "issues": [
+        282
+      ],
+      "referenceCaseIds": [
+        "REF-05-022"
+      ]
     }
   ]
 }

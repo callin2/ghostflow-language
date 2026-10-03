@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### 2026-10-03 — report retained observation event gaps ([#282](https://github.com/callin2/ghostflow-language/issues/282))
+
+Adds a source-bound reference Host journal that retains explicit events separately from completed snapshots. A consumer at sequence10 receives an explicit missed range11–13 if retention begins at14, with the original event14 and no snapshot-derived synthetic events. Complete publication validates atomically, rejected batches permit same-scan retry, and cursors bind exact source/Program/schema/run identity. REF-05-022 verifies actual native/framed-WASM traces, complete host delivery and fresh replay. This reference API does not change source syntax, Interaction snapshot v0, physical evidence or final execution-environment event transport.
+
 ### 2026-10-03 — Program-bound temporary settings ([#279](https://github.com/callin2/ghostflow-language/issues/279))
 
 Adds a reference host for grouped Run/Until operating settings. Temporary values capture the preceding ordinary value, expire or cancel before evaluation, block decisions when lifetime or return validity is unavailable, and restore only with explicit same-Program approval into a fresh run. Invalid ordinary replacement follows aggregate SettingsInvalid. A typed context settings origin (tag 2, temporaryReturn) preserves previously allocated TimeSlots row identities on validated return while ordinary edits retain their deletion and allocation guards. Actor grants and checkpoint approval are trusted host inputs. REF-05-018 compares complete native/WASM outcomes and checkpoint bytes.
