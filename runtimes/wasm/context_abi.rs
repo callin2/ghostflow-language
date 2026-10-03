@@ -313,6 +313,7 @@ fn settings(r: &mut Reader<'_>) -> Result<SettingsEvent, String> {
     let origin = match r.u8()? {
         0 => SettingsOrigin::OperatorEdit,
         1 => SettingsOrigin::ProducerObservation,
+        2 => SettingsOrigin::TemporaryReturn,
         _ => return Err("invalid settings origin".into()),
     };
     let count = r.count(128)?;

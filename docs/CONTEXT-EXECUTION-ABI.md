@@ -245,3 +245,7 @@ VM-failure rollback, settings retry and identity-fenced durable restore.
 `context_schedule`, `natural_context`, `work_calendar` and `cron_schedule`.
 End-to-end Reference fixtures exercise canonical compilation and the same WASM
 runtime rather than a host-side scheduling implementation.
+
+## Temporary settings return origin
+
+GFSF5/GFSF6 typed settings origin tag 2 is `temporaryReturn`. It retains operator-editable target checks and typed range/grid/capacity checks, and permits previously allocated TimeSlots row keys below the stream allocator bound for a Host-validated recorded return. Ordinary origin 0 and producer origin 1 retain their existing rules. Older runtimes reject the additional origin; it is not an authentication token. See [temporary settings host](TEMPORARY-SETTINGS-HOST.md) for the source-bound provenance and trusted Host inputs.

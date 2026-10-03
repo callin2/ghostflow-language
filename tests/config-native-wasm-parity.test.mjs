@@ -26,35 +26,40 @@ function facts(atMs, settings = null) {
   natural: [], schedules: [], settings };
 }
 
-function nativeRun(artifact, attempts) {
+function nativeRun(artifact, attempts, { profile = 'context-settings-v1', checkpoint = null, expectSuccess = true } = {}) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-config-parity-'));
   try {
     const modulePath = path.join(directory, 'module.gfb');
     const tapePath = path.join(directory, 'tape.json');
     fs.writeFileSync(modulePath, artifact.bytes);
-    fs.writeFileSync(tapePath, JSON.stringify({ profile: 'context-settings-v1',
+    fs.writeFileSync(tapePath, JSON.stringify({ profile,
       activation: { bootEpoch: 1, terminalCapacity: 8, bindings: [] },
+      ...(checkpoint ? { checkpoint } : {}),
       steps: attempts.map(({ scanId, nowMs, settings }) => ({ scanId,
         logicalTimeMs: nowMs, inputs: [], ...facts(nowMs, settings) })) }));
     const result = spawnSync(nativePath, [modulePath, tapePath],
       { encoding: 'utf8', timeout: 10_000, maxBuffer: 2 * 1024 * 1024 });
+    if (!expectSuccess) return result;
     assert.equal(result.status, 0, result.stderr || result.stdout);
-    return result.stdout.trim().split('\n').map(line => JSON.parse(line));
+    return result.stdout.trim().split('\n').filter(Boolean).map(line => JSON.parse(line));
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }
 }
 
-async function wasmRun(artifact, attempts, framed) {
+async function wasmRun(artifact, attempts, framed, { checkpoint = null } = {}) {
   const runtime = await (framed ? ControlRuntime.instantiateFramed : ControlRuntime.instantiate)(wasmBytes, artifact,
     { context: { bootEpoch: 1, terminalCapacity: 8, bindings: [] } });
   try {
+    if (checkpoint) runtime.restoreContextCheckpoint(Buffer.from(checkpoint, 'hex'));
     return attempts.map(({ nowMs, settings }) => {
       try {
         const outcome = runtime.step({ nowMs, contextFacts: facts(nowMs, settings) });
-        return { accepted: true, outcome, settings: runtime.contextSnapshot().state };
+        return { accepted: true, outcome, settings: runtime.contextSnapshot().state,
+          checkpoint: Buffer.from(runtime.contextSnapshot().bytes).toString('hex') };
       } catch (error) {
-        return { accepted: false, error: error.message, settings: runtime.contextSnapshot().state };
+        return { accepted: false, error: error.message, settings: runtime.contextSnapshot().state,
+          checkpoint: Buffer.from(runtime.contextSnapshot().bytes).toString('hex') };
       }
     });
   } finally {
@@ -190,6 +195,120 @@ test('REF-05-016 designer Percent rejects operator edits without changing value 
   assert.deepEqual(native.filter(row => row.accepted).map(row => row.outcome.scanId), [0, 1, 2, 3]);
   assert.deepEqual(native.filter(row => row.accepted).map(row => row.outcome.trace.safe),
     [{ duty_pct: 50 }, { duty_pct: 0 }, { duty_pct: 50 }, { duty_pct: 50 }]);
+});
+
+test('REF-05-018 ordinary settings are Program-bound and a fresh Program validates its own typed stream in native and framed WASM', async () => {
+  const programP = await compileSource(literateDocument(`control OrdinarySettingsP {
+    config duration: Duration = 10min { min = 1min; max = 20min; step = 1min; access = operator; }
+    output duration_ms: Duration;
+    duration_ms <- case duration { ok(v) => v; fault(_) => 0ms; };
+  }`), { filename: 'reference-temporary-settings-p.ghost.md' });
+  const programQ = await compileSource(literateDocument(`control OrdinarySettingsQ {
+    config duration: Int = 3 { min = 1; max = 5; step = 1; access = operator; }
+    output selected: Int;
+    selected <- case duration { ok(v) => v; fault(_) => -1; };
+  }`), { filename: 'reference-temporary-settings-q.ghost.md' });
+  const [durationP] = programP.manifest.configs;
+  const [durationQ] = programQ.manifest.configs;
+  assert.equal(durationP.name, durationQ.name, 'same source config name does not define Program identity');
+  assert.equal(durationP.type, 'Duration');
+  assert.equal(durationQ.type, 'Int');
+  const probeP = await ControlRuntime.instantiateFramed(wasmBytes, programP,
+    { context: { bootEpoch: 1, terminalCapacity: 8, bindings: [] } });
+  const fingerprintP = probeP.contextSnapshot().state.programFingerprint;
+  probeP.dispose();
+  const probeQ = await ControlRuntime.instantiateFramed(wasmBytes, programQ,
+    { context: { bootEpoch: 1, terminalCapacity: 8, bindings: [] } });
+  const fingerprintQ = probeQ.contextSnapshot().state.programFingerprint;
+  probeQ.dispose();
+  assert.notEqual(fingerprintP, fingerprintQ);
+  const event = (programFingerprint, eventId, baseRevision, position, result) => ({
+    programFingerprint, eventId, baseRevision, position, origin: 'operatorEdit',
+    changes: [{ configId: durationQ.id, result }],
+  });
+  const pAttempts = [
+    { scanId: 0, nowMs: 0, settings: null },
+    { scanId: 1, nowMs: 1, settings: { programFingerprint: fingerprintP,
+      eventId: 'p-ordinary-override', baseRevision: 0, position: 2, origin: 'operatorEdit',
+      changes: [{ configId: durationP.id, result: { ok: true, type: 'Duration', value: 300_000 } }] } },
+  ];
+  const nativeP = nativeRun(programP, pAttempts, { profile: 'context-settings-civil-v1' });
+  const wasmP = await wasmRun(programP, pAttempts, true);
+  assert.deepEqual(nativeP.map(row => row.accepted), [true, true]);
+  assert.deepEqual(wasmP.map(row => row.accepted), [true, true]);
+  assert.equal(nativeP[1].settings.settingsRevision, 1);
+  assert.deepEqual(nativeP[1].settings.settings[0].result, { ok: true, value: 300_000 });
+  assert.deepEqual(wasmP[1].settings, nativeP[1].settings);
+  assert.equal(wasmP[1].checkpoint, nativeP[1].checkpoint);
+  for (let i = 0; i < pAttempts.length; i++) {
+    assert.deepEqual(wasmP[i].outcome.vm, nativeP[i].outcome.trace);
+    assert.deepEqual(wasmP[i].outcome.frame, { scanId: nativeP[i].outcome.scanId, logicalTimeMs: nativeP[i].outcome.logicalTimeMs });
+  }
+  assert.deepEqual(nativeRun(programP, pAttempts, { profile: 'context-settings-civil-v1' }), nativeP);
+  assert.deepEqual(await wasmRun(programP, pAttempts, true), wasmP);
+
+  const qAttempts = [
+    { scanId: 0, nowMs: 0, settings: null },
+    { scanId: 1, nowMs: 1, settings: event(fingerprintP, 'wrong-program', 0, 2,
+      { ok: true, type: 'Int', value: 4 }) },
+    { scanId: 1, nowMs: 1, settings: { programFingerprint: fingerprintQ,
+      eventId: 'malformed', baseRevision: 0, position: 2, origin: 'operatorEdit', changes: [] } },
+    { scanId: 1, nowMs: 1, settings: { programFingerprint: fingerprintQ,
+      eventId: 'denied-origin', baseRevision: 0, position: 2, origin: 'operatorEdit',
+      changes: [{ configId: durationQ.id + 1000, result: { ok: true, type: 'Int', value: 4 } }] } },
+    { scanId: 1, nowMs: 1, settings: event(fingerprintQ, 'wrong-type', 0, 2,
+      { ok: true, type: 'Duration', value: 300_000 }) },
+    { scanId: 2, nowMs: 2, settings: event(fingerprintQ, 'valid-int', 1, 3,
+      { ok: true, type: 'Int', value: 4 }) },
+    { scanId: 3, nowMs: 3, settings: event(fingerprintQ, 'out-of-range', 2, 4,
+      { ok: true, type: 'Int', value: 6 }) },
+    { scanId: 4, nowMs: 4, settings: event(fingerprintQ, 'producer-unavailable', 3, 5,
+      { ok: false, fault: 'SettingsUnavailable' }) },
+    { scanId: 5, nowMs: 5, settings: event(fingerprintQ, 'valid-recovery', 4, 6,
+      { ok: true, type: 'Int', value: 5 }) },
+  ];
+  const nativeQ = nativeRun(programQ, qAttempts, { profile: 'context-settings-civil-v1' });
+  const wasmQ = await wasmRun(programQ, qAttempts, true);
+  assert.deepEqual(nativeQ.map(row => row.accepted), [true, false, false, false, true, true, true, true, true]);
+  assert.match(nativeQ[1].error, /fingerprint|transaction/i);
+  assert.match(nativeQ[2].error, /empty|settings|transaction/i);
+  assert.match(nativeQ[3].error, /unknown settings stream target/i);
+  for (const index of [1, 2, 3]) {
+    assert.equal(nativeQ[index].settings.settingsRevision, 0, `pre-admission rejection preserves Q revision: ${index}`);
+    assert.deepEqual(nativeQ[index].settings.settings[0].result, { ok: true, value: 3 });
+    assert.equal(nativeQ[index].checkpoint, nativeQ[0].checkpoint);
+  }
+  assert.deepEqual(nativeQ.map(row => row.settings.settingsRevision), [0, 0, 0, 0, 1, 2, 3, 4, 5]);
+  assert.deepEqual(nativeQ[4].settings.settings[0].result, { ok: false, fault: 'SettingsInvalid' });
+  assert.deepEqual(nativeQ[5].settings.settings[0].result, { ok: true, value: 4 });
+  assert.deepEqual(nativeQ[6].settings.settings[0].result, { ok: false, fault: 'SettingsInvalid' });
+  assert.deepEqual(nativeQ[7].settings.settings[0].result, { ok: false, fault: 'SettingsUnavailable' });
+  assert.deepEqual(nativeQ[8].settings.settings[0].result, { ok: true, value: 5 });
+  assert.deepEqual(nativeQ.filter(row => row.accepted).map(row => row.outcome.trace.safe), [
+    { selected: 3 }, { selected: -1 }, { selected: 4 }, { selected: -1 }, { selected: -1 }, { selected: 5 },
+  ]);
+  for (let i = 0; i < qAttempts.length; i++) {
+    assert.equal(wasmQ[i].accepted, nativeQ[i].accepted, `Q acceptance ${i}`);
+    assert.deepEqual(wasmQ[i].settings, nativeQ[i].settings, `Q settings ${i}`);
+    assert.equal(wasmQ[i].checkpoint, nativeQ[i].checkpoint, `Q checkpoint ${i}`);
+    if (nativeQ[i].accepted) {
+      assert.deepEqual(wasmQ[i].outcome.vm, nativeQ[i].outcome.trace, `Q complete trace ${i}`);
+      assert.deepEqual(wasmQ[i].outcome.frame, { scanId: nativeQ[i].outcome.scanId, logicalTimeMs: nativeQ[i].outcome.logicalTimeMs });
+    }
+  }
+  assert.deepEqual(nativeRun(programQ, qAttempts, { profile: 'context-settings-civil-v1' }), nativeQ, 'fresh native replay includes rejected attempts and complete checkpoints');
+  assert.deepEqual(await wasmRun(programQ, qAttempts, true), wasmQ, 'fresh framed replay includes rejected attempts and complete checkpoints');
+
+  await assert.rejects(async () => {
+    const restoredQ = await ControlRuntime.instantiateFramed(wasmBytes, programQ,
+      { context: { bootEpoch: 1, terminalCapacity: 8, bindings: [] } });
+    try { restoredQ.restoreContextCheckpoint(Buffer.from(nativeP[1].checkpoint, 'hex')); }
+    finally { restoredQ.dispose(); }
+  }, /checkpoint|Program identity|fingerprint/i);
+  const nativeRestore = nativeRun(programQ, [{ scanId: 0, nowMs: 0, settings: null }],
+    { profile: 'context-settings-civil-v1', checkpoint: nativeP[1].checkpoint, expectSuccess: false });
+  assert.notEqual(nativeRestore.status, 0);
+  assert.match(nativeRestore.stderr + nativeRestore.stdout, /checkpoint|Program identity|fingerprint/i);
 });
 
 test('GF-TEST-config-native-wasm-parity: bounded Duration and Percent defaults, updates, faults, and rollback match native and WASM', async () => {

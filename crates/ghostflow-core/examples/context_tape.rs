@@ -69,6 +69,7 @@ fn settings_event(value: &Json) -> Result<Option<SettingsEvent>> {
     let origin = match text(&value["origin"])? {
         "operatorEdit" => SettingsOrigin::OperatorEdit,
         "producerObservation" => SettingsOrigin::ProducerObservation,
+        "temporaryReturn" => SettingsOrigin::TemporaryReturn,
         _ => return Err("invalid settings origin".into()),
     };
     let mut changes = Vec::new();
