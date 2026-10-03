@@ -127,6 +127,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/solar-config-compiler.test.mjs',
   'tests/solar-config-runtime.test.mjs',
   'tests/tide-occurrence-identity.test.mjs',
+  'tests/tide-run-late-constraint.test.mjs',
   'tests/atomic-duration-slots.test.mjs',
   'tests/clock-timer-domain-boundary.test.mjs',
   'tests/solar-admitted-observation.test.mjs',

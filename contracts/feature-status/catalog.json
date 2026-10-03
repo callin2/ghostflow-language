@@ -6555,6 +6555,80 @@
       "referenceCaseIds": [
         "REF-03-022"
       ]
+    },
+    {
+      "id": "tide-run-late-constraint",
+      "family": "Finite Tide Run deadline survives safe-output blocking",
+      "clause": {
+        "path": "docs/reference/03-time-and-schedules.en.md",
+        "heading": "3.5 Common Schedule semantics"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/tide-run-late-constraint.test.mjs",
+              "testId": "REF-03-027 native and WASM late Tide Run ends at 08:07 despite blocked safe output from 08:04 to 08:06",
+              "caseId": "REF-03-027",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/tide-run-late-constraint.test.mjs",
+              "testId": "REF-03-027 native and WASM reject exact grace-end admission while one millisecond earlier admits a full Run",
+              "caseId": "REF-03-027",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/tide-run-late-constraint.test.mjs",
+              "testId": "REF-03-027 rejected clock facts preserve the active Run deadline and valid retry matches native WASM replay",
+              "caseId": "REF-03-027",
+              "assertionClass": "rollback",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Caller-supplied Tide facts execute the same finite Run source through native and framed WASM. Complete outcomes/settings/checkpoints agree, including exact deadline/grace boundaries and atomic clock rejection/retry. Safe output clamps without extending the Run. No physical output, authenticated predictions, generic Run adoption or full VM-state restoration is claimed."
+      ],
+      "issues": [
+        216
+      ],
+      "referenceCaseIds": [
+        "REF-03-027"
+      ]
     }
   ]
 }
