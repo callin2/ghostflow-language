@@ -146,14 +146,24 @@ export class TemporarySettingsHost {
         if(request.kind!=='cancel'&&(!Array.isArray(request.changes)||!request.changes.length
           ||request.changes.length>this.#configs.length||new Set(request.changes.map(c=>c.configId)).size!==request.changes.length))fail('checkpoint request target provenance');
         if(request.kind==='ordinary'&&request.lifetime!==undefined)fail('checkpoint ordinary request provenance');
+        if(request.kind==='temporary'){
+          shape(request.lifetime,['kind'],request.lifetime?.kind==='Until'?['dateTimeMs']:[]);
+          if(!['Run','Until'].includes(request.lifetime.kind))fail('checkpoint lifetime request provenance');
+          if(request.lifetime.kind==='Until')validateTimeValue('DateTime',request.lifetime.dateTimeMs);
+          if(request.cancelOverlayIds?.length)fail('checkpoint temporary cancellation provenance');
+          for(const change of request.changes){shape(change,['configId','result']);payload(this.#config(change.configId),change.result);}
+        }
+        if(request.kind==='cancel'&&!request.cancelOverlayIds?.length)fail('checkpoint cancel request provenance');
         if(request.cancelOverlayIds!==undefined&&(!Array.isArray(request.cancelOverlayIds)
           ||new Set(request.cancelOverlayIds).size!==request.cancelOverlayIds.length||request.cancelOverlayIds.some(id=>!text(id))))fail('checkpoint request cancellation provenance');
       }
       if(h.effects.filter(e=>e.kind==='ordinary').length!==(request?.kind==='ordinary'?1:0)
         ||h.effects.filter(e=>e.kind==='temporary').length!==(request?.kind==='temporary'?1:0))fail('checkpoint request effect binding');
+      if(!equal(h.effects.filter(e=>e.kind==='cancel').map(e=>e.overlayId),request?.cancelOverlayIds??[]))fail('checkpoint cancellation effect binding');
       for(const e of h.effects){
         if(e.kind==='temporary'){
-          shape(e,['kind','overlayId','grantSnapshot','changes']);
+          shape(e,['kind','overlayId','grantSnapshot','changes','requestedChanges','lifetime']);
+          if(!equal(e.requestedChanges,request.changes)||!equal(e.lifetime,request.lifetime))fail('checkpoint temporary request payload binding');
           if(e.overlayId!==h.eventId||!Array.isArray(e.grantSnapshot)||!e.grantSnapshot.length
             ||e.grantSnapshot.length>128||new Set(e.grantSnapshot).size!==e.grantSnapshot.length
             ||e.grantSnapshot.some(id=>!exact(id)||this.#config(id).settings?.access!=='operator'))fail('checkpoint history permission provenance');
@@ -162,9 +172,18 @@ export class TemporarySettingsHost {
           for(const c of e.changes){shape(c,['configId','result','returnResult']);
             if(!e.grantSnapshot.includes(c.configId))fail('checkpoint history creation permission binding');
             payload(this.#config(c.configId),c.result);payload(this.#config(c.configId),c.returnResult);}
+          if(!equal(e.changes.map(c=>c.configId),request.changes.map(c=>c.configId)))fail('checkpoint temporary target binding');
+          for(const [i,c] of e.changes.entries()){
+            const requested=request.changes[i].result;
+            if(!requested.type.startsWith('TimeSlots<')){if(!equal(c.result,requested))fail('checkpoint temporary value binding');}
+            else if(c.result.value.entries.length!==requested.value.entries.length||c.result.value.entries.some((row,j)=>{
+              const old=requested.value.entries[j];return row.minuteOfDay!==old.minuteOfDay||old.key!==0&&row.key!==old.key||row.key===0;
+            }))fail('checkpoint temporary row value binding');
+          }
           if(openOverlays.has(e.overlayId))fail('checkpoint history duplicate creation');openOverlays.add(e.overlayId);
         }else if(e.kind==='ordinary'){
-          shape(e,['kind','targets']);
+          shape(e,['kind','targets','requestedChanges']);
+          if(!equal(e.requestedChanges,request.changes))fail('checkpoint ordinary request payload binding');
           if(!Array.isArray(e.targets)||!e.targets.length||e.targets.length>this.#configs.length
             ||new Set(e.targets).size!==e.targets.length)fail('checkpoint history target provenance');
           for(const id of e.targets)this.#config(id);
@@ -179,6 +198,7 @@ export class TemporarySettingsHost {
           const creation=b.history.slice(0,index).find(row=>row.eventId===e.creationEvent);
           if(!creation?.effects.some(effect=>effect.kind==='temporary'&&effect.overlayId===e.overlayId))fail('checkpoint history creation binding');
           const created=creation.effects.find(effect=>effect.kind==='temporary'&&effect.overlayId===e.overlayId);
+          if(e.kind==='expiry'&&created.lifetime.kind!=='Until'||e.kind==='run-ended'&&created.lifetime.kind!=='Run')fail('checkpoint return lifetime binding');
           if(!equal(e.returnTarget,created.changes.map(c=>c.configId))||!equal(e.returnValues,created.changes.map(c=>c.returnResult)))fail('checkpoint history original return binding');
           if(!openOverlays.delete(e.overlayId))fail('checkpoint history duplicate return binding');
           for(const [i,id] of e.returnTarget.entries()){
@@ -221,6 +241,7 @@ export class TemporarySettingsHost {
         ||creation.runId!==o.runId||creation.settingsRevision!==o.settingsRevision||creation.applicationPosition!==o.startingPosition)fail('checkpoint creation event binding');
       if(!equal(o.permissions,creation.effects.find(e=>e.kind==='temporary'&&e.overlayId===o.overlayId)?.grantSnapshot))fail('checkpoint permission creation binding');
       if(!equal(o.changes,creation.effects.find(e=>e.kind==='temporary'&&e.overlayId===o.overlayId)?.changes))fail('checkpoint active creation value binding');
+      if(!equal(o.lifetime,creation.effects.find(e=>e.kind==='temporary'&&e.overlayId===o.overlayId)?.lifetime))fail('checkpoint active lifetime binding');
       for(const change of o.changes){if(covered.has(change.configId)||!seen.has(change.configId))fail('checkpoint overlay target');covered.add(change.configId);
         shape(change,['configId','result','returnResult']);
         if(!o.permissions.includes(change.configId))fail('checkpoint permission target');
@@ -309,13 +330,13 @@ export class TemporarySettingsHost {
           createdAt:{monotonicMs:packet.nowMs,wallMs:clock?.wallMs??null,clockRevision:clock?.sourceRevision??null},
           expiry:event.lifetime.kind==='Run'?{runEnded:this.#run}:{dateTimeMs:event.lifetime.dateTimeMs},
           rollbackProvenance:{ordinaryRevision:state.settingsRevision,returnTarget:captured.map(c=>c.configId)},changes:captured});
-        effects.push({kind:'temporary',overlayId:event.eventId,grantSnapshot:clone(overlays.at(-1).permissions),changes:[]});
+        effects.push({kind:'temporary',overlayId:event.eventId,grantSnapshot:clone(overlays.at(-1).permissions),changes:[],requestedChanges:clone(event.changes),lifetime:clone(event.lifetime)});
       }else{
         if(event.lifetime!==undefined)fail('ordinary lifetime');
         for(const o of [...overlays])if(o.changes.some(c=>event.changes.some(x=>x.configId===c.configId))){
           if(o.changes.some(c=>!event.changes.some(x=>x.configId===c.configId)))fail('cancel entire temporary group before partial ordinary change');remove(o,'ordinary-replacement');}
         for(const change of event.changes)changes.set(change.configId,clone(change));
-        effects.push({kind:'ordinary',targets:event.changes.map(c=>c.configId)});
+        effects.push({kind:'ordinary',targets:event.changes.map(c=>c.configId),requestedChanges:clone(event.changes)});
       }
     }
     const hasReturns=effects.some(e=>e.returnTarget);

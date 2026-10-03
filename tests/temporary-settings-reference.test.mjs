@@ -171,6 +171,12 @@ test('REF-05-018 unavailable trusted time blocks Until decisions and failed retu
   assert.deepEqual(failed.snapshot.core,before.core);assert.equal(failed.snapshot.overlays[0].overlayId,'original');
   const retry=h.step(packet(2,0,{trusted:false}),cancel);assert.equal(retry.accepted,true);assert.equal(retry.snapshot.validity,'available');
   assert.equal(retry.outcome.vm.safe.duration_ms,300000);assert.equal(retry.snapshot.overlays.length,0);
+  const completed=h.checkpoint();
+  for(const mutate of [r=>{delete r.cancelOverlayIds;},r=>{r.cancelOverlayIds=['forged-overlay'];}]){
+   const bad=structuredClone(completed);mutate(bad.body.history.at(-1).request);bad.sha256=sha256Hex(canonicalJson(bad.body));
+   await assert.rejects(create(artifact,{runId:'cancel-restore',boot:2,checkpoint:bad,restoreApproved:true}),/cancel|binding/);
+  }
+  const restored=await create(artifact,{runId:'completed-cancel',boot:2,checkpoint:completed,restoreApproved:true});restored.dispose();
   const goodBefore=h.snapshot();unchanged(h,()=>h.step(packet(3),cancel),/stale|duplicate/);assert.deepEqual(h.snapshot(),goodBefore);
   compareNative(artifact,[{p:startPacket,r:startResult},{p:packet(2,0,{trusted:false,den:0}),r:failed},{p:packet(2,0,{trusted:false}),r:retry}]);
  }finally{h.dispose();}
@@ -233,7 +239,7 @@ test('REF-05-018 approved digest-correct restore revalidates every overlay prove
   const invalid=structuredClone(saved);change(invalid.body.overlays[0]);invalid.sha256=sha256Hex(canonicalJson(invalid.body));
   await assert.rejects(create(artifact,{runId:'new-run',boot:2,checkpoint:invalid,restoreApproved:true}),/provenance|permission|envelope|binding/);
  }
- for(const change of [b=>{b.overlays[0].permissions.reverse();},b=>{b.history[0].actor='';},b=>{b.history[0].reason=42;},b=>{b.history[0].settingsRevision=99;},b=>{b.history[0].applicationPosition=99;},b=>{b.history[0].effects=[{kind:'forged'}];},b=>{b.history[0].effects[0].targets=[999];},b=>{b.history[1].effects[0].grantSnapshot=[];}]){
+ for(const change of [b=>{b.overlays[0].permissions.reverse();},b=>{b.history[0].actor='';},b=>{b.history[0].reason=42;},b=>{b.history[0].settingsRevision=99;},b=>{b.history[0].applicationPosition=99;},b=>{b.history[0].effects=[{kind:'forged'}];},b=>{b.history[0].effects[0].targets=[999];},b=>{b.history[1].effects[0].grantSnapshot=[];},b=>{delete b.history[1].request.lifetime;},b=>{b.history[1].request.lifetime.dateTimeMs=6000;},b=>{b.history[1].request.changes[0].result.value=660000;},b=>{b.history[0].request.changes[0].result.value=480000;}]){
   const invalid=structuredClone(saved);change(invalid.body);invalid.sha256=sha256Hex(canonicalJson(invalid.body));
   await assert.rejects(create(artifact,{runId:'new-run',boot:2,checkpoint:invalid,restoreApproved:true}),/provenance|permission|envelope|binding|identity/);
  }
@@ -244,7 +250,7 @@ test('REF-05-018 approved digest-correct restore revalidates every overlay prove
  try{live.step(packet(0,1000,{boot:2}),event(live,'ordinary','later-ordinary',[typed(artifact,'duty',60)]));contradictory=live.checkpoint();}finally{live.dispose();}
  contradictory.body.history.at(-1).effects=structuredClone(secondSaved.body.history.at(-1).effects);
  contradictory.sha256=sha256Hex(canonicalJson(contradictory.body));
- await assert.rejects(create(artifact,{runId:'contradiction',boot:3,checkpoint:contradictory,restoreApproved:true}),/active overlay binding|request effect binding/);
+ await assert.rejects(create(artifact,{runId:'contradiction',boot:3,checkpoint:contradictory,restoreApproved:true}),/active overlay binding|request effect binding|payload binding/);
  const duplicate=structuredClone(secondSaved);duplicate.body.history.at(-1).effects.push(structuredClone(duplicate.body.history.at(-1).effects[0]));
  duplicate.sha256=sha256Hex(canonicalJson(duplicate.body));
  await assert.rejects(create(artifact,{runId:'duplicate-return',boot:3,checkpoint:duplicate,restoreApproved:true}),/duplicate return binding/);
