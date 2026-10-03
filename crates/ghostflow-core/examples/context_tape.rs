@@ -322,10 +322,11 @@ fn main() -> Result<()> {
         .collect();
     let tape: Json = serde_json::from_slice(&read(&args[1])?)?;
     let solar_profile = tape["profile"] == "context-solar-v1";
+    let settings_periodic_profile = tape["profile"] == "context-settings-periodic-v1";
     let civil_profile =
         tape["profile"] == "context-civil-v1" || tape["profile"] == "context-settings-civil-v1";
     let calendar_profile = tape["profile"] == "context-calendar-v1";
-    if civil_profile || calendar_profile {
+    if civil_profile || calendar_profile || settings_periodic_profile {
         fields(&tape, &["profile", "activation", "steps", "checkpoint"])?;
         fields(
             &tape["activation"],
@@ -333,6 +334,7 @@ fn main() -> Result<()> {
         )?;
     }
     let settings_profile = tape["profile"] == "context-settings-v1"
+        || settings_periodic_profile
         || tape["profile"] == "context-settings-civil-v1"
         || solar_profile;
     if !settings_profile
@@ -397,7 +399,7 @@ fn main() -> Result<()> {
             if !array(&step["natural"], 0)?.is_empty() {
                 return Err("Solar tape cannot supply natural providers".into());
             }
-        } else if civil_profile || calendar_profile {
+        } else if civil_profile || calendar_profile || settings_periodic_profile {
             fields(
                 step,
                 &[
@@ -450,11 +452,11 @@ fn main() -> Result<()> {
                     "Periodic tape cannot supply providers, calendars or occurrence rows".into(),
                 );
             }
-            if settings_profile && !civil_profile {
+            if settings_profile && !civil_profile && !settings_periodic_profile {
                 return Err("settings tape cannot supply schedules".into());
             }
             let mut rows = Vec::new();
-            if civil_profile || calendar_profile {
+            if civil_profile || calendar_profile || settings_periodic_profile {
                 fields(
                     schedule,
                     &[

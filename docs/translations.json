@@ -2,6 +2,13 @@
   "format": "GhostFlow/document-translations-v1",
   "documents": [
     {
+      "source": "docs/GHOST-TIMELINE.md",
+      "sourceLanguage": "en",
+      "translation": "docs/GHOST-TIMELINE.ko.md",
+      "sourceSha256": "41b1aa54b5420ccd5ab4c62cc8ffe17175fac51e9160dfd6b7549bafab9d3aca",
+      "translationSha256": "0b9888503b10cd21068a354cec7639e8bdeb68267eb16e456bdcb78fc51acf41"
+    },
+    {
       "source": "docs/ROLLING-BUDGET-EXPLANATION.md",
       "sourceLanguage": "en",
       "translation": "docs/ROLLING-BUDGET-EXPLANATION.ko.md",
