@@ -3,6 +3,7 @@ import { canonicalUnitFor, isQuantityType } from './quantities.mjs';
 import { isTimeType, validateTimeValue } from './time-literals.mjs';
 import { isInt32, intSettingsIssue } from './int-settings.mjs';
 import { compileControl } from './control.mjs';
+import { compileSourceSync } from './compile-source.mjs';
 import { extractLiterate } from './literate.mjs';
 import { equalBytes } from './sha256.mjs';
 import { remapSourceTrace, sourceMapRequiresTraceMetadata, verifySourceTraceMetadata } from './source-trace.mjs';
@@ -326,7 +327,8 @@ function sourceMapEnvelope(compilation) {
   return {
     format: SOURCE_MAP_FORMAT,
     bytecodeSha256: compilation.manifest.bytecodeSha256,
-    sourceDocument: compilation.sourceDocument,
+      sourceDocument: compilation.sourceDocument,
+      ...(compilation.sourceClosure ? { sourceClosure: compilation.sourceClosure } : {}),
     nodes: compilation.sourceMap,
     lines: compilation.extractionMap ?? null,
     traceMetadata: compilation.traceMetadata ?? null,
@@ -713,7 +715,8 @@ export async function verifyPortablePackage(packageValue, options = {}) {
     fail('manifest-mismatch', 'GFB11 config IDs must be unique');
   }
 
-  exactObject(sourceMap, ['format', 'bytecodeSha256', 'sourceDocument', 'nodes', 'lines', 'traceMetadata'], 'sourceMap');
+  exactObject(sourceMap, ['format', 'bytecodeSha256', 'sourceDocument', 'nodes', 'lines', 'traceMetadata',
+    ...(Object.hasOwn(sourceMap, 'sourceClosure') ? ['sourceClosure'] : [])], 'sourceMap');
   if (sourceMap.format !== SOURCE_MAP_FORMAT || sourceMap.bytecodeSha256 !== bytecodeSha256) {
     fail('source-map-mismatch', 'source map format or GFB1 digest does not match package');
   }
@@ -729,7 +732,21 @@ export async function verifyPortablePackage(packageValue, options = {}) {
   if (!Array.isArray(sourceMap.nodes) || (sourceMap.lines !== null && !Array.isArray(sourceMap.lines))) {
     fail('source-map-mismatch', 'source map nodes/lines have an unsupported shape');
   }
-  if (contextManifest) {
+  if (Object.hasOwn(sourceMap, 'sourceClosure')) {
+    try {
+      if (sourceMap.sourceClosure?.format !== 'GhostFlow/source-closure-v1') throw new Error('invalid source closure format');
+      const replay = compileSourceSync(sourceText, {
+        filename: mappedDocument.filename, sourceClosure: sourceMap.sourceClosure.documents,
+      });
+      if (!equalBytes(replay.bytes, artifacts.bytecode)
+          || canonicalJson(replay.manifest) !== canonicalJson(manifest)
+          || canonicalJson(sourceMapEnvelope(replay)) !== canonicalJson(sourceMap)) {
+        throw new Error('signed source closure does not reproduce exact bytecode, manifest and provenance');
+      }
+    } catch (error) {
+      fail('source-map-mismatch', 'source closure does not match signed artifacts', error);
+    }
+  } else if (contextManifest) {
     // The current compiler emits GFB11 for context source. A signed GFB10
     // artifact cannot be reproduced by recompiling it with that compiler.
     // Keep its source map bound to the signed source and bytecode, then require

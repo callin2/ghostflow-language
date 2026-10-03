@@ -229,3 +229,9 @@ eligible. Native and WASM tests preserve the absent baseline and present feedbac
 outputs and reject re-signed strategy/query/bytecode tampering. GFB and wire formats,
 ABI and signature policy remain unchanged. Physical wiring and Device admission
 remain consumer responsibilities.
+
+## Exact reusable composition provenance
+
+A reusable composition package includes the optional `sourceClosure` in its signed source-map envelope. This contains the exact pinned transitive literate documents, revisions, digests and authored instance identities. Verification recompiles that closure and compares the complete bytecode, manifest and source-map envelope before invoking the target bytecode verifier. A valid signature cannot authorize altered instance provenance. Existing packages without a closure keep their existing verification path.
+
+REF-06-025 checks nested reuse, separate Boolean instance state and typed logical ports through native and framed WASM, then prepares effect-free replay from a verified package. The virtual binding revision identifies logical capabilities; it does not establish physical pin suitability or application. The existing plain Boolean replay profile remains unchanged.

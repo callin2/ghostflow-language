@@ -5,6 +5,10 @@
 
 ## 미출시
 
+### 2026-10-03 — 서명된 재사용 source closure 보존 ([#309](https://github.com/callin2/ghostflow-language/issues/309))
+
+Portable composition package는 이제 정확히 pin된 transitive source closure를 보존한다. 이전에는 서명 과정에서 provenance가 빠지고 검증이 문서 없이 import를 lowering하려 했다. 검증은 서명된 closure를 다시 컴파일하여 전체 bytecode, manifest 및 source-map identity를 비교한 뒤 target admission을 허용한다. 다시 서명한 instance 변조도 거부한다. REF-06-025는 native/WASM instance 격리와 검증된 package의 effect-free replay를 확인한다. 기존 package format과 plain-control replay 정책은 바뀌지 않는다.
+
 ### 2026-10-03 — dependency 및 ownership 거부 맥락 보완 ([#301](https://github.com/callin2/ghostflow-language/issues/301))
 
 Reference §6.6의 진단 상세를 복원한다. 누락되거나 revision이 다른 import는
