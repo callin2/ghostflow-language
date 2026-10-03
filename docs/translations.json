@@ -621,8 +621,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "6f32129b8f63644909381e28f1f03038fd0a3c47797b3961c7ff1b45615e8aff",
-      "translationSha256": "48dcc44bc39d34ab8df099d53a43d1419527c57d80c9829a1ebe4aafdf104a10"
+      "sourceSha256": "d109ee3d9932f3187c4426d79950c939d460857a5b75766e5e7d5bd31b036079",
+      "translationSha256": "9c6d3bdc4ee2ca52c6bc5ee63714c010e67e9cc2f0d3bf1456e244cf5dfbadab"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",
@@ -1036,6 +1036,13 @@
       "translation": "docs/TEMPORARY-SETTINGS-HOST.ko.md",
       "sourceSha256": "99bf4ab2c1053ed43f2c7ae24ecd0254cb685b13b62b00b81aded4d870a65477",
       "translationSha256": "3c7f9790dd7e1e6ccb1ec6ad0760feade6bdec4acd512827f9b078564657ee11"
+    },
+    {
+      "source": "docs/OBSERVATION-EVENT-HISTORY.md",
+      "sourceLanguage": "en",
+      "translation": "docs/OBSERVATION-EVENT-HISTORY.ko.md",
+      "sourceSha256": "c265f6904258eee5e24dd7228222d40317806cffc5f143978f023d32b4bbf952",
+      "translationSha256": "a4f85f8836f1d8cba9b4cc78c70f632b60e47a7c5bda108354c23821a16da9be"
     }
   ],
   "exclusions": [

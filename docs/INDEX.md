@@ -96,6 +96,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/LLM-AUTHORING-WORKFLOW.md](LLM-AUTHORING-WORKFLOW.md) | Model independent authoring workflow | md |
 | [docs/LLM-TOOLCHAIN-ARCHITECTURE.ko.md](LLM-TOOLCHAIN-ARCHITECTURE.ko.md) | 작성 및 가상 시뮬레이션 아키텍처 | md |
 | [docs/LLM-TOOLCHAIN-ARCHITECTURE.md](LLM-TOOLCHAIN-ARCHITECTURE.md) | Authoring and virtual simulation architecture | md |
+| [docs/OBSERVATION-EVENT-HISTORY.ko.md](OBSERVATION-EVENT-HISTORY.ko.md) | 보존 범위가 있는 관찰 event 이력 | md |
+| [docs/OBSERVATION-EVENT-HISTORY.md](OBSERVATION-EVENT-HISTORY.md) | Bounded observation event history | md |
 | [docs/OPERATOR-SETTINGS-STREAM.ko.md](OPERATOR-SETTINGS-STREAM.ko.md) | Typed configuration stream | md |
 | [docs/OPERATOR-SETTINGS-STREAM.md](OPERATOR-SETTINGS-STREAM.md) | Typed configuration streams | md |
 | [docs/OPTIMIZER-PASS-CONTRACT.ko.md](OPTIMIZER-PASS-CONTRACT.ko.md) | 최적화 패스 계약 | md |
@@ -228,4 +230,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.ko.md](research/GF-COMPOSE-R9-ACCEPTANCE.ko.md) | GF-COMPOSE R9: acceptance와 구현 인계 | md |
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.md](research/GF-COMPOSE-R9-ACCEPTANCE.md) | GF-COMPOSE R9: acceptance and implementation handoff | md |
 
-194 documents.
+196 documents.

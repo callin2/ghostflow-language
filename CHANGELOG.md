@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### 2026-10-03 — report retained observation event gaps ([#282](https://github.com/callin2/ghostflow-language/issues/282))
+
+Adds a source-bound reference Host journal that retains explicit events separately from completed snapshots. A consumer at sequence10 receives an explicit missed range11–13 if retention begins at14, with the original event14 and no snapshot-derived synthetic events. Complete publication validates atomically, rejected batches permit same-scan retry, and cursors bind exact source/Program/schema/run identity. REF-05-022 verifies actual native/framed-WASM traces, complete host delivery and fresh replay. This reference API does not change source syntax, Interaction snapshot v0, physical evidence or final execution-environment event transport.
+
 ### 2026-10-03 — source-bound instance trace projection ([#291](https://github.com/callin2/ghostflow-language/issues/291))
 
 Adds a production reference adapter for REF-06-003 instance display and trace projection. The adapter verifies exact root source, imported closure text/revisions/digests, bytecode, manifest, source map and trace metadata by recompiling the supplied artifact before activation. Presentation labels must target the actual compiled instance IDs and remain separate metadata; they do not rename instances or author source revisions. Projection now consumes `observeSourceTrace()` results and returns identity-keyed entries from emitted source-map owners and authored symbols without making private VM slot suffixes public meaning. Malformed labels, caller mutation attempts, wrong source/manifest/closure provenance and wrong trace module identities reject before projection. No source grammar, evaluator or Reference semantics change is introduced.

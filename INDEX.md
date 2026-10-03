@@ -150,6 +150,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/LLM-AUTHORING-WORKFLOW.md](docs/LLM-AUTHORING-WORKFLOW.md) | Model independent authoring workflow | md |
 | [docs/LLM-TOOLCHAIN-ARCHITECTURE.ko.md](docs/LLM-TOOLCHAIN-ARCHITECTURE.ko.md) | 작성 및 가상 시뮬레이션 아키텍처 | md |
 | [docs/LLM-TOOLCHAIN-ARCHITECTURE.md](docs/LLM-TOOLCHAIN-ARCHITECTURE.md) | Authoring and virtual simulation architecture | md |
+| [docs/OBSERVATION-EVENT-HISTORY.ko.md](docs/OBSERVATION-EVENT-HISTORY.ko.md) | 보존 범위가 있는 관찰 event 이력 | md |
+| [docs/OBSERVATION-EVENT-HISTORY.md](docs/OBSERVATION-EVENT-HISTORY.md) | Bounded observation event history | md |
 | [docs/OPERATOR-SETTINGS-STREAM.ko.md](docs/OPERATOR-SETTINGS-STREAM.ko.md) | Typed configuration stream | md |
 | [docs/OPERATOR-SETTINGS-STREAM.md](docs/OPERATOR-SETTINGS-STREAM.md) | Typed configuration streams | md |
 | [docs/OPTIMIZER-PASS-CONTRACT.ko.md](docs/OPTIMIZER-PASS-CONTRACT.ko.md) | 최적화 패스 계약 | md |
@@ -479,4 +481,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-359 documents.
+361 documents.
