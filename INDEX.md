@@ -246,6 +246,7 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/reports/2026-09-24-issue-135-daily-slots-abi.md](docs/reports/2026-09-24-issue-135-daily-slots-abi.md) | Literal DailySlots execution ABI — 2026-09-24 | md |
 | [docs/reports/2026-09-24-range-cancel-acceptance.md](docs/reports/2026-09-24-range-cancel-acceptance.md) | Range `cancel_when` compiler acceptance — 2026-09-24 | md |
 | [docs/reports/2026-09-24-reference-execution-support-audit.md](docs/reports/2026-09-24-reference-execution-support-audit.md) | Reference execution and support audit — 2026-09-24 | md |
+| [docs/reports/2026-10-03-stale-branch-reconciliation.md](docs/reports/2026-10-03-stale-branch-reconciliation.md) | Stale branch reconciliation — 2026-10-03 | md |
 
 ## docs/research/
 
@@ -481,4 +482,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-361 documents.
+362 documents.
