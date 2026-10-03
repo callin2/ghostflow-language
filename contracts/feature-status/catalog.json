@@ -6318,6 +6318,77 @@
       "referenceCaseIds": [
         "REF-03-010"
       ]
+    },
+    {
+      "id": "atomic-duration-slots",
+      "family": "One settings event updates elapsed Duration and civil slots atomically",
+      "clause": {
+        "path": "docs/reference/08-language-runtime-and-device-boundaries.en.md",
+        "heading": "8.6 Language decisions and author-selected policies"
+      },
+      "owner": "HOST",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/atomic-duration-slots.test.mjs",
+              "testId": "REF-08-014 atomic Duration and civil slots preserve the running timer and apply future slot boundaries",
+              "caseId": "REF-08-014",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/atomic-duration-slots.test.mjs",
+              "testId": "REF-08-014 wrong Program rejects the whole live event without resetting owners",
+              "caseId": "REF-08-014",
+              "assertionClass": "rollback",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/atomic-duration-slots.test.mjs",
+              "testId": "REF-08-014 civil values never become successful Duration settings and keep the adopted aggregate fault rail",
+              "caseId": "REF-08-014",
+              "assertionClass": "type-boundary",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Conformance on the adopted GFB11 settings/civil pulse profile: one addressed event applies Duration and TimeSlots at a shared emission revision/position while preserving an ongoing control timer anchor. Exact elapsed deadline, consumed-start suppression and future civil-slot admission remain distinct. Full native/WASM outcomes/checkpoints/settings, wrong-Program atomic rejection/retry, compile-time civil-to-Duration rejection and existing aggregate Result fault emission are exercised. No settings fault-policy change, Schedule Run overlap, dynamic Range Duration/slots profile, Device, UI or hardware implementation claim."
+      ],
+      "issues": [
+        331
+      ],
+      "referenceCaseIds": [
+        "REF-08-014"
+      ]
     }
   ]
 }
