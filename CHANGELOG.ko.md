@@ -5,6 +5,18 @@
 
 ## 미출시
 
+### 2026-10-03 — 혼합 UTC Range와 비공개 config snapshot 복구 ([#503](https://github.com/callin2/ghostflow-language/pull/503))
+
+Reference §§3.5–3.6과 §5의 설정 관측 동작을 복구하는 버그 수정이다.
+GFB20에서 config로 선택한 `DailySlots` Range와 일반 UTC `Daily` Range를
+함께 로드한다. 이전에는 일반 schedule 때문에 activation이 실패했다.
+완료 scan snapshot은 공개 설정과 함께 선언한 비공개
+`config internal: Bool = true;`를 수락한다. 모든 compiled config의 정확한
+runtime 식별자, source 기본값과 emission provenance 검사는 유지하며 공개
+descriptor만 투영한다. 기존 native/framed-WASM 동등성 및 설정 provenance
+테스트가 혼합 activation·실행과 비공개 행 변조를 검증한다. format/ABI 변경이나
+Device·하드웨어 검증을 주장하지 않는다.
+
 ### 2026-10-02 — 경쟁하는 두 output writer 식별 ([#300](https://github.com/callin2/ghostflow-language/issues/300))
 
 조합 duplicate-supplier 진단은 두 원본 writer endpoint를 모두 명명하거나 root
