@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### 2026-10-03 — restore mixed UTC Ranges and private-config snapshots ([#503](https://github.com/callin2/ghostflow-language/pull/503))
+
+Bug fixes restoring Reference §§3.5–3.6 and §5 settings observation behavior.
+GFB20 now loads an ordinary UTC `Daily` Range alongside a config-selected
+`DailySlots` Range; previously the ordinary schedule prevented activation.
+Completed-scan snapshots now accept unexposed `config internal: Bool = true;`
+alongside public settings. Every compiled config still requires its exact runtime
+identity, source default and emission provenance; only public descriptors are
+projected. Existing native/framed-WASM parity and settings-provenance suites
+cover mixed activation/execution and private-row tampering. No format/ABI change
+or Device/hardware verification is claimed.
+
 ### 2026-10-02 — identify both competing output writers ([#300](https://github.com/callin2/ghostflow-language/issues/300))
 
 Composition duplicate-supplier diagnostics now name both authored writer

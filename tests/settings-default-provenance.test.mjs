@@ -26,6 +26,29 @@ async function fixture(sourceText = source) {
 }
 
 function setting(state, name) { return state.settings.find(item => item.name === name); }
+
+test('completed snapshots retain private config validation without projecting a public descriptor', async () => {
+  const { artifact, runtime } = await fixture(source.replace('  output watering: Bool;', '  config internal: Bool = true;\n  output watering: Bool;'));
+  try {
+    const outcome = runtime.step({ nowMs: 0, contextFacts: facts(0) });
+    const state = runtime.contextSnapshot().state;
+    const emit = settingsState => emitCompletedScanSnapshot({ compilation: artifact, runId: 'run.private-config',
+      completion: { kind: 'completed-scan', scanId: 0, logicalTimeMs: 0 }, trace: outcome.vm, settingsState });
+    const snapshot = emit(state);
+    assert.equal(validateInteraction(artifact.interactionSchema, snapshot).valid, true);
+    assert.equal(artifact.interactionSchema.descriptors.some(descriptor => descriptor.name === 'internal'), false);
+    assert.equal(snapshot.observations.some(value => value.descriptorId === 'setting.internal'), false);
+    for (const field of ['id', 'name', 'type', 'defaultValue']) {
+      const corrupted = structuredClone(state);
+      const row = setting(corrupted, 'internal');
+      row[field] = field === 'id' ? row.id + 1 : field === 'defaultValue' ? false : 'invalid';
+      assert.throws(() => emit(corrupted), /settings state identity or Result mismatch/, field);
+    }
+    const missing = structuredClone(state);
+    missing.settings = missing.settings.filter(row => row.name !== 'internal');
+    assert.throws(() => emit(missing), /current Rust settings state is required/);
+  } finally { runtime.dispose(); }
+});
 function ok(configId, type, value) { return { configId, result: { ok: true, type, value } }; }
 function fault(configId) { return { configId, result: { ok: false, type: undefined, value: undefined, fault: 'SettingsUnavailable' } }; }
 function event(fingerprint, eventId, baseRevision, position, changes, origin = 'operatorEdit') {

@@ -696,7 +696,7 @@ pub(crate) fn load_schedule(
                 dst_repeated,
             }
         }
-        13 if matches!(format, 12 | 13 | 15 | 18 | 19) => {
+        13 if matches!(format, 12 | 13 | 15 | 18 | 19 | 20) => {
             if text(reader)? != "UTC" {
                 return Err(Error::new("Range requires UTC timezone"));
             }

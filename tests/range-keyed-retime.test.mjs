@@ -58,14 +58,14 @@ function facts(site, mono, wall, settings = null, trusted = true) {
       sourceRevision: 'range-keyed-retime-v1',
     },
     natural: [],
-    schedules: [{
+    schedules: (Array.isArray(site) ? site : [site]).map(site => ({
       site,
       coverageStartMs: 0,
       coverageEndMs: 253402300799999,
       provider: null,
       calendar: null,
       rows: [],
-    }],
+    })),
     settings,
   };
 }
@@ -92,7 +92,7 @@ async function artifact() {
 
 async function run(steps, { checkpoint = null, compilation = null } = {}) {
   const a = compilation ?? await artifact();
-  const site = a.manifest.schedules[0].site;
+  const site = a.manifest.schedules.map(schedule => schedule.site);
   const slotsId = a.manifest.configs.find(c => c.name === 'watering_slots')?.id;
   const probe = await ControlRuntime.instantiateFramed(wasm, a, { context: activation });
   const fingerprint = probe.contextSnapshot().state.programFingerprint;
@@ -157,6 +157,32 @@ const decisions = row => scheduleEntries(row).map(e => e.decision);
 const occurrenceIds = row => scheduleEntries(row).map(e => e.occurrenceId);
 const dueCount = rows => rows.flatMap(decisions).filter(decision => decision === 'Due').length;
 const slotEntries = row => row.settings.settings.find(setting => setting.name === 'watering_slots').result.value.entries;
+
+test('GFB20 combines keyed DailySlots and ordinary UTC Daily Ranges on native and WASM', async () => {
+  const mixedSource = source.replace('  output pump: Bool;', `  schedule fixed: Daily {
+    timezone = "UTC";
+    at = time\`09:00\`;
+    dst_missing = skip;
+    dst_repeated = first;
+    basis = range(10min);
+    when = true;
+    cancel_when = false;
+    clock = trusted_only;
+    gap = skip_after(60s);
+    recovery = baseline;
+    fallback = skip;
+  }
+  output fixed_pump: Bool;
+  fixed_pump <- fixed.active;
+  output pump: Bool;`);
+  const compilation = await compileSource(mixedSource, { filename: 'mixed-utc-ranges.ghost.md' });
+  assert.equal(Buffer.from(compilation.bytes).readUInt16LE(4), 20);
+  const times = [at0800 - minute, at0800, at0800 + 10 * minute, 9 * hour - minute, 9 * hour, 9 * hour + 10 * minute];
+  const { rows } = await run(times.map(time => ({ mono: time - times[0], wall: day + time })), { compilation });
+  assert.deepEqual(rows.map(row => row.accepted), times.map(() => true));
+  assert.deepEqual(rows.map(row => row.outcome.trace.safe.pump), [false, true, false, false, false, false]);
+  assert.deepEqual(rows.map(row => row.outcome.trace.safe.fixed_pump), [false, false, false, false, true, false]);
+});
 
 test('REF-03-081 retained key retime at 08:05 pauses then resumes same 08:07-08:17 Range without second due', async () => {
   const start = day + at0800;
