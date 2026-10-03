@@ -287,6 +287,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .ok_or("invalid or oversized frames")?;
     let mut previous = None;
     let mut observations = Vec::new();
+    let mut admissions = Vec::new();
     for frame in frames {
         let now = number(&frame["nowMs"])?;
         if previous.is_some_and(|before| now <= before) {
@@ -322,8 +323,75 @@ fn main() -> Result<(), Box<dyn Error>> {
                 LedgerRead::Unknown => return Err("rolling query is Unknown".into()),
             }
         }
+        if !frame["admission"].is_null() {
+            let request = &frame["admission"];
+            let limit = number(&request["limitMs"])?;
+            let reserve = number(&request["reserveMs"])?;
+            let sequence = number(&request["reservationId"])?;
+            if sequence == 0 {
+                return Err("reservation identity must be non-zero".into());
+            }
+            let retry = request["retry"].as_bool().ok_or("retry flag is required")?;
+            let selected = tape["manifest"]["accounting"]["constraints"]
+                .as_array()
+                .ok_or("missing source constraint")?
+                .iter()
+                .filter_map(|group| group["limits"].as_array())
+                .flatten()
+                .find(|limit| {
+                    limit["account"].as_str() == Some(account)
+                        && limit["basis"]["kind"] == "rolling"
+                })
+                .ok_or("missing source rolling constraint")?;
+            if selected["basis"]["durationMs"] != tape["windowMs"]
+                || selected["operator"] != "<="
+                || selected["persistence"] != "durable"
+                || selected["boundMs"] != request["limitMs"]
+                || selected["reserveMs"] != request["reserveMs"]
+                || selected["onUnknown"] != "block"
+            {
+                return Err("source rolling admission constraint mismatch".into());
+            }
+            let mut reservation = [0u8; 16];
+            reservation[..8].copy_from_slice(&sequence.to_le_bytes());
+            let before = ledger.snapshot_bytes()?;
+            let status =
+                match ledger.reserve_rolling(reservation, resource, now, window, limit, reserve) {
+                    Ok(AdmissionResult::Reserved) => "Inserted",
+                    Ok(AdmissionResult::Duplicate) => "Duplicate",
+                    Err(AccountingError::LimitExceeded) => "Rejected",
+                    Err(error) => return Err(error.into()),
+                };
+            let after = ledger.snapshot_bytes()?;
+            let unchanged = before == after;
+            // Test-host serialization round trip is explicit. Physical storage
+            // and the WASM adapter's durability acknowledgement remain separate.
+            ledger = AccountingLedger::restore(config, &after)?;
+            let retry_status = if retry {
+                Some(
+                    match ledger.reserve_rolling(reservation, resource, now, window, limit, reserve)
+                    {
+                        Ok(AdmissionResult::Reserved) => "Inserted",
+                        Ok(AdmissionResult::Duplicate) => "Duplicate",
+                        Err(AccountingError::LimitExceeded) => "Rejected",
+                        Err(error) => return Err(error.into()),
+                    },
+                )
+            } else {
+                None
+            };
+            let explanation = match ledger.explain_rolling(resource, now, window, limit, reserve) {
+                LedgerRead::Known(value) => value,
+                LedgerRead::Unknown => return Err("rolling admission is Unknown".into()),
+            };
+            admissions.push(json!({"nowMs":now,"status":status,"snapshotUnchanged":unchanged,
+                "retry":retry_status,"usedMs":explanation.used_ms,"reservedMs":explanation.reserved_ms}));
+        }
     }
     let mut result = json!({"moduleFingerprint":fingerprint,"account":account,"target":target,"stage":"applied","resourceId":resource,"observations":observations});
+    if !admissions.is_empty() {
+        result["admissionObservations"] = json!(admissions);
+    }
     if !tape["station"].is_null() {
         result["stationObservations"] = station_observations(&tape["station"])?;
     }
