@@ -1297,6 +1297,10 @@
     {
       "path": "tests/fixtures/issue-145-solar-config.ghost.md",
       "reason": "Canonical executable Solar/shared-config conformance fixture with deterministic recorded facts and event sequence; reader guidance and example are translated separately."
+    },
+    {
+      "path": "docs/reports/2026-10-03-stale-branch-reconciliation.md",
+      "reason": "Historical branch reconciliation report and execution evidence; reports may remain in their original language."
     }
   ]
 }
