@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### 2026-10-03 — retain signed reusable source closure ([#309](https://github.com/callin2/ghostflow-language/issues/309))
+
+Portable composition packages now retain their exact transitive pinned source closure. Previously signing omitted this provenance and verification tried to lower imports without their documents. Verification now recompiles the signed closure and compares complete bytecode, manifest and source-map identity before target admission; re-signed instance tampering rejects. REF-06-025 covers native/WASM instance isolation and effect-free replay from the verified package. Existing package format and plain-control replay policy remain unchanged.
+
 ### 2026-10-03 — complete dependency and ownership rejection context ([#301](https://github.com/callin2/ghostflow-language/issues/301))
 
 Restores Reference §6.6 diagnostic detail. Missing or wrong-revision imports now

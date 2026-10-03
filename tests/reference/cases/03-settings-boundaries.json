@@ -726,7 +726,7 @@
       "given": "재사용 가능한 behavior package를 검사한다.",
       "when": "composition provenance와 실행 경계를 감사한다.",
       "then": "exact definition closure, 분리된 instance, logical port, effect-free replay 연결이 모두 추적 가능하다.",
-      "reason": "현재 공개 ghostc CLI만으로 이 계층의 관찰 가능한 계약을 실행할 수 없어 후속 harness가 필요하다."
+      "reason": "Exact pinned closure, separate instance-qualified state and logical ports, signed package provenance rejection, and effect-free what-if replay are checked by tests/reuse-provenance-reference.test.mjs against native and framed WASM owners."
     },
     {
       "id": "REF-07-001",

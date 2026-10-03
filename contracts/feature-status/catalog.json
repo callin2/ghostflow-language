@@ -6869,6 +6869,95 @@
       "referenceCaseIds": [
         "REF-08-001"
       ]
+    },
+    {
+      "id": "reuse-provenance-reference",
+      "family": "Pinned reusable provenance and effect-free execution",
+      "clause": {
+        "path": "docs/reference/06-composition-and-replay.en.md",
+        "heading": "6.11 Design rationale and evidence"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/reuse-provenance-reference.test.mjs",
+              "testId": "REF-06-025 changed transitive documents and incomplete provenance reject before replay execution",
+              "caseId": "REF-06-025",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "negative"
+              ]
+            }
+          ]
+        },
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/reuse-provenance-reference.test.mjs",
+              "testId": "REF-06-025 exact transitive definition closure preserves separate instance state and logical-port provenance in native and WASM",
+              "caseId": "REF-06-025",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/reuse-provenance-reference.test.mjs",
+              "testId": "REF-06-025 effect-free what-if replay retains closure and branch identity without changing live reused instances",
+              "caseId": "REF-06-025",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/reuse-provenance-reference.test.mjs",
+              "testId": "REF-06-025 signed reusable package retains exact closure and logical capability bindings before effect-free execution",
+              "caseId": "REF-06-025",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Exact nested pinned source closure, separate east/west Boolean instance state, instance-qualified source observations and typed logical ports are verified in production native/framed-WASM outcomes and replay. Signed reusable packages retain closure and reject validly re-signed forged instance provenance before target validation; a verified package feeds the existing effect-free plain-control what-if host. Synthetic branch input changes east while west and live continuation remain independent. Logical virtual binding/capability identity is not hardware suitability, physical effect proof, Driver transport or a new replay/lifecycle policy."
+      ],
+      "issues": [
+        309
+      ],
+      "referenceCaseIds": [
+        "REF-06-025"
+      ]
     }
   ]
 }
