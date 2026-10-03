@@ -129,7 +129,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         .iter()
         .filter_map(|group| group["limits"].as_array())
         .flatten()
-        .find(|entry| entry["account"].as_str() == Some(account) && entry["basis"]["kind"] == "rolling")
+        .find(|entry| {
+            entry["account"].as_str() == Some(account) && entry["basis"]["kind"] == "rolling"
+        })
         .ok_or("missing source rolling constraint")?;
     if selected["basis"]["durationMs"] != tape["windowMs"]
         || selected["operator"] != "<="
@@ -164,33 +166,48 @@ fn main() -> Result<(), Box<dyn Error>> {
         let fresh = gf_accounting_create(config.0, config.1, config.2, config.3);
         let fresh_before = snapshot(fresh);
         let fresh_used = used(fresh, resource, reboot_now, window);
-        let fresh_admission = reserve(fresh, 2, resource, reboot_now, window, limit, reserve_ms, false)?;
+        let fresh_admission = reserve(
+            fresh, 2, resource, reboot_now, window, limit, reserve_ms, false,
+        )?;
         let fresh_after = snapshot(fresh);
         gf_accounting_destroy(fresh);
 
         let restored = gf_accounting_create(config.0, config.1, config.2, config.3);
-        let durable_bytes = durable["bytes"].as_array().ok_or("snapshot bytes missing")?;
+        let durable_bytes = durable["bytes"]
+            .as_array()
+            .ok_or("snapshot bytes missing")?;
         let durable_vec: Vec<u8> = durable_bytes
             .iter()
             .map(|v| Ok(u8::try_from(n(v)?)?))
             .collect::<Result<_, Box<dyn Error>>>()?;
-        checked(gf_accounting_restore(restored, durable_vec.as_ptr(), durable_vec.len()))?;
+        checked(gf_accounting_restore(
+            restored,
+            durable_vec.as_ptr(),
+            durable_vec.len(),
+        ))?;
         let restored_before = snapshot(restored);
         let restored_used = used(restored, resource, reboot_now, window);
-        let restored_block = reserve(restored, 3, resource, reboot_now, window, limit, reserve_ms, false)?;
+        let restored_block = reserve(
+            restored, 3, resource, reboot_now, window, limit, reserve_ms, false,
+        )?;
         let restored_after_block = snapshot(restored);
         let expiry_used = used(restored, resource, expiry_now, window);
-        let expiry_grant = reserve(restored, 4, resource, expiry_now, window, limit, reserve_ms, true)?;
+        let expiry_grant = reserve(
+            restored, 4, resource, expiry_now, window, limit, reserve_ms, true,
+        )?;
         let restored_after_expiry = snapshot(restored);
         gf_accounting_destroy(restored);
 
         let corrupt = gf_accounting_create(config.0, config.1, config.2, config.3);
         let mut damaged = durable_vec.clone();
         damaged[7] ^= 255;
-        let corrupt_restore_status = gf_accounting_restore(corrupt, damaged.as_ptr(), damaged.len());
+        let corrupt_restore_status =
+            gf_accounting_restore(corrupt, damaged.as_ptr(), damaged.len());
         let corrupt_before = snapshot(corrupt);
         let corrupt_used = used(corrupt, resource, reboot_now, window);
-        let corrupt_admission = reserve(corrupt, 5, resource, reboot_now, window, limit, reserve_ms, false)?;
+        let corrupt_admission = reserve(
+            corrupt, 5, resource, reboot_now, window, limit, reserve_ms, false,
+        )?;
         let corrupt_after = snapshot(corrupt);
         gf_accounting_destroy(corrupt);
 
