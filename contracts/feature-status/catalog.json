@@ -6275,6 +6275,49 @@
       "referenceCaseIds": [
         "REF-03-028"
       ]
+    },
+    {
+      "id": "clock-timer-domain-boundary",
+      "family": "Clock and elapsed timer domains preserve their admitted boundary",
+      "clause": {
+        "path": "docs/reference/03-time-and-schedules.en.md",
+        "heading": "3.1 Time values and clock domains"
+      },
+      "owner": "HOST",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/clock-timer-domain-boundary.test.mjs",
+              "testId": "REF-03-010: Unknown wall rollback cannot admit a fresh Solar occurrence while monotonic elapsed keeps an active five-minute run",
+              "caseId": "REF-03-010",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Conformance on the adopted Solar/config reference-host profile: actual monotonic timer stays active at elapsed120s despite Unknown ten-minute wall rollback. Fresh trusted admission control and strictly bounded held-clock expiry, source identity, full native/WASM outcome/checkpoint/settings parity and fresh replay are exercised. Caller-supplied clock facts do not implement NTP/RTC or Device clocks. State/timer control is adopted execution; deferred Schedule Run overlap semantics are not adopted."
+      ],
+      "issues": [
+        203
+      ],
+      "referenceCaseIds": [
+        "REF-03-010"
+      ]
     }
   ]
 }
