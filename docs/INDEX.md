@@ -58,6 +58,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/FRAMED-CONTROL-HOST.md](FRAMED-CONTROL-HOST.md) | Framed ControlRuntime adoption (D6) | md |
 | [docs/GFB5-SCHEDULE-PRELUDE.ko.md](GFB5-SCHEDULE-PRELUDE.ko.md) | GFB5 일정 서두 | md |
 | [docs/GFB5-SCHEDULE-PRELUDE.md](GFB5-SCHEDULE-PRELUDE.md) | GFB5 schedule prelude | md |
+| [docs/GHOST-TIMELINE.ko.md](GHOST-TIMELINE.ko.md) | 제한된 live timeline과 ghost rewind | md |
+| [docs/GHOST-TIMELINE.md](GHOST-TIMELINE.md) | Bounded live timeline and ghost rewind | md |
 | [docs/HOST-EVENT-ORDERING-CONTRACT.ko.md](HOST-EVENT-ORDERING-CONTRACT.ko.md) | Host 이벤트 순서 계약 | md |
 | [docs/HOST-EVENT-ORDERING-CONTRACT.md](HOST-EVENT-ORDERING-CONTRACT.md) | Host event ordering contract | md |
 | [docs/IMPLEMENTATION.ko.md](IMPLEMENTATION.ko.md) | 구현 및 아티팩트 경계 | md |
@@ -220,4 +222,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.ko.md](research/GF-COMPOSE-R9-ACCEPTANCE.ko.md) | GF-COMPOSE R9: acceptance와 구현 인계 | md |
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.md](research/GF-COMPOSE-R9-ACCEPTANCE.md) | GF-COMPOSE R9: acceptance and implementation handoff | md |
 
-186 documents.
+188 documents.

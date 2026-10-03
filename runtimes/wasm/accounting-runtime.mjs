@@ -160,14 +160,21 @@ export class AccountingRuntime {
     return this.#durableMutationResult(status, persist, 'accounting cancellation failed');
   }
 
-  async persistPending(persist) {
+  /** Captures actual ledger bytes without publishing or acknowledging them. */
+  snapshot() {
     this.#live();
-    if (typeof persist !== 'function') throw new TypeError('persist callback is required');
     this.#check(this.wasm.gf_accounting_snapshot(this.handle));
     const ptr = this.wasm.gf_accounting_snapshot_ptr(this.handle);
     const len = this.wasm.gf_accounting_snapshot_len(this.handle);
     const snapshot = new Uint8Array(this.wasm.memory.buffer, ptr, len).slice();
     const revision = this.wasm.gf_accounting_revision(this.handle);
+    return { bytes: snapshot, revision };
+  }
+
+  async persistPending(persist) {
+    this.#live();
+    if (typeof persist !== 'function') throw new TypeError('persist callback is required');
+    const { bytes: snapshot, revision } = this.snapshot();
     if (await persist(snapshot, revision) !== true) throw new Error('accounting snapshot was not durably acknowledged');
     this.#check(this.wasm.gf_accounting_ack_persisted(this.handle, revision));
     return { snapshot, revision };

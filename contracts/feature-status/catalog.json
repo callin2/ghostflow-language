@@ -6065,6 +6065,75 @@
       "referenceCaseIds": [
         "REF-08-008"
       ]
+    },
+    {
+      "id": "ghost-timeline-noninterference",
+      "family": "Actual live timeline and durable accounting owners remain isolated from ghost execution and rewind",
+      "clause": {
+        "path": "docs/reference/06-composition-and-replay.en.md",
+        "heading": "6.8 Replay, ghost, and branches"
+      },
+      "owner": "HOST",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/ghost-timeline-noninterference.test.mjs",
+              "testId": "REF-06-018 actual live occurrence and durable ledger remain unchanged through ghost execution and rewind",
+              "caseId": "REF-06-018",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/ghost-timeline-noninterference.test.mjs",
+              "testId": "REF-06-018 rejected ghost requests and immutable caller copies preserve original owners and reusable branch baseline",
+              "caseId": "REF-06-018",
+              "assertionClass": "rollback",
+              "targets": [
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/ghost-timeline-noninterference.test.mjs",
+              "testId": "REF-06-018 source bound durable timeline rejects missing corrupt persistence and invalid live bindings",
+              "caseId": "REF-06-018",
+              "assertionClass": "rollback",
+              "targets": [
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Implemented bounded Node reference timeline owner for same-source GFB10 Periodic/settings and caller-validated applied/durable ledger. Live sink positive dispatch, real native/framed outcomes and occurrence IDs, actual in-memory ledger bytes/revision and FileLedger storage prove ghost/rewind isolation. No physical actuation/authenticity, Range/DST, installation or publishing identity issuer, production Device integration or environmental prediction."
+      ],
+      "issues": [
+        303
+      ],
+      "referenceCaseIds": [
+        "REF-06-018"
+      ]
     }
   ]
 }

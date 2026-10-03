@@ -113,6 +113,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/FRAMED-CONTROL-HOST.md](docs/FRAMED-CONTROL-HOST.md) | Framed ControlRuntime adoption (D6) | md |
 | [docs/GFB5-SCHEDULE-PRELUDE.ko.md](docs/GFB5-SCHEDULE-PRELUDE.ko.md) | GFB5 일정 서두 | md |
 | [docs/GFB5-SCHEDULE-PRELUDE.md](docs/GFB5-SCHEDULE-PRELUDE.md) | GFB5 schedule prelude | md |
+| [docs/GHOST-TIMELINE.ko.md](docs/GHOST-TIMELINE.ko.md) | 제한된 live timeline과 ghost rewind | md |
+| [docs/GHOST-TIMELINE.md](docs/GHOST-TIMELINE.md) | Bounded live timeline and ghost rewind | md |
 | [docs/HOST-EVENT-ORDERING-CONTRACT.ko.md](docs/HOST-EVENT-ORDERING-CONTRACT.ko.md) | Host 이벤트 순서 계약 | md |
 | [docs/HOST-EVENT-ORDERING-CONTRACT.md](docs/HOST-EVENT-ORDERING-CONTRACT.md) | Host event ordering contract | md |
 | [docs/IMPLEMENTATION.ko.md](docs/IMPLEMENTATION.ko.md) | 구현 및 아티팩트 경계 | md |
@@ -471,4 +473,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-351 documents.
+353 documents.
