@@ -108,3 +108,22 @@ Unknown이다. host는 최초 설치용 `initializeEmpty`로 이 이력을 지�
 source-bound WASM adapter는 전체 snapshot 및 admission 결과가 일치한다.
 재부팅을 가로지르는 비교 가능한 monotonic timeline은 caller의 책임이다.
 이 선택된 프로필은 window 만료 후 자동 reset이나 non-durable 프로필을 채택하지 않는다.
+
+## Local-day 적합성 test transport (REF-03-048)
+
+범위가 제한된 test host는 설치된 Intl timezone 자료로 서울 자정을 해석하고
+최종 applied 구간을 분할한다. 독립적인 Automatic/Manual 논리 pump 요청은
+공급된 하나의 resource identity에 연결한다. 요청은 물리 적용의 증거가 아니다.
+ledger는 겹치는 applied 구간을 한 번만 합산한다. 23:50–00:10은 각 local day에
+10분씩, 별도의 rolling 24시간 query에는 20분을 기록한다.
+
+test 전용 `accounting_tape`는 명시적인 segment day tag, 제한된 day query,
+선택적인 전체 record checkpoint를 지원한다. test 전용
+`accounting_local_day_tape`는 production C ABI를 연결해 전체 status,
+checkpoint bytes, revision과 known/Unknown query를 WASM과 비교한다.
+동일 receipt 재전달은 사용량과 checkpoint를 바꾸지 않는다. 잘못된 applied
+구간은 primitive ledger를 변경하지 않지만, production C ABI는 보수적으로
+이력을 Unknown으로 표시하고 revision을 증가시킨다. retry하려면 저장된
+신뢰할 수 있는 checkpoint를 명시적으로 복원해야 하며, 사용량을 자동으로
+초기화하지 않는다. 이 transport는 production clock/binding provider,
+receipt 인증 또는 물리 저장·적용의 검증을 제공하지 않는다.

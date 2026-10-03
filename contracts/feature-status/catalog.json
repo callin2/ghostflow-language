@@ -6754,6 +6754,50 @@
       "referenceCaseIds": [
         "REF-06-015"
       ]
+    },
+    {
+      "id": "local-day-applied-reference",
+      "family": "Trusted Seoul day split and shared applied resource accounting",
+      "clause": {
+        "path": "docs/reference/03-time-and-schedules.en.md",
+        "heading": "3.10 Time-based usage constraints"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/reference-03-048-local-day-accounting.test.mjs",
+              "testId": "REF-03-048: Seoul midnight applied pump interval is split per local day and unioned once across overlapping controls",
+              "caseId": "REF-03-048",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Actual installed Intl data resolves the trusted Seoul midnight split. Independent compiled Automatic/Manual logical pump requests match complete native/framed-WASM outcomes; a bounded test-host binding supplies one physical resource ID and separate final-applied receipts. Production Rust ledger unions overlap to 10min/day and a separate 20min rolling24h result. Full primitive record/checkpoint and production C ABI status/revision/checkpoint/query parity, restored duplicate suppression, conservative invalid-interval Unknown and explicit trusted-checkpoint recovery/retry are tested. Native primitive rejection is atomic; production C ABI intentionally invalidates history on bad applied evidence. This is a trusted test host, not production clock/binding resolution, receipt authenticity, physical application/storage proof, resource arbitration, general day-budget syntax coverage or closure of broader #96."
+      ],
+      "issues": [
+        227
+      ],
+      "referenceCaseIds": [
+        "REF-03-048"
+      ]
     }
   ]
 }

@@ -124,3 +124,23 @@ from `(0,28]`, so the 5-second reserve fits exactly. The native
 agree on these complete snapshots and admission outcomes. The caller owns the
 comparable monotonic timeline across reboot. This selected profile does not
 adopt automatic reset after window expiry or a non-durable profile.
+
+## Local-day conformance transport (REF-03-048)
+
+The bounded test host resolves Seoul midnight through installed Intl timezone
+data, splits final applied intervals, and binds independent Automatic/Manual
+logical pump requests to one supplied resource identity. Requests do not prove
+physical application. The ledger unions overlapping applied intervals once:
+23:50–00:10 contributes ten minutes to each local day and twenty minutes to a
+separate rolling 24-hour query.
+
+The test-only `accounting_tape` supports explicit segment day tags, bounded day
+queries and optional complete record checkpoints. The test-only
+`accounting_local_day_tape` links the production C ABI and compares full status,
+checkpoint bytes, revisions and known/Unknown queries against WASM. Exact receipt
+redelivery leaves usage and checkpoints unchanged. An invalid applied interval
+does not mutate the primitive ledger, but the production C ABI conservatively
+marks its history Unknown and advances its revision. Retry requires explicit
+restoration of the saved trusted checkpoint; it does not silently reset usage.
+These transports supply no production clock/binding provider, receipt
+authentication or physical storage/application certification.
