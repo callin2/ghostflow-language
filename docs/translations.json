@@ -194,8 +194,8 @@
       "source": "docs/CONTEXT-EXECUTION-ABI.md",
       "sourceLanguage": "en",
       "translation": "docs/CONTEXT-EXECUTION-ABI.ko.md",
-      "sourceSha256": "01df0bd3a50050979c9b31a29726ec4e53a0f637a8c32526105ddb99b1454e58",
-      "translationSha256": "8568656caab83cc6237ef892e4395df2246f765257d66324c92f0f346a6fc2e3"
+      "sourceSha256": "2446a5c7d52ecf988ef071b28ddcce82473b5e2f5002ad05d42bc57016883fbd",
+      "translationSha256": "542d4b19bc92d77907101698e4e4ee239b48e2bd5f23acb2665c89a5db8996e6"
     },
     {
       "source": "docs/CONTINUOUS-BOOL-TIMER-CONTRACT.md",

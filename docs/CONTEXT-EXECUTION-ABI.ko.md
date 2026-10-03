@@ -211,6 +211,26 @@ source-day terminal identity와 현재 config Result를 유지하고 새 기준�
 
 ## 증거
 
+테스트 전용 native `context_tape`의 `context-tide-v1` 프로필은 유한한 Tide
+binding과 명시적인 high/low event ID를 가진 provider 관측을 받는다. 다른
+프로필의 guard는 분리되어 유지되며 Moon/calendar binding과 natural provider
+rail은 허용하지 않는다. admission은 공통 core가 담당한다. native record는
+전체 outcome, source/settings 상태와 context checkpoint를 노출하고, facts가
+거부되면 retry를 위한 기존 journal/checkpoint 증거를 보존한다.
+
+REF-03-029는 같은 두 schedule site의 컴파일된 Tide source를 native와 framed
+WASM에서 비교한다. E는 1000ms에 admit된다. provider/context revision을 바꾸고
+planned time을 2000ms로 옮겨도 기존 monotonic Run의 Active 관측은 실제 admit된
+occurrence ID, 원래 revision과 1000ms planned time을 유지한다. 두 schedule 모두
+추가 Due를 내지 않는다. Run 종료 후 2500ms에 수정된 E를 다시 관측해도 두 run
+counter는 1이다. 현재 core는 terminal Tide ID의 후속 context 관측을 생략하므로
+이 증거는 `AlreadyAdmitted`나 `AlreadyTerminal` disposition을 만들어내지 않는다.
+3000ms의 새 E2는 서로 다른 두 source schedule site에서 독립적으로 admit된다.
+전체 outcome/state와 checkpoint parity, 동일 프로그램 checkpoint replay,
+위조 binding 거부와 유효 retry를 검사한다. context restore는 일반 VM state나
+active Run을 복원하지 않는다. provider facts는 호출자가 제공하며 provider
+진위, 물리 출력, production transport나 새로운 일반 Run 정책은 주장하지 않는다.
+
 `context_runtime_tests`는 보호 입력, 공급자 일관성, VM 실패 롤백, 설정 재시도 및
 식별자 제한 영속 복원을 실행한다. `context_abi` 테스트는 패킷 거부를 다룬다.
 종류별 경계 테스트는 `context_schedule`, `natural_context`, `work_calendar` 및

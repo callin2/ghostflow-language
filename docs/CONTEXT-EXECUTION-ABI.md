@@ -218,6 +218,27 @@ existing profile, not an implicit fallback. See the
 
 ## Evidence
 
+The test-only native `context_tape` profile `context-tide-v1` accepts bounded
+Tide bindings and finite provider observations with explicit high/low event IDs.
+Other profile guards remain separate; this profile accepts neither Moon/calendar
+bindings nor natural-provider rails. The shared core owns admission. Native
+records expose complete outcomes, source/settings state and context checkpoints,
+including retained journal/checkpoint evidence after rejected facts for retry.
+
+REF-03-029 compares the same compiled two-site Tide source in native and framed
+WASM. Event E admits at 1000ms. Correcting provider/context revisions and moving
+its planned time to 2000ms retains the actual admitted occurrence ID, original
+revisions and 1000ms planned time while the existing monotonic Run is Active;
+neither schedule emits another Due. After that Run ends, a corrected E scan at
+2500ms leaves both run counters at one. The current core omits terminal Tide
+IDs from later context observations; this evidence does not invent a literal
+`AlreadyAdmitted` or `AlreadyTerminal` disposition. Fresh E2 at 3000ms admits
+independently at both distinct source schedule sites. Full outcome/state and
+checkpoint parity, matching-program checkpoint replay, forged binding rejection
+and valid retry are checked. Context restoration does not restore general VM
+state or active Runs. Provider facts are caller supplied; no provider authenticity,
+physical output, production transport or new generic Run policy is claimed.
+
 `context_runtime_tests` exercises protected inputs, shared-provider consistency,
 VM-failure rollback, settings retry and identity-fenced durable restore.
 `context_abi` tests cover packet rejection. Kind-specific boundary tests live in
