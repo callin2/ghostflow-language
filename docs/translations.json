@@ -152,8 +152,8 @@
       "source": "docs/ACCOUNTING-LEDGER-ABI.md",
       "sourceLanguage": "en",
       "translation": "docs/ACCOUNTING-LEDGER-ABI.ko.md",
-      "sourceSha256": "62512ea7c2d4dc88c804fe6f30baa6ab2f65e4fca05d7fd477848dddb0a42009",
-      "translationSha256": "1b0fd61bdce1123913ac30883e9de94c5d168be10c2a0c83b5ceac65ce882228"
+      "sourceSha256": "1a3addcdc95704ec96eb3a4cf89720fc27f9aceba99583802bbc07f8009d64e8",
+      "translationSha256": "b00d367469a6ba4b3cf6a7002d5b8d78682e9323d92689d01543e1c2692556ae"
     },
     {
       "source": "docs/AFTER-EVENT-WASM-ABI.md",
@@ -362,8 +362,8 @@
       "source": "docs/PORTABLE-PACKAGE.md",
       "sourceLanguage": "en",
       "translation": "docs/PORTABLE-PACKAGE.ko.md",
-      "sourceSha256": "b94fca14e4ae81fb225cd6913971e9ed07143210fa1a4c0a18c031667e55c308",
-      "translationSha256": "684391e33802143faffc270fa4008f995f3325dfdf7cda1add7293fdc5076f9e"
+      "sourceSha256": "f864216237f6b90342971d48d2195604cf1ae38c98c6f5ac52280eb264258cab",
+      "translationSha256": "de6e21bdb7d8e56aeade7cfe99ba61e83000dd133b1ef91342bc77a80b14cb71"
     },
     {
       "source": "docs/ProgrammingInGhostflow.md",
@@ -614,8 +614,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "df99010d91b53126ab58f2c8cf063a801a51833212d96742ae32b9f8ccea0c6c",
-      "translationSha256": "ecb2a0a2d5dd10521d5c4b3bc22fbd349092ae24e6214bb13ba54b1659165a90"
+      "sourceSha256": "0e7961bee9345315e45c3bdfb88dd7d09a23e97172ea92254a1929735473e920",
+      "translationSha256": "d0931b464ace0aa75e0e68cce9a3fb8eac27c9cf3cbc861ef1d810a6534e8028"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",
