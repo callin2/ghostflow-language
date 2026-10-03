@@ -6875,7 +6875,7 @@
       "family": "Program-bound ordinary settings and typed fresh defaults",
       "clause": {
         "path": "docs/reference/05-settings-and-observation.en.md",
-        "heading": "5.1 Config declarations"
+        "heading": "5.1 `config` declarations"
       },
       "owner": "CORE",
       "maturity": "EXPERIMENTAL",
