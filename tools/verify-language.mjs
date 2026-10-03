@@ -106,6 +106,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/compiler-schedule-duplicates.test.mjs',
   'tests/daily-slots-policy.test.mjs',
   'tests/periodic-cron-policy.test.mjs',
+  'tests/civil-dst-reference.test.mjs',
   'tests/natural-condition-contract.test.mjs',
   'tests/natural-schedule-contract.test.mjs',
   'tests/natural-fallback-compiler.test.mjs',
