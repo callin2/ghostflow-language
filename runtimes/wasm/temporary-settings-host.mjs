@@ -125,7 +125,7 @@ export class TemporarySettingsHost {
       || new Set(b.overlays.map(o=>o.overlayId)).size!==b.overlays.length
       || !/^(?:[0-9a-f]{2})+$/.test(b.core?.checkpoint ?? '')) fail('checkpoint identity or bounds');
     const seen=new Set(), covered=new Set();
-    const completedRuns=new Set(),openOverlays=new Set();let previousRun=null,previousPosition=0;
+    const completedRuns=new Set(),openOverlays=new Set(),ordinaryReplay=clone(this.#ordinary);let previousRun=null,previousPosition=0;
     for(const [index,h] of b.history.entries()){
       shape(h,['eventId','runId','settingsRevision','applicationPosition','actor','reason','effects','request']);
       if(!text(h.eventId)||!text(h.runId)||!text(h.actor)||!text(h.reason)
@@ -172,6 +172,7 @@ export class TemporarySettingsHost {
           for(const c of e.changes){shape(c,['configId','result','returnResult']);
             if(!e.grantSnapshot.includes(c.configId))fail('checkpoint history creation permission binding');
             payload(this.#config(c.configId),c.result);payload(this.#config(c.configId),c.returnResult);}
+          for(const c of e.changes)if(!equal(c.returnResult,ordinaryReplay.find(item=>item.configId===c.configId)?.result))fail('checkpoint captured ordinary value binding');
           if(!equal(e.changes.map(c=>c.configId),request.changes.map(c=>c.configId)))fail('checkpoint temporary target binding');
           for(const [i,c] of e.changes.entries()){
             const requested=request.changes[i].result;
@@ -182,12 +183,23 @@ export class TemporarySettingsHost {
           }
           if(openOverlays.has(e.overlayId))fail('checkpoint history duplicate creation');openOverlays.add(e.overlayId);
         }else if(e.kind==='ordinary'){
-          shape(e,['kind','targets','requestedChanges']);
+          shape(e,['kind','targets','requestedChanges','committedChanges']);
           if(!equal(e.requestedChanges,request.changes))fail('checkpoint ordinary request payload binding');
           if(!Array.isArray(e.targets)||!e.targets.length||e.targets.length>this.#configs.length
             ||new Set(e.targets).size!==e.targets.length)fail('checkpoint history target provenance');
           for(const id of e.targets)this.#config(id);
           if(!equal(e.targets,request?.changes?.map(c=>c.configId)))fail('checkpoint ordinary target binding');
+          if(!Array.isArray(e.committedChanges)||!equal(e.committedChanges.map(c=>c.configId),e.targets))fail('checkpoint ordinary commit target binding');
+          for(const [i,c] of e.committedChanges.entries()){
+            shape(c,['configId','result']);const requested=request.changes[i].result;
+            if(c.result.ok){payload(this.#config(c.configId),c.result);payload(this.#config(c.configId),requested);
+              if(!requested.type.startsWith('TimeSlots<')){if(!equal(c.result,requested))fail('checkpoint ordinary committed value binding');}
+              else if(c.result.value.entries.length!==requested.value.entries.length||c.result.value.entries.some((row,j)=>{
+                const old=requested.value.entries[j];return row.minuteOfDay!==old.minuteOfDay||old.key!==0&&row.key!==old.key||row.key===0;
+              }))fail('checkpoint ordinary committed row binding');
+            }else{shape(c.result,['ok','fault']);if(c.result.ok!==false||!['SettingsInvalid','SettingsUnavailable'].includes(c.result.fault))fail('checkpoint ordinary committed fault provenance');}
+            ordinaryReplay.find(item=>item.configId===c.configId).result=clone(c.result);
+          }
         }else{
           shape(e,['kind','overlayId','returnTarget','returnValues','creationEvent','effectiveResults','returnDisposition']);
           if(!['cancel','expiry','run-ended','ordinary-replacement'].includes(e.kind)||!text(e.overlayId)||e.creationEvent!==e.overlayId
@@ -200,6 +212,7 @@ export class TemporarySettingsHost {
           const created=creation.effects.find(effect=>effect.kind==='temporary'&&effect.overlayId===e.overlayId);
           if(e.kind==='expiry'&&created.lifetime.kind!=='Until'||e.kind==='run-ended'&&created.lifetime.kind!=='Run')fail('checkpoint return lifetime binding');
           if(!equal(e.returnTarget,created.changes.map(c=>c.configId))||!equal(e.returnValues,created.changes.map(c=>c.returnResult)))fail('checkpoint history original return binding');
+          if(!equal(e.returnValues,e.returnTarget.map(id=>ordinaryReplay.find(item=>item.configId===id).result)))fail('checkpoint return ordinary layer binding');
           if(!openOverlays.delete(e.overlayId))fail('checkpoint history duplicate return binding');
           for(const [i,id] of e.returnTarget.entries()){
             payload(this.#config(id),e.returnValues[i]);shape(e.effectiveResults[i],['configId','result']);
@@ -207,6 +220,7 @@ export class TemporarySettingsHost {
             const result=e.effectiveResults[i].result;
             if(result.ok)payload(this.#config(id),result);
             else{shape(result,['ok','fault']);if(result.ok!==false||!['SettingsInvalid','SettingsUnavailable'].includes(result.fault))fail('checkpoint history fault provenance');}
+            ordinaryReplay.find(item=>item.configId===id).result=clone(result);
           }
           const fault=e.effectiveResults.some(item=>!item.result.ok);
           if(fault!==(e.returnDisposition==='fault-emission')
@@ -216,6 +230,7 @@ export class TemporarySettingsHost {
       }
     }
     if(!equal([...openOverlays].sort(),b.overlays.map(o=>o.overlayId).sort()))fail('checkpoint history active overlay binding');
+    if(!equal(ordinaryReplay,b.ordinary))fail('checkpoint ordinary history state binding');
     for(const item of b.ordinary){if(seen.has(item.configId))fail('checkpoint setting duplication');seen.add(item.configId);this.#config(item.configId);
       if(item.result.ok)payload(this.#config(item.configId),item.result);
       else if(!['SettingsInvalid','SettingsUnavailable'].includes(item.result.fault))fail('checkpoint ordinary fault');}
@@ -358,6 +373,7 @@ export class TemporarySettingsHost {
       effect.effectiveResults=effect.returnTarget.map(id=>({configId:id,result:this.#typed(effective.settings.find(c=>c.id===id))}));
       effect.returnDisposition=effect.effectiveResults.some(c=>!c.result.ok)?'fault-emission':event?.kind==='ordinary'?'superseded-by-ordinary':'returned';
     }
+    for(const effect of effects)if(effect.kind==='ordinary')effect.committedChanges=effect.targets.map(id=>({configId:id,result:this.#typed(effective.settings.find(c=>c.id===id))}));
     // Accepted ordinary invalid payloads retain the core's aggregate Result
     // fault semantics. Temporary values were validated before this evaluation.
     for(const item of ordinary)if(!overlays.some(o=>o.changes.some(c=>c.configId===item.configId)))item.result=this.#typed(effective.settings.find(c=>c.id===item.configId));

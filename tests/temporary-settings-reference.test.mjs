@@ -223,6 +223,11 @@ test('REF-05-018 invalid ordinary replacement removes the entire overlay atomica
   assert.ok(invalid.snapshot.core.state.settings.every(c=>c.result.ok===false&&c.result.fault==='SettingsInvalid'));
   assert.equal(invalid.snapshot.history.at(-1).effects[0].returnDisposition,'fault-emission');
   assert.deepEqual([invalid.outcome.vm.safe.duration_ms,invalid.outcome.vm.safe.duty_pct],[0,0]);
+  const faultRestore=await create(artifact,{runId:'fault-restore',boot:2,checkpoint:h.checkpoint(),restoreApproved:true});
+  try{assert.ok(faultRestore.snapshot().ordinary.every(c=>!c.result.ok));
+   const recovered=faultRestore.step(packet(0,0,{boot:2}),event(faultRestore,'ordinary','restored-fault-recovery',[typed(artifact,'duration',420000),typed(artifact,'duty',50)]));
+   assert.deepEqual([recovered.outcome.vm.safe.duration_ms,recovered.outcome.vm.safe.duty_pct],[420000,50]);
+  }finally{faultRestore.dispose();}
   unchanged(h,()=>h.step(packet(2),event(h,'temporary','fault-return',[typed(artifact,'duration',420000)],{lifetime:{kind:'Run'}})),/envelope|return validity/);
   const retry=h.step(packet(2),event(h,'ordinary','valid-ordinary-recovery',[typed(artifact,'duration',420000),typed(artifact,'duty',50)]));
   assert.equal(retry.accepted,true);assert.deepEqual([retry.outcome.vm.safe.duration_ms,retry.outcome.vm.safe.duty_pct],[420000,50]);assert.equal(retry.snapshot.core.state.settingsRevision,3);
@@ -239,7 +244,7 @@ test('REF-05-018 approved digest-correct restore revalidates every overlay prove
   const invalid=structuredClone(saved);change(invalid.body.overlays[0]);invalid.sha256=sha256Hex(canonicalJson(invalid.body));
   await assert.rejects(create(artifact,{runId:'new-run',boot:2,checkpoint:invalid,restoreApproved:true}),/provenance|permission|envelope|binding/);
  }
- for(const change of [b=>{b.overlays[0].permissions.reverse();},b=>{b.history[0].actor='';},b=>{b.history[0].reason=42;},b=>{b.history[0].settingsRevision=99;},b=>{b.history[0].applicationPosition=99;},b=>{b.history[0].effects=[{kind:'forged'}];},b=>{b.history[0].effects[0].targets=[999];},b=>{b.history[1].effects[0].grantSnapshot=[];},b=>{delete b.history[1].request.lifetime;},b=>{b.history[1].request.lifetime.dateTimeMs=6000;},b=>{b.history[1].request.changes[0].result.value=660000;},b=>{b.history[0].request.changes[0].result.value=480000;}]){
+ for(const change of [b=>{b.overlays[0].permissions.reverse();},b=>{b.history[0].actor='';},b=>{b.history[0].reason=42;},b=>{b.history[0].settingsRevision=99;},b=>{b.history[0].applicationPosition=99;},b=>{b.history[0].effects=[{kind:'forged'}];},b=>{b.history[0].effects[0].targets=[999];},b=>{b.history[1].effects[0].grantSnapshot=[];},b=>{delete b.history[1].request.lifetime;},b=>{b.history[1].request.lifetime.dateTimeMs=6000;},b=>{b.history[1].request.changes[0].result.value=660000;},b=>{b.history[0].request.changes[0].result.value=480000;},b=>{b.history[0].request.changes[0].result.value=480000;b.history[0].effects[0].requestedChanges[0].result.value=480000;},b=>{b.history[0].request.changes[0].result.value=480000;b.history[0].effects[0].requestedChanges[0].result.value=480000;b.history[0].effects[0].committedChanges[0].result.value=480000;}]){
   const invalid=structuredClone(saved);change(invalid.body);invalid.sha256=sha256Hex(canonicalJson(invalid.body));
   await assert.rejects(create(artifact,{runId:'new-run',boot:2,checkpoint:invalid,restoreApproved:true}),/provenance|permission|envelope|binding|identity/);
  }
