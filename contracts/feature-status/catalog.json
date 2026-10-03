@@ -6629,6 +6629,65 @@
       "referenceCaseIds": [
         "REF-03-027"
       ]
+    },
+    {
+      "id": "civil-dst-reference",
+      "family": "Explicit civil DST gap and fold occurrence conformance",
+      "clause": {
+        "path": "docs/reference/03-time-and-schedules.en.md",
+        "heading": "3.8 DST, midnight and work calendars"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/civil-dst-reference.test.mjs",
+              "testId": "REF-03-039 resolves New York spring gap and fall fold through Intl rows while Rust owns occurrence decisions",
+              "caseId": "REF-03-039",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/civil-dst-reference.test.mjs",
+              "testId": "REF-03-039 rejects malformed civil rows atomically so retry can still consume the occurrence once",
+              "caseId": "REF-03-039",
+              "assertionClass": "rollback",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "One exact compiled Cron source declares both missing-time and all four repeated-time policies. Bounded trusted test host resolves 2026 New York 02:30 spring gap/01:30 fall fold from installed Intl timezone data and checked manifest policies; production Rust validates supplied civil facts and owns decisions/terminal identity. Complete native/framed-WASM outcomes/settings/context checkpoints, fresh replay, restored deduplication and three invalid-fold atomic rejection/retry cases agree. Intl version provenance is actual process metadata. Host civil resolution is test-only, not a production timezone provider or physical verification; context-only restore does not restore arbitrary VM state."
+      ],
+      "issues": [
+        223
+      ],
+      "referenceCaseIds": [
+        "REF-03-039"
+      ]
     }
   ]
 }
