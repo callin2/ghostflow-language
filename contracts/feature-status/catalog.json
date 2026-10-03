@@ -6453,6 +6453,64 @@
       "referenceCaseIds": [
         "REF-03-019"
       ]
+    },
+    {
+      "id": "tide-occurrence-identity",
+      "family": "Tide provider correction preserves admitted occurrence identity",
+      "clause": {
+        "path": "docs/reference/03-time-and-schedules.en.md",
+        "heading": "3.5 Common Schedule semantics"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/tide-occurrence-identity.test.mjs",
+              "testId": "REF-03-029 Tide provider correction keeps admitted occurrence identity and separate schedules independent",
+              "caseId": "REF-03-029",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/tide-occurrence-identity.test.mjs",
+              "testId": "REF-03-029 native and WASM reject forged Tide bindings atomically and retry without duplicate admission",
+              "caseId": "REF-03-029",
+              "assertionClass": "rollback",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Same compiled Tide Run source executes at two distinct stable schedule sites. Actual Due E at1000 retains admitted ID and original revisions/planned time as Active after provider/context/time correction; terminal E cannot readmit at2500, fresh E2 admits at3000. Full native/framed WASM outcomes/source-settings/context checkpoints, restore replay and forged-binding atomic rejection/retry agree. Core omits later terminal Tide observations; no literal AlreadyAdmitted/AlreadyTerminal disposition is manufactured. Caller-supplied finite provider facts and context-only restoration do not establish authenticated predictions, general VM-state restoration, production transport, physical output or generic Run policy."
+      ],
+      "issues": [
+        218
+      ],
+      "referenceCaseIds": [
+        "REF-03-029"
+      ]
     }
   ]
 }
