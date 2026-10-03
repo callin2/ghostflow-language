@@ -190,6 +190,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/core-irrigation-proof.test.mjs',
   'tests/pc-01-projection-sync.test.mjs',
   'tests/integration-contract.test.mjs',
+  'tests/software-input-reference.test.mjs',
   'tests/interaction-contract.test.mjs',
   'tests/interaction-counter.test.mjs',
   'tests/interaction-corpus.test.mjs',
