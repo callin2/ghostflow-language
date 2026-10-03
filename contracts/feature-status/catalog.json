@@ -6798,6 +6798,77 @@
       "referenceCaseIds": [
         "REF-03-048"
       ]
+    },
+    {
+      "id": "cancellation-boundary-reference",
+      "family": "Authored cancellation sequence and external home feedback boundary",
+      "clause": {
+        "path": "docs/reference/08-language-runtime-and-device-boundaries.en.md",
+        "heading": "8.1 Classification principle: meaning and execution means"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/cancellation-boundary-reference.test.mjs",
+              "testId": "REF-08-001 existing enum state and case close sequential valve intents on cancellation then wait for supplied home feedback before Idle",
+              "caseId": "REF-08-001",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/cancellation-boundary-reference.test.mjs",
+              "testId": "REF-08-001 cancellation priority applies independently in each watering stage without introducing a cancellation keyword or hidden Driver sequence",
+              "caseId": "REF-08-001",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/cancellation-boundary-reference.test.mjs",
+              "testId": "REF-08-001 missing or mistyped home feedback and backward time reject atomically and valid retry matches clean native WASM replay",
+              "caseId": "REF-08-001",
+              "assertionClass": "rollback",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "negative",
+                "positive"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "The exact FAQ cancellation requirement is expressed by existing enum/state/case, with authored cancellation priority and a distinct Returning stage. Both logical valve intents close on cancellation, a return intent remains until supplied home feedback, and Idle follows on a later tick. Complete native/framed-WASM outcomes and fresh replay agree; missing/mistyped feedback and backward-time rejection preserve committed state/intent and valid retry equals clean replay. Feedback is a typed external Bool input supplied by a Driver/host, not inferred from intent. This does not prove physical closure, movement, feedback authenticity/quality or a generic cancellation lifecycle; no new keyword or runtime policy is adopted."
+      ],
+      "issues": [
+        318
+      ],
+      "referenceCaseIds": [
+        "REF-08-001"
+      ]
     }
   ]
 }
