@@ -150,6 +150,46 @@ test('GF-TEST-portable-package: deterministic package preserves exact literate, 
   assert.equal(verified.bytecode.copy()[0], 0x47, 'each bytecode copy is detached from verified state');
 });
 
+test('GF-TEST-portable-package-solar: verified source trace accepts compiler-owned schedule input bindings', async () => {
+  const source = `# Solar package
+
+\`\`\`ghost
+control SolarPackage {
+  input start: Bool;
+  schedule morning: Solar {
+    timezone = "Asia/Seoul";
+    latitude = 33.3803475;
+    longitude = 126.5482545;
+    at = sun\`rise + 1h\`;
+    fallback = skip;
+  }
+  output pump: Bool;
+  pump <- start || morning.due;
+}
+\`\`\`
+`;
+  const compilation = await compileSource(source, { filename: 'solar-package.ghost.md' });
+  const current = await currentKeyPromise;
+  const solarIdentity = {
+    ...identity,
+    requiredCapabilities: [
+      { kind: 'actuator', name: 'pump', type: 'bool' },
+      { kind: 'input', name: 'start', type: 'bool' },
+    ],
+  };
+  const packageValue = await buildPortablePackage(compilation, solarIdentity, buildOptions([
+    { keyId: current.keyId, privateKey: current.privateKey },
+  ]));
+  const verified = await verifyPortablePackage(packageValue, {
+    ...verifierOptions(current),
+    supportedManifestFormats: ['GhostFlow/control-v3'],
+    availableCapabilities: solarIdentity.requiredCapabilities,
+  });
+  assert.equal(verified.manifest.schedules[0].name, 'morning');
+  assert.ok(verified.sourceMap.traceMetadata.bindings.some(binding =>
+    binding.kind === 'schedule' && binding.name === '__gf_schedule_due_morning'));
+});
+
 test('GF-TEST-portable-package-intent-map: a re-signed replacement source map still fails strict intent provenance recovery', async () => {
   const source = `<!-- ghostflow:anchor id=GF-INT-PUMP-001 kind=intent status=confirmed origin=user -->
 펌프를 켜 주세요.
