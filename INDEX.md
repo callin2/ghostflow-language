@@ -171,6 +171,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/SEPARATION-VALIDATION.md](docs/SEPARATION-VALIDATION.md) | Language project separation verification | md |
 | [docs/SOLAR-CONFIG-EXECUTION.ko.md](docs/SOLAR-CONFIG-EXECUTION.ko.md) | 공유 live 설정을 사용하는 Solar 실행 | md |
 | [docs/SOLAR-CONFIG-EXECUTION.md](docs/SOLAR-CONFIG-EXECUTION.md) | Solar execution with shared live configuration | md |
+| [docs/SOLAR-EVIDENCE-RECORDER.ko.md](docs/SOLAR-EVIDENCE-RECORDER.ko.md) | 수용된 Solar scan의 실행 증거 | md |
+| [docs/SOLAR-EVIDENCE-RECORDER.md](docs/SOLAR-EVIDENCE-RECORDER.md) | Accepted Solar scan evidence | md |
 | [docs/SOLAR-SCHEDULE.ko.md](docs/SOLAR-SCHEDULE.ko.md) | Solar schedule: compiler와 simulation host | md |
 | [docs/SOLAR-SCHEDULE.md](docs/SOLAR-SCHEDULE.md) | Solar schedules: compiler and simulation host | md |
 | [docs/SOURCE-MAP.ko.md](docs/SOURCE-MAP.ko.md) | 소스를 보존하는 산출물 맵 — 첫 단계 | md |
@@ -473,4 +475,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-353 documents.
+355 documents.
