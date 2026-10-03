@@ -5,6 +5,10 @@
 
 ## 미출시
 
+### 2026-10-03 — source에 결합된 instance trace projection ([#291](https://github.com/callin2/ghostflow-language/issues/291))
+
+REF-06-003 instance 표시와 trace projection을 위한 production 참조 어댑터를 추가한다. 이 어댑터는 activation 전에 supplied artifact를 다시 컴파일하여 정확한 root source, imported closure의 text/revision/digest, bytecode, manifest, source map 및 trace metadata를 검증한다. Presentation label은 실제 컴파일된 instance ID를 정확히 대상으로 해야 하며 별도 metadata로 남는다. 이 label은 instance를 rename하거나 source revision을 작성하지 않는다. Projection은 이제 `observeSourceTrace()` 결과를 사용하고, 방출된 source-map owner와 authored symbol에서 identity-keyed entry를 반환하며 private VM slot suffix를 public meaning으로 만들지 않는다. 잘못된 label, caller mutation 시도, 잘못된 source/manifest/closure provenance 및 다른 trace module identity는 projection 전에 거부된다. Source grammar, evaluator 또는 Reference semantics 변경은 없다.
+
 ### 2026-10-03 — Program에 결합된 임시 설정 ([#279](https://github.com/callin2/ghostflow-language/issues/279))
 
 그룹 단위 Run/Until 운영 설정을 위한 참조 Host를 추가합니다. 임시 값은 직전 일반 값을 기록하고, 평가 전에 만료 또는 취소하며, 수명이나 복귀 유효성을 확인할 수 없으면 결정을 막습니다. 같은 Program에 대한 명시적 승인으로만 새 Run에 복원합니다. 잘못된 일반 값 대체는 전체 SettingsInvalid 경로를 따릅니다. 형식 있는 context 설정 origin(tag 2, temporaryReturn)은 검증된 복귀에서 이미 할당한 TimeSlots 행 식별자를 보존하며 일반 편집의 삭제 및 할당 검사는 유지합니다. 행위자 권한과 체크포인트 승인은 신뢰하는 Host 입력입니다. REF-05-018은 native/WASM의 전체 결과와 체크포인트 바이트를 비교합니다.

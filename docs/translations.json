@@ -2,6 +2,13 @@
   "format": "GhostFlow/document-translations-v1",
   "documents": [
     {
+      "source": "docs/INSTANCE-TRACE-PROJECTION.md",
+      "sourceLanguage": "en",
+      "translation": "docs/INSTANCE-TRACE-PROJECTION.ko.md",
+      "sourceSha256": "12f66540601fb6cdc5084f7d9c5ef6ea06bd4895cb3c99845799c86941f8570b",
+      "translationSha256": "733a67a3f452f200919231ddb7c6fed1f3488b98621f9b36e7e3307fb3d89e7c"
+    },
+    {
       "source": "docs/SOLAR-EVIDENCE-RECORDER.md",
       "sourceLanguage": "en",
       "translation": "docs/SOLAR-EVIDENCE-RECORDER.ko.md",
@@ -537,7 +544,7 @@
       "source": "docs/SOURCE-SAFETY-TRACE.md",
       "sourceLanguage": "en",
       "translation": "docs/SOURCE-SAFETY-TRACE.ko.md",
-      "sourceSha256": "1659bddb02eef09f77bb918d16b3ac4b9fa22e9d15b48bc2bd78889fa409b7b1",
+      "sourceSha256": "0451d71f07c6d17985995861771650dd0b595a1161a6a402e9c5fa480d30c386",
       "translationSha256": "d2c1f8b06c4613ea81e5fd0c9c563524ba5b3c85834379f650476ccc6e950c8e"
     },
     {
@@ -614,8 +621,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "36c4a11a36c8af9f04b24757f3cf3d89efc76b4d7383f4e4c7b561006c1c4daf",
-      "translationSha256": "3ae0d7af7b08b4b44dd19e20fba529e6d45488719007852749d888251116c10a"
+      "sourceSha256": "6f32129b8f63644909381e28f1f03038fd0a3c47797b3961c7ff1b45615e8aff",
+      "translationSha256": "48dcc44bc39d34ab8df099d53a43d1419527c57d80c9829a1ebe4aafdf104a10"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",

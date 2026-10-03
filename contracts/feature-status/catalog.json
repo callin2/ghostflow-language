@@ -7485,6 +7485,141 @@
       "referenceCaseIds": [
         "REF-05-018"
       ]
+    },
+    {
+      "id": "source-bound-instance-trace-projection-reference",
+      "family": "Authored instance identity across labels file locations and declaration order",
+      "clause": {
+        "path": "docs/reference/06-composition-and-replay.en.md",
+        "heading": "6.2 Definitions, instances, and logical ports"
+      },
+      "owner": "HOST",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "host_simulation",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/instance-identity-reference.test.mjs",
+              "testId": "REF-06-003 display names, file locations, and declaration order do not rename authored instance identities",
+              "caseId": "REF-06-003",
+              "assertionClass": "identity",
+              "targets": [
+                "host"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/instance-identity-reference.test.mjs",
+              "testId": "REF-06-003 semantic instance ID changes do not alias old identity and bad pins or presentation reject",
+              "caseId": "REF-06-003",
+              "assertionClass": "identity",
+              "targets": [
+                "host"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/instance-trace-projection.test.mjs",
+              "testId": "REF-06-003 production projection activation owns source, closure, manifest and trace identity",
+              "caseId": "REF-06-003",
+              "assertionClass": "identity",
+              "targets": [
+                "host"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/instance-trace-projection.test.mjs",
+              "testId": "REF-06-003 projection rejects malformed labels, unknown trace identities and supports fresh replay",
+              "caseId": "REF-06-003",
+              "assertionClass": "identity",
+              "targets": [
+                "host"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/instance-trace-projection.test.mjs",
+              "testId": "REF-06-003 adjacent and multiline authored states retain distinct public symbols without private slot or node-order identity",
+              "caseId": "REF-06-003",
+              "assertionClass": "identity",
+              "targets": [
+                "host"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            }
+          ]
+        },
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/instance-identity-reference.test.mjs",
+              "testId": "REF-06-003 display names, file locations, and declaration order do not rename authored instance identities",
+              "caseId": "REF-06-003",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/instance-identity-reference.test.mjs",
+              "testId": "REF-06-003 semantic instance ID changes do not alias old identity and bad pins or presentation reject",
+              "caseId": "REF-06-003",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Actual compileSource immutable source closure, native scan_tape and framed WASM preserve authored instance IDs and complete identity-keyed core outcomes under moved source locators and declaration order. The JavaScript projection owner verifies full recompilation provenance, owns presentation metadata, joins original parser declarations through source-map definitionNodeId and preserves source and bytecode revision hashes in each immutable record. Display labels remain presentation only. This is not final UI transport, Device identity issuance, hardware binding, physical confirmation or authenticated observation storage."
+      ],
+      "issues": [
+        291
+      ],
+      "referenceCaseIds": [
+        "REF-06-003"
+      ]
     }
   ]
 }
