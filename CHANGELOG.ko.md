@@ -5,6 +5,10 @@
 
 ## 미출시
 
+### 2026-10-03 — Program에 결합된 임시 설정 ([#279](https://github.com/callin2/ghostflow-language/issues/279))
+
+그룹 단위 Run/Until 운영 설정을 위한 참조 Host를 추가합니다. 임시 값은 직전 일반 값을 기록하고, 평가 전에 만료 또는 취소하며, 수명이나 복귀 유효성을 확인할 수 없으면 결정을 막습니다. 같은 Program에 대한 명시적 승인으로만 새 Run에 복원합니다. 잘못된 일반 값 대체는 전체 SettingsInvalid 경로를 따릅니다. 형식 있는 context 설정 origin(tag 2, temporaryReturn)은 검증된 복귀에서 이미 할당한 TimeSlots 행 식별자를 보존하며 일반 편집의 삭제 및 할당 검사는 유지합니다. 행위자 권한과 체크포인트 승인은 신뢰하는 Host 입력입니다. REF-05-018은 native/WASM의 전체 결과와 체크포인트 바이트를 비교합니다.
+
 ### 2026-10-03 — 서명된 재사용 source closure 보존 ([#309](https://github.com/callin2/ghostflow-language/issues/309))
 
 Portable composition package는 이제 정확히 pin된 transitive source closure를 보존한다. 이전에는 서명 과정에서 provenance가 빠지고 검증이 문서 없이 import를 lowering하려 했다. 검증은 서명된 closure를 다시 컴파일하여 전체 bytecode, manifest 및 source-map identity를 비교한 뒤 target admission을 허용한다. 다시 서명한 instance 변조도 거부한다. REF-06-025는 native/WASM instance 격리와 검증된 package의 effect-free replay를 확인한다. 기존 package format과 plain-control replay 정책은 바뀌지 않는다.

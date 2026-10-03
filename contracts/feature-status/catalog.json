@@ -7234,6 +7234,257 @@
       "referenceCaseIds": [
         "REF-06-004"
       ]
+    },
+    {
+      "id": "temporary-settings-host-reference",
+      "family": "Program-bound grouped Run and Until temporary settings",
+      "clause": {
+        "path": "docs/reference/05-settings-and-observation.en.md",
+        "heading": "5.2 Source changes and operating settings changes"
+      },
+      "owner": "HOST",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "host_simulation",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/temporary-settings-reference.test.mjs",
+              "testId": "REF-05-018 actual Run overlay is Program-bound and Q revalidates type range permissions lifetime with atomic rejection and fresh replay",
+              "caseId": "REF-05-018",
+              "assertionClass": "rollback",
+              "targets": [
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/temporary-settings-reference.test.mjs",
+              "testId": "REF-05-018 Until overlay survives approved same-Program restart and expires before first decision while Run overlay returns on run boundary",
+              "caseId": "REF-05-018",
+              "assertionClass": "rollback",
+              "targets": [
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/temporary-settings-reference.test.mjs",
+              "testId": "REF-05-018 temporary group rejects nesting and partial ordinary replacement then cancels original group and applies new ordinary value atomically",
+              "caseId": "REF-05-018",
+              "assertionClass": "rollback",
+              "targets": [
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/temporary-settings-reference.test.mjs",
+              "testId": "REF-05-018 unavailable trusted time blocks Until decisions and failed return preserves checkpoint until valid cancellation retry",
+              "caseId": "REF-05-018",
+              "assertionClass": "rollback",
+              "targets": [
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/temporary-settings-reference.test.mjs",
+              "testId": "REF-05-018 corrupt checkpoint and unapproved return provenance reject without creating a new Program overlay",
+              "caseId": "REF-05-018",
+              "assertionClass": "rollback",
+              "targets": [
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/temporary-settings-reference.test.mjs",
+              "testId": "REF-05-018 uncertain expiry and restored actor permission block decisions until explicit whole-overlay recovery",
+              "caseId": "REF-05-018",
+              "assertionClass": "rollback",
+              "targets": [
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/temporary-settings-reference.test.mjs",
+              "testId": "REF-05-018 invalid ordinary replacement removes the entire overlay atomically with SettingsInvalid and forged source or actor reject",
+              "caseId": "REF-05-018",
+              "assertionClass": "rollback",
+              "targets": [
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/temporary-settings-reference.test.mjs",
+              "testId": "REF-05-018 approved digest-correct restore revalidates every overlay provenance field and repeated restart preserves revision and run-local position",
+              "caseId": "REF-05-018",
+              "assertionClass": "rollback",
+              "targets": [
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/temporary-settings-reference.test.mjs",
+              "testId": "REF-05-018 TimeSlots temporary return preserves ordinary row identities and rejects unknown or unallocated keys",
+              "caseId": "REF-05-018",
+              "assertionClass": "rollback",
+              "targets": [
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            }
+          ]
+        },
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/temporary-settings-reference.test.mjs",
+              "testId": "REF-05-018 actual Run overlay is Program-bound and Q revalidates type range permissions lifetime with atomic rejection and fresh replay",
+              "caseId": "REF-05-018",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/temporary-settings-reference.test.mjs",
+              "testId": "REF-05-018 Until overlay survives approved same-Program restart and expires before first decision while Run overlay returns on run boundary",
+              "caseId": "REF-05-018",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/temporary-settings-reference.test.mjs",
+              "testId": "REF-05-018 temporary group rejects nesting and partial ordinary replacement then cancels original group and applies new ordinary value atomically",
+              "caseId": "REF-05-018",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/temporary-settings-reference.test.mjs",
+              "testId": "REF-05-018 unavailable trusted time blocks Until decisions and failed return preserves checkpoint until valid cancellation retry",
+              "caseId": "REF-05-018",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/temporary-settings-reference.test.mjs",
+              "testId": "REF-05-018 uncertain expiry and restored actor permission block decisions until explicit whole-overlay recovery",
+              "caseId": "REF-05-018",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            },
+            {
+              "path": "tests/temporary-settings-reference.test.mjs",
+              "testId": "REF-05-018 TimeSlots temporary return preserves ordinary row identities and rejects unknown or unallocated keys",
+              "caseId": "REF-05-018",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Reference host supplies actor grants, run identity, approved storage and trusted clock; actual shared Rust core evaluates settings, state and timers. Source-bound grouped overlays, uncertainty blocking, ordinary fault replacement, approved fresh-run restoration, complete native/framed-WASM outcomes and checkpoints, rejected retry and row-key-preserving return are tested. Checkpoint digest detects corruption and structural provenance is validated; storage approval supplies integrity, not this unsigned digest. No Device run issuance, authenticated permission service, hardware deployment, physical confirmation or general lifecycle #89 completion is claimed."
+      ],
+      "issues": [
+        279
+      ],
+      "referenceCaseIds": [
+        "REF-05-018"
+      ]
     }
   ]
 }

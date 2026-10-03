@@ -135,6 +135,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/TEMPORAL-REPLAY.md](TEMPORAL-REPLAY.md) | Temporal replay through the WASM adapters | md |
 | [docs/TEMPORAL-RESOURCES.ko.md](TEMPORAL-RESOURCES.ko.md) | Temporal resource 계획 | md |
 | [docs/TEMPORAL-RESOURCES.md](TEMPORAL-RESOURCES.md) | Temporal resource planning | md |
+| [docs/TEMPORARY-SETTINGS-HOST.ko.md](TEMPORARY-SETTINGS-HOST.ko.md) | 임시 설정 reference host | md |
+| [docs/TEMPORARY-SETTINGS-HOST.md](TEMPORARY-SETTINGS-HOST.md) | Temporary settings reference host | md |
 | [docs/TESTING.ko.md](TESTING.ko.md) | GhostFlow 적합성 및 신뢰성 테스트 | md |
 | [docs/TESTING.md](TESTING.md) | GhostFlow conformance and reliability testing | md |
 | [docs/TIME-AND-SCHEDULE-CONTRACT.ko.md](TIME-AND-SCHEDULE-CONTRACT.ko.md) | 시간과 Schedule 계약 제안 | md |
@@ -224,4 +226,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.ko.md](research/GF-COMPOSE-R9-ACCEPTANCE.ko.md) | GF-COMPOSE R9: acceptance와 구현 인계 | md |
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.md](research/GF-COMPOSE-R9-ACCEPTANCE.md) | GF-COMPOSE R9: acceptance and implementation handoff | md |
 
-190 documents.
+192 documents.

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### 2026-10-03 — Program-bound temporary settings ([#279](https://github.com/callin2/ghostflow-language/issues/279))
+
+Adds a reference host for grouped Run/Until operating settings. Temporary values capture the preceding ordinary value, expire or cancel before evaluation, block decisions when lifetime or return validity is unavailable, and restore only with explicit same-Program approval into a fresh run. Invalid ordinary replacement follows aggregate SettingsInvalid. A typed context settings origin (tag 2, temporaryReturn) preserves previously allocated TimeSlots row identities on validated return while ordinary edits retain their deletion and allocation guards. Actor grants and checkpoint approval are trusted host inputs. REF-05-018 compares complete native/WASM outcomes and checkpoint bytes.
+
 ### 2026-10-03 — retain signed reusable source closure ([#309](https://github.com/callin2/ghostflow-language/issues/309))
 
 Portable composition packages now retain their exact transitive pinned source closure. Previously signing omitted this provenance and verification tried to lower imports without their documents. Verification now recompiles the signed closure and compares complete bytecode, manifest and source-map identity before target admission; re-signed instance tampering rejects. REF-06-025 covers native/WASM instance isolation and effect-free replay from the verified package. Existing package format and plain-control replay policy remain unchanged.

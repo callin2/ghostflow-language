@@ -236,3 +236,7 @@ active Run을 복원하지 않는다. provider facts는 호출자가 제공하�
 종류별 경계 테스트는 `context_schedule`, `natural_context`, `work_calendar` 및
 `cron_schedule`에 있다. 종단 간 Reference 픽스처는 정본 컴파일과 호스트 일정
 구현이 아닌 동일 WASM 런타임을 실행한다.
+
+## 임시 설정 복귀 origin
+
+GFSF5/GFSF6 형식 있는 설정 origin tag 2는 `temporaryReturn`입니다. 운영자가 편집할 수 있는 대상 검사와 형식·범위·격자·용량 검사를 유지하며, Host가 검증한 기록된 복귀에 대해 스트림 할당기 경계보다 작은 기존 TimeSlots 행 키를 허용합니다. 일반 origin 0과 producer origin 1의 기존 규칙은 유지합니다. 이전 런타임은 추가 origin을 거부하며 이 값은 인증 토큰이 아닙니다. 소스에 결합된 출처와 신뢰하는 Host 입력은 [임시 설정 Host](TEMPORARY-SETTINGS-HOST.ko.md)를 참조하세요.

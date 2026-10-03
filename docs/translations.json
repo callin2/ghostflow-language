@@ -194,8 +194,8 @@
       "source": "docs/CONTEXT-EXECUTION-ABI.md",
       "sourceLanguage": "en",
       "translation": "docs/CONTEXT-EXECUTION-ABI.ko.md",
-      "sourceSha256": "2446a5c7d52ecf988ef071b28ddcce82473b5e2f5002ad05d42bc57016883fbd",
-      "translationSha256": "542d4b19bc92d77907101698e4e4ee239b48e2bd5f23acb2665c89a5db8996e6"
+      "sourceSha256": "f57b51be5dd579304e09d3c63ae077ed723b6759802fc911eaaeef0359826e12",
+      "translationSha256": "379b193749ee32afe085497025d7eaeb53e17d95e8f890f9d775c61229f082bd"
     },
     {
       "source": "docs/CONTINUOUS-BOOL-TIMER-CONTRACT.md",
@@ -614,8 +614,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "0e7961bee9345315e45c3bdfb88dd7d09a23e97172ea92254a1929735473e920",
-      "translationSha256": "d0931b464ace0aa75e0e68cce9a3fb8eac27c9cf3cbc861ef1d810a6534e8028"
+      "sourceSha256": "36c4a11a36c8af9f04b24757f3cf3d89efc76b4d7383f4e4c7b561006c1c4daf",
+      "translationSha256": "3ae0d7af7b08b4b44dd19e20fba529e6d45488719007852749d888251116c10a"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",
@@ -1022,6 +1022,13 @@
       "translation": "docs/WHAT-IF-REPLAY.ko.md",
       "sourceSha256": "cfef25216d9528d9f5cdd74f206b045de812e89e1192b09d9cfd6605d5f56333",
       "translationSha256": "66361f89e2fa85a84f1e32fe4891fb50e0311836a9c97bf6d54e22b963ed6c66"
+    },
+    {
+      "source": "docs/TEMPORARY-SETTINGS-HOST.md",
+      "sourceLanguage": "en",
+      "translation": "docs/TEMPORARY-SETTINGS-HOST.ko.md",
+      "sourceSha256": "99bf4ab2c1053ed43f2c7ae24ecd0254cb685b13b62b00b81aded4d870a65477",
+      "translationSha256": "3c7f9790dd7e1e6ccb1ec6ad0760feade6bdec4acd512827f9b078564657ee11"
     }
   ],
   "exclusions": [
