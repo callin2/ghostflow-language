@@ -6134,6 +6134,91 @@
       "referenceCaseIds": [
         "REF-06-018"
       ]
+    },
+    {
+      "id": "solar-provider-evidence-boundary",
+      "family": "Solar provider evidence preserves revision validity and occurrence identity",
+      "clause": {
+        "path": "docs/reference/08-language-runtime-and-device-boundaries.en.md",
+        "heading": "8.4 Boundaries each feature must preserve"
+      },
+      "owner": "HOST",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/solar-provider-evidence-boundary.test.mjs",
+              "testId": "REF-08-007 same-data/time Solar occurrence keeps revision, validity and occurrence identity across WASM and native runtime",
+              "caseId": "REF-08-007",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/solar-provider-evidence-boundary.test.mjs",
+              "testId": "REF-08-007 missing and unavailable Solar evidence preserves typed cause instead of proving false",
+              "caseId": "REF-08-007",
+              "assertionClass": "rollback",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/solar-provider-evidence-boundary.test.mjs",
+              "testId": "REF-08-007 rejects caller-supplied due oracle and invalid binding without consuming occurrence; retry uses real core admission",
+              "caseId": "REF-08-007",
+              "assertionClass": "rollback",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/solar-provider-evidence-boundary.test.mjs",
+              "testId": "REF-08-007 outside coverage stays Unknown without catch up and renewed evidence admits a later occurrence",
+              "caseId": "REF-08-007",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Conformance-only existing shared Solar/config execution: finite caller-supplied provider facts retain revisions, validity causes and public occurrence IDs across actual full native/framed WASM outcomes. Duplicate suppression, unavailable/missing/binding rejection and coverage expiry remain distinct from false. No astronomy authenticity, network provider, Device integration or hardware claim."
+      ],
+      "issues": [
+        324
+      ],
+      "referenceCaseIds": [
+        "REF-08-007"
+      ]
     }
   ]
 }
