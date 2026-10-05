@@ -23,9 +23,27 @@ pub struct FramedHandle {
     resource_plan: String,
     context_checkpoint: Vec<u8>,
     context_state: String,
+    lifecycle_required: bool,
+    restart_init: Option<(u8, bool)>,
 }
 
 impl FramedHandle {
+    fn restart_ready(&self) -> bool {
+        !self.lifecycle_required || self.restart_init.is_some()
+    }
+
+    fn activate_driver(&mut self, runtime: Runtime) -> i32 {
+        let mut driver = runtime.into_scan_driver();
+        if let Some((reason, pending)) = self.restart_init {
+            if let Err(error) = driver.initialize_restart(reason, pending) {
+                self.state = FramedState::Configuring(driver.into_runtime());
+                return self.failure(error.to_string());
+            }
+        }
+        self.state = FramedState::Active(driver);
+        self.success()
+    }
+
     fn new() -> Self {
         Self {
             state: FramedState::Configuring(Runtime::new(1024)),
@@ -35,6 +53,8 @@ impl FramedHandle {
             resource_plan: String::new(),
             context_checkpoint: Vec::new(),
             context_state: String::new(),
+            lifecycle_required: false,
+            restart_init: None,
         }
     }
 
@@ -209,10 +229,39 @@ pub unsafe extern "C" fn gf_frame_load(
     };
     match &mut handle.state {
         FramedState::Configuring(runtime) => {
+            handle.lifecycle_required = module.lifecycle().is_some();
+            handle.restart_init = None;
             runtime.install(module, false);
             handle.success()
         }
         FramedState::Active(_) => handle.failure("framed runtime is already active"),
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn gf_frame_initialize_restart(
+    handle: *mut FramedHandle,
+    reason_ordinal: u8,
+    event_pending: u8,
+) -> i32 {
+    let Some(handle) = handle.as_mut() else {
+        return 0;
+    };
+    if event_pending > 1 {
+        return handle.failure("restart event pending must be 0 or 1");
+    }
+    if !handle.lifecycle_required {
+        return handle.failure("module has no restart lifecycle");
+    }
+    match &handle.state {
+        FramedState::Configuring(_) if handle.restart_init.is_none() => {
+            handle.restart_init = Some((reason_ordinal, event_pending == 1));
+            handle.success()
+        }
+        FramedState::Configuring(_) => handle.failure("restart lifecycle is already initialized"),
+        FramedState::Active(_) => {
+            handle.failure("restart lifecycle initialization must precede activation")
+        }
     }
 }
 
@@ -258,13 +307,13 @@ pub unsafe extern "C" fn gf_frame_activate(handle: *mut FramedHandle) -> i32 {
     let Some(handle) = handle.as_mut() else {
         return 0;
     };
+    if !handle.restart_ready() {
+        return handle.failure("restart lifecycle initialization is required before activation");
+    }
     let state = std::mem::replace(&mut handle.state, FramedState::Configuring(Runtime::new(1)));
     match state {
         FramedState::Configuring(mut runtime) => match runtime.activate() {
-            Ok(()) => {
-                handle.state = FramedState::Active(runtime.into_scan_driver());
-                handle.success()
-            }
+            Ok(()) => handle.activate_driver(runtime),
             Err(error) => {
                 handle.state = FramedState::Configuring(runtime);
                 handle.failure(error.to_string())
@@ -277,6 +326,22 @@ pub unsafe extern "C" fn gf_frame_activate(handle: *mut FramedHandle) -> i32 {
     }
 }
 
+/// Validates loaded bytecode and host capabilities without starting a scan run.
+/// This is for validation-only adapters; lifecycle initialization is not implied.
+#[no_mangle]
+pub unsafe extern "C" fn gf_frame_validate(handle: *mut FramedHandle) -> i32 {
+    let Some(handle) = handle.as_mut() else {
+        return 0;
+    };
+    match &mut handle.state {
+        FramedState::Configuring(runtime) => match runtime.activate() {
+            Ok(()) => handle.success(),
+            Err(error) => handle.failure(error.to_string()),
+        },
+        FramedState::Active(_) => handle.failure("validation requires a configuring runtime"),
+    }
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn gf_frame_activate_resource_binding(
     handle: *mut FramedHandle,
@@ -284,6 +349,9 @@ pub unsafe extern "C" fn gf_frame_activate_resource_binding(
     len: usize,
 ) -> i32 {
     let Some(h) = handle.as_mut() else { return 0 };
+    if !h.restart_ready() {
+        return h.failure("restart lifecycle initialization is required before activation");
+    }
     let bytes = match crate::resource_constraints_abi::packet(ptr, len) {
         Ok(v) => v,
         Err(e) => return h.failure(e),
@@ -293,10 +361,7 @@ pub unsafe extern "C" fn gf_frame_activate_resource_binding(
         FramedState::Configuring(mut runtime) => match runtime
             .activate_with_resource_binding(bytes, crate::resource_constraints_abi::registry())
         {
-            Ok(()) => {
-                h.state = FramedState::Active(runtime.into_scan_driver());
-                h.success()
-            }
+            Ok(()) => h.activate_driver(runtime),
             Err(e) => {
                 h.state = FramedState::Configuring(runtime);
                 h.failure(e.to_string())
@@ -348,6 +413,9 @@ pub unsafe extern "C" fn gf_frame_activate_temporal(
     let Some(handle) = handle.as_mut() else {
         return 0;
     };
+    if !handle.restart_ready() {
+        return handle.failure("restart lifecycle initialization is required before activation");
+    }
     let profile = match crate::temporal_abi::from_raw(ptr, len) {
         Ok(profile) => profile,
         Err(error) => return handle.failure(error),
@@ -356,10 +424,7 @@ pub unsafe extern "C" fn gf_frame_activate_temporal(
     let state = std::mem::replace(&mut handle.state, FramedState::Configuring(Runtime::new(1)));
     match state {
         FramedState::Configuring(mut runtime) => match runtime.activate_with_temporal(&profile) {
-            Ok(()) => {
-                handle.state = FramedState::Active(runtime.into_scan_driver());
-                handle.success()
-            }
+            Ok(()) => handle.activate_driver(runtime),
             Err(error) => {
                 handle.state = FramedState::Configuring(runtime);
                 handle.failure(error.to_string())
@@ -410,6 +475,9 @@ pub unsafe extern "C" fn gf_frame_activate_context(
     len: usize,
 ) -> i32 {
     let Some(h) = handle.as_mut() else { return 0 };
+    if !h.restart_ready() {
+        return h.failure("restart lifecycle initialization is required before activation");
+    }
     let profile = match crate::context_abi::activation_from_raw(ptr, len) {
         Ok(profile) => profile,
         Err(error) => return h.failure(error),
@@ -417,10 +485,7 @@ pub unsafe extern "C" fn gf_frame_activate_context(
     let state = std::mem::replace(&mut h.state, FramedState::Configuring(Runtime::new(1)));
     match state {
         FramedState::Configuring(mut runtime) => match runtime.activate_with_context(&profile) {
-            Ok(()) => {
-                h.state = FramedState::Active(runtime.into_scan_driver());
-                h.success()
-            }
+            Ok(()) => h.activate_driver(runtime),
             Err(error) => {
                 h.state = FramedState::Configuring(runtime);
                 h.failure(error.to_string())
@@ -440,6 +505,9 @@ pub unsafe extern "C" fn gf_frame_activate_schedules(
     terminal_capacity: u32,
 ) -> i32 {
     let Some(h) = handle.as_mut() else { return 0 };
+    if !h.restart_ready() {
+        return h.failure("restart lifecycle initialization is required before activation");
+    }
     let state = std::mem::replace(&mut h.state, FramedState::Configuring(Runtime::new(1)));
     match state {
         FramedState::Configuring(mut runtime) => {
@@ -449,10 +517,7 @@ pub unsafe extern "C" fn gf_frame_activate_schedules(
                     terminal_capacity: terminal_capacity as usize,
                 });
             match result {
-                Ok(()) => {
-                    h.state = FramedState::Active(runtime.into_scan_driver());
-                    h.success()
-                }
+                Ok(()) => h.activate_driver(runtime),
                 Err(error) => {
                     h.state = FramedState::Configuring(runtime);
                     h.failure(error.to_string())
@@ -729,6 +794,8 @@ mod replay_tests {
             resource_plan: String::new(),
             context_checkpoint: Vec::new(),
             context_state: String::new(),
+            lifecycle_required: false,
+            restart_init: None,
         };
         assert_eq!(unsafe { gf_frame_resource_plan_len(&h) }, 0);
         let mut packet = profile_packet();
@@ -796,6 +863,8 @@ mod replay_tests {
             resource_plan: String::new(),
             context_checkpoint: Vec::new(),
             context_state: String::new(),
+            lifecycle_required: false,
+            restart_init: None,
         };
         let packet = profile_packet();
         let invoke = |h: &mut FramedHandle, p: &[u8], count, peak, json| unsafe {
@@ -848,4 +917,35 @@ pub unsafe extern "C" fn gf_frame_error_len(handle: *const FramedHandle) -> usiz
         .as_ref()
         .map(|handle| handle.error.len())
         .unwrap_or(0)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn gf_frame_restart_event_pending(handle: *mut FramedHandle) -> i32 {
+    let Some(handle) = handle.as_mut() else {
+        return -1;
+    };
+    if !handle.lifecycle_required {
+        handle.failure("module has no restart lifecycle");
+        return -1;
+    }
+    match &handle.state {
+        FramedState::Active(driver) => {
+            if driver.restart_event_pending() {
+                1
+            } else {
+                0
+            }
+        }
+        FramedState::Configuring(_) if handle.restart_init.is_some() => {
+            if handle.restart_init.is_some_and(|(_, pending)| pending) {
+                1
+            } else {
+                0
+            }
+        }
+        FramedState::Configuring(_) => {
+            handle.failure("restart lifecycle is not active");
+            -1
+        }
+    }
 }

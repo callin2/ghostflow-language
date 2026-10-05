@@ -264,18 +264,26 @@ observation이 있으면 첫 제어 판단 전에 초기 emission 이후의 이�
 연속성을 입증할 수 없는 timer·filter 기억은 복원하지 않는다. 복원 실패는 관찰 가능한
 실패이며, 복원이 성공했다고 표시한 채 초기화하지 않는다.
 
-재시작 원인이 필요하면 다음과 같은 일반 typed input 계약으로 공급한다. 전용
-`on_restart` 문장은 두지 않는다.
+재시작 원인이 필요하면 다음과 같은 정확한 reserved runtime 소유 lifecycle input
+계약을 사용한다. 전용 `on_restart` 문장은 두지 않는다. 이 port는
+`Result<T, SensorFault>` 취득 없이 scalar 값으로 직접 읽으며 optional 표기와
+conditioning 설정을 허용하지 않는다. 다른 외부 입력은 canonical 품질 계약을 유지한다.
 
 ```ghost
 type RestartReason = PowerOn | Brownout | Watchdog | Software | Unknown;
 input restart_reason: RestartReason;
+input restart_event: Bool;
 ```
 
-이 선언은 control 본문의 단편이다. 생산자는 하드웨어가 확인한 원인만 공급하며 근거가
-없으면 `Unknown`이다. `PowerOn`만으로 정전 복구라고 단정하지 않는다. 이 입력은 한 run
-동안 고정된다. 자동 재개, 대기, 취소 후 원위치 이동은 작성자가 state 전이로 정한다.
-첫 판단 전 물리 출력은 Driver의 설치 계약이 소유한다.
+이 정확한 reserved 선언은 control 본문의 단편이다. 호스트는 하드웨어가 확인한 원인이나
+부팅 이벤트의 pending 여부를 명시적으로 공급한다. 원인 근거가 없으면 `Unknown`이다.
+`PowerOn`만으로 정전 복구라고 단정하지 않는다. 이 입력은 한 run 동안 고정된다. framed
+runtime이 두 값을 소유하고 주입한다. 호출자는 scan frame이나 일반 input setter로 값을 넣을 수 없다.
+이벤트가 pending이면 처음 성공적으로 commit된 scan에서 `restart_event`는 true이고 이후
+false다. 거부된 scan은 pending을 유지한다. 부팅 이벤트를 이미 소비한 뒤 프로그램을
+교체하면 호스트는 pending을 false로 설정한다. 작성자는 자동 재개, 대기, 취소 후 원위치
+이동을 state 전이로 정한다. 이 계약은 이벤트와 원인만 제공하며 VM이나 timer 기억을
+복원하지 않는다. 첫 판단 전 물리 출력은 Driver의 설치 계약이 소유한다.
 
 ## 5.3 renderer 독립 관찰 모델
 

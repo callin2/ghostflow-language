@@ -48,6 +48,15 @@ pub struct ScanDriver {
     first_scan_tick: u64,
     next_scan_id: Option<u64>,
     last_time_ms: Option<u64>,
+    restart: Option<RestartState>,
+}
+
+struct RestartState {
+    reason_input: String,
+    reason_count: u8,
+    event_input: String,
+    reason_ordinal: Option<u8>,
+    event_pending: bool,
 }
 
 impl Runtime {
@@ -60,12 +69,53 @@ impl Runtime {
 impl ScanDriver {
     /// Creates an owning framed driver at scan ID zero.
     pub fn new(runtime: Runtime) -> Self {
+        let restart = runtime
+            .module
+            .as_ref()
+            .and_then(|module| module.lifecycle.as_ref())
+            .map(|descriptor| RestartState {
+                reason_input: descriptor.restart_reason_input.clone(),
+                reason_count: descriptor.restart_reason_members.len() as u8,
+                event_input: descriptor.restart_event_input.clone(),
+                reason_ordinal: None,
+                event_pending: false,
+            });
         Self {
             first_scan_tick: runtime.next_tick,
             runtime,
             next_scan_id: Some(0),
             last_time_ms: None,
+            restart,
         }
+    }
+
+    /// Supplies the hardware-confirmed reason and whether this boot still has
+    /// its one restart event to deliver. Call once before the first scan.
+    pub fn initialize_restart(&mut self, reason_ordinal: u8, event_pending: bool) -> Result<()> {
+        let restart = self
+            .restart
+            .as_mut()
+            .ok_or_else(|| Error::new("module has no restart lifecycle"))?;
+        if restart.reason_ordinal.is_some() || self.next_scan_id != Some(0) {
+            return Err(Error::new(
+                "restart lifecycle is already initialized or scanning",
+            ));
+        }
+        if reason_ordinal >= restart.reason_count {
+            return Err(Error::new(
+                "restart reason ordinal is outside declared enum",
+            ));
+        }
+        restart.reason_ordinal = Some(reason_ordinal);
+        restart.event_pending = event_pending;
+        Ok(())
+    }
+
+    /// True until a scan containing the restart event commits successfully.
+    pub fn restart_event_pending(&self) -> bool {
+        self.restart
+            .as_ref()
+            .is_some_and(|restart| restart.event_pending)
     }
 
     pub fn runtime(&self) -> &Runtime {
@@ -130,7 +180,7 @@ impl ScanDriver {
         let expected_input_count = module
             .inputs
             .iter()
-            .filter(|field| !self.derived_input(&field.name))
+            .filter(|field| !self.derived_input(&field.name) && !self.lifecycle_input(&field.name))
             .count();
         if frame.inputs.len() != expected_input_count {
             return Err(Error::new(format!(
@@ -141,6 +191,9 @@ impl ScanDriver {
 
         let mut supplied = BTreeSet::new();
         for input in &frame.inputs {
+            if self.lifecycle_input(&input.name) {
+                return Err(Error::new("restart lifecycle input is runtime-derived"));
+            }
             if self.derived_input(&input.name) {
                 return Err(Error::new("reserved input is runtime-derived"));
             }
@@ -160,11 +213,33 @@ impl ScanDriver {
             }
         }
         for field in &module.inputs {
-            if !self.derived_input(&field.name) && !supplied.contains(field.name.as_str()) {
+            if !self.derived_input(&field.name)
+                && !self.lifecycle_input(&field.name)
+                && !supplied.contains(field.name.as_str())
+            {
                 return Err(Error::new(format!("missing input {}", field.name)));
             }
         }
+        if self
+            .restart
+            .as_ref()
+            .is_some_and(|restart| restart.reason_ordinal.is_none())
+        {
+            return Err(Error::new(
+                "restart lifecycle requires boot initialization before scan",
+            ));
+        }
         Ok(())
+    }
+
+    fn lifecycle_input(&self, name: &str) -> bool {
+        self.runtime
+            .module
+            .as_ref()
+            .and_then(|module| module.lifecycle.as_ref())
+            .is_some_and(|lifecycle| {
+                lifecycle.restart_reason_input == name || lifecycle.restart_event_input == name
+            })
     }
 
     /// Evaluates one complete, validated host frame. Only a successful core
@@ -300,59 +375,81 @@ impl ScanDriver {
                 return Err(error);
             }
         }
-        let derive_epoch = self.runtime.module.as_ref().is_some_and(|m| {
-            matches!(
-                m.format_version,
-                10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20
-            )
-        });
-        let result = if let Some((clock, facts)) = context {
-            let clock_input = self.runtime.set_input(
-                RESERVED_CLOCK_INPUT,
-                Value::Number(clock.monotonic_ms as f64),
+        if let Some(restart) = &self.restart {
+            let reason = f64::from(
+                restart
+                    .reason_ordinal
+                    .expect("validated restart initialization"),
             );
-            let clock_input = if derive_epoch {
-                clock_input.and_then(|()| {
-                    self.runtime
-                        .set_input("__gf_time_epoch", Value::Number(clock.boot_epoch as f64))
-                })
-            } else {
-                clock_input
-            };
-            clock_input.and_then(|()| self.runtime.tick_with_context(clock, facts))
-        } else if let Some((clock, facts, version)) = schedules {
-            self.runtime
-                .set_input(
+            if let Err(error) = self
+                .runtime
+                .set_lifecycle_input(&restart.reason_input, Value::Number(reason))
+            {
+                self.runtime.clear_inputs();
+                return Err(error);
+            }
+            if let Err(error) = self
+                .runtime
+                .set_lifecycle_input(&restart.event_input, Value::Bool(restart.event_pending))
+            {
+                self.runtime.clear_inputs();
+                return Err(error);
+            }
+        }
+        let result = self.runtime.with_scan_driver_authority(|runtime| {
+            let derive_epoch = runtime.module.as_ref().is_some_and(|m| {
+                matches!(
+                    m.format_version,
+                    10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20
+                )
+            });
+            let result = if let Some((clock, facts)) = context {
+                let clock_input = runtime.set_input(
                     RESERVED_CLOCK_INPUT,
                     Value::Number(clock.monotonic_ms as f64),
-                )
-                .and_then(|()| {
-                    self.runtime
-                        .set_input("__gf_time_epoch", Value::Number(clock.boot_epoch as f64))
-                })
-                .and_then(|()| {
-                    if version == 1 {
-                        let facts: Vec<_> = facts
-                            .iter()
-                            .map(|input| crate::solar_runtime::SolarInput {
-                                site: input.site,
-                                facts: input.facts,
-                            })
-                            .collect();
-                        self.runtime.tick_with_solar(clock, &facts)
-                    } else if version == 3 {
-                        self.runtime.tick_with_daily_slots(clock, facts)
-                    } else {
-                        self.runtime.tick_with_schedules(clock, facts)
-                    }
-                })
-        } else if let Some(binding) = resource_binding {
-            self.runtime.tick_with_resource_binding(binding)
-        } else {
-            self.runtime.tick_at(frame.logical_time_ms)
-        };
+                );
+                let clock_input = if derive_epoch {
+                    clock_input.and_then(|()| {
+                        runtime.set_input("__gf_time_epoch", Value::Number(clock.boot_epoch as f64))
+                    })
+                } else {
+                    clock_input
+                };
+                clock_input.and_then(|()| runtime.tick_with_context(clock, facts))
+            } else if let Some((clock, facts, version)) = schedules {
+                runtime
+                    .set_input(
+                        RESERVED_CLOCK_INPUT,
+                        Value::Number(clock.monotonic_ms as f64),
+                    )
+                    .and_then(|()| {
+                        runtime.set_input("__gf_time_epoch", Value::Number(clock.boot_epoch as f64))
+                    })
+                    .and_then(|()| {
+                        if version == 1 {
+                            let facts: Vec<_> = facts
+                                .iter()
+                                .map(|input| crate::solar_runtime::SolarInput {
+                                    site: input.site,
+                                    facts: input.facts,
+                                })
+                                .collect();
+                            runtime.tick_with_solar(clock, &facts)
+                        } else if version == 3 {
+                            runtime.tick_with_daily_slots(clock, facts)
+                        } else {
+                            runtime.tick_with_schedules(clock, facts)
+                        }
+                    })
+            } else if let Some(binding) = resource_binding {
+                runtime.tick_with_resource_binding(binding)
+            } else {
+                runtime.tick_at(frame.logical_time_ms)
+            };
+            result.map(Clone::clone)
+        });
         let trace = match result {
-            Ok(record) => record.clone(),
+            Ok(record) => record,
             Err(error) => {
                 // A rejected core evaluation must not leave a partial frame for
                 // a subsequent legacy tick or another framed attempt.
@@ -361,6 +458,9 @@ impl ScanDriver {
             }
         };
         self.last_time_ms = Some(frame.logical_time_ms);
+        if let Some(restart) = &mut self.restart {
+            restart.event_pending = false;
+        }
         self.next_scan_id = if frame.scan_id == SCAN_FRAME_V1_MAX_EXACT_INTEGER {
             None
         } else {
@@ -488,6 +588,37 @@ mod tests {
         runtime
     }
 
+    fn active_restart_runtime() -> Runtime {
+        let mut module = Module::load(MODULE).unwrap();
+        module.inputs.push(Field {
+            name: "restart_reason".into(),
+            value_type: Type::Number,
+            default: Value::Number(0.0),
+        });
+        module.inputs.push(Field {
+            name: "restart_event".into(),
+            value_type: Type::Bool,
+            default: Value::Bool(false),
+        });
+        module.lifecycle = Some(crate::LifecycleDescriptor {
+            restart_reason_input: "restart_reason".into(),
+            restart_reason_members: ["PowerOn", "Brownout", "Watchdog", "Software", "Unknown"]
+                .into_iter()
+                .map(str::to_owned)
+                .collect(),
+            restart_event_input: "restart_event".into(),
+        });
+        let mut runtime = Runtime::new(8);
+        runtime.install(module, false);
+        for name in ["pump", "valve"] {
+            runtime
+                .add_capability(Capability::new("actuator", name, Type::Bool))
+                .unwrap();
+        }
+        runtime.activate().unwrap();
+        runtime
+    }
+
     fn frame(scan_id: u64, time: u64) -> ScanFrameV1 {
         let inputs = [
             ("start", Value::Bool(true)),
@@ -534,6 +665,62 @@ mod tests {
         assert_eq!(outcome.trace.safe_intents["pump"], Value::Bool(true));
         assert_eq!(driver.next_scan_id(), Some(1));
         assert_eq!(driver.scan_last_time_ms(), Some(100));
+    }
+
+    #[test]
+    fn restart_inputs_are_protected_and_event_pending_clears_only_after_commit() {
+        let mut raw_runtime = active_restart_runtime();
+        assert!(raw_runtime
+            .set_input("restart_reason", Value::Number(1.0))
+            .unwrap_err()
+            .to_string()
+            .contains("runtime-derived"));
+        assert!(raw_runtime
+            .set_input("restart_event", Value::Bool(true))
+            .unwrap_err()
+            .to_string()
+            .contains("runtime-derived"));
+        assert!(raw_runtime
+            .tick()
+            .unwrap_err()
+            .to_string()
+            .contains("require the framed scan driver"));
+        let mut driver = raw_runtime.into_scan_driver();
+        assert!(driver
+            .scan(frame(0, 0))
+            .unwrap_err()
+            .to_string()
+            .contains("boot initialization"));
+        assert!(driver.initialize_restart(2, true).is_ok());
+        assert!(driver.restart_event_pending());
+
+        let incomplete = ScanFrameV1 {
+            inputs: frame(0, 0).inputs[..3].to_vec(),
+            ..frame(0, 0)
+        };
+        assert!(driver.scan(incomplete).is_err());
+        assert!(driver.restart_event_pending());
+
+        let first = driver.scan(frame(0, 0)).unwrap();
+        assert_eq!(first.trace.inputs["restart_reason"], Value::Number(2.0));
+        assert_eq!(first.trace.inputs["restart_event"], Value::Bool(true));
+        assert!(!driver.restart_event_pending());
+
+        let mut forged = frame(1, 1);
+        forged.inputs.pop();
+        forged.inputs.push(ScanInput {
+            name: "restart_event".into(),
+            value: Value::Bool(true),
+        });
+        assert!(driver
+            .scan(forged)
+            .unwrap_err()
+            .to_string()
+            .contains("runtime-derived"));
+        let second = driver.scan(frame(1, 1)).unwrap();
+        assert_eq!(second.trace.inputs["restart_reason"], Value::Number(2.0));
+        assert_eq!(second.trace.inputs["restart_event"], Value::Bool(false));
+        assert!(driver.initialize_restart(3, true).is_err());
     }
 
     #[test]

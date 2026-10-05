@@ -15,6 +15,10 @@ GhostFlow 프로그램의 정본은 설명과 실행 규칙을 함께 담은 하
 [전체 언어 reference](../LANGUAGE-REFERENCE.md)는 이 장과 나머지 상세 장의 색인이다.
 
 외부 입력의 canonical 선언은 `input`이며 읽으면 `Result<T, SensorFault>`다.
+정확한 reserved `restart_reason: RestartReason`과 `restart_event: Bool` 선언은
+runtime 소유 lifecycle 입력이며 외부 취득 규칙의 명시적 예외다.
+각각 `RestartReason`과 `Bool`로 직접 읽는다. optional 표기, conditioning 설정과
+호출자가 공급하는 값은 금지한다. [재시작 계약](05-settings-and-observation.md)을 따른다.
 이 예제는 start fault에서 false, stop fault에서 true를 명시적으로 선택한다.
 설명용 작성 정책이며 암묵적 기본값이 아니다. 기존 `sensor` 선언은 거부한다.
 이전 문서는 보존하고 명시적으로 검토할 새 revision을 만든다.

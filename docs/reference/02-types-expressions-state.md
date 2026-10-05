@@ -168,8 +168,10 @@ phase' = case phase {
 
 ## 2.5 sensor 결과와 명시적 오류 흐름
 
-`sensor moisture: Percent;`의 선언 타입은 정상 payload 타입이다. sensor를 읽은
-결과는 정상값 또는 fault이므로 payload처럼 바로 비교할 수 없다.
+`input moisture: Percent;`의 선언 타입은 정상 payload 타입이다. 외부 입력을 읽은
+결과는 정상값 또는 fault이므로 payload처럼 바로 비교할 수 없다. 정확한 reserved
+runtime 소유 재시작 port는 5장의 계약대로 선언한 scalar 타입으로 읽는다.
+이 예외가 일반 enum 취득 입력을 허용하지는 않는다.
 
 ```ghost
 let dry = case moisture {

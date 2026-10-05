@@ -86,6 +86,8 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/long-tick-state.test.mjs',
   'tests/duration-runtime.test.mjs',
   'tests/portable-package.test.mjs',
+  'tests/restart-lifecycle.test.mjs',
+  'tests/control-runtime-restart-lifecycle.test.mjs',
   'tests/gfb11-periodic-package.test.mjs',
   'tests/gfb10-package.test.mjs',
   'tests/control-host.test.mjs',

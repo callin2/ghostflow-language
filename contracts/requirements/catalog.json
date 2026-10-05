@@ -372,8 +372,8 @@
         "path": "docs/BYTECODE.md",
         "heading": "Expression opcodes",
         "lines": [
-          71,
-          75
+          82,
+          86
         ],
         "sha256": "3f3cd61a644026610359422341b388e30dfb36339b6b1c5179f1cb923df68fb3"
       },
@@ -394,8 +394,8 @@
         "path": "docs/BYTECODE.md",
         "heading": "Safety records and host manifest",
         "lines": [
-          229,
-          232
+          240,
+          243
         ],
         "sha256": "880372d3758ba426290e482974f7eabf3ebf75b4f4159c131631a9c20254427b"
       },
@@ -415,8 +415,8 @@
         "path": "docs/BYTECODE.md",
         "heading": "Safety records and host manifest",
         "lines": [
-          229,
-          229
+          240,
+          240
         ],
         "sha256": "5bb0a87473dc5357394cb0c1cc770813b53d78dd66c4cbace3ff7e2db9ffec6c"
       },
@@ -768,8 +768,8 @@
         "path": "docs/BYTECODE.md",
         "heading": "Module envelope and format decision",
         "lines": [
-          25,
-          32
+          36,
+          43
         ],
         "sha256": "8dc260c1693c00e06ccbedf8f04d3e421851287e78adff7c2cf30e4b5ed7c174"
       },
@@ -789,8 +789,8 @@
         "path": "docs/BYTECODE.md",
         "heading": "Query opcodes",
         "lines": [
-          215,
-          225
+          226,
+          236
         ],
         "sha256": "5d064d9b4ca10fc1b97bcda7c990bcff68489321017821957f168f15a77c5efb"
       },
@@ -812,8 +812,8 @@
         "path": "docs/BYTECODE.md",
         "heading": "Safety records and host manifest",
         "lines": [
-          229,
-          231
+          240,
+          242
         ],
         "sha256": "bf6e287dba00081dfafeb4e1c8f2ac832fbb9b18c6ba8159701978f97a70a32b"
       },
@@ -833,8 +833,8 @@
         "path": "docs/BYTECODE.md",
         "heading": "Safety records and host manifest",
         "lines": [
-          229,
-          233
+          240,
+          244
         ],
         "sha256": "38905a13f131769b7f6d39145d50b0af88998fe75b3da1ade3e4db08a4d9734c"
       },
@@ -856,8 +856,8 @@
         "path": "docs/BYTECODE.md",
         "heading": "Safety records and host manifest",
         "lines": [
-          229,
-          234
+          240,
+          245
         ],
         "sha256": "a6d2bd71d672ce1cf9413a204c025578aa4f65335901bba1e1a62732a55235af"
       },
@@ -993,8 +993,8 @@
         "path": "crates/ghostflow-core/src/lib.rs",
         "heading": "fn monotonic_input_failure_is_atomic()",
         "lines": [
-          4097,
-          4119
+          4274,
+          4296
         ],
         "sha256": "a9a83443a83a4ad006cf9ee304d0f38b8bb14332b54bda1fa0c9ffecc2a583fc"
       },

@@ -3,6 +3,16 @@
 
 # GFB 바이트코드
 
+## 임시 lifecycle framing
+
+로컬 GFB21 후보는 변경 없는 내부 GFB byte와 검증된 restart descriptor를 감싼다.
+[Scan frame WASM](SCAN-FRAME-WASM.ko.md#재시작-수명-주기-확장)을 참고한다.
+GFB19는 계속 live Range start를 뜻하고 GFB20은 keyed TimeSlots Range를 뜻한다.
+공개된 `ghostflow-runtime-99ca1a3`의 lifecycle GFB19 wrapper는 현행 Range 번호와
+충돌하므로 통합 loader가 변환이나 fallback 없이 거부한다. 역사적 byte와 consumer
+pin은 고정된 채로 보존한다. 검토한 source를 별도 owner 후보로 재컴파일해야 하며
+21은 번호 할당 조정 전까지 임시다. 새 format이나 release를 공개하는 변경은 아니다.
+
 GFB18은 채택된 달력 경계 profile `GhostFlow/control-v18`을 추가한다.
 prelude tag 17은 calendar로 판정하는 불변 UTC Daily Range이며 tag 18은
 protected Bool/Bool/fault-code 입력을 쓰는 typed calendar Result다.

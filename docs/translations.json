@@ -187,8 +187,8 @@
       "source": "docs/BYTECODE.md",
       "sourceLanguage": "en",
       "translation": "docs/BYTECODE.ko.md",
-      "sourceSha256": "46e672972b01bacb947fba96c566ae25640e9a04734c30c5a230cb7900981098",
-      "translationSha256": "62ecf64ea5b85a17c5d24fe0c422130ea509202087d19c99505484a8c4490451"
+      "sourceSha256": "d5443741c1e55679ece515863df43303e20635822306e27e71cbc3d88b781ce5",
+      "translationSha256": "8372c388d3b36b0c9f1c39f49bb8741100cc99849bd32dc966ea67c64ea122e7"
     },
     {
       "source": "docs/COMPILER-DIAGNOSTICS.md",
@@ -397,15 +397,15 @@
       "source": "docs/reference/01-source-and-syntax.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/01-source-and-syntax.en.md",
-      "sourceSha256": "666c1788087f2a69189af26cadde30d1a2e00a26546031e5b00639ef4347c612",
-      "translationSha256": "6bd0cc17dbbb9427f9fed8aec6cead11f4d0c3d2707d8cb3ff688f1d939d6f13"
+      "sourceSha256": "6176b93aed705249207eeb200d3a37374d88fbe224ff15a496c2626816b735c3",
+      "translationSha256": "065f19aa716a44e454656dcd9d7bddd7fbb2ffbb3c6294b7d2e80cb766d914ac"
     },
     {
       "source": "docs/reference/02-types-expressions-state.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/02-types-expressions-state.en.md",
-      "sourceSha256": "c56f9f2a4131ba3c7bbda6db4fa89ec62d303b60e3e1db845110e6092c81a8f6",
-      "translationSha256": "746e460f42264b9596eec825b1c5ef0a31fe20849fb1e584f3b001b32e1d0b9c"
+      "sourceSha256": "d8bcaff0a6be8587d0ed4e22630b8a027bed96d16e9ae502f7793c3915b46383",
+      "translationSha256": "441a2e690da0e9d224a77ef328a6937fb24f688ffaaee70aa9dae805193537d5"
     },
     {
       "source": "docs/reference/03-time-and-schedules.md",
@@ -425,8 +425,8 @@
       "source": "docs/reference/05-settings-and-observation.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/05-settings-and-observation.en.md",
-      "sourceSha256": "05ee69ff19b041cdf033ebd0f08d50066056d1da075e25381b4b9cab079ead76",
-      "translationSha256": "446a1963ab84d8edd1c9c43994ed7e7b208b6a6ac39a277890b7a9cd32845257"
+      "sourceSha256": "7efab86b6b8b75c62f8a981836a3c548a6846b131da002bb2de5919ca7d91045",
+      "translationSha256": "4d64765fca739bbcf59870c8e1d78ec18d71458b014538dfa490cbaa1ad1334a"
     },
     {
       "source": "docs/reference/06-composition-and-replay.md",
@@ -516,8 +516,8 @@
       "source": "docs/SCAN-FRAME-WASM.md",
       "sourceLanguage": "en",
       "translation": "docs/SCAN-FRAME-WASM.ko.md",
-      "sourceSha256": "415d9248546fead35e4cf8a099a496d9783170045d219a09c2ca2a8acfccf1e3",
-      "translationSha256": "76e07552e03b1f545d6069f9cae4f021bce5b1ed6ca4cdfdd6f6bb003132f77c"
+      "sourceSha256": "c4ae8521bbff71789e7b05b16a002581e8a2591e6f3aba24ea4d32531cbfe7f8",
+      "translationSha256": "bbd5ebe2a62eb59b1e8336f5d381665db57509d294ef9ce3781e22d884b0de66"
     },
     {
       "source": "docs/SCAN-TAPE-PARITY.md",
@@ -628,8 +628,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "d0d459c379297026a33bf0146160d6e2df02672b434064da76d1413784757a27",
-      "translationSha256": "65f304f33cc8d26b423afe15a82fff70158cd155ae031bc0aa5dc27bccf3a449"
+      "sourceSha256": "4e366c84298e6c62da380b311245da12f5b92d89c2fced3c4afec48a07de4e40",
+      "translationSha256": "0d179249c38fb2d74f977e9cf42fce9904d58a6b371e55a14f78078cd465df0b"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",
