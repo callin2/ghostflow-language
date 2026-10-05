@@ -30,6 +30,8 @@ export function verificationSourceHashes(root) {
     }
   }
   for (const relative of SOURCE_ROOTS) visit(relative);
+  // Current build hooks are authored source; historical pins did not have them.
+  if (fs.existsSync(path.join(root, 'scripts'))) visit('scripts');
   // Historical consumer pins predate the calendar adapter. Its presence makes
   // the reviewed offline dataset mandatory in the current source graph.
   if (fs.existsSync(path.join(root, 'runtimes/node/calendar.mjs'))) visit('data/calendars');
