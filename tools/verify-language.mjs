@@ -2,7 +2,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
+import { enterVerification } from '../scripts/verification-entry.mjs';
 import { fileURLToPath } from 'node:url';
 import { extractLiterate } from './literate.mjs';
 import { compileSource } from './toolchain.mjs';
@@ -279,13 +280,7 @@ const PLC_CURRICULUM_IDS = Object.freeze([
 ]);
 const PLC_CURRICULUM_IMPORTED_REPOSITORY = 'callin2/farm_studio_system';
 const PLC_CURRICULUM_IMPORTED_REVISION = '056a1c88cdfe3276700f6b6a819b715370af20eb';
-const args = process.argv.slice(2);
-// Direct verifier invocations can build native/WASM outputs. Allocate once too.
-if (!process.env.FARM_BUILD_CONTEXT) {
-  const result = spawnSync(process.execPath, ['scripts/build-language-with-identity.mjs', '--verify', ...args], { stdio: 'inherit' });
-  if (result.error) throw result.error;
-  process.exit(result.status ?? 1);
-}
+const args = enterVerification();
 await import('../scripts/require-build-context.mjs');
 if (args.length > 1 || (args.length === 1 && !['--node-only', '--curriculum-only'].includes(args[0]))) {
   console.error('usage: node tools/verify-language.mjs [--node-only|--curriculum-only]');

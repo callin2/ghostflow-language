@@ -22,7 +22,7 @@ if(!process.env.FARM_BUILD_CONTEXT||!process.env.FARM_BUILD_IDENTITY_FILE)throw 
 const guard=run('python3',[vendor,'--inherit-only','--repo',root,'--base-version',pkg.version,'--',process.execPath,'-e','']);
 if(guard)process.exit(guard);
 rmSync(root+'build/build-identity.json',{force:true});
-const status=mode==='--wasm'?run('cargo',['build','--locked','--offline','-p','ghostflow-wasm','--target','wasm32-unknown-unknown','--release']):run(process.execPath,['tools/verify-language.mjs',...args]);
+const status=mode==='--wasm'?run('cargo',['build','--locked','--offline','-p','ghostflow-wasm','--target','wasm32-unknown-unknown','--release']):run(process.execPath,['tools/verify-language.mjs','--identity-artifact',...args]);
 if(status)process.exit(status);
 const identity=JSON.parse(readFileSync(process.env.FARM_BUILD_IDENTITY_FILE));
 if(mode==='--wasm'){
