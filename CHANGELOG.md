@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### 2026-10-05 — canonical quality input ([#531](https://github.com/callin2/ghostflow-language/issues/531))
+
+External `input` declarations now inherit the existing sensor Result, conditioning
+and optional capability rules (Reference 1/4). `input request: Bool;` requires
+explicit handling such as `request |> recover(true)`; healthy false is still
+false. The former `sensor` declaration is rejected with a new-revision migration
+diagnostic. Preserve saved source/history and review former plain input fault
+policies. Existing Bool/Number/quantity wire descriptors, GFB formats and WASM
+ABI remain unchanged. Previous scalar Int/Duration/DateTime input cases need a
+separately reviewed migration contract. Canonical input regressions cover
+plain/framed WASM, quality, conditioning and bytecode parity.
+
 ### 2026-10-03 — report retained observation event gaps ([#282](https://github.com/callin2/ghostflow-language/issues/282))
 
 Adds a source-bound reference Host journal that retains explicit events separately from completed snapshots. A consumer at sequence10 receives an explicit missed range11–13 if retention begins at14, with the original event14 and no snapshot-derived synthetic events. Complete publication validates atomically, rejected batches permit same-scan retry, and cursors bind exact source/Program/schema/run identity. REF-05-022 verifies actual native/framed-WASM traces, complete host delivery and fresh replay. This reference API does not change source syntax, Interaction snapshot v0, physical evidence or final execution-environment event transport.

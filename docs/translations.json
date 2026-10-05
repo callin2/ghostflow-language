@@ -2,6 +2,13 @@
   "format": "GhostFlow/document-translations-v1",
   "documents": [
     {
+      "source": "docs/INPUT-MIGRATION.md",
+      "sourceLanguage": "en",
+      "translation": "docs/INPUT-MIGRATION.ko.md",
+      "sourceSha256": "31689fb22a5ec16e7b38fb06d28325fffa52b1b3c7340fa7b7d845d505b4b5f7",
+      "translationSha256": "8329517e3ff3cba5f01b25eb6068fb960fcc3f771339f56e338a8e8a974d8375"
+    },
+    {
       "source": "docs/INSTANCE-TRACE-PROJECTION.md",
       "sourceLanguage": "en",
       "translation": "docs/INSTANCE-TRACE-PROJECTION.ko.md",
@@ -390,8 +397,8 @@
       "source": "docs/reference/01-source-and-syntax.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/01-source-and-syntax.en.md",
-      "sourceSha256": "41dc41d8a4cf38b5ee56118c0c563226a87981e0d761ee0244dc4bd2852dc0de",
-      "translationSha256": "e2b3366085e862113bf100a00836496e4c5036f54877e1f132ecdc60ebe138ec"
+      "sourceSha256": "666c1788087f2a69189af26cadde30d1a2e00a26546031e5b00639ef4347c612",
+      "translationSha256": "6bd0cc17dbbb9427f9fed8aec6cead11f4d0c3d2707d8cb3ff688f1d939d6f13"
     },
     {
       "source": "docs/reference/02-types-expressions-state.md",
@@ -411,8 +418,8 @@
       "source": "docs/reference/04-sensors-constraints-control.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/04-sensors-constraints-control.en.md",
-      "sourceSha256": "e9f6c0b874fa534c06cfa49e39e5321b65246152f7ce6e4d5f58c749553cf4bf",
-      "translationSha256": "500fdbcfcf7c513bf9ae020537a6752aa03e67d87720c984c1255c2751bc8851"
+      "sourceSha256": "81473ed5d4e9827468a4a3ace1a973c970ae3c911b2cb0734a35099e125792f1",
+      "translationSha256": "ed3e25daa34f224e70a0754b6ee47e39555ca576e8f79ef89ce52df20d45dbf6"
     },
     {
       "source": "docs/reference/05-settings-and-observation.md",
@@ -621,8 +628,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "d109ee3d9932f3187c4426d79950c939d460857a5b75766e5e7d5bd31b036079",
-      "translationSha256": "9c6d3bdc4ee2ca52c6bc5ee63714c010e67e9cc2f0d3bf1456e244cf5dfbadab"
+      "sourceSha256": "dbf86911343a8ddfe73fcf80eca5871e8007f34fc52b437f93164d91b71450ad",
+      "translationSha256": "5698bcb9fab1b4c6c1a06ec0d312cfb532e237ef728a7738d22c71ea1b21e0be"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",

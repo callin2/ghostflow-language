@@ -64,6 +64,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/HOST-EVENT-ORDERING-CONTRACT.md](HOST-EVENT-ORDERING-CONTRACT.md) | Host event ordering contract | md |
 | [docs/IMPLEMENTATION.ko.md](IMPLEMENTATION.ko.md) | 구현 및 아티팩트 경계 | md |
 | [docs/IMPLEMENTATION.md](IMPLEMENTATION.md) | Implementation and artifact boundaries | md |
+| [docs/INPUT-MIGRATION.ko.md](INPUT-MIGRATION.ko.md) | 외부 입력의 canonical 선언과 명시적 revision migration | md |
+| [docs/INPUT-MIGRATION.md](INPUT-MIGRATION.md) | Canonical external input and explicit revision migration | md |
 | [docs/INSTANCE-TRACE-PROJECTION.ko.md](INSTANCE-TRACE-PROJECTION.ko.md) | Instance trace projection 참조 어댑터 | md |
 | [docs/INSTANCE-TRACE-PROJECTION.md](INSTANCE-TRACE-PROJECTION.md) | Instance trace projection reference adapter | md |
 | [docs/INTENT-ANCHOR-MAP.ko.md](INTENT-ANCHOR-MAP.ko.md) | Literate intent anchor map | md |
@@ -231,4 +233,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.ko.md](research/GF-COMPOSE-R9-ACCEPTANCE.ko.md) | GF-COMPOSE R9: acceptance와 구현 인계 | md |
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.md](research/GF-COMPOSE-R9-ACCEPTANCE.md) | GF-COMPOSE R9: acceptance and implementation handoff | md |
 
-197 documents.
+199 documents.

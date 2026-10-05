@@ -351,11 +351,11 @@ class ControlParser {
     // contract. Preserve the same AST shape so the lowerer can type-check and
     // publish one artifact without requiring a synthetic source wrapper.
     if (!this.matches('control')) {
-      const standalone = new Set(['sensor', 'config', 'objective', 'degraded', 'adapt_setting']);
+      const standalone = new Set(['input', 'sensor', 'config', 'objective', 'degraded', 'adapt_setting']);
       if (!standalone.has(this.current().value)) this.expect('control', 'expected control declaration');
       const first = this.current();
       const body = [];
-      while (!this.matches('')) body.push(this.declaration());
+      while (!this.matches('')) body.push(...[this.declaration()].flat());
       return { kind: 'control', name: '__document__', loc: copyLoc(first), body: [...prelude, ...body], imports, standalone: true, sourceNodes: this.nodes };
     }
     const start = this.expect('control', 'expected control declaration');
@@ -364,7 +364,7 @@ class ControlParser {
     const body = [];
     while (!this.matches('}')) {
       if (this.current().kind === 'eof') error(start, 'unclosed control block');
-      body.push(this.declaration());
+      body.push(...[this.declaration()].flat());
     }
     this.take();
     if (!this.matches('')) error(this.current(), `unexpected trailing token ${this.current().value}`);
@@ -585,7 +585,7 @@ class ControlParser {
   declaration() {
     const token = this.current();
     switch (token.value) {
-      case 'input': return this.port('input');
+      case 'input': return this.externalInput();
       case 'output': return this.port('output');
       case 'state': return this.state();
       case 'config': return this.config();
@@ -597,7 +597,7 @@ class ControlParser {
       case 'enum': error(token, 'removed alias enum; use type Name = A | B;');
       case 'fn': return this.functionDecl();
       case 'purefn': error(token, 'removed alias purefn; use fn');
-      case 'sensor': return this.sensor();
+      case 'sensor': error(token, 'removed sensor declaration; use input with the same Result quality and conditioning contract; create an explicit new source revision');
       case 'event': return this.event();
       case 'calendar': return this.logicalProvider('calendar');
       case 'provider': return this.logicalProvider('provider');
@@ -652,9 +652,6 @@ class ControlParser {
     const names = this.names(`expected ${kind} name`);
     this.expect(':', `expected : after ${kind} name`);
     const type = this.typeName();
-    if (kind === 'input' && this.matches('=')) {
-      error(this.current(), 'input declarations are type-only; the host supplies input values');
-    }
     if (kind === 'output' && this.matches('=')) {
       error(this.current(), 'output declarations are type-only; connect each output with `name <- expression;`');
     }
@@ -877,12 +874,19 @@ class ControlParser {
     this.take();
     return this.node('account-constraints', start, { name: name.value, limits });
   }
-  sensor() {
-    const start = this.take(), name = this.identifier('expected sensor name'); const optional = !!this.maybe('?');
+  externalInput() {
+    const start = this.take(), names = [];
+    do {
+      const name = this.identifier('expected input name');
+      names.push({ name, optional: !!this.maybe('?') });
+    } while (this.maybe(','));
     this.expect(':'); const type = this.typeName(); const options = {};
+    if (this.matches('=')) error(this.current(), 'input declarations are type-only; the host supplies typed quality samples');
     if (this.maybe('{')) {
       while (!this.matches('}')) {
-        const key = this.identifier('expected sensor option'); this.expect('=', `expected = after ${key.value}`);
+        const key = this.identifier('expected input option'); this.expect('=', `expected = after ${key.value}`);
+        const optionName = { stale_after: 'staleAfter', recover_after: 'recoverAfter', valid: 'validMin' }[key.value] ?? key.value;
+        if (Object.hasOwn(options, optionName)) error(key, `duplicate input option ${key.value}`);
         if (key.value === 'valid') {
           options.validMin = this.expression(); this.expect('..', 'valid expects ..'); options.validMax = this.expression();
         } else if (key.value === 'filter') options.filter = this.expression();
@@ -890,12 +894,14 @@ class ControlParser {
         else if (key.value === 'stale_after') options.staleAfter = this.expression();
         else if (key.value === 'recover_after') {
           options.recoverAfter = this.expression(); this.expect('samples', 'recover_after expects samples');
-        } else error(key, `unsupported sensor option ${key.value}`);
-        this.expect(';', 'expected ; after sensor option');
+        } else error(key, `unsupported input option ${key.value}`);
+        this.expect(';', 'expected ; after input option');
       }
       this.take(); this.maybe(';');
-    } else this.expect(';', 'expected ; after sensor declaration');
-    return this.node('sensor', start, { name: name.value, optional, type, options });
+    } else this.expect(';', 'expected ; after input declaration');
+    // The internal sensor category and its wire descriptors preserve the existing
+    // typed quality lowering. There is no plain authored input execution path.
+    return names.map(({ name, optional }) => this.node('sensor', start, { name: name.value, optional, type, options }));
   }
   signal() {
     const start = this.take(), name = this.identifier('expected signal name'); this.expect('=', 'signal requires =');
@@ -1851,10 +1857,6 @@ class Lowerer {
       if (item.kind === 'account-constraints') {
         if (!this.ast.body.some(entry => entry.kind === 'resource' || entry.kind === 'account')) error(item.loc, 'unsupported construct constraints; use the named-constraints parser');
         this.validateAccountConstraints(item);
-      }
-      if (item.kind === 'input') {
-        const type = this.resolveType(item.type); if (!SCALAR_TYPES.has(type.kind)) error(item.type.loc, 'input must use a scalar type');
-        for (const name of item.names) { this.addInput(name, type, item.loc, true); this.symbols.get(name).type = type; }
       }
       if (item.kind === 'output') {
         const type = this.resolveType(item.type); if (!SCALAR_TYPES.has(type.kind)) error(item.type.loc, 'output must use a scalar type');

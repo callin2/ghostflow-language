@@ -22,13 +22,17 @@ The basis is [common constraints and sensor contracts](../CONSTRAINTS.md), [sele
 [#105](https://github.com/callin2/ghostflow-language/issues/105) and
 [#110](https://github.com/callin2/ghostflow-language/issues/110).
 
+The canonical external declaration keyword is `input`. It inherits this chapter's typed quality, conditioning and optional capability rules. `sensor` remains an
+internal/wire quality category, not an accepted declaration alias. Migrate source
+only as a new reviewed revision; see [the migration contract](../INPUT-MIGRATION.md).
+
 ## 4.1 sensor and Result quality
 
 In the selected declaration, a sensor's type is its normal payload type.
 
 ```ghost
-sensor low_water: Bool;
-sensor moisture: Percent;
+input low_water: Bool;
+input moisture: Percent;
 ```
 
 The actual type when reading a sensor is conceptually `Result<T, SensorFault>`. Branch on normal samples with `ok(value)` and errors with `fault(reason)`.
@@ -71,7 +75,7 @@ let normalized = temperature |> and_then(normalize);
 The selected sensor configuration notation is:
 
 ```ghost
-sensor moisture: Percent {
+input moisture: Percent {
   sample = 1s;
   valid = 0% .. 100%;
   filter = median(5);
@@ -148,8 +152,8 @@ The two boundaries prevent repeated ON/OFF near the threshold. This memory is ex
 The following is selected notation:
 
 ```ghost
-sensor moisture: Percent { filter = moving_average(3); }
-sensor temperature: Temperature { filter = ema(alpha: 0.25); }
+input moisture: Percent { filter = moving_average(3); }
+input temperature: Temperature { filter = ema(alpha: 0.25); }
 signal stable_start = debounce(start, stable_for: 2s, initial: false);
 ```
 
@@ -339,7 +343,7 @@ separate compatibility decisions.
 ## 4.5 Optional sensors and capabilities
 
 ```ghost
-sensor moisture?: Percent;
+input moisture?: Percent;
 ```
 
 `?` declares that the sensor capability is optional in the installation profile. It does not merge absence with faults of an installed sensor.

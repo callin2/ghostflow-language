@@ -23,13 +23,18 @@ GhostFlow의 센서 값은 숫자 하나가 아니다. 값의 출처·품질·�
 [#105](https://github.com/callin2/ghostflow-language/issues/105),
 [#110](https://github.com/callin2/ghostflow-language/issues/110)이다.
 
+외부 입력의 canonical 선언 keyword는 `input`이다. 이 장의 typed quality,
+conditioning과 optional capability 규칙을 계승한다. `sensor`는 내부/wire 품질
+분류이며 허용되는 선언 alias가 아니다. 소스 변경은 검토할 새 revision으로만
+만든다. [migration 계약](../INPUT-MIGRATION.ko.md)을 따른다.
+
 ## 4.1 sensor와 Result 품질
 
 선택된 선언에서 sensor 타입은 정상 payload 타입이다.
 
 ```ghost
-sensor low_water: Bool;
-sensor moisture: Percent;
+input low_water: Bool;
+input moisture: Percent;
 ```
 
 sensor를 읽은 실제 타입은 개념적으로 `Result<T, SensorFault>`다. 정상 샘플은
@@ -84,7 +89,7 @@ let normalized = temperature |> and_then(normalize);
 선택된 sensor 설정 표기는 다음과 같다.
 
 ```ghost
-sensor moisture: Percent {
+input moisture: Percent {
   sample = 1s;
   valid = 0% .. 100%;
   filter = median(5);
@@ -176,8 +181,8 @@ signal dry = hysteresis(moisture,
 다음은 선택된 표기다.
 
 ```ghost
-sensor moisture: Percent { filter = moving_average(3); }
-sensor temperature: Temperature { filter = ema(alpha: 0.25); }
+input moisture: Percent { filter = moving_average(3); }
+input temperature: Temperature { filter = ema(alpha: 0.25); }
 signal stable_start = debounce(start, stable_for: 2s, initial: false);
 ```
 
@@ -442,7 +447,7 @@ Estimate를 소비하는 실행 지원은 #385에서 별도 compatibility를 정
 ## 4.5 선택 sensor와 capability
 
 ```ghost
-sensor moisture?: Percent;
+input moisture?: Percent;
 ```
 
 `?`는 해당 sensor capability가 설치 profile에서 선택적이라는 선언 정보다. 이는
