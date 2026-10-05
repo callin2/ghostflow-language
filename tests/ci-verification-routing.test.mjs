@@ -145,8 +145,11 @@ test('workflow always triggers, routes both lanes, and preserves full verificati
   assert.match(classifier, /mode: \$\{\{ steps.route.outputs.mode \}\}/);
   for (const [lane, mode] of [[docs, 'docs'], [verify, 'full']]) {
     assert.match(lane, /needs: classify/);
-    assert.ok(lane.includes(`if: \${{ needs.classify.outputs.mode == '${mode}' }}`));
+    const trustedBuild = mode === 'full' ? " && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)" : '';
+    assert.ok(lane.includes(`if: \${{ needs.classify.outputs.mode == '${mode}'${trustedBuild} }}`));
   }
+  assert.match(verify, /permissions:\n      contents: write/);
+  assert.match(verify, /persist-credentials: \$\{\{ matrix.label == 'current' \}\}/);
   assert.match(docs, /npm ci --ignore-scripts/); assert.match(docs, /npm run docs:check/);
   assert.match(docs, /node --test tests\/ci-verification-routing.test.mjs tests\/doc-index.test.mjs/);
   assert.doesNotMatch(docs, /rustup|cargo|coverage|npm test|upload-artifact/);
