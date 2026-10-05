@@ -880,7 +880,7 @@ class ControlParser {
       const name = this.identifier('expected input name');
       names.push({ name, optional: !!this.maybe('?') });
     } while (this.maybe(','));
-    this.expect(':'); const type = this.typeName(); const options = {};
+    this.expect(':', 'expected : after input name'); const type = this.typeName(); const options = {};
     if (this.matches('=')) error(this.current(), 'input declarations are type-only; the host supplies typed quality samples');
     if (this.maybe('{')) {
       while (!this.matches('}')) {
@@ -1702,7 +1702,7 @@ class Lowerer {
     };
   }
   unique(name, loc, category) {
-    rejectName(name, loc, category);
+    rejectName(name, loc, category === 'sensor' ? 'input' : category);
     if (this.symbols.has(name)) error(loc, `duplicate name ${name}`);
     this.symbols.set(name, { category, loc });
   }
@@ -3283,6 +3283,17 @@ class Lowerer {
   expression(node, locals, options, callStack = [], expected = null) {
     if (++this.expansionNodes > EXPANSION_NODE_LIMIT) error(node.loc, `function expansion exceeds ${EXPANSION_NODE_LIMIT} node budget`);
     const recurse = (child, childLocals = locals, childOptions = options, childExpected = null) => this.expression(child, childLocals, childOptions, callStack, childExpected);
+    if (node.kind === 'call' && node.name === 'ok' && node.compositionPayloadType) {
+      // Internal scalar connections are evaluated values, not acquisition
+      // observations. Preserve child Result handling without sample provenance.
+      if (options.pureFunction) error(node.loc, `fn ${options.pureFunction} cannot capture global computed input`);
+      if (options.macroDefinition) error(node.loc, `syntax macro ${options.macroDefinition} cannot capture global computed input`);
+      if (options.parameterConstant) error(node.loc, 'parameter default must be a constant independent of inputs, state and settings');
+      const payloadType = this.resolveType(node.compositionPayloadType);
+      if (!SCALAR_TYPES.has(payloadType.kind))
+        error(node.loc, `computed input payload must be ${typeNameOf(payloadType)}`);
+      return this.callExpression(node, locals, options, callStack, resultType(payloadType, semanticType('SensorFault')));
+    }
     if (node.kind === 'splice') {
       const value = options.macroArguments?.get(node.name);
       if (!value) error(node.loc, `unknown syntax macro parameter ${node.name}`);
@@ -4319,8 +4330,9 @@ export function compileBoundControlPolicyArtifact(source, { filename, envelope }
   const requestAst = { ...ast, body: ast.body.filter(item => !['shared-constraints', 'resource'].includes(item.kind)) };
   const candidate = new Lowerer(requestAst, filename).lower();
   if (![1, 3].includes(new DataView(candidate.bytes.buffer, candidate.bytes.byteOffset).getUint16(4, true))
-    || checked.manifest.outputs.some(port => port.type !== 'Bool')
-    || checked.manifest.inputs.some(port => port.type !== 'Bool')) {
+      || checked.manifest.outputs.some(port => port.type !== 'Bool')
+      || checked.manifest.inputs.some(port => port.type !== 'Bool')
+      || checked.manifest.sensors.some(port => port.type !== 'Bool')) {
     error(ast.loc, 'bound resource execution supports only a Bool GFB1 v1/v3 control; contextual, accounting, continuous and other profiles require separate integration');
   }
   if (typeof envelope !== 'function') error(ast.loc, 'bound resource execution requires a compiled policy envelope');

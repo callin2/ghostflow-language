@@ -1,19 +1,21 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
+import { softwareQualityAbi, softwareQualityRails } from './helpers/software-quality-observations.mjs';
 import { compileSource } from '../tools/toolchain.mjs';
 import { GhostFlowRuntime } from '../runtimes/wasm/ghostflow-runtime.mjs';
 import { FramedGhostFlowRuntime } from '../runtimes/wasm/framed-runtime.mjs';
 import { NativeDispatchError } from '../runtimes/wasm/native-dispatch.mjs';
 
 const wasm = fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
-const artifact = await compileSource('```ghost\ncontrol DispatchStatus {\n input divisor: Number;\n state count: Number = 0.0; count\' = count + 1.0;\n output guard: Int; guard <- 1 div int_exact(divisor);\n}\n```\n', { filename: 'dispatch-status.ghost.md' });
-const frame = divisor => ({ scanId: 0, logicalTimeMs: 0, inputs: [{ name: 'divisor', type: 'Number', value: divisor }] });
+const artifact = await compileSource('```ghost\ncontrol DispatchStatus {\n input divisor: Number;\n state retained_divisor: Number = 1.0;\n let scalar_divisor = case divisor { ok(value) => value; fault(_) => retained_divisor; };\n retained_divisor\' = scalar_divisor;\n state count: Number = 0.0; count\' = count + 1.0;\n output guard: Int; guard <- 1 div int_exact(scalar_divisor);\n}\n```\n', { filename: 'dispatch-status.ghost.md' });
+const frame = divisor => ({ scanId: 0, logicalTimeMs: 0, inputs: Object.entries(softwareQualityRails(artifact, { divisor }, 1, 0)).map(([name, value]) => ({ name, value })) });
 async function active(t, framed) {
   const runtime = await (framed ? FramedGhostFlowRuntime : GhostFlowRuntime).instantiate(wasm);
   const original = runtime.wasm;
   t.after(() => { runtime.wasm = original; runtime.dispose(); });
   runtime.load(artifact.bytes);
+  softwareQualityAbi(runtime, artifact);
   runtime.addCapability('actuator', 'guard', 'int');
   runtime.activate();
   return { runtime, original };

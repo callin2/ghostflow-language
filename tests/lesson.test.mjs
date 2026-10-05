@@ -17,12 +17,12 @@ async function bundleJson(change = value => value) {
     'control LessonPump {',
     '  input enabled: Bool;',
     '  output pump: Bool;',
-    '  pump <- enabled;',
+    '  pump <- enabled |> recover(false);',
     '}',
     '```',
   ].join('\n');
   const bundle = {
-    format: 'ghostflow-lesson-v1', lessonId: 'pump-basics', revision: 'r1', title: 'Pump basics', locale: 'en',
+    format: 'ghostflow-lesson-v1', lessonId: 'pump-basics', revision: 'input-v1', title: 'Pump basics', locale: 'en',
     source: { text: source, sha256: await digest(source), mediaType: 'text/markdown; profile=ghostflow-literate' },
     playback: { durationMs: 60_000, checkpoints: [{ atMs: 10_000, sourceSpan: { startLine: 4, endLine: 8 }, narration: 'Connect input to output.', scenarioId: 'enabled' }] },
     scenarios: [{ id: 'enabled', title: 'Enabled pump', frames: [{ atMs: 0, inputs: { enabled: true } }, { atMs: 30_000, inputs: { enabled: false } }] }],
@@ -89,9 +89,9 @@ test('accepts independently-clocked scenario frames beyond the narration duratio
 test('remaps compiler errors to their original Markdown source location', async () => {
   await assert.rejects(
     compileLessonBundle(await bundleJson(bundle => {
-      bundle.source.text = bundle.source.text.replace('pump <- enabled;', 'pump <- ;');
+      bundle.source.text = bundle.source.text.replace('pump <- enabled |> recover(false);', 'pump <- ;');
     })),
-    error => error.line === 7 && error.column === 11 && error.filename === 'pump-basics@r1.ghost.md',
+    error => error.line === 7 && error.column === 11 && error.filename === 'pump-basics@input-v1.ghost.md',
   );
 });
 

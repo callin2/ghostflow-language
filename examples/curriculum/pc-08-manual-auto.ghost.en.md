@@ -37,7 +37,10 @@ overload relay, and electrical interlocks.
 
 ## GhostFlow source
 
+This explicit input revision consumes producer quality, not physical button diagnostics. Good(false) remains a normal observation. Unknown request/position/mode observations do not establish a new request, released request, position, or mode; existing state is retained where no observation justifies a transition. Existing protection permission requires a confirmed Good(true), and existing hard time limits remain effective. No new START input or global restart policy is added.
+
 ```ghost
+// Source revision: issue531-producer-quality-pc08-v1
 control ManualAutoPump {
   input manual_mode_request, auto_mode_request, manual_start, auto_demand, stop_ok, overload_ok: Bool;
   output pump_contactor: Bool;
@@ -52,21 +55,38 @@ control ManualAutoPump {
   // ghostflow:link id=GF-INT-PC08-MANUAL-AUTO-REARM-V1 relation=implements
   state request_armed: Bool = false;
 
-  let permit = stop_ok && overload_ok;
-  let requested_mode = if manual_mode_request && auto_mode_request then ModeConflict
-    else if manual_mode_request then Manual
-    else if auto_mode_request then Auto
+  let manual_mode_request_true = case manual_mode_request { ok(value) => value; fault(_) => false; };
+  let manual_mode_request_false = case manual_mode_request { ok(value) => !value; fault(_) => false; };
+  let auto_mode_request_true = case auto_mode_request { ok(value) => value; fault(_) => false; };
+  let auto_mode_request_false = case auto_mode_request { ok(value) => !value; fault(_) => false; };
+  let manual_start_true = case manual_start { ok(value) => value; fault(_) => false; };
+  let manual_start_false = case manual_start { ok(value) => !value; fault(_) => false; };
+  let auto_demand_true = case auto_demand { ok(value) => value; fault(_) => false; };
+  let auto_demand_false = case auto_demand { ok(value) => !value; fault(_) => false; };
+  let stop_ok_true = case stop_ok { ok(value) => value; fault(_) => false; };
+  let stop_ok_false = case stop_ok { ok(value) => !value; fault(_) => false; };
+  let overload_ok_true = case overload_ok { ok(value) => value; fault(_) => false; };
+  let overload_ok_false = case overload_ok { ok(value) => !value; fault(_) => false; };
+  let modes_good = case manual_mode_request { ok(_) => case auto_mode_request { ok(_) => true; fault(_) => false; }; fault(_) => false; };
+
+  let permit = stop_ok_true && overload_ok_true;
+  let requested_mode = if !modes_good then mode else if manual_mode_request_true && auto_mode_request_true then ModeConflict
+    else if manual_mode_request_true then Manual
+    else if auto_mode_request_true then Auto
     else Off;
   let mode_changed = requested_mode != mode;
-  let selected_request = if requested_mode == Manual then manual_start
-    else if requested_mode == Auto then auto_demand
+  let selected_request = if requested_mode == Manual then manual_start_true
+    else if requested_mode == Auto then auto_demand_true
     else false;
-  let request_event = request_armed && selected_request;
+  let request_released = if requested_mode == Manual then manual_start_false
+    else if requested_mode == Auto then auto_demand_false
+    else false;
+  let request_event = modes_good && request_armed && selected_request;
 
   mode' = requested_mode;
 
-  request_armed' = if mode_changed || !permit || requested_mode == Off || requested_mode == ModeConflict then false
-    else if !selected_request then true
+  request_armed' = if !modes_good || mode_changed || !permit || requested_mode == Off || requested_mode == ModeConflict then false
+    else if request_released then true
     else false;
 
   run_phase' = case run_phase {
@@ -77,7 +97,7 @@ control ManualAutoPump {
 
     Running =>
       if mode_changed || requested_mode == Off || requested_mode == ModeConflict || !permit then Stopped
-      else if requested_mode == Auto && !auto_demand then Stopped
+      else if requested_mode == Auto && auto_demand_false then Stopped
       else Running;
   };
 

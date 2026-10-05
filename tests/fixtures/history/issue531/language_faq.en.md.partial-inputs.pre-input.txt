@@ -1,0 +1,30 @@
+```ghost
+input today_starts: Int;
+input count_valid: Bool;
+let wash_due = count_valid && today_starts >= 10;
+```
+
+```ghost
+input is_weekday, calendar_valid: Bool;
+config weekday_duration: Duration = 5min {
+  min = 1min;
+  max = 20min;
+  step = 1min;
+  access = operator;
+  label = "평일 작동 시간";
+}
+config weekend_duration: Duration = 10min {
+  min = 1min;
+  max = 20min;
+  step = 1min;
+  access = operator;
+  label = "주말 작동 시간";
+}
+let duration = if is_weekday then weekday_duration else weekend_duration;
+let can_start = calendar_valid;
+```
+
+```ghost
+input is_neap, tide_valid, schedule_due: Bool;
+let start_allowed = tide_valid && is_neap && schedule_due;
+```

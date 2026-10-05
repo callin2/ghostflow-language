@@ -5,9 +5,9 @@
       "id": "PC-01",
       "source": {
         "canonicalPath": "docs/ProgrammingInGhostflow.md",
-        "canonicalSha256": "abe544d6cb2287670ec1eb6355b3497820f4b5d1063bc3ebca6705b8c0fdbbba",
+        "canonicalSha256": "902d6e9cd0fc0990c1f60be6630078efe5d5bf20b6d6ac7ed8ea7383b0f01c2d",
         "executablePath": "examples/curriculum/generated/pc-01-e01.generated.ghost.md",
-        "executableSha256": "321fe84aac9940f5484c21c578437fcf75ea8e435094e698574fc70f0390b45f"
+        "executableSha256": "330a124e9098194c908695036330c8c95e66fd5772e42091c1b92bbb8c687702"
       },
       "inputs": [
         "switch_on"
@@ -316,9 +316,9 @@
       "id": "PC-05",
       "source": {
         "canonicalPath": "examples/curriculum/pc-05-limit-feedback.ghost.md",
-        "canonicalSha256": "ed0fa48243a9e627dce12ce0c4086478db907368228facc61f3c2d088c5dfd9e",
+        "canonicalSha256": "5da6ac776da21bcfb46a44bfd5d7f415f93ec8dea7739e9a0a65c4126e46e3cf",
         "executablePath": "examples/curriculum/pc-05-limit-feedback.ghost.md",
-        "executableSha256": "ed0fa48243a9e627dce12ce0c4086478db907368228facc61f3c2d088c5dfd9e"
+        "executableSha256": "5da6ac776da21bcfb46a44bfd5d7f415f93ec8dea7739e9a0a65c4126e46e3cf"
       },
       "inputs": [
         "open_request",
@@ -473,9 +473,9 @@
       "id": "PC-08",
       "source": {
         "canonicalPath": "examples/curriculum/pc-08-manual-auto.ghost.md",
-        "canonicalSha256": "23d5282723b78b81410558d102a2e7b01f68d0d0fea89180b93e767dd74927c6",
+        "canonicalSha256": "2e0ca37ee68cab672665e953cfda1455993702df0354a1fc80df836cde23afb8",
         "executablePath": "examples/curriculum/pc-08-manual-auto.ghost.md",
-        "executableSha256": "23d5282723b78b81410558d102a2e7b01f68d0d0fea89180b93e767dd74927c6"
+        "executableSha256": "2e0ca37ee68cab672665e953cfda1455993702df0354a1fc80df836cde23afb8"
       },
       "inputs": [
         "manual_mode_request",
@@ -650,9 +650,9 @@
       "id": "PC-09",
       "source": {
         "canonicalPath": "examples/curriculum/pc-09-sequential-water-supply.ghost.md",
-        "canonicalSha256": "02652715e118208011a2d7667e048cfe1b063fcb6286fe3bb3d2b4bbc992366f",
+        "canonicalSha256": "c0473fe780cfd1a5566131cf073dda0f5f768069c4b412fa2b990826aab774b3",
         "executablePath": "examples/curriculum/pc-09-sequential-water-supply.ghost.md",
-        "executableSha256": "02652715e118208011a2d7667e048cfe1b063fcb6286fe3bb3d2b4bbc992366f"
+        "executableSha256": "c0473fe780cfd1a5566131cf073dda0f5f768069c4b412fa2b990826aab774b3"
       },
       "inputs": [
         "start_request",

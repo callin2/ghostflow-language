@@ -1,3 +1,4 @@
+// Explicit temporal fixture revision: issue531-quality-temporal-v1; predecessor retained in fixtures/history/issue531/temporal.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { compileSource } from '../tools/toolchain.mjs';
@@ -57,8 +58,9 @@ test('range accepts adjacent DailySlots intervals and keeps the planned duration
   const midnight = await compileSource(dailySlots({ selected: '[23:45, 00:00]' }), { filename: 'range-midnight-adjacent.ghost.md' });
   assert.deepEqual(midnight.manifest.schedules[0].slots, [0, 1425]);
   const conditional = await compileSource(dailySlots().replace('control PlannedWatering {', 'control PlannedWatering { input stop: Bool;')
-    .replace('cancel_when = false', 'cancel_when = stop'), { filename: 'range-cancel-condition.ghost.md' });
-  assert.equal(conditional.manifest.schedules[0].policy.cancelWhen, 'input.stop');
+    .replace('cancel_when = false', 'cancel_when = stop |> recover(true)'), { filename: 'range-cancel-condition.ghost.md' });
+  assert.equal(conditional.manifest.schedules[0].policy.cancelWhen[0], 'trace-result');
+  assert.deepEqual(conditional.manifest.schedules[0].policy.cancelWhen[2], ['if', 'input.__gf_sensor_ok_stop', 'input.__gf_sensor_value_stop', 'true']);
 });
 
 test('range rejects overlapping static DailySlots intervals at compile time', async () => {

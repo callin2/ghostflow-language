@@ -1,4 +1,11 @@
+// Explicit temporal fixture revision: issue531-quality-temporal-v1; predecessor retained in fixtures/history/issue531/temporal.
 import assert from 'node:assert/strict';
+import { softwareQualityObservations, softwareQualityRails } from './helpers/software-quality-observations.mjs';
+const ControlRuntime = {
+  instantiate: async (...args) => softwareQualityObservations(await BaseControlRuntime.instantiate(...args)),
+  instantiateFramed: async (...args) => softwareQualityObservations(await BaseControlRuntime.instantiateFramed(...args)),
+};
+
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -6,7 +13,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { compileSource, writeArtifact } from '../tools/toolchain.mjs';
-import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
+import { ControlRuntime as BaseControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const wasm = fs.readFileSync(path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm'));
@@ -25,7 +32,7 @@ An 08:00 UTC range(10min) keeps its planned deadline while a safety input blocks
 control PlannedRangeSafety {
   input safety_ok: Bool;
   output safety_gate: Bool;
-  safety_gate <- safety_ok;
+  safety_gate <- safety_ok |> recover(false);
 
   schedule watering: DailySlots<15min> {
     timezone = "UTC";
@@ -92,7 +99,7 @@ test('REF-03-075: fixed Range deadline survives safety blocking in native contex
     writeArtifact(artifact, artifactPath);
     const frames = steps.map(({ mono, wall, safety_ok }, scanId) => ({
       scanId, logicalTimeMs: mono,
-      inputs: [{ name: 'safety_ok', type: 'Bool', value: safety_ok }],
+      inputs: Object.entries(softwareQualityRails(artifact, { safety_ok }, scanId + 1, mono)).map(([name, value]) => ({ name, value })),
       ...facts(site, mono, wall),
     }));
     fs.writeFileSync(tapePath, JSON.stringify({ profile: 'context-civil-v1', activation, steps: frames }));

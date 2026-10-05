@@ -217,6 +217,7 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/reports/2026-09-24-reference-simulator-evidence.json](reports/2026-09-24-reference-simulator-evidence.json) | 2026-09-24-reference-simulator-evidence.json | json |
 | [docs/reports/2026-10-03-stale-branch-reconciliation.md](reports/2026-10-03-stale-branch-reconciliation.md) | Stale branch reconciliation — 2026-10-03 | md |
 | [docs/reports/2026-10-05-input-531-consumer-gates.md](reports/2026-10-05-input-531-consumer-gates.md) | Issue 531 independent review and consumer adoption gates | md |
+| [docs/reports/2026-10-05-input-531-integration.md](reports/2026-10-05-input-531-integration.md) | Issue 531 integration checkpoint and consumer handoff | md |
 
 ## docs/research/
 
@@ -241,4 +242,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.ko.md](research/GF-COMPOSE-R9-ACCEPTANCE.ko.md) | GF-COMPOSE R9: acceptance와 구현 인계 | md |
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.md](research/GF-COMPOSE-R9-ACCEPTANCE.md) | GF-COMPOSE R9: acceptance and implementation handoff | md |
 
-202 documents.
+203 documents.

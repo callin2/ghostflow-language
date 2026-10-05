@@ -1,9 +1,16 @@
+// Explicit temporal fixture revision: issue531-quality-temporal-v1; predecessor retained in fixtures/history/issue531/temporal.
 import assert from 'node:assert/strict';
+import { softwareQualityObservations, softwareQualityRails } from './helpers/software-quality-observations.mjs';
+const ControlRuntime = {
+  instantiate: async (...args) => softwareQualityObservations(await BaseControlRuntime.instantiate(...args)),
+  instantiateFramed: async (...args) => softwareQualityObservations(await BaseControlRuntime.instantiateFramed(...args)),
+};
+
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import test from 'node:test';
 import { validateInteraction } from '../contracts/interaction-v0/validate.mjs';
-import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
+import { ControlRuntime as BaseControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 import { compileControl, ControlCompileError } from '../tools/control.mjs';
 import { emitCompletedScanSnapshot } from '../tools/interaction-runtime-snapshot.mjs';
 import { canonicalJson } from '../tools/canonical-json.mjs';
@@ -13,6 +20,15 @@ import { compileSource } from './helpers/literate-compile.mjs';
 const wasm = fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
 const maxDateTime = 253_402_300_799_999;
 const encoder = new TextEncoder();
+
+test('temporal quality revisions retain exact predecessor tests and source fixtures', () => {
+  const history = JSON.parse(fs.readFileSync(new URL('./fixtures/history/issue531/temporal/programs.json', import.meta.url), 'utf8'));
+  assert.equal(history.snapshots.length, 18);
+  for (const record of [...history.snapshots, ...history.retainedPredecessors]) {
+    const bytes = fs.readFileSync(new URL(`../${record.snapshot ?? record.source}`, import.meta.url));
+    assert.equal(createHash('sha256').update(bytes).digest('hex'), record.sha256, record.source);
+  }
+});
 
 function hexBytes(value) { return Uint8Array.from(value.match(/../g), byte => Number.parseInt(byte, 16)); }
 function concatBytes(...parts) {
@@ -37,7 +53,10 @@ async function resign(value, key) {
 
 test('compiler admits canonical time scalars, settings grids, and DateTime arithmetic', () => {
   const compiled = compileControl(`control CalendarValues {
-    input now: DateTime;
+    input observed_now: DateTime;
+    state previous_now: DateTime = datetime\`1970-01-01T00:00:00Z\`;
+    let now = case observed_now { ok(value) => value; fault(_) => previous_now; };
+    previous_now' = now;
     state day: Date = date\`1970-01-01\`;
     config deadline: DateTime = datetime\`2026-09-22T06:30:00+09:00\` {
       min = datetime\`2026-09-21T00:00:00Z\`;
@@ -63,7 +82,8 @@ test('compiler admits canonical time scalars, settings grids, and DateTime arith
       fault(_) => false;
     };
   }`, { filename: 'calendar-values.ghost' });
-  assert.deepEqual(compiled.manifest.inputs, [{ name: 'now', type: 'DateTime' }]);
+  assert.deepEqual(compiled.manifest.inputs, []);
+  assert.deepEqual(compiled.manifest.sensors.map(({ name, type }) => ({ name, type })), [{ name: 'observed_now', type: 'DateTime' }]);
   assert.deepEqual(compiled.manifest.outputs, [
     { name: 'shifted', type: 'DateTime' }, { name: 'ordered', type: 'Bool' },
   ]);
@@ -116,7 +136,7 @@ test('legacy and framed actual WASM accept boundary rollover and reject overflow
     input base: DateTime;
     input offset: Duration;
     state committed: DateTime = datetime\`1970-01-01T00:00:00Z\`;
-    committed' = base + offset;
+    committed' = case base { ok(value) => case offset { ok(delta) => value + delta; fault(_) => committed; }; fault(_) => committed; };
     output shifted: DateTime;
     shifted <- committed';
   }`, { filename: 'datetime-runtime-control.ghost' });
@@ -137,32 +157,32 @@ test('legacy and framed actual WASM accept boundary rollover and reject overflow
   } finally { framed.dispose(); }
 });
 
-test('runtime rejects noninteger and out-of-range public time values and metadata loss', async () => {
+test('runtime classifies noninteger and out-of-range time samples as Invalid and rejects metadata loss', async () => {
   const compiled = await compileSource(`control TimeBoundary {
     input day: Date;
     input time: TimeOfDay;
     input instant: DateTime;
     let epoch = datetime\`1970-01-01T00:00:00Z\`;
     output same: Bool;
-    same <- instant == epoch;
+    same <- case instant { ok(value) => value == epoch; fault(_) => false; };
   }`, { filename: 'time-boundary.ghost' });
   const runtime = await ControlRuntime.instantiate(wasm, compiled);
   try {
     assert.doesNotThrow(() => runtime.step({ nowMs: 0, inputs: { day: 2_932_896, time: 86_399_999, instant: maxDateTime } }));
     for (const [field, value] of [['day', -1], ['day', 2_932_897], ['time', 0.5], ['time', 86_400_000], ['instant', maxDateTime + 1]]) {
       const inputs = { day: 0, time: 0, instant: 0, [field]: value };
-      assert.throws(() => runtime.step({ nowMs: 1, inputs }), new RegExp(`${field}.*integer|${field}.*range`));
+      assert.equal(runtime.step({ nowMs: 1, inputs }).sensors[field].quality, 'Invalid');
     }
   } finally { runtime.dispose(); }
   const framed = await ControlRuntime.instantiateFramed(wasm, compiled);
   try {
     for (const [field, value] of [['day', -1], ['time', 86_400_000], ['instant', maxDateTime + 1]]) {
-      assert.throws(() => framed.step({ nowMs: 0, inputs: { day: 0, time: 0, instant: 0, [field]: value } }), new RegExp(`${field}.*integer|${field}.*range`));
+      assert.equal(framed.step({ nowMs: 0, inputs: { day: 0, time: 0, instant: 0, [field]: value } }).sensors[field].quality, 'Invalid');
     }
   } finally { framed.dispose(); }
   await assert.rejects(() => ControlRuntime.instantiate(wasm, {
     ...compiled,
-    manifest: { ...compiled.manifest, inputs: [{ ...compiled.manifest.inputs[0], canonicalUnit: 'day' }, ...compiled.manifest.inputs.slice(1)] },
+    manifest: { ...compiled.manifest, sensors: [{ ...compiled.manifest.sensors[0], canonicalUnit: 'day' }, ...compiled.manifest.sensors.slice(1)] },
   }), /canonicalUnit.*forbidden|unknown key/);
 });
 

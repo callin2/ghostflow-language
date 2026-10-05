@@ -5,6 +5,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
+import { softwareQualityAbi, softwareQualityRails } from './helpers/software-quality-observations.mjs';
 import { prepareCurriculumReplays, readCurriculumReplayManifest, verifyCurriculumReplayWasm } from '../tools/curriculum-replay.mjs';
 import { observeSourceTrace } from '../tools/source-trace.mjs';
 import { compileSource, restoreArtifactSourceMap, verifyArtifactSourceMap } from '../tools/toolchain.mjs';
@@ -12,8 +14,8 @@ import { GhostFlowRuntime } from '../runtimes/wasm/ghostflow-runtime.mjs';
 
 // Proof ends at VM requested/safe intent and source/constraint provenance.
 // Driver applied/confirmed, physical flow, and full evaluated-path DAG (#88) are separate claims.
-const root = path.resolve(new URL('../', import.meta.url).pathname);
-const nativePath = path.join(root, 'target/release/examples/scan_tape');
+const root = fileURLToPath(new URL('../', import.meta.url));
+const nativePath = path.join(root, `target/release/examples/scan_tape${process.platform === 'win32' ? '.exe' : ''}`);
 const wasmBytes = fs.readFileSync(path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm'));
 
 function sourceMap(artifact) {
@@ -34,7 +36,7 @@ async function runBoth(t, artifact, frames) {
   const tapePath = path.join(directory, 'frames.tsv');
   fs.writeFileSync(modulePath, artifact.bytes);
   fs.writeFileSync(tapePath, `${frames.map(({ atMs, inputs }, scanId) => [scanId, atMs,
-    ...Object.entries(inputs).flatMap(([name, value]) => [name, 'b', String(value)]),
+    ...Object.entries(softwareQualityRails(artifact, inputs, scanId + 1, atMs)).flatMap(([name, value]) => [name, typeof value === 'boolean' ? 'b' : 'n', String(value)]),
   ].join('\t')).join('\n')}\n`);
   const nativeRun = spawnSync(nativePath, [modulePath, tapePath], {
     encoding: 'utf8', timeout: 10_000, maxBuffer: 2 * 1024 * 1024,
@@ -46,6 +48,7 @@ async function runBoth(t, artifact, frames) {
   const runtime = await GhostFlowRuntime.instantiate(wasmBytes);
   t.after(() => runtime.dispose());
   runtime.load(artifact.bytes);
+  softwareQualityAbi(runtime, artifact);
   for (const output of artifact.manifest.outputs) runtime.addCapability('actuator', output.name, 'bool');
   runtime.activate();
   const wasm = [];
@@ -64,8 +67,10 @@ async function runBoth(t, artifact, frames) {
 test('PC-02 core irrigation proof links canonical intent, state, pump and valve across native/WASM replay', async t => {
   const prepared = await prepareCurriculumReplays();
   const { scenario, artifact } = prepared.scenarios.find(entry => entry.scenario.id === 'PC-02');
-  assert.deepEqual(['sensors', 'schedules', 'timers', 'signals', 'configs'].map(key => artifact.manifest[key]),
-    [[], [], [], [], []], 'PC-02 uses the frozen Bool/state/constraint core only');
+  assert.deepEqual(['schedules', 'timers', 'signals', 'configs'].map(key => artifact.manifest[key]),
+    [[], [], [], []], 'PC-02 keeps Bool/state/constraint logic with typed acquisition rails');
+  assert.deepEqual(artifact.manifest.sensors.map(({ name, type }) => ({ name, type })),
+    [{ name: 'start', type: 'Bool' }, { name: 'stop_ok', type: 'Bool' }]);
   const original = fs.readFileSync(path.join(root, scenario.source.canonicalPath), 'utf8');
   assert.equal(createHash('sha256').update(original).digest('hex'), scenario.source.canonicalSha256);
   assert.equal(artifact.sourceDocument.sha256, scenario.source.canonicalSha256);

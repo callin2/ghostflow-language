@@ -1,0 +1,893 @@
+{
+  "format": "GhostFlow/explicit-quality-test-history-v1",
+  "baselineCommit": "c8a5d37ac09230a9011291a3ae3b053d1bc22773",
+  "revision": "canonical-input-explicit-quality-v1",
+  "entries": [
+    {
+      "path": "tests/programming-builtins.test.mjs",
+      "baselineSha256": "add4b99cbfdc946344bf99eb1c2f7add4290944c3eeb785450027438fff98ec0",
+      "excerpts": [
+        {
+          "line": 103,
+          "source": "  const source = '# Pipeline example\\n\\n```ghost\\ncontrol Pipeline {\\n  sensor moisture: Percent;\\n  output dry: Bool;\\n  dry <- moisture |> map(below(30%)) |> recover(false);\\n}\\n```\\n';"
+        }
+      ]
+    },
+    {
+      "path": "tests/quantities.test.mjs",
+      "baselineSha256": "05f18e603fc554d423bdb538e07ea175770d92a95535d2a8cb1bacaea8189d28",
+      "excerpts": [
+        {
+          "line": 135,
+          "source": "  sensor measured: Temperature {"
+        },
+        {
+          "line": 223,
+          "source": "  sensor measured: Temperature {"
+        }
+      ]
+    },
+    {
+      "path": "tests/control-host.test.mjs",
+      "baselineSha256": "4201253bd8b2abf3a0fdc963cbc387d1a7c7efc8608ce5a9a7d5299652b6e882",
+      "excerpts": [
+        {
+          "line": 15,
+          "source": "  sensor moisture: Percent {"
+        },
+        {
+          "line": 115,
+          "source": "  sensor level: Number { filter = moving_average(4); }"
+        },
+        {
+          "line": 123,
+          "source": "    sensor percent_one: Percent { filter = moving_average(1); }"
+        },
+        {
+          "line": 124,
+          "source": "    sensor number_thirty_one: Number { filter = moving_average(31); }"
+        },
+        {
+          "line": 159,
+          "source": "  sensor level: Number {"
+        },
+        {
+          "line": 163,
+          "source": "  sensor demand: Percent { filter = ema(alpha: 1.0); }"
+        },
+        {
+          "line": 212,
+          "source": "  sensor latest: Number { filter = ema(alpha: 1.0); }"
+        },
+        {
+          "line": 213,
+          "source": "  sensor midpoint: Number { filter = ema(alpha: 0.5); }"
+        },
+        {
+          "line": 241,
+          "source": "  await rejectsEma('sensor flag: Bool { filter = ema(alpha: 0.5); }', /numeric filtering|Number or Percent/);"
+        },
+        {
+          "line": 242,
+          "source": "  await rejectsEma('input factor: Number; sensor value: Number { filter = ema(alpha: factor); }', /ema alpha.*constant Number/);"
+        },
+        {
+          "line": 243,
+          "source": "  await rejectsEma('sensor value: Number { filter = ema(); }', /ema.*alpha/);"
+        },
+        {
+          "line": 244,
+          "source": "  await rejectsEma('sensor value: Number { filter = ema(alpha: 0.5, window: 2); }', /ema.*alpha/);"
+        },
+        {
+          "line": 245,
+          "source": "  await rejectsEma('sensor value: Number { filter = ema(0.5); }', /ema.*alpha/);"
+        },
+        {
+          "line": 246,
+          "source": "  await rejectsEma('sensor value: Number { filter = ema(alpha: 0.0); }', /ema alpha.*\\(0, 1\\]/);"
+        },
+        {
+          "line": 247,
+          "source": "  await rejectsEma('sensor value: Number { filter = ema(alpha: 1.0001); }', /ema alpha.*\\(0, 1\\]/);"
+        },
+        {
+          "line": 248,
+          "source": "  await rejectsEma('sensor value: Number { filter = ema(alpha: 1e309); }', /finite|ema alpha/);"
+        },
+        {
+          "line": 252,
+          "source": "  const ema = await compileSource('control EmaManifest { sensor value: Number { filter = ema(alpha: 0.5); } }', { filename: 'ema-manifest.ghost' });"
+        },
+        {
+          "line": 253,
+          "source": "  const moving = await compileSource('control MovingManifest { sensor value: Number { filter = moving_average(3); } }', { filename: 'moving-manifest.ghost' });"
+        }
+      ]
+    },
+    {
+      "path": "tests/control-runtime-atomicity.test.mjs",
+      "baselineSha256": "1bf8fbf1bc838f9dfae3c8b097580b9c55ea6abb5f0621f271cde43abc8eb685",
+      "excerpts": [
+        {
+          "line": 14,
+          "source": "    sensor middle: Number { filter = median(3); stale_after = 10s; }"
+        },
+        {
+          "line": 15,
+          "source": "    sensor average: Number { filter = ema(alpha: 0.5); stale_after = 10s; }"
+        },
+        {
+          "line": 42,
+          "source": "    sensor moisture: Number { filter = median(1); stale_after = 10s; }"
+        },
+        {
+          "line": 62,
+          "source": "    sensor level: Number { filter = median(1); recover_after = 2 samples; stale_after = 10s; }"
+        },
+        {
+          "line": 93,
+          "source": "    sensor first: Number { filter = median(1); stale_after = 10s; }"
+        },
+        {
+          "line": 94,
+          "source": "    sensor second: Number { filter = median(1); stale_after = 10s; }"
+        },
+        {
+          "line": 123,
+          "source": "    sensor level: Number { filter = median(1); stale_after = 10s; }"
+        },
+        {
+          "line": 149,
+          "source": "    sensor level: Number { filter = median(1); stale_after = 10s; }"
+        },
+        {
+          "line": 172,
+          "source": "    sensor level: Number { filter = median(1); stale_after = 10s; }"
+        }
+      ]
+    },
+    {
+      "path": "tests/framed-control-host.test.mjs",
+      "baselineSha256": "651df76cd937117be5a854bd2ba08d6c2be9210945acd493585f7235293f8c88",
+      "excerpts": [
+        {
+          "line": 158,
+          "source": "  sensor moisture: Percent {"
+        },
+        {
+          "line": 232,
+          "source": "  sensor moisture: Percent {"
+        },
+        {
+          "line": 288,
+          "source": "  sensor moisture: Percent {"
+        }
+      ]
+    },
+    {
+      "path": "tests/control.test.mjs",
+      "baselineSha256": "bd490a574e9725a3f62fdb68f7c4ab4359520c97fc4b9c591ebe8063f9cb8142",
+      "excerpts": [
+        {
+          "line": 139,
+          "source": "  sensor moisture?: Percent {"
+        },
+        {
+          "line": 201,
+          "source": "  sensor low_water: Bool;"
+        },
+        {
+          "line": 249,
+          "source": "const adaptiveProgram = await compileSource('control Adaptive { sensor moisture?: Percent; output pump: Bool; adapt policy { strategy Wet priority 10 match (moisture: sensor<Percent>) { pump <- case moisture { ok(value) => value < 30%; fault(_) => false; }; } strategy Baseline priority 0 match always { pump <- false; } } }');"
+        },
+        {
+          "line": 425,
+          "source": "  sensor moisture?: Percent;"
+        },
+        {
+          "line": 454,
+          "source": "  sensor moisture: Percent { filter = median(4); }"
+        },
+        {
+          "line": 461,
+          "source": "  sensor moisture: Percent { recover_after = 32 samples; }"
+        }
+      ]
+    },
+    {
+      "path": "tests/control-source-validation.test.mjs",
+      "baselineSha256": "9976745af64d524284d6e8150e6a8a7376bb7265f0769036d2c2f7d4554ed0df",
+      "excerpts": [
+        {
+          "line": 179,
+          "source": "    sensor temperature: Number;"
+        },
+        {
+          "line": 195,
+          "source": "      sensor measured: ${type};"
+        },
+        {
+          "line": 208,
+          "source": "      sensor measured: Number;"
+        }
+      ]
+    },
+    {
+      "path": "tests/compiler-syntax-structure.test.mjs",
+      "baselineSha256": "9b3697ef7bd8270771590cc8fd991129f71e5115a38e1dbb07da79e71803d3d8",
+      "excerpts": [
+        {
+          "line": 62,
+          "source": "    bad: 'control Bad { sensor moisture: Percent; let transform = map(below(35%)) >> \u00a7; output dry: Bool; dry <- moisture |> recover(false); }',"
+        },
+        {
+          "line": 63,
+          "source": "    good: 'control Good { sensor moisture: Percent; let transform = map(below(35%)) >> recover(false); output dry: Bool; dry <- moisture |> transform; }',"
+        },
+        {
+          "line": 68,
+          "source": "    bad: 'control Bad { sensor moisture: Percent; output dry: Bool; dry <- moisture |> map(below(35%) |> recover(false)\u00a7; }',"
+        },
+        {
+          "line": 69,
+          "source": "    good: 'control Good { sensor moisture: Percent; output dry: Bool; dry <- moisture |> map(below(35%)) |> recover(false); }',"
+        },
+        {
+          "line": 96,
+          "source": "  sensor reading: Bool;"
+        },
+        {
+          "line": 100,
+          "source": "  sensor reading: Bool;"
+        }
+      ]
+    },
+    {
+      "path": "tests/compiler-window-diagnostics.test.mjs",
+      "baselineSha256": "45995db1f99584316cced4c52114801e63a65326741bb689cdf7adc7ce7ca8bb",
+      "excerpts": [
+        {
+          "line": 31,
+          "source": "  sensor temperature: Temperature;"
+        },
+        {
+          "line": 38,
+          "source": "    sensor temperature: Temperature;"
+        },
+        {
+          "line": 48,
+          "source": "    sensor temperature: Temperature;"
+        },
+        {
+          "line": 83,
+          "source": "    sensor temperature: Temperature;"
+        },
+        {
+          "line": 94,
+          "source": "    sensor temperature: Temperature;"
+        },
+        {
+          "line": 100,
+          "source": "    sensor temperature: Temperature;"
+        },
+        {
+          "line": 111,
+          "source": "    sensor temperature: Temperature;"
+        },
+        {
+          "line": 117,
+          "source": "    sensor temperature: Temperature;"
+        },
+        {
+          "line": 129,
+          "source": "    sensor temperature: Temperature;"
+        },
+        {
+          "line": 136,
+          "source": "    sensor temperature: Temperature;"
+        },
+        {
+          "line": 147,
+          "source": "    sensor pressure: Pressure;"
+        },
+        {
+          "line": 153,
+          "source": "    sensor pressure: Pressure;"
+        },
+        {
+          "line": 163,
+          "source": "  sensor temperature: Temperature;"
+        }
+      ]
+    },
+    {
+      "path": "tests/after-event-control.test.mjs",
+      "baselineSha256": "0424b6ce07e30bec636289a0bef508945c5d39cf0a86574905f2fdbaf3471bb5",
+      "excerpts": [
+        {
+          "line": 14,
+          "source": "  sensor valve_open: Bool;"
+        }
+      ]
+    },
+    {
+      "path": "tests/debounce-control.test.mjs",
+      "baselineSha256": "d89ca04f3f3f8895363038fadcbe60a479299b5edab511508d45464a5f880e85",
+      "excerpts": [
+        {
+          "line": 59,
+          "source": "    sensor start: Bool { stale_after = 10s; }"
+        },
+        {
+          "line": 128,
+          "source": "    sensor request: Bool { stale_after = 10s; }"
+        },
+        {
+          "line": 146,
+          "source": "    sensor request: Bool { stale_after = 10s; }"
+        },
+        {
+          "line": 180,
+          "source": "    sensor request: Bool;"
+        },
+        {
+          "line": 194,
+          "source": "      sensor request: Bool;"
+        },
+        {
+          "line": 211,
+          "source": "    sensor request: Bool { stale_after = 10s; }"
+        },
+        {
+          "line": 238,
+          "source": "    sensor source_a: Bool { stale_after = 10s; }"
+        },
+        {
+          "line": 239,
+          "source": "    sensor source_b: Bool { stale_after = 10s; }"
+        },
+        {
+          "line": 262,
+          "source": "    sensor source_a: Bool { stale_after = 10s; }"
+        },
+        {
+          "line": 263,
+          "source": "    sensor source_b: Bool { stale_after = 10s; }"
+        },
+        {
+          "line": 295,
+          "source": "    sensor source_a: Bool { stale_after = 10s; }"
+        },
+        {
+          "line": 296,
+          "source": "    sensor source_b: Bool { stale_after = 10s; }"
+        },
+        {
+          "line": 322,
+          "source": "    sensor request: Bool { stale_after = 10s; }"
+        },
+        {
+          "line": 378,
+          "source": "    sensor request: Bool;"
+        }
+      ]
+    },
+    {
+      "path": "tests/debounce-runtime.test.mjs",
+      "baselineSha256": "1538d50d5eefcba1d40c0c69bf3b9f2f0172464b627bdcd9b61016dc0b22da04",
+      "excerpts": [
+        {
+          "line": 85,
+          "source": "    sensor probe: Bool;"
+        },
+        {
+          "line": 129,
+          "source": "    sensor a: Bool; sensor b: Bool;"
+        }
+      ]
+    },
+    {
+      "path": "tests/hold-last-diagnostics.test.mjs",
+      "baselineSha256": "048abf20b43b2e89b11978bfcd8b462eb6616f390d495b2a43053ce507991de4",
+      "excerpts": [
+        {
+          "line": 9,
+          "source": "const good = wrap('sensor reading: Bool; signal usable = hold_last(reading, for_at_most: 1s, quality: measured);');"
+        },
+        {
+          "line": 12,
+          "source": "  ['duplicate duration', wrap('sensor reading: Bool; signal usable = hold_last(reading, for_at_most: 1s, \u00a7for_at_most: 2s, quality: measured);'), 'duplicate hold_last argument for_at_most'],"
+        },
+        {
+          "line": 13,
+          "source": "  ['missing quality', wrap('sensor reading: Bool; signal usable = \u00a7hold_last(reading, for_at_most: 1s);'), 'hold_last requires hold_last(source, for_at_most: Duration, quality: measured)'],"
+        },
+        {
+          "line": 14,
+          "source": "  ['unknown quality', wrap('sensor reading: Bool; signal usable = hold_last(reading, for_at_most: 1s, \u00a7quality: estimated);'), 'hold_last quality must be measured'],"
+        },
+        {
+          "line": 18,
+          "source": "  ['zero duration', wrap('sensor reading: Bool; signal usable = hold_last(reading, \u00a7for_at_most: 0s, quality: measured);'), 'hold_last for_at_most must be a positive constant Duration'],"
+        },
+        {
+          "line": 19,
+          "source": "  ['dynamic duration', wrap('sensor reading: Bool; input delay: Duration; signal usable = hold_last(reading, \u00a7for_at_most: delay, quality: measured);'), 'hold_last for_at_most must be a positive constant Duration'],"
+        },
+        {
+          "line": 35,
+          "source": "  const source = count => `control HoldStateBudget { sensor reading: Bool; ${Array.from({ length: count }, (_, index) =>"
+        }
+      ]
+    },
+    {
+      "path": "tests/hold-last-runtime.test.mjs",
+      "baselineSha256": "de063d02cc805bfa37ae975535cfdce5c06c2622d45796891fc865aaf6f75a82",
+      "excerpts": [
+        {
+          "line": 50,
+          "source": "    input divisor: Number; sensor reading: Bool;"
+        },
+        {
+          "line": 89,
+          "source": "    input choose_b: Bool; sensor a: Bool; sensor b: Bool;"
+        },
+        {
+          "line": 120,
+          "source": "    sensor reading: Bool;"
+        },
+        {
+          "line": 141,
+          "source": "    sensor reading: Bool;"
+        },
+        {
+          "line": 158,
+          "source": "    input use_raw: Bool; sensor reading: Bool;"
+        },
+        {
+          "line": 183,
+          "source": "    sensor reading: Bool;"
+        },
+        {
+          "line": 200,
+          "source": "    sensor reading: Bool; signal usable = hold_last(reading, for_at_most: 2s, quality: measured);"
+        },
+        {
+          "line": 227,
+          "source": "    sensor reading: Bool;"
+        },
+        {
+          "line": 249,
+          "source": "    sensor reading: Bool; signal usable = hold_last(reading, for_at_most: 1s, quality: measured);"
+        },
+        {
+          "line": 269,
+          "source": "    input choose_a: Bool; sensor a: Bool { stale_after = 10s; } sensor b: Bool { stale_after = 10s; }"
+        }
+      ]
+    },
+    {
+      "path": "tests/window-control.test.mjs",
+      "baselineSha256": "93f643ae760d54ffe4179d2127fcb4d3a965219fdebe306027deb8a2b1e78b23",
+      "excerpts": [
+        {
+          "line": 18,
+          "source": "    sensor temperature: Temperature;"
+        },
+        {
+          "line": 36,
+          "source": "    sensor temperature: Temperature;"
+        },
+        {
+          "line": 51,
+          "source": "    sensor temperature: Temperature;"
+        },
+        {
+          "line": 63,
+          "source": "    sensor temperature: Temperature;"
+        },
+        {
+          "line": 74,
+          "source": "    sensor temperature: Temperature;"
+        },
+        {
+          "line": 85,
+          "source": "    sensor pressure: Pressure;"
+        },
+        {
+          "line": 98,
+          "source": "    sensor reading: Number;"
+        },
+        {
+          "line": 116,
+          "source": "    sensor number_reading: Number;"
+        },
+        {
+          "line": 117,
+          "source": "    sensor position: Percent;"
+        },
+        {
+          "line": 118,
+          "source": "    sensor pressure: Pressure;"
+        },
+        {
+          "line": 133,
+          "source": "    sensor inside: Temperature;"
+        },
+        {
+          "line": 134,
+          "source": "    sensor outside: Temperature;"
+        },
+        {
+          "line": 148,
+          "source": "      sensor temperature: Temperature;"
+        },
+        {
+          "line": 156,
+          "source": "      sensor temperature: Temperature;"
+        },
+        {
+          "line": 165,
+          "source": "      sensor temperature: Temperature;"
+        },
+        {
+          "line": 174,
+          "source": "      sensor temperature: Temperature;"
+        },
+        {
+          "line": 182,
+          "source": "      sensor temperature: Temperature;"
+        },
+        {
+          "line": 190,
+          "source": "      sensor temperature: Temperature;"
+        },
+        {
+          "line": 206,
+          "source": "      sensor enabled: Bool;"
+        },
+        {
+          "line": 214,
+          "source": "      sensor reading: Number;"
+        },
+        {
+          "line": 222,
+          "source": "      sensor humidity: RelativeHumidity;"
+        },
+        {
+          "line": 230,
+          "source": "      sensor temperature: Temperature;"
+        },
+        {
+          "line": 240,
+          "source": "      sensor temperature: Temperature;"
+        },
+        {
+          "line": 250,
+          "source": "      sensor pressure: Pressure;"
+        },
+        {
+          "line": 260,
+          "source": "      sensor temperature: Temperature;"
+        },
+        {
+          "line": 261,
+          "source": "      sensor change: TemperatureDelta;"
+        },
+        {
+          "line": 272,
+          "source": "      sensor temperature: Temperature;"
+        }
+      ]
+    },
+    {
+      "path": "tests/window-native.test.mjs",
+      "baselineSha256": "cf0cfc7d60a7277fb65da8a8fbb56b3f439ee168cf7d7b38658087cf2b10df31",
+      "excerpts": [
+        {
+          "line": 18,
+          "source": "  sensor temperature: Temperature;"
+        }
+      ]
+    },
+    {
+      "path": "tests/window-framed-native.test.mjs",
+      "baselineSha256": "1986651273ad4edf9ab543d0ea085b7c97902a06e93c6352b19e7786469556aa",
+      "excerpts": [
+        {
+          "line": 20,
+          "source": "  sensor temperature: Temperature;"
+        }
+      ]
+    },
+    {
+      "path": "tests/window-host.test.mjs",
+      "baselineSha256": "b7213a5ea8ae07e7d3afbfeb97b60e379ac782a7a92b1410efbc9587209d939b",
+      "excerpts": [
+        {
+          "line": 13,
+          "source": "  sensor temperature: Temperature;"
+        }
+      ]
+    },
+    {
+      "path": "tests/window-derived-control.test.mjs",
+      "baselineSha256": "c477b4d2ee91cad8b978b1084d4dfb0cd8fdd8ac548885c316be770a684dbacd",
+      "excerpts": [
+        {
+          "line": 13,
+          "source": "    sensor temperature: Temperature;"
+        },
+        {
+          "line": 31,
+          "source": "    sensor inside: Temperature;"
+        },
+        {
+          "line": 32,
+          "source": "    sensor outside: Temperature;"
+        },
+        {
+          "line": 51,
+          "source": "    sensor inside: Temperature;"
+        },
+        {
+          "line": 52,
+          "source": "    sensor outside: Temperature;"
+        },
+        {
+          "line": 66,
+          "source": "    sensor temperature: Temperature;"
+        },
+        {
+          "line": 80,
+          "source": "    sensor temperature: Temperature;"
+        },
+        {
+          "line": 94,
+          "source": "      sensor temperature: Temperature;"
+        }
+      ]
+    },
+    {
+      "path": "tests/window-derived-host.test.mjs",
+      "baselineSha256": "c5d920c2a64c973dd8c7438b1025a6c62b7e629a4ad26b0e8f1246330472145d",
+      "excerpts": [
+        {
+          "line": 13,
+          "source": "  sensor probe: Number;"
+        },
+        {
+          "line": 25,
+          "source": "  .replace('sensor probe: Number;', 'input divisor: Number;\\n  sensor probe: Number;')"
+        }
+      ]
+    },
+    {
+      "path": "tests/temporal-replay-wasm.test.mjs",
+      "baselineSha256": "18975b1554f138611d1851875bb3e5b852a5472c426c06202d696033225a383f",
+      "excerpts": [
+        {
+          "line": 14,
+          "source": "  sensor probe: Number;"
+        }
+      ]
+    },
+    {
+      "path": "tests/temporal-resource-plan-wasm.test.mjs",
+      "baselineSha256": "6a2d6b66d04c766aaf8b6e7b22c49528b67875e4ea4332057cc7ff6ec0710011",
+      "excerpts": [
+        {
+          "line": 13,
+          "source": "  sensor probe: Number;"
+        }
+      ]
+    },
+    {
+      "path": "tests/scan-tape-parity.test.mjs",
+      "baselineSha256": "42246fe9f639e6d40813b58233d697e49da48c96192d8453ce392fb4a11d55b7",
+      "excerpts": [
+        {
+          "line": 27,
+          "source": "    sensor temperature: Number {"
+        },
+        {
+          "line": 102,
+          "source": "  sensor reading: Number {"
+        },
+        {
+          "line": 167,
+          "source": "  sensor moisture: Percent { valid = 0% .. 100%; filter = median(3); stale_after = 3s; recover_after = 3 samples; }"
+        },
+        {
+          "line": 241,
+          "source": "    sensor x: Number { filter = median(1); stale_after = 10s; }"
+        },
+        {
+          "line": 273,
+          "source": "    sensor temperature: Temperature { filter = median(1); stale_after = 3s; }"
+        },
+        {
+          "line": 290,
+          "source": "    sensor a: Number;"
+        },
+        {
+          "line": 291,
+          "source": "    sensor b: Number;"
+        },
+        {
+          "line": 301,
+          "source": "  sensor moisture: Percent {"
+        },
+        {
+          "line": 361,
+          "source": "  sensor moisture: Percent {"
+        },
+        {
+          "line": 410,
+          "source": "  sensor moisture: Percent {"
+        },
+        {
+          "line": 482,
+          "source": "  sensor moisture: Percent {"
+        },
+        {
+          "line": 555,
+          "source": "  sensor moisture: Percent {"
+        },
+        {
+          "line": 634,
+          "source": "  sensor moisture: Percent {"
+        },
+        {
+          "line": 728,
+          "source": "  sensor moisture: Percent {"
+        },
+        {
+          "line": 757,
+          "source": "  sensor moisture: Percent {"
+        },
+        {
+          "line": 859,
+          "source": "  sensor reading: Number { filter = median(1); stale_after = 300ms; recover_after = 3 samples; }"
+        },
+        {
+          "line": 1232,
+          "source": "  sensor moisture: Percent;"
+        },
+        {
+          "line": 1288,
+          "source": "  sensor healthy: Bool;"
+        },
+        {
+          "line": 1350,
+          "source": "  sensor high: Bool;"
+        },
+        {
+          "line": 1393,
+          "source": "  sensor high: Bool;"
+        }
+      ]
+    },
+    {
+      "path": "tests/ghostsim.test.mjs",
+      "baselineSha256": "8dbc895b6282452fe87dade515adf6a42ff5ab75116e665276e27636fd1117ff",
+      "excerpts": [
+        {
+          "line": 19,
+          "source": "    const source = '```ghost\\ncontrol Sensor { sensor moisture: Percent; output pump: Bool; pump <- case moisture { ok(value) => value < 30%; fault(_) => false; }; }\\n```\\n';"
+        }
+      ]
+    },
+    {
+      "path": "tests/ghostsim-continuous-io.test.mjs",
+      "baselineSha256": "a5de4f4c0fff001d93273c2b31d785561472c1c245d70c5b24d3b1b60ab1438f",
+      "excerpts": [
+        {
+          "line": 16,
+          "source": "  const source = '```ghost\\ncontrol Continuous { sensor measured: Number; input target: Number; output command: Number; command <- target; }\\n```\\n';"
+        }
+      ]
+    },
+    {
+      "path": "tests/result-provenance.test.mjs",
+      "baselineSha256": "bc5877e70d9dce4544ef35ec6c722b60eceeebc389794c06f23f8a25dad6df1e",
+      "excerpts": [
+        {
+          "line": 19,
+          "source": "  'control Provenance {', '  input choose: Bool;', '  sensor reading: Number;',"
+        }
+      ]
+    },
+    {
+      "path": "tests/reference-distinct-states.test.mjs",
+      "baselineSha256": "516868a962467ffb34942e4a677e1d937d8d59c27b2a5f55ae49b8df235d2269",
+      "excerpts": [
+        {
+          "line": 63,
+          "source": "    sensor reading?: Number;"
+        }
+      ]
+    },
+    {
+      "path": "tests/debounce-provenance.test.mjs",
+      "baselineSha256": "cd76f452269b882a56441602809f692ec7bd16398371d672dea40080dc547828",
+      "excerpts": [
+        {
+          "line": 46,
+          "source": "    'input choose: Bool;', 'sensor a: Bool;', 'sensor b: Bool;',"
+        },
+        {
+          "line": 65,
+          "source": "  ['physical', source.replace('input start: Bool;', 'sensor start: Bool;').replace('enabled <- stable;', 'enabled <- stable |> recover(false);'), { kind: 'sensor', name: 'start', type: 'bool' }],"
+        }
+      ]
+    },
+    {
+      "path": "tests/window-provenance.test.mjs",
+      "baselineSha256": "534ae661e9ee7c3d081efe3084ce1f3cf28d225e6ac12b3cf1292935ad134b5a",
+      "excerpts": [
+        {
+          "line": 22,
+          "source": "  sensor a: Temperature;"
+        },
+        {
+          "line": 23,
+          "source": "  sensor b: Temperature;"
+        },
+        {
+          "line": 201,
+          "source": "  sensor reading: Number;"
+        }
+      ]
+    },
+    {
+      "path": "tests/what-if-replay.test.mjs",
+      "baselineSha256": "961cd46a28d1114a784ba9b1fa57f3aa124b672e1079eccb49f80bac7d55478d",
+      "excerpts": [
+        {
+          "line": 20,
+          "source": "  '  input start: Bool;', '  sensor moisture: Percent;',"
+        }
+      ]
+    },
+    {
+      "path": "tests/composition-execution.test.mjs",
+      "baselineSha256": "15a1d89c18b26d6759a7ff06c19fc2a063178dcf5043d9af5d0c65e75191a0f1",
+      "excerpts": [
+        {
+          "line": 24,
+          "source": "  sensor detected: Number { sample = 1s; filter = median(1); stale_after = 3s; recover_after = 1 samples; }"
+        },
+        {
+          "line": 36,
+          "source": "  sensor sensor_a: Number { sample = 1s; }"
+        },
+        {
+          "line": 37,
+          "source": "  sensor sensor_b: Number { sample = 1s; }"
+        },
+        {
+          "line": 195,
+          "source": " sensor air: Number { sample = 1s; filter = ${filter}; stale_after = 3s; recover_after = ${recovery} samples; }"
+        },
+        {
+          "line": 246,
+          "source": "  [source.replace('sensor air: Number { sample = 1s; }', 'input air: Number;'), /sensor connection requires/],"
+        },
+        {
+          "line": 247,
+          "source": "  [source.replace('sensor air: Number', 'sensor air: Temperature'), /port type mismatch/],"
+        },
+        {
+          "line": 249,
+          "source": "  [source.replace('sensor air:', 'sensor air?:'), /sensor sample contract mismatch/],"
+        },
+        {
+          "line": 303,
+          "source": " const child = sensorChild().replace('sensor air:', 'sensor air?:')"
+        }
+      ]
+    }
+  ]
+}

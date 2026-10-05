@@ -138,6 +138,26 @@ fault 뒤 filter window는 비운다. filter 준비 조건과 `recover_after` �
 준비하는 것이다. persistent resume은 checkpoint의 source/time continuity를 검증하는
 명시 opt-in이다. 오래된 정상값 하나를 즉시 복원해 허가에 사용하지 않는다.
 
+`recover_after = N samples`는 초기화, 재부팅, source epoch 변경 및 fault 후 복구에서 서로 다른 새 유효 관측을 센다. filter도 준비되었다면 N번째 관측부터 사용할 수 있으며, 중복 sample과 clock-only scan은 세지 않는다. fault 또는 freshness 상실은 새 sequence를 시작한다. 첫 N개 유효 관측을 버리려면 `recover_after = N+1 samples`를 `1..31` 안의 구체적인 개수로 작성한다. 이 옵션은 sample 개수이며 시간 기반 예열이 아니다.
+
+시간 기반 준비 기간은 `recover_after`에 duration 문법을 추가하지 않고 기존 상태 연산 `debounce`로 작성할 수 있다. 이 패턴은 첫 conditioned `Good` 관측부터 2분이 지나고, 그 시점 이후 서로 다른 새 `Good` 관측이 들어올 때까지 Result 사용을 보류한다. `usable` 출력은 사용 가능 여부 표시이며 물리 운전을 명령하지 않는다.
+
+```ghost
+fn observed(value: Number) -> Bool { true }
+control TimedPreparation {
+  input reading: Number { stale_after = 3min; }
+  signal ready = debounce(reading |> map(observed), stable_for: 2min, initial: false);
+  let prepared: Result<Number, SensorFault> = case ready {
+    ok(value) => if value then reading else fault(NotReady);
+    fault(_) => reading;
+  };
+  output usable: Bool;
+  usable <- case prepared { ok(value) => true; fault(_) => false; };
+}
+```
+
+`observed`는 0을 포함한 정상 payload를 true로 변환하며, 입력 fault는 `map`을 그대로 통과한다. debounce 기간은 관측 timestamp를 사용한다. clock-only scan과 중복 sample은 준비 완료를 촉진하지 않는다. fault, stale reception 또는 source epoch 변경은 준비를 다시 시작한다. filter나 sample 개수 기반 복구도 설정했다면 그 단계들이 처음 `Good`을 만든 뒤에 기간이 시작된다. `fault(_) => reading` 분기는 원래 입력 Result와 origin을 보존한다. 예상 관측 주기에 맞게 `stale_after`를 선택해야 한다. 위 예제의 3분 한계는 첫 관측과 준비 기한 관측만 공급하는 드문 관측 간격을 허용한다. 개수 기반 `recover_after`와 작성된 기간 gate는 별도 조건이다.
+
 ## 4.3 filter와 signal 연산
 
 ### median

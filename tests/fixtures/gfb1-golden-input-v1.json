@@ -1,0 +1,9 @@
+{
+  "format": "GhostFlow/input-quality-golden-v1",
+  "source": "gfb1-golden-input-v1.ghost.md",
+  "sourceSha256": "9ab0ca2ccb83cb8a3d962fa88320e4980e8aafafabf27c012253ce84a4c99f48",
+  "artifact": "gfb1-golden-input-v1.gfb",
+  "gfbSha256": "7828f5b8ac5b373e1c548a21ccc0c2f75c65ddda5f36e0794b9658280dd45588",
+  "gfbFormat": 3,
+  "sourceRevision": "canonical-input-quality-v1"
+}

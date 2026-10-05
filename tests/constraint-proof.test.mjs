@@ -22,7 +22,16 @@ Keep the duplicate constraint's independent source origin.
 
 \`\`\`ghost
 control Proof {
-  input ia, ib, ic: Bool;
+  input observed_ia, observed_ib, observed_ic: Bool;
+  state remembered_ia: Bool = false;
+  let ia = case observed_ia { ok(value) => value; fault(_) => remembered_ia; };
+  remembered_ia' = ia;
+  state remembered_ib: Bool = false;
+  let ib = case observed_ib { ok(value) => value; fault(_) => remembered_ib; };
+  remembered_ib' = ib;
+  state remembered_ic: Bool = false;
+  let ic = case observed_ic { ok(value) => value; fault(_) => remembered_ic; };
+  remembered_ic' = ic;
   output a, b, c: Bool;
   a <- ia;
   b <- ib;
@@ -35,7 +44,21 @@ control Proof {
 }
 \`\`\`
 `;
+// input-quality-v1: only the fixture's remembered observations supply unknown values.
 const filename = 'proof.ghost.md';
+function goodRails(compilation, row) {
+  return compilation.manifest.sensors.flatMap(port => [
+    { name: port.valueInput, type: 'Bool', value: row[port.name.replace(/^observed_/, '')] },
+    { name: port.okInput, type: 'Bool', value: true },
+    { name: port.faultInput, type: 'Number', value: 0 },
+  ]);
+}
+function setRails(runtime, rails) {
+  for (const port of rails) runtime[port.type === 'Bool' ? 'setBool' : 'setNumber'](port.name, port.value);
+}
+function railsCsv(rows) {
+  return `${rows[0].map(port => port.name).join(',')}\n${rows.map(row => row.map(port => port.value).join(',')).join('\n')}\n`;
+}
 const clone = value => JSON.parse(JSON.stringify(value));
 
 test('GF-TEST-local-constraint-envelope: grouped mandatory outputs enforce and recover identically in native and both WASM ABIs', async t => {
@@ -64,7 +87,7 @@ test('GF-TEST-local-constraint-envelope: grouped mandatory outputs enforce and r
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   const modulePath = path.join(directory, 'control.gfb'), inputPath = path.join(directory, 'inputs.csv');
   fs.writeFileSync(modulePath, compiled.bytes);
-  fs.writeFileSync(inputPath, `${Object.keys(inputs[0]).join(',')}\n${inputs.map(row => Object.values(row).join(',')).join('\n')}\n`);
+  fs.writeFileSync(inputPath, railsCsv(inputs.map(row => goodRails(compiled, row))));
   const native = () => execFileSync(path.join(root, 'target/release/examples/run' + (process.platform === 'win32' ? '.exe' : '')),
     [modulePath, inputPath], { encoding: 'utf8' }).trim().split('\n').map(JSON.parse);
   const traces = native();
@@ -84,8 +107,8 @@ test('GF-TEST-local-constraint-envelope: grouped mandatory outputs enforce and r
         runtime.activate();
         return inputs.map((row, index) => {
           if (Runtime === FramedGhostFlowRuntime) return runtime.scan({ scanId: index, logicalTimeMs: index,
-            inputs: Object.entries(row).map(([name, value]) => ({ name, value })) }).trace;
-          for (const [name, value] of Object.entries(row)) runtime.setBool(name, value);
+            inputs: goodRails(compiled, row) }).trace;
+          setRails(runtime, goodRails(compiled, row));
           runtime.tick(); return clone(runtime.trace);
         });
       } finally { runtime.dispose(); }
@@ -217,10 +240,11 @@ control TimerProof {
   input run_request: Bool;
   output drive, permit: Bool;
   state run: Bool = false;
-  run' = run_request;
+  let request = case run_request { ok(value) => value; fault(_) => run; };
+  run' = request;
   timer age = elapsed(run);
-  let run_age = if run_request == run then age else 0s;
-  drive <- run_request && run_age < 2s;
+  let run_age = if request == run then age else 0s;
+  drive <- request && run_age < 2s;
   permit <- true;
   require drive => permit;
   require drive => permit;
@@ -236,7 +260,7 @@ control TimerProof {
   for (const name of ['drive', 'permit']) runtime.addCapability('actuator', name, 'bool');
   runtime.activate();
   for (const [now, request, expected] of [[0, true, true], [1999, true, true], [2000, true, false], [2001, true, false], [2002, false, false], [3000, true, true]]) {
-    runtime.setBool('run_request', request); runtime.setNumber('__gf_now_ms', now); runtime.tick();
+    setRails(runtime, goodRails(a, { run_request: request })); runtime.setNumber('__gf_now_ms', now); runtime.tick();
     assert.equal(runtime.trace.safe.drive, expected);
     assert.equal(runtime.trace.stateAfter.run, request);
     assert.equal(observeRuntimeValues(a.traceMetadata, runtime.trace).format, 'GhostFlow/runtime-values-v1');
@@ -252,8 +276,8 @@ test('GF-TEST-constraint-proof-runtime: native and both WASM ABIs preserve fixed
   mutex(b,c);
   mutex(b,c);`).replace('  output a, b, c: Bool;', "  output a, b, c: Bool;\n  state seen: Bool = false;\n  seen' = ia;");
   const a = await compileSource(runtimeSource, { filename });
-  const reference = compile(parse(tokenize(`(module Proof (input ia bool) (input ib bool) (input ic bool) (state seen bool false)
-    (strategy control 0 (device true) (next seen input.ia) (intent a input.ia) (intent b input.ib) (intent c input.ic))
+  const reference = compile(parse(tokenize(`(module Proof (input ia bool) (input ib bool) (input ic bool) (state remembered_ia bool false) (state remembered_ib bool false) (state remembered_ic bool false) (state seen bool false)
+    (strategy control 0 (device true) (next remembered_ia input.ia) (next remembered_ib input.ib) (next remembered_ic input.ic) (next seen input.ia) (intent a input.ia) (intent b input.ib) (intent c input.ic))
     (requires a b) (requires a b) (requires b c)
     (requires-any a b c) (requires-any a b c)
     (mutex a b) (mutex a b) (mutex b c) (mutex b c))`)));
@@ -263,12 +287,14 @@ test('GF-TEST-constraint-proof-runtime: native and both WASM ABIs preserve fixed
   const frames = Array.from({ length: 8 }, (_, mask) => Object.fromEntries(['ia', 'ib', 'ic'].map((name, bit) => [name, Boolean(mask & (1 << bit))])));
   const inputs = path.join(dir, 'inputs.csv');
   fs.writeFileSync(inputs, `ia,ib,ic\n${frames.map(frame => Object.values(frame).join(',')).join('\n')}\n`);
-  const native = bytes => {
+  const qualityInputs = path.join(dir, 'quality-inputs.csv');
+  fs.writeFileSync(qualityInputs, railsCsv(frames.map(row => goodRails(a, row))));
+  const native = (bytes, csv = inputs) => {
     const module = path.join(dir, 'module.gfb'); fs.writeFileSync(module, bytes);
     return execFileSync(path.join(root, 'target/release/examples/run' + (process.platform === 'win32' ? '.exe' : '')),
-      [module, inputs, '--outcomes'], { encoding: 'utf8' }).trim().split('\n').map(JSON.parse);
+      [module, csv, '--outcomes'], { encoding: 'utf8' }).trim().split('\n').map(JSON.parse);
   };
-  const original = native(reference), optimized = native(a.bytes);
+  const original = native(reference), optimized = native(a.bytes, qualityInputs);
   const comparable = trace => ({ requested: trace.requested, safe: trace.safe, faults: trace.faults,
     stateBefore: trace.stateBefore, stateAfter: trace.stateAfter });
   for (let i = 0; i < frames.length; i++) {
@@ -307,9 +333,9 @@ test('GF-TEST-constraint-proof-runtime: native and both WASM ABIs preserve fixed
     for (let i = 0; i < frames.length; i++) {
       let trace;
       if (Runtime === GhostFlowRuntime) {
-        for (const [name, value] of Object.entries(frames[i])) runtime.setBool(name, value);
+        setRails(runtime, goodRails(a, frames[i]));
         runtime.tick(); trace = runtime.trace;
-      } else trace = runtime.scan({ scanId: i, logicalTimeMs: i, inputs: Object.entries(frames[i]).map(([name, value]) => ({ name, value })) }).trace;
+      } else trace = runtime.scan({ scanId: i, logicalTimeMs: i, inputs: goodRails(a, frames[i]) }).trace;
       assert.deepEqual(comparable(trace), comparable(original[i].trace));
       assert.deepEqual(trace.safetyTrace, optimized[i].trace.safetyTrace);
     }

@@ -1,3 +1,4 @@
+import { softwareQualityObservations } from './helpers/software-quality-observations.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -18,15 +19,15 @@ const leaf = doc(`control Latch {
  input start, stop: Bool;
  state held: Bool = false;
  state count: Bool = false;
- held' = !stop && (start || held);
- count' = start || count;
+ held' = !(stop |> recover(false)) && ((start |> recover(false)) || held);
+ count' = (start |> recover(false)) || count;
  output active: Bool;
  output accepted: Bool;
  active <- held';
  accepted <- count';
 }`);
 const pin = (alias, filename, revision, text) => `import ${alias} from "./${filename}" revision "${revision}" sha256 "${sha256Hex(text)}";`;
-const behavior = doc(`${pin('Latch', 'latch.ghost.md', 'latch-r1', leaf)}
+const behavior = doc(`${pin('Latch', 'latch.ghost.md', 'latch-input-v1', leaf)}
 control Behavior {
  input start, stop: Bool;
  output active: Bool;
@@ -37,7 +38,7 @@ control Behavior {
  connect active <- latch.active;
  connect accepted <- latch.accepted;
 }`);
-const source = doc(`${pin('Behavior', 'behavior.ghost.md', 'behavior-r1', behavior)}
+const source = doc(`${pin('Behavior', 'behavior.ghost.md', 'behavior-input-v1', behavior)}
 control Farm {
  input east_start, east_stop, west_start, west_stop: Bool;
  output east_pump, west_pump: Bool;
@@ -54,8 +55,8 @@ control Farm {
  connect west_count <- west.accepted;
 }`);
 const closure = [
- { filename: 'behavior.ghost.md', revision: 'behavior-r1', text: behavior },
- { filename: 'latch.ghost.md', revision: 'latch-r1', text: leaf },
+ { filename: 'behavior.ghost.md', revision: 'behavior-input-v1', text: behavior },
+ { filename: 'latch.ghost.md', revision: 'latch-input-v1', text: leaf },
 ];
 const wasmBytes = fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
 const native = fileURLToPath(new URL(`../target/release/examples/scan_tape${process.platform === 'win32' ? '.exe' : ''}`, import.meta.url));
@@ -65,8 +66,8 @@ const records = [
  { nowMs: 2000, inputs: inputs(false, false, true, false) },
  { nowMs: 3000, inputs: inputs(false, true, false, false) },
  { nowMs: 4000, inputs: inputs(false, false, false, true) },
-];
-const identity = { timelineId: 'recorded.farm', instanceId: 'farm.logical', runId: 'run.recorded', sourceRevision: 'farm-r1', bindingRevision: 'virtual-logical-ports-r1' };
+].map((frame, index) => ({ nowMs: frame.nowMs, samples: Object.fromEntries(Object.entries(frame.inputs).map(([name, value]) => [name, { epoch: 1, id: index + 1, timestampMs: frame.nowMs, quality: 'Good', value }])) }));
+const identity = { timelineId: 'recorded.farm', instanceId: 'farm.logical', runId: 'run.recorded', sourceRevision: 'farm-input-v1', bindingRevision: 'virtual-logical-ports-r1' };
 const compiled = () => compileSource(source, { filename: 'farm.ghost.md', sourceClosure: closure });
 
 function nativeOutcomes(artifact, frames) {
@@ -85,7 +86,7 @@ function nativeOutcomes(artifact, frames) {
 }
 
 async function execution(artifact, tape) {
- const runtime = await ControlRuntime.instantiateFramed(wasmBytes, artifact);
+ const runtime = softwareQualityObservations(await ControlRuntime.instantiateFramed(wasmBytes, artifact));
  const frames = [], outcomes = [];
  const dispatch = runtime.runtime.dispatch.bind(runtime.runtime);
  runtime.runtime.dispatch = frame => { frames.push(structuredClone(frame)); dispatch(frame); outcomes.push(structuredClone(runtime.runtime.outcome)); };
@@ -139,12 +140,12 @@ test('REF-06-025 effect-free what-if replay retains closure and branch identity 
  const baseline = await execution(artifact, records);
  const replay = await prepareWhatIfReplay({ wasmBytes, compilation: artifact, identity, prefix, future });
  assert.equal(replay.checkpoint.sourceClosureSha256, sha256Hex(canonicalJson(artifact.sourceClosure)));
- const live = await ControlRuntime.instantiateFramed(wasmBytes, artifact);
+ const live = softwareQualityObservations(await ControlRuntime.instantiateFramed(wasmBytes, artifact));
  try {
   assert.deepEqual(live.step(prefix[0]), baseline.results[0]);
   const before = structuredClone(live.lastFrameOutcome);
   const request = { branchId: 'branch.east-stop', runId: 'run.ghost', synthetic: [
-   { offset: 0, kind: 'inputs', name: 'east_stop', value: true, provenance: 'synthetic' },
+   { offset: 0, kind: 'samples', name: 'east_stop', value: { ...future[0].samples.east_stop, value: true }, provenance: 'synthetic' },
   ] };
   const receipt = await replay.branch(request);
   assert.equal(receipt.status, 'completed');
@@ -153,7 +154,7 @@ test('REF-06-025 effect-free what-if replay retains closure and branch identity 
   assert.equal(receipt.branchId, request.branchId);
   assert.equal(receipt.runId, request.runId);
   assert.deepEqual(receipt.frames.map(frame => frame.original), baseline.results.slice(1));
-  const candidateRecords = structuredClone(records); candidateRecords[1].inputs.east_stop = true;
+  const candidateRecords = structuredClone(records); candidateRecords[1].samples.east_stop.value = true;
   const candidate = await execution(artifact, candidateRecords);
   assert.deepEqual(receipt.frames.map(frame => frame.candidate), candidate.results.slice(1));
   assert.equal(receipt.frames[0].original.vm.safe.east_pump, true);
@@ -182,7 +183,7 @@ test('REF-06-025 signed reusable package retains exact closure and logical capab
   compilerRevision: '8ed7960ec529576f0aa91a43e2ef9c076c37c27d',
   runtimeSemantics: 'GhostFlow/runtime-semantics-v1', runtimeAbi: 'GhostFlow/framed-scan-abi-v1',
   bindingRevision: identity.bindingRevision,
-  requiredCapabilities: [...artifact.manifest.inputs.map(port => ({ kind: 'input', name: port.name, type: 'bool' })),
+  requiredCapabilities: [...artifact.manifest.sensors.map(port => ({ kind: 'sensor', name: port.name, type: 'bool' })),
    ...artifact.manifest.outputs.map(port => ({ kind: 'actuator', name: port.name, type: 'bool' }))],
  };
  const packaged = await buildPortablePackage(artifact, packageIdentity, {

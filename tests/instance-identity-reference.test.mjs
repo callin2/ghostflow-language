@@ -1,3 +1,4 @@
+import { softwareQualityObservations } from './helpers/software-quality-observations.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -16,13 +17,13 @@ const relay = doc(`control Relay {
   input start, stop: Bool;
   state held: Bool = false;
   state ever: Bool = false;
-  held' = !stop && (start || held);
-  ever' = start || ever;
+  held' = !(stop |> recover(false)) && ((start |> recover(false)) || held);
+  ever' = (start |> recover(false)) || ever;
   output active, accepted: Bool;
   active <- held';
   accepted <- ever';
 }`);
-const pin = (alias, locator, revision = 'relay-r1', text = relay) =>
+const pin = (alias, locator, revision = 'relay-input-v1', text = relay) =>
   `import ${alias} from "${locator}" revision "${revision}" sha256 "${sha256Hex(text)}";`;
 const wasmBytes = fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
 const nativePath = fileURLToPath(new URL(`../target/release/examples/scan_tape${process.platform === 'win32' ? '.exe' : ''}`, import.meta.url));
@@ -52,12 +53,12 @@ function source({ locator, reversed = false, eastName = 'east', westName = 'west
 async function compileVariant({ filename, locator, closureFilename, reversed = false, eastName = 'east', westName = 'west' }) {
   const compiled = await compileSource(source({ locator, reversed, eastName, westName }), {
     filename,
-    sourceClosure: [{ filename: closureFilename, revision: 'relay-r1', text: relay }],
+    sourceClosure: [{ filename: closureFilename, revision: 'relay-input-v1', text: relay }],
   });
   assert.equal(compiled.sourceClosure.documents.length, 1);
   assert.equal(compiled.sourceClosure.documents[0].text, relay);
   assert.equal(compiled.sourceClosure.documents[0].sha256, sha256Hex(relay));
-  assert.equal(compiled.sourceClosure.documents[0].revision, 'relay-r1');
+  assert.equal(compiled.sourceClosure.documents[0].revision, 'relay-input-v1');
   return compiled;
 }
 
@@ -81,7 +82,7 @@ function runNative(artifact, frames) {
 }
 
 async function execute(artifact, owner = null) {
-  const runtime = await ControlRuntime.instantiateFramed(wasmBytes, artifact);
+  const runtime = softwareQualityObservations(await ControlRuntime.instantiateFramed(wasmBytes, artifact));
   const frames = [], outcomes = [];
   const dispatch = runtime.runtime.dispatch.bind(runtime.runtime);
   runtime.runtime.dispatch = frame => { frames.push(structuredClone(frame)); dispatch(frame); outcomes.push(structuredClone(runtime.runtime.outcome)); };
@@ -163,8 +164,8 @@ test('REF-06-003 semantic instance ID changes do not alias old identity and bad 
   await assert.rejects(() => activateInstanceTraceProjection(baseline, { presentationRevision: 'bad', labels: { east: 'East', west: '' } }), /non-empty/);
   await assert.rejects(() => activateInstanceTraceProjection(baseline, { presentationRevision: 'bad', labels: { east: 'East', west: 'Bad\nLabel' } }), /control characters/);
   const wrongDigest = doc(`${pin('Relay', './defs/relay.ghost.md').replace(sha256Hex(relay), '0'.repeat(64))}\ncontrol Farm { instance east: Relay; }`);
-  await assert.rejects(() => compileSource(wrongDigest, { filename: 'farm.ghost.md', sourceClosure: [{ filename: 'defs/relay.ghost.md', revision: 'relay-r1', text: relay }] }), /sha256|digest|hash/i);
+  await assert.rejects(() => compileSource(wrongDigest, { filename: 'farm.ghost.md', sourceClosure: [{ filename: 'defs/relay.ghost.md', revision: 'relay-input-v1', text: relay }] }), /sha256|digest|hash/i);
   const wrongRevision = doc(`${pin('Relay', './defs/relay.ghost.md', 'relay-r2')}\ncontrol Farm { instance east: Relay; }`);
-  await assert.rejects(() => compileSource(wrongRevision, { filename: 'farm.ghost.md', sourceClosure: [{ filename: 'defs/relay.ghost.md', revision: 'relay-r1', text: relay }] }), /revision/i);
+  await assert.rejects(() => compileSource(wrongRevision, { filename: 'farm.ghost.md', sourceClosure: [{ filename: 'defs/relay.ghost.md', revision: 'relay-input-v1', text: relay }] }), /revision/i);
   await assert.rejects(() => compileSource(source({ locator: './defs/relay.ghost.md' }), { filename: 'farm.ghost.md', sourceClosure: [] }), /missing|sourceClosure|dependency|import/i);
 });

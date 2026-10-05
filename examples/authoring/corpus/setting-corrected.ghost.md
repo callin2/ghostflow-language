@@ -15,6 +15,7 @@ control SettingPump {
   config run_duration: Duration = 2s;
   // ghostflow:link id=GF-CORPUS-SETTING-INTENT relation=implements
   state running: Bool = false;
+  // ghostflow:link id=GF-CORPUS-SETTING-INTENT relation=implements
   state restart_blocked: Bool = false;
   // ghostflow:link id=GF-CORPUS-SETTING-INTENT relation=implements
   timer age = elapsed(running);

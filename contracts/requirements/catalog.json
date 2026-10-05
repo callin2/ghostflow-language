@@ -46,7 +46,10 @@
         "GF-TEST-host-virtual-output",
         "GF-TEST-output-native-wasm-differential",
         "GF-TEST-safety-fixed-point",
-        "GF-TEST-contribution-field-boundary"
+        "GF-TEST-contribution-field-boundary",
+        "GF-TEST-host-virtual-output-input-v1",
+        "GF-TEST-output-native-wasm-differential-input-v1",
+        "GF-TEST-contribution-field-boundary-input-v1"
       ],
       "status": "implemented"
     },
@@ -90,7 +93,8 @@
       "pendingReason": "The modern let binding and simultaneous old-state/input reads are tested; legacy with syntax is not directly exercised by this focused case.",
       "status": "partial",
       "testIds": [
-        "GF-TEST-snapshot-commit"
+        "GF-TEST-snapshot-commit",
+        "GF-TEST-snapshot-commit-input-v1"
       ]
     },
     {
@@ -110,7 +114,8 @@
         "core-runtime"
       ],
       "testIds": [
-        "GF-TEST-snapshot-commit"
+        "GF-TEST-snapshot-commit",
+        "GF-TEST-snapshot-commit-input-v1"
       ],
       "status": "implemented"
     },
@@ -133,7 +138,8 @@
       ],
       "testIds": [
         "GF-TEST-next-reference-rejection",
-        "GF-TEST-snapshot-commit"
+        "GF-TEST-snapshot-commit",
+        "GF-TEST-snapshot-commit-input-v1"
       ],
       "status": "implemented"
     },
@@ -203,7 +209,8 @@
       ],
       "status": "implemented",
       "testIds": [
-        "GF-TEST-snapshot-commit"
+        "GF-TEST-snapshot-commit",
+        "GF-TEST-snapshot-commit-input-v1"
       ]
     },
     {
@@ -224,7 +231,8 @@
       ],
       "status": "implemented",
       "testIds": [
-        "GF-TEST-snapshot-commit"
+        "GF-TEST-snapshot-commit",
+        "GF-TEST-snapshot-commit-input-v1"
       ]
     },
     {
@@ -268,7 +276,8 @@
       "testIds": [
         "GF-TEST-snapshot-commit",
         "GF-TEST-error-atomicity",
-        "GF-TEST-safety-fixed-point"
+        "GF-TEST-safety-fixed-point",
+        "GF-TEST-snapshot-commit-input-v1"
       ]
     },
     {
@@ -352,7 +361,8 @@
       ],
       "status": "implemented",
       "testIds": [
-        "GF-TEST-literate-runtime-equivalence"
+        "GF-TEST-literate-runtime-equivalence",
+        "GF-TEST-literate-runtime-equivalence-input-v1"
       ]
     },
     {
@@ -910,8 +920,8 @@
         "path": "tests/control.test.mjs",
         "heading": "control OutputInitializer {",
         "lines": [
-          271,
-          289
+          278,
+          296
         ],
         "sha256": "80f6a330dec6957edfbb4712c37ec4ed95252b4adbd305ef6d7f2c1cb9eb9e71"
       },
@@ -933,17 +943,20 @@
     },
     {
       "id": "GF-TEST-host-virtual-output",
-      "file": "tests/control.test.mjs",
+      "file": "tests/fixtures/history/issue531/virtual-host-proof.pre-input.txt",
       "locator": {
-        "path": "tests/control.test.mjs",
+        "path": "tests/fixtures/history/issue531/virtual-host-proof.pre-input.txt",
         "heading": "// The raw runtime must reject an output-bearing module before the host declares",
         "lines": [
-          238,
-          257
+          1,
+          20
         ],
         "sha256": "4f9ac92548a683b00467e4e052101ce17bd2fe1384d7579c74961f25c9f6cf99"
       },
-      "selector": "virtual host observes a safe output from a compiled control"
+      "selector": "virtual host observes a safe output from a compiled control",
+      "evidenceStatus": "historical",
+      "sourceRevision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773",
+      "supersededBy": "GF-TEST-host-virtual-output-input-v1"
     },
     {
       "id": "GF-TEST-next-reference-rejection",
@@ -952,8 +965,8 @@
         "path": "tests/control.test.mjs",
         "heading": "control NextOutsideOutput {",
         "lines": [
-          328,
-          334
+          335,
+          341
         ],
         "sha256": "db94d45e6331faf2728e09b8ffcbe390e8ed2967540cd226121a2154f66c5611"
       },
@@ -989,25 +1002,37 @@
     },
     {
       "id": "GF-TEST-output-native-wasm-differential",
-      "file": "tests/output-conformance.test.mjs",
+      "file": "tests/fixtures/history/issue531/output-native-wasm-proof.pre-input.txt",
       "locator": {
-        "path": "tests/output-conformance.test.mjs",
+        "path": "tests/fixtures/history/issue531/output-native-wasm-proof.pre-input.txt",
         "heading": "test('GF-TEST-output-native-wasm-differential: all 8DI vectors produce identical 8RO traces', async t =>",
-        "lines": [42,65],
+        "lines": [
+          1,
+          24
+        ],
         "sha256": "89aa0e2a70aae11f6369d7543fdceee5bb0cf673c65ca63ba0ad1f4ae266b0f4"
       },
-      "selector": "native and release WASM produce identical eight-input/eight-output traces without pre-scan intent"
+      "selector": "native and release WASM produce identical eight-input/eight-output traces without pre-scan intent",
+      "evidenceStatus": "historical",
+      "sourceRevision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773",
+      "supersededBy": "GF-TEST-output-native-wasm-differential-input-v1"
     },
     {
       "id": "GF-TEST-snapshot-commit",
-      "file": "tests/runtime-conformance.test.mjs",
+      "file": "tests/fixtures/history/issue531/GF-TEST-snapshot-commit.pre-input.txt",
       "locator": {
-        "path": "tests/runtime-conformance.test.mjs",
+        "path": "tests/fixtures/history/issue531/GF-TEST-snapshot-commit.pre-input.txt",
         "heading": "test('GF-TEST-snapshot-commit: old reads, explicit next reads, and untouched states', async t => {",
-        "lines": [61,83],
+        "lines": [
+          1,
+          23
+        ],
         "sha256": "e343ecf8e50a12b2fdf5c1148bd62fbbf199481615a80775247b06c5a906b17c"
       },
-      "selector": "GF-TEST-snapshot-commit: old reads, explicit next reads, and untouched states"
+      "selector": "GF-TEST-snapshot-commit: old reads, explicit next reads, and untouched states",
+      "evidenceStatus": "historical",
+      "sourceRevision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773",
+      "supersededBy": "GF-TEST-snapshot-commit-input-v1"
     },
     {
       "id": "GF-TEST-error-atomicity",
@@ -1015,7 +1040,10 @@
       "locator": {
         "path": "tests/runtime-conformance.test.mjs",
         "heading": "for (const phase of ['transition', 'intent']) {",
-        "lines": [85,114],
+        "lines": [
+          96,
+          125
+        ],
         "sha256": "7b8d5b13405924c694effa5d3465c14a4d58bfd5ba97fdfe2014b2c5ee593849"
       },
       "selector": "native/release WASM transition and intent arithmetic failures preserve committed state, outputs, tick sequence and journal through recovery"
@@ -1026,7 +1054,10 @@
       "locator": {
         "path": "tests/runtime-conformance.test.mjs",
         "heading": "test('GF-TEST-generated-input-error: omitted generated clock rejects and recovers without defaults', async t => {",
-        "lines": [116,129],
+        "lines": [
+          127,
+          140
+        ],
         "sha256": "4747e523bd16c3f9d37a8a5a28fbdc4c15e453b15c434fb017d9ba6d407cf4ce"
       },
       "selector": "GF-TEST-generated-input-error: omitted generated clock rejects and recovers without defaults"
@@ -1037,7 +1068,10 @@
       "locator": {
         "path": "tests/runtime-conformance.test.mjs",
         "heading": "test('GF-TEST-safety-fixed-point: snapshot rounds are false-only and independent of constraint order', async t => {",
-        "lines": [131,146],
+        "lines": [
+          142,
+          157
+        ],
         "sha256": "fa041208405c0cdd51aee4f4106536680e7289996082aff108f64473c29d2415"
       },
       "selector": "GF-TEST-safety-fixed-point: snapshot rounds are false-only and independent of constraint order"
@@ -1048,7 +1082,10 @@
       "locator": {
         "path": "tests/runtime-conformance.test.mjs",
         "heading": "for (const [name, query, expected] of [",
-        "lines": [148,159],
+        "lines": [
+          159,
+          170
+        ],
         "sha256": "3bbd0ad6c54a8c72bdbf0b6bdd26cb3564205a6559b3a65dd6cdf2c31a6073e9"
       },
       "selector": "native/release WASM reject no strategy match and winning priority ties"
@@ -1059,21 +1096,30 @@
       "locator": {
         "path": "tests/runtime-conformance.test.mjs",
         "heading": "test('GF-TEST-load-error: every truncation and invalid format agree across targets', async t => {",
-        "lines": [161,174],
+        "lines": [
+          172,
+          185
+        ],
         "sha256": "04ec6b9b8d595b0af38fa44c118d37876f9795e884c5ca3db9969ff3b1ff3017"
       },
       "selector": "GF-TEST-load-error: every truncation and invalid format agree across targets"
     },
     {
       "id": "GF-TEST-literate-runtime-equivalence",
-      "file": "tests/runtime-conformance.test.mjs",
+      "file": "tests/fixtures/history/issue531/GF-TEST-literate-runtime-equivalence.pre-input.txt",
       "locator": {
-        "path": "tests/runtime-conformance.test.mjs",
+        "path": "tests/fixtures/history/issue531/GF-TEST-literate-runtime-equivalence.pre-input.txt",
         "heading": "test('GF-TEST-literate-runtime-equivalence: equivalent canonical literate documents deploy identical GFB and traces', async t => {",
-        "lines": [176,185],
+        "lines": [
+          1,
+          10
+        ],
         "sha256": "633b84bc5d12c46ee0757f4cca05a23e9f7988b18031ee3e83fd66d8ce0f029d"
       },
-      "selector": "GF-TEST-literate-runtime-equivalence: equivalent canonical literate documents deploy identical GFB and traces"
+      "selector": "GF-TEST-literate-runtime-equivalence: equivalent canonical literate documents deploy identical GFB and traces",
+      "evidenceStatus": "historical",
+      "sourceRevision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773",
+      "supersededBy": "GF-TEST-literate-runtime-equivalence-input-v1"
     },
     {
       "id": "GF-TEST-interaction-emission-policy",
@@ -1081,7 +1127,10 @@
       "locator": {
         "path": "tests/interaction-emission.test.mjs",
         "heading": "test('GF-TEST-interaction-emission-policy: product compilation is literate-only and identity is caller-supplied', async () => {",
-        "lines": [65,87],
+        "lines": [
+          65,
+          87
+        ],
         "sha256": "6f35522285ec4d6114ee75c603e7626ce38bfc18cb8c8e18fa7cc413d72fc845"
       },
       "selector": "GF-TEST-interaction-emission-policy: product compilation is literate-only and identity is caller-supplied"
@@ -1092,7 +1141,10 @@
       "locator": {
         "path": "tests/runtime-conformance.test.mjs",
         "heading": "test('GF-TEST-query-verifier: exact postfix errors and stack maximum across release targets', async t => {",
-        "lines": [199,216],
+        "lines": [
+          210,
+          227
+        ],
         "sha256": "8ea759ebfb56c2cd392a75a578aabd56584dacdffc4042dc985bc12e6a303340"
       },
       "selector": "GF-TEST-query-verifier: exact postfix errors and stack maximum across release targets"
@@ -1104,8 +1156,8 @@
         "path": "tests/runtime-conformance.test.mjs",
         "heading": "test('GF-TEST-selected-if-error: selected arithmetic fault rejects without partial commit', async t => {",
         "lines": [
-          231,
-          240
+          242,
+          251
         ],
         "sha256": "9d477b522e43c562b05c24412966bf5f15a81a13b0e59c76f18b87e5061ea869"
       },
@@ -1118,8 +1170,8 @@
         "path": "tests/runtime-conformance.test.mjs",
         "heading": "test('GF-TEST-strategy-priority: only ties at the winning priority prevent activation', async t => {",
         "lines": [
-          242,
-          250
+          253,
+          261
         ],
         "sha256": "ef318f93e8fb982b21ade82cdac612409ae5353d57230803d8f8844fe28fc0ee"
       },
@@ -1127,17 +1179,99 @@
     },
     {
       "id": "GF-TEST-contribution-field-boundary",
+      "file": "tests/fixtures/history/issue531/GF-TEST-contribution-field-boundary.pre-input.txt",
+      "locator": {
+        "path": "tests/fixtures/history/issue531/GF-TEST-contribution-field-boundary.pre-input.txt",
+        "heading": "test('GF-TEST-contribution-field-boundary: independent field oracle kills weakened threshold rules', async t => {",
+        "lines": [
+          1,
+          42
+        ],
+        "sha256": "ee54081183c269388d393e5e301c6a1b94228690c2b6d02639709090a89f56db"
+      },
+      "selector": "GF-TEST-contribution-field-boundary: independent field oracle kills weakened threshold rules",
+      "evidenceStatus": "historical",
+      "sourceRevision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773",
+      "supersededBy": "GF-TEST-contribution-field-boundary-input-v1"
+    },
+    {
+      "id": "GF-TEST-host-virtual-output-input-v1",
+      "file": "tests/control.test.mjs",
+      "locator": {
+        "path": "tests/control.test.mjs",
+        "heading": "// The raw runtime must reject an output-bearing module before the host declares",
+        "lines": [
+          244,
+          267
+        ],
+        "sha256": "6a156d4f3a006eec287f7a8a136b0c93e5d707ed2db4e8983c1d8a009411ff60"
+      },
+      "selector": "canonical input virtual host observes explicit Good enable with declared quality capability",
+      "replaces": "GF-TEST-host-virtual-output"
+    },
+    {
+      "id": "GF-TEST-output-native-wasm-differential-input-v1",
+      "file": "tests/output-conformance.test.mjs",
+      "locator": {
+        "path": "tests/output-conformance.test.mjs",
+        "heading": "test('GF-TEST-output-native-wasm-differential: all 8DI vectors produce identical 8RO traces', async t =>",
+        "lines": [
+          43,
+          74
+        ],
+        "sha256": "28d9f0561a34f5377bfd996675167466656df40b737de486545341c320d8bed2"
+      },
+      "selector": "native and release WASM produce identical eight-input/eight-output traces without pre-scan intent",
+      "replaces": "GF-TEST-output-native-wasm-differential",
+      "sourceRevision": "issue531-input-quality-output-conformance-v1"
+    },
+    {
+      "id": "GF-TEST-snapshot-commit-input-v1",
+      "file": "tests/runtime-conformance.test.mjs",
+      "locator": {
+        "path": "tests/runtime-conformance.test.mjs",
+        "heading": "test('GF-TEST-snapshot-commit: old reads, explicit next reads, and untouched states', async t => {",
+        "lines": [
+          72,
+          94
+        ],
+        "sha256": "6b4953298e58e5b963d0030757bd2b189c3c020d0d2befe1f9d319e8d581bbee"
+      },
+      "selector": "GF-TEST-snapshot-commit: old reads, explicit next reads, and untouched states",
+      "replaces": "GF-TEST-snapshot-commit",
+      "sourceRevision": "issue531-input-quality-runtime-conformance-v1"
+    },
+    {
+      "id": "GF-TEST-literate-runtime-equivalence-input-v1",
+      "file": "tests/runtime-conformance.test.mjs",
+      "locator": {
+        "path": "tests/runtime-conformance.test.mjs",
+        "heading": "test('GF-TEST-literate-runtime-equivalence: equivalent canonical literate documents deploy identical GFB and traces', async t => {",
+        "lines": [
+          187,
+          196
+        ],
+        "sha256": "15063238bd4f21b39973da5875e5026df72aad4b5d6fe96091c43ac7840fbdb8"
+      },
+      "selector": "GF-TEST-literate-runtime-equivalence: equivalent canonical literate documents deploy identical GFB and traces",
+      "replaces": "GF-TEST-literate-runtime-equivalence",
+      "sourceRevision": "issue531-input-quality-runtime-conformance-v1"
+    },
+    {
+      "id": "GF-TEST-contribution-field-boundary-input-v1",
       "file": "tests/runtime-conformance.test.mjs",
       "locator": {
         "path": "tests/runtime-conformance.test.mjs",
         "heading": "test('GF-TEST-contribution-field-boundary: independent field oracle kills weakened threshold rules', async t => {",
         "lines": [
-          292,
-          333
+          303,
+          344
         ],
-        "sha256": "ee54081183c269388d393e5e301c6a1b94228690c2b6d02639709090a89f56db"
+        "sha256": "870e3c6c52813e42bb8aea83421f3303f5c96a1f1720b2bcb80680f6a46beac6"
       },
-      "selector": "GF-TEST-contribution-field-boundary: independent field oracle kills weakened threshold rules"
+      "selector": "GF-TEST-contribution-field-boundary: independent field oracle kills weakened threshold rules",
+      "replaces": "GF-TEST-contribution-field-boundary",
+      "sourceRevision": "issue531-input-quality-runtime-conformance-v1"
     }
   ]
 }

@@ -1,4 +1,11 @@
+// Explicit temporal fixture revision: issue531-quality-temporal-v1; predecessor retained in fixtures/history/issue531/temporal.
 import assert from 'node:assert/strict';
+import { softwareQualityObservations, softwareQualityRails } from './helpers/software-quality-observations.mjs';
+const ControlRuntime = {
+  instantiate: async (...args) => softwareQualityObservations(await BaseControlRuntime.instantiate(...args)),
+  instantiateFramed: async (...args) => softwareQualityObservations(await BaseControlRuntime.instantiateFramed(...args)),
+};
+
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -8,19 +15,19 @@ import { fileURLToPath } from 'node:url';
 import { encode } from '@toon-format/toon';
 import { compileSource, writeArtifact, restoreArtifactSourceMap } from '../tools/toolchain.mjs';
 import { observeSourceTrace } from '../tools/source-trace.mjs';
-import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
+import { ControlRuntime as BaseControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 import { encodeContextFacts, solarContextEvidence } from '../runtimes/wasm/context-abi.mjs';
 import { runScenario } from '../tools/ghostsim.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const document = fs.readFileSync(new URL('./fixtures/issue-145-solar-config.ghost.md', import.meta.url), 'utf8');
+const document = fs.readFileSync(new URL('./fixtures/issue-145-solar-config.input-v1.ghost.md', import.meta.url), 'utf8');
 const activation = { bootEpoch: 7, terminalCapacity: 32, bindings: [] };
 let wasm;
 function wasmBytes() {
   if (!wasm) wasm = fs.readFileSync(path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm'));
   return wasm;
 }
-const artifact = () => compileSource(document, { filename: 'issue-145-solar-config.ghost.md' });
+const artifact = () => compileSource(document, { filename: 'issue-145-solar-config.input-v1.ghost.md' });
 const clock = (monotonicMs, wallMs) => ({ monotonicMs, bootEpoch: 7, wallMs, uncertaintyMs: 0,
   trusted: true, unknownReason: null, sourceRevision: 'solar-config-clock-v1' });
 function facts(compiled, mono, wall, settings = null) {
@@ -47,7 +54,7 @@ function native(t, compiled, steps) {
   const modulePath = path.join(directory, 'solar.gfb'), tapePath = path.join(directory, 'tape.json');
   fs.writeFileSync(modulePath, compiled.bytes);
   fs.writeFileSync(tapePath, JSON.stringify({ profile: 'context-solar-v1', activation, steps: steps.map((step, index) => ({
-    scanId: step.scanId ?? index, logicalTimeMs: step.nowMs, inputs: [{ name: 'divisor', value: step.divisor ?? 1 }],
+    scanId: step.scanId ?? index, logicalTimeMs: step.nowMs, inputs: Object.entries(softwareQualityRails(compiled, { divisor: step.divisor ?? 1 }, index + 1, step.nowMs)).map(([name, value]) => ({ name, value })),
     ...step.contextFacts,
   })) }));
   return execFileSync(path.join(root, 'target/release/examples/context_tape' + (process.platform === 'win32' ? '.exe' : '')),
@@ -110,7 +117,7 @@ test('REF-03-025: Solar PredictionStale skip preserves Unknown cause and loaded 
   assert.equal(available[1].safe.due, true, 'available evidence crosses; stale evidence is not a constant-false Schedule');
   assert.equal(available[1].contextTrace.some(row => row.decision === 'Due'), true);
   const descriptor = compiled.manifest.schedules[0];
-  const revised = await compileSource(document + '\nRevision-only prose.\n', { filename: 'issue-145-solar-config.ghost.md' });
+  const revised = await compileSource(document + '\nRevision-only prose.\n', { filename: 'issue-145-solar-config.input-v1.ghost.md' });
   assert.deepEqual(revised.bytes, compiled.bytes, 'equal bytecode alone cannot identify a canonical definition revision');
   assert.notEqual(revised.sourceDocument.sha256, compiled.sourceDocument.sha256);
   assert.throws(() => restoreArtifactSourceMap(sourceMap, compiled.bytes, {

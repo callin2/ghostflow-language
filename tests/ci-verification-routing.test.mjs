@@ -13,9 +13,28 @@ function repository(t) {
   git('init', '-q'); git('config', 'user.name', 'Routing test'); git('config', 'user.email', 'routing@example.invalid');
   const write = (name, content = 'doc\n') => { fs.mkdirSync(path.dirname(path.join(cwd, name)), { recursive: true }); fs.writeFileSync(path.join(cwd, name), content); };
   const commit = () => { git('add', '-A'); git('commit', '-qm', 'fixture'); return git('rev-parse', 'HEAD'); };
+  // Git trees represent names and modes that the host filesystem may not support.
+  const indexFile = (name, content, mode = '100644') => {
+    const oid = execFileSync('git', ['hash-object', '-w', '--stdin'],
+      { cwd, input: content, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+    git('update-index', '--add', '--cacheinfo', mode, oid, name);
+  };
+  const treeFile = (name, content) => {
+    const oid = execFileSync('git', ['hash-object', '-w', '--stdin'],
+      { cwd, input: content, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+    const entries = execFileSync('git', ['ls-tree', '-z', git('write-tree')], { cwd });
+    return execFileSync('git', ['mktree', '-z'],
+      { cwd, input: Buffer.concat([entries, Buffer.from(`100644 blob ${oid}\t${name}\0`)]), encoding: 'utf8' }).trim();
+  };
+  const commitTree = tree => {
+    const head = git('commit-tree', tree, '-p', git('rev-parse', 'HEAD'), '-m', 'fixture');
+    git('update-ref', 'HEAD', head);
+    return head;
+  };
+  const commitIndex = () => commitTree(git('write-tree'));
   write('README.md'); write('docs/SPEC.md'); const base = commit();
   const classify = (before, after, eventName = 'push') => classifyChanges({ cwd, eventName, sha: after, event: eventName === 'pull_request' ? { pull_request: { base: { sha: before }, head: { sha: after } } } : { before } });
-  return { cwd, git, write, commit, base, classify };
+  return { cwd, git, write, commit, indexFile, treeFile, commitTree, commitIndex, base, classify };
 }
 
 test('ordinary docs additions, edits, deletions and allowlisted renames use docs', t => {
@@ -31,7 +50,15 @@ test('mixed, executable markdown, policy, unknown paths and both rename directio
   const r = repository(t);
   for (const name of ['examples/pump.ghost.md', 'docs/SPEC.md', 'AGENTS.md', 'tools/a.mjs', 'odd\nname.md']) {
     const before = r.git('rev-parse', 'HEAD');
-    r.write('README.md', name); r.write(name, 'changed'); const head = r.commit();
+    r.write('README.md', name);
+    let head;
+    if (name.includes('\n')) {
+      r.git('add', 'README.md');
+      head = r.commitTree(r.treeFile(name, 'changed'));
+      assert.ok(r.git('ls-tree', '-rz', head).includes(`\t${name}\0`), 'Git fixture retains the exact newline path');
+    } else {
+      r.write(name, 'changed'); head = r.commit();
+    }
     assert.equal(r.classify(before, head), 'full', name);
   }
   const beforeRename = r.git('rev-parse', 'HEAD');
@@ -42,11 +69,17 @@ test('mixed, executable markdown, policy, unknown paths and both rename directio
 });
 
 test('symlinks and executable mode changes never qualify as docs', t => {
-  const r = repository(t); fs.chmodSync(path.join(r.cwd, 'README.md'), 0o755);
-  const executable = r.commit(); assert.equal(r.classify(r.base, executable), 'full');
-  fs.unlinkSync(path.join(r.cwd, 'README.md')); fs.symlinkSync('docs/SPEC.md', path.join(r.cwd, 'README.md'));
-  const linked = r.commit(); assert.equal(r.classify(executable, linked), 'full');
-  r.git('rm', 'README.md'); assert.equal(r.classify(linked, r.commit()), 'full');
+  const r = repository(t);
+  r.indexFile('README.md', 'doc\n', '100755');
+  const executable = r.commitIndex();
+  assert.match(r.git('ls-tree', executable, 'README.md'), /^100755 blob /);
+  assert.equal(r.classify(r.base, executable), 'full');
+  r.indexFile('README.md', 'docs/SPEC.md', '120000');
+  const linked = r.commitIndex();
+  assert.match(r.git('ls-tree', linked, 'README.md'), /^120000 blob /);
+  assert.equal(r.classify(executable, linked), 'full');
+  r.git('update-index', '--force-remove', '--', 'README.md');
+  assert.equal(r.classify(linked, r.commitIndex()), 'full');
 });
 
 test('PR compares merge-base; push compares exact before; manual and unresolved inputs use full', t => {

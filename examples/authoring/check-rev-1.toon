@@ -3,4 +3,4 @@ operation: check
 source:
   path: build/authoring/pump.ghost.md
   documentId: GF-EXAMPLE-PUMP
-  revisionId: rev-1
+  revisionId: rev-1-input-v1

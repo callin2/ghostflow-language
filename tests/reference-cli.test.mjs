@@ -13,10 +13,10 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const referenceDir = path.join(root, 'docs/reference');
 // Explicit files: adding a chapter requires an intentional coverage update.
 const caseFiles = [
-  'tests/reference/cases/00-principles.json',
-  'tests/reference/cases/01-source-types.json',
-  'tests/reference/cases/02-time-control.json',
-  'tests/reference/cases/03-settings-boundaries.json',
+  'tests/reference/cases-input-v1/00-principles.json',
+  'tests/reference/cases-input-v1/01-source-types.json',
+  'tests/reference/cases-input-v1/02-time-control.json',
+  'tests/reference/cases-input-v1/03-settings-boundaries.json',
 ];
 const chapterFiles = [
   '../LANGUAGE-REFERENCE.md',
@@ -40,6 +40,25 @@ const frozenLinked = new Set((featureValidationErrors.length ? [] : featureCatal
 const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-reference-'));
 const results = [];
 let catalogValidation = 'not-run';
+
+test('input reference revisions preserve pinned predecessor catalogs and their exact software observation subset', () => {
+  for (const catalog of catalogs) {
+    const bytes = fs.readFileSync(path.join(root, catalog.historicalCatalog.path));
+    assert.equal(createHash('sha256').update(bytes).digest('hex'), catalog.historicalCatalog.sha256);
+    const history = JSON.parse(bytes).cases;
+    assert.deepEqual(catalog.cases.map(entry => entry.id), history.map(entry => entry.id));
+    for (const [index, entry] of catalog.cases.entries()) {
+      const predecessor = history[index];
+      for (const field of ['expect', 'status', 'rule', 'diagnosticPattern', 'references'])
+        assert.deepEqual(entry[field], predecessor[field], `${entry.id}: preserved ${field} oracle`);
+      // Historical declaration inventory is checked only as data, never compiled as a fallback.
+      const expectedPorts = [...(predecessor.source ?? '').matchAll(/\binput\s+([\w ,]+)\s*:\s*(\w+)\s*;/g)]
+        .flatMap(([, names, type]) => names.split(',').map(name => ({ name: name.trim(), type })));
+      assert.deepEqual(entry.softwareObservationPorts, expectedPorts, `${entry.id}: acquisition-only ports cannot become synthetic software values`);
+      assert.equal(entry.sourceRevision, 'issue531-input-quality-reference-v1');
+    }
+  }
+});
 
 function slug(text) {
   return text.toLowerCase().replace(/`/g, '').replace(/[^\p{L}\p{N}\p{M}\s_-]/gu, '').replace(/ /g, '-');

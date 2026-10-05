@@ -110,14 +110,14 @@ test('REF-07-001: index concepts stay usable as names while body-defined syntax 
     input warn: Bool;
     input timezone: Bool;
     output binding: Bool;
-    binding <- Driver && checkpoint && warn && timezone;
+    binding <- (Driver |> recover(false)) && (checkpoint |> recover(false)) && (warn |> recover(false)) && (timezone |> recover(false));
   }`);
-  assert.deepEqual(compiled.manifest.inputs.map(input => input.name), ['Driver', 'checkpoint', 'warn', 'timezone']);
+  assert.deepEqual(compiled.manifest.sensors.map(input => input.name), ['Driver', 'checkpoint', 'warn', 'timezone']);
   assert.deepEqual(compiled.manifest.outputs, [{ name: 'binding', type: 'Bool' }]);
   await assert.rejects(compileIndexSource('control Bad { output control: Bool; control <- true; }'),
     /output name control is reserved/);
   await assert.rejects(compileIndexSource('input start: Bool; control Bad { output pump: Bool; pump <- true; }'),
-    /expected control declaration/);
+    /unexpected declaration control/);
 
   const scheduleBody = indexedBody(index, '`timezone`', '03-time-and-schedules.md', '3.6 Selected DailySlots');
   assert.match(scheduleBody, /timezone/);
@@ -152,8 +152,8 @@ test('REF-07-001: indexed design and installation concepts do not become executa
     /unexpected declaration bind/);
   await assert.rejects(compileIndexSource('Driver gpio; control InstallationSketch { output pump: Bool; pump <- true; }'),
     /expected control declaration/);
-  const logical = await compileIndexSource('control LogicalPort { input start: Bool; output pump: Bool; pump <- start; }');
-  assert.deepEqual(logical.manifest.inputs, [{ name: 'start', type: 'Bool' }]);
+  const logical = await compileIndexSource('control LogicalPort { input start: Bool; output pump: Bool; pump <- start |> recover(false); }');
+  assert.deepEqual(logical.manifest.sensors.map(({ name, type }) => ({ name, type })), [{ name: 'start', type: 'Bool' }]);
   assert.deepEqual(logical.manifest.outputs, [{ name: 'pump', type: 'Bool' }]);
   assert.equal('bindings' in logical.manifest, false, 'logical compilation must not invent physical installation bindings');
 });

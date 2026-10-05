@@ -1,3 +1,4 @@
+import { softwareQualityObservations } from './helpers/software-quality-observations.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -11,8 +12,8 @@ import {ControlRuntime} from '../runtimes/wasm/control-runtime.mjs';
 
 const root=fileURLToPath(new URL('../',import.meta.url));
 const doc=code=>'# Composition contract oracle\n\n```ghost\n'+code+'\n```\n';
-const child=doc('control Relay { input start: Bool; output pump: Bool; pump <- start; }');
-const revision='relay-r301',digest=sha256Hex(child),filename='ref-06-015-contract.ghost.md';
+const child=doc('control Relay { input start: Bool; output pump: Bool; pump <- start |> recover(false); }');
+const revision='relay-r301-input-v1',digest=sha256Hex(child),filename='ref-06-015-contract.ghost.md';
 const pin=`import Relay from "./relay.ghost.md" revision "${revision}" sha256 "${digest}";`;
 const candidate=(conflict=false)=>doc(pin+`\ncontrol Farm {
  input east_start, west_start: Bool;
@@ -66,7 +67,7 @@ test('REF-06-015 repaired pinned composition activates unchanged native and WASM
  assert.deepEqual(artifact.sourceClosure.documents, [{...closure[0],sha256:digest}]);
  assert.deepEqual(artifact.sourceClosure.instances.map(x=>[x.definition,x.instance]),[['Relay','east'],['Relay','west']]);
  const wasm=fs.readFileSync(root+'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm');
- const runtime=await ControlRuntime.instantiateFramed(wasm,artifact);t.after(()=>runtime.dispose());
+ const runtime=softwareQualityObservations(await ControlRuntime.instantiateFramed(wasm,artifact));t.after(()=>runtime.dispose());
  const frames=[],outcomes=[],dispatch=runtime.runtime.dispatch.bind(runtime.runtime);
  runtime.runtime.dispatch=frame=>{frames.push(structuredClone(frame));dispatch(frame);outcomes.push(structuredClone(runtime.runtime.outcome));};
  for(const [index,[east_start,west_start]] of [[false,false],[true,false],[false,true],[true,true]].entries())runtime.step({nowMs:index,inputs:{east_start,west_start}});

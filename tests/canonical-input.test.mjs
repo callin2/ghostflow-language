@@ -116,8 +116,11 @@ for (const [type, lower, upper, fallback, absent] of [
       assert.equal(invalid.vm.safe.value, Number(fallback.replace('ms', '')));
       assert.equal(runtime.step({ nowMs: 15, samples: { reading: sample(4, 15, 'Good', 10) } }).sensors.reading.quality, 'NotReady');
       assert.equal(runtime.step({ nowMs: 16, samples: { reading: sample(5, 16, 'Good', 10) } }).vm.safe.value, 10);
-      assert.equal(runtime.step({ nowMs: 17, samples: { reading: sample(1, 17, 'Good', 0, 2) } }).vm.safe.value, 0, 'a new producer epoch resets the existing conditioner');
+      const restarted = runtime.step({ nowMs: 17, samples: { reading: sample(1, 17, 'Good', 0, 2) } });
+      assert.equal(restarted.sensors.reading.quality, 'NotReady', 'a new producer epoch starts a new preparation sequence');
+      assert.equal(restarted.vm.safe.value, Number(fallback.replace('ms', '')));
       assert.deepEqual(runtime.sensors.get('reading').conditioner.sampleIdentity(), { epoch: 2, id: 1, timestampMs: 17 });
+      assert.equal(runtime.step({ nowMs: 18, samples: { reading: sample(2, 18, 'Good', 0, 2) } }).vm.safe.value, 0, 'the second distinct Good observation completes the declared recovery threshold');
     } finally { runtime.dispose(); }
   }
 });

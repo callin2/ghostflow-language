@@ -8,6 +8,23 @@ const faq = fs.readFileSync(new URL('../docs/language_faq.md', import.meta.url),
 const programming = fs.readFileSync(new URL('../docs/ProgrammingInGhostflow.md', import.meta.url), 'utf8');
 const programmingEnglish = fs.readFileSync(new URL('../docs/ProgrammingInGhostflow.en.md', import.meta.url), 'utf8');
 
+test('all complete FAQ and constraint controls compile with identical bilingual source', () => {
+  const controls = document => new Map([...document.matchAll(/```ghost\n([\s\S]*?)```/g)]
+    .filter(match => /(?:^|\n)control \w+ \{/.test(match[1]))
+    .map(match => [match[1].match(/control (\w+)/)[1], match[1]]));
+  for (const stem of ['language_faq', 'CONSTRAINTS']) {
+    const canonical = controls(fs.readFileSync(new URL(`../docs/${stem}.md`, import.meta.url), 'utf8'));
+    const translated = controls(fs.readFileSync(new URL(`../docs/${stem}.en.md`, import.meta.url), 'utf8'));
+    assert.deepEqual([...translated.keys()], [...canonical.keys()]);
+    for (const [name, code] of canonical) {
+      assert.equal(translated.get(name), code, `${stem} ${name} translation must preserve executable code`);
+      assert.ok(compileSourceSync(`# ${name}\n\n\`\`\`ghost\n${code}\`\`\`\n`, {
+        filename: `${name}.ghost.md`,
+      }).bytes.length > 0);
+    }
+  }
+});
+
 test('canonical constraint examples distinguish executable local control from checked shared descriptor', () => {
   for (const name of ['CONSTRAINTS.md', 'CONSTRAINTS.en.md']) {
     const document = fs.readFileSync(new URL(`../docs/${name}`, import.meta.url), 'utf8');

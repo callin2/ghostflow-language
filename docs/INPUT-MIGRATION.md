@@ -81,6 +81,13 @@ Driver, USB and software adapters must separately establish their session,
 binding, disconnect and delivery guarantees. A packet shape alone does not
 prove provenance or physical acquisition.
 
+A Boolean push-button observation does not diagnose a broken wire, a stuck
+contact or a disconnected button. `NotReady` describes acquisition/conditioning
+readiness, such as no accepted observation yet. A successfully read false is
+healthy false. Other quality faults require evidence from the producer or the
+configured freshness/validity contract; the source keyword adds no physical
+diagnostics and imposes no universal restart or START-button requirement.
+
 ## Ownership and adoption gates
 
 | Owner | Contract to adopt |

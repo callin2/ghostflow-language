@@ -1,3 +1,4 @@
+// Explicit canonical arithmetic quality fixture revision: issue531-quality-temporal-v1; raw GFB guard vectors remain unchanged.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -5,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { softwareQualityRails } from './helpers/software-quality-observations.mjs';
 import { compileSource } from '../tools/toolchain.mjs';
 import { compile as compileGfb, parse, tokenize } from '../tools/gfb1.mjs';
 import { GhostFlowRuntime } from '../runtimes/wasm/ghostflow-runtime.mjs';
@@ -16,7 +18,13 @@ const source = `# Dynamic Duration runtime
 
 \`\`\`ghost
 control DurationRuntime {
-  input a, b: Duration;
+  input observed_a, observed_b: Duration;
+  state previous_a: Duration = 0ms;
+  state previous_b: Duration = 0ms;
+  let a = case observed_a { ok(value) => value; fault(_) => previous_a; };
+  let b = case observed_b { ok(value) => value; fault(_) => previous_b; };
+  previous_a' = a;
+  previous_b' = b;
   state accepted: Int = 0;
   accepted' = accepted + 1;
   output result: Duration;
@@ -32,9 +40,24 @@ async function runtimeFor(t, expression = 'a + b') {
   runtime.load(artifact.bytes);
   runtime.addCapability('actuator', 'result', 'number');
   runtime.activate();
+  const setNumber = runtime.setNumber.bind(runtime);
+  runtime.setNumber = (name, value) => {
+    for (const [port, payload] of Object.entries(softwareQualityRails(artifact, { ['observed_' + name]: value }, 1, 0))) {
+      if (typeof payload === 'boolean') runtime.setBool(port, payload);
+      else setNumber(port, payload);
+    }
+  };
   return runtime;
 }
 function nativeFor(t, bytes, header, rows) {
+  if (!Buffer.isBuffer(bytes) && bytes.manifest) {
+    const artifact = bytes;
+    const values = rows.map(row => row.split(',').map(Number));
+    const packets = values.map(([a, b], index) => softwareQualityRails(artifact, { observed_a: a, observed_b: b }, index + 1, index));
+    const columns = Object.keys(packets[0]);
+    header = columns.join(','); rows = packets.map(packet => columns.map(name => packet[name]).join(','));
+    bytes = artifact.bytes;
+  }
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-duration-'));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   const modulePath = path.join(directory, 'duration.gfb'), inputPath = path.join(directory, 'inputs.csv');
@@ -81,7 +104,7 @@ test('duration checked arithmetic rejects invalid intermediate results on native
   ]) {
     const artifact = await compileSource(source.replace('a + b', expression), { filename: 'duration-native.ghost.md' });
     assert.equal(artifact.bytes.readUInt16LE(4), 3);
-    const outcomes = nativeFor(t, artifact.bytes, 'a,b', [safe, invalid, safe]);
+    const outcomes = nativeFor(t, artifact, 'a,b', [safe, invalid, safe]);
     assert.equal(outcomes[0].trace.stateAfter.accepted, 1);
     assert.deepEqual(outcomes[1], { status: 'ERROR', phase: 'tick', error: 'duration-out-of-range', journalLength: 1 });
     assert.equal(outcomes[2].trace.stateBefore.accepted, 1);
@@ -104,7 +127,7 @@ test('duration unary minus and unselected underflow follow the same WASM guard c
   assert.throws(() => skipped.tick(), /duration-out-of-range/);
   assert.equal(skipped.stateInt('accepted'), 1);
   const artifact = await compileSource(source.replace('a + b', expression), { filename: 'duration-branch.ghost.md' });
-  const native = nativeFor(t, artifact.bytes, 'a,b', ['0,1', '1,2']);
+  const native = nativeFor(t, artifact, 'a,b', ['0,1', '1,2']);
   assert.equal(native[0].trace.safe.result, 7);
   assert.equal(native[1].error, 'duration-out-of-range');
 });

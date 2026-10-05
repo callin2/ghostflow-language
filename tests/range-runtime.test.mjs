@@ -1,4 +1,11 @@
+// Explicit temporal fixture revision: issue531-quality-temporal-v1; predecessor retained in fixtures/history/issue531/temporal.
 import assert from 'node:assert/strict';
+import { softwareQualityObservations, softwareQualityRails } from './helpers/software-quality-observations.mjs';
+const ControlRuntime = {
+  instantiate: async (...args) => softwareQualityObservations(await BaseControlRuntime.instantiate(...args)),
+  instantiateFramed: async (...args) => softwareQualityObservations(await BaseControlRuntime.instantiateFramed(...args)),
+};
+
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -7,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { encode } from '@toon-format/toon';
 import { compileSource, writeArtifact } from '../tools/toolchain.mjs';
-import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
+import { ControlRuntime as BaseControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 import { runScenario } from '../tools/ghostsim.mjs';
 import { dailySlotsRange } from './helpers/range-source.mjs';
 
@@ -30,7 +37,7 @@ async function parity(source, steps, expected, { checkpoints = false } = {}) {
   const site = artifact.manifest.schedules[0].site;
   const frames = steps.map(({ mono, wall, trusted = true, inputs = {} }, scanId) => ({
     scanId, logicalTimeMs: mono,
-    inputs: Object.entries(inputs).map(([name, value]) => ({ name, type: 'Bool', value })),
+    inputs: Object.entries(softwareQualityRails(artifact, inputs, scanId + 1, mono)).map(([name, value]) => ({ name, value })),
     ...facts(site, mono, wall, trusted),
   }));
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-range-'));
@@ -63,7 +70,7 @@ async function parity(source, steps, expected, { checkpoints = false } = {}) {
     ]);
     const scenarioPath = path.join(directory, 'scenario.toon');
     fs.writeFileSync(scenarioPath, encode({ format: 'GhostFlow/scenario-v1', id: 'utc-range',
-      initialInputs: frames[0].inputs, keyBindings: [], context: activation, actions }));
+      initialInputs: Object.entries(steps[0].inputs ?? {}).map(([name, value]) => ({ name, type: 'Bool', value })), keyBindings: [], context: activation, actions }));
     const simulation = runScenario(artifactPath, scenarioPath, { format: 'json' });
     assert.equal(simulation.success, true, simulation.encoded);
     const scans = JSON.parse(simulation.encoded).scans;
@@ -147,7 +154,7 @@ test('GF-TEST-range-runtime: half-open expiry, late first observation and monoto
 test('GF-TEST-range-runtime: when waits inside interval; cancellation consumes occurrence without rearming', async () => {
   const source = dailySlotsRange({ selected: '[08:00]', duration: '10min',
     config: 'input allow: Bool; input stop: Bool;' })
-    .replace('when = true;', 'when = allow;').replace('cancel_when = false;', 'cancel_when = stop;');
+    .replace('when = true;', 'when = allow |> recover(false);').replace('cancel_when = false;', 'cancel_when = stop |> recover(true);');
   await parity(source, [
     { mono: 0, wall: day + 8 * hour, inputs: { allow: false, stop: false } },
     { mono: 60_000, wall: day + 8 * hour + 60_000, inputs: { allow: true, stop: false } },

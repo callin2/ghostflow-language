@@ -59,7 +59,7 @@ test('approved input revisions preserve exact predecessor source bytes separatel
     assert.equal(createHash('sha256').update(snapshot).digest('hex'), record.sha256);
     const current = fs.readFileSync(new URL(`../${record.source}`, import.meta.url));
     assert.notEqual(createHash('sha256').update(current).digest('hex'), record.sha256);
-    assert.match(current.toString('utf8'), /issue531-approved-fault-restart-v1/);
+    assert.ok(current.toString('utf8').includes(record.replacementRevision), `missing explicit new revision for ${record.source}`);
   }
 });
 

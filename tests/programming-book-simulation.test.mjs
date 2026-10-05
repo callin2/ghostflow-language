@@ -51,9 +51,11 @@ async function simulate(id, source, frames, extra = {}) {
       actions: frames.flatMap((frame, index) => [
         ...fields.map(field => ({ kind: 'input', name: field.name, type: field.type, value: frame.inputs[field.name] })),
         // Retained healthy scenario observations, not clock-generated production samples.
-        ...compilation.manifest.sensors.filter(sensor => Object.hasOwn(frame.inputs, sensor.name)).map(sensor => ({
+        // The new illustrative revision names producer channels observed_*;
+        // retained healthy datasets keep their original logical field names.
+        ...compilation.manifest.sensors.filter(sensor => Object.hasOwn(frame.inputs, sensor.name.replace(/^observed_/, ''))).map(sensor => ({
           kind: 'sample', name: sensor.name, epoch: 1, id: index + 1,
-          timestampMs: frame.atMs, value: frame.inputs[sensor.name], quality: 'Good',
+          timestampMs: frame.atMs, value: frame.inputs[sensor.name.replace(/^observed_/, '')], quality: 'Good',
         })),
         ...(frame.actions ?? []),
         { kind: 'scan', atMs: frame.atMs, ...(frame.facts ?? {}) },
@@ -88,6 +90,65 @@ async function simulate(id, source, frames, extra = {}) {
 }
 
 const frame = (atMs, inputs, safe, state, requested) => ({ atMs, inputs, safe, state, requested });
+
+test('Programming quality revisions retain displays, block unknown starts and honor known protection', async () => {
+  const fault = (name, id, atMs) => ({
+    kind: 'sample', name: `observed_${name}`, epoch: 1, id,
+    timestampMs: atMs, value: name === 'a' ? 123 : true, quality: 'Disconnected',
+  });
+  await simulate('E12-display-quality', bookSource('E12'), [
+    frame(0, { a: 6, b: 2 }, { sum: 8, product: 12, negative: -6 }),
+    { ...frame(1, { b: 4 }, { sum: 8, product: 12, negative: -6 }), actions: [fault('a', 2, 1)] },
+    frame(2, { a: 0, b: 4 }, { sum: 4, product: 0, negative: 0 }),
+  ]);
+  await simulate('E07-producer-quality', bookSource('E07'), [
+    { ...frame(0, { stop: false, enabled: true }, { pump: false }, { running: false }), actions: [fault('start', 1, 0)] },
+    frame(1, { start: true, stop: false, enabled: true }, { pump: true }, { running: true }),
+    { ...frame(2, { stop: false, enabled: true }, { pump: true }, { running: true }), actions: [fault('start', 3, 2)] },
+    { ...frame(3, { stop: true, enabled: true }, { pump: false }, { running: false }), actions: [fault('start', 4, 3)] },
+  ]);
+  await simulate('E23-protection-quality', bookSource('E23'), [
+    frame(0, { start: false, stop: false, jam_clear: true, reset: false },
+      { conveyor: false, fault_lamp: false }, { fault_latched: false, start_armed: true }),
+    { ...frame(1, { start: true, stop: false, reset: false },
+      { conveyor: false, fault_lamp: false }, { fault_latched: false }), actions: [fault('jam_clear', 2, 1)] },
+    { ...frame(2, { stop: false, jam_clear: false, reset: false },
+      { conveyor: false, fault_lamp: true }, { fault_latched: true, start_armed: false }), actions: [fault('start', 3, 2)] },
+  ]);
+});
+
+test('FAQ quality revisions enforce existing deadlines while request acquisition is unknown', async () => {
+  const faq = fs.readFileSync(path.join(root, 'docs/language_faq.md'), 'utf8');
+  const source = name => {
+    const code = [...faq.matchAll(/```ghost\n([\s\S]*?)```/g)]
+      .find(match => match[1].includes(`control ${name} {`))?.[1];
+    assert.ok(code, `missing ${name} complete source`);
+    return `# ${name}\n\n\`\`\`ghost\n${code}\`\`\`\n`;
+  };
+  const disconnected = (name, id, atMs) => ({
+    kind: 'sample', name: `observed_${name}`, epoch: 1, id,
+    timestampMs: atMs, value: true, quality: 'Disconnected',
+  });
+  const facts = row => ({ ...row, facts: { contextFacts: contextFacts(row.atMs) } });
+  await simulate('FAQ-five-minute-quality', source('FiveMinuteRun'), [
+    frame(0, { start: false, stop: false, low_water: false }, { pump: false }),
+    frame(1, { start: true, stop: false, low_water: false }, { pump: true }),
+    { ...frame(300002, { stop: false, low_water: false }, { pump: false }, { running: false }),
+      actions: [disconnected('start', 3, 300002)] },
+  ].map(facts), { context });
+  await simulate('FAQ-off-delay-quality', source('OffDelay'), [
+    frame(0, { request: true, stop: false }, { enabled: true }),
+    frame(1, { request: false, stop: false }, { enabled: true }),
+    { ...frame(3002, { stop: false }, { enabled: false }, { phase: 0 }),
+      actions: [disconnected('request', 3, 3002)] },
+  ].map(facts), { context });
+  await simulate('FAQ-two-zone-quality', source('TwoZones'), [
+    frame(0, { start: false }, { pump: false }),
+    frame(1, { start: true }, { pump: false }, { phase: 1 }),
+    { ...frame(2001, {}, { pump: true }, { phase: 2 }), actions: [disconnected('start', 3, 2001)] },
+    { ...frame(302001, {}, { pump: false }, { phase: 3 }), actions: [disconnected('start', 4, 302001)] },
+  ].map(facts), { context });
+});
 const plainCases = [
   ['E01', [frame(0, { switch_on: false }, { lamp: false }), frame(1, { switch_on: true }, { lamp: true }), frame(2, { switch_on: false }, { lamp: false })]],
   ['E03', [
@@ -516,8 +577,10 @@ for (const [id, diagnostic] of errorExamples) {
 }
 
 test('Programming source experiments simulate changed priorities and explicit old-state reads', async () => {
-  await simulate('E01-invert', bookSource('E01').replace('lamp <- switch_on |> recover(false)', 'lamp <- !(switch_on |> recover(false))'), [
+  await simulate('E01-invert', bookSource('E01').replace('lamp <- switch_on |> recover(false)', 'lamp <- case switch_on { ok(value) => !value; fault(_) => false; }'), [
     frame(0, { switch_on: false }, { lamp: true }), frame(1, { switch_on: true }, { lamp: false }),
+    { ...frame(2, {}, { lamp: false }), actions: [{ kind: 'sample', name: 'switch_on',
+      epoch: 1, id: 3, timestampMs: 2, value: true, quality: 'Disconnected' }] },
   ]);
   await simulate('E02-inclusive', bookSource('E02').replace('level < value', 'level <= value'),
     [29, 30, 31].map((level, atMs) => ({ ...frame(atMs, { level }, { pump: level <= 30 }), facts: { contextFacts: contextFacts(atMs) } })), { context });
@@ -530,7 +593,7 @@ test('Programming source experiments simulate changed priorities and explicit ol
     frame(0, { start: true, stop: false }, { valve: true, pump: true }, { running: true }),
     frame(1, { start: false, stop: false }, { valve: true, pump: false }, { running: true }),
   ]);
-  await simulate('chapter10-priority-B', bookSource('E03').replace('!stop && (start || running)', 'start || (!stop && running)'), [
+  await simulate('chapter10-priority-B', bookSource('E03').replace('!stop_requested && (running || (start_requested && !restart_blocked))', 'start_requested || (!stop_requested && running)'), [
     frame(0, { start: true, stop: true }, { valve: true, pump: true }, { running: true }),
   ]);
   await simulate('E08-late-observation', bookSource('E08'), [[0, false, false], [1000, true, false], [2999, true, false], [3500, true, true]]

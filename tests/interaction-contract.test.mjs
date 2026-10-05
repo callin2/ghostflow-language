@@ -11,9 +11,9 @@ import { compileSource } from '../tools/toolchain.mjs';
 const root = fileURLToPath(new URL('..', import.meta.url));
 const fixtureSourcePath = 'contracts/interaction-v0/examples/five-minute-watering.ghost.md';
 const read = relative => JSON.parse(fs.readFileSync(path.join(root, relative), 'utf8'));
-const schema = read('contracts/interaction-v0/examples/five-minute-watering.schema.json');
-const snapshot = read('contracts/interaction-v0/examples/five-minute-watering.snapshot.json');
-const scanTape = read('contracts/interaction-v0/examples/five-minute-watering.scan-tape.json');
+const schema = read('contracts/interaction-v0/examples/five-minute-watering.input-v1.schema.json');
+const snapshot = read('contracts/interaction-v0/examples/five-minute-watering.input-v1.snapshot.json');
+const scanTape = read('contracts/interaction-v0/examples/five-minute-watering.input-v1.scan-tape.json');
 const clone = value => structuredClone(value);
 
 function validate(candidateSchema = schema, candidateSnapshot = snapshot, options) {

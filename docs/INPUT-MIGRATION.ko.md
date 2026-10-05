@@ -82,6 +82,12 @@ startup 준비 규칙을 따른다. identity conditioning은 첫 Good sample을 
 adapter는 session, binding, disconnect와 delivery 보장을 별도로 확립한다.
 packet 모양만으로 provenance나 물리 취득을 입증할 수 없다.
 
+push button의 Bool 관측값만으로 단선, 접점 고착이나 버튼 연결 해제를 진단할
+수 없다. `NotReady`는 아직 받아들인 관측값이 없는 경우 같은 취득/conditioning의
+준비 상태다. 정상적으로 읽은 false는 healthy false다. 다른 quality fault도
+producer의 증거나 설정된 freshness/validity 계약이 있어야 한다. 소스 keyword는
+물리 진단을 추가하거나 공통 재시작 정책·START 버튼을 강제하지 않는다.
+
 ## 소유권과 채택 gate
 
 | Owner | 채택할 계약 |

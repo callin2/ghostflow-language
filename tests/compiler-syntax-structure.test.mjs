@@ -59,20 +59,20 @@ const structuralCases = [
   },
   {
     id: 'static-transform-composition-missing-rhs',
-    bad: 'control Bad { sensor moisture: Percent; let transform = map(below(35%)) >> §; output dry: Bool; dry <- moisture |> recover(false); }',
-    good: 'control Good { sensor moisture: Percent; let transform = map(below(35%)) >> recover(false); output dry: Bool; dry <- moisture |> transform; }',
+    bad: 'control Bad { input moisture: Percent; let transform = map(below(35%)) >> §; output dry: Bool; dry <- moisture |> recover(false); }',
+    good: 'control Good { input moisture: Percent; let transform = map(below(35%)) >> recover(false); output dry: Bool; dry <- moisture |> transform; }',
     message: 'expected expression, found ;',
   },
   {
     id: 'pipeline-nested-call-missing-close',
-    bad: 'control Bad { sensor moisture: Percent; output dry: Bool; dry <- moisture |> map(below(35%) |> recover(false)§; }',
-    good: 'control Good { sensor moisture: Percent; output dry: Bool; dry <- moisture |> map(below(35%)) |> recover(false); }',
+    bad: 'control Bad { input moisture: Percent; output dry: Bool; dry <- moisture |> map(below(35%) |> recover(false)§; }',
+    good: 'control Good { input moisture: Percent; output dry: Bool; dry <- moisture |> map(below(35%)) |> recover(false); }',
     message: 'expected ) after arguments',
   },
   {
     id: 'nested-named-argument-missing-expression',
     bad: 'control Bad { input start: Bool; signal stable = debounce(start, stable_for: §, initial: false); output ready: Bool; ready <- stable; }',
-    good: 'control Good { input start: Bool; signal stable = debounce(start, stable_for: 1s, initial: false); output ready: Bool; ready <- stable; }',
+    good: 'control Good { input start: Bool; signal stable = debounce(start, stable_for: 1s, initial: false); output ready: Bool; ready <- stable |> recover(false); }',
     message: 'expected expression, found ,',
   },
 ];
@@ -93,11 +93,11 @@ for (const entry of structuralCases) test(`structural syntax: ${entry.id}`, asyn
 
 test('structural syntax: a comment after a pipeline operator still reports terminal EOF', async () => {
   const bad = `control Bad {
-  sensor reading: Bool;
+  input reading: Bool;
   output ready: Bool;
   ready <- reading |> // missing transform`;
   const good = `control Good {
-  sensor reading: Bool;
+  input reading: Bool;
   output ready: Bool;
   ready <- reading |> recover(false);
 }`;

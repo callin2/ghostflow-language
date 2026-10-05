@@ -1,3 +1,4 @@
+import { softwareQualityObservations, softwareQualityRails } from './helpers/software-quality-observations.mjs';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -17,7 +18,7 @@ const names = prefix => channels.map(channel => `${prefix}${channel}`);
 const source = `control EightChannelBench {
   input ${names('DI').join(', ')}: Bool;
   output ${names('RO').join(', ')}: Bool;
-  ${channels.map(channel => `RO${channel} <- DI${channel};`).join('\n  ')}
+  ${channels.map(channel => `RO${channel} <- DI${channel} |> recover(false);`).join('\n  ')}
 }`;
 
 const vectors = [
@@ -48,11 +49,13 @@ test('GF-TEST-output-native-wasm-differential: all 8DI vectors produce identical
   const modulePath = path.join(temporary, 'eight-channel.gfb');
   const csvPath = path.join(temporary, 'inputs.csv');
   fs.writeFileSync(modulePath, compiled.bytes);
-  fs.writeFileSync(csvPath, `${names('DI').join(',')}\n${vectors.map(vector => vector.join(',')).join('\n')}\n`);
+  const railRows = vectors.map(vector => softwareQualityRails(compiled, Object.fromEntries(names('DI').map((name, index) => [name, vector[index]]))));
+  const railNames = Object.keys(railRows[0]);
+  fs.writeFileSync(csvPath, `${railNames.join(',')}\n${railRows.map(row => railNames.map(name => row[name]).join(',')).join('\n')}\n`);
 
   const native = execFileSync(nativePath, [modulePath, csvPath], { encoding: 'utf8' })
     .trim().split('\n').map(line => JSON.parse(line));
-  const wasm = await ControlRuntime.instantiate(fs.readFileSync(wasmPath), compiled);
+  const wasm = softwareQualityObservations(await ControlRuntime.instantiate(fs.readFileSync(wasmPath), compiled));
   try {
     assert.equal(wasm.runtime.intentBool('RO1'), undefined, 'activation must not invent a pre-scan intent');
     const browser = vectors.map((vector, index) => wasm.step({

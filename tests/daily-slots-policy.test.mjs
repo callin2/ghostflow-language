@@ -1,3 +1,4 @@
+// Explicit temporal fixture revision: issue531-quality-temporal-v1; predecessor retained in fixtures/history/issue531/temporal.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
@@ -97,11 +98,12 @@ test('literal DailySlots emits GFB9 and config-selected slots emit GFB11', async
 
 test('DailySlots retains the authored predicate, DST choices and exact gap boundary', () => {
   const checked = check(code.replace('control DailySlotsValid {', 'control DailySlotsValid { input allow: Bool;')
-    .replace('when = true;', 'when = allow;').replace('60s', '9007199254740991ms')
+    .replace('when = true;', 'when = allow |> recover(false);').replace('60s', '9007199254740991ms')
     .replace('dst_missing = skip;', 'dst_missing = next_valid;').replace('dst_repeated = first;', 'dst_repeated = both;')
     .replace('[00:00, 06:15, 23:45]', '[23:45, 00:00, 06:15]'));
   const schedule = checked.manifest.schedules[0];
-  assert.equal(schedule.policy.when, 'input.allow');
+  assert.equal(schedule.policy.when[0], 'trace-result');
+  assert.deepEqual(schedule.policy.when[2], ['if', 'input.__gf_sensor_ok_allow', 'input.__gf_sensor_value_allow', 'false']);
   assert.equal(schedule.policy.gapMs, Number.MAX_SAFE_INTEGER);
   assert.equal(schedule.dstMissing, 'next_valid');
   assert.equal(schedule.dstRepeated, 'both');

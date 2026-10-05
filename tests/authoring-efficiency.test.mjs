@@ -57,7 +57,7 @@ function collectSourceRevision(repositoryRoot, declared, referenceSourceDigest) 
     packageLockSha256: sha256(fs.readFileSync(path.join(repositoryRoot, 'package-lock.json'))),
     scenarioRunnerSha256: sha256(fs.readFileSync(path.join(repositoryRoot, 'crates/ghostflow-core/examples/scenario_scan.rs'))),
     rustCoreTreeSha256: sha256(filesUnder(path.join(repositoryRoot, 'crates/ghostflow-core/src'))
-      .map(file => `${path.relative(repositoryRoot, file)}\0${sha256(fs.readFileSync(file))}`).join('\n')),
+      .map(file => `${path.relative(repositoryRoot, file).split(path.sep).join('/')}\0${sha256(fs.readFileSync(file))}`).join('\n')),
     referenceSourceDigest,
   };
   return { ...sourceRevision, digest: sourceRevisionDigest(sourceRevision) };

@@ -4,16 +4,17 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { encode } from '@toon-format/toon';
 import { compileSource, writeArtifact } from '../tools/toolchain.mjs';
 
-const cli = new URL('../tools/ghostsim.mjs', import.meta.url).pathname;
+const cli = fileURLToPath(new URL('../tools/ghostsim.mjs', import.meta.url));
 
 async function fixture(t) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostsim-continuous-'));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   const artifact = path.join(directory, 'continuous.gfb');
-  const source = '```ghost\ncontrol Continuous { sensor measured: Number; input target: Number; output command: Number; command <- target; }\n```\n';
+  const source = '```ghost\ncontrol Continuous { input measured: Number; input target: Number; state retained_target: Number = 42.0; let scalar_target = case target { ok(value) => value; fault(_) => retained_target; }; retained_target\' = scalar_target; output command: Number; command <- scalar_target; }\n```\n';
   writeArtifact(await compileSource(source, { filename: 'continuous.ghost.md' }), artifact);
   return { directory, artifact };
 }

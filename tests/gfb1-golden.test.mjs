@@ -8,6 +8,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { compileSource } from '../tools/toolchain.mjs';
 import { GhostFlowRuntime } from '../runtimes/wasm/ghostflow-runtime.mjs';
+import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const fixtureDirectory = path.join(root, 'tests/fixtures');
@@ -51,7 +52,7 @@ async function wasmLoad(bytes, run) {
   }
 }
 
-test('GF-TEST-gfb1-golden: canonical literate source recompiles to the fixed tracked bytes', async () => {
+test('GF-TEST-gfb1-golden: historical source and byte identities remain fixed while canonical plain access rejects', async () => {
   const source = fs.readFileSync(sourcePath, 'utf8');
   const tracked = fs.readFileSync(artifactPath);
   const metadata = JSON.parse(fs.readFileSync(path.join(fixtureDirectory, metadataName), 'utf8'));
@@ -65,10 +66,55 @@ test('GF-TEST-gfb1-golden: canonical literate source recompiles to the fixed tra
   assert.equal(sha256(source), fixedSourceSha256);
   assert.equal(sha256(tracked), fixedGfbSha256);
 
-  const node = await compileSource(source, { filename: sourceName });
-  assert.equal(node.sourceDocument.sha256, fixedSourceSha256);
-  assert.deepEqual(node.bytes, tracked);
-  assert.equal(sha256(node.bytes), fixedGfbSha256);
+  await assert.rejects(() => compileSource(source, { filename: sourceName }), /next state running must be Bool/);
+});
+
+test('GF-TEST-gfb1-input-golden: explicit new quality source has independent bytes and typed recovery parity', async t => {
+  const name = 'gfb1-golden-input-v1';
+  const source = fs.readFileSync(path.join(fixtureDirectory, `${name}.ghost.md`), 'utf8');
+  const tracked = fs.readFileSync(path.join(fixtureDirectory, `${name}.gfb`));
+  const metadata = JSON.parse(fs.readFileSync(path.join(fixtureDirectory, `${name}.json`), 'utf8'));
+  assert.deepEqual(metadata, {
+    format: 'GhostFlow/input-quality-golden-v1', source: `${name}.ghost.md`,
+    sourceSha256: '9ab0ca2ccb83cb8a3d962fa88320e4980e8aafafabf27c012253ce84a4c99f48',
+    artifact: `${name}.gfb`, gfbSha256: '7828f5b8ac5b373e1c548a21ccc0c2f75c65ddda5f36e0794b9658280dd45588',
+    gfbFormat: 3, sourceRevision: 'canonical-input-quality-v1',
+  });
+  assert.equal(sha256(source), '9ab0ca2ccb83cb8a3d962fa88320e4980e8aafafabf27c012253ce84a4c99f48');
+  assert.equal(sha256(tracked), '7828f5b8ac5b373e1c548a21ccc0c2f75c65ddda5f36e0794b9658280dd45588');
+  assert.equal(metadata.sourceSha256, sha256(source));
+  assert.equal(metadata.gfbSha256, sha256(tracked));
+  assert.equal(metadata.sourceRevision, 'canonical-input-quality-v1');
+  const artifact = await compileSource(source, { filename: `${name}.ghost.md` });
+  assert.deepEqual(artifact.bytes, tracked);
+  assert.equal(artifact.manifest.sensors[0].type, 'Bool');
+  assert.deepEqual(artifact.manifest.inputs, []);
+  const frames = [[false, 'Good', false], [true, 'Good', true],
+    [false, 'Disconnected', true], [false, 'Good', false]];
+  const outcomes = [];
+  for (const create of [ControlRuntime.instantiate, ControlRuntime.instantiateFramed]) {
+    const host = await create.call(ControlRuntime, fs.readFileSync(wasmPath), artifact);
+    t.after(() => host.dispose());
+    const traces = frames.map(([value, quality, expected], index) => {
+      const trace = host.step({ nowMs: index, samples: { enabled: {
+        epoch: 1, id: index + 1, timestampMs: index, value, quality,
+      } } }).vm;
+      assert.equal(trace.stateAfter.running, expected);
+      assert.equal(trace.safe.pump, !expected);
+      assert.equal(trace.inputs.__gf_sensor_ok_enabled, quality === 'Good');
+      return trace;
+    });
+    outcomes.push(traces);
+  }
+  assert.deepEqual(outcomes[0].map(trace => trace.safe), outcomes[1].map(trace => trace.safe));
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-input-golden-'));
+  t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
+  const module = path.join(temporary, 'quality.gfb'), csv = path.join(temporary, 'quality.csv');
+  const fields = Object.keys(outcomes[0][0].inputs);
+  fs.writeFileSync(module, tracked);
+  fs.writeFileSync(csv, `${fields.join(',')}\n${outcomes[0].map(trace => fields.map(field => trace.inputs[field]).join(',')).join('\n')}\n`);
+  const native = execFileSync(nativePath, [module, csv, '--outcomes'], { encoding: 'utf8' }).trim().split('\n').map(JSON.parse);
+  assert.deepEqual(native.map(row => row.trace.safe), outcomes[0].map(trace => trace.safe));
 });
 
 test('GF-TEST-gfb1-golden-load: native and release WASM independently accept only the exact valid vector', async t => {

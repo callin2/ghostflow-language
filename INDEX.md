@@ -258,6 +258,7 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/reports/2026-09-24-reference-execution-support-audit.md](docs/reports/2026-09-24-reference-execution-support-audit.md) | Reference execution and support audit — 2026-09-24 | md |
 | [docs/reports/2026-10-03-stale-branch-reconciliation.md](docs/reports/2026-10-03-stale-branch-reconciliation.md) | Stale branch reconciliation — 2026-10-03 | md |
 | [docs/reports/2026-10-05-input-531-consumer-gates.md](docs/reports/2026-10-05-input-531-consumer-gates.md) | Issue 531 independent review and consumer adoption gates | md |
+| [docs/reports/2026-10-05-input-531-integration.md](docs/reports/2026-10-05-input-531-integration.md) | Issue 531 integration checkpoint and consumer handoff | md |
 
 ## docs/research/
 
@@ -310,6 +311,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [examples/station-rules.ghost.md](examples/station-rules.ghost.md) | Shared station policy | md |
 | [examples/vfd-speed.ghost.ko.md](examples/vfd-speed.ghost.ko.md) | vfd-speed.ghost.ko.md | md |
 | [examples/vfd-speed.ghost.md](examples/vfd-speed.ghost.md) | vfd-speed.ghost.md | md |
+| [examples/vfd-speed.input-v1.ghost.ko.md](examples/vfd-speed.input-v1.ghost.ko.md) | VFD 속도 — 명시적 input revision | md |
+| [examples/vfd-speed.input-v1.ghost.md](examples/vfd-speed.input-v1.ghost.md) | VFD speed — explicit input revision | md |
 
 ## examples/authoring/
 
@@ -373,6 +376,16 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [examples/programming-book-imports/E21.ghost.md](examples/programming-book-imports/E21.ghost.md) | E21.ghost.md | md |
 | [examples/programming-book-imports/E22.ghost.md](examples/programming-book-imports/E22.ghost.md) | E22.ghost.md | md |
 | [examples/programming-book-imports/E31.ghost.md](examples/programming-book-imports/E31.ghost.md) | E31.ghost.md | md |
+
+## examples/programming-book-imports-input-v1/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [examples/programming-book-imports-input-v1/E19.ghost.md](examples/programming-book-imports-input-v1/E19.ghost.md) | E19.ghost.md | md |
+| [examples/programming-book-imports-input-v1/E20.ghost.md](examples/programming-book-imports-input-v1/E20.ghost.md) | E20.ghost.md | md |
+| [examples/programming-book-imports-input-v1/E21.ghost.md](examples/programming-book-imports-input-v1/E21.ghost.md) | E21.ghost.md | md |
+| [examples/programming-book-imports-input-v1/E22.ghost.md](examples/programming-book-imports-input-v1/E22.ghost.md) | E22.ghost.md | md |
+| [examples/programming-book-imports-input-v1/E31.ghost.md](examples/programming-book-imports-input-v1/E31.ghost.md) | E31.ghost.md | md |
 
 ## examples/tutorial/
 
@@ -469,12 +482,17 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | --- | --- | --- |
 | [tests/fixtures/after-event-evidence.ghost.md](tests/fixtures/after-event-evidence.ghost.md) | Evidence after event | md |
 | [tests/fixtures/after-event-evidence.input-v1.ghost.md](tests/fixtures/after-event-evidence.input-v1.ghost.md) | Evidence after event | md |
+| [tests/fixtures/exact-counter.input-v1.ghost.md](tests/fixtures/exact-counter.input-v1.ghost.md) | Exact counter interaction input-v1 fixture | md |
+| [tests/fixtures/gfb1-golden-input-v1.ghost.md](tests/fixtures/gfb1-golden-input-v1.ghost.md) | Explicit quality-input golden revision | md |
 | [tests/fixtures/gfb1-golden-v1.ghost.md](tests/fixtures/gfb1-golden-v1.ghost.md) | GFB1 version 1 golden vector | md |
+| [tests/fixtures/gfb2-int-golden-input-v1.ghost.md](tests/fixtures/gfb2-int-golden-input-v1.ghost.md) | Explicit exact-integer quality-input revision | md |
 | [tests/fixtures/gfb2-int-golden-v1.ghost.md](tests/fixtures/gfb2-int-golden-v1.ghost.md) | Exact integer GFB vector | md |
 | [tests/fixtures/issue-145-solar-config.ghost.md](tests/fixtures/issue-145-solar-config.ghost.md) | Solar settings transaction fixture | md |
+| [tests/fixtures/issue-145-solar-config.input-v1.ghost.md](tests/fixtures/issue-145-solar-config.input-v1.ghost.md) | Solar settings transaction fixture | md |
 | [tests/fixtures/issue-90-readonly-settings.ghost.md](tests/fixtures/issue-90-readonly-settings.ghost.md) | Read-only settings producer | md |
 | [tests/fixtures/issue-90-settings-periodic.ghost.md](tests/fixtures/issue-90-settings-periodic.ghost.md) | Live settings stream | md |
 | [tests/fixtures/issue-93-quantities.ghost.md](tests/fixtures/issue-93-quantities.ghost.md) | Quantity execution parity fixture | md |
+| [tests/fixtures/issue-93-quantities.input-v1.ghost.md](tests/fixtures/issue-93-quantities.input-v1.ghost.md) | Quantity execution parity fixture | md |
 | [tests/fixtures/true-for-certified.ghost.md](tests/fixtures/true-for-certified.ghost.md) | Certified hot interval | md |
 | [tests/fixtures/true-for-certified.input-v1.ghost.md](tests/fixtures/true-for-certified.input-v1.ghost.md) | Certified hot interval | md |
 
@@ -483,6 +501,7 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | Path | Title | Type |
 | --- | --- | --- |
 | [tests/fixtures/contribution-134/numeric-threshold.ghost.md](tests/fixtures/contribution-134/numeric-threshold.ghost.md) | Numeric moisture threshold to virtual relay 1 | md |
+| [tests/fixtures/contribution-134/numeric-threshold.input-v1.ghost.md](tests/fixtures/contribution-134/numeric-threshold.input-v1.ghost.md) | Numeric moisture threshold to virtual relay 1 | md |
 
 ## tests/reference/
 
@@ -495,4 +514,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-370 documents.
+384 documents.

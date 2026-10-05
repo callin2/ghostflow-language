@@ -11,6 +11,7 @@ import { runScenario } from './ghostsim.mjs';
 import { createLiveSession } from './ghostsim-live.mjs';
 import { LIVE_HISTORY_LIMIT, renderLivePanel } from './ghostsim-tui.mjs';
 import { jsonSha256 } from './integration-contract.mjs';
+import { readInputObservation } from './software-input-producer.mjs';
 
 const cli = fileURLToPath(import.meta.url);
 const isObject = value => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -93,7 +94,8 @@ function assignment(value, option) {
 
 function setup(artifact, profile, assignments, initialAssignments, defaultLayout) {
   const manifest = JSON.parse(fs.readFileSync(`${artifact}.manifest.json`, 'utf8'));
-  const logicalInputs = new Map(manifest.inputs.filter(field => field.name !== '__gf_now_ms').map(field => [field.name, field]));
+  const rawInputs = manifest.inputs.filter(field => field.name !== '__gf_now_ms');
+  const logicalInputs = new Map([...rawInputs, ...(manifest.sensors ?? [])].map(field => [field.name, field]));
   const logicalOutputs = new Map(manifest.outputs.map(field => [field.name, field]));
   const channels = new Map([...profile.inputs.map(channel => [channel.name, { side: 'input', channel }]),
     ...profile.outputs.map(channel => [channel.name, { side: 'output', channel }])]);
@@ -120,7 +122,7 @@ function setup(artifact, profile, assignments, initialAssignments, defaultLayout
   }
   const values = new Map();
   for (const field of logicalInputs.values()) {
-    if (field.type === 'Bool') values.set(field.name, false);
+    if (field.type === 'Bool' && (usedPorts.has(field.name) || rawInputs.includes(field))) values.set(field.name, false);
   }
   for (const value of initialAssignments) {
     const [name, raw] = assignment(value, '--input');
@@ -132,6 +134,7 @@ function setup(artifact, profile, assignments, initialAssignments, defaultLayout
     values.set(name, field.type === 'Bool' ? raw === 'true' : Number(raw));
   }
   for (const field of logicalInputs.values()) {
+    if (!rawInputs.includes(field) && !usedPorts.has(field.name) && !values.has(field.name)) continue;
     if (!values.has(field.name)) throw new Error(`missing initial input ${field.name}; use --input ${field.name}=value`);
     if (!usedPorts.has(field.name) && !initialAssignments.some(value => value.startsWith(`${field.name}=`))) {
       throw new Error(`missing binding for logical input ${field.name}`);
@@ -144,7 +147,7 @@ function setup(artifact, profile, assignments, initialAssignments, defaultLayout
     const port = bound.get(channel.name);
     return port && channel.type === 'Bool' ? [{ key: index + 1, input: port }] : [];
   });
-  return { manifest, bound, values, keyBindings };
+  return { manifest, bound, values, keyBindings, logicalInputs };
 }
 
 function state(value) {
@@ -165,7 +168,7 @@ function panel(profile, bound, scan, result) {
     const outputPort = output && bound.get(output.name);
     const key = i < 8 && inputPort && input.type === 'Bool' ? String(i + 1) : '';
     const inputName = input ? `${input.label}${inputPort ? '' : ' (unbound)'}` : '';
-    const inputState = input ? inputPort && input.type === 'Bool' ? state(scan?.inputs?.[inputPort]) : inputPort ? 'unsupported' : 'unobserved' : '';
+    const inputState = input ? inputPort && input.type === 'Bool' ? state(readInputObservation(scan, inputPort)) : inputPort ? 'unsupported' : 'unobserved' : '';
     const outputName = output ? `${output.label}${outputPort ? '' : ' (unbound)'}` : '';
     const requested = outputPort && output?.type === 'Bool' ? state(scan?.requestedVirtualIntent?.[outputPort]) : outputPort ? 'unsupported' : output ? 'unobserved' : '';
     const safe = outputPort && output?.type === 'Bool' ? state(scan?.safeVirtualIntent?.[outputPort]) : outputPort ? 'unsupported' : output ? 'unobserved' : '';
@@ -178,7 +181,7 @@ function panel(profile, bound, scan, result) {
 export async function runConsole(args, commands, { panelOutput = process.stderr, resultOutput = process.stdout } = {}) {
   const options = parseArgs(args);
   const profile = profileFromFile(options.profile);
-  const { manifest, bound, values, keyBindings } = setup(options.artifact, profile, options.bindings, options.inputs, !options.profile);
+  const { manifest, bound, values, keyBindings, logicalInputs } = setup(options.artifact, profile, options.bindings, options.inputs, !options.profile);
   const consoleIdentity = {
     profile: { id: profile.id, ...(profile.revision ? { revision: profile.revision } : {}), sha256: profile.sha256 },
     bindings: [...bound].map(([channel, port]) => ({ channel, port })),
@@ -186,7 +189,7 @@ export async function runConsole(args, commands, { panelOutput = process.stderr,
   };
   const scenario = {
     format: 'GhostFlow/scenario-v1', id: `console:${profile.id}`,
-    initialInputs: [...values].map(([name, value]) => ({ name, type: manifest.inputs.find(field => field.name === name).type, value })),
+    initialInputs: [...values].map(([name, value]) => ({ name, type: logicalInputs.get(name).type, value })),
     keyBindings, actions: [],
   };
   let atMs = 0; let result;
@@ -267,8 +270,8 @@ export async function runLiveConsole(args, {
   if (options.record) throw new Error('--record is unavailable in live TTY mode; use piped commands for a bounded replay');
   if (options.explicitFormat) throw new Error('--format is unavailable in live TTY mode; use piped commands for a structured result');
   const profile = profileFromFile(options.profile);
-  const { manifest, bound, values } = setup(options.artifact, profile, options.bindings, options.inputs, !options.profile);
-  const inputTypes = manifest.inputs.filter(field => field.name !== '__gf_now_ms');
+  const { manifest, bound, values, logicalInputs } = setup(options.artifact, profile, options.bindings, options.inputs, !options.profile);
+  const inputTypes = [...logicalInputs.values()].filter(field => values.has(field.name));
   const session = await createSession(options.artifact);
   let timer;
   let entered = false;

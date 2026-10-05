@@ -1,0 +1,132 @@
+{
+  "format": "GhostFlow/vfd-speed-scenario-v1",
+  "sourceSha256": "ce9923f9d50aa0c6b4a36991ae7e065fbd742c997638ab35af04fcada8d5e73c",
+  "inputs": {
+    "potentiometer_v": {
+      "unit": "V",
+      "min": 0,
+      "max": 10
+    }
+  },
+  "outputs": {
+    "speed_v": {
+      "unit": "V"
+    },
+    "speed_hz": {
+      "unit": "Hz"
+    }
+  },
+  "frames": [
+    {
+      "atMs": 0,
+      "inputs": {
+        "start": false,
+        "stop": false,
+        "potentiometer_v": 0
+      },
+      "expectedSafe": {
+        "run": false,
+        "speed_v": 0,
+        "speed_hz": 0
+      }
+    },
+    {
+      "atMs": 1,
+      "inputs": {
+        "start": true,
+        "stop": false,
+        "potentiometer_v": 5
+      },
+      "expectedSafe": {
+        "run": true,
+        "speed_v": 5,
+        "speed_hz": 25
+      }
+    },
+    {
+      "atMs": 2,
+      "inputs": {
+        "start": false,
+        "stop": false,
+        "potentiometer_v": 10
+      },
+      "expectedSafe": {
+        "run": true,
+        "speed_v": 10,
+        "speed_hz": 50
+      }
+    },
+    {
+      "atMs": 3,
+      "inputs": {
+        "start": false,
+        "stop": true,
+        "potentiometer_v": 5
+      },
+      "expectedSafe": {
+        "run": false,
+        "speed_v": 5,
+        "speed_hz": 25
+      }
+    },
+    {
+      "atMs": 4,
+      "inputs": {
+        "start": false,
+        "stop": false,
+        "potentiometer_v": 0
+      },
+      "expectedSafe": {
+        "run": false,
+        "speed_v": 0,
+        "speed_hz": 0
+      }
+    },
+    {
+      "atMs": 5,
+      "inputs": {
+        "start": true,
+        "stop": true,
+        "potentiometer_v": 10
+      },
+      "expectedSafe": {
+        "run": false,
+        "speed_v": 10,
+        "speed_hz": 50
+      }
+    },
+    {
+      "atMs": 6,
+      "inputs": {
+        "start": true,
+        "stop": false,
+        "potentiometer_v": 0
+      },
+      "expectedSafe": {
+        "run": true,
+        "speed_v": 0,
+        "speed_hz": 0
+      }
+    },
+    {
+      "atMs": 7,
+      "inputs": {
+        "start": false,
+        "stop": false,
+        "potentiometer_v": 5
+      },
+      "expectedSafe": {
+        "run": true,
+        "speed_v": 5,
+        "speed_hz": 25
+      }
+    }
+  ],
+  "sourceRevision": "issue531-input-quality-vfd-v1",
+  "predecessor": {
+    "source": "examples/vfd-speed.ghost.md",
+    "sourceSha256": "3319ddd9e8bd5c486586f4e3e94c3e78f62402c4541a712f97e9509cb5d996c3",
+    "scenario": "examples/vfd-speed.scenario.json",
+    "scenarioSha256": "a117f9a20968942aa5afac10218aea5e4666d0f2a445aa05cd4b99550bdeede0"
+  }
+}

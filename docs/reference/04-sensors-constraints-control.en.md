@@ -114,6 +114,26 @@ Clear the filter window after a fault. The result is `NotReady` until both filte
 
 Default reboot semantics reset sensor state and freshness and prepare again from `NotReady`. Persistent resume is an explicit opt-in validating checkpoint source/time continuity. Do not immediately restore a single old normal value and use it as permission.
 
+`recover_after = N samples` counts distinct new valid observations on initialization, reboot, source-epoch changes, and recovery after a fault. The Nth observation is usable once the filter is also ready; duplicates and clock-only scans do not count. A fault or loss of freshness starts a new sequence. To discard the first N valid observations, author `recover_after = N+1 samples` as a concrete count within `1..31`. This option counts samples; it is not a timed warm-up.
+
+A timed preparation period can be authored with the existing stateful `debounce` operation, without a duration form of `recover_after`. This pattern withholds the Result until two minutes have elapsed between the first conditioned `Good` observation and a distinct fresh `Good` observation at or after the deadline. The `usable` output is an availability indicator; it does not command physical operation.
+
+```ghost
+fn observed(value: Number) -> Bool { true }
+control TimedPreparation {
+  input reading: Number { stale_after = 3min; }
+  signal ready = debounce(reading |> map(observed), stable_for: 2min, initial: false);
+  let prepared: Result<Number, SensorFault> = case ready {
+    ok(value) => if value then reading else fault(NotReady);
+    fault(_) => reading;
+  };
+  output usable: Bool;
+  usable <- case prepared { ok(value) => true; fault(_) => false; };
+}
+```
+
+`observed` maps every healthy payload, including zero, to true; an input fault passes through `map` unchanged. The debounce interval uses observation timestamps. Clock-only scans and duplicate samples cannot promote readiness. A fault, stale reception or a source-epoch change restarts preparation. If filtering or sample-count recovery is configured, the interval starts only after those stages first produce `Good`. The `fault(_) => reading` branch preserves the original input Result and its origin. Choose `stale_after` consistently with the expected observation cadence; the three-minute bound above permits the sparse first/deadline observations in this example. Count-based `recover_after` and this authored duration gate are separate conditions.
+
 ## 4.3 Filters and signal operations
 
 ### median
