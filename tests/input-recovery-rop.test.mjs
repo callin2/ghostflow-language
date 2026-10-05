@@ -159,6 +159,70 @@ for (const framed of [false, true]) {
     }
   });
 
+  test(`${mode}: timed readiness tolerates changing values and restarts after actual staleness`, async t => {
+    for (const [recoverSamples, window] of [[1, 1], [3, 1], [1, 3]]) {
+      const required = Math.max(recoverSamples, window);
+      const artifact = compile(`fn observed(value: Number) -> Bool { true }
+        control VaryingPreparation {
+          input reading: Number { stale_after = 3min; recover_after = ${recoverSamples} samples; filter = median(${window}); }
+          signal ready = debounce(reading |> map(observed), stable_for: 2min, initial: false);
+          let prepared: Result<Number, SensorFault> = case ready {
+            ok(value) => if value then reading else fault(NotReady); fault(_) => reading;
+          };
+          output usable: Bool; output value: Number;
+          usable <- case prepared { ok(value) => true; fault(_) => false; };
+          value <- prepared |> recover(-999.0);
+        }`);
+      const runtime = await instantiate(artifact), frames = [], traces = [];
+      if (framed) {
+        const dispatch = runtime.runtime.dispatch.bind(runtime.runtime);
+        runtime.runtime.dispatch = frame => { const outcome = dispatch(frame); frames.push(structuredClone(frame)); return outcome; };
+      }
+      let id = 0, lastPacket;
+      const run = (at, packet, quality, usable) => {
+        const result = runtime.step({ nowMs: at, ...(packet ? { samples: { reading: packet } } : {}) });
+        assert.equal(result.sensors.reading.quality, quality);
+        assert.equal(result.vm.safe.usable, usable);
+        assert.equal(result.vm.safe.value, usable ? result.sensors.reading.value : -999);
+        traces.push(result.vm);
+      };
+      const fresh = (at, value, quality, usable) => {
+        lastPacket = observation(++id, at, value);
+        run(at, lastPacket, quality, usable);
+      };
+      try {
+        for (let n = 0; n < required; n++) fresh(n * 1000, n % 2 ? -100 : 100, n + 1 === required ? 'Good' : 'NotReady', false);
+        const start = (required - 1) * 1000;
+        for (const [offset, value] of [[30000, -75], [60000, 50], [90000, -25], [119999, 125]]) fresh(start + offset, value, 'Good', false);
+        run(start + 120000, null, 'Good', false);
+        run(start + 120000, lastPacket, 'Good', false);
+        fresh(start + 120001, -150, 'Good', true);
+        const last = start + 120001;
+        // Omission is not an immediate disconnect: freshness is the declared boundary.
+        run(last + 179999, null, 'Good', true);
+        run(last + 180000, null, 'Stale', false);
+        const resumed = last + 180001;
+        for (let n = 0; n < required; n++) fresh(resumed + n * 1000, n % 2 ? 200 : -200, n + 1 === required ? 'Good' : 'NotReady', false);
+        const restarted = resumed + (required - 1) * 1000;
+        fresh(restarted + 60000, 275, 'Good', false);
+        fresh(restarted + 119999, -350, 'Good', false);
+        fresh(restarted + 120000, 425, 'Good', true);
+      } finally { runtime.dispose(); }
+      if (framed) {
+        const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'input-varying-preparation-'));
+        t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+        const module = path.join(directory, 'prepared.gfb'), tape = path.join(directory, 'frames.tsv');
+        fs.writeFileSync(module, artifact.bytes);
+        fs.writeFileSync(tape, frames.map(frame => [frame.scanId, frame.logicalTimeMs,
+          ...frame.inputs.flatMap(input => [input.name, input.type === 'Bool' ? 'b' : 'n', input.value])].join('\t')).join('\n') + '\n');
+        const runner = fileURLToPath(new URL(`../target/release/examples/scan_tape${process.platform === 'win32' ? '.exe' : ''}`, import.meta.url));
+        const native = execFileSync(runner, [module, tape], { encoding: 'utf8' }).trim().split('\n').map(JSON.parse);
+        assert.ok(native.every(row => row.accepted));
+        assert.deepEqual(native.map(row => row.outcome.trace), traces);
+      }
+    }
+  });
+
   test(`${mode}: map and and_then preserve faults without evaluating scalar arithmetic`, async t => {
     const artifact = compile(`fn quotient(value: Number) -> Number { 1.0 / value }
       fn checked(value: Number) -> Result<Number, SensorFault> { if value < 0.0 then fault(Invalid) else ok(1.0 / value) }

@@ -98,6 +98,39 @@ GFB1 golden artifact. Exact-head coverage/package results after this correction
 are reported in the draft PR and final handoff. Local Windows results alone do
 not establish full verification.
 
+## Duration preparation semantic regression
+
+The authored pattern debounces `reading |> map(observed)`, not the Number
+payload. `fn observed(value: Number) -> Bool { true }` maps each conditioned
+Good observation to true while retaining Result faults and sample provenance.
+Continuously changing scalar values therefore do not restart the readiness timer.
+`tests/input-recovery-rop.test.mjs` verifies alternating positive/negative values
+through plain/framed WASM and complete native scan-tape trace parity, with
+identity/median filters and recovery thresholds 1 and 3. The first conditioned
+Good timestamp starts the two-minute interval; configuring recovery/filtering
+means count/filter preparation completes before this duration interval begins.
+A fresh Good observation at/after the deadline is mandatory: host clock scans and
+duplicates cannot complete preparation. Faults and epoch changes reset it.
+
+Omission alone does not establish physical disappearance. Before `stale_after`
+the last Good observation remains valid and an already prepared input remains
+usable. At the three-minute freshness boundary, Stale clears readiness; a resumed
+input completes filter/recovery preparation and a full new duration interval.
+The added varying-value/staleness regression verifies both sides of that boundary.
+This is observation-time availability preparation, not Number value stability,
+physical-failure diagnosis, or a duration annotation starting at raw reception.
+
+The module-lifting execution example is in
+`tests/composition-state-feedback-boundary.test.mjs`: a Producer's Bool output
+connects to `middle.previous`, then a second Consumer; generated internal
+Results have no acquisition/fault origins or host sample rails. Native and WASM
+outcomes agree for healthy false/true and all four producer faults. The lowering
+paths are `tools/composition.mjs` computed connection construction and
+`tools/control.mjs` typed `ok` handling; existing `applyTransform` implements
+`map` and `and_then`. Its optional/conditioned-port and unhandled-Result rejection
+suite remains enabled. Combined preparation and composition focused tests pass
+19 tests after adding the varying-value regression.
+
 ## Consumer owner gates
 
 | Owner | Candidate contract and remaining adoption gate |
