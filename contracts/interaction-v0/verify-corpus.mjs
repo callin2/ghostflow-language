@@ -139,9 +139,13 @@ function verifyCorpusShape(corpus) {
 }
 
 function expectedInputTypes(manifest, label) {
-  if (!Array.isArray(manifest?.inputs)) fail(`${label} compiled manifest must provide inputs`);
+  if (!Array.isArray(manifest?.sensors) || !Array.isArray(manifest?.inputs) || manifest.inputs.length) {
+    fail(`${label} compiled manifest must provide canonical quality inputs`);
+  }
   const types = new Map();
-  for (const input of manifest.inputs) {
+  // Tape v1 records independently observed healthy logical values. Execution
+  // adapters acquire those observations as Good samples before VM dispatch.
+  for (const input of manifest.sensors) {
     if (!isObject(input) || typeof input.name !== 'string' || typeof input.type !== 'string') {
       fail(`${label} compiled input descriptors must contain names and types`);
     }

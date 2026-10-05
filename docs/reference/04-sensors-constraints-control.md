@@ -103,7 +103,7 @@ input moisture: Percent {
 | 항목 | 타입·제약 | 의미 |
 |---|---|---|
 | `sample` | 양의 `Duration` | 기대 측정 간격 정보다. sensor를 읽는 thread나 timer를 만들지 않는다. |
-| `valid` | payload와 같은 타입의 닫힌 범위 | filter 전에 raw 정상 후보를 검사한다. 범위 밖 값은 `Invalid`다. |
+| `valid` | payload과 같은 numeric 타입의 닫힌 범위; Bool은 지원하지 않음 | 필터 전 raw 정상 후보를 검사한다. 범위 밖 값은 `Invalid`이다. Bool 범위는 컴파일에서 거부한다. |
 | `filter` | 상태 있는 signal 연산 | 새롭고 유효한 샘플에만 적용한다. |
 | `stale_after` | 양의 `Duration` | 마지막 실제 유효 샘플 시각부터의 freshness 한계다. |
 | `recover_after` | 양의 정수 `N samples` | fault 뒤 N개의 새 유효 샘플이 연속해야 복구 조건을 만족한다. |

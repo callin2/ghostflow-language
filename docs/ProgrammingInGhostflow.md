@@ -1,5 +1,7 @@
 # Programming in GhostFlow
 
+2026-10-05 외부 입력 개정은 품질 정보를 갖는 선언에 `input`을 사용한다. 기존 조건화와 명시적인 `Result` 고장 분기는 소스에 작성된 정책을 유지한다. 이전 `sensor` 발췌는 `tests/fixtures/history/issue531/`에 보존하며, 가져온 소스 개정은 별도로 검증한 소스 묶음이 필요하다.
+
 장치의 동작을 코드로 적고, 실행해 보며 이해하기
 
 **개정판 · 한국어 원본 · Language Reference 기준**
@@ -135,17 +137,25 @@ import package를 확인하는 근거는 `tests/programming-book-simulation.test
 
 ```ghost
 // E01
+// Explicit quality-input revision: acquisition faults request lamp OFF.
 control FollowSwitch {
   input switch_on: Bool;
   output lamp: Bool;
 
-  lamp <- switch_on;
+  lamp <- switch_on |> recover(false);
 }
 ```
 
+이 개정 예제는 외부 입력을 `Result<Bool, SensorFault>`로 읽습니다. 정상 false/true는
+기존 표와 같고, NotReady·Disconnected·Stale·Invalid에서는 명시적으로 lamp OFF를
+요청합니다. 이는 확인된 이 예제의 정책이며 언어 기본값이나 실제 접점 OFF의 증거가
+아닙니다. 입력 fault와 provenance는 그대로 남습니다. 이 스위치 추종 예제에는
+별도 START 버튼이나 운전 기억을 추가하지 않습니다. 이전 E01 원문은
+[개정 전 코드 기록](historical/2026-10-05-input-531-book-excerpts.ko.md)에 보존합니다.
+
 `control FollowSwitch`는 이 판단에 이름과 경계를 줍니다. 경계 밖에서 들어오는 값은
 `input`, 계산이 바깥에 내놓는 값은 `output`입니다. 둘 사이에 숨은 배선이나 장치 선택은
-없습니다. `lamp <- switch_on`을 화살표 방향대로 읽으면 “이번 tick의 lamp 요청은
+없습니다. `lamp <- switch_on |> recover(false)`를 화살표 방향대로 읽으면 “이번 tick의 lamp 요청은
 switch_on에서 왔다”가 됩니다. `Bool`의 두 값만으로도 출력의 출처를 설명할 수 있다는
 것이 첫 번째 작은 성과예요.
 
@@ -173,7 +183,9 @@ switch_on에서 왔다”가 됩니다. `Bool`의 두 값만으로도 출력의 
 
 NC에서 raw 접점이 반대로 보이는 것은 입력 정규화의 문제다. 접점 종류가 NC라는
 사실 자체가 프로그램에 `!`를 붙인다는 뜻은 아니다. 정규화는 배선·입력 모듈의
-경계에서 명시하고, GhostFlow에는 `false` 또는 `true`인 Bool만 전달한다.
+경계에서 명시하고, GhostFlow에는 정상 observation의 `false` 또는 `true` Bool
+payload를 전달한다. observation의 quality와 identity를 보존하며 끊어진 전달 경로를
+정상 false로 바꾸지 않는다.
 
 짧게 비교하면, 릴레이는 접점의 물리적 경로를 만들고, PLC는 DI와 래더/기능 블록으로
 그 입력을 처리하며, GhostFlow는 정규화된 의미 입력을 선언된 출력 계산에 연결한다.
@@ -186,7 +198,7 @@ NC에서 raw 접점이 반대로 보이는 것은 입력 정규화의 문제다.
 입력 묶음을 봅니다. 계산 도중 스위치가 바뀌어 식마다 서로 다른 순간을 읽는 것으로
 상상하지 마세요. 다음 tick이 시작될 때 새 입력 묶음이 들어옵니다.
 
-E01은 기억이 없어서 같은 입력이면 언제나 같은 출력을 냅니다. 실행 기록에서
+E01은 기억이 없어서 같은 입력 observation이면 언제나 같은 출력을 냅니다. 정상 입력 실행 기록에서
 `switch_on`과 `lamp`가 처음 달라진 tick이 있다면 언어 식보다 입력 정규화, binding,
 Driver 쪽을 먼저 살펴볼 이유가 생깁니다. 3장에서 `state`를 더하면 같은 현재 입력에도
 과거에 따라 다른 결과가 나올 수 있습니다.
@@ -327,12 +339,21 @@ START를 손에서 놓았는데 펌프가 계속 돌아야 한다면 현재 입�
 
 ```ghost
 // E03
+// Explicit quality-input revision: protective faults stop; recovery needs healthy START release/repress.
 control LatchingPump {
   input start, stop: Bool;
   state running: Bool = false;
+  state restart_blocked: Bool = false;
   output valve, pump: Bool;
 
-  running' = !stop && (start || running);
+  let start_good = case start { ok(_) => true; fault(_) => false; };
+  let stop_good = case stop { ok(_) => true; fault(_) => false; };
+  let start_requested = start |> recover(false);
+  let stop_requested = stop |> recover(true);
+  let acquisition_fault = !start_good || !stop_good;
+  restart_blocked' = if acquisition_fault then true
+    else if !start_requested then false else restart_blocked;
+  running' = !stop_requested && (running || (start_requested && !restart_blocked));
   valve <- running';
   pump <- running';
 
@@ -340,13 +361,24 @@ control LatchingPump {
 }
 ```
 
+이 명시적 새 revision은 정상 입력의 자기유지와 정지 우선을 보존합니다. START
+취득 fault는 새 시작을 막습니다. 이미 운전 중이면 STOP이 정상이고 해제된 동안만
+운전을 유지합니다. STOP 취득 fault는 운전 기억을 지워 pump/valve OFF를 요청합니다.
+어느 입력이든 fault가 관측되면 재시작을 막습니다. fault로 정지한 뒤 START가 계속
+눌려 있어도 자동 재시작하지 않습니다. 두 입력이 정상인 상태에서 START 해제를
+관측하고 다시 눌러야 시작합니다. 처음부터 정상 START가 눌려 있으면 기존 예제처럼
+즉시 시작합니다. 이 정책은 기존 START 회로에 적용하며 램프나 자동 제어기에 START를
+일괄 추가하는 규칙이 아닙니다. 실제 출력 적용은 별도 Driver 증거가 필요합니다.
+이전 E03 원문은 [개정 전 코드 기록](historical/2026-10-05-input-531-book-excerpts.ko.md)에
+보존합니다.
+
 `running`은 tick 시작 시 기억하고 있던 값이고, `running'`은 이번 입력으로 계산한
 다음 값입니다. 끝의 작은따옴표는 **prime**이라고 읽습니다. 두 이름을 나눠 쓰면
 “STOP을 보기 전의 운전 상태”와 “STOP을 반영한 뒤 확정할 상태”가 섞이지 않습니다.
 
 식을 말로 읽어 봅시다. “정지가 눌리지 않았고, 시작이 눌렸거나 이미 운전 중이었다면
 다음에도 운전한다.” 이 문장이 현장의 요구와 다르면 괄호를 만지기 전에 요구부터
-고쳐야 합니다. 두 버튼이 함께 눌리면 `!stop`이 거짓이므로 정지가 이깁니다. 이
+고쳐야 합니다. 두 버튼이 함께 눌리면 `!stop_requested`가 거짓이므로 정지가 이깁니다. 이
 동시입력 한 행이 ‘정지 우선’이라는 이름을 실제 동작으로 증명합니다.
 
 | tick | start | stop | 이전 `running` | 다음 `running'` | pump |
@@ -923,7 +955,7 @@ public simulator에 숨겨진 `starts.due` 입력을 주입하는 실행 시나�
 
 앞의 `input level: Percent`는 호스트가 이번 계산에 사용할 값을 공급하는 선언이었다.
 실제 센서에는 값뿐 아니라 아직 준비되지 않음, 단절, 오래된 측정 같은 상태가 있다.
-`sensor`를 읽을 때는 정상값을 얻었는지 함께 처리한다.
+`input`를 읽을 때는 정상값을 얻었는지 함께 처리한다.
 
 ### E10 — 흔들리는 수분값으로 급수 판단하기
 
@@ -931,7 +963,7 @@ public simulator에 숨겨진 `starts.due` 입력을 주입하는 실행 시나�
 // E10
 control MoistureControl {
   input enabled: Bool;
-  sensor moisture: Percent {
+  input moisture: Percent {
     sample = 1s;
     valid = 0% .. 100%;
     filter = median(3);
@@ -1010,7 +1042,7 @@ compiler-owned fault 타입을 가진 내장 `Result<T, E>`의 `ok(...)`·`fault
 ```ghost
 // E14
 control OptionalMoisture {
-  sensor moisture?: Percent;
+  input moisture?: Percent;
   output request: Bool;
   adapt moisture_policy {
     strategy WithMoisture priority 100 match (moisture: sensor<Percent>) {
@@ -1519,7 +1551,7 @@ literal은 정확하게 변환한 뒤 binary64로 반올림한다. 정규 런타
 ```ghost
 // E16
 control CelsiusHeater {
-  sensor air: Temperature {
+  input air: Temperature {
     sample = 1s;
     valid = -40°C .. 50°C;
     filter = median(1);
@@ -1538,7 +1570,7 @@ control CelsiusHeater {
 ```ghost
 // E17
 control FahrenheitHeater {
-  sensor air: Temperature {
+  input air: Temperature {
     sample = 1s;
     valid = -40°F .. 122°F;
     filter = median(1);
@@ -1557,7 +1589,7 @@ control FahrenheitHeater {
 ```ghost
 // E18
 control KelvinHeater {
-  sensor air: Temperature {
+  input air: Temperature {
     sample = 1s;
     valid = 233.15K .. 323.15K;
     filter = median(1);
@@ -1606,15 +1638,15 @@ fn air_vpd(t: Temperature, rh: RelativeHumidity) -> VaporPressureDeficit {
   ) * (1 - rh / 100%RH)
 }
 control HumidificationDemand {
-  sensor air: Temperature {
+  input air: Temperature {
     sample = 1s; valid = 0°C .. 50°C;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
-  sensor humidity: RelativeHumidity {
+  input humidity: RelativeHumidity {
     sample = 1s; valid = 0%RH .. 100%RH;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
-  sensor light: PPFD {
+  input light: PPFD {
     sample = 1s; valid = 0umol/m2/s .. 3000umol/m2/s;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
@@ -1656,15 +1688,15 @@ fn air_vpd(t: Temperature, rh: RelativeHumidity) -> VaporPressureDeficit {
   ) * (1 - rh / 100%RH)
 }
 control VentilationDemand {
-  sensor air: Temperature {
+  input air: Temperature {
     sample = 1s; valid = 0°C .. 50°C;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
-  sensor humidity: RelativeHumidity {
+  input humidity: RelativeHumidity {
     sample = 1s; valid = 0%RH .. 100%RH;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
-  sensor light: PPFD {
+  input light: PPFD {
     sample = 1s; valid = 0umol/m2/s .. 3000umol/m2/s;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
@@ -1706,15 +1738,15 @@ fn air_vpd(t: Temperature, rh: RelativeHumidity) -> VaporPressureDeficit {
   ) * (1 - rh / 100%RH)
 }
 control IrrigationDemand {
-  sensor air: Temperature {
+  input air: Temperature {
     sample = 1s; valid = 0°C .. 50°C;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
-  sensor humidity: RelativeHumidity {
+  input humidity: RelativeHumidity {
     sample = 1s; valid = 0%RH .. 100%RH;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
-  sensor light: PPFD {
+  input light: PPFD {
     sample = 1s; valid = 0umol/m2/s .. 3000umol/m2/s;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
@@ -1761,15 +1793,15 @@ import LowVpd from "./E20.ghost.md"
   revision "7e135b93ea4c4988d305f992db277a6d8581a271"
   sha256 "bbf57007c5973684660747c515bb2534124d50341647b2282bd2ca32852a724b";
 control CombinedVpdDemands {
-  sensor air: Temperature {
+  input air: Temperature {
     sample = 1s; valid = 0°C .. 50°C;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
-  sensor humidity: RelativeHumidity {
+  input humidity: RelativeHumidity {
     sample = 1s; valid = 0%RH .. 100%RH;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
-  sensor light: PPFD {
+  input light: PPFD {
     sample = 1s; valid = 0umol/m2/s .. 3000umol/m2/s;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
@@ -1910,11 +1942,11 @@ control PhysicalQuantityUnits {
   input flow: FlowRate;
   input tank_volume: Volume;
   input pipe_length: Length;
-  sensor irradiance: Irradiance {
+  input irradiance: Irradiance {
     sample = 1s; valid = 0W/m2 .. 1500W/m2;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
-  sensor ppfd: PPFD {
+  input ppfd: PPFD {
     sample = 1s; valid = 0umol/m2/s .. 3000umol/m2/s;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
@@ -2010,7 +2042,7 @@ control MissingSemicolon {
 
 ```ghost-error
 control MixedTypes {
-  input level: Number;
+  let level: Number = 0;
   output pump: Bool;
   pump <- level < 30%;
 }
@@ -2083,7 +2115,7 @@ control DuplicateOutput {
 
 ```ghost-error
 control BareSensor {
-  sensor moisture: Percent;
+  input moisture: Percent;
   output pump: Bool;
   pump <- moisture < 30%;
 }
@@ -2310,15 +2342,15 @@ import Ventilation from "./E20.ghost.md"
   revision "7e135b93ea4c4988d305f992db277a6d8581a271"
   sha256 "bbf57007c5973684660747c515bb2534124d50341647b2282bd2ca32852a724b";
 control CombinedGreenhouseDemands {
-  sensor air: Temperature {
+  input air: Temperature {
     sample = 1s; valid = 0°C .. 50°C;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
-  sensor humidity: RelativeHumidity {
+  input humidity: RelativeHumidity {
     sample = 1s; valid = 0%RH .. 100%RH;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
-  sensor light: PPFD {
+  input light: PPFD {
     sample = 1s; valid = 0umol/m2/s .. 3000umol/m2/s;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
@@ -2476,8 +2508,8 @@ control TideRun {
 
 ```ghost-error
 control MixedCount {
-  input count: Int;
-  input measurement: Number;
+  let count: Int = 1;
+  let measurement: Number = 1.5;
   output total: Number;
   total <- count + measurement;
 }

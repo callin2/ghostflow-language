@@ -4,6 +4,8 @@
 
 # Programming in GhostFlow
 
+The 2026-10-05 external-input revision uses `input` for quality-bearing declarations. Existing conditioning and explicit `Result` fault branches remain source-authored policies. Prior `sensor` excerpts are retained under `tests/fixtures/history/issue531/`; imported source revisions require a separately verified closure.
+
 Write device behavior as code, then understand it by running it
 
 **Revised edition · English translation · based on the Language Reference**
@@ -146,17 +148,26 @@ The first program turns the LED on when the switch is on and off when the switch
 
 ```ghost
 // E01
+// Explicit quality-input revision: acquisition faults request lamp OFF.
 control FollowSwitch {
   input switch_on: Bool;
   output lamp: Bool;
 
-  lamp <- switch_on;
+  lamp <- switch_on |> recover(false);
 }
 ```
 
+This revised example reads the external input as `Result<Bool, SensorFault>`.
+Healthy false/true retain the existing table; NotReady, Disconnected, Stale and
+Invalid explicitly request lamp OFF. This is the confirmed policy of this example,
+not a language default or evidence of physical contact OFF. Input faults and
+provenance remain recorded. This switch-following example adds no START button
+or running memory. The previous E01 source is preserved in the
+[prior-code record](historical/2026-10-05-input-531-book-excerpts.md).
+
 `control FollowSwitch` gives this decision a name and a boundary. Values crossing
 in are `input`; calculated values crossing out are `output`. No hidden wiring or
-device choice sits between them. Read `lamp <- switch_on` with the arrow: “this
+device choice sits between them. Read `lamp <- switch_on |> recover(false)` with the arrow: “this
 tick's lamp request came from switch_on.” Even two `Bool` values can explain the
 origin of an output, which is the first useful result.
 
@@ -184,7 +195,9 @@ and normalizes it into program meaning according to wiring and input-module pola
 
 Reversed raw contact behavior with NC is an input normalization issue. An NC contact
 does not by itself mean adding `!` in the program. Specify normalization at the wiring/input-module
-boundary and pass only a `false` or `true` Bool to GhostFlow.
+boundary and pass a `false` or `true` Bool payload in a healthy observation to
+GhostFlow. Preserve the observation's quality and identity; a broken delivery
+path is a fault, not the healthy value false.
 
 Briefly, relays create physical contact paths, PLCs process the inputs with DI and ladder/function blocks,
 and GhostFlow connects normalized semantic inputs to declared output calculations.
@@ -197,7 +210,7 @@ One control evaluation is a **tick**. Every expression in that tick sees one
 captured input set. Do not imagine separate expressions reading a switch at
 different physical moments; a new input set arrives with the next tick.
 
-E01 has no memory, so the same input always produces the same output. If a trace
+E01 has no memory, so the same input observation always produces the same output. If a healthy trace
 first shows `switch_on` and `lamp` disagreeing, inspect normalization, binding,
 or the Driver before blaming this expression. Chapter 3 adds `state`, after which
 the same current input can produce different results because the past differs.
@@ -342,18 +355,39 @@ Keep running after briefly pressing and releasing Start; stop when Stop is press
 
 ```ghost
 // E03
+// Explicit quality-input revision: protective faults stop; recovery needs healthy START release/repress.
 control LatchingPump {
   input start, stop: Bool;
   state running: Bool = false;
+  state restart_blocked: Bool = false;
   output valve, pump: Bool;
 
-  running' = !stop && (start || running);
+  let start_good = case start { ok(_) => true; fault(_) => false; };
+  let stop_good = case stop { ok(_) => true; fault(_) => false; };
+  let start_requested = start |> recover(false);
+  let stop_requested = stop |> recover(true);
+  let acquisition_fault = !start_good || !stop_good;
+  restart_blocked' = if acquisition_fault then true
+    else if !start_requested then false else restart_blocked;
+  running' = !stop_requested && (running || (start_requested && !restart_blocked));
   valve <- running';
   pump <- running';
 
   require pump => valve;
 }
 ```
+
+This explicit new revision preserves healthy self-holding and stop priority.
+A START acquisition fault prevents a new start. An active run continues only
+while STOP is healthy and released. A STOP acquisition fault clears running
+memory and requests pump/valve OFF. Observing a fault on either input blocks
+restart. After a fault stop, holding START cannot restart the run: observe START
+released while both inputs are healthy, then press again. An initially healthy
+pressed START still starts immediately, preserving the original healthy behavior.
+This policy applies to the existing START circuit; it does not add START buttons
+to lamps or automatic controllers. Driver application needs separate evidence.
+The previous E03 source is preserved in the
+[prior-code record](historical/2026-10-05-input-531-book-excerpts.md).
 
 `running` is the remembered value at the start of a tick; `running'` is the next
 value calculated from the current inputs. Read the apostrophe as **prime**. The two
@@ -363,7 +397,7 @@ STOP has been handled.”
 Read the expression aloud: “Keep running if stop is not pressed and either start
 is pressed or the system was already running.” If that sentence is not the field
 requirement, fix the requirement before rearranging parentheses. When both buttons
-are pressed, `!stop` is false, so stop wins. That simultaneous-input row turns
+are pressed, `!stop_requested` is false, so stop wins. That simultaneous-input row turns
 the phrase “stop priority” into observable behavior.
 
 | tick | start | stop | Previous `running` | Next `running'` | pump |
@@ -935,7 +969,7 @@ This chapter verifies a water request; actual flow needs separate device and fee
 
 The earlier `input level: Percent` declared a value supplied by the host for the current calculation.
 Actual sensors have states such as not ready, disconnected, and stale measurements, as well as values.
-When reading `sensor`, also handle whether a healthy value was obtained.
+When reading `input`, also handle whether a healthy value was obtained.
 
 ### E10 — Deciding water supply from fluctuating moisture values
 
@@ -943,7 +977,7 @@ When reading `sensor`, also handle whether a healthy value was obtained.
 // E10
 control MoistureControl {
   input enabled: Bool;
-  sensor moisture: Percent {
+  input moisture: Percent {
     sample = 1s;
     valid = 0% .. 100%;
     filter = median(3);
@@ -1025,7 +1059,7 @@ Follow [Reference §2.5](reference/02-types-expressions-state.md#25-sensor-결�
 ```ghost
 // E14
 control OptionalMoisture {
-  sensor moisture?: Percent;
+  input moisture?: Percent;
   output request: Bool;
   adapt moisture_policy {
     strategy WithMoisture priority 100 match (moisture: sensor<Percent>) {
@@ -1047,7 +1081,7 @@ When uninstalled, `Baseline` requests false. `?` alone does not generate a fallb
 Detailed rules follow [Reference §4.5–4.6](reference/04-sensors-constraints-control.md#45-선택-sensor와-capability).
 
 E14 distinguishes an absent sensor from a fault in an installed sensor. With no
-sensor installed it selects `Baseline`; with an installed sensor whose value is
+input installed it selects `Baseline`; with an installed sensor whose value is
 unavailable it follows the fault branch inside `WithMoisture`. Both requests are
 false, but their evidence differs. Equal output does not mean equal reasoning.
 
@@ -1549,7 +1583,7 @@ Literal conversion is exact before binary64 rounding. Do not feed a value such a
 ```ghost
 // E16
 control CelsiusHeater {
-  sensor air: Temperature {
+  input air: Temperature {
     sample = 1s;
     valid = -40°C .. 50°C;
     filter = median(1);
@@ -1568,7 +1602,7 @@ control CelsiusHeater {
 ```ghost
 // E17
 control FahrenheitHeater {
-  sensor air: Temperature {
+  input air: Temperature {
     sample = 1s;
     valid = -40°F .. 122°F;
     filter = median(1);
@@ -1587,7 +1621,7 @@ control FahrenheitHeater {
 ```ghost
 // E18
 control KelvinHeater {
-  sensor air: Temperature {
+  input air: Temperature {
     sample = 1s;
     valid = 233.15K .. 323.15K;
     filter = median(1);
@@ -1636,15 +1670,15 @@ fn air_vpd(t: Temperature, rh: RelativeHumidity) -> VaporPressureDeficit {
   ) * (1 - rh / 100%RH)
 }
 control HumidificationDemand {
-  sensor air: Temperature {
+  input air: Temperature {
     sample = 1s; valid = 0°C .. 50°C;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
-  sensor humidity: RelativeHumidity {
+  input humidity: RelativeHumidity {
     sample = 1s; valid = 0%RH .. 100%RH;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
-  sensor light: PPFD {
+  input light: PPFD {
     sample = 1s; valid = 0umol/m2/s .. 3000umol/m2/s;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
@@ -1686,15 +1720,15 @@ fn air_vpd(t: Temperature, rh: RelativeHumidity) -> VaporPressureDeficit {
   ) * (1 - rh / 100%RH)
 }
 control VentilationDemand {
-  sensor air: Temperature {
+  input air: Temperature {
     sample = 1s; valid = 0°C .. 50°C;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
-  sensor humidity: RelativeHumidity {
+  input humidity: RelativeHumidity {
     sample = 1s; valid = 0%RH .. 100%RH;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
-  sensor light: PPFD {
+  input light: PPFD {
     sample = 1s; valid = 0umol/m2/s .. 3000umol/m2/s;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
@@ -1736,15 +1770,15 @@ fn air_vpd(t: Temperature, rh: RelativeHumidity) -> VaporPressureDeficit {
   ) * (1 - rh / 100%RH)
 }
 control IrrigationDemand {
-  sensor air: Temperature {
+  input air: Temperature {
     sample = 1s; valid = 0°C .. 50°C;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
-  sensor humidity: RelativeHumidity {
+  input humidity: RelativeHumidity {
     sample = 1s; valid = 0%RH .. 100%RH;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
-  sensor light: PPFD {
+  input light: PPFD {
     sample = 1s; valid = 0umol/m2/s .. 3000umol/m2/s;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
@@ -1792,15 +1826,15 @@ import LowVpd from "./E20.ghost.md"
   revision "7e135b93ea4c4988d305f992db277a6d8581a271"
   sha256 "bbf57007c5973684660747c515bb2534124d50341647b2282bd2ca32852a724b";
 control CombinedVpdDemands {
-  sensor air: Temperature {
+  input air: Temperature {
     sample = 1s; valid = 0°C .. 50°C;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
-  sensor humidity: RelativeHumidity {
+  input humidity: RelativeHumidity {
     sample = 1s; valid = 0%RH .. 100%RH;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
-  sensor light: PPFD {
+  input light: PPFD {
     sample = 1s; valid = 0umol/m2/s .. 3000umol/m2/s;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
@@ -1943,11 +1977,11 @@ control PhysicalQuantityUnits {
   input flow: FlowRate;
   input tank_volume: Volume;
   input pipe_length: Length;
-  sensor irradiance: Irradiance {
+  input irradiance: Irradiance {
     sample = 1s; valid = 0W/m2 .. 1500W/m2;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
-  sensor ppfd: PPFD {
+  input ppfd: PPFD {
     sample = 1s; valid = 0umol/m2/s .. 3000umol/m2/s;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
@@ -2045,7 +2079,7 @@ A newline does not replace the end of a declaration. `;` is required after the d
 
 ```ghost-error
 control MixedTypes {
-  input level: Number;
+  let level: Number = 0;
   output pump: Bool;
   pump <- level < 30%;
 }
@@ -2118,7 +2152,7 @@ An output needs one connection. Statement order does not overwrite an earlier co
 
 ```ghost-error
 control BareSensor {
-  sensor moisture: Percent;
+  input moisture: Percent;
   output pump: Bool;
   pump <- moisture < 30%;
 }
@@ -2349,15 +2383,15 @@ import Ventilation from "./E20.ghost.md"
   revision "7e135b93ea4c4988d305f992db277a6d8581a271"
   sha256 "bbf57007c5973684660747c515bb2534124d50341647b2282bd2ca32852a724b";
 control CombinedGreenhouseDemands {
-  sensor air: Temperature {
+  input air: Temperature {
     sample = 1s; valid = 0°C .. 50°C;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
-  sensor humidity: RelativeHumidity {
+  input humidity: RelativeHumidity {
     sample = 1s; valid = 0%RH .. 100%RH;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
-  sensor light: PPFD {
+  input light: PPFD {
     sample = 1s; valid = 0umol/m2/s .. 3000umol/m2/s;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
@@ -2513,8 +2547,8 @@ Here count is Int and measurement is Number. The compiler rejects this code. If 
 
 ```ghost-error
 control MixedCount {
-  input count: Int;
-  input measurement: Number;
+  let count: Int = 1;
+  let measurement: Number = 1.5;
   output total: Number;
   total <- count + measurement;
 }

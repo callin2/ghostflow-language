@@ -1622,7 +1622,7 @@ class Lowerer {
       || typeof schedule.policy?.fallback === 'object')) this.manifest.format = 'GhostFlow/control-v12';
     if (contextForms.some(form => form[0] === 'at-pulse')) {
       if (solarForms.length || contextForms.some(form => form[0] !== 'at-pulse')
-        || ['configs','sensors','providers','calendars','naturalConditions','objectives','resources','adaptSettings','signals']
+        || ['configs','providers','calendars','naturalConditions','objectives','resources','adaptSettings','signals']
           .some(key => this.manifest[key]?.length) || this.manifest.accounting) {
         error(this.ast.loc, 'At pulse execution cannot mix with other schedule/provider/config profiles');
       }
@@ -2233,6 +2233,7 @@ class Lowerer {
       return out.constant;
     };
     const sampleMs = read(opts.sample, DURATION, 'sample');
+    if (type.kind === 'Bool' && (opts.validMin || opts.validMax)) error(item.loc, 'Bool input does not support valid ranges');
     const validMin = read(opts.validMin, type, 'valid lower bound'); const validMax = read(opts.validMax, type, 'valid upper bound');
     if ((validMin === null) !== (validMax === null)) error(item.loc, 'valid requires both lower and upper bounds');
     if (validMin !== null && validMin > validMax) error(item.loc, 'sensor valid range is inverted');

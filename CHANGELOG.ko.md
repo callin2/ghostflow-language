@@ -5,6 +5,14 @@
 
 ## 미출시
 
+At 전용 예약 프로필도 typed quality input을 허용한다. 기존 sensor 분류 금지는
+이미 지원하던 외부 예약 조건의 canonical 대체 입력까지 거부했으므로 제거했다.
+명시적인 `allow |> recover(false)`는 사용할 수 없는 조건의 실행을 차단한다.
+At clock/recovery 규칙, GFB14와 context ABI는 유지한다. At 계약, native/WASM
+실행 parity 및 fault 회귀 검증으로 이 수정을 확인한다.
+Bool의 `valid` 범위는 host/native admission과 동일하게 컴파일 단계에서 거부한다.
+이전에는 boolean 범위가 어느 host에서도 실행할 수 없는 manifest를 만들 수 있었다.
+
 ### 2026-10-05 — 품질 기반 canonical input ([#531](https://github.com/callin2/ghostflow-language/issues/531))
 
 외부 `input` 선언은 기존 sensor의 Result, conditioning과 optional capability

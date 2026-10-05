@@ -2,6 +2,12 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+
+test('Bool input validity bounds reject before emitting an unusable acquisition manifest', () => {
+  for (const range of ['false .. true', 'true .. true', '0 .. 1']) {
+    assert.throws(() => compileSourceSync(`# Invalid Bool bounds\n\n\`\`\`ghost\ncontrol Bounds { input button: Bool { valid = ${range}; } output lamp: Bool; lamp <- button |> recover(false); }\n\`\`\`\n`, { filename: 'bounds.ghost.md' }), /Bool input does not support valid ranges/);
+  }
+});
 import { compileSourceSync } from '../tools/compile-source.mjs';
 import { compileControl } from '../tools/control.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';

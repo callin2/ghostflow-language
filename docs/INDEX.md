@@ -171,6 +171,13 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/assets/readme-replay.svg](assets/readme-replay.svg) | readme-replay.svg | svg |
 | [docs/assets/readme-trace.svg](assets/readme-trace.svg) | readme-trace.svg | svg |
 
+## docs/historical/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/historical/2026-10-05-input-531-book-excerpts.ko.md](historical/2026-10-05-input-531-book-excerpts.ko.md) | 명시적 입력 품질 개정 전 E01·E03 원래 코드 | md |
+| [docs/historical/2026-10-05-input-531-book-excerpts.md](historical/2026-10-05-input-531-book-excerpts.md) | Original E01 and E03 code before the explicit input-quality revision | md |
+
 ## docs/plans/
 
 | Path | Title | Type |
@@ -234,4 +241,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.ko.md](research/GF-COMPOSE-R9-ACCEPTANCE.ko.md) | GF-COMPOSE R9: acceptance와 구현 인계 | md |
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.md](research/GF-COMPOSE-R9-ACCEPTANCE.md) | GF-COMPOSE R9: acceptance and implementation handoff | md |
 
-200 documents.
+202 documents.

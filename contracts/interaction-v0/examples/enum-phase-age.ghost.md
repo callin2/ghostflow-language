@@ -4,6 +4,9 @@
 The authored phase is a nominal state, and its age measures time since the
 phase most recently changed, regardless of which phase is active.
 
+This explicit input531-v1 revision retains the previous phase when the advance
+input is unavailable; a fault is not a fabricated false advance observation.
+
 ```ghost
 control EnumPhaseAge {
   input advance: Bool;
@@ -16,7 +19,7 @@ control EnumPhaseAge {
   // ghostflow:link id=GF-INT-FIXTURE-ENUM-PHASE-AGE-V0 relation=implements
   timer age = elapsed(phase);
 
-  phase' = if advance then Running else Idle;
+  phase' = case advance { ok(value) => if value then Running else Idle; fault(_) => phase; };
   active <- phase' == Running;
 }
 ```

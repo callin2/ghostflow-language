@@ -1,0 +1,45 @@
+```ghost
+control MoistureControl {
+  input stop: Bool;
+  sensor moisture: Percent {
+    sample = 1s;
+    valid = 0% .. 100%;
+    filter = median(5);
+    stale_after = 3s;
+    recover_after = 3 samples;
+  }
+  signal dry = hysteresis(moisture,
+    on_below: 30%, off_above: 35%, initial: false);
+  output pump: Bool;
+
+  let requested = case dry {
+    ok(value) => value;
+    fault(_) => false;
+  };
+  pump <- requested && !stop;
+}
+```
+
+```ghost
+control TemperatureMonitor {
+  sensor temperature: Number;
+  output high_temperature, sensor_fault: Bool;
+
+  high_temperature <- case temperature {
+    ok(value) => value >= 30.0;
+    fault(_) => false;
+  };
+  sensor_fault <- case temperature {
+    ok(_) => false;
+    fault(_) => true;
+  };
+}
+```
+
+```ghost
+sensor temperature: Number;
+```
+
+```ghost
+sensor temperature: Number;
+```

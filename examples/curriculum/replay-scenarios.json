@@ -5,9 +5,9 @@
       "id": "PC-01",
       "source": {
         "canonicalPath": "docs/ProgrammingInGhostflow.md",
-        "canonicalSha256": "57f32d88e185541daafc5aec21f0dc71449fc8eb87d6450e2a29e85b379c0a21",
+        "canonicalSha256": "abe544d6cb2287670ec1eb6355b3497820f4b5d1063bc3ebca6705b8c0fdbbba",
         "executablePath": "examples/curriculum/generated/pc-01-e01.generated.ghost.md",
-        "executableSha256": "e2b8488fe9da3d51621a463e813d0f08ff19c680a8d34a4a4416db325dc7bbae"
+        "executableSha256": "321fe84aac9940f5484c21c578437fcf75ea8e435094e698574fc70f0390b45f"
       },
       "inputs": [
         "switch_on"
@@ -69,9 +69,9 @@
       "id": "PC-02",
       "source": {
         "canonicalPath": "examples/curriculum/pc-02-start-stop.ghost.md",
-        "canonicalSha256": "7e85d0541383c95d38a8176c496343627367c1b9aa9829320ddd4dc2a477593a",
+        "canonicalSha256": "b5b8213fc2e06c11a81142c24253a3467861eecacc0d6e310cb8a0cff05d5e45",
         "executablePath": "examples/curriculum/pc-02-start-stop.ghost.md",
-        "executableSha256": "7e85d0541383c95d38a8176c496343627367c1b9aa9829320ddd4dc2a477593a"
+        "executableSha256": "b5b8213fc2e06c11a81142c24253a3467861eecacc0d6e310cb8a0cff05d5e45"
       },
       "inputs": [
         "start",
@@ -194,9 +194,9 @@
       "id": "PC-03",
       "source": {
         "canonicalPath": "examples/curriculum/pc-03-motor-contactor.ghost.md",
-        "canonicalSha256": "a44ac8295c000f850bf26e0607abba99268c845f83d7ede66b4618b327964291",
+        "canonicalSha256": "0f953145a2833a6c32e70dbcf52d0a265251a6597289f6d1b53cbc686bd4f4bb",
         "executablePath": "examples/curriculum/pc-03-motor-contactor.ghost.md",
-        "executableSha256": "a44ac8295c000f850bf26e0607abba99268c845f83d7ede66b4618b327964291"
+        "executableSha256": "0f953145a2833a6c32e70dbcf52d0a265251a6597289f6d1b53cbc686bd4f4bb"
       },
       "inputs": [
         "start",

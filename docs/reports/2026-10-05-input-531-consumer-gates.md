@@ -4,16 +4,52 @@ Execution evidence, not a release or physical acceptance claim. The published
 implementation at the start of this audit was 8fc85b1. Follow-up changes remain
 part of draft PR [532](https://github.com/callin2/ghostflow-language/pull/532).
 
-## Policy decision pending
+## Approved example policy and remaining source decisions
 
-No pending fault or restart proposal has been applied to PC01, E03 or irrigation.
-The parent proposed lamp OFF on acquisition fault; START fault inhibits a new
-start while an active run may continue only with healthy STOP/protection;
-STOP/low-water fault releases the latch. It also proposed an explicit fresh START
-off-to-on transition after recovery. These choices require the user's reply.
-Fresh-start recovery changes the historical E03 level-sensitive lesson; if
-approved it needs a separately identified new source revision and new tests.
-Historical source, replay frames, checkpoints and dated benchmark oracles remain.
+The new explicit revisions use lamp OFF on acquisition fault; START fault
+inhibits a new start while an active run may continue only with healthy
+STOP/protection; STOP/low-water fault releases the latch. A fault prevents
+rearming until a healthy START release and subsequent press. This policy has
+been applied to E01/E03, tutorial latch, irrigation, PC02/03/04, the five-minute
+watering fixture and the setting timer fixture. These are source-authored rules,
+not compiler defaults. Historical bytes, replay frames/checkpoints and dated
+benchmark oracles remain separate and unchanged.
+
+PC05–10 still require source-specific fault decisions: unavailable limit/position
+feedback; level-driven timer requests; automatic water levels; mode and automatic
+demand; sequence interruption/fault classification; alarm/reset permission.
+Their original intent does not justify false/zero acquisition replacement or
+adding START to automatic controllers. Other former plain numeric examples need
+an explicit authored output policy; existing Result examples only change the
+declaration keyword. Existing E22/E31 imported closures retain historical pins
+until an explicit new closure revision is prepared. These are full-CI gates.
+
+The question about ESP32-local operational start is a separate Device contract.
+No ESP32-specific language constraint, program-activation rule, Device release or
+physical operation follows from this owner draft.
+
+## Current migration validation
+
+The final combined focused Node run passes 267 tests; the full native package
+crate passes all 43 tests. Documentation validation passes 152 bilingual pairs
+and 66 exclusions. These focused results do not replace full owner CI or installed
+downstream-consumer verification.
+
+- Approved lamp/latch/pump faults and recovery: 59 plain/framed tests pass.
+- PC03/04 control intent, retained PC03 replay checkpoints and reverse symmetry: 20 tests pass.
+- Book E01/E03 run through the actual ghostsim CLI with retained healthy oracles.
+- Package regressions plus requirement catalog: 64 tests pass; native package
+  crate: 43 tests pass, including the unsupported portable At profile rejection.
+- At and requirement catalog: 19 tests pass, including native/WASM/ghostsim parity,
+  all four acquisition faults at the due instant and no recovery replay.
+- Consumer/compiler/import and interaction corpus tests: 69 tests pass; pinned imported code executes
+  through native and framed WASM with actual generated acquisition rails.
+- Whole runnable-document gate: 25 passed / 31 failed after the keyword-only
+  migration. Failures retain the unresolved source-policy and closure gates.
+
+The earlier audit below describes the preceding draft and is historical evidence,
+not the result of the current migration. Each published head still needs its own
+exact-head CI; installed downstream pins remain separate acceptance gates.
 
 ## Independent findings and fixes
 

@@ -1,5 +1,7 @@
 # GhostFlow Coding FAQ
 
+2026-10-05 외부 입력 개정은 품질 정보를 갖는 선언에 `input`을 사용한다. 기존 조건화와 명시적인 `Result` 고장 분기는 그대로 유지하며, 이전 `sensor` 발췌는 `tests/fixtures/history/issue531/`에 보존한다.
+
 “이런 동작은 어떻게 코딩하나요?”에 답하는 사례집이다.
 질문마다 코드, 동작, 그렇게 작성하는 이유를 설명한다.
 언어 규칙의 기준은 [Language Reference](LANGUAGE-REFERENCE.md)다.
@@ -387,7 +389,7 @@ control TwoZones {
 ```ghost
 control MoistureControl {
   input stop: Bool;
-  sensor moisture: Percent {
+  input moisture: Percent {
     sample = 1s;
     valid = 0% .. 100%;
     filter = median(5);
@@ -415,7 +417,7 @@ control MoistureControl {
 
 **문법 근거**
 
-- `sensor`, `sample`, `valid`, `filter`, `stale_after`, `recover_after`: [Reference §4.2 샘플 계약과 sensor 처리 순서](reference/04-sensors-constraints-control.md#42-샘플-계약과-sensor-처리-순서)
+- `input`, `sample`, `valid`, `filter`, `stale_after`, `recover_after`: [Reference §4.2 샘플 계약과 sensor 처리 순서](reference/04-sensors-constraints-control.md#42-샘플-계약과-sensor-처리-순서)
 - `median`, `signal`, `hysteresis`, 이름 붙인 인수: [Reference §4.3 filter와 signal 연산](reference/04-sensors-constraints-control.md#43-filter와-signal-연산)
 - `case`, `ok(value)`, `fault(_)`: [Reference §4.1 sensor와 Result 품질](reference/04-sensors-constraints-control.md#41-sensor와-result-품질)
 
@@ -1473,7 +1475,7 @@ control RestartAndWait {
 
 ```ghost
 control TemperatureMonitor {
-  sensor temperature: Number;
+  input temperature: Number;
   output high_temperature, sensor_fault: Bool;
 
   high_temperature <- case temperature {
@@ -1510,7 +1512,7 @@ control TemperatureMonitor {
 
 **문법 근거**
 
-- `sensor`, `ok(value)`, `fault(_)`: [Reference §4.1 sensor와 Result 품질](reference/04-sensors-constraints-control.md#41-sensor와-result-품질)
+- `input`, `ok(value)`, `fault(_)`: [Reference §4.1 sensor와 Result 품질](reference/04-sensors-constraints-control.md#41-sensor와-result-품질)
 - 단위·샘플·품질·복구 계약: [Reference §4.2 샘플 계약과 sensor 처리 순서](reference/04-sensors-constraints-control.md#42-샘플-계약과-sensor-처리-순서)
 - `Number`와 전용 물리량의 구분: [Reference §2.1 값 종류](reference/02-types-expressions-state.md#21-값-종류), [§2.9 물리량과 단위](reference/02-types-expressions-state.md#29-물리량과-단위)
 - `>=` 비교: [Reference §2.6 표현식과 연산자](reference/02-types-expressions-state.md#26-표현식과-연산자)
@@ -1533,7 +1535,7 @@ control TemperatureMonitor {
 예를 들어 [33번](#q33)의 논리 선언은 소스에 남는다.
 
 ```ghost
-sensor temperature: Number;
+input temperature: Number;
 ```
 
 센서 A를 B로 바꾸는 것은 다음 연결을 바꾸는 일이다. 아래는 파일 형식이나 실행 문법이 아닌 설명이다.
@@ -1564,7 +1566,7 @@ B가 같은 입력 계약을 만족하면 제어 소스는 그대로 둘 수 있
 **문법 근거**
 
 - 정본 `.ghost.md` 문서: [Reference §1.1 왜 문서 하나가 소스인가](reference/01-source-and-syntax.md#11-왜-문서-하나가-소스인가)
-- `sensor` 선언: [Reference §4.1 sensor와 Result 품질](reference/04-sensors-constraints-control.md#41-sensor와-result-품질)
+- `input` 선언: [Reference §4.1 sensor와 Result 품질](reference/04-sensors-constraints-control.md#41-sensor와-result-품질)
 - 소스에 선언하는 샘플·필터·유효성 규칙: [Reference §4.2 샘플 계약과 sensor 처리 순서](reference/04-sensors-constraints-control.md#42-샘플-계약과-sensor-처리-순서)
 - 논리 역할과 물리 endpoint: [Reference §6.2 definition, instance와 논리 port](reference/06-composition-and-replay.md#62-definition-instance와-논리-port)
 - 각 변경의 별도 생명주기: [Reference §6.3 parameters, settings, dependencies와 bindings](reference/06-composition-and-replay.md#63-parameters-settings-dependencies와-bindings)
@@ -1588,7 +1590,7 @@ Word가 프린터마다 다시 컴파일되는 대신 공통 인쇄 인터페이
 예를 들어 아래 **단편**은 온도를 공급하는 제조사나 통신 방식을 지정하지 않는다.
 
 ```ghost
-sensor temperature: Number;
+input temperature: Number;
 ```
 
 설치 계약이 이 값을 섭씨 온도로 정의했다면 새 Driver도 같은 의미의 값과 품질 정보를 공급한다.
@@ -1605,7 +1607,7 @@ Driver를 추가하거나 바꾸는 방법은 실행 환경의 책임이다.
 
 **문법 근거**
 
-- `sensor`와 정상값·오류 계약: [Reference §4.1 sensor와 Result 품질](reference/04-sensors-constraints-control.md#41-sensor와-result-품질)
+- `input`와 정상값·오류 계약: [Reference §4.1 sensor와 Result 품질](reference/04-sensors-constraints-control.md#41-sensor와-result-품질)
 - Driver가 제공하는 샘플·품질 정보: [Reference §4.2 샘플 계약과 sensor 처리 순서](reference/04-sensors-constraints-control.md#42-샘플-계약과-sensor-처리-순서)
 - 논리 port와 물리 endpoint의 분리: [Reference §6.2 definition, instance와 논리 port](reference/06-composition-and-replay.md#62-definition-instance와-논리-port)
 - 소스와 별도로 변경하는 binding: [Reference §6.3 parameters, settings, dependencies와 bindings](reference/06-composition-and-replay.md#63-parameters-settings-dependencies와-bindings)
@@ -1799,7 +1801,7 @@ RS485 연결이라는 사실만으로 통신 명령까지 같아지는 것은 �
 
 입력의 갱신 주기·유효성 및 통신 장애 처리는 기존 논리 입력 계약을 만족해야 한다.
 위 코드의 Bool 입력 두 개가 통신 장애를 자동 감지하는 것은 아니다.
-측정 입력의 정상·오류를 제어에서 구분해야 한다면 [33번](#q33)의 `sensor` 계약을 사용한다.
+측정 입력의 정상·오류를 제어에서 구분해야 한다면 [33번](#q33)의 `input` 계약을 사용한다.
 출력 명령 전송이나 응답도 실제 접점·설비 동작 확인과 구분한다.
 
 기존 입력·출력을 호환되는 RS485 채널로 옮기는 경우에는 binding을 바꾸고

@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { encode } from '@toon-format/toon';
 import { compileSource, writeArtifact } from '../tools/toolchain.mjs';
@@ -11,7 +12,7 @@ import { DailySlots } from '../runtimes/wasm/schedule.mjs';
 import { GhostFlowStation } from '../runtimes/wasm/station.mjs';
 import { bindStationPolicy } from '../runtimes/wasm/policy.mjs';
 
-const root = path.resolve(new URL('..', import.meta.url).pathname);
+const root = fileURLToPath(new URL('..', import.meta.url));
 const book = fs.readFileSync(path.join(root, 'docs/ProgrammingInGhostflow.md'), 'utf8');
 const bookRuntimeIds = new Set();
 function bookTest(id, title, body) {
@@ -47,8 +48,13 @@ async function simulate(id, source, frames, extra = {}) {
       format: 'GhostFlow/scenario-v1', id,
       initialInputs: fields.map(field => ({ name: field.name, type: field.type, value: frames[0].inputs[field.name] })),
       keyBindings: [],
-      actions: frames.flatMap(frame => [
+      actions: frames.flatMap((frame, index) => [
         ...fields.map(field => ({ kind: 'input', name: field.name, type: field.type, value: frame.inputs[field.name] })),
+        // Retained healthy scenario observations, not clock-generated production samples.
+        ...compilation.manifest.sensors.filter(sensor => Object.hasOwn(frame.inputs, sensor.name)).map(sensor => ({
+          kind: 'sample', name: sensor.name, epoch: 1, id: index + 1,
+          timestampMs: frame.atMs, value: frame.inputs[sensor.name], quality: 'Good',
+        })),
         ...(frame.actions ?? []),
         { kind: 'scan', atMs: frame.atMs, ...(frame.facts ?? {}) },
       ]),
@@ -510,7 +516,7 @@ for (const [id, diagnostic] of errorExamples) {
 }
 
 test('Programming source experiments simulate changed priorities and explicit old-state reads', async () => {
-  await simulate('E01-invert', bookSource('E01').replace('lamp <- switch_on', 'lamp <- !switch_on'), [
+  await simulate('E01-invert', bookSource('E01').replace('lamp <- switch_on |> recover(false)', 'lamp <- !(switch_on |> recover(false))'), [
     frame(0, { switch_on: false }, { lamp: true }), frame(1, { switch_on: true }, { lamp: false }),
   ]);
   await simulate('E02-inclusive', bookSource('E02').replace('level < value', 'level <= value'),
@@ -520,7 +526,7 @@ test('Programming source experiments simulate changed priorities and explicit ol
     frame(1, { start: false, stop: false }, { valve: true, pump: true }, { running: true }),
     frame(2, { start: false, stop: true }, { valve: false, pump: false }, { running: false }, { valve: false, pump: true }),
   ]);
-  await simulate('E06-request-experiment', bookSource('E03').replace("pump <- running'", 'pump <- start'), [
+  await simulate('E06-request-experiment', bookSource('E03').replace("pump <- running'", 'pump <- start_requested'), [
     frame(0, { start: true, stop: false }, { valve: true, pump: true }, { running: true }),
     frame(1, { start: false, stop: false }, { valve: true, pump: false }, { running: true }),
   ]);

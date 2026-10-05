@@ -267,7 +267,7 @@ function validateContextManifest(input, bytecodeFormat) {
   if (manifest.format === HOLIDAY_FORMAT && (!schedules.some(item => item.kind === 'daily' && item.day?.kind === 'holiday')
     || schedules.some(item => item.kind === 'at'))) throw new Error('Holiday profile requires Holiday Daily and excludes At');
   if (manifest.format === AT_FORMAT && (!schedules.length || schedules.some(item => item.kind !== 'at')
-    || [configs,sensors,objectives,resources,adaptSettings,providers,calendars,naturals].some(list => list.length) || accounting)) {
+    || [configs,objectives,resources,adaptSettings,providers,calendars,naturals].some(list => list.length) || accounting)) {
     throw new Error('At profile requires At-only execution');
   }
   if (manifest.signals.length) throw new Error('context signal mixing is not supported');

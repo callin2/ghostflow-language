@@ -48,6 +48,7 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [contracts/interaction-v0/examples/browser-exact-counter.ghost.md](contracts/interaction-v0/examples/browser-exact-counter.ghost.md) | Browser exact counter interaction fixture | md |
 | [contracts/interaction-v0/examples/enum-phase-age.ghost.md](contracts/interaction-v0/examples/enum-phase-age.ghost.md) | Enum phase age interaction fixture | md |
 | [contracts/interaction-v0/examples/exact-counter.ghost.md](contracts/interaction-v0/examples/exact-counter.ghost.md) | Exact counter interaction fixture | md |
+| [contracts/interaction-v0/examples/five-minute-watering.ghost.en.md](contracts/interaction-v0/examples/five-minute-watering.ghost.en.md) | Five-minute watering fixture | md |
 | [contracts/interaction-v0/examples/five-minute-watering.ghost.md](contracts/interaction-v0/examples/five-minute-watering.ghost.md) | 5분 급수 제어 | md |
 | [contracts/interaction-v0/examples/multiple-values.ghost.md](contracts/interaction-v0/examples/multiple-values.ghost.md) | Multiple internal values interaction fixture | md |
 | [contracts/interaction-v0/examples/operator-settings.ghost.md](contracts/interaction-v0/examples/operator-settings.ghost.md) | Renderer-independent operator settings fixture | md |
@@ -211,6 +212,13 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/WASM-CI-ARTIFACTS.md](docs/WASM-CI-ARTIFACTS.md) | Revision-addressed GhostFlow WASM CI artifacts | md |
 | [docs/WHAT-IF-REPLAY.ko.md](docs/WHAT-IF-REPLAY.ko.md) | 제한된 what-if 재생 | md |
 | [docs/WHAT-IF-REPLAY.md](docs/WHAT-IF-REPLAY.md) | Bounded what-if replay | md |
+
+## docs/historical/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/historical/2026-10-05-input-531-book-excerpts.ko.md](docs/historical/2026-10-05-input-531-book-excerpts.ko.md) | 명시적 입력 품질 개정 전 E01·E03 원래 코드 | md |
+| [docs/historical/2026-10-05-input-531-book-excerpts.md](docs/historical/2026-10-05-input-531-book-excerpts.md) | Original E01 and E03 code before the explicit input-quality revision | md |
 
 ## docs/plans/
 
@@ -487,4 +495,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-367 documents.
+370 documents.

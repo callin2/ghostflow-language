@@ -4,6 +4,8 @@
 
 # GhostFlow Coding FAQ
 
+The 2026-10-05 external-input revision uses `input` for quality-bearing declarations. Existing conditioning and explicit `Result` fault branches are unchanged; prior `sensor` excerpts remain under `tests/fixtures/history/issue531/`.
+
 This collection answers “How do I code this behavior?”
 Each question explains the code, behavior, and reasons for writing it that way.
 The [Language Reference](LANGUAGE-REFERENCE.md) defines the language rules.
@@ -391,7 +393,7 @@ Use different thresholds for turning on and off. Handle sensor faults explicitly
 ```ghost
 control MoistureControl {
   input stop: Bool;
-  sensor moisture: Percent {
+  input moisture: Percent {
     sample = 1s;
     valid = 0% .. 100%;
     filter = median(5);
@@ -419,7 +421,7 @@ When healthy measurements recover, operation resumes automatically based on a ne
 
 **Syntax basis**
 
-- `sensor`, `sample`, `valid`, `filter`, `stale_after`, `recover_after`: [Reference §4.2 Sample contracts and sensor processing order](reference/04-sensors-constraints-control.md#42-샘플-계약과-sensor-처리-순서)
+- `input`, `sample`, `valid`, `filter`, `stale_after`, `recover_after`: [Reference §4.2 Sample contracts and sensor processing order](reference/04-sensors-constraints-control.md#42-샘플-계약과-sensor-처리-순서)
 - `median`, `signal`, `hysteresis`, named arguments: [Reference §4.3 filter and signal operations](reference/04-sensors-constraints-control.md#43-filter와-signal-연산)
 - `case`, `ok(value)`, `fault(_)`: [Reference §4.1 sensor and Result quality](reference/04-sensors-constraints-control.md#41-sensor와-result-품질)
 
@@ -1480,7 +1482,7 @@ The input contract of this example specifies that `temperature`'s `Number` value
 
 ```ghost
 control TemperatureMonitor {
-  sensor temperature: Number;
+  input temperature: Number;
   output high_temperature, sensor_fault: Bool;
 
   high_temperature <- case temperature {
@@ -1517,7 +1519,7 @@ without tying it to a manufacturer, communication method, or wiring.
 
 **Syntax basis**
 
-- `sensor`, `ok(value)`, `fault(_)`: [Reference §4.1 sensor and Result quality](reference/04-sensors-constraints-control.md#41-sensor와-result-품질)
+- `input`, `ok(value)`, `fault(_)`: [Reference §4.1 sensor and Result quality](reference/04-sensors-constraints-control.md#41-sensor와-result-품질)
 - Unit, sample, quality, and recovery contracts: [Reference §4.2 Sample contracts and sensor processing order](reference/04-sensors-constraints-control.md#42-샘플-계약과-sensor-처리-순서)
 - Distinguishing `Number` from dedicated physical quantities: [Reference §2.1 Value kinds](reference/02-types-expressions-state.md#21-값-종류), [§2.9 Physical quantities and units](reference/02-types-expressions-state.md#29-물리량과-단위)
 - `>=` comparison: [Reference §2.6 Expressions and operators](reference/02-types-expressions-state.md#26-표현식과-연산자)
@@ -1540,7 +1542,7 @@ The canonical control source here is one `.ghost.md` document.
 For example, the logical declaration in [question 33](#q33) remains in source.
 
 ```ghost
-sensor temperature: Number;
+input temperature: Number;
 ```
 
 Replacing sensor A with B changes the following connection. This is an explanation, not a file format or executable syntax.
@@ -1571,7 +1573,7 @@ and adjusting operating durations require different validation and change histor
 **Syntax basis**
 
 - Canonical `.ghost.md` document: [Reference §1.1 Why one document is the source](reference/01-source-and-syntax.md#11-왜-문서-하나가-소스인가)
-- `sensor` declarations: [Reference §4.1 sensor and Result quality](reference/04-sensors-constraints-control.md#41-sensor와-result-품질)
+- `input` declarations: [Reference §4.1 sensor and Result quality](reference/04-sensors-constraints-control.md#41-sensor와-result-품질)
 - Sample/filter/validity rules declared in source: [Reference §4.2 Sample contracts and sensor processing order](reference/04-sensors-constraints-control.md#42-샘플-계약과-sensor-처리-순서)
 - Logical roles and physical endpoints: [Reference §6.2 Definitions, instances, and logical ports](reference/06-composition-and-replay.md#62-definition-instance와-논리-port)
 - Separate lifecycle for each change: [Reference §6.3 Parameters, settings, dependencies, and bindings](reference/06-composition-and-replay.md#63-parameters-settings-dependencies와-bindings)
@@ -1595,7 +1597,7 @@ The Driver handles sensor-specific communication and data interpretation. Instal
 For example, this **fragment** does not specify the manufacturer or communication method supplying temperature.
 
 ```ghost
-sensor temperature: Number;
+input temperature: Number;
 ```
 
 If the installation contract defines this value as Celsius temperature, the new Driver supplies values with the same meaning and quality information.
@@ -1612,7 +1614,7 @@ without tying control intent to particular hardware.
 
 **Syntax basis**
 
-- `sensor` and healthy-value/error contracts: [Reference §4.1 sensor and Result quality](reference/04-sensors-constraints-control.md#41-sensor와-result-품질)
+- `input` and healthy-value/error contracts: [Reference §4.1 sensor and Result quality](reference/04-sensors-constraints-control.md#41-sensor와-result-품질)
 - Sample/quality information provided by Drivers: [Reference §4.2 Sample contracts and sensor processing order](reference/04-sensors-constraints-control.md#42-샘플-계약과-sensor-처리-순서)
 - Separating logical ports from physical endpoints: [Reference §6.2 Definitions, instances, and logical ports](reference/06-composition-and-replay.md#62-definition-instance와-논리-port)
 - Bindings changed independently of source: [Reference §6.3 Parameters, settings, dependencies, and bindings](reference/06-composition-and-replay.md#63-parameters-settings-dependencies와-bindings)
@@ -1806,7 +1808,7 @@ For example, a Modbus RTU board requires handling that protocol and the board's 
 
 Input update intervals, validity, and communication failure handling must satisfy the existing logical input contract.
 The two Bool inputs in the code do not automatically detect communication failures.
-If control must distinguish healthy and faulty measurement inputs, use the `sensor` contract in [question 33](#q33).
+If control must distinguish healthy and faulty measurement inputs, use the `input` contract in [question 33](#q33).
 Distinguish output command transmission or responses from confirmation of actual contact/equipment operation too.
 
 When moving existing inputs/outputs to compatible RS485 channels, change bindings

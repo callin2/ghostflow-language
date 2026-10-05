@@ -201,8 +201,8 @@
       "source": "docs/CONSTRAINTS.md",
       "sourceLanguage": "ko",
       "translation": "docs/CONSTRAINTS.en.md",
-      "sourceSha256": "9199b3a405d17e907612af29755647afde80a00a3ffef3e00e88f3151649d7fd",
-      "translationSha256": "7c4881bc9586781ac7db12dc7e8cf073607e2c8799b36c6d3877d1ffcabc5a18"
+      "sourceSha256": "514579a9db8a14343e61aeb6b4d97e2cf30e7f3b4feb56a4aabb1ea6df39a78e",
+      "translationSha256": "892d2a707305c5fd3df16e2d6e16d979c239e365afed393576a812e78c01e327"
     },
     {
       "source": "docs/CONTEXT-EXECUTION-ABI.md",
@@ -292,8 +292,8 @@
       "source": "docs/language_faq.md",
       "sourceLanguage": "ko",
       "translation": "docs/language_faq.en.md",
-      "sourceSha256": "e1dc7072aa0718c341acba7288ab50a4d4352a3ff687a2a1cd18e9c863123f94",
-      "translationSha256": "e537025a6953253cd8e181ea0b27e75d325775806acd41809751930e1fa8b70d"
+      "sourceSha256": "0b49e0f1158cd31f2ef0c1336284ecb049224a45866e7dc111d377125e072b0e",
+      "translationSha256": "75d86e3481ba2b97bb6862f4a7efebbe9f4ef6803c6bb365da739b94d3a3690e"
     },
     {
       "source": "docs/LANGUAGE-EXAMPLES.md",
@@ -383,8 +383,8 @@
       "source": "docs/ProgrammingInGhostflow.md",
       "sourceLanguage": "ko",
       "translation": "docs/ProgrammingInGhostflow.en.md",
-      "sourceSha256": "57f32d88e185541daafc5aec21f0dc71449fc8eb87d6450e2a29e85b379c0a21",
-      "translationSha256": "8d7a33a13ca2a94b278cf8e06ba525e1eb00b6b5a4aaab304061ede351d0b073"
+      "sourceSha256": "abe544d6cb2287670ec1eb6355b3497820f4b5d1063bc3ebca6705b8c0fdbbba",
+      "translationSha256": "489009116003a4049def5341024e66be46d273b22407eeb15abb1f2785180a0c"
     },
     {
       "source": "docs/REFERENCE-QUERY.md",
@@ -418,8 +418,8 @@
       "source": "docs/reference/04-sensors-constraints-control.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/04-sensors-constraints-control.en.md",
-      "sourceSha256": "81473ed5d4e9827468a4a3ace1a973c970ae3c911b2cb0734a35099e125792f1",
-      "translationSha256": "ed3e25daa34f224e70a0754b6ee47e39555ca576e8f79ef89ce52df20d45dbf6"
+      "sourceSha256": "af299e68c3efd373dc3fc723631c8e338eb8dbfc5e32d11426e4671988aef8ee",
+      "translationSha256": "144c8e8ce5770e8edeb57bb1690145e36ad2a1a4b49f13900cda1e92af878df8"
     },
     {
       "source": "docs/reference/05-settings-and-observation.md",
@@ -628,8 +628,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "017ba023daab9bbdc5fabbf01c0d1e170592d03dad36822c2ae18356ee9923fb",
-      "translationSha256": "18ab154720a0f8ef20bd4f00d09f48491a5ac58be0a566b442a51c0dc402a085"
+      "sourceSha256": "f93d77264ada06c210bfc205f875b2602296e4d77acf90765824a01272447b6f",
+      "translationSha256": "e4e875f3c93307be098ee706b05cf2f1d78835f38385cf1fc94fe0f29f25720f"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",
@@ -649,22 +649,22 @@
       "source": "examples/curriculum/pc-02-start-stop.ghost.md",
       "sourceLanguage": "ko",
       "translation": "examples/curriculum/pc-02-start-stop.ghost.en.md",
-      "sourceSha256": "7e85d0541383c95d38a8176c496343627367c1b9aa9829320ddd4dc2a477593a",
-      "translationSha256": "a6983247ad448a1a6d32edf19cf87dcd2c19ea725002ce24cc9d4337a2702d53"
+      "sourceSha256": "b5b8213fc2e06c11a81142c24253a3467861eecacc0d6e310cb8a0cff05d5e45",
+      "translationSha256": "d73d03dd4ef0e417893912fc06e37050a881f2d0bee58c55a2742b05e7cc5036"
     },
     {
       "source": "examples/curriculum/pc-03-motor-contactor.ghost.md",
       "sourceLanguage": "ko",
       "translation": "examples/curriculum/pc-03-motor-contactor.ghost.en.md",
-      "sourceSha256": "a44ac8295c000f850bf26e0607abba99268c845f83d7ede66b4618b327964291",
-      "translationSha256": "eb374c63500d36c9e5fd7c2b32129a7cc5c1331af73c685d9d281ccecbbb86de"
+      "sourceSha256": "0f953145a2833a6c32e70dbcf52d0a265251a6597289f6d1b53cbc686bd4f4bb",
+      "translationSha256": "1554c00f19f9110a0b891ba1fa888286dfdd97ceb5e468fd8f430b3a9315a771"
     },
     {
       "source": "examples/curriculum/pc-04-direction-interlock.ghost.md",
       "sourceLanguage": "ko",
       "translation": "examples/curriculum/pc-04-direction-interlock.ghost.en.md",
-      "sourceSha256": "f50e73582f8fbae8678ab3fb76f428a56d5d1df283a10d0ae58fcc3d08f7ae27",
-      "translationSha256": "ccd8c0d54af3ae8c6804edf425f1510465900e59d44b7c32452f70ccfb68b241"
+      "sourceSha256": "15f8555d316ed8284dfbd251b63dba0d3b57439db31e3e802f5ff76892fa138c",
+      "translationSha256": "25e462a5acd14054e31f4a1c458cdd5cbb93e07be6914a01eac97ae8895b02e8"
     },
     {
       "source": "examples/curriculum/pc-05-limit-feedback.ghost.md",
@@ -712,8 +712,8 @@
       "source": "examples/irrigation.ghost.md",
       "sourceLanguage": "en",
       "translation": "examples/irrigation.ghost.ko.md",
-      "sourceSha256": "7970f5d43c7a895b5ef1731e8dfa98fe8efe914a31f2388d44ef4926bc6dfd92",
-      "translationSha256": "ba789b2f3e7b5f468c05f692cc25ee43d81c279b4c0c71bd970832f8e3b06caa"
+      "sourceSha256": "591a4a1e70d49802ef23f4c2721f91f0319b0c9eb53ba2470332bacb40f459c6",
+      "translationSha256": "cff1c8d3a64193c179b1dc0a25ab78deb2d31d8f32832046599e6c3f5aeed4bb"
     },
     {
       "source": "examples/scheduled-watering.ghost.md",
@@ -740,8 +740,8 @@
       "source": "examples/tutorial/01-latch.ghost.md",
       "sourceLanguage": "en",
       "translation": "examples/tutorial/01-latch.ghost.ko.md",
-      "sourceSha256": "10ad51975845c985b0abe7b33163122044a3a9ae9e1c9f6fe8f549dbce3324df",
-      "translationSha256": "6c44ba1f7d421aa6e3cfd92a2973336df6782156a0d1a850a34e45901ac45ee9"
+      "sourceSha256": "07292c95a9ca48d4cb7c7d88d8b5fa7f40531f926e460ce34550d639667cf5bd",
+      "translationSha256": "5eecf77b8c1198eafdd42bba434fec6d191f44dcb9b98cae6d72346a22ad55a5"
     },
     {
       "source": "examples/tutorial/02-watering.ghost.md",
@@ -1050,6 +1050,20 @@
       "translation": "docs/OBSERVATION-EVENT-HISTORY.ko.md",
       "sourceSha256": "c265f6904258eee5e24dd7228222d40317806cffc5f143978f023d32b4bbf952",
       "translationSha256": "a4f85f8836f1d8cba9b4cc78c70f632b60e47a7c5bda108354c23821a16da9be"
+    },
+    {
+      "source": "docs/historical/2026-10-05-input-531-book-excerpts.md",
+      "sourceLanguage": "en",
+      "translation": "docs/historical/2026-10-05-input-531-book-excerpts.ko.md",
+      "sourceSha256": "6dd77a0ff1ced5c2ca9e3a34de7b362f848f70495ac0786f458c4481e3f4289e",
+      "translationSha256": "ec321579bf615fc2ce46c184570b1d361f56e0874f8cc2f0ba0911c6b9583695"
+    },
+    {
+      "source": "contracts/interaction-v0/examples/five-minute-watering.ghost.md",
+      "sourceLanguage": "ko",
+      "translation": "contracts/interaction-v0/examples/five-minute-watering.ghost.en.md",
+      "sourceSha256": "a0461e7411d0cabcb3ec3380c1732d3d74b77c708904e0033ead2f573c3dc1e1",
+      "translationSha256": "c3f5c2e366786d150dc060e3527aa1c0ee564d62a82cdac5717bd97c64fc814b"
     }
   ],
   "exclusions": [
@@ -1063,10 +1077,6 @@
     },
     {
       "path": "contracts/interaction-v0/examples/exact-counter.ghost.md",
-      "reason": "Executable test or benchmark input fixture, not authored reader documentation; canonical source identity is retained."
-    },
-    {
-      "path": "contracts/interaction-v0/examples/five-minute-watering.ghost.md",
       "reason": "Executable test or benchmark input fixture, not authored reader documentation; canonical source identity is retained."
     },
     {

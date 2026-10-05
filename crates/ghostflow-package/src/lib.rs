@@ -3196,12 +3196,12 @@ mod tests {
                 value_type: "bool".into(),
             },
             Capability {
-                kind: "input".into(),
+                kind: "sensor".into(),
                 name: "start".into(),
                 value_type: "bool".into(),
             },
             Capability {
-                kind: "input".into(),
+                kind: "sensor".into(),
                 name: "stop".into(),
                 value_type: "bool".into(),
             },
@@ -4080,6 +4080,7 @@ mod tests {
                     Ok(true)
                 };
             let mut capabilities = capabilities();
+            capabilities.truncate(2);
             let manifests = strings(&["GhostFlow/control-v1", "GhostFlow/control-v4"]);
             if version >= 2 {
                 capabilities[0].value_type = "int".into();
@@ -4123,7 +4124,7 @@ mod tests {
             .flat_map(|index| {
                 [
                     Capability {
-                        kind: "input".into(),
+                        kind: "sensor".into(),
                         name: format!("input_{index}"),
                         value_type: "number".into(),
                     },
@@ -4136,7 +4137,7 @@ mod tests {
             })
             .chain([
                 Capability {
-                    kind: "input".into(),
+                    kind: "sensor".into(),
                     name: "enabled".into(),
                     value_type: "bool".into(),
                 },
@@ -4149,9 +4150,9 @@ mod tests {
             .collect();
         let accept =
             |_: &[u8], context: &TargetLoaderContext<'_>| -> std::result::Result<bool, String> {
-                assert_eq!(context.manifest["inputs"].as_array().unwrap().len(), 18);
-                assert_eq!(context.manifest["inputs"][0]["canonicalUnit"], "K");
-                assert_eq!(context.manifest["inputs"][16]["canonicalUnit"], "pH");
+                assert_eq!(context.manifest["sensors"].as_array().unwrap().len(), 19);
+                assert_eq!(context.manifest["sensors"][0]["canonicalUnit"], "K");
+                assert_eq!(context.manifest["sensors"][16]["canonicalUnit"], "pH");
                 Ok(true)
             };
         let mut current = profile(&accept);
@@ -4430,7 +4431,12 @@ mod tests {
                 .map_err(|e| e.to_string())?;
             for (mono, expected) in [(0, true), (2_000, false)] {
                 for (name, value) in [
-                    ("start", ghostflow_core::Value::Bool(true)),
+                    ("__gf_sensor_value_start", ghostflow_core::Value::Bool(true)),
+                    ("__gf_sensor_ok_start", ghostflow_core::Value::Bool(true)),
+                    (
+                        "__gf_sensor_fault_start",
+                        ghostflow_core::Value::Number(0.0),
+                    ),
                     ("__gf_now_ms", ghostflow_core::Value::Number(mono as f64)),
                     ("__gf_time_epoch", ghostflow_core::Value::Number(1.0)),
                 ] {
@@ -4472,7 +4478,7 @@ mod tests {
                 value_type: "bool".into(),
             },
             Capability {
-                kind: "input".into(),
+                kind: "sensor".into(),
                 name: "start".into(),
                 value_type: "bool".into(),
             },
@@ -4540,11 +4546,11 @@ mod tests {
     fn signed_time_descriptors_require_integral_bounded_configs_before_loading() {
         let capabilities: Vec<_> = (0..3)
             .flat_map(|index| {
-                ["input", "actuator"].map(|kind| Capability {
+                ["sensor", "actuator"].map(|kind| Capability {
                     kind: kind.into(),
                     name: format!(
                         "{}_{index}",
-                        if kind == "input" { "input" } else { "output" }
+                        if kind == "sensor" { "input" } else { "output" }
                     ),
                     value_type: "number".into(),
                 })
@@ -4553,8 +4559,8 @@ mod tests {
         let accept =
             |_: &[u8], context: &TargetLoaderContext<'_>| -> std::result::Result<bool, String> {
                 for (index, nominal) in ["Date", "TimeOfDay", "DateTime"].iter().enumerate() {
-                    assert_eq!(context.manifest["inputs"][index]["type"], *nominal);
-                    assert!(context.manifest["inputs"][index]
+                    assert_eq!(context.manifest["sensors"][index]["type"], *nominal);
+                    assert!(context.manifest["sensors"][index]
                         .get("canonicalUnit")
                         .is_none());
                 }
@@ -5130,7 +5136,7 @@ mod tests {
     #[test]
     fn signed_hold_last_domains_and_bytecode_bindings_are_checked_before_target_loader() {
         let capabilities: Vec<_> = [
-            ("input", "start", "bool"),
+            ("sensor", "start", "bool"),
             ("sensor", "probe", "number"),
             ("sensor", "backup", "number"),
             ("actuator", "measuredResult", "bool"),
@@ -5222,7 +5228,7 @@ mod tests {
     fn signed_debounce_domains_and_bytecode_bindings_are_checked_before_target_loader() {
         let capabilities = vec![
             Capability {
-                kind: "input".into(),
+                kind: "sensor".into(),
                 name: "start".into(),
                 value_type: "bool".into(),
             },

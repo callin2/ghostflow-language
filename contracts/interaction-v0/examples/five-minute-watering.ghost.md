@@ -32,9 +32,23 @@ elapsed(watering), exact 5min cutoff.”
 - 제어 의미에서 DI1 true는 버튼을 누른 상태이고 DI2/DI3 true는 해당 정지 조건이 들어온 상태라고 가정합니다; 실제 접점의 전기적 극성은 이 문서에서 정하지 않습니다.
 - 표는 소프트웨어의 가상 채널 연결이며 Waveshare 단자 번호나 실제 배선을 뜻하지 않습니다.
 
+## 입력 품질을 명시한 새 리비전
+
+이 리비전은 #531의 품질 입력 계약을 사용합니다. 정상 false/0은 고장이 아닙니다.
+DI1 고장은 새 시작을 막으며, DI2·DI3가 정상이고 해제 상태이면 기존 운전을 유지합니다.
+DI2 또는 DI3 고장은 운전을 해제합니다. 어느 입력이든 고장이 관측되면 복구 후에도
+DI1을 정상 false로 관측한 다음 true로 바꾸어야 다시 시작합니다. 복구 자체는 시작이 아닙니다.
+기존 소스는 `tests/fixtures/history/issue531/consumer-fixtures.pre-input.json`에 보존합니다.
+
 ```ghost
 control FiveMinuteWatering {
   input DI1, DI2, DI3, DI4, DI5, DI6, DI7, DI8: Bool;
+  let request_good = case DI1 { ok(_) => true; fault(_) => false; };
+  let stop_good = case DI2 { ok(_) => true; fault(_) => false; };
+  let low_water_good = case DI3 { ok(_) => true; fault(_) => false; };
+  let request = DI1 |> recover(false);
+  let stop = DI2 |> recover(true);
+  let low_water = DI3 |> recover(true);
   let watering_limit = 5min;
   output RO1, RO2, RO3, RO4, RO5, RO6, RO7, RO8: Bool;
 
@@ -45,9 +59,9 @@ control FiveMinuteWatering {
   // ghostflow:link id=GF-INT-FIXTURE-WATERING-V1 relation=implements
   timer age = elapsed(watering);
 
-  request_was_high' = DI1;
-  watering' = !DI2 && !DI3
-    && ((DI1 && !request_was_high) || (watering && age < watering_limit));
+  request_was_high' = if !request_good || !stop_good || !low_water_good then true else request;
+  watering' = !stop && !low_water
+    && ((request && !request_was_high) || (watering && age < watering_limit));
 
   // ghostflow:link id=GF-INT-FIXTURE-WATERING-V1 relation=implements
   RO1 <- watering';

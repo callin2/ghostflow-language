@@ -89,7 +89,7 @@ Each item's meaning and constraints are:
 | Item | Type/constraint | Meaning |
 |---|---|---|
 | `sample` | Positive `Duration` | Expected measurement interval information. Creates no sensor-reading thread or timer. |
-| `valid` | Closed range of the same type as the payload | Checks raw normal candidates before filtering. Out-of-range values are `Invalid`. |
+| `valid` | Closed range of the same numeric payload type; unavailable for Bool | Checks raw normal candidates before filtering. Out-of-range values are `Invalid`. Bool ranges reject during compilation. |
 | `filter` | Stateful signal operation | Applies only to new valid samples. |
 | `stale_after` | Positive `Duration` | Freshness limit from the time of the last actual valid sample. |
 | `recover_after` | Positive integer `N samples` | Recovery after a fault requires N consecutive new valid samples. |

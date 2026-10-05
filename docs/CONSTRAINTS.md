@@ -1,5 +1,7 @@
 # GhostFlow 공통 제약과 센서 신호 계약
 
+2026-10-05 외부 입력 개정은 품질 정보를 갖는 선언에 `input`을 사용한다. 기존 조건화와 명시적인 `Result` 고장 분기는 그대로 유지하며, 이전 `sensor` 발췌는 `tests/fixtures/history/issue531/`에 보존한다.
+
 2026-09-24 · 공통 설계 계약. 운영 설정의 현재 문법과 의미는
 [Reference §5.1–5.2](reference/05-settings-and-observation.md)를 따른다.
 실행 범위는 [구현 범위](IMPLEMENTATION.md), [추적성](TRACEABILITY.md)을 참조한다.
@@ -573,7 +575,7 @@ MCU에서는 지원한 제약만 제한된 비교·카운터·상태 기계·허
 명시적인 센서 그래프 노드로 생성된다.
 
 ```text
-sensor moisture: Percent {
+input moisture: Percent {
   sample = 1s;
   valid = 0% .. 100%;
   filter = median(5);
@@ -641,7 +643,7 @@ NotReady부터 다시 준비하는 것이다. 오래된 정상값을 바로 복�
 control MoistureDemand {
   input start, stop: Bool;
 
-  sensor moisture: Percent {
+  input moisture: Percent {
     sample = 1s;
     valid = 0% .. 100%;
     filter = median(5);

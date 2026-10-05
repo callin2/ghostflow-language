@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -19,6 +20,14 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const nativePath = path.join(root, 'target/release/examples/run' + (process.platform === 'win32' ? '.exe' : ''));
 const wasmPath = path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm');
 const encoder = new TextEncoder();
+test('package fixture migration preserves the independently pinned pre-input source revision', () => {
+  const bytes = fs.readFileSync(path.join(root, 'tests/fixtures/history/package-before-input-531.json'));
+  assert.equal(createHash('sha256').update(bytes).digest('hex'), 'c55172cf43cc258a0a4b6441b9ad780f9adc6cd04d12f67e88c6feeeabe42d2b');
+  const snapshot = JSON.parse(bytes);
+  assert.equal(snapshot.revision, '76501ff238694fe0e2979bc4f5b05366fc739426');
+  assert.equal(snapshot.sources.length, 3);
+  for (const source of snapshot.sources) assert.equal(createHash('sha256').update(source.text).digest('hex'), source.sha256);
+});
 const identity = Object.freeze({
   compilerRevision: 'c0bef0e',
   runtimeSemantics: 'GhostFlow/runtime-semantics-v1',
@@ -26,8 +35,8 @@ const identity = Object.freeze({
   requiredCapabilities: [
     { kind: 'actuator', name: 'pump', type: 'bool' },
     { kind: 'actuator', name: 'valve', type: 'bool' },
-    { kind: 'input', name: 'start', type: 'bool' },
-    { kind: 'input', name: 'stop', type: 'bool' },
+    { kind: 'sensor', name: 'start', type: 'bool' },
+    { kind: 'sensor', name: 'stop', type: 'bool' },
   ],
   bindingRevision: 'virtual-two-output-v1',
 });
@@ -159,7 +168,7 @@ control IntentPackage {
   input request: Bool;
   // ghostflow:link id=GF-INT-PUMP-001 relation=implements
   output pump: Bool;
-  pump <- request;
+  pump <- request |> recover(false);
 }
 \`\`\`
 `;
@@ -201,7 +210,7 @@ test('GF-TEST-portable-package-derivations: signed records cannot lose origins o
 });
 
 test('GF-TEST-portable-package-constraint-proof: checked eliminated origins survive signing and re-signed tampering fails', async () => {
-  const source = '```ghost\ncontrol ProofPackage { input start, stop: Bool; output pump, valve: Bool; pump <- start; valve <- stop; require pump => valve; require pump => valve; }\n```';
+  const source = '```ghost\ncontrol ProofPackage { input start, stop: Bool; output pump, valve: Bool; pump <- start |> recover(false); valve <- stop |> recover(false); require pump => valve; require pump => valve; }\n```';
   const compilation = await compileSource(source, { filename: 'proof-package.ghost.md' });
   const current = await currentKeyPromise;
   const packageValue = await buildPortablePackage(compilation, identity, buildOptions([{ keyId: current.keyId, privateKey: current.privateKey }]));
@@ -372,7 +381,7 @@ test('GF-TEST-portable-package-loader-context: target verifier cannot mutate sig
 });
 
 test('GF-TEST-portable-package-manifest-capabilities: input and required sensor omissions fail closed', async () => {
-  const source = `# Required moisture sensor\n\n\`\`\`ghost\ncontrol SensorPump {\n  input enabled: Bool;\n  sensor moisture: Percent;\n  output pump: Bool;\n  let dry = case moisture { ok(value) => value < 30%; fault(_) => false; };\n  pump <- enabled && dry;\n}\n\`\`\`\n`;
+  const source = `# Required moisture sensor\n\n\`\`\`ghost\ncontrol SensorPump {\n  input enabled: Bool;\n  input moisture: Percent;\n  output pump: Bool;\n  let dry = case moisture { ok(value) => value < 30%; fault(_) => false; };\n  pump <- (enabled |> recover(false)) && dry;\n}\n\`\`\`\n`;
   const compilation = await compileSource(source, { filename: 'sensor-pump.ghost.md' });
   const current = await currentKeyPromise;
   const incompleteIdentity = {
@@ -411,7 +420,10 @@ test('GF-TEST-portable-package-hosts: one verified package feeds byte-identical 
     const modulePath = path.join(temporary, 'program.gfb');
     const inputPath = path.join(temporary, 'inputs.csv');
     fs.writeFileSync(modulePath, bytes);
-    fs.writeFileSync(inputPath, 'start,stop\ntrue,false\n');
+    const sensors = compilation.manifest.sensors;
+    const headers = sensors.flatMap(sensor => [sensor.valueInput, sensor.okInput, sensor.faultInput]);
+    const values = sensors.flatMap(sensor => [sensor.name === 'start' ? 'true' : 'false', 'true', '0']);
+    fs.writeFileSync(inputPath, headers.join(',') + '\n' + values.join(',') + '\n');
     const output = execFileSync(nativePath, [modulePath, inputPath, '--outcomes'], { encoding: 'utf8' }).trim();
     const outcome = JSON.parse(output);
     assert.equal(outcome.status, 'OK');
@@ -441,16 +453,16 @@ test('GF-TEST-portable-package-profiles: signed packages preserve profiles 1, 2 
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-package-profiles-'));
   t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
   for (const [version, type, expression] of [[1, 'Number', 'value'], [2, 'Int', 'value'], [3, 'Int', 'if guard then value else 0']]) {
-    const compilation = await compileSource(`# Profile ${version}\n\n\`\`\`ghost\ncontrol Profile${version} { input guard: Bool; input value: ${type}; output result: ${type}; result <- ${expression}; }\n\`\`\`\n`, { filename: `profile-${version}.ghost.md` });
-    const capabilities = [{ kind: 'input', name: 'guard', type: 'bool' },
-      { kind: 'input', name: 'value', type: type.toLowerCase() }, { kind: 'actuator', name: 'result', type: type.toLowerCase() }];
+    const compilation = await compileSource(`# Codec profile ${version}: authored healthy constants, no acquisition ports\n\n\`\`\`ghost\ncontrol Profile${version} { let guard = true; let value = ${type === 'Number' ? '7.0' : '7'}; output result: ${type}; result <- ${expression}; }\n\`\`\`\n`, { filename: `codec-profile-${version}-input-v1.ghost.md` });
+    const capabilities = [{ kind: 'actuator', name: 'result', type: type.toLowerCase() }];
     const packageValue = await buildPortablePackage(compilation, { ...identity, requiredCapabilities: capabilities },
       buildOptions([{ keyId: current.keyId, privateKey: current.privateKey }]));
     assert.equal(packageValue.payload.bytecode.version, String(version));
     const options = { ...verifierOptions(current), availableCapabilities: capabilities,
       supportedManifestFormats: [compilation.manifest.format], verifyBytecode: async bytes => {
         const modulePath = path.join(temporary, 'profile.gfb'), inputPath = path.join(temporary, 'profile.csv');
-        fs.writeFileSync(modulePath, bytes); fs.writeFileSync(inputPath, 'guard,value\ntrue,7\n');
+        // Empty diagnostic cells omit inputs; this codec fixture has no acquisition ports.
+        fs.writeFileSync(modulePath, bytes); fs.writeFileSync(inputPath, 'unused,alsoUnused\n,\n');
         const native = JSON.parse(execFileSync(nativePath, [modulePath, inputPath, '--outcomes'], { encoding: 'utf8' }).trim());
         assert.equal(native.trace.safe.result, 7);
         const runtime = await GhostFlowRuntime.instantiate(fs.readFileSync(wasmPath));
@@ -471,10 +483,10 @@ test('GF-TEST-portable-package-profiles: signed packages preserve profiles 1, 2 
 
 test('GF-TEST-portable-package-quantities: signed quantity ports map to number and preserve canonical units', async () => {
   const current = await currentKeyPromise;
-  const compilation = await compileSource(`# Quantity package\n\n\`\`\`ghost\ncontrol QuantityPackage { input target: Temperature; output echoed: Temperature; echoed <- target; }\n\`\`\`\n`, { filename: 'quantity-package.ghost.md' });
+  const compilation = await compileSource(`# Quantity package\n\n\`\`\`ghost\ncontrol QuantityPackage { input target: Temperature; output echoed: Temperature; echoed <- target |> recover(0K); }\n\`\`\`\n`, { filename: 'quantity-package.ghost.md' });
   const capabilities = [
     { kind: 'actuator', name: 'echoed', type: 'number' },
-    { kind: 'input', name: 'target', type: 'number' },
+    { kind: 'sensor', name: 'target', type: 'number' },
   ];
   const packageValue = await buildPortablePackage(
     compilation,
@@ -487,13 +499,13 @@ test('GF-TEST-portable-package-quantities: signed quantity ports map to number a
     verifyBytecode: () => true,
   };
   const verified = await verifyPortablePackage(packageValue, options);
-  assert.equal(verified.manifest.inputs[0].canonicalUnit, 'K');
+  assert.equal(verified.manifest.sensors[0].canonicalUnit, 'K');
   assert.equal(verified.manifest.outputs[0].canonicalUnit, 'K');
 
   for (const [label, mutate, code] of [
-    ['missing unit', manifest => { delete manifest.inputs[0].canonicalUnit; }, 'unknown-or-missing-field'],
-    ['wrong unit', manifest => { manifest.inputs[0].canonicalUnit = '°C'; }, 'manifest-mismatch'],
-    ['unit on nonquantity', manifest => { manifest.inputs[0] = { name: 'target', type: 'Number', canonicalUnit: 'K' }; }, 'unknown-or-missing-field'],
+    ['missing unit', manifest => { delete manifest.sensors[0].canonicalUnit; }, 'manifest-mismatch'],
+    ['wrong unit', manifest => { manifest.sensors[0].canonicalUnit = '°C'; }, 'manifest-mismatch'],
+    ['unit on nonquantity', manifest => { manifest.sensors[0].type = 'Number'; }, 'manifest-mismatch'],
   ]) {
     const candidate = clone(packageValue);
     const manifest = JSON.parse(Buffer.from(candidate.payload.manifest.contentBase64, 'base64').toString('utf8'));

@@ -3,6 +3,8 @@
 
 # GhostFlow common constraints and sensor signal contract
 
+The 2026-10-05 external-input revision uses `input` for quality-bearing declarations. Existing conditioning and explicit `Result` fault branches are unchanged; prior `sensor` excerpts remain under `tests/fixtures/history/issue531/`.
+
 2026-09-24 · Common design contract.
 Current syntax and semantics for operating settings follow [Reference §5.1–5.2](reference/05-settings-and-observation.md).
 See [implementation scope](IMPLEMENTATION.md) and [traceability](TRACEABILITY.md) for execution coverage.
@@ -580,7 +582,7 @@ For example, the following sketches syntax for a new sensor-processing declarati
 Internal state for each operation is generated as explicit sensor-graph nodes.
 
 ```text
-sensor moisture: Percent {
+input moisture: Percent {
   sample = 1s;
   valid = 0% .. 100%;
   filter = median(5);
@@ -637,7 +639,7 @@ No pressure/flow information is used.
 control MoistureDemand {
   input start, stop: Bool;
 
-  sensor moisture: Percent {
+  input moisture: Percent {
     sample = 1s;
     valid = 0% .. 100%;
     filter = median(5);

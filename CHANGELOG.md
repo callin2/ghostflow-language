@@ -21,6 +21,14 @@ conditioning rather than accepting a separately signed metadata substitution.
 Native package admission validates typed acquisition domains and generated sample
 identity independently; it does not recompile the canonical source.
 
+The At-only schedule profile also accepts these typed quality inputs. Its former
+sensor-category prohibition would otherwise reject the canonical replacement for
+an already supported external scheduling condition. Explicit `allow |> recover(false)`
+inhibits a missing condition; At clock/recovery rules, GFB14 and the context ABI
+remain unchanged. At contract, native/WASM parity and fault regressions cover this fix.
+Bool `valid` ranges now reject during compilation, matching host/native admission;
+previously boolean bounds could emit a manifest that no host could instantiate.
+
 ### 2026-10-03 — report retained observation event gaps ([#282](https://github.com/callin2/ghostflow-language/issues/282))
 
 Adds a source-bound reference Host journal that retains explicit events separately from completed snapshots. A consumer at sequence10 receives an explicit missed range11–13 if retention begins at14, with the original event14 and no snapshot-derived synthetic events. Complete publication validates atomically, rejected batches permit same-scan retry, and cursors bind exact source/Program/schema/run identity. REF-05-022 verifies actual native/framed-WASM traces, complete host delivery and fresh replay. This reference API does not change source syntax, Interaction snapshot v0, physical evidence or final execution-environment event transport.

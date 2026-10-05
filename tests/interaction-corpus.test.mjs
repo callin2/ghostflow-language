@@ -14,6 +14,33 @@ const read = relative => JSON.parse(fs.readFileSync(path.join(root, relative), '
 const corpus = read(corpusPath);
 const clone = value => structuredClone(value);
 
+test('interaction input revision preserves historic projections and every healthy replay stimulus', () => {
+  assert.equal(createHash('sha256').update(fs.readFileSync(path.join(root, 'tests/fixtures/history/issue531/interaction-corpus.pre-input.json'))).digest('hex'),
+    'ab73bca1caf2d8489e7764199a09cf8ccf786881ae45874e0f36e2cc4018260b');
+  const history = read('tests/fixtures/history/issue531/interaction-corpus.pre-input.json');
+  assert.equal(history.baseCommit, '76501ff238694fe0e2979bc4f5b05366fc739426');
+  const originalCorpus = JSON.parse(history.documents.find(entry => entry.path === corpusPath).text);
+  for (const entry of history.documents) {
+    assert.equal(sha256(entry.text), entry.sha256, entry.path);
+    if (/\.(schema|snapshot|scan-tape)\.json$/.test(entry.path)) {
+      assert.equal(sha256(fs.readFileSync(path.join(root, entry.path))), entry.sha256,
+        'historic projection and tape bytes remain independently pinned');
+    }
+  }
+  for (const fixture of corpus.cases) {
+    const original = originalCorpus.cases.find(entry => entry.caseId === fixture.caseId);
+    assert.notEqual(fixture.source.revisionId, original.source.revisionId);
+    assert.match(fixture.source.revisionId, /\.input531-v1$/);
+    assert.notEqual(fixture.source.sha256, original.source.sha256);
+    assert.deepEqual(read(fixture.tapePath).runs, read(original.tapePath).runs,
+      'new identity does not change retained healthy observations or scan/run order');
+    assert.deepEqual(read(fixture.tapePath).observationExpectations, read(original.tapePath).observationExpectations);
+    if (fixture.projections.snapshotPath) assert.deepEqual(
+      read(fixture.projections.snapshotPath).observations, read(original.projections.snapshotPath).observations,
+      'new projection identity preserves the historical healthy state/timer oracle');
+  }
+});
+
 function sha256(value) {
   return createHash('sha256').update(value).digest('hex');
 }
@@ -100,7 +127,8 @@ test('GF-TEST-interaction-corpus-watering: canonical source declares the exact e
     name: `${prefix}${index + 1}`,
     type: 'Bool',
   }));
-  assert.deepEqual(compiled.manifest.inputs, boolChannels('DI', 8));
+  assert.deepEqual(compiled.manifest.inputs, []);
+  assert.deepEqual(compiled.manifest.sensors.map(({ name, type }) => ({ name, type })), boolChannels('DI', 8));
   assert.deepEqual(compiled.manifest.outputs, boolChannels('RO', 8));
   assert.deepEqual(compiled.manifest.timers.map(({ name, state }) => ({ name, state })), [
     { name: 'age', state: 'watering' },

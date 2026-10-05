@@ -3,12 +3,15 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { compileSource } from '../tools/toolchain.mjs';
 import {
   CURRICULUM_REPLAY_IDS,
   prepareCurriculumReplays,
   readCurriculumReplayManifest,
   verifyCurriculumReplayWasm,
+  captureCurriculumReplayAcquisition,
 } from '../tools/curriculum-replay.mjs';
 import {
   derivePc01Projection,
@@ -19,6 +22,47 @@ import {
 
 const wasmPath = new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url);
 const wasmBytes = fs.readFileSync(wasmPath);
+
+test('recorded healthy Bool frames acquire quality samples without mutating history and expose the same native rails', async t => {
+  const artifact = await compileSource('# New explicit input fixture\n\n```ghost\ncontrol Observation { input request: Bool; signal latest = hold_last(request, for_at_most: 1s, quality: measured); output enabled: Bool; enabled <- latest |> recover(true); }\n```\n', { filename: 'fixture.ghost.md' });
+  const scenario = { id: 'EXPLICIT-FIXTURE', frames: [
+    { atMs: 0, inputs: { request: false } }, { atMs: 3000, inputs: { request: true } },
+    { atMs: 6000, inputs: { request: false } },
+  ] };
+  const retained = structuredClone(scenario);
+  const entry = { scenario, artifact, outputNames: ['enabled'], checkpoints: new Map([
+    [0, { requested: { enabled: false }, safe: { enabled: false } }],
+    [1, { requested: { enabled: true }, safe: { enabled: true } }],
+    [2, { requested: { enabled: false }, safe: { enabled: false } }],
+  ]) };
+  const result = await verifyCurriculumReplayWasm(wasmBytes, { prepared: { scenarios: [entry] } });
+  assert.equal(result.legacy.checkpoints, 3); assert.equal(result.framed.checkpoints, 3);
+  const accepted = await captureCurriculumReplayAcquisition(wasmBytes, entry);
+  assert.deepEqual(scenario, retained);
+  for (const [index, frame] of accepted.entries()) {
+    assert.equal(frame.inputs.__gf_sensor_ok_request, true);
+    assert.equal(frame.inputs.__gf_sensor_value_request, scenario.frames[index].inputs.request);
+    assert.equal(frame.inputs.__gf_sensor_fault_request, 0);
+    assert.equal(frame.inputs.__gf_sensor_sample_epoch_request, 1);
+    assert.equal(frame.inputs.__gf_sensor_sample_id_request, index + 1);
+    assert.equal(frame.inputs.__gf_sensor_sample_timestamp_request, scenario.frames[index].atMs);
+    assert.equal(frame.safe.enabled, scenario.frames[index].inputs.request);
+    assert.equal(Object.hasOwn(frame.inputs, 'request'), false);
+  }
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-curriculum-quality-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const modulePath = path.join(directory, 'fixture.gfb'), tapePath = path.join(directory, 'fixture.csv');
+  fs.writeFileSync(modulePath, artifact.bytes);
+  const names = Object.keys(accepted[0].inputs);
+  fs.writeFileSync(tapePath, `${names.join(',')}\n${accepted.map(frame => names.map(name => frame.inputs[name]).join(',')).join('\n')}\n`);
+  const runner = fileURLToPath(new URL('../target/release/examples/run', import.meta.url));
+  const native = execFileSync(runner, [modulePath, tapePath, '--outcomes'], { encoding: 'utf8' }).trim().split('\n').map(line => JSON.parse(line));
+  for (const [index, outcome] of native.entries()) {
+    assert.equal(outcome.status, 'OK');
+    assert.deepEqual(outcome.trace.requested, accepted[index].requested);
+    assert.deepEqual(outcome.trace.safe, accepted[index].safe);
+  }
+});
 
 test('PC-01 generated projection exactly follows the canonical book E01', () => {
   const document = fs.readFileSync(new URL(`../${PC01_DOCUMENT}`, import.meta.url), 'utf8');
