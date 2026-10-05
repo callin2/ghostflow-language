@@ -41,6 +41,8 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
+      - name: Check CI contracts before compiler lanes
+        run: node --test --test-reporter=tap tests/ci-verification-routing.test.mjs tests/verified-wasm-artifact.test.mjs
       - name: Classify exact changed paths
         id: route
         run: node tools/ci-verification-routing.mjs classify
