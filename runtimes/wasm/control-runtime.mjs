@@ -271,7 +271,6 @@ function validateContextManifest(input, bytecodeFormat) {
     throw new Error('At profile requires At-only execution');
   }
   if (manifest.signals.length) throw new Error('context signal mixing is not supported');
-  if (sensors.length && (!objectives.length || sensors.length !== 1)) throw new Error('context sensors require one PID objective');
   const timers = validateList(manifest.timers, 'manifest.timers', ['name','state','clockInput']);
   for (const item of timers) {
     name(item.name, 'timer.name'); name(item.state, `timer ${item.name}.state`);
@@ -404,14 +403,27 @@ function validateContextManifest(input, bytecodeFormat) {
   unique([...schedules,...naturals,...calendarConditions].map(item => item.site), 'context site');
   for (const sensor of sensors) {
     name(sensor.name, 'sensor.name');
-    if (sensor.type !== 'Temperature' || sensor.canonicalUnit !== 'K') throw new Error('context PID sensor must be canonical Temperature');
+    if (objectives.some(objective => objective.measure === sensor.name) && (sensor.type !== 'Temperature' || sensor.canonicalUnit !== 'K')) throw new Error('context PID sensor must be canonical Temperature');
+    type(sensor.type, `sensor ${sensor.name}.type`);
+    validateCanonicalUnit(sensor, `sensor ${sensor.name}`);
     for (const field of ['sampleMs','staleMs','recoverSamples','window']) if (sensor[field] !== null) safeInteger(sensor[field], `sensor ${sensor.name}.${field}`, 1);
+    if (sensor.recoverSamples !== null) safeInteger(sensor.recoverSamples, `sensor ${sensor.name}.recoverSamples`, 1, MAX_WINDOW);
     if (sensor.filter !== null) throw new Error('context PID sensor filtering is not supported');
+    if (sensor.window !== null || Object.hasOwn(sensor, 'alpha')) throw new Error('context sensor filter metadata requires a supported filter');
+    if (sensor.optional !== undefined && typeof sensor.optional !== 'boolean') throw new TypeError(`sensor ${sensor.name}.optional must be boolean`);
     optionalFinite(sensor.validMin, `sensor ${sensor.name}.validMin`);
     optionalFinite(sensor.validMax, `sensor ${sensor.name}.validMax`);
+    if (sensor.type === 'Bool' && (sensor.validMin !== null || sensor.validMax !== null)) throw new Error('context Bool sensor does not support numeric valid bounds');
+    if ((sensor.validMin === null) !== (sensor.validMax === null)) throw new Error('context sensor valid range requires both bounds');
+    for (const bound of ['validMin', 'validMax']) if (sensor[bound] !== null && sensor.type !== 'Bool') typedValue(sensor[bound], sensor.type, `sensor ${sensor.name}.${bound}`);
     if (sensor.validMin !== null && sensor.validMax !== null && sensor.validMin > sensor.validMax) throw new Error('context PID sensor range is inverted');
     for (const [role,prefix] of [['valueInput','sensor_value'],['okInput','sensor_ok'],['faultInput','sensor_fault']])
       generated(sensor[role], `${RESERVED}${prefix}_${sensor.name}`, `sensor ${sensor.name}.${role}`);
+    const sampleFields = ['samplePresentInput', 'sampleEpochInput', 'sampleIdInput', 'sampleTimestampInput'];
+    const count = sampleFields.filter(field => sensor[field] !== undefined).length;
+    if (count !== 0 && count !== 4) throw new Error('context sensor sample identity inputs must be provided together');
+    for (const [field, role] of [['samplePresentInput', 'present'], ['sampleEpochInput', 'epoch'], ['sampleIdInput', 'id'], ['sampleTimestampInput', 'timestamp']])
+      if (count) generated(sensor[field], `${RESERVED}sensor_sample_${role}_${sensor.name}`, `sensor ${sensor.name}.${field}`);
   }
   if (objectives.length > 1) throw new Error('only one context PID objective is supported');
   for (const objective of objectives) {
@@ -419,7 +431,7 @@ function validateContextManifest(input, bytecodeFormat) {
     if (objective.binding !== 'native-temperature-percent-v1' || objective.executable !== false) throw new Error('unsupported context PID objective binding');
     const sensor = sensors.find(item => item.name === objective.measure);
     const target = configs.find(item => item.name === objective.target);
-    if (!sensor || !target || target.type !== 'Temperature' || target.canonicalUnit !== 'K') throw new Error('context PID measure/target binding mismatch');
+    if (!sensor || sensor.type !== 'Temperature' || sensor.canonicalUnit !== 'K' || !target || target.type !== 'Temperature' || target.canonicalUnit !== 'K') throw new Error('context PID measure/target binding mismatch');
     if (!['°C','K'].includes(target.displayUnit)) throw new Error('context PID target display unit is required');
     const binding = record(objective.bindings, `objective ${objective.name}.bindings`);
     keys(binding, ['output','measure','measureOk','target','targetOk','safeMax'], [], `objective ${objective.name}.bindings`);

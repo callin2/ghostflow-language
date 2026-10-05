@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { compileControl, typeCheckControl } from '../tools/control.mjs';
 import { compileSource } from './helpers/literate-compile.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
-import { pidSaturationSource, pidActivation, pidSaturationSteps, pidStages } from './helpers/pid-saturation-vectors.mjs';
+import { pidSaturationSource, pidActivation, pidSaturationSteps, pidStages } from './helpers/pid-saturation-input-vectors.mjs';
 const wasm = fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
 const objective = `control ObjectiveTest {
 input inside_temperature: Temperature;
@@ -118,6 +118,18 @@ test('REF-04-060 canonical native/WASM PID records distinct observation stages a
   const compiled = await compileSource(pidSaturationSource, { filename: 'reference-pid-saturation.ghost' });
   assert.equal(new DataView(compiled.bytes.buffer, compiled.bytes.byteOffset).getUint16(4, true), 11);
   const descriptor = compiled.manifest.objectives[0];
+  for (const [patch, message] of [
+    [{ validMin: 0.5, validMax: 10 }, /validMin must be a safe integer/],
+    [{ recoverSamples: 32 }, /recoverSamples/],
+    [{ window: 3 }, /filter metadata/],
+    [{ alpha: 0.5 }, /filter metadata/],
+    [{ optional: 'yes' }, /optional/],
+    [{ samplePresentInput: '__gf_sensor_sample_present_driver_revision' }, /provided together/],
+  ]) {
+    const manifest = structuredClone(compiled.manifest);
+    Object.assign(manifest.sensors.find(item => item.name === 'driver_revision'), patch);
+    await assert.rejects(() => ControlRuntime.instantiate(wasm, { ...compiled, manifest }, { context: pidActivation }), message);
+  }
   assert.equal(descriptor.binding, 'native-temperature-percent-v1');
   assert.equal(descriptor.controller.antiWindup, 'conditional_safe');
   const root = fileURLToPath(new URL('..', import.meta.url));
@@ -171,8 +183,10 @@ test('REF-04-060 canonical native/WASM PID records distinct observation stages a
   try {
     const step = pidSaturationSteps()[0];
     assert.throws(() => runtime.step({ ...step, inputs: { ...step.inputs, unknown_feedback: 17 } }), /unknown input/);
-    const { driver_applied, ...missing } = step.inputs;
-    assert.throws(() => runtime.step({ ...step, inputs: missing }), /missing.*driver_applied/);
+    const { driver_applied, ...missing } = step.samples;
+    const absent = runtime.step({ ...step, samples: missing });
+    assert.equal(absent.sensors.driver_applied.quality, 'NotReady');
+    assert.equal(absent.vm.requested['roof_vent.position'], 92, 'observation unavailability does not invent an actuator policy');
     assert.equal(runtime.step(step).vm.requested['roof_vent.position'], 92);
   } finally { runtime.dispose(); }
 });
