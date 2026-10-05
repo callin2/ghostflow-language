@@ -68,6 +68,59 @@ Outcome JSON contains only plain data. Methods after dispose throw; disposal is
 idempotent. Check required exports and fail clearly on an old WASM artifact.
 No change to ControlRuntime/frontend yet: D6 owns that integration and pins.
 
+## Restart lifecycle extension
+
+Lifecycle metadata identifies the exact reserved reason input, ordered enum
+members and event input; the loader validates them against the base module. The
+manifest mirrors these values for host binding checks. These runtime-owned ports
+read as scalar values, without external acquisition Result or optional/conditioning
+settings.
+
+The local integration candidate uses provisional GFB21 lifecycle framing:
+`GFB1`, `u16=21`, `u32 innerLength`, unchanged inner GFB bytes, then
+the reason input string, `u8=5`, five ordered reason strings and event input
+string. Strings use the normal GFB `u16` UTF-8 length. Nested resource/lifecycle
+wrappers, invalid names/types/members, truncation and trailing bytes reject.
+The manifest keeps the inner control profile and mirrors the descriptor.
+
+GFB19 remains the current live Range start codec; GFB20 remains TimeSlots Range.
+The separately published `ghostflow-runtime-99ca1a3` prerelease used the same
+number 19 for a lifecycle wrapper. This candidate does not sniff, translate or
+admit that historical wrapper as a Range or lifecycle module. Preserve its
+release bytes and pins; migration requires recompiling reviewed source into
+distinct framing and coordinating a new owner candidate. Number 21 is provisional
+until owner allocation is agreed. Older runtimes reject it; these local changes
+do not modify a published ABI, release or consumer pin. Portable packages retain
+their existing narrow base-profile policy; wrapping a Range does not broaden it.
+
+The numeric GFB format is separate from the release/build identity convention in
+[System #199](https://github.com/callin2/farm_studio_system/issues/199) and
+[language PR533](https://github.com/callin2/ghostflow-language/pull/533):
+`<release-version>-build.<number>`. Allocation remains owned by that workflow.
+Local development tests do not mint an official build ID.
+
+A validation-only host may call `gf_frame_validate(handle)` or
+`FramedGhostFlowRuntime.validate()` after loading the module and registering its
+capabilities. This checks capability compatibility and leaves the handle in its
+configuring state. It does not initialize lifecycle inputs or permit scans.
+
+Before activation, call
+`gf_frame_initialize_restart(handle, reason_ordinal:u8, event_pending:u8)` or
+`FramedGhostFlowRuntime.initializeRestart(reasonOrdinal, eventPending)`. The
+reason ordinal follows the declared member order. The caller supplies `Unknown`
+as ordinal 4 when it cannot confirm a cause. Initialization is required exactly
+once for lifecycle modules. The host must preserve its boot-pending bit across
+program replacement and pass false after a successful lifecycle event.
+Plain, temporal, schedule and context activation all transfer the same
+initialization into ScanDriver before permitting scans.
+
+Lifecycle inputs are omitted from the complete scan frame and rejected if a
+caller attempts to supply them. The runtime injects the fixed reason and event
+value. A successful scan clears pending; a rejected scan retains it. Native and
+WASM hosts can read `ScanDriver::restart_event_pending()` or the WASM
+`gf_frame_restart_event_pending` / JavaScript `restartEventPending` property to
+persist the resulting state. This extension does not restore VM or timer state.
+
 ## Acceptance
 
 Actual built WASM tests cover configure/activate, same-scan requested/safe,

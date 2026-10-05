@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+### 2026-10-05 — reserved lifecycle input integration ([#531](https://github.com/callin2/ghostflow-language/issues/531))
+
+The exact `restart_reason: RestartReason` and `restart_event: Bool` declarations
+remain runtime-owned scalar ports while ordinary external `input` uses typed
+Result acquisition (Reference 1/2/5). Optional markers and conditioning blocks
+are forbidden on these reserved ports. The reason remains fixed; the event clears
+only after a committed scan. No source syntax or automatic fault policy is added.
+Bug fix: the local candidate uses provisional GFB21 framing instead of interpreting
+every GFB19 as a lifecycle envelope. GFB19 live Range start and GFB20 TimeSlots
+Range bytes retain their meaning. The published lifecycle prerelease
+`ghostflow-runtime-99ca1a3` is preserved; its colliding GFB19 wrapper is rejected
+by this combined loader. Migration requires explicit source recompilation and
+owner allocation/consumer coordination before adoption. Package base admission
+stays narrow. Example: `restart_event` still directly reads Bool, while
+`input start: Bool;` requires `start |> recover(false)`. Regression coverage
+checks reserved declarations, native/WASM wrapper rejection and Range parity.
+All framed activation paths now transfer restart initialization into ScanDriver;
+context, schedule and temporal activation previously left it uninitialized.
+The combined lifecycle/live-Range regression checks event consumption after commit.
+
 ### 2026-10-05 — canonical quality input ([#531](https://github.com/callin2/ghostflow-language/issues/531))
 
 External `input` declarations now inherit the existing sensor Result, conditioning
@@ -264,6 +284,16 @@ WASM activation and snapshots, absolute rolling budgets, exact Int/Duration grid
 and bounded identity/history admission. GFB/WASM ABI is unchanged; regenerate old
 adaptation manifests because bounds are now required. This reference profile
 does not provide settings checkpoint recovery or API/Device integration.
+### 2026-10-02 — restart lifecycle inputs
+
+Controls can opt into the exact reserved `RestartReason` and `restart_event`
+inputs. The compiler records and validates their ordered enum metadata in an
+additive GFB19 envelope while preserving the base control profile. Framed native
+and WASM hosts must initialize the hardware-confirmed cause and boot-pending bit
+before activation. The core injects both values and rejects caller overrides.
+The event remains true across rejected scans and clears after the first
+successful commit. This supports event-driven recovery only; VM and timer state
+are not restored. Generic enum inputs and `on_restart` syntax remain unsupported.
 
 ### 2026-10-02 — Station atomic mode-entry binding bug fix ([#250](https://github.com/callin2/ghostflow-language/issues/250))
 

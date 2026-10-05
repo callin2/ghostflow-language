@@ -656,10 +656,10 @@ fn validate_gfb1(bytes: &[u8]) -> Result<u16> {
         return fail(ErrorCode::InvalidBytecodeFormat, "bytecode is not GFB1");
     }
     let version = u16::from_le_bytes([bytes[4], bytes[5]]);
-    if !matches!(version, 1..=4 | 10 | 11) {
+    if !matches!(version, 1..=4 | 10 | 11 | 21) {
         return fail(
             ErrorCode::UnsupportedBytecodeVersion,
-            "supported GFB format versions are 1, 2, 3, 4, 10 and 11",
+            "supported GFB format versions are 1, 2, 3, 4, 10, 11 and 21",
         );
     }
     ghostflow_core::Module::load(bytes).map_err(|error| PortablePackageError {
@@ -672,6 +672,7 @@ fn validate_gfb1(bytes: &[u8]) -> Result<u16> {
 fn manifest_capability_type(value: &str, label: &str) -> Result<&'static str> {
     match value {
         "Bool" => Ok("bool"),
+        "RestartReason" => Ok("number"),
         "Int" => Ok("int"),
         "Number" | "Percent" | "Duration" | "Date" | "TimeOfDay" | "DateTime" => Ok("number"),
         quantity if canonical_quantity_unit(quantity).is_some() => Ok("number"),
@@ -680,6 +681,39 @@ fn manifest_capability_type(value: &str, label: &str) -> Result<&'static str> {
             format!("{label} is unsupported"),
         ),
     }
+}
+
+fn verify_lifecycle_manifest(manifest: &Value, bytecode: &[u8]) -> Result<()> {
+    let module = ghostflow_core::Module::load(bytecode).map_err(|error| PortablePackageError {
+        code: ErrorCode::BytecodeRejected,
+        message: format!("native artifact validation failed: {error}"),
+    })?;
+    match module.lifecycle() {
+        Some(lifecycle) => {
+            let expected = serde_json::json!({
+                "format": "GhostFlow/lifecycle-v1",
+                "restartReasonInput": lifecycle.restart_reason_input,
+                "restartReasonMembers": lifecycle.restart_reason_members.iter().enumerate().map(|(value, name)| {
+                    serde_json::json!({ "name": name, "value": value })
+                }).collect::<Vec<_>>(),
+                "restartEventInput": lifecycle.restart_event_input,
+            });
+            if manifest.get("lifecycle") != Some(&expected) {
+                return fail(
+                    ErrorCode::ManifestMismatch,
+                    "manifest lifecycle metadata does not match GFB21",
+                );
+            }
+        }
+        None if manifest.get("lifecycle").is_some() => {
+            return fail(
+                ErrorCode::ManifestMismatch,
+                "manifest lifecycle metadata has no GFB lifecycle descriptor",
+            );
+        }
+        None => {}
+    }
+    Ok(())
 }
 
 fn canonical_quantity_unit(value: &str) -> Option<&'static str> {
@@ -2258,6 +2292,9 @@ fn verify_manifest(
     if object.contains_key("adaptPolicy") || object.contains_key("strategies") {
         keys.extend(["adaptPolicy", "strategies"]);
     }
+    if object.contains_key("lifecycle") {
+        keys.push("lifecycle");
+    }
     exact_keys(object, &keys, "manifest", ErrorCode::ManifestMismatch)?;
     let format = object["format"]
         .as_str()
@@ -2353,6 +2390,16 @@ fn verify_manifest(
     }
     verify_debounce_descriptors(object, &mut generated_names)?;
     let mut expected = BTreeSet::<Capability>::new();
+    let lifecycle_inputs: HashSet<&str> = object
+        .get("lifecycle")
+        .and_then(Value::as_object)
+        .into_iter()
+        .flat_map(|lifecycle| {
+            ["restartReasonInput", "restartEventInput"]
+                .into_iter()
+                .filter_map(|key| lifecycle.get(key).and_then(Value::as_str))
+        })
+        .collect();
     for (field, kind) in [("inputs", "input"), ("outputs", "actuator")] {
         let mut names = HashSet::new();
         let ports = object[field]
@@ -2397,6 +2444,9 @@ fn verify_manifest(
                 &format!("manifest.{field}[{index}].type"),
             )?;
             manifest_canonical_unit(port, &format!("manifest.{field}[{index}]"))?;
+            if field == "inputs" && lifecycle_inputs.contains(name) {
+                continue;
+            }
             expected.insert(Capability {
                 kind: kind.into(),
                 name: name.into(),
@@ -2844,11 +2894,11 @@ pub fn verify_portable_package_with_signature_policy(
     }
     if !matches!(
         payload.bytecode.version.as_str(),
-        "1" | "2" | "3" | "4" | "10" | "11"
+        "1" | "2" | "3" | "4" | "10" | "11" | "21"
     ) {
         return fail(
             ErrorCode::UnsupportedBytecodeVersion,
-            "payload bytecode version must be 1, 2, 3, 4, 10 or 11",
+            "payload bytecode version must be 1, 2, 3, 4, 10, 11 or 21",
         );
     }
     require_digest(&payload.bytecode.sha256, "payload.bytecode.sha256")?;
@@ -2930,6 +2980,7 @@ pub fn verify_portable_package_with_signature_policy(
     })?;
     let manifest = parse_embedded_canonical_json(&manifest_bytes, "manifest", profile.limits)?;
     let source_map = parse_embedded_canonical_json(&source_map_bytes, "sourceMap", profile.limits)?;
+    verify_lifecycle_manifest(&manifest, &bytecode)?;
     if bytecode_version == 10 && manifest["format"].as_str() != Some("GhostFlow/control-v9") {
         return fail(
             ErrorCode::ManifestMismatch,
@@ -3896,6 +3947,35 @@ mod tests {
                 .code,
             ErrorCode::UnsupportedBytecodeVersion
         );
+    }
+
+    #[test]
+    fn signed_gfb21_lifecycle_package_matches_core_descriptor_and_manifest() {
+        let loader = |_bytes: &[u8],
+                      _context: &TargetLoaderContext<'_>|
+         -> std::result::Result<bool, String> { Ok(true) };
+        let verified =
+            verify_portable_package(&fixture_for("restart-lifecycle-valid"), &profile(&loader))
+                .unwrap();
+        let bytecode = verified.bytecode_copy();
+        assert_eq!(&bytecode[4..6], &[21, 0]);
+        let module = ghostflow_core::Module::load(&bytecode).unwrap();
+        assert!(matches!(
+            module.bytecode_format_version(),
+            1..=4 | 10 | 11 | 18
+        ));
+        let lifecycle = module.lifecycle().unwrap();
+        assert_eq!(lifecycle.restart_reason_input, "restart_reason");
+        assert_eq!(lifecycle.restart_event_input, "restart_event");
+        assert_eq!(lifecycle.restart_reason_members[4], "Unknown");
+
+        let error = verify_portable_package(
+            &fixture_for("restart-lifecycle-manifest-tamper"),
+            &profile(&loader),
+        )
+        .unwrap_err();
+        assert_eq!(error.code, ErrorCode::ManifestMismatch);
+        assert!(error.message.contains("lifecycle metadata"));
     }
 
     #[test]

@@ -5,6 +5,25 @@
 
 ## 미출시
 
+### 2026-10-05 — reserved lifecycle input 통합 ([#531](https://github.com/callin2/ghostflow-language/issues/531))
+
+정확한 `restart_reason: RestartReason`과 `restart_event: Bool` 선언은 runtime 소유
+scalar port로 유지하고 일반 외부 `input`은 typed Result 취득을 사용한다
+(Reference 1/2/5). 이 reserved port에는 optional 표기와 conditioning block을
+허용하지 않는다. 원인은 고정되고 이벤트는 commit된 scan 뒤에만 지워진다.
+새 소스 문법이나 자동 fault 정책은 추가하지 않는다. 버그 수정: 로컬 후보는
+모든 GFB19를 lifecycle envelope로 해석하는 대신 임시 GFB21 framing을 사용한다.
+GFB19 live Range start와 GFB20 TimeSlots Range byte 의미는 유지한다.
+공개된 lifecycle prerelease `ghostflow-runtime-99ca1a3`는 보존하며, 충돌하는
+GFB19 wrapper는 이 통합 loader에서 거부한다. 채택 전에는 명시적인 source
+재컴파일, owner 번호 할당과 consumer 조정이 필요하다. Package base 허용 범위는
+좁게 유지한다. 예: `restart_event`는 Bool을 직접 읽고 `input start: Bool;`은
+`start |> recover(false)`가 필요하다. 회귀 검사는 reserved 선언,
+native/WASM wrapper 거부와 Range 동등성을 검증한다.
+모든 framed 활성화 경로는 이제 restart 초기화를 ScanDriver로 전달한다.
+이전 context, schedule, temporal 활성화는 초기화를 누락했다.
+lifecycle/live-Range 결합 회귀 검사는 commit 후 이벤트 소비를 확인한다.
+
 ### 2026-10-05 — 품질 기반 canonical input ([#531](https://github.com/callin2/ghostflow-language/issues/531))
 
 외부 `input` 선언은 기존 sensor의 Result, conditioning과 optional capability
@@ -248,6 +267,15 @@ REF-04-064가 실제 WASM 활성화와 snapshot, rolling 절대 변화량, 정�
 격자, 제한된 식별자·이력 검증을 확인한다. GFB/WASM ABI는 그대로지만 경계가 필수이므로
 기존 adaptation manifest를 다시 생성해야 한다. 이 reference profile은 설정
 checkpoint 복구나 API/Device 통합을 제공하지 않는다.
+### 2026-10-02 — 재시작 수명 주기 입력
+
+Control은 정확한 reserved `RestartReason`과 `restart_event` 입력을 선택할 수 있다.
+Compiler는 기본 control profile을 보존하면서 순서가 있는 enum metadata를 추가 GFB19
+envelope에 기록하고 검증한다. Framed native/WASM 호스트는 활성화 전에 하드웨어가
+확인한 원인과 부팅 pending bit를 초기화해야 한다. Core가 두 값을 주입하고 호출자의
+덮어쓰기를 거부한다. 이벤트는 거부된 scan 뒤에도 true를 유지하고 처음 성공적으로
+commit된 뒤 지운다. 이는 이벤트 기반 복구만 지원하며 VM과 timer 상태는 복원하지 않는다.
+일반 enum input과 `on_restart` 문법은 계속 지원하지 않는다.
 
 ### 2026-10-02 — Station 원자적 mode 진입 binding 버그 수정 ([#250](https://github.com/callin2/ghostflow-language/issues/250))
 

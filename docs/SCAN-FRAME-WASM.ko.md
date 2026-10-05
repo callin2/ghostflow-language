@@ -72,6 +72,55 @@ dispose는 여러 번 호출해도 안전하다. 필수 export를 확인하고 �
 명확한 오류와 함께 실패한다. ControlRuntime/프런트엔드는 아직 변경하지 않는다.
 D6가 해당 통합과 핀을 담당한다.
 
+## 재시작 수명 주기 확장
+
+Lifecycle metadata는 정확한 reserved 원인 input, 순서가 있는 enum 멤버와
+이벤트 input을 식별하며 loader는 이를 기본 module과 대조한다. Manifest도
+호스트 binding 검사에 사용할 같은 값을 담는다. 이 runtime 소유 port는 외부
+취득 Result나 optional/conditioning 설정 없이 scalar 값으로 읽는다.
+
+로컬 통합 후보는 임시 GFB21 lifecycle framing을 사용한다:
+`GFB1`, `u16=21`, `u32 innerLength`, 변경 없는 내부 GFB byte, 원인 input
+string, `u8=5`, 순서가 고정된 원인 string 다섯 개, event input string 순서다.
+String은 일반 GFB의 `u16` UTF-8 길이를 사용한다. 중첩 resource/lifecycle
+wrapper, 잘못된 이름/타입/멤버, 잘림과 후행 byte는 거부한다.
+Manifest는 내부 control profile을 유지하고 descriptor를 반영한다.
+
+GFB19는 현행 live Range start codec이며 GFB20은 TimeSlots Range다.
+별도로 공개된 `ghostflow-runtime-99ca1a3` prerelease는 같은 번호 19를
+lifecycle wrapper에 사용했다. 이 후보는 역사적 wrapper를 탐지하여 변환하거나
+Range/lifecycle module로 허용하지 않는다. 해당 release byte와 pin은 보존한다.
+이전에는 검토한 source를 별도 framing으로 재컴파일하고 새 owner 후보를
+조정해야 한다. 번호 21은 owner 할당 합의 전까지 임시다. 이전 runtime은 이를
+거부한다. 로컬 변경은 공개 ABI, release 또는 consumer pin을 변경하지 않는다.
+Portable package는 기존의 좁은 base-profile 정책을 유지한다.
+Range를 감싸더라도 package 허용 범위는 넓어지지 않는다.
+
+숫자 GFB format은 [System #199](https://github.com/callin2/farm_studio_system/issues/199)와
+[language PR533](https://github.com/callin2/ghostflow-language/pull/533)의 release/build
+identity 규칙 `<release-version>-build.<number>`와 별개다. 할당은 해당 workflow가
+소유한다. 로컬 개발 검사는 공식 build ID를 발급하지 않는다.
+
+검증 전용 호스트는 module을 불러오고 capability를 등록한 뒤
+`gf_frame_validate(handle)` 또는 `FramedGhostFlowRuntime.validate()`를 호출할 수 있다.
+이 호출은 capability 호환성을 검사하고 handle을 구성 상태에 둔다. Lifecycle input을
+초기화하지 않으며 scan도 허용하지 않는다.
+
+활성화 전에 `gf_frame_initialize_restart(handle, reason_ordinal:u8,
+event_pending:u8)` 또는 `FramedGhostFlowRuntime.initializeRestart(reasonOrdinal,
+eventPending)`를 호출한다. 원인 ordinal은 선언 순서를 따른다. 원인을 확인할 수 없으면
+호출자는 ordinal 4인 `Unknown`을 공급한다. lifecycle module은 정확히 한 번 초기화해야
+한다. 호스트는 프로그램 교체 사이에도 부팅 pending bit를 보존하고, 이벤트를 이미
+성공적으로 소비한 뒤에는 false를 전달한다.
+Plain, temporal, schedule, context 활성화는 모두 scan을 허용하기 전에
+같은 초기화를 ScanDriver로 전달한다.
+
+Lifecycle input은 완전한 scan frame에서 제외하며 호출자가 넣으면 거부한다. Runtime이
+고정 원인과 이벤트 값을 주입한다. 성공한 scan은 pending을 지우고 거부된 scan은 유지한다.
+Native와 WASM 호스트는 `ScanDriver::restart_event_pending()` 또는 WASM의
+`gf_frame_restart_event_pending` / JavaScript `restartEventPending`으로 결과를 읽어 저장할
+수 있다. 이 확장은 VM이나 timer 기억을 복원하지 않는다.
+
 ## 승인 기준
 
 실제 빌드된 WASM 테스트는 구성/활성화, 동일 스캔의 요청/안전 출력, 타이머 시간

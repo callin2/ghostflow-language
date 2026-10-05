@@ -166,14 +166,15 @@ Reject a new temporary request if trusted time is unavailable to determine `Unti
 
 A new run starts from declared state initial values and new timer baselines. Time spent powered off is not added to `elapsed`. Persistence of ordinary settings and state restoration are separate. When a host offers checkpoint restoration, it must verify Program, instance, state schema, and monotonic-time continuity and receive an explicit execution request specifying the checkpoint and restoration permission policy. Do not restore timer or filter memory whose continuity cannot be proven. Restoration failure is observable; do not initialize while reporting successful restoration.
 
-When a restart reason is required, supply it through an ordinary typed input contract such as the following. There is no dedicated `on_restart` statement.
+When a restart reason is required, use the exact reserved runtime-owned lifecycle input contract below. There is no dedicated `on_restart` statement. These ports read directly as scalar values, without `Result<T, SensorFault>` acquisition, and cannot have optional markers or conditioning settings. Other external inputs retain the canonical quality contract.
 
 ```ghost
 type RestartReason = PowerOn | Brownout | Watchdog | Software | Unknown;
 input restart_reason: RestartReason;
+input restart_event: Bool;
 ```
 
-This declaration is a control-body fragment. The producer supplies only hardware-confirmed causes; without evidence, supply `Unknown`. `PowerOn` alone does not establish recovery from a power outage. This input remains fixed for one run. The author defines automatic resumption, waiting, or cancellation followed by returning to the original position through state transitions. The Driver's installation contract owns physical outputs before the first decision.
+These exact reserved declarations are a control-body fragment. The host explicitly supplies the hardware-confirmed reason, or `Unknown` when evidence is unavailable, and whether the boot event remains pending. `PowerOn` alone does not establish recovery from a power outage. The reason is fixed for the run; the framed runtime owns and injects both values. Callers cannot supply them in scan frames or through ordinary input setters. When the event is pending, `restart_event` is true in the first successfully committed scan and false afterward. A rejected scan leaves it pending. The host sets it false when replacing a program after the boot event was already consumed. The author defines automatic resumption, waiting, or cancellation followed by returning to the original position through state transitions. This contract supplies an event and cause; it does not restore VM or timer memory. The Driver's installation contract owns physical outputs before the first decision.
 
 ## 5.3 Renderer-independent observation model
 
