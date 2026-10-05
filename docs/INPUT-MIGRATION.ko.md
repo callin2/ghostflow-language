@@ -4,7 +4,7 @@
 # 외부 입력의 canonical 선언과 명시적 revision migration
 
 pre-1.0 외부 선언은 `input name: T;`다. 읽으면 기존 sensor 품질 계약을
-계승하는 `Result<T, SensorFault>`다. 지원 payload는 Bool, Number, Percent와
+계승하는 `Result<T, SensorFault>`다. 지원 payload는 Bool, Int, Number, Percent, Duration, Date, TimeOfDay, DateTime와
 물리 quantity다. `let`은 계산 binding, `state`는 tick 사이 기억,
 `output`은 요청된 출력 의도 선언이다.
 
@@ -47,11 +47,14 @@ binding을 선택한다. 소스를 재작성하거나 canned 프로그램으로 
 않는다. source revision과 artifact identity를 함께 유지한다. 저장 revision과
 new-candidate 승인은 API의 책임이다.
 
-기존 plain Int, Duration, DateTime 입력 프로그램은 이전 sensor payload 계약
-밖에 있다. payload 지원 확장에는 명시적 타입, conditioning, adapter 검증
-규칙이 필요하다. Number로 몰래 변환하면 타입과 단위 의미가 달라진다.
-명시적으로 검토된 replacement 계약을 채택하기 전까지 원래 compiler/source
-pin을 보존한다.
+모든 지원 scalar payload는 타입이 지정된 quality sample을 사용한다.
+Int는 signed i32, Duration은 음수가 아닌 안전한 정수 밀리초이며,
+Date, TimeOfDay, DateTime은 기존 정수 범위를 유지한다. 소수나 범위 밖의
+숫자 관측값은 conditioning 전에 Invalid가 된다. 잘못된 host record 타입은
+계속 거부한다. Number 변환, 반올림이나 clock 신뢰를 추론하지 않는다.
+정확한 타입은 기존 기본 identity filter를 사용한다. 명시적 숫자 filter와
+hysteresis는 Number, Percent와 physical quantity에 한정한다.
+기존 plain scalar use site에는 여전히 명시적인 작성자 Result 정책이 필요하다.
 
 ## 취득과 wire 호환성
 

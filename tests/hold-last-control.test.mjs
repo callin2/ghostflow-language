@@ -6,7 +6,7 @@ const compile = code => compileSource(`# Hold last compiler\n\n\`\`\`ghost\n${co
 
 test('hold_last emits a bounded typed descriptor and exact private state contract', async () => {
   const artifact = await compile(`control HoldTemperature {
-    sensor temperature: Temperature;
+    input temperature: Temperature;
     signal usable = hold_last(temperature, for_at_most: 2min, quality: measured);
     output ready: Bool;
     ready <- true;
@@ -43,7 +43,7 @@ test('hold_last supports finite payloads and preserves physical lineage through 
   const artifact = await compile(`control HeldMode {
     type Mode = Off | On;
     fn mode(value: Bool) -> Mode { if value then On else Off }
-    sensor request: Bool;
+    input request: Bool;
     signal usable = hold_last(request |> map(mode), for_at_most: 1s, quality: measured);
     output on: Bool;
     on <- case usable { ok(value) => value == On; fault(_) => false; };

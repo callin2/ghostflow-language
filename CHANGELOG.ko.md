@@ -12,8 +12,9 @@
 `request |> recover(true)`처럼 명시적으로 처리한다. healthy false는 false다.
 기존 `sensor` 선언은 새 revision migration 진단으로 거부한다. 저장 소스/이력은
 보존하고 이전 plain input의 fault 정책을 검토한다. Bool/Number/quantity wire
-정보, GFB 형식과 WASM ABI는 그대로다. 기존 scalar Int/Duration/DateTime 입력은
-별도로 검토한 migration 계약이 필요하다. canonical input 회귀 검사는
+정보, GFB 형식과 WASM ABI는 그대로다. Int와 기존 Duration/Date/TimeOfDay/DateTime scalar 범위에도
+반올림 없이 같은 타입별 품질 계약을 적용한다. 잘못된 숫자 관측값은 Invalid가
+되고 정확한 payload는 identity filter를 유지한다. canonical input 회귀 검사는
 plain/framed WASM의 품질, conditioning과 bytecode 일치를 다룬다.
 
 ### 2026-10-03 — 보존 범위의 관찰 event gap 보고 ([#282](https://github.com/callin2/ghostflow-language/issues/282))

@@ -2221,7 +2221,7 @@ class Lowerer {
     (this.manifest.adaptSettings ??= []).push(this.adaptSettings.get(item.name));
   }
   addSensor(item) {
-    const type = this.resolveType(item.type); if (!['Bool', 'Number', 'Percent'].includes(type.kind) && !isQuantityType(type.kind)) error(item.type.loc, 'sensor type must be Bool, Number, Percent, or a physical quantity');
+    const type = this.resolveType(item.type); if (!SCALAR_TYPES.has(type.kind)) error(item.type.loc, 'input type must be a supported scalar payload');
     const valueInput = this.generatedName('sensor_value', item.name), okInput = this.generatedName('sensor_ok', item.name);
     const faultInput = this.generatedName('sensor_fault', item.name);
     this.addInput(valueInput, type, item.loc); this.addInput(okInput, BOOL, item.loc); this.addInput(faultInput, NUMBER, item.loc);

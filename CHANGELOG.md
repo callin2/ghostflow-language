@@ -10,8 +10,9 @@ explicit handling such as `request |> recover(true)`; healthy false is still
 false. The former `sensor` declaration is rejected with a new-revision migration
 diagnostic. Preserve saved source/history and review former plain input fault
 policies. Existing Bool/Number/quantity wire descriptors, GFB formats and WASM
-ABI remain unchanged. Previous scalar Int/Duration/DateTime input cases need a
-separately reviewed migration contract. Canonical input regressions cover
+ABI remain unchanged. Int and the existing Duration/Date/TimeOfDay/DateTime
+scalar domains now have the same typed quality contract without rounding; invalid
+numeric observations become Invalid and exact payloads retain the identity filter. Canonical input regressions cover
 plain/framed WASM, quality, conditioning and bytecode parity.
 
 ### 2026-10-03 — report retained observation event gaps ([#282](https://github.com/callin2/ghostflow-language/issues/282))

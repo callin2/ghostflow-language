@@ -18,6 +18,45 @@ const parity = `control InputParity {
   enabled <- request |> recover(true); value <- reading |> recover(42);
 }`;
 
+for (const [type, fallback, min, max] of [
+  ['Int', '-7', -2147483648, 2147483647],
+  ['Duration', '7ms', 0, Number.MAX_SAFE_INTEGER],
+  ['Date', 'date`2000-01-01`', 0, 2932896],
+  ['TimeOfDay', 'time`00:00:07`', 0, 86399999],
+  ['DateTime', 'datetime`2000-01-01T00:00:00Z`', 0, 253402300799999],
+]) {
+  for (const framed of [false, true]) test(`${type}: exact quality payloads (${framed ? 'framed' : 'plain'} WASM)`, async () => {
+    const artifact = compile(`control Exact { input reading: ${type}; output value: ${type}; value <- reading |> recover(${fallback}); }`);
+    const runtime = await (framed ? ControlRuntime.instantiateFramed : ControlRuntime.instantiate).call(ControlRuntime, wasm(), artifact);
+    try {
+      const unavailable = runtime.step({ nowMs: 0 });
+      assert.equal(unavailable.sensors.reading.quality, 'NotReady');
+      const recovered = unavailable.vm.safe.value;
+      let id = 0;
+      for (const value of [min, 0, max]) {
+        const result = runtime.step({ nowMs: ++id, samples: { reading: sample(id, id, 'Good', value) } });
+        assert.equal(result.sensors.reading.quality, 'Good');
+        assert.equal(result.vm.safe.value, value);
+      }
+      for (const value of [0.5, min - 1, max + 1, NaN, Infinity]) {
+        const result = runtime.step({ nowMs: ++id, samples: { reading: sample(id, id, 'Good', value) } });
+        assert.equal(result.sensors.reading.quality, 'Invalid');
+        assert.equal(result.vm.safe.value, recovered);
+      }
+      for (const quality of ['NotReady', 'Disconnected', 'Stale', 'Invalid']) {
+        const result = runtime.step({ nowMs: ++id, samples: { reading: sample(id, id, quality, 0) } });
+        assert.equal(result.sensors.reading.quality, quality);
+        assert.equal(result.vm.safe.value, recovered);
+      }
+      assert.throws(() => runtime.step({ nowMs: id + 1, samples: { reading: sample(id + 1, id + 1, 'Good', '0') } }), /must be numeric/);
+    } finally { runtime.dispose(); }
+    assert.throws(() => compile(`control Exact { input reading: ${type} { filter = median(3); } }`), /numeric filtering/);
+    const forged = structuredClone(artifact.manifest);
+    Object.assign(forged.sensors[0], { filter: 'moving_average', window: 3 });
+    await assert.rejects(() => ControlRuntime.instantiate(wasm(), { ...artifact, manifest: forged }), /filtering requires/);
+  });
+}
+
 test('canonical input retains existing sensor bytecode and wire descriptor compatibility', () => {
   const artifact = compile(parity);
   // Captured from the existing sensor lowering at unchanged repository
@@ -43,7 +82,7 @@ test('plain use sites and old sensor declaration require explicit migration', ()
   assert.throws(() => compile('control Old { sensor request: Bool; }'), /removed sensor declaration; use input/);
   assert.throws(() => compileControl('control Old { sensor request: Bool; }'), /removed sensor declaration/);
   assert.throws(() => compile('control BadInput { input request: Bool = false; }'), /host supplies typed quality samples/);
-  assert.throws(() => compile('control BadInput { input count: Int; }'), /sensor type must be/);
+  assert.throws(() => compile('control BadInput { input count: Result<Int, SensorFault>; }'), /input type must be/);
 });
 
 test('grouped inputs, let calculation, state memory and output roles remain distinct', () => {
@@ -222,13 +261,14 @@ test('canonical input composition routes one root observation to a pinned privat
 });
 
 test('signed portable package retains quality input capabilities, source and WASM admission', async () => {
-  const artifact = compile(parity);
+  const artifact = compile(parity.replace('input request: Bool;', 'input count: Int; output total: Int; total <- count |> recover(-7); input request: Bool;'));
   const keys = await crypto.subtle.generateKey('Ed25519', false, ['sign', 'verify']);
   const identity = {
     compilerRevision: 'issue531-candidate', runtimeSemantics: 'GhostFlow/runtime-semantics-v1',
     runtimeAbi: 'GhostFlow/framed-scan-abi-v1', bindingRevision: 'explicit-quality-input-v1',
     requiredCapabilities: [
       { kind: 'sensor', name: 'request', type: 'bool' }, { kind: 'sensor', name: 'reading', type: 'number' },
+      { kind: 'sensor', name: 'count', type: 'int' }, { kind: 'actuator', name: 'total', type: 'int' },
       { kind: 'actuator', name: 'enabled', type: 'bool' }, { kind: 'actuator', name: 'value', type: 'number' },
     ],
   };
@@ -240,11 +280,15 @@ test('signed portable package retains quality input capabilities, source and WAS
     trustedKeys: [{ keyId: 'ephemeral-test-key', publicKey: keys.publicKey }], revokedKeyIds: [],
     expectedCompilerRevision: identity.compilerRevision,
     supportedRuntimeSemantics: [identity.runtimeSemantics], supportedRuntimeAbis: [identity.runtimeAbi],
-    supportedManifestFormats: ['GhostFlow/control-v1'], expectedBindingRevision: identity.bindingRevision,
+    supportedManifestFormats: [artifact.manifest.format], expectedBindingRevision: identity.bindingRevision,
     availableCapabilities: identity.requiredCapabilities,
     verifyBytecode: async (bytes, context) => {
       const runtime = await ControlRuntime.instantiateFramed(wasm(), { bytes, manifest: context.manifest });
-      try { assert.equal(runtime.step({ nowMs: 0 }).vm.safe.enabled, true); return true; }
+      try {
+        assert.equal(runtime.step({ nowMs: 0 }).vm.safe.enabled, true);
+        assert.equal(runtime.step({ nowMs: 1, samples: { count: sample(1, 1, 'Good', 2147483647) } }).vm.safe.total, 2147483647);
+        return true;
+      }
       finally { runtime.dispose(); }
     },
   };
@@ -253,5 +297,8 @@ test('signed portable package retains quality input capabilities, source and WAS
   assert.deepEqual(verified.manifest.sensors, artifact.manifest.sensors);
   await assert.rejects(() => verifyPortablePackage(packageValue, { ...options,
     availableCapabilities: identity.requiredCapabilities.filter(x => x.name !== 'request'),
+  }), /capabilit/);
+  await assert.rejects(() => verifyPortablePackage(packageValue, { ...options,
+    availableCapabilities: identity.requiredCapabilities.map(x => x.name === 'count' ? { ...x, type: 'number' } : x),
   }), /capabilit/);
 });

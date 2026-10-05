@@ -2,7 +2,8 @@
 
 The pre-1.0 external declaration is `input name: T;`. Reading it yields
 `Result<T, SensorFault>`, preserving the former sensor quality contract. Supported
-payloads are Bool, Number, Percent and physical quantities. `let` computes a
+payloads are Bool, Int, Number, Percent, Duration, Date, TimeOfDay, DateTime
+and physical quantities. `let` computes a
 binding, `state` remembers between ticks, and `output` declares requested intent.
 
 ```ghost
@@ -44,11 +45,14 @@ bindings for the same approved document. It does not rewrite the source or
 substitute a canned program. Keep source revision and artifact identity together.
 The API owns persisted revisions and new-candidate approval.
 
-Existing plain Int, Duration and DateTime input programs are outside the former
-sensor payload contract. A supported payload extension requires explicit type,
-conditioning and adapter validation rules; converting them to Number silently
-would change type and unit semantics. Preserve their original compiler/source
-pins until an explicitly reviewed replacement contract is adopted.
+All supported scalar payloads use typed quality samples. Int remains signed i32;
+Duration remains a nonnegative safe integer in milliseconds; Date, TimeOfDay and
+DateTime retain their existing exact integer domains. Fractional or out-of-range
+numeric observations become Invalid before conditioning; malformed host record
+types still reject. No conversion to Number, rounding or clock trust is inferred.
+Exact types use the unchanged default identity filter. Explicit numeric filters
+and hysteresis remain limited to Number, Percent and physical quantities.
+Old plain scalar use sites still require an explicit authored Result policy.
 
 ## Acquisition and wire compatibility
 

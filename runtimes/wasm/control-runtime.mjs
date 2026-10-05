@@ -8,7 +8,7 @@ import { validateSolarDescriptor, validateClockPolicy, validateSolarFallback, va
 import { validateSolarActivation } from './solar-abi.mjs';
 import { encodeContextActivation, encodeContextFacts, validateContextSolarFacts } from './context-abi.mjs';
 import { QUANTITY_TYPES, canonicalUnitFor, isQuantityType } from '../../tools/quantities.mjs';
-import { TIME_TYPES, isTimeType, validateTimeValue } from '../../tools/time-literals.mjs';
+import { TIME_TYPES, TIME_BOUNDS, isTimeType, validateTimeValue } from '../../tools/time-literals.mjs';
 import { isInt32, intSettingsIssue } from '../../tools/int-settings.mjs';
 
 const FORMAT = 'GhostFlow/control-v1';
@@ -35,7 +35,7 @@ const contextManifest = manifest => manifest?.format === STREAM_CONTEXT_FORMAT
   || manifest?.format === AVAILABILITY_FORMAT && !manifest.schedules?.some(item => item.kind === 'solar');
 const RESERVED = '__gf_';
 const TYPES = new Set(['Bool', 'Int', 'Number', 'Percent', 'Duration', ...TIME_TYPES, ...QUANTITY_TYPES]);
-const SENSOR_TYPES = new Set(['Bool', 'Number', 'Percent', ...QUANTITY_TYPES]);
+const SENSOR_TYPES = TYPES;
 const MAX_WINDOW = 31;
 const MAX_SAFE = Number.MAX_SAFE_INTEGER;
 const MAX_LIST = 128;
@@ -603,6 +603,7 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
     if (item.staleMs !== null) safeInteger(item.staleMs, `sensor ${item.name}.staleMs`, 1);
     if (item.recoverSamples !== null) safeInteger(item.recoverSamples, `sensor ${item.name}.recoverSamples`, 1, MAX_WINDOW);
     if (item.filter !== null && !['median', 'moving_average', 'ema'].includes(item.filter)) throw new Error(`sensor ${item.name} uses unsupported filter ${String(item.filter)}`);
+    if (item.filter !== null && !['Number', 'Percent'].includes(item.type) && !isQuantityType(item.type)) throw new Error(`sensor ${item.name} filtering requires an approximate numeric payload`);
     const hasAlpha = Object.hasOwn(item, 'alpha');
     if (item.window !== null) {
       safeInteger(item.window, `sensor ${item.name}.window`, 1, MAX_WINDOW);
@@ -617,6 +618,9 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
       finite(item.alpha, `sensor ${item.name}.alpha`);
       if (!(item.alpha > 0 && item.alpha <= 1)) throw new RangeError(`sensor ${item.name}.alpha must be in (0, 1]`);
     } else if (hasAlpha) throw new Error(`sensor ${item.name} alpha is only valid for ema`);
+    if (item.type === 'Int' || item.type === 'Duration' || isTimeType(item.type)) {
+      for (const bound of ['validMin', 'validMax']) if (item[bound] !== null) typedValue(item[bound], item.type, `sensor ${item.name}.${bound}`);
+    }
     optionalFinite(item.validMin, `sensor ${item.name}.validMin`);
     optionalFinite(item.validMax, `sensor ${item.name}.validMax`);
     if ((item.validMin === null) !== (item.validMax === null)) throw new Error(`sensor ${item.name} valid range requires both bounds`);
@@ -881,7 +885,7 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
     }
     const sensor = sensorByName.get(item.sensor);
     if (!sensor) throw new Error(`signal ${item.name} references unknown sensor ${String(item.sensor)}`);
-    if (sensor.type === 'Bool') throw new Error(`signal ${item.name} requires a numeric sensor`);
+    if (!['Number', 'Percent'].includes(sensor.type) && !isQuantityType(sensor.type)) throw new Error(`signal ${item.name} requires an approximate numeric sensor`);
     finite(item.onBelow, `signal ${item.name}.onBelow`); finite(item.offAbove, `signal ${item.name}.offAbove`);
     if (item.onBelow >= item.offAbove) throw new Error(`signal ${item.name} hysteresis bounds are inverted`);
     if (sensor.type === 'Percent' && (item.onBelow < 0 || item.onBelow > 100 || item.offAbove < 0 || item.offAbove > 100)) throw new RangeError(`signal ${item.name} thresholds must be in [0, 100]`);
@@ -930,7 +934,10 @@ async function sha256(value) {
 
 function sensorConfig(item) {
   // sampleMs is descriptive cadence metadata only; step() never polls hardware.
-  const defaults = item.type === 'Bool' ? { min: 0, max: 1 } : item.type === 'Percent' ? { min: 0, max: 100 } : { min: -Number.MAX_VALUE, max: Number.MAX_VALUE };
+  const exactBounds = item.type === 'Int' ? { min: -2147483648, max: 2147483647 }
+    : item.type === 'Duration' ? { min: 0, max: Number.MAX_SAFE_INTEGER }
+    : isTimeType(item.type) ? TIME_BOUNDS[item.type] : null;
+  const defaults = exactBounds ?? (item.type === 'Bool' ? { min: 0, max: 1 } : item.type === 'Percent' ? { min: 0, max: 100 } : { min: -Number.MAX_VALUE, max: Number.MAX_VALUE });
   return {
     filter: item.filter ?? 'median', window: item.window ?? 1,
     ...(item.filter === 'ema' ? { alpha: item.alpha } : {}),
@@ -1162,6 +1169,7 @@ export class ControlRuntime {
       for (const [sensorName, entry] of this.sensors) {
         const reading = sensorReadings.get(sensorName);
         if (entry.item.type === 'Bool') this.runtime.setBool(entry.item.valueInput, reading.value);
+        else if (entry.item.type === 'Int') this.runtime.setInt(entry.item.valueInput, reading.value);
         else this.runtime.setNumber(entry.item.valueInput, reading.value);
         this.runtime.setBool(entry.item.okInput, reading.ok);
         this.runtime.setNumber(entry.item.faultInput, sensorFaultCode(reading));
@@ -1305,14 +1313,20 @@ export class ControlRuntime {
       if (!(typeof quality === 'number' ? Number.isInteger(quality) && quality >= 0 && quality <= 4 : ['NotReady', 'Good', 'Disconnected', 'Stale', 'Invalid'].includes(quality))) throw new TypeError(`samples.${sensorName}.quality is unsupported`);
       const rawValue = sample.value;
       let value;
+      let validPayload = true;
       if (item.type === 'Bool') {
         if (typeof rawValue !== 'boolean') throw new TypeError(`samples.${sensorName}.value must be boolean`);
         value = rawValue ? 1 : 0;
       } else {
         if (typeof rawValue !== 'number') throw new TypeError(`samples.${sensorName}.value must be numeric`);
-        value = Number.isFinite(rawValue) ? rawValue : 0;
+        try {
+          if (item.type === 'Int' || item.type === 'Duration' || isTimeType(item.type)) typedValue(rawValue, item.type, `samples.${sensorName}.value`);
+          else finite(rawValue, `samples.${sensorName}.value`);
+        }
+        catch { validPayload = false; }
+        value = validPayload ? rawValue : 0;
       }
-      normalizedSamples.set(sensorName, { epoch, id, timestampMs, value, quality: Number.isFinite(rawValue) || item.type === 'Bool' ? quality : 'Invalid' });
+      normalizedSamples.set(sensorName, { epoch, id, timestampMs, value, quality: validPayload ? quality : 'Invalid' });
     }
 
     const dueValues = new Map();

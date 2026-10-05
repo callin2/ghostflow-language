@@ -45,8 +45,8 @@ async function expectLocatedFailure(name, bad, good, message, inspectValid = () 
 
 await expectLocatedFailure(
   'Result debounce reports its unsupported numeric payload at the source expression',
-  'control ResultPayload { sensor level: Number; signal stable = debounce(§level, stable_for: 1s, initial: 0.0); }',
-  'control ResultPayload { sensor level: Bool; signal stable = debounce(level, stable_for: 1s, initial: false); }',
+  'control ResultPayload { input level: Number; signal stable = debounce(§level, stable_for: 1s, initial: 0.0); }',
+  'control ResultPayload { input level: Bool; signal stable = debounce(level, stable_for: 1s, initial: false); }',
   'debounce source must be Bool or a named finite enum',
 );
 
@@ -58,7 +58,7 @@ await expectLocatedFailure(
 );
 
 const physicalStateBudget = count => `control PhysicalStateBudget {
-  sensor request: Bool { stale_after = 10s; }
+  input request: Bool { stale_after = 10s; }
   ${Array.from({ length: count }, (_, index) => `signal stable_${index} = debounce(request, stable_for: 1s, initial: false);`).join('\n  ')}
   output stable: Bool;
   stable <- stable_0 |> recover(false);
@@ -81,7 +81,7 @@ await expectLocatedFailure(
 
 const sampleInputBudget = count => `control SampleInputBudget {
   input ${Array.from({ length: count }, (_, index) => `pad_${index}`).join(', ')}: Bool;
-  sensor request: Bool { stale_after = 10s; }
+  input request: Bool { stale_after = 10s; }
   signal stable_request = debounce(request, stable_for: 1s, initial: false);
   output stable: Bool;
   stable <- stable_request |> recover(false);
@@ -89,15 +89,14 @@ const sampleInputBudget = count => `control SampleInputBudget {
 
 await expectLocatedFailure(
   'allocated physical sample identity fields count toward the input budget',
-  `§${sampleInputBudget(121)}`,
-  sampleInputBudget(120),
+  `§${sampleInputBudget(41)}`,
+  sampleInputBudget(40),
   'input budget exceeded (128)',
   valid => {
-    const sensor = valid.manifest.sensors[0];
+    const sensor = valid.manifest.sensors.find(item => item.name === 'request');
     const signal = valid.manifest.signals[0];
     const names = [
-      ...valid.manifest.inputs.map(input => input.name),
-      sensor.valueInput, sensor.okInput, sensor.faultInput,
+      ...valid.manifest.sensors.flatMap(item => [item.valueInput, item.okInput, item.faultInput]),
       sensor.samplePresentInput, sensor.sampleEpochInput, sensor.sampleIdInput, sensor.sampleTimestampInput,
       signal.clockInput,
     ];

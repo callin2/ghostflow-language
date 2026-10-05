@@ -5,7 +5,7 @@ import { typeCheckControl } from '../tools/control.mjs';
 import { extractLiterate } from '../tools/literate.mjs';
 import { compile, parse, tokenize } from '../tools/gfb1.mjs';
 
-const filename = 'true-for-certified.ghost.md';
+const filename = 'true-for-certified.input-v1.ghost.md';
 const document = fs.readFileSync(new URL(`./fixtures/${filename}`, import.meta.url), 'utf8');
 const code = extractLiterate(document, { filename }).code;
 test('true_for type checking retains the certified Bool contract without claiming executable support', () => {
@@ -26,7 +26,7 @@ for (const [label, before, after, diagnostic] of [
   ['negative duration', '5min', '-1ms', /positive constant Duration/],
   ['wrong quality', 'quality: measured', 'quality: held', /quality must be measured/],
   ['duplicate duration', 'duration: 5min', 'duration: 5min, duration: 6min', /duplicate true_for argument duration/],
-  ['numeric source', 'sensor hot: Bool', 'sensor hot: Number', /declared Bool sensor/],
+  ['numeric source', 'input hot: Bool', 'input hot: Number', /declared Bool sensor/],
   ['derived source', 'true_for(hot,', 'true_for(hot |> recover(false),', /directly declared Bool sensor/],
 ]) test(`true_for rejects ${label} during type checking`, () => {
   assert.throws(() => typeCheckControl(code.replace(before, after), { filename }), diagnostic);
