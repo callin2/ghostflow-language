@@ -143,6 +143,10 @@ test('workflow always triggers, routes both lanes, and preserves full verificati
   const classifier = section('classify'), docs = section('docs'), verify = section('verify'), result = section('result');
   assert.match(classifier, /fetch-depth: 0/);
   assert.match(classifier, /mode: \$\{\{ steps.route.outputs.mode \}\}/);
+  const preflight = 'node --test --test-reporter=tap tests/ci-verification-routing.test.mjs tests/verified-wasm-artifact.test.mjs';
+  assert.ok(classifier.includes(preflight), 'cheap CI contracts must run before compiler lanes');
+  assert.ok(classifier.indexOf('actions/setup-node@') < classifier.indexOf(preflight));
+  assert.ok(classifier.indexOf(preflight) < classifier.indexOf('node tools/ci-verification-routing.mjs classify'));
   for (const [lane, mode] of [[docs, 'docs'], [verify, 'full']]) {
     assert.match(lane, /needs: classify/);
     const trustedBuild = mode === 'full' ? " && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)" : '';

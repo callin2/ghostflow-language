@@ -81,6 +81,12 @@ tests or gates to obtain a pass. Reuse previous evidence only when source,
 dependencies, toolchain, configuration and relevant environment inputs match.
 Report each command, exit status, useful counts and any remaining limit.
 
+CI runs `node --test --test-reporter=tap tests/ci-verification-routing.test.mjs tests/verified-wasm-artifact.test.mjs`
+in the classification job before compiler lanes. These local-file contracts need
+no dependency installation or compiler. Keep this early gate and the complete
+downstream verification gates. [Issue #534](https://github.com/callin2/ghostflow-language/issues/534)
+records the observed late workflow failure and the link to System #196.
+
 The verifier validates requirement-catalog excerpts before native compilation or
 replay. If source lines move, relocate the unchanged excerpt and retain its hash;
 never refresh a historical evidence hash to hide drift. Await successful static
