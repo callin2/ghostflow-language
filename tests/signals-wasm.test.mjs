@@ -236,7 +236,7 @@ test('real WASM sample identity preserves accepted, duplicate, and fault samples
 
 test('REF-01-077 hysteresis retains the original three-value trace across an in-memory WASM checkpoint and replay', async t => {
   const artifact = await compileSource(`control HysteresisCheckpoint {
-    sensor moisture: Percent { valid = 0% .. 100%; filter = median(1); stale_after = 3s; recover_after = 1 samples; }
+    input moisture: Percent { valid = 0% .. 100%; filter = median(1); stale_after = 3s; recover_after = 1 samples; }
     signal dry = hysteresis(moisture, on_below: 30%, off_above: 35%, initial: false);
     output pump: Bool;
     pump <- case dry { ok(value) => value; fault(_) => false; };
