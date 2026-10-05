@@ -7,8 +7,8 @@ import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 
 const wasm = fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
 const clone = value => structuredClone(value);
-const basicSource = '# Coverage defensive\n\n```ghost\ncontrol CoverageDefensive {\n  input enabled: Bool;\n  output active: Bool;\n  active <- enabled;\n}\n```\n';
-const sensorSource = '# Coverage sensor\n\n```ghost\ncontrol CoverageSensor {\n  sensor moisture?: Percent { sample = 1s; valid = 0% .. 100%; filter = median(5); stale_after = 3s; recover_after = 3 samples; }\n  signal dry = hysteresis(moisture, on_below: 30%, off_above: 35%, initial: false);\n  output active: Bool;\n  active <- case dry { ok(value) => value; fault(_) => false; };\n}\n```\n';
+const basicSource = '# Coverage defensive\n\n```ghost\ncontrol CoverageDefensive {\n  input enabled: Bool;\n  output active: Bool;\n  active <- case enabled { ok(value) => value; fault(_) => false; };\n}\n```\n';
+const sensorSource = '# Coverage sensor\n\n```ghost\ncontrol CoverageSensor {\n  input moisture?: Percent { sample = 1s; valid = 0% .. 100%; filter = median(5); stale_after = 3s; recover_after = 3 samples; }\n  signal dry = hysteresis(moisture, on_below: 30%, off_above: 35%, initial: false);\n  output active: Bool;\n  active <- case dry { ok(value) => value; fault(_) => false; };\n}\n```\n';
 
 async function rejectManifest(artifact, mutate, diagnostic) {
   const manifest = clone(artifact.manifest);
@@ -17,7 +17,7 @@ async function rejectManifest(artifact, mutate, diagnostic) {
 }
 
 test('runtime covers defensive schedule, timer, sensor, and hysteresis validation', async () => {
-  const basic = await compileSource(basicSource, { filename: 'coverage-defensive.ghost.md' });
+  const basic = await compileSource(basicSource, { filename: 'coverage-defensive.input-v1.ghost.md' });
   for (const [mutate, diagnostic] of [
     [m => { m.name = ''; }, /manifest.name/],
     [m => { m.name = '1bad'; }, /not an identifier/],
@@ -33,7 +33,7 @@ test('runtime covers defensive schedule, timer, sensor, and hysteresis validatio
     [m => { m.configs = [{ name: 'c', type: 'Bool', value: false, settings: {} }]; }, /unknown key|cannot contain/],
   ]) await rejectManifest(basic, mutate, diagnostic);
 
-  const sensor = await compileSource(sensorSource, { filename: 'coverage-sensor.ghost.md' });
+  const sensor = await compileSource(sensorSource, { filename: 'coverage-sensor.input-v1.ghost.md' });
   for (const [mutate, diagnostic] of [
     [m => { m.sensors[0].sampleMs = 0; }, /sampleMs/],
     [m => { m.sensors[0].staleMs = 0; }, /staleMs/],
@@ -59,7 +59,7 @@ test('runtime covers defensive schedule, timer, sensor, and hysteresis validatio
 });
 
 test('source-map validation covers malformed identity and byte inputs', async () => {
-  const artifact = await compileSource(basicSource, { filename: 'coverage-map.ghost.md' });
+  const artifact = await compileSource(basicSource, { filename: 'coverage-map.input-v1.ghost.md' });
   const base = { format: 'GhostFlow/source-map-v1', bytecodeSha256: artifact.manifest.bytecodeSha256, sourceDocument: artifact.sourceDocument, nodes: artifact.sourceMap, lines: artifact.extractionMap, traceMetadata: artifact.traceMetadata };
   for (const [mutate, diagnostic] of [
     [m => { m.sourceDocument.kind = 'raw'; }, /kind/],
@@ -79,7 +79,7 @@ test('source-map validation covers malformed identity and byte inputs', async ()
 });
 
 test('artifact writer persists the validated bytecode, manifest, and source map', async () => {
-  const artifact = await compileSource(basicSource, { filename: 'coverage-writer.ghost.md' });
+  const artifact = await compileSource(basicSource, { filename: 'coverage-writer.input-v1.ghost.md' });
   const directory = fs.mkdtempSync(path.join(process.cwd(), 'build', 'coverage-writer-'));
   const output = path.join(directory, 'program.gfb');
   try {
@@ -93,8 +93,8 @@ test('artifact writer persists the validated bytecode, manifest, and source map'
 });
 
 test('runtime covers true-for descriptor validation failures', async () => {
-  const text = fs.readFileSync(new URL('./fixtures/true-for-certified.ghost.md', import.meta.url), 'utf8');
-  const artifact = await compileSource(text, { filename: 'true-for-defensive.ghost.md' });
+  const text = fs.readFileSync(new URL('./fixtures/true-for-certified.input-v1.ghost.md', import.meta.url), 'utf8');
+  const artifact = await compileSource(text, { filename: 'true-for-defensive.input-v1.ghost.md' });
   for (const [mutate, diagnostic] of [
     [m => { m.signals[0].site = 0; }, /site/],
     [m => { m.signals[0].slot = 1; }, /slot/],

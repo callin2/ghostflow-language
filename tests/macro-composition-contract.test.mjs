@@ -13,7 +13,9 @@ control Latch {
   input start, stop: Bool;
   state running: Bool = false;
   output pump: Bool;
-  running' = @hold(start, stop, running);
+  let start_value = case start { ok(value) => value; fault(_) => false; };
+  let stop_value = case stop { ok(value) => value; fault(_) => true; };
+  running' = @hold(start_value, stop_value, running);
   pump <- running';
 }`);
   assert.ok(compiled.bytes.length > 0);

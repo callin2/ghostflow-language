@@ -87,8 +87,16 @@ verified through plain, framed and native execution. This avoids a second timer
 contract or ABI change while preserving timestamp, fault and reset semantics.
 A new acquisition duration annotation is not implemented or promised.
 
-Exact-head Linux CI results are reported in the draft PR and final handoff.
-Local Windows results do not establish full verification on their own.
+Linux CI at `439b75c7273562a790fd98859add083ff896a007` passes the full
+registered source verification: 3455 tests, 3416 passed, zero failed, 39 todo.
+Both document-index symlink fixtures pass unchanged. Its separate coverage lane
+exposed nine obsolete expectations in four coverage-only fixtures. Those fixtures
+now have explicit Result handling/current input revisions and an independently
+pinned pre-migration archive. Their focused suite passes 14 tests, including
+plain/framed execution and typed admission of the unchanged historical scalar
+GFB1 golden artifact. Exact-head coverage/package results after this correction
+are reported in the draft PR and final handoff. Local Windows results alone do
+not establish full verification.
 
 ## Consumer owner gates
 
