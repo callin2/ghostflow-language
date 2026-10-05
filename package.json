@@ -22,11 +22,12 @@
     "compile": "node tools/ghostc.mjs",
     "compile:example": "node tools/ghostc.mjs examples/scheduled-watering.ghost.md build/scheduled-watering.gfb",
     "constraints": "node tools/ghostrules.mjs",
-    "build:wasm": "cargo build --locked --offline -p ghostflow-wasm --target wasm32-unknown-unknown --release",
+    "build:wasm": "node scripts/build-language-with-identity.mjs --wasm",
     "docs:index": "node tools/check-doc-index-provenance.mjs && node tools/doc-index/docs-index.mjs --docs-dir docs && node tools/doc-index/docs-index.mjs --docs-dir .",
     "docs:index:check": "node tools/check-doc-index-provenance.mjs && node tools/doc-index/docs-index.mjs --check --docs-dir docs && node tools/doc-index/docs-index.mjs --check --docs-dir .",
     "docs:find": "node tools/check-doc-index-provenance.mjs && node tools/doc-index/docs-find.mjs",
-    "test:portable-package": "node --test tests/requirement-catalog.test.mjs && node --test tests/portable-package.test.mjs"
+    "test:portable-package": "node --test tests/requirement-catalog.test.mjs && node --test tests/portable-package.test.mjs",
+    "test:build-identity": "node --test tests/build-identity.test.mjs"
   },
   "dependencies": {
     "@toon-format/toon": "4.1.1",
