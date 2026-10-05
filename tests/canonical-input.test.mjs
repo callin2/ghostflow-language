@@ -6,6 +6,7 @@ import { compileSourceSync } from '../tools/compile-source.mjs';
 import { compileControl } from '../tools/control.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 import { buildPortablePackage, verifyPortablePackage } from '../tools/portable-package.mjs';
+import { canonicalJson } from '../tools/canonical-json.mjs';
 
 const document = code => `# Explicit input revision\n\n\`\`\`ghost\n${code}\n\`\`\`\n`;
 const compile = code => compileSourceSync(document(code), { filename: 'input.ghost.md' });
@@ -71,6 +72,86 @@ test('canonical input retains existing sensor bytecode and wire descriptor compa
     { name: 'request', type: 'Bool', valueInput: '__gf_sensor_value_request', okInput: '__gf_sensor_ok_request', faultInput: '__gf_sensor_fault_request' },
     { name: 'reading', type: 'Number', valueInput: '__gf_sensor_value_reading', okInput: '__gf_sensor_ok_reading', faultInput: '__gf_sensor_fault_reading' },
   ]);
+});
+
+for (const [type, lower, upper, fallback, absent] of [
+  ['Int', '0', '10', '-7', '-9'],
+  ['Duration', '0ms', '10ms', '7ms', '9ms'],
+]) for (const framed of [false, true]) test(`${type}: optional availability, typed range and sample recovery (${framed ? 'framed' : 'plain'})`, async () => {
+  const artifact = compile(`fn identity(value: ${type}) -> ${type} { value }
+    fn pass(value: ${type}) -> Result<${type}, SensorFault> { ok(value) }
+    control OptionalExact {
+      input reading?: ${type} { valid = ${lower} .. ${upper}; stale_after = 10ms; recover_after = 2 samples; }
+      output value: ${type};
+      adapt policy {
+        strategy Present priority 1 match (reading: sensor<${type}>) {
+          value <- reading |> map(identity) |> and_then(pass) |> recover(${fallback});
+        }
+        strategy Absent priority 0 match always { value <- ${absent}; }
+      }
+    }`);
+  const instantiate = framed ? ControlRuntime.instantiateFramed : ControlRuntime.instantiate;
+  for (const present of [false, true]) {
+    const runtime = await instantiate.call(ControlRuntime, wasm(), artifact, {
+      capabilities: present ? [{ kind: 'sensor', name: 'reading', type }] : [],
+    });
+    try {
+      assert.equal(runtime.step({ nowMs: 0 }).vm.safe.value, present ? Number(fallback.replace('ms', '')) : Number(absent.replace('ms', '')));
+      if (!present) continue;
+      assert.equal(runtime.step({ nowMs: 0, samples: { reading: sample(0, 0, 'NotReady', 0) } }).sensors.reading.quality, 'NotReady');
+      const observed = sample(1, 1, 'Good', 0);
+      assert.equal(runtime.step({ nowMs: 1, samples: { reading: observed } }).sensors.reading.quality, 'NotReady');
+      assert.equal(runtime.step({ nowMs: 2, samples: { reading: observed } }).sensors.reading.quality, 'NotReady', 'duplicate delivery does not satisfy recovery');
+      assert.equal(runtime.step({ nowMs: 3, samples: { reading: sample(2, 3, 'Good', 0) } }).vm.safe.value, 0);
+      assert.equal(runtime.step({ nowMs: 12 }).sensors.reading.quality, 'Good');
+      assert.equal(runtime.step({ nowMs: 13 }).sensors.reading.quality, 'Stale');
+      const invalid = runtime.step({ nowMs: 14, samples: { reading: sample(3, 14, 'Good', 11) } });
+      assert.equal(invalid.sensors.reading.quality, 'Invalid', 'typed valid range applies before recovery');
+      assert.equal(invalid.vm.safe.value, Number(fallback.replace('ms', '')));
+      assert.equal(runtime.step({ nowMs: 15, samples: { reading: sample(4, 15, 'Good', 10) } }).sensors.reading.quality, 'NotReady');
+      assert.equal(runtime.step({ nowMs: 16, samples: { reading: sample(5, 16, 'Good', 10) } }).vm.safe.value, 10);
+      assert.equal(runtime.step({ nowMs: 17, samples: { reading: sample(1, 17, 'Good', 0, 2) } }).vm.safe.value, 0, 'a new producer epoch resets the existing conditioner');
+      assert.deepEqual(runtime.sensors.get('reading').conditioner.sampleIdentity(), { epoch: 2, id: 1, timestampMs: 17 });
+    } finally { runtime.dispose(); }
+  }
+});
+
+test('migration without a source fault policy fails without rewriting the original', () => {
+  const original = document('control Follow { input switch_on: Bool; output lamp: Bool; lamp <- switch_on; }');
+  const before = hash(original);
+  assert.throws(() => compileSourceSync(original, { filename: 'unreviewed.ghost.md' }), /output lamp must be Bool/);
+  assert.equal(hash(original), before);
+  assert.throws(() => compile('control BadRange { input reading: Int { valid = 0.5 .. 10; } }'), /Int|constant/);
+  assert.throws(() => compile('control BadRange { input reading: Duration { valid = 0 .. 10; } }'), /Duration|constant/);
+});
+
+for (const framed of [false, true]) test(`Bool valid metadata rejects numeric interpolation (${framed ? 'framed' : 'plain'})`, async () => {
+  const artifact = compile(parity);
+  const manifest = structuredClone(artifact.manifest);
+  Object.assign(manifest.sensors[0], { validMin: 0.2, validMax: 0.8 });
+  const instantiate = framed ? ControlRuntime.instantiateFramed : ControlRuntime.instantiate;
+  await assert.rejects(() => instantiate.call(ControlRuntime, wasm(), { ...artifact, manifest }), /Bool sensor does not support numeric valid bounds/);
+});
+
+for (const framed of [false, true]) test(`malformed acquisition batches preserve accepted identity and permit corrected retry (${framed ? 'framed' : 'plain'})`, async () => {
+  const instantiate = framed ? ControlRuntime.instantiateFramed : ControlRuntime.instantiate;
+  const runtime = await instantiate.call(ControlRuntime, wasm(), compile(parity));
+  try {
+    runtime.step({ nowMs: 0, samples: { request: sample(1, 0, 'Good', false), reading: sample(1, 0, 'Good', 0) } });
+    for (const [patch, message] of [
+      [{ epoch: -1 }, /epoch/], [{ id: 1.5 }, /id/],
+      [{ timestampMs: 2 }, /future/], [{ quality: 5 }, /quality/],
+      [{ value: '1' }, /numeric/], [{ inventedProducer: 'board' }, /unknown|unexpected|unsupported/],
+    ]) {
+      assert.throws(() => runtime.step({ nowMs: 1, samples: {
+        request: sample(2, 1, 'Good', true), reading: { ...sample(2, 1, 'Good', 1), ...patch },
+      } }), message);
+      for (const name of ['request', 'reading']) assert.deepEqual(runtime.sensors.get(name).conditioner.sampleIdentity(), { epoch: 1, id: 1, timestampMs: 0 });
+    }
+    const corrected = runtime.step({ nowMs: 1, samples: { request: sample(2, 1, 'Good', true), reading: sample(2, 1, 'Good', 1) } });
+    assert.deepEqual(corrected.vm.safe, { enabled: true, value: 1 });
+    assert.deepEqual(runtime.sensors.get('reading').conditioner.sampleIdentity(), { epoch: 1, id: 2, timestampMs: 1 });
+  } finally { runtime.dispose(); }
 });
 
 test('plain use sites and old sensor declaration require explicit migration', () => {
@@ -260,7 +341,7 @@ test('canonical input composition routes one root observation to a pinned privat
   } finally { runtime.dispose(); }
 });
 
-test('signed portable package retains quality input capabilities, source and WASM admission', async () => {
+test('signed portable package retains quality input capabilities, source and WASM admission', async t => {
   const artifact = compile(parity.replace('input request: Bool;', 'input count: Int; output total: Int; total <- count |> recover(-7); input request: Bool;'));
   const keys = await crypto.subtle.generateKey('Ed25519', false, ['sign', 'verify']);
   const identity = {
@@ -276,6 +357,7 @@ test('signed portable package retains quality input capabilities, source and WAS
     signers: [{ keyId: 'ephemeral-test-key', privateKey: keys.privateKey }],
     verifyCompilation: (source, options) => compileSourceSync(source, options),
   });
+  let loaderCalls = 0;
   const options = {
     trustedKeys: [{ keyId: 'ephemeral-test-key', publicKey: keys.publicKey }], revokedKeyIds: [],
     expectedCompilerRevision: identity.compilerRevision,
@@ -283,6 +365,7 @@ test('signed portable package retains quality input capabilities, source and WAS
     supportedManifestFormats: [artifact.manifest.format], expectedBindingRevision: identity.bindingRevision,
     availableCapabilities: identity.requiredCapabilities,
     verifyBytecode: async (bytes, context) => {
+      loaderCalls++;
       const runtime = await ControlRuntime.instantiateFramed(wasm(), { bytes, manifest: context.manifest });
       try {
         assert.equal(runtime.step({ nowMs: 0 }).vm.safe.enabled, true);
@@ -301,4 +384,31 @@ test('signed portable package retains quality input capabilities, source and WAS
   await assert.rejects(() => verifyPortablePackage(packageValue, { ...options,
     availableCapabilities: identity.requiredCapabilities.map(x => x.name === 'count' ? { ...x, type: 'number' } : x),
   }), /capabilit/);
+  for (const [name, sensorName, patch] of [
+    ['fractional Int bound', 'count', { validMin: 0.5, validMax: 10 }],
+    ['filtered exact Int', 'count', { filter: 'median', window: 3 }],
+    ['changed recovery', 'count', { recoverSamples: 2 }],
+    ['changed cadence', 'count', { sampleMs: 100 }],
+    ['changed stale bound', 'reading', { staleMs: 100 }],
+    ['Bool numeric bounds', 'request', { validMin: 0.2, validMax: 0.8 }],
+    ['changed optional installation', 'request', { optional: true }],
+  ]) await t.test(name, async () => {
+    const changed = structuredClone(packageValue);
+    const manifest = JSON.parse(Buffer.from(changed.payload.manifest.contentBase64, 'base64').toString('utf8'));
+    Object.assign(manifest.sensors.find(item => item.name === sensorName), patch);
+    const manifestBytes = new TextEncoder().encode(canonicalJson(manifest));
+    changed.payload.manifest.contentBase64 = Buffer.from(manifestBytes).toString('base64');
+    changed.payload.manifest.sha256 = createHash('sha256').update(manifestBytes).digest('hex');
+    const payload = new TextEncoder().encode(canonicalJson(changed.payload));
+    changed.payloadSha256 = createHash('sha256').update(payload).digest('hex');
+    changed.signatures = [{ algorithm: 'Ed25519', keyId: 'ephemeral-test-key',
+      signatureBase64: Buffer.from(await crypto.subtle.sign('Ed25519', keys.privateKey, payload)).toString('base64') }];
+    const before = loaderCalls;
+    await assert.rejects(() => verifyPortablePackage(changed, options), error => {
+      assert.equal(error.code, 'source-map-mismatch');
+      assert.match(error.cause?.message, /sensors typed quality descriptors do not match canonical source lowering/);
+      return true;
+    });
+    assert.equal(loaderCalls, before, 'a valid signature cannot bypass the canonical acquisition contract');
+  });
 });

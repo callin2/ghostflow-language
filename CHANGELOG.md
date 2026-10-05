@@ -13,7 +13,13 @@ policies. Existing Bool/Number/quantity wire descriptors, GFB formats and WASM
 ABI remain unchanged. Int and the existing Duration/Date/TimeOfDay/DateTime
 scalar domains now have the same typed quality contract without rounding; invalid
 numeric observations become Invalid and exact payloads retain the identity filter. Canonical input regressions cover
-plain/framed WASM, quality, conditioning and bytecode parity.
+plain/framed WASM, quality, conditioning and bytecode parity. Optional Int
+capabilities retain the existing Int tag, so installed inputs select the present
+strategy independently of quality. Host admission rejects numeric Bool ranges;
+source replay binds complete signed quality descriptors to canonical input
+conditioning rather than accepting a separately signed metadata substitution.
+Native package admission validates typed acquisition domains and generated sample
+identity independently; it does not recompile the canonical source.
 
 ### 2026-10-03 — report retained observation event gaps ([#282](https://github.com/callin2/ghostflow-language/issues/282))
 

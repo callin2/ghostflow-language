@@ -73,7 +73,10 @@ epoch, observation sequence와 monotonic observation timestamp를 쓸 수 있다
 공급하며 clock-only scan마다 새 sequence 번호를 만들어내지 않는다.
 
 반복된 sample identity는 filter/recovery에 한 번만 기여한다. source epoch
-변경은 continuity를 끊고 NotReady부터 다시 준비한다. 새 sample이 없으면
+변경은 continuity를 끊고 conditioning 이력을 초기화한다. 새 producer는 기존
+startup 준비 규칙을 따른다. identity conditioning은 첫 Good sample을 받아들일
+수 있다. recovery count는 같은 producer epoch에서 관측된 fault 이후에 적용한다.
+이 취득 규칙이 제어의 재시작 정책을 선택하지는 않는다. 새 sample이 없으면
 실제 마지막 valid timestamp에서 freshness를 센다. 순수 표현식의
 `ok(false)`는 이러한 취득 증거를 만들지 않는다. Driver, USB와 software
 adapter는 session, binding, disconnect와 delivery 보장을 별도로 확립한다.

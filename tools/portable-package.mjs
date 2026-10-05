@@ -810,6 +810,11 @@ export async function verifyPortablePackage(packageValue, options = {}) {
     if (canonicalJson(sampleBindings(manifest.sensors)) !== canonicalJson(sampleBindings(replay.manifest.sensors))) {
       throw new Error('debounce sample bindings do not match canonical source lowering');
     }
+    for (const field of ['sensors', 'sensorInstances']) {
+      if (canonicalJson(manifest[field] ?? []) !== canonicalJson(replay.manifest[field] ?? [])) {
+        throw new Error(`${field} typed quality descriptors do not match canonical source lowering`);
+      }
+    }
     if (sourceMap.traceMetadata === null) {
       if (sourceMapRequiresTraceMetadata(replay.sourceMap) || replay.traceMetadata.resultSites.length) throw new Error('trace metadata is required for this source map');
     } else {

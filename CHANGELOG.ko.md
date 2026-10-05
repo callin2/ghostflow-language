@@ -15,7 +15,13 @@
 정보, GFB 형식과 WASM ABI는 그대로다. Int와 기존 Duration/Date/TimeOfDay/DateTime scalar 범위에도
 반올림 없이 같은 타입별 품질 계약을 적용한다. 잘못된 숫자 관측값은 Invalid가
 되고 정확한 payload는 identity filter를 유지한다. canonical input 회귀 검사는
-plain/framed WASM의 품질, conditioning과 bytecode 일치를 다룬다.
+plain/framed WASM의 품질, conditioning과 bytecode 일치를 다룬다. optional Int
+capability는 기존 Int tag를 유지해 설치된 입력이 품질과 무관하게 present
+전략을 선택한다. Host는 Bool의 숫자 범위를 거부하며 source replay는 서명된
+전체 quality descriptor가 canonical input conditioning과 일치하는지 검사한다.
+별도로 서명한 metadata 대체로 이 계약을 바꿀 수 없다. native package는
+취득 metadata의 타입별 범위와 생성된 sample identity를 별도로 검사한다.
+canonical source를 다시 컴파일하는 검사는 아니다.
 
 ### 2026-10-03 — 보존 범위의 관찰 event gap 보고 ([#282](https://github.com/callin2/ghostflow-language/issues/282))
 

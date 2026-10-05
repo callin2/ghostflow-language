@@ -635,6 +635,7 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
     }
     optionalFinite(item.validMin, `sensor ${item.name}.validMin`);
     optionalFinite(item.validMax, `sensor ${item.name}.validMax`);
+    if (item.type === 'Bool' && (item.validMin !== null || item.validMax !== null)) throw new Error('Bool sensor does not support numeric valid bounds');
     if ((item.validMin === null) !== (item.validMax === null)) throw new Error(`sensor ${item.name} valid range requires both bounds`);
     if (item.validMin !== null && item.validMin > item.validMax) throw new Error(`sensor ${item.name} valid range is inverted`);
     if (item.type === 'Percent') {
@@ -1066,7 +1067,7 @@ async function instantiateControlRuntime(wasmBytes, { bytes: bytecode, manifest 
     }
     for (const output of checkedManifest.manifest.outputs) runtime.addCapability('actuator', output.name, output.type === 'Bool' ? 'bool' : output.type === 'Int' ? 'int' : 'number');
     if (suppliedCapabilities !== undefined) for (const sensor of [...checkedManifest.manifest.sensors, ...(checkedManifest.manifest.sensorInstances ?? [])]) {
-      if (presentSensors.has(sensor.sourceSensor ?? sensor.name)) runtime.addCapability('sensor', sensor.name, sensor.type === 'Bool' ? 'bool' : 'number');
+      if (presentSensors.has(sensor.sourceSensor ?? sensor.name)) runtime.addCapability('sensor', sensor.name, sensor.type === 'Bool' ? 'bool' : sensor.type === 'Int' ? 'int' : 'number');
     }
     if (hasContext) runtime.activateContext(options.context);
     else if (hasSchedules) runtime.activateSchedules(options.schedule);

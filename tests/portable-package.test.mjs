@@ -522,7 +522,7 @@ test('GF-TEST-portable-package-browser: signed package verification does not req
 
 test('GF-TEST-portable-package-adapt: canonical Bool strategy package retains optional presence and rejects resigned descriptor changes',async()=>{
  const current=await currentKeyPromise;
- const source='# Explicit feedback\n```ghost\ncontrol Feedback { sensor door?: Bool; output pump: Bool; adapt policy { strategy WithDoor priority 100 match (door: sensor<Bool>) { pump <- case door { ok(value) => value; fault(_) => false; }; } strategy Baseline priority 0 match always { pump <- false; } } }\n```';
+ const source='# Explicit feedback\n```ghost\ncontrol Feedback { input door?: Bool; output pump: Bool; adapt policy { strategy WithDoor priority 100 match (door: sensor<Bool>) { pump <- case door { ok(value) => value; fault(_) => false; }; } strategy Baseline priority 0 match always { pump <- false; } } }\n```';
  await assert.rejects(compileSource(source.replace('strategy WithDoor','strategy control'),{filename:'feedback.ghost.md'}),/strategy name control is reserved/);
  const compilation=await compileSource(source,{filename:'feedback.ghost.md'});const required=[{kind:'actuator',name:'pump',type:'bool'}];
  const packaged=await buildPortablePackage(compilation,{...identity,requiredCapabilities:required},buildOptions([{keyId:current.keyId,privateKey:current.privateKey}]));

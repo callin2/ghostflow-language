@@ -5,8 +5,8 @@
       "source": "docs/INPUT-MIGRATION.md",
       "sourceLanguage": "en",
       "translation": "docs/INPUT-MIGRATION.ko.md",
-      "sourceSha256": "708ab7b86b524084b5ea5edb2c2524648ce9d03580be7ce4bd6d012b9ae16b6f",
-      "translationSha256": "28915eebe8dba06c5602ff073b8f9920d2b44c59021dc8cd365feedfb9be145f"
+      "sourceSha256": "0b8f16ea0424418da23712dc419f6e8135a10e73c39c08fb636af603cbc4839a",
+      "translationSha256": "b45a59a54238a6a84b9bc1b4f7e618fba10c418f29b33d31cc6ad904f31c7340"
     },
     {
       "source": "docs/INSTANCE-TRACE-PROJECTION.md",
@@ -628,8 +628,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "4d4ffa18c6b6a0b2bed7486676b95d6cf9a6e0921ace63820034f0b4e3c68163",
-      "translationSha256": "c80109442b84287bf5dd4f2752a9b22cf3ed075761437d3af52fa079a3ec580d"
+      "sourceSha256": "017ba023daab9bbdc5fabbf01c0d1e170592d03dad36822c2ae18356ee9923fb",
+      "translationSha256": "18ab154720a0f8ef20bd4f00d09f48491a5ac58be0a566b442a51c0dc402a085"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",
@@ -1316,6 +1316,10 @@
     {
       "path": "tests/fixtures/true-for-certified.input-v1.ghost.md",
       "reason": "Explicit canonical input revision of executable fixture; historical predecessor remains intact."
+    },
+    {
+      "path": "docs/reports/2026-10-05-input-531-consumer-gates.md",
+      "reason": "Execution evidence and owner adoption audit; reports may remain in one language."
     }
   ]
 }

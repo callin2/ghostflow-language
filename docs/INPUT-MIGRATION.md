@@ -71,8 +71,11 @@ This packet does not require a physical board ID. The producer supplies actual
 observations, not a fresh sequence number for every clock-only scan.
 
 Repeated sample identity contributes once to filters/recovery. A source epoch
-change breaks continuity; processing prepares again from NotReady. Without new
-samples, freshness is measured from the actual last valid timestamp. A literal
+change breaks continuity and resets conditioning history. The new producer uses
+the existing startup readiness rules; identity conditioning can accept its first
+Good sample. Recovery counts apply after an observed fault within that producer
+epoch. These acquisition rules do not select a control restart policy. Without
+new samples, freshness is measured from the actual last valid timestamp. A literal
 `ok(false)` in a pure expression creates none of this acquisition evidence.
 Driver, USB and software adapters must separately establish their session,
 binding, disconnect and delivery guarantees. A packet shape alone does not
