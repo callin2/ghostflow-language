@@ -155,7 +155,7 @@ test('REF-08-016 [host] 설치 binding과 Driver 배포 형식은 source grammar
   const source = `# Logical port\n\n\`\`\`ghost\ncontrol LogicalPump {
   input start: Bool;
   output pump: Bool;
-  pump <- start;
+  pump <- start |> recover(false);
 }\n\`\`\`\n`;
   const compiled = await compileSource(source, { filename: 'logical-pump.ghost.md' });
   const sourceIdentity = {

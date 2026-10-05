@@ -1,3 +1,4 @@
+import { softwareQualityObservations } from './helpers/software-quality-observations.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -16,12 +17,12 @@ const source='# REF-08-001 cancellation boundary\n\n```ghost\n'+`control Sequent
   input start, cancel, next_zone, home_confirmed: Bool;
   type Phase = Idle | ZoneOne | ZoneTwo | Returning;
   state phase: Phase = Idle;
-  phase' = case phase {
-    Idle => if cancel then Idle else if start then ZoneOne else Idle;
-    ZoneOne => if cancel then Returning else if next_zone then ZoneTwo else ZoneOne;
-    ZoneTwo => if cancel then Returning else ZoneTwo;
-    Returning => if home_confirmed then Idle else Returning;
-  };
+  phase' = case start { ok(observed_start) => case cancel { ok(observed_cancel) => case next_zone { ok(observed_next_zone) => case home_confirmed { ok(observed_home_confirmed) => case phase {
+    Idle => if observed_cancel then Idle else if observed_start then ZoneOne else Idle;
+    ZoneOne => if observed_cancel then Returning else if observed_next_zone then ZoneTwo else ZoneOne;
+    ZoneTwo => if observed_cancel then Returning else ZoneTwo;
+    Returning => if observed_home_confirmed then Idle else Returning;
+  }; fault(_) => phase; }; fault(_) => phase; }; fault(_) => phase; }; fault(_) => phase; };
   output valve_one, valve_two, request_home, idle: Bool;
   valve_one <- phase' == ZoneOne;
   valve_two <- phase' == ZoneTwo;
@@ -36,10 +37,11 @@ const Phase={Idle:0,ZoneOne:1,ZoneTwo:2,Returning:3};
 async function compile(){
  const original=JSON.parse(fs.readFileSync(root+'tests/reference/cases/03-settings-boundaries.json')).cases.find(c=>c.id==='REF-08-001');
  assert.equal(original.issue,'https://github.com/callin2/ghostflow-language/issues/318');assert.equal(original.status,'specified');
- const artifact=await compileSource(source,{filename:'ref-08-001-cancellation.ghost.md'});assert.equal(artifact.sourceDocument.text,source);assert.equal(artifact.sourceDocument.sha256,sha256Hex(source));return artifact;
+ const artifact=await compileSource(source,{filename:'ref-08-001-cancellation-input-v2.ghost.md'});assert.equal(artifact.sourceDocument.text,source);assert.equal(artifact.sourceDocument.sha256,sha256Hex(source));return artifact;
 }
 async function framesFor(artifact,rows){
  const runtime=await ControlRuntime.instantiateFramed(wasm,artifact),frames=[];
+ softwareQualityObservations(runtime);
  const dispatch=runtime.runtime.dispatch.bind(runtime.runtime);
  runtime.runtime.dispatch=frame=>{frames.push(structuredClone(frame));return dispatch(frame);};
  try{rows.forEach((values,i)=>runtime.step({nowMs:i,inputs:inputs(values)}));return frames;}finally{runtime.dispose();}
@@ -68,7 +70,7 @@ test('REF-08-001 existing enum state and case close sequential valve intents on 
   ...Array.from({length:3},()=>({valve_one:false,valve_two:false,request_home:true,idle:false})),
   {valve_one:false,valve_two:false,request_home:false,idle:true}]);
  for(const row of rows){assert.deepEqual(row.outcome.trace.requested,row.outcome.trace.safe);assert.equal('applied' in row.outcome.trace,false);assert.equal('confirmed' in row.outcome.trace,false);}
- assert.equal(rows[3].outcome.trace.inputs.home_confirmed,true,'already-high feedback cannot skip the authored Returning stage');
+ assert.equal(rows[3].outcome.trace.inputs[artifact.manifest.sensors.find(sensor=>sensor.name==='home_confirmed').valueInput],true,'already-high feedback cannot skip the authored Returning stage');
 });
 
 test('REF-08-001 cancellation priority applies independently in each watering stage without introducing a cancellation keyword or hidden Driver sequence', async t => {
@@ -84,8 +86,9 @@ test('REF-08-001 cancellation priority applies independently in each watering st
 
 test('REF-08-001 missing or mistyped home feedback and backward time reject atomically and valid retry matches clean native WASM replay', async t => {
  const artifact=await compile(),clean=await framesFor(artifact,[{}, {start:true}, {cancel:true}, {}, {home_confirmed:true}]);
- const missing=structuredClone(clean[3]);missing.inputs=missing.inputs.filter(i=>i.name!=='home_confirmed');
- const mistyped=structuredClone(clean[3]);Object.assign(mistyped.inputs.find(i=>i.name==='home_confirmed'),{type:'Number',value:1});
+ const homeInput=artifact.manifest.sensors.find(sensor=>sensor.name==='home_confirmed').valueInput;
+ const missing=structuredClone(clean[3]);missing.inputs=missing.inputs.filter(i=>i.name!==homeInput);
+ const mistyped=structuredClone(clean[3]);Object.assign(mistyped.inputs.find(i=>i.name===homeInput),{type:'Number',value:1});
  const backward={...structuredClone(clean[3]),logicalTimeMs:1};
  const rows=await compare(t,artifact,[...clean.slice(0,3),missing,mistyped,backward,...clean.slice(3)]);
  assert.deepEqual(rows.map(r=>r.accepted),[true,true,true,false,false,false,true,true]);

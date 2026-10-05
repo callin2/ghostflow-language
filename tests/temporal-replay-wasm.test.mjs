@@ -11,12 +11,15 @@ const source = `# Temporal replay
 \`\`\`ghost
 control TemporalReplay {
   input divisor: Number;
-  sensor probe: Number;
+  state retained_divisor: Number = 1.0;
+  let scalar_divisor = case divisor { ok(value) => value; fault(_) => retained_divisor; };
+  retained_divisor' = scalar_divisor;
+  input probe: Number;
   signal inner = window_average(probe, over: 2ms, quality: measured, max_age: 2ms);
   signal outer = window_average(inner, over: 10ms, quality: measured, max_age: 10ms);
   output outer_value, ratio: Number;
   outer_value <- outer |> recover(-1.0);
-  ratio <- 1.0 / divisor;
+  ratio <- 1.0 / scalar_divisor;
 }
 \`\`\`
 `;
@@ -25,9 +28,11 @@ const request = (profile, count, changes = {}) => ({
   count, profile, maxPeakTemporalBytes: 256 * 1024 * 1024, maxJsonBytes: 64 * 1024 * 1024, ...changes,
 });
 
-function generatedInputs(sensor, { divisor, nowMs, id, value, present }) {
+function generatedInputs(sensor, divisorSensor, { divisor, nowMs, id, value, present }) {
   return {
-    divisor,
+    [divisorSensor.valueInput]: divisor,
+    [divisorSensor.okInput]: true,
+    [divisorSensor.faultInput]: 0,
     [sensor.valueInput]: value,
     [sensor.okInput]: true,
     [sensor.faultInput]: 0,
@@ -50,6 +55,7 @@ async function harness(t, framed) {
   t.after(() => runtime.dispose());
   runtime.load(artifact.bytes);
   runtime.addCapability('sensor', 'probe', 'number');
+  runtime.addCapability('sensor', 'divisor', 'number');
   runtime.addCapability('actuator', 'outer_value', 'number');
   runtime.addCapability('actuator', 'ratio', 'number');
   const sourceTag = artifact.manifest.signals[0].sources[0].tag;
@@ -59,9 +65,10 @@ async function harness(t, framed) {
     budget: { maxRetainedSamples: 100, maxBytes: 64 * 1024 * 1024 },
   };
   runtime.activateTemporal(profile);
-  const sensor = artifact.manifest.sensors[0];
+  const sensor = artifact.manifest.sensors.find(item => item.name === 'probe');
+  const divisorSensor = artifact.manifest.sensors.find(item => item.name === 'divisor');
   const step = ({ scanId, nowMs, id, value, divisor = 1, present = true }) => {
-    const values = generatedInputs(sensor, { divisor, nowMs, id, value, present });
+    const values = generatedInputs(sensor, divisorSensor, { divisor, nowMs, id, value, present });
     if (framed) return runtime.scan({ scanId, logicalTimeMs: nowMs, inputs: frameInputs(values) });
     runtime.setNumber('__gf_now_ms', nowMs);
     for (const [name, input] of Object.entries(values)) {
@@ -71,11 +78,11 @@ async function harness(t, framed) {
     runtime.tick();
     return runtime.trace;
   };
-  return { artifact, runtime, profile, sensor, step };
+  return { artifact, runtime, profile, sensor, divisorSensor, step };
 }
 
 for (const framed of [false, true]) test(`${framed ? 'framed' : 'legacy'} temporal replay preserves nested evidence, rollback and retained-prefix identity`, async t => {
-  const { runtime, profile, sensor, step } = await harness(t, framed);
+  const { runtime, profile, sensor, divisorSensor, step } = await harness(t, framed);
   assert.equal(runtime.replay, null);
   const accepted = [
     clone(step({ scanId: 0, nowMs: 0, id: 1, value: 0 })),
@@ -93,7 +100,7 @@ for (const framed of [false, true]) test(`${framed ? 'framed' : 'legacy'} tempor
 
   if (!framed) {
     // Replay must not consume the already latched next-tick inputs.
-    const values = generatedInputs(sensor, { divisor: 2, nowMs: 3, id: 3, value: 20, present: false });
+    const values = generatedInputs(sensor, divisorSensor, { divisor: 2, nowMs: 3, id: 3, value: 20, present: false });
     runtime.setNumber('__gf_now_ms', 3);
     for (const [name, value] of Object.entries(values)) {
       if (typeof value === 'boolean') runtime.setBool(name, value); else runtime.setNumber(name, value);

@@ -28,8 +28,8 @@ test('GF-TEST-coverage-declarations: canonical type forms, explicit mutex and co
       config quotient: Number = 6 / 3;
       state mode: Mode = Off;
       state phase: Phase = Idle;
-      mode' = if enabled then On else Off;
-      phase' = if enabled then Running else Idle;
+      mode' = if (enabled |> recover(false)) then On else Off;
+      phase' = if (enabled |> recover(false)) then Running else Idle;
       output first, second: Bool;
       first <- mode' in {On};
       second <- phase' in {Running};
@@ -48,7 +48,7 @@ const invalidControls = [
   ['identifier required', 'control X { input 1: Bool; }', 'expected input name'],
   ['unsupported check', 'control X { check nope; }', 'unsupported construct check'],
   ['unexpected declaration', 'control X { nonsense; }', 'unexpected declaration nonsense'],
-  ['unknown sensor option', 'control X { sensor s: Number { nope = 1; } }', 'unsupported sensor option nope'],
+  ['unknown input option', 'control X { input s: Number { nope = 1; } }', 'unsupported input option nope'],
   ['unsupported schedule kind', 'control X { schedule s: Weekly<15min> { timezone = "UTC"; selected = []; } }', 'only At, Daily, DailySlots<15min>, Periodic, Cron, Solar and Tide schedules are supported'],
   ['schedule timezone type', 'control X { schedule s: DailySlots<15min> { timezone = 1; selected = []; } }', 'timezone must be a string'],
   ['schedule selected item', 'control X { schedule s: DailySlots<15min> { timezone = "UTC"; selected = [true]; } }', 'selected entries must be HH:MM'],
@@ -56,19 +56,19 @@ const invalidControls = [
   ['empty membership set', 'control X { output x: Bool; x <- true in {}; }', 'in set must not be empty'],
   ['unknown type', 'control X { state x: Missing = Value; }', 'unknown type Missing'],
   ['duplicate enum member', 'control X { type A = Same | Other; type B = Same | Last; }', 'duplicate enum member Same'],
-  ['enum input type', 'control X { type Mode = Off | On; input x: Mode; }', 'input must use a scalar type'],
+  ['enum input type', 'control X { type Mode = Off | On; input x: Mode; }', 'input type must be a supported scalar payload'],
   ['enum output type', 'control X { type Mode = Off | On; output x: Mode; x <- Off; }', 'output must use a scalar type'],
   ['nonconstant state', 'control X { input x: Bool; state held: Bool = x; }', 'state initial value must be a constant'],
-  ['duration sensor', 'control X { sensor s: Duration; }', 'sensor type must be Bool, Number, Percent, or a physical quantity'],
-  ['bool median', 'control X { sensor s: Bool { filter = median(3); } }', 'numeric filtering requires a numeric sensor'],
-  ['bad median call', 'control X { sensor s: Number { filter = median(3, 5); } }', 'filter must be median(N), moving_average(N), or ema(alpha: Number)'],
+  ['unsupported input payload', 'control X { input s: Result<Duration, SensorFault>; }', 'input type must be a supported scalar payload'],
+  ['bool median', 'control X { input s: Bool { filter = median(3); } }', 'numeric filtering requires a numeric sensor'],
+  ['bad median call', 'control X { input s: Number { filter = median(3, 5); } }', 'filter must be median(N), moving_average(N), or ema(alpha: Number)'],
   ['wrong schedule interval', 'control X { schedule s: DailySlots<5min> { timezone = "UTC"; selected = []; } }', 'only DailySlots<15min> is supported'],
   ['missing schedule timezone', 'control X { schedule s: DailySlots<15min> { selected = []; } }', 'schedule requires timezone'],
   ['missing schedule slots', 'control X { schedule s: DailySlots<15min> { timezone = "UTC"; } }', 'schedule requires selected slots'],
-  ['bad signal form', 'control X { sensor s: Number; signal d = median(3); }', 'signal requires hysteresis'],
-  ['bad signal sensor', 'control X { input x: Number; signal d = hysteresis(x, on_below: 1, off_above: 2, initial: false); }', 'hysteresis first argument must be a declared sensor'],
-  ['bool hysteresis', 'control X { sensor s: Bool; signal d = hysteresis(s, on_below: false, off_above: true, initial: false); }', 'hysteresis requires a numeric sensor'],
-  ['inverted hysteresis', 'control X { sensor s: Number; signal d = hysteresis(s, on_below: 2, off_above: 1, initial: false); }', 'on_below must be less than off_above'],
+  ['bad signal form', 'control X { input s: Number; signal d = median(3); }', 'signal requires hysteresis'],
+  ['bad signal sensor', 'control X { let x = 1.0; signal d = hysteresis(x, on_below: 1, off_above: 2, initial: false); }', 'hysteresis first argument must be a declared sensor'],
+  ['bool hysteresis', 'control X { input s: Bool; signal d = hysteresis(s, on_below: false, off_above: true, initial: false); }', 'hysteresis requires a numeric sensor'],
+  ['inverted hysteresis', 'control X { input s: Number; signal d = hysteresis(s, on_below: 2, off_above: 1, initial: false); }', 'on_below must be less than off_above'],
   ['bad timer call', 'control X { state s: Bool = false; timer t = median(3); }', 'timer requires elapsed(state)'],
   ['bad timer state', 'control X { input x: Bool; timer t = elapsed(x); }', 'elapsed argument must be a declared state'],
   ['duplicate function', 'control X { fn f() -> Bool { true } fn f() -> Bool { true } }', 'duplicate name f'],
@@ -193,7 +193,7 @@ test('GF-TEST-coverage-runtime-lifecycle: hot swap, rewind, typed getters and wr
 control Lifecycle {
     input enabled: Bool;
     state held: Bool = false;
-    held' = enabled;
+    held' = enabled |> recover(false);
     output result: Bool;
     result <- held';
   }
@@ -203,7 +203,7 @@ control Lifecycle {
 control Lifecycle {
     input enabled: Bool;
     state held: Bool = false;
-    held' = !enabled;
+    held' = !(enabled |> recover(false));
     output result: Bool;
     result <- held';
   }
@@ -213,18 +213,24 @@ control Lifecycle {
   t.after(() => runtime.dispose());
   runtime.load(first.bytes.buffer.slice(first.bytes.byteOffset, first.bytes.byteOffset + first.bytes.byteLength));
   runtime.addCapability('actuator', 'result', 'bool');
+  runtime.addCapability('sensor', 'enabled', 'bool');
   runtime.activate();
-  runtime.setBool('enabled', true);
+  const observed = value => {
+    runtime.setBool('__gf_sensor_ok_enabled', true);
+    runtime.setNumber('__gf_sensor_fault_enabled', 0);
+    runtime.setBool('__gf_sensor_value_enabled', value);
+  };
+  observed(true);
   runtime.tick();
   assert.equal(runtime.stateBool('held'), true);
-  runtime.setBool('enabled', false);
+  observed(false);
   runtime.tick();
   assert.equal(runtime.stateBool('held'), false);
   runtime.rewind(1);
   assert.equal(runtime.stateBool('held'), true);
   runtime.hotSwap(second.bytes);
   assert.equal(runtime.stateBool('held'), true);
-  runtime.setBool('enabled', true);
+  observed(true);
   runtime.tick();
   assert.equal(runtime.stateBool('held'), false);
 

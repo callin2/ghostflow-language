@@ -1,3 +1,4 @@
+import { softwareQualityObservations } from './helpers/software-quality-observations.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { compileSource } from '../tools/toolchain.mjs';
@@ -11,11 +12,11 @@ const doc = code => `# REF-06-003 projection\n\n\`\`\`ghost\n${code}\n\`\`\`\n`;
 const relay = doc(`control Relay {
   input start: Bool;
   state held: Bool = false;
-  held' = start || held;
+  held' = (start |> recover(false)) || held;
   output active: Bool;
   active <- held';
 }`);
-const source = doc(`import Relay from "./relay.ghost.md" revision "relay-r1" sha256 "${sha256Hex(relay)}";
+const source = doc(`import Relay from "./relay.ghost.md" revision "relay-input-v1" sha256 "${sha256Hex(relay)}";
 control Farm {
   input east_start, west_start: Bool;
   output east_pump, west_pump: Bool;
@@ -28,11 +29,11 @@ control Farm {
 }`);
 
 async function artifact() {
-  return compileSource(source, { filename: 'farm.ghost.md', sourceClosure: [{ filename: 'relay.ghost.md', revision: 'relay-r1', text: relay }] });
+  return compileSource(source, { filename: 'farm.ghost.md', sourceClosure: [{ filename: 'relay.ghost.md', revision: 'relay-input-v1', text: relay }] });
 }
 
 async function oneTrace(compiled) {
-  const runtime = await ControlRuntime.instantiateFramed(wasmBytes, compiled);
+  const runtime = softwareQualityObservations(await ControlRuntime.instantiateFramed(wasmBytes, compiled));
   try {
     runtime.step({ nowMs: 0, inputs: { east_start: true, west_start: false } });
     return structuredClone(runtime.runtime.outcome.trace);
@@ -92,9 +93,9 @@ test('REF-06-003 projection rejects malformed labels, unknown trace identities a
 });
 
 test('REF-06-003 adjacent and multiline authored states retain distinct public symbols without private slot or node-order identity', async () => {
-  const definition = doc("control Relay { input start: Bool; state first: Bool = false; state\n second: Bool = true; first' = start; second' = !start; output active: Bool; active <- first'; }");
+  const definition = doc("control Relay { input start: Bool; state first: Bool = false; state\n second: Bool = true; first' = start |> recover(false); second' = !(start |> recover(false)); output active: Bool; active <- first'; }");
   const root = source.replace(sha256Hex(relay), sha256Hex(definition));
-  const compiled = await compileSource(root, {filename: 'farm.ghost.md', sourceClosure: [{filename: 'relay.ghost.md', revision: 'relay-r1', text: definition}]});
+  const compiled = await compileSource(root, {filename: 'farm.ghost.md', sourceClosure: [{filename: 'relay.ghost.md', revision: 'relay-input-v1', text: definition}]});
   const owner = await activateInstanceTraceProjection(compiled, {presentationRevision: 'panel-adjacent', labels: {east: 'East', west: 'West'}});
   const projected = owner.projectTrace(await oneTrace(compiled));
   assert.deepEqual(projected.entries.filter(e => e.kind === 'state').map(e => e.key).sort(), ['east.first', 'east.second', 'west.first', 'west.second']);

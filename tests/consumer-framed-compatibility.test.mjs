@@ -7,6 +7,20 @@ import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 const wasm = () => fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
 const document = code => `# Virtual control\n\nThe GhostFlow source below is the complete reviewed program.\n\n\`\`\`ghost\n${code}\n\`\`\`\n`;
 const compile = (source, filename) => compileSource(source, { filename });
+// These fixtures declare their quality policies in source. Acquisition only
+// supplies independently observed samples, never host-side fallback values.
+const acquired = (nowMs, values) => ({ nowMs, samples: Object.fromEntries(
+  Object.entries(values).map(([name, value]) => [name,
+    { epoch: 1, id: nowMs + 1, timestampMs: nowMs, quality: 'Good', value }])) });
+const restartPolicy = (start, stop) => `
+  let start_good = case ${start} { ok(_) => true; fault(_) => false; };
+  let stop_good = case ${stop} { ok(_) => true; fault(_) => false; };
+  let start_requested = ${start} |> recover(false);
+  let stop_requested = ${stop} |> recover(true);
+  state restart_blocked: Bool = false;
+  restart_blocked' = if !start_good || !stop_good then true
+    else if !start_requested then false else restart_blocked;
+  running' = !stop_requested && (running || (start_requested && !restart_blocked));`;
 
 test('consumer framed WASM executes named VFD Number I/O and independent Start/Stop oracles', async t => {
   const source = document(`control VfdSpeed {
@@ -15,13 +29,16 @@ test('consumer framed WASM executes named VFD Number I/O and independent Start/S
   output run: Bool;
   output speed_v, speed_hz: Number;
   state running: Bool = false;
-  running' = if stop then false else if start then true else running;
+  ${restartPolicy('start', 'stop')}
+  state last_v: Number = 0;
+  last_v' = case potentiometer_v { ok(value) => value; fault(_) => last_v; };
   run <- running';
-  speed_v <- potentiometer_v;
-  speed_hz <- potentiometer_v * 5;
+  speed_v <- last_v';
+  speed_hz <- last_v' * 5;
 }`);
   const artifact = await compile(source, 'consumer-vfd.ghost.md');
-  assert.deepEqual(artifact.manifest.inputs, [
+  assert.deepEqual(artifact.manifest.inputs, []);
+  assert.deepEqual(artifact.manifest.sensors.map(({name, type}) => ({name, type})), [
     { name: 'start', type: 'Bool' }, { name: 'stop', type: 'Bool' },
     { name: 'potentiometer_v', type: 'Number' },
   ]);
@@ -41,10 +58,26 @@ test('consumer framed WASM executes named VFD Number I/O and independent Start/S
     [6, false, true, 5, false, 5, 25],
   ];
   for (const [nowMs, start, stop, potentiometer_v, run, speed_v, speed_hz] of frames) {
-    const actual = runtime.step({ nowMs, inputs: { start, stop, potentiometer_v } });
+    const actual = runtime.step(acquired(nowMs, { start, stop, potentiometer_v }));
     assert.deepEqual(actual.frame, { scanId: nowMs, logicalTimeMs: nowMs });
     assert.deepEqual(actual.vm.safe, { run, speed_v, speed_hz });
   }
+  const qualityScan = (nowMs, start, stop, faults = {}) => {
+    const frame = acquired(nowMs, { start, stop, potentiometer_v: 5 });
+    for (const [name, quality] of Object.entries(faults)) frame.samples[name].quality = quality;
+    return runtime.step(frame);
+  };
+  assert.equal(qualityScan(7, true, false).vm.safe.run, true);
+  assert.equal(qualityScan(8, false, false, { start: 'Disconnected' }).vm.safe.run, true,
+    'START fault blocks new starts but retains existing operation when STOP is healthy');
+  assert.equal(qualityScan(9, true, false, { stop: 'Invalid' }).vm.safe.run, false);
+  assert.equal(qualityScan(10, true, false).vm.safe.run, false, 'held START cannot restart on recovery');
+  assert.equal(qualityScan(11, false, false).vm.safe.run, false);
+  assert.equal(qualityScan(12, true, false).vm.safe.run, true);
+  const unavailableSpeed = qualityScan(13, false, false, { potentiometer_v: 'Disconnected' });
+  assert.equal(unavailableSpeed.sensors.potentiometer_v.quality, 'Disconnected');
+  assert.deepEqual(unavailableSpeed.vm.safe, { run: true, speed_v: 5, speed_hz: 25 },
+    'fixture-authored last Good observation policy does not synthesize a new zero measurement');
 });
 
 test('consumer framed WASM also executes unrelated named Number and Boolean cabinet programs', async t => {
@@ -53,23 +86,28 @@ test('consumer framed WASM also executes unrelated named Number and Boolean cabi
   input temperature_c: Number;
   output fan: Bool;
   output observed_c: Number;
-  fan <- enabled && temperature_c > 30;
-  observed_c <- temperature_c;
+  state observed: Number = 0;
+  observed' = case temperature_c { ok(value) => value; fault(_) => observed; };
+  fan <- (enabled |> recover(false)) && case temperature_c { ok(value) => value > 30; fault(_) => false; };
+  observed_c <- observed';
 }`), 'consumer-temperature.ghost.md');
   const temperatureRuntime = await ControlRuntime.instantiateFramed(wasm(), temperature);
   t.after(() => temperatureRuntime.dispose());
   for (const [nowMs, enabled, temperature_c, fan] of [
     [0, false, 25, false], [1, true, 35, true], [2, false, 40, false],
   ]) {
-    const actual = temperatureRuntime.step({ nowMs, inputs: { enabled, temperature_c } });
+    const actual = temperatureRuntime.step(acquired(nowMs, { enabled, temperature_c }));
     assert.deepEqual(actual.vm.safe, { fan, observed_c: temperature_c });
   }
+  const failedTemperature = acquired(3, { enabled: true, temperature_c: 0 });
+  failedTemperature.samples.temperature_c.quality = 'Invalid';
+  assert.deepEqual(temperatureRuntime.step(failedTemperature).vm.safe, { fan: false, observed_c: 40 });
 
   const cabinet = await compile(document(`control Cabinet {
   input DI1, DI2, DI3, DI4, DI5, DI6, DI7, DI8: Bool;
   output RO1, RO2, RO3, RO4, RO5, RO6, RO7, RO8: Bool;
   state running: Bool = false;
-  running' = if DI2 then false else if DI1 then true else running;
+  ${restartPolicy('DI1', 'DI2')}
   RO1 <- running';
   RO2 <- false; RO3 <- false; RO4 <- false; RO5 <- false;
   RO6 <- false; RO7 <- false; RO8 <- false;
@@ -81,7 +119,7 @@ test('consumer framed WASM also executes unrelated named Number and Boolean cabi
     [0, false, false, false], [1, true, false, true],
     [2, true, true, false], [3, false, false, false],
   ]) {
-    const actual = cabinetRuntime.step({ nowMs, inputs: { ...zero, DI1, DI2 } });
+    const actual = cabinetRuntime.step(acquired(nowMs, { ...zero, DI1, DI2 }));
     assert.deepEqual(actual.vm.safe, { RO1: run, RO2: false, RO3: false, RO4: false,
       RO5: false, RO6: false, RO7: false, RO8: false });
   }
@@ -97,7 +135,7 @@ test('consumer framed settings atomically apply Bool, Number, Percent and Durati
   config untouched: Bool = false { access = operator; }
   state running: Bool = false;
   timer age = elapsed(running);
-  running' = if stop then false else if start then true else running;
+  ${restartPolicy('start', 'stop')}
   output run, permitted: Bool;
   output gain_value: Number;
   run <- running' && case enabled { ok(value) => value; fault(_) => false; }
@@ -128,7 +166,7 @@ test('consumer framed settings atomically apply Bool, Number, Percent and Durati
     natural: [], schedules: [], settings,
   });
   const scan = (nowMs, start, stop, settings = null) => runtime.step({
-    nowMs, inputs: { start, stop }, contextFacts: facts(nowMs, settings),
+    ...acquired(nowMs, { start, stop }), contextFacts: facts(nowMs, settings),
   });
   const first = scan(0, true, false);
   assert.deepEqual(first.frame, { scanId: 0, logicalTimeMs: 0 });

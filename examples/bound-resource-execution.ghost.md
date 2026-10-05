@@ -2,15 +2,44 @@
 
 This complete software-only control routes automatic, manual and fallback requests through one shared logical pump envelope. Inputs are requests, not physical feedback. The authored violation response is pump OFF and valve ON; this is an explicit example choice, not a device safety sequence.
 
+Explicit new source revision: bound-input-quality-v1. The canonical inputs carry producer quality. This example retains the last observations for its request expressions; false initializes that source-local memory. The mandatory automatic/manual admission boundary requires a Good Bool observation in every scan. An unavailable mode rejects the scan atomically and permits a corrected retry; it does not mean OFF, a trip, or a restart command. Original source bytes are retained separately.
+
+<!-- ghostflow:anchor id=GF-INT-BOUND-OBSERVATIONS kind=intent status=confirmed origin=engineer -->
+Retain this software example's last request observations while preserving its authored resource guard.
+
 ```ghost
 control BoundPump {
   resource station: Station;
   resource pump1: BoolActuator;
   resource valve1: BoolActuator;
   input automatic, manual, automatic_request, manual_request, fallback_request, valve_request: Bool;
+  // ghostflow:link id=GF-INT-BOUND-OBSERVATIONS relation=implements
+  state remembered_automatic: Bool = false;
+  let automatic_value = case automatic { ok(value) => value; fault(_) => remembered_automatic; };
+  remembered_automatic' = automatic_value;
+  // ghostflow:link id=GF-INT-BOUND-OBSERVATIONS relation=implements
+  state remembered_manual: Bool = false;
+  let manual_value = case manual { ok(value) => value; fault(_) => remembered_manual; };
+  remembered_manual' = manual_value;
+  // ghostflow:link id=GF-INT-BOUND-OBSERVATIONS relation=implements
+  state remembered_automatic_request: Bool = false;
+  let automatic_request_value = case automatic_request { ok(value) => value; fault(_) => remembered_automatic_request; };
+  remembered_automatic_request' = automatic_request_value;
+  // ghostflow:link id=GF-INT-BOUND-OBSERVATIONS relation=implements
+  state remembered_manual_request: Bool = false;
+  let manual_request_value = case manual_request { ok(value) => value; fault(_) => remembered_manual_request; };
+  remembered_manual_request' = manual_request_value;
+  // ghostflow:link id=GF-INT-BOUND-OBSERVATIONS relation=implements
+  state remembered_fallback_request: Bool = false;
+  let fallback_request_value = case fallback_request { ok(value) => value; fault(_) => remembered_fallback_request; };
+  remembered_fallback_request' = fallback_request_value;
+  // ghostflow:link id=GF-INT-BOUND-OBSERVATIONS relation=implements
+  state remembered_valve_request: Bool = false;
+  let valve_request_value = case valve_request { ok(value) => value; fault(_) => remembered_valve_request; };
+  remembered_valve_request' = valve_request_value;
   output pump, valve: Bool;
-  pump <- (automatic && (automatic_request || fallback_request)) || (manual && manual_request);
-  valve <- valve_request;
+  pump <- (automatic_value && (automatic_request_value || fallback_request_value)) || (manual_value && manual_request_value);
+  valve <- valve_request_value;
   constraints SharedRules for station {
     exclusive at admission { automatic, manual };
     require at safe_output pump1.on => any_on({ valve1 });
@@ -31,7 +60,7 @@ const filename = 'examples/bound-resource-execution.ghost.md';
 const checked = compileSourceSync(fs.readFileSync(filename, 'utf8'), { filename });
 const bound = compileBoundResourceControl(checked, {
   format: 'GhostFlow/resource-constraints-binding-v1',
-  revision: 'virtual-installation-r1',
+  revision: 'virtual-installation-input-v1',
   sourceDocumentSha256: checked.sourceDocument.sha256,
   artifactSha256: checked.manifest.bytecodeSha256,
   resources: [
@@ -55,7 +84,12 @@ const requests = [
 ];
 try {
   for (const [scanId, values] of requests.entries()) {
-    const inputs = checked.manifest.control.inputs.map((port, index) => ({ name: port.name, value: values[index] }));
+    // Each row explicitly supplies Good software observations, including false.
+    const inputs = bound.manifest.sensors.flatMap((port, index) => [
+      { name: port.valueInput, value: values[index] },
+      { name: port.okInput, value: true },
+      { name: port.faultInput, value: 0 },
+    ]);
     const { trace } = runtime.scan({ scanId, logicalTimeMs: scanId, inputs });
     console.log(JSON.stringify(trace));
   }
@@ -82,8 +116,12 @@ Pass `interactionSourceIdentity` to `compileSource` when presenting an
 interaction schema. Binding preserves that document/revision identity and
 regenerates the schema's module identity for the executable GFB17 bytes. Schema
 verification reconstructs both identities; checked descriptors remain
-nonexecutable. Inputs and outputs come from the checked control manifest and
-retain their exact names and types in the bound manifest.
+nonexecutable. Logical inputs and outputs retain their exact names and types in the bound manifest.
+Canonical inputs are in `manifest.sensors`; their generated value/OK/fault rails
+form the complete VM frame. `manifest.inputs` contains only plain historical
+input ports. The immutable mode activation uses the generated value rail and
+the Rust guard validates its matching Bool OK rail. GFRB, GFRS and GFB17 wire
+versions and layouts are unchanged.
 
 The finite profile may include authored Bool state. Link each observed state to
 its confirmed literate intent anchor as required by the interaction contract.

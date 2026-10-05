@@ -21,8 +21,8 @@
         "anchor": "ch01",
         "example": "E01",
         "generatedPath": "examples/curriculum/generated/pc-01-e01.generated.ghost.md",
-        "documentSha256": "57f32d88e185541daafc5aec21f0dc71449fc8eb87d6450e2a29e85b379c0a21",
-        "projectionSha256": "e2b8488fe9da3d51621a463e813d0f08ff19c680a8d34a4a4416db325dc7bbae"
+        "documentSha256": "902d6e9cd0fc0990c1f60be6630078efe5d5bf20b6d6ac7ed8ea7383b0f01c2d",
+        "projectionSha256": "330a124e9098194c908695036330c8c95e66fd5772e42091c1b92bbb8c687702"
       }
     },
     {
@@ -31,7 +31,7 @@
       "source": {
         "kind": "canonical-literate",
         "path": "examples/curriculum/pc-02-start-stop.ghost.md",
-        "sha256": "7e85d0541383c95d38a8176c496343627367c1b9aa9829320ddd4dc2a477593a"
+        "sha256": "b5b8213fc2e06c11a81142c24253a3467861eecacc0d6e310cb8a0cff05d5e45"
       }
     },
     {
@@ -40,7 +40,7 @@
       "source": {
         "kind": "canonical-literate",
         "path": "examples/curriculum/pc-03-motor-contactor.ghost.md",
-        "sha256": "a44ac8295c000f850bf26e0607abba99268c845f83d7ede66b4618b327964291"
+        "sha256": "0f953145a2833a6c32e70dbcf52d0a265251a6597289f6d1b53cbc686bd4f4bb"
       }
     },
     {
@@ -49,7 +49,7 @@
       "source": {
         "kind": "canonical-literate",
         "path": "examples/curriculum/pc-04-direction-interlock.ghost.md",
-        "sha256": "f50e73582f8fbae8678ab3fb76f428a56d5d1df283a10d0ae58fcc3d08f7ae27"
+        "sha256": "15f8555d316ed8284dfbd251b63dba0d3b57439db31e3e802f5ff76892fa138c"
       }
     },
     {
@@ -58,7 +58,7 @@
       "source": {
         "kind": "canonical-literate",
         "path": "examples/curriculum/pc-05-limit-feedback.ghost.md",
-        "sha256": "ed0fa48243a9e627dce12ce0c4086478db907368228facc61f3c2d088c5dfd9e"
+        "sha256": "5da6ac776da21bcfb46a44bfd5d7f415f93ec8dea7739e9a0a65c4126e46e3cf"
       }
     },
     {
@@ -67,7 +67,7 @@
       "source": {
         "kind": "canonical-literate",
         "path": "examples/curriculum/pc-06-timer-patterns.ghost.md",
-        "sha256": "d6bb1c1807b902dc3e202b4bfc216081e8afb0ae0ff1fd9e31b7c887232675e8"
+        "sha256": "57348e78854800846e8c46106b4e7a85e3364145589c15db106ae6e94a2c0f31"
       }
     },
     {
@@ -76,7 +76,7 @@
       "source": {
         "kind": "canonical-literate",
         "path": "examples/curriculum/pc-07-tank-hysteresis.ghost.md",
-        "sha256": "4296356703356889993c9417c8770bc3f172f110098f82788dbedffc4ffbe418"
+        "sha256": "02c8642b3e4505790a650fcebf459b958093c68d84a19af253111c42b7641128"
       }
     },
     {
@@ -85,7 +85,7 @@
       "source": {
         "kind": "canonical-literate",
         "path": "examples/curriculum/pc-08-manual-auto.ghost.md",
-        "sha256": "23d5282723b78b81410558d102a2e7b01f68d0d0fea89180b93e767dd74927c6"
+        "sha256": "2e0ca37ee68cab672665e953cfda1455993702df0354a1fc80df836cde23afb8"
       }
     },
     {
@@ -94,7 +94,7 @@
       "source": {
         "kind": "canonical-literate",
         "path": "examples/curriculum/pc-09-sequential-water-supply.ghost.md",
-        "sha256": "02652715e118208011a2d7667e048cfe1b063fcb6286fe3bb3d2b4bbc992366f"
+        "sha256": "c0473fe780cfd1a5566131cf073dda0f5f768069c4b412fa2b990826aab774b3"
       }
     },
     {
@@ -103,7 +103,7 @@
       "source": {
         "kind": "canonical-literate",
         "path": "examples/curriculum/pc-10-fault-alarm-reset.ghost.md",
-        "sha256": "f3fa613105d47381fdcdd8a16046ca39f376c6eaa1918d1514dfb0e8cff9c5d3"
+        "sha256": "1de7325f75dce05719261192830f84dd58b8d50c5d92757e328698048381148d"
       }
     }
   ]

@@ -11,6 +11,12 @@ The `ghost` fragments in this chapter illustrate syntax and semantics.
 
 Rationale: [Selected syntax](../LANGUAGE-SURFACE.md), [Common language contract](../LANGUAGE.md), [Literate source](../LITERATE.md), [Intent anchors](../INTENT-ANCHOR-MAP.md), [Source preservation](../SOURCE-MAP.md), [Design notes](../DESIGN-NOTES.md). The [complete language reference](../LANGUAGE-REFERENCE.md) indexes this chapter and the other detailed chapters.
 
+Canonical external declarations use `input` and read as `Result<T, SensorFault>`.
+The examples here explicitly choose false for a failed start and true for a failed stop;
+these are illustrative author policies, never implicit defaults. The former `sensor`
+declaration is rejected; preserve old documents and create explicit reviewed revisions.
+See [the migration contract](../INPUT-MIGRATION.md) for acquisition and compatibility.
+
 ## 1.1 Why one document is the source
 
 Keeping only control rules separates them from the reasons for conditions and field premises. Keeping only explanations makes it impossible to mechanically verify which rules execute. GhostFlow preserves explanation, comments, intent, and executable code as one revision, providing one starting point for review.
@@ -40,7 +46,7 @@ control PumpRequest {
 
 ```ghost
   output pump: Bool;
-  pump <- start && !stop;
+  pump <- (start |> recover(false)) && !(stop |> recover(true));
 }
 ```
 ````
@@ -166,7 +172,7 @@ top_level_type ::= enum_decl
 control_item   ::= declaration | function_decl | next_definition
                  | output_connection | constraint | parameter_decl
                  | instance_decl | connect_decl
-declaration    ::= input_decl | sensor_decl | output_decl | config_decl
+declaration    ::= input_decl | output_decl | config_decl
                  | state_decl | let_decl | enum_decl | signal_decl
                  | schedule_decl | timer_decl
 ```
@@ -176,9 +182,9 @@ A program has exactly one `control` execution root. Document-scope imports pin a
 The declaration forms established by the selected syntax are below. Detailed rules for `expr`, `type`, and `pattern` are covered in the [next chapter](02-types-expressions-state.md).
 
 ```text
-input_decl       ::= 'input' name_list ':' type ';'
-sensor_decl      ::= 'sensor' Identifier [ '?' ] ':' type
-                     ( ';' | '{' { sensor_setting ';' } '}' )
+input_decl       ::= 'input' input_names ':' payload_type
+                     ( ';' | '{' { input_setting ';' } '}' )
+input_names      ::= Identifier [ '?' ] { ',' Identifier [ '?' ] }
 output_decl      ::= 'output' name_list ':' type ';'
 config_decl      ::= 'config' Identifier ':' type '=' expr
                      ( ';' | '{' { config_setting ';' } '}' )
@@ -235,12 +241,12 @@ fn allowed(request: Bool, enabled: Bool) -> Bool {
 
 control Example {
   input start, stop: Bool;
-  sensor moisture?: Percent;
+  input moisture?: Percent;
   output pump: Bool;
   config threshold: Percent = 30%;
   type Phase = Idle | Running;
   state phase: Phase = Idle;
-  let request = start && !stop;
+  let request = (start |> recover(false)) && !(stop |> recover(true));
   timer age = elapsed(phase);
 
   phase' = if request then Running else Idle;

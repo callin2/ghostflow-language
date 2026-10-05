@@ -1,3 +1,6 @@
+import { gunzipSync } from 'node:zlib';
+import { createHash } from 'node:crypto';
+import { softwareQualityAbi, softwareQualityRails } from './helpers/software-quality-observations.mjs';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -9,6 +12,10 @@ import { compileSource } from './helpers/literate-compile.mjs';
 import { compile, parse, tokenize } from '../tools/gfb1.mjs';
 import { GhostFlowRuntime } from '../runtimes/wasm/ghostflow-runtime.mjs';
 
+const legacyBytes = fs.readFileSync(new URL('./fixtures/history/issue531/conformance-cancellation.pre-input.json', import.meta.url));
+assert.equal(createHash('sha256').update(legacyBytes).digest('hex'), '15caba9770d9821928aeebb391dee8599bb398040d5ccb8118d5eceb590b2a31');
+for (const original of JSON.parse(legacyBytes).files) assert.equal(createHash('sha256').update(gunzipSync(Buffer.from(original.gzipBase64, 'base64'))).digest('hex'), original.sha256);
+
 const root = fileURLToPath(new URL('..', import.meta.url));
 const wasmBytes = fs.readFileSync(path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm'));
 const nativePath = path.join(root, 'target/release/examples/run' + (process.platform === 'win32' ? '.exe' : ''));
@@ -16,7 +23,11 @@ const gfb = source => compile(parse(tokenize(source)));
 
 // Feed identical deployed bytes and snapshots to two targets. The exact expected
 // outcomes below remain an independent, hand-written oracle for their shared core.
-async function differential(t, bytes, fields, rows, outputs = []) {
+async function differential(t, bytes, fields, rows, outputs = [], artifact = null) {
+  if (artifact) {
+    rows = rows.map((row, index) => softwareQualityRails(artifact, row, index + 1, index));
+    fields = [...new Set(rows.flatMap(row => Object.keys(row)))];
+  }
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-error-conformance-'));
   t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
   const modulePath = path.join(temporary, 'module.gfb');
@@ -29,7 +40,7 @@ async function differential(t, bytes, fields, rows, outputs = []) {
   t.after(() => runtime.dispose());
   const wasm = [];
   const errorOutcome = (phase, error) => ({ status: 'ERROR', phase, error: error.message, journalLength: runtime.journalLength });
-  try { runtime.load(bytes); } catch (error) { wasm.push(errorOutcome('load', error)); }
+  try { runtime.load(bytes); if (artifact) softwareQualityAbi(runtime, artifact); } catch (error) { wasm.push(errorOutcome('load', error)); }
   if (!wasm.length) {
     for (const [name, type] of outputs) runtime.addCapability('actuator', name, type);
     try { runtime.activate(); } catch (error) { wasm.push(errorOutcome('activate', error)); }
@@ -65,13 +76,13 @@ test('GF-TEST-snapshot-commit: old reads, explicit next reads, and untouched sta
     state right: Bool = true;
     state untouched: Number = 7;
     let oldRight = right;
-    left' = oldRight && enable;
+    left' = case enable { ok(observed) => oldRight && observed; fault(_) => left; };
     right' = left;
     output oldLeft, newLeft: Bool;
     oldLeft <- left;
     newLeft <- left';
   }`, { filename: 'snapshot.ghost' });
-  const { outcomes, runtime } = await differential(t, compiled.bytes, ['enable'], [{ enable: true }, { enable: true }], [['oldLeft', 'bool'], ['newLeft', 'bool']]);
+  const { outcomes, runtime } = await differential(t, compiled.bytes, ['enable'], [{ enable: true }, { enable: true }], [['oldLeft', 'bool'], ['newLeft', 'bool']], compiled);
   assert.deepEqual(outcomes.map(row => row.trace.stateBefore), [
     { left: false, right: true, untouched: 7 }, { left: true, right: false, untouched: 7 },
   ]);
@@ -174,12 +185,12 @@ test('GF-TEST-load-error: every truncation and invalid format agree across targe
 });
 
 test('GF-TEST-literate-runtime-equivalence: equivalent canonical literate documents deploy identical GFB and traces', async t => {
-  const source = 'control Literate { input enabled: Bool; output result: Bool; result <- enabled; }';
+  const source = 'control Literate { input enabled: Bool; output result: Bool; result <- enabled |> recover(false); }';
   const first = await compileSource(`# Controller\n\n\`\`\`ghost\n${source}\n\`\`\`\n`, { filename: 'first.ghost.md' });
   const second = await compileSource(`# Same executable control, with independent intent prose.\n\n\`\`\`ghost\n${source}\n\`\`\`\n`, { filename: 'second.ghost.md' });
   assert.deepEqual(first.bytes, second.bytes);
-  const firstRun = await differential(t, first.bytes, ['enabled'], [{ enabled: false }, { enabled: true }], [['result', 'bool']]);
-  const secondRun = await differential(t, second.bytes, ['enabled'], [{ enabled: false }, { enabled: true }], [['result', 'bool']]);
+  const firstRun = await differential(t, first.bytes, ['enabled'], [{ enabled: false }, { enabled: true }], [['result', 'bool']], first);
+  const secondRun = await differential(t, second.bytes, ['enabled'], [{ enabled: false }, { enabled: true }], [['result', 'bool']], second);
   assert.deepEqual(secondRun.outcomes, firstRun.outcomes);
   assert.deepEqual(firstRun.outcomes.map(row => row.trace.safe.result), [false, true]);
 });
@@ -250,7 +261,7 @@ test('GF-TEST-strategy-priority: only ties at the winning priority prevent activ
 });
 
 test('GF-TEST-quantity-native-parity: canonical units, affine boundaries and dimensional arithmetic', async t => {
-  const filename = 'tests/fixtures/issue-93-quantities.ghost.md';
+  const filename = 'tests/fixtures/issue-93-quantities.input-v1.ghost.md';
   const compiled = await compileSource(fs.readFileSync(path.join(root, filename), 'utf8'), { filename });
   const fields = ['ambient', 'co2', 'pressure', 'humidity', 'flow', 'interval', 'requested'];
   const baseline = { ambient: 298.15, co2: 0.0008, pressure: 1200, humidity: 0.7,
@@ -262,7 +273,7 @@ test('GF-TEST-quantity-native-parity: canonical units, affine boundaries and dim
   const outputs = ['cooling', 'ventilation', 'pressure_ok', 'dry'].map(name => [name, 'bool'])
     .concat(['delta', 'delivered', 'target', 'concentration', 'pressure_limit', 'duty', 'duration', 'count']
       .map(name => [name, 'number']));
-  const { outcomes, runtime } = await differential(t, compiled.bytes, fields, rows, outputs);
+  const { outcomes, runtime } = await differential(t, compiled.bytes, fields, rows, outputs, compiled);
   const expected = [
     { cooling: false, ventilation: false, pressure_ok: true, dry: false, delta: 0, delivered: 0.001,
       target: 298.15, concentration: 0.0008, pressure_limit: 1200, duty: 50, duration: 8000, count: 1 },
@@ -280,9 +291,9 @@ test('GF-TEST-quantity-native-parity: canonical units, affine boundaries and dim
   // quantity and a finite input whose product overflows must not commit state.
   const { ambient: omitted, ...missing } = baseline;
   const rejected = await differential(t, compiled.bytes, fields,
-    [baseline, missing, { ...baseline, flow: Number.MAX_VALUE }, baseline], outputs);
+    [baseline, missing, { ...baseline, flow: Number.MAX_VALUE }, baseline], outputs, compiled);
   assert.deepEqual(rejected.outcomes.filter(row => row.status === 'ERROR'), [
-    { status: 'ERROR', phase: 'tick', error: 'missing input ambient', journalLength: 1 },
+    { status: 'ERROR', phase: 'tick', error: `missing input ${compiled.manifest.sensors.find(sensor => sensor.name === 'ambient').valueInput}`, journalLength: 1 },
     { status: 'ERROR', phase: 'tick', error: 'non-finite arithmetic result', journalLength: 1 },
   ]);
   assert.deepEqual(rejected.outcomes.filter(row => row.status === 'OK').map(row => row.trace.stateAfter.accepted), [1, 2]);
@@ -290,7 +301,7 @@ test('GF-TEST-quantity-native-parity: canonical units, affine boundaries and dim
 });
 
 test('GF-TEST-contribution-field-boundary: independent field oracle kills weakened threshold rules', async t => {
-  const filename = 'tests/fixtures/contribution-134/numeric-threshold.ghost.md';
+  const filename = 'tests/fixtures/contribution-134/numeric-threshold.input-v1.ghost.md';
   const source = fs.readFileSync(path.join(root, filename), 'utf8');
   const fixture = JSON.parse(fs.readFileSync(path.join(root, 'tests/fixtures/contribution-134/oracle.json'), 'utf8'));
   // Independent expected values from Device #43's pinned virtual case, not from
@@ -303,7 +314,7 @@ test('GF-TEST-contribution-field-boundary: independent field oracle kills weaken
   const rows = fixture.rows.map(({ moisture }) => ({ moisture }));
   const checkOracle = outcomes => assert.deepEqual(outcomes.map(row => row.trace.safe.pump), expected);
   const compiled = await compileSource(source, { filename });
-  const baseline = await differential(t, compiled.bytes, ['moisture'], rows, [['pump', 'bool']]);
+  const baseline = await differential(t, compiled.bytes, ['moisture'], rows, [['pump', 'bool']], compiled);
   assert.deepEqual(baseline.outcomes.map(row => row.status), rows.map(() => 'OK'));
   checkOracle(baseline.outcomes);
   assert.deepEqual(baseline.outcomes.map(row => row.trace.requested.pump), expected);
@@ -312,18 +323,18 @@ test('GF-TEST-contribution-field-boundary: independent field oracle kills weaken
   const failure = baseline.runtime;
   const committed = failure.trace;
   failure.clearInputs();
-  assert.throws(() => failure.tick(), /missing input moisture/);
+  assert.throws(() => failure.tick(), new RegExp(`missing input ${compiled.manifest.sensors[0].valueInput}`));
   assert.deepEqual(failure.trace, committed);
   assert.equal(failure.intentBool('pump'), true);
   failure.setNumber('moisture', 42.6);
   failure.tick();
   assert.equal(failure.intentBool('pump'), false);
 
-  const rule = 'pump <- moisture < 42.5;';
+  const rule = 'pump <- scalar_moisture < 42.5;';
   assert.equal(source.split(rule).length, 2, 'mutation site must be unique');
-  for (const weakened of ['pump <- moisture <= 42.5;', 'pump <- true;']) {
+  for (const weakened of ['pump <- scalar_moisture <= 42.5;', 'pump <- true;']) {
     const mutant = await compileSource(source.replace(rule, weakened), { filename });
-    const result = await differential(t, mutant.bytes, ['moisture'], rows, [['pump', 'bool']]);
+    const result = await differential(t, mutant.bytes, ['moisture'], rows, [['pump', 'bool']], mutant);
     // Infrastructure errors cannot count as a killed mutant: both targets must
     // complete every scan before the independent boundary assertion goes RED.
     assert.deepEqual(result.outcomes.map(row => row.status), rows.map(() => 'OK'));

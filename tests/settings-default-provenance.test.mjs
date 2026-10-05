@@ -1,3 +1,4 @@
+import { softwareQualityObservations, softwareQualityRails } from './helpers/software-quality-observations.mjs';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -21,7 +22,7 @@ const facts = (ms, settings = null) => ({ clock: clock(ms), natural: [], schedul
 async function fixture(sourceText = source) {
   const artifact = await compileSource(sourceText, { filename: 'tests/fixtures/ref-05-012-settings-provenance.ghost.md', interactionSourceIdentity: identity });
   const wasm = fs.readFileSync(path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm'));
-  const runtime = await ControlRuntime.instantiate(wasm, artifact, { context: { bootEpoch: 1, terminalCapacity: 16, bindings: [] } });
+  const runtime = softwareQualityObservations(await ControlRuntime.instantiate(wasm, artifact, { context: { bootEpoch: 1, terminalCapacity: 16, bindings: [] } }));
   return { artifact, runtime, wasm, ids: Object.fromEntries(artifact.manifest.configs.map(config => [config.name, config.id])) };
 }
 
@@ -100,7 +101,7 @@ function nativeRun(artifact, attempts, checkpoint = null) {
     fs.writeFileSync(tapePath, JSON.stringify({ profile: 'context-settings-v1', checkpoint,
       activation: { bootEpoch: 1, terminalCapacity: 16, bindings: [] },
       steps: attempts.map(({ scanId, nowMs, settings, inputs = {} }) => ({ scanId, logicalTimeMs: nowMs,
-        inputs: Object.entries(inputs).map(([name, value]) => ({ name, type: typeof value === 'boolean' ? 'Bool' : 'Number', value })), ...facts(nowMs, settings) })) }));
+        inputs: Object.entries(softwareQualityRails(artifact, inputs)).map(([name, value]) => ({ name, type: typeof value === 'boolean' ? 'Bool' : 'Number', value })), ...facts(nowMs, settings) })) }));
     const result = spawnSync(nativePath, [modulePath, tapePath],
       { encoding: 'utf8', timeout: 10_000, maxBuffer: 4 * 1024 * 1024 });
     assert.equal(result.status, 0, result.stderr || result.stdout);
@@ -114,7 +115,7 @@ function nativeRun(artifact, attempts, checkpoint = null) {
 }
 
 async function wasmRun(wasm, artifact, attempts, checkpoint = null) {
-  const runtime = await ControlRuntime.instantiateFramed(wasm, artifact, { context: { bootEpoch: 1, terminalCapacity: 16, bindings: [] } });
+  const runtime = softwareQualityObservations(await ControlRuntime.instantiateFramed(wasm, artifact, { context: { bootEpoch: 1, terminalCapacity: 16, bindings: [] } }));
   try {
     if (checkpoint) runtime.restoreContextCheckpoint(Buffer.from(checkpoint, 'hex'));
     return attempts.map(({ scanId, nowMs, settings, inputs = {} }) => {
@@ -384,7 +385,7 @@ test('REF-05-012 checksum-repaired semantic provenance corruption rejects atomic
 
 test('REF-05-012 permission and VM transaction failures preserve provenance, complete outcomes and event reuse on native and framed WASM', async () => {
   const vmSource = source.replace('  output watering: Bool;', '  input divisor: Number;\n  output watering: Bool;')
-    .replace('  watering <- true;', '  watering <- 1 / divisor > 0;')
+    .replace('  watering <- true;', '  watering <- 1 / (divisor |> recover(0)) > 0;')
     .replace('config enabled: Bool = false { access = operator;', 'config enabled: Bool = false { access = designer;');
   const { artifact, runtime, wasm, ids } = await fixture(vmSource);
   const fingerprint = runtime.contextSnapshot().state.programFingerprint;

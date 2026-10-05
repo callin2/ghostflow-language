@@ -1,4 +1,11 @@
+// Explicit temporal fixture revision: issue531-quality-temporal-v1; predecessor retained in fixtures/history/issue531/temporal.
 import assert from 'node:assert/strict';
+import { softwareQualityObservations, softwareQualityRails } from './helpers/software-quality-observations.mjs';
+const ControlRuntime = {
+  instantiate: async (...args) => softwareQualityObservations(await BaseControlRuntime.instantiate(...args)),
+  instantiateFramed: async (...args) => softwareQualityObservations(await BaseControlRuntime.instantiateFramed(...args)),
+};
+
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
@@ -8,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 import { AccountingRuntime } from '../runtimes/wasm/accounting-runtime.mjs';
 import { compileSource } from '../tools/compile-source.mjs';
 import { verifyArtifactSourceMap } from '../tools/toolchain.mjs';
-import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
+import { ControlRuntime as BaseControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const wasmPath = resolve(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm');
@@ -75,7 +82,7 @@ test('REF-03-048: Seoul midnight applied pump interval is split per local day an
   // are not inferred as physical facts from the requested/safe values.
   execFileSync('cargo',['build','--locked','--offline','--release','-p','ghostflow-core','--example','scan_tape'],{cwd:root,stdio:'inherit'});
   for(const [name,demand] of [['Automatic',[true,true,true,true,false]],['Manual',[false,true,true,false,false]]]){
-    const requestSource='# Independent '+name+' pump request\n\n```ghost\ncontrol '+name+' { input request: Bool; output pump: Bool; pump <- request; }\n```\n';
+    const requestSource='# Independent '+name+' pump request\n\n```ghost\ncontrol '+name+' { input request: Bool; output pump: Bool; pump <- request |> recover(false); }\n```\n';
     const controlArtifact=await compileSource(requestSource,{filename:name.toLowerCase()+'-pump.ghost.md'});
     assert.equal(controlArtifact.sourceDocument.text,requestSource);
     const hostBinding=Object.freeze({control:name,port:'pump',physicalResourceId:7,logicalResource:'pump1'});
@@ -87,7 +94,7 @@ test('REF-03-048: Seoul midnight applied pump interval is split per local day an
     assert.deepEqual(outcomes.map(o=>o.trace.requested.pump),demand);assert.deepEqual(outcomes.map(o=>o.trace.safe.pump),demand);
     const dir=mkdtempSync(join(tmpdir(),'ref-03-048-control-'));t.after(()=>rmSync(dir,{recursive:true,force:true}));
     const module=join(dir,'module.gfb'),tape=join(dir,'frames.tsv');writeFileSync(module,controlArtifact.bytes);
-    writeFileSync(tape,frames.map(f=>[f.scanId,f.logicalTimeMs,...f.inputs.flatMap(v=>[v.name,'b',v.value])].join('\t')).join('\n')+'\n');
+    writeFileSync(tape,frames.map(f=>[f.scanId,f.logicalTimeMs,...f.inputs.flatMap(v=>[v.name,v.type==='Bool'?'b':v.type==='Int'?'i':'n',v.value])].join('\t')).join('\n')+'\n');
     const runner=resolve(root,'target/release/examples/scan_tape'+(process.platform==='win32'?'.exe':''));
     const native=()=>execFileSync(runner,[module,tape],{encoding:'utf8',timeout:10_000}).trim().split('\n').map(JSON.parse);
     const rows=native();assert.ok(rows.every(r=>r.accepted));assert.deepEqual(rows.map(r=>r.outcome),outcomes);assert.deepEqual(native(),rows);

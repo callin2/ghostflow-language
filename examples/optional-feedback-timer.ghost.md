@@ -1,5 +1,7 @@
 # Timer control with optional observation
 
+2026-10-05 explicit input-quality revision: unknown request retains established run state; the two-second deadline still applies. Quality does not assert a physical failure.
+
 The operator establishes a command duration for this example: two seconds. This illustrative value is not a measured travel time or an approved setting for a particular installation. Replace it only with an explicitly established installation value. No physical feedback is required to calculate output intent.
 
 `run_request` is a maintained Bool request. The first accepted true scan starts a new interval. Repeated true scans do not reset the timer. At two seconds, requested and safe `drive` become false. Keeping the request true does not restart it. A false scan stops immediately and commits `run = false`; a later true scan starts a fresh interval. A false/true pulse between accepted scans cannot reset the timer. On a new runtime, state and timer initialize again; a first true request starts a new interval.
@@ -14,15 +16,16 @@ Timer completion is the end of authored command duration. It does not prove Driv
 control OptionalFeedbackTimer {
   input run_request: Bool;
   output drive: Bool;
-  sensor observation?: Bool;
+  input observation?: Bool;
 
   // Example value established by the operator; not a measured position.
   let calibrated_duration = 2s;
   state run: Bool = false;
-  run' = run_request;
+  let requested = case run_request { ok(value) => value; fault(_) => run; };
+  run' = requested;
   timer age = elapsed(run);
-  let run_age = if run_request == run then age else 0s;
-  let timed_request = run_request && run_age < calibrated_duration;
+  let run_age = if requested == run then age else 0s;
+  let timed_request = requested && run_age < calibrated_duration;
 
   adapt observation_policy {
     strategy Observed priority 10 match (observation: sensor<Bool>) {

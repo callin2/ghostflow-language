@@ -1,3 +1,4 @@
+import { softwareQualityObservations } from './helpers/software-quality-observations.mjs';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -439,7 +440,7 @@ test('REF-05-104 [host] Until 임시값의 만료는 복귀 설정 event다.', a
   config duration: Duration = 5min { min = 1min; max = 20min; step = 1min; access = operator; }
   state seen: Bool = false;
   timer age = elapsed(seen);
-  seen' = seen || tick;
+  seen' = case tick { ok(observed) => seen || observed; fault(_) => seen; };
   output seconds: Number;
   output remembered: Bool;
   output age_ms: Duration;
@@ -449,6 +450,7 @@ test('REF-05-104 [host] Until 임시값의 만료는 복귀 설정 event다.', a
 }\n\`\`\`\n`, { filename: 'until-expiry-return.ghost.md' });
   const runtime = await ControlRuntime.instantiate(wasmBytes(), compiled,
     { context: { bootEpoch: 12, terminalCapacity: 8, bindings: [] } });
+  softwareQualityObservations(runtime);
   t.after(() => runtime.dispose());
   const fingerprint = runtime.contextSnapshot().state.programFingerprint;
   const configId = compiled.manifest.configs[0].id;
@@ -552,7 +554,7 @@ test('REF-08-015 [runtime] state 초기화와 일반 config 지속성은 별도�
   config duration: Duration = 3min { min = 1min; max = 20min; step = 1min; access = operator; }
   state running: Bool = false;
   timer age = elapsed(running);
-  running' = running || start;
+  running' = case start { ok(observed) => running || observed; fault(_) => running; };
   output active: Bool;
   output age_ms: Duration;
   output seconds: Number;
@@ -562,6 +564,7 @@ test('REF-08-015 [runtime] state 초기화와 일반 config 지속성은 별도�
 }\n\`\`\`\n`, { filename: 'restart-state-timer-config.ghost.md' });
   const firstRun = await ControlRuntime.instantiate(wasmBytes(), compiled,
     { context: { bootEpoch: 15, terminalCapacity: 8, bindings: [] } });
+  softwareQualityObservations(firstRun);
   t.after(() => firstRun.dispose());
   const fingerprint = firstRun.contextSnapshot().state.programFingerprint;
   const configId = compiled.manifest.configs[0].id;
@@ -589,6 +592,7 @@ test('REF-08-015 [runtime] state 초기화와 일반 config 지속성은 별도�
 
   const nextRun = await ControlRuntime.instantiate(wasmBytes(), compiled,
     { context: { bootEpoch: 16, terminalCapacity: 8, bindings: [] } });
+  softwareQualityObservations(nextRun);
   t.after(() => nextRun.dispose());
   const firstDecision = nextRun.step({ nowMs: 1, inputs: { start: false }, contextFacts: facts(1,
     ordinary5min(0, 1, 'preserved-ordinary-5min-at-new-run'), 16) });

@@ -4,6 +4,10 @@
 
 # Programming in GhostFlow
 
+The 2026-10-05 external-input revision uses `input` for quality-bearing declarations. Existing conditioning and explicit `Result` fault branches remain source-authored policies. Prior `sensor` excerpts are retained under `tests/fixtures/history/issue531/`; imported source revisions require a separately verified closure.
+
+Examples that previously used plain observations now expose `observed_*` producer channels and handle their `Result` explicitly. `remembered_*` and `displayed_*` initialize source-local memory; they do not assert that the producer supplied a healthy false or zero. Unknown observations retain established memory and cannot authorize a new guarded transition. A current healthy STOP or removed permission takes precedence, and an existing maximum run duration still expires. Acquisition quality does not assert a physical button or equipment failure. These are explicit illustrative revisions; retained healthy datasets keep their original logical field names through an explicit test adapter.
+
 Write device behavior as code, then understand it by running it
 
 **Revised edition · English translation · based on the Language Reference**
@@ -146,17 +150,26 @@ The first program turns the LED on when the switch is on and off when the switch
 
 ```ghost
 // E01
+// Explicit quality-input revision: acquisition faults request lamp OFF.
 control FollowSwitch {
   input switch_on: Bool;
   output lamp: Bool;
 
-  lamp <- switch_on;
+  lamp <- switch_on |> recover(false);
 }
 ```
 
+This revised example reads the external input as `Result<Bool, SensorFault>`.
+Healthy false/true retain the existing table; NotReady, Disconnected, Stale and
+Invalid explicitly request lamp OFF. This is the confirmed policy of this example,
+not a language default or evidence of physical contact OFF. Input faults and
+provenance remain recorded. This switch-following example adds no START button
+or running memory. The previous E01 source is preserved in the
+[prior-code record](historical/2026-10-05-input-531-book-excerpts.md).
+
 `control FollowSwitch` gives this decision a name and a boundary. Values crossing
 in are `input`; calculated values crossing out are `output`. No hidden wiring or
-device choice sits between them. Read `lamp <- switch_on` with the arrow: “this
+device choice sits between them. Read `lamp <- switch_on |> recover(false)` with the arrow: “this
 tick's lamp request came from switch_on.” Even two `Bool` values can explain the
 origin of an output, which is the first useful result.
 
@@ -184,7 +197,9 @@ and normalizes it into program meaning according to wiring and input-module pola
 
 Reversed raw contact behavior with NC is an input normalization issue. An NC contact
 does not by itself mean adding `!` in the program. Specify normalization at the wiring/input-module
-boundary and pass only a `false` or `true` Bool to GhostFlow.
+boundary and pass a `false` or `true` Bool payload in a healthy observation to
+GhostFlow. Preserve the observation's quality and identity; a broken delivery
+path is a fault, not the healthy value false.
 
 Briefly, relays create physical contact paths, PLCs process the inputs with DI and ladder/function blocks,
 and GhostFlow connects normalized semantic inputs to declared output calculations.
@@ -197,7 +212,7 @@ One control evaluation is a **tick**. Every expression in that tick sees one
 captured input set. Do not imagine separate expressions reading a switch at
 different physical moments; a new input set arrives with the next tick.
 
-E01 has no memory, so the same input always produces the same output. If a trace
+E01 has no memory, so the same input observation always produces the same output. If a healthy trace
 first shows `switch_on` and `lamp` disagreeing, inspect normalization, binding,
 or the Driver before blaming this expression. Chapter 3 adds `state`, after which
 the same current input can produce different results because the past differs.
@@ -208,7 +223,7 @@ to virtual switches/LEDs and device I/O.
 
 ### Try changing it
 
-Before changing the connection to `lamp <- !switch_on;`, draw the new table on
+Before changing the connection to `lamp <- case switch_on { ok(value) => !value; fault(_) => false; };`, draw the new table on
 paper. Because `!` flips true and false, both output cells should change. Restore
 the original after checking it, then change only the input name. Behavior stays the
 same while a reader's interpretation changes: a first exercise in separating a
@@ -289,7 +304,14 @@ Turn on the water-supply output when water level is below the setting.
 ```ghost
 // E02
 control ThresholdControl {
-  input level: Percent;
+  state displayed_pump: Bool = false;
+  displayed_pump' = if level_good then low else displayed_pump;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_level: Percent = 0%;
+  let level_good = case observed_level { ok(_) => true; fault(_) => false; };
+  let level = case observed_level { ok(value) => value; fault(_) => remembered_level; };
+  remembered_level' = level;
+  input observed_level: Percent;
   config threshold: Percent = 30%;
   let low = case threshold {
     ok(value) => level < value;
@@ -297,7 +319,7 @@ control ThresholdControl {
   };
 
   output pump: Bool;
-  pump <- low;
+  pump <- displayed_pump';
 }
 ```
 
@@ -342,18 +364,39 @@ Keep running after briefly pressing and releasing Start; stop when Stop is press
 
 ```ghost
 // E03
+// Explicit quality-input revision: protective faults stop; recovery needs healthy START release/repress.
 control LatchingPump {
   input start, stop: Bool;
   state running: Bool = false;
+  state restart_blocked: Bool = false;
   output valve, pump: Bool;
 
-  running' = !stop && (start || running);
+  let start_good = case start { ok(_) => true; fault(_) => false; };
+  let stop_good = case stop { ok(_) => true; fault(_) => false; };
+  let start_requested = start |> recover(false);
+  let stop_requested = stop |> recover(true);
+  let acquisition_fault = !start_good || !stop_good;
+  restart_blocked' = if acquisition_fault then true
+    else if !start_requested then false else restart_blocked;
+  running' = !stop_requested && (running || (start_requested && !restart_blocked));
   valve <- running';
   pump <- running';
 
   require pump => valve;
 }
 ```
+
+This explicit new revision preserves healthy self-holding and stop priority.
+A START acquisition fault prevents a new start. An active run continues only
+while STOP is healthy and released. A STOP acquisition fault clears running
+memory and requests pump/valve OFF. Observing a fault on either input blocks
+restart. After a fault stop, holding START cannot restart the run: observe START
+released while both inputs are healthy, then press again. An initially healthy
+pressed START still starts immediately, preserving the original healthy behavior.
+This policy applies to the existing START circuit; it does not add START buttons
+to lamps or automatic controllers. Driver application needs separate evidence.
+The previous E03 source is preserved in the
+[prior-code record](historical/2026-10-05-input-531-book-excerpts.md).
 
 `running` is the remembered value at the start of a tick; `running'` is the next
 value calculated from the current inputs. Read the apostrophe as **prime**. The two
@@ -363,7 +406,7 @@ STOP has been handled.”
 Read the expression aloud: “Keep running if stop is not pressed and either start
 is pressed or the system was already running.” If that sentence is not the field
 requirement, fix the requirement before rearranging parentheses. When both buttons
-are pressed, `!stop` is false, so stop wins. That simultaneous-input row turns
+are pressed, `!stop_requested` is false, so stop wins. That simultaneous-input row turns
 the phrase “stop priority” into observable behavior.
 
 | tick | start | stop | Previous `running` | Next `running'` | pump |
@@ -615,11 +658,25 @@ This time, deliberately make the values differ.
 ```ghost
 // E05
 control PumpPermission {
-  input request, valve_ready: Bool;
+  state displayed_pump: Bool = false;
+  displayed_pump' = if request_good && !request then false else if request_good then request else displayed_pump;
+  state displayed_valve: Bool = false;
+  displayed_valve' = if valve_ready_good && !valve_ready then false else if valve_ready_good then valve_ready else displayed_valve;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_request: Bool = false;
+  let request_good = case observed_request { ok(_) => true; fault(_) => false; };
+  let request = case observed_request { ok(value) => value; fault(_) => remembered_request; };
+  remembered_request' = request;
+  state remembered_valve_ready: Bool = false;
+  let valve_ready_good = case observed_valve_ready { ok(_) => true; fault(_) => false; };
+  let valve_ready = case observed_valve_ready { ok(value) => value; fault(_) => remembered_valve_ready; };
+  remembered_valve_ready' = valve_ready;
+  input observed_request: Bool;
+  input observed_valve_ready: Bool;
   output pump, valve: Bool;
 
-  pump <- request;
-  valve <- valve_ready;
+  pump <- displayed_pump';
+  valve <- displayed_valve';
   require pump => valve;
 }
 ```
@@ -650,11 +707,25 @@ and “where the input came from.”
 ```ghost
 // E06
 control DirectionInterlock {
-  input forward_button, reverse_button: Bool;
+  state displayed_forward: Bool = false;
+  displayed_forward' = if forward_button_good && !forward_button then false else if forward_button_good then forward_button else displayed_forward;
+  state displayed_reverse: Bool = false;
+  displayed_reverse' = if reverse_button_good && !reverse_button then false else if reverse_button_good then reverse_button else displayed_reverse;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_forward_button: Bool = false;
+  let forward_button_good = case observed_forward_button { ok(_) => true; fault(_) => false; };
+  let forward_button = case observed_forward_button { ok(value) => value; fault(_) => remembered_forward_button; };
+  remembered_forward_button' = forward_button;
+  state remembered_reverse_button: Bool = false;
+  let reverse_button_good = case observed_reverse_button { ok(_) => true; fault(_) => false; };
+  let reverse_button = case observed_reverse_button { ok(value) => value; fault(_) => remembered_reverse_button; };
+  remembered_reverse_button' = reverse_button;
+  input observed_forward_button: Bool;
+  input observed_reverse_button: Bool;
   output forward, reverse: Bool;
 
-  forward <- forward_button;
-  reverse <- reverse_button;
+  forward <- displayed_forward';
+  reverse <- displayed_reverse';
   mutex(forward, reverse);
 }
 ```
@@ -727,7 +798,22 @@ fn hold(start: Bool, stop: Bool, previous: Bool) -> Bool {
 }
 
 control FunctionLatch {
-  input start, stop, enabled: Bool;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_start: Bool = false;
+  let start_good = case observed_start { ok(_) => true; fault(_) => false; };
+  let start = case observed_start { ok(value) => value; fault(_) => remembered_start; };
+  remembered_start' = start;
+  state remembered_stop: Bool = false;
+  let stop_good = case observed_stop { ok(_) => true; fault(_) => false; };
+  let stop = case observed_stop { ok(value) => value; fault(_) => remembered_stop; };
+  remembered_stop' = stop;
+  state remembered_enabled: Bool = false;
+  let enabled_good = case observed_enabled { ok(_) => true; fault(_) => false; };
+  let enabled = case observed_enabled { ok(value) => value; fault(_) => remembered_enabled; };
+  remembered_enabled' = enabled;
+  input observed_start: Bool;
+  input observed_stop: Bool;
+  input observed_enabled: Bool;
   state running: Bool = false;
   output pump: Bool;
 
@@ -735,7 +821,7 @@ control FunctionLatch {
     request && allow
   }
 
-  running' = permitted(hold(start, stop, running), enabled);
+  running' = if stop_good && stop then false else if enabled_good && !enabled then false else if start_good && stop_good && enabled_good then (permitted(hold(start, stop, running), enabled)) else running;
   pump <- running';
 }
 ```
@@ -773,14 +859,19 @@ but observation and transition happen at ticks.
 ```ghost
 // E08
 control DelayedStart {
-  input start: Bool;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_start: Bool = false;
+  let start_good = case observed_start { ok(_) => true; fault(_) => false; };
+  let start = case observed_start { ok(value) => value; fault(_) => remembered_start; };
+  remembered_start' = start;
+  input observed_start: Bool;
   config delay: Duration = 2s;
   type Phase = Idle | Waiting | Running;
   state phase: Phase = Idle;
   timer age = elapsed(phase);
   output motor: Bool;
 
-  phase' = case delay {
+  phase' = if start_good then (case delay {
     ok(value) => case phase {
       Idle => if start then Waiting else Idle;
       Waiting =>
@@ -789,7 +880,7 @@ control DelayedStart {
       Running => if start then Running else Idle;
     };
     fault(_) => Idle;
-  };
+  }) else phase;
 
   motor <- phase' == Running;
 }
@@ -935,15 +1026,22 @@ This chapter verifies a water request; actual flow needs separate device and fee
 
 The earlier `input level: Percent` declared a value supplied by the host for the current calculation.
 Actual sensors have states such as not ready, disconnected, and stale measurements, as well as values.
-When reading `sensor`, also handle whether a healthy value was obtained.
+When reading `input`, also handle whether a healthy value was obtained.
 
 ### E10 — Deciding water supply from fluctuating moisture values
 
 ```ghost
 // E10
 control MoistureControl {
-  input enabled: Bool;
-  sensor moisture: Percent {
+  state displayed_pump: Bool = false;
+  displayed_pump' = if enabled_good && !enabled then false else if enabled_good then enabled && need_water else displayed_pump;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_enabled: Bool = false;
+  let enabled_good = case observed_enabled { ok(_) => true; fault(_) => false; };
+  let enabled = case observed_enabled { ok(value) => value; fault(_) => remembered_enabled; };
+  remembered_enabled' = enabled;
+  input observed_enabled: Bool;
+  input moisture: Percent {
     sample = 1s;
     valid = 0% .. 100%;
     filter = median(3);
@@ -958,7 +1056,7 @@ control MoistureControl {
   };
 
   output pump: Bool;
-  pump <- enabled && need_water;
+  pump <- displayed_pump';
 }
 ```
 
@@ -1025,7 +1123,7 @@ Follow [Reference §2.5](reference/02-types-expressions-state.md#25-sensor-결�
 ```ghost
 // E14
 control OptionalMoisture {
-  sensor moisture?: Percent;
+  input moisture?: Percent;
   output request: Bool;
   adapt moisture_policy {
     strategy WithMoisture priority 100 match (moisture: sensor<Percent>) {
@@ -1047,7 +1145,7 @@ When uninstalled, `Baseline` requests false. `?` alone does not generate a fallb
 Detailed rules follow [Reference §4.5–4.6](reference/04-sensors-constraints-control.md#45-선택-sensor와-capability).
 
 E14 distinguishes an absent sensor from a fault in an installed sensor. With no
-sensor installed it selects `Baseline`; with an installed sensor whose value is
+input installed it selects `Baseline`; with an installed sensor whose value is
 unavailable it follows the fault branch inside `WithMoisture`. Both requests are
 false, but their evidence differs. Equal output does not mean equal reasoning.
 
@@ -1076,21 +1174,53 @@ meaning in reviews and searches.
 ```ghost
 // E12
 control NumbersAndOperators {
-  input a, b: Number;
+  state displayed_sum: Number = 0;
+  displayed_sum' = if a_good && b_good then a + b else displayed_sum;
+  state displayed_difference: Number = 0;
+  displayed_difference' = if a_good && b_good then a - b else displayed_difference;
+  state displayed_product: Number = 0;
+  displayed_product' = if a_good && b_good then a * b else displayed_product;
+  state displayed_quotient: Number = 0;
+  displayed_quotient' = if a_good && b_good then a / b else displayed_quotient;
+  state displayed_negative: Number = 0;
+  displayed_negative' = if a_good then -a else displayed_negative;
+  state displayed_equal: Bool = false;
+  displayed_equal' = if a_good && b_good then a == b else displayed_equal;
+  state displayed_different: Bool = false;
+  displayed_different' = if a_good && b_good then a != b else displayed_different;
+  state displayed_less: Bool = false;
+  displayed_less' = if a_good && b_good then a < b else displayed_less;
+  state displayed_at_most: Bool = false;
+  displayed_at_most' = if a_good && b_good then a <= b else displayed_at_most;
+  state displayed_greater: Bool = false;
+  displayed_greater' = if a_good && b_good then a > b else displayed_greater;
+  state displayed_at_least: Bool = false;
+  displayed_at_least' = if a_good && b_good then a >= b else displayed_at_least;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_a: Number = 0;
+  let a_good = case observed_a { ok(_) => true; fault(_) => false; };
+  let a = case observed_a { ok(value) => value; fault(_) => remembered_a; };
+  remembered_a' = a;
+  state remembered_b: Number = 0;
+  let b_good = case observed_b { ok(_) => true; fault(_) => false; };
+  let b = case observed_b { ok(value) => value; fault(_) => remembered_b; };
+  remembered_b' = b;
+  input observed_a: Number;
+  input observed_b: Number;
   output sum, difference, product, quotient, negative: Number;
   output equal, different, less, at_most, greater, at_least: Bool;
 
-  sum <- a + b;
-  difference <- a - b;
-  product <- a * b;
-  quotient <- a / b;
-  negative <- -a;
-  equal <- a == b;
-  different <- a != b;
-  less <- a < b;
-  at_most <- a <= b;
-  greater <- a > b;
-  at_least <- a >= b;
+  sum <- displayed_sum';
+  difference <- displayed_difference';
+  product <- displayed_product';
+  quotient <- displayed_quotient';
+  negative <- displayed_negative';
+  equal <- displayed_equal';
+  different <- displayed_different';
+  less <- displayed_less';
+  at_most <- displayed_at_most';
+  greater <- displayed_greater';
+  at_least <- displayed_at_least';
 }
 ```
 
@@ -1125,12 +1255,24 @@ in unselected branches do not occur, but all branches undergo static type checki
 ```ghost
 // E13
 control SafeDivision {
-  input a, b: Number;
+  state displayed_result: Number = 0;
+  displayed_result' = if a_good && b_good then if zero then 0 else a / denominator else displayed_result;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_a: Number = 0;
+  let a_good = case observed_a { ok(_) => true; fault(_) => false; };
+  let a = case observed_a { ok(value) => value; fault(_) => remembered_a; };
+  remembered_a' = a;
+  state remembered_b: Number = 0;
+  let b_good = case observed_b { ok(_) => true; fault(_) => false; };
+  let b = case observed_b { ok(value) => value; fault(_) => remembered_b; };
+  remembered_b' = b;
+  input observed_a: Number;
+  input observed_b: Number;
   let zero = b == 0;
   let denominator = if zero then 1 else b;
   output result: Number;
 
-  result <- if zero then 0 else a / denominator;
+  result <- displayed_result';
 }
 ```
 
@@ -1234,7 +1376,12 @@ the explanation without creating a second independently editable canonical sourc
 ```ghost
 // E15
 control LiterateSwitch {
-  input switch_on: Bool;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_switch_on: Bool = false;
+  let switch_on_good = case observed_switch_on { ok(_) => true; fault(_) => false; };
+  let switch_on = case observed_switch_on { ok(value) => value; fault(_) => remembered_switch_on; };
+  remembered_switch_on' = switch_on;
+  input observed_switch_on: Bool;
   output lamp: Bool;
 ```
 
@@ -1549,7 +1696,7 @@ Literal conversion is exact before binary64 rounding. Do not feed a value such a
 ```ghost
 // E16
 control CelsiusHeater {
-  sensor air: Temperature {
+  input air: Temperature {
     sample = 1s;
     valid = -40°C .. 50°C;
     filter = median(1);
@@ -1568,7 +1715,7 @@ control CelsiusHeater {
 ```ghost
 // E17
 control FahrenheitHeater {
-  sensor air: Temperature {
+  input air: Temperature {
     sample = 1s;
     valid = -40°F .. 122°F;
     filter = median(1);
@@ -1587,7 +1734,7 @@ control FahrenheitHeater {
 ```ghost
 // E18
 control KelvinHeater {
-  sensor air: Temperature {
+  input air: Temperature {
     sample = 1s;
     valid = 233.15K .. 323.15K;
     filter = median(1);
@@ -1636,15 +1783,15 @@ fn air_vpd(t: Temperature, rh: RelativeHumidity) -> VaporPressureDeficit {
   ) * (1 - rh / 100%RH)
 }
 control HumidificationDemand {
-  sensor air: Temperature {
+  input air: Temperature {
     sample = 1s; valid = 0°C .. 50°C;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
-  sensor humidity: RelativeHumidity {
+  input humidity: RelativeHumidity {
     sample = 1s; valid = 0%RH .. 100%RH;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
-  sensor light: PPFD {
+  input light: PPFD {
     sample = 1s; valid = 0umol/m2/s .. 3000umol/m2/s;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
@@ -1686,15 +1833,15 @@ fn air_vpd(t: Temperature, rh: RelativeHumidity) -> VaporPressureDeficit {
   ) * (1 - rh / 100%RH)
 }
 control VentilationDemand {
-  sensor air: Temperature {
+  input air: Temperature {
     sample = 1s; valid = 0°C .. 50°C;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
-  sensor humidity: RelativeHumidity {
+  input humidity: RelativeHumidity {
     sample = 1s; valid = 0%RH .. 100%RH;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
-  sensor light: PPFD {
+  input light: PPFD {
     sample = 1s; valid = 0umol/m2/s .. 3000umol/m2/s;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
@@ -1736,15 +1883,15 @@ fn air_vpd(t: Temperature, rh: RelativeHumidity) -> VaporPressureDeficit {
   ) * (1 - rh / 100%RH)
 }
 control IrrigationDemand {
-  sensor air: Temperature {
+  input air: Temperature {
     sample = 1s; valid = 0°C .. 50°C;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
-  sensor humidity: RelativeHumidity {
+  input humidity: RelativeHumidity {
     sample = 1s; valid = 0%RH .. 100%RH;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
-  sensor light: PPFD {
+  input light: PPFD {
     sample = 1s; valid = 0umol/m2/s .. 3000umol/m2/s;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
@@ -1786,21 +1933,21 @@ inputs.
 ```ghost
 // E22
 import HighVpd from "./E19.ghost.md"
-  revision "7e135b93ea4c4988d305f992db277a6d8581a271"
-  sha256 "ef80061222c5c671b8b78d8fae733b543e51149c7e5d2c7d5e2bb2cc41fbdb30";
+  revision "c8a5d37ac09230a9011291a3ae3b053d1bc22773"
+  sha256 "7bc10efed87a3db2bbf2e5b56fbf0d6c9a45b54117104d3fa0948baa01f695b4";
 import LowVpd from "./E20.ghost.md"
-  revision "7e135b93ea4c4988d305f992db277a6d8581a271"
-  sha256 "bbf57007c5973684660747c515bb2534124d50341647b2282bd2ca32852a724b";
+  revision "c8a5d37ac09230a9011291a3ae3b053d1bc22773"
+  sha256 "9928297e43cd7c9790e6ca5178e71f4fd815223654fcd0b16fcc9605ea24bf38";
 control CombinedVpdDemands {
-  sensor air: Temperature {
+  input air: Temperature {
     sample = 1s; valid = 0°C .. 50°C;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
-  sensor humidity: RelativeHumidity {
+  input humidity: RelativeHumidity {
     sample = 1s; valid = 0%RH .. 100%RH;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
-  sensor light: PPFD {
+  input light: PPFD {
     sample = 1s; valid = 0umol/m2/s .. 3000umol/m2/s;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
@@ -1934,29 +2081,124 @@ separate sensor declarations for radiant irradiance and PPFD.
 ```ghost
 // E33
 control PhysicalQuantityUnits {
-  input air: Temperature;
-  input temperature_change: TemperatureDelta;
-  input humidity: RelativeHumidity;
-  input pressure: Pressure;
-  input vpd: VaporPressureDeficit;
-  input co2: CO2Concentration;
-  input flow: FlowRate;
-  input tank_volume: Volume;
-  input pipe_length: Length;
-  sensor irradiance: Irradiance {
+  state displayed_temperature_ok: Bool = false;
+  displayed_temperature_ok' = if air_good then air >= 25°C && air >= 77°F else displayed_temperature_ok;
+  state displayed_change_ok: Bool = false;
+  displayed_change_ok' = if temperature_change_good then temperature_change >= 5Δ°C && temperature_change >= 9Δ°F else displayed_change_ok;
+  state displayed_humidity_ok: Bool = false;
+  displayed_humidity_ok' = if humidity_good then humidity >= 70%RH else displayed_humidity_ok;
+  state displayed_pressure_ok: Bool = false;
+  displayed_pressure_ok' = if pressure_good then pressure >= 100kPa else displayed_pressure_ok;
+  state displayed_vpd_ok: Bool = false;
+  displayed_vpd_ok' = if vpd_good then vpd >= 1kPaVPD else displayed_vpd_ok;
+  state displayed_co2_ok: Bool = false;
+  displayed_co2_ok' = if co2_good then co2 >= 800ppm else displayed_co2_ok;
+  state displayed_volume_ok: Bool = false;
+  displayed_volume_ok' = if tank_volume_good then tank_volume >= 20L else displayed_volume_ok;
+  state displayed_length_ok: Bool = false;
+  displayed_length_ok' = if pipe_length_good then pipe_length >= 35cm else displayed_length_ok;
+  state displayed_energy_ok: Bool = false;
+  displayed_energy_ok' = if stored_energy_good then stored_energy >= 1kWh else displayed_energy_ok;
+  state displayed_power_ok: Bool = false;
+  displayed_power_ok' = if rated_power_good then rated_power >= 150W else displayed_power_ok;
+  state displayed_current_ok: Bool = false;
+  displayed_current_ok' = if current_good then current >= 800mA else displayed_current_ok;
+  state displayed_voltage_ok: Bool = false;
+  displayed_voltage_ok' = if voltage_good then voltage >= 24V else displayed_voltage_ok;
+  state displayed_conductivity_ok: Bool = false;
+  displayed_conductivity_ok' = if conductivity_good then conductivity >= 1.5mS/cm else displayed_conductivity_ok;
+  state displayed_acidity_ok: Bool = false;
+  displayed_acidity_ok' = if acidity_good then acidity <= 6.5pH else displayed_acidity_ok;
+  state displayed_pumped_volume: Volume = 0L;
+  displayed_pumped_volume' = if flow_good then flow * 1min else displayed_pumped_volume;
+  state displayed_motor_power: Power = 0W;
+  displayed_motor_power' = if current_good && voltage_good then motor_load else displayed_motor_power;
+  state displayed_hourly_energy: Energy = 0Wh;
+  displayed_hourly_energy' = if current_good && voltage_good then motor_load * 1h else displayed_hourly_energy;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_air: Temperature = 0°C;
+  let air_good = case observed_air { ok(_) => true; fault(_) => false; };
+  let air = case observed_air { ok(value) => value; fault(_) => remembered_air; };
+  remembered_air' = air;
+  state remembered_temperature_change: TemperatureDelta = 0Δ°C;
+  let temperature_change_good = case observed_temperature_change { ok(_) => true; fault(_) => false; };
+  let temperature_change = case observed_temperature_change { ok(value) => value; fault(_) => remembered_temperature_change; };
+  remembered_temperature_change' = temperature_change;
+  state remembered_humidity: RelativeHumidity = 0%RH;
+  let humidity_good = case observed_humidity { ok(_) => true; fault(_) => false; };
+  let humidity = case observed_humidity { ok(value) => value; fault(_) => remembered_humidity; };
+  remembered_humidity' = humidity;
+  state remembered_pressure: Pressure = 0kPa;
+  let pressure_good = case observed_pressure { ok(_) => true; fault(_) => false; };
+  let pressure = case observed_pressure { ok(value) => value; fault(_) => remembered_pressure; };
+  remembered_pressure' = pressure;
+  state remembered_vpd: VaporPressureDeficit = 0kPaVPD;
+  let vpd_good = case observed_vpd { ok(_) => true; fault(_) => false; };
+  let vpd = case observed_vpd { ok(value) => value; fault(_) => remembered_vpd; };
+  remembered_vpd' = vpd;
+  state remembered_co2: CO2Concentration = 0ppm;
+  let co2_good = case observed_co2 { ok(_) => true; fault(_) => false; };
+  let co2 = case observed_co2 { ok(value) => value; fault(_) => remembered_co2; };
+  remembered_co2' = co2;
+  state remembered_flow: FlowRate = 0L/min;
+  let flow_good = case observed_flow { ok(_) => true; fault(_) => false; };
+  let flow = case observed_flow { ok(value) => value; fault(_) => remembered_flow; };
+  remembered_flow' = flow;
+  state remembered_tank_volume: Volume = 0L;
+  let tank_volume_good = case observed_tank_volume { ok(_) => true; fault(_) => false; };
+  let tank_volume = case observed_tank_volume { ok(value) => value; fault(_) => remembered_tank_volume; };
+  remembered_tank_volume' = tank_volume;
+  state remembered_pipe_length: Length = 0m;
+  let pipe_length_good = case observed_pipe_length { ok(_) => true; fault(_) => false; };
+  let pipe_length = case observed_pipe_length { ok(value) => value; fault(_) => remembered_pipe_length; };
+  remembered_pipe_length' = pipe_length;
+  state remembered_stored_energy: Energy = 0Wh;
+  let stored_energy_good = case observed_stored_energy { ok(_) => true; fault(_) => false; };
+  let stored_energy = case observed_stored_energy { ok(value) => value; fault(_) => remembered_stored_energy; };
+  remembered_stored_energy' = stored_energy;
+  state remembered_rated_power: Power = 0W;
+  let rated_power_good = case observed_rated_power { ok(_) => true; fault(_) => false; };
+  let rated_power = case observed_rated_power { ok(value) => value; fault(_) => remembered_rated_power; };
+  remembered_rated_power' = rated_power;
+  state remembered_current: ElectricalCurrent = 0A;
+  let current_good = case observed_current { ok(_) => true; fault(_) => false; };
+  let current = case observed_current { ok(value) => value; fault(_) => remembered_current; };
+  remembered_current' = current;
+  state remembered_voltage: Voltage = 0V;
+  let voltage_good = case observed_voltage { ok(_) => true; fault(_) => false; };
+  let voltage = case observed_voltage { ok(value) => value; fault(_) => remembered_voltage; };
+  remembered_voltage' = voltage;
+  state remembered_conductivity: Conductivity = 0mS/cm;
+  let conductivity_good = case observed_conductivity { ok(_) => true; fault(_) => false; };
+  let conductivity = case observed_conductivity { ok(value) => value; fault(_) => remembered_conductivity; };
+  remembered_conductivity' = conductivity;
+  state remembered_acidity: Acidity = 0pH;
+  let acidity_good = case observed_acidity { ok(_) => true; fault(_) => false; };
+  let acidity = case observed_acidity { ok(value) => value; fault(_) => remembered_acidity; };
+  remembered_acidity' = acidity;
+  input observed_air: Temperature;
+  input observed_temperature_change: TemperatureDelta;
+  input observed_humidity: RelativeHumidity;
+  input observed_pressure: Pressure;
+  input observed_vpd: VaporPressureDeficit;
+  input observed_co2: CO2Concentration;
+  input observed_flow: FlowRate;
+  input observed_tank_volume: Volume;
+  input observed_pipe_length: Length;
+  input irradiance: Irradiance {
     sample = 1s; valid = 0W/m2 .. 1500W/m2;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
-  sensor ppfd: PPFD {
+  input ppfd: PPFD {
     sample = 1s; valid = 0umol/m2/s .. 3000umol/m2/s;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
-  input stored_energy: Energy;
-  input rated_power: Power;
-  input current: ElectricalCurrent;
-  input voltage: Voltage;
-  input conductivity: Conductivity;
-  input acidity: Acidity;
+  input observed_stored_energy: Energy;
+  input observed_rated_power: Power;
+  input observed_current: ElectricalCurrent;
+  input observed_voltage: Voltage;
+  input observed_conductivity: Conductivity;
+  input observed_acidity: Acidity;
 
   output temperature_ok, change_ok, humidity_ok, pressure_ok, vpd_ok: Bool;
   output co2_ok, volume_ok, length_ok, irradiance_ok, ppfd_ok: Bool;
@@ -1966,25 +2208,25 @@ control PhysicalQuantityUnits {
   output hourly_energy: Energy;
 
   let motor_load = voltage * current;
-  temperature_ok <- air >= 25°C && air >= 77°F;
-  change_ok <- temperature_change >= 5Δ°C && temperature_change >= 9Δ°F;
-  humidity_ok <- humidity >= 70%RH;
-  pressure_ok <- pressure >= 100kPa;
-  vpd_ok <- vpd >= 1kPaVPD;
-  co2_ok <- co2 >= 800ppm;
-  volume_ok <- tank_volume >= 20L;
-  length_ok <- pipe_length >= 35cm;
+  temperature_ok <- displayed_temperature_ok';
+  change_ok <- displayed_change_ok';
+  humidity_ok <- displayed_humidity_ok';
+  pressure_ok <- displayed_pressure_ok';
+  vpd_ok <- displayed_vpd_ok';
+  co2_ok <- displayed_co2_ok';
+  volume_ok <- displayed_volume_ok';
+  length_ok <- displayed_length_ok';
   irradiance_ok <- case irradiance { ok(value) => value >= 300W/m2; fault(_) => false; };
   ppfd_ok <- case ppfd { ok(value) => value >= 600umol/m2/s; fault(_) => false; };
-  energy_ok <- stored_energy >= 1kWh;
-  power_ok <- rated_power >= 150W;
-  current_ok <- current >= 800mA;
-  voltage_ok <- voltage >= 24V;
-  conductivity_ok <- conductivity >= 1.5mS/cm;
-  acidity_ok <- acidity <= 6.5pH;
-  pumped_volume <- flow * 1min;
-  motor_power <- motor_load;
-  hourly_energy <- motor_load * 1h;
+  energy_ok <- displayed_energy_ok';
+  power_ok <- displayed_power_ok';
+  current_ok <- displayed_current_ok';
+  voltage_ok <- displayed_voltage_ok';
+  conductivity_ok <- displayed_conductivity_ok';
+  acidity_ok <- displayed_acidity_ok';
+  pumped_volume <- displayed_pumped_volume';
+  motor_power <- displayed_motor_power';
+  hourly_energy <- displayed_hourly_energy';
 }
 ```
 
@@ -2045,7 +2287,7 @@ A newline does not replace the end of a declaration. `;` is required after the d
 
 ```ghost-error
 control MixedTypes {
-  input level: Number;
+  let level: Number = 0;
   output pump: Bool;
   pump <- level < 30%;
 }
@@ -2118,7 +2360,7 @@ An output needs one connection. Statement order does not overwrite an earlier co
 
 ```ghost-error
 control BareSensor {
-  sensor moisture: Percent;
+  input moisture: Percent;
   output pump: Bool;
   pump <- moisture < 30%;
 }
@@ -2168,19 +2410,39 @@ Run one scan with `start=true`, `jam_clear=false`, and `reset=false`. `fault_lat
 ```ghost
 // E23
 control TraceableConveyor {
-  input start, stop, jam_clear, reset: Bool;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_start: Bool = false;
+  let start_good = case observed_start { ok(_) => true; fault(_) => false; };
+  let start = case observed_start { ok(value) => value; fault(_) => remembered_start; };
+  remembered_start' = start;
+  state remembered_stop: Bool = false;
+  let stop_good = case observed_stop { ok(_) => true; fault(_) => false; };
+  let stop = case observed_stop { ok(value) => value; fault(_) => remembered_stop; };
+  remembered_stop' = stop;
+  state remembered_jam_clear: Bool = false;
+  let jam_clear_good = case observed_jam_clear { ok(_) => true; fault(_) => false; };
+  let jam_clear = case observed_jam_clear { ok(value) => value; fault(_) => remembered_jam_clear; };
+  remembered_jam_clear' = jam_clear;
+  state remembered_reset: Bool = false;
+  let reset_good = case observed_reset { ok(_) => true; fault(_) => false; };
+  let reset = case observed_reset { ok(value) => value; fault(_) => remembered_reset; };
+  remembered_reset' = reset;
+  input observed_start: Bool;
+  input observed_stop: Bool;
+  input observed_jam_clear: Bool;
+  input observed_reset: Bool;
   state running: Bool = false;
   state fault_latched: Bool = false;
   state start_armed: Bool = true;
   let fault_next = (fault_latched && !reset) || !jam_clear;
 
-  fault_latched' = fault_next;
-  start_armed' = !fault_next && !start;
-  running' = !stop && jam_clear && !fault_latched && (running || (start_armed && start));
+  fault_latched' = if jam_clear_good && !jam_clear then true else if start_good && stop_good && jam_clear_good && reset_good then (fault_next) else fault_latched;
+  start_armed' = if stop_good && stop then false else if jam_clear_good && !jam_clear then false else if start_good && stop_good && jam_clear_good && reset_good then (!fault_next && !start) else start_armed;
+  running' = if stop_good && stop then false else if jam_clear_good && !jam_clear then false else if start_good && stop_good && jam_clear_good && reset_good then (!stop && jam_clear && !fault_latched && (running || (start_armed && start))) else running;
 
   output conveyor, fault_lamp: Bool;
   conveyor <- running';
-  fault_lamp <- fault_next;
+  fault_lamp <- fault_latched';
 }
 ```
 
@@ -2195,16 +2457,38 @@ Set `open_request` for one scan and the command stays active. The “moving” i
 ```ghost
 // E24
 control ValvePanelState {
-  input open_request, close_request, stop, open_limit: Bool;
+  state displayed_open_confirmed: Bool = false;
+  displayed_open_confirmed' = if open_limit_good && !open_limit then false else if open_limit_good then open_limit else displayed_open_confirmed;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_open_request: Bool = false;
+  let open_request_good = case observed_open_request { ok(_) => true; fault(_) => false; };
+  let open_request = case observed_open_request { ok(value) => value; fault(_) => remembered_open_request; };
+  remembered_open_request' = open_request;
+  state remembered_close_request: Bool = false;
+  let close_request_good = case observed_close_request { ok(_) => true; fault(_) => false; };
+  let close_request = case observed_close_request { ok(value) => value; fault(_) => remembered_close_request; };
+  remembered_close_request' = close_request;
+  state remembered_stop: Bool = false;
+  let stop_good = case observed_stop { ok(_) => true; fault(_) => false; };
+  let stop = case observed_stop { ok(value) => value; fault(_) => remembered_stop; };
+  remembered_stop' = stop;
+  state remembered_open_limit: Bool = false;
+  let open_limit_good = case observed_open_limit { ok(_) => true; fault(_) => false; };
+  let open_limit = case observed_open_limit { ok(value) => value; fault(_) => remembered_open_limit; };
+  remembered_open_limit' = open_limit;
+  input observed_open_request: Bool;
+  input observed_close_request: Bool;
+  input observed_stop: Bool;
+  input observed_open_limit: Bool;
   state target_open: Bool = false;
 
-  target_open' = !stop && !close_request && (open_request || target_open);
+  target_open' = if close_request_good && close_request then false else if stop_good && stop then false else if open_request_good && close_request_good && stop_good && open_limit_good then (!stop && !close_request && (open_request || target_open)) else target_open;
 
   output open_command, close_command, moving_open, open_confirmed: Bool;
   open_command <- !stop && target_open';
   close_command <- !stop && !target_open';
   moving_open <- !stop && target_open' && !open_limit;
-  open_confirmed <- open_limit;
+  open_confirmed <- displayed_open_confirmed';
   require !(open_command && close_command);
 }
 ```
@@ -2220,12 +2504,33 @@ This is a first step for understanding logical priority before a firmware upload
 ```ghost
 // E25
 control DirectionRequestGate {
-  input stop_ok, forward_request, reverse_request: Bool;
+  state displayed_forward_command: Bool = false;
+  displayed_forward_command' = if forward_request_good && !forward_request then false else if reverse_request_good && reverse_request then false else if stop_ok_good && !stop_ok then false else if forward_request_good && reverse_request_good && stop_ok_good then stop_ok && forward_request && !reverse_request else displayed_forward_command;
+  state displayed_reverse_command: Bool = false;
+  displayed_reverse_command' = if forward_request_good && forward_request then false else if reverse_request_good && !reverse_request then false else if stop_ok_good && !stop_ok then false else if forward_request_good && reverse_request_good && stop_ok_good then stop_ok && reverse_request && !forward_request else displayed_reverse_command;
+  state displayed_conflict: Bool = false;
+  displayed_conflict' = if forward_request_good && !forward_request then false else if reverse_request_good && !reverse_request then false else if forward_request_good && reverse_request_good then forward_request && reverse_request else displayed_conflict;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_stop_ok: Bool = false;
+  let stop_ok_good = case observed_stop_ok { ok(_) => true; fault(_) => false; };
+  let stop_ok = case observed_stop_ok { ok(value) => value; fault(_) => remembered_stop_ok; };
+  remembered_stop_ok' = stop_ok;
+  state remembered_forward_request: Bool = false;
+  let forward_request_good = case observed_forward_request { ok(_) => true; fault(_) => false; };
+  let forward_request = case observed_forward_request { ok(value) => value; fault(_) => remembered_forward_request; };
+  remembered_forward_request' = forward_request;
+  state remembered_reverse_request: Bool = false;
+  let reverse_request_good = case observed_reverse_request { ok(_) => true; fault(_) => false; };
+  let reverse_request = case observed_reverse_request { ok(value) => value; fault(_) => remembered_reverse_request; };
+  remembered_reverse_request' = reverse_request;
+  input observed_stop_ok: Bool;
+  input observed_forward_request: Bool;
+  input observed_reverse_request: Bool;
   output forward_command, reverse_command, conflict: Bool;
 
-  forward_command <- stop_ok && forward_request && !reverse_request;
-  reverse_command <- stop_ok && reverse_request && !forward_request;
-  conflict <- forward_request && reverse_request;
+  forward_command <- displayed_forward_command';
+  reverse_command <- displayed_reverse_command';
+  conflict <- displayed_conflict';
   require !(forward_command && reverse_command);
 }
 ```
@@ -2241,10 +2546,27 @@ The rule below requests a pump only when the watering window is open, the soil n
 ```ghost
 // E26
 control ReviewedWateringRule {
-  input watering_window, soil_needs_water, source_ready: Bool;
+  state displayed_pump_request: Bool = false;
+  displayed_pump_request' = if soil_needs_water_good && !soil_needs_water then false else if source_ready_good && !source_ready then false else if watering_window_good && !watering_window then false else if soil_needs_water_good && source_ready_good && watering_window_good then watering_window && soil_needs_water && source_ready else displayed_pump_request;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_watering_window: Bool = false;
+  let watering_window_good = case observed_watering_window { ok(_) => true; fault(_) => false; };
+  let watering_window = case observed_watering_window { ok(value) => value; fault(_) => remembered_watering_window; };
+  remembered_watering_window' = watering_window;
+  state remembered_soil_needs_water: Bool = false;
+  let soil_needs_water_good = case observed_soil_needs_water { ok(_) => true; fault(_) => false; };
+  let soil_needs_water = case observed_soil_needs_water { ok(value) => value; fault(_) => remembered_soil_needs_water; };
+  remembered_soil_needs_water' = soil_needs_water;
+  state remembered_source_ready: Bool = false;
+  let source_ready_good = case observed_source_ready { ok(_) => true; fault(_) => false; };
+  let source_ready = case observed_source_ready { ok(value) => value; fault(_) => remembered_source_ready; };
+  remembered_source_ready' = source_ready;
+  input observed_watering_window: Bool;
+  input observed_soil_needs_water: Bool;
+  input observed_source_ready: Bool;
   output pump_request: Bool;
 
-  pump_request <- watering_window && soil_needs_water && source_ready;
+  pump_request <- displayed_pump_request';
 }
 ```
 
@@ -2259,14 +2581,46 @@ Output names represent device roles, not GPIO numbers. The board binding and dri
 ```ghost
 // E27
 control BoardShowcase {
-  input enabled, light_schedule, ventilation_request: Bool;
-  input drain_request, drain_path_ready: Bool;
+  state displayed_grow_light: Bool = false;
+  displayed_grow_light' = if enabled_good && !enabled then false else if light_schedule_good && !light_schedule then false else if enabled_good && light_schedule_good then enabled && light_schedule else displayed_grow_light;
+  state displayed_circulation_fan: Bool = false;
+  displayed_circulation_fan' = if enabled_good && !enabled then false else if ventilation_request_good && !ventilation_request then false else if enabled_good && ventilation_request_good then enabled && ventilation_request else displayed_circulation_fan;
+  state displayed_drain_pump: Bool = false;
+  displayed_drain_pump' = if drain_path_ready_good && !drain_path_ready then false else if drain_request_good && !drain_request then false else if enabled_good && !enabled then false else if drain_path_ready_good && drain_request_good && enabled_good then enabled && drain_request && drain_path_ready else displayed_drain_pump;
+  state displayed_warning: Bool = false;
+  displayed_warning' = if drain_path_ready_good && drain_path_ready then false else if drain_request_good && !drain_request then false else if drain_path_ready_good && drain_request_good then drain_request && !drain_path_ready else displayed_warning;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_enabled: Bool = false;
+  let enabled_good = case observed_enabled { ok(_) => true; fault(_) => false; };
+  let enabled = case observed_enabled { ok(value) => value; fault(_) => remembered_enabled; };
+  remembered_enabled' = enabled;
+  state remembered_light_schedule: Bool = false;
+  let light_schedule_good = case observed_light_schedule { ok(_) => true; fault(_) => false; };
+  let light_schedule = case observed_light_schedule { ok(value) => value; fault(_) => remembered_light_schedule; };
+  remembered_light_schedule' = light_schedule;
+  state remembered_ventilation_request: Bool = false;
+  let ventilation_request_good = case observed_ventilation_request { ok(_) => true; fault(_) => false; };
+  let ventilation_request = case observed_ventilation_request { ok(value) => value; fault(_) => remembered_ventilation_request; };
+  remembered_ventilation_request' = ventilation_request;
+  state remembered_drain_request: Bool = false;
+  let drain_request_good = case observed_drain_request { ok(_) => true; fault(_) => false; };
+  let drain_request = case observed_drain_request { ok(value) => value; fault(_) => remembered_drain_request; };
+  remembered_drain_request' = drain_request;
+  state remembered_drain_path_ready: Bool = false;
+  let drain_path_ready_good = case observed_drain_path_ready { ok(_) => true; fault(_) => false; };
+  let drain_path_ready = case observed_drain_path_ready { ok(value) => value; fault(_) => remembered_drain_path_ready; };
+  remembered_drain_path_ready' = drain_path_ready;
+  input observed_enabled: Bool;
+  input observed_light_schedule: Bool;
+  input observed_ventilation_request: Bool;
+  input observed_drain_request: Bool;
+  input observed_drain_path_ready: Bool;
   output grow_light, circulation_fan, drain_pump, warning: Bool;
 
-  grow_light <- enabled && light_schedule;
-  circulation_fan <- enabled && ventilation_request;
-  drain_pump <- enabled && drain_request && drain_path_ready;
-  warning <- drain_request && !drain_path_ready;
+  grow_light <- displayed_grow_light';
+  circulation_fan <- displayed_circulation_fan';
+  drain_pump <- displayed_drain_pump';
+  warning <- displayed_warning';
 }
 ```
 
@@ -2281,10 +2635,30 @@ Set `fill_request` while `valve_open_limit=false`: only the valve command turns 
 ```ghost
 // E28
 control ConfirmedValveFill {
-  input fill_request, stop_ok, valve_open_limit, source_full: Bool;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_fill_request: Bool = false;
+  let fill_request_good = case observed_fill_request { ok(_) => true; fault(_) => false; };
+  let fill_request = case observed_fill_request { ok(value) => value; fault(_) => remembered_fill_request; };
+  remembered_fill_request' = fill_request;
+  state remembered_stop_ok: Bool = false;
+  let stop_ok_good = case observed_stop_ok { ok(_) => true; fault(_) => false; };
+  let stop_ok = case observed_stop_ok { ok(value) => value; fault(_) => remembered_stop_ok; };
+  remembered_stop_ok' = stop_ok;
+  state remembered_valve_open_limit: Bool = false;
+  let valve_open_limit_good = case observed_valve_open_limit { ok(_) => true; fault(_) => false; };
+  let valve_open_limit = case observed_valve_open_limit { ok(value) => value; fault(_) => remembered_valve_open_limit; };
+  remembered_valve_open_limit' = valve_open_limit;
+  state remembered_source_full: Bool = false;
+  let source_full_good = case observed_source_full { ok(_) => true; fault(_) => false; };
+  let source_full = case observed_source_full { ok(value) => value; fault(_) => remembered_source_full; };
+  remembered_source_full' = source_full;
+  input observed_fill_request: Bool;
+  input observed_stop_ok: Bool;
+  input observed_valve_open_limit: Bool;
+  input observed_source_full: Bool;
   state filling: Bool = false;
 
-  filling' = stop_ok && !source_full && (fill_request || filling);
+  filling' = if stop_ok_good && !stop_ok then false else if source_full_good && source_full then false else if fill_request_good && stop_ok_good && valve_open_limit_good && source_full_good then (stop_ok && !source_full && (fill_request || filling)) else filling;
 
   output valve_open_command, pump_command: Bool;
   valve_open_command <- filling';
@@ -2304,12 +2678,33 @@ This indicator does not decide whether the valve has exceeded its normal travel 
 ```ghost
 // E29
 control ValveWaitDiagnosis {
-  input fill_request, stop_ok, valve_open_limit: Bool;
+  state displayed_valve_open_command: Bool = false;
+  displayed_valve_open_command' = if fill_request_good && !fill_request then false else if stop_ok_good && !stop_ok then false else if fill_request_good && stop_ok_good then fill_request && stop_ok else displayed_valve_open_command;
+  state displayed_pump_command: Bool = false;
+  displayed_pump_command' = if fill_request_good && !fill_request then false else if stop_ok_good && !stop_ok then false else if valve_open_limit_good && !valve_open_limit then false else if fill_request_good && stop_ok_good && valve_open_limit_good then fill_request && stop_ok && valve_open_limit else displayed_pump_command;
+  state displayed_waiting_for_valve: Bool = false;
+  displayed_waiting_for_valve' = if fill_request_good && !fill_request then false else if stop_ok_good && !stop_ok then false else if valve_open_limit_good && valve_open_limit then false else if fill_request_good && stop_ok_good && valve_open_limit_good then fill_request && stop_ok && !valve_open_limit else displayed_waiting_for_valve;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_fill_request: Bool = false;
+  let fill_request_good = case observed_fill_request { ok(_) => true; fault(_) => false; };
+  let fill_request = case observed_fill_request { ok(value) => value; fault(_) => remembered_fill_request; };
+  remembered_fill_request' = fill_request;
+  state remembered_stop_ok: Bool = false;
+  let stop_ok_good = case observed_stop_ok { ok(_) => true; fault(_) => false; };
+  let stop_ok = case observed_stop_ok { ok(value) => value; fault(_) => remembered_stop_ok; };
+  remembered_stop_ok' = stop_ok;
+  state remembered_valve_open_limit: Bool = false;
+  let valve_open_limit_good = case observed_valve_open_limit { ok(_) => true; fault(_) => false; };
+  let valve_open_limit = case observed_valve_open_limit { ok(value) => value; fault(_) => remembered_valve_open_limit; };
+  remembered_valve_open_limit' = valve_open_limit;
+  input observed_fill_request: Bool;
+  input observed_stop_ok: Bool;
+  input observed_valve_open_limit: Bool;
   output valve_open_command, pump_command, waiting_for_valve: Bool;
 
-  valve_open_command <- fill_request && stop_ok;
-  pump_command <- fill_request && stop_ok && valve_open_limit;
-  waiting_for_valve <- fill_request && stop_ok && !valve_open_limit;
+  valve_open_command <- displayed_valve_open_command';
+  pump_command <- displayed_pump_command';
+  waiting_for_valve <- displayed_waiting_for_valve';
 }
 ```
 
@@ -2324,11 +2719,35 @@ An irrigation policy is not just a moisture reading. The farmer’s crop and wor
 ```ghost
 // E30
 control FarmerDirectedWatering {
-  input enabled, watering_window, soil_needs_water, source_ready: Bool;
+  state displayed_pump_request: Bool = false;
+  displayed_pump_request' = if enabled_good && !enabled then false else if soil_needs_water_good && !soil_needs_water then false else if source_ready_good && !source_ready then false else if watering_window_good && !watering_window then false else if enabled_good && soil_needs_water_good && source_ready_good && watering_window_good then enabled && watering_window && soil_needs_water && source_ready else displayed_pump_request;
+  state displayed_source_attention: Bool = false;
+  displayed_source_attention' = if enabled_good && !enabled then false else if soil_needs_water_good && !soil_needs_water then false else if source_ready_good && source_ready then false else if watering_window_good && !watering_window then false else if enabled_good && soil_needs_water_good && source_ready_good && watering_window_good then enabled && watering_window && soil_needs_water && !source_ready else displayed_source_attention;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_enabled: Bool = false;
+  let enabled_good = case observed_enabled { ok(_) => true; fault(_) => false; };
+  let enabled = case observed_enabled { ok(value) => value; fault(_) => remembered_enabled; };
+  remembered_enabled' = enabled;
+  state remembered_watering_window: Bool = false;
+  let watering_window_good = case observed_watering_window { ok(_) => true; fault(_) => false; };
+  let watering_window = case observed_watering_window { ok(value) => value; fault(_) => remembered_watering_window; };
+  remembered_watering_window' = watering_window;
+  state remembered_soil_needs_water: Bool = false;
+  let soil_needs_water_good = case observed_soil_needs_water { ok(_) => true; fault(_) => false; };
+  let soil_needs_water = case observed_soil_needs_water { ok(value) => value; fault(_) => remembered_soil_needs_water; };
+  remembered_soil_needs_water' = soil_needs_water;
+  state remembered_source_ready: Bool = false;
+  let source_ready_good = case observed_source_ready { ok(_) => true; fault(_) => false; };
+  let source_ready = case observed_source_ready { ok(value) => value; fault(_) => remembered_source_ready; };
+  remembered_source_ready' = source_ready;
+  input observed_enabled: Bool;
+  input observed_watering_window: Bool;
+  input observed_soil_needs_water: Bool;
+  input observed_source_ready: Bool;
   output pump_request, source_attention: Bool;
 
-  pump_request <- enabled && watering_window && soil_needs_water && source_ready;
-  source_attention <- enabled && watering_window && soil_needs_water && !source_ready;
+  pump_request <- displayed_pump_request';
+  source_attention <- displayed_source_attention';
 }
 ```
 
@@ -2343,21 +2762,21 @@ Both demands can be true at once. Before connecting them to shared power or outp
 ```ghost
 // E31
 import Irrigation from "./E21.ghost.md"
-  revision "7e135b93ea4c4988d305f992db277a6d8581a271"
-  sha256 "d461a2a0f722271a172ce4c3d66665dad8f3a58a54079712e4bd3adb55f003a0";
+  revision "c8a5d37ac09230a9011291a3ae3b053d1bc22773"
+  sha256 "089daea1b525b0be49685b3595554bfb1aa67091fc995da2d65fb0ef9a24357d";
 import Ventilation from "./E20.ghost.md"
-  revision "7e135b93ea4c4988d305f992db277a6d8581a271"
-  sha256 "bbf57007c5973684660747c515bb2534124d50341647b2282bd2ca32852a724b";
+  revision "c8a5d37ac09230a9011291a3ae3b053d1bc22773"
+  sha256 "9928297e43cd7c9790e6ca5178e71f4fd815223654fcd0b16fcc9605ea24bf38";
 control CombinedGreenhouseDemands {
-  sensor air: Temperature {
+  input air: Temperature {
     sample = 1s; valid = 0°C .. 50°C;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
-  sensor humidity: RelativeHumidity {
+  input humidity: RelativeHumidity {
     sample = 1s; valid = 0%RH .. 100%RH;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
-  sensor light: PPFD {
+  input light: PPFD {
     sample = 1s; valid = 0umol/m2/s .. 3000umol/m2/s;
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
@@ -2386,9 +2805,21 @@ Keeping the `.ghost.md` file with the Language Reference and compiler revision p
 ```ghost
 // E32
 control OwnedWateringRule {
-  input soil_moisture, threshold: Percent;
+  state displayed_pump_request: Bool = false;
+  displayed_pump_request' = if soil_moisture_good && threshold_good then soil_moisture < threshold else displayed_pump_request;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_soil_moisture: Percent = 0%;
+  let soil_moisture_good = case observed_soil_moisture { ok(_) => true; fault(_) => false; };
+  let soil_moisture = case observed_soil_moisture { ok(value) => value; fault(_) => remembered_soil_moisture; };
+  remembered_soil_moisture' = soil_moisture;
+  state remembered_threshold: Percent = 0%;
+  let threshold_good = case observed_threshold { ok(_) => true; fault(_) => false; };
+  let threshold = case observed_threshold { ok(value) => value; fault(_) => remembered_threshold; };
+  remembered_threshold' = threshold;
+  input observed_soil_moisture: Percent;
+  input observed_threshold: Percent;
   output pump_request: Bool;
-  pump_request <- soil_moisture < threshold;
+  pump_request <- displayed_pump_request';
 }
 ```
 
@@ -2428,10 +2859,15 @@ Add one on every successful scan with `add=true`. This counts scans, rather than
 ```ghost
 // E34
 control ExactScanCount {
-  input add: Bool;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_add: Bool = false;
+  let add_good = case observed_add { ok(_) => true; fault(_) => false; };
+  let add = case observed_add { ok(value) => value; fault(_) => remembered_add; };
+  remembered_add' = add;
+  input observed_add: Bool;
   state count: Int = 0;
   output total: Int;
-  count' = if add then count + 1 else count;
+  count' = if add_good then (if add then count + 1 else count) else count;
   total <- count';
 }
 ```
@@ -2443,12 +2879,21 @@ The local spelling 06:30+09:00 and the previous day's 21:30Z identify the same U
 ```ghost
 // E35
 control AbsoluteWindow {
-  input now: DateTime;
+  state displayed_in_window: Bool = false;
+  displayed_in_window' = if now_good then now >= start && now < end else displayed_in_window;
+  state displayed_same_instant: Bool = false;
+  displayed_same_instant' = if true then start == datetime`2026-09-29T21:30:00Z` else displayed_same_instant;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_now: DateTime = datetime`1970-01-01T00:00:00Z`;
+  let now_good = case observed_now { ok(_) => true; fault(_) => false; };
+  let now = case observed_now { ok(value) => value; fault(_) => remembered_now; };
+  remembered_now' = now;
+  input observed_now: DateTime;
   output in_window, same_instant: Bool;
   let start = datetime`2026-09-30T06:30:00+09:00`;
   let end = start + 5min;
-  in_window <- now >= start && now < end;
-  same_instant <- start == datetime`2026-09-29T21:30:00Z`;
+  in_window <- displayed_in_window';
+  same_instant <- displayed_same_instant';
 }
 ```
 
@@ -2461,21 +2906,28 @@ When the Solar event is unavailable, use the explicit alternative at UTC 06:30. 
 ```ghost
 // E36
 control SolarFallbackStart {
-  input enabled: Bool;
+  state displayed_start: Bool = false;
+  displayed_start' = if true then dawn.due else displayed_start;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_enabled: Bool = false;
+  let enabled_good = case observed_enabled { ok(_) => true; fault(_) => false; };
+  let enabled = case observed_enabled { ok(value) => value; fault(_) => remembered_enabled; };
+  remembered_enabled' = enabled;
+  input observed_enabled: Bool;
   schedule dawn: Solar {
     timezone = "UTC";
     latitude = 37;
     longitude = 127;
     at = sun`rise + 30min`;
     basis = pulse;
-    when = enabled;
+    when = enabled_good && enabled;
     clock = hold_trusted(2min, terminal: skip);
     gap = skip_after(60s);
     recovery = baseline;
     fallback = fixed_time(time`06:30`, terminal: skip);
   }
   output start: Bool;
-  start <- dawn.due;
+  start <- displayed_start';
 }
 ```
 
@@ -2488,22 +2940,34 @@ Missing/stale predictions or an Unknown clock do not admit new runs. `fallback=s
 ```ghost
 // E37
 control TideRun {
-  input allowed, stop: Bool;
+  state displayed_pump: Bool = false;
+  displayed_pump' = if true then high.active else displayed_pump;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_allowed: Bool = false;
+  let allowed_good = case observed_allowed { ok(_) => true; fault(_) => false; };
+  let allowed = case observed_allowed { ok(value) => value; fault(_) => remembered_allowed; };
+  remembered_allowed' = allowed;
+  state remembered_stop: Bool = false;
+  let stop_good = case observed_stop { ok(_) => true; fault(_) => false; };
+  let stop = case observed_stop { ok(value) => value; fault(_) => remembered_stop; };
+  remembered_stop' = stop;
+  input observed_allowed: Bool;
+  input observed_stop: Bool;
   provider harbor_tides: TidePredictions;
   schedule high: Tide {
     source = harbor_tides;
     timezone = "UTC";
     at = tide`high - 30min`;
     basis = run(5min, within(10min));
-    when = allowed;
-    cancel_when = stop;
+    when = allowed_good && allowed;
+    cancel_when = stop_good && stop;
     clock = trusted_only;
     gap = skip_after(60s);
     recovery = baseline;
     fallback = skip;
   }
   output pump: Bool;
-  pump <- high.active;
+  pump <- displayed_pump';
 }
 ```
 
@@ -2513,8 +2977,8 @@ Here count is Int and measurement is Number. The compiler rejects this code. If 
 
 ```ghost-error
 control MixedCount {
-  input count: Int;
-  input measurement: Number;
+  let count: Int = 1;
+  let measurement: Number = 1.5;
   output total: Number;
   total <- count + measurement;
 }

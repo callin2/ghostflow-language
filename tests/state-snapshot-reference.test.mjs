@@ -1,3 +1,5 @@
+import { softwareQualityRails } from './helpers/software-quality-observations.mjs';
+import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -7,24 +9,24 @@ import test from 'node:test';
 import { compileSource } from '../tools/toolchain.mjs';
 import { GhostFlowRuntime } from '../runtimes/wasm/ghostflow-runtime.mjs';
 
-const root = path.resolve(new URL('../', import.meta.url).pathname);
-const nativePath = path.join(root, 'target/release/examples/run');
+const root = fileURLToPath(new URL('../', import.meta.url));
+const nativePath = path.join(root, 'target/release/examples/run' + (process.platform === 'win32' ? '.exe' : ''));
 const wasmPath = path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm');
 const header = '# State snapshot reference\n\n' + String.fromCharCode(96, 96, 96) + 'ghost\n';
 const footer = String.fromCharCode(96, 96, 96) + '\n';
 const variants = [
   ['left then right', `state left: Bool = true;
   state right: Bool = false;
-  let derived = swap;
+  let derived = swap |> recover(false);
   let live = derived;
-  left' = if swap then right else left;
-  right' = if swap then left else right;`],
+  left' = if (swap |> recover(false)) then right else left;
+  right' = if (swap |> recover(false)) then left else right;`],
   ['right then left', `state left: Bool = true;
   state right: Bool = false;
   let live = derived;
-  let derived = swap;
-  right' = if swap then left else right;
-  left' = if swap then right else left;`],
+  let derived = swap |> recover(false);
+  right' = if (swap |> recover(false)) then left else right;
+  left' = if (swap |> recover(false)) then right else left;`],
 ];
 const inputs = [true, false, true];
 const expectedStates = [
@@ -55,7 +57,9 @@ ${footer}`;
     const modulePath = path.join(temporary, 'snapshot.gfb');
     const inputPath = path.join(temporary, 'snapshot.csv');
     fs.writeFileSync(modulePath, artifact.bytes);
-    fs.writeFileSync(inputPath, `swap\n${inputs.join('\n')}\n`);
+    const railRows = inputs.map(swap => softwareQualityRails(artifact, { swap }));
+    const railNames = Object.keys(railRows[0]);
+    fs.writeFileSync(inputPath, `${railNames.join(',')}\n${railRows.map(row => railNames.map(name => row[name]).join(',')).join('\n')}\n`);
     const native = execFileSync(nativePath, [modulePath, inputPath, '--outcomes'], { encoding: 'utf8' }).trim().split('\n').map(JSON.parse);
     const runtime = await GhostFlowRuntime.instantiate(fs.readFileSync(wasmPath));
     t.after(() => runtime.dispose());
@@ -68,7 +72,8 @@ ${footer}`;
         assert.deepEqual(native[index].trace.stateAfter, expectedStates[index]);
         const actualNative = native[index].trace.safe;
         assert.deepEqual({ old_left: actualNative.old_left, new_left: actualNative.new_left, live_value: actualNative.live_value }, expected[index]);
-        runtime.setBool('swap', swap); runtime.tick();
+        for (const [name, value] of Object.entries(railRows[index])) typeof value === 'boolean' ? runtime.setBool(name, value) : runtime.setNumber(name, value);
+        runtime.tick();
         assert.deepEqual(runtime.trace.stateAfter, expectedStates[index]);
         assert.deepEqual({ old_left: runtime.intentBool('old_left'), new_left: runtime.intentBool('new_left'), live_value: runtime.intentBool('live_value') }, expected[index]);
       });

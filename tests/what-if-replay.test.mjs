@@ -17,19 +17,19 @@ const source = [
   '<!-- ghostflow:anchor id=GF-INT-REF-06-019 kind=intent status=confirmed origin=user -->',
   'Issue [#304](https://github.com/callin2/ghostflow-language/issues/304) checks that missing sensor records are reported and supplied what-if inputs retain synthetic provenance.', '',
   '```ghost', 'control MissingInputReplay {',
-  '  input start: Bool;', '  sensor moisture: Percent;',
+  '  input start: Bool;', '  input moisture: Percent;',
   '  state running: Bool = false;',
   '  // ghostflow:link id=GF-INT-REF-06-019 relation=implements',
-  "  running' = start && (case moisture { ok(value) => value < 35%; fault(_) => false; });",
+  "  running' = case start { ok(requested) => requested && (case moisture { ok(value) => value < 35%; fault(_) => false; }); fault(_) => false; };",
   '  output pump: Bool;',
   '  // ghostflow:link id=GF-INT-REF-06-019 relation=implements',
   "  pump <- running';", '}', '```', '',
 ].join('\n');
 const identity = { timelineId: 'timeline.recorded', instanceId: 'instance.reference', runId: 'run.original',
-  sourceRevision: 'source.ref-06-019', bindingRevision: 'binding.virtual' };
+  sourceRevision: 'source.ref-06-019.input-v2', bindingRevision: 'binding.virtual' };
 const sample = (id, value, quality = 'Good') => ({ epoch: 1, id, timestampMs: id * 1000, value, quality });
-const first = () => ({ nowMs: 1000, inputs: { start: true }, samples: { moisture: sample(1, 40) } });
-const next = () => ({ nowMs: 2000, inputs: { start: true }, samples: { moisture: sample(2, 40) } });
+const first = () => ({ nowMs: 1000, samples: { start: sample(1, true), moisture: sample(1, 40) } });
+const next = () => ({ nowMs: 2000, samples: { start: sample(2, true), moisture: sample(2, 40) } });
 const request = () => ({ branchId: 'branch.what-if', runId: 'run.ghost' });
 const synthetic = (value, quality = 'Good') => ({ offset: 0, kind: 'samples', name: 'moisture',
   value: sample(2, value, quality), provenance: 'synthetic' });
@@ -58,7 +58,7 @@ function assertNative(compilation, results) {
 
 test('REF-06-019 what-if reports missing recorded sensors instead of inventing or holding an old value', async () => {
   const compilation = await compiled(), prefix = [first()];
-  const future = [{ nowMs: 2000, inputs: { start: true }, samples: {} }];
+  const future = [{ nowMs: 2000, samples: { start: sample(2, true) } }];
   const retained = structuredClone({ compilation, prefix, future, identity });
   const replay = await prepare(compilation, prefix, future);
   const live = await ControlRuntime.instantiateFramed(wasmBytes, compilation);
@@ -77,7 +77,7 @@ test('REF-06-019 what-if reports missing recorded sensors instead of inventing o
     assert.equal(receipt.frames[0].original, null, 'absent original inputs cannot produce a fabricated original outcome');
     assert.equal(receipt.frames[0].candidate.vm.safe.pump, true);
     assert.deepEqual(receipt.provenance, [
-      { offset: 0, logicalTimeMs: 2000, kind: 'inputs', name: 'start', provenance: 'recorded' },
+      { offset: 0, logicalTimeMs: 2000, kind: 'samples', name: 'start', provenance: 'recorded' },
       { offset: 0, logicalTimeMs: 2000, kind: 'samples', name: 'moisture', provenance: 'synthetic' },
     ]);
     assertNative(compilation, [baseline, receipt.frames[0].candidate]);
@@ -137,13 +137,13 @@ test('REF-06-019 source tampering, malformed virtual inputs and incomplete check
   await assert.rejects(prepare(compilation, prefix, [{ ...next(), nowMs: 1000 }]), /times must increase/);
   await assert.rejects(prepare(compilation, [], Array(257).fill(next())), /at most 256/);
   const missingBoth = await prepare(compilation, prefix, [{ nowMs: 2000 }]);
-  assert.deepEqual((await missingBoth.branch(request())).missing.map(gap => `${gap.kind}.${gap.name}`), ['inputs.start', 'samples.moisture']);
+  assert.deepEqual((await missingBoth.branch(request())).missing.map(gap => `${gap.kind}.${gap.name}`), ['samples.start', 'samples.moisture']);
   assert.deepEqual(await replay.branch(request()), original);
 });
 
 test('REF-06-019 preparation captures recordings before async compilation and never promotes later caller samples to recorded evidence', async () => {
   const compilation = await compiled(), prefix = [first()];
-  const future = [{ nowMs: 2000, inputs: { start: true }, samples: {} }];
+  const future = [{ nowMs: 2000, samples: { start: sample(2, true) } }];
   const origin = structuredClone(identity);
   const pending = prepareWhatIfReplay({ wasmBytes, compilation, identity: origin, prefix, future });
   future[0].samples.moisture = sample(2, 20);
@@ -157,6 +157,6 @@ test('REF-06-019 preparation captures recordings before async compilation and ne
   const supplied = await replay.branch({ ...request(), synthetic: [synthetic(20)] });
   assert.equal(supplied.frames[0].candidate.vm.stateBefore.running, false, 'baseline retains the captured wet sample');
   assert.equal(supplied.frames[0].candidate.vm.safe.pump, true);
-  assert.equal(supplied.provenance.find(entry => entry.kind === 'samples').provenance, 'synthetic');
+  assert.equal(supplied.provenance.find(entry => entry.kind === 'samples' && entry.name === 'moisture').provenance, 'synthetic');
   assert.equal((await replay.branch(request())).status, 'missing-input');
 });

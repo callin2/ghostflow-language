@@ -8,9 +8,10 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 const ghostc = fileURLToPath(new URL('../tools/ghostc.mjs', import.meta.url));
-const child = '# 릴레이 원문\r\n\r\n```ghost\r\ncontrol Relay { input start: Bool; output pump: Bool; pump <- start; }\r\n```\r\n';
+// Explicit relay-input-v1 revision; the predecessor is archived independently.
+const child = '# 릴레이 원문\r\n\r\n```ghost\r\ncontrol Relay { input start: Bool; output pump: Bool; state request: Bool = false; request\' = case start { ok(value) => value; fault(_) => request; }; pump <- request\'; }\r\n```\r\n';
 const sha = source => createHash('sha256').update(source).digest('hex');
-const document = (digest, body = 'output pump: Bool; pump <- false;') => `# Root\n\n\`\`\`ghost\nimport Relay from "./relay.ghost.md" revision "relay-r1" sha256 "${digest}";\ncontrol Farm { ${body} }\n\`\`\`\n`;
+const document = (digest, body = 'output pump: Bool; pump <- false;') => `# Root\n\n\`\`\`ghost\nimport Relay from "./relay.ghost.md" revision "relay-input-v1" sha256 "${digest}";\ncontrol Farm { ${body} }\n\`\`\`\n`;
 function fixture(t, source, dependency = child) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-import-digest-'));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));

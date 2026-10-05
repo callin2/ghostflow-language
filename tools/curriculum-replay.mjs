@@ -140,7 +140,8 @@ export async function prepareCurriculumReplays({ repositoryRoot = defaultRoot, m
 
     const inputNames = stringList(scenario.inputs, `${scenario.id}.inputs`);
     const outputNames = stringList(scenario.outputs, `${scenario.id}.outputs`);
-    const compiledInputs = artifact.manifest.inputs.map(input => {
+    if (artifact.manifest.inputs.length) throw new Error(`${scenario.id} authored replay inputs must use quality acquisition`);
+    const compiledInputs = artifact.manifest.sensors.map(input => {
       if (input.type !== 'Bool') throw new Error(`${scenario.id} input ${input.name} must compile as Bool`);
       return input.name;
     });
@@ -182,6 +183,24 @@ export async function prepareCurriculumReplays({ repositoryRoot = defaultRoot, m
   return { format: replay.format, scenarios: prepared };
 }
 
+function observedFrame(frame, frameIndex) {
+  // Each retained fixture frame records explicit healthy observations. This
+  // adapter does not supply a production fault default or sample clock-only ticks.
+  return { nowMs: frame.atMs, samples: Object.fromEntries(Object.entries(frame.inputs).map(([name, value]) =>
+    [name, { epoch: 1, id: frameIndex + 1, timestampMs: frame.atMs, quality: 'Good', value }])) };
+}
+
+/** Accepted acquisition rails for native replay of the same recorded observations. */
+export async function captureCurriculumReplayAcquisition(wasmBytes, entry) {
+  const runtime = await ControlRuntime.instantiate(wasmBytes, entry.artifact);
+  try {
+    return entry.scenario.frames.map((frame, frameIndex) => {
+      const result = runtime.step(observedFrame(frame, frameIndex));
+      return { nowMs: frame.atMs, inputs: { ...result.vm.inputs }, requested: { ...result.vm.requested }, safe: { ...result.vm.safe } };
+    });
+  } finally { runtime.dispose(); }
+}
+
 async function execute(runtimeFactory, wasmBytes, prepared, runtimeName) {
   let frames = 0;
   let checkpoints = 0;
@@ -189,7 +208,7 @@ async function execute(runtimeFactory, wasmBytes, prepared, runtimeName) {
     const runtime = await runtimeFactory(wasmBytes, entry.artifact);
     try {
       for (const [frameIndex, frame] of entry.scenario.frames.entries()) {
-        const result = runtime.step({ nowMs: frame.atMs, inputs: frame.inputs });
+        const result = runtime.step(observedFrame(frame, frameIndex));
         frames += 1;
         const checkpoint = entry.checkpoints.get(frameIndex);
         if (!checkpoint) continue;

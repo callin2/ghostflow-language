@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { softwareQualityObservations, softwareQualityRails } from './helpers/software-quality-observations.mjs';
 import { fileURLToPath } from 'node:url';
 import { compileSource } from '../tools/toolchain.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
@@ -13,7 +14,7 @@ import { FramedGhostFlowRuntime } from '../runtimes/wasm/framed-runtime.mjs';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const wasm = fs.readFileSync(path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm'));
 const compile = code => compileSource(`# Hold last runtime\n\n\`\`\`ghost\n${code}\n\`\`\`\n`, { filename: 'hold-last-runtime.ghost.md' });
-const frame = (scanId, logicalTimeMs, values) => ({ scanId, logicalTimeMs, inputs: Object.entries(values).map(([name, value]) => ({ name, value })) });
+const frame = (artifact, scanId, logicalTimeMs, values) => ({ scanId, logicalTimeMs, inputs: Object.entries(softwareQualityRails(artifact, values, scanId + 1, logicalTimeMs)).map(([name, value]) => ({ name, value })) });
 
 function native(bytes, tape) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-hold-last-'));
@@ -47,13 +48,16 @@ function sensorValues(sensor, { value = false, ok = false, fault = 3, present = 
 
 test('hold_last exact TTL, faults, duplicates and rejected ticks agree on native and both WASM ABIs', async t => {
   const artifact = await compile(`control HoldRuntime {
-    input divisor: Number; sensor reading: Bool;
+    input divisor: Number; input reading: Bool;
+    state retained_divisor: Number = 1.0;
+    let scalar_divisor = case divisor { ok(value) => value; fault(_) => retained_divisor; };
+    retained_divisor' = scalar_divisor;
     signal usable = hold_last(reading, for_at_most: 2s, quality: measured);
     output held_value: Bool; output guard: Int;
-    held_value <- usable |> recover(false); guard <- 1 div int_exact(divisor);
+    held_value <- usable |> recover(false); guard <- 1 div int_exact(scalar_divisor);
   }`);
-  const sensor = artifact.manifest.sensors[0], signal = artifact.manifest.signals[0], s = signal.states;
-  const make = (scanId, now, sample, divisor = 1) => frame(scanId, now, { divisor, ...sensorValues(sensor, sample) });
+  const sensor = artifact.manifest.sensors.find(item => item.name === 'reading'), signal = artifact.manifest.signals[0], s = signal.states;
+  const make = (scanId, now, sample, divisor = 1) => frame(artifact, scanId, now, { divisor, ...sensorValues(sensor, sample) });
   const tape = [
     make(0, 0, {}),
     make(1, 100, { value: true, ok: true, present: true, epoch: 1, id: 1, timestamp: 100 }),
@@ -86,13 +90,13 @@ test('hold_last exact TTL, faults, duplicates and rejected ticks agree on native
 
 test('hold_last retains another-root faults but invalidates the cached root on epoch replacement', async t => {
   const artifact = await compile(`control HoldRoots {
-    input choose_b: Bool; sensor a: Bool; sensor b: Bool;
-    let chosen: Result<Bool, SensorFault> = if choose_b then b else a;
+    input choose_b: Bool; input a: Bool; input b: Bool;
+    let chosen: Result<Bool, SensorFault> = case choose_b { ok(choose) => if choose then b else a; fault(reason) => fault(reason); };
     signal usable = hold_last(chosen, for_at_most: 2s, quality: measured);
     output value: Bool; value <- usable |> recover(false);
   }`);
-  const [a, b] = artifact.manifest.sensors, signal = artifact.manifest.signals[0], s = signal.states;
-  const make = (scanId, now, chooseB, av, bv) => frame(scanId, now, { choose_b: chooseB, ...sensorValues(a, av), ...sensorValues(b, bv) });
+  const [a, b] = ['a', 'b'].map(name => artifact.manifest.sensors.find(item => item.name === name)), signal = artifact.manifest.signals[0], s = signal.states;
+  const make = (scanId, now, chooseB, av, bv) => frame(artifact, scanId, now, { choose_b: chooseB, ...sensorValues(a, av), ...sensorValues(b, bv) });
   const good = (epoch, id, timestamp, value) => ({ epoch, id, timestamp, value, ok: true, present: true });
   const fault = (epoch, id, timestamp) => ({ epoch, id, timestamp, fault: 0, ok: false, present: true });
   const tape = [
@@ -117,13 +121,13 @@ test('hold_last retains another-root faults but invalidates the cached root on e
 test('map cannot launder Held into measured evidence', async () => {
   const artifact = await compile(`control HeldMapQuality {
     fn same(value: Bool) -> Bool { value }
-    sensor reading: Bool;
+    input reading: Bool;
     signal inner = hold_last(reading, for_at_most: 5s, quality: measured);
     signal mapped = hold_last(inner |> map(same), for_at_most: 5s, quality: measured);
     output inner_ok: Bool; output mapped_ok: Bool;
     inner_ok <- inner |> recover(false); mapped_ok <- mapped |> recover(false);
   }`);
-  const sensor = artifact.manifest.sensors[0];
+  const sensor = artifact.manifest.sensors.find(item => item.name === 'reading');
   const runtime = await GhostFlowRuntime.instantiate(wasm);
   try {
     runtime.load(artifact.bytes);
@@ -138,14 +142,14 @@ test('map cannot launder Held into measured evidence', async () => {
 test('and_then preserves incoming Measured or Held quality without constructor laundering', async () => {
   const artifact = await compile(`control HeldAndThenQuality {
     fn authored(value: Bool) -> Result<Bool, SensorFault> { ok(value) }
-    sensor reading: Bool;
+    input reading: Bool;
     signal direct = hold_last(reading |> and_then(authored), for_at_most: 5s, quality: measured);
     signal inner = hold_last(reading, for_at_most: 5s, quality: measured);
     signal chained = hold_last(inner |> and_then(authored), for_at_most: 5s, quality: measured);
     output direct_ok: Bool; output chained_ok: Bool;
     direct_ok <- direct |> recover(false); chained_ok <- chained |> recover(false);
   }`);
-  const sensor = artifact.manifest.sensors[0], runtime = await GhostFlowRuntime.instantiate(wasm);
+  const sensor = artifact.manifest.sensors.find(item => item.name === 'reading'), runtime = await GhostFlowRuntime.instantiate(wasm);
   try {
     runtime.load(artifact.bytes); runtime.addCapability('actuator', 'direct_ok', 'bool'); runtime.addCapability('actuator', 'chained_ok', 'bool'); runtime.activate();
     for (const [name, value] of Object.entries(sensorValues(sensor, { value: true, ok: true, present: true, epoch: 1, id: 1, timestamp: 0 }))) typeof value === 'boolean' ? runtime.setBool(name, value) : runtime.setNumber(name, value);
@@ -155,18 +159,20 @@ test('and_then preserves incoming Measured or Held quality without constructor l
 
 test('if selects Held or Measured quality without branch switches inventing a fresh observation', async () => {
   const artifact = await compile(`control HeldBranchQuality {
-    input use_raw: Bool; sensor reading: Bool;
+    input use_raw: Bool; input reading: Bool;
     signal inner = hold_last(reading, for_at_most: 5s, quality: measured);
-    let selected: Result<Bool, SensorFault> = if use_raw then reading else inner;
+    let selected: Result<Bool, SensorFault> = case use_raw { ok(choose) => if choose then reading else inner; fault(reason) => fault(reason); };
     signal outer = hold_last(selected, for_at_most: 5s, quality: measured);
     output value: Bool; value <- outer |> recover(false);
   }`);
-  const sensor = artifact.manifest.sensors[0], outer = artifact.manifest.signals.find(signal => signal.name === 'outer');
+  const sensor = artifact.manifest.sensors.find(item => item.name === 'reading'), outer = artifact.manifest.signals.find(signal => signal.name === 'outer');
   const runtime = await GhostFlowRuntime.instantiate(wasm);
   try {
     runtime.load(artifact.bytes); runtime.addCapability('actuator', 'value', 'bool'); runtime.activate();
     const step = (now, useRaw, id) => {
-      runtime.setBool('use_raw', useRaw);
+      for (const [name, value] of Object.entries(softwareQualityRails(artifact, { use_raw: useRaw }, id, now))) {
+        typeof value === 'boolean' ? runtime.setBool(name, value) : runtime.setNumber(name, value);
+      }
       for (const [name, value] of Object.entries(sensorValues(sensor, { value: true, ok: true, present: true, epoch: 1, id, timestamp: now }))) typeof value === 'boolean' ? runtime.setBool(name, value) : runtime.setNumber(name, value);
       runtime.tickAt(now); return runtime.trace;
     };
@@ -180,14 +186,14 @@ test('if selects Held or Measured quality without branch switches inventing a fr
 
 test('debounce preserves Held quality and cannot make it measured', async () => {
   const artifact = await compile(`control HeldDebounceQuality {
-    sensor reading: Bool;
+    input reading: Bool;
     signal inner = hold_last(reading, for_at_most: 5s, quality: measured);
     signal settled = debounce(inner, stable_for: 1s, initial: false);
     signal outer = hold_last(settled, for_at_most: 5s, quality: measured);
     output inner_ok: Bool; output outer_ok: Bool;
     inner_ok <- inner |> recover(false); outer_ok <- outer |> recover(false);
   }`);
-  const sensor = artifact.manifest.sensors[0], runtime = await GhostFlowRuntime.instantiate(wasm);
+  const sensor = artifact.manifest.sensors.find(item => item.name === 'reading'), runtime = await GhostFlowRuntime.instantiate(wasm);
   try {
     runtime.load(artifact.bytes); runtime.addCapability('actuator', 'inner_ok', 'bool'); runtime.addCapability('actuator', 'outer_ok', 'bool'); runtime.activate();
     for (const [name, value] of Object.entries(sensorValues(sensor, { value: true, ok: true, present: true, epoch: 1, id: 1, timestamp: 0 }))) typeof value === 'boolean' ? runtime.setBool(name, value) : runtime.setNumber(name, value);
@@ -197,16 +203,16 @@ test('debounce preserves Held quality and cannot make it measured', async () => 
 
 test('future samples never seed a hold or renew an existing cache', async t => {
   const artifact = await compile(`control HoldFuture {
-    sensor reading: Bool; signal usable = hold_last(reading, for_at_most: 2s, quality: measured);
+    input reading: Bool; signal usable = hold_last(reading, for_at_most: 2s, quality: measured);
     output value: Bool; value <- usable |> recover(false);
   }`);
-  const sensor = artifact.manifest.sensors[0], signal = artifact.manifest.signals[0];
+  const sensor = artifact.manifest.sensors.find(item => item.name === 'reading'), signal = artifact.manifest.signals[0];
   const tape = [
-    frame(0, 100, sensorValues(sensor, { value: true, ok: true, present: true, epoch: 1, id: 1, timestamp: 100 })),
-    frame(1, 200, sensorValues(sensor, { value: false, ok: true, present: true, epoch: 1, id: 2, timestamp: 5000 })),
-    frame(2, 2099, sensorValues(sensor, {})),
-    frame(3, 2100, sensorValues(sensor, { value: false, ok: true, present: true, epoch: 1, id: 2, timestamp: 5000 })),
-    frame(4, 5000, sensorValues(sensor, { value: false, ok: true, present: true, epoch: 1, id: 2, timestamp: 5000 })),
+    frame(artifact, 0, 100, sensorValues(sensor, { value: true, ok: true, present: true, epoch: 1, id: 1, timestamp: 100 })),
+    frame(artifact, 1, 200, sensorValues(sensor, { value: false, ok: true, present: true, epoch: 1, id: 2, timestamp: 5000 })),
+    frame(artifact, 2, 2099, sensorValues(sensor, {})),
+    frame(artifact, 3, 2100, sensorValues(sensor, { value: false, ok: true, present: true, epoch: 1, id: 2, timestamp: 5000 })),
+    frame(artifact, 4, 5000, sensorValues(sensor, { value: false, ok: true, present: true, epoch: 1, id: 2, timestamp: 5000 })),
   ];
   const expected = native(artifact.bytes, tape);
   assert.deepEqual(expected.map(row => row.outcome.trace.safe.value), [true, true, true, false, false]);
@@ -224,13 +230,13 @@ test('statically Held input still evaluates an authored Result selector fault an
     fn guarded(value: Bool) -> Result<Bool, SensorFault> {
       if 1 div (if value then 0 else 1) == 1 then ok(value) else ok(value)
     }
-    sensor reading: Bool;
+    input reading: Bool;
     signal inner = hold_last(reading, for_at_most: 5s, quality: measured);
     signal outer = hold_last(inner |> and_then(guarded), for_at_most: 5s, quality: measured);
     state accepted: Number = 0.0; accepted' = accepted + 1.0;
     output value: Bool; value <- outer |> recover(false);
   }`);
-  const sensor = artifact.manifest.sensors[0], inner = artifact.manifest.signals.find(signal => signal.name === 'inner');
+  const sensor = artifact.manifest.sensors.find(item => item.name === 'reading'), inner = artifact.manifest.signals.find(signal => signal.name === 'inner');
   const runtime = await GhostFlowRuntime.instantiate(wasm);
   try {
     runtime.load(artifact.bytes); runtime.addCapability('actuator', 'value', 'bool'); runtime.activate();
@@ -246,14 +252,14 @@ test('statically Held input still evaluates an authored Result selector fault an
 
 test('hold_last age starts at the original delayed sample timestamp and expires at the exact boundary', async t => {
   const artifact = await compile(`control HoldDelayed {
-    sensor reading: Bool; signal usable = hold_last(reading, for_at_most: 1s, quality: measured);
+    input reading: Bool; signal usable = hold_last(reading, for_at_most: 1s, quality: measured);
     output value: Bool; value <- usable |> recover(false);
   }`);
-  const sensor = artifact.manifest.sensors[0], states = artifact.manifest.signals[0].states;
+  const sensor = artifact.manifest.sensors.find(item => item.name === 'reading'), states = artifact.manifest.signals[0].states;
   const tape = [
-    frame(0, 1000, sensorValues(sensor, { value: true, ok: true, present: true, epoch: 1, id: 1, timestamp: 500 })),
-    frame(1, 1499, sensorValues(sensor, {})),
-    frame(2, 1500, sensorValues(sensor, {})),
+    frame(artifact, 0, 1000, sensorValues(sensor, { value: true, ok: true, present: true, epoch: 1, id: 1, timestamp: 500 })),
+    frame(artifact, 1, 1499, sensorValues(sensor, {})),
+    frame(artifact, 2, 1500, sensorValues(sensor, {})),
   ];
   const expected = native(artifact.bytes, tape);
   assert.deepEqual(expected.map(row => row.outcome.trace.safe.value), [true, true, false]);
@@ -266,15 +272,15 @@ test('hold_last age starts at the original delayed sample timestamp and expires 
 
 test('both public hosts roll back partial conditioning, ignore lower IDs, and cold restart NotReady', async () => {
   const artifact = await compile(`control HoldHostAtomic {
-    input choose_a: Bool; sensor a: Bool { stale_after = 10s; } sensor b: Bool { stale_after = 10s; }
-    let selected: Result<Bool, SensorFault> = if choose_a then a else b;
+    input choose_a: Bool; input a: Bool { stale_after = 10s; } input b: Bool { stale_after = 10s; }
+    let selected: Result<Bool, SensorFault> = case choose_a { ok(choose) => if choose then a else b; fault(reason) => fault(reason); };
     signal usable = hold_last(selected, for_at_most: 2s, quality: measured);
     output value: Bool; value <- usable |> recover(false);
   }`);
   const held = artifact.manifest.signals[0].states;
   const sample = (id, timestampMs, value, epoch = 1) => ({ epoch, id, timestampMs, value, quality: 'Good' });
   for (const [label, instantiate] of [['legacy', ControlRuntime.instantiate], ['framed', ControlRuntime.instantiateFramed]]) {
-    const runtime = await instantiate(wasm, artifact);
+    const runtime = softwareQualityObservations(await instantiate(wasm, artifact));
     try {
       assert.equal(runtime.step({ nowMs: 100, inputs: { choose_a: true }, samples: { a: sample(1, 100, true), b: sample(1, 100, true) } }).vm.safe.value, true, label);
       assert.throws(() => runtime.step({ nowMs: 200, inputs: { choose_a: true }, samples: { a: sample(2, 200, false), b: sample(2, 50, false) } }), /clock moved backward/);
@@ -287,7 +293,7 @@ test('both public hosts roll back partial conditioning, ignore lower IDs, and co
       assert.deepEqual(runtime.sensors.get('a').conditioner.sampleIdentity(), { epoch: 1, id: 2, timestampMs: 150 });
     } finally { runtime.dispose(); }
 
-    const restarted = await instantiate(wasm, artifact);
+    const restarted = softwareQualityObservations(await instantiate(wasm, artifact));
     try {
       const cold = restarted.step({ nowMs: 300, inputs: { choose_a: true }, samples: {} });
       assert.equal(cold.vm.safe.value, false, `${label} cold restart is NotReady`);

@@ -1,4 +1,5 @@
 // Pure terminal presentation for the virtual GhostFlow console.
+import { readInputObservation } from './software-input-producer.mjs';
 export const LIVE_HISTORY_LIMIT = 120;
 
 const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
@@ -54,7 +55,7 @@ function state(value) {
 function waveform(scans, port, field, width) {
   if (!port || width <= 0) return '';
   return scans.slice(-width).map(scan => {
-    const value = scan?.[field]?.[port];
+    const value = field === 'inputs' ? readInputObservation(scan, port) : scan?.[field]?.[port];
     const [symbol, color] = value === true ? ['-', '\x1b[32m']
       : value === false ? ['_', '\x1b[2;90m'] : ['?', '\x1b[33m'];
     return `${color}${symbol}\x1b[0m`;
@@ -95,7 +96,7 @@ export function renderLivePanel(profile, bound, scan, history = [], {
       const port = bound.get(input.name);
       const key = index < 8 && port && input.type === 'Bool' ? String(index + 1) : ' ';
       const value = displayState(!port ? 'unobserved' : input.type === 'Bool'
-        ? state(scan?.inputs?.[port]) : 'unsupported');
+        ? state(readInputObservation(scan, port)) : 'unsupported');
       const titleWidth = Math.min(13, Math.max(4, leftWidth - (compact ? 10 : 17)));
       const prefix = `${key} ${pad(channelTitle(input, port), titleWidth)} ${pad(value, value === 'unobserved' ? 10 : 3)} `;
       inputCell = prefix + waveform(samples, port, 'inputs', Math.max(0, leftWidth - cellWidth(prefix)));

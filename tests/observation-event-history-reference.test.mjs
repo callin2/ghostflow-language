@@ -1,3 +1,4 @@
+import { softwareQualityRails } from './helpers/software-quality-observations.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -16,11 +17,11 @@ const source = '# Explicit observation history\n\n<!-- ghostflow:anchor id=GF-EV
   + 'Observe completed decisions; retain explicit events separately from current values.\n\n```ghost\ncontrol EventProbe {\n'
   + 'input enabled: Bool;\n// ghostflow:link id=GF-EVENT-HISTORY relation=implements\nstate seen: Bool = false;\n'
   + '// ghostflow:link id=GF-EVENT-HISTORY relation=implements\nstate tally: Int = 0;\n'
-  + "seen' = enabled; tally' = tally + 1; output result: Bool; result <- seen';\n}\n```\n";
+  + "seen' = enabled |> recover(false); tally' = tally + 1; output result: Bool; result <- seen';\n}\n```\n";
 const compilation = await compileSource(source, {filename: 'event-history.ghost.md',
   interactionSourceIdentity: {documentId: 'document.event-history', revisionId: 'revision.event-history.1'}});
 const scans = Array.from({length: 14}, (_, scanId) => ({scanId, logicalTimeMs: scanId * 100,
-  inputs: [{name: 'enabled', type: 'Bool', value: scanId % 2 === 0}]}));
+  inputs: Object.entries(softwareQualityRails(compilation, { enabled: scanId % 2 === 0 })).map(([name, value]) => ({ name, type: typeof value === 'boolean' ? 'Bool' : 'Number', value }))}));
 async function wasmRun() {
   const runtime = await FramedGhostFlowRuntime.instantiate(wasm);
   try {
@@ -33,7 +34,7 @@ function nativeRun() {
   try {
     fs.writeFileSync(path.join(directory, 'module.gfb'), compilation.bytes);
     fs.writeFileSync(path.join(directory, 'tape.tsv'), scans.map(s => [s.scanId, s.logicalTimeMs,
-      ...s.inputs.flatMap(i => [i.name, 'b', i.value])].join('\t')).join('\n') + '\n');
+      ...s.inputs.flatMap(i => [i.name, i.type === 'Bool' ? 'b' : 'n', i.value])].join('\t')).join('\n') + '\n');
     const run = spawnSync(nativePath, [path.join(directory, 'module.gfb'), path.join(directory, 'tape.tsv')],
       {encoding: 'utf8', timeout: 10000, maxBuffer: 4 * 1024 * 1024});
     assert.equal(run.status, 0, run.error?.message ?? run.stderr);

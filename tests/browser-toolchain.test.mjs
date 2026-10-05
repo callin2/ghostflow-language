@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { compileSource as compileInBrowser } from '../tools/browser-toolchain.mjs';
 import { compileSource as compileInNode } from '../tools/toolchain.mjs';
 import { sha256Hex } from '../tools/sha256.mjs';
+import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const corpus = JSON.parse(fs.readFileSync(path.join(root, 'contracts/interaction-v0/examples/corpus.json'), 'utf8'));
@@ -138,4 +139,64 @@ test('browser public compiler executes with Buffer unavailable', async () => {
   const actual = JSON.parse(child.stdout);
   assert.deepEqual(actual.bytes, [...expected.bytes]);
   assert.deepEqual(actual.result, withoutBytes(expected));
+});
+
+test('quality corpus migration preserves exact predecessor source snapshots', () => {
+  const history = JSON.parse(fs.readFileSync(path.join(root,
+    'tests/fixtures/history/issue531/consumer-fixtures.pre-input.json'), 'utf8'));
+  assert.equal(history.baseCommit, '76501ff238694fe0e2979bc4f5b05366fc739426');
+  assert.equal(history.documents.length, 5);
+  for (const predecessor of history.documents) {
+    assert.equal(sha256Hex(predecessor.text), predecessor.sha256, predecessor.path);
+    assert.notEqual(sha256Hex(fs.readFileSync(path.join(root, predecessor.path))), predecessor.sha256,
+      'migration is a new source revision, leaving the predecessor separately pinned');
+  }
+});
+
+test('five-minute corpus explicitly distinguishes input faults, fresh restart and exact cutoff', async t => {
+  const source = fs.readFileSync(path.join(root, corpus.cases[0].sourcePath), 'utf8');
+  const artifact = await compileInBrowser(source, { filename: 'five-minute-watering.ghost.md' });
+  const wasm = fs.readFileSync(path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm'));
+  for (const failed of ['DI1', 'DI2', 'DI3']) {
+    for (const quality of ['NotReady', 'Disconnected', 'Stale', 'Invalid']) await t.test(`${failed}/${quality}`, async () => {
+      const runtime = await ControlRuntime.instantiateFramed(wasm, artifact);
+      try {
+        const scan = (nowMs, DI1, faults = {}) => {
+          const samples = Object.fromEntries(Array.from({ length: 8 }, (_, n) => {
+            const name = `DI${n + 1}`;
+            return [name, { epoch: 1, id: nowMs + 1, timestampMs: nowMs,
+              quality: faults[name] ?? 'Good', value: name === 'DI1' ? DI1 : false }];
+          }));
+          const outcome = runtime.step({ nowMs, samples });
+          assert.equal(outcome.vm.safe.RO1, outcome.vm.safe.RO2, 'pump and valve remain in lockstep');
+          return outcome;
+        };
+        assert.equal(scan(0, true).vm.safe.RO1, true, 'healthy initial high retains the existing first-start intent');
+        assert.equal(scan(1, false, { [failed]: quality }).vm.safe.RO1, failed === 'DI1');
+        assert.equal(scan(2, true).vm.safe.RO1, failed === 'DI1', 'held START cannot restart fault-stopped operation');
+        assert.equal(scan(3, false).vm.safe.RO1, failed === 'DI1');
+        assert.equal(scan(4, true).vm.safe.RO1, true);
+        assert.equal(scan(5, true).vm.safe.RO1, true);
+        assert.equal(scan(failed === 'DI1' ? 300001 : 300005, true).vm.safe.RO1, false,
+          'source timer retains the exact five-minute cutoff');
+      } finally { runtime.dispose(); }
+    });
+  }
+});
+
+test('descriptor corpus retains prior authored states on unavailable input without fabricating acquisition', async () => {
+  const source = fs.readFileSync(path.join(root, corpus.cases[1].sourcePath), 'utf8');
+  const artifact = await compileInBrowser(source, { filename: 'multiple-values.ghost.md' });
+  const runtime = await ControlRuntime.instantiateFramed(fs.readFileSync(path.join(root,
+    'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm')), artifact);
+  try {
+    const sample = (id, quality, value) => ({ epoch: 1, id, timestampMs: id, quality, value });
+    runtime.step({ nowMs: 1, samples: { first_enable: sample(1, 'Good', true),
+      second_enable: sample(1, 'Good', false), sample: sample(1, 'Good', 42) } });
+    const failed = runtime.step({ nowMs: 2, samples: { first_enable: sample(2, 'Invalid', false),
+      second_enable: sample(2, 'Disconnected', true), sample: sample(2, 'NotReady', 0) } });
+    assert.deepEqual(failed.vm.safe, { first_output: true, second_output: false });
+    assert.equal(failed.vm.stateAfter.quantity, 42);
+    assert.equal(failed.sensors.sample.quality, 'NotReady');
+  } finally { runtime.dispose(); }
 });

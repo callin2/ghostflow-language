@@ -22,13 +22,17 @@ The basis is [common constraints and sensor contracts](../CONSTRAINTS.md), [sele
 [#105](https://github.com/callin2/ghostflow-language/issues/105) and
 [#110](https://github.com/callin2/ghostflow-language/issues/110).
 
+The canonical external declaration keyword is `input`. It inherits this chapter's typed quality, conditioning and optional capability rules. `sensor` remains an
+internal/wire quality category, not an accepted declaration alias. Migrate source
+only as a new reviewed revision; see [the migration contract](../INPUT-MIGRATION.md).
+
 ## 4.1 sensor and Result quality
 
 In the selected declaration, a sensor's type is its normal payload type.
 
 ```ghost
-sensor low_water: Bool;
-sensor moisture: Percent;
+input low_water: Bool;
+input moisture: Percent;
 ```
 
 The actual type when reading a sensor is conceptually `Result<T, SensorFault>`. Branch on normal samples with `ok(value)` and errors with `fault(reason)`.
@@ -71,7 +75,7 @@ let normalized = temperature |> and_then(normalize);
 The selected sensor configuration notation is:
 
 ```ghost
-sensor moisture: Percent {
+input moisture: Percent {
   sample = 1s;
   valid = 0% .. 100%;
   filter = median(5);
@@ -85,7 +89,7 @@ Each item's meaning and constraints are:
 | Item | Type/constraint | Meaning |
 |---|---|---|
 | `sample` | Positive `Duration` | Expected measurement interval information. Creates no sensor-reading thread or timer. |
-| `valid` | Closed range of the same type as the payload | Checks raw normal candidates before filtering. Out-of-range values are `Invalid`. |
+| `valid` | Closed range of the same numeric payload type; unavailable for Bool | Checks raw normal candidates before filtering. Out-of-range values are `Invalid`. Bool ranges reject during compilation. |
 | `filter` | Stateful signal operation | Applies only to new valid samples. |
 | `stale_after` | Positive `Duration` | Freshness limit from the time of the last actual valid sample. |
 | `recover_after` | Positive integer `N samples` | Recovery after a fault requires N consecutive new valid samples. |
@@ -109,6 +113,26 @@ Explicit `Disconnected` and `Invalid` propagate immediately. Without a sample, t
 Clear the filter window after a fault. The result is `NotReady` until both filter readiness and `recover_after` conditions are met. median(5) with recover_after=3 requires at least five new valid samples. Do not count a sample with a changed source epoch or time epoch as the next normal sample in the previous continuous sequence.
 
 Default reboot semantics reset sensor state and freshness and prepare again from `NotReady`. Persistent resume is an explicit opt-in validating checkpoint source/time continuity. Do not immediately restore a single old normal value and use it as permission.
+
+`recover_after = N samples` counts distinct new valid observations on initialization, reboot, source-epoch changes, and recovery after a fault. The Nth observation is usable once the filter is also ready; duplicates and clock-only scans do not count. A fault or loss of freshness starts a new sequence. To discard the first N valid observations, author `recover_after = N+1 samples` as a concrete count within `1..31`. This option counts samples; it is not a timed warm-up.
+
+A timed preparation period can be authored with the existing stateful `debounce` operation, without a duration form of `recover_after`. This pattern withholds the Result until two minutes have elapsed between the first conditioned `Good` observation and a distinct fresh `Good` observation at or after the deadline. The `usable` output is an availability indicator; it does not command physical operation.
+
+```ghost
+fn observed(value: Number) -> Bool { true }
+control TimedPreparation {
+  input reading: Number { stale_after = 3min; }
+  signal ready = debounce(reading |> map(observed), stable_for: 2min, initial: false);
+  let prepared: Result<Number, SensorFault> = case ready {
+    ok(value) => if value then reading else fault(NotReady);
+    fault(_) => reading;
+  };
+  output usable: Bool;
+  usable <- case prepared { ok(value) => true; fault(_) => false; };
+}
+```
+
+`observed` maps every healthy payload, including zero, to true; an input fault passes through `map` unchanged. The debounce interval uses observation timestamps. Clock-only scans and duplicate samples cannot promote readiness. A fault, stale reception or a source-epoch change restarts preparation. If filtering or sample-count recovery is configured, the interval starts only after those stages first produce `Good`. The `fault(_) => reading` branch preserves the original input Result and its origin. Choose `stale_after` consistently with the expected observation cadence; the three-minute bound above permits the sparse first/deadline observations in this example. Count-based `recover_after` and this authored duration gate are separate conditions.
 
 ## 4.3 Filters and signal operations
 
@@ -148,8 +172,8 @@ The two boundaries prevent repeated ON/OFF near the threshold. This memory is ex
 The following is selected notation:
 
 ```ghost
-sensor moisture: Percent { filter = moving_average(3); }
-sensor temperature: Temperature { filter = ema(alpha: 0.25); }
+input moisture: Percent { filter = moving_average(3); }
+input temperature: Temperature { filter = ema(alpha: 0.25); }
 signal stable_start = debounce(start, stable_for: 2s, initial: false);
 ```
 
@@ -339,7 +363,7 @@ separate compatibility decisions.
 ## 4.5 Optional sensors and capabilities
 
 ```ghost
-sensor moisture?: Percent;
+input moisture?: Percent;
 ```
 
 `?` declares that the sensor capability is optional in the installation profile. It does not merge absence with faults of an installed sensor.

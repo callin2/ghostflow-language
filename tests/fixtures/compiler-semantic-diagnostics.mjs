@@ -15,7 +15,7 @@ add('duplicate-enum-local', wrap('type Mode = Off | §Off;'), wrap('type Mode = 
 add('duplicate-enum-global', wrap('type Mode = Off; type Other = §Off;'), wrap('type Mode = Off; type Other = On;'), 'duplicate enum member Off');
 add('enum-fault-shadow', wrap('type Mode = §Stale;'), wrap('type Mode = Fresh;'), 'enum member name Stale is a reserved fault member');
 add('unknown-type', wrap('input x: §Missing;'), wrap('input x: Number;'), 'unknown type Missing');
-add('input-result-storage', wrap('input x: §Result<Bool, SensorFault>;'), wrap('input x: Bool;'), 'input must use a scalar type');
+add('input-result-storage', wrap('input x: §Result<Bool, SensorFault>;'), wrap('input x: Bool;'), 'input type must be a supported scalar payload');
 add('output-result-storage', wrap('output x: §Result<Bool, SensorFault>; x <- ok(true);'), wrap('output x: Bool; x <- true;'), 'output must use a scalar type');
 add('state-result-storage', wrap('state x: §Result<Bool, SensorFault> = ok(true);'), wrap('state x: Bool = true;'), 'Result cannot be stored in state');
 add('config-result-storage', wrap('config x: §Result<Bool, SensorFault> = ok(true);'), wrap('config x: Bool = true;'), 'Result cannot be stored in config');
@@ -33,7 +33,7 @@ add('output-type', wrap('output x: Bool; §x <- 1;'), wrap('output x: Bool; x <-
 add('let-annotation', wrap('§let x: Bool = 1;'), wrap('let x: Bool = true;'), 'let x does not match annotation Bool');
 add('let-cycle', wrap('§let x = y; let y = x;'), wrap('let x = y; let y = true;'), 'cyclic let definition involving x');
 expr('unknown-reference', '§missing', 'true', 'Bool', 'unknown identifier missing');
-expr('unknown-member', '§flag.missing', 'flag', 'Bool', 'unknown member flag.missing', 'input flag: Bool;');
+expr('unknown-member', '§flag.missing', 'flag', 'Bool', 'unknown member flag.missing', 'let flag: Bool = true;');
 expr('next-unknown-reference', "§missing'", "known'", 'Bool', 'unknown state missing', 'state known: Bool = false;');
 add('let-next-reference', wrap("state x: Bool = false; let y = §x';"), wrap('state x: Bool = false; let y = x;'), 'next state references are allowed only in output expressions');
 expr('dead-branch-name', 'if false then §missing else true', 'if false then false else true', 'Bool', 'unknown identifier missing');
@@ -47,7 +47,7 @@ for (const op of ['==', '!=']) expr(`equality-${op}`, `true §${op} 1`, `true ${
 for (const op of ['<', '<=', '>', '>=']) expr(`ordered-${op}`, `true §${op} false`, `1 ${op} 2`, 'Bool', `${op} requires matching ordered types`);
 expr('set-type', '1 §in { true }', '1 in { 2 }', 'Bool', 'in values must match the tested value type');
 expr('bool-arithmetic', 'true §+ false', '1.0 + 2.0', 'Number', '+ requires numeric operands');
-expr('int-number-mixing', 'i §+ n', 'number(i) + n', 'Number', '+ does not implicitly mix Int and Number', 'input i: Int; input n: Number;');
+expr('int-number-mixing', 'i §+ n', 'number(i) + n', 'Number', '+ does not implicitly mix Int and Number', 'let i: Int = 1; let n: Number = 1.0;');
 expr('int-slash', '1 §/ 2', '1 div 2', 'Int', '/ is not defined for Int operands; use div or convert both operands to Number');
 for (const op of ['div', '%']) expr(`number-${op}`, `1.0 §${op} 2.0`, '1.0 / 2.0', 'Number', `${op} requires Int operands`);
 expr('nominal-addition', '1s §+ 1%', '1s + 1s', 'Duration', '+ does not implicitly mix Duration and Percent');
@@ -112,10 +112,10 @@ for (const [ctor, arg] of [['ok', 'true'], ['fault', 'Stale']]) {
 add('ok-payload-type', wrap('let result: Result<Bool, SensorFault> = ok(§1);'), wrap('let result: Result<Bool, SensorFault> = ok(true);'), 'ok payload must be Bool');
 add('fault-enum-type', wrap('let result: Result<Bool, ClockFault> = fault(§Stale);'), wrap('let result: Result<Bool, ClockFault> = fault(ClockUnknown);'), 'fault reason must be ClockFault');
 
-const sensor = (body, type = 'Number') => wrap(`sensor reading: ${type} { ${body} }`);
-add('sensor-type', wrap('sensor reading: §Int;'), wrap('sensor reading: Number;'), 'sensor type must be Bool, Number, Percent, or a physical quantity');
-add('sensor-nonconstant-option', wrap('input interval: Duration; sensor reading: Number { sample = §interval; }'), sensor('sample = 1s;'), 'sample must be a constant Duration');
-add('sensor-inverted-range', wrap('§sensor reading: Number { valid = 2.0 .. 1.0; }'), sensor('valid = 1.0 .. 2.0;'), 'sensor valid range is inverted');
+const sensor = (body, type = 'Number') => wrap(`input reading: ${type} { ${body} }`);
+add('sensor-type', wrap('input reading: §Result<Number, SensorFault>;'), wrap('input reading: Number;'), 'input type must be a supported scalar payload');
+add('sensor-nonconstant-option', wrap('input interval: Duration; input reading: Number { sample = §interval; }'), sensor('sample = 1s;'), 'sample must be a constant Duration');
+add('sensor-inverted-range', wrap('§input reading: Number { valid = 2.0 .. 1.0; }'), sensor('valid = 1.0 .. 2.0;'), 'sensor valid range is inverted');
 add('sensor-filter-type', sensor('filter = §median(3);', 'Bool'), sensor('filter = median(3);'), 'numeric filtering requires a numeric sensor');
 add('sensor-filter-shape', sensor('filter = §1;'), sensor('filter = median(3);'), 'filter must be median(N), moving_average(N), or ema(alpha: Number)');
 add('sensor-filter-name', sensor('filter = §unknown(3);'), sensor('filter = median(3);'), 'filter must be median(N), moving_average(N), or ema(alpha: Number)');
@@ -123,8 +123,8 @@ add('sensor-ema-shape', sensor('filter = §ema(0.5);'), sensor('filter = ema(alp
 add('sensor-ema-range', sensor('filter = §ema(alpha: 0.0);'), sensor('filter = ema(alpha: 0.5);'), 'ema alpha must be finite and in (0, 1]');
 for (const [name, bad, good, message] of [['median', 2, 3, 'median window must be an odd integer from 1 to 31'], ['moving_average', 32, 31, 'moving_average window must be an integer from 1 to 31']]) add(`sensor-${name}-window`, sensor(`filter = §${name}(${bad});`), sensor(`filter = ${name}(${good});`), message);
 add('sensor-recovery-count', sensor('recover_after = §0 samples;'), sensor('recover_after = 1 samples;'), 'recover_after must be an integer from 1 to 31 samples');
-add('sensor-positive-duration', wrap('§sensor reading: Number { stale_after = 0s; }'), sensor('stale_after = 1s;'), 'sensor durations must be positive');
-const signal = (call, type = 'Number') => wrap(`sensor reading: ${type}; signal stable = ${call};`);
+add('sensor-positive-duration', wrap('§input reading: Number { stale_after = 0s; }'), sensor('stale_after = 1s;'), 'sensor durations must be positive');
+const signal = (call, type = 'Number') => wrap(`input reading: ${type}; signal stable = ${call};`);
 const hysteresis = 'hysteresis(reading, on_below: 1.0, off_above: 2.0, initial: false)';
 add('signal-shape', signal('§true'), signal(hysteresis), 'signal requires hysteresis(sensor, on_below:, off_above:, initial:)');
 add('signal-sensor-reference', signal('hysteresis(§true, on_below: 1.0, off_above: 2.0, initial: false)'), signal(hysteresis), 'hysteresis first argument must be a declared sensor');
@@ -177,7 +177,7 @@ expr('case-enum-unknown', 'case mode { §Unknown => true; On => false; }', 'case
 expr('case-enum-duplicate', 'case mode { Off => true; §Off => false; On => false; }', 'case mode { Off => true; On => false; }', 'Bool', 'duplicate case member Off', enumSetup);
 expr('case-enum-incomplete', '§case mode { Off => true; }', 'case mode { Off => true; On => false; }', 'Bool', 'case for Mode must be exhaustive', enumSetup);
 expr('case-enum-branch-type', 'case mode { §Off => true; On => 1; }', 'case mode { Off => true; On => false; }', 'Bool', 'case branches must have the same type', enumSetup);
-const resultSetup = 'sensor reading: Bool;';
+const resultSetup = 'input reading: Bool;';
 const caseGood = 'case reading { ok(v) => v; fault(_) => false; }';
 expr('case-result-pattern', 'case reading { §good(v) => v; fault(_) => false; }', caseGood, 'Bool', 'Result case supports only ok(...) and fault(...)', resultSetup);
 expr('case-result-duplicate', 'case reading { ok(v) => v; §ok(_) => false; fault(_) => false; }', caseGood, 'Bool', 'duplicate ok branch', resultSetup);
@@ -186,7 +186,7 @@ expr('case-result-incomplete', '§case reading { ok(v) => v; }', caseGood, 'Bool
 expr('case-result-branch-type', '§case reading { ok(v) => v; fault(_) => 1; }', caseGood, 'Bool', 'case branches must have the same type', resultSetup);
 expr('case-result-shadow', 'case reading { §ok(Stale) => Stale; fault(_) => false; }', caseGood, 'Bool', 'case binding name Stale is a reserved fault member', resultSetup);
 expr('case-result-reserved-binding', 'case reading { §ok(__gf_private) => __gf_private; fault(_) => false; }', caseGood, 'Bool', 'case binding name __gf_private uses reserved __gf_ prefix', resultSetup);
-const pipeSetup = 'sensor reading: Number;';
+const pipeSetup = 'input reading: Number;';
 const pipeGood = 'reading |> map(below(3.0)) |> recover(false)';
 expr('pipeline-shape', 'reading |> §true', pipeGood, 'Bool', 'Result pipeline requires a compiler-known static transform', pipeSetup);
 expr('pipeline-unknown-transform', 'reading |> §unknown()', pipeGood, 'Bool', 'unsupported Result transform unknown', pipeSetup);
@@ -203,7 +203,7 @@ expr('recover-arity', 'reading |> §recover()', 'reading |> recover(0.0)', 'Numb
 expr('recover-input-type', '1.0 |> §recover(0.0)', 'reading |> recover(0.0)', 'Number', 'recover expects one default and a Result value', pipeSetup);
 expr('recover-default-type', 'reading |> recover(§false)', 'reading |> recover(0.0)', 'Number', 'recover default must be Number', pipeSetup);
 expr('below-arity', 'reading |> map(§below()) |> recover(false)', pipeGood, 'Bool', 'below expects one limit', pipeSetup);
-expr('below-payload-type', 'reading |> map(§below(true)) |> recover(false)', 'reading |> recover(false)', 'Bool', 'below is not defined for Bool', 'sensor reading: Bool;');
+expr('below-payload-type', 'reading |> map(§below(true)) |> recover(false)', 'reading |> recover(false)', 'Bool', 'below is not defined for Bool', 'input reading: Bool;');
 expr('below-limit-type', 'reading |> map(below(§true)) |> recover(false)', pipeGood, 'Bool', 'below limit must be Number', pipeSetup);
 expr('callback-shape', 'reading |> map(§true) |> recover(false)', pipeGood, 'Bool', 'map/and_then requires a named fn or below(limit)', pipeSetup);
 expr('callback-unknown-name', 'reading |> map(§missing) |> recover(false)', pipeGood, 'Bool', 'transform missing must name a unary fn', pipeSetup);
@@ -215,11 +215,13 @@ add('constraint-shape', wrap(`${outputSetup} §require !a;`), wrap(`${outputSetu
 add('constraint-target-type', wrap(`${outputSetup} require §true => b;`), wrap(`${outputSetup} require a => b;`), 'require implication target must be a Bool output');
 add('constraint-mutex-count', wrap(`${outputSetup} §mutex(a);`), wrap(`${outputSetup} mutex(a, b);`), 'mutex needs 2 to 32 Bool outputs');
 add('constraint-mutex-member', wrap(`${outputSetup} §mutex(a, missing);`), wrap(`${outputSetup} mutex(a, b);`), 'mutex member must be a Bool output');
-add('input-resource-budget', `§control Diagnostic { input ${Array.from({length:129}, (_,i)=>`x${i}`).join(', ')}: Bool; }`, wrap(`input ${Array.from({length:128}, (_,i)=>`x${i}`).join(', ')}: Bool;`), 'input budget exceeded (128)');
+// Each external Bool owns value/quality/fault rails: 42 declarations use 126
+// VM inputs; 43 cross the unchanged 128-input resource boundary.
+add('input-resource-budget', `§control Diagnostic { input ${Array.from({length:43}, (_,i)=>`x${i}`).join(', ')}: Bool; }`, wrap(`input ${Array.from({length:42}, (_,i)=>`x${i}`).join(', ')}: Bool;`), 'input budget exceeded (128)');
 add('state-resource-budget', `§control Diagnostic { ${Array.from({length:129}, (_,i)=>`state x${i}: Bool = false;`).join(' ')} }`, wrap(Array.from({length:128}, (_,i)=>`state x${i}: Bool = false;`).join(' ')), 'state budget exceeded (128)');
 add('output-resource-budget', `§control Diagnostic { ${Array.from({length:129}, (_,i)=>`output x${i}: Bool; x${i} <- false;`).join(' ')} }`, wrap(Array.from({length:128}, (_,i)=>`output x${i}: Bool; x${i} <- false;`).join(' ')), 'GFB1 lowering rejected control: strategy resource limit exceeded');
 const duplicated = depth => `${'twice('.repeat(depth)}inputValue${')'.repeat(depth)}`;
-add('expanded-tree-budget', `§control Diagnostic { fn twice(x: Bool) -> Bool { x || x } input inputValue: Bool; output out: Bool; out <- ${duplicated(12)}; }`, wrap(`fn twice(x: Bool) -> Bool { x || x } input inputValue: Bool; output out: Bool; out <- ${duplicated(3)};`), 'function expansion exceeds 4096 node budget');
+add('expanded-tree-budget', `§control Diagnostic { fn twice(x: Bool) -> Bool { x || x } state inputValue: Bool = false; output out: Bool; out <- ${duplicated(12)}; }`, wrap(`fn twice(x: Bool) -> Bool { x || x } state inputValue: Bool = false; output out: Bool; out <- ${duplicated(3)};`), 'function expansion exceeds 4096 node budget');
 
 // Helper failures must retain the same public diagnostic class and source location.
 expr('quantity-decimal-exponent-overflow', '§1e999m', '1e2m', 'Length', 'quantity literal exceeds finite binary64 range');
@@ -239,10 +241,10 @@ add('config-temperature-step-type', wrap('§config x: Temperature = 1°C { min =
 // This is an implementation restriction, not a Reference language rejection.
 const contextSlotsBody = `${dailyBody} dst_missing = skip; dst_repeated = first; basis = pulse; when = true; clock = trusted_only; gap = skip_after(60s); recovery = baseline; fallback = skip;`;
 add('config-daily-slots-combination', `§${wrap(`schedule times: DailySlots<15min> { ${contextSlotsBody} } config x: Bool = false { access = operator; }`)}`, wrap(`schedule times: DailySlots<15min> { ${contextSlotsBody} } let x = false;`), 'config streams cannot mix with legacy Daily/DailySlots context execution; use fixed let values or a config-aware schedule', 'implementation-restriction');
-const aliasExpression = (count, rightHeavy) => `input x: Number; ${Array.from({length: count}, (_, i) => `let v${i} = ${rightHeavy ? `x + ${i ? `v${i-1}` : 'x'}` : `${i ? `v${i-1}` : 'x'} + x`};`).join(' ')} output out: Number; out <- v${count-1};`;
+const aliasExpression = (count, rightHeavy) => `state x: Number = 1.0; ${Array.from({length: count}, (_, i) => `let v${i} = ${rightHeavy ? `x + ${i ? `v${i-1}` : 'x'}` : `${i ? `v${i-1}` : 'x'} + x`};`).join(' ')} output out: Number; out <- v${count-1};`;
 add('expression-stack-budget', `§${wrap(aliasExpression(130, true))}`, wrap(aliasExpression(100, true)), 'expression stack budget exceeded (128) for out');
 add('lowered-syntax-depth-budget', `§${wrap(aliasExpression(130, false))}`, wrap(aliasExpression(100, false)), 'GFB1 lowering rejected control: syntax nesting limit exceeded');
-const largeExpression = depth => `fn twice(x: Number) -> Number { x + x } input x: Number; output out: Number; out <- ${'twice('.repeat(depth)}(x + 17.0)${')'.repeat(depth)};`;
+const largeExpression = depth => `fn twice(x: Number) -> Number { x + x } state x: Number = 1.0; output out: Number; out <- ${'twice('.repeat(depth)}(x + 17.0)${')'.repeat(depth)};`;
 add('expression-byte-budget', `§${wrap(largeExpression(9))}`, wrap(largeExpression(8)), 'GFB1 lowering rejected control: strategy resource limit exceeded');
 const recursiveExpansion = (depth, marked = false) => `fn f0(x: Bool) -> Bool { x } ${Array.from({length: depth}, (_, i) => `fn f${i+1}(x: Bool) -> Bool { f${i}(f${i}(${marked && i === 0 ? '§' : ''}x)) }`).join(' ')}`;
 add('lowering-visit-budget', wrap(recursiveExpansion(12, true)), wrap(recursiveExpansion(3)), 'function expansion exceeds 4096 node budget');
@@ -253,7 +255,7 @@ expr('removed-ifthenelse', '§ifthenelse(true, true, false)', 'if true then true
 for (const name of ['elapsed', 'hysteresis', 'median']) expr(`declaration-only-${name}`, `§${name}(true)`, 'true', 'Bool', `${name} is only valid in its declaration`);
 add('result-type-parameters-missing', wrap('input value: §Result;'), wrap('input value: Bool;'), 'Result type requires payload and error types');
 add('enum-type-as-value', wrap('type Mode = Off | On; let value = §Mode;'), wrap('type Mode = Off | On; let value = Off;'), 'unsupported reference Mode');
-for (const base of ['input', 'state', 'next']) expr(`removed-qualified-${base}`, `§${base}.x`, 'x', 'Bool', `removed qualified reference ${base}.x; use the direct canonical name`, 'input x: Bool;');
+for (const base of ['input', 'state', 'next']) expr(`removed-qualified-${base}`, `§${base}.x`, 'x', 'Bool', `removed qualified reference ${base}.x; use the direct canonical name`, 'let x: Bool = true;');
 add('config-date-setting-invalid-calendar', wrap(`§config day: Date = date\`2026-01-01\` { ${dateSettings.replace('2026-01-03', '2026-02-29')} }`), wrap(`config day: Date = date\`2026-01-01\` { ${dateSettings} }`), 'date literal is out of range');
 // Solar offsets are parsed by a shared literal helper, before lowering.
 add('solar-offset-whole-unit', wrap(`schedule dawn: Solar { ${solarBody.replace('sun`rise`', 'sun`rise + §0.5s`')} }`), wrap(`schedule dawn: Solar { ${solarBody.replace('sun`rise`', 'sun`rise + 500ms`')} }`), 'Solar offset must be an integer duration literal using ms, s, min, or h');
@@ -262,7 +264,7 @@ expr('number-whole-literal-nonfinite', `§${'9'.repeat(310)}`, '1', 'Number', 'n
 const scheduled = `schedule times: DailySlots<15min> { ${dailyBody} }`;
 add('function-schedule-member-capture', `fn f() -> Bool { §times.due } ${wrap(scheduled)}`, `fn f(value: Bool) -> Bool { value } ${wrap(`${scheduled} output out: Bool; out <- f(times.due);`)}`, 'fn f cannot capture global times');
 add('function-local-member-shadow', `fn f(times: Bool) -> Bool { §times.due } ${wrap(scheduled)}`, `fn f(times: Bool) -> Bool { times } ${wrap(`${scheduled} output out: Bool; out <- f(times.due);`)}`, 'unknown member times.due');
-expr('case-local-member-shadow', 'case reading { ok(times) => §times.due; fault(_) => false; }', 'case reading { ok(times) => times; fault(_) => false; }', 'Bool', 'unknown member times.due', `${scheduled} sensor reading: Bool;`);
+expr('case-local-member-shadow', 'case reading { ok(times) => §times.due; fault(_) => false; }', 'case reading { ok(times) => times; fault(_) => false; }', 'Bool', 'unknown member times.due', `${scheduled} input reading: Bool;`);
 add('encoded-name-length', `§control ${'x'.repeat(129)} {}`, `control ${'x'.repeat(128)} {}`, `GFB1 lowering rejected control: invalid module name: ${'x'.repeat(129)}`, 'resource-limit');
 const namedOutputs = count => Array.from({length: count}, (_, i) => { const name = `x${i}`.padEnd(128, 'x'); return `output ${name}: Bool; ${name} <- false;`; }).join(' ');
 add('device-query-byte-budget', `§${wrap(namedOutputs(32))}`, wrap(namedOutputs(20)), 'GFB1 lowering rejected control: strategy resource limit exceeded', 'resource-limit');

@@ -7,7 +7,7 @@ const source = `# Native derived windows
 
 \`\`\`ghost
 control DerivedWindowPackage {
-  sensor probe: Number;
+  input probe: Number;
   signal inner = window_average(probe, over: 2ms, quality: measured, max_age: 2ms);
   signal outer = window_average(inner, over: 10ms, quality: measured, max_age: 10ms);
   output pump: Bool;

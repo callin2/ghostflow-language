@@ -7,8 +7,9 @@ It does not operate hardware or establish Driver receipt authenticity.
 
 The selected profile is a standalone canonical `.ghost.md` GFB10 control with
 Periodic schedules, optional existing settings, and an applied/durable
-`on_time` account in the same source. Sensors, external contexts, controllers,
-objectives and after-event adapters are excluded. Accounting budget constraints
+`on_time` account in the same source. Explicit typed-quality input observations
+use the existing ControlRuntime producer and conditioning contract. External
+contexts, signals, controllers, objectives and after-event adapters are excluded. Accounting budget constraints
 and event-count bindings reject before owners or storage are created: this
 profile observes applied usage without connecting accounting to decision
 enforcement. It does not extend the
@@ -29,12 +30,24 @@ empty ledger initialization. Existing file bytes restore the actual accounting
 owner. They do not restore the decision timeline, active timers or run identity.
 FileLedger's documented desktop durability and single-writer limits still apply.
 
-`append(frame)` accepts complete `nowMs`, `inputs` and `contextFacts`. It executes
+`append(frame)` accepts `nowMs`, declared scalar `inputs`, optional explicit
+quality `samples` and complete `contextFacts`. It executes
 the live framed core, records its full outcome/context checkpoint, then sends
 the selected safe Bool intent through the connected live sink. Sink failure
 retains the accepted decision record and prevents further live dispatch through
 that owner; it does not undo the tick or create applied evidence. The sink must
 be synchronous. Physical application and confirmation are separate observations.
+
+Frames may record `samples` by declared input name, with `epoch`, `id`,
+`timestampMs`, `quality` and a typed `value`. The producer supplies quality;
+healthy false and zero remain Good observations. Omitting a sample advances only
+time: the existing input contract retains or ages previous evidence, or remains
+NotReady before the first observation. The host creates no fresh Good observation
+or physical fault diagnosis. Source-authored Result branches decide how unavailable
+inputs affect intent. Sample records are copied before execution, included in
+frame budgets and branch identity hashes, and must match exactly for recorded
+replay. Synthetic branches can supply different explicit samples without reaching
+the live sink, storage or accounting owner.
 
 `recordApplied(segment)` accepts explicitly caller-validated Driver intervals
 through the source-bound AccountingRuntime and persists/acknowledges its real

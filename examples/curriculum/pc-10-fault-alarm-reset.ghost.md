@@ -74,11 +74,41 @@ E-stop은 에너지를 제거하는 **외부 hardwired safety chain**이며
 
 ## GhostFlow source
 
+이 명시적 input revision은 생산자 품질을 사용하며 버튼의 물리적 고장을 추론하지 않는다. Good(false)는 정상 관측이다. 미상 이동 허가 또는 위치 관측은 이동, 조건부 고장 닫힘, reset 또는 요청 재무장을 허용하지 않는다. 기존 고장 원인은 latch를 유지하며 원인이 없으면 기존 Idle/OFF 경로를 사용한다. 물리적 조건의 원인 이름은 확인된 관측으로만 정하고, 기존 하드 시간 제한까지 목표가 확인되지 않았다면 OpenTimeout 또는 CloseTimeout은 여전히 성립한다. 새 START 입력이나 전역 재시작 정책은 추가하지 않는다.
+
 ```ghost
+// Source revision: issue531-producer-quality-pc10-v1
 control FaultAlarmResetWaterSupply {
   input start_request, reset_request, stop_ok, emergency_stop_ok, overload_ok,
     source_water_ok, valve_drive_ok, open_limit, close_limit: Bool;
   output valve_open_contactor, valve_close_contactor, pump_contactor, alarm: Bool;
+
+  let start_request_true = start_request |> recover(false);
+  let start_request_false = !(start_request |> recover(true));
+  let reset_request_true = reset_request |> recover(false);
+  let reset_request_false = !(reset_request |> recover(true));
+  let stop_ok_true = stop_ok |> recover(false);
+  let stop_ok_false = !(stop_ok |> recover(true));
+  let emergency_stop_ok_true = emergency_stop_ok |> recover(false);
+  let emergency_stop_ok_false = !(emergency_stop_ok |> recover(true));
+  let overload_ok_true = overload_ok |> recover(false);
+  let overload_ok_false = !(overload_ok |> recover(true));
+  let source_water_ok_true = source_water_ok |> recover(false);
+  let source_water_ok_false = !(source_water_ok |> recover(true));
+  let valve_drive_ok_true = valve_drive_ok |> recover(false);
+  let valve_drive_ok_false = !(valve_drive_ok |> recover(true));
+  let open_limit_true = open_limit |> recover(false);
+  let open_limit_false = !(open_limit |> recover(true));
+  let close_limit_true = close_limit |> recover(false);
+  let close_limit_false = !(close_limit |> recover(true));
+  let stop_ok_good = case stop_ok { ok(_) => true; fault(_) => false; };
+  let emergency_stop_ok_good = case emergency_stop_ok { ok(_) => true; fault(_) => false; };
+  let overload_ok_good = case overload_ok { ok(_) => true; fault(_) => false; };
+  let source_water_ok_good = case source_water_ok { ok(_) => true; fault(_) => false; };
+  let valve_drive_ok_good = case valve_drive_ok { ok(_) => true; fault(_) => false; };
+  let open_limit_good = case open_limit { ok(_) => true; fault(_) => false; };
+  let close_limit_good = case close_limit { ok(_) => true; fault(_) => false; };
+  let motion_observations_good = stop_ok_good && emergency_stop_ok_good && overload_ok_good && source_water_ok_good && valve_drive_ok_good && open_limit_good && close_limit_good;
 
   let settle_delay = 2s;
   let watering_time = 5min;
@@ -101,82 +131,78 @@ control FaultAlarmResetWaterSupply {
   // ghostflow:link id=GF-INT-PC10-FAULT-ALARM-RESET-V1 relation=implements
   timer age = elapsed(phase);
 
-  let normal_permit = stop_ok && emergency_stop_ok && overload_ok && source_water_ok && valve_drive_ok;
-  let fault_motion_permit = stop_ok && emergency_stop_ok && overload_ok && valve_drive_ok;
-  let conflict = open_limit && close_limit;
-  let known_closed = close_limit && !open_limit;
-  let known_open = open_limit && !close_limit;
-  let start_event = request_armed && start_request;
-  let reset_event = reset_armed && reset_request;
+  let normal_permit = stop_ok_true && emergency_stop_ok_true && overload_ok_true && source_water_ok_true && valve_drive_ok_true;
+  let fault_motion_permit = stop_ok_true && emergency_stop_ok_true && overload_ok_true && valve_drive_ok_true;
+  let conflict = open_limit_true && close_limit_true;
+  let known_closed = close_limit_true && open_limit_false;
+  let known_open = open_limit_true && close_limit_false;
+  let start_event = request_armed && start_request_true;
+  let reset_event = reset_armed && reset_request_true;
   let fault_cleared = case fault_cause {
     None => true;
-    EmergencyStop => emergency_stop_ok;
-    Overload => overload_ok;
-    LowSourceWater => source_water_ok;
-    ValveDriveUnavailable => valve_drive_ok;
+    EmergencyStop => emergency_stop_ok_true;
+    Overload => overload_ok_true;
+    LowSourceWater => source_water_ok_true;
+    ValveDriveUnavailable => valve_drive_ok_true;
     SensorConflict => !conflict;
     FeedbackLost => known_closed;
     OpenTimeout => known_closed;
     CloseTimeout => known_closed;
   };
-  let fault_free_now = emergency_stop_ok && overload_ok && source_water_ok &&
-    valve_drive_ok && !conflict;
-  let reset_allowed = fault_cause != None && fault_cleared && fault_free_now && known_closed;
+  let fault_free_now = emergency_stop_ok_true && overload_ok_true && source_water_ok_true &&
+    valve_drive_ok_true && !conflict;
+  // Every FaultCause-specific clear condition is implied by fault_free_now and known_closed.
+  let reset_allowed = stop_ok_good && fault_cause != None && fault_free_now && known_closed;
   let immediate_cause =
-    if !emergency_stop_ok then EmergencyStop
-    else if !overload_ok then Overload
-    else if !valve_drive_ok then ValveDriveUnavailable
+    if emergency_stop_ok_false then EmergencyStop
+    else if overload_ok_false then Overload
+    else if valve_drive_ok_false then ValveDriveUnavailable
     else if conflict then SensorConflict
-    else if phase in {Settling, Watering, PumpStopping} && !known_open then FeedbackLost
-    else if phase == Opening && !open_limit && age >= opening_timeout then OpenTimeout
-    else if phase == Closing && !close_limit && age >= closing_timeout then CloseTimeout
-    else if !source_water_ok && phase in {Idle, Opening, Settling, Watering, PumpStopping} then LowSourceWater
+    else if phase in {Settling, Watering, PumpStopping} && open_limit_good && close_limit_good && !known_open then FeedbackLost
+    else if phase == Opening && !open_limit_true && age >= opening_timeout then OpenTimeout
+    else if phase == Closing && !close_limit_true && age >= closing_timeout then CloseTimeout
+    else if source_water_ok_false && phase in {Idle, Opening, Settling, Watering, PumpStopping} then LowSourceWater
     else None;
 
-  request_armed' = phase == Idle && fault_cause == None && normal_permit && !conflict && known_closed && !start_request;
-  reset_armed' = phase == Faulted && reset_allowed && !reset_request;
+  let any_immediate_cause = emergency_stop_ok_false || overload_ok_false || valve_drive_ok_false || conflict ||
+    (phase in {Settling, Watering, PumpStopping} && open_limit_good && close_limit_good && !known_open) ||
+    (phase == Opening && !open_limit_true && age >= opening_timeout) ||
+    (phase == Closing && !close_limit_true && age >= closing_timeout) ||
+    (source_water_ok_false && phase in {Idle, Opening, Settling, Watering, PumpStopping});
+
+  request_armed' = phase == Idle && fault_cause == None && normal_permit && !conflict && known_closed && start_request_false;
+  reset_armed' = phase == Faulted && reset_allowed && reset_request_false;
   fault_cause' =
     if phase == Faulted && reset_event && reset_allowed then None
     else if fault_cause != None then fault_cause
     else immediate_cause;
 
-  phase' = case phase {
+  phase' = if source_water_ok_false && phase in {Settling, Watering, PumpStopping} && known_open && fault_motion_permit then FaultPumpStopping
+    else if any_immediate_cause then Faulted
+    else if !motion_observations_good then if fault_cause != None then Faulted else Idle
+    else if phase in {Idle, Opening, Settling, Watering, PumpStopping, Closing} && stop_ok_false then Idle
+    else case phase {
     Idle =>
-      if immediate_cause != None then Faulted
-      else if !stop_ok then Idle
-      else if start_event && known_closed then Opening
+      if start_event && known_closed then Opening
       else Idle;
 
     Opening =>
-      if immediate_cause != None then Faulted
-      else if !stop_ok then Idle
-      else if known_open then Settling
+      if known_open then Settling
       else Opening;
 
     Settling =>
-      if immediate_cause == LowSourceWater && known_open && fault_motion_permit then FaultPumpStopping
-      else if immediate_cause != None then Faulted
-      else if !stop_ok then Idle
-      else if age >= settle_delay then Watering
+      if age >= settle_delay then Watering
       else Settling;
 
     Watering =>
-      if immediate_cause == LowSourceWater && known_open && fault_motion_permit then FaultPumpStopping
-      else if immediate_cause != None then Faulted
-      else if !stop_ok then Idle
-      else if age >= watering_time then PumpStopping
+      if age >= watering_time then PumpStopping
       else Watering;
 
     PumpStopping =>
-      if immediate_cause == LowSourceWater && known_open && fault_motion_permit then FaultPumpStopping
-      else if immediate_cause != None then Faulted
-      else if !stop_ok then Idle
-      else Closing;
+      Closing;
 
     Closing =>
-      if immediate_cause != None then Faulted
-      else if !stop_ok then Idle
-      else if known_closed then Idle
+      if known_closed then Idle
       else Closing;
 
     FaultPumpStopping =>
@@ -194,10 +220,27 @@ control FaultAlarmResetWaterSupply {
       else Faulted;
   };
 
-  valve_open_contactor <- phase' == Opening;
-  valve_close_contactor <- phase' in {Closing, FaultClosing};
-  pump_contactor <- phase' == Watering;
-  alarm <- phase' in {FaultPumpStopping, FaultClosing, Faulted};
+  // Exact next-phase projections avoid expanding the full phase decision once per output.
+  let transition_permitted = !any_immediate_cause && motion_observations_good &&
+    !(phase in {Idle, Opening, Settling, Watering, PumpStopping, Closing} && stop_ok_false);
+  let next_open = transition_permitted &&
+    ((phase == Idle && start_event && known_closed) || (phase == Opening && !known_open));
+  let next_close = transition_permitted &&
+    (phase == PumpStopping || (phase == Closing && !known_closed) ||
+      (phase == FaultPumpStopping && fault_motion_permit && !conflict) ||
+      (phase == FaultClosing && fault_motion_permit && !conflict && !known_closed && age < closing_timeout));
+  let next_pump = transition_permitted &&
+    ((phase == Settling && age >= settle_delay) || (phase == Watering && age < watering_time));
+  let next_alarm = if any_immediate_cause then true
+    else if !motion_observations_good then fault_cause != None
+    else if phase in {FaultPumpStopping, FaultClosing} then true
+    else if phase == Faulted then !(reset_event && reset_allowed)
+    else false;
+
+  valve_open_contactor <- next_open;
+  valve_close_contactor <- next_close;
+  pump_contactor <- next_pump;
+  alarm <- next_alarm;
   mutex(valve_open_contactor, valve_close_contactor);
   require !(pump_contactor && valve_open_contactor);
   require !(pump_contactor && valve_close_contactor);

@@ -609,6 +609,15 @@ export async function verifyPortablePackage(packageValue, options = {}) {
   const sourceMap = parseCanonicalJson(artifacts.sourceMapBytes, 'sourceMap');
   const contextManifest = packageValue.payload.bytecode.version === '10';
   const manifestKeys = ['format', 'name', 'inputs', 'outputs', 'sensors', 'schedules', 'timers', 'signals', 'configs', 'bytecodeSha256'];
+  if (Object.hasOwn(manifest, 'sensorInstances')) {
+    if (contextManifest && !sourceMap.sourceClosure) {
+      fail('manifest-mismatch', 'historical GFB10 profile does not support sensorInstances');
+    }
+    manifestKeys.push('sensorInstances');
+    if (!Array.isArray(manifest.sensorInstances)) fail('manifest-mismatch', 'manifest.sensorInstances must be an array');
+    // These compiler-derived descriptors are compared in full with canonical
+    // source lowering below; a signature cannot substitute instance provenance.
+  }
   if (contextManifest) {
     for (const key of ['providers', 'calendars', 'naturalConditions', 'accounting', 'resources']) {
       if (Object.hasOwn(manifest, key)) manifestKeys.push(key);
@@ -809,6 +818,11 @@ export async function verifyPortablePackage(packageValue, options = {}) {
     })).filter(entry => Object.keys(entry).length > 1);
     if (canonicalJson(sampleBindings(manifest.sensors)) !== canonicalJson(sampleBindings(replay.manifest.sensors))) {
       throw new Error('debounce sample bindings do not match canonical source lowering');
+    }
+    for (const field of ['sensors', 'sensorInstances']) {
+      if (canonicalJson(manifest[field] ?? []) !== canonicalJson(replay.manifest[field] ?? [])) {
+        throw new Error(`${field} typed quality descriptors do not match canonical source lowering`);
+      }
     }
     if (sourceMap.traceMetadata === null) {
       if (sourceMapRequiresTraceMetadata(replay.sourceMap) || replay.traceMetadata.resultSites.length) throw new Error('trace metadata is required for this source map');

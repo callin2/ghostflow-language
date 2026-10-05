@@ -2,6 +2,89 @@
 
 ## Unreleased
 
+### 2026-10-05 — canonical quality input ([#531](https://github.com/callin2/ghostflow-language/issues/531))
+
+External `input` declarations now inherit the existing sensor Result, conditioning
+and optional capability rules (Reference 1/4). `input request: Bool;` requires
+explicit handling such as `request |> recover(true)`; healthy false is still
+false. The former `sensor` declaration is rejected with a new-revision migration
+diagnostic. Preserve saved source/history and review former plain input fault
+policies. Existing Bool/Number/quantity wire descriptors, GFB formats and WASM
+ABI remain unchanged. Int and the existing Duration/Date/TimeOfDay/DateTime
+scalar domains now have the same typed quality contract without rounding; invalid
+numeric observations become Invalid and exact payloads retain the identity filter. Canonical input regressions cover
+plain/framed WASM, quality, conditioning and bytecode parity. Optional Int
+capabilities retain the existing Int tag, so installed inputs select the present
+strategy independently of quality. Host admission rejects numeric Bool ranges;
+source replay binds complete signed quality descriptors to canonical input
+conditioning rather than accepting a separately signed metadata substitution.
+Native package admission validates typed acquisition domains and generated sample
+identity independently; it does not recompile the canonical source.
+
+The At-only schedule profile also accepts these typed quality inputs. Its former
+sensor-category prohibition would otherwise reject the canonical replacement for
+an already supported external scheduling condition. Explicit `allow |> recover(false)`
+inhibits a missing condition; At clock/recovery rules, GFB14 and the context ABI
+remain unchanged. At contract, native/WASM parity and fault regressions cover this fix.
+Bool `valid` ranges now reject during compilation, matching host/native admission;
+previously boolean bounds could emit a manifest that no host could instantiate.
+
+Current curriculum, tutorial, book and test fixtures now use explicit Result
+handling in new source revisions, with original bytes and historical replay
+identities retained. Producer quality is distinct from physical button diagnosis;
+there is no universal restart or START-button requirement. Public declaration
+diagnostics say input while the existing internal sensor category is retained.
+
+Reference software producers now submit a fresh typed observation only when a
+value was actually supplied. A clock-only frame creates no Good observation;
+startup remains NotReady, and existing freshness rules can yield Stale. Healthy
+false and zero remain Good. Simulator, console and live adapters retain the
+same canonical source; Ghost Timeline records and replays explicit quality samples
+without affecting live sinks or ledgers (Reference 4.2/6.8).
+Canonical Bool inputs are recognized by source-bound resource mode validation.
+Signed composed packages admit sensor-instance descriptors only after complete
+canonical source replay; the historical GFB10 profile rejects that unsupported
+field before loading bytecode. No GFB or ABI change is introduced. Software
+producer, timeline, package-tampering and resource-binding regressions cover these
+contracts.
+
+Internal instance scalar-output connections reuse the existing typed `ok`
+constructor to lift evaluated values into the receiving Result contract
+(Reference 6.2/6.4). They create no acquisition observations or sample lineage.
+The receiving source still handles Results explicitly; source conditioning on
+computed ports rejects, and previous-state feedback/cycle restrictions remain.
+For example, `connect B.previous <- A.previous;` retains its committed-state
+boundary rather than requiring a physical producer. Existing `map(fn)` and
+`and_then(fn)` lift pure and Result-returning functions without new runtime HOFs.
+Native/WASM state-lag, declaration-order and Result-propagation regressions cover
+the change.
+
+Bug fix restoring Reference 4.2 preparation: `recover_after = 3 samples` now
+requires three distinct valid new observations at startup, reset and source epoch
+change as well as after faults. Previously startup/reset bypassed the threshold.
+The third observation is usable once the filter is ready; duplicates and reads
+do not advance the count. Faults, stale reception and source reset start a new
+sequence. The default one-sample behavior remains. Rust and real plain/framed
+WASM regressions preserve unavailable quality, healthy false/zero and explicit
+ROP fault propagation. No duration annotation, ABI or application restart rule is
+added.
+
+The existing authored `map + debounce(stable_for: 2min) + Result case` pattern
+also verifies timed preparation without new syntax: the interval starts at the
+first conditioned Good observation and completes only on a fresh Good observation
+at/after its deadline. Clock-only scans and duplicates cannot complete it; faults,
+staleness and epoch changes reset it. `recover_after = N samples` still means the
+Nth usable observation, while discarding N observations requires threshold N+1
+within the existing 1..31 bound. Plain/framed/native regressions cover the pattern.
+
+Bound resource mode bindings now map canonical Bool inputs to their generated
+value rails and validate the paired OK rails before consuming a permission.
+Unavailable mode observations reject atomically, as missing/mistyped mandatory
+Bool permissions already did; they never become false/OFF or a new trip policy.
+Corrected same-scan retries and the existing source-authored admission, safe
+vector and rearming behavior are covered by native/plain/framed regressions.
+GFRB/GFRS/GFB17 versions and layouts remain unchanged.
+
 ### 2026-10-03 — report retained observation event gaps ([#282](https://github.com/callin2/ghostflow-language/issues/282))
 
 Adds a source-bound reference Host journal that retains explicit events separately from completed snapshots. A consumer at sequence10 receives an explicit missed range11–13 if retention begins at14, with the original event14 and no snapshot-derived synthetic events. Complete publication validates atomically, rejected batches permit same-scan retry, and cursors bind exact source/Program/schema/run identity. REF-05-022 verifies actual native/framed-WASM traces, complete host delivery and fresh replay. This reference API does not change source syntax, Interaction snapshot v0, physical evidence or final execution-environment event transport.

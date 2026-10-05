@@ -5,6 +5,84 @@
 
 ## 미출시
 
+### 2026-10-05 — 품질 기반 canonical input ([#531](https://github.com/callin2/ghostflow-language/issues/531))
+
+외부 `input` 선언은 기존 sensor의 Result, conditioning과 optional capability
+규칙을 계승한다(Reference 1/4). `input request: Bool;`은
+`request |> recover(true)`처럼 명시적으로 처리한다. healthy false는 false다.
+기존 `sensor` 선언은 새 revision migration 진단으로 거부한다. 저장 소스/이력은
+보존하고 이전 plain input의 fault 정책을 검토한다. Bool/Number/quantity wire
+정보, GFB 형식과 WASM ABI는 그대로다. Int와 기존 Duration/Date/TimeOfDay/DateTime scalar 범위에도
+반올림 없이 같은 타입별 품질 계약을 적용한다. 잘못된 숫자 관측값은 Invalid가
+되고 정확한 payload는 identity filter를 유지한다. canonical input 회귀 검사는
+plain/framed WASM의 품질, conditioning과 bytecode 일치를 다룬다. optional Int
+capability는 기존 Int tag를 유지해 설치된 입력이 품질과 무관하게 present
+전략을 선택한다. Host는 Bool의 숫자 범위를 거부하며 source replay는 서명된
+전체 quality descriptor가 canonical input conditioning과 일치하는지 검사한다.
+별도로 서명한 metadata 대체로 이 계약을 바꿀 수 없다. native package는
+취득 metadata의 타입별 범위와 생성된 sample identity를 별도로 검사한다.
+canonical source를 다시 컴파일하는 검사는 아니다.
+
+At 전용 예약 프로필도 typed quality input을 허용한다. 기존 sensor 분류 금지는
+이미 지원하던 외부 예약 조건의 canonical 대체 입력까지 거부했으므로 제거했다.
+명시적인 `allow |> recover(false)`는 사용할 수 없는 조건의 실행을 차단한다.
+At clock/recovery 규칙, GFB14와 context ABI는 유지한다. At 계약, native/WASM
+실행 parity 및 fault 회귀 검증으로 이 수정을 확인한다.
+Bool의 `valid` 범위는 host/native admission과 동일하게 컴파일 단계에서 거부한다.
+이전에는 boolean 범위가 어느 host에서도 실행할 수 없는 manifest를 만들 수 있었다.
+
+현재 curriculum, tutorial, book과 test fixture는 새 source revision에서
+Result를 명시적으로 처리한다. 원본 바이트와 과거 replay identity는 보존한다.
+producer quality는 물리 버튼 고장 진단과 구분하며 공통 재시작 정책이나
+START 버튼을 강제하지 않는다. 공개 선언 진단은 input으로 표기하고 기존
+내부 sensor 분류는 유지한다.
+
+참조 소프트웨어 producer는 값이 실제로 공급됐을 때만 새 타입별 관측을 제출한다.
+clock-only frame은 Good 관측을 만들지 않는다. 초기 상태는 NotReady이고 기존
+freshness 규칙에 따라 Stale이 될 수 있다. 정상 false와 0은 Good이다.
+Simulator, console과 live adapter는 같은 canonical source를 유지한다.
+Ghost Timeline은 명시적 품질 sample을 기록·재생하면서 live sink와 ledger를
+바꾸지 않는다(Reference 4.2/6.8). 소스에 결합된 resource mode 검증은 canonical
+Bool input을 인식한다. 서명된 composition package의 sensor-instance 정보는
+전체 canonical source replay 후에만 승인한다. 과거 GFB10 프로필은 지원하지
+않는 해당 필드를 bytecode 로드 전에 거부한다. GFB와 ABI는 바꾸지 않는다.
+software producer, timeline, package 변조와 resource binding 회귀 검사가
+이를 다룬다.
+
+instance의 scalar output에서 다른 instance input으로의 내부 연결은 기존
+타입별 `ok` 생성자를 재사용해 실제 계산값을 받는 쪽의 Result 계약으로
+lift한다(Reference 6.2/6.4). 취득 관측이나 sample lineage는 생성하지 않는다.
+받는 소스는 Result를 명시적으로 처리해야 한다. 계산 포트의 conditioning은
+거부하며 이전 상태 feedback과 cycle 제한은 유지한다. 예를 들어
+`connect B.previous <- A.previous;`는 물리 producer를 요구하지 않고 기존
+확정 상태 경계를 유지한다. 기존 `map(fn)`과 `and_then(fn)`은 새로운 runtime
+HOF 없이 순수 함수와 Result 반환 함수를 연결한다. native/WASM 상태 지연,
+선언 순서와 Result 전파 회귀 검사가 이를 다룬다.
+
+Reference 4.2의 준비 조건을 복원하는 버그 수정: `recover_after = 3 samples`는
+고장 후뿐 아니라 초기 시작, reset과 source epoch 변경에서도 서로 다른 새
+정상 관측 세 개를 요구한다. 이전에는 초기 시작/reset에서 이 조건을 건너뛰었다.
+필터도 준비됐다면 세 번째 관측부터 사용할 수 있다. 중복 전달과 읽기는 수를
+늘리지 않는다. fault, stale reception과 source reset은 새 준비 순서를 시작한다.
+기본 one-sample 동작은 유지한다. Rust와 실제 plain/framed WASM 회귀 검사는
+사용 불가 품질, 정상 false/0 및 명시적 ROP fault 전파를 보존한다.
+시간 기반 annotation, ABI 또는 application 재시작 규칙은 추가하지 않는다.
+
+기존 소스의 `map + debounce(stable_for: 2min) + Result case` 조합으로 시간
+기준 준비도 검증했다. 새 문법은 없다. 첫 conditioned Good 관측부터 기간을
+재며 deadline 이후의 새 Good 관측에서만 준비를 완료한다. clock-only scan과
+중복 전달은 완료 조건을 만족하지 않는다. fault, stale과 epoch 변경은 준비를
+다시 시작한다. `recover_after = N samples`는 N번째 관측부터 사용한다는 뜻이다.
+처음 N개를 버리려면 기존 1..31 범위에서 N+1을 지정해야 한다.
+plain/framed/native 회귀 검사가 이 조합을 다룬다.
+
+bound resource mode binding은 canonical Bool input을 생성된 value rail에
+연결하고 permission을 읽기 전에 짝인 OK rail을 검증한다. 사용할 수 없는
+mode 관측은 기존 필수 Bool permission의 누락/타입 오류처럼 원자적으로
+거부한다. false/OFF나 새 trip 정책으로 바꾸지 않는다. 같은 scan의 수정된
+재시도 및 기존 소스에 명시된 admission, safe vector와 재무장 동작을
+native/plain/framed 회귀 검사로 다룬다. GFRB/GFRS/GFB17 버전과 형식은 유지한다.
+
 ### 2026-10-03 — 보존 범위의 관찰 event gap 보고 ([#282](https://github.com/callin2/ghostflow-language/issues/282))
 
 명시적 event와 completed snapshot을 분리해서 보존하는 소스에 결합된 참조 Host journal을 추가한다. sequence10의 소비자는 보존 범위가14부터 시작하면 누락 범위11–13과 원래 event14를 받으며 snapshot에서 만든 가상 event는 받지 않는다. 전체 발행을 원자적으로 검증하고 거부된 batch는 같은 scan에서 재시도할 수 있으며 cursor는 정확한 source/Program/schema/run identity에 결합한다. REF-05-022는 실제 native/framed-WASM trace, 전체 Host 전달 및 새 replay를 검증한다. 이 참조 API는 source 문법, Interaction snapshot v0, 물리 증거 또는 실행 환경의 최종 event 전송을 바꾸지 않는다.

@@ -6,7 +6,6 @@ import { execFileSync } from 'node:child_process';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { compileSource } from '../tools/toolchain.mjs';
-import { GhostFlowRuntime } from '../runtimes/wasm/ghostflow-runtime.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
@@ -27,31 +26,43 @@ function workspace(t) {
   return directory;
 }
 async function scalarRuntime(t, artifact) {
-  const runtime = await GhostFlowRuntime.instantiate(wasm);
-  t.after(() => runtime.dispose()); runtime.load(artifact.bytes);
-  for (const output of artifact.manifest.outputs) {
-    runtime.addCapability('actuator', output.name, output.type === 'Bool' ? 'bool' : output.type === 'Int' ? 'int' : 'number');
-  }
-  runtime.activate(); return runtime;
+  const runtime = await ControlRuntime.instantiate(wasm, artifact);
+  t.after(() => runtime.dispose()); return runtime;
 }
-function nativeScalar(t, artifact, header, rows) {
+function nativeScalar(t, artifact, rows) {
   const directory = workspace(t), module = path.join(directory, 'module.gfb'), csv = path.join(directory, 'inputs.csv');
-  fs.writeFileSync(module, artifact.bytes); fs.writeFileSync(csv, `${header}\n${rows.join('\n')}\n`);
+  const fields = Object.keys(rows[0]);
+  fs.writeFileSync(module, artifact.bytes);
+  fs.writeFileSync(csv, `${fields.join(',')}\n${rows.map(row => fields.map(name => row[name]).join(',')).join('\n')}\n`);
   return execFileSync(executable('run'), [module, csv, '--outcomes'], { encoding: 'utf8', timeout: 20_000 })
     .trim().split('\n').map(JSON.parse);
+}
+
+// Explicit bridge for the retained healthy teaching datasets. These are new
+// identified Good observations, not automatic production defaults or clock samples.
+function healthyObservations(artifact, row, index) {
+  const { inputs, ...facts } = row;
+  return { ...facts, samples: Object.fromEntries(artifact.manifest.sensors.map(sensor => {
+    const name = sensor.name.replace(/^observed_/, '');
+    assert.ok(Object.hasOwn(inputs, name), `missing retained observation ${name}`);
+    return [sensor.name, { epoch: 1, id: index + 1, timestampMs: row.nowMs,
+      value: inputs[name], quality: 'Good' }];
+  })) };
 }
 
 test('Programming E34 counts accepted true scans exactly in native and WASM', async t => {
   const artifact = await compileSource(example('E34'), { filename: 'E34.ghost.md' });
   const inputs = [...Array(120).fill(true), false, true];
-  const native = nativeScalar(t, artifact, 'add', inputs);
   const runtime = await scalarRuntime(t, artifact);
+  const traces = inputs.map((add, index) => runtime.step(healthyObservations(artifact,
+    { nowMs: index, inputs: { add } }, index)).vm);
+  const native = nativeScalar(t, artifact, traces.map(trace => trace.inputs));
   let count = 0;
   for (const [index, add] of inputs.entries()) {
-    runtime.setBool('add', add); runtime.tick(); if (add) count++;
-    assert.equal(runtime.trace.safe.total, count);
+    if (add) count++;
+    assert.equal(traces[index].safe.total, count);
     assert.equal(native[index].trace.safe.total, count);
-    assert.equal(runtime.trace.stateAfter.count, count);
+    assert.equal(traces[index].stateAfter.count, count);
   }
   assert.equal(count, 121);
 });
@@ -60,12 +71,13 @@ test('Programming E35 offset equality and half-open DateTime boundaries execute 
   const artifact = await compileSource(example('E35'), { filename: 'E35.ghost.md' });
   const start = Date.parse('2026-09-30T06:30:00+09:00'), end = start + 300_000;
   const instants = [start - 1, start, end - 1, end];
-  const native = nativeScalar(t, artifact, 'now', instants);
   const runtime = await scalarRuntime(t, artifact);
+  const traces = instants.map((now, index) => runtime.step(healthyObservations(artifact,
+    { nowMs: index, inputs: { now } }, index)).vm);
+  const native = nativeScalar(t, artifact, traces.map(trace => trace.inputs));
   for (const [index, now] of instants.entries()) {
-    runtime.setNumber('now', now); runtime.tick();
-    assert.deepEqual(runtime.trace.safe, { in_window: index === 1 || index === 2, same_instant: true });
-    assert.deepEqual(native[index].trace.safe, runtime.trace.safe);
+    assert.deepEqual(traces[index].safe, { in_window: index === 1 || index === 2, same_instant: true });
+    assert.deepEqual(native[index].trace.safe, traces[index].safe);
   }
 });
 
@@ -87,13 +99,14 @@ test('Programming E36 executes explicit Solar fallback, held-clock expiry and re
     }));
   const runtime = await ControlRuntime.instantiate(wasm, artifact, { solar: { bootEpoch: 7, terminalCapacity: 16 } });
   t.after(() => runtime.dispose());
-  const traces = rows.map(row => runtime.step(row).vm);
+  const traces = rows.map((row, index) => runtime.step(healthyObservations(artifact, row, index)).vm);
   assert.deepEqual(traces.map(trace => trace.safe.start), [false, true, false, false, false]);
   assert.equal(traces[1].scheduleTrace[0].observations[0].fallback, true);
   assert.match(JSON.stringify(traces[1].scheduleTrace), /HeldClock/);
   assert.match(JSON.stringify(traces[3].scheduleTrace), /ClockUnknown|TrustExpired/);
   const directory = workspace(t), module = path.join(directory, 'solar.gfb'), tape = path.join(directory, 'solar.json');
-  fs.writeFileSync(module, artifact.bytes); fs.writeFileSync(tape, JSON.stringify({ bootEpoch: 7, terminalCapacity: 16, scans: rows }));
+  fs.writeFileSync(module, artifact.bytes); fs.writeFileSync(tape, JSON.stringify({ bootEpoch: 7, terminalCapacity: 16,
+    scans: rows.map((row, index) => ({ ...row, inputs: traces[index].inputs })) }));
   const native = execFileSync(executable('solar_tape'), [module, tape], { encoding: 'utf8', timeout: 20_000 })
     .trim().split('\n').map(JSON.parse);
   assert.ok(native.every(row => row.accepted));
@@ -121,7 +134,7 @@ test('Programming E37 requires a Tide provider and executes cancellation without
           providerRevision: 'tide-v1', contextRevision: 'book-site-v1' }] }],
     },
   }));
-  const traces = rows.map(row => runtime.step(row).vm);
+  const traces = rows.map((row, index) => runtime.step(healthyObservations(artifact, row, index)).vm);
   assert.deepEqual(traces.map(trace => trace.safe.pump), [false, true, false, false]);
   assert.ok(traces[2].contextTrace.some(observation => /Cancel/.test(observation.decision)));
 });

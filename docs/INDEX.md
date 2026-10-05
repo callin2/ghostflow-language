@@ -64,6 +64,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/HOST-EVENT-ORDERING-CONTRACT.md](HOST-EVENT-ORDERING-CONTRACT.md) | Host event ordering contract | md |
 | [docs/IMPLEMENTATION.ko.md](IMPLEMENTATION.ko.md) | 구현 및 아티팩트 경계 | md |
 | [docs/IMPLEMENTATION.md](IMPLEMENTATION.md) | Implementation and artifact boundaries | md |
+| [docs/INPUT-MIGRATION.ko.md](INPUT-MIGRATION.ko.md) | 외부 입력의 canonical 선언과 명시적 revision migration | md |
+| [docs/INPUT-MIGRATION.md](INPUT-MIGRATION.md) | Canonical external input and explicit revision migration | md |
 | [docs/INSTANCE-TRACE-PROJECTION.ko.md](INSTANCE-TRACE-PROJECTION.ko.md) | Instance trace projection 참조 어댑터 | md |
 | [docs/INSTANCE-TRACE-PROJECTION.md](INSTANCE-TRACE-PROJECTION.md) | Instance trace projection reference adapter | md |
 | [docs/INTENT-ANCHOR-MAP.ko.md](INTENT-ANCHOR-MAP.ko.md) | Literate intent anchor map | md |
@@ -169,6 +171,13 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/assets/readme-replay.svg](assets/readme-replay.svg) | readme-replay.svg | svg |
 | [docs/assets/readme-trace.svg](assets/readme-trace.svg) | readme-trace.svg | svg |
 
+## docs/historical/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/historical/2026-10-05-input-531-book-excerpts.ko.md](historical/2026-10-05-input-531-book-excerpts.ko.md) | 명시적 입력 품질 개정 전 E01·E03 원래 코드 | md |
+| [docs/historical/2026-10-05-input-531-book-excerpts.md](historical/2026-10-05-input-531-book-excerpts.md) | Original E01 and E03 code before the explicit input-quality revision | md |
+
 ## docs/plans/
 
 | Path | Title | Type |
@@ -207,6 +216,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/reports/2026-09-24-reference-execution-support-audit.md](reports/2026-09-24-reference-execution-support-audit.md) | Reference execution and support audit — 2026-09-24 | md |
 | [docs/reports/2026-09-24-reference-simulator-evidence.json](reports/2026-09-24-reference-simulator-evidence.json) | 2026-09-24-reference-simulator-evidence.json | json |
 | [docs/reports/2026-10-03-stale-branch-reconciliation.md](reports/2026-10-03-stale-branch-reconciliation.md) | Stale branch reconciliation — 2026-10-03 | md |
+| [docs/reports/2026-10-05-input-531-consumer-gates.md](reports/2026-10-05-input-531-consumer-gates.md) | Issue 531 independent review and consumer adoption gates | md |
+| [docs/reports/2026-10-05-input-531-integration.md](reports/2026-10-05-input-531-integration.md) | Issue 531 integration checkpoint and consumer handoff | md |
 
 ## docs/research/
 
@@ -231,4 +242,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.ko.md](research/GF-COMPOSE-R9-ACCEPTANCE.ko.md) | GF-COMPOSE R9: acceptance와 구현 인계 | md |
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.md](research/GF-COMPOSE-R9-ACCEPTANCE.md) | GF-COMPOSE R9: acceptance and implementation handoff | md |
 
-197 documents.
+203 documents.

@@ -44,6 +44,30 @@ Preserve existing bindings first and propose remaining capabilities for new port
 
 Physical endpoints are not limited to direct MCU GPIO. I/O expander channels and communicating relay channels may also be binding targets if they satisfy the same logical output contract. The Driver and installation connections own bus addresses, channel selection, and transmission procedures. Committing multiple output intentions in one language tick does not guarantee simultaneous physical channel switching.
 
+### External observations and internal computed connections
+
+A root `input` connected to an instance `input` forwards the existing typed-quality
+acquisition contract, including sample identity and each declared conditioning
+contract. An instance scalar `output` connected to another instance `input` is an
+internal computed connection: its actually evaluated value is passed as
+`Result.ok(value)`. The receiving definition still handles the Result explicitly
+with `case`, `recover`, or another typed Result operation. The connection does not
+recover an upstream error by itself; the producing scalar output already expresses
+its definition's handling policy.
+
+An internal computed connection creates no acquisition input, Good quality claim,
+sample timestamp, sample identity, or sensor fault origin. Optional acquisition and
+input conditioning annotations on that receiving port reject instead of being
+silently discarded. These annotations remain meaningful for acquisition forwarding.
+Committed-state output feedback retains the previous-tick boundary; wrapping a
+computed value does not authorize combinational cycles or next-state feedback.
+Root external Results cannot connect directly to scalar outputs without authored
+Result handling.
+
+**Why:** A calculated value and a producer observation have different evidence.
+Reuse keeps the receiving definition's Result contract while preserving the source
+of acquisition quality and the explicit state boundary.
+
 ## 6.3 Parameters, settings, dependencies, and bindings
 
 These four relationships similarly connect values, but have different lifecycles.

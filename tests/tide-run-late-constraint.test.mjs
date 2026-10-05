@@ -1,4 +1,11 @@
+// Explicit temporal fixture revision: issue531-quality-temporal-v1; predecessor retained in fixtures/history/issue531/temporal.
 import assert from 'node:assert/strict';
+import { softwareQualityObservations, softwareQualityRails } from './helpers/software-quality-observations.mjs';
+const ControlRuntime = {
+  instantiate: async (...args) => softwareQualityObservations(await BaseControlRuntime.instantiate(...args)),
+  instantiateFramed: async (...args) => softwareQualityObservations(await BaseControlRuntime.instantiateFramed(...args)),
+};
+
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -6,7 +13,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { compileSource } from '../tools/toolchain.mjs';
-import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
+import { ControlRuntime as BaseControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const wasm = fs.readFileSync(path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm'));
@@ -20,12 +27,12 @@ const source = '# REF-03-027 finite Tide Run and safe constraint\n\n```ghost\n'
   + 'provider harbor_tides: TidePredictions;\n'
   + 'schedule high_tide: Tide {\n'
   + 'source = harbor_tides; timezone = "UTC"; at = tide`high - 30min`;\n'
-  + 'basis = run(5min, within(10min)); when = allowed; cancel_when = false;\n'
+  + 'basis = run(5min, within(10min)); when = allowed |> recover(false); cancel_when = false;\n'
   + 'clock = trusted_only; gap = skip_after(60s); recovery = baseline; fallback = skip;\n'
   + '}\nstate runs: Int = 0; runs\' = if high_tide.due then runs + 1 else runs;\n'
   + 'output pump, active, due, water_ready: Bool; output admitted: Int;\n'
   + 'pump <- high_tide.active; active <- high_tide.active; due <- high_tide.due; admitted <- runs\';\n'
-  + 'water_ready <- !low_water;\n'
+  + 'water_ready <- case low_water { ok(value) => !value; fault(_) => false; };\n'
   + 'require pump => water_ready;\n'
   + '}\n```\n';
 const binding = { kind: 'tide', provider: 'harbor_tides', namespace: 'ref-03-027', station: 'virtual-harbor',
@@ -74,7 +81,7 @@ function nativeRun(t, artifact, steps, checkpoint = null) {
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const module = path.join(dir, 'module.gfb'), tape = path.join(dir, 'tape.json');
   fs.writeFileSync(module, artifact.bytes);
-  fs.writeFileSync(tape, JSON.stringify({ profile: 'context-tide-v1', activation, checkpoint, steps }));
+  fs.writeFileSync(tape, JSON.stringify({ profile: 'context-tide-v1', activation, checkpoint, steps: steps.map(frame => ({ ...frame, inputs: Object.entries(softwareQualityRails(artifact, Object.fromEntries(frame.inputs.map(input => [input.name, input.value])), frame.scanId + 1, frame.logicalTimeMs)).map(([name, value]) => ({ name, value })) })) }));
   return execFileSync(nativeRunner, [module, tape], { encoding: 'utf8', timeout: 15_000 }).trim().split('\n').map(line => {
     const row = JSON.parse(line);
     return row.accepted ? row : { ...row, outcome: row.lastOutcome };

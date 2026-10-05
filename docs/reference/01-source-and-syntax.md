@@ -14,6 +14,12 @@ GhostFlow 프로그램의 정본은 설명과 실행 규칙을 함께 담은 하
 [소스 보존](../SOURCE-MAP.md), [설계 노트](../DESIGN-NOTES.md).
 [전체 언어 reference](../LANGUAGE-REFERENCE.md)는 이 장과 나머지 상세 장의 색인이다.
 
+외부 입력의 canonical 선언은 `input`이며 읽으면 `Result<T, SensorFault>`다.
+이 예제는 start fault에서 false, stop fault에서 true를 명시적으로 선택한다.
+설명용 작성 정책이며 암묵적 기본값이 아니다. 기존 `sensor` 선언은 거부한다.
+이전 문서는 보존하고 명시적으로 검토할 새 revision을 만든다.
+취득과 호환성은 [migration 계약](../INPUT-MIGRATION.ko.md)을 따른다.
+
 ## 1.1 왜 문서 하나가 소스인가
 
 제어 규칙만 남기면 조건을 둔 이유와 현장 전제가 떨어져 나간다. 반대로 설명만
@@ -49,7 +55,7 @@ control PumpRequest {
 
 ```ghost
   output pump: Bool;
-  pump <- start && !stop;
+  pump <- (start |> recover(false)) && !(stop |> recover(true));
 }
 ```
 ````
@@ -224,7 +230,7 @@ top_level_type ::= enum_decl
 control_item   ::= declaration | function_decl | next_definition
                  | output_connection | constraint | parameter_decl
                  | instance_decl | connect_decl
-declaration    ::= input_decl | sensor_decl | output_decl | config_decl
+declaration    ::= input_decl | output_decl | config_decl
                  | state_decl | let_decl | enum_decl | signal_decl
                  | schedule_decl | timer_decl
 ```
@@ -240,9 +246,9 @@ parameter, instance, connect와 typed expression macro 문법은
 규칙은 [다음 장](02-types-expressions-state.md)에서 다룬다.
 
 ```text
-input_decl       ::= 'input' name_list ':' type ';'
-sensor_decl      ::= 'sensor' Identifier [ '?' ] ':' type
-                     ( ';' | '{' { sensor_setting ';' } '}' )
+input_decl       ::= 'input' input_names ':' payload_type
+                     ( ';' | '{' { input_setting ';' } '}' )
+input_names      ::= Identifier [ '?' ] { ',' Identifier [ '?' ] }
 output_decl      ::= 'output' name_list ':' type ';'
 config_decl      ::= 'config' Identifier ':' type '=' expr
                      ( ';' | '{' { config_setting ';' } '}' )
@@ -300,12 +306,12 @@ fn allowed(request: Bool, enabled: Bool) -> Bool {
 
 control Example {
   input start, stop: Bool;
-  sensor moisture?: Percent;
+  input moisture?: Percent;
   output pump: Bool;
   config threshold: Percent = 30%;
   type Phase = Idle | Running;
   state phase: Phase = Idle;
-  let request = start && !stop;
+  let request = (start |> recover(false)) && !(stop |> recover(true));
   timer age = elapsed(phase);
 
   phase' = if request then Running else Idle;

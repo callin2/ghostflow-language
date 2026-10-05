@@ -4118,11 +4118,21 @@ mod tests {
         assert_eq!(runtime.state("watering"), Some(Value::Bool(false)));
     }
     const MODULE: &[u8] = include_bytes!("../../../build/irrigation.gfb");
+    // Raw VM acquisition rails model explicit Good samples; no host fallback is applied.
     fn submit(r: &mut Runtime, a: bool, b: bool, c: bool, d: f64) {
-        r.set_input("start", Value::Bool(a)).unwrap();
-        r.set_input("stop", Value::Bool(b)).unwrap();
-        r.set_input("low_water", Value::Bool(c)).unwrap();
-        r.set_input("moisture", Value::Number(d)).unwrap();
+        for (name, value) in [
+            ("start", Value::Bool(a)),
+            ("stop", Value::Bool(b)),
+            ("low_water", Value::Bool(c)),
+            ("moisture", Value::Number(d)),
+        ] {
+            r.set_input(&format!("__gf_sensor_value_{name}"), value)
+                .unwrap();
+            r.set_input(&format!("__gf_sensor_ok_{name}"), Value::Bool(true))
+                .unwrap();
+            r.set_input(&format!("__gf_sensor_fault_{name}"), Value::Number(0.0))
+                .unwrap();
+        }
     }
     #[test]
     fn device_query_replay_and_hot_swap() {

@@ -4,8 +4,10 @@ import { fileURLToPath } from 'node:url';
 import { buildPortablePackage, serializePortablePackage } from '../tools/portable-package.mjs';
 import { canonicalJson } from '../tools/canonical-json.mjs';
 import { compileSource } from '../tools/toolchain.mjs';
-import { QUANTITY_TYPES } from '../tools/quantities.mjs';
+import { QUANTITY_TYPES, QUANTITY_UNITS } from '../tools/quantities.mjs';
 
+// This new fixture revision explicitly chooses zero on acquisition fault; legacy payload snapshots remain fixed.
+const quantityZero = type => '0' + QUANTITY_UNITS.find(unit => unit.type === type).suffix;
 const root = fileURLToPath(new URL('../', import.meta.url));
 const encoder = new TextEncoder();
 
@@ -35,8 +37,8 @@ const identity = {
   requiredCapabilities: [
     { kind: 'actuator', name: 'pump', type: 'bool' },
     { kind: 'actuator', name: 'valve', type: 'bool' },
-    { kind: 'input', name: 'start', type: 'bool' },
-    { kind: 'input', name: 'stop', type: 'bool' },
+    { kind: 'sensor', name: 'start', type: 'bool' },
+    { kind: 'sensor', name: 'stop', type: 'bool' },
   ],
   bindingRevision: 'virtual-two-output-v1',
 };
@@ -75,11 +77,11 @@ const configTimerScenario = scenario === 'config-timer-valid';
 if (intSettingsScenario || timeScenario || quantityScenario || configTimerScenario) identity.runtimeAbi = 'GhostFlow/context-scan-abi-v5';
 if (configTimerScenario) identity.requiredCapabilities = [
   { kind: 'actuator', name: 'pump', type: 'bool' },
-  { kind: 'input', name: 'start', type: 'bool' },
+  { kind: 'sensor', name: 'start', type: 'bool' },
 ];
 const windowSource = `control WindowPackage {
   fn above(value: Temperature) -> Bool { value > 280K }
-  sensor probe: Temperature;
+  input probe: Temperature;
   signal average = window_average(probe, over: 1s, quality: measured, max_age: 500ms);
   signal minimum = window_min(probe, over: 1s, quality: measured, max_age: 500ms);
   signal maximum = window_max(probe, over: 1s, quality: measured, max_age: 500ms);
@@ -97,10 +99,10 @@ const intSettingsSource = intSettingsScenario ? `control IntSettingsPackage {
   count <- case wide { ok(value) => value; fault(_) => 0; };
 }` : null;
 const holdSource = scenario.startsWith('hold-basic-') ? `control HoldPackage {
+  input probe: Number;
+  input backup: Number;
   input start: Bool;
-  sensor probe: Number;
-  sensor backup: Number;
-  signal measured = hold_last(if start then probe else backup, for_at_most: 2s, quality: measured);
+  signal measured = hold_last(if (start |> recover(false)) then probe else backup, for_at_most: 2s, quality: measured);
   output measuredResult, finiteResult, booleanResult, integerResult: Bool;
   measuredResult <- true; finiteResult <- true; booleanResult <- true; integerResult <- true;
 }` : holdScenario ? `control HoldPackage {
@@ -108,10 +110,10 @@ const holdSource = scenario.startsWith('hold-basic-') ? `control HoldPackage {
   fn mode(value: Number) -> Mode { if value > 0.0 then On else Off }
   fn hot(value: Number) -> Bool { value > 0.0 }
   fn count(value: Number) -> Int { int_trunc(value) }
+  input probe: Number;
+  input backup: Number;
   input start: Bool;
-  sensor probe: Number;
-  sensor backup: Number;
-  let selected = if start then probe else backup;
+  let selected = if (start |> recover(false)) then probe else backup;
   signal measured = hold_last(selected, for_at_most: 2s, quality: measured);
   signal finite = hold_last(probe |> map(mode), for_at_most: 2s, quality: measured);
   signal boolean = hold_last(probe |> map(hot), for_at_most: 2s, quality: measured);
@@ -125,20 +127,20 @@ const holdSource = scenario.startsWith('hold-basic-') ? `control HoldPackage {
 const debounceSource = debounceScenario ? `control DebouncePackage {
   type Mode = Off | On;
   fn mode(value: Bool) -> Mode { if value then On else Off }
+  input probe: Bool;
+  input backup: Bool;
   input start: Bool;
-  sensor probe: Bool;
-  sensor backup: Bool;
-  let desired = if start then On else Off;
-  signal raw = debounce(start, stable_for: 2s, initial: false);
+  let desired = if (start |> recover(false)) then On else Off;
+  signal raw = debounce(start |> recover(false), stable_for: 2s, initial: false);
   signal finite = debounce(desired, stable_for: 2s, initial: Off);
-  signal measured = debounce((if start then probe else backup) |> map(mode), stable_for: 2s, initial: Off);
+  signal measured = debounce((if (start |> recover(false)) then probe else backup) |> map(mode), stable_for: 2s, initial: Off);
   output rawResult, finiteResult, measuredResult: Bool;
   rawResult <- raw;
   finiteResult <- finite == On;
   measuredResult <- case measured { ok(value) => value == On; fault(_) => false; };
 }` : null;
 const resultSource = resultScenario ? `control SensorResult {
-  sensor probe: Percent;
+  input probe: Percent;
   signal stable = hysteresis(probe, on_below: 30%, off_above: 40%, initial: false);
   output dry, held: Bool;
   dry <- case probe { ok(value) => value < 30%; fault(_) => false; };
@@ -146,7 +148,7 @@ const resultSource = resultScenario ? `control SensorResult {
 }` : null;
 const timeTypes = ['Date', 'TimeOfDay', 'DateTime'];
 const timeSource = timeScenario ? `control Times {
-  ${timeTypes.map((type, index) => `input input_${index}: ${type}; output output_${index}: ${type}; output_${index} <- input_${index};`).join('\n')}
+  ${timeTypes.map((type, index) => `input input_${index}: ${type}; output output_${index}: ${type}; output_${index} <- input_${index} |> recover(${type === 'Date' ? 'date`1970-01-01`' : type === 'TimeOfDay' ? 'time`00:00:00`' : 'datetime`1970-01-01T00:00:00Z`'});`).join('\n')}
   config firstDate: Date = date\`1970-01-01\` { min = date\`1970-01-01\`; max = date\`9999-12-31\`; step = 1; access = operator; label = "Date"; }
   config lastDate: Date = date\`9999-12-31\`;
   config firstTime: TimeOfDay = time\`00:00:00\` { min = time\`00:00:00\`; max = time\`23:59:59.999\`; step = 1ms; access = operator; label = "Time"; }
@@ -155,16 +157,18 @@ const timeSource = timeScenario ? `control Times {
   config lastInstant: DateTime = datetime\`9999-12-31T23:59:59.999Z\`;
 }` : null;
 const quantitySource = quantityScenario ? `control Quantities {
-  ${QUANTITY_TYPES.map((type, index) => `input input_${index}: ${type}; output output_${index}: ${type}; output_${index} <- input_${index};`).join('\n')}
+  ${QUANTITY_TYPES.map((type, index) => `input input_${index}: ${type}; output output_${index}: ${type}; output_${index} <- case input_${index} { ok(value) => value; fault(_) => ${quantityZero(type)}; };`).join('\n')}
   input enabled: Bool;
-  sensor probe: Temperature;
+  input probe: Temperature;
   config threshold: Temperature = 25°C;
   config plain: Number = 1.0;
 }` : null;
+// Codec-only fixtures use authored healthy constants; acquisition uses Result-bearing profile 4.
+// The previous source revision is retained in fixtures/history/package-before-input-531.json.
 const profileSource = {
-  'profile-1': 'control Compact { input start, stop: Bool; output pump, valve: Bool; pump <- start; valve <- start; }',
-  'profile-2': 'control Integer { input start, stop: Bool; state count: Int = 7; output pump: Int; output valve: Bool; pump <- count; valve <- start; }',
-  'profile-3': 'control IntegerBranch { input start, stop: Bool; state count: Int = 7; output pump: Int; output valve: Bool; pump <- if start then count else 0; valve <- start; }',
+  'profile-1': 'control Compact { let start = true; let stop = false; output pump, valve: Bool; pump <- start; valve <- start; }',
+  'profile-2': 'control Integer { let start = true; let stop = false; state count: Int = 7; output pump: Int; output valve: Bool; pump <- count; valve <- start; }',
+  'profile-3': 'control IntegerBranch { let start = true; let stop = false; state count: Int = 7; output pump: Int; output valve: Bool; pump <- if start then count else 0; valve <- start; }',
 }[scenario];
 let source = configTimerScenario
   ? fs.readFileSync(path.join(root, 'examples/authoring/corpus/setting-corrected.ghost.md'), 'utf8')
@@ -174,18 +178,18 @@ if (scenario === 'constraint-proof-valid') {
   if (!source.includes('  require pump => valve;')) throw new Error('missing fixture constraint');
   source = source.replace('  require pump => valve;', '  require pump => valve;\n  require pump => valve;');
 }
-if(adaptScenario) source='# Authored feedback\n```ghost\ncontrol Feedback { sensor door?: Bool; output pump: Bool; adapt policy { strategy WithDoor priority 100 match (door: sensor<Bool>) { pump <- case door { ok(value) => value; fault(_) => false; }; } strategy Baseline priority 0 match always { pump <- false; } } }\n```';
+if(adaptScenario) source='# Authored feedback\n```ghost\ncontrol Feedback { input door?: Bool; output pump: Bool; adapt policy { strategy WithDoor priority 100 match (door: sensor<Bool>) { pump <- case door { ok(value) => value; fault(_) => false; }; } strategy Baseline priority 0 match always { pump <- false; } } }\n```';
 const compilation = await compileSource(source, { filename: '01-latch.ghost.md' });
 if (scenario === 'constraint-proof-valid' && compilation.traceMetadata.format !== 'GhostFlow/source-trace-v2') {
   throw new Error('fixture must contain a checked executable replacement');
 }
-if (scenario === 'profile-2' || scenario === 'profile-3') identity.requiredCapabilities[0].type = 'int';
+if (profileSource) identity.requiredCapabilities = [{kind:'actuator',name:'pump',type:scenario === 'profile-1' ? 'bool' : 'int'}, {kind:'actuator',name:'valve',type:'bool'}];
 if (quantityScenario) identity.requiredCapabilities = [
-  ...QUANTITY_TYPES.flatMap((_, index) => [{ kind: 'input', name: `input_${index}`, type: 'number' }, { kind: 'actuator', name: `output_${index}`, type: 'number' }]),
-  { kind: 'input', name: 'enabled', type: 'bool' }, { kind: 'sensor', name: 'probe', type: 'number' },
+  ...QUANTITY_TYPES.flatMap((_, index) => [{ kind: 'sensor', name: `input_${index}`, type: 'number' }, { kind: 'actuator', name: `output_${index}`, type: 'number' }]),
+  { kind: 'sensor', name: 'enabled', type: 'bool' }, { kind: 'sensor', name: 'probe', type: 'number' },
 ];
 if (timeScenario) identity.requiredCapabilities = timeTypes.flatMap((_, index) => [
-  { kind: 'input', name: `input_${index}`, type: 'number' },
+  { kind: 'sensor', name: `input_${index}`, type: 'number' },
   { kind: 'actuator', name: `output_${index}`, type: 'number' },
 ]);
 if (resultScenario) identity.requiredCapabilities = [
@@ -193,13 +197,13 @@ if (resultScenario) identity.requiredCapabilities = [
   { kind: 'actuator', name: 'dry', type: 'bool' }, { kind: 'actuator', name: 'held', type: 'bool' },
 ];
 if (debounceScenario) identity.requiredCapabilities = [
-  { kind: 'input', name: 'start', type: 'bool' },
+  { kind: 'sensor', name: 'start', type: 'bool' },
   { kind: 'sensor', name: 'probe', type: 'bool' },
   { kind: 'sensor', name: 'backup', type: 'bool' },
   ...['rawResult', 'finiteResult', 'measuredResult'].map(name => ({ kind: 'actuator', name, type: 'bool' })),
 ];
 if (holdScenario) identity.requiredCapabilities = [
-  { kind: 'input', name: 'start', type: 'bool' },
+  { kind: 'sensor', name: 'start', type: 'bool' },
   ...['probe', 'backup'].map(name => ({ kind: 'sensor', name, type: 'number' })),
   ...['measuredResult', 'finiteResult', 'booleanResult', 'integerResult'].map(name => ({ kind: 'actuator', name, type: 'bool' })),
 ];
@@ -434,7 +438,7 @@ if (scenario === 'adapt-valid' || scenario === 'valid' || scenario === 'constrai
     else if (scenario === 'result-signal-wrong') manifest.signals[0].faultInput = '__gf_sensor_fault_probe';
     else if (scenario === 'result-sensor-collision') manifest.sensors[0].valueInput = manifest.sensors[0].faultInput;
     else if (scenario === 'result-signal-collision') manifest.signals[0].okInput = manifest.signals[0].faultInput;
-    else if (scenario === 'time-port-unit') manifest.inputs[0].canonicalUnit = 'day';
+    else if (scenario === 'time-port-unit') manifest.sensors[0].canonicalUnit = 'day';
     else if (scenario === 'time-config-unit') manifest.configs[0].canonicalUnit = 'day';
     else if (scenario === 'time-wrong-type') manifest.outputs[0].type = 'Datetime';
     else if (scenario === 'time-config-string') manifest.configs[0].value = '0';
@@ -449,12 +453,12 @@ if (scenario === 'adapt-valid' || scenario === 'valid' || scenario === 'constrai
       const [, , index, kind] = scenario.split('-');
       manifest.configs[Number(index) * 2].value = kind === 'negative' ? -1 : kind === 'fractional' ? 0.5 : [2932897, 86400000, 253402300800000][Number(index)];
     }
-    else if (scenario === 'quantity-missing-unit') delete manifest.inputs[0].canonicalUnit;
+    else if (scenario === 'quantity-missing-unit') delete manifest.sensors[0].canonicalUnit;
     else if (scenario === 'quantity-wrong-unit') manifest.outputs[0].canonicalUnit = '°C';
-    else if (scenario === 'quantity-extra-field') manifest.inputs[0].displayUnit = '°C';
-    else if (scenario === 'quantity-wrong-type') manifest.inputs[0].type = 'ImaginaryQuantity';
-    else if (scenario === 'quantity-scalar-unit') manifest.inputs[17].canonicalUnit = 'K';
-    else if (scenario === 'quantity-sensor-unit') delete manifest.sensors[0].canonicalUnit;
+    else if (scenario === 'quantity-extra-field') manifest.sensors[0].displayUnit = '°C';
+    else if (scenario === 'quantity-wrong-type') manifest.sensors[0].type = 'ImaginaryQuantity';
+    else if (scenario === 'quantity-scalar-unit') manifest.sensors[17].canonicalUnit = 'K';
+    else if (scenario === 'quantity-sensor-unit') delete manifest.sensors[18].canonicalUnit;
     else if (scenario === 'quantity-config-unit') manifest.configs[0].canonicalUnit = '°C';
     else if (scenario === 'quantity-scalar-config-unit') manifest.configs[1].canonicalUnit = 'K';
     else throw new Error(`unknown quantity scenario: ${scenario}`);

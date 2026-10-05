@@ -5,6 +5,9 @@ import { compileSource } from './helpers/literate-compile.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 import { FramedGhostFlowRuntime } from '../runtimes/wasm/framed-runtime.mjs';
 
+// Producer observations exist only where the test supplies a value.
+const good = (nowMs, values) => Object.fromEntries(Object.entries(values).map(([name, value]) => [name, { epoch: 1, id: nowMs + 1, timestampMs: nowMs, quality: 'Good', value }]));
+
 const wasmPath = new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url);
 const wasmBytes = fs.readFileSync(wasmPath);
 
@@ -121,19 +124,17 @@ control FramedConstraint {
   input enabled: Bool;
   output pump: Bool;
   output permit: Bool;
-  pump <- enabled;
+  pump <- enabled |> recover(false);
   permit <- false;
   require pump => permit;
 }
 `);
   t.after(() => runtime.dispose());
-  assert.throws(() => runtime.step({ nowMs: 0, inputs: {} }), /missing input/);
+  assert.throws(() => runtime.step({ nowMs: 0, samples: good(0, { enabled: 1 }) }), /boolean/);
   let reads = 0;
   const first = runtime.step({
     nowMs: 0,
-    inputs: {
-      get enabled() { reads += 1; return true; },
-    },
+    samples: { enabled: { epoch: 1, id: 1, timestampMs: 0, quality: 'Good', get value() { reads += 1; return true; } } },
   });
   assert.equal(reads, 1, 'each DI primitive is captured exactly once');
   assert.deepEqual(first.frame, { scanId: 0, logicalTimeMs: 0 });
@@ -143,7 +144,7 @@ control FramedConstraint {
   assert.equal(Object.hasOwn(first.vm, 'frame'), false);
   assert.equal(runtime.lastFrameOutcome.scanId, 0, 'framed outcome remains separate from the TickRecord');
 
-  const second = runtime.step({ nowMs: 1, inputs: { enabled: false } });
+  const second = runtime.step({ nowMs: 1, samples: good(1, { enabled: false }) });
   assert.deepEqual(second.frame, { scanId: 1, logicalTimeMs: 1 });
   assert.equal(second.vm.tick, 2);
 });
@@ -154,8 +155,8 @@ control FramedGenerated {
   input start: Bool;
   state running: Bool = false;
   timer age = elapsed(running);
-  running' = start;
-  sensor moisture: Percent {
+  running' = start |> recover(false);
+  input moisture: Percent {
     sample = 1s;
     valid = 0% .. 100%;
     filter = median(1);
@@ -166,19 +167,19 @@ control FramedGenerated {
   schedule starts: DailySlots<15min> { timezone = "UTC"; selected = [00:00]; }
   let dry_ok = case dry { ok(value) => value; fault(_) => false; };
   output pump: Bool;
-  pump <- start && dry_ok && starts.due && age >= 100ms;
+  pump <- (start |> recover(false)) && dry_ok && starts.due && age >= 100ms;
 }
 `, 'framed-generated.ghost');
   t.after(() => runtime.dispose());
   const sample = { epoch: 1, id: 1, timestampMs: 0, quality: 'Good', value: 20 };
-  const first = runtime.step({ nowMs: 0, inputs: { start: true }, samples: { moisture: sample } });
+  const first = runtime.step({ nowMs: 0, samples: { ...good(0, { start: true }), moisture: sample } });
   assert.equal(first.vm.inputs.__gf_now_ms, 0);
   assert.equal(first.vm.inputs.__gf_sensor_ok_moisture, true);
   assert.equal(first.vm.inputs.__gf_signal_value_dry, true);
   assert.equal(first.vm.inputs.__gf_schedule_due_starts, false, 'absent due is an explicit false frame value');
   assert.equal(first.vm.safe.pump, false);
 
-  const next = runtime.step({ nowMs: 100, inputs: { start: true }, due: { starts: true } });
+  const next = runtime.step({ nowMs: 100, samples: good(100, { start: true }), due: { starts: true } });
   assert.deepEqual(next.frame, { scanId: 1, logicalTimeMs: 100 });
   assert.equal(next.vm.inputs.__gf_now_ms, 100);
   assert.equal(next.vm.inputs.__gf_schedule_due_starts, true);
@@ -197,16 +198,16 @@ test('GF-TEST-framed-control-host: does not invoke legacy exports and latches an
       return value;
     },
   }), async () => {
-    const runtime = await framed('control FramedLegacy { input enabled: Bool; output pump: Bool; pump <- enabled; }', 'framed-legacy.ghost');
+    const runtime = await framed('control FramedLegacy { input enabled: Bool; output pump: Bool; pump <- enabled |> recover(false); }', 'framed-legacy.ghost');
     try {
-      const first = runtime.step({ nowMs: 0, inputs: { enabled: true } });
+      const first = runtime.step({ nowMs: 0, samples: good(0, { enabled: true }) });
       assert.equal(first.vm.safe.pump, true);
       const committed = runtime.runtime.outcome;
       runtime.runtime.dispatch = () => { throw new Error('injected framed dispatch failure'); };
-      assert.throws(() => runtime.step({ nowMs: 1, inputs: { enabled: false } }), /injected framed dispatch failure/);
+      assert.throws(() => runtime.step({ nowMs: 1, samples: good(1, { enabled: false }) }), /injected framed dispatch failure/);
       assert.deepEqual(runtime.runtime.outcome, committed, 'the committed framed outcome remains available');
       assert.deepEqual(runtime.lastFrameOutcome, committed, 'the getter reads the live framed outcome, not a host cache');
-      assert.throws(() => runtime.step({ nowMs: 1, inputs: { enabled: false } }), /faulted/);
+      assert.throws(() => runtime.step({ nowMs: 1, samples: good(1, { enabled: false }) }), /faulted/);
       assert.deepEqual(legacyCalls, []);
     } finally { runtime.dispose(); }
   });
@@ -229,7 +230,7 @@ test('GF-TEST-framed-control-host: validation failures do not touch conditioners
   const runtime = await framed(`
 control FramedValidation {
   input start: Bool;
-  sensor moisture: Percent {
+  input moisture: Percent {
     sample = 1s;
     valid = 0% .. 100%;
     filter = median(1);
@@ -239,7 +240,7 @@ control FramedValidation {
   signal dry = hysteresis(moisture, on_below: 30%, off_above: 35%, initial: false);
   schedule starts: DailySlots<15min> { timezone = "UTC"; selected = []; }
   output pump: Bool;
-  pump <- start;
+  pump <- start |> recover(false);
 }
 `, 'framed-validation.ghost');
   t.after(() => runtime.dispose());
@@ -251,14 +252,14 @@ control FramedValidation {
     entry.conditioner.update = (...args) => { counts.update += 1; return update(...args); };
   }
   const sample = { epoch: 1, id: 1, timestampMs: 0, quality: 'Good', value: 20 };
-  assert.throws(() => runtime.step({ nowMs: -1, inputs: { start: true } }), /safe integer/);
-  assert.throws(() => runtime.step({ nowMs: 0, inputs: { start: 1 } }), /boolean/);
-  assert.throws(() => runtime.step({ nowMs: 0, inputs: { start: true }, samples: { moisture: { ...sample, timestampMs: 1 } } }), /future/);
-  assert.throws(() => runtime.step({ nowMs: 0, inputs: { start: true }, due: { starts: 1 } }), /boolean/);
+  assert.throws(() => runtime.step({ nowMs: -1, samples: good(-1, { start: true }) }), /safe integer/);
+  assert.throws(() => runtime.step({ nowMs: 0, samples: good(0, { start: 1 }) }), /boolean/);
+  assert.throws(() => runtime.step({ nowMs: 0, samples: { ...good(0, { start: true }), moisture: { ...sample, timestampMs: 1 } } }), /future/);
+  assert.throws(() => runtime.step({ nowMs: 0, samples: good(0, { start: true }), due: { starts: 1 } }), /boolean/);
   assert.deepEqual(counts, { read: 0, update: 0 });
-  const accepted = runtime.step({ nowMs: 0, inputs: { start: true }, samples: { moisture: sample }, due: { starts: false } });
+  const accepted = runtime.step({ nowMs: 0, samples: { ...good(0, { start: true }), moisture: sample }, due: { starts: false } });
   assert.deepEqual(accepted.frame, { scanId: 0, logicalTimeMs: 0 });
-  assert.deepEqual(counts, { read: 2, update: 2 });
+  assert.deepEqual(counts, { read: 3, update: 3 });
 });
 
 test('GF-TEST-framed-control-host: a known core rejection preserves the committed frame and permits the same ID retry', async t => {
@@ -266,17 +267,17 @@ test('GF-TEST-framed-control-host: a known core rejection preserves the committe
 control FramedCoreFault {
   input divisor: Number;
   output pump: Number;
-  pump <- 1 / divisor;
+  pump <- 1 / (divisor |> recover(0.0));
 }
 `, 'framed-core-fault.ghost');
   t.after(() => runtime.dispose());
-  const first = runtime.step({ nowMs: 0, inputs: { divisor: 1 } });
+  const first = runtime.step({ nowMs: 0, samples: good(0, { divisor: 1 }) });
   const committed = runtime.lastFrameOutcome;
   assert.equal(first.vm.safe.pump, 1);
-  assert.throws(() => runtime.step({ nowMs: 1, inputs: { divisor: 0 } }), /division by zero/);
+  assert.throws(() => runtime.step({ nowMs: 1, samples: good(1, { divisor: 0 }) }), /division by zero/);
   assert.equal(runtime.lastNowMs, 0);
   assert.deepEqual(runtime.lastFrameOutcome, committed);
-  const retry = runtime.step({ nowMs: 1, inputs: { divisor: 1 } });
+  const retry = runtime.step({ nowMs: 1, samples: good(1, { divisor: 1 }) });
   assert.deepEqual(retry.frame, { scanId: 1, logicalTimeMs: 1 });
   assert.equal(retry.vm.safe.pump, 1);
 });
@@ -285,7 +286,7 @@ test('GF-TEST-framed-control-host: generated sensor and signal snapshots match l
   const artifact = await compileSource(`
 control FramedParity {
   input start: Bool;
-  sensor moisture: Percent {
+  input moisture: Percent {
     sample = 1s;
     valid = 0% .. 100%;
     filter = median(1);
@@ -295,14 +296,14 @@ control FramedParity {
   signal dry = hysteresis(moisture, on_below: 30%, off_above: 35%, initial: false);
   let dry_ok = case dry { ok(value) => value; fault(_) => false; };
   output pump: Bool;
-  pump <- start && dry_ok;
+  pump <- (start |> recover(false)) && dry_ok;
 }
 `, { filename: 'framed-parity.ghost' });
   const legacy = await ControlRuntime.instantiate(wasmBytes, artifact);
   const runtime = await ControlRuntime.instantiateFramed(wasmBytes, artifact);
   t.after(() => { runtime.dispose(); legacy.dispose(); });
   for (const [nowMs, value] of [[0, 20], [1_000, 50]]) {
-    const snapshot = { nowMs, inputs: { start: true }, samples: { moisture: { epoch: 1, id: nowMs / 1_000 + 1, timestampMs: nowMs, quality: 'Good', value } } };
+    const snapshot = { nowMs, samples: { ...good(nowMs, { start: true }), moisture: { epoch: 1, id: nowMs / 1_000 + 1, timestampMs: nowMs, quality: 'Good', value } } };
     const expected = legacy.step(snapshot);
     const actual = runtime.step(snapshot);
     assert.deepEqual(actual.sensors, expected.sensors);

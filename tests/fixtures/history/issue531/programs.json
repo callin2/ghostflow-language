@@ -1,0 +1,180 @@
+{
+  "format": "GhostFlow/input-migration-history-v1",
+  "programs": [
+    {
+      "source": "examples/tutorial/01-latch.ghost.md",
+      "snapshot": "tests/fixtures/history/issue531/01-latch.ghost.md.pre-input.txt",
+      "sha256": "10ad51975845c985b0abe7b33163122044a3a9ae9e1c9f6fe8f549dbce3324df",
+      "previousRepositoryRevision": "0e5b790babee4157c42d82ddb01f8eecb0c3f6e6",
+      "replacementRevision": "issue531-approved-fault-restart-v1"
+    },
+    {
+      "source": "examples/tutorial/01-latch.ghost.ko.md",
+      "snapshot": "tests/fixtures/history/issue531/01-latch.ghost.ko.md.pre-input.txt",
+      "sha256": "6c44ba1f7d421aa6e3cfd92a2973336df6782156a0d1a850a34e45901ac45ee9",
+      "previousRepositoryRevision": "0e5b790babee4157c42d82ddb01f8eecb0c3f6e6",
+      "replacementRevision": "issue531-approved-fault-restart-v1"
+    },
+    {
+      "source": "examples/irrigation.ghost.md",
+      "snapshot": "tests/fixtures/history/issue531/irrigation.ghost.md.pre-input.txt",
+      "sha256": "7970f5d43c7a895b5ef1731e8dfa98fe8efe914a31f2388d44ef4926bc6dfd92",
+      "previousRepositoryRevision": "0e5b790babee4157c42d82ddb01f8eecb0c3f6e6",
+      "replacementRevision": "issue531-approved-fault-restart-v1"
+    },
+    {
+      "source": "examples/irrigation.ghost.ko.md",
+      "snapshot": "tests/fixtures/history/issue531/irrigation.ghost.ko.md.pre-input.txt",
+      "sha256": "ba789b2f3e7b5f468c05f692cc25ee43d81c279b4c0c71bd970832f8e3b06caa",
+      "previousRepositoryRevision": "0e5b790babee4157c42d82ddb01f8eecb0c3f6e6",
+      "replacementRevision": "issue531-approved-fault-restart-v1"
+    },
+    {
+      "source": "examples/curriculum/pc-02-start-stop.ghost.md",
+      "snapshot": "tests/fixtures/history/issue531/pc-02-start-stop.ghost.md.pre-input.txt",
+      "sha256": "7e85d0541383c95d38a8176c496343627367c1b9aa9829320ddd4dc2a477593a",
+      "previousRepositoryRevision": "0e5b790babee4157c42d82ddb01f8eecb0c3f6e6",
+      "replacementRevision": "issue531-approved-fault-restart-v1"
+    },
+    {
+      "source": "examples/curriculum/pc-02-start-stop.ghost.en.md",
+      "snapshot": "tests/fixtures/history/issue531/pc-02-start-stop.ghost.en.md.pre-input.txt",
+      "sha256": "a6983247ad448a1a6d32edf19cf87dcd2c19ea725002ce24cc9d4337a2702d53",
+      "previousRepositoryRevision": "0e5b790babee4157c42d82ddb01f8eecb0c3f6e6",
+      "replacementRevision": "issue531-approved-fault-restart-v1"
+    },
+    {
+      "source": "examples/curriculum/pc-03-motor-contactor.ghost.md",
+      "snapshot": "tests/fixtures/history/issue531/pc-03-motor-contactor.ghost.md.pre-input.txt",
+      "sha256": "a44ac8295c000f850bf26e0607abba99268c845f83d7ede66b4618b327964291",
+      "previousRepositoryRevision": "0e5b790babee4157c42d82ddb01f8eecb0c3f6e6",
+      "replacementRevision": "issue531-approved-fault-restart-v1"
+    },
+    {
+      "source": "examples/curriculum/pc-03-motor-contactor.ghost.en.md",
+      "snapshot": "tests/fixtures/history/issue531/pc-03-motor-contactor.ghost.en.md.pre-input.txt",
+      "sha256": "eb374c63500d36c9e5fd7c2b32129a7cc5c1331af73c685d9d281ccecbbb86de",
+      "previousRepositoryRevision": "0e5b790babee4157c42d82ddb01f8eecb0c3f6e6",
+      "replacementRevision": "issue531-approved-fault-restart-v1"
+    },
+    {
+      "source": "examples/curriculum/pc-04-direction-interlock.ghost.md",
+      "snapshot": "tests/fixtures/history/issue531/pc-04-direction-interlock.ghost.md.pre-input.txt",
+      "sha256": "f50e73582f8fbae8678ab3fb76f428a56d5d1df283a10d0ae58fcc3d08f7ae27",
+      "previousRepositoryRevision": "0e5b790babee4157c42d82ddb01f8eecb0c3f6e6",
+      "replacementRevision": "issue531-approved-fault-restart-v1"
+    },
+    {
+      "source": "examples/curriculum/pc-04-direction-interlock.ghost.en.md",
+      "snapshot": "tests/fixtures/history/issue531/pc-04-direction-interlock.ghost.en.md.pre-input.txt",
+      "sha256": "ccd8c0d54af3ae8c6804edf425f1510465900e59d44b7c32452f70ccfb68b241",
+      "previousRepositoryRevision": "0e5b790babee4157c42d82ddb01f8eecb0c3f6e6",
+      "replacementRevision": "issue531-approved-fault-restart-v1"
+    },
+    {
+      "source": "examples/authoring/corpus/setting-corrected.ghost.md",
+      "snapshot": "tests/fixtures/history/issue531/setting-corrected.ghost.md.pre-input.txt",
+      "sha256": "ab76ae931878ba8390aa05fc91a25d42f018d8f20d6fc1d3605231162c619f96",
+      "previousRepositoryRevision": "76501ff238694fe0e2979bc4f5b05366fc739426",
+      "replacementRevision": "issue531-approved-fault-restart-v1"
+    },
+    {
+      "source": "examples/tutorial/03-moisture.ghost.ko.md",
+      "snapshot": "tests/fixtures/history/issue531/03-moisture.ghost.ko.md.pre-input.txt",
+      "sha256": "4b9b540505d136ae5c5ace3eb25b805fe5e3ec5ef00b53721e30de2ab9a53717",
+      "previousRepositoryRevision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773",
+      "replacementRevision": "issue531-producer-quality-tutorial03-v1"
+    },
+    {
+      "source": "examples/tutorial/03-moisture.ghost.md",
+      "snapshot": "tests/fixtures/history/issue531/03-moisture.ghost.md.pre-input.txt",
+      "sha256": "539d85a8ca8926a4f0e7870a4519d2965f4a1fec97372fc96c1bd400bff13ac8",
+      "previousRepositoryRevision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773",
+      "replacementRevision": "issue531-producer-quality-tutorial03-v1"
+    },
+    {
+      "source": "examples/curriculum/pc-05-limit-feedback.ghost.en.md",
+      "snapshot": "tests/fixtures/history/issue531/pc-05-limit-feedback.ghost.en.md.pre-input.txt",
+      "sha256": "a857e9e7df8143242f97914eba6f6f1934ffe7abbed2db9674c9c1beba81c041",
+      "previousRepositoryRevision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773",
+      "replacementRevision": "issue531-producer-quality-pc05-v1"
+    },
+    {
+      "source": "examples/curriculum/pc-05-limit-feedback.ghost.md",
+      "snapshot": "tests/fixtures/history/issue531/pc-05-limit-feedback.ghost.md.pre-input.txt",
+      "sha256": "ed0fa48243a9e627dce12ce0c4086478db907368228facc61f3c2d088c5dfd9e",
+      "previousRepositoryRevision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773",
+      "replacementRevision": "issue531-producer-quality-pc05-v1"
+    },
+    {
+      "source": "examples/curriculum/pc-06-timer-patterns.ghost.en.md",
+      "snapshot": "tests/fixtures/history/issue531/pc-06-timer-patterns.ghost.en.md.pre-input.txt",
+      "sha256": "626a81edba8782493e7931409ab7b3c1f73f65ab6a8f130c56c74ceb9a9e93ba",
+      "previousRepositoryRevision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773",
+      "replacementRevision": "issue531-producer-quality-pc06-v1"
+    },
+    {
+      "source": "examples/curriculum/pc-06-timer-patterns.ghost.md",
+      "snapshot": "tests/fixtures/history/issue531/pc-06-timer-patterns.ghost.md.pre-input.txt",
+      "sha256": "d6bb1c1807b902dc3e202b4bfc216081e8afb0ae0ff1fd9e31b7c887232675e8",
+      "previousRepositoryRevision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773",
+      "replacementRevision": "issue531-producer-quality-pc06-v1"
+    },
+    {
+      "source": "examples/curriculum/pc-07-tank-hysteresis.ghost.en.md",
+      "snapshot": "tests/fixtures/history/issue531/pc-07-tank-hysteresis.ghost.en.md.pre-input.txt",
+      "sha256": "ae58f3e451bd26b399d54947f1910ed3b7a0ddbf09b11c67f07973e2373c44a7",
+      "previousRepositoryRevision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773",
+      "replacementRevision": "issue531-producer-quality-pc07-v1"
+    },
+    {
+      "source": "examples/curriculum/pc-07-tank-hysteresis.ghost.md",
+      "snapshot": "tests/fixtures/history/issue531/pc-07-tank-hysteresis.ghost.md.pre-input.txt",
+      "sha256": "4296356703356889993c9417c8770bc3f172f110098f82788dbedffc4ffbe418",
+      "previousRepositoryRevision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773",
+      "replacementRevision": "issue531-producer-quality-pc07-v1"
+    },
+    {
+      "source": "examples/curriculum/pc-08-manual-auto.ghost.en.md",
+      "snapshot": "tests/fixtures/history/issue531/pc-08-manual-auto.ghost.en.md.pre-input.txt",
+      "sha256": "e4e7b4163dd2d1166cdd0bbaa2e1cb5814d161cb20258b7dd6f026c0788ce57d",
+      "previousRepositoryRevision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773",
+      "replacementRevision": "issue531-producer-quality-pc08-v1"
+    },
+    {
+      "source": "examples/curriculum/pc-08-manual-auto.ghost.md",
+      "snapshot": "tests/fixtures/history/issue531/pc-08-manual-auto.ghost.md.pre-input.txt",
+      "sha256": "23d5282723b78b81410558d102a2e7b01f68d0d0fea89180b93e767dd74927c6",
+      "previousRepositoryRevision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773",
+      "replacementRevision": "issue531-producer-quality-pc08-v1"
+    },
+    {
+      "source": "examples/curriculum/pc-09-sequential-water-supply.ghost.en.md",
+      "snapshot": "tests/fixtures/history/issue531/pc-09-sequential-water-supply.ghost.en.md.pre-input.txt",
+      "sha256": "cf3b4649813073cfb056127f7ba9384e5f2b735c1db97b7e371bb6482925cae5",
+      "previousRepositoryRevision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773",
+      "replacementRevision": "issue531-producer-quality-pc09-v1"
+    },
+    {
+      "source": "examples/curriculum/pc-09-sequential-water-supply.ghost.md",
+      "snapshot": "tests/fixtures/history/issue531/pc-09-sequential-water-supply.ghost.md.pre-input.txt",
+      "sha256": "02652715e118208011a2d7667e048cfe1b063fcb6286fe3bb3d2b4bbc992366f",
+      "previousRepositoryRevision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773",
+      "replacementRevision": "issue531-producer-quality-pc09-v1"
+    },
+    {
+      "source": "examples/curriculum/pc-10-fault-alarm-reset.ghost.en.md",
+      "snapshot": "tests/fixtures/history/issue531/pc-10-fault-alarm-reset.ghost.en.md.pre-input.txt",
+      "sha256": "ed30f7b2cae3e8ab2ee890f4347e6e671fe17de3e50b72de0e23780a4e69af04",
+      "previousRepositoryRevision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773",
+      "replacementRevision": "issue531-producer-quality-pc10-v1"
+    },
+    {
+      "source": "examples/curriculum/pc-10-fault-alarm-reset.ghost.md",
+      "snapshot": "tests/fixtures/history/issue531/pc-10-fault-alarm-reset.ghost.md.pre-input.txt",
+      "sha256": "f3fa613105d47381fdcdd8a16046ca39f376c6eaa1918d1514dfb0e8cff9c5d3",
+      "previousRepositoryRevision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773",
+      "replacementRevision": "issue531-producer-quality-pc10-v1"
+    }
+  ]
+}

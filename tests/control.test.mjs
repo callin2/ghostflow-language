@@ -136,7 +136,7 @@ const sensorProgram = `
 control MoistureDemand {
   input start, stop: Bool;
   input scale: Number;
-  sensor moisture?: Percent {
+  input moisture?: Percent {
     sample = 1s;
     valid = 0% .. 100%;
     filter = median(5);
@@ -152,8 +152,8 @@ control MoistureDemand {
   let dry_ok = case dry { ok(value) => value; fault(_) => false; };
   state running: Bool = false;
   state amount: Number = 0;
-  running' = latch(start, stop, running) && dry_ok;
-  amount' = if running then amount + scale else amount;
+  running' = latch(start |> recover(false), stop |> recover(true), running) && dry_ok;
+  amount' = if running then amount + (scale |> recover(0.0)) else amount;
   output pump, valve: Bool;
   output requested: Number;
   pump <- running';
@@ -164,10 +164,10 @@ control MoistureDemand {
 `;
 const sensorResult = compileControl(sensorProgram, { filename: 'moisture.ghost' });
 const sensorModule = inspectModule(sensorResult.bytes);
-assert.deepEqual(sensorResult.manifest.inputs, [
-  { name: 'start', type: 'Bool' }, { name: 'stop', type: 'Bool' }, { name: 'scale', type: 'Number' },
-]);
-assert.deepEqual(sensorResult.manifest.sensors, [{
+assert.deepEqual(sensorResult.manifest.inputs, []);
+assert.deepEqual(sensorResult.manifest.sensors.map(item => [item.name, item.type]),
+  [['start', 'Bool'], ['stop', 'Bool'], ['scale', 'Number'], ['moisture', 'Percent']]);
+assert.deepEqual(sensorResult.manifest.sensors.filter(item => item.name === 'moisture'), [{
   name: 'moisture', type: 'Percent', sampleMs: 1000, validMin: 0, validMax: 100,
   filter: 'median', window: 5, staleMs: 3000, recoverSamples: 3,
   valueInput: '__gf_sensor_value_moisture', okInput: '__gf_sensor_ok_moisture', faultInput: '__gf_sensor_fault_moisture', optional: true,
@@ -198,12 +198,12 @@ fn hold(start: Bool, blocked: Bool, previous: Bool) -> Bool {
 
 control WateringDemand {
   input start, stop: Bool;
-  sensor low_water: Bool;
+  input low_water: Bool;
   output pump, valve: Bool;
   state watering: Bool = false;
   let water_ok = case low_water { ok(low) => !low; fault(_) => false; };
-  let blocked = stop || !water_ok;
-  watering' = hold(start, blocked, watering);
+  let blocked = (stop |> recover(true)) || !water_ok;
+  watering' = hold(start |> recover(false), blocked, watering);
   valve <- watering';
   pump <- watering';
   require pump => valve;
@@ -214,26 +214,32 @@ assert.equal(inspectModule(topLevelFunction.bytes).name, 'WateringDemand');
 const forwardDefinitions = compileControl(`
 control ForwardDefinitions {
   output pump: Bool;
-  pump <- hold(enabled, delayed);
+  pump <- hold(enabled |> recover(false), delayed);
   let delayed = permit;
   fn hold(value: Bool, gate: Bool) -> Bool { value && gate }
   input enabled: Bool;
-  let permit = enabled;
+  let permit = enabled |> recover(false);
 }
 `, { filename: 'forward.ghost' });
-assert.deepEqual(inspectModule(forwardDefinitions.bytes).inputs, [{ name: 'enabled', type: 1 }]);
+assert.deepEqual(inspectModule(forwardDefinitions.bytes).inputs, [
+  { name: '__gf_sensor_value_enabled', type: 1 }, { name: '__gf_sensor_ok_enabled', type: 1 },
+  { name: '__gf_sensor_fault_enabled', type: 2 },
+]);
 
 const noSensor = compileControl(`
 control Basic {
   input enable: Bool;
   output pump: Bool;
-  pump <- enable;
+  pump <- enable |> recover(false);
 }
 `, { filename: 'basic.ghost' });
-assert.equal(noSensor.manifest.sensors.length, 0);
+assert.equal(noSensor.manifest.sensors.length, 1);
 assert.equal(noSensor.manifest.schedules.length, 0);
 assert.equal(noSensor.manifest.timers.length, 0);
-assert.deepEqual(inspectModule(noSensor.bytes, 1).inputs, [{ name: 'enable', type: 1 }]);
+assert.deepEqual(inspectModule(noSensor.bytes, 3).inputs, [
+  { name: '__gf_sensor_value_enable', type: 1 }, { name: '__gf_sensor_ok_enable', type: 1 },
+  { name: '__gf_sensor_fault_enable', type: 2 },
+]);
 
 // The raw runtime must reject an output-bearing module before the host declares
 // its actuator. ControlRuntime is intentionally the virtual convenience host
@@ -244,19 +250,20 @@ try {
   rawRuntime.load(noSensor.bytes);
   assert.throws(() => rawRuntime.activate(), /no device strategy matches capabilities/);
   rawRuntime.addCapability('actuator', 'pump', 'bool');
+  rawRuntime.addCapability('sensor', 'enable', 'bool');
   rawRuntime.activate();
 } finally { rawRuntime.dispose(); }
-const adaptiveProgram = await compileSource('control Adaptive { sensor moisture?: Percent; output pump: Bool; adapt policy { strategy Wet priority 10 match (moisture: sensor<Percent>) { pump <- case moisture { ok(value) => value < 30%; fault(_) => false; }; } strategy Baseline priority 0 match always { pump <- false; } } }');
+const adaptiveProgram = await compileSource('control Adaptive { input moisture?: Percent; output pump: Bool; adapt policy { strategy Wet priority 10 match (moisture: sensor<Percent>) { pump <- case moisture { ok(value) => value < 30%; fault(_) => false; }; } strategy Baseline priority 0 match always { pump <- false; } } }');
 await assert.rejects(ControlRuntime.instantiate(wasm, adaptiveProgram), /adapt strategy activation requires a capability-aware host/);
 const virtualRuntime = await ControlRuntime.instantiate(wasm, await compileSource(`
 control Basic {
   input enable: Bool;
   output pump: Bool;
-  pump <- enable;
+  pump <- enable |> recover(false);
 }
 `, { filename: 'basic-host.ghost' }));
 try {
-  assert.equal(virtualRuntime.step({ nowMs: 0, inputs: { enable: true } }).vm.safe.pump, true);
+  assert.equal(virtualRuntime.step({ nowMs: 0, samples: { enable: { epoch: 1, id: 1, timestampMs: 0, quality: 'Good', value: true } } }).vm.safe.pump, true);
 } finally { virtualRuntime.dispose(); }
 
 const outputless = compileControl(`
@@ -422,7 +429,7 @@ control StrategyPriorityOverflow {
 
 expectError(`
 control OptionalSensorOutsideMatch {
-  sensor moisture?: Percent;
+  input moisture?: Percent;
   output pump: Bool;
   adapt policy {
     strategy Baseline priority 0 match always {
@@ -451,14 +458,14 @@ control BadSlots {
 
 expectError(`
 control BadSensor {
-  sensor moisture: Percent { filter = median(4); }
+  input moisture: Percent { filter = median(4); }
   output pump: Bool;
 }
 `, 'median window must be an odd integer');
 
 expectError(`
 control RecoverBudget {
-  sensor moisture: Percent { recover_after = 32 samples; }
+  input moisture: Percent { recover_after = 32 samples; }
   output pump: Bool;
 }
 `, 'recover_after must be an integer from 1 to 31 samples');

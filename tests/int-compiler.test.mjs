@@ -43,7 +43,7 @@ test('N1-LIT-02: out-of-range integer literals report their source position', ()
 
 test('whole literals remain Number in immediate Number contexts', () => {
   checks(`control NumberContexts {
-  input temperature: Number;
+  state temperature: Number = 20.0;
   config threshold: Number = 30;
   fn below(value: Number, threshold_value: Number) -> Bool { value < threshold_value }
   output cool: Bool;
@@ -52,14 +52,14 @@ test('whole literals remain Number in immediate Number contexts', () => {
 });
 
 test('N1-TYPE-01/02: mixed numeric operations and Int slash division are rejected', () => {
-  rejects('control MixedAdd { input count: Int; input measure: Number; output x: Int; x <- count + measure; }', '+ does not implicitly mix Int and Number');
-  rejects('control MixedCompare { input count: Int; input measure: Number; output x: Bool; x <- count < measure; }', '< requires matching ordered types');
-  rejects('control Slash { input a, b: Int; output x: Int; x <- a / b; }', '/ is not defined for Int operands; use div or convert both operands to Number');
+  rejects('control MixedAdd { state count: Int = 1; state measure: Number = 1.0; output x: Int; x <- count + measure; }', '+ does not implicitly mix Int and Number');
+  rejects('control MixedCompare { state count: Int = 1; state measure: Number = 1.0; output x: Bool; x <- count < measure; }', '< requires matching ordered types');
+  rejects('control Slash { state a: Int = 7; state b: Int = 3; output x: Int; x <- a / b; }', '/ is not defined for Int operands; use div or convert both operands to Number');
 });
 
 test('Int operators and exact constant arithmetic type-check', () => {
   checks(`control IntegerOperators {
-  input a, b: Int;
+  state a: Int = 7; state b: Int = 3;
   output quotient, remainder: Int;
   output ordered: Bool;
   quotient <- a div b;
@@ -141,7 +141,7 @@ test('constant explicit conversions retain literal types inside GFB3 conjunction
 
 test('dynamic explicit conversions select GFB3 with preserved typed conversion', () => {
   const compiled = compileControl(`control DynamicIntegerConversion {
-      input count: Int;
+      state count: Int = 7;
       output approximate: Number;
       approximate <- number(count);
     }`, { filename: 'dynamic-integer-conversion.ghost' });

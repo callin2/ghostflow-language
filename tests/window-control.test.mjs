@@ -15,7 +15,7 @@ const encodedNumber = value => {
 
 test('window_average accepts measured Temperature evidence and preserves its payload type', async () => {
   const artifact = await compile(`control WindowAverageTemperature {
-    sensor temperature: Temperature;
+    input temperature: Temperature;
     signal average_temperature = window_average(temperature, over: 10min, quality: measured, max_age: 2min);
     output cold: Bool;
     cold <- average_temperature |> map(below(280K)) |> recover(false);
@@ -33,7 +33,7 @@ test('window_average accepts measured Temperature evidence and preserves its pay
 
 test('window_min and window_max accept measured Temperature evidence', async () => {
   const artifact = await compile(`control WindowTemperatureExtrema {
-    sensor temperature: Temperature;
+    input temperature: Temperature;
     signal minimum_temperature = window_min(temperature, over: 10min, quality: measured, max_age: 2min);
     signal maximum_temperature = window_max(temperature, over: 10min, quality: measured, max_age: 2min);
     output low, high: Bool;
@@ -48,7 +48,7 @@ test('window_min and window_max accept measured Temperature evidence', async () 
 
 test('window_rate produces an expression-only Rate<Temperature> consumed by a static threshold pipeline', async () => {
   const artifact = await compile(`control WindowTemperatureRate {
-    sensor temperature: Temperature;
+    input temperature: Temperature;
     signal warming = window_rate(temperature, over: 10min, quality: measured, max_age: 2min);
     output slow: Bool;
     slow <- warming |> map(below(rate(delta: 1ΔK, time: 1s))) |> recover(false);
@@ -60,7 +60,7 @@ test('window_rate produces an expression-only Rate<Temperature> consumed by a st
 
 test('window_rate accepts a negative TemperatureDelta threshold in its expected Rate context', async () => {
   const artifact = await compile(`control WindowCoolingRate {
-    sensor temperature: Temperature;
+    input temperature: Temperature;
     signal cooling = window_rate(temperature, over: 10min, quality: measured, max_age: 2min);
     output fast: Bool;
     fast <- cooling |> map(below(rate(delta: -1ΔK, time: 1s))) |> recover(false);
@@ -70,8 +70,9 @@ test('window_rate accepts a negative TemperatureDelta threshold in its expected 
 
 test('window_rate keeps a dynamic Duration denominator for runtime zero rejection', async () => {
   const artifact = await compile(`control DynamicWindowRateThreshold {
-    input interval: Duration;
-    sensor temperature: Temperature;
+    input observed_interval: Duration;
+    let interval = observed_interval |> recover(1s);
+    input temperature: Temperature;
     signal warming = window_rate(temperature, over: 10min, quality: measured, max_age: 2min);
     output fast: Bool;
     fast <- warming |> map(below(rate(delta: 1ΔK, time: interval))) |> recover(false);
@@ -82,7 +83,7 @@ test('window_rate keeps a dynamic Duration denominator for runtime zero rejectio
 
 test('window_rate normalizes a finite large threshold without an overflowing intermediate', async () => {
   const artifact = await compile(`control LargePressureRateThreshold {
-    sensor pressure: Pressure;
+    input pressure: Pressure;
     signal changing = window_rate(pressure, over: 10min, quality: measured, max_age: 2min);
     output extreme: Bool;
     extreme <- changing |> map(below(rate(delta: 1e308Pa, time: 1s))) |> recover(false);
@@ -95,7 +96,7 @@ test('window_rate normalizes a finite large threshold without an overflowing int
 test('window_average maps measured Int evidence to Number while extrema preserve Int', async () => {
   const artifact = await compile(`control WindowMappedInt {
     fn count(value: Number) -> Int { int_trunc(value) }
-    sensor reading: Number;
+    input reading: Number;
     signal average_count = window_average(reading |> map(count), over: 10s, quality: measured, max_age: 2s);
     signal minimum_count = window_min(reading |> map(count), over: 10s, quality: measured, max_age: 2s);
     signal maximum_count = window_max(reading |> map(count), over: 10s, quality: measured, max_age: 2s);
@@ -113,9 +114,9 @@ test('window_average maps measured Int evidence to Number while extrema preserve
 
 test('window_average preserves Number, Percent, and nominal quantity payload types', async () => {
   const artifact = await compile(`control WindowNumericKinds {
-    sensor number_reading: Number;
-    sensor position: Percent;
-    sensor pressure: Pressure;
+    input number_reading: Number;
+    input position: Percent;
+    input pressure: Pressure;
     signal number_average = window_average(number_reading, over: 10s, quality: measured, max_age: 2s);
     signal position_average = window_average(position, over: 10s, quality: measured, max_age: 2s);
     signal pressure_average = window_average(pressure, over: 10s, quality: measured, max_age: 2s);
@@ -130,10 +131,10 @@ test('window_average preserves Number, Percent, and nominal quantity payload typ
 test('a window accepts a measured Result branch over multiple physical roots', async () => {
   const artifact = await compile(`control WindowPhysicalBranches {
     input use_inside: Bool;
-    sensor inside: Temperature;
-    sensor outside: Temperature;
+    input inside: Temperature;
+    input outside: Temperature;
     signal average_temperature = window_average(
-      if use_inside then inside else outside,
+      case use_inside { ok(use) => if use then inside else outside; fault(reason) => fault(reason); },
       over: 10min, quality: measured, max_age: 2min);
     output cold: Bool;
     cold <- average_temperature |> map(below(280K)) |> recover(false);
@@ -145,7 +146,7 @@ const invalidCases = [
   {
     name: 'missing over',
     source: `control MissingWindowOver {
-      sensor temperature: Temperature;
+      input temperature: Temperature;
       signal average_temperature = §window_average(temperature, quality: measured, max_age: 2min);
     }`,
     message: 'window_average requires window_average(source, over: Duration, quality: measured, max_age: Duration)',
@@ -153,7 +154,7 @@ const invalidCases = [
   {
     name: 'missing max_age',
     source: `control MissingWindowMaxAge {
-      sensor temperature: Temperature;
+      input temperature: Temperature;
       signal average_temperature = §window_average(temperature, over: 10min, quality: measured);
     }`,
     message: 'window_average requires window_average(source, over: Duration, quality: measured, max_age: Duration)',
@@ -161,8 +162,9 @@ const invalidCases = [
   {
     name: 'dynamic over',
     source: `control DynamicWindowOver {
-      input span: Duration;
-      sensor temperature: Temperature;
+      input observed_span: Duration;
+      let span = observed_span |> recover(1s);
+      input temperature: Temperature;
       signal average_temperature = window_average(temperature, over: §span, quality: measured, max_age: 2min);
     }`,
     message: 'window_average over must be a positive constant Duration',
@@ -170,8 +172,9 @@ const invalidCases = [
   {
     name: 'dynamic max_age',
     source: `control DynamicWindowMaxAge {
-      input freshness: Duration;
-      sensor temperature: Temperature;
+      input observed_freshness: Duration;
+      let freshness = observed_freshness |> recover(1s);
+      input temperature: Temperature;
       signal average_temperature = window_average(temperature, over: 10min, quality: measured, max_age: §freshness);
     }`,
     message: 'window_average max_age must be a positive constant Duration',
@@ -179,7 +182,7 @@ const invalidCases = [
   {
     name: 'missing quality',
     source: `control MissingWindowQuality {
-      sensor temperature: Temperature;
+      input temperature: Temperature;
       signal average_temperature = §window_average(temperature, over: 10min, max_age: 2min);
     }`,
     message: 'window_average requires window_average(source, over: Duration, quality: measured, max_age: Duration)',
@@ -187,7 +190,7 @@ const invalidCases = [
   {
     name: 'unsupported quality',
     source: `control EstimatedWindowQuality {
-      sensor temperature: Temperature;
+      input temperature: Temperature;
       signal average_temperature = window_average(temperature, over: 10min, quality: §estimated, max_age: 2min);
     }`,
     message: 'window_average quality must be measured',
@@ -195,7 +198,7 @@ const invalidCases = [
   {
     name: 'raw source',
     source: `control RawWindowSource {
-      input temperature: Temperature;
+      let temperature: Temperature = 280K;
       signal average_temperature = window_average(§temperature, over: 10min, quality: measured, max_age: 2min);
     }`,
     message: 'window_average source must be Result<ordered numeric or physical quantity, SensorFault>',
@@ -203,7 +206,7 @@ const invalidCases = [
   {
     name: 'Bool payload',
     source: `control BoolWindowSource {
-      sensor enabled: Bool;
+      input enabled: Bool;
       signal average_enabled = window_average(§enabled, over: 10min, quality: measured, max_age: 2min);
     }`,
     message: 'window_average source must be Result<ordered numeric or physical quantity, SensorFault>',
@@ -211,7 +214,7 @@ const invalidCases = [
   {
     name: 'Number rate payload',
     source: `control NumberWindowRate {
-      sensor reading: Number;
+      input reading: Number;
       signal changing = window_rate(§reading, over: 10min, quality: measured, max_age: 2min);
     }`,
     message: 'window_rate source must be Result of a supported linear physical quantity',
@@ -219,7 +222,7 @@ const invalidCases = [
   {
     name: 'excluded physical rate payload',
     source: `control RelativeHumidityWindowRate {
-      sensor humidity: RelativeHumidity;
+      input humidity: RelativeHumidity;
       signal changing = window_rate(§humidity, over: 10min, quality: measured, max_age: 2min);
     }`,
     message: 'window_rate source must be Result of a supported linear physical quantity',
@@ -227,7 +230,7 @@ const invalidCases = [
   {
     name: 'mismatched rate delta quantity',
     source: `control MismatchedWindowRate {
-      sensor temperature: Temperature;
+      input temperature: Temperature;
       signal warming = window_rate(temperature, over: 10min, quality: measured, max_age: 2min);
       output fast: Bool;
       fast <- warming |> map(below(rate(delta: §1kPa, time: 1s))) |> recover(false);
@@ -237,7 +240,7 @@ const invalidCases = [
   {
     name: 'zero rate time',
     source: `control ZeroTimeWindowRate {
-      sensor temperature: Temperature;
+      input temperature: Temperature;
       signal warming = window_rate(temperature, over: 10min, quality: measured, max_age: 2min);
       output fast: Bool;
       fast <- warming |> map(below(rate(delta: 1ΔK, time: §0s))) |> recover(false);
@@ -247,7 +250,7 @@ const invalidCases = [
   {
     name: 'non-finite rate threshold',
     source: `control OverflowingPressureRate {
-      sensor pressure: Pressure;
+      input pressure: Pressure;
       signal changing = window_rate(pressure, over: 10min, quality: measured, max_age: 2min);
       output extreme: Bool;
       extreme <- changing |> map(below(§rate(delta: 1e308Pa, time: 1ms))) |> recover(false);
@@ -257,8 +260,8 @@ const invalidCases = [
   {
     name: 'nominal Rate payload mismatch',
     source: `control MismatchedNominalRates {
-      sensor temperature: Temperature;
-      sensor change: TemperatureDelta;
+      input temperature: Temperature;
+      input change: TemperatureDelta;
       signal warming = window_rate(temperature, over: 10min, quality: measured, max_age: 2min);
       signal changing = window_rate(change, over: 10min, quality: measured, max_age: 2min);
       output fast: Bool;
@@ -269,7 +272,7 @@ const invalidCases = [
   {
     name: 'Rate Result let binding',
     source: `control BoundWindowRate {
-      sensor temperature: Temperature;
+      input temperature: Temperature;
       signal warming = window_rate(temperature, over: 10min, quality: measured, max_age: 2min);
       §let saved = warming;
     }`,

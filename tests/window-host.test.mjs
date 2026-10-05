@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
+import { softwareQualityObservations } from './helpers/software-quality-observations.mjs';
 import { compileSource } from '../tools/toolchain.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 
@@ -10,7 +11,10 @@ const source = `# Window host
 \`\`\`ghost
 control WindowHost {
   input threshold_time: Duration;
-  sensor temperature: Temperature;
+  state retained_time: Duration = 1s;
+  let scalar_time = case threshold_time { ok(value) => value; fault(_) => retained_time; };
+  retained_time' = scalar_time;
+  input temperature: Temperature;
   signal average = window_average(temperature, over: 1s, quality: measured, max_age: 1s);
   signal minimum = window_min(temperature, over: 1s, quality: measured, max_age: 1s);
   signal maximum = window_max(temperature, over: 1s, quality: measured, max_age: 1s);
@@ -20,7 +24,7 @@ control WindowHost {
   average_value <- average |> recover(0K);
   minimum_value <- minimum |> recover(0K);
   maximum_value <- maximum |> recover(0K);
-  fast <- rate |> map(below(rate(delta: 1ΔK, time: threshold_time))) |> recover(false);
+  fast <- rate |> map(below(rate(delta: 1ΔK, time: scalar_time))) |> recover(false);
 }
 \`\`\`\n`;
 const profile = (sourceTag = 1) => ({
@@ -42,6 +46,7 @@ for (const [label, instantiate] of [['legacy', ControlRuntime.instantiate], ['fr
     const artifact = await compile();
     const options = { acceptSettings: true, temporal: profile(artifact.manifest.signals[0].sources[0].tag) };
     const runtime = await instantiate.call(ControlRuntime, wasm, artifact, options);
+    softwareQualityObservations(runtime);
     t.after(() => runtime.dispose());
     const first = runtime.step({ nowMs: 1000, inputs: { threshold_time: 1000 }, samples: { temperature: sample(1, 1000, 280) } });
     assert.deepEqual(first.vm.safe, { average_value: 280, minimum_value: 280, maximum_value: 280, fast: false });
@@ -62,6 +67,7 @@ for (const [label, instantiate] of [['legacy', ControlRuntime.instantiate], ['fr
 test('window host retries a zero-time rate fault without committing the window', async t => {
   const artifact = await compile();
   const runtime = await ControlRuntime.instantiate(wasm, artifact, { acceptSettings: true, temporal: profile(artifact.manifest.signals[0].sources[0].tag) });
+  softwareQualityObservations(runtime);
   t.after(() => runtime.dispose());
   runtime.step({ nowMs: 1000, inputs: { threshold_time: 1000 }, samples: { temperature: sample(1, 1000, 280) } });
   assert.throws(() => runtime.step({ nowMs: 1400, inputs: { threshold_time: 0 }, samples: { temperature: sample(2, 1400, 284) } }), /division by zero/);

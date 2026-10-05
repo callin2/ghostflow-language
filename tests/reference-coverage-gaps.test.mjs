@@ -22,7 +22,7 @@ test('Reference coverage exercises valid enum lowering and Tide schedule binding
       at = tide\`high - 30min\`;
       basis = pulse;
       when = true;
-      cancel_when = stop || unsafe_level;
+      cancel_when = (case stop { ok(value) => value; fault(_) => true; }) || (case unsafe_level { ok(value) => value; fault(_) => true; });
       clock = trusted_only;
       gap = skip_after(60s);
       recovery = baseline;
@@ -36,9 +36,9 @@ test('Reference coverage exercises valid enum lowering and Tide schedule binding
 });
 
 test('Reference after_event coverage lowers explicit projections through the direct API', () => {
-  const source = fs.readFileSync(new URL('./fixtures/after-event-evidence.ghost.md', import.meta.url), 'utf8');
-  const code = extractLiterate(source, { filename: 'after-event-evidence.ghost.md' }).code;
-  const artifact = compileTemporalDescriptorArtifact(code, { filename: 'after-event-evidence.ghost.md' });
+  const source = fs.readFileSync(new URL('./fixtures/after-event-evidence.input-v1.ghost.md', import.meta.url), 'utf8');
+  const code = extractLiterate(source, { filename: 'after-event-evidence.input-v1.ghost.md' }).code;
+  const artifact = compileTemporalDescriptorArtifact(code, { filename: 'after-event-evidence.input-v1.ghost.md' });
   assert.match(artifact.manifest.format, /^GhostFlow\/control-v[1-6]$/);
   assert.deepEqual(artifact.manifest.signals[0].projections, ['any']);
 });

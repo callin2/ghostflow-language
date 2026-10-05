@@ -1,3 +1,4 @@
+import { softwareQualityRails } from './helpers/software-quality-observations.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -28,7 +29,7 @@ const source=`control P {
  output counter, quotient: Int;
  duration_ms <- case duration { ok(v) => v; fault(_) => 0ms; };
  duty_pct <- case duty { ok(v) => v; fault(_) => 0%; };
- age_ms <- age; counter <- count'; quotient <- 10 div den;
+ age_ms <- age; counter <- count'; quotient <- 10 div (den |> recover(0));
 }`;
 const artifact=await compileSource(source,{filename:'temporary-program-p.ghost'});
 const config=(a,name)=>a.manifest.configs.find(c=>c.name===name);
@@ -40,7 +41,7 @@ async function create(a=artifact,{runId='run-p',boot=1,...options}={}){
   context:{bootEpoch:boot,terminalCapacity:128,bindings:[]},...options});
 }
 function packet(at,wall=at,{boot=1,trusted=true,den=1}={}){
- return {nowMs:at,inputs:{den},contextFacts:{clock:{monotonicMs:at,bootEpoch:boot,wallMs:trusted?wall:null,
+ return {nowMs:at,samples:{den:{epoch:1,id:at+1,timestampMs:at,quality:'Good',value:den}},contextFacts:{clock:{monotonicMs:at,bootEpoch:boot,wallMs:trusted?wall:null,
   uncertaintyMs:trusted?0:null,trusted,unknownReason:trusted?null:'ClockUnknown',sourceRevision:'temporary-fixture-clock-v1'},natural:[],schedules:[],settings:null}};
 }
 function event(h,kind,id,changes,extra={}){
@@ -56,7 +57,7 @@ function nativeRun(a,tape,{boot=1,checkpoint=null}={}){
   let scanId=0;
   fs.writeFileSync(path.join(dir,'tape.json'),JSON.stringify({profile:'context-settings-civil-v1',activation:{bootEpoch:boot,terminalCapacity:128,bindings:[]},
    ...(checkpoint?{checkpoint}:{}),steps:tape.map(({p,r})=>({scanId:r.accepted?scanId++:scanId,logicalTimeMs:p.nowMs,
-    inputs:a.manifest.inputs.filter(x=>x.name==='den').map(x=>({name:x.name,value:p.inputs.den})),
+    inputs:Object.entries(softwareQualityRails(a, p.samples?.den ? {den:p.samples.den.value} : {})).map(([name,value])=>({name,value})),
     ...p.contextFacts,settings:r.coreEvent??r.attemptedCoreEvent??null}))}));
   const result=spawnSync(native,[path.join(dir,'module.gfb'),path.join(dir,'tape.json')],{encoding:'utf8',timeout:10000,maxBuffer:4*1024*1024});
   assert.equal(result.status,0,result.stderr);return result.stdout.trim().split('\n').map(l=>JSON.parse(l));
@@ -95,7 +96,7 @@ test('REF-05-018 actual Run overlay is Program-bound and Q revalidates type rang
    output selected: ${type}; selected <- case duration { ok(v) => v; fault(_) => ${type==='Int'?'0':'0ms'}; }; }`,{filename:`temporary-q-${label}.ghost`});
   await assert.rejects(create(q,{runId:'run-q',boot:2,checkpoint:first.checkpoint,restoreApproved:true}),/identity/);
   const host=await create(q,{runId:'run-q',boot:2});
-  const qPacket=()=>({...packet(0,0,{boot:2}),inputs:{}});
+  const qPacket=()=>({...packet(0,0,{boot:2}),samples:{}});
   try{
    assert.equal(host.snapshot().overlays.length,0);assert.equal(host.snapshot().core.state.settingsRevision,0);
    const pEvent=event(host,'temporary','p-cannot-transfer',[typed(q,'duration',validValue)],{lifetime:{kind:'Run'},programFingerprint:first.checkpoint.body.programFingerprint});
@@ -271,7 +272,7 @@ test('REF-05-018 approved digest-correct restore revalidates every overlay prove
 test('REF-05-018 TimeSlots temporary return preserves ordinary row identities and rejects unknown or unallocated keys', async () => {
  const a=await compileSource('control S { config slots: TimeSlots<15min,3> = [time`06:00`] { access = operator; } output y: Bool; y <- false; }',{filename:'temporary-slot-return.ghost'});
  const h=await create(a);const tape=[];
- const p=at=>({...packet(at),inputs:{}});
+ const p=at=>({...packet(at),samples:{}});
  try{
   const original=h.snapshot().ordinary[0].result.value;
   unchanged(h,()=>h.step(p(0),event(h,'temporary','bad-key',[typed(a,'slots',{kind:'slots',entries:[{key:99,minuteOfDay:480}]})],{lifetime:{kind:'Run'}})),/key identity/);
