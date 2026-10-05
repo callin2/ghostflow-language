@@ -72,7 +72,9 @@ jobs:
   verify:
     name: Verify WASM (${{ matrix.label }})
     needs: classify
-    if: ${{ needs.classify.outputs.mode == 'full' }}
+    if: ${{ needs.classify.outputs.mode == 'full' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+    permissions:
+      contents: write
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
@@ -112,7 +114,7 @@ jobs:
           ref: ${{ matrix.source_sha }}
           path: source
           fetch-depth: 1
-          persist-credentials: false
+          persist-credentials: ${{ matrix.label == 'current' }}
           submodules: false
 
       - name: Verify tested source commit
@@ -162,6 +164,11 @@ jobs:
 
       - name: Run verified WASM packaging unit test
         run: node --test ci/tests/verified-wasm-artifact.test.mjs
+
+      - name: Test current source build identity with local authority
+        if: ${{ matrix.label == 'current' }}
+        working-directory: source
+        run: npm run test:build-identity
 
       - name: Run source verification
         working-directory: source

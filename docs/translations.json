@@ -117,8 +117,8 @@
       "source": "AGENTS.md",
       "sourceLanguage": "en",
       "translation": "AGENTS.ko.md",
-      "sourceSha256": "8baae1b95a802b97a223de1f8fc2723f7a175a08ecc82f6478a0106408e6674c",
-      "translationSha256": "7fa460b29c05a6680e669918e935e6ac5093099e502af9b4a512171167b3ac8b"
+      "sourceSha256": "cbba332d821b0f916b51e8c7be57ff150751deb4894ddd09c832f2c8a8b03531",
+      "translationSha256": "bb79a9f2c8e55727e0eb19136aa8af7d361e50e59e1d0dfff5e3a7be7bbe750b"
     },
     {
       "source": "contracts/integration-v1/README.md",

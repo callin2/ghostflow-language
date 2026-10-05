@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
+import { enterVerification } from '../scripts/verification-entry.mjs';
 import { fileURLToPath } from 'node:url';
 import { extractLiterate } from './literate.mjs';
 import { compileSource } from './toolchain.mjs';
@@ -14,6 +15,7 @@ import { readCatalog, validateCatalog } from '../contracts/requirements/validate
 // Deliberately explicit. Product/LLM/device tests belong to other repositories.
 export const LANGUAGE_TESTS = Object.freeze([
   'tests/canonical-input.test.mjs',
+  'tests/build-identity.test.mjs',
   'tests/software-input-producer.test.mjs',
   'tests/input-recovery-rop.test.mjs',
   'tests/input-fault-restart.test.mjs',
@@ -278,7 +280,8 @@ const PLC_CURRICULUM_IDS = Object.freeze([
 ]);
 const PLC_CURRICULUM_IMPORTED_REPOSITORY = 'callin2/farm_studio_system';
 const PLC_CURRICULUM_IMPORTED_REVISION = '056a1c88cdfe3276700f6b6a819b715370af20eb';
-const args = process.argv.slice(2);
+const args = enterVerification();
+await import('../scripts/require-build-context.mjs');
 if (args.length > 1 || (args.length === 1 && !['--node-only', '--curriculum-only'].includes(args[0]))) {
   console.error('usage: node tools/verify-language.mjs [--node-only|--curriculum-only]');
   process.exitCode = 2;
@@ -505,6 +508,11 @@ async function verify(nodeOnly, curriculumOnly) {
     console.error(error.message);
   } finally {
     report.finishedAt = new Date().toISOString();
+    if (report.passed && report.wasm?.builtByThisRun) {
+      report.buildIdentity = JSON.parse(fs.readFileSync(process.env.FARM_BUILD_IDENTITY_FILE));
+      fs.mkdirSync(path.join(root, 'build'), { recursive: true });
+      fs.writeFileSync(path.join(root, 'build/build-identity.json'), JSON.stringify({ identity: report.buildIdentity, wasmSha256: report.wasm.sha256, nativeSha256: report.native?.sha256, framedNativeSha256: report.framedNative?.sha256 }, null, 2) + '\n');
+    }
     const build = path.join(root, 'build');
     const history = path.join(build, 'verification-runs');
     fs.mkdirSync(history, { recursive: true });
