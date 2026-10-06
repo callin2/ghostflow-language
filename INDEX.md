@@ -79,6 +79,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/AI-CONTRIBUTION-PACKAGE.md](docs/AI-CONTRIBUTION-PACKAGE.md) | Bounded AI contribution package | md |
 | [docs/BEHAVIOR-COMPOSITION-RESEARCH.ko.md](docs/BEHAVIOR-COMPOSITION-RESEARCH.ko.md) | 동작 조합: 연구와 아키텍처 검토 | md |
 | [docs/BEHAVIOR-COMPOSITION-RESEARCH.md](docs/BEHAVIOR-COMPOSITION-RESEARCH.md) | Behavior composition: research and architecture review | md |
+| [docs/BOOLEAN-OUTPUT-EXPLANATION.ko.md](docs/BOOLEAN-OUTPUT-EXPLANATION.ko.md) | Boolean 요청 출력 설명 | md |
+| [docs/BOOLEAN-OUTPUT-EXPLANATION.md](docs/BOOLEAN-OUTPUT-EXPLANATION.md) | Boolean requested-output explanation | md |
 | [docs/BYTECODE.ko.md](docs/BYTECODE.ko.md) | GFB 바이트코드 | md |
 | [docs/BYTECODE.md](docs/BYTECODE.md) | GFB bytecode | md |
 | [docs/CALENDAR-PROVIDERS.ko.md](docs/CALENDAR-PROVIDERS.ko.md) | 한국 공휴일과 현장 근무 달력 | md |
@@ -483,6 +485,7 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/fixtures/after-event-evidence.ghost.md](tests/fixtures/after-event-evidence.ghost.md) | Evidence after event | md |
 | [tests/fixtures/after-event-evidence.input-v1.ghost.md](tests/fixtures/after-event-evidence.input-v1.ghost.md) | Evidence after event | md |
 | [tests/fixtures/exact-counter.input-v1.ghost.md](tests/fixtures/exact-counter.input-v1.ghost.md) | Exact counter interaction input-v1 fixture | md |
+| [tests/fixtures/explanation-short-circuit.ghost.md](tests/fixtures/explanation-short-circuit.ghost.md) | Preserve the executed Boolean proof path | md |
 | [tests/fixtures/gfb1-golden-input-v1.ghost.md](tests/fixtures/gfb1-golden-input-v1.ghost.md) | Explicit quality-input golden revision | md |
 | [tests/fixtures/gfb1-golden-v1.ghost.md](tests/fixtures/gfb1-golden-v1.ghost.md) | GFB1 version 1 golden vector | md |
 | [tests/fixtures/gfb2-int-golden-input-v1.ghost.md](tests/fixtures/gfb2-int-golden-input-v1.ghost.md) | Explicit exact-integer quality-input revision | md |
@@ -514,4 +517,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-384 documents.
+387 documents.

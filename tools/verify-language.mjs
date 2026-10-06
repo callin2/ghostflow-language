@@ -215,6 +215,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/settings-execution-revalidation.test.mjs',
   'tests/settings-default-provenance.test.mjs',
   'tests/snapshot-identity-join.test.mjs',
+  'tests/explanation-path.test.mjs',
   'tests/intent-anchor-map.test.mjs',
   'tests/ledger.test.mjs',
   'tests/literate.test.mjs',

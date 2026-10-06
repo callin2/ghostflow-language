@@ -23,7 +23,13 @@ const MAX_NAME_BYTES: usize = 1_024;
 const USAGE: &str = "usage: scan_tape <module.gfb> <tape.tsv> [--temporal EPOCH MAX_SAMPLES MAX_BYTES TAG:MAX_OBSERVATIONS:INTERVAL_MS[,..]]";
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let args: Vec<_> = env::args().skip(1).collect();
+    let mut args: Vec<_> = env::args().skip(1).collect();
+    let witnesses = args
+        .last()
+        .is_some_and(|arg| arg == "--instruction-witnesses");
+    if witnesses {
+        args.pop();
+    }
     if args.len() < 2 {
         return Err(USAGE.into());
     }
@@ -41,6 +47,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         .collect();
     let mut runtime = Runtime::new(1024);
     runtime.install(module, false);
+    if witnesses {
+        runtime.enable_instruction_witnesses()?;
+    }
     for capability in capabilities {
         runtime.add_capability(capability)?;
     }

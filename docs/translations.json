@@ -2,6 +2,13 @@
   "format": "GhostFlow/document-translations-v1",
   "documents": [
     {
+      "source": "docs/BOOLEAN-OUTPUT-EXPLANATION.md",
+      "sourceLanguage": "en",
+      "translation": "docs/BOOLEAN-OUTPUT-EXPLANATION.ko.md",
+      "sourceSha256": "506105e4909a8f498f7e3fa7206d4a3568153ebf6076cada1c3663921d199a44",
+      "translationSha256": "407424daee4b30a7ad4b9acd9580d0254a18e2819c0a0ad2875c96d62f587ddf"
+    },
+    {
       "source": "docs/INPUT-MIGRATION.md",
       "sourceLanguage": "en",
       "translation": "docs/INPUT-MIGRATION.ko.md",
@@ -243,8 +250,8 @@
       "source": "docs/DOCUMENTATION.md",
       "sourceLanguage": "en",
       "translation": "docs/DOCUMENTATION.ko.md",
-      "sourceSha256": "01e3114db01e4a7483c77ae859194759ee96e435cbbca0498e8510d075bef3ca",
-      "translationSha256": "5d40b15e4c9de00526d76d1247b353c06dccb4349f0223bfa86ebbb28b6ed698"
+      "sourceSha256": "0a91d830797c1efcb3ba7b5e1e706b37adbe201835ff60e11a05a1538c0f8a27",
+      "translationSha256": "01aa42ab985dd6fdda4503bb4b1744527ec74cb5f86ddbdb4e57e6b33dc8ba31"
     },
     {
       "source": "docs/EXACT-INTEGER-CONTRACT.md",
@@ -628,8 +635,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "d0d459c379297026a33bf0146160d6e2df02672b434064da76d1413784757a27",
-      "translationSha256": "65f304f33cc8d26b423afe15a82fff70158cd155ae031bc0aa5dc27bccf3a449"
+      "sourceSha256": "b37656d76a76309733c6623a0e62805053fe596c713c6a530260c39313e5c207",
+      "translationSha256": "f217256bf11b236e6695506df8b47e659b527849b1510272ac9fd2ad519eb343"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",
@@ -1074,6 +1081,10 @@
     }
   ],
   "exclusions": [
+    {
+      "path": "tests/fixtures/explanation-short-circuit.ghost.md",
+      "reason": "Canonical executable issue283 evaluated-path acceptance fixture, not reader documentation; identity is retained."
+    },
     {
       "path": "contracts/interaction-v0/examples/browser-exact-counter.ghost.md",
       "reason": "Executable test or benchmark input fixture, not authored reader documentation; canonical source identity is retained."

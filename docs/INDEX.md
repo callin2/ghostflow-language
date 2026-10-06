@@ -23,6 +23,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/AI-CONTRIBUTION-PACKAGE.md](AI-CONTRIBUTION-PACKAGE.md) | Bounded AI contribution package | md |
 | [docs/BEHAVIOR-COMPOSITION-RESEARCH.ko.md](BEHAVIOR-COMPOSITION-RESEARCH.ko.md) | 동작 조합: 연구와 아키텍처 검토 | md |
 | [docs/BEHAVIOR-COMPOSITION-RESEARCH.md](BEHAVIOR-COMPOSITION-RESEARCH.md) | Behavior composition: research and architecture review | md |
+| [docs/BOOLEAN-OUTPUT-EXPLANATION.ko.md](BOOLEAN-OUTPUT-EXPLANATION.ko.md) | Boolean 요청 출력 설명 | md |
+| [docs/BOOLEAN-OUTPUT-EXPLANATION.md](BOOLEAN-OUTPUT-EXPLANATION.md) | Boolean requested-output explanation | md |
 | [docs/BYTECODE.ko.md](BYTECODE.ko.md) | GFB 바이트코드 | md |
 | [docs/BYTECODE.md](BYTECODE.md) | GFB bytecode | md |
 | [docs/CALENDAR-PROVIDERS.ko.md](CALENDAR-PROVIDERS.ko.md) | 한국 공휴일과 현장 근무 달력 | md |
@@ -242,4 +244,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.ko.md](research/GF-COMPOSE-R9-ACCEPTANCE.ko.md) | GF-COMPOSE R9: acceptance와 구현 인계 | md |
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.md](research/GF-COMPOSE-R9-ACCEPTANCE.md) | GF-COMPOSE R9: acceptance and implementation handoff | md |
 
-203 documents.
+205 documents.

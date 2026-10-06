@@ -5,6 +5,20 @@
 
 ## 미출시
 
+### 2026-10-06 — Boolean 요청 출력 설명 ([#283](https://github.com/callin2/ghostflow-language/issues/283))
+
+Reference 5.3의 제한된 실제 평가 경로 관찰을 추가한다. 선택적 Rust VM
+instruction witness와 artifact에 결속된 compiler sidecar가 한 완료 scan의
+지원되는 요청 Bool 표현식을 설명한다. false gate와 0 divisor를 사용한
+`pump <- gate && (1.0 / divisor > 0.0)`에서 첫 항의 false가 OFF의 근거이며
+생략된 둘째 항에는 실제 값이나 support가 없다. 공유 DAG의 support는
+parent/output occurrence별로 구분한다. 기존 GFB bytes와 실행 의미는 유지한다.
+실패 scan은 새 완료 proof를 만들지 못하며 source/module/run/scan/time join은
+stale을 구별한다. `tests/explanation-path.test.mjs`가 실제 native/WASM parity와
+거부 경계를 검증한다. timer/schedule/composition/safety/Result/transition proof는
+명시적 미지원이며 issue88 전체 완료나 하드웨어 검증을 주장하지 않는다.
+
+
 ### 2026-10-05 — 품질 기반 canonical input ([#531](https://github.com/callin2/ghostflow-language/issues/531))
 
 외부 `input` 선언은 기존 sensor의 Result, conditioning과 optional capability

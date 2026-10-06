@@ -50,15 +50,24 @@ const OP = { bool:1, number:2, input:3, state:4, next:5, not:10,
   'trace-result':56, 'window-read':57, 'schedule-read':58, 'true-for-read':59 };
 
 class Writer {
-  constructor() { this.parts = []; }
-  bytes(v) { this.parts.push(v instanceof Uint8Array ? v : new Uint8Array(v)); }
-  u8(v) { const b=new Uint8Array(1); new DataView(b.buffer).setUint8(0,v); this.parts.push(b); }
-  u16(v) { const b=new Uint8Array(2); new DataView(b.buffer).setUint16(0,v,true); this.parts.push(b); }
-  u32(v) { const b=new Uint8Array(4); new DataView(b.buffer).setUint32(0,v,true); this.parts.push(b); }
-  u64(v) { const b=new Uint8Array(8); new DataView(b.buffer).setBigUint64(0,BigInt(v),true); this.parts.push(b); }
-  i64(v) { const b=new Uint8Array(8); new DataView(b.buffer).setBigInt64(0,BigInt(v),true); this.parts.push(b); }
-  i32(v) { const b=new Uint8Array(4); new DataView(b.buffer).setInt32(0,v,true); this.parts.push(b); }
-  f64(v) { const b=new Uint8Array(8); new DataView(b.buffer).setFloat64(0,v,true); this.parts.push(b); }
+  constructor() { this.parts = []; this.witnessNodes = []; this.lastOp = null; this.byteLength = 0; }
+  get length() { return this.byteLength; }
+  op(value) { this.lastOp = this.length; this.u8(value); }
+  appendExpression(writer) {
+    const offset = this.length;
+    this.bytes(writer.finish());
+    this.witnessNodes.push(...writer.witnessNodes.map(node => ({ ...node,
+      exits: node.exits.map(exit => ({ pc: exit.pc + offset, end: exit.end + offset })) })));
+    this.lastOp = writer.lastOp === null ? null : writer.lastOp + offset;
+  }
+  bytes(v) { const part = v instanceof Uint8Array ? v : new Uint8Array(v); this.parts.push(part); this.byteLength += part.byteLength; }
+  u8(v) { const b=new Uint8Array(1); new DataView(b.buffer).setUint8(0,v); this.bytes(b); }
+  u16(v) { const b=new Uint8Array(2); new DataView(b.buffer).setUint16(0,v,true); this.bytes(b); }
+  u32(v) { const b=new Uint8Array(4); new DataView(b.buffer).setUint32(0,v,true); this.bytes(b); }
+  u64(v) { const b=new Uint8Array(8); new DataView(b.buffer).setBigUint64(0,BigInt(v),true); this.bytes(b); }
+  i64(v) { const b=new Uint8Array(8); new DataView(b.buffer).setBigInt64(0,BigInt(v),true); this.bytes(b); }
+  i32(v) { const b=new Uint8Array(4); new DataView(b.buffer).setInt32(0,v,true); this.bytes(b); }
+  f64(v) { const b=new Uint8Array(8); new DataView(b.buffer).setFloat64(0,v,true); this.bytes(b); }
   str(s) { const b=UTF8.encode(s); if (b.length>65535) throw new CompileError('string too long'); this.u16(b.length); this.bytes(b); }
   finish() { const size=this.parts.reduce((total,part)=>total+part.byteLength,0); const out=new Uint8Array(size); let at=0; for(const part of this.parts){out.set(part,at);at+=part.byteLength;} return out; }
 }
@@ -115,7 +124,7 @@ function windowQualityDependencies(node, found = new Set()) {
   return found;
 }
 
-function emitExpression(ir) {
+function emitExpression(ir, witnesses = false) {
   let w = new Writer(), usesInt = false, usesFormat3 = false;
   function containsBranch(n) {
     if (['conditional', 'logical_and', 'logical_or'].includes(n.kind)) return true;
@@ -125,62 +134,71 @@ function emitExpression(ir) {
   function branch(condition, yes, no) {
     emit(condition);
     const outer = w;
-    w = new Writer(); emit(yes); const yesBytes = w.finish();
-    w = new Writer(); emit(no); const noBytes = w.finish();
+    w = new Writer(); emit(yes); const yesWriter = w, yesBytes = w.finish();
+    w = new Writer(); const noExits = emit(no); const noWriter = w, noBytes = w.finish();
     w = outer;
     if (yesBytes.length + 3 > 65535 || noBytes.length > 65535) throw new CompileError('expression complexity limit exceeded');
-    w.u8(OP.branchFalse); w.u16(yesBytes.length + 3); w.bytes(yesBytes);
-    w.u8(OP.jump); w.u16(noBytes.length); w.bytes(noBytes);
+    w.op(OP.branchFalse); w.u16(yesBytes.length + 3); w.appendExpression(yesWriter);
+    w.op(OP.jump); w.u16(noBytes.length);
+    const yesExit = { pc: w.lastOp, end: w.length };
+    const noOffset = w.length;
+    w.appendExpression(noWriter);
     usesFormat3 = true;
+    return [yesExit, ...noExits.map(exit => ({ pc: exit.pc + noOffset, end: exit.end + noOffset }))];
   }
   function emit(n) {
+    const exits = emitOne(n) ?? [{ pc: w.lastOp, end: w.length }];
+    if (witnesses && !n.synthetic) w.witnessNodes.push({ expression: n, exits });
+    return exits;
+  }
+  function emitOne(n) {
     switch (n.kind) {
       case 'literal':
-        if (n.type === 'Bool') { w.u8(OP.bool); w.u8(n.value ? 1 : 0); }
-        else if (n.type === 'Int') { usesInt = true; w.u8(OP.int); w.i32(n.value); }
-        else if (compactNumbers && Number.isInteger(n.value) && n.value >= 0 && n.value <= 15 && !Object.is(n.value, -0)) w.u8(32 + n.value);
-        else { w.u8(OP.number); w.f64(n.value); }
+        if (n.type === 'Bool') { w.op(OP.bool); w.u8(n.value ? 1 : 0); }
+        else if (n.type === 'Int') { usesInt = true; w.op(OP.int); w.i32(n.value); }
+        else if (compactNumbers && Number.isInteger(n.value) && n.value >= 0 && n.value <= 15 && !Object.is(n.value, -0)) w.op(32 + n.value);
+        else { w.op(OP.number); w.f64(n.value); }
         return;
       case 'input': case 'previous_state': case 'candidate_next':
-        w.u8(OP[n.kind === 'input' ? 'input' : n.kind === 'previous_state' ? 'state' : 'next']);
+        w.op(OP[n.kind === 'input' ? 'input' : n.kind === 'previous_state' ? 'state' : 'next']);
         w.u16(n.index); return;
       case 'true_for_projection': case 'window_projection': case 'schedule_projection': {
         const operation = n.kind === 'true_for_projection' ? 'true-for-read' : n.kind === 'window_projection' ? 'window-read' : 'schedule-read';
         const fields = operation === 'true-for-read' ? ['ok','value','fault','origin','start','end','covered']
           : operation === 'window-read' ? ['ok','value','fault','origin','revision','timestamp','count','quality']
             : ['due','missed','active'];
-        w.u8(OP[operation]); w.u16(n.slot); w.u8(fields.indexOf(n.field)); return;
+        w.op(OP[operation]); w.u16(n.slot); w.u8(fields.indexOf(n.field)); return;
       }
       case 'result_trace':
         emit(n.payload); emit(n.choice); emit(n.origin);
-        usesFormat3 = true; w.u8(OP['trace-result']); w.u32(n.site); return;
+        usesFormat3 = true; w.op(OP['trace-result']); w.u32(n.site); return;
       case 'integer_negation':
-        emit(n.operand); usesInt = true; w.u8(OP['int-neg']); return;
+        emit(n.operand); usesInt = true; w.op(OP['int-neg']); return;
       case 'integer_arithmetic':
-        emit(n.left); emit(n.right); usesInt = true; w.u8(OP['int-' + n.operation]); return;
+        emit(n.left); emit(n.right); usesInt = true; w.op(OP['int-' + n.operation]); return;
       case 'logical_not':
-        emit(n.operand); w.u8(OP.not); return;
+        emit(n.operand); w.op(OP.not); return;
       case 'logical_and':
-        branch(n.left, n.right, { kind: 'literal', type: 'Bool', value: false }); return;
+        return branch(n.left, n.right, { kind: 'literal', type: 'Bool', value: false, synthetic: true });
       case 'logical_or':
-        branch(n.left, { kind: 'literal', type: 'Bool', value: true }, n.right); return;
+        return branch(n.left, { kind: 'literal', type: 'Bool', value: true, synthetic: true }, n.right);
       case 'conditional':
-        branch(n.condition, n.whenTrue, n.whenFalse); return;
+        return branch(n.condition, n.whenTrue, n.whenFalse);
       case 'comparison':
         emit(n.left); emit(n.right);
         if (n.left.type === 'Int') usesInt = true;
-        w.u8(OP[n.operation]); return;
+        w.op(OP[n.operation]); return;
       case 'arithmetic':
-        emit(n.left); emit(n.right); w.u8(OP[n.operation]); return;
+        emit(n.left); emit(n.right); w.op(OP[n.operation]); return;
       case 'conversion':
-        emit(n.operand); usesInt = true; usesFormat3 = true; w.u8(OP[n.operation]); return;
+        emit(n.operand); usesInt = true; usesFormat3 = true; w.op(OP[n.operation]); return;
       case 'time_guard':
-        emit(n.operand); usesFormat3 = true; w.u8(OP[n.operation]); return;
+        emit(n.operand); usesFormat3 = true; w.op(OP[n.operation]); return;
       default: throw new CompileError('invalid semantic expression IR');
     }
   }
   emit(ir);
-  return { type: TYPE[ir.type.toLowerCase()], bytes: w.finish(), usesInt, usesFormat3 };
+  return { type: TYPE[ir.type.toLowerCase()], bytes: w.finish(), usesInt, usesFormat3, witnessNodes: w.witnessNodes };
 }
 
 function checkedExpression(form, env, allowNext = false) {
@@ -688,7 +706,7 @@ function lowerCoreModule(ast) {
     objectives:compiledObjectives.map(objective=>({...objective,direction:objective.direction?'reverse':'direct'}))};
 }
 
-function emitGfb(moduleIr) {
+function emitGfb(moduleIr, { onExpressions } = {}) {
   const {name,version,inputs,states,strategies,constraints,temporal,objectives:compiledObjectives}=moduleIr;
   const preludeKinds=new Set(strategies.flatMap(strategy=>strategy.extensions.preludes.map(prelude=>prelude.kind)));
   const hasContext=['config-stream','periodic-pulse','cron-pulse','calendar-daily-pulse','holiday-daily-pulse','solar-context-pulse','tide-run',
@@ -701,7 +719,7 @@ function emitGfb(moduleIr) {
   const intDeclarations=inputs.some(input=>input.type==='Int')||states.some(state=>state.type==='Int')
     ||strategies.some(strategy=>strategy.intents.some(intent=>intent.type==='Int'));
   const encode = (entry, message = 'strategy resource limit exceeded') => {
-    const compiled = emitExpression(entry.expression);
+    const compiled = emitExpression(entry.expression, Boolean(onExpressions));
     if (compiled.bytes.length > 4096) throw new CompileError(message);
     return compiled;
   };
@@ -712,6 +730,7 @@ function emitGfb(moduleIr) {
     transitions: strategy.transitions.map(encodeRecord),
     intents: strategy.intents.map(encodeRecord),
   }));
+  onExpressions?.(compiledStrategies);
   if(compiledStrategies.some(strategy=>strategy.query.length>4096))throw new CompileError('strategy resource limit exceeded');
   const intExpressions=compiledStrategies.some(s=>s.transitions.some(t=>t.usesInt)||s.intents.some(i=>i.usesInt));
   const format3=compiledStrategies.some(s=>s.transitions.some(t=>t.usesFormat3)||s.intents.some(i=>i.usesFormat3));

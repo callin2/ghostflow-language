@@ -3417,8 +3417,37 @@
       "issues": [
         88
       ],
-      "referenceCaseIds": []
-    },
+        "referenceCaseIds": []
+      },
+      {
+        "id": "boolean-requested-output-explanation",
+        "family": "Completed-scan Boolean requested-output evaluated-path support slice",
+        "clause": {
+          "path": "docs/reference/05-settings-and-observation.en.md",
+          "heading": "5.3 Renderer-independent observation model"
+        },
+        "owner": "CORE",
+        "maturity": "EXPERIMENTAL",
+        "coreScope": false,
+        "requiredEvidence": [],
+        "evidence": [{
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [{
+            "path": "tests/explanation-path.test.mjs",
+            "testId": "REF-05-023 native/WASM requested OFF explanation keeps the false left support and the skipped faulting right unevaluated",
+            "caseId": "REF-05-023",
+            "targets": ["native", "wasm"],
+            "assertionClass": "target-parity",
+            "polarities": ["positive", "negative", "boundary"]
+          }]
+        }],
+        "gaps": [
+          "Issue283 slice only: opt-in actual instruction witnesses and bounded compiler sidecar explain supported Boolean requested expressions. Timer, schedule, composition, safety, Result and transition proofs are unavailable explicitly. Fresh framed run and logical time are trusted host identities; physical output and full issue88 are unproved."
+        ],
+        "issues": [283],
+        "referenceCaseIds": ["REF-05-023"]
+      },
     {
       "id": "ghost-branch",
       "family": "Ghost branch and hot replacement lifecycle",

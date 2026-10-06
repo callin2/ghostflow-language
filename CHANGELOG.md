@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### 2026-10-06 — Boolean requested-output explanation ([#283](https://github.com/callin2/ghostflow-language/issues/283))
+
+Add the bounded evaluated-path observation slice of Reference 5.3. Opt-in Rust
+VM instruction witnesses and an artifact-bound compiler sidecar now explain
+supported requested Bool expressions from one completed scan. For
+`pump <- gate && (1.0 / divisor > 0.0)` with false gate and zero divisor, the
+false left result supports OFF; the skipped right has no actual value or support.
+Support is scoped to parent/output occurrences in a shared DAG. Existing GFB
+bytes and execution behavior stay unchanged. Failed scans cannot produce new
+completed proofs; source/module/run/scan/time joins retain stale distinctions.
+`tests/explanation-path.test.mjs` verifies actual native/WASM parity and rejection
+boundaries. Timer/schedule/composition/safety/Result/transition proofs remain
+explicit unsupported scope; this does not complete issue88 or verify hardware.
+
+
 ### 2026-10-05 — canonical quality input ([#531](https://github.com/callin2/ghostflow-language/issues/531))
 
 External `input` declarations now inherit the existing sensor Result, conditioning
