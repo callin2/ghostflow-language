@@ -107,7 +107,7 @@ import package를 확인하는 근거는 `tests/programming-book-simulation.test
 ### 주제별로 살펴보기
 
 1. [스위치 하나와 출력 하나](#ch01)
-2. [이름, 값, 타입, 표현식](#ch02)
+2. [이름, 값, 타입, 표현식](#ch02) · [측정값에서 타입 찾기](#quantity-type-lookup)
 3. [상태를 기억한다는 것](#ch03)
 4. [출력 의도와 최종 출력](#ch04)
 5. [함수로 계산을 나누기](#ch05)
@@ -281,6 +281,35 @@ GhostFlow는 signed 32-bit `Int`로 정확한 계수를 표현한다. 범위 초
 [Reference §2.9](reference/02-types-expressions-state.md#29-물리량과-단위)를 따른다.
 `Rate<Q>`는 시간창 계산의 식 전용 타입이며 일반 input/output/state 타입이 아니다.
 단위 혼용과 물리량 사이의 연산은 [15장](#ch15)에서 예제로 설명한다.
+
+<a id="quantity-type-lookup"></a>
+### 측정하려는 값에서 타입 찾기
+
+섭씨를 측정해도 타입 이름은 `Temperature`입니다. `Celsius`나 `Fahrenheit`라는
+타입을 선언하지 않습니다. 단위는 값에 붙입니다. 예를 들어
+`input air: Temperature;`로 선언하고 기준값을 `30°C`로 씁니다.
+`30°C`, `86°F`, `303.15K`는 같은 절대 온도를 나타냅니다.
+[14장](#ch14)에서 단위 변환과 온도 제어 예제를 이어서 볼 수 있습니다.
+
+| 측정하는 값 | 선언 타입 | 값 예시 | 입력 선언 |
+| --- | --- | --- | --- |
+| 절대 온도 | `Temperature` | `30°C` | `input air: Temperature;` |
+| 온도 차이 | `TemperatureDelta` | `5Δ°C` | `input rise: TemperatureDelta;` |
+| 상대 습도 | `RelativeHumidity` | `70%RH` | `input humidity: RelativeHumidity;` |
+| 수위 등 백분율 | `Percent` | `70%` | `input level: Percent;` |
+| 이산화탄소 농도 | `CO2Concentration` | `800ppm` | `input co2: CO2Concentration;` |
+| 유량 | `FlowRate` | `5L/min` | `input flow: FlowRate;` |
+| 압력 | `Pressure` | `1.2kPa` | `input pressure: Pressure;` |
+| 수증기압차 | `VaporPressureDeficit` | `1.2kPaVPD` | `input vpd: VaporPressureDeficit;` |
+| 광합성 광자속 밀도 | `PPFD` | `500umol/m2/s` | `input light: PPFD;` |
+| 전압 | `Voltage` | `24V` | `input supply: Voltage;` |
+| 경과 시간 | `Duration` | `5s` | `input delay: Duration;` |
+
+`70%RH`와 `70%`, `1.2kPaVPD`와 `1.2kPa`는 각각 다른 타입입니다.
+절대 온도와 온도 차이도 구분합니다. 입력은 품질을 담은 `Result`로 읽으므로
+값을 꺼내거나 비교하기 전에 정상/고장 분기를 명시해야 합니다. 이 표는 고장 시
+대체값이나 제어 정책을 정하지 않습니다. 전체 단위와 연산 규칙은
+[Reference §2.9](reference/02-types-expressions-state.md#29-물리량과-단위)를 따릅니다.
 
 ### E02 — 입력, 설정, 계산에 각각 이름 붙이기
 
@@ -994,6 +1023,9 @@ public simulator에 숨겨진 `starts.due` 입력을 주입하는 실행 시나�
 
 <a id="ch08"></a>
 ## 8. 센서의 값과 품질
+
+[측정값에서 타입 찾기](#quantity-type-lookup) 표로 입력 타입을 고르세요.
+예를 들어 섭씨 측정은 `Temperature` 타입과 `30°C` 같은 값을 사용합니다.
 
 수분값이 `29%, 31%, 29%`로 오르내린다고 해보자. 한 경계만 따라 판단하면 급수
 요청도 함께 뒤집힌다. 이번에는 `90%`라는 값 하나가 끼어들었다. 정말 갑자기 젖은

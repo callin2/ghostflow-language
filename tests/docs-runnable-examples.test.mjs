@@ -8,6 +8,56 @@ const faq = fs.readFileSync(new URL('../docs/language_faq.md', import.meta.url),
 const programming = fs.readFileSync(new URL('../docs/ProgrammingInGhostflow.md', import.meta.url), 'utf8');
 const programmingEnglish = fs.readFileSync(new URL('../docs/ProgrammingInGhostflow.en.md', import.meta.url), 'utf8');
 
+test('early bilingual quantity lookup supplies valid declarations before sensor examples', () => {
+  // Expected names/literals follow Reference 2.9, independently of the table.
+  const expected = [
+    ['Temperature', '30°C', 'input air: Temperature;'],
+    ['TemperatureDelta', '5Δ°C', 'input rise: TemperatureDelta;'],
+    ['RelativeHumidity', '70%RH', 'input humidity: RelativeHumidity;'],
+    ['Percent', '70%', 'input level: Percent;'],
+    ['CO2Concentration', '800ppm', 'input co2: CO2Concentration;'],
+    ['FlowRate', '5L/min', 'input flow: FlowRate;'],
+    ['Pressure', '1.2kPa', 'input pressure: Pressure;'],
+    ['VaporPressureDeficit', '1.2kPaVPD', 'input vpd: VaporPressureDeficit;'],
+    ['PPFD', '500umol/m2/s', 'input light: PPFD;'],
+    ['Voltage', '24V', 'input supply: Voltage;'],
+    ['Duration', '5s', 'input delay: Duration;'],
+  ];
+  for (const document of [programming, programmingEnglish]) {
+    const start = document.indexOf('<a id="quantity-type-lookup"></a>');
+    assert.ok(start > document.indexOf('<a id="ch02"></a>'));
+    assert.ok(start < document.indexOf('### E02 —'), 'lookup must precede the first typed-input example');
+    assert.ok(start < document.indexOf('<a id="ch08"></a>'));
+    const end = document.indexOf('### E02 —', start);
+    const section = document.slice(start, end);
+    const rows = [...section.matchAll(/^\| [^|]+ \| `([^`]+)` \| `([^`]+)` \| `([^`]+)` \|$/gm)].map(match => match.slice(1));
+    assert.deepEqual(rows, expected);
+    assert.match(section, /`Celsius`/);
+    assert.match(section, /`Fahrenheit`/);
+    assert.match(section, /\(#ch14\)/);
+    const sensorSection = document.slice(document.indexOf('<a id="ch08"></a>'), document.indexOf('### E10 —'));
+    assert.match(sensorSection, /\(#quantity-type-lookup\)/, 'sensor chapter should expose the early lookup');
+    for (const [type, literal, declaration] of rows) {
+      const name = declaration.match(/input (\w+)/)[1];
+      const source = `# Quantity lookup\n\n\`\`\`ghost\ncontrol Lookup {\n  ${declaration}\n  output value: ${type};\n  value <- ${name} |> recover(${literal});\n}\n\`\`\`\n`;
+      const compiled = compileSourceSync(source, { filename: 'lookup.ghost.md' });
+      assert.equal(compiled.manifest.sensors[0].type, type);
+      assert.equal(compiled.manifest.outputs[0].type, type);
+      if (type === 'Temperature') {
+        for (const invalidType of ['Celsius', 'Fahrenheit']) {
+          const wrong = source.replace('input air: Temperature;', `input air: ${invalidType};`);
+          assert.throws(() => compileSourceSync(wrong, { filename: 'unit-as-type.ghost.md' }),
+            error => error.message.includes(`unknown type ${invalidType}`));
+        }
+        for (const equivalent of ['86°F', '303.15K']) {
+          const converted = compileSourceSync(source.replace('30°C', equivalent), { filename: 'lookup.ghost.md' });
+          assert.deepEqual(converted.bytes, compiled.bytes, 'the documented absolute temperatures must be equivalent');
+        }
+      }
+    }
+  }
+});
+
 test('all complete FAQ and constraint controls compile with identical bilingual source', () => {
   const controls = document => new Map([...document.matchAll(/```ghost\n([\s\S]*?)```/g)]
     .filter(match => /(?:^|\n)control \w+ \{/.test(match[1]))
