@@ -48,6 +48,7 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [contracts/interaction-v0/examples/browser-exact-counter.ghost.md](contracts/interaction-v0/examples/browser-exact-counter.ghost.md) | Browser exact counter interaction fixture | md |
 | [contracts/interaction-v0/examples/enum-phase-age.ghost.md](contracts/interaction-v0/examples/enum-phase-age.ghost.md) | Enum phase age interaction fixture | md |
 | [contracts/interaction-v0/examples/exact-counter.ghost.md](contracts/interaction-v0/examples/exact-counter.ghost.md) | Exact counter interaction fixture | md |
+| [contracts/interaction-v0/examples/five-minute-watering.ghost.en.md](contracts/interaction-v0/examples/five-minute-watering.ghost.en.md) | Five-minute watering fixture | md |
 | [contracts/interaction-v0/examples/five-minute-watering.ghost.md](contracts/interaction-v0/examples/five-minute-watering.ghost.md) | 5분 급수 제어 | md |
 | [contracts/interaction-v0/examples/multiple-values.ghost.md](contracts/interaction-v0/examples/multiple-values.ghost.md) | Multiple internal values interaction fixture | md |
 | [contracts/interaction-v0/examples/operator-settings.ghost.md](contracts/interaction-v0/examples/operator-settings.ghost.md) | Renderer-independent operator settings fixture | md |
@@ -78,6 +79,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/AI-CONTRIBUTION-PACKAGE.md](docs/AI-CONTRIBUTION-PACKAGE.md) | Bounded AI contribution package | md |
 | [docs/BEHAVIOR-COMPOSITION-RESEARCH.ko.md](docs/BEHAVIOR-COMPOSITION-RESEARCH.ko.md) | 동작 조합: 연구와 아키텍처 검토 | md |
 | [docs/BEHAVIOR-COMPOSITION-RESEARCH.md](docs/BEHAVIOR-COMPOSITION-RESEARCH.md) | Behavior composition: research and architecture review | md |
+| [docs/BOOLEAN-OUTPUT-EXPLANATION.ko.md](docs/BOOLEAN-OUTPUT-EXPLANATION.ko.md) | Boolean 요청 출력 설명 | md |
+| [docs/BOOLEAN-OUTPUT-EXPLANATION.md](docs/BOOLEAN-OUTPUT-EXPLANATION.md) | Boolean requested-output explanation | md |
 | [docs/BYTECODE.ko.md](docs/BYTECODE.ko.md) | GFB 바이트코드 | md |
 | [docs/BYTECODE.md](docs/BYTECODE.md) | GFB bytecode | md |
 | [docs/CALENDAR-PROVIDERS.ko.md](docs/CALENDAR-PROVIDERS.ko.md) | 한국 공휴일과 현장 근무 달력 | md |
@@ -120,6 +123,10 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/IMPLEMENTATION.ko.md](docs/IMPLEMENTATION.ko.md) | 구현 및 아티팩트 경계 | md |
 | [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) | Implementation and artifact boundaries | md |
 | [docs/INDEX.md](docs/INDEX.md) | Documentation index | md |
+| [docs/INPUT-MIGRATION.ko.md](docs/INPUT-MIGRATION.ko.md) | 외부 입력의 canonical 선언과 명시적 revision migration | md |
+| [docs/INPUT-MIGRATION.md](docs/INPUT-MIGRATION.md) | Canonical external input and explicit revision migration | md |
+| [docs/INSTANCE-TRACE-PROJECTION.ko.md](docs/INSTANCE-TRACE-PROJECTION.ko.md) | Instance trace projection 참조 어댑터 | md |
+| [docs/INSTANCE-TRACE-PROJECTION.md](docs/INSTANCE-TRACE-PROJECTION.md) | Instance trace projection reference adapter | md |
 | [docs/INTENT-ANCHOR-MAP.ko.md](docs/INTENT-ANCHOR-MAP.ko.md) | Literate intent anchor map | md |
 | [docs/INTENT-ANCHOR-MAP.md](docs/INTENT-ANCHOR-MAP.md) | Literate intent anchor map | md |
 | [docs/INTERACTION-STREAM-CONTRACT.ko.md](docs/INTERACTION-STREAM-CONTRACT.ko.md) | Interaction 스트림 계약 설계 | md |
@@ -148,6 +155,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/LLM-AUTHORING-WORKFLOW.md](docs/LLM-AUTHORING-WORKFLOW.md) | Model independent authoring workflow | md |
 | [docs/LLM-TOOLCHAIN-ARCHITECTURE.ko.md](docs/LLM-TOOLCHAIN-ARCHITECTURE.ko.md) | 작성 및 가상 시뮬레이션 아키텍처 | md |
 | [docs/LLM-TOOLCHAIN-ARCHITECTURE.md](docs/LLM-TOOLCHAIN-ARCHITECTURE.md) | Authoring and virtual simulation architecture | md |
+| [docs/OBSERVATION-EVENT-HISTORY.ko.md](docs/OBSERVATION-EVENT-HISTORY.ko.md) | 보존 범위가 있는 관찰 event 이력 | md |
+| [docs/OBSERVATION-EVENT-HISTORY.md](docs/OBSERVATION-EVENT-HISTORY.md) | Bounded observation event history | md |
 | [docs/OPERATOR-SETTINGS-STREAM.ko.md](docs/OPERATOR-SETTINGS-STREAM.ko.md) | Typed configuration stream | md |
 | [docs/OPERATOR-SETTINGS-STREAM.md](docs/OPERATOR-SETTINGS-STREAM.md) | Typed configuration streams | md |
 | [docs/OPTIMIZER-PASS-CONTRACT.ko.md](docs/OPTIMIZER-PASS-CONTRACT.ko.md) | 최적화 패스 계약 | md |
@@ -189,6 +198,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/TEMPORAL-REPLAY.md](docs/TEMPORAL-REPLAY.md) | Temporal replay through the WASM adapters | md |
 | [docs/TEMPORAL-RESOURCES.ko.md](docs/TEMPORAL-RESOURCES.ko.md) | Temporal resource 계획 | md |
 | [docs/TEMPORAL-RESOURCES.md](docs/TEMPORAL-RESOURCES.md) | Temporal resource planning | md |
+| [docs/TEMPORARY-SETTINGS-HOST.ko.md](docs/TEMPORARY-SETTINGS-HOST.ko.md) | 임시 설정 reference host | md |
+| [docs/TEMPORARY-SETTINGS-HOST.md](docs/TEMPORARY-SETTINGS-HOST.md) | Temporary settings reference host | md |
 | [docs/TESTING.ko.md](docs/TESTING.ko.md) | GhostFlow 적합성 및 신뢰성 테스트 | md |
 | [docs/TESTING.md](docs/TESTING.md) | GhostFlow conformance and reliability testing | md |
 | [docs/TIME-AND-SCHEDULE-CONTRACT.ko.md](docs/TIME-AND-SCHEDULE-CONTRACT.ko.md) | 시간과 Schedule 계약 제안 | md |
@@ -203,6 +214,13 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/WASM-CI-ARTIFACTS.md](docs/WASM-CI-ARTIFACTS.md) | Revision-addressed GhostFlow WASM CI artifacts | md |
 | [docs/WHAT-IF-REPLAY.ko.md](docs/WHAT-IF-REPLAY.ko.md) | 제한된 what-if 재생 | md |
 | [docs/WHAT-IF-REPLAY.md](docs/WHAT-IF-REPLAY.md) | Bounded what-if replay | md |
+
+## docs/historical/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/historical/2026-10-05-input-531-book-excerpts.ko.md](docs/historical/2026-10-05-input-531-book-excerpts.ko.md) | 명시적 입력 품질 개정 전 E01·E03 원래 코드 | md |
+| [docs/historical/2026-10-05-input-531-book-excerpts.md](docs/historical/2026-10-05-input-531-book-excerpts.md) | Original E01 and E03 code before the explicit input-quality revision | md |
 
 ## docs/plans/
 
@@ -240,6 +258,9 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/reports/2026-09-24-issue-135-daily-slots-abi.md](docs/reports/2026-09-24-issue-135-daily-slots-abi.md) | Literal DailySlots execution ABI — 2026-09-24 | md |
 | [docs/reports/2026-09-24-range-cancel-acceptance.md](docs/reports/2026-09-24-range-cancel-acceptance.md) | Range `cancel_when` compiler acceptance — 2026-09-24 | md |
 | [docs/reports/2026-09-24-reference-execution-support-audit.md](docs/reports/2026-09-24-reference-execution-support-audit.md) | Reference execution and support audit — 2026-09-24 | md |
+| [docs/reports/2026-10-03-stale-branch-reconciliation.md](docs/reports/2026-10-03-stale-branch-reconciliation.md) | Stale branch reconciliation — 2026-10-03 | md |
+| [docs/reports/2026-10-05-input-531-consumer-gates.md](docs/reports/2026-10-05-input-531-consumer-gates.md) | Issue 531 independent review and consumer adoption gates | md |
+| [docs/reports/2026-10-05-input-531-integration.md](docs/reports/2026-10-05-input-531-integration.md) | Issue 531 integration checkpoint and consumer handoff | md |
 
 ## docs/research/
 
@@ -292,6 +313,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [examples/station-rules.ghost.md](examples/station-rules.ghost.md) | Shared station policy | md |
 | [examples/vfd-speed.ghost.ko.md](examples/vfd-speed.ghost.ko.md) | vfd-speed.ghost.ko.md | md |
 | [examples/vfd-speed.ghost.md](examples/vfd-speed.ghost.md) | vfd-speed.ghost.md | md |
+| [examples/vfd-speed.input-v1.ghost.ko.md](examples/vfd-speed.input-v1.ghost.ko.md) | VFD 속도 — 명시적 input revision | md |
+| [examples/vfd-speed.input-v1.ghost.md](examples/vfd-speed.input-v1.ghost.md) | VFD speed — explicit input revision | md |
 
 ## examples/authoring/
 
@@ -355,6 +378,16 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [examples/programming-book-imports/E21.ghost.md](examples/programming-book-imports/E21.ghost.md) | E21.ghost.md | md |
 | [examples/programming-book-imports/E22.ghost.md](examples/programming-book-imports/E22.ghost.md) | E22.ghost.md | md |
 | [examples/programming-book-imports/E31.ghost.md](examples/programming-book-imports/E31.ghost.md) | E31.ghost.md | md |
+
+## examples/programming-book-imports-input-v1/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [examples/programming-book-imports-input-v1/E19.ghost.md](examples/programming-book-imports-input-v1/E19.ghost.md) | E19.ghost.md | md |
+| [examples/programming-book-imports-input-v1/E20.ghost.md](examples/programming-book-imports-input-v1/E20.ghost.md) | E20.ghost.md | md |
+| [examples/programming-book-imports-input-v1/E21.ghost.md](examples/programming-book-imports-input-v1/E21.ghost.md) | E21.ghost.md | md |
+| [examples/programming-book-imports-input-v1/E22.ghost.md](examples/programming-book-imports-input-v1/E22.ghost.md) | E22.ghost.md | md |
+| [examples/programming-book-imports-input-v1/E31.ghost.md](examples/programming-book-imports-input-v1/E31.ghost.md) | E31.ghost.md | md |
 
 ## examples/tutorial/
 
@@ -450,19 +483,28 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | Path | Title | Type |
 | --- | --- | --- |
 | [tests/fixtures/after-event-evidence.ghost.md](tests/fixtures/after-event-evidence.ghost.md) | Evidence after event | md |
+| [tests/fixtures/after-event-evidence.input-v1.ghost.md](tests/fixtures/after-event-evidence.input-v1.ghost.md) | Evidence after event | md |
+| [tests/fixtures/exact-counter.input-v1.ghost.md](tests/fixtures/exact-counter.input-v1.ghost.md) | Exact counter interaction input-v1 fixture | md |
+| [tests/fixtures/explanation-short-circuit.ghost.md](tests/fixtures/explanation-short-circuit.ghost.md) | Preserve the executed Boolean proof path | md |
+| [tests/fixtures/gfb1-golden-input-v1.ghost.md](tests/fixtures/gfb1-golden-input-v1.ghost.md) | Explicit quality-input golden revision | md |
 | [tests/fixtures/gfb1-golden-v1.ghost.md](tests/fixtures/gfb1-golden-v1.ghost.md) | GFB1 version 1 golden vector | md |
+| [tests/fixtures/gfb2-int-golden-input-v1.ghost.md](tests/fixtures/gfb2-int-golden-input-v1.ghost.md) | Explicit exact-integer quality-input revision | md |
 | [tests/fixtures/gfb2-int-golden-v1.ghost.md](tests/fixtures/gfb2-int-golden-v1.ghost.md) | Exact integer GFB vector | md |
 | [tests/fixtures/issue-145-solar-config.ghost.md](tests/fixtures/issue-145-solar-config.ghost.md) | Solar settings transaction fixture | md |
+| [tests/fixtures/issue-145-solar-config.input-v1.ghost.md](tests/fixtures/issue-145-solar-config.input-v1.ghost.md) | Solar settings transaction fixture | md |
 | [tests/fixtures/issue-90-readonly-settings.ghost.md](tests/fixtures/issue-90-readonly-settings.ghost.md) | Read-only settings producer | md |
 | [tests/fixtures/issue-90-settings-periodic.ghost.md](tests/fixtures/issue-90-settings-periodic.ghost.md) | Live settings stream | md |
 | [tests/fixtures/issue-93-quantities.ghost.md](tests/fixtures/issue-93-quantities.ghost.md) | Quantity execution parity fixture | md |
+| [tests/fixtures/issue-93-quantities.input-v1.ghost.md](tests/fixtures/issue-93-quantities.input-v1.ghost.md) | Quantity execution parity fixture | md |
 | [tests/fixtures/true-for-certified.ghost.md](tests/fixtures/true-for-certified.ghost.md) | Certified hot interval | md |
+| [tests/fixtures/true-for-certified.input-v1.ghost.md](tests/fixtures/true-for-certified.input-v1.ghost.md) | Certified hot interval | md |
 
 ## tests/fixtures/contribution-134/
 
 | Path | Title | Type |
 | --- | --- | --- |
 | [tests/fixtures/contribution-134/numeric-threshold.ghost.md](tests/fixtures/contribution-134/numeric-threshold.ghost.md) | Numeric moisture threshold to virtual relay 1 | md |
+| [tests/fixtures/contribution-134/numeric-threshold.input-v1.ghost.md](tests/fixtures/contribution-134/numeric-threshold.input-v1.ghost.md) | Numeric moisture threshold to virtual relay 1 | md |
 
 ## tests/reference/
 
@@ -475,4 +517,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-355 documents.
+387 documents.

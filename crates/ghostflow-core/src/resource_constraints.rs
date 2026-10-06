@@ -190,16 +190,32 @@ pub(crate) struct Plan {
     descriptor_hash: String,
     outputs: BTreeMap<String, String>,
     modes: BTreeMap<String, String>,
+    mode_quality: BTreeMap<String, String>,
     groups: Vec<Group>,
     ids: BTreeSet<String>,
 }
 impl Plan {
     pub(crate) fn read(r: &mut Reader<'_>, m: &Module) -> Result<Self> {
         if !matches!(m.format_version, 1 | 3)
-            || m.inputs
-                .iter()
-                .chain(m.states.iter())
-                .any(|f| f.value_type != Type::Bool)
+            || m.inputs.iter().any(|f| {
+                f.value_type != Type::Bool
+                    && !(f.value_type == Type::Number
+                        && f.name
+                            .strip_prefix("__gf_sensor_fault_")
+                            .is_some_and(|name| {
+                                [
+                                    format!("__gf_sensor_value_{name}"),
+                                    format!("__gf_sensor_ok_{name}"),
+                                ]
+                                .iter()
+                                .all(|rail| {
+                                    m.inputs.iter().any(|field| {
+                                        field.name == *rail && field.value_type == Type::Bool
+                                    })
+                                })
+                            }))
+            })
+            || m.states.iter().any(|f| f.value_type != Type::Bool)
             || m.strategies
                 .iter()
                 .flat_map(|s| &s.intents)
@@ -261,11 +277,25 @@ impl Plan {
             ));
         }
         let mut modes = BTreeMap::new();
+        let mut mode_quality = BTreeMap::new();
         let mut mode_ids = BTreeSet::new();
         for _ in 0..count(&mut b, true)? {
             let alias = string(&mut b)?;
             let input = string(&mut b)?;
             let id = string(&mut b)?;
+            if let Some(name) = input.strip_prefix("__gf_sensor_value_") {
+                let ok = format!("__gf_sensor_ok_{name}");
+                if !m
+                    .inputs
+                    .iter()
+                    .any(|field| field.name == ok && field.value_type == Type::Bool)
+                {
+                    return Err(Error::new(
+                        "resource mode requires matching Bool quality input",
+                    ));
+                }
+                mode_quality.insert(alias.clone(), ok);
+            }
             if !m
                 .inputs
                 .iter()
@@ -377,6 +407,7 @@ impl Plan {
             descriptor_hash,
             outputs,
             modes,
+            mode_quality,
             groups,
             ids,
         })
@@ -444,6 +475,15 @@ impl Guard {
         requested: &NamedValues,
         candidate: &NamedValues,
     ) -> Result<(Self, NamedValues, Vec<Observation>)> {
+        // Unknown producer data is not a Boolean admission permission. Reject
+        // before staging any lease, trip, rearm, state or output transition.
+        for (mode, ok) in &self.plan.mode_quality {
+            if inputs.get(ok) != Some(&Value::Bool(true)) {
+                return Err(Error::new(format!(
+                    "resource mode observation unavailable: {mode}"
+                )));
+            }
+        }
         let mut next = self.clone();
         let values: BTreeMap<String, bool> = self
             .plan
@@ -804,12 +844,31 @@ mod tests {
         safe: [bool; 2],
         predicate: Option<Vec<u8>>,
     ) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
+        packet_with_quality(exclusive, safe, predicate, None)
+    }
+    fn packet_with_quality(
+        exclusive: bool,
+        safe: [bool; 2],
+        predicate: Option<Vec<u8>>,
+        quality: Option<bool>,
+    ) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
         let mut inner = b"GFB1\x01\x00".to_vec();
         s(&mut inner, "finite-test");
         inner.extend(1u32.to_le_bytes());
-        inner.extend(4u16.to_le_bytes());
+        inner.extend(if quality == Some(true) { 5u16 } else { 4 }.to_le_bytes());
         for name in ["auto", "manual", "request", "valve"] {
-            s(&mut inner, name);
+            s(
+                &mut inner,
+                if name == "auto" && quality.is_some() {
+                    "__gf_sensor_value_auto"
+                } else {
+                    name
+                },
+            );
+            inner.push(1);
+        }
+        if quality == Some(true) {
+            s(&mut inner, "__gf_sensor_ok_auto");
             inner.push(1);
         }
         inner.extend(1u16.to_le_bytes());
@@ -847,7 +906,14 @@ mod tests {
         if exclusive {
             for name in ["auto", "manual"] {
                 s(&mut activation, &format!("rules/{name}"));
-                s(&mut activation, name);
+                s(
+                    &mut activation,
+                    if name == "auto" && quality.is_some() {
+                        "__gf_sensor_value_auto"
+                    } else {
+                        name
+                    },
+                );
                 s(&mut activation, &format!("stable-mode/{name}"));
             }
         }
@@ -1080,6 +1146,81 @@ mod tests {
         let good = driver.scan_with_resource_binding(frame, &scan).unwrap();
         assert_eq!(good.trace.safe_intents, vals(true, true));
         assert_eq!(good.trace.tick, 1);
+    }
+    #[test]
+    fn typed_mode_requires_matching_quality_and_failed_scan_preserves_atomic_retry() {
+        assert!(
+            Module::load(&packet_with_quality(true, [false, true], None, Some(false)).0)
+                .unwrap_err_message()
+                .contains("matching Bool quality input")
+        );
+        let (bytes, activation, scan) = packet_with_quality(true, [false, true], None, Some(true));
+        let mut runtime = Runtime::new(32);
+        runtime.install(Module::load(&bytes).unwrap(), false);
+        runtime
+            .activate_with_resource_binding(&activation, &ResourceBindingRegistry::new())
+            .unwrap();
+        let mut driver = runtime.into_scan_driver();
+        let frame = |scan_id, active, good| ScanFrameV1 {
+            scan_id,
+            logical_time_ms: scan_id,
+            inputs: [
+                ("__gf_sensor_value_auto", active),
+                ("manual", false),
+                ("request", active),
+                ("valve", true),
+                ("__gf_sensor_ok_auto", good),
+            ]
+            .into_iter()
+            .map(|(name, value)| ScanInput {
+                name: name.into(),
+                value: Value::Bool(value),
+            })
+            .collect(),
+        };
+        assert!(driver
+            .scan_with_resource_binding(frame(0, true, false), &scan)
+            .unwrap_err()
+            .message()
+            .contains("mode observation unavailable"));
+        assert!(driver.runtime().journal().is_empty());
+        assert_eq!(
+            driver.runtime().state("remembered"),
+            Some(Value::Bool(false))
+        );
+        assert_eq!(driver.next_scan_id(), Some(0));
+        assert_eq!(
+            driver
+                .scan_with_resource_binding(frame(0, false, true), &scan)
+                .unwrap()
+                .trace
+                .safe_intents,
+            vals(false, true)
+        );
+        assert_eq!(
+            driver
+                .scan_with_resource_binding(frame(1, true, true), &scan)
+                .unwrap()
+                .trace
+                .safe_intents,
+            vals(true, true)
+        );
+        let before = driver.runtime().journal().back().unwrap().to_json();
+        assert!(driver
+            .scan_with_resource_binding(frame(2, false, false), &scan)
+            .is_err());
+        assert_eq!(driver.runtime().journal().len(), 2);
+        assert_eq!(driver.runtime().journal().back().unwrap().to_json(), before);
+        assert_eq!(
+            driver.runtime().state("remembered"),
+            Some(Value::Bool(true))
+        );
+        assert_eq!(driver.next_scan_id(), Some(2));
+        let retried = driver
+            .scan_with_resource_binding(frame(2, true, true), &scan)
+            .unwrap();
+        assert_eq!(retried.trace.tick, 3);
+        assert_eq!(retried.trace.safe_intents, vals(true, true));
     }
     trait LoadError {
         fn unwrap_err_message(self) -> String;

@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+import { gunzipSync } from 'node:zlib';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
@@ -5,14 +7,21 @@ import { compileSource } from './helpers/literate-compile.mjs';
 import { extractLiterate } from '../tools/literate.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 import { observeRuntimeValues } from '../tools/source-trace.mjs';
-import { sensorFaultTimerSource, sensorFaultTimerScans } from './helpers/continuous-timer-vectors.mjs';
+import { sensorFaultTimerSource, sensorFaultTimerScans } from './helpers/continuous-timer-input-vectors.mjs';
+
+const preRecoveryBytes = fs.readFileSync(new URL('./fixtures/history/issue531/recovery-count-oracles.pre-fix.json', import.meta.url));
+assert.equal(createHash('sha256').update(preRecoveryBytes).digest('hex'), 'aaf889ffeb8f6e7bfb38db1d35b0678e0134397815364bf29fb54823f94b82fd');
+for (const original of JSON.parse(preRecoveryBytes).files) assert.equal(createHash('sha256').update(gunzipSync(Buffer.from(original.gzipBase64, 'base64'))).digest('hex'), original.sha256);
+
+// Producer observations exist only where the test supplies a value.
+const good = (nowMs, values) => Object.fromEntries(Object.entries(values).map(([name, value]) => [name, { epoch: 1, id: nowMs + 1, timestampMs: nowMs, quality: 'Good', value }]));
 
 const wasmPath = new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url);
 const wasmBytes = fs.readFileSync(wasmPath);
 const source = `
 control MoistureHost {
   input start: Bool;
-  sensor moisture: Percent {
+  input moisture: Percent {
     sample = 1s;
     valid = 0% .. 100%;
     filter = median(5);
@@ -22,7 +31,7 @@ control MoistureHost {
   signal dry = hysteresis(moisture, on_below: 30%, off_above: 35%, initial: false);
   let dry_ok = case dry { ok(value) => value; fault(_) => false; };
   output pump: Bool;
-  pump <- start && dry_ok;
+  pump <- (start |> recover(false)) && dry_ok;
 }
 `;
 
@@ -49,23 +58,23 @@ test('T01-FAULT: an explicit sensor fault branch resets continuous_true and reco
 async function artifact() { return compileSource(source, { filename: 'control-host.ghost' }); }
 async function host() { return ControlRuntime.instantiate(wasmBytes, await artifact()); }
 
-test('type-only inputs require host values and preserve initialized state and connected outputs', async () => {
+test('type-only acquisition preserves initialized state and connected outputs with explicit absence handling', async () => {
   const compiled = await compileSource(`control HostInputs {
     input request: Bool;
     state active: Bool = false;
-    active' = request;
+    active' = case request { ok(value) => value; fault(_) => active; };
     output previous, current: Bool;
     previous <- active;
     current <- active';
   }`, { filename: 'host-inputs.ghost' });
   const runtime = await ControlRuntime.instantiate(wasmBytes, compiled);
   try {
-    assert.throws(() => runtime.step({ nowMs: 0, inputs: {} }), /missing input/);
-    const on = runtime.step({ nowMs: 0, inputs: { request: true } });
+    assert.equal(runtime.step({ nowMs: 0 }).sensors.request.quality, 'NotReady');
+    const on = runtime.step({ nowMs: 0, samples: good(0, { request: true }) });
     assert.equal(on.vm.safe?.previous ?? on.vm.safeIntents?.previous, false);
     assert.equal(on.vm.safe?.current ?? on.vm.safeIntents?.current, true);
-    assert.throws(() => runtime.step({ nowMs: 1, inputs: {} }), /missing input/);
-    const off = runtime.step({ nowMs: 1, inputs: { request: false } });
+    assert.equal(runtime.step({ nowMs: 1 }).vm.safe.current, true, 'authored fault branch retains initialized state');
+    const off = runtime.step({ nowMs: 1, samples: good(1, { request: false }) });
     assert.equal(off.vm.safe?.previous ?? off.vm.safeIntents?.previous, true);
     assert.equal(off.vm.safe?.current ?? off.vm.safeIntents?.current, false);
   } finally { runtime.dispose(); }
@@ -80,30 +89,30 @@ const scheduledSource = extractLiterate(
 test('runs compiled control through real WASM with sensor fault/recovery and virtual output capability', async () => {
   const runtime = await host();
   try {
-    const missing = runtime.step({ nowMs: 0, inputs: { start: true } });
+    const missing = runtime.step({ nowMs: 0, samples: good(0, { start: true }) });
     assert.equal(missing.sensors.moisture.quality, 'NotReady');
     assert.equal(missing.signals.dry.value, false);
     for (const [id, value] of [[1, 28], [2, 29], [3, 90], [4, 28]]) {
-      const result = runtime.step({ nowMs: id * 1000, inputs: { start: true }, samples: { moisture: sample(id, value) } });
+      const result = runtime.step({ nowMs: id * 1000, samples: { ...good(id * 1000, { start: true }), moisture: sample(id, value) } });
       assert.equal(result.sensors.moisture.ok, false);
     }
-    const ready = runtime.step({ nowMs: 5000, inputs: { start: true }, samples: { moisture: sample(5, 29) } });
+    const ready = runtime.step({ nowMs: 5000, samples: { ...good(5000, { start: true }), moisture: sample(5, 29) } });
     assert.equal(ready.sensors.moisture.ok, true);
     assert.equal(ready.signals.dry.value, true);
     assert.equal(ready.vm.safe?.pump ?? ready.vm.safeIntents?.pump, true);
 
-    const fault = runtime.step({ nowMs: 6000, inputs: { start: true }, samples: { moisture: sample(6, 0, 'Disconnected') } });
+    const fault = runtime.step({ nowMs: 6000, samples: { ...good(6000, { start: true }), moisture: sample(6, 0, 'Disconnected') } });
     assert.equal(fault.sensors.moisture.quality, 'Disconnected');
     assert.equal(fault.signals.dry.value, false);
     for (const id of [7, 8, 9, 10]) {
-      const recovery = runtime.step({ nowMs: id * 1000, inputs: { start: true }, samples: { moisture: sample(id, 20) } });
+      const recovery = runtime.step({ nowMs: id * 1000, samples: { ...good(id * 1000, { start: true }), moisture: sample(id, 20) } });
       // Reference 4.2 requires a faulted sensor to expose NotReady while its
       // filter window and recover_after evidence are rebuilt.
       assert.equal(recovery.sensors.moisture.quality, 'NotReady');
       assert.equal(recovery.sensors.moisture.ok, false);
       assert.equal(recovery.signals.dry.value, false);
     }
-    const recovered = runtime.step({ nowMs: 11000, inputs: { start: true }, samples: { moisture: sample(11, 20) } });
+    const recovered = runtime.step({ nowMs: 11000, samples: { ...good(11000, { start: true }), moisture: sample(11, 20) } });
     assert.equal(recovered.sensors.moisture.quality, 'Good');
     assert.equal(recovered.signals.dry.value, true);
   } finally { runtime.dispose(); }
@@ -112,7 +121,7 @@ test('runs compiled control through real WASM with sensor fault/recovery and vir
 test('runs moving_average sensor filter through real WASM with full-window and sliding semantics', async () => {
   const compiled = await compileSource(`
 control MovingAverageHost {
-  sensor level: Number { filter = moving_average(4); }
+  input level: Number { filter = moving_average(4); }
   output ready: Bool;
   ready <- case level { ok(_) => true; fault(_) => false; };
 }
@@ -120,8 +129,8 @@ control MovingAverageHost {
   assert.equal(compiled.manifest.sensors[0].filter, 'moving_average');
   assert.equal(compiled.manifest.sensors[0].window, 4);
   const boundary = await compileSource(`control MovingAverageBounds {
-    sensor percent_one: Percent { filter = moving_average(1); }
-    sensor number_thirty_one: Number { filter = moving_average(31); }
+    input percent_one: Percent { filter = moving_average(1); }
+    input number_thirty_one: Number { filter = moving_average(31); }
   }`, { filename: 'moving-average-bounds.ghost' });
   assert.deepEqual(boundary.manifest.sensors.map(({ filter, window }) => ({ filter, window })), [
     { filter: 'moving_average', window: 1 },
@@ -156,11 +165,11 @@ control MovingAverageHost {
 test('runs EMA Number and Percent sensors through real WASM with seed, recurrence, duplicate, and recovery semantics', async () => {
   const compiled = await compileSource(`
 control EmaHost {
-  sensor level: Number {
+  input level: Number {
     filter = ema(alpha: 0.25);
     recover_after = 2 samples;
   }
-  sensor demand: Percent { filter = ema(alpha: 1.0); }
+  input demand: Percent { filter = ema(alpha: 1.0); }
   output level_ready, demand_ready: Bool;
   level_ready <- case level { ok(_) => true; fault(_) => false; };
   demand_ready <- case demand { ok(_) => true; fault(_) => false; };
@@ -181,8 +190,11 @@ control EmaHost {
     } });
     assert.deepEqual(
       { level: seeded.sensors.level.value, demand: seeded.sensors.demand.value },
-      { level: 8, demand: 40 },
+      { level: 0, demand: 40 },
     );
+
+    assert.deepEqual(seeded.sensors.level, { ok: false, value: 0, quality: 'NotReady' });
+    assert.equal(seeded.vm.safe.level_ready, false);
 
     const recurrence = runtime.step({ nowMs: 2000, samples: {
       level: sample(2, 16), demand: sample(2, 50),
@@ -192,6 +204,9 @@ control EmaHost {
       { level: 10, demand: 50 },
     );
 
+    assert.equal(recurrence.sensors.level.quality, 'Good');
+    assert.equal(recurrence.vm.safe.level_ready, true);
+    // 0.25*16 + 0.75*8 independently proves the withheld first seed was retained.
     const duplicate = runtime.step({ nowMs: 2001, samples: { level: sample(2, 100) } });
     assert.equal(duplicate.sensors.level.value, 10);
 
@@ -209,8 +224,8 @@ control EmaHost {
 test('computes EMA with the specified weighted formula without overflowing finite opposite-sign samples', async () => {
   const compiled = await compileSource(`
 control EmaFiniteExtremes {
-  sensor latest: Number { filter = ema(alpha: 1.0); }
-  sensor midpoint: Number { filter = ema(alpha: 0.5); }
+  input latest: Number { filter = ema(alpha: 1.0); }
+  input midpoint: Number { filter = ema(alpha: 0.5); }
 }
 `, { filename: 'ema-finite-extremes.ghost' });
   const runtime = await ControlRuntime.instantiate(wasmBytes, compiled);
@@ -238,19 +253,19 @@ test('rejects invalid EMA source payloads and alpha forms', async () => {
     () => compileSource(`control InvalidEma { ${body} }`, { filename: 'invalid-ema.ghost' }),
     diagnostic,
   );
-  await rejectsEma('sensor flag: Bool { filter = ema(alpha: 0.5); }', /numeric filtering|Number or Percent/);
-  await rejectsEma('input factor: Number; sensor value: Number { filter = ema(alpha: factor); }', /ema alpha.*constant Number/);
-  await rejectsEma('sensor value: Number { filter = ema(); }', /ema.*alpha/);
-  await rejectsEma('sensor value: Number { filter = ema(alpha: 0.5, window: 2); }', /ema.*alpha/);
-  await rejectsEma('sensor value: Number { filter = ema(0.5); }', /ema.*alpha/);
-  await rejectsEma('sensor value: Number { filter = ema(alpha: 0.0); }', /ema alpha.*\(0, 1\]/);
-  await rejectsEma('sensor value: Number { filter = ema(alpha: 1.0001); }', /ema alpha.*\(0, 1\]/);
-  await rejectsEma('sensor value: Number { filter = ema(alpha: 1e309); }', /finite|ema alpha/);
+  await rejectsEma('input flag: Bool { filter = ema(alpha: 0.5); }', /numeric filtering|Number or Percent/);
+  await rejectsEma('input factor: Number; input value: Number { filter = ema(alpha: factor); }', /ema alpha.*constant Number/);
+  await rejectsEma('input value: Number { filter = ema(); }', /ema.*alpha/);
+  await rejectsEma('input value: Number { filter = ema(alpha: 0.5, window: 2); }', /ema.*alpha/);
+  await rejectsEma('input value: Number { filter = ema(0.5); }', /ema.*alpha/);
+  await rejectsEma('input value: Number { filter = ema(alpha: 0.0); }', /ema alpha.*\(0, 1\]/);
+  await rejectsEma('input value: Number { filter = ema(alpha: 1.0001); }', /ema alpha.*\(0, 1\]/);
+  await rejectsEma('input value: Number { filter = ema(alpha: 1e309); }', /finite|ema alpha/);
 });
 
 test('strictly validates canonical EMA manifest alpha metadata', async () => {
-  const ema = await compileSource('control EmaManifest { sensor value: Number { filter = ema(alpha: 0.5); } }', { filename: 'ema-manifest.ghost' });
-  const moving = await compileSource('control MovingManifest { sensor value: Number { filter = moving_average(3); } }', { filename: 'moving-manifest.ghost' });
+  const ema = await compileSource('control EmaManifest { input value: Number { filter = ema(alpha: 0.5); } }', { filename: 'ema-manifest.ghost' });
+  const moving = await compileSource('control MovingManifest { input value: Number { filter = moving_average(3); } }', { filename: 'moving-manifest.ghost' });
   const mutateSensor = (compiled, mutate) => {
     const sensor = { ...compiled.manifest.sensors[0] };
     mutate(sensor);
@@ -263,15 +278,15 @@ test('strictly validates canonical EMA manifest alpha metadata', async () => {
     await assert.rejects(() => ControlRuntime.instantiate(wasmBytes, mutateSensor(ema, sensor => { sensor.alpha = alpha; })), /alpha/);
   }
   await assert.rejects(() => ControlRuntime.instantiate(wasmBytes, mutateSensor(ema, sensor => { sensor.window = 2; })), /ema.*window.*1/);
-  await assert.rejects(() => ControlRuntime.instantiate(wasmBytes, mutateSensor(ema, sensor => { sensor.type = 'Bool'; })), /ema.*numeric payload/);
+  await assert.rejects(() => ControlRuntime.instantiate(wasmBytes, mutateSensor(ema, sensor => { sensor.type = 'Bool'; })), /filtering requires an approximate numeric payload/);
 });
 
 test('rejects clock reversal and does not return a stale trace as a new step', async () => {
   const runtime = await host();
   try {
-    const first = runtime.step({ nowMs: 100, inputs: { start: false } });
+    const first = runtime.step({ nowMs: 100, samples: good(100, { start: false }) });
     assert.equal(first.vm.tick, 1);
-    assert.throws(() => runtime.step({ nowMs: 99, inputs: { start: false } }), /monotonic/);
+    assert.throws(() => runtime.step({ nowMs: 99, samples: good(99, { start: false }) }), /monotonic/);
   } finally { runtime.dispose(); }
 });
 
@@ -327,15 +342,15 @@ test('deep-copies and freezes the validated manifest', async () => {
   const compiled = await artifact();
   const runtime = await ControlRuntime.instantiate(wasmBytes, compiled);
   try {
-    compiled.manifest.inputs[0].name = 'mutated_after_validation';
-    compiled.manifest.sensors[0].validMin = 99;
+    compiled.manifest.sensors[0].name = 'mutated_after_validation';
+    compiled.manifest.sensors[1].validMin = 99;
     compiled.manifest.sensors.push({ name: 'mutated', type: 'Number' });
     assert.equal(Object.isFrozen(runtime.manifest), true);
     assert.equal(Object.isFrozen(runtime.manifest.sensors[0]), true);
-    const result = runtime.step({ nowMs: 0, inputs: { start: false } });
-    assert.equal(result.vm.inputs.start, false);
-    assert.equal(runtime.manifest.inputs[0].name, 'start');
-    assert.equal(runtime.manifest.sensors[0].validMin, 0);
+    const result = runtime.step({ nowMs: 0, samples: good(0, { start: false }) });
+    assert.equal(result.vm.inputs.__gf_sensor_value_start, false);
+    assert.equal(runtime.manifest.sensors[0].name, 'start');
+    assert.equal(runtime.manifest.sensors[1].validMin, 0);
   } finally { runtime.dispose(); }
 });
 
@@ -356,7 +371,7 @@ test('freezes nested stream settings and preserves the bytecode hash boundary', 
 test('routes non-finite and finite out-of-range numeric sensor payloads to core Invalid', async () => {
   const runtime = await host();
   try {
-    const invalid = runtime.step({ nowMs: 1000, inputs: { start: true }, samples: {
+    const invalid = runtime.step({ nowMs: 1000, samples: { ...good(1000, { start: true }),
       moisture: { epoch: 1, id: 1, timestampMs: 1000, value: Number.NaN, quality: 'Good' },
     } });
     assert.equal(invalid.sensors.moisture.ok, false);
@@ -366,7 +381,7 @@ test('routes non-finite and finite out-of-range numeric sensor payloads to core 
     assert.equal(invalid.vm.inputs.__gf_sensor_value_moisture, 0);
     assert.equal(invalid.vm.inputs.__gf_sensor_ok_moisture, false);
 
-    const outOfRange = runtime.step({ nowMs: 2000, inputs: { start: true }, samples: {
+    const outOfRange = runtime.step({ nowMs: 2000, samples: { ...good(2000, { start: true }),
       moisture: { epoch: 1, id: 2, timestampMs: 2000, value: 101, quality: 'Good' },
     } });
     assert.equal(outOfRange.sensors.moisture.quality, 'Invalid');
@@ -375,17 +390,20 @@ test('routes non-finite and finite out-of-range numeric sensor payloads to core 
   } finally { runtime.dispose(); }
 });
 
-test('keeps typed Percent inputs strict while sensor Percent payloads remain fallible', async () => {
+test('canonical Percent input keeps invalid payloads on the explicit fault rail', async () => {
   const compiled = await compileSource(`
 control PercentInputHost {
   input level: Percent;
   output pump: Bool;
-  pump <- level > 50%;
+  pump <- case level { ok(value) => value > 50%; fault(_) => false; };
 }
 `, { filename: 'percent-input-host.ghost' });
   const runtime = await ControlRuntime.instantiate(wasmBytes, compiled);
   try {
-    assert.throws(() => runtime.step({ nowMs: 0, inputs: { level: 101 } }), /in \[0, 100\]/);
+    const invalid = runtime.step({ nowMs: 0, samples: good(0, { level: 101 }) });
+    assert.equal(invalid.sensors.level.quality, 'Invalid');
+    assert.equal(invalid.vm.safe.pump, false);
+    assert.throws(() => runtime.step({ nowMs: 1, samples: good(1, { level: '101' }) }), /must be numeric/);
   } finally { runtime.dispose(); }
 });
 
@@ -396,13 +414,13 @@ test('rejects compiler recovery range beyond the fixed core profile', async () =
   );
 });
 
-test('rejects unknown names, missing inputs, and invalid sample schema', async () => {
+test('rejects unknown names and invalid sample schema while absence remains NotReady', async () => {
   const runtime = await host();
   try {
-    assert.throws(() => runtime.step({ nowMs: 0, inputs: {} }), /missing input/);
-    assert.throws(() => runtime.step({ nowMs: 0, inputs: { start: false, extra: true } }), /unknown input/);
-    assert.throws(() => runtime.step({ nowMs: 0, inputs: { start: false }, samples: { moisture: { epoch: -1, id: 1, timestampMs: 0, value: 20, quality: 'Good' } } }), /safe integer/);
-    assert.throws(() => runtime.step({ nowMs: 0, inputs: { start: false }, samples: { moisture: { epoch: 1, id: 1, timestampMs: 0, value: 20, quality: 'Noise' } } }), /unsupported/);
+    assert.equal(runtime.step({ nowMs: 0 }).sensors.start.quality, 'NotReady');
+    assert.throws(() => runtime.step({ nowMs: 0, inputs: { extra: true } }), /unknown input/);
+    assert.throws(() => runtime.step({ nowMs: 0, samples: { ...good(0, { start: false }), moisture: { epoch: -1, id: 1, timestampMs: 0, value: 20, quality: 'Good' } } }), /safe integer/);
+    assert.throws(() => runtime.step({ nowMs: 0, samples: { ...good(0, { start: false }), moisture: { epoch: 1, id: 1, timestampMs: 0, value: 20, quality: 'Noise' } } }), /unsupported/);
   } finally { runtime.dispose(); }
 });
 

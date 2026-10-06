@@ -1,0 +1,9 @@
+{
+  "baseline": "c8a5d37ac09230a9011291a3ae3b053d1bc22773",
+  "originalFile": "tests/reference/cases/02-time-control.json",
+  "caseId": "REF-04-035",
+  "filename": "capability-strategies.ghost.md",
+  "sourceSha256": "4346f2c108e1a0f0ecef5e37b093bcbf9736cb822069f640b8bfad9a302c1b4e",
+  "source": "# Capability strategies\n\n```ghost\ncontrol CapabilityStrategies {\n  sensor moisture?: Percent;\n  input scheduled: Bool;\n  output pump: Bool;\n  adapt irrigation_policy {\n    strategy WithMoisture priority 100 match (moisture: sensor<Percent>) {\n      let request = case moisture { ok(value) => scheduled && value < 30%; fault(_) => false; };\n      pump <- request;\n    }\n    strategy Baseline priority 0 match always { pump <- scheduled; }\n  }\n}\n```\n",
+  "newRevision": "capability-strategies-input-v2.ghost.md"
+}

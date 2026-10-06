@@ -1,3 +1,4 @@
+import { softwareQualityRails } from './helpers/software-quality-observations.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -10,8 +11,8 @@ import { compileSource, restoreArtifactSourceMap, writeArtifact } from '../tools
 import { emitCompletedScanSnapshot, prepareCompletedScanSnapshot } from '../tools/interaction-runtime-snapshot.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
-const sourcePath = 'contracts/interaction-v0/examples/exact-counter.ghost.md';
-const identity = { documentId: 'source.fixture-exact-counter', revisionId: 'revision.fixture-exact-counter-v0' };
+const sourcePath = 'tests/fixtures/exact-counter.input-v1.ghost.md';
+const identity = { documentId: 'source.fixture-exact-counter', revisionId: 'revision.fixture-exact-counter-input-v1' };
 const read = relative => fs.readFileSync(path.join(root, relative), 'utf8');
 
 async function compileFixture() {
@@ -67,7 +68,7 @@ test('GF-TEST-interaction-counter-runtime: completed WASM scans project every i3
     const outcome = runtime.scan({
       scanId,
       logicalTimeMs: scanId,
-      inputs: [{ name: 'selected', type: 'Int', value }],
+      inputs: Object.entries(softwareQualityRails(artifact, { selected: value })).map(([name, value]) => ({ name, type: name === artifact.manifest.sensors[0].valueInput ? 'Int' : typeof value === 'boolean' ? 'Bool' : 'Number', value })),
     });
     const snapshot = emitCompletedScanSnapshot({
       compilation: artifact,

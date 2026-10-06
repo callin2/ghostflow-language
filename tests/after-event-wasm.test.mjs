@@ -12,7 +12,7 @@ const predicate = (atMs, quality = 'measured') => ({ sourceTag: 22, atMs, value:
 const create = () => AfterEventRuntime.instantiate(wasm(), { windowMs: 10, eventSourceTag: 11, predicateSourceTag: 22 });
 
 test('canonical source binds event identity and predicate without choosing a scalar result', async () => {
-  const filename = 'after-event-evidence.ghost.md';
+  const filename = 'after-event-evidence.input-v1.ghost.md';
   const source = fs.readFileSync(new URL(`./fixtures/${filename}`, import.meta.url), 'utf8');
   const runtime = await AfterEventRuntime.instantiateSource(wasm(), source, { filename, signal: 'opened' });
   try {
@@ -43,7 +43,7 @@ test('canonical source binds event identity and predicate without choosing a sca
 });
 
 test('source binding requires an explicit existing after_event site and canonical literate source', async () => {
-  const filename = 'after-event-evidence.ghost.md';
+  const filename = 'after-event-evidence.input-v1.ghost.md';
   const source = fs.readFileSync(new URL(`./fixtures/${filename}`, import.meta.url), 'utf8');
   await assert.rejects(() => AfterEventRuntime.instantiateSource(wasm(), source), /signal name is required/);
   for (const signal of ['missing', 'valve_open']) {

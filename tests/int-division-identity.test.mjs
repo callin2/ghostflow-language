@@ -4,11 +4,13 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
+import { softwareQualityAbi, softwareQualityRails, softwareQualityCsv } from './helpers/software-quality-observations.mjs';
 import { compileSource } from '../tools/toolchain.mjs';
 import { GhostFlowRuntime } from '../runtimes/wasm/ghostflow-runtime.mjs';
 
-const root = path.resolve(new URL('../', import.meta.url).pathname);
-const nativePath = path.join(root, 'target/release/examples/run');
+const root = fileURLToPath(new URL('../', import.meta.url));
+const nativePath = path.join(root, `target/release/examples/run${process.platform === 'win32' ? '.exe' : ''}`);
 const wasmPath = path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm');
 const MIN = -2_147_483_648;
 const MAX = 2_147_483_647;
@@ -20,9 +22,14 @@ const source = `# Integer division identity
 \`\`\`ghost
 control IntegerDivisionIdentity {
   input a, b: Int;
+  state retained_a: Int = 0;
+  state retained_b: Int = 1;
+  let scalar_a = case a { ok(value) => value; fault(_) => retained_a; };
+  let scalar_b = case b { ok(value) => value; fault(_) => retained_b; };
+  retained_a' = scalar_a; retained_b' = scalar_b;
   output quotient, remainder: Int;
-  quotient <- a div b;
-  remainder <- a % b;
+  quotient <- scalar_a div scalar_b;
+  remainder <- scalar_a % scalar_b;
 }
 \`\`\`
 `;
@@ -40,13 +47,14 @@ test('REF-01-063 native and WASM signed division preserve quotient/remainder ide
   const modulePath = path.join(temporary, 'identity.gfb');
   const inputPath = path.join(temporary, 'identity.csv');
   fs.writeFileSync(modulePath, artifact.bytes);
-  fs.writeFileSync(inputPath, `a,b\n${pairs.map(([a, b]) => `${a},${b}`).join('\n')}\n`);
+  fs.writeFileSync(inputPath, softwareQualityCsv(artifact, pairs.map(([a, b]) => ({ a, b }))));
   const native = execFileSync(nativePath, [modulePath, inputPath, '--outcomes'], { encoding: 'utf8' })
     .trim().split('\n').map(line => JSON.parse(line));
   assert.equal(native.length, pairs.length);
   const runtime = await GhostFlowRuntime.instantiate(fs.readFileSync(wasmPath));
   t.after(() => runtime.dispose());
   runtime.load(artifact.bytes);
+  softwareQualityAbi(runtime, artifact);
   runtime.addCapability('actuator', 'quotient', 'int');
   runtime.addCapability('actuator', 'remainder', 'int');
   runtime.activate();

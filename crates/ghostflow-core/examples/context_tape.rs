@@ -69,6 +69,7 @@ fn settings_event(value: &Json) -> Result<Option<SettingsEvent>> {
     let origin = match text(&value["origin"])? {
         "operatorEdit" => SettingsOrigin::OperatorEdit,
         "producerObservation" => SettingsOrigin::ProducerObservation,
+        "temporaryReturn" => SettingsOrigin::TemporaryReturn,
         _ => return Err("invalid settings origin".into()),
     };
     let mut changes = Vec::new();
@@ -220,7 +221,7 @@ fn solar_evidence(value: &Json) -> Result<SolarContextEvidence> {
     })
 }
 
-fn calendar_binding(value: &Json) -> Result<ProviderBinding> {
+fn provider_binding(value: &Json) -> Result<ProviderBinding> {
     fields(
         value,
         &[
@@ -235,12 +236,14 @@ fn calendar_binding(value: &Json) -> Result<ProviderBinding> {
             "maxUncertaintyMs",
         ],
     )?;
-    if value["kind"] != "calendar" {
-        return Err("calendar tape requires calendar bindings".into());
-    }
+    let kind = match text(&value["kind"])? {
+        "tide" => 0,
+        "calendar" => 2,
+        _ => return Err("invalid provider binding kind".into()),
+    };
     Ok(ProviderBinding {
         provider: text(&value["provider"])?.into(),
-        kind: 2,
+        kind,
         namespace: text(&value["namespace"])?.into(),
         station: text(&value["station"])?.into(),
         binding_revision: text(&value["bindingRevision"])?.into(),
@@ -248,6 +251,48 @@ fn calendar_binding(value: &Json) -> Result<ProviderBinding> {
         timezone: text(&value["timezone"])?.into(),
         criteria: text(&value["criteria"])?.into(),
         max_uncertainty_ms: integer(&value["maxUncertaintyMs"])?,
+    })
+}
+
+fn calendar_binding(value: &Json) -> Result<ProviderBinding> {
+    let binding = provider_binding(value)?;
+    if binding.kind != 2 {
+        return Err("calendar tape requires calendar bindings".into());
+    }
+    Ok(binding)
+}
+
+fn provider_observation(value: &Json) -> Result<ghostflow_core::context_vm::ProviderObservation> {
+    fields(
+        value,
+        &[
+            "binding",
+            "providerRevision",
+            "coverageStartMs",
+            "coverageEndMs",
+            "expiresAtMs",
+            "uncertaintyMs",
+            "fault",
+            "classifications",
+        ],
+    )?;
+    let classifications = array(&value["classifications"], 8)?
+        .iter()
+        .map(|entry| Ok(text(entry)?.to_owned()))
+        .collect::<Result<Vec<_>>>()?;
+    Ok(ghostflow_core::context_vm::ProviderObservation {
+        binding: provider_binding(&value["binding"])?,
+        provider_revision: text(&value["providerRevision"])?.into(),
+        coverage_start_ms: integer(&value["coverageStartMs"])?,
+        coverage_end_ms: integer(&value["coverageEndMs"])?,
+        expires_at_ms: integer(&value["expiresAtMs"])?,
+        uncertainty_ms: integer(&value["uncertaintyMs"])?,
+        fault: if value["fault"].is_null() {
+            None
+        } else {
+            Some(u8::try_from(integer(&value["fault"])?)?)
+        },
+        classifications,
     })
 }
 
@@ -325,8 +370,10 @@ fn main() -> Result<()> {
     let settings_periodic_profile = tape["profile"] == "context-settings-periodic-v1";
     let civil_profile =
         tape["profile"] == "context-civil-v1" || tape["profile"] == "context-settings-civil-v1";
-    let calendar_profile = tape["profile"] == "context-calendar-v1";
-    if civil_profile || calendar_profile || settings_periodic_profile {
+    let calendar_profile = tape["profile"] == "context-calendar-v1"
+        || tape["profile"] == "context-settings-calendar-v1";
+    let tide_profile = tape["profile"] == "context-tide-v1";
+    if civil_profile || calendar_profile || settings_periodic_profile || tide_profile {
         fields(&tape, &["profile", "activation", "steps", "checkpoint"])?;
         fields(
             &tape["activation"],
@@ -336,16 +383,29 @@ fn main() -> Result<()> {
     let settings_profile = tape["profile"] == "context-settings-v1"
         || settings_periodic_profile
         || tape["profile"] == "context-settings-civil-v1"
+        || tape["profile"] == "context-settings-calendar-v1"
         || solar_profile;
     if !settings_profile
         && !civil_profile
         && !calendar_profile
+        && !tide_profile
         && tape["profile"] != "context-periodic-v1"
     {
         return Err("unsupported context tape profile".into());
     }
     let activation = &tape["activation"];
-    let bindings = if calendar_profile {
+    let bindings = if tide_profile {
+        array(&activation["bindings"], 128)?
+            .iter()
+            .map(|value| {
+                let binding = provider_binding(value)?;
+                if binding.kind != 0 {
+                    return Err("tide tape requires tide bindings".into());
+                }
+                Ok(binding)
+            })
+            .collect::<Result<Vec<_>>>()?
+    } else if calendar_profile {
         array(&activation["bindings"], 128)?
             .iter()
             .map(calendar_binding)
@@ -366,7 +426,9 @@ fn main() -> Result<()> {
         terminal_capacity: usize::try_from(integer(&activation["terminalCapacity"])?)?,
         bindings,
     })?;
-    if (civil_profile || calendar_profile || settings_profile) && !tape["checkpoint"].is_null() {
+    if (civil_profile || calendar_profile || settings_profile || tide_profile)
+        && !tape["checkpoint"].is_null()
+    {
         let encoded = tape["checkpoint"]
             .as_str()
             .ok_or("invalid checkpoint hex")?;
@@ -399,7 +461,7 @@ fn main() -> Result<()> {
             if !array(&step["natural"], 0)?.is_empty() {
                 return Err("Solar tape cannot supply natural providers".into());
             }
-        } else if civil_profile || calendar_profile || settings_periodic_profile {
+        } else if civil_profile || calendar_profile || settings_periodic_profile || tide_profile {
             fields(
                 step,
                 &[
@@ -443,20 +505,21 @@ fn main() -> Result<()> {
         }
         let mut schedules = Vec::new();
         for schedule in array(&step["schedules"], 128)? {
-            if !schedule["provider"].is_null()
+            if (!tide_profile && !schedule["provider"].is_null())
                 || (!calendar_profile && !schedule["calendar"].is_null())
-                || (!(civil_profile || calendar_profile)
+                || (!(civil_profile || calendar_profile || tide_profile)
                     && !array(&schedule["rows"], 0)?.is_empty())
             {
                 return Err(
                     "Periodic tape cannot supply providers, calendars or occurrence rows".into(),
                 );
             }
-            if settings_profile && !civil_profile && !settings_periodic_profile {
+            if settings_profile && !civil_profile && !settings_periodic_profile && !calendar_profile
+            {
                 return Err("settings tape cannot supply schedules".into());
             }
             let mut rows = Vec::new();
-            if civil_profile || calendar_profile || settings_periodic_profile {
+            if civil_profile || calendar_profile || settings_periodic_profile || tide_profile {
                 fields(
                     schedule,
                     &[
@@ -484,7 +547,15 @@ fn main() -> Result<()> {
                             "contextRevision",
                         ],
                     )?;
-                    if row["eventKind"] != "civil" || row["eventId"] != "" {
+                    if tide_profile {
+                        if !matches!(text(&row["eventKind"])?, "high" | "low")
+                            || text(&row["eventId"])?.is_empty()
+                        {
+                            return Err(
+                                "tide tape requires stable natural occurrence identities".into()
+                            );
+                        }
+                    } else if row["eventKind"] != "civil" || row["eventId"] != "" {
                         return Err("civil tape cannot supply natural occurrence identities".into());
                     }
                     rows.push(Occurrence {
@@ -492,8 +563,20 @@ fn main() -> Result<()> {
                         slot_key: integer(&row["slotKey"])?,
                         minute_of_day: u16::try_from(integer(&row["minuteOfDay"])?)?,
                         fold: u8::try_from(integer(&row["fold"])?)?,
-                        event_id: String::new(),
-                        event_kind: 0,
+                        event_id: if tide_profile {
+                            text(&row["eventId"])?.into()
+                        } else {
+                            String::new()
+                        },
+                        event_kind: if tide_profile {
+                            if text(&row["eventKind"])? == "high" {
+                                1
+                            } else {
+                                2
+                            }
+                        } else {
+                            0
+                        },
                         instant_ms: optional(&row["instantMs"])?,
                         withdrawn: row["withdrawn"].as_bool().ok_or("invalid withdrawn flag")?,
                         provider_revision: text(&row["providerRevision"])?.into(),
@@ -505,7 +588,11 @@ fn main() -> Result<()> {
                 site: u32::try_from(integer(&schedule["site"])?)?,
                 coverage_start_ms: integer(&schedule["coverageStartMs"])?,
                 coverage_end_ms: integer(&schedule["coverageEndMs"])?,
-                provider: None,
+                provider: if tide_profile && !schedule["provider"].is_null() {
+                    Some(provider_observation(&schedule["provider"])?)
+                } else {
+                    None
+                },
                 calendar: if calendar_profile {
                     calendar_snapshot(&schedule["calendar"])?
                 } else {
@@ -515,7 +602,7 @@ fn main() -> Result<()> {
             });
         }
         let clock = &step["clock"];
-        if civil_profile || calendar_profile {
+        if civil_profile || calendar_profile || tide_profile {
             fields(
                 clock,
                 &[
@@ -576,7 +663,7 @@ fn main() -> Result<()> {
                 ..Default::default()
             },
         );
-        let state = if settings_profile {
+        let state = if settings_profile || tide_profile {
             Some(serde_json::from_str::<Json>(
                 &driver.runtime().context_state_json()?,
             )?)
@@ -591,10 +678,10 @@ fn main() -> Result<()> {
                     "logicalTimeMs": outcome.logical_time_ms, "trace": trace,
                 }});
                 last_outcome = Some(record["outcome"].clone());
-                if settings_profile {
+                if settings_profile || tide_profile {
                     record["settings"] = state.unwrap_or(Json::Null);
                 }
-                if civil_profile || calendar_profile || settings_profile {
+                if civil_profile || calendar_profile || settings_profile || tide_profile {
                     record["checkpoint"] = Json::String(
                         driver
                             .runtime()
@@ -606,14 +693,14 @@ fn main() -> Result<()> {
                 }
                 println!("{record}");
             }
-            Err(error) if calendar_profile => println!(
+            Err(error) if calendar_profile && !settings_profile => println!(
                 "{}",
                 json!({
                     "accepted": false, "error": error.to_string(), "checkpoint": driver.runtime().context_checkpoint()?.iter()
                         .map(|byte| format!("{byte:02x}")).collect::<String>(),
                 })
             ),
-            Err(error) if settings_profile => {
+            Err(error) if settings_profile || tide_profile => {
                 let committed = driver.runtime().journal().back().map(|trace| {
                     serde_json::from_str::<Json>(&trace.to_json()).expect("valid committed trace")
                 });

@@ -236,7 +236,7 @@ test('real WASM sample identity preserves accepted, duplicate, and fault samples
 
 test('REF-01-077 hysteresis retains the original three-value trace across an in-memory WASM checkpoint and replay', async t => {
   const artifact = await compileSource(`control HysteresisCheckpoint {
-    sensor moisture: Percent { valid = 0% .. 100%; filter = median(1); stale_after = 3s; recover_after = 1 samples; }
+    input moisture: Percent { valid = 0% .. 100%; filter = median(1); stale_after = 3s; recover_after = 1 samples; }
     signal dry = hysteresis(moisture, on_below: 30%, off_above: 35%, initial: false);
     output pump: Bool;
     pump <- case dry { ok(value) => value; fault(_) => false; };
@@ -368,13 +368,15 @@ for (const recoverSamples of [1, 31]) {
 
 test('real WASM duplicate samples neither look valid nor advance recovery(31)', async t => {
   const sensor = await realConditioner(t, { recoverSamples: 31 });
-  assert.equal(sensor.update(goodSample(1, 20), 1).quality, 'Good');
-  assert.equal(sensor.update({ ...goodSample(2, 20), quality: 'Invalid' }, 2).quality, 'Invalid');
+  for (let id = 1; id <= 31; id++) {
+    assert.equal(sensor.update(goodSample(id, 20), id).quality, id === 31 ? 'Good' : 'NotReady');
+  }
+  assert.equal(sensor.update({ ...goodSample(32, 20), quality: 'Invalid' }, 32).quality, 'Invalid');
 
   const duplicates = [];
   let final;
   for (let count = 1; count <= 31; count++) {
-    const id = 2 + count;
+    const id = 32 + count;
     final = sensor.update(goodSample(id, 20), id);
     if (count < 31) duplicates.push(sensor.update(goodSample(id, 90), id));
   }

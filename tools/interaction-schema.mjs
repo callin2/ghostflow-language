@@ -22,6 +22,30 @@ function fail(message) {
   throw new Error(`interaction schema: ${message}`);
 }
 
+function missingIntentProvenance(item, node, extraction) {
+  const target = `${item.kind}.${item.name}`;
+  // A suggested candidate is never confirmed intent. Avoid all authored IDs,
+  // including superseded anchors, without reconstructing or editing the source.
+  const used = new Set(extraction.anchors.map(anchor => anchor.id));
+  const base = `GF-REPAIR-${item.kind}-${item.name}`.slice(0, 112);
+  let id = base;
+  for (let suffix = 2; used.has(id); suffix += 1) id = `${base}-${suffix}`;
+  const hint = `If an existing active anchor describes this declaration, add its link immediately before ${target}. Otherwise author and review the reason. A syntactically valid unconfirmed candidate is:\n`
+    + `Outside every code fence, as top-level Markdown:\n`
+    + `<!-- ghostflow:anchor id=${id} kind=assumption status=unconfirmed origin=ai -->\n`
+    + `Unconfirmed candidate: the reason for ${target} still needs author review.\n\n`
+    + `Inside the ghost fence, put the declaration on its own line and add this immediately before it (no blank line or intervening comment):\n`
+    + `// ghostflow:link id=${id} relation=assumes\n`
+    + `Replace the candidate prose with the actual reason; preserve its unconfirmed classification until a person confirms it. Compilation does not approve intent.`;
+  const detail = `interaction schema: ${target} has no literate intent-anchor provenance. An intent anchor identifies a top-level Markdown paragraph or block quote explaining the reason; a link comment connects it to this declaration.`;
+  const error = new Error(`${node.filename}:${node.line}:${node.column}: ${detail}\n${hint}\nSee docs/INTENT-ANCHOR-MAP.md#minimal-authored-form`);
+  Object.assign(error, { filename: node.filename, line: node.line, column: node.column,
+    loc: { endLine: node.endLine, endColumn: node.endColumn },
+    diagnosticCode: 'GF_INTENT_PROVENANCE', diagnosticMessage: detail,
+    diagnosticHint: hint, diagnosticReference: 'docs/INTENT-ANCHOR-MAP.md#minimal-authored-form' });
+  throw error;
+}
+
 function publicId(value, label) {
   if (typeof value !== 'string' || !PUBLIC_ID.test(value) || value.startsWith('__gf_')) {
     fail(`${label} must be an explicit public immutable identity`);
@@ -134,7 +158,7 @@ function expectedSchema(compilation, identityValue) {
     const node = nodeById.get(item.id);
     if (!node || node.kind !== item.kind) fail(`compiler source node is missing for ${item.kind}.${item.name}`);
     const links = linksByNode.get(`${item.id}\u0000${item.kind}`);
-    if (!links?.length) fail(`${item.kind}.${item.name} has no literate intent-anchor provenance`);
+    if (!links?.length) missingIntentProvenance(item, node, extraction);
     const anchors = links.map(link => link.anchorId);
     if (item.kind === 'config') {
       const settings = config.settings;

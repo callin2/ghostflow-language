@@ -7,6 +7,22 @@ import { externalOracleCaseIds, frozenCompilerCaseIds, frozenSpecifiedCaseIds } 
 const catalog = JSON.parse(fs.readFileSync(catalogPath, 'utf8'));
 const errors = value => validateCatalog(value).join('\n');
 
+test('host-only oracle cannot be promoted to native WASM parity or physical evidence', () => {
+  const host = structuredClone(catalog);
+  const row = host.entries.find(entry => entry.id === 'software-input-installation-reference');
+  assert.equal(row.owner, 'HOST');
+  assert.ok(row.evidence[0].refs.every(ref => JSON.stringify(ref.targets) === '["host"]'));
+  assert.deepEqual(validateCatalog(host), []);
+  for (const stage of ['native_wasm', 'driver_application', 'physical_confirmation']) {
+    const invalid = structuredClone(host);
+    invalid.entries.find(entry => entry.id === row.id).evidence[0].stage = stage;
+    assert.match(errors(invalid), /host is allowed only for host_simulation/);
+  }
+  row.evidence[0].refs[0].assertionClass = 'target-parity';
+  row.evidence[0].refs[0].targets = ['host', 'wasm'];
+  assert.match(errors(host), /target-parity requires native and wasm/);
+});
+
 test('feature status catalog validates and generated view is current', () => {
   assert.deepEqual(validateCatalog(catalog), []);
   assert.equal(fs.readFileSync(new URL('../docs/REFERENCE-FEATURE-STATUS.md', import.meta.url), 'utf8'), renderStatus(catalog));

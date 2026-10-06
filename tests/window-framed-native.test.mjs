@@ -9,15 +9,15 @@ import { compileSource } from '../tools/toolchain.mjs';
 import { FramedGhostFlowRuntime } from '../runtimes/wasm/framed-runtime.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const tapePath = path.join(root, 'target/release/examples/scan_tape');
-const adapterPath = path.join(root, 'target/release/examples/scan_adapter');
+const tapePath = path.join(root, 'target/release/examples/scan_tape' + (process.platform === 'win32' ? '.exe' : ''));
+const adapterPath = path.join(root, 'target/release/examples/scan_adapter' + (process.platform === 'win32' ? '.exe' : ''));
 const wasm = fs.readFileSync(path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm'));
 const source = `# Framed native temporal windows
 
 \`\`\`ghost
 control FramedNativeWindows {
   input threshold_time: Duration;
-  sensor temperature: Temperature;
+  input temperature: Temperature;
   signal average_temperature = window_average(temperature, over: 1s, quality: measured, max_age: 1s);
   signal minimum_temperature = window_min(temperature, over: 1s, quality: measured, max_age: 1s);
   signal maximum_temperature = window_max(temperature, over: 1s, quality: measured, max_age: 1s);
@@ -27,7 +27,7 @@ control FramedNativeWindows {
   average <- average_temperature |> recover(0K);
   minimum <- minimum_temperature |> recover(0K);
   maximum <- maximum_temperature |> recover(0K);
-  fast <- temperature_rate |> map(below(rate(delta: 1ΔK, time: threshold_time))) |> recover(false);
+  fast <- temperature_rate |> map(below(rate(delta: 1ΔK, time: (threshold_time |> recover(0ms))))) |> recover(false);
 }
 \`\`\`
 `;
@@ -45,10 +45,13 @@ async function fixture(t) {
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   const modulePath = path.join(directory, 'window.gfb');
   fs.writeFileSync(modulePath, artifact.bytes);
-  const sensor = artifact.manifest.sensors[0];
+  const sensor = artifact.manifest.sensors.find(item => item.name === 'temperature');
+  const thresholdInput = artifact.manifest.sensors.find(item => item.name === 'threshold_time');
   const tag = artifact.manifest.signals[0].sources[0].tag;
   const inputs = ({ threshold, present, id, timestamp, value = 284 }) => [
-    { name: 'threshold_time', value: threshold },
+    { name: thresholdInput.valueInput, value: threshold },
+    { name: thresholdInput.okInput, value: true },
+    { name: thresholdInput.faultInput, value: 0 },
     { name: sensor.valueInput, value },
     { name: sensor.okInput, value: true },
     { name: sensor.faultInput, value: 0 },

@@ -5,7 +5,7 @@
  * to the existing GFB1 S-expression compiler.  It does not evaluate source,
  * load modules, or execute user supplied code.
  */
-import { compile as compileGfb, CompileError } from './gfb1.mjs';
+import { compile as compileGfb, lowerCoreModule, emitGfb, CompileError } from './gfb1.mjs';
 import { buildSourceTrace } from './source-trace.mjs';
 import { checkedAdjacentConstraints } from './constraint-proof.mjs';
 import { QUANTITY_TYPES, canonicalUnitFor, isQuantityType, quantityLiteral, quantitySuffixAt } from './quantities.mjs';
@@ -351,11 +351,11 @@ class ControlParser {
     // contract. Preserve the same AST shape so the lowerer can type-check and
     // publish one artifact without requiring a synthetic source wrapper.
     if (!this.matches('control')) {
-      const standalone = new Set(['sensor', 'config', 'objective', 'degraded', 'adapt_setting']);
+      const standalone = new Set(['input', 'sensor', 'config', 'objective', 'degraded', 'adapt_setting']);
       if (!standalone.has(this.current().value)) this.expect('control', 'expected control declaration');
       const first = this.current();
       const body = [];
-      while (!this.matches('')) body.push(this.declaration());
+      while (!this.matches('')) body.push(...[this.declaration()].flat());
       return { kind: 'control', name: '__document__', loc: copyLoc(first), body: [...prelude, ...body], imports, standalone: true, sourceNodes: this.nodes };
     }
     const start = this.expect('control', 'expected control declaration');
@@ -364,7 +364,7 @@ class ControlParser {
     const body = [];
     while (!this.matches('}')) {
       if (this.current().kind === 'eof') error(start, 'unclosed control block');
-      body.push(this.declaration());
+      body.push(...[this.declaration()].flat());
     }
     this.take();
     if (!this.matches('')) error(this.current(), `unexpected trailing token ${this.current().value}`);
@@ -585,7 +585,7 @@ class ControlParser {
   declaration() {
     const token = this.current();
     switch (token.value) {
-      case 'input': return this.port('input');
+      case 'input': return this.externalInput();
       case 'output': return this.port('output');
       case 'state': return this.state();
       case 'config': return this.config();
@@ -597,7 +597,7 @@ class ControlParser {
       case 'enum': error(token, 'removed alias enum; use type Name = A | B;');
       case 'fn': return this.functionDecl();
       case 'purefn': error(token, 'removed alias purefn; use fn');
-      case 'sensor': return this.sensor();
+      case 'sensor': error(token, 'removed sensor declaration; use input with the same Result quality and conditioning contract; create an explicit new source revision');
       case 'event': return this.event();
       case 'calendar': return this.logicalProvider('calendar');
       case 'provider': return this.logicalProvider('provider');
@@ -652,9 +652,6 @@ class ControlParser {
     const names = this.names(`expected ${kind} name`);
     this.expect(':', `expected : after ${kind} name`);
     const type = this.typeName();
-    if (kind === 'input' && this.matches('=')) {
-      error(this.current(), 'input declarations are type-only; the host supplies input values');
-    }
     if (kind === 'output' && this.matches('=')) {
       error(this.current(), 'output declarations are type-only; connect each output with `name <- expression;`');
     }
@@ -877,12 +874,19 @@ class ControlParser {
     this.take();
     return this.node('account-constraints', start, { name: name.value, limits });
   }
-  sensor() {
-    const start = this.take(), name = this.identifier('expected sensor name'); const optional = !!this.maybe('?');
-    this.expect(':'); const type = this.typeName(); const options = {};
+  externalInput() {
+    const start = this.take(), names = [];
+    do {
+      const name = this.identifier('expected input name');
+      names.push({ name, optional: !!this.maybe('?') });
+    } while (this.maybe(','));
+    this.expect(':', 'expected : after input name'); const type = this.typeName(); const options = {};
+    if (this.matches('=')) error(this.current(), 'input declarations are type-only; the host supplies typed quality samples');
     if (this.maybe('{')) {
       while (!this.matches('}')) {
-        const key = this.identifier('expected sensor option'); this.expect('=', `expected = after ${key.value}`);
+        const key = this.identifier('expected input option'); this.expect('=', `expected = after ${key.value}`);
+        const optionName = { stale_after: 'staleAfter', recover_after: 'recoverAfter', valid: 'validMin' }[key.value] ?? key.value;
+        if (Object.hasOwn(options, optionName)) error(key, `duplicate input option ${key.value}`);
         if (key.value === 'valid') {
           options.validMin = this.expression(); this.expect('..', 'valid expects ..'); options.validMax = this.expression();
         } else if (key.value === 'filter') options.filter = this.expression();
@@ -890,12 +894,14 @@ class ControlParser {
         else if (key.value === 'stale_after') options.staleAfter = this.expression();
         else if (key.value === 'recover_after') {
           options.recoverAfter = this.expression(); this.expect('samples', 'recover_after expects samples');
-        } else error(key, `unsupported sensor option ${key.value}`);
-        this.expect(';', 'expected ; after sensor option');
+        } else error(key, `unsupported input option ${key.value}`);
+        this.expect(';', 'expected ; after input option');
       }
       this.take(); this.maybe(';');
-    } else this.expect(';', 'expected ; after sensor declaration');
-    return this.node('sensor', start, { name: name.value, optional, type, options });
+    } else this.expect(';', 'expected ; after input declaration');
+    // The internal sensor category and its wire descriptors preserve the existing
+    // typed quality lowering. There is no plain authored input execution path.
+    return names.map(({ name, optional }) => this.node('sensor', start, { name: name.value, optional, type, options }));
   }
   signal() {
     const start = this.take(), name = this.identifier('expected signal name'); this.expect('=', 'signal requires =');
@@ -1496,7 +1502,17 @@ export function validateCompositionStructure(ast) {
   const writerIdentity = item => item.kind === 'connect'
     ? item.source.path
     : `output expression ${item.name}`;
-  const conflict = (target, item) => `writers ${writerIdentity(suppliers.get(target))} and ${writerIdentity(item)}`;
+  const conflict = (target, item) => {
+    const writers = [suppliers.get(target), item];
+    const affected = writers.map(writer => {
+      const endpoint = writer.kind === 'connect' ? writer.source : null;
+      const instance = endpoint?.instance ? instances.find(node => node.name === endpoint.instance) : null;
+      const imported = instance ? ast.imports.find(entry => entry.name === instance.alias) : null;
+      return { identity: `${instance ? 'import alias' : 'definition'} ${instance?.alias ?? ast.name}/${instance?.name ?? 'root'}/${endpoint?.port ?? writer.name}`,
+        evidence: imported ? `${imported.locator}@${imported.revision} sha256 ${imported.sha256}` : 'root canonical source' };
+    });
+    return `writers ${writers.map(writerIdentity).join(' and ')}; composition contract: definition ${ast.name}; affected [${affected.map(writer => writer.identity).join(', ')}]; expected one supplier; actual 2; evidence revisions [${[...new Set(affected.map(writer => writer.evidence))].join(', ')}]; choose one supplier before activation`;
+  };
   for (const item of ast.body) {
     if (item.kind === 'connection') {
       if (suppliers.has(item.name)) error(item.loc, `duplicate supplier for output ${item.name}: ${conflict(item.name, item)}`);
@@ -1606,7 +1622,7 @@ class Lowerer {
       || typeof schedule.policy?.fallback === 'object')) this.manifest.format = 'GhostFlow/control-v12';
     if (contextForms.some(form => form[0] === 'at-pulse')) {
       if (solarForms.length || contextForms.some(form => form[0] !== 'at-pulse')
-        || ['configs','sensors','providers','calendars','naturalConditions','objectives','resources','adaptSettings','signals']
+        || ['configs','providers','calendars','naturalConditions','objectives','resources','adaptSettings','signals']
           .some(key => this.manifest[key]?.length) || this.manifest.accounting) {
         error(this.ast.loc, 'At pulse execution cannot mix with other schedule/provider/config profiles');
       }
@@ -1650,10 +1666,17 @@ class Lowerer {
     const accountingResource = [...this.resources.values()].some(type => type === 'Station' || type === 'BoolActuator');
     if (!accountingExecution && (accountingResource || this.accounts.size || this.ast.body.some(item => item.kind === 'account-constraints'))) error(this.ast.loc,
       'accounting execution requires verified resource binding, ledger persistence, and runtime enforcement');
-    let bytes;
+    let bytes, explanationExpressions;
     try {
       if (new TextEncoder().encode(sexpr(module)).length > 1024 * 1024) throw new CompileError('source byte limit exceeded');
-      bytes = compileGfb(canonicalModuleForm(module));
+      bytes = emitGfb(lowerCoreModule(canonicalModuleForm(module)), {
+        onExpressions: strategies => { explanationExpressions = strategies.map(strategy => ({
+          name: strategy.name, intents: strategy.intents.map(intent => ({
+            name: intent.name, type: intent.type, expression: intent.expression,
+            byteLength: intent.expr.length, expressionBytes: Array.from(intent.expr), witnessNodes: intent.witnessNodes,
+          })),
+        })); },
+      });
     }
     catch (cause) {
       const message = cause instanceof Error ? cause.message : String(cause);
@@ -1672,6 +1695,7 @@ class Lowerer {
     // future literate extractor maps this array back to Markdown locations.
     return {
       bytes,
+      explanationExpressions,
       manifest: this.manifest,
       sourceMap: this.ast.sourceNodes,
       traceMetadata: buildSourceTrace({ ...this.ast, body: this.ast.body.flatMap(item => item.kind === 'local-constraints' ? item.rules : [item]) }, this.constraints, bytes, transitions, intents, generatedTimers, this.resultSites, this.generatedSignals,
@@ -1686,7 +1710,7 @@ class Lowerer {
     };
   }
   unique(name, loc, category) {
-    rejectName(name, loc, category);
+    rejectName(name, loc, category === 'sensor' ? 'input' : category);
     if (this.symbols.has(name)) error(loc, `duplicate name ${name}`);
     this.symbols.set(name, { category, loc });
   }
@@ -1841,10 +1865,6 @@ class Lowerer {
       if (item.kind === 'account-constraints') {
         if (!this.ast.body.some(entry => entry.kind === 'resource' || entry.kind === 'account')) error(item.loc, 'unsupported construct constraints; use the named-constraints parser');
         this.validateAccountConstraints(item);
-      }
-      if (item.kind === 'input') {
-        const type = this.resolveType(item.type); if (!SCALAR_TYPES.has(type.kind)) error(item.type.loc, 'input must use a scalar type');
-        for (const name of item.names) { this.addInput(name, type, item.loc, true); this.symbols.get(name).type = type; }
       }
       if (item.kind === 'output') {
         const type = this.resolveType(item.type); if (!SCALAR_TYPES.has(type.kind)) error(item.type.loc, 'output must use a scalar type');
@@ -2209,7 +2229,7 @@ class Lowerer {
     (this.manifest.adaptSettings ??= []).push(this.adaptSettings.get(item.name));
   }
   addSensor(item) {
-    const type = this.resolveType(item.type); if (!['Bool', 'Number', 'Percent'].includes(type.kind) && !isQuantityType(type.kind)) error(item.type.loc, 'sensor type must be Bool, Number, Percent, or a physical quantity');
+    const type = this.resolveType(item.type); if (!SCALAR_TYPES.has(type.kind)) error(item.type.loc, 'input type must be a supported scalar payload');
     const valueInput = this.generatedName('sensor_value', item.name), okInput = this.generatedName('sensor_ok', item.name);
     const faultInput = this.generatedName('sensor_fault', item.name);
     this.addInput(valueInput, type, item.loc); this.addInput(okInput, BOOL, item.loc); this.addInput(faultInput, NUMBER, item.loc);
@@ -2221,6 +2241,7 @@ class Lowerer {
       return out.constant;
     };
     const sampleMs = read(opts.sample, DURATION, 'sample');
+    if (type.kind === 'Bool' && (opts.validMin || opts.validMax)) error(item.loc, 'Bool input does not support valid ranges');
     const validMin = read(opts.validMin, type, 'valid lower bound'); const validMax = read(opts.validMax, type, 'valid upper bound');
     if ((validMin === null) !== (validMax === null)) error(item.loc, 'valid requires both lower and upper bounds');
     if (validMin !== null && validMin > validMax) error(item.loc, 'sensor valid range is inverted');
@@ -3270,6 +3291,17 @@ class Lowerer {
   expression(node, locals, options, callStack = [], expected = null) {
     if (++this.expansionNodes > EXPANSION_NODE_LIMIT) error(node.loc, `function expansion exceeds ${EXPANSION_NODE_LIMIT} node budget`);
     const recurse = (child, childLocals = locals, childOptions = options, childExpected = null) => this.expression(child, childLocals, childOptions, callStack, childExpected);
+    if (node.kind === 'call' && node.name === 'ok' && node.compositionPayloadType) {
+      // Internal scalar connections are evaluated values, not acquisition
+      // observations. Preserve child Result handling without sample provenance.
+      if (options.pureFunction) error(node.loc, `fn ${options.pureFunction} cannot capture global computed input`);
+      if (options.macroDefinition) error(node.loc, `syntax macro ${options.macroDefinition} cannot capture global computed input`);
+      if (options.parameterConstant) error(node.loc, 'parameter default must be a constant independent of inputs, state and settings');
+      const payloadType = this.resolveType(node.compositionPayloadType);
+      if (!SCALAR_TYPES.has(payloadType.kind))
+        error(node.loc, `computed input payload must be ${typeNameOf(payloadType)}`);
+      return this.callExpression(node, locals, options, callStack, resultType(payloadType, semanticType('SensorFault')));
+    }
     if (node.kind === 'splice') {
       const value = options.macroArguments?.get(node.name);
       if (!value) error(node.loc, `unknown syntax macro parameter ${node.name}`);
@@ -4306,8 +4338,9 @@ export function compileBoundControlPolicyArtifact(source, { filename, envelope }
   const requestAst = { ...ast, body: ast.body.filter(item => !['shared-constraints', 'resource'].includes(item.kind)) };
   const candidate = new Lowerer(requestAst, filename).lower();
   if (![1, 3].includes(new DataView(candidate.bytes.buffer, candidate.bytes.byteOffset).getUint16(4, true))
-    || checked.manifest.outputs.some(port => port.type !== 'Bool')
-    || checked.manifest.inputs.some(port => port.type !== 'Bool')) {
+      || checked.manifest.outputs.some(port => port.type !== 'Bool')
+      || checked.manifest.inputs.some(port => port.type !== 'Bool')
+      || checked.manifest.sensors.some(port => port.type !== 'Bool')) {
     error(ast.loc, 'bound resource execution supports only a Bool GFB1 v1/v3 control; contextual, accounting, continuous and other profiles require separate integration');
   }
   if (typeof envelope !== 'function') error(ast.loc, 'bound resource execution requires a compiled policy envelope');

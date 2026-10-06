@@ -119,9 +119,10 @@ export function validateCatalog(catalog) {
         else if (!fs.existsSync(path.join(root, ref.path))) fail(id, `missing test file ${ref.path}`);
         if (!assertions.has(ref.assertionClass)) fail(id, `invalid assertion class ${ref.assertionClass}`);
         if (ref.polarities !== undefined && (!Array.isArray(ref.polarities) || !ref.polarities.length || new Set(ref.polarities).size !== ref.polarities.length || ref.polarities.some(value => !['positive', 'negative', 'boundary'].includes(value)))) fail(id, 'invalid polarities');
-        if (evidence.stage !== 'compile' && (!Array.isArray(ref.targets) || !ref.targets.length || new Set(ref.targets).size !== ref.targets.length || ref.targets.some(value => !['native', 'wasm'].includes(value)))) fail(id, 'runtime evidence needs native/wasm targets');
+        const allowedTargets = evidence.stage === 'host_simulation' ? ['native', 'wasm', 'host'] : ['native', 'wasm'];
+        if (evidence.stage !== 'compile' && (!Array.isArray(ref.targets) || !ref.targets.length || new Set(ref.targets).size !== ref.targets.length || ref.targets.some(value => !allowedTargets.includes(value)))) fail(id, 'runtime evidence needs native/wasm targets (host is allowed only for host_simulation)');
         if (evidence.stage === 'compile' && ref.targets !== undefined) fail(id, 'compile evidence cannot claim runtime targets');
-        if (ref.assertionClass === 'target-parity' && (!Array.isArray(ref.targets) || ref.targets.length !== 2)) fail(id, 'target-parity requires native and wasm');
+        if (ref.assertionClass === 'target-parity' && (!Array.isArray(ref.targets) || ref.targets.length !== 2 || !ref.targets.includes('native') || !ref.targets.includes('wasm'))) fail(id, 'target-parity requires native and wasm');
         if (ref.testId) {
           const testSource = fs.existsSync(path.join(root, ref.path)) ? fs.readFileSync(path.join(root, ref.path), 'utf8') : '';
           if (!namedSelector(testSource, ref.testId) && !executableReferenceSelector(ref, referenceCases.get(ref.caseId))) fail(id, `unresolved or inactive named test ${ref.testId}`);

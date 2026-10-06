@@ -81,6 +81,12 @@ tests or gates to obtain a pass. Reuse previous evidence only when source,
 dependencies, toolchain, configuration and relevant environment inputs match.
 Report each command, exit status, useful counts and any remaining limit.
 
+CI runs `node --test --test-reporter=tap tests/ci-verification-routing.test.mjs tests/verified-wasm-artifact.test.mjs`
+in the classification job before compiler lanes. These local-file contracts need
+no dependency installation or compiler. Keep this early gate and the complete
+downstream verification gates. [Issue #534](https://github.com/callin2/ghostflow-language/issues/534)
+records the observed late workflow failure and the link to System #196.
+
 The verifier validates requirement-catalog excerpts before native compilation or
 replay. If source lines move, relocate the unchanged excerpt and retain its hash;
 never refresh a historical evidence hash to hide drift. Await successful static
@@ -141,6 +147,14 @@ leave indexed metadata unchanged; inspect the source when confirming content.
 Agent maintenance and CI checks are not a filesystem watcher.
 
 ## 5. Close the task and improve repeatability
+
+After a same-repository feature PR merges into `dev`, CI deletes its remote head
+only when the current remote tip still equals the merged event's head SHA. An
+exact Git force-with-lease protects concurrent updates. Fork heads, absent or
+advanced tips, `main`, `dev`, the default branch and release branches are
+preserved. Local branches and worktrees are never removed by this automation.
+Use a merge commit when integrating historical branches whose ancestry must be
+preserved; a squash does not make their original tips ancestors of `dev`.
 
 Report the exact change, evidence and commands, exit status, relevant counts,
 limits, and linked issue or pull request. Do not repeat a full review when

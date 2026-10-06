@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
+import { softwareQualityObservations } from './helpers/software-quality-observations.mjs';
 import { compileSource, restoreArtifactSourceMap } from '../tools/toolchain.mjs';
 import { buildPortablePackage, verifyPortablePackage } from '../tools/portable-package.mjs';
 import { canonicalJson } from '../tools/canonical-json.mjs';
@@ -16,9 +17,9 @@ const source = [
   'fn calendar() -> Result<Bool, CalendarFault> { fault(CalendarMissing) }',
   'fn temporal() -> Result<Bool, TemporalContextFault> { fault(PredictionStale) }',
   '```', '', 'Original explanation between code fences.', '', '```ghost',
-  'control Provenance {', '  input choose: Bool;', '  sensor reading: Number;',
+  'control Provenance {', '  input choose: Bool;', '  input reading: Number;',
   '  output value: Number;', '  output clockReady, calendarReady, temporalReady: Bool;',
-  '  value <- (if choose then reading else unavailable()) |> recover(0.0);',
+  '  value <- (case choose { ok(value) => if value then reading else unavailable(); fault(reason) => fault(reason); }) |> recover(0.0);',
   '  clockReady <- clock() |> recover(false);',
   '  calendarReady <- case calendar() { ok(v) => v; fault(_) => false; };',
   '  temporalReady <- temporal() |> recover(false);',
@@ -54,6 +55,7 @@ test('GF-TEST-result-provenance-observe: decoded committed events preserve order
   const compilation = await compileSource(source, { filename });
   const verified = restoreArtifactSourceMap(envelope(compilation), compilation.bytes, { manifest: compilation.manifest });
   const runtime = await ControlRuntime.instantiate(fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url)), compilation);
+  softwareQualityObservations(runtime);
   try {
     const trace = runtime.step({ nowMs: 0, inputs: { choose: false } }).vm;
     const observed = observeSourceTrace(verified.traceMetadata, trace);
@@ -105,7 +107,7 @@ test('GF-TEST-result-provenance-restore: CRLF and multiple fences preserve canon
     assert.notEqual(site.source.line, site.extractedSource.line);
     assert.match(source.split('\r\n')[site.source.line - 1], site.kind === 'recover' ? /recover\(/ : /case calendar/);
   }
-  assert.equal(map.traceMetadata.resultSites[0].origins.length, 2);
+  assert.equal(map.traceMetadata.resultSites[0].origins.length, 3);
   // Canonical package JSON sorts object keys; field insertion order is irrelevant.
   assert.doesNotThrow(() => restoreArtifactSourceMap(JSON.parse(canonicalJson(map)), compilation.bytes, { manifest: compilation.manifest }));
 });
@@ -124,8 +126,8 @@ test('GF-TEST-result-provenance-package: signed valid evidence loads; re-signed 
   const compilation = await compileSource(source, { filename });
   const keys = await crypto.subtle.generateKey('Ed25519', false, ['sign', 'verify']);
   const keyId = 'result-provenance-test';
-  const identity = { compilerRevision: 'c0bef0e', runtimeSemantics: 'GhostFlow/runtime-semantics-v1', runtimeAbi: 'GhostFlow/framed-scan-abi-v1', bindingRevision: 'result-provenance-v1', requiredCapabilities: [
-    { kind: 'input', name: 'choose', type: 'bool' }, { kind: 'sensor', name: 'reading', type: 'number' },
+  const identity = { compilerRevision: 'issue531-canonical-input-candidate', runtimeSemantics: 'GhostFlow/runtime-semantics-v1', runtimeAbi: 'GhostFlow/framed-scan-abi-v1', bindingRevision: 'result-provenance-input-v2', requiredCapabilities: [
+    { kind: 'sensor', name: 'choose', type: 'bool' }, { kind: 'sensor', name: 'reading', type: 'number' },
     { kind: 'actuator', name: 'value', type: 'number' }, { kind: 'actuator', name: 'clockReady', type: 'bool' }, { kind: 'actuator', name: 'calendarReady', type: 'bool' },
     { kind: 'actuator', name: 'temporalReady', type: 'bool' },
   ] };

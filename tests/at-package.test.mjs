@@ -14,7 +14,7 @@ test('At executable artifacts remain outside the current signed package profile'
     runtimeSemantics: 'GhostFlow/runtime-semantics-v1',
     runtimeAbi: 'GhostFlow/context-scan-abi-v5',
     requiredCapabilities: [
-      { kind: 'input', name: 'allow', type: 'bool' },
+      { kind: 'sensor', name: 'allow', type: 'bool' },
       { kind: 'actuator', name: 'alarm', type: 'bool' },
     ],
     bindingRevision: 'at-package-test',

@@ -8,10 +8,11 @@ import { compileSource } from '../tools/toolchain.mjs';
 import { compileSource as compileBrowserSource } from '../tools/browser-toolchain.mjs';
 import { verificationSourceHashes } from '../tools/verification-sources.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
+import { softwareQualityObservations } from './helpers/software-quality-observations.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const sourcePath = new URL('../examples/vfd-speed.ghost.md', import.meta.url);
-const scenarioPath = new URL('../examples/vfd-speed.scenario.json', import.meta.url);
+const sourcePath = new URL('../examples/vfd-speed.input-v1.ghost.md', import.meta.url);
+const scenarioPath = new URL('../examples/vfd-speed.input-v1.scenario.json', import.meta.url);
 const wasmPath = new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url);
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 
@@ -22,12 +23,12 @@ test('canonical VFD source and scenario execute eight independent framed WASM or
   assert.equal(sha256(source), scenario.sourceSha256);
   assert.deepEqual(scenario.inputs, { potentiometer_v: { unit: 'V', min: 0, max: 10 } });
   assert.deepEqual(scenario.outputs, { speed_v: { unit: 'V' }, speed_hz: { unit: 'Hz' } });
-  const artifact = await compileSource(source, { filename: 'vfd-speed.ghost.md' });
-  const browserArtifact = await compileBrowserSource(source, { filename: 'vfd-speed.ghost.md' });
+  const artifact = await compileSource(source, { filename: 'vfd-speed.input-v1.ghost.md' });
+  const browserArtifact = await compileBrowserSource(source, { filename: 'vfd-speed.input-v1.ghost.md' });
   assert.deepEqual([...browserArtifact.bytes], [...artifact.bytes]);
   assert.deepEqual(browserArtifact.manifest, artifact.manifest);
   assert.equal(browserArtifact.sourceDocument.text, source);
-  assert.deepEqual(artifact.manifest.inputs.map(({ name, type }) => [name, type]), [
+  assert.deepEqual(artifact.manifest.sensors.map(({ name, type }) => [name, type]), [
     ['start', 'Bool'], ['stop', 'Bool'], ['potentiometer_v', 'Number'],
   ]);
   assert.deepEqual(artifact.manifest.outputs.map(({ name, type }) => [name, type]), [
@@ -46,7 +47,7 @@ test('canonical VFD source and scenario execute eight independent framed WASM or
   ];
 
   const wasm = fs.readFileSync(wasmPath);
-  const runtime = await ControlRuntime.instantiateFramed(wasm, artifact);
+  const runtime = softwareQualityObservations(await ControlRuntime.instantiateFramed(wasm, artifact));
   const observed = [];
   try {
     assert.equal(scenario.frames.length, independent.length);
@@ -70,8 +71,8 @@ test('canonical VFD source and scenario execute eight independent framed WASM or
     format: 'GhostFlow/vfd-speed-observed-v1',
     generatedAt: new Date().toISOString(),
     virtualOnly: true,
-    source: { path: 'examples/vfd-speed.ghost.md', sha256: sha256(source) },
-    scenario: { path: 'examples/vfd-speed.scenario.json', sha256: sha256(fs.readFileSync(scenarioPath)), expected: scenario.frames },
+    source: { path: 'examples/vfd-speed.input-v1.ghost.md', sha256: sha256(source) },
+    scenario: { path: 'examples/vfd-speed.input-v1.scenario.json', sha256: sha256(fs.readFileSync(scenarioPath)), expected: scenario.frames },
     compiler: {
       gitRevision: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
       sourceTreeSha256: sha256(JSON.stringify(sourceHashes)),
@@ -87,24 +88,39 @@ test('canonical VFD source and scenario execute eight independent framed WASM or
   fs.writeFileSync(new URL(runName, runDir), JSON.stringify(evidence, null, 2) + '\n', { flag: 'wx' });
 });
 
-test('VFD typed inputs reject missing and invalid values before a scan', async () => {
-  const artifact = await compileSource(fs.readFileSync(sourcePath, 'utf8'), { filename: 'VfdSpeed.ghost.md' });
-  const runtime = await ControlRuntime.instantiateFramed(fs.readFileSync(wasmPath), artifact);
+test('VFD typed observations distinguish unavailable acquisition, malformed records and Invalid numeric quality', async () => {
+  const artifact = await compileSource(fs.readFileSync(sourcePath, 'utf8'), { filename: 'VfdSpeed.input-v1.ghost.md' });
+  const runtime = softwareQualityObservations(await ControlRuntime.instantiateFramed(fs.readFileSync(wasmPath), artifact));
   const valid = { start: false, stop: false, potentiometer_v: 0 };
   try {
-    assert.throws(() => runtime.step({ nowMs: 0, inputs: { start: false, stop: false } }), /missing input potentiometer_v/);
-    assert.throws(() => runtime.step({ nowMs: 0, inputs: { stop: false, potentiometer_v: 0 } }), /missing input start/);
-    assert.throws(() => runtime.step({ nowMs: 0, inputs: { ...valid, start: 0 } }), /inputs.start must be boolean/);
-    for (const invalid of [false, Number.NaN, Number.POSITIVE_INFINITY]) {
-      assert.throws(() => runtime.step({ nowMs: 0, inputs: { ...valid, potentiometer_v: invalid } }), /inputs.potentiometer_v must be finite/);
-    }
-    assert.equal(runtime.lastFrameOutcome, null);
-    const first = runtime.step({ nowMs: 0, inputs: valid });
-    assert.deepEqual(first.frame, { scanId: 0, logicalTimeMs: 0 });
+    const startup = runtime.step({ nowMs: 0 });
+    assert.equal(startup.sensors.potentiometer_v.quality, 'NotReady');
+    assert.deepEqual(startup.vm.safe, { run: false, speed_v: 0, speed_hz: 0 });
+    const before = structuredClone(runtime.lastFrameOutcome);
+    assert.throws(() => runtime.step({ nowMs: 1, inputs: { ...valid, start: 0 } }), /boolean|Bool/);
+    assert.throws(() => runtime.step({ nowMs: 1, inputs: { ...valid, potentiometer_v: false } }), /samples\.potentiometer_v\.value must be numeric/);
+    assert.deepEqual(runtime.lastFrameOutcome, before);
+    const first = runtime.step({ nowMs: 1, inputs: valid });
+    assert.equal(first.sensors.potentiometer_v.ok, true);
+    assert.equal(first.sensors.potentiometer_v.value, 0);
     assert.deepEqual(first.vm.safe, { run: false, speed_v: 0, speed_hz: 0 });
-    assert.equal(typeof first.vm.inputs.potentiometer_v, 'number');
-    assert.equal(runtime.lastFrameOutcome.scanId, 0);
-  } finally {
-    runtime.dispose();
-  }
+    for (const [index, invalid] of [Number.NaN, Number.POSITIVE_INFINITY].entries()) {
+      const bad = runtime.step({ nowMs: index + 2, inputs: { ...valid, potentiometer_v: invalid } });
+      assert.equal(bad.sensors.potentiometer_v.quality, 'Invalid');
+      assert.deepEqual(bad.vm.safe, { run: false, speed_v: 0, speed_hz: 0 });
+    }
+  } finally { runtime.dispose(); }
+});
+
+// Preserve independent predecessor source/scenario identities; healthy frame and
+// output expectations remain identical in the explicit new revision.
+test('VFD migration retains predecessor bytes and the complete healthy replay oracle', () => {
+  const current = JSON.parse(fs.readFileSync(scenarioPath, 'utf8'));
+  const oldSource = fs.readFileSync(new URL('../examples/vfd-speed.ghost.md', import.meta.url));
+  const oldScenario = fs.readFileSync(new URL('../examples/vfd-speed.scenario.json', import.meta.url));
+  assert.equal(sha256(oldSource), current.predecessor.sourceSha256);
+  assert.equal(sha256(oldScenario), current.predecessor.scenarioSha256);
+  assert.equal(current.predecessor.sourceSha256, '3319ddd9e8bd5c486586f4e3e94c3e78f62402c4541a712f97e9509cb5d996c3');
+  assert.equal(current.predecessor.scenarioSha256, 'a117f9a20968942aa5afac10218aea5e4666d0f2a445aa05cd4b99550bdeede0');
+  assert.deepEqual(current.frames, JSON.parse(oldScenario).frames);
 });

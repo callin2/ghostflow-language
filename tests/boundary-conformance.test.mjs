@@ -32,7 +32,9 @@ function controlWithOutputs(count, constraint = '') {
 const controlResourceBoundaries = [
   {
     id: 'GF-TEST-61.3-CONTROL-INPUTS',
-    limit: 128,
+    // Each canonical Bool observation consumes value/ok/fault slots. The VM
+    // still allows 128 inputs; 42 authored inputs fit and 43 need 129 slots.
+    limit: 42,
     source: controlWithInputs,
     error: 'input budget exceeded',
   },

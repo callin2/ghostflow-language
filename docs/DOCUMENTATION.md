@@ -20,6 +20,7 @@ evidence and test inputs have explicit exclusions in [the manifest](translations
 | `docs/ACCOUNTING-LEDGER-ABI.md` | [English](ACCOUNTING-LEDGER-ABI.md) | [한국어](ACCOUNTING-LEDGER-ABI.ko.md) |
 | `docs/AFTER-EVENT-WASM-ABI.md` | [English](AFTER-EVENT-WASM-ABI.md) | [한국어](AFTER-EVENT-WASM-ABI.ko.md) |
 | `docs/BEHAVIOR-COMPOSITION-RESEARCH.md` | [English](BEHAVIOR-COMPOSITION-RESEARCH.md) | [한국어](BEHAVIOR-COMPOSITION-RESEARCH.ko.md) |
+| `docs/BOOLEAN-OUTPUT-EXPLANATION.md` | [English](BOOLEAN-OUTPUT-EXPLANATION.md) | [한국어](BOOLEAN-OUTPUT-EXPLANATION.ko.md) |
 | `docs/BYTECODE.md` | [English](BYTECODE.md) | [한국어](BYTECODE.ko.md) |
 | `docs/CALENDAR-PROVIDERS.md` | [English](CALENDAR-PROVIDERS.md) | [한국어](CALENDAR-PROVIDERS.ko.md) |
 | `docs/COMPILER-DIAGNOSTICS.md` | [English](COMPILER-DIAGNOSTICS.md) | [한국어](COMPILER-DIAGNOSTICS.ko.md) |

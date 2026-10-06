@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { createHash } from 'node:crypto';
+import { gunzipSync } from 'node:zlib';
 import test from 'node:test';
 import { compileSourceSync } from '../tools/compile-source.mjs';
 
@@ -7,6 +9,31 @@ const read = file => fs.readFileSync(new URL(`../${file}`, import.meta.url), 'ut
 const compiler = read('tools/control.mjs');
 const policies = read('tools/constraints.mjs');
 const books = ['docs/ProgrammingInGhostflow.md', 'docs/ProgrammingInGhostflow.en.md'].map(read);
+
+test('scalar fixture migration retains exact baseline source bytes separately', () => {
+  const bytes = fs.readFileSync(new URL('./fixtures/history/issue531/scalar-quality-tests.pre-input.json', import.meta.url));
+  assert.equal(createHash('sha256').update(bytes).digest('hex'),
+    'd694dfe8d633b12f30a29dcdaa35ba92c4d27d5788059cabe7f9fc7f71857edb');
+  for (const entry of JSON.parse(bytes).entries) {
+    const original = gunzipSync(Buffer.from(entry.gzipBase64, 'base64'));
+    assert.equal(createHash('sha256').update(original).digest('hex'), entry.sha256, entry.path);
+  }
+});
+
+test('canonical input migration retains pinned pre-migration explicit-quality declarations', () => {
+  const bytes = fs.readFileSync(new URL('./fixtures/history/issue531/explicit-quality-tests.pre-input.json', import.meta.url));
+  assert.equal(createHash('sha256').update(bytes).digest('hex'),
+    '9aacc5c8e449f77a25a20f3fdb7232972130de5dbf0ee8b11b2f044cd9ecddf9');
+  const history = JSON.parse(bytes);
+  assert.equal(history.baselineCommit, 'c8a5d37ac09230a9011291a3ae3b053d1bc22773');
+  for (const entry of history.entries) {
+    assert.match(entry.baselineSha256, /^[a-f0-9]{64}$/);
+    for (const excerpt of entry.excerpts) {
+      assert.match(excerpt.source, /\bsensor\s+\w+\??\s*:/);
+      assert.ok(Number.isSafeInteger(excerpt.line) && excerpt.line > 0);
+    }
+  }
+});
 
 // Derive callable spellings from existing dispatch, not an independently edited
 // production registry. Contextual constants and rejected aliases are not calls.
@@ -100,7 +127,7 @@ test('PIG keeps unavailable names outside supported entries and explains hystere
 });
 
 test('PIG below example compiles in map and is rejected in and_then', () => {
-  const source = '# Pipeline example\n\n```ghost\ncontrol Pipeline {\n  sensor moisture: Percent;\n  output dry: Bool;\n  dry <- moisture |> map(below(30%)) |> recover(false);\n}\n```\n';
+  const source = '# Pipeline example\n\n```ghost\ncontrol Pipeline {\n  input moisture: Percent;\n  output dry: Bool;\n  dry <- moisture |> map(below(30%)) |> recover(false);\n}\n```\n';
   assert.ok(compileSourceSync(source, { filename: 'pipeline.ghost.md' }).bytes.length > 0);
   assert.throws(() => compileSourceSync(source.replace('map(below', 'and_then(below'),
     { filename: 'pipeline.ghost.md' }), /and_then transform must return Result/);

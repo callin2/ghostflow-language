@@ -1,5 +1,7 @@
 # Explicitly adopted feedback inhibition
 
+2026-10-05 explicit input-quality revision: unknown request retains established run state; the two-second deadline still applies. Quality does not assert a physical failure.
+
 This separate source explicitly adopts a diagnostic permissive rule: a healthy
 true observation permits a timed request; healthy false or any sensor fault
 inhibits it. This illustrative stop rule is authored policy for this example,
@@ -30,15 +32,16 @@ physical evidence. A diagnostic Bool does not establish movement or position.
 control ExplicitFeedbackAdoption {
   input run_request: Bool;
   output drive: Bool;
-  sensor observation: Bool;
+  input observation: Bool;
 
   // Illustrative operator-established command duration, not measured motion.
   let calibrated_duration = 2s;
   state run: Bool = false;
-  run' = run_request;
+  let requested = case run_request { ok(value) => value; fault(_) => run; };
+  run' = requested;
   timer age = elapsed(run);
-  let run_age = if run_request == run then age else 0s;
-  let timed_request = run_request && run_age < calibrated_duration;
+  let run_age = if requested == run then age else 0s;
+  let timed_request = requested && run_age < calibrated_duration;
   let permit = case observation { ok(value) => value; fault(_) => false; };
   drive <- timed_request && permit;
 }

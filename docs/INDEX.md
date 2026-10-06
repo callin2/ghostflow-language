@@ -23,6 +23,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/AI-CONTRIBUTION-PACKAGE.md](AI-CONTRIBUTION-PACKAGE.md) | Bounded AI contribution package | md |
 | [docs/BEHAVIOR-COMPOSITION-RESEARCH.ko.md](BEHAVIOR-COMPOSITION-RESEARCH.ko.md) | 동작 조합: 연구와 아키텍처 검토 | md |
 | [docs/BEHAVIOR-COMPOSITION-RESEARCH.md](BEHAVIOR-COMPOSITION-RESEARCH.md) | Behavior composition: research and architecture review | md |
+| [docs/BOOLEAN-OUTPUT-EXPLANATION.ko.md](BOOLEAN-OUTPUT-EXPLANATION.ko.md) | Boolean 요청 출력 설명 | md |
+| [docs/BOOLEAN-OUTPUT-EXPLANATION.md](BOOLEAN-OUTPUT-EXPLANATION.md) | Boolean requested-output explanation | md |
 | [docs/BYTECODE.ko.md](BYTECODE.ko.md) | GFB 바이트코드 | md |
 | [docs/BYTECODE.md](BYTECODE.md) | GFB bytecode | md |
 | [docs/CALENDAR-PROVIDERS.ko.md](CALENDAR-PROVIDERS.ko.md) | 한국 공휴일과 현장 근무 달력 | md |
@@ -64,6 +66,10 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/HOST-EVENT-ORDERING-CONTRACT.md](HOST-EVENT-ORDERING-CONTRACT.md) | Host event ordering contract | md |
 | [docs/IMPLEMENTATION.ko.md](IMPLEMENTATION.ko.md) | 구현 및 아티팩트 경계 | md |
 | [docs/IMPLEMENTATION.md](IMPLEMENTATION.md) | Implementation and artifact boundaries | md |
+| [docs/INPUT-MIGRATION.ko.md](INPUT-MIGRATION.ko.md) | 외부 입력의 canonical 선언과 명시적 revision migration | md |
+| [docs/INPUT-MIGRATION.md](INPUT-MIGRATION.md) | Canonical external input and explicit revision migration | md |
+| [docs/INSTANCE-TRACE-PROJECTION.ko.md](INSTANCE-TRACE-PROJECTION.ko.md) | Instance trace projection 참조 어댑터 | md |
+| [docs/INSTANCE-TRACE-PROJECTION.md](INSTANCE-TRACE-PROJECTION.md) | Instance trace projection reference adapter | md |
 | [docs/INTENT-ANCHOR-MAP.ko.md](INTENT-ANCHOR-MAP.ko.md) | Literate intent anchor map | md |
 | [docs/INTENT-ANCHOR-MAP.md](INTENT-ANCHOR-MAP.md) | Literate intent anchor map | md |
 | [docs/INTERACTION-STREAM-CONTRACT.ko.md](INTERACTION-STREAM-CONTRACT.ko.md) | Interaction 스트림 계약 설계 | md |
@@ -94,6 +100,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/LLM-AUTHORING-WORKFLOW.md](LLM-AUTHORING-WORKFLOW.md) | Model independent authoring workflow | md |
 | [docs/LLM-TOOLCHAIN-ARCHITECTURE.ko.md](LLM-TOOLCHAIN-ARCHITECTURE.ko.md) | 작성 및 가상 시뮬레이션 아키텍처 | md |
 | [docs/LLM-TOOLCHAIN-ARCHITECTURE.md](LLM-TOOLCHAIN-ARCHITECTURE.md) | Authoring and virtual simulation architecture | md |
+| [docs/OBSERVATION-EVENT-HISTORY.ko.md](OBSERVATION-EVENT-HISTORY.ko.md) | 보존 범위가 있는 관찰 event 이력 | md |
+| [docs/OBSERVATION-EVENT-HISTORY.md](OBSERVATION-EVENT-HISTORY.md) | Bounded observation event history | md |
 | [docs/OPERATOR-SETTINGS-STREAM.ko.md](OPERATOR-SETTINGS-STREAM.ko.md) | Typed configuration stream | md |
 | [docs/OPERATOR-SETTINGS-STREAM.md](OPERATOR-SETTINGS-STREAM.md) | Typed configuration streams | md |
 | [docs/OPTIMIZER-PASS-CONTRACT.ko.md](OPTIMIZER-PASS-CONTRACT.ko.md) | 최적화 패스 계약 | md |
@@ -135,6 +143,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/TEMPORAL-REPLAY.md](TEMPORAL-REPLAY.md) | Temporal replay through the WASM adapters | md |
 | [docs/TEMPORAL-RESOURCES.ko.md](TEMPORAL-RESOURCES.ko.md) | Temporal resource 계획 | md |
 | [docs/TEMPORAL-RESOURCES.md](TEMPORAL-RESOURCES.md) | Temporal resource planning | md |
+| [docs/TEMPORARY-SETTINGS-HOST.ko.md](TEMPORARY-SETTINGS-HOST.ko.md) | 임시 설정 reference host | md |
+| [docs/TEMPORARY-SETTINGS-HOST.md](TEMPORARY-SETTINGS-HOST.md) | Temporary settings reference host | md |
 | [docs/TESTING.ko.md](TESTING.ko.md) | GhostFlow 적합성 및 신뢰성 테스트 | md |
 | [docs/TESTING.md](TESTING.md) | GhostFlow conformance and reliability testing | md |
 | [docs/TIME-AND-SCHEDULE-CONTRACT.ko.md](TIME-AND-SCHEDULE-CONTRACT.ko.md) | 시간과 Schedule 계약 제안 | md |
@@ -162,6 +172,13 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/assets/readme-intent.svg](assets/readme-intent.svg) | readme-intent.svg | svg |
 | [docs/assets/readme-replay.svg](assets/readme-replay.svg) | readme-replay.svg | svg |
 | [docs/assets/readme-trace.svg](assets/readme-trace.svg) | readme-trace.svg | svg |
+
+## docs/historical/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/historical/2026-10-05-input-531-book-excerpts.ko.md](historical/2026-10-05-input-531-book-excerpts.ko.md) | 명시적 입력 품질 개정 전 E01·E03 원래 코드 | md |
+| [docs/historical/2026-10-05-input-531-book-excerpts.md](historical/2026-10-05-input-531-book-excerpts.md) | Original E01 and E03 code before the explicit input-quality revision | md |
 
 ## docs/plans/
 
@@ -200,6 +217,9 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/reports/2026-09-24-range-cancel-acceptance.md](reports/2026-09-24-range-cancel-acceptance.md) | Range `cancel_when` compiler acceptance — 2026-09-24 | md |
 | [docs/reports/2026-09-24-reference-execution-support-audit.md](reports/2026-09-24-reference-execution-support-audit.md) | Reference execution and support audit — 2026-09-24 | md |
 | [docs/reports/2026-09-24-reference-simulator-evidence.json](reports/2026-09-24-reference-simulator-evidence.json) | 2026-09-24-reference-simulator-evidence.json | json |
+| [docs/reports/2026-10-03-stale-branch-reconciliation.md](reports/2026-10-03-stale-branch-reconciliation.md) | Stale branch reconciliation — 2026-10-03 | md |
+| [docs/reports/2026-10-05-input-531-consumer-gates.md](reports/2026-10-05-input-531-consumer-gates.md) | Issue 531 independent review and consumer adoption gates | md |
+| [docs/reports/2026-10-05-input-531-integration.md](reports/2026-10-05-input-531-integration.md) | Issue 531 integration checkpoint and consumer handoff | md |
 
 ## docs/research/
 
@@ -224,4 +244,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.ko.md](research/GF-COMPOSE-R9-ACCEPTANCE.ko.md) | GF-COMPOSE R9: acceptance와 구현 인계 | md |
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.md](research/GF-COMPOSE-R9-ACCEPTANCE.md) | GF-COMPOSE R9: acceptance and implementation handoff | md |
 
-190 documents.
+205 documents.

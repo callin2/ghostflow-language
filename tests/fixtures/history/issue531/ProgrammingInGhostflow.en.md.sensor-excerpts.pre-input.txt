@@ -1,0 +1,374 @@
+```ghost
+// E10
+control MoistureControl {
+  input enabled: Bool;
+  sensor moisture: Percent {
+    sample = 1s;
+    valid = 0% .. 100%;
+    filter = median(3);
+    stale_after = 3s;
+    recover_after = 1 samples;
+  }
+  signal dry = hysteresis(moisture,
+    on_below: 30%, off_above: 35%, initial: false);
+  let need_water = case dry {
+    ok(value) => value;
+    fault(_) => false;
+  };
+
+  output pump: Bool;
+  pump <- enabled && need_water;
+}
+```
+
+```ghost
+// E14
+control OptionalMoisture {
+  sensor moisture?: Percent;
+  output request: Bool;
+  adapt moisture_policy {
+    strategy WithMoisture priority 100 match (moisture: sensor<Percent>) {
+      request <- case moisture {
+        ok(value) => value < 30%;
+        fault(_) => false;
+      };
+    }
+    strategy Baseline priority 0 match always {
+      request <- false;
+    }
+  }
+}
+```
+
+```ghost
+// E16
+control CelsiusHeater {
+  sensor air: Temperature {
+    sample = 1s;
+    valid = -40°C .. 50°C;
+    filter = median(1);
+    stale_after = 3s;
+    recover_after = 1 samples;
+  }
+  signal cold = hysteresis(air,
+    on_below: 18°C, off_above: 22°C, initial: false);
+  output heater: Bool;
+  heater <- cold |> recover(false);
+}
+```
+
+```ghost
+// E17
+control FahrenheitHeater {
+  sensor air: Temperature {
+    sample = 1s;
+    valid = -40°F .. 122°F;
+    filter = median(1);
+    stale_after = 3s;
+    recover_after = 1 samples;
+  }
+  signal cold = hysteresis(air,
+    on_below: 64.4°F, off_above: 71.6°F, initial: false);
+  output heater: Bool;
+  heater <- cold |> recover(false);
+}
+```
+
+```ghost
+// E18
+control KelvinHeater {
+  sensor air: Temperature {
+    sample = 1s;
+    valid = 233.15K .. 323.15K;
+    filter = median(1);
+    stale_after = 3s;
+    recover_after = 1 samples;
+  }
+  signal cold = hysteresis(air,
+    on_below: 291.15K, off_above: 295.15K, initial: false);
+  output heater: Bool;
+  heater <- cold |> recover(false);
+}
+```
+
+```ghost
+// E19
+fn exp_0_3_1(x: Number) -> Number {
+  1 + x / 1 * (1 + x / 2 * (1 + x / 3 * (1 + x / 4 * (1 + x / 5 * (1 + x / 6 * (1 + x / 7 * (1 + x / 8 * (1 + x / 9 * (1 + x / 10 * (1 + x / 11 * (1 + x / 12 * (1 + x / 13 * (1 + x / 14 * (1))))))))))))))
+}
+fn air_vpd(t: Temperature, rh: RelativeHumidity) -> VaporPressureDeficit {
+  0.6108kPaVPD * exp_0_3_1(
+    17.27 * ((t - 0°C) / 1Δ°C) / (((t - 0°C) / 1Δ°C) + 237.3)
+  ) * (1 - rh / 100%RH)
+}
+control HumidificationDemand {
+  sensor air: Temperature {
+    sample = 1s; valid = 0°C .. 50°C;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor humidity: RelativeHumidity {
+    sample = 1s; valid = 0%RH .. 100%RH;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor light: PPFD {
+    sample = 1s; valid = 0umol/m2/s .. 3000umol/m2/s;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  let climate: Result<VaporPressureDeficit, SensorFault> = case air {
+    ok(t) => case humidity {
+      ok(rh) => ok(air_vpd(t, rh));
+      fault(reason) => fault(reason);
+    };
+    fault(reason) => fault(reason);
+  };
+  let daylight = case light {
+    ok(ppfd) => ppfd >= 200umol/m2/s;
+    fault(_) => false;
+  };
+  state demand: Bool = false;
+  demand' = case climate {
+    ok(value) => if value > 1.2kPaVPD then true
+      else if value < 1.0kPaVPD then false else demand;
+    fault(_) => false;
+  };
+  output air_vpd_value: VaporPressureDeficit;
+  output vpd_valid, humidify_demand: Bool;
+  air_vpd_value <- climate |> recover(0kPaVPD);
+  vpd_valid <- case climate { ok(_) => true; fault(_) => false; };
+  humidify_demand <- daylight && demand';
+}
+```
+
+```ghost
+// E20
+fn exp_0_3_1(x: Number) -> Number {
+  1 + x / 1 * (1 + x / 2 * (1 + x / 3 * (1 + x / 4 * (1 + x / 5 * (1 + x / 6 * (1 + x / 7 * (1 + x / 8 * (1 + x / 9 * (1 + x / 10 * (1 + x / 11 * (1 + x / 12 * (1 + x / 13 * (1 + x / 14 * (1))))))))))))))
+}
+fn air_vpd(t: Temperature, rh: RelativeHumidity) -> VaporPressureDeficit {
+  0.6108kPaVPD * exp_0_3_1(
+    17.27 * ((t - 0°C) / 1Δ°C) / (((t - 0°C) / 1Δ°C) + 237.3)
+  ) * (1 - rh / 100%RH)
+}
+control VentilationDemand {
+  sensor air: Temperature {
+    sample = 1s; valid = 0°C .. 50°C;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor humidity: RelativeHumidity {
+    sample = 1s; valid = 0%RH .. 100%RH;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor light: PPFD {
+    sample = 1s; valid = 0umol/m2/s .. 3000umol/m2/s;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  let climate: Result<VaporPressureDeficit, SensorFault> = case air {
+    ok(t) => case humidity {
+      ok(rh) => ok(air_vpd(t, rh));
+      fault(reason) => fault(reason);
+    };
+    fault(reason) => fault(reason);
+  };
+  let daylight = case light {
+    ok(ppfd) => ppfd >= 200umol/m2/s;
+    fault(_) => false;
+  };
+  state demand: Bool = false;
+  demand' = case climate {
+    ok(value) => if value < 0.4kPaVPD then true
+      else if value > 0.6kPaVPD then false else demand;
+    fault(_) => false;
+  };
+  output air_vpd_value: VaporPressureDeficit;
+  output vpd_valid, ventilate_demand: Bool;
+  air_vpd_value <- climate |> recover(0kPaVPD);
+  vpd_valid <- case climate { ok(_) => true; fault(_) => false; };
+  ventilate_demand <- daylight && demand';
+}
+```
+
+```ghost
+// E21
+fn exp_0_3_1(x: Number) -> Number {
+  1 + x / 1 * (1 + x / 2 * (1 + x / 3 * (1 + x / 4 * (1 + x / 5 * (1 + x / 6 * (1 + x / 7 * (1 + x / 8 * (1 + x / 9 * (1 + x / 10 * (1 + x / 11 * (1 + x / 12 * (1 + x / 13 * (1 + x / 14 * (1))))))))))))))
+}
+fn air_vpd(t: Temperature, rh: RelativeHumidity) -> VaporPressureDeficit {
+  0.6108kPaVPD * exp_0_3_1(
+    17.27 * ((t - 0°C) / 1Δ°C) / (((t - 0°C) / 1Δ°C) + 237.3)
+  ) * (1 - rh / 100%RH)
+}
+control IrrigationDemand {
+  sensor air: Temperature {
+    sample = 1s; valid = 0°C .. 50°C;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor humidity: RelativeHumidity {
+    sample = 1s; valid = 0%RH .. 100%RH;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor light: PPFD {
+    sample = 1s; valid = 0umol/m2/s .. 3000umol/m2/s;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  let climate: Result<VaporPressureDeficit, SensorFault> = case air {
+    ok(t) => case humidity {
+      ok(rh) => ok(air_vpd(t, rh));
+      fault(reason) => fault(reason);
+    };
+    fault(reason) => fault(reason);
+  };
+  let daylight = case light {
+    ok(ppfd) => ppfd >= 300umol/m2/s;
+    fault(_) => false;
+  };
+  state demand: Bool = false;
+  demand' = case climate {
+    ok(value) => if value > 1.0kPaVPD then true
+      else if value < 0.8kPaVPD then false else demand;
+    fault(_) => false;
+  };
+  output air_vpd_value: VaporPressureDeficit;
+  output vpd_valid, irrigation_demand: Bool;
+  air_vpd_value <- climate |> recover(0kPaVPD);
+  vpd_valid <- case climate { ok(_) => true; fault(_) => false; };
+  irrigation_demand <- daylight && demand';
+}
+```
+
+```ghost
+// E22
+import HighVpd from "./E19.ghost.md"
+  revision "7e135b93ea4c4988d305f992db277a6d8581a271"
+  sha256 "ef80061222c5c671b8b78d8fae733b543e51149c7e5d2c7d5e2bb2cc41fbdb30";
+import LowVpd from "./E20.ghost.md"
+  revision "7e135b93ea4c4988d305f992db277a6d8581a271"
+  sha256 "bbf57007c5973684660747c515bb2534124d50341647b2282bd2ca32852a724b";
+control CombinedVpdDemands {
+  sensor air: Temperature {
+    sample = 1s; valid = 0°C .. 50°C;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor humidity: RelativeHumidity {
+    sample = 1s; valid = 0%RH .. 100%RH;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor light: PPFD {
+    sample = 1s; valid = 0umol/m2/s .. 3000umol/m2/s;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  output air_vpd_value: VaporPressureDeficit;
+  output vpd_valid, humidify_demand, ventilate_demand: Bool;
+  instance high: HighVpd;
+  instance low: LowVpd;
+  connect high.air <- air;
+  connect high.humidity <- humidity;
+  connect high.light <- light;
+  connect low.air <- air;
+  connect low.humidity <- humidity;
+  connect low.light <- light;
+  connect air_vpd_value <- high.air_vpd_value;
+  connect vpd_valid <- high.vpd_valid;
+  connect humidify_demand <- high.humidify_demand;
+  connect ventilate_demand <- low.ventilate_demand;
+}
+```
+
+```ghost
+// E33
+control PhysicalQuantityUnits {
+  input air: Temperature;
+  input temperature_change: TemperatureDelta;
+  input humidity: RelativeHumidity;
+  input pressure: Pressure;
+  input vpd: VaporPressureDeficit;
+  input co2: CO2Concentration;
+  input flow: FlowRate;
+  input tank_volume: Volume;
+  input pipe_length: Length;
+  sensor irradiance: Irradiance {
+    sample = 1s; valid = 0W/m2 .. 1500W/m2;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor ppfd: PPFD {
+    sample = 1s; valid = 0umol/m2/s .. 3000umol/m2/s;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  input stored_energy: Energy;
+  input rated_power: Power;
+  input current: ElectricalCurrent;
+  input voltage: Voltage;
+  input conductivity: Conductivity;
+  input acidity: Acidity;
+
+  output temperature_ok, change_ok, humidity_ok, pressure_ok, vpd_ok: Bool;
+  output co2_ok, volume_ok, length_ok, irradiance_ok, ppfd_ok: Bool;
+  output energy_ok, power_ok, current_ok, voltage_ok, conductivity_ok, acidity_ok: Bool;
+  output pumped_volume: Volume;
+  output motor_power: Power;
+  output hourly_energy: Energy;
+
+  let motor_load = voltage * current;
+  temperature_ok <- air >= 25°C && air >= 77°F;
+  change_ok <- temperature_change >= 5Δ°C && temperature_change >= 9Δ°F;
+  humidity_ok <- humidity >= 70%RH;
+  pressure_ok <- pressure >= 100kPa;
+  vpd_ok <- vpd >= 1kPaVPD;
+  co2_ok <- co2 >= 800ppm;
+  volume_ok <- tank_volume >= 20L;
+  length_ok <- pipe_length >= 35cm;
+  irradiance_ok <- case irradiance { ok(value) => value >= 300W/m2; fault(_) => false; };
+  ppfd_ok <- case ppfd { ok(value) => value >= 600umol/m2/s; fault(_) => false; };
+  energy_ok <- stored_energy >= 1kWh;
+  power_ok <- rated_power >= 150W;
+  current_ok <- current >= 800mA;
+  voltage_ok <- voltage >= 24V;
+  conductivity_ok <- conductivity >= 1.5mS/cm;
+  acidity_ok <- acidity <= 6.5pH;
+  pumped_volume <- flow * 1min;
+  motor_power <- motor_load;
+  hourly_energy <- motor_load * 1h;
+}
+```
+
+```ghost-error
+control BareSensor {
+  sensor moisture: Percent;
+  output pump: Bool;
+  pump <- moisture < 30%;
+}
+```
+
+```ghost
+// E31
+import Irrigation from "./E21.ghost.md"
+  revision "7e135b93ea4c4988d305f992db277a6d8581a271"
+  sha256 "d461a2a0f722271a172ce4c3d66665dad8f3a58a54079712e4bd3adb55f003a0";
+import Ventilation from "./E20.ghost.md"
+  revision "7e135b93ea4c4988d305f992db277a6d8581a271"
+  sha256 "bbf57007c5973684660747c515bb2534124d50341647b2282bd2ca32852a724b";
+control CombinedGreenhouseDemands {
+  sensor air: Temperature {
+    sample = 1s; valid = 0°C .. 50°C;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor humidity: RelativeHumidity {
+    sample = 1s; valid = 0%RH .. 100%RH;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  sensor light: PPFD {
+    sample = 1s; valid = 0umol/m2/s .. 3000umol/m2/s;
+    filter = median(1); stale_after = 3s; recover_after = 1 samples;
+  }
+  output irrigation_demand, ventilate_demand: Bool;
+  instance watering: Irrigation;
+  instance fan: Ventilation;
+  connect watering.air <- air;
+  connect watering.humidity <- humidity;
+  connect watering.light <- light;
+  connect fan.air <- air;
+  connect fan.humidity <- humidity;
+  connect fan.light <- light;
+  connect irrigation_demand <- watering.irrigation_demand;
+  connect ventilate_demand <- fan.ventilate_demand;
+}
+```

@@ -35,11 +35,11 @@ function clone(value) {
 const traceableTimerControl = `control TraceableTimer {
   input running: Bool;
   state enabled: Bool = false;
-  enabled' = running;
+  enabled' = running |> recover(false);
   timer age = elapsed(enabled);
   output pump, permit: Bool;
   pump <- enabled';
-  permit <- running;
+  permit <- running |> recover(false);
   require pump => permit;
   require !(pump && permit);
 }`;
@@ -168,7 +168,7 @@ test('REF-00-001: equal control bytes retain separate original intent and docume
     '  input request: Bool;',
     '  // ghostflow:link id=GF-INT-REQUEST relation=implements',
     '  output pump: Bool;',
-    '  pump <- request;',
+    '  pump <- request |> recover(false);',
     '}',
     '```',
     '',
@@ -310,7 +310,7 @@ test('continuous timer restoration rejects descriptor, role, source-mode, and de
 \`\`\`ghost
 control ContinuousTrace {
   input hot, backup: Bool;
-  timer hot_for = continuous_true(hot);
+  timer hot_for = continuous_true(hot |> recover(false));
   output ready: Bool;
   ready <- hot_for >= 30ms;
 }
@@ -339,7 +339,7 @@ control ContinuousTrace {
       const dependency = value.map.traceMetadata.dependencies.find(entry => (
         entry.target.field === 'timerValue' && entry.target.name === 'hot_for'
       ));
-      dependency.reads = dependency.reads.filter(read => read.name !== 'hot');
+      dependency.reads = dependency.reads.filter(read => read.name !== '__gf_sensor_value_hot');
     }],
     ['extra condition dependency read', value => {
       const dependency = value.map.traceMetadata.dependencies.find(entry => (
@@ -352,7 +352,7 @@ control ContinuousTrace {
         entry.target.field === 'timerValue' && entry.target.name === 'hot_for'
       ));
       // A real, same-typed input passes name/type checks but is not the source dependency.
-      dependency.reads.find(read => read.name === 'hot').name = 'backup';
+      dependency.reads.find(read => read.name === '__gf_sensor_value_hot').name = '__gf_sensor_value_backup';
     }, /value dependencies do not match canonical source lowering/],
   ];
   for (const [label, mutate, diagnostic = /timer|binding|descriptor|mode|dependenc|canonical/i] of mutations) {

@@ -17,11 +17,11 @@ control Live {
   state count: Int = 0;
   count' = count + 1;
   state active: Bool = false;
-  active' = enabled;
+  active' = enabled |> recover(false);
   timer age = elapsed(active);
   output expired, pump, permit: Bool;
   expired <- age >= 2000ms;
-  pump <- enabled;
+  pump <- enabled |> recover(false);
   permit <- false;
   require pump => permit;
 }
@@ -45,9 +45,13 @@ test('live scans start at zero, advance timers, and retain state beyond 256 scan
   assert.equal(last.stateAfter.count, 300);
   assert.equal(last.safeVirtualIntent.expired, true);
   assert.throws(() => session.scan(0, inputs), /backwards/);
-  assert.throws(() => session.scan(2300, []), /missing input/);
+  const clockOnly = session.scan(2300, []);
+  assert.equal(clockOnly.scanId, 300);
+  assert.equal(clockOnly.stateAfter.count, 301);
+  assert.equal(clockOnly.inputs.__gf_sensor_value_enabled, last.inputs.__gf_sensor_value_enabled,
+    'clock-only scans retain the last observation instead of supplying a synthetic value');
   assert.throws(() => session.scan(2300, [{ ...inputs[0], type: 'Number', value: 1 }]), /type mismatch/);
-  assert.equal(session.scan(2300, inputs).scanId, 300);
+  assert.equal(session.scan(2300, inputs).scanId, 301);
   session.dispose();
   assert.throws(() => session.scan(2301, inputs), /disposed/);
 });

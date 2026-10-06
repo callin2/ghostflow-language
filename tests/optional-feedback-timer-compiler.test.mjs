@@ -13,6 +13,6 @@ test('optional observation timer example compiles from one canonical source', ()
   const artifact = compileSourceSync(source, { filename });
   assert.deepEqual(artifact.manifest.outputs, [{ name: 'drive', type: 'Bool' }]);
   assert.deepEqual(artifact.manifest.timers, [{ name: 'age', state: 'run', clockInput: '__gf_now_ms' }]);
-  assert.equal(artifact.manifest.sensors[0].name, 'observation');
+  assert.equal(artifact.manifest.sensors.find(sensor => sensor.name === 'observation')?.optional, true);
   assert.equal(artifact.manifest.strategies.length, 2);
 });

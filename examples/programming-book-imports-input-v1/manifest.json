@@ -1,0 +1,63 @@
+{
+  "format": "GhostFlow/programming-book-import-package-v1",
+  "root": {
+    "filename": "E22.ghost.md",
+    "sha256": "c229bd2dcbf7a07ae0626e2ffb6c2c264988d7739f26c03727a404498bf47d24",
+    "canonicalSource": {
+      "path": "docs/ProgrammingInGhostflow.md",
+      "example": "E22"
+    }
+  },
+  "imports": [
+    {
+      "filename": "E19.ghost.md",
+      "revision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773",
+      "sha256": "7bc10efed87a3db2bbf2e5b56fbf0d6c9a45b54117104d3fa0948baa01f695b4",
+      "canonicalSource": {
+        "path": "docs/ProgrammingInGhostflow.md",
+        "example": "E19"
+      }
+    },
+    {
+      "filename": "E20.ghost.md",
+      "revision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773",
+      "sha256": "9928297e43cd7c9790e6ca5178e71f4fd815223654fcd0b16fcc9605ea24bf38",
+      "canonicalSource": {
+        "path": "docs/ProgrammingInGhostflow.md",
+        "example": "E20"
+      }
+    }
+  ],
+  "compositions": [
+    {
+      "root": {
+        "filename": "E31.ghost.md",
+        "sha256": "62f357b7cf4c74ebfb5fe527df7e11f68d719df316e7c289740194ee48756771",
+        "canonicalSource": {
+          "path": "docs/ProgrammingInGhostflow.md",
+          "example": "E31"
+        }
+      },
+      "imports": [
+        {
+          "filename": "E21.ghost.md",
+          "revision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773",
+          "sha256": "089daea1b525b0be49685b3595554bfb1aa67091fc995da2d65fb0ef9a24357d",
+          "canonicalSource": {
+            "path": "docs/ProgrammingInGhostflow.md",
+            "example": "E21"
+          }
+        },
+        {
+          "filename": "E20.ghost.md",
+          "revision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773",
+          "sha256": "9928297e43cd7c9790e6ca5178e71f4fd815223654fcd0b16fcc9605ea24bf38",
+          "canonicalSource": {
+            "path": "docs/ProgrammingInGhostflow.md",
+            "example": "E20"
+          }
+        }
+      ]
+    }
+  ]
+}

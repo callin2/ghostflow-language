@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
+import { enterVerification } from '../scripts/verification-entry.mjs';
 import { fileURLToPath } from 'node:url';
 import { extractLiterate } from './literate.mjs';
 import { compileSource } from './toolchain.mjs';
@@ -13,10 +14,19 @@ import { readCatalog, validateCatalog } from '../contracts/requirements/validate
 
 // Deliberately explicit. Product/LLM/device tests belong to other repositories.
 export const LANGUAGE_TESTS = Object.freeze([
+  'tests/canonical-input.test.mjs',
+  'tests/build-identity.test.mjs',
+  'tests/software-input-producer.test.mjs',
+  'tests/input-recovery-rop.test.mjs',
+  'tests/input-fault-restart.test.mjs',
+  'tests/curriculum-start-quality.test.mjs',
+  'tests/curriculum-pc05-quality.test.mjs',
+  'tests/curriculum-pc06-10-quality.test.mjs',
   'tests/doc-translations.test.mjs',
   'tests/doc-index.test.mjs',
   'tests/verified-wasm-artifact.test.mjs',
   'tests/ci-verification-routing.test.mjs',
+  'tests/delete-merged-pr-branch.test.mjs',
   'tests/cli-process.test.mjs',
   'tests/boundary-conformance.test.mjs',
   'tests/host-event-ordering-contract.test.mjs',
@@ -34,6 +44,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/reference-simulator.test.mjs',
   'tests/adapt-control-host.test.mjs',
   'tests/adaptation-settings-host.test.mjs',
+  'tests/temporary-settings-reference.test.mjs',
   'tests/optional-feedback-timer-compiler.test.mjs',
   'tests/optional-feedback-timer.test.mjs',
   'tests/explicit-feedback-adoption-compiler.test.mjs',
@@ -106,24 +117,33 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/compiler-schedule-duplicates.test.mjs',
   'tests/daily-slots-policy.test.mjs',
   'tests/periodic-cron-policy.test.mjs',
+  'tests/civil-dst-reference.test.mjs',
   'tests/natural-condition-contract.test.mjs',
   'tests/natural-schedule-contract.test.mjs',
   'tests/natural-fallback-compiler.test.mjs',
   'tests/natural-fallback-runtime.test.mjs',
   'tests/accounting-syntax.test.mjs',
   'tests/accounting-wasm.test.mjs',
+  'tests/reference-03-048-local-day-accounting.test.mjs',
+  'tests/rolling-overlap-admission-boundary.test.mjs',
   'tests/applied-ledger-evidence-boundary.test.mjs',
   'tests/ghost-timeline-noninterference.test.mjs',
   'tests/event-count-accounting-faults.test.mjs',
   'tests/accounting-admission-faults.test.mjs',
+  'tests/accounting-reboot-budget.test.mjs',
+  'tests/stop-delay-reservation-reference.test.mjs',
   'tests/context-wasm-boundaries.test.mjs',
   'tests/calendar-provider.test.mjs',
   'tests/calendar-execution.test.mjs',
   'tests/calendar-runtime.test.mjs',
   'tests/reference-calendar-boundary.test.mjs',
+  'tests/calendar-host-parity-reference.test.mjs',
   'tests/reference-distinct-states.test.mjs',
+  'tests/cancellation-boundary-reference.test.mjs',
   'tests/solar-config-compiler.test.mjs',
   'tests/solar-config-runtime.test.mjs',
+  'tests/tide-occurrence-identity.test.mjs',
+  'tests/tide-run-late-constraint.test.mjs',
   'tests/atomic-duration-slots.test.mjs',
   'tests/clock-timer-domain-boundary.test.mjs',
   'tests/solar-admitted-observation.test.mjs',
@@ -162,6 +182,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/temporal-replay-wasm.test.mjs',
   'tests/core-replay-wasm.test.mjs',
   'tests/what-if-replay.test.mjs',
+  'tests/reuse-provenance-reference.test.mjs',
   'tests/temporal-resource-plan-wasm.test.mjs',
     'tests/range-contract.test.mjs',
     'tests/range-runtime.test.mjs',
@@ -180,18 +201,21 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/core-irrigation-proof.test.mjs',
   'tests/pc-01-projection-sync.test.mjs',
   'tests/integration-contract.test.mjs',
+  'tests/software-input-reference.test.mjs',
   'tests/interaction-contract.test.mjs',
   'tests/interaction-counter.test.mjs',
   'tests/interaction-corpus.test.mjs',
   'tests/interaction-emission.test.mjs',
   'tests/enum-member-label.test.mjs',
   'tests/interaction-runtime-snapshot.test.mjs',
+  'tests/observation-event-history-reference.test.mjs',
   'tests/observation-no-write.test.mjs',
   'tests/interaction-settings.test.mjs',
   'tests/renderer-setting-validation.test.mjs',
   'tests/settings-execution-revalidation.test.mjs',
   'tests/settings-default-provenance.test.mjs',
   'tests/snapshot-identity-join.test.mjs',
+  'tests/explanation-path.test.mjs',
   'tests/intent-anchor-map.test.mjs',
   'tests/ledger.test.mjs',
   'tests/literate.test.mjs',
@@ -202,7 +226,10 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/import-header.test.mjs',
   'tests/import-composition.test.mjs',
   'tests/composition-execution.test.mjs',
+  'tests/composition-contract-reference.test.mjs',
   'tests/composition-order-independence.test.mjs',
+  'tests/instance-identity-reference.test.mjs',
+  'tests/instance-trace-projection.test.mjs',
   'tests/composition-state-feedback-boundary.test.mjs',
   'tests/competing-output-writers.test.mjs',
   'tests/pinned-import-closure.test.mjs',
@@ -254,7 +281,8 @@ const PLC_CURRICULUM_IDS = Object.freeze([
 ]);
 const PLC_CURRICULUM_IMPORTED_REPOSITORY = 'callin2/farm_studio_system';
 const PLC_CURRICULUM_IMPORTED_REVISION = '056a1c88cdfe3276700f6b6a819b715370af20eb';
-const args = process.argv.slice(2);
+const args = enterVerification();
+await import('../scripts/require-build-context.mjs');
 if (args.length > 1 || (args.length === 1 && !['--node-only', '--curriculum-only'].includes(args[0]))) {
   console.error('usage: node tools/verify-language.mjs [--node-only|--curriculum-only]');
   process.exitCode = 2;
@@ -481,6 +509,11 @@ async function verify(nodeOnly, curriculumOnly) {
     console.error(error.message);
   } finally {
     report.finishedAt = new Date().toISOString();
+    if (report.passed && report.wasm?.builtByThisRun) {
+      report.buildIdentity = JSON.parse(fs.readFileSync(process.env.FARM_BUILD_IDENTITY_FILE));
+      fs.mkdirSync(path.join(root, 'build'), { recursive: true });
+      fs.writeFileSync(path.join(root, 'build/build-identity.json'), JSON.stringify({ identity: report.buildIdentity, wasmSha256: report.wasm.sha256, nativeSha256: report.native?.sha256, framedNativeSha256: report.framedNative?.sha256 }, null, 2) + '\n');
+    }
     const build = path.join(root, 'build');
     const history = path.join(build, 'verification-runs');
     fs.mkdirSync(history, { recursive: true });

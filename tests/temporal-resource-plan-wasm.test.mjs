@@ -10,7 +10,7 @@ const source = `# Temporal resource plan
 
 \`\`\`ghost
 control TemporalResourcePlan {
-  sensor probe: Number;
+  input probe: Number;
   signal inner = window_average(probe, over: 2ms, quality: measured, max_age: 2ms);
   signal outer = window_average(inner, over: 10ms, quality: measured, max_age: 10ms);
   output value: Number;
@@ -27,7 +27,9 @@ const WIDTH = Object.freeze({
   Window: 416, WindowCheckpoint: 232, RootDensity: 16, RootState: 56, Observation: 40,
   EvidenceWindow: 936, EvidenceCheckpoint: 512, EvidencePoint: 64, ProofNode: 72,
   TemporalRuntime: 120, TemporalPlan: 64, WindowPlan: 32, Slot: 952, Snapshot: 48,
-  WindowTrace: 224, Value: 16, ResultTraceEvent: 12, RootInput: 40, Vec: 12, ScanOutcome: 200,
+  // Optional instruction-witness Vec adds 12 bytes plus 4 bytes of alignment
+  // even when capture is disabled; framed replay must budget that header.
+  WindowTrace: 224, Value: 16, ResultTraceEvent: 12, RootInput: 40, Vec: 12, ScanOutcome: 216,
 });
 
 function windowGeometry(overMs, upstream = [], prior = []) {
@@ -74,8 +76,8 @@ function temporalBytes(journalCapacity) {
 const LIVE_ORACLE = temporalBytes(1024);
 const REPLAY_ORACLE = temporalBytes(3);
 const LEGACY_REPLAY_PEAK = LIVE_ORACLE.bytes + REPLAY_ORACLE.bytes + 3 * 24;
-// Independent wasm32 compiler probing measures ScanOutcomeV1 at 200 bytes:
-// the resource trace Vec adds 12 bytes and absorbs 4 bytes of prior padding.
+// The wasm32 layout is 216 bytes after adding the optional witness Vec;
+// framed replay budgets the complete return header, including its alignment.
 const FRAMED_REPLAY_PEAK = LEGACY_REPLAY_PEAK + 3 * WIDTH.ScanOutcome;
 
 function profile(sourceTag, changes = {}) {

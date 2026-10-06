@@ -1,5 +1,7 @@
 # GhostFlow 공통 제약과 센서 신호 계약
 
+2026-10-05 외부 입력 개정은 품질 정보를 갖는 선언에 `input`을 사용한다. 기존 조건화와 명시적인 `Result` 고장 분기는 그대로 유지하며, 이전 `sensor` 발췌는 `tests/fixtures/history/issue531/`에 보존한다.
+
 2026-09-24 · 공통 설계 계약. 운영 설정의 현재 문법과 의미는
 [Reference §5.1–5.2](reference/05-settings-and-observation.md)를 따른다.
 실행 범위는 [구현 범위](IMPLEMENTATION.md), [추적성](TRACEABILITY.md)을 참조한다.
@@ -38,10 +40,24 @@ source만 컴파일한 checked descriptor가 자동으로 실행 artifact로 바
 
 ```ghost
 control LocalPump {
-  input request, valve_ready: Bool;
+  state displayed_pump: Bool = false;
+  displayed_pump' = if request_good && !request then false else if request_good then request else displayed_pump;
+  state displayed_valve: Bool = false;
+  displayed_valve' = if valve_ready_good && !valve_ready then false else if valve_ready_good then valve_ready else displayed_valve;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_request: Bool = false;
+  let request_good = case observed_request { ok(_) => true; fault(_) => false; };
+  let request = case observed_request { ok(value) => value; fault(_) => remembered_request; };
+  remembered_request' = request;
+  state remembered_valve_ready: Bool = false;
+  let valve_ready_good = case observed_valve_ready { ok(_) => true; fault(_) => false; };
+  let valve_ready = case observed_valve_ready { ok(value) => value; fault(_) => remembered_valve_ready; };
+  remembered_valve_ready' = valve_ready;
+  input observed_request: Bool;
+  input observed_valve_ready: Bool;
   output pump, valve: Bool;
-  pump <- request;
-  valve <- valve_ready;
+  pump <- displayed_pump';
+  valve <- displayed_valve';
   constraints LocalRules {
     require at safe_output pump => valve;
   }
@@ -55,13 +71,37 @@ binding 없는 이 policy를 거부한다. 별도의 명시 bound compilation이
 
 ```ghost
 control SharedPumpPolicy {
+  state displayed_pump: Bool = false;
+  displayed_pump' = if pump_request_good && !pump_request then false else if pump_request_good then pump_request else displayed_pump;
+  state displayed_valve: Bool = false;
+  displayed_valve' = if valve_request_good && !valve_request then false else if valve_request_good then valve_request else displayed_valve;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_automatic: Bool = false;
+  let automatic_good = case observed_automatic { ok(_) => true; fault(_) => false; };
+  let automatic = case observed_automatic { ok(value) => value; fault(_) => remembered_automatic; };
+  remembered_automatic' = automatic;
+  state remembered_manual: Bool = false;
+  let manual_good = case observed_manual { ok(_) => true; fault(_) => false; };
+  let manual = case observed_manual { ok(value) => value; fault(_) => remembered_manual; };
+  remembered_manual' = manual;
+  state remembered_pump_request: Bool = false;
+  let pump_request_good = case observed_pump_request { ok(_) => true; fault(_) => false; };
+  let pump_request = case observed_pump_request { ok(value) => value; fault(_) => remembered_pump_request; };
+  remembered_pump_request' = pump_request;
+  state remembered_valve_request: Bool = false;
+  let valve_request_good = case observed_valve_request { ok(_) => true; fault(_) => false; };
+  let valve_request = case observed_valve_request { ok(value) => value; fault(_) => remembered_valve_request; };
+  remembered_valve_request' = valve_request;
   resource station: Station;
   resource pump1: BoolActuator;
   resource valve1: BoolActuator;
-  input automatic, manual, pump_request, valve_request: Bool;
+  input observed_automatic: Bool;
+  input observed_manual: Bool;
+  input observed_pump_request: Bool;
+  input observed_valve_request: Bool;
   output pump, valve: Bool;
-  pump <- pump_request;
-  valve <- valve_request;
+  pump <- displayed_pump';
+  valve <- displayed_valve';
   constraints SharedRules for station {
     exclusive at admission { automatic, manual };
     require at safe_output pump1.on => any_on({ valve1 });
@@ -573,7 +613,7 @@ MCU에서는 지원한 제약만 제한된 비교·카운터·상태 기계·허
 명시적인 센서 그래프 노드로 생성된다.
 
 ```text
-sensor moisture: Percent {
+input moisture: Percent {
   sample = 1s;
   valid = 0% .. 100%;
   filter = median(5);
@@ -639,9 +679,19 @@ NotReady부터 다시 준비하는 것이다. 오래된 정상값을 바로 복�
 
 ```ghost
 control MoistureDemand {
-  input start, stop: Bool;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_start: Bool = false;
+  let start_good = case observed_start { ok(_) => true; fault(_) => false; };
+  let start = case observed_start { ok(value) => value; fault(_) => remembered_start; };
+  remembered_start' = start;
+  state remembered_stop: Bool = false;
+  let stop_good = case observed_stop { ok(_) => true; fault(_) => false; };
+  let stop = case observed_stop { ok(value) => value; fault(_) => remembered_stop; };
+  remembered_stop' = stop;
+  input observed_start: Bool;
+  input observed_stop: Bool;
 
-  sensor moisture: Percent {
+  input moisture: Percent {
     sample = 1s;
     valid = 0% .. 100%;
     filter = median(5);
@@ -662,7 +712,7 @@ control MoistureDemand {
   state watering: Bool = false;
   output pump, valve: Bool;
 
-  watering' = !stop && dry_ok && (start || watering);
+  watering' = if start_good && stop_good then (!stop && dry_ok && (start || watering)) else watering;
   valve <- watering';
   pump  <- watering';
   require pump => valve;

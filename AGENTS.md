@@ -93,6 +93,31 @@ benchmark evidence fixed; diagnose any remaining mismatch rather than rewriting 
   data, or deployment need. Historical raw material may remain as clearly
   isolated evidence, never as an executable fallback.
 
+## Automatic build identity — System #199
+
+`npm run build:wasm`, `make wasm`, `npm test` and direct verifier commands allocate
+online through the exact-byte System tool pinned in `scripts/vendor/BUILD-IDENTITY.json`.
+Every Cargo crate currently has base version 0.1.0. The build hook checks that
+agreement before allocation; a future divergence requires an explicit artifact
+base-version contract. Do not manually choose numbers or bypass the internal guard.
+Raw Cargo is dependency/developer compilation, not an official identified handoff.
+
+Generated `build/build-identity.json` binds the issued full human build version to
+actual output SHA-256. Full verification includes native/framed output hashes and
+copies the identity into its report. CI packaging verifies actual WASM SHA/source
+and puts that same identity in the handoff manifest. Runtime ABI/exports remain
+unchanged. Historical pinned source without these hooks has no retrofitted ID.
+Failed rebuilds invalidate the prior identity before compilation and burn their
+number. Keep the metadata-only remote `build-counter` branch out of cleanup.
+Offline/read-only authority fails before compilation; never guess/reset a counter.
+
+`npm run test:build-identity` uses a local bare authority and a synthetic compiler
+to test identity propagation, failure burning and internal guards. It does not prove
+real WASM compilation; the existing full CI compiler/packaging gates do that.
+The shared canonical allocator is owned by
+[System #199](https://github.com/callin2/farm_studio_system/issues/199).
+Preserve its vendored bytes/checksum. Source SHA describes committed HEAD only.
+
 The migration export preserves compiler/runtime semantics. Format or ABI changes
 need an explicit compatibility decision and conformance tests; package version,
 source-language profile, GFB1 format, manifest format and Device firmware version

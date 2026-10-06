@@ -135,7 +135,7 @@ function mergeCoverage(entries, sourceLengths) {
   for (const entry of entries) for (const script of entry.result ?? []) {
     if (!script.url?.startsWith('file:')) continue;
     const filename = fileURLToPath(script.url);
-    const relative = path.relative(root, filename);
+    const relative = path.relative(root, filename).split(path.sep).join('/');
     if (!TARGETS.includes(relative)) continue;
     // Only on-disk source offsets may contribute to a real target. Browser VM
     // transforms also have distinct synthetic URLs in their harnesses.

@@ -8,7 +8,7 @@ test('true_for keeps the Driver-certified interval contract in the compiled mani
 
 \`\`\`ghost
 control TrueForEvidence {
-  sensor hot: Bool;
+  input hot: Bool;
   signal sustained = §true_for(hot, duration: 5min, quality: measured);
   output alarm: Bool;
   alarm <- sustained |> recover(false);

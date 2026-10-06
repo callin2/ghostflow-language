@@ -10,6 +10,12 @@ Markdown 설명은 실행되지 않으며 최상위 `ghost` 코드 블록만 소
 새 시작 입력이 없으면 `watering` 상태는 이전 값을 유지한다. 두 입력이 한 tick에 모두
 true여도 정지 요청이 시작보다 우선한다.
 
+새 revision `issue531-approved-fault-restart-v1`은 입력 고장 정책을 명시한다.
+START 고장은 새 시작을 차단하지만 STOP이 정상이고 해제되어 있으면 기존 운전을
+유지한다. STOP 고장은 운전을 해제한다. 고장으로 정지한 후에는 입력이 정상으로
+복구되고 START를 껐다 켜야 재시작한다. 물리 버튼의 존재를 강제하지 않는다.
+이전 문서의 정확한 bytes는 tests/fixtures/history/issue531에 보존되어 있다.
+
 ```ghost
 control LatchingPump {
   input start: Bool;
@@ -17,9 +23,18 @@ control LatchingPump {
 
   output pump, valve: Bool;
   state watering: Bool = false;
+  state restart_blocked: Bool = false;
 
-  // stop wins when start and stop arrive in the same tick.
-  watering' = !stop && (start || watering);
+  let start_good = case start { ok(_) => true; fault(_) => false; };
+  let stop_good = case stop { ok(_) => true; fault(_) => false; };
+  let start_requested = start |> recover(false);
+  let stop_requested = stop |> recover(true);
+
+  // Revision issue531-approved-fault-restart-v1: explicit authored fault policy.
+  // Faults block restart until a healthy START off-to-on request.
+  restart_blocked' = if !start_good || !stop_good then true
+                     else if !start_requested then false else restart_blocked;
+  watering' = !stop_requested && (watering || (start_requested && !restart_blocked));
 
   valve <- watering';
   pump  <- watering';

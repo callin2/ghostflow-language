@@ -4,6 +4,7 @@ import { extractLiterate, mapSourcePosition } from './literate.mjs';
 import { compileAccountingControl, compileControl, compileControlPolicyDescriptorArtifact, compileResourcePolicyArtifact, compileScheduleDescriptorArtifact, compileTemporalDescriptorArtifact, hasTemporalDescriptorCalls, isExecutablePulseSchedule, isExecutableRangeSchedule, parseControl } from './control.mjs';
 import { isWellFormedUnicode, sha256Hex, utf8ByteLength } from './sha256.mjs';
 import { compileComposition, resolveDocument } from './composition.mjs';
+import { emitExplanationArtifact } from './explanation.mjs';
 
 export { emitInteractionSchema } from './interaction-schema.mjs';
 
@@ -24,7 +25,9 @@ function attachDiagnostic(error, code, source, identity, position, end, requestS
     source: diagnosticSource(source.filename, source.text, identity),
     ...(requestSource ? { requestSource } : {}),
     diagnostics: [{
-      code: error.diagnosticCode ?? code, severity: 'error', message,
+      code: error.diagnosticCode ?? code, severity: 'error', message: error.diagnosticMessage ?? message,
+      ...(error.diagnosticHint ? { hint: error.diagnosticHint } : {}),
+      ...(error.diagnosticReference ? { reference: error.diagnosticReference } : {}),
       span: {
         file: position.file,
         start: { line: position.line, column: position.column },
@@ -237,12 +240,28 @@ export function compileSourceSync(source, options = {}) {
     extractionMap: extraction.sourceMap,
     warnings: extraction.warnings,
   };
-  const schema = interactionSourceIdentity === undefined ? null : emitInteractionSchema(compilation, interactionSourceIdentity);
+  let schema = null;
+  try {
+    if (interactionSourceIdentity !== undefined) schema = emitInteractionSchema(compilation, interactionSourceIdentity);
+  } catch (error) {
+    // Schema provenance failures already carry canonical source-map locations;
+    // mapping them through extracted code again would point into the wrong fence.
+    if (error.diagnosticCode === 'GF_INTENT_PROVENANCE') {
+      attachDiagnostic(error, error.diagnosticCode, sourceDocument, interactionSourceIdentity,
+        { file: error.filename, line: error.line, column: error.column },
+        Number.isInteger(error.loc?.endLine) && Number.isInteger(error.loc?.endColumn)
+          ? { line: error.loc.endLine, column: error.loc.endColumn } : undefined);
+    }
+    throw error;
+  }
+  const explanationArtifact = emitExplanationArtifact(compilation);
+  const { explanationExpressions: _expressionMappings, ...publicCompilation } = compilation;
   return {
-    ...compilation,
+    ...publicCompilation,
     diagnosticEnvelope: { format: DIAGNOSTICS_FORMAT,
       source: diagnosticSource(filename, source, interactionSourceIdentity), diagnostics: [] },
     interactionSchema: schema,
+    explanationArtifact,
     interactionSourceIdentity: schema ? {
       documentId: schema.source.documentId,
       revisionId: schema.source.revisionId,

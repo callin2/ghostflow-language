@@ -23,7 +23,10 @@ Common stop/protection permission such as `stop_ok` is not mixed into this lesso
 inputs; it is combined again in PC-08/PC-10. `fill_pump` is a logical command to
 the filling contactor, not feedback that the pump actually runs.
 
+This explicit input revision consumes producer quality, not physical button diagnostics. Good(false) remains a normal observation. Unknown request/position/mode observations do not establish a new request, released request, position, or mode; existing state is retained where no observation justifies a transition. Existing protection permission requires a confirmed Good(true), and existing hard time limits remain effective. No new START input or global restart policy is added.
+
 ```ghost
+// Source revision: issue531-producer-quality-pc07-v1
 control TankLevelHysteresis {
   input low_level_reached, high_level_reached: Bool;
   output fill_pump: Bool;
@@ -32,17 +35,23 @@ control TankLevelHysteresis {
   // ghostflow:link id=GF-INT-PC07-TANK-HYSTERESIS-V1 relation=implements
   state phase: Phase = Idle;
 
-  let conflict = high_level_reached && !low_level_reached;
+  let low_level_reached_true = case low_level_reached { ok(value) => value; fault(_) => false; };
+  let low_level_reached_false = case low_level_reached { ok(value) => !value; fault(_) => false; };
+  let high_level_reached_true = case high_level_reached { ok(value) => value; fault(_) => false; };
+  let high_level_reached_false = case high_level_reached { ok(value) => !value; fault(_) => false; };
+  let levels_good = case low_level_reached { ok(_) => case high_level_reached { ok(_) => true; fault(_) => false; }; fault(_) => false; };
 
-  phase' = case phase {
+  let conflict = high_level_reached_true && low_level_reached_false;
+
+  phase' = if !levels_good then phase else case phase {
     Idle =>
       if conflict then SensorConflict
-      else if !low_level_reached then Filling
+      else if low_level_reached_false then Filling
       else Idle;
 
     Filling =>
       if conflict then SensorConflict
-      else if high_level_reached then Idle
+      else if high_level_reached_true then Idle
       else Filling;
 
     SensorConflict =>

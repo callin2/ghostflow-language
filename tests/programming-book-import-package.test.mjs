@@ -22,14 +22,23 @@ const englishBaseline = {
   E19: 'b79efd0fad0a4d8ff39ba360dedcc5fc74f6197e760be54316c8811f5488cb8f',
   E20: '328c1224255dc3facd7ef2250fd8ccbf06f31dae48ab50b9e30af84416908247',
 };
+const inputRevisionBaseline = {
+  E19: '7bc10efed87a3db2bbf2e5b56fbf0d6c9a45b54117104d3fa0948baa01f695b4',
+  E20: '9928297e43cd7c9790e6ca5178e71f4fd815223654fcd0b16fcc9605ea24bf38',
+  E21: '089daea1b525b0be49685b3595554bfb1aa67091fc995da2d65fb0ef9a24357d',
+};
+const englishInputRevisionBaseline = {
+  E19: '945cfec9750a53bcd707f645d37b97d7dc3b6769c63136603dc14047880ba5d9',
+  E20: '50c9671fecf17ebe3a693d30ab70ce16cef9a95a320eae5f0728e4a522cb187a',
+};
 const digest = text => createHash('sha256').update(text).digest('hex');
 
-test('generated import package preserves reviewed E19 and E20 sections byte for byte', () => {
+test('new input revision preserves its separately reviewed E19 and E20 section bytes', () => {
   const derived = deriveProgrammingBookImportPackage(book);
-  assert.equal(PROGRAMMING_BOOK_IMPORT_REVISION, '7e135b93ea4c4988d305f992db277a6d8581a271');
+  assert.equal(PROGRAMMING_BOOK_IMPORT_REVISION, 'c8a5d37ac09230a9011291a3ae3b053d1bc22773');
   assert.deepEqual(derived.manifest.imports.map(item => [item.filename, item.revision, item.sha256]), [
-    ['E19.ghost.md', PROGRAMMING_BOOK_IMPORT_REVISION, baseline.E19],
-    ['E20.ghost.md', PROGRAMMING_BOOK_IMPORT_REVISION, baseline.E20],
+    ['E19.ghost.md', PROGRAMMING_BOOK_IMPORT_REVISION, inputRevisionBaseline.E19],
+    ['E20.ghost.md', PROGRAMMING_BOOK_IMPORT_REVISION, inputRevisionBaseline.E20],
   ]);
   for (const id of ['E19', 'E20', 'E21']) {
     const start = book.indexOf(`### ${id} —`);
@@ -38,13 +47,32 @@ test('generated import package preserves reviewed E19 and E20 sections byte for 
   }
 });
 
-test('both authored languages preserve the reviewed E19 and E20 section bytes', () => {
-  for (const [document, expected] of [[book, baseline], [englishBook, englishBaseline]]) {
+test('both authored languages preserve the new reviewed E19 and E20 section bytes', () => {
+  for (const [document, expected] of [[book, inputRevisionBaseline], [englishBook, englishInputRevisionBaseline]]) {
     for (const id of ['E19', 'E20']) {
       const start = document.indexOf(`### ${id} —`);
       const end = document.indexOf('\n### ', start + 1);
       assert.equal(digest(document.slice(start, end)), expected[id], `${id} reviewed section changed`);
     }
+  }
+});
+
+test('historical import closure and English sections retain their original identities independently', () => {
+  const manifestText = fs.readFileSync(new URL('examples/programming-book-imports/manifest.json', root), 'utf8');
+  assert.equal(digest(manifestText), '06aa8e8e78330e4cf7e31b5085db8a8b34e128c703c65867c0871ab7eea38131');
+  const manifest = JSON.parse(manifestText);
+  const records = [manifest.root, ...manifest.imports,
+    ...manifest.compositions.flatMap(item => [item.root, ...item.imports])];
+  for (const item of records) {
+    const historical = fs.readFileSync(new URL(`examples/programming-book-imports/${item.filename}`, root), 'utf8');
+    assert.equal(digest(historical), item.sha256, `${item.filename} historical source identity`);
+    if (item.revision) assert.equal(item.revision, '7e135b93ea4c4988d305f992db277a6d8581a271');
+  }
+  for (const [id, expected] of Object.entries(baseline)) {
+    assert.equal(digest(fs.readFileSync(new URL(`examples/programming-book-imports/${id}.ghost.md`, root), 'utf8')), expected);
+  }
+  for (const [id, expected] of Object.entries(englishBaseline)) {
+    assert.equal(digest(fs.readFileSync(new URL(`tests/fixtures/history/issue531/${id}.book.en.pre-input.txt`, root), 'utf8')), expected);
   }
 });
 
@@ -55,7 +83,7 @@ test('checked-in package exactly matches deterministic generation', () => {
   assert.deepEqual([...verified.files.keys()], ['E19.ghost.md', 'E20.ghost.md', 'E21.ghost.md', 'E22.ghost.md', 'E31.ghost.md']);
 });
 
-test('E31 pins and composes the original irrigation and ventilation programs', () => {
+test('E31 pins and composes the explicit input revision of irrigation and ventilation', () => {
   const derived = deriveProgrammingBookImportPackage(book);
   const composition = derived.manifest.compositions[0];
   assert.equal(composition.root.filename, 'E31.ghost.md');

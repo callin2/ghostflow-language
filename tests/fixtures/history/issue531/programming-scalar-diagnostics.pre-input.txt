@@ -1,0 +1,16 @@
+```ghost-error
+control MixedTypes {
+  input level: Number;
+  output pump: Bool;
+  pump <- level < 30%;
+}
+```
+
+```ghost-error
+control MixedCount {
+  input count: Int;
+  input measurement: Number;
+  output total: Number;
+  total <- count + measurement;
+}
+```

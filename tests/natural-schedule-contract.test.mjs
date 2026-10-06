@@ -9,7 +9,8 @@ import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 const wasm = fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
 
 const cases = JSON.parse(fs.readFileSync(new URL('./reference/cases/02-time-control.json', import.meta.url))).cases;
-const fixture = id => cases.find(entry => entry.id === id);
+const migratedCases = JSON.parse(fs.readFileSync(new URL('./reference/cases/02-time-control.input-v1.json', import.meta.url))).cases;
+const fixture = id => migratedCases.find(entry => entry.id === id) ?? cases.find(entry => entry.id === id);
 const code = id => {
   const entry = fixture(id);
   return extractLiterate(entry.source, { filename: entry.filename }).code;
@@ -40,9 +41,19 @@ test('Tide reference policy retains stable logical provider and event offset', (
   assert.equal(schedule.source, 'harbor_tides');
   assert.equal(schedule.event, 'high');
   assert.equal(schedule.offsetMs, -1_800_000);
-  assert.deepEqual(schedule.policy, {
+  const { cancelWhen, ...policy } = schedule.policy;
+  assert.equal(cancelWhen[0], 'or');
+  for (const [index, name] of ['stop', 'unsafe_level'].entries()) {
+    assert.equal(cancelWhen[index + 1][0], 'trace-result');
+    assert.deepEqual(cancelWhen[index + 1].slice(2), [
+      ['if', `input.__gf_sensor_ok_${name}`, `input.__gf_sensor_value_${name}`, 'true'],
+      ['if', `input.__gf_sensor_ok_${name}`, '0', ['add', `input.__gf_sensor_fault_${name}`, '1']],
+      ['if', `input.__gf_sensor_ok_${name}`, '0', String(index + 1)],
+    ]);
+  }
+  assert.deepEqual(policy, {
     basis: { kind: 'run', durationMs: 600_000, admission: { kind: 'within', durationMs: 300_000 } },
-    when: 'true', cancelWhen: ['or', 'input.stop', 'input.unsafe_level'],
+    when: 'true',
     clock: 'trusted_only', gapMs: 60_000, recovery: 'baseline', fallback: 'skip',
   });
 });

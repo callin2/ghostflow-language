@@ -16,7 +16,7 @@ test('ghostsim preserves NotReady for a sensor without supplied samples', async 
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostsim-sensor-'));
   const artifact = path.join(directory, 'sensor.gfb');
   try {
-    const source = '```ghost\ncontrol Sensor { sensor moisture: Percent; output pump: Bool; pump <- case moisture { ok(value) => value < 30%; fault(_) => false; }; }\n```\n';
+    const source = '```ghost\ncontrol Sensor { input moisture: Percent; output pump: Bool; pump <- case moisture { ok(value) => value < 30%; fault(_) => false; }; }\n```\n';
     const compiled = await compileSource(source, { filename: 'sensor.ghost.md' });
     writeArtifact(compiled, artifact);
     const result = run(artifact, { format: 'GhostFlow/scenario-v1', id: 'missing-sensor', initialInputs: [], keyBindings: [], actions: [{ kind: 'scan', atMs: 0 }] });
@@ -47,7 +47,7 @@ test('ghostsim preserves NotReady for a sensor without supplied samples', async 
 async function fixture() {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostsim-'));
   const artifact = path.join(directory, 'timer.gfb');
-  const source = `# Timer\n\n\`\`\`ghost\ncontrol Timer {\n  input enabled: Bool;\n  state active: Bool = false;\n  timer age = elapsed(active);\n  active' = enabled;\n  output expired: Bool;\n  expired <- age >= 100ms;\n}\n\`\`\`\n`;
+  const source = `# Timer\n\n\`\`\`ghost\ncontrol Timer {\n  input enabled: Bool;\n  state active: Bool = false;\n  timer age = elapsed(active);\n  active' = case enabled { ok(value) => value; fault(_) => active; };\n  output expired: Bool;\n  expired <- age >= 100ms;\n}\n\`\`\`\n`;
   writeArtifact(await compileSource(source, { filename: 'timer.ghost.md' }), artifact);
   return { directory, artifact };
 }
@@ -65,7 +65,7 @@ test('ghostsim preserves Percent initial values and updates through the native s
   try {
     const artifact = path.join(directory, 'percent.gfb');
     const source = '# Percent inputs\n\n```ghost\ncontrol PercentInput {\n'
-      + '  input level: Percent;\n  output high: Bool;\n  high <- level >= 50%;\n}\n```\n';
+      + '  input level: Percent;\n  output high: Bool;\n  high <- case level { ok(value) => value >= 50%; fault(_) => false; };\n}\n```\n';
     writeArtifact(await compileSource(source, { filename: 'percent.ghost.md' }), artifact);
     const values = [0, 100, 0.25, 50, 33.5];
     const result = run(artifact, {
@@ -81,7 +81,7 @@ test('ghostsim preserves Percent initial values and updates through the native s
     const report = JSON.parse(result.stdout);
     assert.equal(report.format, 'GhostFlow/scenario-result-v1');
     assert.equal(report.outcome, 'completed');
-    assert.deepEqual(report.scans.map(scan => scan.inputs.level), values);
+    assert.deepEqual(report.scans.map(scan => scan.inputs.__gf_sensor_value_level), values);
     assert.deepEqual(report.scans.map(scan => scan.requestedVirtualIntent.high), values.map(value => value >= 50));
     assert.deepEqual(report.scans.map(scan => scan.safeVirtualIntent.high), values.map(value => value >= 50));
   } finally {
@@ -113,7 +113,7 @@ test('ghostsim executes only explicit scans and advances elapsed on a clock-only
     assert.equal(result.scenario.id, scenario.id);
     assert.deepEqual(result.scans.map(scan => scan.logicalTimeMs), [0, 1, 101, 102, 103]);
     assert.deepEqual(result.scans.map(scan => scan.safeVirtualIntent.expired), [false, false, true, true, false]);
-    assert.deepEqual(result.scans.map(scan => scan.inputs.enabled), [false, true, true, false, false]);
+    assert.deepEqual(result.scans.map(scan => scan.inputs.__gf_sensor_value_enabled), [false, true, true, false, false]);
     assert.deepEqual(JSON.parse(run(artifact, scenario).stdout), result);
     const toon = run(artifact, scenario, 'toon');
     assert.equal(toon.status, 0, toon.stderr);
@@ -133,7 +133,6 @@ test('ghostsim rejects incomplete, mistyped, duplicate, and out-of-order actions
   };
   try {
     const cases = [
-      [{ ...base, initialInputs: [] }, 'initialInputs: missing input enabled'],
       [{ ...base, initialInputs: [{ name: 'enabled', type: 'Number', value: 1 }] }, 'initialInputs[0]: type mismatch enabled'],
       [{ ...base, keyBindings: [{ key: 1, input: 'enabled' }, { key: 2, input: 'enabled' }] }, 'keyBindings[1]: duplicate binding enabled'],
       [{ ...base, actions: [...base.actions, { kind: 'scan', atMs: 1 }] }, 'actions[1]: logical time moved backwards'],
@@ -152,6 +151,11 @@ test('ghostsim rejects incomplete, mistyped, duplicate, and out-of-order actions
     const missingJson = JSON.parse(run(artifact, cases[0][0], 'json').stdout);
     const missingToon = decode(run(artifact, cases[0][0], 'toon').stdout, { strict: true });
     assert.deepEqual(missingToon, missingJson);
+    const omitted = run(artifact, { ...base, initialInputs: [] });
+    assert.equal(omitted.status, 0, omitted.stderr);
+    const unavailable = JSON.parse(omitted.stdout).scans[0];
+    assert.equal(unavailable.inputs.__gf_sensor_ok_enabled, false);
+    assert.equal(unavailable.safeVirtualIntent.expired, false);
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }
@@ -160,7 +164,7 @@ test('ghostsim rejects incomplete, mistyped, duplicate, and out-of-order actions
 test('ghostsim passes Int and Number input changes as complete typed snapshots', async () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostsim-typed-'));
   const artifact = path.join(directory, 'typed.gfb');
-  const source = `\`\`\`ghost\ncontrol Typed {\n  input count: Int;\n  input level: Number;\n  output active: Bool;\n  active <- count >= 2 && level >= 1.5;\n}\n\`\`\`\n`;
+  const source = `\`\`\`ghost\ncontrol Typed {\n  input count: Int;\n  input level: Number;\n  output active: Bool;\n  active <- case count { ok(c) => case level { ok(v) => c >= 2 && v >= 1.5; fault(_) => false; }; fault(_) => false; };\n}\n\`\`\`\n`;
   try {
     writeArtifact(await compileSource(source, { filename: 'typed.ghost.md' }), artifact);
     const scenario = {
@@ -173,7 +177,7 @@ test('ghostsim passes Int and Number input changes as complete typed snapshots',
     assert.equal(result.status, 0, result.stderr);
     const rows = JSON.parse(result.stdout).scans;
     assert.deepEqual(rows.map(row => row.safeVirtualIntent.active), [false, true]);
-    assert.deepEqual(rows.map(row => row.inputs.count), [1, 2]);
+    assert.deepEqual(rows.map(row => row.inputs.__gf_sensor_value_count), [1, 2]);
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }
@@ -210,7 +214,7 @@ test('ghostsim rejects malformed TOON and an exhausted scan budget without a suc
 test('ghostsim reports a runtime error as a versioned result without a false completed outcome', async () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostsim-error-'));
   const artifact = path.join(directory, 'division.gfb');
-  const source = `\`\`\`ghost\ncontrol Division {\n  input divisor: Number;\n  output ratio: Number;\n  ratio <- 1.0 / divisor;\n}\n\`\`\`\n`;
+  const source = `\`\`\`ghost\ncontrol Division {\n  input divisor: Number;\n  state retained_divisor: Number = 1.0;\n  let scalar_divisor = case divisor { ok(value) => value; fault(_) => retained_divisor; };\n  retained_divisor' = scalar_divisor;\n  output ratio: Number;\n  ratio <- 1.0 / scalar_divisor;\n}\n\`\`\`\n`;
   try {
     writeArtifact(await compileSource(source, { filename: 'division.ghost.md' }), artifact);
     const scenario = {
@@ -237,8 +241,10 @@ test('ghostsim reports a runtime error as a versioned result without a false com
 test('ghostsim reports unavailable observations after native buffer and result budget failures', async () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostsim-host-error-'));
   const artifact = path.join(directory, 'wide.gfb');
-  const inputNames = Array.from({ length: 100 }, (_, index) => `input_${index}_${'x'.repeat(30)}`);
-  const source = `\`\`\`ghost\ncontrol Wide {\n${inputNames.map(name => `  input ${name}: Bool;`).join('\n')}\n  output active: Bool;\n  active <- ${inputNames[0]};\n}\n\`\`\`\n`;
+  // Twenty-five typed-quality producers occupy 75 rails in the unchanged 128-input
+  // profile. Long names retain the buffer/result-budget pressure of this case.
+  const inputNames = Array.from({ length: 25 }, (_, index) => `input_${index}_${'x'.repeat(30)}`);
+  const source = `\`\`\`ghost\ncontrol Wide {\n${inputNames.map(name => `  input ${name}: Bool;`).join('\n')}\n  output active: Bool;\n  active <- ${inputNames[0]} |> recover(false);\n}\n\`\`\`\n`;
   try {
     writeArtifact(await compileSource(source, { filename: 'wide.ghost.md' }), artifact);
     const scenario = {
@@ -250,6 +256,7 @@ test('ghostsim reports unavailable observations after native buffer and result b
     assert.equal(json.status, 1, json.stderr);
     const result = JSON.parse(json.stdout);
     assert.equal(result.outcome, 'host-error', result.error.message);
+    assert.match(result.error.message, /native observations unavailable:.*ENOBUFS/);
     assert.equal(result.traceComplete, false);
     assert.deepEqual(result.scans, []);
     assert.equal(result.scenario.id, scenario.id);
@@ -281,7 +288,7 @@ test('ghostsim reports unavailable observations after native buffer and result b
 test('ghostsim exposes requested and constrained safe values as separate virtual intents', async () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostsim-safe-'));
   const artifact = path.join(directory, 'safe.gfb');
-  const source = `\`\`\`ghost\ncontrol Safe {\n  input enabled: Bool;\n  output pump, permit: Bool;\n  pump <- enabled;\n  permit <- false;\n  require pump => permit;\n}\n\`\`\`\n`;
+  const source = `\`\`\`ghost\ncontrol Safe {\n  input enabled: Bool;\n  output pump, permit: Bool;\n  pump <- enabled |> recover(false);\n  permit <- false;\n  require pump => permit;\n}\n\`\`\`\n`;
   try {
     writeArtifact(await compileSource(source, { filename: 'safe.ghost.md' }), artifact);
     const scenario = {
@@ -320,9 +327,9 @@ test('REF-08-017 [tooling] 같은 Program, 입력, 논리 시간, 설정 event, 
 control ReplayBoundary {
   input enabled: Bool;
   state latched: Bool = false;
-  latched' = latched || enabled;
+  latched' = case enabled { ok(value) => latched || value; fault(_) => latched; };
   output pump, permit: Bool;
-  pump <- enabled || latched;
+  pump <- case enabled { ok(value) => value || latched; fault(_) => latched; };
   permit <- false;
   require pump => permit;
 }
@@ -378,8 +385,8 @@ test('ghostsim rejects a control requiring external activation bindings without 
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostsim-binding-'));
   const artifact = path.join(directory, 'true-for.gfb');
   try {
-    const source = fs.readFileSync(path.join(root, 'tests/fixtures/true-for-certified.ghost.md'), 'utf8');
-    writeArtifact(await compileSource(source, { filename: 'true-for-certified.ghost.md' }), artifact);
+    const source = fs.readFileSync(path.join(root, 'tests/fixtures/true-for-certified.input-v1.ghost.md'), 'utf8');
+    writeArtifact(await compileSource(source, { filename: 'true-for-certified.input-v1.ghost.md' }), artifact);
     const result = run(artifact, {
       format: 'GhostFlow/scenario-v1', id: 'requires-intervals',
       initialInputs: [], keyBindings: [], actions: [{ kind: 'scan', atMs: 0 }],

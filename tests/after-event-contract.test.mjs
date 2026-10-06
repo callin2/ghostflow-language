@@ -5,7 +5,7 @@ import { compileControl, typeCheckControl } from '../tools/control.mjs';
 import { compileSource } from '../tools/toolchain.mjs';
 import { extractLiterate } from '../tools/literate.mjs';
 
-const filename = 'after-event-evidence.ghost.md';
+const filename = 'after-event-evidence.input-v1.ghost.md';
 const document = fs.readFileSync(new URL(`./fixtures/${filename}`, import.meta.url), 'utf8');
 const code = extractLiterate(document, { filename }).code;
 const descriptorCode = code.replace('after_event_any(opened) |> recover(false)', 'false');
@@ -39,7 +39,7 @@ test('after_event type checking preserves the identified Event and measured Bool
 for (const [label, before, after, diagnostic] of [
   ['nonpositive window', 'window: 10s', 'window: 0ms', /positive constant Duration/],
   ['wrong quality', 'quality: measured', 'quality: held', /quality must be measured/],
-  ['numeric predicate', 'sensor valve_open: Bool', 'sensor valve_open: Number', /directly declared Bool sensor/],
+  ['numeric predicate', 'input valve_open: Bool', 'input valve_open: Number', /directly declared Bool sensor/],
   ['unknown event', 'after_event(started,', 'after_event(missing,', /declared Event/],
   ['duplicate window', 'window: 10s', 'window: 10s, window: 5s', /duplicate after_event argument window/],
 ]) test(`after_event rejects ${label} at type checking`, () => {

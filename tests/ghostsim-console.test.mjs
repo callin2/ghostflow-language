@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -12,8 +13,9 @@ import { compileSource, writeArtifact } from '../tools/toolchain.mjs';
 import { runScenario } from '../tools/ghostsim.mjs';
 import { runLiveConsole, terminalCommands } from '../tools/ghostsim-console.mjs';
 import { jsonSha256 } from '../tools/integration-contract.mjs';
+import { readInputObservation } from '../tools/software-input-producer.mjs';
 
-const root = path.resolve(new URL('..', import.meta.url).pathname);
+const root = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const cli = path.join(root, 'tools/ghostsim-console.mjs');
 
 async function fixture(source) {
@@ -23,12 +25,12 @@ async function fixture(source) {
   return { directory, artifact, record: path.join(directory, 'session.toon') };
 }
 
-function run(artifact, commands, args = []) {
-  return spawnSync(process.execPath, [cli, artifact, ...args], { input: commands.join('\n') + '\n', encoding: 'utf8', timeout: 10000 });
+function run(artifact, commands, args = [], timeoutMs = 10000) {
+  return spawnSync(process.execPath, [cli, artifact, ...args], { input: commands.join('\n') + '\n', encoding: 'utf8', timeout: timeoutMs });
 }
 
 test('default virtual Waveshare panel toggles DI1 and records a replayable TOON scenario', async () => {
-  const { directory, artifact, record } = await fixture('control Demo { input DI1: Bool; output RO1: Bool; RO1 <- DI1; }');
+  const { directory, artifact, record } = await fixture('control Demo { input DI1: Bool; output RO1: Bool; RO1 <- DI1 |> recover(false); }');
   try {
     const child = run(artifact, ['1', '1', 'exit'], ['--record', record]);
     assert.equal(child.status, 0, child.stderr);
@@ -37,7 +39,9 @@ test('default virtual Waveshare panel toggles DI1 and records a replayable TOON 
     assert.match(child.stderr, /RO8/);
     assert.match(child.stderr, /physical: unconfirmed/);
     const result = decode(child.stdout, { strict: true });
-    assert.deepEqual(result.scans.map(scan => scan.inputs.DI1), [true, false]);
+    assert.deepEqual(result.scans.map(scan => readInputObservation(scan, 'DI1')), [true, false]);
+    assert.deepEqual(result.scans.map(scan => scan.inputs.__gf_sensor_ok_DI1), [true, true],
+      'the released button is a healthy false observation');
     assert.deepEqual(result.scans.map(scan => scan.safeVirtualIntent.RO1), [true, false]);
     const replay = decode(runScenario(artifact, record).encoded, { strict: true });
     const runnerProjection = { ...result };
@@ -49,7 +53,7 @@ test('default virtual Waveshare panel toggles DI1 and records a replayable TOON 
 });
 
 test('selected 2DI/4RO profile uses explicit bindings and aligned unequal rows', async () => {
-  const { directory, artifact } = await fixture('control Demo { input enabled: Bool; output motor: Bool; motor <- enabled; }');
+  const { directory, artifact } = await fixture('control Demo { input enabled: Bool; output motor: Bool; motor <- enabled |> recover(false); }');
   try {
     const profilePath = path.join(directory, 'profile.json');
     const profileBytes = Buffer.from(JSON.stringify({
@@ -73,7 +77,7 @@ test('selected 2DI/4RO profile uses explicit bindings and aligned unequal rows',
 });
 
 test('named toggle reaches channels after key 8 and a clock-only scan advances a timer', async () => {
-  const { directory, artifact, record } = await fixture('control Demo { input enabled: Bool; state active: Bool = false; timer age = elapsed(active); active\' = enabled; output expired: Bool; expired <- age >= 100ms; }');
+  const { directory, artifact, record } = await fixture('control Demo { input enabled: Bool; state active: Bool = false; timer age = elapsed(active); active\' = enabled |> recover(false); output expired: Bool; expired <- age >= 100ms; }');
   try {
     const profilePath = path.join(directory, 'profile.json');
     fs.writeFileSync(profilePath, JSON.stringify({
@@ -93,11 +97,11 @@ test('named toggle reaches channels after key 8 and a clock-only scan advances a
 });
 
 test('unrelated logical names require explicit mapping before the console draws a panel', async () => {
-  const { directory, artifact } = await fixture('control Demo { input start: Bool; output pump: Bool; pump <- start; }');
+  const { directory, artifact } = await fixture('control Demo { input start: Bool; output pump: Bool; pump <- start |> recover(false); }');
   try {
     const missing = run(artifact, ['1', 'exit']);
     assert.equal(missing.status, 1);
-    assert.match(missing.stderr, /missing binding for logical input start/);
+    assert.match(missing.stderr, /missing binding for logical output pump/);
     assert.doesNotMatch(missing.stderr, /KEY  INPUT/);
     const duplicate = run(artifact, ['1', 'exit'], ['--bind', 'DI1=start', '--bind', 'DI1=start', '--bind', 'RO1=pump']);
     assert.equal(duplicate.status, 1);
@@ -109,7 +113,7 @@ test('unrelated logical names require explicit mapping before the console draws 
 });
 
 test('panel separates requested and safe virtual output intent', async () => {
-  const { directory, artifact } = await fixture('control Safe { input DI1: Bool; output RO1, RO2: Bool; RO1 <- DI1; RO2 <- false; require RO1 => RO2; }');
+  const { directory, artifact } = await fixture('control Safe { input DI1: Bool; output RO1, RO2: Bool; RO1 <- DI1 |> recover(false); RO2 <- false; require RO1 => RO2; }');
   try {
     const child = run(artifact, ['1', 'exit']);
     assert.equal(child.status, 0, child.stderr);
@@ -150,7 +154,7 @@ test('TTY raw mode restores when setup fails after enabling it', async () => {
 });
 
 test('live TTY scans at zero and draws before any key or timer tick', async () => {
-  const { directory, artifact } = await fixture('control Demo { input DI1: Bool; output RO1: Bool; RO1 <- DI1; }');
+  const { directory, artifact } = await fixture('control Demo { input DI1: Bool; output RO1: Bool; RO1 <- DI1 |> recover(false); }');
   const input = new EventEmitter();
   const output = new EventEmitter();
   const written = [];
@@ -192,7 +196,7 @@ test('live TTY scans at zero and draws before any key or timer tick', async () =
 });
 
 test('live TTY uses elapsed time, scans each tick once, toggles immediately, and bounds history', async () => {
-  const { directory, artifact } = await fixture('control Demo { input DI1: Bool; output RO1: Bool; RO1 <- DI1; }');
+  const { directory, artifact } = await fixture('control Demo { input DI1: Bool; output RO1: Bool; RO1 <- DI1 |> recover(false); }');
   const input = new EventEmitter();
   const output = new EventEmitter();
   const scans = [];
@@ -237,7 +241,7 @@ test('live TTY uses elapsed time, scans each tick once, toggles immediately, and
 });
 
 test('live TTY rejects recording before opening a session', async () => {
-  const { directory, artifact, record } = await fixture('control Demo { input DI1: Bool; output RO1: Bool; RO1 <- DI1; }');
+  const { directory, artifact, record } = await fixture('control Demo { input DI1: Bool; output RO1: Bool; RO1 <- DI1 |> recover(false); }');
   try {
     let opened = false;
     await assert.rejects(runLiveConsole([artifact, '--record', record], {
@@ -249,7 +253,7 @@ test('live TTY rejects recording before opening a session', async () => {
 });
 
 test('live TTY ignores escape key sequences even when split across input chunks', async () => {
-  const { directory, artifact } = await fixture('control Demo { input DI1, DI3, DI5: Bool; output RO1: Bool; RO1 <- DI1; }');
+  const { directory, artifact } = await fixture('control Demo { input DI1, DI3, DI5: Bool; output RO1: Bool; RO1 <- DI1 |> recover(false); }');
   const input = new EventEmitter();
   const output = new EventEmitter();
   const scans = [];
@@ -284,7 +288,7 @@ test('live TTY ignores escape key sequences even when split across input chunks'
 });
 
 test('live TTY restores terminal and disposes runtime when a scan fails', async () => {
-  const { directory, artifact } = await fixture('control Demo { input DI1: Bool; output RO1: Bool; RO1 <- DI1; }');
+  const { directory, artifact } = await fixture('control Demo { input DI1: Bool; output RO1: Bool; RO1 <- DI1 |> recover(false); }');
   const input = new EventEmitter();
   const output = new EventEmitter();
   const writes = [];
@@ -323,7 +327,7 @@ test('live TTY restores terminal and disposes runtime when a scan fails', async 
 });
 
 test('board-profile-v1 endpoint order and identity drive a 2DI/4RO console without installation claims', async () => {
-  const { directory, artifact } = await fixture('control Demo { input enabled: Bool; output motor: Bool; motor <- enabled; }');
+  const { directory, artifact } = await fixture('control Demo { input enabled: Bool; output motor: Bool; motor <- enabled |> recover(false); }');
   try {
     const profilePath = path.join(directory, 'board.json');
     const endpoint = (direction, address) => ({ direction, type: 'Bool', driver: 'fixture', address, activeLevel: 'high', safeLevel: 0 });
@@ -369,7 +373,7 @@ test('board-profile-v1 endpoint order and identity drive a 2DI/4RO console witho
 });
 
 test('rejected command preserves committed scans and records their exact replay', async () => {
-  const { directory, artifact, record } = await fixture('control Demo { input DI1: Bool; output RO1: Bool; RO1 <- DI1; }');
+  const { directory, artifact, record } = await fixture('control Demo { input DI1: Bool; output RO1: Bool; RO1 <- DI1 |> recover(false); }');
   try {
     for (const rejected of ['bad-command', 'scan 0']) {
       const commands = rejected === 'scan 0' ? ['1', 'scan 100', rejected] : ['1', rejected];
@@ -392,10 +396,11 @@ test('rejected command preserves committed scans and records their exact replay'
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 });
 
-test('scan budget rejects the attempted scan while retaining a replayable 256-scan prefix', async () => {
-  const { directory, artifact, record } = await fixture('control Demo { input DI1: Bool; output RO1: Bool; RO1 <- DI1; }');
+test('scan budget rejects the attempted scan while retaining a replayable 256-scan prefix', { timeout: 120000 }, async () => {
+  const { directory, artifact, record } = await fixture('control Demo { input DI1: Bool; output RO1: Bool; RO1 <- DI1 |> recover(false); }');
   try {
-    const child = run(artifact, Array.from({ length: 257 }, () => 'scan 0'), ['--record', record, '--format', 'json']);
+    // Prefix replay is quadratic; this bounded infrastructure timeout leaves the 256-scan guard unchanged.
+    const child = run(artifact, Array.from({ length: 257 }, () => 'scan 0'), ['--record', record, '--format', 'json'], 90000);
     assert.equal(child.status, 1, child.stderr);
     const result = JSON.parse(child.stdout);
     assert.equal(result.outcome, 'command-error');

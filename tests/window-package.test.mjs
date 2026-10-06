@@ -6,7 +6,7 @@ import { buildPortablePackage, verifyPortablePackage, PortablePackageError } fro
 
 const encode = value => new TextEncoder().encode(canonicalJson(value));
 const digest = async bytes => Buffer.from(await crypto.subtle.digest('SHA-256', bytes)).toString('hex');
-const source = '# Window package\n\n```ghost\ncontrol WindowPackage {\n  sensor temperature: Temperature;\n  signal mean = window_average(temperature, over: 1s, quality: measured, max_age: 500ms);\n}\n```\n';
+const source = '# Window package\n\n```ghost\ncontrol WindowPackage {\n  input temperature: Temperature;\n  signal mean = window_average(temperature, over: 1s, quality: measured, max_age: 500ms);\n}\n```\n';
 
 test('signed window metadata preserves canonical descriptors and rejects re-signed substitutions', async t => {
   const compilation = await compileSource(source, { filename: 'window-package.ghost.md' });

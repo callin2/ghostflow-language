@@ -1,0 +1,23 @@
+test('GF-TEST-snapshot-commit: old reads, explicit next reads, and untouched states', async t => {
+  const compiled = await compileSource(`control Snapshot {
+    input enable: Bool;
+    state left: Bool = false;
+    state right: Bool = true;
+    state untouched: Number = 7;
+    let oldRight = right;
+    left' = oldRight && enable;
+    right' = left;
+    output oldLeft, newLeft: Bool;
+    oldLeft <- left;
+    newLeft <- left';
+  }`, { filename: 'snapshot.ghost' });
+  const { outcomes, runtime } = await differential(t, compiled.bytes, ['enable'], [{ enable: true }, { enable: true }], [['oldLeft', 'bool'], ['newLeft', 'bool']]);
+  assert.deepEqual(outcomes.map(row => row.trace.stateBefore), [
+    { left: false, right: true, untouched: 7 }, { left: true, right: false, untouched: 7 },
+  ]);
+  assert.deepEqual(outcomes.map(row => row.trace.stateAfter), [
+    { left: true, right: false, untouched: 7 }, { left: false, right: true, untouched: 7 },
+  ]);
+  assert.deepEqual(outcomes.map(row => row.trace.requested), [{ oldLeft: false, newLeft: true }, { oldLeft: true, newLeft: false }]);
+  assert.equal(runtime.stateNumber('untouched'), 7);
+});

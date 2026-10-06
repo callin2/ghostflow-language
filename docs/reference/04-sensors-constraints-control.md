@@ -23,13 +23,18 @@ GhostFlow의 센서 값은 숫자 하나가 아니다. 값의 출처·품질·�
 [#105](https://github.com/callin2/ghostflow-language/issues/105),
 [#110](https://github.com/callin2/ghostflow-language/issues/110)이다.
 
+외부 입력의 canonical 선언 keyword는 `input`이다. 이 장의 typed quality,
+conditioning과 optional capability 규칙을 계승한다. `sensor`는 내부/wire 품질
+분류이며 허용되는 선언 alias가 아니다. 소스 변경은 검토할 새 revision으로만
+만든다. [migration 계약](../INPUT-MIGRATION.ko.md)을 따른다.
+
 ## 4.1 sensor와 Result 품질
 
 선택된 선언에서 sensor 타입은 정상 payload 타입이다.
 
 ```ghost
-sensor low_water: Bool;
-sensor moisture: Percent;
+input low_water: Bool;
+input moisture: Percent;
 ```
 
 sensor를 읽은 실제 타입은 개념적으로 `Result<T, SensorFault>`다. 정상 샘플은
@@ -84,7 +89,7 @@ let normalized = temperature |> and_then(normalize);
 선택된 sensor 설정 표기는 다음과 같다.
 
 ```ghost
-sensor moisture: Percent {
+input moisture: Percent {
   sample = 1s;
   valid = 0% .. 100%;
   filter = median(5);
@@ -98,7 +103,7 @@ sensor moisture: Percent {
 | 항목 | 타입·제약 | 의미 |
 |---|---|---|
 | `sample` | 양의 `Duration` | 기대 측정 간격 정보다. sensor를 읽는 thread나 timer를 만들지 않는다. |
-| `valid` | payload와 같은 타입의 닫힌 범위 | filter 전에 raw 정상 후보를 검사한다. 범위 밖 값은 `Invalid`다. |
+| `valid` | payload과 같은 numeric 타입의 닫힌 범위; Bool은 지원하지 않음 | 필터 전 raw 정상 후보를 검사한다. 범위 밖 값은 `Invalid`이다. Bool 범위는 컴파일에서 거부한다. |
 | `filter` | 상태 있는 signal 연산 | 새롭고 유효한 샘플에만 적용한다. |
 | `stale_after` | 양의 `Duration` | 마지막 실제 유효 샘플 시각부터의 freshness 한계다. |
 | `recover_after` | 양의 정수 `N samples` | fault 뒤 N개의 새 유효 샘플이 연속해야 복구 조건을 만족한다. |
@@ -132,6 +137,26 @@ fault 뒤 filter window는 비운다. filter 준비 조건과 `recover_after` �
 기본 재부팅 의미는 sensor state와 freshness를 초기화하고 `NotReady`부터 다시
 준비하는 것이다. persistent resume은 checkpoint의 source/time continuity를 검증하는
 명시 opt-in이다. 오래된 정상값 하나를 즉시 복원해 허가에 사용하지 않는다.
+
+`recover_after = N samples`는 초기화, 재부팅, source epoch 변경 및 fault 후 복구에서 서로 다른 새 유효 관측을 센다. filter도 준비되었다면 N번째 관측부터 사용할 수 있으며, 중복 sample과 clock-only scan은 세지 않는다. fault 또는 freshness 상실은 새 sequence를 시작한다. 첫 N개 유효 관측을 버리려면 `recover_after = N+1 samples`를 `1..31` 안의 구체적인 개수로 작성한다. 이 옵션은 sample 개수이며 시간 기반 예열이 아니다.
+
+시간 기반 준비 기간은 `recover_after`에 duration 문법을 추가하지 않고 기존 상태 연산 `debounce`로 작성할 수 있다. 이 패턴은 첫 conditioned `Good` 관측부터 2분이 지나고, 그 시점 이후 서로 다른 새 `Good` 관측이 들어올 때까지 Result 사용을 보류한다. `usable` 출력은 사용 가능 여부 표시이며 물리 운전을 명령하지 않는다.
+
+```ghost
+fn observed(value: Number) -> Bool { true }
+control TimedPreparation {
+  input reading: Number { stale_after = 3min; }
+  signal ready = debounce(reading |> map(observed), stable_for: 2min, initial: false);
+  let prepared: Result<Number, SensorFault> = case ready {
+    ok(value) => if value then reading else fault(NotReady);
+    fault(_) => reading;
+  };
+  output usable: Bool;
+  usable <- case prepared { ok(value) => true; fault(_) => false; };
+}
+```
+
+`observed`는 0을 포함한 정상 payload를 true로 변환하며, 입력 fault는 `map`을 그대로 통과한다. debounce 기간은 관측 timestamp를 사용한다. clock-only scan과 중복 sample은 준비 완료를 촉진하지 않는다. fault, stale reception 또는 source epoch 변경은 준비를 다시 시작한다. filter나 sample 개수 기반 복구도 설정했다면 그 단계들이 처음 `Good`을 만든 뒤에 기간이 시작된다. `fault(_) => reading` 분기는 원래 입력 Result와 origin을 보존한다. 예상 관측 주기에 맞게 `stale_after`를 선택해야 한다. 위 예제의 3분 한계는 첫 관측과 준비 기한 관측만 공급하는 드문 관측 간격을 허용한다. 개수 기반 `recover_after`와 작성된 기간 gate는 별도 조건이다.
 
 ## 4.3 filter와 signal 연산
 
@@ -176,8 +201,8 @@ signal dry = hysteresis(moisture,
 다음은 선택된 표기다.
 
 ```ghost
-sensor moisture: Percent { filter = moving_average(3); }
-sensor temperature: Temperature { filter = ema(alpha: 0.25); }
+input moisture: Percent { filter = moving_average(3); }
+input temperature: Temperature { filter = ema(alpha: 0.25); }
 signal stable_start = debounce(start, stable_for: 2s, initial: false);
 ```
 
@@ -442,7 +467,7 @@ Estimate를 소비하는 실행 지원은 #385에서 별도 compatibility를 정
 ## 4.5 선택 sensor와 capability
 
 ```ghost
-sensor moisture?: Percent;
+input moisture?: Percent;
 ```
 
 `?`는 해당 sensor capability가 설치 profile에서 선택적이라는 선언 정보다. 이는

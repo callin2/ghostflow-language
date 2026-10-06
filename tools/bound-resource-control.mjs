@@ -95,7 +95,10 @@ export function compileBoundResourceControl(compilation, installationBinding) {
   activation.u16(binding.modes.length);
   for (const mode of binding.modes) {
     const group = control.sharedResourceConstraints.find(group => group.name === mode.group);
-    activation.text(`${mode.group}/${mode.name}`); activation.text(mode.input);
+    // Keep the installation identity logical; the immutable activation packet
+    // names the actual typed VM value rail. Rust requires its matching OK rail.
+    const producer = control.sensors?.find(input => input.name === mode.input);
+    activation.text(`${mode.group}/${mode.name}`); activation.text(producer?.valueInput ?? mode.input);
     activation.text(sha256Hex(JSON.stringify([resources.get(group.target).resourceId, mode.group, mode.name])));
   }
   const activationBytes = activation.finish();

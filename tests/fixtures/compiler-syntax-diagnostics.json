@@ -192,29 +192,29 @@
     },
     {
       "id": "parser-sensor-unsupported-option",
-      "code": "control Bad { sensor value: Number { unknown = 1.0; } }",
-      "valid": "control Good { sensor value: Number { sample = 1s; } }",
+      "code": "control Bad { input value: Number { unknown = 1.0; } }",
+      "valid": "control Good { input value: Number { sample = 1s; } }",
       "at": "unknown",
-      "message": "unsupported sensor option unknown"
+      "message": "unsupported input option unknown"
     },
     {
       "id": "parser-sensor-valid-range",
-      "code": "control Bad { sensor value: Number { valid = 0.0, 1.0; } }",
-      "valid": "control Good { sensor value: Number { valid = 0.0 .. 1.0; } }",
+      "code": "control Bad { input value: Number { valid = 0.0, 1.0; } }",
+      "valid": "control Good { input value: Number { valid = 0.0 .. 1.0; } }",
       "at": ", 1.0",
       "message": "valid expects .."
     },
     {
       "id": "parser-sensor-recover-samples",
-      "code": "control Bad { sensor value: Number { recover_after = 2 ticks; } }",
-      "valid": "control Good { sensor value: Number { recover_after = 2 samples; } }",
+      "code": "control Bad { input value: Number { recover_after = 2 ticks; } }",
+      "valid": "control Good { input value: Number { recover_after = 2 samples; } }",
       "at": "ticks",
       "message": "recover_after expects samples"
     },
     {
       "id": "parser-signal-equals",
-      "code": "control Bad { sensor value: Number; signal ready hysteresis(value, on_below: 1.0, off_above: 2.0, initial: false); }",
-      "valid": "control Good { sensor value: Number; signal ready = hysteresis(value, on_below: 1.0, off_above: 2.0, initial: false); }",
+      "code": "control Bad { input value: Number; signal ready hysteresis(value, on_below: 1.0, off_above: 2.0, initial: false); }",
+      "valid": "control Good { input value: Number; signal ready = hysteresis(value, on_below: 1.0, off_above: 2.0, initial: false); }",
       "at": "hysteresis",
       "message": "signal requires ="
     },
@@ -340,8 +340,8 @@
     },
     {
       "id": "parser-case-binding",
-      "code": "control Bad { sensor value: Bool; let ready = case value { ok(1) => true; fault(_) => false; }; }",
-      "valid": "control Good { sensor value: Bool; let ready = case value { ok(v) => v; fault(_) => false; }; }",
+      "code": "control Bad { input value: Bool; let ready = case value { ok(1) => true; fault(_) => false; }; }",
+      "valid": "control Good { input value: Bool; let ready = case value { ok(v) => v; fault(_) => false; }; }",
       "at": "1",
       "message": "expected case binding"
     },
@@ -536,50 +536,50 @@
     },
     {
       "id": "parser-sensor-name",
-      "code": "control Bad { sensor : Number; }",
-      "valid": "control Good { sensor value: Number; }",
+      "code": "control Bad { input : Number; }",
+      "valid": "control Good { input value: Number; }",
       "at": ": Number",
-      "message": "expected sensor name"
+      "message": "expected input name"
     },
     {
       "id": "parser-sensor-option-name",
-      "code": "control Bad { sensor value: Number { = 1s; } }",
-      "valid": "control Good { sensor value: Number { sample = 1s; } }",
+      "code": "control Bad { input value: Number { = 1s; } }",
+      "valid": "control Good { input value: Number { sample = 1s; } }",
       "at": "= 1s",
-      "message": "expected sensor option"
+      "message": "expected input option"
     },
     {
       "id": "parser-sensor-option-equals",
-      "code": "control Bad { sensor value: Number { sample 1s; } }",
-      "valid": "control Good { sensor value: Number { sample = 1s; } }",
+      "code": "control Bad { input value: Number { sample 1s; } }",
+      "valid": "control Good { input value: Number { sample = 1s; } }",
       "at": "1s",
       "message": "expected = after sample"
     },
     {
       "id": "parser-sensor-option-semicolon",
-      "code": "control Bad { sensor value: Number { sample = 1s } }",
-      "valid": "control Good { sensor value: Number { sample = 1s; } }",
+      "code": "control Bad { input value: Number { sample = 1s } }",
+      "valid": "control Good { input value: Number { sample = 1s; } }",
       "at": "}",
-      "message": "expected ; after sensor option"
+      "message": "expected ; after input option"
     },
     {
       "id": "parser-sensor-semicolon",
-      "code": "control Bad { sensor value: Number }",
-      "valid": "control Good { sensor value: Number; }",
+      "code": "control Bad { input value: Number }",
+      "valid": "control Good { input value: Number; }",
       "at": "}",
-      "message": "expected ; after sensor declaration"
+      "message": "expected ; after input declaration"
     },
     {
       "id": "parser-signal-name",
       "code": "control Bad { signal = true; }",
-      "valid": "control Good { sensor value: Number; signal ready = hysteresis(value, on_below: 1.0, off_above: 2.0, initial: false); }",
+      "valid": "control Good { input value: Number; signal ready = hysteresis(value, on_below: 1.0, off_above: 2.0, initial: false); }",
       "at": "= true",
       "message": "expected signal name"
     },
     {
       "id": "parser-signal-semicolon",
-      "code": "control Bad { sensor value: Number; signal ready = hysteresis(value, on_below: 1.0, off_above: 2.0, initial: false) }",
-      "valid": "control Good { sensor value: Number; signal ready = hysteresis(value, on_below: 1.0, off_above: 2.0, initial: false); }",
+      "code": "control Bad { input value: Number; signal ready = hysteresis(value, on_below: 1.0, off_above: 2.0, initial: false) }",
+      "valid": "control Good { input value: Number; signal ready = hysteresis(value, on_below: 1.0, off_above: 2.0, initial: false); }",
       "at": "}",
       "message": "expected ; after signal declaration"
     },
@@ -797,8 +797,8 @@
     },
     {
       "id": "parser-case-binding-close",
-      "code": "control Bad { sensor value: Bool; let ready = case value { ok(v => v; fault(_) => false; }; }",
-      "valid": "control Good { sensor value: Bool; let ready = case value { ok(v) => v; fault(_) => false; }; }",
+      "code": "control Bad { input value: Bool; let ready = case value { ok(v => v; fault(_) => false; }; }",
+      "valid": "control Good { input value: Bool; let ready = case value { ok(v) => v; fault(_) => false; }; }",
       "at": "=> v",
       "message": "expected )"
     },
@@ -944,10 +944,10 @@
     },
     {
       "id": "parser-sensor-colon",
-      "code": "control Bad { sensor value Number; }",
-      "valid": "control Good { sensor value: Number; }",
+      "code": "control Bad { input value Number; }",
+      "valid": "control Good { input value: Number; }",
       "at": "Number",
-      "message": "expected :"
+      "message": "expected : after input name"
     }
   ],
   "literateCases": [

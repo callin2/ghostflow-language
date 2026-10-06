@@ -1,4 +1,11 @@
+// Explicit temporal fixture revision: issue531-quality-temporal-v1; predecessor retained in fixtures/history/issue531/temporal.
 import assert from 'node:assert/strict';
+import { softwareQualityObservations, softwareQualityRails } from './helpers/software-quality-observations.mjs';
+const ControlRuntime = {
+  instantiate: async (...args) => softwareQualityObservations(await BaseControlRuntime.instantiate(...args)),
+  instantiateFramed: async (...args) => softwareQualityObservations(await BaseControlRuntime.instantiateFramed(...args)),
+};
+
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -7,7 +14,7 @@ import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 import { encode } from '@toon-format/toon';
 import { compileSource, writeArtifact } from '../tools/toolchain.mjs';
-import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
+import { ControlRuntime as BaseControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 import { solarFallbackWallMs } from '../runtimes/wasm/solar-schedule.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -33,7 +40,7 @@ const source = '# Natural fallback\n\n```ghost\n' + `control NaturalFallback {
   output due, pump, permit: Bool;
   due <- dawn.due;
   pump <- phase' == Water;
-  permit <- !unsafe;
+  permit <- case unsafe { ok(value) => !value; fault(_) => false; };
   require pump => permit;
 }` + '\n```\n';
 
@@ -84,7 +91,7 @@ test('held clock, fallback recovery and safety retain native/WASM/ghostsim parit
   const binary = path.join(directory, 'natural.gfb');
   writeArtifact(artifact, binary);
   const tape = path.join(directory, 'tape.json');
-  fs.writeFileSync(tape, JSON.stringify({ bootEpoch: 7, terminalCapacity: 16, scans: rows }));
+  fs.writeFileSync(tape, JSON.stringify({ bootEpoch: 7, terminalCapacity: 16, scans: rows.map((row, index) => ({ ...row, inputs: softwareQualityRails(artifact, row.inputs, index + 1, row.nowMs) })) }));
   const native = run(path.join(root, 'target/release/examples/solar_tape' + (process.platform === 'win32' ? '.exe' : '')), [binary, tape])
     .trim().split('\n').map(line => JSON.parse(line));
   assert.ok(native.every(row => row.accepted));
@@ -95,7 +102,7 @@ test('held clock, fallback recovery and safety retain native/WASM/ghostsim parit
   fs.writeFileSync(scenario, encode({ format: 'GhostFlow/scenario-v1', id: 'natural-fallback-parity',
     initialInputs: [{ name: 'unsafe', type: 'Bool', value: false }], keyBindings: [],
     solar: { bootEpoch: 7, terminalCapacity: 16 },
-    actions: rows.flatMap(row => [
+    actions: rows.flatMap((row, index) => [
       { kind: 'input', name: 'unsafe', type: 'Bool', value: row.inputs.unsafe },
       { kind: 'scan', atMs: row.nowMs, solarFacts: row.solarFacts },
     ]) }) + '\n');

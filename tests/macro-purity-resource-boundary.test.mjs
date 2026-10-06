@@ -27,7 +27,7 @@ control RuntimeExpressionSplice {
   input start, stop: Bool;
   state running: Bool = false;
   output pump: Bool;
-  running' = @hold(start, stop, running);
+  running' = @hold(case start { ok(value) => value; fault(_) => false; }, case stop { ok(value) => value; fault(_) => true; }, running);
   pump <- running';
 }`);
   assert.equal(compiled.manifest.name, 'RuntimeExpressionSplice');

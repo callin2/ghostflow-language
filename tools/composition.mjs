@@ -4,6 +4,10 @@ import { sha256Hex, isWellFormedUnicode, utf8ByteLength } from './sha256.mjs';
 
 // POSIX logical locators work identically in browsers and CLI supplied closures.
 export function resolveDocument(importer, locator) {
+  // CLI-supplied filesystem names may use Windows separators; closure keys and
+  // authored relative import resolution use the same POSIX logical namespace.
+  importer = importer.replaceAll('\\', '/');
+  locator = locator.replaceAll('\\', '/');
   const parts = `${importer.slice(0, importer.lastIndexOf('/') + 1)}${locator}`.split('/');
   const result = [];
   for (const part of parts) {
@@ -45,14 +49,20 @@ export function compileComposition(source, filename, supplied) {
     validateCompositionStructure(ast);
     const unit = { ast, extraction, imports: new Map(), filename: name };
     units.set(key, unit); active.add(key);
+    const dependencyContext = (entry, actual) => {
+      const instances = ast.body.filter(node => node.kind === 'instance' && node.alias === entry.name).map(node => node.name);
+      const ports = ast.body.filter(node => node.kind === 'connect').flatMap(node => [node.sink, node.source])
+        .filter(endpoint => instances.includes(endpoint.instance)).map(endpoint => endpoint.path);
+      return `; composition contract: definition ${entry.name} (import alias); instances [${instances.join(', ')}]; ports [${[...new Set(ports)].join(', ')}]; expected revision ${entry.revision} sha256 ${entry.sha256}; actual ${actual}; supply the exact pinned dependency before activation`;
+    };
     for (const entry of ast.imports) {
       const target = resolveDocument(name, entry.locator), document = documents.get(target);
-      if (!document) fail(entry.locatorLoc, `missing imported document ${entry.locator} in sourceClosure`, 'GF_IMPORT');
+      if (!document) fail(entry.locatorLoc, `missing imported document ${entry.locator} in sourceClosure${dependencyContext(entry, 'missing')}`, 'GF_IMPORT');
       // A closing edge to an active definition is a structural cycle even
       // when its circular content pin cannot match. Reject before identity
       // checks so the authored back edge retains the specific cycle reason.
       if (active.has(target)) fail(entry.loc, `executable import cycle at ${entry.locator}`, 'GF_IMPORT');
-      if (document.revision !== entry.revision) fail(entry.loc, `import revision mismatch for ${entry.locator}`, 'GF_IMPORT');
+      if (document.revision !== entry.revision) fail(entry.loc, `import revision mismatch for ${entry.locator}${dependencyContext(entry, `revision ${document.revision} sha256 ${document.sha256}`)}`, 'GF_IMPORT');
       if (document.sha256 !== entry.sha256) fail(entry.digestLoc,
         `import sha256 digest mismatch for ${entry.locator}: expected ${entry.sha256}, actual ${document.sha256}`, 'GF_IMPORT');
       used.add(target); unit.imports.set(entry.name, visit(document.text, target));
@@ -74,7 +84,7 @@ export function compileComposition(source, filename, supplied) {
     for (const node of unit.ast.body) {
       for (const name of node.names ?? (node.name ? [node.name] : [])) names.set(name, `${prefix}${name}`);
       if (node.kind === 'input' || node.kind === 'output') for (const name of node.names) ports.set(name, { kind: node.kind, type: node.type });
-      if (node.kind === 'sensor') ports.set(node.name, { kind: 'sensor', type: node.type, optional: node.optional });
+      if (node.kind === 'sensor') ports.set(node.name, { kind: 'sensor', type: node.type, optional: node.optional, options: node.options });
       if (node.kind === 'connection') outputs.set(node.name, node.value);
     }
     for (const node of unit.ast.sourceNodes) {
@@ -115,6 +125,10 @@ export function compileComposition(source, filename, supplied) {
         if (!provider) fail(value.loc, `missing required input ${path}.${value.name}`);
         return provider();
       }
+      if (value.kind === 'reference' && !locals.has(value.name) && ports.get(value.name)?.kind === 'sensor' && path) {
+        const binding = inputs.get(value.name);
+        if (binding?.computed) return binding.computed();
+      }
       const result = {};
       for (const [key, child] of Object.entries(value)) {
         if (key === 'loc') result[key] = child;
@@ -136,6 +150,15 @@ export function compileComposition(source, filename, supplied) {
       const origin = endpoint(connection.source, connection.source.instance ? 'output' : 'input');
       if (typeKey(sink.port.type) !== typeKey(origin.port.type)) fail(connection.sink.loc, `port type mismatch for ${connection.sink.path}`);
       if (sink.port.kind === 'sensor' || origin.port.kind === 'sensor') {
+        if (sink.port.kind === 'sensor' && origin.port.kind === 'output' && connection.sink.instance && connection.source.instance) {
+          if (sink.port.optional || Object.keys(sink.port.options ?? {}).length)
+            fail(connection.sink.loc, `computed input ${connection.sink.path} cannot declare optional acquisition or conditioning options`);
+          sink.owner.inputs.set(connection.sink.port, { computed: () => ({
+            kind: 'call', id: ids.get(connection.id), loc: connection.sink.loc, name: 'ok', named: [],
+            compositionPayloadType: sink.port.type, args: [origin.owner.output(connection.source.port)],
+          }) });
+          continue;
+        }
         if (sink.port.kind !== 'sensor' || origin.port.kind !== 'sensor' || !connection.sink.instance || connection.source.instance)
           fail(connection.sink.loc, 'sensor connection requires a root sensor source and an instance sensor sink');
         if (sink.port.optional !== origin.port.optional)
@@ -154,6 +177,7 @@ export function compileComposition(source, filename, supplied) {
       const body = [];
       for (const node of unit.ast.body) {
         if (['instance', 'connect', 'connection'].includes(node.kind) || (path && ['input', 'output'].includes(node.kind))) continue;
+        if (node.kind === 'sensor' && path && inputs.get(node.name)?.computed) continue;
         const copy = transform(node);
         if (node.kind === 'sensor' && path) sensorBindings.set(copy.name, { sourceSensor: inputs.get(node.name).sensor, instance: path, port: node.name, loc: inputs.get(node.name).loc });
         if (node.kind === 'parameter' && overrides.has(node.name)) copy.value = overrides.get(node.name);

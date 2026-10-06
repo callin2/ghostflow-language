@@ -10,7 +10,7 @@ receipt의 진위를 보장하지 않는다.
 
 선택된 profile은 독립적인 canonical `.ghost.md` GFB10 control이다. Periodic
 schedule, 기존 settings, 같은 source의 applied/durable `on_time` account를
-사용한다. sensor, 외부 context, controller, objective, after-event adapter는
+사용한다. 외부 context, signal, controller, objective, after-event adapter는
 제외한다. accounting budget constraint와 event-count binding은 owner 생성이나
 저장 전에 거절한다. 이 profile은 applied 사용량을 관찰하지만 accounting을 판단
 강제에 연결하지 않는다. `prepareWhatIfReplay`의 plain-control profile을 확장하지 않는다.
@@ -29,11 +29,23 @@ caller mapping은 명시적인 reference binding이며 installation identity 발
 판단 timeline, 실행 중 timer, run identity는 복원하지 않는다. FileLedger의
 데스크톱 durability와 single-writer 제한은 그대로 적용된다.
 
-`append(frame)`은 완전한 `nowMs`, `inputs`, `contextFacts`를 받는다. live framed
+`append(frame)`은 `nowMs`, 선언된 scalar `inputs`, 선택적 품질 `samples`,
+완전한 `contextFacts`를 받는다. live framed
 core를 실행해 전체 outcome/context checkpoint를 기록하고 선택된 safe Bool intent를
 연결된 live sink로 전달한다. sink 실패 시 이미 승인된 판단 기록은 유지하고
 해당 owner의 추가 live dispatch를 막는다. tick을 취소하거나 applied 증거를
 만들지 않는다. sink는 동기여야 한다. 물리적 적용과 확인은 별도 관찰이다.
+
+선언된 입력의 품질 관측은 기존 ControlRuntime의 producer 및 conditioning
+계약으로 처리한다. frame의 선택적 `samples`에는 입력 이름별 `epoch`, `id`,
+`timestampMs`, `quality`, 타입에 맞는 `value`를 기록한다. 품질은 producer가
+제공하며 정상 false와 0도 Good 관측이다. 샘플을 생략한 frame은 시간만
+진행한다. 기존 입력 계약에 따라 이전 증거가 유지되거나 오래되고, 첫 관측
+전에는 NotReady가 유지된다. host는 새 Good 관측이나 물리 고장 진단을 만들지
+않는다. 입력을 사용할 수 없을 때의 intent는 소스에 작성된 Result 분기가 결정한다.
+샘플은 실행 전에 복사하고 frame 예산과 분기 식별 hash에 포함한다. recorded
+재생은 품질을 포함한 샘플 기록이 정확히 같아야 한다. synthetic 분기는 다른
+명시적 샘플을 제공할 수 있지만 live sink, storage, accounting owner에 접근하지 않는다.
 
 `recordApplied(segment)`는 caller가 검증한 명시적인 Driver interval을 source-bound
 AccountingRuntime에 전달하고 실제 snapshot을 저장·승인한다. request, safe intent,

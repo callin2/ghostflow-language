@@ -5,6 +5,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
+import { softwareQualityObservations } from './helpers/software-quality-observations.mjs';
 import { fileURLToPath } from 'node:url';
 import { AccountingRuntime } from '../runtimes/wasm/accounting-runtime.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
@@ -66,8 +67,8 @@ test('REF-08-008: durable applied ledger uses stable resource evidence and ignor
   // An actual compiled producer executes automatic/manual requests. It is
   // independent of the caller-validated Driver interval ingestion contract.
   const producer = await compileSource('# Request producer\n\n```ghost\ncontrol Requests {\n'
-    + 'input automatic, manual: Bool; output pump: Bool; pump <- automatic || manual;\n}\n```\n', { filename: 'requests.ghost.md' });
-  const requestRuntime = await ControlRuntime.instantiateFramed(wasmBytes, producer);
+    + 'input automatic, manual: Bool; output pump: Bool; pump <- case automatic { ok(a) => case manual { ok(m) => a || m; fault(_) => a; }; fault(_) => case manual { ok(m) => m; fault(_) => false; }; };\n}\n```\n', { filename: 'requests.ghost.md' });
+  const requestRuntime = softwareQualityObservations(await ControlRuntime.instantiateFramed(wasmBytes, producer));
   t.after(() => requestRuntime.dispose());
   const requestFrames = [
     { nowMs: 0, inputs: { automatic: false, manual: false } },
@@ -202,7 +203,8 @@ test('REF-08-008: durable applied ledger uses stable resource evidence and ignor
   const producerModule = join(directory, 'requests.gfb'), producerTape = join(directory, 'requests.tsv');
   writeFileSync(producerModule, producer.bytes);
   writeFileSync(producerTape, requestFrames.map((frame, scan) => [scan, frame.nowMs,
-    ...Object.entries(frame.inputs).flatMap(([name, value]) => [name, 'b', value])].join('\t')).join('\n') + '\n');
+    ...Object.entries(requestOutcomes[scan].trace.inputs).filter(([name]) => name !== '__gf_now_ms')
+      .flatMap(([name, value]) => [name, typeof value === 'boolean' ? 'b' : 'n', value])].join('\t')).join('\n') + '\n');
   const scanRunner = resolve(root, 'target/release/examples/scan_tape' + (process.platform === 'win32' ? '.exe' : ''));
   const nativeRequests = execFileSync(scanRunner, [producerModule, producerTape], { encoding: 'utf8', timeout: 10_000 })
     .trim().split('\n').map(line => JSON.parse(line));

@@ -1,0 +1,10 @@
+test('GF-TEST-literate-runtime-equivalence: equivalent canonical literate documents deploy identical GFB and traces', async t => {
+  const source = 'control Literate { input enabled: Bool; output result: Bool; result <- enabled; }';
+  const first = await compileSource(`# Controller\n\n\`\`\`ghost\n${source}\n\`\`\`\n`, { filename: 'first.ghost.md' });
+  const second = await compileSource(`# Same executable control, with independent intent prose.\n\n\`\`\`ghost\n${source}\n\`\`\`\n`, { filename: 'second.ghost.md' });
+  assert.deepEqual(first.bytes, second.bytes);
+  const firstRun = await differential(t, first.bytes, ['enabled'], [{ enabled: false }, { enabled: true }], [['result', 'bool']]);
+  const secondRun = await differential(t, second.bytes, ['enabled'], [{ enabled: false }, { enabled: true }], [['result', 'bool']]);
+  assert.deepEqual(secondRun.outcomes, firstRun.outcomes);
+  assert.deepEqual(firstRun.outcomes.map(row => row.trace.safe.result), [false, true]);
+});

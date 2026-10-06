@@ -5,6 +5,137 @@
 
 ## 미출시
 
+### 2026-10-06 — 실행 가능한 의도 출처 진단 ([#537](https://github.com/callin2/ghostflow-language/issues/537))
+
+Reference 1.2 의도 링크 계약의 버그 수정입니다. 스키마 요청에서 링크 없는
+`state hot: Bool = false;`는 짧은 메시지만 반환했지만, 이제 원본 선언 위치와
+Markdown anchor 및 인접 코드 link를 설명하고 소스/문서/리비전 ID를 보존합니다.
+수정 힌트는 작성자 검토를 위한 명시적인 미확인 AI 가정(`relation=assumes`)이며,
+확인된 의도를 만들어 내거나 소스를 자동 수정하지 않습니다. Node와 브라우저
+회귀 검사에서 state/timer/operator config 수정이 실행 바이트 변경 없이 컴파일됩니다.
+기존 출처 거부 및 스키마 식별 검사, 문법, GFB/ABI, 런타임, 릴리스 정책은 유지됩니다.
+### 2026-10-06 — Boolean 요청 출력 설명 ([#283](https://github.com/callin2/ghostflow-language/issues/283))
+
+Reference 5.3의 제한된 실제 평가 경로 관찰을 추가한다. 선택적 Rust VM
+instruction witness와 artifact에 결속된 compiler sidecar가 한 완료 scan의
+지원되는 요청 Bool 표현식을 설명한다. false gate와 0 divisor를 사용한
+`pump <- gate && (1.0 / divisor > 0.0)`에서 첫 항의 false가 OFF의 근거이며
+생략된 둘째 항에는 실제 값이나 support가 없다. 공유 DAG의 support는
+parent/output occurrence별로 구분한다. 기존 GFB bytes와 실행 의미는 유지한다.
+실패 scan은 새 완료 proof를 만들지 못하며 source/module/run/scan/time join은
+stale을 구별한다. `tests/explanation-path.test.mjs`가 실제 native/WASM parity와
+거부 경계를 검증한다. timer/schedule/composition/safety/Result/transition proof는
+명시적 미지원이며 issue88 전체 완료나 하드웨어 검증을 주장하지 않는다.
+
+
+### 2026-10-05 — 품질 기반 canonical input ([#531](https://github.com/callin2/ghostflow-language/issues/531))
+
+외부 `input` 선언은 기존 sensor의 Result, conditioning과 optional capability
+규칙을 계승한다(Reference 1/4). `input request: Bool;`은
+`request |> recover(true)`처럼 명시적으로 처리한다. healthy false는 false다.
+기존 `sensor` 선언은 새 revision migration 진단으로 거부한다. 저장 소스/이력은
+보존하고 이전 plain input의 fault 정책을 검토한다. Bool/Number/quantity wire
+정보, GFB 형식과 WASM ABI는 그대로다. Int와 기존 Duration/Date/TimeOfDay/DateTime scalar 범위에도
+반올림 없이 같은 타입별 품질 계약을 적용한다. 잘못된 숫자 관측값은 Invalid가
+되고 정확한 payload는 identity filter를 유지한다. canonical input 회귀 검사는
+plain/framed WASM의 품질, conditioning과 bytecode 일치를 다룬다. optional Int
+capability는 기존 Int tag를 유지해 설치된 입력이 품질과 무관하게 present
+전략을 선택한다. Host는 Bool의 숫자 범위를 거부하며 source replay는 서명된
+전체 quality descriptor가 canonical input conditioning과 일치하는지 검사한다.
+별도로 서명한 metadata 대체로 이 계약을 바꿀 수 없다. native package는
+취득 metadata의 타입별 범위와 생성된 sample identity를 별도로 검사한다.
+canonical source를 다시 컴파일하는 검사는 아니다.
+
+At 전용 예약 프로필도 typed quality input을 허용한다. 기존 sensor 분류 금지는
+이미 지원하던 외부 예약 조건의 canonical 대체 입력까지 거부했으므로 제거했다.
+명시적인 `allow |> recover(false)`는 사용할 수 없는 조건의 실행을 차단한다.
+At clock/recovery 규칙, GFB14와 context ABI는 유지한다. At 계약, native/WASM
+실행 parity 및 fault 회귀 검증으로 이 수정을 확인한다.
+Bool의 `valid` 범위는 host/native admission과 동일하게 컴파일 단계에서 거부한다.
+이전에는 boolean 범위가 어느 host에서도 실행할 수 없는 manifest를 만들 수 있었다.
+
+현재 curriculum, tutorial, book과 test fixture는 새 source revision에서
+Result를 명시적으로 처리한다. 원본 바이트와 과거 replay identity는 보존한다.
+producer quality는 물리 버튼 고장 진단과 구분하며 공통 재시작 정책이나
+START 버튼을 강제하지 않는다. 공개 선언 진단은 input으로 표기하고 기존
+내부 sensor 분류는 유지한다.
+
+참조 소프트웨어 producer는 값이 실제로 공급됐을 때만 새 타입별 관측을 제출한다.
+clock-only frame은 Good 관측을 만들지 않는다. 초기 상태는 NotReady이고 기존
+freshness 규칙에 따라 Stale이 될 수 있다. 정상 false와 0은 Good이다.
+Simulator, console과 live adapter는 같은 canonical source를 유지한다.
+Ghost Timeline은 명시적 품질 sample을 기록·재생하면서 live sink와 ledger를
+바꾸지 않는다(Reference 4.2/6.8). 소스에 결합된 resource mode 검증은 canonical
+Bool input을 인식한다. 서명된 composition package의 sensor-instance 정보는
+전체 canonical source replay 후에만 승인한다. 과거 GFB10 프로필은 지원하지
+않는 해당 필드를 bytecode 로드 전에 거부한다. GFB와 ABI는 바꾸지 않는다.
+software producer, timeline, package 변조와 resource binding 회귀 검사가
+이를 다룬다.
+
+instance의 scalar output에서 다른 instance input으로의 내부 연결은 기존
+타입별 `ok` 생성자를 재사용해 실제 계산값을 받는 쪽의 Result 계약으로
+lift한다(Reference 6.2/6.4). 취득 관측이나 sample lineage는 생성하지 않는다.
+받는 소스는 Result를 명시적으로 처리해야 한다. 계산 포트의 conditioning은
+거부하며 이전 상태 feedback과 cycle 제한은 유지한다. 예를 들어
+`connect B.previous <- A.previous;`는 물리 producer를 요구하지 않고 기존
+확정 상태 경계를 유지한다. 기존 `map(fn)`과 `and_then(fn)`은 새로운 runtime
+HOF 없이 순수 함수와 Result 반환 함수를 연결한다. native/WASM 상태 지연,
+선언 순서와 Result 전파 회귀 검사가 이를 다룬다.
+
+Reference 4.2의 준비 조건을 복원하는 버그 수정: `recover_after = 3 samples`는
+고장 후뿐 아니라 초기 시작, reset과 source epoch 변경에서도 서로 다른 새
+정상 관측 세 개를 요구한다. 이전에는 초기 시작/reset에서 이 조건을 건너뛰었다.
+필터도 준비됐다면 세 번째 관측부터 사용할 수 있다. 중복 전달과 읽기는 수를
+늘리지 않는다. fault, stale reception과 source reset은 새 준비 순서를 시작한다.
+기본 one-sample 동작은 유지한다. Rust와 실제 plain/framed WASM 회귀 검사는
+사용 불가 품질, 정상 false/0 및 명시적 ROP fault 전파를 보존한다.
+시간 기반 annotation, ABI 또는 application 재시작 규칙은 추가하지 않는다.
+
+기존 소스의 `map + debounce(stable_for: 2min) + Result case` 조합으로 시간
+기준 준비도 검증했다. 새 문법은 없다. 첫 conditioned Good 관측부터 기간을
+재며 deadline 이후의 새 Good 관측에서만 준비를 완료한다. clock-only scan과
+중복 전달은 완료 조건을 만족하지 않는다. fault, stale과 epoch 변경은 준비를
+다시 시작한다. `recover_after = N samples`는 N번째 관측부터 사용한다는 뜻이다.
+처음 N개를 버리려면 기존 1..31 범위에서 N+1을 지정해야 한다.
+plain/framed/native 회귀 검사가 이 조합을 다룬다.
+
+bound resource mode binding은 canonical Bool input을 생성된 value rail에
+연결하고 permission을 읽기 전에 짝인 OK rail을 검증한다. 사용할 수 없는
+mode 관측은 기존 필수 Bool permission의 누락/타입 오류처럼 원자적으로
+거부한다. false/OFF나 새 trip 정책으로 바꾸지 않는다. 같은 scan의 수정된
+재시도 및 기존 소스에 명시된 admission, safe vector와 재무장 동작을
+native/plain/framed 회귀 검사로 다룬다. GFRB/GFRS/GFB17 버전과 형식은 유지한다.
+
+### 2026-10-03 — 보존 범위의 관찰 event gap 보고 ([#282](https://github.com/callin2/ghostflow-language/issues/282))
+
+명시적 event와 completed snapshot을 분리해서 보존하는 소스에 결합된 참조 Host journal을 추가한다. sequence10의 소비자는 보존 범위가14부터 시작하면 누락 범위11–13과 원래 event14를 받으며 snapshot에서 만든 가상 event는 받지 않는다. 전체 발행을 원자적으로 검증하고 거부된 batch는 같은 scan에서 재시도할 수 있으며 cursor는 정확한 source/Program/schema/run identity에 결합한다. REF-05-022는 실제 native/framed-WASM trace, 전체 Host 전달 및 새 replay를 검증한다. 이 참조 API는 source 문법, Interaction snapshot v0, 물리 증거 또는 실행 환경의 최종 event 전송을 바꾸지 않는다.
+
+### 2026-10-03 — source에 결합된 instance trace projection ([#291](https://github.com/callin2/ghostflow-language/issues/291))
+
+REF-06-003 instance 표시와 trace projection을 위한 production 참조 어댑터를 추가한다. 이 어댑터는 activation 전에 supplied artifact를 다시 컴파일하여 정확한 root source, imported closure의 text/revision/digest, bytecode, manifest, source map 및 trace metadata를 검증한다. Presentation label은 실제 컴파일된 instance ID를 정확히 대상으로 해야 하며 별도 metadata로 남는다. 이 label은 instance를 rename하거나 source revision을 작성하지 않는다. Projection은 이제 `observeSourceTrace()` 결과를 사용하고, 방출된 source-map owner와 authored symbol에서 identity-keyed entry를 반환하며 private VM slot suffix를 public meaning으로 만들지 않는다. 잘못된 label, caller mutation 시도, 잘못된 source/manifest/closure provenance 및 다른 trace module identity는 projection 전에 거부된다. Source grammar, evaluator 또는 Reference semantics 변경은 없다.
+
+### 2026-10-03 — Program에 결합된 임시 설정 ([#279](https://github.com/callin2/ghostflow-language/issues/279))
+
+그룹 단위 Run/Until 운영 설정을 위한 참조 Host를 추가합니다. 임시 값은 직전 일반 값을 기록하고, 평가 전에 만료 또는 취소하며, 수명이나 복귀 유효성을 확인할 수 없으면 결정을 막습니다. 같은 Program에 대한 명시적 승인으로만 새 Run에 복원합니다. 잘못된 일반 값 대체는 전체 SettingsInvalid 경로를 따릅니다. 형식 있는 context 설정 origin(tag 2, temporaryReturn)은 검증된 복귀에서 이미 할당한 TimeSlots 행 식별자를 보존하며 일반 편집의 삭제 및 할당 검사는 유지합니다. 행위자 권한과 체크포인트 승인은 신뢰하는 Host 입력입니다. REF-05-018은 native/WASM의 전체 결과와 체크포인트 바이트를 비교합니다.
+
+### 2026-10-03 — 서명된 재사용 source closure 보존 ([#309](https://github.com/callin2/ghostflow-language/issues/309))
+
+Portable composition package는 이제 정확히 pin된 transitive source closure를 보존한다. 이전에는 서명 과정에서 provenance가 빠지고 검증이 문서 없이 import를 lowering하려 했다. 검증은 서명된 closure를 다시 컴파일하여 전체 bytecode, manifest 및 source-map identity를 비교한 뒤 target admission을 허용한다. 다시 서명한 instance 변조도 거부한다. REF-06-025는 native/WASM instance 격리와 검증된 package의 effect-free replay를 확인한다. 기존 package format과 plain-control replay 정책은 바뀌지 않는다.
+
+### 2026-10-03 — dependency 및 ownership 거부 맥락 보완 ([#301](https://github.com/callin2/ghostflow-language/issues/301))
+
+Reference §6.6의 진단 상세를 복원한다. 누락되거나 revision이 다른 import는
+import alias, 영향받는 instance/port, 기대 revision/digest 및 실제 누락 또는
+제공된 identity를 명시한다. 중복 supplier는 두 writer를 유지하고 영향받는
+definition/instance/port, supplier 하나라는 기대, 실제 개수, pinned 근거와
+교정 선택을 추가한다. 예를 들어 `pump`의 두 writer는 activation 전에
+`Relay/east/pump`와 `Relay/west/pump`를 모두 명시하여 거부한다. 이전에는
+이유와 writer 이름만 있었고 해당 contract 맥락이 빠져 있었다. 기존 error
+class/category, 작성 위치, 첫 실패 순서 및 후보 거부는 유지한다. 진단 문구가
+더 상세해지지만 source 문법, artifact 또는 ABI는 바뀌지 않는다. REF-06-015
+거부 테스트와 수정된 source의 전체 native/framed-WASM 실행/replay로 검증한다.
+
+
 ### 2026-10-03 — 혼합 UTC Range와 비공개 config snapshot 복구 ([#503](https://github.com/callin2/ghostflow-language/pull/503))
 
 Reference §§3.5–3.6과 §5의 설정 관측 동작을 복구하는 버그 수정이다.

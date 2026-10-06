@@ -810,6 +810,23 @@ pub struct ResultTraceEvent {
 }
 
 #[derive(Clone, Debug)]
+pub struct InstructionWitness {
+    pub pc: usize,
+    pub end: usize,
+    pub next_pc: usize,
+    pub value: Option<Value>,
+}
+
+#[derive(Clone, Debug)]
+pub struct IntentWitness {
+    pub name: String,
+    pub steps: Vec<InstructionWitness>,
+}
+
+/// Opt-in diagnostic budget, independent of journal capacity. No VM opcodes change.
+pub const MAX_EXPLANATION_INSTRUCTIONS: usize = 8192;
+
+#[derive(Clone, Debug)]
 pub struct TickRecord {
     pub module_fingerprint: u64,
     pub resource_trace: Vec<resource_constraints::Observation>,
@@ -823,6 +840,7 @@ pub struct TickRecord {
     pub faults: Vec<String>,
     pub safety_trace: SafetyTrace,
     pub result_trace: Vec<ResultTraceEvent>,
+    pub instruction_witnesses: Option<Vec<IntentWitness>>,
     pub window_trace: Vec<temporal_runtime::WindowTrace>,
     pub true_for_trace: Vec<true_for_runtime::TrueForTrace>,
     pub schedule_trace: Vec<solar_admission::SolarStageResult>,
@@ -843,6 +861,7 @@ impl TickRecord {
 }
 
 pub struct Runtime {
+    instruction_witnesses_enabled: bool,
     module: Option<Module>,
     capabilities: Vec<Capability>,
     active_strategy: Option<usize>,
@@ -865,6 +884,7 @@ pub struct Runtime {
 impl Runtime {
     pub fn new(journal_capacity: usize) -> Self {
         Self {
+            instruction_witnesses_enabled: false,
             module: None,
             capabilities: vec![],
             active_strategy: None,
@@ -885,6 +905,7 @@ impl Runtime {
         }
     }
     pub fn install(&mut self, module: Module, preserve_state: bool) {
+        self.instruction_witnesses_enabled = false;
         if module.resource_policy.is_some() || self.resource_guard.is_some() {
             self.journal.clear();
             self.next_tick = 1;
@@ -1612,6 +1633,26 @@ impl Runtime {
     pub fn tick(&mut self) -> Result<&TickRecord> {
         self.tick_inner(None, None, None)
     }
+    /// Enable bounded requested-intent evidence before execution. Large programs
+    /// remain executable with observation disabled; enabling rejects them upfront.
+    pub fn enable_instruction_witnesses(&mut self) -> Result<()> {
+        let module = self
+            .module
+            .as_ref()
+            .ok_or_else(|| Error::new("no module installed"))?;
+        if module.strategies.iter().any(|strategy| {
+            strategy
+                .intents
+                .iter()
+                .map(|intent| intent.expression.len())
+                .sum::<usize>()
+                > MAX_EXPLANATION_INSTRUCTIONS
+        }) {
+            return Err(Error::new("explanation instruction budget exceeded"));
+        }
+        self.instruction_witnesses_enabled = true;
+        Ok(())
+    }
     pub fn tick_with_resource_binding(&mut self, bytes: &[u8]) -> Result<&TickRecord> {
         self.tick_inner(None, None, Some(bytes))
     }
@@ -1778,6 +1819,7 @@ impl Runtime {
                 .as_ref()
                 .map_or(&[][..], |stage| stage.projections.as_slice())
         };
+        let mut instruction_witnesses = self.instruction_witnesses_enabled.then(Vec::new);
         let evaluated = (|| {
             let window_trace = if let Some(temporal) = &mut self.temporal {
                 temporal.stage(
@@ -1828,7 +1870,13 @@ impl Runtime {
             }
             let mut requested = BTreeMap::new();
             for intent in &strategy.intents {
-                let value = eval_expression_with_preludes(
+                let mut steps = Vec::new();
+                if instruction_witnesses.is_some() {
+                    steps
+                        .try_reserve_exact(intent.expression.len())
+                        .map_err(|_| Error::new("explanation allocation failed"))?;
+                }
+                let value = eval_expression_with_witnesses(
                     &intent.expression,
                     &iv,
                     &self.state,
@@ -1837,9 +1885,16 @@ impl Runtime {
                     projections,
                     true_for_projections,
                     schedule_projections,
+                    instruction_witnesses.as_ref().map(|_| &mut steps),
                 )?;
                 debug_assert_eq!(value.value_type(), intent.value_type);
                 requested.insert(intent.name.clone(), value);
+                if let Some(witnesses) = &mut instruction_witnesses {
+                    witnesses.push(IntentWitness {
+                        name: intent.name.clone(),
+                        steps,
+                    });
+                }
             }
             Ok((requested, window_trace, true_for_trace))
         })();
@@ -1896,6 +1951,7 @@ impl Runtime {
             faults,
             safety_trace,
             result_trace: result_trace.events,
+            instruction_witnesses,
             window_trace,
             true_for_trace,
             schedule_trace: solar_stage
@@ -2849,10 +2905,27 @@ fn eval_expression_with_preludes(
     true_fors: &[[Value; 7]],
     schedules: &[[Value; 3]],
 ) -> Result<Value> {
+    eval_expression_with_witnesses(
+        code, inputs, state, next, trace, windows, true_fors, schedules, None,
+    )
+}
+fn eval_expression_with_witnesses(
+    code: &[u8],
+    inputs: &[Value],
+    state: &[Value],
+    next: Option<&[Value]>,
+    trace: &mut ResultTraceBuffer,
+    windows: &[[Value; 8]],
+    true_fors: &[[Value; 7]],
+    schedules: &[[Value; 3]],
+    mut witnesses: Option<&mut Vec<InstructionWitness>>,
+) -> Result<Value> {
     let mut r = Reader::new(code);
     let mut s = [Value::Bool(false); MAX_STACK];
     let mut n = 0;
     while !r.finished() {
+        let pc = r.at;
+        let mut branch_end = None;
         match r.u8()? {
             1 => {
                 let b = r.u8()?;
@@ -2968,6 +3041,7 @@ fn eval_expression_with_preludes(
             }
             op @ 30..=31 => {
                 let target = r.jump_target()?;
+                branch_end = Some(r.at);
                 let jump = if op == 30 {
                     let Value::Bool(condition) = value_pop(&s, &mut n)? else {
                         return Err(Error::new("branch condition must be Bool"));
@@ -3090,6 +3164,17 @@ fn eval_expression_with_preludes(
                 });
             }
             _ => return Err(Error::new("unknown expression opcode")),
+        }
+        if let Some(steps) = &mut witnesses {
+            if steps.len() >= code.len() || steps.len() >= MAX_EXPLANATION_INSTRUCTIONS {
+                return Err(Error::new("explanation instruction budget exceeded"));
+            }
+            steps.push(InstructionWitness {
+                pc,
+                end: branch_end.unwrap_or(r.at),
+                next_pc: r.at,
+                value: n.checked_sub(1).map(|index| s[index]),
+            });
         }
     }
     if n != 1 {
@@ -3900,6 +3985,7 @@ mod tests {
             faults: vec![],
             safety_trace: trace,
             result_trace: Vec::new(),
+            instruction_witnesses: None,
             window_trace: Vec::new(),
             true_for_trace: Vec::new(),
             schedule_trace: Vec::new(),
@@ -4118,11 +4204,21 @@ mod tests {
         assert_eq!(runtime.state("watering"), Some(Value::Bool(false)));
     }
     const MODULE: &[u8] = include_bytes!("../../../build/irrigation.gfb");
+    // Raw VM acquisition rails model explicit Good samples; no host fallback is applied.
     fn submit(r: &mut Runtime, a: bool, b: bool, c: bool, d: f64) {
-        r.set_input("start", Value::Bool(a)).unwrap();
-        r.set_input("stop", Value::Bool(b)).unwrap();
-        r.set_input("low_water", Value::Bool(c)).unwrap();
-        r.set_input("moisture", Value::Number(d)).unwrap();
+        for (name, value) in [
+            ("start", Value::Bool(a)),
+            ("stop", Value::Bool(b)),
+            ("low_water", Value::Bool(c)),
+            ("moisture", Value::Number(d)),
+        ] {
+            r.set_input(&format!("__gf_sensor_value_{name}"), value)
+                .unwrap();
+            r.set_input(&format!("__gf_sensor_ok_{name}"), Value::Bool(true))
+                .unwrap();
+            r.set_input(&format!("__gf_sensor_fault_{name}"), Value::Number(0.0))
+                .unwrap();
+        }
     }
     #[test]
     fn device_query_replay_and_hot_swap() {

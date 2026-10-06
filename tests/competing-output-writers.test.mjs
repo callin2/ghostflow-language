@@ -5,14 +5,15 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import test from 'node:test';
+import { softwareQualityObservations } from './helpers/software-quality-observations.mjs';
 import { compileSource } from '../tools/compile-source.mjs';
 import { sha256Hex } from '../tools/sha256.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 
 const doc = code => `# Exclusive output intent\n\n\`\`\`ghost\n${code}\n\`\`\`\n`;
-const relay = doc('control Relay { input start: Bool; output pump: Bool; pump <- start; }');
-const pin = `import Relay from "./relay.ghost.md" revision "relay-r1" sha256 "${sha256Hex(relay)}";`;
-const closure = [{filename:'relay.ghost.md',revision:'relay-r1',text:relay}];
+const relay = doc('control Relay { input start: Bool; output pump: Bool; pump <- start |> recover(false); }');
+const pin = `import Relay from "./relay.ghost.md" revision "relay-input-v2" sha256 "${sha256Hex(relay)}";`;
+const closure = [{filename:'relay.ghost.md',revision:'relay-input-v2',text:relay}];
 const compile = source => compileSource(source,{filename:'writers.ghost.md',sourceClosure:closure});
 const declarations = ['instance east: Relay;','instance west: Relay;'];
 
@@ -59,7 +60,7 @@ test('REF-06-014 distinct authoritative channels preserve each writer value with
   const artifact = await compile(source);
   assert.deepEqual(artifact.sourceClosure.instances.map(item=>item.instance),['east','west']);
   const wasm = fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm',import.meta.url));
-  const runtime = await ControlRuntime.instantiateFramed(wasm,artifact);
+  const runtime = softwareQualityObservations(await ControlRuntime.instantiateFramed(wasm,artifact));
   t.after(()=>runtime.dispose());
   const frames=[],outcomes=[],dispatch=runtime.runtime.dispatch.bind(runtime.runtime);
   runtime.runtime.dispatch = frame=>{frames.push(structuredClone(frame));dispatch(frame);outcomes.push(structuredClone(runtime.runtime.outcome));};
