@@ -116,7 +116,7 @@ At each stage, first consider how the device should behave. Then see how to expr
 ### Browse by topic
 
 1. [One switch and one output](#ch01)
-2. [Names, values, types, and expressions](#ch02)
+2. [Names, values, types, and expressions](#ch02) · [Quantity-to-type lookup](#quantity-type-lookup)
 3. [What it means to remember state](#ch03)
 4. [Output intent and final outputs](#ch04)
 5. [Separating calculations with functions](#ch05)
@@ -296,6 +296,36 @@ Allowed units, conversions, and operations follow
 [Reference §2.9](reference/02-types-expressions-state.md#29-물리량과-단위).
 `Rate<Q>` is an expression-only temporal-window type, not a general input/output/state type.
 Chapter 15 gives examples of mixing units and operating across physical quantities.
+
+<a id="quantity-type-lookup"></a>
+### Find the type for your measurement
+
+Even when measuring Celsius, the type name is `Temperature`. Do not declare a
+type named `Celsius` or `Fahrenheit`. Put the unit on the value: declare
+`input air: Temperature;` and write a threshold as `30°C`.
+`30°C`, `86°F`, and `303.15K` represent the same absolute temperature.
+[Chapter 14](#ch14) continues with unit conversions and temperature control.
+
+| Measurement | Declaration type | Example value | Input declaration |
+| --- | --- | --- | --- |
+| Absolute temperature | `Temperature` | `30°C` | `input air: Temperature;` |
+| Temperature difference | `TemperatureDelta` | `5Δ°C` | `input rise: TemperatureDelta;` |
+| Relative humidity | `RelativeHumidity` | `70%RH` | `input humidity: RelativeHumidity;` |
+| Percentage, such as tank level | `Percent` | `70%` | `input level: Percent;` |
+| Carbon dioxide concentration | `CO2Concentration` | `800ppm` | `input co2: CO2Concentration;` |
+| Flow rate | `FlowRate` | `5L/min` | `input flow: FlowRate;` |
+| Pressure | `Pressure` | `1.2kPa` | `input pressure: Pressure;` |
+| Vapor pressure deficit | `VaporPressureDeficit` | `1.2kPaVPD` | `input vpd: VaporPressureDeficit;` |
+| Photosynthetic photon flux density | `PPFD` | `500umol/m2/s` | `input light: PPFD;` |
+| Voltage | `Voltage` | `24V` | `input supply: Voltage;` |
+| Elapsed time | `Duration` | `5s` | `input delay: Duration;` |
+
+`70%RH` and `70%`, and `1.2kPaVPD` and `1.2kPa`, have different types.
+Absolute temperature and temperature difference are also distinct. Inputs read
+as quality-bearing `Result` values, so handle healthy/fault branches explicitly
+before extracting or comparing the value. This table chooses no fault fallback
+or control policy. The complete unit and operation rules follow
+[Reference §2.9](reference/02-types-expressions-state.en.md#29-physical-quantities-and-units).
 
 ### E02 — Naming inputs, settings, and calculations separately
 
@@ -1007,6 +1037,9 @@ Sunrise/sunset, tide predictions, calendar, and clock data depend on external pr
 
 <a id="ch08"></a>
 ## 8. Sensor values and quality
+
+Choose the input type using the [quantity-to-type lookup](#quantity-type-lookup).
+For example, a Celsius measurement uses `Temperature` and a value such as `30°C`.
 
 Suppose moisture alternates between `29%, 31%, 29%`. A single threshold makes the
 water request alternate too. Then one `90%` appears: did the soil suddenly become
