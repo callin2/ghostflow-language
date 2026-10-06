@@ -5,7 +5,7 @@
  * to the existing GFB1 S-expression compiler.  It does not evaluate source,
  * load modules, or execute user supplied code.
  */
-import { compile as compileGfb, CompileError } from './gfb1.mjs';
+import { compile as compileGfb, lowerCoreModule, emitGfb, CompileError } from './gfb1.mjs';
 import { buildSourceTrace } from './source-trace.mjs';
 import { checkedAdjacentConstraints } from './constraint-proof.mjs';
 import { QUANTITY_TYPES, canonicalUnitFor, isQuantityType, quantityLiteral, quantitySuffixAt } from './quantities.mjs';
@@ -1666,10 +1666,17 @@ class Lowerer {
     const accountingResource = [...this.resources.values()].some(type => type === 'Station' || type === 'BoolActuator');
     if (!accountingExecution && (accountingResource || this.accounts.size || this.ast.body.some(item => item.kind === 'account-constraints'))) error(this.ast.loc,
       'accounting execution requires verified resource binding, ledger persistence, and runtime enforcement');
-    let bytes;
+    let bytes, explanationExpressions;
     try {
       if (new TextEncoder().encode(sexpr(module)).length > 1024 * 1024) throw new CompileError('source byte limit exceeded');
-      bytes = compileGfb(canonicalModuleForm(module));
+      bytes = emitGfb(lowerCoreModule(canonicalModuleForm(module)), {
+        onExpressions: strategies => { explanationExpressions = strategies.map(strategy => ({
+          name: strategy.name, intents: strategy.intents.map(intent => ({
+            name: intent.name, type: intent.type, expression: intent.expression,
+            byteLength: intent.expr.length, expressionBytes: Array.from(intent.expr), witnessNodes: intent.witnessNodes,
+          })),
+        })); },
+      });
     }
     catch (cause) {
       const message = cause instanceof Error ? cause.message : String(cause);
@@ -1688,6 +1695,7 @@ class Lowerer {
     // future literate extractor maps this array back to Markdown locations.
     return {
       bytes,
+      explanationExpressions,
       manifest: this.manifest,
       sourceMap: this.ast.sourceNodes,
       traceMetadata: buildSourceTrace({ ...this.ast, body: this.ast.body.flatMap(item => item.kind === 'local-constraints' ? item.rules : [item]) }, this.constraints, bytes, transitions, intents, generatedTimers, this.resultSites, this.generatedSignals,

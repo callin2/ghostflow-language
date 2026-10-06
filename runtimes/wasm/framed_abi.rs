@@ -277,6 +277,24 @@ pub unsafe extern "C" fn gf_frame_activate(handle: *mut FramedHandle) -> i32 {
     }
 }
 
+/// Optional ABI extension. Evidence must be enabled while configuring a new run.
+#[no_mangle]
+pub unsafe extern "C" fn gf_frame_enable_instruction_witnesses(handle: *mut FramedHandle) -> i32 {
+    let Some(handle) = handle.as_mut() else {
+        return 0;
+    };
+    let result = match &mut handle.state {
+        FramedState::Configuring(runtime) => runtime.enable_instruction_witnesses(),
+        FramedState::Active(_) => {
+            return handle.failure("explanation requires a new configuring run")
+        }
+    };
+    match result {
+        Ok(()) => handle.success(),
+        Err(error) => handle.failure(error.to_string()),
+    }
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn gf_frame_activate_resource_binding(
     handle: *mut FramedHandle,

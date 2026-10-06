@@ -4,6 +4,7 @@ import { extractLiterate, mapSourcePosition } from './literate.mjs';
 import { compileAccountingControl, compileControl, compileControlPolicyDescriptorArtifact, compileResourcePolicyArtifact, compileScheduleDescriptorArtifact, compileTemporalDescriptorArtifact, hasTemporalDescriptorCalls, isExecutablePulseSchedule, isExecutableRangeSchedule, parseControl } from './control.mjs';
 import { isWellFormedUnicode, sha256Hex, utf8ByteLength } from './sha256.mjs';
 import { compileComposition, resolveDocument } from './composition.mjs';
+import { emitExplanationArtifact } from './explanation.mjs';
 
 export { emitInteractionSchema } from './interaction-schema.mjs';
 
@@ -238,11 +239,14 @@ export function compileSourceSync(source, options = {}) {
     warnings: extraction.warnings,
   };
   const schema = interactionSourceIdentity === undefined ? null : emitInteractionSchema(compilation, interactionSourceIdentity);
+  const explanationArtifact = emitExplanationArtifact(compilation);
+  const { explanationExpressions: _expressionMappings, ...publicCompilation } = compilation;
   return {
-    ...compilation,
+    ...publicCompilation,
     diagnosticEnvelope: { format: DIAGNOSTICS_FORMAT,
       source: diagnosticSource(filename, source, interactionSourceIdentity), diagnostics: [] },
     interactionSchema: schema,
+    explanationArtifact,
     interactionSourceIdentity: schema ? {
       documentId: schema.source.documentId,
       revisionId: schema.source.revisionId,
