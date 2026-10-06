@@ -11,7 +11,7 @@ import { emitCompletedScanSnapshot } from '../tools/interaction-runtime-snapshot
 import { FramedGhostFlowRuntime } from '../runtimes/wasm/framed-runtime.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
-const native = process.env.GF_EXPLANATION_NATIVE ?? path.join(root, 'target/release/examples/scan_tape.exe');
+const native = process.env.GF_EXPLANATION_NATIVE ?? path.join(root, 'target/release/examples/scan_tape' + (process.platform === 'win32' ? '.exe' : ''));
 const source = fs.readFileSync(new URL('./fixtures/explanation-short-circuit.ghost.md', import.meta.url), 'utf8');
 const artifact = compileSourceSync(source, { filename: 'explanation-short-circuit.ghost.md',
   interactionSourceIdentity: { documentId: 'source.ref-05-023', revisionId: 'revision.ref-05-023.1' } });
@@ -45,6 +45,7 @@ function nativeRun(artifact, tape, capture = true, expectedError) {
     fs.writeFileSync(modulePath, artifact.bytes);
     fs.writeFileSync(tapePath, tape);
     const result = spawnSync(native, [modulePath, tapePath, ...(capture && !process.env.GF_EXPLANATION_BASELINE ? ['--instruction-witnesses'] : [])], { encoding: 'utf8' });
+    assert.ifError(result.error);
     if (expectedError) {
       assert.notEqual(result.status, 0);
       assert.match(result.stderr, expectedError);
