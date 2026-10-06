@@ -5,6 +5,15 @@
 
 ## 미출시
 
+### 2026-10-06 — 실행 가능한 의도 출처 진단 ([#537](https://github.com/callin2/ghostflow-language/issues/537))
+
+Reference 1.2 의도 링크 계약의 버그 수정입니다. 스키마 요청에서 링크 없는
+`state hot: Bool = false;`는 짧은 메시지만 반환했지만, 이제 원본 선언 위치와
+Markdown anchor 및 인접 코드 link를 설명하고 소스/문서/리비전 ID를 보존합니다.
+수정 힌트는 작성자 검토를 위한 명시적인 미확인 AI 가정(`relation=assumes`)이며,
+확인된 의도를 만들어 내거나 소스를 자동 수정하지 않습니다. Node와 브라우저
+회귀 검사에서 state/timer/operator config 수정이 실행 바이트 변경 없이 컴파일됩니다.
+기존 출처 거부 및 스키마 식별 검사, 문법, GFB/ABI, 런타임, 릴리스 정책은 유지됩니다.
 ### 2026-10-06 — Boolean 요청 출력 설명 ([#283](https://github.com/callin2/ghostflow-language/issues/283))
 
 Reference 5.3의 제한된 실제 평가 경로 관찰을 추가한다. 선택적 Rust VM
