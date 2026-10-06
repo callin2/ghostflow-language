@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### 2026-10-06 — actionable intent provenance diagnostics ([#537](https://github.com/callin2/ghostflow-language/issues/537))
+
+Bug fix for the intent-link contract in Reference 1.2: schema requests for
+unlinked `state hot: Bool = false;` previously failed with only a terse message.
+They now locate the authored declaration and explain the Markdown anchor and
+adjacent code link, retaining source/document/revision identity. The repair hint
+uses an explicitly unconfirmed AI assumption (`relation=assumes`) for author
+review, never invented confirmed intent or automatic edits. State/timer/operator
+config repairs compile with unchanged executable bytes in Node and browser
+regressions. Existing provenance rejection and schema identity checks remain.
+No syntax, GFB/ABI, runtime or release-policy change is introduced.
+
 ### 2026-10-06 — Boolean requested-output explanation ([#283](https://github.com/callin2/ghostflow-language/issues/283))
 
 Add the bounded evaluated-path observation slice of Reference 5.3. Opt-in Rust

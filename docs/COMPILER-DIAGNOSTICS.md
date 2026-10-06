@@ -3,7 +3,8 @@
 `compileSource` in the browser and Node toolchains returns `diagnosticEnvelope`.
 Successful compilation has an empty `diagnostics` array. A located compilation
 failure rejects with the same property on the thrown error. The existing error
-class, message, and CLI text remain unchanged.
+class, message, and CLI text remain unchanged except for the actionable missing
+Interaction Schema provenance diagnostic described below.
 
 The envelope format is `GhostFlow/diagnostics-v1`:
 
@@ -51,6 +52,26 @@ an authored position still throws its existing error without a diagnostic span.
 The envelope is API metadata. It does not change GFB bytes, the persisted
 source-map artifact, or runtime behavior. Source identity and executable
 provenance remain governed by [SOURCE-MAP.md](SOURCE-MAP.md).
+
+## Missing Interaction Schema intent provenance
+
+When `interactionSourceIdentity` requests a schema, each authored state, timer,
+and operator config needs an explicit literate anchor link. Missing links now
+report `GF_INTENT_PROVENANCE` at the declaration's original Markdown span, with
+the exact source hash and supplied document/revision IDs. The error explains
+that an anchor identifies a paragraph or block quote outside code fences and a
+link immediately precedes the declaration inside its `ghost` fence.
+
+The `hint` contains valid anchor/link syntax and a collision-free example ID;
+`reference` points to [the authored form](INTENT-ANCHOR-MAP.md#minimal-authored-form).
+Prefer a link to an existing active anchor whose reason actually applies.
+The alternative example is explicitly `kind=assumption status=unconfirmed
+origin=ai` with `relation=assumes`. Author and review the actual reason before
+adoption; compilation never confirms it. Confirmed intent must come from a
+person and follow the existing reclassification contract. No source edit is
+applied automatically. Missing, duplicate, orphan, incompatible and superseded
+anchor/link rejection remains intact. The suggestion changes no executable
+tokens or GFB bytes when authored into a new source revision.
 
 ## Bounded error collection
 
