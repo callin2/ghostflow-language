@@ -8726,6 +8726,46 @@
       "referenceCaseIds": [
         "REF-05-022"
       ]
+    },
+    {
+      "id": "diagnostic-kind-boundaries",
+      "family": "Distinct compiler errors, input faults, schedule Unknown, settings rejection and observation mismatch",
+      "clause": {
+        "path": "docs/reference/07-semantic-rules-and-index.en.md",
+        "heading": "7.2 Invalid programs and external failures"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": ["compile", "native_wasm"],
+      "evidence": [
+        {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [{
+            "path": "tests/reference-diagnostic-kinds.test.mjs",
+            "testId": "REF-07-002: five owner-produced records retain causes provenance and distinct execution effects through serialization",
+            "caseId": "REF-07-002",
+            "assertionClass": "compile-policy",
+            "polarities": ["positive", "negative", "boundary"]
+          }]
+        },
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [{
+            "path": "tests/reference-diagnostic-kinds.test.mjs",
+            "testId": "REF-07-002: five owner-produced records retain causes provenance and distinct execution effects through serialization",
+            "caseId": "REF-07-002",
+            "assertionClass": "observation",
+            "targets": ["wasm"],
+            "polarities": ["positive", "negative", "boundary"]
+          }]
+        }
+      ],
+      "gaps": ["Executable five-record oracle uses actual compiler, Rust framed-WASM control/context and snapshot join producers. Settings rejection preserves NativeDispatchError name, message and committed=false with its submitted request; it does not invent a structured settings receipt. No native parity, final product diagnostic catalog, Device or physical confirmation is claimed. Historical specified case bytes remain pinned; the active reference catalog resolves this exact external oracle."],
+      "issues": [311],
+      "referenceCaseIds": ["REF-07-002"]
     }
   ]
 }

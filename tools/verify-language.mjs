@@ -109,6 +109,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/compiler-cli-diagnostics.test.mjs',
   'tests/ghostc-toon.test.mjs',
   'tests/structured-diagnostics.test.mjs',
+  'tests/reference-diagnostic-kinds.test.mjs',
   'tests/compiler-semantic-diagnostics.test.mjs',
   'tests/compiler-interaction-diagnostics.test.mjs',
   'tests/compiler-control-diagnostics-extra.test.mjs',
