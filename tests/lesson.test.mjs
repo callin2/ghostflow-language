@@ -25,7 +25,10 @@ async function bundleJson(change = value => value) {
     format: 'ghostflow-lesson-v1', lessonId: 'pump-basics', revision: 'input-v1', title: 'Pump basics', locale: 'en',
     source: { text: source, sha256: await digest(source), mediaType: 'text/markdown; profile=ghostflow-literate' },
     playback: { durationMs: 60_000, checkpoints: [{ atMs: 10_000, sourceSpan: { startLine: 4, endLine: 8 }, narration: 'Connect input to output.', scenarioId: 'enabled' }] },
-    scenarios: [{ id: 'enabled', title: 'Enabled pump', frames: [{ atMs: 0, inputs: { enabled: true } }, { atMs: 30_000, inputs: { enabled: false } }] }],
+    scenarios: [{ id: 'enabled', title: 'Enabled pump', frames: [
+      { atMs: 0, inputs: {}, samples: { enabled: { epoch: 1, id: 1, timestampMs: 0, quality: 'Good', value: true } } },
+      { atMs: 30_000, inputs: {}, samples: { enabled: { epoch: 1, id: 2, timestampMs: 30_000, quality: 'Good', value: false } } },
+    ] }],
     toolchain: { compilerId: 'ghostc', compilerRevision: 'r1', runtimeId: 'ghostflow-wasm', runtimeRevision: 'r1', abiVersion: 1 },
   };
   await change(bundle);
@@ -81,6 +84,7 @@ test('accepts independently-clocked scenario frames beyond the narration duratio
     bundle.playback.durationMs = 100;
     bundle.playback.checkpoints[0].atMs = 100;
     bundle.scenarios[0].frames[1].atMs = 1_000;
+    bundle.scenarios[0].frames[1].samples.enabled.timestampMs = 1_000;
   }));
   assert.equal(result.playback.durationMs, 100);
   assert.equal(result.scenarios[0].frames[1].atMs, 1_000);

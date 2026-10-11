@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### 2026-10-12 — typed lesson scenario observations ([#541](https://github.com/callin2/ghostflow-language/issues/541))
+
+Lesson bundle v1 frames now accept optional `samples` using the existing runtime
+shape: `{ epoch, id, timestampMs, quality, value }`. Previously lesson scenarios
+could carry only raw `inputs`, so canonical acquisition Results could not express
+sample identity or faults. `compileLessonBundle` now checks frame bindings against
+the compiled manifest and rejects sensor names in `inputs`. Missing samples stay
+missing; no identity, quality or healthy value is synthesized. Authored source
+continues to own fault responses. Migrating lessons must use a new source revision,
+explicit observations and a supporting language pin. Compiler, GFB, core and WASM
+are unchanged. See `docs/LESSON-BUNDLE.md`; `tests/lesson-samples.test.mjs` checks
+schema/integrity boundaries and real WASM fault recovery/fresh-session replay.
+
 ### 2026-10-11 — immutable IANA DailySlots Range ([#541](https://github.com/callin2/ghostflow-language/issues/541))
 
 Reference 3.5 now permits immutable non-UTC `DailySlots<15min>` with a fixed

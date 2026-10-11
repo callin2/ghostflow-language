@@ -5,6 +5,18 @@
 
 ## 미출시
 
+### 2026-10-12 — typed lesson 시나리오 관측 ([#541](https://github.com/callin2/ghostflow-language/issues/541))
+
+Lesson bundle v1 프레임은 기존 runtime 형식 `{ epoch, id, timestampMs, quality, value }`의
+선택적 `samples`를 받습니다. 이전 시나리오는 일반 `inputs`만 운반할 수 있어 정본 취득
+Result의 sample identity와 fault를 표현할 수 없었습니다. `compileLessonBundle`은 이제
+프레임 바인딩을 컴파일한 manifest와 대조하고 `inputs`에 들어간 sensor 이름을 거부합니다.
+sample 생략은 그대로 유지하며 identity, quality, 정상 값을 합성하지 않습니다. fault 응답은
+계속 작성된 소스가 소유합니다. 이행하는 lesson에는 새 source revision, 명시적 관측과 이를
+지원하는 language pin이 필요합니다. compiler, GFB, core, WASM은 바꾸지 않습니다.
+`docs/LESSON-BUNDLE.ko.md`를 참고하세요. `tests/lesson-samples.test.mjs`는 schema/무결성
+경계와 실제 WASM fault 복구 및 새 세션 재생을 검증합니다.
+
 ### 2026-10-11 — 불변 IANA DailySlots Range ([#541](https://github.com/callin2/ghostflow-language/issues/541))
 
 Reference 3.5는 불변 비 UTC `DailySlots<15min>`과 고정 경과 시간 Range를 허용한다.

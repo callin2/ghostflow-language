@@ -341,8 +341,8 @@
       "source": "docs/LESSON-BUNDLE.md",
       "sourceLanguage": "en",
       "translation": "docs/LESSON-BUNDLE.ko.md",
-      "sourceSha256": "9c0c9069a89bd425a547629ca8c5f0ec8f84cf987617a2d5e1d24a2750031675",
-      "translationSha256": "eac5787ae0f4c478bafaf40761e60038c81ef33c9a466c5a54b36be86b05f85c"
+      "sourceSha256": "1e5dcdbe4ebcd5b0df98781251639fdeaff9df4fc0eeb5e60a023880769c5a18",
+      "translationSha256": "187984c9cc3a6a0ff29de0276edde2179d0caba4560fe9cf3311984d35766353"
     },
     {
       "source": "docs/LITERATE.md",
@@ -635,8 +635,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "c6fb53eb4ed4c76ed710600f87749494d3f6fc07570b97da93c422c1c9a3a6e3",
-      "translationSha256": "5021bdf4dbd64e980f2077c47d70e928b555701e92805a0aa1dd114f16ce3110"
+      "sourceSha256": "b5a391baa3d4df5af84d5a034df540c78e8ab545e22a9eb2be46fbd6299027fe",
+      "translationSha256": "f5f3ba4a6a69ce64e3a09225519101486ea288ee601a726d3bfaa534115aaa29"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",

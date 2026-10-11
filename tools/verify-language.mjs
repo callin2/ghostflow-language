@@ -222,6 +222,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/ledger.test.mjs',
   'tests/literate.test.mjs',
   'tests/lesson.test.mjs',
+  'tests/lesson-samples.test.mjs',
   'tests/lesson-boundaries.test.mjs',
   'tests/source-trace.test.mjs',
   'tests/source-dependencies.test.mjs',
