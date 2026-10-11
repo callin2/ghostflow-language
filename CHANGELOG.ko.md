@@ -5,6 +5,27 @@
 
 ## 미출시
 
+### 2026-10-11 — 불변 IANA DailySlots Range ([#541](https://github.com/callin2/ghostflow-language/issues/541))
+
+Reference 3.5는 불변 비 UTC `DailySlots<15min>`과 고정 경과 시간 Range를 허용한다.
+이전에는 이 조합의 실행을 거부했다. 예를 들어
+`timezone = "Asia/Seoul"; selected = [22:00]; basis = range(7h);`는 다음 날
+05:00까지 실행하며 별도 `[05:00]` / `range(17h)`는 낮 구간을 정의한다.
+GFB21 / `civil-range` tag 19 / control-v21로 제한된 프로필을 구분한다.
+기존 UTC 프로필과 civil occurrence row field는 유지하고 이전 loader는 새 프로필을
+거부한다. 비 UTC Daily/config Range나 일반적인 DST local 종료 시각 연산은 추가하지 않는다.
+
+Host는 rolling coverage와 전날 occurrence를 공급한다. Rust는 선언 slot, fold/gap,
+identity와 revision 일관성, coverage 및 실제 구간 비중첩을 검사한 뒤 기존
+RangeEngine으로 실행한다. 첫 evidence에서 아예 누락한 IANA occurrence의 완전성은
+host tzdb 책임이다. 늦은 admission은 반열린 구간의 남은 시간만 사용한다. admit한
+deadline은 wall 보정과 trust 상실에도 유지되며 소비 identity를 복원해도 admit한
+timer는 재개하지 않는다. 집중 적합성 검사: `tests/civil-range-runtime.test.mjs`.
+canonical `tests/fixtures/issue541-seoul-traffic.ghost.md` fixture는 낮 red 60초,
+green 20초, yellow 3초와 밤 yellow의 전체 1초 주기(500ms ON / 500ms OFF)를
+사용하며 밤 red/green은 OFF다. 이는 compiled 시뮬레이션 근거이며 공공도로 또는
+실물 장치 검증은 아니다.
+
 ### 2026-10-06 — 실행 가능한 의도 출처 진단 ([#537](https://github.com/callin2/ghostflow-language/issues/537))
 
 Reference 1.2 의도 링크 계약의 버그 수정입니다. 스키마 요청에서 링크 없는

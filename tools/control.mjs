@@ -1596,7 +1596,7 @@ class Lowerer {
       || this.providers.size)) {
       error(this.ast.loc, 'extended Solar policy execution requires Solar-only schedules without providers or config streams');
     }
-    if (contextForms.some(form => form[0] === 'utc-range') && solarForms.length) {
+    if (contextForms.some(form => ['utc-range', 'civil-range'].includes(form[0])) && solarForms.length) {
       error(this.ast.loc, 'UTC Range cannot mix with legacy Solar or civil pulse execution');
     }
     if (emitBytecode && this.configStreams.length && solarForms.length) {
@@ -1633,6 +1633,14 @@ class Lowerer {
     if (contextForms.some(form => ['calendar-range', 'calendar-result'].includes(form[0]))) this.manifest.format = 'GhostFlow/control-v18';
     if (contextForms.some(form => form[0] === 'utc-range' && form[6] !== '0')) this.manifest.format = 'GhostFlow/control-v19';
     if (contextForms.some(form => form[0] === 'config-daily-slots-pulse' && form.length === 11)) this.manifest.format = 'GhostFlow/control-v20';
+    if (contextForms.some(form => form[0] === 'civil-range')) {
+      if (solarForms.length || contextForms.some(form => form[0] !== 'civil-range')
+        || ['configs','providers','calendars','naturalConditions','calendarConditions','objectives','resources','adaptSettings']
+          .some(key => this.manifest[key]?.length) || this.manifest.accounting || this.trueFors.length) {
+        error(this.ast.loc, 'civil Range profile requires immutable civil Range schedules without other schedule/provider/config profiles');
+      }
+      this.manifest.format = 'GhostFlow/control-v21';
+    }
     const temporalForms = this.windows.length || this.trueFors.length || solarForms.length || contextForms.length ? [
       ['temporal-context', `${RESERVED_PREFIX}now_ms`, `${RESERVED_PREFIX}time_epoch`],
       ...[...this.temporalRoots.values()].sort((left, right) => left.tag - right.tag).map(root =>
@@ -2452,7 +2460,9 @@ class Lowerer {
           if (!descriptor?.settings || descriptor.settings.min <= 0) error(rangeArg.loc, 'live Range duration config requires a positive minimum Duration');
         }
         if (!options.cancel_when) error(item.loc, `${label} range basis requires cancel_when`);
-        if (civil && (trigger.kind === 'periodic' || item.timezone !== 'UTC')) {
+        const immutableCivilRange = trigger.kind === 'daily-slots' && !trigger.selectedConfig && !rangeConfig
+          && !startConfig && !trigger.day && trigger.gridMs === 900_000;
+        if (civil && (trigger.kind === 'periodic' || item.timezone !== 'UTC' && !immutableCivilRange)) {
           error(options.basis.loc, `${label} range recurrence non-overlap cannot be proved for this civil timezone or anchor`);
         }
         let minimumSpacing;
@@ -3896,6 +3906,12 @@ class Lowerer {
       }
       if (schedule.kind === 'at') return ['at-pulse', ...base, String(schedule.atMs), when, cancel];
       if (schedule.policy.basis?.kind === 'range') {
+        if (schedule.timezone !== 'UTC' && schedule.kind === 'daily-slots' && !schedule.selectedConfig
+          && !schedule.policy.basis.durationConfigId && schedule.gridMs === 900_000) {
+          return ['civil-range', ...base, schedule.timezone, String(schedule.policy.basis.durationMs),
+            ['starts', ...schedule.slots.map(minute => String(minute * 60_000))],
+            schedule.dstMissing, schedule.dstRepeated, when, cancel];
+        }
         if (schedule.timezone !== 'UTC'
           || !['daily', 'daily-slots'].includes(schedule.kind)) error(this.ast.loc, 'executable Range requires immutable UTC Daily or DailySlots');
         if (schedule.selectedConfig) {
@@ -4280,9 +4296,9 @@ export function isExecutablePulseSchedule(item) {
     && ['trusted_only', 'hold_trusted'].includes(item.policy?.clock?.name));
 }
 
-/** Immutable UTC recurrence only; other accepted Range variants stay descriptors. */
+/** UTC recurrence or immutable provider-backed civil DailySlots. */
 export function isExecutableRangeSchedule(item) {
-  return item.timezone === 'UTC' && item.policy?.basis?.kind === 'call'
+  return (item.timezone === 'UTC' || item.scheduleType === 'DailySlots' && Array.isArray(item.selected)) && item.policy?.basis?.kind === 'call'
     && item.policy.basis.name === 'range' && item.policy?.clock?.name === 'trusted_only'
     && (item.scheduleType === 'Daily' && (!item.on && !item.calendar || item.on && item.calendar && ['day`workday`','day`offday`'].includes(item.on.value))
       && (item.at?.kind === 'literal' && item.at.raw.startsWith('time`') || item.at?.kind === 'reference')

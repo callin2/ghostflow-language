@@ -160,7 +160,7 @@ impl Fixture {
             blob(&mut b, if empty { &[1, 0] } else { &self.output });
         }
         b.extend([0, 0]);
-        if matches!(self.version, 7 | 11 | 12) {
+        if matches!(self.version, 7 | 11 | 12 | 21) {
             b.extend([0, 0]); // objective count
         }
         b
@@ -187,6 +187,68 @@ fn utc_range(starts: &[u64], duration: u64, zone: &str) -> Vec<u8> {
     blob(&mut bytes, &[1, 1]);
     blob(&mut bytes, &[1, 0]);
     bytes
+}
+
+fn civil_range(starts: &[u64], duration: u64, zone: &str, missing: u8, repeated: u8) -> Vec<u8> {
+    let mut bytes = vec![19];
+    bytes.extend(7u32.to_le_bytes());
+    string(&mut bytes, "civil");
+    bytes.extend(60_000u64.to_le_bytes());
+    string(&mut bytes, zone);
+    bytes.extend(duration.to_le_bytes());
+    bytes.extend((starts.len() as u16).to_le_bytes());
+    for start in starts {
+        bytes.extend(start.to_le_bytes());
+    }
+    bytes.extend([missing, repeated]);
+    blob(&mut bytes, &[1, 1]);
+    blob(&mut bytes, &[1, 0]);
+    bytes
+}
+
+#[test]
+fn civil_range_profile_independently_validates_binary_descriptors() {
+    let mut fixture = Fixture {
+        version: 21,
+        entries: vec![civil_range(
+            &[22 * 3_600_000],
+            7 * 3_600_000,
+            "Asia/Seoul",
+            0,
+            0,
+        )],
+        output: vec![58, 0, 0, 2],
+        ..Default::default()
+    };
+    assert!(Module::load(&fixture.bytes()).is_ok());
+    for version in [5, 8, 9, 10, 11, 12, 19, 20] {
+        fixture.version = version;
+        assert!(Module::load(&fixture.bytes()).is_err());
+    }
+    fixture.version = 21;
+    for (starts, duration, zone, missing, repeated) in [
+        (vec![], 1, "Asia/Seoul", 0, 0),
+        (vec![0], 0, "Asia/Seoul", 0, 0),
+        (vec![0], 86_400_001, "Asia/Seoul", 0, 0),
+        (vec![1], 1, "Asia/Seoul", 0, 0),
+        (vec![0, 0], 1, "Asia/Seoul", 0, 0),
+        (vec![0, 900_000], 900_001, "Asia/Seoul", 0, 0),
+        (vec![0], 1, "UTC", 0, 0),
+        (vec![0], 1, "Asia/Seoul", 2, 0),
+        (vec![0], 1, "Asia/Seoul", 0, 4),
+    ] {
+        fixture.entries = vec![civil_range(&starts, duration, zone, missing, repeated)];
+        assert!(
+            Module::load(&fixture.bytes()).is_err(),
+            "accepted malformed civil Range"
+        );
+    }
+    fixture.entries = vec![Solar::default().bytes()];
+    fixture.output = vec![58, 0, 0, 0];
+    rejected(
+        &fixture,
+        "GFB format 21 requires immutable civil Range schedules",
+    );
 }
 
 #[test]

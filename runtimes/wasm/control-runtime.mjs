@@ -25,9 +25,11 @@ const SOLAR_CONTEXT_FORMAT = 'GhostFlow/control-v15';
 const CALENDAR_EXECUTION_FORMAT = 'GhostFlow/control-v18';
 const RANGE_LIVE_START_FORMAT = 'GhostFlow/control-v19';
 const TIMESLOTS_RANGE_FORMAT = 'GhostFlow/control-v20';
+const CIVIL_RANGE_FORMAT = 'GhostFlow/control-v21';
 const contextManifest = manifest => manifest?.format === STREAM_CONTEXT_FORMAT
   || manifest?.format === RANGE_LIVE_START_FORMAT
   || manifest?.format === TIMESLOTS_RANGE_FORMAT
+  || manifest?.format === CIVIL_RANGE_FORMAT
   || manifest?.format === CALENDAR_EXECUTION_FORMAT
   || manifest?.format === SOLAR_CONTEXT_FORMAT
   || manifest?.format === HOLIDAY_FORMAT
@@ -237,7 +239,7 @@ function validateContextManifest(input, bytecodeFormat) {
   const manifest = record(input, 'manifest');
   keys(manifest, ['format','name','inputs','outputs','sensors','schedules','timers','signals','configs','bytecodeSha256'],
     ['providers','calendars','naturalConditions','calendarConditions','accounting','resources','objectives','adaptSettings'], 'manifest');
-  if (manifest.format === TIMESLOTS_RANGE_FORMAT ? bytecodeFormat !== 20 : manifest.format === RANGE_LIVE_START_FORMAT ? bytecodeFormat !== 19 : manifest.format === CALENDAR_EXECUTION_FORMAT ? bytecodeFormat !== 18 : manifest.format === SOLAR_CONTEXT_FORMAT ? bytecodeFormat !== 16 : manifest.format === HOLIDAY_FORMAT ? bytecodeFormat !== 15 : manifest.format === AT_FORMAT ? bytecodeFormat !== 14 : manifest.format === AVAILABILITY_FORMAT ? bytecodeFormat !== 13 : ![11, 12].includes(bytecodeFormat)) throw new Error('context manifest requires its matching GFB format');
+  if (manifest.format === CIVIL_RANGE_FORMAT ? bytecodeFormat !== 21 : manifest.format === TIMESLOTS_RANGE_FORMAT ? bytecodeFormat !== 20 : manifest.format === RANGE_LIVE_START_FORMAT ? bytecodeFormat !== 19 : manifest.format === CALENDAR_EXECUTION_FORMAT ? bytecodeFormat !== 18 : manifest.format === SOLAR_CONTEXT_FORMAT ? bytecodeFormat !== 16 : manifest.format === HOLIDAY_FORMAT ? bytecodeFormat !== 15 : manifest.format === AT_FORMAT ? bytecodeFormat !== 14 : manifest.format === AVAILABILITY_FORMAT ? bytecodeFormat !== 13 : ![11, 12].includes(bytecodeFormat)) throw new Error('context manifest requires its matching GFB format');
   name(manifest.name, 'manifest.name');
   if (!/^[0-9a-f]{64}$/.test(manifest.bytecodeSha256)) throw new Error('invalid bytecode SHA-256');
   const inputs = validateList(manifest.inputs, 'manifest.inputs', ['name','type'], ['canonicalUnit']);
@@ -256,6 +258,12 @@ function validateContextManifest(input, bytecodeFormat) {
     ['name','target','authority','runtime','allowed','maxStep','maxChange','windowMs','targetId','targetType']);
   const providers = validateList(manifest.providers ?? [], 'manifest.providers', ['name','type']);
   const calendars = validateList(manifest.calendars ?? [], 'manifest.calendars', ['name','type']);
+  if (bytecodeFormat === 21 && (!schedules.length || schedules.some(item => item.kind !== 'daily-slots'
+    || item.timezone === 'UTC' || item.policy?.basis?.kind !== 'range' || item.selectedConfig || item.day)
+    || configs.length || providers.length || calendars.length || objectives.length
+    || manifest.naturalConditions?.length || manifest.calendarConditions?.length || manifest.accounting)) {
+    throw new Error('civil Range profile requires immutable civil Range schedules');
+  }
   const naturals = validateList(manifest.naturalConditions ?? [], 'manifest.naturalConditions',
     ['site','operation','provider','classification','result','projectionInputs']);
   const calendarConditions = validateList(manifest.calendarConditions ?? [], 'manifest.calendarConditions',
@@ -307,7 +315,8 @@ function validateContextManifest(input, bytecodeFormat) {
     if (!['periodic','cron','daily','daily-slots','tide'].includes(item.kind)) throw new Error('unsupported context schedule kind');
     const range = item.policy?.basis?.kind === 'range';
     if (range) {
-      if (![12, 13, 15, 16, 18, 19, 20].includes(bytecodeFormat) || item.timezone !== 'UTC' || item.day && bytecodeFormat !== 18
+      const civilRange = bytecodeFormat === 21 && item.kind === 'daily-slots' && item.timezone !== 'UTC';
+      if ((!civilRange && (![12, 13, 15, 16, 18, 19, 20].includes(bytecodeFormat) || item.timezone !== 'UTC')) || item.day && bytecodeFormat !== 18
         || item.selectedConfig && bytecodeFormat !== 20 || !['daily','daily-slots'].includes(item.kind)) throw new Error('executable Range requires GFB12 and immutable UTC Daily or DailySlots');
       const policy = record(item.policy, `schedule ${item.name}.policy`);
       keys(policy, ['basis','when','cancelWhen','clock','gapMs','recovery','fallback'], [], `schedule ${item.name}.policy`);
@@ -320,6 +329,12 @@ function validateContextManifest(input, bytecodeFormat) {
       if (hasDurationConfig !== hasDurationConfigId) throw new Error('Range duration config metadata must include name and id together');
       const hasStartConfig = Object.prototype.hasOwnProperty.call(policy.basis, 'startConfig');
       const hasStartConfigId = Object.prototype.hasOwnProperty.call(policy.basis, 'startConfigId');
+      if (civilRange && (typeof item.timezone !== 'string' || !item.timezone.trim() || item.gridMs !== 900_000
+        || !['skip','next_valid'].includes(item.dstMissing) || !['first','second','both','skip'].includes(item.dstRepeated)
+        || hasDurationConfig || hasDurationConfigId || hasStartConfig || hasStartConfigId
+        || !Array.isArray(item.slots) || item.slots.some(minute => minute % 15 !== 0))) {
+        throw new Error('invalid immutable civil Range definition');
+      }
       if (hasDurationConfig && (hasStartConfig || hasStartConfigId)) throw new Error('Range cannot bind both live duration and live start configs');
       if (hasDurationConfig) {
         name(policy.basis.durationConfig, 'Range durationConfig');

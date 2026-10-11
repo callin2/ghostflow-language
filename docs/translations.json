@@ -635,8 +635,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "3dadb9a6b1bcac8d2ba35a5076449ab40009ab9b04698bf418581a7fac7a84c0",
-      "translationSha256": "b90f72b9bb7646fb229a94650ff243f1f8b7aaeaf60891fa57fac43280fa54fb"
+      "sourceSha256": "c6fb53eb4ed4c76ed710600f87749494d3f6fc07570b97da93c422c1c9a3a6e3",
+      "translationSha256": "5021bdf4dbd64e980f2077c47d70e928b555701e92805a0aa1dd114f16ce3110"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",
@@ -1400,6 +1400,10 @@
     {
       "path": "docs/reports/2026-10-12-io-role-terminology-audit.md",
       "reason": "Execution audit receipt and intentional historical/ABI terminology exceptions; report may remain in one language."
+    },
+    {
+      "path": "tests/fixtures/issue541-seoul-traffic.ghost.md",
+      "reason": "Canonical executable civil Range simulation/conformance fixture shared with simulator integration; not authored reader documentation, so its compile identity is retained."
     }
   ]
 }

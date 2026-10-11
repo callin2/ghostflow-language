@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+### 2026-10-11 — immutable IANA DailySlots Range ([#541](https://github.com/callin2/ghostflow-language/issues/541))
+
+Reference 3.5 now permits immutable non-UTC `DailySlots<15min>` with a fixed
+elapsed Range. Previously these executable ranges were rejected. For example,
+`timezone = "Asia/Seoul"; selected = [22:00]; basis = range(7h);` runs through
+05:00 the next day; a separate `[05:00]` / `range(17h)` defines daytime.
+GFB21 / `civil-range` tag 19 / control-v21 identifies the bounded profile;
+existing UTC profiles and civil occurrence row fields remain unchanged. Older
+loaders reject the new profile. It does not add non-UTC Daily/config Range or
+a generic DST local-end-time operator.
+
+Hosts supply rolling coverage and prior-day occurrences. Rust validates declared
+slots, folds/gaps, identity and revision consistency, coverage and actual
+non-overlap, then executes the existing RangeEngine. Initially omitted IANA
+occurrences remain a host tzdb completeness responsibility. Late admission uses
+only the remaining half-open interval; admitted deadlines survive wall correction
+and trust loss, and restored consumed identities never resume an admitted timer.
+Focused conformance: `tests/civil-range-runtime.test.mjs`. The canonical
+`tests/fixtures/issue541-seoul-traffic.ghost.md` fixture uses daytime red 60s,
+green 20s, yellow 3s and nighttime yellow with a full one-second cycle (500ms
+ON / 500ms OFF), with red/green OFF. This is compiled simulation evidence,
+not public-road or physical-device validation.
+
 ### 2026-10-06 — actionable intent provenance diagnostics ([#537](https://github.com/callin2/ghostflow-language/issues/537))
 
 Bug fix for the intent-link contract in Reference 1.2: schema requests for

@@ -497,6 +497,7 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/fixtures/issue-90-settings-periodic.ghost.md](tests/fixtures/issue-90-settings-periodic.ghost.md) | Live settings stream | md |
 | [tests/fixtures/issue-93-quantities.ghost.md](tests/fixtures/issue-93-quantities.ghost.md) | Quantity execution parity fixture | md |
 | [tests/fixtures/issue-93-quantities.input-v1.ghost.md](tests/fixtures/issue-93-quantities.input-v1.ghost.md) | Quantity execution parity fixture | md |
+| [tests/fixtures/issue541-seoul-traffic.ghost.md](tests/fixtures/issue541-seoul-traffic.ghost.md) | Seoul traffic schedule simulation fixture | md |
 | [tests/fixtures/true-for-certified.ghost.md](tests/fixtures/true-for-certified.ghost.md) | Certified hot interval | md |
 | [tests/fixtures/true-for-certified.input-v1.ghost.md](tests/fixtures/true-for-certified.input-v1.ghost.md) | Certified hot interval | md |
 
