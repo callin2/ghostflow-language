@@ -124,7 +124,7 @@
       "source": "AGENTS.md",
       "sourceLanguage": "en",
       "translation": "AGENTS.ko.md",
-      "sourceSha256": "751dc66619825974803b74a8e911af0db1078b2643b6e8834fb65b07394598b8",
+      "sourceSha256": "3b85821c84489e8ac7009731a8666f5d994a0d0dbc1d58c06603380faa99e9a3",
       "translationSha256": "d5dc0827b6c07bb09d7c24d19e9a5b62811fd128ec571e084af2e59a0b89d992"
     },
     {
@@ -188,7 +188,7 @@
       "sourceLanguage": "en",
       "translation": "docs/BEHAVIOR-COMPOSITION-RESEARCH.ko.md",
       "sourceSha256": "ba71b7bea619af29c6160b745c600930e3de9fd9dc850c246dbe479c375fa2ca",
-      "translationSha256": "23774cc3b537135e0c5ab90162b2a08a8f806d2fdb3910e48eb5b3851fd114c5"
+      "translationSha256": "18e11a977610bb8a8847ce2179220249528f7d3511a58ee5f8c60cc0964bcd9f"
     },
     {
       "source": "docs/BYTECODE.md",
@@ -209,7 +209,7 @@
       "sourceLanguage": "ko",
       "translation": "docs/CONSTRAINTS.en.md",
       "sourceSha256": "c05c6f5ed1f91b7be2591ec6fa9cfa64313cb48697e48a7a2a8e2a111c5758e1",
-      "translationSha256": "52bf41250ef0aafc7de6c74c4dc572d6480a54be8d90749f12b425bb57a8ddd4"
+      "translationSha256": "a8ea131dafad9c294a3d40924975e41633ac45743d0a3d35edfd4eb0e293c79c"
     },
     {
       "source": "docs/CONTEXT-EXECUTION-ABI.md",
@@ -278,7 +278,7 @@
       "source": "docs/IMPLEMENTATION.md",
       "sourceLanguage": "en",
       "translation": "docs/IMPLEMENTATION.ko.md",
-      "sourceSha256": "c7060356a5930f3f3b3f288163a2293a9421a631cb64c7bc62dc212ca9dd5793",
+      "sourceSha256": "a7644c76154395b357f59981c638121d90873ec7cf4aa200bfeb14fb027e8d0d",
       "translationSha256": "2f263d867714e4eede4939f53e8a5a1f24b7b41af7526c85114d5e178c4144d8"
     },
     {
@@ -299,7 +299,7 @@
       "source": "docs/language_faq.md",
       "sourceLanguage": "ko",
       "translation": "docs/language_faq.en.md",
-      "sourceSha256": "7ea20c548269e4ec5ed5494da6e5241175ea55b3834f27930dd046200bb04d90",
+      "sourceSha256": "37601528695c662a0f23be6d688b1a1f35da043025612afb0a384d0b4f16ae1f",
       "translationSha256": "b44bee3efb8be64d3acc4b0a55594ba65a09a31c2f1a9a29e1ca19df002150be"
     },
     {
@@ -453,15 +453,15 @@
       "source": "docs/reference/08-language-runtime-and-device-boundaries.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/08-language-runtime-and-device-boundaries.en.md",
-      "sourceSha256": "b9d7b705366c641db02dff6938823f262dc749f1b654c79fe88326f948270592",
-      "translationSha256": "6470a74de2d625bf2fa625b747f88684f90805e8d6b55cd77c04f708bc178dc2"
+      "sourceSha256": "193d1d1111453940a32212ed9e39bc26a38aa989d6b4b00b0b1b49c5a0419b82",
+      "translationSha256": "2d57dd3314ada61d757a05f3b828a0f4295297c77a888fb734a23dad0c0af4a3"
     },
     {
       "source": "docs/research/GF-COMPOSE-R1-USER-OUTCOMES.md",
       "sourceLanguage": "en",
       "translation": "docs/research/GF-COMPOSE-R1-USER-OUTCOMES.ko.md",
       "sourceSha256": "15d7d7dd7f9c5f526b5457b468361f9955d65c08dfd54ca2e51860c12a7e7c1b",
-      "translationSha256": "984baa177938c0647ecdf74d305bc1cd6abc641153cd0525fb0b7091e2db6314"
+      "translationSha256": "de4ca18934d3ac1ec7e05e65c823fdc9853a95c2a9dceeb94ae4f8612f827ce6"
     },
     {
       "source": "docs/research/GF-COMPOSE-R2-AUTHORITY-IDENTITY.md",
@@ -510,7 +510,7 @@
       "sourceLanguage": "en",
       "translation": "docs/research/GF-COMPOSE-R8-INCIDENT-EVIDENCE.ko.md",
       "sourceSha256": "33258915fd3c300f847704ff80a8d88e981a09c7fd91ba355c7caf47cd4e378e",
-      "translationSha256": "3c7f4fb5edd07003c2e7e77dc13c62d351f7eb6475d4baf37d38308d250a797f"
+      "translationSha256": "9302006e2511200fb314a88334a785c30ae497ec0606556570dc0c88dd6d1105"
     },
     {
       "source": "docs/research/GF-COMPOSE-R9-ACCEPTANCE.md",
@@ -538,7 +538,7 @@
       "sourceLanguage": "en",
       "translation": "docs/SCENARIO-RUNNER.ko.md",
       "sourceSha256": "9db51c49195392e20261d509c56eea52abd06cc7695fad057247eea6b224dc56",
-      "translationSha256": "f63065a9b1d4dc542a25bbc4a96eb7e2db95e1487e284b1a7e46882cb5f053ce"
+      "translationSha256": "0a2ed0bb46913108908bd0a93b180b1c52b26faa34d6fd63fc3cee9ba32f00da"
     },
     {
       "source": "docs/SOLAR-SCHEDULE.md",
@@ -985,14 +985,14 @@
       "source": "examples/optional-feedback-timer.ghost.md",
       "sourceLanguage": "en",
       "translation": "examples/optional-feedback-timer.ghost.ko.md",
-      "sourceSha256": "5677f8c8a21b49e8a641da7b64ee20e63b5ea00c53d656775c8437fee55c7c1b",
+      "sourceSha256": "2894c166ff74f91fb1872af19e275360bfd07904ea560c2cdaf9d28fad931181",
       "translationSha256": "8ae95eef99fba967c8c42fd3d85a2b6937b6af4d9f8917fea635105e0ab508b6"
     },
     {
       "source": "examples/explicit-feedback-adoption.ghost.md",
       "sourceLanguage": "en",
       "translation": "examples/explicit-feedback-adoption.ghost.ko.md",
-      "sourceSha256": "d5298f77c75a7e0bee85ac097039a5ef74714e43f2ddc74e76a566f31c3d39b0",
+      "sourceSha256": "e16f70e0e5f9333c8470a7db74952e7424be0137466646d53a6a54866b20226d",
       "translationSha256": "890e4cc79aee418e7cc7446f2e36004b9ff4261f8011b648f759e9b3f8d822d7"
     },
     {

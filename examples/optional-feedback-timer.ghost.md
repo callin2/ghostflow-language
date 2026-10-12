@@ -10,7 +10,7 @@ The operator establishes a command duration for this example: two seconds. This 
 
 The optional `observation` capability selects `Observed` when installed and `Baseline` when absent. Both strategies issue exactly the same actuator intent. Healthy true, healthy false, missing samples and installed faults remain separate sensor observations returned by the production host. The host returns a `NotReady` reading placeholder for an absent optional sensor; capability metadata and the selected strategy establish absence. Supplying a sample cannot invent the absent capability. A fault does not select the absence strategy. This example grants observation no control authority.
 
-Timer completion is the end of authored command duration. It does not prove cabinet-view application, relay contact operation, load movement or position. Requested intent, safe intent, applied command and independent physical evidence remain separate.
+Timer completion is the end of authored command duration. It does not prove renderer application, relay contact operation, load movement or position. Requested intent, safe intent, applied command and independent physical evidence remain separate.
 
 ```ghost
 control OptionalFeedbackTimer {

@@ -33,7 +33,7 @@ when they change execution semantics.
   watchdogs, clocks, and physical I/O. Consume the portable core at an explicit
   revision; changes here do not imply a Device release or hardware verification.
   Input driver and output renderer source belongs in `farm-device-drivers`.
-  cabinet views apply logical outputs to relays, motors, lamps or screens; cabinet
+  Renderers apply logical outputs to relays, motors, lamps or screens; cabinet
   UI is `@ghostflow/cabinet-view`. Device owns host/board integration.
 - The frontend owns farmer interaction and visualization. Installation labels,
   capabilities and bindings are external context. Executable rules belong in

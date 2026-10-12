@@ -378,12 +378,12 @@ If feedback exists, check actual stop/valve state.
 Without feedback, state the limitation that confirmation rests on commands and the stop procedure established at installation.
 Do not claim one mode enum substitutes for physical interlocks or guarantees of actual-state feedback.
 
-Record stop evidence separately as `CommandedStop`, where the cabinet-view reports safe-output application and completes configured cleanup/wait procedures, and `VerifiedStop`, where actual feedback is also confirmed.
+Record stop evidence separately as `CommandedStop`, where the renderer reports safe-output application and completes configured cleanup/wait procedures, and `VerifiedStop`, where actual feedback is also confirmed.
 The basic configuration permits CommandedStop and does not make feedback sensors mandatory.
 It does not display this as verified actual stopping.
 If the device does not respond or safe-output application fails, sending a command alone does not establish completed stopping.
 Only user-added rules may require VerifiedStop.
-Initial safe-output sequence/wait values may use output-cabinet-view defaults; separately display the limitation that their suitability must be checked for a particular installation.
+Initial safe-output sequence/wait values may use output-renderer defaults; separately display the limitation that their suitability must be checked for a particular installation.
 
 Stop requests also cancel/invalidate pending starts.
 Do not queue a mode-change request during operation and later transition automatically without the user's knowledge.

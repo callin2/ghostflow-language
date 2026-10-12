@@ -11,7 +11,7 @@
 
 농부가 “왜 관수가 이뤄지지 않았나요?”라고 물을 때 답변은 엔지니어와 설치자가 조사하는
 것과 같은 occurrence를 식별해야 한다. requested output, 언어 runtime이 선택한 safe output,
-host/cabinet-view 적용 결과, 물리 관측을 구분해야 한다. 값 부재는 false가 아니다. 이전 run이나
+host/renderer 적용 결과, 물리 관측을 구분해야 한다. 값 부재는 false가 아니다. 이전 run이나
 binding을 현재 incident에 join해서는 안 된다.
 
 composition에 특유한 목표는 작고 정확한 증거 인계다. 두 번째 실행 source, 새 event 저장소,
@@ -73,7 +73,7 @@ field, 최종 boot/event-to-run join은 미정이다. 필요한 join 또는 unkn
 
 정확한 참여자 문맥은 definition/module, instance, 같은 run의 settings revision/effective
 event position, installation/binding, run/scan, logical time의 tuple이다. 제안된 인과 증거는
-input event/관측 → 평가된 rule → intent → requested/safe output → cabinet-view 결과/물리 관측이며
+input event/관측 → 평가된 rule → intent → requested/safe output → renderer 결과/물리 관측이며
 평가 시 effective settings에 join한다. 모든 참여자 view는 그 tuple을 사용해야 한다.
 consumer는 이전 run, 잘못된 schema/module/source 또는 binding을 stale/unavailable로 거부해야
 하며 관련 기록을 조용히 제시해서는 안 된다.

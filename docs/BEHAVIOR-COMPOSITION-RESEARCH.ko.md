@@ -295,7 +295,7 @@ R9는 일찍 초안을 만들 수 있지만 R1–R8 전에 확정할 수 없다.
 | 한 출력 채널에 경쟁하는 직접 작성자 두 개 정의 | 컴파일 거부. 배포 가능한 artifact 없음. 기존 단일 작성자 manager가 중재하는 명시적 station 요청은 거부하지 않음. |
 | 잘못된 port type, dependency 부재 또는 suitability 불명 | 구체적 error/unknown 결과. 성공한 deployment라고 주장하지 않음. |
 | 저수위가 관수 차단 | 농부 설명이 정확한 input, rule, requested/safe output과 run에 연결됨. |
-| cabinet-view 적용 실패 또는 feedback 부재 | 명령과 관측된 결과를 구분해 보존. |
+| renderer 적용 실패 또는 feedback 부재 | 명령과 관측된 결과를 구분해 보존. |
 | 재시작, crash 또는 journal gap | boot/run 경계와 마지막 이용 가능한 증거를 보존. 없는 증거를 명시. |
 | parameter, settings 또는 binding 변경 | revision 변경 matrix 적용. 오래된 증거 join 거부. |
 | 운전 중 한 동작으로 여러 live property 변경 | 하나의 event. 승인 시 program/run identity 변경이나 controller 정지 없이 모두 적용. 값 하나라도 invalid이면 변경 없이 전체 event 거부. |

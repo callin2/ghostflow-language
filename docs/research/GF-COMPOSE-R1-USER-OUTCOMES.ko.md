@@ -47,7 +47,7 @@
 | 환기 추가 | 농부, 설치자 | 관수 이후 4팬 환기 동작 추가 | 가설: 기존 관수 배선이 변경될지 수동 확인 | 팬 수, 이용 가능한 출력, 물리 설치 사실 확인 | “환기는 호환됩니다.” 또는 이름 있는 unknown/blocker. 기존 관수 binding 보존 표시 | Integration binding, 정확한 profile/installation revision, 제안된 composition 호환성 결과 | 설명 없는 rebinding 없음. 사용자가 필요한 각 결정과 unknown을 식별 |
 | Pump 소유권 충돌 거부 | 농부, 소프트웨어 엔지니어 | 두 동작 instance가 하나의 pump의 배타적 소유권 주장 | 가설: 충돌이 늦게 발견되거나 엔지니어 log에만 설명됨 | 한 소유자 선택 또는 충돌 동작 제거/변경 | “적용할 수 없습니다. 동작 A와 동작 B가 pump X의 소유권을 주장합니다.” 두 logical port identity 표시 | 선언된 output/port identity, 제안된 첫 profile 배타적 소유권 규칙 | deployment 전 충돌 거부. 두 사용자 모두 충돌하는 주장을 식별 |
 | 저수위 차단 설명 | 농부, 소프트웨어 엔지니어 | Pump ON 요청 중 `low_water=true` | 가설: 농부는 “관수가 시작되지 않음”만 보고 엔지니어는 input과 rule을 별도로 재구성 | 농부는 탱크나 저수위 설치 확인. 엔지니어는 정확한 run과 rule 검증 | 농부: “저수위 신호가 관수를 차단했습니다. 탱크를 확인하세요.” 엔지니어: 같은 incident가 `low_water`, constraint, requested output, safe output, run에 연결됨 | 완료된 scan identity, input/constraint provenance, requested와 resolved safe output 구분 | 농부는 탱크가 비었다고 주장하지 않고 signal과 다음 행동을 명시. 엔지니어는 뒷받침하는 input과 constraint에 도달 |
-| 명령 실패 또는 feedback 부재 조사 | 농부, 소프트웨어 엔지니어, 설치자 | 명령은 발행됐으나 cabinet-view 적용 실패 또는 feedback 부재 | 가설: 명령, 장치 실패, 물리 결과가 혼동됨 | 엔지니어/설치자가 이용 가능한 증거를 식별하고 없는 관측 요청 | “명령을 요청했으나 적용에 실패했습니다.” 또는 “명령 결과 불명: feedback이 없습니다.” 마지막으로 알려진 identity와 gap 표시 | Integration run gate, 이용 가능할 때 device observation. 물리 증거는 별도 유지 | 진단 노력과 증거 탐색 노력 감소. 근거 없는 물리 성공 주장 없음 |
+| 명령 실패 또는 feedback 부재 조사 | 농부, 소프트웨어 엔지니어, 설치자 | 명령은 발행됐으나 renderer 적용 실패 또는 feedback 부재 | 가설: 명령, 장치 실패, 물리 결과가 혼동됨 | 엔지니어/설치자가 이용 가능한 증거를 식별하고 없는 관측 요청 | “명령을 요청했으나 적용에 실패했습니다.” 또는 “명령 결과 불명: feedback이 없습니다.” 마지막으로 알려진 identity와 gap 표시 | Integration run gate, 이용 가능할 때 device observation. 물리 증거는 별도 유지 | 진단 노력과 증거 탐색 노력 감소. 근거 없는 물리 성공 주장 없음 |
 
 ### 측정 sheet
 

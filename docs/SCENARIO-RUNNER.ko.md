@@ -28,7 +28,7 @@ actuatorBindings[1]{actuator,output,type,min,max,feedbackSensor}:
   roof-vent,vent_position,Percent,0,80,vent_position_feedback
 ```
 
-`actuator`는 시나리오 내부 식별자입니다. `output`과 `type`은 Bool이 아닌 동일 매니페스트 출력을 선택해야 합니다. `min` 및 `max`는 유한한 cabinet-view 수락 범위입니다. 안전 목표가 해당 범위를 벗어나면 적용 행을 보고하기 전에 스캔을 거부합니다. `feedbackSensor`는 선택 항목이며 같은 형식의 매니페스트 센서여야 합니다. 지정하면 추적에는 형식이 지정된 처리값과 최신 명시 샘플의 `epoch`, `id`, `timestampMs` 출처 정보가 포함됩니다. 바인딩은 피드백을 만들어내거나 적용 출력을 해당 센서에 연결하지 않습니다. 새 관측을 모델링하려면 이후 `sample` 액션을 제공하세요.
+`actuator`는 시나리오 내부 식별자입니다. `output`과 `type`은 Bool이 아닌 동일 매니페스트 출력을 선택해야 합니다. `min` 및 `max`는 유한한 renderer 수락 범위입니다. 안전 목표가 해당 범위를 벗어나면 적용 행을 보고하기 전에 스캔을 거부합니다. `feedbackSensor`는 선택 항목이며 같은 형식의 매니페스트 센서여야 합니다. 지정하면 추적에는 형식이 지정된 처리값과 최신 명시 샘플의 `epoch`, `id`, `timestampMs` 출처 정보가 포함됩니다. 바인딩은 피드백을 만들어내거나 적용 출력을 해당 센서에 연결하지 않습니다. 새 관측을 모델링하려면 이후 `sample` 액션을 제공하세요.
 
 첫 폐루프 환경 모델은 명시적으로 `GhostFlow/greenhouse-temperature-v1`입니다. `Temperature` 센서 하나를 `Percent` 가상 지붕 환기구 하나에 연결합니다.
 
