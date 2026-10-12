@@ -188,7 +188,7 @@ The accounting target must be explicit.
 
 - requested: ON time requested by control.
 - admitted/safe: logical ON time that passed constraints.
-- applied: command time the Driver reports as applied.
+- applied: command time the renderer reports as applied.
 - confirmed: physical operation time verified by feedback.
 
 Even if `manual_request` is true, a low-water constraint making safe output false consumes no admitted/safe budget. Conversely, without feedback, safe ON time must not be represented as actual flow. The window and maximum ON must be finite, and a state-memory upper bound must be calculable. Reboot must not implicitly reset a protective budget. Select a contract of checkpoint restoration, conservative blocking for the window length, or an explicit non-durable policy.
@@ -702,7 +702,7 @@ A day budget counts final applied ON intervals of the same physical equipment on
 Time boundaries are fixed as follows:
 
 - Requested/safe values selected at accepted scan t_i apply to `[t_i,t_(i+1))`.
-- Applied/confirmed use `[start,end)` of monotonic event timestamps validated by the Driver.
+- Applied/confirmed use `[start,end)` of monotonic event timestamps validated by renderer application and input-driver confirmation evidence.
 - At t, `rolling(d)` integrates interval overlap with `(t-d,t]`. A new value selected at t has not yet consumed usage time at t.
 - When used equals the limit exactly, further ON is blocked. Old partial intervals leave exactly according to logical time; do not use fixed buckets.
 - `local_day(zone)` is `[start,next)` between resolved local midnights, which may last 23 or 25 hours under DST. Split intervals crossing the boundary.
@@ -741,7 +741,7 @@ The public notations established in this chapter are:
 
 This list is the selected language contract. Current compiler support and executable bytecode scope follow the distinctions in §3.5 and §3.6.
 
-Authors specify schedule start predicate, basis and duration, Run cancellation, DST choices, Periodic anchor/change policy, natural fallback, accounting stage/resource/reservation, manual lease and cleaning policy. The language adds no hidden catch-up, retry, cancel, restart or gateway requirement. Compiler acceptance is not evidence of clock/provider data or Driver/physical operation.
+Authors specify schedule start predicate, basis and duration, Run cancellation, DST choices, Periodic anchor/change policy, natural fallback, accounting stage/resource/reservation, manual lease and cleaning policy. The language adds no hidden catch-up, retry, cancel, restart or gateway requirement. Compiler acceptance is not evidence of clock/provider data or driver/renderer or physical operation.
 
 [Full contents](../LANGUAGE-REFERENCE.md) · [Previous chapter](02-types-expressions-state.md) ·
 [Next chapter](04-sensors-constraints-control.md)

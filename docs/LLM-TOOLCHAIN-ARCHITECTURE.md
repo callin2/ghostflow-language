@@ -24,7 +24,7 @@ flowchart LR
   Live -->|persistent WASM Rust ScanDriver| Core[FramedGhostFlowRuntime]
   Live -->|full-screen ASCII; 100 ms cadence| Human
   Human -->|piped commands| Console[ghostsim-console.mjs piped mode]
-  Profile[profile or Driver descriptor] --> Console
+  Profile[profile or channel descriptor] --> Console
   Profile --> Live
   Console -->|recorded TOON scenario| Scenario
   Console -->|same runScenario path| S
@@ -90,7 +90,7 @@ modes display only virtual inputs and requested/safe intent; neither applies
 physical output or confirms hardware state.
 
 The selected [`GhostFlow/board-profile-v1`](KEYBOARD-HOST.md) or presentation-only
-Driver descriptor supplies the console's ordered input and output channel
+Channel descriptor supplies the console's ordered input and output channel
 roster. `--bind CHANNEL=port` connects each channel to a matching manifest
 logical port; board profiles never infer a logical binding from an endpoint
 name. With no descriptor, the console uses a **virtual Waveshare 8DI/8RO**
@@ -123,7 +123,7 @@ descriptor and a physical I/O driver have different responsibilities.
 | Framed scan driver | Owns one runtime and validates complete typed inputs, sequential scan IDs and nondecreasing logical time before evaluation. Successful scans advance its sequence/time. It performs no device I/O. | [`ScanDriver`](../crates/ghostflow-core/src/scan.rs) |
 | Portable Rust runtime | Loads GFB, activates supported capabilities, evaluates expressions, program state, timers and constraints, and emits a trace with requested/safe intents and faults. Native and WASM hosts use this core. | [`ghostflow-core`](../crates/ghostflow-core/src/lib.rs), [WASM adapter](../runtimes/wasm/README.md) |
 | Virtual device view | Displays held inputs, requested/safe output banks and scan identity using the selected channel roster. The state consists of simulated input values, core program state and recorded observations; it has no separate actuator or plant model. | [ASCII panel and profile rules](KEYBOARD-HOST.md) |
-| Profile / Driver descriptor | Describes ordered channels and types; explicit bindings connect them to manifest ports. Board-profile driver/address/polarity metadata is not executed by the console. | [`board-profile-v1` contract](../contracts/integration-v1/README.md), [`console-profile-v1`](KEYBOARD-HOST.md) |
+| Profile / channel descriptor | Describes ordered channels and types; explicit bindings connect them to manifest ports. Board-profile driver/address/polarity metadata is not executed by the console. | [`board-profile-v1` contract](../contracts/integration-v1/README.md), [`console-profile-v1`](KEYBOARD-HOST.md) |
 
 “Virtual device” here means an I/O view around a real GhostFlow runtime. The
 native runner registers virtual actuator capabilities from the module's output
@@ -310,13 +310,13 @@ else successful scan (possibly with constraint faults)
     Output --> Host: I/O error
     Host -> Host: cached applied mask = unknown; cached latch = unknown
   end
-  opt driver available and readback due
+  opt renderer available and readback due
     Output -> Load: read output latch/register
     Load --> Output: observed register value
     Output --> Host: readback evidence with observation scope
   end
   Host -> Host: record_relay(available, applied, latch)
-  opt write/readback failure, latch mismatch or unavailable driver
+  opt write/readback failure, latch mismatch or unavailable renderer
     Host -> Evidence: publish attempted safe mask + separate applied/latch evidence
     Host -> Host: halt: running=false; fault; clear adapter live outputs
     Host -> Evidence: publish halted/fault observation

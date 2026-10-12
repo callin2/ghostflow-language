@@ -177,8 +177,8 @@ job/session을 취소하거나 모든 state를 이전 값으로 되돌린다는 
 
 binding 오류나 VM 실패는 VM state, guard admission과 trace를 함께 rollback한다.
 부분적으로 보호 상태만 바뀌거나 거부된 scan의 증거가 commit되어서는 안 된다.
-논리 safe output은 Driver applied나 physical feedback confirmed와 다르다.
-실제 Driver 순서·물리 안전 장치·현장 설치는 이 profile의 검증 범위가 아니다.
+논리 safe output은 renderer applied나 physical feedback confirmed와 다르다.
+실제 renderer 순서·물리 안전 장치·현장 설치는 이 profile의 검증 범위가 아니다.
 
 accounting은 기존 `resource`·`account`를 선언하고
 `constraints Budget { limit used(account, basis) <= bound { ... } }`를 쓴다.
@@ -194,7 +194,7 @@ output ABI나 물리 안전 순서를 구현했다는 뜻이 아니다. 기존 P
 실행 계약도 임의 resource policy enforcement로 일반화하지 않는다.
 
 모든 필수 조건은 AND다. admission 검사를 먼저 확정하고 요청 후보에 대해
-safe_output 관계를 검사한 뒤 Driver가 적용한다. arbitration priority는 허용 영역
+safe_output 관계를 검사한 뒤 renderer가 적용한다. arbitration priority는 허용 영역
 안에서 요청을 고를 뿐, 필수 제약·binding·provenance·복구 조건을 우회하지 못한다.
 위반 원인과 거부/안전 전이를 구분해 남겨야 한다. 관측 정상화는 새 start 권한이
 아니며, 재시도나 복구도 같은 규칙을 따른다. `check pump_capacity`는 아래 Station
@@ -291,7 +291,7 @@ control이 사용권을 가져가지 않는다. 밸브가 열려 있다는 이�
 않으며, 소유자의 단계별 출력과 장치의 안전 적용 순서를 따른다.
 
 같은 tick의 모든 시작 요청을 한 snapshot에서 중재하고 사용권·시간 예산을 함께
-확보한 요청만 허가한다. 논리적 허가 확정 후 Driver가 출력을 적용하며, 영속 예약이
+확보한 요청만 허가한다. 논리적 허가 확정 후 renderer가 출력을 적용하며, 영속 예약이
 필요하면 그 성공까지 출력 시작을 보류한다. 프로세스 재시도에도 같은 요청 ID를 사용한다.
 이 과정이 여러 GPIO의 물리적 동시 적용을 보장하는 것은 아니다.
 
@@ -360,12 +360,12 @@ Manual/Configure로 직접 넘어갈 수 있는 것은 아니다.
 명령과 설치 시 정한 정지 절차에 근거한 확인이라는 한계를 명시한다.
 물리 인터록이나 실제 상태 피드백의 보장을 모드 enum 하나로 대신했다고 주장하지 않는다.
 
-정지 근거는 Driver가 안전 출력 적용을 보고하고 설정된 정리/대기 절차를 완료한
+정지 근거는 renderer가 안전 출력 적용을 보고하고 설정된 정리/대기 절차를 완료한
 `CommandedStop`과 실제 피드백까지 확인한 `VerifiedStop`을 구분해 기록한다.
 기본 구성은 CommandedStop을 허용하며 피드백 센서를 필수로 만들지 않는다.
 실제 정지를 확인했다고 표시하지는 않는다. 장치 응답이 없거나 안전 출력 적용 실패이면
 명령만 보냈다는 이유로 정지 완료로 판정하지 않는다. 사용자가 추가한 규칙에서만
-VerifiedStop을 요구할 수 있다. 초기 안전 출력 순서·대기 값은 장치 드라이버 기본값을
+VerifiedStop을 요구할 수 있다. 초기 안전 출력 순서·대기 값은 출력 renderer 기본값을
 쓸 수 있고, 특정 설치에서 그 값의 적합성을 확인해야 한다는 한계는 별도로 표시한다.
 
 정지 요청은 대기 중 시작 요청도 취소/무효화한다. 운전 중 모드 변경을 요청해 두었다가
@@ -724,7 +724,7 @@ control MoistureDemand {
 시작하고 자기유지한다. start는 준비 전에 잠깐 들어왔다가 사라진 요청을 저장하지 않는다.
 이후 필터값이 32%인 동안에는 기존 true를 유지하고 35%를 초과하면 false로 바뀐다.
 마지막 유효 샘플부터 stale 한계에 도달하거나 명시적인 fault를 받으면 dry_ok=false로
-급수 의도가 해제된다. 실제 출력 정리 순서는 Driver/설비 정지 절차를 따른다.
+급수 의도가 해제된다. 실제 출력 정리 순서는 renderer/설비 정지 절차를 따른다.
 
 fault 후 정상 샘플 세 개만으로는 median(5)이 준비되지 않으므로 NotReady다.
 다섯 개가 모이고 복구 조건을 만족해도 start=false이고 자기유지가 해제된 상태라면
@@ -791,7 +791,7 @@ checkpoint는 중간 trace와 구분하며, 입력 기록이 유실된 구간은
 시작 전 작업이 필요로 하는 예산을 확인한다. 공유 펌프 사용권과 함께 시간 예산도
 확보하고 사용 후 정산한다. 한도에서 멈출 수 있어야 한다면 다음 출력 적용 구간과
 정지 지연까지 고려해 미리 차단한다. 한 tick 주기만큼의 초과를 허용하는지 또는
-정확한 제한 시각에 Driver가 OFF하는지 목표 실행 계약에 명시해야 한다.
+정확한 제한 시각에 renderer가 OFF하는지 목표 실행 계약에 명시해야 한다.
 
 예약할 예산에는 유한한 ON 시간 상한이 필요하다. 정해진 순차 관수는 실행 계획에서
 계산하고, 종료 시각 없는 수동 운전은 남은 예산 안의 유한 lease와 강제 정지 시각을

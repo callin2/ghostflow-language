@@ -932,7 +932,7 @@ The executable subset is one Bool GFB1 v1/v3 control with every output explicitl
 protected. Writers in one installation share a registry that refuses additional
 active writers for the same stable ID. Context/PID, shared-policy import
 composition and cooperative multi-VM arbitration are outside this subset.
-Results are logical requested/safe intents, not evidence of Driver application,
+Results are logical requested/safe intents, not evidence of renderer application,
 valve-open confirmation or field installation. See [Reference §4.8](reference/04-sensors-constraints-control.en.md#48-common-constraints-notation-and-operations)
 and [the constraint contract](CONSTRAINTS.en.md#shared-bool-execution) for rules
 and stages.
@@ -1308,7 +1308,7 @@ and removing a slot alone does not cancel an already-started run.
 <a id="q25"></a>
 ## 25. Can I change a setting field's label and UI component?
 
-Specify a label with the language's `label`. The renderer creating the screen chooses the UI component.
+Specify a label with the language's `label`. The cabinet-view creating the screen chooses the UI component.
 This **fragment** displays the setting from [question 24](#q24) as “Cleaning time.”
 
 ```ghost
@@ -1333,7 +1333,7 @@ Changing the component still preserves the value's type, range, increment, and c
 `label` is a human-readable name; it does not change the setting ID or permissions.
 
 GhostFlow does not have syntax such as `widget = slider` to specify a particular component.
-That choice belongs to the renderer. Saying that the screen can choose does not mean
+That choice belongs to the cabinet-view. Saying that the screen can choose does not mean
 the language also supplies a menu for operators to change component types directly.
 
 **Why determine screen appearance outside the language?** To edit the same “Cleaning time” setting appropriately on phones and device screens
@@ -1342,7 +1342,7 @@ while retaining identical control semantics and validation rules.
 **Syntax basis**
 
 - `config`, `label`, `min`, `max`, `step`, `access`: [Reference §5.1 config declarations](reference/05-settings-and-observation.md#51-config-선언)
-- Separating UI appearance from language semantics: [Reference §5.3 Renderer-independent observation model](reference/05-settings-and-observation.md#53-renderer-독립-관찰-모델)
+- Separating UI appearance from language semantics: [Reference §5.3 Cabinet-view-independent observation model](reference/05-settings-and-observation.md#53-cabinet-view-독립-관찰-모델)
 - Descriptions conveying setting IDs, types, and permissions: [Reference §5.3 Descriptors and snapshots](reference/05-settings-and-observation.md#descriptor와-snapshot)
 
 <a id="q26"></a>
@@ -1733,7 +1733,7 @@ control RestartAndWait {
 If multiple stages such as return or inspection are needed, set the initial enum state to a preparation stage
 and transition on device feedback as in [question 19](#q19).
 This rule determines output intent after GhostFlow begins evaluation.
-The Driver's boot policy determines actual pin/relay states from power-on until the first evaluation.
+Device and output-renderer boot policy determines actual pin/relay states from power-on until the first evaluation.
 
 **Resuming the pre-outage task is a separate policy.** Ordinary operational settings survive restart,
 but that alone does not automatically restore operating stages or timers.
@@ -2009,11 +2009,11 @@ control PumpRequest {
 The following describes connections, rather than binding-file syntax.
 
 ```text
-Before: logical output pump → output Driver → GPIO A → relay A
-After: logical output pump → output Driver → GPIO B → relay B
+Before: logical output pump → output renderer → GPIO A → relay A
+After: logical output pump → output renderer → GPIO B → relay B
 ```
 
-If the new relay turns on at LOW, adjust polarity in Driver/installation settings
+If the new relay turns on at LOW, adjust polarity in renderer/installation settings
 to carry out the same run request. Actual output values during boot and faults are also defined at that boundary.
 The logical output's `Bool` type alone does not guarantee that the pin supports output, electrical drive conditions,
 contact ratings, wiring, and connected loads are compatible.
@@ -2027,7 +2027,7 @@ Manage output binding changes through installation revisions and application pro
 The absence of a recompilation requirement does not permit wiring replacement during uninterrupted operation.
 
 **Why separate logical outputs from GPIO?** Control expresses the intent “run the pump,”
-and Drivers and installation connections apply it through the electrical signals needed by that relay.
+and renderers and installation connections apply it through the electrical signals needed by that relay.
 
 **Syntax basis**
 
@@ -2042,7 +2042,7 @@ and Drivers and installation connections apply it through the electrical signals
 ## 39. Can I increase the output count with an expansion board such as Waveshare?
 
 Yes. **Logical outputs can connect to expansion-device channels as well as direct GPIO.**
-The Driver handles expansion-device communication and channel control. Bindings connect each logical output to its channel.
+The output renderer handles expansion-device communication and channel control. Bindings connect each logical output to its channel.
 
 ```ghost
 control TwoRelayRequests {
@@ -2070,8 +2070,8 @@ control TwoRelayRequests {
 The following describes installation connections, rather than binding-file syntax.
 
 ```text
-relay1 → expansion output Driver → expansion board channel 1
-relay2 → expansion output Driver → expansion board channel 2
+relay1 → expansion output renderer → expansion board channel 1
+relay2 → expansion output renderer → expansion board channel 2
 ```
 
 For example, the [official Waveshare Modbus RTU Relay 16CH documentation](https://www.waveshare.com/wiki/Modbus_RTU_Relay_16CH)
@@ -2082,14 +2082,14 @@ Do not assume all boards share a communication method merely because the manufac
 **Distinguish simple multiplexers from independent output expansion.**
 For example, [TI CD74HC4067](https://www.ti.com/product/CD74HC4067) selects a channel to connect to a common signal.
 By itself, it is not an output device retaining each of several relays' ON/OFF states.
-Independent sustained outputs require an expansion device/circuit that retains each channel's state and a corresponding Driver contract.
+Independent sustained outputs require an expansion device/circuit that retains each channel's state and a corresponding renderer contract.
 
 Moving existing logical outputs to compatible expansion channels does not require control source changes or recompilation.
 However, adding logical outputs and control behavior for new devices is a program change.
-The Driver must meet the required channel count, update time, output retention, and communication-failure behavior.
+The output renderer must meet the required channel count, update time, output retention, and communication-failure behavior.
 Calculating several outputs in one tick alone does not mean physical relays switch simultaneously.
 
-**Why put expansion methods in the Driver?** So connecting the same control intent to direct GPIO, an expansion chip, or communication-controlled relays
+**Why put expansion methods in the renderer?** So connecting the same control intent to direct GPIO, an expansion chip, or communication-controlled relays
 does not require adding bus commands and channel addresses to control code each time.
 
 **Syntax basis**
@@ -2103,7 +2103,7 @@ does not require adding bus commands and channel addresses to control code each 
 ## 40. Can I also map the inputs and outputs of an RS485 I/O expansion board?
 
 Yes. **Connect each input/output channel of the board to a GhostFlow logical port.**
-The Driver reads inputs and sends output commands according to that board's communication protocol.
+The input driver reads inputs and the output renderer sends output commands according to that board's communication protocol.
 Do not place RS485 addresses or communication commands in control source.
 
 This is an explanatory example of installation mapping. It is neither executable syntax nor a communication frame format.
@@ -2111,7 +2111,7 @@ This is an explanatory example of installation mapping. It is neither executable
 ```text
 Board address 1, DI channel 1 → input Driver → logical input start
 Board address 1, DI channel 2 → input Driver → logical input stop
-Logical output pump → output Driver → board address 1, DO channel 3
+Logical output pump → output renderer → board address 1, DO channel 3
 ```
 
 The control program using these connections is the same as with direct GPIO.

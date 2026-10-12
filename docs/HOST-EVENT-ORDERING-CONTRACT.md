@@ -14,7 +14,7 @@ descriptor implementation or a particular frontend.
 defines a tick's immutable input snapshot and atomic logical state/output commit.
 [Reference 4.7](reference/04-sensors-constraints-control.en.md#47-requested-safe-applied-confirmed)
 separates requested, safe, applied and confirmed evidence.
-[Reference 5.3](reference/05-settings-and-observation.en.md#53-renderer-independent-observation-model)
+[Reference 5.3](reference/05-settings-and-observation.en.md#53-cabinet-view-independent-observation-model)
 and the [interaction stream design](INTERACTION-STREAM-CONTRACT.md) distinguish
 completed snapshots from ordered events and command results. This document
 orders host receipt and scan boundaries; it does not redefine those lifecycles.
@@ -71,7 +71,7 @@ accepted receipt. A loss after acceptance requires explicit gap/fault evidence.
 | 3 | Validate and evaluate | Core-owned next state, requested intent and constrained safe intent from that single snapshot |
 | 4 | Logical outcome | Success commits logical state/results together; failure records the failed attempt without a completed snapshot or new effects |
 | 5 | Capture committed evidence | Bind completion/output intent to the actual committed scan before invoking hooks or physical dispatch |
-| 6 | Dispatch external effects | Dispatch the committed safe intent under the existing Driver/profile policy; partial physical application remains possible |
+| 6 | Dispatch external effects | Dispatch the committed safe intent under the existing renderer/profile policy; partial physical application remains possible |
 | 7 | Accept effect results | Record separate correlated receipts for actual success/failure/uncertainty; admit them only at a future permitted boundary |
 | 8 | Next permitted decision | Explicit typed binding may use new receipts; no retrospective mutation of the originating decision |
 
@@ -95,7 +95,7 @@ retrying a scan ID/time does not itself authorize request retries.
 An effect result identifies its originating committed scan, run, exact source/
 module/binding and effect/attempt identity. Multiple effects and retries need
 distinct identities; a retry cannot fabricate a second original commit.
-A Driver acceptance record proves only the stated register/write acceptance,
+A renderer acceptance record proves only the stated register/write acceptance,
 not relay movement or physical confirmation. Failure or uncertain application
 does not roll back the originating logical state or replace its safe/requested
 intent with a false historical value. Preserve partial application and each

@@ -63,7 +63,7 @@ The more code AI writes, the more important this distinction becomes. What a use
 
 Even if a program says to turn on a pump, the pump might not run if the power is disconnected or the device has a problem. When a screen says ON, we need to distinguish a request to turn it on from confirmation that it is actually running.
 
-GhostFlow takes inputs and computes which actions to request. Which ports and devices those requests connect to is written in the connection configuration, called binding, and the Driver handles the actual hardware. A rule like “stop the pump if there isn't enough water” doesn't need a particular board's pin numbers mixed into it.
+GhostFlow takes inputs and computes which actions to request. Which ports and devices those requests connect to is written in the connection configuration, called binding, and input drivers supply facts and output renderers apply the actual hardware outputs. A rule like “stop the pump if there isn't enough water” doesn't need a particular board's pin numbers mixed into it.
 
 With these responsibilities separated, you can test the same rules with virtual switches and lamps, then connect them to real devices later. You can also design runs that compare behavior without sending any real outputs. But a request produced in a virtual run and equipment operating correctly in the field remain separate things to verify throughout.
 
@@ -145,7 +145,7 @@ What I liked about **Literate CoffeeScript** was reading explanation and code in
 
 **ObservableHQ** influenced me not only through the way connected computations and displays update when a value changes, but also through the way you can take someone else's notebook and use it as part of your own work. What mattered was being able to use a well-made result as material for the next piece of work, rather than just looking at it. Looking at **marimo and D3.js**, I also valued keeping code and results together and seeing the relationships between values and changes.
 
-From **functional programming**, I took the idea of composing small computations without hiding memory or side effects. From **Cycle.js**, I took the perspective of separating receiving inputs, producing output requests, and the Driver that creates actual effects. These connect to the choices to keep state, computation, and hardware distinct.
+From **functional programming**, I took the idea of composing small computations without hiding memory or side effects. From **Cycle.js**, I took the perspective of separating receiving inputs, producing output requests, and the renderer that creates actual effects. These connect to the choices to keep state, computation, and hardware distinct.
 
 **Elm and Rust** influenced the approach of using type and branch checks to catch problems before they appear at runtime. What I valued in **railway-oriented programming** was similar: you should be able to read the failure paths in the code, as well as the normal results.
 

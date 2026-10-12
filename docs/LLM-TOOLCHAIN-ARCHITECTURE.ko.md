@@ -27,7 +27,7 @@ flowchart LR
   Live -->|지속형 WASM Rust ScanDriver| Core[FramedGhostFlowRuntime]
   Live -->|전체 화면 ASCII; 100 ms 간격| Human
   Human -->|파이프 명령| Console[ghostsim-console.mjs 파이프 모드]
-  Profile[프로필 또는 Driver 설명자] --> Console
+  Profile[프로필 또는 채널 설명자] --> Console
   Profile --> Live
   Console -->|기록된 TOON 시나리오| Scenario
   Console -->|같은 runScenario 경로| S
@@ -114,7 +114,7 @@ SHA-256, 바이트코드 SHA-256, 소스 문서 SHA-256과 파일 이름이 표�
 | 프레임 스캔 드라이버 | 런타임 하나를 소유하고 평가 전에 완전한 형식 입력, 순차 스캔 ID, 감소하지 않는 논리 시간을 검증한다. 성공 스캔은 순서/시간을 진행시킨다. 장치 I/O는 하지 않는다. | [`ScanDriver`](../crates/ghostflow-core/src/scan.rs) |
 | 이식 가능한 Rust 런타임 | GFB를 로드하고 지원 기능을 활성화하며 표현식, 프로그램 상태, 타이머와 제약을 평가한다. 요청/안전 의도 및 고장이 담긴 추적을 출력한다. 네이티브와 WASM 호스트가 이 코어를 사용한다. | [`ghostflow-core`](../crates/ghostflow-core/src/lib.rs), [WASM 어댑터](../runtimes/wasm/README.md) |
 | 가상 장치 화면 | 선택된 채널 목록으로 유지 중인 입력, 요청/안전 출력 뱅크와 스캔 식별자를 표시한다. 상태는 시뮬레이션 입력 값, 코어 프로그램 상태와 기록된 관측으로 구성된다. 별도 액추에이터나 플랜트 모델은 없다. | [ASCII 패널 및 프로필 규칙](KEYBOARD-HOST.md) |
-| 프로필/Driver 설명자 | 순서가 있는 채널과 형식을 설명한다. 명시적 바인딩은 이를 매니페스트 포트에 연결한다. 보드 프로필의 드라이버/주소/극성 메타데이터는 콘솔에서 실행되지 않는다. | [`board-profile-v1` 계약](../contracts/integration-v1/README.md), [`console-profile-v1`](KEYBOARD-HOST.md) |
+| 프로필/채널 설명자 | 순서가 있는 채널과 형식을 설명한다. 명시적 바인딩은 이를 매니페스트 포트에 연결한다. 보드 프로필의 드라이버/주소/극성 메타데이터는 콘솔에서 실행되지 않는다. | [`board-profile-v1` 계약](../contracts/integration-v1/README.md), [`console-profile-v1`](KEYBOARD-HOST.md) |
 
 여기서 “가상 장치”는 실제 GhostFlow 런타임을 둘러싼 I/O 화면을 뜻한다. 네이티브
 실행기는 모듈 출력 형식에서 가상 액추에이터 기능을 등록하여 런타임을 활성화한다.
@@ -297,13 +297,13 @@ else 성공한 스캔 (제약 고장이 있을 수 있음)
     Output --> Host: I/O 오류
     Host -> Host: 캐시된 적용 마스크 = 알 수 없음; 래치 = 알 수 없음
   end
-  opt 드라이버 사용 가능 및 판독 시점 도래
+  opt renderer 사용 가능 및 판독 시점 도래
     Output -> Load: 출력 래치/레지스터 읽기
     Load --> Output: 관측된 레지스터 값
     Output --> Host: 관측 범위가 포함된 판독 증거
   end
   Host -> Host: record_relay(available, applied, latch)
-  opt 쓰기/판독 실패, 래치 불일치 또는 드라이버 사용 불가
+  opt 쓰기/판독 실패, 래치 불일치 또는 renderer 사용 불가
     Host -> Evidence: 시도한 안전 마스크 + 별도 적용/래치 증거 게시
     Host -> Host: 중지: running=false; 고장; 어댑터 실시간 출력 제거
     Host -> Evidence: 중지/고장 관측 게시

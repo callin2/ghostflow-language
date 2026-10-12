@@ -36,13 +36,13 @@ Input **drivers** produce logical inputs; output **renderers** apply logical out
 
 Here, **execution environment (host) means the device or process that executes the control program**. It does not require an Android gateway or cloud. A device with necessary clocks and valid data locally can fulfill the contract without Internet access. Network disconnection, data expiry, and unknown time are distinct states.
 
-Rationale: [§1.1 Canonical source](01-source-and-syntax.md#11-왜-문서-하나가-소스인가), [§2.8 Execution semantics](02-types-expressions-state.md#28-tick과-상태-snapshot), [§4.2 Input contracts](04-sensors-constraints-control.md#42-샘플-계약과-sensor-처리-순서), [§5.3 Observation model](05-settings-and-observation.md#53-renderer-독립-관찰-모델), [§6.2 Logical connections](06-composition-and-replay.md#62-definition-instance와-논리-port).
+Rationale: [§1.1 Canonical source](01-source-and-syntax.md#11-왜-문서-하나가-소스인가), [§2.8 Execution semantics](02-types-expressions-state.md#28-tick과-상태-snapshot), [§4.2 Input contracts](04-sensors-constraints-control.md#42-샘플-계약과-sensor-처리-순서), [§5.3 Observation model](05-settings-and-observation.md#53-cabinet-view-독립-관찰-모델), [§6.2 Logical connections](06-composition-and-replay.md#62-definition-instance와-논리-port).
 
 ## 8.3 Complete FAQ responsibility table
 
-This table assigns FAQ 1–41 to rows. “Required” means contractual responsibility, rather than implementation status. Shared Driver/UI responsibilities follow §8.2; each row lists external responsibilities important to that requirement.
+This table assigns FAQ 1–41 to rows. “Required” means contractual responsibility, rather than implementation status. Shared driver/renderer/UI responsibilities follow §8.2; each row lists external responsibilities important to that requirement.
 
-| FAQ and requirement | Language/compiler requirements | Runtime requirements | Execution environment/driver/renderer/installation/UI requirements |
+| FAQ and requirement | Language/compiler requirements | Runtime requirements | Execution environment/driver/cabinet-view/installation/UI requirements |
 |---|---|---|---|
 | [1](../language_faq.md#q01), [41](../language_faq.md#q41) Canonical document/compiler tools | Literate interpretation, preservation and validation of source/intent locations (§1) | Execute identified Program | Tools retain and deliver complete documents/revisions; distinguish compile checking from physical behavior verification |
 | [2](../language_faq.md#q02), [3](../language_faq.md#q03), [18](../language_faq.md#q18) Buttons/self-holding | Bool, previous/next state (§2.8) | Evaluate and commit authored restart conditions from snapshots | Driver supplies pressed meaning; connect actual buttons or explicit software inputs |
@@ -51,7 +51,7 @@ This table assigns FAQ 1–41 to rows. “Required” means contractual responsi
 | [9](../language_faq.md#q09), [10](../language_faq.md#q10) Sensor conditions/tank control | Result, thresholds, filters, hysteresis, state (§4.1–4.3) | Identify new samples; evaluate freshness, recovery, filter state | Driver supplies values, units, sample times, quality |
 | [11](../language_faq.md#q11) Counts | Exact integers, previous input state, conditions (§2.3, §2.8) | Preserve authored edge, limit, initialization expressions and integer-error semantics | Input producer supplies observable events; do not count a long pulse's ticks as event count |
 | [13](../language_faq.md#q13) Alarm holding | Bool state/conditions; public alarm meaning is separate (§5.3) | Evaluate authored latch/reset expressions; preserve raise/clear meaning of explicit alarms | UI displays alarm state; notification/record media are external choices |
-| [14](../language_faq.md#q14), [17](../language_faq.md#q17) Interlocks | require/mutual exclusion, distinction between state and output restriction (§4.7) | requested→safe decisions | Output renderer applies effects; input driver supplies feedback; logical constraints are not physical emergency-stop devices |
+| [14](../language_faq.md#q14), [17](../language_faq.md#q17) Interlocks | require/mutual exclusion, distinction between state and output restriction (§4.7) | requested→safe decisions | Output cabinet-view applies effects; input driver supplies feedback; logical constraints are not physical emergency-stop devices |
 | [16](../language_faq.md#q16) Computational reuse | Pure functions, types, name scopes (§2.7) | Same computation for the same inputs | Do not put device access or hidden state in pure functions |
 | [7](../language_faq.md#q07), [15](../language_faq.md#q15), [20](../language_faq.md#q20) Clock-time/sunrise schedules | DailySlots/Solar, offsets, separation of occurrence and operation (§3.5–3.9) | Contractual occurrence handling/deduplication and operating timers | Supply clocks, location, time zones, natural-event data; preserve occurrence records |
 | [21](../language_faq.md#q21), [27](../language_faq.md#q27)–[29](../language_faq.md#q29) Weekdays/holidays/DST | Date filters/conditions, gap/fold and Unknown semantics (§3.8) | Apply the same date decisions and admission policies | Supply calendar/time-zone data, revisions, coverage; display selectable settings in UI |
@@ -81,7 +81,7 @@ The language distinguishes monotonic time and local dates and defines DST, fallb
 
 ### Accumulated usage and persistent storage
 
-Language contracts specify what is counted (requested/safe/applied/confirmed), scope and date boundaries, initialization, and unknown status. Internal control edge counters can be computed with ordinary state. Persistent installation ledgers spanning controls and modes are updated, stored, and restored by execution-environment providers using stable installation identity and renderer application and input-driver confirmation evidence; they supply identified aggregation snapshots to the control runtime. Pure aggregation computation inside providers also follows the same language contract; storage media do not change aggregation meaning. One device's usage differs from adding its automatic and manual control requests. Do not substitute accumulated screen-on time for installation usage.
+Language contracts specify what is counted (requested/safe/applied/confirmed), scope and date boundaries, initialization, and unknown status. Internal control edge counters can be computed with ordinary state. Persistent installation ledgers spanning controls and modes are updated, stored, and restored by execution-environment providers using stable installation identity and cabinet-view application and input-driver confirmation evidence; they supply identified aggregation snapshots to the control runtime. Pure aggregation computation inside providers also follows the same language contract; storage media do not change aggregation meaning. One device's usage differs from adding its automatic and manual control requests. Do not substitute accumulated screen-on time for installation usage.
 
 **Why:** Temporary execution memory and installation records that must survive restart have different lifetimes. Rationale: [§3.4](03-time-and-schedules.md#34-누적-시간과-rolling-budget), [§3.10](03-time-and-schedules.md#310-시간-기반-사용량-제약).
 
@@ -93,7 +93,7 @@ The language declares types, permitted ranges, increments, permissions, and labe
 
 ### Device independence and actual effects
 
-Compiled Programs use logical roles. Direct GPIO, expanded channels, and RS485 device addresses belong to installation bindings and Drivers. Compatible replacements alone do not require source edits or recompilation. Adding logical ports or new control behavior is a source change. Atomic logical-result commitment, bus command application, and actual contact/mechanical operation confirmation are different facts.
+Compiled Programs use logical roles. Direct GPIO, expanded channels, and RS485 device addresses belong to installation bindings and drivers/renderers. Compatible replacements alone do not require source edits or recompilation. Adding logical ports or new control behavior is a source change. Atomic logical-result commitment, bus command application, and actual contact/mechanical operation confirmation are different facts.
 
 **Why:** Abstracting device access does not eliminate physical delays or failures. Rationale: [§4.7](04-sensors-constraints-control.md#47-requested-safe-applied-confirmed), [§6.3 Compatible replacement](06-composition-and-replay.md#호환-장치-교체와-재컴파일-독립성).
 
@@ -103,7 +103,7 @@ Compiled Programs use logical roles. Direct GPIO, expanded channels, and RS485 d
 |---|---|---|
 | Control expressions, sensor filters, stale_after, source defaults | Language and canonical source | New source revision; new Program candidate when executable rules change |
 | Effective operator config values | Language live settings contract | Same Program/run, new settings revision; ordinary settings survive actual restart |
-| Compatible sensor/GPIO/relay/bus channel connections | Installation binding and Driver | Relevant installation/Driver revision changes; reuse same Program without guaranteeing uninterrupted operation/same run |
+| Compatible sensor/GPIO/relay/bus channel connections | Installation binding and driver/renderer | Relevant installation/Driver revision changes; reuse same Program without guaranteeing uninterrupted operation/same run |
 | Internal state/timer/filter memory | Language execution semantics | Updated during execution; restart restoration requires explicit policy and checkpoint contract |
 | Schedule deduplication records/installation usage | Language installation-record contract and execution environment | Lifetime independent of ordinary state initialization/source replacement; no initialization without a contract |
 | Calendar/tide prediction data | Provider and consuming temporal contract | Retain data revisions, coverage, expiry, and event identity |
@@ -129,7 +129,7 @@ The language defines types, syntax, evaluation, and time boundaries. Actual valu
 | 23 Daily counts/cleaning | Compose exact counts, date boundaries, stages, request memory | Cleaning sequence/devices/interruption conditions/completion criteria |
 | 32 Resumption after power outage | §5.2 New run, initialization, cause input, explicit checkpoint restoration | Automatic resumption or waiting for a new start, permitted restoration scope, physical boot outputs |
 | 33 Temperature sensors | §2.9 Physical-quantity types/units and §4 Result | Contract-compliant devices/Drivers and actual installation evidence |
-| 34–40 Connections/replacement | §6.2–6.4 Logical ports, external bindings, recompilation independence | Installation storage format, actual pins/addresses, Driver deployment methods |
+| 34–40 Connections/replacement | §6.2–6.4 Logical ports, external bindings, recompilation independence | Installation storage format, actual pins/addresses, driver/renderer deployment methods |
 
 The operating choices in this table are not unresolved language-design decisions. Fixing one global answer would change intent across different installations, so they remain explicit source/installation-contract arguments. Storage media, UI components, and communication protocols are also not prerequisites for deciding language syntax.
 

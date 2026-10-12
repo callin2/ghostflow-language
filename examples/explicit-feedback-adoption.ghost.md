@@ -9,7 +9,7 @@ not a universal response to missing feedback. The [observation-only timer](optio
 remains valid without physical feedback and gives observation no control authority.
 
 The operator-established illustrative command duration is two seconds. The
-timer measures maintained request duration, not movement or Driver application.
+timer measures maintained request duration, not movement or cabinet-view application.
 Inhibition neither resets nor extends that duration. Recovery before the deadline
 can permit the remaining request; recovery at or after the deadline cannot restart
 it. Stop/restart semantics are those of the linked timer example.

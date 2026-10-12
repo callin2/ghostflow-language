@@ -175,7 +175,10 @@ input restart_reason: RestartReason;
 
 This declaration is a control-body fragment. The producer supplies only hardware-confirmed causes; without evidence, supply `Unknown`. `PowerOn` alone does not establish recovery from a power outage. This input remains fixed for one run. The author defines automatic resumption, waiting, or cancellation followed by returning to the original position through state transitions. Device installation policy and the output renderer own physical outputs before the first decision.
 
-## 5.3 Renderer-independent observation model
+<a id="53-renderer-독립-관찰-모델"></a>
+<a id="53-renderer-independent-observation-model"></a>
+
+## 5.3 Cabinet-view-independent observation model
 
 In this chapter, the historical term “renderer” for forms and observation views means cabinet view/UI (`@ghostflow/cabinet-view`). An output renderer applies logical output intent as defined in §8.2; UI display does not establish applied or confirmed evidence.
 
@@ -218,7 +221,7 @@ Command results preserve request reception, rejection, starting, completion, can
 
 ### Explanation DAG
 
-An explanation is a directed acyclic graph connecting one output result to actually evaluated inputs, state, timers, named intermediate values, predicates, and constraints. Shared conditions remain one stable node. A renderer may expand it like a tree rooted at a particular output if needed.
+An explanation is a directed acyclic graph connecting one output result to actually evaluated inputs, state, timers, named intermediate values, predicates, and constraints. Shared conditions remain one stable node. A cabinet-view may expand it like a tree rooted at a particular output if needed.
 
 Each completed scan's evaluation requires at least the meaning of `evaluated`, actual value/status, and `supportsResult`. Do not show short-circuited, unevaluated branches as actual evidence. If AND is false, evaluated false children may participate in explaining the result; if OR is true, all evaluated true children may participate. Do not arbitrarily choose one winner. This graph is a proof path for the evaluation result, rather than a claim of counterfactual causation that “the result would have differed without this condition.”
 
@@ -239,7 +242,7 @@ event/command/alarm sequence identity
 
 `scanId` is only ordering within one run. If reset or actual restart creates a new run, even the same `scanId = 0` is a different occurrence. A settings live event does not change `runId`. Joining snapshots and explanations from different sources, Programs, settings, bindings, or runs is treated as stale or mismatch.
 
-GhostFlow observes inputs and control decisions. `pump = true` is output intent and does not prove electrical energization, rotation, or flow. Preserve requested intent, safe intent, host/Driver application results, and actual feedback separately. Without feedback, the result is unknown. Do not turn an explanation that a low-water signal blocked irrigation into a claim that “the tank was actually empty.”
+GhostFlow observes inputs and control decisions. `pump = true` is output intent and does not prove electrical energization, rotation, or flow. Preserve requested intent, safe intent, host/renderer application results, and actual feedback separately. Without feedback, the result is unknown. Do not turn an explanation that a low-water signal blocked irrigation into a claim that “the tank was actually empty.”
 
 ## 5.5 Design rationale and evidence
 

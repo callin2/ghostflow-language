@@ -37,7 +37,7 @@ represented as a valid reference. Calibration persistence does not restore one.
 
 `Basis::Requested` requires request records. `AcknowledgedWrites` requires actual
 write-result records: Acknowledged, WriteFailed or Unknown. An ACK means only
-Driver acceptance. `target` is an opaque byte/digital-mask value, not an arbitrary-unit
+renderer acceptance. `target` is an opaque byte/digital-mask value, not an arbitrary-unit
 actuator quantity. Each record retains original execution origin: boot/program/
 binding identities plus run/time/source epochs. Model, calibration and runtime
 reference do not create write receipts. An earlier receipt can seed an explicitly

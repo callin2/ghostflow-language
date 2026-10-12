@@ -5,7 +5,7 @@
 Design for [#74](https://github.com/callin2/ghostflow-language/issues/74).
 This document specifies a normative host/core observation contract for future
 adoption. It does not implement producers, transport, retention, rendering, or
-new source grammar. Reference [§5.3](reference/05-settings-and-observation.en.md#53-renderer-independent-observation-model)
+new source grammar. Reference [§5.3](reference/05-settings-and-observation.en.md#53-cabinet-view-independent-observation-model)
 remains the language boundary; its lifecycle notation is not an existing record enum.
 Settings from #70 are implemented; command and alarm descriptors are not.
 The existing [v0 contract](../contracts/interaction-v0/README.md) stays unchanged.

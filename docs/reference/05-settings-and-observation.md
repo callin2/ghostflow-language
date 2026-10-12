@@ -277,7 +277,10 @@ input restart_reason: RestartReason;
 동안 고정된다. 자동 재개, 대기, 취소 후 원위치 이동은 작성자가 state 전이로 정한다.
 첫 판단 전 물리 출력은 Device 설치 정책과 출력 renderer가 소유한다.
 
-## 5.3 renderer 독립 관찰 모델
+<a id="53-renderer-독립-관찰-모델"></a>
+<a id="53-renderer-independent-observation-model"></a>
+
+## 5.3 cabinet-view 독립 관찰 모델
 
 이 장에서 입력창과 관찰 화면을 뜻하던 “renderer”는 cabinet view/UI (`@ghostflow/cabinet-view`)를 가리킨다. 출력 renderer는 §8.2에 따라 논리 출력 의도를 적용하며 UI 표시는 applied 또는 confirmed 증거가 아니다.
 
@@ -377,7 +380,7 @@ source, Program, settings, binding 또는 run의 snapshot과 explanation을 이�
 또는 mismatch로 처리한다.
 
 GhostFlow가 관찰하는 것은 입력과 제어 판단이다. `pump = true`는 출력 의도이며 펌프의
-전기적 인가, 회전 또는 유량을 증명하지 않는다. requested intent, safe intent, host/Driver의
+전기적 인가, 회전 또는 유량을 증명하지 않는다. requested intent, safe intent, host/renderer의
 적용 결과, 실제 feedback을 각각 보존한다. feedback이 없으면 unknown이다. 저수위 신호가
 관수를 막았다는 설명을 “탱크가 실제로 비었다”는 주장으로 바꾸지 않는다.
 

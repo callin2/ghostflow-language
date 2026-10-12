@@ -407,7 +407,7 @@ source 값이 계약상 유효하다는 뜻이지 계산 결과가 측정되었�
 설정 방법·operator/source, source/program과 설치 binding revision, run과 monotonic time epoch,
 근거가 된 source/application receipt history, 명시한 산출 basis를 함께 보존한다. actuator
 진행 추정의 첫 basis는 Device가 실제로 수락한 output register/write history다. Device의 ACK는
-driver가 그 register/write를 수락했다는 뜻일 뿐 motor가 움직였거나 position이 확인되었다는
+renderer가 그 register/write를 수락했다는 뜻일 뿐 motor가 움직였거나 position이 확인되었다는
 뜻이 아니다. 요청 시각을 basis로 선택할 수는 있지만 requested history로 명시해야 하며
 applied history와 바꾸어 쓰지 않는다. 이 구분은 §4.7의 요청·safe·applied·confirmed 경계를
 따른다. 보존할 참조와 history는 선언된 deployment profile의 유한한 bound 안에 있어야 한다.

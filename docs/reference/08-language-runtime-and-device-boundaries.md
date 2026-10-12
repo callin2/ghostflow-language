@@ -53,15 +53,15 @@ Android 게이트웨이나 클라우드를 필수 구성으로 뜻하지 않는�
 근거: [§1.1 정본 소스](01-source-and-syntax.md#11-왜-문서-하나가-소스인가),
 [§2.8 실행 의미](02-types-expressions-state.md#28-tick과-상태-snapshot),
 [§4.2 입력 계약](04-sensors-constraints-control.md#42-샘플-계약과-sensor-처리-순서),
-[§5.3 관찰 모델](05-settings-and-observation.md#53-renderer-독립-관찰-모델),
+[§5.3 관찰 모델](05-settings-and-observation.md#53-cabinet-view-독립-관찰-모델),
 [§6.2 논리 연결](06-composition-and-replay.md#62-definition-instance와-논리-port).
 
 ## 8.3 FAQ 전체 책임표
 
 아래 표는 FAQ 1–41을 각각 한 행에 배정한다. “필요한 것”은 계약상 책임이며 구현 상태가 아니다.
-Driver·UI의 공통 책임은 §8.2를 따르고, 각 행에는 해당 요구에서 중요한 외부 책임을 적는다.
+driver/renderer·UI의 공통 책임은 §8.2를 따르고, 각 행에는 해당 요구에서 중요한 외부 책임을 적는다.
 
-| FAQ와 요구 | 언어·컴파일러에 필요한 것 | 런타임에 필요한 것 | 실행 환경·driver/renderer·설치·UI에 필요한 것 |
+| FAQ와 요구 | 언어·컴파일러에 필요한 것 | 런타임에 필요한 것 | 실행 환경·driver/cabinet-view·설치·UI에 필요한 것 |
 |---|---|---|---|
 | [1](../language_faq.md#q01), [41](../language_faq.md#q41) 정본 문서·컴파일 도구 | literate 해석, 소스·의도 위치 보존과 검사 (§1) | 식별된 Program 실행 | 도구가 완전한 문서·판본을 보관하고 전달; 컴파일 검사는 물리 동작 검증과 구분 |
 | [2](../language_faq.md#q02), [3](../language_faq.md#q03), [18](../language_faq.md#q18) 버튼·자기유지 | Bool, 이전/다음 상태 (§2.8) | 작성된 재시작 조건을 snapshot 기반으로 평가·확정 | Driver가 눌림 의미 제공; 실제 버튼 또는 명시된 software input 연결 |
@@ -145,7 +145,7 @@ UI의 사전 검증만으로 승인하지 않으며, 컴포넌트를 바꿔도 �
 ### 장치 독립성과 실제 효과
 
 컴파일된 Program은 논리 역할을 사용한다. 직접 GPIO, 확장 채널, RS485 장치 주소는
-설치 binding과 Driver의 책임이다. 호환 교체만으로 소스 수정·재컴파일을 요구하지 않는다.
+설치 binding과 driver/renderer의 책임이다. 호환 교체만으로 소스 수정·재컴파일을 요구하지 않는다.
 새 논리 port나 새로운 제어 동작을 추가하는 일은 소스 변경이다.
 논리 결과의 원자적 확정, 버스 명령 적용, 실제 접점·기계 동작 확인은 서로 다른 사실이다.
 
@@ -159,7 +159,7 @@ UI의 사전 검증만으로 승인하지 않으며, 컴포넌트를 바꿔도 �
 |---|---|---|
 | 제어식·센서 필터·stale_after·소스 기본값 | 언어와 정본 소스 | 새 source revision; 실행 규칙이 바뀌면 새 Program 후보 |
 | operator config의 유효값 | 언어의 live 설정 계약 | 같은 Program/run, 새 settings revision; 일반 설정은 실제 재시작 후 보존 |
-| 호환 센서·GPIO·릴레이·버스 채널 연결 | 설치 binding과 Driver | 해당 설치/Driver 판본 변경; 같은 Program 재사용, 무정지·동일 run까지 보장하지 않음 |
+| 호환 센서·GPIO·릴레이·버스 채널 연결 | 설치 binding과 driver/renderer | 해당 설치/Driver 판본 변경; 같은 Program 재사용, 무정지·동일 run까지 보장하지 않음 |
 | state·타이머·필터 내부 기억 | 언어 실행 의미 | 실행 중 갱신; 재시작 복원은 명시한 정책과 checkpoint 계약 필요 |
 | 예약 중복 기록·설비 사용량 | 언어의 설비 기록 계약과 실행 환경 | 일반 state 초기화·소스 교체와 독립된 수명; 계약 없는 초기화 금지 |
 | 달력·조석 예측 자료 | 제공자와 이를 소비하는 시간 계약 | 자료 revision·coverage·expiry와 사건 identity 유지 |
@@ -194,7 +194,7 @@ UI의 사전 검증만으로 승인하지 않으며, 컴포넌트를 바꿔도 �
 | 23 일일 횟수와 세척 | 정확 횟수·날짜 경계·단계·요청 기억을 조합 | 세척 순서·장치·중단 조건·세척 완료 인정 기준 |
 | 32 정전 후 재개 | §5.2의 새 run·초기화·원인 입력·명시 checkpoint 복원 | 자동 재개 또는 새 시작 대기, 복원 허용 범위, 물리 부팅 출력 |
 | 33 온도 센서 | §2.9의 물리량 타입·단위와 §4의 Result | 논리 계약을 만족하는 장치·Driver와 실제 설치 증거 |
-| 34–40 연결·교체 | §6.2–6.4의 논리 port·외부 binding·재컴파일 독립성 | 설치 저장 형식·실제 핀/주소·Driver 배포 방식 |
+| 34–40 연결·교체 | §6.2–6.4의 논리 port·외부 binding·재컴파일 독립성 | 설치 저장 형식·실제 핀/주소·driver/renderer 배포 방식 |
 
 이 표의 운전 선택은 언어 설계의 미결정 사항이 아니다. 한 가지 전역 답으로 고정하면
 서로 다른 설비의 의도를 바꾸게 되므로 소스·설치 계약의 명시적 인자로 남긴다.

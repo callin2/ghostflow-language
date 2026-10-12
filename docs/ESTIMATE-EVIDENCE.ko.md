@@ -37,7 +37,7 @@ run, monotonic time epoch, source epoch는 정확한 `u64`다. host는 소유자
 영속성만으로 runtime reference를 복원하지 않는다.
 
 `Basis::Requested`는 request record를 요구한다. `AcknowledgedWrites`는 실제 write 결과인
-Acknowledged, WriteFailed, Unknown record를 요구한다. ACK는 Driver 수락만 뜻한다.
+Acknowledged, WriteFailed, Unknown record를 요구한다. ACK는 renderer 수락만 뜻한다.
 `target`은 불투명한 byte/digital-mask 값이며 임의 단위의 actuator 수치가 아니다.
 각 record는 원래 실행 출처인 boot/program/binding 정체성과 run/time/source epoch를 보존한다.
 모델, 보정, runtime reference는 write receipt를 생성하지 않는다. 이전 receipt는 동일한

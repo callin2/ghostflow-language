@@ -107,8 +107,8 @@ The total is 27 cases. `REF-04-020` passed in batch7, `REF-04-031` in batch9, an
 | compiler/tooling | 22 | Produce execution evidence through compiler, source trace, package/restore tests |
 | core/runtime | 93 | Produce execution evidence through Rust/native/WASM absolute results and state/journal observation |
 | repository host adapter | 26 | Produce execution evidence through deterministic schedule/settings/capability/provider adapter contract tests |
-| External Driver | 7 | Audit application/confirmation/wiring evidence contracts. Language runtime success cannot substitute |
-| External renderer | 3 | Audit descriptor-based read/write permissions and identical validation semantics |
+| External driver/renderer | 7 | Audit application/confirmation/wiring evidence contracts. Language runtime success cannot substitute |
+| External cabinet-view | 3 | Audit descriptor-based read/write permissions and identical validation semantics |
 | design boundary | 7 | Architecture audit for unintended mixing of new keyword/graph/effect scopes |
 | External host/deployment/provider | 6 | Audit OS, durable storage, provider coverage, and installation binding evidence |
 | **Total** | **164** | 141 internal implementations, 23 external boundary audits |
@@ -116,7 +116,7 @@ The total is 27 cases. `REF-04-020` passed in batch7, `REF-04-031` in batch9, an
 The exact list of 23 external boundaries follows. The other 141 specified cases require repository-internal execution evidence.
 
 - Driver 7: `REF-00-002`, `REF-04-010`, `REF-04-043`, `REF-04-053`, `REF-06-005`, `REF-06-006`, `REF-08-010`
-- Renderer 3: `REF-00-009`, `REF-05-019`, `REF-05-020`
+- Cabinet-view 3: `REF-00-009`, `REF-05-019`, `REF-05-020`
 - Design 7: `REF-01-003`, `REF-01-055`, `REF-03-018`, `REF-06-001`, `REF-06-024`, `REF-08-001`, `REF-08-006`
 - External host/deployment/provider 6: `REF-06-018`, `REF-08-003`, `REF-08-004`, `REF-08-008`, `REF-08-013`, `REF-08-016`
 
@@ -222,12 +222,12 @@ Link each group's catalog IDs one-to-one with actual test names or evidence mani
 
 ### Phase 7: External boundary audit
 
-**Description:** Verify repository-required evidence schemas and responsibilities for the 23 external cases. Compiler success does not certify actual device operation or UI renderers.
+**Description:** Verify repository-required evidence schemas and responsibilities for the 23 external cases. Compiler success does not certify actual device operation or cabinet-views.
 
 **Acceptance:**
 
-- Driver contracts separate requested, applied, confirmed, quality, stop proof and physical endpoint evidence.
-- Renderer contracts neither change descriptor type/authority/validation nor create write permissions.
+- Driver/renderer contracts separate requested, applied, confirmed, quality, stop proof and physical endpoint evidence.
+- cabinet-view contracts neither change descriptor type/authority/validation nor create write permissions.
 - Provider/deployment contracts specify revision, coverage, failure, durable identity and offline operability.
 
 **Dependencies:** Stable internal manifests and observation schemas. **Difficulty:** Medium. **Model:** Sol audit; actual hardware acceptance belongs to the user's environment.

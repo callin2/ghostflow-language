@@ -103,8 +103,8 @@ Reference grammar and semantic types
 | compiler/tooling | 22 | compiler, source trace, package/restore test로 실행 증거화 |
 | core/runtime | 93 | Rust/native/WASM의 절대 결과, state 및 journal 관찰로 실행 증거화 |
 | repository host adapter | 26 | schedule/settings/capability/provider adapter의 deterministic contract test로 실행 증거화 |
-| 외부 Driver | 7 | 적용·확인·배선 증거 계약 audit. 언어 runtime 성공으로 대체 금지 |
-| 외부 renderer | 3 | descriptor 기반 read/write 권한과 동일 validation 의미 audit |
+| 외부 driver/renderer | 7 | 적용·확인·배선 증거 계약 audit. 언어 runtime 성공으로 대체 금지 |
+| 외부 cabinet-view | 3 | descriptor 기반 read/write 권한과 동일 validation 의미 audit |
 | design boundary | 7 | 새 keyword/graph/effect 범위가 섞이지 않는지 architecture audit |
 | 외부 host/deployment/provider | 6 | OS, durable storage, provider coverage, installation binding 증거 audit |
 | **합계** | **164** | 내부 구현 141, 외부 경계 audit 23 |
@@ -112,7 +112,7 @@ Reference grammar and semantic types
 외부 경계 23건의 정확한 목록은 다음과 같다. 나머지 specified 141건은 repository 내부 실행 증거 대상이다.
 
 - Driver 7: `REF-00-002`, `REF-04-010`, `REF-04-043`, `REF-04-053`, `REF-06-005`, `REF-06-006`, `REF-08-010`
-- Renderer 3: `REF-00-009`, `REF-05-019`, `REF-05-020`
+- Cabinet-view 3: `REF-00-009`, `REF-05-019`, `REF-05-020`
 - Design 7: `REF-01-003`, `REF-01-055`, `REF-03-018`, `REF-06-001`, `REF-06-024`, `REF-08-001`, `REF-08-006`
 - External host/deployment/provider 6: `REF-06-018`, `REF-08-003`, `REF-08-004`, `REF-08-008`, `REF-08-013`, `REF-08-016`
 
@@ -218,12 +218,12 @@ Reference grammar and semantic types
 
 ### Phase 7: 외부 경계 audit
 
-**설명:** 외부 23건에 대해 repository가 요구하는 evidence schema와 책임 경계를 검증한다. 실제 장치 작동이나 UI renderer를 compiler 성공으로 인증하지 않는다.
+**설명:** 외부 23건에 대해 repository가 요구하는 evidence schema와 책임 경계를 검증한다. 실제 장치 작동이나 cabinet-view를 compiler 성공으로 인증하지 않는다.
 
 **Acceptance:**
 
-- Driver 계약은 requested, applied, confirmed, quality, stop proof와 physical endpoint evidence를 분리한다.
-- renderer 계약은 descriptor type/authority/validation을 바꾸지 않고 write 권한을 생성하지 않는다.
+- Driver/renderer 계약은 requested, applied, confirmed, quality, stop proof와 physical endpoint evidence를 분리한다.
+- cabinet-view 계약은 descriptor type/authority/validation을 바꾸지 않고 write 권한을 생성하지 않는다.
 - provider/deployment 계약은 revision, coverage, failure, durable identity, offline 운전 가능성을 명시한다.
 
 **의존:** 내부 manifest와 observation schema 안정화. **난이도:** 중간. **모델:** Sol audit, 실제 hardware acceptance는 사용자 환경.

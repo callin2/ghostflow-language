@@ -3,7 +3,7 @@
 `createGhostTimeline` in `runtimes/node/ghost-timeline.mjs` implements the
 noninterference boundary of Reference §6.8 and REF-06-018. It is a desktop
 reference host, with actual Rust decision, occurrence and accounting owners.
-It does not operate hardware or establish Driver receipt authenticity.
+It does not operate hardware or establish renderer receipt authenticity.
 
 The selected profile is a standalone canonical `.ghost.md` GFB10 control with
 Periodic schedules, optional existing settings, and an applied/durable
@@ -49,7 +49,7 @@ frame budgets and branch identity hashes, and must match exactly for recorded
 replay. Synthetic branches can supply different explicit samples without reaching
 the live sink, storage or accounting owner.
 
-`recordApplied(segment)` accepts explicitly caller-validated Driver intervals
+`recordApplied(segment)` accepts explicitly caller-validated renderer application intervals
 through the source-bound AccountingRuntime and persists/acknowledges its real
 snapshot. Requests, safe intent and UI time never manufacture these intervals.
 `persistPending()` retries pending persistence; unacknowledged reads retain
