@@ -271,6 +271,8 @@ reproducing the panel also requires retaining its profile and binding arguments.
 
 ## Physical Driver and Device boundary
 
+Input **drivers** produce logical inputs; output **renderers** apply logical output intent to relays, motors, lamps or screens. These are roles, not mutually exclusive device classes. A USB force-feedback joystick has an input driver and an output renderer; an EC11 encoder with TFT similarly combines input and output roles. These examples define boundaries, not implementations. Driver and renderer source belongs in `farm-device-drivers`; Device owns host/board integration, bindings, clocks, watchdogs and boot/failure policy. The cabinet operator UI is `@ghostflow/cabinet-view` and is distinct from an output renderer. Existing `ScanDriver`, host ABI identifiers and profile `driver` fields retain their names and contracts.
+
 The physical path has additional responsibilities defined by
 [Reference §8](reference/08-language-runtime-and-device-boundaries.md) and the
 [integration contract](../contracts/integration-v1/README.md):
@@ -282,7 +284,7 @@ database "Approved profile + installation bindings" as Profile
 participant "Device scan host / clock" as Host
 participant "Sensor / input driver" as Input
 participant "ScanDriver + Rust Runtime" as Core
-participant "Physical output driver" as Output
+participant "Physical output renderer" as Output
 participant "Relay / load" as Load
 participant "Host observation stream" as Evidence
 participant "Independent observation" as Observer
@@ -319,7 +321,7 @@ else successful scan (possibly with constraint faults)
     Host -> Host: halt: running=false; fault; clear adapter live outputs
     Host -> Evidence: publish halted/fault observation
     note over Host,Output
-      A following firmware loop requests OFF through the same driver.
+      A following firmware loop requests OFF through the same renderer.
       OFF is not assumed applied until acknowledged.
       Resume is rejected while faulted; redeployment is required.
     end note
@@ -330,7 +332,7 @@ else successful scan (possibly with constraint faults)
   end
   note over Host,Core
     Core state already committed before output application.
-    Driver failure does not roll back that scan through ScanDriver.
+    Renderer failure does not roll back that scan through ScanDriver.
     Device halt policy is implemented; committed core state is retained.
   end note
 end
@@ -344,9 +346,9 @@ firmware failure path. It is not a connection made by `ghostsim` or hardware
 verification. Independent physical confirmation is a contract boundary;
 the current firmware observation reports intent, applied write and register
 latch only, with no relay-contact or load feedback.
-Device owns firmware, physical drivers, approved board profiles, clocks,
+Device owns firmware, driver/renderer host and board integration, approved board profiles, clocks,
 watchdogs and output handling at boot or failure. Installation bindings select
-the actual endpoint for each logical port. Logical safe intent, driver-applied
+the actual endpoint for each logical port. Logical safe intent, renderer-applied
 output, register readback and physical confirmation remain distinct evidence.
 The integration validator checks supplied identities and mappings; it neither
 installs them nor performs I/O.

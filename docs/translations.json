@@ -124,15 +124,15 @@
       "source": "AGENTS.md",
       "sourceLanguage": "en",
       "translation": "AGENTS.ko.md",
-      "sourceSha256": "cbba332d821b0f916b51e8c7be57ff150751deb4894ddd09c832f2c8a8b03531",
+      "sourceSha256": "3b85821c84489e8ac7009731a8666f5d994a0d0dbc1d58c06603380faa99e9a3",
       "translationSha256": "bb79a9f2c8e55727e0eb19136aa8af7d361e50e59e1d0dfff5e3a7be7bbe750b"
     },
     {
       "source": "contracts/integration-v1/README.md",
       "sourceLanguage": "en",
       "translation": "contracts/integration-v1/README.ko.md",
-      "sourceSha256": "2b6915116de0e5058fbec4d2937c49aadd6daa30b4b44228325cf3aaac69d594",
-      "translationSha256": "5b02675dc63286d77698b87af00de5b70e7b9b9c24836ce29d61a053b0f40c39"
+      "sourceSha256": "36c5b96d1a10892eab8c7348bd5a174dd8f4473dedadffc21475237232cc36f2",
+      "translationSha256": "da7882d891e4ccc12add456e382a694c0c452fdf767148a21a633315e83c8409"
     },
     {
       "source": "contracts/interaction-v0/README.md",
@@ -362,8 +362,8 @@
       "source": "docs/LLM-TOOLCHAIN-ARCHITECTURE.md",
       "sourceLanguage": "en",
       "translation": "docs/LLM-TOOLCHAIN-ARCHITECTURE.ko.md",
-      "sourceSha256": "552ed610b15cd292e4bba9eb7cada9b3c8ea8cf6e43f449d7fd878641d769168",
-      "translationSha256": "5417a34fdeaae2297acf21fb6d2eea0b87b2b309de248410031f9cc9e208ca5a"
+      "sourceSha256": "e6d63ff8ece500711f46aa7036a5ee90e71e4d8dfd09650b3a438f0dfdbedcf3",
+      "translationSha256": "08b171e042111aa37994a98a1273ad4694364c5726282ca3cf0165b019e0fdf8"
     },
     {
       "source": "docs/OPERATOR-SETTINGS-STREAM.md",
@@ -425,15 +425,15 @@
       "source": "docs/reference/04-sensors-constraints-control.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/04-sensors-constraints-control.en.md",
-      "sourceSha256": "b39cc7ca148940d3d4337f6904e41051bc9b59e80b0680dafe80b96f89f731e9",
-      "translationSha256": "e1f76b8d6a8cf87a34fcf3300b3e6c46a767835c6dc8dee4c6713bec6526a438"
+      "sourceSha256": "efeac6b710b35e3201d7713a90e8849ca20e82bc4b813a1f22f66b0a6ec58e9e",
+      "translationSha256": "61606963313ec71c1778d2b713a6d18470fd8c12cf0f3f5274ae689cfab24fe1"
     },
     {
       "source": "docs/reference/05-settings-and-observation.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/05-settings-and-observation.en.md",
-      "sourceSha256": "05ee69ff19b041cdf033ebd0f08d50066056d1da075e25381b4b9cab079ead76",
-      "translationSha256": "446a1963ab84d8edd1c9c43994ed7e7b208b6a6ac39a277890b7a9cd32845257"
+      "sourceSha256": "72737a26dc7813e358ce587ce0d726a3a31a726ecba26d25ec31c30788a3def8",
+      "translationSha256": "1363dcd700190ba1afe125ec1bde492c7bff5319959876e444bedc4a639b4e38"
     },
     {
       "source": "docs/reference/06-composition-and-replay.md",
@@ -453,8 +453,8 @@
       "source": "docs/reference/08-language-runtime-and-device-boundaries.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/08-language-runtime-and-device-boundaries.en.md",
-      "sourceSha256": "70fff5261ac1711546121fba88d0914532967c7ca71a5fab07ca3811fc14454a",
-      "translationSha256": "2980330865774036b79e3fba65b235c9c059e5d6e200da01ae51870defab95d8"
+      "sourceSha256": "01444901e5f7891e942bb2a637df70965dbb458c64f84c4a07e9052eef792e67",
+      "translationSha256": "3f9f935956be753506b0ec3e3a9988e71e7e8330ecfde16ef2f6dcf56879490b"
     },
     {
       "source": "docs/research/GF-COMPOSE-R1-USER-OUTCOMES.md",

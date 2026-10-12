@@ -71,7 +71,7 @@ For `Date` settings, the default, `min`, and `max` are `Date`; `step` is a posit
 
 Schedule lists use the form ``config times: TimeSlots<15min, 8> = [time`06:00`];``. This type's grid and maximum element count define its permitted range. It does not use `min`, `max`, or `step`. List validation and `DailySlots` connections follow [§3.6](03-time-and-schedules.md#36-선택된-dailyslots).
 
-A settings descriptor supplies a stable setting ID, source name, type, default, access permissions, range, increment, label, and source/intent provenance. Renderers can use this information to create typed forms such as Duration inputs, Bool selections, and ranged numeric inputs. Sliders, dials, coordinates, colors, and layout are decided by the renderer. Do not infer settings identity or validation rules from a `label` or widget shape.
+A settings descriptor supplies a stable setting ID, source name, type, default, access permissions, range, increment, label, and source/intent provenance. Cabinet views can use this information to create typed forms such as Duration inputs, Bool selections, and ranged numeric inputs. Sliders, dials, coordinates, colors, and layout are decided by the cabinet view. Do not infer settings identity or validation rules from a `label` or widget shape.
 
 A `Temperature` settings descriptor must include the selected `displayUnit` (`°C` or `K`) separately from the canonical `K` value. Live events changing only the number preserve the existing `displayUnit`. To change the unit, the event must specify the new unit. Missing or ambiguous units are errors before application; do not infer display units from canonical values or magnitudes or choose a default unit.
 
@@ -173,9 +173,12 @@ type RestartReason = PowerOn | Brownout | Watchdog | Software | Unknown;
 input restart_reason: RestartReason;
 ```
 
-This declaration is a control-body fragment. The producer supplies only hardware-confirmed causes; without evidence, supply `Unknown`. `PowerOn` alone does not establish recovery from a power outage. This input remains fixed for one run. The author defines automatic resumption, waiting, or cancellation followed by returning to the original position through state transitions. The Driver's installation contract owns physical outputs before the first decision.
+This declaration is a control-body fragment. The producer supplies only hardware-confirmed causes; without evidence, supply `Unknown`. `PowerOn` alone does not establish recovery from a power outage. This input remains fixed for one run. The author defines automatic resumption, waiting, or cancellation followed by returning to the original position through state transitions. Device installation policy and the output renderer own physical outputs before the first decision.
 
 ## 5.3 Renderer-independent observation model
+
+In this chapter, the historical term “renderer” for forms and observation views means cabinet view/UI (`@ghostflow/cabinet-view`). An output renderer applies logical output intent as defined in §8.2; UI display does not establish applied or confirmed evidence.
+
 
 Observation contracts convey meaning without specifying screens.
 
@@ -188,13 +191,13 @@ Observation contracts convey meaning without specifying screens.
 | alarm | What condition arose and cleared? | Raise/clear events and current state |
 | explanation | What evaluation supports the current result? | Same completed scan |
 
-This contract contains no widgets, layouts, coordinates, colors, or screen-specific visibility policy. Multiple renderers may show the same descriptors and execution identities differently, but do not change values, permissions, validation, or command availability.
+This contract contains no widgets, layouts, coordinates, colors, or screen-specific visibility policy. Multiple cabinet views may show the same descriptors and execution identities differently, but do not change values, permissions, validation, or command availability.
 
 ### Descriptors and snapshots
 
 A descriptor has a public semantic ID, name, kind, source type, read/write/execute permissions, and source/intent provenance. State, timers, exact counters, settings, inputs, outputs, commands, and alarms are classified by their respective declared meanings. Do not infer a counter from a name like `count` or a value that looks integer-shaped.
 
-Changing settings and observing them are different capabilities. Seeing a value in a `state`, timer, or output descriptor creates no write permission. Metadata producers and renderers cannot add `write` or `execute` permissions absent from source. Command permission does not imply direct internal-state write permission; operator settings permission does not imply source-edit permission.
+Changing settings and observing them are different capabilities. Seeing a value in a `state`, timer, or output descriptor creates no write permission. Metadata producers and cabinet views cannot add `write` or `execute` permissions absent from source. Command permission does not imply direct internal-state write permission; operator settings permission does not imply source-edit permission.
 
 A snapshot is bound to exactly one completed scan. Observations distinguish the following.
 
@@ -211,7 +214,7 @@ The descriptor for `timer age = elapsed(phase)` directly identifies the original
 
 A snapshot alone cannot reveal an alarm raised and cleared between refreshes. Events have per-run ordering and must identify duplicates. If records disappear beyond the retention range or a connection breaks, explicitly report sequence gaps or missed ranges. Do not reconstruct intermediate events from the last snapshot.
 
-Command results preserve request reception, rejection, starting, completion, cancellation, and failure as distinct outcomes. `received → rejected | started → completed | cancelled | failed` is lifecycle notation explaining these distinctions, rather than settled source syntax or a record enum/transition schema. Command IDs and execution identities must match; renderers or callbacks do not infer a separate state machine. Report a gap if bounded history loses records before export. Alarms use both current active status and raise/clear events to preserve brief occurrences. Final command/alarm record serialization and transport belong to the execution environment's observation contract. The language has no separate `command` or `alarm` source declarations or severity keywords. Control responses use explicit typed inputs and state expressions. An explicit external descriptor contract connects which inputs are command requests and which observations are exposed as alarms; do not infer them automatically from names or Bool values alone.
+Command results preserve request reception, rejection, starting, completion, cancellation, and failure as distinct outcomes. `received → rejected | started → completed | cancelled | failed` is lifecycle notation explaining these distinctions, rather than settled source syntax or a record enum/transition schema. Command IDs and execution identities must match; cabinet views or callbacks do not infer a separate state machine. Report a gap if bounded history loses records before export. Alarms use both current active status and raise/clear events to preserve brief occurrences. Final command/alarm record serialization and transport belong to the execution environment's observation contract. The language has no separate `command` or `alarm` source declarations or severity keywords. Control responses use explicit typed inputs and state expressions. An explicit external descriptor contract connects which inputs are command requests and which observations are exposed as alarms; do not infer them automatically from names or Bool values alone.
 
 ### Explanation DAG
 

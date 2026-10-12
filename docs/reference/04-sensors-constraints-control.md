@@ -5,7 +5,7 @@
 
 GhostFlow의 센서 값은 숫자 하나가 아니다. 값의 출처·품질·시각과 fault를 함께 다루며,
 출력은 장치 명령이 아니라 먼저 요청 intent로 계산한다. 지역 제어식, 공유 자원 중재,
-안전 제약, Driver 적용, 물리 feedback을 구분해야 센서 고장이나 여러 control의 경쟁을
+안전 제약, 출력 renderer 적용, 물리 feedback을 구분해야 센서 고장이나 여러 control의 경쟁을
 숨기지 않고 설명할 수 있다.
 
 이 장의 코드 표기는 다음처럼 읽는다.
@@ -441,7 +441,7 @@ temporal consumer는 해당 source/type을 명시적으로 허용하고 선언�
 
 연속 예: 명시적으로 설정한 runtime reference, 같은 model/calibration/binding, 같은 run/time
 epoch와 profile bound 내 gap 없는 qualifying write history가 있으면 선택된 model이 estimate를
-산출할 수 있다. 그 결과는 계속 estimate이며 Driver ACK만으로 실제 움직임을 주장하지 않는다.
+산출할 수 있다. 그 결과는 계속 estimate이며 output renderer ACK만으로 실제 움직임을 주장하지 않는다.
 단절 예: applied-history basis에서는 ACK 없는 요청, 실패하거나 불확실한 새 write, reboot 또는
 identity/revision 변경 뒤 새로 검증된 reference가 생기기 전까지 live estimate가 unavailable이다.
 별도로 선언된 requested-history basis는 그 요청을 추정 가정으로 쓸 수 있지만 applied history로
@@ -550,7 +550,7 @@ sensor/input + 이전 state
   → requested output intent
   → arbitration과 constraints
   → safe/effective intent
-  → Driver가 적용한 command
+  → 출력 renderer가 적용한 command
   → feedback으로 confirmed state
 ```
 
@@ -630,7 +630,7 @@ binding과 enforcement가 없는 shared descriptor를 실행 control이나 enfor
 활성화와 각 평가의 binding은 그 identity와 같아야 한다. missing/mismatch는
 부분 실행이 아니라 평가 거부다. bound 실행의 요청·admission·safe_output은
 동일한 Rust commit 경계에서 검사하며 host의 후처리 출력 filter로 대신하지 않는다.
-논리 enforcement가 physical applied/confirmed나 Driver 안전 순서를 보장하지는 않는다.
+논리 enforcement가 physical applied/confirmed나 출력 renderer 안전 순서를 보장하지는 않는다.
 
 exclusive의 원시 activity 입력은 admission 결과가 아니다. 이미 admit된 activity와
 충돌하는 새 claim은 거부하고 기존 admission과 이전 safe 출력을 보존한다.
@@ -678,7 +678,7 @@ persistence가 ledger의 뜻을 정한다. 지역 Bool 규칙이나 shared admis
 완화하거나 resource binding·provenance·복구 조건을 우회하지 않는다.
 예측 가능한 시작 전 위반은 admission을 거부한다. 실행 중에는 작성한 resource별
 safe 동작을 적용하고 원인과 전이를 남긴다. admission, requested 후보,
-safe_output, Driver applied, feedback confirmed를 결정적인 순서로 구분하며 한 단계의
+safe_output, output renderer applied, feedback confirmed를 결정적인 순서로 구분하며 한 단계의
 증거를 다른 단계의 보장으로 바꾸지 않는다(§4.7).
 정상 evidence의 회복은 새 시작 권한이 아니다. 재시도·복구·수동 경로도 같은 필수 조건을 따른다.
 
@@ -933,7 +933,7 @@ clamp할 수 있다.
 PID requested 92%
 wind safety max 20%
 safe target 20%
-Driver applied 20%
+output renderer applied 20%
 position feedback 17% with provenance
 ```
 

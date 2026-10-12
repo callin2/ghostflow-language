@@ -6,7 +6,7 @@
 [Full contents](../LANGUAGE-REFERENCE.en.md) · [Previous: 3. Time and schedules](03-time-and-schedules.en.md) ·
 [Next: 5. Settings and observation](05-settings-and-observation.en.md)
 
-A GhostFlow sensor value is not a single number. It carries value source, quality, time and faults; output is first calculated as a requested intent, not a device command. Distinguishing local control expressions, shared-resource arbitration, safety constraints, Driver application and physical feedback allows sensor failures and competing controls to be explained without hiding them.
+A GhostFlow sensor value is not a single number. It carries value source, quality, time and faults; output is first calculated as a requested intent, not a device command. Distinguishing local control expressions, shared-resource arbitration, safety constraints, output renderer application and physical feedback allows sensor failures and competing controls to be explained without hiding them.
 
 Read the code notation in this chapter as follows:
 
@@ -297,7 +297,7 @@ history must fit a finite bound declared by the deployment profile. If that boun
 cannot be supported, reject the use; do not retain unbounded history on an MCU.
 
 The first actuator-progress basis is the Device's acknowledged output-register or
-write history. Its acknowledgement means only that the Driver accepted that
+write history. Its acknowledgement means only that the output renderer accepted that
 register/write; it does not prove motor movement or position. Request time may be
 used as a basis only when explicitly declared as requested history. Never
 substitute it for applied history. This follows the requested/safe/applied/
@@ -335,7 +335,7 @@ uncertainty bound; it cannot silently accept unknown uncertainty.
 Continuous example: with an explicit runtime reference, matching model,
 calibration and binding, the same run/time epoch, and a gap-free qualifying write
 history within the profile bound, the selected model may produce an estimate. It
-remains an estimate; a Driver ACK alone does not assert movement. Discontinuous
+remains an estimate; an output renderer ACK alone does not assert movement. Discontinuous
 example: for an applied-history basis, an unacknowledged request, failed or
 uncertain new write, reboot, or identity/revision change makes the live estimate
 unavailable until a reference is validated again. A separately declared
@@ -424,7 +424,7 @@ sensor/input + previous state
   → requested output intent
   → arbitration and constraints
   → safe/effective intent
-  → command applied by Driver
+  → command applied by output renderer
   → state confirmed by feedback
 ```
 
@@ -498,7 +498,7 @@ Activation and each evaluation must provide the same binding identity. Missing
 or mismatched binding rejects evaluation rather than partially executing it.
 Bound requests, admission and safe_output are checked within one Rust commit
 boundary, not by a host filter after output publication. Logical enforcement
-does not guarantee physical applied/confirmed evidence or Driver safe sequencing.
+does not guarantee physical applied/confirmed evidence or output renderer safe sequencing.
 
 Raw exclusive activity inputs are not admission results. Deny new claims that
 conflict with an admitted activity, preserving incumbent admission and previous
@@ -550,7 +550,7 @@ including goals/PID. Priority is an arbitration policy choosing requests within 
 it does not relax mandatory conditions or bypass resource binding, provenance or recovery.
 Predictable prestart violations deny admission. During execution, apply authored resource-
 specific safe behavior and retain the cause and transition. Distinguish admission, requested
-candidate, safe_output, Driver applied and feedback confirmed in deterministic order; evidence
+candidate, safe_output, output renderer applied and feedback confirmed in deterministic order; evidence
 at one stage does not guarantee another (§4.7). Recovery of normal evidence creates no new
 start authority. Retries, recovery and manual paths follow the same mandatory conditions.
 
@@ -742,7 +742,7 @@ Controller output is a requested target. Subsequent arbitration and safety const
 PID requested 92%
 wind safety max 20%
 safe target 20%
-Driver applied 20%
+output renderer applied 20%
 position feedback 17% with provenance
 ```
 

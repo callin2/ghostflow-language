@@ -258,6 +258,8 @@ Host --> Human: TOON 결과 (콘솔 표시 봉투 제외)
 
 ## 물리 Driver와 Device 경계
 
+입력 **driver**는 논리 입력을 생산하고 출력 **renderer**는 논리 출력 의도를 릴레이, 모터, 램프 또는 화면에 적용한다. 이들은 서로 배타적인 장치 종류가 아니라 역할이다. USB force-feedback 조이스틱은 입력 driver와 출력 renderer를 함께 가지며 EC11 인코더와 TFT도 입력·출력 역할을 함께 가진다. 이 예시는 경계 설명이며 구현이 아니다. Driver와 renderer 소스는 `farm-device-drivers`에 속하고 Device는 host/board 통합, binding, 시계, watchdog과 부팅·장애 정책을 소유한다. 캐비닛 운영자 UI는 `@ghostflow/cabinet-view`이며 출력 renderer와 구분한다. 기존 `ScanDriver`, host ABI 식별자와 profile의 `driver` 필드는 이름과 계약을 유지한다.
+
 물리 경로에는 다음 문서에서 정의한 추가 책임이 있다.
 [참조 §8](reference/08-language-runtime-and-device-boundaries.md) 및
 [통합 계약](../contracts/integration-v1/README.md)에 정의되어 있다.
@@ -269,7 +271,7 @@ database "승인된 프로필 + 설치 바인딩" as Profile
 participant "Device 스캔 호스트 / 시계" as Host
 participant "센서 / 입력 드라이버" as Input
 participant "ScanDriver + Rust 런타임" as Core
-participant "물리 출력 드라이버" as Output
+participant "물리 출력 renderer" as Output
 participant "릴레이 / 부하" as Load
 participant "호스트 관측 스트림" as Evidence
 participant "독립 관측" as Observer
@@ -306,7 +308,7 @@ else 성공한 스캔 (제약 고장이 있을 수 있음)
     Host -> Host: 중지: running=false; 고장; 어댑터 실시간 출력 제거
     Host -> Evidence: 중지/고장 관측 게시
     note over Host,Output
-      다음 펌웨어 루프는 같은 드라이버로 OFF를 요청한다.
+      다음 펌웨어 루프는 같은 renderer로 OFF를 요청한다.
       확인되기 전까지 OFF가 적용되었다고 간주하지 않는다.
       고장 상태에서는 재개를 거부하며 재배포가 필요하다.
     end note
@@ -317,7 +319,7 @@ else 성공한 스캔 (제약 고장이 있을 수 있음)
   end
   note over Host,Core
     코어 상태는 출력 적용 전에 이미 커밋되었다.
-    드라이버 실패는 ScanDriver를 통해 해당 스캔을 롤백하지 않는다.
+    renderer 실패는 ScanDriver를 통해 해당 스캔을 롤백하지 않는다.
     Device 중지 정책은 구현되어 있으며 커밋된 코어 상태를 보존한다.
   end note
 end
@@ -329,9 +331,9 @@ end
 이 다이어그램은 소유 계약과 현재 `farm-device` 펌웨어 오류 경로를 함께 나타낸다.
 이는 `ghostsim` 연결이나 하드웨어 검증이 아니다. 독립적인 물리 확인은 계약 경계다.
 현재 펌웨어 관측은 의도, 적용 쓰기와 레지스터 래치만 보고하며 릴레이 접점이나
-부하 피드백은 없다. Device는 펌웨어, 물리 드라이버, 승인된 보드 프로필, 시계,
+부하 피드백은 없다. Device는 펌웨어, driver/renderer host와 board 통합, 승인된 보드 프로필, 시계,
 워치독과 부팅/오류 시 출력 처리를 소유한다. 설치 바인딩은 각 논리 포트의 실제
-엔드포인트를 선택한다. 논리 안전 의도, 드라이버가 적용한
+엔드포인트를 선택한다. 논리 안전 의도, renderer가 적용한
 출력, 레지스터 판독값과 물리 확인은 서로 다른 증거로 유지된다. 통합 검증기는
 제공된 식별자와 매핑을 검사하지만 이를 설치하거나 I/O를 수행하지 않는다.
 

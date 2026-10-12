@@ -29,9 +29,12 @@ when they change execution semantics.
 - The API host owns LLM requests, installation context, conversation history,
   source revision storage, and deployment orchestration. An LLM authors a complete
   GhostFlow candidate; this compiler validates it without an LLM or an API service.
-- The Device repository owns firmware, board profiles, pin mappings, drivers,
+- The Device repository owns firmware, board profiles, pin mappings, driver/renderer integration,
   watchdogs, clocks, and physical I/O. Consume the portable core at an explicit
   revision; changes here do not imply a Device release or hardware verification.
+  Input driver and output renderer source belongs in `farm-device-drivers`.
+  Renderers apply logical outputs to relays, motors, lamps or screens; cabinet
+  UI is `@ghostflow/cabinet-view`. Device owns host/board integration.
 - The frontend owns farmer interaction and visualization. Installation labels,
   capabilities and bindings are external context. Executable rules belong in
   versioned GhostFlow source and its compiled artifacts, not a second JSON program.

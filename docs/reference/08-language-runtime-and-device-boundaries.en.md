@@ -9,7 +9,7 @@ This chapter classifies requirements from the [Coding FAQ](../language_faq.md) b
 
 ## 8.1 Classification principle: meaning and execution means
 
-**The language defines what a program means; the runtime makes decisions according to that meaning.** Drivers and execution environments supply the facts and time needed for decisions and apply output effects. Whether an operation runs inside a VM or is computed in a host adapter is separate from ownership of its meaning.
+**The language defines what a program means; the runtime makes decisions according to that meaning.** Input drivers and execution environments supply facts and time needed for decisions; output renderers apply output effects. Whether an operation runs inside a VM or is computed in a host adapter is separate from ownership of its meaning.
 
 For example, “start once every day at local time 6 a.m.” is language schedule semantics. Where clocks and time-zone data come from belongs to the execution environment. Even when adapters supply schedule occurrences, deduplication, missed observations, and DST policies follow the same language contract. Screens and Drivers do not reinterpret starting conditions through separate rules.
 
@@ -21,15 +21,18 @@ User-selected policies are also distinguished. Which device moves after cancella
 
 ## 8.2 Layer responsibilities
 
+Input **drivers** produce logical inputs; output **renderers** apply logical output intent to relays, motors, lamps or screens. These are roles, not mutually exclusive device classes. A USB force-feedback joystick has an input driver and an output renderer; an EC11 encoder with TFT similarly combines input and output roles. These examples define boundaries, not implementations. Driver and renderer source belongs in `farm-device-drivers`; Device owns host/board integration, bindings, clocks, watchdogs and boot/failure policy. The cabinet operator UI is `@ghostflow/cabinet-view` and is distinct from an output renderer. Existing `ScanDriver`, host ABI identifiers and profile `driver` fields retain their names and contracts.
+
+
 | Layer | Required responsibilities | Boundary with other layers |
 |---|---|---|
 | Language specification | Meaning of types, state transitions, time, errors, settings, output intentions; resource bounds and failure rules | Do not turn device addresses, UI appearance, or storage media into control syntax. |
 | Compiler/tools | Interpret canonical documents; check types, names, branches; transform to executable representations; preserve declaration, intent, and settings descriptions | Static type checks alone do not prove physical wiring or actual operation. |
 | Control runtime | Evaluate state, expressions, timers, constraints from input snapshots and commit results atomically; retain execution positions of settings events and observations | Do not arbitrarily add program policy or treat outputs as physical confirmation. |
 | Execution environment/data providers | Clocks and trust, date/natural-event data, execution lifetimes, persistence/restoration of settings, checkpoints, installation records | Expose supplied data revisions, scope, validity, and failures. Do not create a separate control language. |
-| Driver | Device communication, raw-signal interpretation/normalization, sample identity/time/quality, output application results, physical outputs at boot/failure | Do not hide control sequences, interlocks, or date policies outside source. |
+| Input driver / output renderer | Input driver: device communication, raw-signal interpretation/normalization, sample identity/time/quality. Output renderer: logical output application and application results under Device boot/failure policy | Do not hide control sequences, interlocks, or date policies outside source. |
 | Installation profile/binding | Logical-role to actual-endpoint connections, compatibility such as capability/polarity/range, installation revision | Distinguish connection-only changes from source-rule changes. |
-| UI/renderer | Edit/display using described types, labels, ranges, permissions; submit typed requests; display results and errors | Do not regenerate control meaning through separate timers, aggregation, or constraint decisions. |
+| Cabinet view / UI | Edit/display using described types, labels, ranges, permissions; submit typed requests; display results and errors | Do not regenerate control meaning through separate timers, aggregation, or constraint decisions. |
 
 Here, **execution environment (host) means the device or process that executes the control program**. It does not require an Android gateway or cloud. A device with necessary clocks and valid data locally can fulfill the contract without Internet access. Network disconnection, data expiry, and unknown time are distinct states.
 
@@ -39,7 +42,7 @@ Rationale: [§1.1 Canonical source](01-source-and-syntax.md#11-왜-문서-하나
 
 This table assigns FAQ 1–41 to rows. “Required” means contractual responsibility, rather than implementation status. Shared Driver/UI responsibilities follow §8.2; each row lists external responsibilities important to that requirement.
 
-| FAQ and requirement | Language/compiler requirements | Runtime requirements | Execution environment/Driver/installation/UI requirements |
+| FAQ and requirement | Language/compiler requirements | Runtime requirements | Execution environment/driver/renderer/installation/UI requirements |
 |---|---|---|---|
 | [1](../language_faq.md#q01), [41](../language_faq.md#q41) Canonical document/compiler tools | Literate interpretation, preservation and validation of source/intent locations (§1) | Execute identified Program | Tools retain and deliver complete documents/revisions; distinguish compile checking from physical behavior verification |
 | [2](../language_faq.md#q02), [3](../language_faq.md#q03), [18](../language_faq.md#q18) Buttons/self-holding | Bool, previous/next state (§2.8) | Evaluate and commit authored restart conditions from snapshots | Driver supplies pressed meaning; connect actual buttons or explicit software inputs |
@@ -48,17 +51,17 @@ This table assigns FAQ 1–41 to rows. “Required” means contractual responsi
 | [9](../language_faq.md#q09), [10](../language_faq.md#q10) Sensor conditions/tank control | Result, thresholds, filters, hysteresis, state (§4.1–4.3) | Identify new samples; evaluate freshness, recovery, filter state | Driver supplies values, units, sample times, quality |
 | [11](../language_faq.md#q11) Counts | Exact integers, previous input state, conditions (§2.3, §2.8) | Preserve authored edge, limit, initialization expressions and integer-error semantics | Input producer supplies observable events; do not count a long pulse's ticks as event count |
 | [13](../language_faq.md#q13) Alarm holding | Bool state/conditions; public alarm meaning is separate (§5.3) | Evaluate authored latch/reset expressions; preserve raise/clear meaning of explicit alarms | UI displays alarm state; notification/record media are external choices |
-| [14](../language_faq.md#q14), [17](../language_faq.md#q17) Interlocks | require/mutual exclusion, distinction between state and output restriction (§4.7) | requested→safe decisions | Driver/installation own actual effects and feedback; logical constraints are not physical emergency-stop devices |
+| [14](../language_faq.md#q14), [17](../language_faq.md#q17) Interlocks | require/mutual exclusion, distinction between state and output restriction (§4.7) | requested→safe decisions | Output renderer applies effects; input driver supplies feedback; logical constraints are not physical emergency-stop devices |
 | [16](../language_faq.md#q16) Computational reuse | Pure functions, types, name scopes (§2.7) | Same computation for the same inputs | Do not put device access or hidden state in pure functions |
 | [7](../language_faq.md#q07), [15](../language_faq.md#q15), [20](../language_faq.md#q20) Clock-time/sunrise schedules | DailySlots/Solar, offsets, separation of occurrence and operation (§3.5–3.9) | Contractual occurrence handling/deduplication and operating timers | Supply clocks, location, time zones, natural-event data; preserve occurrence records |
 | [21](../language_faq.md#q21), [27](../language_faq.md#q27)–[29](../language_faq.md#q29) Weekdays/holidays/DST | Date filters/conditions, gap/fold and Unknown semantics (§3.8) | Apply the same date decisions and admission policies | Supply calendar/time-zone data, revisions, coverage; display selectable settings in UI |
 | [30](../language_faq.md#q30), [31](../language_faq.md#q31) Tides/moon | Type distinction between timed events and interval conditions, offsets/fallback (§3.9) | Preserve event IDs, revisions, omissions, ongoing-operation semantics | Prediction provider supplies station/model, revision, coverage, expiry, stable event IDs |
 | [22](../language_faq.md#q22), [23](../language_faq.md#q23) Accumulated duration/daily cleaning | Aggregation subject/period, exact counts, state/enum (§3.4, §3.10) | Evaluate authored cleaning conditions/sequences with valid aggregation snapshots | Environment updates, stores, restores ledger using common installation identity and applied/confirmed evidence; author policies in §8.6 |
 | [12](../language_faq.md#q12), [24](../language_faq.md#q24), [26](../language_faq.md#q26) Duration/range changes | config type/default/min/max/step/access and descriptor (§5.1–5.2) | Whole-request validation/atomic live application; preserve state/timers | UI submits typed requests; execution boundary checks permission; environment persists ordinary settings |
-| [25](../language_faq.md#q25) Labels/input UI | label and semantic metadata (§5.1, §5.3) | Supply effective values, revisions, rejection outcomes | Renderer selects time fields, lists, sliders; same validation on all paths |
-| [32](../language_faq.md#q32) Power-outage recovery | Initial values, state transitions, execution identity (§2.8, §5.2) | New run; specified initialization/restoration and authored resume-condition evaluation | Environment supplies checkpoints/restart causes; Driver manages outputs before first decision |
+| [25](../language_faq.md#q25) Labels/input UI | label and semantic metadata (§5.1, §5.3) | Supply effective values, revisions, rejection outcomes | Cabinet view selects time fields, lists, sliders; same validation on all paths |
+| [32](../language_faq.md#q32) Power-outage recovery | Initial values, state transitions, execution identity (§2.8, §5.2) | New run; specified initialization/restoration and authored resume-condition evaluation | Environment supplies checkpoints/restart causes; Device output policy and renderer manage outputs before first decision |
 | [33](../language_faq.md#q33)–[36](../language_faq.md#q36) Sensor replacement/lifecycle/specification | Logical device contracts; retain Program on compatible replacement (§6.2–6.3) | Evaluate contract-compliant inputs through the same rules | Manage Driver changes, installation binding revisions, compatibility; 36 is rationale for principles, not new syntax |
-| [37](../language_faq.md#q37)–[40](../language_faq.md#q40) GPIO/relays/expanded I/O | Logical ports independent of device locations (§6.2–6.3) | Preserve input/safe output contracts | Driver handles buses, addresses, channels, polarity, failures; binding selects actual endpoints |
+| [37](../language_faq.md#q37)–[40](../language_faq.md#q40) GPIO/relays/expanded I/O | Logical ports independent of device locations (§6.2–6.3) | Preserve input/safe output contracts | Driver/renderer handles its role’s buses, addresses, channels, polarity, failures; binding selects actual endpoints |
 
 Range notation includes all FAQs in the interval. For example, 27–29 means 27, 28, and 29. Related chapters: [2](02-types-expressions-state.md), [3](03-time-and-schedules.md), [4](04-sensors-constraints-control.md), [5](05-settings-and-observation.md), [6](06-composition-and-replay.md).
 
@@ -78,7 +81,7 @@ The language distinguishes monotonic time and local dates and defines DST, fallb
 
 ### Accumulated usage and persistent storage
 
-Language contracts specify what is counted (requested/safe/applied/confirmed), scope and date boundaries, initialization, and unknown status. Internal control edge counters can be computed with ordinary state. Persistent installation ledgers spanning controls and modes are updated, stored, and restored by execution-environment providers using stable installation identity and Driver application/confirmation evidence; they supply identified aggregation snapshots to the control runtime. Pure aggregation computation inside providers also follows the same language contract; storage media do not change aggregation meaning. One device's usage differs from adding its automatic and manual control requests. Do not substitute accumulated screen-on time for installation usage.
+Language contracts specify what is counted (requested/safe/applied/confirmed), scope and date boundaries, initialization, and unknown status. Internal control edge counters can be computed with ordinary state. Persistent installation ledgers spanning controls and modes are updated, stored, and restored by execution-environment providers using stable installation identity and renderer application and input-driver confirmation evidence; they supply identified aggregation snapshots to the control runtime. Pure aggregation computation inside providers also follows the same language contract; storage media do not change aggregation meaning. One device's usage differs from adding its automatic and manual control requests. Do not substitute accumulated screen-on time for installation usage.
 
 **Why:** Temporary execution memory and installation records that must survive restart have different lifetimes. Rationale: [§3.4](03-time-and-schedules.md#34-누적-시간과-rolling-budget), [§3.10](03-time-and-schedules.md#310-시간-기반-사용량-제약).
 
@@ -104,7 +107,7 @@ Compiled Programs use logical roles. Direct GPIO, expanded channels, and RS485 d
 | Internal state/timer/filter memory | Language execution semantics | Updated during execution; restart restoration requires explicit policy and checkpoint contract |
 | Schedule deduplication records/installation usage | Language installation-record contract and execution environment | Lifetime independent of ordinary state initialization/source replacement; no initialization without a contract |
 | Calendar/tide prediction data | Provider and consuming temporal contract | Retain data revisions, coverage, expiry, and event identity |
-| Label declarations / component appearance | Source metadata / renderer | Label source edits change document revisions; screen appearance does not change control meaning |
+| Label declarations / component appearance | Source metadata / cabinet view | Label source edits change document revisions; screen appearance does not change control meaning |
 
 This distinction does not determine file counts. Independently of `.ghost.md` being canonical source, installation information, settings overrides, and execution-record storage formats belong to the environment. Do not treat firmware updates, Driver updates, Program replacement, and settings changes as the same kind of update.
 
@@ -148,7 +151,7 @@ Rationale: [§2.3](02-types-expressions-state.md#23-정확한-정수-설계), [�
 2. If it adds meaning that must be identical across execution environments, state the language contract and Why explicitly.
 3. Identify producers, validity, errors, and revisions for every time, sensor, calendar, prediction, and aggregation input.
 4. Separate runtime memory from records to preserve after restart.
-5. Connect actual device connections/output effects through Driver and binding contracts.
+5. Connect actual device connections/output effects through driver/renderer and binding contracts.
 6. Give UI descriptors and observations with the same meaning and leave display/input methods to it.
 
 **Decision criterion:** Given the same Program, inputs, logical time, settings events, and starting state, the same control decision must be explainable. If device or UI kinds introduce hidden differences in that decision, the boundary between language semantics and environmental responsibilities is insufficiently defined. Rationale: [§6.8 Replay](06-composition-and-replay.md#68-replay-ghost와-branch), [§7 Semantic preservation](07-semantic-rules-and-index.md).
