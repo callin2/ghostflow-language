@@ -1,0 +1,86 @@
+{
+  "repo": "ghostflow-language",
+  "head": "8cfd94f65da6aea45c480638c81a163c6cab4de9",
+  "source": "Windows local source; restored through originalTag",
+  "branch": "ci/bounded-verification-speed",
+  "review": "isolated owner-repository comparison checkout",
+  "base": "d7bc140ee214745661ebccd1197eb7cbf3035ec0",
+  "mergeBase": "c342c309ac4ee9b2d02c3b52c6493455967a017c",
+  "changed": [
+    ".github/workflows/verified-wasm.yml",
+    "tests/ci-verification-routing.test.mjs",
+    "tests/cli-process.test.mjs",
+    "tests/compiler-cli-diagnostics.test.mjs",
+    "tests/helpers/cli-process.mjs",
+    "tests/reference-cli.test.mjs",
+    "tools/verify-language.mjs"
+  ],
+  "overlap": [
+    ".github/workflows/verified-wasm.yml",
+    "tests/ci-verification-routing.test.mjs",
+    "tests/cli-process.test.mjs",
+    "tests/compiler-cli-diagnostics.test.mjs",
+    "tests/helpers/cli-process.mjs",
+    "tests/reference-cli.test.mjs",
+    "tools/verify-language.mjs"
+  ],
+  "adoption": "not-adopted; reference-only",
+  "originalTag": "codex/windows-original-bounded-cli-ci-20261014",
+  "archiveBranch": "codex/windows-history-bounded-cli-ci-20261014",
+  "issues": [
+    544
+  ],
+  "credentialPatternHits": 0,
+  "commitBlobsScanned": 7,
+  "snapshots": [
+    {
+      "sourcePath": ".github/workflows/verified-wasm.yml",
+      "archivePath": "history/windows-20261014/bounded-cli-ci/snapshots/.github/workflows/verified-wasm.yml.txt",
+      "gitBlob": "0a16ad02b67fc07d8c06cfeb0d7627bf7a73fe15",
+      "sha256": "ae3d9f99e11b0af94791438cf31500d2678a375c20aed405f7810c73ae294a22",
+      "size": 8137
+    },
+    {
+      "sourcePath": "tests/ci-verification-routing.test.mjs",
+      "archivePath": "history/windows-20261014/bounded-cli-ci/snapshots/tests/ci-verification-routing.test.mjs.txt",
+      "gitBlob": "cf00283ee9065fed2c0c148739cd3990dcec08d8",
+      "sha256": "3b9dd32953be6de4afa0da2697df9619dbb0457af0b6fbc0ef1294eadeac6c37",
+      "size": 10135
+    },
+    {
+      "sourcePath": "tests/cli-process.test.mjs",
+      "archivePath": "history/windows-20261014/bounded-cli-ci/snapshots/tests/cli-process.test.mjs.txt",
+      "gitBlob": "988a9231697a68bec80a207d8d5410cdea693dfd",
+      "sha256": "e55e809d7eabfd2bed15ad14813321f7992e40a59bf37e8917e435a917e5dadc",
+      "size": 1203
+    },
+    {
+      "sourcePath": "tests/compiler-cli-diagnostics.test.mjs",
+      "archivePath": "history/windows-20261014/bounded-cli-ci/snapshots/tests/compiler-cli-diagnostics.test.mjs.txt",
+      "gitBlob": "a1575cc4752a5834f12323b9a35e7ec211373067",
+      "sha256": "297327e2ed3f5cafd60e2094dbbba66982ff788a3cc23a853a0cada8929034fe",
+      "size": 3882
+    },
+    {
+      "sourcePath": "tests/helpers/cli-process.mjs",
+      "archivePath": "history/windows-20261014/bounded-cli-ci/snapshots/tests/helpers/cli-process.mjs.txt",
+      "gitBlob": "012120914dba005b008d2fab191ddd2baff2bbc7",
+      "sha256": "41ccecc59b72c8ae59deccfac2062013a8bcb9e88813a57ffc40afc944d7c39d",
+      "size": 1054
+    },
+    {
+      "sourcePath": "tests/reference-cli.test.mjs",
+      "archivePath": "history/windows-20261014/bounded-cli-ci/snapshots/tests/reference-cli.test.mjs.txt",
+      "gitBlob": "38ddb0b7085ccb59c1e964ec8d83760dfa8f936d",
+      "sha256": "2dd035efb138bafa4a64516017b60d6d810353a1571b46edfa9d23cde15318f5",
+      "size": 15330
+    },
+    {
+      "sourcePath": "tools/verify-language.mjs",
+      "archivePath": "history/windows-20261014/bounded-cli-ci/snapshots/tools/verify-language.mjs.txt",
+      "gitBlob": "2a8d542fed7d9e3ccbb4be7b341a8f7813b388ca",
+      "sha256": "65c1a263c744cd2a74e3d88a8699c3e01e7f66aa0e9adc400d20c3b6621093eb",
+      "size": 22333
+    }
+  ]
+}
