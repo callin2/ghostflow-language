@@ -1,0 +1,28 @@
+Windows uncommitted source preservation — 2026-10-14
+
+Owner: callin2/ghostflow-language; baseline origin/dev d7bc140ee214745661ebccd1197eb7cbf3035ec0.
+Original source HEAD: 9155047e9dec4a1ede6a53e67d178c5c212b08ff. Original HEAD has its independent remote restore
+path; this archive supplies the local uncommitted source delta.
+Decision: NOT ADOPTED. Old GFB14/UTC Window and Run compiler/runtime attempt. Current dev has later canonical input/runtime architecture. Preserve the incomplete local delta as reference only; do not revive superseded raw-source or compatibility paths.
+
+6 exact source files are retained only as .txt snapshots. Source bytes,
+Git blob and SHA256 identities are recorded; active source/AGENTS/workflows/pins
+remain byte-identical to baseline. Existing acceptance issues:
+https://github.com/callin2/ghostflow-language/issues/153
+Central cleanup: https://github.com/callin2/farm_studio_system/issues/206
+
+Verification is structural preservation only: original file hash recheck, archive
+tree-only diff, remote branch SHA and blob/SHA256 readback. No tests, compiler,
+LLM, build, allocator, firmware, flash/serial, service, dev merge or deployment
+was run. Historical execution claims are not fresh evidence. Source overlap
+and semantic compatibility require separate owner review before adoption.
+
+Generated fixture disposition: null
+Restore the source version from MANIFEST, compare it with current dev, and use
+snapshots as evidence; do not run source from this history directory. Root
+deletion remains disallowed because private/ignored data and SDK/artifact
+provenance still need disposition. Original bytes/worktrees are unchanged.
+
+Publication receipt: history/windows-20261014/utc-window-run-uncommitted/PUBLICATION.json
+Archive commit: https://github.com/callin2/ghostflow-language/commit/dd2ff77cc6c83caab965ab09fe1cf3e50b935cc1
+Issue comments: https://github.com/callin2/ghostflow-language/issues/153#issuecomment-6154676582
