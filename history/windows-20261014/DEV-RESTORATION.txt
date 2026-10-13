@@ -1,0 +1,26 @@
+Windows local-work recovery available from dev checkout
+Date: 2026-10-14
+This index preserves source/history; it does not adopt experimental code or authorize deployments.
+Latest dev parent: d7bc140ee214745661ebccd1197eb7cbf3035ec0
+Owning repository: callin2/ghostflow-language
+
+Verified historical sources:
+- codex/windows-history-reference-diagnostic-conformance-20261014 @ 5828228fdc424469a9aff239a22c0430e801cf03
+  https://github.com/callin2/ghostflow-language/blob/5828228fdc424469a9aff239a22c0430e801cf03/history/windows-20261014/reference-diagnostic-conformance/REPORT.txt
+- codex/windows-history-bounded-cli-ci-20261014 @ 435e031a183efc01ffe938e88935bcdc4fbe8114
+  https://github.com/callin2/ghostflow-language/blob/435e031a183efc01ffe938e88935bcdc4fbe8114/history/windows-20261014/bounded-cli-ci/REPORT.txt
+- codex/windows-history-utc-window-run-uncommitted-20261014 @ 32c96e845664e5611dad0b056f36ab60525d0993
+  https://github.com/callin2/ghostflow-language/blob/32c96e845664e5611dad0b056f36ab60525d0993/history/windows-20261014/utc-window-run-uncommitted/REPORT.txt
+
+Restore original experiment: git fetch origin --tags, fetch named preservation/recovery branch and inspect its original tag/manifest.
+Keep dependency exact pins separate from sibling dev heads. Drivers original 640a696ba012f2a7bcd2e92c8033f6c3605b5bf5 is remotely preserved for experiments that reference it; current dev integration still needs review.
+Non-executable snapshots end in .txt, adoption is NOT ADOPTED. Do not copy historical AGENTS/workflows/catalogs or run maintenance methods as current instructions.
+No secrets, raw conversations, DB dumps, physical device backups or unreviewed runtime records are added.
+Validation: latest dev base; archive source Git blob identity; active code unchanged; remote branch SHA and published tree IDs verified. No behavioral/LLM/device acceptance claimed.
+
+Exact API-pinned runtime retained before CI expiry
+Source 81f253235ac3966433bee7fec9dd3fcd8c186ff1; tag ghostflow-runtime-81f2532; SHA-256 1a0011c8cb5a77501026bc86b0823e3df59211cf51754769fad5dd527cdaff08.
+Draft release: https://github.com/callin2/ghostflow-language/releases/tag/untagged-a4f7b29fdfee68ac4355
+Authenticated gh release download works; remote binary hash verified. Original public CI artifact 11160739382 (run 36860998138), not rebuilt. Only WASM, original manifest and curated provenance uploaded; unreviewed verification log excluded. Draft storage is not public publication/device acceptance. API package suite: 25 passed, no live DB/LLM/device use.
+API evidence: https://github.com/callin2/farm_studio_api/blob/72f357cfddbd68d4c793a9f591e93c3335054689/history/windows-20261014/API-DEV-RESTORATION.md
+System tracking: https://github.com/callin2/farm_studio_system/issues/217
