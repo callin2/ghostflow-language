@@ -24,3 +24,14 @@ Draft release: https://github.com/callin2/ghostflow-language/releases/tag/untagg
 Authenticated gh release download works; remote binary hash verified. Original public CI artifact 11160739382 (run 36860998138), not rebuilt. Only WASM, original manifest and curated provenance uploaded; unreviewed verification log excluded. Draft storage is not public publication/device acceptance. API package suite: 25 passed, no live DB/LLM/device use.
 API evidence: https://github.com/callin2/farm_studio_api/blob/72f357cfddbd68d4c793a9f591e93c3335054689/history/windows-20261014/API-DEV-RESTORATION.md
 System tracking: https://github.com/callin2/farm_studio_system/issues/217
+
+
+2026-10-14 user-approved dev merge completed
+PR: https://github.com/callin2/ghostflow-language/pull/546
+Merged commit: d2d40f6028b1c06ff323976002fd1cb6e3e34b67
+Verified remote dev at merge: d2d40f6028b1c06ff323976002fd1cb6e3e34b67
+Original candidate f8b5945dc4e8dd54d793ebab4a86e535958409fe is reachable from dev. Exact prior source commits and preservation/recovery refs are retained; no squash or branch deletion.
+Verification: Language run 38485711354: source/WASM, coverage, frontend-pin and final result SUCCESS; local docs checks passed.
+Documentation receipt changes no runtime source or dependency pin. No service deployment, physical action, runtime release publication or project deletion performed.
+A fresh owning-repository dev clone now includes this restoration entry point. Historical conflicts remain NOT ADOPTED. API runtime stays authenticated draft storage; private credentials/data are separately retained and excluded.
+Tracking: https://github.com/callin2/farm_studio_system/issues/217
