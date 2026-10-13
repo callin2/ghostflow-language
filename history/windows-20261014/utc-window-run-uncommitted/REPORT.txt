@@ -22,3 +22,7 @@ Restore the source version from MANIFEST, compare it with current dev, and use
 snapshots as evidence; do not run source from this history directory. Root
 deletion remains disallowed because private/ignored data and SDK/artifact
 provenance still need disposition. Original bytes/worktrees are unchanged.
+
+Publication receipt: history/windows-20261014/utc-window-run-uncommitted/PUBLICATION.json
+Archive commit: https://github.com/callin2/ghostflow-language/commit/dd2ff77cc6c83caab965ab09fe1cf3e50b935cc1
+Issue comments: https://github.com/callin2/ghostflow-language/issues/153#issuecomment-6154676582

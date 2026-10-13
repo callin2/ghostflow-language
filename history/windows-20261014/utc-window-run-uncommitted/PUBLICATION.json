@@ -1,0 +1,11 @@
+{
+  "sourceCommitUrl": "https://github.com/callin2/ghostflow-language/commit/9155047e9dec4a1ede6a53e67d178c5c212b08ff",
+  "archiveCommitUrl": "https://github.com/callin2/ghostflow-language/commit/dd2ff77cc6c83caab965ab09fe1cf3e50b935cc1",
+  "originalTag": "already-existing remote original HEAD restoration path",
+  "baseline": "d7bc140ee214745661ebccd1197eb7cbf3035ec0",
+  "issueComments": [
+    "https://github.com/callin2/ghostflow-language/issues/153#issuecomment-6154676582"
+  ],
+  "verification": "Full original tag/branch remote SHA and snapshot blob/SHA256 equality; base active tree preserved; source/adoption tests not run.",
+  "adoption": "not-adopted; reference-only"
+}
