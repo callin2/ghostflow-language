@@ -35,3 +35,7 @@ For reference evidence: git fetch origin codex/windows-history-bounded-cli-ci-20
 Never infer adoption from restored history. Original worktrees are unchanged and
 are not approved for deletion: ignored/unknown artifacts and other worker state
 still require disposition. Active shared Device/Drivers paths remain protected.
+
+Publication receipt: history/windows-20261014/bounded-cli-ci/PUBLICATION.json
+Archive commit: https://github.com/callin2/ghostflow-language/commit/96433074fc5637dff6858455f4666ff8bd7e7f4c
+Issue comments: https://github.com/callin2/ghostflow-language/issues/544#issuecomment-6154588993
