@@ -782,8 +782,8 @@
       "source": "README.md",
       "sourceLanguage": "en",
       "translation": "README.ko.md",
-      "sourceSha256": "1d7192ab055955f0152f079c830986463ceee2f10813d9b3f20823cad87d6959",
-      "translationSha256": "77dce46e6c6d6dee565b2f125d311f3034fadf042ae07a5e12df388b23b85d8e"
+      "sourceSha256": "1b2b6cf6736f22d3a76210fd4c13a18357c5fb65e1b04867dbffdf074bc31c0f",
+      "translationSha256": "523167d00c1f72bc207825d44eef348f436aecff18e0ba33e34078ee1cbde431"
     },
     {
       "source": "runtimes/wasm/README.md",
