@@ -1,0 +1,30 @@
+import pathlib, subprocess, json, hashlib, base64
+root=pathlib.Path.cwd(); out=root/'docs/dev-workspace-2026-10-14'; candidate=out/'runtime-candidate'
+repo='callin2/ghostflow-language'; revision='81f253235ac3966433bee7fec9dd3fcd8c186ff1'; tag='ghostflow-runtime-81f2532'; digest='1a0011c8cb5a77501026bc86b0823e3df59211cf51754769fad5dd527cdaff08'
+def run(args):
+ p=subprocess.run(args,capture_output=True); assert p.returncode==0,p.stderr.decode(errors='replace'); return p.stdout
+manifest=json.loads((candidate/'manifest.json').read_text()); assert manifest['source']['commit']==revision
+assert hashlib.sha256((candidate/'ghostflow_wasm.wasm').read_bytes()).hexdigest()==digest
+workflows=json.loads(run(['gh','api',f'repos/{repo}/contents/.github/workflows?ref=dev']))
+for item in workflows:
+ text=base64.b64decode(json.loads(run(['gh','api',item['url']]))['content']).decode()
+ (out/item['name']).write_text(text,encoding='utf8')
+ assert '\n  release:' not in text and '\n  create:' not in text and '\n    tags:' not in text, item['name']
+provenance={'source_repository':repo,'source_revision':revision,'binary_sha256':digest,'bytes':628938,'ci_run_url':'https://github.com/callin2/ghostflow-language/actions/runs/36860998138','ci_artifact_id':11160739382,'ci_artifact_expires_at':'2026-10-15T12:22:45Z','preservation_date':'2026-10-14','status':'DRAFT preservation only; no source adoption, deployment or published release','verification_report':'Original verification.json is not reuploaded; its digest and language-host scope remain in the original manifest. This does not establish device/API/LLM acceptance.'}
+(candidate/'preservation-provenance.json').write_text(json.dumps(provenance,indent=2)+'\n',encoding='utf8')
+notes=out/'runtime-release-notes.txt';notes.write_text('Exact API-pinned runtime preserved from the existing successful public source CI artifact before its short retention expires.\nSource: '+revision+'\nSHA-256: '+digest+'\nCI: '+provenance['ci_run_url']+'\n\nDRAFT storage only. No source rebuild, API pin update, service deployment or device activation. Original CI manifest is retained. Unreviewed verification logs are not uploaded; manifest references their original hash. Related: https://github.com/callin2/farm_studio_system/issues/217\n',encoding='utf8')
+probe=subprocess.run(['gh','api',f'repos/{repo}/git/ref/tags/{tag}'],capture_output=True)
+if probe.returncode:
+ assert b'404' in probe.stderr or b'Not Found' in probe.stderr
+ run(['gh','api','--method','POST',f'repos/{repo}/git/refs','-f','ref=refs/tags/'+tag,'-f','sha='+revision])
+else: assert json.loads(probe.stdout)['object']['sha']==revision
+probe=subprocess.run(['gh','release','view',tag,'--repo',repo,'--json','isDraft,assets,url'],capture_output=True)
+if probe.returncode:
+ run(['gh','release','create',tag,'--repo',repo,'--verify-tag','--draft','--title','Preserved pinned runtime 81f2532','--notes-file',str(notes),str(candidate/'ghostflow_wasm.wasm'),str(candidate/'manifest.json'),str(candidate/'preservation-provenance.json')])
+else: assert json.loads(probe.stdout)['isDraft']
+release=json.loads(run(['gh','release','view',tag,'--repo',repo,'--json','isDraft,assets,url']));assert release['isDraft']; assert any(x['name']=='ghostflow_wasm.wasm' for x in release['assets'])
+readback=out/'runtime-release-readback';readback.mkdir(exist_ok=True)
+run(['gh','release','download',tag,'--repo',repo,'--pattern','ghostflow_wasm.wasm','--dir',str(readback)])
+assert hashlib.sha256((readback/'ghostflow_wasm.wasm').read_bytes()).hexdigest()==digest
+result={**provenance,'tag':tag,'release':release,'remote_download_sha256':digest,'remote_tag_sha_verified':revision}
+(out/'RUNTIME-PRESERVATION.json').write_text(json.dumps(result,indent=2)+'\n'); print(json.dumps(result))
