@@ -1,0 +1,11 @@
+{
+  "sourceCommitUrl": "https://github.com/callin2/ghostflow-language/commit/0227df72a80d1a7a9683c43f831e388858bbe2b8",
+  "archiveCommitUrl": "https://github.com/callin2/ghostflow-language/commit/8f1eeca41215a22b0a4e39389501bd0980d3c351",
+  "originalTag": "codex/windows-original-reference-diagnostic-conformance-20261014",
+  "baseline": "d7bc140ee214745661ebccd1197eb7cbf3035ec0",
+  "issueComments": [
+    "https://github.com/callin2/ghostflow-language/issues/311#issuecomment-6154611490"
+  ],
+  "verification": "Full original tag/branch remote SHA and snapshot blob/SHA256 equality; base active tree preserved; source/adoption tests not run.",
+  "adoption": "not-adopted; reference-only"
+}
