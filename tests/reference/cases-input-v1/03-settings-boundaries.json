@@ -284,7 +284,7 @@
       "id": "REF-05-019",
       "issue": "https://github.com/callin2/ghostflow-language/issues/280",
       "references": [
-        "05-settings-and-observation.md#53-renderer-독립-관찰-모델"
+        "05-settings-and-observation.md#53-cabinet-view-독립-관찰-모델"
       ],
       "rule": "renderer는 widget 선택과 무관하게 descriptor의 타입, 권한, 검증을 보존해야 한다.",
       "scope": "renderer",
