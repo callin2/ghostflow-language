@@ -277,10 +277,16 @@ input restart_reason: RestartReason;
 동안 고정된다. 자동 재개, 대기, 취소 후 원위치 이동은 작성자가 state 전이로 정한다.
 첫 판단 전 물리 출력은 Device 설치 정책과 출력 renderer가 소유한다.
 
-<a id="53-renderer-독립-관찰-모델"></a>
-<a id="53-renderer-independent-observation-model"></a>
+
+
 
 ## 5.3 cabinet-view 독립 관찰 모델
+
+<a id="53-renderer-독립-관찰-모델"></a>
+
+<a id="53-renderer-independent-observation-model"></a>
+
+
 
 이 장에서 입력창과 관찰 화면을 뜻하던 “renderer”는 cabinet view/UI (`@ghostflow/cabinet-view`)를 가리킨다. 출력 renderer는 §8.2에 따라 논리 출력 의도를 적용하며 UI 표시는 applied 또는 confirmed 증거가 아니다.
 

@@ -175,10 +175,16 @@ input restart_reason: RestartReason;
 
 This declaration is a control-body fragment. The producer supplies only hardware-confirmed causes; without evidence, supply `Unknown`. `PowerOn` alone does not establish recovery from a power outage. This input remains fixed for one run. The author defines automatic resumption, waiting, or cancellation followed by returning to the original position through state transitions. Device installation policy and the output renderer own physical outputs before the first decision.
 
-<a id="53-renderer-독립-관찰-모델"></a>
-<a id="53-renderer-independent-observation-model"></a>
+
+
 
 ## 5.3 Cabinet-view-independent observation model
+
+<a id="53-renderer-독립-관찰-모델"></a>
+
+<a id="53-renderer-independent-observation-model"></a>
+
+
 
 In this chapter, the historical term “renderer” for forms and observation views means cabinet view/UI (`@ghostflow/cabinet-view`). An output renderer applies logical output intent as defined in §8.2; UI display does not establish applied or confirmed evidence.
 

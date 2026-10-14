@@ -77,6 +77,8 @@ function indexChapter(file) {
       continue;
     }
     if (fence) continue;
+    const explicitAnchor = line.match(/^<a id="([^"]+)"><\/a>$/);
+    if (explicitAnchor) { anchors.set(explicitAnchor[1], section); continue; }
     const heading = line.match(/^(#{1,6})\s+(.+)$/);
     if (!heading) continue;
     const anchor = slug(heading[2]);
