@@ -43,8 +43,15 @@ Authored transitions own recovery behavior. Device installation policy and the
 output renderer own physical output application and evidence.
 
 Portable packages retain existing base-profile admission: formats1–4,10 and11
-may be wrapped with22. Wrapping does not admit every Range profile into portable
-packages. Host Range execution still supplies valid time coverage and occurrence
+may be wrapped with22. The integration also admits immutable IANA Range21 and
+22 with inner21, paired with control-v21 and context-scan-abi-v5. Full JS owner
+replay and native decoded-descriptor/expression-byte checks bind the signed
+manifest, including arbitrary supported predicates, before the target loader.
+Wrapping does not admit every Range profile into portable packages, and11 retains
+its scalar-config/Periodic limits. No VM execution or GFB meaning changes are
+needed: runtime bytes may match the prior build35, while the new source revision
+and officially issued package/build identity remain distinct. Host Range execution
+still supplies valid time coverage and occurrence
 facts, while the shared core validates and executes the authored schedule.
 
 ## Verification and integration order

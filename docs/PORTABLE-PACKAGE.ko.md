@@ -89,6 +89,26 @@ Host는 이 비인증 상태를 공개하고 upload, 저장 program의 boot, rol
 
 ## 호환성 및 마이그레이션
 
+### 서명된 immutable IANA Range
+
+GFB21, `GhostFlow/control-v21`, `GhostFlow/context-scan-abi-v5`는 명시적인
+portable profile이다. GFB22는 변경 없는 내부21과 검증된 lifecycle descriptor를
+감쌀 수 있다. 기존1–4,10,11 허용은 유지하며 다른 Range, calendar, provider,
+objective 또는 config profile을 이번 변경으로 허용하지 않는다. GFB11의 scalar
+config/Periodic 제한도 유지한다.
+
+서명에는 정확한 fresh source replay가 필요하다. JavaScript 검증은 전체 canonical
+owner manifest를 새 lowering과 비교한다. Rust는 schedule 개수·site·이름, IANA zone,
+선택 slot, duration, DST 정책, gap과 recovery를 decoded CivilRange descriptor에
+결합한다. 두 검증기 모두 다시 서명한 대체를 target loader 전에 거부한다. Rust는
+서명된 `when`/`cancelWhen` owner expression IR을 재인코딩하여 executable byte와
+정확히 비교한다. 비상수 branch, integer와 Result trace도 포함하며 평가하거나 기존
+predicate를 제한하지 않는다. Capability는 runtime 소유 restart port를 제외하지만
+실제 취득 및 actuator 요구를 유지한다. 호스트 tzdb·시간 occurrence fact는 명시적인
+runtime 입력이며 signed package가 이 fact나 물리 실행을 증명하지 않는다.
+`tests/civil-range-package.test.mjs`와 native Rust verifier가 사용하는 실제 서명된
+JavaScript fixture를 참고한다.
+
 ### 스칼라 설정을 사용하는 서명된 GFB11 Periodic
 
 GFB11, `GhostFlow/control-v10`, `GhostFlow/context-scan-abi-v5` 조합은 이제

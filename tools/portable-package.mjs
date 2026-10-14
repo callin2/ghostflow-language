@@ -303,14 +303,14 @@ function validateGfb1(bytes) {
     fail('invalid-bytecode-format', 'bytecode is not GFB1');
   }
   const version = bytes[4] | (bytes[5] << 8);
-  if (![1, 2, 3, 4, 10, 11, 22].includes(version)) fail('unsupported-bytecode-version', 'supported GFB format versions are 1, 2, 3, 4, 10, 11 and 22');
+  if (![1, 2, 3, 4, 10, 11, 21, 22].includes(version)) fail('unsupported-bytecode-version', 'supported GFB format versions are 1, 2, 3, 4, 10, 11, 21 and 22');
   if (version === 22) {
     if (bytes.byteLength < 16) fail('invalid-bytecode-format', 'truncated GFB22 lifecycle envelope');
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     const innerLength = view.getUint32(6, true);
     if (innerLength < 6 || innerLength > bytes.byteLength - 10) fail('invalid-bytecode-format', 'invalid GFB22 base payload length');
     const innerVersion = view.getUint16(14, true);
-    if (![1, 2, 3, 4, 10, 11].includes(innerVersion)) fail('unsupported-bytecode-version', 'unsupported GFB22 base profile');
+    if (![1, 2, 3, 4, 10, 11, 21].includes(innerVersion)) fail('unsupported-bytecode-version', 'unsupported GFB22 base profile');
   }
   return String(version);
 }
@@ -348,6 +348,19 @@ function validateGfbLifecycle(bytes, lifecycle) {
 
 function validateConfigStreamPackageProfile(manifest, version, runtimeAbi) {
   const stream = version === '11';
+  const civil = version === '21';
+  if (civil) {
+    if (manifest.format !== 'GhostFlow/control-v21' || runtimeAbi !== 'GhostFlow/context-scan-abi-v5'
+      || !Array.isArray(manifest.schedules) || !manifest.schedules.length
+      || manifest.schedules.some(s => s?.kind !== 'daily-slots' || s.timezone === 'UTC'
+        || s.gridMs !== 900000 || s.policy?.basis?.kind !== 'range' || s.selectedConfig || s.day)
+      || ['configs','signals','providers','calendars','naturalConditions','calendarConditions','objectives','adaptSettings','resources']
+        .some(field => manifest[field] !== undefined && (!Array.isArray(manifest[field]) || manifest[field].length))
+      || manifest.accounting !== undefined) {
+      fail('unsupported-runtime-abi', 'signed GFB21 requires immutable civil Range, control-v21 and context-scan-abi-v5');
+    }
+    return;
+  }
   if (stream !== (manifest.format === 'GhostFlow/control-v10')
     || stream !== (runtimeAbi === 'GhostFlow/context-scan-abi-v5')) {
     fail('unsupported-runtime-abi', 'GFB11, control-v10 and context-scan-abi-v5 must be selected together');
@@ -582,7 +595,7 @@ function validateEmbeddedArtifacts(payload) {
 
   exactObject(payload.bytecode, ['format', 'version', 'sha256', 'contentBase64'], 'payload.bytecode');
   if (payload.bytecode.format !== 'GFB1') fail('invalid-bytecode-format', 'payload bytecode format must be GFB1');
-  if (!['1', '2', '3', '4', '10', '11', '22'].includes(payload.bytecode.version)) fail('unsupported-bytecode-version', 'payload bytecode version must be 1, 2, 3, 4, 10, 11 or 22');
+  if (!['1', '2', '3', '4', '10', '11', '21', '22'].includes(payload.bytecode.version)) fail('unsupported-bytecode-version', 'payload bytecode version must be 1, 2, 3, 4, 10, 11, 21 or 22');
   digestValue(payload.bytecode.sha256, 'payload.bytecode.sha256');
 
   exactObject(payload.manifest, ['format', 'sha256', 'contentBase64'], 'payload.manifest');
@@ -660,6 +673,7 @@ export async function verifyPortablePackage(packageValue, options = {}) {
   if ((bytecodeVersion === '22') !== (lifecycle !== null)) fail('manifest-mismatch', 'GFB22 bytecode requires matching lifecycle metadata');
   if (lifecycle) validateGfbLifecycle(artifacts.bytecode, manifest.lifecycle);
   const contextManifest = profileVersion === '10';
+  const civilManifest = profileVersion === '21';
   const manifestKeys = ['format', 'name', 'inputs', 'outputs', 'sensors', 'schedules', 'timers', 'signals', 'configs', 'bytecodeSha256'];
   if (Object.hasOwn(manifest, 'sensorInstances')) {
     if (contextManifest && !sourceMap.sourceClosure) {
@@ -670,8 +684,8 @@ export async function verifyPortablePackage(packageValue, options = {}) {
     // These compiler-derived descriptors are compared in full with canonical
     // source lowering below; a signature cannot substitute instance provenance.
   }
-  if (contextManifest) {
-    for (const key of ['providers', 'calendars', 'naturalConditions', 'accounting', 'resources']) {
+  if (contextManifest || civilManifest) {
+    for (const key of ['providers', 'calendars', 'naturalConditions', 'calendarConditions', 'accounting', 'resources', 'objectives', 'adaptSettings']) {
       if (Object.hasOwn(manifest, key)) manifestKeys.push(key);
     }
   }
@@ -754,7 +768,7 @@ export async function verifyPortablePackage(packageValue, options = {}) {
   for (const [index, schedule] of manifest.schedules.entries()) {
     if (!isPlainObject(schedule)) fail('manifest-mismatch', `manifest.schedules[${index}] must be an object`);
     const name = ghostName(schedule.name, `manifest.schedules[${index}].name`);
-    if (!contextManifest && profileVersion !== '11') {
+    if (!contextManifest && !civilManifest && profileVersion !== '11') {
       addGenerated(schedule.dueInput, `__gf_schedule_due_${name}`, `manifest.schedules[${index}].dueInput`);
     } else if (profileVersion === '11' && Object.hasOwn(schedule, 'dueInput')) {
       fail('manifest-mismatch', `manifest.schedules[${index}].dueInput is not a GFB11 Periodic port`);
@@ -839,6 +853,9 @@ export async function verifyPortablePackage(packageValue, options = {}) {
         || !equalBytes(artifacts.bytecode,replay.bytes)) throw new Error('adaptive strategy projection does not match canonical source and bytecode');
     }
     if (!equalBytes(replay.bytes, artifacts.bytecode)) throw new Error('canonical source does not reproduce package bytecode');
+    if (civilManifest && canonicalJson(manifest) !== canonicalJson(compileSourceSync(sourceText, { filename: mappedDocument.filename }).manifest)) {
+      throw new Error('civil Range manifest does not match exact owner source lowering');
+    }
     if (profileVersion === '11'
         && canonicalJson(manifest.configs) !== canonicalJson(replay.manifest.configs)) {
       throw new Error('config streams do not match canonical source lowering');

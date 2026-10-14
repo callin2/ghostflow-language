@@ -42,7 +42,13 @@ consumer binding 준비는 runtime 소유 port를 물리 취득 입력에서 제
 소유한다. Device 설치 정책과 출력 renderer가 물리 출력 적용과 증거를 소유한다.
 
 Portable package는 기존 base-profile 허용 범위를 유지한다. format1–4,10,11은
-22로 감쌀 수 있지만 wrapper가 모든 Range profile의 portable 지원을 뜻하지 않는다.
+22로 감쌀 수 있다. 이번 통합은 control-v21 및 context-scan-abi-v5 조합의 immutable
+IANA Range21과 내부21을 담은22도 허용한다. 전체 JavaScript owner replay와 native의
+decoded descriptor·expression byte 검사가 지원되는 비상수 predicate까지 signed
+manifest를 target loader 전에 결합한다. Wrapper가 모든 Range profile의 portable
+지원을 뜻하지 않으며11의 scalar config/Periodic 제한은 유지한다. VM 실행이나 GFB
+의미 변경은 필요 없다. runtime byte는 이전 build35와 같을 수 있어도 새 source
+revision과 공식 발급 package/build identity는 별개다.
 호스트 Range 실행은 유효한 시간 coverage와 occurrence fact를 공급하며 shared core는
 작성한 schedule을 검증하고 실행한다.
 

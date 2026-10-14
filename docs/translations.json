@@ -383,8 +383,8 @@
       "source": "docs/PORTABLE-PACKAGE.md",
       "sourceLanguage": "en",
       "translation": "docs/PORTABLE-PACKAGE.ko.md",
-      "sourceSha256": "f864216237f6b90342971d48d2195604cf1ae38c98c6f5ac52280eb264258cab",
-      "translationSha256": "de6e21bdb7d8e56aeade7cfe99ba61e83000dd133b1ef91342bc77a80b14cb71"
+      "sourceSha256": "8d133a99e10792f453e30b6bf98a4fe6e398d4f4b08e475589ff69d7bdb6cdfd",
+      "translationSha256": "b70a4d18167a6844bbe422e6abc60a28eefb40f159bdd8caa406f7d39b8edb39"
     },
     {
       "source": "docs/ProgrammingInGhostflow.md",
@@ -635,8 +635,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "9981d589899818adc70fdfc779979c79e9dd3e50d39c74b3e14d5f029c9fb5fe",
-      "translationSha256": "267fbb82df6d2492d29f247545820be3659193d759b28b0ae105df80326d5071"
+      "sourceSha256": "3beb3b17f35bc32c9ff30eaf7a573ad4cd54fb755f23b038d44029aa9ff29f72",
+      "translationSha256": "2aa4dc648ff9b599c2da7a307ea51b40463525df3e5bec1903f677d5b9590dfc"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",
@@ -1083,8 +1083,8 @@
       "source": "docs/plans/2026-10-14-lifecycle-range-integration.md",
       "sourceLanguage": "en",
       "translation": "docs/plans/2026-10-14-lifecycle-range-integration.ko.md",
-      "sourceSha256": "ff76353e377dfc3c56d088697edce059f51b66facabee037ea90951bf41be4bd",
-      "translationSha256": "016ce250ee0128d1e79fa35af45d08dc5a9526f7664af02d282cff76847253f5"
+      "sourceSha256": "93c0448c9ff6027cfd669413a1c84cfbd7043f1e9a8c3071e06a8f5b842f66c2",
+      "translationSha256": "1585081af8b19070a19e782c4222b0335b49951b1c523fd801f7512064edb2ed"
     }
   ],
   "exclusions": [

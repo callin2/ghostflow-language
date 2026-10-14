@@ -5,6 +5,17 @@
 
 ## 미출시
 
+### 2026-10-14 — 서명된 immutable IANA Range 허용 ([#541](https://github.com/callin2/ghostflow-language/issues/541))
+
+Portable 서명은 실행 가능한 GFB21 profile을 거부했지만 이제 immutable IANA
+Range21/control-v21/context-scan-abi-v5와 이 내부 profile을 담은 lifecycle22를
+허용한다. 예를 들어 Asia/Seoul22:00/7h Range와 `restart_event`를 한 signed package에
+유지한다. 기존 profile과 GFB11 scalar config/Periodic 제한은 유지한다. 전체 JS owner
+replay 및 Rust descriptor·predicate byte 비교는 다시 서명한 manifest·header 대체를
+거부하며 predicate 실행은 바꾸지 않는다. `tests/civil-range-package.test.mjs`와 native
+signed fixture 검사는 branch, integer, conversion과 Result predicate를 포함한다.
+Package 허용 변경이며 VM 의미·역사적 hash·release·물리 검증 주장을 바꾸지 않는다.
+
 ### 2026-10-14 — lifecycle과 immutable IANA Range framing 통합 ([#536](https://github.com/callin2/ghostflow-language/pull/536), [#541](https://github.com/callin2/ghostflow-language/issues/541))
 
 두 source 기능을 유지한다. immutable IANA Range는 GFB21을 유지하며 restart
