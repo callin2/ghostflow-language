@@ -55,6 +55,15 @@ coverage includes historical19, provisional lifecycle21, malformed descriptors,
 nested wrappers, truncation and trailing bytes. Existing supported profiles remain
 supported. These tests exercise software facts, not hardware-confirmed causes.
 
+The full verifier exposed overlapping test-file Cargo recompiles of the shared
+WASM output: one reader failed with ENOENT while another compilation replaced
+that artifact. A 256-scan console case also exceeded its 90-second bound under
+concurrent load; isolated calendar and console checks completed in 0.626 and
+43.8 seconds. The verifier therefore runs Node test files serially with
+`--test-concurrency=1` and allows 600 seconds for that suite gate; other gates
+retain 180 seconds. This changes verification scheduling and the suite timeout,
+not scan semantics, user quotas, individual test oracles or runtime limits.
+
 Integrate and verify Language first, then its exact Authoring/Simulator consumers,
 then API/Web bindings and presentation. Keep candidate source, package identity,
 published artifact and actual running service evidence separate. Draft PR and

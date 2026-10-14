@@ -324,7 +324,8 @@ async function verify(nodeOnly, curriculumOnly) {
     process.stdout.write(`\n[gate] ${command} ${arguments_.join(' ')}\n`);
     const result = await new Promise(resolve => {
       let stdout = '', stderr = '', error;
-      const child = spawn(command, arguments_, { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'], timeout: 180_000 });
+      const timeout = arguments_.includes('--test') ? 600_000 : 180_000;
+      const child = spawn(command, arguments_, { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'], timeout });
       child.stdout.on('data', bytes => { stdout += bytes.toString(); process.stdout.write(bytes); });
       child.stderr.on('data', bytes => { stderr += bytes.toString(); process.stderr.write(bytes); });
       child.on('error', failure => { error = failure.message; });
@@ -496,7 +497,9 @@ async function verify(nodeOnly, curriculumOnly) {
       wasmVerified = true;
     }
     report.plcCurriculum.replay.runtime = await verifyCurriculumReplayWasm(fs.readFileSync(wasmPath), { repositoryRoot: root });
-    await gate(process.execPath, ['--test', ...LANGUAGE_TESTS]);
+    // Suites rebuild shared Cargo outputs. Serialize files so one suite cannot
+    // unlink/relink the WASM another suite is reading or starve bounded replay.
+    await gate(process.execPath, ['--test', '--test-concurrency=1', ...LANGUAGE_TESTS]);
     if (!nodeOnly) {
       await gate(process.execPath, ['tools/tutorial.mjs', '--no-build']);
       report.resources = JSON.parse(await gate('cargo', ['run', '--locked', '--offline', '-q', '-p', 'ghostflow-core', '--example', 'resource_report']));
