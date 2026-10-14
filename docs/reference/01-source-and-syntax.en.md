@@ -12,6 +12,11 @@ The `ghost` fragments in this chapter illustrate syntax and semantics.
 Rationale: [Selected syntax](../LANGUAGE-SURFACE.md), [Common language contract](../LANGUAGE.md), [Literate source](../LITERATE.md), [Intent anchors](../INTENT-ANCHOR-MAP.md), [Source preservation](../SOURCE-MAP.md), [Design notes](../DESIGN-NOTES.md). The [complete language reference](../LANGUAGE-REFERENCE.md) indexes this chapter and the other detailed chapters.
 
 Canonical external declarations use `input` and read as `Result<T, SensorFault>`.
+The exact reserved `restart_reason: RestartReason` and `restart_event: Bool`
+declarations are runtime-owned lifecycle inputs, an explicit exception to external
+acquisition. They read directly as `RestartReason` and `Bool`; optional markers,
+conditioning settings and caller-provided values are forbidden. See
+[the restart contract](05-settings-and-observation.en.md).
 The examples here explicitly choose false for a failed start and true for a failed stop;
 these are illustrative author policies, never implicit defaults. The former `sensor`
 declaration is rejected; preserve old documents and create explicit reviewed revisions.

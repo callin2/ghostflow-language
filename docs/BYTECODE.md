@@ -1,5 +1,15 @@
 # GFB bytecode
 
+## Provisional lifecycle framing
+
+The local GFB22 candidate wraps unchanged inner GFB bytes and the checked restart
+descriptor; see [Scan frame WASM](SCAN-FRAME-WASM.md#restart-lifecycle-extension).
+GFB19 continues to mean live Range start and GFB20 means keyed TimeSlots Range.
+The published `ghostflow-runtime-99ca1a3` lifecycle GFB19 wrapper collides with
+the current Range allocation and is rejected by the combined loader, without
+translation or fallback. Its historical bytes and consumer pins remain fixed.
+Recompile reviewed source for a distinct owner candidate; 22 separates this lifecycle wrapper from immutable IANA Range format 21. The unpublished lifecycle21 candidate is rejected. This does not publish a release or verify physical execution.
+
 GFB18 adds the adopted calendar boundary profile `GhostFlow/control-v18`.
 Prelude tag 17 is a calendar-filtered immutable UTC Daily Range; tag 18 is a
 typed calendar Result with protected Bool/Bool/fault-code inputs. Their exact

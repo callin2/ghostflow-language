@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### 2026-10-14 — reconcile lifecycle and immutable IANA Range framing ([#536](https://github.com/callin2/ghostflow-language/pull/536), [#541](https://github.com/callin2/ghostflow-language/issues/541))
+
+Both source features remain supported: immutable IANA Range keeps GFB21 and
+restart lifecycle wraps unchanged inner bytes with GFB22. For example, a
+`restart_event` program with an Asia/Seoul immutable Range retains both contracts.
+The historical lifecycle19 release and unpublished lifecycle21 candidate are
+rejected without sniffing or translation; recompile reviewed source with the
+combined owner candidate and coordinate consumer pins. Existing Range19/20 and
+reserved restart input semantics remain intact. Native/WASM regression coverage
+checks valid combined execution and malformed/colliding framing rejection.
+This source integration does not publish artifacts, deploy services or verify
+physical outputs. See Reference 5.2, Bytecode and Scan frame WASM.
+
 ### 2026-10-12 — typed lesson scenario observations ([#541](https://github.com/callin2/ghostflow-language/issues/541))
 
 Lesson bundle v1 frames now accept optional `samples` using the existing runtime
@@ -64,6 +77,25 @@ completed proofs; source/module/run/scan/time joins retain stale distinctions.
 boundaries. Timer/schedule/composition/safety/Result/transition proofs remain
 explicit unsupported scope; this does not complete issue88 or verify hardware.
 
+### 2026-10-05 — reserved lifecycle input integration ([#531](https://github.com/callin2/ghostflow-language/issues/531))
+
+The exact `restart_reason: RestartReason` and `restart_event: Bool` declarations
+remain runtime-owned scalar ports while ordinary external `input` uses typed
+Result acquisition (Reference 1/2/5). Optional markers and conditioning blocks
+are forbidden on these reserved ports. The reason remains fixed; the event clears
+only after a committed scan. No source syntax or automatic fault policy is added.
+Bug fix: the local candidate uses provisional GFB21 framing instead of interpreting
+every GFB19 as a lifecycle envelope. GFB19 live Range start and GFB20 TimeSlots
+Range bytes retain their meaning. The published lifecycle prerelease
+`ghostflow-runtime-99ca1a3` is preserved; its colliding GFB19 wrapper is rejected
+by this combined loader. Migration requires explicit source recompilation and
+owner allocation/consumer coordination before adoption. Package base admission
+stays narrow. Example: `restart_event` still directly reads Bool, while
+`input start: Bool;` requires `start |> recover(false)`. Regression coverage
+checks reserved declarations, native/WASM wrapper rejection and Range parity.
+All framed activation paths now transfer restart initialization into ScanDriver;
+context, schedule and temporal activation previously left it uninitialized.
+The combined lifecycle/live-Range regression checks event consumption after commit.
 
 ### 2026-10-05 — canonical quality input ([#531](https://github.com/callin2/ghostflow-language/issues/531))
 
@@ -327,6 +359,16 @@ WASM activation and snapshots, absolute rolling budgets, exact Int/Duration grid
 and bounded identity/history admission. GFB/WASM ABI is unchanged; regenerate old
 adaptation manifests because bounds are now required. This reference profile
 does not provide settings checkpoint recovery or API/Device integration.
+### 2026-10-02 — restart lifecycle inputs
+
+Controls can opt into the exact reserved `RestartReason` and `restart_event`
+inputs. The compiler records and validates their ordered enum metadata in an
+additive GFB19 envelope while preserving the base control profile. Framed native
+and WASM hosts must initialize the hardware-confirmed cause and boot-pending bit
+before activation. The core injects both values and rejects caller overrides.
+The event remains true across rejected scans and clears after the first
+successful commit. This supports event-driven recovery only; VM and timer state
+are not restored. Generic enum inputs and `on_restart` syntax remain unsupported.
 
 ### 2026-10-02 — Station atomic mode-entry binding bug fix ([#250](https://github.com/callin2/ghostflow-language/issues/250))
 

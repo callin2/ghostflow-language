@@ -119,6 +119,34 @@ async function parity(artifact, frames, { ghostsim = true, checkpoint, bootEpoch
 }
 const outputs = rows => rows.map(row => row.outcome.trace.safe);
 
+test('GFB22 lifecycle wraps GFB21 IANA Range without changing schedule semantics', async t => {
+  const source = rangeSource().replace('control PlannedWatering {', `control PlannedWatering {
+  type RestartReason = PowerOn | Brownout | Watchdog | Software | Unknown;
+  input restart_reason: RestartReason;
+  input restart_event: Bool;`).replace('pump <- watering.active;',
+    'pump <- if restart_event then false else watering.active;');
+  const artifact = await compile(source);
+  const bytes = Buffer.from(artifact.bytes);
+  assert.equal(bytes.readUInt16LE(4), 22);
+  assert.equal(bytes.readUInt16LE(14), 21);
+  const runtime = await ControlRuntime.instantiateFramed(wasm, artifact, {
+    context: activation, restart: { reasonOrdinal: 0, eventPending: true },
+  });
+  t.after(() => runtime.dispose());
+  const walls = [seoul('2026-10-11T21:59:59'), seoul('2026-10-11T22:00:00'), seoul('2026-10-12T04:59:59')];
+  const frames = timed(artifact, walls);
+  const rows = frames.map(({ logicalTimeMs, scanId, inputs, ...contextFacts }) => {
+    const result = runtime.step({ nowMs: logicalTimeMs, contextFacts });
+    return { pump: runtime.lastFrameOutcome.trace.safe.pump, reason: result.vm.inputs.restart_reason,
+      event: result.vm.inputs.restart_event };
+  });
+  assert.deepEqual(rows, [
+    { pump: false, reason: 0, event: true },
+    { pump: true, reason: 0, event: false },
+    { pump: true, reason: 0, event: false },
+  ]);
+});
+
 test('civil Range allocates GFB21 and rejects older headers and unsupported mutable/other recurrence profiles', async () => {
   const artifact = await compile(rangeSource());
   assert.equal(artifact.bytes.readUInt16LE(4), 21);
