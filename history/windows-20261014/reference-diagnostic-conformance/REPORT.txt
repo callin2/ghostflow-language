@@ -1,0 +1,41 @@
+Windows local-history preservation — 2026-10-14 (Asia/Seoul)
+
+Owning repository: callin2/ghostflow-language
+Tracking: https://github.com/callin2/farm_studio_system/issues/206
+Owner issues: https://github.com/callin2/ghostflow-language/issues/311
+Current baseline: origin/dev d7bc140ee214745661ebccd1197eb7cbf3035ec0
+Original local commit: 0227df72a80d1a7a9683c43f831e388858bbe2b8
+Original source ancestry tag: codex/windows-original-reference-diagnostic-conformance-20261014
+Inactive evidence branch: codex/windows-history-reference-diagnostic-conformance-20261014
+Decision: NOT ADOPTED. Historical REF-07-002 diagnostic test/feature-status attempt. Current catalog and verify inventory differ, and the proposed test path is absent. Preserve the original test intent without transplanting old catalog ranges/hashes.
+Current-path overlap: ["contracts/feature-status/catalog.json", "docs/REFERENCE-FEATURE-STATUS.md", "tools/verify-language.mjs"]
+
+The active source/AGENTS/workflows/pins tree in this archive branch is byte-for-byte
+the current baseline. Only history .txt/manifest/report files are added. Snapshots
+cannot become a second active program. The original commit and its complete
+ancestry are retained by a clearly named historical tag for exact restoration.
+Tags/branch names were checked against original workflow trigger filters; no PR,
+dispatch, dev push, release tag or deployment operation is performed.
+
+Verification: original-tag full SHA readback; every archived source byte equals
+the original commit blob, SHA256 and Git blob IDs retained in MANIFEST; a source
+tree diff verifies archive-only changes. Scanned 4 changed blobs in
+the original commit range for credential/key patterns (0 hits). This is a bounded
+source review, not proof that every conceivable sensitive string is absent.
+No .env/private data/DB dump/customer dialogue/actual incident log/build cache
+or unreviewed binary is added. Lockfiles are preserved as source evidence.
+
+No behavior test, LLM API, install/build/allocator, service restart, serial/flash/
+physical operation, dev merge or production deployment ran in this preservation
+step. Earlier test statements inside historical snapshots are historical claims,
+not fresh execution results. Overlap-free paths do not prove semantic acceptance.
+
+Restore in a clean clone: git fetch origin tag codex/windows-original-reference-diagnostic-conformance-20261014; git switch --detach codex/windows-original-reference-diagnostic-conformance-20261014.
+For reference evidence: git fetch origin codex/windows-history-reference-diagnostic-conformance-20261014; inspect history/windows-20261014/reference-diagnostic-conformance/MANIFEST.json.
+Never infer adoption from restored history. Original worktrees are unchanged and
+are not approved for deletion: ignored/unknown artifacts and other worker state
+still require disposition. Active shared Device/Drivers paths remain protected.
+
+Publication receipt: history/windows-20261014/reference-diagnostic-conformance/PUBLICATION.json
+Archive commit: https://github.com/callin2/ghostflow-language/commit/8f1eeca41215a22b0a4e39389501bd0980d3c351
+Issue comments: https://github.com/callin2/ghostflow-language/issues/311#issuecomment-6154611490

@@ -1,0 +1,58 @@
+{
+  "repo": "ghostflow-language",
+  "head": "0227df72a80d1a7a9683c43f831e388858bbe2b8",
+  "source": "Windows local source; restored through originalTag",
+  "branch": "test/ref07002-diagnostic-conformance",
+  "review": "isolated owner-repository comparison checkout",
+  "base": "d7bc140ee214745661ebccd1197eb7cbf3035ec0",
+  "mergeBase": "285727dfdd54bb8d3815431044882719694e6882",
+  "changed": [
+    "contracts/feature-status/catalog.json",
+    "docs/REFERENCE-FEATURE-STATUS.md",
+    "tests/reference-diagnostic-kinds.test.mjs",
+    "tools/verify-language.mjs"
+  ],
+  "overlap": [
+    "contracts/feature-status/catalog.json",
+    "docs/REFERENCE-FEATURE-STATUS.md",
+    "tools/verify-language.mjs"
+  ],
+  "adoption": "not-adopted; reference-only",
+  "originalTag": "codex/windows-original-reference-diagnostic-conformance-20261014",
+  "archiveBranch": "codex/windows-history-reference-diagnostic-conformance-20261014",
+  "issues": [
+    311
+  ],
+  "credentialPatternHits": 0,
+  "commitBlobsScanned": 4,
+  "snapshots": [
+    {
+      "sourcePath": "contracts/feature-status/catalog.json",
+      "archivePath": "history/windows-20261014/reference-diagnostic-conformance/snapshots/contracts/feature-status/catalog.json.txt",
+      "gitBlob": "5de6282392cb30c79256bb99c7f72d0e06550296",
+      "sha256": "fc5341b00302aee1a6dd8ee5455c81a7743ad5d9cd68b824680e974be2803f40",
+      "size": 314302
+    },
+    {
+      "sourcePath": "docs/REFERENCE-FEATURE-STATUS.md",
+      "archivePath": "history/windows-20261014/reference-diagnostic-conformance/snapshots/docs/REFERENCE-FEATURE-STATUS.md.txt",
+      "gitBlob": "332771608ee51c51724de5516aea0b1d8cbd505e",
+      "sha256": "779572ad927d95f52f416a1ece4680d4f6d2a7a6103c7db9a5a8dd269a71bf51",
+      "size": 135629
+    },
+    {
+      "sourcePath": "tests/reference-diagnostic-kinds.test.mjs",
+      "archivePath": "history/windows-20261014/reference-diagnostic-conformance/snapshots/tests/reference-diagnostic-kinds.test.mjs.txt",
+      "gitBlob": "f854c44703e546e43ba122322d493fd560c11c4a",
+      "sha256": "3412df008d2fdf54bd347f5568e27d2cd181016615d3efebc8b3d4d284a3c4e8",
+      "size": 12338
+    },
+    {
+      "sourcePath": "tools/verify-language.mjs",
+      "archivePath": "history/windows-20261014/reference-diagnostic-conformance/snapshots/tools/verify-language.mjs.txt",
+      "gitBlob": "59e82a060818d9d9762ea803b52f18e0085576f7",
+      "sha256": "04c5ab2dcd90f392c3d1ed6d394490d5ae6f0049183f3eb7b40f911be377b121",
+      "size": 27037
+    }
+  ]
+}

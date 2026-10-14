@@ -169,3 +169,6 @@ after a documentation batch. Runnable FAQ and programming samples are also
 checked by `tests/docs-runnable-examples.test.mjs` in the compiler and host gates.
 
 Released under the [MIT License](LICENSE).
+
+<!-- windows-dev-restoration-20261014 -->
+Windows local-work recovery: [preserved source, documents and exact restoration refs](history/windows-20261014/DEV-RESTORATION.txt). These are inactive historical references; current code and dependency pins remain authoritative.

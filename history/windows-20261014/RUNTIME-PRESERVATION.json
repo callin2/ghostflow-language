@@ -1,0 +1,63 @@
+{
+  "source_repository": "callin2/ghostflow-language",
+  "source_revision": "81f253235ac3966433bee7fec9dd3fcd8c186ff1",
+  "binary_sha256": "1a0011c8cb5a77501026bc86b0823e3df59211cf51754769fad5dd527cdaff08",
+  "bytes": 628938,
+  "ci_run_url": "https://github.com/callin2/ghostflow-language/actions/runs/36860998138",
+  "ci_artifact_id": 11160739382,
+  "ci_artifact_expires_at": "2026-10-15T12:22:45Z",
+  "preservation_date": "2026-10-14",
+  "status": "DRAFT preservation only; no source adoption, deployment or published release",
+  "verification_report": "Original verification.json is not reuploaded; its digest and language-host scope remain in the original manifest. This does not establish device/API/LLM acceptance.",
+  "tag": "ghostflow-runtime-81f2532",
+  "release": {
+    "assets": [
+      {
+        "apiUrl": "https://api.github.com/repos/callin2/ghostflow-language/releases/assets/638572683",
+        "contentType": "application/wasm",
+        "createdAt": "2026-10-13T23:35:18Z",
+        "digest": "sha256:1a0011c8cb5a77501026bc86b0823e3df59211cf51754769fad5dd527cdaff08",
+        "downloadCount": 0,
+        "id": "RA_kwDOUP_3LM4mD9iL",
+        "label": "",
+        "name": "ghostflow_wasm.wasm",
+        "size": 628938,
+        "state": "uploaded",
+        "updatedAt": "2026-10-13T23:35:18Z",
+        "url": "https://github.com/callin2/ghostflow-language/releases/download/untagged-a4f7b29fdfee68ac4355/ghostflow_wasm.wasm"
+      },
+      {
+        "apiUrl": "https://api.github.com/repos/callin2/ghostflow-language/releases/assets/638572684",
+        "contentType": "application/json",
+        "createdAt": "2026-10-13T23:35:18Z",
+        "digest": "sha256:0e5d16e267b74c8903405450bf89e73d2acd0a99be0efba2c315163581781498",
+        "downloadCount": 0,
+        "id": "RA_kwDOUP_3LM4mD9iM",
+        "label": "",
+        "name": "manifest.json",
+        "size": 1616,
+        "state": "uploaded",
+        "updatedAt": "2026-10-13T23:35:18Z",
+        "url": "https://github.com/callin2/ghostflow-language/releases/download/untagged-a4f7b29fdfee68ac4355/manifest.json"
+      },
+      {
+        "apiUrl": "https://api.github.com/repos/callin2/ghostflow-language/releases/assets/638572686",
+        "contentType": "application/json",
+        "createdAt": "2026-10-13T23:35:18Z",
+        "digest": "sha256:4cd85b093a3c1333d5048241041598f8e30dc87b4d0c0bf73f62ed0f4005f348",
+        "downloadCount": 0,
+        "id": "RA_kwDOUP_3LM4mD9iO",
+        "label": "",
+        "name": "preservation-provenance.json",
+        "size": 736,
+        "state": "uploaded",
+        "updatedAt": "2026-10-13T23:35:18Z",
+        "url": "https://github.com/callin2/ghostflow-language/releases/download/untagged-a4f7b29fdfee68ac4355/preservation-provenance.json"
+      }
+    ],
+    "isDraft": true,
+    "url": "https://github.com/callin2/ghostflow-language/releases/tag/untagged-a4f7b29fdfee68ac4355"
+  },
+  "remote_download_sha256": "1a0011c8cb5a77501026bc86b0823e3df59211cf51754769fad5dd527cdaff08",
+  "remote_tag_sha_verified": "81f253235ac3966433bee7fec9dd3fcd8c186ff1"
+}
