@@ -2,6 +2,67 @@
 
 ## Unreleased
 
+### 2026-10-14 — signed immutable IANA Range admission ([#541](https://github.com/callin2/ghostflow-language/issues/541))
+
+Portable signing previously rejected the executable GFB21 profile. It now admits
+immutable IANA Range21/control-v21/context-scan-abi-v5 and lifecycle22 with that
+inner profile. For example, the Asia/Seoul22:00/7h Range can retain `restart_event`
+in one signed package. Existing profiles and GFB11 scalar-config/Periodic limits
+remain. JS full owner replay and Rust descriptor/predicate-byte comparison reject
+freshly re-signed manifest or header substitutions without changing predicate
+execution. `tests/civil-range-package.test.mjs` and the native signed-fixture test
+cover branches, integers, conversions and Result predicates. This adds package
+admission; no VM semantics, historical hashes, release or physical claim changes.
+
+### 2026-10-14 — reconcile lifecycle and immutable IANA Range framing ([#536](https://github.com/callin2/ghostflow-language/pull/536), [#541](https://github.com/callin2/ghostflow-language/issues/541))
+
+Both source features remain supported: immutable IANA Range keeps GFB21 and
+restart lifecycle wraps unchanged inner bytes with GFB22. For example, a
+`restart_event` program with an Asia/Seoul immutable Range retains both contracts.
+The historical lifecycle19 release and unpublished lifecycle21 candidate are
+rejected without sniffing or translation; recompile reviewed source with the
+combined owner candidate and coordinate consumer pins. Existing Range19/20 and
+reserved restart input semantics remain intact. Native/WASM regression coverage
+checks valid combined execution and malformed/colliding framing rejection.
+This source integration does not publish artifacts, deploy services or verify
+physical outputs. See Reference 5.2, Bytecode and Scan frame WASM.
+
+### 2026-10-12 — typed lesson scenario observations ([#541](https://github.com/callin2/ghostflow-language/issues/541))
+
+Lesson bundle v1 frames now accept optional `samples` using the existing runtime
+shape: `{ epoch, id, timestampMs, quality, value }`. Previously lesson scenarios
+could carry only raw `inputs`, so canonical acquisition Results could not express
+sample identity or faults. `compileLessonBundle` now checks frame bindings against
+the compiled manifest and rejects sensor names in `inputs`. Missing samples stay
+missing; no identity, quality or healthy value is synthesized. Authored source
+continues to own fault responses. Migrating lessons must use a new source revision,
+explicit observations and a supporting language pin. Compiler, GFB, core and WASM
+are unchanged. See `docs/LESSON-BUNDLE.md`; `tests/lesson-samples.test.mjs` checks
+schema/integrity boundaries and real WASM fault recovery/fresh-session replay.
+
+### 2026-10-11 — immutable IANA DailySlots Range ([#541](https://github.com/callin2/ghostflow-language/issues/541))
+
+Reference 3.5 now permits immutable non-UTC `DailySlots<15min>` with a fixed
+elapsed Range. Previously these executable ranges were rejected. For example,
+`timezone = "Asia/Seoul"; selected = [22:00]; basis = range(7h);` runs through
+05:00 the next day; a separate `[05:00]` / `range(17h)` defines daytime.
+GFB21 / `civil-range` tag 19 / control-v21 identifies the bounded profile;
+existing UTC profiles and civil occurrence row fields remain unchanged. Older
+loaders reject the new profile. It does not add non-UTC Daily/config Range or
+a generic DST local-end-time operator.
+
+Hosts supply rolling coverage and prior-day occurrences. Rust validates declared
+slots, folds/gaps, identity and revision consistency, coverage and actual
+non-overlap, then executes the existing RangeEngine. Initially omitted IANA
+occurrences remain a host tzdb completeness responsibility. Late admission uses
+only the remaining half-open interval; admitted deadlines survive wall correction
+and trust loss, and restored consumed identities never resume an admitted timer.
+Focused conformance: `tests/civil-range-runtime.test.mjs`. The canonical
+`tests/fixtures/issue541-seoul-traffic.ghost.md` fixture uses daytime red 60s,
+green 20s, yellow 3s and nighttime yellow with a full one-second cycle (500ms
+ON / 500ms OFF), with red/green OFF. This is compiled simulation evidence,
+not public-road or physical-device validation.
+
 ### 2026-10-06 — actionable intent provenance diagnostics ([#537](https://github.com/callin2/ghostflow-language/issues/537))
 
 Bug fix for the intent-link contract in Reference 1.2: schema requests for
@@ -28,6 +89,25 @@ completed proofs; source/module/run/scan/time joins retain stale distinctions.
 boundaries. Timer/schedule/composition/safety/Result/transition proofs remain
 explicit unsupported scope; this does not complete issue88 or verify hardware.
 
+### 2026-10-05 — reserved lifecycle input integration ([#531](https://github.com/callin2/ghostflow-language/issues/531))
+
+The exact `restart_reason: RestartReason` and `restart_event: Bool` declarations
+remain runtime-owned scalar ports while ordinary external `input` uses typed
+Result acquisition (Reference 1/2/5). Optional markers and conditioning blocks
+are forbidden on these reserved ports. The reason remains fixed; the event clears
+only after a committed scan. No source syntax or automatic fault policy is added.
+Bug fix: the local candidate uses provisional GFB21 framing instead of interpreting
+every GFB19 as a lifecycle envelope. GFB19 live Range start and GFB20 TimeSlots
+Range bytes retain their meaning. The published lifecycle prerelease
+`ghostflow-runtime-99ca1a3` is preserved; its colliding GFB19 wrapper is rejected
+by this combined loader. Migration requires explicit source recompilation and
+owner allocation/consumer coordination before adoption. Package base admission
+stays narrow. Example: `restart_event` still directly reads Bool, while
+`input start: Bool;` requires `start |> recover(false)`. Regression coverage
+checks reserved declarations, native/WASM wrapper rejection and Range parity.
+All framed activation paths now transfer restart initialization into ScanDriver;
+context, schedule and temporal activation previously left it uninitialized.
+The combined lifecycle/live-Range regression checks event consumption after commit.
 
 ### 2026-10-05 — canonical quality input ([#531](https://github.com/callin2/ghostflow-language/issues/531))
 
@@ -291,6 +371,16 @@ WASM activation and snapshots, absolute rolling budgets, exact Int/Duration grid
 and bounded identity/history admission. GFB/WASM ABI is unchanged; regenerate old
 adaptation manifests because bounds are now required. This reference profile
 does not provide settings checkpoint recovery or API/Device integration.
+### 2026-10-02 — restart lifecycle inputs
+
+Controls can opt into the exact reserved `RestartReason` and `restart_event`
+inputs. The compiler records and validates their ordered enum metadata in an
+additive GFB19 envelope while preserving the base control profile. Framed native
+and WASM hosts must initialize the hardware-confirmed cause and boot-pending bit
+before activation. The core injects both values and rejects caller overrides.
+The event remains true across rejected scans and clears after the first
+successful commit. This supports event-driven recovery only; VM and timer state
+are not restored. Generic enum inputs and `on_restart` syntax remain unsupported.
 
 ### 2026-10-02 — Station atomic mode-entry binding bug fix ([#250](https://github.com/callin2/ghostflow-language/issues/250))
 

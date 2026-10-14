@@ -6,6 +6,7 @@
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fmt;
+mod predicate_projection;
 
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use ed25519_dalek::{Signature, Verifier as _, VerifyingKey};
@@ -656,10 +657,10 @@ fn validate_gfb1(bytes: &[u8]) -> Result<u16> {
         return fail(ErrorCode::InvalidBytecodeFormat, "bytecode is not GFB1");
     }
     let version = u16::from_le_bytes([bytes[4], bytes[5]]);
-    if !matches!(version, 1..=4 | 10 | 11) {
+    if !matches!(version, 1..=4 | 10 | 11 | 21 | 22) {
         return fail(
             ErrorCode::UnsupportedBytecodeVersion,
-            "supported GFB format versions are 1, 2, 3, 4, 10 and 11",
+            "supported GFB format versions are 1, 2, 3, 4, 10, 11, 21 and 22",
         );
     }
     ghostflow_core::Module::load(bytes).map_err(|error| PortablePackageError {
@@ -672,6 +673,7 @@ fn validate_gfb1(bytes: &[u8]) -> Result<u16> {
 fn manifest_capability_type(value: &str, label: &str) -> Result<&'static str> {
     match value {
         "Bool" => Ok("bool"),
+        "RestartReason" => Ok("number"),
         "Int" => Ok("int"),
         "Number" | "Percent" | "Duration" | "Date" | "TimeOfDay" | "DateTime" => Ok("number"),
         quantity if canonical_quantity_unit(quantity).is_some() => Ok("number"),
@@ -680,6 +682,39 @@ fn manifest_capability_type(value: &str, label: &str) -> Result<&'static str> {
             format!("{label} is unsupported"),
         ),
     }
+}
+
+fn verify_lifecycle_manifest(manifest: &Value, bytecode: &[u8]) -> Result<()> {
+    let module = ghostflow_core::Module::load(bytecode).map_err(|error| PortablePackageError {
+        code: ErrorCode::BytecodeRejected,
+        message: format!("native artifact validation failed: {error}"),
+    })?;
+    match module.lifecycle() {
+        Some(lifecycle) => {
+            let expected = serde_json::json!({
+                "format": "GhostFlow/lifecycle-v1",
+                "restartReasonInput": lifecycle.restart_reason_input,
+                "restartReasonMembers": lifecycle.restart_reason_members.iter().enumerate().map(|(value, name)| {
+                    serde_json::json!({ "name": name, "value": value })
+                }).collect::<Vec<_>>(),
+                "restartEventInput": lifecycle.restart_event_input,
+            });
+            if manifest.get("lifecycle") != Some(&expected) {
+                return fail(
+                    ErrorCode::ManifestMismatch,
+                    "manifest lifecycle metadata does not match GFB22",
+                );
+            }
+        }
+        None if manifest.get("lifecycle").is_some() => {
+            return fail(
+                ErrorCode::ManifestMismatch,
+                "manifest lifecycle metadata has no GFB lifecycle descriptor",
+            );
+        }
+        None => {}
+    }
+    Ok(())
 }
 
 fn canonical_quantity_unit(value: &str) -> Option<&'static str> {
@@ -1675,7 +1710,7 @@ fn verify_debounce_bindings(manifest: &Value, bytecode: &[u8]) -> Result<()> {
         code: ErrorCode::BytecodeRejected,
         message: format!("native artifact validation failed: {error}"),
     })?;
-    if u16::from_le_bytes([bytecode[4], bytecode[5]]) == 11 {
+    if module.bytecode_format_version() == 11 {
         verify_config_bindings(manifest, &module)?;
     } else {
         verify_window_bindings(manifest, &module)?;
@@ -2236,6 +2271,171 @@ fn verify_sensor_conditioning(sensor: &serde_json::Map<String, Value>, label: &s
     Ok(())
 }
 
+fn verify_civil_range_bindings(manifest: &Value, module: &ghostflow_core::Module) -> Result<()> {
+    use ghostflow_core::{context_vm::ScheduleDefinition, schedule_vm::PulseDescriptor};
+    let mismatch = |message: &str| PortablePackageError {
+        code: ErrorCode::ManifestMismatch,
+        message: message.into(),
+    };
+    if manifest["format"].as_str() != Some("GhostFlow/control-v21") {
+        return Err(mismatch("GFB21 requires control-v21"));
+    }
+    if module.objective_requirements().is_some()
+        || module.temporal_requirements().is_some_and(|requirements| {
+            requirements
+                .strategies
+                .iter()
+                .any(|strategy| !strategy.windows.is_empty())
+        })
+        || module.true_for_requirements().is_some_and(|requirements| {
+            requirements
+                .strategies
+                .iter()
+                .any(|strategy| !strategy.signals.is_empty())
+        })
+    {
+        return Err(mismatch(
+            "signed GFB21 does not admit other executable profiles",
+        ));
+    }
+    for field in [
+        "configs",
+        "signals",
+        "providers",
+        "calendars",
+        "naturalConditions",
+        "calendarConditions",
+        "objectives",
+        "adaptSettings",
+        "resources",
+    ] {
+        if manifest
+            .get(field)
+            .is_some_and(|value| !value.as_array().is_some_and(Vec::is_empty))
+        {
+            return Err(mismatch(
+                "signed GFB21 requires immutable civil Range without additional profiles",
+            ));
+        }
+    }
+    if manifest.get("accounting").is_some() {
+        return Err(mismatch("signed GFB21 does not admit accounting"));
+    }
+    let expected = manifest["schedules"]
+        .as_array()
+        .ok_or_else(|| mismatch("civil Range schedules must be an array"))?;
+    let requirements = module
+        .schedule_requirements()
+        .ok_or_else(|| mismatch("civil Range descriptors missing"))?;
+    if expected.is_empty() {
+        return Err(mismatch("civil Range schedules missing"));
+    }
+    for strategy in &requirements.strategies {
+        if strategy.schedules.len() != expected.len() {
+            return Err(mismatch("civil Range schedule count differs from bytecode"));
+        }
+        let mut sites = HashSet::new();
+        for descriptor in &strategy.schedules {
+            let PulseDescriptor::Context(actual) = descriptor else {
+                return Err(mismatch("civil Range requires context descriptors"));
+            };
+            let ScheduleDefinition::CivilRange {
+                timezone,
+                starts_ms,
+                duration_ms,
+                dst_missing,
+                dst_repeated,
+            } = &actual.definition
+            else {
+                return Err(mismatch("civil Range requires immutable IANA descriptors"));
+            };
+            let schedule = expected
+                .iter()
+                .find(|value| value["site"].as_u64() == Some(u64::from(actual.site)))
+                .ok_or_else(|| mismatch("civil Range site differs from bytecode"))?;
+            exact_keys(
+                value_object(schedule, "civil Range schedule")?,
+                &[
+                    "kind",
+                    "gridMs",
+                    "slots",
+                    "site",
+                    "name",
+                    "timezone",
+                    "dstMissing",
+                    "dstRepeated",
+                    "policy",
+                ],
+                "civil Range schedule",
+                ErrorCode::ManifestMismatch,
+            )?;
+            let policy = &schedule["policy"];
+            let policy_object = value_object(policy, "civil Range policy")?;
+            let mut policy_keys = vec!["basis", "when", "clock", "gapMs", "recovery", "fallback"];
+            if policy_object.contains_key("cancelWhen") {
+                policy_keys.push("cancelWhen");
+            }
+            exact_keys(
+                policy_object,
+                &policy_keys,
+                "civil Range policy",
+                ErrorCode::ManifestMismatch,
+            )?;
+            exact_keys(
+                value_object(&policy["basis"], "civil Range basis")?,
+                &["kind", "durationMs"],
+                "civil Range basis",
+                ErrorCode::ManifestMismatch,
+            )?;
+            let slots = schedule["slots"]
+                .as_array()
+                .ok_or_else(|| mismatch("civil Range slots missing"))?;
+            let missing = ["skip", "next_valid"][usize::from(*dst_missing)];
+            let repeated = ["first", "second", "both", "skip"][usize::from(*dst_repeated)];
+            if !sites.insert(actual.site)
+                || schedule["kind"].as_str() != Some("daily-slots")
+                || schedule["gridMs"].as_u64() != Some(900_000)
+                || schedule["name"].as_str() != Some(actual.name.as_str())
+                || schedule["timezone"].as_str() != Some(timezone.as_str())
+                || schedule["dstMissing"].as_str() != Some(missing)
+                || schedule["dstRepeated"].as_str() != Some(repeated)
+                || slots.len() != starts_ms.len()
+                || slots
+                    .iter()
+                    .zip(starts_ms)
+                    .any(|(slot, start)| slot.as_u64() != Some(start / 60_000))
+                || policy["basis"]["kind"].as_str() != Some("range")
+                || policy["basis"]["durationMs"].as_u64() != Some(*duration_ms)
+                || policy["clock"].as_str() != Some("trusted_only")
+                || policy["gapMs"].as_u64() != Some(actual.gap_ms)
+                || policy["recovery"].as_str() != Some("baseline")
+                || policy["fallback"].as_str() != Some("skip")
+                || actual.clock_hold_ms.is_some()
+            {
+                return Err(mismatch("civil Range descriptor differs from bytecode"));
+            }
+            // Re-encode the signed owner IR; never evaluate predicates here.
+            for (key, code, default) in [
+                ("when", &actual.when, None),
+                ("cancelWhen", &actual.cancel, Some("false")),
+            ] {
+                let default_value = default.map(|value| Value::String(value.into()));
+                let projection = policy.get(key).or(default_value.as_ref());
+                if projection
+                    .and_then(|value| predicate_projection::encode(value, module))
+                    .as_deref()
+                    != Some(code.as_slice())
+                {
+                    return Err(mismatch(
+                        "civil Range predicate projection differs from bytecode",
+                    ));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 fn verify_manifest(
     manifest: &Value,
     descriptor_format: &str,
@@ -2257,6 +2457,24 @@ fn verify_manifest(
     ];
     if object.contains_key("adaptPolicy") || object.contains_key("strategies") {
         keys.extend(["adaptPolicy", "strategies"]);
+    }
+    if object.contains_key("lifecycle") {
+        keys.push("lifecycle");
+    }
+    if object["format"].as_str() == Some("GhostFlow/control-v21") {
+        for field in [
+            "providers",
+            "calendars",
+            "naturalConditions",
+            "calendarConditions",
+            "objectives",
+            "adaptSettings",
+            "resources",
+        ] {
+            if object.contains_key(field) {
+                keys.push(field);
+            }
+        }
     }
     exact_keys(object, &keys, "manifest", ErrorCode::ManifestMismatch)?;
     let format = object["format"]
@@ -2353,6 +2571,16 @@ fn verify_manifest(
     }
     verify_debounce_descriptors(object, &mut generated_names)?;
     let mut expected = BTreeSet::<Capability>::new();
+    let lifecycle_inputs: HashSet<&str> = object
+        .get("lifecycle")
+        .and_then(Value::as_object)
+        .into_iter()
+        .flat_map(|lifecycle| {
+            ["restartReasonInput", "restartEventInput"]
+                .into_iter()
+                .filter_map(|key| lifecycle.get(key).and_then(Value::as_str))
+        })
+        .collect();
     for (field, kind) in [("inputs", "input"), ("outputs", "actuator")] {
         let mut names = HashSet::new();
         let ports = object[field]
@@ -2397,6 +2625,9 @@ fn verify_manifest(
                 &format!("manifest.{field}[{index}].type"),
             )?;
             manifest_canonical_unit(port, &format!("manifest.{field}[{index}]"))?;
+            if field == "inputs" && lifecycle_inputs.contains(name) {
+                continue;
+            }
             expected.insert(Capability {
                 kind: kind.into(),
                 name: name.into(),
@@ -2844,11 +3075,11 @@ pub fn verify_portable_package_with_signature_policy(
     }
     if !matches!(
         payload.bytecode.version.as_str(),
-        "1" | "2" | "3" | "4" | "10" | "11"
+        "1" | "2" | "3" | "4" | "10" | "11" | "21" | "22"
     ) {
         return fail(
             ErrorCode::UnsupportedBytecodeVersion,
-            "payload bytecode version must be 1, 2, 3, 4, 10 or 11",
+            "payload bytecode version must be 1, 2, 3, 4, 10, 11, 21 or 22",
         );
     }
     require_digest(&payload.bytecode.sha256, "payload.bytecode.sha256")?;
@@ -2915,13 +3146,24 @@ pub fn verify_portable_package_with_signature_policy(
             "payload bytecode version does not match its GFB header",
         );
     }
-    if (payload.bytecode.version == "11") != (payload.manifest.format == "GhostFlow/control-v10")
-        || (payload.bytecode.version == "11")
+    let module = ghostflow_core::Module::load(&bytecode).map_err(|error| PortablePackageError {
+        code: ErrorCode::BytecodeRejected,
+        message: format!("native artifact validation failed: {error}"),
+    })?;
+    let profile_version = module.bytecode_format_version();
+    if !matches!(profile_version, 1..=4 | 10 | 11 | 21) {
+        return fail(
+            ErrorCode::UnsupportedBytecodeVersion,
+            "unsupported lifecycle base profile",
+        );
+    }
+    if (profile_version == 11) != (payload.manifest.format == "GhostFlow/control-v10")
+        || matches!(profile_version, 11 | 21)
             != (identity.runtime_abi == "GhostFlow/context-scan-abi-v5")
     {
         return fail(
             ErrorCode::ManifestMismatch,
-            "GFB11 requires control-v10 and context-scan-abi-v5",
+            "GFB11/21 requires its matching manifest and context-scan-abi-v5",
         );
     }
     let source_text = String::from_utf8(source_bytes).map_err(|_| PortablePackageError {
@@ -2930,7 +3172,8 @@ pub fn verify_portable_package_with_signature_policy(
     })?;
     let manifest = parse_embedded_canonical_json(&manifest_bytes, "manifest", profile.limits)?;
     let source_map = parse_embedded_canonical_json(&source_map_bytes, "sourceMap", profile.limits)?;
-    if bytecode_version == 10 && manifest["format"].as_str() != Some("GhostFlow/control-v9") {
+    verify_lifecycle_manifest(&manifest, &bytecode)?;
+    if profile_version == 10 && manifest["format"].as_str() != Some("GhostFlow/control-v9") {
         return fail(
             ErrorCode::ManifestMismatch,
             "GFB format 10 requires a control-v9 manifest",
@@ -2942,10 +3185,19 @@ pub fn verify_portable_package_with_signature_policy(
         &bytecode_sha256,
         &identity.required_capabilities,
     )?;
+    if profile_version == 21 {
+        verify_civil_range_bindings(&manifest, &module)?;
+    }
     verify_adapt_bindings(&manifest, &bytecode)?;
     verify_debounce_bindings(&manifest, &bytecode)?;
-    if bytecode_version == 10 {
-        verify_gfb10_periodic_bindings(&manifest, &bytecode)?;
+    if profile_version == 10 {
+        let base = if bytecode_version == 22 {
+            let length = u32::from_le_bytes(bytecode[6..10].try_into().unwrap()) as usize;
+            &bytecode[10..10 + length]
+        } else {
+            &bytecode
+        };
+        verify_gfb10_periodic_bindings(&manifest, base)?;
     }
     verify_source_map(
         &source_map,
@@ -3150,13 +3402,16 @@ mod tests {
     fn fixture_for(scenario: &str) -> Vec<u8> {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let periodic = scenario.strip_prefix("gfb11-periodic-");
+        let civil = scenario.strip_prefix("civil-range-");
         let output = Command::new("node")
-            .arg(root.join(if periodic.is_some() {
+            .arg(root.join(if civil.is_some() {
+                "tests/native-civil-range-package-fixture.mjs"
+            } else if periodic.is_some() {
                 "tests/native-gfb11-periodic-package-fixture.mjs"
             } else {
                 "tests/native-portable-package-fixture.mjs"
             }))
-            .arg(periodic.unwrap_or(scenario))
+            .arg(civil.or(periodic).unwrap_or(scenario))
             .current_dir(&root)
             .output()
             .expect("Node must generate the portable-package fixture");
@@ -3170,6 +3425,91 @@ mod tests {
 
     fn fixture() -> Vec<u8> {
         fixture_for("valid")
+    }
+
+    #[test]
+    fn signed_civil_range_and_lifecycle_bind_owner_descriptors_and_predicates() {
+        let loader = |bytes: &[u8],
+                      context: &TargetLoaderContext<'_>|
+         -> std::result::Result<bool, String> {
+            let module = ghostflow_core::Module::load(bytes).map_err(|error| error.to_string())?;
+            assert_eq!(module.bytecode_format_version(), 21);
+            assert_eq!(context.manifest["format"], "GhostFlow/control-v21");
+            assert_eq!(
+                module.lifecycle().is_some(),
+                u16::from_le_bytes([bytes[4], bytes[5]]) == 22
+            );
+            Ok(true)
+        };
+        let mut current = profile(&loader);
+        let manifests = strings(&["GhostFlow/control-v21", "GhostFlow/control-v10"]);
+        let capabilities = vec![
+            Capability {
+                kind: "actuator".into(),
+                name: "pump".into(),
+                value_type: "bool".into(),
+            },
+            Capability {
+                kind: "sensor".into(),
+                name: "request".into(),
+                value_type: "bool".into(),
+            },
+        ];
+        current.supported_manifest_formats = &manifests;
+        current.available_capabilities = &capabilities;
+        for scenario in [
+            "valid",
+            "lifecycle-valid",
+            "predicate-valid",
+            "lifecycle-predicate-valid",
+            "operators-valid",
+            "lifecycle-operators-valid",
+            "predicate-result-valid",
+            "lifecycle-predicate-result-valid",
+        ] {
+            verify_portable_package(&fixture_for(&format!("civil-range-{scenario}")), &current)
+                .unwrap();
+        }
+        let reject_loader =
+            |_: &[u8], _: &TargetLoaderContext<'_>| -> std::result::Result<bool, String> {
+                panic!("re-signed civil Range mismatch reached target loader")
+            };
+        current.target_loader = &reject_loader;
+        for prefix in ["", "lifecycle-"] {
+            for scenario in [
+                "wrong-zone",
+                "wrong-slots",
+                "wrong-duration",
+                "wrong-site",
+                "wrong-name",
+                "wrong-gap",
+                "wrong-dst",
+                "wrong-when",
+                "wrong-cancel",
+                "missing-schedule",
+                "duplicate-schedule",
+                "extra-policy",
+                "wrong-format",
+                "wrong-abi",
+                "wrong-header",
+                "extra-config",
+                "predicate-tamper",
+                "predicate-result-tamper",
+            ] {
+                let error = verify_portable_package(
+                    &fixture_for(&format!("civil-range-{prefix}{scenario}")),
+                    &current,
+                )
+                .unwrap_err();
+                assert!(
+                    matches!(
+                        error.code,
+                        ErrorCode::ManifestMismatch | ErrorCode::UnsupportedBytecodeVersion
+                    ),
+                    "{prefix}{scenario}: {error:?}"
+                );
+            }
+        }
     }
 
     fn public_key() -> [u8; 32] {
@@ -3896,6 +4236,35 @@ mod tests {
                 .code,
             ErrorCode::UnsupportedBytecodeVersion
         );
+    }
+
+    #[test]
+    fn signed_gfb22_lifecycle_package_matches_core_descriptor_and_manifest() {
+        let loader = |_bytes: &[u8],
+                      _context: &TargetLoaderContext<'_>|
+         -> std::result::Result<bool, String> { Ok(true) };
+        let verified =
+            verify_portable_package(&fixture_for("restart-lifecycle-valid"), &profile(&loader))
+                .unwrap();
+        let bytecode = verified.bytecode_copy();
+        assert_eq!(&bytecode[4..6], &[22, 0]);
+        let module = ghostflow_core::Module::load(&bytecode).unwrap();
+        assert!(matches!(
+            module.bytecode_format_version(),
+            1..=4 | 10 | 11 | 18
+        ));
+        let lifecycle = module.lifecycle().unwrap();
+        assert_eq!(lifecycle.restart_reason_input, "restart_reason");
+        assert_eq!(lifecycle.restart_event_input, "restart_event");
+        assert_eq!(lifecycle.restart_reason_members[4], "Unknown");
+
+        let error = verify_portable_package(
+            &fixture_for("restart-lifecycle-manifest-tamper"),
+            &profile(&loader),
+        )
+        .unwrap_err();
+        assert_eq!(error.code, ErrorCode::ManifestMismatch);
+        assert!(error.message.contains("lifecycle metadata"));
     }
 
     #[test]

@@ -13,6 +13,7 @@ const files = [
   'tests/reference/cases-input-v1/01-source-types.json',
   'tests/reference/cases-input-v1/02-time-control.json',
   'tests/reference/cases-input-v1/03-settings-boundaries.json',
+  'tests/reference/cases-civil-range-v1/02-time-control.json',
 ];
 const accepted = files.flatMap(file => JSON.parse(fs.readFileSync(path.join(root, file), 'utf8')).cases)
   .filter(entry => entry.status === 'executable' && entry.expect === 'accept');

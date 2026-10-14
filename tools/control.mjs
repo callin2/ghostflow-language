@@ -6,7 +6,7 @@
  * load modules, or execute user supplied code.
  */
 import { compile as compileGfb, lowerCoreModule, emitGfb, CompileError } from './gfb1.mjs';
-import { buildSourceTrace } from './source-trace.mjs';
+import { buildSourceTrace, moduleFingerprint } from './source-trace.mjs';
 import { checkedAdjacentConstraints } from './constraint-proof.mjs';
 import { QUANTITY_TYPES, canonicalUnitFor, isQuantityType, quantityLiteral, quantitySuffixAt } from './quantities.mjs';
 import { TIME_TYPES, isTimeType, parseTimeLiteral, validateTimeValue } from './time-literals.mjs';
@@ -899,6 +899,10 @@ class ControlParser {
       }
       this.take(); this.maybe(';');
     } else this.expect(';', 'expected ; after input declaration');
+    if (names.some(({ name }) => ['restart_reason', 'restart_event'].includes(name.value))) {
+      if (names.length !== 1 || names[0].optional || Object.keys(options).length) error(start, 'runtime-owned restart inputs cannot be grouped, optional or conditioned');
+      return [this.node('input', start, { names: [names[0].name.value], type })];
+    }
     // The internal sensor category and its wire descriptors preserve the existing
     // typed quality lowering. There is no plain authored input execution path.
     return names.map(({ name, optional }) => this.node('sensor', start, { name: name.value, optional, type, options }));
@@ -1465,6 +1469,32 @@ function sexpr(value) {
   return String(value);
 }
 
+function wrapLifecycleGfb(bytes, lifecycle) {
+  const encoder = new TextEncoder();
+  const fields = [encoder.encode(lifecycle.restartReasonInput), Uint8Array.of(lifecycle.restartReasonMembers.length),
+    ...lifecycle.restartReasonMembers.map(member => encoder.encode(member.name)), encoder.encode(lifecycle.restartEventInput)];
+  const sized = fields.map((field, index) => {
+    if (index === 1) return field;
+    const prefix = new Uint8Array(2);
+    new DataView(prefix.buffer).setUint16(0, field.length, true);
+    return concatBytes(prefix, field);
+  });
+  const descriptor = concatBytes(...sized);
+  const prefix = new Uint8Array(10);
+  prefix.set([0x47, 0x46, 0x42, 0x31]);
+  const view = new DataView(prefix.buffer);
+  view.setUint16(4, 22, true);
+  view.setUint32(6, bytes.length, true);
+  return concatBytes(prefix, bytes, descriptor);
+}
+
+function concatBytes(...parts) {
+  const result = new Uint8Array(parts.reduce((size, part) => size + part.length, 0));
+  let offset = 0;
+  for (const part of parts) { result.set(part, offset); offset += part.length; }
+  return result;
+}
+
 function canonicalModuleForm(value, depth = 0) {
   if (depth > 128) throw new CompileError('syntax nesting limit exceeded');
   return Array.isArray(value)
@@ -1546,6 +1576,7 @@ class Lowerer {
     this.configStreams = [];
     this.usesInt = false;
     this.failedLets = new Map();
+    this.restartLifecycle = null;
     this.syntaxOnly = false;
     this.accountingExecution = false;
     this.standalone = !!ast.standalone;
@@ -1562,7 +1593,7 @@ class Lowerer {
     if (this.ast.imports.length) error(this.ast.imports[0].loc,
       'import execution requires a verified source closure and composition lowering, which are not yet supported');
     rejectName(this.ast.name, this.ast.loc, 'control');
-    this.declare(); this.validateAndPopulate();
+    this.declare(); this.configureRestartLifecycle(); this.validateAndPopulate();
     for (const check of this.ast.compositionChecks ?? []) {
       const expected = this.resolveType(check.type);
       const actual = this.expression(check.value, new Map(), { allowNext: true }, [], expected);
@@ -1596,7 +1627,7 @@ class Lowerer {
       || this.providers.size)) {
       error(this.ast.loc, 'extended Solar policy execution requires Solar-only schedules without providers or config streams');
     }
-    if (contextForms.some(form => form[0] === 'utc-range') && solarForms.length) {
+    if (contextForms.some(form => ['utc-range', 'civil-range'].includes(form[0])) && solarForms.length) {
       error(this.ast.loc, 'UTC Range cannot mix with legacy Solar or civil pulse execution');
     }
     if (emitBytecode && this.configStreams.length && solarForms.length) {
@@ -1633,6 +1664,14 @@ class Lowerer {
     if (contextForms.some(form => ['calendar-range', 'calendar-result'].includes(form[0]))) this.manifest.format = 'GhostFlow/control-v18';
     if (contextForms.some(form => form[0] === 'utc-range' && form[6] !== '0')) this.manifest.format = 'GhostFlow/control-v19';
     if (contextForms.some(form => form[0] === 'config-daily-slots-pulse' && form.length === 11)) this.manifest.format = 'GhostFlow/control-v20';
+    if (contextForms.some(form => form[0] === 'civil-range')) {
+      if (solarForms.length || contextForms.some(form => form[0] !== 'civil-range')
+        || ['configs','providers','calendars','naturalConditions','calendarConditions','objectives','resources','adaptSettings']
+          .some(key => this.manifest[key]?.length) || this.manifest.accounting || this.trueFors.length) {
+        error(this.ast.loc, 'civil Range profile requires immutable civil Range schedules without other schedule/provider/config profiles');
+      }
+      this.manifest.format = 'GhostFlow/control-v21';
+    }
     const temporalForms = this.windows.length || this.trueFors.length || solarForms.length || contextForms.length ? [
       ['temporal-context', `${RESERVED_PREFIX}now_ms`, `${RESERVED_PREFIX}time_epoch`],
       ...[...this.temporalRoots.values()].sort((left, right) => left.tag - right.tag).map(root =>
@@ -1763,6 +1802,30 @@ class Lowerer {
     if (adaptations.length > 1) error(adaptations[1].loc, 'a control may declare only one adapt policy');
     this.adaptPolicy = adaptations[0] ?? null;
   }
+  configureRestartLifecycle() {
+    const memberNames = ['PowerOn', 'Brownout', 'Watchdog', 'Software', 'Unknown'];
+    const declarations = this.ast.body.filter(item => item.kind === 'input');
+    const hasReservedEnum = this.ast.body.some(item => item.kind === 'enum' && item.name === 'RestartReason');
+    const hasReservedInput = declarations.some(item => item.names.includes('restart_reason') || item.names.includes('restart_event'));
+    if (!hasReservedEnum && !hasReservedInput) return;
+    const enumDecl = this.ast.body.find(item => item.kind === 'enum' && item.name === 'RestartReason');
+    if (!enumDecl || enumDecl.members.length !== memberNames.length
+      || enumDecl.members.some((member, index) => member.name !== memberNames[index])) {
+      error(enumDecl?.loc ?? this.ast.loc, 'RestartReason must declare PowerOn | Brownout | Watchdog | Software | Unknown in that order');
+    }
+    const reasonDecls = declarations.filter(item => item.names.includes('restart_reason'));
+    const eventDecls = declarations.filter(item => item.names.includes('restart_event'));
+    if (reasonDecls.length !== 1 || reasonDecls[0].names.length !== 1 || reasonDecls[0].type.name !== 'RestartReason'
+      || eventDecls.length !== 1 || eventDecls[0].names.length !== 1 || eventDecls[0].type.name !== 'Bool') {
+      error(this.ast.loc, 'restart lifecycle requires input restart_reason: RestartReason and input restart_event: Bool');
+    }
+    this.restartLifecycle = {
+      format: 'GhostFlow/lifecycle-v1', restartReasonInput: 'restart_reason',
+      restartReasonMembers: memberNames.map((name, value) => ({ name, value })),
+      restartEventInput: 'restart_event',
+    };
+    this.manifest.lifecycle = this.restartLifecycle;
+  }
   addInput(name, type, loc, user = false) {
     if (this.gfbInputs.some(x => x[1] === name)) error(loc, `duplicate generated input ${name}`);
     this.gfbInputs.push(['input', name, gfbType(type)]);
@@ -1865,6 +1928,12 @@ class Lowerer {
       if (item.kind === 'account-constraints') {
         if (!this.ast.body.some(entry => entry.kind === 'resource' || entry.kind === 'account')) error(item.loc, 'unsupported construct constraints; use the named-constraints parser');
         this.validateAccountConstraints(item);
+      }
+      if (item.kind === 'input') {
+        const type = this.resolveType(item.type);
+        const isLifecycleReason = this.restartLifecycle && item.names.length === 1 && item.names[0] === 'restart_reason' && type.kind === 'RestartReason';
+        if (!SCALAR_TYPES.has(type.kind) && !isLifecycleReason) error(item.type.loc, 'input must use a scalar type');
+        for (const name of item.names) { this.addInput(name, type, item.loc, true); this.symbols.get(name).type = type; }
       }
       if (item.kind === 'output') {
         const type = this.resolveType(item.type); if (!SCALAR_TYPES.has(type.kind)) error(item.type.loc, 'output must use a scalar type');
@@ -2452,7 +2521,9 @@ class Lowerer {
           if (!descriptor?.settings || descriptor.settings.min <= 0) error(rangeArg.loc, 'live Range duration config requires a positive minimum Duration');
         }
         if (!options.cancel_when) error(item.loc, `${label} range basis requires cancel_when`);
-        if (civil && (trigger.kind === 'periodic' || item.timezone !== 'UTC')) {
+        const immutableCivilRange = trigger.kind === 'daily-slots' && !trigger.selectedConfig && !rangeConfig
+          && !startConfig && !trigger.day && trigger.gridMs === 900_000;
+        if (civil && (trigger.kind === 'periodic' || item.timezone !== 'UTC' && !immutableCivilRange)) {
           error(options.basis.loc, `${label} range recurrence non-overlap cannot be proved for this civil timezone or anchor`);
         }
         let minimumSpacing;
@@ -3896,6 +3967,12 @@ class Lowerer {
       }
       if (schedule.kind === 'at') return ['at-pulse', ...base, String(schedule.atMs), when, cancel];
       if (schedule.policy.basis?.kind === 'range') {
+        if (schedule.timezone !== 'UTC' && schedule.kind === 'daily-slots' && !schedule.selectedConfig
+          && !schedule.policy.basis.durationConfigId && schedule.gridMs === 900_000) {
+          return ['civil-range', ...base, schedule.timezone, String(schedule.policy.basis.durationMs),
+            ['starts', ...schedule.slots.map(minute => String(minute * 60_000))],
+            schedule.dstMissing, schedule.dstRepeated, when, cancel];
+        }
         if (schedule.timezone !== 'UTC'
           || !['daily', 'daily-slots'].includes(schedule.kind)) error(this.ast.loc, 'executable Range requires immutable UTC Daily or DailySlots');
         if (schedule.selectedConfig) {
@@ -4246,6 +4323,12 @@ export function compileControl(source, { filename = '<control>', emitBytecode = 
       : 'named constraints require resource binding and runtime enforcement');
   }
   const lowered = new Lowerer(ast, filename).lower({ emitBytecode });
+  if (emitBytecode && lowered.manifest.lifecycle) {
+    lowered.bytes = wrapLifecycleGfb(lowered.bytes, lowered.manifest.lifecycle);
+    if (lowered.traceMetadata) {
+      lowered.traceMetadata = { ...lowered.traceMetadata, moduleFingerprint: moduleFingerprint(lowered.bytes) };
+    }
+  }
   if (lowered.manifest.signals.some(signal => signal.kind === 'after-event'
     && !signal.projections?.length)) {
     error(ast.loc, 'after_event requires an explicit after_event_any or after_event_all projection');
@@ -4280,9 +4363,9 @@ export function isExecutablePulseSchedule(item) {
     && ['trusted_only', 'hold_trusted'].includes(item.policy?.clock?.name));
 }
 
-/** Immutable UTC recurrence only; other accepted Range variants stay descriptors. */
+/** UTC recurrence or immutable provider-backed civil DailySlots. */
 export function isExecutableRangeSchedule(item) {
-  return item.timezone === 'UTC' && item.policy?.basis?.kind === 'call'
+  return (item.timezone === 'UTC' || item.scheduleType === 'DailySlots' && Array.isArray(item.selected)) && item.policy?.basis?.kind === 'call'
     && item.policy.basis.name === 'range' && item.policy?.clock?.name === 'trusted_only'
     && (item.scheduleType === 'Daily' && (!item.on && !item.calendar || item.on && item.calendar && ['day`workday`','day`offday`'].includes(item.on.value))
       && (item.at?.kind === 'literal' && item.at.raw.startsWith('time`') || item.at?.kind === 'reference')

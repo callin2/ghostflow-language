@@ -37,6 +37,14 @@ pub enum ScheduleDefinition {
         duration: DurationSetting,
         start: TimeOfDaySetting,
     },
+    /// GFB21 immutable DailySlots: host supplies tzdb occurrences, core executes Range.
+    CivilRange {
+        timezone: String,
+        starts_ms: Vec<u64>,
+        duration_ms: u64,
+        dst_missing: u8,
+        dst_repeated: u8,
+    },
     CalendarRange {
         timezone: String,
         starts_ms: Vec<u64>,
@@ -769,6 +777,34 @@ pub(crate) fn load_schedule(
                 duration_ms: duration.initial_ms,
                 duration,
                 start,
+            }
+        }
+        19 if format == 21 => {
+            let timezone = text(reader)?;
+            let duration_ms = exact(reader)?;
+            let count = usize::from(reader.u16()?);
+            if timezone == "UTC" || count == 0 || count > 96 {
+                return Err(Error::new("invalid civil Range definition"));
+            }
+            let mut starts_ms = Vec::with_capacity(count);
+            for _ in 0..count {
+                starts_ms.push(exact(reader)?);
+            }
+            validate_utc_range(&starts_ms, duration_ms)?;
+            let dst_missing = reader.u8()?;
+            let dst_repeated = reader.u8()?;
+            if starts_ms.iter().any(|start| start % 900_000 != 0)
+                || dst_missing > 1
+                || dst_repeated > 3
+            {
+                return Err(Error::new("invalid civil Range grid or DST policy"));
+            }
+            ScheduleDefinition::CivilRange {
+                timezone,
+                starts_ms,
+                duration_ms,
+                dst_missing,
+                dst_repeated,
             }
         }
         14 if format == 14 => ScheduleDefinition::AtPulse {

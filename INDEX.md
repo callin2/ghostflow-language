@@ -228,6 +228,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | --- | --- | --- |
 | [docs/plans/2026-09-28-semantic-kernel.ko.md](docs/plans/2026-09-28-semantic-kernel.ko.md) | Semantic Kernel 0.1 검토 계획 | md |
 | [docs/plans/2026-09-28-semantic-kernel.md](docs/plans/2026-09-28-semantic-kernel.md) | Semantic Kernel 0.1 review plan | md |
+| [docs/plans/2026-10-14-lifecycle-range-integration.ko.md](docs/plans/2026-10-14-lifecycle-range-integration.ko.md) | Lifecycle과 immutable IANA Range 통합 | md |
+| [docs/plans/2026-10-14-lifecycle-range-integration.md](docs/plans/2026-10-14-lifecycle-range-integration.md) | Lifecycle and immutable IANA Range integration | md |
 
 ## docs/reference/
 
@@ -497,6 +499,7 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/fixtures/issue-90-settings-periodic.ghost.md](tests/fixtures/issue-90-settings-periodic.ghost.md) | Live settings stream | md |
 | [tests/fixtures/issue-93-quantities.ghost.md](tests/fixtures/issue-93-quantities.ghost.md) | Quantity execution parity fixture | md |
 | [tests/fixtures/issue-93-quantities.input-v1.ghost.md](tests/fixtures/issue-93-quantities.input-v1.ghost.md) | Quantity execution parity fixture | md |
+| [tests/fixtures/issue541-seoul-traffic.ghost.md](tests/fixtures/issue541-seoul-traffic.ghost.md) | Seoul traffic schedule simulation fixture | md |
 | [tests/fixtures/true-for-certified.ghost.md](tests/fixtures/true-for-certified.ghost.md) | Certified hot interval | md |
 | [tests/fixtures/true-for-certified.input-v1.ghost.md](tests/fixtures/true-for-certified.input-v1.ghost.md) | Certified hot interval | md |
 
@@ -518,4 +521,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-388 documents.
+391 documents.

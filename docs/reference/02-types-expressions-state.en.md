@@ -130,7 +130,7 @@ Every case must be handled. Missing cases are errors; adding a new enum case req
 
 ## 2.5 Sensor results and explicit error flow
 
-The declared type of `sensor moisture: Percent;` is its normal payload type. Reading a sensor produces either a normal value or a fault, so it cannot be compared directly as a payload.
+The declared type of `input moisture: Percent;` is its normal payload type. Reading an external input produces either a normal value or a fault, so it cannot be compared directly as a payload. The exact reserved runtime-owned restart ports read as their declared scalar types, as specified in Chapter 5; this exception does not permit general enum acquisition inputs.
 
 ```ghost
 let dry = case moisture {

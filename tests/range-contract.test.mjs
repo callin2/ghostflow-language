@@ -72,18 +72,14 @@ test('range rejects overlapping static DailySlots intervals at compile time', as
     () => compileSource(dailySlots({ selected: '[23:45, 00:00]', duration: '30min' }), { filename: 'range-midnight-overlap.ghost.md' }),
     error => /range/i.test(diagnostics(error)) && /overlap|non.?overlap/i.test(diagnostics(error)),
   );
-  await assert.rejects(
-    () => compileSource(dailySlots({ selected: '[01:30]', duration: '90min', timezone: 'America/New_York', dstRepeated: 'both' }), { filename: 'range-dst-fold.ghost.md' }),
-    error => /range/i.test(diagnostics(error)) && /non.?overlap.*cannot be proved/i.test(diagnostics(error)),
-  );
+  const fold = await compileSource(dailySlots({ selected: '[01:30]', duration: '90min', timezone: 'America/New_York', dstRepeated: 'both' }), { filename: 'range-dst-fold.ghost.md' });
+  assert.equal(fold.bytes.readUInt16LE(4), 21, 'actual DST interval overlap is checked against host facts by Rust');
   await assert.rejects(
     () => compileSource(daily(), { filename: 'range-dst-day.ghost.md' }),
     error => /range/i.test(diagnostics(error)) && /non.?overlap.*cannot be proved/i.test(diagnostics(error)),
   );
-  await assert.rejects(
-    () => compileSource(dailySlots({ selected: '[02:30]', duration: '15min', timezone: 'America/New_York', dstMissing: 'next_valid' }), { filename: 'range-dst-gap.ghost.md' }),
-    error => /range/i.test(diagnostics(error)) && /non.?overlap.*cannot be proved/i.test(diagnostics(error)),
-  );
+  const gap = await compileSource(dailySlots({ selected: '[02:30]', duration: '15min', timezone: 'America/New_York', dstMissing: 'next_valid' }), { filename: 'range-dst-gap.ghost.md' });
+  assert.equal(gap.bytes.readUInt16LE(4), 21);
 });
 
 test('range rejects a zero duration, independently of overlap', async () => {

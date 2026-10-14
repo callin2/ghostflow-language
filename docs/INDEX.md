@@ -186,6 +186,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | --- | --- | --- |
 | [docs/plans/2026-09-28-semantic-kernel.ko.md](plans/2026-09-28-semantic-kernel.ko.md) | Semantic Kernel 0.1 검토 계획 | md |
 | [docs/plans/2026-09-28-semantic-kernel.md](plans/2026-09-28-semantic-kernel.md) | Semantic Kernel 0.1 review plan | md |
+| [docs/plans/2026-10-14-lifecycle-range-integration.ko.md](plans/2026-10-14-lifecycle-range-integration.ko.md) | Lifecycle과 immutable IANA Range 통합 | md |
+| [docs/plans/2026-10-14-lifecycle-range-integration.md](plans/2026-10-14-lifecycle-range-integration.md) | Lifecycle and immutable IANA Range integration | md |
 
 ## docs/reference/
 
@@ -245,4 +247,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.ko.md](research/GF-COMPOSE-R9-ACCEPTANCE.ko.md) | GF-COMPOSE R9: acceptance와 구현 인계 | md |
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.md](research/GF-COMPOSE-R9-ACCEPTANCE.md) | GF-COMPOSE R9: acceptance and implementation handoff | md |
 
-206 documents.
+208 documents.
