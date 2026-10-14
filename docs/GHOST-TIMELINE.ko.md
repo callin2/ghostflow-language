@@ -5,7 +5,7 @@
 
 `runtimes/node/ghost-timeline.mjs`의 `createGhostTimeline`은 Reference §6.8과
 REF-06-018의 비간섭 경계를 구현한다. 실제 Rust 판단, occurrence, accounting
-owner를 사용하는 데스크톱 reference host다. 하드웨어를 조작하거나 Driver
+owner를 사용하는 데스크톱 reference host다. 하드웨어를 조작하거나 renderer
 receipt의 진위를 보장하지 않는다.
 
 선택된 profile은 독립적인 canonical `.ghost.md` GFB10 control이다. Periodic
@@ -47,7 +47,7 @@ core를 실행해 전체 outcome/context checkpoint를 기록하고 선택된 sa
 재생은 품질을 포함한 샘플 기록이 정확히 같아야 한다. synthetic 분기는 다른
 명시적 샘플을 제공할 수 있지만 live sink, storage, accounting owner에 접근하지 않는다.
 
-`recordApplied(segment)`는 caller가 검증한 명시적인 Driver interval을 source-bound
+`recordApplied(segment)`는 caller가 검증한 명시적인 renderer 적용 interval을 source-bound
 AccountingRuntime에 전달하고 실제 snapshot을 저장·승인한다. request, safe intent,
 UI 시간으로 interval을 만들지 않는다. `persistPending()`은 보류된 저장을 다시
 시도하며 승인되지 않은 읽기는 accounting owner의 Unknown 의미를 유지한다.

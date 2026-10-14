@@ -72,7 +72,7 @@ flowchart TB
   source --> compiler
   conditions["Inputs · previous state<br>Effective settings · time"] --> core
   subgraph external["External ownership · host / Device"]
-    driver["Host / driver<br>Bindings · output application"]
+    driver["Host / renderer<br>Bindings · output application"]
     world["Physical world<br>Applied / confirmed evidence"]
     driver --> world
   end
@@ -85,7 +85,7 @@ flowchart TB
   linkStyle default stroke:#526d76,color:#102b35
 ```
 
-The language computes requested and safe intents. The host and driver apply
+The language computes requested and safe intents. The host and renderer apply
 physical effects. **An intent is not confirmation that a relay moved.** Replay
 checks virtual decisions; physical confirmation needs separate device evidence.
 

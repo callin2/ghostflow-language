@@ -100,7 +100,7 @@ and expected values does not itself prove correctness.
 Native/WASM agreement proves portability for the input tape. Both share Rust
 and can share the same misunderstanding. The field oracle adds an independent
 boundary expectation, not universal correctness or physical protection proof.
-No contact, load, missing-quality channel, driver failure, reboot, live settings,
+No contact, load, missing-quality channel, driver/renderer failure, reboot, live settings,
 power interruption, or HIL trust boundary is validated here; Device #43/#45
 retain those owners and gaps. Retain exact CI/report/artifact identities and
 fresh postmerge evidence when reporting completion.

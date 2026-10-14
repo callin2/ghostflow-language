@@ -194,8 +194,8 @@ cancelling the program's job/session or restoring every state to its previous va
 
 A binding error or VM failure rolls back VM state, guard admission and trace
 together. Do not partially change protected state or commit rejected-scan evidence.
-Logical safe outputs differ from Driver applied and physical feedback confirmed.
-Actual Driver sequencing, physical safety devices and field installation are
+Logical safe outputs differ from renderer applied and physical feedback confirmed.
+Actual renderer sequencing, physical safety devices and field installation are
 outside this profile's validation scope.
 
 Accounting declares the existing `resource` and `account`, then uses
@@ -214,7 +214,7 @@ sequence. Do not generalize the existing narrower PID engine contract into
 arbitrary resource-policy enforcement.
 
 All mandatory conditions combine as AND. Decide admission first, check safe_output
-relations on the requested candidate, then let the Driver apply it. Arbitration
+relations on the requested candidate, then let the renderer apply it. Arbitration
 priority chooses within the permitted region; it cannot bypass mandatory
 constraints, binding, provenance or recovery requirements. Retain violation causes
 separately from denials and safe transitions. Normal observations do not create new
@@ -309,7 +309,7 @@ The pump does not immediately start merely because a valve is open; follow the o
 
 Arbitrate every start request in the same tick from one snapshot.
 Permit only requests securing both ownership and time budget.
-The Driver applies outputs after logical permission commits; if persistent reservation is needed, postpone output start until that succeeds too.
+The renderer applies outputs after logical permission commits; if persistent reservation is needed, postpone output start until that succeeds too.
 Use the same request ID on process retries.
 This process does not guarantee physically simultaneous application of multiple GPIOs.
 
@@ -378,12 +378,12 @@ If feedback exists, check actual stop/valve state.
 Without feedback, state the limitation that confirmation rests on commands and the stop procedure established at installation.
 Do not claim one mode enum substitutes for physical interlocks or guarantees of actual-state feedback.
 
-Record stop evidence separately as `CommandedStop`, where the Driver reports safe-output application and completes configured cleanup/wait procedures, and `VerifiedStop`, where actual feedback is also confirmed.
+Record stop evidence separately as `CommandedStop`, where the renderer reports safe-output application and completes configured cleanup/wait procedures, and `VerifiedStop`, where actual feedback is also confirmed.
 The basic configuration permits CommandedStop and does not make feedback sensors mandatory.
 It does not display this as verified actual stopping.
 If the device does not respond or safe-output application fails, sending a command alone does not establish completed stopping.
 Only user-added rules may require VerifiedStop.
-Initial safe-output sequence/wait values may use device-driver defaults; separately display the limitation that their suitability must be checked for a particular installation.
+Initial safe-output sequence/wait values may use output-renderer defaults; separately display the limitation that their suitability must be checked for a particular installation.
 
 Stop requests also cancel/invalidate pending starts.
 Do not queue a mode-change request during operation and later transition automatically without the user's knowledge.
@@ -721,7 +721,7 @@ When ready dry is true, start begins and latches watering intent.
 Start does not store a request that briefly appeared and disappeared before readiness.
 Afterward, a filtered value of 32% retains the previous true; above 35% changes it to false.
 Reaching the stale limit since the last valid sample or receiving an explicit fault makes dry_ok=false and releases watering intent.
-Actual output cleanup follows the Driver/facility stop procedure.
+Actual output cleanup follows the renderer/facility stop procedure.
 
 Three normal samples after a fault do not prepare median(5), so it remains NotReady.
 Even after five samples accumulate and recovery conditions hold, if start=false and the latch is released, watering does not automatically resume.
@@ -787,7 +787,7 @@ Implementations that unconditionally reset counters to zero from the current wal
 Before starting, check the task's required budget.
 Secure time budget together with shared-pump ownership and settle it after use.
 If stopping at the limit is required, block early considering the next output-application interval and stop delay.
-The target execution contract must specify whether one tick of overrun is allowed or the Driver turns OFF at the exact limit time.
+The target execution contract must specify whether one tick of overrun is allowed or the renderer turns OFF at the exact limit time.
 
 Reserved budgets require a finite upper bound on ON time.
 Calculate fixed sequential watering from the execution plan.

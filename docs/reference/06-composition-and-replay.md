@@ -55,7 +55,7 @@ physical endpoint는 별도 profile과 binding revision이 소유한다. `Bool` 
 
 물리 endpoint는 MCU의 직접 GPIO에 한정하지 않는다. I/O 확장기의 채널이나 통신형
 릴레이의 채널도 같은 논리 출력 계약을 만족하면 binding 대상이 될 수 있다.
-버스 주소·채널 선택·전송 절차는 Driver와 설치 연결이 소유한다. 언어의 한 tick에서
+버스 주소·채널 선택·전송 절차는 출력 renderer와 설치 연결이 소유한다. 언어의 한 tick에서
 여러 출력 의도를 확정해도 실제 채널들이 동시에 전환된다는 보장은 생기지 않는다.
 
 ### 외부 관측과 내부 계산 연결
@@ -243,7 +243,7 @@ completed occurrence
 한 definition의 여러 instance trace를 이름이 같다는 이유로 합치지 않는다. source 위치가
 다른 문서의 node를 하나의 합성 위치로 평탄화하지 않는다. low-water 입력이 pump 요청을
 차단했다면 그 신호와 논리 결과를 말할 수 있지만, tank의 실제 물리 상태를 증명하지 않는다.
-Driver 적용 실패나 feedback 부재도 requested/safe 단계와 분리해 표시한다.
+renderer 적용 실패나 feedback 부재도 requested/safe 단계와 분리해 표시한다.
 
 ## 6.8 replay, ghost와 branch
 

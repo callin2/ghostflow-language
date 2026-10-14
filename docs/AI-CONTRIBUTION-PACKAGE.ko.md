@@ -96,6 +96,6 @@ issue/PR template은 정확한 identity, 명령/exit status, before/after 결과
 native/WASM 일치는 해당 input tape의 이식 근거다. 둘은 Rust를 공유하므로
 같은 오해도 공유할 수 있다. 현장 oracle은 독립적인 경계 기대를 추가할 뿐
 보편적인 정확성이나 물리 보호를 증명하지 않는다. 접점, 부하, missing-quality
-channel, driver failure, reboot, live settings, power interruption, HIL trust
+channel, driver/renderer failure, reboot, live settings, power interruption, HIL trust
 boundary는 검증하지 않는다. Device #43/#45가 해당 owner와 공백을 유지한다.
 완료 보고에는 정확한 CI/report/artifact identity와 새로운 postmerge 근거를 남긴다.

@@ -155,7 +155,9 @@ Bool 계산, 품질 처리, 존재 검사를 혼합하지 않는다.
 | Provenance | 값·판단·설명이 어느 원본과 의도에서 왔는지 나타내는 연결 |
 | Logical port / physical binding | 제어의 의미 있는 연결점 / 그것을 실제 설비에 연결하는 관계 |
 | Semantic DAG | 제어 의미와 의존 관계를 나타내는 그래프. 화면 배치 그래프와 구분한다. |
-| Driver | 논리 입력과 물리 신호, 출력 의도와 실제 효과를 연결하는 경계 |
+| Driver | 물리 신호에서 논리 입력을 생산하는 입력 역할 |
+| Renderer | 릴레이, 모터, 램프, 화면을 포함해 논리 출력 의도를 실제 효과에 적용하는 출력 역할 |
+| Cabinet-view | descriptor와 관찰을 소비하는 운영자 UI; `@ghostflow/cabinet-view` |
 
 ## 7.8 원문에서 reference로 찾아가기
 
@@ -170,11 +172,11 @@ Bool 계산, 품질 처리, 존재 검사를 혼합하지 않는다.
 | [시간 계약](../TIME-AND-SCHEDULE-CONTRACT.md), [연속 타이머](../CONTINUOUS-BOOL-TIMER-CONTRACT.md), [Solar](../SOLAR-SCHEDULE.md), [#23](https://github.com/callin2/ghostflow-language/issues/23), [#46](https://github.com/callin2/ghostflow-language/issues/46), [#90](https://github.com/callin2/ghostflow-language/issues/90) | [3장 시간과 일정](03-time-and-schedules.md#31-시간값과-시계-영역) |
 | [CONSTRAINTS](../CONSTRAINTS.md), LANGUAGE §5–8, [#3](https://github.com/callin2/ghostflow-language/issues/3) | [4.1 sensor와 Result 품질](04-sensors-constraints-control.md#41-sensor와-result-품질), [4.7 requested, safe, applied, confirmed](04-sensors-constraints-control.md#47-requested-safe-applied-confirmed), [4.8 공통 constraints 표기와 연산](04-sensors-constraints-control.md#48-공통-constraints-표기와-연산) |
 | [#94](https://github.com/callin2/ghostflow-language/issues/94), [#95](https://github.com/callin2/ghostflow-language/issues/95), [#96](https://github.com/callin2/ghostflow-language/issues/96) | [4.11 accounting과 budget](04-sensors-constraints-control.md#411-accounting과-budget), [4.12 continuous control objective](04-sensors-constraints-control.md#412-continuous-control-objective), [4.14 bounded adaptation](04-sensors-constraints-control.md#414-bounded-adaptation) |
-| [#68](https://github.com/callin2/ghostflow-language/issues/68), [#70](https://github.com/callin2/ghostflow-language/issues/70), [#73](https://github.com/callin2/ghostflow-language/issues/73), [#74](https://github.com/callin2/ghostflow-language/issues/74), [#88](https://github.com/callin2/ghostflow-language/issues/88), [interaction contract](../../contracts/interaction-v0/README.md) | [5.1 `config` 선언](05-settings-and-observation.md#51-config-선언), [5.3 renderer 독립 관찰 모델](05-settings-and-observation.md#53-renderer-독립-관찰-모델), [5.4 정체성과 물리적 사실의 경계](05-settings-and-observation.md#54-정체성과-물리적-사실의-경계) |
+| [#68](https://github.com/callin2/ghostflow-language/issues/68), [#70](https://github.com/callin2/ghostflow-language/issues/70), [#73](https://github.com/callin2/ghostflow-language/issues/73), [#74](https://github.com/callin2/ghostflow-language/issues/74), [#88](https://github.com/callin2/ghostflow-language/issues/88), [interaction contract](../../contracts/interaction-v0/README.md) | [5.1 `config` 선언](05-settings-and-observation.md#51-config-선언), [5.3 cabinet-view 독립 관찰 모델](05-settings-and-observation.md#53-cabinet-view-독립-관찰-모델), [5.4 정체성과 물리적 사실의 경계](05-settings-and-observation.md#54-정체성과-물리적-사실의-경계) |
 | [#89](https://github.com/callin2/ghostflow-language/issues/89), [#105](https://github.com/callin2/ghostflow-language/issues/105), [#110](https://github.com/callin2/ghostflow-language/issues/110) | [5.2 소스 변경과 운영 설정 변경](05-settings-and-observation.md#52-소스-변경과-운영-설정-변경) |
 | [#99](https://github.com/callin2/ghostflow-language/issues/99)와 연결된 #100–108 설계 기록 | [6.1 하나의 의미 모델과 여러 그래프](06-composition-and-replay.md#61-하나의-의미-모델과-여러-그래프), [6.3 parameters, settings, dependencies와 bindings](06-composition-and-replay.md#63-parameters-settings-dependencies와-bindings), [5.2 소스 변경과 운영 설정 변경](05-settings-and-observation.md#52-소스-변경과-운영-설정-변경) |
 | LANGUAGE §9–12, [문법 비교의 구문 확장](../LANGUAGE-EXAMPLES.md), Programming in GhostFlow §10–12 | [1.6 대표 표기, 참고 별칭과 역사적 대안](01-source-and-syntax.md#16-대표-표기-참고-별칭과-역사적-대안), [6.8 replay, ghost와 branch](06-composition-and-replay.md#68-replay-ghost와-branch), [6.10 `syntax`, `quote`, splice의 문법](06-composition-and-replay.md#610-syntax-quote-splice의-문법) |
-| [SOURCE-SAFETY-TRACE](../SOURCE-SAFETY-TRACE.md), [#42](https://github.com/callin2/ghostflow-language/issues/42) | [5.3 renderer 독립 관찰 모델](05-settings-and-observation.md#53-renderer-독립-관찰-모델), [7.4 의미가 유지되는 변환](07-semantic-rules-and-index.md#74-의미가-유지되는-변환) |
+| [SOURCE-SAFETY-TRACE](../SOURCE-SAFETY-TRACE.md), [#42](https://github.com/callin2/ghostflow-language/issues/42) | [5.3 cabinet-view 독립 관찰 모델](05-settings-and-observation.md#53-cabinet-view-독립-관찰-모델), [7.4 의미가 유지되는 변환](07-semantic-rules-and-index.md#74-의미가-유지되는-변환) |
 | [Coding FAQ 1–41](../language_faq.md) | [8장 전체 책임표](08-language-runtime-and-device-boundaries.md#83-faq-전체-책임표), [언어 결정과 작성자 정책](08-language-runtime-and-device-boundaries.md#86-언어-결정과-작성자가-정하는-정책) |
 
 언어의 새 결정을 추가할 때 해당 기능의 본문, Why, 예제, 이 색인을 함께 갱신한다.

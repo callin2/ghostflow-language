@@ -103,7 +103,7 @@ stream admission 전에 거부한다. 식별되고 권한이 확인된 변경의
 설정 descriptor는 stable setting ID, 소스 이름, 타입, 기본값, 접근 권한, 범위·증분,
 label과 소스·의도 provenance를 제공한다. renderer는 이 정보로 Duration 입력, Bool 선택,
 범위가 있는 수치 입력 같은 typed form을 만들 수 있다. slider, dial, 좌표, 색, 배치는
-renderer가 정한다. `label`이나 widget 모양으로 설정 identity 또는 검증 규칙을 추론하지
+cabinet view가 정한다. `label`이나 widget 모양으로 설정 identity 또는 검증 규칙을 추론하지
 않는다.
 
 `Temperature` 설정 descriptor는 canonical `K` 값과 별도로 선택된 `displayUnit` (`°C` 또는
@@ -275,9 +275,21 @@ input restart_reason: RestartReason;
 이 선언은 control 본문의 단편이다. 생산자는 하드웨어가 확인한 원인만 공급하며 근거가
 없으면 `Unknown`이다. `PowerOn`만으로 정전 복구라고 단정하지 않는다. 이 입력은 한 run
 동안 고정된다. 자동 재개, 대기, 취소 후 원위치 이동은 작성자가 state 전이로 정한다.
-첫 판단 전 물리 출력은 Driver의 설치 계약이 소유한다.
+첫 판단 전 물리 출력은 Device 설치 정책과 출력 renderer가 소유한다.
 
-## 5.3 renderer 독립 관찰 모델
+
+
+
+## 5.3 cabinet-view 독립 관찰 모델
+
+<a id="53-renderer-독립-관찰-모델"></a>
+
+<a id="53-renderer-independent-observation-model"></a>
+
+
+
+이 장에서 입력창과 관찰 화면을 뜻하던 “renderer”는 cabinet view/UI (`@ghostflow/cabinet-view`)를 가리킨다. 출력 renderer는 §8.2에 따라 논리 출력 의도를 적용하며 UI 표시는 applied 또는 confirmed 증거가 아니다.
+
 
 관찰 계약은 의미를 전달하며 화면을 지정하지 않는다.
 
@@ -291,7 +303,7 @@ input restart_reason: RestartReason;
 | explanation | 어떤 평가가 현재 결과를 뒷받침했는가? | 같은 completed scan |
 
 이 계약에는 widget, layout, 좌표, 색상이나 특정 화면의 visibility 정책을 넣지 않는다.
-여러 renderer는 같은 descriptor와 실행 정체성을 서로 다르게 보여줄 수 있지만 값, 권한,
+여러 cabinet view는 같은 descriptor와 실행 정체성을 서로 다르게 보여줄 수 있지만 값, 권한,
 검증, command availability를 바꾸지 않는다.
 
 ### descriptor와 snapshot
@@ -302,7 +314,7 @@ provenance를 갖는다. 상태, 타이머, 정확한 counter, 설정, 입력, �
 추론하지 않는다.
 
 설정 변경과 관찰은 서로 다른 capability다. `state`, timer 또는 output descriptor에 값이
-보인다는 사실은 write 권한을 만들지 않는다. metadata producer나 renderer도 소스에 없는
+보인다는 사실은 write 권한을 만들지 않는다. metadata producer나 cabinet view도 소스에 없는
 `write`·`execute` 권한을 추가할 수 없다. command 권한이 내부 state 직접 변경 권한을 뜻하지
 않으며, operator 설정 권한도 source 편집 권한을 뜻하지 않는다.
 
@@ -331,7 +343,7 @@ snapshot만으로는 두 새로고침 사이에 발생하고 해제된 alarm을 
 command result는 요청 수신, 거부, 시작, 완료, 취소와 실패를 서로 다른 결과로 보존한다.
 `received → rejected | started → completed | cancelled | failed`는 이 구분을 설명하는 lifecycle
 표기이며 확정된 source 문법이나 record enum·전이 schema가 아니다. command ID와 execution
-identity가 같아야 하며, renderer나 callback이 별도의 상태기를 추론하지 않는다. bounded
+identity가 같아야 하며, cabinet view나 callback이 별도의 상태기를 추론하지 않는다. bounded
 history에서 record를 내보내기 전에 잃으면 gap을 보고한다. alarm은 현재 active 여부와
 raise/clear event를 함께 사용하여 짧은 발생도 보존한다. command와 alarm의 최종 record
 직렬화와 전송은 실행 환경의 관찰 계약이다. 별도의 `command`·`alarm` 소스 선언이나
@@ -343,7 +355,7 @@ severity 키워드는 이 언어에 두지 않는다. 제어 반응은 명시된
 
 설명은 하나의 output 결과에서 실제로 평가한 입력, 상태, timer, 이름 있는 중간값,
 predicate와 제약으로 이어지는 방향성 비순환 그래프다. 공유 조건은 하나의 stable node로
-유지한다. renderer가 필요하면 특정 output을 root로 tree처럼 펼칠 수 있다.
+유지한다. cabinet view가 필요하면 특정 output을 root로 tree처럼 펼칠 수 있다.
 
 각 completed scan의 평가에는 적어도 `evaluated`, 실제 value/status와 `supportsResult`의
 의미가 필요하다. short-circuit로 평가하지 않은 branch를 실제 근거처럼 표시하지 않는다.
@@ -374,7 +386,7 @@ source, Program, settings, binding 또는 run의 snapshot과 explanation을 이�
 또는 mismatch로 처리한다.
 
 GhostFlow가 관찰하는 것은 입력과 제어 판단이다. `pump = true`는 출력 의도이며 펌프의
-전기적 인가, 회전 또는 유량을 증명하지 않는다. requested intent, safe intent, host/Driver의
+전기적 인가, 회전 또는 유량을 증명하지 않는다. requested intent, safe intent, host/renderer의
 적용 결과, 실제 feedback을 각각 보존한다. feedback이 없으면 unknown이다. 저수위 신호가
 관수를 막았다는 설명을 “탱크가 실제로 비었다”는 주장으로 바꾸지 않는다.
 

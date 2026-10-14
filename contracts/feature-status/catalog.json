@@ -3244,7 +3244,7 @@
       "family": "Completed-scan default/effective/override",
       "clause": {
         "path": "docs/reference/05-settings-and-observation.md",
-        "heading": "5.3 renderer 독립 관찰 모델"
+        "heading": "5.3 cabinet-view 독립 관찰 모델"
       },
       "owner": "HOST",
       "maturity": "EXPERIMENTAL",
@@ -3272,7 +3272,7 @@
       "family": "Renderer-neutral state and event observation",
       "clause": {
         "path": "docs/reference/05-settings-and-observation.md",
-        "heading": "5.3 renderer 독립 관찰 모델"
+        "heading": "5.3 cabinet-view 독립 관찰 모델"
       },
       "owner": "HOST",
       "maturity": "EXPERIMENTAL",
@@ -3424,7 +3424,7 @@
         "family": "Completed-scan Boolean requested-output evaluated-path support slice",
         "clause": {
           "path": "docs/reference/05-settings-and-observation.en.md",
-          "heading": "5.3 Renderer-independent observation model"
+          "heading": "5.3 Cabinet-view-independent observation model"
         },
         "owner": "CORE",
         "maturity": "EXPERIMENTAL",
@@ -3992,7 +3992,7 @@
         }
       ],
       "gaps": [
-        "Host simulation does not establish Driver application or physical confirmation."
+        "Host simulation does not establish renderer application or physical confirmation."
       ],
       "issues": [
         339,
@@ -4191,7 +4191,7 @@
         }
       ],
       "gaps": [
-        "The exact oracle covers accepted At pulse scans and logical requested/safe intent; Window/Run admission and physical Driver application are not claimed."
+        "The exact oracle covers accepted At pulse scans and logical requested/safe intent; Window/Run admission and physical renderer application are not claimed."
       ],
       "issues": [
         213
@@ -4429,7 +4429,7 @@
         }
       ],
       "gaps": [
-        "Unbound descriptors grant no execution authority. Explicitly bound GFB17 supports finite Bool GFB1 v1/v3 controls only, with one registry for all supported writers and duplicate writers refused. Contextual/accounting/continuous/PID profiles, shared import composition, cooperative multi-control arbitration and session leases are outside this profile. Physical output ABI, Driver application and hardware confirmation are not claimed. The bounded standalone Station adapter is retained for its concrete consumers."
+        "Unbound descriptors grant no execution authority. Explicitly bound GFB17 supports finite Bool GFB1 v1/v3 controls only, with one registry for all supported writers and duplicate writers refused. Contextual/accounting/continuous/PID profiles, shared import composition, cooperative multi-control arbitration and session leases are outside this profile. Physical output ABI, renderer application and hardware confirmation are not claimed. The bounded standalone Station adapter is retained for its concrete consumers."
       ],
       "issues": [
         157,
@@ -5133,7 +5133,7 @@
         }
       ],
       "gaps": [
-        "Same checked canonical GFB11 Temperature/Percent PID source executes on native/WASM over identical accepted sensor-conditioned rails. Actual requested92/safe20 and separately declared applied20/feedback17 fixture inputs retain their distinct identities and quality flag. Perturbed applied/feedback observations cannot replace safe saturation. Repeated constrained deadlines followed by release97 prove conditional_safe rejects integral growth. Public applied/feedback/provenance inputs are explicit host fixtures, not a production Driver receipt or feedback-admission ABI, physical verification, continuous resource arbitration binding, or an independent native sensor producer. The selected policy is read from the compiled descriptor; production trace schema is unchanged."
+        "Same checked canonical GFB11 Temperature/Percent PID source executes on native/WASM over identical accepted sensor-conditioned rails. Actual requested92/safe20 and separately declared applied20/feedback17 fixture inputs retain their distinct identities and quality flag. Perturbed applied/feedback observations cannot replace safe saturation. Repeated constrained deadlines followed by release97 prove conditional_safe rejects integral growth. Public applied/feedback/provenance inputs are explicit host fixtures, not a production renderer receipt or feedback-admission ABI, physical verification, continuous resource arbitration binding, or an independent native sensor producer. The selected policy is read from the compiled descriptor; production trace schema is unchanged."
       ],
       "issues": [
         256
@@ -5220,7 +5220,7 @@
         }
       ],
       "gaps": [
-        "Source-bound reference accounting explanation consumes caller-validated intervals and trusted host bindings/time. Revisions are local to each ledger owner; recovery uses the durable snapshot. No frontend renderer, physical evidence, automatic on_time VM start/cutoff, API integration or storage-medium certification is claimed."
+        "Source-bound reference accounting explanation consumes caller-validated intervals and trusted host bindings/time. Revisions are local to each ledger owner; recovery uses the durable snapshot. No frontend cabinet-view, physical evidence, automatic on_time VM start/cutoff, API integration or storage-medium certification is claimed."
       ],
       "issues": [
         260
@@ -5352,7 +5352,7 @@
         }
       ],
       "gaps": [
-        "The same checked canonical GFB12 immutable UTC DailySlots Range and global Bool safety requirement execute in actual native and framed WASM with identical complete VM/context traces and every durable checkpoint. Requested output remains active while safe output is blocked at08:06/08:07, resumes safely at08:08 without a new admission, remains active at08:09:59.999 and finishes at08:10. The consumed occurrence checkpoint remains unchanged. No Driver applied/confirmed output, physical safety certification, non-UTC/DST, live Range setting binding, generic Run overlap or external publishing-host lifecycle implementation is claimed."
+        "The same checked canonical GFB12 immutable UTC DailySlots Range and global Bool safety requirement execute in actual native and framed WASM with identical complete VM/context traces and every durable checkpoint. Requested output remains active while safe output is blocked at08:06/08:07, resumes safely at08:08 without a new admission, remains active at08:09:59.999 and finishes at08:10. The consumed occurrence checkpoint remains unchanged. No renderer applied/confirmed output, physical safety certification, non-UTC/DST, live Range setting binding, generic Run overlap or external publishing-host lifecycle implementation is claimed."
       ],
       "issues": [
         264
@@ -5738,7 +5738,7 @@
       "family": "Read-only observation cannot create write capabilities",
       "clause": {
         "path": "docs/reference/05-settings-and-observation.en.md",
-        "heading": "5.3 Renderer-independent observation model"
+        "heading": "5.3 Cabinet-view-independent observation model"
       },
       "owner": "CORE",
       "maturity": "EXPERIMENTAL",
@@ -6724,7 +6724,7 @@
       "family": "Renderer-neutral settings preserve typed validation and permission",
       "clause": {
         "path": "docs/reference/05-settings-and-observation.en.md",
-        "heading": "5.3 Renderer-independent observation model"
+        "heading": "5.3 Cabinet-view-independent observation model"
       },
       "owner": "HOST",
       "maturity": "EXPERIMENTAL",
@@ -6767,7 +6767,7 @@
         }
       ],
       "gaps": [
-        "Two renderer-neutral presentation fixtures preserve the compiled Duration descriptor and submit identical unrounded canonical values. Actual native and framed-WASM outcomes/settings/checkpoints agree: authorized off-grid and type-invalid payloads emit SettingsInvalid; designer edits reject before admission; recovery restores a valid Result. Source-bound schema forgery cannot alter type, step, authority, access or provenance. This is conformance-only fixture and reference host evidence, not production frontend UI, authentication, command binding or Device adoption."
+        "Two cabinet-view-neutral presentation fixtures preserve the compiled Duration descriptor and submit identical unrounded canonical values. Actual native and framed-WASM outcomes/settings/checkpoints agree: authorized off-grid and type-invalid payloads emit SettingsInvalid; designer edits reject before admission; recovery restores a valid Result. Source-bound schema forgery cannot alter type, step, authority, access or provenance. This is conformance-only fixture and reference host evidence, not production frontend UI, authentication, command binding or Device adoption."
       ],
       "issues": [
         280
@@ -7432,7 +7432,7 @@
         }
       ],
       "gaps": [
-        "Caller-validated applied intervals and source-bound reference ledger admission: (5,65] retains 15s plus 10s, so used=25s and a 5s reserve fits. Native/WASM known decisions, rejected snapshot preservation and duplicate retry agree; only the WASM reference adapter exercises durable acknowledgement and pending Unknown. Native serialization is not persistence certification. No automatic VM output/resource admission, authenticated Driver receipts or physical verification."
+        "Caller-validated applied intervals and source-bound reference ledger admission: (5,65] retains 15s plus 10s, so used=25s and a 5s reserve fits. Native/WASM known decisions, rejected snapshot preservation and duplicate retry agree; only the WASM reference adapter exercises durable acknowledgement and pending Unknown. Native serialization is not persistence certification. No automatic VM output/resource admission, authenticated renderer receipts or physical verification."
       ],
       "issues": [
         209
@@ -8613,7 +8613,7 @@
       "family": "Explicit retained event sequence gaps and separate completed snapshots",
       "clause": {
         "path": "docs/reference/05-settings-and-observation.en.md",
-        "heading": "5.3 Renderer-independent observation model"
+        "heading": "5.3 Cabinet-view-independent observation model"
       },
       "owner": "HOST",
       "maturity": "EXPERIMENTAL",

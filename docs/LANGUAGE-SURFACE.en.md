@@ -147,7 +147,7 @@ Feedback sensors, pressure, and flow are not mandatory inputs to this basic exam
 
 Computing output intent and the actual output's start, stop, and safe state on failure are different boundaries.
 The GhostFlow VM only computes connection expressions and safety constraints and returns requested/safe intent.
-The host/Driver owns the fail-safe policy that turns all outputs OFF on boot, failure, or disconnection, and its application timing.
+The host/renderer owns the fail-safe policy that turns all outputs OFF on boot, failure, or disconnection, and its application timing.
 Do not interpret the omitted initial value of an `output` declaration as expressing such a policy.
 
 ### Single-valve watering example illustrating schedules and timers

@@ -84,7 +84,7 @@
 ## Phase 7 — 외부 경계 audit
 
 - [ ] Driver 7건 evidence contract audit
-- [ ] Renderer 3건 descriptor/authority audit
+- [ ] Cabinet-view 3건 descriptor/authority audit
 - [ ] Design 7건 graph/effect/language boundary audit
 - [ ] External host/provider/deployment 6건 revision/coverage/offline/durability audit
 

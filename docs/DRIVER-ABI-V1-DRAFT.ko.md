@@ -3,6 +3,8 @@
 
 # Host–Driver C ABI v1 초안
 
+기존 Host–Driver 제목과 `gfdrv_*` 이름은 공통 native adapter ABI를 설명한다. 입력 driver와 출력 renderer 역할은 이 host 경계를 공유하며 출력 쓰기·적용은 renderer 역할이다. 소스는 `farm-device-drivers`에 속하고 Device는 adapter를 host와 board에 통합한다. 이 용어 정리는 초안 ABI를 채택하거나 이름을 바꾸지 않는다.
+
 ## 상태와 권한
 
 이슈 #117: 검토를 위한 문서 전용 제안이며 실제 소비자의 채택은 아직 이루어지지 않았다.

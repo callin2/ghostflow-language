@@ -15,7 +15,7 @@ the VM trace. It does not discover devices or issue GPIO commands.
 `station.mjs` exposes the shared pump's mode/ownership/quota/durability boundary;
 `policy.mjs` binds the standalone constraint templates to one station. The station
 cannot verify that a JavaScript persistence callback really made bytes durable,
-or that a Driver physically stopped. Those are host responsibilities.
+or that a renderer physically stopped. Those are host responsibilities.
 
 Use `requestStop()` synchronously and apply its safe directive before awaiting
 storage. `advance()` returns an actionable safe directive on lease/day expiry.
