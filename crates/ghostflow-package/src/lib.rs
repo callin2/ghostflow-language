@@ -2281,10 +2281,22 @@ fn verify_civil_range_bindings(manifest: &Value, module: &ghostflow_core::Module
         return Err(mismatch("GFB21 requires control-v21"));
     }
     if module.objective_requirements().is_some()
-        || module.temporal_requirements().is_some_and(|requirements| requirements.strategies.iter().any(|strategy| !strategy.windows.is_empty()))
-        || module.true_for_requirements().is_some_and(|requirements| requirements.strategies.iter().any(|strategy| !strategy.signals.is_empty()))
+        || module.temporal_requirements().is_some_and(|requirements| {
+            requirements
+                .strategies
+                .iter()
+                .any(|strategy| !strategy.windows.is_empty())
+        })
+        || module.true_for_requirements().is_some_and(|requirements| {
+            requirements
+                .strategies
+                .iter()
+                .any(|strategy| !strategy.signals.is_empty())
+        })
     {
-        return Err(mismatch("signed GFB21 does not admit other executable profiles"));
+        return Err(mismatch(
+            "signed GFB21 does not admit other executable profiles",
+        ));
     }
     for field in [
         "configs",
