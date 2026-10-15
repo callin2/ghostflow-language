@@ -1078,6 +1078,13 @@
       "translation": "examples/vfd-speed.input-v1.ghost.ko.md",
       "sourceSha256": "ce9923f9d50aa0c6b4a36991ae7e065fbd742c997638ab35af04fcada8d5e73c",
       "translationSha256": "e20b7b0d55a0cda1448469cc9fe0c7c3ef584559d4fa84f3e664675c4e8dbe7d"
+    },
+    {
+      "source": "docs/INCIDENT-REPLAY.md",
+      "sourceLanguage": "en",
+      "translation": "docs/INCIDENT-REPLAY.ko.md",
+      "sourceSha256": "e0be08a89fb5525a64eab63492c0ea94119e2ca7f6ef3bb29db09251020e7921",
+      "translationSha256": "987f8fc7c43db30771b42e48232ae11dbaa18cd19df701fa1f72b5c5c4101187"
     }
   ],
   "exclusions": [
