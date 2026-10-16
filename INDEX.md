@@ -261,6 +261,7 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/reports/2026-10-03-stale-branch-reconciliation.md](docs/reports/2026-10-03-stale-branch-reconciliation.md) | Stale branch reconciliation — 2026-10-03 | md |
 | [docs/reports/2026-10-05-input-531-consumer-gates.md](docs/reports/2026-10-05-input-531-consumer-gates.md) | Issue 531 independent review and consumer adoption gates | md |
 | [docs/reports/2026-10-05-input-531-integration.md](docs/reports/2026-10-05-input-531-integration.md) | Issue 531 integration checkpoint and consumer handoff | md |
+| [docs/reports/2026-10-16-predecessor-language-reference-cleanup.md](docs/reports/2026-10-16-predecessor-language-reference-cleanup.md) | GhostFlow predecessor-language reference cleanup — 2026-10-16 | md |
 
 ## docs/research/
 
@@ -517,4 +518,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-387 documents.
+388 documents.

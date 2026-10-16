@@ -530,8 +530,8 @@
       "source": "docs/SCAN-TAPE-PARITY.md",
       "sourceLanguage": "en",
       "translation": "docs/SCAN-TAPE-PARITY.ko.md",
-      "sourceSha256": "51e6571ff7b4fed1aee1bd738f163a93c7e1db2d841c6f6c4aeab507048fc4d3",
-      "translationSha256": "ee7ba16de9de4f3ece13fd6062747ae89658de1833beee6c5d5ecac6dae7a37c"
+      "sourceSha256": "ba3540f3a06745ea901afb5d3f549b4a0f56a14e28411f013159cff73f6c1877",
+      "translationSha256": "c8664c63aa446b83b46e8f9eef21d0cab07897f7545420af68218e42bcae18c0"
     },
     {
       "source": "docs/SCENARIO-RUNNER.md",
@@ -1396,6 +1396,10 @@
     {
       "path": "docs/reports/2026-10-05-input-531-integration.md",
       "reason": "Owner implementation, verification and consumer handoff report; execution evidence may remain in one language."
+    },
+    {
+      "path": "docs/reports/2026-10-16-predecessor-language-reference-cleanup.md",
+      "reason": "Dated record for user-authorized removal of never-deployed predecessor-language references; tracked by GhostFlow System #235 and ghostflow-language #551."
     }
   ]
 }
