@@ -1400,6 +1400,10 @@
     {
       "path": "docs/reports/2026-10-12-io-role-terminology-audit.md",
       "reason": "Execution audit receipt and intentional historical/ABI terminology exceptions; report may remain in one language."
+    },
+    {
+      "path": "docs/reports/2026-10-16-intent-link-warnings-553.md",
+      "reason": "Issue 553 implementation decisions, source-update and verification evidence; execution reports may remain in one language."
     }
   ]
 }
