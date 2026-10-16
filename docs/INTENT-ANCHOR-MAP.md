@@ -139,6 +139,46 @@ unsigned standalone map detects coordinated replacement.
 
 ## Diagnostics and acceptance vectors
 
+### Default behavior coverage warnings (#553)
+
+The compiler, CLI, and package creation report intent-link coverage warnings by
+default. `GF_INTENT_LINK_MISSING` applies to each unlinked top-level `connection`, `next`, `require`, `mutex`, `let`,
+`function`, `signal`, `schedule`, or `timer` statement. A link covers only its
+own target statement; linking a declaration does not cover later behavior.
+Standalone `input`, `output`, `state`, `config`, `parameter`, and `enum`
+declarations are not counted. Coverage is structural and statement-local: the
+warning does not infer transitive behavior, prove an assertion, or determine
+whether an intent is correct or confirmed. Explicit active links satisfy this
+check even when they describe an unconfirmed assumption; that status remains
+unconfirmed.
+
+`GF_INTENT_LINK_COVERAGE_UNSUPPORTED` reports behavioral owners for which the
+current contract has no link target: top-level `adapt`, `objective`, `account`,
+`account-constraints`, `local-constraints`, `shared-constraints`,
+`adapt-setting`, and `degraded`, plus nested `connection`, `connect`, `next`,
+`require`, and `mutex` statements. These warnings are emitted even when other
+statements have links. Their hints say not to insert an orphan link and explain
+that the copyable example shows standalone syntax, not an immediate repair;
+supporting these targets needs a separate contract change. Nonexecutable
+standalone resource-policy descriptors are exempt.
+
+Warnings carry the original source span, a copyable anchor/link example, and an
+actionable hint. The example labels its policy as an unconfirmed AI assumption
+and includes `recover(false)` as an explicit example fault policy. Up to 20
+warning records are returned. When more than 20 are found, the collection marks
+`limit: 20` and `truncated: true`; exactly 20 does not imply truncation. For an
+imported definition, coverage is reported once per source statement when that
+definition is instantiated. Unused imports do not produce these warnings.
+Imported intent metadata remains unsupported, so the hint explains that a root
+link cannot cover an imported statement and that instance-qualified links need
+a separate contract.
+
+These warnings cover supported linkable top-level behavior and known behavioral
+owners without link support; they do not claim semantic completeness. Existing
+malformed, orphaned, missing-anchor and interaction-schema diagnostics keep
+their existing behavior. The warnings add no executable construct, GFB bytes,
+or runtime behavior.
+
 Diagnostics identify the original filename, line, and column and cover:
 
 1. valid confirmed intent to output, premise to constraint, fallback to schedule,

@@ -159,6 +159,37 @@ test('GF-TEST-portable-package: deterministic package preserves exact literate, 
   assert.equal(verified.bytecode.copy()[0], 0x47, 'each bytecode copy is detached from verified state');
 });
 
+test('package creation reports fresh replay intent warnings without changing the signed envelope', async () => {
+  const source = '```ghost\ncontrol Unlinked { output pump: Bool; pump <- true; }\n```\n';
+  const compilation = await compileSource(source, { filename: 'unlinked.ghost.md' });
+  const replay = await compileSource(source, { filename: 'unlinked.ghost.md' });
+  const current = await currentKeyPromise;
+  const options = {
+    signers: [{ keyId: current.keyId, privateKey: current.privateKey }],
+    verifyCompilation: () => replay,
+  };
+  const reported = [];
+  const packageValue = await buildPortablePackage({ ...compilation, warnings: [] }, identity, {
+    ...options, onDiagnostic: diagnostic => reported.push(diagnostic),
+  });
+  assert.deepEqual(reported, replay.warnings);
+  assert.ok(reported.some(item => item.code === 'GF_INTENT_LINK_MISSING'));
+  const messages = [];
+  const originalWarn = console.warn;
+  let defaultPackage;
+  try {
+    console.warn = message => messages.push(message);
+    defaultPackage = await buildPortablePackage(compilation, identity, options);
+  } finally { console.warn = originalWarn; }
+  assert.ok(messages.some(message => /unlinked\.ghost\.md:2:\d+: warning GF_INTENT_LINK_MISSING:/.test(message)));
+  assert.ok(messages.some(message => /ghostflow:anchor id=/.test(message) && /ghostflow:link id=/.test(message)));
+  assert.equal(serializePortablePackage(packageValue), serializePortablePackage(defaultPackage));
+  assert.deepEqual(Object.keys(packageValue).sort(), ['format', 'payload', 'payloadSha256', 'signatures']);
+  assert.equal('warnings' in packageValue.payload, false);
+  assert.equal('diagnostics' in packageValue.payload, false);
+  assert.deepEqual(Buffer.from(packageValue.payload.bytecode.contentBase64, 'base64'), Buffer.from(compilation.bytes));
+});
+
 test('GF-TEST-portable-package-intent-map: a re-signed replacement source map still fails strict intent provenance recovery', async () => {
   const source = `<!-- ghostflow:anchor id=GF-INT-PUMP-001 kind=intent status=confirmed origin=user -->
 펌프를 켜 주세요.

@@ -201,8 +201,8 @@
       "source": "docs/COMPILER-DIAGNOSTICS.md",
       "sourceLanguage": "en",
       "translation": "docs/COMPILER-DIAGNOSTICS.ko.md",
-      "sourceSha256": "86955c5f0ef22919dd9907e8c3563d8eedace1e03db096663dc5d2e541c249eb",
-      "translationSha256": "de2865bc440754dc222a8610590e05155604b287112b023e2d34d44ba464f290"
+      "sourceSha256": "64b810c1b6b3660f4a19df077cf912526845399ef99046f20f886168fd5c47f8",
+      "translationSha256": "f5a089cfd9d65c6d5b358faab8528bd9860614d96372f512258c427c6f66143b"
     },
     {
       "source": "docs/CONSTRAINTS.md",
@@ -285,8 +285,8 @@
       "source": "docs/INTENT-ANCHOR-MAP.md",
       "sourceLanguage": "en",
       "translation": "docs/INTENT-ANCHOR-MAP.ko.md",
-      "sourceSha256": "692fcaae6b7cc4e49909cdf68dea04e7af369102a1b8b5ea716fedce12051f13",
-      "translationSha256": "269b5ba220189b1ba95f77ea59f96ed94df5db6ec45e56348d467511a33f4bda"
+      "sourceSha256": "d56112071ae4f3843315e4480b2e061f7f6d225e186460a497eb8c0d8cf50210",
+      "translationSha256": "8d0c08083afdf27ba5bc8d8862b71fb85bcadedae4ebb7ffcf33cafd9dd7693b"
     },
     {
       "source": "docs/KEYBOARD-HOST.md",
@@ -635,8 +635,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "3dadb9a6b1bcac8d2ba35a5076449ab40009ab9b04698bf418581a7fac7a84c0",
-      "translationSha256": "b90f72b9bb7646fb229a94650ff243f1f8b7aaeaf60891fa57fac43280fa54fb"
+      "sourceSha256": "30966f16d3d3ad668fca87541a9bc4af6b5aeb728119ad36a83518a0aace661b",
+      "translationSha256": "5d5b48b3bc9e94ac11eb4d29ac9d1db7af719a1476e5a7c9bf20a5640e4ed2e8"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",

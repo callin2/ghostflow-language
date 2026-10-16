@@ -5,6 +5,21 @@
 
 ## 미출시
 
+### 2026-10-16 — 기본 intent-link 경고와 실행 가능한 안내 ([#553](https://github.com/callin2/ghostflow-language/issues/553))
+
+버그 수정: compiler, CLI 및 package 생성이 원본 위치와 실행 가능한 안내를 포함한
+intent-link 범위 경고를 보고합니다. `GF_INTENT_LINK_MISSING`은 link되지 않은 top-level
+connection/next/require/mutex/let/function/signal/schedule/timer 문장을 다룹니다.
+`GF_INTENT_LINK_COVERAGE_UNSUPPORTED`는 지원 link target이 없는 top-level
+adapt/objective/account/constraint/adapt-setting/degraded 소유자와 nested
+connection/connect/next/require/mutex 문장을 식별하며, 안내문은 예시가 즉시 적용할
+수정이 아님을 밝힙니다. 선언은 뒤의 동작을 포함하지 않으며 경고는 전이 의미를
+추론하거나 intent를 확인하지 않습니다. 미확인 assumption은 계속 미확인입니다. 경고는
+최대 20개이며 초과 시 잘림 metadata를 표시합니다. 인스턴스화한 import 정의도 원본
+문장에서 보고합니다. 기존 오류 동작, 실행 결과, GFB 바이트 및 runtime 동작은
+유지됩니다. 회귀 검사는 `tests/intent-link-diagnostics.test.mjs`와 CLI/package 회귀
+검사에 포함됩니다.
+
 ### 2026-10-06 — 실행 가능한 의도 출처 진단 ([#537](https://github.com/callin2/ghostflow-language/issues/537))
 
 Reference 1.2 의도 링크 계약의 버그 수정입니다. 스키마 요청에서 링크 없는

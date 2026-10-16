@@ -3,7 +3,10 @@
 
 # 공개 컴파일러 진단
 
-브라우저 및 Node 도구 체인의 `compileSource`는 `diagnosticEnvelope`를 반환합니다. 컴파일에 성공하면 `diagnostics` 배열은 비어 있습니다. 위치가 있는 컴파일 실패는 던져진 오류의 같은 속성에 포함되어 거부됩니다.
+브라우저 및 Node 도구 체인의 `compileSource`는 `diagnosticEnvelope`를 반환합니다.
+성공한 컴파일에도 경고가 `diagnostics`에 포함될 수 있으며, 경고가 없는 성공 컴파일은
+빈 배열을 반환합니다. 위치가 있는 컴파일 실패는 던져진 오류의 같은 속성에 포함되어
+거부됩니다.
 
 기존 오류 클래스와 메시지 유지 정책의 예외는 아래의 누락된 Interaction Schema
 의도 출처 진단입니다.
@@ -54,6 +57,27 @@ superseded anchor/link 거부는 유지됩니다. 새 소스 리비전에 제안
 현재 출력되는 코드는 문서 추출용 `GF_LITERATE`, 문법용 `GF_PARSE`, 출력 형식 불일치용 `GF_TYPE`, 조합/import 검증용 `GF_IMPORT`, 기타 컴파일러 검사인 `GF_SEMANTIC`입니다. 메시지는 파일명과 좌표 접두어를 제외한 사람이 읽는 오류 상세입니다. 가져온 문서의 진단은 그 문서를 `source`에서 이름과 해시로 식별합니다. 또한 루트 파일명, SHA-256, 제공된 문서/리비전 ID를 가진 루트 컴파일 요청을 `requestSource`에 포함합니다. 루트 식별 정보는 하위 문서에 할당하지 않습니다. `GF_IMPORT`는 누락된 import, 리비전/다이제스트 불일치, 순환 import에만 사용합니다. 조합 형식 및 의미 검사는 자체 분류를 유지합니다. 작성된 위치가 없는 입력 검증은 기존 오류를 던지며 진단 span은 제공하지 않습니다.
 
 엔벌로프는 API 메타데이터입니다. GFB 바이트, 지속 저장된 소스 맵 아티팩트, 런타임 동작을 바꾸지 않습니다. 소스 식별 및 실행 출처 정보는 [SOURCE-MAP.md](SOURCE-MAP.md)를 따릅니다.
+
+compiler, CLI 및 package 생성은 성공한 컴파일에서도 intent-link 범위 경고를 보고합니다.
+지원 대상이지만 link되지 않은 문장은 `GF_INTENT_LINK_MISSING`, link target을 지원하지
+않는 동작 소유자는 `GF_INTENT_LINK_COVERAGE_UNSUPPORTED`입니다. 검사 대상, 한도, import
+처리, 해석 범위는 [기본 동작 범위 경고](INTENT-ANCHOR-MAP.ko.md#기본-동작-범위-경고-553)를
+참고하세요. CLI 사람이 읽는 출력에는 각 경고의 위치, 코드, 안내가 포함되고 JSON 및
+TOON 출력은 같은 record를 전달합니다. 컴파일 결과의 `warnings`에는 추출 경고 문자열과
+구조화된 intent-link 경고 record가 함께 남고, 엔벌로프의 `diagnostics`에는 해당
+구조화 record가 포함됩니다. 이는 실행 결과를 바꾸지 않는 추가 API metadata입니다.
+
+성공한 경고가 import 문서에 있으면 진단 엔벌로프의 `source`는 root 컴파일 문서를
+그대로 가리키고 경고의 `span.file`은 import된 source 위치를 가리킵니다.
+`sourceClosure`에는 하위 문서의 identity가 보존됩니다. 이는 import 오류의 동작과
+다릅니다. import 문서 오류는 하위 문서를 `source`에서 식별·해시하고 root 요청은
+`requestSource`에 기록합니다.
+
+`buildPortablePackage`도 출처 검증 뒤 source를 replay하고 새 replay 경고를 보고합니다.
+각 경고를 처리하려면 `onDiagnostic`을 전달하세요. callback이 없으면 package builder가
+`console.warn`을 사용합니다. callback은 replay 성공 뒤에만 호출되며 callback 예외는
+전파됩니다. 검증 작업은 조용히 동작하고, 경고는 서명 payload에 들어가거나 payload를
+바꾸지 않습니다.
 
 ## 제한된 오류 수집
 

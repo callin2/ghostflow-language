@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+### 2026-10-16 — actionable default intent-link warnings ([#553](https://github.com/callin2/ghostflow-language/issues/553))
+
+Bug fix: the compiler, CLI, and package creation now report intent-link coverage
+warnings with original locations and actionable examples. `GF_INTENT_LINK_MISSING`
+covers unlinked top-level connection/next/require/mutex/let/function/signal/
+schedule/timer statements. `GF_INTENT_LINK_COVERAGE_UNSUPPORTED` identifies
+top-level adapt/objective/account/constraint/adapt-setting/degraded owners and
+nested connection/connect/next/require/mutex statements that have no supported
+link target; their hints say the example is not an immediate repair. Declarations
+do not cover later behavior, and warnings do not infer transitive semantics or
+confirm intent. Unconfirmed assumptions remain unconfirmed. Warnings are capped
+at 20 with explicit truncation metadata, and instantiated imported definitions
+are reported at their source statements. Existing error behavior, executable
+output, GFB bytes and runtime behavior stay unchanged. Regression coverage is in
+`tests/intent-link-diagnostics.test.mjs` and the CLI/package regression tests.
+
 ### 2026-10-06 — actionable intent provenance diagnostics ([#537](https://github.com/callin2/ghostflow-language/issues/537))
 
 Bug fix for the intent-link contract in Reference 1.2: schema requests for
