@@ -218,6 +218,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/snapshot-identity-join.test.mjs',
   'tests/explanation-path.test.mjs',
   'tests/intent-anchor-map.test.mjs',
+  'tests/intent-link-diagnostics.test.mjs',
   'tests/ledger.test.mjs',
   'tests/literate.test.mjs',
   'tests/lesson.test.mjs',

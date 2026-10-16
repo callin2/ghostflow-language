@@ -7,6 +7,7 @@ import { compileSourceSync } from './compile-source.mjs';
 import { extractLiterate } from './literate.mjs';
 import { equalBytes } from './sha256.mjs';
 import { remapSourceTrace, sourceMapRequiresTraceMetadata, verifySourceTraceMetadata } from './source-trace.mjs';
+import { reportWarnings } from './diagnostic-output.mjs';
 
 const UTF8 = new TextEncoder();
 const UTF8_FATAL = new TextDecoder('utf-8', { fatal: true });
@@ -356,8 +357,11 @@ function validateSigningKey(key, type, path) {
   return key;
 }
 
-/** Build a deterministic signed package from a compileSource result and a fresh compiler replay. */
-export async function buildPortablePackage(compilation, identityValue, { signers, verifyCompilation } = {}) {
+/** Build a deterministic signed package; replay warnings go to onDiagnostic or console.warn. */
+export async function buildPortablePackage(compilation, identityValue, { signers, verifyCompilation, onDiagnostic } = {}) {
+  if (onDiagnostic !== undefined && typeof onDiagnostic !== 'function') {
+    fail('invalid-diagnostic-handler', 'onDiagnostic must be a function');
+  }
   if (!isPlainObject(compilation)) fail('invalid-compilation', 'compilation must be a compileSource result');
   const document = exactObject(compilation.sourceDocument, ['format', 'kind', 'filename', 'text', 'sha256'], 'compilation.sourceDocument');
   if (document.format !== SOURCE_FORMAT || document.kind !== 'literate') {
@@ -410,6 +414,7 @@ export async function buildPortablePackage(compilation, identityValue, { signers
       || !bytesEqual(replayMapBytes, sourceMapBytes)) {
     fail('compilation-mismatch', 'source, GFB1, manifest and source map do not belong to one deterministic compilation');
   }
+  reportWarnings(replay.warnings, onDiagnostic);
   const payload = {
     format: PAYLOAD_FORMAT,
     source: {

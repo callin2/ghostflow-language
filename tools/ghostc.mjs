@@ -7,6 +7,7 @@ import { compileSource, writeArtifact } from './toolchain.mjs';
 import { parseControlImports } from './control.mjs';
 import { extractLiterate, mapSourcePosition, MAX_INPUT_BYTES } from './literate.mjs';
 import { decode as decodeToon, encode as encodeToon } from '@toon-format/toon';
+import { reportWarnings } from './diagnostic-output.mjs';
 
 export { compileSource } from './toolchain.mjs';
 
@@ -189,7 +190,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.ar
           ? 'checked temporal descriptor artifact (not executable control)'
         : result.manifest ? 'control-v1 + host manifest' : 'MVP GFB1';
       console.log(`${names[0]}: ${result.bytes.length} bytes; ${artifactKind}${check ? ' (checked)' : ` -> ${names[1]}`}`);
-      for (const warning of result.warnings ?? []) console.warn(`warning: ${typeof warning === 'string' ? warning : warning.message}`);
+      reportWarnings(result.warnings);
     } catch (error) {
       console.error(`ghostc: ${error.message}`);
       process.exitCode = 1;
