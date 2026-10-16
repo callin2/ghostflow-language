@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { classifyChanges, verificationResult } from '../tools/ci-verification-routing.mjs';
+import { languageTestBatches } from '../tools/verification-test-batches.mjs';
 
 function repository(t) {
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-routing-'));
@@ -187,4 +188,25 @@ test('requirement-catalog corruption fails static preflight before native work',
   assert.ok(preflight > verifier.indexOf('  try {'));
   assert.ok(preflight < verifier.indexOf('await verifyPlcCurriculum();'));
   assert.ok(preflight < verifier.indexOf("await gate('cargo'"));
+});
+
+test('host test scheduling isolates console replay and runs the complete explicit list exactly once', () => {
+  const verifier = fs.readFileSync(new URL('../tools/verify-language.mjs', import.meta.url), 'utf8');
+  const declared = verifier.match(/export const LANGUAGE_TESTS = Object\.freeze\(\[([\s\S]*?)\n\]\);/);
+  assert.ok(declared, 'the verifier retains its explicit test inventory');
+  const tests = [...declared[1].matchAll(/'([^']+\.test\.mjs)'/g)].map(match => match[1]);
+  assert.ok(tests.length > 0);
+  const batches = languageTestBatches(tests);
+  assert.deepEqual(batches[0], ['tests/ghostsim-console.test.mjs']);
+  assert.equal(batches.length, 2);
+  assert.deepEqual(batches.flat().toSorted(), tests.toSorted());
+  assert.equal(new Set(batches.flat()).size, tests.length, 'no skipped or repeated test files');
+  assert.match(verifier, /for \(const tests of languageTestBatches\(LANGUAGE_TESTS\)\)\s*\{\s*await gate\(process\.execPath, \['--test', \.\.\.tests\]\);\s*\}/);
+  assert.match(verifier, /timeout: 180_000/);
+});
+
+test('empty test batches never trigger implicit Node test discovery', () => {
+  assert.deepEqual(languageTestBatches([]), []);
+  assert.deepEqual(languageTestBatches(['tests/compiler.test.mjs']), [['tests/compiler.test.mjs']]);
+  assert.deepEqual(languageTestBatches(['tests/ghostsim-console.test.mjs']), [['tests/ghostsim-console.test.mjs']]);
 });
