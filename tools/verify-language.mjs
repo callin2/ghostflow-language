@@ -14,6 +14,7 @@ import { readCatalog, validateCatalog } from '../contracts/requirements/validate
 
 // Deliberately explicit. Product/LLM/device tests belong to other repositories.
 export const LANGUAGE_TESTS = Object.freeze([
+  'tests/hardware-frontmatter.test.mjs',
   'tests/canonical-input.test.mjs',
   'tests/build-identity.test.mjs',
   'tests/software-input-producer.test.mjs',

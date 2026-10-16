@@ -63,6 +63,17 @@ The following are not executable code.
 
 Unclosed executable fences, documents without executable code, and excluded nested blocks that look executable are diagnostic subjects. Do not emulate Markdown structure with regular expressions and execute nested blocks.
 
+### Hardware front matter
+
+The reserved top-level YAML `hardware` field declares pinned dependencies,
+configuration and logical bindings for input drivers and output renderers.
+Compilation exposes a derived plan bound to the exact source SHA-256 and locations
+without changing executable GFB bytes. Invalid schemas, duplicate keys, missing
+references and role mismatches fail at canonical locations. Ordinary front matter
+retains its non-executable behavior. See [Hardware declarations](../HARDWARE-FRONT-MATTER.md)
+for structure, examples and provider validation boundaries.
+Why: installation intent and control rules are reviewed in one revision while Device owns board behavior.
+
 ## 1.2 Original source, locations, and intent links
 
 The original document's prose, `//` comments, Unicode, line endings, and final newline are language assets to preserve exactly. Syntax and type diagnostics refer to the file, line, and column of the original `.ghost.md`, rather than merged temporary text. If a closing brace is missing across several fences, the diagnostic must be able to identify both the declaration start and the document end.

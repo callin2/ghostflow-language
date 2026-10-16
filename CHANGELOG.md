@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### 2026-10-16 — reusable hardware front matter ([#555](https://github.com/callin2/ghostflow-language/issues/555))
+
+Reference 1.1 now reserves YAML `hardware` in canonical documents. Previously
+ignored hardware declarations now produce an exact-source-bound plan for pinned
+profiles/modules, generic bus/instance configuration and input/output bindings.
+For example `current: { instance: power, channel: current }` selects a driver
+independently of the Number type; output renderers use the same role-aware model.
+Malformed or ambiguous hardware YAML and invalid references fail with canonical
+locations. Ordinary front matter and GFB/runtime/package formats remain unchanged.
+Provider schemas and deployment admission remain Device responsibilities; hardware
+import composition is explicitly unsupported. `tests/hardware-frontmatter.test.mjs`
+covers identities, nested parameters, roles, invalid declarations and compiler parity.
+
 ### 2026-10-06 — actionable intent provenance diagnostics ([#537](https://github.com/callin2/ghostflow-language/issues/537))
 
 Bug fix for the intent-link contract in Reference 1.2: schema requests for
