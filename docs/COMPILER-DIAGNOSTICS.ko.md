@@ -3,8 +3,28 @@
 
 # 공개 컴파일러 진단
 
-브라우저 및 Node 도구 체인의 `compileSource`는 `diagnosticEnvelope`를 반환합니다. 컴파일에 성공하면 `diagnostics` 배열은 비어 있습니다. 위치가 있는 컴파일 실패는 던져진 오류의 같은 속성에 포함되어 거부됩니다. 기존 오류 클래스, 메시지, CLI 텍스트는 바뀌지 않습니다.
+브라우저 및 Node 도구 체인의 `compileSource`는 `diagnosticEnvelope`를 반환합니다. 컴파일에 성공하면 `diagnostics` 배열은 비어 있습니다. 위치가 있는 컴파일 실패는 던져진 오류의 같은 속성에 포함되어 거부됩니다.
 
+기존 오류 클래스와 메시지 유지 정책의 예외는 아래의 누락된 Interaction Schema
+의도 출처 진단입니다.
+
+## Interaction Schema 의도 출처 누락
+
+`interactionSourceIdentity`로 스키마를 요청하면 작성된 state, timer, operator
+config에 명시적인 문학적 anchor 링크가 필요합니다. 링크가 없으면 선언의 원본
+Markdown 범위에서 `GF_INTENT_PROVENANCE`를 보고하고, 정확한 소스 해시와 전달된
+문서/리비전 ID를 보존합니다. anchor는 코드 펜스 밖의 문단이나 인용문을 식별하고,
+link 주석은 `ghost` 펜스 안에서 선언 바로 앞에 있어야 한다고 설명합니다.
+
+`hint`는 유효한 anchor/link 구문과 기존 ID에 충돌하지 않는 예시 ID를 담습니다.
+`reference`는 [작성 구문](INTENT-ANCHOR-MAP.md#minimal-authored-form)을 가리킵니다.
+실제 이유가 일치하는 기존 활성 anchor에 링크하는 방법을 우선 사용하세요.
+대안 예시는 `kind=assumption status=unconfirmed origin=ai` 및 `relation=assumes`로
+명시됩니다. 채택하기 전에 실제 이유를 작성하고 검토해야 하며, 컴파일 성공은
+의도 확인이 아닙니다. 확인된 의도는 사람이 확인하고 기존 재분류 계약을 따라야
+합니다. 소스를 자동으로 수정하지 않습니다. 누락, 중복, 고아 링크, 분류 불일치,
+superseded anchor/link 거부는 유지됩니다. 새 소스 리비전에 제안을 작성해도
+실행 토큰과 GFB 바이트는 바뀌지 않습니다.
 엔벌로프 형식은 `GhostFlow/diagnostics-v1`입니다.
 
 ```json

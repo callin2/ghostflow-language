@@ -42,7 +42,31 @@ A logical port preserves direction, semantic type, required or optional dependen
 
 Preserve existing bindings first and propose remaining capabilities for new ports. Matching types and directions do not prove polarity, loads, fail-safe behavior, or actual wiring. Without evidence, these are `unknown`; do not promote them to compatible or physically verified.
 
-Physical endpoints are not limited to direct MCU GPIO. I/O expander channels and communicating relay channels may also be binding targets if they satisfy the same logical output contract. The Driver and installation connections own bus addresses, channel selection, and transmission procedures. Committing multiple output intentions in one language tick does not guarantee simultaneous physical channel switching.
+Physical endpoints are not limited to direct MCU GPIO. I/O expander channels and communicating relay channels may also be binding targets if they satisfy the same logical output contract. The output renderer and installation connections own bus addresses, channel selection, and transmission procedures. Committing multiple output intentions in one language tick does not guarantee simultaneous physical channel switching.
+
+### External observations and internal computed connections
+
+A root `input` connected to an instance `input` forwards the existing typed-quality
+acquisition contract, including sample identity and each declared conditioning
+contract. An instance scalar `output` connected to another instance `input` is an
+internal computed connection: its actually evaluated value is passed as
+`Result.ok(value)`. The receiving definition still handles the Result explicitly
+with `case`, `recover`, or another typed Result operation. The connection does not
+recover an upstream error by itself; the producing scalar output already expresses
+its definition's handling policy.
+
+An internal computed connection creates no acquisition input, Good quality claim,
+sample timestamp, sample identity, or sensor fault origin. Optional acquisition and
+input conditioning annotations on that receiving port reject instead of being
+silently discarded. These annotations remain meaningful for acquisition forwarding.
+Committed-state output feedback retains the previous-tick boundary; wrapping a
+computed value does not authorize combinational cycles or next-state feedback.
+Root external Results cannot connect directly to scalar outputs without authored
+Result handling.
+
+**Why:** A calculated value and a producer observation have different evidence.
+Reuse keeps the receiving definition's Result contract while preserving the source
+of acquisition quality and the explicit state boundary.
 
 ## 6.3 Parameters, settings, dependencies, and bindings
 
@@ -59,7 +83,7 @@ Do not erase these differences into one untyped `with` map. In particular, opera
 
 ### Compatible device replacement and independence from recompilation
 
-A GhostFlow Program targets logical port contracts and does not use installation-specific device models, communication addresses, or pins as executable-rule identity. Drivers handle device-specific communication and value interpretation; bindings connect the actual endpoints that supply logical port values or apply outputs.
+A GhostFlow Program targets logical port contracts and does not use installation-specific device models, communication addresses, or pins as executable-rule identity. Input drivers handle device-specific communication and value interpretation; output renderers apply output intent. Bindings connect the actual endpoints for each role.
 
 **Replacing a physical device or Driver that satisfies the same logical device contract does not require editing control source or recompiling the Program.** Retain the canonical `.ghost.md`, source revision, and compiled Program; change the relevant installation profile/binding revision. The execution environment manages the Driver's own deployment revision.
 
@@ -165,7 +189,7 @@ completed occurrence
 → settings revision and binding revision
 ```
 
-Do not merge traces of multiple instances of one definition merely because their names match. Do not flatten nodes located in different source documents into one synthesized location. When low-water input blocks a pump request, the signal and logical result can be reported, but do not prove the tank's actual physical state. Driver application failures or missing feedback are also displayed separately from requested/safe stages.
+Do not merge traces of multiple instances of one definition merely because their names match. Do not flatten nodes located in different source documents into one synthesized location. When low-water input blocks a pump request, the signal and logical result can be reported, but do not prove the tank's actual physical state. renderer application failures or missing feedback are also displayed separately from requested/safe stages.
 
 ## 6.8 Replay, ghost, and branches
 

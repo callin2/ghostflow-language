@@ -2079,6 +2079,163 @@ fn verify_adapt_bindings(manifest: &Value, bytecode: &[u8]) -> Result<()> {
     Ok(())
 }
 
+// Acquisition metadata is executable host behavior, even though it is not GFB
+// bytecode. Native admission validates its domains without rewriting source.
+fn verify_sensor_conditioning(sensor: &serde_json::Map<String, Value>, label: &str) -> Result<()> {
+    let invalid = |field: &str| PortablePackageError {
+        code: ErrorCode::ManifestMismatch,
+        message: format!("{label}.{field} has invalid sensor conditioning metadata"),
+    };
+    let allowed = [
+        "name",
+        "type",
+        "sampleMs",
+        "staleMs",
+        "recoverSamples",
+        "window",
+        "filter",
+        "validMin",
+        "validMax",
+        "valueInput",
+        "okInput",
+        "faultInput",
+        "optional",
+        "alpha",
+        "canonicalUnit",
+        "samplePresentInput",
+        "sampleEpochInput",
+        "sampleIdInput",
+        "sampleTimestampInput",
+    ];
+    if sensor
+        .keys()
+        .any(|field| !allowed.contains(&field.as_str()))
+    {
+        return Err(invalid("keys"));
+    }
+    let payload = sensor
+        .get("type")
+        .and_then(Value::as_str)
+        .ok_or_else(|| invalid("type"))?;
+    manifest_capability_type(payload, label)?;
+    for field in ["sampleMs", "staleMs", "recoverSamples", "window"] {
+        let value = sensor.get(field).ok_or_else(|| invalid(field))?;
+        if !value.is_null() {
+            let number = value.as_f64().ok_or_else(|| invalid(field))?;
+            let maximum = if matches!(field, "recoverSamples" | "window") {
+                31.0
+            } else {
+                9007199254740991.0
+            };
+            if number.fract() != 0.0 || !(1.0..=maximum).contains(&number) {
+                return Err(invalid(field));
+            }
+        }
+    }
+    if sensor
+        .get("optional")
+        .is_some_and(|value| !value.is_boolean())
+    {
+        return Err(invalid("optional"));
+    }
+    let min = sensor.get("validMin").ok_or_else(|| invalid("validMin"))?;
+    let max = sensor.get("validMax").ok_or_else(|| invalid("validMax"))?;
+    if min.is_null() != max.is_null() {
+        return Err(invalid("validMin"));
+    }
+    let bounds = match payload {
+        "Int" => Some((-2147483648.0, 2147483647.0, true)),
+        "Duration" => Some((0.0, 9007199254740991.0, true)),
+        "Date" => Some((0.0, 2932896.0, true)),
+        "TimeOfDay" => Some((0.0, 86399999.0, true)),
+        "DateTime" => Some((0.0, 253402300799999.0, true)),
+        "Percent" => Some((0.0, 100.0, false)),
+        "RelativeHumidity" => Some((0.0, 1.0, false)),
+        _ => None,
+    };
+    if !min.is_null() {
+        if payload == "Bool" {
+            return Err(invalid("validMin"));
+        }
+        let lower = min
+            .as_f64()
+            .filter(|value| value.is_finite())
+            .ok_or_else(|| invalid("validMin"))?;
+        let upper = max
+            .as_f64()
+            .filter(|value| value.is_finite())
+            .ok_or_else(|| invalid("validMax"))?;
+        if lower > upper {
+            return Err(invalid("validMin"));
+        }
+        if let Some((domain_min, domain_max, exact)) = bounds {
+            for value in [lower, upper] {
+                if !(domain_min..=domain_max).contains(&value) || exact && value.fract() != 0.0 {
+                    return Err(invalid("validMin"));
+                }
+            }
+        }
+    }
+    let filter = sensor.get("filter").ok_or_else(|| invalid("filter"))?;
+    let window = &sensor["window"];
+    if filter.is_null() {
+        if !window.is_null() || sensor.contains_key("alpha") {
+            return Err(invalid("filter"));
+        }
+    } else {
+        if !matches!(payload, "Number" | "Percent") && canonical_quantity_unit(payload).is_none() {
+            return Err(invalid("filter"));
+        }
+        let kind = filter.as_str().ok_or_else(|| invalid("filter"))?;
+        let n = window.as_f64().ok_or_else(|| invalid("window"))?;
+        match kind {
+            "median" if n as u32 % 2 == 1 && !sensor.contains_key("alpha") => {}
+            "moving_average" if !sensor.contains_key("alpha") => {}
+            "ema" if n == 1.0 => {
+                let alpha = sensor
+                    .get("alpha")
+                    .and_then(Value::as_f64)
+                    .ok_or_else(|| invalid("alpha"))?;
+                if !alpha.is_finite() || !(0.0 < alpha && alpha <= 1.0) {
+                    return Err(invalid("alpha"));
+                }
+            }
+            _ => return Err(invalid("filter")),
+        }
+    }
+    let name = sensor
+        .get("name")
+        .and_then(Value::as_str)
+        .ok_or_else(|| invalid("name"))?;
+    for (field, role) in [
+        ("valueInput", "value"),
+        ("okInput", "ok"),
+        ("faultInput", "fault"),
+    ] {
+        if sensor.get(field).and_then(Value::as_str)
+            != Some(format!("__gf_sensor_{role}_{name}").as_str())
+        {
+            return Err(invalid(field));
+        }
+    }
+    let count = SAMPLE_INPUTS
+        .iter()
+        .filter(|(field, _)| sensor.contains_key(*field))
+        .count();
+    if count != 0 && count != SAMPLE_INPUTS.len() {
+        return Err(invalid("samplePresentInput"));
+    }
+    for (field, role) in SAMPLE_INPUTS {
+        if count != 0
+            && sensor.get(field).and_then(Value::as_str)
+                != Some(format!("__gf_sensor_sample_{role}_{name}").as_str())
+        {
+            return Err(invalid(field));
+        }
+    }
+    Ok(())
+}
+
 fn verify_manifest(
     manifest: &Value,
     descriptor_format: &str,
@@ -2253,8 +2410,10 @@ fn verify_manifest(
             code: ErrorCode::ManifestMismatch,
             message: "manifest.sensors must be an array".into(),
         })?;
+    let mut sensor_names = HashSet::new();
     for (index, sensor) in sensors.iter().enumerate() {
         let sensor = value_object(sensor, &format!("manifest.sensors[{index}]"))?;
+        verify_sensor_conditioning(sensor, &format!("manifest.sensors[{index}]"))?;
         manifest_canonical_unit(sensor, &format!("manifest.sensors[{index}]"))?;
         let name =
             sensor
@@ -2273,6 +2432,9 @@ fn verify_manifest(
                     message: format!("manifest.sensors[{index}].type must be a string"),
                 })?;
         require_ghost_name(name, &format!("manifest.sensors[{index}].name"))?;
+        if !sensor_names.insert(name) {
+            return fail(ErrorCode::ManifestMismatch, "duplicate sensor name");
+        }
         let value_type =
             manifest_capability_type(value_type, &format!("manifest.sensors[{index}].type"))?;
         if sensor.get("optional") != Some(&Value::Bool(true)) {
@@ -3034,12 +3196,12 @@ mod tests {
                 value_type: "bool".into(),
             },
             Capability {
-                kind: "input".into(),
+                kind: "sensor".into(),
                 name: "start".into(),
                 value_type: "bool".into(),
             },
             Capability {
-                kind: "input".into(),
+                kind: "sensor".into(),
                 name: "stop".into(),
                 value_type: "bool".into(),
             },
@@ -3918,6 +4080,7 @@ mod tests {
                     Ok(true)
                 };
             let mut capabilities = capabilities();
+            capabilities.truncate(2);
             let manifests = strings(&["GhostFlow/control-v1", "GhostFlow/control-v4"]);
             if version >= 2 {
                 capabilities[0].value_type = "int".into();
@@ -3961,7 +4124,7 @@ mod tests {
             .flat_map(|index| {
                 [
                     Capability {
-                        kind: "input".into(),
+                        kind: "sensor".into(),
                         name: format!("input_{index}"),
                         value_type: "number".into(),
                     },
@@ -3974,7 +4137,7 @@ mod tests {
             })
             .chain([
                 Capability {
-                    kind: "input".into(),
+                    kind: "sensor".into(),
                     name: "enabled".into(),
                     value_type: "bool".into(),
                 },
@@ -3987,9 +4150,9 @@ mod tests {
             .collect();
         let accept =
             |_: &[u8], context: &TargetLoaderContext<'_>| -> std::result::Result<bool, String> {
-                assert_eq!(context.manifest["inputs"].as_array().unwrap().len(), 18);
-                assert_eq!(context.manifest["inputs"][0]["canonicalUnit"], "K");
-                assert_eq!(context.manifest["inputs"][16]["canonicalUnit"], "pH");
+                assert_eq!(context.manifest["sensors"].as_array().unwrap().len(), 19);
+                assert_eq!(context.manifest["sensors"][0]["canonicalUnit"], "K");
+                assert_eq!(context.manifest["sensors"][16]["canonicalUnit"], "pH");
                 Ok(true)
             };
         let mut current = profile(&accept);
@@ -4268,7 +4431,12 @@ mod tests {
                 .map_err(|e| e.to_string())?;
             for (mono, expected) in [(0, true), (2_000, false)] {
                 for (name, value) in [
-                    ("start", ghostflow_core::Value::Bool(true)),
+                    ("__gf_sensor_value_start", ghostflow_core::Value::Bool(true)),
+                    ("__gf_sensor_ok_start", ghostflow_core::Value::Bool(true)),
+                    (
+                        "__gf_sensor_fault_start",
+                        ghostflow_core::Value::Number(0.0),
+                    ),
                     ("__gf_now_ms", ghostflow_core::Value::Number(mono as f64)),
                     ("__gf_time_epoch", ghostflow_core::Value::Number(1.0)),
                 ] {
@@ -4310,7 +4478,7 @@ mod tests {
                 value_type: "bool".into(),
             },
             Capability {
-                kind: "input".into(),
+                kind: "sensor".into(),
                 name: "start".into(),
                 value_type: "bool".into(),
             },
@@ -4378,11 +4546,11 @@ mod tests {
     fn signed_time_descriptors_require_integral_bounded_configs_before_loading() {
         let capabilities: Vec<_> = (0..3)
             .flat_map(|index| {
-                ["input", "actuator"].map(|kind| Capability {
+                ["sensor", "actuator"].map(|kind| Capability {
                     kind: kind.into(),
                     name: format!(
                         "{}_{index}",
-                        if kind == "input" { "input" } else { "output" }
+                        if kind == "sensor" { "input" } else { "output" }
                     ),
                     value_type: "number".into(),
                 })
@@ -4391,8 +4559,8 @@ mod tests {
         let accept =
             |_: &[u8], context: &TargetLoaderContext<'_>| -> std::result::Result<bool, String> {
                 for (index, nominal) in ["Date", "TimeOfDay", "DateTime"].iter().enumerate() {
-                    assert_eq!(context.manifest["inputs"][index]["type"], *nominal);
-                    assert!(context.manifest["inputs"][index]
+                    assert_eq!(context.manifest["sensors"][index]["type"], *nominal);
+                    assert!(context.manifest["sensors"][index]
                         .get("canonicalUnit")
                         .is_none());
                 }
@@ -4446,6 +4614,227 @@ mod tests {
     }
 
     #[test]
+    fn signed_canonical_input_quality_metadata_rejects_before_loader() {
+        let called = std::cell::Cell::new(false);
+        let loader =
+            |bytes: &[u8], _: &TargetLoaderContext<'_>| -> std::result::Result<bool, String> {
+                called.set(true);
+                ghostflow_core::Module::load(bytes)
+                    .map(|_| true)
+                    .map_err(|error| error.to_string())
+            };
+        let formats = strings(&["GhostFlow/control-v4"]);
+        let capabilities = vec![
+            Capability {
+                kind: "sensor".into(),
+                name: "count".into(),
+                value_type: "int".into(),
+            },
+            Capability {
+                kind: "sensor".into(),
+                name: "observation".into(),
+                value_type: "bool".into(),
+            },
+            Capability {
+                kind: "actuator".into(),
+                name: "total".into(),
+                value_type: "int".into(),
+            },
+        ];
+        let mut current = profile(&loader);
+        current.available_capabilities = &capabilities;
+        current.supported_manifest_formats = &formats;
+        current.expected_compiler_revision = "issue531-candidate";
+        current.expected_binding_revision = "canonical-input-quality-v1";
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        for scenario in [
+            "valid",
+            "fractional-bound",
+            "outside-bound",
+            "exact-filter",
+            "recovery",
+            "bool-range",
+            "optional",
+            "partial-identity",
+        ] {
+            called.set(false);
+            let fixture = Command::new("node")
+                .arg(root.join("tests/native-input-quality-package-fixture.mjs"))
+                .arg(scenario)
+                .current_dir(&root)
+                .output()
+                .unwrap();
+            assert!(
+                fixture.status.success(),
+                "fixture {scenario}: {}",
+                String::from_utf8_lossy(&fixture.stderr)
+            );
+            let result = verify_portable_package(&fixture.stdout, &current);
+            if scenario == "valid" {
+                let verified = result.unwrap();
+                assert!(called.get());
+                let mut runtime = ghostflow_core::Runtime::new(4);
+                runtime.install(
+                    ghostflow_core::Module::load(&verified.bytecode_copy()).unwrap(),
+                    false,
+                );
+                runtime
+                    .add_capability(ghostflow_core::Capability::new(
+                        "actuator",
+                        "total",
+                        ghostflow_core::Type::Int,
+                    ))
+                    .unwrap();
+                runtime.activate().unwrap();
+                for (good, expected) in [(true, 2147483647), (false, -7)] {
+                    for (name, value) in [
+                        (
+                            "__gf_sensor_value_observation",
+                            ghostflow_core::Value::Bool(false),
+                        ),
+                        (
+                            "__gf_sensor_ok_observation",
+                            ghostflow_core::Value::Bool(true),
+                        ),
+                        (
+                            "__gf_sensor_fault_observation",
+                            ghostflow_core::Value::Number(0.0),
+                        ),
+                        (
+                            "__gf_sensor_value_count",
+                            ghostflow_core::Value::Int(2147483647),
+                        ),
+                        ("__gf_sensor_ok_count", ghostflow_core::Value::Bool(good)),
+                        (
+                            "__gf_sensor_fault_count",
+                            ghostflow_core::Value::Number(if good { 0.0 } else { 2.0 }),
+                        ),
+                    ] {
+                        runtime.set_input(name, value).unwrap();
+                    }
+                    assert_eq!(
+                        runtime.tick().unwrap().safe_intents["total"],
+                        ghostflow_core::Value::Int(expected)
+                    );
+                }
+            } else {
+                assert_eq!(
+                    result.unwrap_err().code,
+                    ErrorCode::ManifestMismatch,
+                    "{scenario}"
+                );
+                assert!(!called.get(), "malformed {scenario} reached target loader");
+            }
+        }
+    }
+
+    #[test]
+    fn sensor_conditioning_domains_preserve_exact_payloads() {
+        let sensor = serde_json::json!({
+            "name":"reading", "type":"Int", "sampleMs":null, "staleMs":null,
+            "recoverSamples":null, "window":null, "filter":null,
+            "validMin":null, "validMax":null,
+            "valueInput":"__gf_sensor_value_reading", "okInput":"__gf_sensor_ok_reading",
+            "faultInput":"__gf_sensor_fault_reading"
+        });
+        for (payload, minimum, maximum) in [
+            ("Int", -2147483648.0, 2147483647.0),
+            ("Duration", 0.0, 9007199254740991.0),
+            ("Date", 0.0, 2932896.0),
+            ("TimeOfDay", 0.0, 86399999.0),
+            ("DateTime", 0.0, 253402300799999.0),
+        ] {
+            let mut valid = sensor.clone();
+            valid["type"] = serde_json::json!(payload);
+            valid["validMin"] = serde_json::json!(minimum);
+            valid["validMax"] = serde_json::json!(maximum);
+            verify_sensor_conditioning(valid.as_object().unwrap(), "sensor").unwrap();
+            for bound in [minimum - 1.0, maximum + 1.0, 0.5] {
+                let mut bad = valid.clone();
+                bad["validMin"] = serde_json::json!(bound);
+                assert_eq!(
+                    verify_sensor_conditioning(bad.as_object().unwrap(), "sensor")
+                        .unwrap_err()
+                        .code,
+                    ErrorCode::ManifestMismatch
+                );
+            }
+            for filter in ["median", "moving_average", "ema"] {
+                let mut bad = valid.clone();
+                bad["filter"] = serde_json::json!(filter);
+                bad["window"] = serde_json::json!(1);
+                assert!(verify_sensor_conditioning(bad.as_object().unwrap(), "sensor").is_err());
+            }
+        }
+        for (field, value) in [
+            ("sampleMs", serde_json::json!(0)),
+            ("staleMs", serde_json::json!(0.5)),
+            ("recoverSamples", serde_json::json!(32)),
+            ("optional", serde_json::json!(1)),
+            ("window", serde_json::json!(3)),
+            ("alpha", serde_json::json!(0.5)),
+            (
+                "samplePresentInput",
+                serde_json::json!("__gf_sensor_sample_present_reading"),
+            ),
+            ("valueInput", serde_json::json!("__gf_sensor_value_other")),
+        ] {
+            let mut bad = sensor.clone();
+            bad[field] = value;
+            assert!(
+                verify_sensor_conditioning(bad.as_object().unwrap(), "sensor").is_err(),
+                "{field}"
+            );
+        }
+        let mut bool_bounds = sensor.clone();
+        bool_bounds["type"] = serde_json::json!("Bool");
+        bool_bounds["validMin"] = serde_json::json!(0.2);
+        bool_bounds["validMax"] = serde_json::json!(0.8);
+        assert!(verify_sensor_conditioning(bool_bounds.as_object().unwrap(), "sensor").is_err());
+        let mut sample = sensor.clone();
+        for (field, role) in SAMPLE_INPUTS {
+            sample[field] = serde_json::json!(format!("__gf_sensor_sample_{role}_reading"));
+        }
+        sample["optional"] = serde_json::json!(true);
+        sample["recoverSamples"] = serde_json::json!(31);
+        verify_sensor_conditioning(sample.as_object().unwrap(), "sensor").unwrap();
+        sample["sampleIdInput"] = serde_json::json!("__gf_sensor_sample_id_other");
+        assert!(verify_sensor_conditioning(sample.as_object().unwrap(), "sensor").is_err());
+    }
+
+    #[test]
+    fn sensor_conditioning_approximate_filters_remain_explicit() {
+        let sensor = serde_json::json!({
+            "name":"reading", "type":"Number", "sampleMs":1000, "staleMs":3000,
+            "recoverSamples":2, "window":3, "filter":"median", "validMin":-100, "validMax":100,
+            "valueInput":"__gf_sensor_value_reading", "okInput":"__gf_sensor_ok_reading",
+            "faultInput":"__gf_sensor_fault_reading"
+        });
+        verify_sensor_conditioning(sensor.as_object().unwrap(), "sensor").unwrap();
+        let mut average = sensor.clone();
+        average["filter"] = serde_json::json!("moving_average");
+        average["window"] = serde_json::json!(2);
+        verify_sensor_conditioning(average.as_object().unwrap(), "sensor").unwrap();
+        let mut ema = sensor.clone();
+        ema["filter"] = serde_json::json!("ema");
+        ema["window"] = serde_json::json!(1);
+        ema["alpha"] = serde_json::json!(0.25);
+        verify_sensor_conditioning(ema.as_object().unwrap(), "sensor").unwrap();
+        for (field, value) in [
+            ("window", serde_json::json!(2)),
+            ("alpha", serde_json::json!(0)),
+            ("alpha", serde_json::json!(1.1)),
+        ] {
+            let mut bad = ema.clone();
+            bad[field] = value;
+            assert!(verify_sensor_conditioning(bad.as_object().unwrap(), "sensor").is_err());
+        }
+        let mut median = sensor.clone();
+        median["window"] = serde_json::json!(2);
+        assert!(verify_sensor_conditioning(median.as_object().unwrap(), "sensor").is_err());
+    }
+
+    #[test]
     fn hold_last_manifest_domains_and_private_roles_are_strict() {
         let mut descriptor = serde_json::json!({
             "kind":"hold-last", "name":"held", "payloadType":"Number",
@@ -4477,6 +4866,8 @@ mod tests {
             "inputs":[], "outputs":[], "schedules":[], "timers":[], "configs":[],
             "signals":[descriptor], "sensors":[{
                 "name":"probe", "type":"Number", "valueInput":"__gf_sensor_value_probe",
+                "sampleMs":null, "staleMs":null, "recoverSamples":null,
+                "window":null, "filter":null, "validMin":null, "validMax":null,
                 "okInput":"__gf_sensor_ok_probe", "faultInput":"__gf_sensor_fault_probe",
                 "samplePresentInput":"__gf_sensor_sample_present_probe",
                 "sampleEpochInput":"__gf_sensor_sample_epoch_probe",
@@ -4745,7 +5136,7 @@ mod tests {
     #[test]
     fn signed_hold_last_domains_and_bytecode_bindings_are_checked_before_target_loader() {
         let capabilities: Vec<_> = [
-            ("input", "start", "bool"),
+            ("sensor", "start", "bool"),
             ("sensor", "probe", "number"),
             ("sensor", "backup", "number"),
             ("actuator", "measuredResult", "bool"),
@@ -4837,7 +5228,7 @@ mod tests {
     fn signed_debounce_domains_and_bytecode_bindings_are_checked_before_target_loader() {
         let capabilities = vec![
             Capability {
-                kind: "input".into(),
+                kind: "sensor".into(),
                 name: "start".into(),
                 value_type: "bool".into(),
             },

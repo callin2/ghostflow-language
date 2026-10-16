@@ -4,6 +4,8 @@ import { extractLiterate, mapSourcePosition } from './literate.mjs';
 import { compileAccountingControl, compileControl, compileControlPolicyDescriptorArtifact, compileResourcePolicyArtifact, compileScheduleDescriptorArtifact, compileTemporalDescriptorArtifact, hasTemporalDescriptorCalls, isExecutablePulseSchedule, isExecutableRangeSchedule, parseControl } from './control.mjs';
 import { isWellFormedUnicode, sha256Hex, utf8ByteLength } from './sha256.mjs';
 import { compileComposition, resolveDocument } from './composition.mjs';
+import { emitExplanationArtifact } from './explanation.mjs';
+import { parseHardwareFrontMatter, validateHardwareBindings, HardwareFrontMatterError } from './hardware-frontmatter.mjs';
 
 export { emitInteractionSchema } from './interaction-schema.mjs';
 
@@ -24,7 +26,9 @@ function attachDiagnostic(error, code, source, identity, position, end, requestS
     source: diagnosticSource(source.filename, source.text, identity),
     ...(requestSource ? { requestSource } : {}),
     diagnostics: [{
-      code: error.diagnosticCode ?? code, severity: 'error', message,
+      code: error.diagnosticCode ?? code, severity: 'error', message: error.diagnosticMessage ?? message,
+      ...(error.diagnosticHint ? { hint: error.diagnosticHint } : {}),
+      ...(error.diagnosticReference ? { reference: error.diagnosticReference } : {}),
       span: {
         file: position.file,
         start: { line: position.line, column: position.column },
@@ -80,6 +84,7 @@ export function compileSourceSync(source, options = {}) {
   requireFilename(filename, 'source filename');
   requireSourceText(source, `${filename}: source`);
   if (!filename.endsWith('.ghost.md')) throw new Error(`${filename}: GhostFlow product compilation requires a canonical .ghost.md literate source`);
+  const hardwarePlan = parseHardwareFrontMatter(source, { filename });
   let extraction;
   try { extraction = extractLiterate(source, { filename }); }
   catch (error) {
@@ -92,6 +97,8 @@ export function compileSourceSync(source, options = {}) {
   let result, composition, stage = 'parse';
   try {
     const ast = parseControl(extraction.code, { filename });
+    if (hardwarePlan && ast.imports?.length) throw new HardwareFrontMatterError(hardwarePlan.source,
+      hardwarePlan.locations['/hardware'], 'hardware declarations in executable import composition are not supported');
     stage = 'semantic';
     if (options.sourceClosure !== undefined && ast.imports?.length) {
       composition = compileComposition(source, filename, options.sourceClosure);
@@ -113,6 +120,7 @@ export function compileSourceSync(source, options = {}) {
     // path as a single failure. Preserve the original thrown error/message.
     const failures = error.collectedErrors ?? [error];
     const mapFailure = error => {
+      if (error.name === 'HardwareFrontMatterError') return error.diagnosticEnvelope;
       const errorDocument = error.filename === filename ? null : options.sourceClosure?.find(document => resolveDocument('', document.filename) === error.filename);
       if (error.name === 'LiterateError' && errorDocument) {
         attachDiagnostic(error, 'GF_LITERATE', { filename: errorDocument.filename, text: errorDocument.text }, undefined,
@@ -155,6 +163,7 @@ export function compileSourceSync(source, options = {}) {
     };
     throw error;
   }
+  validateHardwareBindings(hardwarePlan, result.manifest);
   if (extraction.anchors.length || extraction.linkDirectives.length) {
     const ast = parseControl(extraction.code, { filename });
     result = {
@@ -236,13 +245,30 @@ export function compileSourceSync(source, options = {}) {
     } : null,
     extractionMap: extraction.sourceMap,
     warnings: extraction.warnings,
+    ...(hardwarePlan ? { hardwarePlan } : {}),
   };
-  const schema = interactionSourceIdentity === undefined ? null : emitInteractionSchema(compilation, interactionSourceIdentity);
+  let schema = null;
+  try {
+    if (interactionSourceIdentity !== undefined) schema = emitInteractionSchema(compilation, interactionSourceIdentity);
+  } catch (error) {
+    // Schema provenance failures already carry canonical source-map locations;
+    // mapping them through extracted code again would point into the wrong fence.
+    if (error.diagnosticCode === 'GF_INTENT_PROVENANCE') {
+      attachDiagnostic(error, error.diagnosticCode, sourceDocument, interactionSourceIdentity,
+        { file: error.filename, line: error.line, column: error.column },
+        Number.isInteger(error.loc?.endLine) && Number.isInteger(error.loc?.endColumn)
+          ? { line: error.loc.endLine, column: error.loc.endColumn } : undefined);
+    }
+    throw error;
+  }
+  const explanationArtifact = emitExplanationArtifact(compilation);
+  const { explanationExpressions: _expressionMappings, ...publicCompilation } = compilation;
   return {
-    ...compilation,
+    ...publicCompilation,
     diagnosticEnvelope: { format: DIAGNOSTICS_FORMAT,
       source: diagnosticSource(filename, source, interactionSourceIdentity), diagnostics: [] },
     interactionSchema: schema,
+    explanationArtifact,
     interactionSourceIdentity: schema ? {
       documentId: schema.source.documentId,
       revisionId: schema.source.revisionId,

@@ -5,15 +5,44 @@
 
 이 완전한 소프트웨어 전용 제어는 자동·수동·대체 경로의 요청을 하나의 공유 논리 펌프 제약으로 통과시킵니다. 입력은 요청이며 물리 피드백이 아닙니다. 작성된 위반 응답은 펌프 OFF와 밸브 ON입니다. 이 예제에서 명시적으로 선택한 값이며 장치 안전 시퀀스가 아닙니다.
 
+명시적인 새 소스 리비전은 bound-input-quality-v1입니다. 정식 input은 생산자가 제공한 품질을 포함합니다. 이 예제의 요청 식은 마지막 관측값을 유지하며, false는 해당 소스 내부 기억 상태의 초기값입니다. 자동·수동 모드의 필수 승인 경계는 매 스캔마다 정상 Bool 관측값을 요구합니다. 모드를 관측할 수 없으면 스캔을 원자적으로 거부하고 수정한 동일 스캔의 재시도를 허용합니다. 이는 OFF, 트립 또는 재시작 명령을 뜻하지 않습니다. 원본 소스는 별도 이력으로 보존합니다.
+
+<!-- ghostflow:anchor id=GF-INT-BOUND-OBSERVATIONS kind=intent status=confirmed origin=engineer -->
+이 소프트웨어 예제의 마지막 요청 관측값을 유지하며 기존 자원 가드를 보존합니다.
+
 ```ghost
 control BoundPump {
   resource station: Station;
   resource pump1: BoolActuator;
   resource valve1: BoolActuator;
   input automatic, manual, automatic_request, manual_request, fallback_request, valve_request: Bool;
+  // ghostflow:link id=GF-INT-BOUND-OBSERVATIONS relation=implements
+  state remembered_automatic: Bool = false;
+  let automatic_value = case automatic { ok(value) => value; fault(_) => remembered_automatic; };
+  remembered_automatic' = automatic_value;
+  // ghostflow:link id=GF-INT-BOUND-OBSERVATIONS relation=implements
+  state remembered_manual: Bool = false;
+  let manual_value = case manual { ok(value) => value; fault(_) => remembered_manual; };
+  remembered_manual' = manual_value;
+  // ghostflow:link id=GF-INT-BOUND-OBSERVATIONS relation=implements
+  state remembered_automatic_request: Bool = false;
+  let automatic_request_value = case automatic_request { ok(value) => value; fault(_) => remembered_automatic_request; };
+  remembered_automatic_request' = automatic_request_value;
+  // ghostflow:link id=GF-INT-BOUND-OBSERVATIONS relation=implements
+  state remembered_manual_request: Bool = false;
+  let manual_request_value = case manual_request { ok(value) => value; fault(_) => remembered_manual_request; };
+  remembered_manual_request' = manual_request_value;
+  // ghostflow:link id=GF-INT-BOUND-OBSERVATIONS relation=implements
+  state remembered_fallback_request: Bool = false;
+  let fallback_request_value = case fallback_request { ok(value) => value; fault(_) => remembered_fallback_request; };
+  remembered_fallback_request' = fallback_request_value;
+  // ghostflow:link id=GF-INT-BOUND-OBSERVATIONS relation=implements
+  state remembered_valve_request: Bool = false;
+  let valve_request_value = case valve_request { ok(value) => value; fault(_) => remembered_valve_request; };
+  remembered_valve_request' = valve_request_value;
   output pump, valve: Bool;
-  pump <- (automatic && (automatic_request || fallback_request)) || (manual && manual_request);
-  valve <- valve_request;
+  pump <- (automatic_value && (automatic_request_value || fallback_request_value)) || (manual_value && manual_request_value);
+  valve <- valve_request_value;
   constraints SharedRules for station {
     exclusive at admission { automatic, manual };
     require at safe_output pump1.on => any_on({ valve1 });
@@ -34,7 +63,7 @@ const filename = 'examples/bound-resource-execution.ghost.md';
 const checked = compileSourceSync(fs.readFileSync(filename, 'utf8'), { filename });
 const bound = compileBoundResourceControl(checked, {
   format: 'GhostFlow/resource-constraints-binding-v1',
-  revision: 'virtual-installation-r1',
+  revision: 'virtual-installation-input-v1',
   sourceDocumentSha256: checked.sourceDocument.sha256,
   artifactSha256: checked.manifest.bytecodeSha256,
   resources: [
@@ -58,7 +87,12 @@ const requests = [
 ];
 try {
   for (const [scanId, values] of requests.entries()) {
-    const inputs = checked.manifest.control.inputs.map((port, index) => ({ name: port.name, value: values[index] }));
+    // Each row explicitly supplies Good software observations, including false.
+    const inputs = bound.manifest.sensors.flatMap((port, index) => [
+      { name: port.valueInput, value: values[index] },
+      { name: port.okInput, value: true },
+      { name: port.faultInput, value: 0 },
+    ]);
     const { trace } = runtime.scan({ scanId, logicalTimeMs: scanId, inputs });
     console.log(JSON.stringify(trace));
   }

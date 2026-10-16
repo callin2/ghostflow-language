@@ -2,6 +2,8 @@
 
 [Korean translation](DRIVER-ABI-V1-DRAFT.ko.md)
 
+The historical Host–Driver title and `gfdrv_*` names describe a common native adapter ABI. Input driver and output renderer roles share this host boundary; output write/application is the renderer role. Source belongs to `farm-device-drivers`; Device integrates the adapter with its host and board. This terminology does not adopt or rename the draft ABI.
+
 ## Status and authority
 
 Issue #117: documentation-only proposal for review, pending actual consumer adoption.

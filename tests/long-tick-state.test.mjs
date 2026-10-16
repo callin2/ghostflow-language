@@ -4,12 +4,14 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
+import { softwareQualityAbi, softwareQualityRails, softwareQualityCsv } from './helpers/software-quality-observations.mjs';
 import { compileSource } from '../tools/toolchain.mjs';
 import { GhostFlowRuntime } from '../runtimes/wasm/ghostflow-runtime.mjs';
 
-const root = path.resolve(new URL('../', import.meta.url).pathname);
+const root = fileURLToPath(new URL('../', import.meta.url));
 const wasm = fs.readFileSync(path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm'));
-const native = path.join(root, 'target/release/examples/run');
+const native = path.join(root, `target/release/examples/run${process.platform === 'win32' ? '.exe' : ''}`);
 const source = `# Long tick state
 
 \`\`\`ghost
@@ -20,9 +22,9 @@ control LongTickState {
   state phase: Phase = Idle;
   timer age = elapsed(phase);
   phase' = case phase {
-    Idle => if start then One else Idle;
+    Idle => case start { ok(value) => if value then One else Idle; fault(_) => Idle; };
     One => if age >= dwell then Two else One;
-    Two => if stop || age >= dwell then Idle else Two;
+    Two => case stop { ok(value) => if value || age >= dwell then Idle else Two; fault(_) => Two; };
   };
   output one, two, idle: Bool;
   output age_value: Duration;
@@ -40,7 +42,7 @@ test('long logical-time jumps commit one finite state phase per accepted tick on
   const modulePath = path.join(dir, 'module.gfb');
   const csvPath = path.join(dir, 'inputs.csv');
   fs.writeFileSync(modulePath, artifact.bytes);
-  fs.writeFileSync(csvPath, 'start,stop,__gf_now_ms\ntrue,false,0\nfalse,false,5000\nfalse,false,5000\nfalse,false,10000\nfalse,true,20000\n');
+  fs.writeFileSync(csvPath, softwareQualityCsv(artifact, [[true, false, 0], [false, false, 5000], [false, false, 5000], [false, false, 10000], [false, true, 20000]].map(([start, stop, __gf_now_ms]) => ({ start, stop, __gf_now_ms }))));
   const outcomes = execFileSync(native, [modulePath, csvPath, '--outcomes'], { encoding: 'utf8' }).trim().split('\n').map(JSON.parse);
   assert.deepEqual(outcomes.map(row => row.trace.safe), [
     { age_value: 0, idle: true, one: false, two: false },
@@ -53,6 +55,7 @@ test('long logical-time jumps commit one finite state phase per accepted tick on
   const runtime = await GhostFlowRuntime.instantiate(wasm);
   t.after(() => runtime.dispose());
   runtime.load(artifact.bytes);
+  softwareQualityAbi(runtime, artifact);
   for (const name of ['one', 'two', 'idle']) runtime.addCapability('actuator', name, 'bool');
   runtime.addCapability('actuator', 'age_value', 'number');
   runtime.activate();

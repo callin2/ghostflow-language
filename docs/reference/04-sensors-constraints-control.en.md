@@ -6,7 +6,7 @@
 [Full contents](../LANGUAGE-REFERENCE.en.md) · [Previous: 3. Time and schedules](03-time-and-schedules.en.md) ·
 [Next: 5. Settings and observation](05-settings-and-observation.en.md)
 
-A GhostFlow sensor value is not a single number. It carries value source, quality, time and faults; output is first calculated as a requested intent, not a device command. Distinguishing local control expressions, shared-resource arbitration, safety constraints, Driver application and physical feedback allows sensor failures and competing controls to be explained without hiding them.
+A GhostFlow sensor value is not a single number. It carries value source, quality, time and faults; output is first calculated as a requested intent, not a device command. Distinguishing local control expressions, shared-resource arbitration, safety constraints, output renderer application and physical feedback allows sensor failures and competing controls to be explained without hiding them.
 
 Read the code notation in this chapter as follows:
 
@@ -22,13 +22,17 @@ The basis is [common constraints and sensor contracts](../CONSTRAINTS.md), [sele
 [#105](https://github.com/callin2/ghostflow-language/issues/105) and
 [#110](https://github.com/callin2/ghostflow-language/issues/110).
 
+The canonical external declaration keyword is `input`. It inherits this chapter's typed quality, conditioning and optional capability rules. `sensor` remains an
+internal/wire quality category, not an accepted declaration alias. Migrate source
+only as a new reviewed revision; see [the migration contract](../INPUT-MIGRATION.md).
+
 ## 4.1 sensor and Result quality
 
 In the selected declaration, a sensor's type is its normal payload type.
 
 ```ghost
-sensor low_water: Bool;
-sensor moisture: Percent;
+input low_water: Bool;
+input moisture: Percent;
 ```
 
 The actual type when reading a sensor is conceptually `Result<T, SensorFault>`. Branch on normal samples with `ok(value)` and errors with `fault(reason)`.
@@ -71,7 +75,7 @@ let normalized = temperature |> and_then(normalize);
 The selected sensor configuration notation is:
 
 ```ghost
-sensor moisture: Percent {
+input moisture: Percent {
   sample = 1s;
   valid = 0% .. 100%;
   filter = median(5);
@@ -85,7 +89,7 @@ Each item's meaning and constraints are:
 | Item | Type/constraint | Meaning |
 |---|---|---|
 | `sample` | Positive `Duration` | Expected measurement interval information. Creates no sensor-reading thread or timer. |
-| `valid` | Closed range of the same type as the payload | Checks raw normal candidates before filtering. Out-of-range values are `Invalid`. |
+| `valid` | Closed range of the same numeric payload type; unavailable for Bool | Checks raw normal candidates before filtering. Out-of-range values are `Invalid`. Bool ranges reject during compilation. |
 | `filter` | Stateful signal operation | Applies only to new valid samples. |
 | `stale_after` | Positive `Duration` | Freshness limit from the time of the last actual valid sample. |
 | `recover_after` | Positive integer `N samples` | Recovery after a fault requires N consecutive new valid samples. |
@@ -109,6 +113,26 @@ Explicit `Disconnected` and `Invalid` propagate immediately. Without a sample, t
 Clear the filter window after a fault. The result is `NotReady` until both filter readiness and `recover_after` conditions are met. median(5) with recover_after=3 requires at least five new valid samples. Do not count a sample with a changed source epoch or time epoch as the next normal sample in the previous continuous sequence.
 
 Default reboot semantics reset sensor state and freshness and prepare again from `NotReady`. Persistent resume is an explicit opt-in validating checkpoint source/time continuity. Do not immediately restore a single old normal value and use it as permission.
+
+`recover_after = N samples` counts distinct new valid observations on initialization, reboot, source-epoch changes, and recovery after a fault. The Nth observation is usable once the filter is also ready; duplicates and clock-only scans do not count. A fault or loss of freshness starts a new sequence. To discard the first N valid observations, author `recover_after = N+1 samples` as a concrete count within `1..31`. This option counts samples; it is not a timed warm-up.
+
+A timed preparation period can be authored with the existing stateful `debounce` operation, without a duration form of `recover_after`. This pattern withholds the Result until two minutes have elapsed between the first conditioned `Good` observation and a distinct fresh `Good` observation at or after the deadline. The `usable` output is an availability indicator; it does not command physical operation.
+
+```ghost
+fn observed(value: Number) -> Bool { true }
+control TimedPreparation {
+  input reading: Number { stale_after = 3min; }
+  signal ready = debounce(reading |> map(observed), stable_for: 2min, initial: false);
+  let prepared: Result<Number, SensorFault> = case ready {
+    ok(value) => if value then reading else fault(NotReady);
+    fault(_) => reading;
+  };
+  output usable: Bool;
+  usable <- case prepared { ok(value) => true; fault(_) => false; };
+}
+```
+
+`observed` maps every healthy payload, including zero, to true; an input fault passes through `map` unchanged. The debounce interval uses observation timestamps. Clock-only scans and duplicate samples cannot promote readiness. A fault, stale reception or a source-epoch change restarts preparation. If filtering or sample-count recovery is configured, the interval starts only after those stages first produce `Good`. The `fault(_) => reading` branch preserves the original input Result and its origin. Choose `stale_after` consistently with the expected observation cadence; the three-minute bound above permits the sparse first/deadline observations in this example. Count-based `recover_after` and this authored duration gate are separate conditions.
 
 ## 4.3 Filters and signal operations
 
@@ -148,8 +172,8 @@ The two boundaries prevent repeated ON/OFF near the threshold. This memory is ex
 The following is selected notation:
 
 ```ghost
-sensor moisture: Percent { filter = moving_average(3); }
-sensor temperature: Temperature { filter = ema(alpha: 0.25); }
+input moisture: Percent { filter = moving_average(3); }
+input temperature: Temperature { filter = ema(alpha: 0.25); }
 signal stable_start = debounce(start, stable_for: 2s, initial: false);
 ```
 
@@ -273,7 +297,7 @@ history must fit a finite bound declared by the deployment profile. If that boun
 cannot be supported, reject the use; do not retain unbounded history on an MCU.
 
 The first actuator-progress basis is the Device's acknowledged output-register or
-write history. Its acknowledgement means only that the Driver accepted that
+write history. Its acknowledgement means only that the output renderer accepted that
 register/write; it does not prove motor movement or position. Request time may be
 used as a basis only when explicitly declared as requested history. Never
 substitute it for applied history. This follows the requested/safe/applied/
@@ -311,7 +335,7 @@ uncertainty bound; it cannot silently accept unknown uncertainty.
 Continuous example: with an explicit runtime reference, matching model,
 calibration and binding, the same run/time epoch, and a gap-free qualifying write
 history within the profile bound, the selected model may produce an estimate. It
-remains an estimate; a Driver ACK alone does not assert movement. Discontinuous
+remains an estimate; an output renderer ACK alone does not assert movement. Discontinuous
 example: for an applied-history basis, an unacknowledged request, failed or
 uncertain new write, reboot, or identity/revision change makes the live estimate
 unavailable until a reference is validated again. A separately declared
@@ -339,7 +363,7 @@ separate compatibility decisions.
 ## 4.5 Optional sensors and capabilities
 
 ```ghost
-sensor moisture?: Percent;
+input moisture?: Percent;
 ```
 
 `?` declares that the sensor capability is optional in the installation profile. It does not merge absence with faults of an installed sensor.
@@ -400,7 +424,7 @@ sensor/input + previous state
   → requested output intent
   → arbitration and constraints
   → safe/effective intent
-  → command applied by Driver
+  → command applied by output renderer
   → state confirmed by feedback
 ```
 
@@ -474,7 +498,7 @@ Activation and each evaluation must provide the same binding identity. Missing
 or mismatched binding rejects evaluation rather than partially executing it.
 Bound requests, admission and safe_output are checked within one Rust commit
 boundary, not by a host filter after output publication. Logical enforcement
-does not guarantee physical applied/confirmed evidence or Driver safe sequencing.
+does not guarantee physical applied/confirmed evidence or output renderer safe sequencing.
 
 Raw exclusive activity inputs are not admission results. Deny new claims that
 conflict with an admitted activity, preserving incumbent admission and previous
@@ -526,7 +550,7 @@ including goals/PID. Priority is an arbitration policy choosing requests within 
 it does not relax mandatory conditions or bypass resource binding, provenance or recovery.
 Predictable prestart violations deny admission. During execution, apply authored resource-
 specific safe behavior and retain the cause and transition. Distinguish admission, requested
-candidate, safe_output, Driver applied and feedback confirmed in deterministic order; evidence
+candidate, safe_output, output renderer applied and feedback confirmed in deterministic order; evidence
 at one stage does not guarantee another (§4.7). Recovery of normal evidence creates no new
 start authority. Retries, recovery and manual paths follow the same mandatory conditions.
 
@@ -718,7 +742,7 @@ Controller output is a requested target. Subsequent arbitration and safety const
 PID requested 92%
 wind safety max 20%
 safe target 20%
-Driver applied 20%
+output renderer applied 20%
 position feedback 17% with provenance
 ```
 

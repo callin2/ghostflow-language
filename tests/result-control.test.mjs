@@ -9,7 +9,7 @@ const sample = (id, quality, value = 0, timestampMs = id) => ({ epoch: 1, id, ti
 
 test('REF-08-012 default new control run clears warm sensor filter and freshness on plain and framed WASM', async () => {
   const compiled = await compileSource(`control FreshSensorRun {
-    sensor moisture: Percent {
+    input moisture: Percent {
       valid = 0% .. 100%; filter = median(5); stale_after = 3s; recover_after = 3 samples;
     }
     output value: Percent;
@@ -77,7 +77,7 @@ test('Result function parameters, constructors, and exhaustive nested fault case
   control ResultFunctions {
     input request: Bool;
     output accepted: Bool;
-    accepted <- case pass(ready(request)) {
+    accepted <- case pass(request |> and_then(ready)) {
       ok(value) => value;
       fault(reason) => case reason {
         Disconnected => false; Stale => false; Invalid => false; NotReady => false;
@@ -86,10 +86,10 @@ test('Result function parameters, constructors, and exhaustive nested fault case
   }`, { filename: 'result-functions.ghost' });
   const runtime = await ControlRuntime.instantiate(wasm, compiled);
   try {
-    const accepted = runtime.step({ nowMs: 0, inputs: { request: true } });
+    const accepted = runtime.step({ nowMs: 0, samples: { request: { epoch: 1, id: 1, timestampMs: 0, quality: 'Good', value: true } } });
     assert.equal(accepted.vm.safe.accepted, true);
     assert.equal(accepted.vm.resultTrace.at(-1).choice, 0);
-    const fallback = runtime.step({ nowMs: 1, inputs: { request: false } });
+    const fallback = runtime.step({ nowMs: 1, samples: { request: { epoch: 1, id: 2, timestampMs: 1, quality: 'Good', value: false } } });
     assert.equal(fallback.vm.safe.accepted, false);
     assert.equal(fallback.vm.resultTrace.at(-1).choice, 4);
     assert.ok(fallback.vm.resultTrace.at(-1).origin > 0);
@@ -119,7 +119,7 @@ test('fault enum members cannot be shadowed by parameters, lets, or Result bindi
   for (const [name, code] of [
     ['parameter', 'fn bad(Stale: Bool) -> Bool { Stale } control Bad {}'],
     ['let', 'control Bad { let Stale = false; }'],
-    ['case binding', 'control Bad { sensor value: Bool; let x = case value { ok(Stale) => Stale; fault(_) => false; }; }'],
+    ['case binding', 'control Bad { input value: Bool; let x = case value { ok(Stale) => Stale; fault(_) => false; }; }'],
     ['enum declaration', 'control Bad { type Mine = Stale; }'],
   ]) await assert.rejects(() => compileSource(code, { filename: `shadow-${name}.ghost` }), /reserved fault member/);
 });
@@ -164,7 +164,7 @@ test('pure function and Result callback scopes cannot capture caller parameters 
 
 test('named static Result transform aliases compose and cycles or scalar aliases reject', async () => {
   const compiled = await compileSource(`control NamedTransform {
-    sensor moisture: Percent;
+    input moisture: Percent;
     let is_dry = map(below(35%)) >> recover(false);
     output dry: Bool;
     dry <- moisture |> is_dry;
@@ -174,10 +174,10 @@ test('named static Result transform aliases compose and cycles or scalar aliases
     assert.equal(runtime.step({ nowMs: 0, samples: { moisture: sample(0, 'Good', 30) } }).vm.safe.dry, true);
   } finally { runtime.dispose(); }
   await assert.rejects(() => compileSource(`control CyclicTransform {
-    sensor moisture: Percent; let first = second; let second = first; output dry: Bool; dry <- moisture |> first;
+    input moisture: Percent; let first = second; let second = first; output dry: Bool; dry <- moisture |> first;
   }`, { filename: 'cyclic-transform.ghost' }), /cyclic let/);
   await assert.rejects(() => compileSource(`control ScalarAlias {
-    sensor moisture: Percent; let threshold = 35%; output dry: Bool; dry <- moisture |> threshold;
+    input moisture: Percent; let threshold = 35%; output dry: Bool; dry <- moisture |> threshold;
   }`, { filename: 'scalar-transform.ghost' }), /not a static Result transform/);
 });
 
@@ -191,7 +191,7 @@ test('Result pipeline precedence leaves DailySlots generic terminators intact', 
 
 test('REF-00-007 normal zero and fault fallback zero retain distinct result trace evidence', async () => {
   const compiled = await compileSource(`control ZeroProvenance {
-    sensor reading: Number;
+    input reading: Number;
     output value: Number;
     value <- reading |> recover(0.0);
   }`, { filename: 'zero-provenance.ghost' });
@@ -217,7 +217,7 @@ test('REF-00-007 normal zero and fault fallback zero retain distinct result trac
 
 test('legacy and framed Result hosts reject missing or forged sensor fault bindings', async () => {
   const compiled = await compileSource(`control ResultBindings {
-    sensor reading: Number;
+    input reading: Number;
     signal low = hysteresis(reading, on_below: 1.0, off_above: 2.0, initial: false);
     output value: Bool;
     value <- low |> recover(false);
@@ -232,7 +232,7 @@ test('legacy and framed Result hosts reject missing or forged sensor fault bindi
 
 test('REF-01-075 optional sensor absence and installed fault identities remain distinct on framed WASM', async () => {
   const compiled = await compileSource(`control OptionalMoisture {
-    sensor moisture?: Percent;
+    input moisture?: Percent;
     output installed, healthy: Bool;
     output reason: Int;
     adapt moisture_policy {
@@ -279,12 +279,12 @@ test('REF-01-075 optional sensor absence and installed fault identities remain d
 
 test('REF-01-075 optional syntax does not implicitly unwrap or default a sensor Result', async () => {
   await assert.rejects(() => compileSource(`control ImplicitOptional {
-    sensor moisture?: Percent;
+    input moisture?: Percent;
     output pump: Bool;
     pump <- moisture < 30%;
   }`, { filename: 'implicit-optional.ghost' }), /optional sensor moisture may only be read inside a strategy that matches it/);
   await assert.rejects(() => compileSource(`control ImplicitOptionalResult {
-    sensor moisture?: Percent;
+    input moisture?: Percent;
     output pump: Bool;
     adapt moisture_policy {
       strategy Installed priority 10 match (moisture: sensor<Percent>) { pump <- moisture < 30%; }
@@ -295,7 +295,7 @@ test('REF-01-075 optional syntax does not implicitly unwrap or default a sensor 
 
 test('REF-04-003 all SensorFault reasons survive explicit fallback', async () => {
   const compiled = await compileSource(`control FaultReasons {
-    sensor reading: Number { stale_after = 3s; }
+    input reading: Number { stale_after = 3s; }
     output value: Number;
     value <- reading |> recover(0.0);
   }`, { filename: 'fault-reasons.ghost' });
@@ -323,7 +323,7 @@ test('REF-04-003 all SensorFault reasons survive explicit fallback', async () =>
 
 test('REF-04-005 map uses each current tick payload and faulted and_then callbacks stay unselected', async () => {
   const mapped = await compileSource(`control CurrentMap {
-    sensor reading: Number;
+    input reading: Number;
     output below: Bool;
     below <- reading |> map(below(30.0)) |> recover(false);
   }`, { filename: 'current-map.ghost' });
@@ -338,7 +338,7 @@ test('REF-04-005 map uses each current tick payload and faulted and_then callbac
     if 7.0 / value > 0.0 then ok(true) else ok(false)
   }
   control SkipFaultingCallback {
-    sensor reading: Number;
+    input reading: Number;
     state committed: Bool = true;
     committed' = reading |> and_then(classify) |> recover(false);
     output value: Bool;

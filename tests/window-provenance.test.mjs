@@ -12,16 +12,16 @@ import { canonicalJson } from '../tools/canonical-json.mjs';
 import { sha256Hex } from '../tools/sha256.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const nativePath = path.join(root, 'target/release/examples/run');
+const nativePath = path.join(root, `target/release/examples/run${process.platform === 'win32' ? '.exe' : ''}`);
 const filename = 'window-provenance.ghost.md';
 const source = `# Selected window
 
 \`\`\`ghost
 control WindowProvenance {
   input choose_a: Bool;
-  sensor a: Temperature;
-  sensor b: Temperature;
-  signal average_temperature = window_average(if choose_a then a else b,
+  input a: Temperature;
+  input b: Temperature;
+  signal average_temperature = window_average(case choose_a { ok(choose) => if choose then a else b; fault(reason) => fault(reason); },
     over: 2s, quality: measured, max_age: 1s);
   output average: Temperature;
   average <- average_temperature |> recover(0K);
@@ -39,21 +39,26 @@ test('window source trace binds the authored site and every static execution dep
   const compiled = await compileSource(source, { filename });
   const descriptor = compiled.manifest.signals[0];
   const node = compiled.sourceMap.find(entry => entry.kind === 'signal');
+  const faultNode = compiled.sourceMap.find(entry => entry.kind === 'call'
+    && source.split('\n')[entry.line - 1].slice(entry.column - 1).startsWith('fault('));
   assert.deepEqual(compiled.traceMetadata.windowSites, [{
     site: descriptor.site, slot: 0, nodeId: node.id, name: 'average_temperature', operation: 'average',
     payloadType: 'Temperature', errorType: 'SensorFault', quality: 'measured', overMs: 2000, maxAgeMs: 1000,
     clockInput: '__gf_now_ms', timeEpochInput: '__gf_time_epoch', sources: descriptor.sources,
-    origins: descriptor.sources.map(root => ({ tag: root.tag, nodeId: root.tag, kind: 'sensor', name: root.name })),
+    origins: [...descriptor.sources.map(root => ({ tag: root.tag, nodeId: root.tag, kind: 'sensor', name: root.name })),
+      { tag: faultNode.id, nodeId: faultNode.id, kind: 'fault' }],
     source: compiled.traceMetadata.windowSites[0].source,
     extractedSource: compiled.traceMetadata.windowSites[0].extractedSource,
   }]);
   const dependency = compiled.traceMetadata.dependencies.find(entry => entry.target.field === 'windowTrace');
   assert.deepEqual(dependency.target, { field: 'windowTrace', name: 'average_temperature' });
   assert.deepEqual(dependency.reads, [
-    { field: 'inputs', name: 'choose_a' },
+    { field: 'inputs', name: '__gf_sensor_ok_choose_a' },
+    { field: 'inputs', name: '__gf_sensor_value_choose_a' },
     { field: 'inputs', name: '__gf_sensor_ok_a' }, { field: 'inputs', name: '__gf_sensor_ok_b' },
     { field: 'inputs', name: '__gf_sensor_value_a' }, { field: 'inputs', name: '__gf_sensor_value_b' },
     { field: 'inputs', name: '__gf_sensor_fault_a' }, { field: 'inputs', name: '__gf_sensor_fault_b' },
+    { field: 'inputs', name: '__gf_sensor_fault_choose_a' },
     ...descriptor.sources.flatMap(root => ['present', 'epoch', 'id', 'timestamp'].map(part => ({
       field: 'inputs', name: `__gf_sensor_sample_${part}_${root.name}`,
     }))),
@@ -82,10 +87,10 @@ test('signed canonical replay rejects re-signed window source-map substitutions 
   const keys = await crypto.subtle.generateKey('Ed25519', true, ['sign', 'verify']);
   const keyId = 'window-provenance-key';
   const identity = {
-    compilerRevision: 'window-provenance-test', runtimeSemantics: 'GhostFlow/runtime-semantics-v1',
-    runtimeAbi: 'GhostFlow/framed-scan-abi-v1', bindingRevision: 'window-provenance-v1',
+    compilerRevision: 'issue531-canonical-input-candidate', runtimeSemantics: 'GhostFlow/runtime-semantics-v1',
+    runtimeAbi: 'GhostFlow/framed-scan-abi-v1', bindingRevision: 'window-provenance-input-v2',
     requiredCapabilities: [
-      { kind: 'input', name: 'choose_a', type: 'bool' },
+      { kind: 'sensor', name: 'choose_a', type: 'bool' },
       { kind: 'sensor', name: 'a', type: 'number' }, { kind: 'sensor', name: 'b', type: 'number' },
       { kind: 'actuator', name: 'average', type: 'number' },
     ],
@@ -125,11 +130,11 @@ test('source observation projects owned Rust window evidence without physical-qu
   const modulePath = path.join(temporary, 'window.gfb');
   const csvPath = path.join(temporary, 'window.csv');
   fs.writeFileSync(modulePath, compiled.bytes);
-  const [a, b] = compiled.manifest.sensors;
-  const header = ['choose_a', a.valueInput, a.okInput, a.faultInput, b.valueInput, b.okInput, b.faultInput,
+  const [choose, a, b] = compiled.manifest.sensors;
+  const header = [choose.valueInput, choose.okInput, choose.faultInput, a.valueInput, a.okInput, a.faultInput, b.valueInput, b.okInput, b.faultInput,
     '__gf_now_ms', '__gf_time_epoch', a.samplePresentInput, a.sampleEpochInput, a.sampleIdInput, a.sampleTimestampInput,
     b.samplePresentInput, b.sampleEpochInput, b.sampleIdInput, b.sampleTimestampInput];
-  fs.writeFileSync(csvPath, `${header.join(',')}\ntrue,280,true,0,300,true,0,1000,5,true,1,7,1000,false,0,0,0\n`);
+  fs.writeFileSync(csvPath, `${header.join(',')}\ntrue,true,0,280,true,0,300,true,0,1000,5,true,1,7,1000,false,0,0,0\n`);
   const roots = compiled.manifest.signals[0].sources;
   const profile = roots.map(root => `${root.tag}:3:1000`).join(',');
   const result = spawnSync(nativePath, [modulePath, csvPath, '--outcomes', '--temporal', '5', '12', '33554432', profile], { encoding: 'utf8' });
@@ -175,7 +180,7 @@ test('source observation projects owned Rust window evidence without physical-qu
 
 test('an available rate requires two contributors with distinct observation times', async () => {
   const rateSource = source
-    .replace('window_average(if choose_a then a else b,', 'window_rate(if choose_a then a else b,')
+    .replace('window_average(case choose_a { ok(choose) => if choose then a else b; fault(reason) => fault(reason); },', 'window_rate(case choose_a { ok(choose) => if choose then a else b; fault(reason) => fault(reason); },')
     .replace('output average: Temperature;', 'output fast: Bool;')
     .replace('average <- average_temperature |> recover(0K);',
       'fast <- average_temperature |> map(below(rate(delta: 1ΔK, time: 1s))) |> recover(false);');
@@ -198,7 +203,7 @@ test('window observation enforces the exact Int machine domain', async () => {
   const intSource = `# Int window\n\n\`\`\`ghost
 fn as_int(value: Number) -> Int { int_trunc(value) }
 control IntWindow {
-  sensor reading: Number;
+  input reading: Number;
   signal minimum = window_min(reading |> map(as_int), over: 1s, quality: measured, max_age: 1s);
   output value: Int;
   value <- minimum |> recover(0);

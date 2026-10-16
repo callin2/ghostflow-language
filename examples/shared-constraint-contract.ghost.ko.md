@@ -14,14 +14,15 @@ control 하나인 이 문서는 검사된 **실행 불가능한 descriptor**입�
 기본값이나 물리 출력 순서를 지시하는 것이 아닙니다.
 
 ```ghost
+// Source revision: issue531-quality-shared-contract-v1
 control SharedPumpPolicy {
   resource station: Station;
   resource pump1: BoolActuator;
   resource valve1: BoolActuator;
   input automatic, manual, pump_request, valve_request: Bool;
   output pump, valve: Bool;
-  pump <- pump_request;
-  valve <- valve_request;
+  pump <- pump_request |> recover(false);
+  valve <- valve_request |> recover(true);
   constraints SharedRules for station {
     exclusive at admission { automatic, manual };
     require at safe_output pump1.on => any_on({ valve1 });

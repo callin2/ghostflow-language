@@ -137,3 +137,9 @@ sensor/actuator capability를 참조해야 합니다. 선택 방식은
 Native/WASM 테스트는 부재 시 baseline과 존재 시 feedback 출력을 유지하며,
 재서명된 전략/query/bytecode 변조를 거부합니다. GFB 및 wire 형식, ABI와 서명
 정책은 바뀌지 않습니다. 물리 배선과 Device admission은 소비자의 책임입니다.
+
+## 정확한 재사용 composition provenance
+
+재사용 composition package는 서명된 source-map envelope에 선택적 `sourceClosure`를 포함한다. 여기에는 정확히 pin된 transitive literate 문서, revision, digest와 작성된 instance identity가 들어간다. 검증은 해당 closure를 다시 컴파일하고 전체 bytecode, manifest 및 source-map envelope를 비교한 뒤 target bytecode verifier를 호출한다. 유효한 서명도 변경된 instance provenance를 허용하지 않는다. closure가 없는 기존 package는 기존 검증 경로를 유지한다.
+
+REF-06-025는 nested reuse, 분리된 Boolean instance state 및 typed logical port를 native와 framed WASM으로 확인하고, 검증된 package에서 effect-free replay를 준비한다. virtual binding revision은 logical capability를 식별하며 물리 pin 적합성이나 적용을 입증하지 않는다. 기존 plain Boolean replay profile은 바뀌지 않는다.

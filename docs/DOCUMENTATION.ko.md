@@ -22,6 +22,7 @@
 | `docs/ACCOUNTING-LEDGER-ABI.md` | [English](ACCOUNTING-LEDGER-ABI.md) | [한국어](ACCOUNTING-LEDGER-ABI.ko.md) |
 | `docs/AFTER-EVENT-WASM-ABI.md` | [English](AFTER-EVENT-WASM-ABI.md) | [한국어](AFTER-EVENT-WASM-ABI.ko.md) |
 | `docs/BEHAVIOR-COMPOSITION-RESEARCH.md` | [English](BEHAVIOR-COMPOSITION-RESEARCH.md) | [한국어](BEHAVIOR-COMPOSITION-RESEARCH.ko.md) |
+| `docs/BOOLEAN-OUTPUT-EXPLANATION.md` | [English](BOOLEAN-OUTPUT-EXPLANATION.md) | [한국어](BOOLEAN-OUTPUT-EXPLANATION.ko.md) |
 | `docs/BYTECODE.md` | [English](BYTECODE.md) | [한국어](BYTECODE.ko.md) |
 | `docs/CALENDAR-PROVIDERS.md` | [English](CALENDAR-PROVIDERS.md) | [한국어](CALENDAR-PROVIDERS.ko.md) |
 | `docs/COMPILER-DIAGNOSTICS.md` | [English](COMPILER-DIAGNOSTICS.md) | [한국어](COMPILER-DIAGNOSTICS.ko.md) |
@@ -136,3 +137,4 @@
 | `tasks/window-gfb4-design.md` | [English](../tasks/window-gfb4-design.md) | [한국어](../tasks/window-gfb4-design.ko.md) |
 | `tests/reference/DECISIONS.md` | [English](../tests/reference/DECISIONS.en.md) | [한국어](../tests/reference/DECISIONS.md) |
 | `tests/reference/README.md` | [English](../tests/reference/README.en.md) | [한국어](../tests/reference/README.md) |
+| `docs/HARDWARE-FRONT-MATTER.md` | [English](HARDWARE-FRONT-MATTER.md) | [한국어](HARDWARE-FRONT-MATTER.ko.md) |

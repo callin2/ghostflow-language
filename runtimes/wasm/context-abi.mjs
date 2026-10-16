@@ -172,8 +172,8 @@ export function encodeContextFacts(packet) {
     const e = object(p.settings, ['programFingerprint','eventId','baseRevision','position','origin','changes'], 'settings');
     writer.raw64(e.programFingerprint, 'settings.programFingerprint'); writer.str(e.eventId, 'settings.eventId');
     writer.u64(e.baseRevision, 'settings.baseRevision'); writer.u64(e.position, 'settings.position');
-    if (!['operatorEdit','producerObservation'].includes(e.origin)) throw new TypeError('invalid settings.origin');
-    writer.u8(e.origin === 'operatorEdit' ? 0 : 1);
+    if (!['operatorEdit','producerObservation','temporaryReturn'].includes(e.origin)) throw new TypeError('invalid settings.origin');
+    writer.u8(e.origin === 'operatorEdit' ? 0 : e.origin === 'producerObservation' ? 1 : 2);
     const changes = bounded(e.changes, 'settings.changes'); if (!changes.length) throw new RangeError('empty settings event');
     writer.u16(changes.length); const changed = new Set();
     for (const [index, value] of changes.entries()) {

@@ -1,0 +1,44 @@
+{
+  "format": "GhostFlow/runtime-snapshot-v0",
+  "version": "0.1",
+  "schema": {
+    "format": "GhostFlow/interaction-schema-v0",
+    "version": "0.3",
+    "sha256": "c1ceca7f3cc7c9a4c231555604e7b3e2a0a8cabc8e1de94e3ea33f07ac432204"
+  },
+  "module": {
+    "id": "FiveMinuteWatering",
+    "moduleFingerprint": "a6b13d5c7734aef6",
+    "bytecodeSha256": "96c44d9b2e9a52c7ccf540d7d159fa1402044b14caa4f183d45cd3d82be6e0b6"
+  },
+  "source": {
+    "documentId": "source.fixture-five-minute-watering",
+    "revisionId": "revision.fixture-five-minute-watering.input531-v1",
+    "format": "GhostFlow/source-document-v1",
+    "kind": "literate",
+    "sha256": "a0461e7411d0cabcb3ec3380c1732d3d74b77c708904e0033ead2f573c3dc1e1"
+  },
+  "runId": "watering-run-before-reset-v1",
+  "completion": {
+    "kind": "completed-scan",
+    "scanId": 0,
+    "logicalTimeMs": 0
+  },
+  "observations": [
+    {
+      "descriptorId": "state.request_was_high",
+      "status": "ready",
+      "value": false
+    },
+    {
+      "descriptorId": "state.watering",
+      "status": "ready",
+      "value": false
+    },
+    {
+      "descriptorId": "timer.age",
+      "status": "ready",
+      "value": 0
+    }
+  ]
+}

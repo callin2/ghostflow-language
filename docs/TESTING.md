@@ -79,7 +79,7 @@ state and does not configure a physical relay's startup or fail-safe level.
 Every declared output has exactly one per-scan connection expression. A constant
 intent is written as a constant connection expression.
 
-Before the first successful scan there is no VM output intent. The host/driver
+Before the first successful scan there is no VM output intent. The host/renderer
 must hold its configured safe state; the default Farm Device policy is OFF.
 Compile, load, activation or tick failure cannot invent an intent from source
 syntax. Physical startup, watchdog and fail-safe policy belong to the identified

@@ -22,7 +22,7 @@
 
 Rust 코어는 공통 생명주기와 실행 식별자를 소유하고 관측 hook을 호출하기
 전에 사실을 기록한다. 작성된 프로그램은 도메인 의미를 소유한다.
-호스트는 레코드를 내보내고 장기 이력을 소유하며 렌더러는 증거를 소비한다.
+호스트는 레코드를 내보내고 장기 이력을 소유하며 cabinet-view는 증거를 소비한다.
 이는 승인된 프런트엔드 [ADR-002, revision `8f95786`](https://github.com/callin2/farm_studio_frontend/blob/8f95786/docs/adr-002-runtime-command-lifecycle-and-host-hooks.md)을
 따른다. 구현은 별도의 채택 작업이다. 명령 완료는 실행 결과이지 물리적
 확인이 아니다. [§4.7](reference/04-sensors-constraints-control.md)은 requested,

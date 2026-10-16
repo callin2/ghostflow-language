@@ -1,4 +1,11 @@
+// Explicit temporal fixture revision: issue531-quality-temporal-v1; predecessor retained in fixtures/history/issue531/temporal.
 import assert from 'node:assert/strict';
+import { softwareQualityObservations, softwareQualityRails } from './helpers/software-quality-observations.mjs';
+const ControlRuntime = {
+  instantiate: async (...args) => softwareQualityObservations(await BaseControlRuntime.instantiate(...args)),
+  instantiateFramed: async (...args) => softwareQualityObservations(await BaseControlRuntime.instantiateFramed(...args)),
+};
+
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -6,11 +13,11 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { compileSource } from '../tools/toolchain.mjs';
-import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
+import { ControlRuntime as BaseControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 import { encodeContextFacts, solarContextEvidence } from '../runtimes/wasm/context-abi.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const document = fs.readFileSync(new URL('./fixtures/issue-145-solar-config.ghost.md', import.meta.url), 'utf8');
+const document = fs.readFileSync(new URL('./fixtures/issue-145-solar-config.input-v1.ghost.md', import.meta.url), 'utf8');
 const activation = { bootEpoch: 7, terminalCapacity: 32, bindings: [] };
 const wasmPath = path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm');
 const nativePath = path.join(root, 'target/release/examples/context_tape' + (process.platform === 'win32' ? '.exe' : ''));
@@ -19,7 +26,7 @@ function wasmBytes() {
   if (!wasm) wasm = fs.readFileSync(wasmPath);
   return wasm;
 }
-const artifact = () => compileSource(document, { filename: 'issue-145-solar-config.ghost.md' });
+const artifact = () => compileSource(document, { filename: 'issue-145-solar-config.input-v1.ghost.md' });
 const clock = (monotonicMs, wallMs) => ({ monotonicMs, bootEpoch: 7, wallMs, uncertaintyMs: 0,
   trusted: true, unknownReason: null, sourceRevision: 'ref-08-007-clock-v1' });
 function providerRows(rows, providerRevision = 'solar-ref-08-007-r1', contextRevision = 'seoul-ref-08-007-binding-r1') {
@@ -40,7 +47,7 @@ function native(t, compiled, steps) {
   fs.writeFileSync(modulePath, compiled.bytes);
   fs.writeFileSync(tapePath, JSON.stringify({ profile: 'context-solar-v1', activation,
     steps: steps.map((step, index) => ({ scanId: step.scanId ?? index, logicalTimeMs: step.nowMs,
-      inputs: [{ name: 'divisor', value: step.divisor ?? 1 }], ...step.contextFacts })) }));
+      inputs: Object.entries(softwareQualityRails(compiled, { divisor: step.divisor ?? 1 }, index + 1, step.nowMs)).map(([name, value]) => ({ name, value })), ...step.contextFacts })) }));
   return execFileSync(nativePath, [modulePath, tapePath], { encoding: 'utf8' }).trim().split('\n').map(line => JSON.parse(line));
 }
 function solarRows(compiled, trace) {
@@ -80,7 +87,7 @@ test('REF-08-007 same-data/time Solar occurrence keeps revision, validity and oc
     'same occurrence is admitted once, not replayed as duplicate Bool pulses');
   assert.equal(traces[1].module, compiled.traceMetadata.moduleFingerprint,
     'runtime trace remains bound to the compiled source/definition identity');
-  assert.equal(compiled.sourceDocument.filename, 'issue-145-solar-config.ghost.md');
+  assert.equal(compiled.sourceDocument.filename, 'issue-145-solar-config.input-v1.ghost.md');
   assert.equal(compiled.traceMetadata.sourceDocumentSha256, compiled.sourceDocument.sha256);
 
   const admitted = solarRows(compiled, traces[1]);

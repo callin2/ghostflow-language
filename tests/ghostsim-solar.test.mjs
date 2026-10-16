@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -7,7 +8,7 @@ import test from 'node:test';
 import { encode } from '@toon-format/toon';
 import { compileSource, writeArtifact } from '../tools/toolchain.mjs';
 
-const catalog = JSON.parse(fs.readFileSync(new URL('./reference/cases/02-time-control.json', import.meta.url))).cases;
+const catalog = JSON.parse(fs.readFileSync(new URL('./reference/cases-input-v1/02-time-control.json', import.meta.url))).cases;
 const selected = id => catalog.find(entry => entry.id === id);
 
 test('REF-03-042 Solar scan requires provider facts and admits the crossing', async t => {
@@ -31,7 +32,7 @@ test('REF-03-042 Solar scan requires provider facts and admits the crossing', as
     actions: [{ kind: 'scan', atMs: 0, solarFacts: facts(0, 900) },
       { kind: 'scan', atMs: 100, solarFacts: facts(100, 1000) }],
   }) + '\n');
-  const result = spawnSync(process.execPath, [new URL('../tools/ghostsim.mjs', import.meta.url).pathname,
+  const result = spawnSync(process.execPath, [fileURLToPath(new URL('../tools/ghostsim.mjs', import.meta.url)),
     artifact, scenarioPath, '--format', 'json'], { encoding: 'utf8', timeout: 10000 });
   assert.equal(result.status, 0, result.stdout + result.stderr);
   const output = JSON.parse(result.stdout);
@@ -61,7 +62,7 @@ test('REF-03-045 Solar scan keeps distinct schedule facts for both sites', async
     actions: [{ kind: 'scan', atMs: 0, solarFacts: facts(0, 900) },
       { kind: 'scan', atMs: 100, solarFacts: facts(100, 1000) }],
   }) + '\n');
-  const result = spawnSync(process.execPath, [new URL('../tools/ghostsim.mjs', import.meta.url).pathname,
+  const result = spawnSync(process.execPath, [fileURLToPath(new URL('../tools/ghostsim.mjs', import.meta.url)),
     artifact, scenarioPath, '--format', 'json'], { encoding: 'utf8', timeout: 10000 });
   assert.equal(result.status, 0, result.stdout + result.stderr);
   const output = JSON.parse(result.stdout);

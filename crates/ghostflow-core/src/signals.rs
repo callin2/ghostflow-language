@@ -428,7 +428,7 @@ impl Sensor {
             last_sample_timestamp: None,
             last_physical_sample_time: None,
             last_now_ms: None,
-            fault: None,
+            fault: Some(SensorFault::NotReady),
             recover_count: 0,
             diagnostics: [None; MAX_DIAGNOSTICS],
             diagnostic_count: 0,
@@ -559,10 +559,14 @@ impl Sensor {
             };
         }
         if let Some(fault) = self.fault {
-            return Reading {
-                value: self.state.filtered,
-                quality: fault.quality(),
-            };
+            // Preparation does not make an old accepted observation fresh.
+            // Explicit producer faults still propagate immediately.
+            if fault != SensorFault::NotReady || !self.is_stale(now_ms) {
+                return Reading {
+                    value: self.state.filtered,
+                    quality: fault.quality(),
+                };
+            }
         }
         if self.is_stale(now_ms) {
             return Reading {
@@ -674,7 +678,7 @@ impl Sensor {
     fn reset_processing(&mut self) {
         self.state.reset();
         self.last_physical_sample_time = None;
-        self.fault = None;
+        self.fault = Some(SensorFault::NotReady);
         self.recover_count = 0;
         self.hysteresis_value = self.initial_hysteresis();
     }
@@ -698,6 +702,84 @@ mod tests {
     }
     fn good(id: u64, time: u64, value: f64) -> Sample {
         Sample::good(1, id, time, value)
+    }
+
+    #[test]
+    fn recovery_threshold_applies_on_startup_reset_and_source_epoch() {
+        for threshold in 1..=MAX_WINDOW {
+            let mut s = sensor(Filter::Median(1), threshold);
+            for epoch in 1..=3 {
+                if epoch == 2 {
+                    s.reset();
+                }
+                for id in 1..=threshold as u64 {
+                    let expected = if id == threshold as u64 {
+                        Ok(UpdateResult::Accepted)
+                    } else {
+                        Err(SensorFault::NotReady)
+                    };
+                    assert_eq!(
+                        s.update(Sample::good(epoch, id, id, 0.0), id),
+                        expected,
+                        "threshold {threshold}, epoch {epoch}, observation {id}"
+                    );
+                    let quality = if id == threshold as u64 {
+                        Quality::Good
+                    } else {
+                        Quality::NotReady
+                    };
+                    for _ in 0..3 {
+                        assert_eq!(s.read(id).quality, quality);
+                    }
+                    assert_eq!(
+                        s.update(Sample::good(epoch, id, id, 99.0), id),
+                        Ok(UpdateResult::Duplicate)
+                    );
+                    assert_eq!(s.read(id).quality, quality);
+                }
+                assert_eq!(s.reading(threshold as u64), Ok(0.0));
+            }
+        }
+    }
+
+    #[test]
+    fn interrupted_recovery_needs_a_new_full_sequence_and_expired_preparation_is_stale() {
+        let mut s = sensor(Filter::Median(1), 3);
+        assert_eq!(s.update(good(1, 1, 0.0), 1), Err(SensorFault::NotReady));
+        assert_eq!(s.update(good(2, 2, 0.0), 2), Err(SensorFault::NotReady));
+        assert_eq!(
+            s.update(Sample::new(1, 3, 3, 0.0, Quality::Invalid), 3),
+            Err(SensorFault::Invalid)
+        );
+        for id in 4..=6 {
+            let expected = if id == 6 {
+                Ok(UpdateResult::Accepted)
+            } else {
+                Err(SensorFault::NotReady)
+            };
+            assert_eq!(s.update(good(id, id, 0.0), id), expected);
+        }
+        assert_eq!(
+            s.update(Sample::good(2, 1, 7, 0.0), 7),
+            Err(SensorFault::NotReady)
+        );
+        assert_eq!(s.read(3007).quality, Quality::Stale);
+        // Reads and duplicate identities cannot turn partial preparation into Good.
+        assert_eq!(
+            s.update(Sample::good(2, 1, 7, 99.0), 3007),
+            Ok(UpdateResult::Duplicate)
+        );
+        assert_eq!(s.read(3007).quality, Quality::Stale);
+        for id in 2..=4 {
+            let now = 3006 + id;
+            let expected = if id == 4 {
+                Ok(UpdateResult::Accepted)
+            } else {
+                Err(SensorFault::NotReady)
+            };
+            assert_eq!(s.update(Sample::good(2, id, now, 0.0), now), expected);
+        }
+        assert_eq!(s.reading(3010), Ok(0.0));
     }
 
     #[test]
@@ -970,7 +1052,7 @@ mod tests {
     #[test]
     fn cloned_snapshot_restores_ema_fault_recovery_clock_and_diagnostics() {
         let mut s = sensor(Filter::Ema(0.5), 2);
-        s.update(good(1, 1, 20.0), 1).unwrap();
+        assert_eq!(s.update(good(1, 1, 20.0), 1), Err(SensorFault::NotReady));
         s.update(good(2, 2, 40.0), 2).unwrap();
         let ready = s.clone();
         s.update(good(3, 3, 80.0), 3).unwrap();
@@ -988,7 +1070,10 @@ mod tests {
         let diagnostics: Vec<_> = s.diagnostics().collect();
         s.update(good(6, 6, 40.0), 6).unwrap();
         assert_eq!(s.reading(6), Ok(30.0));
-        s.update(Sample::good(2, 0, 7, 99.0), 7).unwrap();
+        assert_eq!(
+            s.update(Sample::good(2, 0, 7, 99.0), 7),
+            Err(SensorFault::NotReady)
+        );
         assert_eq!(
             s.update(Sample::good(2, 1, 6, 99.0), 6),
             Err(SensorFault::ClockBackward)

@@ -12,16 +12,18 @@ import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 
 const document = code => `# Exact import intent\n\n\`\`\`ghost\n${code}\n\`\`\`\n`;
 const pin = (alias, locator, revision, text) => `import ${alias} from "${locator}" revision "${revision}" sha256 "${sha256Hex(text)}";`;
-const leaf = document('control Leaf { input start: Bool; output pump: Bool; pump <- start; }');
-const middle = document(`${pin('Leaf', './leaf.ghost.md', 'leaf-r7', leaf)}
+// The prior leaf-r7/middle-r4 source is historical intent, not a fallback.
+const historicalLeaf = document('control Leaf { input start: Bool; output pump: Bool; pump <- start; }');
+const leaf = document('control Leaf { input start: Bool; output pump: Bool; pump <- start |> recover(false); }');
+const middle = document(`${pin('Leaf', './leaf.ghost.md', 'leaf-input-r1', leaf)}
 control Middle { input start: Bool; output pump: Bool; instance inner: Leaf;
 connect inner.start <- start; connect pump <- inner.pump; }`);
-const source = document(`${pin('Middle', './lib/middle.ghost.md', 'middle-r4', middle)}
+const source = document(`${pin('Middle', './lib/middle.ghost.md', 'middle-input-r1', middle)}
 control Farm { input start: Bool; output pump: Bool; instance outer: Middle;
 connect outer.start <- start; connect pump <- outer.pump; }`);
 const documents = [
-  { filename: 'lib/middle.ghost.md', revision: 'middle-r4', text: middle },
-  { filename: 'lib/leaf.ghost.md', revision: 'leaf-r7', text: leaf },
+  { filename: 'lib/middle.ghost.md', revision: 'middle-input-r1', text: middle },
+  { filename: 'lib/leaf.ghost.md', revision: 'leaf-input-r1', text: leaf },
 ];
 const compile = (text = source, closure = documents) => compileSource(text, { filename: 'farm.ghost.md', sourceClosure: closure });
 
@@ -36,6 +38,7 @@ test('REF-06-011 exact transitive revision and digest closure survives artifact 
     { instance: 'outer.inner', filename: 'lib/leaf.ghost.md', definition: 'Leaf' },
   ]);
   assert.equal(artifact.sourceDocument.text, source);
+  assert.notEqual(sha256Hex(leaf), sha256Hex(historicalLeaf), 'quality policy produces an explicit new source revision');
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-pinned-closure-'));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   const modulePath = path.join(directory, 'farm.gfb'), tapePath = path.join(directory, 'frames.tsv');
@@ -47,7 +50,8 @@ test('REF-06-011 exact transitive revision and digest closure survives artifact 
   t.after(() => runtime.dispose());
   const frames = [], outcomes = [], dispatch = runtime.runtime.dispatch.bind(runtime.runtime);
   runtime.runtime.dispatch = frame => { frames.push(structuredClone(frame)); dispatch(frame); outcomes.push(structuredClone(runtime.runtime.outcome)); };
-  for (const [nowMs, start] of [[0,false], [1,true], [2,false]]) runtime.step({ nowMs, inputs: { start } });
+  for (const [nowMs, start] of [[0,false], [1,true], [2,false]]) runtime.step({ nowMs,
+    samples: { start: { epoch: 1, id: nowMs + 1, timestampMs: nowMs, quality: 'Good', value: start } } });
   fs.writeFileSync(tapePath, frames.map(frame => [frame.scanId, frame.logicalTimeMs,
     ...frame.inputs.flatMap(input => [input.name, input.type === 'Bool' ? 'b' : 'n', input.value])].join('\t')).join('\n') + '\n');
   const nativePath = fileURLToPath(new URL('../target/release/examples/scan_tape' + (process.platform === 'win32' ? '.exe' : ''), import.meta.url));
@@ -81,8 +85,8 @@ test('REF-06-011 missing or floating transitive pins and revision or digest mism
     return true;
   });
   for (const [label, edit, pattern] of [
-    ['missing revision', text => text.replace('revision "leaf-r7" ', ''), /requires an immutable revision/],
-    ['floating revision', text => text.replace('"leaf-r7"', '"latest"'), /revision cannot be latest/],
+    ['missing revision', text => text.replace('revision "leaf-input-r1" ', ''), /requires an immutable revision/],
+    ['floating revision', text => text.replace('"leaf-input-r1"', '"latest"'), /revision cannot be latest/],
     ['missing digest', text => text.replace(`sha256 "${sha256Hex(leaf)}"`, ''), /requires a SHA-256 digest/],
   ]) {
     const changed = edit(middle);

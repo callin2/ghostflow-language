@@ -1,3 +1,4 @@
+import { softwareQualityRails } from './helpers/software-quality-observations.mjs';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import crypto from 'node:crypto';
@@ -20,17 +21,17 @@ const source = [
   'control TraceFixture {',
   '  input cascade, anyGate, anyAllowed: Bool;',
   '  state latched: Bool = false;',
-  "  latched' = cascade;",
+  "  latched' = cascade |> recover(false);",
   '  output a, b, c, permit, anyTarget, anyA, anyB, mutexA, mutexB: Bool;',
-  '  a <- cascade;',
-  '  b <- cascade;',
-  '  c <- cascade;',
+  '  a <- cascade |> recover(false);',
+  '  b <- cascade |> recover(false);',
+  '  c <- cascade |> recover(false);',
   '  permit <- false;',
-  '  anyTarget <- anyGate;',
-  '  anyA <- anyAllowed;',
+  '  anyTarget <- anyGate |> recover(false);',
+  '  anyA <- anyAllowed |> recover(false);',
   '  anyB <- false;',
-  '  mutexA <- cascade;',
-  '  mutexB <- cascade;',
+  '  mutexA <- cascade |> recover(false);',
+  '  mutexB <- cascade |> recover(false);',
   '  require a => b;',
   '  require b => c;',
   '  require c => permit;',
@@ -51,7 +52,7 @@ const timerSource = [
   'control TimerTraceFixture {',
   '  input command: Bool;',
   '  state running: Bool = false;',
-  "  running' = command;",
+  "  running' = command |> recover(false);",
   '  timer age = elapsed(running);',
   '  output pump: Bool;',
   '  pump <- running;',
@@ -68,15 +69,18 @@ function sourceTraceShape(trace) {
   }));
 }
 
-async function runNativeAndWasm(t, bytes) {
+async function runNativeAndWasm(t, compiled) {
   assert.ok(fs.existsSync(wasmPath), `missing built WASM runtime: ${wasmPath}`);
   assert.ok(fs.existsSync(nativePath), `missing built native runner: ${nativePath}`);
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-source-trace-'));
   t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
   const modulePath = path.join(temporary, 'module.gfb');
   const csvPath = path.join(temporary, 'inputs.csv');
+  const bytes = compiled.bytes;
+  const railRows = rows.map(row => softwareQualityRails(compiled, row));
+  const railNames = Object.keys(railRows[0]);
   fs.writeFileSync(modulePath, bytes);
-  fs.writeFileSync(csvPath, `${fields.join(',')}\n${rows.map(row => fields.map(name => row[name]).join(',')).join('\n')}\n`);
+  fs.writeFileSync(csvPath, `${railNames.join(',')}\n${railRows.map(row => railNames.map(name => row[name]).join(',')).join('\n')}\n`);
 
   const native = execFileSync(nativePath, [modulePath, csvPath, '--outcomes'], { encoding: 'utf8' })
     .trim().split('\n').map(line => JSON.parse(line));
@@ -86,9 +90,9 @@ async function runNativeAndWasm(t, bytes) {
   for (const name of outputs) runtime.addCapability('actuator', name, 'bool');
   runtime.activate();
   const wasm = [];
-  for (const row of rows) {
+  for (const row of railRows) {
     runtime.clearInputs();
-    for (const [name, value] of Object.entries(row)) runtime.setBool(name, value);
+    for (const [name, value] of Object.entries(row)) typeof value === 'boolean' ? runtime.setBool(name, value) : runtime.setNumber(name, value);
     runtime.tick();
     wasm.push({ status: 'OK', trace: runtime.trace });
   }
@@ -124,9 +128,6 @@ test('source trace records actual compiler nodes, bindings, ordered constraint k
   assert.equal(compiled.traceMetadata.format, 'GhostFlow/source-trace-v1');
 
   assert.deepEqual(compiled.traceMetadata.bindings.map(({ kind, name, fields }) => ({ kind, name, fields })), [
-    { kind: 'input', name: 'cascade', fields: ['inputs'] },
-    { kind: 'input', name: 'anyGate', fields: ['inputs'] },
-    { kind: 'input', name: 'anyAllowed', fields: ['inputs'] },
     { kind: 'state', name: 'latched', fields: ['stateBefore', 'stateAfter'] },
     { kind: 'next', name: 'latched', fields: ['stateAfter'] },
     { kind: 'connection', name: 'a', fields: ['requested', 'safe'] },
@@ -155,20 +156,20 @@ test('source trace records actual compiler nodes, bindings, ordered constraint k
     { index: 4, kind: 'mutex', names: ['mutexA', 'mutexB'] },
   ]);
 
-  const traces = await runNativeAndWasm(t, compiled.bytes);
+  const traces = await runNativeAndWasm(t, compiled);
   for (const trace of traces) assert.equal(trace.module, compiled.traceMetadata.moduleFingerprint);
 });
 
 test('source trace remaps extracted and lesson literate locations while retaining extracted coordinates', async () => {
   const markdown = ['# Trace lesson', '', '```ghost', source, '```', ''].join('\n');
   const direct = await compileSource(markdown, { filename: 'trace.ghost.md' });
-  const input = direct.traceMetadata.bindings.find(entry => entry.name === 'cascade');
+  const input = direct.traceMetadata.bindings.find(entry => entry.name === 'latched');
   assert.equal(input.source.filename, 'trace.ghost.md');
   assert.equal(input.source.line, input.extractedSource.line + 3);
   assert.equal(input.extractedSource.filename, 'trace.ghost.md');
 
   const compiledLesson = await compileLessonBundle(JSON.stringify(lessonBundle(markdown)));
-  const lessonInput = compiledLesson.compilation.traceMetadata.bindings.find(entry => entry.name === 'cascade');
+  const lessonInput = compiledLesson.compilation.traceMetadata.bindings.find(entry => entry.name === 'latched');
   assert.equal(lessonInput.source.filename, 'source-trace@r1.ghost.md');
   assert.equal(lessonInput.source.line, lessonInput.extractedSource.line + 3);
   assert.equal(compiledLesson.compilation.traceMetadata.moduleFingerprint, direct.traceMetadata.moduleFingerprint);
@@ -266,12 +267,16 @@ test('runtime values preserve false and zero and never expose generated timer st
 
 test('source observations bind state, next, requested, safe, and exact safety outcomes', async t => {
   const compiled = await compileSource(source, { filename: 'trace.ghost' });
-  const [trace] = await runNativeAndWasm(t, compiled.bytes);
+  const [trace] = await runNativeAndWasm(t, compiled);
   const observed = observeSourceTrace(compiled.traceMetadata, trace);
   assert.equal(observed.sourceDocumentSha256, compiled.sourceDocument.sha256);
   assert.equal(observed.bytecodeSha256, compiled.manifest.bytecodeSha256);
   const binding = name => observed.bindings.find(entry => entry.name === name);
-  assert.deepEqual(binding('cascade').observations, [{ field: 'inputs', observed: true, value: true }]);
+  assert.deepEqual(compiled.manifest.sensors.map(sensor => sensor.name), fields);
+  assert.ok(observed.resultEvents.length > 0);
+  assert.ok(observed.resultEvents.every(event => event.choice === 0 && event.fault === null));
+  assert.equal(trace.inputs[compiled.manifest.sensors[0].valueInput], true);
+  assert.equal(trace.inputs[compiled.manifest.sensors[0].okInput], true);
   assert.deepEqual(binding('latched').observations, [
     { field: 'stateBefore', observed: true, value: false },
     { field: 'stateAfter', observed: true, value: true },
@@ -288,15 +293,15 @@ test('source observations bind state, next, requested, safe, and exact safety ou
     { field: 'safe', observed: true, value: false },
   ]);
   const missingInputTrace = structuredClone(trace);
-  delete missingInputTrace.inputs.cascade;
+  delete missingInputTrace.stateBefore.latched;
   const missingInput = observeSourceTrace(compiled.traceMetadata, missingInputTrace)
-    .bindings.find(entry => entry.name === 'cascade');
-  assert.deepEqual(missingInput.observations, [{ field: 'inputs', observed: false }]);
+    .bindings.find(entry => entry.name === 'latched');
+  assert.deepEqual(missingInput.observations, [{ field: 'stateBefore', observed: false }, { field: 'stateAfter', observed: true, value: true }]);
 });
 
 test('native and WASM safety traces match independent cascade, requires-any, mutex, and satisfied expectations', async t => {
   const compiled = await compileSource(source, { filename: 'trace.ghost' });
-  const traces = await runNativeAndWasm(t, compiled.bytes);
+  const traces = await runNativeAndWasm(t, compiled);
   assert.deepEqual({ a: traces[0].requested.a, b: traces[0].requested.b, c: traces[0].requested.c }, { a: true, b: true, c: true });
   assert.deepEqual({ a: traces[0].safe.a, b: traces[0].safe.b, c: traces[0].safe.c }, { a: false, b: false, c: false });
   assert.deepEqual(traces[0].faults, [
@@ -336,7 +341,7 @@ test('native and WASM safety traces match independent cascade, requires-any, mut
 
 test('observeSourceTrace fails closed for unknown, identity, index, and name mismatches', async t => {
   const compiled = await compileSource(source, { filename: 'trace.ghost' });
-  const [trace] = await runNativeAndWasm(t, compiled.bytes);
+  const [trace] = await runNativeAndWasm(t, compiled);
   assert.throws(() => observeSourceTrace(undefined, trace), /module identity mismatch/);
   assert.throws(() => observeSourceTrace({ ...compiled.traceMetadata, format: 'unknown' }, trace), /module identity mismatch/);
   assert.throws(() => observeSourceTrace(compiled.traceMetadata, { ...trace, module: '0000000000000000' }), /module identity mismatch/);

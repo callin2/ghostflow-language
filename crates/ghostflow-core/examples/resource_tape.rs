@@ -1,6 +1,6 @@
 //! Software-only finite resource binding tape; no device adapter is involved.
 use ghostflow_core::{
-    resource_constraints::ResourceBindingRegistry, Capability, Module, Runtime, Value,
+    resource_constraints::ResourceBindingRegistry, Capability, Module, Runtime, Type, Value,
 };
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<_> = std::env::args().skip(1).collect();
@@ -10,6 +10,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
     let module = Module::load(&std::fs::read(&args[0])?)?;
+    let input_types: std::collections::BTreeMap<_, _> = module
+        .input_fields()
+        .map(|(name, ty)| (name.to_owned(), ty))
+        .collect();
     let capabilities: Vec<_> = module
         .input_fields()
         .map(|(n, t)| Capability::new("sensor", n, t))
@@ -31,12 +35,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for frame in &args[3..] {
         for pair in frame.split(',') {
             let (name, value) = pair.split_once('=').ok_or("invalid input pair")?;
-            let value = match value {
-                "true" => true,
-                "false" => false,
-                _ => return Err("invalid Bool input".into()),
+            let value = match input_types.get(name) {
+                Some(Type::Bool) => Value::Bool(match value {
+                    "true" => true,
+                    "false" => false,
+                    _ => return Err("invalid Bool input".into()),
+                }),
+                Some(Type::Number) => Value::Number(value.parse()?),
+                _ => return Err("unsupported resource input type".into()),
             };
-            runtime.set_input(name, Value::Bool(value))?;
+            runtime.set_input(name, value)?;
         }
         println!("{}", runtime.tick_with_resource_binding(&scan)?.to_json());
     }

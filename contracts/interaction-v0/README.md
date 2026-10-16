@@ -1,6 +1,6 @@
 # Interaction Schema and Runtime Snapshot v0
 
-This contract is a renderer-neutral **host software** boundary for
+This contract is a cabinet-view-neutral **host software** boundary for
 `GF-IR-1`/TASK-121.1. It defines static semantic descriptors separately from
 one completed runtime observation. Compiler emission is implemented by #71;
 #72 projects only already-completed native or WASM traces through
@@ -134,8 +134,8 @@ is current. `examples/enum-phase-age.ghost.md` and its focused compiler/WASM
 tests demonstrate that the state remains nominal `Phase`, while the timer is a
 `Duration` whose subject is `state.phase`.
 
-There are no widget, layout, visibility, color, coordinate, or renderer-policy
-fields. A renderer may show timers and hide Boolean states by default, but that
+There are no widget, layout, visibility, color, coordinate, or cabinet-view-policy
+fields. A cabinet-view may show timers and hide Boolean states by default, but that
 policy is not part of this IR.
 
 ## Completed runtime snapshot and statuses
@@ -213,7 +213,7 @@ program: it has two authored Bool states and elapsed timers, one Number state,
 and one nominal `Percent` state. Both use syntax accepted by the current
 compiler; no new descriptor kind is implied.
 
-Each `.scan-tape.json` beside the corpus is versioned, renderer-neutral test
+Each `.scan-tape.json` beside the corpus is versioned, cabinet-view-neutral test
 stimulus. Every frame records a completed scan, logical time, and every named
 declared input in compiled manifest order. Runs have distinct `runId` values
 and use contiguous `scanId` values starting at zero. The tape digest is SHA-256

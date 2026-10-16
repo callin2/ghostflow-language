@@ -37,7 +37,7 @@ persist Unknown, snapshot restoration and control activation. A separate context
 ledger restored from the same snapshot produces an actual completed OFF output
 observation; it does not cause the rolling denial or reset its ledger. Animation
 is absent from the accounting API. This is a reference accounting projection,
-not frontend renderer verification, automatic compiled `on_time` start/cutoff
+not frontend cabinet-view verification, automatic compiled `on_time` start/cutoff
 integration, API deployment, storage-medium certification or Device validation.
 The additive WASM export requires rebuilding the WASM module; GFB and ledger
 snapshot formats are unchanged.

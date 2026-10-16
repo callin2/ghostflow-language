@@ -4,12 +4,14 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
+import { softwareQualityAbi, softwareQualityRails } from './helpers/software-quality-observations.mjs';
 import { compileSource } from '../tools/toolchain.mjs';
 import { GhostFlowRuntime } from '../runtimes/wasm/ghostflow-runtime.mjs';
 
-const root = path.resolve(new URL('../', import.meta.url).pathname);
+const root = fileURLToPath(new URL('../', import.meta.url));
 const wasmBytes = fs.readFileSync(path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm'));
-const nativePath = path.join(root, 'target/release/examples/scan_tape');
+const nativePath = path.join(root, `target/release/examples/scan_tape${process.platform === 'win32' ? '.exe' : ''}`);
 const source = `# Core replay proof
 
 This fixed canonical document has no settings events. Its actuator bindings are
@@ -19,13 +21,16 @@ pump: Bool, permit: Bool, and ratio: Number.
 control CoreReplay {
   input start, stop, low_water: Bool;
   input divisor: Number;
+  state retained_divisor: Number = 1.0;
+  let scalar_divisor = case divisor { ok(value) => value; fault(_) => retained_divisor; };
+  retained_divisor' = scalar_divisor;
   state running: Bool = false;
-  running' = !stop && (start || running);
+  running' = case stop { ok(stopped) => !stopped && (case start { ok(started) => started || running; fault(_) => running; }); fault(_) => false; };
   output pump, permit: Bool;
   output ratio: Number;
   pump <- running';
-  permit <- !low_water;
-  ratio <- 1.0 / divisor;
+  permit <- case low_water { ok(low) => !low; fault(_) => false; };
+  ratio <- 1.0 / scalar_divisor;
   require pump => permit;
 }
 \`\`\`
@@ -49,7 +54,7 @@ test('REF-06-017: retained plain-core replay matches fixed native and WASM execu
   const tapePath = path.join(directory, 'tape.tsv');
   fs.writeFileSync(modulePath, artifact.bytes);
   fs.writeFileSync(tapePath, `${tape.map(frame => [frame.scanId, frame.logicalTimeMs,
-    ...Object.entries(frame.inputs).flatMap(([name, value]) => [name, typeof value === 'boolean' ? 'b' : 'n', String(value)]),
+    ...Object.entries(softwareQualityRails(artifact, frame.inputs, frame.scanId + 1, frame.logicalTimeMs)).flatMap(([name, value]) => [name, typeof value === 'boolean' ? 'b' : 'n', String(value)]),
   ].join('\t')).join('\n')}\n`);
   const nativeRun = spawnSync(nativePath, [modulePath, tapePath], {
     encoding: 'utf8', timeout: 30_000, maxBuffer: 8 * 1024 * 1024,
@@ -59,6 +64,7 @@ test('REF-06-017: retained plain-core replay matches fixed native and WASM execu
   const runtime = await GhostFlowRuntime.instantiate(wasmBytes);
   t.after(() => runtime.dispose());
   runtime.load(artifact.bytes);
+  softwareQualityAbi(runtime, artifact);
   for (const [name, type] of context.bindings) runtime.addCapability('actuator', name, type);
   runtime.activate();
   assert.equal(runtime.replay, null);

@@ -1,3 +1,4 @@
+import { softwareQualityRails } from './helpers/software-quality-observations.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -13,12 +14,12 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const wasm = fs.readFileSync(path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm'));
 const source = fs.readFileSync(path.join(root, 'tests/fixtures/issue-90-settings-periodic.ghost.md'), 'utf8')
   .replace('control LiveSettingsPeriodic {', 'control LiveSettingsPeriodic {\n  input manual: Bool;\n  resource pump: BoolActuator;\n  account applied = on_time(pump, stage: applied, persistence: durable);')
-  .replace("active <- running';", "active <- running' || manual;");
+  .replace("active <- running';", "active <- running' || (manual |> recover(false));");
 const origin = { timelineId: 'live.timeline', instanceId: 'live.instance', runId: 'live.run', sourceRevision: 'source.303.1', bindingRevision: 'binding.303.1' };
 const activation = { bootEpoch: 1, terminalCapacity: 16, bindings: [] };
 const periodicSite = (await compileSource(source, { filename: 'live-timeline.ghost.md' })).manifest.schedules[0].site;
 const anchor = Date.parse('2026-10-01T00:00:00Z'), hour = 3_600_000;
-const frame = (ms, manual = false) => ({ nowMs: ms, inputs: { manual }, contextFacts: {
+const frame = (ms, manual = false) => ({ nowMs: ms, samples: { manual: { epoch: 1, id: ms + 1, timestampMs: ms, quality: 'Good', value: manual } }, contextFacts: {
   clock: { monotonicMs: ms, wallMs: anchor + ms, bootEpoch: 1, uncertaintyMs: 0,
     trusted: true, unknownReason: null, sourceRevision: 'clock.303.1' }, natural: [], schedules: [{ site: periodicSite,
       coverageStartMs: anchor + ms - 1, coverageEndMs: anchor + ms + 1, provider: null, calendar: null, rows: [] }], settings: null,
@@ -39,7 +40,7 @@ function native(artifact, frames, directory, profile = 'context-settings-periodi
   fs.writeFileSync(module, artifact.bytes);
   fs.writeFileSync(tape, JSON.stringify({ profile, activation, steps: frames.map(f => ({
     scanId: frames.indexOf(f), logicalTimeMs: f.nowMs,
-    inputs: Object.entries(f.inputs).map(([name, value]) => ({ name, type: 'Bool', value })), ...f.contextFacts,
+    inputs: Object.entries(softwareQualityRails(artifact, {manual: f.samples.manual.value})).map(([name, value]) => ({ name, type: typeof value === 'boolean' ? 'Bool' : 'Number', value })), ...f.contextFacts,
   })) }));
   const execution = spawnSync(path.join(root, `target/release/examples/context_tape${process.platform === 'win32' ? '.exe' : ''}`),
     [module, tape], { encoding: 'utf8', timeout: 10_000, maxBuffer: 8 * 1024 * 1024 });
@@ -99,16 +100,16 @@ test('REF-06-018 actual live occurrence and durable ledger remain unchanged thro
 test('REF-06-018 rejected ghost requests and immutable caller copies preserve original owners and reusable branch baseline', async t => {
   const { timeline, storage, sink } = await fixture(t);
   const supplied = frame(0); timeline.append(supplied); timeline.append(frame(hour));
-  supplied.inputs.manual = true; supplied.contextFacts.clock.wallMs = 0;
+  supplied.samples.manual.value = true; supplied.contextFacts.clock.wallMs = 0;
   const before = timeline.observe(), file = fs.readFileSync(storage.filename), calls = structuredClone(sink);
   const badIdentity = { branchId: origin.timelineId, runId: 'other' };
   await assert.rejects(timeline.branch(badIdentity), /separate identities/);
   const branch = await timeline.branch({ branchId: 'ghost.reject', runId: 'ghost.reject.run' }); t.after(() => branch.dispose());
   const baseline = branch.observe();
-  await assert.rejects(branch.step({ nowMs: hour + 1, inputs: { manual: true } }, { provenance: 'synthetic' }), /recorded context facts/);
+  await assert.rejects(branch.step({ nowMs: hour + 1, samples: frame(hour + 1, true).samples }, { provenance: 'synthetic' }), /recorded context facts/);
   await assert.rejects(branch.step(frame(hour + 1), {}), /explicit.*provenance/);
   await assert.rejects(branch.step(frame(hour + 1), { provenance: 'recorded' }), /captured actual timeline/);
-  const invalid = frame(hour + 1); invalid.inputs.manual = 'wrong';
+  const invalid = frame(hour + 1); invalid.samples.manual.value = 'wrong';
   await assert.rejects(branch.step(invalid, { provenance: 'synthetic' }), /Bool|boolean|type/i);
   assert.deepEqual(branch.observe(), baseline);
   const instantiate = WebAssembly.instantiate;
@@ -118,9 +119,9 @@ test('REF-06-018 rejected ghost requests and immutable caller copies preserve or
   } finally { WebAssembly.instantiate = instantiate; }
   assert.deepEqual(branch.observe(), baseline, 'failed rewind preserves the previously committed branch runtime');
   assert.deepEqual(await branch.rewind(), baseline);
-  const exported = timeline.observe(); exported.frames[0].inputs.manual = true; exported.persisted.fill(0); exported.live.context.settings.splice(0);
+  const exported = timeline.observe(); exported.frames[0].samples.manual.value = true; exported.persisted.fill(0); exported.live.context.settings.splice(0);
   const changed = frame(hour + 11 * 60_000, true), pending = branch.step(changed, { provenance: 'synthetic' });
-  changed.inputs.manual = false;
+  changed.samples.manual.value = false;
   const result = await pending;
   assert.equal(result.outcome.trace.safe.active, true, 'branch captures its frame before awaiting core creation');
   assert.deepEqual(timeline.observe(), before); assert.deepEqual(fs.readFileSync(storage.filename), file); assert.deepEqual(sink, calls);
@@ -163,3 +164,65 @@ test('REF-06-018 source bound durable timeline rejects missing corrupt persisten
   fs.writeFileSync(missing.filename, '{"format":"GhostFlow/ledger-file-v1","sha256":"' + '0'.repeat(64) + '","bytes":"0102"}');
   await assert.rejects(createGhostTimeline({ ...options, accounting: { ...options.accounting, storage: missing }, initializeEmpty: false }), /checksum mismatch/);
 });
+
+for (const quality of ['NotReady', 'Disconnected', 'Stale', 'Invalid']) {
+  test(`issue 531 timeline preserves explicit ${quality}, clock-only aging and immutable quality replay`, async t => {
+    const conditioned = source.replace('input manual: Bool;', 'input manual: Bool { sample = 1ms; stale_after = 2ms; }');
+    const { timeline, storage, sink } = await fixture(t, { document: conditioned });
+    const site = timeline.compilation.manifest.schedules[0].site;
+    const qualityFrame = (ms, manual = false) => { const packet = frame(ms, manual); packet.contextFacts.schedules[0].site = site; return packet; };
+    const clockOnly = ms => { const packet = qualityFrame(ms); delete packet.samples; return packet; };
+    const initial = timeline.append(clockOnly(0));
+    assert.equal(initial.outcome.trace.safe.active, false);
+    assert.ok(initial.outcome.trace.resultTrace.some(event => event.choice === 4), 'no first observation remains NotReady');
+    const supplied = qualityFrame(1, true);
+    assert.equal(timeline.append(supplied).outcome.trace.safe.active, true);
+    supplied.samples.manual.value = false;
+    assert.equal(timeline.observe().frames[1].samples.manual.value, true, 'capture retains the actual supplied observation');
+    const aged = timeline.append(clockOnly(4));
+    assert.equal(aged.outcome.trace.safe.active, false);
+    assert.ok(aged.outcome.trace.resultTrace.some(event => event.choice === 2), 'clock progress does not manufacture fresh Good');
+    const unavailable = qualityFrame(5);
+    unavailable.samples.manual.quality = quality;
+    unavailable.samples.manual.value = true; // Producer payload remains typed; unavailable quality prevents its use.
+    const fault = timeline.append(unavailable);
+    assert.equal(fault.outcome.trace.safe.active, false, 'only the fixture-authored recovery chooses its output');
+    assert.ok(fault.outcome.trace.resultTrace.some(event => event.choice === ['Disconnected', 'Stale', 'Invalid', 'NotReady'].indexOf(quality) + 1));
+    const restored = timeline.append(qualityFrame(6, false));
+    assert.equal(restored.outcome.trace.safe.active, false, 'healthy false is a successful observation');
+    assert.ok(restored.outcome.trace.resultTrace.every(event => event.choice === 0));
+    assert.equal(timeline.append(qualityFrame(7, true)).outcome.trace.safe.active, true);
+
+    const before = timeline.observe(), bytes = fs.readFileSync(storage.filename), calls = structuredClone(sink);
+    const branch = await timeline.branch({ branchId: `quality.${quality}`, runId: `quality.run.${quality}`, at: 2 });
+    t.after(() => branch.dispose());
+    const baseline = branch.observe();
+    const tampered = clockOnly(4); tampered.samples = qualityFrame(4, true).samples;
+    await assert.rejects(branch.step(tampered, { provenance: 'recorded' }), /captured actual timeline/);
+    for (const packet of [
+      { ...qualityFrame(4), inputs: { manual: true } },
+      { ...qualityFrame(4), samples: { unexpected: qualityFrame(4).samples.manual } },
+      { ...qualityFrame(4), samples: { manual: { ...qualityFrame(4).samples.manual, quality: 'invented' } } },
+      { ...qualityFrame(4), samples: { manual: { ...qualityFrame(4).samples.manual, value: 'wrong' } } },
+    ]) {
+      await assert.rejects(branch.step(packet, { provenance: 'synthetic' }), /unknown|quality|Bool|boolean|type/i);
+      assert.deepEqual(branch.observe(), baseline);
+    }
+    for (const packet of [clockOnly(4), unavailable, qualityFrame(6, false), qualityFrame(7, true)]) {
+      if (packet.samples) {
+        const changedQuality = structuredClone(packet);
+        changedQuality.samples.manual.quality = packet.samples.manual.quality === 'Good' ? 'Invalid' : 'Good';
+        const previous = branch.observe();
+        await assert.rejects(branch.step(changedQuality, { provenance: 'recorded' }), /captured actual timeline/);
+        assert.deepEqual(branch.observe(), previous, 'recorded identity includes producer quality');
+      }
+      const replay = await branch.step(packet, { provenance: 'recorded' });
+      const actual = before.receipts[before.frames.findIndex(record => record.nowMs === packet.nowMs)];
+      assert.deepEqual(replay, { ...actual, provenance: 'recorded', physicalEffects: false });
+    }
+    assert.deepEqual(await branch.rewind(), baseline);
+    assert.deepEqual(timeline.observe(), before);
+    assert.deepEqual(fs.readFileSync(storage.filename), bytes);
+    assert.deepEqual(sink, calls);
+  });
+}

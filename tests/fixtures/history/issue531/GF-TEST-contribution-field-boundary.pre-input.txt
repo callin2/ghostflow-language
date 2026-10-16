@@ -1,0 +1,42 @@
+test('GF-TEST-contribution-field-boundary: independent field oracle kills weakened threshold rules', async t => {
+  const filename = 'tests/fixtures/contribution-134/numeric-threshold.ghost.md';
+  const source = fs.readFileSync(path.join(root, filename), 'utf8');
+  const fixture = JSON.parse(fs.readFileSync(path.join(root, 'tests/fixtures/contribution-134/oracle.json'), 'utf8'));
+  // Independent expected values from Device #43's pinned virtual case, not from
+  // compiler output or agreement between two executions of the same Rust core.
+  const expected = [true, false, false, true];
+  assert.deepEqual(fixture.rows, [
+    { moisture: 42.4, pump: true }, { moisture: 42.5, pump: false },
+    { moisture: 42.6, pump: false }, { moisture: 42.4, pump: true },
+  ], 'field oracle edits need separate requirement review');
+  const rows = fixture.rows.map(({ moisture }) => ({ moisture }));
+  const checkOracle = outcomes => assert.deepEqual(outcomes.map(row => row.trace.safe.pump), expected);
+  const compiled = await compileSource(source, { filename });
+  const baseline = await differential(t, compiled.bytes, ['moisture'], rows, [['pump', 'bool']]);
+  assert.deepEqual(baseline.outcomes.map(row => row.status), rows.map(() => 'OK'));
+  checkOracle(baseline.outcomes);
+  assert.deepEqual(baseline.outcomes.map(row => row.trace.requested.pump), expected);
+  // The CSV runner skips wholly blank lines and cannot encode sole-input
+  // omission. Use the explicit WASM seam without claiming native coverage.
+  const failure = baseline.runtime;
+  const committed = failure.trace;
+  failure.clearInputs();
+  assert.throws(() => failure.tick(), /missing input moisture/);
+  assert.deepEqual(failure.trace, committed);
+  assert.equal(failure.intentBool('pump'), true);
+  failure.setNumber('moisture', 42.6);
+  failure.tick();
+  assert.equal(failure.intentBool('pump'), false);
+
+  const rule = 'pump <- moisture < 42.5;';
+  assert.equal(source.split(rule).length, 2, 'mutation site must be unique');
+  for (const weakened of ['pump <- moisture <= 42.5;', 'pump <- true;']) {
+    const mutant = await compileSource(source.replace(rule, weakened), { filename });
+    const result = await differential(t, mutant.bytes, ['moisture'], rows, [['pump', 'bool']]);
+    // Infrastructure errors cannot count as a killed mutant: both targets must
+    // complete every scan before the independent boundary assertion goes RED.
+    assert.deepEqual(result.outcomes.map(row => row.status), rows.map(() => 'OK'));
+    assert.throws(() => checkOracle(result.outcomes), assert.AssertionError,
+      'the unchanged field oracle must reject a weakened/removed inhibition rule');
+  }
+});

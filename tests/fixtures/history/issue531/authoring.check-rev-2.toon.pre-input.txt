@@ -1,0 +1,6 @@
+format: GhostFlow/cli-request-v1
+operation: check
+source:
+  path: build/authoring/pump.ghost.md
+  documentId: GF-EXAMPLE-PUMP
+  revisionId: rev-2

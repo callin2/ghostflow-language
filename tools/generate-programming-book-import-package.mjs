@@ -4,14 +4,14 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
-export const PROGRAMMING_BOOK_IMPORT_REVISION = '7e135b93ea4c4988d305f992db277a6d8581a271';
+export const PROGRAMMING_BOOK_IMPORT_REVISION = 'c8a5d37ac09230a9011291a3ae3b053d1bc22773';
 export const PROGRAMMING_BOOK_DOCUMENT = 'docs/ProgrammingInGhostflow.md';
-export const PROGRAMMING_BOOK_IMPORT_DIRECTORY = 'examples/programming-book-imports';
+export const PROGRAMMING_BOOK_IMPORT_DIRECTORY = 'examples/programming-book-imports-input-v1';
 
 const reviewed = Object.freeze({
-  E19: 'ef80061222c5c671b8b78d8fae733b543e51149c7e5d2c7d5e2bb2cc41fbdb30',
-  E20: 'bbf57007c5973684660747c515bb2534124d50341647b2282bd2ca32852a724b',
-  E21: 'd461a2a0f722271a172ce4c3d66665dad8f3a58a54079712e4bd3adb55f003a0',
+  E19: '7bc10efed87a3db2bbf2e5b56fbf0d6c9a45b54117104d3fa0948baa01f695b4',
+  E20: '9928297e43cd7c9790e6ca5178e71f4fd815223654fcd0b16fcc9605ea24bf38',
+  E21: '089daea1b525b0be49685b3595554bfb1aa67091fc995da2d65fb0ef9a24357d',
 });
 const root = fileURLToPath(new URL('../', import.meta.url));
 const sha256 = text => createHash('sha256').update(text).digest('hex');

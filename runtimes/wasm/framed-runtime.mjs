@@ -128,6 +128,14 @@ export class FramedGhostFlowRuntime {
     if (!this.handle) throw new Error('Framed GhostFlow runtime allocation failed');
   }
 
+  enableInstructionWitnesses() {
+    this.#live();
+    if (typeof this.wasm.gf_frame_enable_instruction_witnesses !== 'function') {
+      throw new Error('WASM artifact does not support instruction witnesses');
+    }
+    this.#check(this.wasm.gf_frame_enable_instruction_witnesses(this.handle));
+  }
+
   dispose() {
     if (this.handle) this.wasm.gf_frame_destroy(this.handle);
     this.handle = 0;

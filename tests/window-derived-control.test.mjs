@@ -10,7 +10,7 @@ const hasBytes = (bytes, expected) => bytes.some((_, start) => expected.every((v
 
 test('nested average and minimum retain derived evidence and transitive physical roots', async () => {
   const artifact = await compile(`control NestedWindows {
-    sensor temperature: Temperature;
+    input temperature: Temperature;
     signal inner = window_average(temperature, over: 2s, quality: measured, max_age: 1s);
     signal outer = window_min(inner, over: 10s, quality: measured, max_age: 2s);
     output low: Bool;
@@ -28,8 +28,8 @@ test('a case over two derived Results preserves both ordered evidence dependenci
   const artifact = await compile(`control CaseSelectedWindows {
     type Side = Inside | Outside;
     state selected: Side = Inside;
-    sensor inside: Temperature;
-    sensor outside: Temperature;
+    input inside: Temperature;
+    input outside: Temperature;
     signal inside_average = window_average(inside, over: 2s, quality: measured, max_age: 1s);
     signal outside_average = window_average(outside, over: 2s, quality: measured, max_age: 1s);
     signal selected_maximum = window_max(case selected { Inside => inside_average; Outside => outside_average; },
@@ -48,10 +48,10 @@ test('a case over two derived Results preserves both ordered evidence dependenci
 test('a selected physical or derived branch records only the derived dependency and all physical roots', async () => {
   const artifact = await compile(`control MixedWindowBranch {
     input use_inner: Bool;
-    sensor inside: Temperature;
-    sensor outside: Temperature;
+    input inside: Temperature;
+    input outside: Temperature;
     signal inner = window_average(inside, over: 2s, quality: measured, max_age: 1s);
-    signal outer = window_max(if use_inner then inner else outside, over: 10s, quality: measured, max_age: 2s);
+    signal outer = window_max(case use_inner { ok(use) => if use then inner else outside; fault(reason) => fault(reason); }, over: 10s, quality: measured, max_age: 2s);
     output high: Bool;
     high <- outer |> map(below(320K)) |> recover(false);
   }`);
@@ -63,7 +63,7 @@ test('a selected physical or derived branch records only the derived dependency 
 test('a constant map preserves the upstream derived evidence marker', async () => {
   const artifact = await compile(`fn constant_temperature(value: Temperature) -> Temperature { 300K }
   control ConstantMappedWindow {
-    sensor temperature: Temperature;
+    input temperature: Temperature;
     signal inner = window_average(temperature, over: 2s, quality: measured, max_age: 1s);
     signal outer = window_average(inner |> map(constant_temperature), over: 10s, quality: measured, max_age: 2s);
     output warm: Bool;
@@ -77,7 +77,7 @@ test('a constant map preserves the upstream derived evidence marker', async () =
 test('pure and_then preserves selected derived evidence through its Result constructor', async () => {
   const artifact = await compile(`fn pass(value: Temperature) -> Result<Temperature, SensorFault> { ok(value) }
   control ChainedWindow {
-    sensor temperature: Temperature;
+    input temperature: Temperature;
     signal inner = window_average(temperature, over: 2s, quality: measured, max_age: 1s);
     signal outer = window_max(inner |> and_then(pass), over: 10s, quality: measured, max_age: 2s);
     output high: Bool;
@@ -91,7 +91,7 @@ test('pure and_then preserves selected derived evidence through its Result const
 test('recover followed by ok cannot launder a derived value into measured evidence', async () => {
   await assert.rejects(() => compile(`fn constructed(value: Temperature) -> Result<Temperature, SensorFault> { ok(value) }
     control LaunderedWindow {
-      sensor temperature: Temperature;
+      input temperature: Temperature;
       signal inner = window_average(temperature, over: 2s, quality: measured, max_age: 1s);
       signal outer = window_max(constructed(inner |> recover(0K)), over: 10s, quality: measured, max_age: 2s);
     }`), error => {

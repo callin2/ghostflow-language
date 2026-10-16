@@ -17,9 +17,45 @@ const fixtures = path.join(root, 'tests/fixtures');
 const sourceName = 'gfb2-int-golden-v1.ghost.md';
 const artifactName = 'gfb2-int-golden-v1.gfb';
 const metadataName = 'gfb2-int-golden-v1.json';
-const nativePath = path.join(root, 'target/release/examples/run');
+const nativePath = path.join(root, `target/release/examples/run${process.platform === 'win32' ? '.exe' : ''}`);
 const wasmPath = path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm');
 const sha256 = value => createHash('sha256').update(value).digest('hex');
+
+// These conformance rows are identified healthy observations. Encoding their
+// generated rails is an explicit fixture adapter, never a production fallback.
+function goodRails(artifact, values) {
+  const rails = {};
+  for (const sensor of artifact.manifest.sensors) {
+    const name = sensor.name.replace(/^raw_/, '');
+    if (!Object.hasOwn(values, name)) continue;
+    rails[sensor.valueInput] = values[name];
+    rails[sensor.okInput] = true;
+    rails[sensor.faultInput] = 0;
+  }
+  if (Object.hasOwn(values, '__gf_now_ms')) rails.__gf_now_ms = values.__gf_now_ms;
+  return rails;
+}
+function goodFrame(artifact, nowMs, values) {
+  return { nowMs, samples: Object.fromEntries(artifact.manifest.sensors.map(sensor => {
+    const name = sensor.name.replace(/^raw_/, '');
+    assert.ok(Object.hasOwn(values, name), `missing known fixture observation ${name}`);
+    return [sensor.name, { epoch: 1, id: nowMs + 1, timestampMs: nowMs,
+      value: values[name], quality: 'Good' }];
+  })) };
+}
+function writeGoodCsv(filename, artifact, observations) {
+  const rows = observations.map(values => goodRails(artifact, values));
+  const names = Object.keys(rows[0]);
+  fs.writeFileSync(filename, `${names.join(',')}\n${rows.map(row => names.map(name => row[name]).join(',')).join('\n')}\n`);
+}
+function setGood(runtime, artifact, name, value) {
+  const sensor = artifact.manifest.sensors.find(item => item.name.replace(/^raw_/, '') === name);
+  assert.ok(sensor, `missing fixture producer ${name}`);
+  const set = sensor.type === 'Bool' ? 'setBool' : sensor.type === 'Int' ? 'setInt' : 'setNumber';
+  runtime[set](sensor.valueInput, value);
+  runtime.setBool(sensor.okInput, true);
+  runtime.setNumber(sensor.faultInput, 0);
+}
 
 test('GF-TEST-gfb3-pc10-budget: full curriculum fits the unchanged budget and replays fault/reset on native and WASM', async t => {
   const filename = 'examples/curriculum/pc-10-fault-alarm-reset.ghost.md';
@@ -43,18 +79,14 @@ test('GF-TEST-gfb3-pc10-budget: full curriculum fits the unchanged budget and re
   t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
   const modulePath = path.join(temporary, 'pc10.gfb');
   const inputPath = path.join(temporary, 'pc10.csv');
-  const inputNames = Object.keys(healthy);
   fs.writeFileSync(modulePath, artifact.bytes);
-  fs.writeFileSync(inputPath, `${[...inputNames, '__gf_now_ms'].join(',')}\n${frames.map(([nowMs, overrides]) => {
-    const inputs = { ...healthy, ...overrides };
-    return [...inputNames.map(name => inputs[name]), nowMs].join(',');
-  }).join('\n')}\n`);
+  writeGoodCsv(inputPath, artifact, frames.map(([nowMs, overrides]) => ({ ...healthy, ...overrides, __gf_now_ms: nowMs })));
   const native = execFileSync(nativePath, [modulePath, inputPath, '--outcomes'], { encoding: 'utf8' })
     .trim().split('\n').map(line => JSON.parse(line));
   const host = await ControlRuntime.instantiateFramed(fs.readFileSync(wasmPath), artifact);
   t.after(() => host.dispose());
   for (const [index, [nowMs, overrides, phase, faultCause]] of frames.entries()) {
-    const wasm = host.step({ nowMs, inputs: { ...healthy, ...overrides } }).vm;
+    const wasm = host.step(goodFrame(artifact, nowMs, { ...healthy, ...overrides })).vm;
     assert.equal(native[index].status, 'OK');
     assert.deepEqual(wasm.stateAfter, native[index].trace.stateAfter);
     assert.equal(wasm.stateAfter.phase, phase);
@@ -67,25 +99,31 @@ test('GF-TEST-gfb3-pc10-budget: full curriculum fits the unchanged budget and re
 });
 
 test('GF-TEST-gfb3-compact-number: every small literal keeps Number identity on native and WASM', async t => {
-  const declarations = Array.from({ length: 16 }, (_, value) => `  output value_${value}: Number;\n  value_${value} <- if guard then ${value}.0 else fallback;`).join('\n');
-  const artifact = await compileSource(`# Compact Number constants\n\n\`\`\`ghost\ncontrol CompactNumbers {\n  input guard: Bool;\n  input fallback: Number;\n${declarations}\n}\n\`\`\`\n`, { filename: 'compact-numbers.ghost.md' });
+  const intents = Array.from({ length: 16 }, (_, value) => `(intent value_${value} (if input.guard ${value}.0 input.fallback))`).join(' ');
+  const bytes = Buffer.from(compileGfb(parseGfb(tokenizeGfb(
+    `(module CompactNumbers (input guard bool) (input fallback number) (strategy control 0 (device true) ${intents}))`,
+  ))));
   for (let value = 0; value <= 15; value++) {
-    assert.notEqual(artifact.bytes.indexOf(Buffer.from([3, 0, 0, 30, 4, 0, 32 + value, 31, 3, 0, 3, 1, 0])), -1);
+    assert.notEqual(bytes.indexOf(Buffer.from([3, 0, 0, 30, 4, 0, 32 + value, 31, 3, 0, 3, 1, 0])), -1);
   }
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-compact-numbers-'));
   t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
   const modulePath = path.join(temporary, 'numbers.gfb');
   const inputPath = path.join(temporary, 'numbers.csv');
-  fs.writeFileSync(modulePath, artifact.bytes);
+  fs.writeFileSync(modulePath, bytes);
   fs.writeFileSync(inputPath, 'guard,fallback\ntrue,2.5\nfalse,2.5\n');
   const native = execFileSync(nativePath, [modulePath, inputPath, '--outcomes'], { encoding: 'utf8' })
     .trim().split('\n').map(line => JSON.parse(line));
-  const host = await ControlRuntime.instantiateFramed(fs.readFileSync(wasmPath), artifact);
+  const host = await GhostFlowRuntime.instantiate(fs.readFileSync(wasmPath));
   t.after(() => host.dispose());
-  for (const [nowMs, guard] of [true, false].entries()) {
+  host.load(bytes);
+  for (let value = 0; value < 16; value++) host.addCapability('actuator', `value_${value}`, 'number');
+  host.activate();
+  for (const [index, guard] of [true, false].entries()) {
     const expected = Object.fromEntries(Array.from({ length: 16 }, (_, value) => [`value_${value}`, guard ? value : 2.5]));
-    assert.deepEqual(native[nowMs].trace.safe, expected);
-    assert.deepEqual(host.step({ nowMs, inputs: { guard, fallback: 2.5 } }).vm.safe, expected);
+    host.setBool('guard', guard); host.setNumber('fallback', 2.5); host.tick();
+    assert.deepEqual(native[index].trace.safe, expected);
+    assert.deepEqual(host.trace.safe, expected);
   }
 });
 
@@ -104,14 +142,19 @@ test('GF-TEST-gfb3-negative-zero: compact literals never erase the Number negati
   assert.equal(runtime.intentNumber('result'), 16);
 });
 
-test('GF-TEST-gfb2-int-golden: MIN, zero, and MAX compile to fixed exact v2 bytes', async () => {
+test('GF-TEST-gfb2-int-golden: historical MIN, zero and MAX identities remain fixed while plain source rejects', async () => {
   const source = fs.readFileSync(path.join(fixtures, sourceName), 'utf8');
   const tracked = fs.readFileSync(path.join(fixtures, artifactName));
   const metadata = JSON.parse(fs.readFileSync(path.join(fixtures, metadataName), 'utf8'));
-  const compiled = await compileSource(source, { filename: sourceName });
+  assert.deepEqual(metadata, {
+    format: 'GhostFlow/gfb2-int-golden-v1', source: sourceName,
+    sourceSha256: 'a7fcb289b9100dc53bbbf6ac487c03147f09b3763b94c955a891a8e3b24de44a',
+    artifact: artifactName, gfbSha256: 'bb1f8b1063bd795f64a791c76e47f1d158fd9009f6eb8f5bcd3bfe33fb098526',
+  });
   assert.equal(new DataView(tracked.buffer, tracked.byteOffset).getUint16(4, true), 2);
-  assert.equal(compiled.manifest.format, 'GhostFlow/control-v4');
-  assert.deepEqual(compiled.bytes, tracked);
+  assert.equal(sha256(source), 'a7fcb289b9100dc53bbbf6ac487c03147f09b3763b94c955a891a8e3b24de44a');
+  assert.equal(sha256(tracked), 'bb1f8b1063bd795f64a791c76e47f1d158fd9009f6eb8f5bcd3bfe33fb098526');
+  await assert.rejects(() => compileSource(source, { filename: sourceName }), /output selected_out must be Int/);
   assert.equal(sha256(source), metadata.sourceSha256);
   assert.equal(sha256(tracked), metadata.gfbSha256);
 });
@@ -146,6 +189,55 @@ test('GF-TEST-gfb2-int-boundary: native and WASM exchange every i32 boundary exa
   assert.throws(() => runtime.setInt('selected', 1.5), /i32/);
   assert.throws(() => runtime.setInt('selected', -2147483649), /i32/);
   assert.throws(() => runtime.setInt('selected', 2147483648), /i32/);
+});
+
+test('GF-TEST-gfb2-input-golden: separately pinned Int quality revision retains exact boundaries through faults', async t => {
+  const name = 'gfb2-int-golden-input-v1';
+  const source = fs.readFileSync(path.join(fixtures, `${name}.ghost.md`), 'utf8');
+  const tracked = fs.readFileSync(path.join(fixtures, `${name}.gfb`));
+  const metadata = JSON.parse(fs.readFileSync(path.join(fixtures, `${name}.json`), 'utf8'));
+  assert.deepEqual(metadata, {
+    format: 'GhostFlow/input-quality-golden-v1', source: `${name}.ghost.md`,
+    sourceSha256: '9d997aa2612d8ba3952bca1088bbc41fb938186e5506ef65f4c91219d0fa49e7',
+    artifact: `${name}.gfb`, gfbSha256: '54d06aba2e7d4b7757240fc047a952c73c5b535cee094240176d3444b80523b5',
+    gfbFormat: 3, sourceRevision: 'canonical-input-quality-v1',
+  });
+  assert.equal(sha256(source), '9d997aa2612d8ba3952bca1088bbc41fb938186e5506ef65f4c91219d0fa49e7');
+  assert.equal(sha256(tracked), '54d06aba2e7d4b7757240fc047a952c73c5b535cee094240176d3444b80523b5');
+  assert.equal(metadata.sourceSha256, sha256(source));
+  assert.equal(metadata.gfbSha256, sha256(tracked));
+  assert.equal(metadata.sourceRevision, 'canonical-input-quality-v1');
+  const artifact = await compileSource(source, { filename: `${name}.ghost.md` });
+  assert.deepEqual(artifact.bytes, tracked);
+  assert.equal(artifact.manifest.sensors[0].type, 'Int');
+  assert.deepEqual(artifact.manifest.inputs, []);
+  const rows = [[-2147483648, 'Good', -2147483648], [0, 'Disconnected', -2147483648],
+    [0, 'Good', 0], [1.5, 'Good', 0], [2147483647, 'Good', 2147483647],
+    [0, 'Stale', 2147483647], [0, 'NotReady', 2147483647], [-2147483648, 'Good', -2147483648]];
+  const captures = [];
+  for (const create of [ControlRuntime.instantiate, ControlRuntime.instantiateFramed]) {
+    const runtime = await create.call(ControlRuntime, fs.readFileSync(wasmPath), artifact);
+    t.after(() => runtime.dispose());
+    const traces = rows.map(([value, quality, expected], index) => {
+      const result = runtime.step({ nowMs: index, samples: { selected: {
+        epoch: 1, id: index + 1, timestampMs: index, value, quality,
+      } } });
+      assert.equal(result.vm.safe.selected_out, expected);
+      assert.equal(result.vm.inputs.__gf_sensor_ok_selected, quality === 'Good' && Number.isInteger(value));
+      return result.vm;
+    });
+    captures.push(traces);
+  }
+  assert.deepEqual(captures[0].map(trace => trace.safe), captures[1].map(trace => trace.safe));
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-int-input-golden-'));
+  t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
+  const module = path.join(temporary, 'quality.gfb'), csv = path.join(temporary, 'quality.csv');
+  const fields = Object.keys(captures[0][0].inputs);
+  fs.writeFileSync(module, tracked);
+  fs.writeFileSync(csv, `${fields.join(',')}\n${captures[0].map(trace => fields.map(field => trace.inputs[field]).join(',')).join('\n')}\n`);
+  const native = execFileSync(nativePath, [module, csv, '--outcomes'], { encoding: 'utf8' }).trim().split('\n').map(JSON.parse);
+  assert.deepEqual(native.map(row => row.trace.safe.selected_out), rows.map(([, , expected]) => expected));
+  assert.deepEqual(native.map(row => row.trace.safe), captures[0].map(trace => trace.safe));
 });
 
 test('GF-TEST-gfb2-int-rejection: versions and type tags fail closed', async () => {
@@ -194,18 +286,20 @@ test('GF-TEST-framed-v2-int: tag 3 carries signed i32 values without Number infe
 });
 
 test('GF-TEST-control-v4-int: manifest-selected legacy and framed hosts preserve Int identity', async t => {
-  const source = fs.readFileSync(path.join(fixtures, sourceName), 'utf8');
-  const artifact = await compileSource(source, { filename: sourceName });
+  const source = fs.readFileSync(path.join(fixtures, 'gfb2-int-golden-input-v1.ghost.md'), 'utf8');
+  const artifact = await compileSource(source, { filename: 'gfb2-int-golden-input-v1.ghost.md' });
   const wasm = fs.readFileSync(wasmPath);
   for (const create of [ControlRuntime.instantiate, ControlRuntime.instantiateFramed]) {
     const runtime = await create.call(ControlRuntime, wasm, artifact);
     t.after(() => runtime.dispose());
-    const result = runtime.step({ nowMs: 0, inputs: { selected: -2147483648 } });
+    const result = runtime.step(goodFrame(artifact, 0, { selected: -2147483648 }));
     assert.equal(result.vm.safe.selected_out, -2147483648);
   }
   const runtime = await ControlRuntime.instantiate(wasm, artifact);
   t.after(() => runtime.dispose());
-  assert.throws(() => runtime.step({ nowMs: 0, inputs: { selected: 1.5 } }), /safe integer/);
+  const invalid = runtime.step(goodFrame(artifact, 0, { selected: 1.5 }));
+  assert.equal(invalid.sensors.selected.quality, 'Invalid');
+  assert.equal(invalid.vm.safe.selected_out, 0, 'invalid producer payload retains initialized source display');
 });
 
 test('GF-TEST-gfb2-int-internal: native and WASM execute Int intermediates without an Int boundary', async t => {
@@ -213,7 +307,10 @@ test('GF-TEST-gfb2-int-internal: native and WASM execute Int intermediates witho
 
 \`\`\`ghost
 control InternalIntegerCalculation {
-  input tick: Bool;
+  input raw_tick: Bool;
+  state remembered_tick: Bool = false;
+  let tick = case raw_tick { ok(value) => value; fault(_) => remembered_tick };
+  remembered_tick' = tick;
   let quotient = -7 div 3;
   let remainder = -7 % 3;
   output valid: Bool;
@@ -231,7 +328,7 @@ control InternalIntegerCalculation {
   const modulePath = path.join(temporary, 'internal.gfb');
   const inputPath = path.join(temporary, 'internal.csv');
   fs.writeFileSync(modulePath, artifact.bytes);
-  fs.writeFileSync(inputPath, 'tick\ntrue\n');
+  writeGoodCsv(inputPath, artifact, [{ tick: true }]);
   const native = execFileSync(nativePath, [modulePath, inputPath, '--outcomes'], { encoding: 'utf8' })
     .trim().split('\n').map(line => JSON.parse(line));
   assert.deepEqual(native.map(row => row.status), ['OK']);
@@ -239,7 +336,7 @@ control InternalIntegerCalculation {
 
   const runtime = await ControlRuntime.instantiate(fs.readFileSync(wasmPath), artifact);
   t.after(() => runtime.dispose());
-  const result = runtime.step({ nowMs: 0, inputs: { tick: true } });
+  const result = runtime.step(goodFrame(artifact, 0, { tick: true }));
   assert.equal(result.vm.safe.valid, true);
 });
 
@@ -282,13 +379,13 @@ for (const [name, expression, rows] of integerOperations) {
     const wasmBytes = fs.readFileSync(wasmPath);
     const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-gfb2-int-edges-'));
     t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
-    const artifact = await compileSource(`# ${name}\n\n\`\`\`ghost\ncontrol Integer${name[0].toUpperCase()}${name.slice(1)} {\n  input a, b: Int;\n  output result: Int;\n  result <- ${expression};\n}\n\`\`\`\n`, {
+    const artifact = await compileSource(`# ${name}\n\n\`\`\`ghost\ncontrol Integer${name[0].toUpperCase()}${name.slice(1)} {\n  input raw_a: Int;\n  state remembered_a: Int = 0;\n  let a = case raw_a { ok(value) => value; fault(_) => remembered_a };\n  remembered_a' = a;\n  input raw_b: Int;\n  state remembered_b: Int = 0;\n  let b = case raw_b { ok(value) => value; fault(_) => remembered_b };\n  remembered_b' = b;\n  output result: Int;\n  result <- ${expression};\n}\n\`\`\`\n`, {
       filename: `integer-${name}.ghost.md`,
     });
     const modulePath = path.join(temporary, `${name}.gfb`);
     const inputPath = path.join(temporary, `${name}.csv`);
     fs.writeFileSync(modulePath, artifact.bytes);
-    fs.writeFileSync(inputPath, `a,b\n${rows.map(([a, b]) => `${a},${b}`).join('\n')}\n`);
+    writeGoodCsv(inputPath, artifact, rows.map(([a, b]) => ({ a, b })));
     const native = execFileSync(nativePath, [modulePath, inputPath, '--outcomes'], { encoding: 'utf8' })
       .trim().split('\n').map(line => JSON.parse(line));
     assert.equal(native.length, rows.length);
@@ -302,8 +399,8 @@ for (const [name, expression, rows] of integerOperations) {
       runtime.activate();
       let lastAccepted;
       for (const [index, [a, b]] of rows.entries()) {
-        runtime.setInt('a', a);
-        runtime.setInt('b', b);
+        setGood(runtime, artifact, 'a', a);
+        setGood(runtime, artifact, 'b', b);
         try {
           runtime.tick();
           lastAccepted = runtime.intentInt('result');
@@ -332,7 +429,14 @@ test('GF-TEST-gfb2-int-fault-atomicity: rejected intent arithmetic preserves sta
 
 \`\`\`ghost
 control IntegerFaultAtomicity {
-  input numerator, divisor: Int;
+  input raw_numerator: Int;
+  state remembered_numerator: Int = 0;
+  let numerator = case raw_numerator { ok(value) => value; fault(_) => remembered_numerator };
+  remembered_numerator' = numerator;
+  input raw_divisor: Int;
+  state remembered_divisor: Int = 0;
+  let divisor = case raw_divisor { ok(value) => value; fault(_) => remembered_divisor };
+  remembered_divisor' = divisor;
   state accepted: Int = 0;
   accepted' = accepted + 1;
   output result: Int;
@@ -346,23 +450,23 @@ control IntegerFaultAtomicity {
   runtime.addCapability('actuator', 'result', 'int');
   runtime.activate();
 
-  runtime.setInt('numerator', 8);
-  runtime.setInt('divisor', 2);
+  setGood(runtime, artifact, 'numerator', 8);
+  setGood(runtime, artifact, 'divisor', 2);
   runtime.tick();
   assert.deepEqual(
     { tick: runtime.trace.tick, journalLength: runtime.journalLength, state: runtime.stateInt('accepted'), intent: runtime.intentInt('result') },
     { tick: 1, journalLength: 1, state: 1, intent: 4 },
   );
 
-  runtime.setInt('numerator', 9);
-  runtime.setInt('divisor', 0);
+  setGood(runtime, artifact, 'numerator', 9);
+  setGood(runtime, artifact, 'divisor', 0);
   assert.throws(() => runtime.tick(), /integer-division-by-zero/);
   assert.deepEqual(
     { tick: runtime.trace.tick, journalLength: runtime.journalLength, state: runtime.stateInt('accepted'), intent: runtime.intentInt('result') },
     { tick: 1, journalLength: 1, state: 1, intent: 4 },
   );
 
-  runtime.setInt('divisor', 3);
+  setGood(runtime, artifact, 'divisor', 3);
   runtime.tick();
   assert.deepEqual(
     { tick: runtime.trace.tick, journalLength: runtime.journalLength, state: runtime.stateInt('accepted'), intent: runtime.intentInt('result') },
@@ -381,8 +485,18 @@ test('GF-TEST-gfb3-number-branches: nested Number and Boolean branches preserve 
 
 \`\`\`ghost
 control NumberBranches {
-  input guard, nested: Bool;
-  input divisor: Number;
+  input raw_guard: Bool;
+  state remembered_guard: Bool = false;
+  let guard = case raw_guard { ok(value) => value; fault(_) => remembered_guard };
+  remembered_guard' = guard;
+  input raw_nested: Bool;
+  state remembered_nested: Bool = false;
+  let nested = case raw_nested { ok(value) => value; fault(_) => remembered_nested };
+  remembered_nested' = nested;
+  input raw_divisor: Number;
+  state remembered_divisor: Number = 0;
+  let divisor = case raw_divisor { ok(value) => value; fault(_) => remembered_divisor };
+  remembered_divisor' = divisor;
   output result: Number;
   output decision: Bool;
   result <- 2.0 + (if guard then (if nested then 7.0 else 1.0 / divisor) else 9.0);
@@ -391,7 +505,7 @@ control NumberBranches {
 \`\`\`
 `, { filename: 'number-branches.ghost.md' });
   assert.equal(artifact.bytes.readUInt16LE(4), 3);
-  assert.notEqual(artifact.manifest.format, 'GhostFlow/control-v4');
+  assert.deepEqual(artifact.manifest.sensors.map(sensor => sensor.type), ['Bool', 'Bool', 'Number']);
   const rows = [
     [false, false, 0, 11, true],
     [true, true, 0, 9, true],
@@ -404,7 +518,7 @@ control NumberBranches {
   const modulePath = path.join(temporary, 'branch.gfb');
   const inputPath = path.join(temporary, 'branch.csv');
   fs.writeFileSync(modulePath, artifact.bytes);
-  fs.writeFileSync(inputPath, `guard,nested,divisor\n${rows.map(row => row.slice(0, 3).join(',')).join('\n')}\n`);
+  writeGoodCsv(inputPath, artifact, rows.map(([guard, nested, divisor]) => ({ guard, nested, divisor })));
   const native = execFileSync(nativePath, [modulePath, inputPath, '--outcomes'], { encoding: 'utf8' })
     .trim().split('\n').map(line => JSON.parse(line));
   assert.deepEqual(native.map(row => row.error ?? [row.trace.safe.result, row.trace.safe.decision]),
@@ -413,7 +527,7 @@ control NumberBranches {
     const host = await create.call(ControlRuntime, fs.readFileSync(wasmPath), artifact);
     t.after(() => host.dispose());
     for (const [nowMs, [guard, nested, divisor, result, decision]] of rows.entries()) {
-      const step = () => host.step({ nowMs, inputs: { guard, nested, divisor } });
+      const step = () => host.step(goodFrame(artifact, nowMs, { guard, nested, divisor }));
       if (typeof result === 'string') assert.throws(step, /division by zero/);
       else assert.deepEqual(step().vm.safe, { result, decision });
     }
@@ -479,8 +593,14 @@ for (const [name, expression, safeGuard, faultGuard, outputType, expected] of sh
 
 \`\`\`ghost
 control Integer${name[0].toUpperCase()}${name.slice(1)}ShortCircuit {
-  input guard: Bool;
-  input divisor: Int;
+  input raw_guard: Bool;
+  state remembered_guard: Bool = false;
+  let guard = case raw_guard { ok(value) => value; fault(_) => remembered_guard };
+  remembered_guard' = guard;
+  input raw_divisor: Int;
+  state remembered_divisor: Int = 0;
+  let divisor = case raw_divisor { ok(value) => value; fault(_) => remembered_divisor };
+  remembered_divisor' = divisor;
   output result: ${outputType === 'int' ? 'Int' : 'Bool'};
   result <- ${expression};
 }
@@ -492,7 +612,7 @@ control Integer${name[0].toUpperCase()}${name.slice(1)}ShortCircuit {
     const modulePath = path.join(temporary, 'branch.gfb');
     const inputPath = path.join(temporary, 'branch.csv');
     fs.writeFileSync(modulePath, artifact.bytes);
-    fs.writeFileSync(inputPath, `guard,divisor\n${guard},0\n`);
+    writeGoodCsv(inputPath, artifact, [{ guard, divisor: 0 }]);
     const native = JSON.parse(execFileSync(nativePath, [modulePath, inputPath, '--outcomes'], { encoding: 'utf8' }).trim());
     if (branch === 'selected') assert.equal(native.error, 'integer-division-by-zero');
     else assert.equal(native.trace.safe.result, expected);
@@ -500,8 +620,8 @@ control Integer${name[0].toUpperCase()}${name.slice(1)}ShortCircuit {
     for (const create of [ControlRuntime.instantiate, ControlRuntime.instantiateFramed]) {
       const host = await create.call(ControlRuntime, fs.readFileSync(wasmPath), artifact);
       t.after(() => host.dispose());
-      if (branch === 'selected') assert.throws(() => host.step({ nowMs: 0, inputs: { guard, divisor: 0 } }), /integer-division-by-zero/);
-      else assert.equal(host.step({ nowMs: 0, inputs: { guard, divisor: 0 } }).vm.safe.result, expected);
+      if (branch === 'selected') assert.throws(() => host.step(goodFrame(artifact, 0, { guard, divisor: 0 })), /integer-division-by-zero/);
+      else assert.equal(host.step(goodFrame(artifact, 0, { guard, divisor: 0 })).vm.safe.result, expected);
     }
     const runtime = await GhostFlowRuntime.instantiate(fs.readFileSync(wasmPath));
     t.after(() => runtime.dispose());
@@ -509,8 +629,8 @@ control Integer${name[0].toUpperCase()}${name.slice(1)}ShortCircuit {
     runtime.addCapability('actuator', 'result', outputType);
     runtime.activate();
 
-    runtime.setBool('guard', guard);
-    runtime.setInt('divisor', 0);
+    setGood(runtime, artifact, 'guard', guard);
+    setGood(runtime, artifact, 'divisor', 0);
     if (branch === 'selected') {
       assert.throws(() => runtime.tick(), /integer-division-by-zero/);
     } else {
@@ -524,13 +644,13 @@ control Integer${name[0].toUpperCase()}${name.slice(1)}ShortCircuit {
 });
 
 test('GF-TEST-gfb2-int-rounding: native and WASM preserve ties-to-even on both signs', async t => {
-  const artifact = await compileSource(`# Integer rounding\n\n\`\`\`ghost\ncontrol IntegerRounding {\n  input run: Bool;\n  output valid: Bool;\n  valid <- run\n    && int_nearest_even(1.5) == 2\n    && int_nearest_even(2.5) == 2\n    && int_nearest_even(-1.5) == -2\n    && int_nearest_even(-2.5) == -2;\n}\n\`\`\`\n`, { filename: 'integer-rounding.ghost.md' });
+  const artifact = await compileSource(`# Integer rounding\n\n\`\`\`ghost\ncontrol IntegerRounding {\n  input raw_run: Bool;\n  state remembered_run: Bool = false;\n  let run = case raw_run { ok(value) => value; fault(_) => remembered_run };\n  remembered_run' = run;\n  output valid: Bool;\n  valid <- run\n    && int_nearest_even(1.5) == 2\n    && int_nearest_even(2.5) == 2\n    && int_nearest_even(-1.5) == -2\n    && int_nearest_even(-2.5) == -2;\n}\n\`\`\`\n`, { filename: 'integer-rounding.ghost.md' });
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-gfb2-int-rounding-'));
   t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
   const modulePath = path.join(temporary, 'rounding.gfb');
   const inputPath = path.join(temporary, 'rounding.csv');
   fs.writeFileSync(modulePath, artifact.bytes);
-  fs.writeFileSync(inputPath, 'run\ntrue\n');
+  writeGoodCsv(inputPath, artifact, [{ run: true }]);
   const native = JSON.parse(execFileSync(nativePath, [modulePath, inputPath, '--outcomes'], { encoding: 'utf8' }).trim());
   assert.equal(native.trace.safe.valid, true);
 
@@ -539,7 +659,7 @@ test('GF-TEST-gfb2-int-rounding: native and WASM preserve ties-to-even on both s
   runtime.load(artifact.bytes);
   runtime.addCapability('actuator', 'valid', 'bool');
   runtime.activate();
-  runtime.setBool('run', true);
+  setGood(runtime, artifact, 'run', true);
   runtime.tick();
   assert.equal(runtime.intentBool('valid'), true);
 });

@@ -1,5 +1,9 @@
 # GhostFlow Coding FAQ
 
+2026-10-05 외부 입력 개정은 품질 정보를 갖는 선언에 `input`을 사용한다. 기존 조건화와 명시적인 `Result` 고장 분기는 그대로 유지하며, 이전 `sensor` 발췌는 `tests/fixtures/history/issue531/`에 보존한다.
+
+개정 예제는 생산자 상태를 알 수 없을 때 소스 내부의 관측 기억과 표시 기억을 명시적으로 유지한다. 초기 기억은 정상적인 생산자 샘플이 아니다. 품질 조건은 알 수 없는 요청이 새 전이를 만들지 못하게 하며 정상 STOP과 허가 해제가 우선하고 제한된 운전 기간도 만료된다. 물리적인 장비 고장을 추론하거나 자동 제어기에 START를 요구하지 않는다.
+
 “이런 동작은 어떻게 코딩하나요?”에 답하는 사례집이다.
 질문마다 코드, 동작, 그렇게 작성하는 이유를 설명한다.
 언어 규칙의 기준은 [Language Reference](LANGUAGE-REFERENCE.md)다.
@@ -77,10 +81,17 @@
 
 ```ghost
 control ButtonLamp {
-  input button: Bool;
+  state displayed_lamp: Bool = false;
+  displayed_lamp' = if button_good && !button then false else if button_good then button else displayed_lamp;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_button: Bool = false;
+  let button_good = case observed_button { ok(_) => true; fault(_) => false; };
+  let button = case observed_button { ok(value) => value; fault(_) => remembered_button; };
+  remembered_button' = button;
+  input observed_button: Bool;
   output lamp: Bool;
 
-  lamp <- button;
+  lamp <- displayed_lamp';
 }
 ```
 ````
@@ -105,10 +116,22 @@ Markdown 설명은 사람이 읽고, `ghost` 블록은 제어 규칙을 담는�
 
 ```ghost
 control HoldToRun {
-  input button, stop: Bool;
+  state displayed_pump: Bool = false;
+  displayed_pump' = if button_good && !button then false else if stop_good && stop then false else if button_good && stop_good then button && !stop else displayed_pump;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_button: Bool = false;
+  let button_good = case observed_button { ok(_) => true; fault(_) => false; };
+  let button = case observed_button { ok(value) => value; fault(_) => remembered_button; };
+  remembered_button' = button;
+  state remembered_stop: Bool = false;
+  let stop_good = case observed_stop { ok(_) => true; fault(_) => false; };
+  let stop = case observed_stop { ok(value) => value; fault(_) => remembered_stop; };
+  remembered_stop' = stop;
+  input observed_button: Bool;
+  input observed_stop: Bool;
   output pump: Bool;
 
-  pump <- button && !stop;
+  pump <- displayed_pump';
 }
 ```
 
@@ -131,15 +154,25 @@ control HoldToRun {
 
 ```ghost
 control StartStop {
-  input start, stop: Bool;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_start: Bool = false;
+  let start_good = case observed_start { ok(_) => true; fault(_) => false; };
+  let start = case observed_start { ok(value) => value; fault(_) => remembered_start; };
+  remembered_start' = start;
+  state remembered_stop: Bool = false;
+  let stop_good = case observed_stop { ok(_) => true; fault(_) => false; };
+  let stop = case observed_stop { ok(value) => value; fault(_) => remembered_stop; };
+  remembered_stop' = stop;
+  input observed_start: Bool;
+  input observed_stop: Bool;
   output pump: Bool;
   state armed: Bool = false;
   state running: Bool = false;
 
   let start_event = armed && start;
 
-  armed' = !stop && !start;
-  running' = !stop && (start_event || running);
+  armed' = if stop_good && stop then false else if start_good && stop_good then (!stop && !start) else armed;
+  running' = if stop_good && stop then false else if start_good && stop_good then (!stop && (start_event || running)) else running;
   pump <- running';
 }
 ```
@@ -169,7 +202,22 @@ control StartStop {
 
 ```ghost
 control FiveMinuteRun {
-  input start, stop, low_water: Bool;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_start: Bool = false;
+  let start_good = case observed_start { ok(_) => true; fault(_) => false; };
+  let start = case observed_start { ok(value) => value; fault(_) => remembered_start; };
+  remembered_start' = start;
+  state remembered_stop: Bool = false;
+  let stop_good = case observed_stop { ok(_) => true; fault(_) => false; };
+  let stop = case observed_stop { ok(value) => value; fault(_) => remembered_stop; };
+  remembered_stop' = stop;
+  state remembered_low_water: Bool = false;
+  let low_water_good = case observed_low_water { ok(_) => true; fault(_) => false; };
+  let low_water = case observed_low_water { ok(value) => value; fault(_) => remembered_low_water; };
+  remembered_low_water' = low_water;
+  input observed_start: Bool;
+  input observed_stop: Bool;
+  input observed_low_water: Bool;
   output pump, valve: Bool;
   config duration: Duration = 5min;
   state armed: Bool = false;
@@ -179,10 +227,10 @@ control FiveMinuteRun {
   let permit = !stop && !low_water;
   let start_event = armed && start;
 
-  armed' = permit && !start;
-  running' = if !permit then false
-    else if running then age < duration
-    else start_event;
+  armed' = if low_water_good && low_water then false else if stop_good && stop then false else if start_good && stop_good && low_water_good then (permit && !start) else armed;
+  running' = if low_water_good && low_water then false else if stop_good && stop then false else if running && !(case duration { ok(value) => age < value; fault(_) => false; }) then false else if start_good && stop_good && low_water_good then (if !permit then false
+    else if running then (case duration { ok(value) => age < value; fault(_) => false; })
+    else start_event) else running;
 
   valve <- running';
   pump <- running';
@@ -212,19 +260,29 @@ control FiveMinuteRun {
 
 ```ghost
 control OnDelay {
-  input request, stop: Bool;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_request: Bool = false;
+  let request_good = case observed_request { ok(_) => true; fault(_) => false; };
+  let request = case observed_request { ok(value) => value; fault(_) => remembered_request; };
+  remembered_request' = request;
+  state remembered_stop: Bool = false;
+  let stop_good = case observed_stop { ok(_) => true; fault(_) => false; };
+  let stop = case observed_stop { ok(value) => value; fault(_) => remembered_stop; };
+  remembered_stop' = stop;
+  input observed_request: Bool;
+  input observed_stop: Bool;
   output enabled: Bool;
   config delay: Duration = 2s;
   type Phase = Idle | Waiting | Active;
   state phase: Phase = Idle;
   timer age = elapsed(phase);
 
-  phase' = case phase {
+  phase' = if !(case delay { ok(_) => true; fault(_) => false; }) then Idle else if stop_good && stop then Idle else if request_good && stop_good then (case phase {
     Idle => if request && !stop then Waiting else Idle;
     Waiting => if stop || !request then Idle
-      else if age >= delay then Active else Waiting;
+      else if (case delay { ok(value) => age >= value; fault(_) => false; }) then Active else Waiting;
     Active => if request && !stop then Active else Idle;
-  };
+  }) else phase;
 
   enabled <- phase' == Active;
 }
@@ -252,21 +310,31 @@ control OnDelay {
 
 ```ghost
 control OffDelay {
-  input request, stop: Bool;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_request: Bool = false;
+  let request_good = case observed_request { ok(_) => true; fault(_) => false; };
+  let request = case observed_request { ok(value) => value; fault(_) => remembered_request; };
+  remembered_request' = request;
+  state remembered_stop: Bool = false;
+  let stop_good = case observed_stop { ok(_) => true; fault(_) => false; };
+  let stop = case observed_stop { ok(value) => value; fault(_) => remembered_stop; };
+  remembered_stop' = stop;
+  input observed_request: Bool;
+  input observed_stop: Bool;
   output enabled: Bool;
   config delay: Duration = 3s;
   type Phase = Idle | Active | Holding;
   state phase: Phase = Idle;
   timer age = elapsed(phase);
 
-  phase' = case phase {
+  phase' = if phase == Holding && (case delay { ok(value) => age >= value; fault(_) => true; }) then Idle else if !(case delay { ok(_) => true; fault(_) => false; }) then Idle else if stop_good && stop then Idle else if request_good && stop_good then (case phase {
     Idle => if request && !stop then Active else Idle;
     Active => if stop then Idle
       else if !request then Holding else Active;
     Holding => if stop then Idle
       else if request then Active
-      else if age >= delay then Idle else Holding;
-  };
+      else if (case delay { ok(value) => age >= value; fault(_) => false; }) then Idle else Holding;
+  }) else phase;
 
   enabled <- phase' in {Active, Holding};
 }
@@ -290,7 +358,12 @@ control OffDelay {
 
 ```ghost
 control DailyWatering {
-  input stop: Bool;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_stop: Bool = false;
+  let stop_good = case observed_stop { ok(_) => true; fault(_) => false; };
+  let stop = case observed_stop { ok(value) => value; fault(_) => remembered_stop; };
+  remembered_stop' = stop;
+  input observed_stop: Bool;
   output pump: Bool;
   schedule starts: DailySlots<15min> {
     timezone = "Asia/Seoul";
@@ -308,7 +381,7 @@ control DailyWatering {
   state running: Bool = false;
   timer age = elapsed(running);
 
-  running' = !stop && (if running then age < duration else starts.due);
+  running' = if stop_good && stop then false else if running && !(age < duration) then false else if stop_good then (!stop && (if running then age < duration else starts.due)) else running;
   pump <- running';
 }
 ```
@@ -335,7 +408,12 @@ control DailyWatering {
 
 ```ghost
 control TwoZones {
-  input start: Bool;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_start: Bool = false;
+  let start_good = case observed_start { ok(_) => true; fault(_) => false; };
+  let start = case observed_start { ok(value) => value; fault(_) => remembered_start; };
+  remembered_start' = start;
+  input observed_start: Bool;
   output pump, valve1, valve2: Bool;
   type Phase = Idle | Open1 | Water1 | Stop1 | Open2 | Water2 | Stop2;
   state phase: Phase = Idle;
@@ -345,17 +423,17 @@ control TwoZones {
   config settle_time: Duration = 2s;
 
   let start_event = armed && start;
-  armed' = phase == Idle && !start;
+  armed' = if start_good then (phase == Idle && !start) else armed;
 
-  phase' = case phase {
+  phase' = if !(case watering_time { ok(_) => true; fault(_) => false; } && case settle_time { ok(_) => true; fault(_) => false; }) then Idle else if phase != Idle || start_good then (case phase {
     Idle => if start_event then Open1 else Idle;
-    Open1 => if age >= settle_time then Water1 else Open1;
-    Water1 => if age >= watering_time then Stop1 else Water1;
-    Stop1 => if age >= settle_time then Open2 else Stop1;
-    Open2 => if age >= settle_time then Water2 else Open2;
-    Water2 => if age >= watering_time then Stop2 else Water2;
-    Stop2 => if age >= settle_time then Idle else Stop2;
-  };
+    Open1 => if (case settle_time { ok(value) => age >= value; fault(_) => false; }) then Water1 else Open1;
+    Water1 => if (case watering_time { ok(value) => age >= value; fault(_) => false; }) then Stop1 else Water1;
+    Stop1 => if (case settle_time { ok(value) => age >= value; fault(_) => false; }) then Open2 else Stop1;
+    Open2 => if (case settle_time { ok(value) => age >= value; fault(_) => false; }) then Water2 else Open2;
+    Water2 => if (case watering_time { ok(value) => age >= value; fault(_) => false; }) then Stop2 else Water2;
+    Stop2 => if (case settle_time { ok(value) => age >= value; fault(_) => false; }) then Idle else Stop2;
+  }) else phase;
 
   valve1 <- phase' in {Open1, Water1, Stop1};
   valve2 <- phase' in {Open2, Water2, Stop2};
@@ -386,8 +464,15 @@ control TwoZones {
 
 ```ghost
 control MoistureControl {
-  input stop: Bool;
-  sensor moisture: Percent {
+  state displayed_pump: Bool = false;
+  displayed_pump' = if stop_good && stop then false else if stop_good then requested && !stop else displayed_pump;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_stop: Bool = false;
+  let stop_good = case observed_stop { ok(_) => true; fault(_) => false; };
+  let stop = case observed_stop { ok(value) => value; fault(_) => remembered_stop; };
+  remembered_stop' = stop;
+  input observed_stop: Bool;
+  input moisture: Percent {
     sample = 1s;
     valid = 0% .. 100%;
     filter = median(5);
@@ -402,7 +487,7 @@ control MoistureControl {
     ok(value) => value;
     fault(_) => false;
   };
-  pump <- requested && !stop;
+  pump <- displayed_pump';
 }
 ```
 
@@ -415,7 +500,7 @@ control MoistureControl {
 
 **문법 근거**
 
-- `sensor`, `sample`, `valid`, `filter`, `stale_after`, `recover_after`: [Reference §4.2 샘플 계약과 sensor 처리 순서](reference/04-sensors-constraints-control.md#42-샘플-계약과-sensor-처리-순서)
+- `input`, `sample`, `valid`, `filter`, `stale_after`, `recover_after`: [Reference §4.2 샘플 계약과 sensor 처리 순서](reference/04-sensors-constraints-control.md#42-샘플-계약과-sensor-처리-순서)
 - `median`, `signal`, `hysteresis`, 이름 붙인 인수: [Reference §4.3 filter와 signal 연산](reference/04-sensors-constraints-control.md#43-filter와-signal-연산)
 - `case`, `ok(value)`, `fault(_)`: [Reference §4.1 sensor와 Result 품질](reference/04-sensors-constraints-control.md#41-sensor와-result-품질)
 
@@ -427,19 +512,29 @@ control MoistureControl {
 
 ```ghost
 control TankLevel {
-  input low_level_reached, high_level_reached: Bool;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_low_level_reached: Bool = false;
+  let low_level_reached_good = case observed_low_level_reached { ok(_) => true; fault(_) => false; };
+  let low_level_reached = case observed_low_level_reached { ok(value) => value; fault(_) => remembered_low_level_reached; };
+  remembered_low_level_reached' = low_level_reached;
+  state remembered_high_level_reached: Bool = false;
+  let high_level_reached_good = case observed_high_level_reached { ok(_) => true; fault(_) => false; };
+  let high_level_reached = case observed_high_level_reached { ok(value) => value; fault(_) => remembered_high_level_reached; };
+  remembered_high_level_reached' = high_level_reached;
+  input observed_low_level_reached: Bool;
+  input observed_high_level_reached: Bool;
   output fill_pump: Bool;
   type Phase = Idle | Filling | SensorConflict;
   state phase: Phase = Idle;
   let conflict = high_level_reached && !low_level_reached;
 
-  phase' = case phase {
+  phase' = if low_level_reached_good && high_level_reached_good then (case phase {
     Idle => if conflict then SensorConflict
       else if !low_level_reached then Filling else Idle;
     Filling => if conflict then SensorConflict
       else if high_level_reached then Idle else Filling;
     SensorConflict => if conflict then SensorConflict else Idle;
-  };
+  }) else phase;
 
   fill_pump <- phase' == Filling;
 }
@@ -466,16 +561,26 @@ control TankLevel {
 
 ```ghost
 control CountThree {
-  input detected, reset: Bool;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_detected: Bool = false;
+  let detected_good = case observed_detected { ok(_) => true; fault(_) => false; };
+  let detected = case observed_detected { ok(value) => value; fault(_) => remembered_detected; };
+  remembered_detected' = detected;
+  state remembered_reset: Bool = false;
+  let reset_good = case observed_reset { ok(_) => true; fault(_) => false; };
+  let reset = case observed_reset { ok(value) => value; fault(_) => remembered_reset; };
+  remembered_reset' = reset;
+  input observed_detected: Bool;
+  input observed_reset: Bool;
   output done: Bool;
   state previous: Bool = false;
   state count: Int = 0;
   let rising = detected && !previous;
 
-  previous' = detected;
-  count' = if reset then 0
+  previous' = if detected_good && reset_good then (detected) else previous;
+  count' = if reset_good && reset then 0 else if detected_good && reset_good then (if reset then 0
     else if rising && count < 3 then count + 1
-    else count;
+    else count) else count;
   done <- count' >= 3;
 }
 ```
@@ -536,14 +641,24 @@ config duration: Duration = 5min {
 
 ```ghost
 control AlarmMemory {
-  input fault_active, reset: Bool;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_fault_active: Bool = false;
+  let fault_active_good = case observed_fault_active { ok(_) => true; fault(_) => false; };
+  let fault_active = case observed_fault_active { ok(value) => value; fault(_) => remembered_fault_active; };
+  remembered_fault_active' = fault_active;
+  state remembered_reset: Bool = false;
+  let reset_good = case observed_reset { ok(_) => true; fault(_) => false; };
+  let reset = case observed_reset { ok(value) => value; fault(_) => remembered_reset; };
+  remembered_reset' = reset;
+  input observed_fault_active: Bool;
+  input observed_reset: Bool;
   output alarm: Bool;
   state latched: Bool = false;
   state reset_armed: Bool = false;
   let reset_event = reset_armed && reset;
 
-  reset_armed' = !fault_active && !reset;
-  latched' = fault_active || (latched && !reset_event);
+  reset_armed' = if fault_active_good && reset_good then (!fault_active && !reset) else reset_armed;
+  latched' = if fault_active_good && reset_good then (fault_active || (latched && !reset_event)) else latched;
   alarm <- latched';
 }
 ```
@@ -568,11 +683,25 @@ fault_active와 reset이 동시에 참이면 fault_active가 이긴다. reset은
 
 ```ghost
 control ExclusiveDirections {
-  input forward_request, reverse_request: Bool;
+  state displayed_forward: Bool = false;
+  displayed_forward' = if forward_request_good && !forward_request then false else if forward_request_good then forward_request else displayed_forward;
+  state displayed_reverse: Bool = false;
+  displayed_reverse' = if reverse_request_good && !reverse_request then false else if reverse_request_good then reverse_request else displayed_reverse;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_forward_request: Bool = false;
+  let forward_request_good = case observed_forward_request { ok(_) => true; fault(_) => false; };
+  let forward_request = case observed_forward_request { ok(value) => value; fault(_) => remembered_forward_request; };
+  remembered_forward_request' = forward_request;
+  state remembered_reverse_request: Bool = false;
+  let reverse_request_good = case observed_reverse_request { ok(_) => true; fault(_) => false; };
+  let reverse_request = case observed_reverse_request { ok(value) => value; fault(_) => remembered_reverse_request; };
+  remembered_reverse_request' = reverse_request;
+  input observed_forward_request: Bool;
+  input observed_reverse_request: Bool;
   output forward, reverse: Bool;
 
-  forward <- forward_request;
-  reverse <- reverse_request;
+  forward <- displayed_forward';
+  reverse <- displayed_reverse';
   require !(forward && reverse);
 }
 ```
@@ -632,11 +761,35 @@ fn permitted(request: Bool, stop: Bool, enabled: Bool) -> Bool {
 }
 
 control TwoRequests {
-  input request1, request2, stop, enabled: Bool;
+  state displayed_zone1: Bool = false;
+  displayed_zone1' = if enabled_good && !enabled then false else if request1_good && !request1 then false else if stop_good && !stop then false else if enabled_good && request1_good && stop_good then permitted(request1, stop, enabled) else displayed_zone1;
+  state displayed_zone2: Bool = false;
+  displayed_zone2' = if enabled_good && !enabled then false else if request2_good && !request2 then false else if stop_good && !stop then false else if enabled_good && request2_good && stop_good then permitted(request2, stop, enabled) else displayed_zone2;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_request1: Bool = false;
+  let request1_good = case observed_request1 { ok(_) => true; fault(_) => false; };
+  let request1 = case observed_request1 { ok(value) => value; fault(_) => remembered_request1; };
+  remembered_request1' = request1;
+  state remembered_request2: Bool = false;
+  let request2_good = case observed_request2 { ok(_) => true; fault(_) => false; };
+  let request2 = case observed_request2 { ok(value) => value; fault(_) => remembered_request2; };
+  remembered_request2' = request2;
+  state remembered_stop: Bool = false;
+  let stop_good = case observed_stop { ok(_) => true; fault(_) => false; };
+  let stop = case observed_stop { ok(value) => value; fault(_) => remembered_stop; };
+  remembered_stop' = stop;
+  state remembered_enabled: Bool = false;
+  let enabled_good = case observed_enabled { ok(_) => true; fault(_) => false; };
+  let enabled = case observed_enabled { ok(value) => value; fault(_) => remembered_enabled; };
+  remembered_enabled' = enabled;
+  input observed_request1: Bool;
+  input observed_request2: Bool;
+  input observed_stop: Bool;
+  input observed_enabled: Bool;
   output zone1, zone2: Bool;
 
-  zone1 <- permitted(request1, stop, enabled);
-  zone2 <- permitted(request2, stop, enabled);
+  zone1 <- displayed_zone1';
+  zone2 <- displayed_zone2';
 }
 ```
 
@@ -666,7 +819,27 @@ control TwoRequests {
 
 ```ghost
 control PumpInterlock {
-  input start, stop, valve_open, low_water: Bool;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_start: Bool = false;
+  let start_good = case observed_start { ok(_) => true; fault(_) => false; };
+  let start = case observed_start { ok(value) => value; fault(_) => remembered_start; };
+  remembered_start' = start;
+  state remembered_stop: Bool = false;
+  let stop_good = case observed_stop { ok(_) => true; fault(_) => false; };
+  let stop = case observed_stop { ok(value) => value; fault(_) => remembered_stop; };
+  remembered_stop' = stop;
+  state remembered_valve_open: Bool = false;
+  let valve_open_good = case observed_valve_open { ok(_) => true; fault(_) => false; };
+  let valve_open = case observed_valve_open { ok(value) => value; fault(_) => remembered_valve_open; };
+  remembered_valve_open' = valve_open;
+  state remembered_low_water: Bool = false;
+  let low_water_good = case observed_low_water { ok(_) => true; fault(_) => false; };
+  let low_water = case observed_low_water { ok(value) => value; fault(_) => remembered_low_water; };
+  remembered_low_water' = low_water;
+  input observed_start: Bool;
+  input observed_stop: Bool;
+  input observed_valve_open: Bool;
+  input observed_low_water: Bool;
   output pump: Bool;
   state armed: Bool = false;
   state running: Bool = false;
@@ -674,8 +847,8 @@ control PumpInterlock {
   let permit = !stop && valve_open && !low_water;
   let start_event = armed && start;
 
-  armed' = permit && !start;
-  running' = permit && (running || start_event);
+  armed' = if low_water_good && low_water then false else if valve_open_good && !valve_open then false else if stop_good && stop then false else if start_good && stop_good && valve_open_good && low_water_good then (permit && !start) else armed;
+  running' = if low_water_good && low_water then false else if valve_open_good && !valve_open then false else if stop_good && stop then false else if start_good && stop_good && valve_open_good && low_water_good then (permit && (running || start_event)) else running;
   pump <- running';
 }
 ```
@@ -691,11 +864,25 @@ control PumpInterlock {
 
 ```ghost
 control DirectionInterlock {
-  input forward_request, reverse_request: Bool;
+  state displayed_forward: Bool = false;
+  displayed_forward' = if forward_request_good && !forward_request then false else if forward_request_good then forward_request else displayed_forward;
+  state displayed_reverse: Bool = false;
+  displayed_reverse' = if reverse_request_good && !reverse_request then false else if reverse_request_good then reverse_request else displayed_reverse;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_forward_request: Bool = false;
+  let forward_request_good = case observed_forward_request { ok(_) => true; fault(_) => false; };
+  let forward_request = case observed_forward_request { ok(value) => value; fault(_) => remembered_forward_request; };
+  remembered_forward_request' = forward_request;
+  state remembered_reverse_request: Bool = false;
+  let reverse_request_good = case observed_reverse_request { ok(_) => true; fault(_) => false; };
+  let reverse_request = case observed_reverse_request { ok(value) => value; fault(_) => remembered_reverse_request; };
+  remembered_reverse_request' = reverse_request;
+  input observed_forward_request: Bool;
+  input observed_reverse_request: Bool;
   output forward, reverse: Bool;
 
-  forward <- forward_request;
-  reverse <- reverse_request;
+  forward <- displayed_forward';
+  reverse <- displayed_reverse';
   require !(forward && reverse);
 }
 ```
@@ -735,7 +922,7 @@ neutral인 관측과 새 claim이 필요하다. require-only group은 requested 
 이 실행 범위는 모든 출력이 명시 보호된 Bool GFB1 v1/v3 control 하나다. 같은 설치의
 writer는 공유 registry를 사용하며 같은 안정 ID의 추가 활성 writer를 거부한다.
 context/PID, shared-policy import composition, 여러 VM의 협력 중재는 포함하지 않는다.
-결과는 논리 requested/safe 의도다. 실제 Driver 적용, 밸브 열림 확인이나 현장 설치를
+결과는 논리 requested/safe 의도다. 실제 renderer 적용, 밸브 열림 확인이나 현장 설치를
 증명하지 않는다. 자세한 규칙과 단계는 [Reference §4.8](reference/04-sensors-constraints-control.md#48-공통-constraints-표기와-연산)과
 [제약 계약](CONSTRAINTS.md#공유-bool-실행)을 참조한다.
 
@@ -758,11 +945,21 @@ context/PID, shared-policy import composition, 여러 VM의 협력 중재는 포
 
 ```ghost
 control SelfHolding {
-  input start, stop: Bool;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_start: Bool = false;
+  let start_good = case observed_start { ok(_) => true; fault(_) => false; };
+  let start = case observed_start { ok(value) => value; fault(_) => remembered_start; };
+  remembered_start' = start;
+  state remembered_stop: Bool = false;
+  let stop_good = case observed_stop { ok(_) => true; fault(_) => false; };
+  let stop = case observed_stop { ok(value) => value; fault(_) => remembered_stop; };
+  remembered_stop' = stop;
+  input observed_start: Bool;
+  input observed_stop: Bool;
   output pump: Bool;
   state running: Bool = false;
 
-  running' = !stop && (start || running);
+  running' = if stop_good && stop then false else if start_good && stop_good then (!stop && (start || running)) else running;
   pump <- running';
 }
 ```
@@ -794,20 +991,40 @@ control SelfHolding {
 
 ```ghost
 control CancelAndReturn {
-  input start, cancel, stopped, home: Bool;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_start: Bool = false;
+  let start_good = case observed_start { ok(_) => true; fault(_) => false; };
+  let start = case observed_start { ok(value) => value; fault(_) => remembered_start; };
+  remembered_start' = start;
+  state remembered_cancel: Bool = false;
+  let cancel_good = case observed_cancel { ok(_) => true; fault(_) => false; };
+  let cancel = case observed_cancel { ok(value) => value; fault(_) => remembered_cancel; };
+  remembered_cancel' = cancel;
+  state remembered_stopped: Bool = false;
+  let stopped_good = case observed_stopped { ok(_) => true; fault(_) => false; };
+  let stopped = case observed_stopped { ok(value) => value; fault(_) => remembered_stopped; };
+  remembered_stopped' = stopped;
+  state remembered_home: Bool = false;
+  let home_good = case observed_home { ok(_) => true; fault(_) => false; };
+  let home = case observed_home { ok(value) => value; fault(_) => remembered_home; };
+  remembered_home' = home;
+  input observed_start: Bool;
+  input observed_cancel: Bool;
+  input observed_stopped: Bool;
+  input observed_home: Bool;
   output work, return_device: Bool;
   type Phase = Idle | Working | Stopping | Returning;
   state phase: Phase = Idle;
   state armed: Bool = false;
 
   let start_event = armed && start;
-  armed' = phase == Idle && !start && !cancel;
-  phase' = case phase {
+  armed' = if start_good && cancel_good && stopped_good && home_good then (phase == Idle && !start && !cancel) else armed;
+  phase' = if start_good && cancel_good && stopped_good && home_good then (case phase {
     Idle => if !cancel && start_event then Working else Idle;
     Working => if cancel then Stopping else Working;
     Stopping => if !stopped then Stopping else if home then Idle else Returning;
     Returning => if home then Idle else Returning;
-  };
+  }) else phase;
   work <- phase' == Working;
   return_device <- phase' == Returning;
   require !(work && return_device);
@@ -912,8 +1129,24 @@ DST와 자정 경계 정책도 일정 계약에 따라 적용한다.
 
 ```ghost
 control UsageLimit {
-  input request, usage_valid: Bool;
-  input used: Duration;
+  state displayed_device: Bool = false;
+  displayed_device' = if request_good && !request then false else if usage_valid_good && !usage_valid then false else if request_good && usage_valid_good && used_good then request && usage_valid && within_limit else displayed_device;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_request: Bool = false;
+  let request_good = case observed_request { ok(_) => true; fault(_) => false; };
+  let request = case observed_request { ok(value) => value; fault(_) => remembered_request; };
+  remembered_request' = request;
+  state remembered_usage_valid: Bool = false;
+  let usage_valid_good = case observed_usage_valid { ok(_) => true; fault(_) => false; };
+  let usage_valid = case observed_usage_valid { ok(value) => value; fault(_) => remembered_usage_valid; };
+  remembered_usage_valid' = usage_valid;
+  state remembered_used: Duration = 0ms;
+  let used_good = case observed_used { ok(_) => true; fault(_) => false; };
+  let used = case observed_used { ok(value) => value; fault(_) => remembered_used; };
+  remembered_used' = used;
+  input observed_request: Bool;
+  input observed_usage_valid: Bool;
+  input observed_used: Duration;
   output device: Bool;
   config max_use: Duration = 1h;
 
@@ -921,7 +1154,7 @@ control UsageLimit {
     ok(value) => used < value;
     fault(_) => false;
   };
-  device <- request && usage_valid && within_limit;
+  device <- displayed_device';
 }
 ```
 
@@ -965,7 +1198,12 @@ control UsageLimit {
 ```ghost
 input today_starts: Int;
 input count_valid: Bool;
-let wash_due = count_valid && today_starts >= 10;
+let wash_due = case count_valid {
+  ok(valid) => if valid then case today_starts {
+    ok(count) => count >= 10; fault(_) => false;
+  } else false;
+  fault(_) => false;
+};
 ```
 
 `today_starts`는 내장 이름이 아니다. 이 단편은 일일 카운터 자체를 선언하지 않는다.
@@ -1095,7 +1333,7 @@ GhostFlow에서 `widget = slider`처럼 특정 컴포넌트를 지정하는 문�
 **문법 근거**
 
 - `config`, `label`, `min`, `max`, `step`, `access`: [Reference §5.1 config 선언](reference/05-settings-and-observation.md#51-config-선언)
-- UI 모양과 언어 의미의 분리: [Reference §5.3 renderer 독립 관찰 모델](reference/05-settings-and-observation.md#53-renderer-독립-관찰-모델)
+- UI 모양과 언어 의미의 분리: [Reference §5.3 cabinet-view 독립 관찰 모델](reference/05-settings-and-observation.md#53-cabinet-view-독립-관찰-모델)
 - 설정 ID·타입·권한을 전달하는 설명: [Reference §5.3 descriptor와 snapshot](reference/05-settings-and-observation.md#descriptor와-snapshot)
 
 
@@ -1166,8 +1404,13 @@ config weekend_duration: Duration = 10min {
   access = operator;
   label = "주말 작동 시간";
 }
-let duration = if is_weekday then weekday_duration else weekend_duration;
-let can_start = calendar_valid;
+let duration = case is_weekday {
+  ok(weekday) => case (if weekday then weekday_duration else weekend_duration) {
+    ok(value) => present(value); fault(_) => absent;
+  };
+  fault(_) => absent;
+};
+let can_start = case calendar_valid { ok(valid) => valid; fault(_) => false; };
 ```
 
 시작 조건에 `can_start`를 함께 검사하고, 운전 시간 비교에 `duration`을 사용한다.
@@ -1207,14 +1450,40 @@ let can_start = calendar_valid;
 
 ```ghost
 control HolidayVentilation {
-  input is_holiday, calendar_valid: Bool;
-  input occupied, hot, stop: Bool;
+  state displayed_fan: Bool = false;
+  displayed_fan' = if calendar_valid_good && !calendar_valid then false else if stop_good && stop then false else if calendar_valid_good && hot_good && is_holiday_good && occupied_good && stop_good then calendar_valid && !stop && request else displayed_fan;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_is_holiday: Bool = false;
+  let is_holiday_good = case observed_is_holiday { ok(_) => true; fault(_) => false; };
+  let is_holiday = case observed_is_holiday { ok(value) => value; fault(_) => remembered_is_holiday; };
+  remembered_is_holiday' = is_holiday;
+  state remembered_calendar_valid: Bool = false;
+  let calendar_valid_good = case observed_calendar_valid { ok(_) => true; fault(_) => false; };
+  let calendar_valid = case observed_calendar_valid { ok(value) => value; fault(_) => remembered_calendar_valid; };
+  remembered_calendar_valid' = calendar_valid;
+  state remembered_occupied: Bool = false;
+  let occupied_good = case observed_occupied { ok(_) => true; fault(_) => false; };
+  let occupied = case observed_occupied { ok(value) => value; fault(_) => remembered_occupied; };
+  remembered_occupied' = occupied;
+  state remembered_hot: Bool = false;
+  let hot_good = case observed_hot { ok(_) => true; fault(_) => false; };
+  let hot = case observed_hot { ok(value) => value; fault(_) => remembered_hot; };
+  remembered_hot' = hot;
+  state remembered_stop: Bool = false;
+  let stop_good = case observed_stop { ok(_) => true; fault(_) => false; };
+  let stop = case observed_stop { ok(value) => value; fault(_) => remembered_stop; };
+  remembered_stop' = stop;
+  input observed_is_holiday: Bool;
+  input observed_calendar_valid: Bool;
+  input observed_occupied: Bool;
+  input observed_hot: Bool;
+  input observed_stop: Bool;
   output fan: Bool;
 
   let normal_request = occupied || hot;
   let holiday_request = hot;
   let request = if is_holiday then holiday_request else normal_request;
-  fan <- calendar_valid && !stop && request;
+  fan <- displayed_fan';
 }
 ```
 
@@ -1375,7 +1644,15 @@ when = tide_is(harbor_tides, tide`neap`);
 
 ```ghost
 input is_neap, tide_valid, schedule_due: Bool;
-let start_allowed = tide_valid && is_neap && schedule_due;
+let start_allowed = case tide_valid {
+  ok(valid) => if valid then case is_neap {
+    ok(neap) => if neap then case schedule_due {
+      ok(due) => due; fault(_) => false;
+    } else false;
+    fault(_) => false;
+  } else false;
+  fault(_) => false;
+};
 ```
 
 운전 상태가 대기 중일 때 `start_allowed`를 시작 조건으로 사용한다.
@@ -1415,14 +1692,29 @@ let start_allowed = tide_valid && is_neap && schedule_due;
 
 ```ghost
 control RestartAndWait {
-  input ready, start, stop: Bool;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_ready: Bool = false;
+  let ready_good = case observed_ready { ok(_) => true; fault(_) => false; };
+  let ready = case observed_ready { ok(value) => value; fault(_) => remembered_ready; };
+  remembered_ready' = ready;
+  state remembered_start: Bool = false;
+  let start_good = case observed_start { ok(_) => true; fault(_) => false; };
+  let start = case observed_start { ok(value) => value; fault(_) => remembered_start; };
+  remembered_start' = start;
+  state remembered_stop: Bool = false;
+  let stop_good = case observed_stop { ok(_) => true; fault(_) => false; };
+  let stop = case observed_stop { ok(value) => value; fault(_) => remembered_stop; };
+  remembered_stop' = stop;
+  input observed_ready: Bool;
+  input observed_start: Bool;
+  input observed_stop: Bool;
   output pump: Bool;
   state armed: Bool = false;
   state running: Bool = false;
 
   let start_event = armed && start;
-  armed' = ready && !stop && !start;
-  running' = ready && !stop && (running || start_event);
+  armed' = if ready_good && !ready then false else if stop_good && stop then false else if ready_good && start_good && stop_good then (ready && !stop && !start) else armed;
+  running' = if ready_good && !ready then false else if stop_good && stop then false else if ready_good && start_good && stop_good then (ready && !stop && (running || start_event)) else running;
   pump <- running';
 }
 ```
@@ -1434,7 +1726,7 @@ control RestartAndWait {
 복귀나 점검 같은 여러 단계가 필요하면 초기 enum 상태를 준비 단계로 두고,
 [19번](#q19)처럼 장치 피드백에 따라 다음 단계로 이동한다.
 이 규칙은 GhostFlow가 판단을 시작한 이후의 출력 의도다.
-전원 투입부터 첫 판단 전까지의 실제 핀·릴레이 상태는 Driver의 부팅 정책이 정한다.
+전원 투입부터 첫 판단 전까지의 실제 핀·릴레이 상태는 Device와 renderer의 부팅 정책이 정한다.
 
 **정전 전 작업을 이어 하는 것은 별도 정책이다.** 일반 운영 설정은 재시작 뒤에도 보존하지만,
 그 사실만으로 운전 단계나 타이머까지 자동 복원되는 것은 아니다.
@@ -1473,7 +1765,7 @@ control RestartAndWait {
 
 ```ghost
 control TemperatureMonitor {
-  sensor temperature: Number;
+  input temperature: Number;
   output high_temperature, sensor_fault: Bool;
 
   high_temperature <- case temperature {
@@ -1510,7 +1802,7 @@ control TemperatureMonitor {
 
 **문법 근거**
 
-- `sensor`, `ok(value)`, `fault(_)`: [Reference §4.1 sensor와 Result 품질](reference/04-sensors-constraints-control.md#41-sensor와-result-품질)
+- `input`, `ok(value)`, `fault(_)`: [Reference §4.1 sensor와 Result 품질](reference/04-sensors-constraints-control.md#41-sensor와-result-품질)
 - 단위·샘플·품질·복구 계약: [Reference §4.2 샘플 계약과 sensor 처리 순서](reference/04-sensors-constraints-control.md#42-샘플-계약과-sensor-처리-순서)
 - `Number`와 전용 물리량의 구분: [Reference §2.1 값 종류](reference/02-types-expressions-state.md#21-값-종류), [§2.9 물리량과 단위](reference/02-types-expressions-state.md#29-물리량과-단위)
 - `>=` 비교: [Reference §2.6 표현식과 연산자](reference/02-types-expressions-state.md#26-표현식과-연산자)
@@ -1533,7 +1825,7 @@ control TemperatureMonitor {
 예를 들어 [33번](#q33)의 논리 선언은 소스에 남는다.
 
 ```ghost
-sensor temperature: Number;
+input temperature: Number;
 ```
 
 센서 A를 B로 바꾸는 것은 다음 연결을 바꾸는 일이다. 아래는 파일 형식이나 실행 문법이 아닌 설명이다.
@@ -1564,7 +1856,7 @@ B가 같은 입력 계약을 만족하면 제어 소스는 그대로 둘 수 있
 **문법 근거**
 
 - 정본 `.ghost.md` 문서: [Reference §1.1 왜 문서 하나가 소스인가](reference/01-source-and-syntax.md#11-왜-문서-하나가-소스인가)
-- `sensor` 선언: [Reference §4.1 sensor와 Result 품질](reference/04-sensors-constraints-control.md#41-sensor와-result-품질)
+- `input` 선언: [Reference §4.1 sensor와 Result 품질](reference/04-sensors-constraints-control.md#41-sensor와-result-품질)
 - 소스에 선언하는 샘플·필터·유효성 규칙: [Reference §4.2 샘플 계약과 sensor 처리 순서](reference/04-sensors-constraints-control.md#42-샘플-계약과-sensor-처리-순서)
 - 논리 역할과 물리 endpoint: [Reference §6.2 definition, instance와 논리 port](reference/06-composition-and-replay.md#62-definition-instance와-논리-port)
 - 각 변경의 별도 생명주기: [Reference §6.3 parameters, settings, dependencies와 bindings](reference/06-composition-and-replay.md#63-parameters-settings-dependencies와-bindings)
@@ -1588,7 +1880,7 @@ Word가 프린터마다 다시 컴파일되는 대신 공통 인쇄 인터페이
 예를 들어 아래 **단편**은 온도를 공급하는 제조사나 통신 방식을 지정하지 않는다.
 
 ```ghost
-sensor temperature: Number;
+input temperature: Number;
 ```
 
 설치 계약이 이 값을 섭씨 온도로 정의했다면 새 Driver도 같은 의미의 값과 품질 정보를 공급한다.
@@ -1605,7 +1897,7 @@ Driver를 추가하거나 바꾸는 방법은 실행 환경의 책임이다.
 
 **문법 근거**
 
-- `sensor`와 정상값·오류 계약: [Reference §4.1 sensor와 Result 품질](reference/04-sensors-constraints-control.md#41-sensor와-result-품질)
+- `input`와 정상값·오류 계약: [Reference §4.1 sensor와 Result 품질](reference/04-sensors-constraints-control.md#41-sensor와-result-품질)
 - Driver가 제공하는 샘플·품질 정보: [Reference §4.2 샘플 계약과 sensor 처리 순서](reference/04-sensors-constraints-control.md#42-샘플-계약과-sensor-처리-순서)
 - 논리 port와 물리 endpoint의 분리: [Reference §6.2 definition, instance와 논리 port](reference/06-composition-and-replay.md#62-definition-instance와-논리-port)
 - 소스와 별도로 변경하는 binding: [Reference §6.3 parameters, settings, dependencies와 bindings](reference/06-composition-and-replay.md#63-parameters-settings-dependencies와-bindings)
@@ -1638,9 +1930,16 @@ Reference §6.3에 이 원칙을 둔다. FAQ는 [35번](#q35)의 비유와 예�
 
 ```ghost
 control ButtonRequest {
-  input start: Bool;
+  state displayed_request: Bool = false;
+  displayed_request' = if start_good && !start then false else if start_good then start else displayed_request;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_start: Bool = false;
+  let start_good = case observed_start { ok(_) => true; fault(_) => false; };
+  let start = case observed_start { ok(value) => value; fault(_) => remembered_start; };
+  remembered_start' = start;
+  input observed_start: Bool;
   output request: Bool;
-  request <- start;
+  request <- displayed_request';
 }
 ```
 
@@ -1681,9 +1980,21 @@ control ButtonRequest {
 
 ```ghost
 control PumpRequest {
-  input run_request, stop: Bool;
+  state displayed_pump: Bool = false;
+  displayed_pump' = if run_request_good && !run_request then false else if stop_good && stop then false else if run_request_good && stop_good then run_request && !stop else displayed_pump;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_run_request: Bool = false;
+  let run_request_good = case observed_run_request { ok(_) => true; fault(_) => false; };
+  let run_request = case observed_run_request { ok(value) => value; fault(_) => remembered_run_request; };
+  remembered_run_request' = run_request;
+  state remembered_stop: Bool = false;
+  let stop_good = case observed_stop { ok(_) => true; fault(_) => false; };
+  let stop = case observed_stop { ok(value) => value; fault(_) => remembered_stop; };
+  remembered_stop' = stop;
+  input observed_run_request: Bool;
+  input observed_stop: Bool;
   output pump: Bool;
-  pump <- run_request && !stop;
+  pump <- displayed_pump';
 }
 ```
 
@@ -1691,11 +2002,11 @@ control PumpRequest {
 다음은 연결 설명이며 binding 파일의 문법은 아니다.
 
 ```text
-변경 전: 논리 출력 pump → 출력 Driver → GPIO A → 릴레이 A
-변경 후: 논리 출력 pump → 출력 Driver → GPIO B → 릴레이 B
+변경 전: 논리 출력 pump → 출력 renderer → GPIO A → 릴레이 A
+변경 후: 논리 출력 pump → 출력 renderer → GPIO B → 릴레이 B
 ```
 
-새 릴레이가 LOW에서 켜지는 방식이라면 Driver·설치 설정에서 극성을 맞춰
+새 릴레이가 LOW에서 켜지는 방식이라면 renderer·설치 설정에서 극성을 맞춰
 동일한 운전 요청을 수행하게 한다. 부팅·장애 시 실제 출력값도 그 경계에서 정한다.
 논리 출력의 타입이 `Bool`이라는 사실만으로 핀의 출력 가능 여부, 전기적 구동 조건,
 접점 정격·배선과 연결 부하의 호환성이 보장되지는 않는다.
@@ -1709,7 +2020,7 @@ control PumpRequest {
 프로그램 재컴파일이 불필요하다는 사실이 운전 중 무중단 배선 교체를 허용하지는 않는다.
 
 **왜 논리 출력과 GPIO를 나누나요?** 제어는 “펌프를 운전한다”는 의도를 표현하고,
-Driver와 설치 연결은 해당 릴레이에 필요한 전기 신호로 그 의도를 적용하기 때문이다.
+renderer와 설치 연결은 해당 릴레이에 필요한 전기 신호로 그 의도를 적용하기 때문이다.
 
 **문법 근거**
 
@@ -1724,22 +2035,36 @@ Driver와 설치 연결은 해당 릴레이에 필요한 전기 신호로 그 �
 ## 39. Waveshare 같은 확장 보드로 출력 수를 늘릴 수 있나요?
 
 가능하다. **논리 출력을 직접 GPIO뿐 아니라 확장 장치의 채널에도 연결할 수 있다.**
-Driver가 확장 장치의 통신과 채널 제어를 맡고, binding이 각 논리 출력을 해당 채널에 연결한다.
+renderer가 확장 장치의 통신과 출력 채널 제어를 맡고, binding이 각 논리 출력을 해당 채널에 연결한다.
 
 ```ghost
 control TwoRelayRequests {
-  input request1, request2: Bool;
+  state displayed_relay1: Bool = false;
+  displayed_relay1' = if request1_good && !request1 then false else if request1_good then request1 else displayed_relay1;
+  state displayed_relay2: Bool = false;
+  displayed_relay2' = if request2_good && !request2 then false else if request2_good then request2 else displayed_relay2;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_request1: Bool = false;
+  let request1_good = case observed_request1 { ok(_) => true; fault(_) => false; };
+  let request1 = case observed_request1 { ok(value) => value; fault(_) => remembered_request1; };
+  remembered_request1' = request1;
+  state remembered_request2: Bool = false;
+  let request2_good = case observed_request2 { ok(_) => true; fault(_) => false; };
+  let request2 = case observed_request2 { ok(value) => value; fault(_) => remembered_request2; };
+  remembered_request2' = request2;
+  input observed_request1: Bool;
+  input observed_request2: Bool;
   output relay1, relay2: Bool;
-  relay1 <- request1;
-  relay2 <- request2;
+  relay1 <- displayed_relay1';
+  relay2 <- displayed_relay2';
 }
 ```
 
 다음은 설치 연결 설명이며 binding 파일의 문법은 아니다.
 
 ```text
-relay1 → 확장 출력 Driver → 확장 보드 1번 채널
-relay2 → 확장 출력 Driver → 확장 보드 2번 채널
+relay1 → 확장 출력 renderer → 확장 보드 1번 채널
+relay2 → 확장 출력 renderer → 확장 보드 2번 채널
 ```
 
 예를 들어 [Waveshare Modbus RTU Relay 16CH 공식 문서](https://www.waveshare.com/wiki/Modbus_RTU_Relay_16CH)는
@@ -1750,14 +2075,14 @@ Waveshare라는 제조사 이름만으로 모든 보드의 통신 방식이 같�
 **단순 멀티플렉서와 독립 출력 확장은 구분한다.**
 예를 들어 [TI CD74HC4067](https://www.ti.com/product/CD74HC4067)은 공통 신호에 연결할 채널을 선택하는 소자다.
 그 자체로 여러 릴레이의 ON/OFF 상태를 각각 유지하는 출력 장치가 되지는 않는다.
-독립적인 지속 출력을 원하면 각 채널의 상태를 유지할 수 있는 확장 장치·회로와 Driver 계약이 필요하다.
+독립적인 지속 출력을 원하면 각 채널의 상태를 유지할 수 있는 확장 장치·회로와 renderer 계약이 필요하다.
 
 기존 논리 출력을 호환되는 확장 채널로 옮기는 경우에는 제어 소스 수정이나 재컴파일이 필요 없다.
 다만 새 장치들을 위한 논리 출력과 제어 동작까지 추가한다면 그 부분은 프로그램 변경이다.
-Driver는 필요한 채널 수·갱신 시간·출력 유지·통신 장애 시 동작을 만족해야 한다.
+renderer는 필요한 채널 수·갱신 시간·출력 유지·통신 장애 시 동작을 만족해야 한다.
 한 tick에서 여러 출력을 계산했다는 사실만으로 물리 릴레이가 동시에 전환되는 것은 아니다.
 
-**왜 확장 방식은 Driver에 두나요?** 같은 제어 의도를 직접 GPIO, 확장 칩, 통신형 릴레이에
+**왜 확장 방식은 renderer에 두나요?** 같은 제어 의도를 직접 GPIO, 확장 칩, 통신형 릴레이에
 연결할 때마다 제어 코드에 버스 명령과 채널 주소를 넣지 않도록 하기 위해서다.
 
 **문법 근거**
@@ -1771,7 +2096,7 @@ Driver는 필요한 채널 수·갱신 시간·출력 유지·통신 장애 시 
 ## 40. RS485 I/O 확장 보드의 입력과 출력도 매핑할 수 있나요?
 
 가능하다. **보드의 각 입력·출력 채널을 GhostFlow의 논리 port에 연결한다.**
-Driver는 해당 보드의 통신 규약에 따라 입력을 읽고 출력 명령을 전달한다.
+입력 driver는 해당 보드의 통신 규약에 따라 입력을 읽고 출력 renderer는 출력 명령을 전달한다.
 제어 소스에는 RS485 주소나 통신 명령을 넣지 않는다.
 
 다음은 설치 매핑의 설명 예다. 실행 문법이나 통신 프레임 형식이 아니다.
@@ -1779,16 +2104,28 @@ Driver는 해당 보드의 통신 규약에 따라 입력을 읽고 출력 명�
 ```text
 보드 주소 1, DI 채널 1 → 입력 Driver → 논리 입력 start
 보드 주소 1, DI 채널 2 → 입력 Driver → 논리 입력 stop
-논리 출력 pump → 출력 Driver → 보드 주소 1, DO 채널 3
+논리 출력 pump → 출력 renderer → 보드 주소 1, DO 채널 3
 ```
 
 이 연결을 사용하는 제어 프로그램은 직접 GPIO를 사용할 때와 같다.
 
 ```ghost
 control RemoteIoRequest {
-  input start, stop: Bool;
+  state displayed_pump: Bool = false;
+  displayed_pump' = if start_good && !start then false else if stop_good && stop then false else if start_good && stop_good then start && !stop else displayed_pump;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_start: Bool = false;
+  let start_good = case observed_start { ok(_) => true; fault(_) => false; };
+  let start = case observed_start { ok(value) => value; fault(_) => remembered_start; };
+  remembered_start' = start;
+  state remembered_stop: Bool = false;
+  let stop_good = case observed_stop { ok(_) => true; fault(_) => false; };
+  let stop = case observed_stop { ok(value) => value; fault(_) => remembered_stop; };
+  remembered_stop' = stop;
+  input observed_start: Bool;
+  input observed_stop: Bool;
   output pump: Bool;
-  pump <- start && !stop;
+  pump <- displayed_pump';
 }
 ```
 
@@ -1799,7 +2136,7 @@ RS485 연결이라는 사실만으로 통신 명령까지 같아지는 것은 �
 
 입력의 갱신 주기·유효성 및 통신 장애 처리는 기존 논리 입력 계약을 만족해야 한다.
 위 코드의 Bool 입력 두 개가 통신 장애를 자동 감지하는 것은 아니다.
-측정 입력의 정상·오류를 제어에서 구분해야 한다면 [33번](#q33)의 `sensor` 계약을 사용한다.
+측정 입력의 정상·오류를 제어에서 구분해야 한다면 [33번](#q33)의 `input` 계약을 사용한다.
 출력 명령 전송이나 응답도 실제 접점·설비 동작 확인과 구분한다.
 
 기존 입력·출력을 호환되는 RS485 채널로 옮기는 경우에는 binding을 바꾸고

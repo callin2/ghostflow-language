@@ -1,3 +1,4 @@
+import { softwareQualityObservations } from './helpers/software-quality-observations.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -15,8 +16,8 @@ const cell = doc(`control Cell {
   input trigger, stop: Bool;
   state held: Bool = false;
   state pulses: Int = 0;
-  held' = !stop && (held || trigger);
-  pulses' = if trigger && !held then pulses + 1 else pulses;
+  held' = !(stop |> recover(false)) && (held || (trigger |> recover(false)));
+  pulses' = if (trigger |> recover(false)) && !held then pulses + 1 else pulses;
   output active, previous: Bool;
   output total: Int;
   active <- held';
@@ -26,14 +27,14 @@ const cell = doc(`control Cell {
 const follower = doc(`control Follower {
   input previous: Bool;
   state seen: Bool = false;
-  seen' = previous;
+  seen' = previous |> recover(false);
   output active: Bool;
   active <- seen';
 }`);
-const pin = (alias, filename, text) => `import ${alias} from "./${filename}" revision "r1" sha256 "${sha256Hex(text)}";`;
+const pin = (alias, filename, text) => `import ${alias} from "./${filename}" revision "input-v1" sha256 "${sha256Hex(text)}";`;
 const closure = [
-  { filename: 'cell.ghost.md', revision: 'r1', text: cell },
-  { filename: 'follower.ghost.md', revision: 'r1', text: follower },
+  { filename: 'cell.ghost.md', revision: 'input-v1', text: cell },
+  { filename: 'follower.ghost.md', revision: 'input-v1', text: follower },
 ];
 const wasm = fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
 const nativePath = fileURLToPath(new URL('../target/release/examples/scan_tape' + (process.platform === 'win32' ? '.exe' : ''), import.meta.url));
@@ -54,7 +55,7 @@ async function compile(ordered, supplied = closure) {
 }
 
 async function execute(artifact, snapshots) {
-  const runtime = await ControlRuntime.instantiateFramed(wasm, artifact);
+  const runtime = softwareQualityObservations(await ControlRuntime.instantiateFramed(wasm, artifact));
   const frames = [], outcomes = [], dispatch = runtime.runtime.dispatch.bind(runtime.runtime);
   runtime.runtime.dispatch = frame => {
     frames.push(structuredClone(frame));
@@ -168,7 +169,7 @@ test('REF-06-013 reversed import closure and dependency traversal preserve previ
 });
 
 test('REF-06-013 declaration order cannot authorize combinational cycles or transitive same-tick next-state reads', async () => {
-  const wire = doc('control Wire { input start: Bool; output result: Bool; result <- start; }');
+  const wire = doc('control Wire { input start: Bool; output result: Bool; result <- start |> recover(false); }');
   for (const reversed of [false, true]) {
     const declarations = ['instance east: Wire;', 'instance west: Wire;'];
     const connections = ['connect east.start <- west.result;', 'connect west.start <- east.result;'];
@@ -177,7 +178,7 @@ test('REF-06-013 declaration order cannot authorize combinational cycles or tran
       ${(reversed ? [...connections].reverse() : connections).join('\n')}
     }`);
     await assert.rejects(() => compileSource(source, { filename: 'cycle.ghost.md',
-      sourceClosure: [{ filename: 'wire.ghost.md', revision: 'r1', text: wire }] }), /combinational port cycle/);
+      sourceClosure: [{ filename: 'wire.ghost.md', revision: 'input-v1', text: wire }] }), /combinational port cycle/);
     const invalid = doc(`${pin('Cell', 'cell.ghost.md', cell)}\n${pin('Follower', 'follower.ghost.md', follower)}\ncontrol NextRead {
       input trigger, stop: Bool;
       ${(reversed ? ['instance consumer: Follower;', 'instance producer: Cell;'] : ['instance producer: Cell;', 'instance consumer: Follower;']).join('\n')}

@@ -1,7 +1,14 @@
+// Explicit temporal fixture revision: issue531-quality-temporal-v1; predecessor retained in fixtures/history/issue531/temporal.
 import assert from 'node:assert/strict';
+import { softwareQualityObservations, softwareQualityRails } from './helpers/software-quality-observations.mjs';
+const ControlRuntime = {
+  instantiate: async (...args) => softwareQualityObservations(await BaseControlRuntime.instantiate(...args)),
+  instantiateFramed: async (...args) => softwareQualityObservations(await BaseControlRuntime.instantiateFramed(...args)),
+};
+
 import fs from 'node:fs';
 import test from 'node:test';
-import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
+import { ControlRuntime as BaseControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 import { compileSource } from '../tools/toolchain.mjs';
 
 const wasm = fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
@@ -16,7 +23,7 @@ control NativeSolar {
     longitude = 0.0;
     at = sun\`rise\`;
     basis = pulse;
-    when = allow;
+    when = allow |> recover(false);
     clock = trusted_only;
     gap = skip_after(60s);
     recovery = baseline;

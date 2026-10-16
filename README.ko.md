@@ -71,7 +71,7 @@ flowchart TB
   source --> compiler
   conditions["입력 · 이전 상태<br>유효 설정 · 시간"] --> core
   subgraph external["외부 소유권 · 호스트 / Device"]
-    driver["호스트 / 드라이버<br>바인딩 · 출력 적용"]
+    driver["호스트 / renderer<br>바인딩 · 출력 적용"]
     world["물리적 세계<br>적용 / 확인 증거"]
     driver --> world
   end
@@ -84,7 +84,7 @@ flowchart TB
   linkStyle default stroke:#526d76,color:#102b35
 ```
 
-언어는 요청 의도와 안전 의도를 계산합니다. 호스트와 드라이버가 물리적 효과를
+언어는 요청 의도와 안전 의도를 계산합니다. 호스트와 renderer가 물리적 효과를
 적용합니다. **의도가 있다는 것은 릴레이가 움직였다는 확인이 아닙니다.**
 재현 실행은 가상 판단을 확인합니다. 물리적 확인에는 별도의 장치 증거가 필요합니다.
 
@@ -167,3 +167,6 @@ GhostFlow는 **1.0 이전** 단계입니다. 참조 문서는 구현된 의미�
 `tests/docs-runnable-examples.test.mjs`로도 검사합니다.
 
 [MIT License](LICENSE)로 배포됩니다.
+
+<!-- windows-dev-restoration-20261014 -->
+Windows 로컬 작업 복원: [보존 소스, 문서와 정확한 복원 참조](history/windows-20261014/DEV-RESTORATION.txt). 비활성 참고 이력이며, 현재 코드와 의존성 pin이 기준입니다.

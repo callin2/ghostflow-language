@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { EstimateEvidenceRuntime, encodeEstimateConfig, encodeEstimateEvaluation, ESTIMATE_MAX_PACKET } from '../runtimes/wasm/estimate-evidence.mjs';
 const context = { identities: Array.from({ length: 7 }, (_, i) => (i + 1).toString(16).padStart(2, '0').repeat(32)), run: '18446744073709551615', timeEpoch: '2', sourceEpoch: '3' };
 const reference = { context, establishedMs: '10', initialSequence: '0', uncertainty: { meaning: 'ab'.repeat(32), bound: null } };
@@ -12,7 +13,7 @@ const evaluation = (nowMs, records = [ack], changes = {}) => ({ context, nowMs, 
   history: { initialSequence: '0', currentSequence: String(records.length), observedFromMs: '10', observedThroughMs: nowMs, complete: true, records }, ...changes });
 async function compare(config, attempts) {
   const packets = attempts.map(a => a instanceof Uint8Array ? a : encodeEstimateEvaluation(a));
-  const native = spawnSync(new URL('../target/release/examples/estimate_evidence', import.meta.url).pathname, [], {
+  const native = spawnSync(fileURLToPath(new URL(`../target/release/examples/estimate_evidence${process.platform === 'win32' ? '.exe' : ''}`, import.meta.url)), [], {
     input: [encodeEstimateConfig(config), ...packets].map(b => Buffer.from(b).toString('hex')).join('\n') + '\n', encoding: 'utf8', timeout: 10000,
   });
   assert.equal(native.status, 0, native.stderr);

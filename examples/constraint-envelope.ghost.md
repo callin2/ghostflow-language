@@ -11,9 +11,23 @@ outputs: the pump needs a ready valve, and the two direction outputs cannot
 be active together. They do not select an automatic/manual arbitration policy
 or certify that any output was applied to hardware.
 
+Explicit input-quality-v1 revision: unknown producer data retains this virtual example’s last observation. Initial false initializes source-local observation memory. The original document is preserved separately.
+
 ```ghost
 control OutputEnvelope {
-  input start, valve_ready, forward_request, reverse_request: Bool;
+  input observed_start, observed_valve_ready, observed_forward_request, observed_reverse_request: Bool;
+  state remembered_start: Bool = false;
+  let start = case observed_start { ok(value) => value; fault(_) => remembered_start; };
+  remembered_start' = start;
+  state remembered_valve_ready: Bool = false;
+  let valve_ready = case observed_valve_ready { ok(value) => value; fault(_) => remembered_valve_ready; };
+  remembered_valve_ready' = valve_ready;
+  state remembered_forward_request: Bool = false;
+  let forward_request = case observed_forward_request { ok(value) => value; fault(_) => remembered_forward_request; };
+  remembered_forward_request' = forward_request;
+  state remembered_reverse_request: Bool = false;
+  let reverse_request = case observed_reverse_request { ok(value) => value; fault(_) => remembered_reverse_request; };
+  remembered_reverse_request' = reverse_request;
   output pump, valve, forward, reverse: Bool;
   pump <- start;
   valve <- valve_ready;

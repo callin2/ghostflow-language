@@ -15,6 +15,7 @@ import {
 } from '../tools/interaction-runtime-snapshot.mjs';
 import { verifyInteractionCorpus } from '../contracts/interaction-v0/verify-corpus.mjs';
 import { FramedGhostFlowRuntime } from '../runtimes/wasm/framed-runtime.mjs';
+import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 import { canonicalJson } from '../tools/canonical-json.mjs';
 import { buildPortablePackage, verifyPortablePackage } from '../tools/portable-package.mjs';
 
@@ -87,7 +88,7 @@ test('REF-01-055 typed values retain identity through verified portable handoff,
   ];
   assert.deepEqual(received.interactionSchema.descriptors.map(descriptor => [descriptor.id, descriptor.sourceType]), expectedTypes);
   const scans = [{ completion: { kind: 'completed-scan', scanId: 0, logicalTimeMs: 100 }, inputs: [] }];
-  const native = nativeRun(received, scans);
+  const native = await nativeRun(received, scans);
   const wasm = await wasmRun(received, scans);
   assert.deepEqual(wasm, native);
   assert.deepEqual(await wasmRun(received, scans), wasm);
@@ -126,7 +127,7 @@ The pump follows the enable input without authored state or a timer.
 control DirectOutput {
   input enabled: Bool;
   output pump: Bool;
-  pump <- enabled;
+  pump <- enabled |> recover(false);
 }
 \`\`\`
 `;
@@ -170,7 +171,25 @@ function tsv(scans) {
   ].join('\t')).join('\n')}\n`;
 }
 
-function nativeRun(artifact, scans) {
+async function acquiredScans(artifact, scans) {
+  if (!artifact.manifest.sensors.length) return scans;
+  const acquisition = await ControlRuntime.instantiate(wasmBytes, artifact);
+  try {
+    return scans.map(scan => {
+      const nowMs = scan.completion.logicalTimeMs;
+      const samples = Object.fromEntries(scan.inputs.map(input => [input.name,
+        { epoch: 1, id: scan.completion.scanId + 1, timestampMs: nowMs,
+          quality: 'Good', value: input.value }]));
+      const result = acquisition.step({ nowMs, samples });
+      return { ...scan, inputs: Object.entries(result.vm.inputs)
+        .filter(([name]) => name !== '__gf_now_ms')
+        .map(([name, value]) => ({ name, value })) };
+    });
+  } finally { acquisition.dispose(); }
+}
+
+async function nativeRun(artifact, scans) {
+  scans = await acquiredScans(artifact, scans);
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-interaction-snapshot-'));
   try {
     const modulePath = path.join(directory, 'module.gfb');
@@ -186,6 +205,7 @@ function nativeRun(artifact, scans) {
 }
 
 async function wasmRun(artifact, scans) {
+  scans = await acquiredScans(artifact, scans);
   const runtime = await FramedGhostFlowRuntime.instantiate(wasmBytes);
   try {
     runtime.load(artifact.bytes);
@@ -210,6 +230,7 @@ function controlShape(outcome) {
 }
 
 async function executeWasm(artifact, run, mode) {
+  const acquired = await acquiredScans(artifact, run.scans);
   const runtime = await FramedGhostFlowRuntime.instantiate(wasmBytes);
   const outcomes = [];
   const snapshots = [];
@@ -230,7 +251,7 @@ async function executeWasm(artifact, run, mode) {
     runtime.load(artifact.bytes);
     for (const output of artifact.manifest.outputs) runtime.addCapability('actuator', output.name, output.type === 'Bool' ? 'bool' : 'number');
     runtime.activate();
-    for (const scan of run.scans) {
+    for (const scan of acquired) {
       const outcome = structuredClone(runtime.scan({
         scanId: scan.completion.scanId,
         logicalTimeMs: scan.completion.logicalTimeMs,
@@ -260,7 +281,7 @@ test('GF-TEST-interaction-runtime-snapshot: exact corpus source/tape produces id
     assert.equal(sha256(read(fixture.sourcePath)), fixture.source.sha256, `${fixture.caseId}: exact canonical literate source hash`);
     assert.equal(tapeDigest(tape), tape.digest.sha256, `${fixture.caseId}: exact canonical scan-tape digest`);
     for (const run of tape.runs) {
-      const native = nativeRun(artifact, run.scans);
+      const native = await nativeRun(artifact, run.scans);
       const wasm = await wasmRun(artifact, run.scans);
       assert.deepEqual(wasm, native, `${fixture.caseId}/${run.runId}: completed scan outcomes must match`);
       const nativeSnapshots = native.map((outcome, index) => emitCompletedScanSnapshot({
@@ -526,7 +547,7 @@ control StateOnly {
   // ghostflow:link id=GF-INT-FIXTURE-STATE-ONLY-V0 relation=implements
   state active: Bool = false;
 
-  active' = enabled;
+  active' = case enabled { ok(value) => value; fault(_) => active; };
   active_output <- active';
 }
 \`\`\`
@@ -572,7 +593,7 @@ test('GF-TEST-interaction-runtime-snapshot-empty: direct control preserves nativ
     completion: { kind: 'completed-scan', scanId: 0, logicalTimeMs: 125 },
     inputs: [{ name: 'enabled', value: true }],
   }];
-  const native = nativeRun(artifact, scans);
+  const native = await nativeRun(artifact, scans);
   const wasm = await wasmRun(artifact, scans);
   assert.deepEqual(wasm, native);
   assert.equal(wasm[0].trace.safe.pump, true);

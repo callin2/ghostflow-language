@@ -20,7 +20,10 @@ the stop path and overload protection respectively permit operation. Outputs
 are logical commands to the forward/reverse contactor coils, not evidence of
 actual motor rotation.
 
+This explicit quality-input revision preserves the healthy replay. Unavailable START requests cannot start or rearm; an existing run may continue while STOP and protection remain healthy and permitted. Unavailable STOP or protection removes permission. Recovery requires healthy release and a new START request. The previous source is retained as non-executable history at `tests/fixtures/history/issue531/pc-04-direction-interlock.ghost.en.md.pre-input.txt`.
+
 ```ghost
+// Source revision: issue531-approved-fault-restart-v1
 control DirectionChangeInterlock {
   input forward_start, reverse_start, stop_ok, overload_ok: Bool;
   output forward_contactor, reverse_contactor: Bool;
@@ -35,12 +38,22 @@ control DirectionChangeInterlock {
   // ghostflow:link id=GF-INT-PC04-DIRECTION-INTERLOCK-V1 relation=implements
   timer age = elapsed(phase);
 
-  let permit = stop_ok && overload_ok;
-  let ambiguous = forward_start && reverse_start;
-  let forward_event = start_armed && forward_start && !reverse_start;
-  let reverse_event = start_armed && reverse_start && !forward_start;
+  let forward_start_good = case forward_start { ok(_) => true; fault(_) => false; };
+  let forward_start_value = forward_start |> recover(false);
+  let reverse_start_good = case reverse_start { ok(_) => true; fault(_) => false; };
+  let reverse_start_value = reverse_start |> recover(false);
+  let stop_ok_good = case stop_ok { ok(_) => true; fault(_) => false; };
+  let stop_ok_value = stop_ok |> recover(false);
+  let overload_ok_good = case overload_ok { ok(_) => true; fault(_) => false; };
+  let overload_ok_value = overload_ok |> recover(false);
 
-  start_armed' = permit && !forward_start && !reverse_start;
+  let permit = stop_ok_value && overload_ok_value;
+  let requests_good = forward_start_good && reverse_start_good;
+  let ambiguous = forward_start_value && reverse_start_value;
+  let forward_event = requests_good && start_armed && forward_start_value && !reverse_start_value;
+  let reverse_event = requests_good && start_armed && reverse_start_value && !forward_start_value;
+
+  start_armed' = requests_good && permit && !forward_start_value && !reverse_start_value;
 
   phase' = case phase {
     Stopped =>

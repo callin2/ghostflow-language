@@ -1,4 +1,11 @@
+// Explicit temporal fixture revision: issue531-quality-temporal-v1; predecessor retained in fixtures/history/issue531/temporal.
 import assert from 'node:assert/strict';
+import { softwareQualityObservations, softwareQualityRails } from './helpers/software-quality-observations.mjs';
+const ControlRuntime = {
+  instantiate: async (...args) => softwareQualityObservations(await BaseControlRuntime.instantiate(...args)),
+  instantiateFramed: async (...args) => softwareQualityObservations(await BaseControlRuntime.instantiateFramed(...args)),
+};
+
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -7,7 +14,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { compile, parse, tokenize } from '../tools/gfb1.mjs';
 import { GhostFlowRuntime } from '../runtimes/wasm/ghostflow-runtime.mjs';
-import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
+import { ControlRuntime as BaseControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 import { compileSource } from './helpers/literate-compile.mjs';
 
 const nativePath = fileURLToPath(new URL('../target/release/examples/run', import.meta.url));
@@ -93,8 +100,14 @@ test('GF-TEST-datetime-guard-loader: unsupported profile, operand and stack shap
 
 test('GF-TEST-datetime-calendar-monotonic: public DateTime shifts and wall corrections preserve elapsed time and atomic native/WASM state', async t => {
   const artifact = await compileSource(`control CalendarAndElapsed {
-    input wall: DateTime;
-    input offset: Duration;
+    input observed_wall: DateTime;
+    input observed_offset: Duration;
+    state previous_wall: DateTime = datetime\`1970-01-01T00:00:00Z\`;
+    state previous_offset: Duration = 0ms;
+    let wall = case observed_wall { ok(value) => value; fault(_) => previous_wall; };
+    let offset = case observed_offset { ok(value) => value; fault(_) => previous_offset; };
+    previous_wall' = wall;
+    previous_offset' = offset;
     state running: Bool = false;
     state accepted: Int = 0;
     timer age = elapsed(running);
@@ -120,8 +133,9 @@ test('GF-TEST-datetime-calendar-monotonic: public DateTime shifts and wall corre
     { mono: 40, wall: 0, offset: 0, elapsed: 40 },
     { mono: 50, wall: MAX, offset: 0, elapsed: 50 },
   ];
-  const outcomes = native(t, artifact.bytes, 'wall,offset,__gf_now_ms',
-    attempts.map(({ mono, wall, offset }) => `${wall},${offset},${mono}`));
+  const packets = attempts.map(({ mono, wall, offset }, index) => ({ ...softwareQualityRails(artifact, { observed_wall: wall, observed_offset: offset }, index + 1, mono), __gf_now_ms: mono }));
+  const columns = Object.keys(packets[0]);
+  const outcomes = native(t, artifact.bytes, columns.join(','), packets.map(packet => columns.map(name => packet[name]).join(',')));
   const runtime = await ControlRuntime.instantiateFramed(fs.readFileSync(wasmPath), artifact);
   t.after(() => runtime.dispose());
   let committed, accepted = 0;
@@ -129,12 +143,12 @@ test('GF-TEST-datetime-calendar-monotonic: public DateTime shifts and wall corre
     if (error) {
       assert.equal(outcomes[index].error, error);
       assert.equal(outcomes[index].journalLength, accepted);
-      assert.throws(() => runtime.step({ nowMs: mono, inputs: { wall, offset } }), new RegExp(error));
+      assert.throws(() => runtime.step({ nowMs: mono, inputs: { observed_wall: wall, observed_offset: offset } }), new RegExp(error));
       assert.deepEqual(runtime.lastFrameOutcome, committed,
         'failed shift preserves frame, state, outputs and elapsed reference');
       return;
     }
-    const result = runtime.step({ nowMs: mono, inputs: { wall, offset } });
+    const result = runtime.step({ nowMs: mono, inputs: { observed_wall: wall, observed_offset: offset } });
     accepted++;
     assert.deepEqual(result.vm.safe, {
       after: wall + offset, before: wall - offset, elapsed_ms: elapsed,

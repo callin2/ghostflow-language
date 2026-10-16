@@ -1,0 +1,306 @@
+{
+  "format": "GhostFlow/diagnostic-fixture-history-v1",
+  "base": "c8a5d37",
+  "files": [
+    {
+      "path": "tests/compiler.test.mjs",
+      "originalSha256": "b4f2e0a4d8bfccadbd42b51819084553e94b3c65ef839424c764e715b3cd1ebc",
+      "excerpts": [
+        {
+          "startLine": 27,
+          "endLine": 27,
+          "sha256": "7be8bdb3444f6c7f2934e6381889a7a85ae0c51381672e15d837a6d0f2877099",
+          "source": "      assert.match(error.message, /input declarations are type-only; the host supplies input values/);\n"
+        },
+        {
+          "startLine": 45,
+          "endLine": 45,
+          "sha256": "7be8bdb3444f6c7f2934e6381889a7a85ae0c51381672e15d837a6d0f2877099",
+          "source": "      assert.match(error.message, /input declarations are type-only; the host supplies input values/);\n"
+        },
+        {
+          "startLine": 53,
+          "endLine": 53,
+          "sha256": "ce527206205aa4373f386fff4fcd3f77c02bb97d4bce15d7e0810fa7d774f4f6",
+          "source": "    '  input x, y: Bool;', '  state active: Bool = false;', \"  active' = x && y;\",\n"
+        },
+        {
+          "startLine": 57,
+          "endLine": 57,
+          "sha256": "a5ea72e1904a4188db0546e147ccdbd862d0c8693abc001b8a15ecf9e7ab6f51",
+          "source": "  assert.deepEqual(result.manifest.inputs, [{ name: 'x', type: 'Bool' }, { name: 'y', type: 'Bool' }]);\n"
+        }
+      ]
+    },
+    {
+      "path": "tests/compiler-syntax-structure.test.mjs",
+      "originalSha256": "9b3697ef7bd8270771590cc8fd991129f71e5115a38e1dbb07da79e71803d3d8",
+      "excerpts": [
+        {
+          "startLine": 62,
+          "endLine": 63,
+          "sha256": "1e66d91e7ffabc22234b9af37c3f5f4f343511db22e108d43b4dfba36d70441a",
+          "source": "    bad: 'control Bad { sensor moisture: Percent; let transform = map(below(35%)) >> §; output dry: Bool; dry <- moisture |> recover(false); }',\n    good: 'control Good { sensor moisture: Percent; let transform = map(below(35%)) >> recover(false); output dry: Bool; dry <- moisture |> transform; }',\n"
+        },
+        {
+          "startLine": 68,
+          "endLine": 69,
+          "sha256": "a12648f0e58fb6f6213598756d98d63ec464e3d6daed06d1bafb519302d26ee9",
+          "source": "    bad: 'control Bad { sensor moisture: Percent; output dry: Bool; dry <- moisture |> map(below(35%) |> recover(false)§; }',\n    good: 'control Good { sensor moisture: Percent; output dry: Bool; dry <- moisture |> map(below(35%)) |> recover(false); }',\n"
+        },
+        {
+          "startLine": 75,
+          "endLine": 75,
+          "sha256": "39986acfa520ac8a6720bdfa3a51c35227e6fbf60b37d8a00e10c33c29af4ca6",
+          "source": "    good: 'control Good { input start: Bool; signal stable = debounce(start, stable_for: 1s, initial: false); output ready: Bool; ready <- stable; }',\n"
+        },
+        {
+          "startLine": 96,
+          "endLine": 96,
+          "sha256": "63eaa78c8ef320dd581e93badb3150e2d5c4b37ef5b037383b18cc21e5dae01d",
+          "source": "  sensor reading: Bool;\n"
+        },
+        {
+          "startLine": 100,
+          "endLine": 100,
+          "sha256": "63eaa78c8ef320dd581e93badb3150e2d5c4b37ef5b037383b18cc21e5dae01d",
+          "source": "  sensor reading: Bool;\n"
+        }
+      ]
+    },
+    {
+      "path": "tests/int-compiler.test.mjs",
+      "originalSha256": "c5e1f16b83364b72cf8f6918952a309a7df8f86f781b57cdf277723bf6432890",
+      "excerpts": [
+        {
+          "startLine": 46,
+          "endLine": 46,
+          "sha256": "0f54e761ef0ab59bb409409b73423084d0cacb4360a265eacd1ac31ea3879b7f",
+          "source": "  input temperature: Number;\n"
+        },
+        {
+          "startLine": 55,
+          "endLine": 57,
+          "sha256": "07eb5e8bb509507d8570fb38707d62abf8e432d6d4f512e1394f4647f2602833",
+          "source": "  rejects('control MixedAdd { input count: Int; input measure: Number; output x: Int; x <- count + measure; }', '+ does not implicitly mix Int and Number');\n  rejects('control MixedCompare { input count: Int; input measure: Number; output x: Bool; x <- count < measure; }', '< requires matching ordered types');\n  rejects('control Slash { input a, b: Int; output x: Int; x <- a / b; }', '/ is not defined for Int operands; use div or convert both operands to Number');\n"
+        },
+        {
+          "startLine": 62,
+          "endLine": 62,
+          "sha256": "21c8b742252b62ff6087ee6a987f5fe2f310316fe13c169c82b433415bd53d48",
+          "source": "  input a, b: Int;\n"
+        },
+        {
+          "startLine": 144,
+          "endLine": 144,
+          "sha256": "464f90c1f0c2eac3dd1377162ed47d4db8285bf100089b352c172cb0fa3e974e",
+          "source": "      input count: Int;\n"
+        }
+      ]
+    },
+    {
+      "path": "tests/fixtures/compiler-semantic-diagnostics.mjs",
+      "originalSha256": "a3b2354fabc6ed3f5e5328ba0dbf02594e5dacdf241f8433f1c3bb934ef8b77d",
+      "excerpts": [
+        {
+          "startLine": 18,
+          "endLine": 18,
+          "sha256": "9ed41a511a8988048ff1fdbdc86daae383203ef416e7aa81615c53bab77dd822",
+          "source": "add('input-result-storage', wrap('input x: §Result<Bool, SensorFault>;'), wrap('input x: Bool;'), 'input must use a scalar type');\n"
+        },
+        {
+          "startLine": 36,
+          "endLine": 36,
+          "sha256": "126e97d37dbe907564723b8c0f220a54138603450a76a263fa26bb2414e1723a",
+          "source": "expr('unknown-member', '§flag.missing', 'flag', 'Bool', 'unknown member flag.missing', 'input flag: Bool;');\n"
+        },
+        {
+          "startLine": 50,
+          "endLine": 50,
+          "sha256": "0b3f48471d5c59c3e7e7afb09d01c8670b89f4b8efaabcfe5900ccaf73dc0557",
+          "source": "expr('int-number-mixing', 'i §+ n', 'number(i) + n', 'Number', '+ does not implicitly mix Int and Number', 'input i: Int; input n: Number;');\n"
+        },
+        {
+          "startLine": 115,
+          "endLine": 118,
+          "sha256": "fdd17e99a3beebf76177bec63480a0243e5a2f6d0474d7f65792a939097b52b7",
+          "source": "const sensor = (body, type = 'Number') => wrap(`sensor reading: ${type} { ${body} }`);\nadd('sensor-type', wrap('sensor reading: §Int;'), wrap('sensor reading: Number;'), 'sensor type must be Bool, Number, Percent, or a physical quantity');\nadd('sensor-nonconstant-option', wrap('input interval: Duration; sensor reading: Number { sample = §interval; }'), sensor('sample = 1s;'), 'sample must be a constant Duration');\nadd('sensor-inverted-range', wrap('§sensor reading: Number { valid = 2.0 .. 1.0; }'), sensor('valid = 1.0 .. 2.0;'), 'sensor valid range is inverted');\n"
+        },
+        {
+          "startLine": 126,
+          "endLine": 127,
+          "sha256": "034b2c9ef43ed547faaabe7ac893503e5c269947b55afb046b71df5d49f016d1",
+          "source": "add('sensor-positive-duration', wrap('§sensor reading: Number { stale_after = 0s; }'), sensor('stale_after = 1s;'), 'sensor durations must be positive');\nconst signal = (call, type = 'Number') => wrap(`sensor reading: ${type}; signal stable = ${call};`);\n"
+        },
+        {
+          "startLine": 180,
+          "endLine": 180,
+          "sha256": "8ec238d4ccdf7fd1d3ac5e786d15032e794e3c0a412e99ffe5e6fda3822b8071",
+          "source": "const resultSetup = 'sensor reading: Bool;';\n"
+        },
+        {
+          "startLine": 189,
+          "endLine": 189,
+          "sha256": "f332ded1882becc8d8ffe15a9b46b341b14a50764d465a45ed9fc79c15c32364",
+          "source": "const pipeSetup = 'sensor reading: Number;';\n"
+        },
+        {
+          "startLine": 206,
+          "endLine": 206,
+          "sha256": "0c26f6dac438df81a594d9308d1ee5bf38289139a68b90bb514fe7981316a9c1",
+          "source": "expr('below-payload-type', 'reading |> map(§below(true)) |> recover(false)', 'reading |> recover(false)', 'Bool', 'below is not defined for Bool', 'sensor reading: Bool;');\n"
+        },
+        {
+          "startLine": 218,
+          "endLine": 218,
+          "sha256": "8de7e77e4b78bc8e2322f7181d1b8cf91baf1aee89499099f84e8704a1c243fb",
+          "source": "add('input-resource-budget', `§control Diagnostic { input ${Array.from({length:129}, (_,i)=>`x${i}`).join(', ')}: Bool; }`, wrap(`input ${Array.from({length:128}, (_,i)=>`x${i}`).join(', ')}: Bool;`), 'input budget exceeded (128)');\n"
+        },
+        {
+          "startLine": 222,
+          "endLine": 222,
+          "sha256": "a320714727726fee332264c03ccf82a91e26b63def8f3fa2e65790876d7ae681",
+          "source": "add('expanded-tree-budget', `§control Diagnostic { fn twice(x: Bool) -> Bool { x || x } input inputValue: Bool; output out: Bool; out <- ${duplicated(12)}; }`, wrap(`fn twice(x: Bool) -> Bool { x || x } input inputValue: Bool; output out: Bool; out <- ${duplicated(3)};`), 'function expansion exceeds 4096 node budget');\n"
+        },
+        {
+          "startLine": 242,
+          "endLine": 242,
+          "sha256": "b5cf0026490e5743be67ab8fd5603ef3124b24c238b052c55709e1745346c789",
+          "source": "const aliasExpression = (count, rightHeavy) => `input x: Number; ${Array.from({length: count}, (_, i) => `let v${i} = ${rightHeavy ? `x + ${i ? `v${i-1}` : 'x'}` : `${i ? `v${i-1}` : 'x'} + x`};`).join(' ')} output out: Number; out <- v${count-1};`;\n"
+        },
+        {
+          "startLine": 245,
+          "endLine": 245,
+          "sha256": "65465f4f68103f9345cfb240b54c8249442c5a751a7a3672a39e2426274bd358",
+          "source": "const largeExpression = depth => `fn twice(x: Number) -> Number { x + x } input x: Number; output out: Number; out <- ${'twice('.repeat(depth)}(x + 17.0)${')'.repeat(depth)};`;\n"
+        },
+        {
+          "startLine": 256,
+          "endLine": 256,
+          "sha256": "2ab0f4344b17159acfaa545cf4719226e13f2d78e57784cfabe64d959ab1fb25",
+          "source": "for (const base of ['input', 'state', 'next']) expr(`removed-qualified-${base}`, `§${base}.x`, 'x', 'Bool', `removed qualified reference ${base}.x; use the direct canonical name`, 'input x: Bool;');\n"
+        },
+        {
+          "startLine": 265,
+          "endLine": 265,
+          "sha256": "42c0d6cbec06e6fe25d723ab5b7aff1a170876e85a71e80be7b1db8ea609cec0",
+          "source": "expr('case-local-member-shadow', 'case reading { ok(times) => §times.due; fault(_) => false; }', 'case reading { ok(times) => times; fault(_) => false; }', 'Bool', 'unknown member times.due', `${scheduled} sensor reading: Bool;`);\n"
+        }
+      ]
+    },
+    {
+      "path": "tests/fixtures/compiler-syntax-diagnostics.json",
+      "originalSha256": "5c50e07e200feb69866247d929697a27477714a0688e22ed3f58272a5218145c",
+      "excerpts": [
+        {
+          "startLine": 195,
+          "endLine": 196,
+          "sha256": "20cea88025254b33003d94c7a1aa206d129c2221b56ccaf359740c788187fa4c",
+          "source": "      \"code\": \"control Bad { sensor value: Number { unknown = 1.0; } }\",\n      \"valid\": \"control Good { sensor value: Number { sample = 1s; } }\",\n"
+        },
+        {
+          "startLine": 198,
+          "endLine": 198,
+          "sha256": "6959a89a0a3352741dd10288f8811096962d32b65a82b65d502b657713da8fd5",
+          "source": "      \"message\": \"unsupported sensor option unknown\"\n"
+        },
+        {
+          "startLine": 202,
+          "endLine": 203,
+          "sha256": "d399b30b02dd73829414351649229d761bb8482361e5101867d69b6ba6a0395b",
+          "source": "      \"code\": \"control Bad { sensor value: Number { valid = 0.0, 1.0; } }\",\n      \"valid\": \"control Good { sensor value: Number { valid = 0.0 .. 1.0; } }\",\n"
+        },
+        {
+          "startLine": 209,
+          "endLine": 210,
+          "sha256": "9f2e5ada0cda3e5ce45c74925c756201a8dfe487797d1780f6d90472c0ad7daa",
+          "source": "      \"code\": \"control Bad { sensor value: Number { recover_after = 2 ticks; } }\",\n      \"valid\": \"control Good { sensor value: Number { recover_after = 2 samples; } }\",\n"
+        },
+        {
+          "startLine": 216,
+          "endLine": 217,
+          "sha256": "b523336662da974dc6d5986205ec3be4d156f4920f316b1ea0274bc0d9b31a15",
+          "source": "      \"code\": \"control Bad { sensor value: Number; signal ready hysteresis(value, on_below: 1.0, off_above: 2.0, initial: false); }\",\n      \"valid\": \"control Good { sensor value: Number; signal ready = hysteresis(value, on_below: 1.0, off_above: 2.0, initial: false); }\",\n"
+        },
+        {
+          "startLine": 343,
+          "endLine": 344,
+          "sha256": "68733ad4e12c772ef4222773ae4a55ad27ec84eb10a872ddaa9ed5ad6a8c3322",
+          "source": "      \"code\": \"control Bad { sensor value: Bool; let ready = case value { ok(1) => true; fault(_) => false; }; }\",\n      \"valid\": \"control Good { sensor value: Bool; let ready = case value { ok(v) => v; fault(_) => false; }; }\",\n"
+        },
+        {
+          "startLine": 539,
+          "endLine": 540,
+          "sha256": "d9e65ea5645bb2a898fc74189ac9a95d2422ea7a7246bfb652f8f73df370d6e4",
+          "source": "      \"code\": \"control Bad { sensor : Number; }\",\n      \"valid\": \"control Good { sensor value: Number; }\",\n"
+        },
+        {
+          "startLine": 542,
+          "endLine": 542,
+          "sha256": "c9a0992ce2e27a15d32fecca2c5937f799b23750bf079543c334591573b5e0a3",
+          "source": "      \"message\": \"expected sensor name\"\n"
+        },
+        {
+          "startLine": 546,
+          "endLine": 547,
+          "sha256": "b49b1421430d74f59bcda44103c31a10de9548c877ee05554f91c642216aed29",
+          "source": "      \"code\": \"control Bad { sensor value: Number { = 1s; } }\",\n      \"valid\": \"control Good { sensor value: Number { sample = 1s; } }\",\n"
+        },
+        {
+          "startLine": 549,
+          "endLine": 549,
+          "sha256": "5553f5d3c940d0cc073098f1532165d5771036f0c5f901ef5e95ddf123a2fc2f",
+          "source": "      \"message\": \"expected sensor option\"\n"
+        },
+        {
+          "startLine": 553,
+          "endLine": 554,
+          "sha256": "f40a92db73956b95a6105b5ccb8fcbf43f7e4240fe120990cefd59a252e59b70",
+          "source": "      \"code\": \"control Bad { sensor value: Number { sample 1s; } }\",\n      \"valid\": \"control Good { sensor value: Number { sample = 1s; } }\",\n"
+        },
+        {
+          "startLine": 560,
+          "endLine": 563,
+          "sha256": "dd2bb83d63bde88d459c0c15aa8075151e12bb9ad70813ca196f8edbfbc834ca",
+          "source": "      \"code\": \"control Bad { sensor value: Number { sample = 1s } }\",\n      \"valid\": \"control Good { sensor value: Number { sample = 1s; } }\",\n      \"at\": \"}\",\n      \"message\": \"expected ; after sensor option\"\n"
+        },
+        {
+          "startLine": 567,
+          "endLine": 570,
+          "sha256": "58f1fc5e8ceaada015b7836b7738d1ed00cd34738b1e4762874305e7c9b7e837",
+          "source": "      \"code\": \"control Bad { sensor value: Number }\",\n      \"valid\": \"control Good { sensor value: Number; }\",\n      \"at\": \"}\",\n      \"message\": \"expected ; after sensor declaration\"\n"
+        },
+        {
+          "startLine": 575,
+          "endLine": 575,
+          "sha256": "1eca52cac0e67ef2da8013834dc9e18ac6e7f7f35451c0293683dd2fe84a2c20",
+          "source": "      \"valid\": \"control Good { sensor value: Number; signal ready = hysteresis(value, on_below: 1.0, off_above: 2.0, initial: false); }\",\n"
+        },
+        {
+          "startLine": 581,
+          "endLine": 582,
+          "sha256": "95986b5b8880e44fc440c1401c395a760f7edec0df972f722b79a68eb2962bdd",
+          "source": "      \"code\": \"control Bad { sensor value: Number; signal ready = hysteresis(value, on_below: 1.0, off_above: 2.0, initial: false) }\",\n      \"valid\": \"control Good { sensor value: Number; signal ready = hysteresis(value, on_below: 1.0, off_above: 2.0, initial: false); }\",\n"
+        },
+        {
+          "startLine": 800,
+          "endLine": 801,
+          "sha256": "a29154609ae055db1eb702a7918e902c051d9bc394f553f04c3e272c8bc6d066",
+          "source": "      \"code\": \"control Bad { sensor value: Bool; let ready = case value { ok(v => v; fault(_) => false; }; }\",\n      \"valid\": \"control Good { sensor value: Bool; let ready = case value { ok(v) => v; fault(_) => false; }; }\",\n"
+        },
+        {
+          "startLine": 947,
+          "endLine": 948,
+          "sha256": "83205546f53e7361132922a9a7c374f67e318f40bd8c5d4a570f1509fe19e5dd",
+          "source": "      \"code\": \"control Bad { sensor value Number; }\",\n      \"valid\": \"control Good { sensor value: Number; }\",\n"
+        },
+        {
+          "startLine": 950,
+          "endLine": 950,
+          "sha256": "b356d6bdb5fe5ed5a0915b08fd0e47eb333b2f8c697f48463c24e509323adff6",
+          "source": "      \"message\": \"expected :\"\n"
+        }
+      ]
+    }
+  ]
+}

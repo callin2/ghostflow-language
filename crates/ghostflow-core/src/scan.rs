@@ -489,27 +489,34 @@ mod tests {
     }
 
     fn frame(scan_id: u64, time: u64) -> ScanFrameV1 {
-        ScanFrameV1 {
-            scan_id,
-            logical_time_ms: time,
-            inputs: vec![
+        let inputs = [
+            ("start", Value::Bool(true)),
+            ("stop", Value::Bool(false)),
+            ("low_water", Value::Bool(false)),
+            ("moisture", Value::Number(90.0)),
+        ]
+        .into_iter()
+        .flat_map(|(name, value)| {
+            [
                 ScanInput {
-                    name: "start".into(),
+                    name: format!("__gf_sensor_value_{name}"),
+                    value,
+                },
+                ScanInput {
+                    name: format!("__gf_sensor_ok_{name}"),
                     value: Value::Bool(true),
                 },
                 ScanInput {
-                    name: "stop".into(),
-                    value: Value::Bool(false),
+                    name: format!("__gf_sensor_fault_{name}"),
+                    value: Value::Number(0.0),
                 },
-                ScanInput {
-                    name: "low_water".into(),
-                    value: Value::Bool(false),
-                },
-                ScanInput {
-                    name: "moisture".into(),
-                    value: Value::Number(90.0),
-                },
-            ],
+            ]
+        })
+        .collect();
+        ScanFrameV1 {
+            scan_id,
+            logical_time_ms: time,
+            inputs,
         }
     }
 
@@ -536,7 +543,7 @@ mod tests {
             .scan(frame(0, SCAN_FRAME_V1_MAX_EXACT_INTEGER + 1))
             .is_err());
         let missing = ScanFrameV1 {
-            inputs: frame(0, 0).inputs[..3].to_vec(),
+            inputs: frame(0, 0).inputs[..11].to_vec(),
             ..frame(0, 0)
         };
         assert!(driver.scan(missing).is_err());
@@ -545,7 +552,7 @@ mod tests {
 
         let mut duplicate = frame(0, 0);
         duplicate.inputs.push(ScanInput {
-            name: "start".into(),
+            name: "__gf_sensor_value_start".into(),
             value: Value::Bool(true),
         });
         assert!(driver.scan(duplicate).is_err());
@@ -559,7 +566,12 @@ mod tests {
         wrong_type.inputs[0].value = Value::Number(1.0);
         assert!(driver.scan(wrong_type).is_err());
         let mut nonfinite = frame(0, 0);
-        nonfinite.inputs[3].value = Value::Number(f64::NAN);
+        nonfinite
+            .inputs
+            .iter_mut()
+            .find(|input| input.name == "__gf_sensor_value_moisture")
+            .unwrap()
+            .value = Value::Number(f64::NAN);
         assert!(driver.scan(nonfinite).is_err());
         assert_eq!(driver.next_scan_id(), Some(0));
         assert_eq!(driver.scan_last_time_ms(), None);
@@ -607,10 +619,14 @@ mod tests {
 
             // Legacy callers may still supply the pre-existing runtime clock input.
             runtime.clear_inputs();
-            runtime.set_input("start", Value::Bool(false)).unwrap();
-            runtime.set_input("stop", Value::Bool(false)).unwrap();
-            runtime.set_input("low_water", Value::Bool(false)).unwrap();
-            runtime.set_input("moisture", Value::Number(90.0)).unwrap();
+            for input in frame(0, 11).inputs {
+                let value = if input.name == "__gf_sensor_value_start" {
+                    Value::Bool(false)
+                } else {
+                    input.value
+                };
+                runtime.set_input(&input.name, value).unwrap();
+            }
             runtime
                 .set_input(RESERVED_CLOCK_INPUT, Value::Number(11.0))
                 .unwrap();

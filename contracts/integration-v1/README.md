@@ -11,6 +11,8 @@ checked identities and hashes agree. It does not mean a gate passed, a device
 was contacted, the program behaves correctly, the pinout is electrically safe,
 or water was delivered. A run with a recorded `fail` can be a valid record.
 
+Input **drivers** produce logical inputs; output **renderers** apply logical output intent to relays, motors, lamps or screens. These are roles, not mutually exclusive device classes. A USB force-feedback joystick has an input driver and an output renderer; an EC11 encoder with TFT similarly combines input and output roles. These examples define boundaries, not implementations. Driver and renderer source belongs in `farm-device-drivers`; Device owns host/board integration, bindings, clocks, watchdogs and boot/failure policy. The cabinet operator UI is `@ghostflow/cabinet-view` and is distinct from an output renderer. Existing `ScanDriver`, host ABI identifiers and profile `driver` fields retain their names and contracts.
+
 ## Records and ownership
 
 The **release** has no program source hash, boot ID, timestamp, or test result.

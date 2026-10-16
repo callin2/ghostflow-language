@@ -1,0 +1,612 @@
+{
+  "format": "GhostFlow/interaction-scan-tape-v1",
+  "version": "1.0",
+  "caseId": "five-minute-watering",
+  "source": {
+    "documentId": "source.fixture-five-minute-watering",
+    "revisionId": "revision.fixture-five-minute-watering.input531-v1",
+    "format": "GhostFlow/source-document-v1",
+    "kind": "literate",
+    "sha256": "a0461e7411d0cabcb3ec3380c1732d3d74b77c708904e0033ead2f573c3dc1e1"
+  },
+  "tapeId": "tape.five-minute-watering.input531-v1",
+  "digest": {
+    "algorithm": "SHA-256",
+    "strategy": "canonical-json-excluding-digest-v1",
+    "sha256": "67062fbd126e17cfc424b80a0cf98aa24d52a678b2d211d31802cfb335116388"
+  },
+  "runs": [
+    {
+      "runId": "watering-run-before-reset-v1",
+      "scans": [
+        {
+          "completion": {
+            "kind": "completed-scan",
+            "scanId": 0,
+            "logicalTimeMs": 0
+          },
+          "inputs": [
+            {
+              "name": "DI1",
+              "value": false
+            },
+            {
+              "name": "DI2",
+              "value": false
+            },
+            {
+              "name": "DI3",
+              "value": false
+            },
+            {
+              "name": "DI4",
+              "value": false
+            },
+            {
+              "name": "DI5",
+              "value": false
+            },
+            {
+              "name": "DI6",
+              "value": false
+            },
+            {
+              "name": "DI7",
+              "value": false
+            },
+            {
+              "name": "DI8",
+              "value": false
+            }
+          ]
+        },
+        {
+          "completion": {
+            "kind": "completed-scan",
+            "scanId": 1,
+            "logicalTimeMs": 1000
+          },
+          "inputs": [
+            {
+              "name": "DI1",
+              "value": true
+            },
+            {
+              "name": "DI2",
+              "value": false
+            },
+            {
+              "name": "DI3",
+              "value": false
+            },
+            {
+              "name": "DI4",
+              "value": false
+            },
+            {
+              "name": "DI5",
+              "value": false
+            },
+            {
+              "name": "DI6",
+              "value": false
+            },
+            {
+              "name": "DI7",
+              "value": false
+            },
+            {
+              "name": "DI8",
+              "value": false
+            }
+          ]
+        },
+        {
+          "completion": {
+            "kind": "completed-scan",
+            "scanId": 2,
+            "logicalTimeMs": 2000
+          },
+          "inputs": [
+            {
+              "name": "DI1",
+              "value": false
+            },
+            {
+              "name": "DI2",
+              "value": false
+            },
+            {
+              "name": "DI3",
+              "value": false
+            },
+            {
+              "name": "DI4",
+              "value": true
+            },
+            {
+              "name": "DI5",
+              "value": true
+            },
+            {
+              "name": "DI6",
+              "value": true
+            },
+            {
+              "name": "DI7",
+              "value": true
+            },
+            {
+              "name": "DI8",
+              "value": true
+            }
+          ]
+        },
+        {
+          "completion": {
+            "kind": "completed-scan",
+            "scanId": 3,
+            "logicalTimeMs": 3000
+          },
+          "inputs": [
+            {
+              "name": "DI1",
+              "value": true
+            },
+            {
+              "name": "DI2",
+              "value": true
+            },
+            {
+              "name": "DI3",
+              "value": false
+            },
+            {
+              "name": "DI4",
+              "value": false
+            },
+            {
+              "name": "DI5",
+              "value": false
+            },
+            {
+              "name": "DI6",
+              "value": false
+            },
+            {
+              "name": "DI7",
+              "value": false
+            },
+            {
+              "name": "DI8",
+              "value": false
+            }
+          ]
+        },
+        {
+          "completion": {
+            "kind": "completed-scan",
+            "scanId": 4,
+            "logicalTimeMs": 4000
+          },
+          "inputs": [
+            {
+              "name": "DI1",
+              "value": true
+            },
+            {
+              "name": "DI2",
+              "value": false
+            },
+            {
+              "name": "DI3",
+              "value": false
+            },
+            {
+              "name": "DI4",
+              "value": false
+            },
+            {
+              "name": "DI5",
+              "value": false
+            },
+            {
+              "name": "DI6",
+              "value": false
+            },
+            {
+              "name": "DI7",
+              "value": false
+            },
+            {
+              "name": "DI8",
+              "value": false
+            }
+          ]
+        },
+        {
+          "completion": {
+            "kind": "completed-scan",
+            "scanId": 5,
+            "logicalTimeMs": 5000
+          },
+          "inputs": [
+            {
+              "name": "DI1",
+              "value": false
+            },
+            {
+              "name": "DI2",
+              "value": false
+            },
+            {
+              "name": "DI3",
+              "value": false
+            },
+            {
+              "name": "DI4",
+              "value": false
+            },
+            {
+              "name": "DI5",
+              "value": false
+            },
+            {
+              "name": "DI6",
+              "value": false
+            },
+            {
+              "name": "DI7",
+              "value": false
+            },
+            {
+              "name": "DI8",
+              "value": false
+            }
+          ]
+        },
+        {
+          "completion": {
+            "kind": "completed-scan",
+            "scanId": 6,
+            "logicalTimeMs": 6000
+          },
+          "inputs": [
+            {
+              "name": "DI1",
+              "value": true
+            },
+            {
+              "name": "DI2",
+              "value": false
+            },
+            {
+              "name": "DI3",
+              "value": false
+            },
+            {
+              "name": "DI4",
+              "value": false
+            },
+            {
+              "name": "DI5",
+              "value": false
+            },
+            {
+              "name": "DI6",
+              "value": false
+            },
+            {
+              "name": "DI7",
+              "value": false
+            },
+            {
+              "name": "DI8",
+              "value": false
+            }
+          ]
+        },
+        {
+          "completion": {
+            "kind": "completed-scan",
+            "scanId": 7,
+            "logicalTimeMs": 7000
+          },
+          "inputs": [
+            {
+              "name": "DI1",
+              "value": true
+            },
+            {
+              "name": "DI2",
+              "value": false
+            },
+            {
+              "name": "DI3",
+              "value": true
+            },
+            {
+              "name": "DI4",
+              "value": false
+            },
+            {
+              "name": "DI5",
+              "value": false
+            },
+            {
+              "name": "DI6",
+              "value": false
+            },
+            {
+              "name": "DI7",
+              "value": false
+            },
+            {
+              "name": "DI8",
+              "value": false
+            }
+          ]
+        },
+        {
+          "completion": {
+            "kind": "completed-scan",
+            "scanId": 8,
+            "logicalTimeMs": 8000
+          },
+          "inputs": [
+            {
+              "name": "DI1",
+              "value": true
+            },
+            {
+              "name": "DI2",
+              "value": false
+            },
+            {
+              "name": "DI3",
+              "value": false
+            },
+            {
+              "name": "DI4",
+              "value": false
+            },
+            {
+              "name": "DI5",
+              "value": false
+            },
+            {
+              "name": "DI6",
+              "value": false
+            },
+            {
+              "name": "DI7",
+              "value": false
+            },
+            {
+              "name": "DI8",
+              "value": false
+            }
+          ]
+        },
+        {
+          "completion": {
+            "kind": "completed-scan",
+            "scanId": 9,
+            "logicalTimeMs": 9000
+          },
+          "inputs": [
+            {
+              "name": "DI1",
+              "value": false
+            },
+            {
+              "name": "DI2",
+              "value": false
+            },
+            {
+              "name": "DI3",
+              "value": false
+            },
+            {
+              "name": "DI4",
+              "value": false
+            },
+            {
+              "name": "DI5",
+              "value": false
+            },
+            {
+              "name": "DI6",
+              "value": false
+            },
+            {
+              "name": "DI7",
+              "value": false
+            },
+            {
+              "name": "DI8",
+              "value": false
+            }
+          ]
+        },
+        {
+          "completion": {
+            "kind": "completed-scan",
+            "scanId": 10,
+            "logicalTimeMs": 10000
+          },
+          "inputs": [
+            {
+              "name": "DI1",
+              "value": true
+            },
+            {
+              "name": "DI2",
+              "value": false
+            },
+            {
+              "name": "DI3",
+              "value": false
+            },
+            {
+              "name": "DI4",
+              "value": false
+            },
+            {
+              "name": "DI5",
+              "value": false
+            },
+            {
+              "name": "DI6",
+              "value": false
+            },
+            {
+              "name": "DI7",
+              "value": false
+            },
+            {
+              "name": "DI8",
+              "value": false
+            }
+          ]
+        },
+        {
+          "completion": {
+            "kind": "completed-scan",
+            "scanId": 11,
+            "logicalTimeMs": 310000
+          },
+          "inputs": [
+            {
+              "name": "DI1",
+              "value": true
+            },
+            {
+              "name": "DI2",
+              "value": false
+            },
+            {
+              "name": "DI3",
+              "value": false
+            },
+            {
+              "name": "DI4",
+              "value": false
+            },
+            {
+              "name": "DI5",
+              "value": false
+            },
+            {
+              "name": "DI6",
+              "value": false
+            },
+            {
+              "name": "DI7",
+              "value": false
+            },
+            {
+              "name": "DI8",
+              "value": false
+            }
+          ]
+        },
+        {
+          "completion": {
+            "kind": "completed-scan",
+            "scanId": 12,
+            "logicalTimeMs": 311000
+          },
+          "inputs": [
+            {
+              "name": "DI1",
+              "value": true
+            },
+            {
+              "name": "DI2",
+              "value": false
+            },
+            {
+              "name": "DI3",
+              "value": false
+            },
+            {
+              "name": "DI4",
+              "value": false
+            },
+            {
+              "name": "DI5",
+              "value": false
+            },
+            {
+              "name": "DI6",
+              "value": false
+            },
+            {
+              "name": "DI7",
+              "value": false
+            },
+            {
+              "name": "DI8",
+              "value": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "runId": "watering-run-after-reset-v1",
+      "scans": [
+        {
+          "completion": {
+            "kind": "completed-scan",
+            "scanId": 0,
+            "logicalTimeMs": 0
+          },
+          "inputs": [
+            {
+              "name": "DI1",
+              "value": false
+            },
+            {
+              "name": "DI2",
+              "value": false
+            },
+            {
+              "name": "DI3",
+              "value": false
+            },
+            {
+              "name": "DI4",
+              "value": false
+            },
+            {
+              "name": "DI5",
+              "value": false
+            },
+            {
+              "name": "DI6",
+              "value": false
+            },
+            {
+              "name": "DI7",
+              "value": false
+            },
+            {
+              "name": "DI8",
+              "value": false
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "observationExpectations": [
+    {
+      "expectationId": "unavailable-timer-validation-case",
+      "descriptorId": "timer.age",
+      "status": "unavailable",
+      "reason": "no-value-provided-by-test-observer"
+    }
+  ]
+}

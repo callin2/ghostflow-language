@@ -55,8 +55,29 @@ physical endpoint는 별도 profile과 binding revision이 소유한다. `Bool` 
 
 물리 endpoint는 MCU의 직접 GPIO에 한정하지 않는다. I/O 확장기의 채널이나 통신형
 릴레이의 채널도 같은 논리 출력 계약을 만족하면 binding 대상이 될 수 있다.
-버스 주소·채널 선택·전송 절차는 Driver와 설치 연결이 소유한다. 언어의 한 tick에서
+버스 주소·채널 선택·전송 절차는 출력 renderer와 설치 연결이 소유한다. 언어의 한 tick에서
 여러 출력 의도를 확정해도 실제 채널들이 동시에 전환된다는 보장은 생기지 않는다.
+
+### 외부 관측과 내부 계산 연결
+
+root의 `input`을 instance의 `input`에 연결하면 기존 typed-quality 획득 계약을
+전달한다. sample identity와 각 소스에 선언된 conditioning 계약도 유지한다.
+instance의 scalar `output`을 다른 instance의 `input`에 연결하면 내부 계산
+연결이다. 실제 평가한 값을 `Result.ok(value)`로 전달하며 받는 정의는 여전히
+`case`, `recover` 또는 타입에 맞는 Result 연산으로 명시적으로 처리한다.
+연결 자체가 상위 오류를 복구하지 않는다. 값을 만드는 scalar output에 이미
+그 정의의 처리 정책이 표현되어 있다.
+
+내부 계산 연결은 획득 입력, Good 품질 주장, sample timestamp, sample identity,
+sensor fault origin을 만들지 않는다. 받는 port에 optional 획득 또는 input
+conditioning 주석이 있으면 조용히 버리지 않고 거부한다. 획득 전달에서는
+이 주석의 의미를 유지한다. committed-state output feedback은 이전 tick의
+경계를 유지하며 계산값을 감싸는 것으로 조합 cycle이나 next-state feedback을
+허용하지 않는다. root의 외부 Result를 명시적인 Result 처리 없이 scalar
+output에 직접 연결할 수 없다.
+
+**왜:** 계산값과 producer 관측은 증거가 다르다. 재사용은 받는 정의의 Result
+계약을 유지하면서 획득 품질의 출처와 명시적인 state 경계를 보존한다.
 
 ## 6.3 parameters, settings, dependencies와 bindings
 
@@ -222,7 +243,7 @@ completed occurrence
 한 definition의 여러 instance trace를 이름이 같다는 이유로 합치지 않는다. source 위치가
 다른 문서의 node를 하나의 합성 위치로 평탄화하지 않는다. low-water 입력이 pump 요청을
 차단했다면 그 신호와 논리 결과를 말할 수 있지만, tank의 실제 물리 상태를 증명하지 않는다.
-Driver 적용 실패나 feedback 부재도 requested/safe 단계와 분리해 표시한다.
+renderer 적용 실패나 feedback 부재도 requested/safe 단계와 분리해 표시한다.
 
 ## 6.8 replay, ghost와 branch
 

@@ -12,7 +12,7 @@ import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 import { observeSourceTrace } from '../tools/source-trace.mjs';
 
 const source = `# Hold last\n\n\`\`\`ghost\ncontrol HoldLastFixture {
-  sensor temperature: Temperature;
+  input temperature: Temperature;
   signal usable_temperature = hold_last(temperature, for_at_most: 2s, quality: measured);
   output ready: Bool;
   ready <- true;

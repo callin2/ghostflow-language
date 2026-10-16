@@ -9,10 +9,10 @@ import { encode } from '@toon-format/toon';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const files = [
-  'tests/reference/cases/00-principles.json',
-  'tests/reference/cases/01-source-types.json',
-  'tests/reference/cases/02-time-control.json',
-  'tests/reference/cases/03-settings-boundaries.json',
+  'tests/reference/cases-input-v1/00-principles.json',
+  'tests/reference/cases-input-v1/01-source-types.json',
+  'tests/reference/cases-input-v1/02-time-control.json',
+  'tests/reference/cases-input-v1/03-settings-boundaries.json',
 ];
 const accepted = files.flatMap(file => JSON.parse(fs.readFileSync(path.join(root, file), 'utf8')).cases)
   .filter(entry => entry.status === 'executable' && entry.expect === 'accept');
@@ -294,7 +294,9 @@ for (const entry of accepted) {
       assert.ok(!standaloneDescriptors.has(entry.id), `${entry.id}: standalone declaration unexpectedly became executable`);
       const oracle = behaviorOracles[entry.id] ?? temporalOracle(entry.id, manifest)
         ?? solarOracle(entry.id, manifest) ?? dailyOracle(entry.id, manifest);
-      const initialInputs = manifest.inputs.filter(input => input.name !== '__gf_now_ms').map(input => {
+      // Only recorded predecessor software ports receive explicit default observations.
+      // Original acquisition-only inputs remain unavailable until a sample/provider supplies them.
+      const initialInputs = entry.softwareObservationPorts.map(input => {
         assert.ok(['Bool', 'Int', 'Number'].includes(input.type),
           `${entry.id}: unsupported external input ${input.name}: ${input.type}`);
         return { name: input.name, type: input.type,
@@ -302,7 +304,24 @@ for (const entry of accepted) {
             ? oracle.initial[input.name] : input.type === 'Bool' ? false : 0 };
       });
       const scenario = path.join(dir, 'scenario.toon');
-      const actions = (oracle?.actions ?? [scan(0)]).map(action => (
+      const observedSoftware = new Map(initialInputs.map(input => [input.name, { ...input }]));
+      const actions = (oracle?.actions ?? [scan(0)]).flatMap(action => {
+        if (action.kind === 'input' && observedSoftware.has(action.name)) {
+          observedSoftware.set(action.name, { name: action.name, type: action.type, value: action.value });
+        }
+        // This fixture deliberately reads its known software registers on each scan.
+        // Clock-only production frames are not rewritten; original acquisition ports are excluded.
+        const readings = action.kind === 'scan'
+          ? [...observedSoftware.values()].map(input => ({ kind: 'input', ...input })) : [];
+        let current = action;
+        if (entry.id === 'REF-03-060' && action.kind === 'scan') {
+          // A new source revision assigns a new generated site; bind the same named Tide evidence.
+          const site = manifest.schedules.find(schedule => schedule.name === 'high').site;
+          current = { ...action, contextFacts: { ...action.contextFacts,
+            schedules: action.contextFacts.schedules.map(facts => ({ ...facts, site })) } };
+        }
+        return [...readings, current];
+      }).map(action => (
         manifest.format === 'GhostFlow/control-v10' && action.kind === 'scan' && !action.contextFacts
           ? { ...action, contextFacts: contextFacts(action.atMs, action.atMs) }
           : action

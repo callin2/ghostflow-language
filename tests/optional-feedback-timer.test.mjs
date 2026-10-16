@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { compileSource } from '../tools/toolchain.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 
@@ -16,12 +17,15 @@ const scans = [[0, false], [100, true], [101, true], [2099, true], [2100, true],
   [2500, true], [2600, false], [2700, true], [4699, true], [4700, true],
   [4800, false], [4900, true], [5000, false], [5100, true]];
 const expected = [false, true, true, true, false, false, false, true, true, false, false, true, false, true];
+const requestFrame = (nowMs, value, samples = {}) => ({ nowMs, samples: {
+  run_request: { epoch: 1, id: nowMs + 1, timestampMs: nowMs, quality: 'Good', value }, ...samples,
+} });
 
 async function replay(quality, value) {
   const runtime = await ControlRuntime.instantiateFramed(wasm, artifact, { capabilities: quality ? [observation] : [] });
   try {
-    return scans.map(([nowMs, run_request], index) => runtime.step({ nowMs, inputs: { run_request },
-      samples: quality ? { observation: { epoch: 1, id: index + 1, timestampMs: nowMs, quality, value } } : {} }));
+    return scans.map(([nowMs, run_request], index) => runtime.step(requestFrame(nowMs, run_request,
+      quality ? { observation: { epoch: 1, id: index + 1, timestampMs: nowMs, quality, value } } : {})));
   } finally { runtime.dispose(); }
 }
 
@@ -51,16 +55,16 @@ for (const [quality, value] of [[null, false], ['Good', true], ['Good', false],
 test('installed observation expiry and recovery do not restart the timer', async () => {
   const runtime = await ControlRuntime.instantiateFramed(wasm, artifact, { capabilities: [observation] });
   try {
-    const initial = runtime.step({ nowMs: 0, inputs: { run_request: true } });
+    const initial = runtime.step(requestFrame(0, true));
     assert.equal(initial.sensors.observation.quality, 'NotReady');
     assert.equal(initial.vm.safe.drive, true, 'a new runtime starts a fresh true interval');
     const sample = (id, timestampMs, value) => ({ epoch: 1, id, timestampMs, quality: 'Good', value });
-    const healthy = runtime.step({ nowMs: 1, inputs: { run_request: true }, samples: { observation: sample(1, 1, true) } });
+    const healthy = runtime.step(requestFrame(1, true, { observation: sample(1, 1, true) }));
     assert.equal(healthy.sensors.observation.quality, 'Good');
-    const stale = runtime.step({ nowMs: 3001, inputs: { run_request: true } });
+    const stale = runtime.step(requestFrame(3001, true));
     assert.equal(stale.sensors.observation.quality, 'Stale');
     assert.equal(stale.vm.safe.drive, false);
-    const recovered = runtime.step({ nowMs: 3002, inputs: { run_request: true }, samples: { observation: sample(2, 3002, false) } });
+    const recovered = runtime.step(requestFrame(3002, true, { observation: sample(2, 3002, false) }));
     assert.equal(recovered.sensors.observation.quality, 'Good');
     assert.equal(recovered.vm.safe.drive, false);
   } finally { runtime.dispose(); }
@@ -69,10 +73,10 @@ test('installed observation expiry and recovery do not restart the timer', async
 test('a sample cannot grant an absent observation capability', async () => {
   const runtime = await ControlRuntime.instantiateFramed(wasm, artifact, { capabilities: [] });
   try {
-    assert.throws(() => runtime.step({ nowMs: 0, inputs: { run_request: true },
-      samples: { observation: { epoch: 1, id: 1, timestampMs: 0, quality: 'Good', value: true } } }),
+    assert.throws(() => runtime.step(requestFrame(0, true,
+      { observation: { epoch: 1, id: 1, timestampMs: 0, quality: 'Good', value: true } })),
     /absent sensor capability observation/);
-    assert.equal(runtime.step({ nowMs: 0, inputs: { run_request: true } }).vm.safe.drive, true);
+    assert.equal(runtime.step(requestFrame(0, true)).vm.safe.drive, true);
   } finally { runtime.dispose(); }
 });
 
@@ -82,14 +86,14 @@ test('native ScanDriver replays the canonical timer baseline with WASM parity', 
     const module = path.join(directory, 'module.gfb');
     const tape = path.join(directory, 'frames.csv');
     fs.writeFileSync(module, artifact.bytes);
-    const sensor = artifact.manifest.sensors[0];
-    fs.writeFileSync(tape, `scan_id,logical_time_ms,run_request,${sensor.valueInput},${sensor.okInput},${sensor.faultInput}\n` +
-      scans.map(([time, run], id) => [id, time, run, false, false, 3].join(',')).join('\n') + '\n');
-    const native = new URL('../target/release/examples/scan_adapter', import.meta.url);
-    const result = spawnSync(native.pathname, [module, tape], { encoding: 'utf8', timeout: 10_000 });
+    const wasmOutcomes = await replay(null, false);
+    const fields = Object.keys(wasmOutcomes[0].vm.inputs).filter(name => name !== '__gf_now_ms');
+    fs.writeFileSync(tape, `scan_id,logical_time_ms,${fields.join(',')}\n` +
+      scans.map(([time], id) => [id, time, ...fields.map(name => wasmOutcomes[id].vm.inputs[name])].join(',')).join('\n') + '\n');
+    const native = fileURLToPath(new URL(`../target/release/examples/scan_adapter${process.platform === 'win32' ? '.exe' : ''}`, import.meta.url));
+    const result = spawnSync(native, [module, tape], { encoding: 'utf8', timeout: 10_000 });
     assert.equal(result.status, 0, result.stderr);
     const outcomes = result.stdout.trim().split('\n').map(line => JSON.parse(line));
-    const wasmOutcomes = await replay(null, false);
     assert.deepEqual(outcomes.map(o => o.trace.requested.drive), expected);
     assert.deepEqual(outcomes.map(o => o.trace.safe.drive), expected);
     assert.deepEqual(outcomes.map(o => o.trace.stateAfter), wasmOutcomes.map(o => o.vm.stateAfter));

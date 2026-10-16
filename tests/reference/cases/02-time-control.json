@@ -249,7 +249,7 @@
       "status": "specified",
       "given": "window=60s, limit=30s이고 ON interval이 (0,20]과 (30,40]이며 t=40s다.",
       "when": "새 ON admission을 평가한다.",
-      "then": "used=30s이므로 차단하고 t=65s에는 첫 interval의 5초만 남아 used=15s가 되어 그만큼 예산이 복구된다.",
+      "then": "used=30s이므로 차단하고 t=65s에는 첫 interval의 15초와 second interval의 10초가 남아 used=25s가 되어 5초 예산이 복구된다.",
       "reason": "partial-overlap 합산과 admission 차단은 compiler CLI가 아니라 runtime ledger로 검증한다."
     },
     {

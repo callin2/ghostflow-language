@@ -73,11 +73,11 @@ expectLocatedFailure(
 
 test('debounce boundary diagnostic: twenty-five accepted and twenty-six rejected raw Bool debouncers', async () => {
   const signals = Array.from({ length: 25 }, (_, index) => `signal s${index} = debounce(start, stable_for: 1s, initial: false);`).join(' ');
-  const compiled = await compileSource(document(`control DebounceStateBudget { input start: Bool; ${signals} output ready: Bool; ready <- s0; }`), { filename });
+  const compiled = await compileSource(document(`control DebounceStateBudget { state start: Bool = false; ${signals} output ready: Bool; ready <- s0; }`), { filename });
   assert.equal(compiled.manifest.signals.length, 25);
   assert.equal(compiled.manifest.signals.reduce((total, signal) => total + Object.keys(signal.states).length, 0), 125);
   const signals26 = Array.from({ length: 26 }, (_, index) => `signal s${index} = debounce(start, stable_for: 1s, initial: false);`).join(' ');
-  const marked = document(`§control DebounceStateBudget { input start: Bool; ${signals26} output ready: Bool; ready <- s0; }`);
+  const marked = document(`§control DebounceStateBudget { state start: Bool = false; ${signals26} output ready: Bool; ready <- s0; }`);
   const at = marked.indexOf('§'), before = marked.slice(0, at), line = before.split('\n').length;
   const column = before.length - before.lastIndexOf('\n');
   await assert.rejects(() => compileSource(marked.replace('§', ''), { filename }), error => {

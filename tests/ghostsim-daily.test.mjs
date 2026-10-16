@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -7,9 +8,9 @@ import test from 'node:test';
 import { encode } from '@toon-format/toon';
 import { compileSource, writeArtifact } from '../tools/toolchain.mjs';
 
-const catalog = JSON.parse(fs.readFileSync(new URL('./reference/cases/02-time-control.json', import.meta.url))).cases;
+const catalog = JSON.parse(fs.readFileSync(new URL('./reference/cases-input-v1/02-time-control.json', import.meta.url))).cases;
 const fixture = catalog.find(entry => entry.id === 'REF-03-024');
-const cli = new URL('../tools/ghostsim.mjs', import.meta.url).pathname;
+const cli = fileURLToPath(new URL('../tools/ghostsim.mjs', import.meta.url));
 const scheduledWallMs = Date.UTC(2026, 8, 23, 21, 30); // 2026-09-24 06:30 Asia/Seoul
 
 async function prepared(t) {

@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -8,8 +9,8 @@ import { encode } from '@toon-format/toon';
 import { compileSource, writeArtifact } from '../tools/toolchain.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 
-const cli = new URL('../tools/ghostsim.mjs', import.meta.url).pathname;
-const catalog = JSON.parse(fs.readFileSync(new URL('./reference/cases/02-time-control.json', import.meta.url), 'utf8'));
+const cli = fileURLToPath(new URL('../tools/ghostsim.mjs', import.meta.url));
+const catalog = JSON.parse(fs.readFileSync(new URL('./reference/cases-input-v1/02-time-control.json', import.meta.url), 'utf8'));
 const reference = catalog.cases.find(entry => entry.id === 'REF-04-058');
 
 async function execute(t, source, id) {

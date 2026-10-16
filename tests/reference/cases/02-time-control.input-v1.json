@@ -1,0 +1,19 @@
+{
+  "format": "GhostFlow/reference-source-revision-v1",
+  "predecessor": "02-time-control.json",
+  "revision": "issue531-natural-policy-input-v1",
+  "cases": [
+    {
+      "id": "REF-03-060",
+      "references": [
+        "03-time-and-schedules.md#달과-조석"
+      ],
+      "rule": "Tide schedule은 TidePredictions provider와 high/low event offset 및 전체 schedule policy를 명시한다.",
+      "scope": "compiler",
+      "status": "executable",
+      "filename": "tide-schedule.ghost.md",
+      "expect": "accept",
+      "source": "# Tide schedule\n\n```ghost\n// Explicit source revision: issue531-natural-policy-input-v1\ncontrol TideSchedule {\n  input stop, unsafe_level: Bool;\n  provider harbor_tides: TidePredictions;\n  schedule high: Tide {\n    source = harbor_tides;\n    timezone = \"Asia/Seoul\";\n    at = tide`high - 30min`;\n    basis = run(10min, within(5min));\n    when = true;\n    cancel_when = (stop |> recover(true)) || (unsafe_level |> recover(true));\n    clock = trusted_only;\n    gap = skip_after(60s);\n    recovery = baseline;\n    fallback = skip;\n  }\n  output active: Bool;\n  active <- high.active;\n}\n```\n"
+    }
+  ]
+}

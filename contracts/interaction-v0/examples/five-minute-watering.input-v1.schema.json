@@ -1,0 +1,88 @@
+{
+  "format": "GhostFlow/interaction-schema-v0",
+  "version": "0.3",
+  "module": {
+    "id": "FiveMinuteWatering",
+    "moduleFingerprint": "a6b13d5c7734aef6",
+    "bytecodeSha256": "96c44d9b2e9a52c7ccf540d7d159fa1402044b14caa4f183d45cd3d82be6e0b6"
+  },
+  "source": {
+    "documentId": "source.fixture-five-minute-watering",
+    "revisionId": "revision.fixture-five-minute-watering.input531-v1",
+    "format": "GhostFlow/source-document-v1",
+    "kind": "literate",
+    "sha256": "a0461e7411d0cabcb3ec3380c1732d3d74b77c708904e0033ead2f573c3dc1e1"
+  },
+  "descriptors": [
+    {
+      "id": "state.request_was_high",
+      "name": "request_was_high",
+      "kind": "state",
+      "sourceType": {
+        "kind": "builtin",
+        "name": "Bool",
+        "unit": null
+      },
+      "access": [
+        "read"
+      ],
+      "provenance": {
+        "sourceNode": {
+          "id": 43,
+          "kind": "state"
+        },
+        "intentAnchorIds": [
+          "GF-INT-FIXTURE-WATERING-V1"
+        ]
+      }
+    },
+    {
+      "id": "state.watering",
+      "name": "watering",
+      "kind": "state",
+      "sourceType": {
+        "kind": "builtin",
+        "name": "Bool",
+        "unit": null
+      },
+      "access": [
+        "read"
+      ],
+      "provenance": {
+        "sourceNode": {
+          "id": 45,
+          "kind": "state"
+        },
+        "intentAnchorIds": [
+          "GF-INT-FIXTURE-WATERING-V1"
+        ]
+      }
+    },
+    {
+      "id": "timer.age",
+      "name": "age",
+      "kind": "timer",
+      "sourceType": {
+        "kind": "builtin",
+        "name": "Duration",
+        "unit": "ms"
+      },
+      "access": [
+        "read"
+      ],
+      "operation": {
+        "kind": "elapsed_since_change",
+        "subjectId": "state.watering"
+      },
+      "provenance": {
+        "sourceNode": {
+          "id": 48,
+          "kind": "timer"
+        },
+        "intentAnchorIds": [
+          "GF-INT-FIXTURE-WATERING-V1"
+        ]
+      }
+    }
+  ]
+}

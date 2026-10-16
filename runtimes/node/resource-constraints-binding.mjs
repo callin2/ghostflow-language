@@ -45,7 +45,8 @@ export function validateResourceConstraintBinding(compilation, binding) {
   const groups = control.sharedResourceConstraints;
   const declarations = new Map(control.resources.map(resource => [resource.name, resource.type]));
   const outputs = new Map(control.outputs.map(output => [output.name, output.type]));
-  const inputs = new Map(control.inputs.map(input => [input.name, input.type]));
+  const inputs = new Map([...control.inputs, ...(control.sensors ?? [])]
+    .map(input => [input.name, input.type]));
   const required = new Set(groups.flatMap(group => [group.target, ...group.outputs]));
   const resourceMap = new Map(), stableIds = new Set(), outputNames = new Set();
   for (const entry of list(binding.resources, 'resources')) {

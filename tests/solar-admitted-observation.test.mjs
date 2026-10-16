@@ -7,10 +7,11 @@ import test from 'node:test';
 import {fileURLToPath} from 'node:url';
 import {compileSource} from '../tools/toolchain.mjs';
 import {solarContextEvidence} from '../runtimes/wasm/context-abi.mjs';
+import { softwareQualityRails } from './helpers/software-quality-observations.mjs';
 import {SolarEvidenceRuntime} from '../runtimes/wasm/solar-evidence-runtime.mjs';
 
 const root=fileURLToPath(new URL('../',import.meta.url));
-const document=fs.readFileSync(path.join(root,'tests/fixtures/issue-145-solar-config.ghost.md'),'utf8');
+const document=fs.readFileSync(path.join(root,'tests/fixtures/issue-145-solar-config.input-v1.ghost.md'),'utf8');
 const wasm=fs.readFileSync(path.join(root,'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm'));
 const activation={bootEpoch:7,terminalCapacity:32,bindings:[]};
 async function fixture(t) {
@@ -20,7 +21,7 @@ async function fixture(t) {
   return{artifact,recorder};
 }
 function frame(artifact,nowMs,wallMs,{provider='prediction.r1',context='site.r4',planned=1000,available=true}={}) {
-  return{nowMs,inputs:{divisor:1},contextFacts:{clock:{monotonicMs:nowMs,wallMs,bootEpoch:7,
+  return{nowMs,samples:{divisor:{epoch:1,id:nowMs+1,timestampMs:nowMs,quality:'Good',value:1}},contextFacts:{clock:{monotonicMs:nowMs,wallMs,bootEpoch:7,
     uncertaintyMs:0,trusted:true,unknownReason:null,sourceRevision:'clock.r3'},natural:[],schedules:[],settings:null,
     solars:artifact.manifest.schedules.map(d=>solarContextEvidence(d,{site:d.site,coverageFromWallMs:0,
       coverageToWallMs:86_400_000,rows:[{sourceDay:0,scheduledWallMs:available?planned:null,available,
@@ -32,7 +33,7 @@ function native(t,artifact,frames) {
   const module=path.join(dir,'source.gfb'),tape=path.join(dir,'facts.json');
   fs.writeFileSync(module,artifact.bytes);
   fs.writeFileSync(tape,JSON.stringify({profile:'context-solar-v1',activation,steps:frames.map((f,scanId)=>({
-    scanId,logicalTimeMs:f.nowMs,inputs:[{name:'divisor',value:f.inputs.divisor}],...f.contextFacts}))}));
+    scanId,logicalTimeMs:f.nowMs,inputs:Object.entries(softwareQualityRails(artifact,{divisor:f.samples.divisor.value},scanId+1,f.nowMs)).map(([name,value])=>({name,value})),...f.contextFacts}))}));
   return execFileSync(path.join(root,'target/release/examples/context_tape'+(process.platform==='win32'?'.exe':'')),
     [module,tape],{encoding:'utf8'}).trim().split('\n').map(l=>JSON.parse(l));
 }

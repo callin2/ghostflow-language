@@ -79,6 +79,13 @@ Sol, 예외적으로 어렵거나 해결되지 않은 작업은 Astra를 사용�
 입력이 같을 때만 기존 증거를 재사용합니다. 각 명령, 종료 상태, 유용한 건수와
 남은 한계를 보고합니다.
 
+CI는 분류 job에서 compiler lane보다 먼저
+`node --test --test-reporter=tap tests/ci-verification-routing.test.mjs tests/verified-wasm-artifact.test.mjs`를 실행합니다.
+이 로컬 파일 계약 검사는 의존성 설치나 compiler가 필요 없습니다. 이 선행 검사와
+기존 전체 후속 검증 게이트를 모두 유지합니다.
+[이슈 #534](https://github.com/callin2/ghostflow-language/issues/534)에 실제로 늦게 발견된
+workflow 오류와 System #196 링크를 기록했습니다.
+
 verifier는 native compilation이나 replay 전에 requirement-catalog excerpt를 검증합니다.
 소스 줄이 이동하면 변경되지 않은 excerpt 위치만 옮기고 해시는 보존합니다.
 drift를 숨기려고 과거 증거 해시를 갱신하지 않습니다. 정적 검사와 집중 검증의 성공 결과를
@@ -138,6 +145,13 @@ node --test tests/doc-translations.test.mjs tests/doc-index.test.mjs
 에이전트 유지 관리와 CI 검사는 파일 시스템 감시자가 아닙니다.
 
 ## 5. 작업 종료 및 반복 개선
+
+같은 저장소의 기능 PR이 `dev`에 병합되면 CI는 현재 원격 tip이 병합 이벤트의
+head SHA와 같을 때만 원격 브랜치를 삭제합니다. 정확한 Git force-with-lease가
+동시 변경을 보호합니다. 포크 head, 없는 tip, 진행된 tip, `main`, `dev`, 기본
+브랜치와 release 브랜치는 보존합니다. 이 자동화는 로컬 브랜치와 작업 트리를
+삭제하지 않습니다. 과거 브랜치의 조상을 보존해야 하는 통합에는 merge commit을
+사용합니다. squash는 원래 tip을 `dev`의 조상으로 만들지 않습니다.
 
 정확한 변경, 증거와 명령, 종료 상태, 관련 건수, 한계 및 연결된 이슈나 풀 리퀘스트를
 보고합니다. 자동 검사 결과가 통과하고 의미, 설계 또는 안전 문제가 남지 않았다면

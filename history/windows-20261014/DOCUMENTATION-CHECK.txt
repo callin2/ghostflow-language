@@ -1,0 +1,20 @@
+2026-10-14 preservation PR documentation verification
+
+Tracking: https://github.com/callin2/ghostflow-language/issues/544
+PR: https://github.com/callin2/ghostflow-language/pull/546
+Initial CI run 38485375739 failed at docs:check with stale source digest README.md.
+The English restoration link had been added without the corresponding Korean link
+and reviewed translation hashes. This was a preservation-document error, not a
+runtime acceptance result. The Korean link and the two current README hashes are
+now updated. No historical benchmark digest or compiler/runtime source is changed.
+
+Temporary Windows verification checkout CRLF conversion initially caused unrelated
+source/provenance digest errors. Tracked text was normalized in that isolated
+verification checkout; unrelated files are not staged or pushed. Only the intended
+README.ko.md, docs/translations.json and this evidence note are committed.
+
+npm run docs:index: PASS.
+npm run docs:check: PASS; 154 translation pairs, 79 exclusions;
+docs/INDEX.md current (205 documents), INDEX.md current (387 documents).
+Full CI rerun after the correction is recorded in the owning issue. Local document
+checks do not claim full Language/Rust/WASM/device/LLM verification.

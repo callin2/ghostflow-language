@@ -21,7 +21,10 @@ when true, they indicate that the open or closed limit respectively has been
 reached. Outputs are logical commands to the open/close contactor coils, not
 evidence that the valve actually moved.
 
+This new producer-quality revision distinguishes unavailable position observations from healthy false. Explicitly unavailable permission or position selects `Stopped`; only two healthy asserted limits mean `SensorConflict`. Request quality gates the existing release/rearm logic. Healthy button values do not infer physical faults, and no new START input is added. The predecessor is retained at `tests/fixtures/history/issue531/pc-05-limit-feedback.ghost.en.md.pre-input.txt`.
+
 ```ghost
+// Source revision: issue531-producer-quality-pc05-v1
 control LimitFeedbackValve {
   input open_request, close_request, open_limit, close_limit, stop_ok, overload_ok: Bool;
   output valve_open_contactor, valve_close_contactor: Bool;
@@ -36,74 +39,72 @@ control LimitFeedbackValve {
   // ghostflow:link id=GF-INT-PC05-LIMIT-FEEDBACK-V1 relation=implements
   timer age = elapsed(phase);
 
-  let permit = stop_ok && overload_ok;
-  let conflict = open_limit && close_limit;
-  let ambiguous = open_request && close_request;
-  let open_event = request_armed && open_request && !close_request;
-  let close_event = request_armed && close_request && !open_request;
+  let requests_good = case open_request { ok(_) => case close_request { ok(_) => true; fault(_) => false; }; fault(_) => false; };
+  let open_requested = open_request |> recover(false);
+  let close_requested = close_request |> recover(false);
+  let permission_good = case stop_ok { ok(_) => case overload_ok { ok(_) => true; fault(_) => false; }; fault(_) => false; };
+  let permit = (stop_ok |> recover(false)) && (overload_ok |> recover(false));
+  let position_known = case open_limit { ok(_) => case close_limit { ok(_) => true; fault(_) => false; }; fault(_) => false; };
+  // Fault branch payloads cannot reach a position decision: phase gates position_known first.
+  let open_observed = case open_limit { ok(value) => value; fault(_) => false; };
+  let close_observed = case close_limit { ok(value) => value; fault(_) => false; };
+  let conflict = open_observed && close_observed;
+  let known_open = open_observed && !close_observed;
+  let known_closed = close_observed && !open_observed;
+  let ambiguous = open_requested && close_requested;
+  let open_event = requests_good && request_armed && open_requested && !close_requested;
+  let close_event = requests_good && request_armed && close_requested && !open_requested;
 
-  request_armed' = permit && !conflict && !open_request && !close_request;
+  request_armed' = requests_good && permission_good && position_known && permit && !conflict && !open_requested && !close_requested;
 
-  phase' = case phase {
+  phase' = if !permission_good || !position_known then Stopped
+    else if conflict then SensorConflict
+    else if phase != SensorConflict && (!permit || ambiguous) then Stopped
+    else case phase {
     Stopped =>
-      if conflict then SensorConflict
-      else if !permit || ambiguous then Stopped
-      else if open_event then Opening
+      if open_event then Opening
       else if close_event then Closing
-      else if open_limit && !close_limit then Open
-      else if close_limit && !open_limit then Closed
+      else if known_open then Open
+      else if known_closed then Closed
       else Stopped;
 
     Closed =>
-      if conflict then SensorConflict
-      else if !permit || ambiguous then Stopped
-      else if open_event then Opening
-      else if close_limit && !open_limit then Closed
-      else if open_limit && !close_limit then Open
+      if open_event then Opening
+      else if known_closed then Closed
+      else if known_open then Open
       else Stopped;
 
     Opening =>
-      if conflict then SensorConflict
-      else if !permit || ambiguous then Stopped
-      else if close_event then WaitClose
-      else if open_limit then Open
+      if close_event then WaitClose
+      else if open_observed then Open
       else Opening;
 
     Open =>
-      if conflict then SensorConflict
-      else if !permit || ambiguous then Stopped
-      else if close_event then Closing
-      else if open_limit && !close_limit then Open
-      else if close_limit && !open_limit then Closed
+      if close_event then Closing
+      else if known_open then Open
+      else if known_closed then Closed
       else Stopped;
 
     Closing =>
-      if conflict then SensorConflict
-      else if !permit || ambiguous then Stopped
-      else if open_event then WaitOpen
-      else if close_limit then Closed
+      if open_event then WaitOpen
+      else if close_observed then Closed
       else Closing;
 
     WaitOpen =>
-      if conflict then SensorConflict
-      else if !permit || ambiguous then Stopped
-      else if close_event then WaitClose
-      else if open_limit then Open
+      if close_event then WaitClose
+      else if open_observed then Open
       else if age >= reversal_wait then Opening
       else WaitOpen;
 
     WaitClose =>
-      if conflict then SensorConflict
-      else if !permit || ambiguous then Stopped
-      else if open_event then WaitOpen
-      else if close_limit then Closed
+      if open_event then WaitOpen
+      else if close_observed then Closed
       else if age >= reversal_wait then Closing
       else WaitClose;
 
     SensorConflict =>
-      if conflict then SensorConflict
-      else if open_limit && !close_limit then Open
-      else if close_limit && !open_limit then Closed
+      if known_open then Open
+      else if known_closed then Closed
       else Stopped;
   };
 

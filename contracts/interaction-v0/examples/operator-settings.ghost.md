@@ -1,8 +1,8 @@
-# Renderer-independent operator settings fixture
+# Cabinet-view-independent operator settings fixture
 
 <!-- ghostflow:anchor id=GF-INT-FIXTURE-OPERATOR-SETTINGS-V0 kind=intent status=confirmed origin=user -->
 Expose the authored operating limits and apply policy without choosing controls,
-layout, colors, or any other renderer behavior.
+layout, colors, or any other cabinet-view behavior.
 
 ```ghost
 control OperatorSettings {

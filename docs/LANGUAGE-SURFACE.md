@@ -146,7 +146,7 @@ false` 또는 둘 다인 tick에서는 `running'`과 두 출력이 모두 false�
 출력 intent의 계산과 실제 출력의 시작·정지·장애 시 안전 상태는 서로 다른 경계다.
 GhostFlow VM은 연결식과 safety 제약을 계산해 requested/safe intent를 반환할 뿐이며,
 부팅·실패·연결 해제 시 모든 출력을 OFF로 만드는 fail-safe 정책과 적용 시점은
-호스트/Driver가 소유한다. `output` 선언의 생략된 초기값을 그런 정책의 표현으로
+호스트/renderer가 소유한다. `output` 선언의 생략된 초기값을 그런 정책의 표현으로
 해석하지 않는다.
 
 ### 시간표와 타이머를 읽는 단일 밸브 관수 예제

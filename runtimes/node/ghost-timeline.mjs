@@ -23,11 +23,15 @@ function bound(frames) {
   if (new TextEncoder().encode(canonicalJson(frames)).length > MAX_BYTES) throw new RangeError('timeline input byte budget exceeded');
 }
 function captureFrame(frame, required, previous) {
-  keys(frame, ['nowMs', 'inputs', 'contextFacts'], 'timeline frame');
+  keys(frame, ['nowMs', 'inputs', 'samples', 'contextFacts'], 'timeline frame');
   const captured = copy(frame);
   if (!Number.isSafeInteger(captured.nowMs) || captured.nowMs < 0 || captured.nowMs <= previous) throw new Error('timeline times must increase');
-  keys(captured.inputs, required, 'timeline inputs');
-  for (const name of required) if (!Object.hasOwn(captured.inputs, name)) throw new Error(`missing recorded input ${name}`);
+  keys(captured.inputs ?? {}, required.inputs, 'timeline inputs');
+  for (const name of required.inputs) if (!Object.hasOwn(captured.inputs ?? {}, name)) throw new Error(`missing recorded input ${name}`);
+  // Acquisition observations are explicit records. An omitted observation is
+  // passed unchanged to ControlRuntime so its existing quality/conditioning
+  // contract decides NotReady, retention or staleness; the host creates none.
+  keys(captured.samples ?? {}, required.samples, 'timeline samples');
   record(captured.contextFacts, 'recorded context facts');
   return captured;
 }
@@ -56,8 +60,8 @@ export async function createGhostTimeline({ wasmBytes, document, filename, sourc
   const manifest = artifact.manifest;
   if (manifest.format !== 'GhostFlow/control-v10' || !manifest.schedules?.length
       || manifest.schedules.some(schedule => schedule.kind !== 'periodic')
-      || ['sensors', 'signals', 'controllers', 'objectives', 'afterEvents'].some(name => manifest[name]?.length)
-      || manifest.contexts?.length) throw new Error('timeline profile requires a GFB10 Periodic control without external context or sensor adapters');
+      || ['signals', 'controllers', 'objectives', 'afterEvents'].some(name => manifest[name]?.length)
+      || manifest.contexts?.length) throw new Error('timeline profile requires a GFB10 Periodic control without external contexts, signals, controllers, objectives or after-event adapters');
   if (manifest.accounting?.constraints?.length
       || manifest.accounting?.bindings?.some(binding => binding.operation !== 'on_time')) {
     throw new Error('timeline profile does not support accounting-dependent decisions or event-count bindings');
@@ -123,7 +127,10 @@ class Timeline {
       return copy(row);
     } finally { this.#busy = false; }
   }
-  #required() { return this.#artifact.manifest.inputs.filter(item => !item.name.startsWith('__gf_')).map(item => item.name); }
+  #required() { return {
+    inputs: this.#artifact.manifest.inputs.filter(item => !item.name.startsWith('__gf_')).map(item => item.name),
+    samples: this.#artifact.manifest.sensors.map(item => item.name),
+  }; }
   async recordApplied(segment) {
     this.#available();
     const captured = copy(segment);

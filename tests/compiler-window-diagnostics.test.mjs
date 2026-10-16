@@ -28,14 +28,14 @@ async function locatedFailure(name, bad, good, message, inspectValid = () => {})
 }
 
 const validAverage = `control ValidAverage {
-  sensor temperature: Temperature;
+  input temperature: Temperature;
   signal average = window_average(temperature, over: 1s, quality: measured, max_age: 1s);
 }`;
 
 await locatedFailure(
   'window diagnostics reject a duplicate named argument at the duplicate name',
   `control DuplicateWindowArgument {
-    sensor temperature: Temperature;
+    input temperature: Temperature;
     signal average = window_average(temperature, over: 1s, §over: 2s, quality: measured, max_age: 1s);
   }`,
   validAverage,
@@ -45,7 +45,7 @@ await locatedFailure(
 await locatedFailure(
   'window diagnostics reject a zero constant duration at its literal',
   `control ZeroWindowDuration {
-    sensor temperature: Temperature;
+    input temperature: Temperature;
     signal average = window_average(temperature, over: §0ms, quality: measured, max_age: 1s);
   }`,
   validAverage,
@@ -56,7 +56,7 @@ await locatedFailure(
   'window diagnostics distinguish a non-SensorFault Result source',
   `fn clock_value(value: Temperature) -> Result<Temperature, ClockFault> { fault(ClockUnknown) }
   control WrongWindowError {
-    input temperature: Temperature;
+    let temperature: Temperature = 280K;
     signal average = window_average(§clock_value(temperature), over: 1s, quality: measured, max_age: 1s);
   }`,
   validAverage,
@@ -67,7 +67,7 @@ await locatedFailure(
   'window diagnostics reject measured evidence without physical sample lineage',
   `fn wrap(value: Temperature) -> Result<Temperature, SensorFault> { ok(value) }
   control UnsourcedWindow {
-    input temperature: Temperature;
+    let temperature: Temperature = 280K;
     signal average = window_average(§wrap(temperature), over: 1s, quality: measured, max_age: 1s);
   }`,
   validAverage,
@@ -80,7 +80,7 @@ await locatedFailure(
     let threshold = §rate(delta: 1ΔK, time: 1s);
   }`,
   `control ContextualRate {
-    sensor temperature: Temperature;
+    input temperature: Temperature;
     signal warming = window_rate(temperature, over: 1s, quality: measured, max_age: 1s);
     output fast: Bool;
     fast <- warming |> map(below(rate(delta: 1ΔK, time: 1s))) |> recover(false);
@@ -91,13 +91,13 @@ await locatedFailure(
 await locatedFailure(
   'rate constructor rejects a duplicate named argument at the duplicate name',
   `control DuplicateRateArgument {
-    sensor temperature: Temperature;
+    input temperature: Temperature;
     signal warming = window_rate(temperature, over: 1s, quality: measured, max_age: 1s);
     output fast: Bool;
     fast <- warming |> map(below(rate(delta: 1ΔK, §delta: 2ΔK, time: 1s))) |> recover(false);
   }`,
   `control ValidRate {
-    sensor temperature: Temperature;
+    input temperature: Temperature;
     signal warming = window_rate(temperature, over: 1s, quality: measured, max_age: 1s);
     output fast: Bool;
     fast <- warming |> map(below(rate(delta: 1ΔK, time: 1s))) |> recover(false);
@@ -108,13 +108,13 @@ await locatedFailure(
 await locatedFailure(
   'rate constructor reports its exact required argument shape',
   `control MissingRateTime {
-    sensor temperature: Temperature;
+    input temperature: Temperature;
     signal warming = window_rate(temperature, over: 1s, quality: measured, max_age: 1s);
     output fast: Bool;
     fast <- warming |> map(below(§rate(delta: 1ΔK))) |> recover(false);
   }`,
   `control ValidRateShape {
-    sensor temperature: Temperature;
+    input temperature: Temperature;
     signal warming = window_rate(temperature, over: 1s, quality: measured, max_age: 1s);
     output fast: Bool;
     fast <- warming |> map(below(rate(delta: 1ΔK, time: 1s))) |> recover(false);
@@ -126,14 +126,14 @@ await locatedFailure(
   'rate constructor rejects a non-Duration dynamic time at its reference',
   `control WrongRateTime {
     input enabled: Bool;
-    sensor temperature: Temperature;
+    input temperature: Temperature;
     signal warming = window_rate(temperature, over: 1s, quality: measured, max_age: 1s);
     output fast: Bool;
     fast <- warming |> map(below(rate(delta: 1ΔK, time: §enabled))) |> recover(false);
   }`,
   `control DynamicRateTime {
-    input interval: Duration;
-    sensor temperature: Temperature;
+    state interval: Duration = 1s;
+    input temperature: Temperature;
     signal warming = window_rate(temperature, over: 1s, quality: measured, max_age: 1s);
     output fast: Bool;
     fast <- warming |> map(below(rate(delta: 1ΔK, time: interval))) |> recover(false);
@@ -144,13 +144,13 @@ await locatedFailure(
 await locatedFailure(
   'rate constructor reports a nominal delta mismatch for a non-temperature quantity',
   `control WrongPressureRateDelta {
-    sensor pressure: Pressure;
+    input pressure: Pressure;
     signal changing = window_rate(pressure, over: 1s, quality: measured, max_age: 1s);
     output fast: Bool;
     fast <- changing |> map(below(rate(delta: §1m3, time: 1s))) |> recover(false);
   }`,
   `control PressureRateDelta {
-    sensor pressure: Pressure;
+    input pressure: Pressure;
     signal changing = window_rate(pressure, over: 1s, quality: measured, max_age: 1s);
     output fast: Bool;
     fast <- changing |> map(below(rate(delta: 1Pa, time: 1s))) |> recover(false);
@@ -160,7 +160,7 @@ await locatedFailure(
 
 const temporalStateBudget = count => `control WindowStateBudget {
   ${Array.from({ length: count }, (_, index) => `state value_${index}: Number = 0.0;`).join('\n  ')}
-  sensor temperature: Temperature;
+  input temperature: Temperature;
   signal average = window_average(temperature, over: 1s, quality: measured, max_age: 1s);
 }`;
 

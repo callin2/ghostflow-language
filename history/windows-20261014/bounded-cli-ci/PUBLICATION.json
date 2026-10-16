@@ -1,0 +1,11 @@
+{
+  "sourceCommitUrl": "https://github.com/callin2/ghostflow-language/commit/8cfd94f65da6aea45c480638c81a163c6cab4de9",
+  "archiveCommitUrl": "https://github.com/callin2/ghostflow-language/commit/96433074fc5637dff6858455f4666ff8bd7e7f4c",
+  "originalTag": "codex/windows-original-bounded-cli-ci-20261014",
+  "baseline": "d7bc140ee214745661ebccd1197eb7cbf3035ec0",
+  "issueComments": [
+    "https://github.com/callin2/ghostflow-language/issues/544#issuecomment-6154588993"
+  ],
+  "verification": "Full original tag/branch remote SHA and snapshot blob/SHA256 equality; base active tree preserved; source/adoption tests not run.",
+  "adoption": "not-adopted; reference-only"
+}

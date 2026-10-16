@@ -13,6 +13,7 @@ import { BoundResourceControlRuntime, simulateBoundResourceControl } from '../ru
 import { BoundResourceControlRuntime as NodeBoundRuntime } from '../runtimes/node/bound-resource-control.mjs';
 import { sha256Hex } from '../tools/sha256.mjs';
 import { prepareCompletedScanSnapshot } from '../tools/interaction-runtime-snapshot.mjs';
+import { softwareQualityRails, softwareQualityAbi } from './helpers/software-quality-observations.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const filename = 'examples/bound-resource-execution.ghost.md';
@@ -47,9 +48,14 @@ const rows = [
   [false, false, false, false, false, true],
   [true, true, true, true, false, true], // simultaneous fresh conflict
 ];
+const logicalNames = ['automatic', 'manual', 'automatic_request', 'manual_request', 'fallback_request', 'valve_request'];
+function rails(bound, values, scanId = 0) {
+  return softwareQualityRails(bound, Object.fromEntries(logicalNames.map((name, index) => [name, values[index]])), scanId + 1, scanId);
+}
+const tapeRow = (bound, values) => Object.entries(rails(bound, values)).map(([name, value]) => `${name}=${value}`).join(',');
 function frame(bound, values, scanId) {
   return { scanId, logicalTimeMs: scanId,
-    inputs: bound.manifest.inputs.map((port, index) => ({ name: port.name, value: values[index] })) };
+    inputs: Object.entries(rails(bound, values, scanId)).map(([name, value]) => ({ name, value })) };
 }
 function wasm() { return fs.readFileSync(path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm')); }
 function temporary(t, bound) {
@@ -79,7 +85,7 @@ test('GF-TEST-bound-resource-compile: source-bound finite executable policy reje
     const invalid = clone(binding); mutate(invalid);
     assert.throws(() => compileBoundResourceControl(checked, invalid), /binding/);
   }
-  assert.throws(() => compile(document.replace('output pump, valve: Bool;', 'output pump, valve, bypass: Bool;\n  bypass <- manual_request;')), /every output/);
+  assert.throws(() => compile(document.replace('output pump, valve: Bool;', 'output pump, valve, bypass: Bool;\n  bypass <- manual_request_value;')), /every output/);
   assert.throws(() => compile(document.replace('input automatic, manual,', 'input extra: Int;\n  input automatic, manual,')), /only a Bool/);
   assert.throws(() => compile(document.replace('  constraints SharedRules for station {', '  constraints Opposite for pump1 { require at safe_output valve1.on == true; safe { pump1 = true; valve1 = true; } }\n  constraints SharedRules for station {')), /incompatible authored safe/);
   assert.throws(() => compile(document.replace('    exclusive at admission { automatic, manual };',
@@ -99,6 +105,9 @@ test('bound browser compiler retains and verifies exact interaction identity aft
   assert.equal(bound.interactionSchema.module.bytecodeSha256, bound.manifest.bytecodeSha256);
   assert.notEqual(bound.interactionSchema.module.bytecodeSha256, checked.interactionSchema.module.bytecodeSha256);
   assert.deepEqual(bound.manifest.inputs, checked.manifest.control.inputs);
+  assert.deepEqual(bound.manifest.sensors, checked.manifest.control.sensors);
+  assert.equal(bound.manifest.inputs.length, 0);
+  assert.equal(bound.manifest.sensors.length, 6);
   assert.deepEqual(bound.manifest.outputs, checked.manifest.control.outputs);
   const runtime = await BoundResourceControlRuntime.instantiate(wasm(), bound);
   try {
@@ -131,16 +140,17 @@ test('portable bound runtime reserves pending writers and shares the concrete No
 
 test('bound browser authored Bool state retains canonical intent provenance in actual completed snapshots', async () => {
   const source = document.replace('```ghost', '<!-- ghostflow:anchor id=GF-INT-REVIEW-BOUND-STATE kind=intent status=confirmed origin=user -->\nRemember whether automatic was requested in a completed scan.\n\n```ghost')
-    .replace('  output pump, valve: Bool;', '  // ghostflow:link id=GF-INT-REVIEW-BOUND-STATE relation=implements\n  state remembered: Bool = false;\n  remembered\' = automatic;\n  output pump, valve: Bool;');
+    .replace('  output pump, valve: Bool;', '  // ghostflow:link id=GF-INT-REVIEW-BOUND-STATE relation=implements\n  state remembered: Bool = false;\n  remembered\' = automatic_value;\n  output pump, valve: Bool;');
   const identity = { documentId: 'review-bound-state', revisionId: 'r1' };
   const checked = await compileSource(source, { filename: 'review-bound-state.ghost.md', interactionSourceIdentity: identity });
   const { binding } = compile();
   const updatedBinding = { ...binding, sourceDocumentSha256: checked.sourceDocument.sha256, artifactSha256: checked.manifest.bytecodeSha256 };
   const bound = compileBoundResourceControl(checked, updatedBinding);
-  assert.deepEqual(checked.interactionSchema.descriptors.map(descriptor => descriptor.id), ['state.remembered']);
+  assert.deepEqual(checked.interactionSchema.descriptors.map(descriptor => descriptor.id),
+    [...logicalNames.map(name => `state.remembered_${name}`), 'state.remembered']);
   assert.deepEqual(bound.interactionSchema.descriptors, checked.interactionSchema.descriptors);
   assert.ok(bound.traceMetadata.bindings.some(entry => entry.kind === 'state' && entry.name === 'remembered'));
-  const stateDescriptor = bound.interactionSchema.descriptors[0];
+  const stateDescriptor = bound.interactionSchema.descriptors.find(descriptor => descriptor.id === 'state.remembered');
   assert.deepEqual(stateDescriptor.provenance.intentAnchorIds, ['GF-INT-REVIEW-BOUND-STATE']);
   const sourceNode = bound.sourceMap.find(node => node.id === stateDescriptor.provenance.sourceNode.id);
   assert.equal(source.split('\n')[sourceNode.line - 1].trim(), 'state remembered: Bool = false;');
@@ -159,8 +169,7 @@ test('GF-TEST-bound-resource-parity: automatic manual fallback admission violati
   const { bound } = compile();
   const files = temporary(t, bound);
   const executable = path.join(root, 'target/release/examples/resource_tape' + (process.platform === 'win32' ? '.exe' : ''));
-  const native = () => execFileSync(executable, [...files, ...rows.map(values => bound.manifest.inputs
-    .map((port, index) => `${port.name}=${values[index]}`).join(','))], { encoding: 'utf8' }).trim().split('\n').map(JSON.parse);
+  const native = () => execFileSync(executable, [...files, ...rows.map(values => tapeRow(bound, values))], { encoding: 'utf8' }).trim().split('\n').map(JSON.parse);
   const expected = native();
   assert.deepEqual(native(), expected);
   assert.deepEqual(expected[0].safe, {}, 'denied start must not dispatch an authored safe vector as new actuation');
@@ -196,9 +205,10 @@ test('GF-TEST-bound-resource-parity: automatic manual fallback admission violati
       for (const output of bound.manifest.outputs) runtime.addCapability('actuator', output.name, 'bool');
       assert.throws(() => runtime.activate(), /binding/);
       runtime.activateResourceBinding(bound.resourceBindingActivation);
+      if (Runtime === GhostFlowRuntime) softwareQualityAbi(runtime, bound);
       const actual = rows.map((values, scanId) => {
         if (Runtime === FramedGhostFlowRuntime) return runtime.scanResourceBinding(frame(bound, values, scanId), bound.resourceBindingScan).trace;
-        for (const [index, port] of bound.manifest.inputs.entries()) runtime.setBool(port.name, values[index]);
+        for (const [index, name] of logicalNames.entries()) runtime.setBool(name, values[index]);
         runtime.tickResourceBinding(bound.resourceBindingScan); return clone(runtime.trace);
       });
       assert.deepEqual(actual, expected);
@@ -252,6 +262,51 @@ test('GF-TEST-bound-resource-bypass: binding every scan atomic retry source forg
   const afterFailure = await BoundResourceControlRuntime.instantiate(wasm(), other); afterFailure.dispose();
 });
 
+test('bound mode quality rejects unavailable observations atomically and accepts corrected same-scan Bool retries', async () => {
+  const { bound } = compile(document, 'virtual/mode-quality');
+  const healthy = [rows[2], rows[3], rows[3], rows[12], rows[10], rows[3]]
+    .map((values, scanId) => frame(bound, values, scanId));
+  const expected = (await simulateBoundResourceControl(wasm(), bound, healthy)).map(outcome => outcome.trace);
+  for (const mode of ['automatic', 'manual']) {
+    const producer = bound.manifest.sensors.find(port => port.name === mode);
+    assert.ok(new TextDecoder().decode(bound.resourceBindingActivation).includes(producer.valueInput));
+    for (const Runtime of [GhostFlowRuntime, FramedGhostFlowRuntime]) {
+      const runtime = await Runtime.instantiate(wasm());
+      try {
+        runtime.load(bound.bytes);
+        for (const port of bound.manifest.outputs) runtime.addCapability('actuator', port.name, 'bool');
+        runtime.activateResourceBinding(bound.resourceBindingActivation);
+        const execute = next => {
+          if (Runtime === FramedGhostFlowRuntime) return runtime.scanResourceBinding(next, bound.resourceBindingScan).trace;
+          for (const port of next.inputs) runtime[typeof port.value === 'boolean' ? 'setBool' : 'setNumber'](port.name, port.value);
+          runtime.tickResourceBinding(bound.resourceBindingScan);
+          return clone(runtime.trace);
+        };
+        const unavailable = (next, payload) => ({ ...next, inputs: next.inputs.map(port => ({ ...port,
+          value: port.name === producer.okInput ? false : port.name === producer.valueInput ? payload : port.value,
+        })) });
+        // A true payload with unknown quality cannot create a fresh claim.
+        assert.throws(() => execute(unavailable(healthy[0], true)), /mode observation unavailable/);
+        assert.deepEqual(execute(healthy[0]), expected[0], 'Good false retries the rejected scan without hidden state');
+        assert.deepEqual(execute(healthy[1]), expected[1]);
+        const committed = () => Runtime === FramedGhostFlowRuntime ? runtime.outcome : runtime.trace;
+        const before = clone(committed());
+        // A false payload with unknown quality cannot release or trip an incumbent.
+        assert.throws(() => execute(unavailable(healthy[2], false)), /mode observation unavailable/);
+        assert.deepEqual(committed(), before, 'rejection retains the complete last committed outcome');
+        assert.deepEqual(execute(healthy[2]), expected[2], 'Good true retries the same scan with unchanged admission');
+        const tripped = execute(healthy[3]);
+        assert.equal(tripped.resourceTrace[0].tripped, true);
+        const beforeRecovery = clone(committed());
+        assert.throws(() => execute(unavailable(healthy[4], false)), /mode observation unavailable/);
+        assert.deepEqual(committed(), beforeRecovery, 'unknown false cannot neutralize a trip');
+        assert.deepEqual(execute(healthy[4]), expected[4], 'only the authored Good neutral frame releases the trip');
+        assert.deepEqual(execute(healthy[5]), expected[5], 'a fresh Good claim still follows the original admission rule');
+      } finally { runtime.dispose(); }
+    }
+  }
+});
+
 test('GF-TEST-bound-resource-overlap: mandatory finite predicates and local safety combine without declaration-order priority', async t => {
   const extra = `  constraints Capacity for pump1 {
     require at safe_output count_on({ valve1 }) >= 1;
@@ -269,8 +324,7 @@ test('GF-TEST-bound-resource-overlap: mandatory finite predicates and local safe
   const files = temporary(t, bound);
   const executable = path.join(root, 'target/release/examples/resource_tape' + (process.platform === 'win32' ? '.exe' : ''));
   const sequence = [rows[3], rows[8], rows[9], rows[10], rows[7]];
-  const traces = execFileSync(executable, [...files, ...sequence.map(values => bound.manifest.inputs
-    .map((port, index) => `${port.name}=${values[index]}`).join(','))], { encoding: 'utf8' }).trim().split('\n').map(JSON.parse);
+  const traces = execFileSync(executable, [...files, ...sequence.map(values => tapeRow(bound, values))], { encoding: 'utf8' }).trim().split('\n').map(JSON.parse);
   assert.deepEqual(traces[1].safe, { pump: false, valve: true });
   assert.ok(traces[1].resourceTrace.every(group => group.tripped), 'overlapping groups trip together');
   const outcomes = await simulateBoundResourceControl(wasm(), bound, sequence.map((values, index) => frame(bound, values, index)));

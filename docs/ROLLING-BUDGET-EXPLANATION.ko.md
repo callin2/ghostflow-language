@@ -39,7 +39,7 @@ REF-04-066은 실제 WASM ledger 거부, 정확한 해제 경계, 영속 승인 
 snapshot 복구와 control activation을 검증한다. 같은 snapshot에서 복구한 별도
 context ledger는 실제 완료된 OFF output 관찰을 만든다. 그것이 rolling 거부를
 발생시키거나 해당 ledger를 초기화하지 않는다. accounting API에는 animation
-입력이 없다. 이는 reference accounting 투영이며 frontend renderer 검증,
+입력이 없다. 이는 reference accounting 투영이며 frontend cabinet-view 검증,
 컴파일된 `on_time` 시작/차단 자동 통합, API 배포, 저장 매체 인증 또는 Device
 검증이 아니다. 추가된 WASM export를 사용하려면 WASM module을 다시 빌드해야
 한다. GFB와 ledger snapshot 형식은 바뀌지 않는다.

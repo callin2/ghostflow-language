@@ -14,9 +14,23 @@ Bool intent endpoint입니다. 이 가상 endpoint에 대해서는 false를 명�
 이 규칙은 자동·수동 중재 정책을 선택하거나 하드웨어에 출력이 적용되었다고
 인증하지 않습니다.
 
+입력 품질을 명시하는 새 리비전 input-quality-v1입니다. 알 수 없는 입력은 이 예제의 이전 관측값을 유지하며, 초기 false는 가상 예제의 상태 초기화입니다. 원본 문서는 별도 이력으로 보존합니다.
+
 ```ghost
 control OutputEnvelope {
-  input start, valve_ready, forward_request, reverse_request: Bool;
+  input observed_start, observed_valve_ready, observed_forward_request, observed_reverse_request: Bool;
+  state remembered_start: Bool = false;
+  let start = case observed_start { ok(value) => value; fault(_) => remembered_start; };
+  remembered_start' = start;
+  state remembered_valve_ready: Bool = false;
+  let valve_ready = case observed_valve_ready { ok(value) => value; fault(_) => remembered_valve_ready; };
+  remembered_valve_ready' = valve_ready;
+  state remembered_forward_request: Bool = false;
+  let forward_request = case observed_forward_request { ok(value) => value; fault(_) => remembered_forward_request; };
+  remembered_forward_request' = forward_request;
+  state remembered_reverse_request: Bool = false;
+  let reverse_request = case observed_reverse_request { ok(value) => value; fault(_) => remembered_reverse_request; };
+  remembered_reverse_request' = reverse_request;
   output pump, valve, forward, reverse: Bool;
   pump <- start;
   valve <- valve_ready;

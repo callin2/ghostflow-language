@@ -1,0 +1,402 @@
+```ghost
+control ButtonLamp {
+  input button: Bool;
+  output lamp: Bool;
+
+  lamp <- button;
+}
+```
+
+```ghost
+control HoldToRun {
+  input button, stop: Bool;
+  output pump: Bool;
+
+  pump <- button && !stop;
+}
+```
+
+```ghost
+control StartStop {
+  input start, stop: Bool;
+  output pump: Bool;
+  state armed: Bool = false;
+  state running: Bool = false;
+
+  let start_event = armed && start;
+
+  armed' = !stop && !start;
+  running' = !stop && (start_event || running);
+  pump <- running';
+}
+```
+
+```ghost
+control FiveMinuteRun {
+  input start, stop, low_water: Bool;
+  output pump, valve: Bool;
+  config duration: Duration = 5min;
+  state armed: Bool = false;
+  state running: Bool = false;
+  timer age = elapsed(running);
+
+  let permit = !stop && !low_water;
+  let start_event = armed && start;
+
+  armed' = permit && !start;
+  running' = if !permit then false
+    else if running then age < duration
+    else start_event;
+
+  valve <- running';
+  pump <- running';
+  require pump => valve;
+}
+```
+
+```ghost
+control OnDelay {
+  input request, stop: Bool;
+  output enabled: Bool;
+  config delay: Duration = 2s;
+  type Phase = Idle | Waiting | Active;
+  state phase: Phase = Idle;
+  timer age = elapsed(phase);
+
+  phase' = case phase {
+    Idle => if request && !stop then Waiting else Idle;
+    Waiting => if stop || !request then Idle
+      else if age >= delay then Active else Waiting;
+    Active => if request && !stop then Active else Idle;
+  };
+
+  enabled <- phase' == Active;
+}
+```
+
+```ghost
+control OffDelay {
+  input request, stop: Bool;
+  output enabled: Bool;
+  config delay: Duration = 3s;
+  type Phase = Idle | Active | Holding;
+  state phase: Phase = Idle;
+  timer age = elapsed(phase);
+
+  phase' = case phase {
+    Idle => if request && !stop then Active else Idle;
+    Active => if stop then Idle
+      else if !request then Holding else Active;
+    Holding => if stop then Idle
+      else if request then Active
+      else if age >= delay then Idle else Holding;
+  };
+
+  enabled <- phase' in {Active, Holding};
+}
+```
+
+```ghost
+control DailyWatering {
+  input stop: Bool;
+  output pump: Bool;
+  schedule starts: DailySlots<15min> {
+    timezone = "Asia/Seoul";
+    selected = [06:00, 18:45];
+    dst_missing = skip;
+    dst_repeated = first;
+    basis = pulse;
+    when = true;
+    clock = trusted_only;
+    gap = skip_after(60s);
+    recovery = baseline;
+    fallback = skip;
+  }
+  let duration = 5min;
+  state running: Bool = false;
+  timer age = elapsed(running);
+
+  running' = !stop && (if running then age < duration else starts.due);
+  pump <- running';
+}
+```
+
+```ghost
+control TwoZones {
+  input start: Bool;
+  output pump, valve1, valve2: Bool;
+  type Phase = Idle | Open1 | Water1 | Stop1 | Open2 | Water2 | Stop2;
+  state phase: Phase = Idle;
+  state armed: Bool = false;
+  timer age = elapsed(phase);
+  config watering_time: Duration = 5min;
+  config settle_time: Duration = 2s;
+
+  let start_event = armed && start;
+  armed' = phase == Idle && !start;
+
+  phase' = case phase {
+    Idle => if start_event then Open1 else Idle;
+    Open1 => if age >= settle_time then Water1 else Open1;
+    Water1 => if age >= watering_time then Stop1 else Water1;
+    Stop1 => if age >= settle_time then Open2 else Stop1;
+    Open2 => if age >= settle_time then Water2 else Open2;
+    Water2 => if age >= watering_time then Stop2 else Water2;
+    Stop2 => if age >= settle_time then Idle else Stop2;
+  };
+
+  valve1 <- phase' in {Open1, Water1, Stop1};
+  valve2 <- phase' in {Open2, Water2, Stop2};
+  pump <- phase' in {Water1, Water2};
+  require pump => (valve1 || valve2);
+  require !(valve1 && valve2);
+}
+```
+
+```ghost
+control MoistureControl {
+  input stop: Bool;
+  sensor moisture: Percent {
+    sample = 1s;
+    valid = 0% .. 100%;
+    filter = median(5);
+    stale_after = 3s;
+    recover_after = 3 samples;
+  }
+  signal dry = hysteresis(moisture,
+    on_below: 30%, off_above: 35%, initial: false);
+  output pump: Bool;
+
+  let requested = case dry {
+    ok(value) => value;
+    fault(_) => false;
+  };
+  pump <- requested && !stop;
+}
+```
+
+```ghost
+control TankLevel {
+  input low_level_reached, high_level_reached: Bool;
+  output fill_pump: Bool;
+  type Phase = Idle | Filling | SensorConflict;
+  state phase: Phase = Idle;
+  let conflict = high_level_reached && !low_level_reached;
+
+  phase' = case phase {
+    Idle => if conflict then SensorConflict
+      else if !low_level_reached then Filling else Idle;
+    Filling => if conflict then SensorConflict
+      else if high_level_reached then Idle else Filling;
+    SensorConflict => if conflict then SensorConflict else Idle;
+  };
+
+  fill_pump <- phase' == Filling;
+}
+```
+
+```ghost
+control CountThree {
+  input detected, reset: Bool;
+  output done: Bool;
+  state previous: Bool = false;
+  state count: Int = 0;
+  let rising = detected && !previous;
+
+  previous' = detected;
+  count' = if reset then 0
+    else if rising && count < 3 then count + 1
+    else count;
+  done <- count' >= 3;
+}
+```
+
+```ghost
+control AlarmMemory {
+  input fault_active, reset: Bool;
+  output alarm: Bool;
+  state latched: Bool = false;
+  state reset_armed: Bool = false;
+  let reset_event = reset_armed && reset;
+
+  reset_armed' = !fault_active && !reset;
+  latched' = fault_active || (latched && !reset_event);
+  alarm <- latched';
+}
+```
+
+```ghost
+control ExclusiveDirections {
+  input forward_request, reverse_request: Bool;
+  output forward, reverse: Bool;
+
+  forward <- forward_request;
+  reverse <- reverse_request;
+  require !(forward && reverse);
+}
+```
+
+```ghost
+fn permitted(request: Bool, stop: Bool, enabled: Bool) -> Bool {
+  request && !stop && enabled
+}
+
+control TwoRequests {
+  input request1, request2, stop, enabled: Bool;
+  output zone1, zone2: Bool;
+
+  zone1 <- permitted(request1, stop, enabled);
+  zone2 <- permitted(request2, stop, enabled);
+}
+```
+
+```ghost
+control PumpInterlock {
+  input start, stop, valve_open, low_water: Bool;
+  output pump: Bool;
+  state armed: Bool = false;
+  state running: Bool = false;
+
+  let permit = !stop && valve_open && !low_water;
+  let start_event = armed && start;
+
+  armed' = permit && !start;
+  running' = permit && (running || start_event);
+  pump <- running';
+}
+```
+
+```ghost
+control DirectionInterlock {
+  input forward_request, reverse_request: Bool;
+  output forward, reverse: Bool;
+
+  forward <- forward_request;
+  reverse <- reverse_request;
+  require !(forward && reverse);
+}
+```
+
+```ghost
+control SelfHolding {
+  input start, stop: Bool;
+  output pump: Bool;
+  state running: Bool = false;
+
+  running' = !stop && (start || running);
+  pump <- running';
+}
+```
+
+```ghost
+control CancelAndReturn {
+  input start, cancel, stopped, home: Bool;
+  output work, return_device: Bool;
+  type Phase = Idle | Working | Stopping | Returning;
+  state phase: Phase = Idle;
+  state armed: Bool = false;
+
+  let start_event = armed && start;
+  armed' = phase == Idle && !start && !cancel;
+  phase' = case phase {
+    Idle => if !cancel && start_event then Working else Idle;
+    Working => if cancel then Stopping else Working;
+    Stopping => if !stopped then Stopping else if home then Idle else Returning;
+    Returning => if home then Idle else Returning;
+  };
+  work <- phase' == Working;
+  return_device <- phase' == Returning;
+  require !(work && return_device);
+}
+```
+
+```ghost
+control UsageLimit {
+  input request, usage_valid: Bool;
+  input used: Duration;
+  output device: Bool;
+  config max_use: Duration = 1h;
+
+  let within_limit = case max_use {
+    ok(value) => used < value;
+    fault(_) => false;
+  };
+  device <- request && usage_valid && within_limit;
+}
+```
+
+```ghost
+control HolidayVentilation {
+  input is_holiday, calendar_valid: Bool;
+  input occupied, hot, stop: Bool;
+  output fan: Bool;
+
+  let normal_request = occupied || hot;
+  let holiday_request = hot;
+  let request = if is_holiday then holiday_request else normal_request;
+  fan <- calendar_valid && !stop && request;
+}
+```
+
+```ghost
+control RestartAndWait {
+  input ready, start, stop: Bool;
+  output pump: Bool;
+  state armed: Bool = false;
+  state running: Bool = false;
+
+  let start_event = armed && start;
+  armed' = ready && !stop && !start;
+  running' = ready && !stop && (running || start_event);
+  pump <- running';
+}
+```
+
+```ghost
+control TemperatureMonitor {
+  sensor temperature: Number;
+  output high_temperature, sensor_fault: Bool;
+
+  high_temperature <- case temperature {
+    ok(value) => value >= 30.0;
+    fault(_) => false;
+  };
+  sensor_fault <- case temperature {
+    ok(_) => false;
+    fault(_) => true;
+  };
+}
+```
+
+```ghost
+control ButtonRequest {
+  input start: Bool;
+  output request: Bool;
+  request <- start;
+}
+```
+
+```ghost
+control PumpRequest {
+  input run_request, stop: Bool;
+  output pump: Bool;
+  pump <- run_request && !stop;
+}
+```
+
+```ghost
+control TwoRelayRequests {
+  input request1, request2: Bool;
+  output relay1, relay2: Bool;
+  relay1 <- request1;
+  relay2 <- request2;
+}
+```
+
+```ghost
+control RemoteIoRequest {
+  input start, stop: Bool;
+  output pump: Bool;
+  pump <- start && !stop;
+}
+```

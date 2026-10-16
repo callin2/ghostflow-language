@@ -1,3 +1,4 @@
+import { softwareQualityAbi } from './helpers/software-quality-observations.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -21,7 +22,7 @@ const timerModule = await compileSource(`control FrameTimer {
   input enabled: Bool;
   state phase: Bool = false;
   timer age = elapsed(phase);
-  phase' = enabled;
+  phase' = case enabled { ok(observed) => observed; fault(_) => phase; };
   output expired: Bool;
   expired <- age >= 100ms;
 }`, { filename: 'frame-timer.ghost' });
@@ -95,6 +96,7 @@ test('GF-TEST-scan-frame-wasm: generated timer lowering receives logical frame t
   const runtime = await FramedGhostFlowRuntime.instantiate(wasmBytes);
   t.after(() => runtime.dispose());
   runtime.load(timerModule.bytes);
+  softwareQualityAbi(runtime, timerModule);
   runtime.addCapability('actuator', 'expired', 'bool');
   runtime.activate();
   const scans = [0, 0, 99, 100, 101].map((logicalTimeMs, scanId) => runtime.scan({
@@ -115,13 +117,14 @@ test('GF-TEST-scan-frame-wasm: generated timer lowering receives logical frame t
 test('GF-TEST-scan-frame-wasm-continuous-true: measures only one uninterrupted true interval', async t => {
   const compiled = await compileSource(`control ContinuousTrueTimer {
     input hot: Bool;
-    timer hot_for = continuous_true(hot);
+    timer hot_for = continuous_true(hot |> recover(false));
     output expired: Bool;
     expired <- hot_for >= 30ms;
   }`, { filename: 'continuous-true-timer.ghost' });
   const runtime = await FramedGhostFlowRuntime.instantiate(wasmBytes);
   t.after(() => runtime.dispose());
   runtime.load(compiled.bytes);
+  softwareQualityAbi(runtime, compiled);
   runtime.addCapability('actuator', 'expired', 'bool');
   runtime.activate();
 
@@ -148,14 +151,15 @@ test('GF-TEST-scan-frame-wasm-continuous-true-rejection: rejected time rollback 
   const compiled = await compileSource(`control ContinuousTrueRollback {
     input hot: Bool;
     state idle: Bool = true;
-    idle' = if hot then idle else false;
-    timer hot_for = continuous_true(hot);
+    idle' = case hot { ok(observed) => if observed then idle else false; fault(_) => idle; };
+    timer hot_for = continuous_true(hot |> recover(false));
     output expired: Bool;
     expired <- hot_for >= 50ms;
   }`, { filename: 'continuous-true-rollback.ghost' });
   const runtime = await FramedGhostFlowRuntime.instantiate(wasmBytes);
   t.after(() => runtime.dispose());
   runtime.load(compiled.bytes);
+  softwareQualityAbi(runtime, compiled);
   runtime.addCapability('actuator', 'expired', 'bool');
   runtime.activate();
 
@@ -186,8 +190,8 @@ test('GF-TEST-scan-frame-wasm-continuous-true-rejection: rejected time rollback 
 test('GF-TEST-scan-frame-wasm-continuous-true-instances: timers keep independent intervals and resets', async t => {
   const compiled = await compileSource(`control ContinuousTrueInstances {
     input hot_a, hot_b: Bool;
-    timer a_for = continuous_true(hot_a);
-    timer b_for = continuous_true(hot_b);
+    timer a_for = continuous_true(hot_a |> recover(false));
+    timer b_for = continuous_true(hot_b |> recover(false));
     output a_ready, b_ready: Bool;
     a_ready <- a_for >= 20ms;
     b_ready <- b_for >= 20ms;
@@ -195,6 +199,7 @@ test('GF-TEST-scan-frame-wasm-continuous-true-instances: timers keep independent
   const runtime = await FramedGhostFlowRuntime.instantiate(wasmBytes);
   t.after(() => runtime.dispose());
   runtime.load(compiled.bytes);
+  softwareQualityAbi(runtime, compiled);
   runtime.addCapability('actuator', 'a_ready', 'bool');
   runtime.addCapability('actuator', 'b_ready', 'bool');
   runtime.activate();
@@ -218,7 +223,7 @@ test('GF-TEST-scan-frame-wasm-continuous-true-dependencies: forward references r
   const forward = await compileSource(`control ContinuousTrueForward {
     input hot: Bool;
     timer qualified = continuous_true(raw >= 5ms);
-    timer raw = continuous_true(hot);
+    timer raw = continuous_true(hot |> recover(false));
     output ready: Bool;
     ready <- qualified >= 1ms;
   }`, { filename: 'continuous-true-forward.ghost' });
@@ -240,8 +245,8 @@ test('GF-TEST-scan-frame-wasm-continuous-true-dependencies: forward references r
 
 // Reference §2.7 and §3.3: declaration order cannot change the dependency graph's meaning.
 for (const [order, declarations] of [
-  ['forward', 'timer qualified = continuous_true(condition); let condition = raw >= 5ms; timer raw = continuous_true(hot);'],
-  ['reverse', 'timer raw = continuous_true(hot); let condition = raw >= 5ms; timer qualified = continuous_true(condition);'],
+  ['forward', 'timer qualified = continuous_true(condition); let condition = raw >= 5ms; timer raw = continuous_true(hot |> recover(false));'],
+  ['reverse', 'timer raw = continuous_true(hot |> recover(false)); let condition = raw >= 5ms; timer qualified = continuous_true(condition);'],
 ]) {
   test(`continuous timer/let ${order} declarations execute the same expected intervals`, async t => {
     const compiled = await compileSource(`control TimerOrder {
@@ -253,6 +258,7 @@ for (const [order, declarations] of [
     const runtime = await FramedGhostFlowRuntime.instantiate(wasmBytes);
     t.after(() => runtime.dispose());
     runtime.load(compiled.bytes);
+  softwareQualityAbi(runtime, compiled);
     runtime.addCapability('actuator', 'ready', 'bool');
     runtime.activate();
     const observations = [[0, true], [4, true], [5, true], [6, true], [7, false], [100, true], [105, true], [106, true]]
@@ -274,13 +280,14 @@ test('GF-TEST-scan-frame-wasm-continuous-true-state: unprimed state condition us
     input enabled: Bool;
     state active: Bool = false;
     timer active_for = continuous_true(active);
-    active' = enabled;
+    active' = case enabled { ok(observed) => observed; fault(_) => active; };
     output expired: Bool;
     expired <- active_for >= 50ms;
   }`, { filename: 'continuous-true-state-snapshot.ghost' });
   const runtime = await FramedGhostFlowRuntime.instantiate(wasmBytes);
   t.after(() => runtime.dispose());
   runtime.load(compiled.bytes);
+  softwareQualityAbi(runtime, compiled);
   runtime.addCapability('actuator', 'expired', 'bool');
   runtime.activate();
 
@@ -294,7 +301,7 @@ test('GF-TEST-scan-frame-wasm-continuous-true-state: unprimed state condition us
 test('GF-TEST-scan-frame-wasm-continuous-true-manifest: consumer accepts the exact mode and rejects mixed or unknown descriptors', async () => {
   const compiled = await compileSource(`control ContinuousTrueManifest {
     input hot: Bool;
-    timer hot_for = continuous_true(hot);
+    timer hot_for = continuous_true(hot |> recover(false));
     output ready: Bool;
     ready <- hot_for >= 1ms;
   }`, { filename: 'continuous-true-manifest.ghost' });

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
+import { softwareQualityObservations } from './helpers/software-quality-observations.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 import { compileSource } from './helpers/literate-compile.mjs';
 
@@ -10,14 +11,17 @@ const source = `# After event control
 \`\`\`ghost
 control AfterEventControl {
   input divisor: Number;
+  state retained_divisor: Number = 1.0;
+  let scalar_divisor = case divisor { ok(value) => value; fault(_) => retained_divisor; };
+  retained_divisor' = scalar_divisor;
   event started: Event;
-  sensor valve_open: Bool;
+  input valve_open: Bool;
   signal opened = after_event(started, valve_open, window: 10s, quality: measured);
   output any_opened, all_opened: Bool;
   output quotient: Number;
   any_opened <- after_event_any(opened) |> recover(false);
   all_opened <- after_event_all(opened) |> recover(false);
-  quotient <- 1.0 / divisor;
+  quotient <- 1.0 / scalar_divisor;
 }
 \`\`\`
 `;
@@ -36,6 +40,7 @@ test('after_event artifacts require an identified event activation profile', asy
 test('ControlRuntime keeps overlapping identities independent at the half-open boundary', async t => {
   const artifact = await compileSource(source, { filename: 'after-event-control.ghost.md' });
   const runtime = await ControlRuntime.instantiate(wasm, artifact, { afterEvent: { timeEpoch: 7 } });
+  softwareQualityObservations(runtime);
   t.after(() => runtime.dispose());
 
   const first = runtime.step({ nowMs: 0, inputs: { divisor: 1 }, events: eventBatch([start(1, 0)]) });
@@ -56,6 +61,7 @@ test('ControlRuntime keeps overlapping identities independent at the half-open b
 test('missing observations remain NotReady and generated Result inputs cannot be spoofed', async t => {
   const artifact = await compileSource(source, { filename: 'after-event-control.ghost.md' });
   const runtime = await ControlRuntime.instantiate(wasm, artifact, { afterEvent: { timeEpoch: 7 } });
+  softwareQualityObservations(runtime);
   t.after(() => runtime.dispose());
   const pending = runtime.step({ nowMs: 0, inputs: { divisor: 1 }, events: eventBatch([start(1, 0)]) });
   assert.equal(pending.vm.safe.any_opened, false);
@@ -69,6 +75,7 @@ test('missing observations remain NotReady and generated Result inputs cannot be
 test('an older delivered sample is not interpolated to the current scan', async t => {
   const artifact = await compileSource(source, { filename: 'after-event-control.ghost.md' });
   const runtime = await ControlRuntime.instantiate(wasm, artifact, { afterEvent: { timeEpoch: 7 } });
+  softwareQualityObservations(runtime);
   t.after(() => runtime.dispose());
   runtime.step({ nowMs: 0, inputs: { divisor: 1 }, events: eventBatch([start(1, 0)]) });
   const stale = runtime.step({
@@ -91,6 +98,7 @@ test('an older delivered sample is not interpolated to the current scan', async 
 test('a duplicate sample identity cannot satisfy a newly delivered start', async t => {
   const artifact = await compileSource(source, { filename: 'after-event-control.ghost.md' });
   const runtime = await ControlRuntime.instantiate(wasm, artifact, { afterEvent: { timeEpoch: 7 } });
+  softwareQualityObservations(runtime);
   t.after(() => runtime.dispose());
   runtime.step({
     nowMs: 0,
@@ -111,6 +119,7 @@ test('a duplicate sample identity cannot satisfy a newly delivered start', async
 test('a predicate source fault persists until a fresh accepted observation recovers it', async t => {
   const artifact = await compileSource(source, { filename: 'after-event-control.ghost.md' });
   const runtime = await ControlRuntime.instantiate(wasm, artifact, { afterEvent: { timeEpoch: 7 } });
+  softwareQualityObservations(runtime);
   t.after(() => runtime.dispose());
   const faulted = runtime.step({
     nowMs: 0,
@@ -132,6 +141,7 @@ test('a predicate source fault persists until a fresh accepted observation recov
 test('a rejected VM scan rolls back tracker identity, result, and logical time', async t => {
   const artifact = await compileSource(source, { filename: 'after-event-control.ghost.md' });
   const runtime = await ControlRuntime.instantiate(wasm, artifact, { afterEvent: { timeEpoch: 7 } });
+  softwareQualityObservations(runtime);
   t.after(() => runtime.dispose());
   const scan = divisor => runtime.step({
     nowMs: 0,
@@ -148,6 +158,7 @@ test('a rejected VM scan rolls back tracker identity, result, and logical time',
 test('invalid event delivery cannot consume an identity before a valid scan', async t => {
   const artifact = await compileSource(source, { filename: 'after-event-control.ghost.md' });
   const runtime = await ControlRuntime.instantiate(wasm, artifact, { afterEvent: { timeEpoch: 7 } });
+  softwareQualityObservations(runtime);
   t.after(() => runtime.dispose());
   assert.throws(() => runtime.step({
     nowMs: 1, inputs: { divisor: 1 }, events: eventBatch([start(1, 2)]),

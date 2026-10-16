@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -9,7 +10,7 @@ import { compileSource, writeArtifact } from '../tools/toolchain.mjs';
 import { validateScenario } from '../tools/ghostsim.mjs';
 
 const root = new URL('../', import.meta.url);
-const catalog = JSON.parse(fs.readFileSync(new URL('./reference/cases/02-time-control.json', import.meta.url), 'utf8')).cases;
+const catalog = JSON.parse(fs.readFileSync(new URL('./reference/cases-input-v1/02-time-control.json', import.meta.url), 'utf8')).cases;
 const selected = id => catalog.find(entry => entry.id === id);
 
 test('temporal and capability scenario options reject unrelated controls', () => {
@@ -29,7 +30,7 @@ async function run(t, id, temporal, actions) {
   writeArtifact(compiled, artifact);
   const scenario = path.join(dir, 'scenario.toon');
   fs.writeFileSync(scenario, encode({ format: 'GhostFlow/scenario-v1', id, initialInputs: [], keyBindings: [], temporal, actions }) + '\n');
-  const result = spawnSync(process.execPath, [new URL('tools/ghostsim.mjs', root).pathname, artifact, scenario, '--format', 'json'], { encoding: 'utf8', timeout: 10000 });
+  const result = spawnSync(process.execPath, [fileURLToPath(new URL('tools/ghostsim.mjs', root)), artifact, scenario, '--format', 'json'], { encoding: 'utf8', timeout: 10000 });
   return { result, output: JSON.parse(result.stdout), manifest: compiled.manifest };
 }
 

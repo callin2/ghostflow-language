@@ -234,7 +234,7 @@ accounting target은 반드시 명시한다.
 
 - requested: 제어가 요청한 ON 시간.
 - admitted/safe: 제약을 통과한 논리 ON 시간.
-- applied: Driver가 적용했다고 보고한 명령 시간.
+- applied: renderer가 적용했다고 보고한 명령 시간.
 - confirmed: feedback으로 확인한 물리 동작 시간.
 
 `manual_request`가 true여도 저수위 제약으로 safe output이 false면 admitted/safe
@@ -1038,7 +1038,7 @@ day 예산은 같은 물리 설비의 final applied ON 구간을 자동·수동�
 시간 경계는 다음처럼 고정한다.
 
 - accepted scan t_i에서 고른 requested/safe 값은 `[t_i,t_(i+1))`에 적용한다.
-- applied/confirmed는 Driver가 검증한 monotonic event timestamp의 `[start,end)`다.
+- applied/confirmed는 renderer 적용과 입력 driver 확인 증거가 검증한 monotonic event timestamp의 `[start,end)`다.
 - `rolling(d)`는 t에서 `(t-d,t]`와 interval의 overlap을 적분한다. t에서 고른 새 값은
   t에서 아직 사용 시간을 소비하지 않았다.
 - used가 limit와 정확히 같으면 추가 ON을 차단한다. 오래된 partial interval은 logical
@@ -1105,7 +1105,7 @@ fault를 명시적으로 나누어 제어용 `Bool`을 만든다. **왜:** 불�
 Periodic anchor/change policy, natural fallback, accounting stage/resource/reservation,
 수동 lease와 세척 정책을 명시한다. 언어는 숨은 catch-up, retry, cancel, restart,
 gateway requirement를 추가하지 않는다. compiler acceptance는 clock/provider 자료나
-Driver/물리 동작의 증거가 아니다.
+driver/renderer·물리 동작의 증거가 아니다.
 
 [전체 목차](../LANGUAGE-REFERENCE.md) · [이전 장](02-types-expressions-state.md) ·
 [다음 장](04-sensors-constraints-control.md)
