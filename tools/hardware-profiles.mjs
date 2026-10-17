@@ -29,7 +29,7 @@ export function profileRequest(root, source, locations) {
   const plan = { format: 'GhostFlow/profile-request-v1', source, locations };
   const fail = diagnostics(plan);
   if (Object.hasOwn(root, 'hardware')) fail('/hardware', 'cannot combine hardware and compact profile declarations');
-  for (const key of Object.keys(root)) if (!['profile', 'devices', 'bindings'].includes(key)) fail(`/${key}`, `unknown compact front matter field ${key}`);
+  for (const key of Object.keys(root)) if (!['profile', 'devices', 'bindings', 'omit'].includes(key)) fail(`/${key}`, `unknown compact front matter field ${key}`);
   if (!validRef(root.profile)) fail('/profile', 'profile must be a fixed id@revision, never latest');
   const devices = Object.hasOwn(root, 'devices') ? root.devices : {};
   if (!object(devices)) fail('/devices', 'devices must be a named object');
@@ -44,13 +44,22 @@ export function profileRequest(root, source, locations) {
     }
   }
   if (!object(root.bindings)) fail('/bindings', 'bindings must be a named object');
+  const omit = Object.hasOwn(root, 'omit') ? root.omit : [];
+  if (!Array.isArray(omit)) fail('/omit', 'omit must be an array');
+  const allowedOmit = new Set(['board.inputs', 'board.outputs']);
+  const seenOmit = new Set();
+  for (const selector of omit) {
+    if (typeof selector !== 'string' || !allowedOmit.has(selector)) fail('/omit', 'omit supports only board.inputs and board.outputs');
+    if (seenOmit.has(selector)) fail('/omit', `duplicate omission ${selector}`);
+    seenOmit.add(selector);
+  }
   for (const [name, target] of Object.entries(root.bindings)) {
     if (!validName(name)) fail('/bindings', `invalid logical name ${name}`);
     const parts = typeof target === 'string' ? target.split('.') : [];
     if (parts.length !== 2 || !parts.every(validName)) fail(`/bindings/${name}`, 'binding must be device.channel or board.channel');
     if (parts[0] !== 'board' && !Object.hasOwn(devices, parts[0])) fail(`/bindings/${name}`, `unknown device ${parts[0]}`);
   }
-  return { ...plan, request: { profile: root.profile, devices, bindings: root.bindings } };
+  return { ...plan, request: { profile: root.profile, devices, bindings: root.bindings, omit } };
 }
 
 // A supplied immutable closure is data, never a resolver with file/network effects.
@@ -199,15 +208,18 @@ export function resolveHardwareProfiles(plan, supplied) {
   for (const [name, target] of Object.entries(plan.request.bindings)) {
     const [instance, channel] = target.split('.');
     const channels = instance === 'board' ? board.channels : devices[instance].channels;
+    if (instance === 'board' && ((bindingRole(channels, channel) === 'input' && plan.request.omit.includes('board.inputs')) || (bindingRole(channels, channel) === 'output' && plan.request.omit.includes('board.outputs')))) fail(`/bindings/${name}`, 'binding targets omitted board provider');
     if (!Object.hasOwn(channels, channel)) fail(`/bindings/${name}`, `unknown channel ${target}; use the channel contract distributed with its profile`);
     if (targets.has(target)) fail(`/bindings/${name}`, `duplicate channel binding ${target}`);
     targets.add(target);
     bindings[name] = { instance, channel, ...clone(channels[channel]) };
   }
-  return { format: 'GhostFlow/profile-resolution-v1', source: plan.source, locations: clone(plan.locations),
+  return { format: 'GhostFlow/profile-resolution-v1', source: plan.source, locations: clone(plan.locations), omit: [...plan.request.omit],
     profile: plan.request.profile, profiles: [...used].sort().map(ref => ({ ref, sha256: catalog.get(ref).sha256 })),
     connections: clone(board.connections), devices, bindings };
 }
+
+function bindingRole(channels, channel) { return channels[channel]?.role; }
 
 export function validateProfileBindings(plan, manifest) {
   const fail = diagnostics(plan);

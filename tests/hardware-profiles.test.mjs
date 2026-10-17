@@ -72,6 +72,20 @@ test('onboard-only program needs just profile and bindings', () => {
   const result = compile({ profile: 'example-board@1', bindings: { one: 'board.RO1' } }, definitions(), 'control Onboard { output one: Bool; one <- false; }');
   assert.deepEqual(result.hardwarePlan.devices, {});
   assert.equal(result.hardwarePlan.profiles.length, 1);
+  assert.deepEqual(result.hardwarePlan.omit, []);
+  assert.equal(result.hardwarePlan.bindings.one.channel, 'RO1');
+});
+
+test('omit rejects bindings to omitted board input or output providers', () => {
+  const defs = definitions();
+  defs['example-board@1'].channels.IN1 = { role: 'input', type: 'Bool' };
+  for (const [selector, channel, role] of [
+    ['board.inputs', 'IN1', 'input'],
+    ['board.outputs', 'RO1', 'output'],
+  ]) {
+    const value = { profile: 'example-board@1', omit: [selector], bindings: { port: `board.${channel}` } };
+    assert.throws(() => compile(value, defs, `control Onboard { ${role} port: Bool; }`), /binding targets omitted board provider/);
+  }
 });
 
 test('documented RS485 input and 8-channel relay example resolves addresses 1, 2, 3 and all outputs', async () => {
@@ -132,6 +146,9 @@ for (const [name, mutate, pattern] of [
   ['unknown device field', r => { r.devices.meter1.baude = 9600; }, /unknown field/],
   ['reserved board device', r => { r.devices.board = { ...r.devices.meter1 }; }, /reserved device/],
   ['unknown root field', r => { r.device = {}; }, /unknown compact front matter field/],
+  ['non-array omit', r => { r.omit = 'board.inputs'; }, /omit must be an array/],
+  ['unknown omit selector', r => { r.omit = ['board.relays']; }, /omit supports only board\.inputs and board\.outputs/],
+  ['duplicate omit selector', r => { r.omit = ['board.outputs', 'board.outputs']; }, /duplicate omission board\.outputs/],
   ['null devices', r => { r.devices = null; }, /devices must/],
   ['floating revision', r => { r.devices.meter1.profile = 'example-meter@latest'; }, /fixed id@revision/],
   ['missing profile', r => { delete r.profile; }, /fixed id@revision/],
