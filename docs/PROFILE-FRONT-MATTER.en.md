@@ -76,6 +76,8 @@ The [complete GhostFlow example](../examples/hardware/rs485-current-relay.ghost.
 
 The input current meters and output relay use the same default RS485 connection. The board/device profiles provide 9600/8N1, so the customer document does not repeat those settings. Addresses 1, 2, and 3 distinguish the devices. `relay.RO1`–`relay.RO8` are Bool output channels from the relay driver/profile and are distinct from built-in board channels such as `board.RO1`. Even for different drivers, duplicate addresses on the same physical bus must be an error.
 
+RYR408B's address and baud rate are set by DIP switches. `address: 3` and the profile's `9600bps` configure communication to match the actual DIP values. Physical settings and declarations must agree; static validation checks agreement among the supplied contracts.
+
 The relay model **RYR408B**, address, speed, and channel count are user-confirmed values; 8N1 is shown in the attached material. `ryr408b@1` and the channel names are proposed design contracts for the confirmed model, not yet published profiles. The static example assumes an RS485/Modbus RTU contract. Confirm the protocol specification, per-channel registers, and ON/OFF values before publishing a driver. Adding the example does not count as verification that a real relay operates.
 
 ## Overall Structure and Execution Context

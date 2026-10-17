@@ -36,6 +36,8 @@ This canonical example extends the preceding design example with two current met
 
 The user-confirmed relay model is **RYR408B**, with 8 channels, address 3, and 9600 bps. The attached material shows 9600 8 N 1. Because the board's default RS485 connection and the device profile both provide 9600/8N1, the customer YAML does not repeat `bus` or the communication settings. A speed mismatch produces an error during interpretation. Addresses 1 and 2 are assigned to the current meters, and address 3 to the relay.
 
+RYR408B's address and baud rate are physically set by the board's DIP switches. YAML `address: 3` and the profile's `9600bps` configure communication to match those DIP settings. The actual DIP values and declarations must agree; compilation checks agreement among the supplied contracts.
+
 The profile IDs and `RO1`–`RO8` shown here are **design/verification contract names**, not profiles published for an actual product. The relay fixture is checked against an RS485/Modbus RTU contract. `ryr408b@1` is the proposed profile ID for the confirmed model. Before publishing a driver/profile, the protocol specification, per-channel registers, ON/OFF values, responses, and output-failure handling must be confirmed. The photograph's initial example using address 1 is not an instruction to change the current address 3. This document does not send commands to physical equipment.
 
 <!-- ghostflow:anchor id=CURRENT-RELAY kind=assumption status=unconfirmed origin=ai -->
