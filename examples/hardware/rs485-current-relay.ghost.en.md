@@ -12,7 +12,7 @@ devices:
     profile: jsy-mk-333@1
     params: { address: 2 }
   relay:
-    profile: rs485-relay-8ch-example@1
+    profile: ryr408b@1
     params: { address: 3 }
 
 bindings:
@@ -28,15 +28,15 @@ bindings:
   auxiliary8: relay.RO8
 ---
 
-# RS485 Current Inputs and 8-Channel Relay Outputs
+# RS485 Current Inputs and RYR408B 8-Channel Relay Outputs
 
 [Korean original](rs485-current-relay.ghost.md) · [Design purpose](../../docs/PROFILE-FRONT-MATTER.en.md)
 
 This canonical example extends the preceding design example with two current meters by adding an output device. It shows that logical inputs and outputs can bind to different drivers sharing the same RS485 connection. It does not mean the physical installation of either current meter has been verified.
 
-The relay board reflects the user-confirmed settings: 8 channels, address 3, and 9600 bps. The attached material shows 9600 8 N 1. Because the board's default RS485 connection and the device profile both provide 9600/8N1, the customer YAML does not repeat `bus` or the communication settings. A speed mismatch produces an error during interpretation. Addresses 1 and 2 are assigned to the current meters, and address 3 to the relay.
+The user-confirmed relay model is **RYR408B**, with 8 channels, address 3, and 9600 bps. The attached material shows 9600 8 N 1. Because the board's default RS485 connection and the device profile both provide 9600/8N1, the customer YAML does not repeat `bus` or the communication settings. A speed mismatch produces an error during interpretation. Addresses 1 and 2 are assigned to the current meters, and address 3 to the relay.
 
-The profile IDs and `RO1`–`RO8` shown here are **design/verification contract names**, not profiles published for an actual product. The relay fixture is checked against an RS485/Modbus RTU contract. Before publishing a driver/profile, the actual product model, protocol specification, per-channel registers, ON/OFF values, responses, and output-failure handling must be confirmed. The photograph's initial example using address 1 is not an instruction to change the current address 3. This document does not send commands to physical equipment.
+The profile IDs and `RO1`–`RO8` shown here are **design/verification contract names**, not profiles published for an actual product. The relay fixture is checked against an RS485/Modbus RTU contract. `ryr408b@1` is the proposed profile ID for the confirmed model. Before publishing a driver/profile, the protocol specification, per-channel registers, ON/OFF values, responses, and output-failure handling must be confirmed. The photograph's initial example using address 1 is not an instruction to change the current address 3. This document does not send commands to physical equipment.
 
 <!-- ghostflow:anchor id=CURRENT-RELAY kind=assumption status=unconfirmed origin=ai -->
 This example assumes that if a motor's phase-A current is at least 0.1 A, it requests the corresponding relay output 1 or 2 ON; if the current is below that threshold or the input has an error, it requests OFF. This is example behavior to demonstrate the bindings, not a user-approved control policy.

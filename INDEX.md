@@ -378,8 +378,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 
 | Path | Title | Type |
 | --- | --- | --- |
-| [examples/hardware/rs485-current-relay.ghost.en.md](examples/hardware/rs485-current-relay.ghost.en.md) | RS485 Current Inputs and 8-Channel Relay Outputs | md |
-| [examples/hardware/rs485-current-relay.ghost.md](examples/hardware/rs485-current-relay.ghost.md) | RS485 전류 입력과 8채널 릴레이 출력 | md |
+| [examples/hardware/rs485-current-relay.ghost.en.md](examples/hardware/rs485-current-relay.ghost.en.md) | RS485 Current Inputs and RYR408B 8-Channel Relay Outputs | md |
+| [examples/hardware/rs485-current-relay.ghost.md](examples/hardware/rs485-current-relay.ghost.md) | RS485 전류 입력과 RYR408B 8채널 릴레이 출력 | md |
 
 ## examples/programming-book-imports/
 

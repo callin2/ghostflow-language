@@ -42,7 +42,7 @@ The address 1, communication conditions, channel names, physical quantities, and
 
 ## RS485 Input and 8-Channel Relay Output
 
-Add a relay expansion board at address **3**, **9600 bps**, with **8 channels** to the preceding two-current-meter setup:
+Add a **RYR408B** relay expansion board at address **3**, **9600 bps**, with **8 channels** to the preceding two-current-meter setup:
 
 ```yaml
 ---
@@ -55,7 +55,7 @@ devices:
     profile: jsy-mk-333@1
     params: { address: 2 }
   relay:
-    profile: rs485-relay-8ch-example@1
+    profile: ryr408b@1
     params: { address: 3 }
 
 bindings:
@@ -76,7 +76,7 @@ The [complete GhostFlow example](../examples/hardware/rs485-current-relay.ghost.
 
 The input current meters and output relay use the same default RS485 connection. The board/device profiles provide 9600/8N1, so the customer document does not repeat those settings. Addresses 1, 2, and 3 distinguish the devices. `relay.RO1`–`relay.RO8` are Bool output channels from the relay driver/profile and are distinct from built-in board channels such as `board.RO1`. Even for different drivers, duplicate addresses on the same physical bus must be an error.
 
-The relay's address, speed, and channel count are user-confirmed values; 8N1 is shown in the attached material. `rs485-relay-8ch-example@1` and the channel names are design contracts, not profiles for an actual product. The static example assumes an RS485/Modbus RTU contract. Confirm the actual model and per-channel registers and ON/OFF values before publishing a driver. Adding the example does not count as verification that a real relay operates.
+The relay model **RYR408B**, address, speed, and channel count are user-confirmed values; 8N1 is shown in the attached material. `ryr408b@1` and the channel names are proposed design contracts for the confirmed model, not yet published profiles. The static example assumes an RS485/Modbus RTU contract. Confirm the protocol specification, per-channel registers, and ON/OFF values before publishing a driver. Adding the example does not count as verification that a real relay operates.
 
 ## Overall Structure and Execution Context
 

@@ -55,7 +55,7 @@ bindings:
 
 ## RS485 입력과 8채널 릴레이 출력
 
-앞의 전류계 두 개 구성에 주소 **3**, **9600bps**, **8채널** 릴레이 확장 보드를 추가하면
+앞의 전류계 두 개 구성에 주소 **3**, **9600bps**, **8채널 RYR408B** 릴레이 확장 보드를 추가하면
 다음과 같다. [전체 GhostFlow 예제](../examples/hardware/rs485-current-relay.ghost.md)는
 의도 링크, 전류에 따른 출력 1·2 제어, 미사용 출력 3~8의 OFF 요청까지 포함한다.
 
@@ -70,7 +70,7 @@ devices:
     profile: jsy-mk-333@1
     params: { address: 2 }
   relay:
-    profile: rs485-relay-8ch-example@1
+    profile: ryr408b@1
     params: { address: 3 }
 
 bindings:
@@ -92,9 +92,9 @@ bindings:
 `relay.RO1`~`relay.RO8`은 릴레이 driver/profile의 Bool 출력 채널이며 보드 내장 `board.RO1`
 등과 구별된다. 다른 드라이버여도 같은 물리 버스에서 주소가 겹치면 오류여야 한다.
 
-릴레이의 주소·속도·채널 수는 사용자 확인값이고, 8N1은 첨부 자료에 표시된 값이다.
-`rs485-relay-8ch-example@1`과 채널 이름은 설계용 계약이며 실제 제품용 profile이 아니다.
-정적 예제는 RS485/Modbus RTU 계약을 가정한다. 실제 모델·채널별 레지스터·ON/OFF 값은
+릴레이 모델 **RYR408B**와 주소·속도·채널 수는 사용자 확인값이고, 8N1은 첨부 자료에 표시된 값이다.
+`ryr408b@1`과 채널 이름은 확인된 모델을 위한 설계용 계약이며 아직 배포된 profile이 아니다.
+정적 예제는 RS485/Modbus RTU 계약을 가정한다. 프로토콜 명세·채널별 레지스터·ON/OFF 값은
 driver 발행 전에 확인한다. 예제 추가를 실제 릴레이 작동 검증으로 기록하지 않는다.
 
 ## 전체 구조와 실행 컨텍스트

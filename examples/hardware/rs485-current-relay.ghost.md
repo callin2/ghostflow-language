@@ -8,7 +8,7 @@ devices:
     profile: jsy-mk-333@1
     params: { address: 2 }
   relay:
-    profile: rs485-relay-8ch-example@1
+    profile: ryr408b@1
     params: { address: 3 }
 
 bindings:
@@ -24,7 +24,7 @@ bindings:
   auxiliary8: relay.RO8
 ---
 
-# RS485 전류 입력과 8채널 릴레이 출력
+# RS485 전류 입력과 RYR408B 8채널 릴레이 출력
 
 [English](rs485-current-relay.ghost.en.md) · [설계 목적](../../docs/PROFILE-FRONT-MATTER.md)
 
@@ -32,14 +32,15 @@ bindings:
 RS485 연결을 공유하는 서로 다른 드라이버에 연결될 수 있음을 보여 준다.
 두 전류계의 물리 설치를 확인했다는 뜻은 아니다.
 
-릴레이 보드는 사용자가 확인한 8채널, 주소 3, 9600bps 설정을 반영한다. 첨부 자료에는
+릴레이 모델은 사용자가 확인한 **RYR408B**이며 8채널, 주소 3, 9600bps 설정을 반영한다. 첨부 자료에는
 9600 8 N 1이 표시되어 있다. 보드의 기본 RS485 연결과 장치 profile이 같은 9600/8N1
 조건을 제공하므로 고객 YAML에 `bus`와 통신 조건을 반복하지 않는다. 속도가 맞지 않으면
 해석 단계에서 오류를 낸다. 주소 1·2는 전류계, 주소 3은 릴레이에 할당한다.
 
 여기 나온 profile ID와 `RO1`~`RO8`은 **설계·검증용 계약 이름**이며 아직 배포된 제품
 profile을 뜻하지 않는다. 릴레이 fixture는 RS485/Modbus RTU 계약으로 검사한다.
-실제 제품의 모델명, 프로토콜 명세, 채널별 레지스터, ON/OFF 값, 응답과 출력 실패 처리
+`ryr408b@1`은 확인된 모델을 위한 제안 profile ID다. 프로토콜 명세, 채널별 레지스터,
+ON/OFF 값, 응답과 출력 실패 처리
 확인은 driver/profile 발행 전에 필요하다. 사진의 주소 1 초기 사용 예시는 현재 주소 3을
 바꾸라는 지시로 사용하지 않는다. 이 문서는 실제 장치에 명령을 보내지 않는다.
 

@@ -5,15 +5,15 @@
       "source": "examples/hardware/rs485-current-relay.ghost.md",
       "sourceLanguage": "ko",
       "translation": "examples/hardware/rs485-current-relay.ghost.en.md",
-      "sourceSha256": "96e66bb5a9b6d15f29bd750c52e8ef601a68c691623f00888c8d9fccc16d9430",
-      "translationSha256": "6ce617c0b484985025d806db7e243b4e7903e2e6b9b8426fc0a1865a483dc391"
+      "sourceSha256": "f5cc65ec3320756e7ad0ea1aac60f1d48134e472a7ca62f57cca46ebf1af177f",
+      "translationSha256": "8e9a68219c64af7b7c326181fb9920ec599b990ad9f0c52eaaff7520a08e288c"
     },
     {
       "source": "docs/PROFILE-FRONT-MATTER.md",
       "sourceLanguage": "ko",
       "translation": "docs/PROFILE-FRONT-MATTER.en.md",
-      "sourceSha256": "50911eaf2edeb4b9b325be4b95e49757c591e939c3af848bc68cfcf6914f6e2c",
-      "translationSha256": "1cad67dee8a39b9a3279e0cac8484cd5e75123da0c90c05c766ee83aa68bd1cf"
+      "sourceSha256": "2e7952182cf4b8858d1143d54c4a591775923fda17c65cc4601309475ea71318",
+      "translationSha256": "8bfa7e407a93586a299c24639eadc8470da7eea5167b8a004f50a798ee5bf0d4"
     },
     {
       "source": "docs/HARDWARE-FRONT-MATTER.md",

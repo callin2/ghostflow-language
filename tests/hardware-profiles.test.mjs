@@ -86,7 +86,7 @@ test('documented RS485 input and 8-channel relay example resolves addresses 1, 2
     addressParameter: 'address',
     channels: Object.fromEntries(Array.from({ length: 8 }, (_, index) => [`RO${index + 1}`, { role: 'output', type: 'Bool' }])),
   };
-  const profiles = catalog({ 'ess3h32@1': board, 'jsy-mk-333@1': defs['example-meter@1'], 'rs485-relay-8ch-example@1': relay });
+  const profiles = catalog({ 'ess3h32@1': board, 'jsy-mk-333@1': defs['example-meter@1'], 'ryr408b@1': relay });
   const options = { filename: 'rs485-current-relay.ghost.md', hardwareProfiles: profiles };
   const result = compileSourceSync(text, options), plan = result.hardwarePlan;
   assert.deepEqual(Object.values(plan.devices).map(d => d.params.address), [1, 2, 3]);
