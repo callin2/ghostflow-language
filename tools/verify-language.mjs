@@ -15,6 +15,7 @@ import { languageTestBatches } from './verification-test-batches.mjs';
 
 // Deliberately explicit. Product/LLM/device tests belong to other repositories.
 export const LANGUAGE_TESTS = Object.freeze([
+  'tests/hardware-profiles.test.mjs',
   'tests/hardware-frontmatter.test.mjs',
   'tests/canonical-input.test.mjs',
   'tests/build-identity.test.mjs',

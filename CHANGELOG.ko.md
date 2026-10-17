@@ -5,6 +5,18 @@
 
 ## 미출시
 
+### 2026-10-17 — 간결한 profile front matter ([#555](https://github.com/callin2/ghostflow-language/issues/555))
+
+Public compile API는 `profile`, 선택적 `devices`, 평평한 `bindings`와 호출자가
+제공하는 `hardwareProfiles` closure를 지원한다. 보드·드라이버 기본값을 재사용하여
+고객이 하드웨어 정보를 반복 작성하지 않게 한다. 고정 profile 상속, 타입이 있는
+일반 매개변수 재정의, 명시적 기본 연결, transport/protocol/settings, 공유 자원의
+주소 충돌과 채널 타입을 정본 위치에서 검사한다. Profile이 없으면 하드웨어를
+추정하지 않고 오류를 낸다. Node/browser API 검사는 원본과 실행 바이트를 보존한다.
+[목적부터 기술한 설계](docs/PROFILE-FRONT-MATTER.md)는 이 Language 단계와 실제
+profile 배포, CLI/package 연결, MCU 버스 공유의 남은 작업을 구분한다.
+Runtime ABI를 변경하거나 새로운 실기기 검증 완료를 주장하지 않는다.
+
 ### 2026-10-16 — 재사용 가능한 hardware front matter ([#555](https://github.com/callin2/ghostflow-language/issues/555))
 
 Reference 1.1은 정본 문서의 YAML `hardware`를 예약한다. 이전에는 무시하던
