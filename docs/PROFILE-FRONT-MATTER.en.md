@@ -40,6 +40,44 @@ This compact format permits only these three root fields and requires bindings f
 
 The address 1, communication conditions, channel names, physical quantities, and units for `meter1` come from its device profile. Address 2 for `meter2` is an installation-specific difference. Inheriting an address default does not mean automatically changing the device's physical address. The customer chooses the logical name, while `currentA` is selected from the channel specification bundled with the driver. The canonical unit `A` for `ElectricalCurrent` is carried by the contract; compatible unit literals such as `mA` in the body follow the existing language's unit-conversion rules.
 
+## RS485 Input and 8-Channel Relay Output
+
+Add a relay expansion board at address **3**, **9600 bps**, with **8 channels** to the preceding two-current-meter setup:
+
+```yaml
+---
+profile: ess3h32@1
+
+devices:
+  meter1:
+    profile: jsy-mk-333@1
+  meter2:
+    profile: jsy-mk-333@1
+    params: { address: 2 }
+  relay:
+    profile: rs485-relay-8ch-example@1
+    params: { address: 3 }
+
+bindings:
+  motor1Current: meter1.currentA
+  motor2Current: meter2.currentA
+  motor1Run: relay.RO1
+  motor2Run: relay.RO2
+  auxiliary3: relay.RO3
+  auxiliary4: relay.RO4
+  auxiliary5: relay.RO5
+  auxiliary6: relay.RO6
+  auxiliary7: relay.RO7
+  auxiliary8: relay.RO8
+---
+```
+
+The [complete GhostFlow example](../examples/hardware/rs485-current-relay.ghost.en.md) includes intent links, control of outputs 1 and 2 based on current, and OFF requests for unused outputs 3–8.
+
+The input current meters and output relay use the same default RS485 connection. The board/device profiles provide 9600/8N1, so the customer document does not repeat those settings. Addresses 1, 2, and 3 distinguish the devices. `relay.RO1`–`relay.RO8` are Bool output channels from the relay driver/profile and are distinct from built-in board channels such as `board.RO1`. Even for different drivers, duplicate addresses on the same physical bus must be an error.
+
+The relay's address, speed, and channel count are user-confirmed values; 8N1 is shown in the attached material. `rs485-relay-8ch-example@1` and the channel names are design contracts, not profiles for an actual product. The static example assumes an RS485/Modbus RTU contract. Confirm the actual model and per-channel registers and ON/OFF values before publishing a driver. Adding the example does not count as verification that a real relay operates.
+
 ## Overall Structure and Execution Context
 
 | Execution location / owner | Responsibility | Output / storage location |
@@ -73,6 +111,7 @@ The interpretation result preserves the selected profile and parent digests, the
 | --- | --- |
 | Customer using only built-in features | Resolve channels using only `profile` + `bindings` |
 | Two current meters of the same model | Default address 1 and explicit address 2, separate instances, same physical bus |
+| Current inputs and 8-channel relay outputs | Current meter addresses 1 and 2, relay address 3, shared 9600 bps connection, bindings to Bool outputs RO1–RO8 |
 | Confirm RS485 use | An explicit path where device requirements match board capability and communication conditions |
 | Different device / different communication implementation | Determine the connection through provider contracts without changing the control body |
 | Typo / missing information | Error that includes the original YAML location and reason for omission/conflict |

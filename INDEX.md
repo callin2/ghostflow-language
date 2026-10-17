@@ -374,6 +374,13 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | --- | --- | --- |
 | [examples/curriculum/generated/pc-01-e01.generated.ghost.md](examples/curriculum/generated/pc-01-e01.generated.ghost.md) | PC-01 — E01 executable projection | md |
 
+## examples/hardware/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [examples/hardware/rs485-current-relay.ghost.en.md](examples/hardware/rs485-current-relay.ghost.en.md) | RS485 Current Inputs and 8-Channel Relay Outputs | md |
+| [examples/hardware/rs485-current-relay.ghost.md](examples/hardware/rs485-current-relay.ghost.md) | RS485 전류 입력과 8채널 릴레이 출력 | md |
+
 ## examples/programming-book-imports/
 
 | Path | Title | Type |
@@ -522,4 +529,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-392 documents.
+394 documents.

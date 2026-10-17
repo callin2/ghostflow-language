@@ -53,6 +53,50 @@ bindings:
 동봉한 채널 명세에서 선택한다. `ElectricalCurrent`의 기준 단위 `A`는 계약으로 전달되며
 본문의 `mA` 같은 호환 단위 리터럴은 기존 언어의 단위 변환 규칙을 따른다.
 
+## RS485 입력과 8채널 릴레이 출력
+
+앞의 전류계 두 개 구성에 주소 **3**, **9600bps**, **8채널** 릴레이 확장 보드를 추가하면
+다음과 같다. [전체 GhostFlow 예제](../examples/hardware/rs485-current-relay.ghost.md)는
+의도 링크, 전류에 따른 출력 1·2 제어, 미사용 출력 3~8의 OFF 요청까지 포함한다.
+
+```yaml
+---
+profile: ess3h32@1
+
+devices:
+  meter1:
+    profile: jsy-mk-333@1
+  meter2:
+    profile: jsy-mk-333@1
+    params: { address: 2 }
+  relay:
+    profile: rs485-relay-8ch-example@1
+    params: { address: 3 }
+
+bindings:
+  motor1Current: meter1.currentA
+  motor2Current: meter2.currentA
+  motor1Run: relay.RO1
+  motor2Run: relay.RO2
+  auxiliary3: relay.RO3
+  auxiliary4: relay.RO4
+  auxiliary5: relay.RO5
+  auxiliary6: relay.RO6
+  auxiliary7: relay.RO7
+  auxiliary8: relay.RO8
+---
+```
+
+입력 전류계와 출력 릴레이는 같은 기본 RS485 연결을 사용한다. 보드·장치 profile이
+9600/8N1을 제공하므로 이를 고객 문서에서 반복하지 않는다. 주소는 1·2·3으로 구분한다.
+`relay.RO1`~`relay.RO8`은 릴레이 driver/profile의 Bool 출력 채널이며 보드 내장 `board.RO1`
+등과 구별된다. 다른 드라이버여도 같은 물리 버스에서 주소가 겹치면 오류여야 한다.
+
+릴레이의 주소·속도·채널 수는 사용자 확인값이고, 8N1은 첨부 자료에 표시된 값이다.
+`rs485-relay-8ch-example@1`과 채널 이름은 설계용 계약이며 실제 제품용 profile이 아니다.
+정적 예제는 RS485/Modbus RTU 계약을 가정한다. 실제 모델·채널별 레지스터·ON/OFF 값은
+driver 발행 전에 확인한다. 예제 추가를 실제 릴레이 작동 검증으로 기록하지 않는다.
+
 ## 전체 구조와 실행 컨텍스트
 
 | 실행 위치 / 소유자 | 책임 | 산출물 / 저장 위치 |
@@ -110,6 +154,7 @@ profile이 실제 추가 배선과 자원을 선언한다. 장치가 연결 자�
 | --- | --- |
 | 내장 기능만 사용하는 고객 | `profile` + `bindings`만으로 채널 해석 |
 | 같은 모델의 전류계 두 개 | 기본 주소 1과 명시 주소 2, 별도 인스턴스, 같은 물리 버스 |
+| 전류 입력과 8채널 릴레이 출력 | 전류계 주소 1·2와 릴레이 주소 3, 9600bps 공유, RO1~RO8 Bool 출력 연결 |
 | RS485 사용 확인 | 장치 요구와 보드 capability·통신 조건이 일치하는 명시적 경로 |
 | 다른 장치 / 다른 통신 구현 | 제어 본문 변경 없이 공급자 계약으로 연결 판단 |
 | 오타·정보 누락 | 원본 YAML 위치와 누락/충돌 이유를 포함하는 오류 |

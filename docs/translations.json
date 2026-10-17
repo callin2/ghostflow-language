@@ -2,11 +2,18 @@
   "format": "GhostFlow/document-translations-v1",
   "documents": [
     {
+      "source": "examples/hardware/rs485-current-relay.ghost.md",
+      "sourceLanguage": "ko",
+      "translation": "examples/hardware/rs485-current-relay.ghost.en.md",
+      "sourceSha256": "96e66bb5a9b6d15f29bd750c52e8ef601a68c691623f00888c8d9fccc16d9430",
+      "translationSha256": "6ce617c0b484985025d806db7e243b4e7903e2e6b9b8426fc0a1865a483dc391"
+    },
+    {
       "source": "docs/PROFILE-FRONT-MATTER.md",
       "sourceLanguage": "ko",
       "translation": "docs/PROFILE-FRONT-MATTER.en.md",
-      "sourceSha256": "1a89c91a8e590904336892835671a935933029776da871da13a9184039506c5f",
-      "translationSha256": "aadbc6b24121c7f91f56cb3ab2f2f918496d00cc32b92643885961ef8199e56b"
+      "sourceSha256": "50911eaf2edeb4b9b325be4b95e49757c591e939c3af848bc68cfcf6914f6e2c",
+      "translationSha256": "1cad67dee8a39b9a3279e0cac8484cd5e75123da0c90c05c766ee83aa68bd1cf"
     },
     {
       "source": "docs/HARDWARE-FRONT-MATTER.md",

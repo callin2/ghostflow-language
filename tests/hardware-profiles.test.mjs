@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
 import { stringify } from 'yaml';
 import { compileSourceSync } from '../tools/compile-source.mjs';
 import { compileSource as browserCompile } from '../tools/browser-toolchain.mjs';
@@ -71,6 +72,38 @@ test('onboard-only program needs just profile and bindings', () => {
   const result = compile({ profile: 'example-board@1', bindings: { one: 'board.RO1' } }, definitions(), 'control Onboard { output one: Bool; one <- false; }');
   assert.deepEqual(result.hardwarePlan.devices, {});
   assert.equal(result.hardwarePlan.profiles.length, 1);
+});
+
+test('documented RS485 input and 8-channel relay example resolves addresses 1, 2, 3 and all outputs', async () => {
+  const text = readFileSync(new URL('../examples/hardware/rs485-current-relay.ghost.md', import.meta.url), 'utf8');
+  const defs = definitions();
+  const board = structuredClone(defs['example-board@1']);
+  board.connections.rs485.settings = { baudRate: 9600, dataBits: 8, parity: 'none', stopBits: 1 };
+  const relay = {
+    kind: 'device', module: { ...pin, id: 'example-rs485-relay-8ch', sha256: 'b'.repeat(64) },
+    requires: { transport: 'rs485', protocol: 'modbus-rtu', settings: { baudRate: 9600, dataBits: 8, parity: 'none', stopBits: 1 } },
+    parameters: { address: { type: 'integer', minimum: 1, maximum: 247 } },
+    addressParameter: 'address',
+    channels: Object.fromEntries(Array.from({ length: 8 }, (_, index) => [`RO${index + 1}`, { role: 'output', type: 'Bool' }])),
+  };
+  const profiles = catalog({ 'ess3h32@1': board, 'jsy-mk-333@1': defs['example-meter@1'], 'rs485-relay-8ch-example@1': relay });
+  const options = { filename: 'rs485-current-relay.ghost.md', hardwareProfiles: profiles };
+  const result = compileSourceSync(text, options), plan = result.hardwarePlan;
+  assert.deepEqual(Object.values(plan.devices).map(d => d.params.address), [1, 2, 3]);
+  assert.equal(new Set(Object.values(plan.devices).map(d => d.connection.resource)).size, 1);
+  assert.equal(plan.devices.relay.connection.settings.baudRate, 9600);
+  assert.notEqual(plan.devices.relay.module.id, plan.devices.meter1.module.id);
+  assert.deepEqual(result.manifest.outputs.map(p => p.name), ['motor1Run', 'motor2Run', ...Array.from({ length: 6 }, (_, index) => `auxiliary${index + 3}`)]);
+  assert.deepEqual(Object.values(plan.bindings).filter(b => b.role === 'output').map(b => [b.instance, b.channel, b.type]),
+    Array.from({ length: 8 }, (_, index) => ['relay', `RO${index + 1}`, 'Bool']));
+  assert.equal(result.sourceDocument.text, text);
+  assert.deepEqual((await browserCompile(text, options)).hardwarePlan, plan);
+  assert.throws(() => compileSourceSync(text.replace('address: 3', 'address: 1'), options), /duplicate address 1/);
+  assert.throws(() => compileSourceSync(text.replace('relay.RO8', 'relay.RO9'), options), /unknown channel relay.RO9/);
+  const wrong = structuredClone(profiles);
+  wrong[2].definition.requires.settings.baudRate = 19200;
+  wrong[2].sha256 = sha256Hex(canonicalJson(wrong[2].definition));
+  assert.throws(() => compileSourceSync(text, { ...options, hardwareProfiles: wrong }), /setting baudRate/);
 });
 
 test('fixed profile inheritance preserves unspecified defaults and records parent digests', () => {
