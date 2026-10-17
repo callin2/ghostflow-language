@@ -6,6 +6,7 @@ import { isWellFormedUnicode, sha256Hex, utf8ByteLength } from './sha256.mjs';
 import { compileComposition, resolveDocument } from './composition.mjs';
 import { emitExplanationArtifact } from './explanation.mjs';
 import { parseHardwareFrontMatter, validateHardwareBindings, HardwareFrontMatterError } from './hardware-frontmatter.mjs';
+import { resolveHardwareProfiles } from './hardware-profiles.mjs';
 
 export { emitInteractionSchema } from './interaction-schema.mjs';
 
@@ -84,7 +85,7 @@ export function compileSourceSync(source, options = {}) {
   requireFilename(filename, 'source filename');
   requireSourceText(source, `${filename}: source`);
   if (!filename.endsWith('.ghost.md')) throw new Error(`${filename}: GhostFlow product compilation requires a canonical .ghost.md literate source`);
-  const hardwarePlan = parseHardwareFrontMatter(source, { filename });
+  const hardwarePlan = resolveHardwareProfiles(parseHardwareFrontMatter(source, { filename }), options.hardwareProfiles);
   let extraction;
   try { extraction = extractLiterate(source, { filename }); }
   catch (error) {
@@ -98,7 +99,7 @@ export function compileSourceSync(source, options = {}) {
   try {
     const ast = parseControl(extraction.code, { filename });
     if (hardwarePlan && ast.imports?.length) throw new HardwareFrontMatterError(hardwarePlan.source,
-      hardwarePlan.locations['/hardware'], 'hardware declarations in executable import composition are not supported');
+      hardwarePlan.locations['/hardware'] ?? hardwarePlan.locations['/profile'], 'hardware declarations in executable import composition are not supported');
     stage = 'semantic';
     if (options.sourceClosure !== undefined && ast.imports?.length) {
       composition = compileComposition(source, filename, options.sourceClosure);
