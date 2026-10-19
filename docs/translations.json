@@ -2,6 +2,13 @@
   "format": "GhostFlow/document-translations-v1",
   "documents": [
     {
+      "source": "docs/FAILURE-REDUCTION.md",
+      "sourceLanguage": "en",
+      "translation": "docs/FAILURE-REDUCTION.ko.md",
+      "sourceSha256": "a280fff119bf1ba19291aa75fca3ff514f8f113419e8dc2e40019613505896ba",
+      "translationSha256": "efa3f83372f64ed953ef96576c60aacea9ae31c8e6a8fce3d5a02b12f9da945d"
+    },
+    {
       "source": "docs/BEHAVIOR-COMPARISON.md",
       "sourceLanguage": "en",
       "translation": "docs/BEHAVIOR-COMPARISON.ko.md",
@@ -278,8 +285,8 @@
       "source": "docs/DOCUMENTATION.md",
       "sourceLanguage": "en",
       "translation": "docs/DOCUMENTATION.ko.md",
-      "sourceSha256": "23d3acbba609ccb3af7b29d1c50ff60f5f463c9f77251fced841774c788b4add",
-      "translationSha256": "6bdba306de954aafaf23c8272e7528face63b75a49b77b7db9726f0791765312"
+      "sourceSha256": "e75038de9c75b6b346e6b1ff453095540a5dc79fa874d46e9cb97bc734dc88c3",
+      "translationSha256": "84e568534e561d9c0c5071e69418d33965f8aae2bc281b16023982744131ed2b"
     },
     {
       "source": "docs/EXACT-INTEGER-CONTRACT.md",

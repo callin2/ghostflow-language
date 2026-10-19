@@ -58,6 +58,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/ESTIMATE-EVIDENCE.md](ESTIMATE-EVIDENCE.md) | Bounded estimate evidence admission | md |
 | [docs/EXACT-INTEGER-CONTRACT.ko.md](EXACT-INTEGER-CONTRACT.ko.md) | 정확한 정수 계약 제안 | md |
 | [docs/EXACT-INTEGER-CONTRACT.md](EXACT-INTEGER-CONTRACT.md) | Exact integer contract proposal | md |
+| [docs/FAILURE-REDUCTION.ko.md](FAILURE-REDUCTION.ko.md) | 제한된 실패 축소 | md |
+| [docs/FAILURE-REDUCTION.md](FAILURE-REDUCTION.md) | Bounded failure reduction | md |
 | [docs/FRAMED-CONTROL-HOST.ko.md](FRAMED-CONTROL-HOST.ko.md) | Framed ControlRuntime 도입 (D6) | md |
 | [docs/FRAMED-CONTROL-HOST.md](FRAMED-CONTROL-HOST.md) | Framed ControlRuntime adoption (D6) | md |
 | [docs/GFB5-SCHEDULE-PRELUDE.ko.md](GFB5-SCHEDULE-PRELUDE.ko.md) | GFB5 일정 서두 | md |
@@ -253,4 +255,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.ko.md](research/GF-COMPOSE-R9-ACCEPTANCE.ko.md) | GF-COMPOSE R9: acceptance와 구현 인계 | md |
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.md](research/GF-COMPOSE-R9-ACCEPTANCE.md) | GF-COMPOSE R9: acceptance and implementation handoff | md |
 
-214 documents.
+216 documents.
