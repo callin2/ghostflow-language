@@ -1,19 +1,44 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import { compileSource } from './helpers/literate-compile.mjs';
+import { compileSource as compileFixtureSource } from './helpers/literate-compile.mjs';
 import { FramedGhostFlowRuntime } from '../runtimes/wasm/framed-runtime.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 import { observeRuntimeValues, observeSourceTrace } from '../tools/source-trace.mjs';
-import { sensorFaultTimerSource, sensorFaultTimerScans } from './helpers/continuous-timer-vectors.mjs';
+import { sensorFaultTimerSource, sensorFaultTimerScans } from './helpers/continuous-timer-input-vectors.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const wasmBytes = fs.readFileSync(path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm'));
 const nativePath = path.join(root, 'target/release/examples/scan_tape' + (process.platform === 'win32' ? '.exe' : ''));
+
+test('pre-input scan/control evidence remains a pinned non-executable historical revision', () => {
+  const archive = fs.readFileSync(path.join(root, 'tests/fixtures/history/scan-control-before-input-531.json'));
+  assert.equal(createHash('sha256').update(archive).digest('hex'),
+    'd92696e759e904ea99018699cdc9ef11586c8fc2b62e1c840d403e01253c26ca');
+  assert.equal(JSON.parse(archive).base, 'c8a5d37');
+});
+
+// Explicit fixture acquisition bridge: only names declared by this compiled
+// source expand to its actual quality rails. Unknown, reserved, duplicate and
+// incorrectly typed fields remain visible to the native/WASM validators.
+const fixtureManifests = new WeakMap();
+async function compileSource(source, options) {
+  const artifact = await compileFixtureSource(source, options);
+  fixtureManifests.set(artifact.bytes, artifact.manifest);
+  return artifact;
+}
+function goodTape(manifest, tape) {
+  return tape.map(frame => ({ ...frame, inputs: frame.inputs.flatMap(field => {
+    const input = manifest.sensors.find(item => item.name === field.name);
+    return input ? [{ name: input.valueInput, value: field.value },
+      { name: input.okInput, value: true }, { name: input.faultInput, value: 0 }] : [field];
+  }) }));
+}
 
 function row(scanId, logicalTimeMs, inputs) {
   return { scanId, logicalTimeMs, inputs };
@@ -24,14 +49,15 @@ test('REF-04-062 canonical native/WASM sensor recovery cannot restart a fault-st
   // primitives. This is not generic Run or degraded-objective lowering.
   const source = `control RequireFreshStart {
     input start: Bool;
-    sensor temperature: Number {
+    input temperature: Number {
       filter = median(1); recover_after = 3 samples; stale_after = 10s;
     }
     state running: Bool = false;
     state previous_start: Bool = false;
     let evidence_ready = case temperature { ok(_) => true; fault(_) => false; };
-    let fresh_start = start && !previous_start;
-    previous_start' = start;
+    let start_value = start |> recover(false);
+    let fresh_start = start_value && !previous_start;
+    previous_start' = start_value;
     let admitted = evidence_ready && (running || fresh_start);
     running' = admitted;
     timer session_age = continuous_true(admitted);
@@ -44,23 +70,24 @@ test('REF-04-062 canonical native/WASM sensor recovery cannot restart a fault-st
   const artifact = await compileSource(source, { filename: 'reference-require-fresh-start.ghost' });
   await assert.rejects(() => compileSource(source.replace('case temperature', 'case missing_sensor'),
     { filename: 'reference-missing-recovery-sensor.ghost' }), /unknown.*missing_sensor|undefined.*missing_sensor/);
-  const at = (nowMs, id, start, quality = 'Good') => ({ nowMs, inputs: { start },
-    samples: { temperature: { epoch: 1, id, timestampMs: nowMs, value: 25, quality } } });
+  const at = (nowMs, id, start, quality = 'Good') => ({ nowMs, samples: { start: { epoch: 1, id, timestampMs: nowMs, value: start, quality: 'Good' }, temperature: { epoch: 1, id, timestampMs: nowMs, value: 25, quality } } });
   const recovering = at(1500, 7, true);
   const steps = [at(0, 1, false), at(100, 2, false), at(200, 3, false),
     at(300, 4, true), at(1300, 5, true), at(1400, 6, true, 'Invalid'),
     recovering, { ...recovering, nowMs: 1600 }, at(1700, 8, true), at(1800, 9, true),
     at(5000, 10, true), at(5100, 11, false), at(5200, 12, true), at(5700, 13, true)];
-  const qualities = ['Good', 'Good', 'Good', 'Good', 'Good', 'Invalid',
+  const qualities = ['NotReady', 'NotReady', 'Good', 'Good', 'Good', 'Invalid',
     'NotReady', 'NotReady', 'NotReady', 'Good', 'Good', 'Good', 'Good', 'Good'];
   const enabled = [false, false, false, true, true, false, false, false, false, false, false, false, true, true];
   const starts = steps.map((_, i) => i === 3 || i === 12);
   const ages = [0, 0, 0, 0, 1000, 0, 0, 0, 0, 0, 0, 0, 0, 500];
   const executions = [];
   for (const instantiate of [ControlRuntime.instantiate, ControlRuntime.instantiateFramed]) {
+    const absent = await instantiate.call(ControlRuntime, wasmBytes, artifact);
+    try { assert.equal(absent.step({ nowMs: 0 }).sensors.start.quality, 'NotReady'); }
+    finally { absent.dispose(); }
     const runtime = await instantiate.call(ControlRuntime, wasmBytes, artifact);
     try {
-      assert.throws(() => runtime.step({ nowMs: 0, inputs: {} }), /missing input/);
       executions.push(steps.map(step => runtime.step(step)));
     } finally { runtime.dispose(); }
   }
@@ -70,13 +97,18 @@ test('REF-04-062 canonical native/WASM sensor recovery cannot restart a fault-st
     assert.equal(result.sensors.temperature.quality, qualities[i]);
     assert.equal(result.sensors.temperature.ok, qualities[i] === 'Good');
     assert.equal(result.vm.stateAfter.running, enabled[i]);
-    assert.equal(result.vm.stateAfter.previous_start, steps[i].inputs.start);
+    assert.equal(result.vm.stateAfter.previous_start, steps[i].samples.start.value);
     assert.deepEqual(result.vm.requested, { enabled: enabled[i], start_requested: starts[i], age_ms: ages[i] });
     assert.deepEqual(result.vm.safe, result.vm.requested);
     assert.equal(result.vm.stateAfter.__gf_timer_was_true_session_age, enabled[i]);
     assert.ok(result.vm.resultTrace.length > 0, 'the explicit fault branch retains Result diagnostics');
     const choice = { Good: 0, Invalid: 3, NotReady: 4 };
-    assert.ok(result.vm.resultTrace.every(site => site.choice === choice[qualities[i]]));
+    const temperatureSites = new Set(artifact.traceMetadata.resultSites
+      .filter(site => site.origins.some(origin => origin.name === 'temperature')).map(site => site.site));
+    assert.ok(result.vm.resultTrace.filter(site => temperatureSites.has(site.site))
+      .every(site => site.choice === choice[qualities[i]]));
+    assert.ok(result.vm.resultTrace.some(site => !temperatureSites.has(site.site) && site.choice === 0),
+      'the new START acquisition remains Good independently of temperature faults');
   }
   assert.equal(framed[4].vm.safe.age_ms, 1000, 'the previous session really accumulated time');
   assert.equal(framed[8].sensors.temperature.ok, false, 'two fresh samples plus a duplicate are insufficient');
@@ -99,7 +131,7 @@ test('REF-04-030 authored direction compares accepted values across fault on nat
   // The author explicitly chooses no direction until a previous success exists
   // and false output intents on fault; the sensor Result remains faulted.
   const artifact = await compileSource(`control AcceptedDirection {
-  sensor reading: Number {
+  input reading: Number {
     filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
   state previousAccepted: Number = 0.0;
@@ -164,7 +196,7 @@ test('REF-04-030 authored direction compares accepted values across fault on nat
 
 test('REF-04-024 median to EMA composition preserves repeated fault, sample identity and bounded state on native VM and plain/framed WASM', async () => {
   const artifact = await compileSource(`control ComposedFilter {
-  sensor moisture: Percent { valid = 0% .. 100%; filter = median(3); stale_after = 3s; recover_after = 3 samples; }
+  input moisture: Percent { valid = 0% .. 100%; filter = median(3); stale_after = 3s; recover_after = 3 samples; }
   signal smooth = ema(moisture, alpha: 0.5);
   signal slower = ema(smooth, alpha: 0.5);
   output value, lagged: Percent;
@@ -238,14 +270,14 @@ test('REF-04-024 median to EMA composition preserves repeated fault, sample iden
 test('REF-04-024 EMA composition rejects invalid contracts and atomically rolls back a failed scan', async () => {
   const source = alpha => `control AtomicEma {
     input divisor: Number;
-    sensor x: Number { filter = median(1); stale_after = 10s; }
+    input x: Number { filter = median(1); stale_after = 10s; }
     signal smooth = ema(x, alpha: ${alpha});
     output value, quotient: Number;
     value <- smooth |> recover(-1.0);
-    quotient <- 1.0 / divisor;
+    quotient <- 1.0 / (divisor |> recover(0.0));
   }`;
   for (const alpha of ['0.0', '1.1', '-0.5']) await assert.rejects(compileSource(source(alpha)), /ema alpha/);
-  await assert.rejects(compileSource(source('0.5').replace('ema(x,', 'ema(divisor,')), /numeric Result/);
+  await assert.rejects(compileSource(source('0.5').replace('ema(x,', 'ema(true,')), /numeric Result/);
   const artifact = await compileSource(source('0.5'));
   const tampered = structuredClone(artifact.manifest);
   tampered.signals[0].alpha = 0;
@@ -257,11 +289,11 @@ test('REF-04-024 EMA composition rejects invalid contracts and atomically rolls 
   for (const instantiate of [ControlRuntime.instantiate, ControlRuntime.instantiateFramed]) {
     const runtime = await instantiate.call(ControlRuntime, wasmBytes, artifact);
     try {
-      const first = runtime.step({ nowMs: 1, inputs: { divisor: 1 }, samples: { x: sample(1, 10) } });
+      const first = runtime.step({ nowMs: 1, samples: { divisor: sample(1, 1), x: sample(1, 10) } });
       assert.equal(first.vm.safe.value, 10);
-      assert.throws(() => runtime.step({ nowMs: 2, inputs: { divisor: 0 }, samples: { x: sample(2, 30) } }), /division by zero/);
+      assert.throws(() => runtime.step({ nowMs: 2, samples: { divisor: sample(2, 0), x: sample(2, 30) } }), /division by zero/);
       assert.deepEqual(runtime.sensors.get('x').conditioner.sampleIdentity(), { epoch: 1, id: 1, timestampMs: 1 });
-      const retry = runtime.step({ nowMs: 2, inputs: { divisor: 1 }, samples: { x: sample(2, 30) } });
+      const retry = runtime.step({ nowMs: 2, samples: { divisor: sample(2, 1), x: sample(2, 30) } });
       assert.deepEqual(retry.vm.stateBefore, first.vm.stateAfter);
       assert.equal(retry.vm.safe.value, 20, 'the rejected scan did not apply an extra EMA recurrence');
     } finally { runtime.dispose(); }
@@ -270,7 +302,7 @@ test('REF-04-024 EMA composition rejects invalid contracts and atomically rolls 
 
 test('named EMA supports affine Temperature and alpha one while rejecting multiple physical roots', async () => {
   const artifact = await compileSource(`control TemperatureEma {
-    sensor temperature: Temperature { filter = median(1); stale_after = 3s; }
+    input temperature: Temperature { filter = median(1); stale_after = 3s; }
     signal smooth = ema(temperature, alpha: 0.5);
     signal immediate = ema(temperature, alpha: 1.0);
     output value, direct: Temperature;
@@ -287,9 +319,9 @@ test('named EMA supports affine Temperature and alpha one while rejecting multip
   } finally { runtime.dispose(); }
   await assert.rejects(compileSource(`control MultipleRoots {
     input select: Bool;
-    sensor a: Number;
-    sensor b: Number;
-    let selected = if select then a else b;
+    input a: Number;
+    input b: Number;
+    let selected = if (select |> recover(false)) then a else b;
     signal smooth = ema(selected, alpha: 0.5);
     output value: Number;
     value <- smooth |> recover(0.0);
@@ -298,7 +330,7 @@ test('named EMA supports affine Temperature and alpha one while rejecting multip
 
 test('REF-04-023 sample timestamp 1000 expires at 4000 despite later filter evaluations on native VM rails and plain/framed WASM conditioning', async () => {
   const artifact = await compileSource(`control StaleBoundary {
-  sensor moisture: Percent {
+  input moisture: Percent {
     valid = 0% .. 100%; filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
   state active: Bool = true;
@@ -358,7 +390,7 @@ test('REF-04-023 sample timestamp 1000 expires at 4000 despite later filter eval
 
 test('REF-04-019 hysteresis keeps strict boundaries and preserves the fault Result on native VM rails and plain/framed WASM conditioning', async () => {
   const artifact = await compileSource(`control HysteresisBoundaries {
-  sensor moisture: Percent {
+  input moisture: Percent {
     valid = 0% .. 100%; filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
   signal dry = hysteresis(moisture, on_below: 30%, off_above: 35%, initial: false);
@@ -407,7 +439,7 @@ test('REF-04-019 hysteresis keeps strict boundaries and preserves the fault Resu
 
 test('REF-04-016 median five rejects partial windows, returns the spike-resistant middle and rebuilds after fault on native and plain/framed WASM', async () => {
   const artifact = await compileSource(`control MedianWindow {
-  sensor moisture: Percent {
+  input moisture: Percent {
     valid = 0% .. 100%; filter = median(5); stale_after = 3s; recover_after = 3 samples;
   }
   state active: Bool = true;
@@ -479,7 +511,7 @@ test('REF-04-016 median five rejects partial windows, returns the spike-resistan
 
 test('REF-04-012 sample timestamp zero holds permission at 2999 and expires at 3000 while default reset removes old permission on native and plain/framed WASM', async () => {
   const artifact = await compileSource(`control FreshnessPermission {
-  sensor moisture: Percent {
+  input moisture: Percent {
     valid = 0% .. 100%; filter = median(1); stale_after = 3s; recover_after = 1 samples;
   }
   state active: Bool = true;
@@ -552,7 +584,7 @@ test('REF-04-012 sample timestamp zero holds permission at 2999 and expires at 3
 
 test('REF-04-011 fault recovery keeps source epochs separate and a default fresh owner resets median readiness on native and plain/framed WASM', async () => {
   const artifact = await compileSource(`control EpochRecovery {
-  sensor moisture: Percent {
+  input moisture: Percent {
     valid = 0% .. 100%; filter = median(5); stale_after = 300ms; recover_after = 3 samples;
   }
   state active: Bool = true;
@@ -631,7 +663,7 @@ test('REF-04-011 fault recovery keeps source epochs separate and a default fresh
 
 test('REF-04-010 Driver sample ID seven is Invalid before filtering and ID eight enters once with sample-timestamp freshness on native and plain/framed WASM', async () => {
   const artifact = await compileSource(`control DriverSample {
-  sensor moisture: Percent {
+  input moisture: Percent {
     valid = 0% .. 100%; filter = median(3); stale_after = 300ms; recover_after = 1 samples;
   }
   state active: Bool = true;
@@ -725,7 +757,7 @@ test('REF-04-010 Driver sample ID seven is Invalid before filtering and ID eight
 
 test('REF-04-010 repeated Driver sample identity does not advance recovery after the filter is ready on plain/framed WASM', async () => {
   const artifact = await compileSource(`control DriverRecovery {
-  sensor moisture: Percent {
+  input moisture: Percent {
     valid = 0% .. 100%; filter = median(1); stale_after = 300ms; recover_after = 5 samples;
   }
   output value: Percent;
@@ -754,7 +786,7 @@ test('REF-04-010 repeated Driver sample identity does not advance recovery after
 
 test('REF-04-003 one sensor retains four fault reasons and decision times through false recovery on native and plain/framed WASM', async () => {
   const artifact = await compileSource(`control FaultJournal {
-  sensor moisture: Percent {
+  input moisture: Percent {
     valid = 0% .. 100%; filter = median(3); stale_after = 300ms; recover_after = 5 samples;
   }
   state running: Bool = true;
@@ -856,7 +888,7 @@ test('REF-04-003 one sensor retains four fault reasons and decision times throug
 test('REF-04-005 pure map projects a held sample over three ticks without changing state, sample freshness or recovery on native and plain/framed WASM', async () => {
   const artifact = await compileSource(`fn invert(value: Number) -> Number { 10.0 / value }
 control PureMap {
-  sensor reading: Number { filter = median(1); stale_after = 300ms; recover_after = 3 samples; }
+  input reading: Number { filter = median(1); stale_after = 300ms; recover_after = 3 samples; }
   state retained: Number = 17.0;
   output projected, original: Number;
   let mapped = reading |> map(invert);
@@ -972,6 +1004,7 @@ function tsv(tape) {
 }
 
 function nativeRun(bytes, tape) {
+  tape = goodTape(fixtureManifests.get(bytes), tape);
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-scan-tape-'));
   try {
     const modulePath = path.join(directory, 'module.gfb');
@@ -987,9 +1020,11 @@ function nativeRun(bytes, tape) {
 }
 
 async function wasmRun(artifact, tape) {
+  tape = goodTape(artifact.manifest, tape);
   const runtime = await FramedGhostFlowRuntime.instantiate(wasmBytes);
   try {
     runtime.load(artifact.bytes);
+    for (const input of artifact.manifest.sensors.filter(item => !item.optional)) runtime.addCapability('sensor', input.name, input.type === 'Bool' ? 'bool' : input.type === 'Int' ? 'int' : 'number');
     for (const output of artifact.manifest.outputs) runtime.addCapability('actuator', output.name, output.type === 'Bool' ? 'bool' : 'number');
     runtime.activate();
     const observations = [];
@@ -1034,7 +1069,7 @@ control NonblockingStop {
   input stop: Bool;
   state running: Bool = true;
   timer age = elapsed(running);
-  running' = running && !stop && age < 5min;
+  running' = running && !(stop |> recover(true)) && age < 5min;
   output pump: Bool;
   output age_before_transition: Duration;
   output timer_expired: Bool;
@@ -1047,7 +1082,7 @@ control NonblockingStop {
   for (const outcomes of [native, wasm]) {
     assert.deepEqual(outcomes.map(item => item.accepted), [true, true]);
     assert.deepEqual(outcomes.map(item => item.outcome.logicalTimeMs), [0, 1000]);
-    assert.deepEqual(outcomes.map(item => item.outcome.trace.inputs.stop), [false, true]);
+    assert.deepEqual(outcomes.map(item => item.outcome.trace.inputs.__gf_sensor_value_stop), [false, true]);
     assert.deepEqual(outcomes.map(item => item.outcome.trace.inputs.__gf_now_ms), [0, 1000]);
     assert.deepEqual(outcomes.map(item => item.outcome.trace.stateBefore.running), [true, true]);
     assert.deepEqual(outcomes.map(item => item.outcome.trace.stateAfter.running), [true, false]);
@@ -1067,7 +1102,7 @@ control TypedUnits {
   output duty_pct: Percent;
   let duration = 5min;
   let duty = 100%;
-  ready <- gate && duration == 300000ms && duty == 100%;
+  ready <- (gate |> recover(false)) && duration == 300000ms && duty == 100%;
   duration_ms <- duration;
   duty_pct <- duty;
 }
@@ -1083,7 +1118,7 @@ test('REF-01-067: non-finite Number result faults atomically on native and WASM'
 control FiniteNumber {
   input value: Number;
   state accepted: Number = 0.0;
-  accepted' = value * 2.0;
+  accepted' = (value |> recover(0.0)) * 2.0;
   output result: Number;
   result <- accepted';
 }
@@ -1104,7 +1139,7 @@ test('REF-03-009: plain core scans preserve equal and exact large logical times 
 control CoreClock {
   input start: Bool;
   state running: Bool = false;
-  running' = running || start;
+  running' = running || (start |> recover(false));
   output pump: Bool;
   pump <- running';
 }
@@ -1121,8 +1156,8 @@ control BlockedCommit {
   state count: Int = 0;
   count' = count + 1;
   output pump, allowed: Bool;
-  pump <- request;
-  allowed <- permit;
+  pump <- request |> recover(false);
+  allowed <- permit |> recover(false);
   require pump => allowed;
 }
 `, [
@@ -1140,18 +1175,18 @@ test('REF-00-008: low-water constraint retains the requested pump and its blocki
 control LowWater {
   input request, low_water: Bool;
   output pump, water_ok: Bool;
-  pump <- request;
-  water_ok <- !low_water;
+  pump <- request |> recover(false);
+  water_ok <- !(low_water |> recover(true));
   require pump => water_ok;
 }
 `, [row(0, 0, [{ name: 'request', value: true }, { name: 'low_water', value: true }])], 'low-water.ghost');
   const trace = native[0].outcome.trace;
   assert.deepEqual([trace.requested.pump, trace.safe.pump], [true, false]);
-  assert.equal(trace.inputs.low_water, true);
+  assert.equal(trace.inputs.__gf_sensor_value_low_water, true);
   assert.equal(trace.safetyTrace.constraints[0].kind, 'requires');
   assert.deepEqual(trace.safetyTrace.constraints[0].firstViolation.blocked, ['pump']);
   assert.ok(artifact.traceMetadata.dependencies.some(entry => entry.target.field === 'requested'
-    && entry.target.name === 'water_ok' && entry.reads.some(read => read.field === 'inputs' && read.name === 'low_water')));
+    && entry.target.name === 'water_ok' && entry.reads.some(read => read.field === 'inputs' && read.name === '__gf_sensor_value_low_water')));
 });
 
 test('REF-00-004: fixed start-stop tape gives identical state and intent in independent runtimes', async () => {
@@ -1159,7 +1194,7 @@ test('REF-00-004: fixed start-stop tape gives identical state and intent in inde
 control ReplayStartStop {
   input start, stop: Bool;
   state running: Bool = false;
-  running' = !stop && (start || running);
+  running' = !(stop |> recover(true)) && ((start |> recover(false)) || running);
   output pump: Bool;
   pump <- running';
 }
@@ -1177,7 +1212,7 @@ test('REF-01-093: let is recomputed from each tick input', async () => {
   const { native } = await compare(`
 control LetEachTick {
   input request: Bool;
-  let current = request;
+  let current = request |> recover(false);
   output pump: Bool;
   pump <- current;
 }
@@ -1190,8 +1225,8 @@ control LetEachTick {
 
 test('REF-01-094: simultaneous swap is independent of next-definition source order', async () => {
   for (const transitions of [
-    "left' = if swap then right else left; right' = if swap then left else right;",
-    "right' = if swap then left else right; left' = if swap then right else left;",
+    "left' = if (swap |> recover(false)) then right else left; right' = if (swap |> recover(false)) then left else right;",
+    "right' = if (swap |> recover(false)) then left else right; left' = if (swap |> recover(false)) then right else left;",
   ]) {
     const { native } = await compare(`
 control Swap {
@@ -1214,7 +1249,7 @@ test('REF-07-006: multiplication by zero keeps a faulting operand and its depend
 control FaultingProduct {
   input divisor: Number;
   output result: Number;
-  result <- (1.0 / divisor) * 0.0;
+  result <- (1.0 / (divisor |> recover(0.0))) * 0.0;
 }
 `, [
     row(0, 0, [{ name: 'divisor', value: 0 }]),
@@ -1224,12 +1259,12 @@ control FaultingProduct {
   assert.match(native[0].error, /division by zero/);
   assert.equal(native[1].outcome.trace.safe.result, 0);
   assert.ok(artifact.traceMetadata.dependencies.some(entry => entry.target.field === 'requested'
-    && entry.target.name === 'result' && entry.reads.some(read => read.field === 'inputs' && read.name === 'divisor')));
+    && entry.target.name === 'result' && entry.reads.some(read => read.field === 'inputs' && read.name === '__gf_sensor_value_divisor')));
 });
 
 test('REF-01-074: explicit false fallback preserves sensor fault and authored case provenance on native and WASM', async () => {
   const source = '# Moisture fallback\n\n```ghost\n' + `control MoistureFallback {
-  sensor moisture: Percent;
+  input moisture: Percent;
   let dry = case moisture { ok(value) => value < 30%; fault(_) => false; };
   output pump: Bool;
   pump <- dry;
@@ -1285,22 +1320,22 @@ test('REF-03-014: one phase transition, rejected stop rollback, and waiting safe
   const source = `control AtomicPhase {
   input stop, advance, permit: Bool;
   input divisor: Number;
-  sensor healthy: Bool;
+  input healthy: Bool;
   let safe_healthy = case healthy { ok(value) => value; fault(_) => false; };
   type Phase = Open | Middle | Final | Idle;
   state phase: Phase = Open;
   timer age = elapsed(phase);
   phase' = case phase {
-    Open => if stop || !safe_healthy then Idle else if age >= 2s then Middle else Open;
-    Middle => if stop || !safe_healthy then Idle else if advance then Final else Middle;
-    Final => if stop || !safe_healthy then Idle else Final;
+    Open => if (stop |> recover(true)) || !safe_healthy then Idle else if age >= 2s then Middle else Open;
+    Middle => if (stop |> recover(true)) || !safe_healthy then Idle else if (advance |> recover(false)) then Final else Middle;
+    Final => if (stop |> recover(true)) || !safe_healthy then Idle else Final;
     Idle => Idle;
   };
   output pump, allowed: Bool;
   output quotient: Number;
   pump <- phase' != Idle;
-  allowed <- permit;
-  quotient <- 1.0 / divisor;
+  allowed <- permit |> recover(false);
+  quotient <- 1.0 / (divisor |> recover(0.0));
   require pump => allowed;
 }`;
   const compiled = await compileSource(source, { filename: 'atomic-phase.ghost' });
@@ -1347,10 +1382,10 @@ test('REF-03-014: one phase transition, rejected stop rollback, and waiting safe
 test('REF-03-017: independently enabled timers preserve separate starts and explicit sensor fault handling on native and WASM', async () => {
   const source = `control IndependentFaultTimers {
   input enabled_a, enabled_b: Bool;
-  sensor high: Bool;
+  input high: Bool;
   let safe_high = case high { ok(value) => value; fault(_) => false; };
-  timer a_for = continuous_true(enabled_a && safe_high);
-  timer b_for = continuous_true(enabled_b && safe_high);
+  timer a_for = continuous_true((enabled_a |> recover(false)) && safe_high);
+  timer b_for = continuous_true((enabled_b |> recover(false)) && safe_high);
   output a_age_ms, b_age_ms: Duration;
   a_age_ms <- a_for;
   b_age_ms <- b_for;
@@ -1390,7 +1425,7 @@ test('REF-03-017: independently enabled timers preserve separate starts and expl
 
 test('REF-03-017: continuous true rejects an implicit Result Bool input', async () => {
   await assert.rejects(compileSource(`control ImplicitFaultTimer {
-  sensor high: Bool;
+  input high: Bool;
   timer active_for = continuous_true(high);
   output age_ms: Duration;
   age_ms <- active_for;
@@ -1402,7 +1437,7 @@ test('REF-03-016: continuous true preserves equal timestamps and resets before a
   const { artifact, native, wasm } = await compare(`
 control ContinuousReference {
   input c: Bool;
-  timer active_for = continuous_true(c);
+  timer active_for = continuous_true(c |> recover(false));
   output age_ms: Duration;
   age_ms <- active_for;
 }
@@ -1456,7 +1491,7 @@ control ElapsedReference {
   input request: Bool;
   state running: Bool = false;
   timer age = elapsed(running);
-  running' = request;
+  running' = request |> recover(false);
   output pump: Bool;
   pump <- running';
 }
@@ -1494,7 +1529,7 @@ control TapeTimer {
   input enabled: Bool;
   state active: Bool = false;
   timer age = elapsed(active);
-  active' = enabled;
+  active' = enabled |> recover(false);
   output expired: Bool;
   expired <- age >= 100ms;
 }
@@ -1517,7 +1552,7 @@ test('GF-TEST-scan-tape-parity: self-hold records old and next state transitions
 control TapeSelfHold {
   input start, stop: Bool;
   state running: Bool = false;
-  running' = !stop && (start || running);
+  running' = !(stop |> recover(true)) && ((start |> recover(false)) || running);
   output pump: Bool;
   pump <- running';
 }
@@ -1532,7 +1567,7 @@ test('GF-TEST-scan-tape-parity: global constraint preserves requested ON and saf
 control TapeConstraint {
   input enabled: Bool;
   output pump, permit: Bool;
-  pump <- enabled;
+  pump <- enabled |> recover(false);
   permit <- false;
   require pump => permit;
 }
@@ -1552,7 +1587,8 @@ test('GF-TEST-scan-tape-parity: rejected envelope attempts retain the prior outc
     row(1, 1, [{ name: 'start', value: true }, { name: 'stop', value: false }, { name: 'extra', value: false }]),
     row(1, 1, [{ name: 'start', value: true }, { name: 'stop', value: false }, { name: '__gf_now_ms', value: 1 }]),
     row(1, 1, [{ name: 'start', value: 1 }, { name: 'stop', value: false }]),
-    row(1, 1, [{ name: 'start', value: true }, { name: 'bad"\\\\', value: false }]),
+    row(1, 1, [{ name: 'start', value: true }, { name: 'bad"\\\\', value: false },
+      { name: '__gf_sensor_ok_stop', value: true }, { name: '__gf_sensor_fault_stop', value: 0 }]),
     row(2, 2, [{ name: 'start', value: true }, { name: 'stop', value: false }]),
     row(Number.MAX_SAFE_INTEGER + 1, 1, [{ name: 'start', value: true }, { name: 'stop', value: false }]),
     row(1, 1, [{ name: 'start', value: false }, { name: 'stop', value: true }]),
@@ -1564,7 +1600,7 @@ test('GF-TEST-scan-tape-parity: rejected envelope attempts retain the prior outc
 control TapeReject {
   input start, stop: Bool;
   state running: Bool = false;
-  running' = !stop && (start || running);
+  running' = !(stop |> recover(true)) && ((start |> recover(false)) || running);
   output pump: Bool;
   pump <- running';
 }
@@ -1601,7 +1637,7 @@ control TapeRollback {
   attempts' = attempts + 1;
   output pump: Number;
   output expired: Bool;
-  pump <- 1 / divisor;
+  pump <- 1 / (divisor |> recover(0.0));
   expired <- age >= 100ms;
 }
 `, tape, 'scan-tape-rollback.ghost');
@@ -1621,7 +1657,7 @@ control TapeRollback {
 });
 
 test('GF-TEST-scan-tape-parity: malformed TSV is a native transport error, not a rejected scan', async () => {
-  const artifact = await compileSource('control TapeTransport { input enabled: Bool; output pump: Bool; pump <- enabled; }', { filename: 'scan-tape-transport.ghost' });
+  const artifact = await compileSource('control TapeTransport { input enabled: Bool; output pump: Bool; pump <- enabled |> recover(false); }', { filename: 'scan-tape-transport.ghost' });
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-scan-tape-malformed-'));
   try {
     const modulePath = path.join(directory, 'module.gfb');

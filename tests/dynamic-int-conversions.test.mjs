@@ -7,10 +7,11 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { compileSource } from '../tools/toolchain.mjs';
 import { compile as compileGfb, parse, tokenize } from '../tools/gfb1.mjs';
+import { softwareQualityAbi, softwareQualityCsv } from './helpers/software-quality-observations.mjs';
 import { GhostFlowRuntime } from '../runtimes/wasm/ghostflow-runtime.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const nativePath = path.join(root, 'target/release/examples/run');
+const nativePath = path.join(root, `target/release/examples/run${process.platform === 'win32' ? '.exe' : ''}`);
 const wasmPath = path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm');
 const fractional = 'integer-conversion-fractional';
 const range = 'integer-conversion-out-of-range';
@@ -26,18 +27,18 @@ const cases = [
 for (const [conversion, inputType, outputType, rows] of cases) {
   test(`GF-TEST-dynamic-conversion-${conversion}: native/WASM results, faults and atomic commits`, async t => {
     const filename = `${conversion}.ghost.md`;
-    const artifact = await compileSource(`# Dynamic ${conversion}\n\n\`\`\`ghost\ncontrol Conversion {\n input value: ${inputType};\n state accepted: Int = 0;\n accepted' = accepted + 1;\n output result: ${outputType};\n result <- ${conversion}(value);\n}\n\`\`\`\n`, { filename });
+    const artifact = await compileSource(`# Dynamic ${conversion}\n\n\`\`\`ghost\ncontrol Conversion {\n input value: ${inputType};\n state retained_value: ${inputType} = ${inputType === 'Int' ? '0' : '0.0'};\n let scalar_value = case value { ok(observed) => observed; fault(_) => retained_value; };\n retained_value' = scalar_value;\n state accepted: Int = 0;\n accepted' = accepted + 1;\n output result: ${outputType};\n result <- ${conversion}(scalar_value);\n}\n\`\`\`\n`, { filename });
     assert.equal(artifact.bytes.readUInt16LE(4), 3);
     assert.equal(artifact.manifest.format, 'GhostFlow/control-v4');
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-conversion-'));
     t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
     const modulePath = path.join(directory, 'conversion.gfb'), inputPath = path.join(directory, 'inputs.csv');
     fs.writeFileSync(modulePath, artifact.bytes);
-    fs.writeFileSync(inputPath, `value\n${rows.map(([value]) => value).join('\n')}\n`);
+    fs.writeFileSync(inputPath, softwareQualityCsv(artifact, rows.map(([value]) => ({ value }))));
     const native = execFileSync(nativePath, [modulePath, inputPath, '--outcomes'], { encoding: 'utf8' }).trim().split('\n').map(line => JSON.parse(line));
     const runtime = await GhostFlowRuntime.instantiate(fs.readFileSync(wasmPath));
     t.after(() => runtime.dispose());
-    runtime.load(artifact.bytes); runtime.addCapability('actuator', 'result', outputType.toLowerCase()); runtime.activate();
+    runtime.load(artifact.bytes); softwareQualityAbi(runtime, artifact); runtime.addCapability('actuator', 'result', outputType.toLowerCase()); runtime.activate();
     let accepted = 0, previous;
     const output = () => outputType === 'Int' ? runtime.intentInt('result') : runtime.intentNumber('result');
     for (const [index, [value, expected]] of rows.entries()) {
@@ -63,12 +64,12 @@ for (const [conversion, inputType, outputType, rows] of cases) {
 }
 
 test('GF-TEST-dynamic-conversion-branches: transition faults are atomic and unselected conversions are skipped', async t => {
-  const artifact = await compileSource('# Conditional conversion\n\n```ghost\ncontrol Conditional { input guard: Bool; input value: Number; state converted: Int = 0; state accepted: Int = 0; converted\' = if guard then int_exact(value) else 7; accepted\' = accepted + 1; output result: Int; result <- converted\'; }\n```\n', { filename: 'conditional-conversion.ghost.md' });
+  const artifact = await compileSource('# Conditional conversion\n\n```ghost\ncontrol Conditional { input guard: Bool; input value: Number; state converted: Int = 0; state accepted: Int = 0; converted\' = case guard { ok(enabled) => if enabled then (case value { ok(observed) => int_exact(observed); fault(_) => converted; }) else 7; fault(_) => converted; }; accepted\' = accepted + 1; output result: Int; result <- converted\'; }\n```\n', { filename: 'conditional-conversion.ghost.md' });
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-conversion-branch-'));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   const modulePath = path.join(directory, 'branch.gfb'), inputPath = path.join(directory, 'inputs.csv');
   fs.writeFileSync(modulePath, artifact.bytes);
-  fs.writeFileSync(inputPath, 'guard,value\nfalse,2147483648.5\ntrue,2147483648.5\ntrue,8\n');
+  fs.writeFileSync(inputPath, softwareQualityCsv(artifact, [{ guard: false, value: 2147483648.5 }, { guard: true, value: 2147483648.5 }, { guard: true, value: 8 }]));
   const native = execFileSync(nativePath, [modulePath, inputPath, '--outcomes'], { encoding: 'utf8' }).trim().split('\n').map(line => JSON.parse(line));
   assert.equal(native[0].trace.safe.result, 7);
   assert.deepEqual(native[1], { status: 'ERROR', phase: 'tick', error: fractional, journalLength: 1 });
@@ -76,7 +77,7 @@ test('GF-TEST-dynamic-conversion-branches: transition faults are atomic and unse
   assert.equal(native[2].trace.safe.result, 8);
   const runtime = await GhostFlowRuntime.instantiate(fs.readFileSync(wasmPath));
   t.after(() => runtime.dispose());
-  runtime.load(artifact.bytes); runtime.addCapability('actuator', 'result', 'int'); runtime.activate();
+  runtime.load(artifact.bytes); softwareQualityAbi(runtime, artifact); runtime.addCapability('actuator', 'result', 'int'); runtime.activate();
   runtime.setBool('guard', false); runtime.setNumber('value', 2147483648.5); runtime.tick();
   assert.equal(runtime.intentInt('result'), 7);
   runtime.setBool('guard', true); runtime.setNumber('value', 2147483648.5);

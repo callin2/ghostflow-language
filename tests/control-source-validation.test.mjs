@@ -33,14 +33,14 @@ test('canonical forms emit the expected public input and output metadata', () =>
       type Mode = Off | On;
       input request: Bool;
       state active: Bool = false;
-      active' = identity(request);
+      active' = case request { ok(value) => identity(value); fault(_) => active; };
       output permit: Bool;
       permit <- if active' then true else false;
     }
   `);
   assert.deepEqual({
     name: result.manifest.name,
-    inputs: result.manifest.inputs,
+    inputs: result.manifest.sensors.map(({ name, type }) => ({ name, type })),
     outputs: result.manifest.outputs,
   }, {
     name: 'Canonical',
@@ -176,7 +176,7 @@ for (const [name, declaration, diagnostic] of [
 
 test('integer-shaped hysteresis thresholds use the Number sensor context', () => {
   const result = compileControl(`control X {
-    sensor temperature: Number;
+    input temperature: Number;
     signal hot = hysteresis(temperature, on_below: 1, off_above: 2, initial: false);
   }`);
   assert.deepEqual(
@@ -192,7 +192,7 @@ for (const [type, below, above, expected] of [
 ]) {
   test(`hysteresis accepts ordered ${type} thresholds ${below} < ${above}`, () => {
     const result = compileControl(`control X {
-      sensor measured: ${type};
+      input measured: ${type};
       signal condition = hysteresis(measured, on_below: ${below}, off_above: ${above}, initial: false);
     }`);
     assert.deepEqual(
@@ -205,7 +205,7 @@ for (const [type, below, above, expected] of [
 for (const [below, above] of [['1', '1'], ['2', '1']]) {
   test(`hysteresis rejects unordered Number thresholds ${below} < ${above} independently`, () => {
     rejects(`control X {
-      sensor measured: Number;
+      input measured: Number;
       signal condition = hysteresis(measured, on_below: ${below}, off_above: ${above}, initial: false);
     }`, /on_below must be less than off_above/, `${below} < ${above}`);
   });

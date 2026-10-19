@@ -52,7 +52,7 @@ safe            = safety(requested, constraints)
 ```
 
 계산이 성공하면 candidate_state와 safe 결과를 하나의 논리 tick으로 확정한다.
-물리 출력의 적용은 이후 호스트 Driver가 맡는다. 논리적 원자성은 여러 GPIO가
+물리 출력의 적용은 이후 호스트 renderer가 맡는다. 논리적 원자성은 여러 GPIO가
 물리적으로 동시에 바뀐다는 뜻이 아니다.
 
 | 요소 | 의미 |
@@ -109,7 +109,7 @@ control WateringDemand {
 `output name: Type;`은 intent 포트의 타입만 선언한다. 각 출력 이름에는 정확히 하나의
 `name <- expression;` 연결이 있어야 하며 선언의 초기값은 허용하지 않는다. 이 연결식은
 VM이 이번 tick에 요청하는 논리 intent다. 부팅·계산 실패·호스트 연결 해제 때 출력을 OFF로
-유지하거나 적용을 중단하는 startup/fail-safe 정책은 VM intent와 별개로 호스트/Driver가
+유지하거나 적용을 중단하는 startup/fail-safe 정책은 VM intent와 별개로 호스트/renderer가
 소유한다. 출력 선언의 기본값으로 안전 정책을 암묵적으로 정하지 않는다.
 다음은 초기 watering=false에서 순서대로 입력한 기대 결과다.
 
@@ -124,7 +124,7 @@ VM이 이번 tick에 요청하는 논리 intent다. 부팅·계산 실패·호�
 센서가 복구됐다는 이유만으로 자기유지가 되살아나지 않으며, 시작과 정지가 함께
 참이면 정지가 우선한다. 이것은 순수 제어 계산 예제다. 설비 모드 진입·공유 펌프
 사용권과 실제 펌프/밸브의 시간차 적용은 [공통 제약 계약](CONSTRAINTS.md)의
-설비 관리자·Driver가 담당하며 위 코드만으로 모두 구현한 것은 아니다.
+설비 관리자·출력 renderer가 담당하며 위 코드만으로 모두 구현한 것은 아니다.
 
 ## 3. 어휘와 타입
 
@@ -300,7 +300,7 @@ intent 대상과 센서 입력의 capability는 프로파일에서 타입까지 
 4. intent/emit을 계산한다. state는 여전히 old, next는 candidate를 읽는다.
 5. 모든 safety 제약을 만족하는 safe intent를 계산한다.
 6. state와 출력 결과, 실행 기록을 논리적으로 함께 확정한다.
-7. 실제 실행의 호스트만 safe intent를 Driver에 적용한다.
+7. 실제 실행의 호스트만 safe intent를 renderer에 적용한다.
 
 state.x는 어느 식에서도 이전 상태, next.x는 intent/emit에서만 다음 상태다.
 계산 도중 이름의 의미가 바뀌지 않는다. next 정의에서 next.y를 읽으면 오류다.
@@ -480,7 +480,7 @@ manifest와 배포 프로토콜 구현은 이번 문법 비교 작업에 포함�
 ### 12.1 호환 장치 교체는 제어 프로그램 교체가 아니다
 
 제어 프로그램은 실제 센서·액추에이터의 모델이나 주소 대신 논리 장치 계약을 사용한다.
-Driver와 설치 binding이 같은 계약을 만족하는 다른 장치를 연결하면, 제어 소스와
+driver/renderer와 설치 binding이 같은 계약을 만족하는 다른 장치를 연결하면, 제어 소스와
 컴파일된 Program을 유지해야 하며 장치 교체만을 이유로 재컴파일을 요구하지 않는다.
 장치별 통신·원시값 해석은 Driver가 담당한다.
 
@@ -504,7 +504,7 @@ Driver·펌웨어와 설치 binding의 배포 주기는 제어 소스의 판본�
 | 입력 스키마 | 모든 입력을 매 tick 요구 | 공통 + 선택 전략 입력 |
 | 상태 읽기 | state=old, next=candidate | 이 의미 유지·명문화 |
 | 안전 제약 | false-only snapshot 고정점, requires-any | 일반 논리식/최적화 solver |
-| 공유 설비·모드 | Rust station + WASM API + 정적 policy 바인딩 | 실장치 Driver·배포 승인 경계 |
+| 공유 설비·모드 | Rust station + WASM API + 정적 policy 바인딩 | 실장치 driver/renderer·배포 승인 경계 |
 | 장치 부가정보 분석 | optional 정수 유량의 Pass/Violation/Unknown | 물리 수압/곡선 모델·알림 전송 |
 | 센서 신호 처리 | 유한 필터·히스테리시스·품질·복구 | 실제 보드 WCET/메모리 측정 |
 | 시간 제약 | 단조 timer, 날짜별 예산/발생 ledger, desktop 저장 | MCU NVS·RTC 신뢰·전원 차단 검증 |

@@ -1,4 +1,11 @@
+// Explicit temporal fixture revision: issue531-quality-temporal-v1; predecessor retained in fixtures/history/issue531/temporal.
 import assert from 'node:assert/strict';
+import { softwareQualityObservations, softwareQualityRails } from './helpers/software-quality-observations.mjs';
+const ControlRuntime = {
+  instantiate: async (...args) => softwareQualityObservations(await BaseControlRuntime.instantiate(...args)),
+  instantiateFramed: async (...args) => softwareQualityObservations(await BaseControlRuntime.instantiateFramed(...args)),
+};
+
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -7,13 +14,13 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { compileSource, restoreArtifactSourceMap } from '../tools/toolchain.mjs';
 import { observeSourceTrace } from '../tools/source-trace.mjs';
-import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
+import { ControlRuntime as BaseControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 import { solarContextEvidence } from '../runtimes/wasm/context-abi.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const wasmPath = path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm');
 const nativePath = path.join(root, 'target/release/examples/context_tape' + (process.platform === 'win32' ? '.exe' : ''));
-const fixture = fs.readFileSync(new URL('./fixtures/issue-145-solar-config.ghost.md', import.meta.url), 'utf8');
+const fixture = fs.readFileSync(new URL('./fixtures/issue-145-solar-config.input-v1.ghost.md', import.meta.url), 'utf8');
 const cases = JSON.parse(fs.readFileSync(new URL('./reference/cases/02-time-control.json', import.meta.url), 'utf8')).cases;
 const reference = cases.find(entry => entry.id === 'REF-03-010');
 const activation = { bootEpoch: 203, terminalCapacity: 32, bindings: [] };
@@ -50,7 +57,7 @@ function native(t, compiled, steps) {
   fs.writeFileSync(modulePath, compiled.bytes);
   fs.writeFileSync(tapePath, JSON.stringify({ profile: 'context-solar-v1', activation,
     steps: steps.map((step, scanId) => ({ scanId, logicalTimeMs: step.nowMs,
-      inputs: [{ name: 'divisor', value: 1 }], ...step.contextFacts })) }));
+      inputs: Object.entries(softwareQualityRails(compiled, { divisor: 1 }, scanId + 1, step.nowMs)).map(([name, value]) => ({ name, value })), ...step.contextFacts })) }));
   return execFileSync(nativePath, [modulePath, tapePath], { encoding: 'utf8' })
     .trim().split('\n').map(line => JSON.parse(line));
 }

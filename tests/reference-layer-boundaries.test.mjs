@@ -50,10 +50,10 @@ test('REF-08-002: compiler/tooling preserves source metadata but does not prove 
   assert.ok(runtime, 'missing runtime layer row');
   assert.match(runtime[1], /출력을 물리 확인으로 간주하지 않는다\./);
 
-  const driver = layers.get('Driver');
+  const driver = layers.get('입력 driver / 출력 renderer');
   assert.ok(driver, 'missing Driver layer row');
   assert.match(driver[0], /장치 통신/);
-  assert.match(driver[0], /출력 적용 결과/);
+  assert.match(driver[0], /논리 출력 적용과 결과/);
 });
 
 test('REF-08-002: FAQ compiler row separates compile checks from physical verification', () => {
@@ -143,19 +143,19 @@ test('REF-08-016 [host] 설치 binding과 Driver 배포 형식은 source grammar
   assert.match(language[1], /장치 주소, UI 모양, 저장 매체를 제어 문법으로 만들지 않는다/);
   assert.match(binding[0], /논리 역할과 실제 endpoint 연결/);
   assert.match(binding[1], /연결만 바뀌는 것과 소스 규칙 변경을 구분한다/);
-  assert.match(chapter08, /직접 GPIO, 확장 채널, RS485 장치 주소는\s+설치 binding과 Driver의 책임이다/);
+  assert.match(chapter08, /직접 GPIO, 확장 채널, RS485 장치 주소는\s+설치 binding과 driver\/renderer의 책임이다/);
   assert.match(chapter08, /호환 교체만으로 소스 수정·재컴파일을 요구하지 않는다/);
-  assert.match(chapter08, /설치 저장 형식·실제 핀\/주소·Driver 배포 방식/);
+  assert.match(chapter08, /설치 저장 형식·실제 핀\/주소·driver\/renderer 배포 방식/);
   assert.match(chapter08, /저장 매체, UI component, 통신 protocol도 언어 문법을 결정하기 위한 선행 조건이 아니다/);
   assert.match(chapter06, /physical endpoint는 별도 profile과 binding revision이 소유한다/);
-  assert.match(chapter06, /버스 주소·채널 선택·전송 절차는 Driver와 설치 연결이 소유한다/);
+  assert.match(chapter06, /버스 주소·채널 선택·전송 절차는 출력 renderer와 설치 연결이 소유한다/);
   assert.match(chapter06, /Driver 자체의 배포 판본은 실행 환경에서 관리한다/);
   assert.match(chapter06, /`bind`는 제어 소스 문법이 아니다/);
 
   const source = `# Logical port\n\n\`\`\`ghost\ncontrol LogicalPump {
   input start: Bool;
   output pump: Bool;
-  pump <- start;
+  pump <- start |> recover(false);
 }\n\`\`\`\n`;
   const compiled = await compileSource(source, { filename: 'logical-pump.ghost.md' });
   const sourceIdentity = {

@@ -1,3 +1,4 @@
+// Explicit temporal fixture revision: issue531-quality-temporal-v1; predecessor retained in fixtures/history/issue531/temporal.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { test } from 'node:test';
@@ -5,7 +6,7 @@ import { compileSource, verifyArtifactSourceMap } from '../tools/toolchain.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 
 const wasm = fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
-const source = `# Scheduled control\n\n\`\`\`ghost\ncontrol Water {\n  input allow: Bool;\n  schedule morning: Cron {\n    timezone = "Asia/Seoul"; at = cron5\`30 6 * * *\`;\n    dst_missing = skip; dst_repeated = first;\n    basis = pulse; when = allow; clock = trusted_only;\n    gap = skip_after(60s); recovery = baseline; fallback = skip;\n  }\n  output pump: Bool;\n  pump <- morning.due;\n}\n\`\`\`\n`;
+const source = `# Scheduled control\n\n\`\`\`ghost\ncontrol Water {\n  input allow: Bool;\n  schedule morning: Cron {\n    timezone = "Asia/Seoul"; at = cron5\`30 6 * * *\`;\n    dst_missing = skip; dst_repeated = first;\n    basis = pulse; when = allow |> recover(false); clock = trusted_only;\n    gap = skip_after(60s); recovery = baseline; fallback = skip;\n  }\n  output pump: Bool;\n  pump <- morning.due;\n}\n\`\`\`\n`;
 
 test('canonical source emits source-bound executable GFB11 schedule control', async () => {
   const compiled = await compileSource(source, { filename: 'water.ghost.md' });
@@ -13,7 +14,8 @@ test('canonical source emits source-bound executable GFB11 schedule control', as
   assert.equal(compiled.bytes.readUInt16LE(4), 11);
   assert.equal(compiled.manifest.format, 'GhostFlow/control-v10');
   assert.deepEqual(compiled.manifest.outputs.map(item => item.name), ['pump']);
-  assert.equal(compiled.manifest.schedules[0].policy.when, 'input.allow');
+  assert.equal(compiled.manifest.schedules[0].policy.when[0], 'trace-result');
+  assert.deepEqual(compiled.manifest.schedules[0].policy.when[2], ['if', 'input.__gf_sensor_ok_allow', 'input.__gf_sensor_value_allow', 'false']);
   await assert.rejects(() => ControlRuntime.instantiate(wasm, compiled), /context activation profile is required/);
   const envelope = {
     format: 'GhostFlow/source-map-v1', bytecodeSha256: compiled.manifest.bytecodeSha256,

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
+import { softwareQualityObservations } from './helpers/software-quality-observations.mjs';
 import { compileSource } from '../tools/toolchain.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 import { observeSourceTrace } from '../tools/source-trace.mjs';
@@ -10,7 +11,7 @@ const source = `# Derived windows
 
 \`\`\`ghost
 control DerivedWindows {
-  sensor probe: Number;
+  input probe: Number;
   signal inner = window_average(probe, over: 2ms, quality: measured, max_age: 2ms);
   signal outer = window_average(inner, over: 10ms, quality: measured, max_age: 10ms);
   output inner_value, outer_value: Number;
@@ -22,9 +23,9 @@ const delayedSource = source
   .replace('over: 2ms, quality: measured, max_age: 2ms', 'over: 10ms, quality: measured, max_age: 10ms')
   .replace('window_average(inner, over: 10ms, quality: measured, max_age: 10ms)', 'window_average(inner, over: 10ms, quality: measured, max_age: 2ms)');
 const retrySource = source
-  .replace('sensor probe: Number;', 'input divisor: Number;\n  sensor probe: Number;')
+  .replace('input probe: Number;', "input divisor: Number;\n  state retained_divisor: Number = 1.0;\n  let scalar_divisor = case divisor { ok(value) => value; fault(_) => retained_divisor; };\n  retained_divisor' = scalar_divisor;\n  input probe: Number;")
   .replace('output inner_value, outer_value: Number;', 'output inner_value, outer_value, ratio: Number;')
-  .replace('outer_value <- outer |> recover(-1.0);', 'outer_value <- outer |> recover(-1.0);\n  ratio <- 1.0 / divisor;');
+  .replace('outer_value <- outer |> recover(-1.0);', 'outer_value <- outer |> recover(-1.0);\n  ratio <- 1.0 / scalar_divisor;');
 const sample = (id, timestampMs, value) => ({ epoch: 5, id, timestampMs, value, quality: 'Good' });
 const compile = text => compileSource(text, { filename: 'window-derived-host.ghost.md' });
 
@@ -32,6 +33,7 @@ async function instantiate(t, artifact, framed, intervalMs = 1) {
   const tag = artifact.manifest.signals.find(signal => signal.name === 'inner').sources[0].tag;
   const options = { acceptSettings: true, temporal: { timeEpoch: 5, rootDensity: [{ sourceTag: tag, maxObservations: 1, intervalMs }], budget: { maxRetainedSamples: 100, maxBytes: 64 * 1024 * 1024 } } };
   const runtime = await (framed ? ControlRuntime.instantiateFramed : ControlRuntime.instantiate).call(ControlRuntime, wasm, artifact, options);
+  softwareQualityObservations(runtime);
   t.after(() => runtime.dispose());
   return runtime;
 }

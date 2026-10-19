@@ -215,7 +215,9 @@ test('REF-07-009: boundary terms have separate identity and effect definitions',
   assert.equal(terms.get('Tick / scan'), '입력을 받아 논리 판단을 확정하는 단위. 문맥별 관측 경계를 함께 읽는다.');
   assert.equal(terms.get('Requested / safe intent'), '제어식이 요청한 출력 / 제약을 거친 출력 의도');
   assert.equal(terms.get('Logical port / physical binding'), '제어의 의미 있는 연결점 / 그것을 실제 설비에 연결하는 관계');
-  assert.equal(terms.get('Driver'), '논리 입력과 물리 신호, 출력 의도와 실제 효과를 연결하는 경계');
+  assert.equal(terms.get('Driver'), '물리 신호에서 논리 입력을 생산하는 입력 역할');
+  assert.equal(terms.get('Renderer'), '릴레이, 모터, 램프, 화면을 포함해 논리 출력 의도를 실제 효과에 적용하는 출력 역할');
+  assert.equal(terms.get('Cabinet-view'), 'descriptor와 관찰을 소비하는 운영자 UI; `@ghostflow/cabinet-view`');
 });
 
 test('REF-07-009: Reference prose does not collapse Program/Run, requested/safe, or logical/physical', () => {

@@ -23,12 +23,12 @@ control IntentPump {
   // ghostflow:link id=GF-INT-FALLBACK-001 relation=fallback
   schedule daily: DailySlots<15min> { timezone = "UTC"; selected = [07:00]; }
   // ghostflow:link id=GF-INT-PUMP-001 relation=implements
-  pump <- request;
+  pump <- request |> recover(false);
   // ghostflow:link id=GF-PREMISE-PERMIT-001 relation=constrains
   require pump => backup;
-  backup <- permit;
+  backup <- permit |> recover(false);
   // ghostflow:link id=GF-ASSUME-CANDIDATE-001 relation=assumes
-  candidate <- request;
+  candidate <- request |> recover(false);
 }
 \`\`\`
 `;
@@ -38,10 +38,10 @@ control IntentPump {
   input request, permit: Bool;
   output pump, backup, candidate: Bool;
   schedule daily: DailySlots<15min> { timezone = "UTC"; selected = [07:00]; }
-  pump <- request;
+  pump <- request |> recover(false);
   require pump => backup;
-  backup <- permit;
-  candidate <- request;
+  backup <- permit |> recover(false);
+  candidate <- request |> recover(false);
 }
 \`\`\`
 `;
@@ -72,9 +72,9 @@ This premise remains unconfirmed.
 control Derivations {
   input request: Bool;
   output pump, backup, spare: Bool;
-  pump <- request;
-  backup <- request;
-  spare <- request;
+  pump <- request |> recover(false);
+  backup <- request |> recover(false);
+  spare <- request |> recover(false);
   // original comment retained
   // ghostflow:link id=GF-CONSTRAINT relation=constrains
   // ghostflow:link id=GF-ASSUMPTION relation=assumes
@@ -192,7 +192,7 @@ control Sparse {
 ${padding}
   // ghostflow:link id=GF-INT-SPARSE relation=implements
   output pump: Bool;
-  pump <- request;
+  pump <- request |> recover(false);
 }
 \`\`\`
 `;
@@ -212,7 +212,7 @@ control Split {
 
 \`\`\`ghost
   output pump: Bool;
-  pump <- request;
+  pump <- request |> recover(false);
 }
 \`\`\`
 `;

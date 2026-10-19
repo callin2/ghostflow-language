@@ -1,0 +1,136 @@
+{
+  "format": "GhostFlow/interaction-scan-tape-v1",
+  "version": "1.0",
+  "caseId": "multiple-values",
+  "source": {
+    "documentId": "source.fixture-multiple-values",
+    "revisionId": "revision.fixture-multiple-values.input531-v1",
+    "format": "GhostFlow/source-document-v1",
+    "kind": "literate",
+    "sha256": "26359bbfb525be0bf04006ca93e3b5d9f31d15b2dec4a6a2e98c7e869651a4cd"
+  },
+  "tapeId": "tape.multiple-values.input531-v1",
+  "digest": {
+    "algorithm": "SHA-256",
+    "strategy": "canonical-json-excluding-digest-v1",
+    "sha256": "516c9f3db16e5bd19a44d90f56c3e98ad15b0455adf467ad33b6f49f534f8307"
+  },
+  "runs": [
+    {
+      "runId": "multiple-values-run-before-reset",
+      "scans": [
+        {
+          "completion": {
+            "kind": "completed-scan",
+            "scanId": 0,
+            "logicalTimeMs": 0
+          },
+          "inputs": [
+            {
+              "name": "first_enable",
+              "value": false
+            },
+            {
+              "name": "second_enable",
+              "value": false
+            },
+            {
+              "name": "sample",
+              "value": 0
+            }
+          ]
+        },
+        {
+          "completion": {
+            "kind": "completed-scan",
+            "scanId": 1,
+            "logicalTimeMs": 10
+          },
+          "inputs": [
+            {
+              "name": "first_enable",
+              "value": true
+            },
+            {
+              "name": "second_enable",
+              "value": false
+            },
+            {
+              "name": "sample",
+              "value": 12.5
+            }
+          ]
+        },
+        {
+          "completion": {
+            "kind": "completed-scan",
+            "scanId": 2,
+            "logicalTimeMs": 250
+          },
+          "inputs": [
+            {
+              "name": "first_enable",
+              "value": true
+            },
+            {
+              "name": "second_enable",
+              "value": true
+            },
+            {
+              "name": "sample",
+              "value": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "runId": "multiple-values-run-after-reset",
+      "scans": [
+        {
+          "completion": {
+            "kind": "completed-scan",
+            "scanId": 0,
+            "logicalTimeMs": 0
+          },
+          "inputs": [
+            {
+              "name": "first_enable",
+              "value": false
+            },
+            {
+              "name": "second_enable",
+              "value": false
+            },
+            {
+              "name": "sample",
+              "value": 0
+            }
+          ]
+        },
+        {
+          "completion": {
+            "kind": "completed-scan",
+            "scanId": 1,
+            "logicalTimeMs": 1
+          },
+          "inputs": [
+            {
+              "name": "first_enable",
+              "value": false
+            },
+            {
+              "name": "second_enable",
+              "value": true
+            },
+            {
+              "name": "sample",
+              "value": 1
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "observationExpectations": []
+}

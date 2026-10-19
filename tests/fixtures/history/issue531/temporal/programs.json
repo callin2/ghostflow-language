@@ -1,0 +1,126 @@
+{
+  "format": "GhostFlow/test-source-migration-history-v1",
+  "replacementRevision": "issue531-quality-temporal-v1",
+  "snapshots": [
+    {
+      "source": "tests/clock-timer-domain-boundary.test.mjs",
+      "snapshot": "tests/fixtures/history/issue531/temporal/clock-timer-domain-boundary.test.mjs.pre-input.txt",
+      "sha256": "3a7832ca41cef56a34a3fe7f731794c468cb0f2a3e823fe7a0afc53661a889a6",
+      "previousRepositoryRevision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773"
+    },
+    {
+      "source": "tests/daily-slots-policy.test.mjs",
+      "snapshot": "tests/fixtures/history/issue531/temporal/daily-slots-policy.test.mjs.pre-input.txt",
+      "sha256": "47eb91a8a41ff2f5091fa4c88b9a07873838164bcdcf9080b54db7e9b479c8ad",
+      "previousRepositoryRevision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773"
+    },
+    {
+      "source": "tests/date-time-control.test.mjs",
+      "snapshot": "tests/fixtures/history/issue531/temporal/date-time-control.test.mjs.pre-input.txt",
+      "sha256": "8b31237974cc273db5ff6e07ed4bcda96b588942208cb7733b74f2598560be5d",
+      "previousRepositoryRevision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773"
+    },
+    {
+      "source": "tests/datetime-runtime.test.mjs",
+      "snapshot": "tests/fixtures/history/issue531/temporal/datetime-runtime.test.mjs.pre-input.txt",
+      "sha256": "cf40c1d4215ad63c4aa8fd5167784dcc0d087d773912bae8963333a2484e581f",
+      "previousRepositoryRevision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773"
+    },
+    {
+      "source": "tests/duration-runtime.test.mjs",
+      "snapshot": "tests/fixtures/history/issue531/temporal/duration-runtime.test.mjs.pre-input.txt",
+      "sha256": "6494bc18d081bdab5f5f375a3b52aec0a323c2a9627962c31858ad28aa9900d0",
+      "previousRepositoryRevision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773"
+    },
+    {
+      "source": "tests/natural-fallback-runtime.test.mjs",
+      "snapshot": "tests/fixtures/history/issue531/temporal/natural-fallback-runtime.test.mjs.pre-input.txt",
+      "sha256": "7dbad7c7769f52c8ecd005ea11785b650963e1360205fd6119c59dce58d4060c",
+      "previousRepositoryRevision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773"
+    },
+    {
+      "source": "tests/natural-schedule-contract.test.mjs",
+      "snapshot": "tests/fixtures/history/issue531/temporal/natural-schedule-contract.test.mjs.pre-input.txt",
+      "sha256": "3c37cfa2b2a06ae8b4efe63337b5aa06dc66dfbf458c9a455763a0fdb971bcf0",
+      "previousRepositoryRevision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773"
+    },
+    {
+      "source": "tests/range-contract.test.mjs",
+      "snapshot": "tests/fixtures/history/issue531/temporal/range-contract.test.mjs.pre-input.txt",
+      "sha256": "bf457e30637a52233fed0b4767064808e69ffa2de78077c55df3a30402dc115d",
+      "previousRepositoryRevision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773"
+    },
+    {
+      "source": "tests/range-runtime.test.mjs",
+      "snapshot": "tests/fixtures/history/issue531/temporal/range-runtime.test.mjs.pre-input.txt",
+      "sha256": "169ae633b88ee3a05b7f463baa91d29c659c034469e2715ba76d360da4050d16",
+      "previousRepositoryRevision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773"
+    },
+    {
+      "source": "tests/range-safety-deadline.test.mjs",
+      "snapshot": "tests/fixtures/history/issue531/temporal/range-safety-deadline.test.mjs.pre-input.txt",
+      "sha256": "7f641cf5c97e1339a6b36e3ce949417177f88498a9f59cde0972146b99d9d331",
+      "previousRepositoryRevision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773"
+    },
+    {
+      "source": "tests/reference-03-048-local-day-accounting.test.mjs",
+      "snapshot": "tests/fixtures/history/issue531/temporal/reference-03-048-local-day-accounting.test.mjs.pre-input.txt",
+      "sha256": "0daeaeb67c836a02d0ef57faf1f165864c3e6cd533cdf77b7e505a6b8119b05b",
+      "previousRepositoryRevision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773"
+    },
+    {
+      "source": "tests/resource-policy-artifact.test.mjs",
+      "snapshot": "tests/fixtures/history/issue531/temporal/resource-policy-artifact.test.mjs.pre-input.txt",
+      "sha256": "9be156025a8a78e610d58c7b5eed64756f7900f4c747bf4cd2fd03c1ebe5cec6",
+      "previousRepositoryRevision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773"
+    },
+    {
+      "source": "tests/schedule-descriptor-artifact.test.mjs",
+      "snapshot": "tests/fixtures/history/issue531/temporal/schedule-descriptor-artifact.test.mjs.pre-input.txt",
+      "sha256": "398752e5571d1541367474462fa6e52ab0f81e88d7f03c4704cf0300f7c7393d",
+      "previousRepositoryRevision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773"
+    },
+    {
+      "source": "tests/solar-admitted-observation.test.mjs",
+      "snapshot": "tests/fixtures/history/issue531/temporal/solar-admitted-observation.test.mjs.pre-input.txt",
+      "sha256": "66814f49ca8f7eb27b3cb59c97dd62639a6604c352831cbaca3098315266ce38",
+      "previousRepositoryRevision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773"
+    },
+    {
+      "source": "tests/solar-config-runtime.test.mjs",
+      "snapshot": "tests/fixtures/history/issue531/temporal/solar-config-runtime.test.mjs.pre-input.txt",
+      "sha256": "be0a8fea5560e8b635a6cc2a72dd5ebbced97e405ce3bb6e34c40d4f2143cfc2",
+      "previousRepositoryRevision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773"
+    },
+    {
+      "source": "tests/solar-control-runtime.test.mjs",
+      "snapshot": "tests/fixtures/history/issue531/temporal/solar-control-runtime.test.mjs.pre-input.txt",
+      "sha256": "c9f8baef0f6e14ec55832733da6569d76eaf6a63f3961083ff5e952f16206f71",
+      "previousRepositoryRevision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773"
+    },
+    {
+      "source": "tests/solar-provider-evidence-boundary.test.mjs",
+      "snapshot": "tests/fixtures/history/issue531/temporal/solar-provider-evidence-boundary.test.mjs.pre-input.txt",
+      "sha256": "6527fca97c35a8b003ea91f8fd0c772901d561953d59e19016da5c0a4dbe3212",
+      "previousRepositoryRevision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773"
+    },
+    {
+      "source": "tests/tide-run-late-constraint.test.mjs",
+      "snapshot": "tests/fixtures/history/issue531/temporal/tide-run-late-constraint.test.mjs.pre-input.txt",
+      "sha256": "8345bf4883a330403e0b627f432d0a6c038da5582daadd35f89e688afb229fb5",
+      "previousRepositoryRevision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773"
+    }
+  ],
+  "retainedPredecessors": [
+    {
+      "source": "tests/fixtures/issue-145-solar-config.ghost.md",
+      "sha256": "388e5c9a34a97a5e3dfa5e294cdd0e19e91f46f59b73d35263fbee9fa63682a4",
+      "previousRepositoryRevision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773"
+    },
+    {
+      "source": "tests/reference/cases/02-time-control.json",
+      "sha256": "2dab37da507e3c4f4d566c093c743f17d84cb350da16ab1b3291e762735b9d77",
+      "previousRepositoryRevision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773"
+    }
+  ]
+}

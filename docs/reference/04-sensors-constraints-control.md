@@ -5,7 +5,7 @@
 
 GhostFlow의 센서 값은 숫자 하나가 아니다. 값의 출처·품질·시각과 fault를 함께 다루며,
 출력은 장치 명령이 아니라 먼저 요청 intent로 계산한다. 지역 제어식, 공유 자원 중재,
-안전 제약, Driver 적용, 물리 feedback을 구분해야 센서 고장이나 여러 control의 경쟁을
+안전 제약, 출력 renderer 적용, 물리 feedback을 구분해야 센서 고장이나 여러 control의 경쟁을
 숨기지 않고 설명할 수 있다.
 
 이 장의 코드 표기는 다음처럼 읽는다.
@@ -23,13 +23,18 @@ GhostFlow의 센서 값은 숫자 하나가 아니다. 값의 출처·품질·�
 [#105](https://github.com/callin2/ghostflow-language/issues/105),
 [#110](https://github.com/callin2/ghostflow-language/issues/110)이다.
 
+외부 입력의 canonical 선언 keyword는 `input`이다. 이 장의 typed quality,
+conditioning과 optional capability 규칙을 계승한다. `sensor`는 내부/wire 품질
+분류이며 허용되는 선언 alias가 아니다. 소스 변경은 검토할 새 revision으로만
+만든다. [migration 계약](../INPUT-MIGRATION.ko.md)을 따른다.
+
 ## 4.1 sensor와 Result 품질
 
 선택된 선언에서 sensor 타입은 정상 payload 타입이다.
 
 ```ghost
-sensor low_water: Bool;
-sensor moisture: Percent;
+input low_water: Bool;
+input moisture: Percent;
 ```
 
 sensor를 읽은 실제 타입은 개념적으로 `Result<T, SensorFault>`다. 정상 샘플은
@@ -84,7 +89,7 @@ let normalized = temperature |> and_then(normalize);
 선택된 sensor 설정 표기는 다음과 같다.
 
 ```ghost
-sensor moisture: Percent {
+input moisture: Percent {
   sample = 1s;
   valid = 0% .. 100%;
   filter = median(5);
@@ -98,7 +103,7 @@ sensor moisture: Percent {
 | 항목 | 타입·제약 | 의미 |
 |---|---|---|
 | `sample` | 양의 `Duration` | 기대 측정 간격 정보다. sensor를 읽는 thread나 timer를 만들지 않는다. |
-| `valid` | payload와 같은 타입의 닫힌 범위 | filter 전에 raw 정상 후보를 검사한다. 범위 밖 값은 `Invalid`다. |
+| `valid` | payload과 같은 numeric 타입의 닫힌 범위; Bool은 지원하지 않음 | 필터 전 raw 정상 후보를 검사한다. 범위 밖 값은 `Invalid`이다. Bool 범위는 컴파일에서 거부한다. |
 | `filter` | 상태 있는 signal 연산 | 새롭고 유효한 샘플에만 적용한다. |
 | `stale_after` | 양의 `Duration` | 마지막 실제 유효 샘플 시각부터의 freshness 한계다. |
 | `recover_after` | 양의 정수 `N samples` | fault 뒤 N개의 새 유효 샘플이 연속해야 복구 조건을 만족한다. |
@@ -132,6 +137,26 @@ fault 뒤 filter window는 비운다. filter 준비 조건과 `recover_after` �
 기본 재부팅 의미는 sensor state와 freshness를 초기화하고 `NotReady`부터 다시
 준비하는 것이다. persistent resume은 checkpoint의 source/time continuity를 검증하는
 명시 opt-in이다. 오래된 정상값 하나를 즉시 복원해 허가에 사용하지 않는다.
+
+`recover_after = N samples`는 초기화, 재부팅, source epoch 변경 및 fault 후 복구에서 서로 다른 새 유효 관측을 센다. filter도 준비되었다면 N번째 관측부터 사용할 수 있으며, 중복 sample과 clock-only scan은 세지 않는다. fault 또는 freshness 상실은 새 sequence를 시작한다. 첫 N개 유효 관측을 버리려면 `recover_after = N+1 samples`를 `1..31` 안의 구체적인 개수로 작성한다. 이 옵션은 sample 개수이며 시간 기반 예열이 아니다.
+
+시간 기반 준비 기간은 `recover_after`에 duration 문법을 추가하지 않고 기존 상태 연산 `debounce`로 작성할 수 있다. 이 패턴은 첫 conditioned `Good` 관측부터 2분이 지나고, 그 시점 이후 서로 다른 새 `Good` 관측이 들어올 때까지 Result 사용을 보류한다. `usable` 출력은 사용 가능 여부 표시이며 물리 운전을 명령하지 않는다.
+
+```ghost
+fn observed(value: Number) -> Bool { true }
+control TimedPreparation {
+  input reading: Number { stale_after = 3min; }
+  signal ready = debounce(reading |> map(observed), stable_for: 2min, initial: false);
+  let prepared: Result<Number, SensorFault> = case ready {
+    ok(value) => if value then reading else fault(NotReady);
+    fault(_) => reading;
+  };
+  output usable: Bool;
+  usable <- case prepared { ok(value) => true; fault(_) => false; };
+}
+```
+
+`observed`는 0을 포함한 정상 payload를 true로 변환하며, 입력 fault는 `map`을 그대로 통과한다. debounce 기간은 관측 timestamp를 사용한다. clock-only scan과 중복 sample은 준비 완료를 촉진하지 않는다. fault, stale reception 또는 source epoch 변경은 준비를 다시 시작한다. filter나 sample 개수 기반 복구도 설정했다면 그 단계들이 처음 `Good`을 만든 뒤에 기간이 시작된다. `fault(_) => reading` 분기는 원래 입력 Result와 origin을 보존한다. 예상 관측 주기에 맞게 `stale_after`를 선택해야 한다. 위 예제의 3분 한계는 첫 관측과 준비 기한 관측만 공급하는 드문 관측 간격을 허용한다. 개수 기반 `recover_after`와 작성된 기간 gate는 별도 조건이다.
 
 ## 4.3 filter와 signal 연산
 
@@ -176,8 +201,8 @@ signal dry = hysteresis(moisture,
 다음은 선택된 표기다.
 
 ```ghost
-sensor moisture: Percent { filter = moving_average(3); }
-sensor temperature: Temperature { filter = ema(alpha: 0.25); }
+input moisture: Percent { filter = moving_average(3); }
+input temperature: Temperature { filter = ema(alpha: 0.25); }
 signal stable_start = debounce(start, stable_for: 2s, initial: false);
 ```
 
@@ -382,7 +407,7 @@ source 값이 계약상 유효하다는 뜻이지 계산 결과가 측정되었�
 설정 방법·operator/source, source/program과 설치 binding revision, run과 monotonic time epoch,
 근거가 된 source/application receipt history, 명시한 산출 basis를 함께 보존한다. actuator
 진행 추정의 첫 basis는 Device가 실제로 수락한 output register/write history다. Device의 ACK는
-driver가 그 register/write를 수락했다는 뜻일 뿐 motor가 움직였거나 position이 확인되었다는
+renderer가 그 register/write를 수락했다는 뜻일 뿐 motor가 움직였거나 position이 확인되었다는
 뜻이 아니다. 요청 시각을 basis로 선택할 수는 있지만 requested history로 명시해야 하며
 applied history와 바꾸어 쓰지 않는다. 이 구분은 §4.7의 요청·safe·applied·confirmed 경계를
 따른다. 보존할 참조와 history는 선언된 deployment profile의 유한한 bound 안에 있어야 한다.
@@ -416,7 +441,7 @@ temporal consumer는 해당 source/type을 명시적으로 허용하고 선언�
 
 연속 예: 명시적으로 설정한 runtime reference, 같은 model/calibration/binding, 같은 run/time
 epoch와 profile bound 내 gap 없는 qualifying write history가 있으면 선택된 model이 estimate를
-산출할 수 있다. 그 결과는 계속 estimate이며 Driver ACK만으로 실제 움직임을 주장하지 않는다.
+산출할 수 있다. 그 결과는 계속 estimate이며 output renderer ACK만으로 실제 움직임을 주장하지 않는다.
 단절 예: applied-history basis에서는 ACK 없는 요청, 실패하거나 불확실한 새 write, reboot 또는
 identity/revision 변경 뒤 새로 검증된 reference가 생기기 전까지 live estimate가 unavailable이다.
 별도로 선언된 requested-history basis는 그 요청을 추정 가정으로 쓸 수 있지만 applied history로
@@ -442,7 +467,7 @@ Estimate를 소비하는 실행 지원은 #385에서 별도 compatibility를 정
 ## 4.5 선택 sensor와 capability
 
 ```ghost
-sensor moisture?: Percent;
+input moisture?: Percent;
 ```
 
 `?`는 해당 sensor capability가 설치 profile에서 선택적이라는 선언 정보다. 이는
@@ -525,7 +550,7 @@ sensor/input + 이전 state
   → requested output intent
   → arbitration과 constraints
   → safe/effective intent
-  → Driver가 적용한 command
+  → 출력 renderer가 적용한 command
   → feedback으로 confirmed state
 ```
 
@@ -605,7 +630,7 @@ binding과 enforcement가 없는 shared descriptor를 실행 control이나 enfor
 활성화와 각 평가의 binding은 그 identity와 같아야 한다. missing/mismatch는
 부분 실행이 아니라 평가 거부다. bound 실행의 요청·admission·safe_output은
 동일한 Rust commit 경계에서 검사하며 host의 후처리 출력 filter로 대신하지 않는다.
-논리 enforcement가 physical applied/confirmed나 Driver 안전 순서를 보장하지는 않는다.
+논리 enforcement가 physical applied/confirmed나 출력 renderer 안전 순서를 보장하지는 않는다.
 
 exclusive의 원시 activity 입력은 admission 결과가 아니다. 이미 admit된 activity와
 충돌하는 새 claim은 거부하고 기존 admission과 이전 safe 출력을 보존한다.
@@ -653,7 +678,7 @@ persistence가 ledger의 뜻을 정한다. 지역 Bool 규칙이나 shared admis
 완화하거나 resource binding·provenance·복구 조건을 우회하지 않는다.
 예측 가능한 시작 전 위반은 admission을 거부한다. 실행 중에는 작성한 resource별
 safe 동작을 적용하고 원인과 전이를 남긴다. admission, requested 후보,
-safe_output, Driver applied, feedback confirmed를 결정적인 순서로 구분하며 한 단계의
+safe_output, output renderer applied, feedback confirmed를 결정적인 순서로 구분하며 한 단계의
 증거를 다른 단계의 보장으로 바꾸지 않는다(§4.7).
 정상 evidence의 회복은 새 시작 권한이 아니다. 재시도·복구·수동 경로도 같은 필수 조건을 따른다.
 
@@ -908,7 +933,7 @@ clamp할 수 있다.
 PID requested 92%
 wind safety max 20%
 safe target 20%
-Driver applied 20%
+output renderer applied 20%
 position feedback 17% with provenance
 ```
 

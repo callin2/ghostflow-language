@@ -1,0 +1,20 @@
+// The raw runtime must reject an output-bearing module before the host declares
+// its actuator. ControlRuntime is intentionally the virtual convenience host
+// that derives and installs that same capability from the checked manifest.
+const wasm = fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
+const rawRuntime = await GhostFlowRuntime.instantiate(wasm);
+try {
+  rawRuntime.load(noSensor.bytes);
+  assert.throws(() => rawRuntime.activate(), /no device strategy matches capabilities/);
+  rawRuntime.addCapability('actuator', 'pump', 'bool');
+  rawRuntime.activate();
+} finally { rawRuntime.dispose(); }
+const adaptiveProgram = await compileSource('control Adaptive { sensor moisture?: Percent; output pump: Bool; adapt policy { strategy Wet priority 10 match (moisture: sensor<Percent>) { pump <- case moisture { ok(value) => value < 30%; fault(_) => false; }; } strategy Baseline priority 0 match always { pump <- false; } } }');
+await assert.rejects(ControlRuntime.instantiate(wasm, adaptiveProgram), /adapt strategy activation requires a capability-aware host/);
+const virtualRuntime = await ControlRuntime.instantiate(wasm, await compileSource(`
+control Basic {
+  input enable: Bool;
+  output pump: Bool;
+  pump <- enable;
+}
+`, { filename: 'basic-host.ghost' }));

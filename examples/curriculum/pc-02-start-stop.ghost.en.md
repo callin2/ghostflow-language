@@ -17,9 +17,20 @@ path, a fresh-start event, and restart inhibition.
 `stop_ok` is a logical input indicating that the stop path permits operation.
 It is supplied as `false` while STOP is active. The NO/NC polarity of the actual
 STOP contact and the electrical safety circuit belong to the device adapter's
-input semantics; this virtual example receives only a normalized Bool.
+input semantics; this virtual example receives a normalized Bool payload and
+acquisition quality.
+
+This explicit new source revision preserves the existing healthy START/STOP scenario.
+A START acquisition fault prevents a new start but retains an active run while
+STOP is healthy and permits operation. A STOP acquisition fault clears running
+and requests OFF. A fault on either input clears `armed`. Restart then requires
+observing a healthy released START while STOP is healthy and permits operation,
+followed by another press. An acquisition fault never counts as a healthy release
+for rearming. The predecessor is retained in
+`tests/fixtures/history/issue531/pc-02-start-stop.ghost.en.md.pre-input.txt`.
 
 ```ghost
+// issue531-approved-fault-restart-v1: rearm requires healthy START release.
 control StartStopPump {
   input start, stop_ok: Bool;
   output valve, pump: Bool;
@@ -29,10 +40,14 @@ control StartStopPump {
   // ghostflow:link id=GF-INT-PC02-START-STOP-REARM-V1 relation=implements
   state running: Bool = false;
 
-  let start_event = armed && start;
+  let start_good = case start { ok(_) => true; fault(_) => false; };
+  let stop_good = case stop_ok { ok(_) => true; fault(_) => false; };
+  let start_requested = start |> recover(false);
+  let stop_permitted = stop_ok |> recover(false);
+  let start_event = start_good && armed && start_requested;
 
-  running' = stop_ok && (start_event || running);
-  armed' = stop_ok && !start;
+  running' = stop_permitted && (start_event || running);
+  armed' = start_good && stop_good && stop_permitted && !start_requested;
 
   valve <- running';
   pump <- running';

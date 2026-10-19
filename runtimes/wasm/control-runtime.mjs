@@ -8,7 +8,7 @@ import { validateSolarDescriptor, validateClockPolicy, validateSolarFallback, va
 import { validateSolarActivation } from './solar-abi.mjs';
 import { encodeContextActivation, encodeContextFacts, validateContextSolarFacts } from './context-abi.mjs';
 import { QUANTITY_TYPES, canonicalUnitFor, isQuantityType } from '../../tools/quantities.mjs';
-import { TIME_TYPES, isTimeType, validateTimeValue } from '../../tools/time-literals.mjs';
+import { TIME_TYPES, TIME_BOUNDS, isTimeType, validateTimeValue } from '../../tools/time-literals.mjs';
 import { isInt32, intSettingsIssue } from '../../tools/int-settings.mjs';
 
 const FORMAT = 'GhostFlow/control-v1';
@@ -35,7 +35,7 @@ const contextManifest = manifest => manifest?.format === STREAM_CONTEXT_FORMAT
   || manifest?.format === AVAILABILITY_FORMAT && !manifest.schedules?.some(item => item.kind === 'solar');
 const RESERVED = '__gf_';
 const TYPES = new Set(['Bool', 'Int', 'Number', 'Percent', 'Duration', ...TIME_TYPES, ...QUANTITY_TYPES]);
-const SENSOR_TYPES = new Set(['Bool', 'Number', 'Percent', ...QUANTITY_TYPES]);
+const SENSOR_TYPES = TYPES;
 const MAX_WINDOW = 31;
 const MAX_SAFE = Number.MAX_SAFE_INTEGER;
 const MAX_LIST = 128;
@@ -267,11 +267,10 @@ function validateContextManifest(input, bytecodeFormat) {
   if (manifest.format === HOLIDAY_FORMAT && (!schedules.some(item => item.kind === 'daily' && item.day?.kind === 'holiday')
     || schedules.some(item => item.kind === 'at'))) throw new Error('Holiday profile requires Holiday Daily and excludes At');
   if (manifest.format === AT_FORMAT && (!schedules.length || schedules.some(item => item.kind !== 'at')
-    || [configs,sensors,objectives,resources,adaptSettings,providers,calendars,naturals].some(list => list.length) || accounting)) {
+    || [configs,objectives,resources,adaptSettings,providers,calendars,naturals].some(list => list.length) || accounting)) {
     throw new Error('At profile requires At-only execution');
   }
   if (manifest.signals.length) throw new Error('context signal mixing is not supported');
-  if (sensors.length && (!objectives.length || sensors.length !== 1)) throw new Error('context sensors require one PID objective');
   const timers = validateList(manifest.timers, 'manifest.timers', ['name','state','clockInput']);
   for (const item of timers) {
     name(item.name, 'timer.name'); name(item.state, `timer ${item.name}.state`);
@@ -404,14 +403,27 @@ function validateContextManifest(input, bytecodeFormat) {
   unique([...schedules,...naturals,...calendarConditions].map(item => item.site), 'context site');
   for (const sensor of sensors) {
     name(sensor.name, 'sensor.name');
-    if (sensor.type !== 'Temperature' || sensor.canonicalUnit !== 'K') throw new Error('context PID sensor must be canonical Temperature');
+    if (objectives.some(objective => objective.measure === sensor.name) && (sensor.type !== 'Temperature' || sensor.canonicalUnit !== 'K')) throw new Error('context PID sensor must be canonical Temperature');
+    type(sensor.type, `sensor ${sensor.name}.type`);
+    validateCanonicalUnit(sensor, `sensor ${sensor.name}`);
     for (const field of ['sampleMs','staleMs','recoverSamples','window']) if (sensor[field] !== null) safeInteger(sensor[field], `sensor ${sensor.name}.${field}`, 1);
+    if (sensor.recoverSamples !== null) safeInteger(sensor.recoverSamples, `sensor ${sensor.name}.recoverSamples`, 1, MAX_WINDOW);
     if (sensor.filter !== null) throw new Error('context PID sensor filtering is not supported');
+    if (sensor.window !== null || Object.hasOwn(sensor, 'alpha')) throw new Error('context sensor filter metadata requires a supported filter');
+    if (sensor.optional !== undefined && typeof sensor.optional !== 'boolean') throw new TypeError(`sensor ${sensor.name}.optional must be boolean`);
     optionalFinite(sensor.validMin, `sensor ${sensor.name}.validMin`);
     optionalFinite(sensor.validMax, `sensor ${sensor.name}.validMax`);
+    if (sensor.type === 'Bool' && (sensor.validMin !== null || sensor.validMax !== null)) throw new Error('context Bool sensor does not support numeric valid bounds');
+    if ((sensor.validMin === null) !== (sensor.validMax === null)) throw new Error('context sensor valid range requires both bounds');
+    for (const bound of ['validMin', 'validMax']) if (sensor[bound] !== null && sensor.type !== 'Bool') typedValue(sensor[bound], sensor.type, `sensor ${sensor.name}.${bound}`);
     if (sensor.validMin !== null && sensor.validMax !== null && sensor.validMin > sensor.validMax) throw new Error('context PID sensor range is inverted');
     for (const [role,prefix] of [['valueInput','sensor_value'],['okInput','sensor_ok'],['faultInput','sensor_fault']])
       generated(sensor[role], `${RESERVED}${prefix}_${sensor.name}`, `sensor ${sensor.name}.${role}`);
+    const sampleFields = ['samplePresentInput', 'sampleEpochInput', 'sampleIdInput', 'sampleTimestampInput'];
+    const count = sampleFields.filter(field => sensor[field] !== undefined).length;
+    if (count !== 0 && count !== 4) throw new Error('context sensor sample identity inputs must be provided together');
+    for (const [field, role] of [['samplePresentInput', 'present'], ['sampleEpochInput', 'epoch'], ['sampleIdInput', 'id'], ['sampleTimestampInput', 'timestamp']])
+      if (count) generated(sensor[field], `${RESERVED}sensor_sample_${role}_${sensor.name}`, `sensor ${sensor.name}.${field}`);
   }
   if (objectives.length > 1) throw new Error('only one context PID objective is supported');
   for (const objective of objectives) {
@@ -419,7 +431,7 @@ function validateContextManifest(input, bytecodeFormat) {
     if (objective.binding !== 'native-temperature-percent-v1' || objective.executable !== false) throw new Error('unsupported context PID objective binding');
     const sensor = sensors.find(item => item.name === objective.measure);
     const target = configs.find(item => item.name === objective.target);
-    if (!sensor || !target || target.type !== 'Temperature' || target.canonicalUnit !== 'K') throw new Error('context PID measure/target binding mismatch');
+    if (!sensor || sensor.type !== 'Temperature' || sensor.canonicalUnit !== 'K' || !target || target.type !== 'Temperature' || target.canonicalUnit !== 'K') throw new Error('context PID measure/target binding mismatch');
     if (!['°C','K'].includes(target.displayUnit)) throw new Error('context PID target display unit is required');
     const binding = record(objective.bindings, `objective ${objective.name}.bindings`);
     keys(binding, ['output','measure','measureOk','target','targetOk','safeMax'], [], `objective ${objective.name}.bindings`);
@@ -603,6 +615,7 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
     if (item.staleMs !== null) safeInteger(item.staleMs, `sensor ${item.name}.staleMs`, 1);
     if (item.recoverSamples !== null) safeInteger(item.recoverSamples, `sensor ${item.name}.recoverSamples`, 1, MAX_WINDOW);
     if (item.filter !== null && !['median', 'moving_average', 'ema'].includes(item.filter)) throw new Error(`sensor ${item.name} uses unsupported filter ${String(item.filter)}`);
+    if (item.filter !== null && !['Number', 'Percent'].includes(item.type) && !isQuantityType(item.type)) throw new Error(`sensor ${item.name} filtering requires an approximate numeric payload`);
     const hasAlpha = Object.hasOwn(item, 'alpha');
     if (item.window !== null) {
       safeInteger(item.window, `sensor ${item.name}.window`, 1, MAX_WINDOW);
@@ -617,8 +630,12 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
       finite(item.alpha, `sensor ${item.name}.alpha`);
       if (!(item.alpha > 0 && item.alpha <= 1)) throw new RangeError(`sensor ${item.name}.alpha must be in (0, 1]`);
     } else if (hasAlpha) throw new Error(`sensor ${item.name} alpha is only valid for ema`);
+    if (item.type === 'Int' || item.type === 'Duration' || isTimeType(item.type)) {
+      for (const bound of ['validMin', 'validMax']) if (item[bound] !== null) typedValue(item[bound], item.type, `sensor ${item.name}.${bound}`);
+    }
     optionalFinite(item.validMin, `sensor ${item.name}.validMin`);
     optionalFinite(item.validMax, `sensor ${item.name}.validMax`);
+    if (item.type === 'Bool' && (item.validMin !== null || item.validMax !== null)) throw new Error('Bool sensor does not support numeric valid bounds');
     if ((item.validMin === null) !== (item.validMax === null)) throw new Error(`sensor ${item.name} valid range requires both bounds`);
     if (item.validMin !== null && item.validMin > item.validMax) throw new Error(`sensor ${item.name} valid range is inverted`);
     if (item.type === 'Percent') {
@@ -881,7 +898,7 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
     }
     const sensor = sensorByName.get(item.sensor);
     if (!sensor) throw new Error(`signal ${item.name} references unknown sensor ${String(item.sensor)}`);
-    if (sensor.type === 'Bool') throw new Error(`signal ${item.name} requires a numeric sensor`);
+    if (!['Number', 'Percent'].includes(sensor.type) && !isQuantityType(sensor.type)) throw new Error(`signal ${item.name} requires an approximate numeric sensor`);
     finite(item.onBelow, `signal ${item.name}.onBelow`); finite(item.offAbove, `signal ${item.name}.offAbove`);
     if (item.onBelow >= item.offAbove) throw new Error(`signal ${item.name} hysteresis bounds are inverted`);
     if (sensor.type === 'Percent' && (item.onBelow < 0 || item.onBelow > 100 || item.offAbove < 0 || item.offAbove > 100)) throw new RangeError(`signal ${item.name} thresholds must be in [0, 100]`);
@@ -930,7 +947,10 @@ async function sha256(value) {
 
 function sensorConfig(item) {
   // sampleMs is descriptive cadence metadata only; step() never polls hardware.
-  const defaults = item.type === 'Bool' ? { min: 0, max: 1 } : item.type === 'Percent' ? { min: 0, max: 100 } : { min: -Number.MAX_VALUE, max: Number.MAX_VALUE };
+  const exactBounds = item.type === 'Int' ? { min: -2147483648, max: 2147483647 }
+    : item.type === 'Duration' ? { min: 0, max: Number.MAX_SAFE_INTEGER }
+    : isTimeType(item.type) ? TIME_BOUNDS[item.type] : null;
+  const defaults = exactBounds ?? (item.type === 'Bool' ? { min: 0, max: 1 } : item.type === 'Percent' ? { min: 0, max: 100 } : { min: -Number.MAX_VALUE, max: Number.MAX_VALUE });
   return {
     filter: item.filter ?? 'median', window: item.window ?? 1,
     ...(item.filter === 'ema' ? { alpha: item.alpha } : {}),
@@ -1047,7 +1067,7 @@ async function instantiateControlRuntime(wasmBytes, { bytes: bytecode, manifest 
     }
     for (const output of checkedManifest.manifest.outputs) runtime.addCapability('actuator', output.name, output.type === 'Bool' ? 'bool' : output.type === 'Int' ? 'int' : 'number');
     if (suppliedCapabilities !== undefined) for (const sensor of [...checkedManifest.manifest.sensors, ...(checkedManifest.manifest.sensorInstances ?? [])]) {
-      if (presentSensors.has(sensor.sourceSensor ?? sensor.name)) runtime.addCapability('sensor', sensor.name, sensor.type === 'Bool' ? 'bool' : 'number');
+      if (presentSensors.has(sensor.sourceSensor ?? sensor.name)) runtime.addCapability('sensor', sensor.name, sensor.type === 'Bool' ? 'bool' : sensor.type === 'Int' ? 'int' : 'number');
     }
     if (hasContext) runtime.activateContext(options.context);
     else if (hasSchedules) runtime.activateSchedules(options.schedule);
@@ -1162,6 +1182,7 @@ export class ControlRuntime {
       for (const [sensorName, entry] of this.sensors) {
         const reading = sensorReadings.get(sensorName);
         if (entry.item.type === 'Bool') this.runtime.setBool(entry.item.valueInput, reading.value);
+        else if (entry.item.type === 'Int') this.runtime.setInt(entry.item.valueInput, reading.value);
         else this.runtime.setNumber(entry.item.valueInput, reading.value);
         this.runtime.setBool(entry.item.okInput, reading.ok);
         this.runtime.setNumber(entry.item.faultInput, sensorFaultCode(reading));
@@ -1305,14 +1326,20 @@ export class ControlRuntime {
       if (!(typeof quality === 'number' ? Number.isInteger(quality) && quality >= 0 && quality <= 4 : ['NotReady', 'Good', 'Disconnected', 'Stale', 'Invalid'].includes(quality))) throw new TypeError(`samples.${sensorName}.quality is unsupported`);
       const rawValue = sample.value;
       let value;
+      let validPayload = true;
       if (item.type === 'Bool') {
         if (typeof rawValue !== 'boolean') throw new TypeError(`samples.${sensorName}.value must be boolean`);
         value = rawValue ? 1 : 0;
       } else {
         if (typeof rawValue !== 'number') throw new TypeError(`samples.${sensorName}.value must be numeric`);
-        value = Number.isFinite(rawValue) ? rawValue : 0;
+        try {
+          if (item.type === 'Int' || item.type === 'Duration' || isTimeType(item.type)) typedValue(rawValue, item.type, `samples.${sensorName}.value`);
+          else finite(rawValue, `samples.${sensorName}.value`);
+        }
+        catch { validPayload = false; }
+        value = validPayload ? rawValue : 0;
       }
-      normalizedSamples.set(sensorName, { epoch, id, timestampMs, value, quality: Number.isFinite(rawValue) || item.type === 'Bool' ? quality : 'Invalid' });
+      normalizedSamples.set(sensorName, { epoch, id, timestampMs, value, quality: validPayload ? quality : 'Invalid' });
     }
 
     const dueValues = new Map();

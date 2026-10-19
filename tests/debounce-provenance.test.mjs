@@ -9,8 +9,8 @@ import { canonicalJson } from '../tools/canonical-json.mjs';
 import { sha256Hex } from '../tools/sha256.mjs';
 import { GhostFlowRuntime } from '../runtimes/wasm/ghostflow-runtime.mjs';
 
-const source = '# Debounced start\n\n```ghost\ncontrol Bounce {\n  input start: Bool;\n  signal stable = debounce(start, stable_for: 2s, initial: false);\n  output enabled: Bool;\n  enabled <- stable;\n}\n```\n';
-const roles = ['stable', 'candidate', 'candidateActive', 'candidateSince', 'lastSourceTag'];
+const source = '# Debounced start\n\n```ghost\ncontrol Bounce {\n  input start: Bool;\n  signal stable = debounce(start, stable_for: 2s, initial: false);\n  output enabled: Bool;\n  enabled <- stable |> recover(false);\n}\n```\n';
+const roles = ['stable', 'candidate', 'candidateActive', 'candidateSince', 'lastSourceTag', 'sourceEpoch', 'sourceId'];
 
 test('debounce generated state provenance survives canonical artifact restore', async () => {
   const compiled = await compileSource(source, { filename: 'bounce.ghost.md' });
@@ -43,8 +43,8 @@ test('debounce generated state provenance survives canonical artifact restore', 
 
 test('debounce source provenance identifies both physical root histories', async () => {
   const document = ['# Selected sensor', '```ghost', 'control Selected {',
-    'input choose: Bool;', 'sensor a: Bool;', 'sensor b: Bool;',
-    'signal stable = debounce(if choose then a else b, stable_for: 1s, initial: false);',
+    'input choose: Bool;', 'input a: Bool;', 'input b: Bool;',
+    'signal stable = debounce(case choose { ok(value) => if value then a else b; fault(reason) => fault(reason); }, stable_for: 1s, initial: false);',
     'output enabled: Bool;', 'enabled <- stable |> recover(false);', '}', '```', ''].join('\n');
   const compiled = await compileSource(document, { filename: 'selected.ghost.md' });
   const bindings = compiled.traceMetadata.bindings.filter(binding => binding.kind === 'signal');
@@ -61,16 +61,16 @@ test('debounce source provenance identifies both physical root histories', async
 });
 
 for (const [kind, signedSource, inputCapability] of [
-  ['raw', source, { kind: 'input', name: 'start', type: 'bool' }],
-  ['physical', source.replace('input start: Bool;', 'sensor start: Bool;').replace('enabled <- stable;', 'enabled <- stable |> recover(false);'), { kind: 'sensor', name: 'start', type: 'bool' }],
+  ['local-scalar', source.replace('input start: Bool;', 'state start: Bool = false;').replace('enabled <- stable |> recover(false);', 'enabled <- stable;'), null],
+  ['quality-input', source, { kind: 'sensor', name: 'start', type: 'bool' }],
 ]) test(`signed ${kind} debounce artifacts reject changed descriptors and generated dependencies before loading`, async () => {
   const compiled = await compileSource(signedSource, { filename: 'bounce.ghost.md' });
   const keys = await crypto.subtle.generateKey('Ed25519', true, ['sign', 'verify']);
   const keyId = 'debounce-provenance';
   const identity = {
-    compilerRevision: 'c0bef0e', runtimeSemantics: 'GhostFlow/runtime-semantics-v1',
-    runtimeAbi: 'GhostFlow/framed-scan-abi-v1', bindingRevision: 'debounce-test-v1',
-    requiredCapabilities: [inputCapability, { kind: 'actuator', name: 'enabled', type: 'bool' }],
+    compilerRevision: 'issue531-canonical-input-candidate', runtimeSemantics: 'GhostFlow/runtime-semantics-v1',
+    runtimeAbi: 'GhostFlow/framed-scan-abi-v1', bindingRevision: 'debounce-input-test-v2',
+    requiredCapabilities: [...(inputCapability ? [inputCapability] : []), { kind: 'actuator', name: 'enabled', type: 'bool' }],
   };
   const signed = await buildPortablePackage(compiled, identity, {
     signers: [{ keyId, privateKey: keys.privateKey }], verifyCompilation: compileSource,

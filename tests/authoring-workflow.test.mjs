@@ -5,9 +5,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { decode, encode } from '@toon-format/toon';
 
-const root = path.resolve(new URL('..', import.meta.url).pathname);
+const root = fileURLToPath(new URL('..', import.meta.url));
 const example = path.join(root, 'examples/authoring');
 const sha256 = text => createHash('sha256').update(text).digest('hex');
 
@@ -56,7 +57,7 @@ test('offline authoring example retrieves Reference, fixes one canonical documen
     const failure = decode(firstCheck.stdout, { strict: true });
     assert.equal(failure.ok, false);
     assert.equal(failure.source.documentId, documentId);
-    assert.equal(failure.source.revisionId, 'rev-1');
+    assert.equal(failure.source.revisionId, 'rev-1-input-v1');
     assert.equal(failure.source.sha256, sha256(first));
     assert.equal(failure.diagnostics[0].span.file, documentPath);
     assert.equal(failure.diagnostics[0].code, 'GF_PARSE');
@@ -68,7 +69,7 @@ test('offline authoring example retrieves Reference, fixes one canonical documen
     assert.equal(checked.ok, true);
     assert.equal(checked.source.sha256, sha256(corrected));
     assert.equal(checked.source.documentId, documentId);
-    assert.equal(checked.source.revisionId, 'rev-2');
+    assert.equal(checked.source.revisionId, 'rev-2-input-v1');
     assert.notEqual(checked.source.sha256, failure.source.sha256);
 
     const compiled = cli('tools/ghostc.mjs', ['--request', request(directory, 'compile-rev-2', documentPath, artifactPath)]);
@@ -77,14 +78,14 @@ test('offline authoring example retrieves Reference, fixes one canonical documen
     assert.equal(compileResult.ok, true);
     const map = JSON.parse(fs.readFileSync(`${artifactPath}.map.json`, 'utf8'));
     assert.equal(map.sourceDocument.text, corrected);
-    assert.deepEqual(map.interactionSourceIdentity, { documentId, revisionId: 'rev-2' });
+    assert.deepEqual(map.interactionSourceIdentity, { documentId, revisionId: 'rev-2-input-v1' });
 
     const simulated = cli('tools/ghostsim.mjs', [artifactPath, path.join(example, 'pump-scenario.toon')]);
     assert.equal(simulated.status, 0, simulated.stdout);
     const result = decode(simulated.stdout, { strict: true });
     assert.equal(result.outcome, 'completed');
     assert.equal(result.artifact.sourceDocumentSha256, checked.source.sha256);
-    assert.deepEqual(result.artifact.sourceIdentity, { documentId, revisionId: 'rev-2' });
+    assert.deepEqual(result.artifact.sourceIdentity, { documentId, revisionId: 'rev-2-input-v1' });
     assert.deepEqual(result.scans.map(scan => scan.requestedVirtualIntent.pump), [true, true, false]);
     assert.deepEqual(result.scans.map(scan => scan.safeVirtualIntent.pump), [false, true, false]);
     assert.match(corrected, /kind=assumption status=unconfirmed/);

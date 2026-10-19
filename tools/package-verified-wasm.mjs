@@ -85,6 +85,14 @@ export async function packageVerifiedWasm(source, destination) {
   const bytes = sourceFile(root, WASM_PATH);
   const binary = { path: 'ghostflow_wasm.wasm', bytes: bytes.length, sha256: sha256(bytes) };
   validateVerificationReport(report, binary);
+  // Old pinned source has no build hooks. Do not retrofit its immutable identity.
+  if (fs.existsSync(path.join(root, 'scripts/build-language-with-identity.mjs'))) {
+    const issued = JSON.parse(sourceFile(root, 'build/build-identity.json'));
+    if (issued.wasmSha256 !== binary.sha256 || issued.identity?.sourceSHA !== sourceIdentity.commit ||
+        JSON.stringify(issued.identity) !== JSON.stringify(report.buildIdentity)) {
+      throw new Error('WASM build identity does not match actual verified bytes/source');
+    }
+  }
   assertVerificationSources(root, report.sourceSha256);
   // Validate the actual module, without substituting an injected ABI or a mock.
   await WebAssembly.compile(bytes);
@@ -102,6 +110,7 @@ export async function packageVerifiedWasm(source, destination) {
     format: 'GhostFlow/verified-wasm-artifact-v1',
     source: { repository, ...sourceIdentity, cargoLockSha256: sha256(sourceFile(root, 'Cargo.lock')) },
     binary,
+    buildIdentity: report.buildIdentity ?? null,
     verification: { path: 'verification.json', sha256: sha256(reportBytes), scope: report.scope },
     toolchain,
     build: { command: ['npm', 'test'], target: 'wasm32-unknown-unknown', profile: 'release' },

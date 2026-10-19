@@ -14,7 +14,10 @@
 정규화 입력이다. 출력은 모터의 실제 회전이 아니라 정회전/역회전 접촉기 코일에
 보낼 논리 명령이다.
 
+이 명시적 quality-input revision은 정상 입력 replay를 유지한다. START 입력 fault는 새 시작과 rearm을 차단하며, 이미 운전 중이면 STOP과 보호 입력이 정상이고 허가된 동안 유지할 수 있다. STOP 또는 보호 입력 fault는 허가를 해제한다. 복구 후 정상 START 해제와 새 시작 요청이 필요하다. 이전 소스는 `tests/fixtures/history/issue531/pc-04-direction-interlock.ghost.md.pre-input.txt`에 비실행 history로 보존한다.
+
 ```ghost
+// Source revision: issue531-approved-fault-restart-v1
 control DirectionChangeInterlock {
   input forward_start, reverse_start, stop_ok, overload_ok: Bool;
   output forward_contactor, reverse_contactor: Bool;
@@ -29,12 +32,22 @@ control DirectionChangeInterlock {
   // ghostflow:link id=GF-INT-PC04-DIRECTION-INTERLOCK-V1 relation=implements
   timer age = elapsed(phase);
 
-  let permit = stop_ok && overload_ok;
-  let ambiguous = forward_start && reverse_start;
-  let forward_event = start_armed && forward_start && !reverse_start;
-  let reverse_event = start_armed && reverse_start && !forward_start;
+  let forward_start_good = case forward_start { ok(_) => true; fault(_) => false; };
+  let forward_start_value = forward_start |> recover(false);
+  let reverse_start_good = case reverse_start { ok(_) => true; fault(_) => false; };
+  let reverse_start_value = reverse_start |> recover(false);
+  let stop_ok_good = case stop_ok { ok(_) => true; fault(_) => false; };
+  let stop_ok_value = stop_ok |> recover(false);
+  let overload_ok_good = case overload_ok { ok(_) => true; fault(_) => false; };
+  let overload_ok_value = overload_ok |> recover(false);
 
-  start_armed' = permit && !forward_start && !reverse_start;
+  let permit = stop_ok_value && overload_ok_value;
+  let requests_good = forward_start_good && reverse_start_good;
+  let ambiguous = forward_start_value && reverse_start_value;
+  let forward_event = requests_good && start_armed && forward_start_value && !reverse_start_value;
+  let reverse_event = requests_good && start_armed && reverse_start_value && !forward_start_value;
+
+  start_armed' = requests_good && permit && !forward_start_value && !reverse_start_value;
 
   phase' = case phase {
     Stopped =>

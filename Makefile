@@ -9,7 +9,7 @@ test:
 	npm test
 
 wasm:
-	cargo build --locked --offline -p ghostflow-wasm --target wasm32-unknown-unknown --release
+	npm run build:wasm
 
 tutorial:
 	npm run tutorial

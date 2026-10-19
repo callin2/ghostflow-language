@@ -300,6 +300,38 @@ pub(crate) fn record(out: &mut impl Write, r: &TickRecord) -> fmt::Result {
         )?;
     }
     out.write_char(']')?;
+    if let Some(intents) = &r.instruction_witnesses {
+        out.write_str(",\"instructionWitnesses\":[")?;
+        for (index, intent) in intents.iter().enumerate() {
+            if index > 0 {
+                out.write_char(',')?;
+            }
+            out.write_str("{\"name\":")?;
+            text(out, &intent.name)?;
+            out.write_str(",\"steps\":[")?;
+            for (index, step) in intent.steps.iter().enumerate() {
+                if index > 0 {
+                    out.write_char(',')?;
+                }
+                write!(
+                    out,
+                    "{{\"pc\":{},\"end\":{},\"nextPc\":{}",
+                    step.pc, step.end, step.next_pc
+                )?;
+                if let Some(value) = step.value {
+                    out.write_str(",\"value\":")?;
+                    match value {
+                        Value::Bool(value) => write!(out, "{value}")?,
+                        Value::Number(value) => write!(out, "{value}")?,
+                        Value::Int(value) => write!(out, "{value}")?,
+                    }
+                }
+                out.write_char('}')?;
+            }
+            out.write_str("]}")?;
+        }
+        out.write_char(']')?;
+    }
     if !r.window_trace.is_empty() {
         out.write_str(",\"windowTrace\":[")?;
         for (index, w) in r.window_trace.iter().enumerate() {
@@ -448,6 +480,7 @@ mod tests {
                 choice: 2,
                 origin: 1,
             }],
+            instruction_witnesses: None,
             window_trace: vec![],
             true_for_trace: vec![],
             schedule_trace: vec![],

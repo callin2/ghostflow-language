@@ -1,3 +1,4 @@
+import { softwareQualityAbi, softwareQualityObservations } from './helpers/software-quality-observations.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -11,7 +12,13 @@ const wasm = fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/g
 const cases = JSON.parse(fs.readFileSync(new URL('./reference/cases/02-time-control.json', import.meta.url)));
 const reference = (Array.isArray(cases) ? cases : cases.cases).find(item => item.id === 'REF-04-035');
 assert.ok(reference, 'canonical capability-strategies source must remain available');
-const artifact = await compileSource(reference.source, { filename: reference.filename });
+const legacyBytes = fs.readFileSync(new URL('./fixtures/history/issue531/adapt-control-host.pre-input.json', import.meta.url));
+assert.equal(createHash('sha256').update(legacyBytes).digest('hex'), '2b949df2e75d2fb6adde1155e7985868c2fd013dba6dbd69b45dae79f740c1d5');
+const legacy = JSON.parse(legacyBytes);
+assert.equal(legacy.source, reference.source, 'original reference source remains byte-identical');
+assert.equal(createHash('sha256').update(legacy.source).digest('hex'), legacy.sourceSha256);
+const activeSource = "# Capability strategies input revision\n\n```ghost\ncontrol CapabilityStrategies {\n input moisture?: Percent;\n input scheduled: Bool;\n let scheduled_value = scheduled |> recover(false);\n output pump: Bool;\n adapt irrigation_policy {\n  strategy WithMoisture priority 100 match (moisture: sensor<Percent>) {\n   let request = case moisture { ok(value) => scheduled_value && value < 30%; fault(_) => false; };\n   pump <- request;\n  }\n  strategy Baseline priority 0 match always { pump <- scheduled_value; }\n }\n}\n```\n";
+const artifact = await compileSource(activeSource, { filename: 'capability-strategies-input-v2.ghost.md' });
 
 test('REF-04-036: duplicate actuator keys reject and comma-AND requires both pump and valve in actual host activation', async t => {
   const original = (Array.isArray(cases) ? cases : cases.cases).find(item => item.id === 'REF-04-036');
@@ -27,8 +34,8 @@ control ProfileAND {
   output pump, valve: Bool;
   adapt policy {
     strategy Both priority 10 match (pump: actuator<Bool>, valve: actuator<Bool>) {
-      pump <- scheduled;
-      valve <- scheduled;
+      pump <- scheduled |> recover(false);
+      valve <- scheduled |> recover(false);
     }
   }
 }
@@ -40,10 +47,12 @@ control ProfileAND {
   const bytes = Buffer.from(compiled.bytes);
   let at = 6;
   const text = () => { const size = bytes.readUInt16LE(at); at += 2; const value = bytes.toString('utf8', at, at + size); at += size; return value; };
-  assert.equal(bytes.readUInt16LE(4), 1);
+  assert.equal(bytes.readUInt16LE(4), 3);
   assert.equal(text(), 'ProfileAND'); at += 4; // Module flags.
-  assert.equal(bytes.readUInt16LE(at), 1); at += 2;
-  assert.equal(text(), 'scheduled'); assert.equal(bytes[at++], 1);
+  assert.equal(bytes.readUInt16LE(at), 3); at += 2;
+  const railTypes = [];
+  for (let index = 0; index < 3; index++) railTypes.push([text(), bytes[at++]]);
+  assert.deepEqual(railTypes, [[compiled.manifest.sensors[0].valueInput, 1], [compiled.manifest.sensors[0].okInput, 1], [compiled.manifest.sensors[0].faultInput, 2]]);
   assert.equal(bytes.readUInt16LE(at), 0); at += 2; // No state.
   assert.equal(bytes.readUInt16LE(at), 1); at += 2;
   assert.equal(text(), 'Both'); at += 4; // Priority.
@@ -88,6 +97,7 @@ control ProfileAND {
       const runtime = await Owner.instantiate(wasm);
       t.after(() => runtime.dispose());
       runtime.load(compiled.bytes);
+      softwareQualityAbi(runtime, compiled);
       const activation = wire({ capabilities, sha256: hash(JSON.stringify(capabilities)) });
       const activate = () => {
         for (const cap of activation.capabilities) runtime.addCapability(cap.kind, cap.name, cap.type);
@@ -110,7 +120,7 @@ control ProfileAND {
         else { runtime.setBool('scheduled', scheduled); runtime.tickAt(scanId); trace = runtime.trace; }
         assert.equal(trace.module, identity.module);
         assert.equal(trace.strategy, 'Both');
-        assert.equal(trace.inputs.scheduled, scheduled);
+        assert.equal(trace.inputs[compiled.manifest.sensors.find(sensor => sensor.name === 'scheduled').valueInput], scheduled);
         assert.deepEqual(trace.requested, { pump: scheduled, valve: scheduled });
         assert.deepEqual(trace.safe, trace.requested);
         traces.push(wire({ snapshot, trace }));
@@ -124,6 +134,7 @@ control ProfileAND {
 
 test('REF-04-035 explicit absent sensor selects Baseline', async () => {
   const host = await ControlRuntime.instantiateFramed(wasm, artifact, { capabilities: [] });
+  softwareQualityObservations(host);
   try {
     assert.equal(host.step({ nowMs: 0, inputs: { scheduled: true } }).vm.requested.pump, true);
     assert.equal(host.step({ nowMs: 1, inputs: { scheduled: false } }).vm.requested.pump, false);
@@ -135,6 +146,7 @@ const sample = (id, quality, value) => ({ epoch: 1, id, timestampMs: id, quality
 
 test('REF-04-035 present sensor uses moisture strategy and faults never select Baseline', async () => {
   const host = await ControlRuntime.instantiateFramed(wasm, artifact, { capabilities: [moisture] });
+  softwareQualityObservations(host);
   try {
     const step = (nowMs, samples = {}) => host.step({ nowMs, inputs: { scheduled: true }, samples }).vm.requested.pump;
     assert.equal(step(0), false, 'present sensor without sample is NotReady, not Baseline');
@@ -146,6 +158,7 @@ test('REF-04-035 present sensor uses moisture strategy and faults never select B
 
 test('absent optional capability rejects samples instead of inventing presence', async () => {
   const host = await ControlRuntime.instantiateFramed(wasm, artifact, { capabilities: [] });
+  softwareQualityObservations(host);
   try {
     assert.throws(() => host.step({ nowMs: 1, inputs: { scheduled: true }, samples: { moisture: sample(1, 'Good', 20) } }), /absent sensor capability moisture/);
   } finally { host.dispose(); }
@@ -160,7 +173,7 @@ test('REF-04-034: activated absence and installed Disconnected retain profile id
   const hash = value => createHash('sha256').update(value).digest('hex');
   const wire = value => JSON.parse(JSON.stringify(value));
   const identity = {
-    sourceSha256: hash(reference.source),
+    sourceSha256: hash(activeSource),
     bytecodeSha256: hash(artifact.bytes),
     manifestSha256: hash(JSON.stringify(artifact.manifest)),
     module: artifact.traceMetadata.moduleFingerprint,
@@ -175,6 +188,7 @@ test('REF-04-034: activated absence and installed Disconnected retain profile id
     const callerB = wire(profiles.B);
     const absent = await instantiate(wasm, artifact, { capabilities: callerA });
     const installed = await instantiate(wasm, artifact, { capabilities: callerB });
+    softwareQualityObservations(absent); softwareQualityObservations(installed);
     t.after(() => { absent.dispose(); installed.dispose(); });
     // Installation facts are captured at activation, not reread from a mutable
     // caller array or inferred from each scan's sensor quality.
@@ -199,14 +213,14 @@ test('REF-04-034: activated absence and installed Disconnected retain profile id
     for (const record of [missing, disconnected, recovered, faultAgain]) {
       assert.deepEqual(record.identity, identity);
       assert.equal(record.outcome.vm.module, identity.module);
-      assert.equal(record.outcome.vm.inputs.scheduled, record.snapshot.inputs.scheduled);
+      assert.equal(record.outcome.vm.inputs[artifact.manifest.sensors.find(sensor => sensor.name === 'scheduled').valueInput], record.snapshot.inputs.scheduled);
       assert.equal(record.activation.sha256, hash(JSON.stringify(record.activation.capabilities)));
     }
     assert.notEqual(missing.activation.sha256, disconnected.activation.sha256);
     assert.deepEqual(missing.activation.capabilities, []);
     assert.equal(missing.outcome.vm.strategy, 'Baseline');
     assert.deepEqual(missing.outcome.vm.requested, { pump: true });
-    assert.deepEqual(missing.outcome.vm.resultTrace, []);
+    assert.ok(missing.outcome.vm.resultTrace.every(entry => entry.choice === 0), 'healthy scheduled projection is not an optional moisture fault');
     for (const record of [disconnected, faultAgain]) {
       assert.deepEqual(record.activation.capabilities, [moisture]);
       assert.equal(record.snapshot.samples.moisture.quality, 'Disconnected');
@@ -214,14 +228,14 @@ test('REF-04-034: activated absence and installed Disconnected retain profile id
       assert.deepEqual(record.outcome.sensors.moisture, { ok: false, value: 0, quality: 'Disconnected' });
       assert.deepEqual(record.outcome.vm.requested, { pump: false });
       assert.deepEqual(record.outcome.vm.safe, { pump: false });
-      assert.deepEqual(record.outcome.vm.resultTrace.map(({ choice, origin }) => ({ choice, origin })),
+      assert.deepEqual(record.outcome.vm.resultTrace.filter(entry => entry.origin === sensorOrigin).map(({ choice, origin }) => ({ choice, origin })),
         [{ choice: 1, origin: sensorOrigin }]);
     }
     assert.equal(recovered.outcome.vm.strategy, 'WithMoisture');
     assert.deepEqual(recovered.outcome.sensors.moisture, { ok: true, value: 20, quality: 'Good' });
     assert.deepEqual(recovered.outcome.vm.requested, { pump: true });
-    assert.deepEqual(recovered.outcome.vm.resultTrace.map(({ choice, origin }) => ({ choice, origin })),
-      [{ choice: 0, origin: 0 }]);
+    assert.equal(recovered.outcome.vm.resultTrace.length, 2);
+    assert.ok(recovered.outcome.vm.resultTrace.every(entry => entry.choice === 0 && entry.origin === 0));
     assert.throws(() => absent.step({ nowMs: 2, inputs: { scheduled: true },
       samples: { moisture: sample(2, 'Good', 20) } }), /absent sensor capability moisture/);
     const stillAbsent = capture(absent, 'A', { nowMs: 2, inputs: { scheduled: false } });
@@ -245,7 +259,7 @@ test('REF-04-038: equal winning priorities reject both declaration orders in act
   const strategies = {
     A: 'strategy A priority 10 match (pump: actuator<Bool>) { pump <- false; }',
     B: 'strategy B priority 10 match (pump: actuator<Bool>) { pump <- true; }',
-    C: 'strategy C priority 11 match (pump: actuator<Bool>) { pump <- enabled; }',
+    C: 'strategy C priority 11 match (pump: actuator<Bool>) { pump <- enabled |> recover(false); }',
   };
   const candidates = [];
   for (const order of ['AB', 'BA', 'ABC', 'CAB', 'BCA']) {
@@ -265,6 +279,7 @@ test('REF-04-038: equal winning priorities reject both declaration orders in act
         const runtime = await Owner.instantiate(wasm);
         t.after(() => runtime.dispose());
         runtime.load(compiled.bytes);
+      softwareQualityAbi(runtime, compiled);
         const activation = wire({ capabilities, sha256: hash(JSON.stringify(capabilities)) });
         for (const cap of activation.capabilities) runtime.addCapability(cap.kind, cap.name, cap.type);
         const snapshot = { scanId: 0, logicalTimeMs: 0, inputs: [{ name: 'enabled', value: true }] };
@@ -299,7 +314,7 @@ test('REF-04-038: equal winning priorities reject both declaration orders in act
           else { runtime.setBool('enabled', enabled); runtime.tickAt(scanId); trace = runtime.trace; }
           assert.equal(trace.module, identity.module);
           assert.equal(trace.strategy, 'C', 'a unique higher priority wins despite lower ties and declaration order');
-          assert.equal(trace.inputs.enabled, enabled);
+          assert.equal(trace.inputs[compiled.manifest.sensors.find(sensor => sensor.name === 'enabled').valueInput], enabled);
           assert.deepEqual(trace.requested, { pump: enabled });
           assert.deepEqual(trace.safe, trace.requested);
           traces.push(wire({ snapshot: input, trace }));

@@ -7,20 +7,20 @@
       "sourcePath": "contracts/interaction-v0/examples/five-minute-watering.ghost.md",
       "source": {
         "documentId": "source.fixture-five-minute-watering",
-        "revisionId": "revision.fixture-five-minute-watering-v2",
+        "revisionId": "revision.fixture-five-minute-watering.input531-v1",
         "format": "GhostFlow/source-document-v1",
         "kind": "literate",
-        "sha256": "ef46838b4add032d03f4cb5fc29ce3c00ef73dbafe9d91c244fa1a78adbfb9f6"
+        "sha256": "a0461e7411d0cabcb3ec3380c1732d3d74b77c708904e0033ead2f573c3dc1e1"
       },
       "module": {
         "id": "FiveMinuteWatering",
-        "moduleFingerprint": "18052752a622baf5",
-        "bytecodeSha256": "acbf84f22c28aabd6c427ab454c937cfebd508bf254b27a1ab3fa390ba6dcd80"
+        "moduleFingerprint": "a6b13d5c7734aef6",
+        "bytecodeSha256": "96c44d9b2e9a52c7ccf540d7d159fa1402044b14caa4f183d45cd3d82be6e0b6"
       },
-      "tapePath": "contracts/interaction-v0/examples/five-minute-watering.scan-tape.json",
+      "tapePath": "contracts/interaction-v0/examples/five-minute-watering.input-v1.scan-tape.json",
       "projections": {
-        "schemaPath": "contracts/interaction-v0/examples/five-minute-watering.schema.json",
-        "snapshotPath": "contracts/interaction-v0/examples/five-minute-watering.snapshot.json"
+        "schemaPath": "contracts/interaction-v0/examples/five-minute-watering.input-v1.schema.json",
+        "snapshotPath": "contracts/interaction-v0/examples/five-minute-watering.input-v1.snapshot.json"
       }
     },
     {
@@ -28,17 +28,17 @@
       "sourcePath": "contracts/interaction-v0/examples/multiple-values.ghost.md",
       "source": {
         "documentId": "source.fixture-multiple-values",
-        "revisionId": "revision.fixture-multiple-values-v0",
+        "revisionId": "revision.fixture-multiple-values.input531-v1",
         "format": "GhostFlow/source-document-v1",
         "kind": "literate",
-        "sha256": "7741d81f6a222ad108ca4026676ce8a1efb1c2e5431d58f9bf8dc49fa49ff645"
+        "sha256": "26359bbfb525be0bf04006ca93e3b5d9f31d15b2dec4a6a2e98c7e869651a4cd"
       },
       "module": {
         "id": "MultipleValues",
-        "moduleFingerprint": "28617ad7636f1d49",
-        "bytecodeSha256": "d9053b923f12b38fdf5c2f4915d4d5e3fb021080bd91a3ec43e54b2c024467ca"
+        "moduleFingerprint": "485bd6d14a161a7b",
+        "bytecodeSha256": "2db2ccea17f54b875fcf5fff21639d10abf7180de1dbb6c9b6daa7985df000ca"
       },
-      "tapePath": "contracts/interaction-v0/examples/multiple-values.scan-tape.json",
+      "tapePath": "contracts/interaction-v0/examples/multiple-values.input-v1.scan-tape.json",
       "projections": {
         "schemaPath": null,
         "snapshotPath": null

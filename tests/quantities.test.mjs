@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
+import { softwareQualityObservations } from './helpers/software-quality-observations.mjs';
 import { compileControl, ControlCompileError } from '../tools/control.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 import { emitCompletedScanSnapshot } from '../tools/interaction-runtime-snapshot.mjs';
@@ -132,7 +133,7 @@ control QuantityCompiler {
     step = 1kPa;
     access = designer;
   }
-  sensor measured: Temperature {
+  input measured: Temperature {
     valid = -40°C .. 100°C;
     filter = ema(alpha: 0.5);
   }
@@ -146,14 +147,17 @@ control QuantityCompiler {
   let recovered_flow = 10L / 2s;
   let reverse_energy = 30min * 2kW;
   let recovered_power = 1kWh / 30min;
-  let reverse_electrical_power = current * voltage;
+  // Calculated display retains its initialized/last observed value on missing quality.
+  state retained_power: Power = 0W;
+  let reverse_electrical_power = case voltage { ok(v) => case current { ok(c) => v * c; fault(_) => retained_power; }; fault(_) => retained_power; };
+  retained_power' = reverse_electrical_power;
   target <- raised;
   delivered <- 5L/min * 2min;
   energy <- 2kW * 30min;
-  power <- voltage * current;
+  power <- reverse_electrical_power;
 }
 `, { filename: 'quantity-compiler.ghost' });
-  assert.deepEqual(compiled.manifest.inputs, [
+  assert.deepEqual(compiled.manifest.sensors.slice(0, 3).map(({ name, type, canonicalUnit }) => ({ name, type, canonicalUnit })), [
     { name: 'ambient', type: 'Temperature', canonicalUnit: 'K' },
     { name: 'voltage', type: 'Voltage', canonicalUnit: 'V' },
     { name: 'current', type: 'ElectricalCurrent', canonicalUnit: 'A' },
@@ -176,7 +180,7 @@ control QuantityCompiler {
     initialOffset: compiled.manifest.configs[1].initialOffset,
     initialEndOffset: compiled.manifest.configs[1].initialEndOffset,
   });
-  assert.equal(compiled.manifest.sensors[0].canonicalUnit, 'K');
+  assert.equal(compiled.manifest.sensors.find(sensor => sensor.name === 'measured').canonicalUnit, 'K');
 });
 
 test('compiler enforces quantity nominal and affine operation boundaries', () => {
@@ -200,11 +204,11 @@ test('compiler enforces quantity nominal and affine operation boundaries', () =>
     let left_scaled = -2 * 1m;
     let right_scaled = 1m * -2;
     output below: Bool;
-    below <- measured < (-2);
+    below <- measured |> map(below(-2.0)) |> recover(false);
   }`, { filename: 'signed-number-context.ghost' }));
   assert.throws(() => compileControl(`control NoIntVariableCoercion {
-    input measured: Number;
-    input integer: Int;
+    state measured: Number = 0.0;
+    state integer: Int = 0;
     output below: Bool;
     below <- measured < -integer;
   }`, { filename: 'no-int-variable-coercion.ghost' }), error =>
@@ -219,8 +223,8 @@ test('actual WASM preserves quantity input, sensor EMA, hysteresis, and numeric 
   const compiled = await compileSource(`
 control QuantityHost {
   input requested: Temperature;
-  input humidity: RelativeHumidity;
-  sensor measured: Temperature {
+  input humidity: RelativeHumidity { valid = 0%RH .. 100%RH; }
+  input measured: Temperature {
     valid = -40°C .. 100°C;
     filter = ema(alpha: 0.5);
   }
@@ -229,14 +233,17 @@ control QuantityHost {
   output negative_length: Length;
   output heat: Bool;
   output humid: Bool;
-  echoed <- requested;
+  // This fixture echoes observations, retaining the initialized display on unavailable input.
+  state retained_requested: Temperature = 300K;
+  echoed <- case requested { ok(value) => value; fault(_) => retained_requested; };
+  retained_requested' = case requested { ok(value) => value; fault(_) => retained_requested; };
   negative_length <- 1m * -2;
   heat <- case cold { ok(value) => value; fault(_) => false; };
-  humid <- humidity > 70%RH;
+  humid <- case humidity { ok(value) => value > 70%RH; fault(_) => false; };
 }
 `, { filename: 'quantity-host.ghost' });
   const wasm = fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
-  const runtime = await ControlRuntime.instantiate(wasm, compiled);
+  const runtime = softwareQualityObservations(await ControlRuntime.instantiate(wasm, compiled));
   try {
     const first = runtime.step({ nowMs: 1, inputs: { requested: 300, humidity: 0.8 }, samples: {
       measured: { epoch: 1, id: 1, timestampMs: 1, value: 290, quality: 'Good' },
@@ -252,11 +259,15 @@ control QuantityHost {
     assert.equal(second.sensors.measured.value, 295);
     assert.equal(second.signals.cold.value, true);
     assert.equal(second.vm.safe.echoed, 301);
-    assert.throws(() => runtime.step({ nowMs: 3, inputs: { requested: Infinity, humidity: 0.8 } }), /requested.*finite/);
-    assert.throws(() => runtime.step({ nowMs: 3, inputs: { requested: 300, humidity: 1.1 } }), /humidity.*\[0, 1\]/);
+    const invalidTemperature = runtime.step({ nowMs: 3, inputs: { requested: Infinity, humidity: 0.8 } });
+    assert.equal(invalidTemperature.sensors.requested.quality, 'Invalid');
+    assert.equal(invalidTemperature.vm.safe.echoed, 301);
+    const invalidHumidity = runtime.step({ nowMs: 4, inputs: { requested: 300, humidity: 1.1 } });
+    assert.equal(invalidHumidity.sensors.humidity.quality, 'Invalid');
+    assert.equal(invalidHumidity.vm.safe.humid, false);
   } finally { runtime.dispose(); }
 
-  const framed = await ControlRuntime.instantiateFramed(wasm, compiled);
+  const framed = softwareQualityObservations(await ControlRuntime.instantiateFramed(wasm, compiled));
   try {
     const result = framed.step({ nowMs: 1, inputs: { requested: 300, humidity: 0.8 }, samples: {
       measured: { epoch: 1, id: 1, timestampMs: 1, value: 290, quality: 'Good' },
@@ -276,11 +287,11 @@ test('runtime strictly validates quantity canonical units and Temperature settin
   const wasm = fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
   const instantiate = manifest => ControlRuntime.instantiate(wasm, { ...compiled, manifest },
     { context: { bootEpoch: 1, terminalCapacity: 8, bindings: [] } });
-  const input = compiled.manifest.inputs[0];
+  const input = compiled.manifest.sensors[0];
   const config = compiled.manifest.configs[0];
-  await assert.rejects(() => instantiate({ ...compiled.manifest, inputs: [{ name: input.name, type: input.type }] }), /canonicalUnit.*required/);
-  await assert.rejects(() => instantiate({ ...compiled.manifest, inputs: [{ ...input, canonicalUnit: 'percent' }] }), /canonicalUnit/);
-  await assert.rejects(() => instantiate({ ...compiled.manifest, inputs: [{ ...input, type: 'Number' }] }), /canonicalUnit.*forbidden|unknown key/);
+  await assert.rejects(() => instantiate({ ...compiled.manifest, sensors: [{ ...input, canonicalUnit: undefined }] }), /sensor humidity.canonicalUnit must be ratio/);
+  await assert.rejects(() => instantiate({ ...compiled.manifest, sensors: [{ ...input, canonicalUnit: 'percent' }] }), /canonicalUnit/);
+  await assert.rejects(() => instantiate({ ...compiled.manifest, sensors: [{ ...input, type: 'Number' }] }), /canonicalUnit.*forbidden|unknown key/);
   await assert.rejects(() => instantiate({ ...compiled.manifest, configs: [{ ...config, settings: { ...config.settings, stepType: undefined } }] }), /stepType/);
 });
 

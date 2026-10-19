@@ -39,7 +39,7 @@ JSON 프로그램을 소유하지 않는다. 생명주기 관찰은 선언된 �
 | 종류 | 의미와 요청 식별자 | 결과와 관찰 경계 |
 | --- | --- | --- |
 | DesiredState | commit scan/revision에서 선언된 논리 endpoint의 요청 목표; 반복된 같은 목표는 지속 의도 | requested/safe snapshot, 각 write attempt 결과와 별도 feedback; scan마다 새 일회성 command가 되지 않음 |
-| Command | 명시적 request ID와 정본 typed-request digest를 가진 한 도메인 동작 | #74에 binding된 received/start/terminal 증거; Driver ACK만으로 도메인 완료나 물리 확인이 되지 않음 |
+| Command | 명시적 request ID와 정본 typed-request digest를 가진 한 도메인 동작 | #74에 binding된 received/start/terminal 증거; renderer ACK만으로 도메인 완료나 물리 확인이 되지 않음 |
 | Process | 작성된 상태/timer 결정으로 여러 tick에 걸친 하나의 요청; 같은 요청이 상관 식별의 root | started/progress/current-state 관찰과 terminal 도메인 증거; 진행은 새 요청이나 새 lifecycle 상태가 아님 |
 | Message | 명시적 send 요청/digest, channel/binding과 별도 send-attempt 식별자 | queue/service 수락, delivery·실패 증거의 명시 범위 유지; 수락은 전달·읽기 증거가 아님 |
 | Render | 정확한 source/schema/run/완료 scan 또는 event 위치와 projection 리비전의 읽기 전용 투영 | rendered/unavailable/stale 표시 결과; 제어 권한, command 완료, feedback이나 commit을 만들지 않음 |
@@ -109,7 +109,7 @@ dispatch는 성공 논리 commit 뒤에 온다. 외부 실패는 해당 commit�
 requested/safe 의도 및 부분/불확실 effect 결과를 보존한다. 상관 결과는
 명시적 typed binding을 통해 향후 허용 결정에만 영향을 준다. host/Device
 중단 정책이 권위를 유지하며 자동 계속 실행·retry·restart는 없다.
-Driver register/write 수락과 sensor 확인은 별도 증거다. 선언된 증거가 실제로
+renderer register/write 수락과 sensor 확인은 별도 증거다. 선언된 증거가 실제로
 확립하지 않는 한 취소 완료는 물리 정지를 주장하지 않는다.
 
 실제 재시작은 새 run 식별자를 사용한다. 과거 terminal은 종결 이력으로

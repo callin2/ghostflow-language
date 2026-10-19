@@ -16,6 +16,15 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const wasm = fs.readFileSync(path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm'));
 const activation = { bootEpoch: 1, terminalCapacity: 8, bindings: [] };
 const planned = Date.UTC(2026, 0, 1, 8);
+function samples(now, values, epoch = 1, quality = 'Good') {
+  return Object.fromEntries(Object.entries(values).map(([name, value]) => [name, { epoch, id: now + 1, timestampMs: now, value, quality }]));
+}
+function rawAllow(artifact, value, quality = 'Good') {
+  const sensor = artifact.manifest.sensors.find(sensor => sensor.name === 'allow');
+  // Raw VM fault payload is an internal placeholder; only the ok/fault rails select Result.
+  return [{ name: sensor.valueInput, type: 'Bool', value: quality === 'Good' ? value : false }, { name: sensor.okInput, type: 'Bool', value: quality === 'Good' },
+    { name: sensor.faultInput, type: 'Number', value: ({ Good: 0, Disconnected: 0, Stale: 1, Invalid: 2, NotReady: 3 })[quality] }];
+}
 function facts(mono, delta, { trusted = true, boot = 1 } = {}) {
   return { clock: { monotonicMs: mono, bootEpoch: boot, wallMs: trusted ? planned + delta : null,
     uncertaintyMs: 0, trusted, unknownReason: trusted ? null : 'ClockUnknown', sourceRevision: 'at-clock-v1' },
@@ -28,8 +37,8 @@ async function parity(steps, due, missed, source = atSource()) {
   const runtime = await ControlRuntime.instantiateFramed(wasm, artifact, { context: activation });
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-at-'));
   try {
-    const frames = steps.map(({ mono, delta, allow = true, trusted = true }, scanId) => ({ scanId,
-      logicalTimeMs: mono, inputs: [{ name: 'allow', type: 'Bool', value: allow }], ...facts(mono, delta, { trusted }) }));
+    const frames = steps.map(({ mono, delta, allow = true, trusted = true, quality = 'Good' }, scanId) => ({ scanId,
+      logicalTimeMs: mono, inputs: rawAllow(artifact, allow, quality), ...facts(mono, delta, { trusted }) }));
     const artifactPath = path.join(dir, 'at.gfb'); writeArtifact(artifact, artifactPath);
     const tapePath = path.join(dir, 'tape.json');
     fs.writeFileSync(tapePath, JSON.stringify({ profile: 'context-periodic-v1', activation, steps: frames }));
@@ -37,17 +46,17 @@ async function parity(steps, due, missed, source = atSource()) {
     const native = spawnSync(exe, [artifactPath, tapePath], { encoding: 'utf8', timeout: 10000 });
     assert.equal(native.status, 0, native.error?.message || native.stderr || native.stdout || 'native runner failed');
     const rows = native.stdout.trim().split('\n').map(JSON.parse);
-    const traces = steps.map(({ mono, delta, allow = true, trusted = true }) => runtime.step({ nowMs: mono,
-      inputs: { allow }, contextFacts: facts(mono, delta, { trusted }) }).vm);
+    const traces = steps.map(({ mono, delta, allow = true, trusted = true, quality = 'Good' }) => runtime.step({ nowMs: mono,
+      samples: samples(mono, { allow }, 1, quality), contextFacts: facts(mono, delta, { trusted }) }).vm);
     assert.deepEqual(traces.map(t => t.safe.alarm), due);
     assert.deepEqual(traces.map(t => t.safe.missed_alarm), missed);
     assert.deepEqual(traces.map(t => (t.contextTrace ?? []).some(o => ['ObservationGap','ConditionsFalseAtPulse','BaselinePastMissed'].includes(o.decision))), missed);
     rows.forEach((row, i) => { assert.equal(row.accepted, true); assert.deepEqual(row.outcome.trace, traces[i]); });
     const scenarioPath = path.join(dir, 'scenario.toon');
     fs.writeFileSync(scenarioPath, encode({ format: 'GhostFlow/scenario-v1', id: 'at-singleton',
-      initialInputs: frames[0].inputs, keyBindings: [], context: activation,
-      actions: steps.flatMap(({ mono, delta, allow = true, trusted = true }) => [
-        { kind: 'input', name: 'allow', type: 'Bool', value: allow },
+      initialInputs: [], keyBindings: [], context: activation,
+      actions: steps.flatMap(({ mono, delta, allow = true, trusted = true, quality = 'Good' }) => [
+        { kind: 'sample', name: 'allow', ...samples(mono, { allow }, 1, quality).allow },
         { kind: 'scan', atMs: mono, contextFacts: facts(mono, delta, { trusted }) }]) }));
     const simulation = runScenario(artifactPath, scenarioPath, { format: 'json' });
     assert.equal(simulation.success, true, simulation.encoded);
@@ -105,6 +114,13 @@ test('GF-TEST-at-runtime: false predicate and observation gap consume without la
   await parity([{ mono: 0, delta: -60000 }, { mono: 60000, delta: 0 }], [false,true], [false,false]);
   await parity([{ mono: 0, delta: -60001 }, { mono: 1, delta: 0 }], [false,false], [false,true]);
 });
+test('canonical At input faults inhibit the pulse and consume it without recovery replay', async () => {
+  for (const quality of ['NotReady', 'Disconnected', 'Stale', 'Invalid']) {
+    await parity([{ mono: 0, delta: -1 }, { mono: 1, delta: 0, quality }, { mono: 2, delta: 1 }],
+      [false, false, false], [false, true, false]);
+  }
+});
+
 test('GF-TEST-at-runtime: boot and trust recovery baseline never catch up past At', async () => {
   await parity([{ mono: 0, delta: 0 }, { mono: 1, delta: -1 }, { mono: 2, delta: 0 }],
     [false,false,false], [true,false,false]);
@@ -121,8 +137,8 @@ test('GF-TEST-at-runtime: checkpointed terminal identities survive reboot rollba
     const original = await ControlRuntime.instantiateFramed(wasm, artifact, { context: activation });
     const restored = await ControlRuntime.instantiateFramed(wasm, artifact, { context: { ...activation, bootEpoch: 2 } });
     t.after(() => { original.dispose(); restored.dispose(); });
-    original.step({ nowMs: 0, inputs: { allow: true }, contextFacts: facts(0, -1) });
-    if (admitted !== null) original.step({ nowMs: 1, inputs: { allow: admitted }, contextFacts: facts(1, 0) });
+    original.step({ nowMs: 0, samples: samples(0, { allow: true }), contextFacts: facts(0, -1) });
+    if (admitted !== null) original.step({ nowMs: 1, samples: samples(1, { allow: admitted }), contextFacts: facts(1, 0) });
     restored.restoreContextCheckpoint(original.contextSnapshot().bytes);
     const before = restored.contextSnapshot().bytes;
     const corrupt = before.slice(); corrupt[0] ^= 1;
@@ -136,8 +152,8 @@ test('GF-TEST-at-runtime: checkpointed terminal identities survive reboot rollba
       assert.throws(() => restored.restoreContextCheckpoint(foreignIdentity), /checkpoint|identity/);
       assert.deepEqual(restored.contextSnapshot().bytes, before, 'invalid occurrence origin preserves restored state');
     }
-    restored.step({ nowMs: 0, inputs: { allow: true }, contextFacts: facts(0, -1, { boot: 2 }) });
-    const trace = restored.step({ nowMs: 1, inputs: { allow: true }, contextFacts: facts(1, 0, { boot: 2 }) }).vm;
+    restored.step({ nowMs: 0, samples: samples(0, { allow: true }, 2), contextFacts: facts(0, -1, { boot: 2 }) });
+    const trace = restored.step({ nowMs: 1, samples: samples(1, { allow: true }, 2), contextFacts: facts(1, 0, { boot: 2 }) }).vm;
     assert.equal(trace.safe.alarm, admitted === null);
     assert.equal(trace.safe.missed_alarm, false, 'restored terminal miss must not emit another missed pulse');
     assert.equal((trace.contextTrace ?? []).some(o => o.decision === 'ConditionsFalseAtPulse'), false);
@@ -150,7 +166,7 @@ test('GF-TEST-at-runtime: wrong program checkpoint and invalid capacity reject b
   const original = await ControlRuntime.instantiateFramed(wasm, a, { context: activation });
   const other = await ControlRuntime.instantiateFramed(wasm, b, { context: { ...activation, bootEpoch: 2 } });
   t.after(() => { original.dispose(); other.dispose(); });
-  original.step({ nowMs: 0, inputs: { allow: true }, contextFacts: facts(0, -1) });
+  original.step({ nowMs: 0, samples: samples(0, { allow: true }), contextFacts: facts(0, -1) });
   const before = other.contextSnapshot().bytes;
   assert.throws(() => other.restoreContextCheckpoint(original.contextSnapshot().bytes), /checkpoint|program|fingerprint/);
   assert.deepEqual(other.contextSnapshot().bytes, before);
@@ -160,16 +176,16 @@ test('GF-TEST-at-runtime: wrong program checkpoint and invalid capacity reject b
 
 test('GF-TEST-at-runtime: failed scan crossing discards consumed state and retries once', async t => {
   const source = atSource({ declarations: 'input allow: Bool; input divisor: Int;',
-    output: 'alarm <- appointment.due && ((1 div divisor) == 1);' });
+    output: 'alarm <- appointment.due && ((1 div (divisor |> recover(0))) == 1);' });
   const artifact = await compileSource(source, { filename: 'at-atomic.ghost.md' });
   const runtime = await ControlRuntime.instantiateFramed(wasm, artifact, { context: activation });
   t.after(() => runtime.dispose());
-  runtime.step({ nowMs: 0, inputs: { allow: true, divisor: 1 }, contextFacts: facts(0, -1) });
+  runtime.step({ nowMs: 0, samples: samples(0, { allow: true, divisor: 1 }), contextFacts: facts(0, -1) });
   const before = runtime.contextSnapshot().bytes;
-  assert.throws(() => runtime.step({ nowMs: 1, inputs: { allow: true, divisor: 0 }, contextFacts: facts(1, 0) }), /zero|division/i);
+  assert.throws(() => runtime.step({ nowMs: 1, samples: samples(1, { allow: true, divisor: 0 }), contextFacts: facts(1, 0) }), /zero|division/i);
   assert.deepEqual(runtime.contextSnapshot().bytes, before);
-  assert.equal(runtime.step({ nowMs: 1, inputs: { allow: true, divisor: 1 }, contextFacts: facts(1, 0) }).vm.safe.alarm, true);
-  assert.equal(runtime.step({ nowMs: 2, inputs: { allow: true, divisor: 1 }, contextFacts: facts(2, 1) }).vm.safe.alarm, false);
+  assert.equal(runtime.step({ nowMs: 1, samples: samples(1, { allow: true, divisor: 1 }), contextFacts: facts(1, 0) }).vm.safe.alarm, true);
+  assert.equal(runtime.step({ nowMs: 2, samples: samples(2, { allow: true, divisor: 1 }), contextFacts: facts(2, 1) }).vm.safe.alarm, false);
 });
 
 test('GF-TEST-at-runtime: old headers and forged host occurrence evidence fail closed', async t => {
@@ -186,13 +202,13 @@ test('GF-TEST-at-runtime: old headers and forged host occurrence evidence fail c
   t.after(() => runtime.dispose());
   const forged = facts(0, -1); forged.schedules.push({ site: artifact.manifest.schedules[0].site,
     coverageStartMs: 0, coverageEndMs: 253402300799999, provider: null, calendar: null, rows: [] });
-  assert.throws(() => runtime.step({ nowMs: 0, inputs: { allow: true }, contextFacts: forged }), /requirements|facts/);
+  assert.throws(() => runtime.step({ nowMs: 0, samples: samples(0, { allow: true }), contextFacts: forged }), /requirements|facts/);
   const manifest = structuredClone(artifact.manifest); manifest.schedules[0].timezone = 'UTC';
   await assert.rejects(ControlRuntime.instantiateFramed(wasm, { ...artifact, manifest }, { context: activation }), /At schedule|unexpected|unsupported/i);
   const shifted = structuredClone(artifact.manifest); shifted.schedules[0].atMs += 10000;
   const nativeOwned = await ControlRuntime.instantiateFramed(wasm, { ...artifact, manifest: shifted }, { context: activation });
   t.after(() => nativeOwned.dispose());
-  nativeOwned.step({ nowMs: 0, inputs: { allow: true }, contextFacts: facts(0, -1) });
-  const trace = nativeOwned.step({ nowMs: 1, inputs: { allow: true }, contextFacts: facts(1, 0) }).vm;
+  nativeOwned.step({ nowMs: 0, samples: samples(0, { allow: true }), contextFacts: facts(0, -1) });
+  const trace = nativeOwned.step({ nowMs: 1, samples: samples(1, { allow: true }), contextFacts: facts(1, 0) }).vm;
   assert.equal(trace.safe.alarm, true, 'manifest date cannot replace the bytecode-owned instant');
 });

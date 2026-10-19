@@ -18,10 +18,22 @@ E08은 하나의 상태와 `elapsed(phase)`를 소개하고, tutorial 예제는 
 하드 최대 운전시간이다. 이 예제는 물리적 안전장치나 실제 부하의 동작을
 보장하지 않는다.
 
+이 명시적 input revision은 생산자 품질을 사용하며 버튼의 물리적 고장을 추론하지 않는다. Good(false)는 정상 관측이다. 미상 요청·위치·모드 관측으로 새 요청, 요청 해제, 위치 또는 모드를 확정하지 않으며 전이를 뒷받침하는 관측이 없으면 기존 상태를 유지한다. 기존 보호 허가는 확인된 Good(true)를 요구하며 기존 하드 시간 제한은 계속 적용된다. 새 START 입력이나 전역 재시작 정책은 추가하지 않는다.
+
 ```ghost
+// Source revision: issue531-producer-quality-pc06-v1
 control TimerPatterns {
   input on_delay_request, off_delay_request, limited_request, stop_ok: Bool;
   output on_delayed, off_delayed, limited_run: Bool;
+
+  let on_delay_request_true = case on_delay_request { ok(value) => value; fault(_) => false; };
+  let on_delay_request_false = case on_delay_request { ok(value) => !value; fault(_) => false; };
+  let off_delay_request_true = case off_delay_request { ok(value) => value; fault(_) => false; };
+  let off_delay_request_false = case off_delay_request { ok(value) => !value; fault(_) => false; };
+  let limited_request_true = case limited_request { ok(value) => value; fault(_) => false; };
+  let limited_request_false = case limited_request { ok(value) => !value; fault(_) => false; };
+  let stop_ok_true = case stop_ok { ok(value) => value; fault(_) => false; };
+  let stop_ok_false = case stop_ok { ok(value) => !value; fault(_) => false; };
 
   let on_delay = 2s;
   let off_delay = 3s;
@@ -46,35 +58,35 @@ control TimerPatterns {
   timer limit_age = elapsed(limit_phase);
 
   on_phase' = case on_phase {
-    OnIdle => if stop_ok && on_delay_request then OnWaiting else OnIdle;
+    OnIdle => if stop_ok_true && on_delay_request_true then OnWaiting else OnIdle;
     OnWaiting =>
-      if !stop_ok || !on_delay_request then OnIdle
-      else if on_age >= on_delay then OnActive
+      if !stop_ok_true || on_delay_request_false then OnIdle
+      else if on_delay_request_true && on_age >= on_delay then OnActive
       else OnWaiting;
-    OnActive => if stop_ok && on_delay_request then OnActive else OnIdle;
+    OnActive => if !stop_ok_true || on_delay_request_false then OnIdle else OnActive;
   };
 
   off_phase' = case off_phase {
-    OffIdle => if stop_ok && off_delay_request then OffActive else OffIdle;
+    OffIdle => if stop_ok_true && off_delay_request_true then OffActive else OffIdle;
     OffActive =>
-      if !stop_ok then OffIdle
-      else if !off_delay_request then OffHolding
+      if !stop_ok_true then OffIdle
+      else if off_delay_request_false then OffHolding
       else OffActive;
     OffHolding =>
-      if !stop_ok then OffIdle
-      else if off_delay_request then OffActive
+      if !stop_ok_true then OffIdle
+      else if off_delay_request_true then OffActive
       else if off_age >= off_delay then OffIdle
       else OffHolding;
   };
 
   limit_phase' = case limit_phase {
-    LimitIdle => if stop_ok && limited_request then LimitRunning else LimitIdle;
+    LimitIdle => if stop_ok_true && limited_request_true then LimitRunning else LimitIdle;
     LimitRunning =>
-      if !stop_ok || !limited_request then LimitIdle
+      if !stop_ok_true || limited_request_false then LimitIdle
       else if limit_age >= max_run then LimitReached
       else LimitRunning;
     LimitReached =>
-      if !stop_ok || !limited_request then LimitIdle
+      if !stop_ok_true || limited_request_false then LimitIdle
       else LimitReached;
   };
 

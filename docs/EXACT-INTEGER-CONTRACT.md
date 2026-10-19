@@ -128,7 +128,7 @@ are compile diagnostics. Input-dependent overflow, zero division and invalid
 conversion reject the current scan before new state or intents commit. The host
 enters its existing execution-fault path and retains the last accepted outcome
 as evidence. This language rule does not itself claim that a physical relay has
-turned OFF; Driver safe-output handling and physical confirmation remain
+turned OFF; renderer safe-output handling and physical confirmation remain
 separate evidence.
 
 Use distinct stable reasons at the runtime boundary:

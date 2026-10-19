@@ -71,13 +71,14 @@ for (const [id, output, on, off, first, last] of [
     // Derived test candidate isolates the unchanged authored policy from the
     // numerical approximation. Expected boundary values are exact canonical Pa.
     const candidate = source(id).replace(/control (\w+) \{/, 'control $1 {\n  input test_vpd: VaporPressureDeficit;')
-      .replace('ok(air_vpd(t, rh))', 'ok(test_vpd)');
+      .replace('ok(air_vpd(t, rh))', 'test_vpd');
     const runtime = await ControlRuntime.instantiateFramed(wasm(), compileSourceSync(candidate, { filename: `${id}-policy.ghost.md` }));
     t.after(() => runtime.dispose());
     const values = [[on, false], [off, false], [first, true], [on, true], [off, true], [last, false], [on, false], [off, false]];
     for (const [index, [value, expected]] of values.entries()) {
       const now = index + 1;
-      const result = runtime.step({ nowMs: now, inputs: { test_vpd: value }, samples: {
+      const result = runtime.step({ nowMs: now, samples: {
+        test_vpd: sample(now, value),
         air: sample(now, 298.15), humidity: sample(now, 0.5), light: sample(now, 0.0005),
       } });
       assert.equal(result.vm.safe[output], expected, `${id}: boundary ${value} with prior state`);

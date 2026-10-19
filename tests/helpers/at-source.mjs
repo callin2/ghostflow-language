@@ -1,4 +1,4 @@
-export function atSource({ at = '2026-01-01T08:00:00Z', when = 'allow', gap = '60s', declarations = 'input allow: Bool;', output = 'alarm <- appointment.due;' } = {}) {
+export function atSource({ at = '2026-01-01T08:00:00Z', when = '(allow |> recover(false))', gap = '60s', declarations = 'input allow: Bool;', output = 'alarm <- appointment.due;' } = {}) {
   return `# One-shot appointment\n\n\`\`\`ghost\ncontrol Appointment {
   ${declarations}
   schedule appointment: At {

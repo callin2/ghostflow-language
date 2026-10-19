@@ -25,15 +25,29 @@ process.stdout.write(result.bytes);
     Module::load(&output.stdout).unwrap()
 }
 
+// Explicit fixture policy inhibits unavailable START and rejects an unavailable divisor.
+// Good acquisition rails retain the original true/false/arithmetic and replay oracles.
+fn submit_good(runtime: &mut Runtime, name: &str, value: Value) {
+    for (prefix, value) in [
+        ("value", value),
+        ("ok", Value::Bool(true)),
+        ("fault", Value::Number(0.0)),
+    ] {
+        runtime
+            .set_input(&format!("__gf_sensor_{prefix}_{name}"), value)
+            .unwrap();
+    }
+}
+
 #[test]
 fn public_debounce_bytecode_preserves_atomicity_ghost_replay_and_rewind() {
     let module = compile(
         br#"
 control NativeDebounce {
   input start: Bool; input divisor: Number;
-  signal stable = debounce(start, stable_for: 2s, initial: false);
+  signal stable = debounce(start |> recover(false), stable_for: 2s, initial: false);
   output result: Bool; output guard: Int;
-  result <- stable; guard <- 1 div int_exact(divisor);
+  result <- stable; guard <- 1 div int_exact(divisor |> recover(0.0));
 }
 "#,
     );
@@ -58,8 +72,8 @@ control NativeDebounce {
     }
     runtime.activate().unwrap();
     for now in [0, 1999] {
-        runtime.set_input("start", Value::Bool(true)).unwrap();
-        runtime.set_input("divisor", Value::Number(1.0)).unwrap();
+        submit_good(&mut runtime, "start", Value::Bool(true));
+        submit_good(&mut runtime, "divisor", Value::Number(1.0));
         runtime.tick_at(now).unwrap();
     }
     let before: Vec<_> = fields
@@ -71,8 +85,8 @@ control NativeDebounce {
         .iter()
         .map(|record| record.to_json())
         .collect();
-    runtime.set_input("start", Value::Bool(true)).unwrap();
-    runtime.set_input("divisor", Value::Number(0.0)).unwrap();
+    submit_good(&mut runtime, "start", Value::Bool(true));
+    submit_good(&mut runtime, "divisor", Value::Number(0.0));
     assert_eq!(
         runtime.tick_at(2000).unwrap_err().message(),
         "integer-division-by-zero"
@@ -92,8 +106,8 @@ control NativeDebounce {
             .collect::<Vec<_>>(),
         journal_before
     );
-    runtime.set_input("start", Value::Bool(true)).unwrap();
-    runtime.set_input("divisor", Value::Number(1.0)).unwrap();
+    submit_good(&mut runtime, "start", Value::Bool(true));
+    submit_good(&mut runtime, "divisor", Value::Number(1.0));
     runtime.tick_at(2000).unwrap();
     assert_eq!(
         runtime.state("__gf_debounce_stable_stable"),
@@ -113,8 +127,8 @@ control NativeDebounce {
         expected
     );
     runtime.rewind(replay[1].tick).unwrap();
-    runtime.set_input("start", Value::Bool(true)).unwrap();
-    runtime.set_input("divisor", Value::Number(1.0)).unwrap();
+    submit_good(&mut runtime, "start", Value::Bool(true));
+    submit_good(&mut runtime, "divisor", Value::Number(1.0));
     assert_eq!(runtime.tick_at(2000).unwrap().to_json(), expected[2]);
 }
 
@@ -124,8 +138,8 @@ fn physical_root_highwaters_are_in_native_journal_replay_and_rewind() {
         br#"
 control PhysicalReplay {
   input pick: Bool;
-  sensor a: Bool; sensor b: Bool;
-  signal stable = debounce(if pick then a else b, stable_for: 2s, initial: false);
+  input a: Bool; input b: Bool;
+  signal stable = debounce(if (pick |> recover(false)) then a else b, stable_for: 2s, initial: false);
   output result: Bool;
   result <- case stable { ok(value) => value; fault(_) => false; };
 }
@@ -138,7 +152,7 @@ control PhysicalReplay {
     runtime.add_capability(capabilities[0].clone()).unwrap();
     runtime.activate().unwrap();
     let submit = |runtime: &mut Runtime, pick: bool, id: f64, timestamp: f64| {
-        runtime.set_input("pick", Value::Bool(pick)).unwrap();
+        submit_good(runtime, "pick", Value::Bool(pick));
         for name in ["a", "b"] {
             for (prefix, value) in [
                 ("value", Value::Bool(true)),

@@ -10,8 +10,9 @@ test('authored feedback policy compiles from its canonical document and matching
   const translation = fs.readFileSync(new URL('../examples/explicit-feedback-adoption.ghost.ko.md', import.meta.url), 'utf8');
   assert.equal(extractLiterate(source).code, extractLiterate(translation).code);
   const artifact = compileSourceSync(source, { filename });
-  assert.equal(artifact.manifest.sensors[0].name, 'observation');
-  assert.notEqual(artifact.manifest.sensors[0].optional, true);
+  const observation = artifact.manifest.sensors.find(sensor => sensor.name === 'observation');
+  assert.ok(observation);
+  assert.notEqual(observation.optional, true);
   assert.deepEqual(artifact.manifest.timers, [{ name: 'age', state: 'run', clockInput: '__gf_now_ms' }]);
   assert.deepEqual(artifact.manifest.outputs, [{ name: 'drive', type: 'Bool' }]);
 });

@@ -30,10 +30,25 @@ valve.” GhostFlow normalizes that intent as follows.
 
 ## GhostFlow source
 
+This explicit input revision consumes producer quality, not physical button diagnostics. Good(false) remains a normal observation. Unknown requests cannot establish a new request or released request, and unknown limits cannot establish a position or conflict. The existing watering deadline still stops the pump. In PumpStopping, unavailable limits defer closure with all outputs off. In Closing, unavailable limits retain Closing and inhibit its close command; restored healthy closed feedback finishes in Idle, while other healthy nonconflicting feedback permits closure to resume. This lesson adds no opening or closing timeout. Existing protection permission requires confirmed Good(true). No new START input or global restart policy is added.
+
 ```ghost
+// Source revision: issue531-producer-quality-pc09-v1
 control SequentialWaterSupply {
   input start_request, open_limit, close_limit, stop_ok, overload_ok: Bool;
   output valve_open_contactor, valve_close_contactor, pump_contactor: Bool;
+
+  let start_request_true = case start_request { ok(value) => value; fault(_) => false; };
+  let start_request_false = case start_request { ok(value) => !value; fault(_) => false; };
+  let open_limit_true = case open_limit { ok(value) => value; fault(_) => false; };
+  let open_limit_false = case open_limit { ok(value) => !value; fault(_) => false; };
+  let close_limit_true = case close_limit { ok(value) => value; fault(_) => false; };
+  let close_limit_false = case close_limit { ok(value) => !value; fault(_) => false; };
+  let stop_ok_true = case stop_ok { ok(value) => value; fault(_) => false; };
+  let stop_ok_false = case stop_ok { ok(value) => !value; fault(_) => false; };
+  let overload_ok_true = case overload_ok { ok(value) => value; fault(_) => false; };
+  let overload_ok_false = case overload_ok { ok(value) => !value; fault(_) => false; };
+  let limits_good = case open_limit { ok(_) => case close_limit { ok(_) => true; fault(_) => false; }; fault(_) => false; };
 
   let settle_delay = 2s;
   let watering_time = 5min;
@@ -46,12 +61,12 @@ control SequentialWaterSupply {
   // ghostflow:link id=GF-INT-PC09-SEQUENTIAL-WATERING-V1 relation=implements
   timer age = elapsed(phase);
 
-  let permit = stop_ok && overload_ok;
-  let conflict = open_limit && close_limit;
-  let known_closed = close_limit && !open_limit;
-  let start_event = request_armed && start_request;
+  let permit = stop_ok_true && overload_ok_true;
+  let conflict = open_limit_true && close_limit_true;
+  let known_closed = close_limit_true && open_limit_false;
+  let start_event = request_armed && start_request_true;
 
-  request_armed' = phase == Idle && permit && !conflict && known_closed && !start_request;
+  request_armed' = phase == Idle && permit && !conflict && known_closed && start_request_false;
 
   phase' = case phase {
     Idle =>
@@ -63,48 +78,49 @@ control SequentialWaterSupply {
     Opening =>
       if conflict then FeedbackFault
       else if !permit then Interrupted
-      else if open_limit && !close_limit then Settling
+      else if open_limit_true && close_limit_false then Settling
       else Opening;
 
     Settling =>
       if conflict then FeedbackFault
       else if !permit then Interrupted
-      else if !open_limit || close_limit then FeedbackFault
-      else if age >= settle_delay then Watering
+      else if limits_good && (open_limit_false || close_limit_true) then FeedbackFault
+      else if limits_good && age >= settle_delay then Watering
       else Settling;
 
     Watering =>
       if conflict then FeedbackFault
       else if !permit then Interrupted
-      else if !open_limit || close_limit then FeedbackFault
+      else if limits_good && (open_limit_false || close_limit_true) then FeedbackFault
       else if age >= watering_time then PumpStopping
       else Watering;
 
     PumpStopping =>
       if conflict then FeedbackFault
       else if !permit then Interrupted
-      else if !open_limit || close_limit then FeedbackFault
-      else Closing;
+      else if limits_good && (open_limit_false || close_limit_true) then FeedbackFault
+      else if limits_good then Closing
+      else PumpStopping;
 
     Closing =>
       if conflict then FeedbackFault
       else if !permit then Interrupted
-      else if close_limit && !open_limit then Idle
+      else if close_limit_true && open_limit_false then Idle
       else Closing;
 
     FeedbackFault =>
       if conflict || !permit then FeedbackFault
-      else if !start_request && known_closed then Idle
+      else if start_request_false && known_closed then Idle
       else FeedbackFault;
 
     Interrupted =>
       if conflict || !permit then Interrupted
-      else if !start_request && known_closed then Idle
+      else if start_request_false && known_closed then Idle
       else Interrupted;
   };
 
   valve_open_contactor <- phase' == Opening;
-  valve_close_contactor <- phase' == Closing;
+  valve_close_contactor <- phase' == Closing && limits_good;
   pump_contactor <- phase' == Watering;
   mutex(valve_open_contactor, valve_close_contactor);
 }

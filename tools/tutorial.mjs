@@ -57,8 +57,16 @@ assert.equal(latch.source, markdown);
 assert.ok(extractLiterate(markdown, { filename: 'examples/tutorial/01-latch.ghost.md' }).code.length > 0);
 assert.deepEqual((await compileSource(markdown, { filename: 'examples/tutorial/01-latch.ghost.md' })).bytes, latch.bytes);
 const latchRuntime = await ControlRuntime.instantiate(wasm, latch);
+// These retained tutorial rows are explicit healthy acquisitions. A clock-only
+// step supplies no sample; unchanged payload values still have a new identity
+// only when a new recorded observation is actually supplied.
+function observedBools(nowMs, values) {
+  return { nowMs, samples: Object.fromEntries(Object.entries(values).map(([name, value]) => [name,
+    { epoch: 1, id: nowMs + 1, timestampMs: nowMs, quality: 'Good', value },
+  ])) };
+}
 const latchRows = [[true, false], [false, false], [true, true], [false, false], [true, false]]
-  .map(([start, stop], nowMs) => latchRuntime.step({ nowMs, inputs: { start, stop } }));
+  .map(([start, stop], nowMs) => latchRuntime.step(observedBools(nowMs, { start, stop })));
 assert.deepEqual(latchRows.map(row => row.vm.safe.pump), [true, true, false, false, true]);
 evidence.scenarios.push({ ...nativeParity(latch, latchRows), literateIdentical: true, checks: ['latch', 'stop-wins', 'pump-requires-valve'] });
 latchRuntime.dispose();
@@ -85,8 +93,11 @@ const moisture = await artifact('03-moisture');
 const moistureRuntime = await ControlRuntime.instantiate(wasm, moisture);
 const moistureRows = [];
 function moistureStep(nowMs, value, start = false, quality = 'Good') {
-  const samples = value === undefined ? {} : { moisture: { epoch: 1, id: nowMs + 1, timestampMs: nowMs, value, quality } };
-  const result = moistureRuntime.step({ nowMs, inputs: { start, stop: false }, samples });
+  const samples = value === undefined ? {} : {
+    ...observedBools(nowMs, { start, stop: false }).samples,
+    moisture: { epoch: 1, id: nowMs + 1, timestampMs: nowMs, value, quality },
+  };
+  const result = moistureRuntime.step({ nowMs, samples });
   moistureRows.push(result); return result;
 }
 [28, 29, 90, 28, 29].forEach((value, index) => moistureStep(index * 1000, value, index === 4));
@@ -108,7 +119,7 @@ evidence.scenarios.push(shared.result);
 // Replay is a new isolated virtual runtime, never a command to the original.
 const replay = await ControlRuntime.instantiate(wasm, latch);
 const replayRows = [[true, false], [false, false], [true, true], [false, false], [true, false]]
-  .map(([start, stop], nowMs) => replay.step({ nowMs, inputs: { start, stop } }));
+  .map(([start, stop], nowMs) => replay.step(observedBools(nowMs, { start, stop })));
 assert.deepEqual(replayRows, latchRows);
 replay.dispose();
 evidence.scenarios.push({ name: 'GhostReplay', ticks: replayRows.length, checks: ['isolated-runtime', 'deterministic-trace', 'no-physical-driver'] });

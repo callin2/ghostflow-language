@@ -3,6 +3,8 @@
 
 # GhostFlow common constraints and sensor signal contract
 
+The 2026-10-05 external-input revision uses `input` for quality-bearing declarations. Existing conditioning and explicit `Result` fault branches are unchanged; prior `sensor` excerpts remain under `tests/fixtures/history/issue531/`.
+
 2026-09-24 · Common design contract.
 Current syntax and semantics for operating settings follow [Reference §5.1–5.2](reference/05-settings-and-observation.md).
 See [implementation scope](IMPLEMENTATION.md) and [traceability](TRACEABILITY.md) for execution coverage.
@@ -45,10 +47,24 @@ ungrouped `require` and `mutex` retain the same meaning.
 
 ```ghost
 control LocalPump {
-  input request, valve_ready: Bool;
+  state displayed_pump: Bool = false;
+  displayed_pump' = if request_good && !request then false else if request_good then request else displayed_pump;
+  state displayed_valve: Bool = false;
+  displayed_valve' = if valve_ready_good && !valve_ready then false else if valve_ready_good then valve_ready else displayed_valve;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_request: Bool = false;
+  let request_good = case observed_request { ok(_) => true; fault(_) => false; };
+  let request = case observed_request { ok(value) => value; fault(_) => remembered_request; };
+  remembered_request' = request;
+  state remembered_valve_ready: Bool = false;
+  let valve_ready_good = case observed_valve_ready { ok(_) => true; fault(_) => false; };
+  let valve_ready = case observed_valve_ready { ok(value) => value; fault(_) => remembered_valve_ready; };
+  remembered_valve_ready' = valve_ready;
+  input observed_request: Bool;
+  input observed_valve_ready: Bool;
   output pump, valve: Bool;
-  pump <- request;
-  valve <- valve_ready;
+  pump <- displayed_pump';
+  valve <- displayed_valve';
   constraints LocalRules {
     require at safe_output pump => valve;
   }
@@ -63,13 +79,37 @@ binding is absent. Separate explicit bound compilation selects execution.
 
 ```ghost
 control SharedPumpPolicy {
+  state displayed_pump: Bool = false;
+  displayed_pump' = if pump_request_good && !pump_request then false else if pump_request_good then pump_request else displayed_pump;
+  state displayed_valve: Bool = false;
+  displayed_valve' = if valve_request_good && !valve_request then false else if valve_request_good then valve_request else displayed_valve;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_automatic: Bool = false;
+  let automatic_good = case observed_automatic { ok(_) => true; fault(_) => false; };
+  let automatic = case observed_automatic { ok(value) => value; fault(_) => remembered_automatic; };
+  remembered_automatic' = automatic;
+  state remembered_manual: Bool = false;
+  let manual_good = case observed_manual { ok(_) => true; fault(_) => false; };
+  let manual = case observed_manual { ok(value) => value; fault(_) => remembered_manual; };
+  remembered_manual' = manual;
+  state remembered_pump_request: Bool = false;
+  let pump_request_good = case observed_pump_request { ok(_) => true; fault(_) => false; };
+  let pump_request = case observed_pump_request { ok(value) => value; fault(_) => remembered_pump_request; };
+  remembered_pump_request' = pump_request;
+  state remembered_valve_request: Bool = false;
+  let valve_request_good = case observed_valve_request { ok(_) => true; fault(_) => false; };
+  let valve_request = case observed_valve_request { ok(value) => value; fault(_) => remembered_valve_request; };
+  remembered_valve_request' = valve_request;
   resource station: Station;
   resource pump1: BoolActuator;
   resource valve1: BoolActuator;
-  input automatic, manual, pump_request, valve_request: Bool;
+  input observed_automatic: Bool;
+  input observed_manual: Bool;
+  input observed_pump_request: Bool;
+  input observed_valve_request: Bool;
   output pump, valve: Bool;
-  pump <- pump_request;
-  valve <- valve_request;
+  pump <- displayed_pump';
+  valve <- displayed_valve';
   constraints SharedRules for station {
     exclusive at admission { automatic, manual };
     require at safe_output pump1.on => any_on({ valve1 });
@@ -154,8 +194,8 @@ cancelling the program's job/session or restoring every state to its previous va
 
 A binding error or VM failure rolls back VM state, guard admission and trace
 together. Do not partially change protected state or commit rejected-scan evidence.
-Logical safe outputs differ from Driver applied and physical feedback confirmed.
-Actual Driver sequencing, physical safety devices and field installation are
+Logical safe outputs differ from renderer applied and physical feedback confirmed.
+Actual renderer sequencing, physical safety devices and field installation are
 outside this profile's validation scope.
 
 Accounting declares the existing `resource` and `account`, then uses
@@ -174,7 +214,7 @@ sequence. Do not generalize the existing narrower PID engine contract into
 arbitrary resource-policy enforcement.
 
 All mandatory conditions combine as AND. Decide admission first, check safe_output
-relations on the requested candidate, then let the Driver apply it. Arbitration
+relations on the requested candidate, then let the renderer apply it. Arbitration
 priority chooses within the permitted region; it cannot bypass mandatory
 constraints, binding, provenance or recovery requirements. Retain violation causes
 separately from denials and safe transitions. Normal observations do not create new
@@ -269,7 +309,7 @@ The pump does not immediately start merely because a valve is open; follow the o
 
 Arbitrate every start request in the same tick from one snapshot.
 Permit only requests securing both ownership and time budget.
-The Driver applies outputs after logical permission commits; if persistent reservation is needed, postpone output start until that succeeds too.
+The renderer applies outputs after logical permission commits; if persistent reservation is needed, postpone output start until that succeeds too.
 Use the same request ID on process retries.
 This process does not guarantee physically simultaneous application of multiple GPIOs.
 
@@ -338,12 +378,12 @@ If feedback exists, check actual stop/valve state.
 Without feedback, state the limitation that confirmation rests on commands and the stop procedure established at installation.
 Do not claim one mode enum substitutes for physical interlocks or guarantees of actual-state feedback.
 
-Record stop evidence separately as `CommandedStop`, where the Driver reports safe-output application and completes configured cleanup/wait procedures, and `VerifiedStop`, where actual feedback is also confirmed.
+Record stop evidence separately as `CommandedStop`, where the renderer reports safe-output application and completes configured cleanup/wait procedures, and `VerifiedStop`, where actual feedback is also confirmed.
 The basic configuration permits CommandedStop and does not make feedback sensors mandatory.
 It does not display this as verified actual stopping.
 If the device does not respond or safe-output application fails, sending a command alone does not establish completed stopping.
 Only user-added rules may require VerifiedStop.
-Initial safe-output sequence/wait values may use device-driver defaults; separately display the limitation that their suitability must be checked for a particular installation.
+Initial safe-output sequence/wait values may use output-renderer defaults; separately display the limitation that their suitability must be checked for a particular installation.
 
 Stop requests also cancel/invalidate pending starts.
 Do not queue a mode-change request during operation and later transition automatically without the user's knowledge.
@@ -580,7 +620,7 @@ For example, the following sketches syntax for a new sensor-processing declarati
 Internal state for each operation is generated as explicit sensor-graph nodes.
 
 ```text
-sensor moisture: Percent {
+input moisture: Percent {
   sample = 1s;
   valid = 0% .. 100%;
   filter = median(5);
@@ -635,9 +675,19 @@ No pressure/flow information is used.
 
 ```ghost
 control MoistureDemand {
-  input start, stop: Bool;
+  // Source-local display memory is initialized here; faults remain producer unknown.
+  state remembered_start: Bool = false;
+  let start_good = case observed_start { ok(_) => true; fault(_) => false; };
+  let start = case observed_start { ok(value) => value; fault(_) => remembered_start; };
+  remembered_start' = start;
+  state remembered_stop: Bool = false;
+  let stop_good = case observed_stop { ok(_) => true; fault(_) => false; };
+  let stop = case observed_stop { ok(value) => value; fault(_) => remembered_stop; };
+  remembered_stop' = stop;
+  input observed_start: Bool;
+  input observed_stop: Bool;
 
-  sensor moisture: Percent {
+  input moisture: Percent {
     sample = 1s;
     valid = 0% .. 100%;
     filter = median(5);
@@ -658,7 +708,7 @@ control MoistureDemand {
   state watering: Bool = false;
   output pump, valve: Bool;
 
-  watering' = !stop && dry_ok && (start || watering);
+  watering' = if start_good && stop_good then (!stop && dry_ok && (start || watering)) else watering;
   valve <- watering';
   pump  <- watering';
   require pump => valve;
@@ -671,7 +721,7 @@ When ready dry is true, start begins and latches watering intent.
 Start does not store a request that briefly appeared and disappeared before readiness.
 Afterward, a filtered value of 32% retains the previous true; above 35% changes it to false.
 Reaching the stale limit since the last valid sample or receiving an explicit fault makes dry_ok=false and releases watering intent.
-Actual output cleanup follows the Driver/facility stop procedure.
+Actual output cleanup follows the renderer/facility stop procedure.
 
 Three normal samples after a fault do not prepare median(5), so it remains NotReady.
 Even after five samples accumulate and recovery conditions hold, if start=false and the latch is released, watering does not automatically resume.
@@ -737,7 +787,7 @@ Implementations that unconditionally reset counters to zero from the current wal
 Before starting, check the task's required budget.
 Secure time budget together with shared-pump ownership and settle it after use.
 If stopping at the limit is required, block early considering the next output-application interval and stop delay.
-The target execution contract must specify whether one tick of overrun is allowed or the Driver turns OFF at the exact limit time.
+The target execution contract must specify whether one tick of overrun is allowed or the renderer turns OFF at the exact limit time.
 
 Reserved budgets require a finite upper bound on ON time.
 Calculate fixed sequential watering from the execution plan.

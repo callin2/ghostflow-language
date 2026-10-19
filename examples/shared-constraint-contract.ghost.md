@@ -11,14 +11,15 @@ loop. They satisfy the authored pump-needs-valve requirement. This is not an
 all-OFF default or a physical sequencing instruction.
 
 ```ghost
+// Source revision: issue531-quality-shared-contract-v1
 control SharedPumpPolicy {
   resource station: Station;
   resource pump1: BoolActuator;
   resource valve1: BoolActuator;
   input automatic, manual, pump_request, valve_request: Bool;
   output pump, valve: Bool;
-  pump <- pump_request;
-  valve <- valve_request;
+  pump <- pump_request |> recover(false);
+  valve <- valve_request |> recover(true);
   constraints SharedRules for station {
     exclusive at admission { automatic, manual };
     require at safe_output pump1.on => any_on({ valve1 });

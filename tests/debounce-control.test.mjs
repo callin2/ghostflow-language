@@ -4,12 +4,15 @@ import test from 'node:test';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 import { compileSource } from './helpers/literate-compile.mjs';
 
+// Producer observations exist only where the test supplies a value.
+const good = (nowMs, values) => Object.fromEntries(Object.entries(values).map(([name, value]) => [name, { epoch: 1, id: nowMs + 1, timestampMs: nowMs, quality: 'Good', value }]));
+
 const wasm = fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
 
 test('debounce observes raw Bool once per committed scan and promotes at the exact duration boundary', async () => {
   const compiled = await compileSource(`control RawDebounce {
     input start: Bool;
-    signal stable_start = debounce(start, stable_for: 2s, initial: false);
+    signal stable_start = debounce(start |> recover(false), stable_for: 2s, initial: false);
     output stable: Bool;
     stable <- stable_start;
   }`, { filename: 'raw-debounce.ghost' });
@@ -32,7 +35,7 @@ test('debounce observes raw Bool once per committed scan and promotes at the exa
       [2099, true, false],
       [2100, true, true],
     ]) {
-      const result = runtime.step({ nowMs, inputs: { start } });
+      const result = runtime.step({ nowMs, samples: good(nowMs, { start }) });
       assert.equal(result.vm.safe.stable, stable, `logical time ${nowMs}`);
     }
   } finally { runtime.dispose(); }
@@ -41,22 +44,22 @@ test('debounce observes raw Bool once per committed scan and promotes at the exa
 test('an opposite raw observation at the old candidate threshold cancels instead of promoting', async () => {
   const compiled = await compileSource(`control ThresholdFlip {
     input start: Bool;
-    signal stable_start = debounce(start, stable_for: 1s, initial: false);
+    signal stable_start = debounce(start |> recover(false), stable_for: 1s, initial: false);
     output stable: Bool;
     stable <- stable_start;
   }`, { filename: 'threshold-flip.ghost' });
   const runtime = await ControlRuntime.instantiate(wasm, compiled);
   try {
-    assert.equal(runtime.step({ nowMs: 0, inputs: { start: true } }).vm.safe.stable, false);
-    assert.equal(runtime.step({ nowMs: 1000, inputs: { start: false } }).vm.safe.stable, false);
-    assert.equal(runtime.step({ nowMs: 1001, inputs: { start: true } }).vm.safe.stable, false);
-    assert.equal(runtime.step({ nowMs: 2001, inputs: { start: true } }).vm.safe.stable, true);
+    assert.equal(runtime.step({ nowMs: 0, samples: good(0, { start: true }) }).vm.safe.stable, false);
+    assert.equal(runtime.step({ nowMs: 1000, samples: good(1000, { start: false }) }).vm.safe.stable, false);
+    assert.equal(runtime.step({ nowMs: 1001, samples: good(1001, { start: true }) }).vm.safe.stable, false);
+    assert.equal(runtime.step({ nowMs: 2001, samples: good(2001, { start: true }) }).vm.safe.stable, true);
   } finally { runtime.dispose(); }
 });
 
 test('Result debounce uses fresh physical sample identity, preserves faults, and resets on source epoch changes', async () => {
   const compiled = await compileSource(`control SampleDebounce {
-    sensor start: Bool { stale_after = 10s; }
+    input start: Bool { stale_after = 10s; }
     signal stable_start = debounce(start, stable_for: 2s, initial: false);
     output stable: Bool;
     stable <- stable_start |> recover(false);
@@ -108,7 +111,7 @@ test('debounce supports raw and Result finite enums with canonical ordered membe
   const raw = await compileSource(`control RawEnumDebounce {
     type Mode = Idle | Run;
     input request: Bool;
-    let observed = if request then Run else Idle;
+    let observed = if (request |> recover(false)) then Run else Idle;
     signal stable_mode = debounce(observed, stable_for: 1s, initial: Idle);
     output running: Bool;
     running <- stable_mode == Run;
@@ -117,15 +120,15 @@ test('debounce supports raw and Result finite enums with canonical ordered membe
   assert.equal(raw.manifest.signals[0].initial, 0);
   const rawRuntime = await ControlRuntime.instantiate(wasm, raw);
   try {
-    assert.equal(rawRuntime.step({ nowMs: 0, inputs: { request: true } }).vm.safe.running, false);
-    assert.equal(rawRuntime.step({ nowMs: 999, inputs: { request: true } }).vm.safe.running, false);
-    assert.equal(rawRuntime.step({ nowMs: 1000, inputs: { request: true } }).vm.safe.running, true);
+    assert.equal(rawRuntime.step({ nowMs: 0, samples: good(0, { request: true }) }).vm.safe.running, false);
+    assert.equal(rawRuntime.step({ nowMs: 999, samples: good(999, { request: true }) }).vm.safe.running, false);
+    assert.equal(rawRuntime.step({ nowMs: 1000, samples: good(1000, { request: true }) }).vm.safe.running, true);
   } finally { rawRuntime.dispose(); }
 
   const result = await compileSource(`fn mode(value: Bool) -> Mode { if value then Run else Idle }
   control ResultEnumDebounce {
     type Mode = Idle | Run;
-    sensor request: Bool { stale_after = 10s; }
+    input request: Bool { stale_after = 10s; }
     signal stable_mode = debounce(request |> map(mode), stable_for: 1s, initial: Idle);
     output running: Bool;
     running <- stable_mode |> map(mode_value) |> recover(false);
@@ -143,7 +146,7 @@ test('debounce supports raw and Result finite enums with canonical ordered membe
 
 test('forward debounce chains preserve physical lineage and cycles reject', async () => {
   const compiled = await compileSource(`control DebounceChain {
-    sensor request: Bool { stale_after = 10s; }
+    input request: Bool { stale_after = 10s; }
     signal twice = debounce(once, stable_for: 1s, initial: false);
     signal once = debounce(request, stable_for: 1s, initial: false);
     output stable: Bool;
@@ -177,7 +180,7 @@ test('forward debounce chains preserve physical lineage and cycles reject', asyn
 
 test('compiler-owned fault enums remain finite debounce payloads after explicit Result case extraction', async () => {
   const compiled = await compileSource(`control FaultEnumDebounce {
-    sensor request: Bool;
+    input request: Bool;
     let reason = case request { ok(_) => NotReady; fault(value) => value; };
     signal stable_reason = debounce(reason, stable_for: 1s, initial: NotReady);
     output disconnected: Bool;
@@ -191,7 +194,7 @@ test('compiler-owned fault enums remain finite debounce payloads after explicit 
 for (const [quality, choice] of [['Disconnected', 1], ['Stale', 2], ['Invalid', 3], ['NotReady', 4]]) {
   test(`debounce preserves ${quality} Result quality and provenance`, async () => {
     const compiled = await compileSource(`control DebounceFault {
-      sensor request: Bool;
+      input request: Bool;
       signal stable_request = debounce(request, stable_for: 1s, initial: false);
       output stable: Bool;
       stable <- stable_request |> recover(false);
@@ -208,7 +211,7 @@ for (const [quality, choice] of [['Disconnected', 1], ['Stale', 2], ['Invalid', 
 
 test('legacy and framed hosts produce the same debounce state and generated sample inputs', async () => {
   const compiled = await compileSource(`control DebounceParity {
-    sensor request: Bool { stale_after = 10s; }
+    input request: Bool { stale_after = 10s; }
     signal stable_request = debounce(request, stable_for: 1s, initial: false);
     output stable: Bool;
     stable <- stable_request |> recover(false);
@@ -235,9 +238,9 @@ test('legacy and framed hosts produce the same debounce state and generated samp
 test('switching physical Result roots resets continuity even without a fresh sample', async () => {
   const compiled = await compileSource(`control RootSwitchDebounce {
     input choose_a: Bool;
-    sensor source_a: Bool { stale_after = 10s; }
-    sensor source_b: Bool { stale_after = 10s; }
-    let selected = if choose_a then source_a else source_b;
+    input source_a: Bool { stale_after = 10s; }
+    input source_b: Bool { stale_after = 10s; }
+    let selected = if (choose_a |> recover(false)) then source_a else source_b;
     signal stable_selected = debounce(selected, stable_for: 1s, initial: false);
     output stable: Bool;
     stable <- stable_selected |> recover(false);
@@ -246,22 +249,22 @@ test('switching physical Result roots resets continuity even without a fresh sam
   const runtime = await ControlRuntime.instantiate(wasm, compiled);
   const sample = (id, timestampMs, value) => ({ epoch: 1, id, timestampMs, value, quality: 'Good' });
   try {
-    assert.equal(runtime.step({ nowMs: 0, inputs: { choose_a: false }, samples: {
+    assert.equal(runtime.step({ nowMs: 0, samples: { ...good(0, { choose_a: false }),
       source_a: sample(1, 0, false), source_b: sample(1, 0, true),
     } }).vm.safe.stable, false);
-    assert.equal(runtime.step({ nowMs: 500, inputs: { choose_a: true } }).vm.safe.stable, false);
-    assert.equal(runtime.step({ nowMs: 1000, inputs: { choose_a: false } }).vm.safe.stable, false, 'returning to the old root cannot reuse its candidate start');
-    assert.equal(runtime.step({ nowMs: 1500, inputs: { choose_a: false }, samples: { source_b: sample(2, 1500, true) } }).vm.safe.stable, false);
-    assert.equal(runtime.step({ nowMs: 2500, inputs: { choose_a: false }, samples: { source_b: sample(3, 2500, true) } }).vm.safe.stable, true);
+    assert.equal(runtime.step({ nowMs: 500, samples: good(500, { choose_a: true }) }).vm.safe.stable, false);
+    assert.equal(runtime.step({ nowMs: 1000, samples: good(1000, { choose_a: false }) }).vm.safe.stable, false, 'returning to the old root cannot reuse its candidate start');
+    assert.equal(runtime.step({ nowMs: 1500, samples: { ...good(1500, { choose_a: false }), source_b: sample(2, 1500, true) } }).vm.safe.stable, false);
+    assert.equal(runtime.step({ nowMs: 2500, samples: { ...good(2500, { choose_a: false }), source_b: sample(3, 2500, true) } }).vm.safe.stable, true);
   } finally { runtime.dispose(); }
 });
 
 test('all physical roots retain independent high-water identities across selection changes', async () => {
   const compiled = await compileSource(`control EpochZeroRoots {
     input choose_a: Bool;
-    sensor source_a: Bool { stale_after = 10s; }
-    sensor source_b: Bool { stale_after = 10s; }
-    let selected = if choose_a then source_a else source_b;
+    input source_a: Bool { stale_after = 10s; }
+    input source_b: Bool { stale_after = 10s; }
+    let selected = if (choose_a |> recover(false)) then source_a else source_b;
     signal stable_selected = debounce(selected, stable_for: 1s, initial: false);
     output stable: Bool;
     stable <- stable_selected |> recover(false);
@@ -269,32 +272,32 @@ test('all physical roots retain independent high-water identities across selecti
   const runtime = await ControlRuntime.instantiate(wasm, compiled);
   const sample = (id, timestampMs) => ({ epoch: 0, id, timestampMs, value: true, quality: 'Good' });
   try {
-    assert.equal(runtime.step({ nowMs: 0, inputs: { choose_a: true }, samples: {
+    assert.equal(runtime.step({ nowMs: 0, samples: { ...good(0, { choose_a: true }),
       source_a: sample(0, 0), source_b: sample(0, 0),
     } }).vm.safe.stable, false);
-    const selectedWithoutSample = runtime.step({ nowMs: 100, inputs: { choose_a: false } });
+    const selectedWithoutSample = runtime.step({ nowMs: 100, samples: good(100, { choose_a: false }) });
     assert.equal(selectedWithoutSample.vm.safe.stable, false);
     assert.equal(selectedWithoutSample.vm.stateAfter.__gf_debounce_last_source_tag_stable_selected,
       compiled.manifest.signals[0].sources.find(source => source.name === 'source_b').tag,
       'the selected root changes even when no new sample is present');
-    assert.equal(runtime.step({ nowMs: 200, inputs: { choose_a: false }, samples: { source_b: sample(0, 200) } }).vm.safe.stable, false);
-    assert.equal(runtime.step({ nowMs: 1200, inputs: { choose_a: false }, samples: { source_b: sample(1, 1200) } }).vm.safe.stable, false,
+    assert.equal(runtime.step({ nowMs: 200, samples: { ...good(200, { choose_a: false }), source_b: sample(0, 200) } }).vm.safe.stable, false);
+    assert.equal(runtime.step({ nowMs: 1200, samples: { ...good(1200, { choose_a: false }), source_b: sample(1, 1200) } }).vm.safe.stable, false,
       'the unselected B id-zero sample was already consumed into its own high-water state');
-    assert.equal(runtime.step({ nowMs: 2200, inputs: { choose_a: false }, samples: { source_b: sample(2, 2200) } }).vm.safe.stable, true);
-    assert.equal(runtime.step({ nowMs: 2300, inputs: { choose_a: true }, samples: { source_b: sample(3, 2300) } }).vm.safe.stable, false);
-    assert.equal(runtime.step({ nowMs: 2400, inputs: { choose_a: true }, samples: { source_a: sample(0, 2400) } }).vm.safe.stable, false,
+    assert.equal(runtime.step({ nowMs: 2200, samples: { ...good(2200, { choose_a: false }), source_b: sample(2, 2200) } }).vm.safe.stable, true);
+    assert.equal(runtime.step({ nowMs: 2300, samples: { ...good(2300, { choose_a: true }), source_b: sample(3, 2300) } }).vm.safe.stable, false);
+    assert.equal(runtime.step({ nowMs: 2400, samples: { ...good(2400, { choose_a: true }), source_a: sample(0, 2400) } }).vm.safe.stable, false,
       'switching back cannot reuse the old A id-zero identity');
-    assert.equal(runtime.step({ nowMs: 2500, inputs: { choose_a: true }, samples: { source_a: sample(1, 2500) } }).vm.safe.stable, false);
-    assert.equal(runtime.step({ nowMs: 3500, inputs: { choose_a: true }, samples: { source_a: sample(2, 3500) } }).vm.safe.stable, true);
+    assert.equal(runtime.step({ nowMs: 2500, samples: { ...good(2500, { choose_a: true }), source_a: sample(1, 2500) } }).vm.safe.stable, false);
+    assert.equal(runtime.step({ nowMs: 3500, samples: { ...good(3500, { choose_a: true }), source_a: sample(2, 3500) } }).vm.safe.stable, true);
   } finally { runtime.dispose(); }
 });
 
 test('an unselected root advances its high-water and later lower IDs cannot start continuity', async () => {
   const compiled = await compileSource(`control UnselectedHighWater {
     input choose_a: Bool;
-    sensor source_a: Bool { stale_after = 10s; }
-    sensor source_b: Bool { stale_after = 10s; }
-    let selected = if choose_a then source_a else source_b;
+    input source_a: Bool { stale_after = 10s; }
+    input source_b: Bool { stale_after = 10s; }
+    let selected = if (choose_a |> recover(false)) then source_a else source_b;
     signal stable_selected = debounce(selected, stable_for: 1s, initial: false);
     output stable: Bool;
     stable <- stable_selected |> recover(false);
@@ -303,42 +306,42 @@ test('an unselected root advances its high-water and later lower IDs cannot star
   const sample = (id, timestampMs, value = true) => ({ epoch: 1, id, timestampMs, value, quality: 'Good' });
   const sourceA = compiled.manifest.signals[0].sources.find(source => source.name === 'source_a');
   try {
-    runtime.step({ nowMs: 0, inputs: { choose_a: false }, samples: {
+    runtime.step({ nowMs: 0, samples: { ...good(0, { choose_a: false }),
       source_a: sample(1, 0), source_b: sample(1, 0, false),
     } });
-    const advanced = runtime.step({ nowMs: 100, inputs: { choose_a: false }, samples: { source_a: sample(10, 100) } });
+    const advanced = runtime.step({ nowMs: 100, samples: { ...good(100, { choose_a: false }), source_a: sample(10, 100) } });
     assert.equal(advanced.vm.stateAfter[sourceA.states.lastId], 10, 'unselected roots still commit authoritative high-water identity');
-    const older = runtime.step({ nowMs: 200, inputs: { choose_a: true }, samples: { source_a: sample(5, 200, false) } });
+    const older = runtime.step({ nowMs: 200, samples: { ...good(200, { choose_a: true }), source_a: sample(5, 200, false) } });
     assert.equal(older.vm.safe.stable, false);
     assert.equal(older.vm.stateAfter[sourceA.states.lastId], 10, 'a lower same-epoch ID is not fresh');
-    assert.equal(runtime.step({ nowMs: 300, inputs: { choose_a: true }, samples: { source_a: sample(11, 300) } }).vm.safe.stable, false);
-    assert.equal(runtime.step({ nowMs: 1300, inputs: { choose_a: true }, samples: { source_a: sample(12, 1300) } }).vm.safe.stable, true);
+    assert.equal(runtime.step({ nowMs: 300, samples: { ...good(300, { choose_a: true }), source_a: sample(11, 300) } }).vm.safe.stable, false);
+    assert.equal(runtime.step({ nowMs: 1300, samples: { ...good(1300, { choose_a: true }), source_a: sample(12, 1300) } }).vm.safe.stable, true);
   } finally { runtime.dispose(); }
 });
 
 test('a rejected VM tick rolls back conditioner identity and debounce high-water together', async () => {
   const compiled = await compileSource(`control RejectedPhysicalDebounce {
     input divisor: Number;
-    sensor request: Bool { stale_after = 10s; }
+    input request: Bool { stale_after = 10s; }
     signal stable_request = debounce(request, stable_for: 1s, initial: false);
     output stable: Bool;
     output quotient: Number;
     stable <- stable_request |> recover(false);
-    quotient <- 1.0 / divisor;
+    quotient <- 1.0 / (divisor |> recover(0.0));
   }`, { filename: 'rejected-physical-debounce.ghost' });
   const runtime = await ControlRuntime.instantiate(wasm, compiled);
   const sample = (id, timestampMs, value) => ({ epoch: 1, id, timestampMs, value, quality: 'Good' });
   const source = compiled.manifest.signals[0].sources[0];
   try {
-    runtime.step({ nowMs: 0, inputs: { divisor: 1 }, samples: { request: sample(1, 0, false) } });
-    assert.throws(() => runtime.step({ nowMs: 100, inputs: { divisor: 0 }, samples: { request: sample(10, 100, true) } }), /division by zero|division-by-zero/);
+    runtime.step({ nowMs: 0, samples: { ...good(0, { divisor: 1 }), request: sample(1, 0, false) } });
+    assert.throws(() => runtime.step({ nowMs: 100, samples: { ...good(100, { divisor: 0 }), request: sample(10, 100, true) } }), /division by zero|division-by-zero/);
     assert.equal(runtime.runtime.trace.stateAfter[source.states.lastId], 1, 'the rejected core tick does not commit debounce high-water state');
     assert.deepEqual(runtime.sensors.get('request').conditioner.sampleIdentity(), { epoch: 1, id: 1, timestampMs: 0 });
-    const retry = runtime.step({ nowMs: 200, inputs: { divisor: 1 }, samples: { request: sample(5, 200, false) } });
+    const retry = runtime.step({ nowMs: 200, samples: { ...good(200, { divisor: 1 }), request: sample(5, 200, false) } });
     assert.equal(retry.vm.stateAfter[source.states.lastId], 5);
     assert.equal(retry.vm.stateAfter.__gf_debounce_candidate_stable_request, false);
-    assert.equal(runtime.step({ nowMs: 1100, inputs: { divisor: 1 }, samples: { request: sample(11, 1100, true) } }).vm.safe.stable, false);
-    assert.equal(runtime.step({ nowMs: 2100, inputs: { divisor: 1 }, samples: { request: sample(12, 2100, true) } }).vm.safe.stable, true);
+    assert.equal(runtime.step({ nowMs: 1100, samples: { ...good(1100, { divisor: 1 }), request: sample(11, 1100, true) } }).vm.safe.stable, false);
+    assert.equal(runtime.step({ nowMs: 2100, samples: { ...good(2100, { divisor: 1 }), request: sample(12, 2100, true) } }).vm.safe.stable, true);
   } finally { runtime.dispose(); }
 });
 
@@ -346,19 +349,19 @@ test('a rejected scan does not commit raw debounce candidate state', async () =>
   const compiled = await compileSource(`control AtomicDebounce {
     input request: Bool;
     input divisor: Number;
-    signal stable_request = debounce(request, stable_for: 1s, initial: false);
+    signal stable_request = debounce(request |> recover(false), stable_for: 1s, initial: false);
     output stable: Bool;
     output quotient: Number;
     stable <- stable_request;
-    quotient <- 1.0 / divisor;
+    quotient <- 1.0 / (divisor |> recover(0.0));
   }`, { filename: 'atomic-debounce.ghost' });
   const runtime = await ControlRuntime.instantiate(wasm, compiled);
   try {
-    runtime.step({ nowMs: 0, inputs: { request: false, divisor: 1 } });
-    assert.throws(() => runtime.step({ nowMs: 100, inputs: { request: true, divisor: 0 } }), /division by zero|division-by-zero/);
+    runtime.step({ nowMs: 0, samples: good(0, { request: false, divisor: 1 }) });
+    assert.throws(() => runtime.step({ nowMs: 100, samples: good(100, { request: true, divisor: 0 }) }), /division by zero|division-by-zero/);
     assert.equal(runtime.runtime.trace.stateAfter.__gf_debounce_candidate_active_stable_request, false);
-    assert.equal(runtime.step({ nowMs: 1100, inputs: { request: true, divisor: 1 } }).vm.safe.stable, false);
-    assert.equal(runtime.step({ nowMs: 2100, inputs: { request: true, divisor: 1 } }).vm.safe.stable, true);
+    assert.equal(runtime.step({ nowMs: 1100, samples: good(1100, { request: true, divisor: 1 }) }).vm.safe.stable, false);
+    assert.equal(runtime.step({ nowMs: 2100, samples: good(2100, { request: true, divisor: 1 }) }).vm.safe.stable, true);
   } finally { runtime.dispose(); }
 });
 
@@ -375,7 +378,7 @@ for (const [label, source, message] of [
 
 test('hosts strictly reject incomplete or forged debounce manifest metadata', async () => {
   const compiled = await compileSource(`control DebounceManifest {
-    sensor request: Bool;
+    input request: Bool;
     signal stable_request = debounce(request, stable_for: 1s, initial: false);
     output stable: Bool;
     stable <- stable_request |> recover(false);

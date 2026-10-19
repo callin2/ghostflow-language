@@ -78,6 +78,34 @@ test('pinned GFB10 package requires target bytecode acceptance', async () => {
   assert.equal(loaderCalls, 1);
 });
 
+test('re-signed historical GFB10 rejects new sensor instance provenance before the target loader', async () => {
+  const { key, packageValue, options } = await signedPeriodicPackage();
+  const predecessor = structuredClone(packageValue);
+  let loaderCalls = 0;
+  const verification = { ...options, verifyBytecode: async () => { loaderCalls++; return true; } };
+  await verifyPortablePackage(packageValue, verification);
+  assert.equal(loaderCalls, 1, 'the unchanged genuine predecessor remains accepted');
+
+  for (const instances of [[], [{ name: 'unrelated', provenance: 'not-in-signed-source' }]]) {
+    const changed = structuredClone(packageValue);
+    const manifest = JSON.parse(Buffer.from(changed.payload.manifest.contentBase64, 'base64').toString('utf8'));
+    manifest.sensorInstances = instances;
+    const bytes = encoder.encode(canonicalJson(manifest));
+    changed.payload.manifest.contentBase64 = Buffer.from(bytes).toString('base64');
+    changed.payload.manifest.sha256 = await digest(bytes);
+    await resign(changed, key);
+
+    assert.deepEqual(changed.payload.bytecode, predecessor.payload.bytecode);
+    assert.deepEqual(changed.payload.source, predecessor.payload.source);
+    assert.deepEqual(changed.payload.sourceMap, predecessor.payload.sourceMap);
+    await assert.rejects(() => verifyPortablePackage(changed, verification), error =>
+      error instanceof PortablePackageError && error.code === 'manifest-mismatch'
+        && /historical GFB10 profile does not support sensorInstances/.test(error.message));
+    assert.equal(loaderCalls, 1, 'new descriptors reject before bytecode verification');
+  }
+  assert.deepEqual(packageValue, predecessor, 'the pinned predecessor is not migrated or overwritten');
+});
+
 test('portable package descriptors continue to reject reserved GFB5 through GFB9', async () => {
   const { key, packageValue, options } = await signedPeriodicPackage();
   for (const version of ['5', '6', '7', '8', '9']) {

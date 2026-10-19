@@ -22,7 +22,7 @@ const { ControlRuntime: LegacyControlRuntime } = await import(`data:text/javascr
 
 test('T01 compatibility: old consumer rejects continuous descriptors before either VM is created', async t => {
   const artifact = await compileSource(`control UnsupportedContinuous {
-    input hot: Bool;
+    state hot: Bool = false;
     timer hot_for = continuous_true(hot);
     output ready: Bool;
     ready <- hot_for >= 1ms;
@@ -44,10 +44,10 @@ test('T01 compatibility: old consumer rejects continuous descriptors before eith
 
 test('T01 compatibility: old and new consumers execute the unchanged legacy elapsed descriptor', async t => {
   const artifact = await compileSource(`control SupportedElapsed {
-    input hot: Bool;
+    state hot: Bool = false;
     state phase: Bool = false;
     timer age = elapsed(phase);
-    phase' = hot;
+    phase' = age < 10ms;
     output ready: Bool;
     ready <- age >= 8ms;
     output age_ms: Duration;
@@ -61,7 +61,7 @@ test('T01 compatibility: old and new consumers execute the unchanged legacy elap
     const runtime = await consumer.instantiate(wasm, artifact);
     t.after(() => runtime.dispose());
     const observed = [[0, true], [5, true], [10, false], [20, false]].map(([nowMs, hot]) => {
-      const { vm } = runtime.step({ nowMs, inputs: { hot } });
+      const { vm } = runtime.step({ nowMs });
       return { age: vm.safe.age_ms, ready: vm.safe.ready };
     });
     assert.deepEqual(observed, expected);

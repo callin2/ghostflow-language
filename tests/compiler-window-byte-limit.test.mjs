@@ -10,7 +10,7 @@ const source = count => `# Audit
 fn twice(x: Number) -> Number { x + x }
 fn huge(x: Number) -> Number { ${nested(count)} }
 control Audit {
-  sensor s: Number;
+  input s: Number;
   signal inner = window_average(s, over: 1s, quality: measured, max_age: 1s);
   signal outer = window_average(inner |> map(huge), over: 1s, quality: measured, max_age: 1s);
 }

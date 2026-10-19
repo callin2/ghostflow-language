@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { softwareQualityObservations } from './helpers/software-quality-observations.mjs';
 import { compileSource } from '../tools/compile-source.mjs';
 import { sha256Hex } from '../tools/sha256.mjs';
 import fs from 'node:fs';
@@ -13,15 +14,15 @@ import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 import { FramedGhostFlowRuntime } from '../runtimes/wasm/framed-runtime.mjs';
 
 const doc = code => `# Original intent\n\n\`\`\`ghost\n${code}\n\`\`\`\n`;
-const relay = doc('control Relay { input start: Bool; output pump: Bool; pump <- start; }');
-const pin = (text = relay) => `import Relay from "./relay.ghost.md" revision "r1" sha256 "${sha256Hex(text)}";`;
+const relay = doc('control Relay { input start: Bool; output pump: Bool; pump <- start |> recover(false); }');
+const pin = (text = relay) => `import Relay from "./relay.ghost.md" revision "input-v2" sha256 "${sha256Hex(text)}";`;
 const root = body => doc(`${pin()} control Farm { input start: Bool; output pump: Bool; ${body} }`);
-const closure = [{ filename: 'relay.ghost.md', revision: 'r1', text: relay }];
+const closure = [{ filename: 'relay.ghost.md', revision: 'input-v2', text: relay }];
 const nativePath = fileURLToPath(new URL('../target/release/examples/scan_tape' + (process.platform === 'win32' ? '.exe' : ''), import.meta.url));
 
 test('REF-00-010: one sensor edge changes only instance A and retains definition and binding provenance on native and WASM', async t => {
   const counter = doc(`control Counter {
-  sensor detected: Number { sample = 1s; filter = median(1); stale_after = 3s; recover_after = 1 samples; }
+  input detected: Number { sample = 1s; filter = median(1); stale_after = 3s; recover_after = 1 samples; }
   let high = case detected { ok(value) => value > 0; fault(_) => false; };
   state was_high: Bool = false;
   state count: Int = 0;
@@ -31,10 +32,10 @@ test('REF-00-010: one sensor edge changes only instance A and retains definition
   total <- count';
 }`);
   const definitionSha = sha256Hex(counter);
-  const source = doc(`import Counter from "./counter.ghost.md" revision "counter-r1" sha256 "${definitionSha}";
+  const source = doc(`import Counter from "./counter.ghost.md" revision "counter-input-v2" sha256 "${definitionSha}";
 control CounterPair {
-  sensor sensor_a: Number { sample = 1s; }
-  sensor sensor_b: Number { sample = 1s; }
+  input sensor_a: Number { sample = 1s; }
+  input sensor_b: Number { sample = 1s; }
   output a, b: Int;
   instance A: Counter;
   instance B: Counter;
@@ -44,12 +45,12 @@ control CounterPair {
   connect b <- B.total;
 }`);
   const artifact = await compileSource(source, { filename: 'counter-pair.ghost.md',
-    sourceClosure: [{ filename: 'counter.ghost.md', revision: 'counter-r1', text: counter }] });
+    sourceClosure: [{ filename: 'counter.ghost.md', revision: 'counter-input-v2', text: counter }] });
   assert.deepEqual(artifact.sourceClosure.instances, [
     { instance: 'A', filename: 'counter.ghost.md', definition: 'Counter' },
     { instance: 'B', filename: 'counter.ghost.md', definition: 'Counter' },
   ]);
-  assert.deepEqual(artifact.sourceClosure.documents, [{ filename: 'counter.ghost.md', revision: 'counter-r1', text: counter, sha256: definitionSha }]);
+  assert.deepEqual(artifact.sourceClosure.documents, [{ filename: 'counter.ghost.md', revision: 'counter-input-v2', text: counter, sha256: definitionSha }]);
   assert.deepEqual(artifact.manifest.sensorInstances.map(({ instance, port, sourceSensor }) => ({ instance, port, sourceSensor })), [
     { instance: 'A', port: 'detected', sourceSensor: 'sensor_a' },
     { instance: 'B', port: 'detected', sourceSensor: 'sensor_b' },
@@ -123,22 +124,34 @@ control CounterPair {
 test('public compiler executes pinned Relay connections with exact source closure', async () => {
   const source = root('instance east: Relay; connect east.start <- start; connect pump <- east.pump;');
   const actual = await compileSource(source, { filename: 'farm.ghost.md', sourceClosure: closure });
-  const expected = await compileSource(doc('control Farm { input start: Bool; output pump: Bool; pump <- start; }'), { filename: 'farm.ghost.md' });
-  assert.deepEqual(actual.bytes, expected.bytes);
+  const expected = await compileSource(doc('control Farm { input start: Bool; output pump: Bool; pump <- start |> recover(false); }'), { filename: 'farm.ghost.md' });
+  assert.notDeepEqual(actual.bytes, expected.bytes, 'instance inputs retain private acquisition rails');
+  const canonicalReplay = await compileSource(source, { filename: 'farm.ghost.md', sourceClosure: closure });
+  assert.deepEqual(canonicalReplay.bytes, actual.bytes, 'the explicit new source revision recompiles exactly');
+  const wasm = fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
+  const runtimes = await Promise.all([actual, expected].map(artifact => ControlRuntime.instantiateFramed(wasm, artifact)));
+  try {
+    for (const [id, [quality, value]] of [['Good', false], ['Good', true], ['NotReady', false], ['Disconnected', false], ['Stale', false], ['Invalid', false]].entries()) {
+      const frame = { nowMs: id, samples: { start: { epoch: 1, id, timestampMs: id, quality, value } } };
+      const [composed, direct] = runtimes.map(runtime => runtime.step(frame));
+      assert.deepEqual(composed.vm.requested, direct.vm.requested);
+      assert.deepEqual(composed.vm.safe, direct.vm.safe);
+    }
+  } finally { runtimes.forEach(runtime => runtime.dispose()); }
   assert.equal(actual.sourceDocument.text, source);
   assert.equal(actual.sourceClosure.documents[0].text, relay);
   assert.ok(actual.sourceMap.some(node => node.filename === 'relay.ghost.md' && node.instance === 'east'));
 });
 
 const compileChild = (child, body) => compileSource(doc(`${pin(child)} control Farm { ${body} }`), {
-  filename: 'farm.ghost.md', sourceClosure: [{ filename: 'relay.ghost.md', revision: 'r1', text: child }],
+  filename: 'farm.ghost.md', sourceClosure: [{ filename: 'relay.ghost.md', revision: 'input-v2', text: child }],
 });
 for (const [label, childBody, rootBody, reason] of [
-  ['missing required input', 'input start: Bool; output pump: Bool; pump <- start;', 'output pump: Bool; instance east: Relay; connect pump <- east.pump;', /missing required input east.start/],
-  ['port direction', 'input start: Bool; output pump: Bool; pump <- start;', 'input start: Bool; instance east: Relay; connect east.pump <- start;', /unknown input port east.pump/],
+  ['missing required input', 'input start: Bool; output pump: Bool; pump <- start |> recover(false);', 'output pump: Bool; instance east: Relay; connect pump <- east.pump;', /missing required input east.start/],
+  ['port direction', 'input start: Bool; output pump: Bool; pump <- start |> recover(false);', 'input start: Bool; instance east: Relay; connect east.pump <- start;', /unknown input port east.pump/],
   ['port type', 'input start: Int; output pump: Bool; pump <- true;', 'input start: Bool; instance east: Relay; connect east.start <- start;', /port type mismatch/],
   ['unused output expression type', 'output pump: Bool; pump <- 1;', 'instance east: Relay;', /output.*type|composition output.*type/],
-  ['port cycle', 'input start: Bool; output pump: Bool; pump <- start;', 'instance east: Relay; connect east.start <- east.pump;', /combinational port cycle/],
+  ['combinational self-cycle', 'input start: Bool; output pump: Bool; pump <- start |> recover(false);', 'instance east: Relay; connect east.start <- east.pump;', /combinational port cycle/],
   ['unknown argument', 'output pump: Bool; pump <- true;', 'instance east: Relay(missing = true);', /unknown instance argument missing/],
   ['nonconstant argument', 'parameter enabled: Bool = true; output pump: Bool; pump <- enabled;', 'input start: Bool; instance east: Relay(enabled = start);', /parameter default.*constant/],
 ]) test(`composition rejects ${label}`, async () => {
@@ -162,10 +175,10 @@ test('persisted artifact verifies the full imported text and instance provenance
 });
 
 test('two instances retain independent state in the Rust runtime', async t => {
-  const child = doc("control Relay { input start: Bool; output pump: Bool; state held: Bool = false; held' = held || start; pump <- held'; }");
+  const child = doc("control Relay { input start: Bool; output pump: Bool; state held: Bool = false; held' = case start { ok(value) => held || value; fault(_) => held; }; pump <- held'; }");
   const actual = await compileChild(child, 'input a, b: Bool; output x, y: Bool; instance east: Relay; instance west: Relay; connect east.start <- a; connect west.start <- b; connect x <- east.pump; connect y <- west.pump;');
   const wasm = fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
-  const runtime = await ControlRuntime.instantiate(wasm, actual);
+  const runtime = softwareQualityObservations(await ControlRuntime.instantiate(wasm, actual));
   t.after(() => runtime.dispose());
   assert.deepEqual(runtime.step({ nowMs: 0, inputs: { a: true, b: false } }).vm.safe, { x: true, y: false });
   assert.deepEqual(runtime.step({ nowMs: 1, inputs: { a: false, b: true } }).vm.safe, { x: true, y: true });
@@ -173,8 +186,8 @@ test('two instances retain independent state in the Rust runtime', async t => {
 
 test('transitive closure resolves relative documents and validates every pin', async () => {
   const wrapper = doc(`${pin()} control Wrapper { input start: Bool; output pump: Bool; instance inner: Relay; connect inner.start <- start; connect pump <- inner.pump; }`);
-  const source = doc(`import Wrapper from "./lib/wrapper.ghost.md" revision "w1" sha256 "${sha256Hex(wrapper)}"; control Farm { input start: Bool; output pump: Bool; instance outer: Wrapper; connect outer.start <- start; connect pump <- outer.pump; }`);
-  const documents = [{ filename: 'lib/wrapper.ghost.md', revision: 'w1', text: wrapper }, { ...closure[0], filename: 'lib/relay.ghost.md' }];
+  const source = doc(`import Wrapper from "./lib/wrapper.ghost.md" revision "wrapper-input-v2" sha256 "${sha256Hex(wrapper)}"; control Farm { input start: Bool; output pump: Bool; instance outer: Wrapper; connect outer.start <- start; connect pump <- outer.pump; }`);
+  const documents = [{ filename: 'lib/wrapper.ghost.md', revision: 'wrapper-input-v2', text: wrapper }, { ...closure[0], filename: 'lib/relay.ghost.md' }];
   const copy = structuredClone(documents);
   const actual = await compileSource(source, { filename: 'farm.ghost.md', sourceClosure: documents });
   assert.deepEqual(documents, copy);
@@ -184,24 +197,24 @@ test('transitive closure resolves relative documents and validates every pin', a
   await assert.rejects(() => compileSource(source, { filename: 'farm.ghost.md', sourceClosure: [documents[0], { ...documents[1], revision: 'wrong' }] }), /revision mismatch/);
 });
 
-test('cross-instance next-state feedback is rejected', async () => {
-  const child = doc("control Relay { input start: Bool; output pump: Bool; state held: Bool = false; held' = start; pump <- held'; }");
-  await assert.rejects(() => compileChild(child, 'input start: Bool; instance east: Relay; instance west: Relay; connect east.start <- start; connect west.start <- east.pump;'), /next state|next-state/);
+test('cross-instance next-state outputs cannot feed same-scan state transitions', async () => {
+  const child = doc("control Relay { input start: Bool; output pump: Bool; state held: Bool = false; held' = case start { ok(value) => value; fault(_) => held; }; pump <- held'; }");
+  await assert.rejects(() => compileChild(child, 'input start: Bool; instance east: Relay; instance west: Relay; connect east.start <- start; connect west.start <- east.pump;'), /next state references are allowed only in output expressions/);
 });
 
 const sensorChild = (filter = 'median(1)', recovery = 1) => doc(`
 fn adjust(air: Number) -> Number { air + 1 }
 control Child {
- sensor air: Number { sample = 1s; filter = ${filter}; stale_after = 3s; recover_after = ${recovery} samples; }
+ input air: Number { sample = 1s; filter = ${filter}; stale_after = 3s; recover_after = ${recovery} samples; }
  output value: Number; output valid: Bool;
  value <- case air { ok(value) => adjust(value); fault(_) => 0; };
  valid <- case air { ok(_) => true; fault(_) => false; };
 }`);
 async function sensorComposition(a = sensorChild(), b = sensorChild('median(3)'), optional = false) {
- const documents = [a, b].map((text, i) => ({ filename: `${i}.ghost.md`, revision: 'r1', text }));
- const headers = documents.map((d, i) => `import Child${i} from "./${d.filename}" revision "r1" sha256 "${sha256Hex(d.text)}";`).join('\n');
+ const documents = [a, b].map((text, i) => ({ filename: `${i}.ghost.md`, revision: 'input-v2', text }));
+ const headers = documents.map((d, i) => `import Child${i} from "./${d.filename}" revision "input-v2" sha256 "${sha256Hex(d.text)}";`).join('\n');
  const source = doc(`${headers} control Farm {
- sensor air${optional ? '?' : ''}: Number { sample = 1s; }
+ input air${optional ? '?' : ''}: Number { sample = 1s; }
  output a, b: Number; output a_valid, b_valid: Bool;
  instance first: Child0; instance second: Child1;
  connect first.air <- air; connect second.air <- air;
@@ -243,10 +256,10 @@ test('sensor composition rejects missing, duplicate, scalar, type and sample-con
  for (const [text, reason] of [
   [source.replace('connect first.air <- air;', ''), /missing required input first.air/],
   [source.replace('connect first.air <- air;', 'connect first.air <- air; connect first.air <- air;'), /duplicate supplier/],
-  [source.replace('sensor air: Number { sample = 1s; }', 'input air: Number;'), /sensor connection requires/],
-  [source.replace('sensor air: Number', 'sensor air: Temperature'), /port type mismatch/],
+  [source.replace('input air: Number { sample = 1s; }', 'let air: Number = 0.0;'), /connect source must be a root input, root sensor or instance output/],
+  [source.replace('input air: Number', 'input air: Temperature'), /port type mismatch/],
   [source.replace('sample = 1s;', 'sample = 2s;'), /sensor sample contract mismatch/],
-  [source.replace('sensor air:', 'sensor air?:'), /sensor sample contract mismatch/],
+  [source.replace('input air:', 'input air?:'), /sensor sample contract mismatch/],
  ]) await assert.rejects(() => compile(text), reason);
  const equivalentInterval = await compile(source.replace('sample = 1s;', 'sample = 1000ms;'));
  assert.equal(equivalentInterval.manifest.sensors[0].sampleMs, 1000);
@@ -300,7 +313,7 @@ test('composed conditioned frames have identical native and WASM VM outcomes', a
 test('private optional sensor capabilities inherit installed root presence without exposing private ports', async t => {
  // Optional reads still require an adapt strategy, which composition deliberately
  // does not support. Constant outputs isolate the host capability inheritance.
- const child = sensorChild().replace('sensor air:', 'sensor air?:')
+ const child = sensorChild().replace('input air:', 'input air?:')
   .replace('case air { ok(value) => adjust(value); fault(_) => 0; }', '0')
   .replace('case air { ok(_) => true; fault(_) => false; }', 'false');
  const { artifact } = await sensorComposition(child, child, true);

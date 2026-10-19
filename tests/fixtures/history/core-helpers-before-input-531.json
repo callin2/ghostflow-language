@@ -1,0 +1,19 @@
+{
+  "format": "GhostFlow/historical-source-excerpts-v1",
+  "revision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773",
+  "purpose": "Pre-canonical-input core test acquisition helpers only; non-executable history. Current helpers retain explicit healthy input values via generated quality rails.",
+  "excerpts": [
+    {
+      "path": "crates/ghostflow-core/src/lib.rs",
+      "function": "submit",
+      "text": "    fn submit(r: &mut Runtime, a: bool, b: bool, c: bool, d: f64) {\n        r.set_input(\"start\", Value::Bool(a)).unwrap();\n        r.set_input(\"stop\", Value::Bool(b)).unwrap();\n        r.set_input(\"low_water\", Value::Bool(c)).unwrap();\n        r.set_input(\"moisture\", Value::Number(d)).unwrap();\n    }\n",
+      "sha256": "a5ea816168540db21144796cb9c2baea22cdcb7fc94869019657e9b6925113d8"
+    },
+    {
+      "path": "crates/ghostflow-core/src/scan.rs",
+      "function": "frame",
+      "text": "    fn frame(scan_id: u64, time: u64) -> ScanFrameV1 {\n        ScanFrameV1 {\n            scan_id,\n            logical_time_ms: time,\n            inputs: vec![\n                ScanInput {\n                    name: \"start\".into(),\n                    value: Value::Bool(true),\n                },\n                ScanInput {\n                    name: \"stop\".into(),\n                    value: Value::Bool(false),\n                },\n                ScanInput {\n                    name: \"low_water\".into(),\n                    value: Value::Bool(false),\n                },\n                ScanInput {\n                    name: \"moisture\".into(),\n                    value: Value::Number(90.0),\n                },\n            ],\n        }\n    }\n\n",
+      "sha256": "b13e39f3a61f2f8d18612ec25592fef6a39901fa80700aed3f250a39525214b9"
+    }
+  ]
+}

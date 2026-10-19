@@ -12,7 +12,7 @@ This complete document is the authoritative control source.
 
 \`\`\`ghost
 control SignedNestedWindows {
-  sensor reading: Number;
+  input reading: Number;
   signal inner = window_average(reading, over: 2ms, quality: measured, max_age: 2ms);
   signal outer = window_max(inner, over: 10ms, quality: measured, max_age: 10ms);
   output maximum: Number;

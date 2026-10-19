@@ -3,5 +3,5 @@ operation: compile
 source:
   path: build/authoring/pump.ghost.md
   documentId: GF-EXAMPLE-PUMP
-  revisionId: rev-2
+  revisionId: rev-2-input-v1
 artifactPath: build/authoring/pump.gfb

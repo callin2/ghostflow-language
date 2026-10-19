@@ -20,7 +20,10 @@ PC-08/PC-10에서 다시
 결합한다. `fill_pump`는 펌프가 실제로 돌았다는 피드백이 아니라 충전 접촉기에
 보낼 논리 명령이다.
 
+이 명시적 input revision은 생산자 품질을 사용하며 버튼의 물리적 고장을 추론하지 않는다. Good(false)는 정상 관측이다. 미상 요청·위치·모드 관측으로 새 요청, 요청 해제, 위치 또는 모드를 확정하지 않으며 전이를 뒷받침하는 관측이 없으면 기존 상태를 유지한다. 기존 보호 허가는 확인된 Good(true)를 요구하며 기존 하드 시간 제한은 계속 적용된다. 새 START 입력이나 전역 재시작 정책은 추가하지 않는다.
+
 ```ghost
+// Source revision: issue531-producer-quality-pc07-v1
 control TankLevelHysteresis {
   input low_level_reached, high_level_reached: Bool;
   output fill_pump: Bool;
@@ -29,17 +32,23 @@ control TankLevelHysteresis {
   // ghostflow:link id=GF-INT-PC07-TANK-HYSTERESIS-V1 relation=implements
   state phase: Phase = Idle;
 
-  let conflict = high_level_reached && !low_level_reached;
+  let low_level_reached_true = case low_level_reached { ok(value) => value; fault(_) => false; };
+  let low_level_reached_false = case low_level_reached { ok(value) => !value; fault(_) => false; };
+  let high_level_reached_true = case high_level_reached { ok(value) => value; fault(_) => false; };
+  let high_level_reached_false = case high_level_reached { ok(value) => !value; fault(_) => false; };
+  let levels_good = case low_level_reached { ok(_) => case high_level_reached { ok(_) => true; fault(_) => false; }; fault(_) => false; };
 
-  phase' = case phase {
+  let conflict = high_level_reached_true && low_level_reached_false;
+
+  phase' = if !levels_good then phase else case phase {
     Idle =>
       if conflict then SensorConflict
-      else if !low_level_reached then Filling
+      else if low_level_reached_false then Filling
       else Idle;
 
     Filling =>
       if conflict then SensorConflict
-      else if high_level_reached then Idle
+      else if high_level_reached_true then Idle
       else Filling;
 
     SensorConflict =>

@@ -18,7 +18,7 @@ GhostFlow 제어/출력 수명 주기, 시뮬레이터 동작, Device 출력 실
 ## 경계
 
 - API 호스트는 LLM 요청, 설치 맥락, 대화 기록, 소스 리비전 저장, 배포 오케스트레이션을 소유합니다. LLM은 완전한 GhostFlow 후보를 작성합니다. 이 컴파일러는 LLM이나 API 서비스 없이 후보를 검증합니다.
-- Device 저장소는 펌웨어, 보드 프로파일, 핀 매핑, 드라이버, 감시 타이머, 시계, 물리 I/O를 소유합니다. 명시된 리비전의 이식 가능한 코어를 사용하세요. 이 저장소의 변경이 Device 릴리스나 하드웨어 검증을 뜻하지는 않습니다.
+- Device 저장소는 펌웨어, 보드 프로파일, 핀 매핑, driver/renderer 통합, 감시 타이머, 시계, 물리 I/O를 소유합니다. 명시된 리비전의 이식 가능한 코어를 사용하세요. 이 저장소의 변경이 Device 릴리스나 하드웨어 검증을 뜻하지는 않습니다. 입력 driver와 출력 renderer 소스는 `farm-device-drivers`에 속합니다. Renderer는 논리 출력을 릴레이, 모터, 램프 또는 화면에 적용하고 캐비닛 UI는 `@ghostflow/cabinet-view`입니다. Device는 host/board 통합을 소유합니다.
 - 프런트엔드는 농가 사용자 상호작용과 시각화를 소유합니다. 설치 라벨, 기능, 바인딩은 외부 맥락입니다. 실행 규칙은 별도의 JSON 프로그램이 아니라 버전 관리되는 GhostFlow 소스와 컴파일 아티팩트에 둡니다.
 - `runtimes/wasm`과 `runtimes/node/ledger.mjs`는 참조 어댑터입니다. 매니페스트를 검증하고 생성 입력을 공급하며 발생 시점과 지속성을 처리할 수 있습니다. 표현식/상태/의도 실행은 공유 Rust 코어에 둡니다.
 
@@ -42,3 +42,26 @@ GhostFlow 제어/출력 수명 주기, 시뮬레이터 동작, Device 출력 실
 - 호환성은 현재의 구체적인 사용자, 데이터 또는 배포 요구가 명시적으로 승인된 경우에만 추가하세요. 과거 원자료는 실행 가능한 대체 경로가 아니라 명확히 격리된 증거로 보관할 수 있습니다.
 
 마이그레이션 내보내기는 컴파일러/런타임 의미를 보존합니다. 형식 또는 ABI 변경에는 명시적인 호환성 결정과 적합성 테스트가 필요합니다. 패키지 버전, 소스 언어 프로파일, GFB1 형식, 매니페스트 형식, Device 펌웨어 버전은 서로 다른 식별자입니다. `docs/IMPLEMENTATION.md`와 `docs/VERIFICATION.md`를 참조하세요.
+## 자동 build identity — System #199
+
+`npm run build:wasm`, `make wasm`, `npm test`와 직접 verifier 호출은
+`scripts/vendor/BUILD-IDENTITY.json`에 고정한 System 도구의 정확한 bytes로
+온라인 번호를 할당한다. 현재 모든 Cargo crate의 base version은 0.1.0이다.
+Hook은 할당 전에 이 일치를 검사한다. 향후 서로 다른 version은 명시적인
+artifact별 base-version 계약이 필요하다. 수동 번호 선택과 내부 guard 우회는 금지한다.
+Raw Cargo는 dependency/개발용 compilation이며 official identified handoff가 아니다.
+
+생성된 `build/build-identity.json`은 실제 output SHA-256과 full human build
+version을 결속한다. Full verification은 native/framed output hash를 포함하고
+report에 같은 identity를 기록한다. CI packaging은 actual WASM SHA/source를
+검사하고 handoff manifest에 같은 identity를 넣는다. Runtime ABI/export는
+변경하지 않는다. Hook이 없던 historical pinned source에 ID를 소급하지 않는다.
+실패한 rebuild는 compiler 전에 이전 identity를 무효화하고 번호를 소모한다.
+Metadata-only remote `build-counter` branch는 cleanup에서 제외한다.
+Offline/read-only authority는 compilation 전에 실패한다. Counter를 추측/reset하지 않는다.
+
+`npm run test:build-identity`는 local bare authority와 synthetic compiler로
+identity propagation, failure burning과 내부 guard를 검사한다. Real WASM
+compilation 증거는 기존 full CI compiler/packaging gate가 제공한다.
+Canonical allocator owner는 [System #199](https://github.com/callin2/farm_studio_system/issues/199)이다.
+Vendored bytes/checksum을 보존한다. Source SHA는 committed HEAD만 식별한다.

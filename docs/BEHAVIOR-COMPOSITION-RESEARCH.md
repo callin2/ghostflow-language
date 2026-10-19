@@ -22,7 +22,7 @@ change normative language documents or claim implementation or verification.
   existing station single-writer resource manager: station requests are not
   competing direct writes. Physical endpoint alias checks remain a separate
   binding validation.
-- **Existing Driver boundary:** GhostFlow defines typed Sources and Intents.
+- **Existing input-driver/output-renderer boundary:** GhostFlow defines typed Sources and Intents.
   Driver backing may be software, specialized hardware, or both. Precision
   measurement/protocol/raw-ISR versus scan handling belongs at that boundary;
   meaningful typed events or measurements enter core logic without farm policy
@@ -245,7 +245,7 @@ records. Signing machinery should not be reimplemented by composition.
 
 A farmer-facing statement and an engineer's detailed view must reference the same
 incident and exact execution context. Keep requested output, resolved safe output,
-host/driver application, and available physical feedback distinct.
+host/renderer application, and available physical feedback distinct.
 
 For the low-water example, report that the low-water signal blocked watering.
 Do not turn that signal into an unsupported claim that the tank is physically empty.
@@ -325,7 +325,7 @@ These are proposed test or walkthrough specifications, not executed results.
 | Define two competing direct writers for one output channel | Compile reject; no deployable artifact. This does not reject explicit station requests arbitrated by the existing single-writer manager. |
 | Wrong port type, missing dependency, or unknown suitability | Specific error/unknown result; no successful deployment claim. |
 | Low-water blocks watering | Farmer explanation links to exact input, rule, requested/safe output, and run. |
-| Driver application fails or feedback is absent | Preserve the distinction between command and observed outcome. |
+| renderer application fails or feedback is absent | Preserve the distinction between command and observed outcome. |
 | Restart, crash, or journal gap | Preserve boot/run boundary and last available evidence; explicitly identify missing evidence. |
 | Change parameter, settings, or binding | Apply the revision-change matrix; reject stale evidence joins. |
 | Change several live properties in one action during active operation | One event; apply all on acceptance without changing program/run identity or stopping the controller. If any value is invalid, reject the whole event with no mutation. |

@@ -211,8 +211,32 @@ source-day terminal identity와 현재 config Result를 유지하고 새 기준�
 
 ## 증거
 
+테스트 전용 native `context_tape`의 `context-tide-v1` 프로필은 유한한 Tide
+binding과 명시적인 high/low event ID를 가진 provider 관측을 받는다. 다른
+프로필의 guard는 분리되어 유지되며 Moon/calendar binding과 natural provider
+rail은 허용하지 않는다. admission은 공통 core가 담당한다. native record는
+전체 outcome, source/settings 상태와 context checkpoint를 노출하고, facts가
+거부되면 retry를 위한 기존 journal/checkpoint 증거를 보존한다.
+
+REF-03-029는 같은 두 schedule site의 컴파일된 Tide source를 native와 framed
+WASM에서 비교한다. E는 1000ms에 admit된다. provider/context revision을 바꾸고
+planned time을 2000ms로 옮겨도 기존 monotonic Run의 Active 관측은 실제 admit된
+occurrence ID, 원래 revision과 1000ms planned time을 유지한다. 두 schedule 모두
+추가 Due를 내지 않는다. Run 종료 후 2500ms에 수정된 E를 다시 관측해도 두 run
+counter는 1이다. 현재 core는 terminal Tide ID의 후속 context 관측을 생략하므로
+이 증거는 `AlreadyAdmitted`나 `AlreadyTerminal` disposition을 만들어내지 않는다.
+3000ms의 새 E2는 서로 다른 두 source schedule site에서 독립적으로 admit된다.
+전체 outcome/state와 checkpoint parity, 동일 프로그램 checkpoint replay,
+위조 binding 거부와 유효 retry를 검사한다. context restore는 일반 VM state나
+active Run을 복원하지 않는다. provider facts는 호출자가 제공하며 provider
+진위, 물리 출력, production transport나 새로운 일반 Run 정책은 주장하지 않는다.
+
 `context_runtime_tests`는 보호 입력, 공급자 일관성, VM 실패 롤백, 설정 재시도 및
 식별자 제한 영속 복원을 실행한다. `context_abi` 테스트는 패킷 거부를 다룬다.
 종류별 경계 테스트는 `context_schedule`, `natural_context`, `work_calendar` 및
 `cron_schedule`에 있다. 종단 간 Reference 픽스처는 정본 컴파일과 호스트 일정
 구현이 아닌 동일 WASM 런타임을 실행한다.
+
+## 임시 설정 복귀 origin
+
+GFSF5/GFSF6 형식 있는 설정 origin tag 2는 `temporaryReturn`입니다. 운영자가 편집할 수 있는 대상 검사와 형식·범위·격자·용량 검사를 유지하며, Host가 검증한 기록된 복귀에 대해 스트림 할당기 경계보다 작은 기존 TimeSlots 행 키를 허용합니다. 일반 origin 0과 producer origin 1의 기존 규칙은 유지합니다. 이전 런타임은 추가 origin을 거부하며 이 값은 인증 토큰이 아닙니다. 소스에 결합된 출처와 신뢰하는 Host 입력은 [임시 설정 Host](TEMPORARY-SETTINGS-HOST.ko.md)를 참조하세요.

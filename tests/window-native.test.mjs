@@ -8,14 +8,14 @@ import { fileURLToPath } from 'node:url';
 import { compileSource } from '../tools/toolchain.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const nativePath = path.join(root, 'target/release/examples/run');
+const nativePath = path.join(root, 'target/release/examples/run' + (process.platform === 'win32' ? '.exe' : ''));
 const usage = 'usage: run <module.gfb> <inputs.csv> [--outcomes] [--temporal EPOCH MAX_SAMPLES MAX_BYTES TAG:MAX_OBSERVATIONS:INTERVAL_MS[,..]] (virtual outputs only)';
 const source = `# Native temporal windows
 
 \`\`\`ghost
 control NativeWindows {
   input threshold_time: Duration;
-  sensor temperature: Temperature;
+  input temperature: Temperature;
   signal average_temperature = window_average(temperature, over: 1s, quality: measured, max_age: 1s);
   signal minimum_temperature = window_min(temperature, over: 1s, quality: measured, max_age: 1s);
   signal maximum_temperature = window_max(temperature, over: 1s, quality: measured, max_age: 1s);
@@ -25,7 +25,7 @@ control NativeWindows {
   average <- average_temperature |> recover(0K);
   minimum <- minimum_temperature |> recover(0K);
   maximum <- maximum_temperature |> recover(0K);
-  fast <- temperature_rate |> map(below(rate(delta: 1ΔK, time: threshold_time))) |> recover(false);
+  fast <- temperature_rate |> map(below(rate(delta: 1ΔK, time: (threshold_time |> recover(0ms))))) |> recover(false);
 }
 \`\`\`
 `;
@@ -37,12 +37,13 @@ async function fixture(t) {
   const modulePath = path.join(temporary, 'window.gfb');
   const inputPath = path.join(temporary, 'window.csv');
   fs.writeFileSync(modulePath, artifact.bytes);
-  const sensor = artifact.manifest.sensors[0];
+  const sensor = artifact.manifest.sensors.find(item => item.name === 'temperature');
+  const thresholdInput = artifact.manifest.sensors.find(item => item.name === 'threshold_time');
   const rootTag = artifact.manifest.signals[0].sources[0].tag;
-  const header = ['threshold_time', sensor.valueInput, sensor.okInput, sensor.faultInput, '__gf_now_ms', '__gf_time_epoch',
+  const header = [thresholdInput.valueInput, thresholdInput.okInput, thresholdInput.faultInput, sensor.valueInput, sensor.okInput, sensor.faultInput, '__gf_now_ms', '__gf_time_epoch',
     sensor.samplePresentInput, sensor.sampleEpochInput, sensor.sampleIdInput, sensor.sampleTimestampInput];
   const row = (threshold, now, present, id, timestamp, value = 284) =>
-    [threshold, value, true, 0, now, 5, present, 1, id, timestamp].join(',');
+    [threshold, true, 0, value, true, 0, now, 5, present, 1, id, timestamp].join(',');
   fs.writeFileSync(inputPath, `${header.join(',')}\n${[
     row(1000, 1000, true, 1, 1000, 280),
     row(0, 1400, true, 2, 1400),

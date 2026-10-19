@@ -191,7 +191,22 @@ export function validateScenario(scenario, manifest) {
   }
   const intervalSources = new Set((manifest.signals ?? []).filter(signal => signal.kind === 'true-for')
     .flatMap(signal => signal.sources.map(source => source.name)));
-  const fields = new Map(manifest.inputs.filter(field => field.name !== '__gf_now_ms').map(field => [field.name, field.type]));
+  const requiredFields = manifest.inputs.filter(field => field.name !== '__gf_now_ms');
+  const fields = new Map([...requiredFields, ...(manifest.sensors ?? [])].map(field => [field.name, field.type]));
+  // A channel has one producer for this scenario. Do not let independently
+  // supplied acquisition identities collide with the session's software producer.
+  const softwareChannels = new Set([
+    ...scenario.initialInputs.map(input => input?.name),
+    ...scenario.keyBindings.map(binding => binding?.input),
+    ...scenario.actions.filter(action => action?.kind === 'input').map(action => action.name),
+  ].filter(name => typeof name === 'string'));
+  const acquiredChannels = new Set([
+    ...scenario.actions.filter(action => action?.kind === 'sample').map(action => action.name),
+    ...(scenario.plant === undefined ? [] : [scenario.plant.sensor]),
+  ].filter(name => typeof name === 'string'));
+  for (const name of acquiredChannels) {
+    if (softwareChannels.has(name)) throw new Error(`input ${name}: multiple acquisition producers in one scenario`);
+  }
   const inputs = new Map();
   for (const [index, input] of scenario.initialInputs.entries()) {
     const location = `initialInputs[${index}]`;
@@ -201,7 +216,7 @@ export function validateScenario(scenario, manifest) {
     if (fields.get(input.name) !== input.type) throw new Error(`${location}: type mismatch ${input.name}`);
     inputs.set(input.name, input.value);
   }
-  for (const name of fields.keys()) {
+  for (const { name } of requiredFields) {
     if (!inputs.has(name)) throw new Error(`initialInputs: missing input ${name}`);
   }
   const keys = new Set();

@@ -1,0 +1,60 @@
+```ghost
+control LocalPump {
+  input request, valve_ready: Bool;
+  output pump, valve: Bool;
+  pump <- request;
+  valve <- valve_ready;
+  constraints LocalRules {
+    require at safe_output pump => valve;
+  }
+}
+```
+
+```ghost
+control SharedPumpPolicy {
+  resource station: Station;
+  resource pump1: BoolActuator;
+  resource valve1: BoolActuator;
+  input automatic, manual, pump_request, valve_request: Bool;
+  output pump, valve: Bool;
+  pump <- pump_request;
+  valve <- valve_request;
+  constraints SharedRules for station {
+    exclusive at admission { automatic, manual };
+    require at safe_output pump1.on => any_on({ valve1 });
+    safe { pump1 = false; valve1 = true; }
+  }
+}
+```
+
+```ghost
+control MoistureDemand {
+  input start, stop: Bool;
+
+  sensor moisture: Percent {
+    sample = 1s;
+    valid = 0% .. 100%;
+    filter = median(5);
+    stale_after = 3s;
+    recover_after = 3 samples;
+  }
+
+  signal dry = hysteresis(moisture,
+    on_below: 30%,
+    off_above: 35%,
+    initial: false);
+
+  let dry_ok = case dry {
+    ok(value) => value;
+    fault(_)  => false;
+  };
+
+  state watering: Bool = false;
+  output pump, valve: Bool;
+
+  watering' = !stop && dry_ok && (start || watering);
+  valve <- watering';
+  pump  <- watering';
+  require pump => valve;
+}
+```

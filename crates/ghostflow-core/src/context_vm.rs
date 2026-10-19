@@ -227,6 +227,9 @@ pub use crate::settings_stream::ConfigEmission as SettingChange;
 pub enum SettingsOrigin {
     OperatorEdit,
     ProducerObservation,
+    /// Host-validated return to the recorded ordinary overlay baseline.
+    /// This label is not authentication; the host validates overlay provenance.
+    TemporaryReturn,
 }
 
 #[derive(Clone, Debug, PartialEq)]

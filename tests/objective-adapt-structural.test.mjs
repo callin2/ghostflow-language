@@ -8,10 +8,10 @@ import { fileURLToPath } from 'node:url';
 import { compileControl, typeCheckControl } from '../tools/control.mjs';
 import { compileSource } from './helpers/literate-compile.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
-import { pidSaturationSource, pidActivation, pidSaturationSteps, pidStages } from './helpers/pid-saturation-vectors.mjs';
+import { pidSaturationSource, pidActivation, pidSaturationSteps, pidStages } from './helpers/pid-saturation-input-vectors.mjs';
 const wasm = fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
 const objective = `control ObjectiveTest {
-sensor inside_temperature: Temperature;
+input inside_temperature: Temperature;
 config target_temperature: Temperature = 25°C { min = 10°C; max = 40°C; step = 0.5Δ°C; access = operator; label = "Target"; }
 resource roof_vent: ContinuousActuator<Percent>;
 objective greenhouse_temperature { measure = inside_temperature; target = target_temperature; manipulate = roof_vent.position; output = 0% .. 80%; controller = pid { period = 10s; late_after = 30s; direction = reverse; kp = proportional_gain(output: 2%, error: 1Δ°C); ki = integral_gain(output: 0.1%, error: 1Δ°C, time: 1s); kd = derivative_gain(output: 1%, time: 1s, error: 1Δ°C); bias = 0%; anti_windup = conditional_safe; disabled = track_safe; transfer = track_safe; fault = disable; restart = reset(output: 0%); } }
@@ -97,7 +97,7 @@ test('native Temperature PID descriptor rejects unsupported timing and output do
 });
 test('native PID descriptor rejects unsupported quantity, manual and degraded paths', () => {
   const pressure = objective
-    .replace('sensor inside_temperature: Temperature;', 'sensor inside_temperature: Pressure;')
+    .replace('input inside_temperature: Temperature;', 'input inside_temperature: Pressure;')
     .replace('config target_temperature: Temperature = 25°C { min = 10°C; max = 40°C; step = 0.5Δ°C;', 'config target_temperature: Pressure = 25Pa { min = 10Pa; max = 40Pa; step = 1Pa;')
     .replaceAll('1Δ°C', '1Pa');
   assert.throws(() => typeCheckControl(pressure), /requires Temperature measure and target/);
@@ -111,13 +111,25 @@ test('native PID descriptor rejects unsupported quantity, manual and degraded pa
 }`);
   assert.throws(() => typeCheckControl(degraded), /native PID objective does not support degraded control/);
 });
-test('degraded control requires exhaustive otherwise', () => { assert.throws(() => typeCheckControl('control X { sensor s: Temperature; degraded D for missing { branch B priority 1 when s quality in { measured } use objective O authority automatic_degraded output 0% .. 30%; otherwise disable; resume = require_start; } }'), /unknown degraded objective|requires at least one branch/); });
+test('degraded control requires exhaustive otherwise', () => { assert.throws(() => typeCheckControl('control X { input s: Temperature; degraded D for missing { branch B priority 1 when s quality in { measured } use objective O authority automatic_degraded output 0% .. 30%; otherwise disable; resume = require_start; } }'), /unknown degraded objective|requires at least one branch/); });
 test('bounded adaptation produces host binding manifest', () => { const r = typeCheckControl('control X { config target: Pressure = 1.0kPa { min = 0.7kPa; max = 1.2kPa; step = 0.05kPa; access = operator; label = "VPD"; } adapt_setting policy for target { allowed = 0.7kPa .. 1.2kPa; max_step = 0.05kPa; max_change = 0.05kPa per 1h; authority = optimizer; } }'); assert.equal(r.manifest.adaptSettings[0].target, 'target'); });
 
 test('REF-04-060 canonical native/WASM PID records distinct observation stages and conditional_safe rejects saturation growth', async t => {
   const compiled = await compileSource(pidSaturationSource, { filename: 'reference-pid-saturation.ghost' });
   assert.equal(new DataView(compiled.bytes.buffer, compiled.bytes.byteOffset).getUint16(4, true), 11);
   const descriptor = compiled.manifest.objectives[0];
+  for (const [patch, message] of [
+    [{ validMin: 0.5, validMax: 10 }, /validMin must be a safe integer/],
+    [{ recoverSamples: 32 }, /recoverSamples/],
+    [{ window: 3 }, /filter metadata/],
+    [{ alpha: 0.5 }, /filter metadata/],
+    [{ optional: 'yes' }, /optional/],
+    [{ samplePresentInput: '__gf_sensor_sample_present_driver_revision' }, /provided together/],
+  ]) {
+    const manifest = structuredClone(compiled.manifest);
+    Object.assign(manifest.sensors.find(item => item.name === 'driver_revision'), patch);
+    await assert.rejects(() => ControlRuntime.instantiate(wasm, { ...compiled, manifest }, { context: pidActivation }), message);
+  }
   assert.equal(descriptor.binding, 'native-temperature-percent-v1');
   assert.equal(descriptor.controller.antiWindup, 'conditional_safe');
   const root = fileURLToPath(new URL('..', import.meta.url));
@@ -171,8 +183,10 @@ test('REF-04-060 canonical native/WASM PID records distinct observation stages a
   try {
     const step = pidSaturationSteps()[0];
     assert.throws(() => runtime.step({ ...step, inputs: { ...step.inputs, unknown_feedback: 17 } }), /unknown input/);
-    const { driver_applied, ...missing } = step.inputs;
-    assert.throws(() => runtime.step({ ...step, inputs: missing }), /missing.*driver_applied/);
+    const { driver_applied, ...missing } = step.samples;
+    const absent = runtime.step({ ...step, samples: missing });
+    assert.equal(absent.sensors.driver_applied.quality, 'NotReady');
+    assert.equal(absent.vm.requested['roof_vent.position'], 92, 'observation unavailability does not invent an actuator policy');
     assert.equal(runtime.step(step).vm.requested['roof_vent.position'], 92);
   } finally { runtime.dispose(); }
 });

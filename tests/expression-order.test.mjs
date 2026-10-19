@@ -4,11 +4,13 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
+import { softwareQualityAbi, softwareQualityCsv } from './helpers/software-quality-observations.mjs';
 import { compileSource } from '../tools/toolchain.mjs';
 import { GhostFlowRuntime } from '../runtimes/wasm/ghostflow-runtime.mjs';
 
-const root = path.resolve(new URL('../', import.meta.url).pathname);
-const nativePath = path.join(root, 'target/release/examples/run');
+const root = fileURLToPath(new URL('../', import.meta.url));
+const nativePath = path.join(root, `target/release/examples/run${process.platform === 'win32' ? '.exe' : ''}`);
 const wasmPath = path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm');
 const source = `# Expression order
 
@@ -23,7 +25,7 @@ control ExpressionOrder {
   subtraction_right <- 6.0 - (2.0 - 1.0);
   division <- 6.0 / 2.0 * 3.0;
   division_right <- 6.0 / (2.0 * 3.0);
-  grouping <- a || b && !c;
+  grouping <- (a |> recover(false)) || (b |> recover(false)) && !(c |> recover(false));
 }
 \`\`\`
 `;
@@ -40,10 +42,14 @@ test('REF §2.2 signed whole literals receive the common Number type of either i
 control SignedBranches {
   input choose: Bool;
   input measured: Number;
-  let first = if choose then -1 else measured;
-  let second = if choose then measured else -1;
-  let below_int = if choose then -2147483649 else measured;
-  let above_int = if choose then measured else 2147483648;
+  state retained_measured: Number = 0.0;
+  let scalar_measured = case measured { ok(observed) => observed; fault(_) => retained_measured; };
+  retained_measured' = scalar_measured;
+  let scalar_choose = choose |> recover(false);
+  let first = if scalar_choose then -1 else scalar_measured;
+  let second = if scalar_choose then scalar_measured else -1;
+  let below_int = if scalar_choose then -2147483649 else scalar_measured;
+  let above_int = if scalar_choose then scalar_measured else 2147483648;
   output first_out, second_out, below_int_out, above_int_out: Number;
   first_out <- first;
   second_out <- second;
@@ -56,6 +62,7 @@ control SignedBranches {
   const runtime = await GhostFlowRuntime.instantiate(fs.readFileSync(wasmPath));
   t.after(() => runtime.dispose());
   runtime.load(compiled.bytes);
+  softwareQualityAbi(runtime, compiled);
   const names = ['first_out', 'second_out', 'below_int_out', 'above_int_out'];
   for (const name of names) runtime.addCapability('actuator', name, 'number');
   runtime.activate();
@@ -71,8 +78,8 @@ test('REF §2.2 branch context never changes an already inferred Int binding', a
   const wrap = body => `# Branch type boundaries\n\n\`\`\`ghost\ncontrol BranchTypes {\n${body}\n}\n\`\`\`\n`;
   for (const expression of ['if choose then exact else measured', 'if choose then measured else exact']) {
     await assert.rejects(compileSource(wrap(`
-      input choose: Bool;
-      input measured: Number;
+      state choose: Bool = false;
+      state measured: Number = 0.0;
       let exact = -1;
       let selected = ${expression};
       output result: Number;
@@ -80,7 +87,7 @@ test('REF §2.2 branch context never changes an already inferred Int binding', a
     `), { filename: 'branch-types.ghost.md' }), /if branches must have the same type/);
   }
   await assert.rejects(compileSource(wrap(`
-    input choose: Bool;
+    state choose: Bool = false;
     let selected = if choose then -2147483649 else 0;
     output result: Number;
     result <- selected;
@@ -93,11 +100,12 @@ test('REF-01-079/080 native and WASM preserve expression precedence and associat
   const modulePath = path.join(temporary, 'expression-order.gfb');
   const inputPath = path.join(temporary, 'expression-order.csv');
   fs.writeFileSync(modulePath, artifact.bytes);
-  fs.writeFileSync(inputPath, `a,b,c\n${cases.map(([, input]) => `${input.a},${input.b},${input.c}`).join('\n')}\n`);
+  fs.writeFileSync(inputPath, softwareQualityCsv(artifact, cases.map(([, input]) => input)));
   const native = execFileSync(nativePath, [modulePath, inputPath, '--outcomes'], { encoding: 'utf8' }).trim().split('\n').map(JSON.parse);
   const runtime = await GhostFlowRuntime.instantiate(fs.readFileSync(wasmPath));
   t.after(() => runtime.dispose());
   runtime.load(artifact.bytes);
+  softwareQualityAbi(runtime, artifact);
   for (const name of ['precedence', 'parentheses', 'subtraction', 'subtraction_right', 'division', 'division_right']) runtime.addCapability('actuator', name, 'number');
   runtime.addCapability('actuator', 'grouping', 'bool');
   runtime.activate();

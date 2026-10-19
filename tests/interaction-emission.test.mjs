@@ -17,7 +17,7 @@ const readJson = relative => JSON.parse(read(relative));
 
 const wateringIdentity = {
   documentId: 'source.fixture-five-minute-watering',
-  revisionId: 'revision.fixture-five-minute-watering-v2',
+  revisionId: 'revision.fixture-five-minute-watering.input531-v1',
 };
 
 const directSource = `# Direct input to output
@@ -28,13 +28,13 @@ The pump follows the enable input without authored state or a timer.
 control DirectOutput {
   input enabled: Bool;
   output pump: Bool;
-  pump <- enabled;
+  pump <- enabled |> recover(false);
 }
 \`\`\`
 `;
 
 test('GF-TEST-interaction-emission: canonical literate compilation produces the exact checked-in v0 schema', async () => {
-  const expected = readJson('contracts/interaction-v0/examples/five-minute-watering.schema.json');
+  const expected = readJson('contracts/interaction-v0/examples/five-minute-watering.input-v1.schema.json');
   const compilation = await compileSource(read(wateringPath), {
     filename: wateringPath,
     interactionSourceIdentity: wateringIdentity,
@@ -42,7 +42,7 @@ test('GF-TEST-interaction-emission: canonical literate compilation produces the 
   assert.deepEqual(compilation.interactionSchema, expected);
   assert.equal(
     interactionSchemaSha256(compilation.interactionSchema),
-    readJson('contracts/interaction-v0/examples/five-minute-watering.snapshot.json').schema.sha256,
+    readJson('contracts/interaction-v0/examples/five-minute-watering.input-v1.snapshot.json').schema.sha256,
   );
 
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-interaction-'));
@@ -165,7 +165,7 @@ control ContinuousTrueInteraction {
   input hot: Bool;
   output alarm: Bool;
   // ghostflow:link id=GF-INT-CONTINUOUS-TRUE-V1 relation=implements
-  timer hot_for = continuous_true(hot);
+  timer hot_for = continuous_true(hot |> recover(false));
   alarm <- hot_for >= 5min;
 }
 \`\`\`
@@ -183,7 +183,7 @@ control ContinuousTrueInteraction {
   const timer = compilation.interactionSchema.descriptors.find(entry => entry.id === 'timer.hot_for');
   assert.equal(timer.operation.kind, 'continuous_true');
   const subject = compilation.sourceMap.find(node => node.id === timer.operation.subjectNodeId);
-  assert.equal(subject?.kind, 'reference');
+  assert.equal(subject?.kind, 'binary');
   assert.deepEqual(compilation.traceMetadata.bindings
     .filter(entry => entry.kind === 'timer')
     .map(entry => [entry.name, entry.generated]), [
@@ -193,7 +193,8 @@ control ContinuousTrueInteraction {
   const valueDependency = compilation.traceMetadata.dependencies.find(entry => (
     entry.target.field === 'timerValue' && entry.target.name === 'hot_for'
   ));
-  assert.ok(valueDependency.reads.some(read => read.field === 'inputs' && read.name === 'hot'));
+  assert.ok(valueDependency.reads.some(read => read.field === 'inputs' && read.name === '__gf_sensor_value_hot'));
+  assert.ok(valueDependency.reads.some(read => read.field === 'inputs' && read.name === '__gf_sensor_ok_hot'));
 
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-continuous-timer-'));
   try {
@@ -218,7 +219,7 @@ control ContinuousTrueInteraction {
     const timerValue = missingConditionRead.traceMetadata.dependencies.find(entry => (
       entry.target.field === 'timerValue' && entry.target.name === 'hot_for'
     ));
-    timerValue.reads = timerValue.reads.filter(read => read.name !== 'hot');
+    timerValue.reads = timerValue.reads.filter(read => read.name !== '__gf_sensor_value_hot');
     assert.throws(() => restoreArtifactSourceMap(missingConditionRead, bytes, {
       manifest: compilation.manifest,
     }), /dependencies do not match canonical source lowering/);

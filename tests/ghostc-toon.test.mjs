@@ -135,7 +135,7 @@ test('imported diagnostics keep child source identity correlated to root source 
     assert.deepEqual(decoded.diagnosticSource, {
       path: childPath, sha256: createHash('sha256').update(child).digest('hex'),
     });
-    assert.equal(decoded.diagnostics[0].span.file, childPath);
+    assert.equal(decoded.diagnostics[0].span.file, childPath.split(path.sep).join('/'));
     assert.equal('diagnosticEnvelope' in decoded, false);
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 });

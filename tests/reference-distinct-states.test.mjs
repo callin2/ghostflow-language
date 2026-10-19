@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { softwareQualityObservations } from './helpers/software-quality-observations.mjs';
 import { readFileSync } from 'node:fs';
 import { compileSource } from '../tools/toolchain.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
@@ -9,7 +10,7 @@ const wasm = readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghos
 const wire = value => JSON.parse(JSON.stringify(value));
 const source = body => `# Distinct boundary states\n\n<!-- ghostflow:anchor id=GF-INT-REF-07-004 kind=intent status=confirmed origin=user -->\nPreserve typed values and their provenance across the control and observation boundary.\n\n\`\`\`ghost\n${body}\n\`\`\`\n`;
 const compile = (id, body) => compileSource(source(body), { filename: `distinct-${id}.ghost.md`,
-  interactionSourceIdentity: { documentId: `source.ref-07-004.${id}`, revisionId: `revision.ref-07-004.${id}.1` } });
+  interactionSourceIdentity: { documentId: `source.ref-07-004.${id}`, revisionId: `revision.ref-07-004.${id}.input-v2` } });
 
 test('REF-07-004: serialized completed observations retain ready false and numeric zero with source and run identity', async t => {
   const artifact = await compile('values', `control Values {
@@ -18,17 +19,20 @@ test('REF-07-004: serialized completed observations retain ready false and numer
     state flag: Bool = false;
     // ghostflow:link id=GF-INT-REF-07-004 relation=implements
     state amount: Number = 0.0;
-    flag' = enabled; amount' = measured;
+    flag' = case enabled { ok(value) => value; fault(_) => flag; };
+    amount' = case measured { ok(value) => value; fault(_) => amount; };
     output flag_out: Bool; output amount_out: Number;
     flag_out <- flag'; amount_out <- amount';
   }`);
   for (const instantiate of [ControlRuntime.instantiate, ControlRuntime.instantiateFramed]) {
-    const runtime = await instantiate.call(ControlRuntime, wasm, artifact);
+    const runtime = softwareQualityObservations(await instantiate.call(ControlRuntime, wasm, artifact));
     t.after(() => runtime.dispose());
     const outcome = wire(runtime.step({ nowMs: 10, inputs: { enabled: false, measured: 0 } }));
     assert.deepEqual(outcome.vm.safe, { amount_out: 0, flag_out: false });
-    assert.equal(typeof outcome.vm.inputs.enabled, 'boolean');
-    assert.equal(typeof outcome.vm.inputs.measured, 'number');
+    assert.equal(typeof outcome.vm.inputs.__gf_sensor_value_enabled, 'boolean');
+    assert.equal(typeof outcome.vm.inputs.__gf_sensor_value_measured, 'number');
+    assert.equal(outcome.sensors.enabled.quality, 'Good');
+    assert.equal(outcome.sensors.measured.quality, 'Good');
     const snapshot = wire(emitCompletedScanSnapshot({ compilation: artifact, runId: 'run.ref-07-004.values',
       completion: { kind: 'completed-scan', scanId: 0, logicalTimeMs: 10 }, trace: outcome.vm }));
     assert.deepEqual(snapshot.observations, [
@@ -44,8 +48,12 @@ test('REF-07-004: serialized completed observations retain ready false and numer
     assert.deepEqual(joinRuntimeSnapshot(artifact.interactionSchema, snapshot, expected), { status: 'ready', staleReasons: [] });
     assert.deepEqual(joinRuntimeSnapshot(artifact.interactionSchema, snapshot, { ...expected, sourceRevisionId: 'different' }),
       { status: 'stale', staleReasons: ['source.revisionId'] });
-    for (const inputs of [{ measured: 0 }, { enabled: false }, { enabled: 0, measured: 0 }, { enabled: false, measured: false }]) {
-      assert.throws(() => runtime.step({ nowMs: 11, inputs }), /input|Bool|Number|boolean|number|missing/i);
+    const noObservation = wire(runtime.step({ nowMs: 11 }));
+    assert.deepEqual(noObservation.vm.safe, { amount_out: 0, flag_out: false });
+    assert.deepEqual(runtime.sensors.get('enabled').conditioner.sampleIdentity(), { epoch: 1, id: 1, timestampMs: 10 });
+    assert.deepEqual(runtime.sensors.get('measured').conditioner.sampleIdentity(), { epoch: 1, id: 1, timestampMs: 10 });
+    for (const inputs of [{ enabled: 0, measured: 0 }, { enabled: false, measured: false }]) {
+      assert.throws(() => runtime.step({ nowMs: 11, inputs }), /samples\.(enabled|measured)\.value must be (boolean|numeric)/);
     }
     const changed = wire(runtime.step({ nowMs: 12, inputs: { enabled: true, measured: 2 } }));
     assert.deepEqual(changed.vm.safe, { amount_out: 2, flag_out: true }, 'valid false/zero inputs are consumed, not replaced by fixed defaults');
@@ -60,7 +68,7 @@ test('REF-07-004: serialized completed observations retain ready false and numer
 
 test('REF-07-004: serialized optional absence and installed sensor fault retain strategy quality and Result origin', async t => {
   const artifact = await compile('presence', `control Presence {
-    sensor reading?: Number;
+    input reading?: Number;
     output installed: Bool; output value: Number;
     adapt sensor_policy {
       strategy Installed priority 10 match (reading: sensor<Number>) {

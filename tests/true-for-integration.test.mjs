@@ -6,7 +6,7 @@ import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 
 // Executable target contract, initially RED. The compiler rejection is not
 // caught: accepting syntax alone must still fail the manifest/runtime assertions.
-const filename = 'true-for-certified.ghost.md';
+const filename = 'true-for-certified.input-v1.ghost.md';
 async function compile() {
   const source = await fs.readFile(new URL(`./fixtures/${filename}`, import.meta.url), 'utf8');
   return compileSource(source, { filename });

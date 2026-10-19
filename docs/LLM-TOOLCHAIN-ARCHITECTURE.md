@@ -24,7 +24,7 @@ flowchart LR
   Live -->|persistent WASM Rust ScanDriver| Core[FramedGhostFlowRuntime]
   Live -->|full-screen ASCII; 100 ms cadence| Human
   Human -->|piped commands| Console[ghostsim-console.mjs piped mode]
-  Profile[profile or Driver descriptor] --> Console
+  Profile[profile or channel descriptor] --> Console
   Profile --> Live
   Console -->|recorded TOON scenario| Scenario
   Console -->|same runScenario path| S
@@ -90,7 +90,7 @@ modes display only virtual inputs and requested/safe intent; neither applies
 physical output or confirms hardware state.
 
 The selected [`GhostFlow/board-profile-v1`](KEYBOARD-HOST.md) or presentation-only
-Driver descriptor supplies the console's ordered input and output channel
+Channel descriptor supplies the console's ordered input and output channel
 roster. `--bind CHANNEL=port` connects each channel to a matching manifest
 logical port; board profiles never infer a logical binding from an endpoint
 name. With no descriptor, the console uses a **virtual Waveshare 8DI/8RO**
@@ -123,7 +123,7 @@ descriptor and a physical I/O driver have different responsibilities.
 | Framed scan driver | Owns one runtime and validates complete typed inputs, sequential scan IDs and nondecreasing logical time before evaluation. Successful scans advance its sequence/time. It performs no device I/O. | [`ScanDriver`](../crates/ghostflow-core/src/scan.rs) |
 | Portable Rust runtime | Loads GFB, activates supported capabilities, evaluates expressions, program state, timers and constraints, and emits a trace with requested/safe intents and faults. Native and WASM hosts use this core. | [`ghostflow-core`](../crates/ghostflow-core/src/lib.rs), [WASM adapter](../runtimes/wasm/README.md) |
 | Virtual device view | Displays held inputs, requested/safe output banks and scan identity using the selected channel roster. The state consists of simulated input values, core program state and recorded observations; it has no separate actuator or plant model. | [ASCII panel and profile rules](KEYBOARD-HOST.md) |
-| Profile / Driver descriptor | Describes ordered channels and types; explicit bindings connect them to manifest ports. Board-profile driver/address/polarity metadata is not executed by the console. | [`board-profile-v1` contract](../contracts/integration-v1/README.md), [`console-profile-v1`](KEYBOARD-HOST.md) |
+| Profile / channel descriptor | Describes ordered channels and types; explicit bindings connect them to manifest ports. Board-profile driver/address/polarity metadata is not executed by the console. | [`board-profile-v1` contract](../contracts/integration-v1/README.md), [`console-profile-v1`](KEYBOARD-HOST.md) |
 
 “Virtual device” here means an I/O view around a real GhostFlow runtime. The
 native runner registers virtual actuator capabilities from the module's output
@@ -271,6 +271,8 @@ reproducing the panel also requires retaining its profile and binding arguments.
 
 ## Physical Driver and Device boundary
 
+Input **drivers** produce logical inputs; output **renderers** apply logical output intent to relays, motors, lamps or screens. These are roles, not mutually exclusive device classes. A USB force-feedback joystick has an input driver and an output renderer; an EC11 encoder with TFT similarly combines input and output roles. These examples define boundaries, not implementations. Driver and renderer source belongs in `farm-device-drivers`; Device owns host/board integration, bindings, clocks, watchdogs and boot/failure policy. The cabinet operator UI is `@ghostflow/cabinet-view` and is distinct from an output renderer. Existing `ScanDriver`, host ABI identifiers and profile `driver` fields retain their names and contracts.
+
 The physical path has additional responsibilities defined by
 [Reference §8](reference/08-language-runtime-and-device-boundaries.md) and the
 [integration contract](../contracts/integration-v1/README.md):
@@ -282,7 +284,7 @@ database "Approved profile + installation bindings" as Profile
 participant "Device scan host / clock" as Host
 participant "Sensor / input driver" as Input
 participant "ScanDriver + Rust Runtime" as Core
-participant "Physical output driver" as Output
+participant "Physical output renderer" as Output
 participant "Relay / load" as Load
 participant "Host observation stream" as Evidence
 participant "Independent observation" as Observer
@@ -308,18 +310,18 @@ else successful scan (possibly with constraint faults)
     Output --> Host: I/O error
     Host -> Host: cached applied mask = unknown; cached latch = unknown
   end
-  opt driver available and readback due
+  opt renderer available and readback due
     Output -> Load: read output latch/register
     Load --> Output: observed register value
     Output --> Host: readback evidence with observation scope
   end
   Host -> Host: record_relay(available, applied, latch)
-  opt write/readback failure, latch mismatch or unavailable driver
+  opt write/readback failure, latch mismatch or unavailable renderer
     Host -> Evidence: publish attempted safe mask + separate applied/latch evidence
     Host -> Host: halt: running=false; fault; clear adapter live outputs
     Host -> Evidence: publish halted/fault observation
     note over Host,Output
-      A following firmware loop requests OFF through the same driver.
+      A following firmware loop requests OFF through the same renderer.
       OFF is not assumed applied until acknowledged.
       Resume is rejected while faulted; redeployment is required.
     end note
@@ -330,7 +332,7 @@ else successful scan (possibly with constraint faults)
   end
   note over Host,Core
     Core state already committed before output application.
-    Driver failure does not roll back that scan through ScanDriver.
+    Renderer failure does not roll back that scan through ScanDriver.
     Device halt policy is implemented; committed core state is retained.
   end note
 end
@@ -344,9 +346,9 @@ firmware failure path. It is not a connection made by `ghostsim` or hardware
 verification. Independent physical confirmation is a contract boundary;
 the current firmware observation reports intent, applied write and register
 latch only, with no relay-contact or load feedback.
-Device owns firmware, physical drivers, approved board profiles, clocks,
+Device owns firmware, driver/renderer host and board integration, approved board profiles, clocks,
 watchdogs and output handling at boot or failure. Installation bindings select
-the actual endpoint for each logical port. Logical safe intent, driver-applied
+the actual endpoint for each logical port. Logical safe intent, renderer-applied
 output, register readback and physical confirmation remain distinct evidence.
 The integration validator checks supplied identities and mappings; it neither
 installs them nor performs I/O.

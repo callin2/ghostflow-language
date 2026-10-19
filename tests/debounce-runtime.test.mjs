@@ -12,14 +12,19 @@ import { FramedGhostFlowRuntime } from '../runtimes/wasm/framed-runtime.mjs';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const wasm = fs.readFileSync(path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm'));
 const compile = code => compileSource(`# Debounce execution\n\n\`\`\`ghost\n${code}\n\`\`\`\n`, { filename: 'debounce-runtime.ghost.md' });
-const frame = (scanId, logicalTimeMs, values) => ({ scanId, logicalTimeMs, inputs: Object.entries(values).map(([name, value]) => ({ name, value })) });
+// These fixture values are explicit Good observations of the named acquisition inputs.
+// Already captured VM rails pass through unchanged, including physical sample identity.
+const frame = (scanId, logicalTimeMs, values) => ({ scanId, logicalTimeMs, inputs: Object.entries(values).flatMap(([name, value]) =>
+  ['start', 'divisor', 'pick_a', 'broken'].includes(name)
+    ? [{ name: `__gf_sensor_value_${name}`, value }, { name: `__gf_sensor_ok_${name}`, value: true }, { name: `__gf_sensor_fault_${name}`, value: 0 }]
+    : [{ name, value }]) });
 function native(bytes, tape) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-debounce-'));
   try {
     const modulePath = path.join(directory, 'module.gfb'), tapePath = path.join(directory, 'tape.tsv');
     fs.writeFileSync(modulePath, bytes);
     fs.writeFileSync(tapePath, tape.map(row => [row.scanId, row.logicalTimeMs, ...row.inputs.flatMap(input => [input.name, typeof input.value === 'boolean' ? 'b' : 'n', String(input.value)])].join('\t')).join('\n') + '\n');
-    const result = spawnSync(path.join(root, 'target/release/examples/scan_tape'), [modulePath, tapePath], { encoding: 'utf8', timeout: 10_000, maxBuffer: 2 * 1024 * 1024 });
+    const result = spawnSync(path.join(root, 'target/release/examples/scan_tape' + (process.platform === 'win32' ? '.exe' : '')), [modulePath, tapePath], { encoding: 'utf8', timeout: 10_000, maxBuffer: 2 * 1024 * 1024 });
     assert.equal(result.status, 0, result.stderr || result.stdout);
     return result.stdout.trim().split('\n').map(line => JSON.parse(line));
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
@@ -41,10 +46,10 @@ function legacyStep(runtime, row) {
 test('debounce private states commit atomically and replay identically on native and both WASM ABIs', async t => {
   const artifact = await compile(`control AtomicDebounce {
     input start: Bool; input divisor: Number;
-    signal stable = debounce(start, stable_for: 2s, initial: false);
+    signal stable = debounce(start |> recover(false), stable_for: 2s, initial: false);
     state accepted: Number = 0.0; accepted' = accepted + 1.0;
     output result: Bool; output guard: Int;
-    result <- stable; guard <- 1 div int_exact(divisor);
+    result <- stable; guard <- 1 div int_exact(divisor |> recover(0.0));
   }`);
   const tape = [
     frame(0, 100, { start: true, divisor: 1 }),
@@ -82,7 +87,7 @@ test('debounce finite Result enum retains physical sample identity, timestamps a
   const artifact = await compile(`control SampleDebounce {
     type Mode = Off | On;
     fn mode(value: Bool) -> Mode { if value then On else Off }
-    sensor probe: Bool;
+    input probe: Bool;
     signal stable = debounce(probe |> map(mode), stable_for: 2s, initial: Off);
     output result: Bool;
     result <- case stable { ok(value) => value == On; fault(_) => false; };
@@ -125,21 +130,25 @@ test('debounce finite Result enum retains physical sample identity, timestamps a
 test('debounce per-root high water survives selection, older samples, faults and rejected scans', async t => {
   const artifact = await compile(`control RootIdentity {
     ${Array.from({ length: 20 }, (_, index) => `let pad${index}: Number = 0.0;`).join('\n')}
-    input pick_a: Bool; input broken: Bool; input divisor: Number;
-    sensor a: Bool; sensor b: Bool;
-    let observed: Result<Bool, SensorFault> = if broken then fault(Invalid) else if pick_a then a else b;
+    input pick_a: Bool; input divisor: Number;
+    input a: Bool; input b: Bool;
+    let observed: Result<Bool, SensorFault> = if (pick_a |> recover(false)) then a else b;
     signal stable = debounce(observed, stable_for: 2s, initial: false);
     output result: Bool; output guard: Int;
     result <- case stable { ok(value) => value; fault(_) => false; };
-    guard <- 1 div int_exact(divisor);
+    guard <- 1 div int_exact(divisor |> recover(0.0));
   }`);
   const signal = artifact.manifest.signals.find(item => item.name === 'stable');
   const make = (now, { pick = true, broken = false, divisor = 1, a, b } = {}) => {
-    const values = { pick_a: pick, broken, divisor };
-    for (const sensor of artifact.manifest.sensors) {
+    const values = { pick_a: pick, divisor };
+    for (const sensor of artifact.manifest.sensors.filter(sensor => ['a', 'b'].includes(sensor.name))) {
       const sample = sensor.name === 'a' ? a : b;
+      // New fixture revision injects the selected input's Invalid quality directly.
+      // The predecessor injected fault(Invalid) through a separate scalar flag;
+      // its exact source is archived. Fault reset/high-water/replay oracles remain.
+      const invalid = broken && (sensor.name === 'a') === pick;
       Object.assign(values, {
-        [sensor.valueInput]: true, [sensor.okInput]: true, [sensor.faultInput]: 0,
+        [sensor.valueInput]: invalid ? false : true, [sensor.okInput]: !invalid, [sensor.faultInput]: invalid ? 2 : 0,
         [sensor.samplePresentInput]: Boolean(sample), [sensor.sampleEpochInput]: sample?.epoch ?? 0,
         [sensor.sampleIdInput]: sample?.id ?? 0, [sensor.sampleTimestampInput]: sample?.timestamp ?? 0,
       });

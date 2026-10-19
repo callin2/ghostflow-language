@@ -7,7 +7,7 @@ const source = `# Nested window provenance
 
 \`\`\`ghost
 control NestedProvenance {
-  sensor reading: Number;
+  input reading: Number;
   signal inner = window_average(reading, over: 2ms, quality: measured, max_age: 2ms);
   signal outer = window_average(inner, over: 10ms, quality: measured, max_age: 10ms);
   output average: Number;

@@ -1,4 +1,6 @@
 <!-- translation-source: examples/explicit-feedback-adoption.ghost.md -->
+
+2026-10-05 명시적인 입력 품질 개정: 요청을 알 수 없으면 기존 운전 상태를 유지하며 2초 기한은 계속 적용한다. 품질은 물리적인 고장을 뜻하지 않는다.
 [영문 원본](explicit-feedback-adoption.ghost.md)
 
 # 명시적으로 채택한 피드백 억제
@@ -10,7 +12,7 @@
 관찰에 제어 권한을 주지 않는다.
 
 운영자가 정한 예시 명령 시간은 2초다. 타이머는 유지된 요청의 시간을 측정한다.
-이동이나 Driver 적용 시간을 측정하지 않는다. 억제는 시간을 초기화하거나
+이동이나 renderer 적용 시간을 측정하지 않는다. 억제는 시간을 초기화하거나
 연장하지 않는다. 기한 전 복구는 남은 요청을 허용할 수 있다. 기한 이후나 정확히
 기한에 복구해도 다시 시작하지 않는다. 정지와 재시작 의미는 연결한 타이머 예제와 같다.
 
@@ -30,15 +32,16 @@
 control ExplicitFeedbackAdoption {
   input run_request: Bool;
   output drive: Bool;
-  sensor observation: Bool;
+  input observation: Bool;
 
   // Illustrative operator-established command duration, not measured motion.
   let calibrated_duration = 2s;
   state run: Bool = false;
-  run' = run_request;
+  let requested = case run_request { ok(value) => value; fault(_) => run; };
+  run' = requested;
   timer age = elapsed(run);
-  let run_age = if run_request == run then age else 0s;
-  let timed_request = run_request && run_age < calibrated_duration;
+  let run_age = if requested == run then age else 0s;
+  let timed_request = requested && run_age < calibrated_duration;
   let permit = case observation { ok(value) => value; fault(_) => false; };
   drive <- timed_request && permit;
 }

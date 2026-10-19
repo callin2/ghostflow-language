@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 import { loadVerifiedArtifact, validateScenario } from './ghostsim.mjs';
+import { SoftwareInputProducer } from './software-input-producer.mjs';
 
 const [artifactPath, scenarioPath] = process.argv.slice(2);
 const { artifactBytes, manifest } = loadVerifiedArtifact(artifactPath);
@@ -31,6 +32,8 @@ try {
   process.exit(1);
 }
 const inputs = Object.fromEntries(scenario.initialInputs.map(input => [input.name, input.value]));
+const softwareProducer = new SoftwareInputProducer(manifest);
+let pendingSoftware = { ...inputs };
 const kelvin = temperature => temperature.unit === 'K' ? temperature.value : temperature.value + 273.15;
 const displayTemperature = (valueK, unit) => ({ value: unit === 'K' ? valueK : valueK - 273.15, unit });
 const bindings = new Map(scenario.keyBindings.map(binding => [binding.key, binding.input]));
@@ -44,8 +47,14 @@ const plantState = scenario.plant === undefined ? null : {
 try {
   for (const [index, action] of scenario.actions.entries()) {
     try {
-      if (action.kind === 'input') inputs[action.name] = action.value;
-      else if (action.kind === 'key') inputs[bindings.get(action.key)] = action.event === 'down';
+      if (action.kind === 'input') {
+        inputs[action.name] = action.value;
+        pendingSoftware[action.name] = action.value;
+      } else if (action.kind === 'key') {
+        const name = bindings.get(action.key);
+        inputs[name] = action.event === 'down';
+        pendingSoftware[name] = inputs[name];
+      }
       else if (action.kind === 'sample') {
         const { kind, name, ...sample } = action;
         samples[name] = sample;
@@ -85,7 +94,13 @@ try {
             sampleProvenance: { epoch: generated.epoch, id: generated.id, timestampMs: generated.timestampMs },
           };
         }
-        const outcome = runtime.step({ nowMs: action.atMs, inputs, samples, intervals,
+        const produced = softwareProducer.stage(pendingSoftware, action.atMs);
+        for (const name of Object.keys(produced.samples)) {
+          if (Object.hasOwn(samples, name)) throw new Error(`duplicate software/sample observation ${name}`);
+        }
+        const rawInputs = Object.fromEntries(Object.entries(inputs).filter(([name]) => !softwareProducer.names.has(name)));
+        const outcome = runtime.step({ nowMs: action.atMs, inputs: rawInputs,
+          samples: { ...produced.samples, ...samples }, intervals,
           ...(action.events === undefined ? {} : { events: action.events }),
           objectiveSafeMax: Object.fromEntries((manifest.objectives ?? []).map(objective => {
             const binding = scenario.actuatorBindings?.find(item => item.output === objective.bindings.output);
@@ -117,6 +132,8 @@ try {
           ...(['GhostFlow/control-v10', 'GhostFlow/control-v15', 'GhostFlow/control-v18'].includes(manifest.format) ? { settingsState: runtime.contextSnapshot().state } : {}),
           ...(scenario.actuatorBindings === undefined ? {} : { virtualActuators }), ...(plant === undefined ? {} : { plant }) }));
         scanId += 1;
+        produced.commit();
+        pendingSoftware = {};
         samples = {};
         intervals = {};
       }
