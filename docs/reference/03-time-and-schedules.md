@@ -629,9 +629,12 @@ row만 보내면 안 된다. 기존 GFSF schedule evidence의 `provider`와 `cal
 허용하지 않는다. DST fold 선택은 선언한 `dst_repeated`를 따른다. Host가 존재하지
 않음을 확인한 `dst_missing = skip` local slot은 `instantMs = null` fact로 표시하거나
 확인된 skipped occurrence로 생략할 수 있다. evidence가 없다는 사실만으로 DST gap을
-증명하지는 않는다. 이 null은 정상 OFF나 새 planned instant로 바꾸지 않는다.
+증명하지는 않는다. Host가 반복 시각임을 확인한 `dst_repeated = skip` slot도
+`dst_missing = next_valid` 여부와 무관하게 `fold = 0`인 null fact로 표시할 수 있다.
+null fact는 `fold = 0`과 하나 이상의 선언된 skip 정책을 요구하며 구간을 만들지 않는다.
+gap과 반복 시각의 구분은 host의 책임이다. 이 null은 정상 OFF나 새 planned instant로 바꾸지 않는다.
 
-Rust는 field 범위, 선언된 slot key/minute, DST fold 선택, null gap의 허용 여부,
+Rust는 field 범위, 선언된 slot key/minute, DST fold 선택, null skip marker의 허용 여부,
 중복·충돌 identity/revision, row instant의 coverage 포함 여부와 실제 반열린 구간의
 비중첩을 검사한다. 현재 admit하여 고정한 구간도 중첩 검사에 포함한다. 연속 evidence의
 coverage가 겹치는 곳에서 이미 관측한 resolved instant의 fact가 사라지거나 충돌하면 거부한다. coverage

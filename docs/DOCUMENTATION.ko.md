@@ -137,3 +137,4 @@
 | `tasks/window-gfb4-design.md` | [English](../tasks/window-gfb4-design.md) | [한국어](../tasks/window-gfb4-design.ko.md) |
 | `tests/reference/DECISIONS.md` | [English](../tests/reference/DECISIONS.en.md) | [한국어](../tests/reference/DECISIONS.md) |
 | `tests/reference/README.md` | [English](../tests/reference/README.en.md) | [한국어](../tests/reference/README.md) |
+| `docs/HARDWARE-FRONT-MATTER.md` | [English](HARDWARE-FRONT-MATTER.md) | [한국어](HARDWARE-FRONT-MATTER.ko.md) |

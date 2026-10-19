@@ -64,7 +64,8 @@ Native/WASM 회귀 검사는 immutable IANA Range와 restart 결합 동작을 �
 한 compile이 artifact를 교체하는 동안 다른 reader가 ENOENT로 실패했다.
 256-scan console 검사도 동시 부하에서 90초 제한을 넘었지만 단독 calendar와
 console 검사는 각각 0.626초와 43.8초에 완료됐다. 따라서 verifier는
-`--test-concurrency=1`로 Node test file을 순차 실행하고 이 suite gate에 600초를
+dev의 console 단독 batch를 유지하며 `--test-concurrency=1`로 Node test file을
+순차 실행하고 각 suite gate에 600초를
 허용한다. 다른 gate는 180초를 유지한다. 이는 검증 실행 순서와 suite timeout의
 변경이며 scan 의미, 사용자 quota, 개별 test oracle 또는 runtime 제한을 바꾸지 않는다.
 

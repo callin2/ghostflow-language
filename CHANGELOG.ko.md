@@ -5,6 +5,28 @@
 
 ## 미출시
 
+### 2026-10-19 — 생략한 civil Range 반복 시각 fact ([#541](https://github.com/callin2/ghostflow-language/issues/541))
+
+불변 IANA Range는 `dst_missing = next_valid`와 함께 사용한
+`dst_repeated = skip`에서도 host의 null·fold-zero marker를 수용한다. 이전에는
+유효한 이 조합이 scan을 거부했다. null marker는 여전히 선언된 skip 정책과 fold 0을
+요구하며 구간을 만들거나 선택된 fold를 대신할 수 없다. Native/WASM/ghostsim
+회귀가 두 skip 정책과 잘못된 marker를 검사한다. GFB21 Range와 GFB22 lifecycle
+할당은 유지한다.
+
+### 2026-10-16 — 재사용 가능한 hardware front matter ([#555](https://github.com/callin2/ghostflow-language/issues/555))
+
+Reference 1.1은 정본 문서의 YAML `hardware`를 예약한다. 이전에는 무시하던
+하드웨어 선언을 정확한 소스에 묶인 plan으로 제공하며 고정 profile/module,
+일반 bus/instance 설정과 입력·출력 바인딩을 담는다. 예를 들어
+`current: { instance: power, channel: current }`는 Number 타입과 독립적으로
+드라이버를 선택하고 출력 렌더러도 같은 역할 모델을 사용한다. 잘못되거나
+모호한 YAML과 참조는 정본 위치에서 실패한다. 일반 front matter와
+GFB/runtime/package 형식은 유지한다. Provider schema와 배포 admission은 Device
+책임이며 hardware import 조합은 명시적으로 미지원이다.
+`tests/hardware-frontmatter.test.mjs`가 정체성, 중첩 설정, 역할, 오류 선언과 컴파일
+바이트 일치를 검증한다.
+
 ### 2026-10-14 — 서명된 immutable IANA Range 허용 ([#541](https://github.com/callin2/ghostflow-language/issues/541))
 
 Portable 서명은 실행 가능한 GFB21 profile을 거부했지만 이제 immutable IANA

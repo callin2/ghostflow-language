@@ -282,6 +282,29 @@ test('a declared missing DST occurrence is inert, and conflicting ordinary/fold 
   assert.equal((await parity(b, reversed, { ghostsim: false }))[0].accepted, false, 'fold first precedes second even when intervals do not overlap');
 });
 
+test('a skipped repeated DST occurrence accepts a null fold-zero fact with next_valid gaps', async () => {
+  const zone = 'America/New_York', instant = Date.parse('2026-11-01T05:30:00Z');
+  const sourceDay = Date.UTC(2026, 10, 1) / DAY;
+  for (const missing of ['skip', 'next_valid']) {
+    const a = await compile(rangeSource({ timezone: zone, selected: '[01:30]', duration: '30min', dstMissing: missing, dstRepeated: 'skip' }));
+    const frames = timed(a, [instant, instant + 30 * 60_000]).map(step => structuredClone(step));
+    for (const step of frames) {
+      step.schedules[0].rows.push(row(sourceDay, 90, null));
+      step.schedules[0].rows.sort((a,b) => a.sourceDay-b.sourceDay || a.slotKey-b.slotKey || a.fold-b.fold);
+    }
+    assert.deepEqual(outputs(await parity(a, frames)).map(o => o.pump), [false, false]);
+    for (const fold of [1, 2]) {
+      const invalid = structuredClone(frames);
+      for (const step of invalid) step.schedules[0].rows.find(r => r.sourceDay === sourceDay).fold = fold;
+      assert.equal((await parity(a, invalid, { ghostsim: false }))[0].accepted, false, 'null skip markers cannot manufacture selected folds');
+    }
+  }
+  const required = await compile(rangeSource({ timezone: zone, selected: '[01:30]', duration: '30min', dstMissing: 'next_valid', dstRepeated: 'first' }));
+  const invalid = timed(required, [instant]);
+  invalid[0].schedules[0].rows = [row(sourceDay, 90, null)];
+  assert.equal((await parity(required, invalid, { ghostsim: false }))[0].accepted, false, 'neither policy permits skipping');
+});
+
 test('actual IANA DST gap/fold facts select policy, preserve elapsed duration and reject actual overlap', async () => {
   const zone = 'America/New_York';
   const springDay = Date.UTC(2026, 2, 8) / DAY, fallDay = Date.UTC(2026, 10, 1) / DAY;

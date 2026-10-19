@@ -2,6 +2,13 @@
   "format": "GhostFlow/document-translations-v1",
   "documents": [
     {
+      "source": "docs/HARDWARE-FRONT-MATTER.md",
+      "sourceLanguage": "en",
+      "translation": "docs/HARDWARE-FRONT-MATTER.ko.md",
+      "sourceSha256": "5d07ad9669f6d35a6e1186c137aadef5b37c9a0d0ff318cd19024071ac188376",
+      "translationSha256": "51d46608022fe38cc40d707799303299d1f37c9c87ff3560db4b5a963ff83358"
+    },
+    {
       "source": "docs/BOOLEAN-OUTPUT-EXPLANATION.md",
       "sourceLanguage": "en",
       "translation": "docs/BOOLEAN-OUTPUT-EXPLANATION.ko.md",
@@ -250,8 +257,8 @@
       "source": "docs/DOCUMENTATION.md",
       "sourceLanguage": "en",
       "translation": "docs/DOCUMENTATION.ko.md",
-      "sourceSha256": "0a91d830797c1efcb3ba7b5e1e706b37adbe201835ff60e11a05a1538c0f8a27",
-      "translationSha256": "01aa42ab985dd6fdda4503bb4b1744527ec74cb5f86ddbdb4e57e6b33dc8ba31"
+      "sourceSha256": "8123c63c9beb43a69a39736a0f43e50e29d285d0264063609fc2224c33363b5f",
+      "translationSha256": "93d0eac02ef1bed3144574fe0f0c2e4ebf7d665d16536ddeab8c4e31f8755d55"
     },
     {
       "source": "docs/EXACT-INTEGER-CONTRACT.md",
@@ -404,8 +411,8 @@
       "source": "docs/reference/01-source-and-syntax.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/01-source-and-syntax.en.md",
-      "sourceSha256": "6176b93aed705249207eeb200d3a37374d88fbe224ff15a496c2626816b735c3",
-      "translationSha256": "065f19aa716a44e454656dcd9d7bddd7fbb2ffbb3c6294b7d2e80cb766d914ac"
+      "sourceSha256": "1993c128edf6b47b8f44c9a421cfd5106c2795ad32b8f5c7101a33eaee68b0d1",
+      "translationSha256": "b63e29b60d8fbf7b75ed4563cee51bb8e813509e141ef63731d958389db4aebc"
     },
     {
       "source": "docs/reference/02-types-expressions-state.md",
@@ -418,8 +425,8 @@
       "source": "docs/reference/03-time-and-schedules.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/03-time-and-schedules.en.md",
-      "sourceSha256": "f3f8ab0e30f35e0012bfdead62796c97ecc39ee052fb09974a0d2155c60ff93f",
-      "translationSha256": "3e183ab0127edbadb3cc73d17c3daaf9191fc7b24373b9f202607b8c19dfc15d"
+      "sourceSha256": "87cd5d29ad1fc5d301cf757302f47cc55a8b034118726494c84038a27ac64afa",
+      "translationSha256": "302d581d1fffc539cc397889602bb1ac596ed680c29d60528698047c67b573e1"
     },
     {
       "source": "docs/reference/04-sensors-constraints-control.md",
@@ -635,8 +642,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "3beb3b17f35bc32c9ff30eaf7a573ad4cd54fb755f23b038d44029aa9ff29f72",
-      "translationSha256": "2aa4dc648ff9b599c2da7a307ea51b40463525df3e5bec1903f677d5b9590dfc"
+      "sourceSha256": "a41d809eb624d131f9d99f12fa5252a2338491e073245f181de71b76e249807f",
+      "translationSha256": "84432c5e387d29a3c285af6e5cb4bcca8ed17cb5f75051f5ecce2cea02713d5c"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",
@@ -1083,8 +1090,8 @@
       "source": "docs/plans/2026-10-14-lifecycle-range-integration.md",
       "sourceLanguage": "en",
       "translation": "docs/plans/2026-10-14-lifecycle-range-integration.ko.md",
-      "sourceSha256": "93c0448c9ff6027cfd669413a1c84cfbd7043f1e9a8c3071e06a8f5b842f66c2",
-      "translationSha256": "1585081af8b19070a19e782c4222b0335b49951b1c523fd801f7512064edb2ed"
+      "sourceSha256": "6ee612c4c17a854e761fcd721bce92e752722c24421784b8e4399beb962201ea",
+      "translationSha256": "df024d821d092d3b891cbb6217d80f7a2dcfc80bc426478682fe18f2863d74f8"
     }
   ],
   "exclusions": [

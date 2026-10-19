@@ -5,6 +5,7 @@ import { compileAccountingControl, compileControl, compileControlPolicyDescripto
 import { isWellFormedUnicode, sha256Hex, utf8ByteLength } from './sha256.mjs';
 import { compileComposition, resolveDocument } from './composition.mjs';
 import { emitExplanationArtifact } from './explanation.mjs';
+import { parseHardwareFrontMatter, validateHardwareBindings, HardwareFrontMatterError } from './hardware-frontmatter.mjs';
 
 export { emitInteractionSchema } from './interaction-schema.mjs';
 
@@ -83,6 +84,7 @@ export function compileSourceSync(source, options = {}) {
   requireFilename(filename, 'source filename');
   requireSourceText(source, `${filename}: source`);
   if (!filename.endsWith('.ghost.md')) throw new Error(`${filename}: GhostFlow product compilation requires a canonical .ghost.md literate source`);
+  const hardwarePlan = parseHardwareFrontMatter(source, { filename });
   let extraction;
   try { extraction = extractLiterate(source, { filename }); }
   catch (error) {
@@ -95,6 +97,8 @@ export function compileSourceSync(source, options = {}) {
   let result, composition, stage = 'parse';
   try {
     const ast = parseControl(extraction.code, { filename });
+    if (hardwarePlan && ast.imports?.length) throw new HardwareFrontMatterError(hardwarePlan.source,
+      hardwarePlan.locations['/hardware'], 'hardware declarations in executable import composition are not supported');
     stage = 'semantic';
     if (options.sourceClosure !== undefined && ast.imports?.length) {
       composition = compileComposition(source, filename, options.sourceClosure);
@@ -116,6 +120,7 @@ export function compileSourceSync(source, options = {}) {
     // path as a single failure. Preserve the original thrown error/message.
     const failures = error.collectedErrors ?? [error];
     const mapFailure = error => {
+      if (error.name === 'HardwareFrontMatterError') return error.diagnosticEnvelope;
       const errorDocument = error.filename === filename ? null : options.sourceClosure?.find(document => resolveDocument('', document.filename) === error.filename);
       if (error.name === 'LiterateError' && errorDocument) {
         attachDiagnostic(error, 'GF_LITERATE', { filename: errorDocument.filename, text: errorDocument.text }, undefined,
@@ -158,6 +163,7 @@ export function compileSourceSync(source, options = {}) {
     };
     throw error;
   }
+  validateHardwareBindings(hardwarePlan, result.manifest);
   if (extraction.anchors.length || extraction.linkDirectives.length) {
     const ast = parseControl(extraction.code, { filename });
     result = {
@@ -239,6 +245,7 @@ export function compileSourceSync(source, options = {}) {
     } : null,
     extractionMap: extraction.sourceMap,
     warnings: extraction.warnings,
+    ...(hardwarePlan ? { hardwarePlan } : {}),
   };
   let schema = null;
   try {

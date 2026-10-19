@@ -1538,7 +1538,9 @@ impl Engine {
                 .and_then(|index| starts.get(index));
             if slot != Some(&(u64::from(row.minute_of_day) * 60_000))
                 || !fold_allowed(row.fold, repeated)
-                || row.instant_ms.is_none() && (missing != 0 || row.fold != 0)
+                // Null fold-zero rows can mark either an explicitly skipped
+                // gap or a repeated slot. The host resolves which DST case it is.
+                || row.instant_ms.is_none() && ((missing != 0 && repeated != 3) || row.fold != 0)
                 || !seen.insert(key(row))
             {
                 return Err(invalid(

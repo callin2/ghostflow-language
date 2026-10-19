@@ -67,7 +67,8 @@ WASM output: one reader failed with ENOENT while another compilation replaced
 that artifact. A 256-scan console case also exceeded its 90-second bound under
 concurrent load; isolated calendar and console checks completed in 0.626 and
 43.8 seconds. The verifier therefore runs Node test files serially with
-`--test-concurrency=1` and allows 600 seconds for that suite gate; other gates
+`--test-concurrency=1`, preserving dev's isolated console test batch, and allows
+600 seconds for each suite gate; other gates
 retain 180 seconds. This changes verification scheduling and the suite timeout,
 not scan semantics, user quotas, individual test oracles or runtime limits.
 

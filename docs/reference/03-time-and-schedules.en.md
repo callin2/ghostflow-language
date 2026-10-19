@@ -429,10 +429,14 @@ is the one-based ordinal after sorting the immutable literal list by time, and
 authored `dst_repeated`. A host-resolved nonexistent local slot with
 `dst_missing = skip` may be represented by an `instantMs = null` fact or omitted
 as a known skipped occurrence. Absent evidence alone does not establish a DST
-gap. Do not replace this null with healthy OFF or invent a planned instant.
+gap. A host-resolved repeated slot with `dst_repeated = skip` may likewise use a
+null fact with `fold = 0`, including when `dst_missing = next_valid`. Null facts
+require `fold = 0` and at least one authored skip policy; they create no interval.
+The host remains responsible for distinguishing a gap from a repeated slot.
+Do not replace this null with healthy OFF or invent a planned instant.
 
 Rust checks field ranges, declared slot key/minute, DST fold selection, whether a
-null gap is permitted, duplicate/conflicting identities and revisions, row
+null skip marker is permitted, duplicate/conflicting identities and revisions, row
 instants within coverage, and non-overlap of actual half-open intervals. Include
 the frozen currently admitted interval in overlap checks. Reject disappearance
 or conflict of a previously observed resolved-instant fact where successive coverage overlaps.
