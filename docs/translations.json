@@ -2,6 +2,13 @@
   "format": "GhostFlow/document-translations-v1",
   "documents": [
     {
+      "source": "docs/INTENT-CONSISTENCY-CONTRACT.md",
+      "sourceLanguage": "ko",
+      "translation": "docs/INTENT-CONSISTENCY-CONTRACT.en.md",
+      "sourceSha256": "3248c8cba361420600e576d1e95ed067d2c010b559ebf54e36d25220712460c9",
+      "translationSha256": "93638f5e6962b770ead15af1956d928e37de2c5a55442df1ddc46528d0e8d23e"
+    },
+    {
       "source": "docs/HARDWARE-FRONT-MATTER.md",
       "sourceLanguage": "en",
       "translation": "docs/HARDWARE-FRONT-MATTER.ko.md",
@@ -257,8 +264,8 @@
       "source": "docs/DOCUMENTATION.md",
       "sourceLanguage": "en",
       "translation": "docs/DOCUMENTATION.ko.md",
-      "sourceSha256": "8123c63c9beb43a69a39736a0f43e50e29d285d0264063609fc2224c33363b5f",
-      "translationSha256": "93d0eac02ef1bed3144574fe0f0c2e4ebf7d665d16536ddeab8c4e31f8755d55"
+      "sourceSha256": "786ad1a0be37ebec470bb1371ff4da0dd74461b2ef6b804effb0c5450ff9f425",
+      "translationSha256": "2417246a4d277a4fb5dfcddcc142ae0b615180b6b2f616c3236cc5bf07f0bd9a"
     },
     {
       "source": "docs/EXACT-INTEGER-CONTRACT.md",

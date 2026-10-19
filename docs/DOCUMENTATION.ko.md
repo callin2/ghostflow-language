@@ -38,6 +38,7 @@
 | `docs/GFB5-SCHEDULE-PRELUDE.md` | [English](GFB5-SCHEDULE-PRELUDE.md) | [한국어](GFB5-SCHEDULE-PRELUDE.ko.md) |
 | `docs/IMPLEMENTATION.md` | [English](IMPLEMENTATION.md) | [한국어](IMPLEMENTATION.ko.md) |
 | `docs/INTENT-ANCHOR-MAP.md` | [English](INTENT-ANCHOR-MAP.md) | [한국어](INTENT-ANCHOR-MAP.ko.md) |
+| `docs/INTENT-CONSISTENCY-CONTRACT.md` | [English](INTENT-CONSISTENCY-CONTRACT.en.md) | [한국어](INTENT-CONSISTENCY-CONTRACT.md) |
 | `docs/KEYBOARD-HOST.md` | [English](KEYBOARD-HOST.md) | [한국어](KEYBOARD-HOST.ko.md) |
 | `docs/LANGUAGE-EXAMPLES.md` | [English](LANGUAGE-EXAMPLES.en.md) | [한국어](LANGUAGE-EXAMPLES.md) |
 | `docs/LANGUAGE-MVP-0.1.md` | [English](LANGUAGE-MVP-0.1.md) | [한국어](LANGUAGE-MVP-0.1.ko.md) |
