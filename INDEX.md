@@ -124,6 +124,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/HOST-EVENT-ORDERING-CONTRACT.md](docs/HOST-EVENT-ORDERING-CONTRACT.md) | Host event ordering contract | md |
 | [docs/IMPLEMENTATION.ko.md](docs/IMPLEMENTATION.ko.md) | 구현 및 아티팩트 경계 | md |
 | [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) | Implementation and artifact boundaries | md |
+| [docs/INCIDENT-REPLAY.ko.md](docs/INCIDENT-REPLAY.ko.md) | incident 캡처와 재현 | md |
+| [docs/INCIDENT-REPLAY.md](docs/INCIDENT-REPLAY.md) | Incident capture and replay | md |
 | [docs/INDEX.md](docs/INDEX.md) | Documentation index | md |
 | [docs/INPUT-MIGRATION.ko.md](docs/INPUT-MIGRATION.ko.md) | 외부 입력의 canonical 선언과 명시적 revision migration | md |
 | [docs/INPUT-MIGRATION.md](docs/INPUT-MIGRATION.md) | Canonical external input and explicit revision migration | md |
@@ -523,4 +525,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-393 documents.
+395 documents.

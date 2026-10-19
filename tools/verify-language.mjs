@@ -259,6 +259,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/scan-frame-wasm.test.mjs',
   'tests/scan-tape-parity.test.mjs',
   'tests/ghostsim.test.mjs',
+  'tests/ghostsim-incident.test.mjs',
   'tests/ghostsim-closed-loop.test.mjs',
   'tests/ghostsim-continuous-io.test.mjs',
   'tests/ghostsim-temporal.test.mjs',

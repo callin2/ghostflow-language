@@ -1092,6 +1092,13 @@
       "translation": "docs/plans/2026-10-14-lifecycle-range-integration.ko.md",
       "sourceSha256": "6ee612c4c17a854e761fcd721bce92e752722c24421784b8e4399beb962201ea",
       "translationSha256": "df024d821d092d3b891cbb6217d80f7a2dcfc80bc426478682fe18f2863d74f8"
+    },
+    {
+      "source": "docs/INCIDENT-REPLAY.md",
+      "sourceLanguage": "en",
+      "translation": "docs/INCIDENT-REPLAY.ko.md",
+      "sourceSha256": "e0be08a89fb5525a64eab63492c0ea94119e2ca7f6ef3bb29db09251020e7921",
+      "translationSha256": "987f8fc7c43db30771b42e48232ae11dbaa18cd19df701fa1f72b5c5c4101187"
     }
   ],
   "exclusions": [

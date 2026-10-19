@@ -462,7 +462,7 @@ export function runScenario(artifactPath, scenarioPath, { format = 'toon' } = {}
     if (Buffer.byteLength(encoded) > MAX_RESULT_BYTES) {
       return hostError(new Error(`result budget ${MAX_RESULT_BYTES} bytes exceeded`));
     }
-    return { encoded, success: !failed };
+    return { encoded, success: !failed, executor: conditioned ? 'wasm' : 'native' };
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }
