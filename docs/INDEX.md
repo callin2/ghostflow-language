@@ -21,6 +21,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/AFTER-EVENT-WASM-ABI.md](AFTER-EVENT-WASM-ABI.md) | Identified after_event execution ABI | md |
 | [docs/AI-CONTRIBUTION-PACKAGE.ko.md](AI-CONTRIBUTION-PACKAGE.ko.md) | 범위를 제한한 AI 기여 작업 패키지 | md |
 | [docs/AI-CONTRIBUTION-PACKAGE.md](AI-CONTRIBUTION-PACKAGE.md) | Bounded AI contribution package | md |
+| [docs/BEHAVIOR-COMPARISON.ko.md](BEHAVIOR-COMPARISON.ko.md) | 제한된 동작 비교 | md |
+| [docs/BEHAVIOR-COMPARISON.md](BEHAVIOR-COMPARISON.md) | Bounded behavior comparison | md |
 | [docs/BEHAVIOR-COMPOSITION-RESEARCH.ko.md](BEHAVIOR-COMPOSITION-RESEARCH.ko.md) | 동작 조합: 연구와 아키텍처 검토 | md |
 | [docs/BEHAVIOR-COMPOSITION-RESEARCH.md](BEHAVIOR-COMPOSITION-RESEARCH.md) | Behavior composition: research and architecture review | md |
 | [docs/BOOLEAN-OUTPUT-EXPLANATION.ko.md](BOOLEAN-OUTPUT-EXPLANATION.ko.md) | Boolean 요청 출력 설명 | md |
@@ -251,4 +253,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.ko.md](research/GF-COMPOSE-R9-ACCEPTANCE.ko.md) | GF-COMPOSE R9: acceptance와 구현 인계 | md |
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.md](research/GF-COMPOSE-R9-ACCEPTANCE.md) | GF-COMPOSE R9: acceptance and implementation handoff | md |
 
-212 documents.
+214 documents.
