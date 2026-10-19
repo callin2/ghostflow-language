@@ -79,6 +79,15 @@ retains its non-executable behavior. See [Hardware declarations](../HARDWARE-FRO
 for structure, examples and provider validation boundaries.
 Why: installation intent and control rules are reviewed in one revision while Device owns board behavior.
 
+Compact authoring reserves root `profile`, optional `devices`, and `bindings`.
+Supplying a pinned `hardwareProfiles` closure to `compileSource`/`compileSourceSync`
+validates inheritance, explicit default connections, parameters, communication
+conditions, address conflicts, and channel types. Every logical input/output needs
+a binding. The returned `hardwarePlan` has format `GhostFlow/profile-resolution-v1`,
+not an unresolved declaration. Missing profiles are never guessed. Follow the
+[design and staged scope](../PROFILE-FRONT-MATTER.en.md). The purpose is to avoid
+making customers repeat facts already known by the board and driver.
+
 ## 1.2 Original source, locations, and intent links
 
 The original document's prose, `//` comments, Unicode, line endings, and final newline are language assets to preserve exactly. Syntax and type diagnostics refer to the file, line, and column of the original `.ghost.md`, rather than merged temporary text. If a closing brace is missing across several fences, the diagnostic must be able to identify both the declaration start and the document end.

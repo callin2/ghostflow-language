@@ -2,11 +2,25 @@
   "format": "GhostFlow/document-translations-v1",
   "documents": [
     {
+      "source": "examples/hardware/rs485-current-relay.ghost.md",
+      "sourceLanguage": "ko",
+      "translation": "examples/hardware/rs485-current-relay.ghost.en.md",
+      "sourceSha256": "a13002e0a2436d226c4530b5c00746114fb30ad900cca6164d626783bfb1257b",
+      "translationSha256": "1ee1ed13c4f16ba711937bdee94d05a826b670df753e38ce4156e58c682bd461"
+    },
+    {
+      "source": "docs/PROFILE-FRONT-MATTER.md",
+      "sourceLanguage": "ko",
+      "translation": "docs/PROFILE-FRONT-MATTER.en.md",
+      "sourceSha256": "c77f8b765be9473835282a1af00ee2bc4af4e2baee9a11bb1e54e97b01a07c43",
+      "translationSha256": "6d756cd86a5264945452f6f15c1d90f7339547b9fad64ab95eb7a6aebeaba9ed"
+    },
+    {
       "source": "docs/HARDWARE-FRONT-MATTER.md",
       "sourceLanguage": "en",
       "translation": "docs/HARDWARE-FRONT-MATTER.ko.md",
-      "sourceSha256": "5d07ad9669f6d35a6e1186c137aadef5b37c9a0d0ff318cd19024071ac188376",
-      "translationSha256": "51d46608022fe38cc40d707799303299d1f37c9c87ff3560db4b5a963ff83358"
+      "sourceSha256": "d5f1f1ecae5a4d02ee4369a62976923e0f594f442666d61771dffa6c0005ffb7",
+      "translationSha256": "0a877b6f6ef8758648fc74124e11c053645f1d556d04006beb9a191fb0e01977"
     },
     {
       "source": "docs/BOOLEAN-OUTPUT-EXPLANATION.md",
@@ -411,8 +425,8 @@
       "source": "docs/reference/01-source-and-syntax.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/01-source-and-syntax.en.md",
-      "sourceSha256": "1993c128edf6b47b8f44c9a421cfd5106c2795ad32b8f5c7101a33eaee68b0d1",
-      "translationSha256": "b63e29b60d8fbf7b75ed4563cee51bb8e813509e141ef63731d958389db4aebc"
+      "sourceSha256": "201088bdf5df8058a8267a2ccee288ec8cd2d7cc29a012fe30ce49ba9d825357",
+      "translationSha256": "d109be89f094f4339236fc14fc6e3188f9317ea36e488caab2048f8191e8b5b1"
     },
     {
       "source": "docs/reference/02-types-expressions-state.md",
@@ -642,8 +656,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "a41d809eb624d131f9d99f12fa5252a2338491e073245f181de71b76e249807f",
-      "translationSha256": "84432c5e387d29a3c285af6e5cb4bcca8ed17cb5f75051f5ecce2cea02713d5c"
+      "sourceSha256": "2ad6dcbf8a72c303eca75c509c7ad73626859fba62319f4d2797da758cb82f3a",
+      "translationSha256": "15151e047b78a42dc96734d7ffa81335e4b55cec651ee7bf7bb5cb6b74a78973"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",

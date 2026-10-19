@@ -11,6 +11,19 @@ skip policy and fold zero, create no interval, and cannot substitute selected
 folds. Native/WASM/ghostsim regressions cover both skip policies and invalid
 markers. GFB21 Range and GFB22 lifecycle allocations remain unchanged.
 
+### 2026-10-17 — compact profile front matter ([#555](https://github.com/callin2/ghostflow-language/issues/555))
+
+The public compile API accepts `profile`, optional `devices`, and flat `bindings`
+with a caller-supplied `hardwareProfiles` closure. Board/driver defaults replace
+repeated customer hardware details. Fixed profile inheritance, generic typed
+parameter overrides, explicit default connections, transport/protocol/settings,
+shared-resource address conflicts and typed channel bindings are checked with
+canonical source locations. Missing profiles are errors, never implicit hardware
+defaults. Node/browser API checks preserve source and executable bytes. The
+[purpose-led design](docs/PROFILE-FRONT-MATTER.en.md) distinguishes this Language
+slice from pending real profile publication, CLI/package integration and MCU bus
+sharing. This does not change the runtime ABI or claim new device acceptance.
+
 ### 2026-10-16 — reusable hardware front matter ([#555](https://github.com/callin2/ghostflow-language/issues/555))
 
 Reference 1.1 now reserves YAML `hardware` in canonical documents. Previously

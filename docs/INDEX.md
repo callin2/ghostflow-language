@@ -112,6 +112,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/OPTIMIZER-PASS-CONTRACT.md](OPTIMIZER-PASS-CONTRACT.md) | Optimizer pass contract | md |
 | [docs/PORTABLE-PACKAGE.ko.md](PORTABLE-PACKAGE.ko.md) | 이식 가능한 GFB 패키지 v1 | md |
 | [docs/PORTABLE-PACKAGE.md](PORTABLE-PACKAGE.md) | Portable GFB package v1 | md |
+| [docs/PROFILE-FRONT-MATTER.en.md](PROFILE-FRONT-MATTER.en.md) | Profile-based Front Matter Design | md |
+| [docs/PROFILE-FRONT-MATTER.md](PROFILE-FRONT-MATTER.md) | Profile 기반 front matter 설계 | md |
 | [docs/ProgrammingInGhostflow.en.md](ProgrammingInGhostflow.en.md) | Programming in GhostFlow | md |
 | [docs/ProgrammingInGhostflow.md](ProgrammingInGhostflow.md) | Programming in GhostFlow | md |
 | [docs/REFERENCE-FEATURE-STATUS.md](REFERENCE-FEATURE-STATUS.md) | Reference feature maturity and evidence | md |
@@ -251,4 +253,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.ko.md](research/GF-COMPOSE-R9-ACCEPTANCE.ko.md) | GF-COMPOSE R9: acceptance와 구현 인계 | md |
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.md](research/GF-COMPOSE-R9-ACCEPTANCE.md) | GF-COMPOSE R9: acceptance and implementation handoff | md |
 
-212 documents.
+214 documents.

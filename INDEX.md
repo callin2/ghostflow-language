@@ -167,6 +167,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/OPTIMIZER-PASS-CONTRACT.md](docs/OPTIMIZER-PASS-CONTRACT.md) | Optimizer pass contract | md |
 | [docs/PORTABLE-PACKAGE.ko.md](docs/PORTABLE-PACKAGE.ko.md) | 이식 가능한 GFB 패키지 v1 | md |
 | [docs/PORTABLE-PACKAGE.md](docs/PORTABLE-PACKAGE.md) | Portable GFB package v1 | md |
+| [docs/PROFILE-FRONT-MATTER.en.md](docs/PROFILE-FRONT-MATTER.en.md) | Profile-based Front Matter Design | md |
+| [docs/PROFILE-FRONT-MATTER.md](docs/PROFILE-FRONT-MATTER.md) | Profile 기반 front matter 설계 | md |
 | [docs/ProgrammingInGhostflow.en.md](docs/ProgrammingInGhostflow.en.md) | Programming in GhostFlow | md |
 | [docs/ProgrammingInGhostflow.md](docs/ProgrammingInGhostflow.md) | Programming in GhostFlow | md |
 | [docs/REFERENCE-FEATURE-STATUS.md](docs/REFERENCE-FEATURE-STATUS.md) | Reference feature maturity and evidence | md |
@@ -376,6 +378,13 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | --- | --- | --- |
 | [examples/curriculum/generated/pc-01-e01.generated.ghost.md](examples/curriculum/generated/pc-01-e01.generated.ghost.md) | PC-01 — E01 executable projection | md |
 
+## examples/hardware/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [examples/hardware/rs485-current-relay.ghost.en.md](examples/hardware/rs485-current-relay.ghost.en.md) | RS485 Current Inputs and RYR408B 8-Channel Relay Outputs | md |
+| [examples/hardware/rs485-current-relay.ghost.md](examples/hardware/rs485-current-relay.ghost.md) | RS485 전류 입력과 RYR408B 8채널 릴레이 출력 | md |
+
 ## examples/programming-book-imports/
 
 | Path | Title | Type |
@@ -525,4 +534,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-395 documents.
+399 documents.

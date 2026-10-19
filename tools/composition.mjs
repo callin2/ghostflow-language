@@ -44,7 +44,7 @@ export function compileComposition(source, filename, supplied) {
     if (active.has(key)) throw new Error(`executable import cycle at ${key}`);
     if (units.has(key)) return units.get(key);
     const hardware = parseHardwareFrontMatter(text, { filename: name });
-    if (hardware) throw new HardwareFrontMatterError(hardware.source, hardware.locations['/hardware'],
+    if (hardware) throw new HardwareFrontMatterError(hardware.source, hardware.locations['/hardware'] ?? hardware.locations['/profile'],
       'hardware declarations in executable import composition are not supported');
     const extraction = extractLiterate(text, { filename: name });
     let ast;
