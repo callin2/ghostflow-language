@@ -62,6 +62,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/GFB5-SCHEDULE-PRELUDE.md](GFB5-SCHEDULE-PRELUDE.md) | GFB5 schedule prelude | md |
 | [docs/GHOST-TIMELINE.ko.md](GHOST-TIMELINE.ko.md) | 제한된 live timeline과 ghost rewind | md |
 | [docs/GHOST-TIMELINE.md](GHOST-TIMELINE.md) | Bounded live timeline and ghost rewind | md |
+| [docs/HARDWARE-FRONT-MATTER.ko.md](HARDWARE-FRONT-MATTER.ko.md) | 정본 소스의 하드웨어 선언 | md |
+| [docs/HARDWARE-FRONT-MATTER.md](HARDWARE-FRONT-MATTER.md) | Hardware declarations in canonical source | md |
 | [docs/HOST-EVENT-ORDERING-CONTRACT.ko.md](HOST-EVENT-ORDERING-CONTRACT.ko.md) | Host 이벤트 순서 계약 | md |
 | [docs/HOST-EVENT-ORDERING-CONTRACT.md](HOST-EVENT-ORDERING-CONTRACT.md) | Host event ordering contract | md |
 | [docs/IMPLEMENTATION.ko.md](IMPLEMENTATION.ko.md) | 구현 및 아티팩트 경계 | md |

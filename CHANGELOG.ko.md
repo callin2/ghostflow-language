@@ -5,6 +5,19 @@
 
 ## 미출시
 
+### 2026-10-16 — 재사용 가능한 hardware front matter ([#555](https://github.com/callin2/ghostflow-language/issues/555))
+
+Reference 1.1은 정본 문서의 YAML `hardware`를 예약한다. 이전에는 무시하던
+하드웨어 선언을 정확한 소스에 묶인 plan으로 제공하며 고정 profile/module,
+일반 bus/instance 설정과 입력·출력 바인딩을 담는다. 예를 들어
+`current: { instance: power, channel: current }`는 Number 타입과 독립적으로
+드라이버를 선택하고 출력 렌더러도 같은 역할 모델을 사용한다. 잘못되거나
+모호한 YAML과 참조는 정본 위치에서 실패한다. 일반 front matter와
+GFB/runtime/package 형식은 유지한다. Provider schema와 배포 admission은 Device
+책임이며 hardware import 조합은 명시적으로 미지원이다.
+`tests/hardware-frontmatter.test.mjs`가 정체성, 중첩 설정, 역할, 오류 선언과 컴파일
+바이트 일치를 검증한다.
+
 ### 2026-10-06 — 실행 가능한 의도 출처 진단 ([#537](https://github.com/callin2/ghostflow-language/issues/537))
 
 Reference 1.2 의도 링크 계약의 버그 수정입니다. 스키마 요청에서 링크 없는

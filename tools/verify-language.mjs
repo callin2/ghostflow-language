@@ -11,9 +11,11 @@ import { CURRICULUM_REPLAY_MANIFEST, prepareCurriculumReplays, verifyCurriculumR
 import { PC01_PROJECTION, verifyPc01Projection } from './generate-pc-01-projection.mjs';
 import { verificationSourceHashes } from './verification-sources.mjs';
 import { readCatalog, validateCatalog } from '../contracts/requirements/validate.mjs';
+import { languageTestBatches } from './verification-test-batches.mjs';
 
 // Deliberately explicit. Product/LLM/device tests belong to other repositories.
 export const LANGUAGE_TESTS = Object.freeze([
+  'tests/hardware-frontmatter.test.mjs',
   'tests/canonical-input.test.mjs',
   'tests/build-identity.test.mjs',
   'tests/software-input-producer.test.mjs',
@@ -493,7 +495,9 @@ async function verify(nodeOnly, curriculumOnly) {
       wasmVerified = true;
     }
     report.plcCurriculum.replay.runtime = await verifyCurriculumReplayWasm(fs.readFileSync(wasmPath), { repositoryRoot: root });
-    await gate(process.execPath, ['--test', ...LANGUAGE_TESTS]);
+    for (const tests of languageTestBatches(LANGUAGE_TESTS)) {
+      await gate(process.execPath, ['--test', ...tests]);
+    }
     if (!nodeOnly) {
       await gate(process.execPath, ['tools/tutorial.mjs', '--no-build']);
       report.resources = JSON.parse(await gate('cargo', ['run', '--locked', '--offline', '-q', '-p', 'ghostflow-core', '--example', 'resource_report']));

@@ -2,6 +2,13 @@
   "format": "GhostFlow/document-translations-v1",
   "documents": [
     {
+      "source": "docs/HARDWARE-FRONT-MATTER.md",
+      "sourceLanguage": "en",
+      "translation": "docs/HARDWARE-FRONT-MATTER.ko.md",
+      "sourceSha256": "5d07ad9669f6d35a6e1186c137aadef5b37c9a0d0ff318cd19024071ac188376",
+      "translationSha256": "51d46608022fe38cc40d707799303299d1f37c9c87ff3560db4b5a963ff83358"
+    },
+    {
       "source": "docs/BOOLEAN-OUTPUT-EXPLANATION.md",
       "sourceLanguage": "en",
       "translation": "docs/BOOLEAN-OUTPUT-EXPLANATION.ko.md",
@@ -250,8 +257,8 @@
       "source": "docs/DOCUMENTATION.md",
       "sourceLanguage": "en",
       "translation": "docs/DOCUMENTATION.ko.md",
-      "sourceSha256": "0a91d830797c1efcb3ba7b5e1e706b37adbe201835ff60e11a05a1538c0f8a27",
-      "translationSha256": "01aa42ab985dd6fdda4503bb4b1744527ec74cb5f86ddbdb4e57e6b33dc8ba31"
+      "sourceSha256": "8123c63c9beb43a69a39736a0f43e50e29d285d0264063609fc2224c33363b5f",
+      "translationSha256": "93d0eac02ef1bed3144574fe0f0c2e4ebf7d665d16536ddeab8c4e31f8755d55"
     },
     {
       "source": "docs/EXACT-INTEGER-CONTRACT.md",
@@ -404,8 +411,8 @@
       "source": "docs/reference/01-source-and-syntax.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/01-source-and-syntax.en.md",
-      "sourceSha256": "666c1788087f2a69189af26cadde30d1a2e00a26546031e5b00639ef4347c612",
-      "translationSha256": "6bd0cc17dbbb9427f9fed8aec6cead11f4d0c3d2707d8cb3ff688f1d939d6f13"
+      "sourceSha256": "d3fce6418819a2d5445804433a5d8e947479020267b26897a935b6edd53d962b",
+      "translationSha256": "d4c06e3a7a5009b816cf1f260dad3c4a7b83aa6b46b6898564e9c4a29ba9277b"
     },
     {
       "source": "docs/reference/02-types-expressions-state.md",
@@ -635,8 +642,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "3dadb9a6b1bcac8d2ba35a5076449ab40009ab9b04698bf418581a7fac7a84c0",
-      "translationSha256": "b90f72b9bb7646fb229a94650ff243f1f8b7aaeaf60891fa57fac43280fa54fb"
+      "sourceSha256": "4051238052cef3d6f901bf6b42912031eac3d15f303437331ea82281e10dd7db",
+      "translationSha256": "e1ddb3e3575efc48cb5e4a20e8864819ce1759e7b4411ed604fe188edc63797e"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",

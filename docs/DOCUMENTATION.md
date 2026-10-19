@@ -9,6 +9,7 @@ evidence and test inputs have explicit exclusions in [the manifest](translations
 
 | Document | English | 한국어 |
 |---|---|---|
+| `docs/HARDWARE-FRONT-MATTER.md` | [English](HARDWARE-FRONT-MATTER.md) | [한국어](HARDWARE-FRONT-MATTER.ko.md) |
 | `AGENTS.md` | [English](../AGENTS.md) | [한국어](../AGENTS.ko.md) |
 | `README.md` | [English](../README.md) | [한국어](../README.ko.md) |
 | `CONTRIBUTING.md` | [English](../CONTRIBUTING.md) | [한국어](../CONTRIBUTING.ko.md) |
