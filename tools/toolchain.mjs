@@ -10,6 +10,7 @@ import { equalBytes, isWellFormedUnicode, sha256Hex, utf8ByteLength } from './sh
 
 export { emitInteractionSchema };
 export { prepareOutputExplanation, joinOutputExplanation, EXPLANATION_LIMITS } from './explanation.mjs';
+export { intentInterpretationDigest, intentConditionDigest, INTENT_EVIDENCE_LIMITS } from './intent-evidence.mjs';
 
 const SOURCE_LIMIT = 1024 * 1024;
 const SOURCE_DOCUMENT_FORMAT = 'GhostFlow/source-document-v1';
@@ -132,10 +133,11 @@ function sourceMapEnvelope(result, bytes) {
     traceMetadata: result.traceMetadata ?? null,
     interactionSchema: result.interactionSchema ?? null,
     interactionSourceIdentity: result.interactionSourceIdentity ?? null,
+    ...(result.intentEvidence ? { intentEvidence: result.intentEvidence.record } : {}),
   };
 }
 
-function validateArtifactSourceMap(map, bytes, { expectedSourceSha256, requireTraceMetadata = false, manifest } = {}) {
+function validateArtifactSourceMap(map, bytes, { expectedSourceSha256, expectedIntentEvidenceSha256, requireTraceMetadata = false, manifest } = {}) {
   if (!map || typeof map !== 'object' || Array.isArray(map)) throw new Error('source map must be an object');
   if (map.format !== SOURCE_MAP_FORMAT) throw new Error(`unsupported source map format ${String(map.format)}`);
   if (!Array.isArray(map.nodes)) throw new Error('source map nodes must be an array');
@@ -158,6 +160,24 @@ function validateArtifactSourceMap(map, bytes, { expectedSourceSha256, requireTr
     if (document.sha256 !== expectedSourceSha256) throw new Error('source document SHA-256 does not match expected revision');
   }
 
+  // Recompute the report from canonical source, never trust a caller's saved verdict.
+  // No supplied external record is promoted into authority or semantic proof.
+  let intentEvidence;
+  if (Object.hasOwn(map, 'intentEvidence')) {
+    const replay = compileSourceSync(document.text, {
+      filename: document.filename,
+      ...(map.sourceClosure ? { sourceClosure: map.sourceClosure.documents } : {}),
+      ...(map.interactionSourceIdentity ? { interactionSourceIdentity: map.interactionSourceIdentity } : {}),
+      intentEvidence: map.intentEvidence,
+    });
+    if (!equalBytes(replay.bytes, artifactBytes)) throw new Error('intent evidence canonical source does not reproduce artifact bytecode');
+    intentEvidence = replay.intentEvidence;
+  }
+  if (expectedIntentEvidenceSha256 !== undefined) {
+    requireDigest(expectedIntentEvidenceSha256, 'expected intent evidence SHA-256');
+    if (intentEvidence?.recordSha256 !== expectedIntentEvidenceSha256) throw new Error('intent evidence missing or different from expected record');
+  }
+
   if (map.sourceClosure !== undefined) {
     if (map.sourceClosure?.format !== 'GhostFlow/source-closure-v1') throw new Error('invalid source closure format');
     const replay = compileSourceSync(document.text, {
@@ -171,7 +191,7 @@ function validateArtifactSourceMap(map, bytes, { expectedSourceSha256, requireTr
       if (canonicalJson(replay[field]) !== canonicalJson(actual)) throw new Error(`source closure ${field} does not match canonical source`);
     }
     if (manifest && canonicalJson(manifest) !== canonicalJson(replay.manifest)) throw new Error('composition manifest does not match canonical source');
-    return { document, traceMetadata: replay.traceMetadata, interactionSchema: replay.interactionSchema,
+    return { document, ...(intentEvidence ? { intentEvidence } : {}), traceMetadata: replay.traceMetadata, interactionSchema: replay.interactionSchema,
       interactionSourceIdentity: replay.interactionSourceIdentity, sourceClosure: replay.sourceClosure };
   }
   const hasTraceMetadata = Object.hasOwn(map, 'traceMetadata');
@@ -221,7 +241,7 @@ function validateArtifactSourceMap(map, bytes, { expectedSourceSha256, requireTr
     }, map.interactionSchema);
     interactionSourceIdentity = { documentId: identity.documentId, revisionId: identity.revisionId };
   }
-  return { document, traceMetadata: hasTraceMetadata ? map.traceMetadata : null, interactionSchema, interactionSourceIdentity };
+  return { document, ...(intentEvidence ? { intentEvidence } : {}), traceMetadata: hasTraceMetadata ? map.traceMetadata : null, interactionSchema, interactionSourceIdentity };
 }
 
 export function verifyArtifactSourceMap(map, bytes, options = {}) {
@@ -233,6 +253,7 @@ export function restoreArtifactSourceMap(map, bytes, options = {}) {
   const restored = validateArtifactSourceMap(map, bytes, { ...options, requireTraceMetadata: true });
   return {
     sourceDocument: restored.document,
+    ...(restored.intentEvidence ? { intentEvidence: restored.intentEvidence } : {}),
     ...(restored.sourceClosure ? { sourceClosure: restored.sourceClosure } : {}),
     sourceMap: map.nodes,
     extractionMap: map.lines,
@@ -246,7 +267,8 @@ export function writeArtifact(result, outputPath) {
   const bytes = requireBytes(result?.bytes);
   const envelope = Object.hasOwn(result, 'sourceDocument') ? sourceMapEnvelope(result, bytes) : null;
   if (envelope) {
-    verifyArtifactSourceMap(envelope, bytes, { manifest: result.manifest });
+    verifyArtifactSourceMap(envelope, bytes, { manifest: result.manifest,
+      ...(result.intentEvidence ? { expectedIntentEvidenceSha256: result.intentEvidence.recordSha256 } : {}) });
     if (result.manifest) {
       requireDigest(result.manifest.bytecodeSha256, 'manifest bytecodeSha256');
       if (result.manifest.bytecodeSha256 !== envelope.bytecodeSha256) throw new Error('manifest bytecode SHA-256 does not match artifact');
