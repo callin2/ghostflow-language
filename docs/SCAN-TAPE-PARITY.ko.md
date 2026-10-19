@@ -108,4 +108,4 @@ artifact의 hash를 분리하고 source hash 집합에 새 source 파일을 포�
 - 읽기 전용 predecessor `esp32s3-new-project/rust/firmware/src/inputs.rs`,
   `rust/control-core/src/debounce.rs`, `rust/firmware/src/main.rs`의 DI scan 절:
   physical raw-level 정규화/debounce는 logical input frame 전 device driver에 속한다.
-  predecessor ST 경로나 이전 device 증거를 GhostFlow acceptance로 가져오지 않는다.
+  이전 device 증거를 GhostFlow acceptance로 가져오지 않는다.
