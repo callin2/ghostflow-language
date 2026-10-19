@@ -114,6 +114,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/ESTIMATE-EVIDENCE.md](docs/ESTIMATE-EVIDENCE.md) | Bounded estimate evidence admission | md |
 | [docs/EXACT-INTEGER-CONTRACT.ko.md](docs/EXACT-INTEGER-CONTRACT.ko.md) | 정확한 정수 계약 제안 | md |
 | [docs/EXACT-INTEGER-CONTRACT.md](docs/EXACT-INTEGER-CONTRACT.md) | Exact integer contract proposal | md |
+| [docs/FAILURE-REDUCTION.ko.md](docs/FAILURE-REDUCTION.ko.md) | 제한된 실패 축소 | md |
+| [docs/FAILURE-REDUCTION.md](docs/FAILURE-REDUCTION.md) | Bounded failure reduction | md |
 | [docs/FRAMED-CONTROL-HOST.ko.md](docs/FRAMED-CONTROL-HOST.ko.md) | Framed ControlRuntime 도입 (D6) | md |
 | [docs/FRAMED-CONTROL-HOST.md](docs/FRAMED-CONTROL-HOST.md) | Framed ControlRuntime adoption (D6) | md |
 | [docs/GFB5-SCHEDULE-PRELUDE.ko.md](docs/GFB5-SCHEDULE-PRELUDE.ko.md) | GFB5 일정 서두 | md |
@@ -526,4 +528,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-396 documents.
+398 documents.

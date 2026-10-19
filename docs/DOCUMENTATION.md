@@ -22,6 +22,7 @@ evidence and test inputs have explicit exclusions in [the manifest](translations
 | `docs/AFTER-EVENT-WASM-ABI.md` | [English](AFTER-EVENT-WASM-ABI.md) | [한국어](AFTER-EVENT-WASM-ABI.ko.md) |
 | `docs/BEHAVIOR-COMPOSITION-RESEARCH.md` | [English](BEHAVIOR-COMPOSITION-RESEARCH.md) | [한국어](BEHAVIOR-COMPOSITION-RESEARCH.ko.md) |
 | `docs/BEHAVIOR-COMPARISON.md` | [English](BEHAVIOR-COMPARISON.md) | [한국어](BEHAVIOR-COMPARISON.ko.md) |
+| `docs/FAILURE-REDUCTION.md` | [English](FAILURE-REDUCTION.md) | [한국어](FAILURE-REDUCTION.ko.md) |
 | `docs/BOOLEAN-OUTPUT-EXPLANATION.md` | [English](BOOLEAN-OUTPUT-EXPLANATION.md) | [한국어](BOOLEAN-OUTPUT-EXPLANATION.ko.md) |
 | `docs/BYTECODE.md` | [English](BYTECODE.md) | [한국어](BYTECODE.ko.md) |
 | `docs/CALENDAR-PROVIDERS.md` | [English](CALENDAR-PROVIDERS.md) | [한국어](CALENDAR-PROVIDERS.ko.md) |
