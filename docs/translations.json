@@ -2,11 +2,18 @@
   "format": "GhostFlow/document-translations-v1",
   "documents": [
     {
+      "source": "docs/INTENT-EVIDENCE.md",
+      "sourceLanguage": "en",
+      "translation": "docs/INTENT-EVIDENCE.ko.md",
+      "sourceSha256": "fdc22fb9c31b1ebf0ecd0a98c3c90d71fbc146055acae8d527f9135e2c520b08",
+      "translationSha256": "58ba62837fc72f9ad78c33db002c377c4eb09b13e496f3077ebb728a6d91c4e0"
+    },
+    {
       "source": "docs/INTENT-CONSISTENCY-CONTRACT.md",
       "sourceLanguage": "ko",
       "translation": "docs/INTENT-CONSISTENCY-CONTRACT.en.md",
-      "sourceSha256": "3248c8cba361420600e576d1e95ed067d2c010b559ebf54e36d25220712460c9",
-      "translationSha256": "93638f5e6962b770ead15af1956d928e37de2c5a55442df1ddc46528d0e8d23e"
+      "sourceSha256": "389323e17d63875c82f6c15795f20f487103924fd69add6b12fa8be36c03e87c",
+      "translationSha256": "6470920d2b411f6e1b4f96284873fae09ff39abec967f2717bdbbf574d1532e1"
     },
     {
       "source": "docs/HARDWARE-FRONT-MATTER.md",
@@ -264,8 +271,8 @@
       "source": "docs/DOCUMENTATION.md",
       "sourceLanguage": "en",
       "translation": "docs/DOCUMENTATION.ko.md",
-      "sourceSha256": "786ad1a0be37ebec470bb1371ff4da0dd74461b2ef6b804effb0c5450ff9f425",
-      "translationSha256": "2417246a4d277a4fb5dfcddcc142ae0b615180b6b2f616c3236cc5bf07f0bd9a"
+      "sourceSha256": "c88d4207af474566d2f0c3a94586274e4996b220142265dec42eb7cba148f06c",
+      "translationSha256": "c57de7de784c800977667da3b1957d0ef223340b010f262580a5f5ca547f2ac4"
     },
     {
       "source": "docs/EXACT-INTEGER-CONTRACT.md",

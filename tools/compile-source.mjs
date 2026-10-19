@@ -6,6 +6,7 @@ import { isWellFormedUnicode, sha256Hex, utf8ByteLength } from './sha256.mjs';
 import { compileComposition, resolveDocument } from './composition.mjs';
 import { emitExplanationArtifact } from './explanation.mjs';
 import { parseHardwareFrontMatter, validateHardwareBindings, HardwareFrontMatterError } from './hardware-frontmatter.mjs';
+import { bindIntentEvidence } from './intent-evidence.mjs';
 
 export { emitInteractionSchema } from './interaction-schema.mjs';
 
@@ -262,9 +263,21 @@ export function compileSourceSync(source, options = {}) {
     throw error;
   }
   const explanationArtifact = emitExplanationArtifact(compilation);
+  let intentEvidence;
+  if (Object.hasOwn(options, 'intentEvidence')) {
+    try { intentEvidence = bindIntentEvidence(compilation, options.intentEvidence); }
+    catch (error) {
+      error.diagnosticEnvelope = { format: DIAGNOSTICS_FORMAT,
+        source: diagnosticSource(filename, source, interactionSourceIdentity),
+        diagnostics: [{ code: 'GF_INTENT_EVIDENCE', severity: 'error', message: error.message,
+          evidencePath: error.evidencePath ?? 'intentEvidence' }] };
+      throw error;
+    }
+  }
   const { explanationExpressions: _expressionMappings, ...publicCompilation } = compilation;
   return {
     ...publicCompilation,
+    ...(intentEvidence ? { intentEvidence } : {}),
     diagnosticEnvelope: { format: DIAGNOSTICS_FORMAT,
       source: diagnosticSource(filename, source, interactionSourceIdentity), diagnostics: [] },
     interactionSchema: schema,

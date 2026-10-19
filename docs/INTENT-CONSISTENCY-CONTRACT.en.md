@@ -8,6 +8,8 @@ The five follow-up features in [#559](https://github.com/callin2/ghostflow-langu
 The obligations in this document are design criteria for follow-up work; they do not mean that new APIs, storage schemas, or approval UIs have been implemented.
 This document does not change existing language syntax, execution semantics, or deployment policy.
 
+The implemented authoring API, validator, CLI, and persistence/recovery for the shared evidence record follow the [intent evidence implementation contract](INTENT-EVIDENCE.md). They check structure, revisions, and explicit links without performing the four judgments below.
+
 ## 1. What Is Judged and Who Has Authority
 
 Whether an interpretation fits the requester's intent and whether code complies with explicit conditions are separate judgments.
