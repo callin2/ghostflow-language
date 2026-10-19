@@ -57,7 +57,7 @@ E90–E102는 성공 실행이 아니라 예상 진단을 확인합니다. 이 �
 
 **설명도 프로그램의 일부예요.** 실제 프로그램은 `.ghost.md` 문서로 작성해요. 한 프로그램의 코드를 여러 `ghost` 코드 블록으로 나눠 적었다면, 문서 최상위에 있는 블록들을 위에서부터 합쳐 하나의 제어 프로그램으로 읽어요. 코드 사이에 적은 문단이나 “왜 이렇게 동작해야 하는지”에 대한 설명도 소스 문서에 함께 남아요.
 
-**코드의 출력과 실제 장치의 동작은 구분해주세요.** 여기서 출력은 장치에 어떤 동작을 요청할지 계산한 값이에요. 코드에서 펌프를 켜라는 값을 만들었다고 실제 펌프가 바로 켜지는 건 아니에요. 그 값을 어느 GPIO나 릴레이에 연결할지 정하는 설정(binding)과, 하드웨어를 다루는 Driver가 따로 필요해요. 센서에서 값을 읽어오는 일도 이쪽에서 맡아요.
+**코드의 출력과 실제 장치의 동작은 구분해주세요.** 여기서 출력은 장치에 어떤 동작을 요청할지 계산한 값이에요. 코드에서 펌프를 켜라는 값을 만들었다고 실제 펌프가 바로 켜지는 건 아니에요. 그 값을 어느 GPIO나 릴레이에 연결할지 정하는 설정(binding)과, 출력을 적용하는 renderer가 따로 필요해요. 센서에서 값을 읽어오는 일은 입력 driver가 맡아요.
 
 정확한 표기가 궁금하면 [Reference 문법 색인](reference/07-semantic-rules-and-index.md#75-선언과-표기-찾아보기)을 찾아보세요. 왜 이런 방식으로 설계했는지는 [설계 철학](LANGUAGE-REFERENCE.md#설계-철학)에, 언어·실행 환경·장치가 각각 맡는 일은 [Reference 8장](reference/08-language-runtime-and-device-boundaries.md#83-faq-전체-책임표)에 정리되어 있어요.
 
@@ -192,7 +192,7 @@ payload를 전달한다. observation의 quality와 identity를 보존하며 끊�
 짧게 비교하면, 릴레이는 접점의 물리적 경로를 만들고, PLC는 DI와 래더/기능 블록으로
 그 입력을 처리하며, GhostFlow는 정규화된 의미 입력을 선언된 출력 계산에 연결한다.
 이 문서의 예제는 논리 계산을 설명한다. 실제 접점, 전기 배선, PLC 입력 모듈 또는
-장치 출력의 검증은 binding과 Driver 계약의 범위다.
+장치 출력의 검증은 binding과 renderer 계약의 범위다.
 
 ### 실행을 읽는 단위: tick
 
@@ -406,7 +406,7 @@ control LatchingPump {
 눌려 있어도 자동 재시작하지 않습니다. 두 입력이 정상인 상태에서 START 해제를
 관측하고 다시 눌러야 시작합니다. 처음부터 정상 START가 눌려 있으면 기존 예제처럼
 즉시 시작합니다. 이 정책은 기존 START 회로에 적용하며 램프나 자동 제어기에 START를
-일괄 추가하는 규칙이 아닙니다. 실제 출력 적용은 별도 Driver 증거가 필요합니다.
+일괄 추가하는 규칙이 아닙니다. 실제 출력 적용은 별도 renderer 증거가 필요합니다.
 이전 E03 원문은 [개정 전 코드 기록](historical/2026-10-05-input-531-book-excerpts.ko.md)에
 보존합니다.
 
@@ -500,7 +500,7 @@ momentary `open_request`/`close_request`, 끝 위치 관측 `open_limit`/`close_
 새 요청은 목표 limit보다 우선해 양쪽 코일 명령을 끈 뒤 2초 경계에서만 이동을 재개한다.
 
 끝 위치가 오지 않는 `Opening`/`Closing`은 timeout과 fault 정책으로 다룬다. 명령과
-끝 위치 관측은 별개의 값이며, physical stop은 Driver와 safety chain의 책임이다.
+끝 위치 관측은 별개의 값이며, physical stop은 renderer와 safety chain의 책임이다.
 
 ### PC-06 — ON-delay, OFF-delay, 최대 운전을 따로 읽기
 
@@ -654,17 +654,17 @@ fault는 부분 갱신 없이 tick을 거부한다. 출력 제약의 차단은 �
 ## 4. 출력 의도와 최종 출력
 
 화면에 펌프가 ON으로 보이는데 물은 나오지 않는 순간, 하나의 Bool로는 설명이
-부족합니다. 코드는 켜 달라고 요청했을 수 있고, 제약이 막았을 수 있고, Driver가
+부족합니다. 코드는 켜 달라고 요청했을 수 있고, 제약이 막았을 수 있고, renderer가
 적용하지 못했거나 피드백이 아직 오지 않았을 수 있어요. E05에서는 일부러
 `request=true`, `valve_ready=false`를 넣고 requested와 safe가 갈라질 것을 예측합니다.
 이 구분을 익히면 “왜 안 켜졌지?”를 추측 대신 증거의 단계로 좁힐 수 있습니다.
 
 이 장에서 편의상 «최종 출력»이라고 부르는 값은 runtime의 **safe intent**입니다.
 `<-`가 만든 **requested intent**를 제약이 검사한 결과죠. 그 뒤에도 증거는 이어집니다.
-Driver가 command를 적용했다는 **applied**, limit·encoder가 따로 돌려준 **confirmed**가
+renderer가 command를 적용했다는 **applied**, limit·encoder가 따로 돌려준 **confirmed**가
 있습니다. safe가 참인 trace만 보고 “펌프가 돌았다”고 결론 내리면 조사해야 할 경계를
 건너뛴 셈입니다. 정확한 수명주기는 [Reference §4.7](reference/04-sensors-constraints-control.md#47-requested-safe-applied-confirmed)과
-[물리 Driver 경계](LLM-TOOLCHAIN-ARCHITECTURE.md#physical-driver-and-device-boundary)에서 이어집니다.
+[물리 driver/renderer 경계](LLM-TOOLCHAIN-ARCHITECTURE.md#physical-driver-and-device-boundary)에서 이어집니다.
 
 ### E05 — 켜 달라는 요청과 허용되는 출력
 
@@ -935,7 +935,7 @@ payload이며 오류 fallback이 아니다. 이 선택은 이 예제의 정책�
 
 타이머 계산에 필요한 시각, DI 입력 묶음, 최종 RO 출력의 경계는 공통이어야 한다.
 native와 WASM은 같은 Rust core에서 식·상태·타이머·제약을 실행한다. 호스트는 입력과
-논리 시각·scan 기회를 공급하며, Device의 실제 I/O Driver는 별도 경계다.
+논리 시각·scan 기회를 공급하며, Device의 실제 I/O driver/renderer는 별도 경계다.
 프레임과 Driver의 구체 API는 호스트 계약이며 이 소스에 플랫폼 분기를 넣지 않는다.
 
 현재 CLI 시뮬레이터는 입력과 requested/safe intent를 보여 주는 가상 I/O다.
@@ -1445,7 +1445,7 @@ definition revision → import → instance + typed connect
                    → semantic composition → bound runtime
 ```
 
-`adapt`, capability 검사, 공통 constraints, 공유 resource, replay와 hot replacement는 각자 정해진 위치·타입·계약으로만 쓴다. 문법과 semantic DAG 규칙은 [Reference §6](reference/06-composition-and-replay.md), 장치·Driver·binding의 책임은 [Reference §8](reference/08-language-runtime-and-device-boundaries.md)을 따른다. 일반 `control` 안에서 임의의 별도 policy 언어가 있다고 가정하지 않는다.
+`adapt`, capability 검사, 공통 constraints, 공유 resource, replay와 hot replacement는 각자 정해진 위치·타입·계약으로만 쓴다. 문법과 semantic DAG 규칙은 [Reference §6](reference/06-composition-and-replay.md), 장치·driver/renderer·binding의 책임은 [Reference §8](reference/08-language-runtime-and-device-boundaries.md)을 따른다. 일반 `control` 안에서 임의의 별도 policy 언어가 있다고 가정하지 않는다.
 
 <a id="ch13"></a>
 ## 13. 내장함수와 내장 연산
@@ -2252,7 +2252,7 @@ control PhysicalQuantityUnits {
 | typed config, live update, observation descriptor | [5장](reference/05-settings-and-observation.md) |
 | import, instance, connect, macro, replay, replacement | [6장](reference/06-composition-and-replay.md) |
 | 오류·불확실성·문법 색인 | [7장](reference/07-semantic-rules-and-index.md) |
-| 언어·runtime·Driver·binding·UI 책임 | [8장](reference/08-language-runtime-and-device-boundaries.md) |
+| 언어·runtime·driver/renderer·binding·UI 책임 | [8장](reference/08-language-runtime-and-device-boundaries.md) |
 | 자주 묻는 코딩 사례 | [GhostFlow Coding FAQ](language_faq.md) |
 
 <a id="appendix-b"></a>
@@ -2388,7 +2388,7 @@ Language Reference는 규범 기준이다. 이 사용 안내서에서 발견한 
 독립 프로그램이므로 관심 있는 한 편을 골라 입력 순서를 바꿔 보세요. PLC 개발자는
 최초 차단 조건을, 웹 개발자는 표시할 evidence를, 펌웨어 개발자는 논리 값과 핀 사이의
 경계를 먼저 볼 수 있습니다. 결과는 논리 evidence이며 실제 접점·밸브·모터는 보드,
-Driver, 배선과 현장 확인이 책임집니다.
+renderer, 배선과 현장 확인이 책임집니다.
 
 ### E23 — PLC 개발자: 고장 원인에서 출력까지 한 번에 따라가기
 
@@ -2567,7 +2567,7 @@ control ReviewedWateringRule {
 
 입력 8개와 출력 8개를 나열한 데이터시트만으로는 고객이 보드로 무엇을 만들지 상상하기 어렵다. 이 예제는 생장등, 순환팬, 배수펌프와 경고 출력을 운영 조건에 연결한다. 제조사는 고객이 자기 보드와 대조해 볼 논리 역할을 제품 예제로 제시할 수 있다.
 
-출력 이름은 GPIO 번호가 아니라 장치 역할이다. `grow_light`를 어느 채널에 연결할지, `source_ready`를 어떤 센서로 공급할지는 보드 binding과 Driver가 결정한다. 따라서 소스 하나가 모든 보드에서 자동 호환된다고 약속하지 않고, 보드별로 확인한 연결표와 묶어 제공할 수 있다.
+출력 이름은 GPIO 번호가 아니라 장치 역할이다. `grow_light`를 어느 채널에 연결할지, `source_ready`를 어떤 센서로 공급할지는 보드 binding과 입력 driver·출력 renderer가 결정한다. 따라서 소스 하나가 모든 보드에서 자동 호환된다고 약속하지 않고, 보드별로 확인한 연결표와 묶어 제공할 수 있다.
 
 ```ghost
 // E27

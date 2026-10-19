@@ -1,0 +1,55 @@
+{
+  "repo": "ghostflow-language",
+  "baseline": "d7bc140ee214745661ebccd1197eb7cbf3035ec0",
+  "originalHead": "9155047e9dec4a1ede6a53e67d178c5c212b08ff",
+  "decision": "not-adopted; reference-only",
+  "changedFiles": [
+    {
+      "sourcePath": "crates/ghostflow-core/src/context_vm.rs",
+      "archivePath": "history/windows-20261014/utc-window-run-uncommitted/snapshots/crates/ghostflow-core/src/context_vm.rs.txt",
+      "sha256": "e9cb3b12310e66b28f3d8cb0868a5803b3acad0b3d8ef64c91777cc462349059",
+      "size": 20499,
+      "gitBlob": "303ca9ca9bf46b643a7aa36124db1126435d9b74"
+    },
+    {
+      "sourcePath": "crates/ghostflow-core/src/lib.rs",
+      "archivePath": "history/windows-20261014/utc-window-run-uncommitted/snapshots/crates/ghostflow-core/src/lib.rs.txt",
+      "sha256": "1fe52d9603f977d29efee3de60793ee3d18f5ea3d2e309e2010491b8b2b45f4e",
+      "size": 145223,
+      "gitBlob": "e95ffe5d32cff8c1a1a15eb2ff0b1aba5f6dcfd9"
+    },
+    {
+      "sourcePath": "crates/ghostflow-core/src/schedule_vm.rs",
+      "archivePath": "history/windows-20261014/utc-window-run-uncommitted/snapshots/crates/ghostflow-core/src/schedule_vm.rs.txt",
+      "sha256": "cb6c511ec9da9d514feb4d8370b430bd48786ca2092b8b58af8cc981a6ac51b1",
+      "size": 17730,
+      "gitBlob": "3f65b75382267262b3fe12984aa58b38f5d00079"
+    },
+    {
+      "sourcePath": "tools/compile-source.mjs",
+      "archivePath": "history/windows-20261014/utc-window-run-uncommitted/snapshots/tools/compile-source.mjs.txt",
+      "sha256": "cc1a828c87646a80510eeed079d767386167ceef39f7f5f7025b01008b9c1c78",
+      "size": 11294,
+      "gitBlob": "273f77fc0ccbbf9f8abf39804b28a674dcf525ab"
+    },
+    {
+      "sourcePath": "tools/control.mjs",
+      "archivePath": "history/windows-20261014/utc-window-run-uncommitted/snapshots/tools/control.mjs.txt",
+      "sha256": "5aeaf53b15547ace4dcbd8aab94130c5f879c7734f31dd0dd09a7c3edd367c3f",
+      "size": 266371,
+      "gitBlob": "57eaa02c7d4e5cd752176481e86997cdf5c20d11"
+    },
+    {
+      "sourcePath": "tools/gfb1.mjs",
+      "archivePath": "history/windows-20261014/utc-window-run-uncommitted/snapshots/tools/gfb1.mjs.txt",
+      "sha256": "d43a4ebbf79ff955f38159acb792eae0fe5133e8c17cdff69320fe4ab95ccc17",
+      "size": 61407,
+      "gitBlob": "01413178f9eba31bf000b3e17abdfdd6f9eb93b5"
+    }
+  ],
+  "generated": null,
+  "ownerIssues": [
+    153
+  ],
+  "sourceCredentialPatternHits": 0
+}

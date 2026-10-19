@@ -21,7 +21,7 @@
   있다. 경쟁하는 직접 작성자는 컴파일에 실패해야 하며 절대로 배포해서는 안 된다.
   이것이 기존 station의 단일 작성자 자원 관리자를 없애지는 않는다. station 요청은
   경쟁하는 직접 쓰기가 아니다. 물리 endpoint alias 검사는 별도 binding 검증으로 남는다.
-- **기존 Driver 경계:** GhostFlow는 typed Source와 Intent를 정의한다. Driver의 기반은
+- **기존 입력 driver/출력 renderer 경계:** GhostFlow는 typed Source와 Intent를 정의한다. Driver의 기반은
   소프트웨어, 특수 하드웨어 또는 둘 다일 수 있다. 정밀 측정/프로토콜/raw-ISR과 scan
   처리의 구분은 이 경계에 속한다. Driver에 농장 정책을 숨기지 않고 의미 있는 typed
   event나 측정을 core 논리에 전달한다. 포착 시각, 수신/평가 시각, 품질은 서로 다르다.
@@ -219,7 +219,7 @@ binding, 현장 secret과 대화 기록을 제외한다. 조합이 signing mecha
 ### A8. 하나의 event, 참여자별 설명
 
 농부용 문장과 엔지니어용 상세 view는 같은 incident와 정확한 실행 문맥을 참조해야 한다.
-requested output, 해소된 safe output, host/driver 적용과 이용 가능한 물리 feedback을 구분한다.
+requested output, 해소된 safe output, host/renderer 적용과 이용 가능한 물리 feedback을 구분한다.
 
 저수위 예에서는 저수위 signal이 관수를 차단했다고 보고한다. 그 signal을 탱크가 물리적으로
 비었다는 근거 없는 주장으로 바꾸지 않는다. 재시작 후 반복되는 scan 번호는 이전 event를
@@ -295,7 +295,7 @@ R9는 일찍 초안을 만들 수 있지만 R1–R8 전에 확정할 수 없다.
 | 한 출력 채널에 경쟁하는 직접 작성자 두 개 정의 | 컴파일 거부. 배포 가능한 artifact 없음. 기존 단일 작성자 manager가 중재하는 명시적 station 요청은 거부하지 않음. |
 | 잘못된 port type, dependency 부재 또는 suitability 불명 | 구체적 error/unknown 결과. 성공한 deployment라고 주장하지 않음. |
 | 저수위가 관수 차단 | 농부 설명이 정확한 input, rule, requested/safe output과 run에 연결됨. |
-| Driver 적용 실패 또는 feedback 부재 | 명령과 관측된 결과를 구분해 보존. |
+| renderer 적용 실패 또는 feedback 부재 | 명령과 관측된 결과를 구분해 보존. |
 | 재시작, crash 또는 journal gap | boot/run 경계와 마지막 이용 가능한 증거를 보존. 없는 증거를 명시. |
 | parameter, settings 또는 binding 변경 | revision 변경 matrix 적용. 오래된 증거 join 거부. |
 | 운전 중 한 동작으로 여러 live property 변경 | 하나의 event. 승인 시 program/run identity 변경이나 controller 정지 없이 모두 적용. 값 하나라도 invalid이면 변경 없이 전체 event 거부. |
@@ -337,7 +337,7 @@ R1–R3 이후에는 사용자 결과, 권한과 실행 대안을 검토한다. 
 lifecycle, package 호환성과 증거 연결을 함께 검토한다. R9는 결정된 내용과 정확한 미해결
 구현 blocker를 기록한다. 하위 연구 완료가 구현을 자동 승인하지는 않는다.
 
-임의 graph query, 범용 ontology, marketplace, 새 UI renderer, 분산 orchestration, 일반
+임의 graph query, 범용 ontology, marketplace, 새 cabinet-view, 분산 orchestration, 일반
 temporal 정리 증명, 기존 #95 작업을 넘는 공유 actuator 정책은 보류한다. 구체적인 사용자
 문제가 필요하다. 자연어 추출과 대화 memory는 API/제품 작업으로 남는다.
 [system memory #68](https://github.com/callin2/farm_studio_system/issues/68)이 이미 그 더 넓은

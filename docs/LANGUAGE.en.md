@@ -50,7 +50,7 @@ safe            = safety(requested, constraints)
 ```
 
 If computation succeeds, candidate_state and safe results are committed as one logical tick.
-The host Driver subsequently applies physical outputs.
+The host renderer subsequently applies physical outputs.
 Logical atomicity does not mean multiple GPIOs change physically at the same instant.
 
 | Element | Meaning |
@@ -109,7 +109,7 @@ Function `hold` itself has no hidden memory. Start and stop are bool samples, no
 `output name: Type;` declares only an intent port's type.
 Every output name must have exactly one `name <- expression;` connection; an initial value in the declaration is prohibited.
 This connection expression is the logical intent requested by the VM this tick.
-The host/Driver separately owns startup/fail-safe policy that keeps outputs OFF or stops applying them on boot, computation failure, or host disconnection.
+The host/renderer separately owns startup/fail-safe policy that keeps outputs OFF or stops applying them on boot, computation failure, or host disconnection.
 Safety policy is not implicitly established by an output declaration's default value.
 The following expected results supply inputs in order from initial watering=false.
 
@@ -123,7 +123,7 @@ The following expected results supply inputs in order from initial watering=fals
 
 Sensor recovery alone does not revive the latch; stop takes priority when start and stop are both true.
 This is a pure control-computation example.
-Facility mode entry, shared-pump ownership, and staggered physical pump/valve application belong to the facility manager and Driver in the [common constraints contract](CONSTRAINTS.md). The code above does not implement them all.
+Facility mode entry, shared-pump ownership, and staggered physical pump/valve application belong to the facility manager and output renderer in the [common constraints contract](CONSTRAINTS.md). The code above does not implement them all.
 
 ## 3. Vocabulary and types
 
@@ -299,7 +299,7 @@ The examples declare no automatic fallback.
 4. Compute intent/emit. State still reads old; next reads candidate.
 5. Compute safe intent satisfying every safety constraint.
 6. Logically commit state, output results, and execution records together.
-7. Only the host of the actual execution applies safe intent to the Driver.
+7. Only the host of the actual execution applies safe intent to the renderer.
 
 state.x is previous state in every expression; next.x is next state only in intent/emit.
 Names do not change meaning during computation.
@@ -364,7 +364,7 @@ Fault records include violated constraints and blocked output IDs.
 Latched state is not physical feedback.
 Safety blocking an output does not implicitly overwrite state.
 Actual valve opening/pump operation is modeled with separate sensor inputs.
-Physical default outputs on removal, device loss, or host failure belong to the Driver/host contract.
+Physical default outputs on removal, device loss, or host failure belong to the renderer/host contract.
 
 Extension to mode, shared-facility, and time constraints follows [CONSTRAINTS.md](CONSTRAINTS.md).
 Output blocking, new-work permission, mode transitions, and warning analysis have different execution semantics.
@@ -482,7 +482,7 @@ Manifest and deployment-protocol implementation is excluded from this syntax-com
 ### 12.1 Compatible device replacement is not control-program replacement
 
 Control programs use logical device contracts rather than models or addresses of actual sensors/actuators.
-If the Driver and installation binding connect a different device satisfying the same contract, control source and the compiled Program must be retained.
+If the driver/renderer and installation binding connect a different device satisfying the same contract, control source and the compiled Program must be retained.
 Device replacement alone must not require recompilation.
 The Driver owns device-specific communication and raw-value interpretation.
 
@@ -506,7 +506,7 @@ Do not interpret new-specification requirements as completed implementation.
 | Input schema | Every input required each tick | Common + selected-strategy inputs |
 | State reads | state=old, next=candidate | Preserve and formalize this meaning |
 | Safety constraints | false-only snapshot fixed point, requires-any | General logical-expression/optimization solver |
-| Shared facilities/modes | Rust station + WASM API + static policy binding | Physical-device Driver/deployment approval boundary |
+| Shared facilities/modes | Rust station + WASM API + static policy binding | Physical-device driver/renderer deployment approval boundary |
 | Device supplementary-information analysis | Pass/Violation/Unknown for optional integer flow | Physical pressure/curve model, notification delivery |
 | Sensor signal processing | Finite filters, hysteresis, quality, recovery | Actual board WCET/memory measurement |
 | Time constraints | Monotonic timer, date-specific budget/occurrence ledger, desktop storage | MCU NVS, RTC trust, power-loss verification |

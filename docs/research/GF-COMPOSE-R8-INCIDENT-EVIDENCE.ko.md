@@ -11,7 +11,7 @@
 
 농부가 “왜 관수가 이뤄지지 않았나요?”라고 물을 때 답변은 엔지니어와 설치자가 조사하는
 것과 같은 occurrence를 식별해야 한다. requested output, 언어 runtime이 선택한 safe output,
-host/driver 적용 결과, 물리 관측을 구분해야 한다. 값 부재는 false가 아니다. 이전 run이나
+host/renderer 적용 결과, 물리 관측을 구분해야 한다. 값 부재는 false가 아니다. 이전 run이나
 binding을 현재 incident에 join해서는 안 된다.
 
 composition에 특유한 목표는 작고 정확한 증거 인계다. 두 번째 실행 source, 새 event 저장소,
@@ -73,7 +73,7 @@ field, 최종 boot/event-to-run join은 미정이다. 필요한 join 또는 unkn
 
 정확한 참여자 문맥은 definition/module, instance, 같은 run의 settings revision/effective
 event position, installation/binding, run/scan, logical time의 tuple이다. 제안된 인과 증거는
-input event/관측 → 평가된 rule → intent → requested/safe output → driver 결과/물리 관측이며
+input event/관측 → 평가된 rule → intent → requested/safe output → renderer 결과/물리 관측이며
 평가 시 effective settings에 join한다. 모든 참여자 view는 그 tuple을 사용해야 한다.
 consumer는 이전 run, 잘못된 schema/module/source 또는 binding을 stale/unavailable로 거부해야
 하며 관련 기록을 조용히 제시해서는 안 된다.
@@ -84,7 +84,7 @@ consumer는 이전 run, 잘못된 schema/module/source 또는 binding을 stale/u
 |---|---|---|---|
 | Requested output | Rust core trace, language source map | 기존 `requested` map/provenance | instance와 정확한 완료 scan에 join. |
 | Safe output | Rust safety resolution | 기존 `safe` map/bounded safety trace | request와 구분하고 constraint 참조 노출. |
-| Host/driver 적용 | API/host와 Device integration | interaction-v0가 정의하지 않음. host fault는 물리 failure가 아님 | #74/#88이 application-result event/부재 의미 정의 필요. Driver source/intent는 정밀 측정, protocol, raw ISR/scan mechanism을 처리하고 농장 정책을 숨기지 않으며 의미 있는 typed event/측정 노출. 포착/수신/평가 시각과 품질 구분. command acknowledgement는 물리 증거가 아님. |
+| Host/renderer 적용 | API/host와 Device integration | interaction-v0가 정의하지 않음. host fault는 물리 failure가 아님 | #74/#88이 application-result event/부재 의미 정의 필요. Driver source/intent는 정밀 측정, protocol, raw ISR/scan mechanism을 처리하고 농장 정책을 숨기지 않으며 의미 있는 typed event/측정 노출. 포착/수신/평가 시각과 품질 구분. command acknowledgement는 물리 증거가 아님. |
 | 물리 관측 | Device/installation 소유자 | #28은 persistent event history를 제안하고 HIL physical-relay 증거를 참조하지만 최종 feedback schema를 결정하지 않음 | #28이 가용 feedback, boot/history identity, retention 정의 필요. 기록된 applied event도 물리 동작 증명이 아님. |
 | Memory/작성 문맥 | API/system #68 | Provenance 문맥만 해당 | 승인 decision/source 경로 없이 execution/binding join이 되어서는 안 됨. |
 | Input occurrence/value 관측 | 여기서 미구현. 합의된 설계. interrupt/scan 기반 포착 가능 | 구분된 포착/수신/평가 시각과 품질을 가진 occurrence identity 또는 관측값 | Ingress record/event-to-tick 대응 정의. 지원 용량 안에서 기본 보존. 입력별 명시 opt-in에만 latest-pending-value 교체. overflow/loss 보고 필수. 순서/대응 미정. 무제한 durable history 아님. |
@@ -99,12 +99,12 @@ consumer는 이전 run, 잘못된 schema/module/source 또는 binding을 stale/u
 보여준다. hardware 증거는 이용 가능한 sensor/installation record뿐이다. 남은 불확실성:
 signal은 물리 탱크 수위나 sensor 정확성을 증명하지 않는다.
 
-#### 2. Driver 적용 실패 또는 feedback 부재
+#### 2. renderer 적용 실패 또는 feedback 부재
 
 농부 답변과 다음 행동: 실패가 기록됐다면 “시스템이 관수를 요청했지만 장치 적용에
 실패했습니다.” 그렇지 않으면 “물리 feedback이 없어 명령 결과를 알 수 없습니다.”
 다음 행동은 installation/driver 경로 검사 또는 설치자 연락이다. software 증거는 같은
-run/scan, requested output, safe output, 존재할 때 host/driver 결과를 보여준다. hardware
+run/scan, requested output, safe output, 존재할 때 host/renderer 결과를 보여준다. hardware
 증거는 Device가 기록했을 때만 binding, driver event, physical feedback을 보여준다.
 남은 불확실성: `requested=ON`이나 `safe=ON`은 pump 운전의 증거가 아니다.
 

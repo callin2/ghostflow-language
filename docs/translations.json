@@ -2,6 +2,62 @@
   "format": "GhostFlow/document-translations-v1",
   "documents": [
     {
+      "source": "docs/INTENT-DECISIONS.md",
+      "sourceLanguage": "en",
+      "translation": "docs/INTENT-DECISIONS.ko.md",
+      "sourceSha256": "e3dd72ad7ecadd661d682fb8c4413ac0ff97edaa8cf04c2bfba56b0ac3a1103e",
+      "translationSha256": "9f06271a03f8a9d3efc4a0b486d2e99d0c16f2cfeb85470fd8e18e43db9c4a85"
+    },
+    {
+      "source": "docs/EXECUTION-EVIDENCE.md",
+      "sourceLanguage": "en",
+      "translation": "docs/EXECUTION-EVIDENCE.ko.md",
+      "sourceSha256": "e11862084bfc8402ed774181fdd1c60a9f8236c5ea9b341ea305da583b00a868",
+      "translationSha256": "f77fcf67df9ba29fb0e3dc85d61fbc39281b77c47d106a1bad394c565b6309ac"
+    },
+    {
+      "source": "docs/TARGET-QUERY.md",
+      "sourceLanguage": "en",
+      "translation": "docs/TARGET-QUERY.ko.md",
+      "sourceSha256": "5eec72f3e1669af6db93cb46d0e168946ce58deef562b1457466ff07ec8d9d85",
+      "translationSha256": "a9752a15c3e268e4376676e0cfad1cdd2d89ceb3ad159f92b2d0b340187b0f9c"
+    },
+    {
+      "source": "docs/FAILURE-REDUCTION.md",
+      "sourceLanguage": "en",
+      "translation": "docs/FAILURE-REDUCTION.ko.md",
+      "sourceSha256": "a280fff119bf1ba19291aa75fca3ff514f8f113419e8dc2e40019613505896ba",
+      "translationSha256": "efa3f83372f64ed953ef96576c60aacea9ae31c8e6a8fce3d5a02b12f9da945d"
+    },
+    {
+      "source": "docs/BEHAVIOR-COMPARISON.md",
+      "sourceLanguage": "en",
+      "translation": "docs/BEHAVIOR-COMPARISON.ko.md",
+      "sourceSha256": "581680d82ec8897dd28e3a2b99764556629194a7c122c5bf83a5dc86b555fa93",
+      "translationSha256": "67efa8a4edce2a0f851c864403b8208d9905c03975452f48ecbef782c5f426b0"
+    },
+    {
+      "source": "docs/INTENT-EVIDENCE.md",
+      "sourceLanguage": "en",
+      "translation": "docs/INTENT-EVIDENCE.ko.md",
+      "sourceSha256": "fdc22fb9c31b1ebf0ecd0a98c3c90d71fbc146055acae8d527f9135e2c520b08",
+      "translationSha256": "58ba62837fc72f9ad78c33db002c377c4eb09b13e496f3077ebb728a6d91c4e0"
+    },
+    {
+      "source": "docs/INTENT-CONSISTENCY-CONTRACT.md",
+      "sourceLanguage": "ko",
+      "translation": "docs/INTENT-CONSISTENCY-CONTRACT.en.md",
+      "sourceSha256": "389323e17d63875c82f6c15795f20f487103924fd69add6b12fa8be36c03e87c",
+      "translationSha256": "6470920d2b411f6e1b4f96284873fae09ff39abec967f2717bdbbf574d1532e1"
+    },
+    {
+      "source": "docs/HARDWARE-FRONT-MATTER.md",
+      "sourceLanguage": "en",
+      "translation": "docs/HARDWARE-FRONT-MATTER.ko.md",
+      "sourceSha256": "5d07ad9669f6d35a6e1186c137aadef5b37c9a0d0ff318cd19024071ac188376",
+      "translationSha256": "51d46608022fe38cc40d707799303299d1f37c9c87ff3560db4b5a963ff83358"
+    },
+    {
       "source": "docs/BOOLEAN-OUTPUT-EXPLANATION.md",
       "sourceLanguage": "en",
       "translation": "docs/BOOLEAN-OUTPUT-EXPLANATION.ko.md",
@@ -33,15 +89,15 @@
       "source": "docs/GHOST-TIMELINE.md",
       "sourceLanguage": "en",
       "translation": "docs/GHOST-TIMELINE.ko.md",
-      "sourceSha256": "1e900a25bd50e93b6095135fe5184b65618ad79d70947447e1c9eecb21527bdf",
-      "translationSha256": "75756361b1c0c87c825aeab32f685f2f5f165d1c4256f48bc136d0bb71a83641"
+      "sourceSha256": "079dd81f7854b43b8aa963c04fe7ded5d8046df7146dcbfd0f133ce42d21aa63",
+      "translationSha256": "9a91ce0c6c1416f4cac6a2f5feeddf9bb1fc7630d798366973219f2666701310"
     },
     {
       "source": "docs/ROLLING-BUDGET-EXPLANATION.md",
       "sourceLanguage": "en",
       "translation": "docs/ROLLING-BUDGET-EXPLANATION.ko.md",
-      "sourceSha256": "8b6a6105ea1a54970fcc0f2cb9d779582d1bbc5138dae5d52363ad667477e78c",
-      "translationSha256": "ea25fbdf36c904cdd66e7f7514e2407cb0dfc3a352332be94b6cebcc98efc3c9"
+      "sourceSha256": "64844c7f06f0dc5363576f9c5be4fba83b21121580d07f3bebfa194efeb5a098",
+      "translationSha256": "1990a080d73fdfbfe79b5fcac908fa98b6f3031c456b856f9e37b191d434f6be"
     },
     {
       "source": "docs/ADAPTATION-SETTINGS-HOST.md",
@@ -75,15 +131,15 @@
       "source": "docs/EFFECT-PROCESS-CONTRACT.md",
       "sourceLanguage": "en",
       "translation": "docs/EFFECT-PROCESS-CONTRACT.ko.md",
-      "sourceSha256": "8e2db15c3eb85a520a584a51e6ba189b39067aac1dee2fdf5be24cefb1b21f60",
-      "translationSha256": "25fd4f29379e369eeb16d5f5e96373d08b88eaebcf0cf36d46a33f69eead49ce"
+      "sourceSha256": "5a50b4cc2db43b40f852250b4bbae4b210b31d4804198530e8817886c3bd0b48",
+      "translationSha256": "bf527adf32343cab929514488d2824dbb3e913a6ce2259c6d0b6a0e3cdcf477f"
     },
     {
       "source": "docs/HOST-EVENT-ORDERING-CONTRACT.md",
       "sourceLanguage": "en",
       "translation": "docs/HOST-EVENT-ORDERING-CONTRACT.ko.md",
-      "sourceSha256": "0ab3bd709d744ac916002733605f5992cf5e07af516598f952b8a3e56fe43d01",
-      "translationSha256": "cf6c40766cddf4464658a9d24e49c13b834c68edf34f7ae66b96be20defcc0bf"
+      "sourceSha256": "4a48d6c946126dfe54c63155ab1019d2d0f3e26c635b7fa9f479bf9acc3a5712",
+      "translationSha256": "03b19de450bfd5efac55353452fd5d8684d6ea6b6d65e1df81952a9b1b25a0d4"
     },
     {
       "source": "docs/CHECKED-CONSTRAINT-REPLACEMENTS.md",
@@ -103,43 +159,43 @@
       "source": "docs/INTERACTION-STREAM-CONTRACT.md",
       "sourceLanguage": "en",
       "translation": "docs/INTERACTION-STREAM-CONTRACT.ko.md",
-      "sourceSha256": "f2e179afa29cc1d6eef9be9cd4df17f17f906686fa7eb74b5254d52a86d10662",
-      "translationSha256": "a5a9493fd5cb51411d81b59c24b78b686822539870d8db5b5e2fdf94f8c131b7"
+      "sourceSha256": "219cc871058c64b779998dfc743c3fc91a6a8594d261bc86eabfd6cff087b49d",
+      "translationSha256": "6f669d64c7ac5a972023fdd035233672e34c0c190b40ced8c4287829087ca01b"
     },
     {
       "source": "docs/DRIVER-ABI-V1-DRAFT.md",
       "sourceLanguage": "en",
       "translation": "docs/DRIVER-ABI-V1-DRAFT.ko.md",
-      "sourceSha256": "54d333b22b97478a38aa04a39ccbc4dafdac16569e21c017ef2b2d4ebaf7255c",
-      "translationSha256": "0a8b9692ba0dcb859a037aaf4fd3ea53f6b474342d8484de0e521ea9461580b7"
+      "sourceSha256": "06dc90ec979705ed6e4043a4d8e0b536f6094c86e50d143a398f3bf7b95a3c52",
+      "translationSha256": "a1fb97badd05cf42811d133e46f52619eecebb2c34b1368e1c2ed32b0ec47bff"
     },
     {
       "source": "docs/ESTIMATE-EVIDENCE.md",
       "sourceLanguage": "en",
       "translation": "docs/ESTIMATE-EVIDENCE.ko.md",
-      "sourceSha256": "b95906697154dfb070cee95e1179ef141cbc4e91a5186eaed1e122b3f0fff65b",
-      "translationSha256": "0530ef684366a737ed89cb3722ab7f6d887e6f902c3dd36fba75dc7392402494"
+      "sourceSha256": "320d15676d62284bbd3489d5ec783d87a756af207ca2683893dc8787747368a3",
+      "translationSha256": "72c4a3432eaef174da528a1a9ec24251892c56cd0ebf928452936c8f3940f28a"
     },
     {
       "source": "AGENTS.md",
       "sourceLanguage": "en",
       "translation": "AGENTS.ko.md",
-      "sourceSha256": "cbba332d821b0f916b51e8c7be57ff150751deb4894ddd09c832f2c8a8b03531",
-      "translationSha256": "bb79a9f2c8e55727e0eb19136aa8af7d361e50e59e1d0dfff5e3a7be7bbe750b"
+      "sourceSha256": "3b85821c84489e8ac7009731a8666f5d994a0d0dbc1d58c06603380faa99e9a3",
+      "translationSha256": "d5dc0827b6c07bb09d7c24d19e9a5b62811fd128ec571e084af2e59a0b89d992"
     },
     {
       "source": "contracts/integration-v1/README.md",
       "sourceLanguage": "en",
       "translation": "contracts/integration-v1/README.ko.md",
-      "sourceSha256": "2b6915116de0e5058fbec4d2937c49aadd6daa30b4b44228325cf3aaac69d594",
-      "translationSha256": "5b02675dc63286d77698b87af00de5b70e7b9b9c24836ce29d61a053b0f40c39"
+      "sourceSha256": "36c5b96d1a10892eab8c7348bd5a174dd8f4473dedadffc21475237232cc36f2",
+      "translationSha256": "da7882d891e4ccc12add456e382a694c0c452fdf767148a21a633315e83c8409"
     },
     {
       "source": "contracts/interaction-v0/README.md",
       "sourceLanguage": "en",
       "translation": "contracts/interaction-v0/README.ko.md",
-      "sourceSha256": "543d522b6be8194d72e8b7e2ad0dc0075f1cb971f01c605cbae29c2ce5ba737f",
-      "translationSha256": "56e5afdd060e30dfc5af6185890b61292a0ec0c9cfe8e61c68f2671282b2e896"
+      "sourceSha256": "1033683932971759c4f44a1bfa542e92acf4b430f7ac965a054145b14329a6d5",
+      "translationSha256": "95070ebf311d23eb4dd28bc7da0093af70119ce7e391015de284110c4cdf1383"
     },
     {
       "source": "contracts/requirements/README.md",
@@ -187,8 +243,8 @@
       "source": "docs/BEHAVIOR-COMPOSITION-RESEARCH.md",
       "sourceLanguage": "en",
       "translation": "docs/BEHAVIOR-COMPOSITION-RESEARCH.ko.md",
-      "sourceSha256": "f7e848ebd1497c9691ed19cb2397b291c13def050a82c767de0689879ba221f9",
-      "translationSha256": "5d9f8e8e6f2f1f157858be60e978050d48450dc716095bcd673f1804a5c475b5"
+      "sourceSha256": "ba71b7bea619af29c6160b745c600930e3de9fd9dc850c246dbe479c375fa2ca",
+      "translationSha256": "18e11a977610bb8a8847ce2179220249528f7d3511a58ee5f8c60cc0964bcd9f"
     },
     {
       "source": "docs/BYTECODE.md",
@@ -208,8 +264,8 @@
       "source": "docs/CONSTRAINTS.md",
       "sourceLanguage": "ko",
       "translation": "docs/CONSTRAINTS.en.md",
-      "sourceSha256": "072244a99e5d16ac4b5f624c207ea0d9dec6608672924d04a585a7a935b3caa3",
-      "translationSha256": "dc47758ff4897e487efa16057650b3b9004097cca5c9fcb6a33e5852632e9ed2"
+      "sourceSha256": "c05c6f5ed1f91b7be2591ec6fa9cfa64313cb48697e48a7a2a8e2a111c5758e1",
+      "translationSha256": "a8ea131dafad9c294a3d40924975e41633ac45743d0a3d35edfd4eb0e293c79c"
     },
     {
       "source": "docs/CONTEXT-EXECUTION-ABI.md",
@@ -250,15 +306,15 @@
       "source": "docs/DOCUMENTATION.md",
       "sourceLanguage": "en",
       "translation": "docs/DOCUMENTATION.ko.md",
-      "sourceSha256": "0a91d830797c1efcb3ba7b5e1e706b37adbe201835ff60e11a05a1538c0f8a27",
-      "translationSha256": "01aa42ab985dd6fdda4503bb4b1744527ec74cb5f86ddbdb4e57e6b33dc8ba31"
+      "sourceSha256": "e0de7157c6085fd43032c544605336796ce9bf4f42392688e203f02d57eab66f",
+      "translationSha256": "df246507dbf991c2fe144f4e8e84d41c015bea8ed8bb5f2123e3c486e9561430"
     },
     {
       "source": "docs/EXACT-INTEGER-CONTRACT.md",
       "sourceLanguage": "en",
       "translation": "docs/EXACT-INTEGER-CONTRACT.ko.md",
-      "sourceSha256": "654c80b551bb0ee31100df03552c2eb940869c37ef468763f104879fa58b59a9",
-      "translationSha256": "d4bc85a4d0727bc3efa99274dfc4e28416d2f71ca98d4a7a74d7d01faa187b92"
+      "sourceSha256": "5ae9d06397f33059488aa952e7f9c4fcac8c364119010b5dc7134c58750c48fd",
+      "translationSha256": "3808b3ddae0d6d09b20ed884b64490cb364bb9bf1681d6159eb5a3f55c18a49e"
     },
     {
       "source": "docs/FRAMED-CONTROL-HOST.md",
@@ -278,8 +334,8 @@
       "source": "docs/IMPLEMENTATION.md",
       "sourceLanguage": "en",
       "translation": "docs/IMPLEMENTATION.ko.md",
-      "sourceSha256": "e2fc080b6617296464ed66ccede9a3f7a04d870050ecd5cfca68c09aac375fef",
-      "translationSha256": "6f16a829574cc632337ce9fc64764c9f5b903ac552051f8b928c4047f138e17b"
+      "sourceSha256": "a7644c76154395b357f59981c638121d90873ec7cf4aa200bfeb14fb027e8d0d",
+      "translationSha256": "2f263d867714e4eede4939f53e8a5a1f24b7b41af7526c85114d5e178c4144d8"
     },
     {
       "source": "docs/INTENT-ANCHOR-MAP.md",
@@ -292,15 +348,15 @@
       "source": "docs/KEYBOARD-HOST.md",
       "sourceLanguage": "en",
       "translation": "docs/KEYBOARD-HOST.ko.md",
-      "sourceSha256": "6ab82d0a230fe0532aac730aca5d599073d054fbe1d996c9319352f83df43669",
-      "translationSha256": "524da14e55d00f7f5593e68d534e7b12c5fb7f26d29e3c6d9f53c7b323507d8d"
+      "sourceSha256": "a80aa1648104fbc389b0ba31bfc45b25b9e2196fcee48a843cb56b108b82036f",
+      "translationSha256": "bed17a1605e7a7ba555b330d78e07f380eb3adf3c340b519494fa32c7f2c6c0a"
     },
     {
       "source": "docs/language_faq.md",
       "sourceLanguage": "ko",
       "translation": "docs/language_faq.en.md",
-      "sourceSha256": "648774ef72142bb16447e79e90fbf2842385e26deb1fd0a0af53a96b952a63d4",
-      "translationSha256": "67f4b2d69447cd16cdb50ef6fd265f1c3639fe08cc6019a7bee2b401f843bdeb"
+      "sourceSha256": "37601528695c662a0f23be6d688b1a1f35da043025612afb0a384d0b4f16ae1f",
+      "translationSha256": "b44bee3efb8be64d3acc4b0a55594ba65a09a31c2f1a9a29e1ca19df002150be"
     },
     {
       "source": "docs/LANGUAGE-EXAMPLES.md",
@@ -313,29 +369,29 @@
       "source": "docs/LANGUAGE-MVP-0.1.md",
       "sourceLanguage": "en",
       "translation": "docs/LANGUAGE-MVP-0.1.ko.md",
-      "sourceSha256": "99e02d32cacb5135d6b55de5523cfa5523fc1ba2cc98a4d25f8ad72527d94325",
-      "translationSha256": "3e4ff94f3c1eee79d6f61fe0aaaa1590fc7d576192258bcab7682335fcea1454"
+      "sourceSha256": "5abbcf5ce8b9a8ab92819261239b53c18190124368e8180a6e524f5ab9547a50",
+      "translationSha256": "365ed186e5d341d0841520b4100141bac449c975cd7931a348d469df6e65b364"
     },
     {
       "source": "docs/LANGUAGE-REFERENCE.md",
       "sourceLanguage": "ko",
       "translation": "docs/LANGUAGE-REFERENCE.en.md",
-      "sourceSha256": "5e173bca6dcd2366a735c5e21c91695f8658055211dffe66d567341fce8719e3",
-      "translationSha256": "1b6ea6554f1190b9461f175788e553ee1fe921a2aa3a270ba37171b61b92c09d"
+      "sourceSha256": "faf1ff0893cd161a00956350b8c7c9625fa32bbc02409b81ef790289db5ca7c6",
+      "translationSha256": "5f6740ad65aa271b0fe01bbd029281410f50bc327528b107ae9613801472cd7b"
     },
     {
       "source": "docs/LANGUAGE-SURFACE.md",
       "sourceLanguage": "ko",
       "translation": "docs/LANGUAGE-SURFACE.en.md",
-      "sourceSha256": "075ab2e7ddc2d8d53c1ed0abc7508f7992403f5cc0b8f11256bffde8d94967d2",
-      "translationSha256": "73d9ba7d4b6a9c6380c1de621d593853bcee415fbeb06490f4721f909aa5bc24"
+      "sourceSha256": "308a9ed1e3502620b922ddae469707e9393a0a38b69eb71b65bada5378818253",
+      "translationSha256": "b06c9a4cf2feab8bfd2e11a668dc5b696263e737787aff091faf2409d5dc556f"
     },
     {
       "source": "docs/LANGUAGE.md",
       "sourceLanguage": "ko",
       "translation": "docs/LANGUAGE.en.md",
-      "sourceSha256": "87309349a2389e2ba251976c40c48c29b9af88a06e9b547491df69aba7b4896e",
-      "translationSha256": "842ed2a308b8e52f78462310d832c396781e77c567f3c95ea5bdabc69b00be34"
+      "sourceSha256": "4279bd76e3d4ea0ff2f14bf93560baf381cc30dc71752ce3f5a0f3f9b1efb713",
+      "translationSha256": "9bd9c9f7ea8543e856a07dbda9e7ace088c3512d1e7000feabdefb166dd77950"
     },
     {
       "source": "docs/LESSON-BUNDLE.md",
@@ -362,8 +418,8 @@
       "source": "docs/LLM-TOOLCHAIN-ARCHITECTURE.md",
       "sourceLanguage": "en",
       "translation": "docs/LLM-TOOLCHAIN-ARCHITECTURE.ko.md",
-      "sourceSha256": "552ed610b15cd292e4bba9eb7cada9b3c8ea8cf6e43f449d7fd878641d769168",
-      "translationSha256": "5417a34fdeaae2297acf21fb6d2eea0b87b2b309de248410031f9cc9e208ca5a"
+      "sourceSha256": "64a4c077c2e4f9bc902c87ce89fc356cd9934c10a7f923c1dda9992686275546",
+      "translationSha256": "a9ffc722bd5bc1792fc5867bca78b54e746147faf693b7e5cc44e4d266fbbe37"
     },
     {
       "source": "docs/OPERATOR-SETTINGS-STREAM.md",
@@ -390,8 +446,8 @@
       "source": "docs/ProgrammingInGhostflow.md",
       "sourceLanguage": "ko",
       "translation": "docs/ProgrammingInGhostflow.en.md",
-      "sourceSha256": "47aa248f3a31f1b6ef3087851536962f0ec868c912e27c3ba83be6c162116c06",
-      "translationSha256": "5f6f065389c647e73f38172504d1b9590d9be29b0b7ee4428091bd9eb95d71cb"
+      "sourceSha256": "916f096043822647cee132c28c2a9b4cd99c7f3c1845de5a7fce0f18f7108c66",
+      "translationSha256": "be74ab93e24d24007849fe47121a4d428f40cff1ff9a5a5ae470ae8a3cffee98"
     },
     {
       "source": "docs/REFERENCE-QUERY.md",
@@ -404,8 +460,8 @@
       "source": "docs/reference/01-source-and-syntax.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/01-source-and-syntax.en.md",
-      "sourceSha256": "666c1788087f2a69189af26cadde30d1a2e00a26546031e5b00639ef4347c612",
-      "translationSha256": "6bd0cc17dbbb9427f9fed8aec6cead11f4d0c3d2707d8cb3ff688f1d939d6f13"
+      "sourceSha256": "d3fce6418819a2d5445804433a5d8e947479020267b26897a935b6edd53d962b",
+      "translationSha256": "d4c06e3a7a5009b816cf1f260dad3c4a7b83aa6b46b6898564e9c4a29ba9277b"
     },
     {
       "source": "docs/reference/02-types-expressions-state.md",
@@ -418,50 +474,50 @@
       "source": "docs/reference/03-time-and-schedules.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/03-time-and-schedules.en.md",
-      "sourceSha256": "e6aa368150182b817d0651a02698ee6500c4db41622651007606e9446514bae8",
-      "translationSha256": "fd635a388eff2d5f0e5fde15c35bb720e6a1287c908ecf9da099917e8b959190"
+      "sourceSha256": "38842695a0f4b6258d06991254a2c4bbda4a52ccf018344b50fb5f77a22921f7",
+      "translationSha256": "d1d2f295c0f444172f3ddd7b77417158f1ac84c903275a5da964fd3000db929f"
     },
     {
       "source": "docs/reference/04-sensors-constraints-control.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/04-sensors-constraints-control.en.md",
-      "sourceSha256": "b39cc7ca148940d3d4337f6904e41051bc9b59e80b0680dafe80b96f89f731e9",
-      "translationSha256": "e1f76b8d6a8cf87a34fcf3300b3e6c46a767835c6dc8dee4c6713bec6526a438"
+      "sourceSha256": "d0e585c929b81106909714e49095b7165880f2e259c8d39d56ab5c1803f95b79",
+      "translationSha256": "61606963313ec71c1778d2b713a6d18470fd8c12cf0f3f5274ae689cfab24fe1"
     },
     {
       "source": "docs/reference/05-settings-and-observation.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/05-settings-and-observation.en.md",
-      "sourceSha256": "05ee69ff19b041cdf033ebd0f08d50066056d1da075e25381b4b9cab079ead76",
-      "translationSha256": "446a1963ab84d8edd1c9c43994ed7e7b208b6a6ac39a277890b7a9cd32845257"
+      "sourceSha256": "29789379ad056fcc17a79b12842497222aa4d6af3621c0d7bf0c01df7431b4cf",
+      "translationSha256": "ca38167bdfa2bee163de42dd296a57b6e24e68aef39c9482589db7fb3f3a0ff7"
     },
     {
       "source": "docs/reference/06-composition-and-replay.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/06-composition-and-replay.en.md",
-      "sourceSha256": "68d5f32486c750cbd2d5103752c011261c92fa176014e4604d1299aee5d1bfd5",
-      "translationSha256": "da649450aab7aab6764d0b396ab716cdba757caf075be312bd4d32dd56553c6e"
+      "sourceSha256": "b6ad74cd0aec4dd7f0c7a9e3214e71d2a3f27d17cbbb4108f64719f8c2b2ff8a",
+      "translationSha256": "156653ac03a4a4b5149d46e4e483beaa437b0c4ad060e355eaf97588f1fb33b8"
     },
     {
       "source": "docs/reference/07-semantic-rules-and-index.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/07-semantic-rules-and-index.en.md",
-      "sourceSha256": "97bf0399f5d58be12f4b34ba4f4ef71e6117720f4d364c2bf39a0f16f09a5976",
-      "translationSha256": "15e30c72439d3ad43d73be473fc29c99b337c2c05035137754a846776be71b16"
+      "sourceSha256": "58a9f31feff7af9f66602bc19d58d9877be0fb2589c8292ed4a1780d5948661f",
+      "translationSha256": "924fd8ca23ace78025c0308f7991673ff8825696bd7a17285fe762ffc1ea32cd"
     },
     {
       "source": "docs/reference/08-language-runtime-and-device-boundaries.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/08-language-runtime-and-device-boundaries.en.md",
-      "sourceSha256": "70fff5261ac1711546121fba88d0914532967c7ca71a5fab07ca3811fc14454a",
-      "translationSha256": "2980330865774036b79e3fba65b235c9c059e5d6e200da01ae51870defab95d8"
+      "sourceSha256": "193d1d1111453940a32212ed9e39bc26a38aa989d6b4b00b0b1b49c5a0419b82",
+      "translationSha256": "2d57dd3314ada61d757a05f3b828a0f4295297c77a888fb734a23dad0c0af4a3"
     },
     {
       "source": "docs/research/GF-COMPOSE-R1-USER-OUTCOMES.md",
       "sourceLanguage": "en",
       "translation": "docs/research/GF-COMPOSE-R1-USER-OUTCOMES.ko.md",
-      "sourceSha256": "d97f1c936e7068300930c5170ac65cc4f6ee942cd2e7232f0eb664babddb0632",
-      "translationSha256": "4953bfc291599b52008d3ed3e5401b3e66352ab29b23188c248569efe9fd7380"
+      "sourceSha256": "15d7d7dd7f9c5f526b5457b468361f9955d65c08dfd54ca2e51860c12a7e7c1b",
+      "translationSha256": "de4ca18934d3ac1ec7e05e65c823fdc9853a95c2a9dceeb94ae4f8612f827ce6"
     },
     {
       "source": "docs/research/GF-COMPOSE-R2-AUTHORITY-IDENTITY.md",
@@ -509,8 +565,8 @@
       "source": "docs/research/GF-COMPOSE-R8-INCIDENT-EVIDENCE.md",
       "sourceLanguage": "en",
       "translation": "docs/research/GF-COMPOSE-R8-INCIDENT-EVIDENCE.ko.md",
-      "sourceSha256": "832faa0ba624cc29aa9ffe57cc1adb4b091151523e7300c93f2f7d12942a9921",
-      "translationSha256": "d02bf674dc8c0efd077cfc6a22501819744242a3d920532f3abdf319d387742e"
+      "sourceSha256": "33258915fd3c300f847704ff80a8d88e981a09c7fd91ba355c7caf47cd4e378e",
+      "translationSha256": "9302006e2511200fb314a88334a785c30ae497ec0606556570dc0c88dd6d1105"
     },
     {
       "source": "docs/research/GF-COMPOSE-R9-ACCEPTANCE.md",
@@ -537,8 +593,8 @@
       "source": "docs/SCENARIO-RUNNER.md",
       "sourceLanguage": "en",
       "translation": "docs/SCENARIO-RUNNER.ko.md",
-      "sourceSha256": "acf0e76d7e4ccd6a1f90a15c5fb7051df27f4d60e07f76f1668952fed9b034b6",
-      "translationSha256": "b424e88850f75407c3aeaa5c455886f5d70a04da7059c9dc3bac64bed2e5af84"
+      "sourceSha256": "9db51c49195392e20261d509c56eea52abd06cc7695fad057247eea6b224dc56",
+      "translationSha256": "0a2ed0bb46913108908bd0a93b180b1c52b26faa34d6fd63fc3cee9ba32f00da"
     },
     {
       "source": "docs/SOLAR-SCHEDULE.md",
@@ -593,8 +649,8 @@
       "source": "docs/TESTING.md",
       "sourceLanguage": "en",
       "translation": "docs/TESTING.ko.md",
-      "sourceSha256": "c4cdeb1d10847754bbbe1d39235378414ed106a2d3b092f727707fa17131b4f2",
-      "translationSha256": "52dcef147020d5f823487eb4fca0de54a40a8d99b8cfad9195619eef23977dd8"
+      "sourceSha256": "fbc9d8eda6ca78ffb565b4e09fc0670cb512cd66be6bdb039f0b9b2738ee815c",
+      "translationSha256": "199f3b0bdef5cb7c7ee38d1c86e9c2fe3895f7ea2d34151ea73960ae84cd944b"
     },
     {
       "source": "docs/TIME-AND-SCHEDULE-CONTRACT.md",
@@ -635,8 +691,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "3dadb9a6b1bcac8d2ba35a5076449ab40009ab9b04698bf418581a7fac7a84c0",
-      "translationSha256": "b90f72b9bb7646fb229a94650ff243f1f8b7aaeaf60891fa57fac43280fa54fb"
+      "sourceSha256": "4051238052cef3d6f901bf6b42912031eac3d15f303437331ea82281e10dd7db",
+      "translationSha256": "e1ddb3e3575efc48cb5e4a20e8864819ce1759e7b4411ed604fe188edc63797e"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",
@@ -782,15 +838,15 @@
       "source": "README.md",
       "sourceLanguage": "en",
       "translation": "README.ko.md",
-      "sourceSha256": "1d7192ab055955f0152f079c830986463ceee2f10813d9b3f20823cad87d6959",
-      "translationSha256": "77dce46e6c6d6dee565b2f125d311f3034fadf042ae07a5e12df388b23b85d8e"
+      "sourceSha256": "0b66b40971eebb85a1cda5c0031f8b3a0c2d388abee5c0ae5de2f984c796c525",
+      "translationSha256": "af3dc0f8f5c03b3ca484864d1400aa9370d2eef4923e7975de331e7376bc27df"
     },
     {
       "source": "runtimes/wasm/README.md",
       "sourceLanguage": "en",
       "translation": "runtimes/wasm/README.ko.md",
-      "sourceSha256": "62390206de54ce92b51cb4041e1a8e76762508f29cbef1bd4c83663e6056a657",
-      "translationSha256": "92fd2b7370b4ea4d07943fa02462ca173096eef86889b540bf658c6beb8ef540"
+      "sourceSha256": "6d41279b3b91f09921e3f4d8ba13c0c05ed8874bc82469a4e9efbda4567f68df",
+      "translationSha256": "14a78ea1fe384dfea85f70d3d04b6f17ce459fdecefe06758eb0c4201c8ec8f8"
     },
     {
       "source": "tasks/after-event-design.md",
@@ -866,8 +922,8 @@
       "source": "tasks/reference-compliance-plan.md",
       "sourceLanguage": "ko",
       "translation": "tasks/reference-compliance-plan.en.md",
-      "sourceSha256": "7f6699d60eb12a91d73f0703a71a2257eed968c909de73b645fe4f85e0a1196f",
-      "translationSha256": "bbc77444b6afdc172907bb7f1d8fc404aee1284193ae6d8410ec1b0c381664d3"
+      "sourceSha256": "9bb43ba3c774b148a94d6b1fcadae576ed815351063675ba43e2e242768816a9",
+      "translationSha256": "8f105dcaf9c9820110e689f5d387aeb4ccc2c8373013e80d37a2306215ca4231"
     },
     {
       "source": "tasks/result-provenance-design.md",
@@ -985,22 +1041,22 @@
       "source": "examples/optional-feedback-timer.ghost.md",
       "sourceLanguage": "en",
       "translation": "examples/optional-feedback-timer.ghost.ko.md",
-      "sourceSha256": "ebf3c849084f2745835ba87aa2b1e01425970e7b69c905778a4c0635bd28af75",
-      "translationSha256": "8aa6c85f0dee23ed413c66a6c9fc9a2a0d2e7c2cc822c30034b7cd962af51b18"
+      "sourceSha256": "2894c166ff74f91fb1872af19e275360bfd07904ea560c2cdaf9d28fad931181",
+      "translationSha256": "8ae95eef99fba967c8c42fd3d85a2b6937b6af4d9f8917fea635105e0ab508b6"
     },
     {
       "source": "examples/explicit-feedback-adoption.ghost.md",
       "sourceLanguage": "en",
       "translation": "examples/explicit-feedback-adoption.ghost.ko.md",
-      "sourceSha256": "91a70d02aa784e6c69f84cf9414a0cee8a1a7442c164d16d4a7d69992dca2b67",
-      "translationSha256": "9ed3ce4d1f57b114aa09cd035b0d68728ac335726fe5f5446f22851a58fa5577"
+      "sourceSha256": "e16f70e0e5f9333c8470a7db74952e7424be0137466646d53a6a54866b20226d",
+      "translationSha256": "890e4cc79aee418e7cc7446f2e36004b9ff4261f8011b648f759e9b3f8d822d7"
     },
     {
       "source": "docs/AI-CONTRIBUTION-PACKAGE.md",
       "sourceLanguage": "en",
       "translation": "docs/AI-CONTRIBUTION-PACKAGE.ko.md",
-      "sourceSha256": "283089fc5d57a3a89207e803954d76081b0d240a6c736e701d8f21be459750db",
-      "translationSha256": "6a8d1527e8cabedbc0d6d8dcf7b90e46711dade4752860d370628fca4eadbd00"
+      "sourceSha256": "711956abfeee1f651b742d24f22eeb01ed6bf61832f5523716c281ed3655277a",
+      "translationSha256": "438b169d6127382a8f69e0a090cb2f9098ec26102a40320885d1ebf9eefca500"
     },
     {
       "source": ".github/pull_request_template.md",
@@ -1400,6 +1456,10 @@
     {
       "path": "docs/reports/2026-10-16-predecessor-language-reference-cleanup.md",
       "reason": "Dated record for user-authorized removal of never-deployed predecessor-language references; tracked by GhostFlow System #235 and ghostflow-language #551."
+    },
+    {
+      "path": "docs/reports/2026-10-12-io-role-terminology-audit.md",
+      "reason": "Execution audit receipt and intentional historical/ABI terminology exceptions; report may remain in one language."
     }
   ]
 }

@@ -69,7 +69,7 @@ host profile이 선택한다. overflow는 수신을 받아들이기 전에 admis
 | 3 | 검증·평가 | 단일 snapshot에서 core 소유의 next state, requested 의도와 제약 후 safe 의도 계산 |
 | 4 | 논리 결과 | 성공은 논리 상태/결과를 함께 commit; 실패는 완료 snapshot·새 effect 없이 실패 attempt 기록 |
 | 5 | commit 증거 캡처 | hook이나 물리 dispatch 전에 완료/출력 의도를 실제 commit scan에 연결 |
-| 6 | 외부 effect dispatch | 기존 Driver/profile 정책으로 commit된 safe 의도 전달; 부분 물리 적용 가능성 유지 |
+| 6 | 외부 effect dispatch | 기존 renderer/profile 정책으로 commit된 safe 의도 전달; 부분 물리 적용 가능성 유지 |
 | 7 | effect 결과 수신 | 실제 성공/실패/불확실성을 별도 상관 수신으로 기록; 향후 허용 경계에서만 admission |
 | 8 | 다음 허용 결정 | 명시적 typed binding이 새 수신을 사용 가능; 원래 결정의 소급 변경 금지 |
 
@@ -91,7 +91,7 @@ batch를 명시적으로 종결하거나 재시도 정책에 따라 같은 불�
 
 effect 결과는 원래 commit scan, run, 정확한 source/module/binding과
 effect/attempt 식별자를 가리킨다. 여러 effect와 재시도는 별도 식별자가
-필요하며 재시도로 두 번째 원래 commit을 만들어서는 안 된다. Driver 수락
+필요하며 재시도로 두 번째 원래 commit을 만들어서는 안 된다. renderer 수락
 기록은 명시된 register/write 수락만 증명하며 relay 이동이나 물리 확인을
 증명하지 않는다. 적용 실패/불확실성은 원래 논리 상태를 rollback하거나
 safe/requested 의도를 과거의 false 값으로 바꾸지 않는다. 부분 적용과 각 결과

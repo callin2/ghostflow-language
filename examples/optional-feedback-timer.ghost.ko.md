@@ -14,7 +14,7 @@
 
 선택 `observation` capability가 설치되어 있으면 `Observed`, 없으면 `Baseline`을 선택합니다. 두 strategy의 actuator 의도는 동일합니다. 정상 true, 정상 false, sample 부재와 설치된 sensor fault는 production host가 반환하는 별도 sensor 관찰에 남습니다. 없는 선택 sensor에 대해 host는 `NotReady` reading placeholder를 반환합니다. capability metadata와 선택한 strategy가 부재를 구분합니다. sample 공급으로 없는 capability를 만들 수 없습니다. fault는 부재 strategy를 선택하지 않습니다. 이 예제는 관찰에 제어 권한을 부여하지 않습니다.
 
-타이머 완료는 작성된 명령 시간의 종료입니다. Driver 적용, relay 접점 작동, 부하 이동 또는 위치를 증명하지 않습니다. requested 의도, safe 의도, applied 명령과 독립 물리 증거는 구분됩니다.
+타이머 완료는 작성된 명령 시간의 종료입니다. renderer 적용, relay 접점 작동, 부하 이동 또는 위치를 증명하지 않습니다. requested 의도, safe 의도, applied 명령과 독립 물리 증거는 구분됩니다.
 
 ```ghost
 control OptionalFeedbackTimer {

@@ -64,7 +64,7 @@ evidence is available; they are not a ranking of the features.
 
 **Explanations are part of the program document.** An actual program is written as a `.ghost.md` document. If its code is split across several top-level `ghost` blocks, read the blocks from top to bottom as one control program. Keep the paragraphs and explanations of why the program should behave a certain way in the source document too.
 
-**Distinguish code output from device behavior.** An output here is a value that requests an action from a device. Producing a value that says to turn on a pump does not turn on a real pump by itself. A binding connects that value to a GPIO or relay, and a Driver handles the hardware. Reading sensor values is also handled there.
+**Distinguish code output from device behavior.** An output here is a value that requests an action from a device. Producing a value that says to turn on a pump does not turn on a real pump by itself. A binding connects that value to a GPIO or relay, and an output renderer applies the hardware output. An input driver reads sensor values.
 
 For exact notation, see the [Reference syntax index](reference/07-semantic-rules-and-index.md#75-선언과-표기-찾아보기). The [design philosophy](LANGUAGE-REFERENCE.md#설계-철학) explains why the language is designed this way. [Reference Chapter 8](reference/08-language-runtime-and-device-boundaries.md#83-faq-전체-책임표) describes responsibilities across the language, execution environment, and device.
 
@@ -204,7 +204,7 @@ path is a fault, not the healthy value false.
 Briefly, relays create physical contact paths, PLCs process the inputs with DI and ladder/function blocks,
 and GhostFlow connects normalized semantic inputs to declared output calculations.
 These examples explain logical calculations. Verification of actual contacts, electrical wiring, PLC input modules,
-or device outputs falls within binding and Driver contracts.
+or device outputs falls within binding and renderer contracts.
 
 ### The unit for reading execution: tick
 
@@ -424,7 +424,7 @@ restart. After a fault stop, holding START cannot restart the run: observe START
 released while both inputs are healthy, then press again. An initially healthy
 pressed START still starts immediately, preserving the original healthy behavior.
 This policy applies to the existing START circuit; it does not add START buttons
-to lamps or automatic controllers. Driver application needs separate evidence.
+to lamps or automatic controllers. renderer application needs separate evidence.
 The previous E03 source is preserved in the
 [prior-code record](historical/2026-10-05-input-531-book-excerpts.md).
 
@@ -670,12 +670,12 @@ Output-constraint blocking differs from this evaluation failure and does not can
 
 When a screen says the pump is ON but no water moves, one Boolean cannot explain
 the situation. The code may have requested ON, a constraint may have blocked it,
-the Driver may not have applied it, or feedback may not have confirmed it. In E05,
+the renderer may not have applied it, or feedback may not have confirmed it. In E05,
 set `request=true` and `valve_ready=false`, then predict where requested and safe
 intent diverge. This turns “why did it not turn on?” into a question about evidence.
 
 “Final outputs” in this chapter means the runtime's **safe intent**. `<-` creates **requested intent**, which constraints restrict.
-**Applied** is evidence of a command applied by a Driver; **confirmed** is separate feedback evidence such as a limit or encoder.
+**Applied** is evidence of a command applied by a renderer; **confirmed** is separate feedback evidence such as a limit or encoder.
 A true safe intent does not establish relay or pump operation. Read
 [Reference §4.7](reference/04-sensors-constraints-control.md#47-requested-safe-applied-confirmed) and the
 [physical Driver boundary](LLM-TOOLCHAIN-ARCHITECTURE.md#physical-driver-and-device-boundary) together.
@@ -1475,7 +1475,7 @@ definition revision → import → instance + typed connect
                    → semantic composition → bound runtime
 ```
 
-Use `adapt`, capability checks, common constraints, shared resources, replay, and hot replacement only at their prescribed locations and with their defined types and contracts. Syntax and semantic DAG rules follow [Reference §6](reference/06-composition-and-replay.md); device/Driver/binding responsibilities follow [Reference §8](reference/08-language-runtime-and-device-boundaries.md). Do not assume an arbitrary separate policy language inside ordinary `control`.
+Use `adapt`, capability checks, common constraints, shared resources, replay, and hot replacement only at their prescribed locations and with their defined types and contracts. Syntax and semantic DAG rules follow [Reference §6](reference/06-composition-and-replay.md); device/driver/renderer/binding responsibilities follow [Reference §8](reference/08-language-runtime-and-device-boundaries.md). Do not assume an arbitrary separate policy language inside ordinary `control`.
 
 <a id="ch13"></a>
 ## 13. Built-in functions and operations
@@ -2609,7 +2609,7 @@ control ReviewedWateringRule {
 
 A data sheet listing eight inputs and eight outputs still leaves customers guessing what they can build. This example connects a grow light, circulation fan, drain pump, and warning output to operating conditions. A board maker can show the logical roles customers could map to their own hardware.
 
-Output names represent device roles, not GPIO numbers. The board binding and driver decide which channel drives `grow_light` and which sensor supplies `source_ready`. This lets a manufacturer publish a project example with a board-specific wiring map instead of promising that one source works automatically on every board.
+Output names represent device roles, not GPIO numbers. The board binding, input driver and output renderer decide which channel drives `grow_light` and which sensor supplies `source_ready`. This lets a manufacturer publish a project example with a board-specific wiring map instead of promising that one source works automatically on every board.
 
 ```ghost
 // E27

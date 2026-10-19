@@ -66,7 +66,7 @@ An `output name: Type;` declaration is type-only and must have exactly one
 intent for the tick; safety resolution may produce a distinct safe intent. The VM
 does not assign startup defaults and does not promise that an intent reached
 hardware. Startup and failure-safe OFF behavior, output application timing, and
-driver disconnect handling are host/Driver policy and require separate evidence.
+renderer disconnect handling are host/renderer policy and require separate evidence.
 
 Extended Solar/Tide natural policies select GFB13 and `GhostFlow/control-v12`; Solar facts use GFSF6. Legacy profiles and packet bytes remain unchanged. WASM function names do not change; pinned older runtimes reject GFB13. The signed portable-package config-only GFB11 profile is not broadened. Compiler/runtime regression coverage belongs to `natural-fallback-compiler.test.mjs`, `natural-fallback-runtime.test.mjs` and core `solar_tape` tests; documentation does not establish their execution result or physical Device behavior.
 

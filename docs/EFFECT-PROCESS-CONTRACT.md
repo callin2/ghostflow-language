@@ -14,7 +14,7 @@ request/result binding need separately versioned consumer adoption.
 [Reference 2.8](reference/02-types-expressions-state.en.md#28-tick-and-state-snapshot)
 owns atomic logical decisions; [4.7](reference/04-sensors-constraints-control.en.md#47-requested-safe-applied-confirmed)
 separates requested, safe, applied and confirmed output evidence;
-[5.3](reference/05-settings-and-observation.en.md#53-renderer-independent-observation-model)
+[5.3](reference/05-settings-and-observation.en.md#53-cabinet-view-independent-observation-model)
 separates descriptors, snapshots, events and execution results.
 The [interaction stream contract](INTERACTION-STREAM-CONTRACT.md) (#74) defines
 the proposed command observation lifecycle. The [host ordering contract](HOST-EVENT-ORDERING-CONTRACT.md)
@@ -40,7 +40,7 @@ identity; display names and primitive values cannot establish a join.
 | Kind | Meaning and request identity | Result and observation boundary |
 | --- | --- | --- |
 | DesiredState | Requested target for a declared logical endpoint at a committed scan/revision; repeated equal targets are continuing intent | Requested/safe snapshots, per-write attempt results and separate feedback; each scan is not a new one-shot command |
-| Command | One domain action with explicit request ID and canonical typed-request digest | Ordered received/start/terminal evidence when bound to #74; Driver ACK alone is not domain completion or physical confirmation |
+| Command | One domain action with explicit request ID and canonical typed-request digest | Ordered received/start/terminal evidence when bound to #74; renderer ACK alone is not domain completion or physical confirmation |
 | Process | One identified request spanning authored state/timer decisions across ticks; same request remains the correlation root | Started/progress/current-state observations and terminal domain evidence; progress is not a new request or a new lifecycle state |
 | Message | Explicit send request and digest, channel/binding identity and distinct send-attempt identity | Queue/service acceptance, delivery or failure evidence retain their stated scope; acceptance does not prove delivery or reading |
 | Render | Read-only projection identified by exact source/schema/run/completed scan or event position and projection revision | Rendered/unavailable/stale presentation outcome; no control authority, command completion, feedback or commit is manufactured |
@@ -114,7 +114,7 @@ Dispatch follows successful logical commit. External failure preserves that
 commit and its requested/safe intent, plus each partial/uncertain effect outcome.
 Its correlated result can affect only a future permitted decision through an
 explicit typed binding. Host/Device halt policy remains authoritative; there is
-no automatic continuation, retry or restart. Driver register/write acceptance
+no automatic continuation, retry or restart. renderer register/write acceptance
 and sensor confirmation remain separate evidence. Cancellation completion does
 not claim physical shutdown unless the declared evidence actually establishes it.
 

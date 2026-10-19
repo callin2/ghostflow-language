@@ -67,7 +67,7 @@ direction and level values, and unique `driver`/`address` pairs before its
 identity is shown or hashed.
 
 The alternative `GhostFlow/console-profile-v1` JSON below is a presentation-only
-Driver descriptor. Its `id`, ordered channels, labels, and types drive the
+Channel descriptor. Its `id`, ordered channels, labels, and types drive the
 virtual panel; it carries no physical installation mapping.
 
 ```json
@@ -119,7 +119,7 @@ its panel state is `unsupported` and it has no toggle shortcut.
 Rows align the input and output lists by index. Empty cells remain empty when
 one side is shorter. Bool values display ON or OFF; missing observations display
 `unobserved`. Output columns separately show requested and safe virtual intent.
-The panel reports the profile/Driver identity, scan ID, virtual time,
+The panel reports the profile/channel descriptor identity, scan ID, virtual time,
 status/error, and `physical: unconfirmed`. The live panel keeps a bounded
 rolling trace of the latest 120 scans. Piped replay prints exact bindings.
 

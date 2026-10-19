@@ -1,4 +1,5 @@
 import { parseControl, compileComposedControl, validateCompositionStructure, ControlCompileError } from './control.mjs';
+import { parseHardwareFrontMatter, HardwareFrontMatterError } from './hardware-frontmatter.mjs';
 import { extractLiterate } from './literate.mjs';
 import { sha256Hex, isWellFormedUnicode, utf8ByteLength } from './sha256.mjs';
 
@@ -42,6 +43,9 @@ export function compileComposition(source, filename, supplied) {
     const key = resolveDocument('', name);
     if (active.has(key)) throw new Error(`executable import cycle at ${key}`);
     if (units.has(key)) return units.get(key);
+    const hardware = parseHardwareFrontMatter(text, { filename: name });
+    if (hardware) throw new HardwareFrontMatterError(hardware.source, hardware.locations['/hardware'],
+      'hardware declarations in executable import composition are not supported');
     const extraction = extractLiterate(text, { filename: name });
     let ast;
     try { ast = parseControl(extraction.code, { filename: name }); }

@@ -922,7 +922,7 @@ neutral인 관측과 새 claim이 필요하다. require-only group은 requested 
 이 실행 범위는 모든 출력이 명시 보호된 Bool GFB1 v1/v3 control 하나다. 같은 설치의
 writer는 공유 registry를 사용하며 같은 안정 ID의 추가 활성 writer를 거부한다.
 context/PID, shared-policy import composition, 여러 VM의 협력 중재는 포함하지 않는다.
-결과는 논리 requested/safe 의도다. 실제 Driver 적용, 밸브 열림 확인이나 현장 설치를
+결과는 논리 requested/safe 의도다. 실제 renderer 적용, 밸브 열림 확인이나 현장 설치를
 증명하지 않는다. 자세한 규칙과 단계는 [Reference §4.8](reference/04-sensors-constraints-control.md#48-공통-constraints-표기와-연산)과
 [제약 계약](CONSTRAINTS.md#공유-bool-실행)을 참조한다.
 
@@ -1333,7 +1333,7 @@ GhostFlow에서 `widget = slider`처럼 특정 컴포넌트를 지정하는 문�
 **문법 근거**
 
 - `config`, `label`, `min`, `max`, `step`, `access`: [Reference §5.1 config 선언](reference/05-settings-and-observation.md#51-config-선언)
-- UI 모양과 언어 의미의 분리: [Reference §5.3 renderer 독립 관찰 모델](reference/05-settings-and-observation.md#53-renderer-독립-관찰-모델)
+- UI 모양과 언어 의미의 분리: [Reference §5.3 cabinet-view 독립 관찰 모델](reference/05-settings-and-observation.md#53-cabinet-view-독립-관찰-모델)
 - 설정 ID·타입·권한을 전달하는 설명: [Reference §5.3 descriptor와 snapshot](reference/05-settings-and-observation.md#descriptor와-snapshot)
 
 
@@ -1726,7 +1726,7 @@ control RestartAndWait {
 복귀나 점검 같은 여러 단계가 필요하면 초기 enum 상태를 준비 단계로 두고,
 [19번](#q19)처럼 장치 피드백에 따라 다음 단계로 이동한다.
 이 규칙은 GhostFlow가 판단을 시작한 이후의 출력 의도다.
-전원 투입부터 첫 판단 전까지의 실제 핀·릴레이 상태는 Driver의 부팅 정책이 정한다.
+전원 투입부터 첫 판단 전까지의 실제 핀·릴레이 상태는 Device와 renderer의 부팅 정책이 정한다.
 
 **정전 전 작업을 이어 하는 것은 별도 정책이다.** 일반 운영 설정은 재시작 뒤에도 보존하지만,
 그 사실만으로 운전 단계나 타이머까지 자동 복원되는 것은 아니다.
@@ -2002,11 +2002,11 @@ control PumpRequest {
 다음은 연결 설명이며 binding 파일의 문법은 아니다.
 
 ```text
-변경 전: 논리 출력 pump → 출력 Driver → GPIO A → 릴레이 A
-변경 후: 논리 출력 pump → 출력 Driver → GPIO B → 릴레이 B
+변경 전: 논리 출력 pump → 출력 renderer → GPIO A → 릴레이 A
+변경 후: 논리 출력 pump → 출력 renderer → GPIO B → 릴레이 B
 ```
 
-새 릴레이가 LOW에서 켜지는 방식이라면 Driver·설치 설정에서 극성을 맞춰
+새 릴레이가 LOW에서 켜지는 방식이라면 renderer·설치 설정에서 극성을 맞춰
 동일한 운전 요청을 수행하게 한다. 부팅·장애 시 실제 출력값도 그 경계에서 정한다.
 논리 출력의 타입이 `Bool`이라는 사실만으로 핀의 출력 가능 여부, 전기적 구동 조건,
 접점 정격·배선과 연결 부하의 호환성이 보장되지는 않는다.
@@ -2020,7 +2020,7 @@ control PumpRequest {
 프로그램 재컴파일이 불필요하다는 사실이 운전 중 무중단 배선 교체를 허용하지는 않는다.
 
 **왜 논리 출력과 GPIO를 나누나요?** 제어는 “펌프를 운전한다”는 의도를 표현하고,
-Driver와 설치 연결은 해당 릴레이에 필요한 전기 신호로 그 의도를 적용하기 때문이다.
+renderer와 설치 연결은 해당 릴레이에 필요한 전기 신호로 그 의도를 적용하기 때문이다.
 
 **문법 근거**
 
@@ -2035,7 +2035,7 @@ Driver와 설치 연결은 해당 릴레이에 필요한 전기 신호로 그 �
 ## 39. Waveshare 같은 확장 보드로 출력 수를 늘릴 수 있나요?
 
 가능하다. **논리 출력을 직접 GPIO뿐 아니라 확장 장치의 채널에도 연결할 수 있다.**
-Driver가 확장 장치의 통신과 채널 제어를 맡고, binding이 각 논리 출력을 해당 채널에 연결한다.
+renderer가 확장 장치의 통신과 출력 채널 제어를 맡고, binding이 각 논리 출력을 해당 채널에 연결한다.
 
 ```ghost
 control TwoRelayRequests {
@@ -2063,8 +2063,8 @@ control TwoRelayRequests {
 다음은 설치 연결 설명이며 binding 파일의 문법은 아니다.
 
 ```text
-relay1 → 확장 출력 Driver → 확장 보드 1번 채널
-relay2 → 확장 출력 Driver → 확장 보드 2번 채널
+relay1 → 확장 출력 renderer → 확장 보드 1번 채널
+relay2 → 확장 출력 renderer → 확장 보드 2번 채널
 ```
 
 예를 들어 [Waveshare Modbus RTU Relay 16CH 공식 문서](https://www.waveshare.com/wiki/Modbus_RTU_Relay_16CH)는
@@ -2075,14 +2075,14 @@ Waveshare라는 제조사 이름만으로 모든 보드의 통신 방식이 같�
 **단순 멀티플렉서와 독립 출력 확장은 구분한다.**
 예를 들어 [TI CD74HC4067](https://www.ti.com/product/CD74HC4067)은 공통 신호에 연결할 채널을 선택하는 소자다.
 그 자체로 여러 릴레이의 ON/OFF 상태를 각각 유지하는 출력 장치가 되지는 않는다.
-독립적인 지속 출력을 원하면 각 채널의 상태를 유지할 수 있는 확장 장치·회로와 Driver 계약이 필요하다.
+독립적인 지속 출력을 원하면 각 채널의 상태를 유지할 수 있는 확장 장치·회로와 renderer 계약이 필요하다.
 
 기존 논리 출력을 호환되는 확장 채널로 옮기는 경우에는 제어 소스 수정이나 재컴파일이 필요 없다.
 다만 새 장치들을 위한 논리 출력과 제어 동작까지 추가한다면 그 부분은 프로그램 변경이다.
-Driver는 필요한 채널 수·갱신 시간·출력 유지·통신 장애 시 동작을 만족해야 한다.
+renderer는 필요한 채널 수·갱신 시간·출력 유지·통신 장애 시 동작을 만족해야 한다.
 한 tick에서 여러 출력을 계산했다는 사실만으로 물리 릴레이가 동시에 전환되는 것은 아니다.
 
-**왜 확장 방식은 Driver에 두나요?** 같은 제어 의도를 직접 GPIO, 확장 칩, 통신형 릴레이에
+**왜 확장 방식은 renderer에 두나요?** 같은 제어 의도를 직접 GPIO, 확장 칩, 통신형 릴레이에
 연결할 때마다 제어 코드에 버스 명령과 채널 주소를 넣지 않도록 하기 위해서다.
 
 **문법 근거**
@@ -2096,7 +2096,7 @@ Driver는 필요한 채널 수·갱신 시간·출력 유지·통신 장애 시 
 ## 40. RS485 I/O 확장 보드의 입력과 출력도 매핑할 수 있나요?
 
 가능하다. **보드의 각 입력·출력 채널을 GhostFlow의 논리 port에 연결한다.**
-Driver는 해당 보드의 통신 규약에 따라 입력을 읽고 출력 명령을 전달한다.
+입력 driver는 해당 보드의 통신 규약에 따라 입력을 읽고 출력 renderer는 출력 명령을 전달한다.
 제어 소스에는 RS485 주소나 통신 명령을 넣지 않는다.
 
 다음은 설치 매핑의 설명 예다. 실행 문법이나 통신 프레임 형식이 아니다.
@@ -2104,7 +2104,7 @@ Driver는 해당 보드의 통신 규약에 따라 입력을 읽고 출력 명�
 ```text
 보드 주소 1, DI 채널 1 → 입력 Driver → 논리 입력 start
 보드 주소 1, DI 채널 2 → 입력 Driver → 논리 입력 stop
-논리 출력 pump → 출력 Driver → 보드 주소 1, DO 채널 3
+논리 출력 pump → 출력 renderer → 보드 주소 1, DO 채널 3
 ```
 
 이 연결을 사용하는 제어 프로그램은 직접 GPIO를 사용할 때와 같다.

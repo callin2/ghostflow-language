@@ -5,7 +5,7 @@
 1. Hardware is addressed by semantic capability, not board, pin, or product.
 2. A tick is deterministic and atomic.
 3. Feedback crosses an explicit state boundary.
-4. Every effect is an intent interpreted by a host driver and safety kernel.
+4. Every effect is an intent interpreted by a host renderer and safety kernel.
 5. Every active strategy is uniquely selected from a device profile.
 6. Every accepted module has statically bounded state and expression cost.
 7. Replay never invokes a physical effect sink.

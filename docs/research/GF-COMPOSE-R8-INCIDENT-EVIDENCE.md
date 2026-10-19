@@ -9,7 +9,7 @@ Status: bounded research/design. No implementation or physical-device test is cl
 When a farmer asks “why did watering not happen?”, the answer must identify the
 same occurrence that an engineer and installer inspect. It must distinguish a
 requested output, the safe output selected by the language runtime, a host or
-driver application result, and physical observation. A missing value is not
+renderer application result, and physical observation. A missing value is not
 false, and an old run or binding must not be joined to the current incident.
 
 The composition-specific goal is a small, exact evidence handoff. It does not
@@ -82,7 +82,7 @@ persistent incident-retention promise.
 The exact participant context is the tuple consisting of definition/module,
 instance, settings revision/effective event position within the same run,
 installation/binding, run/scan, and logical time. Proposed causal evidence is input event or
-observation → evaluated rule → intent → requested/safe output → driver result
+observation → evaluated rule → intent → requested/safe output → renderer result
 or physical observation, joined to the effective settings at evaluation. Every
 participant view must use that tuple. A consumer must reject an old run, wrong
 schema/module/source, or wrong binding as stale or unavailable instead of
@@ -94,7 +94,7 @@ silently presenting a related record.
 |---|---|---|---|
 | Requested output | Rust core trace; language source map | Existing `requested` map and provenance | Join it to instance and exact completed scan. |
 | Safe output | Rust safety resolution | Existing `safe` map and bounded safety trace | Keep distinct from request and expose constraint reference. |
-| Host/driver application | API/host and Device integration | Not defined by interaction-v0; host fault is not physical failure | #74/#88 must define application-result event and absence semantics. Driver source/intent handles precision measurement, protocol, and raw ISR/scan mechanics; it exposes meaningful typed events/measurements without hiding farm policy. Capture time, receipt/evaluation time, and quality stay distinct; command acknowledgement is not physical proof. |
+| Host/renderer application | API/host and Device integration | Not defined by interaction-v0; host fault is not physical failure | #74/#88 must define application-result event and absence semantics. Driver source/intent handles precision measurement, protocol, and raw ISR/scan mechanics; it exposes meaningful typed events/measurements without hiding farm policy. Capture time, receipt/evaluation time, and quality stay distinct; command acknowledgement is not physical proof. |
 | Physical observation | Device/installation owner | #28 proposes persistent event history and references HIL physical-relay evidence, but does not settle the final feedback schema | #28 must define available feedback, boot/history identity, and retention; a recorded applied event still does not prove physical operation. |
 | Memory/authoring context | API/system #68 | Provenance context only | Must never become an execution or binding join without an approved decision/source path. |
 | Input occurrences and value observations | Not implemented here; agreed design. Capture may be interrupt- or scan-based. | Occurrence identity or observed value with distinct capture and receipt/evaluation times and quality | Define the ingress record and event-to-tick mapping. Preserve by default within supported capacity; latest-pending-value replacement only when explicitly opted in per input. Overflow/loss must be reported. Ordering and mapping remain open; this is not unlimited durable history. |
@@ -111,13 +111,13 @@ and source/anchor reference. Hardware evidence is only the available sensor or
 installation record. Remaining uncertainty: the signal does not prove the
 physical tank level or sensor correctness.
 
-#### 2. Driver application failed or feedback is absent
+#### 2. renderer application failed or feedback is absent
 
 Farmer answer and next action: “The system requested watering, but the device
 application failed” when a failure is recorded; otherwise, “The command result
 is unknown because physical feedback is absent.” Next action is to inspect the
 installation/driver path or contact the installer. Software evidence shows the
-same run/scan, requested output, safe output, and host/driver result if present.
+same run/scan, requested output, safe output, and host/renderer result if present.
 Hardware evidence shows the binding, driver event, or physical feedback only if
 Device recorded it. Remaining uncertainty: `requested=ON` or `safe=ON` does not
 prove that the pump ran.
