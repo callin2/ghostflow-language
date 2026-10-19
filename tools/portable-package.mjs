@@ -363,6 +363,9 @@ export async function buildPortablePackage(compilation, identityValue, { signers
     fail('invalid-diagnostic-handler', 'onDiagnostic must be a function');
   }
   if (!isPlainObject(compilation)) fail('invalid-compilation', 'compilation must be a compileSource result');
+  if (Object.hasOwn(compilation, 'intentEvidence')) {
+    fail('unsupported-intent-evidence', 'portable-package-v1 does not transport external intent evidence; keep the authoring record and explicitly compile without that option for this package profile');
+  }
   const document = exactObject(compilation.sourceDocument, ['format', 'kind', 'filename', 'text', 'sha256'], 'compilation.sourceDocument');
   if (document.format !== SOURCE_FORMAT || document.kind !== 'literate') {
     fail('noncanonical-source', 'portable packages require an authoritative .ghost.md literate source');

@@ -8,6 +8,7 @@ import { parseControlImports } from './control.mjs';
 import { extractLiterate, mapSourcePosition, MAX_INPUT_BYTES } from './literate.mjs';
 import { decode as decodeToon, encode as encodeToon } from '@toon-format/toon';
 import { reportWarnings } from './diagnostic-output.mjs';
+import { INTENT_EVIDENCE_LIMITS } from './intent-evidence.mjs';
 
 export { compileSource } from './toolchain.mjs';
 
@@ -22,7 +23,7 @@ function requireRecord(value, label, keys) {
 }
 
 function validateRequest(value) {
-  requireRecord(value, 'request', ['format', 'operation', 'source', 'artifactPath']);
+  requireRecord(value, 'request', ['format', 'operation', 'source', 'artifactPath', 'intentEvidencePath']);
   if (value.format !== REQUEST_FORMAT) throw new Error(`request.format must be ${REQUEST_FORMAT}`);
   if (!['check', 'compile'].includes(value.operation)) throw new Error('request.operation must be check or compile');
   requireRecord(value.source, 'request.source', ['path', 'documentId', 'revisionId']);
@@ -30,13 +31,17 @@ function validateRequest(value) {
     if (typeof value.source[key] !== 'string' || value.source[key].length === 0) throw new Error(`request.source.${key} must be a non-empty string`);
   }
   if (!value.source.path.endsWith('.ghost.md')) throw new Error('request.source.path must name a canonical .ghost.md document');
+  if (Object.hasOwn(value, 'intentEvidencePath')
+      && (typeof value.intentEvidencePath !== 'string' || value.intentEvidencePath.length === 0)) {
+    throw new Error('request.intentEvidencePath must be a non-empty string');
+  }
   if (value.operation === 'compile') {
     if (typeof value.artifactPath !== 'string' || value.artifactPath.length === 0) throw new Error('compile request requires artifactPath');
   } else if (Object.hasOwn(value, 'artifactPath')) throw new Error('check request does not accept artifactPath');
   return value;
 }
 
-function structuredResult(request, ok, diagnosticEnvelope, warnings = [], artifact = undefined, error = undefined) {
+function structuredResult(request, ok, diagnosticEnvelope, warnings = [], artifact = undefined, error = undefined, intentEvidence = undefined) {
   const sourceEnvelope = diagnosticEnvelope?.requestSource ?? diagnosticEnvelope?.source;
   const diagnosticSource = diagnosticEnvelope?.source && sourceEnvelope !== diagnosticEnvelope.source
     && diagnosticEnvelope.source.filename !== sourceEnvelope.filename
@@ -61,8 +66,24 @@ function structuredResult(request, ok, diagnosticEnvelope, warnings = [], artifa
     ...(diagnosticSource ? { diagnosticSource } : {}),
     warnings,
     ...(artifact ? { artifact } : {}),
+    ...(intentEvidence ? { intentEvidence } : {}),
     ...(error ? { error } : {}),
   };
+}
+
+function readIntentEvidence(filename) {
+  try {
+    if (fs.statSync(filename).size > INTENT_EVIDENCE_LIMITS.bytes) {
+      throw new Error('byte limit exceeded');
+    }
+    const bytes = fs.readFileSync(filename);
+    if (bytes.byteLength > INTENT_EVIDENCE_LIMITS.bytes) throw new Error('byte limit exceeded');
+    return JSON.parse(new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes));
+  } catch (cause) {
+    const error = new Error(`intentEvidencePath ${filename}: ${cause.message}`, { cause });
+    error.diagnosticCode = 'GF_INTENT_EVIDENCE';
+    throw error;
+  }
 }
 
 function writeStructured(value, format) {
@@ -92,22 +113,25 @@ async function runRequestCli(args) {
   try {
     const bytes = fs.readFileSync(request.source.path);
     const source = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
+    const intentEvidence = Object.hasOwn(request, 'intentEvidencePath')
+      ? readIntentEvidence(request.intentEvidencePath) : undefined;
     const sourceClosure = collectImportDocuments(source, path.resolve(request.source.path));
     const result = await compileSource(source, {
       filename: sourceClosure.length ? path.resolve(request.source.path) : request.source.path,
       interactionSourceIdentity: { documentId: request.source.documentId, revisionId: request.source.revisionId },
       ...(sourceClosure.length ? { sourceClosure } : {}),
+      ...(intentEvidence !== undefined ? { intentEvidence } : {}),
     });
     if (request.operation === 'compile') writeArtifact(result, request.artifactPath);
     const artifactKind = result.manifest?.format ?? (result.manifest ? 'control-v1 + host manifest' : 'MVP GFB1');
     const artifact = request.operation === 'compile'
       ? { path: request.artifactPath, bytes: result.bytes.length, format: artifactKind }
       : undefined;
-    writeStructured(structuredResult(request, true, result.diagnosticEnvelope, result.warnings ?? [], artifact), format);
+    writeStructured(structuredResult(request, true, result.diagnosticEnvelope, result.warnings ?? [], artifact, undefined, result.intentEvidence), format);
   } catch (error) {
     const envelope = error.diagnosticEnvelope;
     if (!envelope) {
-      writeStructured(structuredResult(request, false, null, [], undefined, { code: 'GF_SOURCE', message: error.message }), format);
+      writeStructured(structuredResult(request, false, null, [], undefined, { code: error.diagnosticCode ?? 'GF_SOURCE', message: error.message }), format);
       process.exitCode = 1;
       return;
     }
