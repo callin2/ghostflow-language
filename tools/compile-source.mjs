@@ -5,6 +5,7 @@ import { compileAccountingControl, compileControl, compileControlPolicyDescripto
 import { isWellFormedUnicode, sha256Hex, utf8ByteLength } from './sha256.mjs';
 import { compileComposition, resolveDocument } from './composition.mjs';
 import { emitExplanationArtifact } from './explanation.mjs';
+import { collectIntentLinkDiagnostics } from './intent-link-diagnostics.mjs';
 import { parseHardwareFrontMatter, validateHardwareBindings, HardwareFrontMatterError } from './hardware-frontmatter.mjs';
 import { resolveHardwareProfiles } from './hardware-profiles.mjs';
 import { bindIntentEvidence } from './intent-evidence.mjs';
@@ -96,9 +97,9 @@ export function compileSourceSync(source, options = {}) {
     }
     throw error;
   }
-  let result, composition, stage = 'parse';
+  let result, composition, ast, stage = 'parse';
   try {
-    const ast = parseControl(extraction.code, { filename });
+    ast = parseControl(extraction.code, { filename });
     if (hardwarePlan && ast.imports?.length) throw new HardwareFrontMatterError(hardwarePlan.source,
       hardwarePlan.locations['/hardware'] ?? hardwarePlan.locations['/profile'], 'hardware declarations in executable import composition are not supported');
     stage = 'semantic';
@@ -167,7 +168,6 @@ export function compileSourceSync(source, options = {}) {
   }
   validateHardwareBindings(hardwarePlan, result.manifest);
   if (extraction.anchors.length || extraction.linkDirectives.length) {
-    const ast = parseControl(extraction.code, { filename });
     result = {
       ...result,
       traceMetadata: attachIntentMetadata(result.traceMetadata, {
@@ -179,6 +179,8 @@ export function compileSourceSync(source, options = {}) {
       }),
     };
   }
+  const intentDiagnostics = collectIntentLinkDiagnostics({ ast, extraction,
+    intentLinks: result.traceMetadata?.intentLinks, composition });
   const mapFor = name => composition?.units.get(resolveDocument('', name))?.extraction.sourceMap ?? extraction.sourceMap;
   const remapConstraintSource = identity => {
     if (!identity) return identity;
@@ -246,7 +248,7 @@ export function compileSourceSync(source, options = {}) {
         ? { sourceDocumentSha256: sourceDocument.sha256 } : {}),
     } : null,
     extractionMap: extraction.sourceMap,
-    warnings: extraction.warnings,
+    warnings: [...extraction.warnings, ...intentDiagnostics.diagnostics],
     ...(hardwarePlan ? { hardwarePlan } : {}),
   };
   let schema = null;
@@ -280,7 +282,7 @@ export function compileSourceSync(source, options = {}) {
     ...publicCompilation,
     ...(intentEvidence ? { intentEvidence } : {}),
     diagnosticEnvelope: { format: DIAGNOSTICS_FORMAT,
-      source: diagnosticSource(filename, source, interactionSourceIdentity), diagnostics: [] },
+      source: diagnosticSource(filename, source, interactionSourceIdentity), ...intentDiagnostics },
     interactionSchema: schema,
     explanationArtifact,
     interactionSourceIdentity: schema ? {

@@ -37,6 +37,22 @@ Provider schemas and deployment admission remain Device responsibilities; hardwa
 import composition is explicitly unsupported. `tests/hardware-frontmatter.test.mjs`
 covers identities, nested parameters, roles, invalid declarations and compiler parity.
 
+### 2026-10-16 — actionable default intent-link warnings ([#553](https://github.com/callin2/ghostflow-language/issues/553))
+
+Bug fix: the compiler, CLI, and package creation now report intent-link coverage
+warnings with original locations and actionable examples. `GF_INTENT_LINK_MISSING`
+covers unlinked top-level connection/next/require/mutex/let/function/signal/
+schedule/timer statements. `GF_INTENT_LINK_COVERAGE_UNSUPPORTED` identifies
+top-level adapt/objective/account/constraint/adapt-setting/degraded owners and
+nested connection/connect/next/require/mutex statements that have no supported
+link target; their hints say the example is not an immediate repair. Declarations
+do not cover later behavior, and warnings do not infer transitive semantics or
+confirm intent. Unconfirmed assumptions remain unconfirmed. Warnings are capped
+at 20 with explicit truncation metadata, and instantiated imported definitions
+are reported at their source statements. Existing error behavior, executable
+output, GFB bytes and runtime behavior stay unchanged. Regression coverage is in
+`tests/intent-link-diagnostics.test.mjs` and the CLI/package regression tests.
+
 ### 2026-10-14 — signed immutable IANA Range admission ([#541](https://github.com/callin2/ghostflow-language/issues/541))
 
 Portable signing previously rejected the executable GFB21 profile. It now admits

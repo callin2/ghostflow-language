@@ -43,7 +43,8 @@ test('matching exact UTF-8 prose and CRLF digest accepts the verified closure', 
   const { input } = fixture(t, document(sha(child)));
   const result = run('--check', input);
   assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.stderr, '');
+  assert.match(result.stderr, /warning GF_INTENT_LINK_MISSING:/);
+  assert.doesNotMatch(result.stderr, /digest mismatch/);
 });
 
 test('changed imported prose fails digest validation without replacing existing artifacts', t => {

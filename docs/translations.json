@@ -271,8 +271,8 @@
       "source": "docs/COMPILER-DIAGNOSTICS.md",
       "sourceLanguage": "en",
       "translation": "docs/COMPILER-DIAGNOSTICS.ko.md",
-      "sourceSha256": "86955c5f0ef22919dd9907e8c3563d8eedace1e03db096663dc5d2e541c249eb",
-      "translationSha256": "de2865bc440754dc222a8610590e05155604b287112b023e2d34d44ba464f290"
+      "sourceSha256": "64b810c1b6b3660f4a19df077cf912526845399ef99046f20f886168fd5c47f8",
+      "translationSha256": "f5a089cfd9d65c6d5b358faab8528bd9860614d96372f512258c427c6f66143b"
     },
     {
       "source": "docs/CONSTRAINTS.md",
@@ -355,8 +355,8 @@
       "source": "docs/INTENT-ANCHOR-MAP.md",
       "sourceLanguage": "en",
       "translation": "docs/INTENT-ANCHOR-MAP.ko.md",
-      "sourceSha256": "692fcaae6b7cc4e49909cdf68dea04e7af369102a1b8b5ea716fedce12051f13",
-      "translationSha256": "269b5ba220189b1ba95f77ea59f96ed94df5db6ec45e56348d467511a33f4bda"
+      "sourceSha256": "d56112071ae4f3843315e4480b2e061f7f6d225e186460a497eb8c0d8cf50210",
+      "translationSha256": "8d0c08083afdf27ba5bc8d8862b71fb85bcadedae4ebb7ffcf33cafd9dd7693b"
     },
     {
       "source": "docs/KEYBOARD-HOST.md",
@@ -705,8 +705,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "2ad6dcbf8a72c303eca75c509c7ad73626859fba62319f4d2797da758cb82f3a",
-      "translationSha256": "15151e047b78a42dc96734d7ffa81335e4b55cec651ee7bf7bb5cb6b74a78973"
+      "sourceSha256": "fbb982600274849d05f4753c99aee1c0162783f41f65c550407bc4d1cd6bead8",
+      "translationSha256": "e6c9bf79e407f7ba6021a53433040fff54dfe4ffa02de691de8860c3fd9f2e09"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",
@@ -1492,6 +1492,10 @@
     {
       "path": "tests/fixtures/issue541-seoul-traffic.ghost.md",
       "reason": "Canonical executable civil Range simulation/conformance fixture shared with simulator integration; not authored reader documentation, so its compile identity is retained."
+    },
+    {
+      "path": "docs/reports/2026-10-16-intent-link-warnings-553.md",
+      "reason": "Issue 553 implementation decisions, source-update and verification evidence; execution reports may remain in one language."
     }
   ]
 }

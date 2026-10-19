@@ -8,6 +8,7 @@ import { extractLiterate } from './literate.mjs';
 import { equalBytes } from './sha256.mjs';
 import { remapSourceTrace, sourceMapRequiresTraceMetadata, verifySourceTraceMetadata } from './source-trace.mjs';
 import { physicalManifestInputs, validateLifecycleManifest } from './lifecycle-contract.mjs';
+import { reportWarnings } from './diagnostic-output.mjs';
 
 const UTF8 = new TextEncoder();
 const UTF8_FATAL = new TextDecoder('utf-8', { fatal: true });
@@ -409,8 +410,11 @@ function validateSigningKey(key, type, path) {
   return key;
 }
 
-/** Build a deterministic signed package from a compileSource result and a fresh compiler replay. */
-export async function buildPortablePackage(compilation, identityValue, { signers, verifyCompilation } = {}) {
+/** Build a deterministic signed package; replay warnings go to onDiagnostic or console.warn. */
+export async function buildPortablePackage(compilation, identityValue, { signers, verifyCompilation, onDiagnostic } = {}) {
+  if (onDiagnostic !== undefined && typeof onDiagnostic !== 'function') {
+    fail('invalid-diagnostic-handler', 'onDiagnostic must be a function');
+  }
   if (!isPlainObject(compilation)) fail('invalid-compilation', 'compilation must be a compileSource result');
   if (Object.hasOwn(compilation, 'intentEvidence')) {
     fail('unsupported-intent-evidence', 'portable-package-v1 does not transport external intent evidence; keep the authoring record and explicitly compile without that option for this package profile');
@@ -473,6 +477,7 @@ export async function buildPortablePackage(compilation, identityValue, { signers
       || !bytesEqual(replayMapBytes, sourceMapBytes)) {
     fail('compilation-mismatch', 'source, GFB1, manifest and source map do not belong to one deterministic compilation');
   }
+  reportWarnings(replay.warnings, onDiagnostic);
   const payload = {
     format: PAYLOAD_FORMAT,
     source: {
