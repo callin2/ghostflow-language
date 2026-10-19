@@ -77,6 +77,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/AFTER-EVENT-WASM-ABI.md](docs/AFTER-EVENT-WASM-ABI.md) | Identified after_event execution ABI | md |
 | [docs/AI-CONTRIBUTION-PACKAGE.ko.md](docs/AI-CONTRIBUTION-PACKAGE.ko.md) | 범위를 제한한 AI 기여 작업 패키지 | md |
 | [docs/AI-CONTRIBUTION-PACKAGE.md](docs/AI-CONTRIBUTION-PACKAGE.md) | Bounded AI contribution package | md |
+| [docs/BEHAVIOR-COMPARISON.ko.md](docs/BEHAVIOR-COMPARISON.ko.md) | 제한된 동작 비교 | md |
+| [docs/BEHAVIOR-COMPARISON.md](docs/BEHAVIOR-COMPARISON.md) | Bounded behavior comparison | md |
 | [docs/BEHAVIOR-COMPOSITION-RESEARCH.ko.md](docs/BEHAVIOR-COMPOSITION-RESEARCH.ko.md) | 동작 조합: 연구와 아키텍처 검토 | md |
 | [docs/BEHAVIOR-COMPOSITION-RESEARCH.md](docs/BEHAVIOR-COMPOSITION-RESEARCH.md) | Behavior composition: research and architecture review | md |
 | [docs/BOOLEAN-OUTPUT-EXPLANATION.ko.md](docs/BOOLEAN-OUTPUT-EXPLANATION.ko.md) | Boolean 요청 출력 설명 | md |
@@ -524,4 +526,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-394 documents.
+396 documents.

@@ -74,6 +74,7 @@ const TESTS = Object.freeze([
   'tests/expression-order.test.mjs', 'tests/dynamic-int-conversions.test.mjs',
   'tests/int-division-identity.test.mjs', 'tests/result-control.test.mjs',
   'tests/interaction-runtime-snapshot.test.mjs', 'tests/intent-anchor-map.test.mjs', 'tests/intent-evidence.test.mjs',
+  'tests/behavior-comparison.test.mjs',
   'tests/curriculum-replay.test.mjs', 'tests/scan-tape-parity.test.mjs',
   'tests/source-dependencies.test.mjs', 'tests/temporal-descriptor-artifact.test.mjs',
   'tests/window-derived-control.test.mjs', 'tests/window-derived-host.test.mjs',
