@@ -145,6 +145,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/SOURCE-SAFETY-TRACE.md](SOURCE-SAFETY-TRACE.md) | Source and safety observation contract | md |
 | [docs/SUNCALC-ATTRIBUTION.ko.md](SUNCALC-ATTRIBUTION.ko.md) | 이식 가능한 태양광 공급자의 SunCalc 저작자 표시 | md |
 | [docs/SUNCALC-ATTRIBUTION.md](SUNCALC-ATTRIBUTION.md) | SunCalc attribution for the portable solar provider | md |
+| [docs/TARGET-QUERY.ko.md](TARGET-QUERY.ko.md) | Target contract query | md |
+| [docs/TARGET-QUERY.md](TARGET-QUERY.md) | Target contract query | md |
 | [docs/TASK-61-CONFORMANCE.md](TASK-61-CONFORMANCE.md) | TASK-61 focused conformance expansion | md |
 | [docs/TASK-62-COVERAGE.md](TASK-62-COVERAGE.md) | TASK-62 coverage evidence | md |
 | [docs/TEMPORAL-DESCRIPTOR-ARTIFACT.ko.md](TEMPORAL-DESCRIPTOR-ARTIFACT.ko.md) | 보류된 temporal artifact | md |
@@ -255,4 +257,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.ko.md](research/GF-COMPOSE-R9-ACCEPTANCE.ko.md) | GF-COMPOSE R9: acceptance와 구현 인계 | md |
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.md](research/GF-COMPOSE-R9-ACCEPTANCE.md) | GF-COMPOSE R9: acceptance and implementation handoff | md |
 
-216 documents.
+218 documents.
