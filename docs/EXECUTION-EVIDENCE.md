@@ -25,9 +25,9 @@ The top-level object has exact `schema: "GhostFlow/execution-evidence-request-v1
 
 | Kind | Additional fields | Meaning |
 | --- | --- | --- |
-| `driver-request` | `stage: "requested" | "safe"`, Boolean or finite numeric `value` | Must use the envelope request ID for `id` and `requestId`. Its value must equal the selected stage's actual output value. |
-| `ack` | `outcome: "accepted" | "rejected" | "fault" | "unknown"` | An ACK refers to the exact driver request ID. Acceptance is a reported command outcome, never physical confirmation. |
-| `register-readback` | `quality: "ok" | "fault" | "unknown"`, and `value` only for `ok` | A supplied register observation. |
+| `driver-request` | `stage: "requested" \| "safe"`, Boolean or finite numeric `value` | Must use the envelope request ID for `id` and `requestId`. Its value must equal the selected stage's actual output value. |
+| `ack` | `outcome: "accepted" \| "rejected" \| "fault" \| "unknown"` | An ACK refers to the exact driver request ID. Acceptance is a reported command outcome, never physical confirmation. |
+| `register-readback` | `quality: "ok" \| "fault" \| "unknown"`, and `value` only for `ok` | A supplied register observation. |
 | `physical-feedback` | The same quality/value rule | A supplied physical observation, not independently verified here. |
 
 One record of each kind is allowed for one request. Missing stages are listed independently. Distinct IDs at one stage, duplicate records, orphan references, wrong request ID, a stage value different from the accepted scan, a reported value differing from the request, and a report timestamp before the driver request are diagnostics. Records are retained for review; there is no latest-wins selection and no join by timestamp proximity. Timestamps are checked only for canonical format and impossible sequence within the supplied clock reference. The API does not verify clock accuracy, device authority, signatures, transport or physical effect.

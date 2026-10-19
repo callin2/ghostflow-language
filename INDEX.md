@@ -139,6 +139,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/INTENT-ANCHOR-MAP.md](docs/INTENT-ANCHOR-MAP.md) | Literate intent anchor map | md |
 | [docs/INTENT-CONSISTENCY-CONTRACT.en.md](docs/INTENT-CONSISTENCY-CONTRACT.en.md) | Responsibility and Evidence Contract for Intent Consistency | md |
 | [docs/INTENT-CONSISTENCY-CONTRACT.md](docs/INTENT-CONSISTENCY-CONTRACT.md) | 의도 정합성의 판단 책임과 근거 계약 | md |
+| [docs/INTENT-DECISIONS.ko.md](docs/INTENT-DECISIONS.ko.md) | 작성된 의도 결정 확인하기 | md |
+| [docs/INTENT-DECISIONS.md](docs/INTENT-DECISIONS.md) | Inspect authored intent decisions | md |
 | [docs/INTENT-EVIDENCE.ko.md](docs/INTENT-EVIDENCE.ko.md) | 의도 근거 작성 API | md |
 | [docs/INTENT-EVIDENCE.md](docs/INTENT-EVIDENCE.md) | Intent evidence authoring API | md |
 | [docs/INTERACTION-STREAM-CONTRACT.ko.md](docs/INTERACTION-STREAM-CONTRACT.ko.md) | Interaction 스트림 계약 설계 | md |
@@ -532,4 +534,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-402 documents.
+404 documents.

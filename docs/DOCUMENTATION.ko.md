@@ -26,6 +26,7 @@
 | `docs/FAILURE-REDUCTION.md` | [English](FAILURE-REDUCTION.md) | [한국어](FAILURE-REDUCTION.ko.md) |
 | `docs/TARGET-QUERY.md` | [English](TARGET-QUERY.md) | [한국어](TARGET-QUERY.ko.md) |
 | `docs/EXECUTION-EVIDENCE.md` | [English](EXECUTION-EVIDENCE.md) | [한국어](EXECUTION-EVIDENCE.ko.md) |
+| `docs/INTENT-DECISIONS.md` | [English](INTENT-DECISIONS.md) | [한국어](INTENT-DECISIONS.ko.md) |
 | `docs/BOOLEAN-OUTPUT-EXPLANATION.md` | [English](BOOLEAN-OUTPUT-EXPLANATION.md) | [한국어](BOOLEAN-OUTPUT-EXPLANATION.ko.md) |
 | `docs/BYTECODE.md` | [English](BYTECODE.md) | [한국어](BYTECODE.ko.md) |
 | `docs/CALENDAR-PROVIDERS.md` | [English](CALENDAR-PROVIDERS.md) | [한국어](CALENDAR-PROVIDERS.ko.md) |

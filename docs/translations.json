@@ -2,11 +2,18 @@
   "format": "GhostFlow/document-translations-v1",
   "documents": [
     {
+      "source": "docs/INTENT-DECISIONS.md",
+      "sourceLanguage": "en",
+      "translation": "docs/INTENT-DECISIONS.ko.md",
+      "sourceSha256": "e3dd72ad7ecadd661d682fb8c4413ac0ff97edaa8cf04c2bfba56b0ac3a1103e",
+      "translationSha256": "9f06271a03f8a9d3efc4a0b486d2e99d0c16f2cfeb85470fd8e18e43db9c4a85"
+    },
+    {
       "source": "docs/EXECUTION-EVIDENCE.md",
       "sourceLanguage": "en",
       "translation": "docs/EXECUTION-EVIDENCE.ko.md",
-      "sourceSha256": "88977c9013560d10a2403bcabfcf0e91d168082abcf6914267ba3e44778d8d2d",
-      "translationSha256": "4748f8910fa385e0518b02a4e5fcef0b6ac694cbd9119541e1cf5b21728cfcd6"
+      "sourceSha256": "e11862084bfc8402ed774181fdd1c60a9f8236c5ea9b341ea305da583b00a868",
+      "translationSha256": "f77fcf67df9ba29fb0e3dc85d61fbc39281b77c47d106a1bad394c565b6309ac"
     },
     {
       "source": "docs/TARGET-QUERY.md",
@@ -299,8 +306,8 @@
       "source": "docs/DOCUMENTATION.md",
       "sourceLanguage": "en",
       "translation": "docs/DOCUMENTATION.ko.md",
-      "sourceSha256": "6b87ba8c6fe71b02f3753ea8eaf4ae125f226097d221e929be90f041cf25f8f0",
-      "translationSha256": "4fc2078a1099963be3856e4dcf9c8e1214bcc5a7ec765b494587be90680ca05f"
+      "sourceSha256": "e0de7157c6085fd43032c544605336796ce9bf4f42392688e203f02d57eab66f",
+      "translationSha256": "df246507dbf991c2fe144f4e8e84d41c015bea8ed8bb5f2123e3c486e9561430"
     },
     {
       "source": "docs/EXACT-INTEGER-CONTRACT.md",

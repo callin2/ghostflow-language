@@ -82,6 +82,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/INTENT-ANCHOR-MAP.md](INTENT-ANCHOR-MAP.md) | Literate intent anchor map | md |
 | [docs/INTENT-CONSISTENCY-CONTRACT.en.md](INTENT-CONSISTENCY-CONTRACT.en.md) | Responsibility and Evidence Contract for Intent Consistency | md |
 | [docs/INTENT-CONSISTENCY-CONTRACT.md](INTENT-CONSISTENCY-CONTRACT.md) | 의도 정합성의 판단 책임과 근거 계약 | md |
+| [docs/INTENT-DECISIONS.ko.md](INTENT-DECISIONS.ko.md) | 작성된 의도 결정 확인하기 | md |
+| [docs/INTENT-DECISIONS.md](INTENT-DECISIONS.md) | Inspect authored intent decisions | md |
 | [docs/INTENT-EVIDENCE.ko.md](INTENT-EVIDENCE.ko.md) | 의도 근거 작성 API | md |
 | [docs/INTENT-EVIDENCE.md](INTENT-EVIDENCE.md) | Intent evidence authoring API | md |
 | [docs/INTERACTION-STREAM-CONTRACT.ko.md](INTERACTION-STREAM-CONTRACT.ko.md) | Interaction 스트림 계약 설계 | md |
@@ -259,4 +261,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.ko.md](research/GF-COMPOSE-R9-ACCEPTANCE.ko.md) | GF-COMPOSE R9: acceptance와 구현 인계 | md |
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.md](research/GF-COMPOSE-R9-ACCEPTANCE.md) | GF-COMPOSE R9: acceptance and implementation handoff | md |
 
-220 documents.
+222 documents.
