@@ -114,5 +114,4 @@ scenarios (D10) and cross-module release qualification (D11) remain separate tas
 - Read-only predecessor `esp32s3-new-project/rust/firmware/src/inputs.rs`,
   `rust/control-core/src/debounce.rs` and the DI scan section of
   `rust/firmware/src/main.rs`: physical raw-level normalization/debounce belongs
-  to the device driver before the logical input frame. No predecessor ST path or
-  old device evidence is imported as GhostFlow acceptance.
+  to the device driver before the logical input frame. Old device evidence is not`r`n  imported as GhostFlow acceptance.
