@@ -4,6 +4,7 @@ import { extractLiterate, mapSourcePosition } from './literate.mjs';
 import { compileAccountingControl, compileControl, compileResourcePolicyArtifact, compileScheduleDescriptorArtifact, compileTemporalDescriptorArtifact, hasTemporalDescriptorCalls, isExecutablePulseSchedule, isExecutableRangeSchedule, parseControl } from './control.mjs';
 import { isWellFormedUnicode, sha256Hex, utf8ByteLength } from './sha256.mjs';
 import { compileComposition, resolveDocument } from './composition.mjs';
+import { createCompilerTelemetry } from './compiler-telemetry.mjs';
 
 export { emitInteractionSchema } from './interaction-schema.mjs';
 
@@ -72,6 +73,14 @@ export async function compileSource(source, options = {}) {
 
 /** Deterministic core also used when verifying persisted artifacts. */
 export function compileSourceSync(source, options = {}) {
+  const telemetry = createCompilerTelemetry(options && typeof options === 'object' ? options.onTelemetry : undefined);
+  if (!telemetry) return compileSourceCore(source, options);
+  try { return compileSourceCore(source, options, telemetry); }
+  catch (error) { telemetry.diagnostics(error); throw error; }
+  finally { telemetry.finish(); }
+}
+
+function compileSourceCore(source, options, telemetry) {
   if (!options || typeof options !== 'object' || Array.isArray(options)) throw new TypeError('compile options must be an object');
   if (Object.hasOwn(options, 'interactionSchema')) {
     throw new Error('interactionSchema is not a compile option; supply interactionSourceIdentity explicitly');
@@ -81,6 +90,7 @@ export function compileSourceSync(source, options = {}) {
   requireSourceText(source, `${filename}: source`);
   if (!filename.endsWith('.ghost.md')) throw new Error(`${filename}: GhostFlow product compilation requires a canonical .ghost.md literate source`);
   let extraction;
+  telemetry?.phase('extract');
   try { extraction = extractLiterate(source, { filename }); }
   catch (error) {
     if (Number.isInteger(error.line) && Number.isInteger(error.column)) {
@@ -90,8 +100,11 @@ export function compileSourceSync(source, options = {}) {
     throw error;
   }
   let result, composition, stage = 'parse';
+  telemetry?.phase('parse');
   try {
     const ast = parseControl(extraction.code, { filename });
+    telemetry?.ast(ast);
+    telemetry?.phase('compile_lower_encode');
     stage = 'semantic';
     if (options.sourceClosure !== undefined && ast.imports?.length) {
       composition = compileComposition(source, filename, options.sourceClosure);
@@ -153,6 +166,7 @@ export function compileSourceSync(source, options = {}) {
     };
     throw error;
   }
+  telemetry?.phase('postprocess');
   if (extraction.anchors.length || extraction.linkDirectives.length) {
     const ast = parseControl(extraction.code, { filename });
     result = {
