@@ -16,6 +16,55 @@
       "translationSha256": "6d756cd86a5264945452f6f15c1d90f7339547b9fad64ab95eb7a6aebeaba9ed"
     },
     {
+      "source": "docs/INTENT-DECISIONS.md",
+      "sourceLanguage": "en",
+      "translation": "docs/INTENT-DECISIONS.ko.md",
+      "sourceSha256": "e3dd72ad7ecadd661d682fb8c4413ac0ff97edaa8cf04c2bfba56b0ac3a1103e",
+      "translationSha256": "9f06271a03f8a9d3efc4a0b486d2e99d0c16f2cfeb85470fd8e18e43db9c4a85"
+    },
+    {
+      "source": "docs/EXECUTION-EVIDENCE.md",
+      "sourceLanguage": "en",
+      "translation": "docs/EXECUTION-EVIDENCE.ko.md",
+      "sourceSha256": "e11862084bfc8402ed774181fdd1c60a9f8236c5ea9b341ea305da583b00a868",
+      "translationSha256": "f77fcf67df9ba29fb0e3dc85d61fbc39281b77c47d106a1bad394c565b6309ac"
+    },
+    {
+      "source": "docs/TARGET-QUERY.md",
+      "sourceLanguage": "en",
+      "translation": "docs/TARGET-QUERY.ko.md",
+      "sourceSha256": "5eec72f3e1669af6db93cb46d0e168946ce58deef562b1457466ff07ec8d9d85",
+      "translationSha256": "a9752a15c3e268e4376676e0cfad1cdd2d89ceb3ad159f92b2d0b340187b0f9c"
+    },
+    {
+      "source": "docs/FAILURE-REDUCTION.md",
+      "sourceLanguage": "en",
+      "translation": "docs/FAILURE-REDUCTION.ko.md",
+      "sourceSha256": "a280fff119bf1ba19291aa75fca3ff514f8f113419e8dc2e40019613505896ba",
+      "translationSha256": "efa3f83372f64ed953ef96576c60aacea9ae31c8e6a8fce3d5a02b12f9da945d"
+    },
+    {
+      "source": "docs/BEHAVIOR-COMPARISON.md",
+      "sourceLanguage": "en",
+      "translation": "docs/BEHAVIOR-COMPARISON.ko.md",
+      "sourceSha256": "581680d82ec8897dd28e3a2b99764556629194a7c122c5bf83a5dc86b555fa93",
+      "translationSha256": "67efa8a4edce2a0f851c864403b8208d9905c03975452f48ecbef782c5f426b0"
+    },
+    {
+      "source": "docs/INTENT-EVIDENCE.md",
+      "sourceLanguage": "en",
+      "translation": "docs/INTENT-EVIDENCE.ko.md",
+      "sourceSha256": "fdc22fb9c31b1ebf0ecd0a98c3c90d71fbc146055acae8d527f9135e2c520b08",
+      "translationSha256": "58ba62837fc72f9ad78c33db002c377c4eb09b13e496f3077ebb728a6d91c4e0"
+    },
+    {
+      "source": "docs/INTENT-CONSISTENCY-CONTRACT.md",
+      "sourceLanguage": "ko",
+      "translation": "docs/INTENT-CONSISTENCY-CONTRACT.en.md",
+      "sourceSha256": "389323e17d63875c82f6c15795f20f487103924fd69add6b12fa8be36c03e87c",
+      "translationSha256": "6470920d2b411f6e1b4f96284873fae09ff39abec967f2717bdbbf574d1532e1"
+    },
+    {
       "source": "docs/HARDWARE-FRONT-MATTER.md",
       "sourceLanguage": "en",
       "translation": "docs/HARDWARE-FRONT-MATTER.ko.md",
@@ -271,8 +320,8 @@
       "source": "docs/DOCUMENTATION.md",
       "sourceLanguage": "en",
       "translation": "docs/DOCUMENTATION.ko.md",
-      "sourceSha256": "8123c63c9beb43a69a39736a0f43e50e29d285d0264063609fc2224c33363b5f",
-      "translationSha256": "93d0eac02ef1bed3144574fe0f0c2e4ebf7d665d16536ddeab8c4e31f8755d55"
+      "sourceSha256": "e0de7157c6085fd43032c544605336796ce9bf4f42392688e203f02d57eab66f",
+      "translationSha256": "df246507dbf991c2fe144f4e8e84d41c015bea8ed8bb5f2123e3c486e9561430"
     },
     {
       "source": "docs/EXACT-INTEGER-CONTRACT.md",

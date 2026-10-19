@@ -21,6 +21,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/AFTER-EVENT-WASM-ABI.md](AFTER-EVENT-WASM-ABI.md) | Identified after_event execution ABI | md |
 | [docs/AI-CONTRIBUTION-PACKAGE.ko.md](AI-CONTRIBUTION-PACKAGE.ko.md) | 범위를 제한한 AI 기여 작업 패키지 | md |
 | [docs/AI-CONTRIBUTION-PACKAGE.md](AI-CONTRIBUTION-PACKAGE.md) | Bounded AI contribution package | md |
+| [docs/BEHAVIOR-COMPARISON.ko.md](BEHAVIOR-COMPARISON.ko.md) | 제한된 동작 비교 | md |
+| [docs/BEHAVIOR-COMPARISON.md](BEHAVIOR-COMPARISON.md) | Bounded behavior comparison | md |
 | [docs/BEHAVIOR-COMPOSITION-RESEARCH.ko.md](BEHAVIOR-COMPOSITION-RESEARCH.ko.md) | 동작 조합: 연구와 아키텍처 검토 | md |
 | [docs/BEHAVIOR-COMPOSITION-RESEARCH.md](BEHAVIOR-COMPOSITION-RESEARCH.md) | Behavior composition: research and architecture review | md |
 | [docs/BOOLEAN-OUTPUT-EXPLANATION.ko.md](BOOLEAN-OUTPUT-EXPLANATION.ko.md) | Boolean 요청 출력 설명 | md |
@@ -56,6 +58,10 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/ESTIMATE-EVIDENCE.md](ESTIMATE-EVIDENCE.md) | Bounded estimate evidence admission | md |
 | [docs/EXACT-INTEGER-CONTRACT.ko.md](EXACT-INTEGER-CONTRACT.ko.md) | 정확한 정수 계약 제안 | md |
 | [docs/EXACT-INTEGER-CONTRACT.md](EXACT-INTEGER-CONTRACT.md) | Exact integer contract proposal | md |
+| [docs/EXECUTION-EVIDENCE.ko.md](EXECUTION-EVIDENCE.ko.md) | 완료된 실행 하나 설명하기 | md |
+| [docs/EXECUTION-EVIDENCE.md](EXECUTION-EVIDENCE.md) | Explain one completed execution | md |
+| [docs/FAILURE-REDUCTION.ko.md](FAILURE-REDUCTION.ko.md) | 제한된 실패 축소 | md |
+| [docs/FAILURE-REDUCTION.md](FAILURE-REDUCTION.md) | Bounded failure reduction | md |
 | [docs/FRAMED-CONTROL-HOST.ko.md](FRAMED-CONTROL-HOST.ko.md) | Framed ControlRuntime 도입 (D6) | md |
 | [docs/FRAMED-CONTROL-HOST.md](FRAMED-CONTROL-HOST.md) | Framed ControlRuntime adoption (D6) | md |
 | [docs/GFB5-SCHEDULE-PRELUDE.ko.md](GFB5-SCHEDULE-PRELUDE.ko.md) | GFB5 일정 서두 | md |
@@ -76,6 +82,12 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/INSTANCE-TRACE-PROJECTION.md](INSTANCE-TRACE-PROJECTION.md) | Instance trace projection reference adapter | md |
 | [docs/INTENT-ANCHOR-MAP.ko.md](INTENT-ANCHOR-MAP.ko.md) | Literate intent anchor map | md |
 | [docs/INTENT-ANCHOR-MAP.md](INTENT-ANCHOR-MAP.md) | Literate intent anchor map | md |
+| [docs/INTENT-CONSISTENCY-CONTRACT.en.md](INTENT-CONSISTENCY-CONTRACT.en.md) | Responsibility and Evidence Contract for Intent Consistency | md |
+| [docs/INTENT-CONSISTENCY-CONTRACT.md](INTENT-CONSISTENCY-CONTRACT.md) | 의도 정합성의 판단 책임과 근거 계약 | md |
+| [docs/INTENT-DECISIONS.ko.md](INTENT-DECISIONS.ko.md) | 작성된 의도 결정 확인하기 | md |
+| [docs/INTENT-DECISIONS.md](INTENT-DECISIONS.md) | Inspect authored intent decisions | md |
+| [docs/INTENT-EVIDENCE.ko.md](INTENT-EVIDENCE.ko.md) | 의도 근거 작성 API | md |
+| [docs/INTENT-EVIDENCE.md](INTENT-EVIDENCE.md) | Intent evidence authoring API | md |
 | [docs/INTERACTION-STREAM-CONTRACT.ko.md](INTERACTION-STREAM-CONTRACT.ko.md) | Interaction 스트림 계약 설계 | md |
 | [docs/INTERACTION-STREAM-CONTRACT.md](INTERACTION-STREAM-CONTRACT.md) | Interaction stream contract design | md |
 | [docs/KEYBOARD-HOST.ko.md](KEYBOARD-HOST.ko.md) | 실시간 키보드 호스트 | md |
@@ -141,6 +153,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/SOURCE-SAFETY-TRACE.md](SOURCE-SAFETY-TRACE.md) | Source and safety observation contract | md |
 | [docs/SUNCALC-ATTRIBUTION.ko.md](SUNCALC-ATTRIBUTION.ko.md) | 이식 가능한 태양광 공급자의 SunCalc 저작자 표시 | md |
 | [docs/SUNCALC-ATTRIBUTION.md](SUNCALC-ATTRIBUTION.md) | SunCalc attribution for the portable solar provider | md |
+| [docs/TARGET-QUERY.ko.md](TARGET-QUERY.ko.md) | Target contract query | md |
+| [docs/TARGET-QUERY.md](TARGET-QUERY.md) | Target contract query | md |
 | [docs/TASK-61-CONFORMANCE.md](TASK-61-CONFORMANCE.md) | TASK-61 focused conformance expansion | md |
 | [docs/TASK-62-COVERAGE.md](TASK-62-COVERAGE.md) | TASK-62 coverage evidence | md |
 | [docs/TEMPORAL-DESCRIPTOR-ARTIFACT.ko.md](TEMPORAL-DESCRIPTOR-ARTIFACT.ko.md) | 보류된 temporal artifact | md |
@@ -253,4 +267,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.ko.md](research/GF-COMPOSE-R9-ACCEPTANCE.ko.md) | GF-COMPOSE R9: acceptance와 구현 인계 | md |
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.md](research/GF-COMPOSE-R9-ACCEPTANCE.md) | GF-COMPOSE R9: acceptance and implementation handoff | md |
 
-214 documents.
+228 documents.
