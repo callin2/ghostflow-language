@@ -78,6 +78,7 @@ const TESTS = Object.freeze([
   'tests/failure-reduction.test.mjs',
   'tests/target-query.test.mjs',
   'tests/execution-evidence.test.mjs',
+  'tests/intent-decisions.test.mjs',
   'tests/curriculum-replay.test.mjs', 'tests/scan-tape-parity.test.mjs',
   'tests/source-dependencies.test.mjs', 'tests/temporal-descriptor-artifact.test.mjs',
   'tests/window-derived-control.test.mjs', 'tests/window-derived-host.test.mjs',

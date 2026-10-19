@@ -28,9 +28,9 @@ API는 명시적인 document 및 revision ID와 함께 canonical `.ghost.md` sou
 
 | Kind | 추가 필드 | 의미 |
 | --- | --- | --- |
-| `driver-request` | `stage: "requested" | "safe"`, Boolean 또는 유한한 숫자 `value` | `id`와 `requestId`에 envelope request ID를 사용해야 한다. 값은 선택한 stage의 실제 output 값과 같아야 한다. |
-| `ack` | `outcome: "accepted" | "rejected" | "fault" | "unknown"` | ACK는 정확한 driver request ID를 참조한다. Acceptance는 보고된 command 결과이며 물리적 확인이 아니다. |
-| `register-readback` | `quality: "ok" | "fault" | "unknown"`, `ok`일 때만 `value` | 호출자가 제공한 register 관측. |
+| `driver-request` | `stage: "requested" \| "safe"`, Boolean 또는 유한한 숫자 `value` | `id`와 `requestId`에 envelope request ID를 사용해야 한다. 값은 선택한 stage의 실제 output 값과 같아야 한다. |
+| `ack` | `outcome: "accepted" \| "rejected" \| "fault" \| "unknown"` | ACK는 정확한 driver request ID를 참조한다. Acceptance는 보고된 command 결과이며 물리적 확인이 아니다. |
+| `register-readback` | `quality: "ok" \| "fault" \| "unknown"`, `ok`일 때만 `value` | 호출자가 제공한 register 관측. |
 | `physical-feedback` | 같은 quality/value 규칙 | 호출자가 제공한 물리 관측이며 여기서 독립 검증하지 않는다. |
 
 하나의 request에는 각 kind의 record를 하나씩만 허용한다. 누락된 stage는 각각 따로 나열한다. 한 stage에 서로 다른 ID가 있거나, record가 중복되거나, 참조 대상이 없거나, request ID가 틀리거나, stage 값이 accepted scan과 다르거나, 보고 값이 request와 다르거나, 보고 timestamp가 driver request보다 앞서면 진단을 남긴다. 검토할 수 있도록 record를 보존한다. 최신 항목 우선 선택은 없으며 timestamp 근접성으로 join하지 않는다. timestamp는 정규 형식인지, 제공된 clock reference 안에서 불가능한 순서가 있는지만 확인한다. API는 clock 정확성, device 권한, 서명, 전송 또는 물리적 효과를 검증하지 않는다.
