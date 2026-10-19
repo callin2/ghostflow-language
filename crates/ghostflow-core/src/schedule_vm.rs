@@ -386,6 +386,7 @@ pub(crate) fn load_prelude(
                 || (kind == 15 && matches!(format, 15 | 16 | 18))
                 || (kind == 17 && format == 18)
                 || (kind == 16 && format == 16)
+                || (kind == 19 && format == 21)
                 || (kind == 14 && format == 14) =>
             {
                 let descriptor =
@@ -482,7 +483,7 @@ pub(crate) fn projection_type(
         return Err(Error::new("schedule projection index"));
     }
     if field
-        > if matches!(format, 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20) {
+        > if matches!(format, 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21) {
             2
         } else {
             1

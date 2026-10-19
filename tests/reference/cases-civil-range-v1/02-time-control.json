@@ -1,0 +1,17 @@
+{
+  "chapterFiles": [],
+  "cases": [
+    {
+      "id": "REF-03-085",
+      "issue": "https://github.com/callin2/ghostflow-language/issues/541",
+      "references": ["03-time-and-schedules.md#35-schedule의-공통-의미"],
+      "rule": "Immutable non-UTC DailySlots<15min> Range uses host civil occurrence facts and a fixed elapsed duration, with stable site/sourceDay/slotKey/fold identity.",
+      "scope": "runtime",
+      "status": "specified",
+      "given": "GFB21/control-v21 has Seoul 22:00+7h and 05:00+17h schedules with host coverage containing previous-day occurrences.",
+      "when": "A first trusted scan occurs at 23:00 or 04:59, or accepted scans cross midnight, 05:00 and 22:00; malformed, duplicate, conflicting or overlapping civil facts are supplied separately.",
+      "then": "Native Rust, WASM and ghostsim admit only the remaining half-open interval, agree on compiled outputs, preserve occurrence dedup across restored checkpoints and reject invalid facts without committing the scan.",
+      "reason": "The host owns IANA tzdb enumeration and declared coverage completeness; core validation cannot independently prove an initially omitted IANA occurrence."
+    }
+  ]
+}

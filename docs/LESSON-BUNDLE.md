@@ -22,11 +22,13 @@ are rejected so unsupported instructions cannot silently acquire meaning.
 - Playback contains durationMs and ordered checkpoints. A checkpoint contains
   atMs, inclusive 1-based sourceSpan startLine/endLine, plain-text narration and
   scenarioId. Spans refer to the original Markdown; they may explain prose.
-- Scenarios have unique id, title and ordered frames. Each frame contains atMs
-  and a map of input names to Boolean or finite numeric values.
+- Scenarios have unique id, title and ordered frames. Each frame contains atMs,
+  an `inputs` map of software input names to Boolean or finite numeric values,
+  and an optional `samples` map for acquisition inputs.
   There must be at least one scenario, frame and checkpoint; times in each array
   are strictly increasing. Each frame permits at most 128 identifier-named inputs;
-  prototype-related names are rejected.
+  prototype-related names are rejected. The separate samples map also permits
+  at most 128 identifier-named entries.
 - Toolchain records compilerId/compilerRevision/runtimeId/runtimeRevision and
   ABI version 1. Identifiers are declarations, not proof of loaded artifacts.
 
@@ -35,6 +37,54 @@ use integer milliseconds. Rerunning a scenario starts from a fresh runtime;
 a narration checkpoint is never a VM snapshot. The execution consumer must
 verify loaded compiler/runtime identities and input binding compatibility before
 claiming a valid comparison. A declared identity is not that verification.
+
+## Acquisition samples in scenario frames
+
+Use the existing `ControlRuntime.step` sample shape for canonical `input`
+declarations. For example, `input enabled: Bool;` with an authored
+`enabled |> recover(false)` policy can receive this frame:
+
+```json
+{
+  "atMs": 100,
+  "inputs": {},
+  "samples": {
+    "enabled": { "epoch": 1, "id": 1, "timestampMs": 100, "quality": "Good", "value": true }
+  }
+}
+```
+
+Each sample contains exactly `epoch`, `id`, `timestampMs`, `quality` and `value`.
+Epoch, ID and timestamp are nonnegative safe integers; a timestamp cannot exceed
+the frame's `atMs`. Quality is `NotReady`, `Good`, `Disconnected`, `Stale` or
+`Invalid`, or its existing numeric code 0–4 in that order. Value is a Boolean or
+finite JSON number, including on fault observations. Values use the manifest's
+canonical units; the lesson validator does not convert them.
+
+After compilation, `compileLessonBundle` checks every frame against the actual
+manifest. `inputs` must supply exactly the software inputs, with their scalar
+types and bounds. Sample names must identify entries in `manifest.sensors`;
+Bool samples require Boolean payloads and other scalar samples require numeric
+payloads. Numeric acquisition range/quality checks, sample identity ordering and
+fault handling remain in the shared runtime. For example, an Int payload of
+`1.5` stays in the artifact and becomes runtime `Invalid`; it is not coerced to
+an integer by the lesson layer. Fault response is authored in Ghostflow source.
+
+Omitting `samples`, using an empty map or omitting one acquisition input supplies
+no new observation. It does not synthesize Good, false, a fresh ID or timestamp.
+An input with no observation starts as runtime `NotReady`; later retention and
+expiry follow its existing runtime contract. A consumer forwards a frame as
+`runtime.step({ nowMs: frame.atMs, inputs: frame.inputs, samples: frame.samples })`.
+Observation maps and nested samples are included in the canonical bundle digest
+and returned as detached frozen values.
+
+This is an optional field in `ghostflow-lesson-v1`; it changes neither GFB nor
+the WASM ABI. Existing frames without samples retain their shape. A source
+migration from plain software values to acquisition Results needs a new authored
+lesson revision and explicit samples/fault policies: placing a sensor name in
+`inputs` now fails compile-time frame binding validation. Older lesson validators
+reject the unknown `samples` field, so consumers must pin the supporting language
+revision. Structural validation alone does not establish manifest compatibility.
 
 ## Integrity and limits
 

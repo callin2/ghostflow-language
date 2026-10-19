@@ -2597,14 +2597,25 @@
               "targets": [
                 "wasm"
               ]
+            },
+            {
+              "path": "tests/civil-range-runtime.test.mjs",
+              "testId": "REF-03-085 Seoul actual compiled traffic switches at 22:00, midnight and 05:00; late night/noon first scans admit",
+              "caseId": "REF-03-085",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ]
             }
           ]
         }
       ],
       "gaps": [],
-      "issues": [],
+      "issues": [541],
       "referenceCaseIds": [
-        "REF-03-024"
+        "REF-03-024",
+        "REF-03-085"
       ]
     },
     {

@@ -2,6 +2,8 @@ import { compileControl } from './control.mjs';
 import { canonicalJson } from './canonical-json.mjs';
 import { extractLiterate, mapSourcePosition } from './literate.mjs';
 import { remapSourceTrace } from './source-trace.mjs';
+import { isInt32 } from './int-settings.mjs';
+import { isTimeType, validateTimeValue } from './time-literals.mjs';
 
 const UTF8 = new TextEncoder();
 const RAW_JSON_LIMIT = 1024 * 1024;
@@ -97,6 +99,67 @@ function validateInputs(value, path) {
   return inputs;
 }
 
+function validateSamples(value, path, atMs) {
+  if (!isPlainObject(value)) fail('invalid-samples', `${path} must be an object`);
+  const names = Object.keys(value);
+  if (names.length > INPUTS_PER_FRAME_LIMIT) fail('sample-limit', `${path} must contain at most ${INPUTS_PER_FRAME_LIMIT} samples`);
+  const samples = Object.create(null);
+  for (const name of names) {
+    boundedString(name, `${path} sample name`, ID_LIMIT);
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name) || ['__proto__', 'constructor', 'prototype'].includes(name)) {
+      fail('invalid-samples', `${path}.${name} is not an allowed sample name`);
+    }
+    const label = `${path}.${name}`;
+    const sample = exactObject(value[name], ['epoch', 'id', 'timestampMs', 'quality', 'value'], label);
+    const epoch = safeInteger(sample.epoch, `${label}.epoch`, 0, Number.MAX_SAFE_INTEGER);
+    const id = safeInteger(sample.id, `${label}.id`, 0, Number.MAX_SAFE_INTEGER);
+    const timestampMs = safeInteger(sample.timestampMs, `${label}.timestampMs`, 0, atMs);
+    const quality = sample.quality;
+    if (!(typeof quality === 'number' ? Number.isInteger(quality) && quality >= 0 && quality <= 4
+      : ['NotReady', 'Good', 'Disconnected', 'Stale', 'Invalid'].includes(quality))) {
+      fail('invalid-samples', `${label}.quality is unsupported`);
+    }
+    if (typeof sample.value !== 'boolean' && !(typeof sample.value === 'number' && Number.isFinite(sample.value))) {
+      fail('invalid-samples', `${label}.value must be a boolean or finite number`);
+    }
+    samples[name] = { epoch, id, timestampMs, quality, value: sample.value };
+  }
+  return samples;
+}
+
+function validateFrameBindings(scenarios, manifest) {
+  const inputs = new Map(manifest.inputs.map(item => [item.name, item.type]));
+  const sensors = new Map(manifest.sensors.map(item => [item.name, item.type]));
+  for (const [scenarioIndex, scenario] of scenarios.entries()) for (const [frameIndex, frame] of scenario.frames.entries()) {
+    const path = `scenarios[${scenarioIndex}].frames[${frameIndex}]`;
+    for (const name of Object.keys(frame.inputs)) if (!inputs.has(name)) {
+      fail('unknown-input', `${path}.inputs.${name} is not a manifest software input; acquisition inputs belong in samples`);
+    }
+    for (const [name, type] of inputs) {
+      if (!Object.hasOwn(frame.inputs, name)) fail('missing-input', `${path}.inputs is missing ${name}`);
+      const value = frame.inputs[name];
+      let valid = type === 'Bool' ? typeof value === 'boolean' : typeof value === 'number' && Number.isFinite(value);
+      if (type === 'Int') valid &&= isInt32(value);
+      if (type === 'Duration') valid &&= Number.isSafeInteger(value) && value >= 0;
+      if (type === 'Percent') valid &&= value >= 0 && value <= 100;
+      if (type === 'RelativeHumidity') valid &&= value >= 0 && value <= 1;
+      if (isTimeType(type)) {
+        try { validateTimeValue(type, value); } catch { valid = false; }
+      }
+      if (!valid) fail('input-type-mismatch', `${path}.inputs.${name} must match ${type}`);
+    }
+    for (const [name, sample] of Object.entries(frame.samples ?? {})) {
+      if (!sensors.has(name)) fail('unknown-sample', `${path}.samples.${name} is not a manifest acquisition input`);
+      const type = sensors.get(name);
+      if (typeof sample.value !== (type === 'Bool' ? 'boolean' : 'number')) {
+        fail('sample-type-mismatch', `${path}.samples.${name}.value must match ${type}`);
+      }
+      // Preserve numeric payloads: the shared runtime owns range/quality handling,
+      // sample identity ordering and missing-observation semantics.
+    }
+  }
+}
+
 function validateSource(value) {
   exactObject(value, ['text', 'sha256', 'mediaType'], 'source');
   const text = boundedString(value.text, 'source.text', SOURCE_LIMIT, { nonempty: false });
@@ -137,11 +200,12 @@ function validateScenarios(value) {
     let previousAtMs = -1;
     const frames = framesValue.map((frame, frameIndex) => {
       const framePath = `${path}.frames[${frameIndex}]`;
-      exactObject(frame, ['atMs', 'inputs'], framePath);
+      exactObject(frame, ['atMs', 'inputs', ...(Object.hasOwn(frame ?? {}, 'samples') ? ['samples'] : [])], framePath);
       const atMs = safeInteger(frame.atMs, `${framePath}.atMs`, 0, DURATION_LIMIT);
       if (atMs <= previousAtMs) fail('invalid-order', `${framePath}.atMs must be strictly increasing`);
       previousAtMs = atMs;
-      return { atMs, inputs: validateInputs(frame.inputs, `${framePath}.inputs`) };
+      return { atMs, inputs: validateInputs(frame.inputs, `${framePath}.inputs`),
+        ...(Object.hasOwn(frame, 'samples') ? { samples: validateSamples(frame.samples, `${framePath}.samples`, atMs) } : {}) };
     });
     return { id, title: boundedString(scenario.title, `${path}.title`, TITLE_LIMIT), frames };
   });
@@ -224,5 +288,6 @@ export async function compileLessonBundle(jsonText) {
     remapCompileError(error, extraction, filename);
   }
   compilation = { ...compilation, traceMetadata: remapSourceTrace(compilation.traceMetadata, extraction.sourceMap) };
+  validateFrameBindings(bundle.scenarios, compilation.manifest);
   return { bundle, extraction, compilation };
 }

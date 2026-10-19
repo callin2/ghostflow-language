@@ -297,9 +297,11 @@ cancel_when := Bool                                   // 현재 civil range에 �
 Solar에 `fallback = fixed_time(TimeOfDay literal, terminal: skip)`을 받는다.
 Tide는 `fallback = skip`만 허용하며 다른 trigger는 trusted-only clock과 skip fallback을 유지한다.
 `window`, `run(_, on_time)`은 선택된 설계 표기이며
-아직 compiler 지원 범위 밖이다. civil `range`는 UTC timezone의 정적 non-overlap을
-증명해야 한다. 불변 UTC Daily와 비어 있지 않은 정적 DailySlots Range는 GFB12로
-실행되며 다른 허용된 Range recurrence는 비실행 descriptor로 유지된다. Range duration은
+아직 compiler 지원 범위 밖이다. 불변 UTC Daily와 비어 있지 않은 정적 DailySlots Range는
+정적 non-overlap을 증명하여 GFB12로 실행한다. 불변 비 UTC `DailySlots<15min>`은
+아래의 GFB21 프로필로 실행하며, 명목상 slot 간격의 컴파일 검사와 host가 공급한
+실제 occurrence 구간의 Rust 검사를 함께 요구한다. 다른 허용된 Range recurrence는
+비실행 descriptor로 유지된다. 지원되는 UTC 프로필에서 Range duration은
 초기값으로 non-overlap을 증명할 수 있는 operator `Duration` config일 수 있다. 승인된 live
 setting event는 frozen planned start에서 현재 occurrence를 다시 계산하며 새 due pulse나
 occurrence identity를 만들지 않는다. Tide의 `run(_, within(_))`은 지원한다.
@@ -466,7 +468,7 @@ record를 합치거나 이유 하나로 요약하지 않는다. 재부팅 뒤 �
 | `window(5min)` (설계) | `[planned, planned+5min)`에서 조건이 처음 true인 시점에 한 번 admit. 같은 occurrence에서 false→true가 반복돼도 재arm하지 않는다. |
 | `run(5min, on_time)` (설계) | observed crossing에서만 admit하고 admission부터 5분 운전한다. |
 | `run(5min, within(10min))` (Tide) | `[planned, planned+10min)`에서 첫 admission을 허용한다. 10분은 grace이고 run length는 5분이다. |
-| `range(10min)` (civil contract) | 신뢰할 수 있는 현재 시각이 `[planned, planned+10min)` 안에 있고 `when`이 true이면 첫 관측·부팅·회복이 늦어도 한 번 admit한다. 끝은 계획 시작점 + 10분이다. 불변 UTC Daily/DailySlots는 GFB12로 실행된다. |
+| `range(10min)` (civil contract) | 신뢰할 수 있는 현재 시각이 `[planned, planned+10min)` 안에 있고 `when`이 true이면 첫 관측·부팅·회복이 늦어도 한 번 admit한다. 끝은 계획 시작점 + 10분이다. 불변 UTC Daily/DailySlots는 GFB12, 아래의 불변 비 UTC DailySlots는 GFB21로 실행된다. |
 
 ```ghost
 schedule morning_watering: Daily {
@@ -494,8 +496,9 @@ schedule morning_watering: Daily {
 UTC Daily/DailySlots에만 실행 lowering을 제공한다. live scalar start 설정은 고정
 Duration을 가진 단일 UTC Daily Range에만 실행 lowering을 제공한다. work calendar Range와
 live Range duration/start config의 조합, live start와 live duration을 함께 쓰는 조합,
-Periodic Range와 비 UTC Range는 정적으로 거부하여 static Range로 조용히 fallback하지
-않는다. 지원되지 않는 변형은 timezone이나 DST 정책을 추측하지 않는다.
+Periodic Range, 비 UTC Daily Range와 비 UTC 설정 기반 Range는 정적으로 거부하여
+static Range로 조용히 fallback하지 않는다. 불변 비 UTC DailySlots는 아래의 별도
+프로필을 따른다. 지원되지 않는 변형은 timezone이나 DST 정책을 추측하지 않는다.
 
 Range context checkpoint는 소비한 occurrence identity와 live duration 또는 live scalar
 start 설정이 있으면 그 effective 값을 보존하며 활성 monotonic timer는 보존하지 않는다.
@@ -526,9 +529,10 @@ wall trust나 hold가 만료되어도 기존 단조 종료 시점까지 진행�
 교집합이 비어 있지 않으면 오류다. 경계가 정확히 맞닿는 경우는 허용한다.
 예를 들어 `DailySlots`의 `selected = [08:00, 08:15]`와 `basis = range(30min)`은
 08:00–08:30과 08:15–08:45가 겹치므로 컴파일 오류다. 컴파일러는 trigger 정의와
-유효 설정으로 occurrence 간격의 비중첩을 증명할 수 있는 Range만 받는다.
-provider나 동적 recurrence의 간격을 증명할 수 없으면 추측하거나 하나를 선택하지
-않고 그 `range` 선언을 컴파일 진단으로 거부한다. 정적 기본값은 컴파일 때,
+유효 설정으로 occurrence 간격의 비중첩을 증명한다. 불변 비 UTC DailySlots 프로필은
+명목상 slot 간격을 컴파일 때 검사하고 실제 구간의 검사는 아래의 Rust fact 검증으로
+완성한다. 이 명시적 프로필 밖에서 provider나 동적 recurrence의 간격을 증명할 수
+없으면 추측하거나 하나를 선택하지 않고 그 `range` 선언을 컴파일 진단으로 거부한다. 정적 기본값은 컴파일 때,
 복원한 설정을 포함한 유효값은 활성화 전에 검사한다. 유효값이 겹치면 활성화를
 거부한다. live 설정 변경으로 겹치면 event 전체를 원자적으로 거부한다. 두 검사는
 현재 admit한 구간과 새로 계획될 구간에도 적용한다.
@@ -572,6 +576,84 @@ requested/safe/applied/confirmed output은 서로 다른 관찰값이다.
 retime과 제거·추가를 구분한다. key를 보존한 retime에는 이 Range 재계산 규칙을
 적용하고, 제거·추가에는 새 항목 baseline 규칙을 적용한다.
 
+### 불변 비 UTC DailySlots Range
+
+비 UTC IANA timezone의 비어 있지 않은 literal `DailySlots<15min>`과 양의 고정
+Duration을 GFB21의 `civil-range` prelude(tag 19), `GhostFlow/control-v21`로 실행한다.
+이 프로필은 같은 종류의 여러 Range, 일반 temporal window와 `elapsed(state)`처럼
+일반 상태로 lowering하는 timer를 함께 사용할 수 있다. 별도의 `true-for` prelude,
+다른 schedule/provider/config 프로필, work calendar, live start/Duration/TimeSlots와는
+결합하지 않는다. 기존 UTC 프로필과 GFSF civil occurrence
+row 형식은 유지한다. 이 row는 GFSF4부터 사용한 것이며 현재 context encoder의 envelope
+버전이 GFSF4라는 뜻은 아니다. 이전 loader는 GFB21을 거부하며 다른 프로필로 대체 실행하지 않는다.
+
+```ghost
+schedule night: DailySlots<15min> {
+  timezone = "Asia/Seoul";
+  selected = [22:00];
+  dst_missing = skip;
+  dst_repeated = first;
+  basis = range(7h);
+  when = true;
+  cancel_when = false;
+  clock = trusted_only;
+  gap = skip_after(60s);
+  recovery = baseline;
+  fallback = skip;
+}
+```
+
+같은 정책의 별도 `selected = [05:00]`, `basis = range(17h)` schedule로 낮 구간을
+정의할 수 있다. 서울의 22:00 + 7시간은 다음 날 05:00에 끝나고, 05:00 + 17시간은
+22:00에 끝난다. 종료 경계는 제외되므로 자정은 야간 구간 안에 있고 05:00/22:00에는
+새 구간이 시작한다. 이 연산은 계획 시작 instant에 고정 경과 시간을 더한다. DST가
+있는 지역에서 임의의 local 종료 시각까지 운전하는 별도 연산으로 해석하지 않는다.
+
+Host는 timezone 변환과 tzdb의 완전성을 소유한다. 각 schedule의
+`[coverageStartMs, coverageEndMs)`를 현재 신뢰 wall instant보다 duration만큼 앞선
+시점까지 포함하고(`coverageStartMs <= max(0, wallMs - durationMs)`), 끝은 현재보다 뒤로
+둔다(`coverageEndMs > wallMs`). 해당 coverage의 모든 occurrence를 공급하며,
+자정을 넘긴 아직 열린 구간의 전날 occurrence도 포함한다. 날짜가 바뀌었다고 오늘의
+row만 보내면 안 된다. 기존 GFSF schedule evidence의 `provider`와 `calendar`는
+`null`이다. JavaScript row는 기존 field를 사용한다.
+
+```text
+{ sourceDay, slotKey, minuteOfDay, fold, eventId, eventKind: "civil",
+  instantMs, withdrawn, providerRevision, contextRevision }
+```
+
+`sourceDay`는 원래 local date의 Unix epoch 기준 일 번호다. `slotKey`는 불변 literal
+목록을 시각순으로 정렬한 뒤 부여한 1부터 시작하는 ordinal이고, `minuteOfDay`는 그
+선언 slot의 정확한 분이다. identity는 `site:sourceDay:slotKey:fold`이며 revision과
+계획 instant는 identity를 바꾸지 않는다. `eventId`는 빈 문자열이며 withdrawal은
+허용하지 않는다. DST fold 선택은 선언한 `dst_repeated`를 따른다. Host가 존재하지
+않음을 확인한 `dst_missing = skip` local slot은 `instantMs = null` fact로 표시하거나
+확인된 skipped occurrence로 생략할 수 있다. evidence가 없다는 사실만으로 DST gap을
+증명하지는 않는다. Host가 반복 시각임을 확인한 `dst_repeated = skip` slot도
+`dst_missing = next_valid` 여부와 무관하게 `fold = 0`인 null fact로 표시할 수 있다.
+null fact는 `fold = 0`과 하나 이상의 선언된 skip 정책을 요구하며 구간을 만들지 않는다.
+gap과 반복 시각의 구분은 host의 책임이다. 이 null은 정상 OFF나 새 planned instant로 바꾸지 않는다.
+
+Rust는 field 범위, 선언된 slot key/minute, DST fold 선택, null skip marker의 허용 여부,
+중복·충돌 identity/revision, row instant의 coverage 포함 여부와 실제 반열린 구간의
+비중첩을 검사한다. 현재 admit하여 고정한 구간도 중첩 검사에 포함한다. 연속 evidence의
+coverage가 겹치는 곳에서 이미 관측한 resolved instant의 fact가 사라지거나 충돌하면 거부한다. coverage
+부족과 잘못된 fact는 새 admission으로 진행하지 않으며 실패 scan은 상태와 occurrence
+이력을 부분 확정하지 않는다. Rust에는 IANA tzdb가 없으므로 host가 첫 evidence에서
+아예 누락한 IANA occurrence의 완전성까지 증명하지는 못한다.
+
+검증한 fact는 기존 RangeEngine으로 실행한다. 첫 관측·부팅·신뢰 회복이 늦어도
+아직 열린 구간이면 남은 시간만 admit한다. `gap`은 clock 관측 정책이며 coverage를
+줄이거나 pulse처럼 열린 Range를 버리는 정책이 아니다. 이미 admit한 timer는 이후
+wall trust 상실이나 시계 보정으로 고정된 monotonic deadline을 바꾸지 않는다.
+checkpoint는 소비 identity를 보존하여 restart 중복을 막고 admit한 timer는 재개하지
+않는다. 아직 소비하지 않은 열린 occurrence에만 부분 구간 admission이 가능하다.
+
+**왜:** 자정 이후의 현재 구간도 전날 계획에서 비롯될 수 있다. Host의 IANA 변환과
+Rust의 fact 검증·admission을 분리하되, 검증된 occurrence가 같은 Range 실행 의미를
+따르게 해야 한다. 이 계약은 compiled GhostFlow의 결정론적 시뮬레이션을 위한 것이며
+공공도로 신호 규정이나 실물 제어 검증을 정의하지 않는다.
+
 ### occurrence identity와 중복 억제
 
 각 planned occurrence는 schedule의 안정적인 선언 ID와 source occurrence key로 식별한다.
@@ -606,7 +688,7 @@ Pulse, Window, Run의 새 occurrence를 모두 missed로 기록하고 어느 것
 실행하지 않는다. Range는 이미 종료되거나 terminal missed/withdrawn으로 기록된
 occurrence를 실행하지 않고, 신뢰 가능한 현재 시각 안에 열린 구간의 현재
 occurrence를 남은 시간 동안 admit한다. 같은 schedule에 동시에 열린 두 Range
-구간은 허용되지 않으며 compile/live 설정 검증에서 거부한다.
+구간은 허용되지 않으며 해당 프로필의 compile/live 설정 또는 Rust fact 검증에서 거부한다.
 정확히 하나만 교차한 경우에는 각 basis의 ordinary admission 규칙을 적용한다.
 
 ## 3.6 선택된 DailySlots

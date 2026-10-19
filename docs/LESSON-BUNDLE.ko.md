@@ -14,10 +14,55 @@
 
 - Source에는 원문 텍스트, SHA-256, 미디어 형식 `text/markdown; profile=ghostflow-literate`가 들어갑니다.
 - Playback에는 durationMs와 순서가 지정된 체크포인트가 들어갑니다. 체크포인트에는 atMs, 1부터 시작하는 포함 범위인 sourceSpan의 startLine/endLine, 일반 텍스트 설명, scenarioId가 들어갑니다. 범위는 원본 Markdown을 가리키며 산문을 설명할 수도 있습니다.
-- 시나리오에는 고유 id, title, 순서가 지정된 프레임이 있습니다. 각 프레임은 atMs와 입력 이름을 Boolean 또는 유한 숫자 값에 연결하는 맵을 가집니다. 시나리오, 프레임, 체크포인트가 각각 하나 이상 있어야 하며 각 배열의 시간은 엄격히 증가해야 합니다. 각 프레임에는 식별자 이름의 입력이 최대 128개 허용됩니다. prototype 관련 이름은 거부됩니다.
+- 시나리오에는 고유 id, title, 순서가 지정된 프레임이 있습니다. 각 프레임은 atMs, 소프트웨어 입력 이름을 Boolean 또는 유한 숫자 값에 연결하는 `inputs` 맵, 취득 입력을 위한 선택적 `samples` 맵을 가집니다. 시나리오, 프레임, 체크포인트가 각각 하나 이상 있어야 하며 각 배열의 시간은 엄격히 증가해야 합니다. 각 프레임에는 식별자 이름의 입력이 최대 128개 허용됩니다. prototype 관련 이름은 거부됩니다. 별도 samples 맵에도 식별자 이름의 항목을 최대 128개 허용합니다.
 - Toolchain은 compilerId/compilerRevision/runtimeId/runtimeRevision과 ABI 버전 1을 기록합니다. 식별자는 선언일 뿐 로드된 아티팩트의 증명이 아닙니다.
 
 설명 재생 시간과 시나리오 스캔 시간은 모두 정수 밀리초를 사용하지만 서로 다른 영역입니다. 시나리오를 다시 실행하면 새 런타임에서 시작합니다. 설명 체크포인트는 VM 스냅샷이 아닙니다. 실행 소비자는 유효한 비교를 주장하기 전에 로드된 컴파일러/런타임 식별 정보와 입력 바인딩 호환성을 검증해야 합니다. 선언된 식별 정보만으로는 검증되지 않습니다.
+
+## 시나리오 프레임의 취득 sample
+
+정본 `input` 선언에는 기존 `ControlRuntime.step` sample 형식을 사용합니다.
+예를 들어 `input enabled: Bool;`과 작성된 `enabled |> recover(false)` 정책은
+다음 프레임을 받을 수 있습니다.
+
+```json
+{
+  "atMs": 100,
+  "inputs": {},
+  "samples": {
+    "enabled": { "epoch": 1, "id": 1, "timestampMs": 100, "quality": "Good", "value": true }
+  }
+}
+```
+
+각 sample에는 `epoch`, `id`, `timestampMs`, `quality`, `value`만 들어갑니다.
+epoch, ID, timestamp는 음이 아닌 안전한 정수이며 timestamp는 프레임의 `atMs`를
+넘을 수 없습니다. quality는 `NotReady`, `Good`, `Disconnected`, `Stale`, `Invalid`
+또는 이 순서에 대응하는 기존 숫자 코드 0–4입니다. value는 fault 관측에서도 Boolean
+또는 유한한 JSON 숫자입니다. 값은 manifest의 정규 단위를 사용하며 lesson 검증기는
+단위를 변환하지 않습니다.
+
+컴파일 뒤 `compileLessonBundle`은 모든 프레임을 실제 manifest와 대조합니다.
+`inputs`는 정확히 소프트웨어 입력을 해당 scalar 타입과 범위에 맞게 공급해야 합니다.
+sample 이름은 `manifest.sensors` 항목을 가리켜야 합니다. Bool sample에는 Boolean
+payload가 필요하고 다른 scalar sample에는 숫자 payload가 필요합니다. 숫자 취득의
+범위/quality 검사, sample identity 순서와 fault 처리는 공유 runtime이 소유합니다.
+예를 들어 Int payload `1.5`는 아티팩트에 유지되며 runtime에서 `Invalid`가 됩니다.
+lesson 계층이 이를 정수로 강제 변환하지 않습니다. fault 응답은 Ghostflow 소스에 작성합니다.
+
+`samples` 생략, 빈 맵 또는 개별 취득 입력 생략은 새 관측을 공급하지 않습니다.
+Good, false, 새 ID 또는 timestamp를 합성하지 않습니다. 관측이 없는 입력은 runtime의
+`NotReady`로 시작하며 이후 보존과 만료는 기존 runtime 계약을 따릅니다. 소비자는
+`runtime.step({ nowMs: frame.atMs, inputs: frame.inputs, samples: frame.samples })`로
+프레임을 전달합니다. 관측 맵과 중첩 sample은 정규 bundle digest에 포함되며 분리된
+동결 값으로 반환됩니다.
+
+이는 `ghostflow-lesson-v1`의 선택적 필드이며 GFB나 WASM ABI를 바꾸지 않습니다.
+samples가 없는 기존 프레임은 형태를 유지합니다. 일반 소프트웨어 값에서 취득 Result로
+소스를 이행할 때는 새로 작성한 lesson revision과 명시적인 sample/fault 정책이 필요합니다.
+sensor 이름을 `inputs`에 넣으면 컴파일 시 프레임 바인딩 검증에서 거부합니다.
+이전 lesson 검증기는 모르는 `samples` 필드를 거부하므로 소비자는 이를 지원하는 language
+revision을 고정해야 합니다. 구조 검증만으로 manifest 호환성이 입증되지는 않습니다.
 
 ## 무결성과 한도
 

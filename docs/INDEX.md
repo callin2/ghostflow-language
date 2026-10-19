@@ -74,6 +74,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/HOST-EVENT-ORDERING-CONTRACT.md](HOST-EVENT-ORDERING-CONTRACT.md) | Host event ordering contract | md |
 | [docs/IMPLEMENTATION.ko.md](IMPLEMENTATION.ko.md) | 구현 및 아티팩트 경계 | md |
 | [docs/IMPLEMENTATION.md](IMPLEMENTATION.md) | Implementation and artifact boundaries | md |
+| [docs/INCIDENT-REPLAY.ko.md](INCIDENT-REPLAY.ko.md) | incident 캡처와 재현 | md |
+| [docs/INCIDENT-REPLAY.md](INCIDENT-REPLAY.md) | Incident capture and replay | md |
 | [docs/INPUT-MIGRATION.ko.md](INPUT-MIGRATION.ko.md) | 외부 입력의 canonical 선언과 명시적 revision migration | md |
 | [docs/INPUT-MIGRATION.md](INPUT-MIGRATION.md) | Canonical external input and explicit revision migration | md |
 | [docs/INSTANCE-TRACE-PROJECTION.ko.md](INSTANCE-TRACE-PROJECTION.ko.md) | Instance trace projection 참조 어댑터 | md |
@@ -122,6 +124,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/OPTIMIZER-PASS-CONTRACT.md](OPTIMIZER-PASS-CONTRACT.md) | Optimizer pass contract | md |
 | [docs/PORTABLE-PACKAGE.ko.md](PORTABLE-PACKAGE.ko.md) | 이식 가능한 GFB 패키지 v1 | md |
 | [docs/PORTABLE-PACKAGE.md](PORTABLE-PACKAGE.md) | Portable GFB package v1 | md |
+| [docs/PROFILE-FRONT-MATTER.en.md](PROFILE-FRONT-MATTER.en.md) | Profile-based Front Matter Design | md |
+| [docs/PROFILE-FRONT-MATTER.md](PROFILE-FRONT-MATTER.md) | Profile 기반 front matter 설계 | md |
 | [docs/ProgrammingInGhostflow.en.md](ProgrammingInGhostflow.en.md) | Programming in GhostFlow | md |
 | [docs/ProgrammingInGhostflow.md](ProgrammingInGhostflow.md) | Programming in GhostFlow | md |
 | [docs/REFERENCE-FEATURE-STATUS.md](REFERENCE-FEATURE-STATUS.md) | Reference feature maturity and evidence | md |
@@ -202,6 +206,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | --- | --- | --- |
 | [docs/plans/2026-09-28-semantic-kernel.ko.md](plans/2026-09-28-semantic-kernel.ko.md) | Semantic Kernel 0.1 검토 계획 | md |
 | [docs/plans/2026-09-28-semantic-kernel.md](plans/2026-09-28-semantic-kernel.md) | Semantic Kernel 0.1 review plan | md |
+| [docs/plans/2026-10-14-lifecycle-range-integration.ko.md](plans/2026-10-14-lifecycle-range-integration.ko.md) | Lifecycle과 immutable IANA Range 통합 | md |
+| [docs/plans/2026-10-14-lifecycle-range-integration.md](plans/2026-10-14-lifecycle-range-integration.md) | Lifecycle and immutable IANA Range integration | md |
 
 ## docs/reference/
 
@@ -237,6 +243,7 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/reports/2026-10-05-input-531-consumer-gates.md](reports/2026-10-05-input-531-consumer-gates.md) | Issue 531 independent review and consumer adoption gates | md |
 | [docs/reports/2026-10-05-input-531-integration.md](reports/2026-10-05-input-531-integration.md) | Issue 531 integration checkpoint and consumer handoff | md |
 | [docs/reports/2026-10-12-io-role-terminology-audit.md](reports/2026-10-12-io-role-terminology-audit.md) | I/O role terminology migration audit — 2026-10-12 | md |
+| [docs/reports/2026-10-16-intent-link-warnings-553.md](reports/2026-10-16-intent-link-warnings-553.md) | #553 — 기본 의도 연결 경고 구현 기록 | md |
 | [docs/reports/2026-10-16-predecessor-language-reference-cleanup.md](reports/2026-10-16-predecessor-language-reference-cleanup.md) | GhostFlow predecessor-language reference cleanup — 2026-10-16 | md |
 
 ## docs/research/
@@ -262,4 +269,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.ko.md](research/GF-COMPOSE-R9-ACCEPTANCE.ko.md) | GF-COMPOSE R9: acceptance와 구현 인계 | md |
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.md](research/GF-COMPOSE-R9-ACCEPTANCE.md) | GF-COMPOSE R9: acceptance and implementation handoff | md |
 
-223 documents.
+230 documents.

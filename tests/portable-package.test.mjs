@@ -15,6 +15,7 @@ import {
 } from '../tools/portable-package.mjs';
 import { compileSource } from '../tools/toolchain.mjs';
 import { GhostFlowRuntime } from '../runtimes/wasm/ghostflow-runtime.mjs';
+import { moduleFingerprint } from '../tools/source-trace.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const nativePath = path.join(root, 'target/release/examples/run' + (process.platform === 'win32' ? '.exe' : ''));
@@ -157,6 +158,37 @@ test('GF-TEST-portable-package: deterministic package preserves exact literate, 
   const changed = verified.bytecode.copy();
   changed[0] = 0;
   assert.equal(verified.bytecode.copy()[0], 0x47, 'each bytecode copy is detached from verified state');
+});
+
+test('package creation reports fresh replay intent warnings without changing the signed envelope', async () => {
+  const source = '```ghost\ncontrol Unlinked { output pump: Bool; pump <- true; }\n```\n';
+  const compilation = await compileSource(source, { filename: 'unlinked.ghost.md' });
+  const replay = await compileSource(source, { filename: 'unlinked.ghost.md' });
+  const current = await currentKeyPromise;
+  const options = {
+    signers: [{ keyId: current.keyId, privateKey: current.privateKey }],
+    verifyCompilation: () => replay,
+  };
+  const reported = [];
+  const packageValue = await buildPortablePackage({ ...compilation, warnings: [] }, identity, {
+    ...options, onDiagnostic: diagnostic => reported.push(diagnostic),
+  });
+  assert.deepEqual(reported, replay.warnings);
+  assert.ok(reported.some(item => item.code === 'GF_INTENT_LINK_MISSING'));
+  const messages = [];
+  const originalWarn = console.warn;
+  let defaultPackage;
+  try {
+    console.warn = message => messages.push(message);
+    defaultPackage = await buildPortablePackage(compilation, identity, options);
+  } finally { console.warn = originalWarn; }
+  assert.ok(messages.some(message => /unlinked\.ghost\.md:2:\d+: warning GF_INTENT_LINK_MISSING:/.test(message)));
+  assert.ok(messages.some(message => /ghostflow:anchor id=/.test(message) && /ghostflow:link id=/.test(message)));
+  assert.equal(serializePortablePackage(packageValue), serializePortablePackage(defaultPackage));
+  assert.deepEqual(Object.keys(packageValue).sort(), ['format', 'payload', 'payloadSha256', 'signatures']);
+  assert.equal('warnings' in packageValue.payload, false);
+  assert.equal('diagnostics' in packageValue.payload, false);
+  assert.deepEqual(Buffer.from(packageValue.payload.bytecode.contentBase64, 'base64'), Buffer.from(compilation.bytes));
 });
 
 test('GF-TEST-portable-package-intent-map: a re-signed replacement source map still fails strict intent provenance recovery', async () => {
@@ -479,6 +511,40 @@ test('GF-TEST-portable-package-profiles: signed packages preserve profiles 1, 2 
       await expectsCode(() => verifyPortablePackage(candidate, { ...options, verifyBytecode: () => assert.fail('mismatch must reject before loader') }), 'bytecode-version-mismatch');
     }
   }
+});
+
+test('GF-TEST-portable-package-restart-lifecycle: real source trace remains bound to the GFB22 wrapper', async () => {
+  const current = await currentKeyPromise;
+  const source = `# Restart lifecycle package
+
+\`\`\`ghost
+control RestartPackage {
+  type RestartReason = PowerOn | Brownout | Watchdog | Software | Unknown;
+  input start, stop: Bool;
+  input restart_reason: RestartReason;
+  input restart_event: Bool;
+  output pump, valve: Bool;
+  // This fixture explicitly chooses false on acquisition fault for both ports.
+  pump <- if restart_event then (start |> recover(false)) else false;
+  valve <- stop |> recover(false);
+}
+\`\`\`
+`;
+  const compilation = await compileSource(source, { filename: 'restart-package.ghost.md' });
+  const capabilities = [
+    { kind: 'actuator', name: 'pump', type: 'bool' },
+    { kind: 'actuator', name: 'valve', type: 'bool' },
+    { kind: 'sensor', name: 'start', type: 'bool' },
+    { kind: 'sensor', name: 'stop', type: 'bool' },
+  ];
+  assert.equal(compilation.traceMetadata.moduleFingerprint, moduleFingerprint(compilation.bytes));
+  const packageValue = await buildPortablePackage(compilation, { ...identity, requiredCapabilities: capabilities },
+    buildOptions([{ keyId: current.keyId, privateKey: current.privateKey }]));
+  const verified = await verifyPortablePackage(packageValue, {
+    ...verifierOptions(current), supportedManifestFormats: [compilation.manifest.format],
+    availableCapabilities: capabilities,
+  });
+  assert.equal(verified.sourceMap.traceMetadata.moduleFingerprint, moduleFingerprint(verified.bytecode.copy()));
 });
 
 test('GF-TEST-portable-package-quantities: signed quantity ports map to number and preserve canonical units', async () => {

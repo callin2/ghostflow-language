@@ -2,6 +2,20 @@
   "format": "GhostFlow/document-translations-v1",
   "documents": [
     {
+      "source": "examples/hardware/rs485-current-relay.ghost.md",
+      "sourceLanguage": "ko",
+      "translation": "examples/hardware/rs485-current-relay.ghost.en.md",
+      "sourceSha256": "a13002e0a2436d226c4530b5c00746114fb30ad900cca6164d626783bfb1257b",
+      "translationSha256": "1ee1ed13c4f16ba711937bdee94d05a826b670df753e38ce4156e58c682bd461"
+    },
+    {
+      "source": "docs/PROFILE-FRONT-MATTER.md",
+      "sourceLanguage": "ko",
+      "translation": "docs/PROFILE-FRONT-MATTER.en.md",
+      "sourceSha256": "c77f8b765be9473835282a1af00ee2bc4af4e2baee9a11bb1e54e97b01a07c43",
+      "translationSha256": "6d756cd86a5264945452f6f15c1d90f7339547b9fad64ab95eb7a6aebeaba9ed"
+    },
+    {
       "source": "docs/INTENT-DECISIONS.md",
       "sourceLanguage": "en",
       "translation": "docs/INTENT-DECISIONS.ko.md",
@@ -54,8 +68,8 @@
       "source": "docs/HARDWARE-FRONT-MATTER.md",
       "sourceLanguage": "en",
       "translation": "docs/HARDWARE-FRONT-MATTER.ko.md",
-      "sourceSha256": "5d07ad9669f6d35a6e1186c137aadef5b37c9a0d0ff318cd19024071ac188376",
-      "translationSha256": "51d46608022fe38cc40d707799303299d1f37c9c87ff3560db4b5a963ff83358"
+      "sourceSha256": "d5f1f1ecae5a4d02ee4369a62976923e0f594f442666d61771dffa6c0005ffb7",
+      "translationSha256": "0a877b6f6ef8758648fc74124e11c053645f1d556d04006beb9a191fb0e01977"
     },
     {
       "source": "docs/BOOLEAN-OUTPUT-EXPLANATION.md",
@@ -250,15 +264,15 @@
       "source": "docs/BYTECODE.md",
       "sourceLanguage": "en",
       "translation": "docs/BYTECODE.ko.md",
-      "sourceSha256": "46e672972b01bacb947fba96c566ae25640e9a04734c30c5a230cb7900981098",
-      "translationSha256": "62ecf64ea5b85a17c5d24fe0c422130ea509202087d19c99505484a8c4490451"
+      "sourceSha256": "2ea95101f59d95fc7f0dfc1676b11b132a57a427135f377377735bcd91cc6dfb",
+      "translationSha256": "bd9129a0788f24149e2244adaf295e08b59ea927fc80517d4d4b6c0bab22ba37"
     },
     {
       "source": "docs/COMPILER-DIAGNOSTICS.md",
       "sourceLanguage": "en",
       "translation": "docs/COMPILER-DIAGNOSTICS.ko.md",
-      "sourceSha256": "86955c5f0ef22919dd9907e8c3563d8eedace1e03db096663dc5d2e541c249eb",
-      "translationSha256": "de2865bc440754dc222a8610590e05155604b287112b023e2d34d44ba464f290"
+      "sourceSha256": "64b810c1b6b3660f4a19df077cf912526845399ef99046f20f886168fd5c47f8",
+      "translationSha256": "f5a089cfd9d65c6d5b358faab8528bd9860614d96372f512258c427c6f66143b"
     },
     {
       "source": "docs/CONSTRAINTS.md",
@@ -341,8 +355,8 @@
       "source": "docs/INTENT-ANCHOR-MAP.md",
       "sourceLanguage": "en",
       "translation": "docs/INTENT-ANCHOR-MAP.ko.md",
-      "sourceSha256": "692fcaae6b7cc4e49909cdf68dea04e7af369102a1b8b5ea716fedce12051f13",
-      "translationSha256": "269b5ba220189b1ba95f77ea59f96ed94df5db6ec45e56348d467511a33f4bda"
+      "sourceSha256": "d56112071ae4f3843315e4480b2e061f7f6d225e186460a497eb8c0d8cf50210",
+      "translationSha256": "8d0c08083afdf27ba5bc8d8862b71fb85bcadedae4ebb7ffcf33cafd9dd7693b"
     },
     {
       "source": "docs/KEYBOARD-HOST.md",
@@ -397,8 +411,8 @@
       "source": "docs/LESSON-BUNDLE.md",
       "sourceLanguage": "en",
       "translation": "docs/LESSON-BUNDLE.ko.md",
-      "sourceSha256": "9c0c9069a89bd425a547629ca8c5f0ec8f84cf987617a2d5e1d24a2750031675",
-      "translationSha256": "eac5787ae0f4c478bafaf40761e60038c81ef33c9a466c5a54b36be86b05f85c"
+      "sourceSha256": "1e5dcdbe4ebcd5b0df98781251639fdeaff9df4fc0eeb5e60a023880769c5a18",
+      "translationSha256": "187984c9cc3a6a0ff29de0276edde2179d0caba4560fe9cf3311984d35766353"
     },
     {
       "source": "docs/LITERATE.md",
@@ -439,8 +453,8 @@
       "source": "docs/PORTABLE-PACKAGE.md",
       "sourceLanguage": "en",
       "translation": "docs/PORTABLE-PACKAGE.ko.md",
-      "sourceSha256": "f864216237f6b90342971d48d2195604cf1ae38c98c6f5ac52280eb264258cab",
-      "translationSha256": "de6e21bdb7d8e56aeade7cfe99ba61e83000dd133b1ef91342bc77a80b14cb71"
+      "sourceSha256": "8d133a99e10792f453e30b6bf98a4fe6e398d4f4b08e475589ff69d7bdb6cdfd",
+      "translationSha256": "b70a4d18167a6844bbe422e6abc60a28eefb40f159bdd8caa406f7d39b8edb39"
     },
     {
       "source": "docs/ProgrammingInGhostflow.md",
@@ -460,22 +474,22 @@
       "source": "docs/reference/01-source-and-syntax.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/01-source-and-syntax.en.md",
-      "sourceSha256": "d3fce6418819a2d5445804433a5d8e947479020267b26897a935b6edd53d962b",
-      "translationSha256": "d4c06e3a7a5009b816cf1f260dad3c4a7b83aa6b46b6898564e9c4a29ba9277b"
+      "sourceSha256": "201088bdf5df8058a8267a2ccee288ec8cd2d7cc29a012fe30ce49ba9d825357",
+      "translationSha256": "d109be89f094f4339236fc14fc6e3188f9317ea36e488caab2048f8191e8b5b1"
     },
     {
       "source": "docs/reference/02-types-expressions-state.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/02-types-expressions-state.en.md",
-      "sourceSha256": "c56f9f2a4131ba3c7bbda6db4fa89ec62d303b60e3e1db845110e6092c81a8f6",
-      "translationSha256": "746e460f42264b9596eec825b1c5ef0a31fe20849fb1e584f3b001b32e1d0b9c"
+      "sourceSha256": "d8bcaff0a6be8587d0ed4e22630b8a027bed96d16e9ae502f7793c3915b46383",
+      "translationSha256": "441a2e690da0e9d224a77ef328a6937fb24f688ffaaee70aa9dae805193537d5"
     },
     {
       "source": "docs/reference/03-time-and-schedules.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/03-time-and-schedules.en.md",
-      "sourceSha256": "38842695a0f4b6258d06991254a2c4bbda4a52ccf018344b50fb5f77a22921f7",
-      "translationSha256": "d1d2f295c0f444172f3ddd7b77417158f1ac84c903275a5da964fd3000db929f"
+      "sourceSha256": "87cd5d29ad1fc5d301cf757302f47cc55a8b034118726494c84038a27ac64afa",
+      "translationSha256": "302d581d1fffc539cc397889602bb1ac596ed680c29d60528698047c67b573e1"
     },
     {
       "source": "docs/reference/04-sensors-constraints-control.md",
@@ -488,8 +502,8 @@
       "source": "docs/reference/05-settings-and-observation.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/05-settings-and-observation.en.md",
-      "sourceSha256": "29789379ad056fcc17a79b12842497222aa4d6af3621c0d7bf0c01df7431b4cf",
-      "translationSha256": "ca38167bdfa2bee163de42dd296a57b6e24e68aef39c9482589db7fb3f3a0ff7"
+      "sourceSha256": "818fa5c589f2e95971dac4aa7860a77f3dffa31de453b2b53144a588ac7a6dc8",
+      "translationSha256": "e207cc0734186ea3c421117252c66d47fd2a4df22c37115b52d6acb85d06829c"
     },
     {
       "source": "docs/reference/06-composition-and-replay.md",
@@ -579,8 +593,8 @@
       "source": "docs/SCAN-FRAME-WASM.md",
       "sourceLanguage": "en",
       "translation": "docs/SCAN-FRAME-WASM.ko.md",
-      "sourceSha256": "415d9248546fead35e4cf8a099a496d9783170045d219a09c2ca2a8acfccf1e3",
-      "translationSha256": "76e07552e03b1f545d6069f9cae4f021bce5b1ed6ca4cdfdd6f6bb003132f77c"
+      "sourceSha256": "f4383538d2b2bf9fc6cd856140ac42ea40a24ca7f6e36aa88e415bb5e37477e5",
+      "translationSha256": "ff170aa8cef69c8a26c1afdd5f1e227f5fd32190b1180dfc202939f76bead74f"
     },
     {
       "source": "docs/SCAN-TAPE-PARITY.md",
@@ -691,8 +705,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "4051238052cef3d6f901bf6b42912031eac3d15f303437331ea82281e10dd7db",
-      "translationSha256": "e1ddb3e3575efc48cb5e4a20e8864819ce1759e7b4411ed604fe188edc63797e"
+      "sourceSha256": "fbb982600274849d05f4753c99aee1c0162783f41f65c550407bc4d1cd6bead8",
+      "translationSha256": "e6c9bf79e407f7ba6021a53433040fff54dfe4ffa02de691de8860c3fd9f2e09"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",
@@ -1134,6 +1148,20 @@
       "translation": "examples/vfd-speed.input-v1.ghost.ko.md",
       "sourceSha256": "ce9923f9d50aa0c6b4a36991ae7e065fbd742c997638ab35af04fcada8d5e73c",
       "translationSha256": "e20b7b0d55a0cda1448469cc9fe0c7c3ef584559d4fa84f3e664675c4e8dbe7d"
+    },
+    {
+      "source": "docs/plans/2026-10-14-lifecycle-range-integration.md",
+      "sourceLanguage": "en",
+      "translation": "docs/plans/2026-10-14-lifecycle-range-integration.ko.md",
+      "sourceSha256": "6ee612c4c17a854e761fcd721bce92e752722c24421784b8e4399beb962201ea",
+      "translationSha256": "df024d821d092d3b891cbb6217d80f7a2dcfc80bc426478682fe18f2863d74f8"
+    },
+    {
+      "source": "docs/INCIDENT-REPLAY.md",
+      "sourceLanguage": "en",
+      "translation": "docs/INCIDENT-REPLAY.ko.md",
+      "sourceSha256": "e0be08a89fb5525a64eab63492c0ea94119e2ca7f6ef3bb29db09251020e7921",
+      "translationSha256": "987f8fc7c43db30771b42e48232ae11dbaa18cd19df701fa1f72b5c5c4101187"
     }
   ],
   "exclusions": [
@@ -1460,6 +1488,14 @@
     {
       "path": "docs/reports/2026-10-12-io-role-terminology-audit.md",
       "reason": "Execution audit receipt and intentional historical/ABI terminology exceptions; report may remain in one language."
+    },
+    {
+      "path": "tests/fixtures/issue541-seoul-traffic.ghost.md",
+      "reason": "Canonical executable civil Range simulation/conformance fixture shared with simulator integration; not authored reader documentation, so its compile identity is retained."
+    },
+    {
+      "path": "docs/reports/2026-10-16-intent-link-warnings-553.md",
+      "reason": "Issue 553 implementation decisions, source-update and verification evidence; execution reports may remain in one language."
     }
   ]
 }

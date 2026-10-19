@@ -201,8 +201,9 @@ test('host test scheduling isolates console replay and runs the complete explici
   assert.equal(batches.length, 2);
   assert.deepEqual(batches.flat().toSorted(), tests.toSorted());
   assert.equal(new Set(batches.flat()).size, tests.length, 'no skipped or repeated test files');
-  assert.match(verifier, /for \(const tests of languageTestBatches\(LANGUAGE_TESTS\)\)\s*\{\s*await gate\(process\.execPath, \['--test', \.\.\.tests\]\);\s*\}/);
-  assert.match(verifier, /timeout: 180_000/);
+  assert.match(verifier, /for \(const tests of languageTestBatches\(LANGUAGE_TESTS\)\)\s*\{\s*await gate\(process\.execPath, \['--test', '--test-concurrency=1', \.\.\.tests\]\);\s*\}/);
+  assert.match(verifier, /const timeout = arguments_\.includes\('--test'\) \? 600_000 : 180_000;/);
+  assert.match(verifier, /spawn\(command, arguments_, \{ cwd: root, env, stdio: \['ignore', 'pipe', 'pipe'\], timeout \}\)/);
 });
 
 test('empty test batches never trigger implicit Node test discovery', () => {

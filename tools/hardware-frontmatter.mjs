@@ -1,5 +1,6 @@
 import { parseDocument, isMap, isSeq, isScalar, isAlias, LineCounter } from 'yaml';
 import { isWellFormedUnicode, sha256Hex, utf8ByteLength } from './sha256.mjs';
+import { profileRequest, validateProfileBindings } from './hardware-profiles.mjs';
 
 const SCHEMA = 'GhostFlow/hardware-v1';
 const NAME = /^[A-Za-z_][A-Za-z0-9_.:-]{0,127}$/;
@@ -32,7 +33,8 @@ export function parseHardwareFrontMatter(source, { filename = 'program.ghost.md'
   const counter = new LineCounter();
   const document = parseDocument(text, { lineCounter: counter, uniqueKeys: true, strict: true, version: '1.2' });
   // Ordinary historical front matter remains non-executable prose, even when not YAML.
-  if (!isMap(document.contents) || !document.contents.items.some(pair => isScalar(pair.key) && pair.key.value === 'hardware')) return null;
+  const reserved = ['hardware', 'profile', 'devices', 'bindings'];
+  if (!isMap(document.contents) || !document.contents.items.some(pair => isScalar(pair.key) && reserved.includes(pair.key.value))) return null;
   const identity = { filename, sha256: sha256Hex(source) };
   const locations = {};
   const locate = node => {
@@ -68,6 +70,7 @@ export function parseHardwareFrontMatter(source, { filename = 'program.ghost.md'
     return node.value;
   };
   const root = data(document.contents);
+  if (['profile', 'devices', 'bindings'].some(key => Object.hasOwn(root, key))) return profileRequest(root, identity, locations);
   const at = path => locations[path] ?? locations['/hardware'];
   const invalid = (path, message) => { throw new HardwareFrontMatterError(identity, at(path), message); };
   const object = (value, path, keys, required = keys) => {
@@ -120,6 +123,8 @@ export function parseHardwareFrontMatter(source, { filename = 'program.ghost.md'
 /** Validate declared bindings against compiler-authored logical ports, never guessed types. */
 export function validateHardwareBindings(plan, manifest) {
   if (!plan) return;
+  if (plan.format === 'GhostFlow/profile-resolution-v1') return validateProfileBindings(plan, manifest);
+  if (plan.format === 'GhostFlow/profile-request-v1') throw new HardwareFrontMatterError(plan.source, plan.locations['/profile'] ?? plan.locations[''], 'resolve hardwareProfiles before validating bindings');
   const control = manifest?.format === 'GhostFlow/control-policy-descriptor-v1' ? manifest.control : manifest;
   const inputs = new Set((control?.sensors ?? []).map(input => input.name));
   const outputs = new Set((control?.outputs ?? []).map(output => output.name));

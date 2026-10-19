@@ -185,8 +185,8 @@ test('composition port failure is semantic, not import resolution', async () => 
   });
 });
 
-test('successful compilation carries an empty diagnostic envelope with source identity', async () => {
-  const source = '```ghost\ncontrol Farm { output pump: Bool; pump <- false; }\n```\n';
+test('fully linked successful compilation carries an empty diagnostic envelope with source identity', async () => {
+  const source = '<!-- ghostflow:anchor id=GF-PUMP kind=intent status=confirmed origin=user -->\n> Keep pump off.\n\n```ghost\ncontrol Farm {\noutput pump: Bool;\n// ghostflow:link id=GF-PUMP relation=implements\npump <- false;\n}\n```\n';
   const result = await compileSource(source, {
     filename: 'farm.ghost.md', interactionSourceIdentity: { documentId: 'farm', revisionId: 'rev-1' },
   });

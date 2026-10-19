@@ -130,6 +130,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/HOST-EVENT-ORDERING-CONTRACT.md](docs/HOST-EVENT-ORDERING-CONTRACT.md) | Host event ordering contract | md |
 | [docs/IMPLEMENTATION.ko.md](docs/IMPLEMENTATION.ko.md) | 구현 및 아티팩트 경계 | md |
 | [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) | Implementation and artifact boundaries | md |
+| [docs/INCIDENT-REPLAY.ko.md](docs/INCIDENT-REPLAY.ko.md) | incident 캡처와 재현 | md |
+| [docs/INCIDENT-REPLAY.md](docs/INCIDENT-REPLAY.md) | Incident capture and replay | md |
 | [docs/INDEX.md](docs/INDEX.md) | Documentation index | md |
 | [docs/INPUT-MIGRATION.ko.md](docs/INPUT-MIGRATION.ko.md) | 외부 입력의 canonical 선언과 명시적 revision migration | md |
 | [docs/INPUT-MIGRATION.md](docs/INPUT-MIGRATION.md) | Canonical external input and explicit revision migration | md |
@@ -177,6 +179,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/OPTIMIZER-PASS-CONTRACT.md](docs/OPTIMIZER-PASS-CONTRACT.md) | Optimizer pass contract | md |
 | [docs/PORTABLE-PACKAGE.ko.md](docs/PORTABLE-PACKAGE.ko.md) | 이식 가능한 GFB 패키지 v1 | md |
 | [docs/PORTABLE-PACKAGE.md](docs/PORTABLE-PACKAGE.md) | Portable GFB package v1 | md |
+| [docs/PROFILE-FRONT-MATTER.en.md](docs/PROFILE-FRONT-MATTER.en.md) | Profile-based Front Matter Design | md |
+| [docs/PROFILE-FRONT-MATTER.md](docs/PROFILE-FRONT-MATTER.md) | Profile 기반 front matter 설계 | md |
 | [docs/ProgrammingInGhostflow.en.md](docs/ProgrammingInGhostflow.en.md) | Programming in GhostFlow | md |
 | [docs/ProgrammingInGhostflow.md](docs/ProgrammingInGhostflow.md) | Programming in GhostFlow | md |
 | [docs/REFERENCE-FEATURE-STATUS.md](docs/REFERENCE-FEATURE-STATUS.md) | Reference feature maturity and evidence | md |
@@ -244,6 +248,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | --- | --- | --- |
 | [docs/plans/2026-09-28-semantic-kernel.ko.md](docs/plans/2026-09-28-semantic-kernel.ko.md) | Semantic Kernel 0.1 검토 계획 | md |
 | [docs/plans/2026-09-28-semantic-kernel.md](docs/plans/2026-09-28-semantic-kernel.md) | Semantic Kernel 0.1 review plan | md |
+| [docs/plans/2026-10-14-lifecycle-range-integration.ko.md](docs/plans/2026-10-14-lifecycle-range-integration.ko.md) | Lifecycle과 immutable IANA Range 통합 | md |
+| [docs/plans/2026-10-14-lifecycle-range-integration.md](docs/plans/2026-10-14-lifecycle-range-integration.md) | Lifecycle and immutable IANA Range integration | md |
 
 ## docs/reference/
 
@@ -278,6 +284,7 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/reports/2026-10-05-input-531-consumer-gates.md](docs/reports/2026-10-05-input-531-consumer-gates.md) | Issue 531 independent review and consumer adoption gates | md |
 | [docs/reports/2026-10-05-input-531-integration.md](docs/reports/2026-10-05-input-531-integration.md) | Issue 531 integration checkpoint and consumer handoff | md |
 | [docs/reports/2026-10-12-io-role-terminology-audit.md](docs/reports/2026-10-12-io-role-terminology-audit.md) | I/O role terminology migration audit — 2026-10-12 | md |
+| [docs/reports/2026-10-16-intent-link-warnings-553.md](docs/reports/2026-10-16-intent-link-warnings-553.md) | #553 — 기본 의도 연결 경고 구현 기록 | md |
 | [docs/reports/2026-10-16-predecessor-language-reference-cleanup.md](docs/reports/2026-10-16-predecessor-language-reference-cleanup.md) | GhostFlow predecessor-language reference cleanup — 2026-10-16 | md |
 
 ## docs/research/
@@ -386,6 +393,13 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | Path | Title | Type |
 | --- | --- | --- |
 | [examples/curriculum/generated/pc-01-e01.generated.ghost.md](examples/curriculum/generated/pc-01-e01.generated.ghost.md) | PC-01 — E01 executable projection | md |
+
+## examples/hardware/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [examples/hardware/rs485-current-relay.ghost.en.md](examples/hardware/rs485-current-relay.ghost.en.md) | RS485 Current Inputs and RYR408B 8-Channel Relay Outputs | md |
+| [examples/hardware/rs485-current-relay.ghost.md](examples/hardware/rs485-current-relay.ghost.md) | RS485 전류 입력과 RYR408B 8채널 릴레이 출력 | md |
 
 ## examples/programming-book-imports/
 
@@ -514,6 +528,7 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/fixtures/issue-90-settings-periodic.ghost.md](tests/fixtures/issue-90-settings-periodic.ghost.md) | Live settings stream | md |
 | [tests/fixtures/issue-93-quantities.ghost.md](tests/fixtures/issue-93-quantities.ghost.md) | Quantity execution parity fixture | md |
 | [tests/fixtures/issue-93-quantities.input-v1.ghost.md](tests/fixtures/issue-93-quantities.input-v1.ghost.md) | Quantity execution parity fixture | md |
+| [tests/fixtures/issue541-seoul-traffic.ghost.md](tests/fixtures/issue541-seoul-traffic.ghost.md) | Seoul traffic schedule simulation fixture | md |
 | [tests/fixtures/true-for-certified.ghost.md](tests/fixtures/true-for-certified.ghost.md) | Certified hot interval | md |
 | [tests/fixtures/true-for-certified.input-v1.ghost.md](tests/fixtures/true-for-certified.input-v1.ghost.md) | Certified hot interval | md |
 
@@ -535,4 +550,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-405 documents.
+415 documents.

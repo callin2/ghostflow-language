@@ -160,6 +160,43 @@ test('JSON and TOON are projections of the same successful compile result', () =
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 });
 
+test('JSON and TOON expose successful intent warnings with the same source identity and actionable hints', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-toon-intent-warning-'));
+  try {
+    const sourcePath = path.join(directory, 'unlinked.ghost.md');
+    const source = '# Pump\n\n```ghost\ncontrol Unlinked { output pump: Bool; pump <- true; }\n```\n';
+    fs.writeFileSync(sourcePath, source);
+    const artifactPath = path.join(directory, 'unlinked.gfb');
+    const request = requestFile(directory, {
+      format: 'GhostFlow/cli-request-v1', operation: 'compile',
+      source: { path: sourcePath, documentId: 'pump', revisionId: 'unlinked-r1' }, artifactPath,
+    });
+    const api = await compileSource(source, { filename: sourcePath });
+    const json = run(['--request', request, '--format', 'json']);
+    const toon = run(['--request', request]);
+    assert.equal(json.status, 0, json.stderr);
+    assert.equal(toon.status, 0, toon.stderr);
+    assert.equal(json.stderr, '');
+    assert.equal(toon.stderr, '');
+    const decoded = JSON.parse(json.stdout);
+    assert.deepEqual(decoded, decode(toon.stdout, { strict: true }));
+    assert.equal(decoded.ok, true);
+    assert.equal(decoded.source.documentId, 'pump');
+    assert.equal(decoded.source.revisionId, 'unlinked-r1');
+    assert.deepEqual(decoded.warnings, api.warnings);
+    assert.deepEqual(decoded.diagnostics, api.diagnosticEnvelope.diagnostics);
+    const warning = decoded.diagnostics.find(item => item.code === 'GF_INTENT_LINK_MISSING');
+    assert.ok(warning);
+    assert.equal(warning.severity, 'warning');
+    assert.equal(warning.span.file, sourcePath.split(path.sep).join('/'));
+    assert.equal(warning.span.start.line, 4);
+    assert.match(warning.hint, /ghostflow:anchor id=/);
+    assert.match(warning.hint, /ghostflow:link id=/);
+    assert.equal(fs.existsSync(artifactPath), true);
+    assert.deepEqual(fs.readFileSync(artifactPath), Buffer.from(api.bytes));
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+});
+
 test('TOON invocation errors return structured exit 2 and reject raw source fields', () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-toon-invalid-'));
   try {

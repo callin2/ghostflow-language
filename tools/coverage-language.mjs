@@ -31,6 +31,7 @@ const TESTS = Object.freeze([
   'tests/true-for-integration.test.mjs', 'tests/true-for-driver-contract.test.mjs',
   'tests/true-for-profile.test.mjs',
   'tests/control-runtime-atomicity.test.mjs', 'tests/native-dispatch-status.test.mjs',
+  'tests/control-runtime-restart-lifecycle.test.mjs',
   'tests/framed-control-host.test.mjs', 'tests/scan-frame-wasm.test.mjs',
   'tests/gfb1-browser.test.mjs', 'tests/core-ir.test.mjs', 'tests/gfb4-browser.test.mjs', 'tests/gfb5-browser.test.mjs',
   'tests/browser-toolchain.test.mjs', 'tests/hold-last-runtime.test.mjs',

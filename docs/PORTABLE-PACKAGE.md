@@ -130,6 +130,27 @@ channel map before invoking the package verifier.
 
 ## Compatibility and migration
 
+### Signed immutable IANA Range
+
+GFB21 with `GhostFlow/control-v21` and `GhostFlow/context-scan-abi-v5` is an
+explicit portable profile. GFB22 may wrap that unchanged inner21 with the
+checked lifecycle descriptor. Existing1–4,10 and11 admission remains; no other
+Range, calendar, provider, objective or config profile is admitted by this change.
+The GFB11 scalar-config/Periodic restrictions remain intact.
+
+Signing requires exact fresh source replay. JavaScript verification compares the
+complete canonical owner manifest with fresh lowering, and Rust binds schedule
+count/site/name, IANA zone, selected slots, duration, DST policies, gap and recovery
+fields to decoded CivilRange descriptors. Both reject re-signed substitutions
+before the target loader. Rust re-encodes the signed `when`/`cancelWhen` owner
+expression IR, including non-literal branches, integers and Result traces, and
+requires exact executable-byte equality without evaluating it or restricting
+existing predicates. Capabilities exclude runtime-owned restart ports but retain
+actual acquisition and actuator requirements. Host tzdb/time occurrence facts
+remain explicit runtime inputs; a signed package does not prove those facts or
+physical execution. See `tests/civil-range-package.test.mjs` and its real signed
+JavaScript fixture exercised by the native Rust verifier.
+
 ### Signed GFB11 Periodic with scalar settings
 
 GFB11 with `GhostFlow/control-v10` and `GhostFlow/context-scan-abi-v5` may now
