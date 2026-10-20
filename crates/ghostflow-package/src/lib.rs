@@ -740,6 +740,164 @@ fn canonical_quantity_unit(value: &str) -> Option<&'static str> {
     })
 }
 
+const OUTPUT_OBSERVATION_ROLES: [(&str, &str); 4] = [
+    ("statusInput", "status"),
+    ("healthInput", "health"),
+    ("completionInput", "completion"),
+    ("faultInput", "fault"),
+];
+
+fn verify_output_observation_descriptors(manifest: &Value) -> Result<HashSet<String>> {
+    let mismatch = |message: &str| PortablePackageError {
+        code: ErrorCode::ManifestMismatch,
+        message: message.into(),
+    };
+    let selected = manifest["format"].as_str() == Some("GhostFlow/control-v22");
+    let mut rails = HashSet::new();
+    for field in ["inputs", "outputs"] {
+        for port in manifest[field].as_array().into_iter().flatten() {
+            if port["name"]
+                .as_str()
+                .is_some_and(|name| name.starts_with("__gf_output_"))
+            {
+                return Err(mismatch("output observation rails cannot be public ports"));
+            }
+        }
+    }
+    if !selected {
+        if manifest.get("outputObservations").is_some() {
+            return Err(mismatch("output observations require control-v22"));
+        }
+        return Ok(rails);
+    }
+    let descriptors = manifest["outputObservations"]
+        .as_array()
+        .ok_or_else(|| mismatch("control-v22 requires outputObservations"))?;
+    if descriptors.is_empty() || descriptors.len() > 32 {
+        return Err(mismatch(
+            "outputObservations must contain 1 to 32 descriptors",
+        ));
+    }
+    for field in ["schedules", "configs"] {
+        if !manifest[field]
+            .as_array()
+            .is_some_and(|values| values.is_empty())
+        {
+            return Err(mismatch(
+                "output observations do not support schedules or configs",
+            ));
+        }
+    }
+    if manifest.get("adaptPolicy").is_some() || manifest.get("strategies").is_some() {
+        return Err(mismatch(
+            "output observations do not support adapt strategies",
+        ));
+    }
+    let mut outputs = HashSet::new();
+    for descriptor in descriptors {
+        let descriptor = value_object(descriptor, "output observation")?;
+        exact_keys(
+            descriptor,
+            &[
+                "output",
+                "statusInput",
+                "healthInput",
+                "completionInput",
+                "faultInput",
+            ],
+            "output observation",
+            ErrorCode::ManifestMismatch,
+        )?;
+        let output = descriptor["output"]
+            .as_str()
+            .ok_or_else(|| mismatch("output observation output must be a name"))?;
+        require_ghost_name(output, "output observation output")?;
+        if output.len() > 96
+            || output.starts_with("__gf_")
+            || !outputs.insert(output)
+            || !manifest["outputs"].as_array().is_some_and(|ports| {
+                ports.iter().any(|port| {
+                    port["name"].as_str() == Some(output) && port["type"].as_str() == Some("Bool")
+                })
+            })
+        {
+            return Err(mismatch(
+                "output observations require unique bounded declared Bool outputs",
+            ));
+        }
+        for (key, role) in OUTPUT_OBSERVATION_ROLES {
+            let expected = format!("__gf_output_{output}_{role}");
+            if descriptor[key].as_str() != Some(expected.as_str()) || !rails.insert(expected) {
+                return Err(mismatch(
+                    "output observation has a mismatched or duplicate private rail",
+                ));
+            }
+        }
+    }
+    Ok(rails)
+}
+
+fn verify_output_observation_bindings(
+    manifest: &Value,
+    module: &ghostflow_core::Module,
+    runtime_abi: &str,
+) -> Result<()> {
+    let rails = verify_output_observation_descriptors(manifest)?;
+    let selected = manifest["format"].as_str() == Some("GhostFlow/control-v22");
+    if selected
+        && (!matches!(module.bytecode_format_version(), 1..=4)
+            || runtime_abi != "GhostFlow/framed-scan-abi-v1")
+    {
+        return fail(
+            ErrorCode::ManifestMismatch,
+            "control-v22 requires the scalar framed runtime profile",
+        );
+    }
+    let mut found = HashSet::new();
+    for (name, value_type) in module.input_fields() {
+        if name.starts_with("__gf_output_") {
+            if value_type != ghostflow_core::Type::Number || !rails.contains(name) {
+                return fail(
+                    ErrorCode::ManifestMismatch,
+                    "bytecode has an undeclared or mistyped output observation rail",
+                );
+            }
+            found.insert(name.to_owned());
+        }
+    }
+    if found != rails
+        || module
+            .state_fields()
+            .any(|(name, _, _)| name.starts_with("__gf_output_"))
+        || module
+            .output_fields()
+            .any(|(name, _)| name.starts_with("__gf_output_"))
+    {
+        return fail(
+            ErrorCode::ManifestMismatch,
+            "bytecode output observation bindings do not match the manifest",
+        );
+    }
+    for descriptor in manifest["outputObservations"]
+        .as_array()
+        .into_iter()
+        .flatten()
+    {
+        let output = descriptor["output"].as_str().unwrap();
+        if !module.output_fields().any(|(name, _)| name == output)
+            || module
+                .output_fields()
+                .any(|(name, ty)| name == output && ty != ghostflow_core::Type::Bool)
+        {
+            return fail(
+                ErrorCode::ManifestMismatch,
+                "observed Bool output is missing from bytecode",
+            );
+        }
+    }
+    Ok(())
+}
+
 fn manifest_canonical_unit(descriptor: &serde_json::Map<String, Value>, label: &str) -> Result<()> {
     let expected = descriptor
         .get("type")
@@ -2461,6 +2619,9 @@ fn verify_manifest(
     if object.contains_key("lifecycle") {
         keys.push("lifecycle");
     }
+    if object["format"].as_str() == Some("GhostFlow/control-v22") {
+        keys.push("outputObservations");
+    }
     if object["format"].as_str() == Some("GhostFlow/control-v21") {
         for field in [
             "providers",
@@ -2477,6 +2638,7 @@ fn verify_manifest(
         }
     }
     exact_keys(object, &keys, "manifest", ErrorCode::ManifestMismatch)?;
+    verify_output_observation_descriptors(manifest)?;
     let format = object["format"]
         .as_str()
         .ok_or_else(|| PortablePackageError {
@@ -3185,6 +3347,7 @@ pub fn verify_portable_package_with_signature_policy(
         &bytecode_sha256,
         &identity.required_capabilities,
     )?;
+    verify_output_observation_bindings(&manifest, &module, &identity.runtime_abi)?;
     if profile_version == 21 {
         verify_civil_range_bindings(&manifest, &module)?;
     }
@@ -3377,6 +3540,86 @@ fn verify_signatures(
 mod tests {
     use super::*;
     use std::process::Command;
+
+    #[test]
+    fn output_observation_manifest_and_bytecode_bindings_are_strict() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let output = Command::new("node").args(["--input-type=module", "-e", r#"
+            import { compileSource } from './tools/compile-source.mjs';
+            const c = await compileSource('# Observe\n\n```ghost\ncontrol Observe { output pump: Bool; output alarm: Bool; pump <- true; alarm <- output_status(pump) == OutputPending; }\n```\n', { filename: 'observe.ghost.md' });
+            process.stdout.write(JSON.stringify({ manifest: c.manifest, bytes: Buffer.from(c.bytes).toString('base64') }));
+        "#]).current_dir(root).output().unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let fixture: Value = serde_json::from_slice(&output.stdout).unwrap();
+        let bytes = BASE64.decode(fixture["bytes"].as_str().unwrap()).unwrap();
+        let module = ghostflow_core::Module::load(&bytes).unwrap();
+        let manifest = &fixture["manifest"];
+        let caps = ["pump", "alarm"].map(|name| Capability {
+            kind: "actuator".into(),
+            name: name.into(),
+            value_type: "bool".into(),
+        });
+        let verify = |candidate: &Value| {
+            verify_manifest(
+                candidate,
+                candidate["format"].as_str().unwrap(),
+                manifest["bytecodeSha256"].as_str().unwrap(),
+                &caps,
+            )?;
+            verify_output_observation_bindings(candidate, &module, "GhostFlow/framed-scan-abi-v1")
+        };
+        verify(manifest).unwrap();
+        assert!(verify_output_observation_bindings(
+            manifest,
+            &module,
+            "GhostFlow/context-scan-abi-v5"
+        )
+        .is_err());
+        for scenario in 0..10 {
+            let mut bad = manifest.clone();
+            match scenario {
+                0 => {
+                    bad.as_object_mut().unwrap().remove("outputObservations");
+                }
+                1 => bad["outputObservations"] = serde_json::json!([]),
+                2 => {
+                    let descriptor = bad["outputObservations"][0].clone();
+                    bad["outputObservations"]
+                        .as_array_mut()
+                        .unwrap()
+                        .push(descriptor);
+                }
+                3 => bad["outputObservations"][0]["extra"] = serde_json::json!(true),
+                4 => bad["outputObservations"][0]["statusInput"] = serde_json::json!("forged"),
+                5 => bad["outputObservations"][0]["output"] = serde_json::json!("missing"),
+                6 => bad["outputs"][0]["type"] = serde_json::json!("Number"),
+                7 => {
+                    bad["format"] = serde_json::json!("GhostFlow/control-v1");
+                    bad.as_object_mut().unwrap().remove("outputObservations");
+                }
+                8 => {
+                    bad["inputs"] =
+                        serde_json::json!([{ "name": "__gf_output_pump_status", "type": "Number" }])
+                }
+                _ => {
+                    bad["outputObservations"][0]["output"] = serde_json::json!("alarm");
+                    for (key, role) in OUTPUT_OBSERVATION_ROLES {
+                        bad["outputObservations"][0][key] =
+                            serde_json::json!(format!("__gf_output_alarm_{role}"));
+                    }
+                }
+            }
+            assert_eq!(
+                verify(&bad).unwrap_err().code,
+                ErrorCode::ManifestMismatch,
+                "scenario {scenario}"
+            );
+        }
+    }
 
     #[test]
     fn executable_at_remains_outside_signed_package_profile() {

@@ -495,8 +495,8 @@
       "source": "docs/reference/04-sensors-constraints-control.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/04-sensors-constraints-control.en.md",
-      "sourceSha256": "85e866d629ac45a4b2b7f8b86ef886023568139d34f2c0e76ac6d743ffda442e",
-      "translationSha256": "98a60f8838303a5adb985fb94d49555a7948e59bc7fa3806526362c99f5fcacc"
+      "sourceSha256": "5d550011a2a452c7b4409d8570573935d51b36937e1a333fc458b8562281844d",
+      "translationSha256": "e3490a29be347e545b50c6ba9855cbb28b67b47de473f819bd691b6f8d16e7aa"
     },
     {
       "source": "docs/reference/05-settings-and-observation.md",
@@ -705,8 +705,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "eaaeb327383d4fd9dab24f6ff806cc2809143e1852d72247403bd1588fcc65b1",
-      "translationSha256": "edc210cafc14c721bcfa5c8c469466fef5566b696b579fc790c7fe0919ee2c49"
+      "sourceSha256": "0de70e974c8105145795f90388087be1e9707dd6d55e6c28fa0ce74a5cfc2bb6",
+      "translationSha256": "17c4427e2683b56dcab5dac0083c28e031c68b1a9259dc5b8fe4b7eb25c57924"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",

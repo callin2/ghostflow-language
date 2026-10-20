@@ -2,6 +2,32 @@
 
 ## Unreleased
 
+### 2026-10-20 — typed output observations ([#578](https://github.com/callin2/ghostflow-language/issues/578))
+
+Reference §4.7 now exposes `output_status`, `output_health`, `output_completion`
+and `output_fault` for declared Bool outputs. Previously source could not consume
+renderer lifecycle evidence. For example, `output_fault(pump) == OutputTimeout`
+can latch a source state; existing state transitions choose manual or automatic
+recovery. Pending adds no fault, health is independent of request status, and
+completion distinguishes host write, device ACK and readback. Trusted observations
+are bound to run/output/request identity; stale receipts and private-rail overrides
+reject. The scalar/sensor profile uses control-v22 with unchanged scalar GFB encoding;
+incompatible context profiles and unsupported hosts reject. Existing manifests
+are unchanged. Compiler, tracker, host and signed-package regressions cover
+pending, completion, faults, independent outputs, reset and tampering.
+
+### 2026-10-20 — require request identity for terminal output observations ([#578](https://github.com/callin2/ghostflow-language/issues/578))
+
+Bug fix: `OutputFailed` and `OutputUnknown` now require a nonzero ID for an
+actually dispatched request in both the portable tracker and reference host.
+Before, a requestless `requestId = 0, status = OutputUnknown` could be accepted
+as a terminal lifecycle result. Startup may still report `requestId = 0,
+status = OutputInitial` with faulted health. Terminal observations retain any
+nonzero partial completion evidence. Providers that sent requestless terminal
+status must report the startup state or bind the result to its request. Rust and
+JavaScript regressions cover both terminal states, faulted startup and partial
+completion.
+
 ### 2026-10-20 — validation without runtime activation ([#572](https://github.com/callin2/ghostflow-language/issues/572))
 
 The framed validation-only entry now checks loaded bytecode and capability

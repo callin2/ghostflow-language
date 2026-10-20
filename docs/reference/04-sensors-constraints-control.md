@@ -582,6 +582,60 @@ confirmed feedback은 출처와 품질을 따로 가진다.
 **왜:** 요청, 제약 결과, 장치 적용, 물리 결과를 한 Bool로 합치면 출력이 차단된 이유와
 장치 불일치를 설명할 수 없고 사용량 accounting 대상도 모호해진다.
 
+### 출력 관측과 복구 정책
+
+선언한 Bool 출력에 `output_status(pump)`, `output_health(pump)`,
+`output_completion(pump)`, `output_fault(pump)`를 사용한다. 각 함수의 반환 타입과
+멤버는 다음과 같다. 서로 다른 타입의 멤버는 비교할 수 없다.
+
+| 타입 | 멤버 (숫자 rail의 0부터 순서) |
+| --- | --- |
+| `OutputStatus` | `OutputInitial`, `OutputPending`, `OutputCompleted`, `OutputFailed`, `OutputUnknown` |
+| `OutputHealth` | `OutputInitializing`, `OutputHealthy`, `OutputFaulted` |
+| `OutputCompletion` | `CompletionNone`, `HostWrite`, `DeviceAck`, `DeviceReadback` |
+| `OutputFault` | `NoOutputFault`, `OutputUnavailable`, `OutputTimeout`, `OutputProtocolError`, `OutputDriverError`, `OutputObservationLost` |
+
+status는 현재 요청의 생명주기이고 health는 장치 준비 상태다. 시작 시 요청 ID 0의
+`OutputInitial`은 completion 없이 초기화 중·준비 완료·장치 오류를 나타낼 수 있다.
+새 요청은 `OutputPending`이며 기존 health·fault를 보존한다. pending 자체와 지원하지
+않는 ACK 기능은 오류가 아니다. 완료 관측은 실제 근거 수준을 명시한다. `HostWrite`는
+장치 ACK나 접점 상태를 증명하지 않으며 `DeviceReadback`도 별도 센서로 확인한 물리
+부하 동작을 자동으로 증명하지 않는다.
+
+```ghost
+control OutputRecovery {
+  input resume: Bool;
+  output pump, alarm: Bool;
+  state stopped: Bool = false;
+  let resume_requested = resume |> recover(false);
+  stopped' = if resume_requested then false else stopped || output_fault(pump) == OutputTimeout;
+  pump <- !stopped';
+  alarm <- output_health(pump) == OutputFaulted;
+}
+```
+
+수동 복구를 기억하는 위 상태와 자동 복구를 허용하는 식은 작성자가 선택한다.
+출력 실패가 이미 확정된 core state를 되돌리지 않는다. host의 별도 안전·종료 정책은
+자신의 계약으로 적용한다. 다른 출력은 자신의 관측을 유지한다.
+
+compiler는 출력별로 네 숫자 입력 `__gf_output_{name}_{status|health|completion|fault}`와
+`outputObservations` descriptor를 한 번 생성한다. 이 profile은 `GhostFlow/control-v22`
+manifest와 기존 scalar GFB1..4를 사용하며, 설정·예약·context·adaptation과의 조합은
+명시적으로 거부한다. source 입력으로 전용 rail을 덮어쓸 수 없다.
+
+host는 현재 run·출력·실제 dispatch한 요청 ID에 결합된 신뢰할 수 있는 renderer 관측을
+공급해야 한다. 이전 요청 ACK·이전 run의 cache·관측 누락을 성공으로 바꾸지 않는다.
+같은 요청의 terminal status와 완료 근거는 퇴행할 수 없고 재시도는 새 요청 ID를 쓴다.
+완료 후 통신을 잃으면 완료 사실은 유지하면서 health·fault가 바뀔 수 있다. 오류 후
+준비 완료는 새 초기화·복구 요청의 근거로 기록하며 실패한 요청을 성공으로 고치지 않는다. 새 run은
+초기 상태로 시작한다. portable Rust tracker는 이 identity와 상태 조합을 검증한다.
+reference framed host는 `outputRunId`와 `outputObservationProvider`를 명시적으로
+받으며 provider를 dispatch identity의 신뢰 경계로 취급한다. 일반 `inputs` 또는
+scan 인자로 관측을 주입하는 것은 거부한다. 지원을 선언하지 않은 host는 활성화를 거부한다.
+
+**왜:** 장치 지연과 오류, 완료 근거를 source가 구분해야 설비별 복구 정책을 검토하고
+같은 관측으로 재현할 수 있다. 관측은 요청 intent나 `SensorFault`로 대체하지 않는다.
+
 ## 4.8 공통 constraints 표기와 연산
 
 정본 작성 단위는 control 내부의 이름 있는 `constraints` 블록이다.

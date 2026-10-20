@@ -10,6 +10,7 @@ import { remapSourceTrace, sourceMapRequiresTraceMetadata, verifySourceTraceMeta
 import { physicalManifestInputs, validateLifecycleManifest } from './lifecycle-contract.mjs';
 import { reportWarnings } from './diagnostic-output.mjs';
 import { validateLegacyAdmission } from './legacy-admission.mjs';
+import { validateOutputObservationsManifest } from './output-observation-contract.mjs';
 
 const UTF8 = new TextEncoder();
 const UTF8_FATAL = new TextDecoder('utf-8', { fatal: true });
@@ -378,6 +379,22 @@ function validateConfigStreamPackageProfile(manifest, version, runtimeAbi) {
   }
 }
 
+function validateOutputObservationPackageProfile(manifest, version, runtimeAbi) {
+  try {
+    validateOutputObservationsManifest(manifest, Number(version));
+  } catch (cause) {
+    fail('manifest-mismatch', cause.message, cause);
+  }
+  for (const field of ['inputs', 'outputs']) {
+    if (Array.isArray(manifest[field]) && manifest[field].some(port => typeof port?.name === 'string' && port.name.startsWith('__gf_output_'))) {
+      fail('manifest-mismatch', 'output observation rails cannot be public ports');
+    }
+  }
+  if (manifest.format === 'GhostFlow/control-v22' && runtimeAbi !== 'GhostFlow/framed-scan-abi-v1') {
+    fail('unsupported-runtime-abi', 'output observations require framed-scan-abi-v1');
+  }
+}
+
 function sourceMapEnvelope(compilation) {
   return {
     format: SOURCE_MAP_FORMAT,
@@ -447,6 +464,7 @@ export async function buildPortablePackage(compilation, identityValue, { signers
   }
 
   const identity = normalizeIdentity(identityValue);
+  validateOutputObservationPackageProfile(compilation.manifest, profileVersion, identity.runtimeAbi);
   validateConfigStreamPackageProfile(compilation.manifest, profileVersion, identity.runtimeAbi);
   if (typeof verifyCompilation !== 'function') {
     fail('compiler-replay-required', 'portable package signing requires a fresh compileSource replay');
@@ -701,14 +719,16 @@ export async function verifyPortablePackage(packageValue, options = {}) {
     }
   }
   if (Object.hasOwn(manifest, 'lifecycle')) manifestKeys.push('lifecycle');
+  if (manifest.format === 'GhostFlow/control-v22') manifestKeys.push('outputObservations');
   if (Object.hasOwn(manifest, 'legacyAdmission')) manifestKeys.push('legacyAdmission');
   if (Object.hasOwn(manifest,'adaptPolicy') || Object.hasOwn(manifest,'strategies')) manifestKeys.push('adaptPolicy','strategies');
   exactObject(manifest, manifestKeys, 'manifest');
   if (manifest.format !== packageValue.payload.manifest.format) fail('manifest-mismatch', 'manifest format does not match descriptor');
-  if (profileVersion === '4' && manifest.format !== 'GhostFlow/control-v4') fail('manifest-mismatch', 'GFB format 4 requires a control-v4 manifest');
+  if (profileVersion === '4' && !['GhostFlow/control-v4', 'GhostFlow/control-v22'].includes(manifest.format)) fail('manifest-mismatch', 'GFB format 4 requires a control-v4 or control-v22 manifest');
   if (contextManifest && manifest.format !== 'GhostFlow/control-v9') fail('manifest-mismatch', 'GFB format 10 requires a control-v9 manifest');
   if (profileVersion === '11' && manifest.format !== 'GhostFlow/control-v10') fail('manifest-mismatch', 'GFB format 11 requires a control-v10 manifest');
   validateConfigStreamPackageProfile(manifest, profileVersion, identity.runtimeAbi);
+  validateOutputObservationPackageProfile(manifest, profileVersion, identity.runtimeAbi);
   ghostName(manifest.name, 'manifest.name');
   if (manifest.bytecodeSha256 !== bytecodeSha256) fail('manifest-mismatch', 'manifest bytecodeSha256 does not match GFB1');
   for (const field of ['inputs', 'outputs', 'sensors', 'schedules', 'timers', 'signals', 'configs']) {
@@ -861,6 +881,12 @@ export async function verifyPortablePackage(packageValue, options = {}) {
     const guarded = Object.hasOwn(manifest,'legacyAdmission');
     const replay = guarded ? compileSourceSync(sourceText, { filename: mappedDocument.filename })
       : compileControl(extraction.code, { filename: mappedDocument.filename });
+    if (manifest.outputObservations !== undefined || replay.manifest.outputObservations !== undefined) {
+      if (manifest.format !== replay.manifest.format
+        || canonicalJson(manifest.outputObservations ?? null) !== canonicalJson(replay.manifest.outputObservations ?? null)) {
+        throw new Error('output observation descriptors do not match canonical source lowering');
+      }
+    }
     if (guarded && canonicalJson(replay.manifest) !== canonicalJson(manifest)) throw new Error('legacy admission manifest does not match canonical source');
     if (Object.hasOwn(manifest,'adaptPolicy') || Object.hasOwn(replay.manifest,'adaptPolicy')) {
       if (canonicalJson(manifest.adaptPolicy ?? null) !== canonicalJson(replay.manifest.adaptPolicy ?? null)

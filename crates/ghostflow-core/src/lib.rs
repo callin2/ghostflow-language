@@ -15,6 +15,7 @@ pub mod estimate_evidence;
 pub mod keyboard;
 pub mod natural_context;
 pub mod objective_vm;
+pub mod output_observation;
 pub mod range_schedule;
 pub mod resource_constraints;
 pub mod resource_policy;

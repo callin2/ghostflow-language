@@ -27,7 +27,14 @@ const FAULT_ENUMS = new Map([
   ['AccountingFault', ['ClockUnknown', 'LedgerMissing', 'LedgerCorrupt', 'LedgerIncomplete', 'CountOverflow']],
   ['SettingsFault', ['SettingsInvalid', 'SettingsUnavailable']],
 ].map(([name, members]) => [name, new Map(members.map((member, index) => [member, index]))]));
-const FAULT_MEMBER_NAMES = new Set([...FAULT_ENUMS.values()].flatMap(members => [...members.keys()]));
+const OUTPUT_ENUMS = new Map([
+  ['OutputStatus', ['OutputInitial', 'OutputPending', 'OutputCompleted', 'OutputFailed', 'OutputUnknown']],
+  ['OutputHealth', ['OutputInitializing', 'OutputHealthy', 'OutputFaulted']],
+  ['OutputCompletion', ['CompletionNone', 'HostWrite', 'DeviceAck', 'DeviceReadback']],
+  ['OutputFault', ['NoOutputFault', 'OutputUnavailable', 'OutputTimeout', 'OutputProtocolError', 'OutputDriverError', 'OutputObservationLost']],
+].map(([name, members]) => [name, new Map(members.map((member, index) => [member, index]))]));
+const OUTPUT_BUILTINS = Object.freeze({ output_status: 'OutputStatus', output_health: 'OutputHealth', output_completion: 'OutputCompletion', output_fault: 'OutputFault' });
+const FAULT_MEMBER_NAMES = new Set([...FAULT_ENUMS.values(), ...OUTPUT_ENUMS.values()].flatMap(members => [...members.keys()]));
 const KEYWORDS = new Set([
   'control', 'fn', 'purefn', 'input', 'output', 'state', 'config', 'let',
   'type', 'enum', 'sensor', 'signal', 'event', 'schedule', 'timer', 'elapsed',
@@ -1311,6 +1318,7 @@ function rejectName(name, loc, label) {
   // prevent ordinary helper names from being used in Result provenance code.
   if (KEYWORDS.has(name) && !(label === 'function' && name === 'calendar')) error(loc, `${label} name ${name} is reserved`);
   if (FAULT_MEMBER_NAMES.has(name)) error(loc, `${label} name ${name} is a reserved fault member`);
+  if (Object.hasOwn(OUTPUT_BUILTINS, name)) error(loc, `${label} name ${name} is a reserved output builtin`);
 }
 function duration(raw, loc) {
   const units = { ms: 1n, s: 1000n, min: 60_000n, h: 3_600_000n };
@@ -1577,6 +1585,7 @@ class Lowerer {
     this.usesInt = false;
     this.failedLets = new Map();
     this.restartLifecycle = null;
+    this.outputObservations = new Map();
     this.syntaxOnly = false;
     this.accountingExecution = false;
     this.standalone = !!ast.standalone;
@@ -1671,6 +1680,15 @@ class Lowerer {
         error(this.ast.loc, 'civil Range profile requires immutable civil Range schedules without other schedule/provider/config profiles');
       }
       this.manifest.format = 'GhostFlow/control-v21';
+    }
+    if (this.outputObservations.size) {
+      if (!['GhostFlow/control-v1', 'GhostFlow/control-v4'].includes(this.manifest.format)
+        || ['configs', 'schedules', 'providers', 'calendars', 'objectives', 'resources', 'adaptSettings']
+          .some(key => this.manifest[key]?.length) || this.manifest.accounting || this.adaptPolicy || this.trueFors.length) {
+        error(this.ast.loc, 'output observations require the scalar/sensor control profile without context, settings, schedules or adaptation');
+      }
+      this.manifest.format = 'GhostFlow/control-v22';
+      this.manifest.outputObservations = [...this.outputObservations.values()];
     }
     const temporalForms = this.windows.length || this.trueFors.length || solarForms.length || contextForms.length ? [
       ['temporal-context', `${RESERVED_PREFIX}now_ms`, `${RESERVED_PREFIX}time_epoch`],
@@ -1778,9 +1796,9 @@ class Lowerer {
     error(type.loc, `unknown type ${type.name}`);
   }
   declare() {
-    for (const [name, members] of FAULT_ENUMS) this.types.set(name, members);
+    for (const [name, members] of [...FAULT_ENUMS, ...OUTPUT_ENUMS]) this.types.set(name, members);
     for (const item of this.ast.body) if (item.kind === 'enum') {
-      if (FAULT_ENUMS.has(item.name) || item.name === 'Result' || item.name === 'Event' || SCALAR_TYPES.has(item.name)) error(item.loc, `type name ${item.name} is reserved`);
+      if (FAULT_ENUMS.has(item.name) || OUTPUT_ENUMS.has(item.name) || item.name === 'Result' || item.name === 'Event' || SCALAR_TYPES.has(item.name)) error(item.loc, `type name ${item.name} is reserved`);
       this.unique(item.name, item.loc, 'type');
       if (!item.members.length) error(item.loc, 'enum needs at least one member');
       const values = new Map();
@@ -3388,9 +3406,9 @@ class Lowerer {
     if (node.kind === 'reference') {
       if (locals.has(node.name)) return locals.get(node.name);
       const member = this.enumMembers.get(node.name); if (member) return { type: semanticType(member.type), sexpr: String(member.value), constant: member.value };
-      const expectedMembers = expected && FAULT_ENUMS.get(expected.kind);
+      const expectedMembers = expected && (FAULT_ENUMS.get(expected.kind) ?? OUTPUT_ENUMS.get(expected.kind));
       if (expectedMembers?.has(node.name)) return { type: expected, sexpr: String(expectedMembers.get(node.name)), constant: expectedMembers.get(node.name) };
-      const faultCandidates = [...FAULT_ENUMS].filter(([, members]) => members.has(node.name));
+      const faultCandidates = [...FAULT_ENUMS, ...OUTPUT_ENUMS].filter(([, members]) => members.has(node.name));
       if (faultCandidates.length === 1) {
         const [faultName, members] = faultCandidates[0];
         return { type: semanticType(faultName), sexpr: String(members.get(node.name)), constant: members.get(node.name) };
@@ -3679,6 +3697,25 @@ class Lowerer {
     return node.id;
   }
   callExpression(node, locals, options, callStack, expected = null) {
+    const observationType = Object.hasOwn(OUTPUT_BUILTINS, node.name) ? OUTPUT_BUILTINS[node.name] : null;
+    if (observationType) {
+      if (node.args.length !== 1 || node.named.length || node.args[0].kind !== 'reference') error(node.loc, `${node.name} expects one declared Bool output`);
+      const output = node.args[0].name;
+      if (locals.has(output) || this.outputs.get(output)?.type.kind !== 'Bool') error(node.args[0].loc, `${node.name} expects one declared Bool output`);
+      if (options.pureFunction || options.macroDefinition || options.parameterConstant) error(node.loc, `${node.name} cannot capture output observations in this context`);
+      let descriptor = this.outputObservations.get(output);
+      if (!descriptor) {
+        if (output.length > 96 || this.outputObservations.size >= 32) error(node.loc, 'output observations exceed the 32-output or 96-character name bound');
+        descriptor = { output };
+        for (const role of ['status', 'health', 'completion', 'fault']) {
+          const input = `${RESERVED_PREFIX}output_${output}_${role}`;
+          descriptor[`${role}Input`] = input;
+          this.addInput(input, NUMBER, node.loc);
+        }
+        this.outputObservations.set(output, descriptor);
+      }
+      return { type: semanticType(observationType), sexpr: `input.${descriptor[`${node.name.slice(7)}Input`]}` };
+    }
     if (node.name === 'after_event_any' || node.name === 'after_event_all') {
       const mode = node.name.slice('after_event_'.length);
       if (node.args.length !== 1 || node.named.length || node.args[0].kind !== 'reference') {

@@ -12,6 +12,7 @@ import { TIME_TYPES, TIME_BOUNDS, isTimeType, validateTimeValue } from '../../to
 import { isInt32, intSettingsIssue } from '../../tools/int-settings.mjs';
 import { physicalManifestInputs, validateLifecycleManifest } from '../../tools/lifecycle-contract.mjs';
 import { validateLegacyAdmission, preflightLegacyAdmission } from '../../tools/legacy-admission-contract.mjs';
+import { OUTPUT_OBSERVATION_FORMAT, OUTPUT_OBSERVATION_ROLES, validateOutputObservationsManifest, validateOutputObservationRails, validateOutputObservation } from '../../tools/output-observation-contract.mjs';
 
 const FORMAT = 'GhostFlow/control-v1';
 const SETTINGS_FORMAT = 'GhostFlow/control-v2';
@@ -496,9 +497,10 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
   if ((Object.hasOwn(manifest, 'adaptPolicy') || Object.hasOwn(manifest, 'strategies')) && capabilities === undefined) {
     throw new Error('adapt strategy activation requires a capability-aware host; ControlRuntime cannot activate this manifest');
   }
-  keys(manifest, ['format', 'name', 'inputs', 'outputs', 'sensors', 'schedules', 'timers', 'signals', 'configs', 'bytecodeSha256'], ['adaptPolicy', 'strategies', 'objectives', 'resources', 'sensorInstances', 'lifecycle','legacyAdmission'], 'manifest');
+  keys(manifest, ['format', 'name', 'inputs', 'outputs', 'sensors', 'schedules', 'timers', 'signals', 'configs', 'bytecodeSha256'], ['adaptPolicy', 'strategies', 'objectives', 'resources', 'sensorInstances', 'lifecycle','legacyAdmission', 'outputObservations'], 'manifest');
+  const outputObservations = validateOutputObservationsManifest(manifest, bytecodeFormat);
   const lifecycle = validateLifecycleManifest(manifest);
-  if (manifest.format !== FORMAT && manifest.format !== INTEGER_FORMAT && !(manifest.format === SETTINGS_FORMAT && acceptSettings) && manifest.format !== SOLAR_FORMAT && manifest.format !== SCHEDULE_FORMAT && manifest.format !== SCHEDULE_SLOTS_FORMAT && manifest.format !== AVAILABILITY_FORMAT && manifest.format !== RANGE_LIVE_START_FORMAT && manifest.format !== TIMESLOTS_RANGE_FORMAT) throw new Error(`unsupported manifest format ${String(manifest.format)}`);
+  if (manifest.format !== OUTPUT_OBSERVATION_FORMAT && manifest.format !== FORMAT && manifest.format !== INTEGER_FORMAT && !(manifest.format === SETTINGS_FORMAT && acceptSettings) && manifest.format !== SOLAR_FORMAT && manifest.format !== SCHEDULE_FORMAT && manifest.format !== SCHEDULE_SLOTS_FORMAT && manifest.format !== AVAILABILITY_FORMAT && manifest.format !== RANGE_LIVE_START_FORMAT && manifest.format !== TIMESLOTS_RANGE_FORMAT) throw new Error(`unsupported manifest format ${String(manifest.format)}`);
   const settingsManifest = manifest.format === SETTINGS_FORMAT || manifest.format === INTEGER_FORMAT || manifest.format === AVAILABILITY_FORMAT;
   const solarManifest = manifest.format === SOLAR_FORMAT || manifest.format === INTEGER_FORMAT || manifest.format === AVAILABILITY_FORMAT;
   name(manifest.name, 'manifest.name');
@@ -593,7 +595,7 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
   for (const item of outputs) { portName(item.name, 'output.name'); type(item.type, `output ${item.name}.type`); validateCanonicalUnit(item, `output ${item.name}`); }
   const windows = signals.filter(item => item.kind === 'window');
   if (manifest.format === INTEGER_FORMAT && ![2, 3, 4, 5, 6].includes(bytecodeFormat)) throw new Error('v4 manifest requires GFB format 2, 3, 4, 5 or 6');
-  if (bytecodeFormat === 4 && (manifest.format !== INTEGER_FORMAT || !windows.length)) throw new Error('GFB format 4 requires a v4 window manifest');
+  if (bytecodeFormat === 4 && (![INTEGER_FORMAT, OUTPUT_OBSERVATION_FORMAT].includes(manifest.format) || !windows.length)) throw new Error('GFB format 4 requires a v4 window manifest');
   if (bytecodeFormat === 6 && (manifest.format !== INTEGER_FORMAT || !signals.some(item => item.kind === 'true-for'))) throw new Error('GFB format 6 requires a v4 true_for manifest');
   if (windows.length && bytecodeFormat !== 4) throw new Error('window manifest requires GFB format 4');
   unique(inputs.map(item => item.name), 'input');
@@ -602,7 +604,7 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
   const declarationNames = [...inputs, ...outputs, ...configs, ...sensors, ...schedules, ...timers, ...signals].map(item => item.name);
   if (declarationNames.length > MAX_NAMES) throw new RangeError(`manifest names exceed ${MAX_NAMES}`);
   unique(declarationNames, 'declaration');
-  const generatedTotal = sensors.reduce((count, item) => count + 3 + (item.samplePresentInput === undefined ? 0 : 4), 0)
+  const generatedTotal = outputObservations.length * 4 + sensors.reduce((count, item) => count + 3 + (item.samplePresentInput === undefined ? 0 : 4), 0)
     + signals.reduce((count, item) => count + (isVmSignal(item) ? 0
       : isAfterEvent(item) ? item.projections.length * 3 : 3), 0)
     + schedules.filter(item => item.kind !== 'solar').length + timers.length * 2 + (timers.length > 0 || signals.some(isVmSignal) ? 1 : 0) + (windows.length ? 1 : 0);
@@ -940,6 +942,7 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
   unique([...windowRoots.values()], 'window root');
 
   unique([
+    ...outputObservations.flatMap(item => OUTPUT_OBSERVATION_ROLES.map(role => item[`${role}Input`])),
     ...sensors.flatMap(item => [item.valueInput, item.okInput, item.faultInput]),
     ...sensors.flatMap(item => [item.samplePresentInput, item.sampleEpochInput, item.sampleIdInput, item.sampleTimestampInput].filter(Boolean)),
     ...signals.flatMap(item => item.kind === 'true-for' || isVmSignal(item) || isAfterEvent(item) ? [] : [item.valueInput, item.okInput, item.faultInput]),
@@ -1013,6 +1016,14 @@ async function instantiateControlRuntime(wasmBytes, { bytes: bytecode, manifest 
     bytecodeFormat = view.getUint16(14, true);
   }
   const checkedManifest = validateManifest(manifest, { ...options, bytecodeFormat });
+  validateOutputObservationRails(checkedManifest.manifest, compiledBytes);
+  if (checkedManifest.manifest.outputObservations?.length) {
+    if (instantiateRuntime !== FramedGhostFlowRuntime.instantiate) throw new Error('output observations require a framed host');
+    if (typeof options.outputObservationProvider !== 'function' || typeof options.outputRunId !== 'string'
+      || !options.outputRunId || options.outputRunId.length > 128) throw new Error('output observations require a trusted provider and current run identity');
+    checkedManifest.outputObservationProvider = options.outputObservationProvider;
+    checkedManifest.outputRunId = options.outputRunId;
+  } else if (options.outputObservationProvider !== undefined || options.outputRunId !== undefined) throw new Error('output observation provider requires control-v22');
   checkedManifest.legacyAdmission = validateLegacyAdmission({ bytes: compiledBytes, manifest: checkedManifest.manifest });
   if ((checkedManifest.lifecycle !== null) !== (compiledBytes.byteLength >= 6 && new DataView(compiledBytes.buffer, compiledBytes.byteOffset, compiledBytes.byteLength).getUint16(4, true) === 22)) {
     throw new Error('manifest lifecycle metadata must match GFB22 bytecode');
@@ -1157,12 +1168,17 @@ export class ControlRuntime {
   #presentSensors;
   #lifecycle;
   #legacyAdmission;
+  #outputObservationProvider;
+  #outputRunId;
+  #outputObservations = new Map();
 
   constructor(runtime, manifest, sensors, signals, afterEvents, framed = false, temporalEpoch = null, hasSolar = false, afterEventEpoch = null, hasSchedules = false, hasContext = false) {
     this.runtime = runtime;
     this.exports = runtime.wasm;
     this.manifest = manifest.manifest;
     this.#legacyAdmission = manifest.legacyAdmission ?? null;
+    this.#outputObservationProvider = manifest.outputObservationProvider;
+    this.#outputRunId = manifest.outputRunId;
     this.inputNames = manifest.inputNames;
     this.physicalInputs = physicalManifestInputs(manifest.manifest);
     this.sensorByName = manifest.sensorByName;
@@ -1216,7 +1232,8 @@ export class ControlRuntime {
    * Executes one caller-supplied snapshot. Sensor sampleMs is metadata for the
    * acquisition owner; this host never polls hardware or performs I/O.
    */
-  step({ nowMs, inputs = {}, samples = {}, due = {}, intervals = {}, events = {}, objectiveSafeMax = {}, solarFacts, scheduleFacts, contextFacts } = {}) {
+  step({ nowMs, inputs = {}, samples = {}, due = {}, intervals = {}, events = {}, objectiveSafeMax = {}, solarFacts, scheduleFacts, contextFacts, outputObservations } = {}) {
+    if (outputObservations !== undefined) throw new Error('output observations may only come from the trusted provider');
     if (this.#framed) return this.#stepFramed({ nowMs, inputs, samples, due, intervals, events, objectiveSafeMax, solarFacts, scheduleFacts, contextFacts });
     return this.#stepLegacy({ nowMs, inputs, samples, due, intervals, events, objectiveSafeMax, solarFacts, scheduleFacts, contextFacts });
   }
@@ -1373,6 +1390,25 @@ export class ControlRuntime {
       inputValue(value, item.type, `inputs.${item.name}`);
       inputValues.set(item.name, value);
     }
+    const outputInputs = [];
+    let observedOutputs = this.#outputObservations;
+    if (this.#outputObservationProvider) {
+      const descriptors = this.manifest.outputObservations;
+      const observations = this.#outputObservationProvider(Object.freeze({ runId: this.#outputRunId,
+        outputs: Object.freeze(descriptors.map(item => item.output)) }));
+      if (!Array.isArray(observations) || observations.length !== descriptors.length) throw new Error('trusted provider must supply every output observation');
+      const seen = new Set();
+      const next = new Map();
+      for (const observation of observations) {
+        const descriptor = descriptors.find(item => item.output === observation?.output);
+        if (!descriptor || seen.has(observation.output)) throw new Error('unknown or duplicate trusted output observation');
+        seen.add(observation.output);
+        const checked = validateOutputObservation(observation, this.#outputRunId, descriptor.output, this.#outputObservations.get(descriptor.output));
+        next.set(descriptor.output, checked);
+        for (const role of OUTPUT_OBSERVATION_ROLES) outputInputs.push({ name: descriptor[`${role}Input`], type: 'Number', value: checked[role] });
+      }
+      observedOutputs = next;
+    }
 
     const normalizedSamples = new Map();
     for (const sensorName of Object.keys(samples)) {
@@ -1440,7 +1476,7 @@ export class ControlRuntime {
         acknowledgements: normalize(raw.acknowledgements, `events.${eventName}.acknowledgements`, false),
       });
     }
-    return { nowMs, inputValues, normalizedSamples, dueValues, intervalValues, eventValues,
+    return { nowMs, inputValues, outputInputs, observedOutputs, normalizedSamples, dueValues, intervalValues, eventValues,
       objectiveSafeMax: objectiveSafeValues, solarFacts, scheduleFacts, contextFacts };
   }
 
@@ -1649,6 +1685,7 @@ export class ControlRuntime {
       const staged = this.#stageAfterEvents(captured, sensorReadings, observedSensors);
       afterEventTransaction = staged.trackers;
       const frameInputs = [];
+      frameInputs.push(...captured.outputInputs);
       for (const item of this.physicalInputs) frameInputs.push({ name: item.name, type: item.type, value: captured.inputValues.get(item.name) });
       for (const [, entry] of this.sensors) {
         const reading = sensorReadings.get(entry.item.name);
@@ -1685,6 +1722,7 @@ export class ControlRuntime {
       phase = 'committed';
       this.lastNowMs = captured.nowMs;
       this.#frameScanId = scanId === MAX_SAFE ? null : scanId + 1;
+      this.#outputObservations = captured.observedOutputs;
       this.#commitConditioners(transaction);
       this.#commitAfterEvents(afterEventTransaction);
       const outcome = this.runtime.outcome;
@@ -1701,6 +1739,7 @@ export class ControlRuntime {
         if (phase === 'dispatch' && error instanceof NativeDispatchError && error.committed === true) {
           this.lastNowMs = captured.nowMs;
           this.#frameScanId = scanId === MAX_SAFE ? null : scanId + 1;
+          this.#outputObservations = captured.observedOutputs;
           try {
             this.#commitConditioners(transaction);
             this.#commitAfterEvents(afterEventTransaction);

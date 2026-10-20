@@ -5,6 +5,30 @@
 
 ## 미출시
 
+### 2026-10-20 — 타입이 있는 출력 관측 ([#578](https://github.com/callin2/ghostflow-language/issues/578))
+
+Reference §4.7에 선언한 Bool 출력용 `output_status`, `output_health`,
+`output_completion`, `output_fault`를 추가했다. 이전에는 source가 renderer
+생명주기 근거를 읽을 수 없었다. 예를 들어 `output_fault(pump) == OutputTimeout`으로
+source state를 유지하고 기존 상태 전이로 수동·자동 복구를 선택한다. pending은
+오류를 추가하지 않고 health는 요청 status와 독립적이며 완료는 host write·장치 ACK·
+readback을 구분한다. 신뢰 관측은 run·출력·요청 identity에 결합하며 오래된 receipt와
+전용 rail 덮어쓰기는 거부한다. scalar/sensor profile은 기존 scalar GFB encoding과
+control-v22를 사용하고 호환되지 않는 context profile·미지원 host는 거부한다.
+기존 manifest는 유지한다. compiler·tracker·host·서명 package 회귀가 pending·완료·
+오류·독립 출력·reset·변조를 검증한다.
+
+### 2026-10-20 — 종료 출력 관측에 요청 identity 요구 ([#578](https://github.com/callin2/ghostflow-language/issues/578))
+
+버그 수정: portable tracker와 reference host에서 `OutputFailed` 및
+`OutputUnknown`은 실제 dispatch된 요청의 0이 아닌 ID가 있어야 한다. 이전에는
+요청이 없는 `requestId = 0, status = OutputUnknown`도 종료 생명주기 결과로
+받아들였다. 시작 상태는 faulted health와 함께 `requestId = 0,
+status = OutputInitial`을 계속 사용할 수 있다. 종료 관측의 0이 아닌 부분 완료
+근거는 보존한다. 요청 없이 종료 상태를 보내던 provider는 시작 상태를 보고하거나
+결과를 해당 요청에 결합해야 한다. Rust와 JavaScript 회귀가 두 종료 상태, faulted
+시작 상태와 부분 완료를 검사한다.
+
 ### 2026-10-20 — runtime 활성화 없는 검증 ([#572](https://github.com/callin2/ghostflow-language/issues/572))
 
 framed validation-only 진입점은 runtime을 활성화하지 않고 bytecode와 capability
