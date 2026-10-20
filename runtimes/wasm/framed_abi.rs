@@ -352,7 +352,7 @@ pub unsafe extern "C" fn gf_frame_validate(handle: *mut FramedHandle) -> i32 {
         return 0;
     };
     match &mut handle.state {
-        FramedState::Configuring(runtime) => match runtime.activate() {
+        FramedState::Configuring(runtime) => match runtime.validate_capabilities() {
             Ok(()) => handle.success(),
             Err(error) => handle.failure(error.to_string()),
         },
@@ -802,6 +802,27 @@ pub unsafe extern "C" fn gf_frame_resource_plan_len(handle: *const FramedHandle)
 #[cfg(test)]
 mod replay_tests {
     use super::*;
+    #[test]
+    fn validation_checks_an_unbound_temporal_module_without_activating_it() {
+        let mut handle = FramedHandle::new();
+        handle.state = FramedState::Configuring(crate::replay_abi::tests::configured_runtime());
+        handle.outcome = "prior outcome".into();
+        for _ in 0..2 {
+            assert_eq!(unsafe { gf_frame_validate(&mut handle) }, 1);
+            let FramedState::Configuring(runtime) = &handle.state else {
+                panic!("validation must preserve configuring state")
+            };
+            assert!(runtime.active_strategy().is_none());
+            assert!(runtime.journal().is_empty());
+            assert!(runtime.temporal_resource_report().is_none());
+            assert_eq!(handle.outcome, "prior outcome");
+        }
+        assert_eq!(unsafe { gf_frame_activate(&mut handle) }, 0);
+        assert_eq!(
+            handle.error,
+            "temporal activation requires runtime bindings"
+        );
+    }
     #[test]
     fn resource_plan_is_static_bounded_and_success_only() {
         let mut h = FramedHandle {

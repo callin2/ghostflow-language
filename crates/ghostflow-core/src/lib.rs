@@ -1181,6 +1181,25 @@ impl Runtime {
         }
         self.activate_inner()
     }
+    /// Check loaded bytecode against capabilities without activating a run.
+    /// Schedule, temporal, resource and lifecycle bindings remain activation duties.
+    pub fn validate_capabilities(&self) -> Result<()> {
+        let module = self
+            .module
+            .as_ref()
+            .ok_or_else(|| Error::new("no module installed"))?;
+        select_strategy_bound(module, &self.capabilities)?;
+        if let Some(objective) = &module.objective {
+            if !self.capabilities.iter().any(|cap| {
+                cap.kind == "actuator"
+                    && cap.name == objective.output
+                    && cap.value_type == Type::Number
+            }) {
+                return Err(Error::new("objective requires numeric actuator capability"));
+            }
+        }
+        Ok(())
+    }
     pub fn activate_with_resource_binding(
         &mut self,
         bytes: &[u8],

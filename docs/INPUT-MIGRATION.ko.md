@@ -56,6 +56,70 @@ Date, TimeOfDay, DateTime은 기존 정수 범위를 유지한다. 소수나 범
 hysteresis는 Number, Percent와 physical quantity에 한정한다.
 기존 plain scalar use site에는 여전히 명시적인 작성자 Result 정책이 필요하다.
 
+## 기존 Bool 입력의 명시적 검증
+
+`previewLegacyScalarMigration(source,{filename})`는 결정적인 새 문서·receipt·bound
+계약을 반환한다. 원문 전체를 정확한 prefix로 보존하고 실행 use site는 바꾸지
+않는다. 독립적인 필수·무조건 Bool 입력만 지원한다. import, 함수/macro, lifecycle,
+optional·conditioning 입력과 다른 타입은 거부한다. 현재 typed 또는 이미 변환한
+문서는 기본적으로 이전하지 않는다. compile 성공만으로 보존을 증명할 수는 없다.
+사용하지 않는 기존 Bool port도 매 frame 필수였기 때문이다. 명시적인 기존 origin
+요청은 `sourceInputContract:'required-current-bool-snapshot'`으로 이를 보존할 수 있다.
+raw lowering 증명은 typed Result 사용을 계속 거부한다. host는 이전 revision을 보존하고 새 문서를 명시적으로
+preview/accept한다. 저장소나 모델은 호출하지 않는다.
+
+최상위 `<!-- ghostflow:legacy-scalar-admission-v1 ` directive는 정확히
+`format,contractVersion,policy,originalSourceSha256,inputs`인 canonical JSON을 담는다.
+format은 `GhostFlow/legacy-scalar-admission-v1`, version은 1, policy는
+`required-current-bool-snapshot`, inputs는 선언 순서의 `{name,type:'Bool'}`이다.
+알 수 없거나 잘못된·중복·선언 불일치 directive는 거부한다. 이후 편집에도 이를
+유지한다. 표시 없는 input은 Result다. 현재 raw lowering을 선택하며 폐기한
+compiler나 fault 기본값을 사용하지 않는다.
+
+`manifest.legacyAdmission`은 `sourceSha256`과 `sha256`을 추가한다. 후자는
+나머지 모든 필드의 canonical JSON hash다. 사용하지 않는 false Bool state
+`__gf_legacy_admission_v1_<sha256>`을 마지막에 추가하여 기존 state index를 보존한다.
+prefix는 compiler 전용이며 새 GFB format이나 WASM ABI는 없다. receipt는 정확히
+`format,contractVersion,originalSourceSha256,convertedSourceSha256,contractSha256,previewSha256`이다.
+format은 `GhostFlow/legacy-scalar-migration-receipt-v1`, `previewSha256`은 나머지
+다섯 필드의 canonical JSON hash다. digest는 filename과 무관하며 반환한 문서가
+그대로 candidate source다.
+
+`inspectLegacyAdmissionSource(source,{bound:true})`는 전체 계약을 반환한다. 기본
+검사는 embedded 조건 또는 null을 반환한다. source-aware
+`validateLegacyAdmission({bytes,manifest,sourceDocument})`와 서명 package replay는
+source·marker·metadata·bytecode digest를 결합한다. 지원하지 않는 physical target은
+Markdown metadata를 무시할 수 있는 frozen compiler 선택 전에
+`assertLegacyAdmissionTarget(source,{supported:false})`를 호출한다.
+
+순수 `preflightLegacyAdmission(contract,frame)`은 frame을 복사한다. 각 port는
+`inputs`의 Bool 하나 또는 `samples`의 정확한 `{epoch,id,timestampMs,quality,value}`
+packet 하나를 요구한다. packet은 Good(또는 ordinal 1), Bool payload, 음수가 아닌
+safe integer metadata와 `nowMs` 이하 timestamp를 요구한다. Good은 원래 raw
+input으로 변환하며 다른 sample은 보존한다. 두 `ControlRuntime` 경로 모두 누락·
+모호함·잘못된·non-Good snapshot을 conditioner·시계·VM 변경 전에 거부한다. 동일
+identity의 유효 Good도 수용하며 acquisition freshness·중복·recovery 정책을 만들지
+않는다. 다른 host도 계약을 강제하거나 거부해야 한다.
+
+reference control host의 `selectControlRuntimeEntry(manifest)`는 기존 non-context
+Solar 또는 native objective에서 `legacy`, 그 밖에는 `framed`를 선택한다. 생성 전에
+선택하며 오류 후 재시도하지 않는다. 기존 Solar는 현재 unframed adapter와 기존
+solar facts를 사용하며 native framed-scan 증거를 주장하지 않는다.
+
+예상 error code는 `legacy_admission_invalid`, `legacy_admission_unsupported`,
+`legacy_admission_frame_rejected`, `legacy_migration_not_required`이며 status 422와
+진단 `GF_SEMANTIC`을 사용한다. frame별 telemetry는 없다. marker만 있거나 metadata만
+있는 artifact는 거부한다. historical raw GFB는 지원한다. 둘 다 제거하고 digest를
+다시 계산하면 trusted source/signature 없이 historical raw GFB와 구별할 수 없다.
+source-aware 검사는 directive만 남은 artifact를 거부한다. product는 source
+replay/signature closure가 필요하며 직접 low-level VM loading의 보편 보장은 없다.
+
+framed `validate()`는 이미 load한 bytecode의 capability strategy를 검사하며 schedule,
+temporal window, resource binding이나 restart lifecycle 입력을 활성화하지 않는다.
+configuring 중 반복할 수 있지만 scan을 허용하지 않는다. 이후 activation은 원래
+profile별 binding과 lifecycle 초기화를 계속 요구한다. legacy admission 사용 여부와
+관계없이 서명 context package에도 이 구분을 적용한다.
+
 ## 취득과 wire 호환성
 
 소스 keyword가 wire의 품질 분류를 바꾸지는 않는다. `manifest.sensors`,

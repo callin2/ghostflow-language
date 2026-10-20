@@ -4309,9 +4309,16 @@ function checkResourcePolicy(ast) {
 }
 
 /** Compile control source to existing GFB1 bytes plus its host-only companion manifest. */
-export function compileControl(source, { filename = '<control>', emitBytecode = true } = {}) {
+export function compileControl(source, { filename = '<control>', emitBytecode = true, rawSnapshotInputs } = {}) {
   if (typeof filename !== 'string' || !filename) internal('filename must be a non-empty string');
   const ast = new ControlParser(source, filename).parse();
+  if (rawSnapshotInputs !== undefined) {
+    const names = new Set(rawSnapshotInputs);
+    const ids = new Set(ast.body.filter(node => node.kind === 'sensor' && names.has(node.name)).map(node => node.id));
+    ast.body = ast.body.map(node => node.kind === 'sensor' && names.has(node.name)
+      ? { ...node, kind: 'input', names: [node.name] } : node);
+    ast.sourceNodes = ast.sourceNodes.map(node => ids.has(node.id) ? { ...node, kind: 'input' } : node);
+  }
   if (ast.kind === 'control' && ast.body.some(item => item.kind === 'shared-constraints')) {
     error(ast.body.find(item => item.kind === 'shared-constraints').loc,
       'shared resource constraints require resource binding and runtime enforcement; compile a checked nonexecutable descriptor');

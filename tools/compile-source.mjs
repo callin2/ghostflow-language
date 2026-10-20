@@ -10,6 +10,9 @@ import { parseHardwareFrontMatter, validateHardwareBindings, HardwareFrontMatter
 import { resolveHardwareProfiles } from './hardware-profiles.mjs';
 import { bindIntentEvidence } from './intent-evidence.mjs';
 import { createCompilerTelemetry } from './compiler-telemetry.mjs';
+import { inspectLegacyAdmissionSource, legacyAdmissionInputs } from './legacy-admission.mjs';
+import { attachLegacyAdmission } from './legacy-admission-contract.mjs';
+import { moduleFingerprint } from './source-trace.mjs';
 
 export { emitInteractionSchema } from './interaction-schema.mjs';
 
@@ -96,6 +99,7 @@ function compileSourceCore(source, options, telemetry) {
   requireFilename(filename, 'source filename');
   requireSourceText(source, `${filename}: source`);
   if (!filename.endsWith('.ghost.md')) throw new Error(`${filename}: GhostFlow product compilation requires a canonical .ghost.md literate source`);
+  const legacyAdmission = inspectLegacyAdmissionSource(source, { filename });
   const hardwarePlan = resolveHardwareProfiles(parseHardwareFrontMatter(source, { filename }), options.hardwareProfiles);
   let extraction;
   telemetry?.phase('extract');
@@ -111,6 +115,7 @@ function compileSourceCore(source, options, telemetry) {
   telemetry?.phase('parse');
   try {
     ast = parseControl(extraction.code, { filename });
+    if (legacyAdmission) legacyAdmissionInputs(ast, legacyAdmission);
     telemetry?.ast(ast);
     telemetry?.phase('compile_lower_encode');
     if (hardwarePlan && ast.imports?.length) throw new HardwareFrontMatterError(hardwarePlan.source,
@@ -130,7 +135,12 @@ function compileSourceCore(source, options, telemetry) {
         ? compileScheduleDescriptorArtifact(extraction.code, { filename })
         : hasTemporalDescriptorCalls(ast)
           ? compileTemporalDescriptorArtifact(extraction.code, { filename })
-          : compileControl(extraction.code, { filename });
+          : compileControl(extraction.code, { filename,
+            ...(legacyAdmission ? { rawSnapshotInputs: legacyAdmission.inputs.map(input => input.name) } : {}) });
+    if (legacyAdmission) {
+      result = attachLegacyAdmission(result, source, legacyAdmission, ast);
+      if (result.traceMetadata) result.traceMetadata = { ...result.traceMetadata, moduleFingerprint: moduleFingerprint(result.bytes) };
+    }
   } catch (error) {
     // Map each independently checked error using the same canonical document
     // path as a single failure. Preserve the original thrown error/message.

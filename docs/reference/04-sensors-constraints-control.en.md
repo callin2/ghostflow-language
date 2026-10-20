@@ -28,6 +28,12 @@ only as a new reviewed revision; see [the migration contract](../INPUT-MIGRATION
 
 ## 4.1 sensor and Result quality
 
+Legacy required Bool snapshots can be preserved only with the explicit versioned
+directive in the [migration contract](../INPUT-MIGRATION.md). It preserves raw
+use sites and required typed values in each current frame; invalid frames reject
+before evaluation without a fault default. Unmarked input stays Result. This
+distinguishes preserving an existing program from authoring a new quality policy.
+
 In the selected declaration, a sensor's type is its normal payload type.
 
 ```ghost
