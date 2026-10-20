@@ -5,7 +5,7 @@
  * to the existing GFB1 S-expression compiler.  It does not evaluate source,
  * load modules, or execute user supplied code.
  */
-import { compile as compileGfb, lowerCoreModule, emitGfb, CompileError } from './gfb1.mjs';
+import { lowerCoreModule, emitGfb, CompileError } from './gfb1.mjs';
 import { buildSourceTrace, moduleFingerprint } from './source-trace.mjs';
 import { checkedAdjacentConstraints } from './constraint-proof.mjs';
 import { QUANTITY_TYPES, canonicalUnitFor, isQuantityType, quantityLiteral, quantitySuffixAt } from './quantities.mjs';
