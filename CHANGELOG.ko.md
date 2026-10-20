@@ -5,6 +5,14 @@
 
 ## 미출시
 
+### 2026-10-20 — runtime 활성화 없는 검증 ([#572](https://github.com/callin2/ghostflow-language/issues/572))
+
+framed validation-only 진입점은 runtime을 활성화하지 않고 bytecode와 capability
+선택을 검사한다. 유효한 GFB21·GFB22 context package를 provider binding 또는
+restart 초기화 전에 검증할 수 있다. 이전에는 activation을 호출하여 미연결
+schedule을 거부하고 선택한 runtime 상태를 변경했다. 누락·타입 불일치·모호한
+capability는 계속 거부하며 실제 실행 activation의 binding·lifecycle guard도 유지한다.
+
 ### 2026-10-20 — 기존 Bool 입력의 명시적 검증 ([#572](https://github.com/callin2/ghostflow-language/issues/572))
 
 독립적인 기존 필수 Bool control은 raw use site를 보존하고 잘못된 frame을 실행

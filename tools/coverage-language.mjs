@@ -33,6 +33,7 @@ const TESTS = Object.freeze([
   'tests/control-runtime-atomicity.test.mjs', 'tests/native-dispatch-status.test.mjs',
   'tests/control-runtime-restart-lifecycle.test.mjs',
   'tests/legacy-admission.test.mjs',
+  'tests/validation-only-wasm.test.mjs',
   'tests/framed-control-host.test.mjs', 'tests/scan-frame-wasm.test.mjs',
   'tests/gfb1-browser.test.mjs', 'tests/core-ir.test.mjs', 'tests/gfb4-browser.test.mjs', 'tests/gfb5-browser.test.mjs',
   'tests/browser-toolchain.test.mjs', 'tests/hold-last-runtime.test.mjs',

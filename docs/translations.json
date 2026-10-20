@@ -82,8 +82,8 @@
       "source": "docs/INPUT-MIGRATION.md",
       "sourceLanguage": "en",
       "translation": "docs/INPUT-MIGRATION.ko.md",
-      "sourceSha256": "206e5e9fb479f3c6b81695ce0e3140fd90e4081aed87b7b10f4781256e29f853",
-      "translationSha256": "2143fb9387f5b9a0394d473036af8e42c44e8a435b2fa388a4cd0e9ede4c194f"
+      "sourceSha256": "8c4079a58e6c03cd587c47a791378380219138a9419fb2fe52af0f12d5a98664",
+      "translationSha256": "7d23e7c1b3d70c2795d8d14792ded6d9053ad91f3291cc1ad2d6a84c9bcb3565"
     },
     {
       "source": "docs/INSTANCE-TRACE-PROJECTION.md",
@@ -705,8 +705,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "46707465123445235ab70882fde367b55f4d3d1f01d0a7cf862241b41bb5a78e",
-      "translationSha256": "ff19a2760f882433794591325f35b02df9259ab4721e4a51be58d9a07efe9618"
+      "sourceSha256": "eaaeb327383d4fd9dab24f6ff806cc2809143e1852d72247403bd1588fcc65b1",
+      "translationSha256": "edc210cafc14c721bcfa5c8c469466fef5566b696b579fc790c7fe0919ee2c49"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",

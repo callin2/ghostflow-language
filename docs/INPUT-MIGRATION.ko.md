@@ -114,6 +114,12 @@ solar facts를 사용하며 native framed-scan 증거를 주장하지 않는다.
 source-aware 검사는 directive만 남은 artifact를 거부한다. product는 source
 replay/signature closure가 필요하며 직접 low-level VM loading의 보편 보장은 없다.
 
+framed `validate()`는 이미 load한 bytecode의 capability strategy를 검사하며 schedule,
+temporal window, resource binding이나 restart lifecycle 입력을 활성화하지 않는다.
+configuring 중 반복할 수 있지만 scan을 허용하지 않는다. 이후 activation은 원래
+profile별 binding과 lifecycle 초기화를 계속 요구한다. legacy admission 사용 여부와
+관계없이 서명 context package에도 이 구분을 적용한다.
+
 ## 취득과 wire 호환성
 
 소스 keyword가 wire의 품질 분류를 바꾸지는 않는다. `manifest.sensors`,

@@ -38,6 +38,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/compiler.test.mjs',
   'tests/compiler-telemetry.test.mjs',
   'tests/legacy-admission.test.mjs',
+  'tests/validation-only-wasm.test.mjs',
   'tests/docs-runnable-examples.test.mjs',
   'tests/programming-natural-examples.test.mjs',
   'tests/programming-builtins.test.mjs',

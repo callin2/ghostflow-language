@@ -117,6 +117,13 @@ raw GFB without trusted source/signatures. Source-aware validation rejects a
 retained directive without its artifact contract. Product paths require source
 replay/signature closure; direct low-level VM loading has no universal guarantee.
 
+Framed `validate()` checks the already-loaded bytecode's capability strategy
+without activating schedules, temporal windows, resource bindings or restart
+lifecycle inputs. It may be repeated while configuring; it does not permit a
+scan. Later activation still requires the original profile-specific bindings
+and lifecycle initialization. The same distinction applies to signed context
+packages whether or not they use legacy admission.
+
 ## Acquisition and wire compatibility
 
 The source keyword does not rename the wire-level quality category. Retain
