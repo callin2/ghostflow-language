@@ -151,6 +151,7 @@ for (const framed of [false,true]) test(`${framed?'framed':'legacy'} runtime rej
   const instantiate=(framed?ControlRuntime.instantiateFramed:ControlRuntime.instantiate).bind(ControlRuntime);
   const runtime=await instantiate(wasm,artifact), control=await instantiate(wasm,artifact);
   try {
+    assert.deepEqual(runtime.legacyAdmission,preview.legacyAdmission);
     const frame={nowMs:1,inputs:{start:true,stop:false}};
     assert.deepEqual(runtime.step(frame),control.step(frame));
     const snapshot=()=>({memory:Buffer.from(runtime.exports.memory.buffer),time:runtime.lastNowMs,outcome:runtime.lastFrameOutcome});
