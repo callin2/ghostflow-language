@@ -11,6 +11,7 @@ import { QUANTITY_TYPES, canonicalUnitFor, isQuantityType } from '../../tools/qu
 import { TIME_TYPES, TIME_BOUNDS, isTimeType, validateTimeValue } from '../../tools/time-literals.mjs';
 import { isInt32, intSettingsIssue } from '../../tools/int-settings.mjs';
 import { physicalManifestInputs, validateLifecycleManifest } from '../../tools/lifecycle-contract.mjs';
+import { validateLegacyAdmission, preflightLegacyAdmission } from '../../tools/legacy-admission-contract.mjs';
 
 const FORMAT = 'GhostFlow/control-v1';
 const SETTINGS_FORMAT = 'GhostFlow/control-v2';
@@ -36,6 +37,13 @@ const contextManifest = manifest => manifest?.format === STREAM_CONTEXT_FORMAT
   || manifest?.format === HOLIDAY_FORMAT
   || manifest?.format === AT_FORMAT
   || manifest?.format === AVAILABILITY_FORMAT && !manifest.schedules?.some(item => item.kind === 'solar');
+
+/** Select an existing reference entry explicitly; never retry after a dispatch error. */
+export function selectControlRuntimeEntry(manifest) {
+  if (!manifest || typeof manifest !== 'object' || !Array.isArray(manifest.schedules)) throw new TypeError('manifest schedules are required');
+  return (!contextManifest(manifest) && manifest.schedules.some(item => item.kind === 'solar'))
+    || (manifest.objectives?.length ?? 0) > 0 ? 'legacy' : 'framed';
+}
 const RESERVED = '__gf_';
 const TYPES = new Set(['Bool', 'Int', 'Number', 'Percent', 'Duration', ...TIME_TYPES, ...QUANTITY_TYPES]);
 const SENSOR_TYPES = TYPES;
@@ -239,7 +247,7 @@ function validateCanonicalUnit(item, label) {
 function validateContextManifest(input, bytecodeFormat) {
   const manifest = record(input, 'manifest');
   keys(manifest, ['format','name','inputs','outputs','sensors','schedules','timers','signals','configs','bytecodeSha256'],
-    ['providers','calendars','naturalConditions','calendarConditions','accounting','resources','objectives','adaptSettings','lifecycle'], 'manifest');
+    ['providers','calendars','naturalConditions','calendarConditions','accounting','resources','objectives','adaptSettings','lifecycle','legacyAdmission'], 'manifest');
   const lifecycle = validateLifecycleManifest(manifest);
   if (manifest.format === CIVIL_RANGE_FORMAT ? bytecodeFormat !== 21 : manifest.format === TIMESLOTS_RANGE_FORMAT ? bytecodeFormat !== 20 : manifest.format === RANGE_LIVE_START_FORMAT ? bytecodeFormat !== 19 : manifest.format === CALENDAR_EXECUTION_FORMAT ? bytecodeFormat !== 18 : manifest.format === SOLAR_CONTEXT_FORMAT ? bytecodeFormat !== 16 : manifest.format === HOLIDAY_FORMAT ? bytecodeFormat !== 15 : manifest.format === AT_FORMAT ? bytecodeFormat !== 14 : manifest.format === AVAILABILITY_FORMAT ? bytecodeFormat !== 13 : ![11, 12].includes(bytecodeFormat)) throw new Error('context manifest requires its matching GFB format');
   name(manifest.name, 'manifest.name');
@@ -488,7 +496,7 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
   if ((Object.hasOwn(manifest, 'adaptPolicy') || Object.hasOwn(manifest, 'strategies')) && capabilities === undefined) {
     throw new Error('adapt strategy activation requires a capability-aware host; ControlRuntime cannot activate this manifest');
   }
-  keys(manifest, ['format', 'name', 'inputs', 'outputs', 'sensors', 'schedules', 'timers', 'signals', 'configs', 'bytecodeSha256'], ['adaptPolicy', 'strategies', 'objectives', 'resources', 'sensorInstances', 'lifecycle'], 'manifest');
+  keys(manifest, ['format', 'name', 'inputs', 'outputs', 'sensors', 'schedules', 'timers', 'signals', 'configs', 'bytecodeSha256'], ['adaptPolicy', 'strategies', 'objectives', 'resources', 'sensorInstances', 'lifecycle','legacyAdmission'], 'manifest');
   const lifecycle = validateLifecycleManifest(manifest);
   if (manifest.format !== FORMAT && manifest.format !== INTEGER_FORMAT && !(manifest.format === SETTINGS_FORMAT && acceptSettings) && manifest.format !== SOLAR_FORMAT && manifest.format !== SCHEDULE_FORMAT && manifest.format !== SCHEDULE_SLOTS_FORMAT && manifest.format !== AVAILABILITY_FORMAT && manifest.format !== RANGE_LIVE_START_FORMAT && manifest.format !== TIMESLOTS_RANGE_FORMAT) throw new Error(`unsupported manifest format ${String(manifest.format)}`);
   const settingsManifest = manifest.format === SETTINGS_FORMAT || manifest.format === INTEGER_FORMAT || manifest.format === AVAILABILITY_FORMAT;
@@ -1005,6 +1013,7 @@ async function instantiateControlRuntime(wasmBytes, { bytes: bytecode, manifest 
     bytecodeFormat = view.getUint16(14, true);
   }
   const checkedManifest = validateManifest(manifest, { ...options, bytecodeFormat });
+  checkedManifest.legacyAdmission = validateLegacyAdmission({ bytes: compiledBytes, manifest: checkedManifest.manifest });
   if ((checkedManifest.lifecycle !== null) !== (compiledBytes.byteLength >= 6 && new DataView(compiledBytes.buffer, compiledBytes.byteOffset, compiledBytes.byteLength).getUint16(4, true) === 22)) {
     throw new Error('manifest lifecycle metadata must match GFB22 bytecode');
   }
@@ -1147,11 +1156,13 @@ export class ControlRuntime {
   #afterEventEpoch;
   #presentSensors;
   #lifecycle;
+  #legacyAdmission;
 
   constructor(runtime, manifest, sensors, signals, afterEvents, framed = false, temporalEpoch = null, hasSolar = false, afterEventEpoch = null, hasSchedules = false, hasContext = false) {
     this.runtime = runtime;
     this.exports = runtime.wasm;
     this.manifest = manifest.manifest;
+    this.#legacyAdmission = manifest.legacyAdmission ?? null;
     this.inputNames = manifest.inputNames;
     this.physicalInputs = physicalManifestInputs(manifest.manifest);
     this.sensorByName = manifest.sensorByName;
@@ -1177,6 +1188,8 @@ export class ControlRuntime {
   }
 
   /** Latest committed framed outcome; legacy entries deliberately expose none. */
+  get legacyAdmission() { return this.#legacyAdmission; }
+
   get lastFrameOutcome() {
     this.#live();
     if (!this.#framed) return null;
@@ -1302,6 +1315,7 @@ export class ControlRuntime {
   }
 
   #captureSnapshot({ nowMs, inputs = {}, samples = {}, due = {}, intervals = {}, events = {}, objectiveSafeMax = {}, solarFacts, scheduleFacts, contextFacts } = {}) {
+    if (this.#legacyAdmission) ({ inputs, samples } = preflightLegacyAdmission(this.#legacyAdmission, { nowMs, inputs, samples }));
     safeInteger(nowMs, 'nowMs');
     if (this.lastNowMs !== null && nowMs < this.lastNowMs) throw new Error('nowMs must be monotonic');
     record(inputs, 'inputs'); record(samples, 'samples'); record(due, 'due'); record(intervals, 'intervals'); record(events, 'events'); record(objectiveSafeMax, 'objectiveSafeMax');

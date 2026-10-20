@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+### 2026-10-20 — validation without runtime activation ([#572](https://github.com/callin2/ghostflow-language/issues/572))
+
+The framed validation-only entry now checks loaded bytecode and capability
+selection without activating the runtime. Valid GFB21 and GFB22 context packages
+can be verified before provider bindings or restart initialization exist. Previously
+validation called activation, rejecting unbound schedules and mutating selected
+runtime state. Missing, mismatched and ambiguous capabilities still reject;
+execution activation still requires every original runtime binding and lifecycle guard.
+
+### 2026-10-20 — explicit legacy Bool admission ([#572](https://github.com/callin2/ghostflow-language/issues/572))
+
+Standalone legacy required Bool controls can create reviewed new source revisions
+that preserve raw use sites and reject invalid frames before execution. Source-bound
+metadata and an appended reserved state bind the current raw lowering. Both reference
+host paths and signed packages enforce the contract; unsupported physical targets
+reject. Ordinary input remains Result. No fault default, old compiler fallback,
+new GFB format, WASM ABI or physical runtime change is introduced.
+
 ### 2026-10-19 — skipped repeated civil Range facts ([#541](https://github.com/callin2/ghostflow-language/issues/541))
 
 An immutable IANA Range now accepts a host's null, fold-zero marker for
