@@ -386,7 +386,7 @@ function validateOutputObservationPackageProfile(manifest, version, runtimeAbi) 
     fail('manifest-mismatch', cause.message, cause);
   }
   for (const field of ['inputs', 'outputs']) {
-    if (manifest[field]?.some(port => typeof port?.name === 'string' && port.name.startsWith('__gf_output_'))) {
+    if (Array.isArray(manifest[field]) && manifest[field].some(port => typeof port?.name === 'string' && port.name.startsWith('__gf_output_'))) {
       fail('manifest-mismatch', 'output observation rails cannot be public ports');
     }
   }
