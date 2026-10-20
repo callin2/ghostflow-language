@@ -18,6 +18,17 @@ control-v22를 사용하고 호환되지 않는 context profile·미지원 host�
 기존 manifest는 유지한다. compiler·tracker·host·서명 package 회귀가 pending·완료·
 오류·독립 출력·reset·변조를 검증한다.
 
+### 2026-10-20 — 종료 출력 관측에 요청 identity 요구 ([#578](https://github.com/callin2/ghostflow-language/issues/578))
+
+버그 수정: portable tracker와 reference host에서 `OutputFailed` 및
+`OutputUnknown`은 실제 dispatch된 요청의 0이 아닌 ID가 있어야 한다. 이전에는
+요청이 없는 `requestId = 0, status = OutputUnknown`도 종료 생명주기 결과로
+받아들였다. 시작 상태는 faulted health와 함께 `requestId = 0,
+status = OutputInitial`을 계속 사용할 수 있다. 종료 관측의 0이 아닌 부분 완료
+근거는 보존한다. 요청 없이 종료 상태를 보내던 provider는 시작 상태를 보고하거나
+결과를 해당 요청에 결합해야 한다. Rust와 JavaScript 회귀가 두 종료 상태, faulted
+시작 상태와 부분 완료를 검사한다.
+
 ### 2026-10-20 — runtime 활성화 없는 검증 ([#572](https://github.com/callin2/ghostflow-language/issues/572))
 
 framed validation-only 진입점은 runtime을 활성화하지 않고 bytecode와 capability

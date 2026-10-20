@@ -72,7 +72,7 @@ export function validateOutputObservation(record, runId, output, previous) {
   const valid = status === 0 ? requestId === 0 && completion === 0
     : status === 1 ? requestId > 0 && completion === 0
     : status === 2 ? requestId > 0 && completion > 0
-    : health === 2 && fault > 0;
+    : requestId > 0 && health === 2 && fault > 0;
   if (!valid) throw new Error('inconsistent output observation');
   if (previous && (requestId < previous.requestId || requestId === previous.requestId
     && (completion < previous.completion || previous.status !== 0 && status === 0 || previous.status >= 2 && status !== previous.status))) throw new Error('stale or regressed output request');

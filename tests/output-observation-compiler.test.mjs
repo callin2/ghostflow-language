@@ -62,6 +62,9 @@ test('manifest tampering cannot rebind, remove or downgrade private output rails
 test('pending and device readiness stay independent, and receipt identity never regresses', () => {
   const initial = {runId:'run',output:'pump',requestId:0,status:0,health:1,completion:0,fault:0};
   validateOutputObservation(initial,'run','pump');
+  const startupFault = {...initial,health:2,fault:1};
+  validateOutputObservation(startupFault,'run','pump');
+  for (const status of [3,4]) assert.throws(() => validateOutputObservation({...startupFault,status,fault:5},'run','pump'), /inconsistent/);
   const pending = {...initial,requestId:1,status:1};
   validateOutputObservation(pending,'run','pump',initial);
   const complete = {...pending,status:2,completion:1};
@@ -69,6 +72,7 @@ test('pending and device readiness stay independent, and receipt identity never 
   validateOutputObservation({...complete,health:2,fault:5},'run','pump',complete);
   const failed = {...pending,status:3,health:2,fault:2};
   validateOutputObservation(failed,'run','pump',pending);
+  for (const status of [3,4]) validateOutputObservation({...failed,status,completion:1,fault:5},'run','pump',pending);
   validateOutputObservation({...failed,requestId:2,status:1},'run','pump',failed);
   assert.throws(() => validateOutputObservation(complete,'new-run','pump'), /stale/);
   assert.throws(() => validateOutputObservation(pending,'run','pump',complete), /regressed/);

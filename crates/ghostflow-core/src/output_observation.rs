@@ -70,7 +70,9 @@ impl OutputObservation {
             Pending => self.request_id > 0 && self.completion == OutputCompletion::None,
             Completed => self.request_id > 0 && self.completion != OutputCompletion::None,
             Failed | Unknown => {
-                self.health == OutputHealth::Faulted && self.fault != OutputFault::None
+                self.request_id > 0
+                    && self.health == OutputHealth::Faulted
+                    && self.fault != OutputFault::None
             }
         };
         if valid {
@@ -235,6 +237,29 @@ mod tests {
         );
         assert!(tracker.begin_request("run", "other", 1).is_err());
         assert!(tracker.reset_run("run").is_err());
+    }
+    #[test]
+    fn terminal_observations_require_a_dispatched_request_but_keep_partial_evidence() {
+        let mut initial = OutputObservation::initial("run", "pump");
+        initial.health = OutputHealth::Faulted;
+        initial.fault = OutputFault::Unavailable;
+        assert!(initial.validate().is_ok());
+
+        for status in [OutputStatus::Failed, OutputStatus::Unknown] {
+            let mut requestless_terminal = initial.clone();
+            requestless_terminal.status = status;
+            requestless_terminal.fault = OutputFault::ObservationLost;
+            assert_eq!(
+                requestless_terminal.validate(),
+                Err("inconsistent output observation")
+            );
+
+            let mut partial_terminal = initial.clone();
+            partial_terminal.request_id = 1;
+            partial_terminal.status = status;
+            partial_terminal.completion = OutputCompletion::HostWrite;
+            assert!(partial_terminal.validate().is_ok());
+        }
     }
     #[test]
     fn initialization_health_and_pending_request_lifecycle_are_independent() {

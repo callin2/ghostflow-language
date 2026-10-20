@@ -16,6 +16,18 @@ incompatible context profiles and unsupported hosts reject. Existing manifests
 are unchanged. Compiler, tracker, host and signed-package regressions cover
 pending, completion, faults, independent outputs, reset and tampering.
 
+### 2026-10-20 — require request identity for terminal output observations ([#578](https://github.com/callin2/ghostflow-language/issues/578))
+
+Bug fix: `OutputFailed` and `OutputUnknown` now require a nonzero ID for an
+actually dispatched request in both the portable tracker and reference host.
+Before, a requestless `requestId = 0, status = OutputUnknown` could be accepted
+as a terminal lifecycle result. Startup may still report `requestId = 0,
+status = OutputInitial` with faulted health. Terminal observations retain any
+nonzero partial completion evidence. Providers that sent requestless terminal
+status must report the startup state or bind the result to its request. Rust and
+JavaScript regressions cover both terminal states, faulted startup and partial
+completion.
+
 ### 2026-10-20 — validation without runtime activation ([#572](https://github.com/callin2/ghostflow-language/issues/572))
 
 The framed validation-only entry now checks loaded bytecode and capability
