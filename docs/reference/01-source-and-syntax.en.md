@@ -12,6 +12,11 @@ The `ghost` fragments in this chapter illustrate syntax and semantics.
 Rationale: [Selected syntax](../LANGUAGE-SURFACE.md), [Common language contract](../LANGUAGE.md), [Literate source](../LITERATE.md), [Intent anchors](../INTENT-ANCHOR-MAP.md), [Source preservation](../SOURCE-MAP.md), [Design notes](../DESIGN-NOTES.md). The [complete language reference](../LANGUAGE-REFERENCE.md) indexes this chapter and the other detailed chapters.
 
 Canonical external declarations use `input` and read as `Result<T, SensorFault>`.
+The exact reserved `restart_reason: RestartReason` and `restart_event: Bool`
+declarations are runtime-owned lifecycle inputs, an explicit exception to external
+acquisition. They read directly as `RestartReason` and `Bool`; optional markers,
+conditioning settings and caller-provided values are forbidden. See
+[the restart contract](05-settings-and-observation.en.md).
 The examples here explicitly choose false for a failed start and true for a failed stop;
 these are illustrative author policies, never implicit defaults. The former `sensor`
 declaration is rejected; preserve old documents and create explicit reviewed revisions.
@@ -73,6 +78,15 @@ references and role mismatches fail at canonical locations. Ordinary front matte
 retains its non-executable behavior. See [Hardware declarations](../HARDWARE-FRONT-MATTER.md)
 for structure, examples and provider validation boundaries.
 Why: installation intent and control rules are reviewed in one revision while Device owns board behavior.
+
+Compact authoring reserves root `profile`, optional `devices`, and `bindings`.
+Supplying a pinned `hardwareProfiles` closure to `compileSource`/`compileSourceSync`
+validates inheritance, explicit default connections, parameters, communication
+conditions, address conflicts, and channel types. Every logical input/output needs
+a binding. The returned `hardwarePlan` has format `GhostFlow/profile-resolution-v1`,
+not an unresolved declaration. Missing profiles are never guessed. Follow the
+[design and staged scope](../PROFILE-FRONT-MATTER.en.md). The purpose is to avoid
+making customers repeat facts already known by the board and driver.
 
 ## 1.2 Original source, locations, and intent links
 

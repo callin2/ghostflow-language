@@ -2597,14 +2597,25 @@
               "targets": [
                 "wasm"
               ]
+            },
+            {
+              "path": "tests/civil-range-runtime.test.mjs",
+              "testId": "REF-03-085 Seoul actual compiled traffic switches at 22:00, midnight and 05:00; late night/noon first scans admit",
+              "caseId": "REF-03-085",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ]
             }
           ]
         }
       ],
       "gaps": [],
-      "issues": [],
+      "issues": [541],
       "referenceCaseIds": [
-        "REF-03-024"
+        "REF-03-024",
+        "REF-03-085"
       ]
     },
     {
@@ -8755,6 +8766,39 @@
       "referenceCaseIds": [
         "REF-05-022"
       ]
+    },
+    {
+      "id": "diagnostic-owner-boundaries",
+      "family": "Distinct diagnostic causes and execution effects",
+      "clause": {
+        "path": "docs/reference/07-semantic-rules-and-index.md",
+        "heading": "7.2 잘못된 프로그램과 외부의 실패"
+      },
+      "owner": "HOST",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "host_simulation",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/diagnostic-owner-boundaries.test.mjs",
+              "testId": "REF-07-002 preserves five owner diagnostics without collapsing execution effects",
+              "caseId": "REF-07-002",
+              "assertionClass": "observation",
+              "targets": ["host", "wasm"],
+              "polarities": ["positive", "negative", "boundary"]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Existing compiler, actual WASM input/context/settings owners and read-only observation joins retain their own causes, source/execution identities and effects through JSON diagnostic projections. This does not introduce a unified product diagnostic protocol or prove native/WASM parity for every record, downstream API/Web presentation, Driver behavior or physical confirmation."
+      ],
+      "issues": [311],
+      "referenceCaseIds": ["REF-07-002"]
     }
   ]
 }

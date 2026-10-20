@@ -12,12 +12,13 @@ import { cliConcurrency, runNodeCli } from './helpers/cli-process.mjs';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const referenceDir = path.join(root, 'docs/reference');
 // Explicit files: adding a chapter requires an intentional coverage update.
-const caseFiles = [
+const historicalRevisionFiles = [
   'tests/reference/cases-input-v1/00-principles.json',
   'tests/reference/cases-input-v1/01-source-types.json',
   'tests/reference/cases-input-v1/02-time-control.json',
   'tests/reference/cases-input-v1/03-settings-boundaries.json',
 ];
+const additiveCaseFiles = ['tests/reference/cases-civil-range-v1/02-time-control.json'];
 const chapterFiles = [
   '../LANGUAGE-REFERENCE.md',
   '01-source-and-syntax.md',
@@ -29,7 +30,9 @@ const chapterFiles = [
   '07-semantic-rules-and-index.md',
   '08-language-runtime-and-device-boundaries.md',
 ];
-const catalogs = caseFiles.map(file => ({ file, ...JSON.parse(fs.readFileSync(path.join(root, file), 'utf8')) }));
+const readCatalog = file => ({ file, ...JSON.parse(fs.readFileSync(path.join(root, file), 'utf8')) });
+const historicalRevisionCatalogs = historicalRevisionFiles.map(readCatalog);
+const catalogs = [...historicalRevisionCatalogs, ...additiveCaseFiles.map(readCatalog)];
 const cases = catalogs.flatMap(catalog => catalog.cases.map(entry => ({ ...entry, catalog: catalog.file })));
 const featureCatalog = JSON.parse(fs.readFileSync(catalogPath, 'utf8'));
 const featureValidationErrors = validateCatalog(featureCatalog);
@@ -42,7 +45,7 @@ const results = [];
 let catalogValidation = 'not-run';
 
 test('input reference revisions preserve pinned predecessor catalogs and their exact software observation subset', () => {
-  for (const catalog of catalogs) {
+  for (const catalog of historicalRevisionCatalogs) {
     const bytes = fs.readFileSync(path.join(root, catalog.historicalCatalog.path));
     assert.equal(createHash('sha256').update(bytes).digest('hex'), catalog.historicalCatalog.sha256);
     const history = JSON.parse(bytes).cases;

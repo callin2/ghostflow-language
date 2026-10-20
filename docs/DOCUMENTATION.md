@@ -21,6 +21,11 @@ evidence and test inputs have explicit exclusions in [the manifest](translations
 | `docs/ACCOUNTING-LEDGER-ABI.md` | [English](ACCOUNTING-LEDGER-ABI.md) | [한국어](ACCOUNTING-LEDGER-ABI.ko.md) |
 | `docs/AFTER-EVENT-WASM-ABI.md` | [English](AFTER-EVENT-WASM-ABI.md) | [한국어](AFTER-EVENT-WASM-ABI.ko.md) |
 | `docs/BEHAVIOR-COMPOSITION-RESEARCH.md` | [English](BEHAVIOR-COMPOSITION-RESEARCH.md) | [한국어](BEHAVIOR-COMPOSITION-RESEARCH.ko.md) |
+| `docs/BEHAVIOR-COMPARISON.md` | [English](BEHAVIOR-COMPARISON.md) | [한국어](BEHAVIOR-COMPARISON.ko.md) |
+| `docs/FAILURE-REDUCTION.md` | [English](FAILURE-REDUCTION.md) | [한국어](FAILURE-REDUCTION.ko.md) |
+| `docs/TARGET-QUERY.md` | [English](TARGET-QUERY.md) | [한국어](TARGET-QUERY.ko.md) |
+| `docs/EXECUTION-EVIDENCE.md` | [English](EXECUTION-EVIDENCE.md) | [한국어](EXECUTION-EVIDENCE.ko.md) |
+| `docs/INTENT-DECISIONS.md` | [English](INTENT-DECISIONS.md) | [한국어](INTENT-DECISIONS.ko.md) |
 | `docs/BOOLEAN-OUTPUT-EXPLANATION.md` | [English](BOOLEAN-OUTPUT-EXPLANATION.md) | [한국어](BOOLEAN-OUTPUT-EXPLANATION.ko.md) |
 | `docs/BYTECODE.md` | [English](BYTECODE.md) | [한국어](BYTECODE.ko.md) |
 | `docs/CALENDAR-PROVIDERS.md` | [English](CALENDAR-PROVIDERS.md) | [한국어](CALENDAR-PROVIDERS.ko.md) |
@@ -37,6 +42,8 @@ evidence and test inputs have explicit exclusions in [the manifest](translations
 | `docs/GFB5-SCHEDULE-PRELUDE.md` | [English](GFB5-SCHEDULE-PRELUDE.md) | [한국어](GFB5-SCHEDULE-PRELUDE.ko.md) |
 | `docs/IMPLEMENTATION.md` | [English](IMPLEMENTATION.md) | [한국어](IMPLEMENTATION.ko.md) |
 | `docs/INTENT-ANCHOR-MAP.md` | [English](INTENT-ANCHOR-MAP.md) | [한국어](INTENT-ANCHOR-MAP.ko.md) |
+| `docs/INTENT-CONSISTENCY-CONTRACT.md` | [English](INTENT-CONSISTENCY-CONTRACT.en.md) | [한국어](INTENT-CONSISTENCY-CONTRACT.md) |
+| `docs/INTENT-EVIDENCE.md` | [English](INTENT-EVIDENCE.md) | [한국어](INTENT-EVIDENCE.ko.md) |
 | `docs/KEYBOARD-HOST.md` | [English](KEYBOARD-HOST.md) | [한국어](KEYBOARD-HOST.ko.md) |
 | `docs/LANGUAGE-EXAMPLES.md` | [English](LANGUAGE-EXAMPLES.en.md) | [한국어](LANGUAGE-EXAMPLES.md) |
 | `docs/LANGUAGE-MVP-0.1.md` | [English](LANGUAGE-MVP-0.1.md) | [한국어](LANGUAGE-MVP-0.1.ko.md) |

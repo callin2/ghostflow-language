@@ -77,6 +77,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/AFTER-EVENT-WASM-ABI.md](docs/AFTER-EVENT-WASM-ABI.md) | Identified after_event execution ABI | md |
 | [docs/AI-CONTRIBUTION-PACKAGE.ko.md](docs/AI-CONTRIBUTION-PACKAGE.ko.md) | 범위를 제한한 AI 기여 작업 패키지 | md |
 | [docs/AI-CONTRIBUTION-PACKAGE.md](docs/AI-CONTRIBUTION-PACKAGE.md) | Bounded AI contribution package | md |
+| [docs/BEHAVIOR-COMPARISON.ko.md](docs/BEHAVIOR-COMPARISON.ko.md) | 제한된 동작 비교 | md |
+| [docs/BEHAVIOR-COMPARISON.md](docs/BEHAVIOR-COMPARISON.md) | Bounded behavior comparison | md |
 | [docs/BEHAVIOR-COMPOSITION-RESEARCH.ko.md](docs/BEHAVIOR-COMPOSITION-RESEARCH.ko.md) | 동작 조합: 연구와 아키텍처 검토 | md |
 | [docs/BEHAVIOR-COMPOSITION-RESEARCH.md](docs/BEHAVIOR-COMPOSITION-RESEARCH.md) | Behavior composition: research and architecture review | md |
 | [docs/BOOLEAN-OUTPUT-EXPLANATION.ko.md](docs/BOOLEAN-OUTPUT-EXPLANATION.ko.md) | Boolean 요청 출력 설명 | md |
@@ -112,6 +114,10 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/ESTIMATE-EVIDENCE.md](docs/ESTIMATE-EVIDENCE.md) | Bounded estimate evidence admission | md |
 | [docs/EXACT-INTEGER-CONTRACT.ko.md](docs/EXACT-INTEGER-CONTRACT.ko.md) | 정확한 정수 계약 제안 | md |
 | [docs/EXACT-INTEGER-CONTRACT.md](docs/EXACT-INTEGER-CONTRACT.md) | Exact integer contract proposal | md |
+| [docs/EXECUTION-EVIDENCE.ko.md](docs/EXECUTION-EVIDENCE.ko.md) | 완료된 실행 하나 설명하기 | md |
+| [docs/EXECUTION-EVIDENCE.md](docs/EXECUTION-EVIDENCE.md) | Explain one completed execution | md |
+| [docs/FAILURE-REDUCTION.ko.md](docs/FAILURE-REDUCTION.ko.md) | 제한된 실패 축소 | md |
+| [docs/FAILURE-REDUCTION.md](docs/FAILURE-REDUCTION.md) | Bounded failure reduction | md |
 | [docs/FRAMED-CONTROL-HOST.ko.md](docs/FRAMED-CONTROL-HOST.ko.md) | Framed ControlRuntime 도입 (D6) | md |
 | [docs/FRAMED-CONTROL-HOST.md](docs/FRAMED-CONTROL-HOST.md) | Framed ControlRuntime adoption (D6) | md |
 | [docs/GFB5-SCHEDULE-PRELUDE.ko.md](docs/GFB5-SCHEDULE-PRELUDE.ko.md) | GFB5 일정 서두 | md |
@@ -124,6 +130,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/HOST-EVENT-ORDERING-CONTRACT.md](docs/HOST-EVENT-ORDERING-CONTRACT.md) | Host event ordering contract | md |
 | [docs/IMPLEMENTATION.ko.md](docs/IMPLEMENTATION.ko.md) | 구현 및 아티팩트 경계 | md |
 | [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) | Implementation and artifact boundaries | md |
+| [docs/INCIDENT-REPLAY.ko.md](docs/INCIDENT-REPLAY.ko.md) | incident 캡처와 재현 | md |
+| [docs/INCIDENT-REPLAY.md](docs/INCIDENT-REPLAY.md) | Incident capture and replay | md |
 | [docs/INDEX.md](docs/INDEX.md) | Documentation index | md |
 | [docs/INPUT-MIGRATION.ko.md](docs/INPUT-MIGRATION.ko.md) | 외부 입력의 canonical 선언과 명시적 revision migration | md |
 | [docs/INPUT-MIGRATION.md](docs/INPUT-MIGRATION.md) | Canonical external input and explicit revision migration | md |
@@ -131,6 +139,12 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/INSTANCE-TRACE-PROJECTION.md](docs/INSTANCE-TRACE-PROJECTION.md) | Instance trace projection reference adapter | md |
 | [docs/INTENT-ANCHOR-MAP.ko.md](docs/INTENT-ANCHOR-MAP.ko.md) | Literate intent anchor map | md |
 | [docs/INTENT-ANCHOR-MAP.md](docs/INTENT-ANCHOR-MAP.md) | Literate intent anchor map | md |
+| [docs/INTENT-CONSISTENCY-CONTRACT.en.md](docs/INTENT-CONSISTENCY-CONTRACT.en.md) | Responsibility and Evidence Contract for Intent Consistency | md |
+| [docs/INTENT-CONSISTENCY-CONTRACT.md](docs/INTENT-CONSISTENCY-CONTRACT.md) | 의도 정합성의 판단 책임과 근거 계약 | md |
+| [docs/INTENT-DECISIONS.ko.md](docs/INTENT-DECISIONS.ko.md) | 작성된 의도 결정 확인하기 | md |
+| [docs/INTENT-DECISIONS.md](docs/INTENT-DECISIONS.md) | Inspect authored intent decisions | md |
+| [docs/INTENT-EVIDENCE.ko.md](docs/INTENT-EVIDENCE.ko.md) | 의도 근거 작성 API | md |
+| [docs/INTENT-EVIDENCE.md](docs/INTENT-EVIDENCE.md) | Intent evidence authoring API | md |
 | [docs/INTERACTION-STREAM-CONTRACT.ko.md](docs/INTERACTION-STREAM-CONTRACT.ko.md) | Interaction 스트림 계약 설계 | md |
 | [docs/INTERACTION-STREAM-CONTRACT.md](docs/INTERACTION-STREAM-CONTRACT.md) | Interaction stream contract design | md |
 | [docs/KEYBOARD-HOST.ko.md](docs/KEYBOARD-HOST.ko.md) | 실시간 키보드 호스트 | md |
@@ -165,6 +179,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/OPTIMIZER-PASS-CONTRACT.md](docs/OPTIMIZER-PASS-CONTRACT.md) | Optimizer pass contract | md |
 | [docs/PORTABLE-PACKAGE.ko.md](docs/PORTABLE-PACKAGE.ko.md) | 이식 가능한 GFB 패키지 v1 | md |
 | [docs/PORTABLE-PACKAGE.md](docs/PORTABLE-PACKAGE.md) | Portable GFB package v1 | md |
+| [docs/PROFILE-FRONT-MATTER.en.md](docs/PROFILE-FRONT-MATTER.en.md) | Profile-based Front Matter Design | md |
+| [docs/PROFILE-FRONT-MATTER.md](docs/PROFILE-FRONT-MATTER.md) | Profile 기반 front matter 설계 | md |
 | [docs/ProgrammingInGhostflow.en.md](docs/ProgrammingInGhostflow.en.md) | Programming in GhostFlow | md |
 | [docs/ProgrammingInGhostflow.md](docs/ProgrammingInGhostflow.md) | Programming in GhostFlow | md |
 | [docs/REFERENCE-FEATURE-STATUS.md](docs/REFERENCE-FEATURE-STATUS.md) | Reference feature maturity and evidence | md |
@@ -192,6 +208,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/SOURCE-SAFETY-TRACE.md](docs/SOURCE-SAFETY-TRACE.md) | Source and safety observation contract | md |
 | [docs/SUNCALC-ATTRIBUTION.ko.md](docs/SUNCALC-ATTRIBUTION.ko.md) | 이식 가능한 태양광 공급자의 SunCalc 저작자 표시 | md |
 | [docs/SUNCALC-ATTRIBUTION.md](docs/SUNCALC-ATTRIBUTION.md) | SunCalc attribution for the portable solar provider | md |
+| [docs/TARGET-QUERY.ko.md](docs/TARGET-QUERY.ko.md) | Target contract query | md |
+| [docs/TARGET-QUERY.md](docs/TARGET-QUERY.md) | Target contract query | md |
 | [docs/TASK-61-CONFORMANCE.md](docs/TASK-61-CONFORMANCE.md) | TASK-61 focused conformance expansion | md |
 | [docs/TASK-62-COVERAGE.md](docs/TASK-62-COVERAGE.md) | TASK-62 coverage evidence | md |
 | [docs/TEMPORAL-DESCRIPTOR-ARTIFACT.ko.md](docs/TEMPORAL-DESCRIPTOR-ARTIFACT.ko.md) | 보류된 temporal artifact | md |
@@ -230,6 +248,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | --- | --- | --- |
 | [docs/plans/2026-09-28-semantic-kernel.ko.md](docs/plans/2026-09-28-semantic-kernel.ko.md) | Semantic Kernel 0.1 검토 계획 | md |
 | [docs/plans/2026-09-28-semantic-kernel.md](docs/plans/2026-09-28-semantic-kernel.md) | Semantic Kernel 0.1 review plan | md |
+| [docs/plans/2026-10-14-lifecycle-range-integration.ko.md](docs/plans/2026-10-14-lifecycle-range-integration.ko.md) | Lifecycle과 immutable IANA Range 통합 | md |
+| [docs/plans/2026-10-14-lifecycle-range-integration.md](docs/plans/2026-10-14-lifecycle-range-integration.md) | Lifecycle and immutable IANA Range integration | md |
 
 ## docs/reference/
 
@@ -264,6 +284,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/reports/2026-10-05-input-531-consumer-gates.md](docs/reports/2026-10-05-input-531-consumer-gates.md) | Issue 531 independent review and consumer adoption gates | md |
 | [docs/reports/2026-10-05-input-531-integration.md](docs/reports/2026-10-05-input-531-integration.md) | Issue 531 integration checkpoint and consumer handoff | md |
 | [docs/reports/2026-10-12-io-role-terminology-audit.md](docs/reports/2026-10-12-io-role-terminology-audit.md) | I/O role terminology migration audit — 2026-10-12 | md |
+| [docs/reports/2026-10-16-intent-link-warnings-553.md](docs/reports/2026-10-16-intent-link-warnings-553.md) | #553 — 기본 의도 연결 경고 구현 기록 | md |
+| [docs/reports/2026-10-16-predecessor-language-reference-cleanup.md](docs/reports/2026-10-16-predecessor-language-reference-cleanup.md) | GhostFlow predecessor-language reference cleanup — 2026-10-16 | md |
 
 ## docs/research/
 
@@ -371,6 +393,13 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | Path | Title | Type |
 | --- | --- | --- |
 | [examples/curriculum/generated/pc-01-e01.generated.ghost.md](examples/curriculum/generated/pc-01-e01.generated.ghost.md) | PC-01 — E01 executable projection | md |
+
+## examples/hardware/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [examples/hardware/rs485-current-relay.ghost.en.md](examples/hardware/rs485-current-relay.ghost.en.md) | RS485 Current Inputs and RYR408B 8-Channel Relay Outputs | md |
+| [examples/hardware/rs485-current-relay.ghost.md](examples/hardware/rs485-current-relay.ghost.md) | RS485 전류 입력과 RYR408B 8채널 릴레이 출력 | md |
 
 ## examples/programming-book-imports/
 
@@ -499,6 +528,7 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/fixtures/issue-90-settings-periodic.ghost.md](tests/fixtures/issue-90-settings-periodic.ghost.md) | Live settings stream | md |
 | [tests/fixtures/issue-93-quantities.ghost.md](tests/fixtures/issue-93-quantities.ghost.md) | Quantity execution parity fixture | md |
 | [tests/fixtures/issue-93-quantities.input-v1.ghost.md](tests/fixtures/issue-93-quantities.input-v1.ghost.md) | Quantity execution parity fixture | md |
+| [tests/fixtures/issue541-seoul-traffic.ghost.md](tests/fixtures/issue541-seoul-traffic.ghost.md) | Seoul traffic schedule simulation fixture | md |
 | [tests/fixtures/true-for-certified.ghost.md](tests/fixtures/true-for-certified.ghost.md) | Certified hot interval | md |
 | [tests/fixtures/true-for-certified.input-v1.ghost.md](tests/fixtures/true-for-certified.input-v1.ghost.md) | Certified hot interval | md |
 
@@ -520,4 +550,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-390 documents.
+415 documents.

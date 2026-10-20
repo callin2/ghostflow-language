@@ -93,6 +93,7 @@ export function validateScenario(scenario, manifest) {
     || manifest.format === 'GhostFlow/control-v14'
     || manifest.format === 'GhostFlow/control-v15'
     || manifest.format === 'GhostFlow/control-v18'
+    || manifest.format === 'GhostFlow/control-v21'
     || manifest.format === 'GhostFlow/control-v12' && !hasSolar;
   if (hasContext) {
     if (scenario.context === undefined) throw new Error('context control requires explicit context activation');
@@ -352,9 +353,28 @@ export function loadVerifiedArtifact(artifactPath) {
   const manifest = JSON.parse(fs.readFileSync(`${artifactPath}.manifest.json`, 'utf8'));
   const map = JSON.parse(fs.readFileSync(`${artifactPath}.map.json`, 'utf8'));
   const document = verifyArtifactSourceMap(map, artifactBytes, { manifest });
-  if (!/^GhostFlow\/control-v(?:[1-9]|10|12|13|14|15|18)$/u.test(manifest.format)) throw new Error('artifact must be an executable control artifact');
+  if (!/^GhostFlow\/control-v(?:[1-9]|10|12|13|14|15|18|21)$/u.test(manifest.format)) throw new Error('artifact must be an executable control artifact');
   if (manifest.bytecodeSha256 !== sha256(artifactBytes)) throw new Error('artifact SHA-256 mismatch');
   return { artifactBytes, manifest, map, document };
+}
+
+/** The actual runner selected by runScenario for this manifest and scenario. */
+export function scenarioExecutionBackend(manifest, scenario) {
+  const conditioned = (manifest.sensors?.length ?? 0) > 0
+    || (manifest.accounting?.bindings?.length ?? 0) > 0
+    || (scenario.actuatorBindings?.length ?? 0) > 0
+    || manifest.schedules?.some(schedule => schedule.kind === 'solar')
+    || manifest.schedules?.some(schedule => schedule.kind === 'daily')
+    || manifest.schedules?.some(schedule => schedule.kind === 'daily-slots')
+    || (manifest.naturalConditions?.length ?? 0) > 0
+    || ['GhostFlow/control-v10', 'GhostFlow/control-v12', 'GhostFlow/control-v13', 'GhostFlow/control-v14', 'GhostFlow/control-v15', 'GhostFlow/control-v18'].includes(manifest.format)
+    || manifest.schedules?.some(schedule => ['periodic','cron','tide'].includes(schedule.kind))
+    || manifest.signals?.some(signal => signal.kind === 'after-event');
+  const host = conditioned
+    ? path.join(root, manifest.accounting?.bindings?.length ? 'tools/scenario-accounting.mjs' : 'tools/scenario-sensors.mjs')
+    : path.join(root, 'target/release/examples/scenario_scan');
+  return { kind: conditioned ? 'wasm' : 'native', host,
+    runtime: conditioned ? path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm') : host };
 }
 
 export function runScenario(artifactPath, scenarioPath, { format = 'toon' } = {}) {
@@ -392,19 +412,10 @@ export function runScenario(artifactPath, scenarioPath, { format = 'toon' } = {}
     };
     // Sensor conditioning is supplied by the existing WASM host; plain input
     // modules use the native framed runner. Neither path retries failed scans.
-    const conditioned = (manifest.sensors?.length ?? 0) > 0
-      || (manifest.accounting?.bindings?.length ?? 0) > 0
-      || (scenario.actuatorBindings?.length ?? 0) > 0
-      || manifest.schedules?.some(schedule => schedule.kind === 'solar')
-      || manifest.schedules?.some(schedule => schedule.kind === 'daily')
-      || manifest.schedules?.some(schedule => schedule.kind === 'daily-slots')
-      || (manifest.naturalConditions?.length ?? 0) > 0
-      || ['GhostFlow/control-v10', 'GhostFlow/control-v12', 'GhostFlow/control-v13', 'GhostFlow/control-v14', 'GhostFlow/control-v15', 'GhostFlow/control-v18'].includes(manifest.format)
-      || manifest.schedules?.some(schedule => ['periodic','cron','tide'].includes(schedule.kind))
-      || manifest.signals?.some(signal => signal.kind === 'after-event');
-    const executable = conditioned ? process.execPath : path.join(root, 'target/release/examples/scenario_scan');
-    const arguments_ = conditioned
-      ? [path.join(root, manifest.accounting?.bindings?.length ? 'tools/scenario-accounting.mjs' : 'tools/scenario-sensors.mjs'), artifactPath, actionsPath]
+    const backend = scenarioExecutionBackend(manifest, scenario);
+    const executable = backend.kind === 'wasm' ? process.execPath : backend.host;
+    const arguments_ = backend.kind === 'wasm'
+      ? [backend.host, artifactPath, actionsPath]
       : [artifactPath, actionsPath];
     const child = spawnSync(executable, arguments_, {
       encoding: 'utf8', timeout: 20_000, maxBuffer: MAX_RESULT_BYTES + 4096,
@@ -461,7 +472,7 @@ export function runScenario(artifactPath, scenarioPath, { format = 'toon' } = {}
     if (Buffer.byteLength(encoded) > MAX_RESULT_BYTES) {
       return hostError(new Error(`result budget ${MAX_RESULT_BYTES} bytes exceeded`));
     }
-    return { encoded, success: !failed };
+    return { encoded, success: !failed, executor: backend.kind };
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }

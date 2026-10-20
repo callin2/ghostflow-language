@@ -31,6 +31,7 @@ pub struct Engine {
     keyed_range: bool,
     range_clock_revision: Option<String>,
     range_calendar_revision: Option<String>,
+    civil_evidence: Option<ScheduleEvidence>,
 }
 
 #[derive(Clone)]
@@ -246,6 +247,7 @@ impl Engine {
         }
         let range_starts_ms = match &desc.definition {
             ScheduleDefinition::UtcRange { starts_ms, .. }
+            | ScheduleDefinition::CivilRange { starts_ms, .. }
             | ScheduleDefinition::CalendarRange { starts_ms, .. } => Some(starts_ms.clone()),
             ScheduleDefinition::ConfigDailySlots {
                 initial_minutes,
@@ -414,12 +416,24 @@ impl Engine {
             for _ in 0..count {
                 let key = reader.string()?;
                 let parts: Vec<_> = key.split(':').collect();
-                if parts.len() != 3 {
+                let civil = matches!(desc.definition, ScheduleDefinition::CivilRange { .. });
+                if parts.len() != if civil { 4 } else { 3 } {
                     return Err(invalid("invalid Range checkpoint occurrence identity"));
                 }
                 let site = parts[0].parse::<u32>().ok();
                 let day = parts[1].parse::<u64>().ok();
                 let slot = parts[2].parse::<u64>().ok();
+                let suffix =
+                    if let ScheduleDefinition::CivilRange { dst_repeated, .. } = desc.definition {
+                        let fold = parts[3]
+                            .parse::<u8>()
+                            .ok()
+                            .filter(|fold| *fold <= 2 && fold_allowed(*fold, dst_repeated))
+                            .ok_or_else(|| invalid("invalid civil Range checkpoint fold"))?;
+                        format!(":{fold}")
+                    } else {
+                        String::new()
+                    };
                 let valid_slot = match &desc.definition {
                     ScheduleDefinition::ConfigDailySlots {
                         range_duration_ms: Some(_),
@@ -430,7 +444,7 @@ impl Engine {
                 if site != Some(desc.site)
                     || day.is_none_or(|day| day > 2_932_896)
                     || !valid_slot
-                    || key != format!("{}:{}:{}", desc.site, day.unwrap(), slot.unwrap())
+                    || key != format!("{}:{}:{}{}", desc.site, day.unwrap(), slot.unwrap(), suffix)
                 {
                     return Err(invalid("invalid Range checkpoint occurrence identity"));
                 }
@@ -602,6 +616,25 @@ impl Engine {
             return Err(invalid("invalid context terminal capacity"));
         }
         let (interval_ms, range_start_ms, slots, next_slot_key) = match &desc.definition {
+            ScheduleDefinition::CivilRange {
+                timezone,
+                starts_ms,
+                duration_ms,
+                dst_missing,
+                dst_repeated,
+            } => {
+                crate::context_vm::validate_utc_range(starts_ms, *duration_ms)?;
+                if timezone.is_empty()
+                    || timezone == "UTC"
+                    || timezone.len() > 128
+                    || starts_ms.iter().any(|start| start % 900_000 != 0)
+                    || *dst_missing > 1
+                    || *dst_repeated > 3
+                {
+                    return Err(invalid("invalid civil Range definition"));
+                }
+                (None, None, Vec::new(), 1)
+            }
             ScheduleDefinition::UtcRange {
                 starts_ms,
                 duration_ms,
@@ -723,6 +756,7 @@ impl Engine {
             range: if matches!(
                 desc.definition,
                 ScheduleDefinition::UtcRange { .. }
+                    | ScheduleDefinition::CivilRange { .. }
                     | ScheduleDefinition::CalendarRange { .. }
                     | ScheduleDefinition::ConfigDailySlots {
                         range_duration_ms: Some(_),
@@ -735,6 +769,7 @@ impl Engine {
             },
             range_clock_revision: None,
             range_calendar_revision: None,
+            civil_evidence: None,
             keyed_range: matches!(
                 desc.definition,
                 ScheduleDefinition::ConfigDailySlots {
@@ -762,6 +797,31 @@ impl Engine {
             return Err(invalid("invalid context schedule evidence"));
         }
         Self::validate_rows(desc, facts)?;
+        if let ScheduleDefinition::CivilRange {
+            starts_ms,
+            duration_ms,
+            dst_missing,
+            dst_repeated,
+            ..
+        } = &desc.definition
+        {
+            if change.is_some() {
+                return Err(invalid(
+                    "immutable civil Range cannot accept settings changes",
+                ));
+            }
+            return self.civil_range(
+                desc.site,
+                starts_ms,
+                *duration_ms,
+                *dst_missing,
+                *dst_repeated,
+                clock,
+                facts,
+                when,
+                cancel,
+            );
+        }
         if let ScheduleDefinition::CalendarRange {
             starts_ms,
             duration_ms,
@@ -924,6 +984,7 @@ impl Engine {
                 staged.at_pulse(desc.site, *at_ms, &observed, when, &mut decision)?
             }
             ScheduleDefinition::UtcRange { .. }
+            | ScheduleDefinition::CivilRange { .. }
             | ScheduleDefinition::CalendarRange { .. }
             | ScheduleDefinition::ConfigDailySlots {
                 range_duration_ms: Some(_),
@@ -1263,6 +1324,23 @@ impl Engine {
                 });
             }
         }
+        self.range_plans(site, duration, clock, when, cancel, retime, plans)
+    }
+
+    fn range_plans(
+        &self,
+        site: u32,
+        duration: u64,
+        clock: ClockSnapshot<'_>,
+        when: bool,
+        cancel: bool,
+        retime: bool,
+        plans: Vec<RangeFact>,
+    ) -> Result<(Self, Decision)> {
+        let original = self
+            .range
+            .as_ref()
+            .ok_or_else(|| invalid("missing Range engine"))?;
         let stage = if retime {
             original.begin_retime(clock, &plans, when, cancel)?
         } else {
@@ -1420,6 +1498,137 @@ impl Engine {
         }
         // Range .missed remains outside the current executable projection contract.
         Ok((staged, out))
+    }
+
+    fn civil_range(
+        &self,
+        site: u32,
+        starts: &[u64],
+        duration: u64,
+        missing: u8,
+        repeated: u8,
+        clock: ClockSnapshot<'_>,
+        facts: &ScheduleEvidence,
+        when: bool,
+        cancel: bool,
+    ) -> Result<(Self, Decision)> {
+        if facts.provider.is_some() || facts.calendar.is_some() {
+            return Err(invalid("unexpected civil Range provider payload"));
+        }
+        if let (ClockTrust::Trusted, Some(wall)) = (clock.trust, clock.wall_ms) {
+            if wall > 253_402_300_799_999
+                || facts.coverage_start_ms > wall.saturating_sub(duration)
+                || wall >= facts.coverage_end_ms
+            {
+                return Err(invalid(
+                    "civil Range coverage must include the complete admission lookback",
+                ));
+            }
+        }
+        let key = |row: &crate::context_vm::Occurrence| {
+            format!("{site}:{}:{}:{}", row.source_day, row.slot_key, row.fold)
+        };
+        let mut seen = BTreeSet::new();
+        let mut plans = Vec::new();
+        for row in &facts.rows {
+            let slot = row
+                .slot_key
+                .checked_sub(1)
+                .and_then(|index| usize::try_from(index).ok())
+                .and_then(|index| starts.get(index));
+            if slot != Some(&(u64::from(row.minute_of_day) * 60_000))
+                || !fold_allowed(row.fold, repeated)
+                // Null fold-zero rows can mark either an explicitly skipped
+                // gap or a repeated slot. The host resolves which DST case it is.
+                || row.instant_ms.is_none() && ((missing != 0 && repeated != 3) || row.fold != 0)
+                || !seen.insert(key(row))
+            {
+                return Err(invalid(
+                    "invalid or duplicate civil Range identity, slot or DST policy",
+                ));
+            }
+            if facts.rows.first().is_some_and(|first| {
+                first.provider_revision != row.provider_revision
+                    || first.context_revision != row.context_revision
+            }) {
+                return Err(invalid("conflicting civil Range fact revisions"));
+            }
+            if facts.rows.iter().any(|other| {
+                other.source_day == row.source_day
+                    && other.slot_key == row.slot_key
+                    && ((other.fold == 0) != (row.fold == 0)
+                        || other.fold == 1 && row.fold == 2 && other.instant_ms >= row.instant_ms)
+            }) {
+                return Err(invalid(
+                    "conflicting civil Range fold identity or instant order",
+                ));
+            }
+            if let Some(instant) = row.instant_ms {
+                if instant < facts.coverage_start_ms || instant >= facts.coverage_end_ms {
+                    return Err(invalid("civil Range occurrence outside declared coverage"));
+                }
+                plans.push(RangeFact {
+                    occurrence_key: key(row),
+                    planned_wall_ms: instant,
+                    duration_ms: duration,
+                });
+            }
+        }
+        // No tzdb lives in the core. We can reject contradictions of facts already
+        // observed in overlapping coverage, but cannot invent missing IANA rows.
+        if let Some(previous) = &self.civil_evidence {
+            for old in &previous.rows {
+                let current = facts.rows.iter().find(|row| key(row) == key(old));
+                if current.is_some_and(|row| {
+                    row.instant_ms != old.instant_ms || row.minute_of_day != old.minute_of_day
+                }) || old.instant_ms.is_some_and(|instant| {
+                    instant >= facts.coverage_start_ms && instant < facts.coverage_end_ms
+                }) && current.is_none()
+                {
+                    return Err(invalid(
+                        "missing or conflicting civil Range occurrence in overlapping coverage",
+                    ));
+                }
+            }
+        }
+        if let Some(active) = self.range.as_ref().and_then(|range| range.active_fact()) {
+            if let Some(current) = plans
+                .iter()
+                .find(|plan| plan.occurrence_key == active.occurrence_key)
+            {
+                if current != active {
+                    return Err(invalid(
+                        "civil Range facts cannot retime an admitted occurrence",
+                    ));
+                }
+            } else {
+                // Loss of clock trust or rolling coverage never extends the frozen
+                // monotonic timer. Keep its plan for completion/cancellation evidence.
+                plans.push(active.clone());
+            }
+        }
+        plans.sort_by_key(|fact| (fact.planned_wall_ms, fact.occurrence_key.clone()));
+        let (mut staged, mut decision) =
+            self.range_plans(site, duration, clock, when, cancel, false, plans)?;
+        for observation in &mut decision.observations {
+            let row = facts
+                .rows
+                .iter()
+                .find(|row| key(row) == observation.occurrence_id)
+                .or_else(|| {
+                    self.civil_evidence.as_ref().and_then(|old| {
+                        old.rows
+                            .iter()
+                            .find(|row| key(row) == observation.occurrence_id)
+                    })
+                });
+            observation.provider_revision =
+                row.map_or(String::new(), |row| row.provider_revision.clone());
+            observation.context_revision =
+                row.map_or(String::new(), |row| row.context_revision.clone());
+        }
+        staged.civil_evidence = Some(facts.clone());
+        Ok((staged, decision))
     }
 
     pub fn stage_settings_fault(

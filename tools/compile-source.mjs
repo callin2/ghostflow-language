@@ -5,7 +5,11 @@ import { compileAccountingControl, compileControl, compileControlPolicyDescripto
 import { isWellFormedUnicode, sha256Hex, utf8ByteLength } from './sha256.mjs';
 import { compileComposition, resolveDocument } from './composition.mjs';
 import { emitExplanationArtifact } from './explanation.mjs';
+import { collectIntentLinkDiagnostics } from './intent-link-diagnostics.mjs';
 import { parseHardwareFrontMatter, validateHardwareBindings, HardwareFrontMatterError } from './hardware-frontmatter.mjs';
+import { resolveHardwareProfiles } from './hardware-profiles.mjs';
+import { bindIntentEvidence } from './intent-evidence.mjs';
+import { createCompilerTelemetry } from './compiler-telemetry.mjs';
 
 export { emitInteractionSchema } from './interaction-schema.mjs';
 
@@ -76,6 +80,14 @@ export async function compileSource(source, options = {}) {
 
 /** Deterministic core also used when verifying persisted artifacts. */
 export function compileSourceSync(source, options = {}) {
+  const telemetry = createCompilerTelemetry(options && typeof options === 'object' ? options.onTelemetry : undefined);
+  if (!telemetry) return compileSourceCore(source, options);
+  try { return compileSourceCore(source, options, telemetry); }
+  catch (error) { telemetry.diagnostics(error); throw error; }
+  finally { telemetry.finish(); }
+}
+
+function compileSourceCore(source, options, telemetry) {
   if (!options || typeof options !== 'object' || Array.isArray(options)) throw new TypeError('compile options must be an object');
   if (Object.hasOwn(options, 'interactionSchema')) {
     throw new Error('interactionSchema is not a compile option; supply interactionSourceIdentity explicitly');
@@ -84,8 +96,9 @@ export function compileSourceSync(source, options = {}) {
   requireFilename(filename, 'source filename');
   requireSourceText(source, `${filename}: source`);
   if (!filename.endsWith('.ghost.md')) throw new Error(`${filename}: GhostFlow product compilation requires a canonical .ghost.md literate source`);
-  const hardwarePlan = parseHardwareFrontMatter(source, { filename });
+  const hardwarePlan = resolveHardwareProfiles(parseHardwareFrontMatter(source, { filename }), options.hardwareProfiles);
   let extraction;
+  telemetry?.phase('extract');
   try { extraction = extractLiterate(source, { filename }); }
   catch (error) {
     if (Number.isInteger(error.line) && Number.isInteger(error.column)) {
@@ -94,11 +107,14 @@ export function compileSourceSync(source, options = {}) {
     }
     throw error;
   }
-  let result, composition, stage = 'parse';
+  let result, composition, ast, stage = 'parse';
+  telemetry?.phase('parse');
   try {
-    const ast = parseControl(extraction.code, { filename });
+    ast = parseControl(extraction.code, { filename });
+    telemetry?.ast(ast);
+    telemetry?.phase('compile_lower_encode');
     if (hardwarePlan && ast.imports?.length) throw new HardwareFrontMatterError(hardwarePlan.source,
-      hardwarePlan.locations['/hardware'], 'hardware declarations in executable import composition are not supported');
+      hardwarePlan.locations['/hardware'] ?? hardwarePlan.locations['/profile'], 'hardware declarations in executable import composition are not supported');
     stage = 'semantic';
     if (options.sourceClosure !== undefined && ast.imports?.length) {
       composition = compileComposition(source, filename, options.sourceClosure);
@@ -163,9 +179,9 @@ export function compileSourceSync(source, options = {}) {
     };
     throw error;
   }
+  telemetry?.phase('postprocess');
   validateHardwareBindings(hardwarePlan, result.manifest);
   if (extraction.anchors.length || extraction.linkDirectives.length) {
-    const ast = parseControl(extraction.code, { filename });
     result = {
       ...result,
       traceMetadata: attachIntentMetadata(result.traceMetadata, {
@@ -177,6 +193,8 @@ export function compileSourceSync(source, options = {}) {
       }),
     };
   }
+  const intentDiagnostics = collectIntentLinkDiagnostics({ ast, extraction,
+    intentLinks: result.traceMetadata?.intentLinks, composition });
   const mapFor = name => composition?.units.get(resolveDocument('', name))?.extraction.sourceMap ?? extraction.sourceMap;
   const remapConstraintSource = identity => {
     if (!identity) return identity;
@@ -244,7 +262,7 @@ export function compileSourceSync(source, options = {}) {
         ? { sourceDocumentSha256: sourceDocument.sha256 } : {}),
     } : null,
     extractionMap: extraction.sourceMap,
-    warnings: extraction.warnings,
+    warnings: [...extraction.warnings, ...intentDiagnostics.diagnostics],
     ...(hardwarePlan ? { hardwarePlan } : {}),
   };
   let schema = null;
@@ -262,11 +280,23 @@ export function compileSourceSync(source, options = {}) {
     throw error;
   }
   const explanationArtifact = emitExplanationArtifact(compilation);
+  let intentEvidence;
+  if (Object.hasOwn(options, 'intentEvidence')) {
+    try { intentEvidence = bindIntentEvidence(compilation, options.intentEvidence); }
+    catch (error) {
+      error.diagnosticEnvelope = { format: DIAGNOSTICS_FORMAT,
+        source: diagnosticSource(filename, source, interactionSourceIdentity),
+        diagnostics: [{ code: 'GF_INTENT_EVIDENCE', severity: 'error', message: error.message,
+          evidencePath: error.evidencePath ?? 'intentEvidence' }] };
+      throw error;
+    }
+  }
   const { explanationExpressions: _expressionMappings, ...publicCompilation } = compilation;
   return {
     ...publicCompilation,
+    ...(intentEvidence ? { intentEvidence } : {}),
     diagnosticEnvelope: { format: DIAGNOSTICS_FORMAT,
-      source: diagnosticSource(filename, source, interactionSourceIdentity), diagnostics: [] },
+      source: diagnosticSource(filename, source, interactionSourceIdentity), ...intentDiagnostics },
     interactionSchema: schema,
     explanationArtifact,
     interactionSourceIdentity: schema ? {

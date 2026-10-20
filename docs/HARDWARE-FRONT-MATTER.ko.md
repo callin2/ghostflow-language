@@ -5,6 +5,12 @@
 
 [한국어](HARDWARE-FRONT-MATTER.ko.md) · [Reference 1.1](reference/01-source-and-syntax.en.md)
 
+보드·드라이버 기본값을 재사용하는 간결한 작성은 [profile 설계와 목적](PROFILE-FRONT-MATTER.md)을
+따른다. 아래 명시적 `hardware` 형식은 실제 profile과 compact 패키징 어댑터를
+구현하는 동안 현재 배포된 Device 패키징 경로를 위해 유지한다. 설치 이행을
+검증한 뒤 이 작성 형식을 제거한다. 파생 배포 계약에는 확장된 하드웨어 사실이
+계속 포함될 수 있다.
+
 `.ghost.md` 문서의 최상위 YAML 예약 필드 `hardware`는 입력 드라이버와 출력
 렌더러의 설치 의존성과 논리 바인딩을 선언한다. 소스 문서가 정본이며 컴파일러는
 파생 `hardwarePlan`을 반환한다. 선언은 코드를 실행하거나 GFB 바이트, 런타임 ABI,

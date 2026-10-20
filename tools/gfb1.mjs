@@ -253,7 +253,7 @@ function lowerCoreModule(ast) {
   for(const c of constraints){if(c.names.length>32||new Set(c.names).size!==c.names.length)throw new CompileError('invalid constraint names or arity');for(const n of c.names)assertName(n,'constraint');}
   const env={inputs:new Map(inputs.map((x,i)=>[x.name,{...x,index:i}])),states:new Map(states.map((x,i)=>[x.name,{...x,index:i}]))};
   const rawWindowCount=strategies.reduce((total,{raw})=>total+raw.slice(3).filter(form=>Array.isArray(form)&&form[0]==='window').length,0);
-  const contextHeads=['at-pulse','periodic-pulse','cron-pulse','calendar-daily-pulse','holiday-daily-pulse','solar-context-pulse','tide-run','config-daily-slots-pulse','utc-range','calendar-range'];
+  const contextHeads=['at-pulse','periodic-pulse','cron-pulse','calendar-daily-pulse','holiday-daily-pulse','solar-context-pulse','tide-run','config-daily-slots-pulse','utc-range','calendar-range','civil-range'];
   const rawScheduleCount=strategies.reduce((total,{raw})=>total+raw.slice(3).filter(form=>Array.isArray(form)&&['solar-pulse','daily-pulse','daily-slots-pulse','config-stream',...contextHeads].includes(form[0])).length,0);
   const hasContext=strategies.some(({raw})=>raw.slice(3).some(form=>Array.isArray(form)&&['config-stream',...contextHeads,'natural-result','accounting-result','calendar-result'].includes(form[0])));
   const rawNaturalCount=strategies.reduce((total,{raw})=>total+raw.slice(3).filter(form=>Array.isArray(form)&&['natural-result','accounting-result','calendar-result'].includes(form[0])).length,0);
@@ -493,7 +493,7 @@ function lowerCoreModule(ast) {
         if(preludeNames.has(scheduleName))throw new CompileError('duplicate prelude name');preludeNames.add(scheduleName);
         const gapMs=unsignedAtom(gapAtom,9007199254740991n,'invalid schedule gap');
         if(!gapMs)throw new CompileError('invalid schedule gap');
-        const expected={ 'at-pulse':3,'solar-context-pulse':9,'cron-pulse':10,'calendar-daily-pulse':8,'holiday-daily-pulse':7,'tide-run':8,'config-daily-slots-pulse':6,'utc-range':6,'calendar-range':8 }[h];
+        const expected={ 'at-pulse':3,'solar-context-pulse':9,'cron-pulse':10,'calendar-daily-pulse':8,'holiday-daily-pulse':7,'tide-run':8,'config-daily-slots-pulse':6,'utc-range':6,'calendar-range':8,'civil-range':7 }[h];
         if(h==='periodic-pulse'?![5,6].includes(payload.length):h==='config-daily-slots-pulse'?![6,7].includes(payload.length):payload.length!==expected)throw new CompileError(`${h} has invalid arity`);
         const [whenForm,cancelForm]=payload.slice(-2);
         const when=checkedExpression(whenForm,contextEnv(),false),cancel=checkedExpression(cancelForm,contextEnv(),false);
@@ -521,6 +521,14 @@ function lowerCoreModule(ast) {
             fallbackAt:unsignedAtom(fallback,86400000n,'invalid Solar fallback time'),configIds};
         }else if(h==='at-pulse'){
           detail={at:unsignedAtom(data[0],253402300799999n,'invalid At DateTime')};
+        }else if(h==='civil-range'){
+          const [timezone,duration,starts,missing,fold]=data;
+          if(timezone==='UTC'||!Array.isArray(starts)||starts[0]!=='starts'||starts.length<2||starts.length>97)throw new CompileError('invalid civil Range definition');
+          const values=starts.slice(1).map(atom=>unsignedAtom(atom,86399999n,'invalid civil Range start'));
+          const length=unsignedAtom(duration,86400000n,'invalid civil Range duration');
+          if(!length||values.some((value,index)=>value%900000n!==0n||index>0&&value<=values[index-1])
+            ||values.some((value,index)=>(values[(index+1)%values.length]+(index+1===values.length?86400000n:0n))-value<length))throw new CompileError('civil Range nominal occurrences must not overlap');
+          detail={timezone:text(timezone),duration:length,starts:values,missing:dst(missing),repeated:repeated(fold)};
         }else if(h==='utc-range'||h==='calendar-range'){
           const [timezone,duration,startConfig,starts]=data;
           if(timezone!=='UTC'||!Array.isArray(starts)||starts[0]!=='starts'||starts.length<2||starts.length>97)throw new CompileError('invalid UTC Range definition');
@@ -710,7 +718,7 @@ function emitGfb(moduleIr, { onExpressions } = {}) {
   const {name,version,inputs,states,strategies,constraints,temporal,objectives:compiledObjectives}=moduleIr;
   const preludeKinds=new Set(strategies.flatMap(strategy=>strategy.extensions.preludes.map(prelude=>prelude.kind)));
   const hasContext=['config-stream','periodic-pulse','cron-pulse','calendar-daily-pulse','holiday-daily-pulse','solar-context-pulse','tide-run',
-    'config-daily-slots-pulse','natural-result','accounting-result','utc-range','at-pulse','calendar-range','calendar-result'].some(kind=>preludeKinds.has(kind));
+    'config-daily-slots-pulse','natural-result','accounting-result','utc-range','at-pulse','calendar-range','calendar-result','civil-range'].some(kind=>preludeKinds.has(kind));
   const hasDailySlots=preludeKinds.has('daily-slots'),hasDaily=preludeKinds.has('daily');
   const hasTrueFors=preludeKinds.has('true-for');
   const hasSchedules=[...preludeKinds].some(kind=>kind!=='window'&&kind!=='true-for'&&kind!=='natural-result'&&kind!=='accounting-result');
@@ -745,7 +753,9 @@ function emitGfb(moduleIr, { onExpressions } = {}) {
   const liveRangeStart=compiledStrategies.some(strategy=>strategy.extensions.preludes.some(prelude=>prelude.kind==='utc-range'&&prelude.value.detail.startConfigId));
   const timeSlotsRange=compiledStrategies.some(strategy=>strategy.extensions.preludes.some(prelude=>prelude.kind==='config-daily-slots-pulse'&&prelude.value.detail.rangeDuration));
   if(liveRangeStart&&calendarExecution)throw new CompileError('live Range start cannot mix with calendar execution');
-  const format=timeSlotsRange?20:liveRangeStart?19:calendarExecution?18:preludeKinds.has('solar-context-pulse')?16:preludeKinds.has('holiday-daily-pulse')?15:preludeKinds.has('at-pulse')?14:extendedNatural?13:preludeKinds.has('utc-range')?12:hasContext?11:hasDailySlots?9:hasDaily?8:hasPid?7:hasTrueFors?6:hasSchedules?5:temporal?4:format3?3:intDeclarations||intExpressions?2:1;
+  const civilRange=preludeKinds.has('civil-range');
+  if(civilRange&&(hasPid||[...preludeKinds].some(kind=>!['civil-range','window'].includes(kind))))throw new CompileError('civil Range profile requires immutable civil Range schedules without other schedule/provider/config profiles');
+  const format=civilRange?21:timeSlotsRange?20:liveRangeStart?19:calendarExecution?18:preludeKinds.has('solar-context-pulse')?16:preludeKinds.has('holiday-daily-pulse')?15:preludeKinds.has('at-pulse')?14:extendedNatural?13:preludeKinds.has('utc-range')?12:hasContext?11:hasDailySlots?9:hasDaily?8:hasPid?7:hasTrueFors?6:hasSchedules?5:temporal?4:format3?3:intDeclarations||intExpressions?2:1;
   const w=new Writer();w.bytes(UTF8.encode('GFB1'));w.u16(format);w.str(name);w.u32(version);
   const typeCode=type=>TYPE[type.toLowerCase()];
   w.u16(inputs.length);for(const x of inputs){w.str(x.name);w.u8(typeCode(x.type));}
@@ -771,6 +781,7 @@ function emitGfb(moduleIr, { onExpressions } = {}) {
   }w.u64(x.gapMs);
     if(prelude.kind==='solar-context-pulse'){w.str(d.timezone);w.f64(d.latitude);w.f64(d.longitude);w.u8(d.event==='rise'?0:1);w.i64(d.offset);w.u64(d.fallbackAt);w.u16(d.configIds.length);for(const id of d.configIds)w.u32(id);}
     else if(prelude.kind==='at-pulse'){w.u64(d.at);}
+    else if(prelude.kind==='civil-range'){w.str(d.timezone);w.u64(d.duration);w.u16(d.starts.length);for(const start of d.starts)w.u64(start);w.u8(missingCode(d.missing));w.u8(repeatedCode(d.repeated));}
     else if(prelude.kind==='utc-range'||prelude.kind==='calendar-range'){w.str(d.timezone);if(Array.isArray(d.duration)&&d.duration[0]==='duration-config'){w.u64(0n);w.u32(Number(d.duration[1]));}else w.u64(d.duration);if(format>=19)w.u32(d.startConfigId??0);w.u16(d.starts.length);for(const start of d.starts)w.u64(start);if(prelude.kind==='calendar-range'){w.str(d.calendar);w.u8(d.selector==='offday'?1:0);}}
     else if(prelude.kind==='periodic-pulse'){w.str(d.epoch);w.u64(d.anchor);w.u32(d.configId);if(d.configId===0)w.u64(d.literal);}
     else if(prelude.kind==='cron-pulse'){w.str(d.timezone);w.u8(missingCode(d.missing));w.u8(repeatedCode(d.repeated));for(const field of d.fields){w.u8(field.length);for(const value of field)w.u8(value);}}
@@ -781,7 +792,7 @@ function emitGfb(moduleIr, { onExpressions } = {}) {
     for(const expression of [x.when,x.cancel]){const bytes=encode(expression,'invalid context schedule predicate').bytes;w.u32(bytes.length);w.bytes(bytes);}
     if(format===13||format===15||format===16)w.u64(x.holdMs??0n);
   };
-  w.u16(compiledStrategies.length);for(const s of compiledStrategies){w.str(s.name);w.i32(s.priority);w.u32(s.query.length);w.bytes(s.query);if(temporal){if(taggedPreludes){w.u16(s.preludes.length);for(const prelude of s.preludes){const tag={'window':0,'schedule':1,'true-for':2,'daily':3,'daily-slots':4,'periodic-pulse':5,'cron-pulse':6,'calendar-daily-pulse':7,'tide-run':8,'config-daily-slots-pulse':9,'natural-result':10,'accounting-result':11,'config-stream':12,'utc-range':13,'at-pulse':14,'holiday-daily-pulse':15,'solar-context-pulse':16,'calendar-range':17,'calendar-result':18}[prelude.kind];w.u8(tag);if(tag>=5)writeContext(prelude);else if(prelude.kind==='window')writeWindow(prelude.value);else if(prelude.kind==='schedule')writeSchedule(prelude.value);else if(prelude.kind==='daily')writeDaily(prelude.value);else if(prelude.kind==='daily-slots')writeDailySlots(prelude.value);else writeTrueFor(prelude.value);}}else{w.u16(s.windows.length);for(const window of s.windows)writeWindow(window);}}w.u16(s.transitions.length);for(const t of s.transitions){w.u16(t.index);w.u32(t.expr.length);w.bytes(t.expr);}w.u16(s.intents.length);for(const i of s.intents){w.str(i.name);w.u8(typeCode(i.type));w.u32(i.expr.length);w.bytes(i.expr);}}
+  w.u16(compiledStrategies.length);for(const s of compiledStrategies){w.str(s.name);w.i32(s.priority);w.u32(s.query.length);w.bytes(s.query);if(temporal){if(taggedPreludes){w.u16(s.preludes.length);for(const prelude of s.preludes){const tag={'window':0,'schedule':1,'true-for':2,'daily':3,'daily-slots':4,'periodic-pulse':5,'cron-pulse':6,'calendar-daily-pulse':7,'tide-run':8,'config-daily-slots-pulse':9,'natural-result':10,'accounting-result':11,'config-stream':12,'utc-range':13,'at-pulse':14,'holiday-daily-pulse':15,'solar-context-pulse':16,'calendar-range':17,'calendar-result':18,'civil-range':19}[prelude.kind];w.u8(tag);if(tag>=5)writeContext(prelude);else if(prelude.kind==='window')writeWindow(prelude.value);else if(prelude.kind==='schedule')writeSchedule(prelude.value);else if(prelude.kind==='daily')writeDaily(prelude.value);else if(prelude.kind==='daily-slots')writeDailySlots(prelude.value);else writeTrueFor(prelude.value);}}else{w.u16(s.windows.length);for(const window of s.windows)writeWindow(window);}}w.u16(s.transitions.length);for(const t of s.transitions){w.u16(t.index);w.u32(t.expr.length);w.bytes(t.expr);}w.u16(s.intents.length);for(const i of s.intents){w.str(i.name);w.u8(typeCode(i.type));w.u32(i.expr.length);w.bytes(i.expr);}}
   w.u16(constraints.length);for(const c of constraints){w.u8(({requires:1,mutex:2,requires_any:3})[c.kind]);w.u16(c.names.length);for(const n of c.names)w.str(n);}
   if(format===7||format>=11){w.u16(compiledObjectives.length);for(const objective of compiledObjectives){w.str(objective.name);w.str(objective.outputPort);for(const index of objective.indices)w.u16(index);if(format>=11)w.u16(objective.targetOkIndex);w.u64(objective.period);w.u64(objective.late);w.u8(objective.direction==='direct'?0:1);for(const value of objective.numbers)w.f64(value);}}
   return w.finish();

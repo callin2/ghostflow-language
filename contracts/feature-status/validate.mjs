@@ -9,6 +9,7 @@ export const catalogPath = path.join(root, 'contracts/feature-status/catalog.jso
 const referenceCatalogs = [
   'tests/reference/cases/00-principles.json', 'tests/reference/cases/01-source-types.json',
   'tests/reference/cases/02-time-control.json', 'tests/reference/cases/03-settings-boundaries.json',
+  'tests/reference/cases-civil-range-v1/02-time-control.json',
 ];
 const stages = new Set(['compile', 'native_wasm', 'host_simulation', 'driver_application', 'physical_confirmation']);
 const owners = new Set(['CORE', 'LIBRARY', 'HOST', 'DRIVER', 'PRODUCT_BOUNDARY']);

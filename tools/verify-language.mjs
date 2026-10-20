@@ -15,6 +15,7 @@ import { languageTestBatches } from './verification-test-batches.mjs';
 
 // Deliberately explicit. Product/LLM/device tests belong to other repositories.
 export const LANGUAGE_TESTS = Object.freeze([
+  'tests/hardware-profiles.test.mjs',
   'tests/hardware-frontmatter.test.mjs',
   'tests/canonical-input.test.mjs',
   'tests/build-identity.test.mjs',
@@ -35,6 +36,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/host-event-ordering-contract.test.mjs',
   'tests/effect-process-contract.test.mjs',
   'tests/compiler.test.mjs',
+  'tests/compiler-telemetry.test.mjs',
   'tests/docs-runnable-examples.test.mjs',
   'tests/programming-natural-examples.test.mjs',
   'tests/programming-builtins.test.mjs',
@@ -91,6 +93,9 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/long-tick-state.test.mjs',
   'tests/duration-runtime.test.mjs',
   'tests/portable-package.test.mjs',
+  'tests/civil-range-package.test.mjs',
+  'tests/restart-lifecycle.test.mjs',
+  'tests/control-runtime-restart-lifecycle.test.mjs',
   'tests/gfb11-periodic-package.test.mjs',
   'tests/gfb10-package.test.mjs',
   'tests/control-host.test.mjs',
@@ -112,6 +117,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/compiler-cli-diagnostics.test.mjs',
   'tests/ghostc-toon.test.mjs',
   'tests/structured-diagnostics.test.mjs',
+  'tests/diagnostic-owner-boundaries.test.mjs',
   'tests/compiler-semantic-diagnostics.test.mjs',
   'tests/compiler-interaction-diagnostics.test.mjs',
   'tests/compiler-control-diagnostics-extra.test.mjs',
@@ -121,6 +127,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/daily-slots-policy.test.mjs',
   'tests/periodic-cron-policy.test.mjs',
   'tests/civil-dst-reference.test.mjs',
+  'tests/civil-range-runtime.test.mjs',
   'tests/natural-condition-contract.test.mjs',
   'tests/natural-schedule-contract.test.mjs',
   'tests/natural-fallback-compiler.test.mjs',
@@ -220,9 +227,12 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/snapshot-identity-join.test.mjs',
   'tests/explanation-path.test.mjs',
   'tests/intent-anchor-map.test.mjs',
+  'tests/intent-link-diagnostics.test.mjs',
+  'tests/intent-evidence.test.mjs',
   'tests/ledger.test.mjs',
   'tests/literate.test.mjs',
   'tests/lesson.test.mjs',
+  'tests/lesson-samples.test.mjs',
   'tests/lesson-boundaries.test.mjs',
   'tests/source-trace.test.mjs',
   'tests/source-dependencies.test.mjs',
@@ -254,6 +264,12 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/scan-frame-wasm.test.mjs',
   'tests/scan-tape-parity.test.mjs',
   'tests/ghostsim.test.mjs',
+  'tests/ghostsim-incident.test.mjs',
+  'tests/behavior-comparison.test.mjs',
+  'tests/failure-reduction.test.mjs',
+  'tests/target-query.test.mjs',
+  'tests/execution-evidence.test.mjs',
+  'tests/intent-decisions.test.mjs',
   'tests/ghostsim-closed-loop.test.mjs',
   'tests/ghostsim-continuous-io.test.mjs',
   'tests/ghostsim-temporal.test.mjs',
@@ -322,7 +338,8 @@ async function verify(nodeOnly, curriculumOnly) {
     process.stdout.write(`\n[gate] ${command} ${arguments_.join(' ')}\n`);
     const result = await new Promise(resolve => {
       let stdout = '', stderr = '', error;
-      const child = spawn(command, arguments_, { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'], timeout: 180_000 });
+      const timeout = arguments_.includes('--test') ? 600_000 : 180_000;
+      const child = spawn(command, arguments_, { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'], timeout });
       child.stdout.on('data', bytes => { stdout += bytes.toString(); process.stdout.write(bytes); });
       child.stderr.on('data', bytes => { stderr += bytes.toString(); process.stderr.write(bytes); });
       child.on('error', failure => { error = failure.message; });
@@ -494,8 +511,9 @@ async function verify(nodeOnly, curriculumOnly) {
       wasmVerified = true;
     }
     report.plcCurriculum.replay.runtime = await verifyCurriculumReplayWasm(fs.readFileSync(wasmPath), { repositoryRoot: root });
+    // Preserve dev batching and serialize suites that rebuild shared Cargo outputs.
     for (const tests of languageTestBatches(LANGUAGE_TESTS)) {
-      await gate(process.execPath, ['--test', ...tests]);
+      await gate(process.execPath, ['--test', '--test-concurrency=1', ...tests]);
     }
     if (!nodeOnly) {
       await gate(process.execPath, ['tools/tutorial.mjs', '--no-build']);

@@ -15,6 +15,10 @@ GhostFlow 프로그램의 정본은 설명과 실행 규칙을 함께 담은 하
 [전체 언어 reference](../LANGUAGE-REFERENCE.md)는 이 장과 나머지 상세 장의 색인이다.
 
 외부 입력의 canonical 선언은 `input`이며 읽으면 `Result<T, SensorFault>`다.
+정확한 reserved `restart_reason: RestartReason`과 `restart_event: Bool` 선언은
+runtime 소유 lifecycle 입력이며 외부 취득 규칙의 명시적 예외다.
+각각 `RestartReason`과 `Bool`로 직접 읽는다. optional 표기, conditioning 설정과
+호출자가 공급하는 값은 금지한다. [재시작 계약](05-settings-and-observation.md)을 따른다.
 이 예제는 start fault에서 false, stop fault에서 true를 명시적으로 선택한다.
 설명용 작성 정책이며 암묵적 기본값이 아니다. 기존 `sensor` 선언은 거부한다.
 이전 문서는 보존하고 명시적으로 검토할 새 revision을 만든다.
@@ -83,6 +87,14 @@ control PumpRequest {
 없는 참조와 역할 불일치는 정본 위치에서 거부한다. 일반 front matter는 기존대로
 비실행 문서다. 구조, 예제와 provider 검증 경계는 [하드웨어 선언](../HARDWARE-FRONT-MATTER.ko.md)을 따른다.
 Why: 설치 의도와 제어 규칙을 같은 revision에서 검토하되 보드 동작은 Device가 소유한다.
+
+간결한 작성 형식은 최상위 `profile`, 선택적 `devices`, `bindings`를 예약한다.
+`compileSource`/`compileSourceSync`에 고정 `hardwareProfiles` closure를 제공하면
+상속·명시적 기본 연결·매개변수·통신 조건·주소 충돌·채널 타입을 검증한다. 모든
+논리 입출력은 바인딩이 필요하다. 반환된 `hardwarePlan`은
+`GhostFlow/profile-resolution-v1`이며 미해석 선언이 아니다. Profile 누락을 추측으로
+대체하지 않는다. [설계와 단계별 범위](../PROFILE-FRONT-MATTER.md)를 따른다.
+고객이 보드와 드라이버의 알려진 사실을 반복하지 않는 것이 이 형식의 목적이다.
 
 ## 1.2 원문, 위치와 의도 연결
 

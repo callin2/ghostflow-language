@@ -81,3 +81,24 @@ test('ghostc CLI valid control harness emits an artifact', async () => {
     assert.equal(fs.existsSync(`${output}.map.json`), true);
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 });
+
+test('ghostc CLI warns with source location and copyable intent-link guidance while preserving successful artifacts', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-cli-intent-warning-'));
+  try {
+    const input = path.join(directory, 'unlinked.ghost.md');
+    const output = path.join(directory, 'unlinked.gfb');
+    fs.writeFileSync(input, document('control Unlinked { output pump: Bool; pump <- true; }'), 'utf8');
+    for (const args of [['--check', input], [input, output]]) {
+      const result = await run(args);
+      assert.equal(result.status, 0, result.stderr);
+      assert.ok(result.stderr.includes(input.split(path.sep).join('/') + ':4:'), result.stderr);
+      assert.match(result.stderr, /warning GF_INTENT_LINK_MISSING:/);
+      assert.match(result.stderr, /ghostflow:anchor id=/);
+      assert.match(result.stderr, /ghostflow:link id=/);
+      assert.match(result.stderr, /relation=assumes/);
+    }
+    assert.equal(fs.existsSync(output), true);
+    assert.equal(fs.existsSync(`${output}.manifest.json`), true);
+    assert.equal(fs.existsSync(`${output}.map.json`), true);
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+});

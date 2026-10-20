@@ -231,7 +231,7 @@ cancel_when := Bool                                   // Required for current ci
 
 All common fields are required. Unconditional admission can specify `when = true`; a Run or Range without language-level cancellation can specify `cancel_when = false`. In the current compiler, `cancel_when` is allowed for `Tide` Run and civil `range`, and is required for `range`. It is forbidden for `pulse`. `hold_trusted(d, terminal: skip)` adds monotonic elapsed time to the last trusted wall instant and uses it for at most d. Uncertainty adds the same monotonic elapsed time to the last uncertainty, recording `HeldClock` provenance. At the boundary, after `ClockUnknown`, terminal skip applies to new admission decisions. An already admitted Range keeps its monotonic end time. High-water does not change.
 
-The current compiler accepts `clock = hold_trusted(positive constant Duration, terminal: skip)` for Solar and Tide and `fallback = fixed_time(TimeOfDay literal, terminal: skip)` for Solar. Tide permits only `fallback = skip`; other triggers retain trusted-only clock and skip fallback. `window` and `run(_, on_time)` remain outside current support. Civil `range` requires provable static non-overlap in UTC; immutable UTC Daily and nonempty static DailySlots ranges execute as GFB12, while other accepted Range recurrences remain descriptors. A Range duration may be an operator `Duration` config when the initial value proves non-overlap; accepted live setting events recompute the current occurrence from its frozen planned start, without a new due pulse or occurrence identity. Tide `run(_, within(_))` is supported.
+The current compiler accepts `clock = hold_trusted(positive constant Duration, terminal: skip)` for Solar and Tide and `fallback = fixed_time(TimeOfDay literal, terminal: skip)` for Solar. Tide permits only `fallback = skip`; other triggers retain trusted-only clock and skip fallback. `window` and `run(_, on_time)` remain outside current support. Immutable UTC Daily and nonempty static DailySlots ranges prove static non-overlap and execute as GFB12. Immutable non-UTC `DailySlots<15min>` uses the GFB21 profile below, combining compile-time nominal slot-spacing checks with Rust validation of actual occurrence intervals supplied by the host. Other accepted Range recurrences remain descriptors. In supported UTC profiles, a Range duration may be an operator `Duration` config when the initial value proves non-overlap; accepted live setting events recompute the current occurrence from its frozen planned start, without a new due pulse or occurrence identity. Tide `run(_, within(_))` is supported.
 
 Bounded natural-policy admission uses held time only while monotonic elapsed time is strictly less than the duration. Missing trusted anchors or uncertainty and checked-addition overflow fail closed. Held wall time and uncertainty are the last trusted values plus elapsed time, with `HeldClock` provenance. Expiry terminal-skips new admission, preserves high-water and does not extend an active Run. Recovery establishes a baseline; restart begins with a new clock. The facts provider owns IANA conversion and supplies a known source local date and fallback instant matching the authored time and timezone on that date. Ambiguous or nonexistent civil times terminal-skip without inventing a fold. The core owns admission and generated due inputs. A fallback and recovered Solar event on the same source local date share a consumed identity and terminal checkpoint. These bounds prevent unavailable predictions or uncertain clocks from silently creating occurrences.
 
@@ -335,7 +335,7 @@ A Bool pulse contains neither count nor reason. The same accepted scan's **order
 | `window(5min)` (design) | Admit once at the first true condition within `[planned, planned+5min)`. Repeated false→true changes in the same occurrence do not rearm it. |
 | `run(5min, on_time)` (design) | Admit only at observed crossing and run for five minutes from admission. |
 | `run(5min, within(10min))` (Tide) | Allow first admission within `[planned, planned+10min)`. Ten minutes are grace; run length is five minutes. |
-| `range(10min)` (civil contract) | If trusted current time is within `[planned, planned+10min)` and `when` is true, admit once even after late first observation, boot or recovery. End is planned start + ten minutes. Immutable UTC Daily/DailySlots execution uses GFB12. |
+| `range(10min)` (civil contract) | If trusted current time is within `[planned, planned+10min)` and `when` is true, admit once even after late first observation, boot or recovery. End is planned start + ten minutes. Immutable UTC Daily/DailySlots uses GFB12; immutable non-UTC DailySlots below uses GFB21. |
 
 ```ghost
 schedule morning_watering: Daily {
@@ -353,7 +353,7 @@ schedule morning_watering: Daily {
 }
 ```
 
-This immutable UTC `range` example is executable GFB12 control bytecode. The bounded execution slice supports Daily without a work calendar and nonempty static DailySlots, with `trusted_only`, `baseline` and `skip`. Immutable UTC Daily with a `workday` or `offday` selector and a typed WorkCalendar uses GFB18. Its start plus duration must not exceed local midnight; divide an overnight work interval into separate explicit Daily ranges. A range ending exactly at midnight is valid because its end is exclusive. Ordinary ranges without a work calendar retain their existing midnight behavior. In this slice, live duration settings lower only for UTC Daily/DailySlots without a work calendar. Live scalar start settings lower only for a single UTC Daily Range with fixed Duration. Work-calendar Range with live duration/start config, combined live start+Duration, Periodic Range and non-UTC Range are rejected statically instead of silently falling back to static Range metadata. Unsupported variants do not infer timezone or DST policy.
+This immutable UTC `range` example is executable GFB12 control bytecode. The bounded execution slice supports Daily without a work calendar and nonempty static DailySlots, with `trusted_only`, `baseline` and `skip`. Immutable UTC Daily with a `workday` or `offday` selector and a typed WorkCalendar uses GFB18. Its start plus duration must not exceed local midnight; divide an overnight work interval into separate explicit Daily ranges. A range ending exactly at midnight is valid because its end is exclusive. Ordinary ranges without a work calendar retain their existing midnight behavior. In this slice, live duration settings lower only for UTC Daily/DailySlots without a work calendar. Live scalar start settings lower only for a single UTC Daily Range with fixed Duration. Work-calendar Range with live duration/start config, combined live start+Duration, Periodic Range, non-UTC Daily Range and non-UTC settings-based Range are rejected statically instead of silently falling back to static Range metadata. Immutable non-UTC DailySlots follows the separate profile below. Unsupported variants do not infer timezone or DST policy.
 
 Range context checkpoints retain consumed occurrence identities and, when present, the effective live duration or live scalar start setting, not an active monotonic timer. Restoring into a fresh boot does not resume or readmit an already consumed occurrence, but the next occurrence uses the restored duration or start. An unconsumed still-open interval may admit only its remaining time. Terminal-capacity exhaustion rejects the scan atomically; identities are never silently pruned.
 
@@ -361,7 +361,7 @@ The late interval is half-open. No new admission occurs at its end boundary. For
 
 `range(duration)` is a fixed planned time interval. For example, first observing an 08:00-planned `range(10min)` at trusted 08:04 requests only the six minutes remaining until 08:10. First observation at or after 08:10 does not start it and records `LateStartExpired`. If `when` becomes true late but before the end, it requests only remaining time. The same applies at startup, reboot, recovery of clock trust and observation gaps. This is explicit partial-interval admission applying only to Range. It does not change `gap = skip_after(...)` and `recovery = baseline` for other bases. Without trusted current time, the result is `Unknown(ClockUnknown)`; estimated time does not admit a new Range. Explicit `clock = hold_trusted(...)` uses time and uncertainty held under that contract. An ongoing Range continues until its existing monotonic end even if wall trust or hold subsequently expires. However, reentry of the same occurrence waiting for a start moved into the future, like new admission, requires trusted time. Even after trust recovers, there is no reentry if the current interval has ended.
 
-Different Range occurrences of the same schedule must not overlap. A nonempty intersection of two half-open intervals is an error. Exactly touching boundaries are allowed. For example, `DailySlots` with `selected = [08:00, 08:15]` and `basis = range(30min)` is a compile error because 08:00–08:30 and 08:15–08:45 overlap. The compiler accepts only Ranges for which trigger definitions and effective settings prove non-overlap of occurrence spacing. If provider or dynamic recurrence spacing cannot be proved, reject that `range` declaration with a compile diagnostic rather than guessing or selecting one. Check static defaults at compile time and effective values, including restored settings, before activation. Overlapping effective values reject activation. A live settings change causing overlap rejects the whole event atomically. Both checks also apply to the currently admitted interval and newly planned intervals.
+Different Range occurrences of the same schedule must not overlap. A nonempty intersection of two half-open intervals is an error. Exactly touching boundaries are allowed. For example, `DailySlots` with `selected = [08:00, 08:15]` and `basis = range(30min)` is a compile error because 08:00–08:30 and 08:15–08:45 overlap. The compiler proves non-overlap from trigger definitions and effective settings. The immutable non-UTC DailySlots profile checks nominal slot spacing at compile time and completes actual interval validation with the Rust fact checks below. Outside that explicit profile, if provider or dynamic recurrence spacing cannot be proved, reject that `range` declaration with a compile diagnostic rather than guessing or selecting one. Check static defaults at compile time and effective values, including restored settings, before activation. Overlapping effective values reject activation. A live settings change causing overlap rejects the whole event atomically. Both checks also apply to the currently admitted interval and newly planned intervals.
 
 At Range admission, fix the planned end using the occurrence's planned start and the effective Duration at that point. Convert the already elapsed portion into remaining time on the monotonic clock. RTC/NTP wall-clock correction after admission neither advances nor delays the ongoing end. Apply the corrected wall clock to subsequent occurrence decisions after the current occurrence ends. Preserve trusted time, planned start and monotonic elapsed reference together for the same occurrence, avoiding recalculation of the end during correction.
 
@@ -370,6 +370,94 @@ If the scalar start-time setting of a trigger with a single planned start, or it
 When global safety constraints block output, safe output immediately becomes false, but the Range occurrence and monotonic end remain. If the constraint clears before the end, only the then-remaining interval may be requested. Blocked time is not appended at the end. `cancel_when = true` terminates the occurrence; renewed permission does not restart it. `.active` and requested/safe/applied/confirmed output are different observations.
 
 If a start-time change places current position before the new planned start, stop with `.active = false` in that decision. On the accepted tick reaching the new start, reassess whether the same occurrence is inside its changed interval. If `when` is true, resume requests only until the current planned end; produce safe output only when safety constraints allow. This is not new admission, so `.due` is not emitted again and occurrence ID and ledger remain. If the changed end is at or before current position, terminate the occurrence immediately without resuming or readmitting. `DailySlots` `TimeSlots` changes distinguish retime from removal/addition using §3.6 stable slot keys. Apply these Range recalculation rules to retime preserving a key, and the new-item baseline rule to removal/addition.
+
+### Immutable non-UTC DailySlots Range
+
+Nonempty literal `DailySlots<15min>` in a non-UTC IANA timezone with a positive
+fixed Duration executes as GFB21, with a `civil-range` prelude (tag 19) and
+`GhostFlow/control-v21`. This profile may combine multiple such Ranges, ordinary
+temporal windows and timers lowered to ordinary state, such as `elapsed(state)`.
+It does not combine with the separate `true-for` prelude, other
+schedule/provider/config profiles, work calendars or live start/Duration/TimeSlots.
+Existing UTC profiles and the GFSF civil occurrence row remain unchanged. That row
+has existed since GFSF4; this does not mean the current context encoder emits a
+GFSF4 envelope. Older loaders reject GFB21 without substituting another profile.
+
+```ghost
+schedule night: DailySlots<15min> {
+  timezone = "Asia/Seoul";
+  selected = [22:00];
+  dst_missing = skip;
+  dst_repeated = first;
+  basis = range(7h);
+  when = true;
+  cancel_when = false;
+  clock = trusted_only;
+  gap = skip_after(60s);
+  recovery = baseline;
+  fallback = skip;
+}
+```
+
+A separate schedule with the same policies, `selected = [05:00]` and
+`basis = range(17h)`, defines the day interval. In Seoul, 22:00 + seven hours ends
+at 05:00 the next day, and 05:00 + seventeen hours ends at 22:00. End boundaries
+are exclusive: midnight is inside the night interval, while 05:00/22:00 starts
+the next interval. This operation adds fixed elapsed time to the planned start
+instant. It is not a separate operation for running until an arbitrary local end
+time in a region with DST.
+
+The host owns timezone conversion and tzdb completeness. For each schedule, its
+`[coverageStartMs, coverageEndMs)` must reach back by the duration from the trusted
+current wall instant (`coverageStartMs <= max(0, wallMs - durationMs)`) and end after now
+(`coverageEndMs > wallMs`). Supply every occurrence in that coverage, including a
+previous-day occurrence whose interval remains open after midnight. Sending only
+today's rows after the date changes is insufficient. The existing GFSF schedule
+evidence has `provider: null` and `calendar: null`. JavaScript rows use the existing
+fields:
+
+```text
+{ sourceDay, slotKey, minuteOfDay, fold, eventId, eventKind: "civil",
+  instantMs, withdrawn, providerRevision, contextRevision }
+```
+
+`sourceDay` is the original local date's day number from the Unix epoch. `slotKey`
+is the one-based ordinal after sorting the immutable literal list by time, and
+`minuteOfDay` is that declared slot's exact minute. Identity is
+`site:sourceDay:slotKey:fold`; revisions and the planned instant do not change it.
+`eventId` is empty and withdrawal is forbidden. DST fold selection follows the
+authored `dst_repeated`. A host-resolved nonexistent local slot with
+`dst_missing = skip` may be represented by an `instantMs = null` fact or omitted
+as a known skipped occurrence. Absent evidence alone does not establish a DST
+gap. A host-resolved repeated slot with `dst_repeated = skip` may likewise use a
+null fact with `fold = 0`, including when `dst_missing = next_valid`. Null facts
+require `fold = 0` and at least one authored skip policy; they create no interval.
+The host remains responsible for distinguishing a gap from a repeated slot.
+Do not replace this null with healthy OFF or invent a planned instant.
+
+Rust checks field ranges, declared slot key/minute, DST fold selection, whether a
+null skip marker is permitted, duplicate/conflicting identities and revisions, row
+instants within coverage, and non-overlap of actual half-open intervals. Include
+the frozen currently admitted interval in overlap checks. Reject disappearance
+or conflict of a previously observed resolved-instant fact where successive coverage overlaps.
+Insufficient coverage and malformed facts do not proceed to new admission; a
+failed scan commits neither partial state nor occurrence history. Rust has no
+IANA tzdb, so it cannot prove completeness of IANA occurrences omitted entirely
+from the host's initial evidence.
+
+Validated facts execute in the existing RangeEngine. Late first observation,
+boot or recovery of clock trust may admit only the remaining part of an open
+interval. `gap` is a clock-observation policy; it does not shorten fact coverage
+or discard an open Range as if it were a pulse. Once admitted, a timer retains
+its fixed monotonic deadline across wall-trust loss or correction. Checkpoints
+preserve consumed identities for restart deduplication and never resume an
+admitted timer. Only an unconsumed open occurrence may admit a partial interval.
+
+**Why:** the current interval after midnight can originate in yesterday's plan.
+Keep host IANA conversion separate from Rust fact validation/admission while
+running validated occurrences with the same Range semantics. This contract
+supports deterministic compiled GhostFlow simulation; it does not define
+public-road signal compliance or validate physical control.
 
 ### Occurrence identity and duplicate suppression
 
@@ -383,7 +471,7 @@ Schedules check monotonic delta and positive wall delta between consecutive acce
 
 `recovery = baseline` establishes only a baseline at initial boot and clock-trust recovery; it does not execute past occurrences in a batch. Range may admit only the remaining time of a still-open current interval. Wall rollback is deduplicated with high-water and the admission ledger. There is no catch-up, retry or replay syntax.
 
-If two or more occurrences of the same schedule are crossed between consecutive accepted scans, record all new Pulse, Window and Run occurrences as missed and admit or execute none. Range does not execute occurrences already ended or recorded terminal missed/withdrawn; it admits the current occurrence whose interval is open at trusted current time for its remaining duration. Two simultaneously open Range intervals of the same schedule are forbidden and rejected in compile/live settings validation. If exactly one occurrence is crossed, apply ordinary admission rules for each basis.
+If two or more occurrences of the same schedule are crossed between consecutive accepted scans, record all new Pulse, Window and Run occurrences as missed and admit or execute none. Range does not execute occurrences already ended or recorded terminal missed/withdrawn; it admits the current occurrence whose interval is open at trusted current time for its remaining duration. Two simultaneously open Range intervals of the same schedule are forbidden and rejected by the profile's compile/live settings or Rust fact validation. If exactly one occurrence is crossed, apply ordinary admission rules for each basis.
 
 ## 3.6 Selected DailySlots
 

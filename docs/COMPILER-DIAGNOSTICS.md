@@ -1,7 +1,8 @@
 # Public compiler diagnostics
 
 `compileSource` in the browser and Node toolchains returns `diagnosticEnvelope`.
-Successful compilation has an empty `diagnostics` array. A located compilation
+Successful compilation may include warnings in `diagnostics`; a clean successful
+compile has an empty array. A located compilation
 failure rejects with the same property on the thrown error. The existing error
 class, message, and CLI text remain unchanged except for the actionable missing
 Interaction Schema provenance diagnostic described below.
@@ -29,6 +30,31 @@ The envelope format is `GhostFlow/diagnostics-v1`:
   }]
 }
 ```
+
+The compiler, CLI, and package creation report intent-link coverage warnings
+on successful compilation: `GF_INTENT_LINK_MISSING` for supported but unlinked
+statements, and `GF_INTENT_LINK_COVERAGE_UNSUPPORTED` when a behavioral owner
+has no supported link target. See
+[default behavior coverage warnings](INTENT-ANCHOR-MAP.md#default-behavior-coverage-warnings)
+for the covered statement kinds, limits, imports, and interpretation boundaries.
+For a successful warning in an imported document, the diagnostic envelope's
+`source` remains the root compilation document, while the warning's `span.file`
+identifies the imported source location. The `sourceClosure` retains the child
+document identity. This differs from an imported-document error, whose
+diagnostic `source` identifies and hashes the child and whose `requestSource`
+identifies the root request.
+The CLI human-readable output includes each warning's location, code, and hint;
+JSON and TOON output carry the same records. The compilation result retains
+`warnings`, containing extraction warning strings and the structured
+intent-link warning records; the envelope's `diagnostics` contains those
+structured records. This is additive API metadata and does not change
+executable output.
+
+`buildPortablePackage` also replays the source after provenance validation and
+reports fresh replay warnings. Pass `onDiagnostic` to handle each warning;
+without a callback the package builder uses `console.warn`. The callback runs
+only after replay succeeds and its exceptions propagate. Verification remains
+silent, and warnings do not enter or change the signed payload.
 
 Coordinates are one-based and refer to the original `.ghost.md` document,
 including prose and fence lines. Columns follow the compiler's UTF-16 code-unit

@@ -128,6 +128,41 @@ LS-1c는 unsigned standalone map이 동시 교체를 탐지한다고 주장해�
 
 ## 진단과 acceptance vector
 
+### 기본 동작 범위 경고 (#553)
+
+compiler, CLI 및 package 생성은 기본적으로 intent-link 범위 경고를 보고한다.
+`GF_INTENT_LINK_MISSING`은 link되지 않은 top-level `connection`, `next`,
+`require`, `mutex`, `let`, `function`, `signal`, `schedule`, `timer` 문장마다
+적용된다. link는 자신의 target 문장만 포함한다. 선언에 link를 달아도 뒤의 동작까지
+포함하지 않는다. 단독 `input`,
+`output`, `state`, `config`, `parameter`, `enum` 선언은 집계하지 않는다. 이 검사는
+구조와 문장 단위만 확인하며 전이 동작을 추론하거나 assertion을 증명하거나 의도가
+옳거나 확인되었는지 판정하지 않는다. 명시된 활성 link는 미확인 assumption을
+설명하는 경우에도 이 검사를 충족하지만, 해당 상태는 계속 미확인이다.
+
+현재 계약에 link target이 없는 동작 소유자는 `GF_INTENT_LINK_COVERAGE_UNSUPPORTED`로
+보고한다. 대상은 top-level `adapt`, `objective`, `account`, `account-constraints`,
+`local-constraints`, `shared-constraints`, `adapt-setting`, `degraded`와 nested
+`connection`, `connect`, `next`, `require`, `mutex` 문장이다. 다른 문장에 link가
+있어도 이 경고는 발생한다. 안내문은 orphan link를 추가하지 말라고 하며, 복사 가능한
+예시는 독립 구문 예시일 뿐 즉시 적용할 수정이 아니라고 설명한다. 이 대상 지원에는
+별도의 계약 변경이 필요하다. 독립된 non-executable resource-policy descriptor는
+검사에서 제외된다.
+
+경고에는 원본 source 범위, 복사해 쓸 수 있는 anchor/link 예시, 실행 가능한 안내가
+포함된다. 예시는 정책을 미확인 AI assumption으로 표시하고 `recover(false)`를 명시적인
+예시 fault 정책으로 사용한다. 최대 20개 경고 record를 반환한다. 20개를 초과하면
+collection에 `limit: 20`, `truncated: true`를 표시한다. 정확히 20개이면 잘림을 뜻하지
+않는다. 가져온 정의는 인스턴스화될 때 원본 문장마다 한 번 경고하며, 사용하지 않는
+import는 이 경고를 만들지 않는다. 가져온 intent metadata는 계속 지원하지 않으므로,
+안내문은 root link가 가져온 문장을 포함할 수 없고 instance-qualified link에는 별도
+계약이 필요하다고 설명한다.
+
+이 경고는 지원되는 link 대상 top-level 동작과 link 지원이 없는 알려진 동작 소유자를
+다루며 의미의 완전성을 주장하지 않는다. 기존 malformed, orphan, missing-anchor 및
+interaction-schema 진단 동작은 유지된다. 이 경고는 실행 구문, GFB 바이트 또는 runtime
+동작을 추가하지 않는다.
+
 진단은 원본 filename/line/column을 식별하며 다음을 다룬다.
 
 1. 유효 confirmed intent→output, premise→constraint, fallback→schedule,

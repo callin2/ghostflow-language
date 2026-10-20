@@ -2,6 +2,13 @@
 
 [한국어](HARDWARE-FRONT-MATTER.ko.md) · [Reference 1.1](reference/01-source-and-syntax.en.md)
 
+For compact authoring with reusable board/driver defaults, read the
+[profile design and purpose](PROFILE-FRONT-MATTER.en.md). The explicit `hardware`
+form below remains for the current deployed Device packaging path while actual
+profiles and the compact packaging adapter are implemented. Retire this authored
+form after verified installation migration; the derived deployment contract may
+still contain expanded hardware facts.
+
 The reserved top-level YAML `hardware` field in a `.ghost.md` document declares
 installation dependencies and logical bindings for input drivers and output
 renderers. The source document remains authoritative. The compiler returns a
