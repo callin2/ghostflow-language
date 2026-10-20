@@ -8,6 +8,17 @@ const faq = fs.readFileSync(new URL('../docs/language_faq.md', import.meta.url),
 const programming = fs.readFileSync(new URL('../docs/ProgrammingInGhostflow.md', import.meta.url), 'utf8');
 const programmingEnglish = fs.readFileSync(new URL('../docs/ProgrammingInGhostflow.en.md', import.meta.url), 'utf8');
 
+test('bilingual Reference 4.7 output recovery example compiles as identical canonical source', () => {
+  const examples = ['04-sensors-constraints-control.md', '04-sensors-constraints-control.en.md'].map(file => {
+    const document = fs.readFileSync(new URL(`../docs/reference/${file}`, import.meta.url), 'utf8');
+    const source = document.match(/```ghost\n(control OutputRecovery \{[\s\S]*?)\n```/)[1];
+    const compilation = compileSourceSync(`\`\`\`ghost\n${source}\n\`\`\`\n`, {filename:'output-recovery.ghost.md'});
+    assert.equal(compilation.manifest.format, 'GhostFlow/control-v22');
+    return source;
+  });
+  assert.equal(examples[0], examples[1]);
+});
+
 test('early bilingual quantity lookup supplies valid declarations before sensor examples', () => {
   // Expected names/literals follow Reference 2.9, independently of the table.
   const expected = [

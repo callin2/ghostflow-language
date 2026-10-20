@@ -449,6 +449,67 @@ The result is safe intent. It is neither evidence of actual GPIO/relay applicati
 
 **Why:** Combining request, constraint result, device application and physical result into one Bool prevents explanation of output blocking and device discrepancy and makes usage accounting targets ambiguous.
 
+### Output observations and recovery policy
+
+Use `output_status(pump)`, `output_health(pump)`, `output_completion(pump)` and
+`output_fault(pump)` with a declared Bool output. Their return types and members
+are below. Members of different types cannot be compared.
+
+| Type | Members (numeric rails start at zero, in this order) |
+| --- | --- |
+| `OutputStatus` | `OutputInitial`, `OutputPending`, `OutputCompleted`, `OutputFailed`, `OutputUnknown` |
+| `OutputHealth` | `OutputInitializing`, `OutputHealthy`, `OutputFaulted` |
+| `OutputCompletion` | `CompletionNone`, `HostWrite`, `DeviceAck`, `DeviceReadback` |
+| `OutputFault` | `NoOutputFault`, `OutputUnavailable`, `OutputTimeout`, `OutputProtocolError`, `OutputDriverError`, `OutputObservationLost` |
+
+Status describes the current request lifecycle; health describes device readiness.
+At startup, request ID zero with `OutputInitial` can describe initializing, ready
+or faulted equipment without completion. A new request is `OutputPending` and
+retains prior health and fault. Pending itself and unsupported ACK capability are
+not faults. Completion records its actual evidence level. `HostWrite` proves
+neither device ACK nor contact position; `DeviceReadback` does not automatically
+prove physical load operation confirmed by a separate sensor.
+
+```ghost
+control OutputRecovery {
+  input resume: Bool;
+  output pump, alarm: Bool;
+  state stopped: Bool = false;
+  let resume_requested = resume |> recover(false);
+  stopped' = if resume_requested then false else stopped || output_fault(pump) == OutputTimeout;
+  pump <- !stopped';
+  alarm <- output_health(pump) == OutputFaulted;
+}
+```
+
+The author chooses a state that remembers manual recovery, as above, or an
+expression that permits automatic recovery. Output failure does not roll back
+committed core state. Separate host safety and termination policies retain their
+own contracts. Other outputs retain their own observations.
+
+The compiler generates four numeric inputs
+`__gf_output_{name}_{status|health|completion|fault}` and an `outputObservations`
+descriptor once per output. This profile uses a `GhostFlow/control-v22` manifest
+and existing scalar GFB1..4; combinations with settings, schedules, context and
+adaptation reject explicitly. Source inputs cannot override these private rails.
+
+Hosts must supply trusted renderer observations bound to the current run, output
+and actually dispatched request ID. Old-request ACKs, previous-run caches and
+missing observations cannot become success. A request's terminal status and
+completion evidence cannot regress; retry uses a new request ID. Communication
+loss after completion may change health and fault while retaining the completion
+fact. Recovered readiness uses evidence from a fresh initialization or recovery
+request; it does not rewrite the failed request as successful. A new run starts
+initially. The portable Rust tracker validates identity
+and state combinations. The reference framed host requires `outputRunId` and
+`outputObservationProvider`, treating the provider as the authority for dispatch
+identity. Injection through ordinary `inputs` or scan arguments rejects. Hosts
+that do not declare support reject activation.
+
+**Why:** Source must distinguish device delay, faults and completion evidence so
+equipment recovery policies can be reviewed and replayed with the same facts.
+Requested intent and `SensorFault` do not substitute for output observations.
+
 ## 4.8 Common constraints notation and operations
 
 The canonical authored unit is a named `constraints` block inside a control.
