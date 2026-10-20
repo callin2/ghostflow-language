@@ -86,6 +86,7 @@ test('reference entry selection retains non-context Solar without an error fallb
   assert.equal(selectControlRuntimeEntry({format:'GhostFlow/control-v15',schedules:[{kind:'solar'}]}),'framed');
   assert.equal(selectControlRuntimeEntry({format:'GhostFlow/control-v21',schedules:[{kind:'civil-range'}]}),'framed');
   assert.equal(selectControlRuntimeEntry(artifact.manifest),'framed');
+  assert.equal(selectControlRuntimeEntry({...artifact.manifest,objectives:[{name:'native-objective'}]}),'legacy');
 });
 
 test('source directives fail closed and physical targets reject before compiler selection', () => {

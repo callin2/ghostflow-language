@@ -45,11 +45,6 @@ export function selectControlRuntimeEntry(manifest) {
     || (manifest.objectives?.length ?? 0) > 0 ? 'legacy' : 'framed';
 }
 const RESERVED = '__gf_';
-/** Select an existing owner entry before instantiation; never retry a rejected frame. */
-export function controlRuntimeEntryForManifest(manifest) {
-  return !contextManifest(manifest) && manifest?.schedules?.some(item => item.kind === 'solar')
-    ? 'unframed-solar' : 'framed';
-}
 const TYPES = new Set(['Bool', 'Int', 'Number', 'Percent', 'Duration', ...TIME_TYPES, ...QUANTITY_TYPES]);
 const SENSOR_TYPES = TYPES;
 const MAX_WINDOW = 31;
