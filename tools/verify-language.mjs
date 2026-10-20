@@ -36,6 +36,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/host-event-ordering-contract.test.mjs',
   'tests/effect-process-contract.test.mjs',
   'tests/compiler.test.mjs',
+  'tests/compiler-telemetry.test.mjs',
   'tests/docs-runnable-examples.test.mjs',
   'tests/programming-natural-examples.test.mjs',
   'tests/programming-builtins.test.mjs',
