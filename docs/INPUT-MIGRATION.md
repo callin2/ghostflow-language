@@ -54,6 +54,69 @@ Exact types use the unchanged default identity filter. Explicit numeric filters
 and hysteresis remain limited to Number, Percent and physical quantities.
 Old plain scalar use sites still require an explicit authored Result policy.
 
+## Explicit legacy Bool admission
+
+`previewLegacyScalarMigration(source,{filename})` returns a deterministic new
+document, receipt and bound contract. It preserves the original document as an
+exact prefix and leaves executable use sites unchanged. Only standalone required,
+unconditioned Bool inputs are supported; imports, functions/macros, lifecycle,
+optional/conditioned inputs and other types reject. Already current typed or
+converted sources do not migrate by default. Compilation success alone does not
+prove preservation: unused legacy Bool ports were still required every frame.
+An explicit known-origin request can pass
+`sourceInputContract:'required-current-bool-snapshot'` to preserve those ports;
+the raw lowering proof still rejects typed Result use. The host preserves the old revision and
+explicitly previews/accepts the new one. No storage or model is called.
+
+A top-level `<!-- ghostflow:legacy-scalar-admission-v1 ` directive carries
+canonical JSON with exactly `format,contractVersion,policy,originalSourceSha256,inputs`.
+Format is `GhostFlow/legacy-scalar-admission-v1`, version 1, policy
+`required-current-bool-snapshot`, and inputs are ordered `{name,type:'Bool'}`.
+Unknown, malformed, duplicate or declaration-mismatched directives reject.
+Keep the directive on later edits. Ordinary unmarked input retains Result semantics.
+This selects the current raw lowering, never a retired compiler or a fault default.
+
+`manifest.legacyAdmission` adds `sourceSha256` and `sha256`; the latter hashes
+canonical JSON of all other fields. An unused false Bool state named
+`__gf_legacy_admission_v1_<sha256>` is appended, preserving existing state indices.
+The prefix is compiler-reserved; no new GFB format or WASM ABI is introduced.
+The receipt has exactly `format,contractVersion,originalSourceSha256,convertedSourceSha256,contractSha256,previewSha256`.
+Its format is `GhostFlow/legacy-scalar-migration-receipt-v1`; `previewSha256`
+hashes canonical JSON of the other five fields. Digests are filename-independent.
+The returned document is the exact candidate source.
+
+`inspectLegacyAdmissionSource(source,{bound:true})` returns the full contract;
+default inspection returns embedded terms or null. Source-aware
+`validateLegacyAdmission({bytes,manifest,sourceDocument})` and signed package
+replay bind source, marker, metadata and bytecode digest. Unsupported physical
+targets call `assertLegacyAdmissionTarget(source,{supported:false})` before
+selecting a frozen compiler that could ignore Markdown metadata.
+
+Pure `preflightLegacyAdmission(contract,frame)` copies the frame. Every port
+requires exactly one Bool in `inputs`, or an exact packet in `samples` with
+`{epoch,id,timestampMs,quality,value}`. Packets require Good (or ordinal 1), Bool
+payload, nonnegative safe integer metadata and timestamp no later than `nowMs`.
+Good packets normalize to original raw inputs; other samples remain. Missing,
+ambiguous, malformed and non-Good snapshots reject before conditioners, clocks
+or VM mutation in both `ControlRuntime` entry paths. Repeated valid Good
+identities remain valid: no acquisition freshness, duplicate or recovery policy
+is invented. Other hosts must enforce this contract or reject it.
+
+`selectControlRuntimeEntry(manifest)` in the reference control host selects
+`legacy` for existing non-context Solar or native-objective profiles and
+`framed` otherwise. Select before instantiation, never retry after an error.
+Legacy Solar uses the current unframed adapter and its existing solar facts;
+it does not claim native framed-scan evidence.
+
+Expected error codes are `legacy_admission_invalid`, `legacy_admission_unsupported`,
+`legacy_admission_frame_rejected`, and `legacy_migration_not_required`, with
+status 422 and diagnostic `GF_SEMANTIC`. No per-frame telemetry is added.
+Marker-only or metadata-only artifacts reject. Historical raw GFB stays supported;
+removing both and recomputing the digest is indistinguishable from historical
+raw GFB without trusted source/signatures. Source-aware validation rejects a
+retained directive without its artifact contract. Product paths require source
+replay/signature closure; direct low-level VM loading has no universal guarantee.
+
 ## Acquisition and wire compatibility
 
 The source keyword does not rename the wire-level quality category. Retain

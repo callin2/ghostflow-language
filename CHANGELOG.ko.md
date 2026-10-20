@@ -5,6 +5,15 @@
 
 ## 미출시
 
+### 2026-10-20 — 기존 Bool 입력의 명시적 검증 ([#572](https://github.com/callin2/ghostflow-language/issues/572))
+
+독립적인 기존 필수 Bool control은 raw use site를 보존하고 잘못된 frame을 실행
+전에 거부하는 새 source revision을 검토할 수 있다. source-bound metadata와
+마지막에 추가한 전용 state가 현재 raw lowering을 결합한다. 두 reference host
+경로와 서명 package가 계약을 강제하고 지원하지 않는 physical target은 거부한다.
+일반 input은 Result다. fault 기본값, 이전 compiler fallback, 새 GFB format,
+WASM ABI 또는 physical runtime 변경은 없다.
+
 ### 2026-10-19 — 생략한 civil Range 반복 시각 fact ([#541](https://github.com/callin2/ghostflow-language/issues/541))
 
 불변 IANA Range는 `dst_missing = next_valid`와 함께 사용한

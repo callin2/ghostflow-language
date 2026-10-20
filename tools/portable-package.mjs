@@ -9,6 +9,7 @@ import { equalBytes } from './sha256.mjs';
 import { remapSourceTrace, sourceMapRequiresTraceMetadata, verifySourceTraceMetadata } from './source-trace.mjs';
 import { physicalManifestInputs, validateLifecycleManifest } from './lifecycle-contract.mjs';
 import { reportWarnings } from './diagnostic-output.mjs';
+import { validateLegacyAdmission } from './legacy-admission.mjs';
 
 const UTF8 = new TextEncoder();
 const UTF8_FATAL = new TextDecoder('utf-8', { fatal: true });
@@ -434,6 +435,7 @@ export async function buildPortablePackage(compilation, identityValue, { signers
   const bytecodeSha256 = await checkedDigest(gfbBytes);
   if (!isPlainObject(compilation.manifest)) fail('missing-manifest', 'portable packages require a control manifest');
   const lifecycle = validateLifecycleManifest(compilation.manifest);
+  validateLegacyAdmission(compilation);
   if ((bytecodeVersion === '22') !== (lifecycle !== null)) fail('manifest-mismatch', 'GFB22 bytecode requires matching lifecycle metadata');
   if (lifecycle) validateGfbLifecycle(gfbBytes, compilation.manifest.lifecycle);
   if (compilation.manifest.bytecodeSha256 !== bytecodeSha256) fail('digest-mismatch', 'manifest bytecodeSha256 does not match GFB1');
@@ -678,6 +680,7 @@ export async function verifyPortablePackage(packageValue, options = {}) {
   const bytecodeVersion = packageValue.payload.bytecode.version;
   const profileVersion = baseGfbVersion(artifacts.bytecode);
   const lifecycle = validateLifecycleManifest(manifest);
+  validateLegacyAdmission({ bytes: artifacts.bytecode, manifest, sourceDocument: sourceText });
   if ((bytecodeVersion === '22') !== (lifecycle !== null)) fail('manifest-mismatch', 'GFB22 bytecode requires matching lifecycle metadata');
   if (lifecycle) validateGfbLifecycle(artifacts.bytecode, manifest.lifecycle);
   const contextManifest = profileVersion === '10';
@@ -698,6 +701,7 @@ export async function verifyPortablePackage(packageValue, options = {}) {
     }
   }
   if (Object.hasOwn(manifest, 'lifecycle')) manifestKeys.push('lifecycle');
+  if (Object.hasOwn(manifest, 'legacyAdmission')) manifestKeys.push('legacyAdmission');
   if (Object.hasOwn(manifest,'adaptPolicy') || Object.hasOwn(manifest,'strategies')) manifestKeys.push('adaptPolicy','strategies');
   exactObject(manifest, manifestKeys, 'manifest');
   if (manifest.format !== packageValue.payload.manifest.format) fail('manifest-mismatch', 'manifest format does not match descriptor');
@@ -854,7 +858,10 @@ export async function verifyPortablePackage(packageValue, options = {}) {
     }
   } else try {
     const extraction = extractLiterate(sourceText, { filename: mappedDocument.filename });
-    const replay = compileControl(extraction.code, { filename: mappedDocument.filename });
+    const guarded = Object.hasOwn(manifest,'legacyAdmission');
+    const replay = guarded ? compileSourceSync(sourceText, { filename: mappedDocument.filename })
+      : compileControl(extraction.code, { filename: mappedDocument.filename });
+    if (guarded && canonicalJson(replay.manifest) !== canonicalJson(manifest)) throw new Error('legacy admission manifest does not match canonical source');
     if (Object.hasOwn(manifest,'adaptPolicy') || Object.hasOwn(replay.manifest,'adaptPolicy')) {
       if (canonicalJson(manifest.adaptPolicy ?? null) !== canonicalJson(replay.manifest.adaptPolicy ?? null)
         || canonicalJson(manifest.strategies ?? null) !== canonicalJson(replay.manifest.strategies ?? null)
@@ -922,7 +929,7 @@ export async function verifyPortablePackage(packageValue, options = {}) {
         if (continuousTimerNames.size) expectedTimerDependencies = replay.traceMetadata.dependencies.filter(entry => (
           entry.target.field === 'timerValue' && continuousTimerNames.has(entry.target.name)
         ));
-        const mappedTrace = remapSourceTrace(replay.traceMetadata, extraction.sourceMap);
+        const mappedTrace = guarded ? replay.traceMetadata : remapSourceTrace(replay.traceMetadata, extraction.sourceMap);
         expectedDerivations = mappedTrace.derivations ?? [];
         expectedConstraintProof = mappedTrace.constraintProof ?? null;
         expectedResultSites = mappedTrace.resultSites;

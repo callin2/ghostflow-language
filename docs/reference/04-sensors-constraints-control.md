@@ -30,6 +30,12 @@ conditioning과 optional capability 규칙을 계승한다. `sensor`는 내부/w
 
 ## 4.1 sensor와 Result 품질
 
+기존 필수 Bool snapshot 보존은 [migration 계약](../INPUT-MIGRATION.ko.md)의
+명시적 versioned directive로만 선택한다. 원래 raw use site와 현재 frame의 typed
+입력 필수 검사를 보존하며 잘못된 frame은 평가 전에 거부한다. fault 기본값을
+만들지 않는다. 표시 없는 input은 Result다. 기존 프로그램 보존과 새 품질 정책
+작성을 혼동하지 않기 위해 이 구분을 둔다.
+
 선택된 선언에서 sensor 타입은 정상 payload 타입이다.
 
 ```ghost

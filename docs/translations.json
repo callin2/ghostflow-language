@@ -82,8 +82,8 @@
       "source": "docs/INPUT-MIGRATION.md",
       "sourceLanguage": "en",
       "translation": "docs/INPUT-MIGRATION.ko.md",
-      "sourceSha256": "e0db9258f1cb7d5012859052396260588556bca600958b3bd8f410398846a09d",
-      "translationSha256": "1ffbf811720074189af88700f18498d8d25da8a58c139d0b9c039652bb2e44f6"
+      "sourceSha256": "206e5e9fb479f3c6b81695ce0e3140fd90e4081aed87b7b10f4781256e29f853",
+      "translationSha256": "2143fb9387f5b9a0394d473036af8e42c44e8a435b2fa388a4cd0e9ede4c194f"
     },
     {
       "source": "docs/INSTANCE-TRACE-PROJECTION.md",
@@ -495,8 +495,8 @@
       "source": "docs/reference/04-sensors-constraints-control.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/04-sensors-constraints-control.en.md",
-      "sourceSha256": "d0e585c929b81106909714e49095b7165880f2e259c8d39d56ab5c1803f95b79",
-      "translationSha256": "61606963313ec71c1778d2b713a6d18470fd8c12cf0f3f5274ae689cfab24fe1"
+      "sourceSha256": "85e866d629ac45a4b2b7f8b86ef886023568139d34f2c0e76ac6d743ffda442e",
+      "translationSha256": "98a60f8838303a5adb985fb94d49555a7948e59bc7fa3806526362c99f5fcacc"
     },
     {
       "source": "docs/reference/05-settings-and-observation.md",
@@ -705,8 +705,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "fbb982600274849d05f4753c99aee1c0162783f41f65c550407bc4d1cd6bead8",
-      "translationSha256": "e6c9bf79e407f7ba6021a53433040fff54dfe4ffa02de691de8860c3fd9f2e09"
+      "sourceSha256": "46707465123445235ab70882fde367b55f4d3d1f01d0a7cf862241b41bb5a78e",
+      "translationSha256": "ff19a2760f882433794591325f35b02df9259ab4721e4a51be58d9a07efe9618"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",

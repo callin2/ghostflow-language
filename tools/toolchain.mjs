@@ -7,8 +7,10 @@ import { canonicalJson } from './canonical-json.mjs';
 import { compileAccountingControl, compileControl, compileResourcePolicyArtifact, compileScheduleDescriptorArtifact, compileTemporalDescriptorArtifact } from './control.mjs';
 import { extractLiterate } from './literate.mjs';
 import { equalBytes, isWellFormedUnicode, sha256Hex, utf8ByteLength } from './sha256.mjs';
+import { inspectLegacyAdmissionSource, validateLegacyAdmission } from './legacy-admission.mjs';
 
 export { emitInteractionSchema };
+export { previewLegacyScalarMigration, inspectLegacyAdmissionSource, assertLegacyAdmissionTarget, validateLegacyAdmission, preflightLegacyAdmission, LegacyAdmissionError } from './legacy-admission.mjs';
 export { prepareOutputExplanation, joinOutputExplanation, EXPLANATION_LIMITS } from './explanation.mjs';
 export { intentInterpretationDigest, intentConditionDigest, INTENT_EVIDENCE_LIMITS } from './intent-evidence.mjs';
 
@@ -93,17 +95,22 @@ function canonicalTraceMetadata(document, bytes, manifest) {
     .filter(timer => timer?.mode === 'continuous-true')
     .map(timer => timer.name));
   const extraction = extractLiterate(document.text, { filename: document.filename });
-  const replay = manifest?.accounting
+  const guarded = inspectLegacyAdmissionSource(document.text) !== null;
+  const replay = guarded ? compileSourceSync(document.text, { filename: document.filename }) : manifest?.accounting
     ? compileAccountingControl(extraction.code, { filename: document.filename })
     : compileControl(extraction.code, { filename: document.filename });
   if (!equalBytes(replay.bytes, bytes)) throw new Error('canonical source does not reproduce artifact bytecode');
+  if (guarded && manifest) {
+    validateLegacyAdmission({ bytes, manifest, sourceDocument: document });
+    if (canonicalJson(manifest) !== canonicalJson(replay.manifest)) throw new Error('legacy admission manifest does not match canonical source');
+  }
   if (manifest?.accounting) {
     const { bytecodeSha256: _digest, ...persisted } = manifest;
     if (canonicalJson(persisted) !== canonicalJson(replay.manifest)) {
       throw new Error('accounting control manifest does not match canonical source');
     }
   }
-  const mappedTrace = remapSourceTrace(replay.traceMetadata, extraction.sourceMap);
+  const mappedTrace = guarded ? replay.traceMetadata : remapSourceTrace(replay.traceMetadata, extraction.sourceMap);
   const expectedSignalBindings = mappedTrace.bindings.filter(entry => entry.kind === 'signal');
   const signalStates = new Set(expectedSignalBindings.map(entry => entry.name));
   return {
