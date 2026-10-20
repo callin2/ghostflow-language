@@ -50,6 +50,59 @@ test('completed snapshots retain private config validation without projecting a 
     assert.throws(() => emit(missing), /current Rust settings state is required/);
   } finally { runtime.dispose(); }
 });
+
+test('completed snapshot version follows public settings descriptors while preserving private Rust state validation', async () => {
+  const readonlyPeriodic = `control ReadonlyPeriodic {
+    config interval: Duration = 1min;
+    schedule cycle: Periodic {
+      every = interval;
+      anchor = instant(datetime\`2026-10-01T00:00:00Z\`);
+      interval_change = preserve_anchor;
+      basis = pulse;
+      when = true;
+      clock = trusted_only;
+      gap = skip_after(2h);
+      recovery = baseline;
+      fallback = skip;
+    }
+    output due: Bool;
+    due <- cycle.due;
+  }`;
+
+  for (const [name, sourceText, expectedVersion, expectedSettingDescriptors] of [
+    ['readonly Periodic', readonlyPeriodic, '0.1', 0],
+    ['operator settings', source, '0.2', 2],
+    ['designer settings', source.replaceAll('access = operator;', 'access = designer;'), '0.2', 2],
+    ['mixed private and public settings', source.replace('  output watering: Bool;', '  config internal: Bool = true;\n  output watering: Bool;'), '0.2', 2],
+  ]) {
+    const literateSource = name === 'readonly Periodic'
+      ? `# Readonly Periodic
+
+\`\`\`ghost
+${sourceText}
+\`\`\``
+      : sourceText;
+    const { artifact, runtime } = await fixture(literateSource);
+    try {
+      const wallMs = 1_790_812_800_000;
+      const contextFacts = name === 'readonly Periodic' ? {
+        clock: { ...clock(0), wallMs }, natural: [],
+        schedules: [{ site: artifact.manifest.schedules[0].site, coverageStartMs: wallMs - 1, coverageEndMs: wallMs + 1,
+          provider: null, calendar: null, rows: [] }],
+        settings: null,
+      } : facts(0);
+      const outcome = runtime.step({ nowMs: 0, contextFacts });
+      const state = runtime.contextSnapshot().state;
+      const snapshot = emitCompletedScanSnapshot({ compilation: artifact, runId: `run.${name.replaceAll(' ', '-')}`,
+        completion: { kind: 'completed-scan', scanId: 0, logicalTimeMs: 0 }, trace: outcome.vm, settingsState: state });
+      assert.equal(artifact.interactionSchema.descriptors.filter(descriptor => descriptor.kind === 'setting').length, expectedSettingDescriptors, name);
+      assert.equal(snapshot.version, expectedVersion, name);
+      assert.equal(Object.hasOwn(snapshot, 'settingsRevision'), expectedSettingDescriptors > 0, name);
+      assert.equal(validateInteraction(artifact.interactionSchema, snapshot).valid, true, name);
+    } finally { runtime.dispose(); }
+  }
+});
+
 function ok(configId, type, value) { return { configId, result: { ok: true, type, value } }; }
 function fault(configId) { return { configId, result: { ok: false, type: undefined, value: undefined, fault: 'SettingsUnavailable' } }; }
 function event(fingerprint, eventId, baseRevision, position, changes, origin = 'operatorEdit') {
