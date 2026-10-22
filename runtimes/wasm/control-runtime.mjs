@@ -491,13 +491,57 @@ function validateContextManifest(input, bytecodeFormat) {
     sensorByName: new Map(sensors.map(item => [item.name,item])), scheduleNames: new Set(schedules.map(item => item.name)), signalNames: new Set() };
 }
 
+// These descriptors retain source provenance. Enforcement stays in the compiled
+// GFB constraints, never in a second host evaluator.
+function validateLocalConstraints(manifest) {
+  if (manifest.localConstraints === undefined) return;
+  const source = (value, label) => {
+    record(value, label);
+    keys(value, ['nodeId', 'filename', 'line', 'column'], ['offset', 'endOffset', 'endLine', 'endColumn', 'extracted'], label);
+    safeInteger(value.nodeId, `${label}.nodeId`, 1);
+    string(value.filename, `${label}.filename`);
+    for (const key of ['line', 'column', 'endLine', 'endColumn'])
+      if (value[key] !== undefined) safeInteger(value[key], `${label}.${key}`, 1);
+    for (const key of ['offset', 'endOffset'])
+      if (value[key] !== undefined) safeInteger(value[key], `${label}.${key}`, 0);
+    if (value.extracted !== undefined) {
+      const extracted = record(value.extracted, `${label}.extracted`);
+      keys(extracted, ['filename', 'line', 'column'], ['offset', 'endOffset', 'endLine', 'endColumn'], `${label}.extracted`);
+      source({ ...extracted, nodeId: value.nodeId }, `${label}.extracted`);
+    }
+  };
+  const groups = validateList(manifest.localConstraints, 'manifest.localConstraints', ['name', 'scope', 'rules', 'source']);
+  if (!groups.length) throw new Error('localConstraints requires at least one group');
+  unique(groups.map(group => group.name), 'local constraint group');
+  for (const group of groups) {
+    name(group.name, 'local constraint group.name');
+    if (group.scope !== 'local_output') throw new Error('local constraint scope must be local_output');
+    source(group.source, 'local constraint group.source');
+    const rules = validateList(group.rules, 'local constraint rules', ['kind', 'stage', 'lowered', 'source']);
+    if (!rules.length) throw new Error('local constraint group requires rules');
+    for (const rule of rules) {
+      if (!['require', 'mutex'].includes(rule.kind) || rule.stage !== 'safe_output') throw new Error('unsupported local constraint kind or stage');
+      source(rule.source, 'local constraint rule.source');
+      if (!Array.isArray(rule.lowered) || !rule.lowered.length || rule.lowered.length > MAX_LIST) throw new Error('invalid local constraint lowering');
+      for (const lowered of rule.lowered) {
+        if (!Array.isArray(lowered) || !['requires', 'requires-any', 'mutex'].includes(lowered[0])
+          || lowered.length < 3 || lowered.length > 33 || lowered[0] === 'requires' && lowered.length !== 3
+          || rule.kind === 'mutex' && lowered[0] !== 'mutex') throw new Error('invalid local constraint lowering');
+        unique(lowered.slice(1), 'local constraint output');
+        for (const output of lowered.slice(1))
+          if (!manifest.outputs.some(item => item.name === output && item.type === 'Bool')) throw new Error('local constraint requires a declared Bool output');
+      }
+    }
+  }
+}
+
 function validateManifest(input, { acceptSettings = false, bytecodeFormat = null, capabilities } = {}) {
   if (contextManifest(input)) return validateContextManifest(input, bytecodeFormat);
   const manifest = record(input, 'manifest');
   if ((Object.hasOwn(manifest, 'adaptPolicy') || Object.hasOwn(manifest, 'strategies')) && capabilities === undefined) {
     throw new Error('adapt strategy activation requires a capability-aware host; ControlRuntime cannot activate this manifest');
   }
-  keys(manifest, ['format', 'name', 'inputs', 'outputs', 'sensors', 'schedules', 'timers', 'signals', 'configs', 'bytecodeSha256'], ['adaptPolicy', 'strategies', 'objectives', 'resources', 'sensorInstances', 'lifecycle','legacyAdmission', 'outputObservations'], 'manifest');
+  keys(manifest, ['format', 'name', 'inputs', 'outputs', 'sensors', 'schedules', 'timers', 'signals', 'configs', 'bytecodeSha256'], ['adaptPolicy', 'strategies', 'objectives', 'resources', 'sensorInstances', 'lifecycle','legacyAdmission', 'outputObservations', 'localConstraints'], 'manifest');
   const outputObservations = validateOutputObservationsManifest(manifest, bytecodeFormat);
   const lifecycle = validateLifecycleManifest(manifest);
   if (manifest.format !== OUTPUT_OBSERVATION_FORMAT && manifest.format !== FORMAT && manifest.format !== INTEGER_FORMAT && !(manifest.format === SETTINGS_FORMAT && acceptSettings) && manifest.format !== SOLAR_FORMAT && manifest.format !== SCHEDULE_FORMAT && manifest.format !== SCHEDULE_SLOTS_FORMAT && manifest.format !== AVAILABILITY_FORMAT && manifest.format !== RANGE_LIVE_START_FORMAT && manifest.format !== TIMESLOTS_RANGE_FORMAT) throw new Error(`unsupported manifest format ${String(manifest.format)}`);
@@ -508,6 +552,7 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
 
   const inputs = validateList(manifest.inputs, 'manifest.inputs', ['name', 'type'], ['canonicalUnit']);
   const outputs = validateList(manifest.outputs, 'manifest.outputs', ['name', 'type'], ['canonicalUnit']);
+  validateLocalConstraints(manifest);
   const sensors = validateList(manifest.sensors, 'manifest.sensors', ['name', 'type', 'sampleMs', 'validMin', 'validMax', 'filter', 'window', 'staleMs', 'recoverSamples', 'valueInput', 'okInput', 'faultInput'], ['optional', 'alpha', 'canonicalUnit', 'samplePresentInput', 'sampleEpochInput', 'sampleIdInput', 'sampleTimestampInput']);
   const sensorInstances = validateList(manifest.sensorInstances ?? [], 'manifest.sensorInstances', ['name', 'type', 'sampleMs', 'validMin', 'validMax', 'filter', 'window', 'staleMs', 'recoverSamples', 'valueInput', 'okInput', 'faultInput', 'sourceSensor', 'instance', 'port'], ['optional', 'alpha', 'canonicalUnit', 'samplePresentInput', 'sampleEpochInput', 'sampleIdInput', 'sampleTimestampInput']);
   if (!Array.isArray(manifest.schedules) || manifest.schedules.length > MAX_LIST) throw new TypeError('manifest.schedules must be a bounded array');

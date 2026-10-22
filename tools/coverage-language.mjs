@@ -58,6 +58,7 @@ const TESTS = Object.freeze([
   'tests/macro-composition-contract.test.mjs', 'tests/objective-adapt-structural.test.mjs',
   'tests/import-header.test.mjs', 'tests/import-cli-digest.test.mjs',
   'tests/named-constraints.test.mjs', 'tests/resource-policy.test.mjs',
+  'tests/local-constraint-host.test.mjs',
   'tests/bound-resource-control.test.mjs',
   'tests/schedule-descriptor-artifact.test.mjs', 'tests/gfb2-int.test.mjs',
   'tests/int-compiler.test.mjs', 'tests/lesson.test.mjs', 'tests/interaction-corpus.test.mjs',

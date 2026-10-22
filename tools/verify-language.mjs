@@ -71,6 +71,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/relative-humidity-ratio.test.mjs',
   'tests/constraints.test.mjs',
   'tests/named-constraints.test.mjs',
+  'tests/local-constraint-host.test.mjs',
   'tests/resource-policy-artifact.test.mjs',
   'tests/constraint-proof.test.mjs',
   'tests/bound-resource-control.test.mjs',
