@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### 2026-10-22 — explain Celsius measurement types ([#537](https://github.com/callin2/ghostflow-language/issues/537))
+
+Compiler diagnostics now explain that an undeclared `Celsius` measurement type
+uses `Temperature` with unit-bearing values such as `30°C` (Reference §2.9).
+Previously the error only named the unknown type. Node/browser diagnostics and
+human/JSON/TOON CLI output link the existing quantity-to-type lookup. The error
+code, original span and failure exit remain; no alias or automatic conversion is
+introduced. User-defined `Celsius` enums and valid-program bytes are preserved.
+Regressions cover the repair, CLI propagation and unchanged artifact files.
+
 ### 2026-10-20 — typed output observations ([#578](https://github.com/callin2/ghostflow-language/issues/578))
 
 Reference §4.7 now exposes `output_status`, `output_health`, `output_completion`

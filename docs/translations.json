@@ -271,8 +271,8 @@
       "source": "docs/COMPILER-DIAGNOSTICS.md",
       "sourceLanguage": "en",
       "translation": "docs/COMPILER-DIAGNOSTICS.ko.md",
-      "sourceSha256": "64b810c1b6b3660f4a19df077cf912526845399ef99046f20f886168fd5c47f8",
-      "translationSha256": "f5a089cfd9d65c6d5b358faab8528bd9860614d96372f512258c427c6f66143b"
+      "sourceSha256": "d4ab41847540f1c9cbcfd4c96a58f1f386f2bcbcbcf546c0a292b10b2442ed73",
+      "translationSha256": "e022c730b28ac273e0a705d9e7f908e8bb3a3481268d9a1b28e41aa9ef35d2dd"
     },
     {
       "source": "docs/CONSTRAINTS.md",
@@ -705,8 +705,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "0de70e974c8105145795f90388087be1e9707dd6d55e6c28fa0ce74a5cfc2bb6",
-      "translationSha256": "17c4427e2683b56dcab5dac0083c28e031c68b1a9259dc5b8fe4b7eb25c57924"
+      "sourceSha256": "e426f3cdc4236922db8adbf8f8d949cddfa5752d3237259fadb0252a931918b0",
+      "translationSha256": "f8814c9dfa30d0183a955b585f69f889df1641ab0468b5268e781cf9c43d06b5"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",
