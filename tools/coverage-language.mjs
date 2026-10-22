@@ -23,6 +23,7 @@ const TESTS = Object.freeze([
   'tests/compiler-window-diagnostics.test.mjs', 'tests/compiler-window-byte-limit.test.mjs',
   'tests/compiler-newline-diagnostics.test.mjs', 'tests/compiler-token-limit-diagnostics.test.mjs',
   'tests/date-time-control.test.mjs', 'tests/quantities.test.mjs',
+  'tests/temperature-type-guidance.test.mjs',
   'tests/result-control.test.mjs', 'tests/result-provenance.test.mjs',
   'tests/source-trace.test.mjs', 'tests/interaction-settings.test.mjs',
   'tests/periodic-cron-policy.test.mjs', 'tests/daily-slots-policy.test.mjs',

@@ -9,7 +9,19 @@
 거부됩니다.
 
 기존 오류 클래스와 메시지 유지 정책의 예외는 아래의 누락된 Interaction Schema
-의도 출처 진단입니다.
+의도 출처 진단과 미선언 Celsius 타입 안내입니다.
+
+## 미선언 Celsius 타입
+
+선언되지 않은 `Celsius`는 기존처럼 `GF_SEMANTIC`, 메시지
+`unknown type Celsius`, 원래 타입 위치로 거절됩니다. `hint`는 섭씨 측정값에
+`input temperature: Temperature;`를 선언하고 `30°C`처럼 값에 단위를 쓰도록
+안내합니다. `reference`는 책에 이미 있는
+[물리량별 타입 조회표](ProgrammingInGhostflow.md#quantity-type-lookup)로 연결합니다.
+사람용 CLI에는 같은 안내가 표시되고 JSON/TOON에는 구조화된 hint가 전달됩니다.
+소스를 자동으로 고치거나 타입 별칭을 추가하지 않습니다. 사용자가 `Celsius`라는
+enum을 선언했다면 기존대로 해석하며, 관계없는 미선언 타입의 진단은 유지합니다.
+유효한 프로그램의 실행 바이트는 같습니다.
 
 ## Interaction Schema 의도 출처 누락
 
