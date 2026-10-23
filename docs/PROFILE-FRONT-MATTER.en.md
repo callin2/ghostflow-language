@@ -39,6 +39,38 @@ These names are design examples and do not denote published profile IDs. `profil
 This compact format permits only these three root fields and requires bindings for every logical input and output in the body. These fields are reserved so authored hardware YAML cannot silently become ordinary metadata.
 By default, all built-in input and output channels from the selected board profile are included as providers. Use `omit: [board.inputs]` or `omit: [board.outputs]` to exclude board providers in that direction; binding to an excluded channel is a validation error. Device owns the physical composition, while Language validates only selectors and bindings.
 
+## Software, Host, and Observation Provider Selectors
+
+The same `bindings` map also accepts explicit `software:<logical-name>`,
+`host:scan-delta-ms`, and `observation:<logical-name>` selectors alongside physical
+channels ([Language #584](https://github.com/callin2/ghostflow-language/issues/584)).
+For two independent valves, the modes and resets can bind to names such as
+`software:valveAMode` and `software:resetA`, the scan interval input to
+`host:scan-delta-ms`, and a diagnostic Bool output to
+`observation:valveAFault`. Contacts still bind explicitly to physical input
+channels such as `board.DI1`, and relay commands to output channels such as
+`board.RO1`. Provider choice is never inferred from a name; every logical input
+and output needs a binding. Explicit nonphysical selectors remain available when
+`omit` excludes board channels.
+
+Canonical `input` declarations currently appear as quality-bearing `sensors` in
+the compiler manifest. `software:<logical-name>` accepts only a same-name,
+dimensionless Bool or Number in manifest `sensors` or existing scalar `inputs`.
+`host:scan-delta-ms` accepts only a dimensionless Number in either set.
+`observation:<logical-name>` accepts only a same-name Bool in manifest `outputs`.
+Other types such as Percent, Duration, and physical quantities, wrong roles or
+names, duplicate physical channels, and missing bindings fail at the original
+YAML location. Two logical inputs cannot share `host:scan-delta-ms` either.
+Physical inputs bind only `sensors`; scalar `inputs` cannot be
+disguised as physical sensors. Existing physical records retain `instance`,
+`channel`, `role`, `type`, and optional `unit`. A nonphysical plan record retains
+`{ provider, endpoint, role }`, with type checked against the compiler manifest.
+The plan does not strip quality rails or synthesize providers or values.
+
+This is the Language static interpretation contract. Device production of
+Number software/host sensor values, package integration, real I/O, and operating
+observations still require their own consumer and physical evidence.
+
 The address 1, communication conditions, channel names, physical quantities, and units for `meter1` come from its device profile. Address 2 for `meter2` is an installation-specific difference. Inheriting an address default does not mean automatically changing the device's physical address. The customer chooses the logical name, while `currentA` is selected from the channel specification bundled with the driver. The canonical unit `A` for `ElectricalCurrent` is carried by the contract; compatible unit literals such as `mA` in the body follow the existing language's unit-conversion rules.
 
 ## RS485 Input and 8-Channel Relay Output

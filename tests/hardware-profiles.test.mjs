@@ -5,7 +5,7 @@ import { stringify } from 'yaml';
 import { compileSourceSync } from '../tools/compile-source.mjs';
 import { compileSource as browserCompile } from '../tools/browser-toolchain.mjs';
 import { parseHardwareFrontMatter } from '../tools/hardware-frontmatter.mjs';
-import { resolveHardwareProfiles } from '../tools/hardware-profiles.mjs';
+import { resolveHardwareProfiles, validateProfileBindings } from '../tools/hardware-profiles.mjs';
 import { canonicalJson } from '../tools/canonical-json.mjs';
 import { sha256Hex } from '../tools/sha256.mjs';
 
@@ -74,6 +74,139 @@ test('onboard-only program needs just profile and bindings', () => {
   assert.equal(result.hardwarePlan.profiles.length, 1);
   assert.deepEqual(result.hardwarePlan.omit, []);
   assert.equal(result.hardwarePlan.bindings.one.channel, 'RO1');
+});
+
+// Synthetic contract shape; no customer source, firmware profile, or physical claim.
+const twoValveCode = `control TwoValves {
+  input modeA, modeB, dtMs: Number;
+  input resetA, resetB: Bool;
+  input button, aOpened, aClosed, bOpened, bClosed: Bool;
+  output RO1, RO2, RO3, RO4, RO5, RO6, faultA, faultB, readyA, readyB, inputReady: Bool;
+  state latchedA: Bool = false;
+  state latchedB: Bool = false;
+  let selectedModeA = case modeA { ok(value) => value; fault(_) => 3.0; };
+  let selectedModeB = case modeB { ok(value) => value; fault(_) => 3.0; };
+  let clearA = case resetA { ok(value) => value; fault(_) => false; };
+  let clearB = case resetB { ok(value) => value; fault(_) => false; };
+  let scanDelta = case dtMs { ok(value) => value; fault(_) => 0.0; };
+  let aOpen = case aOpened { ok(value) => value; fault(_) => false; };
+  let aClose = case aClosed { ok(value) => value; fault(_) => false; };
+  let bOpen = case bOpened { ok(value) => value; fault(_) => false; };
+  let bClose = case bClosed { ok(value) => value; fault(_) => false; };
+  let pressed = case button { ok(value) => value; fault(_) => false; };
+  latchedA' = if clearA then false else latchedA || (aOpen && aClose);
+  latchedB' = if clearB then false else latchedB || (bOpen && bClose);
+  RO1 <- pressed;
+  RO2 <- !pressed;
+  RO3 <- selectedModeA == 1.0 && !aOpen && !latchedA && scanDelta >= 0.0;
+  RO4 <- selectedModeA == 2.0 && !aClose && !latchedA;
+  RO5 <- selectedModeB == 1.0 && !bOpen && !latchedB;
+  RO6 <- selectedModeB == 2.0 && !bClose && !latchedB;
+  faultA <- latchedA;
+  faultB <- latchedB;
+  readyA <- !latchedA && !(aOpen && aClose);
+  readyB <- !latchedB && !(bOpen && bClose);
+  inputReady <- pressed;
+}`;
+const twoValveDefinitions = () => ({
+  'two-valve-board@1': { kind: 'board', connections: {}, defaults: {}, channels: {
+    ...Object.fromEntries(['button', 'aOpened', 'aClosed', 'bOpened', 'bClosed'].map(name => [name, { role: 'input', type: 'Bool' }])),
+    ...Object.fromEntries(Array.from({ length: 6 }, (_, index) => [`RO${index + 1}`, { role: 'output', type: 'Bool' }])),
+  } },
+});
+const twoValveRequest = () => ({ profile: 'two-valve-board@1', bindings: {
+  modeA: 'software:modeA', modeB: 'software:modeB', resetA: 'software:resetA', resetB: 'software:resetB',
+  dtMs: 'host:scan-delta-ms', button: 'board.button', aOpened: 'board.aOpened', aClosed: 'board.aClosed',
+  bOpened: 'board.bOpened', bClosed: 'board.bClosed',
+  ...Object.fromEntries(Array.from({ length: 6 }, (_, index) => [`RO${index + 1}`, `board.RO${index + 1}`])),
+  faultA: 'observation:faultA', faultB: 'observation:faultB', readyA: 'observation:readyA',
+  readyB: 'observation:readyB', inputReady: 'observation:inputReady',
+} });
+
+test('mixed two-valve provider plan preserves explicit selectors, physical records and executable bytes', async () => {
+  const value = twoValveRequest(), profiles = catalog(twoValveDefinitions()), text = source(value, twoValveCode);
+  const before = JSON.stringify(profiles);
+  const options = { filename: 'two-valves.ghost.md', hardwareProfiles: profiles };
+  const result = compileSourceSync(text, options), plan = result.hardwarePlan;
+  assert.deepEqual(result.manifest.inputs, []);
+  assert.deepEqual(result.manifest.sensors.map(port => port.name),
+    ['modeA', 'modeB', 'dtMs', 'resetA', 'resetB', 'button', 'aOpened', 'aClosed', 'bOpened', 'bClosed']);
+  assert.deepEqual(plan.bindings.modeA, { provider: 'software', endpoint: 'software:modeA', role: 'input' });
+  assert.deepEqual(plan.bindings.dtMs, { provider: 'host', endpoint: 'host:scan-delta-ms', role: 'input' });
+  assert.deepEqual(plan.bindings.faultA, { provider: 'observation', endpoint: 'observation:faultA', role: 'output' });
+  assert.deepEqual(plan.bindings.aOpened, { instance: 'board', channel: 'aOpened', role: 'input', type: 'Bool' });
+  assert.deepEqual(plan.bindings.RO1, { instance: 'board', channel: 'RO1', role: 'output', type: 'Bool' });
+  assert.equal(plan.source.sha256, sha256Hex(text));
+  assert.equal(result.sourceDocument.text, text);
+  assert.equal(JSON.stringify(profiles), before);
+  const plain = compileSourceSync(`\`\`\`ghost\n${twoValveCode}\n\`\`\`\n`);
+  assert.deepEqual(result.bytes, plain.bytes);
+  const browser = await browserCompile(text, options);
+  assert.deepEqual(browser.hardwarePlan, plan);
+  assert.deepEqual(browser.bytes, result.bytes);
+});
+
+for (const [name, mutate, pattern] of [
+  ['missing scalar', r => { delete r.bindings.resetB; }, /missing binding for logical port resetB/],
+  ['missing physical contact', r => { delete r.bindings.bClosed; }, /missing binding for logical port bClosed/],
+  ['missing relay output', r => { delete r.bindings.RO6; }, /missing binding for logical port RO6/],
+  ['unknown provider', r => { r.bindings.modeA = 'cloud:modeA'; }, /binding must/],
+  ['malformed software', r => { r.bindings.modeA = 'software:'; }, /binding must/],
+  ['software name mismatch', r => { r.bindings.modeA = 'software:other'; }, /must match logical input modeA/],
+  ['software mapped to output', r => { r.bindings.RO1 = 'software:RO1'; }, /Bool or Number logical input/],
+  ['host mapped to Bool', r => { r.bindings.resetA = 'host:scan-delta-ms'; r.bindings.dtMs = 'software:dtMs'; }, /Number logical input/],
+  ['duplicate host', r => { r.bindings.modeA = 'host:scan-delta-ms'; }, /duplicate channel binding host:scan-delta-ms/],
+  ['host malformed', r => { r.bindings.dtMs = 'host:clock'; }, /binding must/],
+  ['observation name mismatch', r => { r.bindings.faultA = 'observation:other'; }, /must match logical output faultA/],
+  ['observation mapped to input', r => { r.bindings.modeA = 'observation:modeA'; }, /Bool output/],
+  ['physical mapping wrong type', r => { r.bindings.modeA = 'board.RO1'; r.bindings.RO1 = 'observation:RO1'; }, /requires input Number/],
+  ['physical channel collision', r => { r.bindings.bOpened = 'board.aOpened'; }, /duplicate channel binding/],
+  ['physical role mismatch', r => { r.bindings.faultA = 'board.aOpened'; r.bindings.aOpened = 'software:aOpened'; }, /requires output Bool/],
+]) test(`mixed provider rejects ${name} at canonical source`, () => {
+  const value = twoValveRequest(); mutate(value);
+  const text = source(value, twoValveCode);
+  assert.throws(() => compileSourceSync(text, { filename: 'two-valves.ghost.md', hardwareProfiles: catalog(twoValveDefinitions()) }), error => {
+    assert.match(error.message, pattern);
+    assert.equal(error.diagnosticCode, 'GF_HARDWARE');
+    assert.equal(error.diagnosticEnvelope.source.sha256, sha256Hex(text));
+    assert.ok(error.line >= 2 && error.line < text.split('\n').indexOf('# Intent') + 1);
+    if (name === 'duplicate host') assert.equal(text.split('\n')[error.line - 1].slice(error.column - 1), 'host:scan-delta-ms');
+    return true;
+  });
+});
+
+test('virtual providers reject dimensioned ports and wrong output types from the compiler manifest', () => {
+  const value = twoValveRequest(), text = source(value, twoValveCode);
+  const options = { filename: 'two-valves.ghost.md', hardwareProfiles: catalog(twoValveDefinitions()) };
+  const { hardwarePlan, manifest } = compileSourceSync(text, options);
+  for (const [name, update, pattern] of [
+    ['modeA', port => { port.type = 'Percent'; port.canonicalUnit = '%'; }, /dimensionless Bool or Number/],
+    ['modeA', port => { port.canonicalUnit = 'A'; }, /dimensionless Bool or Number/],
+    ['dtMs', port => { port.type = 'Duration'; port.canonicalUnit = 'ms'; }, /dimensionless Number/],
+    ['dtMs', port => { port.canonicalUnit = 'ms'; }, /dimensionless Number/],
+    ['faultA', port => { port.type = 'Number'; }, /Bool output/],
+  ]) {
+    const altered = structuredClone(manifest);
+    const port = [...altered.sensors, ...altered.outputs].find(port => port.name === name);
+    update(port);
+    assert.throws(() => validateProfileBindings(hardwarePlan, altered), pattern);
+  }
+  assert.equal(manifest.sensors.find(port => port.name === 'modeA').type, 'Number');
+  assert.equal(hardwarePlan.bindings.modeA.type, undefined);
+});
+
+test('existing scalar manifest inputs can use explicit software and host providers but not physical channels', () => {
+  const value = twoValveRequest(), text = source(value, twoValveCode);
+  const requestPlan = parseHardwareFrontMatter(text, { filename: 'two-valves.ghost.md' });
+  const plan = resolveHardwareProfiles(requestPlan, catalog(twoValveDefinitions()));
+  const manifest = structuredClone(compileSourceSync(`\`\`\`ghost\n${twoValveCode}\n\`\`\`\n`).manifest);
+  const scalarNames = new Set(['modeA', 'modeB', 'dtMs', 'resetA', 'resetB']);
+  manifest.inputs = manifest.sensors.filter(port => scalarNames.has(port.name)).map(({ name, type }) => ({ name, type }));
+  manifest.sensors = manifest.sensors.filter(port => !scalarNames.has(port.name));
+  validateProfileBindings(plan, manifest);
+  const physical = structuredClone(plan);
+  physical.bindings.modeA = { instance: 'board', channel: 'aOpened', role: 'input', type: 'Bool' };
+  assert.throws(() => validateProfileBindings(physical, manifest), /physical channel cannot bind scalar input modeA/);
 });
 
 test('omit rejects bindings to omitted board input or output providers', () => {
