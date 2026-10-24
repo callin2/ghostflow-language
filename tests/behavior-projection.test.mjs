@@ -98,6 +98,34 @@ test('unsupported expressions stay local and preserve the complete expression', 
   });
 });
 
+test('adaptive strategy outputs do not appear as an empty available projection', () => {
+  const compiled = compile(`control Adaptive {
+    output pump: Bool;
+    adapt policy {
+      strategy Baseline priority 0 match always { pump <- false; }
+    }
+  }`);
+  assert.equal(compiled.behaviorProjection.status, 'unavailable');
+  assert.equal(compiled.behaviorProjection.reason, 'unsupported-construct');
+  assert.deepEqual(compiled.behaviorProjection.roots, []);
+});
+
+test('derived references disclose their complete declaration expression', () => {
+  const compiled = compile(`control Derived {
+    input request: Bool;
+    let wanted = request |> recover(false);
+    output lamp: Bool;
+    lamp <- wanted;
+  }`);
+  assert.deepEqual(compiled.behaviorProjection.roots[0].expression, {
+    kind: 'unavailable',
+    reason: 'unsupported-derived-reference',
+    expressionKind: 'binary',
+    text: '(request |> recover(false))',
+    sourceNodeId: compiled.behaviorProjection.roots[0].expression.sourceNodeId,
+  });
+});
+
 test('changed source receives a new identity and branch without stale projection data', () => {
   const before = compile(current);
   const after = compile(current.replace('fault(reason) => true;', 'fault(reason) => false;'));

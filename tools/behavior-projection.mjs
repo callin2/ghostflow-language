@@ -50,33 +50,38 @@ function literalKind(raw) {
 
 function symbolKinds(ast) {
   const symbols = new Map();
+  const declarations = new Map();
   for (const item of ast.body ?? []) {
     if (item.kind === 'sensor') symbols.set(item.name, 'input');
     else if (item.kind === 'input') for (const name of item.names) symbols.set(name, 'input');
     else if (item.kind === 'state') symbols.set(item.name, 'state-before');
-    else if (['let', 'parameter', 'config', 'signal', 'timer'].includes(item.kind)) symbols.set(item.name, 'local');
+    else if (['parameter', 'config'].includes(item.kind)) symbols.set(item.name, 'local');
+    else if (item.kind === 'let') declarations.set(item.name, item.value);
+    else if (item.kind === 'signal' || item.kind === 'timer') declarations.set(item.name, item.call);
   }
-  return symbols;
+  return { symbols, declarations };
 }
 
 function projectExpression(node, context, depth = 0) {
   if (depth > MAX_DEPTH) throw new ProjectionLimitError('expression depth');
   if (++context.count > MAX_NODES) throw new ProjectionLimitError('expression count');
   const child = value => projectExpression(value, context, depth + 1);
-  const unavailable = reason => ({
+  const unavailable = (reason, expression = node) => ({
     kind: 'unavailable',
     reason,
-    expressionKind: node.kind,
-    text: expressionText(node),
-    sourceNodeId: node.id,
+    expressionKind: expression.kind,
+    text: expressionText(expression),
+    sourceNodeId: expression.id,
   });
   switch (node.kind) {
     case 'literal':
       return { kind: 'literal', valueKind: literalKind(node.raw), value: node.raw, sourceNodeId: node.id };
     case 'reference': {
       const readKind = context.bindings.has(node.name) ? 'local' : context.symbols.get(node.name);
-      return readKind
-        ? { kind: 'read', name: node.name, readKind, sourceNodeId: node.id }
+      if (readKind) return { kind: 'read', name: node.name, readKind, sourceNodeId: node.id };
+      const declaration = context.declarations.get(node.name);
+      return declaration
+        ? unavailable('unsupported-derived-reference', declaration)
         : unavailable('unsupported-reference');
     }
     case 'nextReference':
@@ -139,9 +144,11 @@ export function emitBehaviorProjection({ ast, manifest, sourceSha256, bytecodeSh
     return unavailable('non-control-artifact');
   }
   if (ast.imports?.length) return unavailable('unsupported-construct');
+  if ((ast.body ?? []).some(item => item.kind === 'adapt')) return unavailable('unsupported-construct');
   const roots = (ast.body ?? []).filter(item => item.kind === 'connection' || item.kind === 'next');
   if (roots.length > MAX_ROOTS) return unavailable('projection-limit');
-  const context = { symbols: symbolKinds(ast), bindings: new Set(), count: 0 };
+  const { symbols, declarations } = symbolKinds(ast);
+  const context = { symbols, declarations, bindings: new Set(), count: 0 };
   try {
     return {
       format: FORMAT,
