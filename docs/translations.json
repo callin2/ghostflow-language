@@ -12,8 +12,8 @@
       "source": "docs/PROFILE-FRONT-MATTER.md",
       "sourceLanguage": "ko",
       "translation": "docs/PROFILE-FRONT-MATTER.en.md",
-      "sourceSha256": "c77f8b765be9473835282a1af00ee2bc4af4e2baee9a11bb1e54e97b01a07c43",
-      "translationSha256": "6d756cd86a5264945452f6f15c1d90f7339547b9fad64ab95eb7a6aebeaba9ed"
+      "sourceSha256": "998365bf6132f094f40ca46d257344afb118192fa446a124dd0a33444c33a90c",
+      "translationSha256": "2268075c09500030c56d49ceb40dd04cb769e6af35210f87fae5f072fd43b92b"
     },
     {
       "source": "docs/INTENT-DECISIONS.md",
@@ -705,8 +705,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "0de70e974c8105145795f90388087be1e9707dd6d55e6c28fa0ce74a5cfc2bb6",
-      "translationSha256": "17c4427e2683b56dcab5dac0083c28e031c68b1a9259dc5b8fe4b7eb25c57924"
+      "sourceSha256": "5b71f1b734c9562e901d58acd87c5c2931c4249b5e93ce7bb921fa1d4163b26d",
+      "translationSha256": "36ec03c733ac2136a41873ca8bdaf3785815ac04e267460f5760ffefaf4da2d9"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",
@@ -1496,6 +1496,10 @@
     {
       "path": "docs/reports/2026-10-16-intent-link-warnings-553.md",
       "reason": "Issue 553 implementation decisions, source-update and verification evidence; execution reports may remain in one language."
+    },
+    {
+      "path": "docs/reports/2026-10-24-issue-584-explicit-profile-providers.md",
+      "reason": "Issue 584 owner implementation, test evidence and consumer handoff; dated execution reports may remain in one language."
     }
   ]
 }

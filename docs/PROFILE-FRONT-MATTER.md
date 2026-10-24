@@ -51,6 +51,32 @@ bindings:
 있으며, 제외한 채널에 바인딩하면 검증 오류다. 실제 Device가 물리적 구성을 소유하고,
 Language는 선택자와 바인딩이 유효한지만 검사한다.
 
+## 소프트웨어·호스트·관측 provider 선택자
+
+같은 문서의 `bindings`는 물리 채널 외에 명시적인 `software:<논리이름>`,
+`host:scan-delta-ms`, `observation:<논리이름>`을 받을 수 있다
+([Language #584](https://github.com/callin2/ghostflow-language/issues/584)). 예를 들어 두 밸브의
+독립 모드·reset은 `software:valveAMode`, `software:resetA` 등으로, scan 간 시간 입력은
+`host:scan-delta-ms`로, 진단 Bool 출력은 `observation:valveAFault`로 연결한다. 접점은
+`board.DI1` 같은 물리 입력 채널, 릴레이 명령은 `board.RO1` 같은 물리 출력 채널에
+각각 명시한다. 이름으로 provider를 추정하지 않고 모든 논리 입력·출력을 빠짐없이
+연결해야 한다. `omit`으로 보드 채널을 제외해도 이 명시적인 비물리 선택자는 남는다.
+
+정본 `input` 선언은 현재 compiler manifest의 `sensors`에 품질 정보가 있는 포트로
+나타난다. `software:<논리이름>`은 이름이 정확히 같은 `sensors` 또는 기존 scalar
+`inputs`의 단위 없는 Bool/Number만 받는다. `host:scan-delta-ms`는 두 집합 중 단위
+없는 Number만 받는다. `observation:<논리이름>`은 이름이 정확히 같은 Bool `outputs`만
+받는다. Percent·Duration·물리량 같은 다른 타입, 역할·이름 불일치, 중복 물리 채널,
+누락 바인딩은 원본 YAML 위치와 함께 오류가 된다. `host:scan-delta-ms`를 두 논리 입력에
+중복 연결해도 거부한다. 물리 입력은 `sensors`에만 연결하며
+기존 scalar `inputs`를 물리 센서로 위장하지 않는다. 기존 물리 바인딩 기록은 그대로
+`instance`, `channel`, `role`, `type`, 선택적 `unit`을 유지한다. 비물리 바인딩 계획은
+`{ provider, endpoint, role }`을 보존하고 타입은 compiler manifest에서 검사한다.
+이 계획은 품질 rail을 제거하거나 암묵적인 provider·값을 만들지 않는다.
+
+이 단계는 Language의 정적 해석 계약이다. Device의 Number 소프트웨어/호스트 센서
+공급, package 연결, 실제 장치 입출력 및 운전 관측은 각각 소비자와 실기기 근거가 필요하다.
+
 `meter1`의 주소 1, 통신 조건, 채널 이름·물리량·단위는 장치 profile에서 온다.
 `meter2`의 주소 2는 실제 설치 차이다. 주소 기본값을 상속하는 것은 장치의 물리 주소를
 자동으로 변경한다는 뜻이 아니다. 논리 이름은 고객이 정하고 `currentA`는 드라이버가

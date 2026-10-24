@@ -5,6 +5,19 @@
 
 ## 미출시
 
+### 2026-10-24 — 간결한 profile의 명시적 provider ([#584](https://github.com/callin2/ghostflow-language/issues/584))
+
+간결한 `bindings`는 이제 단위 없는 Bool/Number 품질 센서 또는 기존 scalar 입력에
+`software:<같은 논리 이름>`, 단위 없는 Number 센서/scalar 입력에
+`host:scan-delta-ms`, Bool 출력에 `observation:<같은 논리 이름>`을 받는다. 이전에는
+이 선택자를 잘못된 물리 채널 형식으로 거부했다. 물리 바인딩 기록과 실행 본문 바이트는
+변하지 않는다. 누락·타입·이름·중복·물리 채널에서 scalar 입력으로의 잘못된 연결은
+원본 위치를 포함해 거부한다. 이는 정적 profile 계약이다. Device Number 값 공급과
+package 연결, 실제 장치 검증은 별도다. 예를 들어 같은 compact map의
+`modeA: software:modeA`, `dtMs: host:scan-delta-ms`,
+`faultA: observation:faultA`를 해석한다. 공개 Node/browser 두 밸브 및 잘못된
+바인딩 회귀 검사가 이 규칙을 확인한다.
+
 ### 2026-10-20 — 타입이 있는 출력 관측 ([#578](https://github.com/callin2/ghostflow-language/issues/578))
 
 Reference §4.7에 선언한 Bool 출력용 `output_status`, `output_health`,

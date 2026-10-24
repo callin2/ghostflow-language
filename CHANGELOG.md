@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### 2026-10-24 — explicit compact profile providers ([#584](https://github.com/callin2/ghostflow-language/issues/584))
+
+Compact `bindings` now accepts `software:<same logical name>` for dimensionless
+Bool/Number quality-bearing sensors or existing scalar inputs,
+`host:scan-delta-ms` for a dimensionless Number sensor/scalar input, and
+`observation:<same logical name>` for Bool outputs. Previously these selectors
+failed as malformed physical channels. Physical binding records and executable
+body bytes remain unchanged. Missing, mistyped, mismatched, duplicate, and
+physical-to-scalar bindings fail with canonical source diagnostics. This is a
+static profile contract; Device Number producer/package adoption and physical
+acceptance remain separate. For example, `modeA: software:modeA`,
+`dtMs: host:scan-delta-ms`, and `faultA: observation:faultA` now resolve in the
+same compact map. Public Node/browser two-valve and negative binding regressions
+cover the rule.
+
 ### 2026-10-20 — typed output observations ([#578](https://github.com/callin2/ghostflow-language/issues/578))
 
 Reference §4.7 now exposes `output_status`, `output_health`, `output_completion`

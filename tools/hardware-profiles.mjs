@@ -10,6 +10,13 @@ const forbidden = key => ['__proto__', 'prototype', 'constructor'].includes(key)
 const validName = name => NAME.test(name) && !forbidden(name);
 const validRef = ref => typeof ref === 'string' && REF.test(ref) && ref.split('@')[1] !== 'latest';
 const clone = value => JSON.parse(JSON.stringify(value));
+const virtualSelector = target => {
+  if (typeof target !== 'string') return null;
+  if (/^software:[A-Za-z_][A-Za-z0-9_]{0,63}$/.test(target) && validName(target.slice(9))) return 'software';
+  if (target === 'host:scan-delta-ms') return 'host';
+  if (/^observation:[A-Za-z_][A-Za-z0-9_]{0,63}$/.test(target) && validName(target.slice(12))) return 'observation';
+  return null;
+};
 
 function diagnostics(plan) {
   return (path, message) => {
@@ -55,8 +62,9 @@ export function profileRequest(root, source, locations) {
   }
   for (const [name, target] of Object.entries(root.bindings)) {
     if (!validName(name)) fail('/bindings', `invalid logical name ${name}`);
+    if (virtualSelector(target)) continue;
     const parts = typeof target === 'string' ? target.split('.') : [];
-    if (parts.length !== 2 || !parts.every(validName)) fail(`/bindings/${name}`, 'binding must be device.channel or board.channel');
+    if (parts.length !== 2 || !parts.every(validName)) fail(`/bindings/${name}`, 'binding must be device.channel, board.channel, software:<logical-name>, host:scan-delta-ms, or observation:<logical-name>');
     if (parts[0] !== 'board' && !Object.hasOwn(devices, parts[0])) fail(`/bindings/${name}`, `unknown device ${parts[0]}`);
   }
   return { ...plan, request: { profile: root.profile, devices, bindings: root.bindings, omit } };
@@ -206,12 +214,17 @@ export function resolveHardwareProfiles(plan, supplied) {
   }
   const bindings = {}, targets = new Set();
   for (const [name, target] of Object.entries(plan.request.bindings)) {
+    if (targets.has(target)) fail(`/bindings/${name}`, `duplicate channel binding ${target}`);
+    targets.add(target);
+    const provider = virtualSelector(target);
+    if (provider) {
+      bindings[name] = { provider, endpoint: target, role: provider === 'observation' ? 'output' : 'input' };
+      continue;
+    }
     const [instance, channel] = target.split('.');
     const channels = instance === 'board' ? board.channels : devices[instance].channels;
     if (instance === 'board' && ((bindingRole(channels, channel) === 'input' && plan.request.omit.includes('board.inputs')) || (bindingRole(channels, channel) === 'output' && plan.request.omit.includes('board.outputs')))) fail(`/bindings/${name}`, 'binding targets omitted board provider');
     if (!Object.hasOwn(channels, channel)) fail(`/bindings/${name}`, `unknown channel ${target}; use the channel contract distributed with its profile`);
-    if (targets.has(target)) fail(`/bindings/${name}`, `duplicate channel binding ${target}`);
-    targets.add(target);
     bindings[name] = { instance, channel, ...clone(channels[channel]) };
   }
   return { format: 'GhostFlow/profile-resolution-v1', source: plan.source, locations: clone(plan.locations), omit: [...plan.request.omit],
@@ -224,15 +237,35 @@ function bindingRole(channels, channel) { return channels[channel]?.role; }
 export function validateProfileBindings(plan, manifest) {
   const fail = diagnostics(plan);
   const control = manifest?.format === 'GhostFlow/control-policy-descriptor-v1' ? manifest.control : manifest;
-  const ports = new Map([
-    ...(control?.sensors ?? []).map(port => [port.name, { ...port, role: 'input' }]),
-    ...(control?.outputs ?? []).map(port => [port.name, { ...port, role: 'output' }]),
-  ]);
+  const inputs = new Map((control?.inputs ?? []).map(port => [port.name, port]));
+  const sensors = new Map((control?.sensors ?? []).map(port => [port.name, port]));
+  const outputs = new Map((control?.outputs ?? []).map(port => [port.name, port]));
   for (const [name, binding] of Object.entries(plan.bindings)) {
-    const port = ports.get(name), path = `/bindings/${name}`;
+    const path = `/bindings/${name}`;
+    if (binding.provider === 'software') {
+      const port = sensors.get(name) ?? inputs.get(name);
+      if (!port || !['Bool', 'Number'].includes(port.type) || port.canonicalUnit != null) fail(path, `software binding ${name} requires a dimensionless Bool or Number logical input`);
+      if (binding.endpoint !== `software:${name}`) fail(path, `software endpoint must match logical input ${name}`);
+      continue;
+    }
+    if (binding.provider === 'host') {
+      const port = sensors.get(name) ?? inputs.get(name);
+      if (port?.type !== 'Number' || port.canonicalUnit != null) fail(path, `host:scan-delta-ms binding ${name} requires a dimensionless Number logical input`);
+      continue;
+    }
+    if (binding.provider === 'observation') {
+      if (outputs.get(name)?.type !== 'Bool') fail(path, `observation binding ${name} requires a Bool output`);
+      if (binding.endpoint !== `observation:${name}`) fail(path, `observation endpoint must match logical output ${name}`);
+      continue;
+    }
+    if (inputs.has(name)) fail(path, `physical channel cannot bind scalar input ${name}`);
+    const port = sensors.has(name) ? { ...sensors.get(name), role: 'input' }
+      : outputs.has(name) ? { ...outputs.get(name), role: 'output' } : null;
     if (!port) fail(path, `binding ${name} does not name a declared logical input or output`);
     if (binding.role !== port.role || binding.type !== port.type) fail(path, `binding ${name} requires ${port.role} ${port.type}, got ${binding.role} ${binding.type}`);
     if ((binding.unit ?? null) !== (port.canonicalUnit ?? null)) fail(path, `binding ${name} canonical unit mismatch: expected ${port.canonicalUnit ?? 'none'}`);
   }
-  for (const name of ports.keys()) if (!Object.hasOwn(plan.bindings, name)) fail('/bindings', `missing binding for logical port ${name}`);
+  for (const name of [...inputs.keys(), ...sensors.keys(), ...outputs.keys()]) {
+    if (!Object.hasOwn(plan.bindings, name)) fail('/bindings', `missing binding for logical port ${name}`);
+  }
 }
