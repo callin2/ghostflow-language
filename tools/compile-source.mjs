@@ -13,6 +13,7 @@ import { createCompilerTelemetry } from './compiler-telemetry.mjs';
 import { inspectLegacyAdmissionSource, legacyAdmissionInputs } from './legacy-admission.mjs';
 import { attachLegacyAdmission } from './legacy-admission-contract.mjs';
 import { moduleFingerprint } from './source-trace.mjs';
+import { emitBehaviorProjection } from './behavior-projection.mjs';
 
 export { emitInteractionSchema } from './interaction-schema.mjs';
 
@@ -290,6 +291,13 @@ function compileSourceCore(source, options, telemetry) {
     throw error;
   }
   const explanationArtifact = emitExplanationArtifact(compilation);
+  const behaviorProjection = emitBehaviorProjection({
+    ast,
+    manifest: compilation.manifest,
+    sourceSha256: sourceDocument.sha256,
+    bytecodeSha256: digest,
+    extractionMap: extraction.sourceMap,
+  });
   let intentEvidence;
   if (Object.hasOwn(options, 'intentEvidence')) {
     try { intentEvidence = bindIntentEvidence(compilation, options.intentEvidence); }
@@ -309,6 +317,7 @@ function compileSourceCore(source, options, telemetry) {
       source: diagnosticSource(filename, source, interactionSourceIdentity), ...intentDiagnostics },
     interactionSchema: schema,
     explanationArtifact,
+    behaviorProjection,
     interactionSourceIdentity: schema ? {
       documentId: schema.source.documentId,
       revisionId: schema.source.revisionId,

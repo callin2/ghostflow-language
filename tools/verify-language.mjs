@@ -25,6 +25,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/output-observation-compiler.test.mjs',
   'tests/output-observation-host.test.mjs',
   'tests/output-observation-package.test.mjs',
+  'tests/behavior-projection.test.mjs',
   'tests/curriculum-start-quality.test.mjs',
   'tests/curriculum-pc05-quality.test.mjs',
   'tests/curriculum-pc06-10-quality.test.mjs',
