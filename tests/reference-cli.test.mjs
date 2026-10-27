@@ -8,17 +8,11 @@ import { after, test } from 'node:test';
 import { externalOracleCaseIds, frozenCompilerCaseIds, frozenSpecifiedCaseIds, referenceCaseTitle } from '../tools/reference-evidence.mjs';
 import { catalogPath, validateCatalog } from '../contracts/feature-status/validate.mjs';
 import { cliConcurrency, runNodeCli } from './helpers/cli-process.mjs';
+import { historicalReferenceFiles, loadReferenceCases } from '../tools/reference-cases.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const referenceDir = path.join(root, 'docs/reference');
 // Explicit files: adding a chapter requires an intentional coverage update.
-const historicalRevisionFiles = [
-  'tests/reference/cases-input-v1/00-principles.json',
-  'tests/reference/cases-input-v1/01-source-types.json',
-  'tests/reference/cases-input-v1/02-time-control.json',
-  'tests/reference/cases-input-v1/03-settings-boundaries.json',
-];
-const additiveCaseFiles = ['tests/reference/cases-civil-range-v1/02-time-control.json'];
 const chapterFiles = [
   '../LANGUAGE-REFERENCE.md',
   '01-source-and-syntax.md',
@@ -30,10 +24,8 @@ const chapterFiles = [
   '07-semantic-rules-and-index.md',
   '08-language-runtime-and-device-boundaries.md',
 ];
-const readCatalog = file => ({ file, ...JSON.parse(fs.readFileSync(path.join(root, file), 'utf8')) });
-const historicalRevisionCatalogs = historicalRevisionFiles.map(readCatalog);
-const catalogs = [...historicalRevisionCatalogs, ...additiveCaseFiles.map(readCatalog)];
-const cases = catalogs.flatMap(catalog => catalog.cases.map(entry => ({ ...entry, catalog: catalog.file })));
+const { catalogs, cases } = loadReferenceCases(root);
+const historicalRevisionCatalogs = catalogs.filter(catalog => historicalReferenceFiles.includes(catalog.file));
 const featureCatalog = JSON.parse(fs.readFileSync(catalogPath, 'utf8'));
 const featureValidationErrors = validateCatalog(featureCatalog);
 const externalOracleIds = featureValidationErrors.length ? new Set() : externalOracleCaseIds(featureCatalog, cases);
@@ -158,7 +150,7 @@ test('Reference catalog: unique cases, valid citations, concrete oracles, every 
   const statuses = new Set(['executable', 'specified', 'decision']);
   assert.deepEqual(catalogs.flatMap(c => c.chapterFiles).sort(), [...chapterFiles].sort());
   for (const entry of cases) {
-    assert.match(entry.id, /^REF-\d{2}-[A-Z0-9-]+$/, `invalid case ID in ${entry.catalog}`);
+    assert.match(entry.id, /^REF-\d{2}-[A-Z0-9-]+$/, 'invalid reference case ID');
     assert.ok(!ids.has(entry.id), `duplicate case ${entry.id}`);
     ids.add(entry.id);
     assert.ok(typeof entry.rule === 'string' && entry.rule.trim(), `${entry.id}: missing rule`);

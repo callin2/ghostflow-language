@@ -3,14 +3,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { executableReferenceSelector } from '../../tools/reference-evidence.mjs';
 import { frozenCompilerCaseIds, frozenSpecifiedCaseIds } from '../../tools/reference-evidence.mjs';
+import { loadReferenceCases } from '../../tools/reference-cases.mjs';
 
 export const root = fileURLToPath(new URL('../../', import.meta.url));
 export const catalogPath = path.join(root, 'contracts/feature-status/catalog.json');
-const referenceCatalogs = [
-  'tests/reference/cases/00-principles.json', 'tests/reference/cases/01-source-types.json',
-  'tests/reference/cases/02-time-control.json', 'tests/reference/cases/03-settings-boundaries.json',
-  'tests/reference/cases-civil-range-v1/02-time-control.json',
-];
 const stages = new Set(['compile', 'native_wasm', 'host_simulation', 'driver_application', 'physical_confirmation']);
 const owners = new Set(['CORE', 'LIBRARY', 'HOST', 'DRIVER', 'PRODUCT_BOUNDARY']);
 const maturities = new Set(['STABLE', 'EXPERIMENTAL', 'DESIGN']);
@@ -75,7 +71,7 @@ export function validateCatalog(catalog) {
   const frozen = new Set([...frozenCompilerCaseIds, ...frozenSpecifiedCaseIds]);
   const linkedFrozen = new Set();
   const referenceCases = new Map();
-  for (const file of referenceCatalogs) for (const entry of JSON.parse(fs.readFileSync(path.join(root, file), 'utf8')).cases) referenceCases.set(entry.id, entry);
+  for (const entry of loadReferenceCases(root).cases) referenceCases.set(entry.id, entry);
   const verifier = fs.readFileSync(path.join(root, 'tools/verify-language.mjs'), 'utf8');
   const testList = verifier.match(/export const LANGUAGE_TESTS = Object\.freeze\(\[([\s\S]*?)\]\);/);
   if (!testList) return ['cannot locate explicit LANGUAGE_TESTS list'];

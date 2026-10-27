@@ -1500,6 +1500,10 @@
     {
       "path": "docs/reports/2026-10-24-issue-584-explicit-profile-providers.md",
       "reason": "Issue 584 owner implementation, test evidence and consumer handoff; dated execution reports may remain in one language."
+    },
+    {
+      "path": "docs/reports/2026-10-28-reference-foundations-590.md",
+      "reason": "Issue590 execution report, exact evidence boundary and remaining work inventory; reports may remain in one language."
     }
   ]
 }

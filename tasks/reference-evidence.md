@@ -1,5 +1,7 @@
 # Reference specified-case evidence index
 
+For the current 37-case remainder and its updated results, use the [2026-10-28 #590 audit](../docs/reports/2026-10-28-reference-foundations-590.md) and exact selectors in `contracts/feature-status/catalog.json`: 12 complete software contracts and 25 open contracts. The older mapping below is retained as the historical audit; its unmapped rows and REF-05-013 expectation do not override the current versioned case catalog.
+
 This maps the 164 `status: specified` cases to existing test or native unit-test evidence. A mapping is not a pass or completion claim. `evidence` means a clear existing test locator; `unmapped` means no evidence mapping is assigned in this index. External rows preserve the plan boundary and require separate audit evidence.
 
 Counts: internal 141; external 23; total 164.
