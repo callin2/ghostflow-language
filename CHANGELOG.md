@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### 2026-10-28 — continuous timers in context profiles ([#47](https://github.com/callin2/ghostflow-language/issues/47))
+
+Bug fix for Reference §3.3. A control containing a config and
+`timer on_age = continuous_true(running);` now activates through `ControlRuntime`.
+Previously the compiler emitted this supported timer descriptor, but the context
+manifest validator rejected its `mode` field. Context and scalar profiles now
+share the existing timer descriptor validation. Elapsed timers still require
+their state, and unknown modes or mixed descriptor shapes reject. Native/WASM
+regressions compare state age and continuous time for a 10s ON, 10s OFF, 20s ON
+trace. GFB encoding, timer semantics, and Device firmware remain unchanged.
+
 ### 2026-10-27 — checked dynamic Percent arithmetic ([#591](https://github.com/callin2/ghostflow-language/issues/591))
 
 Bug fix for Reference §2.1: dynamic Percent results now preserve the declared
