@@ -217,6 +217,9 @@ test('REF-06-020 missing required candidate port rejects replacement and preserv
   runtime.tick();
   assert.equal(runtime.stateBool('held'), false, 'the prior program consumes its already supplied snapshot after rejection');
   assert.equal(runtime.intentBool('pump'), false);
+  assert.equal(runtime.trace.module, before.module);
+  assert.equal(Object.hasOwn(runtime.trace.requested, 'unavailable_pump'), false);
+  assert.equal(Object.hasOwn(runtime.trace.safe, 'unavailable_pump'), false);
   assert.equal(runtime.journalLength, journalLength + 1);
 });
 
