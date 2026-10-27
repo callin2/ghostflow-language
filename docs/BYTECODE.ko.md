@@ -82,6 +82,23 @@ Int로 인코딩한다.
 
 ## 표현식 opcode
 
+동적 Percent 산술은 기존 시간 guard를 허용하는 프로필 중 historical GFB10을 제외한
+프로필에서 추가 opcode `60`을 사용한다. 모듈 배치와 형식 선택은 유지한다. 컴파일러 manifest는
+`requiredRuntimeFeatures: ["percent-range-v1"]`를 선언한다. host는 이 요구를
+검증하며, 실제 명령 집합의 최종 판단은 실행물 loader가 한다. 이전 core는 load
+단계에서 알 수 없는 opcode로 거부하여 활성화하지 않는다. GFB 형식 번호가 같다는
+것만으로 이 명령의 지원을 확인할 수 없다. guard가 없는 기존 프로그램은 바이트를
+유지하고 이 요구를 생략한다. 소비자는 guard가 있는 프로그램을 설치하기 전에
+Percent guard를 구현한 core revision을 사용해야 한다. 이 변경은 Device 펌웨어의
+릴리스나 갱신을 포함하지 않는다.
+
+패키지 검증기는 대상이 `percent-range-v1`을 명시적으로 허용하도록 요구한다.
+JS 옵션은 `supportedRuntimeFeatures`, Rust 검증 profile 필드는
+`supported_runtime_features`다. 선언은 컴파일한 프로그램과 일치해야 한다.
+참조 host는 활성화 전에 load한 모듈을 대조한다. historical GFB10은 이 새 명령을
+선언하거나 포함할 수 없다. 현재 source는 현재 profile로 컴파일하며, 기존 GFB10
+프로그램은 새 기능 선언 없이 계속 load할 수 있다.
+
 | Opcode | 피연산자 | 의미 |
 |---:|---|---|
 | 1 | `u8` | Bool 상수, 0 또는 1 |
@@ -107,6 +124,7 @@ Int로 인코딩한다.
 | 57 | `u16 slot, u8 field` | 시간 창 투영: `0=ok`, `1=value`, `2=fault`, `3=origin`, `4=admissionRevision`, `5=newestTimestamp`, `6=count`, `7=quality`; 창이 있는 시간 형식 |
 | 58 | `u16 slot, u8 field` | 일정 투영: `0=due`, `1=missed`, `2=active` (`active`는 컨텍스트 프로필만); 일정이 있는 형식 5, 6, 8, 9, 11 |
 | 59 | `u16 slot, u8 field` | 연속 `true_for` 투영: `0=ok`, `1=value`, `2=fault`, `3=origin`, `4=start`, `5=end`, `6=covered`; 형식 6 |
+| 60 | — | 유한한 Percent `0..100` 검사, Number → Number; 기존 시간 guard 프로필 |
 
 컴파일러는 분기식에서 compact Number 상수를 사용하여 유한 enum 제어 프로그램이 동일한
 4096바이트 표현식 예산에 들도록 한다. 이 상수도 Number 형식이며 Int의 opcode 23 및
@@ -121,6 +139,14 @@ Int로 인코딩한다.
 포함된다. 비유한 입력은 기존 Number 입력 경계에서 계속 유효하지 않다. 변환 고장은
 틱 전체를 거부한다. 선택되지 않은 분기의 변환은 실행되지 않는다. 상수 변환은 컴파일
 시 진단과 리터럴 lowering을 유지하며 해당 직선 프로그램은 여전히 형식 1 또는 2를 선택할 수 있다.
+
+`CHECK_PERCENT`는 양 끝을 포함한 `0..100` 범위의 유한 Number를 보존하며 소수 값도
+허용한다. 그 외에는 `percent-out-of-range`로 tick을 거부한다. 컴파일러는 단항
+음수를 포함해 결과 타입이 Percent인 동적 산술 연산 직후마다 이 명령을 출력한다.
+중간 표현식과 펼친 함수 본문도 검사한다. 선택하지 않은 분기의 guard는 실행하지
+않는다. Number를 반환하는 Percent 비율에는 guard가 필요 없다. 실패 시 기존 산술
+rollback 경로를 사용한다. 출력을 보정하거나 constraint fault를 추가하지 않으며,
+마지막으로 commit한 상태와 출력 의도를 유지한다.
 
 `CHECK_DURATION`은 유한 정수
 `0..9007199254740991`일 때만 Number를 보존한다. 그 외에는 `duration-out-of-range`로

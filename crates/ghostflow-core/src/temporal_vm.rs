@@ -287,7 +287,7 @@ fn quality_dependencies(code: &[u8]) -> Result<Vec<u16>> {
             58 => {
                 reader.take(3)?;
             }
-            10 | 13..=17 | 19..=22 | 24..=29 | 32..=55 => {}
+            10 | 13..=17 | 19..=22 | 24..=29 | 32..=55 | 60 => {}
             _ => return Err(Error::new("unknown expression opcode")),
         }
     }

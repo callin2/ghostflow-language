@@ -22,7 +22,8 @@ function native(t, bytes, observations, artifact) {
   const modulePath = path.join(directory, 'module.gfb');
   const inputPath = path.join(directory, 'inputs.csv');
   fs.writeFileSync(modulePath, bytes);
-  const packets = artifact ? observations.map((values, index) => softwareQualityRails(artifact, values, index + 1, index)) : observations;
+  const packets = (artifact ? observations.map((values, index) => softwareQualityRails(artifact, values, index + 1, index)) : observations)
+    .map(packet => Object.keys(packet).length ? packet : { unused: 0 });
   const names = Object.keys(packets[0]);
   fs.writeFileSync(inputPath, `${names.join(',')}\n${packets.map(packet => names.map(name => packet[name]).join(',')).join('\n')}\n`);
   return execFileSync(nativePath, [modulePath, inputPath, '--outcomes'], { encoding: 'utf8' }).trim().split('\n').map(JSON.parse);
@@ -32,20 +33,40 @@ async function wasm(t, bytes, output, sensor) {
   const runtime = await GhostFlowRuntime.instantiate(fs.readFileSync(wasmPath));
   t.after(() => runtime.dispose());
   runtime.load(bytes);
-  runtime.addCapability('actuator', output, 'number');
-  if (sensor) runtime.addCapability('sensor', sensor, 'number');
+  for (const name of Array.isArray(output) ? output : [output]) runtime.addCapability('actuator', name, 'number');
+  if (sensor) runtime.addCapability('sensor', sensor[0], sensor[1]);
   runtime.activate();
   return runtime;
 }
 
 test('canonical dynamic Percent overflow faults in actual WASM execution', async t => {
-  const artifact = canonical('control PercentOverflow { state a: Percent = 90%; output x: Percent; x <- a + 20%; }');
-  const runtime = await wasm(t, artifact.bytes, 'x');
+  const artifact = canonical('control PercentOverflow { input ignored: Bool; state a: Percent = 90%; output x: Percent; x <- a + 20%; }');
+  const runtime = await wasm(t, artifact.bytes, 'x', ['ignored', 'bool']);
+  for (const [name, payload] of Object.entries(softwareQualityRails(artifact, { ignored: false }, 1, 0))) {
+    if (typeof payload === 'boolean') runtime.setBool(name, payload);
+    else runtime.setNumber(name, payload);
+  }
   assert.throws(() => runtime.tick(), /percent-out-of-range/);
   assert.deepEqual(artifact.manifest.requiredRuntimeFeatures, ['percent-range-v1']);
   assert.equal(runtime.journalLength, 0);
   assert.equal(runtime.stateNumber('a'), 90);
-  assert.equal(native(t, artifact.bytes, [{}])[0].error, 'percent-out-of-range');
+  assert.equal(native(t, artifact.bytes, [{ ignored: false }], artifact)[0].error, 'percent-out-of-range');
+});
+
+test('GFB10 rejects a Percent guard instruction while accepting the historical module', async () => {
+  const fixture = JSON.parse(fs.readFileSync(new URL('./fixtures/gfb10-periodic-package-payload.json', import.meta.url)));
+  const historical = Buffer.from(fixture.payload.bytecode.contentBase64, 'base64');
+  assert.equal(historical.readUInt16LE(4), 10);
+  assert.equal(historical[231], 58);
+  const runtime = await GhostFlowRuntime.instantiate(fs.readFileSync(wasmPath));
+  try {
+    runtime.load(historical);
+    const malformed = Buffer.from(historical);
+    malformed[231] = 60;
+    assert.throws(() => runtime.load(malformed), /Percent guard requires GFB format 3/);
+  } finally {
+    runtime.dispose();
+  }
 });
 
 test('canonical Percent boundaries, fractional results and failed-tick retry agree in native and WASM', async t => {
@@ -63,7 +84,7 @@ control PercentRetry {
   assert.deepEqual(artifact.manifest.requiredRuntimeFeatures, ['percent-range-v1']);
   const values = [0, 99.5, 0.5, 0.5, 0];
   const outcomes = native(t, artifact.bytes, values.map(step => ({ step })), artifact);
-  const runtime = await wasm(t, artifact.bytes, 'position', 'step');
+  const runtime = await wasm(t, artifact.bytes, 'position', ['step', 'number']);
   let committed;
   for (const [index, value] of values.entries()) {
     for (const [name, payload] of Object.entries(softwareQualityRails(artifact, { step: value }, index + 1, index))) {
@@ -89,32 +110,46 @@ control PercentRetry {
 test('Percent underflow, unary negation and invalid intermediate fault before cancellation', async t => {
   for (const expression of ['a - b', '-b', '(a - b) + b']) {
     const artifact = canonical(`control PercentArithmetic {
-      state a: Percent = 0%; state b: Percent = 1%; output result: Percent;
+      input ignored: Bool; state a: Percent = 0%; state b: Percent = 1%; output result: Percent;
       result <- ${expression};
     }`);
     assert.deepEqual(artifact.manifest.requiredRuntimeFeatures, ['percent-range-v1']);
-    const runtime = await wasm(t, artifact.bytes, 'result');
+    const runtime = await wasm(t, artifact.bytes, 'result', ['ignored', 'bool']);
+    for (const [name, payload] of Object.entries(softwareQualityRails(artifact, { ignored: false }, 1, 0))) {
+      if (typeof payload === 'boolean') runtime.setBool(name, payload);
+      else runtime.setNumber(name, payload);
+    }
     assert.throws(() => runtime.tick(), /percent-out-of-range/, expression);
-    assert.equal(native(t, artifact.bytes, [{}])[0].error, 'percent-out-of-range');
+    assert.equal(native(t, artifact.bytes, [{ ignored: false }], artifact)[0].error, 'percent-out-of-range');
   }
 });
 
 test('unselected invalid Percent branch stays lazy and Percent ratio is Number', async t => {
   const artifact = canonical(`control PercentBranch {
-    state condition: Bool = false; state a: Percent = 0%; state b: Percent = 1%;
+    input ignored: Bool; state condition: Bool = false; state a: Percent = 0%; state b: Percent = 1%;
     output position: Percent; output ratio: Number;
     position <- if condition then a - b else 0%;
     ratio <- a / b;
   }`);
   assert.deepEqual(artifact.manifest.requiredRuntimeFeatures, ['percent-range-v1']);
-  const runtime = await wasm(t, artifact.bytes, 'position');
-  runtime.addCapability('actuator', 'ratio', 'number');
+  const runtime = await wasm(t, artifact.bytes, ['position', 'ratio'], ['ignored', 'bool']);
+  for (const [name, payload] of Object.entries(softwareQualityRails(artifact, { ignored: false }, 1, 0))) {
+    if (typeof payload === 'boolean') runtime.setBool(name, payload);
+    else runtime.setNumber(name, payload);
+  }
   runtime.tick();
   assert.equal(runtime.intentNumber('position'), 0);
   assert.equal(runtime.intentNumber('ratio'), 0);
-  assert.equal(native(t, artifact.bytes, [{}])[0].trace.safe.position, 0);
+  assert.equal(native(t, artifact.bytes, [{ ignored: false }], artifact)[0].trace.safe.position, 0);
   const ratio = canonical('control PercentRatio { state a: Percent = 100%; state b: Percent = 1%; output result: Number; result <- a / b; }');
   assert.equal(ratio.manifest.requiredRuntimeFeatures, undefined);
+});
+
+test('compile-time Percent constants still reject out-of-range results', () => {
+  for (const expression of ['90% + 20%', '0% - 1%', '-(1%)']) {
+    assert.throws(() => canonical(`control InvalidPercent { output result: Percent; result <- ${expression}; }`),
+      /Percent constant must be between 0% and 100%/, expression);
+  }
 });
 
 test('Percent guard syntax and bytecode reject wrong type, stack and old profile', async t => {

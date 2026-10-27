@@ -106,6 +106,26 @@ test('re-signed historical GFB10 rejects new sensor instance provenance before t
   assert.deepEqual(packageValue, predecessor, 'the pinned predecessor is not migrated or overwritten');
 });
 
+test('re-signed historical GFB10 rejects runtime feature metadata before the target loader', async () => {
+  const { key, packageValue, options } = await signedPeriodicPackage();
+  let loaderCalls = 0;
+  const verification = { ...options, supportedRuntimeFeatures: ['percent-range-v1'],
+    verifyBytecode: async () => { loaderCalls++; return true; } };
+  await verifyPortablePackage(packageValue, verification);
+  assert.equal(loaderCalls, 1);
+  const changed = structuredClone(packageValue);
+  const manifest = JSON.parse(Buffer.from(changed.payload.manifest.contentBase64, 'base64').toString('utf8'));
+  manifest.requiredRuntimeFeatures = ['percent-range-v1'];
+  const bytes = encoder.encode(canonicalJson(manifest));
+  changed.payload.manifest.contentBase64 = Buffer.from(bytes).toString('base64');
+  changed.payload.manifest.sha256 = await digest(bytes);
+  await resign(changed, key);
+  await assert.rejects(() => verifyPortablePackage(changed, verification), error =>
+    error instanceof PortablePackageError && error.code === 'manifest-mismatch'
+      && /historical GFB10 profile does not support requiredRuntimeFeatures/.test(error.message));
+  assert.equal(loaderCalls, 1);
+});
+
 test('portable package descriptors continue to reject reserved GFB5 through GFB9', async () => {
   const { key, packageValue, options } = await signedPeriodicPackage();
   for (const version of ['5', '6', '7', '8', '9']) {

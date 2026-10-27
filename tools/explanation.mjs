@@ -7,10 +7,10 @@ export const EXPLANATION_LIMITS = Object.freeze({ nodes: 512, edges: 1024, depth
 const childrenOf = node => ['left', 'right', 'operand', 'condition', 'whenTrue', 'whenFalse']
   .filter(key => node[key]).map(key => node[key]);
 const supported = new Set(['literal', 'input', 'previous_state', 'candidate_next', 'logical_not',
-  'logical_and', 'logical_or', 'comparison', 'arithmetic', 'integer_arithmetic', 'integer_negation', 'conversion', 'time_guard', 'conditional']);
+  'logical_and', 'logical_or', 'comparison', 'arithmetic', 'integer_arithmetic', 'integer_negation', 'conversion', 'time_guard', 'nominal_guard', 'conditional']);
 const kinds = { previous_state: 'state', candidate_next: 'state', logical_and: 'all', logical_or: 'any',
   logical_not: 'not', comparison: 'predicate', arithmetic: 'derived', integer_arithmetic: 'derived',
-  integer_negation: 'derived', conversion: 'derived', time_guard: 'derived', conditional: 'derived' };
+  integer_negation: 'derived', conversion: 'derived', time_guard: 'derived', nominal_guard: 'derived', conditional: 'derived' };
 const fail = message => { throw new Error(`explanation: ${message}`); };
 const idOf = expression => 'explanation.' + sha256Hex(canonicalJson(expression)).slice(0, 32);
 const same = (a, b) => canonicalJson(a) === canonicalJson(b);

@@ -24,6 +24,13 @@ export class GhostFlowRuntime {
   }
 
   load(moduleBytes) { this.#bytes(moduleBytes, (p, n) => this.#check(this.wasm.gf_load(this.handle, p, n))); }
+  requiresPercentRangeV1() {
+    this.#live();
+    if (typeof this.wasm.gf_requires_percent_range_v1 !== 'function') return false;
+    const required = this.wasm.gf_requires_percent_range_v1(this.handle);
+    if (required !== 0 && required !== 1) throw new Error(this.#lastError() || 'GhostFlow feature inspection failed');
+    return required === 1;
+  }
   hotSwap(moduleBytes) { this.#bytes(moduleBytes, (p, n) => this.#check(this.wasm.gf_hot_swap(this.handle, p, n))); }
   activate() { this.#check(this.wasm.gf_activate(this.handle)); }
   activateResourceBinding(bytes) {

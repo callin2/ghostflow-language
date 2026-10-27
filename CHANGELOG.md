@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+### 2026-10-27 — checked dynamic Percent arithmetic ([#591](https://github.com/callin2/ghostflow-language/issues/591))
+
+Bug fix for Reference §2.1: dynamic Percent results now preserve the declared
+`0..100` domain. Previously, `state p: Percent = 90%;` followed by
+`output x: Percent; x <- p + 20%;` produced `110` without an error. The evaluated
+addition now rejects the tick with `percent-out-of-range` before committing state
+or outputs. This makes the dynamic error policy explicit. Fractional values,
+lazy branches and Number-valued Percent ratios retain their meaning. Intermediate
+expressions and inlined functions receive the same check.
+
+Guarded artifacts add opcode `60` and declare the `percent-range-v1` runtime
+feature. Existing GFB layouts remain unchanged. Older cores reject the unknown
+instruction before activation; consumers need the updated portable core to execute
+these artifacts. Native/WASM regression cases cover the range, failed-tick retry,
+branch selection and malformed bytecode. Device firmware is not updated here.
+
 ### 2026-10-24 — explicit compact profile providers ([#584](https://github.com/callin2/ghostflow-language/issues/584))
 
 Compact `bindings` now accepts `software:<same logical name>` for dimensionless

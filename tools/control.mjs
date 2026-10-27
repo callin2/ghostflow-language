@@ -1739,6 +1739,9 @@ class Lowerer {
       const message = cause instanceof Error ? cause.message : String(cause);
       error(this.ast.loc, `GFB1 lowering rejected control: ${message}`);
     }
+    const containsPercentGuard = form => Array.isArray(form)
+      && (form[0] === 'check-percent' || form.some(containsPercentGuard));
+    if (containsPercentGuard(module)) this.manifest.requiredRuntimeFeatures = ['percent-range-v1'];
     const generatedTimers = [];
     for (const node of this.ast.body) if (node.kind === 'timer') {
       const timer = this.timers.get(node.name);
@@ -3518,6 +3521,7 @@ class Lowerer {
         validateNominalConstant(value.type, constant, node.loc);
         let lowered = value.type.kind === 'Int' ? ['int-neg', value.sexpr] : ['sub', '0', value.sexpr];
         if (value.type.kind === 'Duration' && constant === undefined) lowered = ['check-duration', lowered];
+        if (value.type.kind === 'Percent' && constant === undefined) lowered = ['check-percent', lowered];
         return { type: value.type, sexpr: lowered, constant };
       }
     }
@@ -3617,6 +3621,7 @@ class Lowerer {
       let lowered = [head, loweredLeft, loweredRight];
       if (type.kind === 'Duration' && constants === undefined) lowered = ['check-duration', lowered];
       if (type.kind === 'DateTime' && constants === undefined) lowered = ['check-datetime', lowered];
+      if (type.kind === 'Percent' && constants === undefined) lowered = ['check-percent', lowered];
       return { type, sexpr: lowered, constant: constants };
     }
     if (op === '=>') error(node.loc, '=> is only valid in require declarations');
@@ -4155,7 +4160,7 @@ function expressionStack(node) {
   const [head, ...args] = node;
   if (head === 'int') return 1;
   if (head === 'window-read' || head === 'true-for-read' || head === 'schedule-read') return 1;
-  if (['not', 'check-duration', 'check-datetime', 'int-neg', 'int-to-number', 'int-exact', 'int-floor', 'int-ceil', 'int-trunc', 'int-nearest-even'].includes(head)) return expressionStack(args[0]);
+  if (['not', 'check-duration', 'check-datetime', 'check-percent', 'int-neg', 'int-to-number', 'int-exact', 'int-floor', 'int-ceil', 'int-trunc', 'int-nearest-even'].includes(head)) return expressionStack(args[0]);
   if (head === 'if') {
     const condition = expressionStack(args[0]); const yes = expressionStack(args[1]); const no = expressionStack(args[2]);
     return Math.max(condition, 1 + yes, 2 + no);
@@ -4479,7 +4484,9 @@ export function compileBoundControlPolicyArtifact(source, { filename, envelope }
     || candidate.bytes.some((byte, index) => bytes[index + 10] !== byte)) {
     error(ast.loc, 'bound resource execution requires the guarded GFB17 envelope');
   }
-  return { ...candidate, bytes, manifest: { ...checked.manifest, format: 'GhostFlow/control-v17' } };
+  return { ...candidate, bytes, manifest: { ...checked.manifest, format: 'GhostFlow/control-v17',
+    ...(candidate.manifest.requiredRuntimeFeatures
+      ? { requiredRuntimeFeatures: candidate.manifest.requiredRuntimeFeatures } : {}) } };
 }
 
 /** Type-checked schedule contract. These bytes cannot be loaded as control bytecode. */

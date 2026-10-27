@@ -473,7 +473,7 @@ impl Module {
                     schedule_count,
                     true_for_count,
                 )?;
-                let (uses_int, marker_count) = expression_metadata(&expression)?;
+                let (uses_int, marker_count, _) = expression_metadata(&expression)?;
                 has_int_expression |= uses_int;
                 result_trace_bound += marker_count;
                 if ty != states[state_index].value_type {
@@ -511,7 +511,7 @@ impl Module {
                 {
                     return Err(Error::new("intent type mismatch"));
                 }
-                let (uses_int, marker_count) = expression_metadata(&expression)?;
+                let (uses_int, marker_count, _) = expression_metadata(&expression)?;
                 has_int_expression |= uses_int;
                 result_trace_bound += marker_count;
                 intents.push(Intent {
@@ -836,6 +836,58 @@ impl Module {
     pub fn bytecode_format_version(&self) -> u16 {
         self.format_version
     }
+    pub fn requires_percent_range_v1(&self) -> Result<bool> {
+        for strategy in &self.strategies {
+            for expression in strategy
+                .transitions
+                .iter()
+                .map(|transition| &transition.expression)
+                .chain(strategy.intents.iter().map(|intent| &intent.expression))
+            {
+                if expression_metadata(expression)?.2 {
+                    return Ok(true);
+                }
+            }
+        }
+        if let Some(temporal) = &self.temporal {
+            for window in temporal
+                .strategies
+                .iter()
+                .flat_map(|strategy| &strategy.windows)
+            {
+                let source = &window.source;
+                for expression in [
+                    &source.ok,
+                    &source.payload,
+                    &source.fault,
+                    &source.origin,
+                    &source.quality,
+                    &source.source_tag,
+                ] {
+                    if expression_metadata(expression)?.2 {
+                        return Ok(true);
+                    }
+                }
+            }
+        }
+        if let Some(schedules) = &self.schedules {
+            for schedule in schedules
+                .strategies
+                .iter()
+                .flat_map(|strategy| &strategy.schedules)
+            {
+                if !schedule.when().is_empty() && expression_metadata(schedule.when())?.2 {
+                    return Ok(true);
+                }
+                if let schedule_vm::PulseDescriptor::Context(context) = schedule {
+                    if expression_metadata(&context.cancel)?.2 {
+                        return Ok(true);
+                    }
+                }
+            }
+        }
+        Ok(false)
+    }
     pub fn version(&self) -> u32 {
         self.version
     }
@@ -1047,6 +1099,12 @@ impl Runtime {
             resource_guard: None,
             resource_lease: None,
         }
+    }
+    pub fn requires_percent_range_v1(&self) -> Result<bool> {
+        self.module
+            .as_ref()
+            .ok_or_else(|| Error::new("module is not loaded"))?
+            .requires_percent_range_v1()
     }
     pub fn install(&mut self, module: Module, preserve_state: bool) {
         self.instruction_witnesses_enabled = false;
@@ -3030,6 +3088,18 @@ fn verify_expression_with_prelude(
                 }
                 type_push(&mut stack, &mut len, Type::Number)?;
             }
+            60 => {
+                if !matches!(
+                    format_version,
+                    3 | 4 | 5 | 6 | 7 | 8 | 9 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21
+                ) {
+                    return Err(Error::new("Percent guard requires GFB format 3"));
+                }
+                if type_pop(&mut stack, &mut len)? != Type::Number {
+                    return Err(Error::new("Percent guard expects Number"));
+                }
+                type_push(&mut stack, &mut len, Type::Number)?;
+            }
             56 => {
                 if !matches!(
                     format_version,
@@ -3115,10 +3185,11 @@ fn verify_expression_with_prelude(
     Ok(stack[0].unwrap())
 }
 
-fn expression_metadata(code: &[u8]) -> Result<(bool, usize)> {
+fn expression_metadata(code: &[u8]) -> Result<(bool, usize, bool)> {
     let mut reader = Reader::new(code);
     let mut uses_int = false;
     let mut markers = 0;
+    let mut percent_guard = false;
     while !reader.finished() {
         match reader.u8()? {
             1 => {
@@ -3139,6 +3210,7 @@ fn expression_metadata(code: &[u8]) -> Result<(bool, usize)> {
                 reader.u16()?;
             }
             10 | 13..=17 | 19..=22 | 32..=47 | 54..=55 => {}
+            60 => percent_guard = true,
             56 => {
                 reader.u32()?;
                 markers += 1;
@@ -3149,7 +3221,7 @@ fn expression_metadata(code: &[u8]) -> Result<(bool, usize)> {
             _ => return Err(Error::new("unknown expression opcode")),
         }
     }
-    Ok((uses_int, markers))
+    Ok((uses_int, markers, percent_guard))
 }
 fn type_push(s: &mut [Option<Type>; MAX_STACK], n: &mut usize, v: Type) -> Result<()> {
     if *n >= MAX_STACK {
@@ -3415,6 +3487,15 @@ fn eval_expression_with_witnesses(
                     || !(0.0..=253_402_300_799_999.0).contains(&value)
                 {
                     return Err(Error::new("datetime-out-of-range"));
+                }
+                value_push(&mut s, &mut n, Value::Number(value))?;
+            }
+            60 => {
+                let Value::Number(value) = value_pop(&s, &mut n)? else {
+                    return Err(Error::new("Percent guard expects Number"));
+                };
+                if !value.is_finite() || !(0.0..=100.0).contains(&value) {
+                    return Err(Error::new("percent-out-of-range"));
                 }
                 value_push(&mut s, &mut n, Value::Number(value))?;
             }
@@ -4195,7 +4276,7 @@ mod tests {
             verify_expression(&code, &[], &[], false, 3).unwrap(),
             Type::Number
         );
-        assert_eq!(expression_metadata(&code).unwrap(), (false, 1));
+        assert_eq!(expression_metadata(&code).unwrap(), (false, 1, false));
         let mut trace = ResultTraceBuffer {
             events: Vec::new(),
             bound: 1,

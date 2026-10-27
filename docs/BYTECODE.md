@@ -49,7 +49,7 @@ The S-expression representation in `tools/gfb1.mjs` is internal compiler IR.
 |---|---|---|
 | 1 | Straight-line expressions without Int | `1=Bool`, `2=Number` |
 | 2 | Straight-line expressions with Int declarations or operations | Also `3=Int` |
-| 3 | Branches, dynamic Int/Number conversions, or time value guards | Bool, Number and Int |
+| 3 | Branches, dynamic Int/Number conversions, or nominal value guards | Bool, Number and Int |
 | 4 | Temporal window modules with physical roots and temporal clock inputs | Existing format 3 types plus bounded window descriptors |
 | 5 | Solar schedule prelude | Format 4 types plus tagged schedule descriptors |
 | 6 | Continuous `true_for` prelude | Temporal types plus true-for descriptors |
@@ -105,6 +105,7 @@ as finite `f64`, and Int as signed `i32`.
 | 57 | `u16 slot, u8 field` | Temporal window projection: `0=ok`, `1=value`, `2=fault`, `3=origin`, `4=admissionRevision`, `5=newestTimestamp`, `6=count`, `7=quality`; temporal formats with windows |
 | 58 | `u16 slot, u8 field` | Schedule projection: `0=due`, `1=missed`, `2=active` (context profiles only for `active`); formats 5, 6, 8, 9 and 11 with schedules |
 | 59 | `u16 slot, u8 field` | Continuous `true_for` projection: `0=ok`, `1=value`, `2=fault`, `3=origin`, `4=start`, `5=end`, `6=covered`; format 6 |
+| 60 | — | Check finite Percent in `0..100`, Number → Number; existing time-guard profiles |
 
 The compiler uses compact Number constants in branched expressions to keep
 finite enum control programs within the same 4096-byte expression budget.
@@ -122,6 +123,33 @@ Non-finite input remains invalid at the existing Number input boundary.
 Conversion faults reject the entire tick. Unselected branch conversions do not
 execute. Constant conversions retain compile-time diagnostics and literal lowering;
 their straight-line programs can still select format 1 or 2.
+
+Dynamic Percent arithmetic uses additive opcode `60` in the profiles that admit
+the existing time guards, except historical GFB10. Module layouts and format selection remain
+unchanged. Its compiler manifest declares
+`requiredRuntimeFeatures: ["percent-range-v1"]`. Hosts validate that requirement;
+the executable loader remains authoritative for the actual instruction set.
+Older cores reject the unknown opcode during load, before activation. A matching
+GFB format number alone does not establish support for this instruction. Existing
+programs without the guard retain their bytes and omit the requirement. Consumers
+must use a core revision containing the Percent guard before installing guarded
+programs. This change does not release or update Device firmware.
+
+Package verifiers require the target to explicitly allow `percent-range-v1`.
+The JS option is `supportedRuntimeFeatures`; the Rust verification profile uses
+`supported_runtime_features`. The declaration must match the compiled program.
+The reference host checks the loaded module before activation. Historical GFB10
+cannot declare or contain the new instruction; current source compiles to current
+profiles. Its existing programs remain loadable without a new feature declaration.
+
+`CHECK_PERCENT` preserves a finite Number in the inclusive range `0..100`,
+including fractional values. Otherwise it rejects the tick with
+`percent-out-of-range`. The compiler emits it immediately after each dynamic
+arithmetic operation with a Percent result, including unary minus. It also
+checks intermediate expressions and inlined function bodies. Unselected branches
+do not execute their guards. A Percent ratio returning Number needs no guard.
+Failure uses the existing arithmetic rollback path; it does not clamp outputs or
+add a constraint fault. The last committed state and intents remain unchanged.
 
 `CHECK_DURATION` preserves a Number only when it is a finite integer in
 `0..9007199254740991`; otherwise it rejects the tick with `duration-out-of-range`.

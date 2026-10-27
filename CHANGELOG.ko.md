@@ -5,6 +5,22 @@
 
 ## 미출시
 
+### 2026-10-27 — 동적 Percent 산술 범위 검사 ([#591](https://github.com/callin2/ghostflow-language/issues/591))
+
+Reference §2.1의 버그 수정이다. 동적 Percent 결과도 선언한 `0..100` 범위를
+유지한다. 이전에는 `state p: Percent = 90%;` 다음에
+`output x: Percent; x <- p + 20%;`를 작성하면 오류 없이 `110`을 출력했다.
+이제 실제 평가한 덧셈은 상태나 출력을 commit하기 전에 `percent-out-of-range`로
+tick을 거부한다. 동적 오류 처리 방식을 명시한 변경이다. 소수 값, 지연 분기,
+Number를 반환하는 Percent 비율의 의미는 유지한다. 중간 표현식과 펼친 함수 본문도
+같은 검사를 받는다.
+
+guard가 있는 실행물은 opcode `60`과 `percent-range-v1` runtime 요구를 추가한다.
+기존 GFB 배치는 유지한다. 이전 core는 활성화 전에 알 수 없는 명령으로 거부하므로,
+이 실행물을 사용하려면 갱신된 portable core가 필요하다. native/WASM 회귀는 범위,
+실패한 tick의 재시도, 분기 선택과 잘못된 bytecode를 검사한다. Device 펌웨어는
+이 작업에서 갱신하지 않는다.
+
 ### 2026-10-24 — 간결한 profile의 명시적 provider ([#584](https://github.com/callin2/ghostflow-language/issues/584))
 
 간결한 `bindings`는 이제 단위 없는 Bool/Number 품질 센서 또는 기존 scalar 입력에

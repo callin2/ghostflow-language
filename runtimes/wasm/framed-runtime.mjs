@@ -147,6 +147,14 @@ export class FramedGhostFlowRuntime {
     this.#bytes(bytes, (ptr, len) => this.#check(this.wasm.gf_frame_load(this.handle, ptr, len)));
   }
 
+  requiresPercentRangeV1() {
+    this.#live();
+    if (typeof this.wasm.gf_frame_requires_percent_range_v1 !== 'function') return false;
+    const required = this.wasm.gf_frame_requires_percent_range_v1(this.handle);
+    if (required !== 0 && required !== 1) throw new Error(this.#lastError() || 'Framed GhostFlow feature inspection failed');
+    return required === 1;
+  }
+
   addCapability(kind, name, type) {
     this.#live();
     if (!['bool', 'number', 'int'].includes(type)) throw new TypeError('capability type must be bool, number, or int');

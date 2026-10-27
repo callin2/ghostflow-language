@@ -127,6 +127,21 @@ pub unsafe extern "C" fn gf_load(handle: *mut Handle, ptr: *const u8, length: us
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn gf_requires_percent_range_v1(handle: *mut Handle) -> i32 {
+    let Some(h) = handle.as_mut() else { return -1 };
+    match h.runtime.requires_percent_range_v1() {
+        Ok(required) => {
+            h.error.clear();
+            i32::from(required)
+        }
+        Err(error) => {
+            h.error = error.to_string();
+            -1
+        }
+    }
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn gf_hot_swap(handle: *mut Handle, ptr: *const u8, length: usize) -> i32 {
     let Some(h) = handle.as_mut() else { return 0 };
     let result = module_from_raw(ptr, length).and_then(|m| h.runtime.hot_swap(m));
