@@ -705,8 +705,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "9d9ed419413518a28c1cfd0755abaafd9e84a83ed352f235a59d51a1f469a635",
-      "translationSha256": "78af5736eb941678199de324b9dd8afc294b61b015859c7290f4582e9e78e7df"
+      "sourceSha256": "ca09baf502adc94c572b945b8d67758dcc1b3f9894064ce8e5b2f56a043875a7",
+      "translationSha256": "a0450b1725edc7764d562b168783a864ebad785818f9f23b342c0e507bc2ad90"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",

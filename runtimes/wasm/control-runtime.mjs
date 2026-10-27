@@ -160,6 +160,17 @@ function validateList(list, label, required, optional = []) {
   });
 }
 
+function validateTimers(timers) {
+  if (!Array.isArray(timers) || timers.length > MAX_LIST) throw new TypeError('manifest.timers must be a bounded array');
+  return timers.map((timer, index) => {
+    const item = record(timer, `manifest.timers[${index}]`);
+    const continuous = Object.hasOwn(item, 'mode');
+    keys(item, continuous ? ['name', 'mode', 'clockInput'] : ['name', 'state', 'clockInput'], [], `manifest.timers[${index}]`);
+    if (continuous && item.mode !== 'continuous-true') throw new Error(`timer ${String(item.name)} has unsupported mode ${String(item.mode)}`);
+    return copy(item);
+  });
+}
+
 function unique(items, label) {
   const seen = new Set();
   for (const item of items) { if (seen.has(item)) throw new Error(`duplicate ${label} ${item}`); seen.add(item); }
@@ -292,9 +303,10 @@ function validateContextManifest(input, bytecodeFormat) {
     throw new Error('At profile requires At-only execution');
   }
   if (manifest.signals.length) throw new Error('context signal mixing is not supported');
-  const timers = validateList(manifest.timers, 'manifest.timers', ['name','state','clockInput']);
+  const timers = validateTimers(manifest.timers);
   for (const item of timers) {
-    name(item.name, 'timer.name'); name(item.state, `timer ${item.name}.state`);
+    name(item.name, 'timer.name');
+    if (item.mode === undefined) name(item.state, `timer ${item.name}.state`);
     if (item.clockInput !== `${RESERVED}now_ms`) throw new Error(`timer ${item.name}.clockInput must be ${RESERVED}now_ms`);
   }
   for (const item of inputs) { name(item.name, 'input.name'); if (item.name.startsWith(RESERVED)) throw new Error('reserved user input'); if (!(lifecycle && item.name === lifecycle.restartReasonInput)) type(item.type, `input ${item.name}.type`); validateCanonicalUnit(item, `input ${item.name}`); }
@@ -560,14 +572,7 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
   if (schedules.some(item => item.kind === 'solar') && !(manifest.format === AVAILABILITY_FORMAT ? bytecodeFormat === 13 : [5, 9].includes(bytecodeFormat))) throw new Error('Solar manifest requires matching GFB format');
   if (manifest.format === SCHEDULE_FORMAT && (bytecodeFormat !== 8 || !schedules.length || schedules.some(item => item.kind !== 'daily'))) throw new Error('v7 manifest requires GFB format 8 Daily schedules');
   if (manifest.format === SCHEDULE_SLOTS_FORMAT && (bytecodeFormat !== 9 || !schedules.length || schedules.some(item => item.kind !== 'daily-slots'))) throw new Error('v8 manifest requires GFB format 9 DailySlots schedules');
-  if (!Array.isArray(manifest.timers) || manifest.timers.length > MAX_LIST) throw new TypeError('manifest.timers must be a bounded array');
-  const timers = manifest.timers.map((timer, index) => {
-    const item = record(timer, `manifest.timers[${index}]`);
-    const continuous = Object.hasOwn(item, 'mode');
-    keys(item, continuous ? ['name', 'mode', 'clockInput'] : ['name', 'state', 'clockInput'], [], `manifest.timers[${index}]`);
-    if (continuous && item.mode !== 'continuous-true') throw new Error(`timer ${String(item.name)} has unsupported mode ${String(item.mode)}`);
-    return copy(item);
-  });
+  const timers = validateTimers(manifest.timers);
   if (!Array.isArray(manifest.signals) || manifest.signals.length > MAX_LIST) throw new TypeError('manifest.signals must be a bounded array');
   const signals = manifest.signals.map((signal, index) => {
     const item = record(signal, `manifest.signals[${index}]`);
