@@ -10,6 +10,8 @@ import { pcErrorCases, pcMutations } from './pc-cases.mjs';
 import { serializerTheoremInput } from './serializer-bridge.mjs';
 import { moduleTheoremInput } from './module-bridge.mjs';
 import { moduleCases } from './module-cases.mjs';
+import { loaderTheoremInput, loaderAdmissionInput } from './loader-bridge.mjs';
+import { loaderCases, loaderMutations } from './loader-cases.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url)), root = resolve(here, '../..');
 const now = () => new Date().toISOString();
@@ -37,7 +39,7 @@ export async function verify({ lean, evidenceDir }) {
   const directory = resolve(evidenceDir), reportPath = join(directory, 'verification.json');
   await mkdir(directory, { recursive: true });
   const report = { schemaVersion: 1, status: 'running', startedAt: now(), productionCompilerProof: false,
-    scope: 'Bool translation, whole canonical module binding, simultaneous tick, byte-PC execution and bounded serialization/decoder equivalence, all valuations',
+    scope: 'Bool translation, independent raw module loading, initialized byte-PC traces for all tick counts, whole canonical module binding and bounded serialization/decoder equivalence',
     wholeModuleTrust: ['production source parser and typed projection', 'Lean kernel and standard logical foundations',
       'canonical module model and byte-PC model correspondence to production Rust remain unproved'],
     results: [], artifacts: [] };
@@ -102,6 +104,10 @@ export async function verify({ lean, evidenceDir }) {
     requireArgument(!/\b(sorry|axiom|native_decide)\b/.test(moduleModel), 'prohibited module proof escape');
     await run('ModuleEnvelope', moduleModel, true, undefined, 'ModuleEnvelope.olean');
     await run('module-envelope-boundaries', `import ModuleEnvelope\n${moduleCases}`, true);
+    const loaderModel = await readFile(join(here, 'ModuleLoader.lean'), 'utf8');
+    requireArgument(!/\b(sorry|admit|axiom|native_decide)\b/.test(loaderModel), 'prohibited loader proof escape');
+    await run('ModuleLoader', loaderModel, true, undefined, 'ModuleLoader.olean');
+    await run('module-loader-boundaries', `import ModuleLoader\n${loaderCases}`, true);
     const compiled = [];
     for (const name of fixtureNames) {
       const filename = `experiments/bool-translation-validation/fixtures/${name}.ghost.md`;
@@ -116,6 +122,7 @@ export async function verify({ lean, evidenceDir }) {
       await run(`${name}-pc`, pcTheoremInput(evidence), true);
       await run(`${name}-serializer`, serializerTheoremInput(evidence), true);
       await run(`${name}-module`, moduleTheoremInput(evidence), true);
+      await run(`${name}-loader`, loaderTheoremInput(evidence), true);
     }
     const noDecoded = structuredClone(compiled[0]);
     delete noDecoded.decoded;
@@ -126,15 +133,23 @@ export async function verify({ lean, evidenceDir }) {
     }
     assert.equal(moduleTheoremInput(noDecoded), moduleTheoremInput(compiled[0]));
     await run('module-ignores-decoded-witness', moduleTheoremInput(noDecoded), true);
+    assert.equal(loaderTheoremInput(noDecoded), loaderTheoremInput(compiled[0]));
+    await run('loader-ignores-decoded-witness', loaderTheoremInput(noDecoded), true);
     const frozenWitness = structuredClone(compiled[0]);
     frozenWitness.artifact.bytes[frozenWitness.decoded.transitions[1].targetOffset] = 0;
     assert.throws(() => validateArtifact(frozenWitness.projection, Uint8Array.from(frozenWitness.artifact.bytes)), /duplicate transition/);
     await run('old-certificate-accepts-frozen-target-witness', serializerTheoremInput(frozenWitness), true);
     await run('module-rejects-frozen-target-witness', moduleTheoremInput(frozenWitness), false, falseProposition);
+    await run('loader-rejects-frozen-target-witness', loaderAdmissionInput(frozenWitness.artifact.bytes, false), true);
     const envelopeMutation = async (name, edit) => {
       const changed = structuredClone(compiled[0]);
       edit(changed.artifact.bytes, changed.decoded);
       await run(`module-rejects-${name}`, moduleTheoremInput(changed), false, falseProposition);
+      const validDifferentProgram = ['initial-state', 'module-name', 'state-name'].includes(name);
+      await run(`loader-${validDifferentProgram ? 'accepts-changed' : 'rejects'}-${name}`,
+        loaderAdmissionInput(changed.artifact.bytes, validDifferentProgram), true);
+      if (validDifferentProgram) await run(`loader-original-source-mismatch-${name}`,
+        loaderTheoremInput(changed), false, falseProposition);
     };
     const strategyOffset = compiled[0].decoded.states.at(-1).initialOffset + 1;
     const priorityOffset = strategyOffset + 2 + 2 + 'control'.length;
@@ -162,6 +177,22 @@ export async function verify({ lean, evidenceDir }) {
     await envelopeMutation('trailing-metadata', bytes => { bytes.push(0); });
     await envelopeMutation('version', bytes => { bytes[8 + compiled[0].projection.name.length] = 2; });
     await envelopeMutation('format', bytes => { bytes[4] = 1; });
+    for (const [name, edit] of [
+      ['oversized-state-count', (bytes, decoded) => { bytes[decoded.stateCountOffset] = 129; }],
+      ['maximal-expression-length', (bytes, decoded) => { bytes.fill(255, decoded.transitions[0].offset - 4, decoded.transitions[0].offset); }],
+      ['noncanonical-initial-bool', (bytes, decoded) => { bytes[decoded.states[0].initialOffset] = 2; }],
+      ['non-byte-query', bytes => { bytes[queryOffset + 3] = 256; }],
+      ['invalid-magic', bytes => { bytes[0] = 0; }],
+    ]) {
+      const changed = structuredClone(compiled[0]);
+      edit(changed.artifact.bytes, changed.decoded);
+      await run(`loader-rejects-${name}`, loaderAdmissionInput(changed.artifact.bytes, false), true);
+    }
+    for (const mutation of loaderMutations) {
+      assert.ok(loaderModel.includes(mutation.before), `${mutation.name} target drifted`);
+      await run(`loader-proof-rejects-${mutation.name}`,
+        loaderModel.replace(mutation.before, mutation.after), false, mutation.diagnostic);
+    }
     for (const mutation of pcMutations) {
       assert.ok(pcModel.includes(mutation.before), `${mutation.name} target drifted`);
       await run(mutation.name, pcModel.replaceAll(mutation.before, mutation.after) + pcErrorCases, false, mutation.diagnostic);

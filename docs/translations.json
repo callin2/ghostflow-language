@@ -1561,6 +1561,10 @@
     {
       "path": "experiments/bool-translation-validation/module-envelope-report.md",
       "reason": "Issue590 bounded formal proof execution report and trusted-boundary evidence; reports may remain in one language."
+    },
+    {
+      "path": "experiments/bool-translation-validation/module-loader-report.md",
+      "reason": "Issue590 raw-loader proof execution report and remaining trust boundary; reports may remain in one language."
     }
   ]
 }
