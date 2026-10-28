@@ -14,6 +14,7 @@ const expectedSuites = [
   ['two-sensor-provenance', 'two-sensor-provenance'],
   ['elapsed-epoch-validation', 'elapsed-epoch-validation'],
   ['elapsed-clock-bounds', 'elapsed-clock-bounds'],
+  ['elapsed-duration-output', 'elapsed-duration-output'],
 ];
 const expectedPaths = [
   '.github/workflows/lean-proof.yml',
@@ -27,16 +28,18 @@ const expectedPaths = [
   'tests/two-sensor-provenance.test.mjs',
   'tests/elapsed-epoch-validation.test.mjs',
   'tests/elapsed-clock-bounds.test.mjs',
+  'tests/elapsed-duration-output.test.mjs',
   'tests/lean-outcome.test.mjs',
+  'tests/lean-proof-workflow.test.mjs',
   'tools/**',
   'crates/ghostflow-core/src/**',
   'package.json',
   'package-lock.json',
 ];
 const checkoutSha = "${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}";
-const bridgeTests = 'node --test tests/bool-translation-validation.test.mjs tests/bool-generated-certificates.test.mjs tests/bool-sensor-validation.test.mjs tests/bool-sensor-state-validation.test.mjs tests/int32-codec-validation.test.mjs tests/lean-outcome.test.mjs tests/two-sensor-provenance.test.mjs tests/elapsed-epoch-validation.test.mjs tests/elapsed-clock-bounds.test.mjs';
+const bridgeTests = 'node --test tests/bool-translation-validation.test.mjs tests/bool-generated-certificates.test.mjs tests/bool-sensor-validation.test.mjs tests/bool-sensor-state-validation.test.mjs tests/int32-codec-validation.test.mjs tests/lean-outcome.test.mjs tests/two-sensor-provenance.test.mjs tests/elapsed-epoch-validation.test.mjs tests/elapsed-clock-bounds.test.mjs tests/elapsed-duration-output.test.mjs tests/lean-proof-workflow.test.mjs';
 
-test('Lean proof workflow preserves routing and runs seven isolated bounded suites', () => {
+test('Lean proof workflow preserves routing and runs eight isolated bounded suites', () => {
   assert.deepEqual(workflow.on.pull_request.paths, expectedPaths);
   assert.deepEqual(workflow.on.push.branches, ['main', 'dev']);
   assert.deepEqual(workflow.on.push.paths, expectedPaths);
