@@ -220,6 +220,22 @@ pub struct SolarContextEvidence {
     pub rows: Vec<crate::solar_admission::SolarFact>,
 }
 
+/// Host IANA conversion of one natural occurrence's chosen planned instant.
+/// The core checks its binding and revision but does not contain a timezone DB.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ScheduledLocalDateFact {
+    pub site: u32,
+    pub source_key: String,
+    pub source_day: i32,
+    pub timezone: String,
+    pub planned_wall_ms: u64,
+    pub scheduled_day: Option<i32>,
+    pub unavailable_reason: Option<u8>,
+    pub provider_revision: String,
+    pub context_revision: String,
+    pub resolver_revision: String,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SettingValue {
     Duration(u64),

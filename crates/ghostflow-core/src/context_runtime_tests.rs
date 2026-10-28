@@ -1946,6 +1946,7 @@ fn pid_reads_staged_config_result_and_rolls_back_with_failed_vm() {
     };
     let mut facts = context_runtime::Facts {
         solars: vec![],
+        scheduled_dates: vec![],
         natural: vec![],
         schedules: vec![],
         settings: None,

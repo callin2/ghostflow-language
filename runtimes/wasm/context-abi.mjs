@@ -1,5 +1,6 @@
-// Context activation and GFSF5/6 provider/settings evidence.
+// Context activation and GFSF5/6/7 provider/settings evidence.
 import { validateSolarDescriptor, validateSolarFallbackFacts } from './solar-schedule.mjs';
+import { localEpochDay } from './civil-date.mjs';
 const utf8 = new TextEncoder();
 const LIMIT = 65_536;
 const MAX_EXACT = Number.MAX_SAFE_INTEGER;
@@ -114,9 +115,10 @@ export function encodeContextActivation(profile) {
 }
 
 export function encodeContextFacts(packet) {
-  const p = object(packet, ['clock','natural','schedules','settings','solars'], 'context facts');
+  const p = object(packet, ['clock','natural','schedules','settings','solars','scheduledDates'], 'context facts');
   const solars = p.solars === undefined ? [] : bounded(p.solars, 'solars');
-  const writer = new Writer(); writer.raw([71,70,83,70]); writer.u16(solars.length ? 6 : 5);
+  const scheduledDates = p.scheduledDates === undefined ? null : bounded(p.scheduledDates, 'scheduledDates', 4096);
+  const writer = new Writer(); writer.raw([71,70,83,70]); writer.u16(scheduledDates !== null ? 7 : solars.length ? 6 : 5);
   const c = object(p.clock, ['monotonicMs','bootEpoch','wallMs','uncertaintyMs','trusted','unknownReason','sourceRevision'], 'clock');
   writer.u64(c.monotonicMs, 'clock.monotonicMs'); writer.u64(c.bootEpoch, 'clock.bootEpoch');
   writer.optional(c.wallMs, 'clock.wallMs'); writer.optional(c.uncertaintyMs, 'clock.uncertaintyMs');
@@ -205,7 +207,7 @@ export function encodeContextFacts(packet) {
       } else throw new TypeError('settings result.ok must be Bool');
     }
   }
-  if (solars.length) {
+  if (solars.length || scheduledDates !== null) {
     writer.u16(solars.length);
     const solarSites = new Set();
     for (const [index, value] of solars.entries()) {
@@ -234,6 +236,35 @@ export function encodeContextFacts(packet) {
         writer.u8(row.unavailableReason == null ? 255 : integer(row.unavailableReason, 'Solar unavailableReason', 5));
         writer.str(row.providerRevision, 'Solar providerRevision'); writer.str(row.contextRevision, 'Solar contextRevision');
       }
+    }
+  }
+  if (scheduledDates !== null) {
+    writer.u16(scheduledDates.length);
+    const identities = new Set();
+    for (const [index, value] of scheduledDates.entries()) {
+      const label = `scheduledDates[${index}]`;
+      const fact = object(value, ['site','sourceKey','sourceDay','timezone','plannedWallMs','scheduledDay',
+        'unavailableReason','providerRevision','contextRevision','resolverRevision'], label);
+      const site = integer(fact.site, `${label}.site`, 0xffff_ffff);
+      if (!site) throw new RangeError(`invalid ${label}.site`);
+      const sourceDay = integer(fact.sourceDay, `${label}.sourceDay`, 2_932_896);
+      const planned = integer(fact.plannedWallMs, `${label}.plannedWallMs`, 253_402_300_799_999);
+      const key = `${site}:${fact.sourceKey}`;
+      if (identities.has(key)) throw new RangeError('duplicate scheduled-date fact');
+      identities.add(key);
+      if (fact.scheduledDay == null) {
+        if (fact.unavailableReason !== 'CivilDateUnavailable') throw new TypeError('scheduled-date unknown requires CivilDateUnavailable');
+      } else {
+        if (fact.unavailableReason != null || integer(fact.scheduledDay, `${label}.scheduledDay`, 2_932_896)
+          !== localEpochDay(planned, fact.timezone)) throw new RangeError('scheduled-date fact does not match IANA conversion');
+      }
+      writer.u32(site); writer.str(fact.sourceKey, `${label}.sourceKey`); writer.u32(sourceDay);
+      writer.str(fact.timezone, `${label}.timezone`); writer.u64(planned, `${label}.plannedWallMs`);
+      writer.u8(fact.scheduledDay == null ? 0 : 1); writer.u32(fact.scheduledDay ?? 0);
+      writer.u8(fact.unavailableReason == null ? 0 : 1);
+      writer.str(fact.providerRevision, `${label}.providerRevision`);
+      writer.str(fact.contextRevision, `${label}.contextRevision`);
+      writer.str(fact.resolverRevision, `${label}.resolverRevision`);
     }
   }
   return writer.finish();
