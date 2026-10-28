@@ -291,6 +291,7 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/reports/2026-10-16-intent-link-warnings-553.md](docs/reports/2026-10-16-intent-link-warnings-553.md) | #553 — 기본 의도 연결 경고 구현 기록 | md |
 | [docs/reports/2026-10-16-predecessor-language-reference-cleanup.md](docs/reports/2026-10-16-predecessor-language-reference-cleanup.md) | GhostFlow predecessor-language reference cleanup — 2026-10-16 | md |
 | [docs/reports/2026-10-24-issue-584-explicit-profile-providers.md](docs/reports/2026-10-24-issue-584-explicit-profile-providers.md) | Explicit compact profile providers — Language #584 | md |
+| [docs/reports/2026-10-28-dev-reconciliation.md](docs/reports/2026-10-28-dev-reconciliation.md) | Remaining language dev reconciliation | md |
 | [docs/reports/2026-10-28-reference-foundations-590.md](docs/reports/2026-10-28-reference-foundations-590.md) | 남은 Reference 계약의 기초 검증 — #590 | md |
 
 ## docs/research/
@@ -570,4 +571,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-425 documents.
+426 documents.

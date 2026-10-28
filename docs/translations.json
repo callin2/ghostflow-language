@@ -271,8 +271,8 @@
       "source": "docs/COMPILER-DIAGNOSTICS.md",
       "sourceLanguage": "en",
       "translation": "docs/COMPILER-DIAGNOSTICS.ko.md",
-      "sourceSha256": "64b810c1b6b3660f4a19df077cf912526845399ef99046f20f886168fd5c47f8",
-      "translationSha256": "f5a089cfd9d65c6d5b358faab8528bd9860614d96372f512258c427c6f66143b"
+      "sourceSha256": "d4ab41847540f1c9cbcfd4c96a58f1f386f2bcbcbcf546c0a292b10b2442ed73",
+      "translationSha256": "e022c730b28ac273e0a705d9e7f908e8bb3a3481268d9a1b28e41aa9ef35d2dd"
     },
     {
       "source": "docs/CONSTRAINTS.md",
@@ -705,8 +705,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "0f84a0af1be63c20e871b20709e225525a9293bdc87139dbd623a298b8a44ef6",
-      "translationSha256": "de9686c5cf13290fc3af543c4d2f3102de1b7c8299f268670a1f7f9334af12cd"
+      "sourceSha256": "93a8c14609eb5a9209f4666c07bcb62e88503d5d8ded6dd05498f732302d0000",
+      "translationSha256": "025f592c226d0c19331173cf19b950ca1e20de4fa5e34723b275201396b68d28"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",
@@ -1534,6 +1534,10 @@
     {
       "path": "experiments/bool-translation-validation/pc-refinement-report.md",
       "reason": "Issue590 dated proof execution evidence and explicit trusted boundary; reports may remain in one language."
+    },
+    {
+      "path": "docs/reports/2026-10-28-dev-reconciliation.md",
+      "reason": "Execution report and source integration evidence; reports may remain in one language."
     }
   ]
 }
