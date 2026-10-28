@@ -65,6 +65,46 @@ const sample = (revision, endpointId, epoch, id, nowMs, value, quality = 'Good')
 const frame = (revision, nowMs, packet) => ({ bindingRevision: revision, nowMs,
   samples: packet ? { reading: packet } : {} });
 
+test('REF-06-005 matching Bool metadata leaves physical suitability Unknown while installed execution continues', async t => {
+  const initial = candidate('r1', 'sensor-a', 2000);
+  initial.boardProfile.endpoints.relay.activeLevel = 'low';
+  initial.boardProfile.endpoints.relay.safeLevel = 1;
+  repin(initial);
+  const host = await InstalledControlHost.instantiate(wasm, artifact, { runId: 'run-1', ...initial });
+  t.after(() => host.dispose());
+  const assessment = host.snapshot().assessment;
+  assert.deepEqual(assessment.metadata, { valid: true, errors: [] });
+  assert.equal(assessment.physical.status, 'unknown');
+  assert.deepEqual(assessment.physical.source, { type: 'none', reference: null });
+  assert.match(assessment.physical.scope, /polarity.*safeLevel.*load.*wiring/);
+  assessment.physical.status = 'pass';
+  initial.boardProfile.endpoints.relay.activeLevel = 'high';
+  for (const id of [1, 2, 3]) {
+    const result = host.step(frame('r1', id * 1000, sample('r1', 'sensor-a', 1, id, id * 1000, 90)));
+    assert.equal(result.assessment.physical.status, 'unknown');
+    result.assessment.physical.status = 'pass';
+  }
+  assert.equal(host.snapshot().latest.vm.safe.active, true);
+  const before = host.snapshot();
+  const tampered = candidate('r2', 'sensor-b', 2000);
+  tampered.boardProfile.endpoints.relay.activeLevel = 'low';
+  await assert.rejects(host.replaceBinding({ runId: 'run-2', ...tampered }), /profile_mismatch/);
+  assert.deepEqual(host.snapshot(), before);
+  const next = candidate('r2', 'sensor-b', 2000);
+  next.boardProfile.endpoints.relay.activeLevel = 'low';
+  next.boardProfile.endpoints.relay.safeLevel = 1;
+  repin(next);
+  const accepted = await host.replaceBinding({ runId: 'run-2', ...next });
+  assert.equal(accepted.bindingRevision, 'r2');
+  assert.deepEqual(accepted.assessment.metadata, before.assessment.metadata);
+  assert.deepEqual(accepted.assessment.physical, before.assessment.physical);
+  assert.notEqual(accepted.assessment.identity.releaseSha256, before.assessment.identity.releaseSha256);
+  assert.deepEqual(accepted.assessment.identity.artifacts, before.assessment.identity.artifacts);
+  accepted.assessment.physical.status = 'pass';
+  assert.equal(host.snapshot().assessment.physical.status, 'unknown');
+  assert.equal(host.step(frame('r2', 0)).assessment.physical.status, 'unknown');
+});
+
 test('REF-04-039 rejects an incompatible profile while the selected strategy sensor is Stale', async t => {
   const host = await InstalledControlHost.instantiate(wasm, adaptArtifact,
     { runId: 'run-1', ...candidate('r1', 'sensor-a', 2000) });

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  jsonSha256, sha256, STATUSES,
+  assessInstallation, jsonSha256, sha256, STATUSES,
   validateReleaseIdentity, validateRunEvidence, validateIntegration,
 } from '../tools/integration-contract.mjs';
 
@@ -24,6 +24,23 @@ function repinMapping(f) {
 function absentGate(status = 'not_run') {
   return { status, source: { type: 'none', reference: null }, scope: 'No evidence collected by this fictional fixture.' };
 }
+
+test('REF-06-005 installation assessment separates metadata admission from physical Unknown', () => {
+  const f = fixture(), assessment = assessInstallation(f);
+  assert.deepEqual(assessment.metadata, validateIntegration({ ...f, runEvidence: null }));
+  assert.deepEqual(assessment.identity, { releaseSha256: jsonSha256(f.release), artifacts: {
+    sourceSha256: sha256(f.artifacts.source), moduleSha256: sha256(f.artifacts.module),
+    manifestSha256: jsonSha256(f.artifacts.manifest),
+  } });
+  assert.equal(assessment.physical.status, 'unknown');
+  assert.deepEqual(assessment.physical.source, { type: 'none', reference: null });
+  f.boardProfile.endpoints['relay.1'].type = 'Number';
+  const rejected = assessInstallation(f);
+  invalid(rejected.metadata, 'profile_mismatch');
+  assert.equal(rejected.identity, null);
+  assert.equal(rejected.physical.status, 'unknown');
+  assert.equal(assessInstallation().metadata.valid, false);
+});
 
 test('fictional JSON is self-contained, hash-consistent, deterministic, and never promoted to physical proof', () => {
   const f = fixture(), before = structuredClone(f);

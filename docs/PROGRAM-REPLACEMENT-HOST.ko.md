@@ -17,6 +17,16 @@ node examples/program-replacement-host.mjs
 
 ## API와 교체 경계
 
+Snapshot, 승인된 step, 성공한 교체는
+[선언 정보만으로 판단한 설치 승인](../contracts/integration-v1/README.ko.md)의
+소유 `assessment`를 노출합니다. 평가는 `{valid, errors}` 선언 검증과 물리 게이트를
+구분하며 release와 정확한 source, module, manifest 다이제스트를 고정합니다.
+선언된 Bool 출력 방향, 타입, 극성, `safeLevel`은 전기 동작, fail-safe 적합성, 부하나
+배선을 검증하지 않으므로 물리 상태는 `unknown`입니다.
+선언 정보가 유효하면 host 실행은 계속됩니다. 성공한 교체는 새 Program 식별자와
+다시 계산한 평가를 함께 발행합니다. 거부된 후보는 현재 평가와 마지막 trace를 유지합니다.
+반환된 평가는 host 상태와 분리됩니다.
+
 ```js
 const host = await ProgramReplacementHost.instantiate(wasmBytes, artifact, {
   runId, release, boardProfile, installation, historyCapacity: 128,

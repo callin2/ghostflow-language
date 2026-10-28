@@ -11,6 +11,20 @@ checked identities and hashes agree. It does not mean a gate passed, a device
 was contacted, the program behaves correctly, the pinout is electrically safe,
 or water was delivered. A run with a recorded `fail` can be a valid record.
 
+`assessInstallation` supplies metadata-only admission for `InstalledControlHost`
+and `ProgramReplacementHost`. It returns `metadata` with the unchanged
+`{valid, errors}` validation result, an `identity` for valid declarations, and
+`physical` in the existing gate shape. The identity pins the release digest and
+exact source, module, and manifest digests. The release pins the profile and
+installation mapping. Invalid metadata has `identity: null` and cannot be admitted.
+The physical gate has `status: "unknown"`, source type `none`, and a null reference.
+Its scope explains that declared polarity and `safeLevel` do not establish
+electrical behavior, fail-safe suitability, load compatibility, or wiring.
+Matching a Bool output's type and direction cannot establish those facts.
+This assessment accepts no physical observation and cannot issue a physical pass.
+It does not block compilation, simulation, or host execution with valid metadata.
+The independently supplied run evidence below retains its own validation contract.
+
 The [installed sensor binding host](../../docs/INSTALLED-SENSOR-BINDING.md)
 documents the versioned `board-profile-v2` input capability and its executable
 replacement admission. Existing v1 records retain the contract below.

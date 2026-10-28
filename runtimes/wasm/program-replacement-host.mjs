@@ -1,7 +1,7 @@
 import { compileSourceSync } from '../../tools/compile-source.mjs';
 import { canonicalJson } from '../../tools/canonical-json.mjs';
 import { sha256Hex } from '../../tools/sha256.mjs';
-import { validateIntegration } from '../../tools/integration-contract.mjs';
+import { assessInstallation } from '../../tools/integration-contract.mjs';
 import { GhostFlowRuntime } from './ghostflow-runtime.mjs';
 import { NativeDispatchError } from './native-dispatch.mjs';
 
@@ -51,8 +51,9 @@ function prepare(artifact, release, boardProfile, installation) {
     fail('source, closure, manifest or bytecode differs from compiler output');
   }
   supported(owned.manifest, owned.sourceClosure);
-  const checked = validateIntegration({ release, boardProfile, installation,
+  const assessment = assessInstallation({ release, boardProfile, installation,
     artifacts: { source: owned.sourceDocument.text, module: owned.bytes, manifest: owned.manifest } });
+  const checked = assessment.metadata;
   if (!checked.valid) fail(`installation or artifact mismatch: ${checked.errors.map(error => `${error.path}:${error.code}`).join(', ')}`);
   for (const sensor of owned.manifest.sensors) {
     const endpointId = installation.bindings[sensor.name];
@@ -60,7 +61,7 @@ function prepare(artifact, release, boardProfile, installation) {
     const endpoint = boardProfile.endpoints[endpointId];
     if (endpoint?.direction !== 'input' || endpoint.type !== sensor.type) fail(`input binding ${sensor.name} direction or type mismatch`);
   }
-  return owned;
+  return { artifact: owned, assessment };
 }
 
 function observationFrame(manifest, supplied) {
@@ -84,12 +85,12 @@ function observationFrame(manifest, supplied) {
 }
 
 export class ProgramReplacementHost {
-  #runtime; #release; #profile; #installation; #artifact; #identity; #runs; #capacity; #latest = null; #disposed = false; #faulted = false;
+  #runtime; #release; #profile; #installation; #artifact; #assessment; #identity; #runs; #capacity; #latest = null; #disposed = false; #faulted = false;
 
   static async instantiate(wasmBytes, artifact, { runId, release, boardProfile, installation, historyCapacity = 128 } = {}) {
     if (!runName(runId) || !Number.isSafeInteger(historyCapacity) || historyCapacity < 1 || historyCapacity > 128) fail('run identity or history capacity');
     const ownedRelease = copy(release), ownedProfile = copy(boardProfile), ownedInstallation = copy(installation);
-    const ownedArtifact = prepare(artifact, ownedRelease, ownedProfile, ownedInstallation);
+    const { artifact: ownedArtifact, assessment } = prepare(artifact, ownedRelease, ownedProfile, ownedInstallation);
     const wasm = new Uint8Array(wasmBytes);
     const runtime = await GhostFlowRuntime.instantiate(wasm);
     try {
@@ -100,14 +101,15 @@ export class ProgramReplacementHost {
         runtime.addCapability(endpoint.direction === 'input' ? 'sensor' : 'actuator', name, 'bool');
       }
       runtime.activate();
-      return new ProgramReplacementHost(activationToken, runtime, ownedArtifact, ownedRelease, ownedProfile, ownedInstallation, runId, historyCapacity);
+      return new ProgramReplacementHost(activationToken, runtime, ownedArtifact, ownedRelease, ownedProfile, ownedInstallation, assessment, runId, historyCapacity);
     } catch (error) { runtime.dispose(); throw error; }
   }
 
-  constructor(token, runtime, artifact, release, profile, installation, runId, capacity) {
+  constructor(token, runtime, artifact, release, profile, installation, assessment, runId, capacity) {
     if (token !== activationToken) fail('fresh validated activation required');
     this.#runtime = runtime; this.#artifact = artifact; this.#release = release;
     this.#profile = profile; this.#installation = installation; this.#capacity = capacity;
+    this.#assessment = assessment;
     this.#identity = this.#makeIdentity(artifact, runId);
     this.#runs = [copy(this.#identity)];
   }
@@ -130,7 +132,7 @@ export class ProgramReplacementHost {
       phase = 'dispatch';
       this.#runtime.tick();
       phase = 'postcommit';
-      const result = { identity: copy(this.#identity), trace: this.#runtime.trace, observations: captured };
+      const result = { identity: copy(this.#identity), assessment: this.#assessment, trace: this.#runtime.trace, observations: captured };
       this.#latest = copy(result);
       return copy(result);
     } catch (error) {
@@ -143,12 +145,13 @@ export class ProgramReplacementHost {
     this.#live();
     if (!runName(runId) || this.#runs.some(run => run.runId === runId)) fail('new runId required');
     if (this.#runs.length >= this.#capacity) fail('run history capacity exhausted');
-    const candidate = prepare(artifact, this.#release, this.#profile, this.#installation);
+    const { artifact: candidate, assessment } = prepare(artifact, this.#release, this.#profile, this.#installation);
     const identity = this.#makeIdentity(candidate, runId);
     const runs = [...this.#runs, identity];
-    const published = copy({ identity, latest: null, runs });
+    const published = copy({ identity, assessment, latest: null, runs });
     this.#runtime.hotSwap(candidate.bytes);
     this.#artifact = candidate;
+    this.#assessment = assessment;
     this.#identity = identity;
     this.#runs = runs;
     this.#latest = null;
@@ -157,7 +160,7 @@ export class ProgramReplacementHost {
 
   snapshot() {
     this.#live();
-    return copy({ identity: this.#identity, latest: this.#latest, runs: this.#runs });
+    return copy({ identity: this.#identity, assessment: this.#assessment, latest: this.#latest, runs: this.#runs });
   }
 
   dispose() { if (!this.#disposed) this.#runtime.dispose(); this.#disposed = true; }
