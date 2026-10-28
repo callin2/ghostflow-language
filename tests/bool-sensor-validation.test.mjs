@@ -5,9 +5,42 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { compileEvidence, projectSource, theoremInput, admissionInput } from '../experiments/bool-sensor-validation/bridge.mjs';
 import { verify } from '../experiments/bool-sensor-validation/verify.mjs';
+import { sourceTheoremInput, sourceAdmissionInput } from '../experiments/bool-sensor-validation/source-bridge.mjs';
+import { sourceVariants } from '../experiments/bool-sensor-validation/source-cases.mjs';
 
 const filename = 'experiments/bool-sensor-validation/fixtures/recover-false.ghost.md';
 const source = () => readFile(new URL(`../${filename}`, import.meta.url), 'utf8');
+
+test('original sensor source bytes independently bind parsed identities and observation', async () => {
+  const bytes = await readFile(new URL(`../${filename}`, import.meta.url));
+  const evidence = compileEvidence(bytes.toString('utf8'), filename);
+  const certificate = sourceTheoremInput(evidence, bytes);
+  assert.ok(certificate.includes(`def originalSourceBytes : SourceReader.SourceBytes := ${JSON.stringify([...bytes])}`));
+  assert.match(certificate, /SensorSourceReader.readSource originalSourceBytes = some parsedSource := by decide/);
+  assert.match(certificate, /SensorSourceReader.readSource_ids originalSourceBytes parsedSource exactSourceRead/);
+  assert.match(certificate, /actualMetadata = SensorSourceReader.metadataOf parsedSource := by decide/);
+  assert.match(certificate, /originalSourceObservedExecution \(ops : NumberOps N\) \(laws : SmallNumberLaws ops\)/);
+  const changed = structuredClone(evidence);
+  changed.source = { text: 'untrusted replacement' };
+  changed.decoded = new Proxy({}, { get() { throw new Error('untrusted decoded metadata'); } });
+  assert.equal(sourceTheoremInput(changed, bytes), certificate);
+  assert.notEqual(sourceTheoremInput(evidence, Buffer.from(bytes.toString().replace('recover(false)', 'recover(true)'))), certificate);
+  assert.doesNotMatch(sourceAdmissionInput([0xc0, 0xaf], false), /sourceProfile|actualMetadata/);
+});
+
+test('renames and trivia preserve production sensor shape and source node construction order', async () => {
+  const original = await source();
+  const expected = compileEvidence(original, filename);
+  for (const [name, mutate] of sourceVariants) {
+    const changed = mutate(original);
+    const evidence = compileEvidence(changed, filename);
+    assert.deepEqual([evidence.projection.origin, evidence.projection.site], [1, 5], name);
+    if (name === 'trivia') {
+      assert.deepEqual(evidence.bytes, expected.bytes);
+      assert.deepEqual(evidence.metadata, expected.metadata);
+    }
+  }
+});
 
 test('canonical Bool recovery emits actual quality rails and binds Result source identities', async () => {
   const evidence = compileEvidence(await source(), filename);

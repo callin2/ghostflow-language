@@ -12,6 +12,8 @@ import { moduleTheoremInput } from './module-bridge.mjs';
 import { moduleCases } from './module-cases.mjs';
 import { loaderTheoremInput, loaderAdmissionInput } from './loader-bridge.mjs';
 import { loaderCases, loaderMutations } from './loader-cases.mjs';
+import { sourceTheoremInput, sourceAdmissionInput } from './source-bridge.mjs';
+import { sourceAdmissionCases, sourceBoundaryCases, sourceStaleMutations } from './source-cases.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url)), root = resolve(here, '../..');
 const now = () => new Date().toISOString();
@@ -39,9 +41,10 @@ export async function verify({ lean, evidenceDir }) {
   const directory = resolve(evidenceDir), reportPath = join(directory, 'verification.json');
   await mkdir(directory, { recursive: true });
   const report = { schemaVersion: 1, status: 'running', startedAt: now(), productionCompilerProof: false,
-    scope: 'Bool translation, independent raw module loading, initialized byte-PC traces for all tick counts, whole canonical module binding and bounded serialization/decoder equivalence',
-    wholeModuleTrust: ['production source parser and typed projection', 'Lean kernel and standard logical foundations',
-      'canonical module model and byte-PC model correspondence to production Rust remain unproved'],
+    scope: 'Independent original-source byte reading for a bounded literate Bool grammar, raw module loading, initialized byte-PC traces for all tick counts, whole canonical module binding and bounded serialization/decoder equivalence',
+    wholeModuleTrust: ['file-to-Lean-literal transport', 'Lean kernel and standard logical foundations',
+      'bounded source grammar/reference interpretation correspondence to full CommonMark and production language semantics remains unproved',
+      'canonical module model and byte-PC model correspondence to production Rust f64/runtime remain unproved'],
     results: [], artifacts: [] };
   const publish = async () => {
     await writeFile(`${reportPath}.tmp`, JSON.stringify(report, null, 2) + '\n');
@@ -108,10 +111,15 @@ export async function verify({ lean, evidenceDir }) {
     requireArgument(!/\b(sorry|admit|axiom|native_decide)\b/.test(loaderModel), 'prohibited loader proof escape');
     await run('ModuleLoader', loaderModel, true, undefined, 'ModuleLoader.olean');
     await run('module-loader-boundaries', `import ModuleLoader\n${loaderCases}`, true);
+    const sourceModel = await readFile(join(here, 'SourceReader.lean'), 'utf8');
+    requireArgument(!/\b(sorry|admit|axiom|native_decide)\b/.test(sourceModel), 'prohibited source proof escape');
+    await run('SourceReader', sourceModel, true, undefined, 'SourceReader.olean');
+    await run('source-reader-boundaries', `import SourceReader\n${sourceBoundaryCases}`, true);
     const compiled = [];
     for (const name of fixtureNames) {
       const filename = `experiments/bool-translation-validation/fixtures/${name}.ghost.md`;
-      const evidence = await compileEvidence(await readFile(join(root, filename), 'utf8'), filename);
+      const originalSourceBytes = await readFile(join(root, filename));
+      const evidence = await compileEvidence(originalSourceBytes.toString('utf8'), filename);
       compiled.push(evidence);
       const serialized = JSON.stringify(evidence, null, 2) + '\n';
       await writeFile(join(directory, `${name}.json`), serialized);
@@ -123,6 +131,18 @@ export async function verify({ lean, evidenceDir }) {
       await run(`${name}-serializer`, serializerTheoremInput(evidence), true);
       await run(`${name}-module`, moduleTheoremInput(evidence), true);
       await run(`${name}-loader`, loaderTheoremInput(evidence), true);
+      await run(`${name}-source`, sourceTheoremInput(evidence, originalSourceBytes), true);
+    }
+    for (const [name, source, accepted] of sourceAdmissionCases) {
+      const bytes = typeof source === 'string' ? Buffer.from(source) : Uint8Array.from(source);
+      await run(`source-${accepted ? 'accepts' : 'rejects'}-${name}`, sourceAdmissionInput(bytes, accepted), true);
+    }
+    for (const [name, mutateSource] of sourceStaleMutations) {
+      const source = compiled[0].source.text;
+      const changed = mutateSource(source);
+      assert.notEqual(changed, source, `${name} source mutation target drifted`);
+      await run(`source-old-certificate-rejects-${name}`,
+        sourceTheoremInput(compiled[0], Buffer.from(changed)), false, falseProposition);
     }
     const noDecoded = structuredClone(compiled[0]);
     delete noDecoded.decoded;

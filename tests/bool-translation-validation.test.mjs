@@ -11,6 +11,7 @@ import { pcTheoremInput } from '../experiments/bool-translation-validation/pc-br
 import { serializerTheoremInput } from '../experiments/bool-translation-validation/serializer-bridge.mjs';
 import { moduleTheoremInput } from '../experiments/bool-translation-validation/module-bridge.mjs';
 import { loaderTheoremInput, loaderAdmissionInput } from '../experiments/bool-translation-validation/loader-bridge.mjs';
+import { sourceTheoremInput } from '../experiments/bool-translation-validation/source-bridge.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const fixture = async name => {
@@ -18,6 +19,22 @@ const fixture = async name => {
   return compileEvidence(await readFile(join(root, filename), 'utf8'), filename);
 };
 const document = code => `# Bool admission test\n\n\`\`\`ghost\n${code}\n\`\`\`\n`;
+
+test('source certificates bind original bytes independently from the production AST witness', async () => {
+  const evidence = await fixture('snapshot-branches');
+  const bytes = await readFile(join(root, evidence.source.filename));
+  const input = sourceTheoremInput(evidence, bytes);
+  assert.ok(input.includes(`def originalSourceBytes : SourceReader.SourceBytes := ${JSON.stringify([...bytes])}`));
+  assert.match(input, /SourceReader.readSource originalSourceBytes = some sourceModule := by decide/);
+  assert.match(input, /theorem originalSourceInitializedTrace \(n : Nat\)/);
+  const changed = structuredClone(evidence);
+  changed.source.text = 'untrusted text witness';
+  changed.decoded = new Proxy({}, { get() { throw new Error('decoded metadata must not be read'); } });
+  assert.equal(sourceTheoremInput(changed, bytes), input);
+  const alteredBytes = Buffer.from(bytes.toString().replace('state left: Bool = true;', 'state left: Bool = false;'));
+  assert.notEqual(sourceTheoremInput(evidence, alteredBytes), input);
+  assert.doesNotMatch(input, /\b(sorry|admit|axiom|native_decide)\b/);
+});
 
 test('real canonical compilation binds Bool profile 1 and 3 byte slices and complete state targets', async () => {
   for (const [name, format] of [['boolean-literals', 1], ['snapshot-branches', 3]]) {
