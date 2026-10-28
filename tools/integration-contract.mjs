@@ -209,8 +209,10 @@ function checkBindings(manifest, profile, installation, c) {
           c.issue(`${p}.staleMs`, 'sample_gap', 'maximum sample gap reaches or exceeds stale_after');
         }
         if (entry.type === 'Number') {
-          if (typeof entry.validMin !== 'number' || typeof entry.validMax !== 'number') {
-            c.issue(p, 'sensor_contract_missing', 'installed Number sensor requires explicit valid range');
+          if (!Number.isFinite(entry.validMin) || !Number.isFinite(entry.validMax)) {
+            c.issue(p, 'sensor_contract_missing', 'installed Number sensor requires a finite valid range');
+          } else if (entry.validMin > entry.validMax) {
+            c.issue(p, 'sensor_range', 'Program valid range must be ordered');
           } else if (sensor.minValue > entry.validMin || sensor.maxValue < entry.validMax) {
             c.issue(p, 'sensor_range', 'endpoint measurement range does not cover the Program valid range');
           }

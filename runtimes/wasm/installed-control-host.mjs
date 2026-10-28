@@ -56,6 +56,10 @@ function prepareInstallation(artifact, release, boardProfile, installation) {
 }
 
 function requireSensorOnlyReplacement(current, next, manifest) {
+  if (current.boardProfile.id !== next.boardProfile.id
+    || current.boardProfile.boardModel !== next.boardProfile.boardModel) {
+    fail('replacement changes board identity or model');
+  }
   const oldRelease = current.release, newRelease = next.release;
   if (canonicalJson({ toolchain: oldRelease.toolchain, runtimeSemanticsVersion: oldRelease.runtimeSemanticsVersion,
     bytecodeFormat: oldRelease.bytecodeFormat, protocolVersion: oldRelease.protocolVersion,
