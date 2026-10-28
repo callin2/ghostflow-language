@@ -5,6 +5,18 @@
 
 ## 미출시
 
+### 2026-10-29 - 소스에 결합한 연속 Percent 중재 ([#249](https://github.com/callin2/ghostflow-language/issues/249), [#590](https://github.com/callin2/ghostflow-language/issues/590))
+
+Reference §4.9는 control 내부 `resource_policy`에 이름 있는 Percent 요청과 상한을
+정의합니다. `select = max`는 70%와 40% 중 70%를 선택하고 정상 20% 상한은 최종
+20%를 만듭니다. Rust가 스캔 커밋 전에 결정 전체를 소유합니다. fault는 이유를
+유지하며 작성한 `safe`를 사용하고 정상 상한의 제한도 받습니다. 별도 작성자와
+objective/PID 결합은 거부합니다. GFB25와 typed GFRB2/GFRS2 binding packet을
+추가하며 GFB17 Bool bytes와 pointer/length export는 그대로입니다. 이전 런타임은
+새 profile을 거부합니다. native/WASM 결정 전체 일치, 동률, fault fallback,
+binding 거부와 실패 스캔 원자성은 `tests/continuous-resource-control.test.mjs`에서
+검증합니다.
+
 ### 2026-10-29 - 합성 런타임 관측 ([#290](https://github.com/callin2/ghostflow-language/issues/290), [#302](https://github.com/callin2/ghostflow-language/issues/302))
 
 명시적 Interaction 생성이 스키마 0.5와 스냅샷 0.3으로 가져온 상태·타이머·설정을 지원합니다.

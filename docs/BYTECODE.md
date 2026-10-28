@@ -1,5 +1,72 @@
 # GFB bytecode
 
+## Continuous Percent resource envelope (GFB25)
+
+GFB25 encodes the scalar continuous resource profile from Reference §4.9.
+It wraps a GFB1/2/3/4 base with one strategy and no temporal, schedule, objective,
+Bool-constraint, or lifecycle profile. Ordinary VM transitions still use the
+previous state. The resource plan evaluates dedicated expression bytecode against
+the same inputs and previous state, then owns every final Number output.
+Requests and ceilings are never exposed as actuator outputs.
+
+All integers are little-endian. Text is a `u16` UTF-8 length followed by bytes.
+Identities contain 1..128 bytes. Hashes are 64 lowercase hexadecimal characters.
+A blob uses `u32 length` followed by bytes. The envelope contains these fields:
+
+1. `GFB1`, format `25:u16`, base blob.
+2. Canonical source SHA-256, checked descriptor SHA-256, activation blob.
+3. Policy count `u16`, at most eight.
+4. Each policy: source node ID `u32`, name, resource alias, output name,
+   selection `u8` (`0=min`, `1=max`), authored safe Percent `f64`, request list,
+   and ceiling list.
+5. Each list: `u16 count`, then source node ID `u32`, name, and four expression
+   blobs per entry: Bool known tag, Number Percent value, Number SensorFault
+   code, Number origin tag. Fault codes are 0=Disconnected, 1=Stale, 2=Invalid,
+   3=NotReady. The owner evaluates the value only when known, and the reason
+   and origin only on fault. No next-state expression is permitted.
+
+Each policy has 1..16 requests and 0..16 ceilings, with at most 32 total entries
+per module. Source node IDs are nonzero and globally unique across these policies
+and entries. Runtime identities are `sourceHash:nodeId`. Finite Percent values
+must be within 0..100. Every output and bound resource has exactly one policy.
+The maximum module size is 1 MiB; the maximum activation size is 64 KiB.
+
+GFRB2 activation contains `GFRB`, version `2:u16`, installation revision, run ID,
+binding SHA-256, source SHA-256, `u16` resource count, and resource records of
+alias, stable resource ID, output name, and typed value tag `2:u8` for Percent.
+GFRS2 scan binding contains `GFRS`, version `2:u16`, binding SHA-256, run ID,
+and source SHA-256. Activation must match the compiled packet exactly; each scan
+must match the activated identity. The compiler derives the binding digest from
+canonical installation JSON. Installation JSON supplies identities and mappings,
+never expressions or policy rules.
+
+Existing resource activation and scan pointer/length exports accept these new
+packet versions. GFB17 and GFRB1/GFRS1 keep their Bool-only meanings. The shared
+Rust `ResourceBindingRegistry` reserves stable resource IDs across both profiles.
+Hosts spanning WASM instances or workers must share the installation writer
+registry; the reference bound adapter covers its JavaScript realm.
+
+`continuousResourceTrace` contains Rust-owned decisions committed with the tick,
+including all known/fault entries, selected value and tied IDs, authored fallback,
+known ceiling clamp, final value, and source, binding, run and tick identities.
+`conditionsKnown=false` survives fallback. This record is logical execution
+evidence; it contains no claim of physical application or confirmation.
+
+Focused developer verification builds the shared owner without allocating an
+official release identity:
+
+```sh
+cargo build --locked --offline --release -p ghostflow-core --example resource_tape
+cargo build --locked --offline --release -p ghostflow-wasm --target wasm32-unknown-unknown
+node --test tests/continuous-resource-control.test.mjs
+```
+
+The test selectors are `GF-TEST-continuous-resource-compile`,
+`GF-TEST-continuous-resource-parity`, `GF-TEST-continuous-resource-dynamic`,
+`GF-TEST-continuous-resource-atomic`, `GF-TEST-continuous-resource-ceilings`, and
+`GF-TEST-continuous-resource-malformed`.
+Official verification and package identity remain separate gates.
+
 ## Provisional lifecycle framing
 
 The local GFB22 candidate wraps unchanged inner GFB bytes and the checked restart

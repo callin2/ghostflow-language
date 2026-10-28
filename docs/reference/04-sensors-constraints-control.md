@@ -826,8 +826,59 @@ overflow와 expiry는 명시적 occurrence이며 숨은 retry가 없다.
 preemption은 `never` 또는
 `higher_authority(cleanup: required, resume: requeue|cancel)` 중 하나를 작성한다. 여기서
 `requeue|cancel`은 문법 대안을 뜻하며 실제 소스에는 하나만 쓴다. 선점도 cleanup, stop evidence,
-safety constraint를 우회하지 않는다. continuous request 선택 정책은 `exclusive`,
-`highest_authority`, `min`, `max` 중 하나를 자원에 명시하며 policy revision과 모든 request를 trace한다.
+safety constraint를 우회하지 않는다.
+
+### 연속 Percent 요청과 상한
+
+하나의 control 안에서 `ContinuousActuator<Percent>`에 대한 요청을 이름으로 선언한다.
+정책은 해당 Percent output의 유일한 작성자다.
+
+```ghost
+control Vent {
+  resource vent: ContinuousActuator<Percent>;
+  output vent_target: Percent;
+  let temperature_demand = 70%;
+  let humidity_demand = 40%;
+  let wind_limit = 20%;
+  resource_policy P for vent {
+    select = max;
+    requests { temperature = temperature_demand; humidity = humidity_demand; }
+    ceilings { wind = wind_limit; }
+    safe = 0%;
+    on_unknown = safe;
+    output = vent_target;
+  }
+}
+```
+
+`select`는 `min` 또는 `max`다. 모든 요청과 상한은 같은 입력 스냅샷과 이전 state에서
+평가하는 `Percent` 또는 `Result<Percent, SensorFault>` 표현식이다. 다음 state 참조는
+허용하지 않는다. 정상 요청 전체의 최소·최대값을 선택한 뒤 정상 상한들의 최소값으로
+제한한다. 예제의 선택값은 70%, 상한은 20%, 최종 safe intent는 20%다. 동률이면
+소스 node ID 오름차순의 첫 요청을 선택하고 모든 동률 요청 ID를 기록한다. 소스 순서를
+바꾸는 편집은 새 소스 판본이다.
+
+요청이나 상한 중 하나라도 fault면 `on_unknown = safe`에 따라 작성한 상수 `safe`를
+candidate로 사용한다. 정상으로 확인된 상한은 이 fallback에도 적용한다. fault 요청을
+0%, fault 상한을 100%로 해석하지 않는다. 오류 이유와 origin은 남으며
+`conditionsKnown`은 false다. 일부 요청이 fault면 `selected`는 null이다. 요청은 모두
+정상이고 상한만 fault면 요청 선택값은 기록하되 fallback을 적용한다. 0%는 이 예제의
+작성자가 선택한 값이며 모든 설비의 물리 안전값을 뜻하지 않는다.
+
+정책마다 요청은 1..16개, 상한은 0..16개이며 control당 정책은 최대 8개다.
+control 전체의 요청·상한 합은 최대 32개다. 각 resource와 output은 정확히 한 정책에
+속해야 한다. 별도 `<-` 작성자와 `exclusive`, `highest_authority` 선택은 거부한다.
+objective/PID, adaptation, schedule, temporal, accounting 및 Bool 자원 정책과의 결합도
+별도 통합 계약이 필요하다. PID의 최종값 추적·anti-windup을 지원한다고 해석하지 않는다.
+
+정식 소스는 기존 checked policy descriptor를 만들며, 명시적 typed 설치 binding으로
+컴파일한 GFB25만 실행한다. Rust 스캔 소유자는 모든 요청·상한, 선택·동률, fallback,
+clamp·최종값, 소스 SHA-256와 node ID, binding과 run/tick ID를 커밋된 결정에 남긴다.
+숫자 범위·packet·identity 검증 실패는 state와 journal을 확정하지 않는다. 최종 논리
+출력은 실제 applied나 confirmed 증거와 별개다.
+
+**왜:** 요청의 의도와 제약의 이유를 같은 실행 기록에서 설명하고, 누락된 정보가 정상
+값으로 바뀌거나 다른 출력 작성자가 마지막에 제한을 덮어쓰는 일을 막는다.
 
 ## 4.10 mode와 live settings
 

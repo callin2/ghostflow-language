@@ -127,7 +127,7 @@ function compileSourceCore(source, options, telemetry) {
       result = composition.result;
     } else result = ast.kind === 'resource-policy'
       ? compileResourcePolicyArtifact(extraction.code, { filename })
-      : ast.body.some(item => item.kind === 'shared-constraints')
+      : ast.body.some(item => ['shared-constraints', 'continuous-policy'].includes(item.kind))
         ? compileControlPolicyDescriptorArtifact(extraction.code, { filename })
       : ast.body.some(item => item.kind === 'account' || item.kind === 'account-constraints')
         ? compileAccountingControl(extraction.code, { filename })
@@ -228,7 +228,7 @@ function compileSourceCore(source, options, telemetry) {
   };
   const controlManifest = result.manifest?.format === 'GhostFlow/control-policy-descriptor-v1'
     ? result.manifest.control : result.manifest;
-  if (controlManifest?.sharedResourceConstraints || controlManifest?.localConstraints) {
+  if (controlManifest?.sharedResourceConstraints || controlManifest?.localConstraints || controlManifest?.continuousResourcePolicies) {
     const mappedControl = { ...controlManifest };
     for (const key of ['sharedResourceConstraints', 'localConstraints']) if (controlManifest[key]) {
       mappedControl[key] = controlManifest[key].map(group => ({ ...group, source: remapConstraintSource(group.source),
@@ -236,6 +236,11 @@ function compileSourceCore(source, options, telemetry) {
         ...(group.safe ? { safe: group.safe.map(entry => ({ ...entry, source: remapConstraintSource(entry.source) })) } : {}),
       }));
     }
+    if (mappedControl.continuousResourcePolicies) mappedControl.continuousResourcePolicies = mappedControl.continuousResourcePolicies.map(policy => ({ ...policy,
+      source: remapConstraintSource(policy.source),
+      requests: policy.requests.map(entry => ({ ...entry, source: remapConstraintSource(entry.source) })),
+      ceilings: policy.ceilings.map(entry => ({ ...entry, source: remapConstraintSource(entry.source) })),
+    }));
     result = { ...result, manifest: result.manifest.format === 'GhostFlow/control-policy-descriptor-v1'
       ? { ...result.manifest, control: mappedControl } : mappedControl };
   }
