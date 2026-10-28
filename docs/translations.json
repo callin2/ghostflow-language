@@ -201,8 +201,8 @@
       "source": "contracts/integration-v1/README.md",
       "sourceLanguage": "en",
       "translation": "contracts/integration-v1/README.ko.md",
-      "sourceSha256": "c0c5e131629bfc19fb832c7d2e0422a51d62281f31ff3e54ff9bd949d73e7076",
-      "translationSha256": "98b100ba8321a4cf3da459763ed284cab4febdf5841f013622f2b8ad5b1484a1"
+      "sourceSha256": "0a1ca64caa5d3e1c75c03b13d0d1f7ff305ba819737900d5e16ec350670160ef",
+      "translationSha256": "70adeb2bfdedee212e876fb1f2ba79563170b021c846d45f0299ccfdf4ff5b1d"
     },
     {
       "source": "contracts/interaction-v0/README.md",

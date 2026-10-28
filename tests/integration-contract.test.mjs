@@ -42,6 +42,47 @@ test('REF-06-005 installation assessment separates metadata admission from physi
   assert.equal(assessInstallation().metadata.valid, false);
 });
 
+test('REF-06-005 installation assessment never publishes identity from changing module getters', () => {
+  const f = fixture(), admitted = f.artifacts.module, altered = new Uint8Array(admitted);
+  altered[0] ^= 1;
+  let reads = 0;
+  Object.defineProperty(f.artifacts, 'module', { enumerable: true,
+    get: () => ++reads <= 2 ? admitted : altered });
+  const assessment = assessInstallation(f);
+  invalid(assessment.metadata, 'shape');
+  assert.equal(assessment.identity, null);
+  assert.equal(assessment.physical.status, 'unknown');
+  assert.equal(reads, 0, 'an accessor is not an immutable data declaration');
+});
+
+test('REF-06-005 installation assessment rejects non-data identity fields without evaluating them', () => {
+  for (const locate of [
+    f => [f.artifacts, 'source'], f => [f.release, 'runtimeSemanticsVersion'],
+    f => [f.boardProfile.endpoints['relay.1'], 'type'], f => [f.installation.bindings, 'pump'],
+  ]) {
+    const f = fixture(), [record, key] = locate(f), original = record[key];
+    let reads = 0;
+    Object.defineProperty(record, key, { enumerable: true, get: () => { reads++; return original; } });
+    const result = assessInstallation(f);
+    invalid(result.metadata, 'shape');
+    assert.equal(result.identity, null);
+    assert.equal(reads, 0);
+  }
+  for (const alter of [
+    f => { f.artifacts.unexpected = true; },
+    f => { f.artifacts[Symbol('unrecorded')] = true; },
+    f => { f.release[Symbol('unrecorded')] = true; },
+    f => { f.artifacts.manifest.outputs[Symbol('unrecorded')] = true; },
+    f => { Object.defineProperty(f.boardProfile, 'hidden', { value: true }); },
+    f => { f.artifacts.manifest.cycle = f.artifacts.manifest; },
+  ]) {
+    const f = fixture(); alter(f);
+    const result = assessInstallation(f);
+    invalid(result.metadata, 'shape');
+    assert.equal(result.identity, null);
+  }
+});
+
 test('fictional JSON is self-contained, hash-consistent, deterministic, and never promoted to physical proof', () => {
   const f = fixture(), before = structuredClone(f);
   assert.equal(example.kind, 'fictional-fixture');
