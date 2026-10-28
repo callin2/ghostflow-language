@@ -1,7 +1,7 @@
 import { compileSourceSync } from '../../tools/compile-source.mjs';
 import { canonicalJson } from '../../tools/canonical-json.mjs';
 import { sha256Hex } from '../../tools/sha256.mjs';
-import { jsonSha256, SCHEMAS, validateIntegration } from '../../tools/integration-contract.mjs';
+import { assessInstallation, jsonSha256, SCHEMAS } from '../../tools/integration-contract.mjs';
 import { ControlRuntime } from './control-runtime.mjs';
 
 const activationToken = Symbol('installed control activation');
@@ -48,11 +48,12 @@ function prepareArtifact(artifact) {
 function prepareInstallation(artifact, release, boardProfile, installation) {
   const owned = { release: copy(release), boardProfile: copy(boardProfile), installation: copy(installation) };
   if (owned.boardProfile?.schema !== SCHEMAS.profileV2) fail('board-profile-v2 is required');
-  const checked = validateIntegration({ ...owned, artifacts: {
+  const assessment = assessInstallation({ ...owned, artifacts: {
     source: artifact.sourceDocument.text, module: artifact.bytes, manifest: artifact.manifest,
   } });
+  const checked = assessment.metadata;
   if (!checked.valid) fail(`installation incompatible: ${checked.errors.map(error => `${error.path}:${error.code}`).join(', ')}`);
-  return { ...owned, capabilities: artifact.manifest.sensors.map(({ name, type }) => ({ kind: 'sensor', name, type })) };
+  return { ...owned, assessment, capabilities: artifact.manifest.sensors.map(({ name, type }) => ({ kind: 'sensor', name, type })) };
 }
 
 function requireSensorOnlyReplacement(current, next, manifest) {
@@ -113,7 +114,8 @@ export class InstalledControlHost {
 
   snapshot() {
     this.#live();
-    return copy({ ...this.#identity(), latest: this.#latest, cleanupError: this.#cleanupError });
+    return copy({ ...this.#identity(), assessment: this.#installation.assessment,
+      latest: this.#latest, cleanupError: this.#cleanupError });
   }
 
   step(frame) {
@@ -131,7 +133,7 @@ export class InstalledControlHost {
       samples[name] = packet.sample;
     }
     const outcome = this.#runtime.step({ nowMs: owned.nowMs, samples });
-    const published = { ...copy(outcome), identity: this.#identity() };
+    const published = { ...copy(outcome), identity: this.#identity(), assessment: this.#installation.assessment };
     this.#latest = published;
     return copy(published);
   }
@@ -157,7 +159,7 @@ export class InstalledControlHost {
       const accepted = { runId, sourceSha256: this.#artifact.sourceDocument.sha256,
         bytecodeSha256: this.#artifact.manifest.bytecodeSha256,
         boardProfileRevision: next.boardProfile.revision,
-        bindingRevision: next.installation.revision, latest: null, cleanupError: null };
+        bindingRevision: next.installation.revision, assessment: copy(next.assessment), latest: null, cleanupError: null };
       const previous = this.#runtime;
       this.#runtime = candidate; candidate = null;
       this.#installation = next;

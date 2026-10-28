@@ -7,6 +7,16 @@
 
 ## 고정된 프로필 계약
 
+Snapshot, 승인된 step, 성공한 binding 교체는
+[선언 정보만으로 판단한 설치 승인](../contracts/integration-v1/README.ko.md)의
+동일한 소유 `assessment`를 포함합니다. 그 식별자는 승인한 source, bytecode, manifest,
+release, profile과 mapping을 고정합니다. Bool 출력이 선언된 방향, 타입, 극성,
+`safeLevel`에 맞더라도 `assessment.physical.status`는 `unknown`입니다.
+이 선언에는 독립적인 전기, fail-safe, 부하, 배선 관측이 없습니다.
+물리 적합성이 Unknown이어도 유효한 host 실행은 계속 가능합니다.
+교체는 발행 전에 평가를 다시 계산합니다. 거부되거나 변조된 후보는 현재 평가와 trace를 유지합니다.
+반환된 평가는 host 상태와 분리됩니다.
+
 기존 `GhostFlow/board-profile-v1` 형태는 유지합니다. 새 `GhostFlow/board-profile-v2`의 Bool 출력은 기존 방향·타입·Driver·주소·활성 극성·안전 레벨을 사용합니다. Number 또는 Bool 입력은 출력 극성 대신 `sensor` 계약을 사용합니다.
 
 `sensor`는 `format: "GhostFlow/sensor-observation-v1"`, `canonicalUnit`, 양의 안전 정수 `maxInterSampleGapMs`를 포함합니다. Number 입력에는 유한하고 순서가 맞는 `minValue`·`maxValue`도 필요합니다. 관측 계약은 수집 주체가 실제 샘플의 source epoch, sample ID, 수집 시각, 값, `Good`·`NotReady`·`Disconnected`·`Stale`·`Invalid` 중 하나의 품질을 제공한다는 선언입니다. 오류의 자리 채움 값이 0이어도 정상값으로 바꾸지 않습니다. 기존 릴리스 SHA-256 참조가 프로필과 설치 매핑을 고정합니다. 이 선언은 물리 센서나 Driver 바이너리의 동작 증명이 아닙니다.

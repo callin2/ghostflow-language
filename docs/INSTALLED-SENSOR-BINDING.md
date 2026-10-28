@@ -4,6 +4,16 @@
 
 ## Pinned profile contract
 
+Snapshots, accepted steps, and successful binding replacements include the same
+owned `assessment` from [metadata-only installation admission](../contracts/integration-v1/README.md).
+Its identity pins the admitted source, bytecode, manifest, release, profile, and mapping.
+`assessment.physical.status` remains `unknown` even when a Bool output matches
+the declared direction, type, polarity, and `safeLevel`. These declarations supply
+no independent electrical, fail-safe, load, or wiring observation. Unknown physical
+suitability leaves valid host execution available. Replacement recomputes the
+assessment before publication; rejected or tampered candidates retain the live
+assessment and trace. Returned assessments are detached from host state.
+
 The existing `GhostFlow/board-profile-v1` shape remains unchanged. The new `GhostFlow/board-profile-v2` uses the same board identity and endpoint map. A v2 Bool output retains `direction`, `type`, `driver`, `address`, `activeLevel`, and `safeLevel`. A v2 Number or Bool input has `direction`, `type`, `driver`, `address`, and `sensor` instead of output polarity fields.
 
 `sensor` contains `format: "GhostFlow/sensor-observation-v1"`, `canonicalUnit`, and a positive safe integer `maxInterSampleGapMs`. A Number input also declares finite ordered `minValue` and `maxValue`. The observation contract means that the acquisition owner supplies actual samples with source epoch, sample ID, capture timestamp, payload, and one of `Good`, `NotReady`, `Disconnected`, `Stale`, or `Invalid`. A fault is a fault, including when its carried placeholder value is zero. The profile and installation are pinned by the existing release SHA-256 references. These are declared capabilities, not authenticated measurements of a physical sensor or Driver binary.

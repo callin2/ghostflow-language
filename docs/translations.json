@@ -201,8 +201,8 @@
       "source": "contracts/integration-v1/README.md",
       "sourceLanguage": "en",
       "translation": "contracts/integration-v1/README.ko.md",
-      "sourceSha256": "bc3714fa00ff24ce4635d20ac822b1e0c4a6c6aa2e9111bb84e6f61566487de9",
-      "translationSha256": "970044a6a111482bdeb89cf4f7429621ffeefbee8ffd929e95e8cf56c2c1ead2"
+      "sourceSha256": "c0c5e131629bfc19fb832c7d2e0422a51d62281f31ff3e54ff9bd949d73e7076",
+      "translationSha256": "98b100ba8321a4cf3da459763ed284cab4febdf5841f013622f2b8ad5b1484a1"
     },
     {
       "source": "contracts/interaction-v0/README.md",
@@ -1167,8 +1167,8 @@
       "source": "docs/PROGRAM-REPLACEMENT-HOST.md",
       "sourceLanguage": "en",
       "translation": "docs/PROGRAM-REPLACEMENT-HOST.ko.md",
-      "sourceSha256": "127859263e8e57267ca07d3d7d5ef5907c0ad5106b157507fe2180373d828684",
-      "translationSha256": "8e2c6129a2e4561e8abe90952db8fd26478fb914276b1f7f521da9916ed26ea6"
+      "sourceSha256": "f631c26c042f39414d81d3e46a393ee4c71e5809c5f920c1dd8b24be68ac1b76",
+      "translationSha256": "613247d76304695d35cf2b77e634d2d6f338fc4009771b9b0023fbc489e5d93c"
     },
     {
       "source": "docs/COMPOSED-CONFIG-TIMER.md",
@@ -1181,8 +1181,8 @@
       "source": "docs/INSTALLED-SENSOR-BINDING.md",
       "sourceLanguage": "en",
       "translation": "docs/INSTALLED-SENSOR-BINDING.ko.md",
-      "sourceSha256": "76157890f1986f57b7aff8af48e3a9d5450ef882074da6e22f06003fba5f9d1f",
-      "translationSha256": "6c6d71b7e110fee15a0ecea951249f27b49fb92750181c3ece50cdd2b4861d65"
+      "sourceSha256": "e05ffe3bb1b1754fd6e2f90293b9874f8939b8b53eea76a2f2c36d8ba4960b9a",
+      "translationSha256": "981fe8e03730a26f7878e4d4cec00f02a10ff63be8b96ea5d12a3672efca0ab9"
     }
   ],
   "exclusions": [

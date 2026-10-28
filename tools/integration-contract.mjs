@@ -300,3 +300,14 @@ export function validateIntegration({ release, boardProfile, installation, artif
   if (runEvidence !== null && !c.errors.length) validateRun(runEvidence, release, artifacts, c);
   return c.result();
 }
+
+/** Metadata-only host admission has no independent physical observation. */
+export function assessInstallation({ release, boardProfile, installation, artifacts } = {}) {
+  const metadata = validateIntegration({ release, boardProfile, installation, artifacts });
+  return {
+    metadata,
+    identity: metadata.valid ? { releaseSha256: jsonSha256(release), artifacts: artifactDigests(artifacts, checks()) } : null,
+    physical: { status: 'unknown', source: { type: 'none', reference: null },
+      scope: 'Metadata-only host admission. Declared polarity and safeLevel do not verify electrical behavior, fail-safe suitability, load or wiring.' },
+  };
+}

@@ -14,6 +14,17 @@ The example compiles two complete `.ghost.md` documents, supplies a fictional In
 
 ## API and transaction
 
+Snapshots, accepted steps, and successful replacements expose an owned
+`assessment` from [metadata-only installation admission](../contracts/integration-v1/README.md).
+It separates `{valid, errors}` metadata validation from the physical gate and pins
+the release plus exact source, module, and manifest digests. The physical status
+is `unknown` because declared Bool output direction, type, polarity, and `safeLevel`
+do not verify electrical behavior, fail-safe suitability, loads, or wiring.
+Host execution continues with valid metadata. A successful replacement publishes
+its recomputed assessment with the new Program identity. A rejected candidate
+leaves the current assessment and last trace intact. Returned assessments are
+detached from host state.
+
 ```js
 const host = await ProgramReplacementHost.instantiate(wasmBytes, artifact, {
   runId, release, boardProfile, installation, historyCapacity: 128,
