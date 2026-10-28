@@ -1612,6 +1612,10 @@
     {
       "path": "docs/reports/2026-10-29-compiler-proof-obligations-590.md",
       "reason": "Issue590 revision-pinned proof obligation inventory and evidence reconciliation; execution reports may remain in one language."
+    },
+    {
+      "path": "experiments/int32-codec-validation/proof-report.md",
+      "reason": "Issue590 signed i32 codec proof and compiler/runtime execution evidence with explicit trust boundaries; reports may remain in one language."
     }
   ]
 }

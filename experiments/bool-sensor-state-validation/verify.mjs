@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { leanOutcomeMatches } from '../lean-outcome.mjs';
 import { readFile, writeFile, mkdir, readdir, mkdtemp, rm, rename } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -29,7 +30,7 @@ async function identity() {
       files[path] = sha256(await readFile(join(root, path)));
     }
   }
-  for (const path of ['package-lock.json', 'crates/ghostflow-core/src/lib.rs', 'tests/bool-sensor-state-validation.test.mjs']) {
+  for (const path of ['experiments/lean-outcome.mjs', 'package-lock.json', 'crates/ghostflow-core/src/lib.rs', 'tests/bool-sensor-state-validation.test.mjs']) {
     files[path] = sha256(await readFile(join(root, path)));
   }
   return { files, sha256: sha256(JSON.stringify(files)) };
@@ -64,8 +65,7 @@ export async function verify({ lean, evidenceDir }) {
       const result = spawnSync(lean, [...(output ? ['-o', join(scratch, `${name}.olean`)] : []), path],
         { cwd: scratch, env: { ...process.env, LEAN_PATH: scratch }, encoding: 'utf8', timeout: 600000, maxBuffer: 4 * 1024 * 1024 });
       const log = (result.stdout ?? '') + (result.stderr ?? '');
-      const passed = !result.error && (result.status === 0) === expectedSuccess
-        && (!diagnostic || log.includes(diagnostic)) && (!expectedSuccess || !log.includes('sorryAx'));
+      const passed = leanOutcomeMatches(result, log, expectedSuccess, diagnostic);
       await writeFile(join(directory, `${name}.lean`), input);
       await writeFile(join(directory, `${name}.log`), log);
       report.results.push({ name, expectedSuccess, diagnostic, passed, exitCode: result.status, signal: result.signal,
