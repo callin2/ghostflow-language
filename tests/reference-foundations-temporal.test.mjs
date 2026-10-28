@@ -383,7 +383,7 @@ test('REF-03-037 invalid target rejects the whole Periodic settings event withou
   assert.deepEqual(artifact.bytes, bytes);
 });
 
-test('REF-03-040 partial: admitted natural Run crosses midnight independently of its source date', async t => {
+test('REF-03-040 admitted natural Run crosses midnight independently of its source date', async t => {
   assert.match(reference('REF-03-040').given, /00:10.*-30min.*23:40/);
   const code = tideProgram('run(30min, within(10min))', ' - 30min');
   const artifact = await compile(code);
@@ -394,8 +394,8 @@ test('REF-03-040 partial: admitted natural Run crosses midnight independently of
   const rows = await parity(t, artifact, frames, 'context-tide-v1', tideActivation);
   assert.deepEqual(rows.map(row => row.outcome.trace.safe.active), [false, true, true, true, true, false]);
   assert.deepEqual(rows.map(row => row.outcome.trace.safe.due), [false, true, false, false, false, false]);
-  await assert.rejects(compile(code.replace('basis = run(', 'on = day`mon`; basis = run(')), /unsupported Tide schedule option on/);
-  t.diagnostic('Remaining REF-03-040 clause: natural scheduled-start Date filtering has no Solar/Tide on option; the Monday filter rejecting Sunday 23:40 remains unimplemented.');
+  const filtered = await compile(code.replace('basis = run(', 'on = day`mon`; basis = run('));
+  assert.equal(filtered.manifest.format, 'GhostFlow/control-v24');
 });
 
 test('REF-03-047 Tide corrections and withdrawals retain stable IDs and do not cancel an admitted Run', async t => {

@@ -7,6 +7,10 @@
 
 `valid: true`는 제공된 레코드의 구조가 일관되고 확인된 식별자와 해시가 일치한다는 뜻입니다. 게이트 통과, 장치 접촉, 프로그램의 올바른 동작, 핀 배선의 전기적 안전성 또는 물 공급을 뜻하지 않습니다. `fail`이 기록된 실행도 유효한 레코드일 수 있습니다.
 
+[설치형 센서 바인딩 호스트](../../docs/INSTALLED-SENSOR-BINDING.ko.md)는
+별도 버전인 `board-profile-v2`의 입력 capability와 실행 가능한 교체 승인 경로를
+설명한다. 기존 v1 레코드는 아래 계약을 유지한다.
+
 입력 **driver**는 논리 입력을 생산하고 출력 **renderer**는 논리 출력 의도를 릴레이, 모터, 램프 또는 화면에 적용한다. 이들은 서로 배타적인 장치 종류가 아니라 역할이다. USB force-feedback 조이스틱은 입력 driver와 출력 renderer를 함께 가지며 EC11 인코더와 TFT도 입력·출력 역할을 함께 가진다. 이 예시는 경계 설명이며 구현이 아니다. Driver와 renderer 소스는 `farm-device-drivers`에 속하고 Device는 host/board 통합, binding, 시계, watchdog과 부팅·장애 정책을 소유한다. 캐비닛 운영자 UI는 `@ghostflow/cabinet-view`이며 출력 renderer와 구분한다. 기존 `ScanDriver`, host ABI 식별자와 profile의 `driver` 필드는 이름과 계약을 유지한다.
 
 ## 레코드와 소유권

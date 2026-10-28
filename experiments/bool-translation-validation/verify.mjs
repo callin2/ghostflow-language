@@ -7,10 +7,11 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { compileEvidence, sha256, theoremInput, validateArtifact, wireBytes } from './bridge.mjs';
 import { pcTheoremInput } from './pc-bridge.mjs';
 import { pcErrorCases, pcMutations } from './pc-cases.mjs';
+import { serializerTheoremInput } from './serializer-bridge.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url)), root = resolve(here, '../..');
 const now = () => new Date().toISOString();
-const fixtureNames = ['snapshot-branches', 'boolean-literals'];
+const fixtureNames = ['snapshot-branches', 'boolean-literals', 'wide-branch'];
 const falseProposition = "tactic 'decide' proved that the proposition";
 
 async function sourceIdentity() {
@@ -34,7 +35,7 @@ export async function verify({ lean, evidenceDir }) {
   const directory = resolve(evidenceDir), reportPath = join(directory, 'verification.json');
   await mkdir(directory, { recursive: true });
   const report = { schemaVersion: 1, status: 'running', startedAt: now(), productionCompilerProof: false,
-    scope: 'Bool expression validator and simultaneous modeled tick, all valuations', results: [], artifacts: [] };
+    scope: 'Bool translation, simultaneous tick, byte-PC execution and bounded serialization/decoder equivalence, all valuations', results: [], artifacts: [] };
   const publish = async () => {
     await writeFile(`${reportPath}.tmp`, JSON.stringify(report, null, 2) + '\n');
     await rename(`${reportPath}.tmp`, reportPath);
@@ -80,6 +81,18 @@ export async function verify({ lean, evidenceDir }) {
     requireArgument(!/\b(sorry|axiom|native_decide)\b/.test(pcModel), 'prohibited PC proof escape');
     await run('ByteMachine', pcModel, true, undefined, 'ByteMachine.olean');
     await run('pc-runtime-errors', `import ByteMachine\n${pcErrorCases}`, true);
+    const serializerModel = await readFile(join(here, 'Serializer.lean'), 'utf8');
+    requireArgument(!/\b(sorry|axiom|native_decide)\b/.test(serializerModel), 'prohibited serializer proof escape');
+    const { serializerCases, serializerMutations } = await import('./serializer-cases.mjs');
+    await run('Serializer', serializerModel, true, undefined, 'Serializer.olean');
+    await run('serializer-boundaries', `import Serializer\n${serializerCases}`, true);
+    const soundnessModel = await readFile(join(here, 'DecoderSoundness.lean'), 'utf8');
+    requireArgument(!/\b(sorry|axiom|native_decide)\b/.test(soundnessModel), 'prohibited decoder soundness proof escape');
+    const { decoderSoundnessCases, decoderSoundnessMutations, decoderConverseProbe } = await import('./decoder-soundness-cases.mjs');
+    await run('decoder-converse-premise-search', `import Serializer\n${decoderConverseProbe}`, true,
+      '(111111, true, true)\n(156, true, true)');
+    await run('DecoderSoundness', soundnessModel, true, undefined, 'DecoderSoundness.olean');
+    await run('decoder-soundness-boundaries', `import DecoderSoundness\n${decoderSoundnessCases}`, true);
     const compiled = [];
     for (const name of fixtureNames) {
       const filename = `experiments/bool-translation-validation/fixtures/${name}.ghost.md`;
@@ -92,10 +105,22 @@ export async function verify({ lean, evidenceDir }) {
         artifactSha256: evidence.artifact.sha256, bridgeEvidenceSha256: sha256(serialized) });
       await run(name, theoremInput(evidence), true);
       await run(`${name}-pc`, pcTheoremInput(evidence), true);
+      await run(`${name}-serializer`, serializerTheoremInput(evidence), true);
     }
     for (const mutation of pcMutations) {
       assert.ok(pcModel.includes(mutation.before), `${mutation.name} target drifted`);
       await run(mutation.name, pcModel.replaceAll(mutation.before, mutation.after) + pcErrorCases, false, mutation.diagnostic);
+    }
+    for (const mutation of serializerMutations) {
+      assert.ok(serializerModel.includes(mutation.before), `${mutation.name} target drifted`);
+      await run(mutation.name, serializerModel.replaceAll(mutation.before, mutation.after) + serializerCases, false, mutation.diagnostic);
+    }
+    for (const mutation of decoderSoundnessMutations) {
+      assert.ok(serializerModel.includes(mutation.before), `${mutation.name} target drifted`);
+      const changed = serializerModel.replaceAll(mutation.before, mutation.after);
+      await run(`decoder-roundtrip-insufficient-${mutation.name}`, changed + mutation.witness, true);
+      await run(`rejected-decoder-converse-${mutation.name}`,
+        changed + soundnessModel.replace(/^import Serializer\r?\n/, ''), false, mutation.diagnostic);
     }
     await run('rejected-pc-candidate-absent', 'import ByteMachine\nopen BoolTranslation BoolTranslation.ByteMachine\nexample : inScope (.next 0 rfl : Expr true) ⟨0, 1, false⟩ = true := by decide\n', false, falseProposition);
     await run('rejected-pc-state-bound', 'import ByteMachine\nopen BoolTranslation BoolTranslation.ByteMachine\nexample : inScope (.previous 1 : Expr false) ⟨0, 1, false⟩ = true := by decide\n', false, falseProposition);

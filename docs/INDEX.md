@@ -80,6 +80,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/INCIDENT-REPLAY.md](INCIDENT-REPLAY.md) | Incident capture and replay | md |
 | [docs/INPUT-MIGRATION.ko.md](INPUT-MIGRATION.ko.md) | 외부 입력의 canonical 선언과 명시적 revision migration | md |
 | [docs/INPUT-MIGRATION.md](INPUT-MIGRATION.md) | Canonical external input and explicit revision migration | md |
+| [docs/INSTALLED-SENSOR-BINDING.ko.md](INSTALLED-SENSOR-BINDING.ko.md) | 설치 센서 바인딩 참조 호스트 | md |
+| [docs/INSTALLED-SENSOR-BINDING.md](INSTALLED-SENSOR-BINDING.md) | Installed sensor binding reference host | md |
 | [docs/INSTANCE-TRACE-PROJECTION.ko.md](INSTANCE-TRACE-PROJECTION.ko.md) | Instance trace projection 참조 어댑터 | md |
 | [docs/INSTANCE-TRACE-PROJECTION.md](INSTANCE-TRACE-PROJECTION.md) | Instance trace projection reference adapter | md |
 | [docs/INTENT-ANCHOR-MAP.ko.md](INTENT-ANCHOR-MAP.ko.md) | Literate intent anchor map | md |
@@ -276,4 +278,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.ko.md](research/GF-COMPOSE-R9-ACCEPTANCE.ko.md) | GF-COMPOSE R9: acceptance와 구현 인계 | md |
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.md](research/GF-COMPOSE-R9-ACCEPTANCE.md) | GF-COMPOSE R9: acceptance and implementation handoff | md |
 
-237 documents.
+239 documents.

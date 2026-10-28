@@ -964,7 +964,7 @@ class ControlParser {
   }
   solarSchedule(start, name) {
     this.expect('{', 'expected { after Solar');
-    const options = { timezone: null, latitude: null, longitude: null, at: null, fallback: null };
+    const options = { timezone: null, latitude: null, longitude: null, at: null, fallback: null, on: null };
     const policy = {};
     const seen = new Set();
     while (!this.matches('}')) {
@@ -980,6 +980,10 @@ class ControlParser {
         options[key.value] = this.solarCoordinate(key, key.value);
       } else if (key.value === 'at') {
         options.at = this.solarAt();
+      } else if (key.value === 'on') {
+        const value = this.current();
+        if (value.kind !== 'context-literal' || !value.value.startsWith('day`')) error(value, 'Solar on requires a weekday day literal');
+        options.on = this.take();
       } else if (key.value === 'fallback') {
         policy.fallback = this.expression();
         if (!(policy.fallback.kind === 'reference' && policy.fallback.name === 'skip')
@@ -997,7 +1001,7 @@ class ControlParser {
   }
   tideSchedule(start, name) {
     this.expect('{', 'expected { after Tide');
-    const options = { source: null, timezone: null, at: null };
+    const options = { source: null, timezone: null, at: null, on: null };
     const policy = {}, seen = new Set();
     while (!this.matches('}')) {
       const key = this.identifier('expected Tide schedule option');
@@ -1008,6 +1012,11 @@ class ControlParser {
         const value = this.current(); if (value.kind !== 'string') error(value, 'Tide timezone must be a string');
         options.timezone = this.take().value;
       } else if (key.value === 'at') options.at = this.tideAt();
+      else if (key.value === 'on') {
+        const value = this.current();
+        if (value.kind !== 'context-literal' || !value.value.startsWith('day`')) error(value, 'Tide on requires a weekday day literal');
+        options.on = this.take();
+      }
       else if (['basis', 'when', 'cancel_when', 'clock', 'gap', 'recovery', 'fallback'].includes(key.value)) policy[key.value] = this.expression();
       else error(key, `unsupported Tide schedule option ${key.value}`);
       this.expect(';', 'expected ; after Tide schedule option');
@@ -1681,6 +1690,15 @@ class Lowerer {
         error(this.ast.loc, 'civil Range profile requires immutable civil Range schedules without other schedule/provider/config profiles');
       }
       this.manifest.format = 'GhostFlow/control-v21';
+    }
+    if (this.manifest.schedules.some(schedule => schedule.day?.kind === 'weekday')) {
+      if (solarForms.length || contextForms.some(form => !['solar-weekday-pulse', 'tide-weekday-run'].includes(form[0]))
+        || this.manifest.schedules.some(schedule => !['solar', 'tide'].includes(schedule.kind) || schedule.day?.kind !== 'weekday')
+        || ['configs', 'calendars', 'naturalConditions', 'calendarConditions', 'objectives', 'resources', 'adaptSettings', 'signals']
+          .some(key => this.manifest[key]?.length) || this.manifest.accounting) {
+        error(this.ast.loc, 'weekday natural profile requires filtered Solar/Tide schedules only');
+      }
+      this.manifest.format = 'GhostFlow/control-v24';
     }
     if (this.outputObservations.size) {
       if (!['GhostFlow/control-v1', 'GhostFlow/control-v4'].includes(this.manifest.format)
@@ -2462,6 +2480,31 @@ class Lowerer {
     if (calendar.type !== expected) error(item.calendar, `${kind} requires ${expected}`);
     return { kind, calendar: calendar.name };
   }
+  resolveNaturalWeekday(item) {
+    if (!item.on) return null;
+    const match = /^day`([^`]+)`$/.exec(item.on.value);
+    if (!match) error(item.on, `${item.scheduleType} on requires a weekday day literal`);
+    const names = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+    const maskFor = name => {
+      const index = names.indexOf(name);
+      if (index < 0) error(item.on, `${item.scheduleType} on supports weekday names only`);
+      return 1 << index;
+    };
+    let mask = 0;
+    for (const part of match[1].split(',')) {
+      const range = /^([a-z]{3})\.\.([a-z]{3})$/.exec(part);
+      if (range) {
+        const from = names.indexOf(range[1]), to = names.indexOf(range[2]);
+        if (from < 0 || to < from) error(item.on, 'weekday range must ascend from sun through sat');
+        for (let day = from; day <= to; day++) mask |= 1 << day;
+      } else {
+        const bit = maskFor(part);
+        if (mask & bit) error(item.on, 'duplicate weekday in day filter');
+        mask |= bit;
+      }
+    }
+    return { kind: 'weekday', mask };
+  }
   addPeriodicSchedule(item) {
     for (const field of ['every', 'anchor', 'interval_change']) {
       if (!item[field]) error(item.loc, `Periodic schedule requires ${field}`);
@@ -2645,6 +2688,7 @@ class Lowerer {
       kind: 'solar', site: item.id, name: item.name, timezone: item.timezone,
       latitude: item.latitude, longitude: item.longitude,
       event: item.at.event, offsetMs: item.at.offsetMs, policy,
+      ...(item.on ? { day: this.resolveNaturalWeekday(item) } : {}),
     });
     this.schedules.set(item.name, { slot, loc: item.loc, projections: new Set(['due', 'missed']) });
     this.symbols.get(item.name).type = { kind: 'Schedule' };
@@ -2663,6 +2707,7 @@ class Lowerer {
     this.manifest.schedules.push({
       kind: 'tide', site: item.id, name: item.name, source: provider.name, timezone: item.timezone,
       event: item.at.event, offsetMs: item.at.offsetMs, policy,
+      ...(item.on ? { day: this.resolveNaturalWeekday(item) } : {}),
     });
     this.schedules.set(item.name, { slot, loc: item.loc, projections: new Set(['due', 'active']) });
     this.symbols.get(item.name).type = { kind: 'Schedule' };
@@ -3982,7 +4027,7 @@ class Lowerer {
     ]);
   }
   solarForms() {
-    return this.manifest.schedules.filter(schedule => schedule.kind === 'solar' && !this.configStreams.length
+    return this.manifest.schedules.filter(schedule => schedule.kind === 'solar' && !this.configStreams.length && !schedule.day
       || ['daily', 'daily-slots'].includes(schedule.kind) && schedule.policy.basis === 'pulse'
         && schedule.policy.clock === 'trusted_only' && !schedule.day && !schedule.selectedConfig).map(schedule => schedule.kind === 'daily' ? [
       'daily-pulse', String(schedule.site), schedule.name, schedule.timezone, String(schedule.atMs),
@@ -4017,7 +4062,7 @@ class Lowerer {
         config.settings?.access === 'operator' ? 'true' : 'false', payload,
         inputs?.ok ?? 'none', inputs?.value ?? 'none', inputs?.fault ?? 'none'];
     });
-    const scheduleForms = this.manifest.schedules.filter(schedule => schedule.kind === 'solar' && this.configStreams.length
+    const scheduleForms = this.manifest.schedules.filter(schedule => schedule.kind === 'solar' && (this.configStreams.length || schedule.day?.kind === 'weekday')
       || schedule.kind === 'at' || schedule.policy?.basis?.kind === 'range'
       || ['periodic', 'cron', 'tide'].includes(schedule.kind)
       || schedule.kind === 'daily' && schedule.day?.calendar
@@ -4033,9 +4078,9 @@ class Lowerer {
           && Object.values(stream.resultInputs).some(input => atoms.has(`input.${input}`)))
           .map(stream => stream.id).sort((a, b) => a - b);
         schedule.configIds = deps;
-        return ['solar-context-pulse', ...base, schedule.timezone, String(schedule.latitude), String(schedule.longitude),
+        return [schedule.day?.kind === 'weekday' ? 'solar-weekday-pulse' : 'solar-context-pulse', ...base, schedule.timezone, String(schedule.latitude), String(schedule.longitude),
           schedule.event, String(schedule.offsetMs), String(schedule.policy.fallback.atMs ?? 86400000),
-          ['config-deps', ...deps.map(String)], when, cancel, String(schedule.policy.clock.durationMs ?? 0)];
+          ['config-deps', ...deps.map(String)], ...(schedule.day ? [String(schedule.day.mask)] : []), when, cancel, String(schedule.policy.clock.durationMs ?? 0)];
       }
       if (schedule.kind === 'at') return schedule.policy.basis?.kind === 'window'
         ? ['at-window', ...base, String(schedule.atMs), String(schedule.policy.basis.durationMs), when, cancel]
@@ -4084,8 +4129,9 @@ class Lowerer {
       }
       if (schedule.kind === 'tide') {
         if (schedule.policy.basis?.kind !== 'run') error(this.ast.loc, 'Tide executable slice requires Run basis');
-        return ['tide-run', ...base, schedule.timezone, schedule.source, schedule.event, String(schedule.offsetMs),
-          String(schedule.policy.basis.durationMs), String(schedule.policy.basis.admission.durationMs), when, cancel,
+        return [schedule.day?.kind === 'weekday' ? 'tide-weekday-run' : 'tide-run', ...base, schedule.timezone, schedule.source, schedule.event, String(schedule.offsetMs),
+          String(schedule.policy.basis.durationMs), String(schedule.policy.basis.admission.durationMs),
+          ...(schedule.day ? [String(schedule.day.mask)] : []), when, cancel,
           ...(typeof schedule.policy.clock === 'object' ? [String(schedule.policy.clock.durationMs)] : [])];
       }
       const config = this.manifest.configs.find(item => item.name === schedule.selectedConfig);

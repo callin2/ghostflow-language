@@ -8,6 +8,7 @@ import { compileEvidence, decodeExpression, decodeModule, projectSource, theorem
   from '../experiments/bool-translation-validation/bridge.mjs';
 import { verify } from '../experiments/bool-translation-validation/verify.mjs';
 import { pcTheoremInput } from '../experiments/bool-translation-validation/pc-bridge.mjs';
+import { serializerTheoremInput } from '../experiments/bool-translation-validation/serializer-bridge.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const fixture = async name => {
@@ -32,7 +33,23 @@ test('real canonical compilation binds Bool profile 1 and 3 byte slices and comp
     assert.match(pcInput, /theorem outputs0PCPreserved \(env : Env\)/);
     assert.match(pcInput, /theorem stateCountBound/);
     assert.match(pcInput, /theorem transitions0Scoped/);
+    const serialized = serializerTheoremInput(evidence);
+    assert.match(serialized, /theorem outputs0Serialized/);
+    assert.match(serialized, /theorem outputs0Recovered : decode true/);
+    assert.match(serialized, /theorem transitions0Recovered : decode false/);
+    assert.match(serialized, /theorem outputs0Reserialized/);
+    assert.match(serialized, /decode_serialized false/);
   }
+});
+
+test('real compiler branch offset uses a nonzero high byte and binds serializer recovery to raw slices', async () => {
+  const evidence = await fixture('wide-branch');
+  const expression = evidence.decoded.outputs[0];
+  assert.ok(expression.wire.falseOffset[1] > 0);
+  assert.equal(expression.wire.falseOffset[0] + 256 * expression.wire.falseOffset[1], wireBytes(expression.wire.yes).length + 3);
+  const theorem = serializerTheoremInput(evidence);
+  assert.ok(theorem.includes(`decode true ((artifactBytes.drop ${expression.offset}).take ${expression.length})`));
+  assert.deepEqual(wireBytes(expression.wire), evidence.artifact.bytes.slice(expression.offset, expression.offset + expression.length));
 });
 
 test('source projection retains old-state default and normalizes simultaneous declaration order', () => {

@@ -72,6 +72,7 @@ pub enum SolarDecision {
     Before,
     Due,
     ConditionsFalseAtPulse,
+    DayIneligible,
     AlreadyTerminal,
     Missed,
     MultipleCrossingsMissed,
@@ -496,7 +497,19 @@ impl SolarPulseEngine {
 }
 
 impl SolarStage {
-    pub fn evaluate(mut self, predicate: bool) -> Result<Self> {
+    pub fn evaluate(self, predicate: bool) -> Result<Self> {
+        self.evaluate_with_day(predicate, Some(true))
+    }
+
+    pub fn pending_source_day(&self) -> Option<i32> {
+        self.result
+            .observations
+            .iter()
+            .find(|row| row.decision == SolarDecision::Before)
+            .map(|row| row.source_day)
+    }
+
+    pub fn evaluate_with_day(mut self, predicate: bool, eligible: Option<bool>) -> Result<Self> {
         let pending: Vec<usize> = self
             .result
             .observations
@@ -517,12 +530,22 @@ impl SolarStage {
             self.result.observations[pending_index].decision = SolarDecision::AlreadyTerminal;
             return Ok(self);
         }
+        if eligible.is_none() {
+            self.result.due = false;
+            self.result.decision = SolarDecision::Unknown;
+            self.result.unknown_reason = Some("CivilDateUnavailable".into());
+            self.result.observations[pending_index].decision = SolarDecision::Unknown;
+            self.evaluated = true;
+            return Ok(self);
+        }
         if self.engine.terminal_days.len() >= self.engine.terminal_capacity {
             return Err(Error::new("solar terminal ledger capacity exceeded"));
         }
         self.engine.terminal_days.push(day);
-        self.result.due = predicate;
-        self.result.decision = if predicate {
+        self.result.due = predicate && eligible == Some(true);
+        self.result.decision = if eligible == Some(false) {
+            SolarDecision::DayIneligible
+        } else if predicate {
             SolarDecision::Due
         } else {
             SolarDecision::ConditionsFalseAtPulse

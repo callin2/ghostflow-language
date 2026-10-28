@@ -1379,6 +1379,7 @@ fn one_scan_rejects_mixed_provider_revisions_before_committing_any_state() {
                 offset_ms: 0,
                 run_ms: 10,
                 within_ms: 20,
+                weekday_mask: None,
             },
             when: vec![1, 1],
             cancel: vec![1, 0],
@@ -1946,6 +1947,7 @@ fn pid_reads_staged_config_result_and_rolls_back_with_failed_vm() {
     };
     let mut facts = context_runtime::Facts {
         solars: vec![],
+        scheduled_dates: vec![],
         natural: vec![],
         schedules: vec![],
         settings: None,
@@ -2048,6 +2050,7 @@ fn solar_config_program() -> Module {
         offset_ms: 0,
         fallback_time_ms: None,
         config_ids: vec![6],
+        weekday_mask: None,
     };
     // Explicit fault fallback true cannot override a referenced settings fault.
     d.when = vec![1, 1];

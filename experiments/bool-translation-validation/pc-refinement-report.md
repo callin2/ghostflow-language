@@ -3,6 +3,10 @@
 Issue [#590](https://github.com/callin2/ghostflow-language/issues/590).
 This follow-up builds on commit `4b02f9ce974ca4a8c7a9e9c86301449438d7a0f6` without changing production code or the admitted source profile.
 
+The later [serializer and raw-decoder extension](serializer-report.md) adds
+canonical encoding and universal recovery. The 41-outcome evidence below remains
+the PC refinement milestone; the expanded runner and axiom set are recorded there.
+
 ## Result and proof boundary
 
 `ByteMachine.lean` adds a deterministic instruction decoder and program-counter machine over raw bytes. The universal `accepted_steps` theorem shows that every accepted, scoped Bool expression reaches the expected end PC and stack through that machine. This closes the structured-expression-to-PC-model obligation for the admitted subset. Correspondence between the new model and the production Rust implementation remains a separate obligation.

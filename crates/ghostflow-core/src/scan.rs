@@ -343,7 +343,7 @@ impl ScanDriver {
                     && self.runtime.module.as_ref().is_some_and(|m| {
                         matches!(
                             m.format_version,
-                            10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23
+                            10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24
                         )
                     }))
                     || [
@@ -400,7 +400,7 @@ impl ScanDriver {
             let derive_epoch = runtime.module.as_ref().is_some_and(|m| {
                 matches!(
                     m.format_version,
-                    10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23
+                    10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24
                 )
             });
             let result = if let Some((clock, facts)) = context {

@@ -5,6 +5,16 @@
 
 ## 미출시
 
+### 2026-10-28 — 자연 사건의 요일 조건 실행 ([#224](https://github.com/callin2/ghostflow-language/issues/224))
+
+Solar와 Tide의 `on = day` 요일 조건은 offset 또는 선택된 fallback을 적용한
+예정 현지 날짜로 판정하고, provider의 원래 사건 날짜도 보존한다. 요일이 맞지 않으면
+`DayIneligible`로 종료하며 missed pulse를 만들지 않는다. 날짜 근거의 누락·충돌은
+scan 전체를 거부하고, IANA 변환 불가는 Unknown으로 남아 뒤늦은 pulse를 만들지 않는다.
+필터가 있는 자연 일정은 별도 GFB24/control-v24 profile을 사용하며 이전 실행기는 거부한다.
+native/WASM 시험은 자정 통과, 재시작, 날짜 근거 거부와 변환 불가를 확인한다.
+이는 compiler/runtime 검증이며 Device 또는 실제 장치 검증을 포함하지 않는다.
+
 ### 2026-10-28 — one-shot At Window 실행 ([#153](https://github.com/callin2/ghostflow-language/issues/153), [#215](https://github.com/callin2/ghostflow-language/issues/215), [#219](https://github.com/callin2/ghostflow-language/issues/219))
 
 Reference §3.5의 `At`에서 양의 상수 `window(Duration)`을 `.due`, `.open`,

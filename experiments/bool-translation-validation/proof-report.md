@@ -4,6 +4,11 @@ Issue [#590](https://github.com/callin2/ghostflow-language/issues/590).
 Production base `0f9b541fa0014951860913f573d593f276ac2149`.
 This report records a bounded universal proof and its compiler bridge. Whole-compiler correctness remains unproved.
 
+The subsequent [serializer and raw-decoder report](serializer-report.md) records
+the expanded theorem set, 57-outcome run and its additional standard Lean
+`Classical.choice` dependency. Counts and axiom observations below describe this
+initial experiment.
+
 ## Design decision
 
 Two approaches were considered before implementation.

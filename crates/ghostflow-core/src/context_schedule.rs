@@ -2,7 +2,8 @@
 //! staged clone only after the whole VM scan succeeds.
 
 use crate::context_vm::{
-    Decision, Observation, ScheduleDefinition, ScheduleDescriptor, ScheduleEvidence, SettingValue,
+    Decision, Observation, ScheduleDefinition, ScheduleDescriptor, ScheduleEvidence,
+    ScheduledLocalDateFact, SettingValue,
 };
 use crate::cron_schedule::{CivilSlot, CronFields, RepeatedPolicy};
 use crate::range_schedule::{RangeDecision, RangeEngine, RangeFact};
@@ -32,6 +33,8 @@ pub struct Engine {
     range_clock_revision: Option<String>,
     range_calendar_revision: Option<String>,
     civil_evidence: Option<ScheduleEvidence>,
+    weekday_mask: Option<u8>,
+    date_history: BTreeMap<(String, u64, String, String, String), ScheduledLocalDateFact>,
 }
 
 #[derive(Clone)]
@@ -41,6 +44,9 @@ struct ActiveRun {
     planned_ms: u64,
     provider_revision: String,
     context_revision: String,
+    source_day: Option<i32>,
+    scheduled_day: Option<i32>,
+    date_resolver_revision: Option<String>,
 }
 
 fn invalid(message: &str) -> Error {
@@ -60,6 +66,29 @@ fn write_string(bytes: &mut Vec<u8>, value: &str) -> Result<()> {
     }
     write_len(bytes, value.len())?;
     bytes.extend_from_slice(value.as_bytes());
+    Ok(())
+}
+
+fn write_date_history(
+    bytes: &mut Vec<u8>,
+    history: &BTreeMap<(String, u64, String, String, String), ScheduledLocalDateFact>,
+) -> Result<()> {
+    write_len(bytes, history.len())?;
+    for fact in history.values() {
+        write_string(bytes, &fact.source_key)?;
+        bytes.extend_from_slice(&fact.source_day.to_le_bytes());
+        write_string(bytes, &fact.timezone)?;
+        bytes.extend_from_slice(&fact.planned_wall_ms.to_le_bytes());
+        bytes.push(u8::from(fact.scheduled_day.is_some()));
+        bytes.extend_from_slice(&fact.scheduled_day.unwrap_or(0).to_le_bytes());
+        for value in [
+            &fact.provider_revision,
+            &fact.context_revision,
+            &fact.resolver_revision,
+        ] {
+            write_string(bytes, value)?;
+        }
+    }
     Ok(())
 }
 
@@ -90,6 +119,9 @@ impl<'a> SnapshotReader<'a> {
     fn u64(&mut self) -> Result<u64> {
         Ok(u64::from_le_bytes(self.take(8)?.try_into().unwrap()))
     }
+    fn i32(&mut self) -> Result<i32> {
+        Ok(i32::from_le_bytes(self.take(4)?.try_into().unwrap()))
+    }
     fn string(&mut self) -> Result<String> {
         let len = self.u16()? as usize;
         if len > 1024 {
@@ -100,7 +132,118 @@ impl<'a> SnapshotReader<'a> {
     }
 }
 
+fn read_date_history(
+    reader: &mut SnapshotReader<'_>,
+    desc: &ScheduleDescriptor,
+    capacity: usize,
+) -> Result<BTreeMap<(String, u64, String, String, String), ScheduledLocalDateFact>> {
+    let count = usize::from(reader.u16()?);
+    if count > capacity {
+        return Err(invalid("scheduled date checkpoint capacity"));
+    }
+    let timezone = match &desc.definition {
+        ScheduleDefinition::SolarContext {
+            timezone,
+            weekday_mask: Some(_),
+            ..
+        }
+        | ScheduleDefinition::TideRun {
+            timezone,
+            weekday_mask: Some(_),
+            ..
+        } => timezone,
+        _ => return Err(invalid("unexpected scheduled date checkpoint")),
+    };
+    let prefix = if matches!(desc.definition, ScheduleDefinition::SolarContext { .. }) {
+        "solar:"
+    } else {
+        "tide:"
+    };
+    let mut history = BTreeMap::new();
+    for _ in 0..count {
+        let source_key = reader.string()?;
+        let source_day = reader.i32()?;
+        let fact_timezone = reader.string()?;
+        let planned_wall_ms = reader.u64()?;
+        let known = reader.u8()?;
+        let day = reader.i32()?;
+        let provider_revision = reader.string()?;
+        let context_revision = reader.string()?;
+        let resolver_revision = reader.string()?;
+        if !source_key.starts_with(prefix)
+            || ![
+                &source_key,
+                &fact_timezone,
+                &provider_revision,
+                &context_revision,
+                &resolver_revision,
+            ]
+            .iter()
+            .all(|s| !s.is_empty() && s.len() <= 128)
+            || &fact_timezone != timezone
+            || !(0..=2_932_896).contains(&source_day)
+            || planned_wall_ms > 253_402_300_799_999
+            || known > 1
+            || (known == 0 && day != 0)
+            || (known == 1 && !(0..=2_932_896).contains(&day))
+        {
+            return Err(invalid("invalid scheduled date checkpoint fact"));
+        }
+        let fact = ScheduledLocalDateFact {
+            site: desc.site,
+            source_key: source_key.clone(),
+            source_day,
+            timezone: fact_timezone,
+            planned_wall_ms,
+            scheduled_day: (known == 1).then_some(day),
+            unavailable_reason: (known == 0).then_some(0),
+            provider_revision: provider_revision.clone(),
+            context_revision: context_revision.clone(),
+            resolver_revision: resolver_revision.clone(),
+        };
+        let key = (
+            source_key,
+            planned_wall_ms,
+            provider_revision,
+            context_revision,
+            resolver_revision,
+        );
+        if history.insert(key, fact).is_some() {
+            return Err(invalid("duplicate scheduled date checkpoint fact"));
+        }
+    }
+    Ok(history)
+}
+
 impl Engine {
+    fn remember_dates(&mut self, facts: &[ScheduledLocalDateFact]) -> Result<()> {
+        if self.weekday_mask.is_none() && !facts.is_empty() {
+            return Err(invalid("unfiltered schedule received local-date facts"));
+        }
+        for fact in facts {
+            let key = (
+                fact.source_key.clone(),
+                fact.planned_wall_ms,
+                fact.provider_revision.clone(),
+                fact.context_revision.clone(),
+                fact.resolver_revision.clone(),
+            );
+            match self.date_history.get(&key) {
+                Some(prior) if prior != fact => {
+                    return Err(invalid("conflicting scheduled local-date revision"))
+                }
+                Some(_) => {}
+                None => {
+                    if self.date_history.len() >= self.capacity {
+                        return Err(invalid("scheduled local-date ledger capacity exceeded"));
+                    }
+                    self.date_history.insert(key, fact.clone());
+                }
+            }
+        }
+        Ok(())
+    }
+
     pub(crate) fn settings_key_allocator(&self) -> u64 {
         self.next_slot_key
     }
@@ -130,10 +273,20 @@ impl Engine {
 
     pub fn snapshot(&self) -> Result<Vec<u8>> {
         if let Some(solar) = &self.solar {
-            let mut bytes = b"GFES\x03".to_vec();
+            let mut bytes = if self.weekday_mask.is_some() {
+                b"GFES\x04".to_vec()
+            } else {
+                b"GFES\x03".to_vec()
+            };
             write_len(&mut bytes, solar.terminal_identities().len())?;
             for (day, _, _) in solar.terminal_identities() {
                 bytes.extend_from_slice(&day.to_le_bytes());
+            }
+            if self.weekday_mask.is_some() {
+                write_date_history(&mut bytes, &self.date_history)?;
+            }
+            if bytes.len() > 1_048_576 {
+                return Err(invalid("Solar context checkpoint exceeds bound"));
             }
             return Ok(bytes);
         }
@@ -178,7 +331,7 @@ impl Engine {
         }
         let mut bytes = Vec::new();
         bytes.extend_from_slice(b"GFES");
-        bytes.push(1);
+        bytes.push(if self.weekday_mask.is_some() { 5 } else { 1 });
         bytes.extend_from_slice(&self.phase_revision.to_le_bytes());
         bytes.push(u8::from(self.interval_ms.is_some()));
         bytes.extend_from_slice(&self.interval_ms.unwrap_or(0).to_le_bytes());
@@ -202,6 +355,9 @@ impl Engine {
             write_string(&mut bytes, id)?;
             bytes.extend_from_slice(&planned.to_le_bytes());
         }
+        if self.weekday_mask.is_some() {
+            write_date_history(&mut bytes, &self.date_history)?;
+        }
         if bytes.len() > 1_048_576 {
             return Err(invalid("context checkpoint exceeds bound"));
         }
@@ -219,7 +375,14 @@ impl Engine {
         }
         let mut reader = SnapshotReader { bytes, at: 0 };
         if matches!(desc.definition, ScheduleDefinition::SolarContext { .. }) {
-            if reader.take(5)? != b"GFES\x03" {
+            let filtered = matches!(
+                desc.definition,
+                ScheduleDefinition::SolarContext {
+                    weekday_mask: Some(_),
+                    ..
+                }
+            );
+            if reader.take(5)? != if filtered { b"GFES\x04" } else { b"GFES\x03" } {
                 return Err(invalid("invalid Solar context checkpoint version"));
             }
             let mut restored = Self::new(desc, boot_epoch, capacity)?;
@@ -234,6 +397,9 @@ impl Engine {
                     0,
                     0,
                 ));
+            }
+            if filtered {
+                restored.date_history = read_date_history(&mut reader, desc, capacity)?;
             }
             if reader.at != bytes.len() {
                 return Err(invalid("trailing Solar context checkpoint bytes"));
@@ -460,7 +626,14 @@ impl Engine {
                 .restore_terminal_keys(keys)?;
             return Ok(restored);
         }
-        if reader.take(4)? != b"GFES" || reader.u8()? != 1 {
+        let filtered = matches!(
+            desc.definition,
+            ScheduleDefinition::TideRun {
+                weekday_mask: Some(_),
+                ..
+            }
+        );
+        if reader.take(4)? != b"GFES" || reader.u8()? != if filtered { 5 } else { 1 } {
             return Err(invalid("invalid context checkpoint version"));
         }
         let mut restored = Self::new(desc, boot_epoch, capacity)?;
@@ -535,6 +708,9 @@ impl Engine {
             if restored.last_plan.insert(key, planned).is_some() {
                 return Err(invalid("duplicate context plan checkpoint key"));
             }
+        }
+        if filtered {
+            restored.date_history = read_date_history(&mut reader, desc, capacity)?;
         }
         if reader.at != bytes.len() {
             return Err(invalid("trailing context checkpoint bytes"));
@@ -770,6 +946,12 @@ impl Engine {
             range_clock_revision: None,
             range_calendar_revision: None,
             civil_evidence: None,
+            weekday_mask: match &desc.definition {
+                ScheduleDefinition::SolarContext { weekday_mask, .. }
+                | ScheduleDefinition::TideRun { weekday_mask, .. } => *weekday_mask,
+                _ => None,
+            },
+            date_history: BTreeMap::new(),
             keyed_range: matches!(
                 desc.definition,
                 ScheduleDefinition::ConfigDailySlots {
@@ -789,6 +971,30 @@ impl Engine {
         cancel: bool,
         change: Option<&SettingValue>,
         next_settings_revision: u64,
+    ) -> Result<(Self, Decision)> {
+        self.stage_with_dates(
+            desc,
+            clock,
+            facts,
+            when,
+            cancel,
+            change,
+            next_settings_revision,
+            &[],
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn stage_with_dates(
+        &self,
+        desc: &ScheduleDescriptor,
+        clock: ClockSnapshot<'_>,
+        facts: &ScheduleEvidence,
+        when: bool,
+        cancel: bool,
+        change: Option<&SettingValue>,
+        next_settings_revision: u64,
+        dates: &[ScheduledLocalDateFact],
     ) -> Result<(Self, Decision)> {
         if facts.site != desc.site
             || facts.rows.len() > 4096
@@ -963,6 +1169,7 @@ impl Engine {
             );
         }
         let mut staged = self.clone();
+        staged.remember_dates(dates)?;
         staged.apply_setting(
             desc,
             change,
@@ -1119,6 +1326,7 @@ impl Engine {
                 offset_ms,
                 run_ms,
                 within_ms,
+                weekday_mask,
                 ..
             } => {
                 staged.tide(
@@ -1133,6 +1341,8 @@ impl Engine {
                     &observed,
                     when,
                     cancel,
+                    *weekday_mask,
+                    dates,
                     &mut decision,
                 )?;
             }
@@ -1147,6 +1357,9 @@ impl Engine {
             if held.is_some() || observed.current_effective_wall_ms.is_none() {
                 let mut evidence = Observation {
                     solar_fallback: None,
+                    source_day: None,
+                    scheduled_day: None,
+                    date_resolver_revision: None,
                     solar_unavailable_reason: None,
                     clock_provenance: None,
                     clock_source_revision: None,
@@ -1397,6 +1610,9 @@ impl Engine {
             };
             out.observations.push(Observation {
                 solar_fallback: None,
+                source_day: None,
+                scheduled_day: None,
+                date_resolver_revision: None,
                 solar_unavailable_reason: None,
                 clock_provenance: None,
                 clock_source_revision: None,
@@ -1423,6 +1639,9 @@ impl Engine {
                     .ok_or_else(|| invalid("missing active Range plan"))?;
                 out.observations.push(Observation {
                     solar_fallback: None,
+                    source_day: None,
+                    scheduled_day: None,
+                    date_resolver_revision: None,
                     solar_unavailable_reason: None,
                     clock_provenance: None,
                     clock_source_revision: None,
@@ -1457,6 +1676,9 @@ impl Engine {
                 });
             out.observations.push(Observation {
                 solar_fallback: None,
+                source_day: None,
+                scheduled_day: None,
+                date_resolver_revision: None,
                 solar_unavailable_reason: None,
                 clock_provenance: None,
                 clock_source_revision: None,
@@ -1472,6 +1694,9 @@ impl Engine {
         } else if result.decision == RangeDecision::ClockUnknown && out.observations.is_empty() {
             out.observations.push(Observation {
                 solar_fallback: None,
+                source_day: None,
+                scheduled_day: None,
+                date_resolver_revision: None,
                 solar_unavailable_reason: None,
                 clock_provenance: None,
                 clock_source_revision: None,
@@ -1493,6 +1718,9 @@ impl Engine {
             });
             out.observations.push(Observation {
                 solar_fallback: None,
+                source_day: None,
+                scheduled_day: None,
+                date_resolver_revision: None,
                 solar_unavailable_reason: None,
                 clock_provenance: None,
                 clock_source_revision: None,
@@ -1656,6 +1884,9 @@ impl Engine {
             Decision {
                 observations: vec![crate::context_vm::Observation {
                     solar_fallback: None,
+                    source_day: None,
+                    scheduled_day: None,
+                    date_resolver_revision: None,
                     solar_unavailable_reason: None,
                     clock_provenance: None,
                     clock_source_revision: None,
@@ -1688,6 +1919,18 @@ impl Engine {
         when: bool,
         settings_fault: Option<u8>,
     ) -> Result<(Self, Decision)> {
+        self.stage_solar_with_dates(desc, clock, evidence, when, settings_fault, &[])
+    }
+
+    pub fn stage_solar_with_dates(
+        &self,
+        desc: &ScheduleDescriptor,
+        clock: ClockSnapshot<'_>,
+        evidence: &crate::context_vm::SolarContextEvidence,
+        when: bool,
+        settings_fault: Option<u8>,
+        dates: &[ScheduledLocalDateFact],
+    ) -> Result<(Self, Decision)> {
         use crate::solar_admission::{SolarDecision as SD, SolarFacts};
         let ScheduleDefinition::SolarContext {
             timezone,
@@ -1695,6 +1938,7 @@ impl Engine {
             longitude,
             event,
             offset_ms,
+            weekday_mask,
             ..
         } = &desc.definition
         else {
@@ -1727,6 +1971,7 @@ impl Engine {
             rows: &evidence.rows,
         };
         let mut staged = self.clone();
+        staged.remember_dates(dates)?;
         let engine = staged
             .solar
             .as_mut()
@@ -1742,9 +1987,19 @@ impl Engine {
                 "SettingsUnavailable"
             }
         });
-        let stage = engine
-            .begin_with_unknown(clock, facts, reason)?
-            .evaluate(when)?;
+        let stage = engine.begin_with_unknown(clock, facts, reason)?;
+        let eligibility =
+            if let (Some(mask), Some(source_day)) = (weekday_mask, stage.pending_source_day()) {
+                let date = dates
+                    .iter()
+                    .find(|fact| fact.source_key == format!("solar:{source_day}"))
+                    .ok_or_else(|| invalid("missing Solar scheduled local-date fact"))?;
+                date.scheduled_day
+                    .map(|day| mask & (1 << ((day + 4) % 7)) != 0)
+            } else {
+                Some(true)
+            };
+        let stage = stage.evaluate_with_day(when, eligibility)?;
         let result = engine.commit(stage)?;
         staged.solar_settings_baseline = settings_fault.is_some();
         let (clock_provenance, clock_source_revision) = match &result.clock_provenance {
@@ -1784,8 +2039,14 @@ impl Engine {
                     | SD::ObservationGap
                     | SD::CorrectionPastHighWater
             );
+            let date = dates
+                .iter()
+                .find(|fact| fact.source_key == format!("solar:{}", row.source_day));
             out.observations.push(Observation {
                 solar_fallback: Some(row.fallback),
+                source_day: weekday_mask.map(|_| row.source_day),
+                scheduled_day: date.and_then(|fact| fact.scheduled_day),
+                date_resolver_revision: date.map(|fact| fact.resolver_revision.clone()),
                 solar_unavailable_reason: row.unavailable_reason,
                 clock_provenance: Some(clock_provenance.into()),
                 clock_source_revision: clock_source_revision.clone(),
@@ -1802,6 +2063,9 @@ impl Engine {
         if out.observations.is_empty() || reason.is_some() || recovery {
             out.observations.push(Observation {
                 solar_fallback: None,
+                source_day: None,
+                scheduled_day: None,
+                date_resolver_revision: None,
                 solar_unavailable_reason: None,
                 clock_provenance: Some(clock_provenance.into()),
                 clock_source_revision: clock_source_revision.clone(),
@@ -2073,6 +2337,9 @@ impl Engine {
         out.missed = !out.due;
         out.observations.push(Observation {
             solar_fallback: None,
+            source_day: None,
+            scheduled_day: None,
+            date_resolver_revision: None,
             solar_unavailable_reason: None,
             clock_provenance: None,
             clock_source_revision: None,
@@ -2137,6 +2404,9 @@ impl Engine {
         out.missed = !out.due;
         out.observations.push(Observation {
             solar_fallback: None,
+            source_day: None,
+            scheduled_day: None,
+            date_resolver_revision: None,
             solar_unavailable_reason: None,
             clock_provenance: None,
             clock_source_revision: None,
@@ -2162,6 +2432,9 @@ impl Engine {
             out.missed = true;
             out.observations.push(Observation {
                 solar_fallback: None,
+                source_day: None,
+                scheduled_day: None,
+                date_resolver_revision: None,
                 solar_unavailable_reason: None,
                 clock_provenance: None,
                 clock_source_revision: None,
@@ -2250,6 +2523,9 @@ impl Engine {
             out.missed |= outcome != "Due";
             out.observations.push(Observation {
                 solar_fallback: None,
+                source_day: None,
+                scheduled_day: None,
+                date_resolver_revision: None,
                 solar_unavailable_reason: None,
                 clock_provenance: None,
                 clock_source_revision: None,
@@ -2309,6 +2585,9 @@ impl Engine {
                     let reason = fault.split(':').next().unwrap_or("CalendarMissing");
                     out.observations.push(Observation {
                         solar_fallback: None,
+                        source_day: None,
+                        scheduled_day: None,
+                        date_resolver_revision: None,
                         solar_unavailable_reason: None,
                         clock_provenance: None,
                         clock_source_revision: None,
@@ -2331,6 +2610,9 @@ impl Engine {
                         self.terminalize(ineligible)?;
                         out.observations.push(Observation {
                             solar_fallback: None,
+                            source_day: None,
+                            scheduled_day: None,
+                            date_resolver_revision: None,
                             solar_unavailable_reason: None,
                             clock_provenance: None,
                             clock_source_revision: None,
@@ -2373,6 +2655,9 @@ impl Engine {
             out.missed |= outcome != "Due";
             out.observations.push(Observation {
                 solar_fallback: None,
+                source_day: None,
+                scheduled_day: None,
+                date_resolver_revision: None,
                 solar_unavailable_reason: None,
                 clock_provenance: None,
                 clock_source_revision: None,
@@ -2403,6 +2688,8 @@ impl Engine {
         clock: &crate::schedule_clock::ClockObservation<'_>,
         when: bool,
         cancel: bool,
+        weekday_mask: Option<u8>,
+        dates: &[ScheduledLocalDateFact],
         out: &mut Decision,
     ) -> Result<()> {
         if clock.disposition != ClockDisposition::Observed {
@@ -2421,6 +2708,9 @@ impl Engine {
                 self.active_run = None;
                 out.observations.push(Observation {
                     solar_fallback: None,
+                    source_day: active.source_day,
+                    scheduled_day: active.scheduled_day,
+                    date_resolver_revision: active.date_resolver_revision.clone(),
                     solar_unavailable_reason: None,
                     clock_provenance: None,
                     clock_source_revision: None,
@@ -2441,6 +2731,9 @@ impl Engine {
                 out.active = true;
                 out.observations.push(Observation {
                     solar_fallback: None,
+                    source_day: active.source_day,
+                    scheduled_day: active.scheduled_day,
+                    date_resolver_revision: active.date_resolver_revision.clone(),
                     solar_unavailable_reason: None,
                     clock_provenance: None,
                     clock_source_revision: None,
@@ -2463,6 +2756,9 @@ impl Engine {
             self.end_pending(site, "IncompleteCoverage", out)?;
             out.observations.push(Observation {
                 solar_fallback: None,
+                source_day: None,
+                scheduled_day: None,
+                date_resolver_revision: None,
                 solar_unavailable_reason: None,
                 clock_provenance: None,
                 clock_source_revision: None,
@@ -2481,6 +2777,9 @@ impl Engine {
             self.end_pending(site, "PredictionMissing", out)?;
             out.observations.push(Observation {
                 solar_fallback: None,
+                source_day: None,
+                scheduled_day: None,
+                date_resolver_revision: None,
                 solar_unavailable_reason: None,
                 clock_provenance: None,
                 clock_source_revision: None,
@@ -2506,6 +2805,9 @@ impl Engine {
             self.end_pending(site, "PredictionStale", out)?;
             out.observations.push(Observation {
                 solar_fallback: None,
+                source_day: None,
+                scheduled_day: None,
+                date_resolver_revision: None,
                 solar_unavailable_reason: None,
                 clock_provenance: None,
                 clock_source_revision: None,
@@ -2536,6 +2838,9 @@ impl Engine {
                     out.missed = true;
                     out.observations.push(Observation {
                         solar_fallback: None,
+                        source_day: None,
+                        scheduled_day: None,
+                        date_resolver_revision: None,
                         solar_unavailable_reason: None,
                         clock_provenance: None,
                         clock_source_revision: None,
@@ -2560,6 +2865,16 @@ impl Engine {
             if self.terminal.contains(&id) {
                 continue;
             }
+            let date = if weekday_mask.is_some() {
+                Some(
+                    dates
+                        .iter()
+                        .find(|fact| fact.source_key == format!("tide:{}", row.event_id))
+                        .ok_or_else(|| invalid("missing Tide scheduled local-date fact"))?,
+                )
+            } else {
+                None
+            };
             if !self.last_plan.contains_key(&id) && self.last_plan.len() >= self.capacity {
                 return Err(invalid("Tide plan ledger capacity exceeded"));
             }
@@ -2580,6 +2895,9 @@ impl Engine {
                     out.missed = true;
                     out.observations.push(Observation {
                         solar_fallback: None,
+                        source_day: None,
+                        scheduled_day: None,
+                        date_resolver_revision: None,
                         solar_unavailable_reason: None,
                         clock_provenance: None,
                         clock_source_revision: None,
@@ -2600,6 +2918,9 @@ impl Engine {
                 out.missed = true;
                 out.observations.push(Observation {
                     solar_fallback: None,
+                    source_day: None,
+                    scheduled_day: None,
+                    date_resolver_revision: None,
                     solar_unavailable_reason: None,
                     clock_provenance: None,
                     clock_source_revision: None,
@@ -2623,6 +2944,9 @@ impl Engine {
                 out.missed = true;
                 out.observations.push(Observation {
                     solar_fallback: None,
+                    source_day: None,
+                    scheduled_day: None,
+                    date_resolver_revision: None,
                     solar_unavailable_reason: None,
                     clock_provenance: None,
                     clock_source_revision: None,
@@ -2642,6 +2966,9 @@ impl Engine {
                 out.missed = true;
                 out.observations.push(Observation {
                     solar_fallback: None,
+                    source_day: None,
+                    scheduled_day: None,
+                    date_resolver_revision: None,
                     solar_unavailable_reason: None,
                     clock_provenance: None,
                     clock_source_revision: None,
@@ -2661,16 +2988,93 @@ impl Engine {
                 && now < planned.saturating_add(within)
                 && (planned > previous || was_pending && now > previous)
             {
-                candidates.push((id, row, planned));
+                if cancel && date.is_some_and(|fact| fact.scheduled_day.is_none()) {
+                    self.pending_grace.remove(&id);
+                    self.terminalize(&id)?;
+                    out.observations.push(Observation {
+                        solar_fallback: None,
+                        source_day: Some(row.source_day),
+                        scheduled_day: None,
+                        date_resolver_revision: date.map(|fact| fact.resolver_revision.clone()),
+                        solar_unavailable_reason: None,
+                        clock_provenance: None,
+                        clock_source_revision: None,
+                        clock_uncertainty_ms: None,
+                        unknown_reason: None,
+                        site,
+                        occurrence_id: id,
+                        planned_ms: Some(planned),
+                        decision: "Cancelled".into(),
+                        provider_revision: row.provider_revision.clone(),
+                        context_revision: row.context_revision.clone(),
+                    });
+                    continue;
+                }
+                if let (Some(mask), Some(date)) = (weekday_mask, date) {
+                    let Some(day) = date.scheduled_day else {
+                        self.pending_grace.insert(
+                            id.clone(),
+                            (
+                                planned,
+                                row.provider_revision.clone(),
+                                row.context_revision.clone(),
+                            ),
+                        );
+                        out.observations.push(Observation {
+                            solar_fallback: None,
+                            source_day: Some(row.source_day),
+                            scheduled_day: None,
+                            date_resolver_revision: Some(date.resolver_revision.clone()),
+                            solar_unavailable_reason: None,
+                            clock_provenance: None,
+                            clock_source_revision: None,
+                            clock_uncertainty_ms: None,
+                            unknown_reason: Some("CivilDateUnavailable".into()),
+                            site,
+                            occurrence_id: id,
+                            planned_ms: Some(planned),
+                            decision: "Unknown(CivilDateUnavailable)".into(),
+                            provider_revision: row.provider_revision.clone(),
+                            context_revision: row.context_revision.clone(),
+                        });
+                        continue;
+                    };
+                    if mask & (1 << ((day + 4) % 7)) == 0 {
+                        self.pending_grace.remove(&id);
+                        self.terminalize(&id)?;
+                        out.observations.push(Observation {
+                            solar_fallback: None,
+                            source_day: Some(row.source_day),
+                            scheduled_day: Some(day),
+                            date_resolver_revision: Some(date.resolver_revision.clone()),
+                            solar_unavailable_reason: None,
+                            clock_provenance: None,
+                            clock_source_revision: None,
+                            clock_uncertainty_ms: None,
+                            unknown_reason: None,
+                            site,
+                            occurrence_id: id,
+                            planned_ms: Some(planned),
+                            decision: "DayIneligible".into(),
+                            provider_revision: row.provider_revision.clone(),
+                            context_revision: row.context_revision.clone(),
+                        });
+                        continue;
+                    }
+                }
+                candidates.push((id, row, planned, date));
             }
         }
         if candidates.len() > 1 {
-            for (id, row, planned) in candidates {
+            for (id, row, planned, _) in candidates {
                 self.pending_grace.remove(&id);
                 self.terminalize(&id)?;
                 out.missed = true;
                 out.observations.push(Observation {
                     solar_fallback: None,
+                    source_day: None,
+                    scheduled_day: None,
+                    date_resolver_revision: None,
                     solar_unavailable_reason: None,
                     clock_provenance: None,
                     clock_source_revision: None,
@@ -2684,12 +3088,15 @@ impl Engine {
                     context_revision: row.context_revision.clone(),
                 });
             }
-        } else if let Some((id, row, planned)) = candidates.pop() {
+        } else if let Some((id, row, planned, date)) = candidates.pop() {
             if cancel {
                 self.pending_grace.remove(&id);
                 self.terminalize(&id)?;
                 out.observations.push(Observation {
                     solar_fallback: None,
+                    source_day: None,
+                    scheduled_day: None,
+                    date_resolver_revision: None,
                     solar_unavailable_reason: None,
                     clock_provenance: None,
                     clock_source_revision: None,
@@ -2716,9 +3123,15 @@ impl Engine {
                     planned_ms: planned,
                     provider_revision: row.provider_revision.clone(),
                     context_revision: row.context_revision.clone(),
+                    source_day: date.map(|_| row.source_day),
+                    scheduled_day: date.and_then(|fact| fact.scheduled_day),
+                    date_resolver_revision: date.map(|fact| fact.resolver_revision.clone()),
                 });
                 out.observations.push(Observation {
                     solar_fallback: None,
+                    source_day: None,
+                    scheduled_day: None,
+                    date_resolver_revision: None,
                     solar_unavailable_reason: None,
                     clock_provenance: None,
                     clock_source_revision: None,
@@ -2740,6 +3153,38 @@ impl Engine {
                         row.context_revision.clone(),
                     ),
                 );
+            }
+        }
+        if weekday_mask.is_some() {
+            let rows: BTreeMap<_, _> = facts
+                .rows
+                .iter()
+                .filter(|row| row.event_kind == if high { 1 } else { 2 })
+                .map(|row| {
+                    (
+                        format!(
+                            "{}:{}:{}",
+                            observation.binding.namespace,
+                            observation.binding.station,
+                            row.event_id
+                        ),
+                        row,
+                    )
+                })
+                .collect();
+            for trace in &mut out.observations {
+                if trace.source_day.is_some() {
+                    continue;
+                }
+                let Some(row) = rows.get(&trace.occurrence_id) else {
+                    continue;
+                };
+                let date = dates
+                    .iter()
+                    .find(|fact| fact.source_key == format!("tide:{}", row.event_id));
+                trace.source_day = Some(row.source_day);
+                trace.scheduled_day = date.and_then(|fact| fact.scheduled_day);
+                trace.date_resolver_revision = date.map(|fact| fact.resolver_revision.clone());
             }
         }
         Ok(())
@@ -3086,6 +3531,7 @@ mod tests {
                 offset_ms: 0,
                 fallback_time_ms,
                 config_ids: vec![],
+                weekday_mask: None,
             },
             when: vec![1, 1],
             cancel: vec![1, 0],
@@ -3452,6 +3898,7 @@ mod tests {
                 offset_ms: 0,
                 run_ms: 600,
                 within_ms: 300,
+                weekday_mask: None,
             },
             when: vec![],
             cancel: vec![],
