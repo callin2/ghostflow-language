@@ -31,7 +31,7 @@ export function leanOutcomeMatches(result, log, expectedSuccess, diagnostic) {
 
 async function sourceIdentity() {
   const paths = ['package.json', 'package-lock.json', 'crates/ghostflow-core/src/lib.rs',
-    'tests/bool-translation-validation.test.mjs'];
+    'tests/bool-translation-validation.test.mjs', 'tests/bool-generated-certificates.test.mjs'];
   async function walk(path) {
     for (const entry of (await readdir(join(root, path), { withFileTypes: true })).sort((a, b) => a.name.localeCompare(b.name))) {
       const child = join(path, entry.name);
