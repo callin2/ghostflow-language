@@ -488,8 +488,8 @@
       "source": "docs/reference/03-time-and-schedules.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/03-time-and-schedules.en.md",
-      "sourceSha256": "17cb0fb3b6eba0cd552cfe5fba24308d33e49ca4891a5be0bd9a38f3f0d4e1c1",
-      "translationSha256": "8c7d54f43fc67c3529b3e0feec7554ca10deb13f081f6be7251e3983fd860097"
+      "sourceSha256": "bd02c3ea6c66d74e23406d4294efcf8669ff3b879c1a1dac1fc00aff3e9b641a",
+      "translationSha256": "474fe749b6d59d1070f2a1091e40fe86d107cebbc59d4af3922ad5abc8a978bb"
     },
     {
       "source": "docs/reference/04-sensors-constraints-control.md",
@@ -1628,6 +1628,14 @@
     {
       "path": "experiments/two-sensor-provenance/fixtures/two-recover.ghost.md",
       "reason": "Exact source bytes for the bounded two-input proof fixture; translating would change the certificate identity."
+    },
+    {
+      "path": "experiments/elapsed-epoch-validation/proof-report.md",
+      "reason": "Issue590 bounded elapsed epoch proof and host observations with explicit numerical and runtime proof boundaries."
+    },
+    {
+      "path": "experiments/elapsed-epoch-validation/fixtures/elapsed-toggle.ghost.md",
+      "reason": "Canonical source bytes consumed by the independent elapsed epoch proof reader; not a translated reading projection."
     }
   ]
 }

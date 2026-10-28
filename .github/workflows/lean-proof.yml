@@ -9,6 +9,7 @@ on:
       - experiments/bool-sensor-state-validation/**
       - experiments/int32-codec-validation/**
       - experiments/two-sensor-provenance/**
+      - experiments/elapsed-epoch-validation/**
       - experiments/lean-outcome.mjs
       - tests/bool-translation-validation.test.mjs
       - tests/bool-generated-certificates.test.mjs
@@ -16,6 +17,7 @@ on:
       - tests/bool-sensor-state-validation.test.mjs
       - tests/int32-codec-validation.test.mjs
       - tests/two-sensor-provenance.test.mjs
+      - tests/elapsed-epoch-validation.test.mjs
       - tests/lean-outcome.test.mjs
       - tools/**
       - crates/ghostflow-core/src/**
@@ -30,6 +32,7 @@ on:
       - experiments/bool-sensor-state-validation/**
       - experiments/int32-codec-validation/**
       - experiments/two-sensor-provenance/**
+      - experiments/elapsed-epoch-validation/**
       - experiments/lean-outcome.mjs
       - tests/bool-translation-validation.test.mjs
       - tests/bool-generated-certificates.test.mjs
@@ -37,6 +40,7 @@ on:
       - tests/bool-sensor-state-validation.test.mjs
       - tests/int32-codec-validation.test.mjs
       - tests/two-sensor-provenance.test.mjs
+      - tests/elapsed-epoch-validation.test.mjs
       - tests/lean-outcome.test.mjs
       - tools/**
       - crates/ghostflow-core/src/**
@@ -63,7 +67,7 @@ jobs:
         with:
           node-version: 22
       - name: Prepare evidence directory
-        run: mkdir -p build/bool-pc-validation build/bool-sensor-validation build/bool-sensor-state-validation build/int32-codec-validation build/two-sensor-provenance
+        run: mkdir -p build/bool-pc-validation build/bool-sensor-validation build/bool-sensor-state-validation build/int32-codec-validation build/two-sensor-provenance build/elapsed-epoch-validation
       - name: Install locked Node dependencies
         shell: bash
         run: |
@@ -94,7 +98,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          node --test tests/bool-translation-validation.test.mjs tests/bool-generated-certificates.test.mjs tests/bool-sensor-validation.test.mjs tests/bool-sensor-state-validation.test.mjs tests/int32-codec-validation.test.mjs tests/lean-outcome.test.mjs tests/two-sensor-provenance.test.mjs 2>&1 | tee build/bool-pc-validation/node-test.log
+          node --test tests/bool-translation-validation.test.mjs tests/bool-generated-certificates.test.mjs tests/bool-sensor-validation.test.mjs tests/bool-sensor-state-validation.test.mjs tests/int32-codec-validation.test.mjs tests/lean-outcome.test.mjs tests/two-sensor-provenance.test.mjs tests/elapsed-epoch-validation.test.mjs 2>&1 | tee build/bool-pc-validation/node-test.log
       - name: Check Bool and PC proofs with Lean kernel
         shell: bash
         run: |
@@ -135,6 +139,14 @@ jobs:
           node experiments/two-sensor-provenance/verify.mjs \
             --lean "$lean_bin" --evidence-dir build/two-sensor-provenance \
             2>&1 | tee build/two-sensor-provenance/verify.log
+      - name: Check elapsed epoch histories with Lean kernel
+        shell: bash
+        run: |
+          set -euo pipefail
+          lean_bin="$("$HOME/.elan/bin/elan" which lean)"
+          node experiments/elapsed-epoch-validation/verify.mjs \
+            --lean "$lean_bin" --evidence-dir build/elapsed-epoch-validation \
+            2>&1 | tee build/elapsed-epoch-validation/verify.log
       - name: Upload proof evidence even on failure
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -146,5 +158,6 @@ jobs:
             build/bool-sensor-state-validation/
             build/int32-codec-validation/
             build/two-sensor-provenance/
+            build/elapsed-epoch-validation/
           if-no-files-found: warn
           retention-days: 30

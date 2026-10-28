@@ -90,7 +90,13 @@ build187은 실제 Rust checked 정수 연산의 세 추출 시도와 거절 사
 build190은 두 Bool sensor의 실제 전체 GFB와 독립 출처를 인증했다. 같은 여섯 rail을
 사용하는 두 식 각각에 대한 모든 Reading 조합의 정리다. JS AST 투영은 신뢰 경계에
 남으며 독립 원본 reader의 두 센서 문법 증명은 추가하지 않았다. 실제 전체 scan의2개
-event 수집은500회 native/WASM 관측으로 구분한다. 타이머 시작 시각 전이는 진행 중이다.
+event 수집은500회 native/WASM 관측으로 구분한다.
+
+build192는 제한된 원본 문서·실제 전체 GFB·metadata를 묶은 elapsed 시작 시각 전이의 모든
+유한 입력 이력 정리를 통과했다. 초기화·유지·변경 시각 선택과 event 반복을 포함한다.
+Number 시각은 선택·전달만 하므로 뺄셈, IEEE 수치 의미, 실제 Rust VM refinement는 아직
+포함하지 않는다. 1,015회 실제 실행 관측 및 공식 15 gate 통과는 별도 근거다. 시계 범위와
+경과 시간 정수 불변식은 다음 독립 의무로 진행한다.
 
 `shasum -a 256`으로 이 checkout에서 관측한 별도 판본이다. 앞선 `4861a78`의 역사적 목록과 해시는 그대로 보존한다.
 

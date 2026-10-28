@@ -109,9 +109,18 @@ phase' = case phase {
 
 The exact rules are:
 
-- The initial value is `0ms`.
-- A new interval starts in the tick that commits a state change, with value zero.
-- Later accepted ticks read the monotonic time difference.
+- The expression value in the first accepted tick is `0ms`.
+- Under the [snapshot rules in §2.8](02-types-expressions-state.en.md#28-tick-and-state-snapshot),
+  state transitions and output expressions that read `age` use the previous timer interval
+  from the start of the tick. Even when `phase'` changes in this tick, its `age` expression
+  value is the elapsed time of the previous interval.
+- When the state change commits, a new interval starts at the current monotonic time.
+  The postcommit timer observation from the same execution is `0ms`. The source trace's
+  timer display uses this postcommit value and does not recompute an `age` output
+  that was already evaluated.
+- Expressions in the next accepted tick read the monotonic time difference from the new
+  interval. A tick with the same timestamp as the change reads `0ms`. Retaining the
+  state value also retains the interval start time.
 - Both false→true and true→false are changes of Bool state. Thus `elapsed(running)` means “how long the current value has been held,” not cumulative ON time.
 - Multiple stages do not advance successively within one tick. One transition occurs on the first tick satisfying the condition, so the actual delay is at least the requested Duration and normally has tick-resolution error.
 - A rejected tick does not change timer state.
