@@ -1553,6 +1553,10 @@
     {
       "path": "experiments/bool-translation-validation/serializer-report.md",
       "reason": "Issue590 proof execution evidence and explicit trusted boundaries; reports may remain in one language."
+    },
+    {
+      "path": "docs/reports/2026-10-29-unattended-correctness-590.md",
+      "reason": "Dated issue590 execution evidence, exact source identities and remaining proof obligations; reports may remain in one language."
     }
   ]
 }
