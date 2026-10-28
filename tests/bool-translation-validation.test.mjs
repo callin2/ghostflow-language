@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { compileEvidence, decodeExpression, decodeModule, projectSource, theoremInput, validateArtifact, wireBytes }
   from '../experiments/bool-translation-validation/bridge.mjs';
 import { verify } from '../experiments/bool-translation-validation/verify.mjs';
+import { pcTheoremInput } from '../experiments/bool-translation-validation/pc-bridge.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const fixture = async name => {
@@ -27,6 +28,10 @@ test('real canonical compilation binds Bool profile 1 and 3 byte slices and comp
     assert.match(input, /theorem artifactTickPreserved \(env : Env\)/);
     assert.match(input, /theorem outputs0Bound/);
     assert.doesNotMatch(input, /\b(sorry|axiom|native_decide)\b/);
+    const pcInput = pcTheoremInput(evidence);
+    assert.match(pcInput, /theorem outputs0PCPreserved \(env : Env\)/);
+    assert.match(pcInput, /theorem stateCountBound/);
+    assert.match(pcInput, /theorem transitions0Scoped/);
   }
 });
 
