@@ -9,6 +9,7 @@ import { compileEvidence, decodeExpression, decodeModule, projectSource, theorem
 import { verify } from '../experiments/bool-translation-validation/verify.mjs';
 import { pcTheoremInput } from '../experiments/bool-translation-validation/pc-bridge.mjs';
 import { serializerTheoremInput } from '../experiments/bool-translation-validation/serializer-bridge.mjs';
+import { moduleTheoremInput } from '../experiments/bool-translation-validation/module-bridge.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const fixture = async name => {
@@ -60,6 +61,26 @@ test('source projection retains old-state default and normalizes simultaneous de
     { target: 1, expression: { kind: 'previous', index: 0 } },
     { target: 2, expression: { kind: 'previous', index: 2 } },
   ]);
+});
+
+test('whole-module certificates use source projection and raw bytes without decoded metadata', async () => {
+  const evidence = await fixture('snapshot-branches');
+  const original = moduleTheoremInput(evidence);
+  const changed = structuredClone(evidence);
+  delete changed.decoded;
+  assert.equal(moduleTheoremInput(changed), original);
+  changed.decoded = new Proxy({}, { get() { throw new Error('decoded metadata must not be read'); } });
+  for (const entry of [...changed.projection.transitions, ...changed.projection.outputs]) {
+    entry.target = 999; entry.offset = 999; entry.length = 999; entry.countOffset = 999;
+  }
+  assert.equal(moduleTheoremInput(changed), original);
+  assert.match(original, /encodeModule sourceModule = \.ok artifactBytes := by decide/);
+  assert.match(original, /recovered_module sourceModule artifactBytes wholeModuleEncoded/);
+  assert.match(original, /module_tick sourceModule artifactBytes wholeModuleEncoded env/);
+  assert.doesNotMatch(original, /artifactBytes\.drop|def targets|\b(sorry|axiom|native_decide)\b/);
+  changed.artifact.bytes[evidence.decoded.transitions[1].targetOffset] = 0;
+  assert.notEqual(moduleTheoremInput(changed), original);
+  assert.throws(() => validateArtifact(evidence.projection, Uint8Array.from(changed.artifact.bytes)), /duplicate transition/);
 });
 
 test('unsupported source forms fail closed before proof generation', () => {
