@@ -118,8 +118,10 @@ async function appliedParity(t, source, ledger, segments, nowMs, windowMs) {
   assert.equal(result.target, 'pump');
 }
 
-test('REF-03-018 partial: state age, continuous true and physical rolling/day accounting keep independent clocks', async t => {
-  assert.match(reference('REF-03-018').then, /40초.*20초.*30초/);
+test('REF-03-018: phase age, continuous ON and physical rolling/day accounting keep independent clocks', async t => {
+  const original = reference('REF-03-018');
+  assert.match(original.given, /10초 ON, 10초 OFF, 20초 ON/);
+  assert.match(original.then, /40초.*20초.*30초/);
   const artifact = await compile(`control TimeQuestions {
     config marker: Bool = true;
     input pump_on: Bool; state phase: Bool = true;
@@ -144,7 +146,6 @@ test('REF-03-018 partial: state age, continuous true and physical rolling/day ac
   assert.equal(ledger.usedRolling(7, 40_000n, 25_000n), 20_000n);
   assert.equal(ledger.usedLocalDay(7, 0), 30_000n);
   await appliedParity(t, source, ledger, [[0, 10_000], [20_000, 40_000]], 40_000, 25_000);
-  t.diagnostic('Remaining REF-03-018 clause: Station exposes its bounded session applied total; generic authored job identity, reset and reboot semantics remain separate from this physical receipt ledger.');
 });
 
 test('context and scalar timer validation retain strict continuous and elapsed descriptor contracts', async () => {

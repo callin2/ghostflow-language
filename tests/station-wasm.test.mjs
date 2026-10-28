@@ -55,7 +55,12 @@ function startRequest(instance, requestId, occurrenceId, nowMs = 10n, budgetMs =
   };
 }
 
-test('Station session actual ON time is 30s after 10s ON, 10s OFF, 20s ON', async () => {
+test('REF-03-018: Station session actual ON time is 30s after 10s ON, 10s OFF, 20s ON', async () => {
+  const reference = JSON.parse(readFileSync(resolve(root, 'tests/reference/cases/02-time-control.json'), 'utf8'))
+    .cases.find(entry => entry.id === 'REF-03-018');
+  assert.equal(reference.status, 'specified');
+  assert.match(reference.given, /10초 ON, 10초 OFF, 20초 ON/);
+  assert.match(reference.then, /작업 누적 ON은 30초/);
   const instance = await station({ dailyQuotaMs: 100_000n, maxStartBudgetMs: 80_000n });
   try {
     instance.synchronizeDay({ day: 20_000, nowMs: 0n, nextDayDeadlineMs: 100_000n });
