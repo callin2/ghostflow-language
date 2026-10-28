@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### 2026-10-29 — active Station session ON time ([#208](https://github.com/callin2/ghostflow-language/issues/208))
+
+The bounded Station adapter now exposes its existing applied pump ON total
+through `session_actual_on_ms` in Rust and `sessionActualOnMs` in WASM.
+Previously only the daily total settled at finish was public. Reading a matching
+active session preserves its total across OFF gaps without advancing time.
+A 10s ON, 10s OFF, 20s ON trace reads 30,000ms at time 40,000ms; daily settlement remains
+at durable finish. Unknown, mismatched, finished, and restored sessions reject.
+The ABI adds a status-returning getter with an exact u64 output; the updated
+wrapper requires that export. Native and WASM tests cover these boundaries and
+BigInt precision. Reference §3.4's generic job and other time meanings remain
+separate. No language syntax, artifact format, or Device firmware changes.
+
 ### 2026-10-28 — natural-event weekday admission ([#224](https://github.com/callin2/ghostflow-language/issues/224))
 
 Solar and Tide schedules now execute `on = day` weekday filters against the

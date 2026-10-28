@@ -55,6 +55,54 @@ function startRequest(instance, requestId, occurrenceId, nowMs = 10n, budgetMs =
   };
 }
 
+test('Station session actual ON time is 30s after 10s ON, 10s OFF, 20s ON', async () => {
+  const instance = await station({ dailyQuotaMs: 100_000n, maxStartBudgetMs: 80_000n });
+  try {
+    instance.synchronizeDay({ day: 20_000, nowMs: 0n, nextDayDeadlineMs: 100_000n });
+    enterAuto(instance);
+    const prepared = instance.prepareStart(startRequest(instance, 2n, undefined, 0n, 50_000n));
+    instance.commitStart(prepared.token);
+    const on = { sessionId: 77n, pumpOn: true, valves: 1n };
+    instance.authorizeOutput({ ...on, nowMs: 0n });
+    instance.reportApplied({ ...on, nowMs: 0n });
+    instance.reportApplied({ sessionId: 77n, pumpOn: false, valves: 0n, nowMs: 10_000n });
+    assert.equal(instance.sessionActualOnMs(77n), 10_000n);
+    instance.advance(20_000n);
+    assert.equal(instance.sessionActualOnMs(77n), 10_000n);
+    instance.authorizeOutput({ ...on, nowMs: 20_000n });
+    instance.reportApplied({ ...on, nowMs: 20_000n });
+    instance.advance(40_000n);
+    assert.equal(instance.sessionActualOnMs(77n), 30_000n);
+    assert.equal(instance.dailyUsedMs, 0n);
+    instance.reportApplied({ sessionId: 77n, pumpOn: false, valves: 0n, nowMs: 40_000n });
+    const finish = instance.prepareFinish({ sessionId: 77n, nowMs: 40_000n });
+    assert.equal(instance.sessionActualOnMs(77n), 30_000n);
+    instance.commitFinish(finish.token);
+    assert.equal(instance.dailyUsedMs, 30_000n);
+    assert.throws(() => instance.sessionActualOnMs(77n), /session does not own/);
+  } finally { instance.dispose(); }
+});
+
+test('Station session actual ON time preserves u64 precision through the WASM ABI', async () => {
+  const elapsed = 9_007_199_254_740_993n;
+  const instance = await station({ dailyQuotaMs: elapsed + 1n, maxStartBudgetMs: elapsed + 1n });
+  try {
+    instance.synchronizeDay({ day: 20_000, nowMs: 0n, nextDayDeadlineMs: elapsed + 2n });
+    enterAuto(instance);
+    const sessionId = 9_007_199_254_740_995n;
+    const prepared = instance.prepareStart({ ...startRequest(instance, 2n, undefined, 0n, elapsed + 1n), sessionId });
+    instance.commitStart(prepared.token);
+    instance.authorizeOutput({ sessionId, pumpOn: true, valves: 1n, nowMs: 0n });
+    instance.reportApplied({ sessionId, pumpOn: true, valves: 1n, nowMs: 0n });
+    assert.equal(instance.sessionActualOnMs(sessionId), 0n);
+    instance.advance(elapsed);
+    assert.equal(instance.sessionActualOnMs(sessionId), elapsed);
+    assert.throws(() => instance.sessionActualOnMs(Number(sessionId)), /safe integer/);
+    assert.throws(() => instance.sessionActualOnMs(-1n), /unsigned 64-bit/);
+  } finally { instance.dispose(); }
+  assert.throws(() => instance.sessionActualOnMs(77n), /disposed/);
+});
+
 test('REF-04-057: checked Station source native/WASM reserves worst ON plus stop delay and enforces finite manual cutoff', async t => {
   const reference = JSON.parse(readFileSync(resolve(root, 'tests/reference/cases/02-time-control.json'), 'utf8')).cases.find(entry => entry.id === 'REF-04-057');
   assert.equal(reference.scope, 'runtime');
@@ -344,59 +392,80 @@ test('REF-04-048: checked Station source native/WASM owner grant survives inacti
       enterAuto(instance);
       let writes = 0;
       const persist = async snapshot => { assert(snapshot.length > 16); writes++; return true; };
-      const grant = await instance.start(startRequest(instance, 2n, undefined), persist);
+      assert.throws(() => instance.sessionActualOnMs(77n), /session does not own/);
+      const grant = await instance.start(startRequest(instance, 2n, undefined, 0n), persist);
       const ownerClaim = instance.claim;
-      const trace = [{ event: 'lease', nowMs: 10, sessionId: 77,
+      const trace = [{ event: 'lease', nowMs: 0, sessionId: 77,
         leaseDeadlineMs: Number(grant.leaseDeadlineMs), reservedMs: Number(instance.reservedMs) }];
       const on = { sessionId: 77n, pumpOn: true, valves: 1n };
       const off = { sessionId: 77n, pumpOn: false, valves: 1n };
       const inactive = { sessionId: 78n, pumpOn: false, valves: 0n };
       for (const actor of order) {
         if (actor === 'A') {
-          const output = instance.authorizeOutput({ ...on, nowMs: 10n });
-          trace.push({ event: 'request', actor, nowMs: 10, pumpOn: true,
+          const output = instance.authorizeOutput({ ...on, nowMs: 0n });
+          trace.push({ event: 'request', actor, nowMs: 0, pumpOn: true,
             accepted: true, sessionId: Number(output.sessionId), valves: Number(output.valves) });
         } else {
-          assert.throws(() => instance.authorizeOutput({ ...inactive, nowMs: 10n }), /session does not own/);
-          trace.push({ event: 'request', actor, nowMs: 10, pumpOn: false,
+          assert.throws(() => instance.authorizeOutput({ ...inactive, nowMs: 0n }), /session does not own/);
+          trace.push({ event: 'request', actor, nowMs: 0, pumpOn: false,
             accepted: false, error: 'SessionMismatch' });
         }
       }
       // This is a host-supplied applied fixture, not a physical driver receipt.
       // Do not reauthorize: reportApplied checks the ON grant retained by Rust
       // after B's rejected OFF request, exposing a last-writer regression.
-      instance.reportApplied({ ...on, nowMs: 10n });
-      assert.throws(() => instance.reportApplied({ ...inactive, nowMs: 10n }), /session does not own/);
-      trace.push({ event: 'appliedFixture', nowMs: 10, sessionId: 77, pumpOn: true,
+      instance.reportApplied({ ...on, nowMs: 0n });
+      assert.throws(() => instance.reportApplied({ ...inactive, nowMs: 0n }), /session does not own/);
+      trace.push({ event: 'appliedFixture', nowMs: 0, sessionId: 77, pumpOn: true,
         valves: 1, nonownerReportRejected: true });
-      instance.advance(20n);
-      trace.push({ event: 'ledger', nowMs: 20, dailyUsedMs: Number(instance.dailyUsedMs),
-        reservedMs: Number(instance.reservedMs) });
+      instance.advance(10n);
+      assert.equal(instance.sessionActualOnMs(77n), 10n);
+      trace.push({ event: 'ledger', nowMs: 10, dailyUsedMs: Number(instance.dailyUsedMs),
+        sessionActualOnMs: Number(instance.sessionActualOnMs(77n)), reservedMs: Number(instance.reservedMs) });
       // The active session accrues ON time internally; dailyUsedMs settles
       // only at durable finish, while its full budget remains reserved.
       assert.equal(instance.dailyUsedMs, 0n);
-      instance.authorizeOutput({ ...off, nowMs: 20n });
-      assert.throws(() => instance.authorizeOutput({ ...inactive, nowMs: 20n }), /session does not own/);
-      instance.reportApplied({ ...off, nowMs: 20n });
-      assert.throws(() => instance.prepareStart({ ...startRequest(instance, 3n, undefined, 20n),
+      instance.authorizeOutput({ ...off, nowMs: 10n });
+      assert.throws(() => instance.authorizeOutput({ ...inactive, nowMs: 10n }), /session does not own/);
+      instance.reportApplied({ ...off, nowMs: 10n });
+      assert.throws(() => instance.prepareStart({ ...startRequest(instance, 3n, undefined, 10n),
         sessionId: 78n, ownerId: 89n }), /already.*owner|owned/i);
       assert.equal(instance.reservedMs, 100n);
       assert.deepEqual(instance.claim, ownerClaim);
       assert.equal(writes, 1);
-      trace.push({ event: 'betweenPhases', nowMs: 20, sessionId: 77, pumpOn: false, valves: 1,
+      trace.push({ event: 'betweenPhases', nowMs: 10, sessionId: 77, pumpOn: false, valves: 1,
         nonownerRejected: true, acquisitionRejected: 'AlreadyOwned', reservedMs: Number(instance.reservedMs) });
-      instance.authorizeOutput({ ...on, nowMs: 30n });
-      instance.reportApplied({ ...on, nowMs: 30n });
-      trace.push({ event: 'appliedFixture', nowMs: 30, sessionId: 77, pumpOn: true, valves: 1 });
+      instance.advance(20n);
+      assert.equal(instance.sessionActualOnMs(77n), 10n);
+      instance.authorizeOutput({ ...on, nowMs: 20n });
+      instance.reportApplied({ ...on, nowMs: 20n });
+      trace.push({ event: 'appliedFixture', nowMs: 20, sessionId: 77, pumpOn: true, valves: 1 });
+      instance.advance(40n);
+      const beforeRead = { bytes: instance.snapshot(), claim: instance.claim, reservedMs: instance.reservedMs };
+      assert.equal(instance.sessionActualOnMs(77n), 30n);
+      assert.throws(() => instance.sessionActualOnMs(78n), /session does not own/);
+      assert.equal(instance.sessionActualOnMs(77n), 30n);
+      assert.deepEqual(instance.snapshot(), beforeRead.bytes);
+      assert.deepEqual(instance.claim, beforeRead.claim);
+      assert.equal(instance.reservedMs, beforeRead.reservedMs);
+      assert.equal(instance.dailyUsedMs, 0n);
+      trace.push({ event: 'sessionTime', nowMs: 40, sessionActualOnMs: 30 });
+      const rebooted = await GhostFlowStation.instantiate(wasmBytes, policy.stationConfig);
+      try {
+        rebooted.restore(beforeRead.bytes);
+        assert.throws(() => rebooted.sessionActualOnMs(77n), /session does not own/);
+        assert.equal(rebooted.reservedMs, 100n);
+      } finally { rebooted.dispose(); }
       instance.authorizeOutput({ sessionId: 77n, pumpOn: false, valves: 0n, nowMs: 40n });
       instance.reportApplied({ sessionId: 77n, pumpOn: false, valves: 0n, nowMs: 40n });
       await instance.finish({ sessionId: 77n, outcome: 'Completed', nowMs: 40n }, persist);
       trace.push({ event: 'finish', nowMs: 40, dailyUsedMs: Number(instance.dailyUsedMs),
         reservedMs: Number(instance.reservedMs) });
-      assert.equal(instance.dailyUsedMs, 20n);
+      assert.equal(instance.dailyUsedMs, 30n);
       assert.equal(instance.reservedMs, 0n);
       assert.equal(writes, 2);
       assert.throws(() => instance.authorizeOutput({ ...on, nowMs: 40n }), /session does not own/);
+      assert.throws(() => instance.sessionActualOnMs(77n), /session does not own/);
       assert.deepEqual(native, { artifactFingerprint: identity.artifactFingerprint, order, trace });
       t.diagnostic(JSON.stringify({ identity, order, trace }));
     } finally { instance.dispose(); }
