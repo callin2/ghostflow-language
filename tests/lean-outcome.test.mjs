@@ -19,6 +19,14 @@ test('Lean outcome predicate accepts normal success and the expected normal fail
   assert.equal(leanOutcomeMatches({ status: 0 }, 'theorem uses sorryAx', true), false);
 });
 
+test('Lean outcome predicate rejects admitted declarations for successes and expected failures', () => {
+  const admittedWarning = "file.lean:1:8: warning: declaration uses 'sorry'\n";
+  assert.equal(leanOutcomeMatches({ status: 0 }, admittedWarning, true), false);
+  assert.equal(leanOutcomeMatches(failed, `${admittedWarning}${contradiction}`, false, diagnostic), false);
+  assert.equal(leanOutcomeMatches({ status: 0 }, 'declaration depends on sorryAx\n', true), false);
+  assert.equal(leanOutcomeMatches(failed, `declaration depends on sorryAx\n${contradiction}`, false, diagnostic), false);
+});
+
 test('Lean outcome predicate rejects interrupted or unavailable child outcomes', () => {
   for (const result of [
     { ...failed, error: new Error('spawn ENOENT') },
