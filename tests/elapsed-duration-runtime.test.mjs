@@ -14,7 +14,7 @@ import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 
 const filename = 'experiments/elapsed-duration-output/fixtures/elapsed-output.ghost.md';
 const source = fs.readFileSync(new URL(`../${filename}`, import.meta.url), 'utf8');
-const sourceSha256 = '402c1fee9503382f489cca6317cbcac5a3ab0a9439d65a7cebf27c89c6f30f93';
+const sourceSha256 = '564f1aeb1a85f4b29a4cd1d302e695e9d88c728ff337c9201ed86e450823f820';
 assert.equal(createHash('sha256').update(source).digest('hex'), sourceSha256);
 const artifact = await compileSource(source, { filename });
 const sensor = artifact.manifest.sensors[0];
