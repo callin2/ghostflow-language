@@ -1,4 +1,4 @@
-# Bounded Bool serialization and raw decoding — #590
+# Bounded Bool serialization and raw decoding (#590)
 
 This unit removes a premise from the earlier byte-PC proof: a representable typed
 Bool expression now has a proven canonical encoding, and an independent raw-byte
@@ -21,6 +21,9 @@ availability remain separate premises of the byte-PC execution theorem.
 | `serialized_bytes` | Successfully serialized elements are actual byte values. |
 | `branch_offsets_positive` | Canonical branch jump offsets are positive in the represented domain. |
 | `serialize_recovery` | Decoding successfully serialized bytes returns the original typed expression. |
+| `decode_serialized` / `decode_iff_serialized` | Every decoder-accepted raw byte sequence reserializes exactly; decoding and successful serialization are equivalent. |
+| `decoded_bytes` | Accepted raw input is nonempty, at most 4096 bytes, and every element is below 256. |
+| `decoded_refinement` / `decoded_execute` | Arbitrary decoder-accepted bytes connect to modeled execution with the explicit slot-scope and stack-room premises. |
 | `serialized_refinement` / `serialized_execute` | Successful serialization and scope premises connect to the existing structured and byte-PC execution results. |
 
 The decoder reads raw opcodes and little-endian operands, slices branch arms by
@@ -28,7 +31,11 @@ their encoded offsets, and builds expressions through its own stack. It receives
 no expression or wire witness to guide parsing. Both arms and the complete input
 must produce singleton results; phase restrictions remain explicit. Its recursion
 terminates by decreasing remaining byte-list length. The recovery theorem is
-universal over the representable typed expressions, not an enumeration of fixtures.
+universal over the representable typed expressions. `DecoderSoundness.lean` proves
+the converse by reconstructing every consumed byte through the decoder induction.
+The converse assumes only successful decoding; it does not require an external
+canonicality, byte-range, or length premise. These are universal proofs, not an
+enumeration of fixtures.
 
 `serializer-bridge.mjs` reuses the earlier kernel-checked equalities between the
 complete actual GFB artifact and each expression slice. It proves serialization
@@ -43,12 +50,20 @@ passed all seven Node bridge tests and all 57 expected Lean/admission outcomes
 using the actual Lean 4.19.0 kernel. The committed-source run finished at
 `2026-10-28T15:01:46.298Z`. Its verification JSON SHA-256 is
 `87593fc0fd6733bc5c2fca22db454c8f75ebff0ac2723d784100f7fbe2165fcb`.
+The converse extension at commit `1605172f6b947b7d37a7b0357d0011dff22bebfe`
+passed seven Node tests and all 64 expected outcomes, retaining the previous 57.
+That run finished at `2026-10-28T15:17:51.237Z`; verification JSON SHA-256 is
+`619fad9ae0f6decbd96dfadf8e5599ed22f94b0fe9c216bf47eed147a69fec4a`.
 The integrated checkout requires its own recorded verification identity.
 
 Nine serializer/decoder mutations are expected to fail with specific proof
 diagnostics. Retained logs distinguish a false theorem from missing imports,
 timeouts or tool startup failures. Existing PC and admission negative checks
-remain in the runner. Run the same `verify.mjs` command documented in the
+remain in the runner. Two additional semantic mutations accept a noncanonical
+Bool operand or discard an unknown trailing byte. Each preserves all earlier
+forward recovery proofs, has a kernel-checked concrete converse counterexample,
+and fails the new converse proof. This distinguishes the new obligation from
+the earlier roundtrip result. Run the same `verify.mjs` command documented in the
 [PC refinement report](pc-refinement-report.md).
 
 The new serializer theorem logs include the standard Lean axioms `propext`,
@@ -62,6 +77,6 @@ The JavaScript source parser/projection and outer GFB header/slice extraction
 remain trusted links in artifact validation. The theorem connects to the modeled
 byte machine; it does not mechanically prove the production Rust implementation,
 other value types or profiles, strategy selection, trace collection, or physical
-effects. Recovery proves `decode(serialize(e)) = e`; the converse for arbitrary
-decoder-accepted bytes is a separate obligation. Parent issue
+effects. Both serialization recovery and its converse are proved in the Lean
+model. Parent issue
 [#590](https://github.com/callin2/ghostflow-language/issues/590) remains open.

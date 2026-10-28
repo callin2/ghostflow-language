@@ -35,7 +35,7 @@ export async function verify({ lean, evidenceDir }) {
   const directory = resolve(evidenceDir), reportPath = join(directory, 'verification.json');
   await mkdir(directory, { recursive: true });
   const report = { schemaVersion: 1, status: 'running', startedAt: now(), productionCompilerProof: false,
-    scope: 'Bool translation, simultaneous tick, byte-PC execution and bounded serialization/recovery, all valuations', results: [], artifacts: [] };
+    scope: 'Bool translation, simultaneous tick, byte-PC execution and bounded serialization/decoder equivalence, all valuations', results: [], artifacts: [] };
   const publish = async () => {
     await writeFile(`${reportPath}.tmp`, JSON.stringify(report, null, 2) + '\n');
     await rename(`${reportPath}.tmp`, reportPath);
