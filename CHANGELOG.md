@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### 2026-10-29 - imported intent provenance ([#290](https://github.com/callin2/ghostflow-language/issues/290), [#302](https://github.com/callin2/ghostflow-language/issues/302))
+
+Pinned imports now retain intent in separate authored instance scopes. Equal
+anchor IDs in different definitions or instances do not merge. Metadata keeps
+original source locations, definition revision/digest, node IDs, and the exact
+source-closure digest. Imported assumptions retain their original confirmation
+and origin. Canonical artifact and package replay reject forged provenance.
+Standalone artifacts remain unchanged. Ordinary compilation and execution work;
+Interaction v0 projection explicitly rejects imported intent it cannot represent.
+Installed snapshot/binding and public descriptor joins remain separate work.
+
 ### 2026-10-29 - atomic installed strategy profiles ([#243](https://github.com/callin2/ghostflow-language/issues/243))
 
 InstalledControlHost now activates source-verified strategies with capabilities

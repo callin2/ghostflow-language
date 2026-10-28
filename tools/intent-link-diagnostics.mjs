@@ -42,7 +42,7 @@ export function collectIntentLinkDiagnostics({ ast, extraction, intentLinks = []
     const instantiated = composition && !isRoot
       ? new Set(composition.result.sourceMap.filter(node => node.instance && node.filename === unit.ast.loc.filename)
         .map(node => node.definitionNodeId)) : null;
-    const linkedIds = new Set(isRoot ? intentLinks.map(link => link.nodeId) : []);
+    const linkedIds = new Set((composition ? unit.intentMetadata?.intentLinks ?? [] : intentLinks).map(link => link.nodeId));
     const topLevelIds = new Set(unit.ast.body.map(node => node.id));
     const candidates = [...unit.ast.body.filter(node => BEHAVIOR_KINDS.has(node.kind) || UNSUPPORTED_BEHAVIOR_KINDS.has(node.kind)),
       ...unit.ast.sourceNodes.filter(node => NESTED_BEHAVIOR_KINDS.has(node.kind)
@@ -64,7 +64,7 @@ export function collectIntentLinkDiagnostics({ ast, extraction, intentLinks = []
           ...(end ? { end: { line: end.line, column: end.column } } : {}) },
         hint: (unsupported
           ? 'This statement has no supported intent-link target in the current contract. Do not insert an orphan link here. The example below shows standalone top-level link syntax, not an immediate repair for this statement. Extending target support requires a separate contract change.\n' : '')
-          + HINT + (isRoot ? '' : '\nThis statement belongs to an instantiated import. The current composition contract rejects imported intent metadata; this warning exposes that coverage gap without claiming a root link covers it. Instance-qualified imported links require a separate contract change.'),
+          + HINT + (isRoot ? '' : '\nThis statement belongs to an instantiated import. Add its anchor and link in the original definition document. Root links cannot cover imported statements.'),
         reference: 'docs/INTENT-ANCHOR-MAP.md#default-behavior-coverage-warnings',
       });
     }

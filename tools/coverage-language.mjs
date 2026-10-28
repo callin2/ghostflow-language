@@ -70,6 +70,7 @@ const TESTS = Object.freeze([
   'tests/state-snapshot-reference.test.mjs', 'tests/solar-provider-wasm.test.mjs',
   'tests/gfb4-window.test.mjs', 'tests/gfb5-schedule.test.mjs',
   'tests/portable-package.test.mjs', 'tests/import-composition.test.mjs',
+  'tests/composition-intent-provenance.test.mjs',
   'tests/window-control.test.mjs', 'tests/hold-last-control.test.mjs',
   'tests/debounce-control.test.mjs',
   'tests/reference-coverage-gaps.test.mjs',

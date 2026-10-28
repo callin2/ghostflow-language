@@ -113,6 +113,46 @@ authenticity에는 signed payload가 source-map digest를 포함하는 기존 po
 verifier 또는 검증 source document에서 수행한 trusted deterministic compiler replay가 필요하다.
 LS-1c는 unsigned standalone map이 동시 교체를 탐지한다고 주장해서는 안 된다.
 
+## 가져온 의도의 provenance
+
+고정된 composition은 인스턴스화된 각 정의의 작성 의도를 보존한다. Root의
+`intentAnchors`와 `intentLinks`는 root 문서 범위를 유지한다. 가져온 인스턴스에
+anchor나 link가 있으면 compiler는 `traceMetadata.compositionIntent`를 추가한다.
+이 container의 필드는 다음과 같다.
+
+- `format`은 `GhostFlow/composition-intent-v1`이다.
+- `sourceClosureSha256`은 `canonicalJson(sourceClosure)`의 SHA-256이다.
+- `instances`는 결정적인 순회 순서의 group이다. 각 group에는 `east` 또는
+  `outer.inside`처럼 작성된 `instance` 경로와, 고정된 `filename`, `revision`,
+  정확한 문서 `sha256`을 담은 `definition`이 있다.
+- 각 group의 `anchors`는 원본 anchor 필드를 보존한다. `links`는 원본 link 필드를
+  보존하며 조합된 `nodeId`와 원본 `definitionNodeId`를 담는다.
+
+Anchor ID의 범위는 해당 문서다. Root, 서로 다른 두 정의, 같은 정의의 여러
+인스턴스가 같은 ID를 사용할 수 있다. Group이 namespace를 제공하며 compiler는
+ID를 다시 쓰거나 생성된 변수 이름에서 인스턴스 identity를 추론하지 않는다.
+가져온 AI assumption은 `origin=ai`, `kind=assumption`, `status=unconfirmed`를
+유지한다. Import는 이를 확인된 의도로 바꾸거나 origin을 변경하지 않는다.
+
+Compiler는 각 정의의 원본 AST로 link를 검증한 뒤 조합된 node에 연결한다.
+원본 Markdown 위치와 추출된 code 위치는 구분해 보존한다. Composition이 실행 선언을
+제거해도 input과 output 선언의 link는 남는다. 사용하지 않는 import 문서는 검증된
+closure에 남지만 instance group을 만들지 않는다. Root revision identity는 필요한
+곳에서 호출자가 제공하며 composition이 만들어내지 않는다.
+
+Artifact 복원과 서명된 portable-package 검증은 정확한 closure를 다시 컴파일해
+모든 provenance를 비교한다. 누락되거나 변경된 group, 정의 identity, closure digest,
+node ID, 위치, 분류, relation을 거부한다. 독립 문서 trace validator는 composition
+container를 거부한다. 정의의 설명만 바꾸면 provenance와 pin은 바뀌며, 실행 token이
+같으면 bytecode는 유지된다.
+
+Root의 `intentEvidence`는 root anchor와 root에 link된 node만 참조할 수 있다.
+같은 anchor ID로 가져온 node를 주장할 수 없다. 현재 Interaction schema는 가져온
+의도 group을 표현할 수 없어 해당 projection 요청을 명시적으로 거부한다.
+일반 컴파일과 실행은 해당 group을 허용한다. 공개 profile과 host 설명 연결은
+[#290](https://github.com/callin2/ghostflow-language/issues/290) 및
+[#302](https://github.com/callin2/ghostflow-language/issues/302)의 별도 작업이다.
+
 ## 추출과 호환성
 
 - CommonMark가 top-level Markdown block을 결정한다. fenced/inline code, multi-line/enclosing
@@ -154,9 +194,9 @@ compiler, CLI 및 package 생성은 기본적으로 intent-link 범위 경고를
 예시 fault 정책으로 사용한다. 최대 20개 경고 record를 반환한다. 20개를 초과하면
 collection에 `limit: 20`, `truncated: true`를 표시한다. 정확히 20개이면 잘림을 뜻하지
 않는다. 가져온 정의는 인스턴스화될 때 원본 문장마다 한 번 경고하며, 사용하지 않는
-import는 이 경고를 만들지 않는다. 가져온 intent metadata는 계속 지원하지 않으므로,
-안내문은 root link가 가져온 문장을 포함할 수 없고 instance-qualified link에는 별도
-계약이 필요하다고 설명한다.
+import는 이 경고를 만들지 않는다. 가져온 link는 그 정의의 해당 문장만 포함한다.
+안내문은 원본 정의 문서에서 작성하도록 안내한다. Root link는 가져온 문장을
+포함할 수 없다.
 
 이 경고는 지원되는 link 대상 top-level 동작과 link 지원이 없는 알려진 동작 소유자를
 다루며 의미의 완전성을 주장하지 않는다. 기존 malformed, orphan, missing-anchor 및
@@ -219,4 +259,4 @@ replacement-guarantee 및 merged-node proof acceptance는 #42의 열린 작업�
 - SMT/BDD 최적화/proof 생성. #42는 나중에 같은 안정적 anchor/node identity에 compiler 생성
   origin/proof record를 붙일 수 있지만 작성 intent를 다시 쓰거나 미검증 relation을 증명됐다고
   표시해서는 안 된다.
-- 일반 annotation 언어, 임의 key/value 확장, multi-file import, 새 source format.
+- 일반 annotation 언어, 임의 key/value 확장, 새 source format.

@@ -355,8 +355,8 @@
       "source": "docs/INTENT-ANCHOR-MAP.md",
       "sourceLanguage": "en",
       "translation": "docs/INTENT-ANCHOR-MAP.ko.md",
-      "sourceSha256": "d56112071ae4f3843315e4480b2e061f7f6d225e186460a497eb8c0d8cf50210",
-      "translationSha256": "8d0c08083afdf27ba5bc8d8862b71fb85bcadedae4ebb7ffcf33cafd9dd7693b"
+      "sourceSha256": "fc82ac81cffc0425f97daa454193dd48e3df21bae4d21d14c744a2b044f5e70b",
+      "translationSha256": "553eb30017233df33aff88227fe584ceb8b71c93721b20cb0d81f95680bd2054"
     },
     {
       "source": "docs/KEYBOARD-HOST.md",
@@ -705,8 +705,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "a66f758e8b4a664e579bce0e6456ecd9f6a89f6de87781d5b9fdd39bceb9fe7c",
-      "translationSha256": "ae3d32b1e8f5b4c84e8f18e8e7e51576de9e990a04fab0a1dd51d9b460c49e2d"
+      "sourceSha256": "06da8245b4ec3e1812274bf27ce739d41d872095040185a171ee0120fb24d8e4",
+      "translationSha256": "85777f0024f6fe242b8cc43df079dc5f6db86fb38b96445fb5a597879fefbbcc"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",
