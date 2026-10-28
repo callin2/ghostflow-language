@@ -2875,26 +2875,6 @@ impl Engine {
             } else {
                 None
             };
-            if date.is_some_and(|fact| fact.scheduled_day.is_none()) {
-                out.observations.push(Observation {
-                    solar_fallback: None,
-                    source_day: Some(row.source_day),
-                    scheduled_day: None,
-                    date_resolver_revision: date.map(|fact| fact.resolver_revision.clone()),
-                    solar_unavailable_reason: None,
-                    clock_provenance: None,
-                    clock_source_revision: None,
-                    clock_uncertainty_ms: None,
-                    unknown_reason: Some("CivilDateUnavailable".into()),
-                    site,
-                    occurrence_id: id,
-                    planned_ms: Some(planned),
-                    decision: "Unknown(CivilDateUnavailable)".into(),
-                    provider_revision: row.provider_revision.clone(),
-                    context_revision: row.context_revision.clone(),
-                });
-                continue;
-            }
             if !self.last_plan.contains_key(&id) && self.last_plan.len() >= self.capacity {
                 return Err(invalid("Tide plan ledger capacity exceeded"));
             }
@@ -3008,8 +2988,57 @@ impl Engine {
                 && now < planned.saturating_add(within)
                 && (planned > previous || was_pending && now > previous)
             {
+                if cancel && date.is_some_and(|fact| fact.scheduled_day.is_none()) {
+                    self.pending_grace.remove(&id);
+                    self.terminalize(&id)?;
+                    out.observations.push(Observation {
+                        solar_fallback: None,
+                        source_day: Some(row.source_day),
+                        scheduled_day: None,
+                        date_resolver_revision: date.map(|fact| fact.resolver_revision.clone()),
+                        solar_unavailable_reason: None,
+                        clock_provenance: None,
+                        clock_source_revision: None,
+                        clock_uncertainty_ms: None,
+                        unknown_reason: None,
+                        site,
+                        occurrence_id: id,
+                        planned_ms: Some(planned),
+                        decision: "Cancelled".into(),
+                        provider_revision: row.provider_revision.clone(),
+                        context_revision: row.context_revision.clone(),
+                    });
+                    continue;
+                }
                 if let (Some(mask), Some(date)) = (weekday_mask, date) {
-                    let day = date.scheduled_day.expect("known date after unknown branch");
+                    let Some(day) = date.scheduled_day else {
+                        self.pending_grace.insert(
+                            id.clone(),
+                            (
+                                planned,
+                                row.provider_revision.clone(),
+                                row.context_revision.clone(),
+                            ),
+                        );
+                        out.observations.push(Observation {
+                            solar_fallback: None,
+                            source_day: Some(row.source_day),
+                            scheduled_day: None,
+                            date_resolver_revision: Some(date.resolver_revision.clone()),
+                            solar_unavailable_reason: None,
+                            clock_provenance: None,
+                            clock_source_revision: None,
+                            clock_uncertainty_ms: None,
+                            unknown_reason: Some("CivilDateUnavailable".into()),
+                            site,
+                            occurrence_id: id,
+                            planned_ms: Some(planned),
+                            decision: "Unknown(CivilDateUnavailable)".into(),
+                            provider_revision: row.provider_revision.clone(),
+                            context_revision: row.context_revision.clone(),
+                        });
+                        continue;
+                    };
                     if mask & (1 << ((day + 4) % 7)) == 0 {
                         self.pending_grace.remove(&id);
                         self.terminalize(&id)?;
