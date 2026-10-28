@@ -5194,6 +5194,7 @@ mod tests {
                             schedules: vec![],
                             settings: None,
                             accounting: vec![],
+                            scheduled_dates: vec![],
                         },
                     )
                     .map_err(|e| e.to_string())?;
