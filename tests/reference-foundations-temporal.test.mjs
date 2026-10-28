@@ -23,9 +23,9 @@ const tideActivation = { ...activation, bindings: [binding] };
 const policy = 'clock = trusted_only; gap = skip_after(60s); recovery = baseline; fallback = skip;';
 const document = code => '# Reference temporal contracts\n\n```ghost\n' + code + '\n```\n';
 const compile = code => compileSource(document(code), { filename: 'reference-foundations-temporal.ghost.md' });
-const clock = (nowMs, wallMs = nowMs) => ({ monotonicMs: nowMs, wallMs, bootEpoch: 590,
+const clock = (nowMs, wallMs = nowMs, bootEpoch = 590) => ({ monotonicMs: nowMs, wallMs, bootEpoch,
   uncertaintyMs: 0, trusted: true, unknownReason: null, sourceRevision: 'fixture-clock-v1' });
-const facts = (nowMs, wallMs = nowMs) => ({ clock: clock(nowMs, wallMs), natural: [], schedules: [], settings: null });
+const facts = (nowMs, wallMs = nowMs, bootEpoch = 590) => ({ clock: clock(nowMs, wallMs, bootEpoch), natural: [], schedules: [], settings: null });
 const frame = (nowMs, contextFacts, inputs = {}) => ({ nowMs, contextFacts, inputs });
 const receiptId = n => { const bytes = new Uint8Array(16); new DataView(bytes.buffer).setBigUint64(0, BigInt(n), true); return bytes; };
 const config = { maxIntervals: 256, maxEvents: 8, maxReservations: 8, maxRollingWindowMs: 86_400_000n };
@@ -37,13 +37,13 @@ function reference(id) {
   return entry;
 }
 
-function native(t, artifact, frames, profile, context = activation) {
+function native(t, artifact, frames, profile, context = activation, checkpoint = null) {
   const dir = mkdtempSync(join(tmpdir(), 'reference-temporal-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const module = join(dir, 'module.gfb'), tape = join(dir, 'tape.json');
   writeFileSync(module, artifact.bytes);
   let scanId = 0;
-  writeFileSync(tape, JSON.stringify({ profile, activation: context,
+  writeFileSync(tape, JSON.stringify({ profile, activation: context, checkpoint,
     steps: frames.map(f => ({ scanId: f.scanId ?? scanId++, logicalTimeMs: f.nowMs,
       inputs: Object.entries(softwareQualityRails(artifact, f.inputs ?? {}, scanId, f.nowMs))
         .map(([name, value]) => ({ name, value })), ...f.contextFacts })) }));
@@ -86,6 +86,15 @@ function tideProgram(basis = 'run(5min, within(10min))', offset = '') {
       basis = ${basis}; when = allowed |> recover(false); cancel_when = false; ${policy} }
     output due, active: Bool; due <- tide_event.due;
     active <- tide_event.active;
+  }`;
+}
+function atWindowProgram() {
+  return `control WindowContract {
+    input allowed: Bool;
+    schedule visit: At { at = datetime\`1970-01-01T08:00:00Z\`; basis = window(5min);
+      when = allowed |> recover(false); ${policy} }
+    output due, open, missed: Bool;
+    due <- visit.due; open <- visit.open; missed <- visit.missed;
   }`;
 }
 
@@ -177,7 +186,7 @@ test('REF-03-021 partial: a twenty-second blocked request remains distinct from 
   t.diagnostic('Remaining REF-03-021 clauses: executable safe accounting and confirmed flow Result/feedback-quality binding are absent; safe false is not a measured safe ledger.');
 });
 
-test('REF-03-026 partial: Pulse misses its false crossing while a late Tide Run retains its monotonic five-minute deadline', async t => {
+test('REF-03-026: Pulse misses, Window admits first true once, and Tide Run retains its monotonic deadline', async t => {
   assert.match(reference('REF-03-026').given, /08:02.*08:03.*08:04/);
   const planned = 28_800_000, origin = planned - 10_000;
   const times = Array.from({ length: 15 }, (_, i) => i * 30_000 + 10_000);
@@ -204,11 +213,18 @@ test('REF-03-026 partial: Pulse misses its false crossing while a late Tide Run 
   const pulseRows = await parity(t, pulse, pulseFrames, 'context-solar-v1');
   assert.ok(pulseRows.every(row => row.outcome.trace.safe.due === false));
   assert.ok(pulseRows[1].outcome.trace.contextTrace.some(row => row.decision === 'ConditionsFalseAtPulse'));
-  await assert.rejects(compile(tideProgram('window(5min)')), /basis.*pulse.*run|unsupported.*basis/i);
-  t.diagnostic('Remaining REF-03-026 clause: Window first-true admission and non-rearming await the language-owned executable Window basis.');
+  const window = await compile(atWindowProgram());
+  const windowRows = await parity(t, window, times.map(at => frame(at, facts(at, origin + at),
+    { allowed: allowed(at) })), 'context-settings-v1');
+  assert.deepEqual(windowRows.map(row => row.outcome.trace.safe.due), times.map(at => at === 130_000));
+  assert.deepEqual(windowRows.map(row => row.outcome.trace.safe.open), times.map(at =>
+    origin + at >= planned && origin + at < planned + 300_000 && allowed(at)));
+  assert.equal(windowRows.filter(row => (row.outcome.trace.contextTrace ?? []).some(observation => observation.decision === 'Due')).length, 1);
+  assert.equal(windowRows.find(row => row.outcome.trace.safe.due).outcome.trace.contextTrace[0].occurrenceId,
+    `${window.manifest.schedules[0].site}:at`);
 });
 
-test('REF-03-030 partial: observation gap terminalizes an open within interval and recovery cannot revive it', async t => {
+test('REF-03-030: observation gap terminalizes Window and open within interval without re-admission', async t => {
   assert.match(reference('REF-03-030').given, /07:59:50.*08:02:00/);
   const artifact = await compile(tideProgram()), planned = 28_800_000;
   const frames = [0, 130_000, 130_001, 190_000].map(at => frame(at,
@@ -220,7 +236,106 @@ test('REF-03-030 partial: observation gap terminalizes an open within interval a
   assert.equal(missed.length, 1);
   assert.equal(missed[0].occurrenceId, 'reference-590:fixture-harbor:E');
   assert.ok(rows.slice(2).every(row => !(row.outcome.trace.contextTrace ?? []).some(observation => observation.decision === 'Due')));
-  t.diagnostic('Remaining REF-03-030 clause: the original 08:00-08:05 Window is not executable; this verifies the independent open-within terminalization clause only.');
+  const window = await compile(atWindowProgram());
+  const windowFrames = [0, 130_000, 130_001, 190_000, 310_000].map(at => frame(at,
+    facts(at, planned - 10_000 + at), { allowed: true }));
+  const windowRows = await parity(t, window, windowFrames, 'context-settings-v1');
+  assert.deepEqual(windowRows.map(row => row.outcome.trace.safe.due), [false, false, false, false, false]);
+  assert.deepEqual(windowRows.map(row => row.outcome.trace.safe.missed), [false, true, false, false, false]);
+  assert.deepEqual(windowRows.map(row => row.outcome.trace.safe.open), [false, true, true, true, false]);
+  const gap = windowRows[1].outcome.trace.contextTrace.find(row => row.decision === 'ObservationGap');
+  assert.equal(gap.occurrenceId, `${window.manifest.schedules[0].site}:at`);
+  assert.ok(windowRows.slice(2).every(row => !(row.outcome.trace.contextTrace ?? []).some(observation => observation.decision === 'Due')));
+});
+
+test('At Window ends at the exact half-open boundary and cannot infer an open level from an untrusted clock', async t => {
+  const artifact = await compile(atWindowProgram()), planned = 28_800_000;
+  const times = [0, 50_000, 100_000, 150_000, 200_000, 250_000, 300_000, 310_000];
+  const rows = await parity(t, artifact, times.map(at => frame(at,
+    facts(at, planned - 10_000 + at), { allowed: false })), 'context-settings-v1');
+  assert.deepEqual(rows.map(row => row.outcome.trace.safe.open), times.map(() => false));
+  assert.deepEqual(rows.map(row => row.outcome.trace.safe.missed), times.map(at => at === 310_000));
+  assert.equal(rows.at(-1).outcome.trace.contextTrace[0].decision, 'LateStartExpired');
+  const untrusted = facts(30_000, null);
+  untrusted.clock.trusted = false;
+  untrusted.clock.unknownReason = 'ClockUnknown';
+  const unknownRows = await parity(t, artifact, [frame(0, facts(0, planned - 10_000), { allowed: true }),
+    frame(30_000, untrusted, { allowed: true })], 'context-settings-v1');
+  assert.equal(unknownRows[1].outcome.trace.safe.open, false);
+  assert.equal(unknownRows[1].outcome.trace.safe.due, false);
+});
+
+test('At Window rejected crossing rolls back admission and retries once in native and WASM', async t => {
+  const source = atWindowProgram().replace('input allowed: Bool;', 'input allowed: Bool; input denominator: Int;')
+    .replace('due <- visit.due;', 'due <- visit.due && ((1 div (denominator |> recover(0))) == 1);');
+  const artifact = await compile(source), planned = 28_800_000;
+  const frames = [frame(0, facts(0, planned - 10_000), { allowed: true, denominator: 1 }),
+    frame(30_000, facts(30_000, planned + 20_000), { allowed: true, denominator: 0 }),
+    frame(30_000, facts(30_000, planned + 20_000), { allowed: true, denominator: 1 })];
+  frames.forEach((item, index) => { item.scanId = index === 2 ? 1 : index; });
+  const nativeRows = native(t, artifact, frames, 'context-settings-v1');
+  assert.deepEqual(nativeRows.map(row => row.accepted), [true, false, true]);
+  assert.equal(nativeRows[2].outcome.trace.safe.due, true);
+  const runtime = softwareQualityObservations(await ControlRuntime.instantiateFramed(wasm, artifact, { context: activation }));
+  t.after(() => runtime.dispose());
+  runtime.step(frames[0]);
+  const before = runtime.contextSnapshot();
+  assert.throws(() => runtime.step(frames[1]), /division|zero/i);
+  assert.deepEqual(runtime.contextSnapshot(), before);
+  runtime.step(frames[2]);
+  assert.deepEqual(runtime.lastFrameOutcome, nativeRows[2].outcome);
+});
+
+test('At Window checkpoint preserves admitted and missed identities across reboot', async t => {
+  const artifact = await compile(atWindowProgram()), planned = 28_800_000;
+  for (const terminal of ['admitted', 'missed', 'unconsumed']) {
+    const original = softwareQualityObservations(await ControlRuntime.instantiateFramed(wasm, artifact, { context: activation }));
+    const rebooted = softwareQualityObservations(await ControlRuntime.instantiateFramed(wasm, artifact,
+      { context: { ...activation, bootEpoch: 591 } }));
+    t.after(() => { original.dispose(); rebooted.dispose(); });
+    original.step(frame(0, facts(0, planned - 10_000), { allowed: true }));
+    if (terminal !== 'unconsumed') original.step(frame(terminal === 'missed' ? 130_000 : 30_000,
+      facts(terminal === 'missed' ? 130_000 : 30_000, planned + (terminal === 'missed' ? 120_000 : 20_000)),
+      { allowed: true }));
+    const checkpoint = Buffer.from(original.contextSnapshot().bytes).toString('hex');
+    rebooted.restoreContextCheckpoint(original.contextSnapshot().bytes);
+    const rebootFrames = [frame(0, facts(0, planned - 10_000, 591), { allowed: true }),
+      frame(30_000, facts(30_000, planned + 20_000, 591), { allowed: true })];
+    const nativeRows = native(t, artifact, rebootFrames, 'context-settings-v1',
+      { ...activation, bootEpoch: 591 }, checkpoint);
+    rebootFrames.forEach((scan, index) => {
+      rebooted.step(scan);
+      assert.deepEqual(rebooted.lastFrameOutcome, nativeRows[index].outcome);
+      assert.equal(Buffer.from(rebooted.contextSnapshot().bytes).toString('hex'), nativeRows[index].checkpoint);
+    });
+    const trace = rebooted.lastFrameOutcome.trace;
+    assert.equal(trace.safe.due, terminal === 'unconsumed');
+    assert.equal(trace.safe.missed, false);
+    assert.equal(trace.safe.open, true);
+    assert.equal((trace.contextTrace ?? []).filter(row => row.decision === 'Due').length, terminal === 'unconsumed' ? 1 : 0);
+  }
+});
+
+test('At Window rejects incompatible projections and mismatched old profiles before activation', async () => {
+  await assert.rejects(compile(atWindowProgram().replace('visit.open', 'visit.active')), /active|projection/);
+  await assert.rejects(compile(atWindowProgram().replace('window(5min)', 'pulse')), /open|projection/);
+  await assert.rejects(compile(tideProgram().replace('tide_event.active', 'tide_event.open')), /open|projection/);
+  await assert.rejects(compile(`control CivilRange {
+    schedule visit: Daily { timezone = "UTC"; at = time\`08:00\`;
+      dst_missing = skip; dst_repeated = first; basis = range(5min);
+      when = true; cancel_when = false; ${policy} }
+    output open: Bool; open <- visit.open;
+  }`), /open|projection/);
+  await assert.rejects(compile(atWindowProgram().replace('window(5min)', 'window(0s)')), /positive bounded Duration/);
+  const artifact = await compile(atWindowProgram());
+  assert.equal(artifact.manifest.format, 'GhostFlow/control-v23');
+  assert.equal(new DataView(artifact.bytes.buffer, artifact.bytes.byteOffset).getUint16(4, true), 23);
+  const oldManifest = structuredClone(artifact);
+  oldManifest.manifest.format = 'GhostFlow/control-v13';
+  await assert.rejects(ControlRuntime.instantiateFramed(wasm, oldManifest, { context: activation }), /matching GFB|profile|format/);
+  const oldWire = structuredClone(artifact);
+  new DataView(oldWire.bytes.buffer, oldWire.bytes.byteOffset).setUint16(4, 14, true);
+  await assert.rejects(ControlRuntime.instantiateFramed(wasm, oldWire, { context: activation }), /matching GFB|profile|format/);
 });
 
 test('REF-03-037 invalid target rejects the whole Periodic settings event without changing run identity or phase', async t => {

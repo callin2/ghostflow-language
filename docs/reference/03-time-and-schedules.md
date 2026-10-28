@@ -253,7 +253,7 @@ value다. 현재 시점에서 trigger, day rule, predicate와 context를 평가�
 admit할지 판단한다. 충족하지 않은 pulse는 자동 대기열에 들어가지 않는다.
 
 선택된 trigger 타입은 `At`, `Daily`, `DailySlots<G>`, `Periodic`, `Cron`, `Solar`,
-`Tide`다. 현재 compiler는 one-shot `At` pulse와 `DailySlots<15min>`을 받는다.
+`Tide`다. 현재 compiler는 one-shot `At` pulse와 Window, `DailySlots<15min>`을 받는다.
 각 타입은 고유 trigger field와 다음 공통 policy field를 가진다.
 
 ```ghost
@@ -296,7 +296,7 @@ cancel_when := Bool                                   // 현재 civil range에 �
 현재 compiler는 Solar와 Tide에 `clock = hold_trusted(positive constant Duration, terminal: skip)`을,
 Solar에 `fallback = fixed_time(TimeOfDay literal, terminal: skip)`을 받는다.
 Tide는 `fallback = skip`만 허용하며 다른 trigger는 trusted-only clock과 skip fallback을 유지한다.
-`window`, `run(_, on_time)`은 선택된 설계 표기이며
+`At` Window는 한정된 실행 범위다. 다른 trigger의 Window와 `run(_, on_time)`은
 아직 compiler 지원 범위 밖이다. 불변 UTC Daily와 비어 있지 않은 정적 DailySlots Range는
 정적 non-overlap을 증명하여 GFB12로 실행한다. 불변 비 UTC `DailySlots<15min>`은
 아래의 GFB21 프로필로 실행하며, 명목상 slot 간격의 컴파일 검사와 host가 공급한
@@ -350,19 +350,50 @@ schedule appointment: At {
 ```
 
 절대 instant는 명시한 offset으로 정규화한다. 같은 instant를 나타내는 offset 표기는
-같은 시점을 계획한다. 이 제한된 profile은 `pulse`, trusted-only clock, baseline recovery,
+같은 시점을 계획한다. 이 제한된 Pulse profile은 trusted-only clock, baseline recovery,
 skip fallback과 양의 상수 gap만 받는다. 누락 field, DateTime이 아닌 값이나 비상수 `at`,
 timezone/DST/cancellation field, 다른 basis는 진단한다. `.due`와 `.missed`를 노출하며
 provider, config, sensor, resource, objective 또는 다른 schedule profile과 혼합하지 않는다.
 GFB14와 control-v13이 이 실행 profile을 식별한다. framed clock/scan transport는 그대로다.
 이전 loader는 GFB14를 거부한다. 서명된 portable package는 아직 이 profile을 받지 않는다.
 
+`At`은 같은 policy 제한에서 양의 상수 `window(Duration)`도 받는다.
+
+```ghost
+schedule appointment: At {
+  at = datetime`2026-01-01T08:00:00Z`;
+  basis = window(5min);
+  when = ready;
+  clock = trusted_only;
+  gap = skip_after(60s);
+  recovery = baseline;
+  fallback = skip;
+}
+output start_once: Bool;
+start_once <- appointment.due;
+```
+
+계획 구간은 `[at, at + duration)`의 반열림 구간이다. trusted clock에서 `.open`은
+**현재** 구간과 `when`의 level이다. `when`이 변하면 false에서 true로 다시 바뀔 수 있다.
+`.due`는 그 구간에서 처음 자격을 갖춘 accepted scan의 한 번짜리 admission pulse다.
+terminal miss나 이전 admission은 새 `.due`를 막지만 현재 `.open` level을 강제로 false로
+만들지 않는다. 예를 들어 08:00의 `window(5min)`에 대해 관측 gap이 07:59:50부터
+08:02:00까지 발생하면 occurrence는 terminal missed가 된다. 08:02에 `when`이 true라면
+`.missed`는 true, `.due`는 false, `.open`은 true일 수 있다. 한 번만 시작할 작업에는
+`.due`를 사용한다. 미상 또는 신뢰할 수 없는 wall time은 알려진 열린 구간을 만들 수
+없다. 08:05 이후 `.open`은 false다. `At` Window에는 cancellation field가 없고 host
+occurrence row를 받지 않는다. GFB23과 control-v23이 별도 실행 profile을 식별한다.
+이전 loader는 이를 거부하고 manifest/profile 불일치도 활성화 전에 거부한다. 서명된
+portable package는 아직 이 profile을 받지 않는다.
+
 Rust core는 host가 제공한 occurrence row 없이 컴파일된 schedule site와 instant에서
-단일 occurrence를 계산한다. admission은 observation gap이 없는 accepted trusted scan에서
-`previous < planned <= current`이고 `when = true`일 때만 가능하다. crossing에서 false이거나
-gap이 겹치면 terminal miss로 소비한다. instant 이후 또는 같은 시점의 boot/recovery
+단일 occurrence를 계산한다. Pulse admission은 observation gap이 없는 accepted trusted scan에서
+`previous < planned <= current`이고 `when = true`일 때만 가능하다. crossing에서 false이면
+terminal miss로 소비한다. Window는 crossing에서 `when`이 false였어도 종료 전 첫 자격을
+갖춘 scan에서 admit할 수 있다. 두 형태 모두 겹치는 observation gap은 terminal miss로
+소비한다. instant 이후 또는 같은 시점의 boot/recovery
 baseline은 catch-up 없이 `BaselinePastMissed`로 소비한다. 재관찰, wall rollback과 recrossing은
-다른 pulse를 만들지 않는다. clock source/boot revision은 새 identity를 만들지 않는다.
+다른 admission을 만들지 않는다. clock source/boot revision은 새 identity를 만들지 않는다.
 거부된 scan은 clock baseline, terminal identity와 projection 어느 것도 commit하지 않는다.
 
 재시작을 가로지르는 dedup에는 같은 program의 terminal checkpoint 복원이 필요하다.
@@ -428,7 +459,7 @@ revision이 포함된다. 대표 disposition은 `Before`, `PredicateFalse`, `Alr
 
 ### 놓친 occurrence에 대한 소스 반응
 
-`schedule_name.missed`는 `Bool` 투영이다. 현재 compiler는 At pulse, Solar와 실행 가능한
+`schedule_name.missed`는 `Bool` 투영이다. 현재 compiler는 At pulse와 Window, Solar와 실행 가능한
 `pulse` civil schedule에 이 투영을 제공한다. 실행 가능한 UTC Range를 포함한
 Range에서는 아직 실행 투영으로 제공하지 않는다. 해당 schedule에서 하나 이상의 occurrence가
 이번 accepted scan에 **terminal missed**로 확정될 때만 true다. 한 scan에서 둘 이상을
@@ -465,7 +496,7 @@ record를 합치거나 이유 하나로 요약하지 않는다. 재부팅 뒤 �
 | basis | admission 의미 |
 |---|---|
 | `pulse` | crossing tick에 조건이 모두 true일 때만 admit. 뒤늦게 true가 되어도 missed다. |
-| `window(5min)` (설계) | `[planned, planned+5min)`에서 조건이 처음 true인 시점에 한 번 admit. 같은 occurrence에서 false→true가 반복돼도 재arm하지 않는다. |
+| `window(5min)` (`At` 실행) | `[planned, planned+5min)`에서 조건이 처음 true인 시점에 한 번 admit. 같은 occurrence에서 false→true가 반복돼도 재arm하지 않는다. 다른 trigger 조합은 설계 단계다. |
 | `run(5min, on_time)` (설계) | observed crossing에서만 admit하고 admission부터 5분 운전한다. |
 | `run(5min, within(10min))` (Tide) | `[planned, planned+10min)`에서 첫 admission을 허용한다. 10분은 grace이고 run length는 5분이다. |
 | `range(10min)` (civil contract) | 신뢰할 수 있는 현재 시각이 `[planned, planned+10min)` 안에 있고 `when`이 true이면 첫 관측·부팅·회복이 늦어도 한 번 admit한다. 끝은 계획 시작점 + 10분이다. 불변 UTC Daily/DailySlots는 GFB12, 아래의 불변 비 UTC DailySlots는 GFB21로 실행된다. |
@@ -670,7 +701,8 @@ metadata이며 같은 사건을 새 사건으로 만들지 않는다.
 일정은 연속한 accepted snapshots의 monotonic delta와 양의 wall delta를 검사한다.
 명시한 `gap = skip_after(d)`의 d를 넘으면 `ObservationGap`이다. 이 정책은 그
 gap과 admission interval이 겹친 Pulse, Window, Run occurrence를 missed로 종결한다.
-Window나 `within(...)`이 아직 열려 있어도 나중에 되살리지 않는다. Range에서
+Window나 `within(...)`이 아직 열려 있어도 나중에 되살리지 않는다. Window의 terminal miss는
+`.due` admission을 막지만 현재 trusted 구간과 predicate에 따른 `.open`은 true일 수 있다. Range에서
 구간 중의 `ObservationGap`은 gap의 관찰 근거이며 그 occurrence를 terminal missed로
 기록하지 않는다. 신뢰 가능한 현재 시각이 여전히 계획 구간 안이면 처음 admit해
 남은 시간만 요청할 수 있다. 종료 경계에 도달하면 `LateStartExpired`로 terminal

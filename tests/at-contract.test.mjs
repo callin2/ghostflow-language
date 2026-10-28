@@ -33,7 +33,7 @@ test('GF-TEST-at-contract: missing, mistyped and unsupported At fields reject be
     [source.replace('datetime`2026-01-01T08:00:00Z`', 'time`08:00`'), /constant DateTime/],
     [source.replace('T08:00:00Z', 'T08:00:00'), /offset|DateTime|datetime/],
     [source.replace('2026-01-01', '2026-02-30'), /DateTime|date|datetime/],
-    [source.replace('basis = pulse;', 'basis = window(5min);'), /requires pulse/],
+    [source.replace('basis = pulse;', 'basis = window(0s);'), /positive bounded Duration/],
     [source.replace('basis = pulse;', 'basis = run(5min, on_time);'), /requires pulse/],
     [source.replace('basis = pulse;', 'basis = range(5min);'), /requires pulse/],
     [source.replace('when = (allow |> recover(false));', 'when = 1;'), /must be Bool/],

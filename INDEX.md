@@ -91,6 +91,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/CHECKED-CONSTRAINT-REPLACEMENTS.md](docs/CHECKED-CONSTRAINT-REPLACEMENTS.md) | Checked constraint replacements | md |
 | [docs/COMPILER-DIAGNOSTICS.ko.md](docs/COMPILER-DIAGNOSTICS.ko.md) | 공개 컴파일러 진단 | md |
 | [docs/COMPILER-DIAGNOSTICS.md](docs/COMPILER-DIAGNOSTICS.md) | Public compiler diagnostics | md |
+| [docs/COMPOSED-CONFIG-TIMER.ko.md](docs/COMPOSED-CONFIG-TIMER.ko.md) | 조합된 control의 config·timer 격리 | md |
+| [docs/COMPOSED-CONFIG-TIMER.md](docs/COMPOSED-CONFIG-TIMER.md) | Config and timer isolation in composed controls | md |
 | [docs/CONSTRAINTS.en.md](docs/CONSTRAINTS.en.md) | GhostFlow common constraints and sensor signal contract | md |
 | [docs/CONSTRAINTS.md](docs/CONSTRAINTS.md) | GhostFlow 공통 제약과 센서 신호 계약 | md |
 | [docs/CONTEXT-EXECUTION-ABI.ko.md](docs/CONTEXT-EXECUTION-ABI.ko.md) | 컨텍스트 실행 ABI | md |
@@ -181,6 +183,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/PORTABLE-PACKAGE.md](docs/PORTABLE-PACKAGE.md) | Portable GFB package v1 | md |
 | [docs/PROFILE-FRONT-MATTER.en.md](docs/PROFILE-FRONT-MATTER.en.md) | Profile-based Front Matter Design | md |
 | [docs/PROFILE-FRONT-MATTER.md](docs/PROFILE-FRONT-MATTER.md) | Profile 기반 front matter 설계 | md |
+| [docs/PROGRAM-REPLACEMENT-HOST.ko.md](docs/PROGRAM-REPLACEMENT-HOST.ko.md) | 참조 Program 교체 host | md |
+| [docs/PROGRAM-REPLACEMENT-HOST.md](docs/PROGRAM-REPLACEMENT-HOST.md) | Reference Program replacement host | md |
 | [docs/ProgrammingInGhostflow.en.md](docs/ProgrammingInGhostflow.en.md) | Programming in GhostFlow | md |
 | [docs/ProgrammingInGhostflow.md](docs/ProgrammingInGhostflow.md) | Programming in GhostFlow | md |
 | [docs/REFERENCE-FEATURE-STATUS.md](docs/REFERENCE-FEATURE-STATUS.md) | Reference feature maturity and evidence | md |
@@ -437,6 +441,20 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [examples/tutorial/04-extra-valves.ghost.ko.md](examples/tutorial/04-extra-valves.ghost.ko.md) | 추가 관측소 밸브 | md |
 | [examples/tutorial/04-extra-valves.ghost.md](examples/tutorial/04-extra-valves.ghost.md) | Extra station valves | md |
 
+## experiments/bool-translation-validation/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [experiments/bool-translation-validation/pc-refinement-report.md](experiments/bool-translation-validation/pc-refinement-report.md) | Bool byte-PC refinement execution report | md |
+| [experiments/bool-translation-validation/proof-report.md](experiments/bool-translation-validation/proof-report.md) | Bool translation validation execution report | md |
+
+## experiments/bool-translation-validation/fixtures/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [experiments/bool-translation-validation/fixtures/boolean-literals.ghost.md](experiments/bool-translation-validation/fixtures/boolean-literals.ghost.md) | Bool literal proof input | md |
+| [experiments/bool-translation-validation/fixtures/snapshot-branches.ghost.md](experiments/bool-translation-validation/fixtures/snapshot-branches.ghost.md) | Bool snapshot and branch proof input | md |
+
 ## runtimes/wasm/
 
 | Path | Title | Type |
@@ -553,4 +571,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-418 documents.
+426 documents.

@@ -14,6 +14,9 @@ import { physicalManifestInputs, validateLifecycleManifest } from '../../tools/l
 import { validateLegacyAdmission, preflightLegacyAdmission } from '../../tools/legacy-admission-contract.mjs';
 import { OUTPUT_OBSERVATION_FORMAT, OUTPUT_OBSERVATION_ROLES, validateOutputObservationsManifest, validateOutputObservationRails, validateOutputObservation } from '../../tools/output-observation-contract.mjs';
 import { validateRequiredRuntimeFeatures } from '../../tools/runtime-features.mjs';
+import { compileSourceSync } from '../../tools/compile-source.mjs';
+import { canonicalJson } from '../../tools/canonical-json.mjs';
+import { equalBytes, sha256Hex } from '../../tools/sha256.mjs';
 
 const FORMAT = 'GhostFlow/control-v1';
 const SETTINGS_FORMAT = 'GhostFlow/control-v2';
@@ -24,6 +27,7 @@ const SCHEDULE_SLOTS_FORMAT = 'GhostFlow/control-v8';
 const STREAM_CONTEXT_FORMAT = 'GhostFlow/control-v10';
 const AVAILABILITY_FORMAT = 'GhostFlow/control-v12';
 const AT_FORMAT = 'GhostFlow/control-v13';
+const AT_WINDOW_FORMAT = 'GhostFlow/control-v23';
 const HOLIDAY_FORMAT = 'GhostFlow/control-v14';
 const SOLAR_CONTEXT_FORMAT = 'GhostFlow/control-v15';
 const CALENDAR_EXECUTION_FORMAT = 'GhostFlow/control-v18';
@@ -38,6 +42,7 @@ const contextManifest = manifest => manifest?.format === STREAM_CONTEXT_FORMAT
   || manifest?.format === SOLAR_CONTEXT_FORMAT
   || manifest?.format === HOLIDAY_FORMAT
   || manifest?.format === AT_FORMAT
+  || manifest?.format === AT_WINDOW_FORMAT
   || manifest?.format === AVAILABILITY_FORMAT && !manifest.schedules?.some(item => item.kind === 'solar');
 
 /** Select an existing reference entry explicitly; never retry after a dispatch error. */
@@ -260,10 +265,10 @@ function validateCanonicalUnit(item, label) {
 function validateContextManifest(input, bytecodeFormat) {
   const manifest = record(input, 'manifest');
   keys(manifest, ['format','name','inputs','outputs','sensors','schedules','timers','signals','configs','bytecodeSha256'],
-    ['providers','calendars','naturalConditions','calendarConditions','accounting','resources','objectives','adaptSettings','lifecycle','legacyAdmission','requiredRuntimeFeatures'], 'manifest');
+    ['providers','calendars','naturalConditions','calendarConditions','accounting','resources','objectives','adaptSettings','lifecycle','legacyAdmission','requiredRuntimeFeatures','sensorInstances'], 'manifest');
   validateRequiredRuntimeFeatures(manifest);
   const lifecycle = validateLifecycleManifest(manifest);
-  if (manifest.format === CIVIL_RANGE_FORMAT ? bytecodeFormat !== 21 : manifest.format === TIMESLOTS_RANGE_FORMAT ? bytecodeFormat !== 20 : manifest.format === RANGE_LIVE_START_FORMAT ? bytecodeFormat !== 19 : manifest.format === CALENDAR_EXECUTION_FORMAT ? bytecodeFormat !== 18 : manifest.format === SOLAR_CONTEXT_FORMAT ? bytecodeFormat !== 16 : manifest.format === HOLIDAY_FORMAT ? bytecodeFormat !== 15 : manifest.format === AT_FORMAT ? bytecodeFormat !== 14 : manifest.format === AVAILABILITY_FORMAT ? bytecodeFormat !== 13 : ![11, 12].includes(bytecodeFormat)) throw new Error('context manifest requires its matching GFB format');
+  if (manifest.format === AT_WINDOW_FORMAT ? bytecodeFormat !== 23 : manifest.format === CIVIL_RANGE_FORMAT ? bytecodeFormat !== 21 : manifest.format === TIMESLOTS_RANGE_FORMAT ? bytecodeFormat !== 20 : manifest.format === RANGE_LIVE_START_FORMAT ? bytecodeFormat !== 19 : manifest.format === CALENDAR_EXECUTION_FORMAT ? bytecodeFormat !== 18 : manifest.format === SOLAR_CONTEXT_FORMAT ? bytecodeFormat !== 16 : manifest.format === HOLIDAY_FORMAT ? bytecodeFormat !== 15 : manifest.format === AT_FORMAT ? bytecodeFormat !== 14 : manifest.format === AVAILABILITY_FORMAT ? bytecodeFormat !== 13 : ![11, 12].includes(bytecodeFormat)) throw new Error('context manifest requires its matching GFB format');
   name(manifest.name, 'manifest.name');
   if (!/^[0-9a-f]{64}$/.test(manifest.bytecodeSha256)) throw new Error('invalid bytecode SHA-256');
   const inputs = validateList(manifest.inputs, 'manifest.inputs', ['name','type'], ['canonicalUnit']);
@@ -275,6 +280,11 @@ function validateContextManifest(input, bytecodeFormat) {
   const sensors = validateList(manifest.sensors, 'manifest.sensors',
     ['name','type','sampleMs','validMin','validMax','filter','window','staleMs','recoverSamples','valueInput','okInput','faultInput'],
     ['optional','alpha','canonicalUnit','samplePresentInput','sampleEpochInput','sampleIdInput','sampleTimestampInput']);
+  const sensorInstances = validateList(manifest.sensorInstances ?? [], 'manifest.sensorInstances',
+    ['name','type','sampleMs','validMin','validMax','filter','window','staleMs','recoverSamples','valueInput','okInput','faultInput','sourceSensor','instance','port'],
+    ['optional','alpha','canonicalUnit','samplePresentInput','sampleEpochInput','sampleIdInput','sampleTimestampInput']);
+  if (sensorInstances.length && manifest.format !== STREAM_CONTEXT_FORMAT)
+    throw new Error('context sensor instances require control-v10');
   const objectives = validateList(manifest.objectives ?? [], 'manifest.objectives',
     ['name','measure','target','manipulate','output','controller','binding','executable','bindings']);
   const resources = validateList(manifest.resources ?? [], 'manifest.resources', ['name','type']);
@@ -298,7 +308,7 @@ function validateContextManifest(input, bytecodeFormat) {
   if (manifest.format === SOLAR_CONTEXT_FORMAT && !schedules.some(item => item.kind === 'solar')) throw new Error('Solar context profile requires Solar');
   if (manifest.format === HOLIDAY_FORMAT && (!schedules.some(item => item.kind === 'daily' && item.day?.kind === 'holiday')
     || schedules.some(item => item.kind === 'at'))) throw new Error('Holiday profile requires Holiday Daily and excludes At');
-  if (manifest.format === AT_FORMAT && (!schedules.length || schedules.some(item => item.kind !== 'at')
+  if ([AT_FORMAT, AT_WINDOW_FORMAT].includes(manifest.format) && (!schedules.length || schedules.some(item => item.kind !== 'at')
     || [configs,objectives,resources,adaptSettings,providers,calendars,naturals].some(list => list.length) || accounting)) {
     throw new Error('At profile requires At-only execution');
   }
@@ -314,11 +324,17 @@ function validateContextManifest(input, bytecodeFormat) {
   for (const item of schedules) {
     name(item.name, 'schedule.name'); safeInteger(item.site, 'schedule.site', 1, 0xffff_ffff);
     if (item.kind === 'at') {
-      if (manifest.format !== AT_FORMAT) throw new Error('At requires control-v13 and GFB14');
+      if (![AT_FORMAT, AT_WINDOW_FORMAT].includes(manifest.format)) throw new Error('At requires its matching control and GFB profile');
       keys(item, ['kind','site','name','policy','atMs'], [], 'At schedule');
       safeInteger(item.atMs, 'At atMs', 0, 253_402_300_799_999);
       keys(record(item.policy, 'At policy'), ['basis','when','clock','gapMs','recovery','fallback'], [], 'At policy');
-      if (item.policy.basis !== 'pulse' || item.policy.clock !== 'trusted_only' || item.policy.recovery !== 'baseline'
+      if (manifest.format === AT_WINDOW_FORMAT) {
+        keys(record(item.policy.basis, 'At Window basis'), ['kind','durationMs'], [], 'At Window basis');
+        if (item.policy.basis.kind !== 'window') throw new Error('At Window requires window basis');
+        safeInteger(item.policy.basis.durationMs, 'At Window durationMs', 1, 253_402_300_799_999 - item.atMs);
+      }
+      if (manifest.format === AT_FORMAT && item.policy.basis !== 'pulse'
+        || item.policy.clock !== 'trusted_only' || item.policy.recovery !== 'baseline'
         || item.policy.fallback !== 'skip') throw new Error('unsupported At policy');
       safeInteger(item.policy.gapMs, 'At gapMs', 1);
       continue;
@@ -439,9 +455,9 @@ function validateContextManifest(input, bytecodeFormat) {
     }
   }
   unique(configs.map(item => item.id), 'config id');
-  unique([...inputs,...outputs,...schedules,...configs,...providers,...calendars,...timers,...sensors,...objectives,...adaptSettings].map(item => item.name), 'context name');
+  unique([...inputs,...outputs,...schedules,...configs,...providers,...calendars,...timers,...sensors,...sensorInstances,...objectives,...adaptSettings].map(item => item.name), 'context name');
   unique([...schedules,...naturals,...calendarConditions].map(item => item.site), 'context site');
-  for (const sensor of sensors) {
+  for (const sensor of [...sensors, ...sensorInstances]) {
     name(sensor.name, 'sensor.name');
     if (objectives.some(objective => objective.measure === sensor.name) && (sensor.type !== 'Temperature' || sensor.canonicalUnit !== 'K')) throw new Error('context PID sensor must be canonical Temperature');
     type(sensor.type, `sensor ${sensor.name}.type`);
@@ -464,6 +480,17 @@ function validateContextManifest(input, bytecodeFormat) {
     if (count !== 0 && count !== 4) throw new Error('context sensor sample identity inputs must be provided together');
     for (const [field, role] of [['samplePresentInput', 'present'], ['sampleEpochInput', 'epoch'], ['sampleIdInput', 'id'], ['sampleTimestampInput', 'timestamp']])
       if (count) generated(sensor[field], `${RESERVED}sensor_sample_${role}_${sensor.name}`, `sensor ${sensor.name}.${field}`);
+  }
+  const sensorByName = new Map(sensors.map(sensor => [sensor.name, sensor]));
+  for (const sensor of sensorInstances) {
+    name(sensor.sourceSensor, 'sensor sourceSensor'); name(sensor.port, 'sensor port');
+    if (typeof sensor.instance !== 'string' || !/^[A-Za-z_][A-Za-z_0-9]*(?:\.[A-Za-z_][A-Za-z_0-9]*)*$/.test(sensor.instance))
+      throw new Error('invalid sensor instance');
+    const source = sensorByName.get(sensor.sourceSensor);
+    if (!source || source.type !== sensor.type || source.sampleMs !== sensor.sampleMs
+      || !!source.optional !== !!sensor.optional) throw new Error(`sensor instance ${sensor.name} source contract mismatch`);
+    const expected = `instance_${sensor.instance.split('.').map(part => `${part.length}_${part}`).join('_')}_${sensor.port}`;
+    if (sensor.name !== expected) throw new Error('sensor instance name mismatch');
   }
   if (objectives.length > 1) throw new Error('only one context PID objective is supported');
   for (const objective of objectives) {
@@ -500,9 +527,10 @@ function validateContextManifest(input, bytecodeFormat) {
   }
   unique(adaptSettings.map(item => item.target), 'adaptation target');
   const normalized = freeze(copy({ ...manifest, inputs, outputs, schedules, configs, providers, calendars, timers,
-    sensors, objectives, resources, adaptSettings, naturalConditions: naturals, ...(calendarConditions.length ? { calendarConditions } : {}), ...(accounting === null ? {} : { accounting }) }));
+    sensors, ...(manifest.sensorInstances === undefined ? {} : { sensorInstances }), objectives, resources, adaptSettings,
+    naturalConditions: naturals, ...(calendarConditions.length ? { calendarConditions } : {}), ...(accounting === null ? {} : { accounting }) }));
   return { manifest: normalized, lifecycle, inputNames: new Set(physicalManifestInputs(normalized).map(item => item.name)),
-    sensorByName: new Map(sensors.map(item => [item.name,item])), scheduleNames: new Set(schedules.map(item => item.name)), signalNames: new Set() };
+    sensorByName, scheduleNames: new Set(schedules.map(item => item.name)), signalNames: new Set() };
 }
 
 // These descriptors retain source provenance. Enforcement stays in the compiled
@@ -1054,7 +1082,34 @@ function sensorFaultCode(reading) {
 
 function inputValue(value, inputType, label) { return typedValue(value, inputType, label); }
 
-async function instantiateControlRuntime(wasmBytes, { bytes: bytecode, manifest } = {}, options, instantiateRuntime, supportsSchedules) {
+function verifySourceBoundContext(artifact, compiledBytes, manifest, bytecodeFormat) {
+  if (![11, 12].includes(bytecodeFormat)
+    && artifact.sourceClosure === undefined && manifest?.sensorInstances === undefined) return;
+  const { sourceDocument, sourceClosure } = artifact;
+  if (!sourceDocument || typeof sourceDocument.text !== 'string'
+    || sourceDocument.format !== 'GhostFlow/source-document-v1'
+    || sourceDocument.kind !== 'literate'
+    || sha256Hex(sourceDocument.text) !== sourceDocument.sha256
+    || sourceClosure !== undefined && (!sourceClosure || sourceClosure.format !== 'GhostFlow/source-closure-v1'
+      || !Array.isArray(sourceClosure.documents))) {
+    throw new Error('context source-bound activation requires an exact source document and import closure when present');
+  }
+  const rebuilt = compileSourceSync(sourceDocument.text, {
+    filename: sourceDocument.filename,
+    ...(sourceClosure === undefined ? {} : { sourceClosure: sourceClosure.documents }),
+  });
+  if (!equalBytes(rebuilt.bytes, compiledBytes)) throw new Error('composition bytecode does not match canonical source');
+  if (manifest.bytecodeSha256 !== rebuilt.manifest.bytecodeSha256)
+    throw new Error('bytecode SHA-256 does not match manifest');
+  if ((rebuilt.sourceClosure === undefined) !== (sourceClosure === undefined)
+    || sourceClosure !== undefined && canonicalJson(rebuilt.sourceClosure) !== canonicalJson(sourceClosure))
+    throw new Error('composition source closure does not match canonical source');
+  if (canonicalJson(rebuilt.manifest) !== canonicalJson(manifest))
+    throw new Error('composition manifest does not match canonical source');
+}
+
+async function instantiateControlRuntime(wasmBytes, artifact = {}, options, instantiateRuntime, supportsSchedules) {
+  const { bytes: bytecode, manifest } = artifact;
   const wasm = new Uint8Array(bytes(wasmBytes, 'wasmBytes'));
   // Copy caller-owned bytecode before awaiting digest verification (TOCTOU-safe).
   const compiledBytes = new Uint8Array(bytes(bytecode, 'bytes'));
@@ -1069,6 +1124,7 @@ async function instantiateControlRuntime(wasmBytes, { bytes: bytecode, manifest 
     bytecodeFormat = view.getUint16(14, true);
   }
   const checkedManifest = validateManifest(manifest, { ...options, bytecodeFormat });
+  verifySourceBoundContext(artifact, compiledBytes, manifest, bytecodeFormat);
   validateOutputObservationRails(checkedManifest.manifest, compiledBytes);
   if (checkedManifest.manifest.outputObservations?.length) {
     if (instantiateRuntime !== FramedGhostFlowRuntime.instantiate) throw new Error('output observations require a framed host');
@@ -1201,8 +1257,8 @@ async function instantiateControlRuntime(wasmBytes, { bytes: bytecode, manifest 
 }
 
 export class ControlRuntime {
-  static async instantiate(wasmBytes, { bytes: bytecode, manifest } = {}, options = {}) {
-    const initialized = await instantiateControlRuntime(wasmBytes, { bytes: bytecode, manifest }, options, GhostFlowRuntime.instantiate, true);
+  static async instantiate(wasmBytes, artifact = {}, options = {}) {
+    const initialized = await instantiateControlRuntime(wasmBytes, artifact, options, GhostFlowRuntime.instantiate, true);
     return new ControlRuntime(initialized.runtime, initialized.checkedManifest, initialized.sensors, initialized.signals,
       initialized.afterEvents, false, initialized.temporalEpoch, initialized.hasSolar, initialized.afterEventEpoch, initialized.hasSchedules, initialized.hasContext);
   }

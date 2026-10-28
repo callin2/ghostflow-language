@@ -375,7 +375,10 @@ test('signed portable package retains quality input capabilities, source and WAS
     availableCapabilities: identity.requiredCapabilities,
     verifyBytecode: async (bytes, context) => {
       loaderCalls++;
-      const runtime = await ControlRuntime.instantiateFramed(wasm(), { bytes, manifest: context.manifest });
+      const runtime = await ControlRuntime.instantiateFramed(wasm(), {
+        bytes, manifest: context.manifest, sourceDocument: context.sourceMap.sourceDocument,
+        ...(context.sourceMap.sourceClosure === undefined ? {} : { sourceClosure: context.sourceMap.sourceClosure }),
+      });
       try {
         assert.equal(runtime.step({ nowMs: 0 }).vm.safe.enabled, true);
         assert.equal(runtime.step({ nowMs: 1, samples: { count: sample(1, 1, 'Good', 2147483647) } }).vm.safe.total, 2147483647);

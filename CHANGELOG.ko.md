@@ -5,6 +5,18 @@
 
 ## 미출시
 
+### 2026-10-28 — one-shot At Window 실행 ([#153](https://github.com/callin2/ghostflow-language/issues/153), [#215](https://github.com/callin2/ghostflow-language/issues/215), [#219](https://github.com/callin2/ghostflow-language/issues/219))
+
+Reference §3.5의 `At`에서 양의 상수 `window(Duration)`을 `.due`, `.open`,
+`.missed`와 함께 실행한다. 이전 Window는 설계 단계였다. 08:00의
+`window(5min)`은 08:05 전 첫 eligible accepted scan에서 한 번 admit한다.
+`.open`은 관측 gap으로 admission이 terminal missed가 되어도 현재 trusted 구간과
+predicate level을 나타낸다. `.due`는 같은 occurrence에 다시 발생하지 않는다.
+거부된 scan은 clock과 terminal ledger를 되돌리고, 복원한 checkpoint는 재부팅을
+가로질러 중복을 막는다. GFB23/control-v23은 Pulse와 구별되는 profile이며 이전
+runtime에서는 거부된다. native/WASM Reference trace는 늦은 predicate, 관측 gap,
+반열림 종료 경계와 재시작을 검증한다. Device 또는 실제 장치 검증은 포함하지 않는다.
+
 ### 2026-10-28 — context profile의 연속 타이머 ([#47](https://github.com/callin2/ghostflow-language/issues/47))
 
 Reference §3.3의 버그 수정이다. config와

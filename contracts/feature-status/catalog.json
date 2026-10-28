@@ -3457,15 +3457,25 @@
                 "negative",
                 "boundary"
               ]
+            },
+            {
+              "path": "tests/composition-config-timer-isolation.test.mjs",
+              "testId": "REF-06-002 live east setting and state change leave west setting and timer independent on native and WASM",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ]
             }
           ]
         }
       ],
       "gaps": [
-        "Executable evidence covers pinned counter instances with distinct sensor suppliers, isolated state and verified definition/instance/binding provenance; imported intent metadata and broader composition cases remain separate contracts."
+        "Pinned composition verifies distinct sensor suppliers and private state/config/timer execution on native and WASM. REF-06-002 remains incomplete for instance-specific binding revisions and composed interaction/descriptor joins; imported intent metadata remains unsupported."
       ],
       "issues": [
-        195
+        195,
+        290
       ],
       "referenceCaseIds": [
         "REF-00-010"
@@ -3602,14 +3612,45 @@
               ]
             }
           ]
+        },
+        {
+          "stage": "host_simulation",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/program-replacement-host.test.mjs",
+              "testId": "REF-06-020 rejected candidate preserves previous Program, run and accepted trace",
+              "caseId": "REF-06-020",
+              "assertionClass": "rollback",
+              "targets": [
+                "host",
+                "wasm"
+              ]
+            },
+            {
+              "path": "tests/program-replacement-host.test.mjs",
+              "testId": "REF-06-022 successful replacement publishes new identities and requires a fresh complete input snapshot",
+              "caseId": "REF-06-022",
+              "assertionClass": "identity",
+              "targets": [
+                "host",
+                "wasm"
+              ]
+            }
+          ]
         }
       ],
       "gaps": [
-        "Core state-type/module rejection, compatible state transfer and fresh-input enforcement are verified; replacement source/run lifecycle, ledger/occurrence non-mutation and complete branch isolation remain open."
+        "The bounded unframed Bool I/O reference host verifies candidate rejection, source/artifact/run publication and fresh observations. Framed settings/temporal/ledger migration, Device installation and complete branch isolation remain open."
       ],
-      "issues": [],
+      "issues": [
+        305,
+        307
+      ],
       "referenceCaseIds": [
-        "REF-06-021"
+        "REF-06-021",
+        "REF-06-020",
+        "REF-06-022"
       ]
     },
     {
@@ -8989,6 +9030,58 @@
       ],
       "referenceCaseIds": [
         "REF-07-002"
+      ]
+    },
+    {
+      "id": "at-window-reference",
+      "family": "One-shot At Window admission and terminal gap handling",
+      "clause": {
+        "path": "docs/reference/03-time-and-schedules.en.md",
+        "heading": "3.5 Common Schedule semantics"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/reference-foundations-temporal.test.mjs",
+              "testId": "REF-03-026: Pulse misses, Window admits first true once, and Tide Run retains its monotonic deadline",
+              "caseId": "REF-03-026",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ]
+            },
+            {
+              "path": "tests/reference-foundations-temporal.test.mjs",
+              "testId": "REF-03-030: observation gap terminalizes Window and open within interval without re-admission",
+              "caseId": "REF-03-030",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Bounded immutable At Window-only GFB23 profile; signed portable package and physical dispatch are not claimed."
+      ],
+      "issues": [
+        153,
+        215,
+        219
+      ],
+      "referenceCaseIds": [
+        "REF-03-026",
+        "REF-03-030"
       ]
     }
   ]

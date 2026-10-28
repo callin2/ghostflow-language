@@ -40,7 +40,7 @@ export function validateOutputObservationRails(manifest, bytes) {
     data = data.subarray(10, 10 + length);
     view = new DataView(data.buffer, data.byteOffset, data.byteLength);
   }
-  if (view.getUint16(4, true) < 1 || view.getUint16(4, true) > 21 || view.getUint16(4, true) === 17) throw new Error('unsupported GFB input table format');
+  if (view.getUint16(4, true) < 1 || view.getUint16(4, true) > 23 || [17, 22].includes(view.getUint16(4, true))) throw new Error('unsupported GFB input table format');
   const expected = new Set((manifest.outputObservations ?? []).flatMap(item => OUTPUT_OBSERVATION_ROLES.map(role => item[`${role}Input`])));
   let offset = 6;
   const text = () => {

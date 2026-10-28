@@ -199,7 +199,7 @@ Even if `manual_request` is true, a low-water constraint making safe output fals
 
 A Schedule is a continuously evaluated typed reactive value, not a delayed call or background thread. It evaluates trigger, day rule, predicate and context at the current time to decide whether to admit an occurrence. An unsatisfied pulse is not automatically queued.
 
-The selected trigger types are `At`, `Daily`, `DailySlots<G>`, `Periodic`, `Cron`, `Solar` and `Tide`. The current compiler accepts one-shot `At` pulse and only `DailySlots<15min>`. Each type has its own trigger fields and these common policy fields.
+The selected trigger types are `At`, `Daily`, `DailySlots<G>`, `Periodic`, `Cron`, `Solar` and `Tide`. The current compiler accepts one-shot `At` pulse and Window, and only `DailySlots<15min>`. Each type has its own trigger fields and these common policy fields.
 
 ```ghost
 schedule name: TriggerType {
@@ -231,7 +231,7 @@ cancel_when := Bool                                   // Required for current ci
 
 All common fields are required. Unconditional admission can specify `when = true`; a Run or Range without language-level cancellation can specify `cancel_when = false`. In the current compiler, `cancel_when` is allowed for `Tide` Run and civil `range`, and is required for `range`. It is forbidden for `pulse`. `hold_trusted(d, terminal: skip)` adds monotonic elapsed time to the last trusted wall instant and uses it for at most d. Uncertainty adds the same monotonic elapsed time to the last uncertainty, recording `HeldClock` provenance. At the boundary, after `ClockUnknown`, terminal skip applies to new admission decisions. An already admitted Range keeps its monotonic end time. High-water does not change.
 
-The current compiler accepts `clock = hold_trusted(positive constant Duration, terminal: skip)` for Solar and Tide and `fallback = fixed_time(TimeOfDay literal, terminal: skip)` for Solar. Tide permits only `fallback = skip`; other triggers retain trusted-only clock and skip fallback. `window` and `run(_, on_time)` remain outside current support. Immutable UTC Daily and nonempty static DailySlots ranges prove static non-overlap and execute as GFB12. Immutable non-UTC `DailySlots<15min>` uses the GFB21 profile below, combining compile-time nominal slot-spacing checks with Rust validation of actual occurrence intervals supplied by the host. Other accepted Range recurrences remain descriptors. In supported UTC profiles, a Range duration may be an operator `Duration` config when the initial value proves non-overlap; accepted live setting events recompute the current occurrence from its frozen planned start, without a new due pulse or occurrence identity. Tide `run(_, within(_))` is supported.
+The current compiler accepts `clock = hold_trusted(positive constant Duration, terminal: skip)` for Solar and Tide and `fallback = fixed_time(TimeOfDay literal, terminal: skip)` for Solar. Tide permits only `fallback = skip`; other triggers retain trusted-only clock and skip fallback. `At` Window is the bounded executable Window profile; Window on other triggers and `run(_, on_time)` remain outside current support. Immutable UTC Daily and nonempty static DailySlots ranges prove static non-overlap and execute as GFB12. Immutable non-UTC `DailySlots<15min>` uses the GFB21 profile below, combining compile-time nominal slot-spacing checks with Rust validation of actual occurrence intervals supplied by the host. Other accepted Range recurrences remain descriptors. In supported UTC profiles, a Range duration may be an operator `Duration` config when the initial value proves non-overlap; accepted live setting events recompute the current occurrence from its frozen planned start, without a new due pulse or occurrence identity. Tide `run(_, within(_))` is supported.
 
 Bounded natural-policy admission uses held time only while monotonic elapsed time is strictly less than the duration. Missing trusted anchors or uncertainty and checked-addition overflow fail closed. Held wall time and uncertainty are the last trusted values plus elapsed time, with `HeldClock` provenance. Expiry terminal-skips new admission, preserves high-water and does not extend an active Run. Recovery establishes a baseline; restart begins with a new clock. The facts provider owns IANA conversion and supplies a known source local date and fallback instant matching the authored time and timezone on that date. Ambiguous or nonexistent civil times terminal-skip without inventing a fold. The core owns admission and generated due inputs. A fallback and recovered Solar event on the same source local date share a consumed identity and terminal checkpoint. These bounds prevent unavailable predictions or uncertain clocks from silently creating occurrences.
 
@@ -266,9 +266,27 @@ schedule appointment: At {
 }
 ```
 
-The absolute instant is normalized from its explicit offset. Equivalent offset spellings plan the same instant. This bounded profile accepts only `pulse`, trusted-only clock, baseline recovery and skip fallback, with a positive constant gap. Missing fields, non-DateTime/nonconstant `at`, timezone/DST/cancellation fields and other bases are diagnostics. It exposes `.due` and `.missed`; it cannot mix with provider, config, sensor, resource, objective or other schedule profiles. GFB14 and control-v13 identify this execution profile; the framed clock/scan transport is unchanged. Older loaders reject GFB14. Signed portable packages do not yet accept this profile.
+The absolute instant is normalized from its explicit offset. Equivalent offset spellings plan the same instant. This bounded Pulse profile accepts trusted-only clock, baseline recovery and skip fallback, with a positive constant gap. Missing fields, non-DateTime/nonconstant `at`, timezone/DST/cancellation fields and other bases are diagnostics. It exposes `.due` and `.missed`; it cannot mix with provider, config, sensor, resource, objective or other schedule profiles. GFB14 and control-v13 identify this execution profile; the framed clock/scan transport is unchanged. Older loaders reject GFB14. Signed portable packages do not yet accept this profile.
 
-The Rust core computes one occurrence from the compiled schedule site and instant, without host-supplied occurrence rows. Admission requires `previous < planned <= current` on an accepted trusted scan with no observation gap and `when = true`. False at crossing and an overlapping gap consume a terminal miss. A boot/recovery baseline at or after the instant consumes a `BaselinePastMissed` occurrence without catch-up. Reobserving, wall rollback and recrossing do not create another pulse. Clock source/boot revision does not create a new identity. Rejected scans commit neither the clock baseline, terminal identity nor projections.
+`At` also accepts a positive constant `window(Duration)` under the same policy restrictions:
+
+```ghost
+schedule appointment: At {
+  at = datetime`2026-01-01T08:00:00Z`;
+  basis = window(5min);
+  when = ready;
+  clock = trusted_only;
+  gap = skip_after(60s);
+  recovery = baseline;
+  fallback = skip;
+}
+output start_once: Bool;
+start_once <- appointment.due;
+```
+
+The planned interval is half-open: `[at, at + duration)`. With a trusted clock, `.open` is the **current** interval and `when` level. It can turn false and true again as `when` changes. `.due` is a once-only admission pulse at the first eligible accepted scan in that interval. A terminal miss or prior admission prevents another `.due`; it does not force the current `.open` level false. For example, an observation gap from 07:59:50 to 08:02:00 with `window(5min)` terminally misses the 08:00 occurrence: at 08:02, `.missed` is true, `.due` is false, and `.open` can be true when `when` is true. Use `.due` for work intended to start once. Unknown or untrusted wall time cannot produce a known-open interval. At or after 08:05, `.open` is false. `At` Window has no cancellation field and accepts no host occurrence rows. GFB23 and control-v23 identify this distinct execution profile; older loaders reject it, and a manifest/profile mismatch is rejected before activation. Signed portable packages do not yet accept this profile.
+
+The Rust core computes one occurrence from the compiled schedule site and instant, without host-supplied occurrence rows. Pulse admission requires `previous < planned <= current` on an accepted trusted scan with no observation gap and `when = true`; false at crossing consumes a terminal miss. Window may admit at the first eligible scan before its end even when `when` was false at crossing. An overlapping observation gap terminally misses either form. A boot/recovery baseline at or after the instant consumes a `BaselinePastMissed` occurrence without catch-up. Reobserving, wall rollback and recrossing do not create another admission. Clock source/boot revision does not create a new identity. Rejected scans commit neither the clock baseline, terminal identity nor projections.
 
 Cross-restart deduplication requires restoring the matching program's terminal checkpoint. A consumed or missed identity stays consumed even if the new boot's wall clock is before the instant; a pre-occurrence checkpoint may admit a future crossing. Fresh activation has no durable history. A crash after admission but before durable checkpoint publication is outside the VM's once-only guarantee; host persistence and dispatch must handle that boundary. Admission is logical evidence and does not prove physical execution or acknowledgement.
 
@@ -314,7 +332,7 @@ Because `.due = false` alone cannot distinguish ordinary false, Unknown fallback
 
 ### Source response to missed occurrences
 
-`schedule_name.missed` is a `Bool` projection. The current compiler provides it for At pulse, Solar and executable `pulse` civil schedules. It is not yet an execution projection for Range, including executable UTC Range controls. It is true only when one or more occurrences of that schedule become **terminal missed** in this accepted scan. Even if two or more are missed in one scan, the value is true once; it is false in the next accepted scan if there is no new terminal miss. A control action evaluates this value exactly once in that accepted scan's immutable snapshot. Simply reobserving an occurrence already recorded as terminal missed or restoring a checkpoint does not make it true again. Rejected scans commit neither this pulse nor state transitions.
+`schedule_name.missed` is a `Bool` projection. The current compiler provides it for At pulse and Window, Solar and executable `pulse` civil schedules. It is not yet an execution projection for Range, including executable UTC Range controls. It is true only when one or more occurrences of that schedule become **terminal missed** in this accepted scan. Even if two or more are missed in one scan, the value is true once; it is false in the next accepted scan if there is no new terminal miss. A control action evaluates this value exactly once in that accepted scan's immutable snapshot. Simply reobserving an occurrence already recorded as terminal missed or restoring a checkpoint does not make it true again. Rejected scans commit neither this pulse nor state transitions.
 
 ```ghost
 state missed_scans: Int = 0;
@@ -332,7 +350,7 @@ A Bool pulse contains neither count nor reason. The same accepted scan's **order
 | basis | Admission semantics |
 |---|---|
 | `pulse` | Admit only if all conditions are true on the crossing tick. Becoming true later still means missed. |
-| `window(5min)` (design) | Admit once at the first true condition within `[planned, planned+5min)`. Repeated false→true changes in the same occurrence do not rearm it. |
+| `window(5min)` (`At` execution) | Admit once at the first true condition within `[planned, planned+5min)`. Repeated false→true changes in the same occurrence do not rearm it. Other trigger combinations remain design. |
 | `run(5min, on_time)` (design) | Admit only at observed crossing and run for five minutes from admission. |
 | `run(5min, within(10min))` (Tide) | Allow first admission within `[planned, planned+10min)`. Ten minutes are grace; run length is five minutes. |
 | `range(10min)` (civil contract) | If trusted current time is within `[planned, planned+10min)` and `when` is true, admit once even after late first observation, boot or recovery. End is planned start + ten minutes. Immutable UTC Daily/DailySlots uses GFB12; immutable non-UTC DailySlots below uses GFB21. |
@@ -467,7 +485,7 @@ An occurrence is admitted at most once. Sustained true does not create a new run
 
 ### Observation gaps and recovery
 
-Schedules check monotonic delta and positive wall delta between consecutive accepted snapshots. Exceeding d in explicit `gap = skip_after(d)` is an `ObservationGap`. This policy terminates Pulse, Window and Run occurrences as missed when that gap overlaps their admission interval. Do not revive them later even if Window or `within(...)` remains open. For Range, `ObservationGap` during the interval is evidence of the gap, not a terminal missed record for that occurrence. If trusted current time is still inside the planned interval, first admission may request only remaining time. Reaching the end boundary records terminal missed with `LateStartExpired` without execution. An occurrence already terminated as terminal missed or withdrawn is not revived merely because time is inside the interval. In particular, Tide `CorrectionPastHighWater` and `EventWithdrawn` are terminal for Range too.
+Schedules check monotonic delta and positive wall delta between consecutive accepted snapshots. Exceeding d in explicit `gap = skip_after(d)` is an `ObservationGap`. This policy terminates Pulse, Window and Run occurrences as missed when that gap overlaps their admission interval. Do not revive them later even if Window or `within(...)` remains open. A terminal Window miss stops `.due` admission; its current trusted interval and predicate may still make `.open` true. For Range, `ObservationGap` during the interval is evidence of the gap, not a terminal missed record for that occurrence. If trusted current time is still inside the planned interval, first admission may request only remaining time. Reaching the end boundary records terminal missed with `LateStartExpired` without execution. An occurrence already terminated as terminal missed or withdrawn is not revived merely because time is inside the interval. In particular, Tide `CorrectionPastHighWater` and `EventWithdrawn` are terminal for Range too.
 
 `recovery = baseline` establishes only a baseline at initial boot and clock-trust recovery; it does not execute past occurrences in a batch. Range may admit only the remaining time of a still-open current interval. Wall rollback is deduplicated with high-water and the admission ledger. There is no catch-up, retry or replay syntax.
 

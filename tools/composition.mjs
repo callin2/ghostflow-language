@@ -20,7 +20,7 @@ export function resolveDocument(importer, locator) {
 }
 const fail = (loc, text, code) => { throw new ControlCompileError(text, loc, code); };
 const typeKey = type => JSON.stringify(type, (key, value) => key === 'loc' ? undefined : value);
-const simpleKinds = new Set(['input', 'output', 'parameter', 'state', 'let', 'next', 'connection', 'instance', 'connect', 'sensor', 'function']);
+const simpleKinds = new Set(['input', 'output', 'parameter', 'state', 'let', 'next', 'connection', 'instance', 'connect', 'sensor', 'function', 'config', 'timer']);
 
 /** Verify the complete supplied closure, then compose ASTs without generating source. */
 export function compileComposition(source, filename, supplied) {
