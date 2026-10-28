@@ -1054,6 +1054,8 @@ function verifySourceBoundContext(artifact, compiledBytes, manifest, bytecodeFor
     ...(sourceClosure === undefined ? {} : { sourceClosure: sourceClosure.documents }),
   });
   if (!equalBytes(rebuilt.bytes, compiledBytes)) throw new Error('composition bytecode does not match canonical source');
+  if (manifest.bytecodeSha256 !== rebuilt.manifest.bytecodeSha256)
+    throw new Error('bytecode SHA-256 does not match manifest');
   if ((rebuilt.sourceClosure === undefined) !== (sourceClosure === undefined)
     || sourceClosure !== undefined && canonicalJson(rebuilt.sourceClosure) !== canonicalJson(sourceClosure))
     throw new Error('composition source closure does not match canonical source');
