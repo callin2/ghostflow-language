@@ -475,3 +475,35 @@ Rust compiler, Charon/Aeneas translator, 표준 라이브러리 모델은 신뢰
 GFB23/24 및 별도25 wrapper까지 구분한다. 이전 수치와 미해결 결함을 현재 것으로 재사용하지
 않으며 전체 컴파일러 의미 보존 의무는 계속 열어 둔다. 다음 독립 검증에서 발견한
 binding 교체 시 일반 설정 소실은 #295에서 별도 실패 재현과 수정으로 진행한다.
+
+## build178: 센서 연결 교체에서 사용자의 설정 보존
+
+REF-06-007의 parameter·운영 설정·의존 문서·설치 binding을 실제로 각각 변경하는
+부분 검사를 만들다가 결함을 발견했다. `allow=false`로 설정하고 같은 프로그램의 센서
+binding만 교체하면, 기존 host가 설정을 초기값 true와 revision0으로 되돌렸다.
+수정 전 검사 `cb5056a06df69eb873cf3bac4335ee96eb9427ef`를 별도 폴더에서 다시 실행해
+실제 `0 !== 1` 실패와 exit1을 보존했다. 관련 컴파일러·host·검사 소스는 통합 전 실패 커밋
+`1e54e5b`와 동일하다. 실패 영수증은 `build/evidence/binding-settings-regression-cb5056a/`
+아래에 있으며 SHA-256은 `dc1729aebc48d1d0f8c0f64ad9d02d8ce1a86a208175b228425ed7ff1bf6dfdb`다.
+
+교체 후보가 기존 host 소유의 설정 checkpoint를 검증·복원한 뒤에만 게시하도록 고쳤다.
+일반 설정 Result와 revision, 설정 이력을 보존하며 VM 상태·타이머·입력 수집은 새 실행으로
+시작한다. Run 임시 설정은 첫 새 실행 판단 전에 반환하고 Until 설정은 기존 기한까지
+유지한다. 후보 준비 중 합성 host의 scan을 거절해 checkpoint 이후 설정 유실도 막았다.
+후보 준비 실패는 기존 실행을 보존한다. 새로운 외부 checkpoint API는 추가하지 않았다.
+
+독립 검토는 집중13개를 통과했고 열린 P1/P2 지적은 없었다. 통합본의 관련 검사36개도
+통과했다. 전체 검증의 고정 소스는 `dab5051c0f6d3bdc9a25aad88f48eb45a8ded8a6`다.
+공식 build178은 `2026-10-28T21:20:44.794Z`에 exit0으로 완료됐으며14 gate, Rust441,
+주 Node3894 pass /11 TODO /0 fail, 별도 console15와 Python3 pass다. 영수증 SHA-256은
+`d315a143b2961e61d05acdf5c372ce090dc15e85f77dfb71b906c020f150efb3`이다.
+전체 로그·identity·receipt는 `build/evidence/build178/`에 보존했다.
+
+전체 검증 종료 후 coverage를 순차 실행해2560개 검사를 통과했다. 기존 지정12개 JS 파일의
+함수476/476, 줄90.35%, V8 block range88.25%다. 수정한 installed host 자체는 이12개
+측정 대상에 포함되지 않으므로 이 수치를 해당 host의 coverage로 주장하지 않는다.
+coverage 영수증 SHA-256은 `a830a9c94e390ecca58752af7ba4a050d05d62f56d65bd4f7bce2c561f4ce86d`다.
+
+#295는 전체 완료로 닫지 않는다. 네 실제 소유 경로의 부분 검사를 추가했으나 통합 변경
+계획 출력은 아직 없고, parameter가 있는 합성 manifest는 현재 설치 host의 허용 범위 밖이다.
+이번 근거는 참조 host 실행이며 Device 영속 저장·재부팅·물리 출력 확인을 뜻하지 않는다.
