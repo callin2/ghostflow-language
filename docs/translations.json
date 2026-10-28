@@ -488,8 +488,8 @@
       "source": "docs/reference/03-time-and-schedules.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/03-time-and-schedules.en.md",
-      "sourceSha256": "87cd5d29ad1fc5d301cf757302f47cc55a8b034118726494c84038a27ac64afa",
-      "translationSha256": "302d581d1fffc539cc397889602bb1ac596ed680c29d60528698047c67b573e1"
+      "sourceSha256": "52d9b39599f4916703e65514b25946cd18941a3610a675f6a8452576148c106a",
+      "translationSha256": "2ce32cc770d69574c45ccf8fba15adcd3bcb3ca2dda259f7b96cef803816cba0"
     },
     {
       "source": "docs/reference/04-sensors-constraints-control.md",
@@ -705,8 +705,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "ca09baf502adc94c572b945b8d67758dcc1b3f9894064ce8e5b2f56a043875a7",
-      "translationSha256": "a0450b1725edc7764d562b168783a864ebad785818f9f23b342c0e507bc2ad90"
+      "sourceSha256": "0f84a0af1be63c20e871b20709e225525a9293bdc87139dbd623a298b8a44ef6",
+      "translationSha256": "de9686c5cf13290fc3af543c4d2f3102de1b7c8299f268670a1f7f9334af12cd"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",
@@ -1162,6 +1162,13 @@
       "translation": "docs/INCIDENT-REPLAY.ko.md",
       "sourceSha256": "e0be08a89fb5525a64eab63492c0ea94119e2ca7f6ef3bb29db09251020e7921",
       "translationSha256": "987f8fc7c43db30771b42e48232ae11dbaa18cd19df701fa1f72b5c5c4101187"
+    },
+    {
+      "source": "docs/PROGRAM-REPLACEMENT-HOST.md",
+      "sourceLanguage": "en",
+      "translation": "docs/PROGRAM-REPLACEMENT-HOST.ko.md",
+      "sourceSha256": "127859263e8e57267ca07d3d7d5ef5907c0ad5106b157507fe2180373d828684",
+      "translationSha256": "8e2c6129a2e4561e8abe90952db8fd26478fb914276b1f7f521da9916ed26ea6"
     }
   ],
   "exclusions": [
@@ -1504,6 +1511,18 @@
     {
       "path": "docs/reports/2026-10-28-reference-foundations-590.md",
       "reason": "Issue590 execution report, exact evidence boundary and remaining work inventory; reports may remain in one language."
+    },
+    {
+      "path": "experiments/bool-translation-validation/proof-report.md",
+      "reason": "Issue590 proof execution report or exact executable proof fixture; evidence identity is retained in one language."
+    },
+    {
+      "path": "experiments/bool-translation-validation/fixtures/boolean-literals.ghost.md",
+      "reason": "Issue590 proof execution report or exact executable proof fixture; evidence identity is retained in one language."
+    },
+    {
+      "path": "experiments/bool-translation-validation/fixtures/snapshot-branches.ghost.md",
+      "reason": "Issue590 proof execution report or exact executable proof fixture; evidence identity is retained in one language."
     }
   ]
 }

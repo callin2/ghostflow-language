@@ -387,11 +387,13 @@ occurrence row를 받지 않는다. GFB23과 control-v23이 별도 실행 profil
 portable package는 아직 이 profile을 받지 않는다.
 
 Rust core는 host가 제공한 occurrence row 없이 컴파일된 schedule site와 instant에서
-단일 occurrence를 계산한다. admission은 observation gap이 없는 accepted trusted scan에서
-`previous < planned <= current`이고 `when = true`일 때만 가능하다. crossing에서 false이거나
-gap이 겹치면 terminal miss로 소비한다. instant 이후 또는 같은 시점의 boot/recovery
+단일 occurrence를 계산한다. Pulse admission은 observation gap이 없는 accepted trusted scan에서
+`previous < planned <= current`이고 `when = true`일 때만 가능하다. crossing에서 false이면
+terminal miss로 소비한다. Window는 crossing에서 `when`이 false였어도 종료 전 첫 자격을
+갖춘 scan에서 admit할 수 있다. 두 형태 모두 겹치는 observation gap은 terminal miss로
+소비한다. instant 이후 또는 같은 시점의 boot/recovery
 baseline은 catch-up 없이 `BaselinePastMissed`로 소비한다. 재관찰, wall rollback과 recrossing은
-다른 pulse를 만들지 않는다. clock source/boot revision은 새 identity를 만들지 않는다.
+다른 admission을 만들지 않는다. clock source/boot revision은 새 identity를 만들지 않는다.
 거부된 scan은 clock baseline, terminal identity와 projection 어느 것도 commit하지 않는다.
 
 재시작을 가로지르는 dedup에는 같은 program의 terminal checkpoint 복원이 필요하다.

@@ -126,6 +126,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/PORTABLE-PACKAGE.md](PORTABLE-PACKAGE.md) | Portable GFB package v1 | md |
 | [docs/PROFILE-FRONT-MATTER.en.md](PROFILE-FRONT-MATTER.en.md) | Profile-based Front Matter Design | md |
 | [docs/PROFILE-FRONT-MATTER.md](PROFILE-FRONT-MATTER.md) | Profile 기반 front matter 설계 | md |
+| [docs/PROGRAM-REPLACEMENT-HOST.ko.md](PROGRAM-REPLACEMENT-HOST.ko.md) | 참조 Program 교체 host | md |
+| [docs/PROGRAM-REPLACEMENT-HOST.md](PROGRAM-REPLACEMENT-HOST.md) | Reference Program replacement host | md |
 | [docs/ProgrammingInGhostflow.en.md](ProgrammingInGhostflow.en.md) | Programming in GhostFlow | md |
 | [docs/ProgrammingInGhostflow.md](ProgrammingInGhostflow.md) | Programming in GhostFlow | md |
 | [docs/REFERENCE-FEATURE-STATUS.md](REFERENCE-FEATURE-STATUS.md) | Reference feature maturity and evidence | md |
@@ -271,4 +273,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.ko.md](research/GF-COMPOSE-R9-ACCEPTANCE.ko.md) | GF-COMPOSE R9: acceptance와 구현 인계 | md |
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.md](research/GF-COMPOSE-R9-ACCEPTANCE.md) | GF-COMPOSE R9: acceptance and implementation handoff | md |
 
-232 documents.
+234 documents.

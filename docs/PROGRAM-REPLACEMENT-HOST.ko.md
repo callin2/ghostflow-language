@@ -1,3 +1,6 @@
+<!-- translation-source: docs/PROGRAM-REPLACEMENT-HOST.md -->
+[영어 원문](PROGRAM-REPLACEMENT-HOST.md)
+
 # 참조 Program 교체 host
 
 `ProgramReplacementHost`는 컴파일된 GhostFlow Program 하나를 실행하고, 완료된 tick 사이에서 검증된 교체를 확정한다. 평가와 상태 이전에는 기존 Rust core를 사용한다. 이 참조 adapter는 설치, Driver 호출, 출력 적용 또는 물리 검증을 수행하지 않는다.
@@ -32,6 +35,8 @@ host.dispose();
 `replace`는 Rust `hotSwap` 호출 전에 후보를 완전히 검증하고 복사한다. 검증 또는 core 호환성 검사에 실패하면 이전 Program, state, run과 마지막 수락 trace가 유지된다. 성공하면 새 source/artifact/run identity를 공개하고 마지막 trace를 비운다. core가 입력 cache를 폐기하므로 다음 tick에는 완전한 새 관측이 필요하다. 같은 이름·타입의 state 이전은 core가 전담하며 JavaScript에서 복사하지 않는다. 사용한 run ID는 재사용할 수 없다. 정해진 이력 capacity에 도달하면 ID를 잊는 대신 추가 교체를 거부한다.
 
 ## 지원 범위와 한계
+
+새 snapshot은 호출자가 새 schema의 모든 관측을 다시 제공한다는 뜻이며, host가 이전 입력 cache를 물려받지 않는다. 장치에서 새로 채취한 값이나 새로운 observation ID를 요구한다는 뜻은 아니다. 같은 sample이 여러 tick 동안 최신 관측일 수 있다. sample의 나이와 진위는 별도 관측 계약에서 다룬다.
 
 참조 host는 Bool 논리 입력·출력을 가진 `GhostFlow/control-v1`과 `control-v4`를 지원하며 Int 제어 state를 포함할 수 있다. 조합, settings, timer, signal, schedule, 센서 conditioning, optional sensor, resource/objective 정책, 출력 관측 rail 및 lifecycle/context profile은 실행 중 Program을 바꾸기 전에 거부한다. 전체 framed `ControlRuntime`에는 별도 sensor/context 상태가 있고 framed hot-swap ABI가 없으므로 해당 이전에는 별도 transaction 설계가 필요하다. Device/Driver 설치, 출력 적용, feedback 및 물리 수용은 독립된 소유 경계에 남는다.
 

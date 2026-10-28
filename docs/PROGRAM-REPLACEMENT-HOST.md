@@ -33,6 +33,8 @@ Every `step` supplies a complete observation map. Each logical Bool input has a 
 
 ## Supported profile and limits
 
+A fresh snapshot means the caller resupplies every observation for the new schema; the host never inherits the old input cache. It does not require a newly sampled device value or a new observation ID. The same sample may remain current across ticks. Sample age and authenticity require their separately owned observation contracts.
+
 The reference host accepts `GhostFlow/control-v1` and `control-v4` with Bool logical inputs and outputs, including Int control state. It rejects composition, settings, timers, signals, schedules, sensor conditioning, optional sensors, resource/objective policies, output observation rails, and lifecycle/context profiles before changing the live Program. The full framed `ControlRuntime` has additional host-owned sensor and context state and no framed hot-swap ABI; those migrations require a separate transaction design. Device/driver installation, output application, feedback, and physical acceptance remain independently owned.
 
 Related cases: [REF-06-020](https://github.com/callin2/ghostflow-language/issues/305), [REF-06-022](https://github.com/callin2/ghostflow-language/issues/307).
