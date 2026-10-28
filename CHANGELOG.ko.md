@@ -5,6 +5,18 @@
 
 ## 미출시
 
+### 2026-10-29 - 스캔 소유 출력 단계 집계 ([#211](https://github.com/callin2/ghostflow-language/issues/211))
+
+명시적으로 연결한 BoolActuator 자원의 durable `on_time` 관찰 account가 requested,
+safe, confirmed 단계를 허용합니다. Rust 스캔 소유자가 requested와 safe 구간 및
+관측 범위를 기록합니다. 20초 요청이 차단되면 requested 20초, safe 0초이며 피드백이
+없는 confirmed는 Unknown입니다. 이전에는 이 선언을 실행 컴파일에서 거부했습니다.
+영속 스냅샷은 소스·출력·단계·run에 결합하며 새 run은 재시작 전 구간을 연장하지
+않습니다. 관측 공백, 영속 저장 대기와 용량 소진은 Unknown입니다. 이 관찰 프로필은
+admission limit와 event account 혼합을 거부합니다. 기존 applied receipt 집계는
+유지합니다. native와 WASM 회귀 검증은 `tests/stage-accounting-control.test.mjs`에
+있으며 Reference §3.4와 §4.7의 물리 증거 구분을 유지합니다.
+
 ### 2026-10-29 - 가져온 모듈의 의도 provenance ([#290](https://github.com/callin2/ghostflow-language/issues/290), [#302](https://github.com/callin2/ghostflow-language/issues/302))
 
 고정된 import의 의도를 작성된 인스턴스별 범위에 보존합니다. 정의나 인스턴스가 다르면 같은 anchor ID도 합치지 않습니다.

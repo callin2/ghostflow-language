@@ -832,6 +832,8 @@ A day budget counts final applied ON intervals of the same physical equipment on
 Time boundaries are fixed as follows:
 
 - Requested/safe values selected at accepted scan t_i apply to `[t_i,t_(i+1))`.
+- Zero usage is Known only with observation evidence covering the entire query interval. Missing coverage is not filled with false.
+- A new run restored from a snapshot does not extend the previous run's last value to the new timestamp. Historical intervals retain their original run identity; the new run has separate observation coverage.
 - Applied/confirmed use `[start,end)` of monotonic event timestamps validated by renderer application and input-driver confirmation evidence.
 - At t, `rolling(d)` integrates interval overlap with `(t-d,t]`. A new value selected at t has not yet consumed usage time at t.
 - When used equals the limit exactly, further ON is blocked. Old partial intervals leave exactly according to logical time; do not use fixed buckets.

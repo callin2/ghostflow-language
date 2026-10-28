@@ -1175,6 +1175,9 @@ day 예산은 같은 물리 설비의 final applied ON 구간을 자동·수동�
 시간 경계는 다음처럼 고정한다.
 
 - accepted scan t_i에서 고른 requested/safe 값은 `[t_i,t_(i+1))`에 적용한다.
+- 사용량 0도 query 범위 전체의 관측 증거가 있어야 Known이다. 관측 공백은 false로 채우지 않는다.
+- snapshot을 복원한 새 run은 이전 run의 마지막 값을 새 시각까지 연장하지 않는다.
+  이전 run의 구간은 원래 run identity와 함께 보존하고 새 run의 관측 범위를 별도로 계산한다.
 - applied/confirmed는 renderer 적용과 입력 driver 확인 증거가 검증한 monotonic event timestamp의 `[start,end)`다.
 - `rolling(d)`는 t에서 `(t-d,t]`와 interval의 overlap을 적분한다. t에서 고른 새 값은
   t에서 아직 사용 시간을 소비하지 않았다.

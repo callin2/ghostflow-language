@@ -49,6 +49,7 @@ pub struct ScanDriver {
     next_scan_id: Option<u64>,
     last_time_ms: Option<u64>,
     restart: Option<RestartState>,
+    stage_accounting: Option<crate::stage_accounting::StageAccounting>,
 }
 
 struct RestartState {
@@ -86,6 +87,7 @@ impl ScanDriver {
             next_scan_id: Some(0),
             last_time_ms: None,
             restart,
+            stage_accounting: None,
         }
     }
 
@@ -120,6 +122,53 @@ impl ScanDriver {
 
     pub fn runtime(&self) -> &Runtime {
         &self.runtime
+    }
+
+    pub fn activate_stage_accounting(&mut self, binding: &[u8]) -> Result<()> {
+        if self.next_scan_id != Some(0) || self.stage_accounting.is_some() {
+            return Err(Error::new(
+                "stage accounting must activate once before scanning",
+            ));
+        }
+        let module = self.runtime.module.as_ref()
+            .ok_or_else(|| Error::new("no module installed"))?;
+        self.stage_accounting = Some(crate::stage_accounting::StageAccounting::activate(module, binding)?);
+        Ok(())
+    }
+
+    pub fn stage_accounting_query(
+        &self, account: &str, run: &str, start: u64, end: u64,
+    ) -> Result<crate::stage_accounting::UsageRead> {
+        self.stage_accounting.as_ref()
+            .ok_or_else(|| Error::new("stage accounting is not active"))?
+            .query(account, run, start, end)
+    }
+
+    pub fn stage_accounting_snapshot(&self) -> Result<(u64, Vec<u8>)> {
+        let owner = self.stage_accounting.as_ref()
+            .ok_or_else(|| Error::new("stage accounting is not active"))?;
+        Ok((owner.revision(), owner.snapshot()))
+    }
+
+    pub fn acknowledge_stage_accounting(&mut self, revision: u64) -> Result<()> {
+        self.stage_accounting.as_mut()
+            .ok_or_else(|| Error::new("stage accounting is not active"))?
+            .acknowledge(revision)
+    }
+
+    pub fn restore_stage_accounting(&mut self, bytes: &[u8]) -> Result<()> {
+        if self.next_scan_id != Some(0) {
+            return Err(Error::new("stage accounting restore requires a fresh scan run"));
+        }
+        self.stage_accounting.as_mut()
+            .ok_or_else(|| Error::new("stage accounting is not active"))?
+            .restore(bytes)
+    }
+
+    pub fn stage_accounting_gap(&mut self) -> Result<()> {
+        self.stage_accounting.as_mut()
+            .ok_or_else(|| Error::new("stage accounting is not active"))?.gap();
+        Ok(())
     }
 
     pub fn into_runtime(self) -> Runtime {
@@ -457,6 +506,9 @@ impl ScanDriver {
                 return Err(error);
             }
         };
+        if let Some(owner) = &mut self.stage_accounting {
+            owner.observe(frame.logical_time_ms, &trace);
+        }
         self.last_time_ms = Some(frame.logical_time_ms);
         if let Some(restart) = &mut self.restart {
             restart.event_pending = false;
