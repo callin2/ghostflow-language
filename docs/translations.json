@@ -1608,6 +1608,10 @@
     {
       "path": "experiments/rust-reader-validation/ValueType-extraction-diagnosis.md",
       "reason": "Issue590 unsuccessful extraction diagnosis and exact frozen evidence identities; execution reports may remain in one language."
+    },
+    {
+      "path": "docs/reports/2026-10-29-compiler-proof-obligations-590.md",
+      "reason": "Issue590 revision-pinned proof obligation inventory and evidence reconciliation; execution reports may remain in one language."
     }
   ]
 }

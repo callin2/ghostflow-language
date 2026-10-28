@@ -57,11 +57,25 @@ Rust reader의 보관된 검증 영수증 SHA-256은 `c4594a73839230601e7a05e98c
 
 전체 주장을 위해서는 (1) 제품 추출/파서/재파싱/타입·lowering의 모든 허용 소스에 대한 의미 보존과 거부, (2) 모든 산출물 분기 및 GFB profile·wrapper의 실제 바이트와 동반 metadata 정합성, (3) 실제 Rust 로더/VM 및 WASM 경계와 Lean 모델의 refinement, (4) 시간·수치/f64·fault·제약·accounting·composition·lifecycle의 상태 이력 의미가 필요하다. 현재 어느 것도 전체 범위에서 닫히지 않았다.
 
-다음 작은 독립 단위로는 생산 `Reader::u8` 및 고정 폭 정수 reader의 실제 Rust 추출과 경계/커서 정리를 권한다. `Reader::new`/`finished`의 바로 다음 바이트 소비 의무이며 원본 `Module::load`로 이어지는 관찰 가능한 거부·수용 경계를 좁힌다. 먼저 현행 Aeneas의 Option/String 의존성이 없는 함수 하나가 추출되는지 확인하고, 실패하면 정확한 생성 출력/의존성으로 기록한다. 별도로 제한된 Bool source reader의 **리뷰 수정 후** 통합 checkout에서 기존 verifier를 재실행해 source identity를 갱신하는 것은 새 정리보다 작은 검증 작업이다. 어느 작업도 Rust 전체 로더/VM 증명을 완료했다고 표현하지 않는다.
+다음 바이트 소비 의무는 생산 `Reader::u8` 및 고정 폭 정수 reader의 실제 Rust 추출과 경계/커서 정리다. 이들은 `take`와 오류 문자열 생성에 의존하므로 이미 발견한 표준 라이브러리 추출 한계를 먼저 해결해야 한다. 같은 실패를 반복하거나 Rust를 단순화한 복사본으로 대신 증명하지 않는다. 독립적인 원본→artifact 인증서 확장과 실제 owner 경로의 반례 검증은 이 의존성과 별개로 진행할 수 있다.
+
+### 검토 수정 후 통합 근거
+
+위 개별 보고서의 초기 실행 기록 이후에도 검증을 진행했다. 통합 결과의 기준은
+[연속 작업 기록](2026-10-29-unattended-correctness-590.md)의 build170·173·176 절이다.
+Bool 원본 reader는 build170 소스에서 Lean173회와 별도 JS admission11개가 통과했고,
+센서 원본 reader는 Lean125회, 센서·상태 이력은 build173 소스에서 Lean80회가 통과했다.
+각 실행에서 기록한 소스 해시와 통합본을 대조했다. 해당 receipt SHA-256은 순서대로
+`ee18d623320137b611291b0c2a66f74ae657d3b6541c06b4fab736d66b7f0a51`,
+`c80cded0cc4a0899fe156c866e2e29b902e8bfc73475174ce3ca5b90e7c09832`,
+`9940c5325ab03e18dec0b26950fd458bbbda8817408decbd1b93eaab48c28f5c`다.
+그러므로 원본 reader의 검토 전183개 기록을 최신 결과로 쓰거나, 이미 완료한 통합 검사를
+새로운 미완료 작업으로 세지 않는다. Rust reader의 `1bcb177` 통합 실행도7개 정리와3개
+거절을 통과했으며 receipt는 `d8a2a82d1f213cdd702d5d6dcc76f764775c5f38a95f6fd9a5558f4aee079437`다.
 
 ## 기준 파일 지문
 
-`shasum -a 256`으로 이 checkout에서 관측한 값이다. 앞선 `4861a78` 목록의 해시를 현재 해시로 대체해 사용한다.
+`shasum -a 256`으로 이 checkout에서 관측한 별도 판본이다. 앞선 `4861a78`의 역사적 목록과 해시는 그대로 보존한다.
 
 | 파일 | SHA-256 |
 | --- | --- |
