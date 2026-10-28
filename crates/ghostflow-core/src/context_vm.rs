@@ -26,6 +26,7 @@ pub enum ScheduleDefinition {
         offset_ms: i64,
         fallback_time_ms: Option<u64>,
         config_ids: Vec<u32>,
+        weekday_mask: Option<u8>,
     },
     AtPulse {
         at_ms: u64,
@@ -89,6 +90,7 @@ pub enum ScheduleDefinition {
         offset_ms: i64,
         run_ms: u64,
         within_ms: u64,
+        weekday_mask: Option<u8>,
     },
     ConfigDailySlots {
         config_id: u32,
@@ -273,6 +275,9 @@ pub struct SettingsEvent {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Observation {
     pub solar_fallback: Option<bool>,
+    pub source_day: Option<i32>,
+    pub scheduled_day: Option<i32>,
+    pub date_resolver_revision: Option<String>,
     pub solar_unavailable_reason: Option<u8>,
     pub clock_provenance: Option<String>,
     pub clock_source_revision: Option<String>,
@@ -435,7 +440,7 @@ pub(crate) fn load_schedule(
                 offday,
             }
         }
-        16 if format == 16 => {
+        16 | 21 if format == 16 || format == 24 && kind == 21 => {
             let timezone = text(reader)?;
             let latitude = reader.f64()?;
             let longitude = reader.f64()?;
@@ -462,6 +467,15 @@ pub(crate) fn load_schedule(
                 { return Err(Error::new("invalid Solar config dependency")); }
                 config_ids.push(id);
             }
+            let weekday_mask = if kind == 21 {
+                let mask = reader.u8()?;
+                if mask == 0 || mask > 127 {
+                    return Err(Error::new("invalid weekday mask"));
+                }
+                Some(mask)
+            } else {
+                None
+            };
             ScheduleDefinition::SolarContext {
                 timezone,
                 latitude,
@@ -470,6 +484,7 @@ pub(crate) fn load_schedule(
                 offset_ms,
                 fallback_time_ms: (fallback != 86_400_000).then_some(fallback),
                 config_ids,
+                weekday_mask,
             }
         }
         5 => {
@@ -601,7 +616,7 @@ pub(crate) fn load_schedule(
                 dst_repeated,
             }
         }
-        8 => {
+        8 | 22 if kind == 8 || format == 24 => {
             let timezone = text(reader)?;
             let provider = text(reader)?;
             let high = flag(reader)?;
@@ -616,6 +631,15 @@ pub(crate) fn load_schedule(
             if !(-86_400_000..=86_400_000).contains(&offset_ms) || run_ms == 0 || within_ms == 0 {
                 return Err(Error::new("invalid Tide Run duration"));
             }
+            let weekday_mask = if kind == 22 {
+                let mask = reader.u8()?;
+                if mask == 0 || mask > 127 {
+                    return Err(Error::new("invalid weekday mask"));
+                }
+                Some(mask)
+            } else {
+                None
+            };
             ScheduleDefinition::TideRun {
                 timezone,
                 provider,
@@ -623,6 +647,7 @@ pub(crate) fn load_schedule(
                 offset_ms,
                 run_ms,
                 within_ms,
+                weekday_mask,
             }
         }
         9 => {
@@ -860,7 +885,7 @@ pub(crate) fn load_schedule(
             ));
         }
     }
-    let clock_hold_ms = if matches!(format, 13 | 15 | 16) {
+    let clock_hold_ms = if matches!(format, 13 | 15 | 16 | 24) {
         let hold = exact(reader)?;
         if hold != 0
             && !matches!(

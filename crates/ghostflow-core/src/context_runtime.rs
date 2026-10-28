@@ -64,9 +64,13 @@ fn validate_scheduled_dates(descriptors: &[PulseDescriptor], facts: &Facts) -> R
                 _ => None,
             })
             .ok_or_else(|| invalid("scheduled local-date site is not a natural schedule"))?;
-        let (timezone, source_day, planned, provider_revision, context_revision) =
+        let (timezone, source_day, planned, provider_revision, context_revision, filtered) =
             match &descriptor.definition {
-                ScheduleDefinition::SolarContext { timezone, .. } => {
+                ScheduleDefinition::SolarContext {
+                    timezone,
+                    weekday_mask,
+                    ..
+                } => {
                     let row = facts
                         .solars
                         .iter()
@@ -83,11 +87,13 @@ fn validate_scheduled_dates(descriptors: &[PulseDescriptor], facts: &Facts) -> R
                         row.scheduled_wall_ms.or(row.fallback_wall_ms),
                         &row.provider_revision,
                         &row.context_revision,
+                        weekday_mask.is_some(),
                     )
                 }
                 ScheduleDefinition::TideRun {
                     timezone,
                     offset_ms,
+                    weekday_mask,
                     ..
                 } => {
                     let row = facts
@@ -112,6 +118,7 @@ fn validate_scheduled_dates(descriptors: &[PulseDescriptor], facts: &Facts) -> R
                         planned,
                         &row.provider_revision,
                         &row.context_revision,
+                        weekday_mask.is_some(),
                     )
                 }
                 _ => {
@@ -120,13 +127,61 @@ fn validate_scheduled_dates(descriptors: &[PulseDescriptor], facts: &Facts) -> R
                     ))
                 }
             };
-        if fact.timezone != *timezone
+        if !filtered
+            || fact.timezone != *timezone
             || fact.source_day != source_day
             || Some(fact.planned_wall_ms) != planned
             || fact.provider_revision != *provider_revision
             || fact.context_revision != *context_revision
         {
             return Err(invalid("scheduled local-date fact binding mismatch"));
+        }
+    }
+    for descriptor in descriptors {
+        let PulseDescriptor::Context(descriptor) = descriptor else {
+            continue;
+        };
+        match &descriptor.definition {
+            ScheduleDefinition::SolarContext {
+                weekday_mask: Some(_),
+                ..
+            } => {
+                let evidence = facts
+                    .solars
+                    .iter()
+                    .find(|row| row.site == descriptor.site)
+                    .ok_or_else(|| invalid("missing filtered Solar evidence"))?;
+                for row in &evidence.rows {
+                    let key = format!("solar:{}", row.source_day);
+                    if row.scheduled_wall_ms.or(row.fallback_wall_ms).is_some()
+                        && !seen.contains(&(descriptor.site, key.as_str()))
+                    {
+                        return Err(invalid("missing required Solar scheduled local-date fact"));
+                    }
+                }
+            }
+            ScheduleDefinition::TideRun {
+                high,
+                weekday_mask: Some(_),
+                ..
+            } => {
+                let evidence = facts
+                    .schedules
+                    .iter()
+                    .find(|row| row.site == descriptor.site)
+                    .ok_or_else(|| invalid("missing filtered Tide evidence"))?;
+                for row in &evidence.rows {
+                    let key = format!("tide:{}", row.event_id);
+                    if !row.withdrawn
+                        && row.event_kind == if *high { 1 } else { 2 }
+                        && row.instant_ms.is_some()
+                        && !seen.contains(&(descriptor.site, key.as_str()))
+                    {
+                        return Err(invalid("missing required Tide scheduled local-date fact"));
+                    }
+                }
+            }
+            _ => {}
         }
     }
     Ok(())
@@ -149,6 +204,7 @@ mod scheduled_date_binding_tests {
                 offset_ms: -1_800_000,
                 run_ms: 600_000,
                 within_ms: 0,
+                weekday_mask: Some(127),
             },
             when: vec![],
             cancel: vec![],
@@ -241,6 +297,7 @@ mod scheduled_date_binding_tests {
                 offset_ms: 0,
                 fallback_time_ms: Some(1),
                 config_ids: vec![],
+                weekday_mask: Some(127),
             },
             when: vec![],
             cancel: vec![],
@@ -610,6 +667,9 @@ impl ContextRuntime {
             inputs[usize::from(d.fault_input)] = Value::Number(f64::from(fault));
             staged.trace.push(Observation {
                 solar_fallback: None,
+                source_day: None,
+                scheduled_day: None,
+                date_resolver_revision: None,
                 solar_unavailable_reason: None,
                 clock_provenance: None,
                 clock_source_revision: None,
@@ -903,6 +963,9 @@ impl ContextRuntime {
                             group_fault = Some(SETTINGS_INVALID);
                             staged.trace.push(Observation {
                                 solar_fallback: None,
+                                source_day: None,
+                                scheduled_day: None,
+                                date_resolver_revision: None,
                                 solar_unavailable_reason: None,
                                 clock_provenance: None,
                                 clock_source_revision: None,
@@ -1013,6 +1076,9 @@ impl ContextRuntime {
             config.project(inputs);
             staged.trace.push(Observation {
                 solar_fallback: None,
+                source_day: None,
+                scheduled_day: None,
+                date_resolver_revision: None,
                 solar_unavailable_reason: None,
                 clock_provenance: None,
                 clock_source_revision: None,
@@ -1074,6 +1140,9 @@ impl ContextRuntime {
             inputs[usize::from(d.fault_input)] = Value::Number(f64::from(fault));
             staged.trace.push(Observation {
                 solar_fallback: None,
+                source_day: None,
+                scheduled_day: None,
+                date_resolver_revision: None,
                 solar_unavailable_reason: None,
                 clock_provenance: None,
                 clock_source_revision: clock.source_revision.map(str::to_owned),
@@ -1151,6 +1220,9 @@ impl ContextRuntime {
             inputs[usize::from(d.fault_input)] = Value::Number(f64::from(fault));
             staged.trace.push(Observation {
                 solar_fallback: None,
+                source_day: None,
+                scheduled_day: None,
+                date_resolver_revision: None,
                 solar_unavailable_reason: None,
                 clock_provenance: None,
                 clock_source_revision: None,
@@ -1248,6 +1320,12 @@ impl ContextRuntime {
                 let engine = self.engines[index]
                     .as_ref()
                     .ok_or_else(|| invalid("context engine binding mismatch"))?;
+                let dates: Vec<_> = facts
+                    .scheduled_dates
+                    .iter()
+                    .filter(|fact| fact.site == d.site)
+                    .cloned()
+                    .collect();
                 let (next, decision) =
                     if let ScheduleDefinition::SolarContext { config_ids, .. } = &d.definition {
                         let fault = staged
@@ -1262,11 +1340,11 @@ impl ContextRuntime {
                             .iter()
                             .find(|s| s.site == d.site)
                             .ok_or_else(|| invalid("missing Solar context facts"))?;
-                        engine.stage_solar(d, clock, solar, when, fault)?
+                        engine.stage_solar_with_dates(d, clock, solar, when, fault, &dates)?
                     } else if let Some(Err(fault)) = config.map(|c| &c.current) {
                         engine.stage_settings_fault(d, clock, evidence, *fault)?
                     } else {
-                        engine.stage(
+                        engine.stage_with_dates(
                             d,
                             clock,
                             evidence,
@@ -1274,6 +1352,7 @@ impl ContextRuntime {
                             cancel,
                             change.as_ref(),
                             staged.runtime.settings_revision,
+                            &dates,
                         )?
                     };
                 staged.runtime.engines[index] = Some(next);

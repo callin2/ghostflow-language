@@ -55,6 +55,18 @@ fn context_traces(out: &mut impl Write, r: &TickRecord) -> fmt::Result {
             text(out, &observation.provider_revision)?;
             out.write_str(",\"contextRevision\":")?;
             text(out, &observation.context_revision)?;
+            if let Some(source_day) = observation.source_day {
+                write!(out, ",\"sourceDay\":{source_day},\"scheduledDay\":")?;
+                if let Some(scheduled_day) = observation.scheduled_day {
+                    write!(out, "{scheduled_day}")?;
+                } else {
+                    out.write_str("null")?;
+                }
+                if let Some(revision) = &observation.date_resolver_revision {
+                    out.write_str(",\"dateResolverRevision\":")?;
+                    text(out, revision)?;
+                }
+            }
             if let Some(fallback) = observation.solar_fallback {
                 write!(out, ",\"fallback\":{fallback}")?;
             }
