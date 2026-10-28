@@ -2612,7 +2612,9 @@
         }
       ],
       "gaps": [],
-      "issues": [541],
+      "issues": [
+        541
+      ],
       "referenceCaseIds": [
         "REF-03-024",
         "REF-03-085"
@@ -2645,13 +2647,32 @@
               "assertionClass": "compile-policy"
             }
           ]
+        },
+        {
+          "stage": "host_simulation",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/reference-foundations-temporal.test.mjs",
+              "testId": "REF-03-037 invalid target rejects the whole Periodic settings event without changing run identity or phase",
+              "caseId": "REF-03-037",
+              "assertionClass": "observation",
+              "targets": [
+                "native",
+                "wasm",
+                "host"
+              ]
+            }
+          ]
         }
       ],
       "gaps": [
         "Selectors establish compiled policy fields, not every occurrence and recovery path."
       ],
       "issues": [],
-      "referenceCaseIds": []
+      "referenceCaseIds": [
+        "REF-03-037"
+      ]
     },
     {
       "id": "solar-schedule",
@@ -2675,13 +2696,32 @@
               "assertionClass": "compile-policy"
             }
           ]
+        },
+        {
+          "stage": "host_simulation",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/reference-foundations-temporal.test.mjs",
+              "testId": "REF-03-047 Tide corrections and withdrawals retain stable IDs and do not cancel an admitted Run",
+              "caseId": "REF-03-047",
+              "assertionClass": "observation",
+              "targets": [
+                "native",
+                "wasm",
+                "host"
+              ]
+            }
+          ]
         }
       ],
       "gaps": [
-        "Compiled Solar descriptor is covered; provider crossing and lunar/tidal contracts need separate oracles."
+        "Exact REF-03-047 supplied Tide correction/withdrawal and Solar LocationUnknown/sea-level behavior is verified; arbitrary external provider correctness and physical effects are not claimed."
       ],
       "issues": [],
-      "referenceCaseIds": []
+      "referenceCaseIds": [
+        "REF-03-047"
+      ]
     },
     {
       "id": "sensor-quality",
@@ -3223,12 +3263,42 @@
                 "positive",
                 "boundary"
               ]
+            },
+            {
+              "path": "tests/reference-foundations-settings.test.mjs",
+              "testId": "REF-04-054 rejects the entire unauthorized live group and uses elapsed time with a valid shorter limit",
+              "caseId": "REF-04-054",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ]
+            },
+            {
+              "path": "tests/reference-foundations-settings.test.mjs",
+              "testId": "REF-05-014 approved live edit retains source Program and run while recording exact effective position",
+              "caseId": "REF-05-014",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ]
+            },
+            {
+              "path": "tests/reference-foundations-atomicity.test.mjs",
+              "testId": "REF-05-013 current contract atomically emits SettingsInvalid for every target once on native WASM",
+              "caseId": "REF-05-013",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ]
             }
           ]
         }
       ],
       "gaps": [
-        "Linked snapshot does not establish atomic multi-setting events or persistence."
+        "Multi-setting fault/recovery and live edits are verified; actual Device restart persistence and run issuance remain separate. REF-05-013 uses the explicit issue274-settings-result-v1 revision; its predecessor remains immutable."
       ],
       "issues": [
         74,
@@ -3247,7 +3317,10 @@
         "REF-05-105",
         "REF-05-104",
         "REF-05-103",
-        "REF-08-015"
+        "REF-08-015",
+        "REF-04-054",
+        "REF-05-014",
+        "REF-05-013"
       ]
     },
     {
@@ -3264,18 +3337,30 @@
       "evidence": [
         {
           "stage": "host_simulation",
-          "status": "gap",
-          "refs": []
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/renderer-setting-validation.test.mjs",
+              "testId": "REF-00-009 time entry and slider accept five minutes and fault ninety seconds without rounding",
+              "caseId": "REF-00-009",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ]
+            }
+          ]
         }
       ],
       "gaps": [
-        "REF-05-012 needs defaultValue/effectiveValue/override and distinct source/settings revision oracle."
+        "Two presentation fixtures preserve one execution-boundary validation contract; product renderer integration and arbitrary cross-artifact lifecycle are not claimed."
       ],
       "issues": [
         89
       ],
       "referenceCaseIds": [
-        "REF-05-012"
+        "REF-05-012",
+        "REF-00-009"
       ]
     },
     {
@@ -3428,37 +3513,52 @@
       "issues": [
         88
       ],
-        "referenceCaseIds": []
+      "referenceCaseIds": []
+    },
+    {
+      "id": "boolean-requested-output-explanation",
+      "family": "Completed-scan Boolean requested-output evaluated-path support slice",
+      "clause": {
+        "path": "docs/reference/05-settings-and-observation.en.md",
+        "heading": "5.3 Cabinet-view-independent observation model"
       },
-      {
-        "id": "boolean-requested-output-explanation",
-        "family": "Completed-scan Boolean requested-output evaluated-path support slice",
-        "clause": {
-          "path": "docs/reference/05-settings-and-observation.en.md",
-          "heading": "5.3 Cabinet-view-independent observation model"
-        },
-        "owner": "CORE",
-        "maturity": "EXPERIMENTAL",
-        "coreScope": false,
-        "requiredEvidence": [],
-        "evidence": [{
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
           "stage": "native_wasm",
           "status": "verified",
-          "refs": [{
-            "path": "tests/explanation-path.test.mjs",
-            "testId": "REF-05-023 native/WASM requested OFF explanation keeps the false left support and the skipped faulting right unevaluated",
-            "caseId": "REF-05-023",
-            "targets": ["native", "wasm"],
-            "assertionClass": "target-parity",
-            "polarities": ["positive", "negative", "boundary"]
-          }]
-        }],
-        "gaps": [
-          "Issue283 slice only: opt-in actual instruction witnesses and bounded compiler sidecar explain supported Boolean requested expressions. Timer, schedule, composition, safety, Result and transition proofs are unavailable explicitly. Fresh framed run and logical time are trusted host identities; physical output and full issue88 are unproved."
-        ],
-        "issues": [283],
-        "referenceCaseIds": ["REF-05-023"]
-      },
+          "refs": [
+            {
+              "path": "tests/explanation-path.test.mjs",
+              "testId": "REF-05-023 native/WASM requested OFF explanation keeps the false left support and the skipped faulting right unevaluated",
+              "caseId": "REF-05-023",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "assertionClass": "target-parity",
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Issue283 slice only: opt-in actual instruction witnesses and bounded compiler sidecar explain supported Boolean requested expressions. Timer, schedule, composition, safety, Result and transition proofs are unavailable explicitly. Fresh framed run and logical time are trusted host identities; physical output and full issue88 are unproved."
+      ],
+      "issues": [
+        283
+      ],
+      "referenceCaseIds": [
+        "REF-05-023"
+      ]
+    },
     {
       "id": "ghost-branch",
       "family": "Ghost branch and hot replacement lifecycle",
@@ -3482,15 +3582,35 @@
               "targets": [
                 "wasm"
               ]
+            },
+            {
+              "path": "tests/reference-foundations-settings.test.mjs",
+              "testId": "REF-06-021 Bool to Int state change and changed module identity reject before any migration or commit",
+              "caseId": "REF-06-021",
+              "assertionClass": "rollback",
+              "targets": [
+                "wasm"
+              ]
+            },
+            {
+              "path": "tests/reference-foundations-settings.test.mjs",
+              "testId": "REF-06-021 compatible state keeps its value while new state defaults removed state disappears and inputs require a fresh snapshot",
+              "caseId": "REF-06-021",
+              "assertionClass": "rollback",
+              "targets": [
+                "wasm"
+              ]
             }
           ]
         }
       ],
       "gaps": [
-        "WASM hot-swap/rewind exists; host branch isolation, ledger and occurrence non-mutation, and replacement rollback remain unproved."
+        "Core state-type/module rejection, compatible state transfer and fresh-input enforcement are verified; replacement source/run lifecycle, ledger/occurrence non-mutation and complete branch isolation remain open."
       ],
       "issues": [],
-      "referenceCaseIds": []
+      "referenceCaseIds": [
+        "REF-06-021"
+      ]
     },
     {
       "id": "semantic-rejection",
@@ -4052,6 +4172,61 @@
           "stage": "physical_confirmation",
           "status": "not-claimed",
           "refs": []
+        },
+        {
+          "stage": "host_simulation",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/reference-foundations-output.test.mjs",
+              "testId": "REF-05-025 completed ON intent without device evidence never invents application or confirmation",
+              "caseId": "REF-05-025",
+              "assertionClass": "observation",
+              "targets": [
+                "wasm",
+                "host"
+              ]
+            },
+            {
+              "path": "tests/reference-foundations-output.test.mjs",
+              "testId": "REF-00-002 acknowledged ON and register readback leave absent rotation feedback unknown",
+              "caseId": "REF-00-002",
+              "assertionClass": "observation",
+              "targets": [
+                "wasm",
+                "host"
+              ]
+            },
+            {
+              "path": "tests/reference-foundations-output.test.mjs",
+              "testId": "REF-04-043 failed application and false feedback retain independent provenance and quality",
+              "caseId": "REF-04-043",
+              "assertionClass": "observation",
+              "targets": [
+                "wasm",
+                "host"
+              ]
+            },
+            {
+              "path": "tests/reference-foundations-output.test.mjs",
+              "testId": "REF-08-010 one logical output commit preserves distinct bus application and feedback times",
+              "caseId": "REF-08-010",
+              "assertionClass": "observation",
+              "targets": [
+                "wasm",
+                "host"
+              ]
+            },
+            {
+              "path": "tests/reference-foundations-output.test.mjs",
+              "testId": "REF-06-006 compatible logical outputs admit GPIO expansion and bus endpoints without source changes",
+              "caseId": "REF-06-006",
+              "assertionClass": "observation",
+              "targets": [
+                "host"
+              ]
+            }
+          ]
         }
       ],
       "gaps": [
@@ -4061,7 +4236,12 @@
         333
       ],
       "referenceCaseIds": [
-        "REF-08-016"
+        "REF-08-016",
+        "REF-05-025",
+        "REF-00-002",
+        "REF-04-043",
+        "REF-08-010",
+        "REF-06-006"
       ]
     },
     {
@@ -8788,8 +8968,15 @@
               "testId": "REF-07-002 preserves five owner diagnostics without collapsing execution effects",
               "caseId": "REF-07-002",
               "assertionClass": "observation",
-              "targets": ["host", "wasm"],
-              "polarities": ["positive", "negative", "boundary"]
+              "targets": [
+                "host",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
             }
           ]
         }
@@ -8797,8 +8984,12 @@
       "gaps": [
         "Existing compiler, actual WASM input/context/settings owners and read-only observation joins retain their own causes, source/execution identities and effects through JSON diagnostic projections. This does not introduce a unified product diagnostic protocol or prove native/WASM parity for every record, downstream API/Web presentation, Driver behavior or physical confirmation."
       ],
-      "issues": [311],
-      "referenceCaseIds": ["REF-07-002"]
+      "issues": [
+        311
+      ],
+      "referenceCaseIds": [
+        "REF-07-002"
+      ]
     }
   ]
 }

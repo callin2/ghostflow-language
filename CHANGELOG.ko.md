@@ -5,6 +5,17 @@
 
 ## 미출시
 
+### 2026-10-28 — context profile의 연속 타이머 ([#47](https://github.com/callin2/ghostflow-language/issues/47))
+
+Reference §3.3의 버그 수정이다. config와
+`timer on_age = continuous_true(running);`을 함께 선언한 control도 이제
+`ControlRuntime`으로 활성화한다. 이전에는 compiler가 지원하는 타이머 descriptor를
+만들었지만 context manifest 검증기가 `mode` 필드를 거부했다. context와 scalar
+profile이 기존 타이머 descriptor 검증을 공유하도록 수정했다. elapsed 타이머는
+계속 state를 요구하며 알 수 없는 mode와 혼합 descriptor 형식은 거부한다.
+native/WASM 회귀는 10초 ON, 10초 OFF, 20초 ON trace의 상태 age와 연속 시간을
+비교한다. GFB encoding, 타이머 의미와 Device 펌웨어는 변하지 않는다.
+
 ### 2026-10-27 — 동적 Percent 산술 범위 검사 ([#591](https://github.com/callin2/ghostflow-language/issues/591))
 
 Reference §2.1의 버그 수정이다. 동적 Percent 결과도 선언한 `0..100` 범위를

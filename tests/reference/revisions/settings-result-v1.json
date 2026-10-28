@@ -1,0 +1,25 @@
+{
+  "sourceRevision": "issue274-settings-result-v1",
+  "cases": [
+    {
+      "supersedesSha256": "3ed0877ff6f7c5351ccbc8439652829c777f3210f1054cf7ef68dbf719f1a4cd",
+      "case": {
+        "id": "REF-05-013",
+        "issue": "https://github.com/callin2/ghostflow-language/issues/274",
+        "references": [
+          "05-settings-and-observation.md#atomic-live-event"
+        ],
+        "rule": "여러 설정의 live payload는 함께 검증하며 성공 또는 오류 observation을 대상 stream 전체에 원자적으로 emit한다.",
+        "scope": "runtime",
+        "status": "specified",
+        "given": "duration=5min, duty=50%이고 한 event가 duration=10min과 범위 밖 duty=110%를 요청한다.",
+        "when": "event를 검증하고 적용한다.",
+        "then": "식별된 모든 대상에 fault(SettingsInvalid)를 함께 emit하고 settings revision과 effective position을 한 번 전진시킨다. duration만 새 ok 값으로 적용하지 않으며 대상 밖 stream은 유지한다. 같은 emission 재전송은 중복 적용하지 않고 새 유효 event는 대상 모두를 함께 복구한다.",
+        "reason": "Reference 5.2의 현재 Result 계약을 실행한다. 이전 last-good 유지 기대값은 이 revision의 supersedesSha256으로 고정된 역사적 case에 보존한다.",
+        "softwareObservationPorts": [],
+        "sourceRevision": "issue274-settings-result-v1"
+      }
+    }
+  ],
+  "decision": "https://github.com/callin2/ghostflow-language/issues/274#issuecomment-6445458117"
+}

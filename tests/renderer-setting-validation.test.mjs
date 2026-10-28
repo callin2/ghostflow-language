@@ -86,6 +86,27 @@ const event = (fingerprint, id, changes, position = 2, baseRevision = 0) => ({
   programFingerprint: fingerprint, eventId: id, baseRevision, position, origin: 'operatorEdit', changes,
 });
 
+test('REF-00-009 time entry and slider accept five minutes and fault ninety seconds without rounding', async () => {
+  const { artifact, wasm, fingerprint } = await fixture();
+  const descriptor = artifact.interactionSchema.descriptors.find(item => item.id === 'setting.duration');
+  const config = artifact.manifest.configs.find(item => item.name === 'duration');
+  assert.deepEqual(descriptor.constraint, { kind: 'range', min: 60000, max: 1200000, step: 60000 });
+  const [entry, slider] = consumers(descriptor, config.id);
+  const runs = [];
+  for (const [valid, invalid] of [[entry.submit('5'), entry.submit('1.5')], [slider.submit(300000), slider.submit(90000)]]) {
+    const rows = await replay(artifact, wasm, [
+      { scanId: 0, ms: 0, settings: event(fingerprint, 'five-minutes', [valid], 1, 0) },
+      { scanId: 1, ms: 1, settings: event(fingerprint, 'off-grid', [invalid], 2, 1) },
+    ]);
+    assert.deepEqual(rows[0].settings.settings.find(item => item.name === 'duration').result,
+      { ok: true, value: 300000 });
+    assert.deepEqual(rows[1].settings.settings.find(item => item.name === 'duration').result,
+      { ok: false, fault: 'SettingsInvalid' });
+    runs.push(rows);
+  }
+  assert.deepEqual(runs[0], runs[1]);
+});
+
 test('REF-05-019 time-entry and slider preserve Duration off-grid fault and recovery in native WASM', async () => {
   const { artifact, wasm, fingerprint } = await fixture();
   const descriptor = artifact.interactionSchema.descriptors.find(item => item.id === 'setting.duration');
