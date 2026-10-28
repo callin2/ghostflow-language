@@ -1504,6 +1504,10 @@
     {
       "path": "docs/reports/2026-10-28-reference-foundations-590.md",
       "reason": "Issue590 execution report, exact evidence boundary and remaining work inventory; reports may remain in one language."
+    },
+    {
+      "path": "docs/reports/2026-10-28-dev-reconciliation.md",
+      "reason": "Execution report and source integration evidence; reports may remain in one language."
     }
   ]
 }
