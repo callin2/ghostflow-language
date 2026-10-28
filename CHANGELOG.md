@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### 2026-10-29 - atomic installed strategy profiles ([#243](https://github.com/callin2/ghostflow-language/issues/243))
+
+InstalledControlHost now activates source-verified strategies with capabilities
+from validated sensor bindings and Bool outputs. A Stale sample remains a Result
+inside the selected strategy. An incompatible candidate profile rejects without
+changing the active profile, run, conditioner, or Program state. A compatible
+candidate publishes a fresh run between completed steps. Optional sensor absence
+and physical Driver installation remain outside this bounded host contract.
+
 ### 2026-10-29 — active Station session ON time ([#208](https://github.com/callin2/ghostflow-language/issues/208))
 
 The bounded Station adapter now exposes its existing applied pump ON total

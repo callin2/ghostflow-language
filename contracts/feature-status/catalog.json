@@ -9171,6 +9171,55 @@
       "referenceCaseIds": [
         "REF-06-009"
       ]
+    },
+    {
+      "id": "installed-strategy-profile-admission",
+      "family": "Atomic installed strategy profile admission",
+      "clause": {
+        "path": "docs/reference/04-sensors-constraints-control.en.md",
+        "heading": "4.6 Device queries and strategy selection"
+      },
+      "owner": "HOST",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "host_simulation",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/installed-control-host.test.mjs",
+              "testId": "REF-04-039 rejects an incompatible profile while the selected strategy sensor is Stale",
+              "caseId": "REF-04-039",
+              "assertionClass": "rollback",
+              "targets": [
+                "host",
+                "wasm"
+              ]
+            },
+            {
+              "path": "tests/installed-control-host.test.mjs",
+              "testId": "REF-04-039 publishes a compatible profile as a fresh strategy run between completed steps",
+              "caseId": "REF-04-039",
+              "assertionClass": "identity",
+              "targets": [
+                "host",
+                "wasm"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Required conditioned Number/Bool sensors and validated Bool output capabilities only. Optional sensor absence, arbitrary caller capabilities and physical driver activation remain outside this host evidence. Successful replacement starts a fresh run."
+      ],
+      "issues": [
+        243
+      ],
+      "referenceCaseIds": [
+        "REF-04-039"
+      ]
     }
   ]
 }

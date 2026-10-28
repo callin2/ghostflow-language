@@ -137,6 +137,19 @@ test('REF-04-039 publishes a compatible profile as a fresh strategy run between 
   assert.equal(ready.vm.safe.active, false, 'successful publication starts with fresh Program and conditioner state');
 });
 
+test('installed strategies retain validated Bool output actuator capabilities', async t => {
+  const source = adaptDocument.replace('adapt policy {', `adapt policy {
+    strategy WithOutput priority 200 match (active: actuator<Bool>) { active <- true; }`);
+  const compiled = compileSourceSync(source, { filename: 'installed-output-capability.ghost.md' });
+  const host = await InstalledControlHost.instantiate(wasm, compiled,
+    { runId: 'output-run', ...candidate('r1', 'sensor-a', 2000) });
+  t.after(() => host.dispose());
+  const result = host.step(frame('r1', 0));
+  assert.equal(result.sensors.reading.quality, 'NotReady');
+  assert.equal(result.vm.strategy, 'WithOutput');
+  assert.equal(result.vm.safe.active, true);
+});
+
 test('installed strategy metadata must match the canonical compiler output', async () => {
   const mutations = [
     manifest => { manifest.adaptPolicy.name = 'forged'; },

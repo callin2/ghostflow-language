@@ -5,6 +5,12 @@
 
 ## 미출시
 
+### 2026-10-29 - 설치 전략 프로필의 원자 적용 ([#243](https://github.com/callin2/ghostflow-language/issues/243))
+
+InstalledControlHost가 검증된 센서 바인딩과 Bool 출력의 capability로 소스 검증된 전략을 활성화합니다.
+Stale 샘플은 선택된 전략의 Result로 처리합니다. 호환되지 않는 후보 프로필은 현재 프로필·run·입력 품질 상태·Program 상태를 유지한 채 거부합니다.
+호환 후보는 완료된 step 사이에서 새 run으로 게시합니다. 선택 센서의 absence와 물리 Driver 설치는 이 한정된 호스트 계약 밖에 남습니다.
+
 ### 2026-10-29 — 활성 Station 세션 ON 시간 ([#208](https://github.com/callin2/ghostflow-language/issues/208))
 
 유한한 Station adapter가 기존의 적용된 펌프 ON 누적값을 Rust의

@@ -705,8 +705,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "5c9ba5fa5af84cdba6cb6eb9b14cfe8130a5d42929929c9d0a8220c90f9d498e",
-      "translationSha256": "eeb3c5cbd8587c79df6fc6b4b6d751c0197af8ae3aa46ca284343e6c694b77a6"
+      "sourceSha256": "a66f758e8b4a664e579bce0e6456ecd9f6a89f6de87781d5b9fdd39bceb9fe7c",
+      "translationSha256": "ae3d32b1e8f5b4c84e8f18e8e7e51576de9e990a04fab0a1dd51d9b460c49e2d"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",
@@ -1181,8 +1181,8 @@
       "source": "docs/INSTALLED-SENSOR-BINDING.md",
       "sourceLanguage": "en",
       "translation": "docs/INSTALLED-SENSOR-BINDING.ko.md",
-      "sourceSha256": "cfaff89affe6c7a16c3303a23e3faa4d675d813d86190fc6636fb55737273f0c",
-      "translationSha256": "7dc9c82f44ba9880cb726eb4294480d2b930b6faef47a0f2a5c2cbf46aa3cf1c"
+      "sourceSha256": "76157890f1986f57b7aff8af48e3a9d5450ef882074da6e22f06003fba5f9d1f",
+      "translationSha256": "6c6d71b7e110fee15a0ecea951249f27b49fb92750181c3ece50cdd2b4861d65"
     }
   ],
   "exclusions": [

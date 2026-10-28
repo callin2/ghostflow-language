@@ -43,4 +43,4 @@ const result = host.step({ bindingRevision: installation.revision, nowMs: 1000,
 
 교체는 후보 전체를 검증하고 전략을 활성화한 뒤 게시합니다. 예를 들어 `WithReading`이 필수 Number 센서에 match하고 현재 읽기가 Stale일 때, 후보가 그 센서를 Bool 엔드포인트에 연결하면 `type_mismatch`로 거부합니다. 기존 프로필·run·바인딩·상태·최근 trace를 보존합니다. 이후 step도 `WithReading`과 명시적 fault 분기를 계속 실행합니다. 호환 후보는 새 run으로 게시하며 센서는 `NotReady`, Program 상태는 소스의 초기값에서 시작합니다.
 
-지원 Program은 소스 재검증을 통과한 독립형 `control-v1` 또는 `control-v4` 바이트, 필수 Number/Bool 센서 한 개 이상, Bool 출력으로 한정합니다. 선택 센서 바인딩과 actuator capability는 이 호스트 프로필 범위에 포함하지 않습니다. 일정·타이머·signal·config·import·scalar 입력은 게시 전에 거부합니다. 실제 Device 바인딩 적용, Driver 보장, 물리 부하 동작은 별도의 증거가 필요합니다.
+지원 Program은 소스 재검증을 통과한 독립형 `control-v1` 또는 `control-v4` 바이트, 필수 Number/Bool 센서 한 개 이상, Bool 출력으로 한정합니다. 선택 센서 바인딩과 호출자가 임의로 제공한 capability는 이 호스트 프로필 범위에 포함하지 않습니다. 검증된 Bool 출력은 전략 선택의 actuator capability로 사용할 수 있습니다. 일정·타이머·signal·config·import·scalar 입력은 게시 전에 거부합니다. 실제 Device 바인딩 적용, Driver 보장, 물리 부하 동작은 별도의 증거가 필요합니다.
