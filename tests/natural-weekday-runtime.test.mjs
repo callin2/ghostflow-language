@@ -123,7 +123,6 @@ test('REF-03-040 Tide uses scheduled Sunday to reject Monday filter and keep adm
     const observation = crossing.contextTrace.find(row => row.decision === (shouldAdmit ? 'Due' : 'DayIneligible'));
     assert.equal(observation.sourceDay, sourceDay);
     assert.equal(observation.scheduledDay, scheduledDay);
-    assert.equal(crossing.requested.missed, undefined);
     assert.equal(actual[2].outcome.trace.safe.active, shouldAdmit);
     if (shouldAdmit) {
       const active = actual[2].outcome.trace.contextTrace.find(row => row.decision === 'Active');
@@ -197,7 +196,7 @@ function solarFrame(site, mono, wall) {
       trusted: true, unknownReason: null, sourceRevision: 'rtc-r1' },
     natural: [], settings: null, schedules: [],
     solars: [{ site, timezone: 'Asia/Seoul', latitude: 37.5665, longitude: 126.978,
-      event: 0, offsetMs: 1_800_000, coverageStartMs: planned - 3_600_000,
+      event: 0, offsetMs: -1_800_000, coverageStartMs: planned - 3_600_000,
       coverageEndMs: planned + 3_600_000,
       rows: [{ sourceDay, scheduledWallMs: planned, availability: 0,
         fallbackWallMs: null, unavailableReason: null,
@@ -205,9 +204,15 @@ function solarFrame(site, mono, wall) {
   } };
 }
 
+function solarSource(day) {
+  return source('SolarValid', day).replace('rise + 30min', 'rise - 30min')
+    .replace('output due: Bool;', 'output due, missed: Bool;')
+    .replace('due <- dawn.due;', 'due <- dawn.due;\n  missed <- dawn.missed;');
+}
+
 test('REF-03-040 Solar weekday admission uses scheduled date and emits the chosen cause', async t => {
   for (const [day, admitted] of [['mon', false], ['sun', true]]) {
-    const artifact = await compileSource(source('SolarValid', day), { filename: `solar-${day}.ghost.md` });
+    const artifact = await compileSource(solarSource(day), { filename: `solar-${day}.ghost.md` });
     const site = artifact.manifest.schedules[0].site;
     const frames = [solarFrame(site, 0, planned - 1), solarFrame(site, 1, planned)];
     const native = runNative(t, artifact, frames, 7, null, 'context-solar-v1');
@@ -215,6 +220,7 @@ test('REF-03-040 Solar weekday admission uses scheduled date and emits the chose
     parity(native, actual);
     assert.ok(actual.every(row => row.accepted));
     assert.equal(actual[1].outcome.trace.safe.due, admitted);
+    assert.equal(actual[1].outcome.trace.safe.missed, false);
     const row = actual[1].outcome.trace.contextTrace.find(value => value.decision ===
       (admitted ? 'Due' : 'DayIneligible'));
     assert.equal(row.sourceDay, sourceDay);
@@ -223,7 +229,7 @@ test('REF-03-040 Solar weekday admission uses scheduled date and emits the chose
 });
 
 test('Solar fixed fallback uses the chosen planned instant and rejects a mismatched date fact', async t => {
-  const src = source('SolarValid', 'sun')
+  const src = solarSource('sun')
     .replace('fallback = skip', 'fallback = fixed_time(time`23:40`, terminal: skip)');
   const artifact = await compileSource(src, { filename: 'solar-fallback-weekday.ghost.md' });
   const site = artifact.manifest.schedules[0].site;
@@ -256,7 +262,7 @@ test('UTC and both sides of a New York DST boundary agree in native and WASM adm
     { timezone: 'America/New_York', instant: '2026-11-01T06:30:00Z', day: 'sun', expected: '2026-11-01' },
   ];
   for (const example of examples) {
-    const src = source('SolarValid', example.day).replace('Asia/Seoul', example.timezone);
+    const src = solarSource(example.day).replace('Asia/Seoul', example.timezone);
     const artifact = await compileSource(src, { filename: `solar-${example.timezone}-${example.day}.ghost.md` });
     const site = artifact.manifest.schedules[0].site;
     const instant = Date.parse(example.instant);

@@ -145,6 +145,8 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/civil-range-runtime.test.mjs',
   'tests/natural-condition-contract.test.mjs',
   'tests/natural-schedule-contract.test.mjs',
+  'tests/scheduled-local-date-facts.test.mjs',
+  'tests/natural-weekday-runtime.test.mjs',
   'tests/natural-fallback-compiler.test.mjs',
   'tests/natural-fallback-runtime.test.mjs',
   'tests/accounting-syntax.test.mjs',

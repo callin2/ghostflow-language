@@ -9083,6 +9083,55 @@
         "REF-03-026",
         "REF-03-030"
       ]
+    },
+    {
+      "id": "natural-weekday-admission",
+      "family": "Natural-event scheduled local-date weekday admission",
+      "clause": {
+        "path": "docs/reference/03-time-and-schedules.en.md",
+        "heading": "3.8 DST, midnight and work calendars"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/natural-weekday-runtime.test.mjs",
+              "testId": "REF-03-040 Tide uses scheduled Sunday to reject Monday filter and keep admitted Sunday Run through midnight",
+              "caseId": "REF-03-040",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ]
+            },
+            {
+              "path": "tests/natural-weekday-runtime.test.mjs",
+              "testId": "REF-03-040 Solar weekday admission uses scheduled date and emits the chosen cause",
+              "caseId": "REF-03-040",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Bounded immutable weekday filters in GFB24. Host IANA conversion is external evidence; the portable core validates its binding and revision. Work-calendar natural filters, Device execution and physical acceptance are not claimed."
+      ],
+      "issues": [
+        224
+      ],
+      "referenceCaseIds": [
+        "REF-03-040"
+      ]
     }
   ]
 }

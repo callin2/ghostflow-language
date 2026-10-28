@@ -488,8 +488,8 @@
       "source": "docs/reference/03-time-and-schedules.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/03-time-and-schedules.en.md",
-      "sourceSha256": "52d9b39599f4916703e65514b25946cd18941a3610a675f6a8452576148c106a",
-      "translationSha256": "2ce32cc770d69574c45ccf8fba15adcd3bcb3ca2dda259f7b96cef803816cba0"
+      "sourceSha256": "98f4d3b349649bcbfe0734f09e677af1797830e83719047c37b9b9be52d75b7b",
+      "translationSha256": "0e8d917590d4f3a524e12c865aaa6602d423c3a4e7fc6bf24380a10ad81a65fe"
     },
     {
       "source": "docs/reference/04-sensors-constraints-control.md",
@@ -705,8 +705,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "93a8c14609eb5a9209f4666c07bcb62e88503d5d8ded6dd05498f732302d0000",
-      "translationSha256": "025f592c226d0c19331173cf19b950ca1e20de4fa5e34723b275201396b68d28"
+      "sourceSha256": "002f8fdceebd8af6d26b84323d6c0719bc3818d04fe46194f1e0c1006ac521b7",
+      "translationSha256": "15a4a7218b774cc8169dd4728d3e9c2f362882d580bd6e60809a1e85676edcf5"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",
