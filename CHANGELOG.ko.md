@@ -55,6 +55,18 @@ package 연결, 실제 장치 검증은 별도다. 예를 들어 같은 compact 
 프로그램의 실행 바이트도 보존한다. 수정법·CLI 전달·기존 산출물 보존을 회귀로
 검증한다.
 
+### 2026-10-22 — 공개 WASM host에서 지역 제약 묶음 실행 ([#558](https://github.com/callin2/ghostflow-language/issues/558))
+
+Reference §4.8의 문서화된 동작을 복구한 버그 수정이다. scalar/sensor
+`ControlRuntime` host가 컴파일러의 `localConstraints` 출처 metadata를 받는다.
+이전에는 유효한 `constraints Safety { require at safe_output pump => valve; }`가
+컴파일된 뒤 host admission에서 알 수 없는 키 오류로 거절됐다. 묶음·규칙·출처의
+상한과 Bool 출력 참조를 검증하며 미지원 metadata의 엄격한 거절을 유지한다.
+요청·안전 출력과 위반 trace는 기존 GFB 규칙으로 계산한다. 언어 profile·bytecode
+형식·WASM ABI는 바꾸지 않는다. 공개 legacy/framed host 회귀는 implication,
+require-any, mutex, 복구와 잘못된 metadata를 검사한다. 가상 실행 근거이며
+물리 출력 검증은 아니다.
+
 ### 2026-10-20 — 타입이 있는 출력 관측 ([#578](https://github.com/callin2/ghostflow-language/issues/578))
 
 Reference §4.7에 선언한 Bool 출력용 `output_status`, `output_health`,
