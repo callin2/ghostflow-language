@@ -149,7 +149,7 @@ test('REF-03-040 Tide uses scheduled Sunday to reject Monday filter and keep adm
   }
 });
 
-test('unavailable conversion stays Unknown, and missing or contradictory facts reject without advancing Tide state', async t => {
+test('unavailable conversion defers Tide admission within grace; malformed facts roll back', async t => {
   const artifact = await compileSource(tideSource('sun'), { filename: 'tide-unknown.ghost.md' });
   const site = artifact.manifest.schedules[0].site;
   const baseline = tideFrame(site, 0, planned - 1);
@@ -172,14 +172,16 @@ test('unavailable conversion stays Unknown, and missing or contradictory facts r
     resolverRevision: 'intl-gregory-v2' };
   const later = { ...known, resolverRevision: 'intl-gregory-v3' };
   const unavailableFrames = [baseline, tideFrame(site, 1, planned, { dates: [unknown] }),
-    tideFrame(site, 2, planned + 1, { dates: [later] })];
+    tideFrame(site, 2, planned + 60_000, { dates: [later] })];
   const nativeUnknown = runNative(t, artifact, unavailableFrames);
   const wasmUnknown = await runWasm(artifact, unavailableFrames);
   parity(nativeUnknown, wasmUnknown);
   assert.equal(wasmUnknown[1].outcome.trace.safe.due, false);
   assert.ok(wasmUnknown[1].outcome.trace.contextTrace.some(row => row.decision === 'Unknown(CivilDateUnavailable)'
     && row.sourceDay === sourceDay && row.scheduledDay === null));
-  assert.equal(wasmUnknown[2].outcome.trace.safe.due, false);
+  assert.equal(wasmUnknown[2].outcome.trace.safe.due, true);
+  assert.ok(wasmUnknown[2].outcome.trace.contextTrace.some(row => row.decision === 'Due'
+    && row.sourceDay === sourceDay && row.scheduledDay === scheduledDay));
 
   const unchangedRevision = [tideFrame(site, 0, planned - 1, { dates: [unknown] }),
     tideFrame(site, 1, planned, { dates: [{ ...known, resolverRevision: 'intl-gregory-v2' }] })];
@@ -188,6 +190,45 @@ test('unavailable conversion stays Unknown, and missing or contradictory facts r
   parity(nativeConflict, wasmConflict);
   assert.deepEqual(wasmConflict.map(row => row.accepted), [true, false]);
   assert.match(wasmConflict[1].error, /conflicting scheduled local-date revision/);
+});
+
+test('unavailable Tide date expires at the exact grace end without late admission', async t => {
+  const artifact = await compileSource(tideSource('sun'), { filename: 'tide-date-grace-end.ghost.md' });
+  const site = artifact.manifest.schedules[0].site;
+  const known = naturalScheduledDateFacts(tideFrame(site, 1, planned).contextFacts,
+    artifact.manifest.schedules)[0];
+  const unknown = { ...known, scheduledDay: null, unavailableReason: 'CivilDateUnavailable',
+    resolverRevision: 'intl-gregory-v2' };
+  const frames = [tideFrame(site, 0, planned - 1),
+    tideFrame(site, 1, planned, { dates: [unknown] }),
+    tideFrame(site, 2, planned + 5 * 60_000,
+      { dates: [{ ...known, resolverRevision: 'intl-gregory-v3' }] })];
+  const native = runNative(t, artifact, frames), actual = await runWasm(artifact, frames);
+  parity(native, actual);
+  assert.ok(actual.every(row => row.accepted));
+  assert.ok(actual[1].outcome.trace.contextTrace.some(row => row.decision === 'Unknown(CivilDateUnavailable)'));
+  assert.equal(actual[2].outcome.trace.safe.due, false);
+  assert.ok(actual[2].outcome.trace.contextTrace.some(row => row.decision === 'GraceExpired'));
+});
+
+test('Tide cancellation during unavailable date terminalizes before a later conversion', async t => {
+  const artifact = await compileSource(tideSource('sun').replace('cancel_when = false;', 'cancel_when = true;'),
+    { filename: 'tide-date-cancel.ghost.md' });
+  const site = artifact.manifest.schedules[0].site;
+  const known = naturalScheduledDateFacts(tideFrame(site, 1, planned).contextFacts,
+    artifact.manifest.schedules)[0];
+  const unknown = { ...known, scheduledDay: null, unavailableReason: 'CivilDateUnavailable',
+    resolverRevision: 'intl-gregory-v2' };
+  const frames = [tideFrame(site, 0, planned - 1),
+    tideFrame(site, 1, planned, { dates: [unknown] }),
+    tideFrame(site, 2, planned + 60_000,
+      { dates: [{ ...known, resolverRevision: 'intl-gregory-v3' }] })];
+  const native = runNative(t, artifact, frames), actual = await runWasm(artifact, frames);
+  parity(native, actual);
+  assert.ok(actual.every(row => row.accepted));
+  assert.equal(actual[1].outcome.trace.safe.due, false);
+  assert.ok(actual[1].outcome.trace.contextTrace.some(row => row.decision === 'Cancelled'));
+  assert.equal(actual[2].outcome.trace.safe.due, false);
 });
 
 function solarFrame(site, mono, wall) {
