@@ -6,8 +6,10 @@ on:
       - .github/workflows/lean-proof.yml
       - experiments/bool-translation-validation/**
       - experiments/bool-sensor-validation/**
+      - experiments/bool-sensor-state-validation/**
       - tests/bool-translation-validation.test.mjs
       - tests/bool-sensor-validation.test.mjs
+      - tests/bool-sensor-state-validation.test.mjs
       - tools/**
       - crates/ghostflow-core/src/**
       - package.json
@@ -18,8 +20,10 @@ on:
       - .github/workflows/lean-proof.yml
       - experiments/bool-translation-validation/**
       - experiments/bool-sensor-validation/**
+      - experiments/bool-sensor-state-validation/**
       - tests/bool-translation-validation.test.mjs
       - tests/bool-sensor-validation.test.mjs
+      - tests/bool-sensor-state-validation.test.mjs
       - tools/**
       - crates/ghostflow-core/src/**
       - package.json
@@ -45,7 +49,7 @@ jobs:
         with:
           node-version: 22
       - name: Prepare evidence directory
-        run: mkdir -p build/bool-pc-validation build/bool-sensor-validation
+        run: mkdir -p build/bool-pc-validation build/bool-sensor-validation build/bool-sensor-state-validation
       - name: Install locked Node dependencies
         shell: bash
         run: |
@@ -76,7 +80,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          node --test tests/bool-translation-validation.test.mjs tests/bool-sensor-validation.test.mjs 2>&1 | tee build/bool-pc-validation/node-test.log
+          node --test tests/bool-translation-validation.test.mjs tests/bool-sensor-validation.test.mjs tests/bool-sensor-state-validation.test.mjs 2>&1 | tee build/bool-pc-validation/node-test.log
       - name: Check Bool and PC proofs with Lean kernel
         shell: bash
         run: |
@@ -93,6 +97,14 @@ jobs:
           node experiments/bool-sensor-validation/verify.mjs \
             --lean "$lean_bin" --evidence-dir build/bool-sensor-validation \
             2>&1 | tee build/bool-sensor-validation/verify.log
+      - name: Check sensor state input histories with Lean kernel
+        shell: bash
+        run: |
+          set -euo pipefail
+          lean_bin="$("$HOME/.elan/bin/elan" which lean)"
+          node experiments/bool-sensor-state-validation/verify.mjs \
+            --lean "$lean_bin" --evidence-dir build/bool-sensor-state-validation \
+            2>&1 | tee build/bool-sensor-state-validation/verify.log
       - name: Upload proof evidence even on failure
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -101,5 +113,6 @@ jobs:
           path: |
             build/bool-pc-validation/
             build/bool-sensor-validation/
+            build/bool-sensor-state-validation/
           if-no-files-found: warn
           retention-days: 30

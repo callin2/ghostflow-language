@@ -1592,6 +1592,14 @@
     {
       "path": "contracts/alarm-v1/examples/temperature.ghost.md",
       "reason": "Canonical executable alarm conformance fixture; changing prose changes its source identity. Bilingual explanation is in contracts/alarm-v1/README.md and README.ko.md."
+    },
+    {
+      "path": "experiments/bool-sensor-state-validation/proof-report.md",
+      "reason": "Issue590 bounded input-history formal proof execution report and explicit trust boundaries; reports may remain in one language."
+    },
+    {
+      "path": "experiments/bool-sensor-state-validation/fixtures/toggle.ghost.md",
+      "reason": "Canonical executable compiler fixture for the stateful sensor proof; test data has no translated executable copy."
     }
   ]
 }

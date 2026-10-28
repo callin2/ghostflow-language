@@ -457,6 +457,18 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [examples/tutorial/04-extra-valves.ghost.ko.md](examples/tutorial/04-extra-valves.ghost.ko.md) | 추가 관측소 밸브 | md |
 | [examples/tutorial/04-extra-valves.ghost.md](examples/tutorial/04-extra-valves.ghost.md) | Extra station valves | md |
 
+## experiments/bool-sensor-state-validation/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [experiments/bool-sensor-state-validation/proof-report.md](experiments/bool-sensor-state-validation/proof-report.md) | Bool sensor state input-history proof report | md |
+
+## experiments/bool-sensor-state-validation/fixtures/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [experiments/bool-sensor-state-validation/fixtures/toggle.ghost.md](experiments/bool-sensor-state-validation/fixtures/toggle.ghost.md) | Bool sensor state toggle | md |
+
 ## experiments/bool-sensor-validation/
 
 | Path | Title | Type |
@@ -605,4 +617,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-440 documents.
+442 documents.
