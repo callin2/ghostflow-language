@@ -521,6 +521,14 @@ impl Station {
     pub fn active_session(&self) -> Option<SessionId> {
         self.active.map(|v| v.session_id)
     }
+    /// Applied pump ON time recorded for the matching active session.
+    /// Reading does not advance the monotonic clock or settle daily usage.
+    pub fn session_actual_on_ms(&self, session_id: SessionId) -> Result<u64> {
+        self.active
+            .filter(|active| active.session_id == session_id)
+            .map(|active| active.actual_on_ms)
+            .ok_or(StationError::SessionMismatch)
+    }
     pub fn pending_token(&self) -> Option<u64> {
         self.pending.as_ref().map(|pending| pending.token)
     }
@@ -2229,6 +2237,79 @@ mod tests {
         assert_eq!(s.daily_used_ms(), 100);
         assert_eq!(s.reserved_ms(), 0);
         assert_eq!(s.mode(), Mode::Stopped);
+    }
+
+    #[test]
+    fn session_actual_on_time_is_read_only_and_survives_off_gaps() {
+        let config = StationConfig {
+            daily_quota_ms: 100_000,
+            max_start_budget_ms: 80_000,
+            ..config()
+        };
+        let mut s = Station::new(config.clone()).unwrap();
+        s.synchronize_day(100, 0, 100_000, true).unwrap();
+        assert_eq!(
+            s.session_actual_on_ms(77),
+            Err(StationError::SessionMismatch)
+        );
+        enter(&mut s, Mode::Auto, 1);
+        let request = start_request(&s, 2, None, 0, 50_000);
+        commit_start(&mut s, request);
+        let on = OutputState {
+            pump_on: true,
+            valves: 1,
+        };
+        s.authorize_output(77, on, 0).unwrap();
+        s.report_applied(77, on, 0).unwrap();
+        s.report_applied(77, OutputState::SAFE, 10_000).unwrap();
+        assert_eq!(s.session_actual_on_ms(77), Ok(10_000));
+        s.advance(20_000).unwrap();
+        assert_eq!(s.session_actual_on_ms(77), Ok(10_000));
+        s.authorize_output(77, on, 20_000).unwrap();
+        s.report_applied(77, on, 20_000).unwrap();
+        s.advance(40_000).unwrap();
+        let before = s.clone();
+        assert_eq!(s.session_actual_on_ms(77), Ok(30_000));
+        assert_eq!(
+            s.session_actual_on_ms(78),
+            Err(StationError::SessionMismatch)
+        );
+        assert_eq!(s.session_actual_on_ms(77), Ok(30_000));
+        assert_eq!(s.snapshot_bytes(), before.snapshot_bytes());
+        assert_eq!(s.active, before.active);
+        assert_eq!(s.last_monotonic_ms, before.last_monotonic_ms);
+        assert_eq!(s.daily_used_ms(), 0);
+
+        let restored = Station::restore(config, &s.snapshot_bytes().unwrap()).unwrap();
+        assert_eq!(
+            restored.session_actual_on_ms(77),
+            Err(StationError::SessionMismatch)
+        );
+        assert_eq!(restored.reserved_ms(), 50_000);
+        s.report_applied(77, OutputState::SAFE, 40_000).unwrap();
+        let finish = s
+            .prepare_finish(77, FinishOutcome::Completed, 40_000)
+            .unwrap();
+        assert_eq!(s.session_actual_on_ms(77), Ok(30_000));
+        s.commit_finish(DurableAck::new(finish.token())).unwrap();
+        assert_eq!(s.daily_used_ms(), 30_000);
+        assert_eq!(
+            s.session_actual_on_ms(77),
+            Err(StationError::SessionMismatch)
+        );
+        let request = start_request(&s, 3, None, 40_000, 50_000);
+        commit_start(
+            &mut s,
+            StartRequest {
+                session_id: 78,
+                ..request
+            },
+        );
+        assert_eq!(s.session_actual_on_ms(78), Ok(0));
+        assert_eq!(
+            s.session_actual_on_ms(77),
+            Err(StationError::SessionMismatch)
+        );
     }
 
     #[test]

@@ -705,8 +705,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "002f8fdceebd8af6d26b84323d6c0719bc3818d04fe46194f1e0c1006ac521b7",
-      "translationSha256": "15a4a7218b774cc8169dd4728d3e9c2f362882d580bd6e60809a1e85676edcf5"
+      "sourceSha256": "a66f758e8b4a664e579bce0e6456ecd9f6a89f6de87781d5b9fdd39bceb9fe7c",
+      "translationSha256": "ae3d32b1e8f5b4c84e8f18e8e7e51576de9e990a04fab0a1dd51d9b460c49e2d"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",
@@ -810,8 +810,8 @@
       "source": "examples/station-rules.ghost.md",
       "sourceLanguage": "en",
       "translation": "examples/station-rules.ghost.ko.md",
-      "sourceSha256": "cbb466e0e90b34b9ee6d7847846719e1fdd85f10d40cfecb081fdd7e2ce1f46e",
-      "translationSha256": "e5a2aaccec9df9df9e8922649a102b607eb74f4321cac9c15266a8570c07ce79"
+      "sourceSha256": "a8c4f19c68074fc63453e0b2f75cb5808db7cb3ca10061deb39101abf2f2abb8",
+      "translationSha256": "f8e498a44feb99600fe14a4200a286c4861aec40842f46af52293c15729091e7"
     },
     {
       "source": "examples/tutorial/01-latch.ghost.md",
@@ -1181,8 +1181,8 @@
       "source": "docs/INSTALLED-SENSOR-BINDING.md",
       "sourceLanguage": "en",
       "translation": "docs/INSTALLED-SENSOR-BINDING.ko.md",
-      "sourceSha256": "cfaff89affe6c7a16c3303a23e3faa4d675d813d86190fc6636fb55737273f0c",
-      "translationSha256": "7dc9c82f44ba9880cb726eb4294480d2b930b6faef47a0f2a5c2cbf46aa3cf1c"
+      "sourceSha256": "76157890f1986f57b7aff8af48e3a9d5450ef882074da6e22f06003fba5f9d1f",
+      "translationSha256": "6c6d71b7e110fee15a0ecea951249f27b49fb92750181c3ece50cdd2b4861d65"
     }
   ],
   "exclusions": [
@@ -1553,6 +1553,10 @@
     {
       "path": "experiments/bool-translation-validation/serializer-report.md",
       "reason": "Issue590 proof execution evidence and explicit trusted boundaries; reports may remain in one language."
+    },
+    {
+      "path": "docs/reports/2026-10-29-unattended-correctness-590.md",
+      "reason": "Dated issue590 execution evidence, exact source identities and remaining proof obligations; reports may remain in one language."
     }
   ]
 }

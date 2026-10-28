@@ -401,7 +401,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     if order != "AB" && order != "BA" {
         return Err("invalid bounded order".into());
     }
-    let prepared = station.prepare_start(request(&station, 77, 10))?;
+    let prepared = station.prepare_start(request(&station, 77, 0))?;
     let grant = station.commit_start(DurableAck::new(prepared.token()))?;
     let on = OutputState {
         pump_on: true,
@@ -411,59 +411,65 @@ fn main() -> Result<(), Box<dyn Error>> {
         pump_on: false,
         valves: 1,
     };
-    let mut trace = vec![json!({"event":"lease","nowMs":10,"sessionId":77,
+    let mut trace = vec![json!({"event":"lease","nowMs":0,"sessionId":77,
         "leaseDeadlineMs":grant.lease_deadline_ms,"reservedMs":station.reserved_ms()})];
     for actor in order.chars() {
         if actor == 'A' {
-            let output = station.authorize_output(77, on, 10)?;
+            let output = station.authorize_output(77, on, 0)?;
             trace.push(
-                json!({"event":"request","actor":"A","nowMs":10,"pumpOn":true,
+                json!({"event":"request","actor":"A","nowMs":0,"pumpOn":true,
                 "accepted":true,"sessionId":output.session_id,"valves":output.output.valves}),
             );
         } else {
-            if station.authorize_output(78, OutputState::SAFE, 10).err()
+            if station.authorize_output(78, OutputState::SAFE, 0).err()
                 != Some(StationError::SessionMismatch)
             {
                 return Err("inactive B unexpectedly authorized".into());
             }
             trace.push(
-                json!({"event":"request","actor":"B","nowMs":10,"pumpOn":false,
+                json!({"event":"request","actor":"B","nowMs":0,"pumpOn":false,
                 "accepted":false,"error":"SessionMismatch"}),
             );
         }
     }
     // No reauthorization: this real owner check must still recognize A's ON grant.
-    station.report_applied(77, on, 10)?;
-    if station.report_applied(78, OutputState::SAFE, 10).err()
-        != Some(StationError::SessionMismatch)
+    station.report_applied(77, on, 0)?;
+    if station.report_applied(78, OutputState::SAFE, 0).err() != Some(StationError::SessionMismatch)
     {
         return Err("inactive B unexpectedly reported applied".into());
     }
     trace.push(
-        json!({"event":"appliedFixture","nowMs":10,"sessionId":77,"pumpOn":true,"valves":1,
+        json!({"event":"appliedFixture","nowMs":0,"sessionId":77,"pumpOn":true,"valves":1,
         "nonownerReportRejected":true}),
     );
-    station.advance(20)?;
+    station.advance(10)?;
     trace.push(
-        json!({"event":"ledger","nowMs":20,"dailyUsedMs":station.daily_used_ms(),
+        json!({"event":"ledger","nowMs":10,"dailyUsedMs":station.daily_used_ms(),
+        "sessionActualOnMs":station.session_actual_on_ms(77)?,
         "reservedMs":station.reserved_ms()}),
     );
-    station.authorize_output(77, off, 20)?;
-    if station.authorize_output(78, OutputState::SAFE, 20).err()
+    station.authorize_output(77, off, 10)?;
+    if station.authorize_output(78, OutputState::SAFE, 10).err()
         != Some(StationError::SessionMismatch)
     {
         return Err("inactive B unexpectedly authorized between phases".into());
     }
-    station.report_applied(77, off, 20)?;
-    if station.prepare_start(request(&station, 78, 20)).err() != Some(StationError::AlreadyOwned) {
+    station.report_applied(77, off, 10)?;
+    if station.prepare_start(request(&station, 78, 10)).err() != Some(StationError::AlreadyOwned) {
         return Err("B unexpectedly acquired an OFF session lease".into());
     }
-    trace.push(json!({"event":"betweenPhases","nowMs":20,"sessionId":77,"pumpOn":false,"valves":1,
+    trace.push(json!({"event":"betweenPhases","nowMs":10,"sessionId":77,"pumpOn":false,"valves":1,
         "nonownerRejected":true,"acquisitionRejected":"AlreadyOwned","reservedMs":station.reserved_ms()}));
-    station.authorize_output(77, on, 30)?;
-    station.report_applied(77, on, 30)?;
+    station.advance(20)?;
+    if station.session_actual_on_ms(77)? != 10 {
+        return Err("OFF gap changed session ON time".into());
+    }
+    station.authorize_output(77, on, 20)?;
+    station.report_applied(77, on, 20)?;
     trace
-        .push(json!({"event":"appliedFixture","nowMs":30,"sessionId":77,"pumpOn":true,"valves":1}));
+        .push(json!({"event":"appliedFixture","nowMs":20,"sessionId":77,"pumpOn":true,"valves":1}));
+    station.advance(40)?;
+    trace.push(json!({"event":"sessionTime","nowMs":40,"sessionActualOnMs":station.session_actual_on_ms(77)?}));
     station.authorize_output(77, OutputState::SAFE, 40)?;
     station.report_applied(77, OutputState::SAFE, 40)?;
     let prepared = station.prepare_finish(77, FinishOutcome::Completed, 40)?;

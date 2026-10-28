@@ -144,7 +144,7 @@ test('REF-03-018 partial: state age, continuous true and physical rolling/day ac
   assert.equal(ledger.usedRolling(7, 40_000n, 25_000n), 20_000n);
   assert.equal(ledger.usedLocalDay(7, 0), 30_000n);
   await appliedParity(t, source, ledger, [[0, 10_000], [20_000, 40_000]], 40_000, 25_000);
-  t.diagnostic('Remaining REF-03-018 clause: no job-scoped cumulative ON API; physical receipt totals do not establish job ownership/reset semantics.');
+  t.diagnostic('Remaining REF-03-018 clause: Station exposes its bounded session applied total; generic authored job identity, reset and reboot semantics remain separate from this physical receipt ledger.');
 });
 
 test('context and scalar timer validation retain strict continuous and elapsed descriptor contracts', async () => {

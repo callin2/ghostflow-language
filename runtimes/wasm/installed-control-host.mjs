@@ -39,7 +39,7 @@ function prepareArtifact(artifact) {
       || item.optional === true || !Number.isSafeInteger(item.staleMs) || item.staleMs <= 0
       || item.type === 'Number' && (typeof item.validMin !== 'number' || typeof item.validMax !== 'number'))
     || ['schedules', 'timers', 'signals', 'configs'].some(key => !Array.isArray(manifest[key]) || manifest[key].length)
-    || Object.keys(manifest).some(key => !['format', 'name', 'inputs', 'outputs', 'sensors', 'schedules', 'timers', 'signals', 'configs', 'bytecodeSha256'].includes(key))) {
+    || Object.keys(manifest).some(key => !['format', 'name', 'inputs', 'outputs', 'sensors', 'schedules', 'timers', 'signals', 'configs', 'strategies', 'adaptPolicy', 'bytecodeSha256'].includes(key))) {
     fail('unsupported conditioned sensor Program profile');
   }
   return owned;
@@ -52,7 +52,7 @@ function prepareInstallation(artifact, release, boardProfile, installation) {
     source: artifact.sourceDocument.text, module: artifact.bytes, manifest: artifact.manifest,
   } });
   if (!checked.valid) fail(`installation incompatible: ${checked.errors.map(error => `${error.path}:${error.code}`).join(', ')}`);
-  return owned;
+  return { ...owned, capabilities: artifact.manifest.sensors.map(({ name, type }) => ({ kind: 'sensor', name, type })) };
 }
 
 function requireSensorOnlyReplacement(current, next, manifest) {
@@ -88,7 +88,8 @@ export class InstalledControlHost {
     const ownedArtifact = prepareArtifact(artifact);
     const ownedInstallation = prepareInstallation(ownedArtifact, release, boardProfile, installation);
     const wasm = new Uint8Array(wasmBytes).slice();
-    const runtime = await ControlRuntime.instantiateFramed(wasm, ownedArtifact);
+    const runtime = await ControlRuntime.instantiateFramed(wasm, ownedArtifact,
+      { capabilities: ownedInstallation.capabilities });
     return new InstalledControlHost(activationToken, wasm, ownedArtifact, ownedInstallation, runtime, runId);
   }
 
@@ -150,7 +151,8 @@ export class InstalledControlHost {
         fail('profile revision cannot change its content');
       }
       requireSensorOnlyReplacement(this.#installation, next, this.#artifact.manifest);
-      candidate = await ControlRuntime.instantiateFramed(this.#wasm, this.#artifact);
+      candidate = await ControlRuntime.instantiateFramed(this.#wasm, this.#artifact,
+        { capabilities: next.capabilities });
       if (this.#disposed) fail('owner was disposed during preparation');
       const accepted = { runId, sourceSha256: this.#artifact.sourceDocument.sha256,
         bytecodeSha256: this.#artifact.manifest.bytecodeSha256,
