@@ -264,6 +264,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/import-composition.test.mjs',
   'tests/composition-intent-provenance.test.mjs',
   'tests/composed-interaction.test.mjs',
+  'tests/composed-explanation.test.mjs',
   'tests/stage-accounting-control.test.mjs',
   'tests/composition-execution.test.mjs',
   'tests/composition-config-timer-isolation.test.mjs',
