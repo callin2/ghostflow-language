@@ -3,7 +3,7 @@
 
 # 설치 센서 바인딩 참조 호스트
 
-`InstalledControlHost`는 고정된 컴파일 Program과 해시로 고정된 설치 선언의 적합성을 검사한 뒤 기존 `ControlRuntime.instantiateFramed`로 실행합니다. [REF-06-009](https://github.com/callin2/ghostflow-language/issues/297)의 호스트 계약입니다. 장치 발견, Driver 설치, 폴링, 실물 검증은 수행하지 않습니다.
+`InstalledControlHost`는 고정된 컴파일 Program과 해시로 고정된 설치 선언의 적합성을 검사한 뒤 기존 `ControlRuntime.instantiateFramed`로 실행합니다. [REF-06-009 센서 교체](https://github.com/callin2/ghostflow-language/issues/297)와 [REF-04-039 전략 프로필 교체](https://github.com/callin2/ghostflow-language/issues/243)의 호스트 계약입니다. 장치 발견, Driver 설치, 폴링, 실물 검증은 수행하지 않습니다.
 
 ## 고정된 프로필 계약
 
@@ -35,4 +35,12 @@ const result = host.step({ bindingRevision: installation.revision, nowMs: 1000,
 
 이 작업은 센서 바인딩만 바꿉니다. 보드 ID·모델, 출력 배선, 설치 ID, 컴파일러·런타임·프로토콜 메타데이터, 펌웨어 digest가 바뀌면 거부합니다. 다른 물리 보드로의 이전에는 별도 설치 절차가 필요합니다. `step` 결과에는 승인된 실행의 run·소스·바이트코드·프로필·바인딩 식별자가 함께 들어가며, snapshot과 결과는 호출자 객체와 분리됩니다.
 
-지원 Program은 소스 재검증을 통과한 독립형 `control-v1` 또는 `control-v4` 바이트, 필수 Number/Bool 센서 한 개 이상, Bool 출력으로 한정합니다. 일정·타이머·signal·config·import·scalar 입력은 게시 전에 거부합니다. 실제 Device 바인딩 적용, Driver 보장, 물리 부하 동작은 별도의 증거가 필요합니다.
+## 전략 활성화
+
+이 한정 Program 프로필은 컴파일러가 생성한 `adaptPolicy`와 `strategies` 메타데이터도 받습니다. 호스트는 정규 소스를 재컴파일하고 전략의 match·우선순위·정책 식별자를 포함한 전체 manifest와 바이트코드를 비교한 뒤 승인합니다. 호출자가 메타데이터를 수정하면 이 비교에서 거부됩니다.
+
+통합 검증이 모든 필수 센서 바인딩과 엔드포인트 타입을 확인한 뒤, 호스트는 연결된 센서마다 명시적 capability를 `ControlRuntime`에 전달합니다. 기존 Rust 런타임이 활성화 시점에 전략을 선택합니다. capability 존재 여부는 검증된 설치에서 결정하며 샘플 품질과 독립적입니다. `NotReady`·`Stale`을 비롯한 센서 fault는 선택된 전략 아래의 Result 관측으로 유지합니다. fault 때문에 capability를 제거하거나 `match always`를 자동 선택하지 않습니다.
+
+교체는 후보 전체를 검증하고 전략을 활성화한 뒤 게시합니다. 예를 들어 `WithReading`이 필수 Number 센서에 match하고 현재 읽기가 Stale일 때, 후보가 그 센서를 Bool 엔드포인트에 연결하면 `type_mismatch`로 거부합니다. 기존 프로필·run·바인딩·상태·최근 trace를 보존합니다. 이후 step도 `WithReading`과 명시적 fault 분기를 계속 실행합니다. 호환 후보는 새 run으로 게시하며 센서는 `NotReady`, Program 상태는 소스의 초기값에서 시작합니다.
+
+지원 Program은 소스 재검증을 통과한 독립형 `control-v1` 또는 `control-v4` 바이트, 필수 Number/Bool 센서 한 개 이상, Bool 출력으로 한정합니다. 선택 센서 바인딩과 actuator capability는 이 호스트 프로필 범위에 포함하지 않습니다. 일정·타이머·signal·config·import·scalar 입력은 게시 전에 거부합니다. 실제 Device 바인딩 적용, Driver 보장, 물리 부하 동작은 별도의 증거가 필요합니다.
