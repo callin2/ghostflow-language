@@ -521,6 +521,18 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [experiments/rust-reader-validation/proof-report.md](experiments/rust-reader-validation/proof-report.md) | Production Rust Reader foundation (#590) | md |
 | [experiments/rust-reader-validation/ValueType-extraction-diagnosis.md](experiments/rust-reader-validation/ValueType-extraction-diagnosis.md) | Value::value_type extraction: unsupported F64 (#590) | md |
 
+## experiments/two-sensor-provenance/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [experiments/two-sensor-provenance/proof-report.md](experiments/two-sensor-provenance/proof-report.md) | Two independent Bool recovery expressions | md |
+
+## experiments/two-sensor-provenance/fixtures/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [experiments/two-sensor-provenance/fixtures/two-recover.ghost.md](experiments/two-sensor-provenance/fixtures/two-recover.ghost.md) | Independent Bool acquisition recovery | md |
+
 ## runtimes/wasm/
 
 | Path | Title | Type |
@@ -637,4 +649,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-447 documents.
+449 documents.
