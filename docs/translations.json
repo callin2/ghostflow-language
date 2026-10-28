@@ -1565,6 +1565,14 @@
     {
       "path": "experiments/bool-translation-validation/module-loader-report.md",
       "reason": "Issue590 raw-loader proof execution report and remaining trust boundary; reports may remain in one language."
+    },
+    {
+      "path": "experiments/bool-sensor-validation/proof-report.md",
+      "reason": "Issue590 canonical sensor proof execution report and explicit trusted boundaries; reports may remain in one language."
+    },
+    {
+      "path": "experiments/bool-sensor-validation/fixtures/recover-false.ghost.md",
+      "reason": "Canonical compiler input for the bounded sensor proof experiment; test data has no translated executable copy."
     }
   ]
 }
