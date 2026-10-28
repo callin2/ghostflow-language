@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFile, writeFile, mkdir, copyFile } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, copyFile, rename } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { compileSourceSync } from '../../tools/compile-source.mjs';
@@ -11,6 +11,11 @@ import { sha256 } from './bridge.mjs';
 
 const [sibling, evidence] = process.argv.slice(2), directory = resolve(evidence);
 await mkdir(directory, {recursive:true});
+const reportPath=join(directory,'runtime-verification.json');
+const report={status:'running',startedAt:new Date().toISOString(),productionCorrespondenceProof:false};
+const publish=async()=>{const temporary=`${reportPath}.tmp`;await writeFile(temporary,JSON.stringify(report,null,2)+'\n');await rename(temporary,reportPath);};
+await publish();
+try {
 const receiptPath = join(resolve(sibling),'build/evidence/build183/verification.json');
 const receiptBytes = await readFile(receiptPath), receipt = JSON.parse(receiptBytes);
 assert.equal(receipt.passed,true);
@@ -77,10 +82,15 @@ for (const framed of [false,true]) {
     }
   } finally {rt.dispose();}
 }
-const report={status:'passed',at:new Date().toISOString(),sourceRows:rows.length,executions:observed.length,
+Object.assign(report,{status:'passed',at:new Date().toISOString(),sourceRows:rows.length,executions:observed.length,
   sourceSha256:sha256(source),artifactSha256:sha256(compiled.bytes),nativeExitCode:result.status,productionCorrespondenceProof:false,
   provenance:{reused:true,builtByThisRun:false,receiptSha256:sha256(receiptBytes),sourceSHA:receipt.buildIdentity.sourceSHA,
-    checkedRustCargoFiles:files.length,wasmSha256:sha256(wasm),nativeSha256:sha256(native)},wrapperFiles,observed};
+    checkedRustCargoFiles:files.length,wasmSha256:sha256(wasm),nativeSha256:sha256(native)},wrapperFiles,observed});
 for (const [path,hash] of Object.entries(wrapperFiles)) assert.equal(sha256(await readFile(path)),hash,`wrapper changed: ${path}`);
-await writeFile(join(directory,'runtime-verification.json'),JSON.stringify(report,null,2)+'\n');
+await publish();
 console.log(JSON.stringify({...report,observed:undefined}));
+} catch(error) {
+  Object.assign(report,{status:'failed',finishedAt:new Date().toISOString(),error:error?.stack??String(error)});
+  await publish();
+  throw error;
+}
