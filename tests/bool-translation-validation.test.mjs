@@ -10,6 +10,7 @@ import { verify } from '../experiments/bool-translation-validation/verify.mjs';
 import { pcTheoremInput } from '../experiments/bool-translation-validation/pc-bridge.mjs';
 import { serializerTheoremInput } from '../experiments/bool-translation-validation/serializer-bridge.mjs';
 import { moduleTheoremInput } from '../experiments/bool-translation-validation/module-bridge.mjs';
+import { loaderTheoremInput, loaderAdmissionInput } from '../experiments/bool-translation-validation/loader-bridge.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const fixture = async name => {
@@ -91,6 +92,27 @@ test('unsupported source forms fail closed before proof generation', () => {
     "control Bad { state x: Bool = true; x' = x'; output out: Bool; out <- true; }",
     'control Bad { output out: Bool; out <- 1.0 > 0.0; }',
   ]) assert.throws(() => projectSource(document(code), 'bad.ghost.md'), /Bool validator admission/);
+});
+
+test('raw loader certificates use no decoded witnesses and quantify initialized traces over every tick count', async () => {
+  const evidence = await fixture('snapshot-branches');
+  const original = loaderTheoremInput(evidence);
+  const changed = structuredClone(evidence);
+  changed.decoded = new Proxy({}, { get() { throw new Error('decoded metadata must not be read'); } });
+  for (const entry of [...changed.projection.transitions, ...changed.projection.outputs]) {
+    entry.target = 999; entry.offset = 999; entry.length = 999;
+  }
+  assert.equal(loaderTheoremInput(changed), original);
+  assert.match(original, /load artifactBytes = some sourceModule := by\n  apply load_of_read/);
+  assert.match(original, /theorem loadedInitializedTrace \(n : Nat\)/);
+  assert.match(original, /initialized_trace artifactBytes sourceModule exactModuleLoaded n/);
+  assert.match(original, /loaded_initial artifactBytes sourceModule exactModuleLoaded/);
+  assert.doesNotMatch(original, /artifactBytes\.drop|\b(sorry|admit|axiom|native_decide)\b/);
+  const admission = loaderAdmissionInput(evidence.artifact.bytes, true);
+  assert.doesNotMatch(admission, /sourceModule|projection|decoded/);
+  changed.artifact.bytes[evidence.decoded.states[0].initialOffset] ^= 1;
+  assert.notEqual(loaderTheoremInput(changed), original);
+  assert.notEqual(loaderAdmissionInput(changed.artifact.bytes, true), admission);
 });
 
 test('unknown opcodes, broken offsets, incomplete and surplus expression stacks are rejected', () => {
