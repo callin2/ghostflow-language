@@ -277,3 +277,21 @@ test('UTC and both sides of a New York DST boundary agree in native and WASM adm
     assert.equal(actual[1].outcome.trace.contextTrace.find(row => row.decision === 'Due').scheduledDay, epochDay);
   }
 });
+
+test('filtered Tide correction keeps admitted identity and the original Run date evidence', async t => {
+  const artifact = await compileSource(tideSource('sun'), { filename: 'tide-correction-weekday.ghost.md' });
+  const site = artifact.manifest.schedules[0].site;
+  const baseline = tideFrame(site, 0, planned - 1);
+  const admission = tideFrame(site, 1, planned);
+  const corrected = tideFrame(site, 2, planned + 1, { providerRevision: 'harbor-r2' });
+  corrected.contextFacts.schedules[0].rows[0].instantMs += 60_000;
+  const native = runNative(t, artifact, [baseline, admission, corrected]);
+  const actual = await runWasm(artifact, [baseline, admission, corrected]);
+  parity(native, actual);
+  assert.deepEqual(actual.map(row => row.outcome.trace.safe.due), [false, true, false]);
+  assert.equal(actual[2].outcome.trace.safe.active, true);
+  const active = actual[2].outcome.trace.contextTrace.find(row => row.decision === 'Active');
+  assert.equal(active.providerRevision, 'harbor-r1');
+  assert.equal(active.sourceDay, sourceDay);
+  assert.equal(active.scheduledDay, scheduledDay);
+});
