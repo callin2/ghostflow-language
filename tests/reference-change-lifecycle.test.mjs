@@ -119,10 +119,12 @@ test('REF-06-007 partial oracle: parameter, setting, dependency and binding use 
   assert.equal(accepted.runId, 'run-2');
   assert.equal(accepted.sourceSha256, before.identity.sourceSha256);
   assert.equal(accepted.bytecodeSha256, before.identity.bytecodeSha256);
-  assert.equal(host.snapshot().execution.core.state.settingsRevision, 0);
+  assert.equal(host.snapshot().execution.core.state.settingsRevision, 1);
+  assert.equal(host.snapshot().execution.core.state.settings[0].result.value, false);
   assert.throws(() => host.step(frame('binding-r1', 'sensor-a', 0, 1, true)), /stale binding revision/);
   assert.throws(() => host.step(frame('binding-r2', 'sensor-b', 0, 1, true), event), /Program\/source\/run identity/);
   const afterBinding = host.step(frame('binding-r2', 'sensor-b', 0, 1, true));
+  assert.equal(afterBinding.vm.safe.on, false, 'a binding-only change retains the accepted ordinary setting');
   assert.equal(afterBinding.provenance.routes.inputs[0].endpointId, 'sensor-b');
   assert.equal(afterBinding.provenance.routes.outputs[0].endpointId, 'relay');
 });
