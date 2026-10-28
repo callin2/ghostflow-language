@@ -60,6 +60,19 @@ async function parity(t, a, d, actions) {
 }
 const query = (binding, cursor = null) => ({ query: [...encodeAlarmQuery(binding, cursor)] });
 
+test('GF-TEST-alarm-source-provenance: matching forged metadata, schema digest and descriptor cannot invent an anchor', () => {
+  const a = compile(), anchorId = 'GF-ABSENT-FROM-SOURCE';
+  const provenance = a.interactionSchema.descriptors.find(state => state.id === 'state.hot').provenance;
+  assert.equal(source.includes(anchorId), false);
+  a.traceMetadata.intentLinks.filter(link => link.nodeId === provenance.sourceNode.id)
+    .forEach(link => { link.anchorId = anchorId; });
+  provenance.intentAnchorIds = [anchorId];
+  const d = descriptor(a);
+  assert.equal(d.schema.sha256, interactionSchemaSha256(a.interactionSchema));
+  assert.deepEqual(d.alarms[0].provenance.intentAnchorIds, [anchorId]);
+  assert.throws(() => prepareAlarmObservation(a, d), /traceMetadata.*canonical.*replay/);
+});
+
 test('GF-TEST-alarm-provenance: explicit metadata binds exact source, module, Bool node and intent anchors', () => {
   const a = compile(), d = descriptor(a);
   assert.deepEqual(parseAlarmDescriptor(canonicalJson(d)), d);

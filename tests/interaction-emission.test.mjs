@@ -7,6 +7,7 @@ import test from 'node:test';
 import { interactionSchemaSha256 } from '../contracts/interaction-v0/validate.mjs';
 import { verifyInteractionCorpus } from '../contracts/interaction-v0/verify-corpus.mjs';
 import { compileSource, restoreArtifactSourceMap, writeArtifact } from '../tools/toolchain.mjs';
+import { restoreInteractionSchema } from '../tools/interaction-schema.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const wateringPath = 'contracts/interaction-v0/examples/five-minute-watering.ghost.md';
@@ -84,6 +85,26 @@ test('GF-TEST-interaction-emission-policy: product compilation is literate-only 
     }),
     /requires a canonical \.ghost\.md literate source/,
   );
+});
+
+test('GF-TEST-interaction-restore: canonical replay rejects forged source nodes and mutually consistent invented intent', async () => {
+  const compilation = await compileSource(read(wateringPath), {
+    filename: wateringPath, interactionSourceIdentity: wateringIdentity,
+  });
+  assert.deepEqual(restoreInteractionSchema(compilation, compilation.interactionSchema), compilation.interactionSchema);
+  const moved = structuredClone(compilation);
+  moved.sourceMap.find(node => node.kind === 'state').line += 1;
+  assert.throws(() => restoreInteractionSchema(moved, moved.interactionSchema), /sourceMap.*canonical.*replay/);
+
+  const forged = structuredClone(compilation);
+  const provenance = forged.interactionSchema.descriptors[0].provenance;
+  const anchorId = 'GF-ABSENT-FROM-SOURCE';
+  assert.equal(forged.sourceDocument.text.includes(anchorId), false);
+  forged.traceMetadata.intentLinks.filter(link => link.nodeId === provenance.sourceNode.id)
+    .forEach(link => { link.anchorId = anchorId; });
+  provenance.intentAnchorIds = [anchorId];
+  assert.throws(() => restoreInteractionSchema(forged, forged.interactionSchema), /traceMetadata.*canonical.*replay/);
+  assert.throws(() => restoreInteractionSchema(compilation, forged.interactionSchema), /does not match compiler provenance/);
 });
 
 test('GF-TEST-interaction-emission-empty: stateless literate control emits an identified empty schema', async () => {
