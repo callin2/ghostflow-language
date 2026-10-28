@@ -14,6 +14,9 @@ import { physicalManifestInputs, validateLifecycleManifest } from '../../tools/l
 import { validateLegacyAdmission, preflightLegacyAdmission } from '../../tools/legacy-admission-contract.mjs';
 import { OUTPUT_OBSERVATION_FORMAT, OUTPUT_OBSERVATION_ROLES, validateOutputObservationsManifest, validateOutputObservationRails, validateOutputObservation } from '../../tools/output-observation-contract.mjs';
 import { validateRequiredRuntimeFeatures } from '../../tools/runtime-features.mjs';
+import { compileSourceSync } from '../../tools/compile-source.mjs';
+import { canonicalJson } from '../../tools/canonical-json.mjs';
+import { equalBytes, sha256Hex } from '../../tools/sha256.mjs';
 
 const FORMAT = 'GhostFlow/control-v1';
 const SETTINGS_FORMAT = 'GhostFlow/control-v2';
@@ -1026,10 +1029,33 @@ function sensorFaultCode(reading) {
 
 function inputValue(value, inputType, label) { return typedValue(value, inputType, label); }
 
-async function instantiateControlRuntime(wasmBytes, { bytes: bytecode, manifest } = {}, options, instantiateRuntime, supportsSchedules) {
+function verifyComposedSource(artifact, compiledBytes, manifest) {
+  if (artifact.sourceClosure === undefined && manifest?.sensorInstances === undefined) return;
+  const { sourceDocument, sourceClosure } = artifact;
+  if (!sourceDocument || typeof sourceDocument.text !== 'string'
+    || sourceDocument.format !== 'GhostFlow/source-document-v1'
+    || sourceDocument.kind !== 'literate'
+    || sha256Hex(sourceDocument.text) !== sourceDocument.sha256
+    || !sourceClosure || sourceClosure.format !== 'GhostFlow/source-closure-v1'
+    || !Array.isArray(sourceClosure.documents)) {
+    throw new Error('composed control requires an exact source document and source closure');
+  }
+  const rebuilt = compileSourceSync(sourceDocument.text, {
+    filename: sourceDocument.filename, sourceClosure: sourceClosure.documents,
+  });
+  if (!equalBytes(rebuilt.bytes, compiledBytes)) throw new Error('composition bytecode does not match canonical source');
+  if (canonicalJson(rebuilt.sourceClosure) !== canonicalJson(sourceClosure))
+    throw new Error('composition source closure does not match canonical source');
+  if (canonicalJson(rebuilt.manifest) !== canonicalJson(manifest))
+    throw new Error('composition manifest does not match canonical source');
+}
+
+async function instantiateControlRuntime(wasmBytes, artifact = {}, options, instantiateRuntime, supportsSchedules) {
+  const { bytes: bytecode, manifest } = artifact;
   const wasm = new Uint8Array(bytes(wasmBytes, 'wasmBytes'));
   // Copy caller-owned bytecode before awaiting digest verification (TOCTOU-safe).
   const compiledBytes = new Uint8Array(bytes(bytecode, 'bytes'));
+  verifyComposedSource(artifact, compiledBytes, manifest);
   let bytecodeFormat = compiledBytes.byteLength >= 6
     ? new DataView(compiledBytes.buffer, compiledBytes.byteOffset, compiledBytes.byteLength).getUint16(4, true)
     : null;
@@ -1173,8 +1199,8 @@ async function instantiateControlRuntime(wasmBytes, { bytes: bytecode, manifest 
 }
 
 export class ControlRuntime {
-  static async instantiate(wasmBytes, { bytes: bytecode, manifest } = {}, options = {}) {
-    const initialized = await instantiateControlRuntime(wasmBytes, { bytes: bytecode, manifest }, options, GhostFlowRuntime.instantiate, true);
+  static async instantiate(wasmBytes, artifact = {}, options = {}) {
+    const initialized = await instantiateControlRuntime(wasmBytes, artifact, options, GhostFlowRuntime.instantiate, true);
     return new ControlRuntime(initialized.runtime, initialized.checkedManifest, initialized.sensors, initialized.signals,
       initialized.afterEvents, false, initialized.temporalEpoch, initialized.hasSolar, initialized.afterEventEpoch, initialized.hasSchedules, initialized.hasContext);
   }
