@@ -2,7 +2,7 @@ import { attachIntentMetadata, remapSourceTrace } from './source-trace.mjs';
 import { emitInteractionSchema } from './interaction-schema.mjs';
 import { extractLiterate, mapSourcePosition } from './literate.mjs';
 import { compileAccountingControl, compileControl, compileControlPolicyDescriptorArtifact, compileResourcePolicyArtifact, compileScheduleDescriptorArtifact, compileTemporalDescriptorArtifact, hasTemporalDescriptorCalls, isExecutablePulseSchedule, isExecutableRangeSchedule, parseControl } from './control.mjs';
-import { isWellFormedUnicode, sha256Hex, utf8ByteLength } from './sha256.mjs';
+import { equalBytes, isWellFormedUnicode, sha256Hex, utf8ByteLength } from './sha256.mjs';
 import { compileComposition, resolveDocument } from './composition.mjs';
 import { emitExplanationArtifact } from './explanation.mjs';
 import { collectIntentLinkDiagnostics } from './intent-link-diagnostics.mjs';
@@ -91,7 +91,7 @@ export function compileSourceSync(source, options = {}) {
   finally { telemetry.finish(); }
 }
 
-function compileSourceCore(source, options, telemetry) {
+function canonicalSourceInput(source, options) {
   if (!options || typeof options !== 'object' || Array.isArray(options)) throw new TypeError('compile options must be an object');
   if (Object.hasOwn(options, 'interactionSchema')) {
     throw new Error('interactionSchema is not a compile option; supply interactionSourceIdentity explicitly');
@@ -101,7 +101,31 @@ function compileSourceCore(source, options, telemetry) {
   requireSourceText(source, `${filename}: source`);
   if (!filename.endsWith('.ghost.md')) throw new Error(`${filename}: GhostFlow product compilation requires a canonical .ghost.md literate source`);
   const legacyAdmission = inspectLegacyAdmissionSource(source, { filename });
-  const hardwarePlan = resolveHardwareProfiles(parseHardwareFrontMatter(source, { filename }), options.hardwareProfiles);
+  const hardwareDeclaration = parseHardwareFrontMatter(source, { filename });
+  return { source, filename, interactionSourceIdentity, legacyAdmission, hardwareDeclaration };
+}
+
+function compileSourceCore(source, options, telemetry) {
+  const input = canonicalSourceInput(source, options);
+  const hardwarePlan = resolveHardwareProfiles(input.hardwareDeclaration, options.hardwareProfiles);
+  return compileLiterateCore(input, options, telemetry, hardwarePlan);
+}
+
+/** Reconstruct program provenance against exact bytes; this does not admit a hardware installation. */
+export function replaySourceProvenance({ sourceDocument, bytes, sourceClosure }) {
+  const options = { filename: sourceDocument.filename,
+    ...(sourceClosure ? { sourceClosure: sourceClosure.documents } : {}) };
+  const replay = sourceClosure ? compileSourceSync(sourceDocument.text, options)
+    : compileLiterateCore(canonicalSourceInput(sourceDocument.text, options), options);
+  if (!equalBytes(bytes, replay.bytes)) {
+    throw new Error(`interaction schema: bytecode does not match canonical ${sourceClosure ? 'source closure' : 'literate source'} replay`);
+  }
+  return { bytes: replay.bytes, sourceDocument: replay.sourceDocument, sourceMap: replay.sourceMap,
+    traceMetadata: replay.traceMetadata, manifest: replay.manifest,
+    ...(replay.sourceClosure ? { sourceClosure: replay.sourceClosure } : {}) };
+}
+
+function compileLiterateCore({ source, filename, interactionSourceIdentity, legacyAdmission, hardwareDeclaration }, options, telemetry, hardwarePlan) {
   let extraction;
   telemetry?.phase('extract');
   try { extraction = extractLiterate(source, { filename }); }
@@ -119,8 +143,8 @@ function compileSourceCore(source, options, telemetry) {
     if (legacyAdmission) legacyAdmissionInputs(ast, legacyAdmission);
     telemetry?.ast(ast);
     telemetry?.phase('compile_lower_encode');
-    if (hardwarePlan && ast.imports?.length) throw new HardwareFrontMatterError(hardwarePlan.source,
-      hardwarePlan.locations['/hardware'] ?? hardwarePlan.locations['/profile'], 'hardware declarations in executable import composition are not supported');
+    if (hardwareDeclaration && ast.imports?.length) throw new HardwareFrontMatterError(hardwareDeclaration.source,
+      hardwareDeclaration.locations['/hardware'] ?? hardwareDeclaration.locations['/profile'], 'hardware declarations in executable import composition are not supported');
     stage = 'semantic';
     if (options.sourceClosure !== undefined && ast.imports?.length) {
       composition = compileComposition(source, filename, options.sourceClosure);

@@ -13,6 +13,11 @@ Standalone, composed and alarm regressions cover the rejection in
 `tests/interaction-emission.test.mjs`, `tests/composed-interaction.test.mjs` and
 `tests/alarm-observation.test.mjs`. Settings restore tests retain 0.3 and 0.4
 contracts in `tests/settings-default-provenance.test.mjs`.
+Canonical replay also restores admitted compact-profile source without requesting
+the external profile closure again. For example, a persisted `profile:
+example-board@1` program retains its exact source digest, node spans and 0.3 or
+0.4 schema. Ordinary compilation still validates profile digests and bindings.
+The replay reconstructs program provenance and does not validate an installation.
 
 ### 2026-10-29 - scan-owned alarm lifecycle ([#287](https://github.com/callin2/ghostflow-language/issues/287))
 
