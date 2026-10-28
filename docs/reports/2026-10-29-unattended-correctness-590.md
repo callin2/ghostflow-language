@@ -641,3 +641,32 @@ SHA-256은 `4b8bd469559ccbc582c86b571073083f43e3ddf9355214f2407ee0f736e14d8c`다
 전체 로그·identity·receipt를 `build/evidence/build190/`에 보존했다. WASM 해시는 build187과 같다.
 CI에도 실제 두 입력 Lean 검사를 추가했다. JS 원본 AST 투영, 일반 f64/Rust 대응과 전체
 compiler 증명은 남는다. 자세한 범위는 [두 입력 보고서](../../experiments/two-sensor-provenance/proof-report.md)에 있다.
+
+## build192: elapsed 시작 시각과 두 관측 시점
+
+원본 문서와 실제 419바이트 GFB 전체를 연결해, 모든 유한 입력 이력에서 초기화 시 현재
+시각 선택·상태 유지 시 시작 시각 보존·상태 변경 시 시작 시각 갱신을 증명했다. 생성된
+회복 식의 반복 평가로 생기는 event도 그대로 모델링했다. Number는 선택·전달만 하며
+Duration 뺄셈이나 실제 Rust VM 대응을 증명한 것은 아니다.
+
+고정 소스 `106beff40020b5b1185f20704f98b2c6e9fa85bd`에서 Lean 51회(성공 32·목표 정리
+거절 19)가 `2026-10-28T23:10:14.752Z`에 exit 0으로 끝났다. 입력 109개와 모든 결과의
+소스·로그 해시가 일치했다. receipt SHA-256은
+`f88e61116dceca0bb69584e3c47c119fa6eaa6d19c158950476c5ce49338c665`다.
+빌드183의 Rust/Cargo 100개 및 바이너리 해시를 확인해 재사용한 101개 이력·1,015 scan도
+5개 실행 경로에서 일치했다. 시각은 `2026-10-28T23:05:21.972Z`, receipt SHA-256은
+`327e9e689fb6f1cd03045a23b7afb80e52213261d3453b4f7bd33d5e28f4d268`다.
+
+검토에서 proof helper의 외부 Lean 버전 조회 중 이전 passed 기록이 남는 문제를 재현하고
+수정했다. 시작 시 running과 실패 시 failed를 원자적으로 남기는 회귀 검사 6개를 통과했다.
+또한 상태 변경 scan에서 제어식은 이전 구간의 시간을 읽고, 확정 후 timer 관측은 새 구간의
+0을 표시한다는 기존 동작을 두 언어의 reference와 같은 실행의 회귀 검사에 명시했다.
+
+공식 build192는 `2026-10-28T23:15:07.294Z`에 exit 0으로 끝났다. 15 gate, Rust 441,
+주 Node 3,923 pass / 11 TODO / 0 fail, console 15, Python 3+8 pass다. 전체 로그·identity·
+receipt는 `build/evidence/build192/`에 보존했다. receipt SHA-256은
+`a4a9a3f4eec40edfd907288c90719c0b739b5bf8436c98df52cd256099e09f91`이다.
+새 WASM은 build183과 같은 해시다. 실제 장치 시험은 하지 않았다.
+
+후속으로 시계의 정수 범위·비감소 전제 아래 경과 시간 범위를 증명하고, 실제 실행 경로의
+상한·역행·거부 뒤 상태 보존을 검사한다. 전체 compiler 증명과 Rust/f64 대응은 열려 있다.

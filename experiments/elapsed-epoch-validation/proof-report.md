@@ -86,7 +86,7 @@ It checks all 100 Rust and Cargo source hashes against that receipt and fingerpr
 The receipt SHA-256 is `1f1d03c4919cf4bd8b7be803069d8a158e46a327438bc4e7d1306f2177ca5d1f`.
 The native binary SHA-256 is `28aa4823424e7ce3055f2ea1cb08f59ca93ba926bd6142b593870156a6cd4e90`.
 The WASM binary SHA-256 is `98d3bb473dc90f68681d974277dc01b17e69516d45c69e55147b7805a608d423`.
-No compiler build, firmware upload, or hardware test is part of this unit.
+No compiler build, firmware upload, or hardware test was part of that standalone worker run.
 
 The runtime helper publishes an atomic running receipt before provenance reads, then a fresh passed or failed receipt.
 A focused regression test starts with a passed receipt, supplies a missing runtime source, and checks replacement by failed with exit code 1.
@@ -106,3 +106,37 @@ node experiments/elapsed-epoch-validation/runtime.mjs ../ghostflow-int32-integra
 ```
 
 The runtime command requires the unchanged build183 receipt and binaries in the supplied sibling checkout.
+
+## Integrated verification
+
+The integration source is `106beff40020b5b1185f20704f98b2c6e9fa85bd`.
+Fresh Lean execution finished at `2026-10-28T23:10:14.752Z` with exit 0:
+51 expected outcomes, comprising 32 successes and 19 targeted rejections.
+All 109 input hashes and every outcome's input/log hash matched the retained files.
+The receipt is `build/elapsed-wave17-590/verification.json`, SHA-256
+`f88e61116dceca0bb69584e3c47c119fa6eaa6d19c158950476c5ce49338c665`.
+The worker's earlier receipts in `evidence-summary.json` remain historical records.
+
+The fresh runtime observation finished at `2026-10-28T23:05:21.972Z`:
+101 histories and 1,015 scans across the five production paths, reusing the verified
+build183 binaries. Its receipt SHA-256 is
+`327e9e689fb6f1cd03045a23b7afb80e52213261d3453b4f7bd33d5e28f4d268`
+at `build/elapsed-runtime-wave17-590/runtime-verification.json`.
+
+Independent review found that the proof helper initially left an earlier passed
+receipt visible during the external Lean version probe. A regression observed that
+stale value before the fix. The helper now publishes running before the probe,
+and a failed probe replaces the receipt with failed. The six focused tests pass.
+Review confirmed the fix without changing the proof semantics.
+
+Official build192 finished at `2026-10-28T23:15:07.294Z`, exit 0: all 15 gates,
+441 Rust tests, 3,923 main Node passes with 11 TODO and no failures, 15 console
+tests, and Python suites of 3 and 8 tests. The full log, identity and receipt are
+retained under `build/evidence/build192/`. Receipt SHA-256:
+`a4a9a3f4eec40edfd907288c90719c0b739b5bf8436c98df52cd256099e09f91`.
+The rebuilt WASM hash matches build183. This is host evidence, not hardware evidence.
+
+The Korean and English time references now distinguish source expressions reading
+the old epoch from timer observations reading committed state. The new regression
+checks both values in the same plain/framed execution. Existing runtime semantics
+remain unchanged. Clock range and numeric subtraction are separate proof obligations.
