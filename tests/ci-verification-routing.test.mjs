@@ -211,3 +211,9 @@ test('empty test batches never trigger implicit Node test discovery', () => {
   assert.deepEqual(languageTestBatches(['tests/compiler.test.mjs']), [['tests/compiler.test.mjs']]);
   assert.deepEqual(languageTestBatches(['tests/ghostsim-console.test.mjs']), [['tests/ghostsim-console.test.mjs']]);
 });
+
+test('coverage tests serialize shared Cargo artifact writers and readers', () => {
+  const coverage = fs.readFileSync(new URL('../tools/coverage-language.mjs', import.meta.url), 'utf8');
+  assert.match(coverage, /run\(process\.execPath, \['--test', '--test-concurrency=1', \.\.\.TESTS\]/);
+  assert.match(coverage, /NODE_V8_COVERAGE: coverageDir \}, timeout: 600_000 \}/);
+});

@@ -5,6 +5,7 @@ import { isInt32, intSettingsIssue } from '../../tools/int-settings.mjs';
 import { isTimeType, validateTimeValue } from '../../tools/time-literals.mjs';
 import { compileSourceSync } from '../../tools/compile-source.mjs';
 import { prepareCompletedScanSnapshot } from '../../tools/interaction-runtime-snapshot.mjs';
+import { prepareOutputExplanation } from '../../tools/explanation.mjs';
 
 const clone = value => structuredClone(value);
 const token = Symbol('temporary settings activation');
@@ -63,10 +64,15 @@ export class TemporarySettingsHost {
   #ordinary; #overlays = []; #history = []; #ids = [];
   #position = 0; #unavailable = null; #ended = false;
   #observationProducer = null; #observation = { snapshot: null, error: null };
+  #explanationProducer = null; #explanation = { proofs: [], error: null };
 
   static async instantiate(wasm, artifact, { runId, grants, historyCapacity = 256,
-    checkpoint = null, restoreApproved = false, framed = true, ...activation } = {}) {
+    checkpoint = null, restoreApproved = false, framed = true, outputExplanations = false, ...activation } = {}) {
     artifact=clone(artifact);grants=clone(grants);activation=clone(activation);
+    if (typeof outputExplanations !== 'boolean') fail('outputExplanations must be Boolean');
+    if (outputExplanations && !framed) fail('output explanations require a framed host');
+    if (outputExplanations && !artifact.interactionSchema) fail('output explanations require an Interaction Schema');
+    if (activation.instructionWitnesses !== undefined) fail('use outputExplanations to enable instruction witnesses');
     if (!text(runId) || !exact(historyCapacity) || historyCapacity < 1 || historyCapacity > 4096
       || !grants || typeof grants !== 'object' || Array.isArray(grants)
       || Object.entries(grants).some(([actor,ids]) => !text(actor) || !Array.isArray(ids)
@@ -78,10 +84,13 @@ export class TemporarySettingsHost {
     const verified=compileSourceSync(artifact.sourceDocument.text,{filename:artifact.sourceDocument.filename,
       ...(artifact.sourceClosure?{sourceClosure:artifact.sourceClosure.documents}:{})});
     if(sha256Hex(verified.bytes)!==sha256Hex(artifact.bytes)||!equal(verified.manifest,artifact.manifest))fail('source/manifest identity');
-    const runtime = await (framed ? ControlRuntime.instantiateFramed : ControlRuntime.instantiate)(wasm,clone(artifact),activation);
+    const explanationProducer = outputExplanations ? prepareOutputExplanation({ compilation: artifact, runId }) : null;
+    const runtime = await (framed ? ControlRuntime.instantiateFramed : ControlRuntime.instantiate)(wasm,clone(artifact),
+      { ...activation, ...(outputExplanations ? { instructionWitnesses: true } : {}) });
     try {
       const owner = new TemporarySettingsHost(token,runtime,artifact.sourceDocument.sha256,runId,clone(grants),historyCapacity,framed);
       if (artifact.interactionSchema) owner.#observationProducer = prepareCompletedScanSnapshot({ compilation: artifact, runId });
+      owner.#explanationProducer = explanationProducer;
       if (checkpoint !== null) owner.#restore(checkpoint,restoreApproved);
       return owner;
     } catch (error) { runtime.dispose(); throw error; }
@@ -100,7 +109,10 @@ export class TemporarySettingsHost {
   #config(id) { const c=this.#configs.find(c=>c.id===id);if(!c)fail('setting identity');return c; }
   #allowed(actor,id) { return Object.hasOwn(this.#grants,actor) && this.#grants[actor].includes(id) && this.#config(id).settings?.access==='operator'; }
   interactionSnapshot() { return clone(this.#observation); }
+  get currentFrameCompletion() { return this.#runtime.currentFrameCompletion; }
   get interactionIdentity() { return this.#observationProducer ? clone(this.#observationProducer.expected) : null; }
+  explanationSnapshot() { return this.#explanationProducer ? clone(this.#explanation) : { proofs: [], error: 'output-explanations-disabled' }; }
+  get explanationDescriptor() { return this.#explanationProducer ? clone(this.#explanationProducer.descriptor) : null; }
   snapshot() {
     const core=this.#runtime.contextSnapshot();
     return {sourceSha256:this.#source,programFingerprint:core.state.programFingerprint,runId:this.#run,
@@ -282,7 +294,9 @@ export class TemporarySettingsHost {
   dispose(){this.#runtime.dispose();}
   endRun(packet){return this.#attempt(packet,null,true);}
   step(packet,event=null){return this.#attempt(packet,event,false);}
-  #attempt(packet,event,ending){try{return this.#step(packet,event,ending);}catch(error){
+  #attempt(packet,event,ending){
+    if (this.#explanationProducer) this.#explanation = { proofs: [], error: 'scan-not-completed' };
+    try{return this.#step(packet,event,ending);}catch(error){
     if(!(error instanceof ReturnUnavailable))throw error;
     this.#unavailable=error.message;return {accepted:false,reason:'settings-unavailable',outcome:null,coreEvent:null,snapshot:this.snapshot()};}}
 
@@ -402,7 +416,19 @@ export class TemporarySettingsHost {
         this.#observation = { snapshot: null, error: 'completed-scan-observation-failed' };
       }
     }
-    return {accepted:true,reason:null,outcome,coreEvent:clone(coreEvent),snapshot:this.snapshot(),
+    const result = {accepted:true,reason:null,outcome,coreEvent:clone(coreEvent),snapshot:this.snapshot(),
       ...(this.#observationProducer ? { observation: this.interactionSnapshot() } : {})};
+    if (this.#explanationProducer) {
+      try {
+        const strategy = this.#explanationProducer.descriptor.strategies.find(item => item.name === outcome.vm.strategy);
+        if (!strategy || this.#observation.error !== null) throw new Error('completed observation unavailable');
+        const proofs = strategy.outputs.map(output => this.#explanationProducer.emit({ runId: this.#run, result, outputId: output.outputId }));
+        this.#explanation = { proofs, error: null };
+      } catch {
+        this.#explanation = { proofs: [], error: 'completed-scan-explanation-failed' };
+      }
+      result.explanation = this.explanationSnapshot();
+    }
+    return result;
   }
 }

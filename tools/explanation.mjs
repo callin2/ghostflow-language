@@ -1,6 +1,8 @@
 import { canonicalJson } from './canonical-json.mjs';
 import { sha256Hex } from './sha256.mjs';
-import { compileSourceSync } from './compile-source.mjs';
+import { replaySourceProvenance, emitInteractionSchema } from './compile-source.mjs';
+import { extractLiterate } from './literate.mjs';
+import { parseControl } from './control.mjs';
 import { prepareCompletedScanSnapshot, joinRuntimeSnapshot } from './interaction-runtime-snapshot.mjs';
 
 export const EXPLANATION_LIMITS = Object.freeze({ nodes: 512, edges: 1024, depth: 64, instructions: 8192 });
@@ -33,18 +35,45 @@ function instructionTable(bytes) {
   return table;
 }
 
+function composedSources(compilation) {
+  if (!compilation.sourceClosure) return null;
+  const documents = new Map([compilation.sourceDocument, ...compilation.sourceClosure.documents]
+    .map(document => [document.filename, document]));
+  const declarations = new Map([...documents.values()].map(document => [document.filename,
+    new Map(parseControl(extractLiterate(document.text, { filename: document.filename }).code,
+      { filename: document.filename }).body.map(item => [item.id, item]))]));
+  const nodes = new Map(compilation.sourceMap.map(node => [node.id, node]));
+  return binding => {
+    const node = nodes.get(binding.nodeId), document = documents.get(node?.filename);
+    const declaration = declarations.get(node?.filename)?.get(node.definitionNodeId);
+    if (!node || !document || !declaration) fail('composed semantic source binding unavailable');
+    const intent = node.instance === null ? compilation.traceMetadata
+      : compilation.traceMetadata.compositionIntent?.instances.find(item => item.instance === node.instance);
+    return {
+      label: declaration.name,
+      source: { sourceNode: { nodeId: node.id, definitionNodeId: node.definitionNodeId,
+        instance: node.instance, filename: node.filename, line: node.line, column: node.column,
+        endLine: node.endLine, endColumn: node.endColumn,
+        sourceSha256: document.sha256, ...(document.revision ? { sourceRevision: document.revision } : {}) },
+      intentProvenance: own((intent?.intentLinks ?? intent?.links ?? []).filter(link => link.nodeId === node.id)) },
+    };
+  };
+}
+
 /** A bounded sidecar emitted from the same IR/instruction writers as GFB1.
  * Offsets are private artifact mappings, never public semantic identities. */
 export function emitExplanationArtifact(compilation) {
   const artifact = { format: 'GhostFlow/explanation-artifact-v1', version: '0.1',
     sourceSha256: compilation.sourceDocument.sha256, bytecodeSha256: compilation.manifest.bytecodeSha256,
     limits: { ...EXPLANATION_LIMITS }, nodes: [], strategies: [],
-    unsupportedKinds: ['timer', 'schedule', 'composition', 'safety', 'result', 'transition-proof'] };
+    ...(compilation.sourceClosure ? { sourceClosureSha256: sha256Hex(canonicalJson(compilation.sourceClosure)) } : {}),
+    unsupportedKinds: ['timer', 'schedule', 'safety', 'result', 'transition-proof'] };
   const nodes = new Map();
-  if (compilation.sourceClosure || !compilation.explanationExpressions) {
+  if (!compilation.explanationExpressions) {
     artifact.unavailableReason = 'unsupported-artifact-kind';
     return artifact;
   }
+  const sourceFor = composedSources(compilation);
   for (const strategy of compilation.explanationExpressions) {
     const outputs = [];
     for (const intent of strategy.intents) {
@@ -54,7 +83,8 @@ export function emitExplanationArtifact(compilation) {
       let unsupportedKind = null, count = 0, edges = 0;
       const check = (node, depth = 1) => {
         if (++count > EXPLANATION_LIMITS.nodes || depth > EXPLANATION_LIMITS.depth) unsupportedKind = 'resource-bounds';
-        if (!supported.has(node.kind) || node.name?.startsWith('__gf_')) unsupportedKind ??= node.kind;
+        if (!supported.has(node.kind)) unsupportedKind ??= node.kind;
+        if (node.name?.startsWith('__gf_')) unsupportedKind ??= 'generated-rail';
         const children = childrenOf(node); edges += children.length;
         for (const child of children) check(child, depth + 1);
       };
@@ -63,26 +93,36 @@ export function emitExplanationArtifact(compilation) {
       if (edges > EXPLANATION_LIMITS.edges || nodes.size + count > EXPLANATION_LIMITS.nodes) unsupportedKind ??= 'resource-bounds';
       if (unsupportedKind) { output.unsupportedKind = unsupportedKind; continue; }
       const binding = compilation.traceMetadata.bindings.find(item => item.kind === 'connection' && item.name === intent.name);
+      const sourceOf = expression => {
+        const leaf = ['input', 'previous_state', 'candidate_next'].includes(expression.kind);
+        const semanticBinding = leaf ? compilation.traceMetadata.bindings.find(item => item.name === expression.name
+          && item.kind === (expression.kind === 'input' ? 'input' : 'state')) : binding;
+        if (!semanticBinding) fail('semantic source binding unavailable');
+        if (sourceFor) {
+          const resolved = sourceFor(semanticBinding);
+          return { label: leaf ? (resolved.source.sourceNode.instance ? `${resolved.source.sourceNode.instance}.` : '') + resolved.label : null,
+            source: { ...resolved.source, sourceRole: leaf ? 'declaration' : 'output-connection' } };
+        }
+        return { label: expression.name,
+          source: { sourceNode: { nodeId: semanticBinding.nodeId, ...semanticBinding.source },
+            intentProvenance: (compilation.traceMetadata.intentLinks ?? []).filter(link => link.nodeId === semanticBinding.nodeId) } };
+      };
       const add = (expression, path = 'root') => {
         const nodeId = idOf(expression), children = childrenOf(expression);
         const occurrenceId = `${output.outputId}:${path}`;
         const childOccurrences = children.map((child, index) => add(child, `${path}.${index}`));
-        const semanticBinding = ['input', 'previous_state', 'candidate_next'].includes(expression.kind)
-          ? compilation.traceMetadata.bindings.find(item => item.name === expression.name && item.kind === (expression.kind === 'input' ? 'input' : 'state')) : binding;
-        if (!semanticBinding) fail('semantic source binding unavailable');
-        const sourceNode = { nodeId: semanticBinding.nodeId, ...semanticBinding.source };
-        const provenance = (compilation.traceMetadata.intentLinks ?? []).filter(link => link.nodeId === semanticBinding.nodeId);
+        const { label, source } = sourceOf(expression);
         const descriptor = { id: nodeId, kind: kinds[expression.kind] ?? expression.kind, semanticType: expression.type,
-          label: expression.name ?? expression.operation ?? ({ logical_and: 'AND', logical_or: 'OR', logical_not: 'NOT' }[expression.kind]) ?? expression.kind,
-          children: children.map(idOf), sources: [{ sourceNode, intentProvenance: provenance }] };
+          label: label ?? expression.operation ?? ({ logical_and: 'AND', logical_or: 'OR', logical_not: 'NOT' }[expression.kind]) ?? expression.kind,
+          children: children.map(idOf), sources: [source] };
         if (!nodes.has(nodeId)) nodes.set(nodeId, descriptor);
-        else if (!nodes.get(nodeId).sources.some(source => same(source.sourceNode, sourceNode))) nodes.get(nodeId).sources.push(descriptor.sources[0]);
+        else if (!nodes.get(nodeId).sources.some(item => same(item, source))) nodes.get(nodeId).sources.push(source);
         // Expression objects retain occurrence identity in the emitter, including
         // repeated semantic nodes. Never deduplicate execution sites by node ID.
         const mapping = intent.witnessNodes.find(item => item.expression === expression);
         if (!mapping) fail('instruction mapping unavailable');
         output.occurrences.push({ id: occurrenceId, nodeId, operation: expression.kind,
-          children: childOccurrences, exits: own(mapping.exits) });
+          children: childOccurrences, exits: own(mapping.exits), ...(sourceFor ? { source: own(source) } : {}) });
         return occurrenceId;
       };
       output.rootOccurrenceId = add(intent.expression);
@@ -102,24 +142,53 @@ export function prepareOutputExplanation({ compilation, runId } = {}) {
   const owned = own(compilation);
   const identity = owned.interactionSourceIdentity;
   if (!owned.sourceDocument || !identity) fail('canonical source and Interaction identity required');
-  const rebuilt = compileSourceSync(owned.sourceDocument.text, { filename: owned.sourceDocument.filename,
-    interactionSourceIdentity: identity, ...(owned.sourceClosure ? { sourceClosure: owned.sourceClosure } : {}) });
+  let replay;
+  try { replay = replaySourceProvenance(owned); }
+  catch (error) { fail(`artifact mapping mismatch: ${error.message}`); }
+  const rebuilt = { ...replay, interactionSchema: emitInteractionSchema(replay, identity) };
   if (sha256Hex(owned.bytes) !== rebuilt.manifest.bytecodeSha256 || !same(owned.explanationArtifact, rebuilt.explanationArtifact)) fail('artifact mapping mismatch');
+  for (const field of ['sourceMap', 'traceMetadata', 'manifest', ...(owned.sourceClosure ? ['sourceClosure'] : [])]) {
+    if (!same(owned[field], rebuilt[field])) fail(`${field} mapping mismatch`);
+  }
   const descriptor = freeze(own(rebuilt.explanationArtifact));
   const snapshotProducer = prepareCompletedScanSnapshot({ compilation: rebuilt, runId });
   return Object.freeze({ descriptor, expected: snapshotProducer.expected,
     emit({ runId: actualRunId, result, outputId } = {}) {
       if (actualRunId !== runId) fail('run epoch mismatch');
-      // A failed adapter attempt may retain its last good outcome. It is never
-      // admissible as the failed attempt's completed proof.
-      if (result?.accepted !== true || !result.outcome) fail('accepted completed scan required');
-      const outcome = result.outcome, trace = outcome.trace;
-      if (outcome.format !== 'GhostFlow/scan-outcome-v1' || trace?.tick !== outcome.scanId + 1) fail('scan/tick mismatch for fresh run');
-      const completion = { kind: 'completed-scan', scanId: outcome.scanId, logicalTimeMs: outcome.logicalTimeMs };
-      const snapshot = snapshotProducer.emit({ completion, trace });
+      const { completion, trace, settingsState } = completedResult(result, snapshotProducer.expected, rebuilt.manifest.configs ?? []);
+      const snapshot = snapshotProducer.emit({ completion, trace, ...(settingsState ? { settingsState } : {}) });
       return projectVerifiedProof(descriptor, snapshot, trace, outputId);
     },
   });
+}
+
+function completedResult(result, expected, configs = []) {
+  if (result?.accepted !== true || !result.outcome) fail('accepted completed scan required');
+  const outcome = result.outcome, ownedHost = outcome.frame !== undefined;
+  const frame = ownedHost ? outcome.frame : outcome;
+  const trace = ownedHost ? outcome.vm : outcome.trace;
+  if ((!ownedHost && outcome.format !== 'GhostFlow/scan-outcome-v1')
+    || !Number.isSafeInteger(frame?.scanId) || frame.scanId < 0
+    || !Number.isSafeInteger(frame.logicalTimeMs) || frame.logicalTimeMs < 0
+    || trace?.tick !== frame.scanId + 1 || trace.module !== expected.moduleFingerprint) fail('scan/tick/module mismatch for fresh run');
+  let settingsState;
+  if (ownedHost) {
+    const state = result.snapshot;
+    if (state?.runId !== expected.runId || state.sourceSha256 !== expected.sourceSha256
+      || state.programFingerprint !== expected.moduleFingerprint || state.position !== frame.scanId + 1
+      || state.lastOutcome?.scanId !== frame.scanId || state.lastOutcome.logicalTimeMs !== frame.logicalTimeMs
+      || !same(state.lastOutcome.trace, trace)) fail('completed settings host identity mismatch');
+    if (trace.contextTrace?.some(item => ['SettingsOk', 'SettingsInvalid', 'SettingsUnavailable'].includes(item.decision)
+      && item.providerRevision !== String(state.core?.state?.settingsRevision))) fail('completed settings revision mismatch');
+    if (configs.length) {
+      settingsState = state.core?.state;
+      if (!settingsState || !configs.every(config => {
+        const observation = trace.contextTrace?.filter(item => item.site === config.id && item.contextRevision === config.name);
+        return observation?.length === 1 && observation[0].providerRevision === String(settingsState.settingsRevision);
+      })) fail('completed settings revision mismatch');
+    }
+  }
+  return { completion: { kind: 'completed-scan', scanId: frame.scanId, logicalTimeMs: frame.logicalTimeMs }, trace, settingsState };
 }
 
 function projectVerifiedProof(descriptor, snapshot, trace, outputId) {
@@ -128,6 +197,8 @@ function projectVerifiedProof(descriptor, snapshot, trace, outputId) {
   if (!output || !Object.hasOwn(trace.requested, output.name)) fail('requested output unavailable');
   const shell = { format: 'GhostFlow/output-explanation-v1', version: '0.1', schema: snapshot.schema,
     module: snapshot.module, source: snapshot.source, runId: snapshot.runId, completion: snapshot.completion,
+    ...(snapshot.composition ? { composition: snapshot.composition } : {}),
+    ...(snapshot.settingsRevision !== undefined ? { settingsRevision: snapshot.settingsRevision } : {}),
     artifactSha256: sha256Hex(canonicalJson(descriptor)), outputId, stage: 'requested',
     value: trace.requested[output.name], rootNodeId: output.rootNodeId ?? null, evaluations: [], edges: [] };
   if (output.unsupportedKind) return freeze({ ...shell, status: 'unavailable', reason: `unsupported-kind:${output.unsupportedKind}` });
@@ -160,6 +231,7 @@ function projectVerifiedProof(descriptor, snapshot, trace, outputId) {
     const node = descriptor.nodes.find(item => item.id === occurrence.nodeId);
     if (value && (!Object.hasOwn(value, 'value') || (node.semanticType === 'Bool' ? typeof value.value !== 'boolean' : typeof value.value !== 'number'))) fail('actual value type mismatch');
     evaluations.set(occurrence.id, { occurrenceId: occurrence.id, nodeId: occurrence.nodeId,
+      ...(occurrence.source ? { source: occurrence.source } : {}),
       status: value ? 'ready' : 'unavailable', evaluated: Boolean(value),
       ...(value ? { value: value.value } : { reason: 'not-evaluated' }), supportsResult: false });
   }
@@ -200,15 +272,17 @@ export function joinOutputExplanation(schema, proof, snapshot, expected, descrip
     || proof.status === 'unavailable' && (proof.evaluations.length !== 0 || proof.edges.length !== 0)) fail('proof payload bounds or occurrence mismatch');
   const snapshotJoin = joinRuntimeSnapshot(schema, snapshot, expected);
   const proofJoin = joinRuntimeSnapshot(schema, { ...snapshot, schema: proof.schema, module: proof.module,
-    source: proof.source, runId: proof.runId, completion: proof.completion }, expected);
+    source: proof.source, runId: proof.runId, completion: proof.completion,
+    ...(snapshot.composition ? { composition: proof.composition } : {}) }, expected);
   const staleReasons = [...new Set([...snapshotJoin.staleReasons, ...proofJoin.staleReasons])];
   if (!same(proof.completion, snapshot.completion)) staleReasons.push('completion-mismatch');
+  if (proof.settingsRevision !== snapshot.settingsRevision) staleReasons.push('settings-revision-mismatch');
   if (!staleReasons.length) {
-    const outcome = result?.outcome;
-    if (result?.accepted !== true || outcome?.format !== 'GhostFlow/scan-outcome-v1'
-      || outcome.scanId !== snapshot.completion.scanId || outcome.logicalTimeMs !== snapshot.completion.logicalTimeMs
-      || outcome.trace?.tick !== outcome.scanId + 1 || outcome.trace?.module !== schema.module.moduleFingerprint) fail('accepted output sample mismatch');
-    const rebuiltProof = projectVerifiedProof(descriptor, snapshot, outcome.trace, proof.outputId);
+    const actual = completedResult(result, expected);
+    if (!same(actual.completion, snapshot.completion)
+      || snapshot.settingsRevision !== undefined && result.outcome.frame
+        && result.snapshot.core?.state?.settingsRevision !== snapshot.settingsRevision) fail('accepted output sample mismatch');
+    const rebuiltProof = projectVerifiedProof(descriptor, snapshot, actual.trace, proof.outputId);
     if (!same(proof, rebuiltProof)) fail('proof payload does not match actual output/witnesses');
   }
   return { status: staleReasons.length ? 'stale' : 'ready', staleReasons };

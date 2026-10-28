@@ -1120,6 +1120,8 @@ function verifySourceBoundContext(artifact, compiledBytes, manifest, bytecodeFor
 }
 
 async function instantiateControlRuntime(wasmBytes, artifact = {}, options, instantiateRuntime, supportsSchedules) {
+  if (options.instructionWitnesses !== undefined && typeof options.instructionWitnesses !== 'boolean') throw new Error('instructionWitnesses must be Boolean');
+  if (options.instructionWitnesses && instantiateRuntime !== FramedGhostFlowRuntime.instantiate) throw new Error('instruction witnesses require a framed host');
   const { bytes: bytecode, manifest } = artifact;
   const wasm = new Uint8Array(bytes(wasmBytes, 'wasmBytes'));
   // Copy caller-owned bytecode before awaiting digest verification (TOCTOU-safe).
@@ -1226,6 +1228,7 @@ async function instantiateControlRuntime(wasmBytes, artifact = {}, options, inst
   const afterEvents = new Map();
   try {
     runtime.load(compiledBytes);
+    if (options.instructionWitnesses) runtime.enableInstructionWitnesses();
     const declaredPercentRange = validateRequiredRuntimeFeatures(checkedManifest.manifest).includes('percent-range-v1');
     if (runtime.requiresPercentRangeV1() !== declaredPercentRange) {
       throw new Error('requiredRuntimeFeatures does not match loaded bytecode');
@@ -1282,6 +1285,7 @@ export class ControlRuntime {
   }
 
   #frameScanId;
+  #currentFrameCompletion = null;
   #framed;
   #faulted;
   #temporalEpoch;
@@ -1334,6 +1338,10 @@ export class ControlRuntime {
     this.#live();
     if (!this.#framed) return null;
     return this.runtime.outcome;
+  }
+  get currentFrameCompletion() {
+    this.#live();
+    return this.#faulted || this.#currentFrameCompletion === null ? null : { ...this.#currentFrameCompletion };
   }
   get restartEventPending() {
     this.#live();
@@ -1843,6 +1851,7 @@ export class ControlRuntime {
 
       phase = 'dispatch';
       const frame = { scanId, logicalTimeMs: captured.nowMs, inputs: frameInputs };
+      this.#currentFrameCompletion = null;
       if (this.#hasContext) this.runtime.dispatchContext(frame, captured.contextFacts);
       else if (this.#hasSchedules) this.runtime.dispatchSchedules(frame, captured.scheduleFacts);
       else this.runtime.dispatch(frame);
@@ -1853,6 +1862,7 @@ export class ControlRuntime {
       this.#commitConditioners(transaction);
       this.#commitAfterEvents(afterEventTransaction);
       const outcome = this.runtime.outcome;
+      this.#currentFrameCompletion = { scanId, logicalTimeMs: captured.nowMs };
       return {
         vm: outcome.trace,
         sensors: Object.fromEntries(sensorReadings),
@@ -1889,6 +1899,7 @@ export class ControlRuntime {
     this.runtime.dispose();
     this.lastNowMs = null;
     this.#frameScanId = null;
+    this.#currentFrameCompletion = null;
     this.#faulted = false;
   }
 

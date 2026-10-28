@@ -75,8 +75,8 @@
       "source": "docs/BOOLEAN-OUTPUT-EXPLANATION.md",
       "sourceLanguage": "en",
       "translation": "docs/BOOLEAN-OUTPUT-EXPLANATION.ko.md",
-      "sourceSha256": "506105e4909a8f498f7e3fa7206d4a3568153ebf6076cada1c3663921d199a44",
-      "translationSha256": "407424daee4b30a7ad4b9acd9580d0254a18e2819c0a0ad2875c96d62f587ddf"
+      "sourceSha256": "4d23264df642643c4489a363d6e406b579e3121d06a450c28e6334c96b80eccf",
+      "translationSha256": "1161909fb8e27e043c8c458253af20cb7357fad185e2e4a2253101a1321a64a6"
     },
     {
       "source": "docs/INPUT-MIGRATION.md",
@@ -705,8 +705,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "deae2aa7eba794ea142de6c87795984634e461371fd6612a1041ef41902bd4df",
-      "translationSha256": "5eb19065ff83443d9b078bd708cca4f44f0d96aae8125bb33dd370276fdf6bdf"
+      "sourceSha256": "7b240a69d8693a0db87ae8a83ad19572bd4705ca79dc120a144891615a5dfa0e",
+      "translationSha256": "d61e6c7a06442a8d57dd05b8cc1422515d78b020e5da062b6258c4bce6fbc5e3"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",
@@ -1181,8 +1181,8 @@
       "source": "docs/INSTALLED-SENSOR-BINDING.md",
       "sourceLanguage": "en",
       "translation": "docs/INSTALLED-SENSOR-BINDING.ko.md",
-      "sourceSha256": "e05ffe3bb1b1754fd6e2f90293b9874f8939b8b53eea76a2f2c36d8ba4960b9a",
-      "translationSha256": "981fe8e03730a26f7878e4d4cec00f02a10ff63be8b96ea5d12a3672efca0ab9"
+      "sourceSha256": "003179107e326ad1b937d34e3c849e9bc1c3398f54423841e527dab314c66592",
+      "translationSha256": "b70d37ce061716c2816de34cd1d5c74981e8b5cfedc844af4839253d555b831f"
     },
     {
       "source": "contracts/alarm-v1/README.md",

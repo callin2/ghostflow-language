@@ -121,7 +121,7 @@ export function replaySourceProvenance({ sourceDocument, bytes, sourceClosure })
     throw new Error(`interaction schema: bytecode does not match canonical ${sourceClosure ? 'source closure' : 'literate source'} replay`);
   }
   return { bytes: replay.bytes, sourceDocument: replay.sourceDocument, sourceMap: replay.sourceMap,
-    traceMetadata: replay.traceMetadata, manifest: replay.manifest,
+    traceMetadata: replay.traceMetadata, manifest: replay.manifest, explanationArtifact: replay.explanationArtifact,
     ...(replay.sourceClosure ? { sourceClosure: replay.sourceClosure } : {}) };
 }
 

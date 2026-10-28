@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+### 2026-10-29 - installed composed execution ([#290](https://github.com/callin2/ghostflow-language/issues/290), [#302](https://github.com/callin2/ghostflow-language/issues/302))
+
+InstalledControlHost admits the bounded direct-port `control-v10` composition
+profile and owns its settings runtime. Same-scan output explanations bind actual
+effective settings and admitted instance endpoints. Instance sensor contracts
+are checked against their root acquisition endpoint. Rejected replacements
+preserve the whole owner; accepted replacements start a fresh run. Config/timer
+expression explanations remain unavailable and physical suitability remains
+unknown. The specified REF-06-002 isolation case has native/WASM and installed-host
+evidence. REF-06-016 checks both instances' explanations against their source nodes,
+positions, revisions, settings and distinct endpoints. The broader section 6.7
+requested-to-safe constraint explanation chain remains incomplete.
+Runtime dispatch failure invalidates current explanation availability while
+preserving historical completions. Preflight rejection retains the current proof.
+See `docs/INSTALLED-SENSOR-BINDING.md` and `tests/installed-composition.test.mjs`.
+
 ### 2026-10-29 - restore exact interaction provenance ([#287](https://github.com/callin2/ghostflow-language/issues/287), [#590](https://github.com/callin2/ghostflow-language/issues/590))
 
 Interaction Schema restoration now checks persisted source nodes and intent
