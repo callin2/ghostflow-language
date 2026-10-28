@@ -12,6 +12,10 @@
 유효한 선언의 식별자를 `identity`로, 기존 게이트 형태의 물리 평가를 `physical`로 반환합니다.
 식별자는 release 다이제스트와 정확한 source, module, manifest 다이제스트를 고정합니다.
 Release는 profile과 설치 mapping을 고정합니다. 잘못된 선언은 `identity: null`이며 승인할 수 없습니다.
+평가는 검증과 식별자 계산 전에 네 입력 레코드와 module bytes를 복사해 소유합니다.
+이 레코드 내부의 accessor, symbol key, 열거 불가능한 필드, 순환 참조,
+plain object가 아닌 객체는 metadata `shape` 오류를 만듭니다.
+일반적인 추가 필드는 기존의 정확한 필드 검사를 그대로 받습니다.
 물리 게이트는 `status: "unknown"`, source type `none`, null reference를 가집니다.
 Scope는 선언된 극성과 `safeLevel`이 전기 동작, fail-safe 적합성, 부하 호환성이나 배선을
 입증하지 않는다고 설명합니다. Bool 출력의 타입과 방향이 맞는 것만으로 이 사실들을 입증할 수 없습니다.

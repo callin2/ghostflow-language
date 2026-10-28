@@ -17,6 +17,10 @@ and `ProgramReplacementHost`. It returns `metadata` with the unchanged
 `physical` in the existing gate shape. The identity pins the release digest and
 exact source, module, and manifest digests. The release pins the profile and
 installation mapping. Invalid metadata has `identity: null` and cannot be admitted.
+Assessment captures the four input records and module bytes before validation
+and identity calculation. Within those records, accessors, symbol keys,
+non-enumerable fields, cycles, and non-plain objects produce a metadata `shape`
+error. Ordinary extra fields remain subject to the existing exact-field checks.
 The physical gate has `status: "unknown"`, source type `none`, and a null reference.
 Its scope explains that declared polarity and `safeLevel` do not establish
 electrical behavior, fail-safe suitability, load compatibility, or wiring.
