@@ -10,6 +10,7 @@ import { sha256Hex } from '../tools/sha256.mjs';
 import { observeRuntimeValues, observeSourceTrace } from '../tools/source-trace.mjs';
 import { restoreArtifactSourceMap, writeArtifact } from '../tools/toolchain.mjs';
 import { TemporarySettingsHost } from '../runtimes/wasm/temporary-settings-host.mjs';
+import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 import { softwareQualityRails } from './helpers/software-quality-observations.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -192,6 +193,22 @@ test('REF-06-002 rejects broken closure and unsupported composed interaction des
   await assert.rejects(() => TemporarySettingsHost.instantiate(wasm, rewired, {
     runId: 'rewired-run', grants: {}, context,
   }), /source\/manifest identity/);
+});
+
+test('direct framed activation pins composed sensor routing to the source closure', async t => {
+  const artifact = await compile();
+  const honest = await ControlRuntime.instantiateFramed(wasm, artifact, { context });
+  t.after(() => honest.dispose());
+  assert.deepEqual(honest.step(packet(0, 1, true, false)).vm.safe,
+    { east_on: true, west_on: false });
+  const rewired = structuredClone(artifact);
+  rewired.manifest.sensorInstances[0].sourceSensor = 'west_start';
+  assert.equal(sha256Hex(rewired.bytes), artifact.manifest.bytecodeSha256);
+  await assert.rejects(() => ControlRuntime.instantiateFramed(wasm, rewired, { context }),
+    /composition manifest does not match canonical source/);
+  await assert.rejects(() => ControlRuntime.instantiateFramed(wasm, {
+    bytes: artifact.bytes, manifest: artifact.manifest,
+  }, { context }), /composed control requires.*source closure/);
 });
 
 test('composed context settings reject unsupported conditioned instance inputs before activation', async () => {

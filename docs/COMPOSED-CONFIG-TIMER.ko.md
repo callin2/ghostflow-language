@@ -15,4 +15,5 @@
 - interaction-v0 descriptor 생성기는 root source만 읽습니다. 이제 조합 산출물을 명시적으로 거절하므로 가져온 설정과 timer가 유효한 descriptor schema에서 조용히 빠지지 않습니다. 조합 descriptor와 binding 연결은 별도 작업입니다.
 - 가져온 config literal offset은 root 조합 source가 아니라 가져온 definition을 가리킵니다. 이 기반은 검증된 host에서 live settings event를 제공하며, 가져온 source의 literal 편집은 제공하지 않습니다.
 - context manifest는 source type·sample 주기·optionality가 같은 인스턴스 sensor rail을 허용합니다. 기존 `ControlRuntime`은 각 인스턴스에 별도 conditioner를 둡니다. 현재 context profile은 input filter와 그 밖의 미지원 conditioning metadata를 활성화 전에 계속 거절합니다. native tape 검사는 인스턴스 rail을 명시적으로 제공하고, WASM host는 root sample에서 이를 만듭니다.
+- 조합된 control을 `ControlRuntime`에서 직접 활성화하려면 source document와 전체 import closure가 필요합니다. 런타임 생성 전에 이를 다시 컴파일해 정확한 bytecode·closure·manifest를 대조하므로, `sensorInstances.sourceSensor`만 편집하여 같은 타입의 다른 root sensor로 바꿀 수 없습니다.
 - native/WASM 일치는 이 참조 실행 계약의 근거입니다. settings actor·설치 기록·시계·Device 배포·물리 출력의 진위를 확인하지는 않습니다.
