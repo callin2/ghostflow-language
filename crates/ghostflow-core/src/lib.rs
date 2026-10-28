@@ -27,6 +27,7 @@ pub mod signals;
 pub mod solar;
 pub mod solar_admission;
 pub mod solar_runtime;
+pub mod stage_accounting;
 pub mod station;
 pub mod temporal;
 pub mod temporal_evidence;

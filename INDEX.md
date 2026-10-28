@@ -448,6 +448,7 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 
 | Path | Title | Type |
 | --- | --- | --- |
+| [experiments/bool-translation-validation/module-envelope-report.md](experiments/bool-translation-validation/module-envelope-report.md) | Whole Bool module binding proof report | md |
 | [experiments/bool-translation-validation/pc-refinement-report.md](experiments/bool-translation-validation/pc-refinement-report.md) | Bool byte-PC refinement execution report | md |
 | [experiments/bool-translation-validation/proof-report.md](experiments/bool-translation-validation/proof-report.md) | Bool translation validation execution report | md |
 | [experiments/bool-translation-validation/serializer-report.md](experiments/bool-translation-validation/serializer-report.md) | Bounded Bool serialization and raw decoding (#590) | md |
@@ -576,4 +577,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-431 documents.
+432 documents.

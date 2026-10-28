@@ -1,0 +1,623 @@
+{
+  "format": "GhostFlow/composed-interaction-corpus-v1",
+  "version": "1.0",
+  "sourceDocument": {
+    "format": "GhostFlow/source-document-v1",
+    "kind": "literate",
+    "filename": "pair.ghost.md",
+    "text": "# Cells\n\n<!-- ghostflow:anchor id=cell-intent kind=intent status=confirmed origin=user -->\nKeep each cell independent.\n\n```ghost\nimport Cell from \"./cell.ghost.md\" revision \"r1\" sha256 \"22a9ed3f433ae0f6ae94618c0c9a6cbdf8fea29868b743af2c266004388e53f9\";\ncontrol Pair {\n  input east_start, west_start: Bool;\n  output east_on, west_on: Bool;\n  // ghostflow:link id=cell-intent relation=implements\n  state running: Bool = false;\n  running' = east_start |> recover(false);\n  instance east: Cell;\n  instance west: Cell;\n  connect east.start <- east_start;\n  connect west.start <- west_start;\n  connect east_on <- east.on;\n  connect west_on <- west.on;\n}\n```\n",
+    "sha256": "dd33ec87f4d68a49a15200897b400385e97794286b0c30eb1dd0f33daf0558ef"
+  },
+  "sourceClosure": {
+    "format": "GhostFlow/source-closure-v1",
+    "documents": [
+      {
+        "filename": "cell.ghost.md",
+        "revision": "r1",
+        "text": "# Cells\n\n<!-- ghostflow:anchor id=cell-intent kind=intent status=confirmed origin=user -->\nKeep each cell independent.\n\n```ghost\ncontrol Cell {\n  input start: Bool;\n  // ghostflow:link id=cell-intent relation=implements\n  config duration: Duration = 5s { min = 1s; max = 10s; step = 1s; access = operator; }\n  // ghostflow:link id=cell-intent relation=implements\n  state running: Bool = false;\n  // ghostflow:link id=cell-intent relation=implements\n  timer age = elapsed(running);\n  running' = running || (start |> recover(false));\n  output on: Bool;\n  on <- running' && age < (duration |> recover(0s));\n}\n```\n",
+        "sha256": "22a9ed3f433ae0f6ae94618c0c9a6cbdf8fea29868b743af2c266004388e53f9"
+      }
+    ],
+    "instances": [
+      {
+        "instance": "east",
+        "filename": "cell.ghost.md",
+        "definition": "Cell"
+      },
+      {
+        "instance": "west",
+        "filename": "cell.ghost.md",
+        "definition": "Cell"
+      }
+    ]
+  },
+  "sourceIdentity": {
+    "documentId": "pair",
+    "revisionId": "r1"
+  },
+  "schema": {
+    "format": "GhostFlow/interaction-schema-v0",
+    "version": "0.5",
+    "module": {
+      "id": "Pair",
+      "moduleFingerprint": "68aec25250c2148b",
+      "bytecodeSha256": "31c312e94c0281b7b81f2876418e1c1c14c3a29c389bc2908568d2d9e024e39e"
+    },
+    "source": {
+      "documentId": "pair",
+      "revisionId": "r1",
+      "format": "GhostFlow/source-document-v1",
+      "kind": "literate",
+      "sha256": "dd33ec87f4d68a49a15200897b400385e97794286b0c30eb1dd0f33daf0558ef"
+    },
+    "composition": {
+      "sourceClosureSha256": "1445fad4afdfd4bbc657f697cdbbce83e4915b4384d02a296cc229ec55cd3698",
+      "instances": [
+        {
+          "instance": "east",
+          "definition": {
+            "filename": "cell.ghost.md",
+            "revision": "r1",
+            "sha256": "22a9ed3f433ae0f6ae94618c0c9a6cbdf8fea29868b743af2c266004388e53f9"
+          }
+        },
+        {
+          "instance": "west",
+          "definition": {
+            "filename": "cell.ghost.md",
+            "revision": "r1",
+            "sha256": "22a9ed3f433ae0f6ae94618c0c9a6cbdf8fea29868b743af2c266004388e53f9"
+          }
+        }
+      ]
+    },
+    "descriptors": [
+      {
+        "instance": null,
+        "id": "state.running",
+        "name": "running",
+        "kind": "state",
+        "sourceType": {
+          "kind": "builtin",
+          "name": "Bool",
+          "unit": null
+        },
+        "access": [
+          "read"
+        ],
+        "provenance": {
+          "sourceNode": {
+            "id": 6,
+            "definitionNodeId": 6,
+            "kind": "state",
+            "source": {
+              "filename": "pair.ghost.md",
+              "line": 12,
+              "column": 3,
+              "endLine": 12,
+              "endColumn": 8
+            }
+          },
+          "intentAnchors": [
+            {
+              "instance": null,
+              "anchorId": "cell-intent"
+            }
+          ]
+        }
+      },
+      {
+        "instance": "east",
+        "id": "setting.duration",
+        "name": "duration",
+        "kind": "setting",
+        "sourceType": {
+          "kind": "builtin",
+          "name": "Duration",
+          "unit": "ms"
+        },
+        "access": [
+          "read"
+        ],
+        "provenance": {
+          "sourceNode": {
+            "id": 20,
+            "definitionNodeId": 3,
+            "kind": "config",
+            "source": {
+              "filename": "cell.ghost.md",
+              "line": 10,
+              "column": 3,
+              "endLine": 10,
+              "endColumn": 9
+            }
+          },
+          "intentAnchors": [
+            {
+              "instance": "east",
+              "anchorId": "cell-intent"
+            }
+          ]
+        },
+        "authority": "operator",
+        "applyPolicy": "live",
+        "label": "duration",
+        "defaultValue": 5000,
+        "constraint": {
+          "kind": "range",
+          "min": 1000,
+          "max": 10000,
+          "step": 1000
+        }
+      },
+      {
+        "instance": "east",
+        "id": "state.running",
+        "name": "running",
+        "kind": "state",
+        "sourceType": {
+          "kind": "builtin",
+          "name": "Bool",
+          "unit": null
+        },
+        "access": [
+          "read"
+        ],
+        "provenance": {
+          "sourceNode": {
+            "id": 22,
+            "definitionNodeId": 5,
+            "kind": "state",
+            "source": {
+              "filename": "cell.ghost.md",
+              "line": 12,
+              "column": 3,
+              "endLine": 12,
+              "endColumn": 8
+            }
+          },
+          "intentAnchors": [
+            {
+              "instance": "east",
+              "anchorId": "cell-intent"
+            }
+          ]
+        }
+      },
+      {
+        "instance": "east",
+        "id": "timer.age",
+        "name": "age",
+        "kind": "timer",
+        "sourceType": {
+          "kind": "builtin",
+          "name": "Duration",
+          "unit": "ms"
+        },
+        "access": [
+          "read"
+        ],
+        "provenance": {
+          "sourceNode": {
+            "id": 25,
+            "definitionNodeId": 8,
+            "kind": "timer",
+            "source": {
+              "filename": "cell.ghost.md",
+              "line": 14,
+              "column": 3,
+              "endLine": 14,
+              "endColumn": 8
+            }
+          },
+          "intentAnchors": [
+            {
+              "instance": "east",
+              "anchorId": "cell-intent"
+            }
+          ]
+        },
+        "operation": {
+          "kind": "elapsed_since_change",
+          "subject": {
+            "instance": "east",
+            "descriptorId": "state.running"
+          }
+        }
+      },
+      {
+        "instance": "west",
+        "id": "setting.duration",
+        "name": "duration",
+        "kind": "setting",
+        "sourceType": {
+          "kind": "builtin",
+          "name": "Duration",
+          "unit": "ms"
+        },
+        "access": [
+          "read"
+        ],
+        "provenance": {
+          "sourceNode": {
+            "id": 45,
+            "definitionNodeId": 3,
+            "kind": "config",
+            "source": {
+              "filename": "cell.ghost.md",
+              "line": 10,
+              "column": 3,
+              "endLine": 10,
+              "endColumn": 9
+            }
+          },
+          "intentAnchors": [
+            {
+              "instance": "west",
+              "anchorId": "cell-intent"
+            }
+          ]
+        },
+        "authority": "operator",
+        "applyPolicy": "live",
+        "label": "duration",
+        "defaultValue": 5000,
+        "constraint": {
+          "kind": "range",
+          "min": 1000,
+          "max": 10000,
+          "step": 1000
+        }
+      },
+      {
+        "instance": "west",
+        "id": "state.running",
+        "name": "running",
+        "kind": "state",
+        "sourceType": {
+          "kind": "builtin",
+          "name": "Bool",
+          "unit": null
+        },
+        "access": [
+          "read"
+        ],
+        "provenance": {
+          "sourceNode": {
+            "id": 47,
+            "definitionNodeId": 5,
+            "kind": "state",
+            "source": {
+              "filename": "cell.ghost.md",
+              "line": 12,
+              "column": 3,
+              "endLine": 12,
+              "endColumn": 8
+            }
+          },
+          "intentAnchors": [
+            {
+              "instance": "west",
+              "anchorId": "cell-intent"
+            }
+          ]
+        }
+      },
+      {
+        "instance": "west",
+        "id": "timer.age",
+        "name": "age",
+        "kind": "timer",
+        "sourceType": {
+          "kind": "builtin",
+          "name": "Duration",
+          "unit": "ms"
+        },
+        "access": [
+          "read"
+        ],
+        "provenance": {
+          "sourceNode": {
+            "id": 50,
+            "definitionNodeId": 8,
+            "kind": "timer",
+            "source": {
+              "filename": "cell.ghost.md",
+              "line": 14,
+              "column": 3,
+              "endLine": 14,
+              "endColumn": 8
+            }
+          },
+          "intentAnchors": [
+            {
+              "instance": "west",
+              "anchorId": "cell-intent"
+            }
+          ]
+        },
+        "operation": {
+          "kind": "elapsed_since_change",
+          "subject": {
+            "instance": "west",
+            "descriptorId": "state.running"
+          }
+        }
+      }
+    ]
+  },
+  "scans": [
+    {
+      "packet": {
+        "nowMs": 0,
+        "samples": {
+          "east_start": {
+            "epoch": 1,
+            "id": 1,
+            "timestampMs": 0,
+            "quality": "Good",
+            "value": true
+          },
+          "west_start": {
+            "epoch": 1,
+            "id": 1,
+            "timestampMs": 0,
+            "quality": "Good",
+            "value": false
+          }
+        },
+        "contextFacts": {
+          "clock": {
+            "monotonicMs": 0,
+            "bootEpoch": 1,
+            "wallMs": 1700000000000,
+            "uncertaintyMs": 0,
+            "trusted": true,
+            "unknownReason": null,
+            "sourceRevision": "clock-r1"
+          },
+          "natural": [],
+          "schedules": [],
+          "settings": null
+        }
+      },
+      "snapshot": {
+        "format": "GhostFlow/runtime-snapshot-v0",
+        "version": "0.3",
+        "schema": {
+          "format": "GhostFlow/interaction-schema-v0",
+          "version": "0.5",
+          "sha256": "283b338992bc93ae64bfc42bcf05df502e0b66a45755891f0e84e60bcfe44ebc"
+        },
+        "module": {
+          "id": "Pair",
+          "moduleFingerprint": "68aec25250c2148b",
+          "bytecodeSha256": "31c312e94c0281b7b81f2876418e1c1c14c3a29c389bc2908568d2d9e024e39e"
+        },
+        "source": {
+          "documentId": "pair",
+          "revisionId": "r1",
+          "format": "GhostFlow/source-document-v1",
+          "kind": "literate",
+          "sha256": "dd33ec87f4d68a49a15200897b400385e97794286b0c30eb1dd0f33daf0558ef"
+        },
+        "composition": {
+          "sourceClosureSha256": "1445fad4afdfd4bbc657f697cdbbce83e4915b4384d02a296cc229ec55cd3698",
+          "instances": [
+            {
+              "instance": "east",
+              "definition": {
+                "filename": "cell.ghost.md",
+                "revision": "r1",
+                "sha256": "22a9ed3f433ae0f6ae94618c0c9a6cbdf8fea29868b743af2c266004388e53f9"
+              }
+            },
+            {
+              "instance": "west",
+              "definition": {
+                "filename": "cell.ghost.md",
+                "revision": "r1",
+                "sha256": "22a9ed3f433ae0f6ae94618c0c9a6cbdf8fea29868b743af2c266004388e53f9"
+              }
+            }
+          ]
+        },
+        "runId": "composed-corpus-run",
+        "completion": {
+          "kind": "completed-scan",
+          "scanId": 0,
+          "logicalTimeMs": 0
+        },
+        "settingsRevision": 0,
+        "observations": [
+          {
+            "instance": null,
+            "descriptorId": "state.running",
+            "status": "ready",
+            "value": true
+          },
+          {
+            "instance": "east",
+            "descriptorId": "setting.duration",
+            "defaultValue": 5000,
+            "emissionRevision": 0,
+            "applicationPosition": null,
+            "override": false,
+            "status": "ready",
+            "value": 5000
+          },
+          {
+            "instance": "east",
+            "descriptorId": "state.running",
+            "status": "ready",
+            "value": true
+          },
+          {
+            "instance": "east",
+            "descriptorId": "timer.age",
+            "status": "ready",
+            "value": 0
+          },
+          {
+            "instance": "west",
+            "descriptorId": "setting.duration",
+            "defaultValue": 5000,
+            "emissionRevision": 0,
+            "applicationPosition": null,
+            "override": false,
+            "status": "ready",
+            "value": 5000
+          },
+          {
+            "instance": "west",
+            "descriptorId": "state.running",
+            "status": "ready",
+            "value": false
+          },
+          {
+            "instance": "west",
+            "descriptorId": "timer.age",
+            "status": "ready",
+            "value": 0
+          }
+        ]
+      }
+    },
+    {
+      "packet": {
+        "nowMs": 1000,
+        "samples": {
+          "east_start": {
+            "epoch": 1,
+            "id": 2,
+            "timestampMs": 1000,
+            "quality": "Good",
+            "value": false
+          },
+          "west_start": {
+            "epoch": 1,
+            "id": 2,
+            "timestampMs": 1000,
+            "quality": "Good",
+            "value": true
+          }
+        },
+        "contextFacts": {
+          "clock": {
+            "monotonicMs": 1000,
+            "bootEpoch": 1,
+            "wallMs": 1700000001000,
+            "uncertaintyMs": 0,
+            "trusted": true,
+            "unknownReason": null,
+            "sourceRevision": "clock-r1"
+          },
+          "natural": [],
+          "schedules": [],
+          "settings": null
+        }
+      },
+      "snapshot": {
+        "format": "GhostFlow/runtime-snapshot-v0",
+        "version": "0.3",
+        "schema": {
+          "format": "GhostFlow/interaction-schema-v0",
+          "version": "0.5",
+          "sha256": "283b338992bc93ae64bfc42bcf05df502e0b66a45755891f0e84e60bcfe44ebc"
+        },
+        "module": {
+          "id": "Pair",
+          "moduleFingerprint": "68aec25250c2148b",
+          "bytecodeSha256": "31c312e94c0281b7b81f2876418e1c1c14c3a29c389bc2908568d2d9e024e39e"
+        },
+        "source": {
+          "documentId": "pair",
+          "revisionId": "r1",
+          "format": "GhostFlow/source-document-v1",
+          "kind": "literate",
+          "sha256": "dd33ec87f4d68a49a15200897b400385e97794286b0c30eb1dd0f33daf0558ef"
+        },
+        "composition": {
+          "sourceClosureSha256": "1445fad4afdfd4bbc657f697cdbbce83e4915b4384d02a296cc229ec55cd3698",
+          "instances": [
+            {
+              "instance": "east",
+              "definition": {
+                "filename": "cell.ghost.md",
+                "revision": "r1",
+                "sha256": "22a9ed3f433ae0f6ae94618c0c9a6cbdf8fea29868b743af2c266004388e53f9"
+              }
+            },
+            {
+              "instance": "west",
+              "definition": {
+                "filename": "cell.ghost.md",
+                "revision": "r1",
+                "sha256": "22a9ed3f433ae0f6ae94618c0c9a6cbdf8fea29868b743af2c266004388e53f9"
+              }
+            }
+          ]
+        },
+        "runId": "composed-corpus-run",
+        "completion": {
+          "kind": "completed-scan",
+          "scanId": 1,
+          "logicalTimeMs": 1000
+        },
+        "settingsRevision": 0,
+        "observations": [
+          {
+            "instance": null,
+            "descriptorId": "state.running",
+            "status": "ready",
+            "value": false
+          },
+          {
+            "instance": "east",
+            "descriptorId": "setting.duration",
+            "defaultValue": 5000,
+            "emissionRevision": 0,
+            "applicationPosition": null,
+            "override": false,
+            "status": "ready",
+            "value": 5000
+          },
+          {
+            "instance": "east",
+            "descriptorId": "state.running",
+            "status": "ready",
+            "value": true
+          },
+          {
+            "instance": "east",
+            "descriptorId": "timer.age",
+            "status": "ready",
+            "value": 1000
+          },
+          {
+            "instance": "west",
+            "descriptorId": "setting.duration",
+            "defaultValue": 5000,
+            "emissionRevision": 0,
+            "applicationPosition": null,
+            "override": false,
+            "status": "ready",
+            "value": 5000
+          },
+          {
+            "instance": "west",
+            "descriptorId": "state.running",
+            "status": "ready",
+            "value": true
+          },
+          {
+            "instance": "west",
+            "descriptorId": "timer.age",
+            "status": "ready",
+            "value": 0
+          }
+        ]
+      }
+    }
+  ]
+}

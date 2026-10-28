@@ -1,5 +1,50 @@
 # Accounting ledger primitive ABI
 
+## Scan-owned Bool stage observation
+
+`StageAccountingControl.instantiateSource` compiles canonical source and validates
+an explicit resource-to-Bool-output mapping. Resource and output names need not
+match. The source-bound compiler checks the supplied artifact against canonical
+recompilation before producing the Rust activation packet. This profile supports
+up to 32 durable `on_time` accounts, with `maxSegments` from 1 to 4096. It rejects
+admission limits and mixed event accounts. Existing applied-ledger APIs keep
+their receipt contract.
+
+`ScanDriver` owns the observer. It records only successful scans, using the
+previous requested or safe value on `[previous_time, current_time)`. A false
+value records coverage and contributes zero ON time. Queries clip intervals
+and require complete coverage of the requested range. Duplicate scan IDs and
+reverse clocks reject without changing accounting. A distinct scan at the same
+time changes the next value without consuming time. Publication capacity
+exhaustion leaves the accepted control scan intact and makes accounting Unknown.
+The observer never accepts caller-supplied traces or records requested/safe
+intervals in the applied ledger.
+
+`query(account, startMs, endMs, runId)` uses u64 BigInt times and returns
+`{ kind: 'Known', usedMs: BigInt }` or `{ kind: 'Unknown', reason }`.
+Applied returns `NoReceipt`; confirmed returns `NoFeedback`. This observer has
+no physical receipt or feedback ingestion path. The caller selects the bounded
+query interval. No default lifetime, day boundary or admission policy is added.
+`coverageGap()` drops the active interval cursor when the host cannot attest
+continued observation. Coverage after the next scan does not fill the gap.
+
+`persist(write)` passes a detached snapshot copy and its exact BigInt revision
+to the host writer. Only a `true` acknowledgement for the current revision makes
+usage Known. Failure, or another scan during the write, leaves persistence
+pending. The host owns actual durable storage. A snapshot binds the module
+fingerprint, canonical source SHA-256, account/resource/output/stage mapping,
+capacity, run identities and covered intervals. Its checksum detects corruption;
+it does not authenticate storage. Restore requires a fresh owner with an unused
+run ID, retains historical queries by their original run ID, and resets the
+observation cursor. A restarted monotonic clock may begin at zero. No interval
+bridges the restart. Snapshot history supports at most 32 run identities and
+fails closed when those bounds or identities do not match.
+
+`tests/stage-accounting-control.test.mjs` compares native and WASM trace results,
+queries and complete snapshot bytes. REF-03-021's blocked 20s request produces
+requested 20000ms, safe 0ms, applied Unknown and confirmed Unknown. Physical
+Driver behavior and storage durability are separate acceptance evidence.
+
 This ABI exposes the Rust accounting ledger to a host through WebAssembly.
 GFB10 count Results execute inside the portable control VM using the paired
 ledger. Source-bound rolling reservation admission is an explicit reference-host

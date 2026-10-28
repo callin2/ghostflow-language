@@ -25,9 +25,7 @@ export class AccountingRuntime {
   static async instantiateSource(wasmBytes, document, { filename = 'program.ghost.md', account, resourceId, eventType, config } = {}) {
     if (typeof account !== 'string' || !account) throw new TypeError('account name is required');
     const artifact = await compileSource(document, { filename });
-    const descriptor = artifact.manifest?.format === 'GhostFlow/control-v10'
-      ? artifact.manifest.accounting?.bindings.find(item => item.name === account)
-      : undefined;
+    const descriptor = artifact.manifest.accounting?.bindings.find(item => item.name === account);
     if (!descriptor) throw new Error(`source has no accounting account ${account}`);
     if (descriptor.persistence !== 'durable') throw new Error('unsupported accounting persistence');
     const evidence = descriptor.evidenceBinding;

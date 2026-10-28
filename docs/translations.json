@@ -208,8 +208,8 @@
       "source": "contracts/interaction-v0/README.md",
       "sourceLanguage": "en",
       "translation": "contracts/interaction-v0/README.ko.md",
-      "sourceSha256": "1033683932971759c4f44a1bfa542e92acf4b430f7ac965a054145b14329a6d5",
-      "translationSha256": "95070ebf311d23eb4dd28bc7da0093af70119ce7e391015de284110c4cdf1383"
+      "sourceSha256": "5dbbc65ae5116c19a92d27fd231b274ccc5fa0db70c3800056c29fbab75fae2a",
+      "translationSha256": "60925cf692e453ecc5a43ebf628406597c071c9925033698a868b5ed10ff8f4f"
     },
     {
       "source": "contracts/requirements/README.md",
@@ -243,8 +243,8 @@
       "source": "docs/ACCOUNTING-LEDGER-ABI.md",
       "sourceLanguage": "en",
       "translation": "docs/ACCOUNTING-LEDGER-ABI.ko.md",
-      "sourceSha256": "1a3addcdc95704ec96eb3a4cf89720fc27f9aceba99583802bbc07f8009d64e8",
-      "translationSha256": "b00d367469a6ba4b3cf6a7002d5b8d78682e9323d92689d01543e1c2692556ae"
+      "sourceSha256": "91d07a5ffb81fbd31129f47b61be0bf0cd7c069079c1cd7259ad3ba3576b2172",
+      "translationSha256": "d0004414fd56b0ca10998ff11b285db9b97f2a6b8d658d98f951ce095c3b7d6c"
     },
     {
       "source": "docs/AFTER-EVENT-WASM-ABI.md",
@@ -488,8 +488,8 @@
       "source": "docs/reference/03-time-and-schedules.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/03-time-and-schedules.en.md",
-      "sourceSha256": "4b999c7fabbf6693b0defab0e6f0273e292b1ff954a37e5767ad34f3424cd173",
-      "translationSha256": "03daf6c4e04866e9bd7bdd823333b5d90c438385c6d3ae074b8399180db55fa4"
+      "sourceSha256": "17cb0fb3b6eba0cd552cfe5fba24308d33e49ca4891a5be0bd9a38f3f0d4e1c1",
+      "translationSha256": "8c7d54f43fc67c3529b3e0feec7554ca10deb13f081f6be7251e3983fd860097"
     },
     {
       "source": "docs/reference/04-sensors-constraints-control.md",
@@ -705,8 +705,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "06da8245b4ec3e1812274bf27ce739d41d872095040185a171ee0120fb24d8e4",
-      "translationSha256": "85777f0024f6fe242b8cc43df079dc5f6db86fb38b96445fb5a597879fefbbcc"
+      "sourceSha256": "b3e2a153c9a4f77eacbaa37edc04db5677f43e57a6d0326d5eae00aefb5fb148",
+      "translationSha256": "640ec6fe9623207afb3e7fe54fe0218218cd1ee69fb73c733a4946cc6e3afc23"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",
@@ -1557,6 +1557,10 @@
     {
       "path": "docs/reports/2026-10-29-unattended-correctness-590.md",
       "reason": "Dated issue590 execution evidence, exact source identities and remaining proof obligations; reports may remain in one language."
+    },
+    {
+      "path": "experiments/bool-translation-validation/module-envelope-report.md",
+      "reason": "Issue590 bounded formal proof execution report and trusted-boundary evidence; reports may remain in one language."
     }
   ]
 }

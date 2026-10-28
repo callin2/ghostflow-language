@@ -12,6 +12,56 @@
 
 ## 정적 스키마
 
+### 합성 프로필 0.5
+
+Interaction 스키마를 명시적으로 요청했고 정식 소스 closure에 인스턴스가 있으면
+스키마 `0.5`와 스냅샷 `0.3`을 선택합니다. 독립 프로그램의 스키마 `0.3`/`0.4`와
+스냅샷 `0.1`/`0.2` 형식은 그대로 유지합니다. 두 합성 문서에는
+`composition.sourceClosureSha256`과 `composition.instances`가 들어갑니다.
+각 항목은 작성한 인스턴스 경로를 원본 정의의 `filename`, `revision`, `sha256`에
+연결합니다. closure 다이제스트는 고정된 의존 문서와 인스턴스를 포함한 정식
+closure JSON 전체를 대상으로 합니다.
+
+설명자는 `(instance, id)`로 식별합니다. `instance`는 `east.cell` 같은 작성 경로이며
+루트는 `null`입니다. `id`와 `name`은 원본의 지역 이름을 유지하므로 east와 west가
+각각 `setting.duration`을 가질 수 있습니다. 관측값도 같은 `instance`와 지역
+`descriptorId`를 담습니다. `provenance.sourceNode`는 펼쳐진 컴파일러 `id`, 원본
+`definitionNodeId`, 선언 `kind`, 원본 문서 `source` 범위(`filename`, `line`,
+`column`, `endLine`, `endColumn`)를 유지합니다. `provenance.intentAnchors`는
+`{instance, anchorId}` 참조 목록입니다. 정의나 인스턴스가 다르면 동일한 앵커 ID도
+서로 구분합니다. elapsed 타이머는 `operation.subject: {instance, descriptorId}`를
+사용하고 continuous 타이머는 펼쳐진 `subjectNodeId`를 유지합니다. 컴파일러 생성
+이름과 타이머 저장 슬롯은 비공개입니다.
+
+생성과 복원은 정확한 정식 closure를 다시 컴파일한 뒤 소스맵, 추적 메타데이터,
+manifest, 설명자 출처를 받아들입니다. 런타임 생성자는 검증한 입력의 사본을
+소유합니다. 소비자의 식별 결합에는 스키마, 모듈, 소스, 실행 식별자와 함께 closure
+다이제스트가 들어갑니다. 합성 스냅샷에는 항상 `settingsRevision`이 있으며 설정이
+없으면 0입니다. 설정의 `defaultValue`, `emissionRevision`, `applicationPosition`,
+`override` 및 성공/실패 Result는 기존 Rust 의미를 유지합니다. 인스턴스별로 별도
+리비전 카운터를 만들지 않습니다.
+
+`TemporarySettingsHost`는 Interaction 스키마가 있는 아티팩트의 생성자를 준비합니다.
+수락한 각 스텝은 자신이 소유한 완료 결과와 실제 적용된 Rust 설정으로
+`observation: {snapshot, error}`를 발행합니다. `interactionSnapshot()`은 최신 관측
+사본을 읽으며 tick을 실행하지 않습니다. `interactionIdentity`는 해당 호스트의 예상
+결합 식별자를 반환합니다. 기존 `framed: false` 진입점에서는 호스트가 이미 소유한
+수락 스텝 위치에서 1을 뺀 값을 `scanId`로 쓰고 수락한 패킷의 시각을 사용합니다.
+framed 진입점은 런타임이 완료한 프레임 식별자를 사용합니다.
+실행 후 관측 투영이 실패해도 스텝은 수락된 상태로 남고,
+관측 스냅샷을 null로 두며 `completed-scan-observation-failed`를 기록합니다. 설정
+이력을 되돌리거나 같은 이벤트의 재시도를 허용하지 않습니다. 저수준 완료 추적
+어댑터는 호출자가 동일한 실행·스캔·설정 기록을 제공한다는 전제를 유지합니다.
+페이로드 검증만으로 실제 런타임 소유권을 인증할 수는 없습니다.
+
+`examples/composed-v0.5.json`은 버전이 명시된 소스·closure·스키마·스냅샷 corpus입니다.
+`verifyComposedInteractionCorpus`는 정적 출처를 재구성하며
+`tests/composed-interaction.test.mjs`는 실제 호스트에서 스캔을 재현합니다.
+이 프로필은 설치·binding 소유권이나 합성 출력 설명을 추가하지 않습니다. 설명
+어댑터는 명시적인 미지원 검사를 유지합니다.
+관련 이슈는 [#290](https://github.com/callin2/ghostflow-language/issues/290)과
+[#302](https://github.com/callin2/ghostflow-language/issues/302)입니다.
+
 스키마는 고정된 `module`(`id`, 컴파일러 추적 `moduleFingerprint`, 매니페스트 `bytecodeSha256`)과 소스 문서(`documentId`, `revisionId`, `format`, `kind`, 소스 `sha256`) 식별자를 가집니다. `module.id`는 공개 제어 모듈 식별자이고, `moduleFingerprint`는 컴파일 모듈의 안정적인 16자리 16진수 추적 지문이며, `bytecodeSha256`은 출력 매니페스트 바이트코드의 소문자 SHA-256입니다. 지문과 아티팩트 다이제스트는 서로 다르며 둘 다 필요합니다. `source.documentId`는 하나의 작성 문서 리비전 전반에서 안정적인 불투명 공개 식별자입니다. `source.revisionId`는 저장된 정식 리비전 하나를 위한 불투명하고 불변인 식별자입니다. `source.sha256`은 그 리비전의 UTF-8 소스 바이트 SHA-256입니다. 두 소스 식별자 모두 경로가 아니므로 대화 또는 리비전 저장소의 문서를 지원합니다. 픽스처의 저장소 경로는 테스트 하네스에서만 사용됩니다.
 
 `source.kind`는 정확히 `literate`입니다. GhostFlow의 정식 작성·검토·버전 관리 소스는 literate 문서입니다. 제품/컴파일러 입력은 정식 `.ghost.md`만 가능합니다. 일반 코드는 거부되며 지원되는 작성, 가져오기, 아티팩트 또는 Interaction Schema 대체 입력이 될 수 없습니다.

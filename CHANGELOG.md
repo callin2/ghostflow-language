@@ -2,6 +2,32 @@
 
 ## Unreleased
 
+### 2026-10-29 - composed runtime observation ([#290](https://github.com/callin2/ghostflow-language/issues/290), [#302](https://github.com/callin2/ghostflow-language/issues/302))
+
+Explicit Interaction emission now supports imported states, timers and settings
+through schema 0.5 and snapshot 0.3. For example, `east` and `west` each retain
+their own `setting.duration`, original source span and qualified intent anchor.
+TemporarySettingsHost publishes its accepted scan and effective settings without
+an extra tick. Failed observation after dispatch preserves the accepted control
+step. Standalone contract shapes and control evaluation are unchanged. Canonical
+replay, actual framed/legacy host observations, nested instances and the versioned
+corpus are covered by `tests/composed-interaction.test.mjs`. Installation/binding
+ownership and composed output explanations remain separate work.
+
+### 2026-10-29 - scan-owned output stage accounting ([#211](https://github.com/callin2/ghostflow-language/issues/211))
+
+Durable `on_time` observation accounts now accept requested, safe, and confirmed
+stages for explicitly bound BoolActuator resources. The Rust scan owner records
+requested and safe intervals and their coverage. A blocked 20s request reads
+requested 20s, safe 0s, and confirmed Unknown without feedback. Previously these
+declarations were rejected at executable compilation. Source, output, stage and
+run identities bind durable snapshots; a fresh run never extends a pre-restart
+interval. Missing coverage, pending persistence and exhausted capacity remain
+Unknown. This profile rejects admission limits and mixed event accounts. Applied
+receipt accounting is unchanged. Native and WASM regression evidence is in
+`tests/stage-accounting-control.test.mjs`; Reference §3.4 and §4.7 retain separate
+physical evidence requirements.
+
 ### 2026-10-29 - imported intent provenance ([#290](https://github.com/callin2/ghostflow-language/issues/290), [#302](https://github.com/callin2/ghostflow-language/issues/302))
 
 Pinned imports now retain intent in separate authored instance scopes. Equal

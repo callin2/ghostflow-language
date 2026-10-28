@@ -13,6 +13,8 @@ import { extractLiterate } from './literate.mjs';
 import { compileControl, parseControl } from './control.mjs';
 import { canonicalUnitFor, isQuantityType } from './quantities.mjs';
 import { moduleFingerprint } from './source-trace.mjs';
+import { composedInteraction } from './composed-interaction.mjs';
+import { compileSourceSync } from './compile-source.mjs';
 
 const PUBLIC_ID = /^[A-Za-z][A-Za-z0-9._:-]{0,127}$/;
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -85,8 +87,10 @@ function sourceType(name, enums) {
 }
 
 function validationSnapshot(schema) {
+  const composed = schema.version === '0.5';
+  const settings = schema.version === SETTINGS_INTERACTION_SCHEMA_VERSION || composed;
   const valueFor = descriptor => {
-    if (descriptor.kind === 'setting' && schema.version === SETTINGS_INTERACTION_SCHEMA_VERSION) return descriptor.defaultValue;
+    if (descriptor.kind === 'setting' && settings) return descriptor.defaultValue;
     if (descriptor.kind === 'setting' && descriptor.constraint.kind === 'range') return descriptor.constraint.min;
     if (descriptor.kind === 'setting' && descriptor.constraint.kind === 'choices') return descriptor.constraint.values[0];
     const type = descriptor.sourceType;
@@ -95,19 +99,20 @@ function validationSnapshot(schema) {
   };
   return {
     format: RUNTIME_SNAPSHOT_FORMAT,
-    version: schema.version === SETTINGS_INTERACTION_SCHEMA_VERSION ? SETTINGS_RUNTIME_SNAPSHOT_VERSION : RUNTIME_SNAPSHOT_VERSION,
+    version: composed ? '0.3' : settings ? SETTINGS_RUNTIME_SNAPSHOT_VERSION : RUNTIME_SNAPSHOT_VERSION,
     schema: { format: schema.format, version: schema.version, sha256: '0'.repeat(64) },
     module: { ...schema.module },
     source: { ...schema.source },
+    ...(composed ? { composition: structuredClone(schema.composition) } : {}),
     runId: 'schema-validation',
     completion: { kind: 'completed-scan', scanId: 0, logicalTimeMs: 0 },
-    ...(schema.version === SETTINGS_INTERACTION_SCHEMA_VERSION ? { settingsRevision: 0 } : {}),
-    observations: schema.descriptors.map(descriptor => descriptor.kind === 'setting' && schema.version === SETTINGS_INTERACTION_SCHEMA_VERSION ? {
+    ...(settings ? { settingsRevision: 0 } : {}),
+    observations: schema.descriptors.map(descriptor => ({ ...(composed ? { instance: descriptor.instance } : {}), ...(descriptor.kind === 'setting' && settings ? {
       descriptorId: descriptor.id, defaultValue: valueFor(descriptor), emissionRevision: 0,
       applicationPosition: null, override: false, status: 'ready', value: valueFor(descriptor),
     } : {
       descriptorId: descriptor.id, status: 'ready', value: valueFor(descriptor),
-    }),
+    }) })),
   };
 }
 
@@ -121,12 +126,9 @@ function assertContractSchema(schema) {
 }
 
 function expectedSchema(compilation, identityValue) {
+  if (compilation?.sourceClosure?.instances?.length) return composedSchema(compilation, identityValue);
   if (compilation?.traceMetadata?.compositionIntent) {
     fail('interaction schema does not support instance-qualified imported intent metadata');
-  }
-  if (compilation?.sourceClosure?.instances?.length
-    && (compilation.manifest?.configs?.length || compilation.manifest?.timers?.length)) {
-    fail('interaction schema does not support imported behavior instances');
   }
   const source = canonicalDocument(compilation?.sourceDocument);
   const identity = sourceIdentity(identityValue);
@@ -216,6 +218,46 @@ function expectedSchema(compilation, identityValue) {
   return schema;
 }
 
+function composedSchema(compilation, identityValue) {
+  const source = canonicalDocument(compilation.sourceDocument);
+  const identity = sourceIdentity(identityValue);
+  const { entries, composition } = composedInteraction(compilation);
+  const descriptors = entries.map(({ item, node, config, links, unit, sourceNode, instance, enums }) => {
+    if (!links.length) missingIntentProvenance(item, node, unit.extraction);
+    const counter = item.kind === 'state' && links.some(link => link.meaning === 'counter');
+    if (counter && item.type.name !== 'Int') fail(`state.${item.name} counter meaning requires Int`);
+    const kind = item.kind === 'config' ? 'setting' : counter ? 'counter' : item.kind;
+    const descriptor = { instance, id: `${kind}.${item.name}`, name: item.name, kind,
+      sourceType: sourceType(item.kind === 'timer' ? 'Duration' : config?.type ?? item.type.name, enums), access: ['read'],
+      provenance: { sourceNode, intentAnchors: [...new Set(links.map(link => link.anchorId))]
+        .map(anchorId => ({ instance, anchorId })) } };
+    if (config) Object.assign(descriptor, { authority: config.settings.access, applyPolicy: 'live',
+      label: config.settings.label ?? item.name, defaultValue: config.value,
+      constraint: config.type === 'Bool' ? { kind: 'choices', values: [false, true] }
+        : { kind: 'range', min: config.settings.min, max: config.settings.max, step: config.settings.step } });
+    if (item.kind === 'timer') {
+      const subject = item.call.args[0];
+      if (item.call.name === 'continuous_true') {
+        const subjectNode = compilation.sourceMap.find(node => node.instance === instance && node.definitionNodeId === subject.id);
+        if (!subjectNode) fail('continuous timer subject node is missing');
+        descriptor.operation = { kind: 'continuous_true', subjectNodeId: subjectNode.id };
+      } else {
+        const target = entries.find(entry => entry.instance === instance && entry.item.kind === 'state' && entry.item.name === subject.name);
+        if (!target) fail('timer subject state is missing');
+        const subjectKind = target.links.some(link => link.meaning === 'counter') ? 'counter' : 'state';
+        descriptor.operation = { kind: 'elapsed_since_change', subject: { instance, descriptorId: `${subjectKind}.${subject.name}` } };
+      }
+    }
+    return descriptor;
+  });
+  const schema = { format: INTERACTION_SCHEMA_FORMAT, version: '0.5',
+    module: { id: compilation.manifest.name, moduleFingerprint: compilation.traceMetadata.moduleFingerprint,
+      bytecodeSha256: compilation.manifest.bytecodeSha256 },
+    source: { ...identity, format: SOURCE_FORMAT, kind: 'literate', sha256: source.sha256 }, composition, descriptors };
+  assertContractSchema(schema);
+  return schema;
+}
+
 /** Emit a v0 schema only from an already type-checked canonical literate compilation. */
 export function emitInteractionSchema(compilation, sourceIdentityValue) {
   return expectedSchema(compilation, sourceIdentityValue);
@@ -230,7 +272,7 @@ export function verifyInteractionSchema(compilation, schema) {
   });
   // A persisted legacy settings document retains its original contract and
   // digest. It is never silently promoted to the provenance profile.
-  if (schema.version === INTERACTION_SCHEMA_VERSION) {
+  if (schema.version === INTERACTION_SCHEMA_VERSION && expected.version !== '0.5') {
     expected.version = INTERACTION_SCHEMA_VERSION;
     expected.descriptors = expected.descriptors.map(descriptor => {
       if (descriptor.kind !== 'setting') return descriptor;
@@ -243,8 +285,13 @@ export function verifyInteractionSchema(compilation, schema) {
 }
 
 /** Recompile the literate envelope before accepting its persisted interaction schema. */
-export function restoreInteractionSchema({ sourceDocument, sourceMap, traceMetadata, bytes }, schema) {
+export function restoreInteractionSchema({ sourceDocument, sourceMap, traceMetadata, bytes, sourceClosure }, schema) {
   const source = canonicalDocument(sourceDocument);
+  if (sourceClosure) {
+    const replay = compileSourceSync(source.text, { filename: source.filename, sourceClosure: sourceClosure.documents });
+    if (!equalBytes(bytes, replay.bytes)) fail('bytecode does not match canonical source closure replay');
+    return verifyInteractionSchema({ ...replay, sourceMap, traceMetadata, sourceClosure }, schema);
+  }
   const extraction = extractLiterate(source.text, { filename: source.filename });
   const replay = compileControl(extraction.code, { filename: source.filename });
   const replayBytes = Uint8Array.from(replay.bytes);

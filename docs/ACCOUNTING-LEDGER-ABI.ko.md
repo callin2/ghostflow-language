@@ -3,6 +3,46 @@
 
 # Accounting ledger 기본 ABI
 
+## 스캔 소유 Bool 단계 관찰
+
+`StageAccountingControl.instantiateSource`는 정규 원본을 컴파일하고 명시적인
+resource→Bool output 연결을 검증한다. resource와 output 이름은 달라도 된다.
+소스 연결 컴파일러는 canonical 재컴파일 결과와 artifact가 일치하는지 검사한 뒤
+Rust activation packet을 만든다. 이 프로필은 durable `on_time` account 최대 32개와
+1..4096 범위의 `maxSegments`를 지원한다. admission limit와 event account 혼합은
+거부한다. 기존 applied ledger API의 receipt 계약은 유지한다.
+
+`ScanDriver`가 관찰자를 소유한다. 성공한 스캔만 기록하며 직전 requested 또는 safe
+값을 `[previous_time, current_time)`에 적용한다. false도 관측 범위에 기록하되 ON
+시간은 0이다. query는 구간을 잘라 합산하며 요청 범위 전체의 관측 증거를 요구한다.
+중복 scan ID와 역행 시계는 집계를 바꾸지 않고 거부한다. 같은 시각의 다른 스캔은
+시간을 소비하지 않고 다음 값을 바꾼다. 기록 용량이 소진되어도 승인된 제어 스캔은
+유지하고 집계만 Unknown이 된다. 호출자가 만든 trace는 받지 않으며 requested와
+safe 구간을 applied ledger에 넣지 않는다.
+
+`query(account, startMs, endMs, runId)`는 u64 BigInt 시각을 받으며
+`{ kind: 'Known', usedMs: BigInt }` 또는 `{ kind: 'Unknown', reason }`을 반환한다.
+applied는 `NoReceipt`, confirmed는 `NoFeedback`이다. 이 관찰자는 물리 receipt나
+feedback을 수집하는 경로가 없다. 호출자가 유한 query 구간을 정하며 기본 수명,
+일 경계나 admission 정책을 추가하지 않는다. host가 지속 관측을 입증할 수 없으면
+`coverageGap()`이 활성 구간 cursor를 버린다. 다음 스캔은 그 공백을 채우지 않는다.
+
+`persist(write)`는 스냅샷 복사본과 정확한 BigInt revision을 host writer에 넘긴다.
+현재 revision에 대한 `true` 응답 뒤에만 사용량이 Known이 된다. 저장 실패 또는
+저장 중 새 스캔이 발생하면 persistence pending 상태를 유지한다. 실제 영속 저장은
+host 책임이다. 스냅샷은 module fingerprint, canonical source SHA-256,
+account/resource/output/stage 연결, 용량, run identity와 관측 구간을 결합한다.
+checksum은 손상을 탐지하며 저장소를 인증하지 않는다. 복원은 미사용 run ID의 새
+소유자만 허용한다. 과거 query는 원래 run ID를 사용하고 관측 cursor는 초기화한다.
+재시작한 monotonic clock은 0부터 시작할 수 있으며 재시작을 가로질러 구간을
+연결하지 않는다. 이력은 최대 32개의 run identity를 지원하며 한도나 identity가
+일치하지 않으면 fail closed 처리한다.
+
+`tests/stage-accounting-control.test.mjs`는 native와 WASM의 trace, query 및 전체
+스냅샷 byte를 비교한다. REF-03-021의 차단된 20초 요청은 requested 20000ms,
+safe 0ms, applied Unknown, confirmed Unknown을 만든다. 물리 Driver 동작과
+저장소 영속성은 별도 인수 근거다.
+
 이 ABI는 WebAssembly를 통해 Rust accounting ledger를 호스트에 노출한다.
 GFB10 count Result는 연결된 ledger로 portable control VM 안에서 실행된다.
 Source-bound rolling reservation admission은 명시적인 참조 host 연산이며,

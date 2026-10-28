@@ -4,6 +4,9 @@ use ghostflow_core::{
 };
 use std::{collections::BTreeSet, slice, str};
 
+#[path = "stage_accounting_abi.rs"]
+mod stage_accounting_abi;
+
 const MAX_PACKET_BYTES: usize = 65_536;
 const MAX_INPUTS: usize = 128;
 const MAX_NAME_BYTES: usize = 1_024;
@@ -25,6 +28,9 @@ pub struct FramedHandle {
     context_state: String,
     lifecycle_required: bool,
     restart_init: Option<(u8, bool)>,
+    stage_snapshot: Vec<u8>,
+    stage_query: String,
+    stage_revision: u64,
 }
 
 impl FramedHandle {
@@ -55,6 +61,9 @@ impl FramedHandle {
             context_state: String::new(),
             lifecycle_required: false,
             restart_init: None,
+            stage_snapshot: Vec::new(),
+            stage_query: String::new(),
+            stage_revision: 0,
         }
     }
 
@@ -850,14 +859,9 @@ mod replay_tests {
     fn resource_plan_is_static_bounded_and_success_only() {
         let mut h = FramedHandle {
             state: FramedState::Configuring(crate::replay_abi::tests::configured_runtime()),
-            error: String::new(),
             outcome: "live".into(),
             replay: "old replay".into(),
-            resource_plan: String::new(),
-            context_checkpoint: Vec::new(),
-            context_state: String::new(),
-            lifecycle_required: false,
-            restart_init: None,
+            ..FramedHandle::new()
         };
         assert_eq!(unsafe { gf_frame_resource_plan_len(&h) }, 0);
         let mut packet = profile_packet();
@@ -919,14 +923,9 @@ mod replay_tests {
         }
         let mut h = FramedHandle {
             state: FramedState::Active(driver),
-            error: String::new(),
             outcome: "unchanged outcome".into(),
             replay: String::new(),
-            resource_plan: String::new(),
-            context_checkpoint: Vec::new(),
-            context_state: String::new(),
-            lifecycle_required: false,
-            restart_init: None,
+            ..FramedHandle::new()
         };
         let packet = profile_packet();
         let invoke = |h: &mut FramedHandle, p: &[u8], count, peak, json| unsafe {

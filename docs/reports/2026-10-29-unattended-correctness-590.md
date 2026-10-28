@@ -44,7 +44,7 @@ Lean 모델은 다음을 보장한다.
   직렬화한 바이트가 원래 입력과 정확히 같다. 별도 canonicality 가정은 없다.
 - 허용된 바이트열은 비어 있지 않고 4096바이트 이하며 각 원소는 0..255이다.
 - 명시적인 slot 범위와 stack 여유 조건에서 기존 byte-PC 실행 모델의 의미와
-  연결된다. 실제 compiler가 만든 전체 artifact와 식 slice도 kernel equality로 확인한다.
+  연결된다. 실제 compiler artifact에서 JavaScript가 추출한 식 slice와 witness의 equality를 kernel에서 확인한다. 바깥 metadata 전체를 검증하는 정리는 아직 없다.
 
 정수 operand 2를 true로 받아들이거나 끝의 알 수 없는 바이트를 버리는 두
 변이는 예전 정방향 복원 증명을 통과한다. 새 역방향 증명은 이를 거절하며,
@@ -131,3 +131,80 @@ root intent와 혼합하지 않는 인스턴스별 provenance 표현을 다음 �
 | REF-06-016 / #302 | occurrence에서 instance/source/settings/binding으로 추적 |
 | REF-07-007 / #314 | 실제 CSE 변환이 생겼을 때의 provenance 보존 |
 | REF-08-011 / #328 | 여러 계층의 revision 변경 분류 |
+
+## build150 후속 확인
+
+인스턴스별 원본 의도 연결은 [PR598](https://github.com/callin2/ghostflow-language/pull/598)에 있다.
+root의 anchor/link와 imported definition의 anchor/link를 분리하고, 각 instance에
+원본 파일·revision·digest·node·span을 유지한다. 같은 정의를 두 번 사용하거나
+원본에서 지워지는 논리 port에도 연결을 보존한다. canonical source closure를
+다시 컴파일해 package의 provenance를 검증한다. 독립 검토에서 10개 변조 후보의
+거절과 standalone artifact 세 개의 동일성을 확인했다.
+
+소스 `a5c3ef9d3d4998c9d9b551e1865b0073232a3fb1`의 공식 build150은
+`2026-10-28T16:14:31.901Z`에 exit 0으로 완료됐다. 13 gate, Rust441,
+주 Node3813 pass / 18 TODO / 0 fail, 별도 CLI console15 pass다.
+verification SHA-256은 `c971ce5f1cc8ed2cf4d1c170ca321932c298379daa0bd5f9b419bd368d33b137`이다.
+로컬 기록은 `build/evidence/build150/`에 보존했다.
+
+같은 소스에서 Lean 4.19.0의 기대 실행 결과 64개가 통과했다.
+완료 시각은 `2026-10-28T16:08:28.670Z`이며 verification SHA-256은
+`b1dd5ff9f412891201e8757aa95d368167293427687c4552a68f41446acf1290`이다.
+별도 coverage 검사는 함수469/469(100%), 줄90.10%, V8 ranges88.17%였다.
+보고서 SHA-256은 `a48354d032647b2ff6c179327df8da3d4cfe77b627175f3f351fa4e16fc3bed3`이다.
+
+PR596의 head66dbd11과 PR597의 head6403cae는 모든 필수 CI가 통과했다.
+PR598의 heada5c3ef9도 [전체·coverage·frontend-pin 검사](https://github.com/callin2/ghostflow-language/actions/runs/40722998085)와
+[Lean 검사](https://github.com/callin2/ghostflow-language/actions/runs/40722997779)가 통과했다.
+이 확인은 해당 head의 검사 결과다. 병합과 전체 컴파일러 증명을 뜻하지 않는다.
+
+현재 다음 세 단위를 병행한다.
+
+- #290/#302에서 실제 TemporarySettingsHost의 완료 scan에 인스턴스별 state·timer·setting 관측을 연결한다.
+- #211에서 requested/safe를 기존 applied ledger와 분리해 집계하고, 피드백이 없을 때 confirmed를 Unknown으로 반환하는 실제 실행 경로를 만든다.
+- #590에서 Lean이 원본 Bool module의 전체 envelope를 재구성하도록 보강한다. 기존 JS 검증기가 거절하는 metadata 변이도 Lean kernel 자체에서 거절되는지 확인한다.
+
+이 세 단위는 구현 중이며, 이 기록의 통과 수나 Reference 완료 수에 포함하지 않았다.
+
+
+## build156: 실제 관측·단계 집계와 전체 Bool 모듈 증명
+
+[PR599](https://github.com/callin2/ghostflow-language/pull/599)는 다음 세 단위를 통합한다.
+
+- 조합 프로그램의 실제 완료 scan에서 instance별 state·timer·setting을 관측한다. 원본 closure의 파일·revision·digest·node·span을 유지한다. 조회는 실행을 진행하지 않으며, commit 뒤 관측 투영에 실패해도 같은 scan을 다시 실행시키지 않는다. 조합 binding과 explanation 연결은 #290/#302에 남는다.
+- #211의 requested/safe 집계를 Rust scan 소유자에 연결했다. 같은 소스에서 request 20초, 저수위 차단으로 safe 0초, apply receipt 없음, feedback 없음이 각각 구분된다. 누락·재부팅 경계·저장하지 못한 revision은 Unknown으로 남는다. REF-03-021은 실제 native/WASM 관찰과 일치하며 이 묶음의 Reference TODO는 18개에서 17개로 줄었다.
+- Lean이 Bool 모듈 전체 바이트를 원본 투영에서 재구성하고, 그 일치에서 실제 코드 조각과 모든 값 조합의 tick 동작을 증명한다. 이전 인증서가 놓쳤던 transition target metadata 변이는 새 인증서에서 거절된다. 이는 증명 범위의 보완이며 기존 JavaScript 검증기의 취약점으로 보고하지 않는다.
+
+최종 소스는 `2a16c9877b4127ed28bda409f7fcc2234f1882db`다.
+공식 build156은 `2026-10-28T17:14:45.959Z`에 exit 0으로 완료됐다.
+13 gate, Rust441, 주 Node3835 pass / 17 TODO / 0 fail, 별도 console15 pass다.
+verification SHA-256은 `0fce403dfb6b4c53c58a269c5c2bcbca0445f28c8e6669c8099336d38a05d28b`다.
+WASM SHA-256은 `fdd4811caa17e823a6535345245b9c511c14cf8aaaf6ad3ca9515ad165272775`다.
+기록은 `build/evidence/build156/`에 보존했다.
+
+같은 소스의 Lean 검사는 `2026-10-28T17:08:52.743Z`에 완료됐다.
+실제 Lean 호출81개는 성공26개와 의도된 거절55개이며, 별도 JavaScript admission 거절11개도 통과했다.
+합계92개는 증명 정리 수가 아니다. 보고서 SHA-256은
+`7c4aee629ce4047b027beac89052558f195bca06b604d3adbfc032acc371c4f0`다.
+실행 기록은 `build/bool-wave5-final-590/verification.json`에 있다.
+원본 파서·typed projection과 실제 Rust 구현의 모델 대응은 아직 증명하지 않았다.
+
+별도 coverage gate도 exit 0이다. 함수469/469, 줄7314/8108(90.21%), V8 ranges5503/6234(88.27%)다.
+V8 range는 문법상의 branch coverage와 구분한다. 보고서 SHA-256은
+`19f0d7413ab09d9b8091941e79cb22023c341ef25d3c631e9428e1590ba8579e`이며
+`build/evidence/coverage-2a16c98/`에 보존했다.
+
+독립 검토에서 applied-only 집계의 잘못된 scalar/context profile 선택을 찾아 고쳤다.
+네 단계 단독 선언과 기존 applied limit/count_events 바이트 동일성도 확인했다.
+첫 통합 검사에서 FramedHandle 테스트 두 곳의 새 필드 누락이 발생했다.
+공통 생성자를 재사용하도록 수정한 뒤 Rust WASM 테스트21개와 전체 검사가 통과했다.
+실패 기록은 `build/evidence/wave5-rust-test-fixture-failure/`에 보존했다.
+검증 완료 여부를 분류하는 feature-status catalog·validator도 source identity에 포함했다.
+
+최신 dev `6937b8c95c0b028fbf107b41baf52ae634722fda`에는 PR596·597·598이 병합돼 있다.
+그 tree는 검증했던 `a5c3ef9`와 동일하다. 이 세 병합을 이 작업자가 실행한 것은 아니다.
+PR599의 병합 및 현재 CI 결과는 이 기록의 로컬 통과와 별도로 추적한다.
+
+다음 묶음은 #249의 source-bound Percent 중재, #293의 실제 설치 경로에서 물리 Unknown 표시,
+#590의 Lean raw module reader와 초기 상태부터 반복 실행하는 증명이다.
+#293은 물리 증거 부재를 가상 실행 중단 조건으로 추가하지 않는다.

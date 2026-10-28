@@ -5,6 +5,28 @@
 
 ## 미출시
 
+### 2026-10-29 - 합성 런타임 관측 ([#290](https://github.com/callin2/ghostflow-language/issues/290), [#302](https://github.com/callin2/ghostflow-language/issues/302))
+
+명시적 Interaction 생성이 스키마 0.5와 스냅샷 0.3으로 가져온 상태·타이머·설정을 지원합니다.
+예를 들어 `east`와 `west`는 각각의 `setting.duration`, 원본 위치와 인스턴스별 의도 앵커를 유지합니다.
+TemporarySettingsHost는 추가 tick 없이 자신이 수락한 스캔과 실제 적용 설정을 게시합니다.
+실행 후 관측에 실패해도 제어 스텝은 수락된 상태로 유지합니다. 독립 프로그램의 계약 형식과
+제어 평가 의미는 바뀌지 않습니다. 정식 원본 재현, 실제 framed·legacy 호스트 관측, 중첩
+인스턴스와 버전이 명시된 corpus를 `tests/composed-interaction.test.mjs`에서 검증합니다.
+설치·binding 소유권과 합성 출력 설명은 별도 후속 작업입니다.
+
+### 2026-10-29 - 스캔 소유 출력 단계 집계 ([#211](https://github.com/callin2/ghostflow-language/issues/211))
+
+명시적으로 연결한 BoolActuator 자원의 durable `on_time` 관찰 account가 requested,
+safe, confirmed 단계를 허용합니다. Rust 스캔 소유자가 requested와 safe 구간 및
+관측 범위를 기록합니다. 20초 요청이 차단되면 requested 20초, safe 0초이며 피드백이
+없는 confirmed는 Unknown입니다. 이전에는 이 선언을 실행 컴파일에서 거부했습니다.
+영속 스냅샷은 소스·출력·단계·run에 결합하며 새 run은 재시작 전 구간을 연장하지
+않습니다. 관측 공백, 영속 저장 대기와 용량 소진은 Unknown입니다. 이 관찰 프로필은
+admission limit와 event account 혼합을 거부합니다. 기존 applied receipt 집계는
+유지합니다. native와 WASM 회귀 검증은 `tests/stage-accounting-control.test.mjs`에
+있으며 Reference §3.4와 §4.7의 물리 증거 구분을 유지합니다.
+
 ### 2026-10-29 - 가져온 모듈의 의도 provenance ([#290](https://github.com/callin2/ghostflow-language/issues/290), [#302](https://github.com/callin2/ghostflow-language/issues/302))
 
 고정된 import의 의도를 작성된 인스턴스별 범위에 보존합니다. 정의나 인스턴스가 다르면 같은 anchor ID도 합치지 않습니다.

@@ -594,7 +594,7 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
   if ((Object.hasOwn(manifest, 'adaptPolicy') || Object.hasOwn(manifest, 'strategies')) && capabilities === undefined) {
     throw new Error('adapt strategy activation requires a capability-aware host; ControlRuntime cannot activate this manifest');
   }
-  keys(manifest, ['format', 'name', 'inputs', 'outputs', 'sensors', 'schedules', 'timers', 'signals', 'configs', 'bytecodeSha256'], ['adaptPolicy', 'strategies', 'objectives', 'resources', 'sensorInstances', 'lifecycle','legacyAdmission', 'outputObservations', 'requiredRuntimeFeatures', 'localConstraints'], 'manifest');
+  keys(manifest, ['format', 'name', 'inputs', 'outputs', 'sensors', 'schedules', 'timers', 'signals', 'configs', 'bytecodeSha256'], ['adaptPolicy', 'strategies', 'objectives', 'resources', 'sensorInstances', 'lifecycle','legacyAdmission', 'outputObservations', 'requiredRuntimeFeatures', 'localConstraints', 'accounting'], 'manifest');
   validateRequiredRuntimeFeatures(manifest);
   const outputObservations = validateOutputObservationsManifest(manifest, bytecodeFormat);
   const lifecycle = validateLifecycleManifest(manifest);
@@ -721,7 +721,7 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
   unique(configs.map(item => item.name), 'config');
   for (const item of resources) {
     name(item.name, 'resource.name');
-    if (item.type !== 'ContinuousActuator') throw new Error(`resource ${item.name} has unsupported type ${String(item.type)}`);
+    if (item.type !== 'ContinuousActuator' && !(manifest.accounting && item.type === 'BoolActuator')) throw new Error(`resource ${item.name} has unsupported type ${String(item.type)}`);
   }
   unique(resources.map(item => item.name), 'resource');
 

@@ -35,6 +35,9 @@ export function verificationSourceHashes(root) {
   // Historical consumer pins predate the calendar adapter. Its presence makes
   // the reviewed offline dataset mandatory in the current source graph.
   if (fs.existsSync(path.join(root, 'runtimes/node/calendar.mjs'))) visit('data/calendars');
+  // Feature-status policy and its validator classify verification completion.
+  // Older source pins without this directory retain their original hash set.
+  if (fs.existsSync(path.join(root, 'contracts/feature-status'))) visit('contracts/feature-status');
   return hashes;
 }
 

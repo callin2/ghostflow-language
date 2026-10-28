@@ -349,6 +349,33 @@ export async function verifyInteractionCorpus({ root = REPOSITORY_ROOT, corpus, 
   return { format: 'GhostFlow/verified-interaction-corpus-v1', version: '1.0', cases: results };
 }
 
+/** Exact composed source/schema fixtures; runtime tests replay the recorded scans. */
+export async function verifyComposedInteractionCorpus({ corpus } = {}) {
+  const fixture = corpus ?? JSON.parse(fs.readFileSync(path.join(REPOSITORY_ROOT,
+    'contracts/interaction-v0/examples/composed-v0.5.json'), 'utf8'));
+  exactObject(fixture, ['format', 'version', 'sourceDocument', 'sourceClosure', 'sourceIdentity', 'schema', 'scans'], 'composed corpus');
+  if (fixture.format !== 'GhostFlow/composed-interaction-corpus-v1' || fixture.version !== '1.0') fail('unsupported composed corpus version');
+  const compilation = await compileSource(fixture.sourceDocument.text, {
+    filename: fixture.sourceDocument.filename, sourceClosure: fixture.sourceClosure.documents,
+    interactionSourceIdentity: fixture.sourceIdentity,
+  });
+  for (const [name, expected] of [['sourceDocument', compilation.sourceDocument], ['sourceClosure', compilation.sourceClosure], ['schema', compilation.interactionSchema]]) {
+    if (canonicalJson(fixture[name]) !== canonicalJson(expected)) fail(`composed corpus ${name} differs from canonical compilation`);
+  }
+  if (fixture.schema.version !== '0.5' || !Array.isArray(fixture.scans) || !fixture.scans.length) fail('composed corpus requires the explicit composed profile and scans');
+  let time = -1;
+  for (const [index, scan] of fixture.scans.entries()) {
+    exactObject(scan, ['packet', 'snapshot'], `composed corpus scans[${index}]`);
+    const result = validateInteraction(fixture.schema, scan.snapshot);
+    if (!result.valid) fail(`composed corpus snapshot fails contract: ${JSON.stringify(result.errors)}`);
+    if (scan.snapshot.completion.scanId !== index || scan.snapshot.completion.logicalTimeMs !== scan.packet.nowMs
+      || scan.packet.nowMs < time || scan.snapshot.runId !== fixture.scans[0].snapshot.runId) fail('composed corpus scan identity differs');
+    time = scan.packet.nowMs;
+  }
+  return { format: 'GhostFlow/verified-composed-interaction-corpus-v1', version: '1.0',
+    sourceClosureSha256: fixture.schema.composition.sourceClosureSha256, scanCount: fixture.scans.length };
+}
+
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   if (process.argv.length !== 2) {
     process.stderr.write('usage: node contracts/interaction-v0/verify-corpus.mjs\n');

@@ -259,6 +259,8 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/import-header.test.mjs',
   'tests/import-composition.test.mjs',
   'tests/composition-intent-provenance.test.mjs',
+  'tests/composed-interaction.test.mjs',
+  'tests/stage-accounting-control.test.mjs',
   'tests/composition-execution.test.mjs',
   'tests/composition-config-timer-isolation.test.mjs',
   'tests/composition-contract-reference.test.mjs',
@@ -528,7 +530,7 @@ async function verify(nodeOnly, curriculumOnly) {
       await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-core', '--example', 'run']);
       await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-core', '--release',
         '--example', 'run', '--example', 'scan_adapter', '--example', 'scan_tape',
-        '--example', 'context_tape', '--example', 'scenario_scan', '--example', 'estimate_evidence', '--example', 'solar_tape', '--example', 'resource_tape']);
+        '--example', 'context_tape', '--example', 'scenario_scan', '--example', 'estimate_evidence', '--example', 'solar_tape', '--example', 'resource_tape', '--example', 'stage_accounting_tape']);
       await gate('cargo', ['build', '--locked', '--offline', '-p', 'ghostflow-wasm', '--target', 'wasm32-unknown-unknown', '--release']);
       wasmVerified = true;
     }

@@ -156,7 +156,7 @@ test('REF-03-022: durable applied reboot budget blocks Unknown after reboot and 
 
   await assert.rejects(AccountingRuntime.instantiateSource(wasm, source.replace('stage: applied', 'stage: safe'), {
     filename, account: 'applied', resourceId, config,
-  }), /applied|unsupported accounting stage/);
+  }), /scan stage accounting requires/);
   const bounded = await AccountingRuntime.instantiateSource(wasm, source, { filename, account: 'applied', resourceId, config });
   try {
     await bounded.initializeEmpty(async () => true);
