@@ -90,13 +90,24 @@ class ReceiptTests(unittest.TestCase):
                 lean.write_text(baseline + '\n' + declaration)
                 self.assertEqual(audit.inspect(self.directory)['status'], 'rejected')
 
-    def extraction_with_mock_tools(self, mutate_source):
+    def test_local_wrapper_roots_are_rejected(self):
+        path = self.directory / 'IntPrimitives.llbc'
+        llbc = json.loads(path.read_text())
+        for root in llbc['translated']['fun_decls']:
+            root['item_meta']['is_local'] = True
+            root['item_meta']['name'].insert(0, {'Ident': ['local_wrapper', 0]})
+        path.write_text(json.dumps(llbc))
+        self.assertEqual(audit.inspect(self.directory)['status'], 'rejected')
+
+    def extraction_with_mock_tools(self, mutate_source, mutate_driver=False):
         root = Path(self.temporary.name) / 'repository'
         source = root / 'crates/ghostflow-core/src/lib.rs'
         source.parent.mkdir(parents=True)
         source.write_text('unchanged production fixture')
         charon, aeneas = root / 'charon', root / 'aeneas'
+        driver = charon.with_name('charon-driver')
         charon.write_text('mock Charon binary')
+        driver.write_text('mock Charon driver binary')
         aeneas.write_text('mock Aeneas binary')
         output = root / 'output'
         commands = []
@@ -106,6 +117,8 @@ class ReceiptTests(unittest.TestCase):
             fixture(output)
             if Path(command[0]).resolve() == aeneas.resolve() and mutate_source:
                 source.write_text('changed during extraction')
+            if Path(command[0]).resolve() == aeneas.resolve() and mutate_driver:
+                driver.write_text('changed driver during extraction')
             return subprocess.CompletedProcess(command, 0, '', '')
 
         argv = ['extract.py', '--charon', str(charon), '--aeneas', str(aeneas),
@@ -119,7 +132,7 @@ class ReceiptTests(unittest.TestCase):
         self.assertIn('--offline', commands[0])
         self.assertEqual(report['inputSha256Before']['charon'], hashlib.sha256(charon.read_bytes()).hexdigest())
         self.assertEqual(set(report['inputSha256Before']),
-                         {'production', 'charon', 'aeneas', 'extractHelper', 'auditHelper'})
+                         {'production', 'charon', 'charonDriver', 'aeneas', 'extractHelper', 'auditHelper'})
         self.assertEqual(report['admission']['sha256'], audit.inspect(output)['sha256'])
         return result, report
 
@@ -134,6 +147,14 @@ class ReceiptTests(unittest.TestCase):
         self.assertEqual(result, 1)
         self.assertEqual(report['status'], 'failed')
         self.assertFalse(report['inputsUnchanged'])
+
+    def test_driver_change_rejects_mock_extraction(self):
+        result, report = self.extraction_with_mock_tools(False, mutate_driver=True)
+        self.assertEqual(result, 1)
+        self.assertEqual(report['status'], 'failed')
+        self.assertFalse(report['inputsUnchanged'])
+        self.assertNotEqual(report['inputSha256Before']['charonDriver'],
+                            report['inputSha256After']['charonDriver'])
 
 
 if __name__ == '__main__':

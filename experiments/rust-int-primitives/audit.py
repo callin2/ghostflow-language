@@ -42,8 +42,9 @@ def inspect(directory):
     if llbc['has_errors']:
         reasons.append('Charon reported errors')
     if set(root_bodies) != METHODS or not all(
-            x['opacity'] == 'Transparent' and x['structured'] for x in root_bodies.values()):
-        reasons.append('selected external roots lack transparent Structured LLBC bodies')
+            x['isLocal'] is False and x['opacity'] == 'Transparent' and x['structured']
+            for x in root_bodies.values()):
+        reasons.append('selected roots must be external with transparent Structured LLBC bodies')
     missing = sorted(RUST_NAMES - emitted)
     if missing:
         reasons.append('selected actual roots absent from non-opaque Lean translation')
