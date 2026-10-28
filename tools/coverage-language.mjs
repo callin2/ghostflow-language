@@ -12,6 +12,7 @@ const TESTS = Object.freeze([
   'tests/runtime-conformance.test.mjs',
   'tests/compiler.test.mjs', 'tests/constraints.test.mjs', 'tests/coverage-edges.test.mjs', 'tests/control-host.test.mjs',
   'tests/control.test.mjs', 'tests/integration-contract.test.mjs', 'tests/ledger.test.mjs',
+  'tests/installed-control-host.test.mjs', 'tests/program-replacement-host.test.mjs',
   'tests/literate.test.mjs', 'tests/policy.test.mjs',
   'tests/output-conformance.test.mjs', 'tests/schedule.test.mjs', 'tests/scheduled-admission.test.mjs',
   'tests/signals-wasm.test.mjs', 'tests/station-wasm.test.mjs', 'tests/accounting-wasm.test.mjs', 'tests/toolchain.test.mjs',

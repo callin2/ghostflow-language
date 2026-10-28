@@ -9314,6 +9314,89 @@
       "referenceCaseIds": [
         "REF-03-021"
       ]
+    },
+    {
+      "id": "installation-physical-unknown",
+      "family": "Installation metadata admission preserves Unknown physical suitability",
+      "clause": {
+        "path": "docs/reference/06-composition-and-replay.en.md",
+        "heading": "6.2 Definitions, instances, and logical ports"
+      },
+      "owner": "HOST",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "host_simulation",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/integration-contract.test.mjs",
+              "testId": "REF-06-005 installation assessment separates metadata admission from physical Unknown",
+              "caseId": "REF-06-005",
+              "assertionClass": "identity",
+              "targets": [
+                "host"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/installed-control-host.test.mjs",
+              "testId": "REF-06-005 matching Bool metadata leaves physical suitability Unknown while installed execution continues",
+              "caseId": "REF-06-005",
+              "assertionClass": "runtime-value",
+              "targets": [
+                "host",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/program-replacement-host.test.mjs",
+              "testId": "REF-06-005 Program replacement retains physical Unknown and atomically binds assessment to admitted artifacts",
+              "caseId": "REF-06-005",
+              "assertionClass": "rollback",
+              "targets": [
+                "host",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/integration-contract.test.mjs",
+              "testId": "REF-06-005 installation assessment never publishes identity from changing module getters",
+              "caseId": "REF-06-005",
+              "assertionClass": "identity",
+              "targets": [
+                "host"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "The real installation and program-replacement reference hosts retain an owned metadata assessment and run WASM with physical Unknown. Declared polarity and safeLevel do not establish electrical, load, fail-safe or wiring evidence. No Device acceptance or physical verification is produced; Unknown does not block host execution."
+      ],
+      "issues": [
+        293
+      ],
+      "referenceCaseIds": [
+        "REF-06-005"
+      ]
     }
   ]
 }
