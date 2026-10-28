@@ -1557,6 +1557,10 @@
     {
       "path": "docs/reports/2026-10-29-unattended-correctness-590.md",
       "reason": "Dated issue590 execution evidence, exact source identities and remaining proof obligations; reports may remain in one language."
+    },
+    {
+      "path": "experiments/bool-translation-validation/module-envelope-report.md",
+      "reason": "Issue590 bounded formal proof execution report and trusted-boundary evidence; reports may remain in one language."
     }
   ]
 }

@@ -78,7 +78,7 @@ node experiments/bool-translation-validation/verify.mjs \
 The source identity includes all imported Lean proof files and the generator.
 The result count is a count of expected outcomes, including intentional failures, rather than a count of universal theorems.
 
-The run completed at `2026-10-28T16:37:39.520Z` with 92 of 92 expected outcomes, comprising 26 successes and 66 expected rejections.
+The run completed at `2026-10-28T16:37:39.520Z` with 92 of 92 expected outcomes. These consist of 81 actual Lean invocations (26 successes and 55 expected rejections) and 11 JavaScript admission assertions (all expected rejections).
 The previous 64 outcomes remain in that run. The focused Node tests passed 8 of 8 cases.
 The source identity SHA-256 is `ff5e81aaa3f9b1df352e1531035f0009d29821dc9bac37237401c616f290fe99`.
 The verification report SHA-256 is `f0e6c9fdb9f36c4d649124c9fe52f6c34a72f8fd003a0d49e1fd21a7303336db`.

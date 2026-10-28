@@ -89,7 +89,6 @@ theorem encoded (m : Module) (raw : List Nat) (h : encodeModule m = .ok raw) :
   split at h <;> simp_all
   split at h <;> simp_all
 
--- Every boundary is recomputed from the typed module. No decoded offsets enter this view.
 def slices : List (Entry p) → List Nat → List (List Nat)
   | [], _ => []
   | e :: es, raw =>
