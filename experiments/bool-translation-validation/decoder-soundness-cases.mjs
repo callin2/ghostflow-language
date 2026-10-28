@@ -59,7 +59,7 @@ export const decoderSoundnessMutations = [
     after: 'else if b = 1 ∨ b = 2 then scan p rest (.literal true :: stack) else none',
     witness: `
 open BoolTranslation BoolTranslation.Serialization
-example : decode false [1, 2] = some (.literal true) := by simp [decode, scan]
+example : decode false [1, 2] = some (.literal true) := by simp [decode, scan.eq_def]
 example : serialize (.literal true : Expr false) = .ok [1, 1] := by rfl
 example : ([1, 1] : List Nat) ≠ [1, 2] := by decide
 example : serialize (.literal true : Expr false) ≠ .ok [1, 2] := by
@@ -69,7 +69,7 @@ example : serialize (.literal true : Expr false) ≠ .ok [1, 2] := by
     after: '| _ => some stack\ntermination_by code.length',
     witness: `
 open BoolTranslation BoolTranslation.Serialization
-example : decode false [1, 1, 255] = some (.literal true) := by simp [decode, scan]
+example : decode false [1, 1, 255] = some (.literal true) := by simp [decode, scan.eq_def]
 example : serialize (.literal true : Expr false) = .ok [1, 1] := by rfl
 example : ([1, 1] : List Nat) ≠ [1, 1, 255] := by decide
 example : serialize (.literal true : Expr false) ≠ .ok [1, 1, 255] := by
