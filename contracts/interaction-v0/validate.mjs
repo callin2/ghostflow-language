@@ -7,6 +7,8 @@ export const INTERACTION_SCHEMA_VERSION = '0.3';
 export const RUNTIME_SNAPSHOT_VERSION = '0.1';
 export const SETTINGS_INTERACTION_SCHEMA_VERSION = '0.4';
 export const SETTINGS_RUNTIME_SNAPSHOT_VERSION = '0.2';
+export const COMPOSED_INTERACTION_SCHEMA_VERSION = '0.5';
+export const COMPOSED_RUNTIME_SNAPSHOT_VERSION = '0.3';
 
 const PUBLIC_ID = /^[A-Za-z][A-Za-z0-9._:-]{0,127}$/;
 const ENUM_MEMBER_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -116,6 +118,55 @@ function sourceType(value, path, errors) {
   }
 }
 
+function instancePath(value, path, errors) {
+  if (value !== null && (typeof value !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*$/.test(value)
+    || value.split('.').some(part => part.startsWith('__gf_')))) issue(errors, path, 'instance', 'must be null or an authored instance path');
+}
+
+const descriptorKey = (instance, id) => JSON.stringify([instance ?? null, id]);
+
+function compositionIdentity(value, path, errors) {
+  if (!exactObject(value, ['sourceClosureSha256', 'instances'], path, errors)) return;
+  sha256(value.sourceClosureSha256, `${path}.sourceClosureSha256`, errors);
+  if (!Array.isArray(value.instances) || !value.instances.length) { issue(errors, path, 'composition', 'requires instances'); return; }
+  const seen = new Set();
+  value.instances.forEach((entry, index) => {
+    const p = `${path}.instances[${index}]`;
+    if (!exactObject(entry, ['instance', 'definition'], p, errors)) return;
+    instancePath(entry.instance, `${p}.instance`, errors);
+    if (entry.instance === null || seen.has(entry.instance)) issue(errors, p, 'instance', 'requires unique non-root instances');
+    seen.add(entry.instance);
+    if (exactObject(entry.definition, ['filename', 'revision', 'sha256'], `${p}.definition`, errors)) {
+      for (const key of ['filename', 'revision']) if (typeof entry.definition[key] !== 'string' || !entry.definition[key].trim()) issue(errors, `${p}.definition.${key}`, 'definition', 'must be non-empty');
+      sha256(entry.definition.sha256, `${p}.definition.sha256`, errors);
+    }
+  });
+}
+
+function composedProvenance(value, kind, instance, path, errors) {
+  if (!exactObject(value, ['sourceNode', 'intentAnchors'], path, errors)) return;
+  if (exactObject(value.sourceNode, ['id', 'definitionNodeId', 'kind', 'source'], `${path}.sourceNode`, errors)) {
+    for (const key of ['id', 'definitionNodeId']) if (!Number.isSafeInteger(value.sourceNode[key]) || value.sourceNode[key] < 1) issue(errors, `${path}.sourceNode.${key}`, 'source_node', 'must be a positive node ID');
+    if (value.sourceNode.kind !== kind) issue(errors, `${path}.sourceNode.kind`, 'source_node', 'must match descriptor kind');
+    const source = value.sourceNode.source;
+    if (exactObject(source, ['filename', 'line', 'column', 'endLine', 'endColumn'], `${path}.sourceNode.source`, errors)) {
+      if (typeof source.filename !== 'string' || !source.filename) issue(errors, path, 'source_span', 'requires filename');
+      for (const key of ['line', 'column', 'endLine', 'endColumn']) if (!Number.isSafeInteger(source[key]) || source[key] < 1) issue(errors, path, 'source_span', 'requires positive source coordinates');
+      if (source.endLine < source.line || source.endLine === source.line && source.endColumn < source.column) issue(errors, path, 'source_span', 'requires ordered source span');
+    }
+  }
+  if (!Array.isArray(value.intentAnchors) || !value.intentAnchors.length) { issue(errors, path, 'intent_provenance', 'requires intent anchors'); return; }
+  const seen = new Set();
+  value.intentAnchors.forEach((entry, index) => {
+    const p = `${path}.intentAnchors[${index}]`;
+    if (!exactObject(entry, ['instance', 'anchorId'], p, errors)) return;
+    if (entry.instance !== instance) issue(errors, p, 'intent_provenance', 'anchor must belong to the descriptor instance');
+    publicId(entry.anchorId, `${p}.anchorId`, errors);
+    if (seen.has(entry.anchorId)) issue(errors, p, 'duplicate_identity', 'must not repeat anchor');
+    seen.add(entry.anchorId);
+  });
+}
+
 function provenance(value, kind, path, errors) {
   if (!exactObject(value, ['sourceNode', 'intentAnchorIds'], path, errors)) return;
   if (exactObject(value.sourceNode, ['id', 'kind'], `${path}.sourceNode`, errors)) {
@@ -136,7 +187,7 @@ function provenance(value, kind, path, errors) {
   }
 }
 
-function descriptor(value, index, errors, settingsProfile) {
+function descriptor(value, index, errors, settingsProfile, composed = false) {
   const path = `schema.descriptors[${index}]`;
   if (!object(value)) {
     issue(errors, path, 'shape', 'must be an object');
@@ -147,7 +198,9 @@ function descriptor(value, index, errors, settingsProfile) {
     : value.kind === 'setting'
       ? ['id', 'name', 'kind', 'sourceType', 'access', 'authority', 'applyPolicy', 'label', ...(settingsProfile ? ['defaultValue'] : []), 'constraint', 'provenance']
     : ['id', 'name', 'kind', 'sourceType', 'access', 'provenance'];
+  if (composed) fields.push('instance');
   if (!exactObject(value, fields, path, errors)) return;
+  if (composed) instancePath(value.instance, `${path}.instance`, errors);
   publicId(value.id, `${path}.id`, errors);
   publicId(value.name, `${path}.name`, errors);
   if (!['state', 'timer', 'counter', 'setting'].includes(value.kind)) issue(errors, `${path}.kind`, 'descriptor_kind', 'v0 supports state, timer, counter, and setting only');
@@ -157,7 +210,7 @@ function descriptor(value, index, errors, settingsProfile) {
   }
   if (value.kind === 'timer') {
     const continuous = value.operation?.kind === 'continuous_true';
-    const operationFields = continuous ? ['kind', 'subjectNodeId'] : ['kind', 'subjectId'];
+    const operationFields = continuous ? ['kind', 'subjectNodeId'] : ['kind', composed ? 'subject' : 'subjectId'];
     if (exactObject(value.operation, operationFields, `${path}.operation`, errors)) {
       if (continuous) {
         if (!Number.isInteger(value.operation.subjectNodeId) || value.operation.subjectNodeId < 1) {
@@ -165,7 +218,13 @@ function descriptor(value, index, errors, settingsProfile) {
         }
       } else {
         if (value.operation.kind !== 'elapsed_since_change') issue(errors, `${path}.operation.kind`, 'timer_operation', 'must be elapsed_since_change or continuous_true');
-        publicId(value.operation.subjectId, `${path}.operation.subjectId`, errors);
+        if (composed) {
+          if (exactObject(value.operation.subject, ['instance', 'descriptorId'], `${path}.operation.subject`, errors)) {
+            instancePath(value.operation.subject.instance, `${path}.operation.subject.instance`, errors);
+            publicId(value.operation.subject.descriptorId, `${path}.operation.subject.descriptorId`, errors);
+            if (value.operation.subject.instance !== value.instance) issue(errors, `${path}.operation.subject.instance`, 'timer_subject', 'must belong to the timer instance');
+          }
+        } else publicId(value.operation.subjectId, `${path}.operation.subjectId`, errors);
       }
     }
     if (value.sourceType?.kind !== 'builtin' || value.sourceType?.name !== 'Duration' || value.sourceType?.unit !== 'ms') {
@@ -203,11 +262,15 @@ function descriptor(value, index, errors, settingsProfile) {
       }
     }
   }
-  provenance(value.provenance, value.kind === 'counter' ? 'state' : value.kind === 'setting' ? 'config' : value.kind, `${path}.provenance`, errors);
+  const sourceKind = value.kind === 'counter' ? 'state' : value.kind === 'setting' ? 'config' : value.kind;
+  if (composed) composedProvenance(value.provenance, sourceKind, value.instance, `${path}.provenance`, errors);
+  else provenance(value.provenance, sourceKind, `${path}.provenance`, errors);
 }
 
 function validateSchema(schema, errors) {
-  if (!exactObject(schema, ['format', 'version', 'module', 'source', 'descriptors'], 'schema', errors)) return;
+  const composed = schema?.version === COMPOSED_INTERACTION_SCHEMA_VERSION;
+  if (!exactObject(schema, ['format', 'version', 'module', 'source', 'descriptors', ...(composed ? ['composition'] : [])], 'schema', errors)) return;
+  if (composed) compositionIdentity(schema.composition, 'schema.composition', errors);
   if (schema.format !== INTERACTION_SCHEMA_FORMAT) issue(errors, 'schema.format', 'format', `must be ${INTERACTION_SCHEMA_FORMAT}`);
   moduleIdentity(schema.module, 'schema.module', errors);
   sourceIdentity(schema.source, 'schema.source', errors);
@@ -217,22 +280,35 @@ function validateSchema(schema, errors) {
   }
   const ids = new Set();
   const names = new Set();
+  const sourceNodes = new Set();
   schema.descriptors.forEach((entry, index) => {
-    descriptor(entry, index, errors, schema.version === SETTINGS_INTERACTION_SCHEMA_VERSION);
-    if (ids.has(entry?.id)) issue(errors, `schema.descriptors[${index}].id`, 'duplicate_identity', 'must be unique');
-    if (names.has(entry?.name)) issue(errors, `schema.descriptors[${index}].name`, 'duplicate_identity', 'must be unique');
-    ids.add(entry?.id); names.add(entry?.name);
+    descriptor(entry, index, errors, schema.version === SETTINGS_INTERACTION_SCHEMA_VERSION || composed, composed);
+    const id = composed ? descriptorKey(entry?.instance, entry?.id) : entry?.id;
+    const name = composed ? descriptorKey(entry?.instance, entry?.name) : entry?.name;
+    if (ids.has(id)) issue(errors, `schema.descriptors[${index}].id`, 'duplicate_identity', 'must be unique');
+    if (names.has(name)) issue(errors, `schema.descriptors[${index}].name`, 'duplicate_identity', 'must be unique');
+    ids.add(id); names.add(name);
+    if (composed && entry?.instance !== null && !(Array.isArray(schema.composition?.instances)
+      && schema.composition.instances.some(instance => instance?.instance === entry?.instance))) issue(errors, `schema.descriptors[${index}].instance`, 'instance', 'must resolve to composition');
+    if (composed) {
+      const sourceNode = entry?.provenance?.sourceNode;
+      if (sourceNodes.has(sourceNode?.id)) issue(errors, `schema.descriptors[${index}].provenance.sourceNode.id`, 'duplicate_identity', 'must identify one flattened declaration');
+      sourceNodes.add(sourceNode?.id);
+      const definition = Array.isArray(schema.composition?.instances)
+        ? schema.composition.instances.find(instance => instance?.instance === entry?.instance)?.definition : null;
+      if (definition && sourceNode?.source?.filename !== definition.filename) issue(errors, `schema.descriptors[${index}].provenance.sourceNode.source.filename`, 'definition', 'must match the instance definition');
+    }
   });
   const hasSettings = schema.descriptors.some(entry => entry?.kind === 'setting');
-  if (schema.version !== INTERACTION_SCHEMA_VERSION && !(hasSettings && schema.version === SETTINGS_INTERACTION_SCHEMA_VERSION)) {
+  if (!composed && schema.version !== INTERACTION_SCHEMA_VERSION && !(hasSettings && schema.version === SETTINGS_INTERACTION_SCHEMA_VERSION)) {
     issue(errors, 'schema.version', 'version', 'must be 0.3 or the explicit settings profile 0.4');
   }
-  const descriptorsById = new Map(schema.descriptors.map(entry => [entry?.id, entry]));
+  const descriptorsById = new Map(schema.descriptors.map(entry => [composed ? descriptorKey(entry?.instance, entry?.id) : entry?.id, entry]));
   for (const entry of schema.descriptors) {
     if (entry?.kind !== 'timer') continue;
     if (entry.operation?.kind === 'continuous_true') continue;
-    const subject = descriptorsById.get(entry.operation?.subjectId);
-    if (!subject || subject.kind !== 'state') {
+    const subject = descriptorsById.get(composed ? descriptorKey(entry.operation?.subject?.instance, entry.operation?.subject?.descriptorId) : entry.operation?.subjectId);
+    if (!subject || !(composed ? ['state', 'counter'] : ['state']).includes(subject.kind)) {
       issue(errors, `schema.descriptors.${entry.id}.operation.subjectId`, 'timer_subject', 'must resolve to an authored state descriptor');
     }
   }
@@ -262,7 +338,7 @@ function readyValue(type, value, path, errors) {
   }
 }
 
-function observation(value, descriptorValue, index, errors, globalSettingsRevision, settingsProfile) {
+function observation(value, descriptorValue, index, errors, globalSettingsRevision, settingsProfile, composed = false) {
   const path = `snapshot.observations[${index}]`;
   if (!object(value)) {
     issue(errors, path, 'shape', 'must be an object');
@@ -277,7 +353,9 @@ function observation(value, descriptorValue, index, errors, globalSettingsRevisi
     : value.status === 'unavailable' ? ['descriptorId', 'status', 'reason']
       : value.status === 'error' ? ['descriptorId', ...settingErrorFields, 'status', 'error']
         : ['descriptorId', 'status'];
+  if (composed) fields.push('instance');
   if (!exactObject(value, fields, path, errors)) return;
+  if (composed) instancePath(value.instance, `${path}.instance`, errors);
   publicId(value.descriptorId, `${path}.descriptorId`, errors);
   if (value.status === 'ready') {
     readyValue(descriptorValue?.sourceType, value.value, `${path}.value`, errors);
@@ -317,13 +395,20 @@ function observation(value, descriptorValue, index, errors, globalSettingsRevisi
 }
 
 function validateSnapshot(schema, snapshot, errors) {
-  const hasSettings = schema.version === SETTINGS_INTERACTION_SCHEMA_VERSION;
+  const composed = schema.version === COMPOSED_INTERACTION_SCHEMA_VERSION;
+  const hasSettings = schema.version === SETTINGS_INTERACTION_SCHEMA_VERSION || composed;
   const snapshotFields = hasSettings
     ? ['format', 'version', 'schema', 'module', 'source', 'runId', 'completion', 'settingsRevision', 'observations']
     : ['format', 'version', 'schema', 'module', 'source', 'runId', 'completion', 'observations'];
+  if (composed) snapshotFields.push('composition');
   if (!exactObject(snapshot, snapshotFields, 'snapshot', errors)) return;
+  if (composed) {
+    const before = errors.length;
+    compositionIdentity(snapshot.composition, 'snapshot.composition', errors);
+    if (errors.length === before && canonicalJson(snapshot.composition) !== canonicalJson(schema.composition)) issue(errors, 'snapshot.composition', 'identity_mismatch', 'must match canonical source closure');
+  }
   if (snapshot.format !== RUNTIME_SNAPSHOT_FORMAT) issue(errors, 'snapshot.format', 'format', `must be ${RUNTIME_SNAPSHOT_FORMAT}`);
-  const expectedSnapshotVersion = hasSettings ? SETTINGS_RUNTIME_SNAPSHOT_VERSION : RUNTIME_SNAPSHOT_VERSION;
+  const expectedSnapshotVersion = composed ? COMPOSED_RUNTIME_SNAPSHOT_VERSION : hasSettings ? SETTINGS_RUNTIME_SNAPSHOT_VERSION : RUNTIME_SNAPSHOT_VERSION;
   if (snapshot.version !== expectedSnapshotVersion) issue(errors, 'snapshot.version', 'version', `must be ${expectedSnapshotVersion} for ${hasSettings ? 'settings' : 'non-settings'} profile`);
   const globalSettingsRevision = hasSettings ? snapshot.settingsRevision : 0;
   if (hasSettings && (!Number.isSafeInteger(globalSettingsRevision) || globalSettingsRevision < 0)) issue(errors, 'snapshot.settingsRevision', 'settings_provenance', 'must be a non-negative safe integer');
@@ -346,17 +431,19 @@ function validateSnapshot(schema, snapshot, errors) {
     issue(errors, 'snapshot.observations', 'observations', 'must be an array');
     return;
   }
-  const descriptors = new Map(schema.descriptors.map(entry => [entry.id, entry]));
+  const keyFor = entry => composed ? descriptorKey(entry?.instance, entry?.descriptorId ?? entry?.id) : entry?.descriptorId ?? entry?.id;
+  const descriptors = new Map(schema.descriptors.map(entry => [keyFor(entry), entry]));
   const ids = new Set();
   snapshot.observations.forEach((entry, index) => {
-    observation(entry, descriptors.get(entry?.descriptorId), index, errors, globalSettingsRevision, hasSettings);
-    if (!descriptors.has(entry?.descriptorId)) issue(errors, `snapshot.observations[${index}].descriptorId`, 'unknown_descriptor', 'is absent from the static schema');
-    if (ids.has(entry?.descriptorId)) issue(errors, `snapshot.observations[${index}].descriptorId`, 'duplicate_descriptor', 'must occur once');
-    ids.add(entry?.descriptorId);
+    const key = keyFor(entry);
+    observation(entry, descriptors.get(key), index, errors, globalSettingsRevision, hasSettings, composed);
+    if (!descriptors.has(key)) issue(errors, `snapshot.observations[${index}].descriptorId`, 'unknown_descriptor', 'is absent from the static schema');
+    if (ids.has(key)) issue(errors, `snapshot.observations[${index}].descriptorId`, 'duplicate_descriptor', 'must occur once');
+    ids.add(key);
   });
   for (const descriptorId of descriptors.keys()) if (!ids.has(descriptorId)) issue(errors, 'snapshot.observations', 'missing_observation', `must explicitly cover ${descriptorId}`);
   if (hasSettings) {
-    const settings = snapshot.observations.filter(entry => descriptors.get(entry?.descriptorId)?.kind === 'setting');
+    const settings = snapshot.observations.filter(entry => descriptors.get(keyFor(entry))?.kind === 'setting');
     const positions = new Map();
     for (const entry of settings) {
       if (positions.has(entry.emissionRevision) && positions.get(entry.emissionRevision) !== entry.applicationPosition) {
@@ -364,7 +451,7 @@ function validateSnapshot(schema, snapshot, errors) {
       }
       positions.set(entry.emissionRevision, entry.applicationPosition);
     }
-    if (globalSettingsRevision > 0 && !settings.some(entry => entry.emissionRevision === globalSettingsRevision)) {
+    if (settings.length && globalSettingsRevision > 0 && !settings.some(entry => entry.emissionRevision === globalSettingsRevision)) {
       issue(errors, 'snapshot.settingsRevision', 'settings_provenance', 'latest accepted revision must be represented by a setting');
     }
   }
@@ -386,6 +473,7 @@ function expectedJoin(schema, snapshot, expected) {
   compare(snapshot.source.revisionId, expected.sourceRevisionId, 'source.revisionId');
   compare(snapshot.source.sha256, expected.sourceSha256, 'source.sha256');
   compare(snapshot.runId, expected.runId, 'runId');
+  compare(snapshot.composition?.sourceClosureSha256, expected.sourceClosureSha256, 'composition.sourceClosureSha256');
   return { status: staleReasons.length ? 'stale' : 'ready', staleReasons };
 }
 

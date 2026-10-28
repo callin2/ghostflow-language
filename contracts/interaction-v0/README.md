@@ -27,6 +27,59 @@ matching snapshot; a format-version match alone is insufficient.
 
 ## Static schema
 
+### Composed profile 0.5
+
+An explicitly requested Interaction Schema selects version `0.5` when the
+canonical source closure contains instances. Its snapshot version is `0.3`.
+Standalone schema `0.3`/`0.4` and snapshot `0.1`/`0.2` shapes are unchanged.
+Both composed documents carry `composition.sourceClosureSha256` and
+`composition.instances`, whose entries bind each authored instance path to its
+definition `filename`, `revision`, and `sha256`. The closure digest covers exact
+canonical closure JSON, including the pinned dependency documents and instances.
+
+A descriptor is addressed by `(instance, id)`. `instance` is an authored path
+such as `east.cell`, or `null` for the root. `id` and `name` retain their local
+authored spelling, so east and west may both expose `setting.duration`.
+Observations carry that same `instance` and local `descriptorId` pair.
+`provenance.sourceNode` retains the flattened compiler `id`, original
+`definitionNodeId`, declaration `kind`, and original document `source` span
+(`filename`, `line`, `column`, `endLine`, `endColumn`).
+`provenance.intentAnchors` contains `{instance, anchorId}` references. Duplicate
+anchor IDs in different definitions or instances remain distinct. Elapsed timers
+use `operation.subject: {instance, descriptorId}`; continuous timers retain their
+flattened `subjectNodeId`. Compiler names and timer storage slots are private.
+
+Emission and restoration recompile the exact canonical closure before accepting
+its source map, trace metadata, manifest, or descriptor provenance. The runtime
+producer owns copies of those verified inputs. Consumer identity joins include
+the closure digest as well as schema, module, source, and run identity.
+Every composed snapshot carries `settingsRevision` (zero without settings).
+Settings retain the existing Rust `defaultValue`, `emissionRevision`,
+`applicationPosition`, `override`, and success/fault Result semantics; there is
+no separate per-instance revision counter.
+
+`TemporarySettingsHost` prepares a producer for an artifact containing an
+Interaction Schema. Each accepted step publishes `observation: {snapshot,
+error}` from its own completed runtime outcome and effective Rust settings.
+`interactionSnapshot()` reads a copy of the latest observation and never ticks.
+`interactionIdentity` returns the host's expected join identity. A projection
+on the legacy `framed: false` entry uses the host's existing accepted-step
+position minus one as `scanId`, and the captured accepted packet time. The
+framed entry uses the runtime's completed frame identity. A projection
+failure after dispatch leaves the step accepted and records
+`completed-scan-observation-failed` with a null observation snapshot. It does not
+undo settings history or make the event retryable. The low-level completed-trace
+adapter still trusts its caller to supply one matching run/scan/settings record;
+payload validation cannot authenticate actual runtime ownership.
+
+`examples/composed-v0.5.json` is the versioned source/closure/schema/snapshot
+corpus. `verifyComposedInteractionCorpus` reconstructs its static provenance;
+`tests/composed-interaction.test.mjs` replays its scans on the actual host.
+This profile does not add installation/binding ownership or composed output
+explanations. The explanation adapter keeps its explicit unsupported guard.
+See [#290](https://github.com/callin2/ghostflow-language/issues/290) and
+[#302](https://github.com/callin2/ghostflow-language/issues/302).
+
 The schema has pinned `module` (`id`, compiler trace `moduleFingerprint`, and
 manifest `bytecodeSha256`) and source-document (`documentId`, `revisionId`,
 `format`, `kind`, source `sha256`) identities. `module.id` is the public control

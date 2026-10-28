@@ -81,10 +81,10 @@ function timerClockMalformed(descriptor, trace) {
   return value !== undefined && (!Number.isSafeInteger(value) || value < 0);
 }
 
-function publicObservation(descriptor, values, trace, settings) {
+function publicObservation(descriptor, values, trace, settings, runtimeName = descriptor.name) {
   if (descriptor.kind === 'setting') {
-    if (!settings.has(descriptor.name)) return { descriptorId: descriptor.id, status: 'unavailable', reason: 'runtime-value-unavailable' };
-    const item = settings.get(descriptor.name);
+    if (!settings.has(runtimeName)) return { descriptorId: descriptor.id, status: 'unavailable', reason: 'runtime-value-unavailable' };
+    const item = settings.get(runtimeName);
     const result = item.result;
     const base = {
       descriptorId: descriptor.id,
@@ -100,13 +100,13 @@ function publicObservation(descriptor, values, trace, settings) {
       : { descriptorId: descriptor.id, status: 'error', error: 'runtime-value-type-mismatch' };
   }
   const runtimeKind = descriptor.kind === 'counter' ? 'state' : descriptor.kind;
-  const value = values.get(`${runtimeKind}\u0000${descriptor.name}`);
+  const value = values.get(`${runtimeKind}\u0000${runtimeName}`);
   if (value) {
     return typeMatches(descriptor.sourceType, value.value)
       ? { descriptorId: descriptor.id, status: 'ready', value: value.value }
       : { descriptorId: descriptor.id, status: 'error', error: 'runtime-value-type-mismatch' };
   }
-  if ((descriptor.kind === 'state' || descriptor.kind === 'counter') && stateMalformed(descriptor, trace)) {
+  if ((descriptor.kind === 'state' || descriptor.kind === 'counter') && stateMalformed({ ...descriptor, name: runtimeName }, trace)) {
     return { descriptorId: descriptor.id, status: 'error', error: 'runtime-value-invalid' };
   }
   if (timerClockMalformed(descriptor, trace)) {
@@ -134,13 +134,14 @@ export function expectedRuntimeIdentity(schema, runId) {
     sourceDocumentId: schema.source.documentId,
     sourceRevisionId: schema.source.revisionId,
     sourceSha256: schema.source.sha256,
+    ...(schema.version === '0.5' ? { sourceClosureSha256: schema.composition.sourceClosureSha256 } : {}),
     runId,
   });
 }
 
 /** Validate and derive the consumer-only ready/stale join result. */
 export function joinRuntimeSnapshot(schema, snapshot, expected) {
-  exactObject(expected, EXPECTED_FIELDS, 'expected identity');
+  exactObject(expected, [...EXPECTED_FIELDS, ...(schema.version === '0.5' ? ['sourceClosureSha256'] : [])], 'expected identity');
   const result = validateInteraction(schema, snapshot, { expected });
   if (!result.valid) throw new Error('interaction runtime snapshot: snapshot failed contract validation');
   return result.join;
@@ -157,6 +158,7 @@ export function prepareCompletedScanSnapshot({ compilation, schema, runId } = {}
   let owned = structuredClone({
     interactionSchema: compilation?.interactionSchema,
     sourceDocument: compilation?.sourceDocument,
+    sourceClosure: compilation?.sourceClosure,
     sourceMap: compilation?.sourceMap,
     traceMetadata: compilation?.traceMetadata,
     manifest: compilation?.manifest,
@@ -168,6 +170,14 @@ export function prepareCompletedScanSnapshot({ compilation, schema, runId } = {}
   }
   const traceMetadata = freezeOwned(owned.traceMetadata);
   const configs = freezeOwned(owned.manifest?.configs ?? []);
+  const runtimeNames = new Map(verifiedSchema.descriptors.map(descriptor => {
+    const nodeId = descriptor.provenance.sourceNode.id;
+    const binding = traceMetadata.bindings.find(binding => binding.nodeId === nodeId);
+    const name = descriptor.kind === 'setting' ? configs.find(config => config.id === nodeId)?.name
+      : descriptor.kind === 'timer' ? binding?.generated?.declaration : binding?.name;
+    if (!name) throw new Error('interaction runtime snapshot: descriptor runtime binding is missing');
+    return [nodeId, name];
+  }));
   const expected = expectedRuntimeIdentity(verifiedSchema, runId);
   const hasTimer = verifiedSchema.descriptors.some(descriptor => descriptor.kind === 'timer');
   // Byte buffers and canonical source are verification-only, not closure state.
@@ -176,7 +186,7 @@ export function prepareCompletedScanSnapshot({ compilation, schema, runId } = {}
     schema: verifiedSchema,
     expected,
     emit: ({ completion, trace, settingsState } = {}) => emitVerifiedSnapshot({
-      verifiedSchema, traceMetadata, configs, expected, hasTimer, completion, trace, settingsState,
+      verifiedSchema, traceMetadata, configs, runtimeNames, expected, hasTimer, completion, trace, settingsState,
     }),
   });
 }
@@ -186,7 +196,7 @@ export function emitCompletedScanSnapshot({ compilation, schema, runId, completi
   return prepareCompletedScanSnapshot({ compilation, schema, runId }).emit({ completion, trace, settingsState });
 }
 
-function emitVerifiedSnapshot({ verifiedSchema, traceMetadata, configs, expected, hasTimer, completion, trace, settingsState }) {
+function emitVerifiedSnapshot({ verifiedSchema, traceMetadata, configs, runtimeNames, expected, hasTimer, completion, trace, settingsState }) {
   exactObject(completion, ['kind', 'scanId', 'logicalTimeMs'], 'completion');
   if (completion.kind !== 'completed-scan' || !Number.isSafeInteger(completion.scanId) || completion.scanId < 0
       || !Number.isSafeInteger(completion.logicalTimeMs) || completion.logicalTimeMs < 0) {
@@ -216,7 +226,7 @@ function emitVerifiedSnapshot({ verifiedSchema, traceMetadata, configs, expected
     }
     const declared = new Map(configs.map(config => [config.id, config]));
     const settingTypes = new Map(verifiedSchema.descriptors.filter(descriptor => descriptor.kind === 'setting')
-      .map(descriptor => [descriptor.name, descriptor.sourceType]));
+      .map(descriptor => [runtimeNames.get(descriptor.provenance.sourceNode.id), descriptor.sourceType]));
     for (const item of settingsState.settings) {
       const config = declared.get(item?.id), result = item?.result;
       if (!config || item.name !== config.name || item.type !== config.type || settings.has(item.name)
@@ -236,9 +246,10 @@ function emitVerifiedSnapshot({ verifiedSchema, traceMetadata, configs, expected
   } else if (settingsState !== undefined) {
     throw new Error('interaction runtime snapshot: unexpected settings state');
   }
+  const composed = verifiedSchema.version === '0.5';
   const snapshot = {
     format: 'GhostFlow/runtime-snapshot-v0',
-    version: hasPublicSettings ? '0.2' : '0.1',
+    version: composed ? '0.3' : hasPublicSettings ? '0.2' : '0.1',
     schema: {
       format: verifiedSchema.format,
       version: verifiedSchema.version,
@@ -246,10 +257,14 @@ function emitVerifiedSnapshot({ verifiedSchema, traceMetadata, configs, expected
     },
     module: { ...verifiedSchema.module },
     source: { ...verifiedSchema.source },
+    ...(composed ? { composition: structuredClone(verifiedSchema.composition) } : {}),
     runId: expected.runId,
     completion: { ...completion },
-    ...(hasPublicSettings ? { settingsRevision: settingsState.settingsRevision } : {}),
-    observations: verifiedSchema.descriptors.map(descriptor => publicObservation(descriptor, values, trace, settings)),
+    ...(hasPublicSettings || composed ? { settingsRevision: settingsState?.settingsRevision ?? 0 } : {}),
+    observations: verifiedSchema.descriptors.map(descriptor => ({
+      ...(composed ? { instance: descriptor.instance } : {}),
+      ...publicObservation(descriptor, values, trace, settings, runtimeNames.get(descriptor.provenance.sourceNode.id)),
+    })),
   };
   const validated = validateInteraction(verifiedSchema, snapshot);
   if (!validated.valid) throw new Error('interaction runtime snapshot: produced snapshot failed contract validation');

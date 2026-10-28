@@ -4,6 +4,7 @@ import { sha256Hex } from '../../tools/sha256.mjs';
 import { isInt32, intSettingsIssue } from '../../tools/int-settings.mjs';
 import { isTimeType, validateTimeValue } from '../../tools/time-literals.mjs';
 import { compileSourceSync } from '../../tools/compile-source.mjs';
+import { prepareCompletedScanSnapshot } from '../../tools/interaction-runtime-snapshot.mjs';
 
 const clone = value => structuredClone(value);
 const token = Symbol('temporary settings activation');
@@ -58,9 +59,10 @@ function payload(config, result) {
 // clock and approved checkpoint storage are explicit host inputs, not labels
 // authenticated by this adapter.
 export class TemporarySettingsHost {
-  #runtime; #configs; #grants; #source; #run; #capacity;
+  #runtime; #configs; #grants; #source; #run; #capacity; #framed;
   #ordinary; #overlays = []; #history = []; #ids = [];
   #position = 0; #unavailable = null; #ended = false;
+  #observationProducer = null; #observation = { snapshot: null, error: null };
 
   static async instantiate(wasm, artifact, { runId, grants, historyCapacity = 256,
     checkpoint = null, restoreApproved = false, framed = true, ...activation } = {}) {
@@ -78,15 +80,17 @@ export class TemporarySettingsHost {
     if(sha256Hex(verified.bytes)!==sha256Hex(artifact.bytes)||!equal(verified.manifest,artifact.manifest))fail('source/manifest identity');
     const runtime = await (framed ? ControlRuntime.instantiateFramed : ControlRuntime.instantiate)(wasm,clone(artifact),activation);
     try {
-      const owner = new TemporarySettingsHost(token,runtime,artifact.sourceDocument.sha256,runId,clone(grants),historyCapacity);
+      const owner = new TemporarySettingsHost(token,runtime,artifact.sourceDocument.sha256,runId,clone(grants),historyCapacity,framed);
+      if (artifact.interactionSchema) owner.#observationProducer = prepareCompletedScanSnapshot({ compilation: artifact, runId });
       if (checkpoint !== null) owner.#restore(checkpoint,restoreApproved);
       return owner;
     } catch (error) { runtime.dispose(); throw error; }
   }
 
-  constructor(key,runtime,source,run,grants,capacity) {
+  constructor(key,runtime,source,run,grants,capacity,framed) {
     if (key !== token) fail('fresh activation required');
     this.#runtime=runtime;this.#source=source;this.#run=run;this.#grants=grants;this.#capacity=capacity;
+    this.#framed=Boolean(framed);
     this.#configs=clone(runtime.manifest.configs);
     for(const ids of Object.values(grants))for(const id of ids)this.#config(id);
     const state=runtime.contextSnapshot().state;
@@ -95,6 +99,8 @@ export class TemporarySettingsHost {
   #typed(config) { return config.result.ok ? {ok:true,type:config.type,value:clone(config.result.value)} : clone(config.result); }
   #config(id) { const c=this.#configs.find(c=>c.id===id);if(!c)fail('setting identity');return c; }
   #allowed(actor,id) { return Object.hasOwn(this.#grants,actor) && this.#grants[actor].includes(id) && this.#config(id).settings?.access==='operator'; }
+  interactionSnapshot() { return clone(this.#observation); }
+  get interactionIdentity() { return this.#observationProducer ? clone(this.#observationProducer.expected) : null; }
   snapshot() {
     const core=this.#runtime.contextSnapshot();
     return {sourceSha256:this.#source,programFingerprint:core.state.programFingerprint,runId:this.#run,
@@ -381,6 +387,22 @@ export class TemporarySettingsHost {
     for(const effect of effects)if(effect.kind==='temporary')effect.changes=clone(overlays.find(o=>o.overlayId===effect.overlayId).changes);
     this.#ordinary=ordinary;this.#overlays=overlays;this.#position=position;this.#unavailable=null;this.#ended=ending;
     if(coreEvent){this.#ids.push(coreEvent.eventId);this.#history.push({eventId:coreEvent.eventId,runId:this.#run,settingsRevision:effective.settingsRevision,applicationPosition:position,actor:event?.actor??'lifecycle',reason:event?.reason??'lifetime completion',request:clone(event),effects});}
-    return {accepted:true,reason:null,outcome,coreEvent:clone(coreEvent),snapshot:this.snapshot()};
+    if (this.#observationProducer) {
+      try {
+        const completion = this.#framed ? outcome.frame
+          : { scanId: position - 1, logicalTimeMs: packet.nowMs };
+        const snapshot = this.#observationProducer.emit({
+          completion: { kind: 'completed-scan', scanId: completion.scanId, logicalTimeMs: completion.logicalTimeMs },
+          trace: outcome.vm, settingsState: effective,
+        });
+        this.#observation = { snapshot, error: null };
+      } catch {
+        // Dispatch and settings history have committed. Observation cannot make
+        // this accepted control step retryable or expose private runtime names.
+        this.#observation = { snapshot: null, error: 'completed-scan-observation-failed' };
+      }
+    }
+    return {accepted:true,reason:null,outcome,coreEvent:clone(coreEvent),snapshot:this.snapshot(),
+      ...(this.#observationProducer ? { observation: this.interactionSnapshot() } : {})};
   }
 }
