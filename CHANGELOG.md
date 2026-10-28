@@ -11,6 +11,8 @@ are checked against their root acquisition endpoint. Rejected replacements
 preserve the whole owner; accepted replacements start a fresh run. Config/timer
 expression explanations remain unavailable and physical suitability remains
 unknown. The broader REF-06-002 and REF-06-016 scope remains incomplete.
+Runtime dispatch failure invalidates current explanation availability while
+preserving historical completions. Preflight rejection retains the current proof.
 See `docs/INSTALLED-SENSOR-BINDING.md` and `tests/installed-composition.test.mjs`.
 
 ### 2026-10-29 - restore exact interaction provenance ([#287](https://github.com/callin2/ghostflow-language/issues/287), [#590](https://github.com/callin2/ghostflow-language/issues/590))

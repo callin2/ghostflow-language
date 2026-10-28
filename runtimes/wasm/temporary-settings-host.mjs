@@ -109,6 +109,7 @@ export class TemporarySettingsHost {
   #config(id) { const c=this.#configs.find(c=>c.id===id);if(!c)fail('setting identity');return c; }
   #allowed(actor,id) { return Object.hasOwn(this.#grants,actor) && this.#grants[actor].includes(id) && this.#config(id).settings?.access==='operator'; }
   interactionSnapshot() { return clone(this.#observation); }
+  get currentFrameCompletion() { return this.#runtime.currentFrameCompletion; }
   get interactionIdentity() { return this.#observationProducer ? clone(this.#observationProducer.expected) : null; }
   explanationSnapshot() { return this.#explanationProducer ? clone(this.#explanation) : { proofs: [], error: 'output-explanations-disabled' }; }
   get explanationDescriptor() { return this.#explanationProducer ? clone(this.#explanationProducer.descriptor) : null; }

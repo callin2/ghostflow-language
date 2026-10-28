@@ -89,6 +89,15 @@ available; config/timer generated-rail expressions remain unavailable. These
 receipts do not authenticate a physical Driver or prove state transitions,
 safety outputs, applied outputs or physical effects.
 
+`snapshot().latest` retains the last accepted completion as history. Separately,
+`currentFrameCompletion` identifies the actual runtime's current completed scan.
+Dispatch clears that identity before execution and publishes a new identity only
+after completion. A failed dispatch, including a settings-return failure reported
+as `accepted: false`, therefore makes current output explanations unavailable.
+Acquisition, settings and context preflight rejections that never dispatch retain
+the current identity. Historical proofs are unchanged and cannot be presented as
+current through `explainOutput` after a dispatch failure.
+
 Replacement prepares the complete new owner before publication. Rejected
 candidates preserve settings, overlays, history, state, timers, conditioners,
 latest completion and assessment. Success starts fresh state, settings and

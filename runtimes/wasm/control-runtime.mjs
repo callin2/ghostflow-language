@@ -1285,6 +1285,7 @@ export class ControlRuntime {
   }
 
   #frameScanId;
+  #currentFrameCompletion = null;
   #framed;
   #faulted;
   #temporalEpoch;
@@ -1337,6 +1338,10 @@ export class ControlRuntime {
     this.#live();
     if (!this.#framed) return null;
     return this.runtime.outcome;
+  }
+  get currentFrameCompletion() {
+    this.#live();
+    return this.#faulted || this.#currentFrameCompletion === null ? null : { ...this.#currentFrameCompletion };
   }
   get restartEventPending() {
     this.#live();
@@ -1846,6 +1851,7 @@ export class ControlRuntime {
 
       phase = 'dispatch';
       const frame = { scanId, logicalTimeMs: captured.nowMs, inputs: frameInputs };
+      this.#currentFrameCompletion = null;
       if (this.#hasContext) this.runtime.dispatchContext(frame, captured.contextFacts);
       else if (this.#hasSchedules) this.runtime.dispatchSchedules(frame, captured.scheduleFacts);
       else this.runtime.dispatch(frame);
@@ -1856,6 +1862,7 @@ export class ControlRuntime {
       this.#commitConditioners(transaction);
       this.#commitAfterEvents(afterEventTransaction);
       const outcome = this.runtime.outcome;
+      this.#currentFrameCompletion = { scanId, logicalTimeMs: captured.nowMs };
       return {
         vm: outcome.trace,
         sensors: Object.fromEntries(sensorReadings),
@@ -1892,6 +1899,7 @@ export class ControlRuntime {
     this.runtime.dispose();
     this.lastNowMs = null;
     this.#frameScanId = null;
+    this.#currentFrameCompletion = null;
     this.#faulted = false;
   }
 

@@ -86,6 +86,13 @@ revision·승인 digest·instance 경로를 묶은 `provenance`를 포함합니�
 여전히 unavailable입니다. 이 근거는 물리 Driver 인증이나 state transition,
 safety output, applied output, 실물 효과의 증명이 아닙니다.
 
+`snapshot().latest`는 마지막 수락 완료 결과를 이력으로 보존합니다. 이와 별도로
+`currentFrameCompletion`은 실제 런타임의 현재 완료 scan을 식별합니다. dispatch는
+실행 전에 이 식별자를 지우고 완료한 뒤 새 식별자를 게시합니다. `accepted: false`로
+보고되는 설정 복귀 실패를 포함해 dispatch가 실패하면 현재 출력 설명을 제공하지 않습니다.
+dispatch에 진입하지 않은 수집·설정·context 사전 검사 거절은 현재 식별자를 유지합니다.
+과거 proof는 바꾸지 않으며 dispatch 실패 후 `explainOutput`에서 현재 근거로 제시할 수 없습니다.
+
 교체는 새 소유자를 완전히 준비한 뒤 게시합니다. 거절된 후보는 설정·overlay·history·
 state·timer·conditioner·최신 완료 결과·assessment를 유지합니다. 성공하면 새 run에서
 state·설정·conditioner를 초기화하고 이전 완료 결과를 지웁니다. 이 한정 경로는
