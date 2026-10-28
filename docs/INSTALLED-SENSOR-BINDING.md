@@ -1,6 +1,6 @@
 # Installed sensor binding reference host
 
-`InstalledControlHost` admits a fixed compiled Program against a pinned installation declaration, then runs it through `ControlRuntime.instantiateFramed`. This is a host contract for [REF-06-009](https://github.com/callin2/ghostflow-language/issues/297). It performs no device discovery, Driver installation, polling, or physical verification.
+`InstalledControlHost` admits a fixed compiled Program against a pinned installation declaration, then runs it through `ControlRuntime.instantiateFramed`. This covers [REF-06-009 sensor replacement](https://github.com/callin2/ghostflow-language/issues/297) and [REF-04-039 strategy profile replacement](https://github.com/callin2/ghostflow-language/issues/243). It performs no device discovery, Driver installation, polling, or physical verification.
 
 ## Pinned profile contract
 
@@ -32,4 +32,12 @@ The caller attaches binding revision and endpoint ID at sample capture. The host
 
 This operation changes sensor bindings only. It rejects changes to board ID or model, output wiring, installation ID, compiler/runtime/protocol metadata, or firmware digest. Migrating to another physical board requires a separate installation workflow. `step` returns the accepted outcome with its run, source, bytecode, profile, and binding identity attached; snapshots and results are detached from caller-owned objects.
 
-The supported Program profile has source-verified, standalone `control-v1` or `control-v4` bytes, at least one nonoptional Number/Bool sensor, Bool outputs, and no schedules, timers, signals, configs, imports, or scalar inputs. Other profiles fail before publication. Device binding application, actual Driver guarantees, and physical load behavior remain separate evidence.
+## Strategy activation
+
+The bounded Program profile also accepts compiler-generated `adaptPolicy` and `strategies` metadata. The host recompiles the canonical source and compares the complete manifest and bytecode before admission, including strategy matches, priorities and policy identity. Caller-edited metadata fails that comparison.
+
+After integration validation confirms every required sensor binding and endpoint type, the host supplies an explicit capability for each bound sensor to `ControlRuntime`. The existing Rust runtime selects the strategy during activation. Capability presence comes from the validated installation, independently of sample quality. `NotReady`, `Stale` and other sensor faults remain Result observations under the selected strategy. They never remove a capability or select `match always` automatically.
+
+A replacement validates the complete candidate and activates its strategy before publication. For example, if `WithReading` matches a required Number sensor and the current reading is Stale, a candidate binding that sensor to a Bool endpoint fails with `type_mismatch`. The old profile, run, binding, state and latest trace remain available. Subsequent steps still execute `WithReading` and its explicit fault branch. A compatible candidate publishes a fresh run whose sensor starts `NotReady` and whose Program state starts from its source initializer.
+
+The supported Program profile has source-verified, standalone `control-v1` or `control-v4` bytes, at least one nonoptional Number/Bool sensor, Bool outputs, and no schedules, timers, signals, configs, imports, or scalar inputs. Optional sensor bindings and actuator capabilities remain outside this host profile. Other profiles fail before publication. Device binding application, actual Driver guarantees, and physical load behavior remain separate evidence.
