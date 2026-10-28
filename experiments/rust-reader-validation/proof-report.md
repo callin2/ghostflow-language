@@ -6,6 +6,9 @@
 `Reader::new` and `Reader::finished`; the Rust implementation was not copied or
 rewritten for extraction. `translation.json` is the extractor's original mapping.
 `provenance.json` records the source, generated Lean, LLBC and toolchain identities.
+The separate [ValueType extraction diagnosis](ValueType-extraction-diagnosis.md)
+records why the actual `Value::value_type` output cannot yet enter this kernel
+proof unit with the pinned Aeneas library.
 
 `ReaderFoundationProof.lean` establishes:
 
@@ -45,9 +48,10 @@ The retained historical receipt is at
 Its SHA-256 is
 `c4594a73839230601e7a05e98cbee0ac9dfe092c94e98da1056599423af578c6`.
 It records the 2026-10-28 host proof run and its tool outputs; it is historical
-evidence, not proof that a later rerun passed. Each new run replaces it with an
-atomically published `running` receipt before checks begin, then atomically
-publishes the final result.
+evidence, not proof that a later rerun passed. Each new run replaces only the
+current receipt in its selected output directory with an atomically published
+`running` receipt before checks begin, then atomically publishes the final
+result. The historical copy is not overwritten.
 Only Lean's standard `propext`, `Classical.choice`, and `Quot.sound` are allowed in
 the theorem dependency audit. No additional axiom, `sorry`, or `native_decide` is
 accepted in the two input Lean files.
