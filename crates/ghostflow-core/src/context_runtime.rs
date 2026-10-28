@@ -306,7 +306,7 @@ impl ContextRuntime {
         staged.runtime.clock.poll(clock)?;
         let expected = descriptors
             .iter()
-            .filter(|d| matches!(d, PulseDescriptor::Calendar(_)) || matches!(d, PulseDescriptor::Context(c) if !matches!(c.definition, ScheduleDefinition::AtPulse { .. } | ScheduleDefinition::SolarContext { .. })))
+            .filter(|d| matches!(d, PulseDescriptor::Calendar(_)) || matches!(d, PulseDescriptor::Context(c) if !matches!(c.definition, ScheduleDefinition::AtPulse { .. } | ScheduleDefinition::AtWindow { .. } | ScheduleDefinition::SolarContext { .. })))
             .count();
         if facts.schedules.len() != expected || facts.natural.len() > self.bindings.len() {
             return Err(invalid("context facts do not match installed requirements"));
@@ -457,7 +457,7 @@ impl ContextRuntime {
                 ScheduleDefinition::SolarContext { .. } => {
                     return Err(invalid("Solar requires Solar facts, not civil evidence"))
                 }
-                ScheduleDefinition::AtPulse { .. } => {
+                ScheduleDefinition::AtPulse { .. } | ScheduleDefinition::AtWindow { .. } => {
                     return Err(invalid("At occurrences are computed by the core"))
                 }
                 ScheduleDefinition::Periodic { .. } | ScheduleDefinition::UtcRange { .. } => {
@@ -918,7 +918,9 @@ impl ContextRuntime {
                 };
                 let evidence = if matches!(
                     d.definition,
-                    ScheduleDefinition::AtPulse { .. } | ScheduleDefinition::SolarContext { .. }
+                    ScheduleDefinition::AtPulse { .. }
+                        | ScheduleDefinition::AtWindow { .. }
+                        | ScheduleDefinition::SolarContext { .. }
                 ) {
                     &at_evidence
                 } else {

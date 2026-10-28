@@ -24,6 +24,7 @@ const SCHEDULE_SLOTS_FORMAT = 'GhostFlow/control-v8';
 const STREAM_CONTEXT_FORMAT = 'GhostFlow/control-v10';
 const AVAILABILITY_FORMAT = 'GhostFlow/control-v12';
 const AT_FORMAT = 'GhostFlow/control-v13';
+const AT_WINDOW_FORMAT = 'GhostFlow/control-v23';
 const HOLIDAY_FORMAT = 'GhostFlow/control-v14';
 const SOLAR_CONTEXT_FORMAT = 'GhostFlow/control-v15';
 const CALENDAR_EXECUTION_FORMAT = 'GhostFlow/control-v18';
@@ -38,6 +39,7 @@ const contextManifest = manifest => manifest?.format === STREAM_CONTEXT_FORMAT
   || manifest?.format === SOLAR_CONTEXT_FORMAT
   || manifest?.format === HOLIDAY_FORMAT
   || manifest?.format === AT_FORMAT
+  || manifest?.format === AT_WINDOW_FORMAT
   || manifest?.format === AVAILABILITY_FORMAT && !manifest.schedules?.some(item => item.kind === 'solar');
 
 /** Select an existing reference entry explicitly; never retry after a dispatch error. */
@@ -263,7 +265,7 @@ function validateContextManifest(input, bytecodeFormat) {
     ['providers','calendars','naturalConditions','calendarConditions','accounting','resources','objectives','adaptSettings','lifecycle','legacyAdmission','requiredRuntimeFeatures'], 'manifest');
   validateRequiredRuntimeFeatures(manifest);
   const lifecycle = validateLifecycleManifest(manifest);
-  if (manifest.format === CIVIL_RANGE_FORMAT ? bytecodeFormat !== 21 : manifest.format === TIMESLOTS_RANGE_FORMAT ? bytecodeFormat !== 20 : manifest.format === RANGE_LIVE_START_FORMAT ? bytecodeFormat !== 19 : manifest.format === CALENDAR_EXECUTION_FORMAT ? bytecodeFormat !== 18 : manifest.format === SOLAR_CONTEXT_FORMAT ? bytecodeFormat !== 16 : manifest.format === HOLIDAY_FORMAT ? bytecodeFormat !== 15 : manifest.format === AT_FORMAT ? bytecodeFormat !== 14 : manifest.format === AVAILABILITY_FORMAT ? bytecodeFormat !== 13 : ![11, 12].includes(bytecodeFormat)) throw new Error('context manifest requires its matching GFB format');
+  if (manifest.format === AT_WINDOW_FORMAT ? bytecodeFormat !== 23 : manifest.format === CIVIL_RANGE_FORMAT ? bytecodeFormat !== 21 : manifest.format === TIMESLOTS_RANGE_FORMAT ? bytecodeFormat !== 20 : manifest.format === RANGE_LIVE_START_FORMAT ? bytecodeFormat !== 19 : manifest.format === CALENDAR_EXECUTION_FORMAT ? bytecodeFormat !== 18 : manifest.format === SOLAR_CONTEXT_FORMAT ? bytecodeFormat !== 16 : manifest.format === HOLIDAY_FORMAT ? bytecodeFormat !== 15 : manifest.format === AT_FORMAT ? bytecodeFormat !== 14 : manifest.format === AVAILABILITY_FORMAT ? bytecodeFormat !== 13 : ![11, 12].includes(bytecodeFormat)) throw new Error('context manifest requires its matching GFB format');
   name(manifest.name, 'manifest.name');
   if (!/^[0-9a-f]{64}$/.test(manifest.bytecodeSha256)) throw new Error('invalid bytecode SHA-256');
   const inputs = validateList(manifest.inputs, 'manifest.inputs', ['name','type'], ['canonicalUnit']);
@@ -298,7 +300,7 @@ function validateContextManifest(input, bytecodeFormat) {
   if (manifest.format === SOLAR_CONTEXT_FORMAT && !schedules.some(item => item.kind === 'solar')) throw new Error('Solar context profile requires Solar');
   if (manifest.format === HOLIDAY_FORMAT && (!schedules.some(item => item.kind === 'daily' && item.day?.kind === 'holiday')
     || schedules.some(item => item.kind === 'at'))) throw new Error('Holiday profile requires Holiday Daily and excludes At');
-  if (manifest.format === AT_FORMAT && (!schedules.length || schedules.some(item => item.kind !== 'at')
+  if ([AT_FORMAT, AT_WINDOW_FORMAT].includes(manifest.format) && (!schedules.length || schedules.some(item => item.kind !== 'at')
     || [configs,objectives,resources,adaptSettings,providers,calendars,naturals].some(list => list.length) || accounting)) {
     throw new Error('At profile requires At-only execution');
   }
@@ -314,11 +316,17 @@ function validateContextManifest(input, bytecodeFormat) {
   for (const item of schedules) {
     name(item.name, 'schedule.name'); safeInteger(item.site, 'schedule.site', 1, 0xffff_ffff);
     if (item.kind === 'at') {
-      if (manifest.format !== AT_FORMAT) throw new Error('At requires control-v13 and GFB14');
+      if (![AT_FORMAT, AT_WINDOW_FORMAT].includes(manifest.format)) throw new Error('At requires its matching control and GFB profile');
       keys(item, ['kind','site','name','policy','atMs'], [], 'At schedule');
       safeInteger(item.atMs, 'At atMs', 0, 253_402_300_799_999);
       keys(record(item.policy, 'At policy'), ['basis','when','clock','gapMs','recovery','fallback'], [], 'At policy');
-      if (item.policy.basis !== 'pulse' || item.policy.clock !== 'trusted_only' || item.policy.recovery !== 'baseline'
+      if (manifest.format === AT_WINDOW_FORMAT) {
+        keys(record(item.policy.basis, 'At Window basis'), ['kind','durationMs'], [], 'At Window basis');
+        if (item.policy.basis.kind !== 'window') throw new Error('At Window requires window basis');
+        safeInteger(item.policy.basis.durationMs, 'At Window durationMs', 1, 253_402_300_799_999 - item.atMs);
+      }
+      if (manifest.format === AT_FORMAT && item.policy.basis !== 'pulse'
+        || item.policy.clock !== 'trusted_only' || item.policy.recovery !== 'baseline'
         || item.policy.fallback !== 'skip') throw new Error('unsupported At policy');
       safeInteger(item.policy.gapMs, 'At gapMs', 1);
       continue;

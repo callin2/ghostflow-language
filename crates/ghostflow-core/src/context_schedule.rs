@@ -540,7 +540,7 @@ impl Engine {
             return Err(invalid("trailing context checkpoint bytes"));
         }
         match &desc.definition {
-            ScheduleDefinition::AtPulse { .. } => {
+            ScheduleDefinition::AtPulse { .. } | ScheduleDefinition::AtWindow { .. } => {
                 let identity = format!("{}:at", desc.site);
                 if restored.terminal.iter().any(|id| id != &identity)
                     || restored.interval_ms.is_some()
@@ -983,6 +983,14 @@ impl Engine {
             ScheduleDefinition::AtPulse { at_ms } => {
                 staged.at_pulse(desc.site, *at_ms, &observed, when, &mut decision)?
             }
+            ScheduleDefinition::AtWindow { at_ms, duration_ms } => staged.at_window(
+                desc.site,
+                *at_ms,
+                *duration_ms,
+                &observed,
+                when,
+                &mut decision,
+            )?,
             ScheduleDefinition::UtcRange { .. }
             | ScheduleDefinition::CivilRange { .. }
             | ScheduleDefinition::CalendarRange { .. }
@@ -1174,7 +1182,9 @@ impl Engine {
         }
         if matches!(
             desc.definition,
-            ScheduleDefinition::UtcRange { .. } | ScheduleDefinition::AtPulse { .. }
+            ScheduleDefinition::UtcRange { .. }
+                | ScheduleDefinition::AtPulse { .. }
+                | ScheduleDefinition::AtWindow { .. }
         ) && (facts.provider.is_some() || facts.calendar.is_some() || !facts.rows.is_empty())
         {
             return Err(invalid("unexpected UTC Range evidence payload"));
@@ -2057,6 +2067,70 @@ impl Engine {
             "ConditionsFalseAtPulse"
         } else {
             "Due"
+        };
+        self.terminalize(&id)?;
+        out.due = outcome == "Due";
+        out.missed = !out.due;
+        out.observations.push(Observation {
+            solar_fallback: None,
+            solar_unavailable_reason: None,
+            clock_provenance: None,
+            clock_source_revision: None,
+            clock_uncertainty_ms: None,
+            unknown_reason: None,
+            site,
+            occurrence_id: id,
+            planned_ms: Some(planned),
+            decision: outcome.into(),
+            provider_revision: String::new(),
+            context_revision: String::new(),
+        });
+        Ok(())
+    }
+
+    fn at_window(
+        &mut self,
+        site: u32,
+        planned: u64,
+        duration: u64,
+        clock: &crate::schedule_clock::ClockObservation<'_>,
+        when: bool,
+        out: &mut Decision,
+    ) -> Result<()> {
+        let Some(now) = clock.current_effective_wall_ms else {
+            return Ok(());
+        };
+        let end = planned
+            .checked_add(duration)
+            .ok_or_else(|| invalid("At Window end overflow"))?;
+        out.active = planned <= now && now < end && when;
+        let id = format!("{site}:at");
+        if self.terminal.contains(&id) || now < planned {
+            return Ok(());
+        }
+        let previous = clock.previous_effective_wall_ms;
+        let gap_overlaps = clock.disposition == ClockDisposition::ObservationGap
+            && previous.is_some_and(|before| before < end);
+        let outcome = if gap_overlaps {
+            Some("ObservationGap")
+        } else if matches!(
+            clock.disposition,
+            ClockDisposition::BootBaseline | ClockDisposition::RecoveryBaseline
+        ) {
+            Some("BaselinePastMissed")
+        } else if now >= end {
+            Some("LateStartExpired")
+        } else if clock.disposition == ClockDisposition::Observed
+            && previous.is_some_and(|before| before < end)
+            && now >= clock.previous_trusted_high_water_ms.unwrap_or(0)
+            && when
+        {
+            Some("Due")
+        } else {
+            None
+        };
+        let Some(outcome) = outcome else {
+            return Ok(());
         };
         self.terminalize(&id)?;
         out.due = outcome == "Due";

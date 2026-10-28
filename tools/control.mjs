@@ -1660,13 +1660,14 @@ class Lowerer {
     else if (solarForms.some(form => form[0] === 'daily-pulse')) this.manifest.format = 'GhostFlow/control-v7';
     if (this.manifest.schedules.some(schedule => typeof schedule.policy?.clock === 'object'
       || typeof schedule.policy?.fallback === 'object')) this.manifest.format = 'GhostFlow/control-v12';
-    if (contextForms.some(form => form[0] === 'at-pulse')) {
-      if (solarForms.length || contextForms.some(form => form[0] !== 'at-pulse')
+    if (contextForms.some(form => ['at-pulse', 'at-window'].includes(form[0]))) {
+      const atForm = contextForms[0]?.[0];
+      if (solarForms.length || contextForms.some(form => form[0] !== atForm)
         || ['configs','providers','calendars','naturalConditions','objectives','resources','adaptSettings','signals']
           .some(key => this.manifest[key]?.length) || this.manifest.accounting) {
-        error(this.ast.loc, 'At pulse execution cannot mix with other schedule/provider/config profiles');
+        error(this.ast.loc, 'At execution cannot mix with other schedule/provider/config profiles');
       }
-      this.manifest.format = 'GhostFlow/control-v13';
+      this.manifest.format = atForm === 'at-window' ? 'GhostFlow/control-v23' : 'GhostFlow/control-v13';
     }
     if (contextForms.some(form => form[0] === 'holiday-daily-pulse')) this.manifest.format = 'GhostFlow/control-v14';
     if (contextForms.some(form => form[0] === 'solar-context-pulse')) this.manifest.format = 'GhostFlow/control-v15';
@@ -2377,7 +2378,10 @@ class Lowerer {
       if (item.timezone !== null || item.policy.dst_missing || item.policy.dst_repeated) error(item.loc, 'At has no timezone or DST fields');
       const at = this.expression(item.at, new Map(), { allowNext: false });
       if (at.type.kind !== 'DateTime' || !Number.isSafeInteger(at.constant)) error(item.at.loc, 'At at must be a constant DateTime');
-      if (item.policy.basis?.kind !== 'reference' || item.policy.basis.name !== 'pulse') error(item.loc, 'At executable basis requires pulse');
+      if (!(item.policy.basis?.kind === 'reference' && item.policy.basis.name === 'pulse')
+        && !(item.policy.basis?.kind === 'call' && item.policy.basis.name === 'window')) {
+        error(item.loc, 'At executable basis requires pulse or window(positive Duration)');
+      }
       return this.addCivilSchedulePolicy(item, { kind: 'at', atMs: at.constant }, false);
     }
     if (item.scheduleType === 'Solar') return this.addSolarSchedule(item);
@@ -2521,6 +2525,15 @@ class Lowerer {
       if (options.basis.kind === 'reference' && options.basis.name === 'pulse') {
         if (options.cancel_when) error(options.cancel_when.loc, `${label} pulse basis does not use cancel_when`);
         basis = 'pulse';
+      } else if (trigger.kind === 'at' && options.basis.kind === 'call' && options.basis.name === 'window'
+        && options.basis.args.length === 1 && !options.basis.named.length) {
+        if (options.cancel_when) error(options.cancel_when.loc, 'At Window does not use cancel_when');
+        const length = this.expression(options.basis.args[0], new Map(), { allowNext: false }, [], DURATION);
+        if (!sameType(length.type, DURATION) || !Number.isSafeInteger(length.constant) || length.constant <= 0
+          || trigger.atMs + length.constant > 253_402_300_799_999) {
+          error(options.basis.loc, 'At Window requires a positive bounded Duration');
+        }
+        basis = { kind: 'window', durationMs: length.constant };
       } else if (options.basis.kind === 'call' && options.basis.name === 'range'
         && options.basis.args.length === 1 && !options.basis.named.length) {
         const rangeArg = options.basis.args[0];
@@ -2569,7 +2582,7 @@ class Lowerer {
         basis = { kind: 'range', durationMs: range.constant,
           ...(rangeConfig ? { durationConfig: rangeArg.name, durationConfigId: rangeConfig.id } : {}),
           ...(startConfig ? { startConfig: item.at.name, startConfigId: startConfig.id } : {}) };
-      } else error(options.basis.loc, `${label} basis must be pulse or range(positive Duration)`);
+      } else error(options.basis.loc, `${label} basis must be pulse${trigger.kind === 'at' ? ', window(positive Duration)' : ''} or range(positive Duration)`);
       const clock = choice('clock', ['trusted_only']);
       const recovery = choice('recovery', ['baseline']);
       const fallback = choice('fallback', ['skip']);
@@ -2602,7 +2615,9 @@ class Lowerer {
       if (isExecutablePulseSchedule(item) || isExecutableRangeSchedule(item)) {
         if (!this.hasClock) { this.addInput(`${RESERVED_PREFIX}now_ms`, NUMBER, item.loc); this.hasClock = true; }
         if (!this.gfbInputs.some(input => input[1] === `${RESERVED_PREFIX}time_epoch`)) this.addInput(`${RESERVED_PREFIX}time_epoch`, NUMBER, item.loc);
-        this.schedules.set(item.name, { slot, loc: item.loc, projections: new Set(isExecutableRangeSchedule(item) ? ['due', 'active'] : ['due', 'missed']) });
+        this.schedules.set(item.name, { slot, loc: item.loc, projections: new Set(
+          basis?.kind === 'window' ? ['due', 'missed', 'open']
+            : isExecutableRangeSchedule(item) ? ['due', 'active'] : ['due', 'missed']) });
       }
   }
   addSolarSchedule(item) {
@@ -3475,8 +3490,15 @@ class Lowerer {
       if (node.member === 'active' && !locals.has(node.base) && this.schedules.has(node.base)) {
         if (options.pureFunction) error(node.loc, `fn ${options.pureFunction} cannot capture global ${node.base}`);
         const schedule = this.schedules.get(node.base);
+        if (schedule.projections?.has('open')) error(node.loc, `schedule ${node.base} exposes .open, not .active`);
         return { type: BOOL, sexpr: schedule.slot === undefined
           ? `input.${schedule.activeInput ?? schedule.dueInput}` : ['schedule-read', String(schedule.slot), 'active'] };
+      }
+      if (node.member === 'open' && !locals.has(node.base) && this.schedules.has(node.base)) {
+        if (options.pureFunction) error(node.loc, `fn ${options.pureFunction} cannot capture global ${node.base}`);
+        const schedule = this.schedules.get(node.base);
+        if (!schedule.projections?.has('open')) error(node.loc, `schedule ${node.base} does not expose .open`);
+        return { type: BOOL, sexpr: ['schedule-read', String(schedule.slot), 'active'] };
       }
       if (node.member === 'missed' && !locals.has(node.base) && this.schedules.has(node.base)) {
         if (options.pureFunction) error(node.loc, `fn ${options.pureFunction} cannot capture global ${node.base}`);
@@ -4007,7 +4029,9 @@ class Lowerer {
           schedule.event, String(schedule.offsetMs), String(schedule.policy.fallback.atMs ?? 86400000),
           ['config-deps', ...deps.map(String)], when, cancel, String(schedule.policy.clock.durationMs ?? 0)];
       }
-      if (schedule.kind === 'at') return ['at-pulse', ...base, String(schedule.atMs), when, cancel];
+      if (schedule.kind === 'at') return schedule.policy.basis?.kind === 'window'
+        ? ['at-window', ...base, String(schedule.atMs), String(schedule.policy.basis.durationMs), when, cancel]
+        : ['at-pulse', ...base, String(schedule.atMs), when, cancel];
       if (schedule.policy.basis?.kind === 'range') {
         if (schedule.timezone !== 'UTC' && schedule.kind === 'daily-slots' && !schedule.selectedConfig
           && !schedule.policy.basis.durationConfigId && schedule.gridMs === 900_000) {
