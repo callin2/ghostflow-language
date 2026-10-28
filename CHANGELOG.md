@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### 2026-10-28 — one-shot At Window execution ([#153](https://github.com/callin2/ghostflow-language/issues/153), [#215](https://github.com/callin2/ghostflow-language/issues/215), [#219](https://github.com/callin2/ghostflow-language/issues/219))
+
+Reference §3.5 `At` now executes a positive constant `window(Duration)` with
+`.due`, `.open` and `.missed`. Previously Window remained a design-only basis.
+An 08:00 `window(5min)` admits once on the first eligible accepted scan before
+08:05. `.open` reports the current trusted interval and predicate level, even
+when an observation gap terminally missed admission; `.due` never rearms that
+occurrence. Rejected scans roll back the clock and terminal ledger, and restored
+checkpoints preserve deduplication across reboot. GFB23/control-v23 keep this
+profile distinct from Pulse and fail closed in older runtimes. Native/WASM
+Reference traces cover late predicate, observation gap, half-open end, and
+restart. This change does not claim Device or physical acceptance.
+
 ### 2026-10-28 — continuous timers in context profiles ([#47](https://github.com/callin2/ghostflow-language/issues/47))
 
 Bug fix for Reference §3.3. A control containing a config and

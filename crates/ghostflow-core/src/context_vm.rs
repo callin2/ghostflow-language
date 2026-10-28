@@ -30,6 +30,10 @@ pub enum ScheduleDefinition {
     AtPulse {
         at_ms: u64,
     },
+    AtWindow {
+        at_ms: u64,
+        duration_ms: u64,
+    },
     /// GFB12 immutable civil Range; UTC recurrence is computed in Rust.
     UtcRange {
         starts_ms: Vec<u64>,
@@ -816,6 +820,19 @@ pub(crate) fn load_schedule(
                 at
             },
         },
+        20 if format == 23 => {
+            let at_ms = exact(reader)?;
+            let duration_ms = exact(reader)?;
+            if at_ms > 253_402_300_799_999
+                || duration_ms == 0
+                || at_ms
+                    .checked_add(duration_ms)
+                    .is_none_or(|end| end > 253_402_300_799_999)
+            {
+                return Err(Error::new("At Window bounds are invalid"));
+            }
+            ScheduleDefinition::AtWindow { at_ms, duration_ms }
+        }
         _ => return Err(Error::new("invalid context schedule kind")),
     };
     let when = reader.blob()?;
