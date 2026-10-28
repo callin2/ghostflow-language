@@ -96,7 +96,9 @@ export function decodeModule(bytes) {
   requireThat(format === 1 || format === 3, `unsupported GFB format ${format}`);
   const name = reader.string(), version = reader.u32();
   requireThat(version === 1, 'unsupported module version');
+  const inputCountOffset = reader.at;
   requireThat(reader.u16() === 0, 'external input and Result profiles unsupported');
+  const stateCountOffset = reader.at;
   const states = Array.from({ length: reader.u16() }, () => {
     const name = reader.string(), typeOffset = reader.at;
     requireThat(reader.u8() === 1, 'non-Bool state');
@@ -136,7 +138,7 @@ export function decodeModule(bytes) {
   }
   for (const transition of transitions) references(transition.wire, false);
   for (const output of outputs) references(output.wire, true);
-  return { format, name, version, states, transitions, outputs };
+  return { format, name, version, inputCountOffset, stateCountOffset, states, transitions, outputs };
 }
 
 export function projectSource(source, filename) {

@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { compileEvidence, sha256, theoremInput, validateArtifact, wireBytes } from './bridge.mjs';
+import { pcTheoremInput } from './pc-bridge.mjs';
+import { pcErrorCases, pcMutations } from './pc-cases.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url)), root = resolve(here, '../..');
 const now = () => new Date().toISOString();
@@ -12,7 +14,8 @@ const fixtureNames = ['snapshot-branches', 'boolean-literals'];
 const falseProposition = "tactic 'decide' proved that the proposition";
 
 async function sourceIdentity() {
-  const paths = ['package.json', 'package-lock.json', 'crates/ghostflow-core/src/lib.rs'];
+  const paths = ['package.json', 'package-lock.json', 'crates/ghostflow-core/src/lib.rs',
+    'tests/bool-translation-validation.test.mjs'];
   async function walk(path) {
     for (const entry of (await readdir(join(root, path), { withFileTypes: true })).sort((a, b) => a.name.localeCompare(b.name))) {
       const child = join(path, entry.name);
@@ -73,6 +76,10 @@ export async function verify({ lean, evidenceDir }) {
       assert.ok(passed, `${name}: unexpected Lean outcome\n${log}`);
     };
     await run('BoolTranslation', model, true, undefined, 'BoolTranslation.olean');
+    const pcModel = await readFile(join(here, 'ByteMachine.lean'), 'utf8');
+    requireArgument(!/\b(sorry|axiom|native_decide)\b/.test(pcModel), 'prohibited PC proof escape');
+    await run('ByteMachine', pcModel, true, undefined, 'ByteMachine.olean');
+    await run('pc-runtime-errors', `import ByteMachine\n${pcErrorCases}`, true);
     const compiled = [];
     for (const name of fixtureNames) {
       const filename = `experiments/bool-translation-validation/fixtures/${name}.ghost.md`;
@@ -84,7 +91,17 @@ export async function verify({ lean, evidenceDir }) {
       report.artifacts.push({ fixture: filename, sourceSha256: evidence.source.sha256,
         artifactSha256: evidence.artifact.sha256, bridgeEvidenceSha256: sha256(serialized) });
       await run(name, theoremInput(evidence), true);
+      await run(`${name}-pc`, pcTheoremInput(evidence), true);
     }
+    for (const mutation of pcMutations) {
+      assert.ok(pcModel.includes(mutation.before), `${mutation.name} target drifted`);
+      await run(mutation.name, pcModel.replaceAll(mutation.before, mutation.after) + pcErrorCases, false, mutation.diagnostic);
+    }
+    await run('rejected-pc-candidate-absent', 'import ByteMachine\nopen BoolTranslation BoolTranslation.ByteMachine\nexample : inScope (.next 0 rfl : Expr true) ⟨0, 1, false⟩ = true := by decide\n', false, falseProposition);
+    await run('rejected-pc-state-bound', 'import ByteMachine\nopen BoolTranslation BoolTranslation.ByteMachine\nexample : inScope (.previous 1 : Expr false) ⟨0, 1, false⟩ = true := by decide\n', false, falseProposition);
+    const wrongCounts = structuredClone(compiled[0]);
+    wrongCounts.decoded.states.pop();
+    await run('rejected-pc-header-count', pcTheoremInput(wrongCounts), false, falseProposition);
     const mutate = async (name, index, edit) => {
       const changed = structuredClone(compiled[index]);
       edit(changed);
