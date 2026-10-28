@@ -4,7 +4,15 @@
 
 # Interaction 스키마 및 런타임 스냅샷 v0
 
-## 합성 프로필 0.5
+이 계약은 `GF-IR-1`/TASK-121.1을 위한 cabinet-view 중립 **호스트 소프트웨어** 경계입니다. 정적 의미 설명자와 완료된 런타임 관찰 하나를 별도로 정의합니다. 컴파일러 출력은 #71에서 구현합니다. #72는 `tools/interaction-runtime-snapshot.mjs`를 통해 이미 완료된 네이티브 또는 WASM 추적만 투영합니다. 이 어댑터는 스캔을 평가하거나 I/O를 수행하거나 요청/안전 출력을 변경하지 않습니다.
+
+`GhostFlow/interaction-schema-v0`와 `GhostFlow/runtime-snapshot-v0`는 각각 자체 `version`을 가집니다. 버전은 호환성 레이블이지 정확한 스키마 인스턴스 식별자가 아닙니다. 스냅샷에는 `snapshot.schema.sha256`의 정적 스키마 정규 JSON SHA-256도 있습니다. 소비자는 이 다이제스트, 형식, 버전을 제공된 정적 문서와 연결해야 합니다.
+
+스키마 다이제스트는 이 저장소의 `canonicalJson(schema, {rejectSparseArrays: true, rejectUnsafeIntegers: true})`가 생성한 UTF-8 바이트의 SHA-256입니다. 정확한 규칙은 다음과 같습니다. 각 일반 객체 키를 ECMAScript UTF-16 코드 단위 순서로 재귀 정렬하고, 배열 요소 순서를 유지하며, 잘못된 유니코드를 거부한 뒤 ECMAScript `JSON.stringify`로 문자열을 인코딩합니다. 불리언과 null은 JSON 리터럴로 인코딩하고, 유한한 IEEE-754 숫자는 안전하지 않은 정수를 거부하면서 ECMAScript `JSON.stringify` 표기법으로 인코딩합니다(`-0`은 `0`). 공백을 출력하지 않습니다. 희소 배열, 일반 객체가 아닌 객체, 비유한 숫자 및 깊이 64 초과 중첩은 거부합니다. 소비자는 제공된 다이제스트를 비교합니다. 다른 언어의 생성자는 일치하는 스냅샷을 발행하기 전에 이 바이트를 정확히 재현해야 합니다. 형식 버전만 일치하는 것으로는 충분하지 않습니다.
+
+## 정적 스키마
+
+### 합성 프로필 0.5
 
 Interaction 스키마를 명시적으로 요청했고 정식 소스 closure에 인스턴스가 있으면
 스키마 `0.5`와 스냅샷 `0.3`을 선택합니다. 독립 프로그램의 스키마 `0.3`/`0.4`와
@@ -53,14 +61,6 @@ framed 진입점은 런타임이 완료한 프레임 식별자를 사용합니�
 어댑터는 명시적인 미지원 검사를 유지합니다.
 관련 이슈는 [#290](https://github.com/callin2/ghostflow-language/issues/290)과
 [#302](https://github.com/callin2/ghostflow-language/issues/302)입니다.
-
-이 계약은 `GF-IR-1`/TASK-121.1을 위한 cabinet-view 중립 **호스트 소프트웨어** 경계입니다. 정적 의미 설명자와 완료된 런타임 관찰 하나를 별도로 정의합니다. 컴파일러 출력은 #71에서 구현합니다. #72는 `tools/interaction-runtime-snapshot.mjs`를 통해 이미 완료된 네이티브 또는 WASM 추적만 투영합니다. 이 어댑터는 스캔을 평가하거나 I/O를 수행하거나 요청/안전 출력을 변경하지 않습니다.
-
-`GhostFlow/interaction-schema-v0`와 `GhostFlow/runtime-snapshot-v0`는 각각 자체 `version`을 가집니다. 버전은 호환성 레이블이지 정확한 스키마 인스턴스 식별자가 아닙니다. 스냅샷에는 `snapshot.schema.sha256`의 정적 스키마 정규 JSON SHA-256도 있습니다. 소비자는 이 다이제스트, 형식, 버전을 제공된 정적 문서와 연결해야 합니다.
-
-스키마 다이제스트는 이 저장소의 `canonicalJson(schema, {rejectSparseArrays: true, rejectUnsafeIntegers: true})`가 생성한 UTF-8 바이트의 SHA-256입니다. 정확한 규칙은 다음과 같습니다. 각 일반 객체 키를 ECMAScript UTF-16 코드 단위 순서로 재귀 정렬하고, 배열 요소 순서를 유지하며, 잘못된 유니코드를 거부한 뒤 ECMAScript `JSON.stringify`로 문자열을 인코딩합니다. 불리언과 null은 JSON 리터럴로 인코딩하고, 유한한 IEEE-754 숫자는 안전하지 않은 정수를 거부하면서 ECMAScript `JSON.stringify` 표기법으로 인코딩합니다(`-0`은 `0`). 공백을 출력하지 않습니다. 희소 배열, 일반 객체가 아닌 객체, 비유한 숫자 및 깊이 64 초과 중첩은 거부합니다. 소비자는 제공된 다이제스트를 비교합니다. 다른 언어의 생성자는 일치하는 스냅샷을 발행하기 전에 이 바이트를 정확히 재현해야 합니다. 형식 버전만 일치하는 것으로는 충분하지 않습니다.
-
-## 정적 스키마
 
 스키마는 고정된 `module`(`id`, 컴파일러 추적 `moduleFingerprint`, 매니페스트 `bytecodeSha256`)과 소스 문서(`documentId`, `revisionId`, `format`, `kind`, 소스 `sha256`) 식별자를 가집니다. `module.id`는 공개 제어 모듈 식별자이고, `moduleFingerprint`는 컴파일 모듈의 안정적인 16자리 16진수 추적 지문이며, `bytecodeSha256`은 출력 매니페스트 바이트코드의 소문자 SHA-256입니다. 지문과 아티팩트 다이제스트는 서로 다르며 둘 다 필요합니다. `source.documentId`는 하나의 작성 문서 리비전 전반에서 안정적인 불투명 공개 식별자입니다. `source.revisionId`는 저장된 정식 리비전 하나를 위한 불투명하고 불변인 식별자입니다. `source.sha256`은 그 리비전의 UTF-8 소스 바이트 SHA-256입니다. 두 소스 식별자 모두 경로가 아니므로 대화 또는 리비전 저장소의 문서를 지원합니다. 픽스처의 저장소 경로는 테스트 하네스에서만 사용됩니다.
 

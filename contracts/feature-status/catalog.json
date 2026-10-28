@@ -3478,10 +3478,43 @@
               ]
             }
           ]
+        },
+        {
+          "stage": "host_simulation",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/composed-interaction.test.mjs",
+              "testId": "actual settings host owns independent completed observations and read operations do not tick",
+              "assertionClass": "observation",
+              "targets": [
+                "host",
+                "wasm"
+              ]
+            },
+            {
+              "path": "tests/composed-interaction.test.mjs",
+              "testId": "legacy and framed settings hosts publish the same accepted scans from their own completion owners",
+              "assertionClass": "runtime-value",
+              "targets": [
+                "host",
+                "wasm"
+              ]
+            },
+            {
+              "path": "tests/composed-interaction.test.mjs",
+              "testId": "persisted and browser artifacts reconstruct the same composed schema and reject tampering",
+              "assertionClass": "identity",
+              "targets": [
+                "host",
+                "wasm"
+              ]
+            }
+          ]
         }
       ],
       "gaps": [
-        "Pinned composition preserves definition-local intent within authored instance scopes and verifies private state/config/timer execution. REF-06-002 and REF-06-016 remain incomplete for per-instance binding provenance joined to actual installed snapshots and composed interaction/descriptor publication."
+        "Pinned composition preserves definition-local intent, authored instance identities and private state/config/timer execution. Composed Interaction schema/snapshot projections are emitted by the actual TemporarySettingsHost. REF-06-002 and REF-06-016 remain incomplete for actual installed binding provenance and the composed explanation path."
       ],
       "issues": [
         195,

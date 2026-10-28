@@ -208,8 +208,8 @@
       "source": "contracts/interaction-v0/README.md",
       "sourceLanguage": "en",
       "translation": "contracts/interaction-v0/README.ko.md",
-      "sourceSha256": "1033683932971759c4f44a1bfa542e92acf4b430f7ac965a054145b14329a6d5",
-      "translationSha256": "95070ebf311d23eb4dd28bc7da0093af70119ce7e391015de284110c4cdf1383"
+      "sourceSha256": "5dbbc65ae5116c19a92d27fd231b274ccc5fa0db70c3800056c29fbab75fae2a",
+      "translationSha256": "60925cf692e453ecc5a43ebf628406597c071c9925033698a868b5ed10ff8f4f"
     },
     {
       "source": "contracts/requirements/README.md",
@@ -705,8 +705,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "06da8245b4ec3e1812274bf27ce739d41d872095040185a171ee0120fb24d8e4",
-      "translationSha256": "85777f0024f6fe242b8cc43df079dc5f6db86fb38b96445fb5a597879fefbbcc"
+      "sourceSha256": "d1d3936c45df7b6677e1583747c5ab7d3f2da4b852f722dfbc8fe7282fb380e2",
+      "translationSha256": "a631f473eca2e2c46653d09dc2b24c1492eb008942135f8647b57c87e565db44"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",
