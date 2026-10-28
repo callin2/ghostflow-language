@@ -547,6 +547,7 @@ async function verify(nodeOnly, curriculumOnly) {
     }
     report.plcCurriculum.replay.runtime = await verifyCurriculumReplayWasm(fs.readFileSync(wasmPath), { repositoryRoot: root });
     await gate('python3', ['experiments/rust-reader-validation/test_verify_receipt.py']);
+    await gate('python3', ['experiments/rust-int-primitives/test_receipts.py']);
     // Preserve dev batching and serialize suites that rebuild shared Cargo outputs.
     for (const tests of languageTestBatches(LANGUAGE_TESTS)) {
       await gate(process.execPath, ['--test', '--test-concurrency=1', ...tests]);
