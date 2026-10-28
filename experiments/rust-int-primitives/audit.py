@@ -10,6 +10,15 @@ import re
 
 METHODS = {'checked_add', 'checked_neg'}
 RUST_NAMES = {'core::num::{i32}::' + x for x in METHODS}
+STABLE_ARTIFACTS = ['IntPrimitives.llbc', 'lean/IntPrimitives.lean', 'lean/translation.json',
+                    'charon.stdout.log', 'charon.stderr.log',
+                    'aeneas.stdout.log', 'aeneas.stderr.log']
+
+
+def write_report(path, report):
+    temporary = path.with_name(path.name + '.tmp')
+    temporary.write_text(json.dumps(report, indent=2) + '\n')
+    os.replace(temporary, path)
 
 
 def inspect(directory):
@@ -26,7 +35,9 @@ def inspect(directory):
     generated = (directory / 'lean/IntPrimitives.lean').read_text()
     annotations = set(re.findall(r'@\[rust_fun "([^"\n]+)"\]', generated))
     emitted = {f['rust_name'] for f in metadata['functions'] if not f['is_opaque']} & annotations
-    escapes = re.findall(r'^.*\b(?:axiom|sorry|admit|native_decide)\b.*$', generated, re.M)
+    escapes = re.findall(
+        r'^.*\b(?:axiom|axioms|constant|constants|opaque|sorry|sorryAx|admit|native_decide)\b.*$',
+        generated, re.M)
     reasons = []
     if llbc['has_errors']:
         reasons.append('Charon reported errors')
@@ -43,19 +54,26 @@ def inspect(directory):
             'llbcHasErrors': llbc['has_errors'], 'rootBodies': root_bodies,
             'missingLeanRoots': missing, 'unapprovedDeclarations': escapes,
             'reasons': reasons, 'targetInformation': translated['target_information'],
-            'sha256': {str(p.relative_to(directory)): hashlib.sha256(p.read_bytes()).hexdigest()
-                       for p in sorted(directory.rglob('*')) if p.is_file()
-                       and p.name not in {'admission.json', 'admission.json.tmp'}}}
+            'sha256': {name: hashlib.sha256((directory / name).read_bytes()).hexdigest()
+                       for name in STABLE_ARTIFACTS if (directory / name).is_file()}}
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('directory', type=Path)
     args = parser.parse_args()
-    report = inspect(args.directory)
-    temporary = args.directory / 'admission.json.tmp'
-    temporary.write_text(json.dumps(report, indent=2) + '\n')
-    os.replace(temporary, args.directory / 'admission.json')
+    args.directory.mkdir(parents=True, exist_ok=True)
+    receipt = args.directory / 'admission.json'
+    report = {'status': 'running',
+              'observedAt': datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')}
+    write_report(receipt, report)
+    try:
+        report.update(inspect(args.directory))
+    except Exception as error:
+        report.update(status='failed', reasons=[str(error)])
+    finally:
+        report['finishedAt'] = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+        write_report(receipt, report)
     print(json.dumps({'status': report['status'], 'reasons': report['reasons']}))
     return 0 if report['status'] == 'admissible-for-proof' else 1
 
