@@ -1796,6 +1796,14 @@ class Lowerer {
       return semanticType(type.name);
     }
     if (this.types.has(type.name) || FAULT_ENUMS.has(type.name)) return semanticType(type.name);
+    if (type.name === 'Celsius') {
+      const detail = 'unknown type Celsius';
+      const reference = 'docs/ProgrammingInGhostflow.md#quantity-type-lookup';
+      const hint = 'For a Celsius measurement, declare input temperature: Temperature; and put the unit on the value, for example 30°C.';
+      const failure = new ControlCompileError(`${detail}\n${hint}\nSee ${reference}`, type.loc);
+      Object.assign(failure, { diagnosticMessage: detail, diagnosticHint: hint, diagnosticReference: reference });
+      throw failure;
+    }
     error(type.loc, `unknown type ${type.name}`);
   }
   declare() {

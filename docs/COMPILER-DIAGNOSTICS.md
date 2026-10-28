@@ -5,7 +5,7 @@ Successful compilation may include warnings in `diagnostics`; a clean successful
 compile has an empty array. A located compilation
 failure rejects with the same property on the thrown error. The existing error
 class, message, and CLI text remain unchanged except for the actionable missing
-Interaction Schema provenance diagnostic described below.
+Interaction Schema provenance and undeclared Celsius guidance described below.
 
 The envelope format is `GhostFlow/diagnostics-v1`:
 
@@ -78,6 +78,18 @@ an authored position still throws its existing error without a diagnostic span.
 The envelope is API metadata. It does not change GFB bytes, the persisted
 source-map artifact, or runtime behavior. Source identity and executable
 provenance remain governed by [SOURCE-MAP.md](SOURCE-MAP.md).
+
+## Undeclared Celsius type
+
+An undeclared `Celsius` still rejects with `GF_SEMANTIC`, message
+`unknown type Celsius`, and the original type span. Its `hint` explains that a
+Celsius measurement uses `input temperature: Temperature;` and a value such as
+`30°C`. The `reference` links to the book's existing
+[quantity-to-type lookup](ProgrammingInGhostflow.md#quantity-type-lookup).
+The human CLI includes the same guidance; JSON/TOON carry the structured hint.
+No source is rewritten and no type alias is added. A user-defined enum named
+`Celsius` still resolves normally, and unrelated unknown types keep their
+existing diagnostics. Valid programs retain the same executable bytes.
 
 ## Missing Interaction Schema intent provenance
 

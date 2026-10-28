@@ -74,6 +74,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/time-literals.test.mjs',
   'tests/date-time-control.test.mjs',
   'tests/quantities.test.mjs',
+  'tests/temperature-type-guidance.test.mjs',
   'tests/relative-humidity-ratio.test.mjs',
   'tests/constraints.test.mjs',
   'tests/named-constraints.test.mjs',

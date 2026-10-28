@@ -45,6 +45,16 @@ package 연결, 실제 장치 검증은 별도다. 예를 들어 같은 compact 
 `faultA: observation:faultA`를 해석한다. 공개 Node/browser 두 밸브 및 잘못된
 바인딩 회귀 검사가 이 규칙을 확인한다.
 
+### 2026-10-22 — 섭씨 측정값의 타입 안내 ([#537](https://github.com/callin2/ghostflow-language/issues/537))
+
+미선언 `Celsius` 측정 타입의 컴파일 진단에서 `Temperature`와 `30°C` 같은
+단위 있는 값을 쓰도록 안내한다(Reference §2.9). 이전 오류는 알 수 없는 타입
+이름만 표시했다. Node/browser 진단과 사람용·JSON·TOON CLI 출력에서 기존
+물리량별 타입 조회표로 연결한다. 오류 코드·원래 위치·실패 종료는 유지하고,
+별칭이나 자동 변환은 추가하지 않는다. 사용자 정의 `Celsius` enum과 유효한
+프로그램의 실행 바이트도 보존한다. 수정법·CLI 전달·기존 산출물 보존을 회귀로
+검증한다.
+
 ### 2026-10-20 — 타입이 있는 출력 관측 ([#578](https://github.com/callin2/ghostflow-language/issues/578))
 
 Reference §4.7에 선언한 Bool 출력용 `output_status`, `output_health`,
