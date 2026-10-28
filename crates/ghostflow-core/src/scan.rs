@@ -130,44 +130,62 @@ impl ScanDriver {
                 "stage accounting must activate once before scanning",
             ));
         }
-        let module = self.runtime.module.as_ref()
+        let module = self
+            .runtime
+            .module
+            .as_ref()
             .ok_or_else(|| Error::new("no module installed"))?;
-        self.stage_accounting = Some(crate::stage_accounting::StageAccounting::activate(module, binding)?);
+        self.stage_accounting = Some(crate::stage_accounting::StageAccounting::activate(
+            module, binding,
+        )?);
         Ok(())
     }
 
     pub fn stage_accounting_query(
-        &self, account: &str, run: &str, start: u64, end: u64,
+        &self,
+        account: &str,
+        run: &str,
+        start: u64,
+        end: u64,
     ) -> Result<crate::stage_accounting::UsageRead> {
-        self.stage_accounting.as_ref()
+        self.stage_accounting
+            .as_ref()
             .ok_or_else(|| Error::new("stage accounting is not active"))?
             .query(account, run, start, end)
     }
 
     pub fn stage_accounting_snapshot(&self) -> Result<(u64, Vec<u8>)> {
-        let owner = self.stage_accounting.as_ref()
+        let owner = self
+            .stage_accounting
+            .as_ref()
             .ok_or_else(|| Error::new("stage accounting is not active"))?;
         Ok((owner.revision(), owner.snapshot()))
     }
 
     pub fn acknowledge_stage_accounting(&mut self, revision: u64) -> Result<()> {
-        self.stage_accounting.as_mut()
+        self.stage_accounting
+            .as_mut()
             .ok_or_else(|| Error::new("stage accounting is not active"))?
             .acknowledge(revision)
     }
 
     pub fn restore_stage_accounting(&mut self, bytes: &[u8]) -> Result<()> {
         if self.next_scan_id != Some(0) {
-            return Err(Error::new("stage accounting restore requires a fresh scan run"));
+            return Err(Error::new(
+                "stage accounting restore requires a fresh scan run",
+            ));
         }
-        self.stage_accounting.as_mut()
+        self.stage_accounting
+            .as_mut()
             .ok_or_else(|| Error::new("stage accounting is not active"))?
             .restore(bytes)
     }
 
     pub fn stage_accounting_gap(&mut self) -> Result<()> {
-        self.stage_accounting.as_mut()
-            .ok_or_else(|| Error::new("stage accounting is not active"))?.gap();
+        self.stage_accounting
+            .as_mut()
+            .ok_or_else(|| Error::new("stage accounting is not active"))?
+            .gap();
         Ok(())
     }
 
