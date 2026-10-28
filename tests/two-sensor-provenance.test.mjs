@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
+import {mkdir,mkdtemp,readFile,rm,writeFile} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join,resolve} from 'node:path';
+import {spawnSync} from 'node:child_process';
 import test from 'node:test';
-import {readFile} from 'node:fs/promises';
 import {compileEvidence,locate,theoremInput,witnessInput} from '../experiments/two-sensor-provenance/bridge.mjs';
 
 const filename='experiments/two-sensor-provenance/fixtures/two-recover.ghost.md';
@@ -34,4 +37,21 @@ test('byte locator preserves full module framing for semantic mutants',()=>{
   const input=witnessInput(bytes,false);
   assert.match(input,/theorem structurallyParsed/);assert.match(input,/theorem targetedEquality : SensorMachine.run/);
   assert.throws(()=>locate([...bytes,0]));
+});
+test('runtime verification replaces a stale passed receipt when its reused build input is missing',async()=>{
+  const directory=await mkdtemp(join(tmpdir(),'ghostflow-two-sensor-stale-receipt-'));
+  try {
+    const sibling=join(directory,'sibling'),evidence=join(directory,'evidence');
+    await mkdir(join(sibling,'build/evidence/build183'),{recursive:true});
+    const receipt=join(evidence,'runtime-verification.json');
+    await mkdir(evidence,{recursive:true});
+    await writeFile(receipt,JSON.stringify({status:'passed',at:'old'}));
+    const result=spawnSync(process.execPath,[resolve('experiments/two-sensor-provenance/runtime.mjs'),sibling,evidence],
+      {encoding:'utf8',timeout:30000});
+    assert.notEqual(result.status,0);
+    const current=JSON.parse(await readFile(receipt,'utf8'));
+    assert.equal(current.status,'failed');
+    assert.match(current.error,/verification\.json/);
+    assert.match(current.finishedAt,/Z$/);
+  } finally {await rm(directory,{recursive:true,force:true});}
 });
