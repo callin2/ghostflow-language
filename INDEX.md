@@ -449,7 +449,7 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | --- | --- | --- |
 | [experiments/bool-translation-validation/pc-refinement-report.md](experiments/bool-translation-validation/pc-refinement-report.md) | Bool byte-PC refinement execution report | md |
 | [experiments/bool-translation-validation/proof-report.md](experiments/bool-translation-validation/proof-report.md) | Bool translation validation execution report | md |
-| [experiments/bool-translation-validation/serializer-report.md](experiments/bool-translation-validation/serializer-report.md) | Bounded Bool serialization and raw decoding — #590 | md |
+| [experiments/bool-translation-validation/serializer-report.md](experiments/bool-translation-validation/serializer-report.md) | Bounded Bool serialization and raw decoding (#590) | md |
 
 ## experiments/bool-translation-validation/fixtures/
 
