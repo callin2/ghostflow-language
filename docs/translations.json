@@ -1616,6 +1616,10 @@
     {
       "path": "experiments/int32-codec-validation/proof-report.md",
       "reason": "Issue590 signed i32 codec proof and compiler/runtime execution evidence with explicit trust boundaries; reports may remain in one language."
+    },
+    {
+      "path": "experiments/rust-int-primitives/proof-report.md",
+      "reason": "Issue590 unsuccessful actual Rust primitive extraction diagnosis, tool provenance and artifact admission evidence; reports may remain in one language."
     }
   ]
 }
