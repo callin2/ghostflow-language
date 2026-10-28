@@ -1600,6 +1600,18 @@
     {
       "path": "experiments/bool-sensor-state-validation/fixtures/toggle.ghost.md",
       "reason": "Canonical executable compiler fixture for the stateful sensor proof; test data has no translated executable copy."
+    },
+    {
+      "path": "experiments/rust-reader-validation/proof-report.md",
+      "reason": "Issue590 production Rust extraction and kernel proof execution evidence with explicit trusted boundaries; reports may remain in one language."
+    },
+    {
+      "path": "experiments/rust-reader-validation/ValueType-extraction-diagnosis.md",
+      "reason": "Issue590 unsuccessful extraction diagnosis and exact frozen evidence identities; execution reports may remain in one language."
+    },
+    {
+      "path": "docs/reports/2026-10-29-compiler-proof-obligations-590.md",
+      "reason": "Issue590 revision-pinned proof obligation inventory and evidence reconciliation; execution reports may remain in one language."
     }
   ]
 }
