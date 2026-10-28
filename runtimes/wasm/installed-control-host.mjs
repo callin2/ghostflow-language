@@ -154,7 +154,8 @@ export class InstalledControlHost {
     this.#live();
     return copy({ ...this.#identity(), assessment: this.#installation.assessment,
       latest: this.#latest, cleanupError: this.#cleanupError,
-      ...(this.#composed ? { execution: this.#runtime.snapshot(), routes: this.#routes() } : {}) });
+      ...(this.#composed ? { execution: this.#runtime.snapshot(), routes: this.#routes(),
+        currentFrameCompletion: this.#runtime.currentFrameCompletion } : {}) });
   }
 
   #routes() {
@@ -200,7 +201,9 @@ export class InstalledControlHost {
 
   explainOutput(outputId, completion = this.#latest) {
     this.#live();
-    if (!this.#composed || !this.#latest || canonicalJson(completion) !== canonicalJson(this.#latest)) {
+    if (!this.#composed || !this.#latest
+      || canonicalJson(this.#runtime.currentFrameCompletion) !== canonicalJson(this.#latest.frame)
+      || canonicalJson(completion) !== canonicalJson(this.#latest)) {
       fail('current owned installed completion required');
     }
     const result = this.#latest.execution;

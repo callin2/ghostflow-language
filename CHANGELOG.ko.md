@@ -13,6 +13,8 @@ endpoint를 연결합니다. instance 센서 계약은 root 수집 endpoint에 �
 거절된 교체는 소유자 전체를 보존하고 수락된 교체는 새 run으로 시작합니다.
 config/timer 표현식 설명은 여전히 unavailable이며 물리 적합성은 unknown입니다.
 REF-06-002와 REF-06-016의 더 넓은 요구 범위는 미완료입니다.
+런타임 dispatch 실패 시 과거 완료 결과를 보존하면서 현재 설명의 유효성을 해제합니다.
+사전 검사 거절은 현재 proof를 유지합니다.
 `docs/INSTALLED-SENSOR-BINDING.md`와 `tests/installed-composition.test.mjs`에 근거가 있습니다.
 
 ### 2026-10-29 - 정확한 Interaction provenance 복원 ([#287](https://github.com/callin2/ghostflow-language/issues/287), [#590](https://github.com/callin2/ghostflow-language/issues/590))

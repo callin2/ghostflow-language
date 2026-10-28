@@ -16,7 +16,7 @@ Each installed cell keeps its own state and operating duration.
 ${code}
 \`\`\`
 `;
-function compile({ output = 'running', childStale = '3s', rootStale = '4s', type = 'Bool', valid = '', rootValid = valid } = {}) {
+function compile({ output = 'running', childStale = '3s', rootStale = '4s', type = 'Bool', valid = '', rootValid = valid, extra = '' } = {}) {
   const cell = document(`control Cell {
   input start: ${type} { sample = 1s; stale_after = ${childStale}; ${valid} }
   // ghostflow:link id=cell-intent relation=implements
@@ -25,6 +25,7 @@ function compile({ output = 'running', childStale = '3s', rootStale = '4s', type
   state running: Bool = false;
   // ghostflow:link id=cell-intent relation=implements
   timer age = elapsed(running);
+  ${extra}
   running' = ${type === 'Bool' ? 'start |> recover(false)' : 'case start { ok(value) => value > 0; fault(_) => false; }'};
   output on: Bool;
   on <- ${output};
@@ -235,4 +236,45 @@ test('installed route projection rejects otherwise valid root computations', asy
   const compiled = compileSourceSync(source, { filename: artifact.sourceDocument.filename,
     sourceClosure: artifact.sourceClosure.documents, interactionSourceIdentity: artifact.interactionSourceIdentity });
   await assert.rejects(create(compiled), /root requires direct instance port connections/);
+});
+
+test('failed actual installed scan invalidates current explanation without rewriting the historical completion', async t => {
+  const compiled = compile({ output: 'running && (1.0 / divisor > 0.0)',
+    extra: '// ghostflow:link id=cell-intent relation=implements\n  state divisor: Number = 0.0;' });
+  const host = await create(compiled); t.after(() => host.dispose());
+  const accepted = host.step(frame(0, 1, true, false));
+  const historical = structuredClone(accepted);
+  assert.equal(host.explainOutput('output.east_on').status, 'ready');
+  assert.deepEqual(host.snapshot().currentFrameCompletion, accepted.frame);
+  assert.throws(() => host.step(frame(1000, 2, true, false)), /division by zero/);
+  assert.equal(host.snapshot().currentFrameCompletion, null);
+  assert.throws(() => host.explainOutput('output.east_on'), /current owned installed completion/);
+  assert.throws(() => host.explainOutput('output.east_on', accepted), /current owned installed completion/);
+  assert.deepEqual(accepted, historical);
+  assert.deepEqual(host.snapshot().latest, historical);
+  await host.replaceBinding({ runId: 'run-2', ...installation('r2') });
+  host.step(frame(0, 1, false, false, 'r2'));
+  assert.equal(host.explainOutput('output.east_on').status, 'ready');
+});
+
+test('nonaccepted installed runtime execution invalidates current proof while preflight rejection preserves it', async t => {
+  const compiled = compile({ output: 'running && (1.0 / divisor > 0.0)',
+    extra: '// ghostflow:link id=cell-intent relation=implements\n  state divisor: Number = 0.0;' });
+  const host = await create(compiled); t.after(() => host.dispose());
+  const accepted = host.step(frame(0, 1, true, false), setting(host, 'temporary'));
+  const before = host.snapshot();
+  assert.throws(() => host.step(frame(1000, 2, true, false),
+    mutate(setting(host), event => { event.actor = 'unknown'; })), /permission/);
+  assert.deepEqual(host.snapshot(), before);
+  assert.equal(host.explainOutput('output.east_on').status, 'ready');
+  assert.throws(() => host.step(mutate(frame(1000, 2, true, false), packet => {
+    packet.contextFacts.clock.monotonicMs = -1;
+  })), /monotonic|clock/);
+  assert.deepEqual(host.snapshot(), before);
+  assert.equal(host.explainOutput('output.east_on').status, 'ready');
+  const rejected = host.step(frame(1000, 2, true, false), setting(host));
+  assert.equal(rejected.accepted, false);
+  assert.equal(rejected.reason, 'settings-unavailable');
+  assert.throws(() => host.explainOutput('output.east_on'), /current owned installed completion/);
+  assert.deepEqual(host.snapshot().latest, accepted);
 });
