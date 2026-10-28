@@ -1,0 +1,91 @@
+name: Lean Bool and PC proof
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/lean-proof.yml
+      - experiments/bool-translation-validation/**
+      - tests/bool-translation-validation.test.mjs
+      - tools/**
+      - crates/ghostflow-core/src/**
+      - package.json
+      - package-lock.json
+  push:
+    branches: [main, dev]
+    paths:
+      - .github/workflows/lean-proof.yml
+      - experiments/bool-translation-validation/**
+      - tests/bool-translation-validation.test.mjs
+      - tools/**
+      - crates/ghostflow-core/src/**
+      - package.json
+      - package-lock.json
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  proof:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout proof source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          submodules: false
+      - name: Set up Node.js 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+      - name: Prepare evidence directory
+        run: mkdir -p build/bool-pc-validation
+      - name: Install locked Node dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts 2>&1 | tee build/bool-pc-validation/npm-ci.log
+      - name: Install pinned Lean 4.19.0
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            archive="$RUNNER_TEMP/elan-v4.1.2-linux-x86_64.tar.gz"
+            installer="$RUNNER_TEMP/elan-v4.1.2"
+            mkdir -p "$installer"
+            curl --fail --location --silent --show-error \
+              https://github.com/leanprover/elan/releases/download/v4.1.2/elan-x86_64-unknown-linux-gnu.tar.gz \
+              --output "$archive"
+            printf '%s  %s\n' f81c2e48c1588d4612cd2c8851947898a45ac8d72748a07dff3a5694f1cf589b "$archive" | sha256sum --check
+            tar -xzf "$archive" -C "$installer"
+            "$installer/elan-init" -y --default-toolchain none --no-modify-path
+            elan_version="$("$HOME/.elan/bin/elan" --version)"
+            printf '%s\n' "$elan_version"
+            [[ "$elan_version" =~ ^elan[[:space:]]4\.1\.2([[:space:]]|$) ]] || { echo 'unexpected elan version' >&2; exit 1; }
+            "$HOME/.elan/bin/elan" toolchain install leanprover/lean4:v4.19.0
+            "$HOME/.elan/bin/elan" default leanprover/lean4:v4.19.0
+            "$HOME/.elan/bin/elan" which lean
+          } 2>&1 | tee build/bool-pc-validation/lean-install.log
+      - name: Check proof bridge tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test tests/bool-translation-validation.test.mjs 2>&1 | tee build/bool-pc-validation/node-test.log
+      - name: Check Bool and PC proofs with Lean kernel
+        shell: bash
+        run: |
+          set -euo pipefail
+          lean_bin="$("$HOME/.elan/bin/elan" which lean)"
+          node experiments/bool-translation-validation/verify.mjs \
+            --lean "$lean_bin" --evidence-dir build/bool-pc-validation \
+            2>&1 | tee build/bool-pc-validation/verify.log
+      - name: Upload proof evidence even on failure
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lean-bool-pc-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/bool-pc-validation/
+          if-no-files-found: warn
+          retention-days: 30
