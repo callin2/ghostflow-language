@@ -27,6 +27,19 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [.github/pull_request_template.ko.md](.github/pull_request_template.ko.md) | pull_request_template.ko.md | md |
 | [.github/pull_request_template.md](.github/pull_request_template.md) | pull_request_template.md | md |
 
+## contracts/alarm-v1/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [contracts/alarm-v1/README.ko.md](contracts/alarm-v1/README.ko.md) | 알람 관측 v1 | md |
+| [contracts/alarm-v1/README.md](contracts/alarm-v1/README.md) | Alarm observation v1 | md |
+
+## contracts/alarm-v1/examples/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [contracts/alarm-v1/examples/temperature.ghost.md](contracts/alarm-v1/examples/temperature.ghost.md) | Software temperature alarm observation | md |
+
 ## contracts/integration-v1/
 
 | Path | Title | Type |
@@ -590,4 +603,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-435 documents.
+438 documents.

@@ -5,6 +5,17 @@
 
 ## 미출시
 
+### 2026-10-29 - 스캔이 소유하는 알람 생명주기 ([#287](https://github.com/callin2/ghostflow-language/issues/287))
+
+소스가 검증된 외부 descriptor로 scalar scan profile의 작성된 Bool 상태를
+알람에 연결할 수 있습니다. Rust가 내보내기 전에 발생/해제 episode와 현재
+조건을 기록하므로 false→true→false 뒤에 조회해도 두 전이를 받습니다.
+알람 v1은 명시적 gap을 가진 유한 보존과 binding/run/stream cursor를 추가합니다.
+실패한 스캔과 조회는 순서를 진행하지 않습니다. 원본 GFB 바이트와 v0 snapshot은
+그대로입니다. 통합 command stream은 별도 설계로 남습니다. 전체 레코드
+native/WASM 일치와 거절 검증은 `tests/alarm-observation.test.mjs`에 있으며
+범위와 schema는 [알람 v1 계약](contracts/alarm-v1/README.ko.md)에 있습니다.
+
 ### 2026-10-29 - 소스에 결합한 연속 Percent 중재 ([#249](https://github.com/callin2/ghostflow-language/issues/249), [#590](https://github.com/callin2/ghostflow-language/issues/590))
 
 Reference §4.9는 control 내부 `resource_policy`에 이름 있는 Percent 요청과 상한을

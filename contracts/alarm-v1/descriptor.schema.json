@@ -1,0 +1,226 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ghostflow.dev/contracts/alarm-v1/descriptor.schema.json",
+  "title": "GhostFlow alarm v1 descriptor",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "version",
+    "schema",
+    "module",
+    "source",
+    "retention",
+    "alarms"
+  ],
+  "properties": {
+    "format": {
+      "const": "GhostFlow/alarm-descriptor-v1"
+    },
+    "version": {
+      "const": 1
+    },
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format",
+        "version",
+        "sha256"
+      ],
+      "properties": {
+        "format": {
+          "const": "GhostFlow/interaction-schema-v0"
+        },
+        "version": {
+          "const": "0.3"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "module": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "moduleFingerprint",
+        "bytecodeSha256"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9._:-]{0,127}$"
+        },
+        "moduleFingerprint": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{16}$"
+        },
+        "bytecodeSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "documentId",
+        "revisionId",
+        "format",
+        "kind",
+        "sha256"
+      ],
+      "properties": {
+        "documentId": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9._:-]{0,127}$"
+        },
+        "revisionId": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9._:-]{0,127}$"
+        },
+        "format": {
+          "const": "GhostFlow/source-document-v1"
+        },
+        "kind": {
+          "const": "literate"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "retention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capacity",
+        "policy"
+      ],
+      "properties": {
+        "capacity": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1024
+        },
+        "policy": {
+          "const": "drop-oldest-report-gap"
+        }
+      }
+    },
+    "alarms": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "kind",
+          "condition",
+          "severity",
+          "meaning",
+          "provenance"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9._:-]{0,127}$"
+          },
+          "kind": {
+            "const": "alarm"
+          },
+          "condition": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "descriptorId",
+              "activeWhen"
+            ],
+            "properties": {
+              "descriptorId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "activeWhen": {
+                "const": true
+              }
+            }
+          },
+          "severity": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "code",
+              "meaning"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9._:-]{0,127}$"
+              },
+              "meaning": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              }
+            }
+          },
+          "meaning": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "raised",
+              "cleared"
+            ],
+            "properties": {
+              "raised": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "cleared": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              }
+            }
+          },
+          "provenance": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "sourceNodeId",
+              "intentAnchorIds"
+            ],
+            "properties": {
+              "sourceNodeId": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295
+              },
+              "intentAnchorIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512
+                },
+                "minItems": 1,
+                "maxItems": 32,
+                "uniqueItems": true
+              }
+            }
+          }
+        }
+      },
+      "minItems": 1,
+      "maxItems": 16
+    }
+  }
+}

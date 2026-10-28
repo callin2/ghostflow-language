@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### 2026-10-29 - scan-owned alarm lifecycle ([#287](https://github.com/callin2/ghostflow-language/issues/287))
+
+A source-validated external descriptor can now map an authored Bool state to an
+alarm in the scalar scan profile. Rust records raised/cleared episodes and the
+current condition before export, so a consumer querying after false→true→false
+still receives both transitions. Alarm v1 adds bounded retention with explicit
+gaps and binding/run/stream cursors; failed scans and queries do not advance it.
+Original GFB bytes and v0 snapshots are unchanged. The combined command stream
+remains a separate design. Native/WASM full-record parity and rejection coverage
+are in `tests/alarm-observation.test.mjs`; scope and schemas are in
+[the alarm v1 contract](contracts/alarm-v1/README.md).
+
 ### 2026-10-29 - source-bound continuous Percent arbitration ([#249](https://github.com/callin2/ghostflow-language/issues/249), [#590](https://github.com/callin2/ghostflow-language/issues/590))
 
 Reference §4.9 now defines named Percent requests and ceilings in an in-control
