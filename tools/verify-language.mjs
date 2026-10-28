@@ -242,6 +242,8 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/two-sensor-provenance.test.mjs',
   'tests/elapsed-epoch-validation.test.mjs',
   'tests/elapsed-snapshot-observation.test.mjs',
+  'tests/elapsed-clock-admission.test.mjs',
+  'tests/elapsed-clock-bounds.test.mjs',
   'tests/bool-sensor-runtime.test.mjs',
   'tests/alarm-observation.test.mjs',
   'tests/software-input-reference.test.mjs',

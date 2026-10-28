@@ -1636,6 +1636,10 @@
     {
       "path": "experiments/elapsed-epoch-validation/fixtures/elapsed-toggle.ghost.md",
       "reason": "Canonical source bytes consumed by the independent elapsed epoch proof reader; not a translated reading projection."
+    },
+    {
+      "path": "experiments/elapsed-clock-bounds/proof-report.md",
+      "reason": "Issue590 bounded mathematical clock proof and explicit runtime and source correspondence limits."
     }
   ]
 }
