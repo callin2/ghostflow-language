@@ -33,7 +33,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     runtime.activate_with_resource_binding(&std::fs::read(&args[1])?, &registry)?;
     let scan = std::fs::read(&args[2])?;
     for frame in &args[3..] {
-        for pair in frame.split(',') {
+        for pair in frame.split(',').filter(|pair| !pair.is_empty()) {
             let (name, value) = pair.split_once('=').ok_or("invalid input pair")?;
             let value = match input_types.get(name) {
                 Some(Type::Bool) => Value::Bool(match value {

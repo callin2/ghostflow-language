@@ -3,6 +3,71 @@
 
 # GFB 바이트코드
 
+## 연속 Percent 자원 봉투 (GFB25)
+
+GFB25는 Reference §4.9의 scalar 연속 자원 profile을 인코딩한다. 전략 하나를 가진
+GFB1/2/3/4 base를 감싸며 temporal, schedule, objective, Bool constraint와 lifecycle
+profile은 허용하지 않는다. 일반 VM transition은 이전 state를 사용한다. 자원 계획은
+같은 입력과 이전 state에서 전용 expression bytecode를 평가한 뒤 모든 최종 Number
+output을 소유한다. 요청과 상한은 actuator output으로 노출하지 않는다.
+
+모든 정수는 little-endian이다. text는 `u16` UTF-8 길이와 bytes다. identity 길이는
+1..128 bytes이며 hash는 소문자 16진수 64자다. blob은 `u32 length`와 bytes다.
+봉투의 필드는 다음과 같다.
+
+1. `GFB1`, format `25:u16`, base blob.
+2. 정식 소스 SHA-256, checked descriptor SHA-256, activation blob.
+3. Policy count `u16`, 최대 8개.
+4. 각 policy: source node ID `u32`, 이름, resource alias, output 이름,
+   selection `u8` (`0=min`, `1=max`), 작성한 safe Percent `f64`, request list,
+   ceiling list.
+5. 각 list: `u16 count`, 각 entry의 source node ID `u32`, 이름, 네 expression blob.
+   순서대로 Bool known tag, Number Percent value, Number SensorFault code,
+   Number origin tag다. fault code는 0=Disconnected, 1=Stale, 2=Invalid,
+   3=NotReady다. 소유자는 known일 때만 value를 평가하고 fault일 때만 reason과
+   origin을 평가한다. 다음 state expression은 허용하지 않는다.
+
+각 policy의 request는 1..16개, ceiling은 0..16개이며 module 전체 entry는 최대
+32개다. source node ID는 0이 아니며 policy와 entry 전체에서 유일하다. 런타임
+identity는 `sourceHash:nodeId`다. 유한 Percent 값은 0..100 범위여야 한다. 각
+output과 bound resource에는 정확히 하나의 policy가 있다. module 크기 상한은
+1 MiB, activation 크기 상한은 64 KiB다.
+
+GFRB2 activation에는 `GFRB`, version `2:u16`, 설치 revision, run ID, binding
+SHA-256, source SHA-256, `u16` resource count와 resource record가 있다.
+record는 alias, stable resource ID, output 이름, Percent를 뜻하는 typed value
+tag `2:u8`다. GFRS2 scan binding에는 `GFRS`, version `2:u16`, binding SHA-256,
+run ID, source SHA-256가 있다. activation은 컴파일한 packet과 정확히 일치해야
+하며 매 scan은 활성 identity와 일치해야 한다. compiler는 canonical 설치 JSON으로
+binding digest를 계산한다. 설치 JSON은 identity와 mapping을 공급하며 expression이나
+policy rule을 담지 않는다.
+
+기존 resource activation과 scan pointer/length export가 새 packet version을
+받는다. GFB17과 GFRB1/GFRS1의 Bool-only 의미는 유지한다. 공통 Rust
+`ResourceBindingRegistry`가 두 profile에 걸쳐 stable resource ID를 예약한다.
+여러 WASM instance나 worker를 쓰는 host는 설치 writer registry를 공유해야 한다.
+참조 bound adapter는 자신의 JavaScript realm을 보호한다.
+
+`continuousResourceTrace`는 tick과 함께 커밋한 Rust 소유 결정을 담는다. 모든
+known/fault entry, 선택값과 동률 ID, 작성한 fallback, 정상 ceiling clamp, 최종값,
+source·binding·run·tick identity를 포함한다. fallback 후에도
+`conditionsKnown=false`는 유지한다. 이 기록은 논리 실행 근거이며 물리 적용이나
+확인을 주장하지 않는다.
+
+집중 개발 검증은 정식 release identity를 할당하지 않고 공통 소유자를 빌드한다.
+
+```sh
+cargo build --locked --offline --release -p ghostflow-core --example resource_tape
+cargo build --locked --offline --release -p ghostflow-wasm --target wasm32-unknown-unknown
+node --test tests/continuous-resource-control.test.mjs
+```
+
+test selector는 `GF-TEST-continuous-resource-compile`,
+`GF-TEST-continuous-resource-parity`, `GF-TEST-continuous-resource-dynamic`,
+`GF-TEST-continuous-resource-atomic`, `GF-TEST-continuous-resource-ceilings`,
+`GF-TEST-continuous-resource-malformed`다.
+정식 검증과 package identity는 별도 gate다.
+
 ## 임시 lifecycle framing
 
 로컬 GFB22 후보는 변경 없는 내부 GFB byte와 검증된 restart descriptor를 감싼다.

@@ -9,7 +9,7 @@ impl ResourceBindingRegistry {
     pub fn new() -> Self {
         Self::default()
     }
-    fn acquire(&self, ids: &BTreeSet<String>) -> Result<Lease> {
+    pub(crate) fn acquire(&self, ids: &BTreeSet<String>) -> Result<Lease> {
         let mut owned = self
             .0
             .lock()

@@ -8,6 +8,7 @@ pub mod context_runtime;
 mod context_runtime_tests;
 pub mod context_schedule;
 pub mod context_vm;
+pub mod continuous_resource;
 pub mod controller;
 pub mod cron_schedule;
 pub mod daily_slots;
@@ -195,6 +196,7 @@ pub struct Module {
     true_fors: Option<true_for_vm::TrueForRequirements>,
     objective: Option<objective_vm::ObjectiveDescriptor>,
     resource_policy: Option<resource_constraints::Plan>,
+    continuous_resource: Option<continuous_resource::ContinuousResourcePlan>,
     lifecycle: Option<LifecycleDescriptor>,
 }
 
@@ -271,6 +273,26 @@ impl Module {
                 restart_reason_members: reason_members,
                 restart_event_input: event_name,
             });
+            module.fingerprint = fingerprint;
+            return Ok(module);
+        }
+        if format_version == 25 {
+            let length = reader.u32()? as usize;
+            if length > MAX_MODULE_BYTES {
+                return Err(Error::new("continuous base byte limit"));
+            }
+            let inner = reader.take(length)?;
+            if inner.get(..4) != Some(&b"GFB1"[..]) || !matches!(inner.get(4..6), Some([1..=4, 0]))
+            {
+                return Err(Error::new("continuous wrapper requires scalar GFB base"));
+            }
+            let mut module = Self::load(inner)?;
+            let plan = continuous_resource::ContinuousResourcePlan::read(&mut reader, &mut module)?;
+            if !reader.finished() {
+                return Err(Error::new("trailing continuous wrapper bytes"));
+            }
+            module.continuous_resource = Some(plan);
+            module.format_version = 25;
             module.fingerprint = fingerprint;
             return Ok(module);
         }
@@ -874,6 +896,7 @@ impl Module {
             true_fors,
             objective,
             resource_policy: None,
+            continuous_resource: None,
             lifecycle: None,
         })
     }
@@ -891,6 +914,9 @@ impl Module {
         self.format_version
     }
     pub fn requires_percent_range_v1(&self) -> Result<bool> {
+        if self.continuous_resource.is_some() {
+            return Ok(true);
+        }
         for strategy in &self.strategies {
             for expression in strategy
                 .transitions
@@ -1078,6 +1104,7 @@ pub const MAX_EXPLANATION_INSTRUCTIONS: usize = 8192;
 pub struct TickRecord {
     pub module_fingerprint: u64,
     pub resource_trace: Vec<resource_constraints::Observation>,
+    pub continuous_resource_trace: Vec<continuous_resource::ContinuousResourceDecision>,
     pub tick: u64,
     pub strategy: String,
     pub inputs: NamedValues,
@@ -1162,7 +1189,10 @@ impl Runtime {
     }
     pub fn install(&mut self, module: Module, preserve_state: bool) {
         self.instruction_witnesses_enabled = false;
-        if module.resource_policy.is_some() || self.resource_guard.is_some() {
+        if module.resource_policy.is_some()
+            || module.continuous_resource.is_some()
+            || self.resource_lease.is_some()
+        {
             self.journal.clear();
             self.next_tick = 1;
         }
@@ -1204,7 +1234,10 @@ impl Runtime {
         self.last_time_ms = None;
     }
     pub fn hot_swap(&mut self, module: Module) -> Result<()> {
-        if module.resource_policy.is_some() || self.resource_guard.is_some() {
+        if module.resource_policy.is_some()
+            || module.continuous_resource.is_some()
+            || self.resource_lease.is_some()
+        {
             return Err(Error::new(
                 "resource hot swap requires explicit binding activation",
             ));
@@ -1288,7 +1321,7 @@ impl Runtime {
         if self
             .module
             .as_ref()
-            .is_some_and(|m| m.resource_policy.is_some())
+            .is_some_and(|m| m.resource_policy.is_some() || m.continuous_resource.is_some())
         {
             return Err(Error::new("resource activation requires immutable binding"));
         }
@@ -1318,8 +1351,18 @@ impl Runtime {
         bytes: &[u8],
         registry: &resource_constraints::ResourceBindingRegistry,
     ) -> Result<()> {
-        if self.resource_guard.is_some() {
+        if self.resource_lease.is_some() {
             return Err(Error::new("resource runtime already activated"));
+        }
+        if let Some(plan) = self
+            .module
+            .as_ref()
+            .and_then(|m| m.continuous_resource.as_ref())
+        {
+            let lease = plan.activate(bytes, registry)?;
+            self.activate_inner()?;
+            self.resource_lease = Some(lease);
+            return Ok(());
         }
         let plan = self
             .module
@@ -2000,6 +2043,14 @@ impl Runtime {
                     resource_binding
                         .ok_or_else(|| Error::new("resource tick requires immutable binding"))?,
                 )?;
+        } else if let Some(plan) = &m.continuous_resource {
+            if self.resource_lease.is_none() {
+                return Err(Error::new("continuous runtime is not activated"));
+            }
+            plan.validate_scan(
+                resource_binding
+                    .ok_or_else(|| Error::new("continuous tick requires immutable binding"))?,
+            )?;
         } else if resource_binding.is_some() {
             return Err(Error::new("not a bound resource module"));
         }
@@ -2255,7 +2306,17 @@ impl Runtime {
                 Value::Number(stage.result.safe_percent),
             );
         }
+        let continuous_resource_trace = if let Some(plan) = &m.continuous_resource {
+            let (continuous_requested, continuous_safe, decisions) =
+                plan.stage(&iv, &self.state, self.next_tick, &mut result_trace)?;
+            requested = continuous_requested;
+            safe = continuous_safe;
+            decisions
+        } else {
+            vec![]
+        };
         let rec = TickRecord {
+            continuous_resource_trace,
             resource_trace,
             module_fingerprint: m.fingerprint,
             tick: self.next_tick,
@@ -4144,6 +4205,7 @@ mod tests {
             format_version: 2,
             objective: None,
             resource_policy: None,
+            continuous_resource: None,
             lifecycle: None,
             name: "int-atomicity".into(),
             version: 1,
@@ -4521,6 +4583,7 @@ mod tests {
         assert!(rule.final_evaluation.satisfied);
         let encoded = TickRecord {
             resource_trace: vec![],
+            continuous_resource_trace: vec![],
             module_fingerprint: 0,
             tick: 1,
             strategy: "test".into(),

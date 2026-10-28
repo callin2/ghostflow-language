@@ -689,7 +689,67 @@ resource_policy shared_pump for pump1 {
 
 The first surface uses a `session` lease. `concurrency` is a positive static integer at or below capability bounds. `reserve_all` admits only when lease and required budgets can all be acquired from the same snapshot. Queue must be one of `reject`, `fifo(max:N, expires_after:D, tie:request_id)` or `authority_then_fifo(max:N, expires_after:D, tie:request_id)`. `N` and `D` are positive. FIFO key is durable accept position; ties use stable request ID byte order. Overflow and expiry are explicit occurrences with no hidden retry.
 
-Specify preemption as `never` or `higher_authority(cleanup: required, resume: requeue|cancel)`. Here `requeue|cancel` denotes syntax alternatives; actual source uses one. Preemption does not bypass cleanup, stop evidence or safety constraints. Explicitly select a continuous-request policy of `exclusive`, `highest_authority`, `min` or `max` on the resource; trace policy revision and all requests.
+Specify preemption as `never` or `higher_authority(cleanup: required, resume: requeue|cancel)`. Here `requeue|cancel` denotes syntax alternatives; actual source uses one. Preemption does not bypass cleanup, stop evidence or safety constraints.
+
+### Continuous Percent requests and ceilings
+
+One control declares named requests for a `ContinuousActuator<Percent>` resource.
+Its policy is the sole writer of the corresponding Percent output.
+
+```ghost
+control Vent {
+  resource vent: ContinuousActuator<Percent>;
+  output vent_target: Percent;
+  let temperature_demand = 70%;
+  let humidity_demand = 40%;
+  let wind_limit = 20%;
+  resource_policy P for vent {
+    select = max;
+    requests { temperature = temperature_demand; humidity = humidity_demand; }
+    ceilings { wind = wind_limit; }
+    safe = 0%;
+    on_unknown = safe;
+    output = vent_target;
+  }
+}
+```
+
+`select` is `min` or `max`. Each request and ceiling is a `Percent` or
+`Result<Percent, SensorFault>` expression evaluated against the same input
+snapshot and previous state. Next-state references are rejected. Select the
+minimum or maximum of all known requests, then clamp it to the minimum known
+ceiling. The example selects 70%, clamps at 20%, and produces a final safe intent
+of 20%. Equal values select the first request in ascending source node ID order
+and record every tied request ID. Reordering source creates a new source revision.
+
+If any request or ceiling faults, the required `on_unknown = safe` uses the
+authored constant `safe` as the candidate. Known ceilings still clamp this
+fallback. A fault request does not become 0%; a fault ceiling does not become
+100%. The decision retains its reason and origin and sets `conditionsKnown` to
+false. `selected` is null when any request faults. If every request is known but
+a ceiling faults, the decision retains the selected request value and applies
+the fallback. The example's 0% is an authored choice, not a universal physical
+safety value.
+
+Each policy has 1..16 requests and 0..16 ceilings. A control has at most eight
+policies and 32 total request/ceiling entries. Each resource and output belongs
+to exactly one policy. A separate `<-` writer and `exclusive` or
+`highest_authority` selection are rejected. Composition with objective/PID,
+adaptation, schedules, temporal operations, accounting, or Bool resource policy
+requires a separate integration contract. This profile does not establish PID
+final-value tracking or aggregate anti-windup.
+
+Canonical source produces the existing checked policy descriptor. Execution
+requires GFB25 compiled with an explicit typed installation binding. The Rust
+scan owner commits every request and ceiling, selection and ties, fallback,
+clamp and final value, source SHA-256 and node IDs, and binding and run/tick IDs
+in its decision. Invalid numeric ranges, packets, or identities reject before
+state and journal commit. The final logical output is separate from applied
+and confirmed evidence.
+
+**Why:** Intent and constraint reasons must remain explainable in the same
+execution record. Unknown information cannot silently become a normal value,
+and another output writer cannot overwrite the final limit.
 
 ## 4.10 Modes and live settings
 

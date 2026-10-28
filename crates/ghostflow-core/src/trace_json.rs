@@ -356,6 +356,16 @@ pub(crate) fn record(out: &mut impl Write, r: &TickRecord) -> fmt::Result {
     }
     certified_traces(out, r)?;
     context_traces(out, r)?;
+    if !r.continuous_resource_trace.is_empty() {
+        out.write_str(",\"continuousResourceTrace\":[")?;
+        for (index, decision) in r.continuous_resource_trace.iter().enumerate() {
+            if index > 0 {
+                out.write_char(',')?;
+            }
+            decision.write_json(out)?;
+        }
+        out.write_char(']')?;
+    }
     if !r.resource_trace.is_empty() {
         out.write_str(",\"resourceTrace\":[")?;
         for (index, trace) in r.resource_trace.iter().enumerate() {
@@ -475,6 +485,7 @@ mod tests {
     fn shared_writer_preserves_escaped_schema_and_propagates_sink_failure() {
         let r = TickRecord {
             resource_trace: vec![],
+            continuous_resource_trace: vec![],
             module_fingerprint: 1,
             tick: 2,
             strategy: "λ\"\\\n\u{1}".into(),

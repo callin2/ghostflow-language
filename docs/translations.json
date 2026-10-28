@@ -264,8 +264,8 @@
       "source": "docs/BYTECODE.md",
       "sourceLanguage": "en",
       "translation": "docs/BYTECODE.ko.md",
-      "sourceSha256": "cbe51119a2a9e9783da65146dbb08cee2840fa334b27e8975f338643007d0bec",
-      "translationSha256": "867d6070904356f1b2ba710e9accee4ad789d907a7eecd8a903a169e1eada197"
+      "sourceSha256": "160ecd9ec0db5aa9d8626d7d1320ee1c9575a0cc6e519871eddfb36f62fb7db6",
+      "translationSha256": "acb103bf7d28c4f762cf89db6b9e42b6a8edb21e94763cfd3ac90f90123ea470"
     },
     {
       "source": "docs/COMPILER-DIAGNOSTICS.md",
@@ -495,8 +495,8 @@
       "source": "docs/reference/04-sensors-constraints-control.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/04-sensors-constraints-control.en.md",
-      "sourceSha256": "5d550011a2a452c7b4409d8570573935d51b36937e1a333fc458b8562281844d",
-      "translationSha256": "e3490a29be347e545b50c6ba9855cbb28b67b47de473f819bd691b6f8d16e7aa"
+      "sourceSha256": "86163f0b5bdc504c02bdacf101110a1123550ace497df00c15c480a5150ba5d0",
+      "translationSha256": "058208dcaf76ff13cf20937e2c57ed34e95d6f9678131d24078dd945f75ca499"
     },
     {
       "source": "docs/reference/05-settings-and-observation.md",
@@ -705,8 +705,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "b3e2a153c9a4f77eacbaa37edc04db5677f43e57a6d0326d5eae00aefb5fb148",
-      "translationSha256": "640ec6fe9623207afb3e7fe54fe0218218cd1ee69fb73c733a4946cc6e3afc23"
+      "sourceSha256": "5d3baba02f529c101e138df2fd28bc3feea046630ff2fab521e99e1701cd871d",
+      "translationSha256": "53a4bd951284ae2ea3757634203311c7a74d31ef9e4f6d7f40c7d2eff1f2332f"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",

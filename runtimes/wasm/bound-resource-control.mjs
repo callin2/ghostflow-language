@@ -23,7 +23,7 @@ export class BoundResourceControlRuntime {
     try {
       runtime = await FramedGhostFlowRuntime.instantiate(wasmBytes);
       runtime.load(checked.bytes);
-      for (const output of checked.manifest.outputs) runtime.addCapability('actuator', output.name, 'bool');
+      for (const output of checked.manifest.outputs) runtime.addCapability('actuator', output.name, output.type === 'Percent' ? 'number' : 'bool');
       runtime.activateResourceBinding(checked.resourceBindingActivation);
       return new BoundResourceControlRuntime(runtime, checked, identities, owner, creation);
     } catch (error) {
