@@ -167,7 +167,7 @@ test('context and scalar timer validation retain strict continuous and elapsed d
   }
 });
 
-test('REF-03-021 partial: a twenty-second blocked request remains distinct from safe output and applied evidence', async t => {
+test('REF-03-021: a twenty-second blocked request retains requested and safe producer evidence', async t => {
   assert.match(reference('REF-03-021').given, /20초.*safe=false/);
   const artifact = await compile(`control Blocked {
     config marker: Bool = true; input manual, low_water: Bool;
@@ -180,10 +180,11 @@ test('REF-03-021 partial: a twenty-second blocked request remains distinct from 
     assert.equal(row.outcome.trace.safe.pump, false);
   }
   for (const stage of ['requested', 'safe', 'confirmed']) {
-    await assert.rejects(compile(`control Unsupported { resource pump: BoolActuator;
-      account usage = on_time(pump, stage: ${stage}, persistence: durable); }`), /executable accounting requires durable applied/);
+    const accounting = await compile(`control Observed { resource pump: BoolActuator;
+      account usage = on_time(pump, stage: ${stage}, persistence: durable); }`);
+    assert.equal(accounting.manifest.accounting.bindings[0].evidenceBinding.stage, stage);
   }
-  t.diagnostic('Remaining REF-03-021 clauses: executable safe accounting and confirmed flow Result/feedback-quality binding are absent; safe false is not a measured safe ledger.');
+  t.diagnostic('Stage usage and missing-feedback accounting are exercised through the actual Rust owner in stage-accounting-control.test.mjs; positive physical confirmation remains outside this observation profile.');
 });
 
 test('REF-03-026: Pulse misses, Window admits first true once, and Tide Run retains its monotonic deadline', async t => {
@@ -456,7 +457,9 @@ test('REF-04-055 partial: applied ledger counts only five seconds of merged phys
   assert.equal(ledger.usedLocalDay(7, 0), 5000n);
   assert.equal(ledger.usedRolling(7, 10_000n, 10_000n), 5000n);
   await appliedParity(t, source, ledger, [[5000, 9000], [7000, 10_000]], 10_000, 10_000);
-  await assert.rejects(compile(`control NoConfirmedFlow { resource pump: BoolActuator;
-    account physical_flow = on_time(pump, stage: confirmed, persistence: durable); }`), /executable accounting requires durable applied/);
+  await assert.rejects(AccountingRuntime.instantiateSource(wasm, document(`control NoConfirmedFlow { resource pump: BoolActuator;
+    account physical_flow = on_time(pump, stage: confirmed, persistence: durable); }`), {
+    filename: 'no-confirmed-flow.ghost.md', account: 'physical_flow', resourceId: 7, config,
+  }), /unsupported accounting stage/);
   t.diagnostic('Remaining REF-04-055 clauses: Device driver evidence must bind queue/block/apply lifecycle to receipts; executable confirmed-flow Result with feedback quality is absent.');
 });

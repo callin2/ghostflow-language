@@ -195,7 +195,7 @@ test('REF-03-020: source-bound native and WASM rolling ledgers integrate regular
   await assert.rejects(AccountingRuntime.instantiateSource(wasmBytes, source, { filename, account: 'missing', resourceId: 7, config: ledgerConfig }), /no accounting account/);
   await assert.rejects(AccountingRuntime.instantiateSource(wasmBytes, source.replace('stage: applied', 'stage: safe'), {
     filename, account: binding.name, resourceId: 7, config: ledgerConfig,
-  }), /applied|unsupported accounting stage/);
+  }), /scan stage accounting requires|unsupported accounting stage/);
   for (const [mutate, reason] of [
     [request => { request.account = 'missing'; }, /unknown source account/],
     [request => { request.target = 'other'; }, /source target mismatch/],
@@ -315,7 +315,7 @@ test('REF-04-046: checked source native/WASM ledgers merge applied overlap while
   }
   await assert.rejects(AccountingRuntime.instantiateSource(wasmBytes, source.replace('stage: applied', 'stage: safe'), {
     filename, account: 'applied', resourceId: 7, config,
-  }), /applied|unsupported accounting stage/);
+  }), /scan stage accounting requires|unsupported accounting stage/);
 });
 
 test('REF-04-056: checked source native/WASM once, day and rolling histories survive fresh-owner restart independently', async t => {
@@ -627,7 +627,7 @@ control Accounting {
   }), /eventType is required/);
   await assert.rejects(AccountingRuntime.instantiateSource(wasmBytes, source.replace('stage: applied', 'stage: requested'), {
     filename, account: 'applied', resourceId: 7, config,
-  }), /executable accounting requires durable applied/);
+  }), /scan stage accounting requires/);
   await assert.rejects(AccountingRuntime.instantiateSource(wasmBytes, source.replace('persistence: durable', 'persistence: volatile'), {
     filename, account: 'applied', resourceId: 7, config,
   }), /executable accounting requires durable applied/);

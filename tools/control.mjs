@@ -1655,16 +1655,22 @@ class Lowerer {
       const bindings = this.manifest.accounts ?? [];
       const constraints = this.manifest.accountingConstraints ?? [];
       if (!bindings.length || bindings.some(binding => binding.persistence !== 'durable'
-        || binding.operation === 'on_time' && binding.evidenceBinding.stage !== 'applied'
         || binding.operation === 'count_events' && binding.basis.kind !== 'local_day')
         || constraints.some(group => group.limits.some(limit => limit.basis.kind !== 'rolling' || limit.operator !== '<='))) {
         error(this.ast.loc, 'executable accounting requires durable applied/local_day bindings and <= rolling limits');
       }
       this.manifest.accounting = { bindings, constraints };
+      if (bindings.some(binding => binding.operation === 'on_time' && binding.evidenceBinding.stage !== 'applied')
+        && (bindings.some(binding => binding.operation !== 'on_time' || this.resources.get(binding.evidenceBinding.target) !== 'BoolActuator')
+          || constraints.length)) {
+        error(this.ast.loc, 'scan stage accounting requires BoolActuator on_time observation accounts without limits');
+      }
       delete this.manifest.accounts;
       delete this.manifest.accountingConstraints;
     }
-    if (contextForms.length || accountingExecution) this.manifest.format = 'GhostFlow/control-v10';
+    const scanStageAccounting = accountingExecution && this.manifest.accounting.bindings.some(binding =>
+      binding.operation === 'on_time' && binding.evidenceBinding.stage !== 'applied');
+    if (contextForms.length || accountingExecution && !scanStageAccounting) this.manifest.format = 'GhostFlow/control-v10';
     else if (solarForms.some(form => form[0] === 'daily-slots-pulse')) this.manifest.format = 'GhostFlow/control-v8';
     else if (solarForms.some(form => form[0] === 'daily-pulse')) this.manifest.format = 'GhostFlow/control-v7';
     if (this.manifest.schedules.some(schedule => typeof schedule.policy?.clock === 'object'
@@ -1896,7 +1902,8 @@ class Lowerer {
       if (!over || over.kind !== 'call' || !['local_day', 'rolling'].includes(over.name)) error(item.loc, 'count_events requires over: local_day(...) or rolling(...)');
     }
     const evidenceBinding = call.name === 'on_time'
-      ? { kind: 'applied_interval', target: first.name, stage: stage.name, identity: 'receipt_id' }
+      ? { kind: stage.name === 'applied' ? 'applied_interval' : stage.name === 'confirmed' ? 'feedback_interval' : 'scan_interval',
+        target: first.name, stage: stage.name, identity: stage.name === 'applied' ? 'receipt_id' : stage.name === 'confirmed' ? 'feedback_id' : 'run_scan_id' }
       : { kind: 'typed_event', target: first.name, identity: 'event_id' };
     const basis = call.name === 'count_events' ? this.accountingBasis(named.get('over'), item.loc) : undefined;
     let resultInputs;

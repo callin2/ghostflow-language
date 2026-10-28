@@ -136,6 +136,42 @@ export class FramedGhostFlowRuntime {
     this.#check(this.wasm.gf_frame_enable_instruction_witnesses(this.handle));
   }
 
+  activateStageAccounting(bytes) {
+    this.#bytes(bytes, (p, n) => this.#check(this.wasm.gf_frame_stage_activate(this.handle, p, n)));
+  }
+
+  restoreStageAccounting(bytes) {
+    this.#bytes(bytes, (p, n) => this.#check(this.wasm.gf_frame_stage_restore(this.handle, p, n)));
+  }
+
+  stageAccountingSnapshot() {
+    this.#live();
+    this.#check(this.wasm.gf_frame_stage_snapshot(this.handle));
+    const ptr = this.wasm.gf_frame_stage_snapshot_ptr(this.handle), len = this.wasm.gf_frame_stage_snapshot_len(this.handle);
+    return { bytes: new Uint8Array(this.wasm.memory.buffer, ptr, len).slice(), revision: this.wasm.gf_frame_stage_revision(this.handle) };
+  }
+
+  acknowledgeStageAccounting(revision) {
+    this.#live();
+    if (typeof revision !== 'bigint' || revision < 0n || revision > 0xffff_ffff_ffff_ffffn) throw new TypeError('stage accounting revision must be u64 BigInt');
+    this.#check(this.wasm.gf_frame_stage_acknowledge(this.handle, revision));
+  }
+
+  stageAccountingGap() {
+    this.#live();
+    this.#check(this.wasm.gf_frame_stage_gap(this.handle));
+  }
+
+  stageAccountingQuery(account, run, start, end) {
+    this.#live();
+    for (const value of [start, end]) if (typeof value !== 'bigint' || value < 0n || value > 0xffff_ffff_ffff_ffffn) throw new TypeError('stage accounting query time must be u64 BigInt');
+    this.#bytes(identifier(account, 'account'), (ap, an) => this.#bytes(identifier(run, 'run'), (rp, rn) =>
+      this.#check(this.wasm.gf_frame_stage_query(this.handle, ap, an, rp, rn, start, end))));
+    const ptr = this.wasm.gf_frame_stage_query_ptr(this.handle), len = this.wasm.gf_frame_stage_query_len(this.handle);
+    const result = JSON.parse(decoder.decode(new Uint8Array(this.wasm.memory.buffer, ptr, len)));
+    return result.kind === 'Known' ? { ...result, usedMs: BigInt(result.usedMs) } : result;
+  }
+
   dispose() {
     if (this.handle) this.wasm.gf_frame_destroy(this.handle);
     this.handle = 0;
