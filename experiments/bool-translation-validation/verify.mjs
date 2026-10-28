@@ -8,6 +8,8 @@ import { compileEvidence, sha256, theoremInput, validateArtifact, wireBytes } fr
 import { pcTheoremInput } from './pc-bridge.mjs';
 import { pcErrorCases, pcMutations } from './pc-cases.mjs';
 import { serializerTheoremInput } from './serializer-bridge.mjs';
+import { moduleTheoremInput } from './module-bridge.mjs';
+import { moduleCases } from './module-cases.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url)), root = resolve(here, '../..');
 const now = () => new Date().toISOString();
@@ -35,7 +37,10 @@ export async function verify({ lean, evidenceDir }) {
   const directory = resolve(evidenceDir), reportPath = join(directory, 'verification.json');
   await mkdir(directory, { recursive: true });
   const report = { schemaVersion: 1, status: 'running', startedAt: now(), productionCompilerProof: false,
-    scope: 'Bool translation, simultaneous tick, byte-PC execution and bounded serialization/decoder equivalence, all valuations', results: [], artifacts: [] };
+    scope: 'Bool translation, whole canonical module binding, simultaneous tick, byte-PC execution and bounded serialization/decoder equivalence, all valuations',
+    wholeModuleTrust: ['production source parser and typed projection', 'Lean kernel and standard logical foundations',
+      'canonical module model and byte-PC model correspondence to production Rust remain unproved'],
+    results: [], artifacts: [] };
   const publish = async () => {
     await writeFile(`${reportPath}.tmp`, JSON.stringify(report, null, 2) + '\n');
     await rename(`${reportPath}.tmp`, reportPath);
@@ -93,6 +98,10 @@ export async function verify({ lean, evidenceDir }) {
       '(111111, true, true)\n(156, true, true)');
     await run('DecoderSoundness', soundnessModel, true, undefined, 'DecoderSoundness.olean');
     await run('decoder-soundness-boundaries', `import DecoderSoundness\n${decoderSoundnessCases}`, true);
+    const moduleModel = await readFile(join(here, 'ModuleEnvelope.lean'), 'utf8');
+    requireArgument(!/\b(sorry|axiom|native_decide)\b/.test(moduleModel), 'prohibited module proof escape');
+    await run('ModuleEnvelope', moduleModel, true, undefined, 'ModuleEnvelope.olean');
+    await run('module-envelope-boundaries', `import ModuleEnvelope\n${moduleCases}`, true);
     const compiled = [];
     for (const name of fixtureNames) {
       const filename = `experiments/bool-translation-validation/fixtures/${name}.ghost.md`;
@@ -106,7 +115,53 @@ export async function verify({ lean, evidenceDir }) {
       await run(name, theoremInput(evidence), true);
       await run(`${name}-pc`, pcTheoremInput(evidence), true);
       await run(`${name}-serializer`, serializerTheoremInput(evidence), true);
+      await run(`${name}-module`, moduleTheoremInput(evidence), true);
     }
+    const noDecoded = structuredClone(compiled[0]);
+    delete noDecoded.decoded;
+    assert.equal(moduleTheoremInput(noDecoded), moduleTheoremInput(compiled[0]));
+    noDecoded.decoded = { states: [], transitions: [{ target: 999, offset: 999, length: 999 }], inputCountOffset: 999, stateCountOffset: 999 };
+    for (const entry of [...noDecoded.projection.transitions, ...noDecoded.projection.outputs]) {
+      entry.target = 999; entry.offset = 999; entry.length = 999; entry.countOffset = 999;
+    }
+    assert.equal(moduleTheoremInput(noDecoded), moduleTheoremInput(compiled[0]));
+    await run('module-ignores-decoded-witness', moduleTheoremInput(noDecoded), true);
+    const frozenWitness = structuredClone(compiled[0]);
+    frozenWitness.artifact.bytes[frozenWitness.decoded.transitions[1].targetOffset] = 0;
+    assert.throws(() => validateArtifact(frozenWitness.projection, Uint8Array.from(frozenWitness.artifact.bytes)), /duplicate transition/);
+    await run('old-certificate-accepts-frozen-target-witness', serializerTheoremInput(frozenWitness), true);
+    await run('module-rejects-frozen-target-witness', moduleTheoremInput(frozenWitness), false, falseProposition);
+    const envelopeMutation = async (name, edit) => {
+      const changed = structuredClone(compiled[0]);
+      edit(changed.artifact.bytes, changed.decoded);
+      await run(`module-rejects-${name}`, moduleTheoremInput(changed), false, falseProposition);
+    };
+    const strategyOffset = compiled[0].decoded.states.at(-1).initialOffset + 1;
+    const priorityOffset = strategyOffset + 2 + 2 + 'control'.length;
+    const queryLengthOffset = priorityOffset + 4;
+    const queryOffset = queryLengthOffset + 4;
+    await envelopeMutation('initial-state', (bytes, decoded) => { bytes[decoded.states[0].initialOffset] ^= 1; });
+    await envelopeMutation('module-name', bytes => { bytes[8] = 88; });
+    await envelopeMutation('state-name', (bytes, decoded) => { bytes[decoded.states[0].typeOffset - 1] ^= 1; });
+    await envelopeMutation('state-count', (bytes, decoded) => { bytes[decoded.stateCountOffset]++; });
+    await envelopeMutation('input-count', (bytes, decoded) => { bytes[decoded.inputCountOffset] = 1; });
+    await envelopeMutation('state-type', (bytes, decoded) => { bytes[decoded.states[0].typeOffset] = 2; });
+    await envelopeMutation('strategy-count', bytes => { bytes[strategyOffset] = 2; });
+    await envelopeMutation('strategy-name', bytes => { bytes[strategyOffset + 4] = 88; });
+    await envelopeMutation('priority', bytes => { bytes[priorityOffset] = 1; });
+    await envelopeMutation('query-length', bytes => { bytes[queryLengthOffset]++; });
+    await envelopeMutation('capability-query', bytes => { bytes[queryOffset + 3] = 88; });
+    await envelopeMutation('transition-count', (bytes, decoded) => { bytes[decoded.transitions[0].targetOffset - 2]--; });
+    await envelopeMutation('swapped-targets', (bytes, decoded) => {
+      bytes[decoded.transitions[0].targetOffset] = 1; bytes[decoded.transitions[1].targetOffset] = 0;
+    });
+    await envelopeMutation('expression-length', (bytes, decoded) => { bytes[decoded.outputs[0].offset - 4]++; });
+    await envelopeMutation('output-name', (bytes, decoded) => { bytes[decoded.outputs[0].offset - 6] ^= 1; });
+    await envelopeMutation('output-type', (bytes, decoded) => { bytes[decoded.outputs[0].offset - 5] = 2; });
+    await envelopeMutation('constraints', bytes => { bytes[bytes.length - 2] = 1; });
+    await envelopeMutation('trailing-metadata', bytes => { bytes.push(0); });
+    await envelopeMutation('version', bytes => { bytes[8 + compiled[0].projection.name.length] = 2; });
+    await envelopeMutation('format', bytes => { bytes[4] = 1; });
     for (const mutation of pcMutations) {
       assert.ok(pcModel.includes(mutation.before), `${mutation.name} target drifted`);
       await run(mutation.name, pcModel.replaceAll(mutation.before, mutation.after) + pcErrorCases, false, mutation.diagnostic);

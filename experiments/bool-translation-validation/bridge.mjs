@@ -204,7 +204,7 @@ export function validateArtifact(projected, artifactBytes) {
   return decoded;
 }
 
-function leanExpr(e) {
+export function leanExpr(e) {
   switch (e.kind) {
     case 'literal': return `(.literal ${e.value})`;
     case 'previous': return `(.previous ${e.index})`;
