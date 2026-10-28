@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {readFile,writeFile,mkdtemp,rm} from 'node:fs/promises';
+import {readFile,writeFile,mkdtemp,rm,chmod} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
 import {spawnSync} from 'node:child_process';
@@ -39,5 +39,20 @@ test('runtime failure replaces an earlier passed receipt before provenance reads
     assert.equal(result.status,1);assert.equal(result.signal,null);assert.equal(result.error,undefined);
     const receipt=JSON.parse(await readFile(path,'utf8'));assert.equal(receipt.status,'failed');assert.equal(receipt.executions,undefined);
     assert.match(receipt.error.message,/ENOENT/);assert.ok(receipt.startedAt);assert.ok(receipt.finishedAt);
+  }finally{await rm(directory,{recursive:true,force:true});}
+});
+test('proof receipt is running before the external Lean version probe',async()=>{
+  const directory=await mkdtemp(join(tmpdir(),'epoch-proof-receipt-'));
+  try{
+    const path=join(directory,'verification.json'),marker=join(directory,'observed-status'),probe=join(directory,'lean-version-probe');
+    await writeFile(path,JSON.stringify({status:'passed',results:[{passed:true}]}));
+    await writeFile(probe,`#!/usr/bin/env node\nconst fs=require('node:fs');\nfs.writeFileSync(${JSON.stringify(marker)},JSON.parse(fs.readFileSync(${JSON.stringify(path)},'utf8')).status);\nprocess.exit(1);\n`);
+    await chmod(probe,0o700);
+    const result=spawnSync(process.execPath,[resolve('experiments/elapsed-epoch-validation/verify.mjs'),'--lean',probe,'--evidence-dir',directory],{encoding:'utf8',timeout:30000});
+    assert.equal(result.status,1);assert.equal(result.signal,null);assert.equal(result.error,undefined);
+    assert.equal(await readFile(marker,'utf8'),'running');
+    const receipt=JSON.parse(await readFile(path,'utf8'));
+    assert.equal(receipt.status,'failed');assert.deepEqual(receipt.results,[]);
+    assert.ok(receipt.startedAt);assert.ok(receipt.finishedAt);
   }finally{await rm(directory,{recursive:true,force:true});}
 });

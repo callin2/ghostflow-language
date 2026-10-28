@@ -38,6 +38,7 @@ async function run(name,input,expectedSuccess=true,diagnostic,output=false,targe
   await publish();assert.ok(passed,`${name}: unexpected Lean outcome\n${log}`);
 }
 try{
+  await publish();
   assert.ok(args.includes('--lean'),'--lean required');const version=spawnSync(lean,['--version'],{encoding:'utf8'});assert.equal(version.status,0);assert.match(version.stdout,/version 4\.19\.0/);
   report.lean={version:version.stdout.trim(),sha256:sha256(await readFile(lean))};report.sourceIdentity=await identity();await publish();
   for(const[dir,names]of models)for(const n of names)await run(n,await readFile(join(root,'experiments',dir,`${n}.lean`),'utf8'),true,undefined,true);
