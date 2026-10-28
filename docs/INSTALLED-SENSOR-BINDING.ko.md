@@ -94,8 +94,13 @@ dispatch에 진입하지 않은 수집·설정·context 사전 검사 거절은 
 과거 proof는 바꾸지 않으며 dispatch 실패 후 `explainOutput`에서 현재 근거로 제시할 수 없습니다.
 
 교체는 새 소유자를 완전히 준비한 뒤 게시합니다. 거절된 후보는 설정·overlay·history·
-state·timer·conditioner·최신 완료 결과·assessment를 유지합니다. 성공하면 새 run에서
-state·설정·conditioner를 초기화하고 이전 완료 결과를 지웁니다. 이 한정 경로는
+state·timer·conditioner·최신 완료 결과·assessment를 유지합니다. 성공하면 소유자가 보유한
+설정 checkpoint를 검증해 일반 설정의 Result 값·fault·revision·history를 복원합니다.
+Run overlay는 새 run의 첫 제어 판단 전에 반환하며, Until overlay는 기존 만료 시각과
+유효성 규칙을 유지합니다. 제어 state·timer·conditioner는 새 run에서 초기화하고 이전
+완료 결과를 지웁니다. checkpoint 캡처와 게시 사이에 승인된 설정이 유실되지 않도록
+교체 진행 중 합성 `step`은 거부합니다. 복원 실패 시 기존 소유자를 유지합니다.
+parameter가 포함된 합성 manifest는 여전히 이 한정 호스트 프로필의 범위 밖입니다. 이 경로는
 native/WASM config/timer 검사와 함께 REF-06-002의 지정된 east 상태·설정 변경 독립성 사례를
 충족합니다. 중첩 경로와 인스턴스별 무중단 binding 교체는 이 프로필의 범위 밖입니다.
 REF-06-016은 각 인스턴스의 출력 설명을 정확한 원본 노드·위치·리비전·설정·설치 endpoint

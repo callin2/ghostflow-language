@@ -5,6 +5,16 @@
 
 ## 미출시
 
+### 2026-10-29 - 호환 바인딩 교체 시 설정 유지 ([#295](https://github.com/callin2/ghostflow-language/issues/295), [#590](https://github.com/callin2/ghostflow-language/issues/590))
+
+InstalledControlHost가 호환 센서 바인딩 교체를 승인할 때 자신이 보유한 설정
+체크포인트를 복원합니다. 새 실행에서도 일반 설정의 최신 Result와 설정 리비전을
+유지하며, fault도 보존합니다. Run 오버레이는 새 실행의 첫 scan에서 반환하고
+Until 오버레이는 만료 시각까지 유지합니다. 제어 상태·타이머·센서 관측은 새로
+시작합니다. 교체 실패 시 기존 호스트를 유지하고, 교체 중 합성 scan이 체크포인트
+캡처와 경합하지 못하게 합니다. 근거는 `tests/reference-change-lifecycle.test.mjs`와
+`tests/installed-composition.test.mjs`입니다.
+
 ### 2026-10-29 - 설치된 합성 실행 ([#290](https://github.com/callin2/ghostflow-language/issues/290), [#302](https://github.com/callin2/ghostflow-language/issues/302))
 
 InstalledControlHost가 직접 port를 연결하는 한정 `control-v10` 합성 프로필을 승인하고

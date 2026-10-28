@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### 2026-10-29 - retain settings across compatible binding replacement ([#295](https://github.com/callin2/ghostflow-language/issues/295), [#590](https://github.com/callin2/ghostflow-language/issues/590))
+
+InstalledControlHost now restores its owned settings checkpoint when it accepts
+a compatible sensor binding replacement. The new run retains the latest ordinary
+Result and settings revision, including a fault. A Run overlay returns on the
+first new-run scan; an Until overlay remains until its deadline. The new runtime
+still starts with fresh control state, timers and sensor observations. A failed
+replacement leaves the previous owner intact, and composed scans cannot race
+checkpoint capture during replacement. See `tests/reference-change-lifecycle.test.mjs` and
+`tests/installed-composition.test.mjs`.
+
 ### 2026-10-29 - installed composed execution ([#290](https://github.com/callin2/ghostflow-language/issues/290), [#302](https://github.com/callin2/ghostflow-language/issues/302))
 
 InstalledControlHost admits the bounded direct-port `control-v10` composition

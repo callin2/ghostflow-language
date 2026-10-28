@@ -100,8 +100,15 @@ current through `explainOutput` after a dispatch failure.
 
 Replacement prepares the complete new owner before publication. Rejected
 candidates preserve settings, overlays, history, state, timers, conditioners,
-latest completion and assessment. Success starts fresh state, settings and
-conditioners in a new run and clears previous completions. This bounded path
+latest completion and assessment. Success restores the owner's validated settings
+checkpoint, preserving ordinary Result values, faults, revision and history.
+Run overlays return before the first new-run control decision; Until overlays
+keep their existing deadline and validity rules. Control state, timers and
+conditioners start fresh in the new run, and previous completions are cleared.
+Composed `step` calls are rejected while replacement is pending so no accepted
+setting can be lost between checkpoint capture and publication. Restoration
+failure leaves the previous owner intact. Parameter-bearing composed manifests
+remain outside this bounded host profile. This bounded path
 completes the specified REF-06-002 east-state/settings isolation case together with
 the native/WASM config/timer checks. Nested routes and independent hot binding
 migration are outside this profile. REF-06-016 checks each instance's output explanation
