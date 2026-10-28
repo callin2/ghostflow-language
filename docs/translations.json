@@ -460,8 +460,8 @@
       "source": "docs/ProgrammingInGhostflow.md",
       "sourceLanguage": "ko",
       "translation": "docs/ProgrammingInGhostflow.en.md",
-      "sourceSha256": "916f096043822647cee132c28c2a9b4cd99c7f3c1845de5a7fce0f18f7108c66",
-      "translationSha256": "be74ab93e24d24007849fe47121a4d428f40cff1ff9a5a5ae470ae8a3cffee98"
+      "sourceSha256": "99278cbddd8006a97bea10dac899a0c6061829c1b7644a4eb85d14c087e2fcf4",
+      "translationSha256": "3f970ef71a43c6429b043df4bed4819e9ffe48c1f16cb3a785abb205bc5a8b2b"
     },
     {
       "source": "docs/REFERENCE-QUERY.md",
@@ -1169,6 +1169,13 @@
       "translation": "docs/PROGRAM-REPLACEMENT-HOST.ko.md",
       "sourceSha256": "127859263e8e57267ca07d3d7d5ef5907c0ad5106b157507fe2180373d828684",
       "translationSha256": "8e2c6129a2e4561e8abe90952db8fd26478fb914276b1f7f521da9916ed26ea6"
+    },
+    {
+      "source": "docs/COMPOSED-CONFIG-TIMER.md",
+      "sourceLanguage": "en",
+      "translation": "docs/COMPOSED-CONFIG-TIMER.ko.md",
+      "sourceSha256": "87dae63380407b77899217daa3db3f7d491c7a025850085bc20cbfe9b76b4731",
+      "translationSha256": "4e87a153b8433dbc6f38ecb5a70810fcee1cd373e204cd4022766613ba643fe2"
     }
   ],
   "exclusions": [
@@ -1523,6 +1530,10 @@
     {
       "path": "experiments/bool-translation-validation/fixtures/snapshot-branches.ghost.md",
       "reason": "Issue590 proof execution report or exact executable proof fixture; evidence identity is retained in one language."
+    },
+    {
+      "path": "experiments/bool-translation-validation/pc-refinement-report.md",
+      "reason": "Issue590 dated proof execution evidence and explicit trusted boundary; reports may remain in one language."
     }
   ]
 }

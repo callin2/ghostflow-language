@@ -3457,15 +3457,25 @@
                 "negative",
                 "boundary"
               ]
+            },
+            {
+              "path": "tests/composition-config-timer-isolation.test.mjs",
+              "testId": "REF-06-002 live east setting and state change leave west setting and timer independent on native and WASM",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ]
             }
           ]
         }
       ],
       "gaps": [
-        "Executable evidence covers pinned counter instances with distinct sensor suppliers, isolated state and verified definition/instance/binding provenance; imported intent metadata and broader composition cases remain separate contracts."
+        "Pinned composition verifies distinct sensor suppliers and private state/config/timer execution on native and WASM. REF-06-002 remains incomplete for instance-specific binding revisions and composed interaction/descriptor joins; imported intent metadata remains unsupported."
       ],
       "issues": [
-        195
+        195,
+        290
       ],
       "referenceCaseIds": [
         "REF-00-010"

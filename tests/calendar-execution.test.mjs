@@ -64,7 +64,7 @@ test('Holiday and farm working-day schedules share context execution, while At r
     gap = skip_after(60s); recovery = baseline; fallback = skip;
   }`;
   await assert.rejects(() => compileSource(program().replace('  output due:', `${atSchedule}\n  output due:`)),
-    /At pulse execution cannot mix/);
+    /At execution cannot mix/);
 });
 
 test('Holiday tag cannot masquerade as the existing WorkCalendar selector', () => {

@@ -1579,6 +1579,7 @@ provider는 관측·예측을 공급한다. 프로그램은 무엇을 허용할�
 | `skip_after` | `skip_after(Duration)`: 허용 관측 공백 제한 | schedule gap 필드; 더 큰 공백에는 명시적 skip/baseline 정책 사용. [정책](../tests/periodic-cron-policy.test.mjs). |
 | `range` | `range(Duration)`: 계획된 구간 | schedule basis; 비중첩 증명과 명시적 cancel_when 필요. 고정 UTC 구간은 제한된 실행 경로를 지원하며 일반 민간시 구간은 descriptor 범위다. [Range 계약](../tests/schedule-descriptor-artifact.test.mjs). |
 | `run` | `run(Duration, within(Duration))`: 승인부터 Tide 운전 | Tide basis; 첫 Duration은 운전 길이. 유예 구간 안에서 첫 승인 필요. [Tide](../tests/natural-schedule-contract.test.mjs). |
+| `window` | `window(Duration)`: At의 한 번짜리 접수 구간 | 고정 At의 반열린 구간에서 처음 자격을 갖춘 scan이 `.due`를 낸다. `.open`은 현재 조건이며 이미 접수하거나 놓친 occurrence를 다시 시작하지 않는다. [At Window](../tests/reference-foundations-temporal.test.mjs). |
 | `within` | `within(Duration)`: Tide 승인 유예 | Tide run의 둘째 인자 전용; [planned,planned+grace), 정확한 끝 제외. 운전 길이를 늘리지 않는다. [Tide](../tests/natural-schedule-contract.test.mjs). |
 | `hold_trusted` | `hold_trusted(Duration, terminal: skip)`: 제한된 신뢰 시각 보류 | Solar/Tide clock 필드; 양수 상수, 이전 신뢰 근거와 run/time 연속성 필요. 정확한 만료 경계는 skip. E36. [Execution](../tests/programming-natural-examples.test.mjs). |
 | `fixed_time` | `fixed_time(TimeOfDay literal, terminal: skip)`: 고정 시각 fallback | Solar fallback 전용; 상수 TimeOfDay literal과 명시적 terminal skip. Tide로 옮기지 않는다. E36/E101. [Execution](../tests/programming-natural-examples.test.mjs). |

@@ -35,6 +35,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/CHECKED-CONSTRAINT-REPLACEMENTS.md](CHECKED-CONSTRAINT-REPLACEMENTS.md) | Checked constraint replacements | md |
 | [docs/COMPILER-DIAGNOSTICS.ko.md](COMPILER-DIAGNOSTICS.ko.md) | 공개 컴파일러 진단 | md |
 | [docs/COMPILER-DIAGNOSTICS.md](COMPILER-DIAGNOSTICS.md) | Public compiler diagnostics | md |
+| [docs/COMPOSED-CONFIG-TIMER.ko.md](COMPOSED-CONFIG-TIMER.ko.md) | 조합된 control의 config·timer 격리 | md |
+| [docs/COMPOSED-CONFIG-TIMER.md](COMPOSED-CONFIG-TIMER.md) | Config and timer isolation in composed controls | md |
 | [docs/CONSTRAINTS.en.md](CONSTRAINTS.en.md) | GhostFlow common constraints and sensor signal contract | md |
 | [docs/CONSTRAINTS.md](CONSTRAINTS.md) | GhostFlow 공통 제약과 센서 신호 계약 | md |
 | [docs/CONTEXT-EXECUTION-ABI.ko.md](CONTEXT-EXECUTION-ABI.ko.md) | 컨텍스트 실행 ABI | md |
@@ -273,4 +275,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.ko.md](research/GF-COMPOSE-R9-ACCEPTANCE.ko.md) | GF-COMPOSE R9: acceptance와 구현 인계 | md |
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.md](research/GF-COMPOSE-R9-ACCEPTANCE.md) | GF-COMPOSE R9: acceptance and implementation handoff | md |
 
-234 documents.
+236 documents.

@@ -91,6 +91,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/CHECKED-CONSTRAINT-REPLACEMENTS.md](docs/CHECKED-CONSTRAINT-REPLACEMENTS.md) | Checked constraint replacements | md |
 | [docs/COMPILER-DIAGNOSTICS.ko.md](docs/COMPILER-DIAGNOSTICS.ko.md) | 공개 컴파일러 진단 | md |
 | [docs/COMPILER-DIAGNOSTICS.md](docs/COMPILER-DIAGNOSTICS.md) | Public compiler diagnostics | md |
+| [docs/COMPOSED-CONFIG-TIMER.ko.md](docs/COMPOSED-CONFIG-TIMER.ko.md) | 조합된 control의 config·timer 격리 | md |
+| [docs/COMPOSED-CONFIG-TIMER.md](docs/COMPOSED-CONFIG-TIMER.md) | Config and timer isolation in composed controls | md |
 | [docs/CONSTRAINTS.en.md](docs/CONSTRAINTS.en.md) | GhostFlow common constraints and sensor signal contract | md |
 | [docs/CONSTRAINTS.md](docs/CONSTRAINTS.md) | GhostFlow 공통 제약과 센서 신호 계약 | md |
 | [docs/CONTEXT-EXECUTION-ABI.ko.md](docs/CONTEXT-EXECUTION-ABI.ko.md) | 컨텍스트 실행 ABI | md |
@@ -442,6 +444,7 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 
 | Path | Title | Type |
 | --- | --- | --- |
+| [experiments/bool-translation-validation/pc-refinement-report.md](experiments/bool-translation-validation/pc-refinement-report.md) | Bool byte-PC refinement execution report | md |
 | [experiments/bool-translation-validation/proof-report.md](experiments/bool-translation-validation/proof-report.md) | Bool translation validation execution report | md |
 
 ## experiments/bool-translation-validation/fixtures/
@@ -567,4 +570,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-422 documents.
+425 documents.
