@@ -86,6 +86,13 @@ export async function verify({ lean, evidenceDir }) {
     const { serializerCases, serializerMutations } = await import('./serializer-cases.mjs');
     await run('Serializer', serializerModel, true, undefined, 'Serializer.olean');
     await run('serializer-boundaries', `import Serializer\n${serializerCases}`, true);
+    const soundnessModel = await readFile(join(here, 'DecoderSoundness.lean'), 'utf8');
+    requireArgument(!/\b(sorry|axiom|native_decide)\b/.test(soundnessModel), 'prohibited decoder soundness proof escape');
+    const { decoderSoundnessCases, decoderSoundnessMutations, decoderConverseProbe } = await import('./decoder-soundness-cases.mjs');
+    await run('decoder-converse-premise-search', `import Serializer\n${decoderConverseProbe}`, true,
+      '(111111, true, true)\n(156, true, true)');
+    await run('DecoderSoundness', soundnessModel, true, undefined, 'DecoderSoundness.olean');
+    await run('decoder-soundness-boundaries', `import DecoderSoundness\n${decoderSoundnessCases}`, true);
     const compiled = [];
     for (const name of fixtureNames) {
       const filename = `experiments/bool-translation-validation/fixtures/${name}.ghost.md`;
@@ -107,6 +114,13 @@ export async function verify({ lean, evidenceDir }) {
     for (const mutation of serializerMutations) {
       assert.ok(serializerModel.includes(mutation.before), `${mutation.name} target drifted`);
       await run(mutation.name, serializerModel.replaceAll(mutation.before, mutation.after) + serializerCases, false, mutation.diagnostic);
+    }
+    for (const mutation of decoderSoundnessMutations) {
+      assert.ok(serializerModel.includes(mutation.before), `${mutation.name} target drifted`);
+      const changed = serializerModel.replaceAll(mutation.before, mutation.after);
+      await run(`decoder-roundtrip-insufficient-${mutation.name}`, changed + mutation.witness, true);
+      await run(`rejected-decoder-converse-${mutation.name}`,
+        changed + soundnessModel.replace(/^import Serializer\r?\n/, ''), false, mutation.diagnostic);
     }
     await run('rejected-pc-candidate-absent', 'import ByteMachine\nopen BoolTranslation BoolTranslation.ByteMachine\nexample : inScope (.next 0 rfl : Expr true) ⟨0, 1, false⟩ = true := by decide\n', false, falseProposition);
     await run('rejected-pc-state-bound', 'import ByteMachine\nopen BoolTranslation BoolTranslation.ByteMachine\nexample : inScope (.previous 1 : Expr false) ⟨0, 1, false⟩ = true := by decide\n', false, falseProposition);

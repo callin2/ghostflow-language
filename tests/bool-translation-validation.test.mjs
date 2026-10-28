@@ -37,6 +37,8 @@ test('real canonical compilation binds Bool profile 1 and 3 byte slices and comp
     assert.match(serialized, /theorem outputs0Serialized/);
     assert.match(serialized, /theorem outputs0Recovered : decode true/);
     assert.match(serialized, /theorem transitions0Recovered : decode false/);
+    assert.match(serialized, /theorem outputs0Reserialized/);
+    assert.match(serialized, /decode_serialized false/);
   }
 });
 
