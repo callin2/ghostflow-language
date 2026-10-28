@@ -59,7 +59,7 @@ The full CommonMark reader, production parser and compiler refinement, general i
 Natural-language anchor intent correspondence also remains open.
 This unit changes no production compiler or runtime behavior and claims no hardware execution.
 
-## Verification evidence
+## Worker verification evidence
 
 The final verification receipt and focused test log are recorded in `evidence-summary.json`.
 The final run exits with code 0 after 40 expected Lean outcomes: 23 successful checks and 17 targeted rejections.
@@ -88,6 +88,25 @@ Attempts2 and 3 retained Lean elaboration and final-PC tactic errors.
 Attempt4 checked the generic theorem but exceeded the 180-second limit while compiling a single long Reader declaration.
 Splitting that Reader into header, strategy, and body definitions reduced its profiled compilation to four seconds.
 Attempt5 checked the full artifact execution theorem but rejected an ambiguous generated metadata identifier.
+
+## Integration and receipt recovery
+
+The integration source is `fa6d3b44e04d91636c4568d97525a2d61fd1284c`.
+Its fresh Lean run passed all 40 expected outcomes at `2026-10-28T22:38:48.286Z`.
+All 102 input hashes and the 40 input/log pairs match. The receipt is
+`build/two-sensor-wave16-final-590/verification.json`, SHA-256
+`7c8fe4c16b08d926258bc529c52a6e9200c05ed8179ba208352fee029ebeac1d`.
+The integration runtime run passed the same 500 scans using the separately identified build183 binaries;
+its receipt SHA-256 is `4b8bd469559ccbc582c86b571073083f43e3ddf9355214f2407ee0f736e14d8c`.
+The committed worker evidence summary above remains an unchanged historical record.
+
+A failed runtime recheck previously left an old `passed` receipt in the evidence directory.
+The integration helper atomically writes `running` before input reads and writes `failed` with a
+nonzero exit on error. The reproduced missing-input case is now the eighth focused test.
+Production code and Lean models are unchanged by this receipt fix.
+The final host build190 passed all 15 gates, including 3915 main Node tests, 441 Rust tests,
+15 console tests and 3+8 Python tests; 11 existing Reference TODOs remain open.
+The full integration evidence is recorded in the [work log](../../docs/reports/2026-10-29-unattended-correctness-590.md).
 The corrected standalone certificate then passed with no axioms for the raw read and metadata equalities.
 Its execution theorem depends on `propext` and `Quot.sound`.
 

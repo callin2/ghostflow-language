@@ -609,3 +609,35 @@ receipt SHA-256은 `288f8b6f2d21586f088f8425e062067db60ed940157118bb6f7ca7cfdab8
 
 이 도구 의존성은 실제 Rust 정수 본문 증명만 막는다. 두 입력의 오류 출처 연결과
 `elapsed(state)` 시작 시각 전이 검증은 독립 단위로 계속 진행한다. 전체 compiler 증명은 열려 있다.
+
+## build190: 두 입력의 독립 회복과 오류 출처
+
+두 Bool 입력이 각자 `recover(false)`를 거쳐 자기 출력으로 연결되는373바이트 실제 GFB를
+검증했다. 여섯 입력 slot, 두45바이트 식, 전체 module 소비 및 trace metadata를 묶었다.
+모든 두 입력 Reading과 오래된 payload 조합에 대해 각각의 출력 식이 자기 입력의 값과
+오류 출처만 사용한다는 명제가 Lean 커널을 통과했다. 기존 `SensorMachine`과 trace 용량1은
+변경하지 않았다. 식마다 새 trace로 평가하는 정리이며 전체 scan collector의 증명은 아니다.
+
+최종 소스는 `fa6d3b44e04d91636c4568d97525a2d61fd1284c`다. Lean40회(성공23·목표 정리
+거절17)가 `2026-10-28T22:38:48.286Z`에 exit0으로 끝났고102개 입력 해시가 일치했다.
+receipt SHA-256은 `7c8fe4c16b08d926258bc529c52a6e9200c05ed8179ba208352fee029ebeac1d`이며
+`build/two-sensor-wave16-final-590/`에 있다. 각 slot·site·origin 교환과 source 변경은
+구조적으로 유효한 module임을 먼저 확인한 후 정확한 목표 등식에서 거절했다. 별도 metadata와
+원본 바이트 변이도 해당 정리에서 거절했다. 독립 검토는 증명 입력·로그·해시와 경계를 확인했다.
+
+build183 바이너리를 실제 Rust/Cargo100개 및 바이너리 해시로 확인해 재사용했다. 입력100조합을
+native·WASM·framed·canonical·canonical framed의5경로에서 실행한500scan이 요청·안전 값,
+두 event와 센서 출처에 일치했다. 관측 시각은 `2026-10-28T22:36:44.438Z`, runtime receipt
+SHA-256은 `4b8bd469559ccbc582c86b571073083f43e3ddf9355214f2407ee0f736e14d8c`다.
+새 runtime build, 물리 장치 시험 또는 전체 Rust 의미 대응 증명으로 세지 않는다.
+
+검토 중 runtime helper의 실패 재실행이 과거 passed 파일을 남기는 반례를 재현했다.
+시작 시 running·실패 시 failed를 원자적으로 기록하도록 수정하고 회귀 검사를 추가했다.
+수정 전 build188와 Lean/관측 기록은 보존했고, 최종 소스로 위 검증을 다시 실행했다.
+
+공식 build190은 `2026-10-28T22:42:52.581Z`에 exit0으로 끝났다.15 gate, Rust441,
+주 Node3915 pass /11 TODO /0 fail, console15, Python3+8 pass다. receipt SHA-256은
+`020200989e5812d04c6a3c9d1c526d58566629a63818aee9c5bbab77915a5671`이며
+전체 로그·identity·receipt를 `build/evidence/build190/`에 보존했다. WASM 해시는 build187과 같다.
+CI에도 실제 두 입력 Lean 검사를 추가했다. JS 원본 AST 투영, 일반 f64/Rust 대응과 전체
+compiler 증명은 남는다. 자세한 범위는 [두 입력 보고서](../../experiments/two-sensor-provenance/proof-report.md)에 있다.
