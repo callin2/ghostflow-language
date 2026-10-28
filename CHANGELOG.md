@@ -11,7 +11,9 @@ are checked against their root acquisition endpoint. Rejected replacements
 preserve the whole owner; accepted replacements start a fresh run. Config/timer
 expression explanations remain unavailable and physical suitability remains
 unknown. The specified REF-06-002 isolation case has native/WASM and installed-host
-evidence; the full REF-06-016 requested-to-safe explanation chain remains incomplete.
+evidence. REF-06-016 checks both instances' explanations against their source nodes,
+positions, revisions, settings and distinct endpoints. The broader section 6.7
+requested-to-safe constraint explanation chain remains incomplete.
 Runtime dispatch failure invalidates current explanation availability while
 preserving historical completions. Preflight rejection retains the current proof.
 See `docs/INSTALLED-SENSOR-BINDING.md` and `tests/installed-composition.test.mjs`.

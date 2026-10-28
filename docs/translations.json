@@ -705,8 +705,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "7da4b0de249521868436c27cb30fb84255b0cd2b8ad395b85f12e9badd0f2bd2",
-      "translationSha256": "235c19922ec2991f8cdf2c1187608cb7f3deb8c247e9551e82991bcb88e90d7e"
+      "sourceSha256": "7b240a69d8693a0db87ae8a83ad19572bd4705ca79dc120a144891615a5dfa0e",
+      "translationSha256": "d61e6c7a06442a8d57dd05b8cc1422515d78b020e5da062b6258c4bce6fbc5e3"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",
@@ -1181,8 +1181,8 @@
       "source": "docs/INSTALLED-SENSOR-BINDING.md",
       "sourceLanguage": "en",
       "translation": "docs/INSTALLED-SENSOR-BINDING.ko.md",
-      "sourceSha256": "49028b2e64863fa945a9bf79c532d0d34fb24cd03b43f5f495e434f227d9494f",
-      "translationSha256": "40790d1fed536c5ee98466a10fd0efad49237f7c6b1e0e29d0bb11bb94d7e105"
+      "sourceSha256": "003179107e326ad1b937d34e3c849e9bc1c3398f54423841e527dab314c66592",
+      "translationSha256": "b70d37ce061716c2816de34cd1d5c74981e8b5cfedc844af4839253d555b831f"
     },
     {
       "source": "contracts/alarm-v1/README.md",

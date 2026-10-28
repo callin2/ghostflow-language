@@ -3583,12 +3583,20 @@
               "assertionClass": "identity",
               "targets": ["host", "wasm"],
               "polarities": ["negative", "boundary"]
+            },
+            {
+              "path": "tests/installed-composition.test.mjs",
+              "testId": "REF-06-016 installed explanations keep each instance occurrence and exact provenance",
+              "caseId": "REF-06-016",
+              "assertionClass": "identity",
+              "targets": ["host", "wasm"],
+              "polarities": ["positive", "boundary"]
             }
           ]
         }
       ],
       "gaps": [
-        "REF-06-002 has actual native/WASM state, setting and timer isolation plus installed direct-port endpoint/provenance evidence. Installation supports a bounded root-to-instance control-v10 profile and fresh-run binding replacement; nested routes and independent hot binding migration are not implemented. REF-06-016 remains partial: composed requested Bool explanations bind source/settings/installation, but the full requested-to-safe constraint chain and config/timer expressions remain unavailable."
+        "REF-06-002 has actual native/WASM state, setting and timer isolation plus installed direct-port endpoint/provenance evidence. REF-06-016 has actual installed WASM explanations for two instances retaining separate source nodes, spans, revisions, settings and endpoint routes. Installation supports a bounded root-to-instance control-v10 profile and fresh-run binding replacement; nested routes and independent hot binding migration are not implemented. The broader section 6.7 requested-to-safe constraint chain and config/timer expression explanations remain unavailable."
       ],
       "issues": [
         195,
@@ -3597,7 +3605,8 @@
       ],
       "referenceCaseIds": [
         "REF-00-010",
-        "REF-06-002"
+        "REF-06-002",
+        "REF-06-016"
       ]
     },
     {

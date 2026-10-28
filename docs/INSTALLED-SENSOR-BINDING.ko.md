@@ -98,6 +98,7 @@ state·timer·conditioner·최신 완료 결과·assessment를 유지합니다. 
 state·설정·conditioner를 초기화하고 이전 완료 결과를 지웁니다. 이 한정 경로는
 native/WASM config/timer 검사와 함께 REF-06-002의 지정된 east 상태·설정 변경 독립성 사례를
 충족합니다. 중첩 경로와 인스턴스별 무중단 binding 교체는 이 프로필의 범위 밖입니다.
-REF-06-016의 requested부터 safe까지 이어지는 전체 제약 설명 경로는 미완료입니다.
+REF-06-016은 각 인스턴스의 출력 설명을 정확한 원본 노드·위치·리비전·설정·설치 endpoint
+경로와 대조합니다. 더 넓은 6.7절의 requested부터 safe까지 이어지는 전체 제약 설명 경로는 미완료입니다.
 `tests/installed-composition.test.mjs`는 실제 WASM 실행으로 같은 시각의 east/west 독립성,
 근거 연결, 변조, 오류와 교체를 검증합니다.

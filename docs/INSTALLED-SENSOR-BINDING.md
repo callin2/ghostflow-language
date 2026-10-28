@@ -104,6 +104,8 @@ latest completion and assessment. Success starts fresh state, settings and
 conditioners in a new run and clears previous completions. This bounded path
 completes the specified REF-06-002 east-state/settings isolation case together with
 the native/WASM config/timer checks. Nested routes and independent hot binding
-migration are outside this profile. The full REF-06-016 requested-to-safe constraint
-chain remains incomplete. `tests/installed-composition.test.mjs` exercises actual WASM execution,
+migration are outside this profile. REF-06-016 checks each instance's output explanation
+against its exact source node, span, revision, settings and installed endpoint route.
+The broader section 6.7 requested-to-safe constraint chain remains incomplete.
+`tests/installed-composition.test.mjs` exercises actual WASM execution,
 same-time east/west isolation, joined provenance, tampering, faults and replacement.
