@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### 2026-10-29 - restore exact interaction provenance ([#287](https://github.com/callin2/ghostflow-language/issues/287), [#590](https://github.com/callin2/ghostflow-language/issues/590))
+
+Interaction Schema restoration now checks persisted source nodes and intent
+metadata against a fresh canonical compilation before verifying the schema.
+Previously, unchanged source and GFB bytes could accept an invented anchor such
+as `GF-ABSENT-FROM-SOURCE` when the caller changed the metadata, schema and alarm
+descriptor together. Valid schema versions and source identities are preserved.
+Standalone, composed and alarm regressions cover the rejection in
+`tests/interaction-emission.test.mjs`, `tests/composed-interaction.test.mjs` and
+`tests/alarm-observation.test.mjs`. Settings restore tests retain 0.3 and 0.4
+contracts in `tests/settings-default-provenance.test.mjs`.
+
 ### 2026-10-29 - scan-owned alarm lifecycle ([#287](https://github.com/callin2/ghostflow-language/issues/287))
 
 A source-validated external descriptor can now map an authored Bool state to an

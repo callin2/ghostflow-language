@@ -5,6 +5,17 @@
 
 ## 미출시
 
+### 2026-10-29 - 정확한 Interaction provenance 복원 ([#287](https://github.com/callin2/ghostflow-language/issues/287), [#590](https://github.com/callin2/ghostflow-language/issues/590))
+
+Interaction Schema 복원은 스키마를 검증하기 전에 저장된 소스 노드와 의도
+메타데이터를 정식 소스의 재컴파일 결과와 비교합니다. 이전에는 원본 소스와
+GFB 바이트가 같아도 호출자가 메타데이터, 스키마, 알람 descriptor를 함께 바꾸면
+`GF-ABSENT-FROM-SOURCE`처럼 존재하지 않는 앵커를 수락할 수 있었습니다.
+유효한 스키마 버전과 소스 식별자는 보존합니다. 독립·합성·알람 거절 회귀는
+`tests/interaction-emission.test.mjs`, `tests/composed-interaction.test.mjs`,
+`tests/alarm-observation.test.mjs`에서 검증합니다. 설정 복원 테스트는
+`tests/settings-default-provenance.test.mjs`에서 0.3과 0.4 계약을 유지합니다.
+
 ### 2026-10-29 - 스캔이 소유하는 알람 생명주기 ([#287](https://github.com/callin2/ghostflow-language/issues/287))
 
 소스가 검증된 외부 descriptor로 scalar scan profile의 작성된 Bool 상태를

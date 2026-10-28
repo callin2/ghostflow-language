@@ -993,8 +993,8 @@
         "path": "crates/ghostflow-core/src/lib.rs",
         "heading": "fn monotonic_input_failure_is_atomic()",
         "lines": [
-          4793,
-          4815
+          4801,
+          4823
         ],
         "sha256": "a9a83443a83a4ad006cf9ee304d0f38b8bb14332b54bda1fa0c9ffecc2a583fc"
       },
@@ -1128,8 +1128,8 @@
         "path": "tests/interaction-emission.test.mjs",
         "heading": "test('GF-TEST-interaction-emission-policy: product compilation is literate-only and identity is caller-supplied', async () => {",
         "lines": [
-          65,
-          87
+          66,
+          88
         ],
         "sha256": "6f35522285ec4d6114ee75c603e7626ce38bfc18cb8c8e18fa7cc413d72fc845"
       },
