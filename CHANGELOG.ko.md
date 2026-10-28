@@ -5,6 +5,16 @@
 
 ## 미출시
 
+### 2026-10-29 - 설치된 합성 실행 ([#290](https://github.com/callin2/ghostflow-language/issues/290), [#302](https://github.com/callin2/ghostflow-language/issues/302))
+
+InstalledControlHost가 직접 port를 연결하는 한정 `control-v10` 합성 프로필을 승인하고
+설정 런타임을 소유합니다. 같은 scan의 출력 설명에 실제 유효 설정과 승인한 instance
+endpoint를 연결합니다. instance 센서 계약은 root 수집 endpoint에 대해 검사합니다.
+거절된 교체는 소유자 전체를 보존하고 수락된 교체는 새 run으로 시작합니다.
+config/timer 표현식 설명은 여전히 unavailable이며 물리 적합성은 unknown입니다.
+REF-06-002와 REF-06-016의 더 넓은 요구 범위는 미완료입니다.
+`docs/INSTALLED-SENSOR-BINDING.md`와 `tests/installed-composition.test.mjs`에 근거가 있습니다.
+
 ### 2026-10-29 - 정확한 Interaction provenance 복원 ([#287](https://github.com/callin2/ghostflow-language/issues/287), [#590](https://github.com/callin2/ghostflow-language/issues/590))
 
 Interaction Schema 복원은 스키마를 검증하기 전에 저장된 소스 노드와 의도
