@@ -234,7 +234,8 @@ const coverageDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ghostflow-v8-covera
 try {
   // Artifact-writer tests create temporary files beneath this ignored directory.
   await fs.mkdir(path.join(root, 'build'), { recursive: true });
-  const result = await run(process.execPath, ['--test', ...TESTS], { env: { ...process.env, NODE_V8_COVERAGE: coverageDir } });
+  const result = await run(process.execPath, ['--test', '--test-concurrency=1', ...TESTS],
+    { env: { ...process.env, NODE_V8_COVERAGE: coverageDir }, timeout: 600_000 });
   if (result.status !== 0 || result.error || result.signal) throw new Error(`coverage test allowlist failed: ${result.error ?? result.signal ?? result.status}`);
   const reports = await Promise.all((await fs.readdir(coverageDir)).filter(name => name.endsWith('.json')).map(async name => JSON.parse(await fs.readFile(path.join(coverageDir, name), 'utf8'))));
   const sourceLengths = new Map(await Promise.all(TARGETS.map(async target =>
