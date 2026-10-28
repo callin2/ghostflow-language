@@ -7738,6 +7738,60 @@
       ]
     },
     {
+      "id": "distinct-time-meanings",
+      "family": "Phase age, continuous ON, session ON and physical accounting",
+      "clause": {
+        "path": "docs/reference/03-time-and-schedules.en.md",
+        "heading": "3.4 Cumulative time and rolling budget"
+      },
+      "owner": "HOST",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/reference-foundations-temporal.test.mjs",
+              "testId": "REF-03-018: phase age, continuous ON and physical rolling/day accounting keep independent clocks",
+              "caseId": "REF-03-018",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive"
+              ]
+            },
+            {
+              "path": "tests/station-wasm.test.mjs",
+              "testId": "REF-03-018: Station session actual ON time is 30s after 10s ON, 10s OFF, 20s ON",
+              "caseId": "REF-03-018",
+              "assertionClass": "runtime-value",
+              "targets": [
+                "wasm"
+              ],
+              "polarities": [
+                "positive"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "For the exact 0/10s/20s/40s fixture, native/WASM scans yield 40s phase age and 20s continuous ON; applied physical intervals yield 20s in the chosen 25s rolling window and 30s for local day. The bounded Station WASM owner separately queries 30s applied ON for its active session and settles 30s to the day ledger at finish. Session and physical ledger values have distinct owners; this does not claim authored generic job identity, job reset/reboot semantics, physical driver receipts or hardware verification."
+      ],
+      "issues": [
+        208
+      ],
+      "referenceCaseIds": [
+        "REF-03-018"
+      ]
+    },
+    {
       "id": "rolling-partial-overlap-admission",
       "family": "Rolling partial overlap and exact reserve admission",
       "clause": {
