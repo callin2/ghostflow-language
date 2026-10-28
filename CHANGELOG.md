@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### 2026-10-29 - source-bound continuous Percent arbitration ([#249](https://github.com/callin2/ghostflow-language/issues/249), [#590](https://github.com/callin2/ghostflow-language/issues/590))
+
+Reference §4.9 now defines named Percent requests and ceilings in an in-control
+`resource_policy`. `select = max` chooses 70% from 70% and 40%; a known 20%
+ceiling produces final 20%. Rust owns the complete decision before scan commit.
+Faults retain their reason and use authored `safe`, still clamped by known
+ceilings. Separate writers and objective/PID composition reject. This adds
+GFB25 and typed GFRB2/GFRS2 binding packets; GFB17 Bool bytes and pointer/length
+exports remain unchanged. Old runtimes reject the new profile. Native/WASM
+whole-decision parity, ties, fault fallback, binding rejection, and failed-scan
+atomicity are covered by `tests/continuous-resource-control.test.mjs`.
+
 ### 2026-10-29 - composed runtime observation ([#290](https://github.com/callin2/ghostflow-language/issues/290), [#302](https://github.com/callin2/ghostflow-language/issues/302))
 
 Explicit Interaction emission now supports imported states, timers and settings

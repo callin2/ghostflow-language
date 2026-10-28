@@ -3071,21 +3071,78 @@
     },
     {
       "id": "resource-arbitration",
-      "family": "Shared resource arbitration",
+      "family": "Shared resource arbitration with bounded Percent policies",
       "clause": {
         "path": "docs/reference/04-sensors-constraints-control.md",
         "heading": "4.9 공유 자원과 arbitration"
       },
-      "owner": "LIBRARY",
+      "owner": "CORE",
       "maturity": "EXPERIMENTAL",
       "coreScope": false,
-      "requiredEvidence": [],
-      "evidence": [],
-      "gaps": [
-        "Compiled resource policy exists, but its named oracle is not registered in the active language gate; queue runtime binding remains fail-closed."
+      "requiredEvidence": [
+        "compile",
+        "native_wasm"
       ],
-      "issues": [],
-      "referenceCaseIds": []
+      "evidence": [
+        {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/continuous-resource-control.test.mjs",
+              "testId": "GF-TEST-continuous-resource-compile: canonical policy is typed, sole-writer and bound to source identities",
+              "caseId": "REF-04-051",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            }
+          ]
+        },
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/continuous-resource-control.test.mjs",
+              "testId": "GF-TEST-continuous-resource-parity: canonical 70/40 selects 70 and wind ceiling clamps to 20 in native and WASM owner",
+              "caseId": "REF-04-051",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "positive"
+              ]
+            },
+            {
+              "path": "tests/continuous-resource-control.test.mjs",
+              "testId": "GF-TEST-continuous-resource-malformed: native and WASM loaders reject invalid typed plans before activation",
+              "caseId": "REF-04-051",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ],
+              "polarities": [
+                "negative"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "One canonical scalar control owns bounded identified Percent requests and ceilings, explicit min/max selection and authored fallback. Source revision and complete decisions come from the Rust owner and match native/WASM traces. Independent producer modules, PID aggregate anti-windup, temporal/context composition and Device application/physical confirmation are not implemented by this profile."
+      ],
+      "issues": [
+        249,
+        158
+      ],
+      "referenceCaseIds": [
+        "REF-04-051"
+      ]
     },
     {
       "id": "control-objectives",
@@ -9313,6 +9370,89 @@
       ],
       "referenceCaseIds": [
         "REF-03-021"
+      ]
+    },
+    {
+      "id": "installation-physical-unknown",
+      "family": "Installation metadata admission preserves Unknown physical suitability",
+      "clause": {
+        "path": "docs/reference/06-composition-and-replay.en.md",
+        "heading": "6.2 Definitions, instances, and logical ports"
+      },
+      "owner": "HOST",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "host_simulation",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/integration-contract.test.mjs",
+              "testId": "REF-06-005 installation assessment separates metadata admission from physical Unknown",
+              "caseId": "REF-06-005",
+              "assertionClass": "identity",
+              "targets": [
+                "host"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/installed-control-host.test.mjs",
+              "testId": "REF-06-005 matching Bool metadata leaves physical suitability Unknown while installed execution continues",
+              "caseId": "REF-06-005",
+              "assertionClass": "runtime-value",
+              "targets": [
+                "host",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/program-replacement-host.test.mjs",
+              "testId": "REF-06-005 Program replacement retains physical Unknown and atomically binds assessment to admitted artifacts",
+              "caseId": "REF-06-005",
+              "assertionClass": "rollback",
+              "targets": [
+                "host",
+                "wasm"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            },
+            {
+              "path": "tests/integration-contract.test.mjs",
+              "testId": "REF-06-005 installation assessment never publishes identity from changing module getters",
+              "caseId": "REF-06-005",
+              "assertionClass": "identity",
+              "targets": [
+                "host"
+              ],
+              "polarities": [
+                "positive",
+                "negative"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "The real installation and program-replacement reference hosts retain an owned metadata assessment and run WASM with physical Unknown. Declared polarity and safeLevel do not establish electrical, load, fail-safe or wiring evidence. No Device acceptance or physical verification is produced; Unknown does not block host execution."
+      ],
+      "issues": [
+        293
+      ],
+      "referenceCaseIds": [
+        "REF-06-005"
       ]
     }
   ]

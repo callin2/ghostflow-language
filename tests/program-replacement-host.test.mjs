@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
 import { compileSourceSync } from '../tools/compile-source.mjs';
-import { jsonSha256 } from '../tools/integration-contract.mjs';
+import { jsonSha256, sha256 } from '../tools/integration-contract.mjs';
 import { ProgramReplacementHost } from '../runtimes/wasm/program-replacement-host.mjs';
 
 const wasm = fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
@@ -58,6 +58,41 @@ function installed({ input = true } = {}) {
 const observed = (value, observationId = 'observation-1') => ({ enabled: { ok: true, value,
   source: 'virtual-input', observationId } });
 const faulted = () => ({ enabled: { ok: false, fault: 'Disconnected', source: 'virtual-input', observationId: 'fault-1' } });
+
+test('REF-06-005 Program replacement retains physical Unknown and atomically binds assessment to admitted artifacts', async t => {
+  const installation = installed(), firstArtifact = compile(initial);
+  const host = await ProgramReplacementHost.instantiate(wasm, firstArtifact, { runId: 'run-before', ...installation });
+  t.after(() => host.dispose());
+  const initialAssessment = host.snapshot().assessment;
+  assert.deepEqual(initialAssessment.metadata, { valid: true, errors: [] });
+  assert.equal(initialAssessment.physical.status, 'unknown');
+  assert.deepEqual(initialAssessment.identity, { releaseSha256: jsonSha256(installation.release), artifacts: {
+    sourceSha256: sha256(initial), moduleSha256: sha256(firstArtifact.bytes), manifestSha256: jsonSha256(firstArtifact.manifest),
+  } });
+  installation.release.device.firmwareSha256 = '3'.repeat(64);
+  initialAssessment.physical.status = 'pass';
+  const first = host.step({ observations: observed(true) });
+  assert.equal(first.trace.safe.pump, true);
+  assert.equal(first.assessment.physical.status, 'unknown');
+  first.assessment.physical.status = 'pass';
+  const before = host.snapshot(), forged = compile(compatible);
+  forged.manifest.outputs[0].type = 'Number';
+  assert.throws(() => host.replace({ artifact: forged, runId: 'run-forged' }), /differs from compiler output/);
+  assert.deepEqual(host.snapshot(), before);
+  const nextArtifact = compile(compatible);
+  const accepted = host.replace({ artifact: nextArtifact, runId: 'run-after' });
+  assert.equal(accepted.identity.runId, 'run-after');
+  assert.equal(accepted.assessment.physical.status, 'unknown');
+  assert.equal(accepted.assessment.identity.releaseSha256, before.assessment.identity.releaseSha256);
+  assert.equal(accepted.assessment.identity.artifacts.sourceSha256, sha256(compatible));
+  assert.equal(accepted.assessment.identity.artifacts.moduleSha256, sha256(nextArtifact.bytes));
+  assert.notDeepEqual(accepted.assessment.identity.artifacts, before.assessment.identity.artifacts);
+  accepted.assessment.physical.status = 'pass';
+  const continued = host.step({ observations: observed(true, 'observation-2') });
+  assert.equal(continued.trace.safe.pump, true);
+  assert.equal(continued.assessment.physical.status, 'unknown');
+  assert.deepEqual(continued.assessment, host.snapshot().assessment);
+});
 
 test('REF-06-020 installation must bind each required logical sensor before activation', async () => {
   await assert.rejects(ProgramReplacementHost.instantiate(wasm, compile(initial), {

@@ -6,6 +6,7 @@ import { sha256Hex } from './sha256.mjs';
 import { canonicalJson } from './canonical-json.mjs';
 import { emitInteractionSchema } from './interaction-schema.mjs';
 import { validateResourceConstraintBinding } from '../runtimes/node/resource-constraints-binding.mjs';
+import { compileContinuousResourceControl } from './continuous-resource-control.mjs';
 
 const fail = message => { throw new Error(`bound resource control: ${message}`); };
 const compare = (a, b) => a < b ? -1 : a > b ? 1 : 0;
@@ -55,6 +56,7 @@ function predicate(writer, node) {
 
 /** Source-derived executable policy; installation JSON supplies identities and ports only. */
 export function compileBoundResourceControl(compilation, installationBinding) {
+  if (compilation?.manifest?.control?.continuousResourcePolicies) return compileContinuousResourceControl(compilation, installationBinding);
   const verified = validateResourceConstraintBinding(compilation, installationBinding);
   const binding = { ...verified,
     resources: [...verified.resources].sort((a, b) => compare(a.name, b.name)),
@@ -149,7 +151,7 @@ export function compileBoundResourceControl(compilation, installationBinding) {
 
 /** Reconstruct both executable bytes and source metadata before accepting a saved artifact. */
 export function verifyBoundResourceCompilation(compilation) {
-  if (compilation?.manifest?.format !== 'GhostFlow/control-v17') fail('expected an executable bound resource control');
+  if (!['GhostFlow/control-v17', 'GhostFlow/control-v25'].includes(compilation?.manifest?.format)) fail('expected an executable bound resource control');
   const source = compilation.sourceDocument;
   const { executable: _flag, ...binding } = compilation.manifest.resourceBinding;
   const checked = compileBoundResourceControl(compileSourceSync(source.text, { filename: source.filename,
@@ -166,6 +168,26 @@ export function verifyBoundResourceCompilation(compilation) {
 export function observeBoundResourceTrace(compilation, trace) {
   const checked = verifyBoundResourceCompilation(compilation);
   const manifest = checked.manifest;
+  if (manifest.format === 'GhostFlow/control-v25') {
+    const decisions = trace?.continuousResourceTrace;
+    if (trace?.module !== moduleFingerprint(compilation.bytes) || !Array.isArray(decisions)
+      || decisions.length !== manifest.continuousResourcePolicies.length) fail('continuous source/artifact/decision identity mismatch');
+    const seen = new Set();
+    return decisions.map(decision => {
+      const policy = manifest.continuousResourcePolicies.find(policy => policy.name === decision.policy);
+      const identity = node => `${manifest.sourceDocumentSha256}:${node.id}`;
+      if (!policy || seen.has(policy.name) || decision.identity !== identity(policy)
+        || decision.sourceHash !== manifest.sourceDocumentSha256 || decision.descriptorHash !== manifest.descriptorSha256
+        || decision.bindingHash !== manifest.bindingSha256 || decision.bindingRevision !== manifest.bindingRevision
+        || decision.runId !== manifest.resourceBinding.runId || decision.tick !== trace.tick
+        || decision.output !== policy.output || decision.resource !== policy.target
+        || decision.resourceId !== manifest.resourceBinding.resources.find(resource => resource.name === policy.target)?.resourceId
+        || ['requests', 'ceilings'].some(kind => !Array.isArray(decision[kind]) || decision[kind].length !== policy[kind].length
+          || decision[kind].some((entry, index) => entry.identity !== identity(policy[kind][index]) || entry.name !== policy[kind][index].name))) fail('continuous source/binding/decision identity mismatch');
+      seen.add(policy.name);
+      return { policy: policy.name, source: policy.source, evidence: 'executed', decision };
+    });
+  }
   if (manifest?.format !== 'GhostFlow/control-v17'
     || sha256Hex(compilation.bytes) !== manifest.bytecodeSha256
     || trace?.module !== moduleFingerprint(compilation.bytes)

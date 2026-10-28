@@ -8,6 +8,18 @@ const faq = fs.readFileSync(new URL('../docs/language_faq.md', import.meta.url),
 const programming = fs.readFileSync(new URL('../docs/ProgrammingInGhostflow.md', import.meta.url), 'utf8');
 const programmingEnglish = fs.readFileSync(new URL('../docs/ProgrammingInGhostflow.en.md', import.meta.url), 'utf8');
 
+test('bilingual Reference 4.9 continuous resource example compiles as identical canonical source', () => {
+  const examples = ['04-sensors-constraints-control.md', '04-sensors-constraints-control.en.md'].map(file => {
+    const document = fs.readFileSync(new URL(`../docs/reference/${file}`, import.meta.url), 'utf8');
+    const source = document.match(/```ghost\n(control Vent \{[\s\S]*?)\n```/)[1];
+    const compilation = compileSourceSync(`\`\`\`ghost\n${source}\n\`\`\`\n`, { filename: 'continuous-reference.ghost.md' });
+    assert.equal(compilation.manifest.format, 'GhostFlow/control-policy-descriptor-v1');
+    assert.equal(compilation.manifest.control.continuousResourcePolicies[0].select, 'max');
+    return source;
+  });
+  assert.equal(examples[0], examples[1]);
+});
+
 test('bilingual Reference 4.7 output recovery example compiles as identical canonical source', () => {
   const examples = ['04-sensors-constraints-control.md', '04-sensors-constraints-control.en.md'].map(file => {
     const document = fs.readFileSync(new URL(`../docs/reference/${file}`, import.meta.url), 'utf8');

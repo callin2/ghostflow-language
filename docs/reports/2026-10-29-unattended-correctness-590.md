@@ -208,3 +208,42 @@ PR599의 병합 및 현재 CI 결과는 이 기록의 로컬 통과와 별도로
 다음 묶음은 #249의 source-bound Percent 중재, #293의 실제 설치 경로에서 물리 Unknown 표시,
 #590의 Lean raw module reader와 초기 상태부터 반복 실행하는 증명이다.
 #293은 물리 증거 부재를 가상 실행 중단 조건으로 추가하지 않는다.
+
+## build160: Percent 중재·설치 판정과 원시 모듈 읽기 증명
+
+사용자 의도가 실제 실행에서 유지되는지 확인하는 다음 세 단위를 완료했다.
+
+- #249의 한 scalar control에서 Percent 요청70과40을 max로 선택하고 ceiling20으로 제한한다. 요청·제한·선택·최종값·오류 원인은 실제 Rust 기록에 남고 native/WASM 결과가 일치한다. 독립 producer 모듈과 PID 통합은 범위 밖이다.
+- #293의 설치 및 프로그램 교체 소유자가 metadata admission과 물리 적합성 Unknown을 함께 보존한다. 물리 증거가 없어도 가상 실행은 계속된다. 독립 검토가 찾은 변경 가능한 getter의 identity 불일치는 검증 전에 데이터를 소유하도록 수정했다.
+- Lean 원시 module reader가 전체 바이트를 읽고 초기 Bool state를 복원한다. canonical 재인코딩과 남은 바이트 검사를 거쳐 받아들인 모듈은 초기 상태부터 임의 횟수의 실행에서 모델과 일치한다. 중복 transition target을 허용하는 parser-only 변형은 반례로 거절된다.
+
+최종 실행 소스는 `0c5c00a03634d725bdfdf4b9b70fde8e324969e4`다.
+공식 build160은 `2026-10-28T18:09:05.388Z`에 exit 0으로 완료됐다.
+13 gate, Rust441, 주 Node3848 pass / 15 TODO / 0 fail, 별도 console15 pass다.
+verification SHA-256은 `d35652843975f46c60b85b7bf88c495af6fdd6bfc416747ca6b7e4fc1382a8a9`다.
+WASM SHA-256은 `1d0af12b5c6aa73ff7815027f0c8f8472f43f27d2b0d7af5ab04a2202a08c398`다.
+기록은 `build/evidence/build160/`에 보존했다.
+
+첫 통합 검사는 framed replay의 고정 예상 크기216바이트가 실제224바이트와 달라 실패했다.
+별도 wasm32 컴파일러 `size_of` probe로224바이트를 확인했다. 실행기는 이미 실제 크기를 계산했다.
+테스트 예상값 갱신 후 예산1바이트 부족 거부와 정확한 예산 허용을 포함한22개 검사가 통과했다.
+실패와 LLVM probe는 `build/evidence/wave6-replay-failure/`에 보존했다.
+
+Lean 보고서는 `67545be0eb07320889b219c5b1971b64b9f56641`에서
+`2026-10-28T17:51:01.685Z`에 완료됐다. 실제 Lean 호출119개는 성공58개와 의도된 거절61개다.
+별도 JavaScript admission 검사11개도 통과했다. 합계130개는 정리 수가 아니다.
+보고서 SHA-256은 `6d1f54e184574e9a77299961ee900c2e8c005974a28882fbca9d22eaa2e9fe48`다.
+이후 replay 테스트 한 파일만 바뀌었다. 보고서에 묶인106개 파일의 SHA-256은 최종 실행 소스와 모두 같다.
+기록은 `build/bool-wave6-590/`에 있다. 원본 파서와 typed projection, 수치 연산,
+모델과 production Rust 사이의 일반적 대응은 전체 컴파일러 정확성의 미증명 범위로 남는다.
+
+지정된 coverage 대상은 함수475/475, 줄7438/8235(90.32%), V8 ranges5560/6301(88.24%)다.
+전체 저장소의 모든 함수나 문법 branch 비율을 뜻하지 않는다. 보고서 SHA-256은
+`b6d9cebdf04af337561d4e21ee9f31af5005109df796ce67d429c89bfd718b5e`이며
+`build/evidence/coverage-0c5c00a/`에 보존했다.
+
+PR599의 필수 CI는 모두 통과했지만 `2026-10-28` 조회 시 아직 미병합이다.
+다음 단위는 #287의 실제 알람 발생·해제 이력과 Bool 입력 오류 복구 증명이다.
+알람 독립 검토에서 원문에 없는 intent anchor를 허용하는 공유 복원 결함을 재현했다.
+수정 과정에서 기존 profile 문서 복원 회귀도 발견해 보완 중이다.
+이 후속 단위의 결과는 build160이나 TODO15개 수치에 포함하지 않았다.

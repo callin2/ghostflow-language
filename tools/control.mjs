@@ -609,6 +609,7 @@ class ControlParser {
       case 'calendar': return this.logicalProvider('calendar');
       case 'provider': return this.logicalProvider('provider');
       case 'resource': return this.resourceDecl();
+      case 'resource_policy': return this.continuousResourcePolicy();
       case 'account': return this.accountDecl();
       case 'signal': return this.signal();
       case 'schedule': return this.schedule();
@@ -846,6 +847,30 @@ class ControlParser {
     }
     this.expect(';', 'expected ; after resource declaration');
     return this.node('resource', start, { name: name.value, type: type.value, typeArgs });
+  }
+  continuousResourcePolicy() {
+    const start = this.take(), name = this.identifier('expected policy name');
+    this.expect('for'); const target = this.identifier('expected resource'); this.expect('{');
+    const fields = {}, groups = {};
+    while (!this.matches('}')) {
+      const key = this.identifier('expected continuous policy field');
+      if (Object.hasOwn(fields, key.value) || Object.hasOwn(groups, key.value)) error(key, 'duplicate continuous policy field');
+      if (['requests', 'ceilings'].includes(key.value)) {
+        this.expect('{'); const entries = [];
+        while (!this.matches('}')) {
+          const entry = this.identifier('expected source request name'); this.expect('=');
+          entries.push(this.node('continuous-entry', entry, { name: entry.value, value: this.expression() })); this.expect(';');
+        }
+        this.take(); this.maybe(';'); groups[key.value] = entries;
+      } else {
+        if (!['select', 'safe', 'on_unknown', 'output'].includes(key.value)) error(key, 'unsupported continuous policy field');
+        this.expect('='); fields[key.value] = this.expression(); this.expect(';');
+      }
+    }
+    this.take(); this.maybe(';');
+    for (const key of ['select', 'safe', 'on_unknown', 'output']) if (!fields[key]) error(start, `missing continuous policy field ${key}`);
+    for (const key of ['requests', 'ceilings']) if (!groups[key]) error(start, `missing continuous policy field ${key}`);
+    return this.node('continuous-policy', start, { name: name.value, target: target.value, ...fields, ...groups });
   }
   accountDecl() {
     const start = this.take(), name = this.identifier('expected account name');
@@ -1600,7 +1625,14 @@ class Lowerer {
     this.standalone = !!ast.standalone;
     this.hasSolarSchedule = ast.body.some(item => item.kind === 'schedule' && item.scheduleType === 'Solar');
   }
-  lower({ emitBytecode = true, accountingExecution = false } = {}) {
+  lower({ emitBytecode = true, accountingExecution = false, continuousExecution = false } = {}) {
+    if (this.ast.body.some(item => item.kind === 'continuous-policy')) {
+      const unsupported = this.ast.body.find(item => ['objective', 'adapt', 'degraded', 'adapt-setting', 'shared-constraints', 'account', 'account-constraints', 'schedule', 'provider', 'calendar', 'timer', 'signal', 'config'].includes(item.kind));
+      if (unsupported) error(unsupported.loc, 'continuous resource arbitration requires the scalar snapshot profile; objective/PID and other profile composition require explicit integration');
+    }
+    if (emitBytecode && !continuousExecution && this.ast.body.some(item => item.kind === 'continuous-policy')) {
+      error(this.ast.loc, 'continuous resource policy requires immutable resource binding');
+    }
     if (emitBytecode && this.ast.body.some(item => item.kind === 'shared-constraints')) {
       error(this.ast.body.find(item => item.kind === 'shared-constraints').loc,
         'shared resource constraints require resource binding and runtime enforcement; compile a checked nonexecutable descriptor');
@@ -1760,6 +1792,22 @@ class Lowerer {
           })),
         })); },
       });
+      if (continuousExecution) {
+        const expressions = this.continuousPolicies.flatMap(policy => [...policy.requests, ...policy.ceilings]
+          .flatMap(entry => Object.entries(entry.rails).map(([role, value]) => ['intent', `continuous_${entry.id}_${role}`, value])));
+        const expressionModule = module.map(form => Array.isArray(form) && form[0] === 'strategy'
+          ? [...form.filter(child => !Array.isArray(child) || child[0] !== 'intent'), ...expressions] : form);
+        const expressionBytes = emitGfb(lowerCoreModule(canonicalModuleForm(expressionModule)), { onExpressions: strategies => {
+          const encoded = new Map(strategies[0].intents.map(intent => [intent.name, intent.expr]));
+          for (const policy of this.continuousPolicies) for (const entry of [...policy.requests, ...policy.ceilings]) {
+            entry.expressions = Object.fromEntries(Object.keys(entry.rails).map(role => [role, encoded.get(`continuous_${entry.id}_${role}`)]));
+          }
+        } });
+        const expressionFormat = new DataView(expressionBytes.buffer, expressionBytes.byteOffset).getUint16(4, true);
+        const baseView = new DataView(bytes.buffer, bytes.byteOffset);
+        if (![1, 2, 3, 4].includes(expressionFormat) || ![1, 2, 3, 4].includes(baseView.getUint16(4, true))) error(this.ast.loc, 'continuous expressions require the scalar snapshot profile');
+        baseView.setUint16(4, Math.max(baseView.getUint16(4, true), expressionFormat), true);
+      }
     }
     catch (cause) {
       const message = cause instanceof Error ? cause.message : String(cause);
@@ -1782,6 +1830,7 @@ class Lowerer {
     return {
       bytes,
       explanationExpressions,
+      ...(continuousExecution ? { continuousPolicies: this.continuousPolicies } : {}),
       manifest: this.manifest,
       sourceMap: this.ast.sourceNodes,
       traceMetadata: buildSourceTrace({ ...this.ast, body: this.ast.body.flatMap(item => item.kind === 'local-constraints' ? item.rules : [item]) }, this.constraints, bytes, transitions, intents, generatedTimers, this.resultSites, this.generatedSignals,
@@ -1849,7 +1898,7 @@ class Lowerer {
     for (const item of this.ast.body) {
       if (item.kind === 'enum') continue;
       if (item.kind === 'input' || item.kind === 'output') for (const name of item.names) this.unique(name, item.loc, item.kind);
-      else if (['state', 'config', 'parameter', 'let', 'function', 'syntax', 'sensor', 'event', 'calendar', 'provider', 'signal', 'schedule', 'timer', 'resource', 'account', 'account-constraints', 'shared-constraints', 'local-constraints'].includes(item.kind)) this.unique(item.name, item.loc, item.kind);
+      else if (['state', 'config', 'parameter', 'let', 'function', 'syntax', 'sensor', 'event', 'calendar', 'provider', 'signal', 'schedule', 'timer', 'resource', 'account', 'account-constraints', 'shared-constraints', 'local-constraints', 'continuous-policy'].includes(item.kind)) this.unique(item.name, item.loc, item.kind);
       else if (item.kind === 'adapt') this.unique(item.name, item.loc, 'adapt policy');
       else if (['objective', 'degraded', 'adapt-setting'].includes(item.kind)) this.unique(item.name, item.loc, item.kind);
     }
@@ -2109,6 +2158,7 @@ class Lowerer {
     this.validateFunctionBodies();
     checkIndependent(this.ast.body.filter(item => item.kind === 'let'), item => this.addLet(item));
     checkIndependent(this.ast.body.filter(item => item.kind === 'next'), item => this.addNext(item));
+    this.addContinuousPolicies();
     if (this.adaptPolicy) {
       const connection = this.ast.body.find(item => item.kind === 'connection');
       if (connection) error(connection.loc, 'output connections in an adaptive control belong inside each strategy');
@@ -2132,6 +2182,47 @@ class Lowerer {
           source: { nodeId: item.id, ...item.loc } });
       }
     }
+  }
+  addContinuousPolicies() {
+    const policies = this.ast.body.filter(item => item.kind === 'continuous-policy');
+    if (!policies.length) return;
+    const targets = new Set(), outputs = new Set();
+    this.continuousPolicies = policies.map(policy => {
+      const resource = this.ast.body.find(item => item.kind === 'resource' && item.name === policy.target);
+      if (resource?.type !== 'ContinuousActuator' || resource.typeArgs?.length !== 1 || resource.typeArgs[0].name !== 'Percent') error(policy.loc, 'continuous policy requires ContinuousActuator<Percent>');
+      if (targets.has(policy.target)) error(policy.loc, 'duplicate continuous resource writer'); targets.add(policy.target);
+      if (policy.select.kind !== 'reference' || !['min', 'max'].includes(policy.select.name)) error(policy.select.loc, 'continuous select supports min or max; exclusive and highest_authority require a separate policy');
+      if (policy.on_unknown.kind !== 'reference' || policy.on_unknown.name !== 'safe') error(policy.on_unknown.loc, 'continuous on_unknown must explicitly be safe');
+      if (policy.output.kind !== 'reference') error(policy.output.loc, 'continuous output must name a Percent output');
+      const output = this.outputs.get(policy.output.name);
+      if (!output || output.type.kind !== 'Percent' || outputs.has(policy.output.name)) error(policy.output.loc, 'continuous policy requires a sole Percent output writer');
+      outputs.add(policy.output.name);
+      const safe = this.expression(policy.safe, new Map(), { allowNext: false }, [], PERCENT);
+      if (safe.type.kind !== 'Percent' || !Number.isFinite(safe.constant)) error(policy.safe.loc, 'continuous safe must be a constant Percent');
+      output.expression = safe;
+      const entries = (items, kind) => {
+        if (items.length > 16 || kind === 'request' && !items.length) error(policy.loc, 'continuous policy requires 1..16 requests and 0..16 ceilings');
+        const names = new Set();
+        return items.map(entry => {
+          rejectName(entry.name, entry.loc, kind);
+          if (names.has(entry.name)) error(entry.loc, `duplicate ${kind} name`); names.add(entry.name);
+          const value = this.expression(entry.value, new Map(), { allowNext: false });
+          const result = value.type.kind === 'Result';
+          if (result ? value.type.value.kind !== 'Percent' || value.type.error.kind !== 'SensorFault' : value.type.kind !== 'Percent') error(entry.loc, 'continuous expression must be Percent or Result<Percent, SensorFault>');
+          return { id: entry.id, name: entry.name, source: { nodeId: entry.id, ...entry.loc },
+            rails: result ? { ok: value.ok, value: value.value, fault: value.faultCode, origin: value.originTag }
+              : { ok: 'true', value: value.sexpr, fault: '0', origin: '0' } };
+        }).sort((a, b) => a.id - b.id);
+      };
+      return { id: policy.id, name: policy.name, target: policy.target, select: policy.select.name,
+        safe: safe.constant, onUnknown: 'safe', output: policy.output.name,
+        source: { nodeId: policy.id, ...policy.loc }, requests: entries(policy.requests, 'request'), ceilings: entries(policy.ceilings, 'ceiling') };
+    });
+    if (this.outputs.size !== outputs.size || this.resources.size !== targets.size) error(this.ast.loc, 'every output and resource must have exactly one continuous policy');
+    if (this.continuousPolicies.length > 8) error(this.ast.loc, 'continuous policy limit is 8');
+    if (this.continuousPolicies.reduce((sum, policy) => sum + policy.requests.length + policy.ceilings.length, 0) > 32) error(this.ast.loc, 'continuous request and ceiling total limit is 32');
+    this.manifest.continuousResourcePolicies = this.continuousPolicies.map(({ requests, ceilings, ...policy }) => ({ ...policy,
+      requests: requests.map(({ rails, ...entry }) => entry), ceilings: ceilings.map(({ rails, ...entry }) => entry) }));
   }
   addAdapt(item) {
     const strategyNames = new Set();
@@ -4528,12 +4619,14 @@ export function compileResourcePolicyArtifact(source, { filename = '<policy>' } 
 /** Checked in-control shared resource contract; it cannot be installed as GFB. */
 export function compileControlPolicyDescriptorArtifact(source, { filename = '<control>' } = {}) {
   const ast = new ControlParser(source, filename).parse();
-  if (ast.kind !== 'control' || !ast.body.some(item => item.kind === 'shared-constraints')) {
+  if (ast.kind !== 'control' || !ast.body.some(item => ['shared-constraints', 'continuous-policy'].includes(item.kind))) {
     error(ast.loc, 'expected a control with shared resource constraints');
   }
   const checked = new Lowerer(ast, filename).lower({ emitBytecode: false });
   const manifest = { format: 'GhostFlow/control-policy-descriptor-v1', executable: false,
-    requiredRuntimeContracts: ['bound-shared-resources', 'admission-exclusivity', 'safe-output-resource-requirements'],
+    requiredRuntimeContracts: checked.manifest.continuousResourcePolicies
+      ? ['continuous-resource-owner-v1', 'bound-resource-every-scan', 'one-registry-for-all-writers']
+      : ['bound-shared-resources', 'admission-exclusivity', 'safe-output-resource-requirements'],
     control: checked.manifest };
   const bytes = new TextEncoder().encode(JSON.stringify({
     format: 'GhostFlow/control-policy-descriptor-artifact-v1', executable: false,
@@ -4544,6 +4637,21 @@ export function compileControlPolicyDescriptorArtifact(source, { filename = '<co
   // compiler supplies those from the actual guarded request program.
   return { bytes, manifest, sourceMap: checked.sourceMap,
     traceMetadata: { bindings: [], constraints: [], resultSites: [] } };
+}
+
+/** Dedicated expressions are encoded by the same VM encoder as ordinary intents. */
+export function compileContinuousControlPolicyArtifact(source, { filename, envelope } = {}) {
+  const ast = new ControlParser(source, filename).parse();
+  if (ast.kind !== 'control' || !ast.body.some(item => item.kind === 'continuous-policy')) error(ast.loc, 'expected continuous resource policy');
+  if (typeof envelope !== 'function') error(ast.loc, 'continuous execution requires a compiled policy envelope');
+  const candidate = new Lowerer(ast, filename).lower({ continuousExecution: true });
+  const bytes = envelope(candidate.bytes, candidate.continuousPolicies);
+  if (!(bytes instanceof Uint8Array) || bytes.length < candidate.bytes.length + 10
+    || new TextDecoder().decode(bytes.subarray(0, 4)) !== 'GFB1'
+    || new DataView(bytes.buffer, bytes.byteOffset).getUint16(4, true) !== 25
+    || new DataView(bytes.buffer, bytes.byteOffset).getUint32(6, true) !== candidate.bytes.length
+    || candidate.bytes.some((byte, index) => bytes[index + 10] !== byte)) error(ast.loc, 'continuous execution requires the guarded GFB25 envelope');
+  return { ...candidate, bytes };
 }
 
 /** Internal bound-profile lowering. Never returns an unguarded shared-policy program. */

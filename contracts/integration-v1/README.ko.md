@@ -7,6 +7,22 @@
 
 `valid: true`는 제공된 레코드의 구조가 일관되고 확인된 식별자와 해시가 일치한다는 뜻입니다. 게이트 통과, 장치 접촉, 프로그램의 올바른 동작, 핀 배선의 전기적 안전성 또는 물 공급을 뜻하지 않습니다. `fail`이 기록된 실행도 유효한 레코드일 수 있습니다.
 
+`assessInstallation`은 `InstalledControlHost`와 `ProgramReplacementHost`의
+선언 정보만으로 설치를 승인합니다. 기존 `{valid, errors}` 검증 결과를 `metadata`로,
+유효한 선언의 식별자를 `identity`로, 기존 게이트 형태의 물리 평가를 `physical`로 반환합니다.
+식별자는 release 다이제스트와 정확한 source, module, manifest 다이제스트를 고정합니다.
+Release는 profile과 설치 mapping을 고정합니다. 잘못된 선언은 `identity: null`이며 승인할 수 없습니다.
+평가는 검증과 식별자 계산 전에 네 입력 레코드와 module bytes를 복사해 소유합니다.
+이 레코드 내부의 accessor, symbol key, 열거 불가능한 필드, 순환 참조,
+plain object가 아닌 객체는 metadata `shape` 오류를 만듭니다.
+일반적인 추가 필드는 기존의 정확한 필드 검사를 그대로 받습니다.
+물리 게이트는 `status: "unknown"`, source type `none`, null reference를 가집니다.
+Scope는 선언된 극성과 `safeLevel`이 전기 동작, fail-safe 적합성, 부하 호환성이나 배선을
+입증하지 않는다고 설명합니다. Bool 출력의 타입과 방향이 맞는 것만으로 이 사실들을 입증할 수 없습니다.
+이 평가는 물리 관측을 입력받지 않으며 물리 pass를 발행할 수 없습니다.
+선언 정보가 유효하면 컴파일, 시뮬레이션, host 실행을 막지 않습니다.
+아래의 독립적으로 제공된 실행 증거는 자체 검증 계약을 유지합니다.
+
 [설치형 센서 바인딩 호스트](../../docs/INSTALLED-SENSOR-BINDING.ko.md)는
 별도 버전인 `board-profile-v2`의 입력 capability와 실행 가능한 교체 승인 경로를
 설명한다. 기존 v1 레코드는 아래 계약을 유지한다.

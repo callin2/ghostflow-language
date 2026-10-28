@@ -27,9 +27,8 @@ const WIDTH = Object.freeze({
   Window: 416, WindowCheckpoint: 232, RootDensity: 16, RootState: 56, Observation: 40,
   EvidenceWindow: 936, EvidenceCheckpoint: 512, EvidencePoint: 64, ProofNode: 72,
   TemporalRuntime: 120, TemporalPlan: 64, WindowPlan: 32, Slot: 952, Snapshot: 48,
-  // Optional instruction-witness Vec adds 12 bytes plus 4 bytes of alignment
-  // even when capture is disabled; framed replay must budget that header.
-  WindowTrace: 224, Value: 16, ResultTraceEvent: 12, RootInput: 40, Vec: 12, ScanOutcome: 216,
+  // Witness and continuous-resource Vec headers remain allocated when empty.
+  WindowTrace: 224, Value: 16, ResultTraceEvent: 12, RootInput: 40, Vec: 12, ScanOutcome: 224,
 });
 
 function windowGeometry(overMs, upstream = [], prior = []) {
@@ -76,8 +75,7 @@ function temporalBytes(journalCapacity) {
 const LIVE_ORACLE = temporalBytes(1024);
 const REPLAY_ORACLE = temporalBytes(3);
 const LEGACY_REPLAY_PEAK = LIVE_ORACLE.bytes + REPLAY_ORACLE.bytes + 3 * 24;
-// The wasm32 layout is 216 bytes after adding the optional witness Vec;
-// framed replay budgets the complete return header, including its alignment.
+// Framed replay budgets the complete return header, including its alignment.
 const FRAMED_REPLAY_PEAK = LEGACY_REPLAY_PEAK + 3 * WIDTH.ScanOutcome;
 
 function profile(sourceTag, changes = {}) {

@@ -300,3 +300,43 @@ export function validateIntegration({ release, boardProfile, installation, artif
   if (runEvidence !== null && !c.errors.length) validateRun(runEvidence, release, artifacts, c);
   return c.result();
 }
+
+function captureInstallationData(value, ancestors = new Set()) {
+  if (value === null || typeof value !== 'object') {
+    if (['function', 'symbol'].includes(typeof value)) throw new TypeError('expected plain data');
+    return value;
+  }
+  const bytes = value instanceof Uint8Array;
+  if ((!bytes && !Array.isArray(value) && !isObject(value)) || ancestors.has(value)) {
+    throw new TypeError('expected acyclic plain data');
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(value), keys = Reflect.ownKeys(descriptors);
+  const captured = bytes ? new Uint8Array(keys.length)
+    : Array.isArray(value) ? new Array(descriptors.length.value) : Object.create(Object.getPrototypeOf(value));
+  ancestors.add(value);
+  for (const [index, key] of keys.entries()) {
+    if (Array.isArray(value) && key === 'length') continue;
+    const descriptor = descriptors[key];
+    if (typeof key !== 'string' || !descriptor.enumerable || !own(descriptor, 'value')
+      || bytes && key !== String(index)) throw new TypeError('expected enumerable string data properties without accessors');
+    if (bytes) captured[index] = descriptor.value;
+    else Object.defineProperty(captured, key, { value: captureInstallationData(descriptor.value, ancestors), enumerable: true });
+  }
+  ancestors.delete(value);
+  return bytes ? captured : Object.freeze(captured);
+}
+
+/** Metadata-only host admission has no independent physical observation. */
+export function assessInstallation({ release, boardProfile, installation, artifacts } = {}) {
+  const c = checks();
+  let captured;
+  try { captured = captureInstallationData({ release, boardProfile, installation, artifacts }); }
+  catch (error) { c.issue('assessment', 'shape', error.message); }
+  const metadata = captured ? validateIntegration(captured) : c.result();
+  return {
+    metadata,
+    identity: metadata.valid ? { releaseSha256: jsonSha256(captured.release), artifacts: artifactDigests(captured.artifacts, checks()) } : null,
+    physical: { status: 'unknown', source: { type: 'none', reference: null },
+      scope: 'Metadata-only host admission. Declared polarity and safeLevel do not verify electrical behavior, fail-safe suitability, load or wiring.' },
+  };
+}
