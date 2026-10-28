@@ -1,0 +1,15 @@
+# Config and timer isolation in composed controls
+
+The compiler can instantiate one pinned definition more than once when that definition declares scalar `config` streams and `elapsed` or `continuous_true` timers. It qualifies each config name and ID, authored state, timer name, and generated timer state by instance path. The original definition text, digest, source node, and instance path remain in the compiled artifact. The shared Rust core evaluates the combined Program; JavaScript does not implement a second timer or settings evaluator.
+
+The reference host can apply a live settings event to one qualified config ID. All configs participate in one atomic Program settings transaction and one global `settingsRevision`; each config retains its own latest Result, `emissionRevision`, and application position. A changed east config does not change west's value or emission revision. Both timers read the same supplied logical clock, while their state and starting points remain separate. Use the exact compiled manifest ID when granting or targeting a setting, and pin the source closure before activation.
+
+`tests/composition-config-timer-isolation.test.mjs` runs a two-instance Program through `TemporarySettingsHost` and the native `context_tape` runner with the same complete inputs and settings event. It checks state, timer, settings, output, and imported source provenance. Wrong import revisions or digests, cross-instance grants, and invalid temporary values reject without changing the accepted host snapshot.
+
+## Current boundary
+
+- This foundation does not issue opaque deployment instance IDs or per-instance installation binding revisions. Integration v1 pins one installation mapping. An instance path in the source map identifies compiler provenance; it is not proof of an applied Device binding.
+- The interaction-v0 descriptor emitter reads the root source only. It now rejects composed artifacts explicitly, so imported settings and timers cannot disappear from an apparently valid descriptor schema. A composed descriptor and binding join remain separate work.
+- Imported config literal offsets refer to the imported definition, not to the root composition source. This foundation exposes live settings events through the verified host; it does not provide imported-source literal editing.
+- The context manifest accepts instance sensor rails with the same source type, sample interval, and optionality. Existing `ControlRuntime` gives each instance its own conditioner. The current context profile still rejects input filters and other unsupported conditioning metadata before activation. Native tape tests supply the instance rails explicitly; the WASM host derives them from the root sample.
+- Native/WASM agreement establishes this reference execution contract. It does not authenticate settings actors, installation records, clocks, Device deployment, or physical outputs.
