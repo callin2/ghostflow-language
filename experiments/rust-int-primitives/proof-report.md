@@ -77,7 +77,7 @@ choices reproduce attempts 1, 2, and 3 respectively in a fresh output directory.
 It never builds or installs extraction tools and never reuses prior output.
 The environment must put the existing rustup launcher on PATH.
 
-The helper now uses Cargo `--locked --offline`, records the actual Charon/Aeneas
+The helper now uses Cargo `--locked --offline`, records the actual Charon/driver/Aeneas
 binary and both helper SHA-256 values, and checks production/tool/helper hashes
 before and after extraction. A changed input forces failure. These receipt
 improvements do not retroactively modify the three historical command records.
@@ -86,12 +86,14 @@ an inspection exception. Its artifact digest covers only LLBC, generated Lean,
 translation metadata and the four named tool stdout/stderr logs. Extraction and
 admission receipts, their temporary files and other files are excluded, avoiding
 self-referential digests. It also rejects `constant`, `opaque` and `sorryAx`
-alongside axiom and other proof escapes. Structural admission remains a candidate
+alongside axiom and other proof escapes. Every selected LLBC root must have
+`is_local=false`; a local wrapper cannot satisfy the external-root contract.
+Structural admission remains a candidate
 input check, never a kernel proof or complete source-equivalence check.
 
 Review regressions reproduced stale success using a corrupted LLBC with an old
 admissible receipt. The pre-fix receipt/hash regressions fail against `ccca4a1`;
-the corrected six-test suite passes with
+the corrected eight-test suite passes with
 `python3 -m unittest discover -s experiments/rust-int-primitives -p test_receipts.py`.
 Synthetic test artifacts verify guards only. Fresh copies of all three actual
 historical artifacts still reject; original artifact hashes remain unchanged.

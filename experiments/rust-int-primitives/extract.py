@@ -43,6 +43,8 @@ def main():
               'roots': ROOTS, 'steps': []}
     inputs = {'production': ROOT / 'crates/ghostflow-core/src/lib.rs',
               'charon': args.charon.resolve(), 'aeneas': args.aeneas.resolve(),
+              'charonDriver': args.charon.resolve().with_name(
+                  'charon-driver.exe' if os.name == 'nt' else 'charon-driver'),
               'extractHelper': Path(__file__).resolve(),
               'auditHelper': Path(__file__).resolve().with_name('audit.py')}
 
