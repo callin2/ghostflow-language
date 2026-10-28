@@ -1379,6 +1379,7 @@ fn one_scan_rejects_mixed_provider_revisions_before_committing_any_state() {
                 offset_ms: 0,
                 run_ms: 10,
                 within_ms: 20,
+                weekday_mask: None,
             },
             when: vec![1, 1],
             cancel: vec![1, 0],
@@ -2049,6 +2050,7 @@ fn solar_config_program() -> Module {
         offset_ms: 0,
         fallback_time_ms: None,
         config_ids: vec![6],
+        weekday_mask: None,
     };
     // Explicit fault fallback true cannot override a referenced settings fault.
     d.when = vec![1, 1];

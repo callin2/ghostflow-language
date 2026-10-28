@@ -253,7 +253,7 @@ function lowerCoreModule(ast) {
   for(const c of constraints){if(c.names.length>32||new Set(c.names).size!==c.names.length)throw new CompileError('invalid constraint names or arity');for(const n of c.names)assertName(n,'constraint');}
   const env={inputs:new Map(inputs.map((x,i)=>[x.name,{...x,index:i}])),states:new Map(states.map((x,i)=>[x.name,{...x,index:i}]))};
   const rawWindowCount=strategies.reduce((total,{raw})=>total+raw.slice(3).filter(form=>Array.isArray(form)&&form[0]==='window').length,0);
-  const contextHeads=['at-pulse','at-window','periodic-pulse','cron-pulse','calendar-daily-pulse','holiday-daily-pulse','solar-context-pulse','tide-run','config-daily-slots-pulse','utc-range','calendar-range','civil-range'];
+  const contextHeads=['at-pulse','at-window','periodic-pulse','cron-pulse','calendar-daily-pulse','holiday-daily-pulse','solar-context-pulse','solar-weekday-pulse','tide-run','tide-weekday-run','config-daily-slots-pulse','utc-range','calendar-range','civil-range'];
   const rawScheduleCount=strategies.reduce((total,{raw})=>total+raw.slice(3).filter(form=>Array.isArray(form)&&['solar-pulse','daily-pulse','daily-slots-pulse','config-stream',...contextHeads].includes(form[0])).length,0);
   const hasContext=strategies.some(({raw})=>raw.slice(3).some(form=>Array.isArray(form)&&['config-stream',...contextHeads,'natural-result','accounting-result','calendar-result'].includes(form[0])));
   const rawNaturalCount=strategies.reduce((total,{raw})=>total+raw.slice(3).filter(form=>Array.isArray(form)&&['natural-result','accounting-result','calendar-result'].includes(form[0])).length,0);
@@ -485,15 +485,15 @@ function lowerCoreModule(ast) {
       else if(contextHeads.includes(h)){
         if(!temporal||seenExecutable)throw new CompileError('context schedule requires temporal prelude before execution');
         const [siteAtom,scheduleName,gapAtom,...payload]=a;
-        const holdMs=h==='solar-context-pulse'||h==='tide-run'&&payload.length===9?unsignedAtom(payload.pop(),9007199254740991n,'invalid hold duration'):null;
-        if(h==='tide-run'&&holdMs===0n)throw new CompileError('extended Tide policy requires positive hold duration');
+        const holdMs=['solar-context-pulse','solar-weekday-pulse'].includes(h)||['tide-run','tide-weekday-run'].includes(h)&&payload.length===(h==='tide-run'?9:10)?unsignedAtom(payload.pop(),9007199254740991n,'invalid hold duration'):null;
+        if(['tide-run','tide-weekday-run'].includes(h)&&holdMs===0n)throw new CompileError('extended Tide policy requires positive hold duration');
         const site=Number(unsignedAtom(siteAtom,4294967295n,'invalid schedule site'));
         if(!site||preludeSites.has(site))throw new CompileError('invalid or duplicate prelude site');
         preludeSites.add(site);assertName(scheduleName,'schedule');
         if(preludeNames.has(scheduleName))throw new CompileError('duplicate prelude name');preludeNames.add(scheduleName);
         const gapMs=unsignedAtom(gapAtom,9007199254740991n,'invalid schedule gap');
         if(!gapMs)throw new CompileError('invalid schedule gap');
-        const expected={ 'at-pulse':3,'at-window':4,'solar-context-pulse':9,'cron-pulse':10,'calendar-daily-pulse':8,'holiday-daily-pulse':7,'tide-run':8,'config-daily-slots-pulse':6,'utc-range':6,'calendar-range':8,'civil-range':7 }[h];
+        const expected={ 'at-pulse':3,'at-window':4,'solar-context-pulse':9,'solar-weekday-pulse':10,'cron-pulse':10,'calendar-daily-pulse':8,'holiday-daily-pulse':7,'tide-run':8,'tide-weekday-run':9,'config-daily-slots-pulse':6,'utc-range':6,'calendar-range':8,'civil-range':7 }[h];
         if(h==='periodic-pulse'?![5,6].includes(payload.length):h==='config-daily-slots-pulse'?![6,7].includes(payload.length):payload.length!==expected)throw new CompileError(`${h} has invalid arity`);
         const [whenForm,cancelForm]=payload.slice(-2);
         const when=checkedExpression(whenForm,contextEnv(),false),cancel=checkedExpression(cancelForm,contextEnv(),false);
@@ -503,8 +503,8 @@ function lowerCoreModule(ast) {
         const dst=value=>{const index=['skip','next_valid'].indexOf(value);if(index<0)throw new CompileError('invalid DST missing policy');return index;};
         const repeated=value=>{const index=['first','second','both','skip'].indexOf(value);if(index<0)throw new CompileError('invalid DST repeated policy');return index;};
         let detail;
-        if(h==='solar-context-pulse'){
-          const [timezone,latitude,longitude,event,offset,fallback,dependencies]=data;
+        if(h==='solar-context-pulse'||h==='solar-weekday-pulse'){
+          const [timezone,latitude,longitude,event,offset,fallback,dependencies,weekdayMask]=data;
           if(!['rise','set'].includes(event))throw new CompileError('invalid Solar event');
           if(!Array.isArray(dependencies)||dependencies[0]!=='config-deps'||dependencies.length>129)throw new CompileError('invalid Solar config dependencies');
           const configIds=dependencies.slice(1).map(atom=>Number(unsignedAtom(atom,4294967295n,'invalid Solar config id')));
@@ -518,7 +518,9 @@ function lowerCoreModule(ast) {
           detail={timezone:text(timezone),latitude:finiteAtom(latitude,-90,90,'invalid Solar latitude'),
             longitude:finiteAtom(longitude,-180,180,'invalid Solar longitude'),event,
             offset:signedAtom(offset,-86400000n,86400000n,'invalid Solar offset'),
-            fallbackAt:unsignedAtom(fallback,86400000n,'invalid Solar fallback time'),configIds};
+            fallbackAt:unsignedAtom(fallback,86400000n,'invalid Solar fallback time'),configIds,
+            ...(h==='solar-weekday-pulse'?{weekdayMask:Number(unsignedAtom(weekdayMask,127n,'invalid weekday mask'))}:{})};
+          if(h==='solar-weekday-pulse'&&!detail.weekdayMask)throw new CompileError('invalid weekday mask');
         }else if(h==='at-pulse'){
           detail={at:unsignedAtom(data[0],253402300799999n,'invalid At DateTime')};
         }else if(h==='civil-range'){
@@ -584,14 +586,16 @@ function lowerCoreModule(ast) {
           const [at,duration]=data;
           detail={at:unsignedAtom(at,253402300799999n,'invalid At instant'),duration:unsignedAtom(duration,9007199254740991n,'invalid At Window duration')};
           if(!detail.duration||detail.at+detail.duration>253402300799999n)throw new CompileError('invalid At Window bounds');
-        }else if(h==='tide-run'){
-          const [timezone,provider,event,offset,run,within]=data;
+        }else if(h==='tide-run'||h==='tide-weekday-run'){
+          const [timezone,provider,event,offset,run,within,weekdayMask]=data;
           if(!['high','low'].includes(event))throw new CompileError('invalid Tide event');
           detail={timezone:text(timezone),provider:text(provider),high:event==='high'?1:0,
             offset:signedAtom(offset,-86400000n,86400000n,'invalid Tide offset'),
             run:unsignedAtom(run,9007199254740991n,'invalid Tide run'),
-            within:unsignedAtom(within,9007199254740991n,'invalid Tide within')};
+            within:unsignedAtom(within,9007199254740991n,'invalid Tide within'),
+            ...(h==='tide-weekday-run'?{weekdayMask:Number(unsignedAtom(weekdayMask,127n,'invalid weekday mask'))}:{})};
           if(!detail.run||!detail.within)throw new CompileError('invalid Tide duration');
+          if(h==='tide-weekday-run'&&!detail.weekdayMask)throw new CompileError('invalid weekday mask');
         }else{
           const [timezone,configIdAtom,...rest]=data;
           const withRange=rest.length===3;
@@ -721,7 +725,7 @@ function lowerCoreModule(ast) {
 function emitGfb(moduleIr, { onExpressions } = {}) {
   const {name,version,inputs,states,strategies,constraints,temporal,objectives:compiledObjectives}=moduleIr;
   const preludeKinds=new Set(strategies.flatMap(strategy=>strategy.extensions.preludes.map(prelude=>prelude.kind)));
-  const hasContext=['config-stream','periodic-pulse','cron-pulse','calendar-daily-pulse','holiday-daily-pulse','solar-context-pulse','tide-run',
+  const hasContext=['config-stream','periodic-pulse','cron-pulse','calendar-daily-pulse','holiday-daily-pulse','solar-context-pulse','solar-weekday-pulse','tide-run','tide-weekday-run',
     'config-daily-slots-pulse','natural-result','accounting-result','utc-range','at-pulse','at-window','calendar-range','calendar-result','civil-range'].some(kind=>preludeKinds.has(kind));
   const hasDailySlots=preludeKinds.has('daily-slots'),hasDaily=preludeKinds.has('daily');
   const hasTrueFors=preludeKinds.has('true-for');
@@ -759,7 +763,9 @@ function emitGfb(moduleIr, { onExpressions } = {}) {
   if(liveRangeStart&&calendarExecution)throw new CompileError('live Range start cannot mix with calendar execution');
   const civilRange=preludeKinds.has('civil-range');
   if(civilRange&&(hasPid||[...preludeKinds].some(kind=>!['civil-range','window'].includes(kind))))throw new CompileError('civil Range profile requires immutable civil Range schedules without other schedule/provider/config profiles');
-  const format=preludeKinds.has('at-window')?23:civilRange?21:timeSlotsRange?20:liveRangeStart?19:calendarExecution?18:preludeKinds.has('solar-context-pulse')?16:preludeKinds.has('holiday-daily-pulse')?15:preludeKinds.has('at-pulse')?14:extendedNatural?13:preludeKinds.has('utc-range')?12:hasContext?11:hasDailySlots?9:hasDaily?8:hasPid?7:hasTrueFors?6:hasSchedules?5:temporal?4:format3?3:intDeclarations||intExpressions?2:1;
+  const weekdayNatural=preludeKinds.has('solar-weekday-pulse')||preludeKinds.has('tide-weekday-run');
+  if(weekdayNatural&&(hasPid||[...preludeKinds].some(kind=>!['solar-weekday-pulse','tide-weekday-run'].includes(kind))))throw new CompileError('weekday natural profile requires filtered Solar/Tide schedules only');
+  const format=preludeKinds.has('solar-weekday-pulse')||preludeKinds.has('tide-weekday-run')?24:preludeKinds.has('at-window')?23:civilRange?21:timeSlotsRange?20:liveRangeStart?19:calendarExecution?18:preludeKinds.has('solar-context-pulse')?16:preludeKinds.has('holiday-daily-pulse')?15:preludeKinds.has('at-pulse')?14:extendedNatural?13:preludeKinds.has('utc-range')?12:hasContext?11:hasDailySlots?9:hasDaily?8:hasPid?7:hasTrueFors?6:hasSchedules?5:temporal?4:format3?3:intDeclarations||intExpressions?2:1;
   const w=new Writer();w.bytes(UTF8.encode('GFB1'));w.u16(format);w.str(name);w.u32(version);
   const typeCode=type=>TYPE[type.toLowerCase()];
   w.u16(inputs.length);for(const x of inputs){w.str(x.name);w.u8(typeCode(x.type));}
@@ -783,7 +789,7 @@ function emitGfb(moduleIr, { onExpressions } = {}) {
   }if(prelude.kind==='accounting-result'){
     w.str(x.account);w.str(x.event);w.str(x.timezone);for(const index of x.indices)w.u16(index);return;
   }w.u64(x.gapMs);
-    if(prelude.kind==='solar-context-pulse'){w.str(d.timezone);w.f64(d.latitude);w.f64(d.longitude);w.u8(d.event==='rise'?0:1);w.i64(d.offset);w.u64(d.fallbackAt);w.u16(d.configIds.length);for(const id of d.configIds)w.u32(id);}
+    if(prelude.kind==='solar-context-pulse'||prelude.kind==='solar-weekday-pulse'){w.str(d.timezone);w.f64(d.latitude);w.f64(d.longitude);w.u8(d.event==='rise'?0:1);w.i64(d.offset);w.u64(d.fallbackAt);w.u16(d.configIds.length);for(const id of d.configIds)w.u32(id);if(prelude.kind==='solar-weekday-pulse')w.u8(d.weekdayMask);}
     else if(prelude.kind==='at-pulse'){w.u64(d.at);}
     else if(prelude.kind==='at-window'){w.u64(d.at);w.u64(d.duration);}
     else if(prelude.kind==='civil-range'){w.str(d.timezone);w.u64(d.duration);w.u16(d.starts.length);for(const start of d.starts)w.u64(start);w.u8(missingCode(d.missing));w.u8(repeatedCode(d.repeated));}
@@ -792,12 +798,42 @@ function emitGfb(moduleIr, { onExpressions } = {}) {
     else if(prelude.kind==='cron-pulse'){w.str(d.timezone);w.u8(missingCode(d.missing));w.u8(repeatedCode(d.repeated));for(const field of d.fields){w.u8(field.length);for(const value of field)w.u8(value);}}
     else if(prelude.kind==='calendar-daily-pulse'){w.str(d.timezone);w.u64(d.at);w.str(d.calendar);w.u8(d.offday==='offday'?1:0);w.u8(missingCode(d.missing));w.u8(repeatedCode(d.repeated));}
     else if(prelude.kind==='holiday-daily-pulse'){w.str(d.timezone);w.u64(d.at);w.str(d.calendar);w.u8(missingCode(d.missing));w.u8(repeatedCode(d.repeated));}
-    else if(prelude.kind==='tide-run'){w.str(d.timezone);w.str(d.provider);w.u8(d.high==='high'?1:0);w.i64(d.offset);w.u64(d.run);w.u64(d.within);}
+    else if(prelude.kind==='tide-run'||prelude.kind==='tide-weekday-run'){w.str(d.timezone);w.str(d.provider);w.u8(d.high==='high'?1:0);w.i64(d.offset);w.u64(d.run);w.u64(d.within);if(prelude.kind==='tide-weekday-run')w.u8(d.weekdayMask);}
     else {w.str(d.timezone);w.u32(d.configId);if(format>=20)w.u64(d.rangeDuration??0n);w.u8(missingCode(d.missing));w.u8(repeatedCode(d.repeated));}
     for(const expression of [x.when,x.cancel]){const bytes=encode(expression,'invalid context schedule predicate').bytes;w.u32(bytes.length);w.bytes(bytes);}
-    if(format===13||format===15||format===16)w.u64(x.holdMs??0n);
+    if(format===13||format===15||format===16||format===24)w.u64(x.holdMs??0n);
   };
-  w.u16(compiledStrategies.length);for(const s of compiledStrategies){w.str(s.name);w.i32(s.priority);w.u32(s.query.length);w.bytes(s.query);if(temporal){if(taggedPreludes){w.u16(s.preludes.length);for(const prelude of s.preludes){const tag={'window':0,'schedule':1,'true-for':2,'daily':3,'daily-slots':4,'periodic-pulse':5,'cron-pulse':6,'calendar-daily-pulse':7,'tide-run':8,'config-daily-slots-pulse':9,'natural-result':10,'accounting-result':11,'config-stream':12,'utc-range':13,'at-pulse':14,'holiday-daily-pulse':15,'solar-context-pulse':16,'calendar-range':17,'calendar-result':18,'civil-range':19,'at-window':20}[prelude.kind];w.u8(tag);if(tag>=5)writeContext(prelude);else if(prelude.kind==='window')writeWindow(prelude.value);else if(prelude.kind==='schedule')writeSchedule(prelude.value);else if(prelude.kind==='daily')writeDaily(prelude.value);else if(prelude.kind==='daily-slots')writeDailySlots(prelude.value);else writeTrueFor(prelude.value);}}else{w.u16(s.windows.length);for(const window of s.windows)writeWindow(window);}}w.u16(s.transitions.length);for(const t of s.transitions){w.u16(t.index);w.u32(t.expr.length);w.bytes(t.expr);}w.u16(s.intents.length);for(const i of s.intents){w.str(i.name);w.u8(typeCode(i.type));w.u32(i.expr.length);w.bytes(i.expr);}}
+  w.u16(compiledStrategies.length);
+  for(const s of compiledStrategies){
+    w.str(s.name);w.i32(s.priority);w.u32(s.query.length);w.bytes(s.query);
+    if(temporal){
+      if(taggedPreludes){
+        w.u16(s.preludes.length);
+        for(const prelude of s.preludes){
+          const tag={'window':0,'schedule':1,'true-for':2,'daily':3,'daily-slots':4,'periodic-pulse':5,
+            'cron-pulse':6,'calendar-daily-pulse':7,'tide-run':8,'config-daily-slots-pulse':9,
+            'natural-result':10,'accounting-result':11,'config-stream':12,'utc-range':13,
+            'at-pulse':14,'holiday-daily-pulse':15,'solar-context-pulse':16,'calendar-range':17,
+            'calendar-result':18,'civil-range':19,'at-window':20,'solar-weekday-pulse':21,
+            'tide-weekday-run':22}[prelude.kind];
+          w.u8(tag);
+          if(tag>=5)writeContext(prelude);
+          else if(prelude.kind==='window')writeWindow(prelude.value);
+          else if(prelude.kind==='schedule')writeSchedule(prelude.value);
+          else if(prelude.kind==='daily')writeDaily(prelude.value);
+          else if(prelude.kind==='daily-slots')writeDailySlots(prelude.value);
+          else writeTrueFor(prelude.value);
+        }
+      }else{
+        w.u16(s.windows.length);
+        for(const window of s.windows)writeWindow(window);
+      }
+    }
+    w.u16(s.transitions.length);
+    for(const t of s.transitions){w.u16(t.index);w.u32(t.expr.length);w.bytes(t.expr);}
+    w.u16(s.intents.length);
+    for(const i of s.intents){w.str(i.name);w.u8(typeCode(i.type));w.u32(i.expr.length);w.bytes(i.expr);}
+  }
   w.u16(constraints.length);for(const c of constraints){w.u8(({requires:1,mutex:2,requires_any:3})[c.kind]);w.u16(c.names.length);for(const n of c.names)w.str(n);}
   if(format===7||format>=11){w.u16(compiledObjectives.length);for(const objective of compiledObjectives){w.str(objective.name);w.str(objective.outputPort);for(const index of objective.indices)w.u16(index);if(format>=11)w.u16(objective.targetOkIndex);w.u64(objective.period);w.u64(objective.late);w.u8(objective.direction==='direct'?0:1);for(const value of objective.numbers)w.f64(value);}}
   return w.finish();

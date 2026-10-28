@@ -644,6 +644,25 @@ These two fields are required for `Daily`, `DailySlots`, `Cron` and civil `Perio
 
 When a natural-event offset crosses midnight, apply the day filter to the calculated **scheduled start local Date**. Also retain the original natural event's source date in the trace. Do not stop an already admitted Run merely because the day changed.
 
+The executable Solar and Tide `on = day` profile accepts weekdays from `sun`
+through `sat`, contiguous ranges such as `mon..fri`, and comma lists. It does
+not yet accept `holiday`, `workday`, or `offday` for natural events. A Monday
+00:10 tide event in `Asia/Seoul` with a `high - 30min` offset plans a Sunday
+23:40 start. A Sunday filter is eligible; a Monday filter terminates as
+`DayIneligible`, with `.missed = false` and no `.due`. An admitted Tide Run
+continues across midnight until its original end.
+
+The host resolves the selected offset or Solar fallback instant in the IANA
+timezone and sends a fact binding `sourceDay`, `scheduledDay`, timezone, planned
+instant, and provider, context, and resolver revisions. `sourceDay` retains the
+provider's original event identity; it is never recomputed from the offset.
+The core cannot independently prove external timezone data, so the host
+conversion and revisions form a trust boundary. A missing or conflicting
+required fact rejects the entire scan. An unavailable conversion produces
+`Unknown(CivilDateUnavailable)` without admission or terminalization; later
+facts do not catch up a past pulse. Traces show both dates. Checkpoints retain
+terminal and deduplication history but do not resume an active Run.
+
 Weekdays, holidays and site workdays are different rules. Declare calendars as logical providers bound to actual data by the installation profile.
 
 ```ghost
@@ -666,7 +685,7 @@ A weekday tag needs no calendar. `holiday` requires HolidayCalendar; `workday` a
 `holiday` is membership in the public holiday date list. A `work` exception for
 the same date preserves the holiday fact; weekly pattern and holiday work policy
 do not affect it. Daily pulses for `holiday`, `workday` and `offday` use typed
-calendars and explicit common/DST policies. Weekday tags remain outside this
+calendars and explicit common/DST policies. Weekday tags for Daily pulses remain outside this
 execution scope. Ordinary `calendar_is` with a `workday`, `offday` or `holiday`
 selector returns the typed Result below; its bounded executable profile requires
 an explicit UTC calendar binding. Other timezone profiles are rejected at

@@ -7,6 +7,7 @@ import { encodeTemporalProfile } from './temporal-profile.mjs';
 import { validateSolarDescriptor, validateClockPolicy, validateSolarFallback, validateSolarFallbackFacts } from './solar-schedule.mjs';
 import { validateSolarActivation } from './solar-abi.mjs';
 import { encodeContextActivation, encodeContextFacts, validateContextSolarFacts } from './context-abi.mjs';
+import { naturalScheduledDateFacts } from './civil-date.mjs';
 import { QUANTITY_TYPES, canonicalUnitFor, isQuantityType } from '../../tools/quantities.mjs';
 import { TIME_TYPES, TIME_BOUNDS, isTimeType, validateTimeValue } from '../../tools/time-literals.mjs';
 import { isInt32, intSettingsIssue } from '../../tools/int-settings.mjs';
@@ -25,6 +26,7 @@ const STREAM_CONTEXT_FORMAT = 'GhostFlow/control-v10';
 const AVAILABILITY_FORMAT = 'GhostFlow/control-v12';
 const AT_FORMAT = 'GhostFlow/control-v13';
 const AT_WINDOW_FORMAT = 'GhostFlow/control-v23';
+const NATURAL_WEEKDAY_FORMAT = 'GhostFlow/control-v24';
 const HOLIDAY_FORMAT = 'GhostFlow/control-v14';
 const SOLAR_CONTEXT_FORMAT = 'GhostFlow/control-v15';
 const CALENDAR_EXECUTION_FORMAT = 'GhostFlow/control-v18';
@@ -40,6 +42,7 @@ const contextManifest = manifest => manifest?.format === STREAM_CONTEXT_FORMAT
   || manifest?.format === HOLIDAY_FORMAT
   || manifest?.format === AT_FORMAT
   || manifest?.format === AT_WINDOW_FORMAT
+  || manifest?.format === NATURAL_WEEKDAY_FORMAT
   || manifest?.format === AVAILABILITY_FORMAT && !manifest.schedules?.some(item => item.kind === 'solar');
 
 /** Select an existing reference entry explicitly; never retry after a dispatch error. */
@@ -265,7 +268,7 @@ function validateContextManifest(input, bytecodeFormat) {
     ['providers','calendars','naturalConditions','calendarConditions','accounting','resources','objectives','adaptSettings','lifecycle','legacyAdmission','requiredRuntimeFeatures'], 'manifest');
   validateRequiredRuntimeFeatures(manifest);
   const lifecycle = validateLifecycleManifest(manifest);
-  if (manifest.format === AT_WINDOW_FORMAT ? bytecodeFormat !== 23 : manifest.format === CIVIL_RANGE_FORMAT ? bytecodeFormat !== 21 : manifest.format === TIMESLOTS_RANGE_FORMAT ? bytecodeFormat !== 20 : manifest.format === RANGE_LIVE_START_FORMAT ? bytecodeFormat !== 19 : manifest.format === CALENDAR_EXECUTION_FORMAT ? bytecodeFormat !== 18 : manifest.format === SOLAR_CONTEXT_FORMAT ? bytecodeFormat !== 16 : manifest.format === HOLIDAY_FORMAT ? bytecodeFormat !== 15 : manifest.format === AT_FORMAT ? bytecodeFormat !== 14 : manifest.format === AVAILABILITY_FORMAT ? bytecodeFormat !== 13 : ![11, 12].includes(bytecodeFormat)) throw new Error('context manifest requires its matching GFB format');
+  if (manifest.format === NATURAL_WEEKDAY_FORMAT ? bytecodeFormat !== 24 : manifest.format === AT_WINDOW_FORMAT ? bytecodeFormat !== 23 : manifest.format === CIVIL_RANGE_FORMAT ? bytecodeFormat !== 21 : manifest.format === TIMESLOTS_RANGE_FORMAT ? bytecodeFormat !== 20 : manifest.format === RANGE_LIVE_START_FORMAT ? bytecodeFormat !== 19 : manifest.format === CALENDAR_EXECUTION_FORMAT ? bytecodeFormat !== 18 : manifest.format === SOLAR_CONTEXT_FORMAT ? bytecodeFormat !== 16 : manifest.format === HOLIDAY_FORMAT ? bytecodeFormat !== 15 : manifest.format === AT_FORMAT ? bytecodeFormat !== 14 : manifest.format === AVAILABILITY_FORMAT ? bytecodeFormat !== 13 : ![11, 12].includes(bytecodeFormat)) throw new Error('context manifest requires its matching GFB format');
   name(manifest.name, 'manifest.name');
   if (!/^[0-9a-f]{64}$/.test(manifest.bytecodeSha256)) throw new Error('invalid bytecode SHA-256');
   const inputs = validateList(manifest.inputs, 'manifest.inputs', ['name','type'], ['canonicalUnit']);
@@ -298,6 +301,10 @@ function validateContextManifest(input, bytecodeFormat) {
   if (manifest.format !== CALENDAR_EXECUTION_FORMAT && calendarConditions.length) throw new Error('calendar Result requires control-v18');
   const accounting = manifest.accounting === undefined ? null : copy(record(manifest.accounting, 'manifest.accounting'));
   if (manifest.format === SOLAR_CONTEXT_FORMAT && !schedules.some(item => item.kind === 'solar')) throw new Error('Solar context profile requires Solar');
+  if (manifest.format === NATURAL_WEEKDAY_FORMAT && (!schedules.length || schedules.some(item => !['solar', 'tide'].includes(item.kind)
+    || item.day?.kind !== 'weekday' || !Number.isInteger(item.day.mask) || item.day.mask < 1 || item.day.mask > 127)
+    || configs.length || calendars.length || naturals.length || calendarConditions.length || objectives.length
+    || resources.length || adaptSettings.length || accounting)) throw new Error('weekday natural profile requires filtered Solar/Tide schedules');
   if (manifest.format === HOLIDAY_FORMAT && (!schedules.some(item => item.kind === 'daily' && item.day?.kind === 'holiday')
     || schedules.some(item => item.kind === 'at'))) throw new Error('Holiday profile requires Holiday Daily and excludes At');
   if ([AT_FORMAT, AT_WINDOW_FORMAT].includes(manifest.format) && (!schedules.length || schedules.some(item => item.kind !== 'at')
@@ -332,8 +339,9 @@ function validateContextManifest(input, bytecodeFormat) {
       continue;
     }
     if (item.kind === 'solar') {
-      if (manifest.format !== SOLAR_CONTEXT_FORMAT) throw new Error('context Solar requires control-v15 and GFB16');
-      keys(item, ['kind','site','name','timezone','latitude','longitude','event','offsetMs','policy','configIds'], [], 'context Solar schedule');
+      if (![SOLAR_CONTEXT_FORMAT, NATURAL_WEEKDAY_FORMAT].includes(manifest.format)) throw new Error('context Solar requires matching control and GFB profile');
+      keys(item, ['kind','site','name','timezone','latitude','longitude','event','offsetMs','policy','configIds'], manifest.format === NATURAL_WEEKDAY_FORMAT ? ['day'] : [], 'context Solar schedule');
+      if (manifest.format === NATURAL_WEEKDAY_FORMAT) keys(record(item.day, 'weekday rule'), ['kind','mask'], [], 'weekday rule');
       if (!Array.isArray(item.configIds) || item.configIds.length > 128
         || item.configIds.some((id, index) => !Number.isSafeInteger(id) || id <= 0 || id > 0xffff_ffff
           || index > 0 && id <= item.configIds[index - 1] || !configs.some(config => config.id === id))) throw new Error('invalid context Solar config dependencies');
@@ -411,8 +419,11 @@ function validateContextManifest(input, bytecodeFormat) {
     }
     if (!range && item.kind === 'daily-slots' && !item.selectedConfig) throw new Error('context DailySlots requires TimeSlots config');
     if (item.kind === 'tide' && !providers.some(p => p.name === item.source && p.type === 'TidePredictions')) throw new Error('unbound Tide provider');
+    if (item.kind === 'tide' && manifest.format === NATURAL_WEEKDAY_FORMAT) {
+      keys(record(item.day, 'weekday rule'), ['kind','mask'], [], 'weekday rule');
+    } else if (item.kind === 'tide' && item.day) throw new Error('weekday rule requires control-v24');
     if (!range) {
-      validateClockPolicy(item.policy?.clock, { allowHold: [AVAILABILITY_FORMAT, HOLIDAY_FORMAT, SOLAR_CONTEXT_FORMAT].includes(manifest.format) && item.kind === 'tide' });
+      validateClockPolicy(item.policy?.clock, { allowHold: [AVAILABILITY_FORMAT, HOLIDAY_FORMAT, SOLAR_CONTEXT_FORMAT, NATURAL_WEEKDAY_FORMAT].includes(manifest.format) && item.kind === 'tide' });
       if (item.policy?.fallback !== 'skip' || item.policy?.recovery !== 'baseline') throw new Error('unsupported context schedule fallback or recovery');
     }
   }
@@ -1386,6 +1397,9 @@ export class ControlRuntime {
     if (this.#hasContext && contextFacts === undefined) throw new Error('context facts are required');
     if (!this.#hasContext && contextFacts !== undefined) throw new Error('context facts require a GFB10 control');
     if (this.#hasContext) {
+      if (this.manifest.format === NATURAL_WEEKDAY_FORMAT && contextFacts.scheduledDates === undefined) {
+        contextFacts = { ...contextFacts, scheduledDates: naturalScheduledDateFacts(contextFacts, this.manifest.schedules) };
+      }
       validateContextSolarFacts(contextFacts, this.manifest.schedules);
       encodeContextFacts(contextFacts);
       if (contextFacts.clock.monotonicMs !== nowMs) throw new Error('context clock.monotonicMs must equal nowMs');

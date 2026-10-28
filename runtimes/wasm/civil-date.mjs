@@ -29,3 +29,37 @@ export function scheduledLocalDateFact({ site, sourceKey, sourceDay, timezone, p
     scheduledDay: localEpochDay(plannedWallMs, timezone), unavailableReason: null,
     providerRevision, contextRevision, resolverRevision };
 }
+
+// This revision names the host conversion algorithm, not the host's tzdb
+// release. Provider/context revisions remain separate evidence.
+export const LOCAL_DATE_RESOLVER_REVISION = 'intl-gregory-v1';
+
+export function naturalScheduledDateFacts(packet, descriptors) {
+  const facts = [];
+  for (const descriptor of descriptors) {
+    if (descriptor.day?.kind !== 'weekday') continue;
+    const evidence = descriptor.kind === 'solar'
+      ? packet.solars?.find(row => row.site === descriptor.site)
+      : packet.schedules?.find(row => row.site === descriptor.site);
+    if (!evidence) continue; // The provider binding validator rejects the missing envelope.
+    for (const row of evidence.rows) {
+      if (descriptor.kind === 'tide' && (row.withdrawn || row.eventKind !== descriptor.event)) continue;
+      const plannedWallMs = descriptor.kind === 'solar'
+        ? row.scheduledWallMs ?? row.fallbackWallMs
+        : row.instantMs == null ? null : row.instantMs + descriptor.offsetMs;
+      if (plannedWallMs == null) continue;
+      const base = { site: descriptor.site,
+        sourceKey: descriptor.kind === 'solar' ? `solar:${row.sourceDay}` : `tide:${row.eventId}`,
+        sourceDay: row.sourceDay, timezone: descriptor.timezone, plannedWallMs,
+        providerRevision: row.providerRevision, contextRevision: row.contextRevision,
+        resolverRevision: LOCAL_DATE_RESOLVER_REVISION };
+      try {
+        facts.push(scheduledLocalDateFact(base));
+      } catch (error) {
+        if (!(error instanceof RangeError)) throw error;
+        facts.push({ ...base, scheduledDay: null, unavailableReason: 'CivilDateUnavailable' });
+      }
+    }
+  }
+  return facts;
+}

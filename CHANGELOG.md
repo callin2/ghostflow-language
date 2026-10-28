@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### 2026-10-28 — natural-event weekday admission ([#224](https://github.com/callin2/ghostflow-language/issues/224))
+
+Solar and Tide schedules now execute `on = day` weekday filters against the
+scheduled local date after offset or chosen fallback, while retaining the
+provider's source date. A false day is terminal `DayIneligible` without a
+missed pulse. Missing or contradictory date facts reject the scan; unavailable
+IANA conversion remains Unknown without later pulse catch-up. GFB24/control-v24
+is a distinct fail-closed profile for filtered natural schedules. Native/WASM
+tests cover midnight, restart, date-fact rejection, and unknown conversion.
+This is compiler/runtime evidence, not Device or physical acceptance.
+
 ### 2026-10-28 — one-shot At Window execution ([#153](https://github.com/callin2/ghostflow-language/issues/153), [#215](https://github.com/callin2/ghostflow-language/issues/215), [#219](https://github.com/callin2/ghostflow-language/issues/219))
 
 Reference §3.5 `At` now executes a positive constant `window(Duration)` with
