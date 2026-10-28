@@ -53,4 +53,42 @@ const result = host.step({ bindingRevision: installation.revision, nowMs: 1000,
 
 교체는 후보 전체를 검증하고 전략을 활성화한 뒤 게시합니다. 예를 들어 `WithReading`이 필수 Number 센서에 match하고 현재 읽기가 Stale일 때, 후보가 그 센서를 Bool 엔드포인트에 연결하면 `type_mismatch`로 거부합니다. 기존 프로필·run·바인딩·상태·최근 trace를 보존합니다. 이후 step도 `WithReading`과 명시적 fault 분기를 계속 실행합니다. 호환 후보는 새 run으로 게시하며 센서는 `NotReady`, Program 상태는 소스의 초기값에서 시작합니다.
 
-지원 Program은 소스 재검증을 통과한 독립형 `control-v1` 또는 `control-v4` 바이트, 필수 Number/Bool 센서 한 개 이상, Bool 출력으로 한정합니다. 선택 센서 바인딩과 호출자가 임의로 제공한 capability는 이 호스트 프로필 범위에 포함하지 않습니다. 검증된 Bool 출력은 전략 선택의 actuator capability로 사용할 수 있습니다. 일정·타이머·signal·config·import·scalar 입력은 게시 전에 거부합니다. 실제 Device 바인딩 적용, Driver 보장, 물리 부하 동작은 별도의 증거가 필요합니다.
+독립형 Program은 소스 재검증을 통과한 `control-v1` 또는 `control-v4` 바이트, 필수 Number/Bool 센서 한 개 이상, Bool 출력으로 한정합니다. 선택 센서 바인딩과 호출자가 임의로 제공한 capability는 이 호스트 프로필 범위에 포함하지 않습니다. 검증된 Bool 출력은 전략 선택의 actuator capability로 사용할 수 있습니다. 일정·타이머·signal·config·import·scalar 입력은 게시 전에 거부합니다. 실제 Device 바인딩 적용, Driver 보장, 물리 부하 동작은 별도의 증거가 필요합니다.
+
+## 설치된 합성 실행
+
+합성 프로필은 정본으로 고정한 source closure, Interaction Schema, 인스턴스별
+state·config·timer, 필수 Number/Bool 센서, Bool 출력이 있는 `control-v10`을 받습니다.
+활성화에는 `context`, 행위자별 `grants`, 선택적으로 `historyCapacity`를 전달합니다.
+호스트가 내부에서 소유하는 framed `TemporarySettingsHost` 한 개가 유일한 controller를
+소유합니다. 설정, 관측과 설명은 같은 실제 scan에서 나옵니다.
+
+root에는 port 선언, instance, root 입력에서 instance 입력으로 또는 instance 출력에서
+root 출력으로 직접 이어지는 연결만 허용합니다. 중첩 instance, instance 간 연결,
+root 계산, schedule과 signal은 거부합니다. 경로는 컴파일러가 재구성한 정본 AST,
+`sourceClosure`, `sourceMap`에서 도출하고 typed `sensorInstances` 입력 매핑과
+일치해야 합니다. root와 모든 instance 센서에 대해 실제 승인한 endpoint의 단위·측정
+범위·sample gap과 stale 경계를 검사합니다. 생성된 런타임 이름으로 경로를 추측하지 않습니다.
+
+`step(frame, settingsEvent)`에 수집 packet과 추가 `contextFacts` 필드를 전달합니다.
+기존 임시 설정 event 계약은 `snapshot().execution`의 현재 식별자를 사용합니다.
+endpoint·binding revision·수집 형태 검사는 설정 소유자에 진입하기 전에 끝납니다.
+유효한 `Invalid` 또는 `Disconnected` 관측은 오류로 conditioner에 전달하고,
+epoch·sample ID·timestamp에는 공통 런타임의 샘플 식별 규칙을 그대로 적용합니다.
+
+수락된 결과는 실제 설정 소유자 결과인 `execution`과 run·scan·논리 시각·확정된 설정
+revision·승인 digest·instance 경로를 묶은 `provenance`를 포함합니다.
+`explainOutput('output.east_on', result)`는 소유자의 현재 완료 결과만 받습니다.
+실제 proof와 observation을 결합하고 descriptor, 해당 instance의 유효 설정, 입력 경로와
+출력 endpoint를 반환합니다. 이전 결과, 뒤바꾼 경로·설정·revision은 거부합니다.
+`ready` join은 연결의 유효성을 뜻하고 표현식 설명의 제공 여부는 `proof.status`가
+별도로 표시합니다. state 기반 Bool proof는 제공하며 config/timer 생성 rail 표현식은
+여전히 unavailable입니다. 이 근거는 물리 Driver 인증이나 state transition,
+safety output, applied output, 실물 효과의 증명이 아닙니다.
+
+교체는 새 소유자를 완전히 준비한 뒤 게시합니다. 거절된 후보는 설정·overlay·history·
+state·timer·conditioner·최신 완료 결과·assessment를 유지합니다. 성공하면 새 run에서
+state·설정·conditioner를 초기화하고 이전 완료 결과를 지웁니다. 이 한정 경로는
+REF-06-002와 REF-06-016의 근거이며 더 넓은 요구 범위는 미완료입니다.
+`tests/installed-composition.test.mjs`는 실제 WASM 실행으로 같은 시각의 east/west 독립성,
+근거 연결, 변조, 오류와 교체를 검증합니다.

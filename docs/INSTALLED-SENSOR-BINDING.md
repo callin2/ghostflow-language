@@ -50,4 +50,49 @@ After integration validation confirms every required sensor binding and endpoint
 
 A replacement validates the complete candidate and activates its strategy before publication. For example, if `WithReading` matches a required Number sensor and the current reading is Stale, a candidate binding that sensor to a Bool endpoint fails with `type_mismatch`. The old profile, run, binding, state and latest trace remain available. Subsequent steps still execute `WithReading` and its explicit fault branch. A compatible candidate publishes a fresh run whose sensor starts `NotReady` and whose Program state starts from its source initializer.
 
-The supported Program profile has source-verified, standalone `control-v1` or `control-v4` bytes, at least one nonoptional Number/Bool sensor, Bool outputs, and no schedules, timers, signals, configs, imports, or scalar inputs. Optional sensor bindings and arbitrary caller-supplied capabilities remain outside this host profile. Validated Bool outputs remain available as actuator capabilities for strategy matching. Other profiles fail before publication. Device binding application, actual Driver guarantees, and physical load behavior remain separate evidence.
+The standalone Program profile has source-verified `control-v1` or `control-v4` bytes, at least one nonoptional Number/Bool sensor, Bool outputs, and no schedules, timers, signals, configs, imports, or scalar inputs. Optional sensor bindings and arbitrary caller-supplied capabilities remain outside this host profile. Validated Bool outputs remain available as actuator capabilities for strategy matching. Other profiles fail before publication. Device binding application, actual Driver guarantees, and physical load behavior remain separate evidence.
+
+## Installed composed execution
+
+The composed profile accepts `control-v10` with a canonical pinned source closure,
+an Interaction Schema, private instance states, configs and timers, required
+Number/Bool sensors and Bool outputs. Pass `context`, actor `grants` and optionally
+`historyCapacity` at activation. The host privately owns one framed
+`TemporarySettingsHost`, which owns the only controller. Settings, observations
+and explanations come from that same actual scan.
+
+The root contains only port declarations, instances and direct root input to
+instance input or instance output to root output connections. Nested instances,
+instance-to-instance routes, root computations, schedules and signals are
+rejected. Routes come from the compiler-replayed canonical AST, `sourceClosure`
+and `sourceMap`, and agree with the typed `sensorInstances` input mapping.
+Every root and instance sensor is checked against its actual admitted endpoint,
+including unit, measurement range and sample-gap/stale limit. Generated runtime
+names do not define routes.
+
+Call `step(frame, settingsEvent)` with acquired packets and an extra `contextFacts`
+field. The existing temporary-settings event contract uses current identity from
+`snapshot().execution`. Endpoint, binding revision and acquisition shape checks
+precede entry to the settings owner. Valid `Invalid` or `Disconnected` observations
+reach the conditioner as faults; epoch, sample ID and timestamp keep the shared
+runtime's sample identity rules.
+
+An accepted result includes the actual settings-owner `execution` and
+`provenance` binding its run, scan, logical time, committed settings revision,
+admission digests and instance routes. `explainOutput('output.east_on', result)`
+accepts only the owner's current completed result. It joins the actual proof and
+observation and returns the descriptor, instance's effective settings, input
+routes and output endpoint. Old results, swapped routes, settings or revisions
+reject. A `ready` join validates the association; `proof.status` separately says
+whether the expression explanation is available. State-based Bool proofs are
+available; config/timer generated-rail expressions remain unavailable. These
+receipts do not authenticate a physical Driver or prove state transitions,
+safety outputs, applied outputs or physical effects.
+
+Replacement prepares the complete new owner before publication. Rejected
+candidates preserve settings, overlays, history, state, timers, conditioners,
+latest completion and assessment. Success starts fresh state, settings and
+conditioners in a new run and clears previous completions. This bounded path
+contributes evidence to REF-06-002 and REF-06-016; their broader scope remains
+incomplete. `tests/installed-composition.test.mjs` exercises actual WASM execution,
+same-time east/west isolation, joined provenance, tampering, faults and replacement.
