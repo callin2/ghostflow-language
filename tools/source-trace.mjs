@@ -139,6 +139,7 @@ function provenanceError(entry, message) {
   error.filename = source.filename;
   error.line = source.line;
   error.column = source.column;
+  error.diagnosticSourceLocation = source;
   return error;
 }
 

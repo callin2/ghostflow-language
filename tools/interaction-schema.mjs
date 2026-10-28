@@ -121,6 +121,9 @@ function assertContractSchema(schema) {
 }
 
 function expectedSchema(compilation, identityValue) {
+  if (compilation?.traceMetadata?.compositionIntent) {
+    fail('interaction schema does not support instance-qualified imported intent metadata');
+  }
   if (compilation?.sourceClosure?.instances?.length
     && (compilation.manifest?.configs?.length || compilation.manifest?.timers?.length)) {
     fail('interaction schema does not support imported behavior instances');

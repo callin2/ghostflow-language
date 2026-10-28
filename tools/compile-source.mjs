@@ -149,6 +149,16 @@ function compileSourceCore(source, options, telemetry) {
     const mapFailure = error => {
       if (error.name === 'HardwareFrontMatterError') return error.diagnosticEnvelope;
       const errorDocument = error.filename === filename ? null : options.sourceClosure?.find(document => resolveDocument('', document.filename) === error.filename);
+      if (error.diagnosticSourceLocation && (error.filename === filename || errorDocument)) {
+        const location = error.diagnosticSourceLocation;
+        attachDiagnostic(error, 'GF_INTENT_PROVENANCE',
+          errorDocument ? { filename: error.filename, text: errorDocument.text } : { filename, text: source },
+          errorDocument ? undefined : interactionSourceIdentity,
+          { file: location.filename, line: location.line, column: location.column },
+          { line: location.endLine, column: location.endColumn },
+          errorDocument ? diagnosticSource(filename, source, interactionSourceIdentity) : undefined);
+        return error.diagnosticEnvelope;
+      }
       if (error.name === 'LiterateError' && errorDocument) {
         attachDiagnostic(error, 'GF_LITERATE', { filename: errorDocument.filename, text: errorDocument.text }, undefined,
           { file: error.filename, line: error.line, column: error.column }, undefined,
@@ -192,7 +202,7 @@ function compileSourceCore(source, options, telemetry) {
   }
   telemetry?.phase('postprocess');
   validateHardwareBindings(hardwarePlan, result.manifest);
-  if (extraction.anchors.length || extraction.linkDirectives.length) {
+  if (!composition && (extraction.anchors.length || extraction.linkDirectives.length)) {
     result = {
       ...result,
       traceMetadata: attachIntentMetadata(result.traceMetadata, {

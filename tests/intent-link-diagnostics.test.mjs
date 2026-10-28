@@ -113,7 +113,7 @@ test('instantiated import warns at its own source once; unused imports do not co
     if (instantiate) {
       assert.equal(result.warnings[0].span.file, 'child.ghost.md');
       assert.equal(result.warnings[0].span.start.line, 6);
-      assert.match(result.warnings[0].hint, /current composition contract rejects imported intent metadata/);
+      assert.match(result.warnings[0].hint, /original definition document.*Root links cannot cover imported statements/);
     }
   }
 });

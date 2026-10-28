@@ -2,6 +2,8 @@ import { parseControl, compileComposedControl, validateCompositionStructure, Con
 import { parseHardwareFrontMatter, HardwareFrontMatterError } from './hardware-frontmatter.mjs';
 import { extractLiterate } from './literate.mjs';
 import { sha256Hex, isWellFormedUnicode, utf8ByteLength } from './sha256.mjs';
+import { canonicalJson } from './canonical-json.mjs';
+import { attachIntentMetadata, remapSourceTrace } from './source-trace.mjs';
 
 // POSIX logical locators work identically in browsers and CLI supplied closures.
 export function resolveDocument(importer, locator) {
@@ -75,13 +77,16 @@ export function compileComposition(source, filename, supplied) {
   }
   const root = visit(source, filename);
   let nextId = 1, expanded = 0, transformed = 0;
-  const sourceNodes = [], instances = [], compositionChecks = [];
+  const sourceNodes = [], instances = [], compositionChecks = [], intentInstances = [];
+  let rootIntent;
   const sensorBindings = new Map();
   const allBodies = [];
   function instantiate(unit, path, argumentsList = [], callerTransform = value => value) {
     if (++expanded > 128) fail(unit.ast.loc, 'composition instance limit exceeded');
-    if (path && (unit.extraction.anchors.length || unit.extraction.linkDirectives.length)) fail(unit.ast.loc,
-      'imported intent links require instance-qualified intent metadata');
+    if (!unit.intentMetadata) unit.intentMetadata = attachIntentMetadata({}, {
+      anchors: unit.extraction.anchors, linkDirectives: unit.extraction.linkDirectives,
+      ast: unit.ast, sourceMap: unit.ast.sourceNodes, extractionMap: unit.extraction.sourceMap,
+    });
     for (const node of unit.ast.body) if (!simpleKinds.has(node.kind)) fail(node.loc, `composition of ${node.kind} requires its instance contract`);
     const prefix = path ? `instance_${path.split('.').map(part => `${part.length}_${part}`).join('_')}_` : '';
     const names = new Map(), ports = new Map(), outputs = new Map(), inputs = new Map(), ids = new Map();
@@ -94,6 +99,18 @@ export function compileComposition(source, filename, supplied) {
     for (const node of unit.ast.sourceNodes) {
       const id = nextId++; ids.set(node.id, id);
       sourceNodes.push({ ...node, id, instance: path || null, definitionNodeId: node.id });
+    }
+    if (unit.intentMetadata.intentAnchors) {
+      const links = unit.intentMetadata.intentLinks.map(link => ({ ...link, nodeId: ids.get(link.nodeId),
+        ...(path ? { definitionNodeId: link.nodeId } : {}),
+      }));
+      if (path) {
+        const { filename, revision, sha256 } = documents.get(resolveDocument('', unit.filename));
+        intentInstances.push({ instance: path, definition: { filename, revision, sha256 },
+          anchors: unit.intentMetadata.intentAnchors,
+          links: remapSourceTrace({ bindings: [], constraints: [], resultSites: [], intentLinks: links }, unit.extraction.sourceMap).intentLinks,
+        });
+      } else rootIntent = { intentAnchors: unit.intentMetadata.intentAnchors, intentLinks: links };
     }
     const parameters = new Map(unit.ast.body.filter(node => node.kind === 'parameter').map(node => [node.name, node]));
     const overrides = new Map();
@@ -227,5 +244,12 @@ export function compileComposition(source, filename, supplied) {
     result.manifest.sensors = result.manifest.sensors.filter(sensor => !sensorBindings.has(sensor.name));
   }
   const closure = { format: 'GhostFlow/source-closure-v1', documents: [...used].sort().map(key => documents.get(key)), instances };
+  if (rootIntent || intentInstances.length) result.traceMetadata = {
+    ...result.traceMetadata, ...rootIntent,
+    ...(intentInstances.length ? { compositionIntent: {
+      format: 'GhostFlow/composition-intent-v1', sourceClosureSha256: sha256Hex(canonicalJson(closure)),
+      instances: intentInstances,
+    } } : {}),
+  };
   return { result, closure, units };
 }
