@@ -7,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { compileEvidence, theoremInput, admissionInput, sha256 } from './bridge.mjs';
 import { cases, machineMutations } from './cases.mjs';
 import { differential } from './differential.mjs';
+import { leanOutcomeMatches } from '../lean-outcome.mjs';
 import { sourceTheoremInput, sourceAdmissionInput } from './source-bridge.mjs';
 import { sourceAdmissionCases, sourceOnlyMutations, sourceVariants, parserBoundaryCases, document } from './source-cases.mjs';
 import { compileEvidence as compileBoolEvidence } from '../bool-translation-validation/bridge.mjs';
@@ -31,7 +32,7 @@ async function identity() {
     const path = `experiments/bool-translation-validation/${name}.lean`;
     files[path] = sha256(await readFile(join(root, path)));
   }
-  for (const path of ['package-lock.json', 'crates/ghostflow-core/src/lib.rs', 'tests/bool-sensor-validation.test.mjs']) {
+  for (const path of ['experiments/lean-outcome.mjs', 'package-lock.json', 'crates/ghostflow-core/src/lib.rs', 'tests/bool-sensor-validation.test.mjs']) {
     files[path] = sha256(await readFile(join(root, path)));
   }
   for (const name of ['bridge.mjs', 'loader-bridge.mjs', 'source-bridge.mjs',
@@ -76,8 +77,7 @@ export async function verify({ lean, evidenceDir, wasmPath, nativePath, runtimeS
       const result = spawnSync(lean, [...(output ? ['-o', join(scratch, `${name}.olean`)] : []), path],
         { cwd: scratch, env: { ...process.env, LEAN_PATH: scratch }, encoding: 'utf8', timeout: 60000, maxBuffer: 4 * 1024 * 1024 });
       const log = (result.stdout ?? '') + (result.stderr ?? '');
-      const passed = !result.error && (result.status === 0) === expectedSuccess
-        && (!diagnostic || log.includes(diagnostic)) && (!expectedSuccess || !log.includes('sorryAx'));
+      const passed = leanOutcomeMatches(result, log, expectedSuccess, diagnostic);
       await writeFile(join(directory, `${name}.lean`), input);
       await writeFile(join(directory, `${name}.log`), log);
       report.results.push({ name, expectedSuccess, diagnostic, passed, exitCode: result.status, signal: result.signal,
