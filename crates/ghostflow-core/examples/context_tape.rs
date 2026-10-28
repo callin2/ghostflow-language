@@ -3,8 +3,8 @@
 use ghostflow_core::{
     context_runtime::{Activation, Facts},
     context_vm::{
-        Occurrence, ProviderBinding, ScheduleEvidence, SettingChange, SettingsEvent,
-        SettingsOrigin, SolarContextEvidence,
+        Occurrence, ProviderBinding, ScheduleEvidence, ScheduledLocalDateFact, SettingChange,
+        SettingsEvent, SettingsOrigin, SolarContextEvidence,
     },
     scan::{ScanFrameV1, ScanInput},
     schedule_clock::{ClockSnapshot, ClockTrust},
@@ -218,6 +218,47 @@ fn solar_evidence(value: &Json) -> Result<SolarContextEvidence> {
         coverage_start_ms: integer(&value["coverageStartMs"])?,
         coverage_end_ms: integer(&value["coverageEndMs"])?,
         rows,
+    })
+}
+
+fn scheduled_date(value: &Json) -> Result<ScheduledLocalDateFact> {
+    fields(
+        value,
+        &[
+            "site",
+            "sourceKey",
+            "sourceDay",
+            "timezone",
+            "plannedWallMs",
+            "scheduledDay",
+            "unavailableReason",
+            "providerRevision",
+            "contextRevision",
+            "resolverRevision",
+        ],
+    )?;
+    let scheduled_day = optional(&value["scheduledDay"])?
+        .map(i32::try_from)
+        .transpose()?;
+    let unavailable_reason = match value["unavailableReason"].as_str() {
+        None if value["unavailableReason"].is_null() => None,
+        Some("CivilDateUnavailable") => Some(0),
+        _ => return Err("invalid scheduled-date unavailable reason".into()),
+    };
+    if scheduled_day.is_some() == unavailable_reason.is_some() {
+        return Err("invalid scheduled-date availability".into());
+    }
+    Ok(ScheduledLocalDateFact {
+        site: u32::try_from(integer(&value["site"])?)?,
+        source_key: text(&value["sourceKey"])?.into(),
+        source_day: i32::try_from(integer(&value["sourceDay"])?)?,
+        timezone: text(&value["timezone"])?.into(),
+        planned_wall_ms: integer(&value["plannedWallMs"])?,
+        scheduled_day,
+        unavailable_reason,
+        provider_revision: text(&value["providerRevision"])?.into(),
+        context_revision: text(&value["contextRevision"])?.into(),
+        resolver_revision: text(&value["resolverRevision"])?.into(),
     })
 }
 
@@ -456,6 +497,7 @@ fn main() -> Result<()> {
                     "schedules",
                     "settings",
                     "solars",
+                    "scheduledDates",
                 ],
             )?;
             if !array(&step["natural"], 0)?.is_empty() {
@@ -472,6 +514,7 @@ fn main() -> Result<()> {
                     "natural",
                     "schedules",
                     "settings",
+                    "scheduledDates",
                 ],
             )?;
             if !array(&step["natural"], 0)?.is_empty() {
@@ -649,6 +692,14 @@ fn main() -> Result<()> {
         } else {
             vec![]
         };
+        let scheduled_dates = if step["scheduledDates"].is_null() {
+            vec![]
+        } else {
+            array(&step["scheduledDates"], 4096)?
+                .iter()
+                .map(scheduled_date)
+                .collect::<Result<Vec<_>>>()?
+        };
         let result = driver.scan_with_context(
             ScanFrameV1 {
                 scan_id: integer(&step["scanId"])?,
@@ -660,6 +711,7 @@ fn main() -> Result<()> {
                 schedules,
                 settings,
                 solars,
+                scheduled_dates,
                 ..Default::default()
             },
         );

@@ -1,4 +1,4 @@
-//! GFSF5 facts and GFCA1 activation. Only typed evidence crosses the host boundary.
+//! GFSF5/6/7 facts and GFCA1 activation. Only typed evidence crosses the host boundary.
 use ghostflow_core::{
     context_runtime::{Activation, Facts},
     context_vm::*,
@@ -305,6 +305,36 @@ fn solar(r: &mut Reader<'_>) -> Result<SolarContextEvidence, String> {
     })
 }
 
+fn scheduled_date(r: &mut Reader<'_>) -> Result<ScheduledLocalDateFact, String> {
+    let site = r.u32()?;
+    let source_key = r.text(false)?;
+    let source_day = r.day(false)?;
+    let timezone = r.text(false)?;
+    let planned_wall_ms = r.exact()?;
+    let known = r.flag()?;
+    let day = r.day(false)?;
+    let unavailable = r.flag()?;
+    if site == 0
+        || planned_wall_ms > 253_402_300_799_999
+        || known == unavailable
+        || (!known && day != 0)
+    {
+        return Err("invalid scheduled local-date fact".into());
+    }
+    Ok(ScheduledLocalDateFact {
+        site,
+        source_key,
+        source_day,
+        timezone,
+        planned_wall_ms,
+        scheduled_day: known.then_some(day),
+        unavailable_reason: unavailable.then_some(0),
+        provider_revision: r.text(false)?,
+        context_revision: r.text(false)?,
+        resolver_revision: r.text(false)?,
+    })
+}
+
 fn settings(r: &mut Reader<'_>) -> Result<SettingsEvent, String> {
     let program_fingerprint = r.raw64()?;
     let event_id = r.text(false)?;
@@ -440,7 +470,7 @@ fn decode_facts(bytes: &[u8]) -> Result<Packet, String> {
         return Err("invalid context facts header".into());
     }
     let version = r.u16()?;
-    if !matches!(version, 5 | 6) {
+    if !matches!(version, 5 | 6 | 7) {
         return Err("invalid context facts header".into());
     }
     let monotonic_ms = r.exact()?;
@@ -465,10 +495,16 @@ fn decode_facts(bytes: &[u8]) -> Result<Packet, String> {
     if r.flag()? {
         facts.settings = Some(settings(&mut r)?);
     }
-    if version == 6 {
+    if version >= 6 {
         let count = r.count(128)?;
         for _ in 0..count {
             facts.solars.push(solar(&mut r)?);
+        }
+    }
+    if version == 7 {
+        let count = r.count(4096)?;
+        for _ in 0..count {
+            facts.scheduled_dates.push(scheduled_date(&mut r)?);
         }
     }
     r.finish()?;

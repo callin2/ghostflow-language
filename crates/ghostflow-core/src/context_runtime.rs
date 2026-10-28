@@ -25,9 +25,266 @@ pub struct Activation {
 pub struct Facts {
     pub solars: Vec<SolarContextEvidence>,
     pub schedules: Vec<ScheduleEvidence>,
+    pub scheduled_dates: Vec<ScheduledLocalDateFact>,
     pub natural: Vec<ProviderObservation>,
     pub settings: Option<SettingsEvent>,
     pub accounting: Vec<AccountingInput>,
+}
+
+// Validate the host's IANA result against the immutable schedule and the
+// selected provider row. The core cannot reproduce an IANA conversion.
+fn validate_scheduled_dates(descriptors: &[PulseDescriptor], facts: &Facts) -> Result<()> {
+    let mut seen = BTreeSet::new();
+    for fact in &facts.scheduled_dates {
+        if fact.site == 0
+            || !(0..=2_932_896).contains(&fact.source_day)
+            || fact
+                .scheduled_day
+                .is_some_and(|day| !(0..=2_932_896).contains(&day))
+            || fact.scheduled_day.is_some() == fact.unavailable_reason.is_some()
+            || fact.unavailable_reason.is_some_and(|reason| reason != 0)
+            || fact.planned_wall_ms > 253_402_300_799_999
+            || ![
+                &fact.source_key,
+                &fact.timezone,
+                &fact.provider_revision,
+                &fact.context_revision,
+                &fact.resolver_revision,
+            ]
+            .iter()
+            .all(|s| bounded(s))
+            || !seen.insert((fact.site, fact.source_key.as_str()))
+        {
+            return Err(invalid("invalid or duplicate scheduled local-date fact"));
+        }
+        let descriptor = descriptors
+            .iter()
+            .find_map(|entry| match entry {
+                PulseDescriptor::Context(desc) if desc.site == fact.site => Some(desc),
+                _ => None,
+            })
+            .ok_or_else(|| invalid("scheduled local-date site is not a natural schedule"))?;
+        let (timezone, source_day, planned, provider_revision, context_revision) =
+            match &descriptor.definition {
+                ScheduleDefinition::SolarContext { timezone, .. } => {
+                    let row = facts
+                        .solars
+                        .iter()
+                        .find(|e| e.site == fact.site)
+                        .and_then(|e| {
+                            e.rows
+                                .iter()
+                                .find(|row| fact.source_key == format!("solar:{}", row.source_day))
+                        })
+                        .ok_or_else(|| invalid("scheduled local-date Solar source is missing"))?;
+                    (
+                        timezone,
+                        row.source_day,
+                        row.scheduled_wall_ms.or(row.fallback_wall_ms),
+                        &row.provider_revision,
+                        &row.context_revision,
+                    )
+                }
+                ScheduleDefinition::TideRun {
+                    timezone,
+                    offset_ms,
+                    ..
+                } => {
+                    let row = facts
+                        .schedules
+                        .iter()
+                        .find(|e| e.site == fact.site)
+                        .and_then(|e| {
+                            e.rows
+                                .iter()
+                                .find(|row| fact.source_key == format!("tide:{}", row.event_id))
+                        })
+                        .ok_or_else(|| invalid("scheduled local-date Tide source is missing"))?;
+                    let planned = if row.withdrawn {
+                        None
+                    } else {
+                        row.instant_ms
+                            .and_then(|instant| instant.checked_add_signed(*offset_ms))
+                    };
+                    (
+                        timezone,
+                        row.source_day,
+                        planned,
+                        &row.provider_revision,
+                        &row.context_revision,
+                    )
+                }
+                _ => {
+                    return Err(invalid(
+                        "scheduled local-date site is not a natural schedule",
+                    ))
+                }
+            };
+        if fact.timezone != *timezone
+            || fact.source_day != source_day
+            || Some(fact.planned_wall_ms) != planned
+            || fact.provider_revision != *provider_revision
+            || fact.context_revision != *context_revision
+        {
+            return Err(invalid("scheduled local-date fact binding mismatch"));
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod scheduled_date_binding_tests {
+    use super::*;
+
+    fn tide_descriptor() -> Vec<PulseDescriptor> {
+        vec![PulseDescriptor::Context(ScheduleDescriptor {
+            clock_hold_ms: None,
+            site: 41,
+            name: "tide".into(),
+            gap_ms: 0,
+            definition: ScheduleDefinition::TideRun {
+                timezone: "Asia/Seoul".into(),
+                provider: "harbor".into(),
+                high: true,
+                offset_ms: -1_800_000,
+                run_ms: 600_000,
+                within_ms: 0,
+            },
+            when: vec![],
+            cancel: vec![],
+        })]
+    }
+
+    fn tide_facts() -> Facts {
+        Facts {
+            schedules: vec![ScheduleEvidence {
+                site: 41,
+                coverage_start_ms: 1,
+                coverage_end_ms: 2,
+                provider: None,
+                calendar: None,
+                rows: vec![Occurrence {
+                    source_day: 20_752,
+                    slot_key: 0,
+                    minute_of_day: 0,
+                    fold: 0,
+                    event_id: "high-a".into(),
+                    event_kind: 1,
+                    instant_ms: Some(1_792_941_000_000),
+                    withdrawn: false,
+                    provider_revision: "harbor-r7".into(),
+                    context_revision: "station-r2".into(),
+                }],
+            }],
+            scheduled_dates: vec![ScheduledLocalDateFact {
+                site: 41,
+                source_key: "tide:high-a".into(),
+                source_day: 20_752,
+                timezone: "Asia/Seoul".into(),
+                planned_wall_ms: 1_792_939_200_000,
+                scheduled_day: Some(20_751),
+                unavailable_reason: None,
+                provider_revision: "harbor-r7".into(),
+                context_revision: "station-r2".into(),
+                resolver_revision: "iana-r1".into(),
+            }],
+            ..Facts::default()
+        }
+    }
+
+    #[test]
+    fn tide_date_joins_offset_plan_without_replacing_provider_source_day() {
+        let descriptor = tide_descriptor();
+        let facts = tide_facts();
+        assert!(validate_scheduled_dates(&descriptor, &facts).is_ok());
+        let mut mismatched = facts.clone();
+        mismatched.scheduled_dates[0].source_day = 20_751;
+        assert!(validate_scheduled_dates(&descriptor, &mismatched).is_err());
+        let mut mismatched = facts.clone();
+        mismatched.scheduled_dates[0].planned_wall_ms += 1;
+        assert!(validate_scheduled_dates(&descriptor, &mismatched).is_err());
+        let mut mismatched = facts.clone();
+        mismatched.scheduled_dates[0].provider_revision = "harbor-r8".into();
+        assert!(validate_scheduled_dates(&descriptor, &mismatched).is_err());
+    }
+
+    #[test]
+    fn repeated_or_unbound_date_facts_reject_entire_frame() {
+        let descriptor = tide_descriptor();
+        let facts = tide_facts();
+        let mut repeated = facts.clone();
+        repeated
+            .scheduled_dates
+            .push(facts.scheduled_dates[0].clone());
+        assert!(validate_scheduled_dates(&descriptor, &repeated).is_err());
+        let mut unbound = facts.clone();
+        unbound.scheduled_dates[0].source_key = "tide:other".into();
+        assert!(validate_scheduled_dates(&descriptor, &unbound).is_err());
+        let mut unknown = facts;
+        unknown.scheduled_dates[0].scheduled_day = None;
+        unknown.scheduled_dates[0].unavailable_reason = Some(0);
+        assert!(validate_scheduled_dates(&descriptor, &unknown).is_ok());
+    }
+
+    #[test]
+    fn solar_date_joins_selected_fallback_instant() {
+        let descriptors = vec![PulseDescriptor::Context(ScheduleDescriptor {
+            clock_hold_ms: None,
+            site: 42,
+            name: "sunrise".into(),
+            gap_ms: 0,
+            definition: ScheduleDefinition::SolarContext {
+                timezone: "Asia/Seoul".into(),
+                latitude: 37.0,
+                longitude: 127.0,
+                event: 0,
+                offset_ms: 0,
+                fallback_time_ms: Some(1),
+                config_ids: vec![],
+            },
+            when: vec![],
+            cancel: vec![],
+        })];
+        let mut fallback = crate::solar_admission::SolarFact::available(
+            20_752,
+            1_792_941_000_000,
+            "sun-r7",
+            "station-r2",
+        );
+        fallback.scheduled_wall_ms = None;
+        fallback.fallback_wall_ms = Some(1_792_939_200_000);
+        fallback.availability = crate::solar_admission::SolarFactAvailability::Unavailable;
+        fallback.unavailable_reason = Some(1);
+        let mut facts = Facts {
+            solars: vec![SolarContextEvidence {
+                site: 42,
+                timezone: "Asia/Seoul".into(),
+                latitude: 37.0,
+                longitude: 127.0,
+                event: 0,
+                offset_ms: 0,
+                coverage_start_ms: 1,
+                coverage_end_ms: 2,
+                rows: vec![fallback],
+            }],
+            scheduled_dates: vec![ScheduledLocalDateFact {
+                site: 42,
+                source_key: "solar:20752".into(),
+                source_day: 20_752,
+                timezone: "Asia/Seoul".into(),
+                planned_wall_ms: 1_792_939_200_000,
+                scheduled_day: Some(20_751),
+                unavailable_reason: None,
+                provider_revision: "sun-r7".into(),
+                context_revision: "station-r2".into(),
+                resolver_revision: "iana-r1".into(),
+            }],
+            ..Facts::default()
+        };
+        assert!(validate_scheduled_dates(&descriptors, &facts).is_ok());
+        facts.scheduled_dates[0].planned_wall_ms = 1_792_941_000_000;
+        assert!(validate_scheduled_dates(&descriptors, &facts).is_err());
+    }
 }
 
 /// A Result produced from a Rust ledger, never decoded from caller projections.
@@ -388,6 +645,7 @@ impl ContextRuntime {
                 PulseDescriptor::Context(ScheduleDescriptor { site, definition: ScheduleDefinition::SolarContext { .. }, .. }) if *site == solar.site))
             { return Err(invalid("unknown or duplicate Solar context site")); }
         }
+        validate_scheduled_dates(descriptors, facts)?;
         for evidence in &facts.schedules {
             if !sites.insert(evidence.site)
                 || !descriptors.iter().any(|d| {
