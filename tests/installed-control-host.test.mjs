@@ -117,6 +117,24 @@ test('v2 sensor declarations reject missing or false timing, unit, range and qua
   }
 });
 
+test('pure integration validation rejects missing, nonfinite, and reversed Program Number ranges', () => {
+  const variants = [
+    { name: 'missing minimum', change: sensor => { delete sensor.validMin; }, code: 'sensor_contract_missing' },
+    { name: 'missing maximum', change: sensor => { delete sensor.validMax; }, code: 'sensor_contract_missing' },
+    { name: 'NaN minimum', change: sensor => { sensor.validMin = NaN; }, code: 'shape' },
+    { name: 'infinite maximum', change: sensor => { sensor.validMax = Infinity; }, code: 'shape' },
+    { name: 'reversed endpoints', change: sensor => { sensor.validMin = 100; sensor.validMax = 0; }, code: 'sensor_range' },
+  ];
+  for (const { name, change, code } of variants) {
+    const manifest = structuredClone(artifact.manifest);
+    change(manifest.sensors[0]);
+    const result = validateIntegration({ ...candidate('r1', 'sensor-a', 2000),
+      artifacts: { source: document, module: artifact.bytes, manifest } });
+    assert.equal(result.valid, false, name);
+    assert.ok(result.errors.some(error => error.code === code), `${name}: ${JSON.stringify(result.errors)}`);
+  }
+});
+
 test('replacement serializes proposals, rejects reused run IDs and disposal wins pending preparation', async () => {
   const host = await InstalledControlHost.instantiate(wasm, artifact, { runId: 'run-1', ...candidate('r1', 'sensor-a', 2000) });
   const next = candidate('r2', 'sensor-b', 2000);
@@ -160,6 +178,34 @@ test('a sensor replacement cannot silently change output wiring or unrelated rel
   repin(reusedProfile);
   await assert.rejects(host.replaceBinding({ runId: 'run-2', ...reusedProfile }), /profile revision cannot change/);
   assert.deepEqual(host.snapshot(), before);
+});
+
+test('a rejected board identity or model migration leaves the live run, conditioner and trace intact', async t => {
+  const host = await InstalledControlHost.instantiate(wasm, artifact,
+    { runId: 'run-1', ...candidate('r1', 'sensor-a', 2000) });
+  t.after(() => host.dispose());
+  for (const [id, value] of [[1, 10], [2, 80], [3, 90]]) {
+    host.step(frame('r1', (id - 1) * 1000,
+      sample('r1', 'sensor-a', 1, id, (id - 1) * 1000, value)));
+  }
+  const before = host.snapshot();
+  const changedId = candidate('r2', 'sensor-b', 2000);
+  changedId.boardProfile.id = 'another-board';
+  changedId.installation.boardProfile.id = changedId.boardProfile.id;
+  changedId.release.device.boardProfile.id = changedId.boardProfile.id;
+  repin(changedId);
+  const changedModel = candidate('r2', 'sensor-b', 2000);
+  changedModel.boardProfile.boardModel = 'ANOTHER-BOARD';
+  repin(changedModel);
+  for (const next of [changedId, changedModel]) {
+    await assert.rejects(host.replaceBinding({ runId: 'run-2', ...next }), /changes board identity or model/);
+    assert.deepEqual(host.snapshot(), before);
+  }
+  const continued = host.step(frame('r1', 2500));
+  assert.equal(continued.sensors.reading.quality, 'Good');
+  assert.equal(continued.vm.safe.active, true);
+  assert.equal(continued.identity.runId, 'run-1');
+  assert.equal(continued.identity.bindingRevision, 'r1');
 });
 
 test('retired binding revisions cannot be revived for queued samples', async t => {
