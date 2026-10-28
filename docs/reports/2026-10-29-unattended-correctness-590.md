@@ -384,3 +384,50 @@ native/WASM 비교는 공식 host gate의 별도 등록 검사에서 실행됐�
 이 증명으로 확정하지 않는다. 센서 수치 연산의 SmallNumberLaws도 명시적 가정으로 남는다.
 다음 단위는 입력 복구와 상태 전이를 임의 입력 이력에 대해 합성하고, 별도로 실제
 Rust Reader 함수에서 Lean으로 이어지는 추출 도구의 적용 가능성을 확인하는 것이다.
+
+## build173: 센서 복구와 상태 전이를 임의 입력 이력에 대해 합성
+
+한 Bool 입력을 `recover(false)`로 처리하고, 정상 true인 스캔마다 Bool 상태를 뒤집은 뒤
+그 후보 상태를 출력하는 제한 프로필을 추가했다. 초기값은 true/false 모두 허용한다.
+이는 상승 에지 감지가 아니다. true를 유지하면 매 스캔 상태가 바뀌며, false 또는 오류이면
+현재 상태를 보존한다. 프로필 문서와 실제 예제도 이 의미를 명시한다.
+
+원본 문서 reader가 배정한 입력 origin과 recover site, 독립 reader가 실제 전체 바이너리에서
+읽은 transition/output 코드, 실제 compiler의 metadata를 연결한다. 복구 정리는 임의의
+기존 스택 꼬리와 오류 기록을 보존하고, 상태 정리는 old state와 candidate state를 구분한다.
+이들을 귀납적으로 합성하여 모든 유한 입력 이력의 상태·출력·Result 기록을 증명한다.
+
+첫 독립 실행은 네 경계 예제의 `decide`가 필요한 판정 인스턴스를 찾지 못해 실패했다.
+해당 닫힌 식의 계산에 맞게 `rfl`로 고쳤다. 정리·가정·실행 의미를 바꾸지 않았다.
+실패 근거는 별도 작업 공간의 `build/sensor-state-proof-590/`에 보존했다. 수정본에 대한
+독립 검토에서 열린 P1/P2 결함은 없었고, 통합 소스에서도 커널 검사를 새로 실행했다.
+
+통합 검증 소스는 `645b6899f325b0d1d24a1398f2f70af8d9f44787`다.
+Lean 80회(성공48·기대거절32)가 `2026-10-28T20:14:10.520Z`에 exit0으로 끝났다.
+151개 기록 소스 해시가 모두 일치한다. 영수증 SHA-256은
+`9940c5325ab03e18dec0b26950fd458bbbda8817408decbd1b93eaab48c28f5c`이며
+근거는 `build/sensor-state-wave10-590/`에 있다.
+
+실제 native/plain-WASM/framed-WASM 관측168개도 같은 최종 증명 단위에서 통과했다.
+이 검사는 build169의 확인된 실행물을 복사해 재사용했고 Rust/Cargo100개 소스 해시를
+대조했다. fresh runtime build나 수학적 Rust 대응 증명으로 세지 않는다. 최종 관측 영수증은
+`build/evidence/sensor-state-differential-0a5fb1d/differential.json`이며 SHA-256은
+`75e082bbf4bfc4a4366634a00991a89b3549829d36f60f747e45f08f044acd7b`다.
+
+공식 build173은 `2026-10-28T20:18:39.101Z`에 exit0으로 완료됐다. 13 gate, Rust441,
+주 Node3891 pass / 11 TODO / 0 fail, 별도 console15 pass다. 영수증 SHA-256은
+`cb0722c04d8d9eece0409268f033d4005579eaef1e01f8db3e1d8a7240e9e261`이며
+원본 로그·identity·receipt는 `build/evidence/build173/`에 보존했다. WASM 해시는
+앞선 build169/170과 같은 `98d3bb473dc90f68681d974277dc01b17e69516d45c69e55147b7805a608d423`다.
+
+같이 등록한 REF-03-018은 10초 ON → 10초 OFF → 20초 ON에서 경과40초·연속ON20초·
+작업 누적ON30초를 구분한다. 작업은 기존에 허용한 Station 세션 하나, 관측 단계는 applied다.
+WASM에서 세션의30초를 직접 조회하고, native/WASM의 별도 시간·ledger 관측도 검사한다.
+범용 작업 문법, 여러 세션을 묶는 누적, 실제 접점 확인을 추가로 완료한 것이 아니다.
+정확한 사례를 실행 검사에 연결하여 TODO가12개에서11개로 줄었다.
+
+생산 실행 코드는 변경하지 않았다. coverage 수치는 build169의 지정 대상 측정으로 남기며
+새로운 측정이라고 주장하지 않는다. 이전 원본 증명 PR602·603은 각 고정 head의 GitHub
+검사가 모두 통과했다. 전체 compiler, production Rust/model 대응, f64 SmallNumberLaws,
+원본 전달 경로와 장치 동작은 여전히 전체 증명의 남은 범위다. 다음 실험은 생산 Rust
+Reader의 실제 본문을 Charon/Aeneas로 추출하고 Lean에서 불변조건부터 확인하는 것이다.
