@@ -74,7 +74,7 @@ def lex : Nat → List Nat → Option (List String)
       let tokens ← lex fuel (rest.drop tail.length)
       pure (tokenString (b :: tail) :: tokens)
     else if (b = 38 && rest.head? = some 38) || (b = 124 && rest.head? = some 124) ||
-        (b = 60 && rest.head? = some 45) then do
+        (b = 60 && rest.head? = some 45) || (b = 124 && rest.head? = some 62) then do
       let tokens ← lex fuel rest.tail
       pure (tokenString [b, rest.head!] :: tokens)
     else if [123, 125, 40, 41, 58, 59, 61, 39, 33].contains b then do
