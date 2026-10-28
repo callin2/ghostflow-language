@@ -59,3 +59,42 @@ accepted in the two input Lean files.
 The kernel checks the resulting Lean propositions. Rust compiler, Charon/Aeneas
 translation and the standard-library model remain trusted boundaries. This run
 uses host extraction, not an ESP32 compilation or hardware acceptance result.
+
+## Extraction attempts and remaining dependencies
+
+The original extraction used Charon 0.1.299, Rust nightly-2026-09-17 and
+`--preset=aeneas --start-from=crate::Reader::new,crate::Reader::finished`
+on the real `ghostflow-core` library. Aeneas used `-backend lean`,
+`-namespace GhostFlowReader` and `-emit-json`. No production Rust source was
+rewritten or copied into a simplified crate. The frozen LLBC and generated output
+are required inputs to the verification helper; they are retained as local build
+evidence. Rechecking this committed Lean file alone would not establish that a
+fresh Rust extraction produced it.
+
+The installed backend is Lean 4.35.0 with Aeneas commit
+`399081f237935f9aa805f2d4a51fd3784aea11a9`. Its locked Mathlib revision is
+`56a005855ea17e0b0958f73ec801ae140b0a1679`. Charon is pinned to
+`2ec7e964e1032c59220e726840a9ac7d7684be2f`; production firmware toolchain selection
+was not changed. The isolated Rust installation did update the existing rustup
+launcher from 1.29.1 to 1.29.2 before automatic update checking was disabled.
+Lean 4.19.0 remains available for the earlier compiler certificate experiments.
+
+| Attempt | Observed result | Consequence |
+| --- | --- | --- |
+| Actual `Reader::take` and `u16`, default standard-library extraction | Generated unknown-function axioms for Option helpers and String construction | Not admitted as a completed proof |
+| Expand Option and String bodies with the default sysroot | Unsupported string-to-byte transmute and unit constant translation | Partial generated files are not proof inputs |
+| Supply standard-library MIR from pinned `cargo miri setup` | Option helper bodies translated; String ownership remained opaque | The dependency was narrowed, not removed |
+| Expand `alloc::str` ownership as well | String byte conversion, slice ownership and unchecked UTF-8 construction remained opaque | `take`/integer decoder refinement still requires standard-library modeling or extractor support |
+| Actual `Value::value_type` | Generated `F64` type missing from pinned Lean backend | See [the failure report](ValueType-extraction-diagnosis.md); no substitute type was admitted |
+
+The successful standard-library MIR attempt used
+`CHARON_MIRI_SYSROOTS=/absolute/path/to/miri-sysroot` with Charon's `--sysroot=miri`.
+Passing a raw custom sysroot did not consistently configure dependency builds;
+that failed attempt is retained separately. Monomorphization also failed because
+it conflicts with `--no-gen-tuple-structs` in the selected Aeneas preset.
+These are concrete extraction dependencies, not evidence of a production Rust bug.
+
+The normal host test command runs the three receipt regressions. It does not run
+this Lean 4.35 proof or rebuild the extraction tools. The separate Lean 4.19 CI
+job remains responsible for the earlier Bool, sensor and state experiments.
+The current Rust foundation result is a local kernel run with independent review.
