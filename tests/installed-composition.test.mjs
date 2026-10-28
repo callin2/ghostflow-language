@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { compileSourceSync } from '../tools/compile-source.mjs';
 import { sha256Hex } from '../tools/sha256.mjs';
+import { canonicalJson } from '../tools/canonical-json.mjs';
 import { jsonSha256, SCHEMAS } from '../tools/integration-contract.mjs';
 import { InstalledControlHost } from '../runtimes/wasm/installed-control-host.mjs';
 
@@ -129,6 +130,59 @@ test('installed composition keeps actual east and west settings, state, timers a
     c => { c.provenance.routes.sourceClosureSha256 = '0'.repeat(64); },
     c => { c.execution.snapshot.core.state.settings[0].result.value = 5000; },
   ]) assert.throws(() => host.explainOutput('output.east_on', mutate(result, change)), /current owned/);
+});
+
+test('REF-06-016 installed explanations keep each instance occurrence and exact provenance', async t => {
+  const host = await create(); t.after(() => host.dispose());
+  host.step(frame(0, 1, true, false));
+  const completed = host.step(frame(1000, 2, true, false), setting(host));
+  assert.deepEqual(completed.vm.safe, { east_on: true, west_on: false });
+
+  const east = host.explainOutput('output.east_on', completed);
+  const west = host.explainOutput('output.west_on', completed);
+  const closure = artifact.sourceClosure.documents[0];
+  const sourceClosureSha256 = sha256Hex(canonicalJson(artifact.sourceClosure));
+  const expected = [
+    [east, 'east', 'eastInput', 'eastRelay', true, 1000],
+    [west, 'west', 'westInput', 'westRelay', false, 5000],
+  ];
+  for (const [explanation, instance, inputEndpoint, outputEndpoint, value, duration] of expected) {
+    assert.equal(explanation.status, 'ready');
+    assert.equal(explanation.proof.status, 'ready');
+    assert.equal(explanation.proof.value, value);
+    assert.equal(explanation.installation.scanId, completed.frame.scanId);
+    assert.equal(explanation.installation.logicalTimeMs, completed.frame.logicalTimeMs);
+    assert.equal(explanation.installation.settingsRevision, 1);
+    assert.equal(explanation.installation.bindingRevision, 'r1');
+    assert.equal(explanation.installation.routes.sourceClosureSha256, sourceClosureSha256);
+    assert.equal(explanation.outputRoute.instance, instance);
+    assert.equal(explanation.outputRoute.endpointId, outputEndpoint);
+    assert.deepEqual(explanation.inputRoutes.map(route => route.endpointId), [inputEndpoint]);
+    assert.deepEqual(explanation.effectiveSettings.map(setting => setting.result.value), [duration]);
+    assert.deepEqual(explanation.outputRoute.definition,
+      { filename: closure.filename, revision: closure.revision, sha256: closure.sha256 });
+
+    const occurrences = explanation.proof.evaluations.filter(evaluation => evaluation.source?.sourceNode?.instance === instance);
+    assert.ok(occurrences.length > 0);
+    for (const occurrence of occurrences) {
+      const source = occurrence.source.sourceNode;
+      const node = artifact.sourceMap.find(node => node.id === source.nodeId);
+      assert.ok(node);
+      assert.deepEqual(source, {
+        nodeId: node.id, definitionNodeId: node.definitionNodeId, instance,
+        filename: closure.filename, line: node.line, column: node.column,
+        endLine: node.endLine, endColumn: node.endColumn,
+        sourceSha256: closure.sha256, sourceRevision: closure.revision,
+      });
+      assert.equal(occurrence.occurrenceId.startsWith(`output.${instance}_on:`), true);
+    }
+    assert.equal(explanation.proof.evaluations.some(evaluation =>
+      evaluation.source?.sourceNode?.instance === (instance === 'east' ? 'west' : 'east')), false);
+  }
+  const eastNodes = east.proof.evaluations.filter(item => item.source?.sourceNode?.instance === 'east');
+  const westNodes = west.proof.evaluations.filter(item => item.source?.sourceNode?.instance === 'west');
+  assert.notEqual(eastNodes[0].source.sourceNode.nodeId, westNodes[0].source.sourceNode.nodeId);
+  assert.equal(eastNodes[0].source.sourceNode.definitionNodeId, westNodes[0].source.sourceNode.definitionNodeId);
 });
 
 test('installed acquisition rejection precedes settings commit and preserves the last completed proof', async t => {
