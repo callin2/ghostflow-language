@@ -9454,6 +9454,98 @@
       "referenceCaseIds": [
         "REF-06-005"
       ]
+    },
+    {
+      "id": "alarm-scan-owner",
+      "family": "Source-bound alarm state and retained episodes from committed scans",
+      "clause": {
+        "path": "docs/reference/05-settings-and-observation.md",
+        "heading": "5.3 cabinet-view 독립 관찰 모델"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [
+        "compile",
+        "native_wasm"
+      ],
+      "evidence": [
+        {
+          "stage": "compile",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/alarm-observation.test.mjs",
+              "testId": "GF-TEST-alarm-provenance: explicit metadata binds exact source, module, Bool node and intent anchors",
+              "caseId": "REF-05-027",
+              "assertionClass": "compile-policy",
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ]
+            }
+          ]
+        },
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/alarm-observation.test.mjs",
+              "testId": "GF-TEST-alarm-short-episode: native/WASM completed false-true-false retains raised and cleared after last scan",
+              "caseId": "REF-05-027",
+              "assertionClass": "target-parity",
+              "polarities": [
+                "positive"
+              ],
+              "targets": [
+                "native",
+                "wasm"
+              ]
+            },
+            {
+              "path": "tests/alarm-observation.test.mjs",
+              "testId": "GF-TEST-alarm-history: repeats, new episodes, bounded gaps, reconnect and cursor identities agree in native/WASM",
+              "caseId": "REF-05-027",
+              "assertionClass": "target-parity",
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ],
+              "targets": [
+                "native",
+                "wasm"
+              ]
+            },
+            {
+              "path": "tests/alarm-observation.test.mjs",
+              "testId": "GF-TEST-alarm-atomicity: rejected evaluation, stale scans and reverse clocks do not create a baseline or transitions",
+              "caseId": "REF-05-027",
+              "assertionClass": "target-parity",
+              "polarities": [
+                "positive",
+                "negative",
+                "boundary"
+              ],
+              "targets": [
+                "native",
+                "wasm"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "A standalone scalar module binds an external descriptor to authored Bool states. Rust ScanDriver records current state and raise/clear episodes at accepted scans, with bounded retention and explicit sequence gaps. Program provenance is regenerated from canonical source; profile admission remains separate. This does not implement commands, durable cross-run history, authenticated transport, composed alarm conditions or physical confirmation."
+      ],
+      "issues": [
+        287
+      ],
+      "referenceCaseIds": [
+        "REF-05-027"
+      ]
     }
   ]
 }
