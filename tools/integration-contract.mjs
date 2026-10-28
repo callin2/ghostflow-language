@@ -4,6 +4,8 @@ import { createHash } from 'node:crypto';
 export const SCHEMAS = Object.freeze({
   release: 'GhostFlow/integration-release-v1',
   profile: 'GhostFlow/board-profile-v1',
+  profileV2: 'GhostFlow/board-profile-v2',
+  sensorObservation: 'GhostFlow/sensor-observation-v1',
   installation: 'GhostFlow/installation-mapping-v1',
   run: 'GhostFlow/integration-run-v1',
 });
@@ -94,18 +96,42 @@ function releaseShape(release, c) {
 function validateRelease(release, boardProfile, installation, c) {
   releaseShape(release, c);
   if (c.fields(boardProfile, 'boardProfile', ['schema', 'id', 'revision', 'boardModel', 'endpoints'])) {
-    c.schema(boardProfile.schema, SCHEMAS.profile, 'boardProfile');
+    const profileV2 = boardProfile.schema === SCHEMAS.profileV2;
+    if (!profileV2) c.schema(boardProfile.schema, SCHEMAS.profile, 'boardProfile');
     for (const key of ['id', 'revision', 'boardModel']) c.text(boardProfile[key], `boardProfile.${key}`);
     if (c.object(boardProfile.endpoints, 'boardProfile.endpoints')) {
       const addresses = new Set();
       for (const name of Object.keys(boardProfile.endpoints).sort()) {
         const endpoint = boardProfile.endpoints[name], p = `boardProfile.endpoints.${name}`;
         c.text(name, p);
-        if (!c.fields(endpoint, p, ['direction', 'type', 'driver', 'address', 'activeLevel', 'safeLevel'])) continue;
+        const sensorInput = profileV2 && endpoint?.direction === 'input';
+        if (!c.fields(endpoint, p, sensorInput
+          ? ['direction', 'type', 'driver', 'address', 'sensor']
+          : ['direction', 'type', 'driver', 'address', 'activeLevel', 'safeLevel'])) continue;
         if (!['input', 'output'].includes(endpoint.direction)) c.issue(`${p}.direction`, 'shape', 'expected input or output');
         for (const key of ['type', 'driver', 'address']) c.text(endpoint[key], `${p}.${key}`);
-        if (!['high', 'low'].includes(endpoint.activeLevel)) c.issue(`${p}.activeLevel`, 'shape', 'expected high or low');
-        if (![0, 1].includes(endpoint.safeLevel)) c.issue(`${p}.safeLevel`, 'shape', 'expected numeric 0 or 1');
+        if (sensorInput) {
+          if (!['Number', 'Bool'].includes(endpoint.type)) c.issue(`${p}.type`, 'unsupported_sensor_type', 'v2 input supports Number or Bool');
+          const sensor = endpoint.sensor, q = `${p}.sensor`;
+          if (c.fields(sensor, q, endpoint.type === 'Number'
+            ? ['format', 'canonicalUnit', 'minValue', 'maxValue', 'maxInterSampleGapMs']
+            : ['format', 'canonicalUnit', 'maxInterSampleGapMs'])) {
+            c.equal(sensor.format, SCHEMAS.sensorObservation, `${q}.format`, 'sensor_contract_mismatch');
+            if (sensor.canonicalUnit !== null) c.text(sensor.canonicalUnit, `${q}.canonicalUnit`);
+            if (!Number.isSafeInteger(sensor.maxInterSampleGapMs) || sensor.maxInterSampleGapMs <= 0) {
+              c.issue(`${q}.maxInterSampleGapMs`, 'sample_gap', 'expected positive safe integer milliseconds');
+            }
+            if (endpoint.type === 'Number') {
+              if (typeof sensor.minValue !== 'number' || !Number.isFinite(sensor.minValue)
+                || typeof sensor.maxValue !== 'number' || !Number.isFinite(sensor.maxValue)
+                || sensor.minValue > sensor.maxValue) c.issue(q, 'sensor_range', 'expected ordered finite Number measurement range');
+            }
+          }
+        } else {
+          if (profileV2 && endpoint.type !== 'Bool') c.issue(`${p}.type`, 'unsupported_output_type', 'v2 output supports Bool');
+          if (!['high', 'low'].includes(endpoint.activeLevel)) c.issue(`${p}.activeLevel`, 'shape', 'expected high or low');
+          if (![0, 1].includes(endpoint.safeLevel)) c.issue(`${p}.safeLevel`, 'shape', 'expected numeric 0 or 1');
+        }
         const address = JSON.stringify([endpoint.driver, endpoint.address]);
         if (addresses.has(address)) c.issue(p, 'duplicate_endpoint', 'endpoint driver/address pair is already declared');
         addresses.add(address);
@@ -159,7 +185,10 @@ function artifactDigests(artifacts, c) {
 
 function checkBindings(manifest, profile, installation, c) {
   const names = new Set();
-  for (const [list, direction] of [['inputs', 'input'], ['outputs', 'output']]) {
+  const profileV2 = profile.schema === SCHEMAS.profileV2;
+  const lists = [['inputs', 'input'], ['outputs', 'output']];
+  if (profileV2) lists.push(['sensors', 'input']);
+  for (const [list, direction] of lists) {
     if (!Array.isArray(manifest[list])) { c.issue(`artifacts.manifest.${list}`, 'shape', 'expected an array'); continue; }
     manifest[list].forEach((entry, index) => {
       const p = `artifacts.manifest.${list}[${index}]`;
@@ -171,6 +200,22 @@ function checkBindings(manifest, profile, installation, c) {
       const endpoint = profile.endpoints[installation.bindings[entry.name]];
       c.equal(endpoint.direction, direction, p, 'direction_mismatch');
       c.equal(endpoint.type, entry.type, p, 'type_mismatch');
+      if (list === 'sensors' && endpoint.direction === 'input' && endpoint.type === entry.type) {
+        const sensor = endpoint.sensor;
+        c.equal(sensor.canonicalUnit, entry.canonicalUnit ?? null, `${p}.canonicalUnit`, 'unit_mismatch');
+        if (!Number.isSafeInteger(entry.staleMs) || entry.staleMs <= 0) {
+          c.issue(`${p}.staleMs`, 'sensor_contract_missing', 'installed sensor requires explicit stale_after');
+        } else if (sensor.maxInterSampleGapMs >= entry.staleMs) {
+          c.issue(`${p}.staleMs`, 'sample_gap', 'maximum sample gap reaches or exceeds stale_after');
+        }
+        if (entry.type === 'Number') {
+          if (typeof entry.validMin !== 'number' || typeof entry.validMax !== 'number') {
+            c.issue(p, 'sensor_contract_missing', 'installed Number sensor requires explicit valid range');
+          } else if (sensor.minValue > entry.validMin || sensor.maxValue < entry.validMax) {
+            c.issue(p, 'sensor_range', 'endpoint measurement range does not cover the Program valid range');
+          }
+        }
+      }
     });
   }
 }
