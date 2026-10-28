@@ -2,8 +2,8 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fmt;
 
 pub mod accounting;
-pub mod alarm_stream;
 pub mod after_event;
+pub mod alarm_stream;
 pub mod context_runtime;
 #[cfg(test)]
 mod context_runtime_tests;

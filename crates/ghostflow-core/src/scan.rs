@@ -138,7 +138,9 @@ impl ScanDriver {
             .as_ref()
             .ok_or_else(|| Error::new("no module installed"))?;
         self.alarms = Some(crate::alarm_stream::AlarmStream::activate(
-            module, packet, expected_sha256,
+            module,
+            packet,
+            expected_sha256,
         )?);
         Ok(())
     }
