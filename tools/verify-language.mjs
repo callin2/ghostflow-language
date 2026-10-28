@@ -82,6 +82,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/resource-policy-artifact.test.mjs',
   'tests/constraint-proof.test.mjs',
   'tests/bound-resource-control.test.mjs',
+  'tests/continuous-resource-control.test.mjs',
   'tests/coverage-edges.test.mjs',
   'tests/gfb1-browser.test.mjs',
   'tests/coverage-source-identity.test.mjs',

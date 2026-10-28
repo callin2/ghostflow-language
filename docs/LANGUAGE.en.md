@@ -455,7 +455,7 @@ Predicting how changed pump behavior affects actual moisture requires a separate
 
 Modules compiled and verified on the host are handled under the same execution contract in ESP-IDF Rust and WASM.
 Users upload, activate, and remove logic modules. The host verifies ports, output ownership, profiles, and resource bounds.
-Detailed syntax for multi-module connections and output arbitration is later scope.
+Within one canonical scalar control, the bounded Percent resource policy supports named requests, named ceilings, explicit min/max selection and authored fallback; see [Reference §4.9](reference/04-sensors-constraints-control.en.md#49-shared-resources-and-arbitration). Independent producer-module connections and PID aggregation remain later scope.
 
 Replacement commits at a tick boundary after candidate-module validation, strategy selection, state-compatibility checks, and ghost comparison when needed.
 Failure retains the existing module.

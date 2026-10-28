@@ -62,6 +62,7 @@ const TESTS = Object.freeze([
   'tests/named-constraints.test.mjs', 'tests/resource-policy.test.mjs',
   'tests/local-constraint-host.test.mjs',
   'tests/bound-resource-control.test.mjs',
+  'tests/continuous-resource-control.test.mjs',
   'tests/schedule-descriptor-artifact.test.mjs', 'tests/gfb2-int.test.mjs',
   'tests/int-compiler.test.mjs', 'tests/lesson.test.mjs', 'tests/interaction-corpus.test.mjs',
   'tests/temporal-resource-plan-wasm.test.mjs', 'tests/temporal-replay-wasm.test.mjs',

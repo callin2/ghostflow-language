@@ -452,8 +452,10 @@ wall clock은 입력 데이터이며 순서 기준은 논리 tick이다. 추가 
 
 호스트에서 컴파일·검증한 모듈을 ESP-IDF Rust와 WASM의 같은 실행 계약으로
 처리한다. 사용자는 logic module을 올리고 활성화·제거하며 호스트가 포트,
-출력 소유권, 프로파일, 자원 상한을 검증한다. 다중 모듈 연결과 출력 중재의
-상세 문법은 후속 범위다.
+출력 소유권, 프로파일, 자원 상한을 검증한다. 하나의 canonical scalar control 안에서는
+이름을 가진 Percent 요청·상한, 명시적 min/max 선택과 작성된 fallback을 지원한다.
+[Reference §4.9](reference/04-sensors-constraints-control.md#49-공유-자원과-arbitration)를 따른다.
+독립 producer module 연결과 PID 통합은 후속 범위다.
 
 교체는 후보 모듈 검증, 전략 선택, 상태 호환성 검사, 필요 시 고스트 비교를 거쳐
 tick 경계에서 확정한다. 실패하면 기존 모듈을 유지한다.
