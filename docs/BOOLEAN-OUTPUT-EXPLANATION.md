@@ -40,7 +40,11 @@ const join = joinOutputExplanation(compilation.interactionSchema, proof, snapsho
 ```
 
 Preparation recompiles the canonical source to verify every mapping and bound,
-and owns its immutable artifact. Public `evaluations` identify both semantic
+and owns its immutable artifact. This program-provenance replay also accepts an
+already admitted compact-profile source without its external hardware profiles.
+It reconstructs the sidecar and source metadata from exact bytes. It does not
+admit a hardware installation. Public compilation still requires the pinned
+profiles. Public `evaluations` identify both semantic
 node and execution occurrence. `evaluated`, actual `value`, `status`, and
 output-path `supportsResult` are distinct. A skipped occurrence is unavailable,
 has no actual value and never supports the result, even when another output
@@ -66,6 +70,49 @@ host adapter supplies the run epoch and scan logical time; this does not
 authenticate arbitrary caller-created JSON or permit relabeling historical
 outcomes. The caller must discard the producer when its run restarts.
 
+## Composed controls and the settings owner
+
+`TemporarySettingsHost.instantiate(wasm, compilation, { runId, grants, context,
+outputExplanations: true })` enables capture before framed activation. The default
+keeps capture disabled. A legacy host, missing Interaction Schema, unsupported
+WASM witness ABI, or capture budget overflow rejects the opt-in before a run.
+`ControlRuntime.instantiateFramed` also accepts `instructionWitnesses: true` for
+hosts that own their own proof projection.
+
+The settings owner projects its actual accepted `outcome.vm` and `outcome.frame`
+after committing the scan and settings event. Each returned `result.explanation`
+contains `proofs` and `error`. Pass that same result to `joinOutputExplanation`.
+No wrapper around a retained outcome is needed. `explanationSnapshot()` returns
+an owned copy of the latest projection, and `explanationDescriptor` returns an
+owned copy of its verified compiler descriptor. Queries do not tick the runtime.
+
+Composed Bool state expressions retain the existing evaluated-path rules. State
+labels use authored instance paths such as `east.running` and `west.running`.
+The compiler resolves these paths through the source map's `instance` and
+`definitionNodeId`, then the canonical closure's declaration. It never decodes
+generated storage names. The state source includes its instance, expanded node
+ID, original definition node ID, imported filename, revision, SHA-256, and
+declaration span. Identical imported definitions have distinct instance evidence.
+Compound expressions and literals retain an explicit `output-connection` source
+role when their exact imported expression span is unavailable. That role points
+to the root output connection and does not claim an imported expression span.
+Each composed occurrence and evaluation retains its own source record. Identical
+literals can share a semantic node without borrowing another output's provenance.
+
+Proofs carry the snapshot's exact composition and committed `settingsRevision`.
+The producer verifies the host's run, completion, retained committed outcome,
+and Rust settings-revision observations. Consumers reject a different closure,
+run, completed scan, settings revision, or instruction path. An attempted scan
+clears the latest explanation before admission. A failed attempt leaves no new
+proof, even when the runtime retains its prior completed outcome. Projection
+failure after commit returns `completed-scan-explanation-failed` with an empty
+proof list while the control result remains accepted. The committed settings
+event cannot be retried. The next successful scan can publish a new explanation.
+
+`tests/composed-explanation.test.mjs` exercises the actual WASM settings owner,
+including east/west states with different values, short-circuit omission,
+settings edits, rejected identities, caller mutation, and post-commit failure.
+
 ## Bounds and remaining scope
 
 The sidecar allows at most 512 semantic/occurrence nodes, 1024 edges and depth
@@ -80,10 +127,14 @@ instruction records. Hosts must provision journal memory for enabled capture.
 Supported expressions include Bool literals/state snapshots, NOT, AND, OR,
 predicates, arithmetic/conversions, and conditionals. Candidate state is an
 observed scalar, not an explanation of its transition. Timer, schedule,
-composition, safety, Result/recovery and transition proof kinds remain explicit
+safety, Result/recovery and transition proof kinds remain explicit
 unsupported scope. In particular quality-bearing public inputs do not acquire
 fabricated Result proofs. Issue88 remains open for those integrations, richer
-provenance and full public package/host lifecycle handling.
+provenance and full public package/host lifecycle handling. Composed config and
+timer expressions that depend on generated rails remain explicitly unavailable.
+[Issue290](https://github.com/callin2/ghostflow-language/issues/290) and
+[issue302](https://github.com/callin2/ghostflow-language/issues/302) retain
+installation/binding identity and the broader composed expression profile.
 
 The exact native/WASM acceptance selector is registered in the feature catalog:
 `REF-05-023 native/WASM requested OFF explanation keeps the false left support and the skipped faulting right unevaluated`

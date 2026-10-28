@@ -40,7 +40,10 @@ const join = joinOutputExplanation(compilation.interactionSchema, proof, snapsho
 ```
 
 준비 단계는 canonical source를 재컴파일하여 모든 mapping과 bound를 검증하고 immutable
-artifact를 소유한다. 공개 `evaluations`는 semantic node와 실행 occurrence를 함께 식별한다.
+artifact를 소유한다. 이 program provenance replay는 이미 승인된 compact-profile source를
+외부 hardware profile 없이도 받는다. 정확한 bytes에서 sidecar와 source metadata를
+재구성하며 hardware installation을 승인하지 않는다. 공개 컴파일은 계속 고정된 profile을
+요구한다. 공개 `evaluations`는 semantic node와 실행 occurrence를 함께 식별한다.
 `evaluated`, 실제 `value`, `status`, output 경로의 `supportsResult`는 별개다.
 생략된 occurrence는 unavailable이며 실제 값과 support가 없다. 다른 output이 같은
 semantic node를 평가했어도 이 규칙은 같다. `edges`는 parent별 support를 가진다.
@@ -60,6 +63,45 @@ producer는 새 framed run(`trace.tick = scanId + 1`)과 accepted outcome만 받
 신뢰된 host adapter가 run epoch와 scan logical time을 제공한다. 임의의 JSON을 인증하거나
 과거 outcome의 identity를 바꿀 권한을 주는 계약은 아니다. run 재시작 시 producer를 폐기한다.
 
+## 합성 제어와 settings owner
+
+`TemporarySettingsHost.instantiate(wasm, compilation, { runId, grants, context,
+outputExplanations: true })`는 framed 활성화 전에 수집을 켠다. 기본값은 수집하지 않는다.
+legacy host, 없는 Interaction Schema, 미지원 WASM witness ABI, 수집 budget 초과는
+run 시작 전에 opt-in을 거부한다. proof projection을 직접 소유하는 host는
+`ControlRuntime.instantiateFramed`의 `instructionWitnesses: true`를 사용할 수 있다.
+
+settings owner는 scan과 settings event를 commit한 뒤 실제 accepted `outcome.vm`과
+`outcome.frame`을 projection한다. 반환한 `result.explanation`에는 `proofs`와 `error`가
+있다. 같은 result를 `joinOutputExplanation`에 전달한다. 보존된 outcome을 새 wrapper로
+감쌀 필요가 없다. `explanationSnapshot()`은 최신 projection의 소유권이 분리된 복사본을,
+`explanationDescriptor`는 검증된 compiler descriptor의 복사본을 반환한다.
+조회는 runtime을 tick하지 않는다.
+
+합성 Bool 상태식은 기존 실제 평가 경로 규칙을 유지한다. 상태 label은 `east.running`,
+`west.running`처럼 작성된 instance 경로를 사용한다. 컴파일러는 source map의 `instance`와
+`definitionNodeId`에서 canonical closure의 선언으로 경로를 연결한다. 생성된 storage 이름을
+해독하지 않는다. 상태 source에는 instance, 확장 node ID, 원래 definition node ID,
+import filename, revision, SHA-256, 선언 span이 있다. 같은 import 정의도 instance별
+증거를 구별한다. compound 식과 literal의 정확한 import 식 span이 없으면 명시적인
+`output-connection` source role을 유지한다. 이 role은 root 출력 연결을 가리키며
+import 식의 span을 주장하지 않는다.
+각 합성 occurrence와 evaluation은 자신의 source record를 유지한다. 같은 literal이
+semantic node를 공유해도 다른 출력의 provenance를 빌리지 않는다.
+
+proof는 snapshot과 정확히 같은 composition 및 commit된 `settingsRevision`을 갖는다.
+producer는 host의 run, 완료 정보, 보존된 commit outcome, Rust settings revision 관찰을
+검증한다. 소비자는 다른 closure, run, 완료 scan, settings revision, instruction 경로를
+거부한다. scan을 시도하면 admission 전에 최신 설명을 비운다. runtime이 이전 완료
+outcome을 보존해도 실패한 시도에 새 proof를 붙이지 않는다. commit 후 projection이
+실패하면 빈 proof 목록과 `completed-scan-explanation-failed`를 반환하고 제어 결과는
+accepted를 유지한다. commit된 settings event를 재시도할 수 없다. 다음 성공한 scan은
+새 설명을 공개할 수 있다.
+
+`tests/composed-explanation.test.mjs`는 실제 WASM settings owner에서 서로 다른 값을 가진
+east/west 상태, short-circuit 생략, settings 변경, identity 거부, 호출자 mutation,
+commit 후 실패를 검증한다.
+
 ## bound와 남은 범위
 
 sidecar는 semantic/occurrence node 최대 512개, edge 1024개, 깊이 64를 허용한다.
@@ -70,10 +112,14 @@ journal capacity가 보존 상한을 정한다. 선택적 진단 모드는 MCU �
 꺼진 모드는 instruction record를 할당하지 않는다. host는 수집용 journal 메모리를 확보한다.
 
 Bool literal/state snapshot, NOT, AND, OR, predicate, 산술/변환, conditional을 지원한다.
-candidate state는 관찰된 scalar이며 transition 설명은 아니다. timer, schedule, composition,
+candidate state는 관찰된 scalar이며 transition 설명은 아니다. timer, schedule,
 safety, Result/recovery, transition proof는 명시적으로 미지원이다. 품질이 있는 공개 input의
 Result proof를 꾸며내지 않는다. 관련 통합, 더 풍부한 provenance, 전체 공개 package/host
-lifecycle 작업을 위해 issue88은 열린 상태를 유지한다.
+lifecycle 작업을 위해 issue88은 열린 상태를 유지한다. 생성된 rail에 의존하는 합성 config와
+timer 식은 계속 명시적으로 unavailable이다.
+[Issue290](https://github.com/callin2/ghostflow-language/issues/290)과
+[issue302](https://github.com/callin2/ghostflow-language/issues/302)는 installation/binding
+identity와 더 넓은 합성 식 profile을 다룬다.
 
 feature catalog의 정확한 native/WASM 인수 selector는 `tests/explanation-path.test.mjs`의
 `REF-05-023 native/WASM requested OFF explanation keeps the false left support and the skipped faulting right unevaluated`다.
