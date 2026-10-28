@@ -99,3 +99,40 @@ is not a new kernel execution. Its receipt is
 The focused shared-classifier and clock-receipt tests passed eight of eight after
 the correction. The earlier failing receipt-test output is preserved separately.
 `evidence-summary.json` records these identities and limits.
+
+## Integrated verification
+
+The frozen integration source is `b2f8b945d895193d85c0246bb366cf0e921438c4`.
+Fresh Lean execution with the corrected shared classifier finished at
+`2026-10-28T23:28:47.774Z`, exit 0: 43 invocations, comprising 34 successes and
+9 rejections at the intended theorem lines. All 116 source hashes, all input/log
+hashes and 18 compiled-model hashes matched. The receipt is
+`build/clock-bounds-wave18-590/verification.json`, SHA-256
+`8ae58adbe0d2aac3ef590ab5fe779ffbdb57a8e0a80d5c7d4a201036d1fc3044`.
+
+Independent review checked the mathematical induction, original-source/full-module
+connection, historical receipt and exact rejection locations. The existing
+`EpochMachine` and `EpochModule` were not changed. The five general theorems use
+only the standard logical axioms printed by Lean, `propext` and `Quot.sound`.
+
+Six real plain/framed runtime tests cover selected integer boundaries through
+2^53−1, one-millisecond differences near that limit, repeated timestamps and
+invalid-clock calls followed by valid calls. Literal expectations check that a
+rejected clock does not advance accepted state or change the elapsed interval.
+These are finite production observations, not a proof of the JS/Rust admission
+implementation or IEEE arithmetic. The integrated focused group passed 28 tests.
+
+Official build194 finished at `2026-10-28T23:32:56.340Z`, exit 0. All 15 gates
+passed: 441 Rust tests, 3,934 main Node passes with 11 TODO and no failures,
+15 console tests, and Python suites of 3 and 8 tests. The receipt SHA-256 is
+`7e4ddb9a7462023fce39e7eeea50bcdbacf2c022747e5180ac1759b1c3799163`.
+Full log, identity and receipt are in `build/evidence/build194/`.
+
+The shared classifier now rejects Lean's authored `declaration uses 'sorry'`
+warning for both expected outcomes. A separate real probe establishes that
+`False := by decide` followed by `#print axioms` reports an automatic recovery
+`sorryAx`; that remains an expected rejection, never an accepted proof. All 492
+retained logs across six earlier verifier suites passed reclassification, with
+their input/log hashes checked. This was not a new kernel run. The replay receipt
+SHA-256 is `6b39a604a14709fd7a9abaa9ab82f0970ef9353003d2fb46666948f29c8bec33`
+at `build/lean-warning-wave18-590/verification.json`.
