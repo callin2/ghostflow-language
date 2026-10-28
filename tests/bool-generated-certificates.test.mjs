@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { compileEvidence, decodeModule, sha256, validateArtifact } from '../experiments/bool-translation-validation/bridge.mjs';
 import { generatedCase, generatedCases, generatedCaseCount, generatedSeed } from '../experiments/bool-translation-validation/generated-cases.mjs';
 import { sourceTheoremInput } from '../experiments/bool-translation-validation/source-bridge.mjs';
-import { leanOutcomeMatches } from '../experiments/bool-translation-validation/verify.mjs';
+import { leanOutcomeMatches } from '../experiments/lean-outcome.mjs';
 
 test('fixed generation budget, seed, domain and feature coverage', () => {
   const cases = generatedCases();
