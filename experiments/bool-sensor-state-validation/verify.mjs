@@ -89,11 +89,11 @@ example : rawTrace naturalNumbers transitionCode outputCode false
   [⟨.healthy true, false⟩, ⟨.fault .stale, true⟩, ⟨.healthy false, true⟩, ⟨.healthy true, false⟩] =
   some [⟨true, true, [⟨7,0,0⟩]⟩, ⟨true, true, [⟨7,2,1⟩]⟩,
         ⟨true, true, [⟨7,0,0⟩]⟩, ⟨false, false, [⟨7,0,0⟩]⟩] := by decide
-example : step naturalNumbers [5,0,0] [] [.bool true] none 1 ⟨0,[],[]⟩ = none := by decide
-example : step naturalNumbers [4,1,0] [] [.bool true] none 1 ⟨0,[],[]⟩ = none := by decide
-example : step naturalNumbers [10] [] [] none 1 ⟨0,[.number 1],[]⟩ = none := by decide
+example : step naturalNumbers [5,0,0] [] [.bool true] none 1 ⟨0,[],[]⟩ = none := by rfl
+example : step naturalNumbers [4,1,0] [] [.bool true] none 1 ⟨0,[],[]⟩ = none := by rfl
+example : step naturalNumbers [10] [] [] none 1 ⟨0,[.number 1],[]⟩ = none := by rfl
 example : step naturalNumbers [56,7,0,0,0] [] [] none 1
-  ⟨0,[.number 0,.number 0,.bool true],[⟨7,0,0⟩]⟩ = none := by decide
+  ⟨0,[.number 0,.number 0,.bool true],[⟨7,0,0⟩]⟩ = none := by rfl
 `);
     for (const [name, edit] of [
       ['initial-true', s => s.replace('held: Bool = false', 'held: Bool = true')],
