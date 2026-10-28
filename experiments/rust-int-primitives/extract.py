@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 import subprocess
 
-from audit import inspect
+from audit import inspect, write_report
 
 ROOT = Path(__file__).resolve().parents[2]
 ROOTS = ['i32::checked_add', 'i32::checked_neg']
@@ -41,11 +41,13 @@ def main():
               'productionFile': 'crates/ghostflow-core/src/lib.rs',
               'productionSha256': sha(ROOT / 'crates/ghostflow-core/src/lib.rs'),
               'roots': ROOTS, 'steps': []}
+    inputs = {'production': ROOT / 'crates/ghostflow-core/src/lib.rs',
+              'charon': args.charon.resolve(), 'aeneas': args.aeneas.resolve(),
+              'extractHelper': Path(__file__).resolve(),
+              'auditHelper': Path(__file__).resolve().with_name('audit.py')}
 
     def save():
-        temporary = output / 'extraction.json.tmp'
-        temporary.write_text(json.dumps(report, indent=2) + '\n')
-        os.replace(temporary, output / 'extraction.json')
+        write_report(output / 'extraction.json', report)
 
     def run(label, cmd):
         result = subprocess.run([str(x) for x in cmd], cwd=ROOT, env=env,
@@ -61,6 +63,9 @@ def main():
 
     save()
     try:
+        report['inputSha256Before'] = {name: sha(path) for name, path in inputs.items()}
+        report['inputPaths'] = {name: str(path) for name, path in inputs.items()}
+        save()
         filters = []
         if args.configuration != 'broad':
             filters += ['--opaque=core', '--opaque=alloc', '--opaque=std']
@@ -75,7 +80,7 @@ def main():
                       '--start-from=' + ','.join(ROOTS), '--extract-opaque-bodies',
                       *filters,
                       '--dest-file=' + str(output / 'IntPrimitives.llbc'),
-                      '--', '-p', 'ghostflow-core', '--lib'])
+                      '--', '--locked', '--offline', '-p', 'ghostflow-core', '--lib'])
         llbc = json.loads((output / 'IntPrimitives.llbc').read_text())
         if llbc['has_errors']:
             raise RuntimeError('Charon emitted extraction errors')
@@ -87,6 +92,12 @@ def main():
     except Exception as error:
         report['status'] = 'failed'
         report['error'] = str(error)
+    report['inputSha256After'] = {name: sha(path) if path.is_file() else None
+                                 for name, path in inputs.items()}
+    report['inputsUnchanged'] = report.get('inputSha256Before') == report['inputSha256After']
+    if not report['inputsUnchanged']:
+        report['status'] = 'failed'
+        report['error'] = report.get('error', 'source, tool binary or helper changed during extraction')
     report['finishedAt'] = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
     save()
     print(json.dumps({'status': report['status'], 'receipt': str(output / 'extraction.json'),

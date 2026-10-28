@@ -70,12 +70,35 @@ proof was attempted against the rejected file. Historical extraction receipts
 whose status is `translated` record process translation only, never proof admission.
 The current extraction helper runs admission before reporting a usable artifact.
 
-Run `python3 experiments/rust-int-primitives/audit.py DIRECTORY` on a retained
-attempt. `extract.py --help` lists the existing-binary, isolated-target and
+Run `python3 experiments/rust-int-primitives/audit.py DIRECTORY` on a fresh copy
+of a retained attempt, preserving historical receipts. `extract.py --help` lists the existing-binary, isolated-target and
 Miri-sysroot inputs. Its `--configuration broad`, `exact-pattern`, and `wildcard`
 choices reproduce attempts 1, 2, and 3 respectively in a fresh output directory.
 It never builds or installs extraction tools and never reuses prior output.
 The environment must put the existing rustup launcher on PATH.
+
+The helper now uses Cargo `--locked --offline`, records the actual Charon/Aeneas
+binary and both helper SHA-256 values, and checks production/tool/helper hashes
+before and after extraction. A changed input forces failure. These receipt
+improvements do not retroactively modify the three historical command records.
+The audit atomically publishes `running` before reading inputs and `failed` on
+an inspection exception. Its artifact digest covers only LLBC, generated Lean,
+translation metadata and the four named tool stdout/stderr logs. Extraction and
+admission receipts, their temporary files and other files are excluded, avoiding
+self-referential digests. It also rejects `constant`, `opaque` and `sorryAx`
+alongside axiom and other proof escapes. Structural admission remains a candidate
+input check, never a kernel proof or complete source-equivalence check.
+
+Review regressions reproduced stale success using a corrupted LLBC with an old
+admissible receipt. The pre-fix receipt/hash regressions fail against `ccca4a1`;
+the corrected six-test suite passes with
+`python3 -m unittest discover -s experiments/rust-int-primitives -p test_receipts.py`.
+Synthetic test artifacts verify guards only. Fresh copies of all three actual
+historical artifacts still reject; original artifact hashes remain unchanged.
+No fourth extraction was run. The recheck and actual binary/helper/source hash
+snapshot is `build/rust-int-primitives-review/recheck/verification.json`, observed
+at `2026-10-28T22:05:15.274969Z`, SHA-256
+`0d845c14aa8dd46486164cd662b766beb24af9e9f483984deae9996e72cb654d`.
 
 Attempt 3 LLBC SHA-256:
 `07022725faab0b8a6bd98dc05f89242024eb1566614215baf4c6cb3a61db3f03`.
