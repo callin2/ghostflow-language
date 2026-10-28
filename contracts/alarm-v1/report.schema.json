@@ -1,0 +1,379 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ghostflow.dev/contracts/alarm-v1/report.schema.json",
+  "title": "GhostFlow alarm v1 report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "version",
+    "context",
+    "cursor",
+    "current",
+    "coverage",
+    "events"
+  ],
+  "properties": {
+    "format": {
+      "const": "GhostFlow/alarm-report-v1"
+    },
+    "version": {
+      "const": 1
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bytecodeSha256",
+        "sourceSha256",
+        "schemaSha256",
+        "descriptorSha256",
+        "bindingSha256",
+        "moduleFingerprint",
+        "moduleId",
+        "documentId",
+        "revisionId",
+        "runId",
+        "streamId"
+      ],
+      "properties": {
+        "bytecodeSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "sourceSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "schemaSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "descriptorSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "bindingSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "moduleFingerprint": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{16}$"
+        },
+        "moduleId": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9._:-]{0,127}$"
+        },
+        "documentId": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9._:-]{0,127}$"
+        },
+        "revisionId": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9._:-]{0,127}$"
+        },
+        "runId": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9._:-]{0,127}$"
+        },
+        "streamId": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9._:-]{0,127}$"
+        }
+      }
+    },
+    "cursor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bindingSha256",
+        "runId",
+        "streamId",
+        "sequence"
+      ],
+      "properties": {
+        "bindingSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "runId": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9._:-]{0,127}$"
+        },
+        "streamId": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9._:-]{0,127}$"
+        },
+        "sequence": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "current": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scanId",
+        "logicalTimeMs",
+        "alarms"
+      ],
+      "properties": {
+        "scanId": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "logicalTimeMs": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "alarms": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "alarmId",
+              "stateDescriptorId",
+              "sourceNodeId",
+              "intentAnchorIds",
+              "state",
+              "episodeSequence",
+              "lastSequence"
+            ],
+            "properties": {
+              "alarmId": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9._:-]{0,127}$"
+              },
+              "stateDescriptorId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "sourceNodeId": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295
+              },
+              "intentAnchorIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512
+                },
+                "minItems": 1,
+                "maxItems": 32,
+                "uniqueItems": true
+              },
+              "state": {
+                "enum": [
+                  "unobserved",
+                  "inactive",
+                  "active"
+                ]
+              },
+              "episodeSequence": {
+                "oneOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "lastSequence": {
+                "oneOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          },
+          "minItems": 1,
+          "maxItems": 16
+        }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capacity",
+        "oldestSequence",
+        "latestSequence",
+        "gap"
+      ],
+      "properties": {
+        "capacity": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1024
+        },
+        "oldestSequence": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "latestSequence": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "gap": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "reason",
+                "fromSequence",
+                "toSequence"
+              ],
+              "properties": {
+                "reason": {
+                  "const": "retention-overflow"
+                },
+                "fromSequence": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "toSequence": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "alarmId",
+          "stateDescriptorId",
+          "sourceNodeId",
+          "intentAnchorIds",
+          "sequence",
+          "episodeSequence",
+          "transition",
+          "scanId",
+          "logicalTimeMs"
+        ],
+        "properties": {
+          "alarmId": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9._:-]{0,127}$"
+          },
+          "stateDescriptorId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "sourceNodeId": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          },
+          "intentAnchorIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            },
+            "minItems": 1,
+            "maxItems": 32,
+            "uniqueItems": true
+          },
+          "sequence": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "episodeSequence": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "transition": {
+            "enum": [
+              "raised",
+              "cleared"
+            ]
+          },
+          "scanId": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "logicalTimeMs": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        }
+      },
+      "minItems": 0,
+      "maxItems": 1024
+    }
+  }
+}

@@ -10,7 +10,7 @@ import { emitCompletedScanSnapshot } from '../tools/interaction-runtime-snapshot
 import { compileSource } from '../tools/toolchain.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 import { validateInteraction, interactionSchemaSha256 } from '../contracts/interaction-v0/validate.mjs';
-import { verifyInteractionSchema } from '../tools/interaction-schema.mjs';
+import { verifyInteractionSchema, restoreInteractionSchema } from '../tools/interaction-schema.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const nativePath = path.join(root, `target/release/examples/context_tape${process.platform === 'win32' ? '.exe' : ''}`);
@@ -347,6 +347,7 @@ test('REF-05-012 versioned public settings reject forged defaults and revision c
       completion: { kind: 'completed-scan', scanId: 0, logicalTimeMs: 0 }, trace: result.vm, settingsState });
     const initial = emit(state);
     assert.equal(artifact.interactionSchema.version, '0.4');
+    assert.deepEqual(restoreInteractionSchema(artifact, artifact.interactionSchema), artifact.interactionSchema);
     assert.equal(initial.version, '0.2');
     const forgedSchema = structuredClone(artifact.interactionSchema);
     forgedSchema.descriptors[0].defaultValue = 360000;
@@ -375,6 +376,7 @@ test('REF-05-012 versioned public settings reject forged defaults and revision c
     legacySchema.version = '0.3';
     legacySchema.descriptors.forEach(row => { delete row.defaultValue; });
     assert.deepEqual(verifyInteractionSchema(artifact, legacySchema), legacySchema);
+    assert.deepEqual(restoreInteractionSchema(artifact, legacySchema), legacySchema);
     const legacy = structuredClone(initial); legacy.version = '0.1'; delete legacy.settingsRevision;
     legacy.schema.version = '0.3'; legacy.schema.sha256 = interactionSchemaSha256(legacySchema);
     legacy.observations.forEach(row => { delete row.defaultValue; delete row.emissionRevision; delete row.applicationPosition; delete row.override; });

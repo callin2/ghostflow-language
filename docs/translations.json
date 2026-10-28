@@ -173,8 +173,8 @@
       "source": "docs/INTERACTION-STREAM-CONTRACT.md",
       "sourceLanguage": "en",
       "translation": "docs/INTERACTION-STREAM-CONTRACT.ko.md",
-      "sourceSha256": "219cc871058c64b779998dfc743c3fc91a6a8594d261bc86eabfd6cff087b49d",
-      "translationSha256": "6f669d64c7ac5a972023fdd035233672e34c0c190b40ced8c4287829087ca01b"
+      "sourceSha256": "9a37da519fecec9e66b037b1d7db2b4874f2ab36b0c669306dc55f0e1d074b23",
+      "translationSha256": "3e25f9199680f86310f3e36f0fa91c1e95b6e9bb326a813e062f7b1c1e1a3787"
     },
     {
       "source": "docs/DRIVER-ABI-V1-DRAFT.md",
@@ -705,8 +705,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "5d3baba02f529c101e138df2fd28bc3feea046630ff2fab521e99e1701cd871d",
-      "translationSha256": "53a4bd951284ae2ea3757634203311c7a74d31ef9e4f6d7f40c7d2eff1f2332f"
+      "sourceSha256": "deae2aa7eba794ea142de6c87795984634e461371fd6612a1041ef41902bd4df",
+      "translationSha256": "5eb19065ff83443d9b078bd708cca4f44f0d96aae8125bb33dd370276fdf6bdf"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",
@@ -1183,6 +1183,13 @@
       "translation": "docs/INSTALLED-SENSOR-BINDING.ko.md",
       "sourceSha256": "e05ffe3bb1b1754fd6e2f90293b9874f8939b8b53eea76a2f2c36d8ba4960b9a",
       "translationSha256": "981fe8e03730a26f7878e4d4cec00f02a10ff63be8b96ea5d12a3672efca0ab9"
+    },
+    {
+      "source": "contracts/alarm-v1/README.md",
+      "sourceLanguage": "en",
+      "translation": "contracts/alarm-v1/README.ko.md",
+      "sourceSha256": "59c27a28abcd62deb7aa07305ac297bfb9e41903798a02ff731df853b16ae3e1",
+      "translationSha256": "fda912ae4fa7f6886e2bfaa520f73edbdc4c17cc8eb9f7d2b3499321e3036b25"
     }
   ],
   "exclusions": [
@@ -1565,6 +1572,18 @@
     {
       "path": "experiments/bool-translation-validation/module-loader-report.md",
       "reason": "Issue590 raw-loader proof execution report and remaining trust boundary; reports may remain in one language."
+    },
+    {
+      "path": "experiments/bool-sensor-validation/proof-report.md",
+      "reason": "Issue590 canonical sensor proof execution report and explicit trusted boundaries; reports may remain in one language."
+    },
+    {
+      "path": "experiments/bool-sensor-validation/fixtures/recover-false.ghost.md",
+      "reason": "Canonical compiler input for the bounded sensor proof experiment; test data has no translated executable copy."
+    },
+    {
+      "path": "contracts/alarm-v1/examples/temperature.ghost.md",
+      "reason": "Canonical executable alarm conformance fixture; changing prose changes its source identity. Bilingual explanation is in contracts/alarm-v1/README.md and README.ko.md."
     }
   ]
 }

@@ -247,3 +247,48 @@ PR599의 필수 CI는 모두 통과했지만 `2026-10-28` 조회 시 아직 미�
 알람 독립 검토에서 원문에 없는 intent anchor를 허용하는 공유 복원 결함을 재현했다.
 수정 과정에서 기존 profile 문서 복원 회귀도 발견해 보완 중이다.
 이 후속 단위의 결과는 build160이나 TODO15개 수치에 포함하지 않았다.
+
+## build164: 알람 발생 기록과 Bool 입력 오류 복구 증명
+
+실행 중 짧게 발생했다 사라진 알람도 실제 Rust scan owner가 발생·해제 순서로 기록한다.
+조회는 실행 상태를 바꾸지 않으며, 실패한 스캔은 알람 이력을 진행시키지 않는다.
+유한 보존으로 누락된 구간은 명시적인 gap으로 전달한다. 실제 native/WASM 실행에서
+동일한 전체 레코드와 거절 동작을 확인했다. REF-05-027을 구현 검증 대상으로 전환했다.
+
+독립 검토가 찾은 원문에 없는 intent anchor 위조를 canonical source replay로 거절한다.
+이 수정 과정에서 발견한 compact-profile 복원 회귀도 고쳤다. 원본 소스·바이트의 출처 복원과
+외부 프로필을 통한 설치 허용 판단을 구분한다. 일반 컴파일의 프로필 검사는 계속 적용된다.
+최종 독립 검토의 관련 검사124개가 통과했다.
+
+최종 실행 소스는 `20ac08ec0a5d54915132bad15ae9f4f4a402bd7a`다.
+공식 build164는 `2026-10-28T18:45:05.207Z`에 통과했다.
+13 gate, Rust441, 주 Node3865 pass / 14 TODO / 0 fail, 별도 console15 pass다.
+verification SHA-256은 `6d1ec1714ff3eee74bfd0a369629765e707e7e56c1a8dc29250ee70e68afc972`다.
+WASM SHA-256은 `98d3bb473dc90f68681d974277dc01b17e69516d45c69e55147b7805a608d423`다.
+기록은 `build/evidence/build164/`에 보존했다. 첫 통합 시 Rust 형식 검사에서 발견한
+세 파일의 차이를 수정한 뒤 전체 검사와 두 Lean 검사를 같은 소스에서 다시 실행했다.
+실패 기록은 `build/evidence/wave7-format-failure/`에 있다.
+
+기존 Bool translation 검사는 실제 Lean 호출119개(성공58, 의도된 거절61)와
+별도 JavaScript admission 검사11개가 통과했다. 이130개는 정리 개수가 아니다.
+보고서 `build/bool-wave7-final-590/verification.json`의 SHA-256은
+`6906571055b9f44221ac582538878eccb1ec3cb4635859c7b746ee5679d41f9e`다.
+
+새 Bool 입력 검사는 `di |> recover(false)`의 정상 false와 오류 대체 false를 구분한다.
+Disconnected·Stale·Invalid·NotReady와 이전 Bool payload에 관계없이 복구 경로를 증명한다.
+실제 Lean 호출44개(성공32, 의도된 거절12)가 통과했다. 보고서
+`build/bool-sensor-wave7-final-590/verification.json`의 SHA-256은
+`709e39195fa21d363a7c635778ca78868564d7b91bca3340a4af8767ef908fe2`다.
+두 보고서의 원본 파일107개와145개 해시는 모두 최종 실행 소스와 일치한다.
+수치 연산 법칙은 명시적 가정이다. 일반적인 production f64 대응은 아직 증명하지 않았다.
+실제 native/WASM 값 비교50개와 경계 검사25개는 공식 host gate에 등록한 별도 검사로 통과했다.
+
+coverage 검사2539개가 통과했다. 지정된 대상 함수475/475, 줄7439/8235(90.33%),
+V8 ranges5564/6304(88.26%)다. 전체 저장소나 문법 branch 비율을 뜻하지 않는다.
+보고서 SHA-256은 `591859258319e1eef0d444dfd0ec51da2cf9a5791da9f107119530f96cf69547`이며
+`build/evidence/coverage-20ac08e/`에 보존했다.
+
+PR599는 이후 외부에서 dev에 병합됐고, PR600의 필수 CI는 모두 통과했다.
+이 작업자가 두 PR을 병합한 것은 아니다. 다음 단위는 합성 프로그램의 실제 출력 원인과
+설치·설정 식별자 연결, 그리고 Lean이 원본 문서를 직접 읽는 제한 문법 검증이다.
+원본 파서 전체·전체 언어·실제 Rust 실행기 대응을 포함한 컴파일러 전체 증명은 계속 미완료다.

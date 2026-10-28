@@ -3,6 +3,7 @@ use std::fmt;
 
 pub mod accounting;
 pub mod after_event;
+pub mod alarm_stream;
 pub mod context_runtime;
 #[cfg(test)]
 mod context_runtime_tests;
@@ -184,6 +185,7 @@ struct Constraint {
 #[derive(Clone)]
 pub struct Module {
     fingerprint: u64,
+    bytecode_sha256: [u8; 32],
     format_version: u16,
     name: String,
     version: u32,
@@ -212,6 +214,7 @@ impl Module {
         if bytes.len() > MAX_MODULE_BYTES {
             return Err(Error::new("module byte limit exceeded"));
         }
+        let bytecode_sha256 = alarm_stream::sha256(bytes);
         let fingerprint = bytes.iter().fold(0xcbf29ce484222325u64, |hash, byte| {
             (hash ^ u64::from(*byte)).wrapping_mul(0x100000001b3)
         });
@@ -274,6 +277,7 @@ impl Module {
                 restart_event_input: event_name,
             });
             module.fingerprint = fingerprint;
+            module.bytecode_sha256 = bytecode_sha256;
             return Ok(module);
         }
         if format_version == 25 {
@@ -294,6 +298,7 @@ impl Module {
             module.continuous_resource = Some(plan);
             module.format_version = 25;
             module.fingerprint = fingerprint;
+            module.bytecode_sha256 = bytecode_sha256;
             return Ok(module);
         }
         if format_version == 17 {
@@ -315,6 +320,7 @@ impl Module {
             module.resource_policy = Some(plan);
             module.format_version = 17;
             module.fingerprint = fingerprint;
+            module.bytecode_sha256 = bytecode_sha256;
             return Ok(module);
         }
         if !matches!(
@@ -884,6 +890,7 @@ impl Module {
         }
         Ok(Self {
             fingerprint,
+            bytecode_sha256,
             format_version,
             name,
             version,
@@ -4199,6 +4206,7 @@ mod tests {
         let second_transition = vec![4, 1, 0, 3, 0, 0, second_opcode];
         Module {
             fingerprint: 85,
+            bytecode_sha256: [0; 32],
             temporal: None,
             schedules: None,
             true_fors: None,

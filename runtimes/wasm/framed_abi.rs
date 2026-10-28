@@ -4,6 +4,8 @@ use ghostflow_core::{
 };
 use std::{collections::BTreeSet, slice, str};
 
+#[path = "alarm_abi.rs"]
+mod alarm_abi;
 #[path = "stage_accounting_abi.rs"]
 mod stage_accounting_abi;
 
@@ -31,6 +33,7 @@ pub struct FramedHandle {
     stage_snapshot: Vec<u8>,
     stage_query: String,
     stage_revision: u64,
+    alarm_report: String,
 }
 
 impl FramedHandle {
@@ -64,6 +67,7 @@ impl FramedHandle {
             stage_snapshot: Vec::new(),
             stage_query: String::new(),
             stage_revision: 0,
+            alarm_report: String::new(),
         }
     }
 

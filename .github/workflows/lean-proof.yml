@@ -5,7 +5,9 @@ on:
     paths:
       - .github/workflows/lean-proof.yml
       - experiments/bool-translation-validation/**
+      - experiments/bool-sensor-validation/**
       - tests/bool-translation-validation.test.mjs
+      - tests/bool-sensor-validation.test.mjs
       - tools/**
       - crates/ghostflow-core/src/**
       - package.json
@@ -15,7 +17,9 @@ on:
     paths:
       - .github/workflows/lean-proof.yml
       - experiments/bool-translation-validation/**
+      - experiments/bool-sensor-validation/**
       - tests/bool-translation-validation.test.mjs
+      - tests/bool-sensor-validation.test.mjs
       - tools/**
       - crates/ghostflow-core/src/**
       - package.json
@@ -41,7 +45,7 @@ jobs:
         with:
           node-version: 22
       - name: Prepare evidence directory
-        run: mkdir -p build/bool-pc-validation
+        run: mkdir -p build/bool-pc-validation build/bool-sensor-validation
       - name: Install locked Node dependencies
         shell: bash
         run: |
@@ -72,7 +76,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          node --test tests/bool-translation-validation.test.mjs 2>&1 | tee build/bool-pc-validation/node-test.log
+          node --test tests/bool-translation-validation.test.mjs tests/bool-sensor-validation.test.mjs 2>&1 | tee build/bool-pc-validation/node-test.log
       - name: Check Bool and PC proofs with Lean kernel
         shell: bash
         run: |
@@ -81,11 +85,21 @@ jobs:
           node experiments/bool-translation-validation/verify.mjs \
             --lean "$lean_bin" --evidence-dir build/bool-pc-validation \
             2>&1 | tee build/bool-pc-validation/verify.log
+      - name: Check actual Bool sensor recovery with Lean kernel
+        shell: bash
+        run: |
+          set -euo pipefail
+          lean_bin="$("$HOME/.elan/bin/elan" which lean)"
+          node experiments/bool-sensor-validation/verify.mjs \
+            --lean "$lean_bin" --evidence-dir build/bool-sensor-validation \
+            2>&1 | tee build/bool-sensor-validation/verify.log
       - name: Upload proof evidence even on failure
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: lean-bool-pc-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: build/bool-pc-validation/
+          path: |
+            build/bool-pc-validation/
+            build/bool-sensor-validation/
           if-no-files-found: warn
           retention-days: 30

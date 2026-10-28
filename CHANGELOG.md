@@ -2,6 +2,35 @@
 
 ## Unreleased
 
+### 2026-10-29 - restore exact interaction provenance ([#287](https://github.com/callin2/ghostflow-language/issues/287), [#590](https://github.com/callin2/ghostflow-language/issues/590))
+
+Interaction Schema restoration now checks persisted source nodes and intent
+metadata against a fresh canonical compilation before verifying the schema.
+Previously, unchanged source and GFB bytes could accept an invented anchor such
+as `GF-ABSENT-FROM-SOURCE` when the caller changed the metadata, schema and alarm
+descriptor together. Valid schema versions and source identities are preserved.
+Standalone, composed and alarm regressions cover the rejection in
+`tests/interaction-emission.test.mjs`, `tests/composed-interaction.test.mjs` and
+`tests/alarm-observation.test.mjs`. Settings restore tests retain 0.3 and 0.4
+contracts in `tests/settings-default-provenance.test.mjs`.
+Canonical replay also restores admitted compact-profile source without requesting
+the external profile closure again. For example, a persisted `profile:
+example-board@1` program retains its exact source digest, node spans and 0.3 or
+0.4 schema. Ordinary compilation still validates profile digests and bindings.
+The replay reconstructs program provenance and does not validate an installation.
+
+### 2026-10-29 - scan-owned alarm lifecycle ([#287](https://github.com/callin2/ghostflow-language/issues/287))
+
+A source-validated external descriptor can now map an authored Bool state to an
+alarm in the scalar scan profile. Rust records raised/cleared episodes and the
+current condition before export, so a consumer querying after false→true→false
+still receives both transitions. Alarm v1 adds bounded retention with explicit
+gaps and binding/run/stream cursors; failed scans and queries do not advance it.
+Original GFB bytes and v0 snapshots are unchanged. The combined command stream
+remains a separate design. Native/WASM full-record parity and rejection coverage
+are in `tests/alarm-observation.test.mjs`; scope and schemas are in
+[the alarm v1 contract](contracts/alarm-v1/README.md).
+
 ### 2026-10-29 - source-bound continuous Percent arbitration ([#249](https://github.com/callin2/ghostflow-language/issues/249), [#590](https://github.com/callin2/ghostflow-language/issues/590))
 
 Reference §4.9 now defines named Percent requests and ceilings in an in-control

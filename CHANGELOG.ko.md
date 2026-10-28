@@ -5,6 +5,33 @@
 
 ## 미출시
 
+### 2026-10-29 - 정확한 Interaction provenance 복원 ([#287](https://github.com/callin2/ghostflow-language/issues/287), [#590](https://github.com/callin2/ghostflow-language/issues/590))
+
+Interaction Schema 복원은 스키마를 검증하기 전에 저장된 소스 노드와 의도
+메타데이터를 정식 소스의 재컴파일 결과와 비교합니다. 이전에는 원본 소스와
+GFB 바이트가 같아도 호출자가 메타데이터, 스키마, 알람 descriptor를 함께 바꾸면
+`GF-ABSENT-FROM-SOURCE`처럼 존재하지 않는 앵커를 수락할 수 있었습니다.
+유효한 스키마 버전과 소스 식별자는 보존합니다. 독립·합성·알람 거절 회귀는
+`tests/interaction-emission.test.mjs`, `tests/composed-interaction.test.mjs`,
+`tests/alarm-observation.test.mjs`에서 검증합니다. 설정 복원 테스트는
+`tests/settings-default-provenance.test.mjs`에서 0.3과 0.4 계약을 유지합니다.
+정식 재현은 검증 후 저장한 compact-profile 소스도 외부 프로파일 closure를
+다시 요구하지 않고 복원합니다. 예를 들어 `profile: example-board@1` 프로그램은
+정확한 소스 digest, 노드 위치와 0.3 또는 0.4 스키마를 유지합니다. 일반 컴파일은
+계속 프로파일 digest와 binding을 검증합니다. 재현은 프로그램 출처를 재구성하며
+설치 구성을 검증하지는 않습니다.
+
+### 2026-10-29 - 스캔이 소유하는 알람 생명주기 ([#287](https://github.com/callin2/ghostflow-language/issues/287))
+
+소스가 검증된 외부 descriptor로 scalar scan profile의 작성된 Bool 상태를
+알람에 연결할 수 있습니다. Rust가 내보내기 전에 발생/해제 episode와 현재
+조건을 기록하므로 false→true→false 뒤에 조회해도 두 전이를 받습니다.
+알람 v1은 명시적 gap을 가진 유한 보존과 binding/run/stream cursor를 추가합니다.
+실패한 스캔과 조회는 순서를 진행하지 않습니다. 원본 GFB 바이트와 v0 snapshot은
+그대로입니다. 통합 command stream은 별도 설계로 남습니다. 전체 레코드
+native/WASM 일치와 거절 검증은 `tests/alarm-observation.test.mjs`에 있으며
+범위와 schema는 [알람 v1 계약](contracts/alarm-v1/README.ko.md)에 있습니다.
+
 ### 2026-10-29 - 소스에 결합한 연속 Percent 중재 ([#249](https://github.com/callin2/ghostflow-language/issues/249), [#590](https://github.com/callin2/ghostflow-language/issues/590))
 
 Reference §4.9는 control 내부 `resource_policy`에 이름 있는 Percent 요청과 상한을

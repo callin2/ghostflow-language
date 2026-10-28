@@ -136,6 +136,18 @@ export class FramedGhostFlowRuntime {
     this.#check(this.wasm.gf_frame_enable_instruction_witnesses(this.handle));
   }
 
+  activateAlarms(bytes, expectedSha256) {
+    if (typeof this.wasm.gf_frame_alarm_activate !== 'function') throw new Error('WASM artifact lacks alarm v1');
+    this.#bytes(byteBuffer(bytes, 'alarm binding', 65536), (p, n) => this.#bytes(identifier(expectedSha256, 'alarm digest'), (dp, dn) =>
+      this.#check(this.wasm.gf_frame_alarm_activate(this.handle, p, n, dp, dn))));
+  }
+
+  queryAlarms(bytes) {
+    this.#bytes(byteBuffer(bytes, 'alarm query', 2048), (p, n) => this.#check(this.wasm.gf_frame_alarm_query(this.handle, p, n)));
+    const ptr = this.wasm.gf_frame_alarm_report_ptr(this.handle), len = this.wasm.gf_frame_alarm_report_len(this.handle);
+    return JSON.parse(decoder.decode(new Uint8Array(this.wasm.memory.buffer, ptr, len)));
+  }
+
   activateStageAccounting(bytes) {
     this.#bytes(bytes, (p, n) => this.#check(this.wasm.gf_frame_stage_activate(this.handle, p, n)));
   }

@@ -1,4 +1,4 @@
-import { equalBytes, sha256Hex } from './sha256.mjs';
+import { sha256Hex } from './sha256.mjs';
 import {
   INTERACTION_SCHEMA_FORMAT,
   INTERACTION_SCHEMA_VERSION,
@@ -10,11 +10,12 @@ import {
   validateInteraction,
 } from '../contracts/interaction-v0/validate.mjs';
 import { extractLiterate } from './literate.mjs';
-import { compileControl, parseControl } from './control.mjs';
+import { parseControl } from './control.mjs';
+import { canonicalJson } from './canonical-json.mjs';
 import { canonicalUnitFor, isQuantityType } from './quantities.mjs';
 import { moduleFingerprint } from './source-trace.mjs';
 import { composedInteraction } from './composed-interaction.mjs';
-import { compileSourceSync } from './compile-source.mjs';
+import { replaySourceProvenance } from './compile-source.mjs';
 
 const PUBLIC_ID = /^[A-Za-z][A-Za-z0-9._:-]{0,127}$/;
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -287,21 +288,9 @@ export function verifyInteractionSchema(compilation, schema) {
 /** Recompile the literate envelope before accepting its persisted interaction schema. */
 export function restoreInteractionSchema({ sourceDocument, sourceMap, traceMetadata, bytes, sourceClosure }, schema) {
   const source = canonicalDocument(sourceDocument);
-  if (sourceClosure) {
-    const replay = compileSourceSync(source.text, { filename: source.filename, sourceClosure: sourceClosure.documents });
-    if (!equalBytes(bytes, replay.bytes)) fail('bytecode does not match canonical source closure replay');
-    return verifyInteractionSchema({ ...replay, sourceMap, traceMetadata, sourceClosure }, schema);
+  const replay = replaySourceProvenance({ sourceDocument: source, bytes, sourceClosure });
+  for (const [field, value] of Object.entries({ sourceMap, traceMetadata, ...(sourceClosure ? { sourceClosure } : {}) })) {
+    if (canonicalJson(value) !== canonicalJson(replay[field])) fail(`${field} does not match canonical source replay`);
   }
-  const extraction = extractLiterate(source.text, { filename: source.filename });
-  const replay = compileControl(extraction.code, { filename: source.filename });
-  const replayBytes = Uint8Array.from(replay.bytes);
-  if (!equalBytes(bytes, replayBytes)) fail('bytecode does not match canonical literate source replay');
-  const manifest = { ...replay.manifest, bytecodeSha256: sha256Hex(replayBytes) };
-  return verifyInteractionSchema({
-    bytes: replayBytes,
-    manifest,
-    sourceDocument: source,
-    sourceMap,
-    traceMetadata,
-  }, schema);
+  return verifyInteractionSchema(replay, schema);
 }
