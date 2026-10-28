@@ -3436,6 +3436,16 @@
               "path": "tests/import-composition.test.mjs",
               "testId": "pinned composition AST preserves named specialization and endpoint source positions",
               "assertionClass": "compile-policy"
+            },
+            {
+              "path": "tests/composition-intent-provenance.test.mjs",
+              "testId": "composition keeps duplicate anchor IDs scoped to the root and each authored instance",
+              "assertionClass": "identity"
+            },
+            {
+              "path": "tests/composition-intent-provenance.test.mjs",
+              "testId": "canonical artifact recovery rejects every forged composition intent field and missing metadata",
+              "assertionClass": "identity"
             }
           ]
         },
@@ -3471,11 +3481,12 @@
         }
       ],
       "gaps": [
-        "Pinned composition verifies distinct sensor suppliers and private state/config/timer execution on native and WASM. REF-06-002 remains incomplete for instance-specific binding revisions and composed interaction/descriptor joins; imported intent metadata remains unsupported."
+        "Pinned composition preserves definition-local intent within authored instance scopes and verifies private state/config/timer execution. REF-06-002 and REF-06-016 remain incomplete for per-instance binding provenance joined to actual installed snapshots and composed interaction/descriptor publication."
       ],
       "issues": [
         195,
-        290
+        290,
+        302
       ],
       "referenceCaseIds": [
         "REF-00-010"

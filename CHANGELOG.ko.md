@@ -5,6 +5,14 @@
 
 ## 미출시
 
+### 2026-10-29 - 가져온 모듈의 의도 provenance ([#290](https://github.com/callin2/ghostflow-language/issues/290), [#302](https://github.com/callin2/ghostflow-language/issues/302))
+
+고정된 import의 의도를 작성된 인스턴스별 범위에 보존합니다. 정의나 인스턴스가 다르면 같은 anchor ID도 합치지 않습니다.
+원본 위치, 정의 revision·digest, node ID, 정확한 source closure digest를 유지하며, 가져온 가정의 확인 상태와 작성 주체를 바꾸지 않습니다.
+정규 원본 재컴파일과 패키지 검증은 위조된 provenance를 거절합니다. 독립 문서 artifact는 바뀌지 않습니다.
+일반 컴파일과 실행은 가능하며, Interaction v0가 표현할 수 없는 imported intent를 투영해 달라는 요청은 명시적으로 거절합니다.
+실제 설치 snapshot·binding 및 공개 descriptor 연결은 후속 범위입니다.
+
 ### 2026-10-29 - 설치 전략 프로필의 원자 적용 ([#243](https://github.com/callin2/ghostflow-language/issues/243))
 
 InstalledControlHost가 검증된 센서 바인딩과 Bool 출력의 capability로 소스 검증된 전략을 활성화합니다.
