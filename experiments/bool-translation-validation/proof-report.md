@@ -4,6 +4,16 @@ Issue [#590](https://github.com/callin2/ghostflow-language/issues/590).
 Production base `0f9b541fa0014951860913f573d593f276ac2149`.
 This report records a bounded universal proof and its compiler bridge. Whole-compiler correctness remains unproved.
 
+## Generated production certificates on `dab5051`
+
+The fixed generator in `generated-cases.mjs` uses seed `0x590b001` and emits exactly 16 canonical `.ghost.md` programs. Each has 1–4 Bool states and 1–3 Bool outputs. Across the family, initial states include both values; cases exercise old-state swaps, omitted next assignments retained by identity, forward declarations, candidate reads in outputs, `!`, `&&`, `||`, `if` and explicit grouping. The existing `wide-branch` fixture continues to cover a nonzero high byte in a branch offset. The generator builds phase-typed expression nodes: state transitions contain no candidate reads.
+
+For every generated source, `compileEvidence` invokes the production `compileSource`. The existing `sourceTheoremInput` then binds the original UTF-8 source bytes, the complete raw GFB bytes, `SourceReader.readSource`, `ModuleLoader.load`, and the initialized trace theorem quantified over every tick count. This is a deterministic family of applications of the bounded Bool theorem, not a proof for arbitrary GhostFlow programs.
+
+The focused Node suite passed 14/14. The Lean 4.19.0 runner exited 0 with 202/202 expected outcomes, including 16/16 generated source certificates and two expected semantic rejections. Changing the source initial Bool value produces another successfully compiled program but fails `exactSourceRead` against the old source module. Changing the GFB initial Bool byte leaves a decodable module but fails `exactModuleLoaded` against the original source module. Both failures occurred at the named equality proof with `decide`; neither log contains an import or unknown-identifier failure. After this run, the runner's negative-outcome predicate was tightened to reject import, unknown identifier, missing-file, signal and timeout failures. A focused replay of the 191 retained Lean logs against that predicate passed 191/191; 11 JavaScript admission outcomes have no Lean log and were not part of that replay.
+
+Ignored evidence is under `build/bool-generated-certificates-590/`: `verification.json` SHA-256 `ac844511dbb0c28a6279dcfcc0e667b3597fd4eab32c4e5725a11acedec76f16` and `outcome-guard-replay.json` SHA-256 `f66e9b48e1dfb36ba62aee7d0e4ac74a55260d6168c1a497de911cda29c497fd`. The directory retains each source, GFB, bridge evidence, Lean input and log, plus per-source and per-artifact hashes. The 202-outcome run predates the predicate-only hardening; the retained logs were replayed under the hardened predicate. No production compiler or runtime semantics changed, and no native/WASM trace or device acceptance is claimed here.
+
 The subsequent [serializer and raw-decoder report](serializer-report.md) records
 the expanded theorem set, 57-outcome run and its additional standard Lean
 `Classical.choice` dependency. Counts and axiom observations below describe this
