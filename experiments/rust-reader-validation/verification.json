@@ -1,0 +1,310 @@
+{
+  "status": "passed",
+  "observedAt": "2026-10-28T20:31:13.387231Z",
+  "checks": [
+    {
+      "name": "baseline",
+      "expectedSuccess": true,
+      "generatedCompilation": {
+        "command": [
+          "/private/tmp/ghostflow-proof-tools-590/lean-4.35.0-darwin/bin/lean",
+          "-o",
+          "ReaderFoundation.olean",
+          "ReaderFoundation.lean"
+        ],
+        "exitCode": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "proof": {
+        "command": [
+          "/private/tmp/ghostflow-proof-tools-590/lean-4.35.0-darwin/bin/lean",
+          "ReaderFoundationProof.lean"
+        ],
+        "exitCode": 0,
+        "stdout": "'GhostFlowReader.Foundation.new_exact' depends on axioms: [propext, Classical.choice, Quot.sound]\n'GhostFlowReader.Foundation.new_valid' depends on axioms: [propext, Classical.choice, Quot.sound]\n'GhostFlowReader.Foundation.finished_exact' depends on axioms: [propext, Classical.choice, Quot.sound]\n'GhostFlowReader.Foundation.finished_terminates' depends on axioms: [propext, Classical.choice, Quot.sound]\n'GhostFlowReader.Foundation.cursor_eq_length_iff_remaining_empty' depends on axioms: [propext,\n Classical.choice,\n Quot.sound]\n'GhostFlowReader.Foundation.finished_remaining' depends on axioms: [propext, Classical.choice, Quot.sound]\n'GhostFlowReader.Foundation.invalid_cursor_counterexample' depends on axioms: [propext, Classical.choice, Quot.sound]\n",
+        "stderr": ""
+      }
+    },
+    {
+      "name": "mutant-new-starts-at-one",
+      "expectedSuccess": false,
+      "generatedCompilation": {
+        "command": [
+          "/private/tmp/ghostflow-proof-tools-590/lean-4.35.0-darwin/bin/lean",
+          "-o",
+          "ReaderFoundation.olean",
+          "ReaderFoundation.lean"
+        ],
+        "exitCode": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "proof": {
+        "command": [
+          "/private/tmp/ghostflow-proof-tools-590/lean-4.35.0-darwin/bin/lean",
+          "ReaderFoundationProof.lean"
+        ],
+        "exitCode": 1,
+        "stdout": "ReaderFoundationProof.lean:16:2: error: Tactic `rfl` failed: The left-hand side\n  Reader.new bytes\nis not definitionally equal to the right-hand side\n  Result.ok { bytes := bytes, \u00abat\u00bb := 0#usize }\n\nbytes : Slice U8\n\u22a2 Reader.new bytes = Result.ok { bytes := bytes, \u00abat\u00bb := 0#usize }\nReaderFoundationProof.lean:22:38: error: Application type mismatch: The argument\n  rfl\nhas type\n  ?m.24 = ?m.24\nbut is expected to have type\n  Reader.new bytes = Result.ok { bytes := bytes, \u00abat\u00bb := 0#usize }\nin the application\n  And.intro rfl\n'GhostFlowReader.Foundation.new_exact' depends on axioms: [propext, sorryAx, Classical.choice, Quot.sound]\n'GhostFlowReader.Foundation.new_valid' depends on axioms: [propext, sorryAx, Classical.choice, Quot.sound]\n'GhostFlowReader.Foundation.finished_exact' depends on axioms: [propext, Classical.choice, Quot.sound]\n'GhostFlowReader.Foundation.finished_terminates' depends on axioms: [propext, Classical.choice, Quot.sound]\n'GhostFlowReader.Foundation.cursor_eq_length_iff_remaining_empty' depends on axioms: [propext,\n Classical.choice,\n Quot.sound]\n'GhostFlowReader.Foundation.finished_remaining' depends on axioms: [propext, Classical.choice, Quot.sound]\n'GhostFlowReader.Foundation.invalid_cursor_counterexample' depends on axioms: [propext, Classical.choice, Quot.sound]\n",
+        "stderr": ""
+      }
+    },
+    {
+      "name": "mutant-finished-inverted",
+      "expectedSuccess": false,
+      "generatedCompilation": {
+        "command": [
+          "/private/tmp/ghostflow-proof-tools-590/lean-4.35.0-darwin/bin/lean",
+          "-o",
+          "ReaderFoundation.olean",
+          "ReaderFoundation.lean"
+        ],
+        "exitCode": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "proof": {
+        "command": [
+          "/private/tmp/ghostflow-proof-tools-590/lean-4.35.0-darwin/bin/lean",
+          "ReaderFoundationProof.lean"
+        ],
+        "exitCode": 1,
+        "stdout": "ReaderFoundationProof.lean:27:74: error: unsolved goals\nr : Reader\n\u22a2 False\n'GhostFlowReader.Foundation.new_exact' depends on axioms: [propext, Classical.choice, Quot.sound]\n'GhostFlowReader.Foundation.new_valid' depends on axioms: [propext, Classical.choice, Quot.sound]\n'GhostFlowReader.Foundation.finished_exact' depends on axioms: [propext, sorryAx, Classical.choice, Quot.sound]\n'GhostFlowReader.Foundation.finished_terminates' depends on axioms: [propext, sorryAx, Classical.choice, Quot.sound]\n'GhostFlowReader.Foundation.cursor_eq_length_iff_remaining_empty' depends on axioms: [propext,\n Classical.choice,\n Quot.sound]\n'GhostFlowReader.Foundation.finished_remaining' depends on axioms: [propext, sorryAx, Classical.choice, Quot.sound]\n'GhostFlowReader.Foundation.invalid_cursor_counterexample' depends on axioms: [propext,\n sorryAx,\n Classical.choice,\n Quot.sound]\n",
+        "stderr": ""
+      }
+    },
+    {
+      "name": "invalid-cursor-without-premise",
+      "expectedSuccess": false,
+      "proof": {
+        "command": [
+          "/private/tmp/ghostflow-proof-tools-590/lean-4.35.0-darwin/bin/lean",
+          "InvalidCursorClaim.lean"
+        ],
+        "exitCode": 1,
+        "stdout": "InvalidCursorClaim.lean:3:95: error: unsolved goals\n\u22a2 False\n",
+        "stderr": ""
+      }
+    }
+  ],
+  "scope": "actual production Reader.new and Reader.finished extraction only",
+  "limits": [
+    "No Reader.take/u16 or complete loader equivalence proof.",
+    "Host 64-bit extraction; no ESP32 target or hardware claim.",
+    "Rust compiler, Charon/Aeneas translation and standard-library model correctness remain trusted.",
+    "remaining is the list-remainder representation; ModuleLoader.lean is not imported."
+  ],
+  "provenance": {
+    "issue": "https://github.com/callin2/ghostflow-language/issues/590",
+    "productionCommit": "645b6899f325b0d1d24a1398f2f70af8d9f44787",
+    "productionFile": "crates/ghostflow-core/src/lib.rs",
+    "productionSha256": "9115f4a05d7e55be9674473796f6be214bada56fa1bb8177845ea495f1314bf4",
+    "generatedSha256": "c70d954c6e74797211064148a07549c93dc260d46ff5df0372edf3688a85941e",
+    "llbcSha256": "2332ae0f8ea6548789ce3a98f3a3c67e113189fcbfae4188c341815a6fd6f84e",
+    "charonCommit": "2ec7e964e1032c59220e726840a9ac7d7684be2f",
+    "aeneasCommit": "399081f237935f9aa805f2d4a51fd3784aea11a9",
+    "leanVersion": "4.35.0",
+    "targetScope": "host 64-bit; not an ESP32 target proof",
+    "startFrom": [
+      "crate::Reader::new",
+      "crate::Reader::finished"
+    ],
+    "sourceLines": {
+      "Reader": [
+        3818,
+        3821
+      ],
+      "new": [
+        3823,
+        3825
+      ],
+      "finished": [
+        3826,
+        3828
+      ]
+    }
+  },
+  "extractionTarget": {
+    "key": "x86_64-apple-darwin",
+    "value": {
+      "arch": "X86_64",
+      "vendor": "apple",
+      "os": "MacOs",
+      "env": "Unspecified",
+      "cfg_abi": "Unspecified",
+      "target_pointer_size": 8,
+      "is_little_endian": true,
+      "c_enum_smallest_repr_ty": "I32",
+      "primitive_alignments": [
+        {
+          "key": "Bool",
+          "value": 1
+        },
+        {
+          "key": {
+            "Integer": {
+              "Signed": "I8"
+            }
+          },
+          "value": 1
+        },
+        {
+          "key": {
+            "Integer": {
+              "Signed": "I16"
+            }
+          },
+          "value": 2
+        },
+        {
+          "key": {
+            "Integer": {
+              "Signed": "I32"
+            }
+          },
+          "value": 4
+        },
+        {
+          "key": {
+            "Integer": {
+              "Signed": "I64"
+            }
+          },
+          "value": 8
+        },
+        {
+          "key": {
+            "Integer": {
+              "Signed": "I128"
+            }
+          },
+          "value": 16
+        },
+        {
+          "key": {
+            "Integer": {
+              "Signed": "Isize"
+            }
+          },
+          "value": 8
+        },
+        {
+          "key": {
+            "Integer": {
+              "Unsigned": "U8"
+            }
+          },
+          "value": 1
+        },
+        {
+          "key": {
+            "Integer": {
+              "Unsigned": "U16"
+            }
+          },
+          "value": 2
+        },
+        {
+          "key": {
+            "Integer": {
+              "Unsigned": "U32"
+            }
+          },
+          "value": 4
+        },
+        {
+          "key": {
+            "Integer": {
+              "Unsigned": "U64"
+            }
+          },
+          "value": 8
+        },
+        {
+          "key": {
+            "Integer": {
+              "Unsigned": "U128"
+            }
+          },
+          "value": 16
+        },
+        {
+          "key": {
+            "Integer": {
+              "Unsigned": "Usize"
+            }
+          },
+          "value": 8
+        },
+        {
+          "key": {
+            "Float": "F16"
+          },
+          "value": 2
+        },
+        {
+          "key": {
+            "Float": "F32"
+          },
+          "value": 4
+        },
+        {
+          "key": {
+            "Float": "F64"
+          },
+          "value": 8
+        },
+        {
+          "key": {
+            "Float": "F128"
+          },
+          "value": 16
+        },
+        {
+          "key": "Char",
+          "value": 4
+        }
+      ]
+    }
+  },
+  "lean": {
+    "command": [
+      "/private/tmp/ghostflow-proof-tools-590/lean-4.35.0-darwin/bin/lean",
+      "--version"
+    ],
+    "exitCode": 0,
+    "stdout": "Lean (version 4.35.0, x86_64-apple-darwin24.6.0, commit eb6cafb7290e8bd5f2937522d8d804f58f02bafc, Release)\n",
+    "stderr": "",
+    "sha256": "3f04956c5cef436a26fd88956effdb6767d8beb0174012c19989764bd74a4f3b"
+  },
+  "library": {
+    "AeneasOleanSha256": "d21ffb5d8ded86e35d734d63531504f660fcd419397afeea414bf72bfc86b479",
+    "searchPaths": [
+      "/private/tmp/ghostflow-aeneas-toolchain-590/backends/lean/.lake/build/lib/lean",
+      "/private/tmp/ghostflow-aeneas-toolchain-590/backends/lean/.lake/packages/LeanSearchClient/.lake/build/lib/lean",
+      "/private/tmp/ghostflow-aeneas-toolchain-590/backends/lean/.lake/packages/Qq/.lake/build/lib/lean",
+      "/private/tmp/ghostflow-aeneas-toolchain-590/backends/lean/.lake/packages/aesop/.lake/build/lib/lean",
+      "/private/tmp/ghostflow-aeneas-toolchain-590/backends/lean/.lake/packages/batteries/.lake/build/lib/lean",
+      "/private/tmp/ghostflow-aeneas-toolchain-590/backends/lean/.lake/packages/importGraph/.lake/build/lib/lean",
+      "/private/tmp/ghostflow-aeneas-toolchain-590/backends/lean/.lake/packages/mathlib/.lake/build/lib/lean",
+      "/private/tmp/ghostflow-aeneas-toolchain-590/backends/lean/.lake/packages/plausible/.lake/build/lib/lean",
+      "/private/tmp/ghostflow-aeneas-toolchain-590/backends/lean/.lake/packages/proofwidgets/.lake/build/lib/lean"
+    ],
+    "lakeManifestSha256": "14e04fb0abf42c95fabccc050f11715f9cb7e86316a26a55a87c89b95a72a5a3"
+  },
+  "sourceHashes": {
+    "provenance.json": "97cd241dfbc8fa65a464751c6fd4609e28086e42c5ad196232c93df2f3902134",
+    "ReaderFoundation.lean": "c70d954c6e74797211064148a07549c93dc260d46ff5df0372edf3688a85941e",
+    "README.md": "03ef5e4a66a9e577270e21fc0e8a7a2578a91b204547a12c6114d3a91cb3bc29",
+    "translation.json": "f4d6ad001b1ff8f622c30fd58a6d202eb4e4f7120df51277c1ae71545298f4e6",
+    "ReaderFoundationProof.lean": "ae80ea29fce8c89c1624f4ef64bde6efeeb6b97da618f6bc33270d8118a5c8f2",
+    "verify.py": "e10fe12ab12aa84913fdffe7c03651e0010ee5efbe76eb3e2840e095879fcf96"
+  },
+  "allowedLogicalAxioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+  ],
+  "finishedAt": "2026-10-28T20:32:00.311724Z"
+}
