@@ -138,17 +138,27 @@ test('handoff rejects omitted, extra and changed source evidence', t => {
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   for (const name of ['tools', 'crates/ghostflow-core', 'crates/ghostflow-package',
     'runtimes/wasm', 'data/calendars', 'tests', 'examples', 'docs', 'contracts/integration-v1',
-    'contracts/interaction-v0', 'contracts/requirements']) {
+    'contracts/interaction-v0', 'contracts/requirements', 'contracts/feature-status']) {
     fs.mkdirSync(path.join(root, name), { recursive: true });
     fs.writeFileSync(path.join(root, name, 'fixture.txt'), `fixture ${name}`);
   }
   for (const name of ['runtimes/node/ledger.mjs', 'runtimes/node/calendar.mjs', 'README.md', 'AGENTS.md', '.gitignore',
-    'Cargo.toml', 'Cargo.lock', 'package.json', 'package-lock.json', 'Makefile']) {
+    'Cargo.toml', 'Cargo.lock', 'package.json', 'package-lock.json', 'Makefile',
+    'contracts/feature-status/catalog.json', 'contracts/feature-status/validate.mjs']) {
     fs.mkdirSync(path.dirname(path.join(root, name)), { recursive: true });
     fs.writeFileSync(path.join(root, name), `fixture ${name}`);
   }
   const hashes = verificationSourceHashes(root);
   assert.doesNotThrow(() => assertVerificationSources(root, hashes));
+  for (const classifiedSource of ['contracts/feature-status/catalog.json', 'contracts/feature-status/validate.mjs']) {
+    assert.ok(Object.hasOwn(hashes, classifiedSource), `${classifiedSource} is part of verification identity`);
+    const missingSource = { ...hashes };
+    delete missingSource[classifiedSource];
+    assert.throws(() => assertVerificationSources(root, missingSource), /hash set/);
+    fs.writeFileSync(path.join(root, classifiedSource), `changed ${classifiedSource}`);
+    assert.throws(() => assertVerificationSources(root, hashes), /source changed/);
+    fs.writeFileSync(path.join(root, classifiedSource), `fixture ${classifiedSource}`);
+  }
   const omitted = { ...hashes };
   delete omitted['crates/ghostflow-package/fixture.txt'];
   assert.throws(() => assertVerificationSources(root, omitted), /hash set/);
@@ -165,11 +175,15 @@ test('handoff rejects omitted, extra and changed source evidence', t => {
   assert.throws(() => assertVerificationSources(root, hashes), /source changed/);
   fs.writeFileSync(path.join(root, 'data/calendars/fixture.txt'), 'fixture data/calendars');
   fs.rmSync(path.join(root, 'runtimes/node/calendar.mjs'));
+  fs.rmSync(path.join(root, 'contracts/feature-status'), { recursive: true });
   const historical = verificationSourceHashes(root);
   const historicalExpected = { ...hashes };
   delete historicalExpected['runtimes/node/calendar.mjs'];
   delete historicalExpected['data/calendars/fixture.txt'];
-  assert.deepEqual(historical, historicalExpected, 'pre-calendar source graph keeps its original evidence keys');
+  delete historicalExpected['contracts/feature-status/fixture.txt'];
+  delete historicalExpected['contracts/feature-status/catalog.json'];
+  delete historicalExpected['contracts/feature-status/validate.mjs'];
+  assert.deepEqual(historical, historicalExpected, 'historical source graph keeps its original evidence keys');
   fs.rmSync(path.join(root, 'data/calendars'), { recursive: true });
   fs.writeFileSync(path.join(root, 'runtimes/node/calendar.mjs'), 'fixture runtimes/node/calendar.mjs');
   assert.throws(() => verificationSourceHashes(root), /ENOENT/, 'current adapter requires its reviewed dataset');
