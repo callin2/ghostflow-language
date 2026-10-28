@@ -9132,6 +9132,45 @@
       "referenceCaseIds": [
         "REF-03-040"
       ]
+    },
+    {
+      "id": "installed-sensor-admission",
+      "family": "Pinned sensor capability and replacement admission",
+      "clause": {
+        "path": "docs/reference/06-composition-and-replay.en.md",
+        "heading": "6.3 Parameters, settings, dependencies, and bindings"
+      },
+      "owner": "HOST",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [],
+      "evidence": [
+        {
+          "stage": "host_simulation",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/installed-control-host.test.mjs",
+              "testId": "REF-06-009 rejects slow Number replacement and publishes a fresh run only after compatible admission",
+              "caseId": "REF-06-009",
+              "assertionClass": "rollback",
+              "targets": [
+                "host",
+                "wasm"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Bounded pinned Number/Bool inputs and Bool outputs using a fresh framed ControlRuntime run. Capability records are declarations; Device driver installation, hardware authentication, uninterrupted migration and physical behavior are separate work."
+      ],
+      "issues": [
+        297
+      ],
+      "referenceCaseIds": [
+        "REF-06-009"
+      ]
     }
   ]
 }

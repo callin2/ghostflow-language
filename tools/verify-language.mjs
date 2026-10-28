@@ -229,6 +229,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/pc-01-projection-sync.test.mjs',
   'tests/integration-contract.test.mjs',
   'tests/program-replacement-host.test.mjs',
+  'tests/installed-control-host.test.mjs',
   'tests/bool-translation-validation.test.mjs',
   'tests/software-input-reference.test.mjs',
   'tests/interaction-contract.test.mjs',

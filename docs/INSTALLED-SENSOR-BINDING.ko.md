@@ -1,3 +1,6 @@
+<!-- translation-source: docs/INSTALLED-SENSOR-BINDING.md -->
+[English 원문](INSTALLED-SENSOR-BINDING.md)
+
 # 설치 센서 바인딩 참조 호스트
 
 `InstalledControlHost`는 고정된 컴파일 Program과 해시로 고정된 설치 선언의 적합성을 검사한 뒤 기존 `ControlRuntime.instantiateFramed`로 실행합니다. [REF-06-009](https://github.com/callin2/ghostflow-language/issues/297)의 호스트 계약입니다. 장치 발견, Driver 설치, 폴링, 실물 검증은 수행하지 않습니다.
@@ -11,6 +14,20 @@
 `validateIntegration`은 센서 바인딩의 방향·타입·정규 단위, Program의 명시적 `valid` 범위를 포함하는 측정 범위, 관측 계약, `maxInterSampleGapMs < staleMs`를 검사합니다. 정확히 같은 값도 stale 경계에 닿으므로 거부합니다. 소스의 `sample` 간격은 정보이며 별도 폴링 명령이나 두 번째 강제 기한으로 재해석하지 않습니다. 명시적 `stale_after`가 없는 v2 센서나 명시적 `valid` 범위가 없는 Number 센서는 이 한정 호스트에서 거부합니다. 기존 v1 검증의 형태와 동작은 그대로입니다.
 
 ## 실행과 교체
+
+```js
+import { InstalledControlHost } from './runtimes/wasm/installed-control-host.mjs';
+
+const host = await InstalledControlHost.instantiate(wasmBytes, compiled, {
+  runId: 'run-1', release, boardProfile, installation,
+});
+const result = host.step({ bindingRevision: installation.revision, nowMs: 1000,
+  samples: { reading: { bindingRevision: installation.revision,
+    endpointId: installation.bindings.reading,
+    sample: { epoch: 1, id: 1, timestampMs: 1000, quality: 'Good', value: 42 },
+  } },
+});
+```
 
 `InstalledControlHost.instantiate(wasmBytes, compiled, { runId, release, boardProfile, installation })`로 시작합니다. `step`에는 현재 `bindingRevision`, `nowMs`, `samples`를 전달합니다. 각 샘플은 수집 시점의 `bindingRevision`, `endpointId`, `{ epoch, id, timestampMs, quality, value }`를 포함합니다. 호스트는 이전 리비전이나 다른 엔드포인트의 샘플을 `ControlRuntime`에 전달하기 전에 거부합니다. 호출자가 제공한 표지는 하드웨어 인증이 아닙니다. 새 샘플이 없는 scan은 빈 `samples`를 전달하며, freshness는 기존 conditioner가 판정합니다. 실행 출력은 제어 의도이며 실물 출력 증거가 아닙니다.
 

@@ -201,8 +201,8 @@
       "source": "contracts/integration-v1/README.md",
       "sourceLanguage": "en",
       "translation": "contracts/integration-v1/README.ko.md",
-      "sourceSha256": "36c5b96d1a10892eab8c7348bd5a174dd8f4473dedadffc21475237232cc36f2",
-      "translationSha256": "da7882d891e4ccc12add456e382a694c0c452fdf767148a21a633315e83c8409"
+      "sourceSha256": "bc3714fa00ff24ce4635d20ac822b1e0c4a6c6aa2e9111bb84e6f61566487de9",
+      "translationSha256": "970044a6a111482bdeb89cf4f7429621ffeefbee8ffd929e95e8cf56c2c1ead2"
     },
     {
       "source": "contracts/interaction-v0/README.md",
@@ -1176,6 +1176,13 @@
       "translation": "docs/COMPOSED-CONFIG-TIMER.ko.md",
       "sourceSha256": "c57d57f2c1acb29a6a1d7dbb278bd73a8e3432eb7273fd96d867b0cc816554a4",
       "translationSha256": "0ed5fac669ec27bc2678a82ddcd04b93ab79761bd801218eaeec67722b0fdcd0"
+    },
+    {
+      "source": "docs/INSTALLED-SENSOR-BINDING.md",
+      "sourceLanguage": "en",
+      "translation": "docs/INSTALLED-SENSOR-BINDING.ko.md",
+      "sourceSha256": "cfaff89affe6c7a16c3303a23e3faa4d675d813d86190fc6636fb55737273f0c",
+      "translationSha256": "7dc9c82f44ba9880cb726eb4294480d2b930b6faef47a0f2a5c2cbf46aa3cf1c"
     }
   ],
   "exclusions": [
@@ -1538,6 +1545,14 @@
     {
       "path": "docs/reports/2026-10-28-dev-reconciliation.md",
       "reason": "Execution report and source integration evidence; reports may remain in one language."
+    },
+    {
+      "path": "experiments/bool-translation-validation/fixtures/wide-branch.ghost.md",
+      "reason": "Exact executable proof fixture for issue590; translations would change the compiled evidence identity."
+    },
+    {
+      "path": "experiments/bool-translation-validation/serializer-report.md",
+      "reason": "Issue590 proof execution evidence and explicit trusted boundaries; reports may remain in one language."
     }
   ]
 }

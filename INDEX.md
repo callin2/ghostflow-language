@@ -137,6 +137,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/INDEX.md](docs/INDEX.md) | Documentation index | md |
 | [docs/INPUT-MIGRATION.ko.md](docs/INPUT-MIGRATION.ko.md) | 외부 입력의 canonical 선언과 명시적 revision migration | md |
 | [docs/INPUT-MIGRATION.md](docs/INPUT-MIGRATION.md) | Canonical external input and explicit revision migration | md |
+| [docs/INSTALLED-SENSOR-BINDING.ko.md](docs/INSTALLED-SENSOR-BINDING.ko.md) | 설치 센서 바인딩 참조 호스트 | md |
+| [docs/INSTALLED-SENSOR-BINDING.md](docs/INSTALLED-SENSOR-BINDING.md) | Installed sensor binding reference host | md |
 | [docs/INSTANCE-TRACE-PROJECTION.ko.md](docs/INSTANCE-TRACE-PROJECTION.ko.md) | Instance trace projection 참조 어댑터 | md |
 | [docs/INSTANCE-TRACE-PROJECTION.md](docs/INSTANCE-TRACE-PROJECTION.md) | Instance trace projection reference adapter | md |
 | [docs/INTENT-ANCHOR-MAP.ko.md](docs/INTENT-ANCHOR-MAP.ko.md) | Literate intent anchor map | md |
@@ -447,6 +449,7 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | --- | --- | --- |
 | [experiments/bool-translation-validation/pc-refinement-report.md](experiments/bool-translation-validation/pc-refinement-report.md) | Bool byte-PC refinement execution report | md |
 | [experiments/bool-translation-validation/proof-report.md](experiments/bool-translation-validation/proof-report.md) | Bool translation validation execution report | md |
+| [experiments/bool-translation-validation/serializer-report.md](experiments/bool-translation-validation/serializer-report.md) | Bounded Bool serialization and raw decoding — #590 | md |
 
 ## experiments/bool-translation-validation/fixtures/
 
@@ -454,6 +457,7 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | --- | --- | --- |
 | [experiments/bool-translation-validation/fixtures/boolean-literals.ghost.md](experiments/bool-translation-validation/fixtures/boolean-literals.ghost.md) | Bool literal proof input | md |
 | [experiments/bool-translation-validation/fixtures/snapshot-branches.ghost.md](experiments/bool-translation-validation/fixtures/snapshot-branches.ghost.md) | Bool snapshot and branch proof input | md |
+| [experiments/bool-translation-validation/fixtures/wide-branch.ghost.md](experiments/bool-translation-validation/fixtures/wide-branch.ghost.md) | Bool branch with a nonzero high offset byte | md |
 
 ## runtimes/wasm/
 
@@ -571,4 +575,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-426 documents.
+430 documents.
