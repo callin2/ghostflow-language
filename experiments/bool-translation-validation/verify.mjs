@@ -14,15 +14,24 @@ import { loaderTheoremInput, loaderAdmissionInput } from './loader-bridge.mjs';
 import { loaderCases, loaderMutations } from './loader-cases.mjs';
 import { sourceTheoremInput, sourceAdmissionInput } from './source-bridge.mjs';
 import { sourceAdmissionCases, sourceBoundaryCases, sourceStaleMutations } from './source-cases.mjs';
+import { generatedCases, generatedSeed } from './generated-cases.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url)), root = resolve(here, '../..');
 const now = () => new Date().toISOString();
 const fixtureNames = ['snapshot-branches', 'boolean-literals', 'wide-branch'];
 const falseProposition = "tactic 'decide' proved that the proposition";
+const infrastructureDiagnostic = /unknown identifier|unknown constant|could not import|unknown module|failed to load|no such file|timed out/i;
+
+export function leanOutcomeMatches(result, log, expectedSuccess, diagnostic) {
+  if (result.error || result.signal || !Number.isInteger(result.status) || infrastructureDiagnostic.test(log)) return false;
+  return (result.status === 0) === expectedSuccess
+    && (!diagnostic || log.includes(diagnostic))
+    && (!expectedSuccess || !log.includes('sorryAx'));
+}
 
 async function sourceIdentity() {
   const paths = ['package.json', 'package-lock.json', 'crates/ghostflow-core/src/lib.rs',
-    'tests/bool-translation-validation.test.mjs'];
+    'tests/bool-translation-validation.test.mjs', 'tests/bool-generated-certificates.test.mjs'];
   async function walk(path) {
     for (const entry of (await readdir(join(root, path), { withFileTypes: true })).sort((a, b) => a.name.localeCompare(b.name))) {
       const child = join(path, entry.name);
@@ -76,8 +85,7 @@ export async function verify({ lean, evidenceDir }) {
       const result = spawnSync(lean, [...(output ? ['-o', join(scratch, output)] : []), path],
         { cwd: scratch, env: { ...process.env, LEAN_PATH: scratch }, encoding: 'utf8', timeout: 60000, maxBuffer: 4 * 1024 * 1024 });
       const log = (result.stdout ?? '') + (result.stderr ?? '');
-      const passed = !result.error && (result.status === 0) === expectedSuccess
-        && (!diagnostic || log.includes(diagnostic)) && (!expectedSuccess || !log.includes('sorryAx'));
+      const passed = leanOutcomeMatches(result, log, expectedSuccess, diagnostic);
       await writeFile(join(directory, `${name}.lean`), content);
       await writeFile(join(directory, `${name}.log`), log);
       report.results.push({ name, expectedSuccess, expectedDiagnostic: diagnostic, passed,
@@ -133,6 +141,31 @@ export async function verify({ lean, evidenceDir }) {
       await run(`${name}-loader`, loaderTheoremInput(evidence), true);
       await run(`${name}-source`, sourceTheoremInput(evidence, originalSourceBytes), true);
     }
+    const generated = generatedCases();
+    report.generated = { seed: generatedSeed, count: generated.length,
+      features: [...new Set(generated.flatMap(x => x.features))].sort() };
+    for (const sample of generated) {
+      const originalSourceBytes = Buffer.from(sample.source, 'utf8');
+      const evidence = await compileEvidence(sample.source, sample.filename);
+      const serialized = JSON.stringify(evidence, null, 2) + '\n';
+      await writeFile(join(directory, `${sample.name}.ghost.md`), originalSourceBytes);
+      await writeFile(join(directory, `${sample.name}.json`), serialized);
+      await writeFile(join(directory, `${sample.name}.gfb`), Uint8Array.from(evidence.artifact.bytes));
+      report.artifacts.push({ fixture: sample.filename, generatedSeed: sample.seed, generatedIndex: sample.index,
+        features: sample.features, sourceSha256: evidence.source.sha256,
+        artifactSha256: evidence.artifact.sha256, bridgeEvidenceSha256: sha256(serialized) });
+      await run(`${sample.name}-source`, sourceTheoremInput(evidence, originalSourceBytes), true);
+    }
+    const mutantSample = generated.find(x => x.states.length > 1);
+    const mutantEvidence = await compileEvidence(mutantSample.source, mutantSample.filename);
+    const initial = mutantSample.states[0].initial;
+    const changedSource = Buffer.from(mutantSample.source.replace(
+      `state s0: Bool = ${initial};`, `state s0: Bool = ${!initial};`), 'utf8');
+    assert.notDeepEqual(changedSource, Buffer.from(mutantSample.source));
+    await run('generated-rejects-source-initial', sourceTheoremInput(mutantEvidence, changedSource), false, falseProposition);
+    const changedArtifact = structuredClone(mutantEvidence);
+    changedArtifact.artifact.bytes[changedArtifact.decoded.states[0].initialOffset] ^= 1;
+    await run('generated-rejects-artifact-initial', sourceTheoremInput(changedArtifact, Buffer.from(mutantSample.source)), false, falseProposition);
     for (const [name, source, accepted] of sourceAdmissionCases) {
       const bytes = typeof source === 'string' ? Buffer.from(source) : Uint8Array.from(source);
       await run(`source-${accepted ? 'accepts' : 'rejects'}-${name}`, sourceAdmissionInput(bytes, accepted), true);
