@@ -61,6 +61,8 @@ def main():
                          'remaining is the list-remainder representation; ModuleLoader.lean is not imported.']}
     write_report(report_path, report)
     try:
+        if not __debug__:
+            raise RuntimeError('Python optimization disables verification assertions; run without -O or PYTHONOPTIMIZE')
         provenance = json.loads((HERE / 'provenance.json').read_text())
         report['provenance'] = provenance
         assert digest(ROOT / provenance['productionFile']) == provenance['productionSha256'], 'production source drift'

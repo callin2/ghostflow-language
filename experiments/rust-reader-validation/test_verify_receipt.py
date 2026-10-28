@@ -54,10 +54,10 @@ sys.exit(module.main())
 
 
 class ReceiptPublicationTest(unittest.TestCase):
-    def run_child(self, mode, root, output):
+    def run_child(self, mode, root, output, optimized=False):
         harness = root / 'harness.py'
         harness.write_text(HARNESS)
-        return subprocess.run([sys.executable, str(harness), str(VERIFY), mode,
+        return subprocess.run([sys.executable, *(['-O'] if optimized else []), str(harness), str(VERIFY), mode,
                                str(root / 'fixtures'), str(output)],
                               capture_output=True, text=True)
 
@@ -86,6 +86,21 @@ class ReceiptPublicationTest(unittest.TestCase):
 
             self.assertEqual(child.returncode, 1, child.stdout + child.stderr)
             self.assertEqual(json.loads(receipt.read_text())['status'], 'failed')
+
+    def test_optimized_python_is_rejected_before_verification(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output = root / 'out'
+            output.mkdir()
+            receipt = output / 'verification.json'
+            receipt.write_text('{"status":"passed"}\n')
+
+            child = self.run_child('interrupted', root, output, optimized=True)
+
+            self.assertEqual(child.returncode, 1, child.stdout + child.stderr)
+            result = json.loads(receipt.read_text())
+            self.assertEqual(result['status'], 'failed')
+            self.assertIn('Python optimization disables verification assertions', result['error'])
 
 
 if __name__ == '__main__':
