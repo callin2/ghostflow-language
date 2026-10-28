@@ -1574,6 +1574,10 @@
       "reason": "Issue590 raw-loader proof execution report and remaining trust boundary; reports may remain in one language."
     },
     {
+      "path": "experiments/bool-translation-validation/source-reader-report.md",
+      "reason": "Issue590 original-source byte reader proof execution report and bounded grammar trust boundary; reports may remain in one language."
+    },
+    {
       "path": "experiments/bool-sensor-validation/proof-report.md",
       "reason": "Issue590 canonical sensor proof execution report and explicit trusted boundaries; reports may remain in one language."
     },
