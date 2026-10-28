@@ -139,9 +139,15 @@ phase' = case phase {
 
 정확한 규칙은 다음과 같다.
 
-- 초기값은 `0ms`다.
-- 상태 변경을 확정한 tick에서 새 구간이 시작되고 값은 0이다.
-- 이후 accepted tick에서 단조 시각 차이를 읽는다.
+- 첫 accepted tick의 식 평가값은 `0ms`다.
+- [§2.8의 snapshot 규칙](02-types-expressions-state.md#28-tick과-상태-snapshot)에 따라
+  `age`를 읽는 상태 전이식과 출력식은 tick 시작 시점의 이전 타이머 구간을 사용한다.
+  이번 tick에서 `phase'`가 달라져도 그 tick의 `age` 식 평가값은 이전 구간의 경과 시간이다.
+- 상태 변경이 확정되면 현재 단조 시각에서 새 구간을 시작한다. 같은 실행 결과의
+  커밋 후 타이머 관찰값은 `0ms`다. 소스 trace의 타이머 표시는 이 커밋 후 값을 사용하며,
+  이미 계산한 `age` 출력값을 다시 계산하지 않는다.
+- 다음 accepted tick의 식은 새 구간의 단조 시각 차이를 읽는다. 변경 tick과 같은
+  timestamp이면 `0ms`이며, 상태값이 유지되면 구간 시작 시각도 유지된다.
 - Bool 상태는 false→true와 true→false 모두 상태 변경이다. 따라서
   `elapsed(running)`은 “현재 값이 유지된 시간”이지 누적 ON 시간은 아니다.
 - 한 tick에서 여러 단계가 연달아 넘어가지 않는다. 조건을 만족한 첫 tick에서 한 번
