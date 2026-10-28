@@ -1,0 +1,30 @@
+{
+  "issue": "https://github.com/callin2/ghostflow-language/issues/590",
+  "productionCommit": "645b6899f325b0d1d24a1398f2f70af8d9f44787",
+  "productionFile": "crates/ghostflow-core/src/lib.rs",
+  "productionSha256": "9115f4a05d7e55be9674473796f6be214bada56fa1bb8177845ea495f1314bf4",
+  "generatedSha256": "c70d954c6e74797211064148a07549c93dc260d46ff5df0372edf3688a85941e",
+  "llbcSha256": "2332ae0f8ea6548789ce3a98f3a3c67e113189fcbfae4188c341815a6fd6f84e",
+  "charonCommit": "2ec7e964e1032c59220e726840a9ac7d7684be2f",
+  "aeneasCommit": "399081f237935f9aa805f2d4a51fd3784aea11a9",
+  "leanVersion": "4.35.0",
+  "targetScope": "host 64-bit; not an ESP32 target proof",
+  "startFrom": [
+    "crate::Reader::new",
+    "crate::Reader::finished"
+  ],
+  "sourceLines": {
+    "Reader": [
+      3818,
+      3821
+    ],
+    "new": [
+      3823,
+      3825
+    ],
+    "finished": [
+      3826,
+      3828
+    ]
+  }
+}
