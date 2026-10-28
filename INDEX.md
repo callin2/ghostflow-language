@@ -502,6 +502,12 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [experiments/bool-translation-validation/fixtures/snapshot-branches.ghost.md](experiments/bool-translation-validation/fixtures/snapshot-branches.ghost.md) | Bool snapshot and branch proof input | md |
 | [experiments/bool-translation-validation/fixtures/wide-branch.ghost.md](experiments/bool-translation-validation/fixtures/wide-branch.ghost.md) | Bool branch with a nonzero high offset byte | md |
 
+## experiments/elapsed-clock-bounds/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [experiments/elapsed-clock-bounds/proof-report.md](experiments/elapsed-clock-bounds/proof-report.md) | Accepted clock bounds for the source-bound elapsed epoch history | md |
+
 ## experiments/elapsed-epoch-validation/
 
 | Path | Title | Type |
@@ -661,4 +667,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-451 documents.
+452 documents.
