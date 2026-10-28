@@ -13,6 +13,9 @@ test('Lean outcome predicate accepts normal success and the expected normal fail
   assert.equal(leanOutcomeMatches({ status: 0 }, contradiction, false, diagnostic), false);
   assert.equal(leanOutcomeMatches(failed, contradiction, true), false);
   assert.equal(leanOutcomeMatches(failed, 'other failure', false, diagnostic), false);
+  for (const missing of [undefined, null, '']) {
+    assert.equal(leanOutcomeMatches(failed, contradiction, false, missing), false);
+  }
   assert.equal(leanOutcomeMatches({ status: 0 }, 'theorem uses sorryAx', true), false);
 });
 

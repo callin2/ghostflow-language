@@ -7,21 +7,18 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { GhostFlowRuntime } from '../../runtimes/wasm/ghostflow-runtime.mjs';
 import { FramedGhostFlowRuntime } from '../../runtimes/wasm/framed-runtime.mjs';
 import { compileEvidence, inspectModule, mutations, sha256, theoremInput, values } from './bridge.mjs';
+import { leanOutcomeMatches as subprocessOutcomeMatches } from '../lean-outcome.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url)), root = resolve(here, '../..');
 const now = () => new Date().toISOString();
-const infrastructureDiagnostic = /unknown identifier|unknown constant|could not import|unknown module|failed to load|no such file|timed out|maximum recursion depth|maximum number of heartbeats|out of memory/i;
-
 export function leanOutcomeMatches(result, log, expectedSuccess, diagnostic) {
-  if (result.error || result.signal || !Number.isInteger(result.status) || infrastructureDiagnostic.test(log)) return false;
-  if (expectedSuccess) return result.status === 0 && !log.includes('sorryAx');
-  return result.status !== 0 && typeof diagnostic === 'string' && diagnostic.length > 0
-    && log.includes(diagnostic) && (log.match(/\berror:/g) ?? []).length === 1;
+  return subprocessOutcomeMatches(result, log, expectedSuccess, diagnostic)
+    && (expectedSuccess || (log.match(/\berror:/g) ?? []).length === 1);
 }
 
 async function sourceIdentity() {
   const paths = ['package.json', 'package-lock.json', 'crates/ghostflow-core/src/lib.rs',
-    'tests/int32-codec-validation.test.mjs'];
+    'tests/int32-codec-validation.test.mjs', 'experiments/lean-outcome.mjs'];
   async function walk(path) {
     for (const entry of await readdir(join(root, path), { withFileTypes: true })) {
       const child = join(path, entry.name);
