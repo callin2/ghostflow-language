@@ -75,6 +75,13 @@ Bool 원본 reader는 build170 소스에서 Lean173회와 별도 JS admission11�
 
 ## 기준 파일 지문
 
+후속 build182·183의 증거는 [연속 작업 기록](2026-10-29-unattended-correctness-590.md)에
+추가했다. 생성 Bool16개는 원본 reader와 전체 module의 all-tick 정리를 적용한 유한
+사례군이며, signed i32 코덱은 모든 허용 정수에 대한 수학적 왕복·정규성 정리다.
+실제 compiler54개 payload와 재사용 native/WASM6개 trace는 별도 관측이다.
+생산 Rust 정수 reader 또는 전체 compiler 대응 증명을 완료한 것으로 바꾸지 않는다.
+공통 Lean process 판정 보완에 따른 기존 로그 재판정도 신규 커널 증명과 구분했다.
+
 `shasum -a 256`으로 이 checkout에서 관측한 별도 판본이다. 앞선 `4861a78`의 역사적 목록과 해시는 그대로 보존한다.
 
 | 파일 | SHA-256 |
