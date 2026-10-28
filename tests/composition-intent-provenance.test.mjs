@@ -166,12 +166,16 @@ test('root evidence cannot claim an imported node through a colliding anchor ID'
   assert.ok(compile(source, [child], { intentEvidence }).intentEvidence);
 });
 
-test('ordinary compilation accepts imported intent and interaction projection explicitly refuses it', () => {
+test('ordinary compilation and explicit composed interaction preserve imported intent', () => {
   const c = compile();
   assert.equal(c.interactionSchema, null);
   const identity = { documentId: 'farm', revisionId: 'r1' };
-  assert.throws(() => emitInteractionSchema(c, identity), /does not support instance-qualified imported intent/);
-  assert.throws(() => compile(pair(), [child], { interactionSourceIdentity: identity }), /does not support instance-qualified imported intent/);
+  const schema = emitInteractionSchema(c, identity);
+  assert.equal(schema.version, '0.5');
+  assert.deepEqual(schema.descriptors.map(descriptor => descriptor.provenance.intentAnchors), [
+    [{ instance: 'east', anchorId: 'GUESS' }], [{ instance: 'west', anchorId: 'GUESS' }],
+  ]);
+  assert.deepEqual(compile(pair(), [child], { interactionSourceIdentity: identity }).interactionSchema, schema);
 });
 
 test('WASM activation and execution accept original unconfirmed imported intent', async t => {

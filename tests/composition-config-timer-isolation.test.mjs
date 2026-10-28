@@ -183,12 +183,12 @@ test('REF-06-002 live east setting and state change leave west setting and timer
   }
 });
 
-test('REF-06-002 rejects broken closure and unsupported composed interaction descriptors', async () => {
+test('REF-06-002 rejects broken closure and composed descriptors without authored intent', async () => {
   await assert.rejects(() => compile(source, [{ ...closure[0], revision: 'wrong' }]), /import revision mismatch/);
   await assert.rejects(() => compile(source, [{ ...closure[0], text: `${cell}tampered` }]), /digest mismatch/);
   await assert.rejects(() => compile(source, closure, {
     interactionSourceIdentity: { documentId: 'pair', revisionId: 'pair-r1' },
-  }), /interaction schema does not support imported behavior instances/);
+  }), /has no literate intent-anchor provenance/);
   const rewired = structuredClone(await compile());
   rewired.manifest.sensorInstances[0].sourceSensor = 'west_start';
   await assert.rejects(() => TemporarySettingsHost.instantiate(wasm, rewired, {

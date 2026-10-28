@@ -5,6 +5,16 @@
 
 ## 미출시
 
+### 2026-10-29 - 합성 런타임 관측 ([#290](https://github.com/callin2/ghostflow-language/issues/290), [#302](https://github.com/callin2/ghostflow-language/issues/302))
+
+명시적 Interaction 생성이 스키마 0.5와 스냅샷 0.3으로 가져온 상태·타이머·설정을 지원합니다.
+예를 들어 `east`와 `west`는 각각의 `setting.duration`, 원본 위치와 인스턴스별 의도 앵커를 유지합니다.
+TemporarySettingsHost는 추가 tick 없이 자신이 수락한 스캔과 실제 적용 설정을 게시합니다.
+실행 후 관측에 실패해도 제어 스텝은 수락된 상태로 유지합니다. 독립 프로그램의 계약 형식과
+제어 평가 의미는 바뀌지 않습니다. 정식 원본 재현, 실제 framed·legacy 호스트 관측, 중첩
+인스턴스와 버전이 명시된 corpus를 `tests/composed-interaction.test.mjs`에서 검증합니다.
+설치·binding 소유권과 합성 출력 설명은 별도 후속 작업입니다.
+
 ### 2026-10-29 - 가져온 모듈의 의도 provenance ([#290](https://github.com/callin2/ghostflow-language/issues/290), [#302](https://github.com/callin2/ghostflow-language/issues/302))
 
 고정된 import의 의도를 작성된 인스턴스별 범위에 보존합니다. 정의나 인스턴스가 다르면 같은 anchor ID도 합치지 않습니다.
