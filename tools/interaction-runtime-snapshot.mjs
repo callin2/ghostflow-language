@@ -207,6 +207,7 @@ function emitVerifiedSnapshot({ verifiedSchema, traceMetadata, configs, expected
   }
   const values = new Map(observed.values.map(value => [runtimeValueKey(value), value]));
   const settings = new Map();
+  const hasPublicSettings = verifiedSchema.descriptors.some(descriptor => descriptor.kind === 'setting');
   if (configs.length) {
     if (!object(settingsState) || settingsState.programFingerprint !== traceMetadata.moduleFingerprint
         || !Number.isSafeInteger(settingsState.settingsRevision) || settingsState.settingsRevision < 0
@@ -237,7 +238,7 @@ function emitVerifiedSnapshot({ verifiedSchema, traceMetadata, configs, expected
   }
   const snapshot = {
     format: 'GhostFlow/runtime-snapshot-v0',
-    version: configs.length ? '0.2' : '0.1',
+    version: hasPublicSettings ? '0.2' : '0.1',
     schema: {
       format: verifiedSchema.format,
       version: verifiedSchema.version,
@@ -247,7 +248,7 @@ function emitVerifiedSnapshot({ verifiedSchema, traceMetadata, configs, expected
     source: { ...verifiedSchema.source },
     runId: expected.runId,
     completion: { ...completion },
-    ...(configs.length ? { settingsRevision: settingsState.settingsRevision } : {}),
+    ...(hasPublicSettings ? { settingsRevision: settingsState.settingsRevision } : {}),
     observations: verifiedSchema.descriptors.map(descriptor => publicObservation(descriptor, values, trace, settings)),
   };
   const validated = validateInteraction(verifiedSchema, snapshot);
