@@ -13,6 +13,7 @@ import { isInt32, intSettingsIssue } from '../../tools/int-settings.mjs';
 import { physicalManifestInputs, validateLifecycleManifest } from '../../tools/lifecycle-contract.mjs';
 import { validateLegacyAdmission, preflightLegacyAdmission } from '../../tools/legacy-admission-contract.mjs';
 import { OUTPUT_OBSERVATION_FORMAT, OUTPUT_OBSERVATION_ROLES, validateOutputObservationsManifest, validateOutputObservationRails, validateOutputObservation } from '../../tools/output-observation-contract.mjs';
+import { validateRequiredRuntimeFeatures } from '../../tools/runtime-features.mjs';
 
 const FORMAT = 'GhostFlow/control-v1';
 const SETTINGS_FORMAT = 'GhostFlow/control-v2';
@@ -248,7 +249,8 @@ function validateCanonicalUnit(item, label) {
 function validateContextManifest(input, bytecodeFormat) {
   const manifest = record(input, 'manifest');
   keys(manifest, ['format','name','inputs','outputs','sensors','schedules','timers','signals','configs','bytecodeSha256'],
-    ['providers','calendars','naturalConditions','calendarConditions','accounting','resources','objectives','adaptSettings','lifecycle','legacyAdmission'], 'manifest');
+    ['providers','calendars','naturalConditions','calendarConditions','accounting','resources','objectives','adaptSettings','lifecycle','legacyAdmission','requiredRuntimeFeatures'], 'manifest');
+  validateRequiredRuntimeFeatures(manifest);
   const lifecycle = validateLifecycleManifest(manifest);
   if (manifest.format === CIVIL_RANGE_FORMAT ? bytecodeFormat !== 21 : manifest.format === TIMESLOTS_RANGE_FORMAT ? bytecodeFormat !== 20 : manifest.format === RANGE_LIVE_START_FORMAT ? bytecodeFormat !== 19 : manifest.format === CALENDAR_EXECUTION_FORMAT ? bytecodeFormat !== 18 : manifest.format === SOLAR_CONTEXT_FORMAT ? bytecodeFormat !== 16 : manifest.format === HOLIDAY_FORMAT ? bytecodeFormat !== 15 : manifest.format === AT_FORMAT ? bytecodeFormat !== 14 : manifest.format === AVAILABILITY_FORMAT ? bytecodeFormat !== 13 : ![11, 12].includes(bytecodeFormat)) throw new Error('context manifest requires its matching GFB format');
   name(manifest.name, 'manifest.name');
@@ -497,7 +499,8 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
   if ((Object.hasOwn(manifest, 'adaptPolicy') || Object.hasOwn(manifest, 'strategies')) && capabilities === undefined) {
     throw new Error('adapt strategy activation requires a capability-aware host; ControlRuntime cannot activate this manifest');
   }
-  keys(manifest, ['format', 'name', 'inputs', 'outputs', 'sensors', 'schedules', 'timers', 'signals', 'configs', 'bytecodeSha256'], ['adaptPolicy', 'strategies', 'objectives', 'resources', 'sensorInstances', 'lifecycle','legacyAdmission', 'outputObservations'], 'manifest');
+  keys(manifest, ['format', 'name', 'inputs', 'outputs', 'sensors', 'schedules', 'timers', 'signals', 'configs', 'bytecodeSha256'], ['adaptPolicy', 'strategies', 'objectives', 'resources', 'sensorInstances', 'lifecycle','legacyAdmission', 'outputObservations', 'requiredRuntimeFeatures'], 'manifest');
+  validateRequiredRuntimeFeatures(manifest);
   const outputObservations = validateOutputObservationsManifest(manifest, bytecodeFormat);
   const lifecycle = validateLifecycleManifest(manifest);
   if (manifest.format !== OUTPUT_OBSERVATION_FORMAT && manifest.format !== FORMAT && manifest.format !== INTEGER_FORMAT && !(manifest.format === SETTINGS_FORMAT && acceptSettings) && manifest.format !== SOLAR_FORMAT && manifest.format !== SCHEDULE_FORMAT && manifest.format !== SCHEDULE_SLOTS_FORMAT && manifest.format !== AVAILABILITY_FORMAT && manifest.format !== RANGE_LIVE_START_FORMAT && manifest.format !== TIMESLOTS_RANGE_FORMAT) throw new Error(`unsupported manifest format ${String(manifest.format)}`);
@@ -1106,6 +1109,10 @@ async function instantiateControlRuntime(wasmBytes, { bytes: bytecode, manifest 
   const afterEvents = new Map();
   try {
     runtime.load(compiledBytes);
+    const declaredPercentRange = validateRequiredRuntimeFeatures(checkedManifest.manifest).includes('percent-range-v1');
+    if (runtime.requiresPercentRangeV1() !== declaredPercentRange) {
+      throw new Error('requiredRuntimeFeatures does not match loaded bytecode');
+    }
     if (checkedManifest.lifecycle) runtime.initializeRestart(options.restart.reasonOrdinal, options.restart.eventPending);
     for (const item of [...checkedManifest.manifest.sensors, ...(checkedManifest.manifest.sensorInstances ?? [])]) sensors.set(item.name, { item, conditioner: new SignalConditioner(runtime.wasm, sensorConfig(item)) });
     for (const item of checkedManifest.manifest.signals) {

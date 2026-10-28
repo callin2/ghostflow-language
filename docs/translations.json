@@ -264,8 +264,8 @@
       "source": "docs/BYTECODE.md",
       "sourceLanguage": "en",
       "translation": "docs/BYTECODE.ko.md",
-      "sourceSha256": "2ea95101f59d95fc7f0dfc1676b11b132a57a427135f377377735bcd91cc6dfb",
-      "translationSha256": "bd9129a0788f24149e2244adaf295e08b59ea927fc80517d4d4b6c0bab22ba37"
+      "sourceSha256": "cbe51119a2a9e9783da65146dbb08cee2840fa334b27e8975f338643007d0bec",
+      "translationSha256": "867d6070904356f1b2ba710e9accee4ad789d907a7eecd8a903a169e1eada197"
     },
     {
       "source": "docs/COMPILER-DIAGNOSTICS.md",
@@ -481,8 +481,8 @@
       "source": "docs/reference/02-types-expressions-state.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/02-types-expressions-state.en.md",
-      "sourceSha256": "d8bcaff0a6be8587d0ed4e22630b8a027bed96d16e9ae502f7793c3915b46383",
-      "translationSha256": "441a2e690da0e9d224a77ef328a6937fb24f688ffaaee70aa9dae805193537d5"
+      "sourceSha256": "e766eb4613ff106a7e14ca5667c2b691bb97a4fa25f21e8dd9d54898ffeb8c61",
+      "translationSha256": "bc3884d853fac21fc91f7f88b4c3a52be87eb0e8851820f76b7f11cad3052c9b"
     },
     {
       "source": "docs/reference/03-time-and-schedules.md",
@@ -705,8 +705,8 @@
       "source": "CHANGELOG.md",
       "sourceLanguage": "en",
       "translation": "CHANGELOG.ko.md",
-      "sourceSha256": "5b71f1b734c9562e901d58acd87c5c2931c4249b5e93ce7bb921fa1d4163b26d",
-      "translationSha256": "36ec03c733ac2136a41873ca8bdaf3785815ac04e267460f5760ffefaf4da2d9"
+      "sourceSha256": "9d9ed419413518a28c1cfd0755abaafd9e84a83ed352f235a59d51a1f469a635",
+      "translationSha256": "78af5736eb941678199de324b9dd8afc294b61b015859c7290f4582e9e78e7df"
     },
     {
       "source": "examples/authoring/pump-rev-1.ghost.md",

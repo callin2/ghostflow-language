@@ -239,6 +239,29 @@ pub unsafe extern "C" fn gf_frame_load(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn gf_frame_requires_percent_range_v1(handle: *mut FramedHandle) -> i32 {
+    let Some(handle) = handle.as_mut() else {
+        return -1;
+    };
+    match &handle.state {
+        FramedState::Configuring(runtime) => match runtime.requires_percent_range_v1() {
+            Ok(required) => {
+                handle.error.clear();
+                i32::from(required)
+            }
+            Err(error) => {
+                handle.error = error.to_string();
+                -1
+            }
+        },
+        FramedState::Active(_) => {
+            handle.error = "framed runtime is already active".into();
+            -1
+        }
+    }
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn gf_frame_initialize_restart(
     handle: *mut FramedHandle,
     reason_ordinal: u8,

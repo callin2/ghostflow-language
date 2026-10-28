@@ -118,13 +118,13 @@ export function lowerExpression(form, env, allowNext = false) {
       if (left.type !== 'Number' || right.type !== 'Number') throw new CompileError(`${head} expects numbers`);
       return { kind: 'arithmetic', operation: head, type: 'Number', left, right };
     }
-    if (conversions.has(head) || head === 'check-duration' || head === 'check-datetime') {
+    if (conversions.has(head) || head === 'check-duration' || head === 'check-datetime' || head === 'check-percent') {
       const sourceType = head === 'int-to-number' ? 'Int' : 'Number';
       const message = conversions.has(head) ? `${head} expects one ${sourceType} operand` : `${head} expects one Number operand`;
       if (args.length !== 1) throw new CompileError(message);
       const operand = lower(args[0]);
       if (operand.type !== sourceType) throw new CompileError(message);
-      return { kind: conversions.has(head) ? 'conversion' : 'time_guard', operation: head,
+      return { kind: conversions.has(head) ? 'conversion' : head === 'check-percent' ? 'nominal_guard' : 'time_guard', operation: head,
         type: head === 'int-to-number' || !conversions.has(head) ? 'Number' : 'Int', operand };
     }
     throw new CompileError(`unknown expression ${head}`);

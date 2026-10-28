@@ -152,6 +152,7 @@ pub(crate) fn encode(value: &Value, module: &Module) -> Option<Vec<u8>> {
             "int-nearest-even" => (53, 1),
             "check-duration" => (54, 1),
             "check-datetime" => (55, 1),
+            "check-percent" => (60, 1),
             _ => return None,
         };
         if args.len() != arity {

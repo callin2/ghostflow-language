@@ -52,6 +52,7 @@ pub enum ErrorCode {
     BytecodeVersionMismatch,
     CompilerRevisionMismatch,
     UnsupportedRuntimeSemantics,
+    UnsupportedRuntimeFeature,
     UnsupportedRuntimeAbi,
     BindingRevisionMismatch,
     UnsupportedManifestFormat,
@@ -100,6 +101,7 @@ impl ErrorCode {
             Self::BytecodeVersionMismatch => "bytecode-version-mismatch",
             Self::CompilerRevisionMismatch => "compiler-revision-mismatch",
             Self::UnsupportedRuntimeSemantics => "unsupported-runtime-semantics",
+            Self::UnsupportedRuntimeFeature => "unsupported-runtime-feature",
             Self::UnsupportedRuntimeAbi => "unsupported-runtime-abi",
             Self::BindingRevisionMismatch => "binding-revision-mismatch",
             Self::UnsupportedManifestFormat => "unsupported-manifest-format",
@@ -234,6 +236,7 @@ pub struct VerificationProfile<'a> {
     pub revoked_key_ids: &'a [String],
     pub expected_compiler_revision: &'a str,
     pub supported_runtime_semantics: &'a [String],
+    pub supported_runtime_features: &'a [String],
     pub supported_runtime_abis: &'a [String],
     pub supported_manifest_formats: &'a [String],
     pub available_capabilities: &'a [Capability],
@@ -2594,6 +2597,44 @@ fn verify_civil_range_bindings(manifest: &Value, module: &ghostflow_core::Module
     Ok(())
 }
 
+fn required_runtime_features(manifest: &Value) -> Result<bool> {
+    let Some(value) = manifest.get("requiredRuntimeFeatures") else {
+        return Ok(false);
+    };
+    let features = value.as_array().ok_or_else(|| PortablePackageError {
+        code: ErrorCode::ManifestMismatch,
+        message: "manifest.requiredRuntimeFeatures must be a non-empty bounded array".into(),
+    })?;
+    if features.is_empty() || features.len() > 8 {
+        return fail(
+            ErrorCode::ManifestMismatch,
+            "manifest.requiredRuntimeFeatures must be a non-empty bounded array",
+        );
+    }
+    let mut seen = HashSet::new();
+    for feature in features {
+        let Some(feature) = feature.as_str().filter(|feature| !feature.is_empty()) else {
+            return fail(
+                ErrorCode::ManifestMismatch,
+                "manifest.requiredRuntimeFeatures entries must be non-empty strings",
+            );
+        };
+        if !seen.insert(feature) {
+            return fail(
+                ErrorCode::ManifestMismatch,
+                format!("duplicate required runtime feature {feature}"),
+            );
+        }
+        if feature != "percent-range-v1" {
+            return fail(
+                ErrorCode::ManifestMismatch,
+                format!("unsupported required runtime feature {feature}"),
+            );
+        }
+    }
+    Ok(true)
+}
+
 fn verify_manifest(
     manifest: &Value,
     descriptor_format: &str,
@@ -2619,6 +2660,9 @@ fn verify_manifest(
     if object.contains_key("lifecycle") {
         keys.push("lifecycle");
     }
+    if object.contains_key("requiredRuntimeFeatures") {
+        keys.push("requiredRuntimeFeatures");
+    }
     if object["format"].as_str() == Some("GhostFlow/control-v22") {
         keys.push("outputObservations");
     }
@@ -2638,6 +2682,7 @@ fn verify_manifest(
         }
     }
     exact_keys(object, &keys, "manifest", ErrorCode::ManifestMismatch)?;
+    required_runtime_features(manifest)?;
     verify_output_observation_descriptors(manifest)?;
     let format = object["format"]
         .as_str()
@@ -3347,6 +3392,31 @@ pub fn verify_portable_package_with_signature_policy(
         &bytecode_sha256,
         &identity.required_capabilities,
     )?;
+    let declared_percent_range = required_runtime_features(&manifest)?;
+    let actual_percent_range =
+        module
+            .requires_percent_range_v1()
+            .map_err(|error| PortablePackageError {
+                code: ErrorCode::BytecodeRejected,
+                message: format!("native artifact feature validation failed: {error}"),
+            })?;
+    if declared_percent_range != actual_percent_range {
+        return fail(
+            ErrorCode::ManifestMismatch,
+            "manifest.requiredRuntimeFeatures does not match verified GFB instructions",
+        );
+    }
+    if declared_percent_range
+        && !profile
+            .supported_runtime_features
+            .iter()
+            .any(|feature| feature == "percent-range-v1")
+    {
+        return fail(
+            ErrorCode::UnsupportedRuntimeFeature,
+            "target does not support runtime feature percent-range-v1",
+        );
+    }
     verify_output_observation_bindings(&manifest, &module, &identity.runtime_abi)?;
     if profile_version == 21 {
         verify_civil_range_bindings(&manifest, &module)?;
@@ -3812,12 +3882,64 @@ mod tests {
             revoked_key_ids: revoked,
             expected_compiler_revision: "c0bef0e",
             supported_runtime_semantics: semantics,
+            supported_runtime_features: &[],
             supported_runtime_abis: abis,
             supported_manifest_formats: manifests,
             available_capabilities: capabilities,
             expected_binding_revision: "virtual-two-output-v1",
             target_loader: loader,
             limits: VerifierLimits::default(),
+        }
+    }
+
+    #[test]
+    fn percent_runtime_feature_is_bound_to_verified_instructions_and_target_support() {
+        let loader =
+            |bytes: &[u8], _: &TargetLoaderContext<'_>| -> std::result::Result<bool, String> {
+                ghostflow_core::Module::load(bytes)
+                    .map(|_| true)
+                    .map_err(|error| error.to_string())
+            };
+        let mut current = profile(&loader);
+        let features = strings(&["percent-range-v1"]);
+        let capabilities = vec![Capability {
+            kind: "actuator".into(),
+            name: "pump".into(),
+            value_type: "number".into(),
+        }];
+        current.supported_runtime_features = &features;
+        current.available_capabilities = &capabilities;
+        let fixture = |scenario: &str| {
+            let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+            let output = Command::new("node")
+                .arg(root.join("tests/percent-native-package-fixture.mjs"))
+                .arg(scenario)
+                .current_dir(&root)
+                .output()
+                .expect("Node must generate the Percent package fixture");
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            output.stdout
+        };
+        let valid = fixture("valid");
+        verify_portable_package(&valid, &current).unwrap();
+        current.supported_runtime_features = &[];
+        assert_eq!(
+            verify_portable_package(&valid, &current).unwrap_err().code,
+            ErrorCode::UnsupportedRuntimeFeature
+        );
+        current.supported_runtime_features = &features;
+        for scenario in ["missing", "forged", "unknown", "duplicate", "malformed"] {
+            assert_eq!(
+                verify_portable_package(&fixture(scenario), &current)
+                    .unwrap_err()
+                    .code,
+                ErrorCode::ManifestMismatch,
+                "{scenario}"
+            );
         }
     }
 

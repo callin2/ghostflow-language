@@ -881,7 +881,7 @@ fn config_dependencies(
             57..=59 => {
                 r.take(3)?;
             }
-            10 | 13..=22 | 24..=29 | 32..=55 => {}
+            10 | 13..=22 | 24..=29 | 32..=55 | 60 => {}
             _ => return Err(Error::new("unknown expression opcode")),
         }
     }

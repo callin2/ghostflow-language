@@ -47,7 +47,7 @@ const OP = { bool:1, number:2, input:3, state:4, next:5, not:10,
   int:23, 'int-neg':24, 'int-add':25, 'int-sub':26, 'int-mul':27, 'int-div':28, 'int-rem':29,
   branchFalse:30, jump:31, 'int-to-number':48, 'int-exact':49, 'int-floor':50,
   'int-ceil':51, 'int-trunc':52, 'int-nearest-even':53, 'check-duration':54, 'check-datetime':55,
-  'trace-result':56, 'window-read':57, 'schedule-read':58, 'true-for-read':59 };
+  'trace-result':56, 'window-read':57, 'schedule-read':58, 'true-for-read':59, 'check-percent':60 };
 
 class Writer {
   constructor() { this.parts = []; this.witnessNodes = []; this.lastOp = null; this.byteLength = 0; }
@@ -192,7 +192,7 @@ function emitExpression(ir, witnesses = false) {
         emit(n.left); emit(n.right); w.op(OP[n.operation]); return;
       case 'conversion':
         emit(n.operand); usesInt = true; usesFormat3 = true; w.op(OP[n.operation]); return;
-      case 'time_guard':
+      case 'time_guard': case 'nominal_guard':
         emit(n.operand); usesFormat3 = true; w.op(OP[n.operation]); return;
       default: throw new CompileError('invalid semantic expression IR');
     }

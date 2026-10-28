@@ -28,6 +28,20 @@ Rationale: [Selected syntax](../LANGUAGE-SURFACE.md), [Common language contract]
 
 The boundaries of `Percent` expose meaning and prevent incorrect numeric connections. `Duration` differs from calendar time. Wall-clock correction does not rewind a timer's monotonic elapsed time.
 
+Every arithmetic expression whose result type is `Percent` must remain in the
+inclusive range `0..100`. Fractional values such as `99.5%` are valid. Invalid
+constant results are compile errors. An evaluated dynamic result outside that
+range rejects the tick with `percent-out-of-range`, using the existing arithmetic
+error path. It does not commit candidate state, outputs, or a successful journal
+entry. It does not clamp the value or define a physical output policy.
+An earlier non-finite Number arithmetic error retains its existing error code.
+
+The rule includes intermediate expressions and function bodies. For a dynamic
+`p = 90%`, `(p + 20%) - 20%` fails at the addition even though its final arithmetic
+value would be `90%`. An unselected branch is not evaluated. A ratio such as
+`p / 0.5%` has type `Number`, so its result `180` is valid. These checks keep the
+declared value domain meaningful throughout a calculation.
+
 ### Literal spelling
 
 - Bool is exactly `true` or `false`.

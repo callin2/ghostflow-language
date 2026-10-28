@@ -11,6 +11,7 @@ import { physicalManifestInputs, validateLifecycleManifest } from './lifecycle-c
 import { reportWarnings } from './diagnostic-output.mjs';
 import { validateLegacyAdmission } from './legacy-admission.mjs';
 import { validateOutputObservationsManifest } from './output-observation-contract.mjs';
+import { validateRequiredRuntimeFeatures } from './runtime-features.mjs';
 
 const UTF8 = new TextEncoder();
 const UTF8_FATAL = new TextDecoder('utf-8', { fatal: true });
@@ -301,6 +302,11 @@ function normalizeIdentity(value, { requireSorted = false } = {}) {
   };
 }
 
+function requiredRuntimeFeatures(manifest) {
+  try { return validateRequiredRuntimeFeatures(manifest); }
+  catch (error) { fail('manifest-mismatch', error.message, error); }
+}
+
 function validateGfb1(bytes) {
   if (bytes.byteLength < 6 || bytes[0] !== 0x47 || bytes[1] !== 0x46 || bytes[2] !== 0x42 || bytes[3] !== 0x31) {
     fail('invalid-bytecode-format', 'bytecode is not GFB1');
@@ -451,6 +457,7 @@ export async function buildPortablePackage(compilation, identityValue, { signers
   const profileVersion = baseGfbVersion(gfbBytes);
   const bytecodeSha256 = await checkedDigest(gfbBytes);
   if (!isPlainObject(compilation.manifest)) fail('missing-manifest', 'portable packages require a control manifest');
+  requiredRuntimeFeatures(compilation.manifest);
   const lifecycle = validateLifecycleManifest(compilation.manifest);
   validateLegacyAdmission(compilation);
   if ((bytecodeVersion === '22') !== (lifecycle !== null)) fail('manifest-mismatch', 'GFB22 bytecode requires matching lifecycle metadata');
@@ -721,8 +728,18 @@ export async function verifyPortablePackage(packageValue, options = {}) {
   if (Object.hasOwn(manifest, 'lifecycle')) manifestKeys.push('lifecycle');
   if (manifest.format === 'GhostFlow/control-v22') manifestKeys.push('outputObservations');
   if (Object.hasOwn(manifest, 'legacyAdmission')) manifestKeys.push('legacyAdmission');
+  if (Object.hasOwn(manifest, 'requiredRuntimeFeatures')) manifestKeys.push('requiredRuntimeFeatures');
   if (Object.hasOwn(manifest,'adaptPolicy') || Object.hasOwn(manifest,'strategies')) manifestKeys.push('adaptPolicy','strategies');
   exactObject(manifest, manifestKeys, 'manifest');
+  const requiredFeatures = requiredRuntimeFeatures(manifest);
+  if (contextManifest && requiredFeatures.length) {
+    fail('manifest-mismatch', 'historical GFB10 profile does not support requiredRuntimeFeatures');
+  }
+  const supportedFeatures = options.supportedRuntimeFeatures === undefined
+    ? new Set() : supportedSet(options.supportedRuntimeFeatures, 'supportedRuntimeFeatures');
+  for (const feature of requiredFeatures) {
+    if (!supportedFeatures.has(feature)) fail('unsupported-runtime-feature', `target does not support runtime feature ${feature}`);
+  }
   if (manifest.format !== packageValue.payload.manifest.format) fail('manifest-mismatch', 'manifest format does not match descriptor');
   if (profileVersion === '4' && !['GhostFlow/control-v4', 'GhostFlow/control-v22'].includes(manifest.format)) fail('manifest-mismatch', 'GFB format 4 requires a control-v4 or control-v22 manifest');
   if (contextManifest && manifest.format !== 'GhostFlow/control-v9') fail('manifest-mismatch', 'GFB format 10 requires a control-v9 manifest');
@@ -881,6 +898,9 @@ export async function verifyPortablePackage(packageValue, options = {}) {
     const guarded = Object.hasOwn(manifest,'legacyAdmission');
     const replay = guarded ? compileSourceSync(sourceText, { filename: mappedDocument.filename })
       : compileControl(extraction.code, { filename: mappedDocument.filename });
+    if (canonicalJson(requiredRuntimeFeatures(replay.manifest)) !== canonicalJson(requiredFeatures)) {
+      throw new Error('runtime features do not match canonical source lowering');
+    }
     if (manifest.outputObservations !== undefined || replay.manifest.outputObservations !== undefined) {
       if (manifest.format !== replay.manifest.format
         || canonicalJson(manifest.outputObservations ?? null) !== canonicalJson(replay.manifest.outputObservations ?? null)) {
