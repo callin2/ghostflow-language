@@ -5,6 +5,20 @@
 
 ## 미출시
 
+### 2026-10-29 — 활성 Station 세션 ON 시간 ([#208](https://github.com/callin2/ghostflow-language/issues/208))
+
+유한한 Station adapter가 기존의 적용된 펌프 ON 누적값을 Rust의
+`session_actual_on_ms`와 WASM의 `sessionActualOnMs`로 공개합니다.
+이전에는 finish에서 정산한 일일 합계만 공개했습니다. 활성 세션의 ID가
+일치하면 시간을 진행하지 않고 OFF 구간에도 누적값을 유지해 읽습니다.
+10s ON, 10s OFF, 20s ON trace는 시각 40,000ms에서 30,000ms를 읽으며,
+일일 정산은 durable finish에서 유지합니다. 없거나 ID가 다르거나 종료·복원된
+세션은 거절합니다. ABI는 상태 반환과 정확한 u64 출력을 제공하는 getter를
+추가하며 새 wrapper는 해당 export를 요구합니다. Native와 WASM 검사는
+이 경계와 BigInt 정밀도를 확인합니다. Reference §3.4의 일반 작업과 다른 시간
+의미는 별도 계약으로 남습니다. 언어 문법, artifact 형식, Device firmware는
+변경하지 않습니다.
+
 ### 2026-10-28 — 자연 사건의 요일 조건 실행 ([#224](https://github.com/callin2/ghostflow-language/issues/224))
 
 Solar와 Tide의 `on = day` 요일 조건은 offset 또는 선택된 fallback을 적용한

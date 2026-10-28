@@ -661,6 +661,26 @@ pub unsafe extern "C" fn gf_station_daily_used_ms(handle: *const StationHandle) 
         .unwrap_or(0)
 }
 #[no_mangle]
+pub unsafe extern "C" fn gf_station_session_actual_on_ms(
+    handle: *mut StationHandle,
+    session_id: u64,
+    output: *mut u64,
+) -> i32 {
+    let Some(handle) = handle.as_mut() else {
+        return 0;
+    };
+    let Some(output) = output.as_mut() else {
+        return handle.fail("null session time output pointer");
+    };
+    let result = handle
+        .station
+        .session_actual_on_ms(session_id)
+        .map(|value| {
+            *output = value;
+        });
+    handle.complete(result)
+}
+#[no_mangle]
 pub unsafe extern "C" fn gf_station_reserved_ms(handle: *const StationHandle) -> u64 {
     handle
         .as_ref()

@@ -64,7 +64,7 @@ export class GhostFlowStation {
 
   constructor(exports, config = {}) {
     if (!exports || typeof exports !== 'object') throw new TypeError('WASM exports are required');
-    if (!exports.gf_station_create || !exports.gf_station_daily_used_ms || !exports.gf_station_reserved_ms || !exports.gf_alloc || !exports.gf_dealloc || !exports.memory) throw new Error('WASM module does not include the GhostFlow station ABI');
+    if (!exports.gf_station_create || !exports.gf_station_daily_used_ms || !exports.gf_station_session_actual_on_ms || !exports.gf_station_reserved_ms || !exports.gf_alloc || !exports.gf_dealloc || !exports.memory) throw new Error('WASM module does not include the GhostFlow station ABI');
     if (config === null || typeof config !== 'object' || Array.isArray(config)) throw new TypeError('station config must be an object');
     this.wasm = exports;
     const valveCount = u8(config.valveCount ?? 8, 'valveCount');
@@ -95,6 +95,14 @@ export class GhostFlowStation {
   // Global physical-pump accounting: ON time is reported by the host driver and is
   // shared across every session of this one station.
   get dailyUsedMs() { this.#alive(); return this.wasm.gf_station_daily_used_ms(this.handle); }
+  sessionActualOnMs(sessionId) {
+    this.#alive();
+    const id = u64(sessionId, 'sessionId');
+    return this.#bytes(new Uint8Array(8), ptr => {
+      this.#check(this.wasm.gf_station_session_actual_on_ms(this.handle, id, ptr));
+      return new DataView(this.wasm.memory.buffer).getBigUint64(ptr, true);
+    });
+  }
   // Finite budgets reserved by active or conservatively cancelled starts.
   get reservedMs() { this.#alive(); return this.wasm.gf_station_reserved_ms(this.handle); }
   get lastLeaseDeadlineMs() { this.#alive(); return this.wasm.gf_station_last_lease_deadline(this.handle); }
