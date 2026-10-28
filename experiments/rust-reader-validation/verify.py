@@ -31,6 +31,13 @@ def run(args, cwd, env=None):
             'stdout': p.stdout, 'stderr': p.stderr}
 
 
+def write_report(path, report):
+    """Publish a complete receipt atomically so interrupted runs cannot look passed."""
+    temporary = path.with_name(path.name + '.tmp')
+    temporary.write_text(json.dumps(report, indent=2) + '\n')
+    os.replace(temporary, path)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--lean', type=Path, required=True)
@@ -45,12 +52,14 @@ def main():
     args.aeneas = args.aeneas.resolve()
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
+    report_path = output / 'verification.json'
     report = {'status': 'running', 'observedAt': datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
               'checks': [], 'scope': 'actual production Reader.new and Reader.finished extraction only',
               'limits': ['No Reader.take/u16 or complete loader equivalence proof.',
                          'Host 64-bit extraction; no ESP32 target or hardware claim.',
                          'Rust compiler, Charon/Aeneas translation and standard-library model correctness remain trusted.',
                          'remaining is the list-remainder representation; ModuleLoader.lean is not imported.']}
+    write_report(report_path, report)
     try:
         provenance = json.loads((HERE / 'provenance.json').read_text())
         report['provenance'] = provenance
@@ -137,8 +146,8 @@ example : Reader.finished invalidReader = Result.ok (decide (remaining invalidRe
         report['error'] = str(error)
     finally:
         report['finishedAt'] = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
-        (output / 'verification.json').write_text(json.dumps(report, indent=2) + '\n')
-    print(json.dumps({'status': report['status'], 'report': str(output / 'verification.json'), 'error': report.get('error')}))
+        write_report(report_path, report)
+    print(json.dumps({'status': report['status'], 'report': str(report_path), 'error': report.get('error')}))
     return 0 if report['status'] == 'passed' else 1
 
 
