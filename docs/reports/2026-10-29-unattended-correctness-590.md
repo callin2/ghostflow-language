@@ -336,3 +336,51 @@ dev에 병합된 것을 확인했다. dev `5f64f4eb702535cbc72c97dc158fa900b21e0
 다음 단위는 독립 Lean reader가 원본 문서 바이트를 읽어 실제 artifact 및 metadata와
 대조하는 증명이다. 그 뒤에는 센서 복구와 상태 전이를 모든 입력 이력에 대해 합성한다.
 이 후속 단위와 생산 Rust refinement는 build169의 완료 주장에 포함하지 않는다.
+
+## build170: 원본 문서 바이트에서 시작하는 Lean 증명
+
+Lean의 독립 reader가 원본 `.ghost.md` UTF-8 바이트, 제한된 문서 envelope, 토큰과
+이름을 읽는다. JavaScript가 제안한 AST나 프로필만으로 소스의 의미를 승인하지 않는다.
+각 인증서에서 원본 읽기 결과와 실제 compiler가 만든 전체 원시 artifact를 따로 검사한다.
+
+Bool 상태 프로필은 초기 상태에서 임의 횟수의 tick trace를 증명한다. 센서 프로필은
+변경하지 않은 canonical `input Bool |> recover(false)` 문서를 읽고, 구문을 소비하며
+배정한 origin/site와 실제 Result metadata까지 연결한다. 모든 Reading과 이전 payload에
+대해 정상 false와 오류를 복구한 false가 관측에서 구분됨을 증명한다.
+
+독립 검토는 별도 Lean 모듈 빌드와 원본 고정·실행물/metadata 동반 위조를 검사했다.
+동반 위조는 원본 읽기 equality에서 거절됐다. 잘못된 HTML anchor 위치와 문서 문맥도
+거절됐다. 이전 reserved `__gf_` 이름 허용 문제를 수정했고, 최종 전체 검사에는 그 거절도
+포함했다. 첫 sensor 경계 검사의 recursion 예산 실패는 별도로 보존한 뒤 검사 예산을
+명시하고 재실행했다. 실제 proof의 가정이나 문법을 느슨하게 바꾸지 않았다.
+
+최종 실행 소스는 `ce7d1ce9`로 시작하는 커밋이다. 공식 build170은
+`2026-10-28T19:51:48.518Z`에 exit0으로 완료됐다. 13 gate, Rust441,
+주 Node3887 pass / 12 TODO / 0 fail, 별도 console15 pass다.
+verification SHA-256은 `dfa874110209c65946fdad72fe51f1d9fd28167fdd8f962d8acaddc283d26a2f`다.
+WASM SHA-256은 `98d3bb473dc90f68681d974277dc01b17e69516d45c69e55147b7805a608d423`다.
+기록은 `build/evidence/build170/`에 보존했다. 이후 병합한 선행 PR602의 변경은
+앞 절의 결과 보고서와 dev 병합 이력이며 실행 및 증명 소스는 바뀌지 않았다.
+
+| 증명 검사 | 실제 결과 | 보고서 SHA-256 |
+|---|---|---|
+| Bool 원본·module·byte-PC | Lean173회:106성공·67예상거절, 별도 JS admission11개 | `ee18d623320137b611291b0c2a66f74ae657d3b6541c06b4fab736d66b7f0a51` |
+| 센서 원본·artifact·metadata·관측 | Lean125회:94성공·31예상거절 | `c80cded0cc4a0899fe156c866e2e29b902e8bfc73475174ce3ca5b90e7c09832` |
+
+이는 정리 수가 아니라 기대 실행 결과 수다. 완료 시각은 각각
+`2026-10-28T19:48:01.224Z`, `2026-10-28T19:44:06.993Z`다. 각 보고서가 묶은111개와
+156개 소스 해시는 모두 통합 실행 소스와 일치한다. 근거는
+`build/bool-wave9-590/`와 `build/sensor-wave9-590/`에 있다.
+원본 및 bridge Node16개와 문서 검사도 통과했다. 첫 별도 작업 공간의 Node 실행은
+의존성 설치 전이라 실패했고, 잠금 파일대로 offline 설치 후 재실행했다.
+
+이 단위는 실험·그 검사·문서만 변경했다. production code와 coverage 검사 목록은
+build169와 같으므로 앞 절의 coverage 근거를 유지하며 새 coverage 실행으로 세지 않는다.
+sensor 증명 runner의 선택적 runtime differential은 실행하지 않았다. 같은 생산 경로의
+native/WASM 비교는 공식 host gate의 별도 등록 검사에서 실행됐다.
+
+허용 문법은 전체 GhostFlow나 CommonMark가 아니다. 자연어 의도와 코드의 일치,
+파일 전달 경로, 일반 production parser 의미, Rust 실행기와 모델 사이의 대응은
+이 증명으로 확정하지 않는다. 센서 수치 연산의 SmallNumberLaws도 명시적 가정으로 남는다.
+다음 단위는 입력 복구와 상태 전이를 임의 입력 이력에 대해 합성하고, 별도로 실제
+Rust Reader 함수에서 Lean으로 이어지는 추출 도구의 적용 가능성을 확인하는 것이다.
