@@ -104,6 +104,7 @@ const TESTS = Object.freeze([
   'tests/coverage-defensive-runtime.test.mjs',
     'tests/natural-schedule-contract.test.mjs', 'tests/solar-schedule.test.mjs',
     'tests/natural-fallback-compiler.test.mjs', 'tests/natural-fallback-runtime.test.mjs',
+  'tests/scheduled-local-date-facts.test.mjs', 'tests/natural-weekday-runtime.test.mjs',
   'tests/time-literals.test.mjs',
   'tests/true-for-lowering.test.mjs', 'tests/true-for-wasm.test.mjs',
   'tests/estimate-evidence.test.mjs',
