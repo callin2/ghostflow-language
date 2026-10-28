@@ -37,13 +37,13 @@ function reference(id) {
   return entry;
 }
 
-function native(t, artifact, frames, profile, context = activation) {
+function native(t, artifact, frames, profile, context = activation, checkpoint = null) {
   const dir = mkdtempSync(join(tmpdir(), 'reference-temporal-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const module = join(dir, 'module.gfb'), tape = join(dir, 'tape.json');
   writeFileSync(module, artifact.bytes);
   let scanId = 0;
-  writeFileSync(tape, JSON.stringify({ profile, activation: context,
+  writeFileSync(tape, JSON.stringify({ profile, activation: context, checkpoint,
     steps: frames.map(f => ({ scanId: f.scanId ?? scanId++, logicalTimeMs: f.nowMs,
       inputs: Object.entries(softwareQualityRails(artifact, f.inputs ?? {}, scanId, f.nowMs))
         .map(([name, value]) => ({ name, value })), ...f.contextFacts })) }));
@@ -297,9 +297,17 @@ test('At Window checkpoint preserves admitted and missed identities across reboo
     if (terminal !== 'unconsumed') original.step(frame(terminal === 'missed' ? 130_000 : 30_000,
       facts(terminal === 'missed' ? 130_000 : 30_000, planned + (terminal === 'missed' ? 120_000 : 20_000)),
       { allowed: true }));
+    const checkpoint = Buffer.from(original.contextSnapshot().bytes).toString('hex');
     rebooted.restoreContextCheckpoint(original.contextSnapshot().bytes);
-    rebooted.step(frame(0, facts(0, planned - 10_000, 591), { allowed: true }));
-    rebooted.step(frame(30_000, facts(30_000, planned + 20_000, 591), { allowed: true }));
+    const rebootFrames = [frame(0, facts(0, planned - 10_000, 591), { allowed: true }),
+      frame(30_000, facts(30_000, planned + 20_000, 591), { allowed: true })];
+    const nativeRows = native(t, artifact, rebootFrames, 'context-settings-v1',
+      { ...activation, bootEpoch: 591 }, checkpoint);
+    rebootFrames.forEach((scan, index) => {
+      rebooted.step(scan);
+      assert.deepEqual(rebooted.lastFrameOutcome, nativeRows[index].outcome);
+      assert.equal(Buffer.from(rebooted.contextSnapshot().bytes).toString('hex'), nativeRows[index].checkpoint);
+    });
     const trace = rebooted.lastFrameOutcome.trace;
     assert.equal(trace.safe.due, terminal === 'unconsumed');
     assert.equal(trace.safe.missed, false);
