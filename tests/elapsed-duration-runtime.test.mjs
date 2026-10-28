@@ -29,17 +29,17 @@ const scenarios = [
       [116, 'Stale', true], [117, 'Invalid', true], [118, 'NotReady', true],
       [119, 'Good', true], [120, 'Good', false]],
     expected: [
-      [false, 0, false, false, 100, 0, null],
-      [false, 100, true, true, 105, 5, null],
-      [true, 105, true, false, 106, 1, null],
-      [false, 106, true, true, 106, 0, null],
-      [true, 106, true, true, 106, 4, null],
-      [true, 106, true, true, 106, 9, 'Disconnected'],
-      [true, 106, true, true, 106, 10, 'Stale'],
-      [true, 106, true, true, 106, 11, 'Invalid'],
-      [true, 106, true, true, 106, 12, 'NotReady'],
-      [true, 106, true, false, 119, 13, null],
-      [false, 119, true, false, 119, 1, null],
+      [false, 0, false, false, 100, 0, null, 1],
+      [false, 100, true, true, 105, 5, null, 2],
+      [true, 105, true, false, 106, 1, null, 2],
+      [false, 106, true, true, 106, 0, null, 2],
+      [true, 106, true, true, 106, 4, null, 2],
+      [true, 106, true, true, 106, 9, 'Disconnected', 2],
+      [true, 106, true, true, 106, 10, 'Stale', 2],
+      [true, 106, true, true, 106, 11, 'Invalid', 2],
+      [true, 106, true, true, 106, 12, 'NotReady', 2],
+      [true, 106, true, false, 119, 13, null, 2],
+      [false, 119, true, false, 119, 1, null, 2],
     ],
   },
   {
@@ -47,10 +47,10 @@ const scenarios = [
     steps: [[9007199254740989, 'Good', true], [9007199254740990, 'Good', true],
       [9007199254740991, 'Good', true], [9007199254740991, 'Good', false]],
     expected: [
-      [false, 0, false, true, 9007199254740989, 0, null],
-      [true, 9007199254740989, true, false, 9007199254740990, 1, null],
-      [false, 9007199254740990, true, true, 9007199254740991, 1, null],
-      [true, 9007199254740991, true, true, 9007199254740991, 0, null],
+      [false, 0, false, true, 9007199254740989, 0, null, 1],
+      [true, 9007199254740989, true, false, 9007199254740990, 1, null, 2],
+      [false, 9007199254740990, true, true, 9007199254740991, 1, null, 2],
+      [true, 9007199254740991, true, true, 9007199254740991, 0, null, 2],
     ],
   },
 ];
@@ -109,7 +109,7 @@ for (const scenario of scenarios) {
     for (const [entry, traces] of executions) {
       assert.equal(traces.length, scenario.expected.length, entry);
       for (const [index, trace] of traces.entries()) {
-        const [before, sinceBefore, initialized, after, sinceAfter, age, fault] = scenario.expected[index];
+        const [before, sinceBefore, initialized, after, sinceAfter, age, fault, eventCount] = scenario.expected[index];
         assert.deepEqual(trace.stateBefore,
           { held: before, __gf_timer_since_age: sinceBefore, __gf_timer_initialized_age: initialized }, entry);
         assert.deepEqual(trace.stateAfter,
@@ -118,7 +118,7 @@ for (const scenario of scenarios) {
         assert.deepEqual(trace.safe, { relay: after, age_ms: age }, entry);
         assert.deepEqual(trace.faults, [], entry);
         const events = observeSourceTrace(artifact.traceMetadata, trace).resultEvents;
-        assert.ok(events.length > 0, entry);
+        assert.equal(events.length, eventCount, entry);
         for (const event of events) {
           assert.deepEqual({ kind: event.kind, errorType: event.errorType, fault: event.fault,
             origin: event.originDescriptor?.name ?? null, source: event.source },
