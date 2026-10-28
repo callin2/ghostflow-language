@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "issue": "https://github.com/callin2/ghostflow-language/issues/590#issuecomment-6483394125",
+  "recordedAt": "2026-10-28T23:55:27.423Z",
+  "status": "passed",
+  "productionCompilerProof": false,
+  "scope": "Actual source and complete two-output GFB admission; all admitted histories of elapsed Duration expression observations in a Nat subtraction model",
+  "assumptions": [
+    "AcceptedFrom is the modeled public clock contract, not a proved JS/Rust admission refinement",
+    "Opcode20 uses Nat subtraction; existing EpochMachine executes all state transitions unchanged",
+    "Output runValue has code.length+1 fuel, exact terminal PC and singleton stack; it is not actual Rust VM refinement"
+  ],
+  "unproved": [
+    "f64 subtraction, literal representation and Rust/model correspondence",
+    "General compiler or source parser correctness",
+    "Actual Rust loader admission of every mutated model artifact",
+    "Production scan commit, scheduler and physical relay timing"
+  ],
+  "proof": {
+    "path": "build/elapsed-duration-output/attempt-2/verification.json",
+    "sha256": "079abf6d5556ec49db889e09e0aa480729ee96797cafef78d311d6981598a06b",
+    "startedAt": "2026-10-28T23:46:19.580Z",
+    "finishedAt": "2026-10-28T23:53:49.716Z",
+    "dependencyReuse": false,
+    "importedModules": 18,
+    "newModules": 3,
+    "checks": 52,
+    "successes": 40,
+    "expectedRejections": 12,
+    "sourceIdentitySha256": "118aff3ecf351735799c5b0ab0d25573b5ea08b2700ca2813a03b4f10f4f04f7",
+    "sourceFiles": 124,
+    "lean": {
+      "version": "Lean (version 4.19.0, x86_64-apple-darwin22.6.0, commit 6caaee842e94, Release)",
+      "executableSha256": "e06bfeeb39efd58c2c3b1dece023d212f10c249453a3e6f0742d02741afecf9c"
+    },
+    "fixtureSha256": "564f1aeb1a85f4b29a4cd1d302e695e9d88c728ff337c9201ed86e450823f820",
+    "bytecodeSha256": "96cccb3e96233c613b8042086a05d186d9b5c5376e91d582b1c5c9393d3cfa2e",
+    "modelHashes": {
+      "experiments/elapsed-duration-output/DurationMachine.lean": "652cc936121434b6ff5b58fac53bb9e76ac4f8fdc741def40e19bbd1fa76276e",
+      "experiments/elapsed-duration-output/DurationModule.lean": "1bae1130df1a5a19e803198d451ddf2680d0bddbd3ecdba4379811f393f18529",
+      "experiments/elapsed-duration-output/DurationSource.lean": "a204fbee5d6787c15c8dfad193f75e73699c016fb603e55a6f522b6cc250ac9f"
+    }
+  },
+  "focusedTests": {
+    "command": "node --test tests/elapsed-duration-output.test.mjs",
+    "exitCode": 0,
+    "tests": 4,
+    "passed": 4,
+    "failed": 0,
+    "source": "Observed command completion after canonical fixture correction"
+  },
+  "runtime": {
+    "included": false,
+    "owner": "Separate root integration worker; no runtime result counted in this kernel receipt"
+  },
+  "preservedFailureArtifacts": [
+    {
+      "path": "build/elapsed-duration-output/attempt-1/verification.json",
+      "sha256": "1d15bb03a1c7c31b0363c583cce4d0bf0bbea39792afb119d55cb5d151d18f84"
+    },
+    {
+      "path": "build/elapsed-duration-output/model-development/verification.json",
+      "sha256": "a6b0e293875b9335e71d9189b598c046ea858a5def5796170a7681c08151bc2d"
+    },
+    {
+      "path": "build/elapsed-duration-output/model-development-2/verification.json",
+      "sha256": "e9a15827845d148a4f49038b5d14848515259115af05690ad428523feab3149f"
+    },
+    {
+      "path": "build/elapsed-duration-output/model-development-3/actual-source.json",
+      "sha256": "1d1ec59e0c319fff8a074b2f4df2e9bf595e3aed0922cf21234c6f0afd6b2cce"
+    },
+    {
+      "path": "build/elapsed-duration-output/model-development-3/debug-source.log",
+      "sha256": "50210db9bee35ccb220fc439fedeac86ef495bd0f375e41d0e4a31e5b75ee071"
+    }
+  ],
+  "developmentReuse": {
+    "path": "build/elapsed-duration-output/model-development-3/verification.json",
+    "sha256": "41fac19d2ea30a7144d1b73ff646199943c9d87717d790ed8873e6fadc2d254b",
+    "dependencyReuse": true,
+    "baseSourceFiles": 116,
+    "reusedModules": 18,
+    "freshNewModels": 3,
+    "includedInFinalCounts": false
+  }
+}
