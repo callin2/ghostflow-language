@@ -1,4 +1,3 @@
-//! Test transport. Scan evaluation and accounting are owned by ScanDriver.
 use ghostflow_core::{
     scan::{ScanFrameV1, ScanInput},
     Capability, Module, Runtime, Value,

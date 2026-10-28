@@ -72,6 +72,7 @@ const TESTS = Object.freeze([
   'tests/portable-package.test.mjs', 'tests/import-composition.test.mjs',
   'tests/composition-intent-provenance.test.mjs',
   'tests/composed-interaction.test.mjs',
+  'tests/stage-accounting-control.test.mjs',
   'tests/window-control.test.mjs', 'tests/hold-last-control.test.mjs',
   'tests/debounce-control.test.mjs',
   'tests/reference-coverage-gaps.test.mjs',

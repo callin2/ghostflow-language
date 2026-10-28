@@ -138,8 +138,6 @@ impl StageAccounting {
         })
     }
 
-    // Publication cannot reject an already committed control scan. Exhaustion
-    // poisons this observation ledger without changing runtime acceptance.
     pub(crate) fn observe(&mut self, at: u64, trace: &TickRecord) {
         self.advance_revision();
         if self.fault.is_some() {

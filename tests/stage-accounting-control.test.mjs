@@ -73,6 +73,23 @@ test('REF-03-021: canonical source drives requested 20s, observed safe zero, and
     interactionSchema: null, interactionSourceIdentity: null }, a.bytes, { manifest: a.manifest });
 });
 
+test('single-stage observation accounts select the actual scalar execution profile', async t => {
+  for (const [stage, expected] of [['requested', known(20_000)], ['safe', known(0)],
+    ['applied', unknown('NoReceipt')], ['confirmed', unknown('NoFeedback')]]) {
+    await t.test(stage, async t => {
+      const document = source.split('\n').filter(line => !line.startsWith('account ')
+        || line.startsWith(`account ${stage}_usage `)).join('\n');
+      const owner = await create(t, {}, document);
+      assert.equal(owner.artifact.manifest.format, 'GhostFlow/control-v1');
+      softwareQualityObservations(owner.control);
+      owner.step({ nowMs: 0, inputs: { manual: true, low_water: true } });
+      owner.step({ nowMs: 20_000, inputs: { manual: true, low_water: true } });
+      await owner.persist(async () => true);
+      assert.deepEqual(owner.query(`${stage}_usage`, 0n, 20_000n), expected);
+    });
+  }
+});
+
 test('native/WASM exact parity includes rejection atomicity, repeated timestamps, clipping, gaps and snapshots', async t => {
   const owner = await create(t), a = owner.artifact;
   const actions = [frame(a, 0, 0), { persist: true }, query('requested', 0, 0), frame(a, 1, 20_000), { persist: true },

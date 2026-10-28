@@ -9264,6 +9264,56 @@
       "referenceCaseIds": [
         "REF-04-039"
       ]
+    },
+    {
+      "id": "scan-stage-accounting",
+      "family": "Scan-owned requested and safe usage with unknown physical evidence",
+      "clause": {
+        "path": "docs/reference/03-time-and-schedules.md",
+        "heading": "3.4 누적 시간과 rolling budget"
+      },
+      "owner": "CORE",
+      "maturity": "EXPERIMENTAL",
+      "coreScope": false,
+      "requiredEvidence": [
+        "native_wasm"
+      ],
+      "evidence": [
+        {
+          "stage": "native_wasm",
+          "status": "verified",
+          "refs": [
+            {
+              "path": "tests/stage-accounting-control.test.mjs",
+              "testId": "REF-03-021: canonical source drives requested 20s, observed safe zero, and unknown physical evidence",
+              "caseId": "REF-03-021",
+              "assertionClass": "runtime-value",
+              "targets": [
+                "wasm"
+              ]
+            },
+            {
+              "path": "tests/stage-accounting-control.test.mjs",
+              "testId": "native/WASM exact parity includes rejection atomicity, repeated timestamps, clipping, gaps and snapshots",
+              "caseId": "REF-03-021",
+              "assertionClass": "target-parity",
+              "targets": [
+                "native",
+                "wasm"
+              ]
+            }
+          ]
+        }
+      ],
+      "gaps": [
+        "Observation-only source adapter consumes actual accepted ScanDriver outcomes with explicit resource/output mapping. Positive applied receipts and confirmed physical feedback are not produced. Admission enforcement, signed package handoff, storage-medium certification and Device deployment remain separate owner work."
+      ],
+      "issues": [
+        211
+      ],
+      "referenceCaseIds": [
+        "REF-03-021"
+      ]
     }
   ]
 }

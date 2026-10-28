@@ -1668,8 +1668,9 @@ class Lowerer {
       delete this.manifest.accounts;
       delete this.manifest.accountingConstraints;
     }
-    const scanStageAccounting = accountingExecution && this.manifest.accounting.bindings.some(binding =>
-      binding.operation === 'on_time' && binding.evidenceBinding.stage !== 'applied');
+    const scanStageAccounting = accountingExecution && !this.manifest.accounting.constraints.length
+      && this.manifest.accounting.bindings.every(binding => binding.operation === 'on_time'
+        && this.resources.get(binding.evidenceBinding.target) === 'BoolActuator');
     if (contextForms.length || accountingExecution && !scanStageAccounting) this.manifest.format = 'GhostFlow/control-v10';
     else if (solarForms.some(form => form[0] === 'daily-slots-pulse')) this.manifest.format = 'GhostFlow/control-v8';
     else if (solarForms.some(form => form[0] === 'daily-pulse')) this.manifest.format = 'GhostFlow/control-v7';
