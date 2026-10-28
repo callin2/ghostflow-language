@@ -76,7 +76,16 @@ test('composed schema retains instance-local authored identities and exact origi
     else if (field === 'traceMetadata') bad.traceMetadata.compositionIntent.instances[0].links[0].anchorId = 'other';
     else bad.sourceClosure.instances[0].instance = 'other';
     assert.throws(() => verifyInteractionSchema(bad, schema), /canonical closure/);
+    assert.throws(() => restoreInteractionSchema(bad, schema), /canonical.*(?:closure|replay)/);
   }
+  const forged = structuredClone(artifact);
+  const provenance = forged.interactionSchema.descriptors.find(d => d.instance === 'east').provenance;
+  const anchorId = 'GF-ABSENT-FROM-SOURCE';
+  assert.equal(cell.includes(anchorId), false);
+  forged.traceMetadata.compositionIntent.instances.find(entry => entry.instance === 'east').links
+    .filter(link => link.nodeId === provenance.sourceNode.id).forEach(link => { link.anchorId = anchorId; });
+  provenance.intentAnchors = [{ instance: 'east', anchorId }];
+  assert.throws(() => restoreInteractionSchema(forged, forged.interactionSchema), /canonical.*(?:closure|replay)/);
   const swapped = structuredClone(schema);
   [swapped.descriptors[1].provenance.sourceNode, swapped.descriptors[4].provenance.sourceNode]
     = [swapped.descriptors[4].provenance.sourceNode, swapped.descriptors[1].provenance.sourceNode];
