@@ -329,8 +329,9 @@ WASM SHA-256은 `98d3bb473dc90f68681d974277dc01b17e69516d45c69e55147b7805a608d42
 지정된 coverage 대상은 함수476/476, 줄7450/8246(90.35%), V8 ranges5570/6312(88.24%)다.
 전체 저장소나 문법 branch의 비율이 아니다. 보고서 SHA-256은
 `e09fdcd0da40d385eadd4c633144864c2a782779eac9607d5d21bf940e6c6b86`이며
-`build/evidence/coverage-cf18447/`에 보존했다. PR600·601의 필수 CI는 통과했고
-이 시점에는 미병합이다. 이 작업자는 병합하지 않았다.
+`build/evidence/coverage-cf18447/`에 보존했다. 게시 직전 재조회에서 PR600·601이 외부에서
+dev에 병합된 것을 확인했다. dev `5f64f4eb702535cbc72c97dc158fa900b21e0383`의 tree는
+검토된 선행 head `f2f88f2`와 같다. 이 작업자는 두 PR을 병합하지 않았다.
 
 다음 단위는 독립 Lean reader가 원본 문서 바이트를 읽어 실제 artifact 및 metadata와
 대조하는 증명이다. 그 뒤에는 센서 복구와 상태 전이를 모든 입력 이력에 대해 합성한다.
