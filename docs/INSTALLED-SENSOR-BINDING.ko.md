@@ -96,6 +96,8 @@ dispatch에 진입하지 않은 수집·설정·context 사전 검사 거절은 
 교체는 새 소유자를 완전히 준비한 뒤 게시합니다. 거절된 후보는 설정·overlay·history·
 state·timer·conditioner·최신 완료 결과·assessment를 유지합니다. 성공하면 새 run에서
 state·설정·conditioner를 초기화하고 이전 완료 결과를 지웁니다. 이 한정 경로는
-REF-06-002와 REF-06-016의 근거이며 더 넓은 요구 범위는 미완료입니다.
+native/WASM config/timer 검사와 함께 REF-06-002의 지정된 east 상태·설정 변경 독립성 사례를
+충족합니다. 중첩 경로와 인스턴스별 무중단 binding 교체는 이 프로필의 범위 밖입니다.
+REF-06-016의 requested부터 safe까지 이어지는 전체 제약 설명 경로는 미완료입니다.
 `tests/installed-composition.test.mjs`는 실제 WASM 실행으로 같은 시각의 east/west 독립성,
 근거 연결, 변조, 오류와 교체를 검증합니다.

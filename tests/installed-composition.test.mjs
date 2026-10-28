@@ -104,6 +104,8 @@ test('installed composition keeps actual east and west settings, state, timers a
   const settings = changed.execution.snapshot.core.state.settings;
   assert.deepEqual(settings.map(setting => [setting.result.value, setting.emissionRevision]), [[1000, 1], [5000, 0]]);
   assert.deepEqual(changed.provenance.routes.inputs[1], before.provenance.routes.inputs[1]);
+  assert.deepEqual(changed.provenance.routes.outputs[1], before.provenance.routes.outputs[1]);
+  assert.equal(changed.provenance.bindingRevision, before.provenance.bindingRevision);
   assert.deepEqual(changed.provenance.routes.outputs.map(route => route.endpointId), ['eastRelay', 'westRelay']);
   assert.equal(changed.provenance.routes.inputs[0].definition.sha256, artifact.sourceClosure.documents[0].sha256);
   assert.equal(changed.assessment.physical.status, 'unknown');
