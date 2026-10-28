@@ -262,7 +262,7 @@ function validateCanonicalUnit(item, label) {
 function validateContextManifest(input, bytecodeFormat) {
   const manifest = record(input, 'manifest');
   keys(manifest, ['format','name','inputs','outputs','sensors','schedules','timers','signals','configs','bytecodeSha256'],
-    ['providers','calendars','naturalConditions','calendarConditions','accounting','resources','objectives','adaptSettings','lifecycle','legacyAdmission','requiredRuntimeFeatures'], 'manifest');
+    ['providers','calendars','naturalConditions','calendarConditions','accounting','resources','objectives','adaptSettings','lifecycle','legacyAdmission','requiredRuntimeFeatures','sensorInstances'], 'manifest');
   validateRequiredRuntimeFeatures(manifest);
   const lifecycle = validateLifecycleManifest(manifest);
   if (manifest.format === AT_WINDOW_FORMAT ? bytecodeFormat !== 23 : manifest.format === CIVIL_RANGE_FORMAT ? bytecodeFormat !== 21 : manifest.format === TIMESLOTS_RANGE_FORMAT ? bytecodeFormat !== 20 : manifest.format === RANGE_LIVE_START_FORMAT ? bytecodeFormat !== 19 : manifest.format === CALENDAR_EXECUTION_FORMAT ? bytecodeFormat !== 18 : manifest.format === SOLAR_CONTEXT_FORMAT ? bytecodeFormat !== 16 : manifest.format === HOLIDAY_FORMAT ? bytecodeFormat !== 15 : manifest.format === AT_FORMAT ? bytecodeFormat !== 14 : manifest.format === AVAILABILITY_FORMAT ? bytecodeFormat !== 13 : ![11, 12].includes(bytecodeFormat)) throw new Error('context manifest requires its matching GFB format');
@@ -277,6 +277,11 @@ function validateContextManifest(input, bytecodeFormat) {
   const sensors = validateList(manifest.sensors, 'manifest.sensors',
     ['name','type','sampleMs','validMin','validMax','filter','window','staleMs','recoverSamples','valueInput','okInput','faultInput'],
     ['optional','alpha','canonicalUnit','samplePresentInput','sampleEpochInput','sampleIdInput','sampleTimestampInput']);
+  const sensorInstances = validateList(manifest.sensorInstances ?? [], 'manifest.sensorInstances',
+    ['name','type','sampleMs','validMin','validMax','filter','window','staleMs','recoverSamples','valueInput','okInput','faultInput','sourceSensor','instance','port'],
+    ['optional','alpha','canonicalUnit','samplePresentInput','sampleEpochInput','sampleIdInput','sampleTimestampInput']);
+  if (sensorInstances.length && manifest.format !== STREAM_CONTEXT_FORMAT)
+    throw new Error('context sensor instances require control-v10');
   const objectives = validateList(manifest.objectives ?? [], 'manifest.objectives',
     ['name','measure','target','manipulate','output','controller','binding','executable','bindings']);
   const resources = validateList(manifest.resources ?? [], 'manifest.resources', ['name','type']);
@@ -447,9 +452,9 @@ function validateContextManifest(input, bytecodeFormat) {
     }
   }
   unique(configs.map(item => item.id), 'config id');
-  unique([...inputs,...outputs,...schedules,...configs,...providers,...calendars,...timers,...sensors,...objectives,...adaptSettings].map(item => item.name), 'context name');
+  unique([...inputs,...outputs,...schedules,...configs,...providers,...calendars,...timers,...sensors,...sensorInstances,...objectives,...adaptSettings].map(item => item.name), 'context name');
   unique([...schedules,...naturals,...calendarConditions].map(item => item.site), 'context site');
-  for (const sensor of sensors) {
+  for (const sensor of [...sensors, ...sensorInstances]) {
     name(sensor.name, 'sensor.name');
     if (objectives.some(objective => objective.measure === sensor.name) && (sensor.type !== 'Temperature' || sensor.canonicalUnit !== 'K')) throw new Error('context PID sensor must be canonical Temperature');
     type(sensor.type, `sensor ${sensor.name}.type`);
@@ -472,6 +477,17 @@ function validateContextManifest(input, bytecodeFormat) {
     if (count !== 0 && count !== 4) throw new Error('context sensor sample identity inputs must be provided together');
     for (const [field, role] of [['samplePresentInput', 'present'], ['sampleEpochInput', 'epoch'], ['sampleIdInput', 'id'], ['sampleTimestampInput', 'timestamp']])
       if (count) generated(sensor[field], `${RESERVED}sensor_sample_${role}_${sensor.name}`, `sensor ${sensor.name}.${field}`);
+  }
+  const sensorByName = new Map(sensors.map(sensor => [sensor.name, sensor]));
+  for (const sensor of sensorInstances) {
+    name(sensor.sourceSensor, 'sensor sourceSensor'); name(sensor.port, 'sensor port');
+    if (typeof sensor.instance !== 'string' || !/^[A-Za-z_][A-Za-z_0-9]*(?:\.[A-Za-z_][A-Za-z_0-9]*)*$/.test(sensor.instance))
+      throw new Error('invalid sensor instance');
+    const source = sensorByName.get(sensor.sourceSensor);
+    if (!source || source.type !== sensor.type || source.sampleMs !== sensor.sampleMs
+      || !!source.optional !== !!sensor.optional) throw new Error(`sensor instance ${sensor.name} source contract mismatch`);
+    const expected = `instance_${sensor.instance.split('.').map(part => `${part.length}_${part}`).join('_')}_${sensor.port}`;
+    if (sensor.name !== expected) throw new Error('sensor instance name mismatch');
   }
   if (objectives.length > 1) throw new Error('only one context PID objective is supported');
   for (const objective of objectives) {
@@ -508,9 +524,10 @@ function validateContextManifest(input, bytecodeFormat) {
   }
   unique(adaptSettings.map(item => item.target), 'adaptation target');
   const normalized = freeze(copy({ ...manifest, inputs, outputs, schedules, configs, providers, calendars, timers,
-    sensors, objectives, resources, adaptSettings, naturalConditions: naturals, ...(calendarConditions.length ? { calendarConditions } : {}), ...(accounting === null ? {} : { accounting }) }));
+    sensors, ...(manifest.sensorInstances === undefined ? {} : { sensorInstances }), objectives, resources, adaptSettings,
+    naturalConditions: naturals, ...(calendarConditions.length ? { calendarConditions } : {}), ...(accounting === null ? {} : { accounting }) }));
   return { manifest: normalized, lifecycle, inputNames: new Set(physicalManifestInputs(normalized).map(item => item.name)),
-    sensorByName: new Map(sensors.map(item => [item.name,item])), scheduleNames: new Set(schedules.map(item => item.name)), signalNames: new Set() };
+    sensorByName, scheduleNames: new Set(schedules.map(item => item.name)), signalNames: new Set() };
 }
 
 function validateManifest(input, { acceptSettings = false, bytecodeFormat = null, capabilities } = {}) {
