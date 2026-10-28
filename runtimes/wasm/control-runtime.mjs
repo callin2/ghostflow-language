@@ -1120,6 +1120,8 @@ function verifySourceBoundContext(artifact, compiledBytes, manifest, bytecodeFor
 }
 
 async function instantiateControlRuntime(wasmBytes, artifact = {}, options, instantiateRuntime, supportsSchedules) {
+  if (options.instructionWitnesses !== undefined && typeof options.instructionWitnesses !== 'boolean') throw new Error('instructionWitnesses must be Boolean');
+  if (options.instructionWitnesses && instantiateRuntime !== FramedGhostFlowRuntime.instantiate) throw new Error('instruction witnesses require a framed host');
   const { bytes: bytecode, manifest } = artifact;
   const wasm = new Uint8Array(bytes(wasmBytes, 'wasmBytes'));
   // Copy caller-owned bytecode before awaiting digest verification (TOCTOU-safe).
@@ -1226,6 +1228,7 @@ async function instantiateControlRuntime(wasmBytes, artifact = {}, options, inst
   const afterEvents = new Map();
   try {
     runtime.load(compiledBytes);
+    if (options.instructionWitnesses) runtime.enableInstructionWitnesses();
     const declaredPercentRange = validateRequiredRuntimeFeatures(checkedManifest.manifest).includes('percent-range-v1');
     if (runtime.requiresPercentRangeV1() !== declaredPercentRange) {
       throw new Error('requiredRuntimeFeatures does not match loaded bytecode');
