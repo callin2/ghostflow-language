@@ -38,8 +38,16 @@ python3 experiments/rust-reader-validation/verify.py \
 The helper checks artifact identity before running Lean, audits the seven theorem
 axiom lists, and requires failure when the initial cursor becomes one, the
 finished condition is inverted, or the invariant is omitted on the concrete
-invalid Reader. Generated mutants and complete command results remain under
-`build/rust-reader-foundation-proof/`; `verification.json` records the outcome.
+invalid Reader. Generated mutants and current run results remain under the
+selected output directory (by default `build/rust-reader-foundation-proof/`).
+The retained historical receipt is at
+`build/evidence/rust-reader-validation/verification.json` (ignored build evidence).
+Its SHA-256 is
+`c4594a73839230601e7a05e98cbee0ac9dfe092c94e98da1056599423af578c6`.
+It records the 2026-10-28 host proof run and its tool outputs; it is historical
+evidence, not proof that a later rerun passed. Each new run replaces it with an
+atomically published `running` receipt before checks begin, then atomically
+publishes the final result.
 Only Lean's standard `propext`, `Classical.choice`, and `Quot.sound` are allowed in
 the theorem dependency audit. No additional axiom, `sorry`, or `native_decide` is
 accepted in the two input Lean files.
