@@ -7,10 +7,14 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { compileEvidence, theoremInput, admissionInput, sha256 } from './bridge.mjs';
 import { cases, machineMutations } from './cases.mjs';
 import { differential } from './differential.mjs';
+import { sourceTheoremInput, sourceAdmissionInput } from './source-bridge.mjs';
+import { sourceAdmissionCases, sourceOnlyMutations, sourceVariants, parserBoundaryCases, document } from './source-cases.mjs';
+import { compileEvidence as compileBoolEvidence } from '../bool-translation-validation/bridge.mjs';
+import { sourceTheoremInput as boolSourceTheoremInput, sourceAdmissionInput as boolSourceAdmissionInput } from '../bool-translation-validation/source-bridge.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url)), root = resolve(here, '../..');
 const now = () => new Date().toISOString();
-const oldModels = ['BoolTranslation', 'ByteMachine', 'Serializer', 'DecoderSoundness', 'ModuleEnvelope', 'ModuleLoader'];
+const oldModels = ['BoolTranslation', 'ByteMachine', 'Serializer', 'DecoderSoundness', 'ModuleEnvelope', 'ModuleLoader', 'SourceReader'];
 const falseProposition = "tactic 'decide' proved that the proposition";
 
 async function identity() {
@@ -30,6 +34,11 @@ async function identity() {
   for (const path of ['package-lock.json', 'crates/ghostflow-core/src/lib.rs', 'tests/bool-sensor-validation.test.mjs']) {
     files[path] = sha256(await readFile(join(root, path)));
   }
+  for (const name of ['bridge.mjs', 'loader-bridge.mjs', 'source-bridge.mjs',
+    'fixtures/boolean-literals.ghost.md', 'fixtures/snapshot-branches.ghost.md', 'fixtures/wide-branch.ghost.md']) {
+    const path = `experiments/bool-translation-validation/${name}`;
+    files[path] = sha256(await readFile(join(root, path)));
+  }
   return { files, sha256: sha256(JSON.stringify(files)) };
 }
 
@@ -37,8 +46,11 @@ export async function verify({ lean, evidenceDir, wasmPath, nativePath, runtimeS
   const directory = resolve(evidenceDir), reportPath = join(directory, 'verification.json');
   await mkdir(directory, { recursive: true });
   const report = { schemaVersion: 1, status: 'running', startedAt: now(), productionCompilerProof: false,
-    scope: 'Canonical one Bool input recover(false), full module loading, typed raw-PC execution and Result trace for every admitted reading',
+    scope: 'Independent original canonical source-byte reading for one Bool input recover(false), full module loading, typed raw-PC execution and Result trace for every admitted reading',
     numberCorrespondence: 'The generic theorem requires SmallNumberLaws. Production f64 is separately observed on the finite admitted domain.',
+    trustedBoundaries: ['file-to-Lean-literal transport and Lean foundations',
+      'full CommonMark, production syntax/node numbering, and complete Rust runtime correspondence remain unproved',
+      'natural-language anchor intent correspondence remains unproved'],
     results: [] };
   const publish = async () => {
     await writeFile(`${reportPath}.tmp`, JSON.stringify(report, null, 2) + '\n');
@@ -77,12 +89,51 @@ export async function verify({ lean, evidenceDir, wasmPath, nativePath, runtimeS
     const machine = await readFile(join(here, 'SensorMachine.lean'), 'utf8');
     await run('SensorMachine', machine, true, undefined, true);
     await run('SensorProfile', await readFile(join(here, 'SensorProfile.lean'), 'utf8'), true, undefined, true);
+    const sourceReader = await readFile(join(here, 'SensorSourceReader.lean'), 'utf8');
+    await run('SensorSourceReader', sourceReader, true, undefined, true);
     await run('sensor-boundaries', `import SensorProfile\n${cases}`, true);
+    await run('sensor-source-boundaries', `import SensorSourceReader\n${parserBoundaryCases}`, true);
     const filename = 'experiments/bool-sensor-validation/fixtures/recover-false.ghost.md';
-    const source = await readFile(join(root, filename), 'utf8');
+    const originalSourceBytes = await readFile(join(root, filename));
+    const source = originalSourceBytes.toString('utf8');
+    assert.ok(Buffer.from(source).equals(originalSourceBytes), 'source must round-trip as UTF-8 without replacement');
+    report.originalSourceSha256 = sha256(originalSourceBytes);
     const evidence = compileEvidence(source, filename);
     await writeFile(join(directory, 'compiler-evidence.json'), JSON.stringify(evidence, null, 2) + '\n');
     await run('actual-canonical-sensor', theoremInput(evidence), true);
+    await run('actual-original-source-sensor', sourceTheoremInput(evidence, originalSourceBytes), true);
+    assert.ok(sourceReader.includes('nextNode := cursor.nextNode + 1'), 'source node allocator mutation target drifted');
+    await run('source-rejects-wrong-node-allocation',
+      sourceReader.replace('nextNode := cursor.nextNode + 1', 'nextNode := cursor.nextNode + 2') +
+        sourceTheoremInput(evidence, originalSourceBytes).replace(/^import SensorSourceReader\n/, ''), false, falseProposition);
+    for (const [name, input, accepted] of sourceAdmissionCases) {
+      const bytes = typeof input === 'string' ? Buffer.from(input) : Uint8Array.from(input);
+      await run(`source-${accepted ? 'accepts' : 'rejects'}-${name}`, sourceAdmissionInput(bytes, accepted), true);
+    }
+    for (const [name, mutate] of sourceOnlyMutations) {
+      const changed = mutate(source);
+      assert.notEqual(changed, source, `${name} source mutation target drifted`);
+      await run(`source-original-certificate-rejects-${name}`, sourceTheoremInput(evidence, Buffer.from(changed)), false, falseProposition);
+    }
+    for (const [name, mutate] of sourceVariants) {
+      const changed = mutate(source);
+      assert.notEqual(changed, source, `${name} source variant target drifted`);
+      const recompiled = compileEvidence(changed, filename);
+      await run(`source-accepts-${name}`, sourceTheoremInput(recompiled, Buffer.from(changed)), true);
+      if (name.startsWith('renamed-')) {
+        await run(`source-rejects-colluding-${name}`, sourceTheoremInput(recompiled, originalSourceBytes), false, falseProposition);
+      } else {
+        assert.deepEqual(recompiled.bytes, evidence.bytes, 'trivia must retain artifact bytes');
+        assert.deepEqual(recompiled.metadata, evidence.metadata, 'trivia must retain node identities');
+      }
+    }
+    const purePipe = document('control Pipe { output out: Bool; out <- true |> recover(false); }');
+    await run('pure-bool-rejects-new-pipe-token', boolSourceAdmissionInput(Buffer.from(purePipe), false), true);
+    for (const name of ['boolean-literals', 'snapshot-branches', 'wide-branch']) {
+      const path = `experiments/bool-translation-validation/fixtures/${name}.ghost.md`;
+      const bytes = await readFile(join(root, path));
+      await run(`pure-bool-source-${name}`, boolSourceTheoremInput(await compileBoolEvidence(bytes.toString('utf8'), path), bytes), true);
+    }
     const raw = evidence.bytes, start = raw.length - 47;
     assert.deepEqual(raw.slice(start, start + 4), [3, 1, 0, 30]);
     const findName = text => {
@@ -128,9 +179,11 @@ export async function verify({ lean, evidenceDir, wasmPath, nativePath, runtimeS
     ]) {
       const changed = structuredClone(evidence); edit(changed);
       await run(`reject-metadata-${name}`, theoremInput(changed), false, falseProposition);
+      await run(`source-reject-metadata-${name}`, sourceTheoremInput(changed, originalSourceBytes), false, falseProposition);
     }
     const changedName = structuredClone(evidence); changedName.bytes[8] = 88;
     await run('reject-original-source-identity', theoremInput(changedName), false, falseProposition);
+    await run('source-reject-artifact-name', sourceTheoremInput(changedName, originalSourceBytes), false, falseProposition);
     changedName.projection.name = `X${changedName.projection.name.slice(1)}`;
     await run('accept-valid-changed-module-name', theoremInput(changedName), true);
     for (const mutation of machineMutations) {
