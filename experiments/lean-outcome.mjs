@@ -2,8 +2,9 @@ const infrastructureDiagnostic = /unknown identifier|unknown constant|could not 
 
 export function leanOutcomeMatches(result, log, expectedSuccess, diagnostic) {
   if (result.error || result.signal || !Number.isInteger(result.status) || infrastructureDiagnostic.test(log)
-    || log.includes('sorryAx') || log.includes("declaration uses 'sorry'")) return false;
+    || log.includes("declaration uses 'sorry'")) return false;
   if (!expectedSuccess && (typeof diagnostic !== 'string' || diagnostic.length === 0)) return false;
   return (result.status === 0) === expectedSuccess
-    && (!diagnostic || log.includes(diagnostic));
+    && (!diagnostic || log.includes(diagnostic))
+    && (!expectedSuccess || !log.includes('sorryAx'));
 }
