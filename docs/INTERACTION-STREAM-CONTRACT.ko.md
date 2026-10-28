@@ -8,7 +8,10 @@
 생산자, 전송, 보존, 렌더링이나 새 소스 문법을 구현하지 않는다.
 [Reference §5.3](reference/05-settings-and-observation.md)은 언어 경계를
 유지한다. 그 생명주기 표기는 기존 레코드 enum이 아니다.
-#70의 설정은 구현되었지만 command와 alarm descriptor는 아직 구현되지 않았다.
+#70의 설정과 #287의 제한된 [알람 전용 생산자](../contracts/alarm-v1/README.ko.md)는
+구현되었다. command descriptor와 아래 통합 스트림은 후속 범위다. 알람 v1은
+별도의 닫힌 descriptor/report schema를 가지며 Rust가 확정한 scalar Bool 상태
+전이를 기록한다. 제안된 통합 스트림 형식을 구현했다고 주장하지 않는다.
 기존 [v0 계약](../contracts/interaction-v0/README.ko.md)은 그대로 유지한다.
 
 ## 의미와 책임

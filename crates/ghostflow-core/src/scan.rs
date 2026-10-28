@@ -50,6 +50,7 @@ pub struct ScanDriver {
     last_time_ms: Option<u64>,
     restart: Option<RestartState>,
     stage_accounting: Option<crate::stage_accounting::StageAccounting>,
+    alarms: Option<crate::alarm_stream::AlarmStream>,
 }
 
 struct RestartState {
@@ -88,6 +89,7 @@ impl ScanDriver {
             last_time_ms: None,
             restart,
             stage_accounting: None,
+            alarms: None,
         }
     }
 
@@ -122,6 +124,30 @@ impl ScanDriver {
 
     pub fn runtime(&self) -> &Runtime {
         &self.runtime
+    }
+
+    pub fn activate_alarms(&mut self, packet: &[u8], expected_sha256: &str) -> Result<()> {
+        if self.next_scan_id != Some(0) || self.runtime.next_tick != 1 || self.alarms.is_some() {
+            return Err(Error::new(
+                "alarms activate once on a fresh run before scanning",
+            ));
+        }
+        let module = self
+            .runtime
+            .module
+            .as_ref()
+            .ok_or_else(|| Error::new("no module installed"))?;
+        self.alarms = Some(crate::alarm_stream::AlarmStream::activate(
+            module, packet, expected_sha256,
+        )?);
+        Ok(())
+    }
+
+    pub fn query_alarms(&self, packet: &[u8]) -> Result<String> {
+        self.alarms
+            .as_ref()
+            .ok_or_else(|| Error::new("alarms are not active"))?
+            .query(packet)
     }
 
     pub fn activate_stage_accounting(&mut self, binding: &[u8]) -> Result<()> {
@@ -431,6 +457,9 @@ impl ScanDriver {
         resource_binding: Option<&[u8]>,
     ) -> Result<ScanOutcomeV1> {
         self.validate_scan_frame(&frame)?;
+        if let Some(alarms) = &self.alarms {
+            alarms.preflight()?;
+        }
 
         // Never combine a framed scan with pending legacy setter values.
         self.runtime.clear_inputs();
@@ -524,6 +553,9 @@ impl ScanDriver {
                 return Err(error);
             }
         };
+        if let Some(alarms) = &mut self.alarms {
+            alarms.observe(frame.scan_id, frame.logical_time_ms, &trace.state_after);
+        }
         if let Some(owner) = &mut self.stage_accounting {
             owner.observe(frame.logical_time_ms, &trace);
         }

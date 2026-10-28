@@ -7,7 +7,11 @@ This document specifies a normative host/core observation contract for future
 adoption. It does not implement producers, transport, retention, rendering, or
 new source grammar. Reference [§5.3](reference/05-settings-and-observation.en.md#53-cabinet-view-independent-observation-model)
 remains the language boundary; its lifecycle notation is not an existing record enum.
-Settings from #70 are implemented; command and alarm descriptors are not.
+Settings from #70 and the bounded [alarm-only producer](../contracts/alarm-v1/README.md)
+from #287 are implemented. Command descriptors and the combined stream below
+remain future work. Alarm v1 has its own closed descriptor/report schemas and
+records committed scalar Bool-state transitions in Rust; it does not claim the
+proposed combined stream format.
 The existing [v0 contract](../contracts/interaction-v0/README.md) stays unchanged.
 
 ## Meaning and ownership
