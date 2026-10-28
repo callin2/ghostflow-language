@@ -1029,22 +1029,25 @@ function sensorFaultCode(reading) {
 
 function inputValue(value, inputType, label) { return typedValue(value, inputType, label); }
 
-function verifyComposedSource(artifact, compiledBytes, manifest) {
-  if (artifact.sourceClosure === undefined && manifest?.sensorInstances === undefined) return;
+function verifySourceBoundContext(artifact, compiledBytes, manifest, bytecodeFormat) {
+  if (![11, 12].includes(bytecodeFormat)
+    && artifact.sourceClosure === undefined && manifest?.sensorInstances === undefined) return;
   const { sourceDocument, sourceClosure } = artifact;
   if (!sourceDocument || typeof sourceDocument.text !== 'string'
     || sourceDocument.format !== 'GhostFlow/source-document-v1'
     || sourceDocument.kind !== 'literate'
     || sha256Hex(sourceDocument.text) !== sourceDocument.sha256
-    || !sourceClosure || sourceClosure.format !== 'GhostFlow/source-closure-v1'
-    || !Array.isArray(sourceClosure.documents)) {
-    throw new Error('composed control requires an exact source document and source closure');
+    || sourceClosure !== undefined && (!sourceClosure || sourceClosure.format !== 'GhostFlow/source-closure-v1'
+      || !Array.isArray(sourceClosure.documents))) {
+    throw new Error('context source-bound activation requires an exact source document and import closure when present');
   }
   const rebuilt = compileSourceSync(sourceDocument.text, {
-    filename: sourceDocument.filename, sourceClosure: sourceClosure.documents,
+    filename: sourceDocument.filename,
+    ...(sourceClosure === undefined ? {} : { sourceClosure: sourceClosure.documents }),
   });
   if (!equalBytes(rebuilt.bytes, compiledBytes)) throw new Error('composition bytecode does not match canonical source');
-  if (canonicalJson(rebuilt.sourceClosure) !== canonicalJson(sourceClosure))
+  if ((rebuilt.sourceClosure === undefined) !== (sourceClosure === undefined)
+    || sourceClosure !== undefined && canonicalJson(rebuilt.sourceClosure) !== canonicalJson(sourceClosure))
     throw new Error('composition source closure does not match canonical source');
   if (canonicalJson(rebuilt.manifest) !== canonicalJson(manifest))
     throw new Error('composition manifest does not match canonical source');
@@ -1055,7 +1058,6 @@ async function instantiateControlRuntime(wasmBytes, artifact = {}, options, inst
   const wasm = new Uint8Array(bytes(wasmBytes, 'wasmBytes'));
   // Copy caller-owned bytecode before awaiting digest verification (TOCTOU-safe).
   const compiledBytes = new Uint8Array(bytes(bytecode, 'bytes'));
-  verifyComposedSource(artifact, compiledBytes, manifest);
   let bytecodeFormat = compiledBytes.byteLength >= 6
     ? new DataView(compiledBytes.buffer, compiledBytes.byteOffset, compiledBytes.byteLength).getUint16(4, true)
     : null;
@@ -1067,6 +1069,7 @@ async function instantiateControlRuntime(wasmBytes, artifact = {}, options, inst
     bytecodeFormat = view.getUint16(14, true);
   }
   const checkedManifest = validateManifest(manifest, { ...options, bytecodeFormat });
+  verifySourceBoundContext(artifact, compiledBytes, manifest, bytecodeFormat);
   validateOutputObservationRails(checkedManifest.manifest, compiledBytes);
   if (checkedManifest.manifest.outputObservations?.length) {
     if (instantiateRuntime !== FramedGhostFlowRuntime.instantiate) throw new Error('output observations require a framed host');

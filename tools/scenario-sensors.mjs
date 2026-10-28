@@ -5,7 +5,7 @@ import { loadVerifiedArtifact, validateScenario } from './ghostsim.mjs';
 import { SoftwareInputProducer } from './software-input-producer.mjs';
 
 const [artifactPath, scenarioPath] = process.argv.slice(2);
-const { artifactBytes, manifest } = loadVerifiedArtifact(artifactPath);
+const { artifactBytes, manifest, map } = loadVerifiedArtifact(artifactPath);
 const scenario = JSON.parse(fs.readFileSync(scenarioPath, 'utf8'));
 validateScenario(scenario, manifest);
 const wasm = fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
@@ -18,7 +18,10 @@ const hasContext = manifest.format === 'GhostFlow/control-v10';
 const hasObjective = (manifest.objectives?.length ?? 0) > 0;
 try {
   const instantiate = certified || hasAfterEvent || hasSolar || hasDaily || hasContext || hasObjective ? ControlRuntime.instantiate : ControlRuntime.instantiateFramed;
-  runtime = await instantiate.call(ControlRuntime, wasm, { bytes: artifactBytes, manifest }, {
+  runtime = await instantiate.call(ControlRuntime, wasm, {
+    bytes: artifactBytes, manifest, sourceDocument: map.sourceDocument,
+    ...(map.sourceClosure === undefined ? {} : { sourceClosure: map.sourceClosure }),
+  }, {
     acceptSettings: true,
     ...(scenario.temporal === undefined ? {} : { temporal: scenario.temporal }),
     ...(scenario.afterEvent === undefined ? {} : { afterEvent: scenario.afterEvent }),

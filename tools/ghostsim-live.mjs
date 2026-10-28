@@ -6,9 +6,12 @@ import { SoftwareInputProducer } from './software-input-producer.mjs';
 // One activated Rust runtime owns the entire live session. The host supplies
 // complete input frames and logical time; it does not replay prior scans.
 export async function createLiveSession(artifactPath) {
-  const { artifactBytes, manifest } = loadVerifiedArtifact(artifactPath);
+  const { artifactBytes, manifest, map } = loadVerifiedArtifact(artifactPath);
   const wasm = fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
-  const runtime = await ControlRuntime.instantiateFramed(wasm, { bytes: artifactBytes, manifest });
+  const runtime = await ControlRuntime.instantiateFramed(wasm, {
+    bytes: artifactBytes, manifest, sourceDocument: map.sourceDocument,
+    ...(map.sourceClosure === undefined ? {} : { sourceClosure: map.sourceClosure }),
+  });
   const producer = new SoftwareInputProducer(manifest);
   let scanId = 0;
   let previousTime = 0;

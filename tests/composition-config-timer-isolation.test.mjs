@@ -12,6 +12,7 @@ import { restoreArtifactSourceMap, writeArtifact } from '../tools/toolchain.mjs'
 import { TemporarySettingsHost } from '../runtimes/wasm/temporary-settings-host.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 import { softwareQualityRails } from './helpers/software-quality-observations.mjs';
+import { dailySlotsRange } from './helpers/range-source.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const document = code => `# Independent cells\n\n\`\`\`ghost\n${code}\n\`\`\`\n`;
@@ -208,7 +209,32 @@ test('direct framed activation pins composed sensor routing to the source closur
     /composition manifest does not match canonical source/);
   await assert.rejects(() => ControlRuntime.instantiateFramed(wasm, {
     bytes: artifact.bytes, manifest: artifact.manifest,
-  }, { context }), /composed control requires.*source closure/);
+  }, { context }), /context source-bound activation requires.*source document/);
+  const stripped = structuredClone(artifact.manifest);
+  delete stripped.sensorInstances;
+  await assert.rejects(() => ControlRuntime.instantiateFramed(wasm, {
+    bytes: artifact.bytes, manifest: stripped,
+  }, { context }), /context source-bound activation requires.*source document/);
+  stripped.format = 'GhostFlow/control-v1';
+  await assert.rejects(() => ControlRuntime.instantiateFramed(wasm, {
+    bytes: artifact.bytes, manifest: stripped,
+  }, { context }), /manifest|context source-bound activation requires/);
+  delete stripped.format;
+  await assert.rejects(() => ControlRuntime.instantiateFramed(wasm, {
+    bytes: artifact.bytes, manifest: stripped,
+  }, { context }), /manifest|format|context source-bound activation requires/);
+});
+
+test('standalone control-v10/GFB12 Range also requires exact source at direct activation', async () => {
+  const artifact = await compileSource(dailySlotsRange({ selected: '[08:00]', duration: '10min' }),
+    { filename: 'standalone-range.ghost.md' });
+  assert.equal(new DataView(artifact.bytes.buffer, artifact.bytes.byteOffset).getUint16(4, true), 12);
+  assert.equal(artifact.manifest.format, 'GhostFlow/control-v10');
+  await assert.rejects(() => ControlRuntime.instantiateFramed(wasm,
+    { bytes: artifact.bytes, manifest: artifact.manifest }, { context }),
+  /context source-bound activation requires.*source document/);
+  const runtime = await ControlRuntime.instantiateFramed(wasm, artifact, { context });
+  runtime.dispose();
 });
 
 test('composed context settings reject unsupported conditioned instance inputs before activation', async () => {
