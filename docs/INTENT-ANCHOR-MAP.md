@@ -122,6 +122,50 @@ whose signed payload covers the source-map digest, or a trusted deterministic
 compiler replay from the verified source document. LS-1c must not claim that an
 unsigned standalone map detects coordinated replacement.
 
+## Imported intent provenance
+
+Pinned composition preserves authored intent for each instantiated definition.
+The root `intentAnchors` and `intentLinks` remain scoped to the root document.
+The compiler adds `traceMetadata.compositionIntent` when an imported instance
+has anchors or links. This container has these fields:
+
+- `format` is `GhostFlow/composition-intent-v1`.
+- `sourceClosureSha256` is SHA-256 of `canonicalJson(sourceClosure)`.
+- `instances` contains groups in deterministic traversal order. Each group has
+  the authored `instance` path, such as `east` or `outer.inside`, and `definition`
+  with the pinned `filename`, `revision`, and exact document `sha256`.
+- Each group's `anchors` preserves the original anchor fields. Its `links`
+  preserves the original link fields, with composed `nodeId` and original
+  `definitionNodeId`.
+
+Anchor IDs are local to their document. The root, two definitions, and repeated
+instances may use the same ID. The group supplies the namespace; the compiler
+does not rewrite IDs or infer instance identity from generated variable names.
+An imported AI assumption remains `origin=ai`, `kind=assumption`, and
+`status=unconfirmed`. Importing it does not confirm it or change its origin.
+
+The compiler validates links against each definition's original AST before
+binding them to composed nodes. Original Markdown locations and extracted-code
+locations remain separate. Input and output declaration links survive even when
+composition removes the executable declaration. An unused imported document
+stays in the verified closure but contributes no instance group. Root revision
+identity is supplied by the caller where required; composition invents none.
+
+Artifact restoration and signed portable-package verification recompile the
+exact closure and compare all provenance. They reject missing or modified groups,
+definition identities, closure digest, node IDs, locations, classifications, or
+relations. The standalone trace validator rejects a composition container.
+Prose-only definition edits change provenance and pins while unchanged executable
+tokens retain the same bytecode.
+
+Root `intentEvidence` can refer only to root anchors and root linked nodes.
+It cannot claim an imported node through an equal anchor ID. The current
+Interaction schema cannot represent imported intent groups and explicitly rejects
+a projection request containing them. Ordinary compilation and execution still
+accept those groups. Public profile and host explanation joins are separate work
+under [#290](https://github.com/callin2/ghostflow-language/issues/290) and
+[#302](https://github.com/callin2/ghostflow-language/issues/302).
+
 ## Extraction and compatibility
 
 - CommonMark determines top-level Markdown blocks. Text-looking directives in
@@ -169,9 +213,8 @@ warning records are returned. When more than 20 are found, the collection marks
 `limit: 20` and `truncated: true`; exactly 20 does not imply truncation. For an
 imported definition, coverage is reported once per source statement when that
 definition is instantiated. Unused imports do not produce these warnings.
-Imported intent metadata remains unsupported, so the hint explains that a root
-link cannot cover an imported statement and that instance-qualified links need
-a separate contract.
+An imported link covers only its own definition statement. The hint directs
+authors to that original document; a root link cannot cover an imported statement.
 
 These warnings cover supported linkable top-level behavior and known behavioral
 owners without link support; they do not claim semantic completeness. Existing
@@ -244,5 +287,4 @@ This metadata is not a CSE engine, SMT solver or proof framework.
   compiler-produced origin/proof records to the same stable anchor and node
   identities, but it must not rewrite authored intent or mark an unverified
   relation as proved.
-- A general annotation language, arbitrary key/value extensions, multi-file
-  imports, or a new source format.
+- A general annotation language, arbitrary key/value extensions, or a new source format.
