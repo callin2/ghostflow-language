@@ -27,6 +27,14 @@ control Pair {
 const compile = (definition, revision, enabled, supplied = [{ filename: 'cell.ghost.md', revision, text: definition }]) =>
   compileSourceSync(source(definition, revision, enabled), { filename: 'pair.ghost.md', sourceClosure: supplied,
     interactionSourceIdentity: { documentId: 'pair', revisionId: revision } });
+const runtimeDefinition = document(`control Cell {
+  input start: Bool { sample = 1s; stale_after = 3s; }
+  // ghostflow:link id=cell-intent relation=implements
+  config allow: Bool = true { access = operator; }
+  output on: Bool;
+  on <- (allow |> recover(false)) && (start |> recover(false));
+}`);
+const runtimeArtifact = compile(runtimeDefinition, 'cell-runtime-r1', null);
 
 function installed(revision, endpointId) {
   const boardProfile = { schema: SCHEMAS.profileV2, id: 'board', revision, boardModel: 'REFERENCE-ONLY', endpoints: {
@@ -52,6 +60,17 @@ const frame = (revision, endpointId, nowMs, id, value) => ({ bindingRevision: re
   contextFacts: { clock: { monotonicMs: nowMs, bootEpoch: 1, wallMs: nowMs,
     uncertaintyMs: 0, trusted: true, unknownReason: null, sourceRevision: 'clock-r1' },
   natural: [], schedules: [], settings: null } });
+const createHost = () => InstalledControlHost.instantiate(wasm, runtimeArtifact,
+  { runId: 'run-1', ...installed('binding-r1', 'sensor-a'), grants: { cell: [runtimeArtifact.manifest.configs[0].id] },
+    context: { bootEpoch: 1, terminalCapacity: 16, bindings: [] } });
+const settingEvent = (host, eventId, result, kind = 'ordinary', lifetime = undefined) => {
+  const identity = host.snapshot().execution;
+  return { kind, eventId, actor: 'cell', reason: 'operator setting',
+    programFingerprint: identity.programFingerprint, sourceSha256: identity.sourceSha256,
+    runId: identity.runId, baseRevision: identity.core.state.settingsRevision,
+    changes: [{ configId: runtimeArtifact.manifest.configs[0].id, result }],
+    ...(lifetime ? { lifetime } : {}) };
+};
 
 test('REF-06-007 partial oracle: parameter, setting, dependency and binding use distinct actual owners', async t => {
   const firstDefinition = child();
@@ -74,26 +93,11 @@ test('REF-06-007 partial oracle: parameter, setting, dependency and binding use 
   assert.throws(() => compile(secondDefinition, 'cell-r2', 'true',
     [{ filename: 'cell.ghost.md', revision: 'cell-r2', text: firstDefinition }]), /digest mismatch/);
 
-  const runtimeDefinition = document(`control Cell {
-  input start: Bool { sample = 1s; stale_after = 3s; }
-  // ghostflow:link id=cell-intent relation=implements
-  config allow: Bool = true { access = operator; }
-  output on: Bool;
-  on <- (allow |> recover(false)) && (start |> recover(false));
-}`);
-  const runtimeArtifact = compile(runtimeDefinition, 'cell-runtime-r1', null);
-  const host = await InstalledControlHost.instantiate(wasm, runtimeArtifact,
-    { runId: 'run-1', ...installed('binding-r1', 'sensor-a'), grants: { cell: [runtimeArtifact.manifest.configs[0].id] },
-      context: { bootEpoch: 1, terminalCapacity: 16, bindings: [] } });
+  const host = await createHost();
   t.after(() => host.dispose());
   const before = host.step(frame('binding-r1', 'sensor-a', 0, 1, true));
   assert.equal(before.vm.safe.on, true);
-  const identity = host.snapshot().execution;
-  const event = { kind: 'ordinary', eventId: 'allow-off', actor: 'cell', reason: 'operator setting',
-    programFingerprint: identity.programFingerprint, sourceSha256: identity.sourceSha256,
-    runId: identity.runId, baseRevision: identity.core.state.settingsRevision,
-    changes: [{ configId: runtimeArtifact.manifest.configs[0].id,
-      result: { ok: true, type: 'Bool', value: false } }] };
+  const event = settingEvent(host, 'allow-off', { ok: true, type: 'Bool', value: false });
   const changed = host.step(frame('binding-r1', 'sensor-a', 1000, 2, true), event);
   assert.equal(changed.vm.safe.on, false);
   assert.equal(changed.execution.snapshot.core.state.settingsRevision, 1);
@@ -114,7 +118,10 @@ test('REF-06-007 partial oracle: parameter, setting, dependency and binding use 
   incompatible.release.installation.sha256 = jsonSha256(incompatible.installation);
   await assert.rejects(host.replaceBinding({ runId: 'run-2', ...incompatible }), /sample_gap/);
   assert.deepEqual(host.snapshot(), afterSetting);
-  const accepted = await host.replaceBinding({ runId: 'run-2', ...replacement });
+  const pending = host.replaceBinding({ runId: 'run-2', ...replacement });
+  assert.throws(() => host.step(frame('binding-r1', 'sensor-a', 2000, 3, true)), /replacement already pending/);
+  assert.deepEqual(host.snapshot(), afterSetting);
+  const accepted = await pending;
   assert.equal(accepted.bindingRevision, 'binding-r2');
   assert.equal(accepted.runId, 'run-2');
   assert.equal(accepted.sourceSha256, before.identity.sourceSha256);
@@ -127,4 +134,35 @@ test('REF-06-007 partial oracle: parameter, setting, dependency and binding use 
   assert.equal(afterBinding.vm.safe.on, false, 'a binding-only change retains the accepted ordinary setting');
   assert.equal(afterBinding.provenance.routes.inputs[0].endpointId, 'sensor-b');
   assert.equal(afterBinding.provenance.routes.outputs[0].endpointId, 'relay');
+});
+
+test('installed binding replacement retains an accepted ordinary settings fault', async t => {
+  const host = await createHost();
+  t.after(() => host.dispose());
+  host.step(frame('binding-r1', 'sensor-a', 0, 1, true));
+  const invalid = host.step(frame('binding-r1', 'sensor-a', 1000, 2, true),
+    settingEvent(host, 'invalid-allow', { ok: true, type: 'Bool', value: 7 }));
+  assert.deepEqual(invalid.execution.snapshot.core.state.settings[0].result,
+    { ok: false, fault: 'SettingsInvalid' });
+  await host.replaceBinding({ runId: 'run-2', ...installed('binding-r2', 'sensor-b') });
+  const restored = host.snapshot().execution;
+  assert.equal(restored.core.state.settingsRevision, 1);
+  assert.deepEqual(restored.core.state.settings[0].result, { ok: false, fault: 'SettingsInvalid' });
+  const first = host.step(frame('binding-r2', 'sensor-b', 0, 1, true));
+  assert.equal(first.vm.safe.on, false);
+});
+
+test('installed binding replacement keeps Until overlay until its deadline', async t => {
+  const host = await createHost();
+  t.after(() => host.dispose());
+  host.step(frame('binding-r1', 'sensor-a', 0, 1, true),
+    settingEvent(host, 'temporary-off', { ok: true, type: 'Bool', value: false },
+      'temporary', { kind: 'Until', dateTimeMs: 10_000 }));
+  await host.replaceBinding({ runId: 'run-2', ...installed('binding-r2', 'sensor-b') });
+  const retained = host.step(frame('binding-r2', 'sensor-b', 0, 1, true));
+  assert.equal(retained.vm.safe.on, false);
+  assert.equal(retained.execution.snapshot.overlays.length, 1);
+  const expired = host.step(frame('binding-r2', 'sensor-b', 10_000, 2, true));
+  assert.equal(expired.vm.safe.on, true);
+  assert.deepEqual(expired.execution.snapshot.overlays, []);
 });
