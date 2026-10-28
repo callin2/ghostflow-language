@@ -488,8 +488,8 @@
       "source": "docs/reference/03-time-and-schedules.md",
       "sourceLanguage": "ko",
       "translation": "docs/reference/03-time-and-schedules.en.md",
-      "sourceSha256": "98f4d3b349649bcbfe0734f09e677af1797830e83719047c37b9b9be52d75b7b",
-      "translationSha256": "0e8d917590d4f3a524e12c865aaa6602d423c3a4e7fc6bf24380a10ad81a65fe"
+      "sourceSha256": "4b999c7fabbf6693b0defab0e6f0273e292b1ff954a37e5767ad34f3424cd173",
+      "translationSha256": "03daf6c4e04866e9bd7bdd823333b5d90c438385c6d3ae074b8399180db55fa4"
     },
     {
       "source": "docs/reference/04-sensors-constraints-control.md",

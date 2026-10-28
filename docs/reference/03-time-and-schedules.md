@@ -942,7 +942,8 @@ fixed DateTime과 provider가 공급한 instant에는 DST ambiguity가 없다.
 자연 사건 실행 profile에 포함되지 않는다. `Asia/Seoul`의 월요일 00:10
 Tide 사건에 `high - 30min` offset을 쓰면 예정 시작은 일요일 23:40이다.
 따라서 일요일 filter는 통과하고 월요일 filter는 terminal `DayIneligible`이다.
-이 거절은 `.missed = false`이며 `.due`를 만들지 않는다. 이미 admit한 Tide Run은
+이 거절은 terminal miss나 `.due`를 만들지 않는다. Solar에서는 `.missed = false`로
+관찰하며, Tide는 아직 `.missed` 소스 projection을 제공하지 않는다. 이미 admit한 Tide Run은
 자정을 지나도 본래 종료 시각까지 유지한다.
 
 host는 선택된 offset 또는 Solar fallback 예정 instant를 IANA timezone으로
@@ -951,8 +952,11 @@ resolver revision을 묶은 사실을 전달한다. sourceDay는 provider가 준
 identity이며 offset으로 다시 계산하지 않는다. core는 이 외부 timezone 자료의
 정확성을 독립 검증할 수 없으므로 host 변환과 revision을 신뢰 경계로 취급한다.
 필수 사실이 빠지거나 서로 충돌하면 scan 전체를 거부한다. 변환 불가 사실은
-`Unknown(CivilDateUnavailable)`이며 새 admission이나 terminal을 만들지 않는다.
-늦은 자료가 과거 pulse를 catch-up하지는 않는다. trace는 두 날짜를 함께 보여
+`Unknown(CivilDateUnavailable)`이며 변환 실패 자체로 새 admission이나 terminal을 만들지 않는다.
+늦은 자료가 과거 Solar pulse를 catch-up하지는 않는다. Tide crossing은 선언한
+`within(...)` 유예를 유지하므로, 반열린 유예 종료 전에 변환이 복구되고 요일이
+맞으면 한 번 admit할 수 있다. 취소·관측 gap·유예 만료는 대기 occurrence를 종료하며,
+이후 변환 복구가 이를 되살리지 않는다. trace는 두 날짜를 함께 보여
 주며, checkpoint는 terminal/중복 방지 기록을 보존하지만 진행 중인 Run을
 재개하지 않는다.
 

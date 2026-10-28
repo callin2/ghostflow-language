@@ -649,7 +649,8 @@ through `sat`, contiguous ranges such as `mon..fri`, and comma lists. It does
 not yet accept `holiday`, `workday`, or `offday` for natural events. A Monday
 00:10 tide event in `Asia/Seoul` with a `high - 30min` offset plans a Sunday
 23:40 start. A Sunday filter is eligible; a Monday filter terminates as
-`DayIneligible`, with `.missed = false` and no `.due`. An admitted Tide Run
+`DayIneligible` without a terminal miss or `.due`. Solar exposes this as
+`.missed = false`; Tide does not yet expose a `.missed` source projection. An admitted Tide Run
 continues across midnight until its original end.
 
 The host resolves the selected offset or Solar fallback instant in the IANA
@@ -659,8 +660,12 @@ provider's original event identity; it is never recomputed from the offset.
 The core cannot independently prove external timezone data, so the host
 conversion and revisions form a trust boundary. A missing or conflicting
 required fact rejects the entire scan. An unavailable conversion produces
-`Unknown(CivilDateUnavailable)` without admission or terminalization; later
-facts do not catch up a past pulse. Traces show both dates. Checkpoints retain
+`Unknown(CivilDateUnavailable)` without admission or terminalization from that
+conversion failure alone. Later facts do not catch up a past Solar pulse.
+A Tide crossing retains its authored `within(...)` grace: if conversion recovers
+and the day is eligible before the exclusive grace end, it may admit once.
+Cancellation, observation gaps and grace expiry still terminate the pending
+occurrence; conversion recovery does not revive it. Traces show both dates. Checkpoints retain
 terminal and deduplication history but do not resume an active Run.
 
 Weekdays, holidays and site workdays are different rules. Declare calendars as logical providers bound to actual data by the installation profile.
