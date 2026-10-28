@@ -23,7 +23,8 @@ Knowing the syntax of one feature differs from preserving the same meaning when 
 | Sensor fault | Disconnected, Invalid, Stale, NotReady | Input data does not satisfy normal measurement conditions. Handle through explicit error flow. |
 | Schedule Unknown | Missing time, location, prediction, or calendar information | No evidence determines whether an occurrence happens. Do not disguise it as False or permission. |
 | Known unmet condition | Normal moisture value does not satisfy irrigation conditions | The decision completed normally; the condition result is False. |
-| Settings change rejection | Range, increment, or permission violation | Do not apply the whole requested settings event. Preserve existing effective settings. |
+| Settings admission rejection | Malformed envelope, unknown target, different Program, stale base revision, or permission failure | Reject the event and preserve existing settings observations and revision. |
+| Settings payload error | Type, range, or increment violation in an identified, authorized bundle | Emit `fault(SettingsInvalid)` for every target together and advance the revision and effective position. Preserve settings outside the target set. Follow the atomic live event rules in [§5.2](05-settings-and-observation.en.md#atomic-live-event). |
 | Missing/mismatched observation | No value, snapshot from another source revision or execution | Do not merge it as a normal observation of the current program. |
 
 Do not directly use sensor faults in arithmetic or logic as normal payloads. Expressions choosing substitutes must expose the meaning of the choice. A substitute does not erase the original error or origin. Settings request rejection and control tick computation failure are also different events.

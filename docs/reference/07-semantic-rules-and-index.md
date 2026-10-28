@@ -24,7 +24,8 @@
 | 센서 fault | Disconnected, Invalid, Stale, NotReady | 입력 데이터가 정상 측정 조건을 만족하지 않는다. 명시적 오류 흐름으로 다룬다. |
 | 일정의 Unknown | 시각·위치·예측·달력 정보가 없음 | 발생 여부를 결정할 근거가 없다. False나 허가로 꾸미지 않는다. |
 | 알려진 불충족 | 정상 수분값이 관수 조건을 만족하지 않음 | 판단은 정상적으로 끝났고 조건 결과가 False다. |
-| 설정 변경 거절 | 범위·증분·권한 위반 | 요청한 설정 event 전체를 적용하지 않는다. 기존 유효 설정을 보존한다. |
+| 설정 admission 거절 | 손상된 envelope, 알 수 없는 대상, 다른 Program, stale 기준 revision, 권한 위반 | event를 수락하지 않고 기존 설정 observation과 revision을 보존한다. |
+| 설정 payload 오류 | 식별·권한 검증을 통과한 묶음의 타입·범위·증분 위반 | 대상 모두에 `fault(SettingsInvalid)`를 함께 emit하고 revision과 effective position을 진행한다. 대상 밖 설정은 유지한다. [§5.2](05-settings-and-observation.md#atomic-live-event)의 atomic live event 규칙을 따른다. |
 | 관측 부재·불일치 | 값 없음, 다른 소스 판본이나 다른 실행의 snapshot | 현재 프로그램의 정상 관측값으로 합치지 않는다. |
 
 센서 fault를 정상 payload처럼 산술·논리에 바로 넣지 않는다.
