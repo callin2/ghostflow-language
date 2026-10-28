@@ -15,6 +15,11 @@ GFB 바이트가 같아도 호출자가 메타데이터, 스키마, 알람 descr
 `tests/interaction-emission.test.mjs`, `tests/composed-interaction.test.mjs`,
 `tests/alarm-observation.test.mjs`에서 검증합니다. 설정 복원 테스트는
 `tests/settings-default-provenance.test.mjs`에서 0.3과 0.4 계약을 유지합니다.
+정식 재현은 검증 후 저장한 compact-profile 소스도 외부 프로파일 closure를
+다시 요구하지 않고 복원합니다. 예를 들어 `profile: example-board@1` 프로그램은
+정확한 소스 digest, 노드 위치와 0.3 또는 0.4 스키마를 유지합니다. 일반 컴파일은
+계속 프로파일 digest와 binding을 검증합니다. 재현은 프로그램 출처를 재구성하며
+설치 구성을 검증하지는 않습니다.
 
 ### 2026-10-29 - 스캔이 소유하는 알람 생명주기 ([#287](https://github.com/callin2/ghostflow-language/issues/287))
 

@@ -73,6 +73,24 @@ test('GF-TEST-alarm-source-provenance: matching forged metadata, schema digest a
   assert.throws(() => prepareAlarmObservation(a, d), /traceMetadata.*canonical.*replay/);
 });
 
+test('GF-TEST-alarm-profile-provenance: admitted profile source prepares alarms without an external profile closure', () => {
+  const definition = { kind: 'board', connections: {}, defaults: {}, channels: { RO1: { role: 'output', type: 'Number' } } };
+  const text = `---\nprofile: example-board@1\nbindings:\n  temperature: software:temperature\n  divisor: software:divisor\n  ratio: board.RO1\n---\n${source}`;
+  const a = compileSourceSync(text, { filename,
+    hardwareProfiles: [{ ref: 'example-board@1', definition, sha256: sha256Hex(canonicalJson(definition)) }],
+    interactionSourceIdentity: { documentId: 'source.alarm-profile', revisionId: 'revision.alarm-profile.v1' } });
+  const { hardwarePlan: _plan, ...persisted } = a;
+  const d = descriptor(a);
+  assert.equal(persisted.sourceDocument.text, text);
+  assert.equal(persisted.interactionSchema.source.sha256, sha256Hex(text));
+  assert.ok(prepareAlarmObservation(persisted, d).bind(identity).bytes.length > 0);
+  const provenance = persisted.interactionSchema.descriptors.find(state => state.id === 'state.hot').provenance;
+  persisted.traceMetadata.intentLinks.filter(link => link.nodeId === provenance.sourceNode.id)
+    .forEach(link => { link.anchorId = 'GF-ABSENT-FROM-PROFILE-SOURCE'; });
+  provenance.intentAnchorIds = ['GF-ABSENT-FROM-PROFILE-SOURCE'];
+  assert.throws(() => prepareAlarmObservation(persisted, descriptor(persisted)), /traceMetadata.*canonical.*replay/);
+});
+
 test('GF-TEST-alarm-provenance: explicit metadata binds exact source, module, Bool node and intent anchors', () => {
   const a = compile(), d = descriptor(a);
   assert.deepEqual(parseAlarmDescriptor(canonicalJson(d)), d);

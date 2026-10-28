@@ -1,4 +1,4 @@
-import { equalBytes, sha256Hex } from './sha256.mjs';
+import { sha256Hex } from './sha256.mjs';
 import {
   INTERACTION_SCHEMA_FORMAT,
   INTERACTION_SCHEMA_VERSION,
@@ -15,7 +15,7 @@ import { canonicalJson } from './canonical-json.mjs';
 import { canonicalUnitFor, isQuantityType } from './quantities.mjs';
 import { moduleFingerprint } from './source-trace.mjs';
 import { composedInteraction } from './composed-interaction.mjs';
-import { compileSourceSync } from './compile-source.mjs';
+import { replaySourceProvenance } from './compile-source.mjs';
 
 const PUBLIC_ID = /^[A-Za-z][A-Za-z0-9._:-]{0,127}$/;
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -288,9 +288,7 @@ export function verifyInteractionSchema(compilation, schema) {
 /** Recompile the literate envelope before accepting its persisted interaction schema. */
 export function restoreInteractionSchema({ sourceDocument, sourceMap, traceMetadata, bytes, sourceClosure }, schema) {
   const source = canonicalDocument(sourceDocument);
-  const replay = compileSourceSync(source.text, { filename: source.filename,
-    ...(sourceClosure ? { sourceClosure: sourceClosure.documents } : {}) });
-  if (!equalBytes(bytes, replay.bytes)) fail(`bytecode does not match canonical ${sourceClosure ? 'source closure' : 'literate source'} replay`);
+  const replay = replaySourceProvenance({ sourceDocument: source, bytes, sourceClosure });
   for (const [field, value] of Object.entries({ sourceMap, traceMetadata, ...(sourceClosure ? { sourceClosure } : {}) })) {
     if (canonicalJson(value) !== canonicalJson(replay[field])) fail(`${field} does not match canonical source replay`);
   }

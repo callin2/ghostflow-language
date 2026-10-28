@@ -8,6 +8,8 @@ import { interactionSchemaSha256 } from '../contracts/interaction-v0/validate.mj
 import { verifyInteractionCorpus } from '../contracts/interaction-v0/verify-corpus.mjs';
 import { compileSource, restoreArtifactSourceMap, writeArtifact } from '../tools/toolchain.mjs';
 import { restoreInteractionSchema } from '../tools/interaction-schema.mjs';
+import { canonicalJson } from '../tools/canonical-json.mjs';
+import { sha256Hex } from '../tools/sha256.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const wateringPath = 'contracts/interaction-v0/examples/five-minute-watering.ghost.md';
@@ -105,6 +107,71 @@ test('GF-TEST-interaction-restore: canonical replay rejects forged source nodes 
   provenance.intentAnchorIds = [anchorId];
   assert.throws(() => restoreInteractionSchema(forged, forged.interactionSchema), /traceMetadata.*canonical.*replay/);
   assert.throws(() => restoreInteractionSchema(compilation, forged.interactionSchema), /does not match compiler provenance/);
+});
+
+test('GF-TEST-interaction-restore-profile: exact provenance restores without repeating external hardware admission', async () => {
+  const source = `---
+profile: example-board@1
+bindings:
+  one: board.RO1
+---
+# Profile state
+
+<!-- ghostflow:anchor id=GF-PROFILE-STATE kind=intent status=confirmed origin=user -->
+Keep the configured state.
+
+\`\`\`ghost
+control ProfileState {
+  // ghostflow:link id=GF-PROFILE-STATE relation=implements
+  config enabled: Bool = false { access = operator; }
+  // ghostflow:link id=GF-PROFILE-STATE relation=implements
+  state active: Bool = false;
+  active' = enabled |> recover(false);
+  output one: Bool;
+  one <- active;
+}
+\`\`\`
+`;
+  const definition = { kind: 'board', connections: {}, defaults: {}, channels: { RO1: { role: 'output', type: 'Bool' } } };
+  const hardwareProfiles = [{ ref: 'example-board@1', definition, sha256: sha256Hex(canonicalJson(definition)) }];
+  const options = { filename: 'profile-state.ghost.md', hardwareProfiles, interactionSourceIdentity: wateringIdentity };
+  await assert.rejects(() => compileSource(source, { ...options, hardwareProfiles: undefined }), /supply hardwareProfiles/);
+  await assert.rejects(() => compileSource(source, { ...options, hardwareProfiles: [{ ...hardwareProfiles[0], sha256: '0'.repeat(64) }] }), /profile digest mismatch/);
+  const wrong = structuredClone(definition);
+  wrong.channels.RO1.type = 'Number';
+  await assert.rejects(() => compileSource(source, { ...options,
+    hardwareProfiles: [{ ref: 'example-board@1', definition: wrong, sha256: sha256Hex(canonicalJson(wrong)) }] }), /requires output Bool/);
+
+  const compilation = await compileSource(source, options), schema = compilation.interactionSchema;
+  assert.equal(schema.version, '0.4');
+  assert.equal(compilation.sourceDocument.text, source);
+  assert.equal(schema.source.sha256, sha256Hex(source));
+  assert.equal(compilation.sourceMap.find(node => node.kind === 'state').line,
+    source.split('\n').findIndex(line => line.includes('state active:')) + 1);
+  const { hardwarePlan: _plan, ...persisted } = compilation;
+  assert.deepEqual(restoreInteractionSchema(persisted, schema), schema);
+  const legacy = structuredClone(schema);
+  legacy.version = '0.3';
+  legacy.descriptors.forEach(descriptor => { delete descriptor.defaultValue; });
+  assert.deepEqual(restoreInteractionSchema(persisted, legacy), legacy);
+
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-profile-restore-'));
+  try {
+    const artifact = path.join(temporary, 'profile-state.gfb');
+    writeArtifact(compilation, artifact);
+    const envelope = JSON.parse(fs.readFileSync(`${artifact}.map.json`, 'utf8'));
+    assert.deepEqual(restoreArtifactSourceMap(envelope, fs.readFileSync(artifact)).interactionSchema, schema);
+  } finally {
+    fs.rmSync(temporary, { recursive: true, force: true });
+  }
+
+  const forged = structuredClone(persisted), anchorId = 'GF-ABSENT-FROM-PROFILE-SOURCE';
+  const provenance = forged.interactionSchema.descriptors.find(descriptor => descriptor.id === 'state.active').provenance;
+  forged.hardwarePlan = { profile: 'forged-profile@1' };
+  forged.traceMetadata.intentLinks.filter(link => link.nodeId === provenance.sourceNode.id)
+    .forEach(link => { link.anchorId = anchorId; });
+  provenance.intentAnchorIds = [anchorId];
+  assert.throws(() => restoreInteractionSchema(forged, forged.interactionSchema), /traceMetadata.*canonical.*replay/);
 });
 
 test('GF-TEST-interaction-emission-empty: stateless literate control emits an identified empty schema', async () => {
