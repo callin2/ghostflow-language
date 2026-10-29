@@ -11,6 +11,7 @@ on:
       - experiments/two-sensor-provenance/**
       - experiments/elapsed-epoch-validation/**
       - experiments/elapsed-clock-bounds/**
+      - experiments/elapsed-duration-output/**
       - experiments/lean-outcome.mjs
       - tests/bool-translation-validation.test.mjs
       - tests/bool-generated-certificates.test.mjs
@@ -20,7 +21,9 @@ on:
       - tests/two-sensor-provenance.test.mjs
       - tests/elapsed-epoch-validation.test.mjs
       - tests/elapsed-clock-bounds.test.mjs
+      - tests/elapsed-duration-output.test.mjs
       - tests/lean-outcome.test.mjs
+      - tests/lean-proof-workflow.test.mjs
       - tools/**
       - crates/ghostflow-core/src/**
       - package.json
@@ -36,6 +39,7 @@ on:
       - experiments/two-sensor-provenance/**
       - experiments/elapsed-epoch-validation/**
       - experiments/elapsed-clock-bounds/**
+      - experiments/elapsed-duration-output/**
       - experiments/lean-outcome.mjs
       - tests/bool-translation-validation.test.mjs
       - tests/bool-generated-certificates.test.mjs
@@ -45,7 +49,9 @@ on:
       - tests/two-sensor-provenance.test.mjs
       - tests/elapsed-epoch-validation.test.mjs
       - tests/elapsed-clock-bounds.test.mjs
+      - tests/elapsed-duration-output.test.mjs
       - tests/lean-outcome.test.mjs
+      - tests/lean-proof-workflow.test.mjs
       - tools/**
       - crates/ghostflow-core/src/**
       - package.json
@@ -56,9 +62,30 @@ permissions:
   contents: read
 
 jobs:
-  proof:
+  lean-proofs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        include:
+          - verifier: bool-translation-validation
+            evidence_dir: bool-pc-validation
+          - verifier: bool-sensor-validation
+            evidence_dir: bool-sensor-validation
+          - verifier: bool-sensor-state-validation
+            evidence_dir: bool-sensor-state-validation
+          - verifier: int32-codec-validation
+            evidence_dir: int32-codec-validation
+          - verifier: two-sensor-provenance
+            evidence_dir: two-sensor-provenance
+          - verifier: elapsed-epoch-validation
+            evidence_dir: elapsed-epoch-validation
+          - verifier: elapsed-clock-bounds
+            evidence_dir: elapsed-clock-bounds
+          - verifier: elapsed-duration-output
+            evidence_dir: elapsed-duration-output
     steps:
       - name: Checkout proof source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -70,13 +97,27 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
-      - name: Prepare evidence directory
-        run: mkdir -p build/bool-pc-validation build/bool-sensor-validation build/bool-sensor-state-validation build/int32-codec-validation build/two-sensor-provenance build/elapsed-epoch-validation build/elapsed-clock-bounds
+      - name: Prepare suite evidence directory
+        shell: bash
+        env:
+          PROOF_CHECKOUT_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          evidence_dir="build/${{ matrix.evidence_dir }}"
+          mkdir -p "$evidence_dir"
+          {
+            printf 'verifier=%s\n' '${{ matrix.verifier }}'
+            printf 'checkout_sha=%s\n' "$PROOF_CHECKOUT_SHA"
+            printf 'runner_os=%s\n' "$RUNNER_OS"
+            printf 'node='; node --version
+            printf 'npm='; npm --version
+            uname -a
+          } 2>&1 | tee "$evidence_dir/setup.log"
       - name: Install locked Node dependencies
         shell: bash
         run: |
           set -euo pipefail
-          npm ci --ignore-scripts 2>&1 | tee build/bool-pc-validation/npm-ci.log
+          npm ci --ignore-scripts 2>&1 | tee "build/${{ matrix.evidence_dir }}/npm-ci.log"
       - name: Install pinned Lean 4.19.0
         shell: bash
         run: |
@@ -97,80 +138,40 @@ jobs:
             "$HOME/.elan/bin/elan" toolchain install leanprover/lean4:v4.19.0
             "$HOME/.elan/bin/elan" default leanprover/lean4:v4.19.0
             "$HOME/.elan/bin/elan" which lean
-          } 2>&1 | tee build/bool-pc-validation/lean-install.log
+          } 2>&1 | tee "build/${{ matrix.evidence_dir }}/lean-install.log"
       - name: Check proof bridge tests
         shell: bash
         run: |
           set -euo pipefail
-          node --test tests/bool-translation-validation.test.mjs tests/bool-generated-certificates.test.mjs tests/bool-sensor-validation.test.mjs tests/bool-sensor-state-validation.test.mjs tests/int32-codec-validation.test.mjs tests/lean-outcome.test.mjs tests/two-sensor-provenance.test.mjs tests/elapsed-epoch-validation.test.mjs tests/elapsed-clock-bounds.test.mjs 2>&1 | tee build/bool-pc-validation/node-test.log
-      - name: Check Bool and PC proofs with Lean kernel
+          node --test tests/bool-translation-validation.test.mjs tests/bool-generated-certificates.test.mjs tests/bool-sensor-validation.test.mjs tests/bool-sensor-state-validation.test.mjs tests/int32-codec-validation.test.mjs tests/lean-outcome.test.mjs tests/two-sensor-provenance.test.mjs tests/elapsed-epoch-validation.test.mjs tests/elapsed-clock-bounds.test.mjs tests/elapsed-duration-output.test.mjs tests/lean-proof-workflow.test.mjs 2>&1 | tee "build/${{ matrix.evidence_dir }}/node-test.log"
+      - name: Check suite with Lean kernel
         shell: bash
         run: |
           set -euo pipefail
           lean_bin="$("$HOME/.elan/bin/elan" which lean)"
-          node experiments/bool-translation-validation/verify.mjs \
-            --lean "$lean_bin" --evidence-dir build/bool-pc-validation \
-            2>&1 | tee build/bool-pc-validation/verify.log
-      - name: Check actual Bool sensor recovery with Lean kernel
-        shell: bash
-        run: |
-          set -euo pipefail
-          lean_bin="$("$HOME/.elan/bin/elan" which lean)"
-          node experiments/bool-sensor-validation/verify.mjs \
-            --lean "$lean_bin" --evidence-dir build/bool-sensor-validation \
-            2>&1 | tee build/bool-sensor-validation/verify.log
-      - name: Check sensor state input histories with Lean kernel
-        shell: bash
-        run: |
-          set -euo pipefail
-          lean_bin="$("$HOME/.elan/bin/elan" which lean)"
-          node experiments/bool-sensor-state-validation/verify.mjs \
-            --lean "$lean_bin" --evidence-dir build/bool-sensor-state-validation \
-            2>&1 | tee build/bool-sensor-state-validation/verify.log
-      - name: Check signed i32 codec certificates with Lean kernel
-        shell: bash
-        run: |
-          set -euo pipefail
-          lean_bin="$("$HOME/.elan/bin/elan" which lean)"
-          node experiments/int32-codec-validation/verify.mjs \
-            --lean "$lean_bin" --evidence-dir build/int32-codec-validation \
-            2>&1 | tee build/int32-codec-validation/verify.log
-      - name: Check two-sensor provenance with Lean kernel
-        shell: bash
-        run: |
-          set -euo pipefail
-          lean_bin="$("$HOME/.elan/bin/elan" which lean)"
-          node experiments/two-sensor-provenance/verify.mjs \
-            --lean "$lean_bin" --evidence-dir build/two-sensor-provenance \
-            2>&1 | tee build/two-sensor-provenance/verify.log
-      - name: Check elapsed epoch histories with Lean kernel
-        shell: bash
-        run: |
-          set -euo pipefail
-          lean_bin="$("$HOME/.elan/bin/elan" which lean)"
-          node experiments/elapsed-epoch-validation/verify.mjs \
-            --lean "$lean_bin" --evidence-dir build/elapsed-epoch-validation \
-            2>&1 | tee build/elapsed-epoch-validation/verify.log
-      - name: Check elapsed clock bounds with Lean kernel
-        shell: bash
-        run: |
-          set -euo pipefail
-          lean_bin="$("$HOME/.elan/bin/elan" which lean)"
-          node experiments/elapsed-clock-bounds/verify.mjs \
-            --lean "$lean_bin" --evidence-dir build/elapsed-clock-bounds \
-            2>&1 | tee build/elapsed-clock-bounds/verify.log
+          node "experiments/${{ matrix.verifier }}/verify.mjs" \
+            --lean "$lean_bin" --evidence-dir "build/${{ matrix.evidence_dir }}" \
+            2>&1 | tee "build/${{ matrix.evidence_dir }}/verify.log"
       - name: Upload proof evidence even on failure
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: lean-bool-pc-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            build/bool-pc-validation/
-            build/bool-sensor-validation/
-            build/bool-sensor-state-validation/
-            build/int32-codec-validation/
-            build/two-sensor-provenance/
-            build/elapsed-epoch-validation/
-            build/elapsed-clock-bounds/
+          name: lean-${{ matrix.verifier }}-${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/${{ matrix.evidence_dir }}/
           if-no-files-found: warn
           retention-days: 30
+
+  proof:
+    name: proof
+    needs: [lean-proofs]
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require every Lean proof suite to succeed
+        env:
+          LEAN_PROOFS_RESULT: ${{ needs.lean-proofs.result }}
+        run: |
+          if [[ "$LEAN_PROOFS_RESULT" != "success" ]]; then
+            printf 'Lean proof matrix result was %s\n' "$LEAN_PROOFS_RESULT" >&2
+            exit 1
+          fi

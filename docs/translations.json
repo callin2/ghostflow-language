@@ -1640,6 +1640,14 @@
     {
       "path": "experiments/elapsed-clock-bounds/proof-report.md",
       "reason": "Issue590 bounded mathematical clock proof and explicit runtime and source correspondence limits."
+    },
+    {
+      "path": "experiments/elapsed-duration-output/proof-report.md",
+      "reason": "Issue590 source-bound Duration output proof and actual runtime observations with explicit IEEE and compiler proof limits."
+    },
+    {
+      "path": "experiments/elapsed-duration-output/fixtures/elapsed-output.ghost.md",
+      "reason": "Exact source bytes for the independent Duration certificate reader; translating changes the proof identity."
     }
   ]
 }
