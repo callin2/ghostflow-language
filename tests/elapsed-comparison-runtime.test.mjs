@@ -1,0 +1,150 @@
+import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import test from 'node:test';
+import { compileSource } from '../tools/toolchain.mjs';
+import { observeSourceTrace } from '../tools/source-trace.mjs';
+import { GhostFlowRuntime } from '../runtimes/wasm/ghostflow-runtime.mjs';
+import { FramedGhostFlowRuntime } from '../runtimes/wasm/framed-runtime.mjs';
+import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
+
+const filename = 'experiments/elapsed-comparison-output/fixtures/elapsed-comparison.ghost.md';
+const source = fs.readFileSync(new URL(`../${filename}`, import.meta.url), 'utf8');
+const sourceSha256 = 'bac696c393cd335fc66799fa1a032ae67cf6aedfb07d336a7660ab9962ee09ec';
+assert.equal(createHash('sha256').update(source).digest('hex'), sourceSha256);
+const artifact = await compileSource(source, { filename });
+assert.equal(createHash('sha256').update(artifact.bytes).digest('hex'),
+  '2674befe50e72050e48b5033f7ae28a5f9d2b36cf7851783ff233bbfe84c88d9');
+const sensor = artifact.manifest.sensors[0];
+const wasm = fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
+const native = fileURLToPath(new URL(`../target/release/examples/scan_tape${process.platform === 'win32' ? '.exe' : ''}`, import.meta.url));
+const faultCode = { Good: 0, Disconnected: 0, Stale: 1, Invalid: 2, NotReady: 3 };
+const scenarios = [
+  {
+    name: '2999, 3000 and 3001 milliseconds with healthy false retaining state',
+    steps: [[100, 'Good', false], [3099, 'Good', false], [3100, 'Good', false], [3101, 'Good', false]],
+    expected: [
+      [false, 0, false, false, 100, false, null, 1],
+      [false, 100, true, false, 100, false, null, 2],
+      [false, 100, true, false, 100, true, null, 2],
+      [false, 100, true, false, 100, true, null, 2],
+    ],
+  },
+  {
+    name: 'a toggle at equality compares the previous timer snapshot before reset',
+    steps: [[100, 'Good', true], [3099, 'Good', false], [3100, 'Good', true], [3101, 'Good', false]],
+    expected: [
+      [false, 0, false, true, 100, false, null, 1],
+      [true, 100, true, true, 100, false, null, 2],
+      [true, 100, true, false, 3100, true, null, 2],
+      [false, 3100, true, false, 3100, false, null, 2],
+    ],
+  },
+  {
+    name: 'fault recovery retains the state and timer across the comparison boundary',
+    steps: [[100, 'Good', false], [3099, 'Stale', true], [3100, 'Invalid', true],
+      [3101, 'NotReady', true], [3102, 'Disconnected', true], [3103, 'Good', false],
+      [3104, 'Good', true], [3105, 'Good', false]],
+    expected: [
+      [false, 0, false, false, 100, false, null, 1],
+      [false, 100, true, false, 100, false, 'Stale', 2],
+      [false, 100, true, false, 100, true, 'Invalid', 2],
+      [false, 100, true, false, 100, true, 'NotReady', 2],
+      [false, 100, true, false, 100, true, 'Disconnected', 2],
+      [false, 100, true, false, 100, true, null, 2],
+      [false, 100, true, true, 3104, true, null, 2],
+      [true, 3104, true, true, 3104, false, null, 2],
+    ],
+  },
+  {
+    name: 'one millisecond precision and a 3000 millisecond delta near the exact clock limit',
+    steps: [[9007199254737990, 'Good', false], [9007199254737991, 'Good', false],
+      [9007199254740989, 'Good', false], [9007199254740990, 'Good', true], [9007199254740991, 'Good', false]],
+    expected: [
+      [false, 0, false, false, 9007199254737990, false, null, 1],
+      [false, 9007199254737990, true, false, 9007199254737990, false, null, 2],
+      [false, 9007199254737990, true, false, 9007199254737990, false, null, 2],
+      [false, 9007199254737990, true, true, 9007199254740990, true, null, 2],
+      [true, 9007199254740990, true, true, 9007199254740990, false, null, 2],
+    ],
+  },
+];
+
+for (const scenario of scenarios) {
+  test(`fixed elapsed comparison fixture has complete state, output and source-fault correspondence for ${scenario.name}`, async t => {
+    assert.equal(artifact.sourceDocument.sha256, sourceSha256);
+    assert.ok(artifact.traceMetadata.intentAnchors.some(anchor => anchor.id === 'GF-ELAPSED-DURATION'
+      && anchor.status === 'confirmed'));
+    const frames = scenario.steps.map(([logicalTimeMs, quality, payload], scanId) => ({
+      scanId, logicalTimeMs, inputs: [
+        { name: sensor.valueInput, value: payload },
+        { name: sensor.okInput, value: quality === 'Good' },
+        { name: sensor.faultInput, value: faultCode[quality] },
+      ],
+    }));
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-elapsed-comparison-'));
+    t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+    const modulePath = path.join(directory, 'module.gfb');
+    const tapePath = path.join(directory, 'frames.tsv');
+    fs.writeFileSync(modulePath, artifact.bytes);
+    fs.writeFileSync(tapePath, `${frames.map(frame => [frame.scanId, frame.logicalTimeMs,
+      ...frame.inputs.flatMap(({ name, value }) => [name, typeof value === 'boolean' ? 'b' : 'n', value]),
+    ].join('\t')).join('\n')}\n`);
+    const result = spawnSync(native, [modulePath, tapePath], { encoding: 'utf8', timeout: 10_000, maxBuffer: 2 * 1024 * 1024 });
+    assert.equal(result.status, 0, result.stderr || result.error?.message);
+    const records = result.stdout.trim().split('\n').map(line => JSON.parse(line));
+    assert.ok(records.every(record => record.accepted));
+    const executions = [['native', records.map(record => record.outcome.trace)]];
+
+    for (const Runtime of [GhostFlowRuntime, FramedGhostFlowRuntime]) {
+      const runtime = await Runtime.instantiate(wasm);
+      t.after(() => runtime.dispose());
+      runtime.load(artifact.bytes);
+      runtime.addCapability('actuator', 'relay', 'bool');
+      runtime.addCapability('actuator', 'expired', 'bool');
+      runtime.activate();
+      const traces = frames.map(frame => {
+        if (Runtime === FramedGhostFlowRuntime) return runtime.scan(frame).trace;
+        for (const { name, value } of frame.inputs) {
+          if (typeof value === 'boolean') runtime.setBool(name, value);
+          else runtime.setNumber(name, value);
+        }
+        runtime.tickAt(frame.logicalTimeMs);
+        return runtime.trace;
+      });
+      executions.push([Runtime.name, traces]);
+    }
+    for (const entry of ['instantiate', 'instantiateFramed']) {
+      const runtime = await ControlRuntime[entry](wasm, artifact);
+      t.after(() => runtime.dispose());
+      executions.push([`ControlRuntime.${entry}`, scenario.steps.map(([nowMs, quality, value], index) =>
+        runtime.step({ nowMs, samples: { trigger: { epoch: 1, id: index + 1, timestampMs: nowMs, quality, value } } }).vm)]);
+    }
+
+    for (const [entry, traces] of executions) {
+      assert.equal(traces.length, scenario.expected.length, entry);
+      for (const [index, trace] of traces.entries()) {
+        const [before, sinceBefore, initialized, after, sinceAfter, expired, fault, eventCount] = scenario.expected[index];
+        assert.deepEqual(trace.stateBefore,
+          { held: before, __gf_timer_since_age: sinceBefore, __gf_timer_initialized_age: initialized }, entry);
+        assert.deepEqual(trace.stateAfter,
+          { held: after, __gf_timer_since_age: sinceAfter, __gf_timer_initialized_age: true }, entry);
+        assert.deepEqual(trace.requested, { relay: after, expired }, entry);
+        assert.deepEqual(trace.safe, { relay: after, expired }, entry);
+        assert.deepEqual(trace.faults, [], entry);
+        const events = observeSourceTrace(artifact.traceMetadata, trace).resultEvents;
+        assert.equal(events.length, eventCount, entry);
+        for (const event of events) {
+          assert.deepEqual({ kind: event.kind, errorType: event.errorType, fault: event.fault,
+            origin: event.originDescriptor?.name ?? null, source: event.source },
+          { kind: 'recover', errorType: 'SensorFault', fault, origin: fault === null ? null : 'trigger',
+            source: { filename, line: 13, column: 26, endLine: 13, endColumn: 33 } }, entry);
+        }
+      }
+    }
+  });
+}
