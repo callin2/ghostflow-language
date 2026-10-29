@@ -701,3 +701,33 @@ receipt는 `build/evidence/build192/`에 보존했다. receipt SHA-256은
 
 실제 Duration 출력식 실행과의 결합을 다음 단위로 진행한다. 수학적 정수 경계만으로
 생산 Rust f64 뺄셈 대응이나 전체 compiler 정확성이 증명됐다고 주장하지 않는다.
+
+## build196: 실제 Duration 출력과 증명 CI 분리
+
+기존 Bool 출력과 epoch 전이는 유지하고 `age_ms <- age`라는 실제 Duration 출력을
+추가했다. 원본 문서·470바이트 전체 GFB·출력 타입·연결·이전 상태 의존성을 함께
+인증했다. 모든 허용 시각 이력에서 출력이 이전 epoch의 수학적 경과시간과 같고
+기존 사건 목록이 보존됨을 증명했다. Nat 뺄셈 모델이며 생산 f64와 Rust 대응은 열려 있다.
+
+초기 fixture의 Markdown 링크 문장을 독립 reader의 제한된 문법이 거절했다. 생산
+컴파일러 오류가 아니며, 문장을 일반 URL 안내로 고친 뒤 다시 인증했다. 실행 코드와
+행 번호·실제 GFB 해시는 같았다. 초기 실패 및 옛 원본 SHA는 기존 기록에 보존했다.
+현재 fixture SHA는 `564f1aeb1a85f4b29a4cd1d302e695e9d88c728ff337c9201ed86e450823f820`이다.
+
+고정 소스 `e26386138c95f9065e793642d232ddb3fe008ab5`에서 fresh Lean 52회가
+`2026-10-29T00:08:22.767Z`에 exit 0으로 끝났다. 성공40·목표 정리 거절12이며
+124개 입력과 모든 로그·21개 모델 산출물 해시가 일치했다. receipt SHA-256은
+`739b0340d914062876bfcaa3b77bb22ed5f7a44223f2b1ecb660682da4ef0113`이다.
+5개 실제 실행 경로의 15 scan, 총75 관측도 상태 전후·출력·고장 출처·사건 수와
+일치했다. 이는 유한 실행 검사이며 Lean 정리의 범위와 구분한다.
+
+공식 build196은 `2026-10-29T00:10:06.846Z`에 exit 0으로 완료됐다. 15 gate,
+Rust441, 주 Node3942 pass/11 TODO/0 fail, console15, Python3+8 pass다.
+receipt SHA-256은 `5ee781d42056168c455c519de34b173dab7e81f763e0ad2d2a4f1fda708d6652`다.
+전체 로그·identity·receipt는 `build/evidence/build196/`에 보존했다. 독립 검토에서
+새 증명과 runtime 검사의 열린 P1/P2는 없었다. 장치 시험은 하지 않았다.
+
+Lean CI를 독립8개 묶음으로 나누고 동시 실행을3개로 제한했다. 묶음별 증거를 남기며
+최종 `proof` 검사는 모두 성공해야 통과한다. 검사 등록 누락을 검토에서 발견해
+공식 실행 목록·경로 필터에 추가했다. 실제 GitHub 실행 결과는 별도로 확인한다.
+다음 단위는 같은 epoch의 `age >= 3000ms` 비교다. 전체 compiler 증명은 계속 열려 있다.

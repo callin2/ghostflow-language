@@ -114,3 +114,35 @@ after the fixture correction. `evidence-summary.json` records hashes of the
 preserved failures and separately labels the earlier dependency-reuse development
 checks. Debug-only `#eval` output is not counted as a kernel theorem or a passed
 admission result. Runtime replay remains separate evidence owned by integration.
+
+## Integrated verification
+
+The frozen integration source is `e26386138c95f9065e793642d232ddb3fe008ab5`.
+Fresh Lean execution completed at `2026-10-29T00:08:22.767Z`, exit 0, with
+52 invocations comprising 40 successes and 12 rejections at their intended
+proposition lines. All 124 source hashes, every input/log hash and 21 compiled
+model hashes matched. The receipt is `build/duration-wave19-590/verification.json`,
+SHA-256 `739b0340d914062876bfcaa3b77bb22ed5f7a44223f2b1ecb660682da4ef0113`.
+This run compiled every dependency freshly.
+
+Independent review found no open P1/P2 issue in the source/module binding,
+all-histories theorem, targeted controls or receipt handling. Two real runtime
+scenarios exercise 15 scans across native, raw WASM, framed WASM and both
+canonical adapters. Their 75 observations check exact old/new state, requested
+and safe outputs, input-fault origin and event counts. These are finite runtime
+observations, separate from the universal mathematical-model theorem.
+
+Official build196 finished at `2026-10-29T00:10:06.846Z`, exit 0. It passed all
+15 gates, 441 Rust tests, 3,942 main Node tests, 15 console tests and Python
+3+8 tests. Eleven reference TODOs remain. The receipt SHA-256 is
+`5ee781d42056168c455c519de34b173dab7e81f763e0ad2d2a4f1fda708d6652`.
+The receipt, build identity and complete log are retained in
+`build/evidence/build196/`. Its newly built WASM matches build194's hash; the
+new native scan_tape hash is recorded independently in the receipt.
+
+CI now runs eight isolated Lean suites with at most three jobs in parallel.
+Each retains its own evidence, including on failure, and the existing required
+`proof` check accepts only overall matrix success. A real prior serial job took
+23 minutes 10 seconds under its 30-minute limit. No measured speedup or prior
+timeout is claimed. GitHub matrix execution is a separate pending check at
+this source revision; local gate tests cover success/failure/cancelled/skipped.
