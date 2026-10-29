@@ -1,0 +1,4 @@
+at	decision	why	evidence	result
+2026-10-29T00:05:03.380Z	Preserve the existing timer and epoch machines	The new obligation is the comparison output bound to actual compiler bytes	experiments/elapsed-comparison-output/ComparisonMachine.lean	Nonliteral and noncomparison output instructions delegate to unchanged DurationMachine.step
+2026-10-29T00:23:30.883Z	Accept the complete fresh kernel run	All concrete observations and targeted admission or equivalence outcomes matched	build/elapsed-comparison-output/final/verification.json	46 positive checks and 18 expected rejections; no dependency reuse
+2026-10-29T00:24:00.067Z	Keep numeric and production execution correspondence explicit	An exact constant table and Nat comparison do not establish general f64 or Rust refinement	experiments/elapsed-comparison-output/evidence-summary.json	All 21 old models match base; runtime replay remains separate integration evidence

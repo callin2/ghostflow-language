@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 1,
+  "issue": "https://github.com/callin2/ghostflow-language/issues/590#issuecomment-6483936760",
+  "recordedAt": "2026-10-29T00:24:00.067Z",
+  "status": "passed",
+  "productionCompilerProof": false,
+  "scope": "Actual original source and complete two-Bool-output GFB admission; elapsed >= 3000 observations over all accepted histories in a Nat comparison model",
+  "assumptions": [
+    "AcceptedFrom is the modeled public clock contract, not a proved JS/Rust admission refinement",
+    "Opcode20 delegates to unchanged DurationMachine Nat subtraction; unchanged EpochMachine executes the state transitions",
+    "Only exact binary64 encodings of 3000 and counterexample 3001 are mapped to Nat constants; no general f64 decoder theorem",
+    "Opcode17 >= and counterexample opcode16 > compare Nats; production byte encodings are bound, numeric correspondence is assumed",
+    "Output runValue has code.length+1 fuel, exact terminal PC and singleton stack; it is not actual Rust VM refinement"
+  ],
+  "unproved": [
+    "General f64 decoding, subtraction, comparison and Rust/model correspondence",
+    "General compiler or source parser correctness",
+    "Actual Rust loader admission of every mutated model artifact",
+    "Production scan commit, scheduler and physical relay timing",
+    "Production safe-output resolution"
+  ],
+  "proof": {
+    "path": "build/elapsed-comparison-output/final/verification.json",
+    "sha256": "d9b1a942df2a26de1bb5df04cee8186dcec66ac770d83618504a1909b1d13952",
+    "startedAt": "2026-10-29T00:11:12.970Z",
+    "finishedAt": "2026-10-29T00:23:30.883Z",
+    "dependencyReuse": false,
+    "importedModules": 21,
+    "newModules": 3,
+    "checks": 64,
+    "successes": 46,
+    "expectedRejections": 18,
+    "sourceIdentitySha256": "f76cce8ff6c8f0d6119d5238da151fd71f14580cff51e5c96ed4f1e19c73f702",
+    "sourceFiles": 131,
+    "lean": {
+      "version": "Lean (version 4.19.0, x86_64-apple-darwin22.6.0, commit 6caaee842e94, Release)",
+      "executableSha256": "e06bfeeb39efd58c2c3b1dece023d212f10c249453a3e6f0742d02741afecf9c"
+    },
+    "fixtureSha256": "bac696c393cd335fc66799fa1a032ae67cf6aedfb07d336a7660ab9962ee09ec",
+    "bytecodeSha256": "2674befe50e72050e48b5033f7ae28a5f9d2b36cf7851783ff233bbfe84c88d9",
+    "modelHashes": {
+      "experiments/elapsed-comparison-output/ComparisonMachine.lean": "46cece5b8e1e4724cb1faf4109c29e55b89f4848c2062c0b262750ede463a85d",
+      "experiments/elapsed-comparison-output/ComparisonModule.lean": "e091c99f50ddb8cd095530869f1e6593f050590ae14c60fa38922a1633b595c0",
+      "experiments/elapsed-comparison-output/ComparisonSource.lean": "c539992c2a796f7451f606dd40cfe48e1b319d60bda3fd2fa61f5a1455342bf6"
+    },
+    "unchangedImportedModels": {
+      "base": "e26386138c95f9065e793642d232ddb3fe008ab5",
+      "files": 21,
+      "bundleSha256": "e69dfddc9b5d326e0c9b562b7f163d56acf51e8bea563ee671809dd5827a1813",
+      "hashes": {
+        "experiments/bool-sensor-state-validation/SensorStateMachine.lean": "a89c40d7314c591930b4d9ad75a7ee67ed98fc4d995bb6e1cdf020ed59d2f9c4",
+        "experiments/bool-sensor-state-validation/SensorStateProfile.lean": "85e07282ac1dd11e7e9daa67f8db2a2927188f5b8358ce30c508f4e982128098",
+        "experiments/bool-sensor-state-validation/SensorStateRecovery.lean": "c230c9f2dc005b81c84effe538516a7f7197d125586e135918cf93376de7375e",
+        "experiments/bool-sensor-state-validation/SensorStateSource.lean": "3170c109609426eae53bbff634473fa8afdfceeac839231c692a45ea9f5afadb",
+        "experiments/bool-sensor-validation/SensorMachine.lean": "471e5298596787694f6723135bee69145d83c3bf93b85eea48901d41b87ed764",
+        "experiments/bool-sensor-validation/SensorProfile.lean": "dbbeab9d1f7ea10cf5ca5a83415426d231ecb7b456db509ebf48d763bc1c0cf1",
+        "experiments/bool-sensor-validation/SensorSourceReader.lean": "3a589c4be0a85d3ad98e95db0aeaf094bc28f024150f87aa86f6601cc8355b7b",
+        "experiments/bool-translation-validation/BoolTranslation.lean": "e2c5a78c4a5f6a92dc920b6a9e3fd797de36e283b4f3b61845be197c60b4945c",
+        "experiments/bool-translation-validation/ByteMachine.lean": "10d721331fa1ef0b9c6097d0c1266f73944e7655ce6ed0130eb12fae1c7deeac",
+        "experiments/bool-translation-validation/DecoderSoundness.lean": "164713443eb153c5e2e991d1f4f417cf1f113ca72223201908555b529dc54c55",
+        "experiments/bool-translation-validation/ModuleEnvelope.lean": "d9684d7d1f8d7d03fa3c3ecc2c4ec1ca53321813a9c2f74d720c54597ade2c3a",
+        "experiments/bool-translation-validation/ModuleLoader.lean": "d7bb51d5e286ca8fb9d4d362fe1c5ff87c54c7b222944ea5e41bd3bdb7559f3d",
+        "experiments/bool-translation-validation/Serializer.lean": "e953d2cf9ba4317468fd2411459ba7787bcadcd97d28911db0b638341fdbaad6",
+        "experiments/bool-translation-validation/SourceReader.lean": "a4d4912c1c419fea49607d17b127d61b29540d72593703fa2d0d21eb28ed9b98",
+        "experiments/elapsed-clock-bounds/ClockBounds.lean": "0ab5981df4a1e323d50993ddaaf1e98be2d9bb8e11a85a7d027a9615b7226285",
+        "experiments/elapsed-duration-output/DurationMachine.lean": "652cc936121434b6ff5b58fac53bb9e76ac4f8fdc741def40e19bbd1fa76276e",
+        "experiments/elapsed-duration-output/DurationModule.lean": "1bae1130df1a5a19e803198d451ddf2680d0bddbd3ecdba4379811f393f18529",
+        "experiments/elapsed-duration-output/DurationSource.lean": "a204fbee5d6787c15c8dfad193f75e73699c016fb603e55a6f522b6cc250ac9f",
+        "experiments/elapsed-epoch-validation/EpochMachine.lean": "b9716dda077ef00317b414dd203715ff2cd728ce410d241f1d52683243457638",
+        "experiments/elapsed-epoch-validation/EpochModule.lean": "8e39cada119747de3e2379691bec4a0f4fea0e0e2875dda767e39833989cba60",
+        "experiments/elapsed-epoch-validation/EpochSource.lean": "1c43fa5b7aba24c7def874901af71b9b2bd8e6629763bab262545c43af39e71e"
+      }
+    }
+  },
+  "focusedTests": {
+    "command": "node --test tests/elapsed-comparison-output.test.mjs",
+    "exitCode": 0,
+    "tests": 5,
+    "passed": 5,
+    "failed": 0
+  },
+  "runtime": {
+    "included": false,
+    "owner": "Separate runtime and integration worker; runtime results are not counted in this kernel receipt"
+  },
+  "preservedFailureArtifacts": [
+    {
+      "path": "build/elapsed-comparison-output/development-1/verification.json",
+      "sha256": "f25c71b97ff301d8efe2837b74dc81ebaebf6b758ef283e6f0a4c63f992143fe",
+      "result": "Failed on a new adapter record-update layout syntax error; the line was corrected before the complete fresh final run"
+    }
+  ]
+}
