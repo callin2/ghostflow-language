@@ -1,0 +1,50 @@
+{
+  "format": "GhostFlow/control-v1",
+  "name": "PercentMatrix",
+  "inputs": [],
+  "outputs": [
+    {
+      "name": "value",
+      "type": "Percent"
+    },
+    {
+      "name": "ratio",
+      "type": "Number"
+    }
+  ],
+  "sensors": [
+    {
+      "name": "observed",
+      "type": "Percent",
+      "sampleMs": null,
+      "validMin": null,
+      "validMax": null,
+      "filter": null,
+      "window": null,
+      "staleMs": null,
+      "recoverSamples": null,
+      "valueInput": "__gf_sensor_value_observed",
+      "okInput": "__gf_sensor_ok_observed",
+      "faultInput": "__gf_sensor_fault_observed"
+    },
+    {
+      "name": "enabled",
+      "type": "Bool",
+      "sampleMs": null,
+      "validMin": null,
+      "validMax": null,
+      "filter": null,
+      "window": null,
+      "staleMs": null,
+      "recoverSamples": null,
+      "valueInput": "__gf_sensor_value_enabled",
+      "okInput": "__gf_sensor_ok_enabled",
+      "faultInput": "__gf_sensor_fault_enabled"
+    }
+  ],
+  "schedules": [],
+  "timers": [],
+  "signals": [],
+  "configs": [],
+  "bytecodeSha256": "e1c4e9fbce31638f1eff163171dcf92f1e150b76bfe87c0c0c46aae6b769bbe9"
+}

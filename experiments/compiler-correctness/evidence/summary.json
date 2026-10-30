@@ -1,0 +1,59 @@
+{
+  "observedAt": "2026-10-27T13:51:17.516Z",
+  "compilerRevision": "4861a78a72f0f1078cafe99bf26b93d541e1b82c",
+  "overallCompilerCorrectness": "refuted-by-Percent-value-domain-counterexample",
+  "wholeCompilerProof": "not-complete",
+  "productionCompilerAndRuntimeChanged": false,
+  "issue": "https://github.com/callin2/ghostflow-language/issues/590",
+  "counterexampleIssue": "https://github.com/callin2/ghostflow-language/issues/591",
+  "officialHostVerification": {
+    "passed": true,
+    "exitCode": 0,
+    "gates": 13,
+    "rustPassed": 436,
+    "nodeBatches": [
+      {
+        "tests": 15,
+        "pass": 15,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      {
+        "tests": 3728,
+        "pass": 3691,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 37
+      }
+    ],
+    "initialFailure": "New experiment Markdown was not indexed; registered and reran full verification successfully."
+  },
+  "independentAdversarial": {
+    "exitCode": 1,
+    "checks": 12,
+    "passed": 9,
+    "failed": 3,
+    "failures": [
+      "percent-runtime-domain",
+      "percent-state-domain",
+      "percent-boundaries-branch-and-ratio"
+    ]
+  },
+  "partialFormalResult": {
+    "scope": "Adjacent exact duplicate constraint elimination in Lean safety-round model",
+    "verification": "passed",
+    "checks": 6,
+    "leanCertificates": 5,
+    "finiteNativeWasmRows": 343,
+    "negativeBridgeChecks": 30,
+    "unproved": [
+      "source extraction and grammar",
+      "type and expression lowering",
+      "remaining GFB profiles and descriptors",
+      "Lean model to Rust implementation refinement"
+    ]
+  }
+}

@@ -1,0 +1,56 @@
+[
+  {
+    "ok": true,
+    "vm": {
+      "tick": 1,
+      "module": "8ea39e95a1224a1a",
+      "strategy": "control",
+      "inputs": {},
+      "stateBefore": {
+        "amount": 90
+      },
+      "stateAfter": {
+        "amount": 110
+      },
+      "requested": {
+        "value": 110
+      },
+      "safe": {
+        "value": 110
+      },
+      "faults": [],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": []
+      },
+      "resultTrace": []
+    }
+  },
+  {
+    "ok": true,
+    "vm": {
+      "tick": 2,
+      "module": "8ea39e95a1224a1a",
+      "strategy": "control",
+      "inputs": {},
+      "stateBefore": {
+        "amount": 110
+      },
+      "stateAfter": {
+        "amount": 130
+      },
+      "requested": {
+        "value": 130
+      },
+      "safe": {
+        "value": 130
+      },
+      "faults": [],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": []
+      },
+      "resultTrace": []
+    }
+  }
+]

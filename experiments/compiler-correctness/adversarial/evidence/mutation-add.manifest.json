@@ -1,0 +1,17 @@
+{
+  "format": "GhostFlow/control-v1",
+  "name": "Mutation",
+  "inputs": [],
+  "outputs": [
+    {
+      "name": "value",
+      "type": "Number"
+    }
+  ],
+  "sensors": [],
+  "schedules": [],
+  "timers": [],
+  "signals": [],
+  "configs": [],
+  "bytecodeSha256": "9f10d2d5dfc725ccaa3ddaabc2c82225accc128e702fa16af7d3bdf17c9575d4"
+}

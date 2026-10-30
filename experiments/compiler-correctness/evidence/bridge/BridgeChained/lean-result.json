@@ -1,0 +1,8 @@
+{
+  "fixture": "BridgeChained",
+  "sourceSha256": "9d0dd0442ae89f0877f6bc4c2cda83c706eb91e1b9a969eb12bc57a43e8ff205",
+  "theorem": "CompilerSafety.check_run instantiated with accepted : check original compiled = true",
+  "exitCode": 0,
+  "stdout": "",
+  "stderr": ""
+}

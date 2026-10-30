@@ -1,0 +1,3912 @@
+{
+  "original": [
+    {
+      "tick": 1,
+      "module": "1e6df7ab352fed39",
+      "strategy": "control",
+      "inputs": {
+        "__gf_sensor_fault_raw_a": 0,
+        "__gf_sensor_fault_raw_b": 0,
+        "__gf_sensor_fault_raw_c": 0,
+        "__gf_sensor_fault_raw_d": 0,
+        "__gf_sensor_fault_raw_e": 0,
+        "__gf_sensor_fault_raw_f": 0,
+        "__gf_sensor_fault_raw_g": 0,
+        "__gf_sensor_fault_raw_h": 0,
+        "__gf_sensor_fault_raw_i": 0,
+        "__gf_sensor_ok_raw_a": true,
+        "__gf_sensor_ok_raw_b": true,
+        "__gf_sensor_ok_raw_c": true,
+        "__gf_sensor_ok_raw_d": true,
+        "__gf_sensor_ok_raw_e": true,
+        "__gf_sensor_ok_raw_f": true,
+        "__gf_sensor_ok_raw_g": true,
+        "__gf_sensor_ok_raw_h": true,
+        "__gf_sensor_ok_raw_i": true,
+        "__gf_sensor_value_raw_a": false,
+        "__gf_sensor_value_raw_b": false,
+        "__gf_sensor_value_raw_c": false,
+        "__gf_sensor_value_raw_d": false,
+        "__gf_sensor_value_raw_e": false,
+        "__gf_sensor_value_raw_f": false,
+        "__gf_sensor_value_raw_g": false,
+        "__gf_sensor_value_raw_h": false,
+        "__gf_sensor_value_raw_i": false
+      },
+      "stateBefore": {},
+      "stateAfter": {},
+      "requested": {
+        "a": false,
+        "b": false,
+        "c": false,
+        "d": false,
+        "e": false,
+        "f": false,
+        "g": false,
+        "h": false,
+        "i": false
+      },
+      "safe": {
+        "a": false,
+        "b": false,
+        "c": false,
+        "d": false,
+        "e": false,
+        "f": false,
+        "g": false,
+        "h": false,
+        "i": false
+      },
+      "faults": [],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": [
+          {
+            "index": 0,
+            "kind": "mutex",
+            "names": [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "g",
+              "h",
+              "i"
+            ],
+            "firstViolation": null,
+            "final": {
+              "round": 0,
+              "values": {
+                "a": false,
+                "b": false,
+                "c": false,
+                "d": false,
+                "e": false,
+                "f": false,
+                "g": false,
+                "h": false,
+                "i": false
+              },
+              "satisfied": true
+            }
+          },
+          {
+            "index": 1,
+            "kind": "mutex",
+            "names": [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "g",
+              "h",
+              "i"
+            ],
+            "firstViolation": null,
+            "final": {
+              "round": 0,
+              "values": {
+                "a": false,
+                "b": false,
+                "c": false,
+                "d": false,
+                "e": false,
+                "f": false,
+                "g": false,
+                "h": false,
+                "i": false
+              },
+              "satisfied": true
+            }
+          }
+        ]
+      },
+      "resultTrace": [
+        {
+          "site": 14,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 19,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 24,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 29,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 34,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 39,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 44,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 49,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 54,
+          "choice": 0,
+          "origin": 0
+        }
+      ]
+    },
+    {
+      "tick": 2,
+      "module": "1e6df7ab352fed39",
+      "strategy": "control",
+      "inputs": {
+        "__gf_sensor_fault_raw_a": 0,
+        "__gf_sensor_fault_raw_b": 0,
+        "__gf_sensor_fault_raw_c": 0,
+        "__gf_sensor_fault_raw_d": 0,
+        "__gf_sensor_fault_raw_e": 0,
+        "__gf_sensor_fault_raw_f": 0,
+        "__gf_sensor_fault_raw_g": 0,
+        "__gf_sensor_fault_raw_h": 0,
+        "__gf_sensor_fault_raw_i": 0,
+        "__gf_sensor_ok_raw_a": true,
+        "__gf_sensor_ok_raw_b": true,
+        "__gf_sensor_ok_raw_c": true,
+        "__gf_sensor_ok_raw_d": true,
+        "__gf_sensor_ok_raw_e": true,
+        "__gf_sensor_ok_raw_f": true,
+        "__gf_sensor_ok_raw_g": true,
+        "__gf_sensor_ok_raw_h": true,
+        "__gf_sensor_ok_raw_i": true,
+        "__gf_sensor_value_raw_a": true,
+        "__gf_sensor_value_raw_b": true,
+        "__gf_sensor_value_raw_c": true,
+        "__gf_sensor_value_raw_d": true,
+        "__gf_sensor_value_raw_e": true,
+        "__gf_sensor_value_raw_f": true,
+        "__gf_sensor_value_raw_g": true,
+        "__gf_sensor_value_raw_h": true,
+        "__gf_sensor_value_raw_i": true
+      },
+      "stateBefore": {},
+      "stateAfter": {},
+      "requested": {
+        "a": true,
+        "b": true,
+        "c": true,
+        "d": true,
+        "e": true,
+        "f": true,
+        "g": true,
+        "h": true,
+        "i": true
+      },
+      "safe": {
+        "a": false,
+        "b": false,
+        "c": false,
+        "d": false,
+        "e": false,
+        "f": false,
+        "g": false,
+        "h": false,
+        "i": false
+      },
+      "faults": [
+        "mutex:a,b,c,d,e,f,g,h,i"
+      ],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": [
+          {
+            "index": 0,
+            "kind": "mutex",
+            "names": [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "g",
+              "h",
+              "i"
+            ],
+            "firstViolation": {
+              "round": 0,
+              "values": {
+                "a": true,
+                "b": true,
+                "c": true,
+                "d": true,
+                "e": true,
+                "f": true,
+                "g": true,
+                "h": true,
+                "i": true
+              },
+              "blocked": [
+                "a",
+                "b",
+                "c",
+                "d",
+                "e",
+                "f",
+                "g",
+                "h",
+                "i"
+              ]
+            },
+            "final": {
+              "round": 1,
+              "values": {
+                "a": false,
+                "b": false,
+                "c": false,
+                "d": false,
+                "e": false,
+                "f": false,
+                "g": false,
+                "h": false,
+                "i": false
+              },
+              "satisfied": true
+            }
+          },
+          {
+            "index": 1,
+            "kind": "mutex",
+            "names": [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "g",
+              "h",
+              "i"
+            ],
+            "firstViolation": {
+              "round": 0,
+              "values": {
+                "a": true,
+                "b": true,
+                "c": true,
+                "d": true,
+                "e": true,
+                "f": true,
+                "g": true,
+                "h": true,
+                "i": true
+              },
+              "blocked": [
+                "a",
+                "b",
+                "c",
+                "d",
+                "e",
+                "f",
+                "g",
+                "h",
+                "i"
+              ]
+            },
+            "final": {
+              "round": 1,
+              "values": {
+                "a": false,
+                "b": false,
+                "c": false,
+                "d": false,
+                "e": false,
+                "f": false,
+                "g": false,
+                "h": false,
+                "i": false
+              },
+              "satisfied": true
+            }
+          }
+        ]
+      },
+      "resultTrace": [
+        {
+          "site": 14,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 19,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 24,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 29,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 34,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 39,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 44,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 49,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 54,
+          "choice": 0,
+          "origin": 0
+        }
+      ]
+    },
+    {
+      "tick": 3,
+      "module": "1e6df7ab352fed39",
+      "strategy": "control",
+      "inputs": {
+        "__gf_sensor_fault_raw_a": 0,
+        "__gf_sensor_fault_raw_b": 0,
+        "__gf_sensor_fault_raw_c": 0,
+        "__gf_sensor_fault_raw_d": 0,
+        "__gf_sensor_fault_raw_e": 0,
+        "__gf_sensor_fault_raw_f": 0,
+        "__gf_sensor_fault_raw_g": 0,
+        "__gf_sensor_fault_raw_h": 0,
+        "__gf_sensor_fault_raw_i": 0,
+        "__gf_sensor_ok_raw_a": true,
+        "__gf_sensor_ok_raw_b": true,
+        "__gf_sensor_ok_raw_c": true,
+        "__gf_sensor_ok_raw_d": true,
+        "__gf_sensor_ok_raw_e": true,
+        "__gf_sensor_ok_raw_f": true,
+        "__gf_sensor_ok_raw_g": true,
+        "__gf_sensor_ok_raw_h": true,
+        "__gf_sensor_ok_raw_i": true,
+        "__gf_sensor_value_raw_a": true,
+        "__gf_sensor_value_raw_b": false,
+        "__gf_sensor_value_raw_c": false,
+        "__gf_sensor_value_raw_d": false,
+        "__gf_sensor_value_raw_e": false,
+        "__gf_sensor_value_raw_f": false,
+        "__gf_sensor_value_raw_g": false,
+        "__gf_sensor_value_raw_h": false,
+        "__gf_sensor_value_raw_i": false
+      },
+      "stateBefore": {},
+      "stateAfter": {},
+      "requested": {
+        "a": true,
+        "b": false,
+        "c": false,
+        "d": false,
+        "e": false,
+        "f": false,
+        "g": false,
+        "h": false,
+        "i": false
+      },
+      "safe": {
+        "a": true,
+        "b": false,
+        "c": false,
+        "d": false,
+        "e": false,
+        "f": false,
+        "g": false,
+        "h": false,
+        "i": false
+      },
+      "faults": [],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": [
+          {
+            "index": 0,
+            "kind": "mutex",
+            "names": [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "g",
+              "h",
+              "i"
+            ],
+            "firstViolation": null,
+            "final": {
+              "round": 0,
+              "values": {
+                "a": true,
+                "b": false,
+                "c": false,
+                "d": false,
+                "e": false,
+                "f": false,
+                "g": false,
+                "h": false,
+                "i": false
+              },
+              "satisfied": true
+            }
+          },
+          {
+            "index": 1,
+            "kind": "mutex",
+            "names": [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "g",
+              "h",
+              "i"
+            ],
+            "firstViolation": null,
+            "final": {
+              "round": 0,
+              "values": {
+                "a": true,
+                "b": false,
+                "c": false,
+                "d": false,
+                "e": false,
+                "f": false,
+                "g": false,
+                "h": false,
+                "i": false
+              },
+              "satisfied": true
+            }
+          }
+        ]
+      },
+      "resultTrace": [
+        {
+          "site": 14,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 19,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 24,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 29,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 34,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 39,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 44,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 49,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 54,
+          "choice": 0,
+          "origin": 0
+        }
+      ]
+    },
+    {
+      "tick": 4,
+      "module": "1e6df7ab352fed39",
+      "strategy": "control",
+      "inputs": {
+        "__gf_sensor_fault_raw_a": 0,
+        "__gf_sensor_fault_raw_b": 0,
+        "__gf_sensor_fault_raw_c": 0,
+        "__gf_sensor_fault_raw_d": 0,
+        "__gf_sensor_fault_raw_e": 0,
+        "__gf_sensor_fault_raw_f": 0,
+        "__gf_sensor_fault_raw_g": 0,
+        "__gf_sensor_fault_raw_h": 0,
+        "__gf_sensor_fault_raw_i": 0,
+        "__gf_sensor_ok_raw_a": true,
+        "__gf_sensor_ok_raw_b": true,
+        "__gf_sensor_ok_raw_c": true,
+        "__gf_sensor_ok_raw_d": true,
+        "__gf_sensor_ok_raw_e": true,
+        "__gf_sensor_ok_raw_f": true,
+        "__gf_sensor_ok_raw_g": true,
+        "__gf_sensor_ok_raw_h": true,
+        "__gf_sensor_ok_raw_i": true,
+        "__gf_sensor_value_raw_a": false,
+        "__gf_sensor_value_raw_b": true,
+        "__gf_sensor_value_raw_c": false,
+        "__gf_sensor_value_raw_d": false,
+        "__gf_sensor_value_raw_e": false,
+        "__gf_sensor_value_raw_f": false,
+        "__gf_sensor_value_raw_g": false,
+        "__gf_sensor_value_raw_h": false,
+        "__gf_sensor_value_raw_i": false
+      },
+      "stateBefore": {},
+      "stateAfter": {},
+      "requested": {
+        "a": false,
+        "b": true,
+        "c": false,
+        "d": false,
+        "e": false,
+        "f": false,
+        "g": false,
+        "h": false,
+        "i": false
+      },
+      "safe": {
+        "a": false,
+        "b": true,
+        "c": false,
+        "d": false,
+        "e": false,
+        "f": false,
+        "g": false,
+        "h": false,
+        "i": false
+      },
+      "faults": [],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": [
+          {
+            "index": 0,
+            "kind": "mutex",
+            "names": [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "g",
+              "h",
+              "i"
+            ],
+            "firstViolation": null,
+            "final": {
+              "round": 0,
+              "values": {
+                "a": false,
+                "b": true,
+                "c": false,
+                "d": false,
+                "e": false,
+                "f": false,
+                "g": false,
+                "h": false,
+                "i": false
+              },
+              "satisfied": true
+            }
+          },
+          {
+            "index": 1,
+            "kind": "mutex",
+            "names": [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "g",
+              "h",
+              "i"
+            ],
+            "firstViolation": null,
+            "final": {
+              "round": 0,
+              "values": {
+                "a": false,
+                "b": true,
+                "c": false,
+                "d": false,
+                "e": false,
+                "f": false,
+                "g": false,
+                "h": false,
+                "i": false
+              },
+              "satisfied": true
+            }
+          }
+        ]
+      },
+      "resultTrace": [
+        {
+          "site": 14,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 19,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 24,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 29,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 34,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 39,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 44,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 49,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 54,
+          "choice": 0,
+          "origin": 0
+        }
+      ]
+    },
+    {
+      "tick": 5,
+      "module": "1e6df7ab352fed39",
+      "strategy": "control",
+      "inputs": {
+        "__gf_sensor_fault_raw_a": 0,
+        "__gf_sensor_fault_raw_b": 0,
+        "__gf_sensor_fault_raw_c": 0,
+        "__gf_sensor_fault_raw_d": 0,
+        "__gf_sensor_fault_raw_e": 0,
+        "__gf_sensor_fault_raw_f": 0,
+        "__gf_sensor_fault_raw_g": 0,
+        "__gf_sensor_fault_raw_h": 0,
+        "__gf_sensor_fault_raw_i": 0,
+        "__gf_sensor_ok_raw_a": true,
+        "__gf_sensor_ok_raw_b": true,
+        "__gf_sensor_ok_raw_c": true,
+        "__gf_sensor_ok_raw_d": true,
+        "__gf_sensor_ok_raw_e": true,
+        "__gf_sensor_ok_raw_f": true,
+        "__gf_sensor_ok_raw_g": true,
+        "__gf_sensor_ok_raw_h": true,
+        "__gf_sensor_ok_raw_i": true,
+        "__gf_sensor_value_raw_a": false,
+        "__gf_sensor_value_raw_b": false,
+        "__gf_sensor_value_raw_c": true,
+        "__gf_sensor_value_raw_d": false,
+        "__gf_sensor_value_raw_e": false,
+        "__gf_sensor_value_raw_f": false,
+        "__gf_sensor_value_raw_g": false,
+        "__gf_sensor_value_raw_h": false,
+        "__gf_sensor_value_raw_i": false
+      },
+      "stateBefore": {},
+      "stateAfter": {},
+      "requested": {
+        "a": false,
+        "b": false,
+        "c": true,
+        "d": false,
+        "e": false,
+        "f": false,
+        "g": false,
+        "h": false,
+        "i": false
+      },
+      "safe": {
+        "a": false,
+        "b": false,
+        "c": true,
+        "d": false,
+        "e": false,
+        "f": false,
+        "g": false,
+        "h": false,
+        "i": false
+      },
+      "faults": [],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": [
+          {
+            "index": 0,
+            "kind": "mutex",
+            "names": [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "g",
+              "h",
+              "i"
+            ],
+            "firstViolation": null,
+            "final": {
+              "round": 0,
+              "values": {
+                "a": false,
+                "b": false,
+                "c": true,
+                "d": false,
+                "e": false,
+                "f": false,
+                "g": false,
+                "h": false,
+                "i": false
+              },
+              "satisfied": true
+            }
+          },
+          {
+            "index": 1,
+            "kind": "mutex",
+            "names": [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "g",
+              "h",
+              "i"
+            ],
+            "firstViolation": null,
+            "final": {
+              "round": 0,
+              "values": {
+                "a": false,
+                "b": false,
+                "c": true,
+                "d": false,
+                "e": false,
+                "f": false,
+                "g": false,
+                "h": false,
+                "i": false
+              },
+              "satisfied": true
+            }
+          }
+        ]
+      },
+      "resultTrace": [
+        {
+          "site": 14,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 19,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 24,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 29,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 34,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 39,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 44,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 49,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 54,
+          "choice": 0,
+          "origin": 0
+        }
+      ]
+    },
+    {
+      "tick": 6,
+      "module": "1e6df7ab352fed39",
+      "strategy": "control",
+      "inputs": {
+        "__gf_sensor_fault_raw_a": 0,
+        "__gf_sensor_fault_raw_b": 0,
+        "__gf_sensor_fault_raw_c": 0,
+        "__gf_sensor_fault_raw_d": 0,
+        "__gf_sensor_fault_raw_e": 0,
+        "__gf_sensor_fault_raw_f": 0,
+        "__gf_sensor_fault_raw_g": 0,
+        "__gf_sensor_fault_raw_h": 0,
+        "__gf_sensor_fault_raw_i": 0,
+        "__gf_sensor_ok_raw_a": true,
+        "__gf_sensor_ok_raw_b": true,
+        "__gf_sensor_ok_raw_c": true,
+        "__gf_sensor_ok_raw_d": true,
+        "__gf_sensor_ok_raw_e": true,
+        "__gf_sensor_ok_raw_f": true,
+        "__gf_sensor_ok_raw_g": true,
+        "__gf_sensor_ok_raw_h": true,
+        "__gf_sensor_ok_raw_i": true,
+        "__gf_sensor_value_raw_a": false,
+        "__gf_sensor_value_raw_b": false,
+        "__gf_sensor_value_raw_c": false,
+        "__gf_sensor_value_raw_d": true,
+        "__gf_sensor_value_raw_e": false,
+        "__gf_sensor_value_raw_f": false,
+        "__gf_sensor_value_raw_g": false,
+        "__gf_sensor_value_raw_h": false,
+        "__gf_sensor_value_raw_i": false
+      },
+      "stateBefore": {},
+      "stateAfter": {},
+      "requested": {
+        "a": false,
+        "b": false,
+        "c": false,
+        "d": true,
+        "e": false,
+        "f": false,
+        "g": false,
+        "h": false,
+        "i": false
+      },
+      "safe": {
+        "a": false,
+        "b": false,
+        "c": false,
+        "d": true,
+        "e": false,
+        "f": false,
+        "g": false,
+        "h": false,
+        "i": false
+      },
+      "faults": [],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": [
+          {
+            "index": 0,
+            "kind": "mutex",
+            "names": [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "g",
+              "h",
+              "i"
+            ],
+            "firstViolation": null,
+            "final": {
+              "round": 0,
+              "values": {
+                "a": false,
+                "b": false,
+                "c": false,
+                "d": true,
+                "e": false,
+                "f": false,
+                "g": false,
+                "h": false,
+                "i": false
+              },
+              "satisfied": true
+            }
+          },
+          {
+            "index": 1,
+            "kind": "mutex",
+            "names": [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "g",
+              "h",
+              "i"
+            ],
+            "firstViolation": null,
+            "final": {
+              "round": 0,
+              "values": {
+                "a": false,
+                "b": false,
+                "c": false,
+                "d": true,
+                "e": false,
+                "f": false,
+                "g": false,
+                "h": false,
+                "i": false
+              },
+              "satisfied": true
+            }
+          }
+        ]
+      },
+      "resultTrace": [
+        {
+          "site": 14,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 19,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 24,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 29,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 34,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 39,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 44,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 49,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 54,
+          "choice": 0,
+          "origin": 0
+        }
+      ]
+    },
+    {
+      "tick": 7,
+      "module": "1e6df7ab352fed39",
+      "strategy": "control",
+      "inputs": {
+        "__gf_sensor_fault_raw_a": 0,
+        "__gf_sensor_fault_raw_b": 0,
+        "__gf_sensor_fault_raw_c": 0,
+        "__gf_sensor_fault_raw_d": 0,
+        "__gf_sensor_fault_raw_e": 0,
+        "__gf_sensor_fault_raw_f": 0,
+        "__gf_sensor_fault_raw_g": 0,
+        "__gf_sensor_fault_raw_h": 0,
+        "__gf_sensor_fault_raw_i": 0,
+        "__gf_sensor_ok_raw_a": true,
+        "__gf_sensor_ok_raw_b": true,
+        "__gf_sensor_ok_raw_c": true,
+        "__gf_sensor_ok_raw_d": true,
+        "__gf_sensor_ok_raw_e": true,
+        "__gf_sensor_ok_raw_f": true,
+        "__gf_sensor_ok_raw_g": true,
+        "__gf_sensor_ok_raw_h": true,
+        "__gf_sensor_ok_raw_i": true,
+        "__gf_sensor_value_raw_a": false,
+        "__gf_sensor_value_raw_b": false,
+        "__gf_sensor_value_raw_c": false,
+        "__gf_sensor_value_raw_d": false,
+        "__gf_sensor_value_raw_e": true,
+        "__gf_sensor_value_raw_f": false,
+        "__gf_sensor_value_raw_g": false,
+        "__gf_sensor_value_raw_h": false,
+        "__gf_sensor_value_raw_i": false
+      },
+      "stateBefore": {},
+      "stateAfter": {},
+      "requested": {
+        "a": false,
+        "b": false,
+        "c": false,
+        "d": false,
+        "e": true,
+        "f": false,
+        "g": false,
+        "h": false,
+        "i": false
+      },
+      "safe": {
+        "a": false,
+        "b": false,
+        "c": false,
+        "d": false,
+        "e": true,
+        "f": false,
+        "g": false,
+        "h": false,
+        "i": false
+      },
+      "faults": [],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": [
+          {
+            "index": 0,
+            "kind": "mutex",
+            "names": [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "g",
+              "h",
+              "i"
+            ],
+            "firstViolation": null,
+            "final": {
+              "round": 0,
+              "values": {
+                "a": false,
+                "b": false,
+                "c": false,
+                "d": false,
+                "e": true,
+                "f": false,
+                "g": false,
+                "h": false,
+                "i": false
+              },
+              "satisfied": true
+            }
+          },
+          {
+            "index": 1,
+            "kind": "mutex",
+            "names": [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "g",
+              "h",
+              "i"
+            ],
+            "firstViolation": null,
+            "final": {
+              "round": 0,
+              "values": {
+                "a": false,
+                "b": false,
+                "c": false,
+                "d": false,
+                "e": true,
+                "f": false,
+                "g": false,
+                "h": false,
+                "i": false
+              },
+              "satisfied": true
+            }
+          }
+        ]
+      },
+      "resultTrace": [
+        {
+          "site": 14,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 19,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 24,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 29,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 34,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 39,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 44,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 49,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 54,
+          "choice": 0,
+          "origin": 0
+        }
+      ]
+    },
+    {
+      "tick": 8,
+      "module": "1e6df7ab352fed39",
+      "strategy": "control",
+      "inputs": {
+        "__gf_sensor_fault_raw_a": 0,
+        "__gf_sensor_fault_raw_b": 0,
+        "__gf_sensor_fault_raw_c": 0,
+        "__gf_sensor_fault_raw_d": 0,
+        "__gf_sensor_fault_raw_e": 0,
+        "__gf_sensor_fault_raw_f": 0,
+        "__gf_sensor_fault_raw_g": 0,
+        "__gf_sensor_fault_raw_h": 0,
+        "__gf_sensor_fault_raw_i": 0,
+        "__gf_sensor_ok_raw_a": true,
+        "__gf_sensor_ok_raw_b": true,
+        "__gf_sensor_ok_raw_c": true,
+        "__gf_sensor_ok_raw_d": true,
+        "__gf_sensor_ok_raw_e": true,
+        "__gf_sensor_ok_raw_f": true,
+        "__gf_sensor_ok_raw_g": true,
+        "__gf_sensor_ok_raw_h": true,
+        "__gf_sensor_ok_raw_i": true,
+        "__gf_sensor_value_raw_a": false,
+        "__gf_sensor_value_raw_b": false,
+        "__gf_sensor_value_raw_c": false,
+        "__gf_sensor_value_raw_d": false,
+        "__gf_sensor_value_raw_e": false,
+        "__gf_sensor_value_raw_f": true,
+        "__gf_sensor_value_raw_g": false,
+        "__gf_sensor_value_raw_h": false,
+        "__gf_sensor_value_raw_i": false
+      },
+      "stateBefore": {},
+      "stateAfter": {},
+      "requested": {
+        "a": false,
+        "b": false,
+        "c": false,
+        "d": false,
+        "e": false,
+        "f": true,
+        "g": false,
+        "h": false,
+        "i": false
+      },
+      "safe": {
+        "a": false,
+        "b": false,
+        "c": false,
+        "d": false,
+        "e": false,
+        "f": true,
+        "g": false,
+        "h": false,
+        "i": false
+      },
+      "faults": [],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": [
+          {
+            "index": 0,
+            "kind": "mutex",
+            "names": [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "g",
+              "h",
+              "i"
+            ],
+            "firstViolation": null,
+            "final": {
+              "round": 0,
+              "values": {
+                "a": false,
+                "b": false,
+                "c": false,
+                "d": false,
+                "e": false,
+                "f": true,
+                "g": false,
+                "h": false,
+                "i": false
+              },
+              "satisfied": true
+            }
+          },
+          {
+            "index": 1,
+            "kind": "mutex",
+            "names": [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "g",
+              "h",
+              "i"
+            ],
+            "firstViolation": null,
+            "final": {
+              "round": 0,
+              "values": {
+                "a": false,
+                "b": false,
+                "c": false,
+                "d": false,
+                "e": false,
+                "f": true,
+                "g": false,
+                "h": false,
+                "i": false
+              },
+              "satisfied": true
+            }
+          }
+        ]
+      },
+      "resultTrace": [
+        {
+          "site": 14,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 19,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 24,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 29,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 34,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 39,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 44,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 49,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 54,
+          "choice": 0,
+          "origin": 0
+        }
+      ]
+    },
+    {
+      "tick": 9,
+      "module": "1e6df7ab352fed39",
+      "strategy": "control",
+      "inputs": {
+        "__gf_sensor_fault_raw_a": 0,
+        "__gf_sensor_fault_raw_b": 0,
+        "__gf_sensor_fault_raw_c": 0,
+        "__gf_sensor_fault_raw_d": 0,
+        "__gf_sensor_fault_raw_e": 0,
+        "__gf_sensor_fault_raw_f": 0,
+        "__gf_sensor_fault_raw_g": 0,
+        "__gf_sensor_fault_raw_h": 0,
+        "__gf_sensor_fault_raw_i": 0,
+        "__gf_sensor_ok_raw_a": true,
+        "__gf_sensor_ok_raw_b": true,
+        "__gf_sensor_ok_raw_c": true,
+        "__gf_sensor_ok_raw_d": true,
+        "__gf_sensor_ok_raw_e": true,
+        "__gf_sensor_ok_raw_f": true,
+        "__gf_sensor_ok_raw_g": true,
+        "__gf_sensor_ok_raw_h": true,
+        "__gf_sensor_ok_raw_i": true,
+        "__gf_sensor_value_raw_a": false,
+        "__gf_sensor_value_raw_b": false,
+        "__gf_sensor_value_raw_c": false,
+        "__gf_sensor_value_raw_d": false,
+        "__gf_sensor_value_raw_e": false,
+        "__gf_sensor_value_raw_f": false,
+        "__gf_sensor_value_raw_g": true,
+        "__gf_sensor_value_raw_h": false,
+        "__gf_sensor_value_raw_i": false
+      },
+      "stateBefore": {},
+      "stateAfter": {},
+      "requested": {
+        "a": false,
+        "b": false,
+        "c": false,
+        "d": false,
+        "e": false,
+        "f": false,
+        "g": true,
+        "h": false,
+        "i": false
+      },
+      "safe": {
+        "a": false,
+        "b": false,
+        "c": false,
+        "d": false,
+        "e": false,
+        "f": false,
+        "g": true,
+        "h": false,
+        "i": false
+      },
+      "faults": [],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": [
+          {
+            "index": 0,
+            "kind": "mutex",
+            "names": [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "g",
+              "h",
+              "i"
+            ],
+            "firstViolation": null,
+            "final": {
+              "round": 0,
+              "values": {
+                "a": false,
+                "b": false,
+                "c": false,
+                "d": false,
+                "e": false,
+                "f": false,
+                "g": true,
+                "h": false,
+                "i": false
+              },
+              "satisfied": true
+            }
+          },
+          {
+            "index": 1,
+            "kind": "mutex",
+            "names": [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "g",
+              "h",
+              "i"
+            ],
+            "firstViolation": null,
+            "final": {
+              "round": 0,
+              "values": {
+                "a": false,
+                "b": false,
+                "c": false,
+                "d": false,
+                "e": false,
+                "f": false,
+                "g": true,
+                "h": false,
+                "i": false
+              },
+              "satisfied": true
+            }
+          }
+        ]
+      },
+      "resultTrace": [
+        {
+          "site": 14,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 19,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 24,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 29,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 34,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 39,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 44,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 49,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 54,
+          "choice": 0,
+          "origin": 0
+        }
+      ]
+    },
+    {
+      "tick": 10,
+      "module": "1e6df7ab352fed39",
+      "strategy": "control",
+      "inputs": {
+        "__gf_sensor_fault_raw_a": 0,
+        "__gf_sensor_fault_raw_b": 0,
+        "__gf_sensor_fault_raw_c": 0,
+        "__gf_sensor_fault_raw_d": 0,
+        "__gf_sensor_fault_raw_e": 0,
+        "__gf_sensor_fault_raw_f": 0,
+        "__gf_sensor_fault_raw_g": 0,
+        "__gf_sensor_fault_raw_h": 0,
+        "__gf_sensor_fault_raw_i": 0,
+        "__gf_sensor_ok_raw_a": true,
+        "__gf_sensor_ok_raw_b": true,
+        "__gf_sensor_ok_raw_c": true,
+        "__gf_sensor_ok_raw_d": true,
+        "__gf_sensor_ok_raw_e": true,
+        "__gf_sensor_ok_raw_f": true,
+        "__gf_sensor_ok_raw_g": true,
+        "__gf_sensor_ok_raw_h": true,
+        "__gf_sensor_ok_raw_i": true,
+        "__gf_sensor_value_raw_a": false,
+        "__gf_sensor_value_raw_b": false,
+        "__gf_sensor_value_raw_c": false,
+        "__gf_sensor_value_raw_d": false,
+        "__gf_sensor_value_raw_e": false,
+        "__gf_sensor_value_raw_f": false,
+        "__gf_sensor_value_raw_g": false,
+        "__gf_sensor_value_raw_h": true,
+        "__gf_sensor_value_raw_i": false
+      },
+      "stateBefore": {},
+      "stateAfter": {},
+      "requested": {
+        "a": false,
+        "b": false,
+        "c": false,
+        "d": false,
+        "e": false,
+        "f": false,
+        "g": false,
+        "h": true,
+        "i": false
+      },
+      "safe": {
+        "a": false,
+        "b": false,
+        "c": false,
+        "d": false,
+        "e": false,
+        "f": false,
+        "g": false,
+        "h": true,
+        "i": false
+      },
+      "faults": [],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": [
+          {
+            "index": 0,
+            "kind": "mutex",
+            "names": [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "g",
+              "h",
+              "i"
+            ],
+            "firstViolation": null,
+            "final": {
+              "round": 0,
+              "values": {
+                "a": false,
+                "b": false,
+                "c": false,
+                "d": false,
+                "e": false,
+                "f": false,
+                "g": false,
+                "h": true,
+                "i": false
+              },
+              "satisfied": true
+            }
+          },
+          {
+            "index": 1,
+            "kind": "mutex",
+            "names": [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "g",
+              "h",
+              "i"
+            ],
+            "firstViolation": null,
+            "final": {
+              "round": 0,
+              "values": {
+                "a": false,
+                "b": false,
+                "c": false,
+                "d": false,
+                "e": false,
+                "f": false,
+                "g": false,
+                "h": true,
+                "i": false
+              },
+              "satisfied": true
+            }
+          }
+        ]
+      },
+      "resultTrace": [
+        {
+          "site": 14,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 19,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 24,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 29,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 34,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 39,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 44,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 49,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 54,
+          "choice": 0,
+          "origin": 0
+        }
+      ]
+    },
+    {
+      "tick": 11,
+      "module": "1e6df7ab352fed39",
+      "strategy": "control",
+      "inputs": {
+        "__gf_sensor_fault_raw_a": 0,
+        "__gf_sensor_fault_raw_b": 0,
+        "__gf_sensor_fault_raw_c": 0,
+        "__gf_sensor_fault_raw_d": 0,
+        "__gf_sensor_fault_raw_e": 0,
+        "__gf_sensor_fault_raw_f": 0,
+        "__gf_sensor_fault_raw_g": 0,
+        "__gf_sensor_fault_raw_h": 0,
+        "__gf_sensor_fault_raw_i": 0,
+        "__gf_sensor_ok_raw_a": true,
+        "__gf_sensor_ok_raw_b": true,
+        "__gf_sensor_ok_raw_c": true,
+        "__gf_sensor_ok_raw_d": true,
+        "__gf_sensor_ok_raw_e": true,
+        "__gf_sensor_ok_raw_f": true,
+        "__gf_sensor_ok_raw_g": true,
+        "__gf_sensor_ok_raw_h": true,
+        "__gf_sensor_ok_raw_i": true,
+        "__gf_sensor_value_raw_a": false,
+        "__gf_sensor_value_raw_b": false,
+        "__gf_sensor_value_raw_c": false,
+        "__gf_sensor_value_raw_d": false,
+        "__gf_sensor_value_raw_e": false,
+        "__gf_sensor_value_raw_f": false,
+        "__gf_sensor_value_raw_g": false,
+        "__gf_sensor_value_raw_h": false,
+        "__gf_sensor_value_raw_i": true
+      },
+      "stateBefore": {},
+      "stateAfter": {},
+      "requested": {
+        "a": false,
+        "b": false,
+        "c": false,
+        "d": false,
+        "e": false,
+        "f": false,
+        "g": false,
+        "h": false,
+        "i": true
+      },
+      "safe": {
+        "a": false,
+        "b": false,
+        "c": false,
+        "d": false,
+        "e": false,
+        "f": false,
+        "g": false,
+        "h": false,
+        "i": true
+      },
+      "faults": [],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": [
+          {
+            "index": 0,
+            "kind": "mutex",
+            "names": [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "g",
+              "h",
+              "i"
+            ],
+            "firstViolation": null,
+            "final": {
+              "round": 0,
+              "values": {
+                "a": false,
+                "b": false,
+                "c": false,
+                "d": false,
+                "e": false,
+                "f": false,
+                "g": false,
+                "h": false,
+                "i": true
+              },
+              "satisfied": true
+            }
+          },
+          {
+            "index": 1,
+            "kind": "mutex",
+            "names": [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "g",
+              "h",
+              "i"
+            ],
+            "firstViolation": null,
+            "final": {
+              "round": 0,
+              "values": {
+                "a": false,
+                "b": false,
+                "c": false,
+                "d": false,
+                "e": false,
+                "f": false,
+                "g": false,
+                "h": false,
+                "i": true
+              },
+              "satisfied": true
+            }
+          }
+        ]
+      },
+      "resultTrace": [
+        {
+          "site": 14,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 19,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 24,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 29,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 34,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 39,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 44,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 49,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 54,
+          "choice": 0,
+          "origin": 0
+        }
+      ]
+    }
+  ],
+  "optimized": [
+    {
+      "tick": 1,
+      "module": "1e6df7ab352fed39",
+      "strategy": "control",
+      "inputs": {
+        "__gf_sensor_fault_raw_a": 0,
+        "__gf_sensor_fault_raw_b": 0,
+        "__gf_sensor_fault_raw_c": 0,
+        "__gf_sensor_fault_raw_d": 0,
+        "__gf_sensor_fault_raw_e": 0,
+        "__gf_sensor_fault_raw_f": 0,
+        "__gf_sensor_fault_raw_g": 0,
+        "__gf_sensor_fault_raw_h": 0,
+        "__gf_sensor_fault_raw_i": 0,
+        "__gf_sensor_ok_raw_a": true,
+        "__gf_sensor_ok_raw_b": true,
+        "__gf_sensor_ok_raw_c": true,
+        "__gf_sensor_ok_raw_d": true,
+        "__gf_sensor_ok_raw_e": true,
+        "__gf_sensor_ok_raw_f": true,
+        "__gf_sensor_ok_raw_g": true,
+        "__gf_sensor_ok_raw_h": true,
+        "__gf_sensor_ok_raw_i": true,
+        "__gf_sensor_value_raw_a": false,
+        "__gf_sensor_value_raw_b": false,
+        "__gf_sensor_value_raw_c": false,
+        "__gf_sensor_value_raw_d": false,
+        "__gf_sensor_value_raw_e": false,
+        "__gf_sensor_value_raw_f": false,
+        "__gf_sensor_value_raw_g": false,
+        "__gf_sensor_value_raw_h": false,
+        "__gf_sensor_value_raw_i": false
+      },
+      "stateBefore": {},
+      "stateAfter": {},
+      "requested": {
+        "a": false,
+        "b": false,
+        "c": false,
+        "d": false,
+        "e": false,
+        "f": false,
+        "g": false,
+        "h": false,
+        "i": false
+      },
+      "safe": {
+        "a": false,
+        "b": false,
+        "c": false,
+        "d": false,
+        "e": false,
+        "f": false,
+        "g": false,
+        "h": false,
+        "i": false
+      },
+      "faults": [],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": [
+          {
+            "index": 0,
+            "kind": "mutex",
+            "names": [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "g",
+              "h",
+              "i"
+            ],
+            "firstViolation": null,
+            "final": {
+              "round": 0,
+              "values": {
+                "a": false,
+                "b": false,
+                "c": false,
+                "d": false,
+                "e": false,
+                "f": false,
+                "g": false,
+                "h": false,
+                "i": false
+              },
+              "satisfied": true
+            }
+          },
+          {
+            "index": 1,
+            "kind": "mutex",
+            "names": [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "g",
+              "h",
+              "i"
+            ],
+            "firstViolation": null,
+            "final": {
+              "round": 0,
+              "values": {
+                "a": false,
+                "b": false,
+                "c": false,
+                "d": false,
+                "e": false,
+                "f": false,
+                "g": false,
+                "h": false,
+                "i": false
+              },
+              "satisfied": true
+            }
+          }
+        ]
+      },
+      "resultTrace": [
+        {
+          "site": 14,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 19,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 24,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 29,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 34,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 39,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 44,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 49,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 54,
+          "choice": 0,
+          "origin": 0
+        }
+      ]
+    },
+    {
+      "tick": 2,
+      "module": "1e6df7ab352fed39",
+      "strategy": "control",
+      "inputs": {
+        "__gf_sensor_fault_raw_a": 0,
+        "__gf_sensor_fault_raw_b": 0,
+        "__gf_sensor_fault_raw_c": 0,
+        "__gf_sensor_fault_raw_d": 0,
+        "__gf_sensor_fault_raw_e": 0,
+        "__gf_sensor_fault_raw_f": 0,
+        "__gf_sensor_fault_raw_g": 0,
+        "__gf_sensor_fault_raw_h": 0,
+        "__gf_sensor_fault_raw_i": 0,
+        "__gf_sensor_ok_raw_a": true,
+        "__gf_sensor_ok_raw_b": true,
+        "__gf_sensor_ok_raw_c": true,
+        "__gf_sensor_ok_raw_d": true,
+        "__gf_sensor_ok_raw_e": true,
+        "__gf_sensor_ok_raw_f": true,
+        "__gf_sensor_ok_raw_g": true,
+        "__gf_sensor_ok_raw_h": true,
+        "__gf_sensor_ok_raw_i": true,
+        "__gf_sensor_value_raw_a": true,
+        "__gf_sensor_value_raw_b": true,
+        "__gf_sensor_value_raw_c": true,
+        "__gf_sensor_value_raw_d": true,
+        "__gf_sensor_value_raw_e": true,
+        "__gf_sensor_value_raw_f": true,
+        "__gf_sensor_value_raw_g": true,
+        "__gf_sensor_value_raw_h": true,
+        "__gf_sensor_value_raw_i": true
+      },
+      "stateBefore": {},
+      "stateAfter": {},
+      "requested": {
+        "a": true,
+        "b": true,
+        "c": true,
+        "d": true,
+        "e": true,
+        "f": true,
+        "g": true,
+        "h": true,
+        "i": true
+      },
+      "safe": {
+        "a": false,
+        "b": false,
+        "c": false,
+        "d": false,
+        "e": false,
+        "f": false,
+        "g": false,
+        "h": false,
+        "i": false
+      },
+      "faults": [
+        "mutex:a,b,c,d,e,f,g,h,i"
+      ],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": [
+          {
+            "index": 0,
+            "kind": "mutex",
+            "names": [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "g",
+              "h",
+              "i"
+            ],
+            "firstViolation": {
+              "round": 0,
+              "values": {
+                "a": true,
+                "b": true,
+                "c": true,
+                "d": true,
+                "e": true,
+                "f": true,
+                "g": true,
+                "h": true,
+                "i": true
+              },
+              "blocked": [
+                "a",
+                "b",
+                "c",
+                "d",
+                "e",
+                "f",
+                "g",
+                "h",
+                "i"
+              ]
+            },
+            "final": {
+              "round": 1,
+              "values": {
+                "a": false,
+                "b": false,
+                "c": false,
+                "d": false,
+                "e": false,
+                "f": false,
+                "g": false,
+                "h": false,
+                "i": false
+              },
+              "satisfied": true
+            }
+          },
+          {
+            "index": 1,
+            "kind": "mutex",
+            "names": [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "g",
+              "h",
+              "i"
+            ],
+            "firstViolation": {
+              "round": 0,
+              "values": {
+                "a": true,
+                "b": true,
+                "c": true,
+                "d": true,
+                "e": true,
+                "f": true,
+                "g": true,
+                "h": true,
+                "i": true
+              },
+              "blocked": [
+                "a",
+                "b",
+                "c",
+                "d",
+                "e",
+                "f",
+                "g",
+                "h",
+                "i"
+              ]
+            },
+            "final": {
+              "round": 1,
+              "values": {
+                "a": false,
+                "b": false,
+                "c": false,
+                "d": false,
+                "e": false,
+                "f": false,
+                "g": false,
+                "h": false,
+                "i": false
+              },
+              "satisfied": true
+            }
+          }
+        ]
+      },
+      "resultTrace": [
+        {
+          "site": 14,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 19,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 24,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 29,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 34,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 39,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 44,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 49,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 54,
+          "choice": 0,
+          "origin": 0
+        }
+      ]
+    },
+    {
+      "tick": 3,
+      "module": "1e6df7ab352fed39",
+      "strategy": "control",
+      "inputs": {
+        "__gf_sensor_fault_raw_a": 0,
+        "__gf_sensor_fault_raw_b": 0,
+        "__gf_sensor_fault_raw_c": 0,
+        "__gf_sensor_fault_raw_d": 0,
+        "__gf_sensor_fault_raw_e": 0,
+        "__gf_sensor_fault_raw_f": 0,
+        "__gf_sensor_fault_raw_g": 0,
+        "__gf_sensor_fault_raw_h": 0,
+        "__gf_sensor_fault_raw_i": 0,
+        "__gf_sensor_ok_raw_a": true,
+        "__gf_sensor_ok_raw_b": true,
+        "__gf_sensor_ok_raw_c": true,
+        "__gf_sensor_ok_raw_d": true,
+        "__gf_sensor_ok_raw_e": true,
+        "__gf_sensor_ok_raw_f": true,
+        "__gf_sensor_ok_raw_g": true,
+        "__gf_sensor_ok_raw_h": true,
+        "__gf_sensor_ok_raw_i": true,
+        "__gf_sensor_value_raw_a": true,
+        "__gf_sensor_value_raw_b": false,
+        "__gf_sensor_value_raw_c": false,
+        "__gf_sensor_value_raw_d": false,
+        "__gf_sensor_value_raw_e": false,
+        "__gf_sensor_value_raw_f": false,
+        "__gf_sensor_value_raw_g": false,
+        "__gf_sensor_value_raw_h": false,
+        "__gf_sensor_value_raw_i": false
+      },
+      "stateBefore": {},
+      "stateAfter": {},
+      "requested": {
+        "a": true,
+        "b": false,
+        "c": false,
+        "d": false,
+        "e": false,
+        "f": false,
+        "g": false,
+        "h": false,
+        "i": false
+      },
+      "safe": {
+        "a": true,
+        "b": false,
+        "c": false,
+        "d": false,
+        "e": false,
+        "f": false,
+        "g": false,
+        "h": false,
+        "i": false
+      },
+      "faults": [],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": [
+          {
+            "index": 0,
+            "kind": "mutex",
+            "names": [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "g",
+              "h",
+              "i"
+            ],
+            "firstViolation": null,
+            "final": {
+              "round": 0,
+              "values": {
+                "a": true,
+                "b": false,
+                "c": false,
+                "d": false,
+                "e": false,
+                "f": false,
+                "g": false,
+                "h": false,
+                "i": false
+              },
+              "satisfied": true
+            }
+          },
+          {
+            "index": 1,
+            "kind": "mutex",
+            "names": [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "g",
+              "h",
+              "i"
+            ],
+            "firstViolation": null,
+            "final": {
+              "round": 0,
+              "values": {
+                "a": true,
+                "b": false,
+                "c": false,
+                "d": false,
+                "e": false,
+                "f": false,
+                "g": false,
+                "h": false,
+                "i": false
+              },
+              "satisfied": true
+            }
+          }
+        ]
+      },
+      "resultTrace": [
+        {
+          "site": 14,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 19,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 24,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 29,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 34,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 39,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 44,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 49,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 54,
+          "choice": 0,
+          "origin": 0
+        }
+      ]
+    },
+    {
+      "tick": 4,
+      "module": "1e6df7ab352fed39",
+      "strategy": "control",
+      "inputs": {
+        "__gf_sensor_fault_raw_a": 0,
+        "__gf_sensor_fault_raw_b": 0,
+        "__gf_sensor_fault_raw_c": 0,
+        "__gf_sensor_fault_raw_d": 0,
+        "__gf_sensor_fault_raw_e": 0,
+        "__gf_sensor_fault_raw_f": 0,
+        "__gf_sensor_fault_raw_g": 0,
+        "__gf_sensor_fault_raw_h": 0,
+        "__gf_sensor_fault_raw_i": 0,
+        "__gf_sensor_ok_raw_a": true,
+        "__gf_sensor_ok_raw_b": true,
+        "__gf_sensor_ok_raw_c": true,
+        "__gf_sensor_ok_raw_d": true,
+        "__gf_sensor_ok_raw_e": true,
+        "__gf_sensor_ok_raw_f": true,
+        "__gf_sensor_ok_raw_g": true,
+        "__gf_sensor_ok_raw_h": true,
+        "__gf_sensor_ok_raw_i": true,
+        "__gf_sensor_value_raw_a": false,
+        "__gf_sensor_value_raw_b": true,
+        "__gf_sensor_value_raw_c": false,
+        "__gf_sensor_value_raw_d": false,
+        "__gf_sensor_value_raw_e": false,
+        "__gf_sensor_value_raw_f": false,
+        "__gf_sensor_value_raw_g": false,
+        "__gf_sensor_value_raw_h": false,
+        "__gf_sensor_value_raw_i": false
+      },
+      "stateBefore": {},
+      "stateAfter": {},
+      "requested": {
+        "a": false,
+        "b": true,
+        "c": false,
+        "d": false,
+        "e": false,
+        "f": false,
+        "g": false,
+        "h": false,
+        "i": false
+      },
+      "safe": {
+        "a": false,
+        "b": true,
+        "c": false,
+        "d": false,
+        "e": false,
+        "f": false,
+        "g": false,
+        "h": false,
+        "i": false
+      },
+      "faults": [],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": [
+          {
+            "index": 0,
+            "kind": "mutex",
+            "names": [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "g",
+              "h",
+              "i"
+            ],
+            "firstViolation": null,
+            "final": {
+              "round": 0,
+              "values": {
+                "a": false,
+                "b": true,
+                "c": false,
+                "d": false,
+                "e": false,
+                "f": false,
+                "g": false,
+                "h": false,
+                "i": false
+              },
+              "satisfied": true
+            }
+          },
+          {
+            "index": 1,
+            "kind": "mutex",
+            "names": [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "g",
+              "h",
+              "i"
+            ],
+            "firstViolation": null,
+            "final": {
+              "round": 0,
+              "values": {
+                "a": false,
+                "b": true,
+                "c": false,
+                "d": false,
+                "e": false,
+                "f": false,
+                "g": false,
+                "h": false,
+                "i": false
+              },
+              "satisfied": true
+            }
+          }
+        ]
+      },
+      "resultTrace": [
+        {
+          "site": 14,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 19,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 24,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 29,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 34,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 39,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 44,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 49,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 54,
+          "choice": 0,
+          "origin": 0
+        }
+      ]
+    },
+    {
+      "tick": 5,
+      "module": "1e6df7ab352fed39",
+      "strategy": "control",
+      "inputs": {
+        "__gf_sensor_fault_raw_a": 0,
+        "__gf_sensor_fault_raw_b": 0,
+        "__gf_sensor_fault_raw_c": 0,
+        "__gf_sensor_fault_raw_d": 0,
+        "__gf_sensor_fault_raw_e": 0,
+        "__gf_sensor_fault_raw_f": 0,
+        "__gf_sensor_fault_raw_g": 0,
+        "__gf_sensor_fault_raw_h": 0,
+        "__gf_sensor_fault_raw_i": 0,
+        "__gf_sensor_ok_raw_a": true,
+        "__gf_sensor_ok_raw_b": true,
+        "__gf_sensor_ok_raw_c": true,
+        "__gf_sensor_ok_raw_d": true,
+        "__gf_sensor_ok_raw_e": true,
+        "__gf_sensor_ok_raw_f": true,
+        "__gf_sensor_ok_raw_g": true,
+        "__gf_sensor_ok_raw_h": true,
+        "__gf_sensor_ok_raw_i": true,
+        "__gf_sensor_value_raw_a": false,
+        "__gf_sensor_value_raw_b": false,
+        "__gf_sensor_value_raw_c": true,
+        "__gf_sensor_value_raw_d": false,
+        "__gf_sensor_value_raw_e": false,
+        "__gf_sensor_value_raw_f": false,
+        "__gf_sensor_value_raw_g": false,
+        "__gf_sensor_value_raw_h": false,
+        "__gf_sensor_value_raw_i": false
+      },
+      "stateBefore": {},
+      "stateAfter": {},
+      "requested": {
+        "a": false,
+        "b": false,
+        "c": true,
+        "d": false,
+        "e": false,
+        "f": false,
+        "g": false,
+        "h": false,
+        "i": false
+      },
+      "safe": {
+        "a": false,
+        "b": false,
+        "c": true,
+        "d": false,
+        "e": false,
+        "f": false,
+        "g": false,
+        "h": false,
+        "i": false
+      },
+      "faults": [],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": [
+          {
+            "index": 0,
+            "kind": "mutex",
+            "names": [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "g",
+              "h",
+              "i"
+            ],
+            "firstViolation": null,
+            "final": {
+              "round": 0,
+              "values": {
+                "a": false,
+                "b": false,
+                "c": true,
+                "d": false,
+                "e": false,
+                "f": false,
+                "g": false,
+                "h": false,
+                "i": false
+              },
+              "satisfied": true
+            }
+          },
+          {
+            "index": 1,
+            "kind": "mutex",
+            "names": [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "g",
+              "h",
+              "i"
+            ],
+            "firstViolation": null,
+            "final": {
+              "round": 0,
+              "values": {
+                "a": false,
+                "b": false,
+                "c": true,
+                "d": false,
+                "e": false,
+                "f": false,
+                "g": false,
+                "h": false,
+                "i": false
+              },
+              "satisfied": true
+            }
+          }
+        ]
+      },
+      "resultTrace": [
+        {
+          "site": 14,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 19,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 24,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 29,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 34,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 39,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 44,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 49,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 54,
+          "choice": 0,
+          "origin": 0
+        }
+      ]
+    },
+    {
+      "tick": 6,
+      "module": "1e6df7ab352fed39",
+      "strategy": "control",
+      "inputs": {
+        "__gf_sensor_fault_raw_a": 0,
+        "__gf_sensor_fault_raw_b": 0,
+        "__gf_sensor_fault_raw_c": 0,
+        "__gf_sensor_fault_raw_d": 0,
+        "__gf_sensor_fault_raw_e": 0,
+        "__gf_sensor_fault_raw_f": 0,
+        "__gf_sensor_fault_raw_g": 0,
+        "__gf_sensor_fault_raw_h": 0,
+        "__gf_sensor_fault_raw_i": 0,
+        "__gf_sensor_ok_raw_a": true,
+        "__gf_sensor_ok_raw_b": true,
+        "__gf_sensor_ok_raw_c": true,
+        "__gf_sensor_ok_raw_d": true,
+        "__gf_sensor_ok_raw_e": true,
+        "__gf_sensor_ok_raw_f": true,
+        "__gf_sensor_ok_raw_g": true,
+        "__gf_sensor_ok_raw_h": true,
+        "__gf_sensor_ok_raw_i": true,
+        "__gf_sensor_value_raw_a": false,
+        "__gf_sensor_value_raw_b": false,
+        "__gf_sensor_value_raw_c": false,
+        "__gf_sensor_value_raw_d": true,
+        "__gf_sensor_value_raw_e": false,
+        "__gf_sensor_value_raw_f": false,
+        "__gf_sensor_value_raw_g": false,
+        "__gf_sensor_value_raw_h": false,
+        "__gf_sensor_value_raw_i": false
+      },
+      "stateBefore": {},
+      "stateAfter": {},
+      "requested": {
+        "a": false,
+        "b": false,
+        "c": false,
+        "d": true,
+        "e": false,
+        "f": false,
+        "g": false,
+        "h": false,
+        "i": false
+      },
+      "safe": {
+        "a": false,
+        "b": false,
+        "c": false,
+        "d": true,
+        "e": false,
+        "f": false,
+        "g": false,
+        "h": false,
+        "i": false
+      },
+      "faults": [],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": [
+          {
+            "index": 0,
+            "kind": "mutex",
+            "names": [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "g",
+              "h",
+              "i"
+            ],
+            "firstViolation": null,
+            "final": {
+              "round": 0,
+              "values": {
+                "a": false,
+                "b": false,
+                "c": false,
+                "d": true,
+                "e": false,
+                "f": false,
+                "g": false,
+                "h": false,
+                "i": false
+              },
+              "satisfied": true
+            }
+          },
+          {
+            "index": 1,
+            "kind": "mutex",
+            "names": [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "g",
+              "h",
+              "i"
+            ],
+            "firstViolation": null,
+            "final": {
+              "round": 0,
+              "values": {
+                "a": false,
+                "b": false,
+                "c": false,
+                "d": true,
+                "e": false,
+                "f": false,
+                "g": false,
+                "h": false,
+                "i": false
+              },
+              "satisfied": true
+            }
+          }
+        ]
+      },
+      "resultTrace": [
+        {
+          "site": 14,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 19,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 24,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 29,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 34,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 39,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 44,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 49,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 54,
+          "choice": 0,
+          "origin": 0
+        }
+      ]
+    },
+    {
+      "tick": 7,
+      "module": "1e6df7ab352fed39",
+      "strategy": "control",
+      "inputs": {
+        "__gf_sensor_fault_raw_a": 0,
+        "__gf_sensor_fault_raw_b": 0,
+        "__gf_sensor_fault_raw_c": 0,
+        "__gf_sensor_fault_raw_d": 0,
+        "__gf_sensor_fault_raw_e": 0,
+        "__gf_sensor_fault_raw_f": 0,
+        "__gf_sensor_fault_raw_g": 0,
+        "__gf_sensor_fault_raw_h": 0,
+        "__gf_sensor_fault_raw_i": 0,
+        "__gf_sensor_ok_raw_a": true,
+        "__gf_sensor_ok_raw_b": true,
+        "__gf_sensor_ok_raw_c": true,
+        "__gf_sensor_ok_raw_d": true,
+        "__gf_sensor_ok_raw_e": true,
+        "__gf_sensor_ok_raw_f": true,
+        "__gf_sensor_ok_raw_g": true,
+        "__gf_sensor_ok_raw_h": true,
+        "__gf_sensor_ok_raw_i": true,
+        "__gf_sensor_value_raw_a": false,
+        "__gf_sensor_value_raw_b": false,
+        "__gf_sensor_value_raw_c": false,
+        "__gf_sensor_value_raw_d": false,
+        "__gf_sensor_value_raw_e": true,
+        "__gf_sensor_value_raw_f": false,
+        "__gf_sensor_value_raw_g": false,
+        "__gf_sensor_value_raw_h": false,
+        "__gf_sensor_value_raw_i": false
+      },
+      "stateBefore": {},
+      "stateAfter": {},
+      "requested": {
+        "a": false,
+        "b": false,
+        "c": false,
+        "d": false,
+        "e": true,
+        "f": false,
+        "g": false,
+        "h": false,
+        "i": false
+      },
+      "safe": {
+        "a": false,
+        "b": false,
+        "c": false,
+        "d": false,
+        "e": true,
+        "f": false,
+        "g": false,
+        "h": false,
+        "i": false
+      },
+      "faults": [],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": [
+          {
+            "index": 0,
+            "kind": "mutex",
+            "names": [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "g",
+              "h",
+              "i"
+            ],
+            "firstViolation": null,
+            "final": {
+              "round": 0,
+              "values": {
+                "a": false,
+                "b": false,
+                "c": false,
+                "d": false,
+                "e": true,
+                "f": false,
+                "g": false,
+                "h": false,
+                "i": false
+              },
+              "satisfied": true
+            }
+          },
+          {
+            "index": 1,
+            "kind": "mutex",
+            "names": [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "g",
+              "h",
+              "i"
+            ],
+            "firstViolation": null,
+            "final": {
+              "round": 0,
+              "values": {
+                "a": false,
+                "b": false,
+                "c": false,
+                "d": false,
+                "e": true,
+                "f": false,
+                "g": false,
+                "h": false,
+                "i": false
+              },
+              "satisfied": true
+            }
+          }
+        ]
+      },
+      "resultTrace": [
+        {
+          "site": 14,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 19,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 24,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 29,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 34,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 39,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 44,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 49,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 54,
+          "choice": 0,
+          "origin": 0
+        }
+      ]
+    },
+    {
+      "tick": 8,
+      "module": "1e6df7ab352fed39",
+      "strategy": "control",
+      "inputs": {
+        "__gf_sensor_fault_raw_a": 0,
+        "__gf_sensor_fault_raw_b": 0,
+        "__gf_sensor_fault_raw_c": 0,
+        "__gf_sensor_fault_raw_d": 0,
+        "__gf_sensor_fault_raw_e": 0,
+        "__gf_sensor_fault_raw_f": 0,
+        "__gf_sensor_fault_raw_g": 0,
+        "__gf_sensor_fault_raw_h": 0,
+        "__gf_sensor_fault_raw_i": 0,
+        "__gf_sensor_ok_raw_a": true,
+        "__gf_sensor_ok_raw_b": true,
+        "__gf_sensor_ok_raw_c": true,
+        "__gf_sensor_ok_raw_d": true,
+        "__gf_sensor_ok_raw_e": true,
+        "__gf_sensor_ok_raw_f": true,
+        "__gf_sensor_ok_raw_g": true,
+        "__gf_sensor_ok_raw_h": true,
+        "__gf_sensor_ok_raw_i": true,
+        "__gf_sensor_value_raw_a": false,
+        "__gf_sensor_value_raw_b": false,
+        "__gf_sensor_value_raw_c": false,
+        "__gf_sensor_value_raw_d": false,
+        "__gf_sensor_value_raw_e": false,
+        "__gf_sensor_value_raw_f": true,
+        "__gf_sensor_value_raw_g": false,
+        "__gf_sensor_value_raw_h": false,
+        "__gf_sensor_value_raw_i": false
+      },
+      "stateBefore": {},
+      "stateAfter": {},
+      "requested": {
+        "a": false,
+        "b": false,
+        "c": false,
+        "d": false,
+        "e": false,
+        "f": true,
+        "g": false,
+        "h": false,
+        "i": false
+      },
+      "safe": {
+        "a": false,
+        "b": false,
+        "c": false,
+        "d": false,
+        "e": false,
+        "f": true,
+        "g": false,
+        "h": false,
+        "i": false
+      },
+      "faults": [],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": [
+          {
+            "index": 0,
+            "kind": "mutex",
+            "names": [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "g",
+              "h",
+              "i"
+            ],
+            "firstViolation": null,
+            "final": {
+              "round": 0,
+              "values": {
+                "a": false,
+                "b": false,
+                "c": false,
+                "d": false,
+                "e": false,
+                "f": true,
+                "g": false,
+                "h": false,
+                "i": false
+              },
+              "satisfied": true
+            }
+          },
+          {
+            "index": 1,
+            "kind": "mutex",
+            "names": [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "g",
+              "h",
+              "i"
+            ],
+            "firstViolation": null,
+            "final": {
+              "round": 0,
+              "values": {
+                "a": false,
+                "b": false,
+                "c": false,
+                "d": false,
+                "e": false,
+                "f": true,
+                "g": false,
+                "h": false,
+                "i": false
+              },
+              "satisfied": true
+            }
+          }
+        ]
+      },
+      "resultTrace": [
+        {
+          "site": 14,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 19,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 24,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 29,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 34,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 39,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 44,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 49,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 54,
+          "choice": 0,
+          "origin": 0
+        }
+      ]
+    },
+    {
+      "tick": 9,
+      "module": "1e6df7ab352fed39",
+      "strategy": "control",
+      "inputs": {
+        "__gf_sensor_fault_raw_a": 0,
+        "__gf_sensor_fault_raw_b": 0,
+        "__gf_sensor_fault_raw_c": 0,
+        "__gf_sensor_fault_raw_d": 0,
+        "__gf_sensor_fault_raw_e": 0,
+        "__gf_sensor_fault_raw_f": 0,
+        "__gf_sensor_fault_raw_g": 0,
+        "__gf_sensor_fault_raw_h": 0,
+        "__gf_sensor_fault_raw_i": 0,
+        "__gf_sensor_ok_raw_a": true,
+        "__gf_sensor_ok_raw_b": true,
+        "__gf_sensor_ok_raw_c": true,
+        "__gf_sensor_ok_raw_d": true,
+        "__gf_sensor_ok_raw_e": true,
+        "__gf_sensor_ok_raw_f": true,
+        "__gf_sensor_ok_raw_g": true,
+        "__gf_sensor_ok_raw_h": true,
+        "__gf_sensor_ok_raw_i": true,
+        "__gf_sensor_value_raw_a": false,
+        "__gf_sensor_value_raw_b": false,
+        "__gf_sensor_value_raw_c": false,
+        "__gf_sensor_value_raw_d": false,
+        "__gf_sensor_value_raw_e": false,
+        "__gf_sensor_value_raw_f": false,
+        "__gf_sensor_value_raw_g": true,
+        "__gf_sensor_value_raw_h": false,
+        "__gf_sensor_value_raw_i": false
+      },
+      "stateBefore": {},
+      "stateAfter": {},
+      "requested": {
+        "a": false,
+        "b": false,
+        "c": false,
+        "d": false,
+        "e": false,
+        "f": false,
+        "g": true,
+        "h": false,
+        "i": false
+      },
+      "safe": {
+        "a": false,
+        "b": false,
+        "c": false,
+        "d": false,
+        "e": false,
+        "f": false,
+        "g": true,
+        "h": false,
+        "i": false
+      },
+      "faults": [],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": [
+          {
+            "index": 0,
+            "kind": "mutex",
+            "names": [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "g",
+              "h",
+              "i"
+            ],
+            "firstViolation": null,
+            "final": {
+              "round": 0,
+              "values": {
+                "a": false,
+                "b": false,
+                "c": false,
+                "d": false,
+                "e": false,
+                "f": false,
+                "g": true,
+                "h": false,
+                "i": false
+              },
+              "satisfied": true
+            }
+          },
+          {
+            "index": 1,
+            "kind": "mutex",
+            "names": [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "g",
+              "h",
+              "i"
+            ],
+            "firstViolation": null,
+            "final": {
+              "round": 0,
+              "values": {
+                "a": false,
+                "b": false,
+                "c": false,
+                "d": false,
+                "e": false,
+                "f": false,
+                "g": true,
+                "h": false,
+                "i": false
+              },
+              "satisfied": true
+            }
+          }
+        ]
+      },
+      "resultTrace": [
+        {
+          "site": 14,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 19,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 24,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 29,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 34,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 39,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 44,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 49,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 54,
+          "choice": 0,
+          "origin": 0
+        }
+      ]
+    },
+    {
+      "tick": 10,
+      "module": "1e6df7ab352fed39",
+      "strategy": "control",
+      "inputs": {
+        "__gf_sensor_fault_raw_a": 0,
+        "__gf_sensor_fault_raw_b": 0,
+        "__gf_sensor_fault_raw_c": 0,
+        "__gf_sensor_fault_raw_d": 0,
+        "__gf_sensor_fault_raw_e": 0,
+        "__gf_sensor_fault_raw_f": 0,
+        "__gf_sensor_fault_raw_g": 0,
+        "__gf_sensor_fault_raw_h": 0,
+        "__gf_sensor_fault_raw_i": 0,
+        "__gf_sensor_ok_raw_a": true,
+        "__gf_sensor_ok_raw_b": true,
+        "__gf_sensor_ok_raw_c": true,
+        "__gf_sensor_ok_raw_d": true,
+        "__gf_sensor_ok_raw_e": true,
+        "__gf_sensor_ok_raw_f": true,
+        "__gf_sensor_ok_raw_g": true,
+        "__gf_sensor_ok_raw_h": true,
+        "__gf_sensor_ok_raw_i": true,
+        "__gf_sensor_value_raw_a": false,
+        "__gf_sensor_value_raw_b": false,
+        "__gf_sensor_value_raw_c": false,
+        "__gf_sensor_value_raw_d": false,
+        "__gf_sensor_value_raw_e": false,
+        "__gf_sensor_value_raw_f": false,
+        "__gf_sensor_value_raw_g": false,
+        "__gf_sensor_value_raw_h": true,
+        "__gf_sensor_value_raw_i": false
+      },
+      "stateBefore": {},
+      "stateAfter": {},
+      "requested": {
+        "a": false,
+        "b": false,
+        "c": false,
+        "d": false,
+        "e": false,
+        "f": false,
+        "g": false,
+        "h": true,
+        "i": false
+      },
+      "safe": {
+        "a": false,
+        "b": false,
+        "c": false,
+        "d": false,
+        "e": false,
+        "f": false,
+        "g": false,
+        "h": true,
+        "i": false
+      },
+      "faults": [],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": [
+          {
+            "index": 0,
+            "kind": "mutex",
+            "names": [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "g",
+              "h",
+              "i"
+            ],
+            "firstViolation": null,
+            "final": {
+              "round": 0,
+              "values": {
+                "a": false,
+                "b": false,
+                "c": false,
+                "d": false,
+                "e": false,
+                "f": false,
+                "g": false,
+                "h": true,
+                "i": false
+              },
+              "satisfied": true
+            }
+          },
+          {
+            "index": 1,
+            "kind": "mutex",
+            "names": [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "g",
+              "h",
+              "i"
+            ],
+            "firstViolation": null,
+            "final": {
+              "round": 0,
+              "values": {
+                "a": false,
+                "b": false,
+                "c": false,
+                "d": false,
+                "e": false,
+                "f": false,
+                "g": false,
+                "h": true,
+                "i": false
+              },
+              "satisfied": true
+            }
+          }
+        ]
+      },
+      "resultTrace": [
+        {
+          "site": 14,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 19,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 24,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 29,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 34,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 39,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 44,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 49,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 54,
+          "choice": 0,
+          "origin": 0
+        }
+      ]
+    },
+    {
+      "tick": 11,
+      "module": "1e6df7ab352fed39",
+      "strategy": "control",
+      "inputs": {
+        "__gf_sensor_fault_raw_a": 0,
+        "__gf_sensor_fault_raw_b": 0,
+        "__gf_sensor_fault_raw_c": 0,
+        "__gf_sensor_fault_raw_d": 0,
+        "__gf_sensor_fault_raw_e": 0,
+        "__gf_sensor_fault_raw_f": 0,
+        "__gf_sensor_fault_raw_g": 0,
+        "__gf_sensor_fault_raw_h": 0,
+        "__gf_sensor_fault_raw_i": 0,
+        "__gf_sensor_ok_raw_a": true,
+        "__gf_sensor_ok_raw_b": true,
+        "__gf_sensor_ok_raw_c": true,
+        "__gf_sensor_ok_raw_d": true,
+        "__gf_sensor_ok_raw_e": true,
+        "__gf_sensor_ok_raw_f": true,
+        "__gf_sensor_ok_raw_g": true,
+        "__gf_sensor_ok_raw_h": true,
+        "__gf_sensor_ok_raw_i": true,
+        "__gf_sensor_value_raw_a": false,
+        "__gf_sensor_value_raw_b": false,
+        "__gf_sensor_value_raw_c": false,
+        "__gf_sensor_value_raw_d": false,
+        "__gf_sensor_value_raw_e": false,
+        "__gf_sensor_value_raw_f": false,
+        "__gf_sensor_value_raw_g": false,
+        "__gf_sensor_value_raw_h": false,
+        "__gf_sensor_value_raw_i": true
+      },
+      "stateBefore": {},
+      "stateAfter": {},
+      "requested": {
+        "a": false,
+        "b": false,
+        "c": false,
+        "d": false,
+        "e": false,
+        "f": false,
+        "g": false,
+        "h": false,
+        "i": true
+      },
+      "safe": {
+        "a": false,
+        "b": false,
+        "c": false,
+        "d": false,
+        "e": false,
+        "f": false,
+        "g": false,
+        "h": false,
+        "i": true
+      },
+      "faults": [],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": [
+          {
+            "index": 0,
+            "kind": "mutex",
+            "names": [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "g",
+              "h",
+              "i"
+            ],
+            "firstViolation": null,
+            "final": {
+              "round": 0,
+              "values": {
+                "a": false,
+                "b": false,
+                "c": false,
+                "d": false,
+                "e": false,
+                "f": false,
+                "g": false,
+                "h": false,
+                "i": true
+              },
+              "satisfied": true
+            }
+          },
+          {
+            "index": 1,
+            "kind": "mutex",
+            "names": [
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "g",
+              "h",
+              "i"
+            ],
+            "firstViolation": null,
+            "final": {
+              "round": 0,
+              "values": {
+                "a": false,
+                "b": false,
+                "c": false,
+                "d": false,
+                "e": false,
+                "f": false,
+                "g": false,
+                "h": false,
+                "i": true
+              },
+              "satisfied": true
+            }
+          }
+        ]
+      },
+      "resultTrace": [
+        {
+          "site": 14,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 19,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 24,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 29,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 34,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 39,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 44,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 49,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 54,
+          "choice": 0,
+          "origin": 0
+        }
+      ]
+    }
+  ]
+}

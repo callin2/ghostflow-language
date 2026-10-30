@@ -1,0 +1,13 @@
+{
+  "identity": {
+    "baseVersion": "0.1.0",
+    "buildNumber": 124,
+    "buildVersion": "0.1.0-build.124",
+    "repo": "github.com/callin2/ghostflow-language",
+    "schema": 1,
+    "sourceSHA": "4861a78a72f0f1078cafe99bf26b93d541e1b82c"
+  },
+  "wasmSha256": "f3347d44a8087033d293c167ca07b0a618475b7b5cc5c8d3ab806565b302eaca",
+  "nativeSha256": "cccebe028384c5a6ecde63acc5ebb87ff7f7ce8b20adede345f92fde2ee30eea",
+  "framedNativeSha256": "8db0192a7cbc92c92d35130a4da6aa438b6900ec16b05591c7029d5937a96b5c"
+}

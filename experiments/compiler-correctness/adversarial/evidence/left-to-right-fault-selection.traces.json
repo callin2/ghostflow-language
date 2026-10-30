@@ -1,0 +1,10 @@
+[
+  {
+    "ok": false,
+    "error": "integer-conversion-out-of-range"
+  },
+  {
+    "ok": false,
+    "error": "division by zero"
+  }
+]

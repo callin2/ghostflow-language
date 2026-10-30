@@ -1,0 +1,37 @@
+[
+  {
+    "ok": true,
+    "vm": {
+      "tick": 1,
+      "module": "c0ee0d2bcea911e5",
+      "strategy": "control",
+      "inputs": {},
+      "stateBefore": {
+        "a": 16777216,
+        "one": 1,
+        "third": 0.3333333333333333
+      },
+      "stateAfter": {
+        "a": 16777216,
+        "one": 1,
+        "third": 0.3333333333333333
+      },
+      "requested": {
+        "constant": 1,
+        "dynamic": 1,
+        "rational": 1
+      },
+      "safe": {
+        "constant": 1,
+        "dynamic": 1,
+        "rational": 1
+      },
+      "faults": [],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": []
+      },
+      "resultTrace": []
+    }
+  }
+]

@@ -1,0 +1,8 @@
+{
+  "fixture": "BridgeCountBoundary",
+  "sourceSha256": "36707605c1614f5a1ebc0270ea8fe946357333b511897102bb86e0e406635d53",
+  "theorem": "CompilerSafety.check_run instantiated with accepted : check original compiled = true",
+  "exitCode": 0,
+  "stdout": "",
+  "stderr": ""
+}

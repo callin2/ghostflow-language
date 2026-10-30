@@ -1,0 +1,506 @@
+{
+  "original": [
+    {
+      "status": "OK",
+      "trace": {
+        "tick": 1,
+        "module": "e3bb0ab9086d2e2c",
+        "strategy": "control",
+        "inputs": {
+          "__gf_sensor_fault_raw_a": 0,
+          "__gf_sensor_fault_raw_b": 0,
+          "__gf_sensor_ok_raw_a": true,
+          "__gf_sensor_ok_raw_b": true,
+          "__gf_sensor_value_raw_a": false,
+          "__gf_sensor_value_raw_b": false
+        },
+        "stateBefore": {
+          "counter": 0
+        },
+        "stateAfter": {
+          "counter": 1
+        },
+        "requested": {
+          "a": true,
+          "b": false
+        },
+        "safe": {
+          "a": true,
+          "b": false
+        },
+        "faults": [],
+        "safetyTrace": {
+          "format": "GhostFlow/safety-trace-v1",
+          "constraints": [
+            {
+              "index": 0,
+              "kind": "mutex",
+              "names": [
+                "a",
+                "b"
+              ],
+              "firstViolation": null,
+              "final": {
+                "round": 0,
+                "values": {
+                  "a": true,
+                  "b": false
+                },
+                "satisfied": true
+              }
+            },
+            {
+              "index": 1,
+              "kind": "mutex",
+              "names": [
+                "a",
+                "b"
+              ],
+              "firstViolation": null,
+              "final": {
+                "round": 0,
+                "values": {
+                  "a": true,
+                  "b": false
+                },
+                "satisfied": true
+              }
+            }
+          ]
+        },
+        "resultTrace": []
+      }
+    },
+    {
+      "status": "OK",
+      "trace": {
+        "tick": 2,
+        "module": "e3bb0ab9086d2e2c",
+        "strategy": "control",
+        "inputs": {
+          "__gf_sensor_fault_raw_a": 0,
+          "__gf_sensor_fault_raw_b": 0,
+          "__gf_sensor_ok_raw_a": true,
+          "__gf_sensor_ok_raw_b": true,
+          "__gf_sensor_value_raw_a": true,
+          "__gf_sensor_value_raw_b": false
+        },
+        "stateBefore": {
+          "counter": 1
+        },
+        "stateAfter": {
+          "counter": 2
+        },
+        "requested": {
+          "a": true,
+          "b": false
+        },
+        "safe": {
+          "a": true,
+          "b": false
+        },
+        "faults": [],
+        "safetyTrace": {
+          "format": "GhostFlow/safety-trace-v1",
+          "constraints": [
+            {
+              "index": 0,
+              "kind": "mutex",
+              "names": [
+                "a",
+                "b"
+              ],
+              "firstViolation": null,
+              "final": {
+                "round": 0,
+                "values": {
+                  "a": true,
+                  "b": false
+                },
+                "satisfied": true
+              }
+            },
+            {
+              "index": 1,
+              "kind": "mutex",
+              "names": [
+                "a",
+                "b"
+              ],
+              "firstViolation": null,
+              "final": {
+                "round": 0,
+                "values": {
+                  "a": true,
+                  "b": false
+                },
+                "satisfied": true
+              }
+            }
+          ]
+        },
+        "resultTrace": []
+      }
+    },
+    {
+      "status": "OK",
+      "trace": {
+        "tick": 3,
+        "module": "e3bb0ab9086d2e2c",
+        "strategy": "control",
+        "inputs": {
+          "__gf_sensor_fault_raw_a": 0,
+          "__gf_sensor_fault_raw_b": 0,
+          "__gf_sensor_ok_raw_a": true,
+          "__gf_sensor_ok_raw_b": true,
+          "__gf_sensor_value_raw_a": false,
+          "__gf_sensor_value_raw_b": true
+        },
+        "stateBefore": {
+          "counter": 2
+        },
+        "stateAfter": {
+          "counter": 3
+        },
+        "requested": {
+          "a": true,
+          "b": false
+        },
+        "safe": {
+          "a": true,
+          "b": false
+        },
+        "faults": [],
+        "safetyTrace": {
+          "format": "GhostFlow/safety-trace-v1",
+          "constraints": [
+            {
+              "index": 0,
+              "kind": "mutex",
+              "names": [
+                "a",
+                "b"
+              ],
+              "firstViolation": null,
+              "final": {
+                "round": 0,
+                "values": {
+                  "a": true,
+                  "b": false
+                },
+                "satisfied": true
+              }
+            },
+            {
+              "index": 1,
+              "kind": "mutex",
+              "names": [
+                "a",
+                "b"
+              ],
+              "firstViolation": null,
+              "final": {
+                "round": 0,
+                "values": {
+                  "a": true,
+                  "b": false
+                },
+                "satisfied": true
+              }
+            }
+          ]
+        },
+        "resultTrace": []
+      }
+    },
+    {
+      "status": "OK",
+      "trace": {
+        "tick": 4,
+        "module": "e3bb0ab9086d2e2c",
+        "strategy": "control",
+        "inputs": {
+          "__gf_sensor_fault_raw_a": 0,
+          "__gf_sensor_fault_raw_b": 0,
+          "__gf_sensor_ok_raw_a": true,
+          "__gf_sensor_ok_raw_b": true,
+          "__gf_sensor_value_raw_a": true,
+          "__gf_sensor_value_raw_b": true
+        },
+        "stateBefore": {
+          "counter": 3
+        },
+        "stateAfter": {
+          "counter": 4
+        },
+        "requested": {
+          "a": true,
+          "b": false
+        },
+        "safe": {
+          "a": true,
+          "b": false
+        },
+        "faults": [],
+        "safetyTrace": {
+          "format": "GhostFlow/safety-trace-v1",
+          "constraints": [
+            {
+              "index": 0,
+              "kind": "mutex",
+              "names": [
+                "a",
+                "b"
+              ],
+              "firstViolation": null,
+              "final": {
+                "round": 0,
+                "values": {
+                  "a": true,
+                  "b": false
+                },
+                "satisfied": true
+              }
+            },
+            {
+              "index": 1,
+              "kind": "mutex",
+              "names": [
+                "a",
+                "b"
+              ],
+              "firstViolation": null,
+              "final": {
+                "round": 0,
+                "values": {
+                  "a": true,
+                  "b": false
+                },
+                "satisfied": true
+              }
+            }
+          ]
+        },
+        "resultTrace": []
+      }
+    }
+  ],
+  "optimized": [
+    {
+      "status": "OK",
+      "trace": {
+        "tick": 1,
+        "module": "4812025b6c7ff706",
+        "strategy": "control",
+        "inputs": {
+          "__gf_sensor_fault_raw_a": 0,
+          "__gf_sensor_fault_raw_b": 0,
+          "__gf_sensor_ok_raw_a": true,
+          "__gf_sensor_ok_raw_b": true,
+          "__gf_sensor_value_raw_a": false,
+          "__gf_sensor_value_raw_b": false
+        },
+        "stateBefore": {
+          "counter": 0
+        },
+        "stateAfter": {
+          "counter": 1
+        },
+        "requested": {
+          "a": true,
+          "b": false
+        },
+        "safe": {
+          "a": true,
+          "b": false
+        },
+        "faults": [],
+        "safetyTrace": {
+          "format": "GhostFlow/safety-trace-v1",
+          "constraints": [
+            {
+              "index": 0,
+              "kind": "mutex",
+              "names": [
+                "a",
+                "b"
+              ],
+              "firstViolation": null,
+              "final": {
+                "round": 0,
+                "values": {
+                  "a": true,
+                  "b": false
+                },
+                "satisfied": true
+              }
+            }
+          ]
+        },
+        "resultTrace": []
+      }
+    },
+    {
+      "status": "OK",
+      "trace": {
+        "tick": 2,
+        "module": "4812025b6c7ff706",
+        "strategy": "control",
+        "inputs": {
+          "__gf_sensor_fault_raw_a": 0,
+          "__gf_sensor_fault_raw_b": 0,
+          "__gf_sensor_ok_raw_a": true,
+          "__gf_sensor_ok_raw_b": true,
+          "__gf_sensor_value_raw_a": true,
+          "__gf_sensor_value_raw_b": false
+        },
+        "stateBefore": {
+          "counter": 1
+        },
+        "stateAfter": {
+          "counter": 2
+        },
+        "requested": {
+          "a": true,
+          "b": false
+        },
+        "safe": {
+          "a": true,
+          "b": false
+        },
+        "faults": [],
+        "safetyTrace": {
+          "format": "GhostFlow/safety-trace-v1",
+          "constraints": [
+            {
+              "index": 0,
+              "kind": "mutex",
+              "names": [
+                "a",
+                "b"
+              ],
+              "firstViolation": null,
+              "final": {
+                "round": 0,
+                "values": {
+                  "a": true,
+                  "b": false
+                },
+                "satisfied": true
+              }
+            }
+          ]
+        },
+        "resultTrace": []
+      }
+    },
+    {
+      "status": "OK",
+      "trace": {
+        "tick": 3,
+        "module": "4812025b6c7ff706",
+        "strategy": "control",
+        "inputs": {
+          "__gf_sensor_fault_raw_a": 0,
+          "__gf_sensor_fault_raw_b": 0,
+          "__gf_sensor_ok_raw_a": true,
+          "__gf_sensor_ok_raw_b": true,
+          "__gf_sensor_value_raw_a": false,
+          "__gf_sensor_value_raw_b": true
+        },
+        "stateBefore": {
+          "counter": 2
+        },
+        "stateAfter": {
+          "counter": 3
+        },
+        "requested": {
+          "a": true,
+          "b": false
+        },
+        "safe": {
+          "a": true,
+          "b": false
+        },
+        "faults": [],
+        "safetyTrace": {
+          "format": "GhostFlow/safety-trace-v1",
+          "constraints": [
+            {
+              "index": 0,
+              "kind": "mutex",
+              "names": [
+                "a",
+                "b"
+              ],
+              "firstViolation": null,
+              "final": {
+                "round": 0,
+                "values": {
+                  "a": true,
+                  "b": false
+                },
+                "satisfied": true
+              }
+            }
+          ]
+        },
+        "resultTrace": []
+      }
+    },
+    {
+      "status": "OK",
+      "trace": {
+        "tick": 4,
+        "module": "4812025b6c7ff706",
+        "strategy": "control",
+        "inputs": {
+          "__gf_sensor_fault_raw_a": 0,
+          "__gf_sensor_fault_raw_b": 0,
+          "__gf_sensor_ok_raw_a": true,
+          "__gf_sensor_ok_raw_b": true,
+          "__gf_sensor_value_raw_a": true,
+          "__gf_sensor_value_raw_b": true
+        },
+        "stateBefore": {
+          "counter": 3
+        },
+        "stateAfter": {
+          "counter": 4
+        },
+        "requested": {
+          "a": true,
+          "b": false
+        },
+        "safe": {
+          "a": true,
+          "b": false
+        },
+        "faults": [],
+        "safetyTrace": {
+          "format": "GhostFlow/safety-trace-v1",
+          "constraints": [
+            {
+              "index": 0,
+              "kind": "mutex",
+              "names": [
+                "a",
+                "b"
+              ],
+              "firstViolation": null,
+              "final": {
+                "round": 0,
+                "values": {
+                  "a": true,
+                  "b": false
+                },
+                "satisfied": true
+              }
+            }
+          ]
+        },
+        "resultTrace": []
+      }
+    }
+  ]
+}

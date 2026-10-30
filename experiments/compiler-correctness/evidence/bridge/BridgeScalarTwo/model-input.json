@@ -1,0 +1,232 @@
+{
+  "sourceForms": [
+    [
+      "mutex",
+      "a",
+      "b"
+    ],
+    [
+      "mutex",
+      "a",
+      "b"
+    ]
+  ],
+  "decoded": {
+    "version": 2,
+    "name": "BridgeScalarTwo",
+    "moduleVersion": 1,
+    "inputs": [
+      {
+        "name": "__gf_sensor_value_raw_a",
+        "type": 1
+      },
+      {
+        "name": "__gf_sensor_ok_raw_a",
+        "type": 1
+      },
+      {
+        "name": "__gf_sensor_fault_raw_a",
+        "type": 2
+      },
+      {
+        "name": "__gf_sensor_value_raw_b",
+        "type": 1
+      },
+      {
+        "name": "__gf_sensor_ok_raw_b",
+        "type": 1
+      },
+      {
+        "name": "__gf_sensor_fault_raw_b",
+        "type": 2
+      }
+    ],
+    "states": [
+      {
+        "name": "counter",
+        "type": 3
+      }
+    ],
+    "strategies": [
+      {
+        "name": "control",
+        "priority": 0,
+        "transitions": [
+          {
+            "stateIndex": 0,
+            "expressionLength": 9
+          }
+        ],
+        "intents": [
+          {
+            "name": "a",
+            "type": 1,
+            "expressionLength": 2
+          },
+          {
+            "name": "b",
+            "type": 1,
+            "expressionLength": 2
+          }
+        ]
+      }
+    ],
+    "constraints": [
+      [
+        "mutex",
+        "a",
+        "b"
+      ]
+    ],
+    "constraintsOffset": 286
+  },
+  "frames": [
+    {
+      "a": false,
+      "b": false
+    },
+    {
+      "a": true,
+      "b": false
+    },
+    {
+      "a": false,
+      "b": true
+    },
+    {
+      "a": true,
+      "b": true
+    }
+  ],
+  "rails": [
+    [
+      {
+        "name": "__gf_sensor_value_raw_a",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_a",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_a",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_b",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_b",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_b",
+        "type": "number",
+        "value": 0
+      }
+    ],
+    [
+      {
+        "name": "__gf_sensor_value_raw_a",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_ok_raw_a",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_a",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_b",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_b",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_b",
+        "type": "number",
+        "value": 0
+      }
+    ],
+    [
+      {
+        "name": "__gf_sensor_value_raw_a",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_a",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_a",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_b",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_ok_raw_b",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_b",
+        "type": "number",
+        "value": 0
+      }
+    ],
+    [
+      {
+        "name": "__gf_sensor_value_raw_a",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_ok_raw_a",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_a",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_b",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_ok_raw_b",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_b",
+        "type": "number",
+        "value": 0
+      }
+    ]
+  ],
+  "trustBoundary": "production literate extractor and parser; independent GFB framing decoder"
+}

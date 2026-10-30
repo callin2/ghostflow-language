@@ -1,0 +1,17 @@
+{
+  "format": "GhostFlow/control-v1",
+  "name": "PercentState",
+  "inputs": [],
+  "outputs": [
+    {
+      "name": "value",
+      "type": "Percent"
+    }
+  ],
+  "sensors": [],
+  "schedules": [],
+  "timers": [],
+  "signals": [],
+  "configs": [],
+  "bytecodeSha256": "930379cce56d6b8e890a451d55f2d5f362143403674d254561e173e3d7bbe8af"
+}

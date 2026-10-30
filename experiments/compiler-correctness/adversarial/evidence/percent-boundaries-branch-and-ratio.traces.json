@@ -1,0 +1,285 @@
+[
+  {
+    "ok": true,
+    "vm": {
+      "tick": 1,
+      "module": "3c5fbcdc5114dd5a",
+      "strategy": "control",
+      "inputs": {
+        "__gf_sensor_fault_enabled": 0,
+        "__gf_sensor_fault_observed": 0,
+        "__gf_sensor_ok_enabled": true,
+        "__gf_sensor_ok_observed": true,
+        "__gf_sensor_value_enabled": true,
+        "__gf_sensor_value_observed": 0
+      },
+      "stateBefore": {},
+      "stateAfter": {},
+      "requested": {
+        "ratio": 0,
+        "value": 20
+      },
+      "safe": {
+        "ratio": 0,
+        "value": 20
+      },
+      "faults": [],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": []
+      },
+      "resultTrace": [
+        {
+          "site": 14,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 9,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 9,
+          "choice": 0,
+          "origin": 0
+        }
+      ]
+    }
+  },
+  {
+    "ok": true,
+    "vm": {
+      "tick": 2,
+      "module": "3c5fbcdc5114dd5a",
+      "strategy": "control",
+      "inputs": {
+        "__gf_sensor_fault_enabled": 0,
+        "__gf_sensor_fault_observed": 0,
+        "__gf_sensor_ok_enabled": true,
+        "__gf_sensor_ok_observed": true,
+        "__gf_sensor_value_enabled": true,
+        "__gf_sensor_value_observed": 79.5
+      },
+      "stateBefore": {},
+      "stateAfter": {},
+      "requested": {
+        "ratio": 159,
+        "value": 99.5
+      },
+      "safe": {
+        "ratio": 159,
+        "value": 99.5
+      },
+      "faults": [],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": []
+      },
+      "resultTrace": [
+        {
+          "site": 14,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 9,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 9,
+          "choice": 0,
+          "origin": 0
+        }
+      ]
+    }
+  },
+  {
+    "ok": true,
+    "vm": {
+      "tick": 3,
+      "module": "3c5fbcdc5114dd5a",
+      "strategy": "control",
+      "inputs": {
+        "__gf_sensor_fault_enabled": 0,
+        "__gf_sensor_fault_observed": 0,
+        "__gf_sensor_ok_enabled": true,
+        "__gf_sensor_ok_observed": true,
+        "__gf_sensor_value_enabled": true,
+        "__gf_sensor_value_observed": 80
+      },
+      "stateBefore": {},
+      "stateAfter": {},
+      "requested": {
+        "ratio": 160,
+        "value": 100
+      },
+      "safe": {
+        "ratio": 160,
+        "value": 100
+      },
+      "faults": [],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": []
+      },
+      "resultTrace": [
+        {
+          "site": 14,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 9,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 9,
+          "choice": 0,
+          "origin": 0
+        }
+      ]
+    }
+  },
+  {
+    "ok": true,
+    "vm": {
+      "tick": 4,
+      "module": "3c5fbcdc5114dd5a",
+      "strategy": "control",
+      "inputs": {
+        "__gf_sensor_fault_enabled": 0,
+        "__gf_sensor_fault_observed": 0,
+        "__gf_sensor_ok_enabled": true,
+        "__gf_sensor_ok_observed": true,
+        "__gf_sensor_value_enabled": false,
+        "__gf_sensor_value_observed": 90
+      },
+      "stateBefore": {},
+      "stateAfter": {},
+      "requested": {
+        "ratio": 180,
+        "value": 0.5
+      },
+      "safe": {
+        "ratio": 180,
+        "value": 0.5
+      },
+      "faults": [],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": []
+      },
+      "resultTrace": [
+        {
+          "site": 14,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 9,
+          "choice": 0,
+          "origin": 0
+        }
+      ]
+    }
+  },
+  {
+    "ok": true,
+    "vm": {
+      "tick": 5,
+      "module": "3c5fbcdc5114dd5a",
+      "strategy": "control",
+      "inputs": {
+        "__gf_sensor_fault_enabled": 0,
+        "__gf_sensor_fault_observed": 0,
+        "__gf_sensor_ok_enabled": true,
+        "__gf_sensor_ok_observed": true,
+        "__gf_sensor_value_enabled": true,
+        "__gf_sensor_value_observed": 90
+      },
+      "stateBefore": {},
+      "stateAfter": {},
+      "requested": {
+        "ratio": 180,
+        "value": 110
+      },
+      "safe": {
+        "ratio": 180,
+        "value": 110
+      },
+      "faults": [],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": []
+      },
+      "resultTrace": [
+        {
+          "site": 14,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 9,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 9,
+          "choice": 0,
+          "origin": 0
+        }
+      ]
+    }
+  },
+  {
+    "ok": true,
+    "vm": {
+      "tick": 6,
+      "module": "3c5fbcdc5114dd5a",
+      "strategy": "control",
+      "inputs": {
+        "__gf_sensor_fault_enabled": 0,
+        "__gf_sensor_fault_observed": 0,
+        "__gf_sensor_ok_enabled": true,
+        "__gf_sensor_ok_observed": true,
+        "__gf_sensor_value_enabled": true,
+        "__gf_sensor_value_observed": 100
+      },
+      "stateBefore": {},
+      "stateAfter": {},
+      "requested": {
+        "ratio": 200,
+        "value": 120
+      },
+      "safe": {
+        "ratio": 200,
+        "value": 120
+      },
+      "faults": [],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": []
+      },
+      "resultTrace": [
+        {
+          "site": 14,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 9,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 9,
+          "choice": 0,
+          "origin": 0
+        }
+      ]
+    }
+  }
+]

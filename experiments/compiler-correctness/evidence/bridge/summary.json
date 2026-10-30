@@ -1,0 +1,228 @@
+{
+  "format": "GhostFlow/compiler-correctness-bridge-v1",
+  "status": "passed",
+  "startedAt": "2026-10-27T13:36:35.796Z",
+  "completedAt": "2026-10-27T13:36:42.390Z",
+  "sourceSha256": {
+    "experiments/compiler-correctness/bridge.mjs": "a1b5f64a5f3ed5b58cdf50a4a89b9c397d168d649c9678a76eb1b2f0c7813c86",
+    "experiments/compiler-correctness/decoder.mjs": "96a2368eb6c1e5a0e35d3ae562fba441df825c9be8034a81f538c6686c02c836",
+    "experiments/compiler-correctness/lean/ConstraintPreservation.lean": "f94db470d86c8d52f89c4b476baf82cf63dc7886d67b76ffab1d0d9c1862ad5f",
+    "tools/toolchain.mjs": "9339a37b439d4b6faa886eeb99c56c6e3fdc72eb8b973a4fd6a9fe39a5d103ae",
+    "tools/compile-source.mjs": "83b050d5300d664d361f69d8e9008c549f03e5d3eca8a6a9393976b5c31cf24b",
+    "tools/control.mjs": "c1c39bc8e5ccc7fb98ec1c661da62a26ed8a82d9d3f3fafce20d71242174e0df",
+    "tools/constraint-proof.mjs": "230251ee5b983b6703aed1a3054fab1c941f3c8e9a3f64aa1c9dba17ebf88eb7",
+    "tools/gfb1.mjs": "4d58bb5bedccc30b7616b8513f17e598298ae0a1458906ee49140c2c1b8718b8",
+    "crates/ghostflow-core/src/lib.rs": "a03b26a7fb74992572acbf92a90d7c6f41225e7084d02e77a86a5f5cce5c3dd5"
+  },
+  "compilerRevision": "4861a78a72f0f1078cafe99bf26b93d541e1b82c",
+  "wasmSha256": "f3347d44a8087033d293c167ca07b0a618475b7b5cc5c8d3ab806565b302eaca",
+  "nativeSha256": "cccebe028384c5a6ecde63acc5ebb87ff7f7ce8b20adede345f92fde2ee30eea",
+  "results": [
+    {
+      "fixture": "BridgeScalarOne",
+      "sourceSha256": "a77165b2e040df3aedd3e7ef7a85cf958d168999f95af806c5f5275603f21740",
+      "optimizedSha256": "2ec53d3f3e02e5d5724284f5fbaae228ce6c86ba2010a54a2b767460c705a48e",
+      "originalSha256": "1fd132ec34b6e6f9c2b2ef16dbea87071804c190a77dbfd4a27875a88de64738",
+      "certificateSha256": "d07aefbd0867de4f3bd4c8bd596baad4f0ec47fb68c3881b7ef88b43db708ea2",
+      "gfbProfile": 1,
+      "sourceConstraints": 2,
+      "emittedConstraints": 1,
+      "valuations": 4,
+      "nativeAndWasmCompared": true,
+      "negative": {
+        "truncatedGfb": "rejected",
+        "trailingGfb": "rejected",
+        "unsupportedProfile": "rejected",
+        "invalidConstraintKind": "rejected",
+        "tamperedCertificate": "rejected",
+        "validChangedBytesVsCertificate": "rejected"
+      },
+      "formalStatus": "formal-partial: generated certificate accepted by Lean; adjacent exact Bool constraint effect only",
+      "limits": [
+        "source extraction and AST parse are production code, not proved here",
+        "GFB expression instructions are opaque to this decoder",
+        "native and WASM runs sample finite input sequences"
+      ]
+    },
+    {
+      "fixture": "BridgeScalarTwo",
+      "sourceSha256": "53bce311de9d1012052cae1deac1c90dda4d0287dd1f5ee0546c24758f10e2c9",
+      "optimizedSha256": "3a56b27732f0bad481c42a866a3529ba1c908c74c6bce62935ba6f05cb13f981",
+      "originalSha256": "f52ff1ad150cfae9beaaa7668f2123b2e24e4a1fa8ae8f1ba448c45677c842ec",
+      "certificateSha256": "8d75934e345a5a56a759dea0fc5bf73ea4af6ac45f9785be7de11604603af07c",
+      "gfbProfile": 2,
+      "sourceConstraints": 2,
+      "emittedConstraints": 1,
+      "valuations": 4,
+      "nativeAndWasmCompared": true,
+      "negative": {
+        "truncatedGfb": "rejected",
+        "trailingGfb": "rejected",
+        "unsupportedProfile": "rejected",
+        "invalidConstraintKind": "rejected",
+        "tamperedCertificate": "rejected",
+        "validChangedBytesVsCertificate": "rejected"
+      },
+      "formalStatus": "formal-partial: generated certificate accepted by Lean; adjacent exact Bool constraint effect only",
+      "limits": [
+        "source extraction and AST parse are production code, not proved here",
+        "GFB expression instructions are opaque to this decoder",
+        "native and WASM runs sample finite input sequences"
+      ]
+    },
+    {
+      "fixture": "BridgeChained",
+      "sourceSha256": "6ec46e1ed486a1fa5fe5ac354cd9870cb2af8ec9f62c61fb16cd24e411225db3",
+      "optimizedSha256": "0f48de1dad016a56ba70b7f92d91960ee0c528887a8182fe12d6887cf9390d6d",
+      "originalSha256": "5936f7bb7ceb742f6bcfcb37ce3c4c544ddbc201f0c3992ff419ea119e6f3a8c",
+      "certificateSha256": "926ce5990329ba7741d165ad8bf8b0235a90d49cf94ef88147e29708dde448a6",
+      "gfbProfile": 3,
+      "sourceConstraints": 10,
+      "emittedConstraints": 5,
+      "valuations": 64,
+      "nativeAndWasmCompared": true,
+      "negative": {
+        "truncatedGfb": "rejected",
+        "trailingGfb": "rejected",
+        "unsupportedProfile": "rejected",
+        "invalidConstraintKind": "rejected",
+        "tamperedCertificate": "rejected",
+        "validChangedBytesVsCertificate": "rejected"
+      },
+      "formalStatus": "formal-partial: generated certificate accepted by Lean; adjacent exact Bool constraint effect only",
+      "limits": [
+        "source extraction and AST parse are production code, not proved here",
+        "GFB expression instructions are opaque to this decoder",
+        "native and WASM runs sample finite input sequences"
+      ]
+    },
+    {
+      "fixture": "BridgeEight",
+      "sourceSha256": "472b4ba7657a69a3cc85be841de1c82ee9811eb9fac91a7793ad45f702d5ac2d",
+      "optimizedSha256": "4c170b74406baf9f8f311849e8b3df391e17cc6b64ec7c4dc57a31717fff3c35",
+      "originalSha256": "0a877f96fabfb722449b1677afafa556da47fdb3712d64c3ad25729b907385b7",
+      "certificateSha256": "5b30d7422950abd31ec8c5931ced6553b0b2443eae71e826835e0b5f1619dd4d",
+      "gfbProfile": 3,
+      "sourceConstraints": 4,
+      "emittedConstraints": 2,
+      "valuations": 256,
+      "nativeAndWasmCompared": true,
+      "negative": {
+        "truncatedGfb": "rejected",
+        "trailingGfb": "rejected",
+        "unsupportedProfile": "rejected",
+        "invalidConstraintKind": "rejected",
+        "tamperedCertificate": "rejected",
+        "validChangedBytesVsCertificate": "rejected"
+      },
+      "formalStatus": "formal-partial: generated certificate accepted by Lean; adjacent exact Bool constraint effect only",
+      "limits": [
+        "source extraction and AST parse are production code, not proved here",
+        "GFB expression instructions are opaque to this decoder",
+        "native and WASM runs sample finite input sequences"
+      ]
+    },
+    {
+      "fixture": "BridgeNineFallback",
+      "sourceSha256": "ef8d3a7f2fd1514c5ea9d5c5c944e4cc54b282a6990fdb64498da0a9f433afb3",
+      "optimizedSha256": "4346bdf71cadc36fe30ba26424288c1b15d2159ca0462f8ecf389e223b5e2c42",
+      "originalSha256": "4346bdf71cadc36fe30ba26424288c1b15d2159ca0462f8ecf389e223b5e2c42",
+      "certificateSha256": null,
+      "gfbProfile": 3,
+      "sourceConstraints": 2,
+      "emittedConstraints": 2,
+      "valuations": 11,
+      "nativeAndWasmCompared": true,
+      "negative": {},
+      "formalStatus": "no proof; unoptimized nine-name fallback",
+      "limits": [
+        "source extraction and AST parse are production code, not proved here",
+        "GFB expression instructions are opaque to this decoder",
+        "native and WASM runs sample finite input sequences"
+      ]
+    },
+    {
+      "fixture": "BridgeCountBoundary",
+      "sourceSha256": "ccf5b1655fa1263ce67cadf6de5b3843d372a21b6d44d26e6e5ddffaac2122be",
+      "optimizedSha256": "45c0ca9d700f40be0048646119b02f543f6c1886b62ce8a908117fdc1c4677a8",
+      "originalSha256": "7523a297493c19a055ac5ea0c4c53d5b03584ddae21286c928c9040fe2b40daf",
+      "certificateSha256": "7722af25fcd33a8744b5110e33ad2529eba50b2c6ae1bb622c35a265a0954754",
+      "gfbProfile": 3,
+      "sourceConstraints": 128,
+      "emittedConstraints": 1,
+      "valuations": 4,
+      "nativeAndWasmCompared": true,
+      "negative": {
+        "truncatedGfb": "rejected",
+        "trailingGfb": "rejected",
+        "unsupportedProfile": "rejected",
+        "invalidConstraintKind": "rejected",
+        "tamperedCertificate": "rejected",
+        "validChangedBytesVsCertificate": "rejected"
+      },
+      "formalStatus": "formal-partial: generated certificate accepted by Lean; adjacent exact Bool constraint effect only",
+      "limits": [
+        "source extraction and AST parse are production code, not proved here",
+        "GFB expression instructions are opaque to this decoder",
+        "native and WASM runs sample finite input sequences"
+      ]
+    }
+  ],
+  "lean": {
+    "status": "checked",
+    "leanBinarySha256": "e06bfeeb39efd58c2c3b1dece023d212f10c249453a3e6f0742d02741afecf9c",
+    "moduleRun": {
+      "exitCode": 0,
+      "stdout": "'CompilerSafety.check_run' depends on axioms: [propext, Quot.sound]",
+      "stderr": ""
+    },
+    "certificateRuns": [
+      {
+        "fixture": "BridgeScalarOne",
+        "sourceSha256": "cdf7a8334a08c6dc0dc502b4f8140bad9b62a5259ff74ac21908b7d8de9644c7",
+        "theorem": "CompilerSafety.check_run instantiated with accepted : check original compiled = true",
+        "exitCode": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "fixture": "BridgeScalarTwo",
+        "sourceSha256": "23b8b7518d8b076467a44772052e2e9ac5f37cf0f7d4da1f4d9eb29f5b64e9db",
+        "theorem": "CompilerSafety.check_run instantiated with accepted : check original compiled = true",
+        "exitCode": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "fixture": "BridgeChained",
+        "sourceSha256": "9d0dd0442ae89f0877f6bc4c2cda83c706eb91e1b9a969eb12bc57a43e8ff205",
+        "theorem": "CompilerSafety.check_run instantiated with accepted : check original compiled = true",
+        "exitCode": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "fixture": "BridgeEight",
+        "sourceSha256": "b7c715526004e0b269dee5befcf7378313e942d9a1e97f085e4f2badf84effa0",
+        "theorem": "CompilerSafety.check_run instantiated with accepted : check original compiled = true",
+        "exitCode": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "fixture": "BridgeCountBoundary",
+        "sourceSha256": "36707605c1614f5a1ebc0270ea8fe946357333b511897102bb86e0e406635d53",
+        "theorem": "CompilerSafety.check_run instantiated with accepted : check original compiled = true",
+        "exitCode": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    ]
+  },
+  "checkerFalseFallback": "retains original constraints",
+  "overBudget129": {
+    "message": "BridgeReject129.ghost.md:4:1: GFB1 lowering rejected control: module resource limit exceeded",
+    "status": "rejected-before-artifact"
+  },
+  "claim": "Concrete source-to-byte and native/WASM evidence for adjacent exact Bool constraint elimination; no full compiler proof."
+}

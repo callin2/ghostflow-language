@@ -1,0 +1,31 @@
+[
+  {
+    "ok": true,
+    "vm": {
+      "tick": 1,
+      "module": "5fe82cabed2a7d62",
+      "strategy": "control",
+      "inputs": {},
+      "stateBefore": {
+        "a": 90
+      },
+      "stateAfter": {
+        "a": 90
+      },
+      "requested": {
+        "above": 110,
+        "below": -10
+      },
+      "safe": {
+        "above": 110,
+        "below": -10
+      },
+      "faults": [],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": []
+      },
+      "resultTrace": []
+    }
+  }
+]

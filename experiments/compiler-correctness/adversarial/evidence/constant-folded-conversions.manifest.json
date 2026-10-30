@@ -1,0 +1,29 @@
+{
+  "format": "GhostFlow/control-v4",
+  "name": "Folded",
+  "inputs": [],
+  "outputs": [
+    {
+      "name": "folded",
+      "type": "Number"
+    },
+    {
+      "name": "dynamic",
+      "type": "Number"
+    },
+    {
+      "name": "truncated_constant",
+      "type": "Int"
+    },
+    {
+      "name": "truncated_dynamic",
+      "type": "Int"
+    }
+  ],
+  "sensors": [],
+  "schedules": [],
+  "timers": [],
+  "signals": [],
+  "configs": [],
+  "bytecodeSha256": "e348fb410726d01d25c1c8720743efa5a0ff35dbd807cd04fcc1f953f06ca691"
+}

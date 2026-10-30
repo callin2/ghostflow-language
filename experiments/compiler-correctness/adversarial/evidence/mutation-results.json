@@ -1,0 +1,8 @@
+{
+  "observations": [
+    11,
+    5
+  ],
+  "expected": 11,
+  "killed": true
+}

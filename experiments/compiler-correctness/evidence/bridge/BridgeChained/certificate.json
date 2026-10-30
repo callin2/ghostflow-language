@@ -1,0 +1,106 @@
+{
+  "checker": "GhostFlow/adjacent-constraint-effect-checker-v1",
+  "rule": "adjacent-exact-ordered-bool-constraint-v1",
+  "scope": "GhostFlow/bool-output-constraint-effect-v1",
+  "status": "independently-verified",
+  "original": [
+    [
+      "requires",
+      "a",
+      "b"
+    ],
+    [
+      "requires",
+      "a",
+      "b"
+    ],
+    [
+      "requires-any",
+      "a",
+      "b",
+      "c"
+    ],
+    [
+      "requires-any",
+      "a",
+      "b",
+      "c"
+    ],
+    [
+      "mutex",
+      "d",
+      "e",
+      "f"
+    ],
+    [
+      "mutex",
+      "d",
+      "e",
+      "f"
+    ],
+    [
+      "requires",
+      "b",
+      "d"
+    ],
+    [
+      "requires",
+      "b",
+      "d"
+    ],
+    [
+      "requires",
+      "d",
+      "e"
+    ],
+    [
+      "requires",
+      "d",
+      "e"
+    ]
+  ],
+  "compiled": [
+    [
+      "requires",
+      "a",
+      "b"
+    ],
+    [
+      "requires-any",
+      "a",
+      "b",
+      "c"
+    ],
+    [
+      "mutex",
+      "d",
+      "e",
+      "f"
+    ],
+    [
+      "requires",
+      "b",
+      "d"
+    ],
+    [
+      "requires",
+      "d",
+      "e"
+    ]
+  ],
+  "sourceToCompiled": [
+    0,
+    0,
+    1,
+    1,
+    2,
+    2,
+    3,
+    3,
+    4,
+    4
+  ],
+  "originalSha256": "401d8658b874efcf51b407269175e3ef0e9daf8bd3a39126d6bc6e1986ed10b1",
+  "compiledSha256": "24c90b0a0a54bbd1f9dc4e520bcd9c01c52838bbb379f838fc74235927d5aa9e",
+  "certificateSha256": "926ce5990329ba7741d165ad8bf8b0235a90d49cf94ef88147e29708dde448a6"
+}

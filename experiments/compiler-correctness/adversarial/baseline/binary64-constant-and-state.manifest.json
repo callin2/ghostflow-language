@@ -1,0 +1,25 @@
+{
+  "format": "GhostFlow/control-v1",
+  "name": "Precision",
+  "inputs": [],
+  "outputs": [
+    {
+      "name": "constant",
+      "type": "Number"
+    },
+    {
+      "name": "dynamic",
+      "type": "Number"
+    },
+    {
+      "name": "rational",
+      "type": "Number"
+    }
+  ],
+  "sensors": [],
+  "schedules": [],
+  "timers": [],
+  "signals": [],
+  "configs": [],
+  "bytecodeSha256": "8c79ab18cec1686a4bca42e557d3b2f13e13be76eb57731a3315aeeb21938829"
+}

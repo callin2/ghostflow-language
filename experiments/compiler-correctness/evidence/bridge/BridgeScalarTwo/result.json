@@ -1,0 +1,26 @@
+{
+  "fixture": "BridgeScalarTwo",
+  "sourceSha256": "53bce311de9d1012052cae1deac1c90dda4d0287dd1f5ee0546c24758f10e2c9",
+  "optimizedSha256": "3a56b27732f0bad481c42a866a3529ba1c908c74c6bce62935ba6f05cb13f981",
+  "originalSha256": "f52ff1ad150cfae9beaaa7668f2123b2e24e4a1fa8ae8f1ba448c45677c842ec",
+  "certificateSha256": "8d75934e345a5a56a759dea0fc5bf73ea4af6ac45f9785be7de11604603af07c",
+  "gfbProfile": 2,
+  "sourceConstraints": 2,
+  "emittedConstraints": 1,
+  "valuations": 4,
+  "nativeAndWasmCompared": true,
+  "negative": {
+    "truncatedGfb": "rejected",
+    "trailingGfb": "rejected",
+    "unsupportedProfile": "rejected",
+    "invalidConstraintKind": "rejected",
+    "tamperedCertificate": "rejected",
+    "validChangedBytesVsCertificate": "rejected"
+  },
+  "formalStatus": "formal-partial: generated certificate accepted by Lean; adjacent exact Bool constraint effect only",
+  "limits": [
+    "source extraction and AST parse are production code, not proved here",
+    "GFB expression instructions are opaque to this decoder",
+    "native and WASM runs sample finite input sequences"
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "checker": "GhostFlow/adjacent-constraint-effect-checker-v1",
+  "rule": "adjacent-exact-ordered-bool-constraint-v1",
+  "scope": "GhostFlow/bool-output-constraint-effect-v1",
+  "status": "independently-verified",
+  "original": [
+    [
+      "requires",
+      "a",
+      "b"
+    ],
+    [
+      "requires",
+      "a",
+      "b"
+    ]
+  ],
+  "compiled": [
+    [
+      "requires",
+      "a",
+      "b"
+    ]
+  ],
+  "sourceToCompiled": [
+    0,
+    0
+  ],
+  "originalSha256": "f478622d7a3d566a02780f134540a7ac01cc7e3eb775f349b9a212133daef6b1",
+  "compiledSha256": "28695c3cb95b1f6046642cdeb2ccf206132792504f8271aefaa808bf78e1a301",
+  "certificateSha256": "d07aefbd0867de4f3bd4c8bd596baad4f0ec47fb68c3881b7ef88b43db708ea2"
+}

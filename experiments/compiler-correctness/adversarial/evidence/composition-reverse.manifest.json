@@ -1,0 +1,86 @@
+{
+  "format": "GhostFlow/control-v4",
+  "name": "Pair",
+  "inputs": [],
+  "outputs": [
+    {
+      "name": "a",
+      "type": "Int"
+    },
+    {
+      "name": "b",
+      "type": "Int"
+    }
+  ],
+  "sensors": [
+    {
+      "name": "left",
+      "type": "Bool",
+      "sampleMs": null,
+      "validMin": null,
+      "validMax": null,
+      "filter": null,
+      "window": null,
+      "staleMs": null,
+      "recoverSamples": null,
+      "valueInput": "__gf_sensor_value_left",
+      "okInput": "__gf_sensor_ok_left",
+      "faultInput": "__gf_sensor_fault_left"
+    },
+    {
+      "name": "right",
+      "type": "Bool",
+      "sampleMs": null,
+      "validMin": null,
+      "validMax": null,
+      "filter": null,
+      "window": null,
+      "staleMs": null,
+      "recoverSamples": null,
+      "valueInput": "__gf_sensor_value_right",
+      "okInput": "__gf_sensor_ok_right",
+      "faultInput": "__gf_sensor_fault_right"
+    }
+  ],
+  "schedules": [],
+  "timers": [],
+  "signals": [],
+  "configs": [],
+  "sensorInstances": [
+    {
+      "name": "instance_4_east_enabled",
+      "type": "Bool",
+      "sampleMs": null,
+      "validMin": null,
+      "validMax": null,
+      "filter": null,
+      "window": null,
+      "staleMs": null,
+      "recoverSamples": null,
+      "valueInput": "__gf_sensor_value_instance_4_east_enabled",
+      "okInput": "__gf_sensor_ok_instance_4_east_enabled",
+      "faultInput": "__gf_sensor_fault_instance_4_east_enabled",
+      "sourceSensor": "left",
+      "instance": "east",
+      "port": "enabled"
+    },
+    {
+      "name": "instance_4_west_enabled",
+      "type": "Bool",
+      "sampleMs": null,
+      "validMin": null,
+      "validMax": null,
+      "filter": null,
+      "window": null,
+      "staleMs": null,
+      "recoverSamples": null,
+      "valueInput": "__gf_sensor_value_instance_4_west_enabled",
+      "okInput": "__gf_sensor_ok_instance_4_west_enabled",
+      "faultInput": "__gf_sensor_fault_instance_4_west_enabled",
+      "sourceSensor": "right",
+      "instance": "west",
+      "port": "enabled"
+    }
+  ],
+  "bytecodeSha256": "2c402c956a14611b30f205868c8d40d3eacf8246ce06f49effb1287bd7ed7990"
+}

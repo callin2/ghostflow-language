@@ -1,0 +1,96 @@
+{
+  "format": "compiler-correctness-adversarial-v1",
+  "at": "2026-10-27T13:28:52.837Z",
+  "wasmSha256": "f3347d44a8087033d293c167ca07b0a618475b7b5cc5c8d3ab806565b302eaca",
+  "scope": "finite independent semantic checks through canonical compileSource, emitted GFB and actual WASM; no universal correctness claim",
+  "results": [
+    {
+      "name": "binary64-constant-and-state",
+      "passed": true,
+      "evidence": {
+        "sourceSha256": "9213583b56dc146d90b703dfcfbdc6595593c1c1cbcefaf5624b5fd62e425d1f",
+        "artifactSha256": "8c79ab18cec1686a4bca42e557d3b2f13e13be76eb57731a3315aeeb21938829",
+        "frames": 1
+      }
+    },
+    {
+      "name": "constant-folded-conversions",
+      "passed": true,
+      "evidence": {
+        "sourceSha256": "f21a32935a451fe77d3fdab9e3b25d8a2c78262bbd62770cc053c45cc219aba2",
+        "artifactSha256": "e348fb410726d01d25c1c8720743efa5a0ff35dbd807cd04fcc1f953f06ca691",
+        "frames": 1
+      }
+    },
+    {
+      "name": "int-boundary-oracle-and-atomicity",
+      "passed": true,
+      "evidence": {
+        "rows": 312,
+        "oracle": "independent BigInt arithmetic with explicit i32 range and fault contracts"
+      }
+    },
+    {
+      "name": "left-to-right-fault-selection",
+      "passed": true,
+      "evidence": {
+        "sourceSha256": "d9386468985e49483a85c935b52ed6f3a879eb95feaa13bf33ac9e6ddd75c188",
+        "artifactSha256": "5492c7ef2e4100a2d6365b4c9934fc1ef377183ecc3f90ea8c290a3e29ae544c",
+        "frames": 2
+      }
+    },
+    {
+      "name": "short-circuit-function-and-result",
+      "passed": true,
+      "evidence": {
+        "sourceSha256": "b2517829e5d11137aff317cc6c2f7a7d1dda8869699600584985c94612dff759",
+        "artifactSha256": "fab15b8ed4568d2df1e3969994c82d43c10f6645530fff332cb138294f6232a5",
+        "frames": 1
+      }
+    },
+    {
+      "name": "timer-reset-and-same-time",
+      "passed": true,
+      "evidence": {
+        "sourceSha256": "802198c4bb4809cec23f674c8550b68382d1532d27807a40c9424049294e96f8",
+        "artifactSha256": "9073baaab3d0f87ff45bbb93a70d5d4240228a1991ff316e4157e7a42b4d0a13",
+        "frames": 8
+      }
+    },
+    {
+      "name": "composition-independent-instance-state",
+      "passed": true,
+      "evidence": {
+        "orders": 2,
+        "framesPerOrder": 4
+      }
+    },
+    {
+      "name": "percent-runtime-domain",
+      "passed": false,
+      "error": "Percent results must remain in 0..100, observed {\"ok\":true,\"vm\":{\"tick\":1,\"module\":\"5fe82cabed2a7d62\",\"strategy\":\"control\",\"inputs\":{},\"stateBefore\":{\"a\":90},\"stateAfter\":{\"a\":90},\"requested\":{\"above\":110,\"below\":-10},\"safe\":{\"above\":110,\"below\":-10},\"faults\":[],\"safetyTrace\":{\"format\":\"GhostFlow/safety-trace-v1\",\"constraints\":[]},\"resultTrace\":[]}}\n\ntrue !== false\n",
+      "stack": "AssertionError [ERR_ASSERTION]: Percent results must remain in 0..100, observed {\"ok\":true,\"vm\":{\"tick\":1,\"module\":\"5fe82cabed2a7d62\",\"strategy\":\"control\",\"inputs\":{},\"stateBefore\":{\"a\":90},\"stateAfter\":{\"a\":90},\"requested\":{\"above\":110,\"below\":-10},\"safe\":{\"above\":110,\"below\":-10},\"faults\":[],\"safetyTrace\":{\"format\":\"GhostFlow/safety-trace-v1\",\"constraints\":[]},\"resultTrace\":[]}}\n\ntrue !== false\n\n    at file:///Users/changjin/Documents/PlatformIO/Projects/esp32s3-new-project/workspaces/ghostflow-compiler-590/experiments/compiler-correctness/adversarial/check.mjs:183:10\n    at execute (file:///Users/changjin/Documents/PlatformIO/Projects/esp32s3-new-project/workspaces/ghostflow-compiler-590/experiments/compiler-correctness/adversarial/check.mjs:44:5)\n    at async check (file:///Users/changjin/Documents/PlatformIO/Projects/esp32s3-new-project/workspaces/ghostflow-compiler-590/experiments/compiler-correctness/adversarial/check.mjs:30:54)\n    at async file:///Users/changjin/Documents/PlatformIO/Projects/esp32s3-new-project/workspaces/ghostflow-compiler-590/experiments/compiler-correctness/adversarial/check.mjs:177:1"
+    },
+    {
+      "name": "percent-constant-domain",
+      "passed": true,
+      "evidence": {
+        "diagnostic": "Percent constant must be between 0% and 100%"
+      }
+    },
+    {
+      "name": "artifact-mutation-detection",
+      "passed": true,
+      "evidence": {
+        "observations": [
+          11,
+          5
+        ],
+        "expected": 11,
+        "killed": true
+      }
+    }
+  ],
+  "passed": 9,
+  "failed": 1
+}

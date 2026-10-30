@@ -1,0 +1,598 @@
+{
+  "original": [
+    {
+      "status": "OK",
+      "trace": {
+        "tick": 1,
+        "module": "aa7a07e3aa27f56f",
+        "strategy": "control",
+        "inputs": {
+          "__gf_sensor_fault_raw_a": 0,
+          "__gf_sensor_fault_raw_b": 0,
+          "__gf_sensor_ok_raw_a": true,
+          "__gf_sensor_ok_raw_b": true,
+          "__gf_sensor_value_raw_a": false,
+          "__gf_sensor_value_raw_b": false
+        },
+        "stateBefore": {},
+        "stateAfter": {},
+        "requested": {
+          "a": true,
+          "b": false
+        },
+        "safe": {
+          "a": false,
+          "b": false
+        },
+        "faults": [
+          "requires:a:b"
+        ],
+        "safetyTrace": {
+          "format": "GhostFlow/safety-trace-v1",
+          "constraints": [
+            {
+              "index": 0,
+              "kind": "requires",
+              "names": [
+                "a",
+                "b"
+              ],
+              "firstViolation": {
+                "round": 0,
+                "values": {
+                  "a": true,
+                  "b": false
+                },
+                "blocked": [
+                  "a"
+                ]
+              },
+              "final": {
+                "round": 1,
+                "values": {
+                  "a": false,
+                  "b": false
+                },
+                "satisfied": true
+              }
+            },
+            {
+              "index": 1,
+              "kind": "requires",
+              "names": [
+                "a",
+                "b"
+              ],
+              "firstViolation": {
+                "round": 0,
+                "values": {
+                  "a": true,
+                  "b": false
+                },
+                "blocked": [
+                  "a"
+                ]
+              },
+              "final": {
+                "round": 1,
+                "values": {
+                  "a": false,
+                  "b": false
+                },
+                "satisfied": true
+              }
+            }
+          ]
+        },
+        "resultTrace": []
+      }
+    },
+    {
+      "status": "OK",
+      "trace": {
+        "tick": 2,
+        "module": "aa7a07e3aa27f56f",
+        "strategy": "control",
+        "inputs": {
+          "__gf_sensor_fault_raw_a": 0,
+          "__gf_sensor_fault_raw_b": 0,
+          "__gf_sensor_ok_raw_a": true,
+          "__gf_sensor_ok_raw_b": true,
+          "__gf_sensor_value_raw_a": true,
+          "__gf_sensor_value_raw_b": false
+        },
+        "stateBefore": {},
+        "stateAfter": {},
+        "requested": {
+          "a": true,
+          "b": false
+        },
+        "safe": {
+          "a": false,
+          "b": false
+        },
+        "faults": [
+          "requires:a:b"
+        ],
+        "safetyTrace": {
+          "format": "GhostFlow/safety-trace-v1",
+          "constraints": [
+            {
+              "index": 0,
+              "kind": "requires",
+              "names": [
+                "a",
+                "b"
+              ],
+              "firstViolation": {
+                "round": 0,
+                "values": {
+                  "a": true,
+                  "b": false
+                },
+                "blocked": [
+                  "a"
+                ]
+              },
+              "final": {
+                "round": 1,
+                "values": {
+                  "a": false,
+                  "b": false
+                },
+                "satisfied": true
+              }
+            },
+            {
+              "index": 1,
+              "kind": "requires",
+              "names": [
+                "a",
+                "b"
+              ],
+              "firstViolation": {
+                "round": 0,
+                "values": {
+                  "a": true,
+                  "b": false
+                },
+                "blocked": [
+                  "a"
+                ]
+              },
+              "final": {
+                "round": 1,
+                "values": {
+                  "a": false,
+                  "b": false
+                },
+                "satisfied": true
+              }
+            }
+          ]
+        },
+        "resultTrace": []
+      }
+    },
+    {
+      "status": "OK",
+      "trace": {
+        "tick": 3,
+        "module": "aa7a07e3aa27f56f",
+        "strategy": "control",
+        "inputs": {
+          "__gf_sensor_fault_raw_a": 0,
+          "__gf_sensor_fault_raw_b": 0,
+          "__gf_sensor_ok_raw_a": true,
+          "__gf_sensor_ok_raw_b": true,
+          "__gf_sensor_value_raw_a": false,
+          "__gf_sensor_value_raw_b": true
+        },
+        "stateBefore": {},
+        "stateAfter": {},
+        "requested": {
+          "a": true,
+          "b": false
+        },
+        "safe": {
+          "a": false,
+          "b": false
+        },
+        "faults": [
+          "requires:a:b"
+        ],
+        "safetyTrace": {
+          "format": "GhostFlow/safety-trace-v1",
+          "constraints": [
+            {
+              "index": 0,
+              "kind": "requires",
+              "names": [
+                "a",
+                "b"
+              ],
+              "firstViolation": {
+                "round": 0,
+                "values": {
+                  "a": true,
+                  "b": false
+                },
+                "blocked": [
+                  "a"
+                ]
+              },
+              "final": {
+                "round": 1,
+                "values": {
+                  "a": false,
+                  "b": false
+                },
+                "satisfied": true
+              }
+            },
+            {
+              "index": 1,
+              "kind": "requires",
+              "names": [
+                "a",
+                "b"
+              ],
+              "firstViolation": {
+                "round": 0,
+                "values": {
+                  "a": true,
+                  "b": false
+                },
+                "blocked": [
+                  "a"
+                ]
+              },
+              "final": {
+                "round": 1,
+                "values": {
+                  "a": false,
+                  "b": false
+                },
+                "satisfied": true
+              }
+            }
+          ]
+        },
+        "resultTrace": []
+      }
+    },
+    {
+      "status": "OK",
+      "trace": {
+        "tick": 4,
+        "module": "aa7a07e3aa27f56f",
+        "strategy": "control",
+        "inputs": {
+          "__gf_sensor_fault_raw_a": 0,
+          "__gf_sensor_fault_raw_b": 0,
+          "__gf_sensor_ok_raw_a": true,
+          "__gf_sensor_ok_raw_b": true,
+          "__gf_sensor_value_raw_a": true,
+          "__gf_sensor_value_raw_b": true
+        },
+        "stateBefore": {},
+        "stateAfter": {},
+        "requested": {
+          "a": true,
+          "b": false
+        },
+        "safe": {
+          "a": false,
+          "b": false
+        },
+        "faults": [
+          "requires:a:b"
+        ],
+        "safetyTrace": {
+          "format": "GhostFlow/safety-trace-v1",
+          "constraints": [
+            {
+              "index": 0,
+              "kind": "requires",
+              "names": [
+                "a",
+                "b"
+              ],
+              "firstViolation": {
+                "round": 0,
+                "values": {
+                  "a": true,
+                  "b": false
+                },
+                "blocked": [
+                  "a"
+                ]
+              },
+              "final": {
+                "round": 1,
+                "values": {
+                  "a": false,
+                  "b": false
+                },
+                "satisfied": true
+              }
+            },
+            {
+              "index": 1,
+              "kind": "requires",
+              "names": [
+                "a",
+                "b"
+              ],
+              "firstViolation": {
+                "round": 0,
+                "values": {
+                  "a": true,
+                  "b": false
+                },
+                "blocked": [
+                  "a"
+                ]
+              },
+              "final": {
+                "round": 1,
+                "values": {
+                  "a": false,
+                  "b": false
+                },
+                "satisfied": true
+              }
+            }
+          ]
+        },
+        "resultTrace": []
+      }
+    }
+  ],
+  "optimized": [
+    {
+      "status": "OK",
+      "trace": {
+        "tick": 1,
+        "module": "d55744fe46845494",
+        "strategy": "control",
+        "inputs": {
+          "__gf_sensor_fault_raw_a": 0,
+          "__gf_sensor_fault_raw_b": 0,
+          "__gf_sensor_ok_raw_a": true,
+          "__gf_sensor_ok_raw_b": true,
+          "__gf_sensor_value_raw_a": false,
+          "__gf_sensor_value_raw_b": false
+        },
+        "stateBefore": {},
+        "stateAfter": {},
+        "requested": {
+          "a": true,
+          "b": false
+        },
+        "safe": {
+          "a": false,
+          "b": false
+        },
+        "faults": [
+          "requires:a:b"
+        ],
+        "safetyTrace": {
+          "format": "GhostFlow/safety-trace-v1",
+          "constraints": [
+            {
+              "index": 0,
+              "kind": "requires",
+              "names": [
+                "a",
+                "b"
+              ],
+              "firstViolation": {
+                "round": 0,
+                "values": {
+                  "a": true,
+                  "b": false
+                },
+                "blocked": [
+                  "a"
+                ]
+              },
+              "final": {
+                "round": 1,
+                "values": {
+                  "a": false,
+                  "b": false
+                },
+                "satisfied": true
+              }
+            }
+          ]
+        },
+        "resultTrace": []
+      }
+    },
+    {
+      "status": "OK",
+      "trace": {
+        "tick": 2,
+        "module": "d55744fe46845494",
+        "strategy": "control",
+        "inputs": {
+          "__gf_sensor_fault_raw_a": 0,
+          "__gf_sensor_fault_raw_b": 0,
+          "__gf_sensor_ok_raw_a": true,
+          "__gf_sensor_ok_raw_b": true,
+          "__gf_sensor_value_raw_a": true,
+          "__gf_sensor_value_raw_b": false
+        },
+        "stateBefore": {},
+        "stateAfter": {},
+        "requested": {
+          "a": true,
+          "b": false
+        },
+        "safe": {
+          "a": false,
+          "b": false
+        },
+        "faults": [
+          "requires:a:b"
+        ],
+        "safetyTrace": {
+          "format": "GhostFlow/safety-trace-v1",
+          "constraints": [
+            {
+              "index": 0,
+              "kind": "requires",
+              "names": [
+                "a",
+                "b"
+              ],
+              "firstViolation": {
+                "round": 0,
+                "values": {
+                  "a": true,
+                  "b": false
+                },
+                "blocked": [
+                  "a"
+                ]
+              },
+              "final": {
+                "round": 1,
+                "values": {
+                  "a": false,
+                  "b": false
+                },
+                "satisfied": true
+              }
+            }
+          ]
+        },
+        "resultTrace": []
+      }
+    },
+    {
+      "status": "OK",
+      "trace": {
+        "tick": 3,
+        "module": "d55744fe46845494",
+        "strategy": "control",
+        "inputs": {
+          "__gf_sensor_fault_raw_a": 0,
+          "__gf_sensor_fault_raw_b": 0,
+          "__gf_sensor_ok_raw_a": true,
+          "__gf_sensor_ok_raw_b": true,
+          "__gf_sensor_value_raw_a": false,
+          "__gf_sensor_value_raw_b": true
+        },
+        "stateBefore": {},
+        "stateAfter": {},
+        "requested": {
+          "a": true,
+          "b": false
+        },
+        "safe": {
+          "a": false,
+          "b": false
+        },
+        "faults": [
+          "requires:a:b"
+        ],
+        "safetyTrace": {
+          "format": "GhostFlow/safety-trace-v1",
+          "constraints": [
+            {
+              "index": 0,
+              "kind": "requires",
+              "names": [
+                "a",
+                "b"
+              ],
+              "firstViolation": {
+                "round": 0,
+                "values": {
+                  "a": true,
+                  "b": false
+                },
+                "blocked": [
+                  "a"
+                ]
+              },
+              "final": {
+                "round": 1,
+                "values": {
+                  "a": false,
+                  "b": false
+                },
+                "satisfied": true
+              }
+            }
+          ]
+        },
+        "resultTrace": []
+      }
+    },
+    {
+      "status": "OK",
+      "trace": {
+        "tick": 4,
+        "module": "d55744fe46845494",
+        "strategy": "control",
+        "inputs": {
+          "__gf_sensor_fault_raw_a": 0,
+          "__gf_sensor_fault_raw_b": 0,
+          "__gf_sensor_ok_raw_a": true,
+          "__gf_sensor_ok_raw_b": true,
+          "__gf_sensor_value_raw_a": true,
+          "__gf_sensor_value_raw_b": true
+        },
+        "stateBefore": {},
+        "stateAfter": {},
+        "requested": {
+          "a": true,
+          "b": false
+        },
+        "safe": {
+          "a": false,
+          "b": false
+        },
+        "faults": [
+          "requires:a:b"
+        ],
+        "safetyTrace": {
+          "format": "GhostFlow/safety-trace-v1",
+          "constraints": [
+            {
+              "index": 0,
+              "kind": "requires",
+              "names": [
+                "a",
+                "b"
+              ],
+              "firstViolation": {
+                "round": 0,
+                "values": {
+                  "a": true,
+                  "b": false
+                },
+                "blocked": [
+                  "a"
+                ]
+              },
+              "final": {
+                "round": 1,
+                "values": {
+                  "a": false,
+                  "b": false
+                },
+                "satisfied": true
+              }
+            }
+          ]
+        },
+        "resultTrace": []
+      }
+    }
+  ]
+}

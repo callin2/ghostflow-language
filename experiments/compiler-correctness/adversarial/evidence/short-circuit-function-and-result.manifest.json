@@ -1,0 +1,29 @@
+{
+  "format": "GhostFlow/control-v1",
+  "name": "UnselectedFaults",
+  "inputs": [],
+  "outputs": [
+    {
+      "name": "conditional",
+      "type": "Number"
+    },
+    {
+      "name": "recovered",
+      "type": "Number"
+    },
+    {
+      "name": "conjunction",
+      "type": "Bool"
+    },
+    {
+      "name": "disjunction",
+      "type": "Bool"
+    }
+  ],
+  "sensors": [],
+  "schedules": [],
+  "timers": [],
+  "signals": [],
+  "configs": [],
+  "bytecodeSha256": "fab15b8ed4568d2df1e3969994c82d43c10f6645530fff332cb138294f6232a5"
+}

@@ -1,0 +1,77 @@
+{
+  "scope": "Lean safety-round model and adjacent-deletion checker",
+  "productionCompilerProof": false,
+  "status": "passed",
+  "startedAt": "2026-10-27T13:39:48.842233Z",
+  "leanExecutable": "/Users/changjin/Documents/PlatformIO/Projects/esp32s3-new-project/.tools/lean589/lean-4.19.0-darwin/bin/lean",
+  "results": [
+    {
+      "name": "ConstraintPreservation",
+      "exitCode": 0,
+      "expectedSuccess": true,
+      "passed": true,
+      "startedAt": "2026-10-27T13:39:48.904196Z",
+      "finishedAt": "2026-10-27T13:39:49.676053Z",
+      "stdout": "'CompilerSafety.check_run' depends on axioms: [propext, Quot.sound]\n",
+      "stderr": ""
+    },
+    {
+      "name": "AcceptedMixed",
+      "exitCode": 0,
+      "expectedSuccess": true,
+      "passed": true,
+      "startedAt": "2026-10-27T13:39:49.676978Z",
+      "finishedAt": "2026-10-27T13:39:50.082172Z",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "RejectedChangedDependency",
+      "exitCode": 1,
+      "expectedSuccess": false,
+      "passed": true,
+      "startedAt": "2026-10-27T13:39:50.083201Z",
+      "finishedAt": "2026-10-27T13:39:50.465197Z",
+      "stdout": "/var/folders/mm/dt3zt4wn7ln40yzpt154yvhh0000gn/T/gf-constraint-proof-hz2htsuz/RejectedChangedDependency.lean:5:35: error: tactic 'decide' proved that the proposition\n  check [Constraint.requires \"a\" \"b\", Constraint.requires \"a\" \"b\"] [Constraint.requires \"a\" \"c\"] = true\nis false\n",
+      "stderr": ""
+    },
+    {
+      "name": "RejectedNonAdjacent",
+      "exitCode": 1,
+      "expectedSuccess": false,
+      "passed": true,
+      "startedAt": "2026-10-27T13:39:50.466212Z",
+      "finishedAt": "2026-10-27T13:39:50.850869Z",
+      "stdout": "/var/folders/mm/dt3zt4wn7ln40yzpt154yvhh0000gn/T/gf-constraint-proof-hz2htsuz/RejectedNonAdjacent.lean:5:54: error: tactic 'decide' proved that the proposition\n  check [Constraint.requires \"a\" \"b\", Constraint.requires \"b\" \"c\", Constraint.requires \"a\" \"b\"]\n      [Constraint.requires \"a\" \"b\", Constraint.requires \"b\" \"c\"] =\n    true\nis false\n",
+      "stderr": ""
+    },
+    {
+      "name": "RejectedRemovedRule",
+      "exitCode": 1,
+      "expectedSuccess": false,
+      "passed": true,
+      "startedAt": "2026-10-27T13:39:50.851909Z",
+      "finishedAt": "2026-10-27T13:39:51.209010Z",
+      "stdout": "/var/folders/mm/dt3zt4wn7ln40yzpt154yvhh0000gn/T/gf-constraint-proof-hz2htsuz/RejectedRemovedRule.lean:5:35: error: tactic 'decide' proved that the proposition\n  check [Constraint.requires \"a\" \"b\", Constraint.mutex [\"a\", \"b\"]] [Constraint.requires \"a\" \"b\"] = true\nis false\n",
+      "stderr": ""
+    },
+    {
+      "name": "RejectedXorAggregation",
+      "exitCode": 1,
+      "expectedSuccess": false,
+      "passed": true,
+      "startedAt": "2026-10-27T13:39:51.210063Z",
+      "finishedAt": "2026-10-27T13:39:51.938362Z",
+      "stdout": "/var/folders/mm/dt3zt4wn7ln40yzpt154yvhh0000gn/T/gf-constraint-proof-hz2htsuz/RejectedXorAggregation.lean:67:6: error: unsolved goals\ncase mk.mk.left.h.true\nab : String \u2192 Bool\naf : Faults\nac : Bool\nbb : String \u2192 Bool\nbf : Faults\nbc : Bool\nn : String\n\u22a2 False\n'CompilerSafety.check_run' depends on axioms: [propext, sorryAx, Quot.sound]\n",
+      "stderr": ""
+    }
+  ],
+  "proofSha256": "f94db470d86c8d52f89c4b476baf82cf63dc7886d67b76ffab1d0d9c1862ad5f",
+  "verifierSha256": "4f99ef0c8f4b3169be05c1aca7a37233dc5d1223dde896a7fa4f9f26da65c3d5",
+  "leanVersion": {
+    "exitCode": 0,
+    "stdout": "Lean (version 4.19.0, x86_64-apple-darwin22.6.0, commit 6caaee842e94, Release)\n",
+    "stderr": ""
+  },
+  "finishedAt": "2026-10-27T13:39:51.940239Z"
+}

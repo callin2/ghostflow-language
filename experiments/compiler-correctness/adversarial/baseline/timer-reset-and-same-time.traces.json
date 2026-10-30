@@ -1,0 +1,458 @@
+[
+  {
+    "ok": true,
+    "vm": {
+      "tick": 1,
+      "module": "fbc45bc1af5752eb",
+      "strategy": "control",
+      "inputs": {
+        "__gf_now_ms": 0,
+        "__gf_sensor_fault_enabled": 0,
+        "__gf_sensor_ok_enabled": true,
+        "__gf_sensor_value_enabled": true
+      },
+      "stateBefore": {
+        "__gf_timer_since_hot_for": 0,
+        "__gf_timer_was_true_hot_for": false
+      },
+      "stateAfter": {
+        "__gf_timer_since_hot_for": 0,
+        "__gf_timer_was_true_hot_for": true
+      },
+      "requested": {
+        "age": 0,
+        "done": false
+      },
+      "safe": {
+        "age": 0,
+        "done": false
+      },
+      "faults": [],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": []
+      },
+      "resultTrace": [
+        {
+          "site": 4,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 4,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 4,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 4,
+          "choice": 0,
+          "origin": 0
+        }
+      ]
+    }
+  },
+  {
+    "ok": true,
+    "vm": {
+      "tick": 2,
+      "module": "fbc45bc1af5752eb",
+      "strategy": "control",
+      "inputs": {
+        "__gf_now_ms": 999,
+        "__gf_sensor_fault_enabled": 0,
+        "__gf_sensor_ok_enabled": true,
+        "__gf_sensor_value_enabled": true
+      },
+      "stateBefore": {
+        "__gf_timer_since_hot_for": 0,
+        "__gf_timer_was_true_hot_for": true
+      },
+      "stateAfter": {
+        "__gf_timer_since_hot_for": 0,
+        "__gf_timer_was_true_hot_for": true
+      },
+      "requested": {
+        "age": 999,
+        "done": false
+      },
+      "safe": {
+        "age": 999,
+        "done": false
+      },
+      "faults": [],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": []
+      },
+      "resultTrace": [
+        {
+          "site": 4,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 4,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 4,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 4,
+          "choice": 0,
+          "origin": 0
+        }
+      ]
+    }
+  },
+  {
+    "ok": true,
+    "vm": {
+      "tick": 3,
+      "module": "fbc45bc1af5752eb",
+      "strategy": "control",
+      "inputs": {
+        "__gf_now_ms": 1000,
+        "__gf_sensor_fault_enabled": 0,
+        "__gf_sensor_ok_enabled": true,
+        "__gf_sensor_value_enabled": true
+      },
+      "stateBefore": {
+        "__gf_timer_since_hot_for": 0,
+        "__gf_timer_was_true_hot_for": true
+      },
+      "stateAfter": {
+        "__gf_timer_since_hot_for": 0,
+        "__gf_timer_was_true_hot_for": true
+      },
+      "requested": {
+        "age": 1000,
+        "done": true
+      },
+      "safe": {
+        "age": 1000,
+        "done": true
+      },
+      "faults": [],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": []
+      },
+      "resultTrace": [
+        {
+          "site": 4,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 4,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 4,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 4,
+          "choice": 0,
+          "origin": 0
+        }
+      ]
+    }
+  },
+  {
+    "ok": true,
+    "vm": {
+      "tick": 4,
+      "module": "fbc45bc1af5752eb",
+      "strategy": "control",
+      "inputs": {
+        "__gf_now_ms": 1000,
+        "__gf_sensor_fault_enabled": 0,
+        "__gf_sensor_ok_enabled": true,
+        "__gf_sensor_value_enabled": true
+      },
+      "stateBefore": {
+        "__gf_timer_since_hot_for": 0,
+        "__gf_timer_was_true_hot_for": true
+      },
+      "stateAfter": {
+        "__gf_timer_since_hot_for": 0,
+        "__gf_timer_was_true_hot_for": true
+      },
+      "requested": {
+        "age": 1000,
+        "done": true
+      },
+      "safe": {
+        "age": 1000,
+        "done": true
+      },
+      "faults": [],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": []
+      },
+      "resultTrace": [
+        {
+          "site": 4,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 4,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 4,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 4,
+          "choice": 0,
+          "origin": 0
+        }
+      ]
+    }
+  },
+  {
+    "ok": true,
+    "vm": {
+      "tick": 5,
+      "module": "fbc45bc1af5752eb",
+      "strategy": "control",
+      "inputs": {
+        "__gf_now_ms": 1001,
+        "__gf_sensor_fault_enabled": 0,
+        "__gf_sensor_ok_enabled": true,
+        "__gf_sensor_value_enabled": false
+      },
+      "stateBefore": {
+        "__gf_timer_since_hot_for": 0,
+        "__gf_timer_was_true_hot_for": true
+      },
+      "stateAfter": {
+        "__gf_timer_since_hot_for": 1001,
+        "__gf_timer_was_true_hot_for": false
+      },
+      "requested": {
+        "age": 0,
+        "done": false
+      },
+      "safe": {
+        "age": 0,
+        "done": false
+      },
+      "faults": [],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": []
+      },
+      "resultTrace": [
+        {
+          "site": 4,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 4,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 4,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 4,
+          "choice": 0,
+          "origin": 0
+        }
+      ]
+    }
+  },
+  {
+    "ok": true,
+    "vm": {
+      "tick": 6,
+      "module": "fbc45bc1af5752eb",
+      "strategy": "control",
+      "inputs": {
+        "__gf_now_ms": 9000,
+        "__gf_sensor_fault_enabled": 0,
+        "__gf_sensor_ok_enabled": true,
+        "__gf_sensor_value_enabled": true
+      },
+      "stateBefore": {
+        "__gf_timer_since_hot_for": 1001,
+        "__gf_timer_was_true_hot_for": false
+      },
+      "stateAfter": {
+        "__gf_timer_since_hot_for": 9000,
+        "__gf_timer_was_true_hot_for": true
+      },
+      "requested": {
+        "age": 0,
+        "done": false
+      },
+      "safe": {
+        "age": 0,
+        "done": false
+      },
+      "faults": [],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": []
+      },
+      "resultTrace": [
+        {
+          "site": 4,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 4,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 4,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 4,
+          "choice": 0,
+          "origin": 0
+        }
+      ]
+    }
+  },
+  {
+    "ok": true,
+    "vm": {
+      "tick": 7,
+      "module": "fbc45bc1af5752eb",
+      "strategy": "control",
+      "inputs": {
+        "__gf_now_ms": 9999,
+        "__gf_sensor_fault_enabled": 0,
+        "__gf_sensor_ok_enabled": true,
+        "__gf_sensor_value_enabled": true
+      },
+      "stateBefore": {
+        "__gf_timer_since_hot_for": 9000,
+        "__gf_timer_was_true_hot_for": true
+      },
+      "stateAfter": {
+        "__gf_timer_since_hot_for": 9000,
+        "__gf_timer_was_true_hot_for": true
+      },
+      "requested": {
+        "age": 999,
+        "done": false
+      },
+      "safe": {
+        "age": 999,
+        "done": false
+      },
+      "faults": [],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": []
+      },
+      "resultTrace": [
+        {
+          "site": 4,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 4,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 4,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 4,
+          "choice": 0,
+          "origin": 0
+        }
+      ]
+    }
+  },
+  {
+    "ok": true,
+    "vm": {
+      "tick": 8,
+      "module": "fbc45bc1af5752eb",
+      "strategy": "control",
+      "inputs": {
+        "__gf_now_ms": 10000,
+        "__gf_sensor_fault_enabled": 0,
+        "__gf_sensor_ok_enabled": true,
+        "__gf_sensor_value_enabled": true
+      },
+      "stateBefore": {
+        "__gf_timer_since_hot_for": 9000,
+        "__gf_timer_was_true_hot_for": true
+      },
+      "stateAfter": {
+        "__gf_timer_since_hot_for": 9000,
+        "__gf_timer_was_true_hot_for": true
+      },
+      "requested": {
+        "age": 1000,
+        "done": true
+      },
+      "safe": {
+        "age": 1000,
+        "done": true
+      },
+      "faults": [],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": []
+      },
+      "resultTrace": [
+        {
+          "site": 4,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 4,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 4,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 4,
+          "choice": 0,
+          "origin": 0
+        }
+      ]
+    }
+  }
+]

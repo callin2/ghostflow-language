@@ -1,0 +1,8 @@
+{
+  "fixture": "BridgeEight",
+  "sourceSha256": "b7c715526004e0b269dee5befcf7378313e942d9a1e97f085e4f2badf84effa0",
+  "theorem": "CompilerSafety.check_run instantiated with accepted : check original compiled = true",
+  "exitCode": 0,
+  "stdout": "",
+  "stderr": ""
+}

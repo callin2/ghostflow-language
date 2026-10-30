@@ -1,0 +1,41 @@
+[
+  {
+    "ok": true,
+    "vm": {
+      "tick": 1,
+      "module": "28340221780141c5",
+      "strategy": "control",
+      "inputs": {},
+      "stateBefore": {
+        "zero": 0
+      },
+      "stateAfter": {
+        "zero": 0
+      },
+      "requested": {
+        "conditional": 7,
+        "conjunction": false,
+        "disjunction": true,
+        "recovered": 9
+      },
+      "safe": {
+        "conditional": 7,
+        "conjunction": false,
+        "disjunction": true,
+        "recovered": 9
+      },
+      "faults": [],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": []
+      },
+      "resultTrace": [
+        {
+          "site": 20,
+          "choice": 1,
+          "origin": 15
+        }
+      ]
+    }
+  }
+]

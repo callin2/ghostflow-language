@@ -1,0 +1,222 @@
+[
+  {
+    "ok": true,
+    "vm": {
+      "tick": 1,
+      "module": "17575505583d68d4",
+      "strategy": "control",
+      "inputs": {
+        "__gf_sensor_fault_instance_4_east_enabled": 0,
+        "__gf_sensor_fault_instance_4_west_enabled": 0,
+        "__gf_sensor_fault_left": 0,
+        "__gf_sensor_fault_right": 0,
+        "__gf_sensor_ok_instance_4_east_enabled": true,
+        "__gf_sensor_ok_instance_4_west_enabled": true,
+        "__gf_sensor_ok_left": true,
+        "__gf_sensor_ok_right": true,
+        "__gf_sensor_value_instance_4_east_enabled": true,
+        "__gf_sensor_value_instance_4_west_enabled": false,
+        "__gf_sensor_value_left": true,
+        "__gf_sensor_value_right": false
+      },
+      "stateBefore": {
+        "instance_4_east_total": 0,
+        "instance_4_west_total": 0
+      },
+      "stateAfter": {
+        "instance_4_east_total": 1,
+        "instance_4_west_total": 0
+      },
+      "requested": {
+        "a": 1,
+        "b": 0
+      },
+      "safe": {
+        "a": 1,
+        "b": 0
+      },
+      "faults": [],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": []
+      },
+      "resultTrace": [
+        {
+          "site": 16,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 32,
+          "choice": 0,
+          "origin": 0
+        }
+      ]
+    }
+  },
+  {
+    "ok": true,
+    "vm": {
+      "tick": 2,
+      "module": "17575505583d68d4",
+      "strategy": "control",
+      "inputs": {
+        "__gf_sensor_fault_instance_4_east_enabled": 0,
+        "__gf_sensor_fault_instance_4_west_enabled": 0,
+        "__gf_sensor_fault_left": 0,
+        "__gf_sensor_fault_right": 0,
+        "__gf_sensor_ok_instance_4_east_enabled": true,
+        "__gf_sensor_ok_instance_4_west_enabled": true,
+        "__gf_sensor_ok_left": true,
+        "__gf_sensor_ok_right": true,
+        "__gf_sensor_value_instance_4_east_enabled": true,
+        "__gf_sensor_value_instance_4_west_enabled": false,
+        "__gf_sensor_value_left": true,
+        "__gf_sensor_value_right": false
+      },
+      "stateBefore": {
+        "instance_4_east_total": 1,
+        "instance_4_west_total": 0
+      },
+      "stateAfter": {
+        "instance_4_east_total": 2,
+        "instance_4_west_total": 0
+      },
+      "requested": {
+        "a": 2,
+        "b": 0
+      },
+      "safe": {
+        "a": 2,
+        "b": 0
+      },
+      "faults": [],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": []
+      },
+      "resultTrace": [
+        {
+          "site": 16,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 32,
+          "choice": 0,
+          "origin": 0
+        }
+      ]
+    }
+  },
+  {
+    "ok": true,
+    "vm": {
+      "tick": 3,
+      "module": "17575505583d68d4",
+      "strategy": "control",
+      "inputs": {
+        "__gf_sensor_fault_instance_4_east_enabled": 0,
+        "__gf_sensor_fault_instance_4_west_enabled": 0,
+        "__gf_sensor_fault_left": 0,
+        "__gf_sensor_fault_right": 0,
+        "__gf_sensor_ok_instance_4_east_enabled": true,
+        "__gf_sensor_ok_instance_4_west_enabled": true,
+        "__gf_sensor_ok_left": true,
+        "__gf_sensor_ok_right": true,
+        "__gf_sensor_value_instance_4_east_enabled": false,
+        "__gf_sensor_value_instance_4_west_enabled": true,
+        "__gf_sensor_value_left": false,
+        "__gf_sensor_value_right": true
+      },
+      "stateBefore": {
+        "instance_4_east_total": 2,
+        "instance_4_west_total": 0
+      },
+      "stateAfter": {
+        "instance_4_east_total": 2,
+        "instance_4_west_total": 1
+      },
+      "requested": {
+        "a": 2,
+        "b": 1
+      },
+      "safe": {
+        "a": 2,
+        "b": 1
+      },
+      "faults": [],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": []
+      },
+      "resultTrace": [
+        {
+          "site": 16,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 32,
+          "choice": 0,
+          "origin": 0
+        }
+      ]
+    }
+  },
+  {
+    "ok": true,
+    "vm": {
+      "tick": 4,
+      "module": "17575505583d68d4",
+      "strategy": "control",
+      "inputs": {
+        "__gf_sensor_fault_instance_4_east_enabled": 0,
+        "__gf_sensor_fault_instance_4_west_enabled": 0,
+        "__gf_sensor_fault_left": 0,
+        "__gf_sensor_fault_right": 0,
+        "__gf_sensor_ok_instance_4_east_enabled": true,
+        "__gf_sensor_ok_instance_4_west_enabled": true,
+        "__gf_sensor_ok_left": true,
+        "__gf_sensor_ok_right": true,
+        "__gf_sensor_value_instance_4_east_enabled": false,
+        "__gf_sensor_value_instance_4_west_enabled": false,
+        "__gf_sensor_value_left": false,
+        "__gf_sensor_value_right": false
+      },
+      "stateBefore": {
+        "instance_4_east_total": 2,
+        "instance_4_west_total": 1
+      },
+      "stateAfter": {
+        "instance_4_east_total": 2,
+        "instance_4_west_total": 1
+      },
+      "requested": {
+        "a": 2,
+        "b": 1
+      },
+      "safe": {
+        "a": 2,
+        "b": 1
+      },
+      "faults": [],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": []
+      },
+      "resultTrace": [
+        {
+          "site": 16,
+          "choice": 0,
+          "origin": 0
+        },
+        {
+          "site": 32,
+          "choice": 0,
+          "origin": 0
+        }
+      ]
+    }
+  }
+]

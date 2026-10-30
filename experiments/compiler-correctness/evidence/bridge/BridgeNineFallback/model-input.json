@@ -1,0 +1,1858 @@
+{
+  "sourceForms": [
+    [
+      "mutex",
+      "a",
+      "b",
+      "c",
+      "d",
+      "e",
+      "f",
+      "g",
+      "h",
+      "i"
+    ],
+    [
+      "mutex",
+      "a",
+      "b",
+      "c",
+      "d",
+      "e",
+      "f",
+      "g",
+      "h",
+      "i"
+    ]
+  ],
+  "decoded": {
+    "version": 3,
+    "name": "BridgeNineFallback",
+    "moduleVersion": 1,
+    "inputs": [
+      {
+        "name": "__gf_sensor_value_raw_a",
+        "type": 1
+      },
+      {
+        "name": "__gf_sensor_ok_raw_a",
+        "type": 1
+      },
+      {
+        "name": "__gf_sensor_fault_raw_a",
+        "type": 2
+      },
+      {
+        "name": "__gf_sensor_value_raw_b",
+        "type": 1
+      },
+      {
+        "name": "__gf_sensor_ok_raw_b",
+        "type": 1
+      },
+      {
+        "name": "__gf_sensor_fault_raw_b",
+        "type": 2
+      },
+      {
+        "name": "__gf_sensor_value_raw_c",
+        "type": 1
+      },
+      {
+        "name": "__gf_sensor_ok_raw_c",
+        "type": 1
+      },
+      {
+        "name": "__gf_sensor_fault_raw_c",
+        "type": 2
+      },
+      {
+        "name": "__gf_sensor_value_raw_d",
+        "type": 1
+      },
+      {
+        "name": "__gf_sensor_ok_raw_d",
+        "type": 1
+      },
+      {
+        "name": "__gf_sensor_fault_raw_d",
+        "type": 2
+      },
+      {
+        "name": "__gf_sensor_value_raw_e",
+        "type": 1
+      },
+      {
+        "name": "__gf_sensor_ok_raw_e",
+        "type": 1
+      },
+      {
+        "name": "__gf_sensor_fault_raw_e",
+        "type": 2
+      },
+      {
+        "name": "__gf_sensor_value_raw_f",
+        "type": 1
+      },
+      {
+        "name": "__gf_sensor_ok_raw_f",
+        "type": 1
+      },
+      {
+        "name": "__gf_sensor_fault_raw_f",
+        "type": 2
+      },
+      {
+        "name": "__gf_sensor_value_raw_g",
+        "type": 1
+      },
+      {
+        "name": "__gf_sensor_ok_raw_g",
+        "type": 1
+      },
+      {
+        "name": "__gf_sensor_fault_raw_g",
+        "type": 2
+      },
+      {
+        "name": "__gf_sensor_value_raw_h",
+        "type": 1
+      },
+      {
+        "name": "__gf_sensor_ok_raw_h",
+        "type": 1
+      },
+      {
+        "name": "__gf_sensor_fault_raw_h",
+        "type": 2
+      },
+      {
+        "name": "__gf_sensor_value_raw_i",
+        "type": 1
+      },
+      {
+        "name": "__gf_sensor_ok_raw_i",
+        "type": 1
+      },
+      {
+        "name": "__gf_sensor_fault_raw_i",
+        "type": 2
+      }
+    ],
+    "states": [],
+    "strategies": [
+      {
+        "name": "control",
+        "priority": 0,
+        "transitions": [],
+        "intents": [
+          {
+            "name": "a",
+            "type": 1,
+            "expressionLength": 45
+          },
+          {
+            "name": "b",
+            "type": 1,
+            "expressionLength": 45
+          },
+          {
+            "name": "c",
+            "type": 1,
+            "expressionLength": 45
+          },
+          {
+            "name": "d",
+            "type": 1,
+            "expressionLength": 45
+          },
+          {
+            "name": "e",
+            "type": 1,
+            "expressionLength": 45
+          },
+          {
+            "name": "f",
+            "type": 1,
+            "expressionLength": 45
+          },
+          {
+            "name": "g",
+            "type": 1,
+            "expressionLength": 45
+          },
+          {
+            "name": "h",
+            "type": 1,
+            "expressionLength": 45
+          },
+          {
+            "name": "i",
+            "type": 1,
+            "expressionLength": 45
+          }
+        ]
+      }
+    ],
+    "constraints": [
+      [
+        "mutex",
+        "a",
+        "b",
+        "c",
+        "d",
+        "e",
+        "f",
+        "g",
+        "h",
+        "i"
+      ],
+      [
+        "mutex",
+        "a",
+        "b",
+        "c",
+        "d",
+        "e",
+        "f",
+        "g",
+        "h",
+        "i"
+      ]
+    ],
+    "constraintsOffset": 1347
+  },
+  "frames": [
+    {
+      "a": false,
+      "b": false,
+      "c": false,
+      "d": false,
+      "e": false,
+      "f": false,
+      "g": false,
+      "h": false,
+      "i": false
+    },
+    {
+      "a": true,
+      "b": true,
+      "c": true,
+      "d": true,
+      "e": true,
+      "f": true,
+      "g": true,
+      "h": true,
+      "i": true
+    },
+    {
+      "a": true,
+      "b": false,
+      "c": false,
+      "d": false,
+      "e": false,
+      "f": false,
+      "g": false,
+      "h": false,
+      "i": false
+    },
+    {
+      "a": false,
+      "b": true,
+      "c": false,
+      "d": false,
+      "e": false,
+      "f": false,
+      "g": false,
+      "h": false,
+      "i": false
+    },
+    {
+      "a": false,
+      "b": false,
+      "c": true,
+      "d": false,
+      "e": false,
+      "f": false,
+      "g": false,
+      "h": false,
+      "i": false
+    },
+    {
+      "a": false,
+      "b": false,
+      "c": false,
+      "d": true,
+      "e": false,
+      "f": false,
+      "g": false,
+      "h": false,
+      "i": false
+    },
+    {
+      "a": false,
+      "b": false,
+      "c": false,
+      "d": false,
+      "e": true,
+      "f": false,
+      "g": false,
+      "h": false,
+      "i": false
+    },
+    {
+      "a": false,
+      "b": false,
+      "c": false,
+      "d": false,
+      "e": false,
+      "f": true,
+      "g": false,
+      "h": false,
+      "i": false
+    },
+    {
+      "a": false,
+      "b": false,
+      "c": false,
+      "d": false,
+      "e": false,
+      "f": false,
+      "g": true,
+      "h": false,
+      "i": false
+    },
+    {
+      "a": false,
+      "b": false,
+      "c": false,
+      "d": false,
+      "e": false,
+      "f": false,
+      "g": false,
+      "h": true,
+      "i": false
+    },
+    {
+      "a": false,
+      "b": false,
+      "c": false,
+      "d": false,
+      "e": false,
+      "f": false,
+      "g": false,
+      "h": false,
+      "i": true
+    }
+  ],
+  "rails": [
+    [
+      {
+        "name": "__gf_sensor_value_raw_a",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_a",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_a",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_b",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_b",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_b",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_c",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_c",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_c",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_d",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_d",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_d",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_e",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_e",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_e",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_f",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_f",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_f",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_g",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_g",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_g",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_h",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_h",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_h",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_i",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_i",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_i",
+        "type": "number",
+        "value": 0
+      }
+    ],
+    [
+      {
+        "name": "__gf_sensor_value_raw_a",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_ok_raw_a",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_a",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_b",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_ok_raw_b",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_b",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_c",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_ok_raw_c",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_c",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_d",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_ok_raw_d",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_d",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_e",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_ok_raw_e",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_e",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_f",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_ok_raw_f",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_f",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_g",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_ok_raw_g",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_g",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_h",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_ok_raw_h",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_h",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_i",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_ok_raw_i",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_i",
+        "type": "number",
+        "value": 0
+      }
+    ],
+    [
+      {
+        "name": "__gf_sensor_value_raw_a",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_ok_raw_a",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_a",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_b",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_b",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_b",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_c",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_c",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_c",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_d",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_d",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_d",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_e",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_e",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_e",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_f",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_f",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_f",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_g",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_g",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_g",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_h",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_h",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_h",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_i",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_i",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_i",
+        "type": "number",
+        "value": 0
+      }
+    ],
+    [
+      {
+        "name": "__gf_sensor_value_raw_a",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_a",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_a",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_b",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_ok_raw_b",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_b",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_c",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_c",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_c",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_d",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_d",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_d",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_e",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_e",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_e",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_f",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_f",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_f",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_g",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_g",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_g",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_h",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_h",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_h",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_i",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_i",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_i",
+        "type": "number",
+        "value": 0
+      }
+    ],
+    [
+      {
+        "name": "__gf_sensor_value_raw_a",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_a",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_a",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_b",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_b",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_b",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_c",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_ok_raw_c",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_c",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_d",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_d",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_d",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_e",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_e",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_e",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_f",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_f",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_f",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_g",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_g",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_g",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_h",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_h",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_h",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_i",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_i",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_i",
+        "type": "number",
+        "value": 0
+      }
+    ],
+    [
+      {
+        "name": "__gf_sensor_value_raw_a",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_a",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_a",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_b",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_b",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_b",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_c",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_c",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_c",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_d",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_ok_raw_d",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_d",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_e",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_e",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_e",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_f",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_f",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_f",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_g",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_g",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_g",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_h",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_h",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_h",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_i",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_i",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_i",
+        "type": "number",
+        "value": 0
+      }
+    ],
+    [
+      {
+        "name": "__gf_sensor_value_raw_a",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_a",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_a",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_b",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_b",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_b",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_c",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_c",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_c",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_d",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_d",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_d",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_e",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_ok_raw_e",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_e",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_f",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_f",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_f",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_g",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_g",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_g",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_h",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_h",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_h",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_i",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_i",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_i",
+        "type": "number",
+        "value": 0
+      }
+    ],
+    [
+      {
+        "name": "__gf_sensor_value_raw_a",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_a",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_a",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_b",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_b",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_b",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_c",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_c",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_c",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_d",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_d",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_d",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_e",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_e",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_e",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_f",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_ok_raw_f",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_f",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_g",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_g",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_g",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_h",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_h",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_h",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_i",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_i",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_i",
+        "type": "number",
+        "value": 0
+      }
+    ],
+    [
+      {
+        "name": "__gf_sensor_value_raw_a",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_a",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_a",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_b",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_b",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_b",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_c",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_c",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_c",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_d",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_d",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_d",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_e",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_e",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_e",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_f",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_f",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_f",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_g",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_ok_raw_g",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_g",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_h",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_h",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_h",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_i",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_i",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_i",
+        "type": "number",
+        "value": 0
+      }
+    ],
+    [
+      {
+        "name": "__gf_sensor_value_raw_a",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_a",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_a",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_b",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_b",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_b",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_c",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_c",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_c",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_d",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_d",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_d",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_e",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_e",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_e",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_f",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_f",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_f",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_g",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_g",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_g",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_h",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_ok_raw_h",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_h",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_i",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_i",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_i",
+        "type": "number",
+        "value": 0
+      }
+    ],
+    [
+      {
+        "name": "__gf_sensor_value_raw_a",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_a",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_a",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_b",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_b",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_b",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_c",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_c",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_c",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_d",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_d",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_d",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_e",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_e",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_e",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_f",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_f",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_f",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_g",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_g",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_g",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_h",
+        "type": "bool",
+        "value": false
+      },
+      {
+        "name": "__gf_sensor_ok_raw_h",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_h",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "name": "__gf_sensor_value_raw_i",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_ok_raw_i",
+        "type": "bool",
+        "value": true
+      },
+      {
+        "name": "__gf_sensor_fault_raw_i",
+        "type": "number",
+        "value": 0
+      }
+    ]
+  ],
+  "trustBoundary": "production literate extractor and parser; independent GFB framing decoder"
+}

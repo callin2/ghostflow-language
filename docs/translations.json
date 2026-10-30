@@ -1500,6 +1500,178 @@
     {
       "path": "docs/reports/2026-10-24-issue-584-explicit-profile-providers.md",
       "reason": "Issue 584 owner implementation, test evidence and consumer handoff; dated execution reports may remain in one language."
+    },
+    {
+      "path": "experiments/compiler-correctness/README.md",
+      "reason": "Issue 590 dated compiler-verification investigation, proof or review report; execution reports may remain in one language."
+    },
+    {
+      "path": "experiments/compiler-correctness/adversarial/baseline/binary64-constant-and-state.ghost.md",
+      "reason": "Issue 590 generated verification fixture or preserved counterexample; exact executable evidence is not translated."
+    },
+    {
+      "path": "experiments/compiler-correctness/adversarial/baseline/cell.ghost.md",
+      "reason": "Issue 590 generated verification fixture or preserved counterexample; exact executable evidence is not translated."
+    },
+    {
+      "path": "experiments/compiler-correctness/adversarial/baseline/composition-forward.ghost.md",
+      "reason": "Issue 590 generated verification fixture or preserved counterexample; exact executable evidence is not translated."
+    },
+    {
+      "path": "experiments/compiler-correctness/adversarial/baseline/composition-reverse.ghost.md",
+      "reason": "Issue 590 generated verification fixture or preserved counterexample; exact executable evidence is not translated."
+    },
+    {
+      "path": "experiments/compiler-correctness/adversarial/baseline/constant-folded-conversions.ghost.md",
+      "reason": "Issue 590 generated verification fixture or preserved counterexample; exact executable evidence is not translated."
+    },
+    {
+      "path": "experiments/compiler-correctness/adversarial/baseline/integer-add.ghost.md",
+      "reason": "Issue 590 generated verification fixture or preserved counterexample; exact executable evidence is not translated."
+    },
+    {
+      "path": "experiments/compiler-correctness/adversarial/baseline/integer-divide.ghost.md",
+      "reason": "Issue 590 generated verification fixture or preserved counterexample; exact executable evidence is not translated."
+    },
+    {
+      "path": "experiments/compiler-correctness/adversarial/baseline/integer-multiply.ghost.md",
+      "reason": "Issue 590 generated verification fixture or preserved counterexample; exact executable evidence is not translated."
+    },
+    {
+      "path": "experiments/compiler-correctness/adversarial/baseline/integer-remainder.ghost.md",
+      "reason": "Issue 590 generated verification fixture or preserved counterexample; exact executable evidence is not translated."
+    },
+    {
+      "path": "experiments/compiler-correctness/adversarial/baseline/left-to-right-fault-selection.ghost.md",
+      "reason": "Issue 590 generated verification fixture or preserved counterexample; exact executable evidence is not translated."
+    },
+    {
+      "path": "experiments/compiler-correctness/adversarial/baseline/mutation-add.ghost.md",
+      "reason": "Issue 590 generated verification fixture or preserved counterexample; exact executable evidence is not translated."
+    },
+    {
+      "path": "experiments/compiler-correctness/adversarial/baseline/percent-constant-domain.ghost.md",
+      "reason": "Issue 590 generated verification fixture or preserved counterexample; exact executable evidence is not translated."
+    },
+    {
+      "path": "experiments/compiler-correctness/adversarial/baseline/percent-runtime-domain.ghost.md",
+      "reason": "Issue 590 generated verification fixture or preserved counterexample; exact executable evidence is not translated."
+    },
+    {
+      "path": "experiments/compiler-correctness/adversarial/baseline/short-circuit-function-and-result.ghost.md",
+      "reason": "Issue 590 generated verification fixture or preserved counterexample; exact executable evidence is not translated."
+    },
+    {
+      "path": "experiments/compiler-correctness/adversarial/baseline/timer-reset-and-same-time.ghost.md",
+      "reason": "Issue 590 generated verification fixture or preserved counterexample; exact executable evidence is not translated."
+    },
+    {
+      "path": "experiments/compiler-correctness/adversarial/evidence/binary64-constant-and-state.ghost.md",
+      "reason": "Issue 590 generated verification fixture or preserved counterexample; exact executable evidence is not translated."
+    },
+    {
+      "path": "experiments/compiler-correctness/adversarial/evidence/cell.ghost.md",
+      "reason": "Issue 590 generated verification fixture or preserved counterexample; exact executable evidence is not translated."
+    },
+    {
+      "path": "experiments/compiler-correctness/adversarial/evidence/composition-forward.ghost.md",
+      "reason": "Issue 590 generated verification fixture or preserved counterexample; exact executable evidence is not translated."
+    },
+    {
+      "path": "experiments/compiler-correctness/adversarial/evidence/composition-reverse.ghost.md",
+      "reason": "Issue 590 generated verification fixture or preserved counterexample; exact executable evidence is not translated."
+    },
+    {
+      "path": "experiments/compiler-correctness/adversarial/evidence/constant-folded-conversions.ghost.md",
+      "reason": "Issue 590 generated verification fixture or preserved counterexample; exact executable evidence is not translated."
+    },
+    {
+      "path": "experiments/compiler-correctness/adversarial/evidence/integer-add.ghost.md",
+      "reason": "Issue 590 generated verification fixture or preserved counterexample; exact executable evidence is not translated."
+    },
+    {
+      "path": "experiments/compiler-correctness/adversarial/evidence/integer-divide.ghost.md",
+      "reason": "Issue 590 generated verification fixture or preserved counterexample; exact executable evidence is not translated."
+    },
+    {
+      "path": "experiments/compiler-correctness/adversarial/evidence/integer-multiply.ghost.md",
+      "reason": "Issue 590 generated verification fixture or preserved counterexample; exact executable evidence is not translated."
+    },
+    {
+      "path": "experiments/compiler-correctness/adversarial/evidence/integer-remainder.ghost.md",
+      "reason": "Issue 590 generated verification fixture or preserved counterexample; exact executable evidence is not translated."
+    },
+    {
+      "path": "experiments/compiler-correctness/adversarial/evidence/left-to-right-fault-selection.ghost.md",
+      "reason": "Issue 590 generated verification fixture or preserved counterexample; exact executable evidence is not translated."
+    },
+    {
+      "path": "experiments/compiler-correctness/adversarial/evidence/mutation-add.ghost.md",
+      "reason": "Issue 590 generated verification fixture or preserved counterexample; exact executable evidence is not translated."
+    },
+    {
+      "path": "experiments/compiler-correctness/adversarial/evidence/percent-boundaries-branch-and-ratio.ghost.md",
+      "reason": "Issue 590 generated verification fixture or preserved counterexample; exact executable evidence is not translated."
+    },
+    {
+      "path": "experiments/compiler-correctness/adversarial/evidence/percent-constant-domain.ghost.md",
+      "reason": "Issue 590 generated verification fixture or preserved counterexample; exact executable evidence is not translated."
+    },
+    {
+      "path": "experiments/compiler-correctness/adversarial/evidence/percent-runtime-domain.ghost.md",
+      "reason": "Issue 590 generated verification fixture or preserved counterexample; exact executable evidence is not translated."
+    },
+    {
+      "path": "experiments/compiler-correctness/adversarial/evidence/percent-state-domain.ghost.md",
+      "reason": "Issue 590 generated verification fixture or preserved counterexample; exact executable evidence is not translated."
+    },
+    {
+      "path": "experiments/compiler-correctness/adversarial/evidence/short-circuit-function-and-result.ghost.md",
+      "reason": "Issue 590 generated verification fixture or preserved counterexample; exact executable evidence is not translated."
+    },
+    {
+      "path": "experiments/compiler-correctness/adversarial/evidence/timer-reset-and-same-time.ghost.md",
+      "reason": "Issue 590 generated verification fixture or preserved counterexample; exact executable evidence is not translated."
+    },
+    {
+      "path": "experiments/compiler-correctness/adversarial/report.md",
+      "reason": "Issue 590 dated compiler-verification investigation, proof or review report; execution reports may remain in one language."
+    },
+    {
+      "path": "experiments/compiler-correctness/evidence/bridge/BridgeChained/source.ghost.md",
+      "reason": "Issue 590 generated verification fixture or preserved counterexample; exact executable evidence is not translated."
+    },
+    {
+      "path": "experiments/compiler-correctness/evidence/bridge/BridgeCountBoundary/source.ghost.md",
+      "reason": "Issue 590 generated verification fixture or preserved counterexample; exact executable evidence is not translated."
+    },
+    {
+      "path": "experiments/compiler-correctness/evidence/bridge/BridgeEight/source.ghost.md",
+      "reason": "Issue 590 generated verification fixture or preserved counterexample; exact executable evidence is not translated."
+    },
+    {
+      "path": "experiments/compiler-correctness/evidence/bridge/BridgeNineFallback/source.ghost.md",
+      "reason": "Issue 590 generated verification fixture or preserved counterexample; exact executable evidence is not translated."
+    },
+    {
+      "path": "experiments/compiler-correctness/evidence/bridge/BridgeScalarOne/source.ghost.md",
+      "reason": "Issue 590 generated verification fixture or preserved counterexample; exact executable evidence is not translated."
+    },
+    {
+      "path": "experiments/compiler-correctness/evidence/bridge/BridgeScalarTwo/source.ghost.md",
+      "reason": "Issue 590 generated verification fixture or preserved counterexample; exact executable evidence is not translated."
+    },
+    {
+      "path": "experiments/compiler-correctness/proof-design.md",
+      "reason": "Issue 590 dated compiler-verification investigation, proof or review report; execution reports may remain in one language."
+    },
+    {
+      "path": "experiments/compiler-correctness/review.md",
+      "reason": "Issue 590 dated compiler-verification investigation, proof or review report; execution reports may remain in one language."
+    },
+    {
+      "path": "experiments/compiler-correctness/semantics-inventory.md",
+      "reason": "Issue 590 dated compiler-verification investigation, proof or review report; execution reports may remain in one language."
     }
   ]
 }

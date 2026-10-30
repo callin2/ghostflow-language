@@ -1,0 +1,37 @@
+[
+  {
+    "ok": true,
+    "vm": {
+      "tick": 1,
+      "module": "95516d7faf42c05f",
+      "strategy": "control",
+      "inputs": {},
+      "stateBefore": {
+        "high": 2147483647,
+        "n": 2147483647.75
+      },
+      "stateAfter": {
+        "high": 2147483647,
+        "n": 2147483647.75
+      },
+      "requested": {
+        "dynamic": 2147483647,
+        "folded": 2147483647,
+        "truncated_constant": 2147483647,
+        "truncated_dynamic": 2147483647
+      },
+      "safe": {
+        "dynamic": 2147483647,
+        "folded": 2147483647,
+        "truncated_constant": 2147483647,
+        "truncated_dynamic": 2147483647
+      },
+      "faults": [],
+      "safetyTrace": {
+        "format": "GhostFlow/safety-trace-v1",
+        "constraints": []
+      },
+      "resultTrace": []
+    }
+  }
+]

@@ -1,0 +1,42 @@
+{
+  "format": "GhostFlow/control-v1",
+  "name": "TimerBoundary",
+  "inputs": [],
+  "outputs": [
+    {
+      "name": "age",
+      "type": "Duration"
+    },
+    {
+      "name": "done",
+      "type": "Bool"
+    }
+  ],
+  "sensors": [
+    {
+      "name": "enabled",
+      "type": "Bool",
+      "sampleMs": null,
+      "validMin": null,
+      "validMax": null,
+      "filter": null,
+      "window": null,
+      "staleMs": null,
+      "recoverSamples": null,
+      "valueInput": "__gf_sensor_value_enabled",
+      "okInput": "__gf_sensor_ok_enabled",
+      "faultInput": "__gf_sensor_fault_enabled"
+    }
+  ],
+  "schedules": [],
+  "timers": [
+    {
+      "name": "hot_for",
+      "mode": "continuous-true",
+      "clockInput": "__gf_now_ms"
+    }
+  ],
+  "signals": [],
+  "configs": [],
+  "bytecodeSha256": "9073baaab3d0f87ff45bbb93a70d5d4240228a1991ff316e4157e7a42b4d0a13"
+}

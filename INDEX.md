@@ -435,6 +435,99 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [examples/tutorial/04-extra-valves.ghost.ko.md](examples/tutorial/04-extra-valves.ghost.ko.md) | 추가 관측소 밸브 | md |
 | [examples/tutorial/04-extra-valves.ghost.md](examples/tutorial/04-extra-valves.ghost.md) | Extra station valves | md |
 
+## experiments/compiler-correctness/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [experiments/compiler-correctness/proof-design.md](experiments/compiler-correctness/proof-design.md) | Compiler correctness investigation report | md |
+| [experiments/compiler-correctness/README.md](experiments/compiler-correctness/README.md) | GhostFlow 컴파일러 전체 정확성 검증 — 2026-10-27 | md |
+| [experiments/compiler-correctness/review.md](experiments/compiler-correctness/review.md) | Independent review of the partial constraint proof | md |
+| [experiments/compiler-correctness/semantics-inventory.md](experiments/compiler-correctness/semantics-inventory.md) | Compiler correctness inventory at `4861a78a72f0f1078cafe99bf26b93d541e1b82c` | md |
+
+## experiments/compiler-correctness/adversarial/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [experiments/compiler-correctness/adversarial/report.md](experiments/compiler-correctness/adversarial/report.md) | Independent compiler and runtime counterexample evidence | md |
+
+## experiments/compiler-correctness/adversarial/baseline/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [experiments/compiler-correctness/adversarial/baseline/binary64-constant-and-state.ghost.md](experiments/compiler-correctness/adversarial/baseline/binary64-constant-and-state.ghost.md) | Compiler correctness adversarial example | md |
+| [experiments/compiler-correctness/adversarial/baseline/cell.ghost.md](experiments/compiler-correctness/adversarial/baseline/cell.ghost.md) | Compiler correctness adversarial example | md |
+| [experiments/compiler-correctness/adversarial/baseline/composition-forward.ghost.md](experiments/compiler-correctness/adversarial/baseline/composition-forward.ghost.md) | Compiler correctness adversarial example | md |
+| [experiments/compiler-correctness/adversarial/baseline/composition-reverse.ghost.md](experiments/compiler-correctness/adversarial/baseline/composition-reverse.ghost.md) | Compiler correctness adversarial example | md |
+| [experiments/compiler-correctness/adversarial/baseline/constant-folded-conversions.ghost.md](experiments/compiler-correctness/adversarial/baseline/constant-folded-conversions.ghost.md) | Compiler correctness adversarial example | md |
+| [experiments/compiler-correctness/adversarial/baseline/integer-add.ghost.md](experiments/compiler-correctness/adversarial/baseline/integer-add.ghost.md) | Compiler correctness adversarial example | md |
+| [experiments/compiler-correctness/adversarial/baseline/integer-divide.ghost.md](experiments/compiler-correctness/adversarial/baseline/integer-divide.ghost.md) | Compiler correctness adversarial example | md |
+| [experiments/compiler-correctness/adversarial/baseline/integer-multiply.ghost.md](experiments/compiler-correctness/adversarial/baseline/integer-multiply.ghost.md) | Compiler correctness adversarial example | md |
+| [experiments/compiler-correctness/adversarial/baseline/integer-remainder.ghost.md](experiments/compiler-correctness/adversarial/baseline/integer-remainder.ghost.md) | Compiler correctness adversarial example | md |
+| [experiments/compiler-correctness/adversarial/baseline/left-to-right-fault-selection.ghost.md](experiments/compiler-correctness/adversarial/baseline/left-to-right-fault-selection.ghost.md) | Compiler correctness adversarial example | md |
+| [experiments/compiler-correctness/adversarial/baseline/mutation-add.ghost.md](experiments/compiler-correctness/adversarial/baseline/mutation-add.ghost.md) | Compiler correctness adversarial example | md |
+| [experiments/compiler-correctness/adversarial/baseline/percent-constant-domain.ghost.md](experiments/compiler-correctness/adversarial/baseline/percent-constant-domain.ghost.md) | Compiler correctness adversarial example | md |
+| [experiments/compiler-correctness/adversarial/baseline/percent-runtime-domain.ghost.md](experiments/compiler-correctness/adversarial/baseline/percent-runtime-domain.ghost.md) | Compiler correctness adversarial example | md |
+| [experiments/compiler-correctness/adversarial/baseline/short-circuit-function-and-result.ghost.md](experiments/compiler-correctness/adversarial/baseline/short-circuit-function-and-result.ghost.md) | Compiler correctness adversarial example | md |
+| [experiments/compiler-correctness/adversarial/baseline/timer-reset-and-same-time.ghost.md](experiments/compiler-correctness/adversarial/baseline/timer-reset-and-same-time.ghost.md) | Compiler correctness adversarial example | md |
+
+## experiments/compiler-correctness/adversarial/evidence/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [experiments/compiler-correctness/adversarial/evidence/binary64-constant-and-state.ghost.md](experiments/compiler-correctness/adversarial/evidence/binary64-constant-and-state.ghost.md) | Compiler correctness adversarial example | md |
+| [experiments/compiler-correctness/adversarial/evidence/cell.ghost.md](experiments/compiler-correctness/adversarial/evidence/cell.ghost.md) | Compiler correctness adversarial example | md |
+| [experiments/compiler-correctness/adversarial/evidence/composition-forward.ghost.md](experiments/compiler-correctness/adversarial/evidence/composition-forward.ghost.md) | Compiler correctness adversarial example | md |
+| [experiments/compiler-correctness/adversarial/evidence/composition-reverse.ghost.md](experiments/compiler-correctness/adversarial/evidence/composition-reverse.ghost.md) | Compiler correctness adversarial example | md |
+| [experiments/compiler-correctness/adversarial/evidence/constant-folded-conversions.ghost.md](experiments/compiler-correctness/adversarial/evidence/constant-folded-conversions.ghost.md) | Compiler correctness adversarial example | md |
+| [experiments/compiler-correctness/adversarial/evidence/integer-add.ghost.md](experiments/compiler-correctness/adversarial/evidence/integer-add.ghost.md) | Compiler correctness adversarial example | md |
+| [experiments/compiler-correctness/adversarial/evidence/integer-divide.ghost.md](experiments/compiler-correctness/adversarial/evidence/integer-divide.ghost.md) | Compiler correctness adversarial example | md |
+| [experiments/compiler-correctness/adversarial/evidence/integer-multiply.ghost.md](experiments/compiler-correctness/adversarial/evidence/integer-multiply.ghost.md) | Compiler correctness adversarial example | md |
+| [experiments/compiler-correctness/adversarial/evidence/integer-remainder.ghost.md](experiments/compiler-correctness/adversarial/evidence/integer-remainder.ghost.md) | Compiler correctness adversarial example | md |
+| [experiments/compiler-correctness/adversarial/evidence/left-to-right-fault-selection.ghost.md](experiments/compiler-correctness/adversarial/evidence/left-to-right-fault-selection.ghost.md) | Compiler correctness adversarial example | md |
+| [experiments/compiler-correctness/adversarial/evidence/mutation-add.ghost.md](experiments/compiler-correctness/adversarial/evidence/mutation-add.ghost.md) | Compiler correctness adversarial example | md |
+| [experiments/compiler-correctness/adversarial/evidence/percent-boundaries-branch-and-ratio.ghost.md](experiments/compiler-correctness/adversarial/evidence/percent-boundaries-branch-and-ratio.ghost.md) | Compiler correctness adversarial example | md |
+| [experiments/compiler-correctness/adversarial/evidence/percent-constant-domain.ghost.md](experiments/compiler-correctness/adversarial/evidence/percent-constant-domain.ghost.md) | Compiler correctness adversarial example | md |
+| [experiments/compiler-correctness/adversarial/evidence/percent-runtime-domain.ghost.md](experiments/compiler-correctness/adversarial/evidence/percent-runtime-domain.ghost.md) | Compiler correctness adversarial example | md |
+| [experiments/compiler-correctness/adversarial/evidence/percent-state-domain.ghost.md](experiments/compiler-correctness/adversarial/evidence/percent-state-domain.ghost.md) | Compiler correctness adversarial example | md |
+| [experiments/compiler-correctness/adversarial/evidence/short-circuit-function-and-result.ghost.md](experiments/compiler-correctness/adversarial/evidence/short-circuit-function-and-result.ghost.md) | Compiler correctness adversarial example | md |
+| [experiments/compiler-correctness/adversarial/evidence/timer-reset-and-same-time.ghost.md](experiments/compiler-correctness/adversarial/evidence/timer-reset-and-same-time.ghost.md) | Compiler correctness adversarial example | md |
+
+## experiments/compiler-correctness/evidence/bridge/BridgeChained/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [experiments/compiler-correctness/evidence/bridge/BridgeChained/source.ghost.md](experiments/compiler-correctness/evidence/bridge/BridgeChained/source.ghost.md) | BridgeChained | md |
+
+## experiments/compiler-correctness/evidence/bridge/BridgeCountBoundary/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [experiments/compiler-correctness/evidence/bridge/BridgeCountBoundary/source.ghost.md](experiments/compiler-correctness/evidence/bridge/BridgeCountBoundary/source.ghost.md) | BridgeCountBoundary | md |
+
+## experiments/compiler-correctness/evidence/bridge/BridgeEight/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [experiments/compiler-correctness/evidence/bridge/BridgeEight/source.ghost.md](experiments/compiler-correctness/evidence/bridge/BridgeEight/source.ghost.md) | BridgeEight | md |
+
+## experiments/compiler-correctness/evidence/bridge/BridgeNineFallback/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [experiments/compiler-correctness/evidence/bridge/BridgeNineFallback/source.ghost.md](experiments/compiler-correctness/evidence/bridge/BridgeNineFallback/source.ghost.md) | BridgeNineFallback | md |
+
+## experiments/compiler-correctness/evidence/bridge/BridgeScalarOne/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [experiments/compiler-correctness/evidence/bridge/BridgeScalarOne/source.ghost.md](experiments/compiler-correctness/evidence/bridge/BridgeScalarOne/source.ghost.md) | BridgeScalarOne | md |
+
+## experiments/compiler-correctness/evidence/bridge/BridgeScalarTwo/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [experiments/compiler-correctness/evidence/bridge/BridgeScalarTwo/source.ghost.md](experiments/compiler-correctness/evidence/bridge/BridgeScalarTwo/source.ghost.md) | BridgeScalarTwo | md |
+
 ## runtimes/wasm/
 
 | Path | Title | Type |
@@ -551,4 +644,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-416 documents.
+459 documents.

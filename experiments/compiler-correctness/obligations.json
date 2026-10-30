@@ -1,0 +1,87 @@
+{
+  "schema": "GhostFlow/compiler-correctness-obligations-v1",
+  "issue": "https://github.com/callin2/ghostflow-language/issues/590",
+  "baseCommit": "4861a78a72f0f1078cafe99bf26b93d541e1b82c",
+  "statusMeaning": {
+    "unproved": "No current formal proof or named test evidence is attached here.",
+    "coverage-listed": "Listed test files exist in source; their current result is tracked separately, and no universal proof is asserted.",
+    "formal-partial": "A checked formal result covers only the named fragment and trust boundary."
+  },
+  "currentFormalResult": {
+    "status": "formal-partial",
+    "scope": "Adjacent exact Bool constraint duplicate elimination in the Lean SafetyState model, for all rounds and initial model states. Parser, other lowering, GFB expression semantics, and Rust VM refinement remain unproved.",
+    "theorem": "CompilerSafety.check_run",
+    "theoremSource": "experiments/compiler-correctness/lean/ConstraintPreservation.lean",
+    "theoremSourceSha256": "f94db470d86c8d52f89c4b476baf82cf63dc7886d67b76ffab1d0d9c1862ad5f",
+    "bridgeEvidence": "experiments/compiler-correctness/evidence/bridge/summary.json",
+    "checkedCertificates": 5,
+    "nativeAndWasmInputRows": 343
+  },
+  "sourceSha256": {
+    "tools/compile-source.mjs": "83b050d5300d664d361f69d8e9008c549f03e5d3eca8a6a9393976b5c31cf24b",
+    "tools/toolchain.mjs": "9339a37b439d4b6faa886eeb99c56c6e3fdc72eb8b973a4fd6a9fe39a5d103ae",
+    "tools/control.mjs": "c1c39bc8e5ccc7fb98ec1c661da62a26ed8a82d9d3f3fafce20d71242174e0df",
+    "tools/literate.mjs": "1b077cb32b12fd42bcd047336b6565c76d4b454945ece681f3146204054b86ef",
+    "tools/composition.mjs": "38e63719afc556815c76020c72ee9e49dce58ac906ac090b4e9d894bf492d35f",
+    "tools/gfb1.mjs": "4d58bb5bedccc30b7616b8513f17e598298ae0a1458906ee49140c2c1b8718b8",
+    "tools/core-ir.mjs": "9294dda242f1814114cf921c6da0366e1d0c69733ff67610a39a137bcb0703bb",
+    "crates/ghostflow-core/src/lib.rs": "a03b26a7fb74992572acbf92a90d7c6f41225e7084d02e77a86a5f5cce5c3dd5"
+  },
+  "entry": {
+    "function": "tools/toolchain.mjs:23 compileSource -> tools/compile-source.mjs:81 compileSourceSync",
+    "canonicalInput": ".ghost.md",
+    "branchSelector": "tools/compile-source.mjs:119-141",
+    "outputIdentity": "tools/compile-source.mjs:256-326",
+    "status": "coverage-listed",
+    "tests": ["tests/canonical-input.test.mjs", "tests/toolchain.test.mjs"]
+  },
+  "artifactFamilies": [
+    {"id":"composed-control","producer":"tools/composition.mjs:26 compileComposition -> tools/control.mjs:4420 compileComposedControl","output":"GFB","dependencies":["tools/literate.mjs","tools/control.mjs","tools/composition.mjs","tools/gfb1.mjs","crates/ghostflow-core/src/lib.rs"],"obligations":["pinned closure identity","capture-free substitution","single supplier and type-correct ports","produced GFB behavior matches composed AST"],"status":"coverage-listed","tests":["tests/import-composition.test.mjs"]},
+    {"id":"resource-policy","producer":"tools/control.mjs:4425 compileResourcePolicyArtifact","output":"nonexecutable JSON","dependencies":["tools/control.mjs","tools/compile-source.mjs"],"obligations":["policy AST and manifest match exact JSON bytes","runtime binding not implied"],"status":"coverage-listed","tests":["tests/resource-policy-artifact.test.mjs"]},
+    {"id":"shared-constraint-descriptor","producer":"tools/control.mjs:4438 compileControlPolicyDescriptorArtifact","output":"nonexecutable JSON","dependencies":["tools/control.mjs","tools/compile-source.mjs","tools/bound-resource-control.mjs"],"obligations":["descriptor is nonexecutable","canonical source and checked policy match bytes","separate GFB17 bound request proof"],"status":"coverage-listed","tests":["tests/resource-policy-artifact.test.mjs"]},
+    {"id":"accounting-control","producer":"tools/control.mjs:4384 compileAccountingControl","output":"GFB","dependencies":["tools/control.mjs","tools/gfb1.mjs","crates/ghostflow-core/src/accounting.rs","crates/ghostflow-core/src/lib.rs"],"obligations":["durable applied or local-day preconditions","rolling budget and fault semantics","exact GFB profile and VM behavior"],"status":"coverage-listed","tests":["tests/accounting-syntax.test.mjs","tests/accounting-wasm.test.mjs"]},
+    {"id":"schedule-descriptor","producer":"tools/control.mjs:4486 compileScheduleDescriptorArtifact","output":"nonexecutable JSON","dependencies":["tools/control.mjs","tools/compile-source.mjs"],"obligations":["deferred schedule policy matches checked AST","descriptor cannot be accepted as executable GFB"],"status":"coverage-listed","tests":["tests/schedule.test.mjs"]},
+    {"id":"temporal-dispatch","producer":"tools/control.mjs:4510 compileTemporalDescriptorArtifact","output":"GFB or nonexecutable JSON based on checked sites","dependencies":["tools/control.mjs","tools/gfb1.mjs","crates/ghostflow-core/src/temporal_runtime.rs","crates/ghostflow-core/src/lib.rs"],"obligations":["returned format determines executable claim","after_event and natural evidence semantics","GFB byte relation for executable branch"],"status":"coverage-listed","tests":["tests/temporal-descriptor-artifact.test.mjs","tests/after-event-contract.test.mjs"]},
+    {"id":"ordinary-control","producer":"tools/control.mjs:4349 compileControl","output":"GFB, optionally GFB22 lifecycle wrapper","dependencies":["tools/control.mjs","tools/core-ir.mjs","tools/gfb1.mjs","tools/constraint-proof.mjs","crates/ghostflow-core/src/lib.rs"],"obligations":["typed AST to IR semantic preservation","actual bytes decode to equivalent module","VM step relation over state and requested outputs","companion manifest and trace match bytes"],"status":"coverage-listed","tests":["tests/compiler.test.mjs","tests/control.test.mjs","tests/scan-tape-parity.test.mjs"]}
+  ],
+  "gfbProfiles": [
+    {"versions":[1],"trigger":"base scalar","status":"coverage-listed","tests":["tests/gfb1-golden.test.mjs"]},
+    {"versions":[2],"trigger":"Int declarations or expressions","status":"coverage-listed","tests":["tests/gfb2-int.test.mjs"]},
+    {"versions":[3],"trigger":"extended expression format","status":"coverage-listed","tests":["tests/int-compiler.test.mjs"]},
+    {"versions":[4],"trigger":"temporal windows","status":"coverage-listed","tests":["tests/gfb4-window.test.mjs"]},
+    {"versions":[5],"trigger":"schedules","status":"coverage-listed","tests":["tests/gfb5-schedule.test.mjs"]},
+    {"versions":[6],"trigger":"true-for","status":"coverage-listed","tests":["tests/gfb6-native.test.mjs"]},
+    {"versions":[7],"trigger":"PID objective","status":"coverage-listed","tests":["tests/gfb7-pid-contract.test.mjs"]},
+    {"versions":[8],"trigger":"Daily","status":"coverage-listed","tests":["tests/daily-runtime.test.mjs"]},
+    {"versions":[9],"trigger":"DailySlots","status":"coverage-listed","tests":["tests/daily-slots-runtime.test.mjs"]},
+    {"versions":[10],"trigger":"loader-accepted legacy profile; not selected by current emitGfb format expression","status":"unproved"},
+    {"versions":[11],"trigger":"context prelude","status":"coverage-listed","tests":["tests/gfb11-periodic-package.test.mjs"]},
+    {"versions":[12],"trigger":"UTC Range","status":"coverage-listed","tests":["tests/range-runtime.test.mjs"]},
+    {"versions":[13],"trigger":"extended natural schedule","status":"coverage-listed","tests":["tests/natural-fallback-runtime.test.mjs"]},
+    {"versions":[14],"trigger":"At pulse","status":"coverage-listed","tests":["tests/native-at-bytecode-fixture.mjs"]},
+    {"versions":[15],"trigger":"holiday Daily","status":"coverage-listed","tests":["tests/calendar-execution.test.mjs"]},
+    {"versions":[16],"trigger":"Solar context pulse","status":"coverage-listed","tests":["tests/solar-control-runtime.test.mjs"]},
+    {"versions":[17],"trigger":"bound resource wrapper around Bool GFB1 or GFB3","status":"coverage-listed","tests":["tests/resource-policy-artifact.test.mjs"]},
+    {"versions":[18],"trigger":"calendar execution","status":"coverage-listed","tests":["tests/calendar-execution.test.mjs"]},
+    {"versions":[19],"trigger":"live Range start","status":"coverage-listed","tests":["tests/range-live-start.test.mjs"]},
+    {"versions":[20],"trigger":"config DailySlots Range","status":"coverage-listed","tests":["tests/range-timeslots-overlap.test.mjs"]},
+    {"versions":[21],"trigger":"civil Range","status":"coverage-listed","tests":["tests/civil-range-runtime.test.mjs"]},
+    {"versions":[22],"trigger":"lifecycle wrapper","status":"coverage-listed","tests":["tests/control-runtime-restart-lifecycle.test.mjs"]}
+  ],
+  "profileCode": ["tools/gfb1.mjs:717-801 emitGfb", "tools/control.mjs:1479 wrapLifecycleGfb", "tools/control.mjs:4459 compileBoundControlPolicyArtifact", "crates/ghostflow-core/src/lib.rs:206-320 Module::load"],
+  "constructGroups": [
+    {"id":"literate-source","code":["tools/literate.mjs:28-110","tools/compile-source.mjs:94-116"],"obligation":"extraction is exact and location preserving","status":"coverage-listed","tests":["tests/literate.test.mjs"]},
+    {"id":"parser-and-grammar","code":["tools/control.mjs:216-319","tools/control.mjs:350-1300"],"obligation":"tokens and AST equal accepted grammar with precedence and rejection","status":"coverage-listed","tests":["tests/compiler-syntax-structure.test.mjs"]},
+    {"id":"types-literals-quantities","code":["tools/control.mjs:637-656","tools/control.mjs:1380-1480","tools/quantities.mjs","tools/time-literals.mjs"],"obligation":"domain, unit, overflow and rounding rules","status":"coverage-listed","tests":["tests/int-compiler.test.mjs","tests/time-literals.test.mjs"]},
+    {"id":"pure-expression-state-output","code":["tools/control.mjs:3269-3917","tools/core-ir.mjs:19-132","tools/gfb1.mjs:127-203"],"obligation":"expression and simultaneous next-state semantics through exact bytes","status":"coverage-listed","tests":["tests/expression-order.test.mjs","tests/control.test.mjs"]},
+    {"id":"result-quality-conditioning","code":["tools/control.mjs:2318-2370","tools/control.mjs:2714-3226","tools/control.mjs:3380-3917"],"obligation":"fault, provenance, sampling and hold semantics","status":"coverage-listed","tests":["tests/result-control.test.mjs","tests/hold-last-runtime.test.mjs"]},
+    {"id":"time-schedule-context","code":["tools/control.mjs:917-1067","tools/control.mjs:2371-2713","tools/control.mjs:3941-4080","tools/gfb1.mjs:717-801"],"obligation":"clock, DST, replay, provider and policy semantics for every prelude","status":"coverage-listed","tests":["tests/schedule.test.mjs","tests/temporal-replay-wasm.test.mjs"]},
+    {"id":"composition","code":["tools/control.mjs:565-591","tools/control.mjs:683-714","tools/composition.mjs:26-230"],"obligation":"closure pins, hygienic instantiation and port graph equivalence","status":"coverage-listed","tests":["tests/import-composition.test.mjs"]},
+    {"id":"constraints-adaptation-accounting-lifecycle","code":["tools/control.mjs:1079-1207","tools/control.mjs:1852-2317","tools/control.mjs:3347-3379","tools/constraint-proof.mjs"],"obligation":"ordered effects, strategy selection, accounting budget, restart and output observation","status":"formal-partial","formalFragment":"adjacent exact Bool constraint duplicate elimination only","tests":["tests/constraint-proof.test.mjs","tests/accounting-wasm.test.mjs"]},
+    {"id":"companion-artifacts","code":["tools/compile-source.mjs:220-326","tools/toolchain.mjs:51-310","tools/source-trace.mjs"],"obligation":"manifest, trace, explanation, behavior projection and hashes refer to same exact source and bytes","status":"coverage-listed","tests":["tests/toolchain.test.mjs","tests/portable-package.test.mjs"]}
+  ],
+  "existingCertificate": {"format":"GhostFlow/adjacent-constraint-effect-checker-v1","code":["tools/constraint-proof.mjs:11-104","tools/source-trace.mjs:284,383-384,493-495","tools/portable-package.mjs:960"],"claim":"Adjacent exact Bool constraint duplicate elimination only; JS finite-domain checker, not a whole-compiler proof.","status":"coverage-listed","tests":["tests/constraint-proof.test.mjs"]},
+  "bridge": {"code":["experiments/compiler-correctness/bridge.mjs","experiments/compiler-correctness/decoder.mjs"],"evidence":"experiments/compiler-correctness/evidence/bridge/summary.json","profiles":[1,2,3],"nativeAndWasmInputRows":343,"negativeRejections":30,"leanCertificatesChecked":5,"status":"formal-partial","claim":"The Lean theorem proves only the modeled adjacent duplicate effect; the bridge checks artifact identity and samples real native/WASM execution."},
+  "decoderAndRunner": {"javascriptDecoder":"none exported by tools/gfb1.mjs","productionDecoder":"crates/ghostflow-core/src/lib.rs:206 Module::load","nativeRunners":["crates/ghostflow-core/examples/run.rs","crates/ghostflow-core/examples/scan_tape.rs"],"parityTest":"tests/scan-tape-parity.test.mjs:1008-1040"},
+  "proofCandidates": [{"id":"scalar-translation-validator","input":"canonical source + actual compiler AST + actual compileSourceSync bytes","claimBoundary":"after production parsing until extraction and parser receive independent proofs","resultOnUnsupported":"unsupported","status":"unproved"}]
+}

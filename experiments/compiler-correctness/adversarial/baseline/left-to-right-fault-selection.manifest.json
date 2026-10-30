@@ -1,0 +1,32 @@
+{
+  "format": "GhostFlow/control-v4",
+  "name": "FaultOrder",
+  "inputs": [],
+  "outputs": [
+    {
+      "name": "value",
+      "type": "Bool"
+    }
+  ],
+  "sensors": [
+    {
+      "name": "choose",
+      "type": "Bool",
+      "sampleMs": null,
+      "validMin": null,
+      "validMax": null,
+      "filter": null,
+      "window": null,
+      "staleMs": null,
+      "recoverSamples": null,
+      "valueInput": "__gf_sensor_value_choose",
+      "okInput": "__gf_sensor_ok_choose",
+      "faultInput": "__gf_sensor_fault_choose"
+    }
+  ],
+  "schedules": [],
+  "timers": [],
+  "signals": [],
+  "configs": [],
+  "bytecodeSha256": "5492c7ef2e4100a2d6365b4c9934fc1ef377183ecc3f90ea8c290a3e29ae544c"
+}

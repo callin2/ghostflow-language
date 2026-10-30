@@ -1,0 +1,50 @@
+{
+  "format": "GhostFlow/control-v4",
+  "name": "IntegerOracle",
+  "inputs": [],
+  "outputs": [
+    {
+      "name": "value",
+      "type": "Int"
+    },
+    {
+      "name": "accepted",
+      "type": "Int"
+    }
+  ],
+  "sensors": [
+    {
+      "name": "left",
+      "type": "Int",
+      "sampleMs": null,
+      "validMin": null,
+      "validMax": null,
+      "filter": null,
+      "window": null,
+      "staleMs": null,
+      "recoverSamples": null,
+      "valueInput": "__gf_sensor_value_left",
+      "okInput": "__gf_sensor_ok_left",
+      "faultInput": "__gf_sensor_fault_left"
+    },
+    {
+      "name": "right",
+      "type": "Int",
+      "sampleMs": null,
+      "validMin": null,
+      "validMax": null,
+      "filter": null,
+      "window": null,
+      "staleMs": null,
+      "recoverSamples": null,
+      "valueInput": "__gf_sensor_value_right",
+      "okInput": "__gf_sensor_ok_right",
+      "faultInput": "__gf_sensor_fault_right"
+    }
+  ],
+  "schedules": [],
+  "timers": [],
+  "signals": [],
+  "configs": [],
+  "bytecodeSha256": "b501cbc958166e7c43efffb7c48e32c91ccf60eb43659737a7208d17c706c4a5"
+}

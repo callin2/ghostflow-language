@@ -1,0 +1,19 @@
+{
+  "fixture": "BridgeNineFallback",
+  "sourceSha256": "ef8d3a7f2fd1514c5ea9d5c5c944e4cc54b282a6990fdb64498da0a9f433afb3",
+  "optimizedSha256": "4346bdf71cadc36fe30ba26424288c1b15d2159ca0462f8ecf389e223b5e2c42",
+  "originalSha256": "4346bdf71cadc36fe30ba26424288c1b15d2159ca0462f8ecf389e223b5e2c42",
+  "certificateSha256": null,
+  "gfbProfile": 3,
+  "sourceConstraints": 2,
+  "emittedConstraints": 2,
+  "valuations": 11,
+  "nativeAndWasmCompared": true,
+  "negative": {},
+  "formalStatus": "no proof; unoptimized nine-name fallback",
+  "limits": [
+    "source extraction and AST parse are production code, not proved here",
+    "GFB expression instructions are opaque to this decoder",
+    "native and WASM runs sample finite input sequences"
+  ]
+}

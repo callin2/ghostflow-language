@@ -1,0 +1,8 @@
+{
+  "fixture": "BridgeScalarOne",
+  "sourceSha256": "cdf7a8334a08c6dc0dc502b4f8140bad9b62a5259ff74ac21908b7d8de9644c7",
+  "theorem": "CompilerSafety.check_run instantiated with accepted : check original compiled = true",
+  "exitCode": 0,
+  "stdout": "",
+  "stderr": ""
+}
