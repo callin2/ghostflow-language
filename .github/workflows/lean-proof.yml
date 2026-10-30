@@ -12,6 +12,7 @@ on:
       - experiments/elapsed-epoch-validation/**
       - experiments/elapsed-clock-bounds/**
       - experiments/elapsed-duration-output/**
+      - experiments/elapsed-comparison-output/**
       - experiments/lean-outcome.mjs
       - tests/bool-translation-validation.test.mjs
       - tests/bool-generated-certificates.test.mjs
@@ -22,6 +23,7 @@ on:
       - tests/elapsed-epoch-validation.test.mjs
       - tests/elapsed-clock-bounds.test.mjs
       - tests/elapsed-duration-output.test.mjs
+      - tests/elapsed-comparison-output.test.mjs
       - tests/lean-outcome.test.mjs
       - tests/lean-proof-workflow.test.mjs
       - tools/**
@@ -40,6 +42,7 @@ on:
       - experiments/elapsed-epoch-validation/**
       - experiments/elapsed-clock-bounds/**
       - experiments/elapsed-duration-output/**
+      - experiments/elapsed-comparison-output/**
       - experiments/lean-outcome.mjs
       - tests/bool-translation-validation.test.mjs
       - tests/bool-generated-certificates.test.mjs
@@ -50,6 +53,7 @@ on:
       - tests/elapsed-epoch-validation.test.mjs
       - tests/elapsed-clock-bounds.test.mjs
       - tests/elapsed-duration-output.test.mjs
+      - tests/elapsed-comparison-output.test.mjs
       - tests/lean-outcome.test.mjs
       - tests/lean-proof-workflow.test.mjs
       - tools/**
@@ -86,6 +90,8 @@ jobs:
             evidence_dir: elapsed-clock-bounds
           - verifier: elapsed-duration-output
             evidence_dir: elapsed-duration-output
+          - verifier: elapsed-comparison-output
+            evidence_dir: elapsed-comparison-output
     steps:
       - name: Checkout proof source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -143,7 +149,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          node --test tests/bool-translation-validation.test.mjs tests/bool-generated-certificates.test.mjs tests/bool-sensor-validation.test.mjs tests/bool-sensor-state-validation.test.mjs tests/int32-codec-validation.test.mjs tests/lean-outcome.test.mjs tests/two-sensor-provenance.test.mjs tests/elapsed-epoch-validation.test.mjs tests/elapsed-clock-bounds.test.mjs tests/elapsed-duration-output.test.mjs tests/lean-proof-workflow.test.mjs 2>&1 | tee "build/${{ matrix.evidence_dir }}/node-test.log"
+          node --test tests/bool-translation-validation.test.mjs tests/bool-generated-certificates.test.mjs tests/bool-sensor-validation.test.mjs tests/bool-sensor-state-validation.test.mjs tests/int32-codec-validation.test.mjs tests/lean-outcome.test.mjs tests/two-sensor-provenance.test.mjs tests/elapsed-epoch-validation.test.mjs tests/elapsed-clock-bounds.test.mjs tests/elapsed-duration-output.test.mjs tests/elapsed-comparison-output.test.mjs tests/lean-proof-workflow.test.mjs 2>&1 | tee "build/${{ matrix.evidence_dir }}/node-test.log"
       - name: Check suite with Lean kernel
         shell: bash
         run: |

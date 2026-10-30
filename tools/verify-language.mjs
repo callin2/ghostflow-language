@@ -247,6 +247,8 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/elapsed-clock-bounds.test.mjs',
   'tests/elapsed-duration-output.test.mjs',
   'tests/elapsed-duration-runtime.test.mjs',
+  'tests/elapsed-comparison-output.test.mjs',
+  'tests/elapsed-comparison-runtime.test.mjs',
   'tests/bool-sensor-runtime.test.mjs',
   'tests/alarm-observation.test.mjs',
   'tests/software-input-reference.test.mjs',

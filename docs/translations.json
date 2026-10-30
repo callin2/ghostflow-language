@@ -1648,6 +1648,14 @@
     {
       "path": "experiments/elapsed-duration-output/fixtures/elapsed-output.ghost.md",
       "reason": "Exact source bytes for the independent Duration certificate reader; translating changes the proof identity."
+    },
+    {
+      "path": "experiments/elapsed-comparison-output/proof-report.md",
+      "reason": "Issue590 source-bound elapsed comparison proof and finite actual runtime evidence with explicit production proof boundaries."
+    },
+    {
+      "path": "experiments/elapsed-comparison-output/fixtures/elapsed-comparison.ghost.md",
+      "reason": "Exact source bytes admitted by the independent comparison certificate reader; translation changes the proof identity."
     }
   ]
 }
